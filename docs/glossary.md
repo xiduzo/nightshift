@@ -57,6 +57,17 @@ The Method context speaks the method's own language. For WTF that is Epic, Featu
 | Stack | object | A native code-host group of Pull Requests, one per Trace of one Feature. | Epic #2 |
 | Board | object | The pipeline view of a Run. Columns derive from Pull Request, check, and review facts. | Epic #2 |
 | Change | object | An OpenSpec change: a proposal with specs, design, and tasks under `openspec/changes/`. | Epic #3 |
+| Spec | object | An OpenSpec specification file under `openspec/specs/<name>/spec.md`. | Feature #15 |
+| Archived Change | object | An OpenSpec Change moved to `openspec/changes/archive/<date>-<name>/`. | Feature #15 |
+| Package List | object | The Method Packages a Project can bind: the built-in packages and packages from a git URL. | Feature #14 |
+| Decision Entry | object | One line in `openspec/changes/<name>/decisions.md`: the choice, the time, the person, and a note. | Feature #16 |
+| Poll Interval | object | The machine-local time between two Index refreshes. | Feature #8 |
+| validate | verb | Check a Method Package or a Project Config against its schema and report Findings. | Feature #14 |
+| pin | verb | Fix a Method Package to one git ref. | Feature #14 |
+| propose | verb | Write an OpenSpec Change to the repo. | Feature #16 |
+| apply | verb | Implement an OpenSpec Change. | Feature #16 |
+| archive | verb | Move an applied OpenSpec Change to the archive. | Feature #16 |
+| RunEnded | event | A Run ended because no Step Run remained. | Feature #9 |
 | bind | verb | Attach a local clone to a Project and detect its method. | Epic #1 |
 | detect | verb | Find the method of a repo from its Detection Markers. | Epic #1 |
 | materialize | verb | Copy a pinned Skill Pack into a per-run plugin directory. | Epic #1 |
