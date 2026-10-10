@@ -56,3 +56,6 @@ coverage
 .cache
 tmp
 temp
+
+# Claude Code local settings (machine-specific hook paths)
+.claude/settings.local.json
