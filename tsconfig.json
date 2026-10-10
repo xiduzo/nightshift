@@ -1,0 +1,3 @@
+{
+  "extends": "@nightshift/config/tsconfig.base.json"
+}
