@@ -63,6 +63,7 @@ Exit codes: 0 ok · 2 usage/input-missing · 3 input not valid UTF-8 ·
 4 `gh` not found · otherwise gh's own exit code.
 """
 import argparse
+import json
 import os
 import re
 import shutil
@@ -145,7 +146,10 @@ def run_gh(cmd):
 
 def cmd_read(args, extra):
     gh = find_gh()
-    cmd = [gh, kind(args.pr), "view", str(args.number), "--json", "body", "-q", ".body"]
+    # Ask for JSON and decode it here. `-q .body` prints the body plus one
+    # newline that the body never had, so every read -> edit round trip grew
+    # the body by one trailing newline. The JSON string is byte-exact.
+    cmd = [gh, kind(args.pr), "view", str(args.number), "--json", "body"]
     if args.repo:
         cmd += ["--repo", args.repo]
     cmd += extra
@@ -154,7 +158,12 @@ def cmd_read(args, extra):
         if proc.stderr:
             sys.stderr.buffer.write(proc.stderr)
         return proc.returncode
-    text = normalize_newlines(proc.stdout.decode("utf-8"))
+    try:
+        body = json.loads(proc.stdout.decode("utf-8")).get("body") or ""
+    except (ValueError, AttributeError):
+        eprint("gh-body: could not decode the JSON that gh returned for the body.")
+        return 1
+    text = normalize_newlines(body)
     safe_num = re.sub(r"[^0-9A-Za-z]", "", str(args.number)) or "x"
     fd, path = tempfile.mkstemp(prefix=f"wtf-{kind(args.pr)}-{safe_num}-", suffix=".md")
     os.close(fd)
