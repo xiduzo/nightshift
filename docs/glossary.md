@@ -13,6 +13,7 @@ The Method context speaks the method's own language. For WTF that is Epic, Featu
 | QA Engineer | actor | Verifies scenarios and files bugs. | VISION |
 | Runner Operator | actor | Keeps a machine that runs sessions for the team. | VISION |
 | Method Author | actor | Maintains a method package: its skills, artifact types, and flows. | VISION |
+| Member | actor | A person in a Workspace with read or write access to its Projects. Local mode has one Member with write access. | Feature #7 |
 | Method | context | What a spec-driven method is: artifact types, lifecycle states, flows, skills, detection. | VISION |
 | Run | context | Executing a flow against a project: frontier, scheduling, run policy, gates, decisions. | VISION |
 | Session | context | One harness session on one runner: transcript, tool calls, needs-input, resume. | VISION |
@@ -92,6 +93,8 @@ The Method context speaks the method's own language. For WTF that is Epic, Featu
 | SessionEnded | event | A Session ended with a Step Report. | Epic #1 |
 | GateOpened | event | A Gate was placed in the Needs-you inbox. | Epic #1 |
 | GateResolved | event | A person answered a Gate. | Epic #1 |
+| ResolutionWrittenBack | event | A Gate resolution was recorded on the Artifact. | Feature #7 |
+| WriteBackFailed | event | A write back to the Artifact failed and can be started again. | Feature #7 |
 | ArtifactCreated | event | An Artifact Connector created an Artifact. | Epic #1 |
 | ArtifactIndexed | event | The Index of a Project was refreshed. | Epic #1 |
 | FlowRequested | event | A Project Chat message asked for a Flow. | Epic #1 |
