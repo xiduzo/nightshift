@@ -24,6 +24,35 @@ export const flowNameSchema = z
 		"Use lowercase letters, digits and -, starting with a letter or digit.",
 	);
 
+/**
+ * A Decision label or a Gate choice. It is also an outcome, so edges and
+ * templates use it. "error", "stopped", "interrupted" and "waiting" are
+ * reserved for the engine.
+ */
+export const labelSchema = z
+	.string()
+	.regex(
+		/^[a-z][a-z0-9-]{0,29}$/,
+		"Use lowercase letters, digits and -, starting with a letter.",
+	);
+
+export const reservedOutcomes = [
+	"error",
+	"stopped",
+	"interrupted",
+	"waiting",
+] as const;
+
+/** `github`: read issues and pull requests, comment, label, open a pull request. */
+export const toolSetSchema = z.enum(["github"]);
+export type ToolSet = z.infer<typeof toolSetSchema>;
+
+const option = z.object({
+	name: labelSchema,
+	/** Tells the decider (or the person) what this option means. */
+	description: z.string().optional(),
+});
+
 const position = z.object({ x: z.number(), y: z.number() });
 
 const nodeBase = {
@@ -56,6 +85,8 @@ export const agentNodeSchema = z.object({
 	 * policy). `resume`: a later visit continues this node's last session.
 	 */
 	session: z.enum(["fresh", "resume"]).default("fresh"),
+	/** Tool sets the agent gets on top of the harness's own tools. */
+	tools: z.array(toolSetSchema).default([]),
 });
 
 export const commandNodeSchema = z.object({
@@ -69,12 +100,39 @@ export const commandNodeSchema = z.object({
 	command: z.string().min(1),
 });
 
+export const decisionNodeSchema = z.object({
+	...nodeBase,
+	type: z.literal("decision"),
+	/** What to decide, with the context it needs. Supports templates. */
+	prompt: z.string().min(1),
+	/** The labels the decider picks from. Each one is an outcome. */
+	labels: z.array(option).min(2),
+	/** The decider provider. Only Claude Code for now, with no tools of its own. */
+	decider: z.literal("claude-code").default("claude-code"),
+	/** A small, fast model is enough. */
+	model: z.string().min(1).default("haiku"),
+	/** Tool sets the decider may use to look things up. */
+	tools: z.array(toolSetSchema).default([]),
+});
+
+export const gateNodeSchema = z.object({
+	...nodeBase,
+	type: z.literal("gate"),
+	/** What the person is asked, with the context they need. Supports templates. */
+	question: z.string().min(1),
+	/** The answers the person can give. Each one is an outcome. */
+	choices: z.array(option).min(1),
+});
+
 export const flowNodeSchema = z.discriminatedUnion("type", [
 	agentNodeSchema,
 	commandNodeSchema,
+	decisionNodeSchema,
+	gateNodeSchema,
 ]);
 
-export const outcomeSchema = z.enum(["pass", "fail", "needs-input"]);
+/** `pass`, `fail`, `needs-input`, or a Decision label or Gate choice. */
+export const outcomeSchema = labelSchema;
 
 export const flowEdgeSchema = z.object({
 	id: z.string().min(1),
@@ -104,15 +162,25 @@ export type FlowInput = z.input<typeof flowSchema>;
 export type FlowNode = z.infer<typeof flowNodeSchema>;
 export type AgentNode = z.infer<typeof agentNodeSchema>;
 export type CommandNode = z.infer<typeof commandNodeSchema>;
+export type DecisionNode = z.infer<typeof decisionNodeSchema>;
+export type GateNode = z.infer<typeof gateNodeSchema>;
 export type FlowEdge = z.infer<typeof flowEdgeSchema>;
 export type Outcome = z.infer<typeof outcomeSchema>;
 export type FlowNodeType = FlowNode["type"];
 
-/** The outcomes a node type can end with. */
-export const outcomesByType: Record<FlowNodeType, readonly Outcome[]> = {
-	agent: ["pass", "fail", "needs-input"],
-	command: ["pass", "fail"],
-};
+/** The outcomes a node can end with, in the order its handles show. */
+export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
+	switch (node.type) {
+		case "agent":
+			return ["pass", "fail", "needs-input"];
+		case "command":
+			return ["pass", "fail"];
+		case "decision":
+			return node.labels.map((label) => label.name);
+		case "gate":
+			return node.choices.map((choice) => choice.name);
+	}
+}
 
 /**
  * The fields a later node can read with `{{<nodeId>.<field>}}`. A field of a
@@ -123,6 +191,10 @@ export const outputFieldsByType = {
 	agent: ["outcome", "output", "summary", "visit", "session_id"],
 	/** log_tail: the last lines of stdout and stderr together. */
 	command: ["outcome", "exit_code", "log_tail", "visit"],
+	/** outcome: the label. notes: why the decider picked it. */
+	decision: ["outcome", "notes", "visit"],
+	/** outcome: the choice. note: what the person wrote with it. */
+	gate: ["outcome", "note", "visit"],
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
 export type OutputField<T extends FlowNodeType> =

@@ -1,6 +1,7 @@
 import type {
 	AgentEvent,
 	AgentHarness,
+	Decider,
 	HarnessName,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
@@ -21,6 +22,7 @@ import type {
 /** Derived from the event log, never stored. */
 export type RunStatus =
 	| "running" // a step is in progress, or the walk is between steps
+	| "waiting" // a Gate waits for a person in the Needs-you inbox
 	| "finished" // the walk reached a `pass` outcome with no edge left to take
 	| "stopped" // a person stopped the run
 	| "failed" // a step errored, a `fail`/`needs-input` had no edge, or a loop hit its max
@@ -33,9 +35,12 @@ export type Project = {
 	createdAt: number;
 };
 
-/** How one visit of a node ended. */
+/**
+ * How one visit of a node ended: one of the node's outcomes (`pass`, a
+ * Decision label, a Gate choice, …) or one of the reserved values below.
+ */
 export type StepOutcome =
-	| Outcome // the node finished and produced an outcome
+	| Outcome
 	| "error" // the harness or the command could not run, or the step timed out
 	| "stopped" // a person stopped the run
 	| "interrupted"; // the daemon died while the step ran
@@ -99,13 +104,41 @@ export type RunDetail = RunSummary & {
 	takeOverCommand: string | null;
 };
 
+/** What a Decision step writes to its transcript. */
+export type DecisionEvent =
+	| { type: "decision-start"; prompt: string; labels: string[]; model: string }
+	| { type: "decision"; label: string; notes: string };
+
+/** What a Gate step writes to its transcript. */
+export type GateEvent =
+	| {
+			type: "gate-open";
+			question: string;
+			choices: { name: string; description?: string }[];
+	  }
+	| { type: "gate-resolved"; choice: string; note: string };
+
 /** What a command step writes to its transcript. */
 export type CommandEvent =
 	| { type: "command-start"; command: string }
 	| { type: "command-output"; stream: "stdout" | "stderr"; text: string }
 	| { type: "command-exit"; exitCode: number | null };
 
-export type StepEvent = AgentEvent | CommandEvent;
+export type StepEvent = AgentEvent | CommandEvent | DecisionEvent | GateEvent;
+
+/** A Gate that waits for a person. */
+export type OpenGate = {
+	runId: string;
+	runTitle: string;
+	projectId: string;
+	projectName: string;
+	stepId: string;
+	nodeId: string;
+	/** The rendered question. */
+	question: string;
+	choices: { name: string; description?: string }[];
+	openedAt: number;
+};
 
 /**
  * One line of a step's transcript file. `seq` increases by one per run,
@@ -114,7 +147,7 @@ export type StepEvent = AgentEvent | CommandEvent;
 export type TranscriptEntry = {
 	seq: number;
 	stepId: string;
-	/** The engine's agent session id. Null for command steps. */
+	/** The engine's agent session id. Null for other steps. */
 	sessionId: string | null;
 	at: number;
 	event: StepEvent;
@@ -150,6 +183,20 @@ export interface Engine {
 	saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
 	deleteFlow(projectId: string, name: string): Promise<void>;
 
+	/** Open Gates over all runs, oldest first. The Needs-you inbox. A Gate stays open across daemon restarts. */
+	listGates(): Promise<OpenGate[]>;
+	/**
+	 * Answers an open Gate with one of its choices and continues the walk on
+	 * that outcome. Fails when the step is not an open Gate or the choice is
+	 * not one of its choices.
+	 */
+	resolveGate(input: {
+		runId: string;
+		stepId: string;
+		choice: string;
+		note?: string;
+	}): Promise<void>;
+
 	listRuns(input?: { projectId?: string }): Promise<RunSummary[]>;
 	getRun(runId: string): Promise<RunDetail>;
 
@@ -158,7 +205,7 @@ export interface Engine {
 	 * worktree, starts walking at the start node, and returns at once.
 	 */
 	startRun(input: StartRunInput): Promise<RunSummary>;
-	/** Aborts the running step and ends the run as `stopped`. No-op when nothing runs. */
+	/** Aborts the running step, or closes an open Gate, and ends the run as `stopped`. No-op when nothing runs or waits. */
 	stopRun(runId: string): Promise<void>;
 	/**
 	 * Continues a stopped, failed or interrupted run at its last step's node.
@@ -182,9 +229,11 @@ export interface Engine {
 export type EngineOptions = {
 	db: Database;
 	harnesses: Partial<Record<HarnessName, AgentHarness>>;
+	/** Decides Decision nodes. A flow with a Decision node fails to start without one. */
+	decider?: Decider;
 	/** Root for transcripts, command logs and other on-disk state, for example ~/.nightshift. */
 	dataDir: string;
-	/** How many runs may run a step at once. Default 2. */
+	/** How many runs may run a step at once. A run waiting at a Gate does not count. Default 2. */
 	maxConcurrentRuns?: number;
 	/** Safety net against runaway flows: the most steps one run may take. Default 50. */
 	maxStepsPerRun?: number;

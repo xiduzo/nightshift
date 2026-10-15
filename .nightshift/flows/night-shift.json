@@ -1,0 +1,77 @@
+{
+	"version": 1,
+	"start": "worker",
+	"nodes": [
+		{
+			"id": "worker",
+			"label": "start",
+			"position": {
+				"x": -296,
+				"y": -88
+			},
+			"type": "agent",
+			"prompt": "hello world",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"session": "fresh"
+		},
+		{
+			"id": "check",
+			"position": {
+				"x": 16,
+				"y": -80
+			},
+			"type": "command",
+			"command": "bun run check"
+		},
+		{
+			"id": "agent",
+			"label": "pass agantt",
+			"position": {
+				"x": 384,
+				"y": -96
+			},
+			"type": "agent",
+			"prompt": "echo your input",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"session": "fresh"
+		},
+		{
+			"id": "agent_2",
+			"label": "fail agent",
+			"position": {
+				"x": 400,
+				"y": 128
+			},
+			"type": "agent",
+			"prompt": "write a haiku",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"session": "fresh"
+		}
+	],
+	"edges": [
+		{
+			"id": "worker-pass-check",
+			"from": "worker",
+			"outcome": "pass",
+			"to": "check"
+		},
+		{
+			"id": "check-pass-agent",
+			"from": "check",
+			"outcome": "pass",
+			"to": "agent"
+		},
+		{
+			"id": "check-fail-agent_2",
+			"from": "check",
+			"outcome": "fail",
+			"to": "agent_2"
+		}
+	]
+}

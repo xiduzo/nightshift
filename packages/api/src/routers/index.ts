@@ -47,6 +47,21 @@ const flows = {
 		),
 };
 
+/** The Needs-you inbox. */
+const gates = {
+	list: publicProcedure.handler(({ context }) => context.engine.listGates()),
+	resolve: publicProcedure
+		.input(
+			z.object({
+				runId: z.string(),
+				stepId: z.string(),
+				choice: z.string().min(1),
+				note: z.string().optional(),
+			}),
+		)
+		.handler(({ context, input }) => context.engine.resolveGate(input)),
+};
+
 const runs = {
 	list: publicProcedure
 		.input(z.object({ projectId: z.string().optional() }).optional())
@@ -102,6 +117,7 @@ export const appRouter = {
 	healthCheck: publicProcedure.handler(() => "OK"),
 	projects,
 	flows,
+	gates,
 	runs,
 };
 export type AppRouter = typeof appRouter;
