@@ -1,0 +1,24 @@
+{
+	"name": "@nightshift/agents",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./*": "./src/*.ts"
+	},
+	"scripts": {
+		"build": "tsc -b",
+		"check-types": "tsc -b",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@tanstack/ai": "0.69.0",
+		"@tanstack/ai-claude-code": "0.9.0",
+		"@tanstack/ai-sandbox": "0.5.23",
+		"@tanstack/ai-sandbox-local-process": "0.2.6"
+	},
+	"devDependencies": {
+		"@nightshift/config": "workspace:*",
+		"@types/bun": "catalog:",
+		"typescript": "catalog:"
+	}
+}
