@@ -51,7 +51,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Term | Meaning |
 |------|---------|
 | running | A Step runs, or the Run is between Steps. |
-| finished | The Run reached a `pass` with no Edge left to take. |
+| waiting | A Gate waits for a person in the Needs-you inbox. |
+| finished | The Run reached `pass`, a Decision label, or a Gate choice with no Edge left to take. |
 | stopped | A person stopped the Run. |
 | failed | A Step errored, a `fail` or `needs-input` had no Edge, or a Retry Loop hit its Max. |
 | interrupted | The daemon stopped while a Step ran. |
@@ -90,4 +91,5 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | SessionEnded | A Session ended, with its cost. |
 | EdgeTaken | The Run followed an Edge to the next Node. |
 | StopRequested | A person asked to stop the Run. |
+| GateOpened | A Gate put its question in the Needs-you inbox. |
 | RunEnded | The Run finished or failed, with the reason. |

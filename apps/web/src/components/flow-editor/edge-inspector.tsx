@@ -1,8 +1,8 @@
 import {
 	type Flow,
 	type FlowEdge,
+	nodeOutcomes,
 	type Outcome,
-	outcomesByType,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -17,8 +17,6 @@ import { edgeInLoop } from "@/lib/flow-draft";
 
 import { Field, PositiveIntInput } from "./fields";
 
-const ALL_OUTCOMES: Outcome[] = ["pass", "fail", "needs-input"];
-
 export function EdgeInspector({
 	flow,
 	edge,
@@ -32,7 +30,10 @@ export function EdgeInspector({
 }) {
 	const id = useId();
 	const source = flow.nodes.find((node) => node.id === edge.from);
-	const outcomes = source ? outcomesByType[source.type] : ALL_OUTCOMES;
+	const known = source ? [...new Set(nodeOutcomes(source))] : [];
+	// An edge on an outcome its node no longer has keeps it until changed.
+	const missing = !known.includes(edge.outcome);
+	const outcomes = missing ? [edge.outcome, ...known] : known;
 	const loopsBack = edgeInLoop(flow, edge);
 
 	return (
@@ -67,11 +68,17 @@ export function EdgeInspector({
 			<Field
 				id={`${id}-outcome`}
 				label="Outcome"
+				error={
+					missing
+						? `${edge.from} has no ${outcomeLabel(edge.outcome)} outcome. Pick one it has.`
+						: null
+				}
 				hint={`The run takes this edge when ${edge.from} ends with this outcome.`}
 			>
 				<NativeSelect
 					id={`${id}-outcome`}
 					value={edge.outcome}
+					aria-invalid={missing}
 					aria-describedby={`${id}-outcome-hint`}
 					onChange={(event) => {
 						const outcome = event.target.value as Outcome;
@@ -81,6 +88,7 @@ export function EdgeInspector({
 					{outcomes.map((outcome) => (
 						<NativeSelectOption key={outcome} value={outcome}>
 							{outcomeLabel(outcome)}
+							{missing && outcome === edge.outcome ? " (missing)" : ""}
 						</NativeSelectOption>
 					))}
 				</NativeSelect>

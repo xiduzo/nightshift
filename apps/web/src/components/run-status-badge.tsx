@@ -5,6 +5,7 @@ import {
 	CircleCheckIcon,
 	CircleStopIcon,
 	CircleXIcon,
+	HourglassIcon,
 	LoaderCircleIcon,
 	type LucideIcon,
 } from "lucide-react";
@@ -20,6 +21,12 @@ const STATUS: Record<
 		icon: LoaderCircleIcon,
 		className:
 			"border-status-running/40 bg-status-running/10 text-status-running [&>svg]:animate-spin motion-reduce:[&>svg]:animate-none",
+	},
+	waiting: {
+		label: "Waiting for you",
+		icon: HourglassIcon,
+		className:
+			"border-status-waiting/40 bg-status-waiting/10 text-status-waiting",
 	},
 	finished: {
 		label: "Finished",

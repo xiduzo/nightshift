@@ -24,12 +24,16 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { outcomeLabel } from "@/components/outcome-badge";
 import {
 	checkFlow,
 	isSavable,
 	removeEdge,
 	removeNode,
+	removeOutcome,
 	renameNode,
+	renameOutcome,
+	restoreOutcome,
 	updateEdge,
 	updateNode,
 } from "@/lib/flow-draft";
@@ -203,6 +207,37 @@ function Editor({
 		return null;
 	};
 
+	const renameSelectedOutcome =
+		(node: FlowNode) => (index: number, name: string) => {
+			setDraft((current) => renameOutcome(current, node.id, index, name));
+			return null;
+		};
+
+	// Dropping a label drops its edges too: say so, and offer to put them back.
+	const removeSelectedOutcome = (node: FlowNode) => (index: number) => {
+		const result = removeOutcome(draft, node.id, index);
+		const { option, dropped } = result;
+		if (!option) return;
+		setDraft((current) => removeOutcome(current, node.id, index).flow);
+		if (dropped.length === 0) return;
+		const noun = node.type === "decision" ? "label" : "choice";
+		toast.info(
+			`Removed the ${noun} ${outcomeLabel(option.name)} and ${dropped.length} ${dropped.length === 1 ? "edge" : "edges"} on it.`,
+			{
+				description: dropped
+					.map((edge) => `${edge.from} → ${edge.to}`)
+					.join(", "),
+				action: {
+					label: "Undo",
+					onClick: () =>
+						setDraft((current) =>
+							restoreOutcome(current, node.id, index, option, dropped),
+						),
+				},
+			},
+		);
+	};
+
 	return (
 		<main className="grid min-h-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr]">
 			<header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2">
@@ -289,6 +324,8 @@ function Editor({
 									)
 								}
 								onRename={renameSelected(selectedNode)}
+								onRenameOutcome={renameSelectedOutcome(selectedNode)}
+								onRemoveOutcome={removeSelectedOutcome(selectedNode)}
 								onSetStart={() =>
 									setDraft((current) => ({
 										...current,

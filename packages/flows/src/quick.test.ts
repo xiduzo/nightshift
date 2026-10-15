@@ -23,6 +23,7 @@ describe("singleAgentFlow", () => {
 					model: "sonnet",
 					permissionMode: "acceptEdits",
 					session: "fresh",
+					tools: [],
 				},
 			],
 			edges: [],

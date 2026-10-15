@@ -3,13 +3,20 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness, reportingScript } from "@nightshift/agents/fake";
-import type { AgentHarness } from "@nightshift/agents/types";
+import type {
+	AgentHarness,
+	Decider,
+	DecisionInput,
+	DecisionResult,
+} from "@nightshift/agents/types";
 import { event } from "@nightshift/db/schema/nightshift";
 import {
 	type AgentNode,
 	type CommandNode,
+	type DecisionNode,
 	type Flow,
 	type FlowEdge,
+	type GateNode,
 	singleAgentFlow,
 } from "@nightshift/flows";
 import { asc } from "drizzle-orm";
@@ -25,6 +32,7 @@ import {
 import type {
 	Engine,
 	EngineOptions,
+	RunDetail,
 	RunStatus,
 	RunStreamItem,
 	TranscriptEntry,
@@ -40,7 +48,10 @@ afterEach(async () => {
 
 function makeEngine(
 	harness: AgentHarness,
-	options: Pick<EngineOptions, "maxConcurrentRuns" | "maxStepsPerRun"> = {},
+	options: Pick<
+		EngineOptions,
+		"maxConcurrentRuns" | "maxStepsPerRun" | "decider"
+	> = {},
 	internals: EngineInternals = {},
 ): Engine {
 	return createEngine(
@@ -68,6 +79,7 @@ function agent(
 		model: "sonnet",
 		permissionMode: "acceptEdits",
 		session: "fresh",
+		tools: [],
 		...extra,
 	};
 }
@@ -936,6 +948,717 @@ describe("recovery", () => {
 			["worker", "pass"],
 			["check", "pass"],
 		]);
+	});
+});
+
+function decision(
+	id: string,
+	prompt: string,
+	labels: string[],
+	extra: Partial<DecisionNode> = {},
+): DecisionNode {
+	return {
+		id,
+		type: "decision",
+		position: { x: 0, y: 0 },
+		prompt,
+		labels: labels.map((name) => ({ name })),
+		decider: "claude-code",
+		model: "haiku",
+		tools: [],
+		...extra,
+	};
+}
+
+function gate(
+	id: string,
+	question: string,
+	choices: string[],
+	extra: Partial<GateNode> = {},
+): GateNode {
+	return {
+		id,
+		type: "gate",
+		position: { x: 0, y: 0 },
+		question,
+		choices: choices.map((name) => ({ name })),
+		...extra,
+	};
+}
+
+const decided = (
+	label: string,
+	notes = "",
+	costUsd: number | null = null,
+): DecisionResult => ({ kind: "decided", label, notes, costUsd });
+
+/** A decider the test scripts per call (0-based). Never a real session. */
+function scriptedDecider(
+	answer: (
+		input: DecisionInput,
+		call: number,
+	) => DecisionResult | Promise<DecisionResult>,
+) {
+	const calls: DecisionInput[] = [];
+	const decider: Decider = {
+		name: "test",
+		async decide(input) {
+			calls.push(input);
+			return answer(input, calls.length - 1);
+		},
+	};
+	return { decider, calls };
+}
+
+/** Answers with an `aborted` error when its signal fires, never before. */
+const waitForAbort = (input: DecisionInput) =>
+	new Promise<DecisionResult>((resolve) => {
+		input.signal.addEventListener(
+			"abort",
+			() =>
+				resolve({
+					kind: "error",
+					errorKind: "aborted",
+					message: "aborted",
+					costUsd: 0.001,
+				}),
+			{ once: true },
+		);
+	});
+
+function sessionCostOf(detail: RunDetail): number {
+	const sessions = detail.steps.flatMap((s) => s.sessions);
+	return sessions.reduce((sum, s) => sum + (s.costUsd ?? 0), 0);
+}
+
+async function stepEntries(runId: string, stepId: string | undefined) {
+	return readTranscript(
+		join(sandbox.dataDir, "transcripts", runId, `${stepId}.ndjson`),
+	);
+}
+
+describe("decisions", () => {
+	test("a label with no edge is a chosen end: the run finishes", async () => {
+		const { decider } = scriptedDecider(() => decided("stop", "Done.", 0.01));
+		const engine = makeEngine(fakeHarness(), { decider });
+		const flow = flowOf(
+			[decision("decide", "Continue?", ["continue", "stop"])],
+			[edge("e1", "decide", "continue", "decide", 2)],
+		);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow,
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		const detail = await engine.getRun(run.id);
+		expect(detail.reason).toBe('Ended at node "decide" with "stop".');
+	});
+
+	test("a decision routes the walk along the edge of its label", async () => {
+		const harness = fakeHarness((_input, call) =>
+			call === 0 ? reportingScript("pass", "Built the parser.") : {},
+		);
+		const { decider, calls } = scriptedDecider(() =>
+			decided("ship", "The tests pass.", 0.02),
+		);
+		const engine = makeEngine(harness, { decider });
+		const flow = flowOf(
+			[
+				agent("worker", "Build it"),
+				decision(
+					"decide",
+					"Worker said: {{worker.summary}}",
+					["ship", "redo"],
+					{
+						labels: [
+							{ name: "ship", description: "Good enough" },
+							{ name: "redo" },
+						],
+						tools: ["github"],
+					},
+				),
+				agent("shipper", "Ship it. {{decide.notes}} ({{decide.outcome}})"),
+			],
+			[
+				edge("e1", "worker", "pass", "decide"),
+				edge("e2", "decide", "ship", "shipper"),
+				edge("e3", "decide", "redo", "worker", 2),
+			],
+		);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow,
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0]).toMatchObject({
+			cwd: run.worktreePath,
+			prompt: "Worker said: Built the parser.",
+			labels: [{ name: "ship", description: "Good enough" }, { name: "redo" }],
+			model: "haiku",
+			tools: ["github"],
+		});
+		expect(harness.calls.map((c) => c.prompt)).toEqual([
+			"Build it",
+			"Ship it. The tests pass. (ship)",
+		]);
+
+		const detail = await engine.getRun(run.id);
+		expect(detail.traversals).toEqual({ e1: 1, e2: 1 });
+		const step = detail.steps[1];
+		expect(step).toMatchObject({
+			nodeId: "decide",
+			nodeType: "decision",
+			outcome: "ship",
+			error: null,
+			outputs: { outcome: "ship", notes: "The tests pass.", visit: 1 },
+			sessions: [],
+		});
+		expect(step?.costUsd).toBeCloseTo(0.02);
+		// The run's cost is its sessions' cost plus the decider's.
+		expect(detail.costUsd).toBeCloseTo(sessionCostOf(detail) + 0.02);
+		expect((await engine.listRuns())[0]?.costUsd).toBeCloseTo(detail.costUsd);
+
+		expect((await stepEntries(run.id, step?.id)).map((e) => e.event)).toEqual([
+			{
+				type: "decision-start",
+				prompt: "Worker said: Built the parser.",
+				labels: ["ship", "redo"],
+				model: "haiku",
+			},
+			{ type: "decision", label: "ship", notes: "The tests pass." },
+		]);
+	});
+
+	test("a decider error fails the step and the run, and its cost counts", async () => {
+		const { decider } = scriptedDecider(() => ({
+			kind: "error",
+			errorKind: "harness",
+			message: "boom",
+			costUsd: 0.03,
+		}));
+		const engine = makeEngine(fakeHarness(), { decider });
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[decision("decide", "Go?", ["yes", "no"]), command("done", "true")],
+				[edge("e1", "decide", "yes", "done")],
+			),
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("failed");
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps[0]).toMatchObject({
+			outcome: "error",
+			error: "The decider failed: boom",
+			outputs: { outcome: "error", notes: "", visit: 1 },
+		});
+		expect(detail.reason).toBe(
+			'Node "decide" failed: The decider failed: boom',
+		);
+		expect(detail.costUsd).toBeCloseTo(0.03);
+	});
+
+	test("a label that is not one of the node's labels is an error", async () => {
+		const { decider } = scriptedDecider(() => decided("maybe", "Unsure."));
+		const engine = makeEngine(fakeHarness(), { decider });
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[decision("decide", "Go?", ["yes", "no"]), command("done", "true")],
+				[edge("e1", "decide", "yes", "done")],
+			),
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("failed");
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps[0]?.outcome).toBe("error");
+		expect(detail.steps[0]?.error).toBe(
+			'The decider picked "maybe", which is not a label of this node. The labels are: yes, no.',
+		);
+		expect(detail.steps).toHaveLength(1);
+	});
+
+	test("startRun refuses a flow with a Decision node when no decider is configured", async () => {
+		const engine = makeEngine(fakeHarness());
+		await expect(
+			engine.startRun({
+				projectId: await projectId(engine),
+				flow: flowOf([decision("decide", "Go?", ["yes", "no"])]),
+			}),
+		).rejects.toThrow("no decider is configured");
+		expect(await engine.listRuns()).toEqual([]);
+		expect(existsSync(join(sandbox.root, "repo.nightshift"))).toBe(false);
+	});
+
+	test("a decision that runs past its timeout errors", async () => {
+		const { decider } = scriptedDecider(waitForAbort);
+		const engine = makeEngine(fakeHarness(), { decider }, { minuteMs: 50 });
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([
+				decision("decide", "Go?", ["yes", "no"], { timeoutMinutes: 1 }),
+			]),
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("failed");
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps[0]).toMatchObject({
+			outcome: "error",
+			error: "The step ran past its time budget of 1 min.",
+		});
+		expect(detail.steps[0]?.costUsd).toBeCloseTo(0.001);
+	});
+
+	test("stop aborts a decision", async () => {
+		const { decider, calls } = scriptedDecider(waitForAbort);
+		const engine = makeEngine(fakeHarness(), { decider });
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([decision("decide", "Go?", ["yes", "no"])]),
+		});
+		await waitFor(() => calls[0]);
+		await engine.stopRun(run.id);
+		expect(calls[0]?.signal.aborted).toBe(true);
+		const detail = await engine.getRun(run.id);
+		expect(detail.status).toBe("stopped");
+		expect(detail.steps[0]?.outcome).toBe("stopped");
+	});
+});
+
+/** worker → gate; approve → shipper; reject → worker (max 2). */
+function gateFlow(): Flow {
+	return flowOf(
+		[
+			agent("worker", "Build it. {{gate.note}}"),
+			gate("gate", "The worker said: {{worker.summary}}. Ship it?", [
+				"approve",
+				"reject",
+			]),
+			agent("shipper", "Ship it. Reviewer: {{gate.note}}"),
+		],
+		[
+			edge("e1", "worker", "pass", "gate"),
+			edge("e2", "gate", "approve", "shipper"),
+			edge("e3", "gate", "reject", "worker", 2),
+		],
+	);
+}
+
+async function openGateOf(engine: Engine, runId: string) {
+	return waitFor(
+		async () => (await engine.listGates()).find((g) => g.runId === runId),
+		{ label: "an open gate" },
+	);
+}
+
+describe("gates", () => {
+	test("a gate waits without a slot, and its answer continues the walk", async () => {
+		const harness = fakeHarness((_input, call) =>
+			call === 0 ? reportingScript("pass", "Built the parser.") : {},
+		);
+		const engine = makeEngine(harness, { maxConcurrentRuns: 1 });
+		const id = await projectId(engine);
+		const run = await engine.startRun({ projectId: id, flow: gateFlow() });
+		await waitForStatus(engine, run.id, "waiting");
+
+		const gates = await engine.listGates();
+		expect(gates).toHaveLength(1);
+		const open = gates[0];
+		expect(open).toMatchObject({
+			runId: run.id,
+			runTitle: run.title,
+			projectId: id,
+			projectName: "repo",
+			nodeId: "gate",
+			question: "The worker said: Built the parser.. Ship it?",
+			choices: [{ name: "approve" }, { name: "reject" }],
+		});
+		let detail = await engine.getRun(run.id);
+		expect(detail.steps.at(-1)).toMatchObject({
+			id: open?.stepId,
+			nodeType: "gate",
+			outcome: null,
+			endedAt: null,
+		});
+		expect(open?.openedAt).toBeGreaterThanOrEqual(
+			detail.steps[1]?.startedAt ?? Number.POSITIVE_INFINITY,
+		);
+
+		// The waiting run holds no slot: another run starts with a cap of 1.
+		const other = await engine.startRun({
+			projectId: id,
+			flow: flowOf([agent("solo", "Go")]),
+		});
+		expect(await waitForEnd(engine, other.id)).toBe("finished");
+
+		await engine.resolveGate({
+			runId: run.id,
+			stepId: open?.stepId ?? "",
+			choice: "approve",
+			note: "LGTM, merge after CI.",
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect(await engine.listGates()).toEqual([]);
+		expect(harness.calls.at(-1)?.prompt).toBe(
+			"Ship it. Reviewer: LGTM, merge after CI.",
+		);
+		detail = await engine.getRun(run.id);
+		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["worker", "pass"],
+			["gate", "approve"],
+			["shipper", "pass"],
+		]);
+		expect(detail.steps[1]?.outputs).toEqual({
+			outcome: "approve",
+			note: "LGTM, merge after CI.",
+			visit: 1,
+		});
+		expect(detail.traversals).toEqual({ e1: 1, e2: 1 });
+		expect(
+			(await stepEntries(run.id, open?.stepId)).map((e) => e.event),
+		).toEqual([
+			{
+				type: "gate-open",
+				question: "The worker said: Built the parser.. Ship it?",
+				choices: [{ name: "approve" }, { name: "reject" }],
+			},
+			{
+				type: "gate-resolved",
+				choice: "approve",
+				note: "LGTM, merge after CI.",
+			},
+		]);
+	});
+
+	test("watchRun reports the wait and the answer", async () => {
+		const engine = makeEngine(fakeHarness());
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: gateFlow(),
+		});
+		const watching = collect(engine, run.id, isStatus("finished"));
+		const open = await openGateOf(engine, run.id);
+		await engine.resolveGate({
+			runId: run.id,
+			stepId: open.stepId,
+			choice: "approve",
+		});
+		const items = await watching;
+		const statuses = statusesOf(items);
+		expect(statuses).toContain("waiting");
+		expect(statuses.slice(statuses.indexOf("waiting"))).toEqual([
+			"waiting",
+			"running",
+			"finished",
+		]);
+		const gateSteps = items.flatMap((i) =>
+			i.kind === "step" && i.step.nodeId === "gate" ? [i.step] : [],
+		);
+		expect(gateSteps.some((s) => s.outcome === null)).toBe(true);
+		expect(gateSteps.at(-1)).toMatchObject({
+			outcome: "approve",
+			outputs: { note: "" },
+		});
+		expect(
+			entriesOf(items)
+				.map((e) => e.event.type)
+				.filter((t) => t.startsWith("gate")),
+		).toEqual(["gate-open", "gate-resolved"]);
+	});
+
+	test("resolveGate rejects a wrong step, a wrong choice and a run that does not wait", async () => {
+		const engine = makeEngine(fakeHarness());
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: gateFlow(),
+		});
+		const open = await openGateOf(engine, run.id);
+		const workerStep = (await engine.getRun(run.id)).steps[0]?.id ?? "";
+
+		await expect(
+			engine.resolveGate({ runId: run.id, stepId: open.stepId, choice: "yes" }),
+		).rejects.toThrow(
+			'"yes" is not a choice of this Gate. Choose one of: approve, reject.',
+		);
+		await expect(
+			engine.resolveGate({
+				runId: run.id,
+				stepId: workerStep,
+				choice: "approve",
+			}),
+		).rejects.toThrow("is not the open Gate of this run");
+		await expect(
+			engine.resolveGate({
+				runId: "missing",
+				stepId: open.stepId,
+				choice: "approve",
+			}),
+		).rejects.toThrow("Run not found");
+		await expect(engine.resumeRun(run.id)).rejects.toThrow("waits at a Gate");
+		expect(await statusOf(engine, run.id)).toBe("waiting");
+
+		await engine.resolveGate({
+			runId: run.id,
+			stepId: open.stepId,
+			choice: "approve",
+		});
+		await expect(
+			engine.resolveGate({
+				runId: run.id,
+				stepId: open.stepId,
+				choice: "approve",
+			}),
+		).rejects.toThrow();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		await expect(
+			engine.resolveGate({
+				runId: run.id,
+				stepId: open.stepId,
+				choice: "reject",
+			}),
+		).rejects.toThrow("does not wait at a Gate");
+	});
+
+	test("an answer while the run cap is full fails and keeps the gate open", async () => {
+		const { harness, sessions } = scriptedHarness();
+		const engine = makeEngine(harness, { maxConcurrentRuns: 1 });
+		const id = await projectId(engine);
+		const run = await engine.startRun({
+			projectId: id,
+			flow: flowOf(
+				[gate("gate", "Go?", ["go"]), command("done", "true")],
+				[edge("e1", "gate", "go", "done")],
+			),
+		});
+		const open = await openGateOf(engine, run.id);
+		const busy = await engine.startRun({
+			projectId: id,
+			flow: flowOf([agent("solo", "Go")]),
+		});
+		await waitFor(() => sessions[0]);
+
+		await expect(
+			engine.resolveGate({ runId: run.id, stepId: open.stepId, choice: "go" }),
+		).rejects.toThrow("The run cap is reached: 1 of 1");
+		expect(await statusOf(engine, run.id)).toBe("waiting");
+		expect(await engine.listGates()).toHaveLength(1);
+
+		sessions[0]?.finish();
+		await waitForStatus(engine, busy.id, "finished");
+		await engine.resolveGate({
+			runId: run.id,
+			stepId: open.stepId,
+			choice: "go",
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+	});
+
+	test("a gate stays open across a daemon restart and can be answered there", async () => {
+		const first = makeEngine(fakeHarness());
+		const id = await projectId(first);
+		const run = await first.startRun({ projectId: id, flow: gateFlow() });
+		const open = await openGateOf(first, run.id);
+
+		// A new daemon on the same database and data directory.
+		const harness = fakeHarness();
+		const second = makeEngine(harness);
+		expect(await statusOf(second, run.id)).toBe("waiting");
+		expect(await second.listGates()).toEqual([open]);
+		const detail = await second.getRun(run.id);
+		expect(detail.steps.at(-1)?.outcome).toBeNull();
+		expect(await loggedTypes()).not.toContain("RunEnded");
+
+		await second.resolveGate({
+			runId: run.id,
+			stepId: open.stepId,
+			choice: "reject",
+			note: "Add tests.",
+		});
+		await waitForStatus(second, run.id, "waiting");
+		expect(harness.calls[0]?.prompt).toBe("Build it. Add tests.");
+		const again = await openGateOf(second, run.id);
+		expect(again.stepId).not.toBe(open.stepId);
+
+		// The seq keeps counting across the restart.
+		const items = await collect(second, run.id, (_i, all) =>
+			entriesOf(all).some(
+				(e) => e.event.type === "gate-open" && e.stepId === again.stepId,
+			),
+		);
+		const seqs = entriesOf(items).map((e) => e.seq);
+		expect(seqs).toEqual(seqs.map((_, i) => i + 1));
+	});
+
+	test("a project with a waiting gate cannot be removed", async () => {
+		const engine = makeEngine(fakeHarness());
+		const id = await projectId(engine);
+		const run = await engine.startRun({ projectId: id, flow: gateFlow() });
+		await openGateOf(engine, run.id);
+		await expect(engine.removeProject(id)).rejects.toThrow("waits at a Gate");
+		await engine.stopRun(run.id);
+		await engine.removeProject(id);
+		expect(await engine.listGates()).toEqual([]);
+	});
+
+	test("stop closes a waiting gate, and resume asks again", async () => {
+		const harness = fakeHarness((_input, call) =>
+			reportingScript("pass", `summary ${call + 1}`),
+		);
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: gateFlow(),
+		});
+		const open = await openGateOf(engine, run.id);
+
+		await engine.stopRun(run.id);
+		let detail = await engine.getRun(run.id);
+		expect(detail.status).toBe("stopped");
+		expect(detail.reason).toBeNull();
+		expect(detail.steps.at(-1)).toMatchObject({
+			id: open.stepId,
+			outcome: "stopped",
+			outputs: { outcome: "stopped", note: "", visit: 1 },
+		});
+		expect(await engine.listGates()).toEqual([]);
+		expect(await loggedTypes()).toContain("StopRequested");
+		await expect(
+			engine.resolveGate({
+				runId: run.id,
+				stepId: open.stepId,
+				choice: "approve",
+			}),
+		).rejects.toThrow("does not wait at a Gate");
+		// Stopping again is a no-op.
+		await engine.stopRun(run.id);
+
+		await engine.resumeRun(run.id);
+		const reopened = await openGateOf(engine, run.id);
+		expect(reopened.stepId).not.toBe(open.stepId);
+		expect(reopened.question).toBe(open.question);
+		detail = await engine.getRun(run.id);
+		expect(detail.status).toBe("waiting");
+		expect(detail.steps.map((s) => [s.nodeId, s.visit, s.outcome])).toEqual([
+			["worker", 1, "pass"],
+			["gate", 1, "stopped"],
+			["gate", 2, null],
+		]);
+		await engine.resolveGate({
+			runId: run.id,
+			stepId: reopened.stepId,
+			choice: "approve",
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+	});
+});
+
+describe("a full flow", () => {
+	test("worker → decide → gate → worker loops until its max, then resumes at the gate", async () => {
+		const harness = fakeHarness((_input, call) =>
+			reportingScript("pass", `attempt ${call + 1}`),
+		);
+		const answers = ["retry", "review", "review"];
+		const { decider, calls } = scriptedDecider((_input, call) =>
+			decided(answers[call] ?? "review", `call ${call + 1}`, 0.01),
+		);
+		const engine = makeEngine(harness, { decider, maxConcurrentRuns: 1 });
+		const flow = flowOf(
+			[
+				agent("worker", "Build it. Reviewer: {{gate.note}}", {
+					tools: ["github"],
+				}),
+				decision("decide", "Worker: {{worker.summary}}. Review it?", [
+					"retry",
+					"review",
+				]),
+				gate("gate", "{{worker.summary}} ({{decide.notes}}). Ship it?", [
+					"approve",
+					"rework",
+				]),
+				command("ship", 'echo "shipped: {{gate.note}}"'),
+			],
+			[
+				edge("built", "worker", "pass", "decide"),
+				edge("retry", "decide", "retry", "worker", 2),
+				edge("review", "decide", "review", "gate"),
+				edge("rework", "gate", "rework", "worker", 1),
+				edge("approve", "gate", "approve", "ship"),
+			],
+		);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow,
+		});
+
+		const first = await openGateOf(engine, run.id);
+		expect(first.question).toBe("attempt 2 (call 2). Ship it?");
+		await engine.resolveGate({
+			runId: run.id,
+			stepId: first.stepId,
+			choice: "rework",
+			note: "Add tests.",
+		});
+		await waitFor(
+			async () => (await engine.getRun(run.id)).steps.length === 8,
+			{ label: "the second gate" },
+		);
+		const second = await openGateOf(engine, run.id);
+		expect(second.question).toBe("attempt 3 (call 3). Ship it?");
+
+		// The rework edge has a max of 1: a second rework fails the run.
+		await engine.resolveGate({
+			runId: run.id,
+			stepId: second.stepId,
+			choice: "rework",
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("failed");
+		let detail = await engine.getRun(run.id);
+		expect(detail.reason).toContain('"rework"');
+		expect(detail.reason).toContain("max 1");
+
+		// Resume asks the gate again; this time it ships.
+		await engine.resumeRun(run.id);
+		const third = await openGateOf(engine, run.id);
+		await engine.resolveGate({
+			runId: run.id,
+			stepId: third.stepId,
+			choice: "approve",
+			note: "ok",
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+
+		detail = await engine.getRun(run.id);
+		expect(detail.steps.map((s) => [s.nodeId, s.visit, s.outcome])).toEqual([
+			["worker", 1, "pass"],
+			["decide", 1, "retry"],
+			["worker", 2, "pass"],
+			["decide", 2, "review"],
+			["gate", 1, "rework"],
+			["worker", 3, "pass"],
+			["decide", 3, "review"],
+			["gate", 2, "rework"],
+			["gate", 3, "approve"],
+			["ship", 1, "pass"],
+		]);
+		expect(detail.traversals).toEqual({
+			built: 3,
+			retry: 1,
+			review: 2,
+			rework: 1,
+			approve: 1,
+		});
+		expect(detail.steps.at(-1)?.outputs.log_tail).toBe("shipped: ok");
+		expect(harness.calls.map((c) => c.prompt)).toEqual([
+			"Build it. Reviewer: ",
+			"Build it. Reviewer: ",
+			"Build it. Reviewer: Add tests.",
+		]);
+		expect(harness.calls.every((c) => c.tools?.join() === "github")).toBe(true);
+		expect(calls.map((c) => c.prompt)).toEqual([
+			"Worker: attempt 1. Review it?",
+			"Worker: attempt 2. Review it?",
+			"Worker: attempt 3. Review it?",
+		]);
+		expect(detail.costUsd).toBeCloseTo(sessionCostOf(detail) + 0.03);
 	});
 });
 

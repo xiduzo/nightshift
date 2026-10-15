@@ -3,18 +3,23 @@ import { cn } from "@nightshift/ui/lib/utils";
 import {
 	CircleAlertIcon,
 	CircleCheckIcon,
+	CircleDotIcon,
 	CircleStopIcon,
 	CircleXIcon,
+	HourglassIcon,
 	LoaderCircleIcon,
 	type LucideIcon,
 	MessageCircleQuestionIcon,
 	TriangleAlertIcon,
 } from "lucide-react";
 
-import type { Outcome, StepOutcome } from "@/lib/api-types";
+import type { Outcome, StepOutcome, StepSummary } from "@/lib/api-types";
 
-/** A step that has not ended yet has no outcome: it is running. */
-export type StepState = StepOutcome | "running";
+/**
+ * A step that has not ended yet has no outcome: it is running, or, for a
+ * Gate, waiting for a person.
+ */
+export type StepState = StepOutcome | "running" | "waiting";
 
 type Style = {
 	label: string;
@@ -27,7 +32,8 @@ type Style = {
 	color: string;
 };
 
-export const STEP_STATE: Record<StepState, Style> = {
+/** The states with a fixed look. Any other outcome is a Decision label or a Gate choice. */
+const KNOWN_STATES = {
 	pass: {
 		label: "Pass",
 		icon: CircleCheckIcon,
@@ -80,11 +86,67 @@ export const STEP_STATE: Record<StepState, Style> = {
 		text: "text-status-running",
 		color: "var(--status-running)",
 	},
+	waiting: {
+		label: "Waiting for you",
+		icon: HourglassIcon,
+		badge: "border-status-waiting/40 bg-status-waiting/10 text-status-waiting",
+		text: "text-status-waiting",
+		color: "var(--status-waiting)",
+	},
+} satisfies Record<string, Style>;
+
+/** The colour family of an outcome. Edges and arrowheads come in these. */
+export type OutcomeTone = "pass" | "fail" | "needs-input" | "label";
+export const OUTCOME_TONES: OutcomeTone[] = [
+	"pass",
+	"fail",
+	"needs-input",
+	"label",
+];
+
+export function outcomeTone(outcome: Outcome): OutcomeTone {
+	return outcome === "pass" || outcome === "fail" || outcome === "needs-input"
+		? outcome
+		: "label";
+}
+
+const TONE_STYLE: Record<OutcomeTone, Omit<Style, "label">> = {
+	pass: KNOWN_STATES.pass,
+	fail: KNOWN_STATES.fail,
+	"needs-input": KNOWN_STATES["needs-input"],
+	label: {
+		icon: CircleDotIcon,
+		badge: "border-outcome-label/40 bg-outcome-label/10 text-outcome-label",
+		text: "text-outcome-label",
+		color: "var(--outcome-label)",
+	},
 };
+
+function isKnown(state: string): state is keyof typeof KNOWN_STATES {
+	return Object.hasOwn(KNOWN_STATES, state);
+}
+
+/** The look of a step state or an outcome. A Decision label or Gate choice shows its own name. */
+export function stepStateStyle(state: StepState): Style {
+	if (isKnown(state)) return KNOWN_STATES[state];
+	return { ...TONE_STYLE.label, label: state };
+}
+
+/** The colour of an outcome, for handles, edges and arrowheads. */
+export function outcomeStyle(outcome: Outcome): Omit<Style, "label"> {
+	return TONE_STYLE[outcomeTone(outcome)];
+}
+
+/** What a step shows: its outcome, else running, or waiting for an open Gate. */
+export function stepState(
+	step: Pick<StepSummary, "outcome" | "nodeType">,
+): StepState {
+	return step.outcome ?? (step.nodeType === "gate" ? "waiting" : "running");
+}
 
 /** The outcome of an edge, shown as its label. */
 export function outcomeLabel(outcome: Outcome): string {
-	return STEP_STATE[outcome].label.toLowerCase();
+	return isKnown(outcome) ? KNOWN_STATES[outcome].label.toLowerCase() : outcome;
 }
 
 export function OutcomeBadge({
@@ -94,7 +156,7 @@ export function OutcomeBadge({
 	state: StepState;
 	className?: string;
 }) {
-	const { label, icon: Icon, badge } = STEP_STATE[state];
+	const { label, icon: Icon, badge } = stepStateStyle(state);
 	return (
 		<Badge variant="outline" className={cn(badge, className)}>
 			<Icon aria-hidden="true" />

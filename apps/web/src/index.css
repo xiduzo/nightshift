@@ -12,6 +12,7 @@
 	--status-stopped: oklch(0.48 0 0);
 	--status-failed: oklch(0.55 0.22 27);
 	--status-interrupted: oklch(0.52 0.13 65);
+	--status-waiting: oklch(0.5 0.2 305);
 }
 
 .dark {
@@ -20,16 +21,23 @@
 	--status-stopped: oklch(0.72 0 0);
 	--status-failed: oklch(0.704 0.191 22.216);
 	--status-interrupted: oklch(0.82 0.14 80);
+	--status-waiting: oklch(0.76 0.14 305);
 }
 
 /*
  * Step outcomes reuse the status hues: pass reads as finished, fail as failed,
- * needs-input as the amber that asks for a person.
+ * needs-input as the amber that asks for a person. Every other outcome (a
+ * Decision label, a Gate choice) shares one teal accent; its name is the signal.
  */
 :root {
 	--outcome-pass: var(--status-finished);
 	--outcome-fail: var(--status-failed);
 	--outcome-needs-input: var(--status-interrupted);
+	--outcome-label: oklch(0.52 0.1 200);
+}
+
+.dark {
+	--outcome-label: oklch(0.8 0.1 200);
 }
 
 @theme inline {
@@ -38,9 +46,11 @@
 	--color-status-stopped: var(--status-stopped);
 	--color-status-failed: var(--status-failed);
 	--color-status-interrupted: var(--status-interrupted);
+	--color-status-waiting: var(--status-waiting);
 	--color-outcome-pass: var(--outcome-pass);
 	--color-outcome-fail: var(--outcome-fail);
 	--color-outcome-needs-input: var(--outcome-needs-input);
+	--color-outcome-label: var(--outcome-label);
 }
 
 /* React Flow, themed with the app tokens. Follows `.dark` on <html>. */

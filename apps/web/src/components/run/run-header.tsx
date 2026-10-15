@@ -6,6 +6,7 @@ import {
 	CircleStopIcon,
 	CircleXIcon,
 	ClipboardCopyIcon,
+	HandIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,10 +19,16 @@ export function RunHeader({
 	run,
 	status,
 	reconnecting,
+	openGateNodeId,
+	onShowGate,
 }: {
 	run: RunDetail;
 	status: RunStatus;
 	reconnecting: boolean;
+	/** The node of the Gate the run waits at, if any. */
+	openGateNodeId: string | null;
+	/** Selects the open Gate's step, so its answer form shows. */
+	onShowGate: () => void;
 }) {
 	const queryClient = useQueryClient();
 	const projects = useQuery(orpc.projects.list.queryOptions());
@@ -104,12 +111,17 @@ export function RunHeader({
 						<ClipboardCopyIcon data-icon="inline-start" />
 						Take over
 					</Button>
-					{status === "running" ? (
+					{status === "running" || status === "waiting" ? (
 						<Button
 							variant="destructive"
 							size="sm"
 							onClick={() => stopRun.mutate({ runId: run.id })}
 							disabled={stopRun.isPending}
+							title={
+								status === "waiting"
+									? "Close the gate without an answer and stop the run"
+									: undefined
+							}
 						>
 							<CircleStopIcon data-icon="inline-start" />
 							{stopRun.isPending ? "Stopping…" : "Stop"}
@@ -120,6 +132,32 @@ export function RunHeader({
 			<h1 className="line-clamp-2 whitespace-pre-wrap break-words font-medium text-sm">
 				{run.title}
 			</h1>
+			{status === "waiting" && openGateNodeId ? (
+				<p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 border border-status-waiting/50 bg-status-waiting/10 px-2 py-1.5 text-xs">
+					<HandIcon
+						className="size-3.5 shrink-0 text-status-waiting"
+						aria-hidden="true"
+					/>
+					<span>
+						The run waits at the gate{" "}
+						<span className="font-mono">{openGateNodeId}</span> for your answer.
+					</span>
+					<button
+						type="button"
+						onClick={onShowGate}
+						className="font-medium text-status-waiting underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+					>
+						Answer it
+					</button>
+					<span className="text-muted-foreground">or</span>
+					<Link
+						to="/inbox"
+						className="font-medium text-status-waiting underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+					>
+						open the inbox
+					</Link>
+				</p>
+			) : null}
 			{status === "failed" && run.reason ? (
 				<p
 					role="alert"

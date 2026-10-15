@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
 	failingScript,
+	fakeDecider,
 	fakeHarness,
 	reportingScript,
 	usageLimitScript,
 } from "./fake";
-import type { AgentEvent, AgentSessionInput } from "./types";
+import type { AgentEvent, AgentSessionInput, DecisionInput } from "./types";
 
 function input(overrides: Partial<AgentSessionInput> = {}): AgentSessionInput {
 	return {
@@ -212,5 +213,95 @@ describe("fakeHarness", () => {
 			"report",
 			"finished",
 		]);
+	});
+});
+
+function decisionInput(overrides: Partial<DecisionInput> = {}): DecisionInput {
+	return {
+		cwd: "/tmp/fake",
+		prompt: "Continue?",
+		labels: [{ name: "continue" }, { name: "stop" }],
+		model: "haiku",
+		signal: new AbortController().signal,
+		...overrides,
+	};
+}
+
+describe("fakeDecider", () => {
+	test("returns the scripted results in order and records the calls", async () => {
+		const decider = fakeDecider(
+			[
+				{ label: "continue" },
+				{ label: "stop", notes: "Enough.", costUsd: null },
+				{
+					kind: "error",
+					errorKind: "usage-limit",
+					message: "limit",
+					costUsd: null,
+				},
+			],
+			{ delayMs: 0 },
+		);
+		expect(await decider.decide(decisionInput())).toEqual({
+			kind: "decided",
+			label: "continue",
+			notes: "Fake decision: continue",
+			costUsd: 0.0001,
+		});
+		expect(await decider.decide(decisionInput())).toEqual({
+			kind: "decided",
+			label: "stop",
+			notes: "Enough.",
+			costUsd: null,
+		});
+		expect(await decider.decide(decisionInput())).toMatchObject({
+			kind: "error",
+			errorKind: "usage-limit",
+		});
+		expect(await decider.decide(decisionInput())).toMatchObject({
+			kind: "error",
+			errorKind: "harness",
+		});
+		expect(decider.calls).toHaveLength(4);
+	});
+
+	test("refuses a scripted label that is not one of the labels", async () => {
+		const decider = fakeDecider([{ label: "maybe" }], { delayMs: 0 });
+		expect(await decider.decide(decisionInput())).toMatchObject({
+			kind: "error",
+			errorKind: "harness",
+		});
+	});
+
+	test("a script function picks per call", async () => {
+		const decider = fakeDecider((input, call) => ({
+			label: input.labels[call % 2]?.name ?? "stop",
+		}));
+		expect(await decider.decide(decisionInput())).toMatchObject({
+			label: "continue",
+		});
+		expect(await decider.decide(decisionInput())).toMatchObject({
+			label: "stop",
+		});
+	});
+
+	test("honours the signal", async () => {
+		const decider = fakeDecider([{ label: "continue" }], { delayMs: 10_000 });
+		const controller = new AbortController();
+		const pending = decider.decide(
+			decisionInput({ signal: controller.signal }),
+		);
+		controller.abort();
+		expect(await pending).toEqual({
+			kind: "error",
+			errorKind: "aborted",
+			message: "The decision was aborted",
+			costUsd: null,
+		});
+		const aborted = new AbortController();
+		aborted.abort();
+		expect(
+			await decider.decide(decisionInput({ signal: aborted.signal })),
+		).toMatchObject({ errorKind: "aborted" });
 	});
 });

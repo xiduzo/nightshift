@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { claudeCodeHarness } from "@nightshift/agents";
+import { claudeCodeDecider, claudeCodeHarness } from "@nightshift/agents";
 import { createAuth } from "@nightshift/auth";
 import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
@@ -17,5 +17,6 @@ export const auth = createAuth(ENV, db, desktopOrigins);
 export const engine = await createEngine({
 	db,
 	harnesses: { "claude-code": claudeCodeHarness() },
+	decider: claudeCodeDecider(),
 	dataDir: ENV.NIGHTSHIFT_DATA_DIR ?? join(homedir(), ".nightshift"),
 });

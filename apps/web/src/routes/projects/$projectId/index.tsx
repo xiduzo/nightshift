@@ -7,10 +7,12 @@ import {
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { HandIcon } from "lucide-react";
 
 import { FlowList } from "@/components/flow-list";
 import { NewRunForm } from "@/components/new-run-form";
 import { RunList } from "@/components/run-list";
+import { useOpenGates } from "@/hooks/use-open-gates";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/projects/$projectId/")({
@@ -20,8 +22,21 @@ export const Route = createFileRoute("/projects/$projectId/")({
 function ProjectComponent() {
 	const { projectId } = Route.useParams();
 	const projects = useQuery(orpc.projects.list.queryOptions());
-	const runs = useQuery(orpc.runs.list.queryOptions({ input: { projectId } }));
+	const runs = useQuery({
+		...orpc.runs.list.queryOptions({ input: { projectId } }),
+		// Live while a run is on its way, so one that reaches a Gate shows as waiting.
+		refetchInterval: (query) =>
+			query.state.data?.some(
+				(run) => run.status === "running" || run.status === "waiting",
+			)
+				? 5000
+				: false,
+		meta: { quietRefetchErrors: true },
+	});
 	const project = projects.data?.find((p) => p.id === projectId);
+	const gates = useOpenGates();
+	const waiting =
+		gates.data?.filter((gate) => gate.projectId === projectId).length ?? 0;
 
 	if (projects.isLoading) {
 		return (
@@ -79,9 +94,20 @@ function ProjectComponent() {
 						aria-labelledby="runs-heading"
 						className="flex flex-col gap-3"
 					>
-						<h2 id="runs-heading" className="font-medium text-sm">
-							Runs
-						</h2>
+						<div className="flex items-center gap-2">
+							<h2 id="runs-heading" className="font-medium text-sm">
+								Runs
+							</h2>
+							{waiting > 0 ? (
+								<Link
+									to="/inbox"
+									className="ml-auto flex items-center gap-1 text-status-waiting text-xs underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+								>
+									<HandIcon className="size-3.5" aria-hidden="true" />
+									{waiting} waiting for you
+								</Link>
+							) : null}
+						</div>
 						<RunList
 							runs={runs.data}
 							isLoading={runs.isLoading}

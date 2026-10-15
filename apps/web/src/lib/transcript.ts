@@ -1,6 +1,7 @@
 import type {
 	AgentErrorKind,
 	AgentUsage,
+	GateChoice,
 	TranscriptEntry,
 } from "@/lib/api-types";
 
@@ -8,9 +9,10 @@ import type {
  * Folds the raw transcript entries of a run into display items, per step. An
  * agent step gets one block per assistant message, one row per tool call, a
  * boundary per session, its step report, and the events that end a session.
- * A command step gets its command line, one log, and its exit code. Folding is
- * incremental so a long replay and a fast live stream only touch the items
- * that change.
+ * A command step gets its command line, one log, and its exit code. A
+ * decision step gets what was asked and the label it picked; a gate step its
+ * question and the answer. Folding is incremental so a long replay and a fast
+ * live stream only touch the items that change.
  */
 
 type ItemBase = {
@@ -63,8 +65,41 @@ export type LogItem = ItemBase & { kind: "log"; chunks: LogChunk[] };
 
 export type ExitItem = ItemBase & { kind: "exit"; exitCode: number | null };
 
+/** What the decider was asked. The prompt is rendered, templates filled in. */
+export type DecisionAskItem = ItemBase & {
+	kind: "decision-ask";
+	prompt: string;
+	labels: string[];
+	model: string;
+};
+
+/** The label the decider picked, and why. */
+export type DecisionItem = ItemBase & {
+	kind: "decision";
+	label: string;
+	notes: string;
+};
+
+/** A Gate opened: the rendered question and the choices. */
+export type GateOpenItem = ItemBase & {
+	kind: "gate-open";
+	question: string;
+	choices: GateChoice[];
+};
+
+/** A person answered the Gate. */
+export type GateResolvedItem = ItemBase & {
+	kind: "gate-resolved";
+	choice: string;
+	note: string;
+};
+
 export type TranscriptItem =
 	| SessionItem
+	| DecisionAskItem
+	| DecisionItem
+	| GateOpenItem
+	| GateResolvedItem
 	| MessageItem
 	| ToolItem
 	| ReportItem
@@ -282,6 +317,43 @@ function applyStepEntries(
 					kind: "exit",
 					key: `exit:${entry.seq}`,
 					exitCode: event.exitCode,
+				});
+				break;
+			case "decision-start":
+				push({
+					...base,
+					kind: "decision-ask",
+					key: `decision-ask:${entry.seq}`,
+					prompt: event.prompt,
+					labels: event.labels,
+					model: event.model,
+				});
+				break;
+			case "decision":
+				push({
+					...base,
+					kind: "decision",
+					key: `decision:${entry.seq}`,
+					label: event.label,
+					notes: event.notes,
+				});
+				break;
+			case "gate-open":
+				push({
+					...base,
+					kind: "gate-open",
+					key: `gate-open:${entry.seq}`,
+					question: event.question,
+					choices: event.choices,
+				});
+				break;
+			case "gate-resolved":
+				push({
+					...base,
+					kind: "gate-resolved",
+					key: `gate-resolved:${entry.seq}`,
+					choice: event.choice,
+					note: event.note,
 				});
 				break;
 		}

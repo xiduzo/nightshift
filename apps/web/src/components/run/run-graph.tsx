@@ -18,6 +18,7 @@ import {
 	OutcomeMarkers,
 } from "@/components/flow/outcome-edge";
 import { useMeasured } from "@/components/flow/use-measured";
+import { stepState } from "@/components/outcome-badge";
 import type { StepSummary } from "@/lib/api-types";
 
 /**
@@ -44,7 +45,7 @@ export function RunGraph({
 		const states = new Map<string, NodeRunState>();
 		for (const step of steps) {
 			const visits = (states.get(step.nodeId)?.visits ?? 0) + 1;
-			states.set(step.nodeId, { state: step.outcome ?? "running", visits });
+			states.set(step.nodeId, { state: stepState(step), visits });
 		}
 		return states;
 	}, [steps]);

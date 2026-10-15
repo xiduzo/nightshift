@@ -15,6 +15,7 @@ export function singleAgentFlow(
 		model: input.model,
 		permissionMode: input.permissionMode,
 		session: "fresh",
+		tools: [],
 	};
 	if (input.effort !== undefined) node.effort = input.effort;
 	if (input.skill !== undefined) node.skill = input.skill;

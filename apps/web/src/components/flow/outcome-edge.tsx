@@ -10,7 +10,13 @@ import {
 } from "@xyflow/react";
 import { createContext, memo, useContext } from "react";
 
-import { outcomeLabel, STEP_STATE } from "@/components/outcome-badge";
+import {
+	OUTCOME_TONES,
+	type OutcomeTone,
+	outcomeLabel,
+	outcomeStyle,
+	outcomeTone,
+} from "@/components/outcome-badge";
 
 export type OutcomeEdgeData = {
 	outcome: Outcome;
@@ -27,19 +33,17 @@ export const SelectEdgeContext = createContext<((id: string) => void) | null>(
 	null,
 );
 
-const OUTCOMES: Outcome[] = ["pass", "fail", "needs-input"];
-
-const markerId = (outcome: Outcome) => `ns-arrow-${outcome}`;
+const markerId = (tone: OutcomeTone) => `ns-arrow-${tone}`;
 
 /** Arrowheads, one per outcome colour. Render once inside each canvas. */
 export function OutcomeMarkers() {
 	return (
 		<svg className="absolute size-0" aria-hidden="true">
 			<defs>
-				{OUTCOMES.map((outcome) => (
+				{OUTCOME_TONES.map((tone) => (
 					<marker
-						key={outcome}
-						id={markerId(outcome)}
+						key={tone}
+						id={markerId(tone)}
 						viewBox="0 0 10 10"
 						refX="9"
 						refY="5"
@@ -50,7 +54,7 @@ export function OutcomeMarkers() {
 					>
 						<path
 							d="M0,0 L10,5 L0,10 z"
-							style={{ fill: STEP_STATE[outcome].color }}
+							style={{ fill: outcomeStyle(tone).color }}
 						/>
 					</marker>
 				))}
@@ -94,7 +98,8 @@ const OutcomeEdge = memo(function OutcomeEdge({
 	});
 	if (!data) return null;
 
-	const color = STEP_STATE[data.outcome].color;
+	const style = outcomeStyle(data.outcome);
+	const color = style.color;
 	const untaken = data.traversals === 0;
 
 	return (
@@ -102,7 +107,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 			<BaseEdge
 				id={id}
 				path={path}
-				markerEnd={`url(#${markerId(data.outcome)})`}
+				markerEnd={`url(#${markerId(outcomeTone(data.outcome))})`}
 				style={{
 					stroke: color,
 					strokeWidth: selected ? 2.5 : 1.5,
@@ -118,7 +123,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 					onClick={() => selectEdge?.(id)}
 					className={cn(
 						"nodrag nopan pointer-events-auto absolute border bg-card px-1.5 py-0.5 font-medium text-[11px] outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default",
-						STEP_STATE[data.outcome].text,
+						style.text,
 						selected && "ring-1 ring-ring",
 						data.hasError && "border-destructive",
 						untaken && "opacity-60",

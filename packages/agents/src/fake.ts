@@ -4,6 +4,9 @@ import type {
 	AgentHarness,
 	AgentSessionInput,
 	AgentUsage,
+	Decider,
+	DecisionInput,
+	DecisionResult,
 	StepReportOutcome,
 } from "./types";
 
@@ -209,4 +212,75 @@ export function fakeHarness(script: FakeScriptSource = {}): FakeHarness {
 	}
 
 	return { name: "claude-code", calls, run };
+}
+
+/**
+ * One scripted decision: a label (with optional notes and cost), or a whole
+ * DecisionResult, for example an error.
+ */
+export type FakeDecision =
+	| { label: string; notes?: string; costUsd?: number | null }
+	| DecisionResult;
+
+export type FakeDecider = Decider & {
+	/** The inputs of every `decide` call, in order. */
+	readonly calls: DecisionInput[];
+};
+
+/**
+ * A deterministic decider for engine tests. It returns the scripted results
+ * in order, one per call, after `delayMs`. An abort during the pause returns
+ * an `aborted` error. Like the real decider, it refuses a scripted label that
+ * is not one of the input's labels, and it errors once the script runs out.
+ */
+export function fakeDecider(
+	script:
+		| FakeDecision[]
+		| ((input: DecisionInput, call: number) => FakeDecision),
+	options: { delayMs?: number } = {},
+): FakeDecider {
+	const calls: DecisionInput[] = [];
+	const delayMs = options.delayMs ?? 5;
+
+	async function decide(input: DecisionInput): Promise<DecisionResult> {
+		const call = calls.length;
+		calls.push(input);
+		const aborted: DecisionResult = {
+			kind: "error",
+			errorKind: "aborted",
+			message: "The decision was aborted",
+			costUsd: null,
+		};
+		if (input.signal.aborted) return aborted;
+		await pause(delayMs, input.signal);
+		if (input.signal.aborted) return aborted;
+
+		const step =
+			typeof script === "function" ? script(input, call) : script[call];
+		if (step === undefined) {
+			return {
+				kind: "error",
+				errorKind: "harness",
+				message: `The fake decider has no scripted result for call ${call + 1}`,
+				costUsd: null,
+			};
+		}
+		if ("kind" in step) return step;
+		if (!input.labels.some((label) => label.name === step.label)) {
+			return {
+				kind: "error",
+				errorKind: "harness",
+				message: `The scripted label "${step.label}" is not one of the labels`,
+				costUsd: null,
+			};
+		}
+		return {
+			kind: "decided",
+			label: step.label,
+			notes: step.notes ?? `Fake decision: ${step.label}`,
+			costUsd: step.costUsd === undefined ? 0.0001 : step.costUsd,
+		};
+	}
+
+	return { name: "fake", calls, decide };
 }

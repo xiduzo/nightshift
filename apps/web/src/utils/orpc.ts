@@ -11,6 +11,12 @@ export function createQueryClient() {
 	return new QueryClient({
 		queryCache: new QueryCache({
 			onError: (error, query) => {
+				// Polling queries show their own error instead of a toast per poll.
+				if (query.meta?.quietErrors) return;
+				// A failed background refetch keeps the data it has; no toast either.
+				if (query.meta?.quietRefetchErrors && query.state.data !== undefined) {
+					return;
+				}
 				toast.error(`Error: ${error.message}`, {
 					action: {
 						label: "retry",

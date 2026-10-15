@@ -4,6 +4,7 @@ import {
 	countStepsSinceWalkBegan,
 	countVisits,
 	deriveNodeOutputs,
+	deriveOpenGate,
 	deriveResumePoint,
 	deriveRunState,
 	deriveSteps,
@@ -54,7 +55,14 @@ function log() {
 				"StepStarted",
 				{
 					nodeId,
-					nodeType: nodeId === "check" ? "command" : "agent",
+					nodeType:
+						nodeId === "check"
+							? "command"
+							: nodeId === "gate"
+								? "gate"
+								: nodeId === "decide"
+									? "decision"
+									: "agent",
 					visit,
 					transcriptPath: `/t/${stepId}`,
 					logPath: null,
@@ -67,10 +75,22 @@ function log() {
 			stepId: string,
 			outcome: StepOutcome,
 			outputs: Record<string, string | number> = {},
+			costUsd?: number | null,
 		) =>
 			push(
 				"StepEnded",
-				{ outcome, outputs: { outcome, ...outputs }, error: null },
+				{
+					outcome,
+					outputs: { outcome, ...outputs },
+					error: null,
+					...(costUsd === undefined ? {} : { costUsd }),
+				},
+				{ stepId },
+			),
+		gateOpened: (stepId: string, question = "Ship it?") =>
+			push(
+				"GateOpened",
+				{ question, choices: [{ name: "approve" }, { name: "reject" }] },
 				{ stepId },
 			),
 		sessionStarted: (stepId: string, sessionId: string) =>
@@ -311,4 +331,96 @@ test("openWork lists what a dead daemon left open", () => {
 
 	const done = log().runStarted().ended("finished");
 	expect(openWork(done.events).runOpen).toBe(false);
+});
+
+test("sumCostUsd and step costs include what a step spent itself", () => {
+	const { events } = log()
+		.runStarted()
+		.stepStarted("s1", "worker")
+		.sessionStarted("s1", "a")
+		.sessionEnded("s1", "a", "finished", 0.25)
+		.stepEnded("s1", "pass")
+		.stepStarted("s2", "decide")
+		.stepEnded("s2", "continue", { notes: "ok" }, 0.01)
+		.stepStarted("s3", "decide", 2)
+		.stepEnded("s3", "error", {}, null)
+		// A late duplicate end of s2 does not count twice.
+		.stepEnded("s2", "continue", {}, 5);
+	const steps = deriveSteps(events);
+	expect(steps.map((s) => s.costUsd)).toEqual([0.25, 0.01, 0]);
+	expect(sumCostUsd(events)).toBeCloseTo(0.26);
+});
+
+describe("gates", () => {
+	test("an open Gate makes the run waiting, and an answer ends the wait", () => {
+		const b = log()
+			.runStarted()
+			.stepStarted("s1", "gate")
+			.gateOpened("s1", "Ship PR 12?");
+		expect(deriveRunState(b.events)).toEqual({
+			status: "waiting",
+			reason: null,
+		});
+		expect(deriveOpenGate(b.events)).toEqual({
+			stepId: "s1",
+			nodeId: "gate",
+			visit: 1,
+			question: "Ship PR 12?",
+			choices: [{ name: "approve" }, { name: "reject" }],
+			openedAt: b.events.at(-1)?.at ?? 0,
+		});
+		expect(deriveSteps(b.events)[0]?.gate?.question).toBe("Ship PR 12?");
+
+		b.stepEnded("s1", "approve", { note: "yes", visit: 1 });
+		expect(deriveOpenGate(b.events)).toBeNull();
+		expect(deriveRunState(b.events).status).toBe("running");
+		expect(deriveNodeOutputs(b.events).gate).toEqual({
+			outcome: "approve",
+			note: "yes",
+			visit: 1,
+		});
+	});
+
+	test("a Gate step that never opened is not waiting", () => {
+		const { events } = log().runStarted().stepStarted("s1", "gate");
+		expect(deriveOpenGate(events)).toBeNull();
+		expect(deriveRunState(events).status).toBe("running");
+		// Recovery interrupts it like any other open step.
+		expect(openWork(events).steps.map((s) => s.id)).toEqual(["s1"]);
+	});
+
+	test("an ended run has no open Gate", () => {
+		const { events } = log()
+			.runStarted()
+			.stepStarted("s1", "gate")
+			.gateOpened("s1")
+			.ended("failed", "broken log");
+		expect(deriveOpenGate(events)).toBeNull();
+		expect(deriveRunState(events).status).toBe("failed");
+	});
+
+	test("a waiting run is not lost work: recovery leaves it open", () => {
+		const { events } = log()
+			.runStarted()
+			.stepStarted("s1", "worker")
+			.stepEnded("s1", "pass")
+			.stepStarted("s2", "gate")
+			.gateOpened("s2");
+		const open = openWork(events);
+		expect(open.steps).toEqual([]);
+		expect(open.sessions).toEqual([]);
+		expect(open.runOpen).toBe(false);
+	});
+
+	test("a Gate closed by a stop resumes as a new visit of the Gate", () => {
+		const { events } = log()
+			.runStarted()
+			.stepStarted("s1", "gate")
+			.gateOpened("s1")
+			.stepEnded("s1", "stopped", { note: "", visit: 1 })
+			.ended("stopped");
+		expect(deriveOpenGate(events)).toBeNull();
+		expect(deriveRunState(events).status).toBe("stopped");
+		expect(deriveResumePoint(events)).toEqual({ kind: "node", nodeId: "gate" });
+	});
 });

@@ -1,8 +1,10 @@
 import {
 	type AgentNode,
 	type CommandNode,
+	type DecisionNode,
 	type Flow,
 	type FlowNode,
+	type GateNode,
 	nodeIdSchema,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
@@ -12,19 +14,23 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Textarea } from "@nightshift/ui/components/textarea";
-import {
-	BotIcon,
-	PlayIcon,
-	SquareTerminalIcon,
-	Trash2Icon,
-	TriangleAlertIcon,
-} from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { PlayIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react";
+import { useId, useState } from "react";
 
+import { NODE_TYPE } from "@/components/flow/node-type";
 import type { Effort, PermissionMode } from "@/lib/api-types";
-import { MODEL_SUGGESTIONS, templateVariables } from "@/lib/flow-draft";
+import {
+	MODEL_SUGGESTIONS,
+	type NodeOption,
+	nodeOptions,
+	type OptionNode,
+	withOptions,
+} from "@/lib/flow-draft";
 
 import { Field, PositiveIntInput } from "./fields";
+import { GitHubToolsField } from "./github-tools-field";
+import { OptionsEditor } from "./options-editor";
+import { TemplateField } from "./template-field";
 
 const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
 	{ value: "acceptEdits", label: "Accept edits" },
@@ -40,6 +46,8 @@ export function NodeInspector({
 	node,
 	onChange,
 	onRename,
+	onRenameOutcome,
+	onRemoveOutcome,
 	onSetStart,
 	onDelete,
 }: {
@@ -48,20 +56,22 @@ export function NodeInspector({
 	onChange: (change: (node: FlowNode) => FlowNode) => void;
 	/** Returns an error message when the new id is taken. */
 	onRename: (id: string) => string | null;
+	/** Renames a Decision label or Gate choice and moves its edges along. */
+	onRenameOutcome: (index: number, name: string) => string | null;
+	/** Removes a Decision label or Gate choice and drops its edges. */
+	onRemoveOutcome: (index: number) => void;
 	onSetStart: () => void;
 	onDelete: () => void;
 }) {
 	const id = useId();
 	const isStart = flow.start === node.id;
-	const Icon = node.type === "agent" ? BotIcon : SquareTerminalIcon;
+	const { label: typeLabel, icon: Icon } = NODE_TYPE[node.type];
 
 	return (
 		<div className="flex flex-col gap-4">
 			<header className="flex items-center gap-2">
 				<Icon className="size-4 text-muted-foreground" aria-hidden="true" />
-				<h2 className="font-medium text-sm">
-					{node.type === "agent" ? "Agent node" : "Command node"}
-				</h2>
+				<h2 className="font-medium text-sm">{typeLabel} node</h2>
 				<div className="ml-auto flex items-center gap-1">
 					<Button
 						variant="outline"
@@ -120,7 +130,8 @@ export function NodeInspector({
 						)
 					}
 				/>
-			) : (
+			) : null}
+			{node.type === "command" ? (
 				<CommandFields
 					node={node}
 					onChange={(change) =>
@@ -129,7 +140,33 @@ export function NodeInspector({
 						)
 					}
 				/>
-			)}
+			) : null}
+			{node.type === "decision" ? (
+				<DecisionFields
+					flow={flow}
+					node={node}
+					onChange={(change) =>
+						onChange((current) =>
+							current.type === "decision" ? change(current) : current,
+						)
+					}
+					onRenameOutcome={onRenameOutcome}
+					onRemoveOutcome={onRemoveOutcome}
+				/>
+			) : null}
+			{node.type === "gate" ? (
+				<GateFields
+					flow={flow}
+					node={node}
+					onChange={(change) =>
+						onChange((current) =>
+							current.type === "gate" ? change(current) : current,
+						)
+					}
+					onRenameOutcome={onRenameOutcome}
+					onRemoveOutcome={onRemoveOutcome}
+				/>
+			) : null}
 
 			<Field
 				id={`${id}-timeout`}
@@ -230,27 +267,10 @@ function AgentFields({
 	onChange: (change: (node: AgentNode) => AgentNode) => void;
 }) {
 	const id = useId();
-	const promptRef = useRef<HTMLTextAreaElement>(null);
-	const variables = templateVariables(flow, node.id);
-
-	const insertVariable = (variable: string) => {
-		const textarea = promptRef.current;
-		const start = textarea?.selectionStart ?? node.prompt.length;
-		const end = textarea?.selectionEnd ?? node.prompt.length;
-		const prompt =
-			node.prompt.slice(0, start) + variable + node.prompt.slice(end);
-		onChange((current) => ({ ...current, prompt }));
-		requestAnimationFrame(() => {
-			if (!textarea) return;
-			textarea.focus();
-			const cursor = start + variable.length;
-			textarea.setSelectionRange(cursor, cursor);
-		});
-	};
 
 	return (
 		<>
-			<Field
+			<TemplateField
 				id={`${id}-prompt`}
 				label="Prompt"
 				hint={
@@ -258,49 +278,12 @@ function AgentFields({
 						? `Runs as /${node.skill} followed by the prompt.`
 						: "What the agent should do. Leave it empty only when a skill is set."
 				}
-			>
-				<Textarea
-					ref={promptRef}
-					id={`${id}-prompt`}
-					value={node.prompt}
-					placeholder="Implement the change, then report pass or fail."
-					className="max-h-80 min-h-28 font-mono"
-					aria-describedby={`${id}-prompt-hint`}
-					onChange={(event) => {
-						const prompt = event.target.value;
-						onChange((current) => ({ ...current, prompt }));
-					}}
-				/>
-			</Field>
-
-			<details className="group/vars border bg-muted/30 text-xs" open>
-				<summary className="cursor-pointer select-none px-2 py-1.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring">
-					Template variables · click to insert
-				</summary>
-				<dl className="flex flex-col gap-1.5 border-t px-2 py-2">
-					{variables.map(({ scope, variables: list }) => (
-						<div key={scope} className="flex flex-col gap-1">
-							<dt className="font-mono text-muted-foreground">{scope}</dt>
-							<dd className="flex flex-wrap gap-1">
-								{list.map((variable) => (
-									<button
-										key={variable}
-										type="button"
-										className="border bg-background px-1 py-0.5 font-mono text-[11px] outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring"
-										onClick={() => insertVariable(variable)}
-										title={`Insert ${variable}`}
-									>
-										{variable.slice(scope.length + 3, -2)}
-									</button>
-								))}
-							</dd>
-						</div>
-					))}
-				</dl>
-				<p className="border-t px-2 py-1.5 text-muted-foreground">
-					A node that has not run yet renders as an empty string.
-				</p>
-			</details>
+				flow={flow}
+				nodeId={node.id}
+				value={node.prompt}
+				placeholder="Implement the change, then report pass or fail."
+				onChange={(prompt) => onChange((current) => ({ ...current, prompt }))}
+			/>
 
 			<Field
 				id={`${id}-skill`}
@@ -415,6 +398,12 @@ function AgentFields({
 				</NativeSelect>
 			</Field>
 
+			<GitHubToolsField
+				id={`${id}-github`}
+				tools={node.tools ?? []}
+				onChange={(tools) => onChange((current) => ({ ...current, tools }))}
+			/>
+
 			<p className="text-muted-foreground text-xs">
 				Harness: <span className="text-foreground">Claude Code</span>. The agent
 				ends with a step report: pass, fail, or needs input.
@@ -451,5 +440,202 @@ function CommandFields({
 				}}
 			/>
 		</Field>
+	);
+}
+
+/** The labels or choices of a node, with the edits that keep its edges in step. */
+function NodeOptionsField<T extends OptionNode>({
+	id,
+	kind,
+	node,
+	min,
+	hint,
+	onChange,
+	onRenameOutcome,
+	onRemoveOutcome,
+}: {
+	id: string;
+	kind: "label" | "choice";
+	node: T;
+	min: number;
+	hint: string;
+	onChange: (change: (node: T) => T) => void;
+	onRenameOutcome: (index: number, name: string) => string | null;
+	onRemoveOutcome: (index: number) => void;
+}) {
+	const options = nodeOptions(node);
+	const change = (edit: (options: NodeOption[]) => NodeOption[]) =>
+		onChange((current) => withOptions(current, edit(nodeOptions(current))));
+
+	return (
+		<section
+			aria-labelledby={`${id}-heading`}
+			className="flex flex-col gap-1.5"
+		>
+			<h3 id={`${id}-heading`} className="text-xs leading-none">
+				{kind === "label" ? "Labels" : "Choices"}
+			</h3>
+			<p id={`${id}-hint`} className="text-muted-foreground text-xs">
+				{hint}
+			</p>
+			<OptionsEditor
+				kind={kind}
+				options={options}
+				min={min}
+				describedBy={`${id}-hint`}
+				onRename={onRenameOutcome}
+				onRemove={onRemoveOutcome}
+				onDescribe={(index, description) =>
+					change((list) =>
+						list.map((option, at) => {
+							if (at !== index) return option;
+							const { description: _, ...rest } = option;
+							return description === undefined
+								? rest
+								: { ...rest, description };
+						}),
+					)
+				}
+				onAdd={(option) => change((list) => [...list, option])}
+				onMove={(from, to) =>
+					change((list) => {
+						const next = list.slice();
+						const [moved] = next.splice(from, 1);
+						if (moved) next.splice(to, 0, moved);
+						return next;
+					})
+				}
+			/>
+		</section>
+	);
+}
+
+function DecisionFields({
+	flow,
+	node,
+	onChange,
+	onRenameOutcome,
+	onRemoveOutcome,
+}: {
+	flow: Flow;
+	node: DecisionNode;
+	onChange: (change: (node: DecisionNode) => DecisionNode) => void;
+	onRenameOutcome: (index: number, name: string) => string | null;
+	onRemoveOutcome: (index: number) => void;
+}) {
+	const id = useId();
+	return (
+		<>
+			<TemplateField
+				id={`${id}-prompt`}
+				label="Prompt"
+				hint="What to decide, with the context it needs. The decider reads it, picks one label, and writes notes on why."
+				flow={flow}
+				nodeId={node.id}
+				value={node.prompt}
+				invalid={node.prompt.trim() === ""}
+				placeholder="Read {{check.log_tail}}. Is the build green enough to open a pull request?"
+				onChange={(prompt) => onChange((current) => ({ ...current, prompt }))}
+			/>
+
+			<NodeOptionsField
+				id={`${id}-labels`}
+				kind="label"
+				node={node}
+				min={2}
+				hint="The decider returns exactly one. Each label is an outcome with its own edge. A description tells the decider when to pick it."
+				onChange={onChange}
+				onRenameOutcome={onRenameOutcome}
+				onRemoveOutcome={onRemoveOutcome}
+			/>
+
+			<Field
+				id={`${id}-model`}
+				label="Model"
+				hint="A small, fast model is enough to pick a label."
+			>
+				<Input
+					id={`${id}-model`}
+					list={`${id}-models`}
+					value={node.model}
+					autoComplete="off"
+					spellCheck={false}
+					aria-invalid={node.model.trim() === ""}
+					aria-describedby={`${id}-model-hint`}
+					onChange={(event) => {
+						const model = event.target.value;
+						onChange((current) => ({ ...current, model }));
+					}}
+				/>
+				<datalist id={`${id}-models`}>
+					{MODEL_SUGGESTIONS.map((value) => (
+						<option key={value} value={value} />
+					))}
+				</datalist>
+			</Field>
+
+			<GitHubToolsField
+				id={`${id}-github`}
+				tools={node.tools ?? []}
+				onChange={(tools) => onChange((current) => ({ ...current, tools }))}
+			/>
+
+			<p className="text-muted-foreground text-xs">
+				Decider: <span className="text-foreground">Claude Code</span>. Later
+				nodes read <code className="font-mono">{`{{${node.id}.outcome}}`}</code>{" "}
+				and <code className="font-mono">{`{{${node.id}.notes}}`}</code>.
+			</p>
+		</>
+	);
+}
+
+function GateFields({
+	flow,
+	node,
+	onChange,
+	onRenameOutcome,
+	onRemoveOutcome,
+}: {
+	flow: Flow;
+	node: GateNode;
+	onChange: (change: (node: GateNode) => GateNode) => void;
+	onRenameOutcome: (index: number, name: string) => string | null;
+	onRemoveOutcome: (index: number) => void;
+}) {
+	const id = useId();
+	return (
+		<>
+			<TemplateField
+				id={`${id}-question`}
+				label="Question"
+				hint="What you are asked in the Needs-you inbox, with the context you need to answer. The run waits until you do."
+				flow={flow}
+				nodeId={node.id}
+				value={node.question}
+				invalid={node.question.trim() === ""}
+				className="font-sans"
+				placeholder="The worker opened {{worker.summary}}. Merge it and go on?"
+				onChange={(question) =>
+					onChange((current) => ({ ...current, question }))
+				}
+			/>
+
+			<NodeOptionsField
+				id={`${id}-choices`}
+				kind="choice"
+				node={node}
+				min={1}
+				hint="One button each in the inbox. Each choice is an outcome with its own edge."
+				onChange={onChange}
+				onRenameOutcome={onRenameOutcome}
+				onRemoveOutcome={onRemoveOutcome}
+			/>
+
+			<p className="text-muted-foreground text-xs">
+				Later nodes read your answer as{" "}
+				<code className="font-mono">{`{{${node.id}.outcome}}`}</code> and your
+				note as <code className="font-mono">{`{{${node.id}.note}}`}</code>.
+			</p>
+		</>
 	);
 }

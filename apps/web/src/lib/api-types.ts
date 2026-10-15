@@ -38,7 +38,22 @@ export type CommandEvent = Extract<
 	StepEvent,
 	{ type: "command-start" | "command-output" | "command-exit" }
 >;
-export type AgentEvent = Exclude<StepEvent, CommandEvent>;
+export type DecisionEvent = Extract<
+	StepEvent,
+	{ type: "decision-start" | "decision" }
+>;
+export type GateEvent = Extract<
+	StepEvent,
+	{ type: "gate-open" | "gate-resolved" }
+>;
+export type AgentEvent = Exclude<
+	StepEvent,
+	CommandEvent | DecisionEvent | GateEvent
+>;
+
+/** A Gate that waits for a person: the Needs-you inbox. */
+export type OpenGate = Outputs["gates"]["list"][number];
+export type GateChoice = OpenGate["choices"][number];
 export type AgentUsage = NonNullable<
 	Extract<AgentEvent, { type: "finished" }>["usage"]
 >;

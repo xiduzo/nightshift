@@ -17,11 +17,18 @@ import {
 	CircleStopIcon,
 	CircleXIcon,
 	ClockIcon,
+	HandIcon,
 	LoaderCircleIcon,
+	SplitIcon,
 } from "lucide-react";
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 
-import { STEP_STATE } from "@/components/outcome-badge";
+import { GateAnswer } from "@/components/gate/gate-answer";
+import {
+	outcomeLabel,
+	outcomeStyle,
+	stepStateStyle,
+} from "@/components/outcome-badge";
 import type { SessionSummary, StepSummary } from "@/lib/api-types";
 import {
 	formatCost,
@@ -31,9 +38,13 @@ import {
 	formatTokens,
 } from "@/lib/format";
 import type {
+	DecisionAskItem,
+	DecisionItem,
 	ErrorItem,
 	ExitItem,
 	FinishedItem,
+	GateOpenItem,
+	GateResolvedItem,
 	LogItem,
 	MessageItem,
 	ReportItem,
@@ -46,19 +57,25 @@ import { ToolCallRow } from "./tool-call-row";
 /**
  * The transcript of one step. An agent step reads as a conversation: session
  * boundaries with their prompt, messages, tool calls, and the step report. A
- * command step reads as a terminal log.
+ * command step reads as a terminal log. A decision step shows what the decider
+ * was asked and what it picked. A gate step shows its question, and while it
+ * is open, the choices to answer it with.
  */
 export function StepTranscript({
+	runId,
 	step,
 	transcript,
 	connecting,
 }: {
+	runId: string;
 	step: StepSummary;
 	transcript: TranscriptState;
 	/** The first replay has not arrived yet. */
 	connecting: boolean;
 }) {
 	const running = step.outcome === null;
+	// A gate step without an outcome waits for a person: it gets the answer form.
+	const gateOpen = step.nodeType === "gate" && running;
 	const sessionNumbers = new Map(
 		step.sessions.map((session, position) => [session.id, position + 1]),
 	);
@@ -87,20 +104,36 @@ export function StepTranscript({
 					>
 						{transcript.items.map((item) => (
 							<MessageScrollerItem key={item.key} messageId={item.key}>
-								<TranscriptItemView
-									item={item}
-									running={running}
-									session={
-										item.sessionId
-											? sessionsById.get(item.sessionId)
-											: undefined
-									}
-									sessionNumber={
-										item.sessionId
-											? sessionNumbers.get(item.sessionId)
-											: undefined
-									}
-								/>
+								{item.kind === "gate-open" ? (
+									<GateQuestion
+										item={item}
+										answer={
+											gateOpen ? (
+												<GateAnswer
+													runId={runId}
+													stepId={step.id}
+													nodeId={step.nodeId}
+													choices={item.choices}
+												/>
+											) : null
+										}
+									/>
+								) : (
+									<TranscriptItemView
+										item={item}
+										running={running}
+										session={
+											item.sessionId
+												? sessionsById.get(item.sessionId)
+												: undefined
+										}
+										sessionNumber={
+											item.sessionId
+												? sessionNumbers.get(item.sessionId)
+												: undefined
+										}
+									/>
+								)}
 							</MessageScrollerItem>
 						))}
 						{pendingSessions.map((session) => (
@@ -131,16 +164,12 @@ export function StepTranscript({
 								</p>
 							</div>
 						) : null}
-						{running ? (
+						{running && !gateOpen ? (
 							<Marker className="py-1">
 								<MarkerIcon>
 									<LoaderCircleIcon className="animate-spin text-status-running motion-reduce:animate-none" />
 								</MarkerIcon>
-								<MarkerContent>
-									{step.nodeType === "agent"
-										? "The agent is working…"
-										: "The command is running…"}
-								</MarkerContent>
+								<MarkerContent>{RUNNING_TEXT[step.nodeType]}</MarkerContent>
 							</Marker>
 						) : null}
 					</MessageScrollerContent>
@@ -150,6 +179,13 @@ export function StepTranscript({
 		</MessageScrollerProvider>
 	);
 }
+
+const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
+	agent: "The agent is working…",
+	command: "The command is running…",
+	decision: "The decider is choosing…",
+	gate: "Waiting for an answer…",
+};
 
 const TranscriptItemView = memo(function TranscriptItemView({
 	item,
@@ -193,6 +229,14 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			return <CommandLog item={item} />;
 		case "exit":
 			return <CommandExit item={item} />;
+		case "decision-ask":
+			return <DecisionAsk item={item} />;
+		case "decision":
+			return <DecisionCard item={item} />;
+		case "gate-open":
+			return <GateQuestion item={item} answer={null} />;
+		case "gate-resolved":
+			return <GateResolved item={item} />;
 	}
 });
 
@@ -249,7 +293,7 @@ function MessageBlock({ item }: { item: MessageItem }) {
 
 /** The agent's step report: the outcome the flow follows, and its summary. */
 function ReportCard({ item }: { item: ReportItem }) {
-	const { label, icon: Icon, text, color } = STEP_STATE[item.outcome];
+	const { label, icon: Icon, text, color } = stepStateStyle(item.outcome);
 	return (
 		<div
 			className="flex gap-2 border border-l-[3px] bg-card px-3 py-2"
@@ -366,5 +410,148 @@ function CommandExit({ item }: { item: ExitItem }) {
 				· {formatTime(item.at)}
 			</MarkerContent>
 		</Marker>
+	);
+}
+
+/** What the decider was asked, with the labels it could pick. */
+function DecisionAsk({ item }: { item: DecisionAskItem }) {
+	return (
+		<div className="flex flex-col gap-2">
+			<Marker variant="separator">
+				<MarkerContent>
+					<h3 className="inline font-medium text-foreground">Decision</h3>
+					<span title={formatDateTime(item.at)}>
+						{" "}
+						· {formatTime(item.at)} · {item.model}
+					</span>
+				</MarkerContent>
+			</Marker>
+			<div className="border-primary/40 border-l-2 bg-muted/40 px-3 py-2">
+				<p className="mb-1 text-muted-foreground text-xs">Prompt</p>
+				<p className="whitespace-pre-wrap break-words text-sm">{item.prompt}</p>
+				<p className="mt-2 flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
+					Picks one of
+					{item.labels.map((label) => (
+						<span
+							key={label}
+							className={cn(
+								"border bg-background px-1 font-mono",
+								outcomeStyle(label).text,
+							)}
+						>
+							{outcomeLabel(label)}
+						</span>
+					))}
+				</p>
+			</div>
+		</div>
+	);
+}
+
+/** The label the decider picked, and its notes on why. */
+function DecisionCard({ item }: { item: DecisionItem }) {
+	const { text, color } = outcomeStyle(item.label);
+	return (
+		<div
+			className="flex gap-2 border border-l-[3px] bg-card px-3 py-2"
+			style={{ borderLeftColor: color }}
+		>
+			<SplitIcon
+				className={cn("mt-0.5 size-4 shrink-0", text)}
+				aria-hidden="true"
+			/>
+			<div className="flex min-w-0 flex-col gap-1">
+				<p className="text-xs">
+					<span className="text-muted-foreground">Decided · </span>
+					<span className={cn("font-medium font-mono", text)}>
+						{outcomeLabel(item.label)}
+					</span>
+				</p>
+				{item.notes.trim() ? (
+					<p className="whitespace-pre-wrap break-words text-sm">
+						{item.notes}
+					</p>
+				) : (
+					<p className="text-muted-foreground text-sm italic">No notes.</p>
+				)}
+			</div>
+		</div>
+	);
+}
+
+/** The question a Gate asks. While the gate is open, the answer form follows. */
+function GateQuestion({
+	item,
+	answer,
+}: {
+	item: GateOpenItem;
+	answer: ReactNode;
+}) {
+	return (
+		<div
+			className={cn(
+				"flex flex-col gap-3 border bg-card px-3 py-3",
+				answer && "border-status-waiting/60",
+			)}
+		>
+			<p className="flex items-center gap-1.5 text-xs">
+				<HandIcon className="size-3.5 text-status-waiting" aria-hidden="true" />
+				<span className="font-medium text-status-waiting">
+					{answer ? "Waiting for you" : "Gate"}
+				</span>
+				<span className="text-muted-foreground">
+					· opened{" "}
+					<time
+						dateTime={new Date(item.at).toISOString()}
+						title={formatDateTime(item.at)}
+					>
+						{formatRelative(item.at)}
+					</time>
+				</span>
+			</p>
+			<p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+				{item.question}
+			</p>
+			{answer}
+		</div>
+	);
+}
+
+/** The answer a person gave, and their note. */
+function GateResolved({ item }: { item: GateResolvedItem }) {
+	const { text, color } = outcomeStyle(item.choice);
+	return (
+		<div
+			className="flex gap-2 border border-l-[3px] bg-card px-3 py-2"
+			style={{ borderLeftColor: color }}
+		>
+			<HandIcon
+				className={cn("mt-0.5 size-4 shrink-0", text)}
+				aria-hidden="true"
+			/>
+			<div className="flex min-w-0 flex-col gap-1">
+				<p className="text-xs">
+					<span className="text-muted-foreground">Answered · </span>
+					<span className={cn("font-medium font-mono", text)}>
+						{outcomeLabel(item.choice)}
+					</span>
+					<span className="text-muted-foreground">
+						{" "}
+						·{" "}
+						<time
+							dateTime={new Date(item.at).toISOString()}
+							title={formatDateTime(item.at)}
+						>
+							{formatTime(item.at)}
+						</time>
+					</span>
+				</p>
+				{item.note.trim() ? (
+					<p className="whitespace-pre-wrap break-words text-sm">{item.note}</p>
+				) : (
+					<p className="text-muted-foreground text-sm italic">No note.</p>
+				)}
+			</div>
+		</div>
 	);
 }

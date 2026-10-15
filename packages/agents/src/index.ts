@@ -1,3 +1,25 @@
-export { claudeCodeHarness } from "./claude-code";
-export { fakeHarness } from "./fake";
+export {
+	type ClaudeCodeHarnessOptions,
+	type ClaudeCodeProcessOptions,
+	claudeCodeHarness,
+} from "./claude-code";
+export {
+	type ClaudeCodeDeciderOptions,
+	claudeCodeDecider,
+	DECIDE_TOOL_ID,
+	DECIDE_TOOL_NAME,
+} from "./decider";
+export {
+	type FakeDecider,
+	type FakeDecision,
+	fakeDecider,
+	fakeHarness,
+} from "./fake";
+export {
+	GITHUB_TOOL_IDS,
+	GITHUB_TOOL_NAMES,
+	type GithubToolName,
+	type GithubToolsOptions,
+	githubTools,
+} from "./github";
 export type * from "./types";

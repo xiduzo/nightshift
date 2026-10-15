@@ -12,10 +12,10 @@ import {
 	ReactFlow,
 	useReactFlow,
 } from "@xyflow/react";
-import { BotIcon, SquareTerminalIcon } from "lucide-react";
 import { useCallback, useMemo, useRef } from "react";
 
 import { type FlowCanvasNode, nodeTypes } from "@/components/flow/flow-node";
+import { NODE_TYPE } from "@/components/flow/node-type";
 import {
 	edgeTypes,
 	type FlowCanvasEdge,
@@ -36,6 +36,8 @@ export type Selection =
 	| { kind: "node"; id: string }
 	| { kind: "edge"; id: string }
 	| null;
+
+const PALETTE: FlowNodeType[] = ["agent", "command", "decision", "gate"];
 
 /** Below the node a new one lands on, so repeated adds do not stack exactly. */
 const ADD_OFFSET = 32;
@@ -270,16 +272,24 @@ export function EditorCanvas({
 					<Controls showInteractive={false} position="bottom-left" />
 					<Panel
 						position="top-left"
-						className="m-2 flex gap-1 border bg-card p-1"
+						className="m-2 flex flex-wrap gap-1 border bg-card p-1"
+						aria-label="Add a node"
 					>
-						<Button variant="ghost" size="sm" onClick={() => add("agent")}>
-							<BotIcon data-icon="inline-start" />
-							Agent
-						</Button>
-						<Button variant="ghost" size="sm" onClick={() => add("command")}>
-							<SquareTerminalIcon data-icon="inline-start" />
-							Command
-						</Button>
+						{PALETTE.map((type) => {
+							const { label, icon: Icon, blurb } = NODE_TYPE[type];
+							return (
+								<Button
+									key={type}
+									variant="ghost"
+									size="sm"
+									onClick={() => add(type)}
+									title={`Add a ${label} node. ${blurb}`}
+								>
+									<Icon data-icon="inline-start" />
+									{label}
+								</Button>
+							);
+						})}
 					</Panel>
 				</ReactFlow>
 			</SelectEdgeContext.Provider>

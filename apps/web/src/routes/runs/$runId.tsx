@@ -72,6 +72,14 @@ function RunComponent() {
 		steps.find((step) => step.id === pickedStepId) ?? steps[steps.length - 1];
 	const lastStep = steps[steps.length - 1];
 
+	// The newest step of a gate without an outcome is the one the run waits at.
+	const openGate =
+		status === "waiting"
+			? [...steps]
+					.reverse()
+					.find((step) => step.nodeType === "gate" && step.outcome === null)
+			: undefined;
+
 	const selectNode = (nodeId: string) => {
 		const latest = [...steps].reverse().find((step) => step.nodeId === nodeId);
 		if (latest) setPickedStepId(latest.id);
@@ -83,6 +91,8 @@ function RunComponent() {
 				run={run.data}
 				status={status}
 				reconnecting={stream.connection === "reconnecting"}
+				openGateNodeId={openGate?.nodeId ?? null}
+				onShowGate={() => openGate && setPickedStepId(openGate.id)}
 			/>
 			<div className="grid min-h-0 auto-rows-max grid-cols-[minmax(0,1fr)] overflow-y-auto lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
 				<div className="grid min-h-0 grid-rows-[18rem_auto] border-b lg:grid-rows-[minmax(18rem,1fr)_auto] lg:border-r lg:border-b-0">
@@ -129,6 +139,7 @@ function RunComponent() {
 							<StepHeader step={selectedStep} />
 							<StepTranscript
 								key={selectedStep.id}
+								runId={run.data.id}
 								step={selectedStep}
 								transcript={
 									stream.transcript.steps.get(selectedStep.id) ??

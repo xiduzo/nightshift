@@ -1,6 +1,5 @@
-import { BotIcon, SquareTerminalIcon } from "lucide-react";
-
-import { OutcomeBadge } from "@/components/outcome-badge";
+import { hasCost, NODE_TYPE } from "@/components/flow/node-type";
+import { OutcomeBadge, stepState } from "@/components/outcome-badge";
 import type { StepSummary } from "@/lib/api-types";
 import { formatCost, formatDateTime, formatTime } from "@/lib/format";
 
@@ -8,7 +7,7 @@ import { stepDuration } from "./step-timeline";
 
 /** What the selected step is, and the outputs later nodes can read from it. */
 export function StepHeader({ step }: { step: StepSummary }) {
-	const Icon = step.nodeType === "agent" ? BotIcon : SquareTerminalIcon;
+	const Icon = NODE_TYPE[step.nodeType].icon;
 	const outputs = Object.entries(step.outputs);
 
 	return (
@@ -23,7 +22,7 @@ export function StepHeader({ step }: { step: StepSummary }) {
 						</span>
 					) : null}
 				</h2>
-				<OutcomeBadge state={step.outcome ?? "running"} />
+				<OutcomeBadge state={stepState(step)} />
 				<span className="text-muted-foreground">
 					<time
 						dateTime={new Date(step.startedAt).toISOString()}
@@ -32,7 +31,7 @@ export function StepHeader({ step }: { step: StepSummary }) {
 						{formatTime(step.startedAt)}
 					</time>{" "}
 					· {stepDuration(step)}
-					{step.nodeType === "agent" ? ` · ${formatCost(step.costUsd)}` : ""}
+					{hasCost(step.nodeType) ? ` · ${formatCost(step.costUsd)}` : ""}
 				</span>
 			</div>
 			{outputs.length > 0 ? (

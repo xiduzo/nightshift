@@ -16,6 +16,7 @@ function flowWith(edges: FlowEdge[]): Flow {
 				model: "sonnet",
 				permissionMode: "acceptEdits",
 				session: "fresh",
+				tools: [],
 			},
 			{
 				id: "check",

@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test";
 import type {
 	AgentNode,
 	CommandNode,
+	DecisionNode,
 	Flow,
 	FlowEdge,
 	FlowNode,
+	GateNode,
 } from "./schema";
 import type { FlowIssue } from "./types";
 import { parseFlow, validateFlow } from "./validate";
@@ -19,6 +21,7 @@ function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
 		model: "sonnet",
 		permissionMode: "acceptEdits",
 		session: "fresh",
+		tools: [],
 		...extra,
 	};
 }
@@ -29,6 +32,39 @@ function command(id: string, extra: Partial<CommandNode> = {}): CommandNode {
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: "bun test",
+		...extra,
+	};
+}
+
+function decision(
+	id: string,
+	labels: string[],
+	extra: Partial<DecisionNode> = {},
+): DecisionNode {
+	return {
+		id,
+		type: "decision",
+		position: { x: 0, y: 0 },
+		prompt: "Should we go on?",
+		labels: labels.map((name) => ({ name })),
+		decider: "claude-code",
+		model: "haiku",
+		tools: [],
+		...extra,
+	};
+}
+
+function gate(
+	id: string,
+	choices: string[],
+	extra: Partial<GateNode> = {},
+): GateNode {
+	return {
+		id,
+		type: "gate",
+		position: { x: 0, y: 0 },
+		question: "Ship it?",
+		choices: choices.map((name) => ({ name })),
 		...extra,
 	};
 }
@@ -332,6 +368,294 @@ describe("validateFlow", () => {
 	});
 });
 
+/** worker → decide → gate → ship, with retry loops back to the worker. */
+function decideAndGate(): Flow {
+	return flow(
+		[
+			agent("worker", {
+				prompt: "Build it. Reviewer said: {{gate.note}}",
+				tools: ["github"],
+			}),
+			decision("decide", ["continue", "stop"], {
+				prompt: "The worker reported: {{worker.summary}}. Go on?",
+				tools: ["github"],
+			}),
+			gate("gate", ["approve", "reject"], {
+				question: "The decider said {{decide.outcome}}: {{decide.notes}}",
+			}),
+			command("ship", { command: "gh pr ready" }),
+			agent("wrap_up", { prompt: "Write down why we stopped." }),
+		],
+		[
+			edge("built", "worker", "pass", "decide"),
+			edge("go-on", "decide", "continue", "gate"),
+			edge("halt", "decide", "stop", "wrap_up"),
+			edge("approved", "gate", "approve", "ship"),
+			edge("rejected", "gate", "reject", "worker", 3),
+		],
+	);
+}
+
+describe("validateFlow: decisions and gates", () => {
+	test("worker → decide → gate → ship validates", () => {
+		expect(validateFlow(decideAndGate())).toEqual([]);
+		const json = JSON.parse(JSON.stringify(decideAndGate()));
+		delete json.nodes[1].decider;
+		delete json.nodes[1].model;
+		delete json.nodes[1].tools;
+		const parsed = parseFlow(json);
+		expect(parsed.issues).toEqual([]);
+		expect(parsed.flow?.nodes[1]).toMatchObject({
+			decider: "claude-code",
+			model: "haiku",
+			tools: [],
+		});
+	});
+
+	test("an edge outcome must be a label or choice of its source", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					agent("worker"),
+					decision("decide", ["continue", "stop"]),
+					gate("gate", ["approve"]),
+				],
+				[
+					edge("a", "worker", "pass", "decide"),
+					edge("b", "decide", "continue", "gate"),
+					edge("c", "decide", "stop", "worker", 1),
+					edge("d", "decide", "pass", "worker", 1),
+					edge("e", "gate", "approve", "worker", 1),
+					edge("f", "gate", "continue", "worker", 1),
+				],
+			),
+		);
+		expect(errors(issues)).toEqual([
+			expect.objectContaining({
+				edgeId: "d",
+				message: expect.stringContaining("continue, stop"),
+			}),
+			expect.objectContaining({
+				edgeId: "f",
+				message: expect.stringContaining('"gate" ends with approve'),
+			}),
+		]);
+	});
+
+	test("a label used by another node is not an outcome of this one", () => {
+		const issues = validateFlow(
+			flow(
+				[agent("worker"), command("check")],
+				[
+					edge("a", "worker", "approve", "check"),
+					edge("b", "check", "continue", "worker", 1),
+				],
+			),
+		);
+		expect(errors(issues).map((issue) => issue.edgeId)).toEqual(["a", "b"]);
+	});
+
+	test("duplicate decision labels and gate choices", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					decision("decide", ["go", "stop", "go"]),
+					gate("gate", ["yes", "yes"]),
+				],
+				[
+					edge("a", "decide", "go", "gate"),
+					edge("b", "decide", "stop", "gate"),
+					edge("c", "gate", "yes", "decide", 1),
+				],
+				"decide",
+			),
+		);
+		expect(issues).toEqual([
+			{
+				severity: "error",
+				message: expect.stringContaining('label "go" more than once'),
+				nodeId: "decide",
+			},
+			{
+				severity: "error",
+				message: expect.stringContaining('choice "yes" more than once'),
+				nodeId: "gate",
+			},
+		]);
+	});
+
+	test("reserved outcomes cannot be labels or choices", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					decision("decide", ["go", "error"]),
+					gate("gate", ["waiting", "stopped", "ok"]),
+				],
+				[
+					edge("a", "decide", "go", "gate"),
+					edge("b", "gate", "ok", "decide", 1),
+				],
+				"decide",
+			),
+		);
+		expect(errors(issues)).toEqual([
+			expect.objectContaining({
+				nodeId: "decide",
+				message: expect.stringContaining('"error", which is reserved'),
+			}),
+			expect.objectContaining({
+				nodeId: "gate",
+				message: expect.stringContaining('"waiting", which is reserved'),
+			}),
+			expect.objectContaining({
+				nodeId: "gate",
+				message: expect.stringContaining('"stopped", which is reserved'),
+			}),
+		]);
+		expect(warnings(issues)).toEqual([]);
+	});
+
+	test("a label or choice without an edge is a warning", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					agent("worker"),
+					decision("decide", ["continue", "stop"]),
+					gate("gate", ["approve", "reject"]),
+				],
+				[
+					edge("a", "worker", "pass", "decide"),
+					edge("b", "decide", "continue", "gate"),
+					edge("c", "gate", "approve", "worker", 2),
+				],
+			),
+		);
+		expect(issues).toEqual([
+			{
+				severity: "warning",
+				message:
+					'Decision node "decide" has no edge for "stop": the run ends there when the decider picks "stop".',
+				nodeId: "decide",
+			},
+			{
+				severity: "warning",
+				message:
+					'Gate node "gate" has no edge for "reject": the run ends there when the person picks "reject".',
+				nodeId: "gate",
+			},
+		]);
+	});
+
+	test("template references in a decision prompt and a gate question", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					agent("worker"),
+					decision("decide", ["go", "stop"], {
+						prompt: "{{worker.summary}} {{worker.log_tail}} {{ghost.notes}}",
+					}),
+					gate("gate", ["ok"], {
+						question:
+							"{{decide.notes}} {{decide.summary}} {{run.branch}} {{gate.note}} {{gate.notes}}",
+					}),
+				],
+				[
+					edge("a", "worker", "pass", "decide"),
+					edge("b", "decide", "go", "gate"),
+					edge("c", "decide", "stop", "gate"),
+					edge("d", "gate", "ok", "worker", 1),
+				],
+			),
+		);
+		expect(
+			errors(issues).map((issue) => [issue.nodeId, issue.message]),
+		).toEqual([
+			[
+				"decide",
+				expect.stringContaining(
+					'The prompt of "decide" uses {{worker.log_tail}}',
+				),
+			],
+			["decide", expect.stringContaining("{{ghost.notes}}")],
+			[
+				"gate",
+				expect.stringContaining(
+					'The question of "gate" uses {{decide.summary}}',
+				),
+			],
+			["gate", expect.stringContaining("{{gate.notes}}")],
+		]);
+	});
+
+	test("an agent may read decision and gate fields", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					decision("decide", ["go", "stop"]),
+					gate("gate", ["ok"]),
+					agent("worker", {
+						prompt:
+							"{{decide.outcome}} {{decide.notes}} {{decide.visit}} {{gate.outcome}} {{gate.note}} {{gate.visit}}",
+					}),
+				],
+				[
+					edge("a", "decide", "go", "gate"),
+					edge("b", "decide", "stop", "worker"),
+					edge("c", "gate", "ok", "worker"),
+				],
+				"decide",
+			),
+		);
+		expect(issues).toEqual([]);
+	});
+
+	test("a loop through a gate still needs a max", () => {
+		const looping = flow(
+			[agent("worker"), gate("gate", ["approve", "reject"])],
+			[
+				edge("a", "worker", "pass", "gate"),
+				edge("b", "gate", "reject", "worker"),
+				edge("c", "gate", "approve", "worker", 1),
+			],
+		);
+		expect(validateFlow(looping)).toEqual([
+			{
+				severity: "error",
+				message: expect.stringContaining("worker → gate → worker"),
+				nodeId: "worker",
+			},
+		]);
+		const gateOnly = flow(
+			[gate("gate", ["again", "done"])],
+			[edge("a", "gate", "again", "gate")],
+			"gate",
+		);
+		expect(errors(validateFlow(gateOnly))).toEqual([
+			expect.objectContaining({
+				message: expect.stringContaining("gate → gate"),
+			}),
+		]);
+	});
+
+	test("a loop through a decision still needs a max", () => {
+		const issues = validateFlow(
+			flow(
+				[agent("worker"), decision("decide", ["again", "done"])],
+				[
+					edge("a", "worker", "pass", "decide"),
+					edge("b", "decide", "again", "worker"),
+					edge("c", "decide", "done", "worker", 1),
+				],
+			),
+		);
+		expect(errors(issues)).toEqual([
+			expect.objectContaining({
+				message: expect.stringContaining("worker → decide → worker"),
+			}),
+		]);
+	});
+});
+
 describe("parseFlow", () => {
 	test("parses a valid flow and applies defaults", () => {
 		const json = JSON.parse(JSON.stringify(retryLoop(3)));
@@ -352,7 +676,7 @@ describe("parseFlow", () => {
 			version: 1,
 			start: "Worker",
 			nodes: [{ ...agent("worker"), model: "" }],
-			edges: [{ id: "a", from: "worker", outcome: "maybe", to: "check" }],
+			edges: [{ id: "a", from: "worker", outcome: "Maybe", to: "check" }],
 		});
 		expect(result.flow).toBeNull();
 		expect(result.issues.map((issue) => issue.severity)).toEqual([

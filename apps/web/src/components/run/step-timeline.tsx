@@ -1,7 +1,6 @@
 import { cn } from "@nightshift/ui/lib/utils";
-import { BotIcon, SquareTerminalIcon } from "lucide-react";
-
-import { OutcomeBadge } from "@/components/outcome-badge";
+import { hasCost, NODE_TYPE } from "@/components/flow/node-type";
+import { OutcomeBadge, stepState } from "@/components/outcome-badge";
 import type { StepSummary } from "@/lib/api-types";
 import { formatCost, formatDuration, formatTime } from "@/lib/format";
 
@@ -31,7 +30,7 @@ export function StepTimeline({
 		<ol className="flex flex-col divide-y">
 			{steps.map((step, index) => {
 				const selected = step.id === selectedStepId;
-				const Icon = step.nodeType === "agent" ? BotIcon : SquareTerminalIcon;
+				const Icon = NODE_TYPE[step.nodeType].icon;
 				return (
 					<li key={step.id}>
 						<button
@@ -48,7 +47,7 @@ export function StepTimeline({
 							</span>
 							<Icon
 								className="size-3.5 shrink-0 text-muted-foreground"
-								aria-label={step.nodeType}
+								aria-label={NODE_TYPE[step.nodeType].label}
 							/>
 							<span className="min-w-0 truncate font-medium font-mono">
 								{step.nodeId}
@@ -58,10 +57,7 @@ export function StepTimeline({
 									visit {step.visit}
 								</span>
 							) : null}
-							<OutcomeBadge
-								state={step.outcome ?? "running"}
-								className="ml-auto"
-							/>
+							<OutcomeBadge state={stepState(step)} className="ml-auto" />
 							<span
 								className="w-14 shrink-0 text-right text-muted-foreground tabular-nums"
 								title={`Started ${formatTime(step.startedAt)}`}
@@ -69,7 +65,7 @@ export function StepTimeline({
 								{stepDuration(step)}
 							</span>
 							<span className="w-14 shrink-0 text-right text-muted-foreground tabular-nums">
-								{step.nodeType === "agent" ? formatCost(step.costUsd) : "—"}
+								{hasCost(step.nodeType) ? formatCost(step.costUsd) : "—"}
 							</span>
 						</button>
 					</li>

@@ -2,8 +2,9 @@ import {
 	type Flow,
 	type FlowNode,
 	flowSchema,
-	outcomesByType,
+	nodeOutcomes,
 	outputFieldsByType,
+	reservedOutcomes,
 	runFields,
 } from "./schema";
 import { templateRefs } from "./template";
@@ -12,8 +13,11 @@ import type { FlowIssue } from "./types";
 /**
  * Checks what the schema cannot: unique ids, a known start node, edges between
  * known nodes with outcomes the source node can produce, an Agent node with a
- * prompt or a skill, template references to known nodes and fields, and no
- * cycle without an edge that has a `max`. Warns about unreachable nodes.
+ * prompt or a skill, Decision labels and Gate choices that are unique and not
+ * reserved, template references to known nodes and fields, and no cycle
+ * without an edge that has a `max` (a Gate in a cycle too: a person could
+ * loop forever). Warns about unreachable nodes and about Decision labels or
+ * Gate choices without an edge, since picking one ends the run as failed.
  */
 export function validateFlow(flow: Flow): FlowIssue[] {
 	const issues: FlowIssue[] = [];
@@ -60,9 +64,9 @@ export function validateFlow(flow: Flow): FlowIssue[] {
 			error(`Edge "${edge.id}" leaves unknown node "${edge.from}".`, {
 				edgeId: edge.id,
 			});
-		} else if (!outcomesByType[source.type].includes(edge.outcome)) {
+		} else if (!nodeOutcomes(source).includes(edge.outcome)) {
 			error(
-				`Edge "${edge.id}" leaves "${edge.from}" on "${edge.outcome}", but a ${source.type} node ends with ${outcomesByType[source.type].join(", ")}.`,
+				`Edge "${edge.id}" leaves "${edge.from}" on "${edge.outcome}", but ${describeNode(source)} ends with ${nodeOutcomes(source).join(", ")}.`,
 				{ edgeId: edge.id },
 			);
 		}
@@ -91,15 +95,26 @@ export function validateFlow(flow: Flow): FlowIssue[] {
 
 	// Node content.
 	for (const node of nodes.values()) {
-		if (node.type === "agent") {
-			if (node.prompt.trim() === "" && node.skill === undefined) {
-				error(`Agent node "${node.id}" needs a prompt or a skill.`, {
-					nodeId: node.id,
-				});
-			}
-			checkTemplate(node, node.prompt, "prompt", nodes, error);
-		} else {
-			checkTemplate(node, node.command, "command", nodes, error);
+		switch (node.type) {
+			case "agent":
+				if (node.prompt.trim() === "" && node.skill === undefined) {
+					error(`Agent node "${node.id}" needs a prompt or a skill.`, {
+						nodeId: node.id,
+					});
+				}
+				checkTemplate(node, node.prompt, "prompt", nodes, error);
+				break;
+			case "command":
+				checkTemplate(node, node.command, "command", nodes, error);
+				break;
+			case "decision":
+				checkOptions(node, "label", "the decider", flow, error, warning);
+				checkTemplate(node, node.prompt, "prompt", nodes, error);
+				break;
+			case "gate":
+				checkOptions(node, "choice", "the person", flow, error, warning);
+				checkTemplate(node, node.question, "question", nodes, error);
+				break;
 		}
 	}
 
@@ -137,6 +152,57 @@ export function validateFlow(flow: Flow): FlowIssue[] {
 	}
 
 	return issues;
+}
+
+function describeNode(node: FlowNode): string {
+	return node.type === "agent" || node.type === "command"
+		? `a ${node.type} node`
+		: `"${node.id}"`;
+}
+
+/**
+ * Decision labels and Gate choices are outcomes: each must be unique within
+ * its node and not reserved for the engine. One without an edge is allowed,
+ * but picking it ends the run as failed.
+ */
+function checkOptions(
+	node: Extract<FlowNode, { type: "decision" | "gate" }>,
+	kind: "label" | "choice",
+	picker: string,
+	flow: Flow,
+	error: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
+	warning: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
+): void {
+	const title = node.type === "decision" ? "Decision" : "Gate";
+	const names = nodeOutcomes(node);
+	const reserved: readonly string[] = reservedOutcomes;
+	const seen = new Set<string>();
+	for (const name of names) {
+		if (seen.has(name)) {
+			error(
+				`${title} node "${node.id}" has the ${kind} "${name}" more than once.`,
+				{ nodeId: node.id },
+			);
+			continue;
+		}
+		seen.add(name);
+		if (reserved.includes(name)) {
+			error(
+				`${title} node "${node.id}" uses the ${kind} "${name}", which is reserved. Do not use: ${reserved.join(", ")}.`,
+				{ nodeId: node.id },
+			);
+			continue;
+		}
+		const routed = flow.edges.some(
+			(edge) => edge.from === node.id && edge.outcome === name,
+		);
+		if (!routed) {
+			warning(
+				`${title} node "${node.id}" has no edge for "${name}": the run ends there when ${picker} picks "${name}".`,
+				{ nodeId: node.id },
+			);
+		}
+	}
 }
 
 function checkTemplate(

@@ -23,7 +23,7 @@ import type {
 export type RunStatus =
 	| "running" // a step is in progress, or the walk is between steps
 	| "waiting" // a Gate waits for a person in the Needs-you inbox
-	| "finished" // the walk reached a `pass` outcome with no edge left to take
+	| "finished" // the walk reached `pass`, a Decision label or a Gate choice with no edge left to take
 	| "stopped" // a person stopped the run
 	| "failed" // a step errored, a `fail`/`needs-input` had no edge, or a loop hit its max
 	| "interrupted"; // the daemon died while a step ran
@@ -86,7 +86,7 @@ export type RunSummary = {
 	branch: string;
 	baseRef: string;
 	status: RunStatus;
-	/** Why the run failed, when it did. */
+	/** Why the run failed, or which Decision label or Gate choice ended it. */
 	reason: string | null;
 	createdAt: number;
 	/** Sum over all steps. */

@@ -25,6 +25,8 @@ export type RunEnding = Exclude<RunStatus, "running">;
 
 export type StepOutputs = Record<string, string | number>;
 
+export type GateChoice = { name: string; description?: string };
+
 export type EnginePayloads = {
 	ProjectAdded: { projectId: string; name: string; repoPath: string };
 	ProjectRemoved: { projectId: string };
@@ -61,6 +63,23 @@ export type EnginePayloads = {
 		outcome: StepOutcome;
 		outputs: StepOutputs;
 		error: string | null;
+		/**
+		 * What the step spent outside harness sessions, for example a
+		 * Decision's decider. Harness sessions report their own cost in
+		 * `SessionEnded`. Absent in logs written before Slice 3.
+		 */
+		costUsd?: number | null;
+	};
+	/**
+	 * A Gate step asks a person and waits. The step stays open until a person
+	 * answers (`StepEnded` with the choice) or stops the run (`StepEnded` with
+	 * `stopped`). An open Gate makes the run `waiting`, and it survives a
+	 * daemon restart: it is a fact, not a timer.
+	 */
+	GateOpened: {
+		/** The rendered question. */
+		question: string;
+		choices: GateChoice[];
 	};
 	SessionStarted: {
 		prompt: string;
@@ -143,8 +162,9 @@ function bySeq(events: readonly LoggedEvent[]): LoggedEvent[] {
 /**
  * The run's status and why it ended. The latest of `RunStarted`,
  * `RunResumed` and `RunEnded` decides: an end gives its status, a start or a
- * resume means the run is `running`. A run with none of them (the daemon
- * died while it created the run) is `interrupted`.
+ * resume means the run is `running`, or `waiting` while a Gate is open. A run
+ * with none of them (the daemon died while it created the run) is
+ * `interrupted`.
  */
 export function deriveRunState(events: readonly LoggedEvent[]): {
 	status: RunStatus;
@@ -165,6 +185,7 @@ export function deriveRunState(events: readonly LoggedEvent[]): {
 	if (latest.type === "RunEnded") {
 		return { status: latest.payload.status, reason: latest.payload.reason };
 	}
+	if (deriveOpenGate(events)) return { status: "waiting", reason: null };
 	return { status: "running", reason: null };
 }
 
@@ -243,7 +264,15 @@ export type DerivedStep = {
 	outputs: StepOutputs;
 	error: string | null;
 	sessions: DerivedSession[];
+	/** Harness sessions plus what the step spent itself (a decider). */
 	costUsd: number;
+	/** Gate steps only: the latest `GateOpened` of this step. */
+	gate: {
+		question: string;
+		choices: GateChoice[];
+		openedAt: number;
+		openedSeq: number;
+	} | null;
 };
 
 /**
@@ -272,12 +301,20 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 				error: null,
 				sessions: [],
 				costUsd: 0,
+				gate: null,
 			});
 			continue;
 		}
 		const step = steps.get(e.stepId);
 		if (!step) continue;
-		if (e.type === "StepReopened") {
+		if (e.type === "GateOpened") {
+			step.gate = {
+				question: e.payload.question,
+				choices: e.payload.choices,
+				openedAt: e.at,
+				openedSeq: e.seq,
+			};
+		} else if (e.type === "StepReopened") {
 			step.openedSeq = e.seq;
 			step.endedAt = null;
 			step.outcome = null;
@@ -287,6 +324,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 			step.outcome = e.payload.outcome;
 			step.outputs = e.payload.outputs;
 			step.error = e.payload.error;
+			step.costUsd += e.payload.costUsd ?? 0;
 		}
 	}
 	for (const session of deriveSessions(events)) {
@@ -410,27 +448,89 @@ export function deriveResumePoint(
 	return { kind: "node", nodeId: last.nodeId };
 }
 
-/** The sum of the cost each ended session reported. */
+/**
+ * The run's cost: what each ended session reported, plus what steps spent
+ * outside sessions (a decider).
+ */
 export function sumCostUsd(events: readonly LoggedEvent[]): number {
+	const steps = deriveSteps(events);
+	const stepIds = new Set(steps.map((s) => s.id));
 	let total = 0;
+	for (const step of steps) total += step.costUsd;
+	// A session whose step is missing from the log still cost money.
 	for (const session of deriveSessions(events)) {
+		if (session.stepId && stepIds.has(session.stepId)) continue;
 		total += session.ending?.costUsd ?? 0;
 	}
 	return total;
 }
 
+export type OpenGateFact = {
+	stepId: string;
+	nodeId: string;
+	visit: number;
+	question: string;
+	choices: GateChoice[];
+	openedAt: number;
+};
+
+/**
+ * The Gate the run waits at: a Gate step that opened and has not ended,
+ * while the run has not ended. A Gate step that started but never wrote
+ * `GateOpened` (the daemon died in between) is not open: recovery
+ * interrupts it like any other step.
+ */
+export function deriveOpenGate(
+	events: readonly LoggedEvent[],
+): OpenGateFact | null {
+	let lastRunEvent: LoggedEvent | null = null;
+	for (const e of events) {
+		if (
+			(e.type === "RunStarted" ||
+				e.type === "RunResumed" ||
+				e.type === "RunEnded") &&
+			(!lastRunEvent || e.seq > lastRunEvent.seq)
+		) {
+			lastRunEvent = e;
+		}
+	}
+	if (!lastRunEvent || lastRunEvent.type === "RunEnded") return null;
+	const walkBegan = lastRunEvent.seq;
+	const open = deriveSteps(events).findLast(
+		(s) =>
+			s.endedAt === null &&
+			s.gate !== null &&
+			s.gate.openedSeq > s.openedSeq &&
+			s.gate.openedSeq > walkBegan,
+	);
+	if (!open?.gate) return null;
+	return {
+		stepId: open.id,
+		nodeId: open.nodeId,
+		visit: open.visit,
+		question: open.gate.question,
+		choices: open.gate.choices,
+		openedAt: open.gate.openedAt,
+	};
+}
+
 /**
  * What a daemon that died left open, per run: sessions and steps that
- * started but never ended, and whether the run itself never ended.
+ * started but never ended, and whether the run itself never ended. An open
+ * Gate is not lost work: it waits for a person, so it stays open and its
+ * run stays `waiting`.
  */
 export function openWork(events: readonly LoggedEvent[]): {
 	sessions: DerivedSession[];
 	steps: DerivedStep[];
 	runOpen: boolean;
 } {
+	const gate = deriveOpenGate(events);
 	return {
 		sessions: deriveSessions(events).filter((s) => s.ending === null),
-		steps: deriveSteps(events).filter((s) => s.endedAt === null),
+		steps: deriveSteps(events).filter(
+			(s) => s.endedAt === null && s.id !== gate?.stepId,
+		),
 		runOpen: deriveRunStatus(events) === "running",
 	};
 }

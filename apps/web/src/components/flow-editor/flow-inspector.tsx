@@ -68,6 +68,10 @@ export function FlowInspector({
 					</li>
 					<li>Select a node or an edge to edit it. Backspace deletes it.</li>
 					<li>
+						A Decision node has one outcome per label, a Gate node one per
+						choice. Renaming one moves its edges along.
+					</li>
+					<li>
 						An edge back to an earlier node is a retry loop. Give one edge in
 						every loop a max.
 					</li>
