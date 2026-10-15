@@ -11,7 +11,24 @@
  *
  * The translator enforces the stream contract: one `session` event first and
  * one terminal `finished` / `error` event last (from `finish`).
+ *
+ * Step reports (`stepReport` on), see `step-report.ts`:
+ * - A `report_step` tool call becomes one `report` event, emitted when its
+ *   successful result arrives. The call itself is harness plumbing: its
+ *   `tool-start` / `tool-end` / `tool-result` events are not emitted. A call
+ *   with invalid input, or one that fails or is denied, emits its tool
+ *   events instead, so the transcript shows the report that did not count.
+ * - A `NIGHTSHIFT-REPORT: {...}` line in the final result text becomes one
+ *   `report` event just before the terminal event. The line stays in the
+ *   streamed text.
+ * Both channels are read in every mode; the last report counts.
  */
+import {
+	isReportTool,
+	parseStepReport,
+	parseTextReport,
+	type StepReport,
+} from "./step-report";
 import type { AgentErrorKind, AgentEvent, AgentUsage } from "./types";
 
 /** The AG-UI chunk shape this module reads. Every field is checked at runtime. */
@@ -31,6 +48,8 @@ export type SdkSignals = {
 	resultError?: string;
 	/** Usage from the result message, a fallback for RUN_FINISHED usage. */
 	resultUsage?: AgentUsage;
+	/** The `result` text of the result message: the final assistant text. */
+	resultText?: string;
 };
 
 export type FinishInput = {
@@ -151,9 +170,12 @@ export function observeSdkMessage(
 
 	if (message.type === "result") {
 		const resultUsage = usageFromSdkResult(message);
-		const next: SdkSignals = resultUsage
-			? { ...signals, resultUsage }
-			: signals;
+		const resultText = asString(message.result);
+		const next: SdkSignals = {
+			...signals,
+			...(resultUsage ? { resultUsage } : {}),
+			...(resultText !== undefined ? { resultText } : {}),
+		};
 		// Max turns is a normal stop for the run policy, not a harness failure.
 		const failed =
 			message.subtype === "error_max_turns"
@@ -216,6 +238,17 @@ function toolName(chunk: AgUiChunk): string | undefined {
 	);
 }
 
+function isErrorResult(chunk: AgUiChunk): boolean {
+	if (chunk.state === "output-error") return true;
+	const metadata = isRecord(chunk.metadata) ? chunk.metadata : undefined;
+	const tanstack =
+		metadata && isRecord(metadata.tanstack) ? metadata.tanstack : undefined;
+	return tanstack?.state === "output-error";
+}
+
+/** The result the adapter synthesizes for a call the run never resolved. */
+const INTERRUPTED_RESULT = JSON.stringify({ status: "interrupted" });
+
 function errorMessage(error: unknown): string {
 	if (error instanceof Error && error.message) return error.message;
 	if (typeof error === "string" && error) return error;
@@ -247,6 +280,8 @@ export type Translator = {
 export function createTranslator(options: {
 	/** Session id to report when the harness ends before it reports one. */
 	fallbackSessionId: string;
+	/** Turn `report_step` tool calls into `report` events. */
+	stepReport?: boolean;
 }): Translator {
 	let sessionEmitted = false;
 	let finished = false;
@@ -257,6 +292,14 @@ export function createTranslator(options: {
 	let runError: string | undefined;
 	/** Tool names by call id: `chat()` can drop the name from TOOL_CALL_END. */
 	const toolNames = new Map<string, string>();
+	/** Report tool calls by call id, with their input once it is complete. */
+	const reportCalls = new Map<
+		string,
+		{ name: string; input?: unknown; report?: StepReport }
+	>();
+	const isReportCall = (toolCallId: string, name: string | undefined) =>
+		options.stepReport === true &&
+		(reportCalls.has(toolCallId) || isReportTool(name));
 
 	function emit(events: AgentEvent[]): AgentEvent[] {
 		if (sessionEmitted) return events;
@@ -288,12 +331,26 @@ export function createTranslator(options: {
 				const toolCallId = asString(chunk.toolCallId);
 				if (!toolCallId) return [];
 				const name = toolName(chunk) ?? "unknown";
+				if (isReportCall(toolCallId, name)) {
+					reportCalls.set(toolCallId, { name });
+					return [];
+				}
 				toolNames.set(toolCallId, name);
 				return emit([{ type: "tool-start", toolCallId, name }]);
 			}
 			case "TOOL_CALL_END": {
 				const toolCallId = asString(chunk.toolCallId);
 				if (!toolCallId) return [];
+				if (isReportCall(toolCallId, toolName(chunk))) {
+					const input = toolInput(chunk);
+					reportCalls.set(toolCallId, {
+						name:
+							reportCalls.get(toolCallId)?.name ?? toolName(chunk) ?? "unknown",
+						input,
+						report: parseStepReport(input),
+					});
+					return [];
+				}
 				return emit([
 					{
 						type: "tool-end",
@@ -307,6 +364,30 @@ export function createTranslator(options: {
 				const toolCallId = asString(chunk.toolCallId);
 				if (!toolCallId) return [];
 				const content = chunk.content;
+				const call = reportCalls.get(toolCallId);
+				if (call) {
+					reportCalls.delete(toolCallId);
+					if (call.report && !isErrorResult(chunk)) {
+						if (content === INTERRUPTED_RESULT) return [];
+						return emit([{ type: "report", ...call.report }]);
+					}
+					// A report that did not count stays visible, so a person can see why the step passed without one.
+					return emit([
+						{ type: "tool-start", toolCallId, name: call.name },
+						{
+							type: "tool-end",
+							toolCallId,
+							name: call.name,
+							input: call.input,
+						},
+						{
+							type: "tool-result",
+							toolCallId,
+							content:
+								typeof content === "string" ? content : JSON.stringify(content),
+						},
+					]);
+				}
 				return emit([
 					{
 						type: "tool-result",
@@ -389,7 +470,15 @@ export function createTranslator(options: {
 						...pending.splice(0),
 					];
 			sessionEmitted = true;
-			return [...head, terminal(input)];
+			const textReport =
+				options.stepReport && !input.aborted && signals.resultText
+					? parseTextReport(signals.resultText)
+					: undefined;
+			return [
+				...head,
+				...(textReport ? [{ type: "report" as const, ...textReport }] : []),
+				terminal(input),
+			];
 		},
 	};
 }

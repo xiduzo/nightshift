@@ -5,34 +5,32 @@ import type {
 } from "@/lib/api-types";
 
 /**
- * Folds the raw transcript entries of a run into display items: one block per
- * assistant message, one row per tool call, a boundary per session, and the
- * events that end a session. Folding is incremental so a long replay and a fast
- * live stream only touch the items that change.
+ * Folds the raw transcript entries of a run into display items, per step. An
+ * agent step gets one block per assistant message, one row per tool call, a
+ * boundary per session, its step report, and the events that end a session.
+ * A command step gets its command line, one log, and its exit code. Folding is
+ * incremental so a long replay and a fast live stream only touch the items
+ * that change.
  */
 
-export type SessionItem = {
-	kind: "session";
+type ItemBase = {
 	key: string;
-	sessionId: string;
+	/** The engine's agent session id. Null for command steps. */
+	sessionId: string | null;
 	at: number;
+};
+
+export type SessionItem = ItemBase & {
+	kind: "session";
+	sessionId: string;
 	model?: string;
 	harnessSessionId?: string;
 };
 
-export type MessageItem = {
-	kind: "message";
-	key: string;
-	sessionId: string;
-	at: number;
-	text: string;
-};
+export type MessageItem = ItemBase & { kind: "message"; text: string };
 
-export type ToolItem = {
+export type ToolItem = ItemBase & {
 	kind: "tool";
-	key: string;
-	sessionId: string;
-	at: number;
 	toolCallId: string;
 	name: string;
 	/** Set once the harness has the full input. */
@@ -41,57 +39,98 @@ export type ToolItem = {
 	result?: string;
 };
 
-export type FinishedItem = {
-	kind: "finished";
-	key: string;
-	sessionId: string;
-	at: number;
-	usage?: AgentUsage;
+export type ReportItem = ItemBase & {
+	kind: "report";
+	outcome: "pass" | "fail" | "needs-input";
+	summary: string;
 };
 
-export type ErrorItem = {
+export type FinishedItem = ItemBase & { kind: "finished"; usage?: AgentUsage };
+
+export type ErrorItem = ItemBase & {
 	kind: "error";
-	key: string;
-	sessionId: string;
-	at: number;
 	errorKind: AgentErrorKind;
 	message: string;
 	resetAt?: number;
 };
 
+export type CommandItem = ItemBase & { kind: "command"; command: string };
+
+export type LogChunk = { stream: "stdout" | "stderr"; text: string };
+
+/** All output of one command, in order. Neighbouring chunks of one stream are merged. */
+export type LogItem = ItemBase & { kind: "log"; chunks: LogChunk[] };
+
+export type ExitItem = ItemBase & { kind: "exit"; exitCode: number | null };
+
 export type TranscriptItem =
 	| SessionItem
 	| MessageItem
 	| ToolItem
+	| ReportItem
 	| FinishedItem
-	| ErrorItem;
+	| ErrorItem
+	| CommandItem
+	| LogItem
+	| ExitItem;
 
+/** The transcript of one step. */
 export type TranscriptState = {
 	items: TranscriptItem[];
 	/** Item key to index in `items`. */
 	index: Map<string, number>;
-	/** Highest seq folded so far; -1 when empty. */
-	lastSeq: number;
 };
 
 export const emptyTranscript: TranscriptState = {
 	items: [],
 	index: new Map(),
+};
+
+/** The transcripts of a run, by step id. */
+export type RunTranscript = {
+	steps: ReadonlyMap<string, TranscriptState>;
+	/** Highest seq folded so far; -1 when empty. */
+	lastSeq: number;
+};
+
+export const emptyRunTranscript: RunTranscript = {
+	steps: new Map(),
 	lastSeq: -1,
 };
 
 /** Applies entries in seq order. Entries at or below `lastSeq` are ignored. */
 export function applyEntries(
-	state: TranscriptState,
+	state: RunTranscript,
 	entries: TranscriptEntry[],
-): TranscriptState {
+): RunTranscript {
 	const fresh = entries.filter((entry) => entry.seq > state.lastSeq);
 	if (fresh.length === 0) return state;
 	fresh.sort((a, b) => a.seq - b.seq);
 
+	const byStep = new Map<string, TranscriptEntry[]>();
+	for (const entry of fresh) {
+		const list = byStep.get(entry.stepId);
+		if (list) list.push(entry);
+		else byStep.set(entry.stepId, [entry]);
+	}
+
+	const steps = new Map(state.steps);
+	for (const [stepId, stepEntries] of byStep) {
+		steps.set(
+			stepId,
+			applyStepEntries(steps.get(stepId) ?? emptyTranscript, stepEntries),
+		);
+	}
+
+	return { steps, lastSeq: fresh[fresh.length - 1]?.seq ?? state.lastSeq };
+}
+
+function applyStepEntries(
+	state: TranscriptState,
+	entries: TranscriptEntry[],
+): TranscriptState {
 	const items = state.items.slice();
 	const index = new Map(state.index);
-	let lastSeq = state.lastSeq;
 
 	const push = (item: TranscriptItem) => {
 		index.set(item.key, items.length);
@@ -106,15 +145,10 @@ export function applyEntries(
 		items[position] = change(items[position] as T);
 		return true;
 	};
-	const ensureSession = (entry: TranscriptEntry) => {
-		const key = `session:${entry.sessionId}`;
+	const ensureSession = (entry: TranscriptEntry, sessionId: string) => {
+		const key = `session:${sessionId}`;
 		if (!index.has(key)) {
-			push({
-				kind: "session",
-				key,
-				sessionId: entry.sessionId,
-				at: entry.at,
-			});
+			push({ kind: "session", key, sessionId, at: entry.at });
 		}
 		return key;
 	};
@@ -138,18 +172,21 @@ export function applyEntries(
 		return key;
 	};
 
-	for (const entry of fresh) {
-		lastSeq = entry.seq;
-		const sessionKey = ensureSession(entry);
+	for (const entry of entries) {
+		const sessionKey =
+			entry.sessionId === null ? null : ensureSession(entry, entry.sessionId);
 		const event = entry.event;
+		const base = { sessionId: entry.sessionId, at: entry.at };
 
 		switch (event.type) {
 			case "session":
-				update<SessionItem>(sessionKey, (item) => ({
-					...item,
-					model: event.model ?? item.model,
-					harnessSessionId: event.sessionId,
-				}));
+				if (sessionKey) {
+					update<SessionItem>(sessionKey, (item) => ({
+						...item,
+						model: event.model ?? item.model,
+						harnessSessionId: event.sessionId,
+					}));
+				}
 				break;
 			case "text": {
 				const key = `message:${entry.sessionId}:${event.messageId}`;
@@ -158,13 +195,7 @@ export function applyEntries(
 					text: item.text + event.delta,
 				}));
 				if (!found) {
-					push({
-						kind: "message",
-						key,
-						sessionId: entry.sessionId,
-						at: entry.at,
-						text: event.delta,
-					});
+					push({ ...base, kind: "message", key, text: event.delta });
 				}
 				break;
 			}
@@ -183,36 +214,80 @@ export function applyEntries(
 			}
 			case "tool-result": {
 				const key = ensureTool(entry, event.toolCallId, "tool");
-				update<ToolItem>(key, (item) => ({
-					...item,
-					result: event.content,
-				}));
+				update<ToolItem>(key, (item) => ({ ...item, result: event.content }));
 				break;
 			}
+			case "report":
+				push({
+					...base,
+					kind: "report",
+					key: `report:${entry.seq}`,
+					outcome: event.outcome,
+					summary: event.summary,
+				});
+				break;
 			case "finished":
 				push({
+					...base,
 					kind: "finished",
 					key: `finished:${entry.seq}`,
-					sessionId: entry.sessionId,
-					at: entry.at,
 					usage: event.usage,
 				});
 				break;
 			case "error":
 				push({
+					...base,
 					kind: "error",
 					key: `error:${entry.seq}`,
-					sessionId: entry.sessionId,
-					at: entry.at,
 					errorKind: event.kind,
 					message: event.message,
 					resetAt: event.resetAt,
 				});
 				break;
+			case "command-start":
+				push({
+					...base,
+					kind: "command",
+					key: `command:${entry.seq}`,
+					command: event.command,
+				});
+				break;
+			case "command-output": {
+				const last = items[items.length - 1];
+				if (last?.kind === "log") {
+					const chunks = last.chunks.slice();
+					const tail = chunks[chunks.length - 1];
+					if (tail && tail.stream === event.stream) {
+						chunks[chunks.length - 1] = {
+							stream: tail.stream,
+							text: tail.text + event.text,
+						};
+					} else {
+						chunks.push({ stream: event.stream, text: event.text });
+					}
+					items[items.length - 1] = { ...last, chunks };
+				} else {
+					push({
+						...base,
+						kind: "log",
+						key: `log:${entry.seq}`,
+						chunks: [{ stream: event.stream, text: event.text }],
+					});
+				}
+				break;
+			}
+			case "command-exit":
+				push({
+					...base,
+					kind: "exit",
+					key: `exit:${entry.seq}`,
+					exitCode: event.exitCode,
+				});
+				break;
 		}
 	}
 
-	return { items, index, lastSeq };
+	return { items, index };
 }
 
 /** A one-line summary of a tool's input: the command, path, or pattern it acts on. */

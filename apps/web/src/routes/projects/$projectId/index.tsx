@@ -8,11 +8,12 @@ import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
+import { FlowList } from "@/components/flow-list";
 import { NewRunForm } from "@/components/new-run-form";
 import { RunList } from "@/components/run-list";
 import { orpc } from "@/utils/orpc";
 
-export const Route = createFileRoute("/projects/$projectId")({
+export const Route = createFileRoute("/projects/$projectId/")({
 	component: ProjectComponent,
 });
 
@@ -55,17 +56,25 @@ function ProjectComponent() {
 					</p>
 				</header>
 				<div className="grid gap-8 lg:grid-cols-2">
-					<section
-						aria-labelledby="new-run-heading"
-						className="flex flex-col gap-3"
-					>
-						<h2 id="new-run-heading" className="font-medium text-sm">
-							New run
-						</h2>
-						<div className="border p-3">
-							<NewRunForm projectId={project.id} />
-						</div>
-					</section>
+					<div className="flex flex-col gap-8">
+						<FlowList projectId={project.id} />
+						<section
+							aria-labelledby="new-run-heading"
+							className="flex flex-col gap-3"
+						>
+							<div className="flex flex-col gap-0.5">
+								<h2 id="new-run-heading" className="font-medium text-sm">
+									Quick run
+								</h2>
+								<p className="text-muted-foreground text-xs">
+									One Agent node with a prompt, no flow file.
+								</p>
+							</div>
+							<div className="border p-3">
+								<NewRunForm projectId={project.id} />
+							</div>
+						</section>
+					</div>
 					<section
 						aria-labelledby="runs-heading"
 						className="flex flex-col gap-3"
@@ -76,7 +85,7 @@ function ProjectComponent() {
 						<RunList
 							runs={runs.data}
 							isLoading={runs.isLoading}
-							emptyDescription="Start a run with the form. Each run works in its own worktree."
+							emptyDescription="Run a flow or start a quick run. Each run works in its own worktree."
 						/>
 					</section>
 				</div>

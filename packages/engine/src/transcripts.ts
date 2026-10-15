@@ -5,17 +5,26 @@ import { dirname, join } from "node:path";
 import type { TranscriptEntry } from "./types";
 
 /**
- * Transcripts are NDJSON files on disk, one per session:
- * `<dataDir>/transcripts/<runId>/<sessionId>.ndjson`. `seq` increases by one
- * per run, across sessions.
+ * Transcripts are NDJSON files on disk, one per step:
+ * `<dataDir>/transcripts/<runId>/<stepId>.ndjson`. `seq` increases by one
+ * per run, across steps and sessions. A command step also keeps its full
+ * output as plain text in `<dataDir>/logs/<runId>/<stepId>.log`.
  */
 
 export function transcriptPath(
 	dataDir: string,
 	runId: string,
-	sessionId: string,
+	stepId: string,
 ): string {
-	return join(dataDir, "transcripts", runId, `${sessionId}.ndjson`);
+	return join(dataDir, "transcripts", runId, `${stepId}.ndjson`);
+}
+
+export function commandLogPath(
+	dataDir: string,
+	runId: string,
+	stepId: string,
+): string {
+	return join(dataDir, "logs", runId, `${stepId}.log`);
 }
 
 /**
@@ -45,7 +54,7 @@ export async function readTranscriptFile(
 	return entries;
 }
 
-/** All entries of a run, over all its sessions, ordered by seq. */
+/** All entries of a run, over all its steps, ordered by seq. */
 export async function readRunTranscript(
 	paths: readonly string[],
 ): Promise<TranscriptEntry[]> {

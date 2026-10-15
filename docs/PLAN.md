@@ -135,8 +135,7 @@ bun run build          # everything, desktop last
 
 ## 7. Open items
 
-- Do the TanStack AI harness adapters (`ai-claude-code` 0.9, `ai-opencode` 0.5, `ai-codex` 0.6) accept our own tools inside the harness session, or only the harness's built-in tools? The answer decides how the GitHub tools reach an Agent node. Confirm in Slice 1.
-- Do the harness adapters expose session resume and the usage-limit reset time? The run policy needs both.
-- Pin `@tanstack/ai` (0.69) and each adapter to exact versions. They move fast.
-- Electrobun packaging needs a static web build of TanStack Start. Confirm before Slice 2.
-- Issues #1 to #3 and their Features describe the earlier plan. Close or refine them to match this plan.
+- Our own TanStack AI tools reach a Claude Code session over MCP as `mcp__tanstack__<name>` (Slice 2, the `report_step` tool). Plan mode denies them, so a plan-mode Agent node reports with a text line instead. Check OpenCode and Codex when their adapters arrive.
+- Session resume works through the adapter (Slice 1). The usage-limit reset time is parsed from the harness's raw messages, but no real usage limit has tested it yet.
+- Electrobun packaging needs a static web build of TanStack Start. Confirm before the first desktop build.
+- `@tanstack/ai-sandbox` 0.5.23 writes its projection marker to a doubled path when the workspace has a fixed directory. We set `workspace.root: '.'` to avoid it. Report it upstream.

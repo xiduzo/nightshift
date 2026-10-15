@@ -1,3 +1,4 @@
+import { singleAgentFlow } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Input } from "@nightshift/ui/components/input";
 import { Label } from "@nightshift/ui/components/label";
@@ -35,6 +36,7 @@ export function NewRunForm({ projectId }: { projectId: string }) {
 		useState<PermissionMode>("acceptEdits");
 	const [effort, setEffort] = useState<Effort | "">("");
 	const [baseRef, setBaseRef] = useState("");
+	const [flowError, setFlowError] = useState<string | null>(null);
 
 	const startRun = useMutation(
 		orpc.runs.start.mutationOptions({
@@ -50,12 +52,24 @@ export function NewRunForm({ projectId }: { projectId: string }) {
 
 	const submit = () => {
 		if (!canSubmit) return;
+		let flow: ReturnType<typeof singleAgentFlow>;
+		try {
+			flow = singleAgentFlow({
+				prompt: prompt.trim(),
+				model: model.trim(),
+				permissionMode,
+				effort: effort || undefined,
+			});
+		} catch (error) {
+			setFlowError(
+				`Could not build the run: ${error instanceof Error ? error.message : String(error)}`,
+			);
+			return;
+		}
+		setFlowError(null);
 		startRun.mutate({
 			projectId,
-			prompt: prompt.trim(),
-			model: model.trim(),
-			permissionMode,
-			effort: effort || undefined,
+			flow,
 			baseRef: baseRef.trim() || undefined,
 		});
 	};
@@ -176,9 +190,9 @@ export function NewRunForm({ projectId }: { projectId: string }) {
 				</p>
 			) : null}
 
-			{startRun.error ? (
+			{flowError || startRun.error ? (
 				<p role="alert" className="text-destructive text-xs">
-					{startRun.error.message}
+					{flowError ?? startRun.error?.message}
 				</p>
 			) : null}
 

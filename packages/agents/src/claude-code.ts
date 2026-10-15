@@ -14,6 +14,7 @@ import {
 } from "@tanstack/ai-sandbox";
 import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
 import { streamSession } from "./session-stream";
+import { reportStepTool, stepReportSetup } from "./step-report";
 import { createTranslator, type Translator } from "./translate";
 import type {
 	AgentEvent,
@@ -23,7 +24,10 @@ import type {
 } from "./types";
 
 export type ClaudeCodeHarnessOptions = {
-	/** Built-in tools the session may use without a prompt (`--allowedTools`). */
+	/**
+	 * Built-in tools the session may use without a prompt (`--allowedTools`).
+	 * With `stepReport`, the report tool is added (see `step-report.ts`).
+	 */
 	allowedTools?: string[];
 	/** Built-in tools removed from the session (`--disallowedTools`). */
 	disallowedTools?: string[];
@@ -129,6 +133,8 @@ function startChat(
 		lifecycle: { reuse: "none", destroyOnComplete: true },
 	});
 
+	const report = stepReportSetup(input, options.allowedTools);
+
 	// Typed as `opus`, the model with every Effort level, so `chat()` accepts
 	// any `reasoning` level. The adapter gets the real id and clamps the level
 	// to that model's own levels at runtime.
@@ -137,7 +143,7 @@ function startChat(
 		permissionMode: input.permissionMode,
 		settingSources: options.settingSources ?? ["user", "project", "local"],
 		emitDiff: false,
-		...(options.allowedTools ? { allowedTools: options.allowedTools } : {}),
+		...(report.allowedTools ? { allowedTools: report.allowedTools } : {}),
 		...(options.disallowedTools
 			? { disallowedTools: options.disallowedTools }
 			: {}),
@@ -155,7 +161,8 @@ function startChat(
 	return chat({
 		adapter,
 		threadId: id,
-		messages: [{ role: "user", content: input.prompt }],
+		messages: [{ role: "user", content: report.prompt }],
+		...(report.withTool ? { tools: [reportStepTool()] } : {}),
 		...(input.resumeSessionId
 			? { modelOptions: { sessionId: input.resumeSessionId } }
 			: {}),
@@ -173,6 +180,7 @@ async function* runClaudeCode(
 	const translator = createTranslator({
 		// Only used when Claude Code fails before it reports its session id.
 		fallbackSessionId: input.resumeSessionId ?? randomUUID(),
+		stepReport: input.stepReport === true,
 	});
 	const abortController = new AbortController();
 	const forwardAbort = () => abortController.abort(input.signal.reason);

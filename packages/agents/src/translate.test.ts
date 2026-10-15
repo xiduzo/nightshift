@@ -371,6 +371,206 @@ describe("createTranslator", () => {
 	});
 });
 
+describe("step reports", () => {
+	const reporting = () =>
+		createTranslator({ fallbackSessionId: "fallback", stepReport: true });
+
+	const reportCall = (
+		input: unknown,
+		result: Record<string, unknown> = { content: "Step report recorded." },
+		name = "report_step",
+	) => [
+		{ type: "TOOL_CALL_START", toolCallId: "r1", toolCallName: name },
+		{ type: "TOOL_CALL_ARGS", toolCallId: "r1", delta: "{}" },
+		{ type: "TOOL_CALL_END", toolCallId: "r1", toolCallName: name, input },
+		{ type: "TOOL_CALL_RESULT", toolCallId: "r1", messageId: "x", ...result },
+	];
+
+	test("a report tool call becomes one report event, without tool events", () => {
+		const events = feed(reporting(), [
+			session,
+			{ type: "TOOL_CALL_START", toolCallId: "c1", toolCallName: "Read" },
+			{ type: "TOOL_CALL_END", toolCallId: "c1", input: {} },
+			{ type: "TOOL_CALL_RESULT", toolCallId: "c1", content: "hi" },
+			...reportCall({ outcome: "pass", summary: " All good. " }),
+			runFinished,
+		]);
+		expect(events.map((e) => e.type)).toEqual([
+			"session",
+			"tool-start",
+			"tool-end",
+			"tool-result",
+			"report",
+			"finished",
+		]);
+		expect(events[4]).toEqual({
+			type: "report",
+			outcome: "pass",
+			summary: "All good.",
+		});
+	});
+
+	test("accepts the prefixed MCP name and the input from metadata", () => {
+		const translator = reporting();
+		const events = feed(translator, [
+			session,
+			{
+				type: "TOOL_CALL_START",
+				toolCallId: "r1",
+				toolCallName: "mcp__tanstack__report_step",
+			},
+			{
+				type: "TOOL_CALL_END",
+				toolCallId: "r1",
+				metadata: {
+					tanstack: { input: { outcome: "needs-input", summary: "Which?" } },
+				},
+			},
+			{ type: "TOOL_CALL_RESULT", toolCallId: "r1", content: "ok" },
+			runFinished,
+		]);
+		expect(events[1]).toEqual({
+			type: "report",
+			outcome: "needs-input",
+			summary: "Which?",
+		});
+	});
+
+	test.each([
+		["invalid input", { outcome: "maybe", summary: "x" }, { content: "ok" }],
+		["missing summary", { outcome: "pass" }, { content: "ok" }],
+		[
+			"an error result",
+			{ outcome: "pass", summary: "x" },
+			{ content: "denied", state: "output-error" },
+		],
+		[
+			"an error result in metadata",
+			{ outcome: "pass", summary: "x" },
+			{
+				content: "Tool execution failed",
+				metadata: { tanstack: { state: "output-error" } },
+			},
+		],
+	])("shows the call instead of a report for %s", (_name, input, result) => {
+		const events = feed(reporting(), [
+			session,
+			...reportCall(input, result),
+			runFinished,
+		]);
+		expect(events.map((e) => e.type)).toEqual([
+			"session",
+			"tool-start",
+			"tool-end",
+			"tool-result",
+			"finished",
+		]);
+	});
+
+	test("emits nothing for an interrupted call", () => {
+		const events = feed(reporting(), [
+			session,
+			...reportCall(
+				{ outcome: "pass", summary: "x" },
+				{ content: '{"status":"interrupted"}' },
+			),
+			runFinished,
+		]);
+		expect(events.map((e) => e.type)).toEqual(["session", "finished"]);
+	});
+
+	test("the agent can report again after a rejected call", () => {
+		const events = feed(reporting(), [
+			session,
+			...reportCall(
+				{ outcome: "nope" },
+				{ content: "x", state: "output-error" },
+			),
+			...reportCall({ outcome: "fail", summary: "Tests fail." }),
+			runFinished,
+		]);
+		expect(events.filter((e) => e.type === "report")).toEqual([
+			{ type: "report", outcome: "fail", summary: "Tests fail." },
+		]);
+	});
+
+	test("without stepReport the tool call is an ordinary tool", () => {
+		const events = feed(newTranslator(), [
+			session,
+			...reportCall({ outcome: "pass", summary: "x" }),
+			runFinished,
+		]);
+		expect(events.map((e) => e.type)).toEqual([
+			"session",
+			"tool-start",
+			"tool-end",
+			"tool-result",
+			"finished",
+		]);
+	});
+
+	test("a text report in the result becomes a report before finished", () => {
+		const translator = reporting();
+		translator.observeSdk({
+			type: "result",
+			subtype: "success",
+			is_error: false,
+			result:
+				'Done.\nNIGHTSHIFT-REPORT: {"outcome": "fail", "summary": "No pelican."}',
+		});
+		const events = feed(translator, [session, runFinished]);
+		expect(events.slice(1)).toEqual([
+			{ type: "report", outcome: "fail", summary: "No pelican." },
+			expect.objectContaining({ type: "finished" }),
+		]);
+	});
+
+	test("a text report counts after a tool report", () => {
+		const translator = reporting();
+		translator.observeSdk({
+			type: "result",
+			subtype: "success",
+			result: 'NIGHTSHIFT-REPORT: {"outcome": "pass", "summary": "b"}',
+		});
+		const events = feed(translator, [
+			session,
+			...reportCall({ outcome: "fail", summary: "a" }),
+			runFinished,
+		]);
+		expect(events.filter((e) => e.type === "report").at(-1)).toEqual({
+			type: "report",
+			outcome: "pass",
+			summary: "b",
+		});
+	});
+
+	test("no text report when aborted or when stepReport is off", () => {
+		const result = {
+			type: "result",
+			subtype: "success",
+			result: 'NIGHTSHIFT-REPORT: {"outcome": "pass", "summary": "x"}',
+		};
+		const aborted = reporting();
+		aborted.observeSdk(result);
+		const off = newTranslator();
+		off.observeSdk(result);
+		expect(
+			feed(aborted, [session, runFinished], { aborted: true }).map(
+				(e) => e.type,
+			),
+		).toEqual(["session", "error"]);
+		expect(feed(off, [session, runFinished]).map((e) => e.type)).toEqual([
+			"session",
+			"finished",
+		]);
+	});
+
+	test("a session without a report emits no report", () => {
+		const events = feed(reporting(), [session, runFinished]);
+		expect(events.map((e) => e.type)).toEqual(["session", "finished"]);
+	});
+});
+
 describe("observeSdkMessage", () => {
 	test("ignores unrelated messages", () => {
 		const signals = {};

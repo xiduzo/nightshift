@@ -4,7 +4,9 @@ import type { TranscriptEntry } from "./types";
 export type BusItem =
 	| { kind: "transcript"; entry: TranscriptEntry }
 	/** The run's status may have changed. Listeners derive it again. */
-	| { kind: "status-changed" };
+	| { kind: "status-changed" }
+	/** A step started, changed or ended. Listeners derive its summary again. */
+	| { kind: "step-changed"; stepId: string };
 
 type Listener = (item: BusItem) => void;
 
@@ -34,7 +36,7 @@ export function createRunBus() {
 				try {
 					listener(item);
 				} catch {
-					// A broken listener must not break the session that publishes.
+					// A broken listener must not break the walk that publishes.
 				}
 			}
 		},

@@ -11,6 +11,7 @@ import {
 	MessageScrollerProvider,
 	MessageScrollerViewport,
 } from "@nightshift/ui/components/message-scroller";
+import { cn } from "@nightshift/ui/lib/utils";
 import {
 	CircleCheckIcon,
 	CircleStopIcon,
@@ -20,7 +21,8 @@ import {
 } from "lucide-react";
 import { memo } from "react";
 
-import type { RunDetail, SessionSummary } from "@/lib/api-types";
+import { STEP_STATE } from "@/components/outcome-badge";
+import type { SessionSummary, StepSummary } from "@/lib/api-types";
 import {
 	formatCost,
 	formatDateTime,
@@ -30,41 +32,47 @@ import {
 } from "@/lib/format";
 import type {
 	ErrorItem,
+	ExitItem,
 	FinishedItem,
+	LogItem,
 	MessageItem,
-	SessionItem,
+	ReportItem,
 	TranscriptItem,
 	TranscriptState,
 } from "@/lib/transcript";
 
 import { ToolCallRow } from "./tool-call-row";
 
-export function RunTranscript({
-	run,
+/**
+ * The transcript of one step. An agent step reads as a conversation: session
+ * boundaries with their prompt, messages, tool calls, and the step report. A
+ * command step reads as a terminal log.
+ */
+export function StepTranscript({
+	step,
 	transcript,
-	running,
 	connecting,
 }: {
-	run: RunDetail;
+	step: StepSummary;
 	transcript: TranscriptState;
-	running: boolean;
 	/** The first replay has not arrived yet. */
 	connecting: boolean;
 }) {
+	const running = step.outcome === null;
 	const sessionNumbers = new Map(
-		run.sessions.map((session, position) => [session.id, position + 1]),
+		step.sessions.map((session, position) => [session.id, position + 1]),
 	);
 	const sessionsById = new Map(
-		run.sessions.map((session) => [session.id, session]),
+		step.sessions.map((session) => [session.id, session]),
 	);
 	// Sessions the engine knows about but that have no transcript entries yet,
 	// for example one that was resumed a moment ago.
 	const seen = new Set(
-		transcript.items
-			.filter((item) => item.kind === "session")
-			.map((item) => item.sessionId),
+		transcript.items.flatMap((item) =>
+			item.kind === "session" ? [item.sessionId] : [],
+		),
 	);
-	const pendingSessions = run.sessions.filter(
+	const pendingSessions = step.sessions.filter(
 		(session) => !seen.has(session.id),
 	);
 	const isEmpty = transcript.items.length === 0 && pendingSessions.length === 0;
@@ -72,7 +80,7 @@ export function RunTranscript({
 	return (
 		<MessageScrollerProvider autoScroll defaultScrollPosition="end">
 			<MessageScroller className="min-h-0">
-				<MessageScrollerViewport aria-label="Transcript">
+				<MessageScrollerViewport aria-label={`Transcript of ${step.nodeId}`}>
 					<MessageScrollerContent
 						aria-live="off"
 						className="mx-auto w-full max-w-4xl gap-3 px-4 py-4"
@@ -82,9 +90,16 @@ export function RunTranscript({
 								<TranscriptItemView
 									item={item}
 									running={running}
-									session={sessionsById.get(item.sessionId)}
-									sessionNumber={sessionNumbers.get(item.sessionId)}
-									runPrompt={run.prompt}
+									session={
+										item.sessionId
+											? sessionsById.get(item.sessionId)
+											: undefined
+									}
+									sessionNumber={
+										item.sessionId
+											? sessionNumbers.get(item.sessionId)
+											: undefined
+									}
 								/>
 							</MessageScrollerItem>
 						))}
@@ -105,12 +120,27 @@ export function RunTranscript({
 								{connecting ? "Loading transcript…" : "No transcript yet."}
 							</p>
 						) : null}
+						{step.error ? (
+							<div className="flex gap-2 border border-destructive/50 bg-destructive/10 px-3 py-2 text-destructive text-sm">
+								<CircleXIcon
+									className="mt-0.5 size-4 shrink-0"
+									aria-hidden="true"
+								/>
+								<p className="whitespace-pre-wrap break-words text-xs">
+									{step.error}
+								</p>
+							</div>
+						) : null}
 						{running ? (
 							<Marker className="py-1">
 								<MarkerIcon>
 									<LoaderCircleIcon className="animate-spin text-status-running motion-reduce:animate-none" />
 								</MarkerIcon>
-								<MarkerContent>The agent is working…</MarkerContent>
+								<MarkerContent>
+									{step.nodeType === "agent"
+										? "The agent is working…"
+										: "The command is running…"}
+								</MarkerContent>
 							</Marker>
 						) : null}
 					</MessageScrollerContent>
@@ -126,52 +156,45 @@ const TranscriptItemView = memo(function TranscriptItemView({
 	running,
 	session,
 	sessionNumber,
-	runPrompt,
 }: {
 	item: TranscriptItem;
 	running: boolean;
 	session: SessionSummary | undefined;
 	sessionNumber: number | undefined;
-	runPrompt: string;
 }) {
 	switch (item.kind) {
 		case "session":
 			return (
-				<SessionStart
-					item={item}
+				<SessionBoundary
 					number={sessionNumber}
-					prompt={session?.prompt ?? (sessionNumber === 1 ? runPrompt : "")}
+					at={item.at}
+					model={item.model}
+					prompt={session?.prompt ?? ""}
 				/>
 			);
 		case "message":
 			return <MessageBlock item={item} />;
 		case "tool":
 			return <ToolCallRow item={item} running={running} />;
+		case "report":
+			return <ReportCard item={item} />;
 		case "finished":
 			return <SessionFinished item={item} />;
 		case "error":
 			return <SessionError item={item} />;
+		case "command":
+			return (
+				<p className="break-words font-mono text-xs">
+					<span className="select-none text-muted-foreground">$ </span>
+					{item.command}
+				</p>
+			);
+		case "log":
+			return <CommandLog item={item} />;
+		case "exit":
+			return <CommandExit item={item} />;
 	}
 });
-
-function SessionStart({
-	item,
-	number,
-	prompt,
-}: {
-	item: SessionItem;
-	number: number | undefined;
-	prompt: string;
-}) {
-	return (
-		<SessionBoundary
-			number={number}
-			at={item.at}
-			model={item.model}
-			prompt={prompt}
-		/>
-	);
-}
 
 function SessionBoundary({
 	number,
@@ -206,7 +229,7 @@ function SessionBoundary({
 				</p>
 				{prompt.trim() === "" ? (
 					<p className="text-muted-foreground text-sm italic">
-						Resumed without a new prompt.
+						{resumed ? "Resumed without a new prompt." : "No prompt."}
 					</p>
 				) : (
 					<p className="whitespace-pre-wrap break-words text-sm">{prompt}</p>
@@ -220,6 +243,30 @@ function MessageBlock({ item }: { item: MessageItem }) {
 	return (
 		<div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
 			{item.text}
+		</div>
+	);
+}
+
+/** The agent's step report: the outcome the flow follows, and its summary. */
+function ReportCard({ item }: { item: ReportItem }) {
+	const { label, icon: Icon, text, color } = STEP_STATE[item.outcome];
+	return (
+		<div
+			className="flex gap-2 border border-l-[3px] bg-card px-3 py-2"
+			style={{ borderLeftColor: color }}
+		>
+			<Icon className={cn("mt-0.5 size-4 shrink-0", text)} aria-hidden="true" />
+			<div className="flex min-w-0 flex-col gap-1">
+				<p className="text-xs">
+					<span className="text-muted-foreground">Step report · </span>
+					<span className={cn("font-medium", text)}>{label}</span>
+				</p>
+				{item.summary.trim() ? (
+					<p className="whitespace-pre-wrap break-words text-sm">
+						{item.summary}
+					</p>
+				) : null}
+			</div>
 		</div>
 	);
 }
@@ -282,5 +329,42 @@ function SessionError({ item }: { item: ErrorItem }) {
 				) : null}
 			</div>
 		</div>
+	);
+}
+
+function CommandLog({ item }: { item: LogItem }) {
+	return (
+		<pre className="max-h-[36rem] overflow-auto whitespace-pre-wrap break-words border bg-muted/40 p-2 font-mono text-xs leading-relaxed">
+			{item.chunks.map((chunk, index) => (
+				<span
+					// Chunks only grow at the end, so the index is stable.
+					key={index}
+					className={chunk.stream === "stderr" ? "text-destructive" : undefined}
+				>
+					{chunk.text}
+				</span>
+			))}
+		</pre>
+	);
+}
+
+function CommandExit({ item }: { item: ExitItem }) {
+	const passed = item.exitCode === 0;
+	return (
+		<Marker>
+			<MarkerIcon>
+				{passed ? (
+					<CircleCheckIcon className="text-outcome-pass" />
+				) : (
+					<CircleXIcon className="text-outcome-fail" />
+				)}
+			</MarkerIcon>
+			<MarkerContent>
+				{item.exitCode === null
+					? "The command ended without an exit code"
+					: `Exited with code ${item.exitCode}`}{" "}
+				· {formatTime(item.at)}
+			</MarkerContent>
+		</Marker>
 	);
 }

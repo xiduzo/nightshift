@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { failingScript, fakeHarness, usageLimitScript } from "./fake";
+import {
+	failingScript,
+	fakeHarness,
+	reportingScript,
+	usageLimitScript,
+} from "./fake";
 import type { AgentEvent, AgentSessionInput } from "./types";
 
 function input(overrides: Partial<AgentSessionInput> = {}): AgentSessionInput {
@@ -169,6 +174,43 @@ describe("fakeHarness", () => {
 				input: { command: "ls" },
 			},
 			{ type: "tool-result", toolCallId: "fake-tool-1", content: "a.txt" },
+		]);
+	});
+
+	test.each(["pass", "fail", "needs-input"] as const)(
+		"reporting script: %s",
+		async (outcome) => {
+			const events = await collect(
+				fakeHarness({
+					...reportingScript(outcome, "Summary."),
+					delayMs: 0,
+				}).run(input({ stepReport: true })),
+			);
+			expectContract(events);
+			expect(events.slice(-2)).toEqual([
+				{ type: "report", outcome, summary: "Summary." },
+				{ type: "finished" },
+			]);
+		},
+	);
+
+	test("report steps keep their place among the other steps", async () => {
+		const events = await collect(
+			fakeHarness({
+				delayMs: 0,
+				steps: [
+					{ type: "report", outcome: "fail", summary: "first" },
+					{ type: "text", text: "more" },
+					{ type: "report", outcome: "pass", summary: "second" },
+				],
+			}).run(input()),
+		);
+		expect(events.map((e) => e.type)).toEqual([
+			"session",
+			"report",
+			"text",
+			"report",
+			"finished",
 		]);
 	});
 });

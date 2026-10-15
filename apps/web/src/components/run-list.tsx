@@ -60,7 +60,7 @@ export function RunList({
 						<div className="flex min-w-0 items-center gap-2">
 							<RunStatusBadge status={run.status} />
 							<span className="min-w-0 flex-1 truncate text-sm">
-								{run.prompt}
+								{run.title}
 							</span>
 						</div>
 						<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-muted-foreground text-xs">
@@ -69,7 +69,7 @@ export function RunList({
 									{projectNames.get(run.projectId) ?? "Unknown project"}
 								</span>
 							) : null}
-							<span>{run.model}</span>
+							<span>{run.flowName ? "Flow" : "Quick run"}</span>
 							<span className="truncate font-mono">{run.branch}</span>
 							<span>{formatCost(run.costUsd)}</span>
 							<time

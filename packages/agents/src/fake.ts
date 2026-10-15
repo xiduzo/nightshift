@@ -4,6 +4,7 @@ import type {
 	AgentHarness,
 	AgentSessionInput,
 	AgentUsage,
+	StepReportOutcome,
 } from "./types";
 
 /** One step of a scripted fake session. */
@@ -14,6 +15,8 @@ export type FakeStep =
 			chunkSize?: number;
 	  }
 	| { type: "tool"; name: string; input?: unknown; result?: string }
+	/** The agent's step report: one `report` event. */
+	| { type: "report"; outcome: StepReportOutcome; summary: string }
 	| { type: "wait"; ms: number };
 
 export type FakeOutcome =
@@ -75,6 +78,20 @@ export function usageLimitScript(resetAt?: number): FakeScript {
 	};
 }
 
+/** A script that reports its step outcome, then finishes. */
+export function reportingScript(
+	outcome: StepReportOutcome,
+	summary = `Fake report: ${outcome}`,
+): FakeScript {
+	return {
+		steps: [
+			{ type: "text", text: "Working on it." },
+			{ type: "report", outcome, summary },
+		],
+		outcome: { type: "finished" },
+	};
+}
+
 /** A script that ends with a harness failure. */
 export function failingScript(message = "Fake harness failure"): FakeScript {
 	return {
@@ -132,6 +149,12 @@ export function fakeHarness(script: FakeScriptSource = {}): FakeHarness {
 			for (const step of steps) {
 				if (step.type === "wait") {
 					yield { wait: step.ms };
+				} else if (step.type === "report") {
+					yield {
+						type: "report",
+						outcome: step.outcome,
+						summary: step.summary,
+					};
 				} else if (step.type === "text") {
 					const messageId = `fake-message-${++ids}`;
 					for (const delta of chunksOf(step.text, step.chunkSize ?? 8)) {

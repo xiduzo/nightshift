@@ -1,23 +1,31 @@
 import type { AppRouterClient } from "@nightshift/api/routers/index";
+import type { AgentNode, Outcome } from "@nightshift/flows";
 import type { InferClientInputs, InferClientOutputs } from "@orpc/client";
 
 /**
  * Contract types, derived from the API client so the web app depends only on
- * `@nightshift/api`. They mirror `@nightshift/engine/types` and
- * `@nightshift/agents/types`.
+ * `@nightshift/api` (and the browser-safe `@nightshift/flows`). They mirror
+ * `@nightshift/engine/types` and `@nightshift/agents/types`.
  */
 
 type Outputs = InferClientOutputs<AppRouterClient>;
 type Inputs = InferClientInputs<AppRouterClient>;
 
 export type Project = Outputs["projects"]["list"][number];
+export type FlowListItem = Outputs["flows"]["list"][number];
+export type LoadedFlow = Outputs["flows"]["get"];
+
 export type RunSummary = Outputs["runs"]["list"][number];
 export type RunDetail = Outputs["runs"]["get"];
-export type SessionSummary = RunDetail["sessions"][number];
+export type StepSummary = RunDetail["steps"][number];
+export type SessionSummary = StepSummary["sessions"][number];
 export type RunStatus = RunSummary["status"];
-export type PermissionMode = RunSummary["permissionMode"];
-export type Effort = NonNullable<RunSummary["effort"]>;
+export type StepOutcome = NonNullable<StepSummary["outcome"]>;
 export type StartRunInput = Inputs["runs"]["start"];
+
+export type PermissionMode = AgentNode["permissionMode"];
+export type Effort = NonNullable<AgentNode["effort"]>;
+export type { Outcome };
 
 export type RunStreamItem =
 	Outputs["runs"]["watch"] extends AsyncIterable<infer Item> ? Item : never;
@@ -25,7 +33,12 @@ export type TranscriptEntry = Extract<
 	RunStreamItem,
 	{ kind: "transcript" }
 >["entry"];
-export type AgentEvent = TranscriptEntry["event"];
+export type StepEvent = TranscriptEntry["event"];
+export type CommandEvent = Extract<
+	StepEvent,
+	{ type: "command-start" | "command-output" | "command-exit" }
+>;
+export type AgentEvent = Exclude<StepEvent, CommandEvent>;
 export type AgentUsage = NonNullable<
 	Extract<AgentEvent, { type: "finished" }>["usage"]
 >;

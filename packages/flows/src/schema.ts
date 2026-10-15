@@ -61,7 +61,11 @@ export const agentNodeSchema = z.object({
 export const commandNodeSchema = z.object({
 	...nodeBase,
 	type: z.literal("command"),
-	/** Run with `sh -c` in the worktree. Supports templates. Exit 0 is `pass`. */
+	/**
+	 * Run with `sh -c` in the worktree. Exit 0 is `pass`. Template values
+	 * arrive as environment variables, never as shell text: write
+	 * `echo "{{worker.summary}}"` and the shell sees `echo "${NS_WORKER_SUMMARY}"`.
+	 */
 	command: z.string().min(1),
 });
 

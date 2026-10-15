@@ -1,4 +1,6 @@
 @import "@nightshift/ui/globals.css";
+/* In a layer, so Tailwind utilities on nodes and handles win over it. */
+@import "@xyflow/react/dist/style.css" layer(components);
 
 /*
  * Run status colors. A status always pairs its color with a label and an icon,
@@ -20,10 +22,74 @@
 	--status-interrupted: oklch(0.82 0.14 80);
 }
 
+/*
+ * Step outcomes reuse the status hues: pass reads as finished, fail as failed,
+ * needs-input as the amber that asks for a person.
+ */
+:root {
+	--outcome-pass: var(--status-finished);
+	--outcome-fail: var(--status-failed);
+	--outcome-needs-input: var(--status-interrupted);
+}
+
 @theme inline {
 	--color-status-running: var(--status-running);
 	--color-status-finished: var(--status-finished);
 	--color-status-stopped: var(--status-stopped);
 	--color-status-failed: var(--status-failed);
 	--color-status-interrupted: var(--status-interrupted);
+	--color-outcome-pass: var(--outcome-pass);
+	--color-outcome-fail: var(--outcome-fail);
+	--color-outcome-needs-input: var(--outcome-needs-input);
+}
+
+/* React Flow, themed with the app tokens. Follows `.dark` on <html>. */
+.react-flow {
+	--xy-background-color: var(--background);
+	--xy-background-pattern-color: color-mix(
+		in oklch,
+		var(--muted-foreground) 35%,
+		transparent
+	);
+	--xy-edge-stroke: var(--muted-foreground);
+	--xy-edge-stroke-width: 1.5;
+	--xy-edge-stroke-selected: var(--foreground);
+	--xy-connectionline-stroke: var(--ring);
+	--xy-connectionline-stroke-width: 1.5;
+	--xy-node-color: var(--card-foreground);
+	--xy-node-background-color: var(--card);
+	--xy-node-border: 1px solid var(--border);
+	--xy-node-border-radius: 0;
+	--xy-handle-background-color: var(--muted-foreground);
+	--xy-handle-border-color: var(--card);
+	--xy-selection-background-color: color-mix(
+		in oklch,
+		var(--ring) 10%,
+		transparent
+	);
+	--xy-selection-border: 1px dotted var(--ring);
+	--xy-controls-button-background-color: var(--card);
+	--xy-controls-button-background-color-hover: var(--muted);
+	--xy-controls-button-color: var(--foreground);
+	--xy-controls-button-color-hover: var(--foreground);
+	--xy-controls-button-border-color: var(--border);
+	--xy-controls-box-shadow: 0 0 0 1px var(--border);
+	--xy-minimap-background-color: var(--card);
+	--xy-minimap-mask-background-color: color-mix(
+		in oklch,
+		var(--muted) 70%,
+		transparent
+	);
+	--xy-minimap-node-background-color: var(--muted-foreground);
+	--xy-edge-label-background-color: var(--card);
+	--xy-edge-label-color: var(--foreground);
+	--xy-attribution-background-color: transparent;
+}
+
+.react-flow__controls-button svg {
+	fill: currentColor;
+}
+
+.react-flow__attribution a {
+	color: var(--muted-foreground);
 }
