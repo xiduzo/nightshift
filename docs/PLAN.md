@@ -1,19 +1,16 @@
 # Night Shift — Plan
 
-> An open agent orchestrator for spec-driven development.
+> A personal workbench to draw agent flows and run them unattended.
 
 This document records the concept, the decisions behind it, the architecture, and the delivery order. The steering documents in `docs/steering/` hold the durable rules. This plan holds the route.
 
 ## 1. What Night Shift is
 
-Night Shift is a team-facing workbench where a spec-driven development (SDD) method runs as a deterministic pipeline of agent sessions. People take part only at gates. The method is a plugin. WTF and OpenSpec ship first. The systems of record are plugins too. GitHub Issues, Jira, and repo files hold artifacts. GitHub pull requests and stacks are the code host.
+Night Shift is a workbench for one developer. You draw a flow in a graph editor. Each node is a step: an agent session with a prompt and/or a skill, a shell command, a decision, or a gate. The engine runs the flow on your machine, with your own CLI logins, while you sleep. In the morning you read a stack of pull requests and the open gates.
 
-Everything runs on the user's machine. The daemon is the product. The desktop app makes the daemon usable for people who will never run a script.
+Night Shift replaces `night-shift.py`, the script in `rpgdotexe/tools/night-shift/`. The script hardcodes one pipeline: worker, check, retry, rescue, pull request, checkpoint. Night Shift turns that pipeline into a flow that you can see and change. The script keeps running the nights until a flow runs a full Epic.
 
-Night Shift replaces two things:
-
-- `night-shift.py`, the shell script in `rpgdotexe/tools/night-shift/` that runs an Epic unattended. Its run policy is the seed of the engine.
-- The hosted "agent orchestrator" class of tools. Their failure modes (session loss, orchestrator agents that strand a project, worktree corruption, unbounded concurrency, configuration drift) are the list of things the engine must get right.
+Night Shift is for its author first. A team, a server mode, and other methods come only after the personal tool works every night.
 
 ## 2. Decisions
 
@@ -21,60 +18,59 @@ Each row is a settled decision. Change a row only with a new ADR.
 
 | Topic | Decision |
 | --- | --- |
-| Users | Role-agnostic. A UI over the agent tools a team already uses. |
-| Truth | Hybrid. The app owns runs, gates, sessions, and method state. The connector owns the artifacts. The app keeps a cached index. |
-| Topology | Local now. One Bun daemon embedded in the desktop app. The same daemon can run on a company server later, with laptops as runners. |
-| Identity | Better Auth always. Local mode auto-creates one user and one session. |
-| Step execution | Every method step runs as a harness session (Claude Code, OpenCode, Codex, Copilot, and every other TanStack AI harness adapter). TanStack AI owns the orchestrator, the router, and the gate plumbing. |
-| Skill packs | The runner materializes a pinned skill pack into a per-run plugin directory. The repo stays clean. |
-| Method package | A git repo or npm package: skill directories plus `method.json` (artifact types, lifecycle states, detection markers, flows). Flows are fixed in the package in v1 and overridable by a repo file. A flow builder comes later. |
-| Orchestrator | Stateless. Short steps at checkpoints that read durable state and return `continue` or `halt` plus steering notes, validated against a schema. The project chat is its human face. |
-| Agent profiles | Harness or model, model name, effort, permission mode, time budget, sandbox provider. Flows reference profiles by name. |
-| Run policy | Retries with a fresh session and a tight brief, rescue by a stronger profile, blocked propagation, network grace, usage-limit waits that resume the same session, a stop time. |
-| Scheduling | Core. Locks on repos, branches, and declared file sets. Methods supply conflict hints. Concurrency cap per runner. |
-| Gates | TanStack AI approval interrupts, persisted and resolvable by anyone with write access on the project. A method may narrow this. Every resolution writes back to the artifact. |
-| Needs input | Two modes per step: intercept the harness ask-the-user tool mid-session, or a structured end-of-step report with a needs-input item. |
-| Runner | The daemon on a machine. In-process in v1, behind an NDJSON event protocol so a remote runner is a transport change. Pool membership is opt-in. Headless mode is the same binary without a tray. |
+| Users | One developer: the author. Better Auth stays, and local mode auto-creates one user and one session. |
+| The method | The flow is the method. No method packages and no `method.json`. A WTF night is one flow among others. |
+| Flows | A directed graph that you edit in React Flow (`@xyflow/react`). Stored as a versioned JSON file in the repo: `.nightshift/flows/<name>.json`, with a published zod schema. |
+| Node types | Agent, Command, Decision, Gate, For Each. See section 3. |
+| Edges | An edge leaves a node on a named outcome (`pass`, `fail`, or a Decision label). An edge back to an earlier node is a retry loop. Every loop has a maximum count. The engine refuses a flow with an unbounded loop. |
+| Harnesses | Every Agent node runs as a harness session through a TanStack AI harness adapter: `@tanstack/ai-claude-code`, `@tanstack/ai-opencode`, `@tanstack/ai-codex`. |
+| Skills | An Agent node names a skill that the harness already has (user, project, or plugin skills). No skill pack materialization. |
+| GitHub | GitHub is a set of TanStack AI tools (read issue, write comment, set label, open pull request, link stack) on top of the `gh` CLI. Agent and Decision nodes can call them. The engine also calls them directly for fixed work. |
+| Decisions | A Decision node returns one of its declared labels plus notes, validated against a schema. The decider is a provider behind an interface. The default provider is a small model through TanStack AI structured output. Other providers (for example an OpenRouter model) plug in behind the same interface. |
+| Run policy | Ported from the script: fresh session with a tight brief on retry, rescue by a stronger profile, blocked propagation, network grace, usage-limit waits that resume the same session, a stop time. Policy is engine code. A flow only sets its numbers. |
 | Worktrees | The user's own clone. Worktrees live in a sibling directory. Garbage collection never deletes a dirty tree. |
-| Connectors | CLI-first (`gh`, `acli`) behind a transport-agnostic interface. MCP per vendor when a CLI falls short. Credentials are the user's own CLI logins. Anything the app holds lives in the OS keychain. Index refresh by polling and on demand. |
-| Connector kinds | Artifact connectors (GitHub Issues, Jira, repo files) and code-host connectors (GitHub PRs and stacks). A project binds one of each. |
-| PR follow-through | Core after the first slice. CI failures and review comments route back to the owning session. Board columns derive from PR, check, and review facts. |
-| State model | Durable facts in the database. Status is always derived. Every change appends to an event log that fans out to the UI over SSE. |
-| Configuration | One versioned file per project, `.nightshift/project.json`, with a published zod schema and a doctor. Machine-local settings stay in the app. A method's own config (for example `.wtf/config.json`) is read, never duplicated. |
+| State model | Durable facts in libsql. Status is always derived. Every change appends to an event log that fans out to the UI over SSE. |
 | Session view | Structured transcript. "Take over" hands the user the resume command. |
-| Notifications | OS notifications plus write-back on the artifact. Slack after server mode exists. |
-| Tenancy | Workspace → Project. Tenant id on every row. No cross-workspace queries. |
 | Shell | Electrobun. Bun is the main process, so the daemon runs in-process with no sidecar. |
-| Platforms | macOS and Linux in v1. |
+| Platforms | macOS first. |
 | License | Apache-2.0. Built in public. |
-| Process | Built with WTF from the first Epic. The current script runs the nights until Night Shift runs its own. |
 
-Decided without a question, flagged here: a step runs in one repo, so a cross-repo change is two steps. Session transcripts are stored in full on disk with an index in the database.
+Dropped from the earlier plan: method packages and `method.json`, the OpenSpec method, Jira, server mode with remote runners, the NDJSON runner protocol, the stateless orchestrator as a separate concept (it is now a Decision node), and the project chat.
 
-## 3. Architecture
+## 3. Node types
+
+| Node | Does | Outcomes |
+| --- | --- | --- |
+| Agent | Runs one harness session in the run's worktree. Holds a prompt and/or a skill, a harness, a model, an effort, a permission mode, and a time budget. Ends with a structured Step Report. | `pass`, `fail`, `needs-input` |
+| Command | Runs one shell command in the worktree, for example the gate check. Keeps the full log on disk and the tail in the report. | `pass` (exit 0), `fail` |
+| Decision | Reads the reports of earlier nodes and returns one declared label plus notes. | One edge per label |
+| Gate | Waits for a person in the Needs-you inbox. Holds a question and the choices. | One edge per choice |
+| For Each | Runs a sub-flow once per item of a list. The first source is "the Traces of an Epic, blockers first", read again before each item. A failed item blocks the items that wait on it. | `done`, `halted` |
+
+A node reads the outputs of earlier nodes through template variables, for example `{{check.log_tail}}` or `{{item.body}}`.
+
+## 4. Architecture
 
 ```mermaid
 flowchart LR
   subgraph desktop["Electrobun app (Bun main process)"]
-    ui["apps/web — TanStack Start UI"]
+    ui["apps/web — UI + React Flow editor"]
     daemon["apps/server — Hono + oRPC daemon"]
-    engine["packages/engine — flow engine"]
-    runner["packages/runner — sessions"]
-    connectors["packages/connectors"]
+    engine["packages/engine — flow runner"]
+    agents["packages/agents — harness sessions + tools"]
     db[("libsql — facts + event log")]
   end
-  methods["method packages (wtf, openspec)"]
-  harness["harness CLIs: claude, opencode, codex, …"]
-  systems["GitHub, Jira, repo files"]
+  flows[".nightshift/flows/*.json"]
+  harness["claude, opencode, codex"]
+  gh["gh CLI → GitHub"]
 
   ui -- "oRPC + SSE" --> daemon
   daemon --> engine
-  engine --> runner
-  engine --> connectors
+  engine --> agents
   engine --> db
-  runner -- "@tanstack/ai adapters" --> harness
-  runner -- "materialized skill pack" --> methods
-  connectors -- "gh, acli, files" --> systems
+  engine -- "load + validate" --> flows
+  agents -- "@tanstack/ai adapters" --> harness
+  agents -- "GitHub tools" --> gh
 ```
 
 ### Packages
@@ -82,65 +78,48 @@ flowchart LR
 | Package | Owns |
 | --- | --- |
 | `apps/server` | The daemon. Hono, oRPC router, Better Auth, SSE fan-out of the event log, OS notifications. |
-| `apps/web` | The UI. Spec tree and artifact editor, pipeline board, session transcript, gate inbox, run history with cost, doctor, settings, project chat. |
-| `apps/desktop` | The Electrobun shell. Tray, window, auto-update. No logic. |
-| `packages/db` | Drizzle schema on libsql. Durable facts, the event log, tenant id on every row. Full transcripts live on disk, indexed here. |
+| `apps/web` | The UI. Flow editor, run view with live transcripts, Needs-you inbox, run history. |
+| `apps/desktop` | The Electrobun shell. Tray and window. No logic. |
+| `packages/db` | Drizzle schema on libsql. Durable facts and the event log. Full transcripts live on disk, indexed here. |
 | `packages/api` | oRPC contracts shared by server and web. |
-| `packages/config` | The `.nightshift/project.json` schema, the loader, the doctor. |
-| `packages/methods` | The `method.json` schema, the loader, skill pack materialization, detection. |
-| `packages/engine` | Flow graph, frontier computation, scheduler with locks and a concurrency cap, run policy, gates, orchestrator decisions, worktree garbage collection. |
-| `packages/runner` | The runner protocol (NDJSON events, in-process transport), harness sessions through `@tanstack/ai` adapters, sandbox middleware, needs-input interception, session resume. |
-| `packages/connectors` | The artifact and code-host interfaces. `github-issues`, `repo-files`, `github-prs` in v1. `jira` next. |
+| `packages/flows` | The flow schema (zod), the loader, and the validator (unbounded loops, unknown skills, missing outcomes). |
+| `packages/engine` | Graph walk, run policy, gates, worktrees, For Each ordering. |
+| `packages/agents` | Harness sessions through `@tanstack/ai` adapters, session resume, usage-limit waits, the GitHub tools, the decider providers. |
 | `packages/ui` | Shared components and tokens. |
 
-### Method packages
+## 5. Delivery
 
-`method.json` declares:
+### Slice 1 — One agent node, live
 
-- `artifacts`: types, hierarchy, lifecycle states, where they live (issues or files).
-- `detect`: markers that bind a repo to this method (`.wtf/config.json`, `openspec/`).
-- `profiles`: the default agent profiles the flows reference.
-- `flows`: named graphs of steps. A step names a skill, a profile, inputs, a needs-input mode, and whether a gate follows.
+Pick a repo. Run one Agent node with a prompt on Claude Code in a fresh worktree. Watch the transcript stream into the UI. Stop it. Resume it.
 
-The WTF package lives in the `wtf` repo next to `skills/`. The OpenSpec package is a thin wrapper until upstream adopts the manifest.
+Proves: the TanStack AI harness adapter inside the Bun daemon, worktrees, the event log, SSE, transcripts on disk.
 
-## 4. Delivery
+### Slice 2 — The flow editor
 
-### Slice 1 — Chat to issue
+Draw a flow in React Flow with Agent and Command nodes and `pass`/`fail` edges. Save it to `.nightshift/flows/`. Run it: worker → check → back to worker on `fail`, at most three times.
 
-Bind a repo. Detect WTF. Type "write an epic for X" in the project chat. Hit a gate. See the issue on GitHub.
+Proves: the flow schema, the validator, the graph walk, retry loops, template variables.
 
-Proves: method packs, skill pack materialization, harness invocation, gates, the GitHub Issues connector, the event log, chat.
+### Slice 3 — Decisions, gates, GitHub
 
-### Slice 2 — One Feature, unattended
+Add Decision and Gate nodes and the GitHub tools. A flow reads an issue, builds it, opens a pull request, and asks a Decision node whether to continue.
 
-Run one Feature from an existing Epic. Wake up to a stack of pull requests.
+Proves: structured decisions, the Needs-you inbox, the GitHub tools inside a harness session.
 
-Proves: the flow engine, run policy, worktrees, the code-host connector, the stateless orchestrator, the board.
+### Slice 4 — The night as a flow
 
-### Slice 3 — OpenSpec
+Add the For Each node and the full run policy. Rebuild the rpgdotexe night as a flow: Traces blockers first, worker, gate check, retry, rescue, pull request on the stack, Feature checkpoint. Run one Feature unattended. Retire `night-shift.py` when a flow runs a full Epic.
 
-Bind a repo that uses OpenSpec. Run a proposal through apply.
-
-Proves: the method abstraction and the repo-files connector.
+Proves: parity with the script.
 
 ### Then
 
-PR follow-through. Jira. Flow builder. Server mode with remote runners. Windows. Slack.
+Only when the personal tool runs every night: a flow library to share, other methods, Jira, server mode, Windows.
 
-## 5. Setup
+## 6. Setup
 
-The repo was scaffolded with Better-T-Stack:
-
-```bash
-bunx create-better-t-stack@latest create nightshift \
-  --frontend tanstack-start --backend hono --runtime bun --api orpc \
-  --database sqlite --orm drizzle --db-setup none \
-  --auth better-auth --payments none \
-  --addons electrobun turborepo biome lefthook \
-  --examples none --git --package-manager bun --install \
-  --web-deploy none --server-deploy none --disable-analytics
-```
+The repo was scaffolded with Better-T-Stack (TanStack Start, Hono, Bun, oRPC, libsql, Drizzle, Better Auth, Electrobun, Turborepo, Biome, Lefthook).
 
 Daily commands:
 
@@ -154,10 +133,10 @@ bun run check-types    # TypeScript
 bun run build          # everything, desktop last
 ```
 
-WTF is set up in this repo (`.wtf/config.json`, issue templates, labels). Plan work with `/wtf.write-epic`, build with `/wtf.loop` or the current night-shift script.
+## 7. Open items
 
-## 6. Open items
-
-- The `method.json` schema is a draft until the OpenSpec package exists.
-- The TanStack AI harness adapters pin `@tanstack/ai` 0.68. Confirm the sandbox middleware works inside an Electrobun main process before Slice 1 ends.
+- Do the TanStack AI harness adapters (`ai-claude-code` 0.9, `ai-opencode` 0.5, `ai-codex` 0.6) accept our own tools inside the harness session, or only the harness's built-in tools? The answer decides how the GitHub tools reach an Agent node. Confirm in Slice 1.
+- Do the harness adapters expose session resume and the usage-limit reset time? The run policy needs both.
+- Pin `@tanstack/ai` (0.69) and each adapter to exact versions. They move fast.
 - Electrobun packaging needs a static web build of TanStack Start. Confirm before Slice 2.
+- Issues #1 to #3 and their Features describe the earlier plan. Close or refine them to match this plan.
