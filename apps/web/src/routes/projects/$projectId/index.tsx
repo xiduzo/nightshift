@@ -7,12 +7,13 @@ import {
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { HandIcon } from "lucide-react";
+import { HandIcon, MoonIcon } from "lucide-react";
 
 import { FlowList } from "@/components/flow-list";
 import { NewRunForm } from "@/components/new-run-form";
 import { RunList } from "@/components/run-list";
 import { useOpenGates } from "@/hooks/use-open-gates";
+import { formatDateTime, formatTime } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/projects/$projectId/")({
@@ -27,7 +28,10 @@ function ProjectComponent() {
 		// Live while a run is on its way, so one that reaches a Gate shows as waiting.
 		refetchInterval: (query) =>
 			query.state.data?.some(
-				(run) => run.status === "running" || run.status === "waiting",
+				(run) =>
+					run.status === "running" ||
+					run.status === "waiting" ||
+					run.status === "sleeping",
 			)
 				? 5000
 				: false,
@@ -37,6 +41,11 @@ function ProjectComponent() {
 	const gates = useOpenGates();
 	const waiting =
 		gates.data?.filter((gate) => gate.projectId === projectId).length ?? 0;
+	const sleeping = runs.data?.filter((run) => run.status === "sleeping") ?? [];
+	// The one that wakes first.
+	const nextWake = sleeping
+		.flatMap((run) => (run.wakeAt ? [run.wakeAt] : []))
+		.sort((a, b) => a - b)[0];
 
 	if (projects.isLoading) {
 		return (
@@ -98,15 +107,34 @@ function ProjectComponent() {
 							<h2 id="runs-heading" className="font-medium text-sm">
 								Runs
 							</h2>
-							{waiting > 0 ? (
-								<Link
-									to="/inbox"
-									className="ml-auto flex items-center gap-1 text-status-waiting text-xs underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
-								>
-									<HandIcon className="size-3.5" aria-hidden="true" />
-									{waiting} waiting for you
-								</Link>
-							) : null}
+							<div className="ml-auto flex items-center gap-3">
+								{sleeping.length > 0 ? (
+									<span className="flex items-center gap-1 text-status-sleeping text-xs">
+										<MoonIcon className="size-3.5" aria-hidden="true" />
+										{sleeping.length} sleeping
+										{nextWake ? (
+											<>
+												, wakes{" "}
+												<time
+													dateTime={new Date(nextWake).toISOString()}
+													title={formatDateTime(nextWake)}
+												>
+													{formatTime(nextWake)}
+												</time>
+											</>
+										) : null}
+									</span>
+								) : null}
+								{waiting > 0 ? (
+									<Link
+										to="/inbox"
+										className="flex items-center gap-1 text-status-waiting text-xs underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+									>
+										<HandIcon className="size-3.5" aria-hidden="true" />
+										{waiting} waiting for you
+									</Link>
+								) : null}
+							</div>
 						</div>
 						<RunList
 							runs={runs.data}

@@ -3,6 +3,7 @@ import {
 	BotIcon,
 	HandIcon,
 	type LucideIcon,
+	RepeatIcon,
 	SplitIcon,
 	SquareTerminalIcon,
 } from "lucide-react";
@@ -31,6 +32,11 @@ export const NODE_TYPE: Record<
 		label: "Gate",
 		icon: HandIcon,
 		blurb: "Waits for you to pick a choice in the inbox.",
+	},
+	foreach: {
+		label: "For Each",
+		icon: RepeatIcon,
+		blurb: "Runs a body flow once per item of a list.",
 	},
 };
 

@@ -1,12 +1,23 @@
+import type { ReactNode } from "react";
 import { hasCost, NODE_TYPE } from "@/components/flow/node-type";
 import { OutcomeBadge, stepState } from "@/components/outcome-badge";
-import type { StepSummary } from "@/lib/api-types";
+
+import type { RunStatus, StepSummary } from "@/lib/api-types";
 import { formatCost, formatDateTime, formatTime } from "@/lib/format";
 
 import { stepDuration } from "./step-timeline";
 
 /** What the selected step is, and the outputs later nodes can read from it. */
-export function StepHeader({ step }: { step: StepSummary }) {
+export function StepHeader({
+	step,
+	runStatus,
+	context,
+}: {
+	step: StepSummary;
+	runStatus: RunStatus;
+	/** Where the step ran, for a step inside a For Each body. */
+	context?: ReactNode;
+}) {
 	const Icon = NODE_TYPE[step.nodeType].icon;
 	const outputs = Object.entries(step.outputs);
 
@@ -22,7 +33,7 @@ export function StepHeader({ step }: { step: StepSummary }) {
 						</span>
 					) : null}
 				</h2>
-				<OutcomeBadge state={stepState(step)} />
+				<OutcomeBadge state={stepState(step, runStatus)} />
 				<span className="text-muted-foreground">
 					<time
 						dateTime={new Date(step.startedAt).toISOString()}
@@ -34,6 +45,9 @@ export function StepHeader({ step }: { step: StepSummary }) {
 					{hasCost(step.nodeType) ? ` · ${formatCost(step.costUsd)}` : ""}
 				</span>
 			</div>
+			{context ? (
+				<div className="text-muted-foreground text-xs">{context}</div>
+			) : null}
 			{outputs.length > 0 ? (
 				<details className="group/outputs text-xs">
 					<summary className="cursor-pointer select-none text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring">

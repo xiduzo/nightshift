@@ -8,14 +8,28 @@ import {
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronRightIcon, HandIcon, InboxIcon } from "lucide-react";
+import {
+	ChevronRightIcon,
+	HandIcon,
+	InboxIcon,
+	MoonIcon,
+	SunriseIcon,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { GateAnswer } from "@/components/gate/gate-answer";
 import { useNow } from "@/hooks/use-now";
 import { useOpenGates } from "@/hooks/use-open-gates";
-import type { OpenGate } from "@/lib/api-types";
-import { formatDateTime, formatWaited } from "@/lib/format";
+import type { OpenGate, Project, RunSummary } from "@/lib/api-types";
+import {
+	formatCountdown,
+	formatDateTime,
+	formatTime,
+	formatWaited,
+} from "@/lib/format";
+import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/inbox")({
 	// Polls from the browser; nothing to render on the server.
@@ -27,6 +41,15 @@ function InboxComponent() {
 	const gates = useOpenGates();
 	const now = useNow(30_000);
 	const count = gates.data?.length ?? 0;
+	const runs = useQuery({
+		...orpc.runs.list.queryOptions({ input: {} }),
+		refetchInterval: 15_000,
+		meta: { quietErrors: true },
+	});
+	const projects = useQuery(orpc.projects.list.queryOptions());
+	const sleeping = (runs.data ?? [])
+		.filter((run) => run.status === "sleeping")
+		.sort((a, b) => (a.wakeAt ?? 0) - (b.wakeAt ?? 0));
 
 	return (
 		<main className="min-h-0 overflow-y-auto">
@@ -85,8 +108,101 @@ function InboxComponent() {
 						))}
 					</ol>
 				)}
+
+				{sleeping.length > 0 ? (
+					<SleepingRuns runs={sleeping} projects={projects.data} />
+				) : null}
 			</div>
 		</main>
+	);
+}
+
+/** Runs that wait on a usage limit or the network. They go on by themselves. */
+function SleepingRuns({
+	runs,
+	projects,
+}: {
+	runs: RunSummary[];
+	projects: Project[] | undefined;
+}) {
+	const now = useNow(1000);
+	const queryClient = useQueryClient();
+	const wake = useMutation(
+		orpc.runs.resume.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.runs.key() }),
+			onError: (error) => toast.error(`Could not wake: ${error.message}`),
+		}),
+	);
+	const projectNames = new Map(projects?.map((p) => [p.id, p.name]));
+
+	return (
+		<section
+			aria-labelledby="sleeping-heading"
+			className="flex flex-col gap-2 pt-4"
+		>
+			<header className="flex flex-col gap-0.5">
+				<h2
+					id="sleeping-heading"
+					className="flex items-center gap-2 font-medium text-sm"
+				>
+					<MoonIcon
+						className="size-4 text-status-sleeping"
+						aria-hidden="true"
+					/>
+					Sleeping
+					<span className="text-muted-foreground tabular-nums">
+						{runs.length}
+					</span>
+				</h2>
+				<p className="text-muted-foreground text-xs">
+					Runs that wait for a usage limit or the network. Each one continues
+					its session on its own; wake it to try now.
+				</p>
+			</header>
+			<ul className="flex flex-col divide-y border">
+				{runs.map((run) => (
+					<li
+						key={run.id}
+						className="flex flex-wrap items-center gap-x-3 gap-y-1 border-l-[3px] border-l-status-sleeping px-3 py-2 text-xs"
+					>
+						<span className="text-muted-foreground">
+							{projectNames.get(run.projectId) ?? "Project"}
+						</span>
+						<Link
+							to="/runs/$runId"
+							params={{ runId: run.id }}
+							className="min-w-0 flex-1 truncate font-medium text-sm underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+						>
+							{run.title}
+						</Link>
+						{run.wakeAt ? (
+							<span className="text-status-sleeping">
+								wakes{" "}
+								<time
+									dateTime={new Date(run.wakeAt).toISOString()}
+									title={formatDateTime(run.wakeAt)}
+								>
+									{formatTime(run.wakeAt)}
+								</time>{" "}
+								<span className="font-mono tabular-nums">
+									({formatCountdown(run.wakeAt - now)})
+								</span>
+							</span>
+						) : null}
+						<Button
+							variant="outline"
+							size="xs"
+							disabled={wake.isPending && wake.variables?.runId === run.id}
+							onClick={() => wake.mutate({ runId: run.id })}
+						>
+							<SunriseIcon data-icon="inline-start" />
+							Wake now
+						</Button>
+					</li>
+				))}
+			</ul>
+		</section>
 	);
 }
 

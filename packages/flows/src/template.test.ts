@@ -117,3 +117,43 @@ describe("renderCommand", () => {
 		expect(proc.stdout.toString().trim()).toBe('done $(touch pwned) "quoted"');
 	});
 });
+
+describe("item references", () => {
+	const withItem: TemplateContext = {
+		...context,
+		item: { number: 12, title: "Add login", base_branch: "trace/11-base" },
+	};
+
+	test("renderTemplate reads the item", () => {
+		expect(
+			renderTemplate(
+				"#{{item.number}} {{ item.title }} on {{item.base_branch}}",
+				withItem,
+			),
+		).toBe("#12 Add login on trace/11-base");
+	});
+
+	test("a missing item or field renders as an empty string", () => {
+		expect(renderTemplate("[{{item.body}}]", withItem)).toBe("[]");
+		expect(renderTemplate("[{{item.title}}]", context)).toBe("[]");
+	});
+
+	test("renderCommand passes item fields as NS_ITEM_<FIELD>", () => {
+		const { command, env } = renderCommand(
+			'gh issue view {{item.number}} --comments "{{item.body}}"',
+			withItem,
+		);
+		expect(command).toBe(
+			`gh issue view \${NS_ITEM_NUMBER} --comments "\${NS_ITEM_BODY}"`,
+		);
+		expect(env).toEqual({ NS_ITEM_NUMBER: "12", NS_ITEM_BODY: "" });
+	});
+
+	test("a node cannot shadow the item scope", () => {
+		const shadow: TemplateContext = {
+			...withItem,
+			nodes: { ...withItem.nodes, item: { title: "node" } },
+		};
+		expect(renderTemplate("{{item.title}}", shadow)).toBe("Add login");
+	});
+});

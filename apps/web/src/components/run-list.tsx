@@ -8,7 +8,12 @@ import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Link } from "@tanstack/react-router";
 
 import type { Project, RunSummary } from "@/lib/api-types";
-import { formatCost, formatDateTime, formatRelative } from "@/lib/format";
+import {
+	formatCost,
+	formatDateTime,
+	formatRelative,
+	formatTime,
+} from "@/lib/format";
 
 import { RunStatusBadge } from "./run-status-badge";
 
@@ -62,6 +67,17 @@ export function RunList({
 							<span className="min-w-0 flex-1 truncate text-sm">
 								{run.title}
 							</span>
+							{run.status === "sleeping" && run.wakeAt ? (
+								<span className="shrink-0 text-status-sleeping text-xs">
+									wakes{" "}
+									<time
+										dateTime={new Date(run.wakeAt).toISOString()}
+										title={formatDateTime(run.wakeAt)}
+									>
+										{formatTime(run.wakeAt)}
+									</time>
+								</span>
+							) : null}
 						</div>
 						<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-muted-foreground text-xs">
 							{projects ? (

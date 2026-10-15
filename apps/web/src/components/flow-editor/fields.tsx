@@ -43,16 +43,18 @@ export function Field({
 	);
 }
 
-function parsePositiveInt(text: string): number | null {
+function parsePositive(text: string, decimal: boolean): number | null {
 	const trimmed = text.trim();
-	if (!/^\d+$/.test(trimmed)) return null;
+	if (!(decimal ? /^\d+(\.\d+)?$/ : /^\d+$/).test(trimmed)) return null;
 	const value = Number(trimmed);
-	return value > 0 && Number.isSafeInteger(value) ? value : null;
+	if (!(value > 0)) return null;
+	return decimal || Number.isSafeInteger(value) ? value : null;
 }
 
 /**
- * A whole number above 0, or empty for "not set". Keeps what the person types
- * while it is not a valid number yet, and commits only valid values.
+ * A whole number above 0 (or with `decimal`, any number above 0), or empty for
+ * "not set". Keeps what the person types while it is not a valid number yet,
+ * and commits only valid values.
  */
 export function PositiveIntInput({
 	id,
@@ -60,23 +62,26 @@ export function PositiveIntInput({
 	onChange,
 	placeholder,
 	describedBy,
+	decimal = false,
 }: {
 	id: string;
 	value: number | undefined;
 	onChange: (value: number | undefined) => void;
 	placeholder?: string;
 	describedBy?: string;
+	decimal?: boolean;
 }) {
+	const parsePositiveInt = (input: string) => parsePositive(input, decimal);
 	const [text, setText] = useState(value?.toString() ?? "");
 
 	// Follow outside changes, but keep a half-typed value that means the same.
 	useEffect(() => {
 		setText((current) => {
 			const parsed =
-				current.trim() === "" ? undefined : parsePositiveInt(current);
+				current.trim() === "" ? undefined : parsePositive(current, decimal);
 			return parsed === value ? current : (value?.toString() ?? "");
 		});
-	}, [value]);
+	}, [value, decimal]);
 
 	const invalid = text.trim() !== "" && parsePositiveInt(text) === null;
 
@@ -84,7 +89,7 @@ export function PositiveIntInput({
 		<>
 			<Input
 				id={id}
-				inputMode="numeric"
+				inputMode={decimal ? "decimal" : "numeric"}
 				value={text}
 				placeholder={placeholder}
 				aria-invalid={invalid}
@@ -102,7 +107,9 @@ export function PositiveIntInput({
 			/>
 			{invalid ? (
 				<p role="alert" className="text-destructive text-xs">
-					Use a whole number above 0, or leave it empty.
+					{decimal
+						? "Use a number above 0, or leave it empty."
+						: "Use a whole number above 0, or leave it empty."}
 				</p>
 			) : null}
 		</>

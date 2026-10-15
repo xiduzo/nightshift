@@ -138,6 +138,11 @@ export const githubSourceSchema = z.object({
 	requireLabel: z.string().min(1).optional(),
 	/** Sub-issues with any of these labels count as done before the run. */
 	doneLabels: z.array(z.string().min(1)).default([]),
+	/**
+	 * Sub-issues with any of these labels are left out (for example `draft`).
+	 * Items blocked by them wait, because a left-out blocker is not done.
+	 */
+	skipLabels: z.array(z.string().min(1)).default([]),
 });
 
 /**

@@ -2,7 +2,9 @@ import type {
 	AgentErrorKind,
 	AgentUsage,
 	GateChoice,
+	ItemState,
 	TranscriptEntry,
+	WaitEvent,
 } from "@/lib/api-types";
 
 /**
@@ -11,7 +13,9 @@ import type {
  * boundary per session, its step report, and the events that end a session.
  * A command step gets its command line, one log, and its exit code. A
  * decision step gets what was asked and the label it picked; a gate step its
- * question and the answer. Folding is incremental so a long replay and a fast
+ * question and the answer. A For Each step gets the item lists it read and a
+ * start and an end per item. A wait of the run policy shows where it happens,
+ * with the wake that ends it. Folding is incremental so a long replay and a fast
  * live stream only touch the items that change.
  */
 
@@ -94,8 +98,47 @@ export type GateResolvedItem = ItemBase & {
 	note: string;
 };
 
+/** A For Each read its source. */
+export type ItemsReadItem = ItemBase & {
+	kind: "items-read";
+	count: number;
+	open: number;
+};
+
+export type ItemStartItem = ItemBase & {
+	kind: "item-start";
+	itemId: string;
+	title: string;
+	branch: string | null;
+	baseBranch: string | null;
+};
+
+export type ItemEndItem = ItemBase & {
+	kind: "item-end";
+	itemId: string;
+	state: ItemState;
+	reason: string | null;
+};
+
+export type WaitReason = Extract<WaitEvent, { type: "wait" }>["reason"];
+
+/** The run sleeps: a usage limit or a network failure, until a time. */
+export type WaitItem = ItemBase & {
+	kind: "wait";
+	reason: WaitReason;
+	until: number;
+	message: string;
+};
+
+export type WakeItem = ItemBase & { kind: "wake" };
+
 export type TranscriptItem =
 	| SessionItem
+	| ItemsReadItem
+	| ItemStartItem
+	| ItemEndItem
+	| WaitItem
+	| WakeItem
 	| DecisionAskItem
 	| DecisionItem
 	| GateOpenItem
@@ -121,16 +164,27 @@ export const emptyTranscript: TranscriptState = {
 	index: new Map(),
 };
 
+/** The wait the run is in, if the latest wait has no wake after it. */
+export type CurrentWait = {
+	stepId: string;
+	reason: WaitReason;
+	until: number;
+	message: string;
+	at: number;
+};
+
 /** The transcripts of a run, by step id. */
 export type RunTranscript = {
 	steps: ReadonlyMap<string, TranscriptState>;
 	/** Highest seq folded so far; -1 when empty. */
 	lastSeq: number;
+	lastWait: CurrentWait | null;
 };
 
 export const emptyRunTranscript: RunTranscript = {
 	steps: new Map(),
 	lastSeq: -1,
+	lastWait: null,
 };
 
 /** Applies entries in seq order. Entries at or below `lastSeq` are ignored. */
@@ -149,6 +203,22 @@ export function applyEntries(
 		else byStep.set(entry.stepId, [entry]);
 	}
 
+	let lastWait = state.lastWait;
+	for (const entry of fresh) {
+		const event = entry.event;
+		if (event.type === "wait") {
+			lastWait = {
+				stepId: entry.stepId,
+				reason: event.reason,
+				until: event.until,
+				message: event.message,
+				at: entry.at,
+			};
+		} else if (event.type === "wake") {
+			lastWait = null;
+		}
+	}
+
 	const steps = new Map(state.steps);
 	for (const [stepId, stepEntries] of byStep) {
 		steps.set(
@@ -157,7 +227,11 @@ export function applyEntries(
 		);
 	}
 
-	return { steps, lastSeq: fresh[fresh.length - 1]?.seq ?? state.lastSeq };
+	return {
+		steps,
+		lastSeq: fresh[fresh.length - 1]?.seq ?? state.lastSeq,
+		lastWait,
+	};
 }
 
 function applyStepEntries(
@@ -355,6 +429,49 @@ function applyStepEntries(
 					choice: event.choice,
 					note: event.note,
 				});
+				break;
+			case "items-read":
+				push({
+					...base,
+					kind: "items-read",
+					key: `items-read:${entry.seq}`,
+					count: event.count,
+					open: event.open,
+				});
+				break;
+			case "item-start":
+				push({
+					...base,
+					kind: "item-start",
+					key: `item-start:${entry.seq}`,
+					itemId: event.itemId,
+					title: event.title,
+					branch: event.branch,
+					baseBranch: event.baseBranch,
+				});
+				break;
+			case "item-end":
+				push({
+					...base,
+					kind: "item-end",
+					key: `item-end:${entry.seq}`,
+					itemId: event.itemId,
+					state: event.state,
+					reason: event.reason,
+				});
+				break;
+			case "wait":
+				push({
+					...base,
+					kind: "wait",
+					key: `wait:${entry.seq}`,
+					reason: event.reason,
+					until: event.until,
+					message: event.message,
+				});
+				break;
+			case "wake":
+				push({ ...base, kind: "wake", key: `wake:${entry.seq}` });
 				break;
 		}
 	}

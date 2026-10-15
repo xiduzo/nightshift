@@ -30,6 +30,7 @@ import {
 	type SessionSetup,
 } from "./claude-code";
 import { GITHUB_TOOL_IDS, githubTools } from "./github";
+import { failureKind } from "./translate";
 import type {
 	AgentErrorKind,
 	AgentEvent,
@@ -201,6 +202,7 @@ async function decideWithClaudeCode(
 	}
 	// A recorded decision counts even when the session failed after it.
 	if (decision) return { kind: "decided", ...decision, costUsd };
+	// `usage-limit` and `network` pass through, so the engine waits and asks again.
 	if (terminal?.type === "error") {
 		return failed(terminal.kind, terminal.message, costUsd);
 	}
@@ -221,9 +223,12 @@ export function claudeCodeDecider(
 			try {
 				return await decideWithClaudeCode(input, options);
 			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
 				return failed(
-					input.signal.aborted ? "aborted" : "harness",
-					error instanceof Error ? error.message : String(error),
+					input.signal.aborted
+						? "aborted"
+						: (failureKind(message) ?? "harness"),
+					message,
 					null,
 				);
 			}

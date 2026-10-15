@@ -1,6 +1,7 @@
 import { Badge } from "@nightshift/ui/components/badge";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
+	BanIcon,
 	CircleAlertIcon,
 	CircleCheckIcon,
 	CircleDotIcon,
@@ -10,16 +11,24 @@ import {
 	LoaderCircleIcon,
 	type LucideIcon,
 	MessageCircleQuestionIcon,
+	MoonIcon,
+	OctagonPauseIcon,
 	TriangleAlertIcon,
 } from "lucide-react";
 
-import type { Outcome, StepOutcome, StepSummary } from "@/lib/api-types";
+import type {
+	ItemState,
+	Outcome,
+	RunStatus,
+	StepOutcome,
+	StepSummary,
+} from "@/lib/api-types";
 
 /**
  * A step that has not ended yet has no outcome: it is running, or, for a
  * Gate, waiting for a person.
  */
-export type StepState = StepOutcome | "running" | "waiting";
+export type StepState = StepOutcome | "running" | "waiting" | "sleeping";
 
 type Style = {
 	label: string;
@@ -93,6 +102,14 @@ const KNOWN_STATES = {
 		text: "text-status-waiting",
 		color: "var(--status-waiting)",
 	},
+	sleeping: {
+		label: "Sleeping",
+		icon: MoonIcon,
+		badge:
+			"border-status-sleeping/40 bg-status-sleeping/10 text-status-sleeping",
+		text: "text-status-sleeping",
+		color: "var(--status-sleeping)",
+	},
 } satisfies Record<string, Style>;
 
 /** The colour family of an outcome. Edges and arrowheads come in these. */
@@ -137,11 +154,21 @@ export function outcomeStyle(outcome: Outcome): Omit<Style, "label"> {
 	return TONE_STYLE[outcomeTone(outcome)];
 }
 
-/** What a step shows: its outcome, else running, or waiting for an open Gate. */
+/**
+ * What a step shows: its outcome, else running, or waiting for an open Gate.
+ * In a sleeping run, the step that has not ended sleeps with it (a For Each
+ * step keeps running: one of its body steps sleeps).
+ */
 export function stepState(
 	step: Pick<StepSummary, "outcome" | "nodeType">,
+	runStatus?: RunStatus,
 ): StepState {
-	return step.outcome ?? (step.nodeType === "gate" ? "waiting" : "running");
+	if (step.outcome !== null) return step.outcome;
+	if (step.nodeType === "gate") return "waiting";
+	if (runStatus === "sleeping" && step.nodeType !== "foreach") {
+		return "sleeping";
+	}
+	return "running";
 }
 
 /** The outcome of an edge, shown as its label. */
@@ -157,6 +184,48 @@ export function OutcomeBadge({
 	className?: string;
 }) {
 	const { label, icon: Icon, badge } = stepStateStyle(state);
+	return (
+		<Badge variant="outline" className={cn(badge, className)}>
+			<Icon aria-hidden="true" />
+			{label}
+		</Badge>
+	);
+}
+
+const ITEM_STATES: Record<ItemState, Style> = {
+	done: { ...KNOWN_STATES.pass, label: "Done" },
+	failed: { ...KNOWN_STATES.fail, label: "Failed" },
+	blocked: {
+		label: "Blocked",
+		icon: BanIcon,
+		badge: "border-status-stopped/40 bg-status-stopped/10 text-status-stopped",
+		text: "text-status-stopped",
+		color: "var(--status-stopped)",
+	},
+	halted: {
+		label: "Halted",
+		icon: OctagonPauseIcon,
+		badge:
+			"border-status-interrupted/40 bg-status-interrupted/10 text-status-interrupted",
+		text: "text-status-interrupted",
+		color: "var(--status-interrupted)",
+	},
+	running: KNOWN_STATES.running,
+};
+
+export function itemStateStyle(state: ItemState): Style {
+	return ITEM_STATES[state];
+}
+
+/** The state of one For Each item. */
+export function ItemStateBadge({
+	state,
+	className,
+}: {
+	state: ItemState;
+	className?: string;
+}) {
+	const { label, icon: Icon, badge } = ITEM_STATES[state];
 	return (
 		<Badge variant="outline" className={cn(badge, className)}>
 			<Icon aria-hidden="true" />

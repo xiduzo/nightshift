@@ -15,13 +15,16 @@ const RESERVED: readonly string[] = reservedOutcomes;
 /**
  * The labels of a Decision node or the choices of a Gate node. Each one is an
  * outcome with its own handle. A name commits on blur or Enter, so the edges
- * on it follow one rename and not every keystroke.
+ * on it follow one rename and not every keystroke. Without `onDescribe` and
+ * `onMove` it edits a plain list of names, for example a For Each's halt-on
+ * labels.
  */
 export function OptionsEditor({
 	kind,
 	options,
 	min,
 	describedBy,
+	newName,
 	onRename,
 	onDescribe,
 	onAdd,
@@ -33,12 +36,14 @@ export function OptionsEditor({
 	/** The schema's minimum; removing stops there. */
 	min: number;
 	describedBy?: string;
+	/** The name a new entry starts with. Defaults to the noun. */
+	newName?: string;
 	/** Returns an error when the name cannot be used. */
 	onRename: (index: number, name: string) => string | null;
-	onDescribe: (index: number, description: string | undefined) => void;
+	onDescribe?: (index: number, description: string | undefined) => void;
 	onAdd: (option: NodeOption) => void;
 	onRemove: (index: number) => void;
-	onMove: (index: number, to: number) => void;
+	onMove?: (index: number, to: number) => void;
 }) {
 	const id = useId();
 	const noun = kind === "label" ? "label" : "choice";
@@ -66,9 +71,13 @@ export function OptionsEditor({
 							if (taken) return `Another ${noun} is named ${name}.`;
 							return onRename(index, name);
 						}}
-						onDescribe={(description) => onDescribe(index, description)}
+						onDescribe={
+							onDescribe
+								? (description) => onDescribe(index, description)
+								: undefined
+						}
 						onRemove={() => onRemove(index)}
-						onMove={(to) => onMove(index, to)}
+						onMove={onMove ? (to) => onMove(index, to) : undefined}
 					/>
 				))}
 			</ol>
@@ -78,7 +87,7 @@ export function OptionsEditor({
 				className="self-start"
 				onClick={() => {
 					setFocusIndex(options.length);
-					onAdd({ name: uniqueOptionName(options, noun) });
+					onAdd({ name: uniqueOptionName(options, newName ?? noun) });
 				}}
 			>
 				<PlusIcon data-icon="inline-start" />
@@ -111,9 +120,9 @@ function OptionRow({
 	min: number;
 	autoFocus: boolean;
 	onRename: (name: string) => string | null;
-	onDescribe: (description: string | undefined) => void;
+	onDescribe?: (description: string | undefined) => void;
 	onRemove: () => void;
-	onMove: (to: number) => void;
+	onMove?: (to: number) => void;
 }) {
 	const [text, setText] = useState(option.name);
 	const [error, setError] = useState<string | null>(null);
@@ -182,33 +191,39 @@ function OptionRow({
 						}
 					}}
 				/>
-				<Button
-					variant="ghost"
-					size="icon-xs"
-					aria-label={`Move ${option.name} up`}
-					title="Move up"
-					disabled={index === 0}
-					onClick={() => onMove(index - 1)}
-				>
-					<ArrowUpIcon />
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon-xs"
-					aria-label={`Move ${option.name} down`}
-					title="Move down"
-					disabled={index === count - 1}
-					onClick={() => onMove(index + 1)}
-				>
-					<ArrowDownIcon />
-				</Button>
+				{onMove ? (
+					<>
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							aria-label={`Move ${option.name} up`}
+							title="Move up"
+							disabled={index === 0}
+							onClick={() => onMove(index - 1)}
+						>
+							<ArrowUpIcon />
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							aria-label={`Move ${option.name} down`}
+							title="Move down"
+							disabled={index === count - 1}
+							onClick={() => onMove(index + 1)}
+						>
+							<ArrowDownIcon />
+						</Button>
+					</>
+				) : null}
 				<Button
 					variant="ghost"
 					size="icon-xs"
 					aria-label={`Remove ${option.name}`}
 					title={
 						canRemove
-							? `Remove this ${noun} and its edges`
+							? onMove
+								? `Remove this ${noun} and its edges`
+								: `Remove this ${noun}`
 							: `Keep at least ${min} ${min === 1 ? noun : `${noun}s`}.`
 					}
 					disabled={!canRemove}
@@ -222,18 +237,20 @@ function OptionRow({
 					{error}
 				</p>
 			) : null}
-			<Input
-				id={`${id}-description`}
-				value={option.description ?? ""}
-				aria-label={`Description of ${position}`}
-				placeholder="What it means (optional)"
-				className="h-7"
-				autoComplete="off"
-				onChange={(event) => {
-					const description = event.target.value;
-					onDescribe(description || undefined);
-				}}
-			/>
+			{onDescribe ? (
+				<Input
+					id={`${id}-description`}
+					value={option.description ?? ""}
+					aria-label={`Description of ${position}`}
+					placeholder="What it means (optional)"
+					className="h-7"
+					autoComplete="off"
+					onChange={(event) => {
+						const description = event.target.value;
+						onDescribe(description || undefined);
+					}}
+				/>
+			) : null}
 		</li>
 	);
 }

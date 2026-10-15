@@ -1,4 +1,6 @@
-import type { Flow } from "@nightshift/flows";
+import type { Flow, Policy } from "@nightshift/flows";
+import { Checkbox } from "@nightshift/ui/components/checkbox";
+import { Label } from "@nightshift/ui/components/label";
 import {
 	NativeSelect,
 	NativeSelectOption,
@@ -6,7 +8,27 @@ import {
 import { Textarea } from "@nightshift/ui/components/textarea";
 import { useId } from "react";
 
-import { Field } from "./fields";
+import { POLICY_DEFAULTS, setPolicyNumber } from "@/lib/flow-draft";
+
+import { Field, PositiveIntInput } from "./fields";
+
+const POLICY_FIELDS: { key: keyof Policy; label: string; hint: string }[] = [
+	{
+		key: "usageLimitFirstWaitMinutes",
+		label: "Usage limit: first wait",
+		hint: "When the harness hits a usage limit without a reset time. Doubles each time.",
+	},
+	{
+		key: "usageLimitMaxWaitMinutes",
+		label: "Usage limit: longest wait",
+		hint: "The doubling stops here.",
+	},
+	{
+		key: "networkGraceMinutes",
+		label: "Network grace",
+		hint: "The longest total wait for the network before the step fails.",
+	},
+];
 
 /** Shown when nothing is selected: the flow's own settings and how to edit. */
 export function FlowInspector({
@@ -56,6 +78,58 @@ export function FlowInspector({
 					))}
 				</NativeSelect>
 			</Field>
+			<div className="flex items-start gap-2">
+				<Checkbox
+					id={`${id}-body`}
+					checked={flow.input === "item"}
+					className="mt-0.5"
+					aria-describedby={`${id}-body-hint`}
+					onCheckedChange={(checked) =>
+						onChange((current) => ({
+							...current,
+							input: checked ? "item" : undefined,
+						}))
+					}
+				/>
+				<div className="flex flex-col gap-0.5">
+					<Label htmlFor={`${id}-body`}>Body flow (runs once per item)</Label>
+					<p id={`${id}-body-hint`} className="text-muted-foreground text-xs">
+						A For Each node runs it for each item. Its templates read the item
+						as <code className="font-mono">{"{{item.title}}"}</code>,{" "}
+						<code className="font-mono">{"{{item.body}}"}</code>,{" "}
+						<code className="font-mono">{"{{item.number}}"}</code>, … A body
+						flow does not start on its own.
+					</p>
+				</div>
+			</div>
+			<section aria-labelledby={`${id}-policy`} className="flex flex-col gap-3">
+				<div className="flex flex-col gap-0.5">
+					<h3 id={`${id}-policy`} className="font-medium text-xs">
+						Run policy · minutes
+					</h3>
+					<p className="text-muted-foreground text-xs">
+						{flow.input === "item"
+							? "A body flow uses the run policy of the flow that runs it."
+							: "A usage limit or a network failure puts the run to sleep, then continues the same session. Empty uses the default."}
+					</p>
+				</div>
+				{(flow.input === "item" ? [] : POLICY_FIELDS).map(
+					({ key, label, hint }) => (
+						<Field key={key} id={`${id}-${key}`} label={label} hint={hint}>
+							<PositiveIntInput
+								id={`${id}-${key}`}
+								decimal
+								value={flow.policy?.[key]}
+								placeholder={`${POLICY_DEFAULTS[key]} (default)`}
+								describedBy={`${id}-${key}-hint`}
+								onChange={(value) =>
+									onChange((current) => setPolicyNumber(current, key, value))
+								}
+							/>
+						</Field>
+					),
+				)}
+			</section>
 			<section aria-labelledby={`${id}-help`} className="flex flex-col gap-1.5">
 				<h3 id={`${id}-help`} className="font-medium text-xs">
 					How to edit

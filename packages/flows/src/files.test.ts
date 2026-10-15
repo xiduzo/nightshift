@@ -6,6 +6,7 @@ import {
 	deleteFlowFile,
 	flowsDir,
 	listFlowFiles,
+	loadAllFlows,
 	readFlowFile,
 	writeFlowFile,
 } from "./files";
@@ -181,5 +182,75 @@ describe("flow names", () => {
 	test("a rejected write creates nothing", async () => {
 		await expect(writeFlowFile(repo, "../escape", quick())).rejects.toThrow();
 		expect(await listFlowFiles(repo)).toEqual([]);
+	});
+});
+
+describe("For Each references", () => {
+	const body = (): Flow => ({ ...quick(), input: "item" });
+
+	/** One For Each node running `bodyName`. */
+	const outer = (bodyName: string): Flow => ({
+		version: 1,
+		start: "each",
+		nodes: [
+			{
+				id: "each",
+				type: "foreach",
+				position: { x: 0, y: 0 },
+				source: { kind: "github", parent: "7", doneLabels: [], skipLabels: [] },
+				flow: bodyName,
+				branchPerItem: true,
+				haltOn: ["halt"],
+			},
+		],
+		edges: [],
+	});
+
+	test("loadAllFlows maps every flow file, null when it does not parse", async () => {
+		expect(await loadAllFlows(repo)).toEqual({});
+		await writeFlowFile(repo, "trace", body());
+		await writeFile(join(flowsDir(repo), "broken.json"), "not json");
+		await writeFile(join(flowsDir(repo), "wrong.json"), '{"version":2}');
+		const flows = await loadAllFlows(repo);
+		expect(Object.keys(flows).sort()).toEqual(["broken", "trace", "wrong"]);
+		expect(flows.broken).toBeNull();
+		expect(flows.wrong).toBeNull();
+		expect(flows.trace?.input).toBe("item");
+	});
+
+	test("writeFlowFile checks the body against the repo's flows", async () => {
+		expect(await writeFlowFile(repo, "night", outer("trace"))).toEqual([
+			expect.objectContaining({
+				nodeId: "each",
+				message: expect.stringContaining("does not exist"),
+			}),
+		]);
+		await writeFlowFile(repo, "trace", body());
+		expect(await writeFlowFile(repo, "night", outer("trace"))).toEqual([]);
+	});
+
+	test("writeFlowFile finds a flow that runs itself", async () => {
+		const self = { ...outer("loop"), input: "item" as const };
+		expect(await writeFlowFile(repo, "loop", self)).toEqual([
+			expect.objectContaining({
+				message: expect.stringContaining("loop → loop"),
+			}),
+		]);
+	});
+
+	test("readFlowFile and listFlowFiles check bodies too", async () => {
+		await writeFlowFile(repo, "night", outer("trace"));
+		await writeFlowFile(repo, "trace", { ...quick(), input: undefined });
+		const loaded = await readFlowFile(repo, "night");
+		expect(loaded.issues).toEqual([
+			expect.objectContaining({
+				message: expect.stringContaining('Set its input to "item"'),
+			}),
+		]);
+		const list = await listFlowFiles(repo);
+		expect(list.map((item) => [item.name, item.errorCount])).toEqual([
+			["night", 1],
+			["trace", 0],
+		]);
 	});
 });

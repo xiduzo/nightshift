@@ -17,14 +17,20 @@ import {
 	CircleStopIcon,
 	CircleXIcon,
 	ClockIcon,
+	GitBranchIcon,
 	HandIcon,
+	ListChecksIcon,
 	LoaderCircleIcon,
+	MoonIcon,
 	SplitIcon,
+	SunriseIcon,
 } from "lucide-react";
 import { memo, type ReactNode } from "react";
 
 import { GateAnswer } from "@/components/gate/gate-answer";
 import {
+	ItemStateBadge,
+	itemStateStyle,
 	outcomeLabel,
 	outcomeStyle,
 	stepStateStyle,
@@ -36,6 +42,7 @@ import {
 	formatRelative,
 	formatTime,
 	formatTokens,
+	itemLabel,
 } from "@/lib/format";
 import type {
 	DecisionAskItem,
@@ -45,11 +52,16 @@ import type {
 	FinishedItem,
 	GateOpenItem,
 	GateResolvedItem,
+	ItemEndItem,
+	ItemStartItem,
+	ItemsReadItem,
 	LogItem,
 	MessageItem,
 	ReportItem,
 	TranscriptItem,
 	TranscriptState,
+	WaitItem,
+	WakeItem,
 } from "@/lib/transcript";
 
 import { ToolCallRow } from "./tool-call-row";
@@ -93,6 +105,14 @@ export function StepTranscript({
 		(session) => !seen.has(session.id),
 	);
 	const isEmpty = transcript.items.length === 0 && pendingSessions.length === 0;
+	// An item's end only names its id; its start has the title.
+	// A blocked item never starts: its title comes from the step's item list.
+	const itemTitles = new Map([
+		...step.items.map((item) => [item.id, item.title] as const),
+		...transcript.items.flatMap((item) =>
+			item.kind === "item-start" ? [[item.itemId, item.title] as const] : [],
+		),
+	]);
 
 	return (
 		<MessageScrollerProvider autoScroll defaultScrollPosition="end">
@@ -121,6 +141,11 @@ export function StepTranscript({
 								) : (
 									<TranscriptItemView
 										item={item}
+										itemTitle={
+											item.kind === "item-end"
+												? itemTitles.get(item.itemId)
+												: undefined
+										}
 										running={running}
 										session={
 											item.sessionId
@@ -185,15 +210,19 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	command: "The command is running…",
 	decision: "The decider is choosing…",
 	gate: "Waiting for an answer…",
+	foreach: "Working through the items…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({
 	item,
+	itemTitle,
 	running,
 	session,
 	sessionNumber,
 }: {
 	item: TranscriptItem;
+	/** For an item's end: the title from its start. */
+	itemTitle?: string;
 	running: boolean;
 	session: SessionSummary | undefined;
 	sessionNumber: number | undefined;
@@ -237,8 +266,133 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			return <GateQuestion item={item} answer={null} />;
 		case "gate-resolved":
 			return <GateResolved item={item} />;
+		case "items-read":
+			return <ItemsRead item={item} />;
+		case "item-start":
+			return <ItemStart item={item} />;
+		case "item-end":
+			return <ItemEnd item={item} title={itemTitle} />;
+		case "wait":
+			return <WaitCard item={item} />;
+		case "wake":
+			return <WakeMarker item={item} />;
 	}
 });
+
+function ItemsRead({ item }: { item: ItemsReadItem }) {
+	return (
+		<Marker>
+			<MarkerIcon>
+				<ListChecksIcon />
+			</MarkerIcon>
+			<MarkerContent>
+				Read {item.count} {item.count === 1 ? "item" : "items"} · {item.open}{" "}
+				open · {formatTime(item.at)}
+			</MarkerContent>
+		</Marker>
+	);
+}
+
+function ItemStart({ item }: { item: ItemStartItem }) {
+	return (
+		<div className="flex flex-col gap-1 pt-2">
+			<Marker variant="separator">
+				<MarkerContent>
+					<h3 className="inline font-medium text-foreground">
+						{itemLabel(item.itemId)} {item.title}
+					</h3>
+					<span title={formatDateTime(item.at)}> · {formatTime(item.at)}</span>
+				</MarkerContent>
+			</Marker>
+			{item.branch ? (
+				<p className="flex items-center justify-center gap-1 text-muted-foreground text-xs">
+					<GitBranchIcon className="size-3" aria-hidden="true" />
+					<span className="font-mono text-foreground">{item.branch}</span>
+					{item.baseBranch ? (
+						<>
+							<span aria-hidden="true">→</span>
+							<span className="sr-only">on top of</span>
+							<span className="font-mono">{item.baseBranch}</span>
+						</>
+					) : null}
+				</p>
+			) : null}
+		</div>
+	);
+}
+
+function ItemEnd({ item, title }: { item: ItemEndItem; title?: string }) {
+	const { color } = itemStateStyle(item.state);
+	return (
+		<div
+			className="flex flex-wrap items-center gap-x-2 gap-y-1 border border-l-[3px] bg-card px-3 py-1.5 text-xs"
+			style={{ borderLeftColor: color }}
+		>
+			<ItemStateBadge state={item.state} />
+			<span className="min-w-0 truncate">
+				<span className="font-mono">{itemLabel(item.itemId)}</span>
+				{title ? ` ${title}` : ""}
+			</span>
+			<span className="ml-auto text-muted-foreground">
+				{formatTime(item.at)}
+			</span>
+			{item.reason ? (
+				<p className="basis-full whitespace-pre-wrap break-words text-muted-foreground">
+					{item.reason}
+				</p>
+			) : null}
+		</div>
+	);
+}
+
+const WAIT_TITLE: Record<WaitItem["reason"], string> = {
+	"usage-limit": "Usage limit reached",
+	network: "The network is down",
+};
+
+/** The run sleeps on this step, and when it continues the same session. */
+function WaitCard({ item }: { item: WaitItem }) {
+	return (
+		<div className="flex gap-2 border border-status-sleeping/50 bg-status-sleeping/10 px-3 py-2 text-sm">
+			<MoonIcon
+				className="mt-0.5 size-4 shrink-0 text-status-sleeping"
+				aria-hidden="true"
+			/>
+			<div className="flex min-w-0 flex-col gap-1">
+				<p className="font-medium text-status-sleeping">
+					{WAIT_TITLE[item.reason]} · sleeping
+				</p>
+				{item.message ? (
+					<p className="whitespace-pre-wrap break-words text-xs">
+						{item.message}
+					</p>
+				) : null}
+				<p className="text-muted-foreground text-xs">
+					Continues the same session at{" "}
+					<time
+						dateTime={new Date(item.until).toISOString()}
+						title={formatDateTime(item.until)}
+						className="text-foreground"
+					>
+						{formatTime(item.until)}
+					</time>{" "}
+					({formatRelative(item.until)}).
+				</p>
+			</div>
+		</div>
+	);
+}
+
+function WakeMarker({ item }: { item: WakeItem }) {
+	return (
+		<Marker>
+			<MarkerIcon>
+				<SunriseIcon className="text-status-sleeping" />
+			</MarkerIcon>
+			<MarkerContent>Woke up · {formatTime(item.at)}</MarkerContent>
+		</Marker>
+	);
+}
 
 function SessionBoundary({
 	number,

@@ -185,6 +185,28 @@ describe("claudeCodeDecider", () => {
 		});
 	});
 
+	test("a network failure maps to a network error", async () => {
+		const d = await decider([], {
+			FAKE_CLAUDE_RESULT_ERROR: "API Error: Connection error.",
+		});
+		expect(await d.decide(input())).toEqual({
+			kind: "error",
+			errorKind: "network",
+			message: "API Error: Connection error.",
+			costUsd: null,
+		});
+	});
+
+	test("a usage limit maps to a usage-limit error", async () => {
+		const d = await decider([], {
+			FAKE_CLAUDE_RESULT_ERROR: "You've hit your limit · resets 3pm",
+		});
+		expect(await d.decide(input())).toMatchObject({
+			kind: "error",
+			errorKind: "usage-limit",
+		});
+	});
+
 	test("abort stops the session and returns aborted", async () => {
 		const d = await decider(
 			[],

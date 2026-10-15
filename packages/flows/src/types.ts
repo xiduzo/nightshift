@@ -41,6 +41,12 @@ export type ValidateOptions = {
 	 * browser before the list loads).
 	 */
 	flows?: Readonly<Record<string, Flow | null>>;
+	/**
+	 * The name of the flow being checked. With `flows`, it finds a flow that
+	 * runs itself through For Each bodies, and the given flow replaces the
+	 * saved one of that name (an edit that is not saved yet).
+	 */
+	name?: string;
 };
 
 /** One `{{a.b}}` reference found in a template. */

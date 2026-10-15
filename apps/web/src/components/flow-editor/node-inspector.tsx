@@ -28,6 +28,7 @@ import {
 } from "@/lib/flow-draft";
 
 import { Field, PositiveIntInput } from "./fields";
+import { type BodyFlowSupport, ForEachFields } from "./foreach-fields";
 import { GitHubToolsField } from "./github-tools-field";
 import { OptionsEditor } from "./options-editor";
 import { TemplateField } from "./template-field";
@@ -50,9 +51,12 @@ export function NodeInspector({
 	onRemoveOutcome,
 	onSetStart,
 	onDelete,
+	bodyFlows,
 }: {
 	flow: Flow;
 	node: FlowNode;
+	/** For Each nodes: the project's flows and the actions on body flows. */
+	bodyFlows: BodyFlowSupport;
 	onChange: (change: (node: FlowNode) => FlowNode) => void;
 	/** Returns an error message when the new id is taken. */
 	onRename: (id: string) => string | null;
@@ -165,6 +169,19 @@ export function NodeInspector({
 					}
 					onRenameOutcome={onRenameOutcome}
 					onRemoveOutcome={onRemoveOutcome}
+				/>
+			) : null}
+
+			{node.type === "foreach" ? (
+				<ForEachFields
+					flow={flow}
+					node={node}
+					support={bodyFlows}
+					onChange={(change) =>
+						onChange((current) =>
+							current.type === "foreach" ? change(current) : current,
+						)
+					}
 				/>
 			) : null}
 
@@ -396,6 +413,23 @@ function AgentFields({
 						Resume the last session
 					</NativeSelectOption>
 				</NativeSelect>
+			</Field>
+
+			<Field
+				id={`${id}-idle`}
+				label="Idle timeout in minutes"
+				optional
+				hint="The step fails when the agent shows no activity for this long."
+			>
+				<PositiveIntInput
+					id={`${id}-idle`}
+					value={node.idleMinutes}
+					placeholder="No limit"
+					describedBy={`${id}-idle-hint`}
+					onChange={(idleMinutes) =>
+						onChange((current) => ({ ...current, idleMinutes }))
+					}
+				/>
 			</Field>
 
 			<GitHubToolsField

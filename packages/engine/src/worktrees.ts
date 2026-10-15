@@ -144,3 +144,110 @@ export async function createWorktree(input: {
 	]);
 	return { worktreePath, branch, baseRef };
 }
+
+/** The checked-out branch of a worktree, or null when HEAD is detached. */
+export async function currentBranch(cwd: string): Promise<string | null> {
+	const result = await git(cwd, ["symbolic-ref", "--short", "-q", "HEAD"]);
+	return result.exitCode === 0 && result.stdout ? result.stdout : null;
+}
+
+export async function branchExists(
+	cwd: string,
+	name: string,
+): Promise<boolean> {
+	const result = await git(cwd, [
+		"rev-parse",
+		"--verify",
+		"--quiet",
+		`refs/heads/${name}`,
+	]);
+	return result.exitCode === 0;
+}
+
+/**
+ * What `git status --porcelain` lists: changed, staged and untracked files.
+ * Empty when the worktree is clean.
+ */
+export async function uncommittedChanges(cwd: string): Promise<string[]> {
+	const out = await gitOrThrow(cwd, ["status", "--porcelain"]);
+	return out ? out.split("\n").filter(Boolean) : [];
+}
+
+/** A git-safe slug: lowercase letters, digits and single dashes. */
+export function slugify(text: string, maxChars = 48): string {
+	const slug = text
+		.normalize("NFKD")
+		.replace(/[̀-ͯ]/g, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	return slug.slice(0, maxChars).replace(/-+$/, "");
+}
+
+/**
+ * `nightshift/<run8>-<id>-<title>`: the branch of one For Each item. Not
+ * `nightshift/<run8>/…`: git cannot hold a branch inside the name of
+ * another, and `nightshift/<run8>` is the run's own branch.
+ */
+export function itemBranchName(
+	shortId: string,
+	item: { id: string; title: string },
+): string {
+	const slug = slugify(`${item.id} ${item.title}`) || "item";
+	return `nightshift/${shortId}-${slug}`;
+}
+
+/** `name`, or `name-2`, `name-3`, … when a branch of that name exists. */
+export async function freeBranchName(
+	cwd: string,
+	name: string,
+): Promise<string> {
+	if (!(await branchExists(cwd, name))) return name;
+	for (let n = 2; ; n++) {
+		const candidate = `${name}-${n}`;
+		if (!(await branchExists(cwd, candidate))) return candidate;
+	}
+}
+
+/**
+ * Creates `branch` at `base` and checks it out. Refuses a worktree with
+ * uncommitted changes: nothing is committed or stashed on the user's behalf.
+ */
+export async function createAndCheckoutBranch(
+	cwd: string,
+	branch: string,
+	base: string,
+): Promise<void> {
+	await refuseDirty(cwd);
+	await gitOrThrow(cwd, ["checkout", "-q", "-b", branch, base]);
+}
+
+/** Checks out an existing branch. Refuses a worktree with uncommitted changes. */
+export async function checkoutBranch(
+	cwd: string,
+	branch: string,
+): Promise<void> {
+	if ((await currentBranch(cwd)) === branch) return;
+	await refuseDirty(cwd);
+	await gitOrThrow(cwd, ["checkout", "-q", branch]);
+}
+
+async function refuseDirty(cwd: string): Promise<void> {
+	const changes = await uncommittedChanges(cwd);
+	if (changes.length === 0) return;
+	const shown = changes
+		.slice(0, 5)
+		.map((line) => line.slice(3))
+		.join(", ");
+	const more = changes.length > 5 ? ` and ${changes.length - 5} more` : "";
+	throw new DirtyWorktreeError(
+		`The worktree has changes that are not committed (${shown}${more}). Night Shift commits nothing on your behalf: the body flow should commit its work.`,
+	);
+}
+
+export class DirtyWorktreeError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "DirtyWorktreeError";
+	}
+}

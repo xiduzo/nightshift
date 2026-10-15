@@ -19,12 +19,14 @@ function lookup(
 	scope: string,
 	field: string,
 ): string {
-	const source: Record<string, string | number> | undefined =
+	const source: Partial<Record<string, string | number>> | undefined =
 		scope === "run"
 			? context.run
-			: Object.hasOwn(context.nodes, scope)
-				? context.nodes[scope]
-				: undefined;
+			: scope === "item"
+				? context.item
+				: Object.hasOwn(context.nodes, scope)
+					? context.nodes[scope]
+					: undefined;
 	if (!source || !Object.hasOwn(source, field)) return "";
 	const value = source[field];
 	return value === undefined || value === null ? "" : String(value);

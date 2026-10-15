@@ -14,7 +14,8 @@
 		"@nightshift/agents": "workspace:*",
 		"@nightshift/db": "workspace:*",
 		"@nightshift/flows": "workspace:*",
-		"drizzle-orm": "catalog:"
+		"drizzle-orm": "catalog:",
+		"zod": "catalog:"
 	},
 	"devDependencies": {
 		"@nightshift/config": "workspace:*",

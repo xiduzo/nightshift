@@ -6,6 +6,7 @@ import type {
 	Flow,
 	FlowEdge,
 	FlowNode,
+	ForEachNode,
 	GateNode,
 } from "./schema";
 import type { FlowIssue } from "./types";
@@ -65,6 +66,23 @@ function gate(
 		position: { x: 0, y: 0 },
 		question: "Ship it?",
 		choices: choices.map((name) => ({ name })),
+		...extra,
+	};
+}
+
+function foreach(
+	id: string,
+	body: string,
+	extra: Partial<ForEachNode> = {},
+): ForEachNode {
+	return {
+		id,
+		type: "foreach",
+		position: { x: 0, y: 0 },
+		source: { kind: "github", parent: "12", doneLabels: [], skipLabels: [] },
+		flow: body,
+		branchPerItem: true,
+		haltOn: ["halt"],
 		...extra,
 	};
 }
@@ -695,6 +713,335 @@ describe("parseFlow", () => {
 		expect(result.flow).toBeNull();
 		expect(result.issues).toEqual([
 			{ severity: "error", message: expect.stringMatching(/^\(root\): /) },
+		]);
+	});
+});
+
+describe("validateFlow: item references", () => {
+	const body = (prompt: string): Flow => ({
+		...flow([agent("worker", { prompt })], []),
+		input: "item",
+	});
+
+	test("a body flow may read item fields and run fields", () => {
+		const issues = validateFlow(
+			body("Build #{{item.number}} {{item.title}} on {{run.branch}}"),
+		);
+		expect(issues).toEqual([]);
+	});
+
+	test("an unknown item field is an error that lists the fields", () => {
+		const issues = errors(validateFlow(body("{{item.labels}}")));
+		expect(issues).toEqual([
+			expect.objectContaining({
+				nodeId: "worker",
+				message: expect.stringContaining('has no field "labels"'),
+			}),
+		]);
+		expect(issues[0]?.message).toContain("parent_number");
+	});
+
+	test("item fields need input: item", () => {
+		const issues = errors(
+			validateFlow(flow([agent("worker", { prompt: "{{item.title}}" })], [])),
+		);
+		expect(issues).toEqual([
+			expect.objectContaining({
+				nodeId: "worker",
+				message: expect.stringContaining("only a For Each body"),
+			}),
+		]);
+	});
+
+	test("the node id item is reserved", () => {
+		const issues = errors(validateFlow(flow([agent("item")], [], "item")));
+		expect(issues).toEqual([
+			expect.objectContaining({
+				nodeId: "item",
+				message: expect.stringContaining("reserved"),
+			}),
+		]);
+	});
+});
+
+describe("validateFlow: For Each", () => {
+	/** A body that builds one item. */
+	const traceBody = (): Flow => ({
+		...flow([agent("worker", { prompt: "Build {{item.title}}" })], []),
+		input: "item",
+	});
+
+	/** each → summary on done: the night. */
+	const night = (node: ForEachNode = foreach("each", "trace")): Flow =>
+		flow(
+			[node, agent("report", { prompt: "{{each.summary}}" })],
+			[edge("after", node.id, "done", "report")],
+			node.id,
+		);
+
+	test("a For Each over a body flow is valid", () => {
+		expect(validateFlow(night(), { flows: { trace: traceBody() } })).toEqual(
+			[],
+		);
+	});
+
+	test("edges leave only on done or halted", () => {
+		const bad = night();
+		bad.edges.push(edge("oops", "each", "pass", "report"));
+		bad.edges.push(edge("stop", "each", "halted", "report"));
+		expect(errors(validateFlow(bad))).toEqual([
+			expect.objectContaining({
+				edgeId: "oops",
+				message: expect.stringContaining("done, halted"),
+			}),
+		]);
+	});
+
+	test("a node may read the For Each fields", () => {
+		const bad = night();
+		bad.nodes[1] = agent("report", { prompt: "{{each.output}}" });
+		expect(errors(validateFlow(bad))).toEqual([
+			expect.objectContaining({
+				nodeId: "report",
+				message: expect.stringContaining("done_count"),
+			}),
+		]);
+	});
+
+	test("the source templates are checked", () => {
+		const github = night(
+			foreach("each", "trace", {
+				source: {
+					kind: "github",
+					parent: "{{nope.number}}",
+					doneLabels: [],
+					skipLabels: [],
+				},
+			}),
+		);
+		expect(errors(validateFlow(github))).toEqual([
+			expect.objectContaining({
+				nodeId: "each",
+				message: expect.stringContaining("source parent"),
+			}),
+		]);
+		const command = night(
+			foreach("each", "trace", {
+				source: { kind: "command", command: "list {{item.number}}" },
+			}),
+		);
+		expect(errors(validateFlow(command))).toEqual([
+			expect.objectContaining({
+				nodeId: "each",
+				message: expect.stringContaining("only a For Each body"),
+			}),
+		]);
+	});
+
+	test("a nested For Each may read the outer item", () => {
+		const features: Flow = {
+			...night(
+				foreach("each", "trace", {
+					source: {
+						kind: "github",
+						parent: "{{item.number}}",
+						doneLabels: [],
+						skipLabels: [],
+					},
+				}),
+			),
+			input: "item",
+		};
+		expect(validateFlow(features)).toEqual([]);
+	});
+
+	test("halt labels must be valid and not reserved", () => {
+		const bad = night(
+			foreach("each", "trace", { haltOn: ["halt", "error", "Bad Label"] }),
+		);
+		const issues = errors(validateFlow(bad));
+		expect(issues).toEqual([
+			expect.objectContaining({
+				nodeId: "each",
+				message: expect.stringContaining('"error", which is reserved'),
+			}),
+			expect.objectContaining({
+				nodeId: "each",
+				message: expect.stringContaining('"Bad Label", which is not a valid'),
+			}),
+		]);
+	});
+
+	test("without flows the body is not checked", () => {
+		expect(validateFlow(night(foreach("each", "missing")))).toEqual([]);
+	});
+
+	test("the body flow must exist", () => {
+		expect(errors(validateFlow(night(), { flows: {} }))).toEqual([
+			expect.objectContaining({
+				nodeId: "each",
+				message:
+					'For Each node "each" runs flow "trace", which does not exist.',
+			}),
+		]);
+	});
+
+	test("the body flow must parse", () => {
+		expect(errors(validateFlow(night(), { flows: { trace: null } }))).toEqual([
+			expect.objectContaining({
+				nodeId: "each",
+				message: expect.stringContaining("does not parse"),
+			}),
+		]);
+	});
+
+	test("the body flow must take an item", () => {
+		const plain = flow([agent("worker")], []);
+		expect(errors(validateFlow(night(), { flows: { trace: plain } }))).toEqual([
+			expect.objectContaining({
+				nodeId: "each",
+				message: expect.stringContaining('Set its input to "item"'),
+			}),
+		]);
+	});
+
+	test("a body with errors gives one error, its issues are not repeated", () => {
+		const broken: Flow = {
+			...flow([agent("worker", { prompt: "{{nope.x}} {{item.nope}}" })], []),
+			input: "item",
+		};
+		broken.nodes.push(agent("idle"));
+		expect(validateFlow(night(), { flows: { trace: broken } })).toEqual([
+			{
+				severity: "error",
+				nodeId: "each",
+				message: 'Body flow "trace" of For Each node "each" has 2 errors.',
+			},
+		]);
+	});
+
+	test("one body error is singular", () => {
+		const broken: Flow = {
+			...flow([agent("worker", { prompt: "{{nope.x}}" })], []),
+			input: "item",
+		};
+		expect(
+			errors(validateFlow(night(), { flows: { trace: broken } }))[0]?.message,
+		).toBe('Body flow "trace" of For Each node "each" has 1 error.');
+	});
+
+	test("errors of a nested body count once, on its parent", () => {
+		const feature: Flow = { ...night(), input: "item" };
+		const broken: Flow = {
+			...flow([agent("worker", { prompt: "{{nope.x}}" })], []),
+			input: "item",
+		};
+		const top = night(foreach("each", "feature"));
+		const flows = { feature, trace: broken };
+		expect(errors(validateFlow(top, { flows }))).toEqual([
+			expect.objectContaining({
+				message: 'Body flow "feature" of For Each node "each" has 1 error.',
+			}),
+		]);
+	});
+
+	test("a flow that runs itself is an error with the chain", () => {
+		const self: Flow = { ...night(foreach("each", "loop")), input: "item" };
+		expect(
+			errors(validateFlow(self, { flows: { loop: self }, name: "loop" })),
+		).toEqual([
+			expect.objectContaining({
+				nodeId: "each",
+				message: expect.stringContaining("runs this flow again: loop → loop."),
+			}),
+		]);
+	});
+
+	test("A → B → A is an error on A with the chain", () => {
+		const a: Flow = { ...night(foreach("each", "b")), input: "item" };
+		const b: Flow = { ...night(foreach("each", "a")), input: "item" };
+		const issues = errors(validateFlow(a, { flows: { a, b }, name: "a" }));
+		expect(issues).toEqual([
+			expect.objectContaining({
+				nodeId: "each",
+				message: expect.stringContaining("runs this flow again: a → b → a."),
+			}),
+		]);
+	});
+
+	test("the flow being checked replaces its saved version", () => {
+		const saved: Flow = { ...flow([agent("worker")], []), input: "item" };
+		const edited: Flow = { ...night(foreach("each", "a")), input: "item" };
+		expect(
+			errors(validateFlow(edited, { flows: { a: saved }, name: "a" })),
+		).toEqual([
+			expect.objectContaining({
+				message: expect.stringContaining("a → a"),
+			}),
+		]);
+	});
+
+	test("a cycle below a body is reported once, in the body", () => {
+		const b: Flow = { ...night(foreach("each", "c")), input: "item" };
+		const c: Flow = { ...night(foreach("each", "b")), input: "item" };
+		const top = night(foreach("each", "b"));
+		expect(
+			errors(validateFlow(top, { flows: { b, c, top }, name: "top" })),
+		).toEqual([
+			expect.objectContaining({
+				message: 'Body flow "b" of For Each node "each" has 1 error.',
+			}),
+		]);
+		expect(
+			errors(validateFlow(b, { flows: { b, c, top }, name: "b" })),
+		).toEqual([
+			expect.objectContaining({
+				message: expect.stringContaining("runs this flow again: b → c → b."),
+			}),
+		]);
+	});
+
+	test("without a name, a body that runs itself still shows up", () => {
+		const loop: Flow = { ...night(foreach("each", "loop")), input: "item" };
+		const top = night(foreach("each", "loop"));
+		expect(errors(validateFlow(top, { flows: { loop } }))).toEqual([
+			expect.objectContaining({
+				message: 'Body flow "loop" of For Each node "each" has 1 error.',
+			}),
+		]);
+	});
+
+	test("two For Each nodes may share a body", () => {
+		const twice = flow(
+			[foreach("first", "trace"), foreach("second", "trace")],
+			[edge("next", "first", "done", "second")],
+			"first",
+		);
+		expect(validateFlow(twice, { flows: { trace: traceBody() } })).toEqual([]);
+	});
+});
+
+describe("parseFlow with options", () => {
+	test("passes the options to validateFlow", () => {
+		const json = {
+			version: 1,
+			start: "each",
+			nodes: [
+				{
+					id: "each",
+					type: "foreach",
+					position: { x: 0, y: 0 },
+					source: { kind: "command", command: "./list-items" },
+					flow: "trace",
+				},
+			],
+			edges: [],
+		};
+		expect(parseFlow(json).issues).toEqual([]);
+		expect(parseFlow(json, { flows: {} }).issues).toEqual([
+			expect.objectContaining({
+				message: expect.stringContaining("does not exist"),
+			}),
 		]);
 	});
 });

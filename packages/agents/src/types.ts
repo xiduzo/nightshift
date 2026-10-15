@@ -123,5 +123,7 @@ export type GithubItemsInput = {
 	parent: number;
 	requireLabel?: string;
 	doneLabels: string[];
+	/** Sub-issues with one of these labels are left out of the list. */
+	skipLabels?: string[];
 	signal: AbortSignal;
 };

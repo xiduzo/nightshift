@@ -23,6 +23,12 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Gate | A Node that waits for a person in the Needs-you inbox, with a question and its choices. | PLAN §3 |
 | For Each Node | A Node that runs a sub-flow once per item of a list. | PLAN §3 |
 | Start Node | The Node a Run begins at. | Slice 2 |
+| Body Flow | A Flow with `input: "item"` that a For Each Node runs once per Item. | Slice 4 |
+| Item | One entry of a For Each source: a GitHub sub-issue, or one object of a command's JSON list. | Slice 4 |
+| Source | Where a For Each Node reads its Items, again before each Item. | Slice 4 |
+| Item Branch | The branch one Item works on, on top of the last Item that finished. Together they form the Stack. | Slice 4 |
+| Stack | The chain of Item Branches of one For Each, and the pull requests opened on them. | PLAN §5 |
+| Stop Time | The time after which a Run starts no new Step. | Slice 4 |
 | Outcome | How a Step ended: `pass`, `fail`, `needs-input`, or a Decision label. | PLAN §3 |
 | Edge | A link from a Node to the next Node, taken on one Outcome. | PLAN §2 |
 | Max | How often a Run may take an Edge. Every loop needs an Edge with a Max. | Slice 2 |
@@ -52,6 +58,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 |------|---------|
 | running | A Step runs, or the Run is between Steps. |
 | waiting | A Gate waits for a person in the Needs-you inbox. |
+| sleeping | A usage limit or a network failure: a timer continues the same Session. |
 | finished | The Run reached `pass`, a Decision label, or a Gate choice with no Edge left to take. |
 | stopped | A person stopped the Run. |
 | failed | A Step errored, a `fail` or `needs-input` had no Edge, or a Retry Loop hit its Max. |
@@ -72,6 +79,10 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | retry | Take a Retry Loop back to an earlier Node. | Slice 2 |
 | rescue | Retry a Node with a stronger model. | PLAN §2 |
 | resolve | Answer a Gate with one of its choices. | PLAN §3 |
+| block | Skip an Item because an Item it waits on failed. | Slice 4 |
+| halt | End a For Each early because a Body Flow ended on a halt label. | Slice 4 |
+| sleep | Wait on a timer after a usage limit or a network failure. | Slice 4 |
+| wake | End a sleep and continue the same Session. | Slice 4 |
 
 ## Events
 

@@ -3,6 +3,7 @@ import {
 	type DecisionNode,
 	type FlowNode,
 	type FlowNodeType,
+	type ForEachNode,
 	type GateNode,
 	nodeOutcomes,
 } from "@nightshift/flows";
@@ -17,11 +18,13 @@ import {
 } from "@xyflow/react";
 import {
 	CircleAlertIcon,
+	GitBranchIcon,
 	GitPullRequestIcon,
 	PlayIcon,
 	TriangleAlertIcon,
+	WorkflowIcon,
 } from "lucide-react";
-import { memo, useEffect, useRef } from "react";
+import { memo, useContext, useEffect, useRef } from "react";
 
 import {
 	OutcomeBadge,
@@ -30,9 +33,10 @@ import {
 	type StepState,
 	stepStateStyle,
 } from "@/components/outcome-badge";
-import { agentSummary, firstLine } from "@/lib/flow-draft";
+import { agentSummary, firstLine, sourceSummary } from "@/lib/flow-draft";
 
 import { NODE_TYPE } from "./node-type";
+import { OpenFlowContext } from "./open-flow-context";
 
 export type NodeRunState = {
 	/** The state of the node's latest step. */
@@ -53,6 +57,17 @@ export type FlowCanvasNode = Node<FlowNodeData, FlowNodeType>;
 
 /** The descriptions of a node's options, by name, to show beside their handles. */
 function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
+	if (node.type === "foreach") {
+		return new Map([
+			["done", "Every item ran"],
+			[
+				"halted",
+				node.haltOn.length > 0
+					? `A body ended on ${node.haltOn.join(", ")}`
+					: undefined,
+			],
+		]);
+	}
 	const options =
 		node.type === "decision"
 			? node.labels
@@ -160,6 +175,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 				{node.type === "agent" ? <AgentBody node={node} /> : null}
 				{node.type === "decision" ? <DecisionBody node={node} /> : null}
 				{node.type === "gate" ? <GateBody node={node} /> : null}
+				{node.type === "foreach" ? <ForEachBody node={node} /> : null}
 				{node.type === "command" ? (
 					<code className="block truncate bg-muted/60 px-1.5 py-1 font-mono text-[11px]">
 						{node.command.trim() === "" ? (
@@ -309,9 +325,74 @@ function GateBody({ node }: { node: GateNode }) {
 	);
 }
 
+/** Where the items come from, which body flow runs per item, and on which branch. */
+function ForEachBody({ node }: { node: ForEachNode }) {
+	const openFlow = useContext(OpenFlowContext);
+	const summary = sourceSummary(node.source);
+	const command = node.source.kind === "command";
+	return (
+		<>
+			{command ? (
+				<code className="block truncate bg-muted/60 px-1.5 py-1 font-mono text-[11px]">
+					{summary === "" ? (
+						<span className="text-muted-foreground italic">
+							No source command yet
+						</span>
+					) : (
+						<>
+							<span className="text-muted-foreground" aria-hidden="true">
+								${" "}
+							</span>
+							{summary}
+						</>
+					)}
+				</code>
+			) : (
+				<p
+					className={cn(
+						"line-clamp-2 break-words",
+						summary === "" && "text-muted-foreground italic",
+					)}
+				>
+					{summary === "" ? "No parent issue yet" : summary}
+				</p>
+			)}
+			<span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+				<WorkflowIcon className="size-3 shrink-0" aria-hidden="true" />
+				<span className="shrink-0">Body</span>
+				{node.flow === "" ? (
+					<span className="italic">not picked yet</span>
+				) : openFlow ? (
+					<button
+						type="button"
+						className="nodrag nopan min-w-0 truncate font-mono text-foreground underline decoration-foreground/30 underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-1 focus-visible:ring-ring"
+						title={`Open the body flow ${node.flow}`}
+						onClick={(event) => {
+							event.stopPropagation();
+							openFlow(node.flow);
+						}}
+					>
+						{node.flow}
+					</button>
+				) : (
+					<span className="min-w-0 truncate font-mono text-foreground">
+						{node.flow}
+					</span>
+				)}
+			</span>
+			<span className="flex min-w-0 items-center gap-1 truncate text-[11px] text-muted-foreground">
+				<GitBranchIcon className="size-3 shrink-0" aria-hidden="true" />
+				{node.branchPerItem ? "Branch per item" : "One shared branch"}
+				{node.maxItems ? ` · max ${node.maxItems} items` : ""}
+			</span>
+		</>
+	);
+}
+
 export const nodeTypes: NodeTypes = {
 	agent: FlowNodeCard,
 	command: FlowNodeCard,
 	decision: FlowNodeCard,
 	gate: FlowNodeCard,
+	foreach: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;

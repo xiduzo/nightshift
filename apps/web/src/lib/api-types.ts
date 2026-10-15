@@ -19,6 +19,10 @@ export type RunSummary = Outputs["runs"]["list"][number];
 export type RunDetail = Outputs["runs"]["get"];
 export type StepSummary = RunDetail["steps"][number];
 export type SessionSummary = StepSummary["sessions"][number];
+/** One item of a For Each visit. */
+export type ItemSummary = StepSummary["items"][number];
+export type ItemState = ItemSummary["state"];
+export type StepScope = NonNullable<StepSummary["scope"]>;
 export type RunStatus = RunSummary["status"];
 export type StepOutcome = NonNullable<StepSummary["outcome"]>;
 export type StartRunInput = Inputs["runs"]["start"];
@@ -46,9 +50,14 @@ export type GateEvent = Extract<
 	StepEvent,
 	{ type: "gate-open" | "gate-resolved" }
 >;
+export type ForEachEvent = Extract<
+	StepEvent,
+	{ type: "items-read" | "item-start" | "item-end" }
+>;
+export type WaitEvent = Extract<StepEvent, { type: "wait" | "wake" }>;
 export type AgentEvent = Exclude<
 	StepEvent,
-	CommandEvent | DecisionEvent | GateEvent
+	CommandEvent | DecisionEvent | GateEvent | ForEachEvent | WaitEvent
 >;
 
 /** A Gate that waits for a person: the Needs-you inbox. */

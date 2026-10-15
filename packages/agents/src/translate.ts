@@ -42,6 +42,8 @@ type UsageLimit = { message: string; resetAt?: number };
 export type SdkSignals = {
 	/** An assistant message reported a rate or usage limit. */
 	usageLimit?: UsageLimit;
+	/** An assistant message reported an API error that means the network or the service is down. */
+	networkError?: string;
 	/** Reset time of the last `rate_limit_event` with status `rejected`. */
 	rejectedResetAt?: number;
 	/** The result message reported a failure. */
@@ -78,14 +80,76 @@ export function toEpochMs(value: number): number {
 	return value < 1e12 ? value * 1000 : value;
 }
 
+/**
+ * A usage or primary rate limit: the account is out of usage for now. Ported
+ * from `LIMITED` in `night-shift.py`, plus Claude Code's own wording.
+ */
 const USAGE_LIMIT_TEXT =
-	/usage limit|hit your (?:\w+ )?limit|limit reached|out of (?:extra )?usage/i;
+	/usage limit|session limit|weekly limit|hit your (?:\w+ )?limit|limit reached|out of (?:extra )?usage|rate.?limit|\b429\b|too many requests|quota/i;
+
+/**
+ * The service cannot be reached: DNS, refused or reset connections, timeouts,
+ * TLS, HTTP 5xx, and GitHub's secondary rate limit (a short back-off, not an
+ * exhausted account). Ported from `OFFLINE` in `night-shift.py` (without its
+ * own "did not finish in" timeout text), plus the wording of Claude Code's API
+ * errors (`API Error: 529 …`, `Connection error.`, `Request timed out.`) and
+ * Node's socket error codes.
+ */
+const NETWORK_TEXT = new RegExp(
+	[
+		"error connecting to",
+		"could not resolve host",
+		"no such host",
+		"name resolution",
+		"network is (?:unreachable|down)",
+		"connection (?:refused|reset|timed out|closed|error)",
+		"operation timed out",
+		"request timed out",
+		"i/o timeout",
+		"tls handshake",
+		"unexpected eof",
+		"remote end hung up",
+		"socket hang up",
+		"fetch failed",
+		"\\bHTTP 5\\d\\d\\b",
+		"\\bapi error\\W{0,3}5\\d\\d\\b",
+		"bad gateway",
+		"service unavailable",
+		"gateway time-?out",
+		"overloaded",
+		"secondary rate.?limit",
+		"\\b(?:ECONNREFUSED|ECONNRESET|ECONNABORTED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|ENETDOWN|EHOSTUNREACH|EPIPE)\\b",
+	].join("|"),
+	"i",
+);
+
+/** GitHub's secondary rate limit says "rate limit" but is a network wait. */
+const SECONDARY_RATE_LIMIT = /secondary rate.?limit/i;
 
 /** Older Claude Code versions end the message with `|<epoch seconds>`. */
 const LEGACY_RESET = /\|(\d{10,13})\s*$/;
 
+/**
+ * What a failure text says about why the harness stopped: `usage-limit`,
+ * `network`, or undefined for any other failure. A secondary rate limit is
+ * `network`; a usage limit, a primary rate limit, a 429, or a quota is
+ * `usage-limit`, also when the text mentions the network too.
+ */
+export function failureKind(
+	text: string,
+): "usage-limit" | "network" | undefined {
+	if (SECONDARY_RATE_LIMIT.test(text)) return "network";
+	if (USAGE_LIMIT_TEXT.test(text)) return "usage-limit";
+	if (NETWORK_TEXT.test(text)) return "network";
+	return undefined;
+}
+
 export function isUsageLimitText(text: string): boolean {
-	return USAGE_LIMIT_TEXT.test(text);
+	return failureKind(text) === "usage-limit";
+}
+
+export function isNetworkText(text: string): boolean {
+	return failureKind(text) === "network";
 }
 
 export function parseLegacyResetAt(text: string): number | undefined {
@@ -149,7 +213,21 @@ export function observeSdkMessage(
 		const isLimit =
 			message.error === "rate_limit" ||
 			message.api_error === "usage_limit_reached";
-		if (!isLimit) return signals;
+		if (!isLimit) {
+			const error = asString(message.error);
+			if (!error) return signals;
+			const text = assistantText(message);
+			const isNetwork =
+				error === "server_error" ||
+				failureKind(text) === "network" ||
+				failureKind(error) === "network";
+			return isNetwork
+				? {
+						...signals,
+						networkError: text || "Claude Code could not reach its API",
+					}
+				: signals;
+		}
 		const params = message.api_error_params;
 		const resetAt = isRecord(params)
 			? resetAtFromInfo(params.rate_limit_info)
@@ -434,18 +512,25 @@ export function createTranslator(options: {
 			);
 		}
 		if (failure !== undefined) {
-			if (signals.rejectedResetAt !== undefined || isUsageLimitText(failure)) {
+			const kind = failureKind(failure);
+			if (signals.rejectedResetAt !== undefined || kind === "usage-limit") {
 				return errorEvent(
 					"usage-limit",
 					failure,
 					parseLegacyResetAt(failure) ?? signals.rejectedResetAt,
 				);
 			}
+			if (kind === "network" || signals.networkError !== undefined) {
+				return errorEvent("network", failure);
+			}
 			return errorEvent("harness", failure);
 		}
 		if (runFinished) {
 			const usage = runFinished.usage ?? signals.resultUsage;
 			return { type: "finished", ...(usage ? { usage } : {}) };
+		}
+		if (signals.networkError !== undefined) {
+			return errorEvent("network", signals.networkError);
 		}
 		return errorEvent("harness", "Claude Code ended without a result");
 	}

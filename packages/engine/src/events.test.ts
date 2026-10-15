@@ -7,7 +7,10 @@ import {
 	deriveOpenGate,
 	deriveResumePoint,
 	deriveRunState,
+	deriveSleep,
 	deriveSteps,
+	deriveStopAfterStep,
+	deriveStopAt,
 	deriveTraversals,
 	type EngineEventType,
 	type EnginePayloads,
@@ -15,6 +18,7 @@ import {
 	lastHarnessSession,
 	lastHarnessSessionOfNode,
 	openWork,
+	type Scope,
 	type SessionOutcome,
 	sumCostUsd,
 } from "./events";
@@ -41,6 +45,7 @@ function log() {
 	};
 	const builder = {
 		events,
+		push,
 		runStarted: () =>
 			push("RunStarted", {
 				projectId: "p",
@@ -422,5 +427,227 @@ describe("gates", () => {
 		expect(deriveOpenGate(events)).toBeNull();
 		expect(deriveRunState(events).status).toBe("stopped");
 		expect(deriveResumePoint(events)).toEqual({ kind: "node", nodeId: "gate" });
+	});
+});
+
+describe("For Each scopes", () => {
+	const item = (id: string) => ({
+		id,
+		number: null,
+		title: id,
+		body: null,
+		url: null,
+		parentNumber: null,
+		parentTitle: null,
+	});
+	const started = (
+		b: ReturnType<typeof log>,
+		stepId: string,
+		nodeId: string,
+		nodeType: "agent" | "foreach" | "command",
+		scope: Scope | null,
+	) =>
+		b.push(
+			"StepStarted",
+			{
+				nodeId,
+				nodeType,
+				visit: 1,
+				transcriptPath: `/t/${stepId}`,
+				logPath: null,
+				scope,
+			},
+			{ stepId },
+		);
+	const itemStarted = (b: ReturnType<typeof log>, stepId: string, id: string) =>
+		b.push(
+			"ItemStarted",
+			{ item: item(id), index: 1, branch: null, baseBranch: null },
+			{ stepId },
+		);
+
+	/** loop (top) → item A → inner (For Each) → item a1 → worker. */
+	function nested() {
+		const b = log().runStarted();
+		started(b, "outer", "loop", "foreach", null);
+		itemStarted(b, "outer", "A");
+		started(b, "inner", "traces", "foreach", {
+			forEachStepId: "outer",
+			itemId: "A",
+		});
+		itemStarted(b, "inner", "a1");
+		started(b, "w", "worker", "agent", {
+			forEachStepId: "inner",
+			itemId: "a1",
+		});
+		b.sessionStarted("w", "s").harness("w", "s", "h-1");
+		return b;
+	}
+
+	test("outputs, visits and edge counts are kept per scope", () => {
+		const b = nested();
+		b.stepEnded("w", "pass", { summary: "inside" });
+		b.push("EdgeTaken", {
+			edgeId: "e1",
+			from: "worker",
+			to: "check",
+			outcome: "pass",
+			scope: { forEachStepId: "inner", itemId: "a1" },
+		});
+		started(b, "top", "worker", "agent", null);
+		b.stepEnded("top", "pass", { summary: "top" });
+		b.edge("e1", "worker", "check");
+		const key = "inner/a1";
+		expect(deriveNodeOutputs(b.events).worker?.summary).toBe("top");
+		expect(deriveNodeOutputs(b.events, key).worker?.summary).toBe("inside");
+		expect(countVisits(b.events, "worker")).toBe(1);
+		expect(countVisits(b.events, "worker", key)).toBe(1);
+		expect(deriveTraversals(b.events)).toEqual({ e1: 1 });
+		expect(deriveTraversals(b.events, key)).toEqual({ e1: 1 });
+		expect(lastHarnessSessionOfNode(b.events, "worker", key)).toBe("h-1");
+		expect(lastHarnessSessionOfNode(b.events, "worker")).toBeNull();
+	});
+
+	test("resume inside nested items wraps the point in its For Each steps", () => {
+		const b = nested();
+		b.sessionEnded("w", "s", "stopped").stepEnded("w", "stopped");
+		b.stepEnded("inner", "stopped").stepEnded("outer", "stopped");
+		b.ended("stopped");
+		expect(deriveResumePoint(b.events)).toEqual({
+			kind: "foreach",
+			nodeId: "loop",
+			stepId: "outer",
+			itemId: "A",
+			inner: {
+				kind: "foreach",
+				nodeId: "traces",
+				stepId: "inner",
+				itemId: "a1",
+				inner: {
+					kind: "session",
+					stepId: "w",
+					nodeId: "worker",
+					harnessSessionId: "h-1",
+				},
+			},
+		});
+	});
+
+	test("an ended item continues the loop; an ended For Each runs again", () => {
+		const b = nested();
+		b.stepEnded("w", "pass");
+		b.push(
+			"ItemEnded",
+			{ itemId: "a1", state: "done", reason: null },
+			{
+				stepId: "inner",
+			},
+		);
+		b.stepEnded("inner", "stopped").stepEnded("outer", "stopped");
+		b.ended("stopped");
+		expect(deriveResumePoint(b.events)).toMatchObject({
+			kind: "foreach",
+			stepId: "outer",
+			itemId: "A",
+			inner: { kind: "foreach", stepId: "inner", itemId: null, inner: null },
+		});
+
+		const c = nested();
+		c.stepEnded("w", "pass");
+		c.push(
+			"ItemEnded",
+			{ itemId: "a1", state: "done", reason: null },
+			{
+				stepId: "inner",
+			},
+		);
+		c.stepEnded("inner", "done");
+		c.ended("failed");
+		expect(deriveResumePoint(c.events)).toMatchObject({
+			kind: "foreach",
+			stepId: "outer",
+			itemId: "A",
+			inner: { kind: "node", nodeId: "traces" },
+		});
+	});
+
+	test("items derive their states, blocked ones included", () => {
+		const b = nested();
+		b.push(
+			"ItemBlocked",
+			{ item: item("a2"), blocker: "a1", reason: "blocked by #a1" },
+			{ stepId: "inner" },
+		);
+		b.push(
+			"ItemEnded",
+			{ itemId: "a1", state: "failed", reason: "boom" },
+			{
+				stepId: "inner",
+			},
+		);
+		const outer = () => deriveSteps(b.events).find((s) => s.id === "outer");
+		expect(outer()?.items[0]).toMatchObject({ state: "running", open: true });
+		const inner = deriveSteps(b.events).find((s) => s.id === "inner");
+		expect(inner?.scope).toEqual({ forEachStepId: "outer", itemId: "A" });
+		expect(inner?.items.map((i) => [i.facts.id, i.state, i.reason])).toEqual([
+			["a1", "failed", "boom"],
+			["a2", "blocked", "blocked by #a1"],
+		]);
+		// The For Each step ends while item A is in progress.
+		b.stepEnded("outer", "interrupted");
+		expect(outer()?.items[0]).toMatchObject({
+			state: "failed",
+			reason: "The daemon stopped during this item.",
+			open: true,
+		});
+		b.stepReopened("outer");
+		expect(outer()?.items[0]).toMatchObject({ state: "running", reason: null });
+	});
+
+	test("a sleeping step keeps itself and its For Each steps open across a restart", () => {
+		const b = nested();
+		b.sessionEnded("w", "s", "failed");
+		b.push(
+			"WaitStarted",
+			{ reason: "usage-limit", until: 5000, message: "limit", since: 1 },
+			{ stepId: "w" },
+		);
+		expect(deriveRunState(b.events).status).toBe("sleeping");
+		expect(deriveSleep(b.events)).toMatchObject({ stepId: "w", until: 5000 });
+		const open = openWork(b.events);
+		expect(open.steps).toEqual([]);
+		expect(open.runOpen).toBe(false);
+
+		b.push("WaitEnded", { early: false }, { stepId: "w" });
+		expect(deriveRunState(b.events).status).toBe("running");
+		expect(openWork(b.events).steps.map((s) => s.id)).toEqual([
+			"outer",
+			"inner",
+			"w",
+		]);
+	});
+
+	test("stop after the step and the stop time", () => {
+		const b = log();
+		b.push("RunStarted", {
+			projectId: "p",
+			flowName: "f",
+			title: "f",
+			start: "worker",
+			stopAt: 99,
+		});
+		expect(deriveStopAt(b.events)).toBe(99);
+		expect(deriveStopAfterStep(b.events)).toBe(false);
+		b.push("StopAfterStepRequested", {});
+		expect(deriveStopAfterStep(b.events)).toBe(true);
+		b.ended("stopped");
+		b.push("RunResumed", {
+			nodeId: "worker",
+			stepId: null,
+			prompt: null,
+			clearStopAt: true,
+		});
+		expect(deriveStopAfterStep(b.events)).toBe(false);
+		expect(deriveStopAt(b.events)).toBeNull();
 	});
 });

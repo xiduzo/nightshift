@@ -6,7 +6,8 @@
  * array `$FAKE_CLAUDE_CALLS`, a call of that bridged tool over the real MCP
  * bridge from `--mcp-config` (as an assistant `tool_use` plus a user
  * `tool_result`); an optional pause of `$FAKE_CLAUDE_SLEEP_MS`; and a
- * successful result that costs `$FAKE_CLAUDE_COST_USD` (default 0.0012).
+ * result that costs `$FAKE_CLAUDE_COST_USD` (default 0.0012): successful, or
+ * a failure with the text `$FAKE_CLAUDE_RESULT_ERROR` when that is set.
  */
 import { appendFileSync, readFileSync } from "node:fs";
 
@@ -121,11 +122,12 @@ for (const call of calls) {
 const sleepMs = Number(process.env.FAKE_CLAUDE_SLEEP_MS ?? 0);
 if (sleepMs > 0) await Bun.sleep(sleepMs);
 
+const resultError = process.env.FAKE_CLAUDE_RESULT_ERROR;
 print({
 	type: "result",
 	subtype: "success",
-	is_error: false,
-	result: "Done.",
+	is_error: resultError !== undefined,
+	result: resultError ?? "Done.",
 	session_id: sessionId,
 	total_cost_usd: Number(process.env.FAKE_CLAUDE_COST_USD ?? 0.0012),
 	usage: { input_tokens: 10, output_tokens: 5 },

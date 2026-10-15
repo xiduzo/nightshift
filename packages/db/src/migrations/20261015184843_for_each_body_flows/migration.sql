@@ -1,0 +1,1 @@
+ALTER TABLE `run` ADD `body_flows` text DEFAULT '{}' NOT NULL;

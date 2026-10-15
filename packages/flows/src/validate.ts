@@ -1,7 +1,10 @@
 import {
 	type Flow,
 	type FlowNode,
+	type ForEachNode,
 	flowSchema,
+	itemFields,
+	labelSchema,
 	nodeOutcomes,
 	outputFieldsByType,
 	reservedOutcomes,
@@ -18,10 +21,25 @@ import type { FlowIssue, ValidateOptions } from "./types";
  * without an edge that has a `max` (a Gate in a cycle too: a person could
  * loop forever). Warns about unreachable nodes and about Decision labels or
  * Gate choices without an edge, since picking one ends the run as failed.
+ *
+ * `{{item.<field>}}` works only in a flow with `input: "item"`. With
+ * `options.flows`, a For Each body must exist, parse and have
+ * `input: "item"`, and a flow may not run itself through For Each bodies.
+ * Issues inside a body are not repeated: a body with errors gives one error
+ * on the For Each node.
  */
 export function validateFlow(
 	flow: Flow,
 	options: ValidateOptions = {},
+): FlowIssue[] {
+	return validateIn(flow, options, []);
+}
+
+/** `ancestors`: the flows whose For Each bodies led here, outermost first. */
+function validateIn(
+	flow: Flow,
+	options: ValidateOptions,
+	ancestors: readonly string[],
 ): FlowIssue[] {
 	const issues: FlowIssue[] = [];
 	const error = (message: string, at: Pick<FlowIssue, "nodeId" | "edgeId">) =>
@@ -39,10 +57,11 @@ export function validateFlow(
 			continue;
 		}
 		nodes.set(node.id, node);
-		if (node.id === "run") {
-			error(`Node id "run" is reserved for {{run.<field>}} templates.`, {
-				nodeId: node.id,
-			});
+		if (node.id === "run" || node.id === "item") {
+			error(
+				`Node id "${node.id}" is reserved for {{${node.id}.<field>}} templates.`,
+				{ nodeId: node.id },
+			);
 		}
 	}
 
@@ -105,19 +124,59 @@ export function validateFlow(
 						nodeId: node.id,
 					});
 				}
-				checkTemplate(node, node.prompt, "prompt", nodes, error);
+				checkTemplate(node, node.prompt, "prompt", nodes, flow.input, error);
 				break;
 			case "command":
-				checkTemplate(node, node.command, "command", nodes, error);
+				checkTemplate(node, node.command, "command", nodes, flow.input, error);
 				break;
 			case "decision":
 				checkOptions(node, "label", "the decider", flow, error, warning);
-				checkTemplate(node, node.prompt, "prompt", nodes, error);
+				checkTemplate(node, node.prompt, "prompt", nodes, flow.input, error);
 				break;
 			case "gate":
 				checkOptions(node, "choice", "the person", flow, error, warning);
-				checkTemplate(node, node.question, "question", nodes, error);
+				checkTemplate(
+					node,
+					node.question,
+					"question",
+					nodes,
+					flow.input,
+					error,
+				);
 				break;
+			case "foreach":
+				if (node.source.kind === "github") {
+					checkTemplate(
+						node,
+						node.source.parent,
+						"source parent",
+						nodes,
+						flow.input,
+						error,
+					);
+				} else {
+					checkTemplate(
+						node,
+						node.source.command,
+						"source command",
+						nodes,
+						flow.input,
+						error,
+					);
+				}
+				checkHaltOn(node, error);
+				break;
+		}
+	}
+
+	// For Each bodies, when the project's flows are known.
+	if (options.flows !== undefined) {
+		const flows: Record<string, Flow | null> = { ...options.flows };
+		if (options.name !== undefined) flows[options.name] = flow;
+		const chain =
+			options.name === undefined ? ancestors : [...ancestors, options.name];
+		for (const node of nodes.values()) {
+			if (node.type === "foreach") checkBody(node, flows, chain, error);
 		}
 	}
 
@@ -155,6 +214,114 @@ export function validateFlow(
 	}
 
 	return issues;
+}
+
+/**
+ * The body must exist, parse and take an item. It may not lead back to the
+ * flow being checked (the last of `chain`). Cycles through an outer flow are
+ * left to that flow, so each is reported once.
+ */
+function checkBody(
+	node: ForEachNode,
+	flows: Readonly<Record<string, Flow | null>>,
+	chain: readonly string[],
+	error: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
+): void {
+	const at = { nodeId: node.id };
+	const runs = `For Each node "${node.id}" runs flow "${node.flow}"`;
+	if (!Object.hasOwn(flows, node.flow)) {
+		error(`${runs}, which does not exist.`, at);
+		return;
+	}
+	const body = flows[node.flow];
+	if (!body) {
+		error(`${runs}, which does not parse. Fix that file first.`, at);
+		return;
+	}
+	if (body.input !== "item") {
+		error(
+			`${runs}, which is not a For Each body. Set its input to "item".`,
+			at,
+		);
+	}
+
+	const self = chain.at(-1);
+	if (self !== undefined) {
+		const path = pathBack(node.flow, self, flows, new Set(chain.slice(0, -1)));
+		if (path !== null) {
+			error(
+				`${runs}, which runs this flow again: ${[self, ...path].join(" → ")}. A flow cannot contain itself.`,
+				at,
+			);
+		}
+	}
+	if (chain.includes(node.flow)) return;
+
+	const count = validateIn(body, { flows, name: node.flow }, chain).filter(
+		(issue) => issue.severity === "error",
+	).length;
+	if (count > 0) {
+		error(
+			`Body flow "${node.flow}" of For Each node "${node.id}" has ${count} ${count === 1 ? "error" : "errors"}.`,
+			at,
+		);
+	}
+}
+
+/**
+ * The shortest chain of For Each bodies from `start` to `target`, both
+ * included, or null. Does not pass through `skip`.
+ */
+function pathBack(
+	start: string,
+	target: string,
+	flows: Readonly<Record<string, Flow | null>>,
+	skip: ReadonlySet<string>,
+): string[] | null {
+	if (start === target) return [start];
+	if (skip.has(start)) return null;
+	const parent = new Map<string, string>([[start, start]]);
+	const queue = [start];
+	for (let name = queue.shift(); name !== undefined; name = queue.shift()) {
+		const flow = Object.hasOwn(flows, name) ? flows[name] : null;
+		for (const node of flow?.nodes ?? []) {
+			if (node.type !== "foreach" || parent.has(node.flow)) continue;
+			parent.set(node.flow, name);
+			if (node.flow === target) {
+				const path = [target];
+				for (let at = name; at !== start; ) {
+					path.push(at);
+					at = parent.get(at) ?? start;
+				}
+				path.push(start);
+				return path.reverse();
+			}
+			if (!skip.has(node.flow)) queue.push(node.flow);
+		}
+	}
+	return null;
+}
+
+/** Halt labels are outcomes of the body: valid labels, not reserved. */
+function checkHaltOn(
+	node: ForEachNode,
+	error: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
+): void {
+	const reserved: readonly string[] = reservedOutcomes;
+	for (const label of node.haltOn) {
+		const parsed = labelSchema.safeParse(label);
+		if (!parsed.success) {
+			error(
+				`For Each node "${node.id}" halts on "${label}", which is not a valid label: ${parsed.error.issues[0]?.message ?? "not allowed"}`,
+				{ nodeId: node.id },
+			);
+		} else if (reserved.includes(label)) {
+			error(
+				`For Each node "${node.id}" halts on "${label}", which is reserved. Do not use: ${reserved.join(", ")}.`,
+				{ nodeId: node.id },
+			);
+		}
+	}
 }
 
 function describeNode(node: FlowNode): string {
@@ -213,12 +380,22 @@ function checkTemplate(
 	text: string,
 	where: string,
 	nodes: ReadonlyMap<string, FlowNode>,
+	input: Flow["input"],
 	error: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
 ): void {
 	for (const ref of templateRefs(text)) {
 		let fields: readonly string[];
 		if (ref.scope === "run") {
 			fields = runFields;
+		} else if (ref.scope === "item") {
+			if (input !== "item") {
+				error(
+					`The ${where} of "${node.id}" uses ${ref.raw}, but only a For Each body can read item fields. Set the flow's input to "item".`,
+					{ nodeId: node.id },
+				);
+				continue;
+			}
+			fields = itemFields;
 		} else {
 			const target = nodes.get(ref.scope);
 			if (!target) {
@@ -331,6 +508,7 @@ function cycleThrough(
 /** Parses unknown JSON and validates it. Schema errors come back as issues. */
 export function parseFlow(
 	json: unknown,
+	options: ValidateOptions = {},
 ): { flow: Flow; issues: FlowIssue[] } | { flow: null; issues: FlowIssue[] } {
 	const result = flowSchema.safeParse(json);
 	if (!result.success) {
@@ -342,5 +520,5 @@ export function parseFlow(
 			})),
 		};
 	}
-	return { flow: result.data, issues: validateFlow(result.data) };
+	return { flow: result.data, issues: validateFlow(result.data, options) };
 }

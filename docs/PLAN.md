@@ -89,6 +89,8 @@ flowchart LR
 
 ## 5. Delivery
 
+Status (2026-10-15): Slices 1 to 4 are built. The night runs as flows in `examples/rpgdotexe/`. `night-shift.py` retires after a flow runs a full Epic.
+
 ### Slice 1 — One agent node, live
 
 Pick a repo. Run one Agent node with a prompt on Claude Code in a fresh worktree. Watch the transcript stream into the UI. Stop it. Resume it.
@@ -139,4 +141,9 @@ bun run build          # everything, desktop last
 - Session resume works through the adapter (Slice 1). The usage-limit reset time is parsed from the harness's raw messages, but no real usage limit has tested it yet.
 - Electrobun packaging needs a static web build of TanStack Start. Confirm before the first desktop build.
 - The decider runs Claude Code with no built-in tools (`--tools "" --strict-mcp-config`). `@tanstack/ai-claude-code` 0.9 cannot pass that next to several bridged tools, so we append the flags to the `claude` executable string, which the adapter splits on spaces. Recheck on every adapter upgrade, and ask upstream for an option.
+- Flows have no run parameters yet: the rpgdotexe example hardcodes the Epic number in `night.json`. Add parameters (`{{params.epic}}`) set in the start dialog.
+- An item cut short by a stop or a daemon death shows `failed` with a reason, and runs again on resume. Consider `stopped` and `interrupted` item states.
+- `timeoutMinutes` on a For Each node is not enforced. Every step inside the body keeps its own limit.
+- Item branches are `nightshift/<run8>-<id>-<title>`: git cannot nest a branch under the run branch `nightshift/<run8>`.
+- Usage-limit and network sleeps are tested with fakes only. The first real usage limit at night is the real test.
 - `@tanstack/ai-sandbox` 0.5.23 writes its projection marker to a doubled path when the workspace has a fixed directory. We set `workspace.root: '.'` to avoid it. Report it upstream.

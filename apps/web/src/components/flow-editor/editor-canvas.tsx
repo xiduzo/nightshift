@@ -37,7 +37,13 @@ export type Selection =
 	| { kind: "edge"; id: string }
 	| null;
 
-const PALETTE: FlowNodeType[] = ["agent", "command", "decision", "gate"];
+const PALETTE: FlowNodeType[] = [
+	"agent",
+	"command",
+	"decision",
+	"gate",
+	"foreach",
+];
 
 /** Below the node a new one lands on, so repeated adds do not stack exactly. */
 const ADD_OFFSET = 32;

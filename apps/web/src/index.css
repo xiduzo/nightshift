@@ -13,6 +13,8 @@
 	--status-failed: oklch(0.55 0.22 27);
 	--status-interrupted: oklch(0.52 0.13 65);
 	--status-waiting: oklch(0.5 0.2 305);
+	/* A usage limit or the network: quieter than running, it continues on a timer. */
+	--status-sleeping: oklch(0.5 0.07 235);
 }
 
 .dark {
@@ -22,6 +24,7 @@
 	--status-failed: oklch(0.704 0.191 22.216);
 	--status-interrupted: oklch(0.82 0.14 80);
 	--status-waiting: oklch(0.76 0.14 305);
+	--status-sleeping: oklch(0.78 0.06 235);
 }
 
 /*
@@ -47,6 +50,7 @@
 	--color-status-failed: var(--status-failed);
 	--color-status-interrupted: var(--status-interrupted);
 	--color-status-waiting: var(--status-waiting);
+	--color-status-sleeping: var(--status-sleeping);
 	--color-outcome-pass: var(--outcome-pass);
 	--color-outcome-fail: var(--outcome-fail);
 	--color-outcome-needs-input: var(--outcome-needs-input);

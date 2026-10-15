@@ -7,8 +7,10 @@ import {
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { ChevronRightIcon } from "lucide-react";
+import { Fragment, type ReactNode, useMemo, useState } from "react";
 
+import { ItemList } from "@/components/run/item-list";
 import { ResumeComposer } from "@/components/run/resume-composer";
 import { RunGraph } from "@/components/run/run-graph";
 import { RunHeader } from "@/components/run/run-header";
@@ -16,7 +18,19 @@ import { StepHeader } from "@/components/run/step-header";
 import { StepTimeline } from "@/components/run/step-timeline";
 import { StepTranscript } from "@/components/transcript/step-transcript";
 import { mergeSteps, useRunStream } from "@/hooks/use-run-stream";
-import type { RunStatus } from "@/lib/api-types";
+import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
+import { itemLabel } from "@/lib/format";
+import {
+	bodyFlowName,
+	bodyFlowOf,
+	derivedTraversals,
+	type ItemScope,
+	itemsOf,
+	scopeChain,
+	stepAtScope,
+	stepsIn,
+	stepsUnder,
+} from "@/lib/run-steps";
 import { emptyTranscript } from "@/lib/transcript";
 import { orpc } from "@/utils/orpc";
 
@@ -34,6 +48,8 @@ function RunComponent() {
 	const stream = useRunStream(runId);
 	/** Null follows the latest step as the run walks. */
 	const [pickedStepId, setPickedStepId] = useState<string | null>(null);
+	/** The For Each item in focus: the steps and the graph narrow to it. */
+	const [focus, setFocus] = useState<ItemScope>(null);
 
 	const steps = useMemo(
 		() => mergeSteps(run.data?.steps ?? [], stream.steps),
@@ -68,8 +84,12 @@ function RunComponent() {
 
 	// The stream reports a status change before the refetched run arrives.
 	const status = stream.status ?? run.data.status;
+	const runData = run.data;
+	// In focus: only the item's steps, nested ones included.
+	const visible = stepsUnder(steps, focus);
 	const selectedStep =
-		steps.find((step) => step.id === pickedStepId) ?? steps[steps.length - 1];
+		steps.find((step) => step.id === pickedStepId) ??
+		visible[visible.length - 1];
 	const lastStep = steps[steps.length - 1];
 
 	// The newest step of a gate without an outcome is the one the run waits at.
@@ -80,10 +100,46 @@ function RunComponent() {
 					.find((step) => step.nodeType === "gate" && step.outcome === null)
 			: undefined;
 
+	// The graph: the top-level flow, or the body flow of the item in focus.
+	const focusStep = focus
+		? steps.find((step) => step.id === focus.forEachStepId)
+		: undefined;
+	const bodyFlow = focusStep
+		? bodyFlowOf(runData, steps, focusStep)
+		: undefined;
+	const graphFlow = (focus && bodyFlow) || runData.flow;
+	const graphScope: ItemScope = focus && bodyFlow ? focus : null;
+	const graphSteps = stepsIn(steps, graphScope);
+	const graphTraversals = graphScope
+		? derivedTraversals(graphFlow, graphSteps)
+		: runData.traversals;
+	const graphSelected = selectedStep
+		? stepAtScope(steps, selectedStep, graphScope)
+		: undefined;
+
 	const selectNode = (nodeId: string) => {
-		const latest = [...steps].reverse().find((step) => step.nodeId === nodeId);
+		const latest = [...graphSteps]
+			.reverse()
+			.find((step) => step.nodeId === nodeId);
 		if (latest) setPickedStepId(latest.id);
 	};
+
+	const selectItem = (scope: ItemScope) => {
+		setFocus(scope);
+		// Show the item's latest step; the whole run follows the latest again.
+		setPickedStepId(
+			scope ? (stepsUnder(steps, scope).at(-1)?.id ?? null) : null,
+		);
+	};
+
+	const breadcrumb = graphScope ? (
+		<FocusBreadcrumb
+			run={runData}
+			steps={steps}
+			focus={graphScope}
+			onSelect={selectItem}
+		/>
+	) : null;
 
 	return (
 		<main className="grid min-h-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr]">
@@ -92,16 +148,29 @@ function RunComponent() {
 				status={status}
 				reconnecting={stream.connection === "reconnecting"}
 				openGateNodeId={openGate?.nodeId ?? null}
-				onShowGate={() => openGate && setPickedStepId(openGate.id)}
+				onShowGate={() => {
+					if (!openGate) return;
+					setFocus(null);
+					setPickedStepId(openGate.id);
+				}}
+				wait={stream.transcript.lastWait}
 			/>
 			<div className="grid min-h-0 auto-rows-max grid-cols-[minmax(0,1fr)] overflow-y-auto lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
 				<div className="grid min-h-0 grid-rows-[18rem_auto] border-b lg:grid-rows-[minmax(18rem,1fr)_auto] lg:border-r lg:border-b-0">
 					<RunGraph
-						flow={run.data.flow}
-						steps={steps}
-						traversals={run.data.traversals}
-						selectedNodeId={selectedStep?.nodeId ?? null}
+						key={
+							graphScope
+								? `${graphScope.forEachStepId}:${graphScope.itemId}`
+								: "top"
+						}
+						flow={graphFlow}
+						steps={graphSteps}
+						runStatus={status}
+						traversals={graphTraversals}
+						selectedNodeId={graphSelected?.nodeId ?? null}
 						onSelectNode={selectNode}
+						breadcrumb={breadcrumb}
+						label={graphScope ? "Body flow of the item in focus" : undefined}
 					/>
 					<section
 						aria-labelledby="steps-heading"
@@ -112,8 +181,15 @@ function RunComponent() {
 								Steps
 							</h2>
 							<span className="text-muted-foreground text-xs">
-								{steps.length}
+								{visible.length}
 							</span>
+							{focus ? (
+								<FocusChip
+									steps={steps}
+									focus={focus}
+									onClear={() => selectItem(null)}
+								/>
+							) : null}
 							{pickedStepId ? (
 								<button
 									type="button"
@@ -127,16 +203,47 @@ function RunComponent() {
 						<div className="min-h-0 overflow-y-auto">
 							<StepTimeline
 								steps={steps}
+								scope={focus}
+								runStatus={status}
 								selectedStepId={selectedStep?.id ?? null}
+								selectedItem={focus}
 								onSelect={setPickedStepId}
+								onSelectItem={selectItem}
 							/>
 						</div>
 					</section>
 				</div>
-				<div className="grid h-[75vh] grid-rows-[auto_1fr_auto] lg:h-auto lg:min-h-0">
+				<div
+					className={
+						selectedStep?.nodeType === "foreach"
+							? "grid h-[75vh] grid-rows-[auto_auto_1fr_auto] lg:h-auto lg:min-h-0"
+							: "grid h-[75vh] grid-rows-[auto_1fr_auto] lg:h-auto lg:min-h-0"
+					}
+				>
 					{selectedStep ? (
 						<>
-							<StepHeader step={selectedStep} />
+							<StepHeader
+								step={selectedStep}
+								runStatus={status}
+								context={
+									selectedStep.scope ? (
+										<StepContext
+											run={runData}
+											steps={steps}
+											step={selectedStep}
+											onSelect={selectItem}
+										/>
+									) : undefined
+								}
+							/>
+							{selectedStep.nodeType === "foreach" ? (
+								<ItemList
+									step={selectedStep}
+									steps={steps}
+									selectedItem={focus}
+									onSelectItem={selectItem}
+								/>
+							) : null}
 							<StepTranscript
 								key={selectedStep.id}
 								runId={run.data.id}
@@ -161,5 +268,146 @@ function RunComponent() {
 				</div>
 			</div>
 		</main>
+	);
+}
+
+/** One crumb per For Each level, from the run's flow down to the item in focus. */
+function useCrumbs(
+	run: RunDetail,
+	steps: StepSummary[],
+	focus: ItemScope,
+): { key: string; label: ReactNode; scope: ItemScope }[] {
+	const crumbs: { key: string; label: ReactNode; scope: ItemScope }[] = [
+		{ key: "top", label: run.flowName ?? "Run", scope: null },
+	];
+	for (const { forEachStep, itemId } of scopeChain(steps, focus)) {
+		const item = itemsOf(forEachStep, steps).find((one) => one.id === itemId);
+		const body = bodyFlowName(run, steps, forEachStep);
+		crumbs.push({
+			key: `${forEachStep.id}:${itemId}`,
+			label: (
+				<>
+					<span className="text-muted-foreground">{forEachStep.nodeId} ·</span>{" "}
+					{itemLabel(itemId, item?.number)}
+					{item && item.title !== itemId ? ` ${item.title}` : ""}
+					{body ? (
+						<span className="text-muted-foreground"> · {body}</span>
+					) : null}
+				</>
+			),
+			scope: { forEachStepId: forEachStep.id, itemId },
+		});
+	}
+	return crumbs;
+}
+
+/** Over the graph: where the body flow sits, with a way back up. */
+function FocusBreadcrumb({
+	run,
+	steps,
+	focus,
+	onSelect,
+}: {
+	run: RunDetail;
+	steps: StepSummary[];
+	focus: ItemScope;
+	onSelect: (scope: ItemScope) => void;
+}) {
+	const crumbs = useCrumbs(run, steps, focus);
+	return (
+		<nav
+			aria-label="Where in the run"
+			className="flex max-w-[calc(100vw-2rem)] items-center gap-1 border bg-card px-2 py-1 text-xs shadow-xs lg:max-w-md"
+		>
+			{crumbs.map((crumb, index) => (
+				<Fragment key={crumb.key}>
+					{index > 0 ? (
+						<ChevronRightIcon
+							className="size-3 shrink-0 text-muted-foreground"
+							aria-hidden="true"
+						/>
+					) : null}
+					{index === crumbs.length - 1 ? (
+						<span aria-current="location" className="min-w-0 truncate">
+							{crumb.label}
+						</span>
+					) : (
+						<button
+							type="button"
+							className="shrink-0 font-mono underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+							onClick={() => onSelect(crumb.scope)}
+						>
+							{crumb.label}
+						</button>
+					)}
+				</Fragment>
+			))}
+		</nav>
+	);
+}
+
+/** Above the step list: which item it shows, and a way back to the whole run. */
+function FocusChip({
+	steps,
+	focus,
+	onClear,
+}: {
+	steps: StepSummary[];
+	focus: NonNullable<ItemScope>;
+	onClear: () => void;
+}) {
+	const forEachStep = steps.find((step) => step.id === focus.forEachStepId);
+	const item = forEachStep
+		? itemsOf(forEachStep, steps).find((one) => one.id === focus.itemId)
+		: undefined;
+	return (
+		<span className="flex min-w-0 items-center gap-1 border bg-muted px-1.5 text-xs">
+			<span className="min-w-0 truncate">
+				{itemLabel(focus.itemId, item?.number)}
+				{item && item.title !== focus.itemId ? ` ${item.title}` : ""}
+			</span>
+			<button
+				type="button"
+				onClick={onClear}
+				className="shrink-0 text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+			>
+				Show all
+			</button>
+		</span>
+	);
+}
+
+/** For a body step: the For Each and the item it ran for. Clicking focuses the item. */
+function StepContext({
+	run,
+	steps,
+	step,
+	onSelect,
+}: {
+	run: RunDetail;
+	steps: StepSummary[];
+	step: StepSummary;
+	onSelect: (scope: ItemScope) => void;
+}) {
+	const crumbs = useCrumbs(run, steps, step.scope).slice(1);
+	return (
+		<span className="flex flex-wrap items-center gap-1">
+			In
+			{crumbs.map((crumb, index) => (
+				<Fragment key={crumb.key}>
+					{index > 0 ? (
+						<ChevronRightIcon className="size-3" aria-hidden="true" />
+					) : null}
+					<button
+						type="button"
+						className="text-foreground underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+						title="Focus on this item"
+						onClick={() => onSelect(crumb.scope)}
+					>
+						{crumb.label}
+					</button>
+				</Fragment>
+			))}
+		</span>
 	);
 }

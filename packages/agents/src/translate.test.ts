@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
 	createTranslator,
+	failureKind,
+	isNetworkText,
 	isUsageLimitText,
 	observeSdkMessage,
 	parseLegacyResetAt,
@@ -607,6 +609,17 @@ describe("usage-limit text", () => {
 		["You've hit your weekly limit", true],
 		["5-hour limit reached ∙ resets 3pm", true],
 		["Not logged in", false],
+		[
+			'API Error: 429 {"type":"error","error":{"type":"rate_limit_error","message":"This request would exceed the rate limit for your organization"}}',
+			true,
+		],
+		["HTTP 429: Too Many Requests (https://api.github.com/graphql)", true],
+		["You have exceeded your quota", true],
+		["API rate limit exceeded for user ID 123456.", true],
+		[
+			"You have exceeded a secondary rate limit. Please wait a few minutes before you try again.",
+			false,
+		],
 	])("%s", (text, expected) => {
 		expect(isUsageLimitText(text)).toBe(expected);
 	});
@@ -615,5 +628,204 @@ describe("usage-limit text", () => {
 		expect(parseLegacyResetAt("x|1760000000")).toBe(1_760_000_000_000);
 		expect(parseLegacyResetAt("x|1760000000123")).toBe(1_760_000_000_123);
 		expect(parseLegacyResetAt("no reset")).toBeUndefined();
+	});
+});
+
+describe("network text", () => {
+	test.each([
+		"API Error: Connection error.",
+		"API Error (Request timed out.)",
+		'API Error: 500 {"type":"error","error":{"type":"api_error","message":"Internal server error"}}',
+		'API Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}',
+		"error connecting to api.github.com",
+		'Post "https://api.github.com/graphql": dial tcp: lookup api.github.com: no such host',
+		"fatal: unable to access 'https://github.com/x/y.git/': Could not resolve host: github.com",
+		"getaddrinfo ENOTFOUND api.anthropic.com",
+		"getaddrinfo EAI_AGAIN api.anthropic.com",
+		"connect ECONNREFUSED 127.0.0.1:443",
+		"read ECONNRESET",
+		"Connection reset by peer",
+		"connection refused",
+		"ssh: connect to host github.com port 22: Operation timed out",
+		"net/http: TLS handshake timeout",
+		'Post "https://api.github.com/graphql": unexpected EOF',
+		"error: RPC failed; curl 56 LibreSSL SSL_read: Connection reset by peer; fatal: the remote end hung up unexpectedly",
+		"HTTP 502: Bad Gateway (https://api.github.com/graphql)",
+		"HTTP 503: Service Unavailable",
+		"HTTP 504: Gateway Timeout",
+		"Network is unreachable",
+		"TypeError: fetch failed",
+		"socket hang up",
+		"You have exceeded a secondary rate limit. Please wait a few minutes before you try again.",
+	])("network: %s", (text) => {
+		expect(failureKind(text)).toBe("network");
+		expect(isNetworkText(text)).toBe(true);
+		expect(isUsageLimitText(text)).toBe(false);
+	});
+
+	test.each([
+		"Not logged in · Please run /login",
+		"Invalid API key · Please run /login",
+		"HTTP 404: Not Found (https://api.github.com/repos/x/y)",
+		"HTTP 401: Bad credentials",
+		"Claude Code run failed: error_during_execution",
+	])("neither: %s", (text) => {
+		expect(failureKind(text)).toBeUndefined();
+	});
+
+	test("a primary rate limit stays a usage limit, also next to a 5xx word", () => {
+		expect(
+			failureKind(
+				'API Error: 429 {"type":"error","error":{"type":"rate_limit_error"}}',
+			),
+		).toBe("usage-limit");
+		expect(failureKind("HTTP 429: Too Many Requests")).toBe("usage-limit");
+		expect(failureKind("service unavailable: quota exhausted")).toBe(
+			"usage-limit",
+		);
+	});
+});
+
+describe("network errors", () => {
+	const newTranslator = () =>
+		createTranslator({ fallbackSessionId: "fallback" });
+
+	test("a failed result with an API connection error", () => {
+		const translator = newTranslator();
+		translator.observeSdk({
+			type: "result",
+			subtype: "success",
+			is_error: true,
+			result: "API Error: Connection error.",
+		});
+		expect(feed(translator, [session, runFinished]).at(-1)).toEqual({
+			type: "error",
+			kind: "network",
+			message: "API Error: Connection error.",
+		});
+	});
+
+	test("a RUN_ERROR with a socket error", () => {
+		const events = feed(newTranslator(), [
+			session,
+			{
+				type: "RUN_ERROR",
+				message: "getaddrinfo ENOTFOUND api.anthropic.com",
+			},
+		]);
+		expect(events.at(-1)).toEqual({
+			type: "error",
+			kind: "network",
+			message: "getaddrinfo ENOTFOUND api.anthropic.com",
+		});
+	});
+
+	test("a thrown stream with a refused connection", () => {
+		const events = feed(newTranslator(), [session], {
+			aborted: false,
+			thrown: new Error("connect ECONNREFUSED 127.0.0.1:443"),
+		});
+		expect(events.at(-1)).toMatchObject({ type: "error", kind: "network" });
+	});
+
+	test("an assistant server_error marks a plain failure as network", () => {
+		const translator = newTranslator();
+		translator.observeSdk({
+			type: "assistant",
+			error: "server_error",
+			message: {
+				content: [
+					{
+						type: "text",
+						text: 'API Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}',
+					},
+				],
+			},
+		});
+		translator.observeSdk({
+			type: "result",
+			subtype: "error_during_execution",
+			is_error: true,
+			errors: ["Claude Code process ended"],
+		});
+		expect(feed(translator, [session, runFinished]).at(-1)).toEqual({
+			type: "error",
+			kind: "network",
+			message: "Claude Code process ended",
+		});
+	});
+
+	test("an assistant network error without a result", () => {
+		const translator = newTranslator();
+		translator.observeSdk({
+			type: "assistant",
+			error: "unknown",
+			message: {
+				content: [{ type: "text", text: "API Error: Request timed out." }],
+			},
+		});
+		expect(feed(translator, [session]).at(-1)).toEqual({
+			type: "error",
+			kind: "network",
+			message: "API Error: Request timed out.",
+		});
+	});
+
+	test("an assistant API error that recovered does not fail the session", () => {
+		const translator = newTranslator();
+		translator.observeSdk({
+			type: "assistant",
+			error: "server_error",
+			message: { content: [{ type: "text", text: "API Error: 500" }] },
+		});
+		expect(feed(translator, [session, runFinished]).at(-1)?.type).toBe(
+			"finished",
+		);
+	});
+
+	test("an assistant error that is not the network is ignored", () => {
+		expect(
+			observeSdkMessage(
+				{},
+				{
+					type: "assistant",
+					error: "authentication_failed",
+					message: { content: [{ type: "text", text: "Invalid API key" }] },
+				},
+			),
+		).toEqual({});
+	});
+
+	test("a rejected rate_limit_event wins over a network text", () => {
+		const translator = newTranslator();
+		translator.observeSdk({
+			type: "rate_limit_event",
+			rate_limit_info: { status: "rejected", resetsAt: 1_760_000_100 },
+		});
+		translator.observeSdk({
+			type: "result",
+			subtype: "success",
+			is_error: true,
+			result: "API Error: Connection error.",
+		});
+		expect(feed(translator, [session, runFinished]).at(-1)).toMatchObject({
+			kind: "usage-limit",
+			resetAt: 1_760_000_100_000,
+		});
+	});
+
+	test("a primary rate limit in the result is a usage limit", () => {
+		const translator = newTranslator();
+		translator.observeSdk({
+			type: "result",
+			subtype: "success",
+			is_error: true,
+			result:
+				'API Error: 429 {"type":"error","error":{"type":"rate_limit_error","message":"Number of request tokens has exceeded your per-minute rate limit"}}',
+		});
+		expect(feed(translator, [session, runFinished]).at(-1)).toMatchObject({
+			type: "error",
+			kind: "usage-limit",
+		});
 	});
 });

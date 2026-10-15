@@ -19,15 +19,20 @@ import {
 	CircleAlertIcon,
 	CircleDotIcon,
 	PlayIcon,
+	RepeatIcon,
 	SaveIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { OpenFlowContext } from "@/components/flow/open-flow-context";
 import { outcomeLabel } from "@/components/outcome-badge";
+import { StartRunDialog } from "@/components/run/start-run-dialog";
+import { useProjectFlows } from "@/hooks/use-project-flows";
 import {
 	checkFlow,
 	isSavable,
+	newBodyFlow,
 	removeEdge,
 	removeNode,
 	removeOutcome,
@@ -83,7 +88,13 @@ function Editor({
 		() => JSON.stringify(draft) !== savedJson,
 		[draft, savedJson],
 	);
-	const check = useMemo(() => checkFlow(draft), [draft]);
+	// The other flow files, for For Each body references. The draft stands in for this one.
+	const projectFlows = useProjectFlows(projectId, name);
+	const check = useMemo(
+		() => checkFlow(draft, projectFlows.flows, name),
+		[draft, projectFlows.flows, name],
+	);
+	const [starting, setStarting] = useState(false);
 	const savable = useMemo(() => isSavable(draft), [draft]);
 	const errorCount = check.issues.filter(
 		(issue) => issue.severity === "error",
@@ -100,17 +111,23 @@ function Editor({
 		}),
 	);
 
-	const startRun = useMutation(
-		orpc.runs.start.mutationOptions({
-			onSuccess: (run) => {
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
-				void navigate({ to: "/runs/$runId", params: { runId: run.id } });
-			},
-			onError: (error) => toast.error(`Could not start: ${error.message}`),
-		}),
+	const canSave = dirty && savable && !saveFlow.isPending;
+
+	/** After a save: the draft is the file now, and the cached flow follows. */
+	const onSaved = useCallback(
+		(snapshot: Flow, issues: FlowIssue[]) => {
+			setSavedJson(JSON.stringify(snapshot));
+			queryClient.setQueryData(
+				orpc.flows.get.queryKey({ input: { projectId, name } }),
+				(loaded) => (loaded ? { ...loaded, flow: snapshot, issues } : loaded),
+			);
+			void queryClient.invalidateQueries({
+				queryKey: orpc.flows.list.key(),
+			});
+		},
+		[queryClient, projectId, name],
 	);
 
-	const canSave = dirty && savable && !saveFlow.isPending;
 	const save = useCallback(() => {
 		if (!canSave) return;
 		const snapshot = draft;
@@ -118,15 +135,7 @@ function Editor({
 			{ projectId, name, flow: snapshot },
 			{
 				onSuccess: (issues) => {
-					setSavedJson(JSON.stringify(snapshot));
-					queryClient.setQueryData(
-						orpc.flows.get.queryKey({ input: { projectId, name } }),
-						(loaded) =>
-							loaded ? { ...loaded, flow: snapshot, issues } : loaded,
-					);
-					void queryClient.invalidateQueries({
-						queryKey: orpc.flows.list.key(),
-					});
+					onSaved(snapshot, issues);
 					const errors = issues.filter(
 						(issue) => issue.severity === "error",
 					).length;
@@ -140,7 +149,58 @@ function Editor({
 				},
 			},
 		);
-	}, [canSave, saveFlow, projectId, name, draft, queryClient]);
+	}, [canSave, saveFlow, projectId, name, draft, onSaved]);
+
+	const openFlow = useCallback(
+		(flowName: string) =>
+			void navigate({
+				to: "/projects/$projectId/flows/$name",
+				params: { projectId, name: flowName },
+			}),
+		[navigate, projectId],
+	);
+
+	// A new body flow: write it, point the node at it, save this flow, open it.
+	const createBody = useMutation(orpc.flows.save.mutationOptions());
+	const createBodyFlow = async (nodeId: string, bodyName: string) => {
+		try {
+			await createBody.mutateAsync({
+				projectId,
+				name: bodyName,
+				flow: newBodyFlow(),
+			});
+		} catch (error) {
+			toast.error(
+				`Could not create ${bodyName}: ${error instanceof Error ? error.message : String(error)}`,
+			);
+			return;
+		}
+		void queryClient.invalidateQueries({ queryKey: orpc.flows.list.key() });
+		const next = updateNode(draft, nodeId, (node) =>
+			node.type === "foreach" ? { ...node, flow: bodyName } : node,
+		);
+		setDraft(next);
+		if (!isSavable(next)) {
+			toast.info(
+				`Created ${bodyName}. Fix this flow's fields and save it, then open the body from the node.`,
+			);
+			return;
+		}
+		try {
+			const issues = await saveFlow.mutateAsync({
+				projectId,
+				name,
+				flow: next,
+			});
+			onSaved(next, issues);
+		} catch {
+			return;
+		}
+		toast.success(`Created ${bodyName} and saved ${name}.`);
+		// The save has not rendered yet; leaving must not ask about it.
+		dirtyRef.current = false;
+		openFlow(bodyName);
+	};
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -162,11 +222,14 @@ function Editor({
 		withResolver: true,
 	});
 
-	const runBlockedBy = dirty
-		? "Save the flow first."
-		: errorCount > 0
-			? "Fix the errors first."
-			: null;
+	const isBody = draft.input === "item";
+	const runBlockedBy = isBody
+		? "A body flow runs inside a For Each. Run the flow that holds it."
+		: dirty
+			? "Save the flow first."
+			: errorCount > 0
+				? "Fix the errors first."
+				: null;
 
 	const selectIssue = (issue: FlowIssue) => {
 		if (issue.nodeId && draft.nodes.some((node) => node.id === issue.nodeId)) {
@@ -257,6 +320,15 @@ function Editor({
 					<ChevronRightIcon className="size-3 shrink-0" aria-hidden="true" />
 				</nav>
 				<h1 className="font-medium font-mono text-sm">{name}</h1>
+				{isBody ? (
+					<Badge
+						variant="outline"
+						title="Runs once per item inside a For Each node"
+					>
+						<RepeatIcon aria-hidden="true" />
+						Body flow
+					</Badge>
+				) : null}
 				<div aria-live="polite" className="flex items-center gap-2">
 					{dirty ? (
 						<Badge variant="outline" className="text-status-interrupted">
@@ -288,26 +360,33 @@ function Editor({
 						<SaveIcon data-icon="inline-start" />
 						{saveFlow.isPending ? "Saving…" : "Save"}
 					</Button>
+					{isBody ? (
+						<span className="hidden text-muted-foreground text-xs sm:inline">
+							A body flow runs inside a For Each
+						</span>
+					) : null}
 					<Button
 						size="sm"
-						onClick={() => startRun.mutate({ projectId, flowName: name })}
-						disabled={runBlockedBy !== null || startRun.isPending}
+						onClick={() => setStarting(true)}
+						disabled={runBlockedBy !== null}
 						title={runBlockedBy ?? "Run this flow in a new worktree"}
 					>
 						<PlayIcon data-icon="inline-start" />
-						{startRun.isPending ? "Starting…" : "Run"}
+						Run
 					</Button>
 				</div>
 			</header>
 
 			<div className="grid min-h-0 auto-rows-max grid-cols-[minmax(0,1fr)] grid-rows-[60vh] overflow-y-auto md:grid-cols-[minmax(0,1fr)_22rem] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden">
-				<EditorCanvas
-					flow={draft}
-					check={check}
-					selection={selection}
-					onFlowChange={changeFlow}
-					onSelect={setSelection}
-				/>
+				<OpenFlowContext.Provider value={openFlow}>
+					<EditorCanvas
+						flow={draft}
+						check={check}
+						selection={selection}
+						onFlowChange={changeFlow}
+						onSelect={setSelection}
+					/>
+				</OpenFlowContext.Provider>
 				<aside
 					aria-label="Inspector"
 					className="grid min-h-0 grid-rows-[1fr_auto] border-t md:border-t-0 md:border-l"
@@ -336,6 +415,14 @@ function Editor({
 									setDraft((current) => removeNode(current, selectedNode.id));
 									setSelection(null);
 								}}
+								bodyFlows={{
+									flowName: name,
+									flows: projectFlows.flows,
+									onOpen: openFlow,
+									onCreate: (nodeId, bodyName) =>
+										void createBodyFlow(nodeId, bodyName),
+									creating: createBody.isPending || saveFlow.isPending,
+								}}
 							/>
 						) : selectedEdge ? (
 							<EdgeInspector
@@ -361,6 +448,13 @@ function Editor({
 					</div>
 				</aside>
 			</div>
+
+			<StartRunDialog
+				open={starting}
+				onOpenChange={setStarting}
+				projectId={projectId}
+				flowName={name}
+			/>
 
 			<AlertDialog
 				open={blocker.status === "blocked"}

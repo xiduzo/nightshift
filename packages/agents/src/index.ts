@@ -22,4 +22,9 @@ export {
 	type GithubToolsOptions,
 	githubTools,
 } from "./github";
+export {
+	type GithubItemsOptions,
+	readGithubItems,
+	SUB_ISSUES_QUERY,
+} from "./github-items";
 export type * from "./types";

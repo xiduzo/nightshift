@@ -1,19 +1,42 @@
+import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@nightshift/ui/components/dropdown-menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
+	AlarmClockIcon,
+	ChevronDownIcon,
 	ChevronRightIcon,
 	CircleStopIcon,
 	CircleXIcon,
 	ClipboardCopyIcon,
 	HandIcon,
+	MoonIcon,
+	SkipForwardIcon,
+	SunriseIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { RunStatusBadge } from "@/components/run-status-badge";
+import { useNow } from "@/hooks/use-now";
 import type { RunDetail, RunStatus } from "@/lib/api-types";
-import { formatCost, formatDateTime } from "@/lib/format";
+import {
+	dayWord,
+	formatCost,
+	formatCountdown,
+	formatDateTime,
+	formatDayTime,
+	formatTime,
+} from "@/lib/format";
+import type { CurrentWait } from "@/lib/transcript";
 import { orpc } from "@/utils/orpc";
+
+const STOPPABLE: RunStatus[] = ["running", "waiting", "sleeping"];
 
 export function RunHeader({
 	run,
@@ -21,10 +44,13 @@ export function RunHeader({
 	reconnecting,
 	openGateNodeId,
 	onShowGate,
+	wait,
 }: {
 	run: RunDetail;
 	status: RunStatus;
 	reconnecting: boolean;
+	/** The latest wait of the run policy without a wake after it. */
+	wait: CurrentWait | null;
 	/** The node of the Gate the run waits at, if any. */
 	openGateNodeId: string | null;
 	/** Selects the open Gate's step, so its answer form shows. */
@@ -59,6 +85,7 @@ export function RunHeader({
 		["Cost", formatCost(run.costUsd), false],
 		["Started", formatDateTime(run.createdAt), false],
 	];
+	const stoppable = STOPPABLE.includes(status);
 
 	return (
 		<header className="flex flex-col gap-2 border-b px-4 py-3">
@@ -94,6 +121,25 @@ export function RunHeader({
 				</nav>
 				<div aria-live="polite" className="flex items-center gap-2">
 					<RunStatusBadge status={status} />
+					{stoppable && run.stopAfterStep ? (
+						<Badge
+							variant="outline"
+							className="border-status-stopped/40 text-status-stopped"
+							title="The running step finishes, then the run stops."
+						>
+							<SkipForwardIcon aria-hidden="true" />
+							Stops after this step
+						</Badge>
+					) : null}
+					{stoppable && run.stopAt ? (
+						<Badge
+							variant="outline"
+							title={`No new step starts after ${formatDateTime(run.stopAt)}.`}
+						>
+							<AlarmClockIcon aria-hidden="true" />
+							Stops {dayWord(run.stopAt)} {formatTime(run.stopAt)}
+						</Badge>
+					) : null}
 					{reconnecting ? (
 						<span className="text-muted-foreground text-xs">
 							Reconnecting to the live transcript…
@@ -111,21 +157,14 @@ export function RunHeader({
 						<ClipboardCopyIcon data-icon="inline-start" />
 						Take over
 					</Button>
-					{status === "running" || status === "waiting" ? (
-						<Button
-							variant="destructive"
-							size="sm"
-							onClick={() => stopRun.mutate({ runId: run.id })}
-							disabled={stopRun.isPending}
-							title={
-								status === "waiting"
-									? "Close the gate without an answer and stop the run"
-									: undefined
-							}
-						>
-							<CircleStopIcon data-icon="inline-start" />
-							{stopRun.isPending ? "Stopping…" : "Stop"}
-						</Button>
+					{stoppable ? (
+						<StopMenu
+							runId={run.id}
+							status={status}
+							stopAfterStep={run.stopAfterStep}
+							pending={stopRun.isPending}
+							onStop={(when) => stopRun.mutate({ runId: run.id, when })}
+						/>
 					) : null}
 				</div>
 			</div>
@@ -158,6 +197,9 @@ export function RunHeader({
 					</Link>
 				</p>
 			) : null}
+			{status === "sleeping" ? (
+				<SleepBanner runId={run.id} wakeAt={run.wakeAt} wait={wait} />
+			) : null}
 			{status === "failed" && run.reason ? (
 				<p
 					role="alert"
@@ -176,6 +218,16 @@ export function RunHeader({
 						</dd>
 					</div>
 				))}
+				{run.stopAt ? (
+					<div className="flex min-w-0 gap-1">
+						<dt className="text-muted-foreground">Stop time</dt>
+						<dd className="truncate">
+							<time dateTime={new Date(run.stopAt).toISOString()}>
+								{formatDayTime(run.stopAt)}
+							</time>
+						</dd>
+					</div>
+				) : null}
 				<div className="flex min-w-0 basis-full gap-1">
 					<dt className="text-muted-foreground">Worktree</dt>
 					<dd className="truncate font-mono" title={run.worktreePath}>
@@ -184,5 +236,161 @@ export function RunHeader({
 				</div>
 			</dl>
 		</header>
+	);
+}
+
+/** Stop now, or let the running step finish first. */
+function StopMenu({
+	runId,
+	status,
+	stopAfterStep,
+	pending,
+	onStop,
+}: {
+	runId: string;
+	status: RunStatus;
+	stopAfterStep: boolean;
+	pending: boolean;
+	onStop: (when: "now" | "after-step") => void;
+}) {
+	return (
+		<div className="flex" key={runId}>
+			<Button
+				variant="destructive"
+				size="sm"
+				onClick={() => onStop("now")}
+				disabled={pending}
+				title={
+					status === "waiting"
+						? "Close the gate without an answer and stop the run"
+						: status === "sleeping"
+							? "End the sleep and stop the run"
+							: "Abort the running step and stop the run"
+				}
+			>
+				<CircleStopIcon data-icon="inline-start" />
+				{pending ? "Stopping…" : "Stop now"}
+			</Button>
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					render={
+						<Button
+							variant="destructive"
+							size="icon-sm"
+							className="border-l border-l-destructive/30"
+							aria-label="More ways to stop"
+							disabled={pending}
+						/>
+					}
+				>
+					<ChevronDownIcon />
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end" className="w-64">
+					<DropdownMenuItem variant="destructive" onClick={() => onStop("now")}>
+						<CircleStopIcon />
+						<span className="flex flex-col">
+							Stop now
+							<span className="text-muted-foreground">
+								Aborts the running step.
+							</span>
+						</span>
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						disabled={stopAfterStep}
+						onClick={() => onStop("after-step")}
+					>
+						<SkipForwardIcon />
+						<span className="flex flex-col">
+							Stop after this step
+							<span className="text-muted-foreground">
+								{stopAfterStep
+									? "Already asked."
+									: "The running step finishes; no new one starts."}
+							</span>
+						</span>
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</div>
+	);
+}
+
+const SLEEP_REASON = {
+	"usage-limit": "The harness hit a usage limit.",
+	network: "The network is down.",
+} as const;
+
+/** Why the run sleeps, a live countdown to when it wakes, and a way to wake it now. */
+function SleepBanner({
+	runId,
+	wakeAt,
+	wait,
+}: {
+	runId: string;
+	wakeAt: number | null;
+	wait: CurrentWait | null;
+}) {
+	const now = useNow(1000);
+	const queryClient = useQueryClient();
+	const wake = useMutation(
+		orpc.runs.resume.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.runs.key() }),
+			onError: (error) => toast.error(`Could not wake: ${error.message}`),
+		}),
+	);
+	const until = wakeAt ?? wait?.until ?? null;
+
+	return (
+		<div className="flex flex-wrap items-center gap-x-2 gap-y-1 border border-status-sleeping/50 bg-status-sleeping/10 px-2 py-1.5 text-xs">
+			<MoonIcon
+				className="size-3.5 shrink-0 text-status-sleeping"
+				aria-hidden="true"
+			/>
+			<span>
+				{wait ? SLEEP_REASON[wait.reason] : "The run sleeps."} It continues the
+				same session
+				{until ? (
+					<>
+						{" "}
+						at{" "}
+						<time
+							dateTime={new Date(until).toISOString()}
+							title={formatDateTime(until)}
+							className="font-medium"
+						>
+							{formatTime(until)}
+						</time>
+						, in{" "}
+						<span
+							className="font-medium font-mono text-status-sleeping tabular-nums"
+							role="timer"
+							aria-live="off"
+						>
+							{formatCountdown(until - now)}
+						</span>
+					</>
+				) : null}
+				.
+			</span>
+			<Button
+				variant="outline"
+				size="xs"
+				className="ml-auto"
+				disabled={wake.isPending}
+				onClick={() => wake.mutate({ runId })}
+			>
+				<SunriseIcon data-icon="inline-start" />
+				{wake.isPending ? "Waking…" : "Wake now"}
+			</Button>
+			{wait?.message ? (
+				<span
+					className="min-w-0 basis-full truncate text-muted-foreground"
+					title={wait.message}
+				>
+					{wait.message}
+				</span>
+			) : null}
+		</div>
 	);
 }

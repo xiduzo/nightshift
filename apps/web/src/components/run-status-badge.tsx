@@ -8,6 +8,7 @@ import {
 	HourglassIcon,
 	LoaderCircleIcon,
 	type LucideIcon,
+	MoonIcon,
 } from "lucide-react";
 
 import type { RunStatus } from "@/lib/api-types";
@@ -27,6 +28,12 @@ const STATUS: Record<
 		icon: HourglassIcon,
 		className:
 			"border-status-waiting/40 bg-status-waiting/10 text-status-waiting",
+	},
+	sleeping: {
+		label: "Sleeping",
+		icon: MoonIcon,
+		className:
+			"border-status-sleeping/40 bg-status-sleeping/10 text-status-sleeping",
 	},
 	finished: {
 		label: "Finished",
