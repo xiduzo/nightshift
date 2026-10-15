@@ -1,4 +1,4 @@
-import type { Flow, FlowEdge, Outcome, RunField } from "./schema";
+import type { Flow, FlowEdge, ItemField, Outcome, RunField } from "./schema";
 
 /** One problem in a flow. A flow with any `error` cannot run. */
 export type FlowIssue = {
@@ -14,6 +14,33 @@ export type NodeOutputs = Record<string, Record<string, string | number>>;
 export type TemplateContext = {
 	nodes: NodeOutputs;
 	run: Record<RunField, string>;
+	/** Set inside a For Each body. */
+	item?: Partial<Record<ItemField, string | number>>;
+};
+
+/** One item of a For Each source, before the engine adds branches. */
+export type SourceItem = {
+	/** Unique within the source. The issue number for GitHub. */
+	id: string;
+	number?: number;
+	title: string;
+	body?: string;
+	url?: string;
+	/** Ids of items (or other issues) that must be done first. */
+	blockedBy: { id: string; done: boolean }[];
+	/** Done before this run: closed, or carries a done label. Skipped. */
+	done: boolean;
+	parentNumber?: number;
+	parentTitle?: string;
+};
+
+export type ValidateOptions = {
+	/**
+	 * Flow files that exist in the project, by name, for checking For Each
+	 * `flow` references. Leave out to skip those checks (for example in the
+	 * browser before the list loads).
+	 */
+	flows?: Readonly<Record<string, Flow | null>>;
 };
 
 /** One `{{a.b}}` reference found in a template. */

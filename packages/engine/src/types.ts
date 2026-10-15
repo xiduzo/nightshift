@@ -2,6 +2,7 @@ import type {
 	AgentEvent,
 	AgentHarness,
 	Decider,
+	GithubItemsInput,
 	HarnessName,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
@@ -10,8 +11,10 @@ import type {
 	FlowIssue,
 	FlowListItem,
 	FlowNodeType,
+	ItemState,
 	LoadedFlow,
 	Outcome,
+	SourceItem,
 } from "@nightshift/flows";
 
 /**
@@ -23,6 +26,7 @@ import type {
 export type RunStatus =
 	| "running" // a step is in progress, or the walk is between steps
 	| "waiting" // a Gate waits for a person in the Needs-you inbox
+	| "sleeping" // a usage limit or a network failure: a timer continues the same session
 	| "finished" // the walk reached `pass`, a Decision label or a Gate choice with no edge left to take
 	| "stopped" // a person stopped the run
 	| "failed" // a step errored, a `fail`/`needs-input` had no edge, or a loop hit its max
@@ -70,9 +74,29 @@ export type StepSummary = {
 	/** The node's template outputs, for example `log_tail` or `summary`. */
 	outputs: Record<string, string | number>;
 	error: string | null;
-	/** Agent steps only. Several when a person resumed the step. */
+	/** Set when the step ran inside a For Each body: which For Each step and which item. */
+	scope: { forEachStepId: string; itemId: string } | null;
+	/** For Each steps only: the items of this visit, in the order they started. */
+	items: ItemSummary[];
+	/** Agent steps only. Several when a person resumed the step or a wait continued it. */
 	sessions: SessionSummary[];
 	costUsd: number;
+};
+
+/** One item of a For Each visit. */
+export type ItemSummary = {
+	id: string;
+	number: number | null;
+	title: string;
+	url: string | null;
+	state: ItemState;
+	/** Null when the For Each does not use a branch per item. */
+	branch: string | null;
+	baseBranch: string | null;
+	startedAt: number;
+	endedAt: number | null;
+	/** Why it failed or is blocked, or which label halted it. */
+	reason: string | null;
 };
 
 export type RunSummary = {
@@ -88,6 +112,12 @@ export type RunSummary = {
 	status: RunStatus;
 	/** Why the run failed, or which Decision label or Gate choice ended it. */
 	reason: string | null;
+	/** When a sleeping run continues. */
+	wakeAt: number | null;
+	/** The stop time: no new step starts after it. */
+	stopAt: number | null;
+	/** Set when a person asked to stop after the running step. */
+	stopAfterStep: boolean;
 	createdAt: number;
 	/** Sum over all steps. */
 	costUsd: number;
@@ -96,6 +126,8 @@ export type RunSummary = {
 export type RunDetail = RunSummary & {
 	/** The copy of the flow taken when the run started. Edits to the file do not change it. */
 	flow: Flow;
+	/** Copies of the For Each body flows, by flow name, taken at start. */
+	bodyFlows: Record<string, Flow>;
 	/** In the order they started. */
 	steps: StepSummary[];
 	/** How often the run took each edge, by edge id. */
@@ -118,13 +150,46 @@ export type GateEvent =
 	  }
 	| { type: "gate-resolved"; choice: string; note: string };
 
+/** What a For Each step writes to its transcript. */
+export type ForEachEvent =
+	| { type: "items-read"; count: number; open: number }
+	| {
+			type: "item-start";
+			itemId: string;
+			title: string;
+			branch: string | null;
+			baseBranch: string | null;
+	  }
+	| {
+			type: "item-end";
+			itemId: string;
+			state: ItemState;
+			reason: string | null;
+	  };
+
+/** A wait of the run policy, written to the transcript of the step that waits. */
+export type WaitEvent =
+	| {
+			type: "wait";
+			reason: "usage-limit" | "network";
+			until: number;
+			message: string;
+	  }
+	| { type: "wake" };
+
 /** What a command step writes to its transcript. */
 export type CommandEvent =
 	| { type: "command-start"; command: string }
 	| { type: "command-output"; stream: "stdout" | "stderr"; text: string }
 	| { type: "command-exit"; exitCode: number | null };
 
-export type StepEvent = AgentEvent | CommandEvent | DecisionEvent | GateEvent;
+export type StepEvent =
+	| AgentEvent
+	| CommandEvent
+	| DecisionEvent
+	| GateEvent
+	| ForEachEvent
+	| WaitEvent;
 
 /** A Gate that waits for a person. */
 export type OpenGate = {
@@ -161,6 +226,8 @@ export type RunStreamItem =
 
 export type StartRunInput = {
 	projectId: string;
+	/** Epoch ms. No new step starts after it; the run then ends as stopped. */
+	stopAt?: number;
 	/** Git ref to branch the worktree from. Defaults to the clone's current HEAD. */
 	baseRef?: string;
 } & (
@@ -205,10 +272,19 @@ export interface Engine {
 	 * worktree, starts walking at the start node, and returns at once.
 	 */
 	startRun(input: StartRunInput): Promise<RunSummary>;
-	/** Aborts the running step, or closes an open Gate, and ends the run as `stopped`. No-op when nothing runs or waits. */
-	stopRun(runId: string): Promise<void>;
 	/**
-	 * Continues a stopped, failed or interrupted run at its last step's node.
+	 * `now` (default): aborts the running step, closes an open Gate or ends a
+	 * sleep, and ends the run as `stopped`. `after-step`: lets the running
+	 * step finish, then ends the run as `stopped` before the next step.
+	 * No-op when nothing runs, waits or sleeps.
+	 */
+	stopRun(
+		runId: string,
+		options?: { when?: "now" | "after-step" },
+	): Promise<void>;
+	/**
+	 * Continues a stopped, failed or interrupted run at its last step's node
+	 * (inside a For Each, at the same item). A sleeping run wakes at once.
 	 * An Agent node with a harness session continues that session with the
 	 * prompt (default "Continue where you left off."). Any other node runs
 	 * again. Edge counts carry over. Fails while the run is running.
@@ -231,6 +307,8 @@ export type EngineOptions = {
 	harnesses: Partial<Record<HarnessName, AgentHarness>>;
 	/** Decides Decision nodes. A flow with a Decision node fails to start without one. */
 	decider?: Decider;
+	/** Reads GitHub For Each sources. A flow with one fails to start without it. */
+	readGithubItems?: (input: GithubItemsInput) => Promise<SourceItem[]>;
 	/** Root for transcripts, command logs and other on-disk state, for example ~/.nightshift. */
 	dataDir: string;
 	/** How many runs may run a step at once. A run waiting at a Gate does not count. Default 2. */

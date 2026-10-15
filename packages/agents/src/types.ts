@@ -48,7 +48,12 @@ export type ToolSet = "github";
 
 export type StepReportOutcome = "pass" | "fail" | "needs-input";
 
-export type AgentErrorKind = "aborted" | "usage-limit" | "harness";
+/**
+ * `usage-limit`: the harness hit a usage or rate limit (`resetAt` when known).
+ * `network`: the harness could not reach its service (DNS, refused, 5xx, …).
+ * The engine waits and continues the same session for both.
+ */
+export type AgentErrorKind = "aborted" | "usage-limit" | "network" | "harness";
 
 /**
  * One normalized event of a harness session. Every stream emits exactly one
@@ -110,3 +115,13 @@ export interface Decider {
 	/** Never throws: failures come back as `kind: "error"`. */
 	decide(input: DecisionInput): Promise<DecisionResult>;
 }
+
+/** Input for reading For Each items from GitHub sub-issues. */
+export type GithubItemsInput = {
+	/** A directory in the repo; `gh` resolves the repo from its remote. */
+	cwd: string;
+	parent: number;
+	requireLabel?: string;
+	doneLabels: string[];
+	signal: AbortSignal;
+};

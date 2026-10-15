@@ -87,6 +87,8 @@ export const agentNodeSchema = z.object({
 	session: z.enum(["fresh", "resume"]).default("fresh"),
 	/** Tool sets the agent gets on top of the harness's own tools. */
 	tools: z.array(toolSetSchema).default([]),
+	/** The step fails when the agent shows no activity for this long. */
+	idleMinutes: z.number().int().positive().optional(),
 });
 
 export const commandNodeSchema = z.object({
@@ -124,11 +126,58 @@ export const gateNodeSchema = z.object({
 	choices: z.array(option).min(1),
 });
 
+/**
+ * GitHub sub-issues of one parent issue, blockers first ("blocked by"
+ * links); among free issues GitHub's order stays.
+ */
+export const githubSourceSchema = z.object({
+	kind: z.literal("github"),
+	/** The parent issue number. Supports templates, for example `{{item.number}}`. */
+	parent: z.string().min(1),
+	/** Only sub-issues with this label become items. */
+	requireLabel: z.string().min(1).optional(),
+	/** Sub-issues with any of these labels count as done before the run. */
+	doneLabels: z.array(z.string().min(1)).default([]),
+});
+
+/**
+ * A command (sh -c in the worktree) that prints a JSON array of items:
+ * `{ id, title, body?, url?, blockedBy?: id[], done?: boolean }`.
+ */
+export const commandSourceSchema = z.object({
+	kind: z.literal("command"),
+	command: z.string().min(1),
+});
+
+export const itemSourceSchema = z.discriminatedUnion("kind", [
+	githubSourceSchema,
+	commandSourceSchema,
+]);
+
+export const forEachNodeSchema = z.object({
+	...nodeBase,
+	type: z.literal("foreach"),
+	/** Read again before each item, so items added during the run get built too. */
+	source: itemSourceSchema,
+	/** The body: a flow file in the same project with `input: "item"`. */
+	flow: flowNameSchema,
+	/**
+	 * Each item works on its own branch, created on top of the last item
+	 * that finished (the stack). Off: all items share the run's branch.
+	 */
+	branchPerItem: z.boolean().default(true),
+	/** A body that ends on one of these labels or choices stops the loop with `halted`. */
+	haltOn: z.array(labelSchema).default(["halt"]),
+	/** Safety net: the most items one visit may start. */
+	maxItems: z.number().int().positive().optional(),
+});
+
 export const flowNodeSchema = z.discriminatedUnion("type", [
 	agentNodeSchema,
 	commandNodeSchema,
 	decisionNodeSchema,
 	gateNodeSchema,
+	forEachNodeSchema,
 ]);
 
 /** `pass`, `fail`, `needs-input`, or a Decision label or Gate choice. */
@@ -147,9 +196,28 @@ export const flowEdgeSchema = z.object({
 	max: z.number().int().positive().optional(),
 });
 
+/**
+ * The numbers of the run policy. The policy itself is engine code: a usage
+ * limit or a network failure waits and then continues the same session.
+ */
+export const policySchema = z.object({
+	/** The first wait after a usage limit without a known reset time. Doubles each time. */
+	usageLimitFirstWaitMinutes: z.number().positive().default(5),
+	usageLimitMaxWaitMinutes: z.number().positive().default(60),
+	/** The longest total wait for the network before the step fails. */
+	networkGraceMinutes: z.number().positive().default(240),
+});
+
 export const flowSchema = z.object({
 	version: z.literal(FLOW_VERSION),
 	description: z.string().optional(),
+	/**
+	 * `item`: this flow is a For Each body. Its templates may read
+	 * `{{item.<field>}}`, and a run cannot start it on its own.
+	 */
+	input: z.literal("item").optional(),
+	/** Used for the top-level flow of a run. A body flow uses its parent's. */
+	policy: policySchema.optional(),
 	/** The node the run starts at. */
 	start: nodeIdSchema,
 	nodes: z.array(flowNodeSchema),
@@ -164,6 +232,9 @@ export type AgentNode = z.infer<typeof agentNodeSchema>;
 export type CommandNode = z.infer<typeof commandNodeSchema>;
 export type DecisionNode = z.infer<typeof decisionNodeSchema>;
 export type GateNode = z.infer<typeof gateNodeSchema>;
+export type ForEachNode = z.infer<typeof forEachNodeSchema>;
+export type ItemSource = z.infer<typeof itemSourceSchema>;
+export type Policy = z.infer<typeof policySchema>;
 export type FlowEdge = z.infer<typeof flowEdgeSchema>;
 export type Outcome = z.infer<typeof outcomeSchema>;
 export type FlowNodeType = FlowNode["type"];
@@ -179,6 +250,8 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return node.labels.map((label) => label.name);
 		case "gate":
 			return node.choices.map((choice) => choice.name);
+		case "foreach":
+			return ["done", "halted"];
 	}
 }
 
@@ -195,11 +268,40 @@ export const outputFieldsByType = {
 	decision: ["outcome", "notes", "visit"],
 	/** outcome: the choice. note: what the person wrote with it. */
 	gate: ["outcome", "note", "visit"],
+	/** Counts per item status, and one line per item: `#12 done`, `#13 blocked by #12`. */
+	foreach: [
+		"outcome",
+		"done_count",
+		"failed_count",
+		"blocked_count",
+		"waiting_count",
+		"summary",
+		"visit",
+	],
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
 export type OutputField<T extends FlowNodeType> =
 	(typeof outputFieldsByType)[T][number];
 
-/** Fields of the run itself: `{{run.branch}}`. */
+/**
+ * Fields of the current item in a For Each body: `{{item.title}}`.
+ * `branch` is the item's branch, `base_branch` the branch it builds on.
+ * `parent_*` describe the issue the source listed it under.
+ */
+export const itemFields = [
+	"id",
+	"number",
+	"title",
+	"body",
+	"url",
+	"index",
+	"branch",
+	"base_branch",
+	"parent_number",
+	"parent_title",
+] as const;
+export type ItemField = (typeof itemFields)[number];
+
+/** Fields of the run itself: `{{run.branch}}`. In a For Each body, `branch` is the item's branch. */
 export const runFields = ["branch", "worktree", "base_ref", "flow"] as const;
 export type RunField = (typeof runFields)[number];

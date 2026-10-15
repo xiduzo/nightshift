@@ -77,18 +77,27 @@ const runs = {
 					projectId: z.string(),
 					flowName: flowNameSchema,
 					baseRef: z.string().min(1).optional(),
+					stopAt: z.number().int().positive().optional(),
 				}),
 				z.object({
 					projectId: z.string(),
 					flow: flowSchema,
 					baseRef: z.string().min(1).optional(),
+					stopAt: z.number().int().positive().optional(),
 				}),
 			]),
 		)
 		.handler(({ context, input }) => context.engine.startRun(input)),
 	stop: publicProcedure
-		.input(z.object({ runId: z.string() }))
-		.handler(({ context, input }) => context.engine.stopRun(input.runId)),
+		.input(
+			z.object({
+				runId: z.string(),
+				when: z.enum(["now", "after-step"]).optional(),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.engine.stopRun(input.runId, { when: input.when }),
+		),
 	resume: publicProcedure
 		.input(
 			z.object({ runId: z.string(), prompt: z.string().min(1).optional() }),

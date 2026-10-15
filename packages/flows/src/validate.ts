@@ -8,7 +8,7 @@ import {
 	runFields,
 } from "./schema";
 import { templateRefs } from "./template";
-import type { FlowIssue } from "./types";
+import type { FlowIssue, ValidateOptions } from "./types";
 
 /**
  * Checks what the schema cannot: unique ids, a known start node, edges between
@@ -19,7 +19,10 @@ import type { FlowIssue } from "./types";
  * loop forever). Warns about unreachable nodes and about Decision labels or
  * Gate choices without an edge, since picking one ends the run as failed.
  */
-export function validateFlow(flow: Flow): FlowIssue[] {
+export function validateFlow(
+	flow: Flow,
+	options: ValidateOptions = {},
+): FlowIssue[] {
 	const issues: FlowIssue[] = [];
 	const error = (message: string, at: Pick<FlowIssue, "nodeId" | "edgeId">) =>
 		issues.push({ severity: "error", message, ...at });
