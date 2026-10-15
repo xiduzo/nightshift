@@ -1254,3 +1254,47 @@ describe("stop modes", () => {
 		).rejects.toThrow("stop time has passed");
 	});
 });
+
+describe("run params", () => {
+	test("params reach top-level and body templates, defaults apply", async () => {
+		const engine = makeEngine(fakeHarness());
+		await saveBody("body", [
+			command("note", `echo "body sees epic {{params.epic}} for {{item.id}}"`),
+		]);
+		const flow = flowOf(
+			[
+				command("hello", `echo "epic {{params.epic}} model {{params.model}}"`),
+				forEach("loop", "body", printItems([{ id: "1", title: "a" }]), {
+					branchPerItem: false,
+				}),
+			],
+			[edge("e1", "hello", "pass", "loop")],
+			{
+				params: [
+					{ name: "epic", required: true },
+					{ name: "model", default: "sonnet" },
+				],
+			},
+		);
+		const id = await projectId(engine);
+
+		await expect(engine.startRun({ projectId: id, flow })).rejects.toThrow(
+			"The run needs a value for: epic.",
+		);
+		await expect(
+			engine.startRun({ projectId: id, flow, params: { nope: "x" } }),
+		).rejects.toThrow('The flow has no param "nope".');
+
+		const run = await engine.startRun({
+			projectId: id,
+			flow,
+			params: { epic: " 1097 " },
+		});
+		const detail = await waitForEnd(engine, run.id);
+		expect(detail.status).toBe("finished");
+		expect(detail.params).toEqual({ epic: "1097", model: "sonnet" });
+		const outputs = detail.steps.map((s) => s.outputs.log_tail);
+		expect(outputs).toContain("epic 1097 model sonnet");
+		expect(outputs).toContain("body sees epic 1097 for 1");
+	});
+});

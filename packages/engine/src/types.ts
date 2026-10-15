@@ -114,6 +114,8 @@ export type RunSummary = {
 	reason: string | null;
 	/** When a sleeping run continues. */
 	wakeAt: number | null;
+	/** The run parameters it started with. */
+	params: Record<string, string>;
 	/** The stop time: no new step starts after it. */
 	stopAt: number | null;
 	/** Set when a person asked to stop after the running step. */
@@ -226,6 +228,12 @@ export type RunStreamItem =
 
 export type StartRunInput = {
 	projectId: string;
+	/**
+	 * Values for the flow's `params`, by name. A missing or empty value takes
+	 * the param's default; a required param without either refuses the start.
+	 * Names the flow does not declare are refused.
+	 */
+	params?: Record<string, string>;
 	/** Epoch ms. No new step starts after it; the run then ends as stopped. */
 	stopAt?: number;
 	/** Git ref to branch the worktree from. Defaults to the clone's current HEAD. */

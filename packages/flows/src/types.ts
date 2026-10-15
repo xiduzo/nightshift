@@ -16,6 +16,8 @@ export type TemplateContext = {
 	run: Record<RunField, string>;
 	/** Set inside a For Each body. */
 	item?: Partial<Record<ItemField, string | number>>;
+	/** The run parameters, by name. */
+	params?: Record<string, string>;
 };
 
 /** One item of a For Each source, before the engine adds branches. */

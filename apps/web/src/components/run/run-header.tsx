@@ -86,6 +86,7 @@ export function RunHeader({
 		["Started", formatDateTime(run.createdAt), false],
 	];
 	const stoppable = STOPPABLE.includes(status);
+	const paramEntries = Object.entries(run.params ?? {});
 
 	return (
 		<header className="flex flex-col gap-2 border-b px-4 py-3">
@@ -111,6 +112,18 @@ export function RunHeader({
 							>
 								{run.flowName}
 							</Link>
+							{paramEntries.length > 0 ? (
+								<span
+									className="truncate font-mono text-foreground"
+									title={paramEntries
+										.map(([name, value]) => `${name}: ${value}`)
+										.join("\n")}
+								>
+									{paramEntries
+										.map(([name, value]) => `${name} ${value}`)
+										.join(" · ")}
+								</span>
+							) : null}
 							<ChevronRightIcon
 								className="size-3 shrink-0"
 								aria-hidden="true"

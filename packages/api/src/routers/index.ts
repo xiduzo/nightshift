@@ -78,12 +78,14 @@ const runs = {
 					flowName: flowNameSchema,
 					baseRef: z.string().min(1).optional(),
 					stopAt: z.number().int().positive().optional(),
+					params: z.record(z.string(), z.string()).optional(),
 				}),
 				z.object({
 					projectId: z.string(),
 					flow: flowSchema,
 					baseRef: z.string().min(1).optional(),
 					stopAt: z.number().int().positive().optional(),
+					params: z.record(z.string(), z.string()).optional(),
 				}),
 			]),
 		)

@@ -59,6 +59,7 @@ import {
 	type DerivedStep,
 	deriveNodeOutputs,
 	deriveOpenGate,
+	deriveParams,
 	deriveResumePoint,
 	deriveRunState,
 	deriveSleep,
@@ -259,6 +260,35 @@ const LIFECYCLE_EVENT_TYPES = [
 const isWaitKind = (
 	kind: AgentErrorKind | null | undefined,
 ): kind is WaitReason => kind === "usage-limit" || kind === "network";
+
+/**
+ * The run's param values: the given value, else the default. Refuses names
+ * the flow does not declare and required params without a value.
+ */
+export function resolveParams(
+	flow: Flow,
+	given: Record<string, string> | undefined,
+): Record<string, string> {
+	const declared = flow.params ?? [];
+	const names = new Set(declared.map((param) => param.name));
+	const unknown = Object.keys(given ?? {}).filter((name) => !names.has(name));
+	if (unknown.length > 0) {
+		throw new Error(
+			`The flow has no param ${unknown.map((n) => `"${n}"`).join(", ")}.`,
+		);
+	}
+	const values: Record<string, string> = {};
+	const missing: string[] = [];
+	for (const param of declared) {
+		const value = given?.[param.name]?.trim() || param.default || "";
+		if (value === "" && param.required) missing.push(param.label ?? param.name);
+		values[param.name] = value;
+	}
+	if (missing.length > 0) {
+		throw new Error(`The run needs a value for: ${missing.join(", ")}.`);
+	}
+	return values;
+}
 
 export function createEngine(
 	options: EngineOptions,
@@ -468,6 +498,7 @@ export function createEngine(
 				state.status === "sleeping"
 					? (deriveSleep(events)?.until ?? null)
 					: null,
+			params: deriveParams(events),
 			stopAt: deriveStopAt(events),
 			stopAfterStep: open && deriveStopAfterStep(events),
 			createdAt: row.createdAt.getTime(),
@@ -553,6 +584,7 @@ export function createEngine(
 				base_ref: row.baseRef,
 				flow: row.flowName ?? row.title,
 			},
+			params: deriveParams(events),
 		};
 		if (frame.item) context.item = frame.item;
 		return context;
@@ -2184,7 +2216,12 @@ export function createEngine(
 				if (input.stopAt !== undefined && input.stopAt <= now()) {
 					throw new Error("The stop time has passed already.");
 				}
-				const title = flowName ?? quickRunTitle(flow);
+				const params = resolveParams(flow, input.params);
+				const title = flowName
+					? [flowName, ...Object.entries(params).map(([k, v]) => `${k} ${v}`)]
+							.join(" · ")
+							.slice(0, 120)
+					: quickRunTitle(flow);
 				const worktree = await createWorktree({
 					repoPath: projectRow.repoPath,
 					shortId: runId.slice(0, 8),
@@ -2214,6 +2251,7 @@ export function createEngine(
 						title,
 						start: flow.start,
 						stopAt: input.stopAt ?? null,
+						params,
 					},
 				});
 				await appendEvent(db, {

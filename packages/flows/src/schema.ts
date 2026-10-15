@@ -213,6 +213,23 @@ export const policySchema = z.object({
 	networkGraceMinutes: z.number().positive().default(240),
 });
 
+/** A run parameter: a value a person gives when they start the run, read as `{{params.<name>}}`. */
+export const paramSchema = z.object({
+	name: z
+		.string()
+		.regex(
+			/^[a-z][a-z0-9_]{0,39}$/,
+			"Use lowercase letters, digits and _, starting with a letter.",
+		),
+	/** Shown in the start dialog. Defaults to the name. */
+	label: z.string().optional(),
+	description: z.string().optional(),
+	/** Used when the person leaves the field empty. */
+	default: z.string().optional(),
+	/** A run cannot start without a value (or a default). */
+	required: z.boolean().optional(),
+});
+
 export const flowSchema = z.object({
 	version: z.literal(FLOW_VERSION),
 	description: z.string().optional(),
@@ -223,6 +240,12 @@ export const flowSchema = z.object({
 	input: z.literal("item").optional(),
 	/** Used for the top-level flow of a run. A body flow uses its parent's. */
 	policy: policySchema.optional(),
+	/**
+	 * Values asked when the run starts, for example the Epic number. Every
+	 * flow of the run, body flows too, reads them as `{{params.<name>}}`.
+	 * Only a top-level flow declares them.
+	 */
+	params: z.array(paramSchema).optional(),
 	/** The node the run starts at. */
 	start: nodeIdSchema,
 	nodes: z.array(flowNodeSchema),
@@ -240,6 +263,7 @@ export type GateNode = z.infer<typeof gateNodeSchema>;
 export type ForEachNode = z.infer<typeof forEachNodeSchema>;
 export type ItemSource = z.infer<typeof itemSourceSchema>;
 export type Policy = z.infer<typeof policySchema>;
+export type Param = z.infer<typeof paramSchema>;
 export type FlowEdge = z.infer<typeof flowEdgeSchema>;
 export type Outcome = z.infer<typeof outcomeSchema>;
 export type FlowNodeType = FlowNode["type"];

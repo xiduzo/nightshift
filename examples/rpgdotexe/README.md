@@ -11,10 +11,9 @@ These three flows rebuild `tools/night-shift/night-shift.py` of the rpgdotexe re
 ## How to use it
 
 1. Copy `.nightshift/flows/` into your rpgdotexe clone.
-2. In `night.json`, set the Epic number: `nodes[0].source.parent` (`"699"` is a placeholder; flows have no run parameters).
-3. Add the clone as a project in Night Shift.
-4. Run the flow `night` with a stop time. A stop starts no new work; the next run continues, because a Trace with the label `implemented` counts as done.
-5. In the morning, read the pull requests, `.build/night/STATUS.md` in the run's worktree, and the comment of the checkpoint on each Feature.
+2. Add the clone as a project in Night Shift.
+3. Run the flow `night`: the start dialog asks for the Epic number (the `epic` param, like `night-shift.py <epic>`) and a stop time. A stop starts no new work; the next run continues, because a Trace with the label `implemented` counts as done.
+4. In the morning, read the pull requests, `.build/night/STATUS.md` in the run's worktree, and the comment of the checkpoint on each Feature.
 
 The flows call `python3 tools/night-shift/night-shift.py gate` (the check) and import two helpers from that file. Keep the script in the repo until the check moves somewhere else.
 

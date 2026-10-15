@@ -15,6 +15,7 @@ import {
 	itemFields,
 	type Outcome,
 	outputFieldsByType,
+	type Param,
 	type Policy,
 	runFields,
 	validateFlow,
@@ -139,6 +140,40 @@ export function setPolicyNumber(
 	const empty = Object.keys(next).length === 0;
 	// A partial policy is valid input; the draft only lives as input.
 	return { ...flow, policy: empty ? undefined : (next as Policy) };
+}
+
+/** Replaces the run parameters. An empty list is dropped, so the file stays minimal. */
+export function setParams(flow: Flow, params: Param[]): Flow {
+	return { ...flow, params: params.length === 0 ? undefined : params };
+}
+
+/** `base`, else `base_2`, `base_3`, … whichever no param uses yet. */
+export function uniqueParamName(params: Param[], base: string): string {
+	const taken = new Set(params.map((param) => param.name));
+	if (!taken.has(base)) return base;
+	for (let n = 2; ; n++) {
+		const name = `${base}_${n}`;
+		if (!taken.has(name)) return name;
+	}
+}
+
+/**
+ * Renames a run parameter and the `{{params.old}}` references in this flow's
+ * prompts, commands and questions. Body flows that read it keep the old name.
+ */
+export function renameParam(flow: Flow, index: number, to: string): Flow {
+	const params = flow.params ?? [];
+	const from = params[index]?.name;
+	if (from === undefined || from === to) return flow;
+	const reference = new RegExp(`(\\{\\{\\s*params\\.)${from}(\\s*\\}\\})`, "g");
+	const rewrite = (text: string) => text.replace(reference, `$1${to}$2`);
+	return {
+		...flow,
+		params: params.map((param, at) =>
+			at === index ? { ...param, name: to } : param,
+		),
+		nodes: flow.nodes.map((node) => rewriteTemplates(node, rewrite)),
+	};
 }
 
 /** A new flow: one Agent node named `worker`. */
@@ -449,8 +484,9 @@ export function removeEdge(flow: Flow, id: string): Flow {
 }
 
 /**
- * The `{{…}}` variables a node can use: other nodes' outputs, the item's
- * fields in a body flow, and the run's fields.
+ * The `{{…}}` variables a node can use: the run parameters of a top-level
+ * flow, the item's fields in a body flow, other nodes' outputs, and the run's
+ * fields. A body flow reads its parent's parameters, which it cannot know.
  */
 export function templateVariables(flow: Flow, nodeId: string) {
 	const nodes = flow.nodes
@@ -470,7 +506,17 @@ export function templateVariables(flow: Flow, nodeId: string) {
 					},
 				]
 			: [];
+	const params =
+		flow.input !== "item" && flow.params && flow.params.length > 0
+			? [
+					{
+						scope: "params",
+						variables: flow.params.map((param) => `{{params.${param.name}}}`),
+					},
+				]
+			: [];
 	return [
+		...params,
 		...item,
 		...nodes,
 		{ scope: "run", variables: runFields.map((field) => `{{run.${field}}}`) },
@@ -530,6 +576,7 @@ export function checkFlow(
 			const [scope, index, ...rest] = issue.path;
 			const field = rest.map(String).join(".");
 			const message =
+				paramMessage(flow, scope, index) ??
 				FIELD_MESSAGES[field] ??
 				optionMessage(flow, index, rest) ??
 				haltOnMessage(flow, index, rest) ??
@@ -579,6 +626,19 @@ function optionMessage(
 	return name === ""
 		? `A ${kind.toLowerCase()} has no name.`
 		: `${kind} "${name}": use lowercase letters, digits and -, starting with a letter.`;
+}
+
+/** A bad run parameter: `params.0.name` reads as `Run parameter "Epic": …`. */
+function paramMessage(
+	flow: Flow,
+	scope: PropertyKey | undefined,
+	index: PropertyKey | undefined,
+): string | undefined {
+	if (scope !== "params" || typeof index !== "number") return;
+	const name = flow.params?.[index]?.name ?? "";
+	return name === ""
+		? "A run parameter has no name."
+		: `Run parameter "${name}": use lowercase letters, digits and _, starting with a letter.`;
 }
 
 /** A bad halt-on label: `haltOn.0` reads as `Halt-on label "Stop": …`. */

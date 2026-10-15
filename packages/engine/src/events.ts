@@ -71,6 +71,8 @@ export type EnginePayloads = {
 		start: string;
 		/** Epoch ms: no new step or item starts after it. Absent before Slice 4. */
 		stopAt?: number | null;
+		/** The run parameters, defaults applied. Absent on older runs. */
+		params?: Record<string, string>;
 	};
 	WorktreeCreated: { worktreePath: string; branch: string; baseRef: string };
 	/** A person continued a stopped, failed or interrupted run. */
@@ -372,6 +374,13 @@ export function deriveStopAt(events: readonly LoggedEvent[]): number | null {
 		else if (e.type === "RunResumed" && e.payload.clearStopAt) stopAt = null;
 	}
 	return stopAt;
+}
+
+export function deriveParams(
+	events: readonly LoggedEvent[],
+): Record<string, string> {
+	const started = events.find((e) => e.type === "RunStarted");
+	return started?.type === "RunStarted" ? (started.payload.params ?? {}) : {};
 }
 
 /** How often the run took each edge of one scope (default: the top level), by edge id. */

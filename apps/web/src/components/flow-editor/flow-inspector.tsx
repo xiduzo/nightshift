@@ -1,4 +1,5 @@
 import type { Flow, Policy } from "@nightshift/flows";
+import { Button } from "@nightshift/ui/components/button";
 import { Checkbox } from "@nightshift/ui/components/checkbox";
 import { Label } from "@nightshift/ui/components/label";
 import {
@@ -8,9 +9,10 @@ import {
 import { Textarea } from "@nightshift/ui/components/textarea";
 import { useId } from "react";
 
-import { POLICY_DEFAULTS, setPolicyNumber } from "@/lib/flow-draft";
+import { POLICY_DEFAULTS, setParams, setPolicyNumber } from "@/lib/flow-draft";
 
 import { Field, PositiveIntInput } from "./fields";
+import { ParamsEditor } from "./params-editor";
 
 const POLICY_FIELDS: { key: keyof Policy; label: string; hint: string }[] = [
 	{
@@ -97,11 +99,53 @@ export function FlowInspector({
 						A For Each node runs it for each item. Its templates read the item
 						as <code className="font-mono">{"{{item.title}}"}</code>,{" "}
 						<code className="font-mono">{"{{item.body}}"}</code>,{" "}
-						<code className="font-mono">{"{{item.number}}"}</code>, … A body
+						<code className="font-mono">{"{{item.number}}"}</code>, … and the
+						run parameters of the top-level flow as{" "}
+						<code className="font-mono">{"{{params.<name>}}"}</code>. A body
 						flow does not start on its own.
 					</p>
 				</div>
 			</div>
+			{flow.input === "item" ? (
+				(flow.params?.length ?? 0) > 0 ? (
+					<div className="flex flex-col items-start gap-1.5 border border-destructive/50 bg-destructive/10 px-2 py-1.5 text-xs">
+						<p>
+							This flow still declares run parameters. A body flow cannot: it
+							reads those of the top-level flow.
+						</p>
+						<Button
+							variant="outline"
+							size="xs"
+							onClick={() => onChange((current) => setParams(current, []))}
+						>
+							Remove the parameters
+						</Button>
+					</div>
+				) : null
+			) : (
+				<section
+					aria-labelledby={`${id}-params`}
+					className="flex flex-col gap-3"
+				>
+					<div className="flex flex-col gap-0.5">
+						<h3 id={`${id}-params`} className="font-medium text-xs">
+							Run parameters
+						</h3>
+						<p
+							id={`${id}-params-hint`}
+							className="text-muted-foreground text-xs"
+						>
+							Asked when you start a run. Read them as{" "}
+							<code className="font-mono">{"{{params.name}}"}</code>.
+						</p>
+					</div>
+					<ParamsEditor
+						flow={flow}
+						describedBy={`${id}-params-hint`}
+						onChange={onChange}
+					/>
+				</section>
+			)}
 			<section aria-labelledby={`${id}-policy`} className="flex flex-col gap-3">
 				<div className="flex flex-col gap-0.5">
 					<h3 id={`${id}-policy`} className="font-medium text-xs">

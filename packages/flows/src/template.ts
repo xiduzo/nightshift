@@ -24,9 +24,11 @@ function lookup(
 			? context.run
 			: scope === "item"
 				? context.item
-				: Object.hasOwn(context.nodes, scope)
-					? context.nodes[scope]
-					: undefined;
+				: scope === "params"
+					? context.params
+					: Object.hasOwn(context.nodes, scope)
+						? context.nodes[scope]
+						: undefined;
 	if (!source || !Object.hasOwn(source, field)) return "";
 	const value = source[field];
 	return value === undefined || value === null ? "" : String(value);

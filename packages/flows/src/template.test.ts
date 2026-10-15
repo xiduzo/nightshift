@@ -157,3 +157,20 @@ describe("item references", () => {
 		expect(renderTemplate("{{item.title}}", shadow)).toBe("Add login");
 	});
 });
+
+describe("params", () => {
+	test("render from context.params, missing as empty", () => {
+		const context = {
+			nodes: {},
+			run: { branch: "b", worktree: "/w", base_ref: "main", flow: "night" },
+			params: { epic: "1097" },
+		};
+		expect(renderTemplate("Epic {{params.epic}}{{params.nope}}", context)).toBe(
+			"Epic 1097",
+		);
+		expect(renderCommand("gh issue view {{params.epic}}", context)).toEqual({
+			command: "gh issue view ${NS_PARAMS_EPIC}",
+			env: { NS_PARAMS_EPIC: "1097" },
+		});
+	});
+});

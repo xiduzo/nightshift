@@ -181,6 +181,7 @@ function GitHubSourceFields({
 }) {
 	const id = useId();
 	const inBody = flow.input === "item";
+	const params = inBody ? [] : (flow.params ?? []);
 	return (
 		<>
 			<Field
@@ -191,7 +192,21 @@ function GitHubSourceFields({
 						<>
 							The issue whose sub-issues become the items.{" "}
 							<code className="font-mono">{"{{item.number}}"}</code> reads the
-							current item of this body flow: the Traces of a Feature.
+							current item of this body flow: the Traces of a Feature.{" "}
+							<code className="font-mono">{"{{params.<name>}}"}</code> reads the
+							run parameters of the top-level flow.
+						</>
+					) : params.length > 0 ? (
+						<>
+							The issue number whose sub-issues become the items, for example an
+							Epic. Takes templates, such as{" "}
+							{params.map((param, index) => (
+								<span key={param.name}>
+									{index > 0 ? ", " : null}
+									<code className="font-mono">{`{{params.${param.name}}}`}</code>
+								</span>
+							))}
+							.
 						</>
 					) : (
 						"The issue number whose sub-issues become the items, for example an Epic. Takes templates."
@@ -201,7 +216,13 @@ function GitHubSourceFields({
 				<Input
 					id={`${id}-parent`}
 					value={source.parent}
-					placeholder={inBody ? "{{item.number}}" : "42"}
+					placeholder={
+						inBody
+							? "{{item.number}}"
+							: params[0]
+								? `{{params.${params[0].name}}}`
+								: "42"
+					}
 					className="font-mono"
 					autoComplete="off"
 					spellCheck={false}

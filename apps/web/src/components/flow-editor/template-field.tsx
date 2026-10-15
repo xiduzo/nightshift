@@ -89,9 +89,15 @@ export function TemplateField({
 						</div>
 					))}
 				</dl>
-				<p className="border-t px-2 py-1.5 text-muted-foreground">
-					A node that has not run yet renders as an empty string.
-				</p>
+				<div className="flex flex-col gap-1 border-t px-2 py-1.5 text-muted-foreground">
+					{flow.input === "item" ? (
+						<p>
+							<code className="font-mono">{"{{params.<name>}}"}</code> reads the
+							run parameters of the top-level flow.
+						</p>
+					) : null}
+					<p>A node that has not run yet renders as an empty string.</p>
+				</div>
 			</details>
 		</>
 	);

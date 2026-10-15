@@ -454,6 +454,7 @@ function Editor({
 				onOpenChange={setStarting}
 				projectId={projectId}
 				flowName={name}
+				params={draft.params}
 			/>
 
 			<AlertDialog

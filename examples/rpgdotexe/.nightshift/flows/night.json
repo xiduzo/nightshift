@@ -1,6 +1,14 @@
 {
 	"version": 1,
-	"description": "The rpgdotexe night: builds each Feature of one Epic, blockers first. Set the Epic number in the source of `features` (699 is a placeholder).",
+	"description": "The rpgdotexe night: builds each Feature of one Epic, blockers first, like `night-shift.py <epic>`.",
+	"params": [
+		{
+			"name": "epic",
+			"label": "Epic",
+			"description": "The issue number of the Epic to build, as in night-shift.py <epic>.",
+			"required": true
+		}
+	],
 	"policy": {
 		"usageLimitFirstWaitMinutes": 5,
 		"usageLimitMaxWaitMinutes": 60,
@@ -18,7 +26,7 @@
 			"type": "foreach",
 			"source": {
 				"kind": "github",
-				"parent": "699",
+				"parent": "{{params.epic}}",
 				"requireLabel": "feature",
 				"doneLabels": []
 			},

@@ -57,13 +57,15 @@ function validateIn(
 			continue;
 		}
 		nodes.set(node.id, node);
-		if (node.id === "run" || node.id === "item") {
+		if (node.id === "run" || node.id === "item" || node.id === "params") {
 			error(
 				`Node id "${node.id}" is reserved for {{${node.id}.<field>}} templates.`,
 				{ nodeId: node.id },
 			);
 		}
 	}
+
+	checkParams(flow, error);
 
 	if (!nodes.has(flow.start)) {
 		error(`Start node "${flow.start}" does not exist.`, {
@@ -124,25 +126,18 @@ function validateIn(
 						nodeId: node.id,
 					});
 				}
-				checkTemplate(node, node.prompt, "prompt", nodes, flow.input, error);
+				checkTemplate(node, node.prompt, "prompt", nodes, flow, error);
 				break;
 			case "command":
-				checkTemplate(node, node.command, "command", nodes, flow.input, error);
+				checkTemplate(node, node.command, "command", nodes, flow, error);
 				break;
 			case "decision":
 				checkOptions(node, "label", "the decider", flow, error, warning);
-				checkTemplate(node, node.prompt, "prompt", nodes, flow.input, error);
+				checkTemplate(node, node.prompt, "prompt", nodes, flow, error);
 				break;
 			case "gate":
 				checkOptions(node, "choice", "the person", flow, error, warning);
-				checkTemplate(
-					node,
-					node.question,
-					"question",
-					nodes,
-					flow.input,
-					error,
-				);
+				checkTemplate(node, node.question, "question", nodes, flow, error);
 				break;
 			case "foreach":
 				if (node.source.kind === "github") {
@@ -151,7 +146,7 @@ function validateIn(
 						node.source.parent,
 						"source parent",
 						nodes,
-						flow.input,
+						flow,
 						error,
 					);
 				} else {
@@ -160,7 +155,7 @@ function validateIn(
 						node.source.command,
 						"source command",
 						nodes,
-						flow.input,
+						flow,
 						error,
 					);
 				}
@@ -375,16 +370,49 @@ function checkOptions(
 	}
 }
 
+function checkParams(
+	flow: Flow,
+	error: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
+): void {
+	const params = flow.params ?? [];
+	if (params.length > 0 && flow.input === "item") {
+		error(
+			"A body flow cannot declare params: it reads the params of the top-level flow that runs it.",
+			{},
+		);
+	}
+	const seen = new Set<string>();
+	for (const param of params) {
+		if (seen.has(param.name)) {
+			error(`The param "${param.name}" is declared more than once.`, {});
+		}
+		seen.add(param.name);
+	}
+}
+
 function checkTemplate(
 	node: FlowNode,
 	text: string,
 	where: string,
 	nodes: ReadonlyMap<string, FlowNode>,
-	input: Flow["input"],
+	flow: Flow,
 	error: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
 ): void {
+	const input = flow.input;
 	for (const ref of templateRefs(text)) {
 		let fields: readonly string[];
+		if (ref.scope === "params") {
+			// A body flow reads the params of whichever top-level flow runs it.
+			if (input === "item") continue;
+			fields = (flow.params ?? []).map((param) => param.name);
+			if (!fields.includes(ref.field)) {
+				error(
+					`The ${where} of "${node.id}" uses ${ref.raw}, but the flow has no param "${ref.field}". Add it to the flow's params.`,
+					{ nodeId: node.id },
+				);
+			}
+			continue;
+		}
 		if (ref.scope === "run") {
 			fields = runFields;
 		} else if (ref.scope === "item") {

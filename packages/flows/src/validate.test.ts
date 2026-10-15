@@ -1045,3 +1045,50 @@ describe("parseFlow with options", () => {
 		]);
 	});
 });
+
+describe("validateFlow: params", () => {
+	const errors = (f: Flow) =>
+		validateFlow(f).filter((issue) => issue.severity === "error");
+
+	test("a declared param can be read", () => {
+		const f = {
+			...flow([agent("worker", { prompt: "Build Epic {{params.epic}}" })], []),
+			params: [{ name: "epic", required: true }],
+		};
+		expect(errors(f)).toEqual([]);
+	});
+
+	test("an undeclared param is an error", () => {
+		const f = flow([agent("worker", { prompt: "Epic {{params.epic}}" })], []);
+		expect(errors(f).map((i) => i.message)).toEqual([
+			'The prompt of "worker" uses {{params.epic}}, but the flow has no param "epic". Add it to the flow\'s params.',
+		]);
+	});
+
+	test("a body flow reads params it does not declare", () => {
+		const f = {
+			...flow([agent("worker", { prompt: "Epic {{params.epic}}" })], []),
+			input: "item" as const,
+		};
+		expect(errors(f)).toEqual([]);
+	});
+
+	test("a body flow cannot declare params, and names are unique", () => {
+		const f = {
+			...flow([agent("worker")], []),
+			input: "item" as const,
+			params: [{ name: "epic" }, { name: "epic" }],
+		};
+		expect(errors(f).map((i) => i.message)).toEqual([
+			"A body flow cannot declare params: it reads the params of the top-level flow that runs it.",
+			'The param "epic" is declared more than once.',
+		]);
+	});
+
+	test("the node id params is reserved", () => {
+		const f = flow([agent("params")], [], "params");
+		expect(errors(f).map((i) => i.message)).toContain(
+			'Node id "params" is reserved for {{params.<field>}} templates.',
+		);
+	});
+});
