@@ -115,4 +115,6 @@ export type EngineOptions = {
 	harnesses: Partial<Record<HarnessName, AgentHarness>>;
 	/** Root for transcripts and other on-disk state, for example ~/.nightshift. */
 	dataDir: string;
+	/** How many sessions may run at once, over all runs. Default 2. */
+	maxConcurrentSessions?: number;
 };
