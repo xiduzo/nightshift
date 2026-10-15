@@ -13,6 +13,7 @@
 		"@nightshift/auth": "workspace:*",
 		"@nightshift/db": "workspace:*",
 		"@nightshift/engine": "workspace:*",
+		"@nightshift/flows": "workspace:*",
 		"@orpc/client": "catalog:",
 		"@orpc/openapi": "catalog:",
 		"@orpc/server": "catalog:",

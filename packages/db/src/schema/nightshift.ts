@@ -15,21 +15,23 @@ export const project = sqliteTable("project", {
 	/** Absolute path of the user's own clone. */
 	repoPath: text("repo_path").notNull().unique(),
 	createdAt: createdAt(),
+	/** Set when a person removed the project. Its runs and events stay. Adding the path again clears it. */
+	removedAt: integer("removed_at", { mode: "timestamp_ms" }),
 });
 
-/** One execution against a project. In Slice 1 a run is one Agent node. */
+/** One walk of a flow in its own worktree. */
 export const run = sqliteTable(
 	"run",
 	{
 		id: text("id").primaryKey(),
 		projectId: text("project_id")
 			.notNull()
-			.references(() => project.id, { onDelete: "cascade" }),
-		prompt: text("prompt").notNull(),
-		harness: text("harness").notNull(),
-		model: text("model").notNull(),
-		permissionMode: text("permission_mode").notNull(),
-		effort: text("effort"),
+			.references(() => project.id),
+		/** The flow file the run started from. Null for a quick run. */
+		flowName: text("flow_name"),
+		/** JSON copy of the flow at start. The run never reads the file again. */
+		flow: text("flow").notNull(),
+		title: text("title").notNull(),
 		/** Absolute path of the worktree the run works in. */
 		worktreePath: text("worktree_path").notNull(),
 		branch: text("branch").notNull(),
@@ -39,33 +41,59 @@ export const run = sqliteTable(
 	(table) => [index("run_projectId_idx").on(table.projectId)],
 );
 
-/** One harness session of a run. A resume continues the same harness session id in a new row. */
+/** One visit of one node. */
+export const step = sqliteTable(
+	"step",
+	{
+		id: text("id").primaryKey(),
+		runId: text("run_id")
+			.notNull()
+			.references(() => run.id),
+		nodeId: text("node_id").notNull(),
+		nodeType: text("node_type").notNull(),
+		/** 1 for the first visit of this node in the run. */
+		visit: integer("visit").notNull(),
+		/** Absolute path of the step's NDJSON transcript on disk. */
+		transcriptPath: text("transcript_path").notNull(),
+		createdAt: createdAt(),
+	},
+	(table) => [index("step_runId_idx").on(table.runId)],
+);
+
+/** One harness session of an Agent step. A resume adds a row that continues the same harness session id. */
 export const agentSession = sqliteTable(
 	"agent_session",
 	{
 		id: text("id").primaryKey(),
 		runId: text("run_id")
 			.notNull()
-			.references(() => run.id, { onDelete: "cascade" }),
+			.references(() => run.id),
+		stepId: text("step_id")
+			.notNull()
+			.references(() => step.id),
 		/** The harness's own session id, known after the harness starts. */
 		harnessSessionId: text("harness_session_id"),
+		/** The rendered prompt the session received. */
 		prompt: text("prompt").notNull(),
-		/** Absolute path of the NDJSON transcript file on disk. */
-		transcriptPath: text("transcript_path").notNull(),
 		createdAt: createdAt(),
 	},
-	(table) => [index("agent_session_runId_idx").on(table.runId)],
+	(table) => [
+		index("agent_session_runId_idx").on(table.runId),
+		index("agent_session_stepId_idx").on(table.stepId),
+	],
 );
 
 /**
  * The append-only event log. One row per fact that changed. `seq` orders the
- * log globally. Transcript chunks (text deltas, tool calls) stay on disk, not here.
+ * log globally. No foreign keys: nothing may delete a row here. Transcript
+ * chunks (text deltas, tool calls, command output) stay on disk, not here.
  */
 export const event = sqliteTable(
 	"event",
 	{
 		seq: integer("seq").primaryKey({ autoIncrement: true }),
-		runId: text("run_id").references(() => run.id, { onDelete: "cascade" }),
+		runId: text("run_id"),
+		stepId: text("step_id"),
 		sessionId: text("session_id"),
 		type: text("type").notNull(),
 		/** JSON-encoded payload. */

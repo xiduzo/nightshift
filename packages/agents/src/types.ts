@@ -25,6 +25,12 @@ export type AgentSessionInput = {
 	effort?: Effort;
 	/** Continue this harness session instead of starting a new one. */
 	resumeSessionId?: string;
+	/**
+	 * Ask the agent for a step report: the harness tells the agent how to
+	 * report and emits one `report` event when it does. A session that
+	 * finishes without a report is treated as `pass` by the engine.
+	 */
+	stepReport?: boolean;
 	/** Aborting stops the harness process. The stream then ends with an `error` event of kind `aborted`. */
 	signal: AbortSignal;
 };
@@ -34,6 +40,8 @@ export type AgentUsage = {
 	outputTokens: number;
 	costUsd?: number;
 };
+
+export type StepReportOutcome = "pass" | "fail" | "needs-input";
 
 export type AgentErrorKind = "aborted" | "usage-limit" | "harness";
 
@@ -48,6 +56,8 @@ export type AgentEvent =
 	| { type: "tool-start"; toolCallId: string; name: string }
 	| { type: "tool-end"; toolCallId: string; name: string; input: unknown }
 	| { type: "tool-result"; toolCallId: string; content: string }
+	/** The agent's step report. When the agent reports twice, the last one counts. */
+	| { type: "report"; outcome: StepReportOutcome; summary: string }
 	| { type: "finished"; usage?: AgentUsage }
 	| {
 			type: "error";

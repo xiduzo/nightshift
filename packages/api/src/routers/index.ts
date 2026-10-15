@@ -1,17 +1,10 @@
+import { flowNameSchema, flowSchema } from "@nightshift/flows";
 import type { RouterClient } from "@orpc/server";
 import { z } from "zod";
 
 import { publicProcedure } from "../index";
 
 // Local single-user mode: procedures are public until the local auto-session exists.
-
-const permissionMode = z.enum([
-	"default",
-	"acceptEdits",
-	"bypassPermissions",
-	"plan",
-]);
-const effort = z.enum(["low", "medium", "high", "xhigh", "max"]);
 
 const projects = {
 	list: publicProcedure.handler(({ context }) => context.engine.listProjects()),
@@ -30,6 +23,30 @@ const projects = {
 		),
 };
 
+const flowRef = z.object({ projectId: z.string(), name: flowNameSchema });
+
+const flows = {
+	list: publicProcedure
+		.input(z.object({ projectId: z.string() }))
+		.handler(({ context, input }) => context.engine.listFlows(input.projectId)),
+	get: publicProcedure
+		.input(flowRef)
+		.handler(({ context, input }) =>
+			context.engine.getFlow(input.projectId, input.name),
+		),
+	/** Saves drafts with errors too. Returns the issues. */
+	save: publicProcedure
+		.input(flowRef.extend({ flow: flowSchema }))
+		.handler(({ context, input }) =>
+			context.engine.saveFlow(input.projectId, input.name, input.flow),
+		),
+	remove: publicProcedure
+		.input(flowRef)
+		.handler(({ context, input }) =>
+			context.engine.deleteFlow(input.projectId, input.name),
+		),
+};
+
 const runs = {
 	list: publicProcedure
 		.input(z.object({ projectId: z.string().optional() }).optional())
@@ -37,16 +54,21 @@ const runs = {
 	get: publicProcedure
 		.input(z.object({ runId: z.string() }))
 		.handler(({ context, input }) => context.engine.getRun(input.runId)),
+	/** Starts a flow file by name, or a flow given inline (a quick run). */
 	start: publicProcedure
 		.input(
-			z.object({
-				projectId: z.string(),
-				prompt: z.string().min(1),
-				model: z.string().min(1),
-				permissionMode,
-				effort: effort.optional(),
-				baseRef: z.string().min(1).optional(),
-			}),
+			z.union([
+				z.object({
+					projectId: z.string(),
+					flowName: flowNameSchema,
+					baseRef: z.string().min(1).optional(),
+				}),
+				z.object({
+					projectId: z.string(),
+					flow: flowSchema,
+					baseRef: z.string().min(1).optional(),
+				}),
+			]),
 		)
 		.handler(({ context, input }) => context.engine.startRun(input)),
 	stop: publicProcedure
@@ -79,6 +101,7 @@ const runs = {
 export const appRouter = {
 	healthCheck: publicProcedure.handler(() => "OK"),
 	projects,
+	flows,
 	runs,
 };
 export type AppRouter = typeof appRouter;

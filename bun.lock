@@ -110,6 +110,7 @@
         "@nightshift/auth": "workspace:*",
         "@nightshift/db": "workspace:*",
         "@nightshift/engine": "workspace:*",
+        "@nightshift/flows": "workspace:*",
         "@orpc/client": "catalog:",
         "@orpc/openapi": "catalog:",
         "@orpc/server": "catalog:",
@@ -160,7 +161,19 @@
       "dependencies": {
         "@nightshift/agents": "workspace:*",
         "@nightshift/db": "workspace:*",
+        "@nightshift/flows": "workspace:*",
         "drizzle-orm": "catalog:",
+      },
+      "devDependencies": {
+        "@nightshift/config": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/flows": {
+      "name": "@nightshift/flows",
+      "dependencies": {
+        "zod": "catalog:",
       },
       "devDependencies": {
         "@nightshift/config": "workspace:*",
@@ -467,6 +480,8 @@
     "@nightshift/db": ["@nightshift/db@workspace:packages/db"],
 
     "@nightshift/engine": ["@nightshift/engine@workspace:packages/engine"],
+
+    "@nightshift/flows": ["@nightshift/flows@workspace:packages/flows"],
 
     "@nightshift/ui": ["@nightshift/ui@workspace:packages/ui"],
 
