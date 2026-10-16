@@ -98,6 +98,11 @@ export type ConnectionStore = {
 	expandForTest(
 		target: { name: string } | { server: McpServer },
 	): Promise<{ expansion: McpExpansion; values: string[] }>;
+	/**
+	 * The values of the saved secrets and of the variables the connections
+	 * reference, to take out of an exported run.
+	 */
+	secretValues(): Promise<string[]>;
 };
 
 /** The `${NAME}` references of a server's env values and headers. */
@@ -285,6 +290,14 @@ export function createConnectionStore(options: {
 				expansion: expandMcpServers({ [name]: server }, vars),
 				values: variables.flatMap((v) => (vars[v] ? [vars[v]] : [])),
 			};
+		},
+		async secretValues() {
+			const names = new Set(savedSecrets);
+			for (const c of connections.values()) {
+				for (const name of referencedVariables(c.server)) names.add(name);
+			}
+			const vars = await envFor(names);
+			return [...names].flatMap((name) => (vars[name] ? [vars[name]] : []));
 		},
 	};
 }
