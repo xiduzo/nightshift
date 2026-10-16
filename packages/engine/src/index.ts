@@ -13,6 +13,14 @@ export {
 } from "./connections";
 export { createEngine } from "./engine";
 export {
+	exportRun,
+	openRunBundle,
+	RUN_BUNDLE_FORMAT_VERSION,
+	type RunBundle,
+	type RunBundleMeta,
+	type RunBundleSummary,
+} from "./run-bundle";
+export {
 	createSettingsStore,
 	type RunSettings,
 	type SettingField,
