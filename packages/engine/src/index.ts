@@ -12,6 +12,7 @@ export {
 	secretNameSchema,
 } from "./connections";
 export { createEngine } from "./engine";
+export { chooseFolder } from "./folder-picker";
 export {
 	acquireLease,
 	LEASE_HEARTBEAT_MS,

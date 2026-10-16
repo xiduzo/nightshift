@@ -1,5 +1,6 @@
 import { HARNESS_ADAPTERS } from "@nightshift/agents";
 import {
+	chooseFolder,
 	connectionInputSchema,
 	secretNameSchema,
 	settingsPatchSchema,
@@ -32,6 +33,10 @@ const projects = {
 			}),
 		)
 		.handler(({ context, input }) => context.engine.addProject(input)),
+	/** Opens the native folder picker on this Mac. Null when cancelled. */
+	chooseFolder: publicProcedure.handler(() =>
+		chooseFolder("Choose a git repository to add to Night Shift"),
+	),
 	remove: publicProcedure
 		.input(z.object({ projectId: z.string() }))
 		.handler(({ context, input }) =>
@@ -336,13 +341,15 @@ const profiles = {
 				(previousName === undefined || renamed) &&
 				context.profiles.get(profile.name)
 			) {
-				throw new Error(`A profile named "${profile.name}" exists.`);
+				throw new Error(
+					`A profile named "${profile.name}" already exists. Pick another name.`,
+				);
 			}
 			if (renamed) {
 				const use = (await flowUse(context.engine)).profiles.get(previousName);
 				if (use && use.length > 0) {
 					throw new Error(
-						`Flows name "${previousName}" (${use.map((u) => u.flowName).join(", ")}). Rename it there too, or keep the name.`,
+						`The flows ${use.map((u) => u.flowName).join(", ")} use "${previousName}". Change it there first, or keep the name.`,
 					);
 				}
 			}
@@ -351,7 +358,7 @@ const profiles = {
 			);
 			if (unknown.length > 0) {
 				throw new Error(
-					`This daemon has no connection named ${unknown.map((n) => `"${n}"`).join(", ")}.`,
+					`There is no connection named ${unknown.map((n) => `"${n}"`).join(", ")}. Add it under Agents → Tools first.`,
 				);
 			}
 			const saved = await context.profiles.save(profile);
@@ -405,7 +412,9 @@ const connections = {
 				previousName !== connection.name &&
 				context.connections.get(connection.name)
 			) {
-				throw new Error(`A connection named "${connection.name}" exists.`);
+				throw new Error(
+					`A connection named "${connection.name}" already exists. Pick another name.`,
+				);
 			}
 			const saved = await context.connections.save(connection);
 			if (previousName && previousName !== connection.name) {
