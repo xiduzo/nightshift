@@ -141,7 +141,7 @@ export function InspectorHeader({
 /** The small uppercase heading of an inspector section. */
 function SectionTitle({ children }: { children: ReactNode }) {
 	return (
-		<span className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
+		<span className="flex-1 text-left font-medium text-muted-foreground text-xs uppercase tracking-wider">
 			{children}
 		</span>
 	);

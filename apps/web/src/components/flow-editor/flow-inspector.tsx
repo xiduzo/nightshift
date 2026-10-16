@@ -77,7 +77,7 @@ export function FlowInspector({
 				title={name ?? "This flow"}
 			/>
 
-			<InspectorSection title="General">
+			<InspectorSection title="General" collapsible>
 				<Field id={`${id}-description`} label="Description" optional>
 					<Textarea
 						id={`${id}-description`}
@@ -122,6 +122,8 @@ export function FlowInspector({
 
 			<InspectorSection
 				title="Inputs"
+				collapsible
+				defaultOpen={flow.inputs.length > 0}
 				aside={
 					<Badge variant="secondary" className="tabular-nums">
 						{flow.inputs.length}
@@ -145,6 +147,8 @@ export function FlowInspector({
 
 			<InspectorSection
 				title="Outputs"
+				collapsible
+				defaultOpen={flow.outputs.length > 0}
 				aside={
 					<Badge variant="secondary" className="tabular-nums">
 						{flow.outputs.length}
