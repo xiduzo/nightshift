@@ -3,18 +3,26 @@ import { z } from "zod";
 /**
  * The flow file format: `.nightshift/flows/<name>.json` in the user's clone.
  * The schema checks shape only. `validateFlow` checks meaning (unbounded
- * loops, unknown nodes, template references).
+ * loops, unknown names, template references, calls between flows).
+ *
+ * A flow is a function: it declares `inputs`, runs its nodes, and returns
+ * `outputs` to whoever called it (a run, a Subflow node, or a For Each node).
+ * Version 1 files migrate on load (`migrateFlow`).
  */
 
-export const FLOW_VERSION = 1;
+export const FLOW_VERSION = 2;
 
-/** A node id is also its name in templates: `{{check.log_tail}}`. */
-export const nodeIdSchema = z
+/**
+ * A node id or an input name. Both are names in templates (`{{check.log_tail}}`,
+ * `{{epic}}`) and share one namespace per flow. `run` is reserved.
+ */
+export const nameSchema = z
 	.string()
 	.regex(
 		/^[a-z][a-z0-9_]{0,39}$/,
 		"Use lowercase letters, digits and _, starting with a letter.",
 	);
+export const nodeIdSchema = nameSchema;
 
 /** A flow file name, without `.json`. */
 export const flowNameSchema = z
@@ -25,9 +33,9 @@ export const flowNameSchema = z
 	);
 
 /**
- * A Decision label or a Gate choice. It is also an outcome, so edges and
- * templates use it. "error", "stopped", "interrupted" and "waiting" are
- * reserved for the engine.
+ * An outcome: `pass`, `fail`, `needs-input`, an Agent's own outcome, a
+ * Decision label, or a Gate choice. "error", "stopped", "interrupted" and
+ * "waiting" are reserved for the engine.
  */
 export const labelSchema = z
 	.string()
@@ -43,17 +51,27 @@ export const reservedOutcomes = [
 	"waiting",
 ] as const;
 
+/** Names a flow may not use for a node or an input. */
+export const reservedNames = ["run"] as const;
+
 /** `github`: read issues and pull requests, comment, label, open a pull request. */
 export const toolSetSchema = z.enum(["github"]);
 export type ToolSet = z.infer<typeof toolSetSchema>;
 
 const option = z.object({
 	name: labelSchema,
-	/** Tells the decider (or the person) what this option means. */
+	/** Tells the agent, the decider or the person what this option means. */
 	description: z.string().optional(),
 });
+export type Option = z.infer<typeof option>;
+
+/** A JSON Schema object (draft 2020-12 subset), kept as data. */
+export const jsonSchemaSchema = z.record(z.string(), z.unknown());
 
 const position = z.object({ x: z.number(), y: z.number() });
+
+/** A template string per input name of the called flow. */
+const bindings = z.record(nameSchema, z.string());
 
 const nodeBase = {
 	id: nodeIdSchema,
@@ -67,7 +85,7 @@ const nodeBase = {
 export const agentNodeSchema = z.object({
 	...nodeBase,
 	type: z.literal("agent"),
-	/** The message to the agent. Supports `{{node.field}}` and `{{run.field}}`. */
+	/** The message to the agent. Supports templates. */
 	prompt: z.string(),
 	/** A skill the harness already has, run as `/<skill> <prompt>`. */
 	skill: z.string().min(1).optional(),
@@ -95,6 +113,17 @@ export const agentNodeSchema = z.object({
 	tools: z.array(toolSetSchema).default([]),
 	/** The step fails when the agent shows no activity for this long. */
 	idleMinutes: z.number().int().positive().optional(),
+	/**
+	 * The agent's own outcomes, each with an edge. Replaces `pass`, `fail`
+	 * and `needs-input` when set. The agent reports one of them.
+	 */
+	outcomes: z.array(option).min(1).optional(),
+	/**
+	 * A JSON Schema for the `data` of the step report. The agent must report
+	 * data that matches it, else the step ends as `error`. Later nodes read
+	 * it as `{{<node>.data}}` or a path into it, for example `{{planner.data.tasks}}`.
+	 */
+	output: jsonSchemaSchema.optional(),
 });
 
 export const commandNodeSchema = z.object({
@@ -133,53 +162,94 @@ export const gateNodeSchema = z.object({
 });
 
 /**
- * GitHub sub-issues of one parent issue, blockers first ("blocked by"
- * links); among free issues GitHub's order stays.
+ * Runs another flow of the project once. `inputs` binds each input of the
+ * called flow to a template. Its outputs are the called flow's outputs, plus
+ * `ended` (the label or choice it ended on, or "") and `visit`.
  */
-export const githubSourceSchema = z.object({
-	kind: z.literal("github"),
-	/** The parent issue number. Supports templates, for example `{{item.number}}`. */
-	parent: z.string().min(1),
-	/** Only sub-issues with this label become items. */
-	requireLabel: z.string().min(1).optional(),
-	/** Sub-issues with any of these labels count as done before the run. */
-	doneLabels: z.array(z.string().min(1)).default([]),
-	/**
-	 * Sub-issues with any of these labels are left out (for example `draft`).
-	 * Items blocked by them wait, because a left-out blocker is not done.
-	 */
-	skipLabels: z.array(z.string().min(1)).default([]),
+export const subflowNodeSchema = z.object({
+	...nodeBase,
+	type: z.literal("subflow"),
+	flow: flowNameSchema,
+	inputs: bindings.default({}),
 });
 
 /**
- * A command (sh -c in the worktree) that prints a JSON array of items:
- * `{ id, title, body?, url?, blockedBy?: id[], done?: boolean }`.
+ * A template that renders a JSON array, often another node's output:
+ * `{{planner.data.tasks}}`. A template that is one reference keeps the
+ * value as it is; any other text is parsed as JSON after rendering.
  */
+export const jsonSourceSchema = z.object({
+	kind: z.literal("json"),
+	value: z.string().min(1),
+});
+
+/** A command (sh -c in the worktree) that prints a JSON array on stdout. */
 export const commandSourceSchema = z.object({
 	kind: z.literal("command"),
 	command: z.string().min(1),
 });
 
-export const itemSourceSchema = z.discriminatedUnion("kind", [
-	githubSourceSchema,
+/**
+ * Files in the worktree that match a glob, sorted by path. Each element is
+ * `{ id: path, title: path, path }`.
+ */
+export const filesSourceSchema = z.object({
+	kind: z.literal("files"),
+	glob: z.string().min(1),
+});
+
+/**
+ * GitHub sub-issues of one parent issue. Each element is
+ * `{ id, number, title, body, url, state, labels, parent: { number, title },
+ * dependsOn, done }`; `dependsOn` comes from the "blocked by" links.
+ */
+export const githubSourceSchema = z.object({
+	kind: z.literal("github"),
+	/** The parent issue number. Supports templates, for example `{{epic}}` or `{{item.number}}`. */
+	parent: z.string().min(1),
+	/** Only sub-issues with this label become elements. */
+	requireLabel: z.string().min(1).optional(),
+	/** Sub-issues with any of these labels count as done before the run. */
+	doneLabels: z.array(z.string().min(1)).default([]),
+	/**
+	 * Sub-issues with any of these labels are left out (for example `draft`).
+	 * Elements that depend on them wait, because a left-out dependency is not done.
+	 */
+	skipLabels: z.array(z.string().min(1)).default([]),
+});
+
+export const listSourceSchema = z.discriminatedUnion("kind", [
+	jsonSourceSchema,
 	commandSourceSchema,
+	filesSourceSchema,
+	githubSourceSchema,
 ]);
 
+/**
+ * Runs a flow once per element of a list. An element is any JSON value. An
+ * object element may carry `id` (else `name`, else its position), `title`,
+ * `url`, `dependsOn` (ids, or `{ id, done }`), and `done` (true: skipped).
+ */
 export const forEachNodeSchema = z.object({
 	...nodeBase,
 	type: z.literal("foreach"),
-	/** Read again before each item, so items added during the run get built too. */
-	source: itemSourceSchema,
-	/** The body: a flow file in the same project with `input: "item"`. */
+	/** Read again before each element, so elements added during the run run too. */
+	source: listSourceSchema,
+	/** The flow to run per element. Any flow of the project that has the input named by `as`. */
 	flow: flowNameSchema,
+	/** The input of the called flow that receives the element. */
+	as: nameSchema.default("item"),
+	/** Templates for the called flow's other inputs, for example `{ "epic": "{{epic}}" }`. */
+	inputs: bindings.default({}),
 	/**
-	 * Each item works on its own branch, created on top of the last item
-	 * that finished (the stack). Off: all items share the run's branch.
+	 * `per-item`: each element works on its own branch, created on top of the
+	 * last element that finished (the stack). `shared`: all elements work on
+	 * the branch that is checked out.
 	 */
-	branchPerItem: z.boolean().default(true),
-	/** A body that ends on one of these labels or choices stops the loop with `halted`. */
+	branch: z.enum(["per-item", "shared"]).default("per-item"),
+	/** A called flow that ends on one of these labels or choices stops the loop with `halted`. */
 	haltOn: z.array(labelSchema).default(["halt"]),
-	/** Safety net: the most items one visit may start. */
+	/** Safety net: the most elements one visit may start. */
 	maxItems: z.number().int().positive().optional(),
 });
 
@@ -188,10 +258,10 @@ export const flowNodeSchema = z.discriminatedUnion("type", [
 	commandNodeSchema,
 	decisionNodeSchema,
 	gateNodeSchema,
+	subflowNodeSchema,
 	forEachNodeSchema,
 ]);
 
-/** `pass`, `fail`, `needs-input`, or a Decision label or Gate choice. */
 export const outcomeSchema = labelSchema;
 
 export const flowEdgeSchema = z.object({
@@ -210,6 +280,7 @@ export const flowEdgeSchema = z.object({
 /**
  * The numbers of the run policy. The policy itself is engine code: a usage
  * limit or a network failure waits and then continues the same session.
+ * Only the top-level flow of a run sets them.
  */
 export const policySchema = z.object({
 	/** The first wait after a usage limit without a known reset time. Doubles each time. */
@@ -221,40 +292,39 @@ export const policySchema = z.object({
 	maxSteps: z.number().int().positive().optional(),
 });
 
-/** A run parameter: a value a person gives when they start the run, read as `{{params.<name>}}`. */
-export const paramSchema = z.object({
-	name: z
-		.string()
-		.regex(
-			/^[a-z][a-z0-9_]{0,39}$/,
-			"Use lowercase letters, digits and _, starting with a letter.",
-		),
+/**
+ * A value the flow takes. `text`: a string, the start dialog shows a field.
+ * `json`: any JSON value, read with a path (`{{item.title}}`); the start
+ * dialog takes JSON.
+ */
+export const flowInputSchema = z.object({
+	name: nameSchema,
+	type: z.enum(["text", "json"]).default("text"),
 	/** Shown in the start dialog. Defaults to the name. */
 	label: z.string().optional(),
 	description: z.string().optional(),
-	/** Used when the person leaves the field empty. */
+	/** Used when no value is given. For `json`, JSON text. */
 	default: z.string().optional(),
-	/** A run cannot start without a value (or a default). */
+	/** A run or a call cannot start without a value (or a default). */
 	required: z.boolean().optional(),
+});
+
+/** A value the flow returns, rendered from a template when the flow ends. */
+export const flowOutputSchema = z.object({
+	name: nameSchema,
+	/** A template. One reference keeps its JSON value: `{{review.data}}`. */
+	value: z.string(),
+	description: z.string().optional(),
 });
 
 export const flowSchema = z.object({
 	version: z.literal(FLOW_VERSION),
 	description: z.string().optional(),
-	/**
-	 * `item`: this flow is a For Each body. Its templates may read
-	 * `{{item.<field>}}`, and a run cannot start it on its own.
-	 */
-	input: z.literal("item").optional(),
-	/** Used for the top-level flow of a run. A body flow uses its parent's. */
+	inputs: z.array(flowInputSchema).default([]),
+	outputs: z.array(flowOutputSchema).default([]),
+	/** Used when this flow is the top-level flow of a run. */
 	policy: policySchema.optional(),
-	/**
-	 * Values asked when the run starts, for example the Epic number. Every
-	 * flow of the run, body flows too, reads them as `{{params.<name>}}`.
-	 * Only a top-level flow declares them.
-	 */
-	params: z.array(paramSchema).optional(),
-	/** The node the run starts at. */
+	/** The node the flow starts at. */
 	start: nodeIdSchema,
 	nodes: z.array(flowNodeSchema),
 	edges: z.array(flowEdgeSchema),
@@ -268,25 +338,40 @@ export type AgentNode = z.infer<typeof agentNodeSchema>;
 export type CommandNode = z.infer<typeof commandNodeSchema>;
 export type DecisionNode = z.infer<typeof decisionNodeSchema>;
 export type GateNode = z.infer<typeof gateNodeSchema>;
+export type SubflowNode = z.infer<typeof subflowNodeSchema>;
 export type ForEachNode = z.infer<typeof forEachNodeSchema>;
-export type ItemSource = z.infer<typeof itemSourceSchema>;
+export type ListSource = z.infer<typeof listSourceSchema>;
 export type Policy = z.infer<typeof policySchema>;
-export type Param = z.infer<typeof paramSchema>;
+export type FlowInputDef = z.infer<typeof flowInputSchema>;
+export type FlowOutputDef = z.infer<typeof flowOutputSchema>;
 export type FlowEdge = z.infer<typeof flowEdgeSchema>;
 export type Outcome = z.infer<typeof outcomeSchema>;
 export type FlowNodeType = FlowNode["type"];
+
+/** Any JSON value: what inputs, outputs and list elements hold. */
+export type JsonValue =
+	| string
+	| number
+	| boolean
+	| null
+	| JsonValue[]
+	| { [key: string]: JsonValue };
 
 /** The outcomes a node can end with, in the order its handles show. */
 export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 	switch (node.type) {
 		case "agent":
-			return ["pass", "fail", "needs-input"];
+			return node.outcomes
+				? node.outcomes.map((o) => o.name)
+				: ["pass", "fail", "needs-input"];
 		case "command":
 			return ["pass", "fail"];
 		case "decision":
 			return node.labels.map((label) => label.name);
 		case "gate":
 			return node.choices.map((choice) => choice.name);
+		case "subflow":
+			return ["pass", "fail"];
 		case "foreach":
 			return ["done", "halted"];
 	}
@@ -294,18 +379,25 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 
 /**
  * The fields a later node can read with `{{<nodeId>.<field>}}`. A field of a
- * node that has not run yet renders as an empty string.
+ * node that has not run yet renders as an empty string. `data` (Agent) and
+ * `results` (For Each) hold JSON and take a deeper path. A Subflow node also
+ * has the outputs of the flow it calls (see `nodeOutputFields`).
  */
 export const outputFieldsByType = {
-	/** output: the agent's final message. summary: its step report, else the output. */
-	agent: ["outcome", "output", "summary", "visit", "session_id"],
+	/** output: the final message. summary: the report's summary, else the output. data: the report's JSON. */
+	agent: ["outcome", "output", "summary", "data", "visit", "session_id"],
 	/** log_tail: the last lines of stdout and stderr together. */
 	command: ["outcome", "exit_code", "log_tail", "visit"],
 	/** outcome: the label. notes: why the decider picked it. */
 	decision: ["outcome", "notes", "visit"],
 	/** outcome: the choice. note: what the person wrote with it. */
 	gate: ["outcome", "note", "visit"],
-	/** Counts per item status, and one line per item: `#12 done`, `#13 blocked by #12`. */
+	/** ended: the label or choice the called flow ended on, or "". */
+	subflow: ["outcome", "ended", "visit"],
+	/**
+	 * Counts per element state; summary: one line per element; results: a JSON
+	 * array of `{ id, title, state, reason, outputs }` per element.
+	 */
 	foreach: [
 		"outcome",
 		"done_count",
@@ -313,32 +405,25 @@ export const outputFieldsByType = {
 		"blocked_count",
 		"waiting_count",
 		"summary",
+		"results",
 		"visit",
 	],
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
-export type OutputField<T extends FlowNodeType> =
-	(typeof outputFieldsByType)[T][number];
+/** Output fields that hold JSON, so a template may take a path below them. */
+export const jsonOutputFields = ["data", "results"] as const;
 
 /**
- * Fields of the current item in a For Each body: `{{item.title}}`.
- * `branch` is the item's branch, `base_branch` the branch it builds on.
- * `parent_*` describe the issue the source listed it under.
+ * Fields of the run: `{{run.branch}}`. Inside a For Each, `branch` is the
+ * element's branch, `base_branch` the branch it builds on, and `index` the
+ * element's position (from 0). Outside, both are "".
  */
-export const itemFields = [
-	"id",
-	"number",
-	"title",
-	"body",
-	"url",
-	"index",
+export const runFields = [
 	"branch",
 	"base_branch",
-	"parent_number",
-	"parent_title",
+	"index",
+	"worktree",
+	"base_ref",
+	"flow",
 ] as const;
-export type ItemField = (typeof itemFields)[number];
-
-/** Fields of the run itself: `{{run.branch}}`. In a For Each body, `branch` is the item's branch. */
-export const runFields = ["branch", "worktree", "base_ref", "flow"] as const;
 export type RunField = (typeof runFields)[number];

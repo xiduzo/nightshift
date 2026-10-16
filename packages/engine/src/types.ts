@@ -12,14 +12,15 @@ import type {
 	FlowListItem,
 	FlowNodeType,
 	ItemState,
+	JsonValue,
+	ListItem,
 	LoadedFlow,
 	Outcome,
-	SourceItem,
 } from "@nightshift/flows";
 
 /**
  * The engine's public contract. The API layer only calls this interface.
- * Slice 2: a run walks a flow of Agent and Command nodes in one worktree.
+ * A run walks a flow, and the flows it calls, in one worktree.
  */
 
 /** Derived from the event log, never stored. */
@@ -74,8 +75,11 @@ export type StepSummary = {
 	/** The node's template outputs, for example `log_tail` or `summary`. */
 	outputs: Record<string, string | number>;
 	error: string | null;
-	/** Set when the step ran inside a For Each body: which For Each step and which item. */
-	scope: { forEachStepId: string; itemId: string } | null;
+	/**
+	 * Set when the step ran inside a called flow: the Subflow or For Each
+	 * step that called it, and (For Each) the element. Null at the top level.
+	 */
+	scope: { parentStepId: string; itemId: string | null } | null;
 	/** For Each steps only: the items of this visit, in the order they started. */
 	items: ItemSummary[];
 	/** Agent steps only. Several when a person resumed the step or a wait continued it. */
@@ -86,9 +90,10 @@ export type StepSummary = {
 /** One item of a For Each visit. */
 export type ItemSummary = {
 	id: string;
-	number: number | null;
 	title: string;
 	url: string | null;
+	/** The element as the source gave it. */
+	value: JsonValue;
 	state: ItemState;
 	/** Null when the For Each does not use a branch per item. */
 	branch: string | null;
@@ -114,8 +119,8 @@ export type RunSummary = {
 	reason: string | null;
 	/** When a sleeping run continues. */
 	wakeAt: number | null;
-	/** The run parameters it started with. */
-	params: Record<string, string>;
+	/** The values of the top-level flow's inputs, defaults applied. */
+	inputs: Record<string, JsonValue>;
 	/** The stop time: no new step starts after it. */
 	stopAt: number | null;
 	/** Set when a person asked to stop after the running step. */
@@ -128,8 +133,8 @@ export type RunSummary = {
 export type RunDetail = RunSummary & {
 	/** The copy of the flow taken when the run started. Edits to the file do not change it. */
 	flow: Flow;
-	/** Copies of the For Each body flows, by flow name, taken at start. */
-	bodyFlows: Record<string, Flow>;
+	/** Copies of every flow the run can call (Subflow and For Each), by name, taken at start. */
+	calledFlows: Record<string, Flow>;
 	/** In the order they started. */
 	steps: StepSummary[];
 	/** How often the run took each edge, by edge id. */
@@ -229,11 +234,12 @@ export type RunStreamItem =
 export type StartRunInput = {
 	projectId: string;
 	/**
-	 * Values for the flow's `params`, by name. A missing or empty value takes
-	 * the param's default; a required param without either refuses the start.
-	 * Names the flow does not declare are refused.
+	 * Values for the flow's `inputs`, by name: a string for a `text` input,
+	 * any JSON value (or JSON text) for a `json` input. A missing or empty
+	 * value takes the input's default; a required input without either
+	 * refuses the start. Names the flow does not declare are refused.
 	 */
-	params?: Record<string, string>;
+	inputs?: Record<string, JsonValue>;
 	/** Epoch ms. No new step starts after it; the run then ends as stopped. */
 	stopAt?: number;
 	/** Git ref to branch the worktree from. Defaults to the clone's current HEAD. */
@@ -316,7 +322,7 @@ export type EngineOptions = {
 	/** Decides Decision nodes. A flow with a Decision node fails to start without one. */
 	decider?: Decider;
 	/** Reads GitHub For Each sources. A flow with one fails to start without it. */
-	readGithubItems?: (input: GithubItemsInput) => Promise<SourceItem[]>;
+	readGithubItems?: (input: GithubItemsInput) => Promise<ListItem[]>;
 	/** Root for transcripts, command logs and other on-disk state, for example ~/.nightshift. */
 	dataDir: string;
 	/** How many runs may run a step at once. A run waiting at a Gate does not count. Default 2. */

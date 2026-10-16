@@ -34,9 +34,12 @@ export type AgentSessionInput = {
 	/**
 	 * Ask the agent for a step report: the harness tells the agent how to
 	 * report and emits one `report` event when it does. A session that
-	 * finishes without a report is treated as `pass` by the engine.
+	 * finishes without a report is treated as `pass` by the engine (or as
+	 * `error` when the spec has its own outcomes or an output schema).
+	 * `true` asks for `pass`, `fail` or `needs-input`; a spec sets the
+	 * outcomes and a JSON Schema for the report's `data`.
 	 */
-	stepReport?: boolean;
+	stepReport?: boolean | StepReportSpec;
 	/** Tool sets the session gets on top of the harness's own tools. */
 	tools?: ToolSet[];
 	/** Aborting stops the harness process. The stream then ends with an `error` event of kind `aborted`. */
@@ -52,7 +55,19 @@ export type AgentUsage = {
 /** `github`: the GitHub tools on top of `gh`, scoped to the repo of `cwd`. */
 export type ToolSet = "github";
 
-export type StepReportOutcome = "pass" | "fail" | "needs-input";
+/** An outcome name: `pass`, `fail`, `needs-input`, or one of the spec's outcomes. */
+export type StepReportOutcome = string;
+
+export type StepReportSpec = {
+	/** The outcomes the agent may report. Default: pass, fail, needs-input. */
+	outcomes?: { name: string; description?: string }[];
+	/**
+	 * A JSON Schema for the report's `data`. The tool's input schema carries
+	 * it, so the model sees it. The harness does not validate the data; the
+	 * engine does.
+	 */
+	output?: Record<string, unknown>;
+};
 
 /**
  * `usage-limit`: the harness hit a usage or rate limit (`resetAt` when known).
@@ -73,7 +88,13 @@ export type AgentEvent =
 	| { type: "tool-end"; toolCallId: string; name: string; input: unknown }
 	| { type: "tool-result"; toolCallId: string; content: string }
 	/** The agent's step report. When the agent reports twice, the last one counts. */
-	| { type: "report"; outcome: StepReportOutcome; summary: string }
+	| {
+			type: "report";
+			outcome: StepReportOutcome;
+			summary: string;
+			/** Present when the spec has an output schema (not yet validated). */
+			data?: unknown;
+	  }
 	| { type: "finished"; usage?: AgentUsage }
 	| {
 			type: "error";

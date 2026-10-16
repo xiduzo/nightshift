@@ -6,7 +6,7 @@
  * Every argument goes to `gh` as an argv field (`-f` / `-F`), never through
  * a shell. The query only reads.
  */
-import type { SourceItem } from "@nightshift/flows";
+import type { ListItem } from "@nightshift/flows";
 import { type ProcessResult, runProcess } from "./github";
 import type { GithubItemsInput } from "./types";
 
@@ -128,7 +128,7 @@ const lower = (name: string) => name.toLowerCase();
 export async function readGithubItems(
 	input: GithubItemsInput,
 	options?: GithubItemsOptions,
-): Promise<SourceItem[]> {
+): Promise<ListItem[]> {
 	if (input.signal.aborted) throw new Error("Reading GitHub items was aborted");
 	const { owner, name } = await repoOf(input, options);
 	const required =
@@ -136,7 +136,7 @@ export async function readGithubItems(
 	const doneLabels = new Set(input.doneLabels.map(lower));
 	const skipLabels = new Set((input.skipLabels ?? []).map(lower));
 
-	const items: SourceItem[] = [];
+	const items: ListItem[] = [];
 	let cursor: string | undefined;
 	for (;;) {
 		const args = [
