@@ -89,7 +89,7 @@ export const TOOLS: Tool[] = [
 	},
 ];
 
-function checkState(check: CliCheck | undefined): CheckState {
+export function checkState(check: CliCheck | undefined): CheckState {
 	if (!check) return "checking";
 	if (!check.path) return "missing";
 	return check.problem ? "problem" : "ready";

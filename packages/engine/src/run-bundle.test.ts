@@ -39,7 +39,6 @@ const work: AgentNode = {
 	model: "sonnet",
 	permissionMode: "acceptEdits",
 	session: "fresh",
-	tools: [],
 };
 const check: CommandNode = {
 	id: "check",

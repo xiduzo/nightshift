@@ -8,7 +8,7 @@ import type {
 /**
  * Agent Profiles: a harness, a model and its tools under one name, defined on
  * the daemon. A node that names a profile takes its harness, model, effort
- * and permission mode unless it sets them itself; tool sets and connections
+ * and permission mode unless it sets them itself; CLI tools and connections
  * add up. A run resolves the profiles of its flows when it starts, so the
  * run's copy holds plain nodes and a later change to a profile reaches the
  * next run, not this one.
@@ -26,7 +26,7 @@ export function resolveAgentNode(
 	node: AgentNode,
 	profile: AgentProfileSettings,
 ): AgentNode {
-	const tools = [...new Set([...profile.tools, ...node.tools])];
+	const clis = [...new Set([...profile.clis, ...(node.clis ?? [])])];
 	const connections = [
 		...new Set([...profile.connections, ...(node.connections ?? [])]),
 	];
@@ -35,10 +35,10 @@ export function resolveAgentNode(
 		harness: node.harness ?? profile.harness,
 		model: node.model ?? profile.model,
 		permissionMode: node.permissionMode ?? profile.permissionMode,
-		tools,
 	};
 	const effort = node.effort ?? profile.effort;
 	if (effort !== undefined) resolved.effort = effort;
+	if (clis.length > 0) resolved.clis = clis;
 	if (connections.length > 0) resolved.connections = connections;
 	return resolved;
 }

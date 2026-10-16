@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	claudeCodeHarness,
 	claudeCommand,
 	claudeMcpConfig,
+	cliAllowRules,
 	harnessSetup,
 } from "./claude-code";
 import { fakeBin } from "./fixtures/bin";
-import { GITHUB_TOOL_IDS, GITHUB_TOOL_NAMES } from "./github";
 import { REPORT_TOOL_ID } from "./step-report";
 import type { AgentEvent, AgentSessionInput, StepReportSpec } from "./types";
 
@@ -122,103 +122,71 @@ describe("claudeCodeHarness with MCP servers", () => {
 });
 
 describe("harnessSetup", () => {
-	test("no tool sets: no bridged tools", () => {
+	test("no CLI tools: no bridged tools", () => {
 		const setup = harnessSetup(input(), { allowedTools: ["Read"] });
 		expect(setup.tools).toEqual([]);
 		expect(setup.allowedTools).toEqual(["Read"]);
 		expect(setup.bridgedToolsOnly).toBeUndefined();
 	});
 
-	test("github: the tools, allowed, next to report_step", () => {
-		const setup = harnessSetup(input({ tools: ["github"], stepReport: true }), {
-			allowedTools: ["Read"],
-		});
-		expect(setup.tools.map((t) => t.name)).toEqual([
-			"report_step",
-			...GITHUB_TOOL_NAMES,
-		]);
+	test("CLI tools: allowed in the shell, no bridged tools", () => {
+		const setup = harnessSetup(
+			input({ clis: ["gh", "aws"], stepReport: true }),
+			{ allowedTools: ["Read"] },
+		);
+		expect(setup.tools.map((t) => t.name)).toEqual(["report_step"]);
 		expect(setup.allowedTools).toEqual([
 			"Read",
 			REPORT_TOOL_ID,
-			...GITHUB_TOOL_IDS,
+			"Bash(gh:*)",
+			"Bash(aws:*)",
 		]);
 		// Agent sessions keep their built-in tools.
 		expect(setup.bridgedToolsOnly).toBeUndefined();
 	});
 
-	test("github without allowedTools allows only the GitHub tools", () => {
-		expect(harnessSetup(input({ tools: ["github"] }), {}).allowedTools).toEqual(
-			[...GITHUB_TOOL_IDS],
-		);
+	test("CLI tools without allowedTools allow only the CLI tools", () => {
+		expect(harnessSetup(input({ clis: ["gh"] }), {}).allowedTools).toEqual([
+			"Bash(gh:*)",
+		]);
 	});
 });
 
-describe("claudeCodeHarness with github", () => {
-	test("GitHub tool calls are normal tool events; report_step still reports", async () => {
-		const rules = join(dir, "rules.json");
-		await writeFile(
-			rules,
-			JSON.stringify([
-				{
-					tool: "gh",
-					args: ["issue", "list"],
-					stdout: JSON.stringify([{ number: 1, title: "A", labels: [] }]),
-				},
-			]),
-		);
+describe("cliAllowRules", () => {
+	test("one Bash rule per CLI tool", () => {
+		expect(
+			cliAllowRules({ clis: ["gh", "acli"], permissionMode: "default" }),
+		).toEqual(["Bash(gh:*)", "Bash(acli:*)"]);
+	});
+
+	test("plan mode runs nothing, so it gets none", () => {
+		expect(cliAllowRules({ clis: ["gh"], permissionMode: "plan" })).toEqual([]);
+	});
+});
+
+describe("claudeCodeHarness with CLI tools", () => {
+	test("the CLI tools reach --allowedTools", async () => {
 		const claudeLog = join(dir, "claude.jsonl");
-		const gh = await fakeBin(dir, "gh", "fake-gh", {
-			FAKE_TOOL: "gh",
-			FAKE_RULES: rules,
-		});
 		const claude = await fakeBin(dir, "claude", "fake-claude", {
 			FAKE_CLAUDE_LOG: claudeLog,
 			FAKE_CLAUDE_CALLS: JSON.stringify([
-				{ name: "github_list_issues", arguments: {} },
 				{
 					name: "report_step",
-					arguments: { outcome: "pass", summary: "Listed." },
+					arguments: { outcome: "pass", summary: "Done." },
 				},
 			]),
 		});
-		const harness = claudeCodeHarness({
-			claudeExecutable: claude,
-			github: { gh },
-		});
 		const events: AgentEvent[] = [];
-		for await (const event of harness.run(
-			input({ tools: ["github"], stepReport: true }),
-		)) {
+		for await (const event of claudeCodeHarness({
+			claudeExecutable: claude,
+		}).run(input({ clis: ["gh"], stepReport: true }))) {
 			events.push(event);
 		}
-
-		const types = events.map((e) => e.type);
-		expect(types[0]).toBe("session");
-		expect(types.at(-1)).toBe("finished");
-		const start = events.find((e) => e.type === "tool-start");
-		expect(start).toMatchObject({ name: "github_list_issues" });
-		const result = events.find((e) => e.type === "tool-result");
-		expect(
-			JSON.parse(result?.type === "tool-result" ? result.content : "null"),
-		).toEqual([{ number: 1, title: "A", labels: [] }]);
-		expect(events.filter((e) => e.type === "report")).toEqual([
-			{ type: "report", outcome: "pass", summary: "Listed." },
-		]);
-		// report_step is plumbing: no tool events for it.
-		expect(
-			events.filter(
-				(e) =>
-					(e.type === "tool-start" || e.type === "tool-end") &&
-					e.name.includes("report"),
-			),
-		).toEqual([]);
-
+		expect(events.at(-1)?.type).toBe("finished");
 		const run = JSON.parse((await readFile(claudeLog, "utf8")).trim());
 		const argv: string[] = run.argv;
-		expect(argv).not.toContain("--tools");
-		expect(argv).not.toContain("--strict-mcp-config");
 		const allowed = argv[argv.indexOf("--allowedTools") + 1]?.split(",");
-		expect(allowed).toEqual([REPORT_TOOL_ID, ...GITHUB_TOOL_IDS]);
+		expect(allowed).toEqual([REPORT_TOOL_ID, "Bash(gh:*)"]);
 	});
 });
 

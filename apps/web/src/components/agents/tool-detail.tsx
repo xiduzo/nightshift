@@ -33,19 +33,17 @@ import {
 	PencilIcon,
 	PlugIcon,
 	SquareTerminalIcon,
-	WrenchIcon,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { CliPanel, toolFor } from "@/components/connections/cli-panel";
 import {
 	FactList,
 	OffMachineNote,
 	VariableBadge,
 } from "@/components/connections/parts";
 import { McpTestOutcome } from "@/components/connections/test-result";
-import type { Connection, SettingsView } from "@/components/connections/types";
+import type { Connection } from "@/components/connections/types";
 import { orpc } from "@/utils/orpc";
 
 import { DetailSection, DetailShell } from "./detail-shell";
@@ -102,7 +100,7 @@ export function ToolDetail({
 
 	return (
 		<DetailShell
-			icon={remote ? <GlobeIcon /> : <SquareTerminalIcon />}
+			icon={remote ? <GlobeIcon /> : <PlugIcon />}
 			kicker={
 				remote
 					? "Tool · MCP server at a URL"
@@ -260,7 +258,7 @@ export function ToolDetail({
 	);
 }
 
-function UsedBySection({
+export function UsedBySection({
 	profiles,
 	flows,
 	onOpenProfile,
@@ -326,40 +324,7 @@ function UsedBySection({
 	);
 }
 
-/** The built-in GitHub tool set: Night Shift's own tools, through `gh`. */
-export function GithubToolsetDetail({
-	settings,
-	profiles,
-	onOpenProfile,
-}: {
-	settings: SettingsView | undefined;
-	profiles: string[];
-	onOpenProfile: (name: string) => void;
-}) {
-	return (
-		<DetailShell
-			icon={<WrenchIcon />}
-			kicker="Tool · built-in tool set"
-			title="github"
-			mono
-			subtitle="Read issues and pull requests, comment, set labels, and open a pull request. The For Each GitHub source uses it too."
-		>
-			<DetailSection
-				title="GitHub CLI"
-				description="The tools run gh with your own login. Nothing to set up beyond that."
-			>
-				<CliPanel tool={toolFor("github")} settings={settings} />
-			</DetailSection>
-			<UsedBySection
-				profiles={profiles}
-				flows={[]}
-				onOpenProfile={onOpenProfile}
-			/>
-		</DetailShell>
-	);
-}
-
-/** "Add a tool": an MCP server as a local command or at a URL. */
+/** "Add a tool": a program on this computer, or an MCP server. */
 export function ToolPicker({
 	open,
 	onOpenChange,
@@ -367,20 +332,22 @@ export function ToolPicker({
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onPick: (kind: "command" | "url") => void;
+	onPick: (kind: "cli" | "mcp") => void;
 }) {
 	const options = [
 		{
-			kind: "command" as const,
-			title: "MCP server · local command",
-			blurb: "The daemon starts it for each session, for example npx or bunx.",
+			kind: "cli" as const,
+			title: "CLI",
+			blurb:
+				"A program on this computer, for example gh, aws or acli. Agents run it without asking.",
 			icon: SquareTerminalIcon,
 		},
 		{
-			kind: "url" as const,
-			title: "MCP server · URL",
-			blurb: "A server that is already running, local or hosted.",
-			icon: GlobeIcon,
+			kind: "mcp" as const,
+			title: "MCP server",
+			blurb:
+				"A server that gives the agents more tools. It runs on this computer or at a URL.",
+			icon: PlugIcon,
 		},
 	];
 	return (
@@ -389,8 +356,8 @@ export function ToolPicker({
 				<DialogHeader>
 					<DialogTitle>Add a tool</DialogTitle>
 					<DialogDescription>
-						An MCP server that profiles hand to their sessions, next to the
-						harness's own tools. The github tool set is built in.
+						Choose what the agents can use. Then add it to a profile or an Agent
+						node.
 					</DialogDescription>
 				</DialogHeader>
 				<ItemGroup className="gap-2">

@@ -10,9 +10,38 @@
  *   `{{item.index}}` → `{{run.index}}`. Other `{{item.x}}` stay.
  * - For Each: `branchPerItem` → `branch` (`per-item` / `shared`), `as: "item"`.
  * - Every template in prompts, commands, questions, sources and outputs.
+ *
+ * Any version: the built-in tool set `tools: ["github"]` → the CLI tool
+ * `clis: ["gh"]` (see `migrateToolSets`).
  */
 export function migrateFlow(json: unknown): unknown {
-	if (!isRecord(json) || json.version !== 1) return json;
+	const current = isRecord(json) && json.version === 1 ? migrateV1(json) : json;
+	if (!isRecord(current) || !Array.isArray(current.nodes)) return current;
+	let changed = false;
+	const nodes = current.nodes.map((node) => {
+		const migrated = migrateToolSets(node);
+		if (migrated !== node) changed = true;
+		return migrated;
+	});
+	return changed ? { ...current, nodes } : current;
+}
+
+/**
+ * An Agent node, Decision node or profile with the old `tools` field: the
+ * GitHub tool set gave the agent `gh`, so `github` becomes the CLI tool
+ * `gh`. A Decision node loses its tools. Returns the input unchanged when it
+ * has no `tools`.
+ */
+export function migrateToolSets(json: unknown): unknown {
+	if (!isRecord(json) || !("tools" in json)) return json;
+	const { tools, ...rest } = json;
+	const github = Array.isArray(tools) && tools.includes("github");
+	if (!github || rest.type === "decision") return rest;
+	const clis = Array.isArray(rest.clis) ? rest.clis : [];
+	return { ...rest, clis: clis.includes("gh") ? clis : [...clis, "gh"] };
+}
+
+function migrateV1(json: Record<string, unknown>): Record<string, unknown> {
 	const { version: _version, input, params, ...rest } = json;
 	const { description, policy, start, nodes, edges, ...others } = rest;
 

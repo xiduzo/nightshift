@@ -3,7 +3,6 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fakeBin } from "./fixtures/bin";
-import { GITHUB_TOOL_NAMES } from "./github";
 import {
 	createOpencodeObserver,
 	opencodeHarness,
@@ -70,7 +69,7 @@ async function collect(stream: AsyncIterable<AgentEvent>) {
 type LogLine = {
 	argv: string[];
 	config: Record<string, unknown> & {
-		permission: Record<string, string>;
+		permission: Record<string, string | Record<string, string>>;
 		mcp?: Record<string, unknown>;
 	};
 	prompt: string;
@@ -146,6 +145,23 @@ describe("opencodePermission", () => {
 
 	test("the session's MCP servers are allowed, plan mode too", () => {
 		expect(opencodePermission("plan", ["docs"])["docs_*"]).toBe("allow");
+	});
+
+	test("CLI tools are allowed where other commands are denied", () => {
+		for (const mode of ["default", "acceptEdits"] as const) {
+			expect(opencodePermission(mode, [], ["gh", "aws"]).bash).toEqual({
+				"*": "deny",
+				gh: "allow",
+				"gh *": "allow",
+				aws: "allow",
+				"aws *": "allow",
+			});
+		}
+	});
+
+	test("CLI tools change nothing where every command runs, or none", () => {
+		expect(opencodePermission("auto", [], ["gh"]).bash).toBe("allow");
+		expect(opencodePermission("plan", [], ["gh"]).bash).toBe("deny");
 	});
 });
 
@@ -350,12 +366,13 @@ describe("opencodeHarness", () => {
 		]);
 	});
 
-	test("github tools and MCP servers reach the session", async () => {
+	test("CLI tools and MCP servers reach the session", async () => {
 		const { log, harness } = await fakeOpencode();
 		await collect(
 			harness.run(
 				input({
-					tools: ["github"],
+					permissionMode: "acceptEdits",
+					clis: ["gh"],
 					mcpServers: {
 						docs: { url: "https://docs/mcp", headers: { A: "b" } },
 					},
@@ -363,7 +380,11 @@ describe("opencodeHarness", () => {
 			),
 		);
 		const [line] = await readLog(log);
-		expect(line?.tools?.map((t) => t.name)).toEqual([...GITHUB_TOOL_NAMES]);
+		expect(line?.config.permission.bash).toEqual({
+			"*": "deny",
+			gh: "allow",
+			"gh *": "allow",
+		});
 		expect(line?.config.mcp?.docs).toEqual({
 			type: "remote",
 			url: "https://docs/mcp",

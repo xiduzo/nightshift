@@ -46,7 +46,6 @@ function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
 		model: "sonnet",
 		permissionMode: "acceptEdits",
 		session: "fresh",
-		tools: [],
 		...extra,
 	};
 }

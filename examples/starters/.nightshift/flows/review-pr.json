@@ -27,12 +27,12 @@
 				"y": 0
 			},
 			"type": "agent",
-			"prompt": "Review pull request {{pr}} of this repository. Read it with your GitHub tools: its description, the linked issue, and the diff (`gh pr diff {{pr}}` works too). Do not change the code and do not post anything: a person reads your review first.\n\nLook for bugs, missing tests, and changes the description does not explain. Report `approve` when it can merge as it is, else `request-changes`. Put a short `summary` of your verdict in the data, and one entry in `comments` per finding: the file `path`, the `line` in the new version, and the `body`.",
+			"prompt": "Review pull request {{pr}} of this repository. Read it with `gh`: its description (`gh pr view {{pr}}`), the linked issue, and the diff (`gh pr diff {{pr}}`). Do not change the code and do not post anything: a person reads your review first.\n\nLook for bugs, missing tests, and changes the description does not explain. Report `approve` when it can merge as it is, else `request-changes`. Put a short `summary` of your verdict in the data, and one entry in `comments` per finding: the file `path`, the `line` in the new version, and the `body`.",
 			"harness": "claude-code",
 			"model": "sonnet",
 			"permissionMode": "auto",
 			"effort": "high",
-			"tools": ["github"],
+			"clis": ["gh"],
 			"timeoutMinutes": 30,
 			"outcomes": [
 				{

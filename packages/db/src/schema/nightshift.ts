@@ -135,6 +135,17 @@ export const connection = sqliteTable("connection", {
 });
 
 /**
+ * A CLI tool: a program on this computer, by its name (`gh`, `aws`), that
+ * the agents may run. Agent nodes and profiles name it in `clis`.
+ */
+export const cliTool = sqliteTable("cli_tool", {
+	name: text("name").primaryKey(),
+	description: text("description"),
+	createdAt: createdAt(),
+	updatedAt: updatedAt(),
+});
+
+/**
  * An Agent Profile: a harness, a model and its tools under one name, defined
  * once on this daemon. An Agent node names it in `profile`; a run resolves it
  * into the node when it starts.
@@ -142,7 +153,7 @@ export const connection = sqliteTable("connection", {
 export const agentProfile = sqliteTable("agent_profile", {
 	name: text("name").primaryKey(),
 	description: text("description"),
-	/** JSON: the profile's agent settings (harness, model, effort, permission mode, tools, connections). */
+	/** JSON: the profile's agent settings (harness, model, effort, permission mode, CLI tools, connections). */
 	settings: text("settings").notNull(),
 	createdAt: createdAt(),
 	updatedAt: updatedAt(),

@@ -1,6 +1,7 @@
 import { HARNESS_ADAPTERS } from "@nightshift/agents";
 import {
 	chooseFolder,
+	cliToolInputSchema,
 	connectionInputSchema,
 	secretNameSchema,
 	settingsPatchSchema,
@@ -207,13 +208,16 @@ type FlowRef = { projectId: string; projectName: string; flowName: string };
 
 /**
  * Who uses what, from every flow of every project: the flows whose Agent
- * nodes name each connection, and the Agent nodes that name each profile.
+ * nodes name each connection and each CLI tool, and the Agent nodes that
+ * name each profile.
  */
 async function flowUse(engine: Engine): Promise<{
 	connections: Map<string, FlowRef[]>;
+	clis: Map<string, FlowRef[]>;
 	profiles: Map<string, (FlowRef & { nodeIds: string[] })[]>;
 }> {
 	const connections = new Map<string, FlowRef[]>();
+	const clis = new Map<string, FlowRef[]>();
 	const profiles = new Map<string, (FlowRef & { nodeIds: string[] })[]>();
 	for (const project of await engine.listProjects()) {
 		const files = await engine.listFlows(project.id).catch(() => []);
@@ -232,6 +236,9 @@ async function flowUse(engine: Engine): Promise<{
 			for (const name of new Set(agents.flatMap((n) => n.connections ?? []))) {
 				connections.set(name, [...(connections.get(name) ?? []), ref]);
 			}
+			for (const name of new Set(agents.flatMap((n) => n.clis ?? []))) {
+				clis.set(name, [...(clis.get(name) ?? []), ref]);
+			}
 			const byProfile = new Map<string, string[]>();
 			for (const node of agents) {
 				if (node.profile === undefined) continue;
@@ -248,7 +255,7 @@ async function flowUse(engine: Engine): Promise<{
 			}
 		}
 	}
-	return { connections, profiles };
+	return { connections, clis, profiles };
 }
 
 /**
@@ -359,6 +366,14 @@ const profiles = {
 			if (unknown.length > 0) {
 				throw new Error(
 					`There is no connection named ${unknown.map((n) => `"${n}"`).join(", ")}. Add it under Agents → Tools first.`,
+				);
+			}
+			const unknownClis = profile.clis.filter(
+				(name) => !context.cliTools.get(name),
+			);
+			if (unknownClis.length > 0) {
+				throw new Error(
+					`There is no CLI tool named ${unknownClis.map((n) => `"${n}"`).join(", ")}. Add it under Agents → Tools first.`,
 				);
 			}
 			const saved = await context.profiles.save(profile);
@@ -483,6 +498,48 @@ const connections = {
 		),
 };
 
+/**
+ * CLI tools: programs on this computer that the agents may run. Agent nodes
+ * and profiles name them in `clis`.
+ */
+const cliTools = {
+	list: publicProcedure.handler(async ({ context }) => {
+		const use = (await flowUse(context.engine)).clis;
+		return context.cliTools.list().map((tool) => ({
+			...tool,
+			usedBy: use.get(tool.name) ?? [],
+			profiles: context.profiles
+				.list()
+				.filter((p) => p.clis.includes(tool.name))
+				.map((p) => p.name),
+		}));
+	}),
+	/** The programs this computer can run by name, to pick one from. */
+	programs: publicProcedure.handler(({ context }) => context.checks.programs()),
+	/** Where the program is and its version. Read-only. */
+	check: publicProcedure
+		.input(z.object({ name: cliToolInputSchema.shape.name }))
+		.handler(({ context, input }) => context.checks.cli(input.name)),
+	/** Adds a CLI tool, or changes its description. */
+	save: publicProcedure
+		.input(cliToolInputSchema)
+		.handler(({ context, input }) => context.cliTools.save(input)),
+	/** Also takes it off the profiles that name it. */
+	remove: publicProcedure
+		.input(z.object({ name: z.string() }))
+		.handler(async ({ context, input }) => {
+			await context.cliTools.remove(input.name);
+			for (const p of context.profiles.list()) {
+				if (!p.clis.includes(input.name)) continue;
+				const { updatedAt: _at, ...profile } = p;
+				await context.profiles.save({
+					...profile,
+					clis: p.clis.filter((c) => c !== input.name),
+				});
+			}
+		}),
+};
+
 export const appRouter = {
 	healthCheck: publicProcedure.handler(() => "OK"),
 	projects,
@@ -492,6 +549,7 @@ export const appRouter = {
 	runs,
 	settings,
 	connections,
+	cliTools,
 	harnesses,
 	profiles,
 };

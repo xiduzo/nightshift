@@ -67,6 +67,7 @@ import {
 	type CalledFlowSupport,
 	InputBindings,
 } from "./called-flow-fields";
+import { CliToolsField } from "./cli-tools-field";
 import { ConnectionsField, type DaemonConnection } from "./connections-field";
 import { OutcomePill } from "./edge-inspector";
 import {
@@ -82,7 +83,6 @@ import { OptionsEditor } from "./options-editor";
 import { OutputSchemaField } from "./output-schema-field";
 
 import { TemplateField } from "./template-field";
-import { ToolSetsField } from "./tool-sets-field";
 
 /** The node without one of its own fields: it comes from the profile again. */
 function withoutField(
@@ -326,16 +326,6 @@ export function NodeInspector({
 					onChange={(change) =>
 						onChange((current) =>
 							current.type === "agent" ? change(current) : current,
-						)
-					}
-				/>
-			) : null}
-			{node.type === "decision" ? (
-				<DecisionAdvanced
-					node={node}
-					onChange={(change) =>
-						onChange((current) =>
-							current.type === "decision" ? change(current) : current,
 						)
 					}
 				/>
@@ -926,7 +916,15 @@ function AgentAdvanced({
 			: profiles.data?.find((p) => p.name === node.profile);
 	const id = useId();
 	const serverCount = Object.keys(node.mcpServers ?? {}).length;
-	const toolCount = node.tools?.length ?? 0;
+	const cliTools = useQuery({
+		...orpc.cliTools.list.queryOptions(),
+		staleTime: 30_000,
+		meta: { quietErrors: true },
+	});
+	const clis = node.clis ?? [];
+	const missingClis = cliTools.data
+		? clis.filter((name) => !cliTools.data.some((t) => t.name === name))
+		: [];
 	const named = node.connections ?? [];
 	const missing = connections
 		? named.filter((name) => !connections.some((c) => c.name === name))
@@ -956,30 +954,39 @@ function AgentAdvanced({
 			</InspectorSection>
 
 			<InspectorSection
-				title="Tool sets"
+				title="CLI tools"
 				collapsible
-				defaultOpen={toolCount > 0}
+				defaultOpen={clis.length > 0 || (cliTools.data?.length ?? 0) > 0}
 				aside={
-					toolCount > 0 ? (
+					missingClis.length > 0 ? (
+						<Badge variant="destructive" className="tabular-nums">
+							{missingClis.length} missing
+						</Badge>
+					) : clis.length > 0 ? (
 						<Badge variant="secondary" className="tabular-nums">
-							{toolCount}
+							{clis.length}
 						</Badge>
 					) : null
 				}
 			>
-				{profile && profile.tools.length > 0 ? (
+				{profile && profile.clis.length > 0 ? (
 					<Note>
 						The profile adds{" "}
 						<span className="font-mono text-foreground">
-							{profile.tools.join(", ")}
+							{profile.clis.join(", ")}
 						</span>
-						. Tick more here for this node only.
+						. Pick more here for this node only.
 					</Note>
 				) : null}
-				<ToolSetsField
-					id={`${id}-tools`}
-					tools={node.tools ?? []}
-					onChange={(tools) => onChange((current) => ({ ...current, tools }))}
+				<CliToolsField
+					id={`${id}-clis`}
+					names={clis}
+					tools={cliTools.data}
+					onChange={(names) =>
+						onChange(({ clis: _, ...rest }) =>
+							names.length > 0 ? { ...rest, clis: names } : rest,
+						)
+					}
 				/>
 			</InspectorSection>
 
@@ -1233,38 +1240,6 @@ function DecisionFields({
 				</Note>
 			</InspectorSection>
 		</>
-	);
-}
-
-/** A Decision node's tool sets, below its edges. */
-function DecisionAdvanced({
-	node,
-	onChange,
-}: {
-	node: DecisionNode;
-	onChange: (change: (node: DecisionNode) => DecisionNode) => void;
-}) {
-	const id = useId();
-	const toolCount = node.tools?.length ?? 0;
-	return (
-		<InspectorSection
-			title="Tool sets"
-			collapsible
-			defaultOpen={toolCount > 0}
-			aside={
-				toolCount > 0 ? (
-					<Badge variant="secondary" className="tabular-nums">
-						{toolCount}
-					</Badge>
-				) : null
-			}
-		>
-			<ToolSetsField
-				id={`${id}-tools`}
-				tools={node.tools ?? []}
-				onChange={(tools) => onChange((current) => ({ ...current, tools }))}
-			/>
-		</InspectorSection>
 	);
 }
 

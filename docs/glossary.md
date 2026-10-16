@@ -18,7 +18,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
 | Node | One step of a Flow: Agent, Command, Decision, Gate, Subflow, or For Each. Its id is also its name in templates. | PLAN §3 |
 | Agent Node | A Node that runs one Session on its Harness, with a prompt and/or a skill, a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. | PLAN §3 |
-| Agent Profile | A Harness, a model, an effort, a permission mode, Tool Sets and Connections under one name, defined once on the daemon (the Agents page). Agent Nodes name it in `profile`. A Run resolves it when it starts, so a later change reaches the next Run. A Flow that names a profile the daemon does not have refuses to start. | Agents |
+| Agent Profile | A Harness, a model, an effort, a permission mode, CLI Tools and Connections under one name, defined once on the daemon (the Agents page). Agent Nodes name it in `profile`. A Run resolves it when it starts, so a later change reaches the next Run. A Flow that names a profile the daemon does not have refuses to start. | Agents |
 | Command Node | A Node that runs one shell command in the Worktree. Exit 0 is `pass`. | PLAN §3 |
 | Decision Node | A Node that reads earlier outputs and returns one of its declared labels. | PLAN §3 |
 | Gate | A Node that waits for a person in the Needs-you inbox, with a question and its choices. | PLAN §3 |
@@ -69,7 +69,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Side Effect | What a Step's tool did outside the Worktree, for example a GitHub comment. The Event Log keeps it per Step and key, so a Session that continues the Step does not do it twice. | Restarts |
 | Needs-you inbox | The list of open Gates. | PLAN §3 |
 | Decider | The provider behind a Decision Node. The default is a small model with structured output. | PLAN §2 |
-| GitHub Tools | The TanStack AI tools on top of `gh` that Agent and Decision Nodes can call. | PLAN §2 |
+| CLI Tool | A program on this computer, by its name (`gh`, `aws`), defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `clis`: its agent may run it without a prompt. A Flow that names one the daemon does not have, or that the computer cannot find, refuses to start. | CLI tools |
 
 ## Run status
 

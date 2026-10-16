@@ -18,7 +18,7 @@ const builder: AgentProfileSettings = {
 	model: "openai/gpt-5.2",
 	effort: "high",
 	permissionMode: "auto",
-	tools: ["github"],
+	clis: ["gh"],
 	connections: ["playwright"],
 };
 
@@ -30,7 +30,6 @@ function node(extra: Partial<AgentNode> = {}): AgentNode {
 		prompt: "Do the work",
 		profile: "builder",
 		session: "fresh",
-		tools: [],
 		...extra,
 	};
 }
@@ -47,7 +46,7 @@ function flowOf(...nodes: AgentNode[]): Flow {
 }
 
 describe("resolveAgentNode", () => {
-	test("takes the harness, model, effort, permission mode and tools of the profile", () => {
+	test("takes the harness, model, effort, permission mode, CLI tools and connections of the profile", () => {
 		const resolved = resolveAgentNode(node(), builder);
 		expect(resolved).toMatchObject({
 			profile: "builder",
@@ -55,19 +54,24 @@ describe("resolveAgentNode", () => {
 			model: "openai/gpt-5.2",
 			effort: "high",
 			permissionMode: "auto",
-			tools: ["github"],
+			clis: ["gh"],
 			connections: ["playwright"],
 		});
 		expect(resolvedAgent(resolved)).not.toBeNull();
 	});
 
-	test("a field the node sets wins; tool sets and connections add up", () => {
+	test("a field the node sets wins; CLI tools and connections add up", () => {
 		const resolved = resolveAgentNode(
-			node({ model: "openai/gpt-5.1-codex", connections: ["linear"] }),
+			node({
+				model: "openai/gpt-5.1-codex",
+				clis: ["aws", "gh"],
+				connections: ["linear"],
+			}),
 			builder,
 		);
 		expect(resolved.model).toBe("openai/gpt-5.1-codex");
 		expect(resolved.harness).toBe("opencode");
+		expect(resolved.clis).toEqual(["gh", "aws"]);
 		expect(resolved.connections).toEqual(["playwright", "linear"]);
 	});
 

@@ -311,3 +311,53 @@ describe("the rpgdotexe night, as version 1", () => {
 		expect(refs).toContain("{{item.parent.number}}");
 	});
 });
+
+describe("migrateFlow: tool sets", () => {
+	const current = (nodes: unknown[]) => ({
+		version: 2,
+		inputs: [],
+		outputs: [],
+		start: "work",
+		nodes,
+		edges: [],
+	});
+
+	test("the github tool set becomes the CLI tool gh", () => {
+		const migrated = migrateFlow(
+			current([
+				{ ...agent, id: "work", prompt: "Go", tools: ["github"] },
+				{ ...agent, id: "more", prompt: "Go", tools: ["github"], clis: ["gh"] },
+				{ ...agent, id: "none", prompt: "Go", tools: [] },
+				{
+					id: "decide",
+					type: "decision",
+					position: { x: 0, y: 0 },
+					prompt: "Go on?",
+					labels: [{ name: "yes" }, { name: "no" }],
+					tools: ["github"],
+				},
+			]),
+		) as { nodes: Record<string, unknown>[] };
+		expect(migrated.nodes.map((n) => [n.tools, n.clis])).toEqual([
+			[undefined, ["gh"]],
+			[undefined, ["gh"]],
+			[undefined, undefined],
+			[undefined, undefined],
+		]);
+		expect(flowSchema.safeParse(migrated).success).toBe(true);
+	});
+
+	test("a flow without tool sets stays the same object", () => {
+		const flow = current([{ ...agent, id: "work", prompt: "Go" }]);
+		expect(migrateFlow(flow)).toBe(flow);
+	});
+
+	test("version 1 tool sets migrate too", () => {
+		const migrated = migrateFlow({
+			...v1Body,
+			nodes: [{ ...agent, id: "prepare", prompt: "Go", tools: ["github"] }],
+			edges: [],
+		}) as { nodes: Record<string, unknown>[] };
+		expect(migrated.nodes[0]?.clis).toEqual(["gh"]);
+	});
+});

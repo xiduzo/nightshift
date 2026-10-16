@@ -1775,8 +1775,7 @@ export function createEngine(
 				resumeSessionId: resumeSessionId ?? undefined,
 				stepReport: stepReportOf(node),
 				effects: effectJournal(runId, stepId),
-				// A run snapshot from before Slice 3 has no `tools`.
-				tools: node.tools ?? [],
+				...(node.clis && node.clis.length > 0 ? { clis: node.clis } : {}),
 				...(Object.keys(mcp.servers).length > 0
 					? { mcpServers: mcp.servers }
 					: {}),
@@ -1929,7 +1928,6 @@ export function createEngine(
 						: { name: label.name, description: label.description },
 				),
 				model: node.model,
-				tools: node.tools ?? [],
 				signal,
 			},
 			signal,
@@ -2640,8 +2638,9 @@ export function createEngine(
 			}
 			const all = [flow, ...Object.values(calledFlows)];
 			const nodes = all.flatMap((f) => f.nodes);
-			const unknownConnections = missingConnections(
+			const unknownConnections = missingNames(
 				nodes,
+				(node) => node.connections ?? [],
 				options.connectionNames?.() ?? new Set(),
 			);
 			if (unknownConnections.length > 0) {
@@ -2650,6 +2649,37 @@ export function createEngine(
 						.map(
 							({ name, nodeIds }) =>
 								`The flow names the connection "${name}" (${nodeIds.join(", ")}), but this daemon does not have it. Add it under Agents → Tools.`,
+						)
+						.join(" "),
+				);
+			}
+			const unknownClis = missingNames(
+				nodes,
+				(node) => node.clis ?? [],
+				options.cliNames?.() ?? new Set(),
+			);
+			if (unknownClis.length > 0) {
+				throw new Error(
+					unknownClis
+						.map(
+							({ name, nodeIds }) =>
+								`The flow uses the CLI tool "${name}" (${nodeIds.join(", ")}), but no CLI tool has that name. Add it under Agents → Tools.`,
+						)
+						.join(" "),
+				);
+			}
+			const findCli = options.findCli ?? ((name: string) => Bun.which(name));
+			const notFound = [
+				...new Set(
+					nodes.flatMap((n) => (n.type === "agent" ? (n.clis ?? []) : [])),
+				),
+			].filter((name) => findCli(name) === null);
+			if (notFound.length > 0) {
+				throw new Error(
+					notFound
+						.map(
+							(name) =>
+								`The flow uses the CLI tool "${name}", but this computer does not have it. Install ${name}, or take it off the flow.`,
 						)
 						.join(" "),
 				);
@@ -3241,15 +3271,19 @@ function missingHarnesses(
 	return [...missing].map(([harness, nodeIds]) => ({ harness, nodeIds }));
 }
 
-/** The connections the Agent nodes name that the daemon does not have, with their nodes. */
-function missingConnections(
+/**
+ * The names the Agent nodes list (connections, CLI tools) that the daemon
+ * does not have, with their nodes.
+ */
+function missingNames(
 	nodes: readonly FlowNode[],
+	listed: (node: AgentNode) => readonly string[],
 	names: ReadonlySet<string>,
 ): { name: string; nodeIds: string[] }[] {
 	const missing = new Map<string, string[]>();
 	for (const node of nodes) {
 		if (node.type !== "agent") continue;
-		for (const name of node.connections ?? []) {
+		for (const name of listed(node)) {
 			if (names.has(name)) continue;
 			const ids = missing.get(name) ?? [];
 			if (!ids.includes(node.id)) ids.push(node.id);

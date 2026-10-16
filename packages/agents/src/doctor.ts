@@ -1,5 +1,6 @@
-import { stat } from "node:fs/promises";
+import { access, constants, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
+import { delimiter, join } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
@@ -333,6 +334,71 @@ export async function checkGithub(bin: string): Promise<CliCheck> {
 	} catch {
 		return check;
 	}
+}
+
+/**
+ * A CLI tool (a program the agents may run): where it is and its version.
+ * Many programs do not know `--version`, so a missing version is no
+ * problem. `gh` gets the GitHub CLI check, with its login.
+ */
+export async function checkCli(
+	name: string,
+	searchPath: string = process.env.PATH ?? "",
+): Promise<CliCheck> {
+	if (name === "gh") return checkGithub(name);
+	const path = Bun.which(name, { PATH: searchPath });
+	const check: CliCheck = {
+		bin: name,
+		path,
+		version: null,
+		account: null,
+		facts: [],
+		problem: path
+			? null
+			: `Night Shift cannot find ${name} on this computer. Install it, then check again.`,
+		checkedAt: Date.now(),
+	};
+	if (!path) return check;
+	try {
+		const out = await run([path, "--version"]);
+		return out.code === 0
+			? { ...check, version: firstLine(out.stdout) }
+			: check;
+	} catch {
+		return check;
+	}
+}
+
+/**
+ * The programs this computer can run by name: every executable file in the
+ * directories of the daemon's PATH, sorted, each name once.
+ */
+export async function pathPrograms(
+	path: string = process.env.PATH ?? "",
+): Promise<string[]> {
+	const names = new Set<string>();
+	for (const dir of new Set(path.split(delimiter).filter(Boolean))) {
+		let entries: string[];
+		try {
+			entries = await readdir(dir);
+		} catch {
+			continue;
+		}
+		await Promise.all(
+			entries.map(async (entry) => {
+				if (names.has(entry) || entry.startsWith(".")) return;
+				try {
+					const file = join(dir, entry);
+					if (!(await stat(file)).isFile()) return;
+					await access(file, constants.X_OK);
+					names.add(entry);
+				} catch {
+					// Not executable, or a broken link.
+				}
+			}),
+		);
+	}
+	return [...names].sort((a, b) => a.localeCompare(b));
 }
 
 export type McpTestResult = {

@@ -5,16 +5,15 @@
  * Why a tool and not `chat({ outputSchema })`: the claude-code adapter does
  * support structured output (`--json-schema`), but it cannot turn off the
  * built-in tools while it also bridges more than one of our tools (`--tools ""`
- * comes only with `toolChoice: 'none'` or one named tool), and a Decision node
- * with the `github` tool set needs the GitHub tools next to the answer. With a
- * `decide` tool, the answer and the GitHub tools travel over the same MCP
- * bridge; the tool checks the label against the node's labels and the agent
- * gets a tool error to correct a wrong one. It is also the same channel as
+ * comes only with `toolChoice: 'none'` or one named tool). With a `decide`
+ * tool, the answer travels over the MCP bridge; the tool checks the label
+ * against the node's labels and the agent gets a tool error to correct a
+ * wrong one. It is also the same channel as
  * `report_step`, which is proven in live sessions.
  *
  * The session has no built-in tools: `--tools ""` and `--strict-mcp-config`
  * (see `claudeCommand` in `claude-code.ts`), so it can read nothing and run
- * nothing besides `decide` and, with `github`, the GitHub tools. It loads no
+ * nothing besides `decide`. It loads no
  * settings tier by default, so no user hooks, plugins, or memory files reach
  * it.
  */
@@ -29,7 +28,6 @@ import {
 	runClaudeCodeSession,
 	type SessionSetup,
 } from "./claude-code";
-import { GITHUB_TOOL_IDS, githubTools } from "./github";
 import { failureKind } from "./translate";
 import type {
 	AgentErrorKind,
@@ -115,7 +113,7 @@ export function decideTool(
 
 /** The prompt of a decision session: the question, the labels, and how to answer. */
 export function decisionPrompt(
-	input: Pick<DecisionInput, "prompt" | "labels" | "tools">,
+	input: Pick<DecisionInput, "prompt" | "labels">,
 ): string {
 	const labels = input.labels
 		.map((label) =>
@@ -130,9 +128,7 @@ export function decisionPrompt(
 		`## Labels\n\n${labels}`,
 		[
 			"Call the `decide` tool exactly once, with `label` set to one of the labels above and `notes` set to one to three sentences on why.",
-			input.tools?.includes("github")
-				? "You can read the repository's GitHub issues and pull requests with the `github_*` tools before you decide."
-				: "You have no other tools.",
+			"You have no other tools.",
 			"Do not answer in text only: a decision that is not given with the tool does not count.",
 		].join(" "),
 	].join("\n\n");
@@ -157,21 +153,14 @@ async function decideWithClaudeCode(
 	}
 
 	let decision: Decision | undefined;
-	const github = input.tools?.includes("github")
-		? githubTools({ ...options.github, cwd: input.cwd })
-		: [];
 	const setup: SessionSetup = {
 		prompt: decisionPrompt(input),
 		tools: [
 			decideTool(input.labels, (d) => {
 				decision = d;
 			}),
-			...github,
 		],
-		allowedTools: [
-			DECIDE_TOOL_ID,
-			...(github.length > 0 ? GITHUB_TOOL_IDS : []),
-		],
+		allowedTools: [DECIDE_TOOL_ID],
 		stepReport: false,
 		bridgedToolsOnly: true,
 		settingSources: options.settingSources ?? [],

@@ -5,10 +5,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+	checkCli,
 	checkGithub,
 	checkHarness,
 	HARNESS_ADAPTERS,
 	harnessModels,
+	pathPrograms,
 	resolveBin,
 	testMcpServer,
 } from "./doctor";
@@ -68,6 +70,49 @@ describe("resolveBin", () => {
 		expect(await resolveBin("sh")).toBe(Bun.which("sh") as string);
 		expect(await resolveBin("sh")).toMatch(/\/sh$/);
 		expect(await resolveBin("nightshift-doctor-not-anywhere")).toBeNull();
+	});
+});
+
+describe("checkCli", () => {
+	test("a program on the PATH: its path and version", async () => {
+		const path = await fakeCli("acli", {
+			"--version": { stdout: "acli 1.2.3\n" },
+		});
+		expect(await checkCli("acli", dir)).toMatchObject({
+			bin: "acli",
+			path,
+			version: "acli 1.2.3",
+			problem: null,
+		});
+	});
+
+	test("a program without --version is still ready", async () => {
+		await fakeCli("jq", {});
+		expect(await checkCli("jq", dir)).toMatchObject({
+			version: null,
+			problem: null,
+		});
+	});
+
+	test("a program that is not there has a problem", async () => {
+		const check = await checkCli("nightshift-not-anywhere", dir);
+		expect(check.path).toBeNull();
+		expect(check.problem).toContain("cannot find nightshift-not-anywhere");
+	});
+});
+
+describe("pathPrograms", () => {
+	test("the executables of each directory, sorted, each once", async () => {
+		await fakeCli("zeta", {});
+		await fakeCli("alpha", {});
+		await writeFile(join(dir, "notes.txt"), "not a program");
+		const other = join(dir, "other");
+		await mkdir(other);
+		await writeFile(join(other, "alpha"), "#!/bin/sh\n");
+		await chmod(join(other, "alpha"), 0o755);
+		expect(
+			await pathPrograms(`${dir}:${other}:${join(dir, "missing")}`),
+		).toEqual(["alpha", "zeta"]);
 	});
 });
 

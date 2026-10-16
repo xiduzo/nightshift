@@ -10,7 +10,6 @@ import {
 	codexSetup,
 } from "./codex";
 import { fakeBin } from "./fixtures/bin";
-import { GITHUB_TOOL_NAMES } from "./github";
 import type { AgentEvent, AgentSessionInput } from "./types";
 
 let dir: string;
@@ -175,31 +174,23 @@ describe("codexHarness", () => {
 		]);
 	});
 
-	test("github tools are bridged; MCP servers go in as config", async () => {
-		const { log, harness } = await fakeCodex({
-			FAKE_CODEX_CALLS: JSON.stringify([
-				{ name: "github_read_issue", arguments: {} },
-			]),
-		});
-		const events = await collect(
+	test("report_step is bridged; MCP servers go in as config", async () => {
+		const { log, harness } = await fakeCodex();
+		await collect(
 			harness.run(
 				input({
-					tools: ["github"],
+					stepReport: true,
+					clis: ["gh"],
 					mcpServers: {
 						docs: { url: "https://docs/mcp", headers: { A: "b" } },
 					},
 				}),
 			),
 		);
-		// Invalid arguments: the bridge returns a tool error, a normal tool event.
-		expect(events.find((e) => e.type === "tool-start")).toMatchObject({
-			name: "github_read_issue",
-		});
 		const [line] = await readLog(log);
 		expect(line?.config["mcp_servers.docs.url"]).toBe('"https://docs/mcp"');
 		expect(line?.config["mcp_servers.docs.http_headers"]).toBe('{ A = "b" }');
 		expect(line?.config["mcp_servers.tanstack.url"]).toContain("http");
-		expect(GITHUB_TOOL_NAMES).toContain("github_read_issue");
 	});
 
 	test("resume: the session event comes first, before any output", async () => {

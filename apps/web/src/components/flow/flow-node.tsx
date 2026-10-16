@@ -32,7 +32,6 @@ import {
 	SquareTerminalIcon,
 	TriangleAlertIcon,
 	WorkflowIcon,
-	WrenchIcon,
 } from "lucide-react";
 import { memo, useContext, useEffect, useRef } from "react";
 
@@ -325,17 +324,17 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	);
 });
 
-/** A small mark per tool set the node has. */
-function ToolSets({ tools }: { tools: readonly string[] }) {
+/** A small mark with the CLI tools the node may run. */
+function CliTools({ tools }: { tools: readonly string[] }) {
 	if (tools.length === 0) return null;
 	return (
 		<>
 			{" · "}
 			<span
 				className="inline-flex items-center gap-0.5 align-bottom font-mono text-foreground/80"
-				title={`Tool sets: ${tools.join(", ")}`}
+				title={`CLI tools: ${tools.join(", ")}`}
 			>
-				<WrenchIcon className="size-3" aria-hidden="true" />
+				<SquareTerminalIcon className="size-3" aria-hidden="true" />
 				{tools.join(", ")}
 			</span>
 		</>
@@ -375,7 +374,7 @@ function AgentBody({ node }: { node: AgentNode }) {
 					.join("")}
 				{node.session === "resume" ? " · resumes session" : ""}
 				{node.output ? " · data schema" : ""}
-				<ToolSets tools={node.tools ?? []} />
+				<CliTools tools={node.clis ?? []} />
 			</span>
 			<p
 				className={cn(
@@ -396,7 +395,6 @@ function DecisionBody({ node }: { node: DecisionNode }) {
 		<>
 			<span className="truncate text-[11px] text-muted-foreground">
 				{node.model}
-				<ToolSets tools={node.tools ?? []} />
 			</span>
 			<p
 				className={cn(

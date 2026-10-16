@@ -67,6 +67,9 @@ function makeEngine(
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },
 			dataDir: sandbox.dataDir,
+			// The format 1 flows had the GitHub tool set: now the CLI tool gh.
+			cliNames: () => new Set(["gh"]),
+			findCli: (name) => `/usr/local/bin/${name}`,
 			...options,
 		},
 		{ runLog },
@@ -87,7 +90,6 @@ function agent(
 		model: "sonnet",
 		permissionMode: "acceptEdits",
 		session: "fresh",
-		tools: [],
 		...extra,
 	};
 }

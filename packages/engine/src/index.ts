@@ -1,4 +1,11 @@
 export {
+	type CliTool,
+	type CliToolInput,
+	type CliToolStore,
+	cliToolInputSchema,
+	createCliToolStore,
+} from "./cli-tools";
+export {
 	type Connection,
 	type ConnectionInput,
 	type ConnectionStore,

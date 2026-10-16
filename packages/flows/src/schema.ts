@@ -54,9 +54,18 @@ export const reservedOutcomes = [
 /** Names a flow may not use for a node or an input. */
 export const reservedNames = ["run"] as const;
 
-/** `github`: read issues and pull requests, comment, label, open a pull request. */
-export const toolSetSchema = z.enum(["github"]);
-export type ToolSet = z.infer<typeof toolSetSchema>;
+/**
+ * A CLI tool: the name of a program on this computer, as a shell finds it
+ * on its PATH, for example `gh`, `aws` or `acli`. Defined once on the daemon
+ * (the Agents page, under Tools); an Agent node or profile lists the ones its
+ * agent may run.
+ */
+export const cliNameSchema = z
+	.string()
+	.regex(
+		/^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/,
+		"Use the program name only, for example gh or aws.",
+	);
 
 /** The coding-agent CLIs an Agent node can run on: the TanStack AI harness adapters. */
 export const harnessNameSchema = z.enum(["claude-code", "opencode", "codex"]);
@@ -129,8 +138,8 @@ export const agentNodeSchema = z.object({
 	skill: z.string().min(1).optional(),
 	/**
 	 * An Agent Profile defined on the daemon (the Agents page): its harness,
-	 * model, effort, permission mode, tool sets and connections. A field the
-	 * node sets itself wins over the profile; tool sets and connections add
+	 * model, effort, permission mode, CLI tools and connections. A field the
+	 * node sets itself wins over the profile; CLI tools and connections add
 	 * up. A run resolves the profile when it starts, and a flow that names a
 	 * profile the daemon does not have refuses to start.
 	 */
@@ -150,8 +159,13 @@ export const agentNodeSchema = z.object({
 	 * policy). `resume`: a later visit continues this node's last session.
 	 */
 	session: z.enum(["fresh", "resume"]).default("fresh"),
-	/** Tool sets the agent gets on top of the harness's own tools. */
-	tools: z.array(toolSetSchema).default([]),
+	/**
+	 * CLI tools by name (programs defined on this daemon, under Agents →
+	 * Tools): the agent may run them without a prompt. A flow that names one
+	 * the daemon does not have, or that this computer cannot find, refuses
+	 * to start.
+	 */
+	clis: z.array(cliNameSchema).optional(),
 	/** The step fails when the agent shows no activity for this long. */
 	idleMinutes: z.number().int().positive().optional(),
 	/**
@@ -184,7 +198,8 @@ export const agentProfileSettingsSchema = z.object({
 	model: z.string().trim().min(1),
 	effort: effortSchema.optional(),
 	permissionMode: permissionModeSchema,
-	tools: z.array(toolSetSchema).default([]),
+	/** CLI tools (programs on this daemon) by name. */
+	clis: z.array(cliNameSchema).default([]),
 	/** Connections (MCP servers on this daemon) by name. */
 	connections: z.array(nameSchema).default([]),
 });
@@ -218,8 +233,6 @@ export const decisionNodeSchema = z.object({
 	decider: z.literal("claude-code").default("claude-code"),
 	/** A small, fast model is enough. */
 	model: z.string().min(1).default("haiku"),
-	/** Tool sets the decider may use to look things up. */
-	tools: z.array(toolSetSchema).default([]),
 });
 
 export const gateNodeSchema = z.object({

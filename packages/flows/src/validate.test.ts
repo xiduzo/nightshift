@@ -23,7 +23,6 @@ function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
 		model: "sonnet",
 		permissionMode: "acceptEdits",
 		session: "fresh",
-		tools: [],
 		...extra,
 	};
 }
@@ -51,7 +50,6 @@ function decision(
 		labels: labels.map((name) => ({ name })),
 		decider: "claude-code",
 		model: "haiku",
-		tools: [],
 		...extra,
 	};
 }
@@ -410,11 +408,10 @@ function decideAndGate(): Flow {
 		[
 			agent("worker", {
 				prompt: "Build it. Reviewer said: {{gate.note}}",
-				tools: ["github"],
+				clis: ["gh"],
 			}),
 			decision("decide", ["continue", "stop"], {
 				prompt: "The worker reported: {{worker.summary}}. Go on?",
-				tools: ["github"],
 			}),
 			gate("gate", ["approve", "reject"], {
 				question: "The decider said {{decide.outcome}}: {{decide.notes}}",
@@ -438,13 +435,11 @@ describe("validateFlow: decisions and gates", () => {
 		const json = JSON.parse(JSON.stringify(decideAndGate()));
 		delete json.nodes[1].decider;
 		delete json.nodes[1].model;
-		delete json.nodes[1].tools;
 		const parsed = parseFlow(json);
 		expect(parsed.issues).toEqual([]);
 		expect(parsed.flow?.nodes[1]).toMatchObject({
 			decider: "claude-code",
 			model: "haiku",
-			tools: [],
 		});
 	});
 

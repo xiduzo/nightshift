@@ -4,6 +4,7 @@ import type { Context as HonoContext } from "hono";
 import {
 	auth,
 	checks,
+	cliTools,
 	connections,
 	daemon,
 	db,
@@ -28,6 +29,7 @@ export async function createContext({
 		session,
 		settings,
 		connections,
+		cliTools,
 		profiles,
 		checks,
 		daemon,

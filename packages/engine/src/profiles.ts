@@ -5,6 +5,7 @@ import {
 	type AgentProfileSettings,
 	agentProfileSchema,
 	agentProfileSettingsSchema,
+	migrateToolSets,
 } from "@nightshift/flows";
 import { eq, sql } from "drizzle-orm";
 
@@ -36,8 +37,9 @@ export function createProfileStore(options: { db: Database }): ProfileStore {
 		async load() {
 			profiles.clear();
 			for (const row of await db.select().from(agentProfile)) {
+				// A profile saved with the GitHub tool set reads as one with `gh`.
 				const parsed = agentProfileSettingsSchema.safeParse(
-					safeJson(row.settings),
+					migrateToolSets(safeJson(row.settings)),
 				);
 				// A row this version cannot read stays in the database, unused.
 				if (!parsed.success) continue;

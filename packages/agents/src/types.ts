@@ -45,8 +45,14 @@ export type AgentSessionInput = {
 	 * outcomes and a JSON Schema for the report's `data`.
 	 */
 	stepReport?: boolean | StepReportSpec;
-	/** Tool sets the session gets on top of the harness's own tools. */
-	tools?: ToolSet[];
+	/**
+	 * CLI tools: programs on this computer, by name (`gh`, `aws`), that the
+	 * agent may run in its shell without a prompt. In `plan` mode nothing
+	 * runs, so they add nothing. How each harness allows them: see
+	 * `cliAllowRules` (Claude Code) and `opencodePermission`. Codex cannot
+	 * allow one command: its sandbox decides.
+	 */
+	clis?: string[];
 	/** MCP servers by name, added to the harness's own configuration. */
 	mcpServers?: Record<string, McpServerConfig>;
 	/** Where the tools record what they did outside the worktree. See `EffectJournal`. */
@@ -81,9 +87,6 @@ export type AgentUsage = {
 	outputTokens: number;
 	costUsd?: number;
 };
-
-/** `github`: the GitHub tools on top of `gh`, scoped to the repo of `cwd`. */
-export type ToolSet = "github";
 
 /** An outcome name: `pass`, `fail`, `needs-input`, or one of the spec's outcomes. */
 export type StepReportOutcome = string;
@@ -141,13 +144,12 @@ export interface AgentHarness {
 }
 
 export type DecisionInput = {
-	/** Where tools run, for example `gh` against the worktree's repo. */
+	/** The worktree. The decider runs there. */
 	cwd: string;
 	/** The rendered question with its context. */
 	prompt: string;
 	labels: { name: string; description?: string }[];
 	model: string;
-	tools?: ToolSet[];
 	signal: AbortSignal;
 };
 

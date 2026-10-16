@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import {
 	type AgentHarness,
+	checkCli,
 	checkGithub,
 	checkHarness,
 	claudeCodeDecider,
@@ -10,6 +11,7 @@ import {
 	codexHarness,
 	harnessModels,
 	opencodeHarness,
+	pathPrograms,
 	readGithubItems,
 	testMcpServer,
 } from "@nightshift/agents";
@@ -19,6 +21,7 @@ import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import {
 	acquireLease,
+	createCliToolStore,
 	createConnectionStore,
 	createEngine,
 	createProfileStore,
@@ -95,8 +98,14 @@ export const connections = createConnectionStore({
 	env,
 	secrets: keychainSecrets(),
 });
+export const cliTools = createCliToolStore({ db });
 export const profiles = createProfileStore({ db });
-await Promise.all([settings.load(), connections.load(), profiles.load()]);
+await Promise.all([
+	settings.load(),
+	connections.load(),
+	cliTools.load(),
+	profiles.load(),
+]);
 
 /** A harness built per session, so a changed path in Settings applies to the next session. */
 function perSession(
@@ -105,8 +114,6 @@ function perSession(
 ): AgentHarness {
 	return { name, run: (input) => build().run(input) };
 }
-
-const github = () => ({ gh: settings.current().ghBin });
 
 // `bun --hot` evaluates this module again on each reload. Only the newest
 // engine may start scheduled runs: the one before stops its scheduler.
@@ -124,19 +131,16 @@ export const engine = await createEngine({
 		"claude-code": perSession("claude-code", () =>
 			claudeCodeHarness({
 				claudeExecutable: settings.current().claudeBin,
-				github: github(),
 			}),
 		),
 		opencode: perSession("opencode", () =>
 			opencodeHarness({
 				opencodeExecutable: settings.current().opencodeBin,
-				github: github(),
 			}),
 		),
 		codex: perSession("codex", () =>
 			codexHarness({
 				codexExecutable: settings.current().codexBin,
-				github: github(),
 			}),
 		),
 	},
@@ -145,14 +149,16 @@ export const engine = await createEngine({
 		decide: (input) =>
 			claudeCodeDecider({
 				claudeExecutable: settings.current().claudeBin,
-				github: github(),
 			}).decide(input),
 	},
-	readGithubItems: (input) => readGithubItems(input, { gh: github().gh }),
+	readGithubItems: (input) =>
+		readGithubItems(input, { gh: settings.current().ghBin }),
 	dataDir,
 	settings: () => settings.run(),
 	mcpServersFor: (node) => connections.mcpServersFor(node),
 	connectionNames: () => connections.names(),
+	cliNames: () => cliTools.names(),
+	findCli: (name) => Bun.which(name),
 	harnessNames: () => new Set(settings.current().harnesses),
 	profileFor: (name) => profiles.settingsFor(name),
 	// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.
@@ -164,6 +170,8 @@ export const engine = await createEngine({
 export const checks: Context["checks"] = {
 	harness: checkHarness,
 	github: checkGithub,
+	cli: (name) => checkCli(name),
+	programs: () => pathPrograms(),
 	mcp: (config, redact) => testMcpServer(config, { redact }),
 	models: harnessModels,
 };

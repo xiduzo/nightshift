@@ -44,13 +44,18 @@ import {
 } from "@nightshift/ui/components/toggle-group";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { BotIcon, CircleAlertIcon, WorkflowIcon } from "lucide-react";
+import {
+	BotIcon,
+	CircleAlertIcon,
+	SquareTerminalIcon,
+	WorkflowIcon,
+} from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { CliCheckBadge } from "@/components/connections/cli-panel";
 import { KindBadge } from "@/components/connections/parts";
-import type { Connection } from "@/components/connections/types";
+import type { CliTool, Connection } from "@/components/connections/types";
 import { EFFORTS, PERMISSION_MODES } from "@/lib/agent-options";
 import type { Effort, PermissionMode } from "@/lib/api-types";
 import { harnessInfo } from "@/lib/harnesses";
@@ -67,8 +72,8 @@ import type {
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
 
-type Draft = Omit<ProfileInput, "previousName" | "tools" | "connections"> &
-	Required<Pick<ProfileInput, "tools" | "connections">>;
+type Draft = Omit<ProfileInput, "previousName" | "clis" | "connections"> &
+	Required<Pick<ProfileInput, "clis" | "connections">>;
 
 function draftFrom(profile: ProfileRow): Draft {
 	const { usedBy: _usedBy, updatedAt: _at, ...rest } = profile;
@@ -87,7 +92,7 @@ export function newProfileDraft(
 		harness,
 		model: harnessInfo(harness).defaultModel,
 		permissionMode,
-		tools: [],
+		clis: [],
 		connections: [],
 	};
 }
@@ -108,6 +113,7 @@ export function ProfileDetail({
 	initial,
 	profiles,
 	harnesses,
+	cliTools,
 	connections,
 	onSaved,
 	onDeleted,
@@ -121,6 +127,7 @@ export function ProfileDetail({
 	profiles: ProfileRow[];
 	/** The added harnesses. */
 	harnesses: HarnessRow[];
+	cliTools: CliTool[];
 	connections: Connection[];
 	onSaved: (name: string) => void;
 	onDeleted: () => void;
@@ -391,34 +398,43 @@ export function ProfileDetail({
 
 			<DetailSection
 				title="Tools"
-				description="Added to each session, next to the harness's own tools."
+				description="What the agents can use. They run the CLI tools without asking. The permission mode decides about all other commands."
 			>
 				<div className="grid gap-2">
-					<FieldLabel htmlFor={`${id}-t-github`}>
-						<Field orientation="horizontal">
-							<Checkbox
-								id={`${id}-t-github`}
-								checked={draft.tools.includes("github")}
-								onCheckedChange={(on) =>
-									set({
-										tools: on
-											? [...draft.tools.filter((t) => t !== "github"), "github"]
-											: draft.tools.filter((t) => t !== "github"),
-									})
-								}
-							/>
-							<FieldContent>
-								<FieldTitle className="font-mono">
-									github
-									<Badge variant="secondary">Built in</Badge>
-								</FieldTitle>
-								<FieldDescription className="text-xs">
-									Read issues and pull requests, comment, set labels, and open a
-									pull request, through your own gh login.
-								</FieldDescription>
-							</FieldContent>
-						</Field>
-					</FieldLabel>
+					{cliTools.map((t) => (
+						<FieldLabel key={t.name} htmlFor={`${id}-cli-${t.name}`}>
+							<Field orientation="horizontal">
+								<Checkbox
+									id={`${id}-cli-${t.name}`}
+									checked={draft.clis.includes(t.name)}
+									onCheckedChange={(on) =>
+										set({
+											clis: on
+												? [...draft.clis, t.name]
+												: draft.clis.filter((x) => x !== t.name),
+										})
+									}
+								/>
+								<FieldContent>
+									<FieldTitle className="font-mono">
+										{t.name}
+										<Badge variant="secondary">
+											<SquareTerminalIcon
+												data-icon="inline-start"
+												aria-hidden
+											/>
+											CLI
+										</Badge>
+									</FieldTitle>
+									{t.description ? (
+										<FieldDescription className="text-xs">
+											{t.description}
+										</FieldDescription>
+									) : null}
+								</FieldContent>
+							</Field>
+						</FieldLabel>
+					))}
 					{connections.map((c) => (
 						<FieldLabel key={c.name} htmlFor={`${id}-c-${c.name}`}>
 							<Field orientation="horizontal">
@@ -447,9 +463,9 @@ export function ProfileDetail({
 							</Field>
 						</FieldLabel>
 					))}
-					{connections.length === 0 ? (
+					{cliTools.length === 0 && connections.length === 0 ? (
 						<p className="text-muted-foreground text-xs">
-							Add an MCP server under Tools to hand it to a profile.
+							Add a CLI tool or an MCP server under Tools, then pick it here.
 						</p>
 					) : null}
 				</div>

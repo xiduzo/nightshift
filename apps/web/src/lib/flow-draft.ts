@@ -70,7 +70,6 @@ export function agentNode(
 		model: defaults.agentModel ?? DEFAULT_MODEL,
 		permissionMode: defaults.agentPermissionMode ?? "acceptEdits",
 		session: "fresh",
-		tools: [],
 	};
 }
 
@@ -96,7 +95,6 @@ export function decisionNode(
 		],
 		decider: "claude-code",
 		model: defaults.decisionModel ?? DEFAULT_DECISION_MODEL,
-		tools: [],
 	};
 }
 

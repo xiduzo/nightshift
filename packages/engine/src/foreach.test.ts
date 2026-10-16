@@ -93,7 +93,6 @@ function agent(
 		model: "sonnet",
 		permissionMode: "acceptEdits",
 		session: "fresh",
-		tools: [],
 		...extra,
 	};
 }
@@ -111,7 +110,6 @@ function decision(id: string, labels: string[]): DecisionNode {
 		labels: labels.map((name) => ({ name })),
 		decider: "claude-code",
 		model: "haiku",
-		tools: [],
 	};
 }
 

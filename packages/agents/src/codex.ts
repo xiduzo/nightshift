@@ -7,7 +7,7 @@
  * permission mode picks that sandbox (see `codexPolicy`).
  *
  * The adapter bridges `chat()` tools over MCP (`mcp_servers.tanstack`), so
- * `report_step` and the GitHub tools work as in Claude Code, and the node's
+ * `report_step` works as in Claude Code, and the node's
  * own MCP servers go in as `--config mcp_servers.<name>.*` overrides: they
  * live only on the command line, no config file is written.
  *
@@ -30,7 +30,6 @@ import {
 	runAdapterSession,
 	shellQuote,
 } from "./adapter-session";
-import { type GithubToolsOptions, githubTools } from "./github";
 import { reportStepTool, stepReportSetup } from "./step-report";
 import {
 	createTranslator,
@@ -59,8 +58,6 @@ export type CodexHarnessOptions = {
 	config?: Record<string, string>;
 	/** How long to wait for the process to stop after an abort. Default 5 s. */
 	abortGraceMs?: number;
-	/** How the GitHub tools run `gh` and `git` (tests use fakes). */
-	github?: Omit<GithubToolsOptions, "cwd">;
 };
 
 /** The adapter's CUSTOM event with the thread (session) id. */
@@ -229,23 +226,16 @@ export function codexSetup(
 		{ ...input, permissionMode: "default" },
 		undefined,
 	);
-	const github = input.tools?.includes("github")
-		? githubTools({
-				...options.github,
-				cwd: input.cwd,
-				...(input.effects ? { effects: input.effects } : {}),
-			})
-		: [];
+	// CLI tools (`input.clis`) change nothing here: Codex never asks, and its
+	// sandbox decides what a shell command may do. The run checks that they
+	// are installed.
 	const ownEffort: Record<string, string> =
 		input.effort !== undefined && !KNOWN_MODELS.has(input.model)
 			? { model_reasoning_effort: tomlString(codexEffort(input.effort)) }
 			: {};
 	return {
 		prompt: report.prompt,
-		tools: [
-			...(report.withTool ? [reportStepTool(input.stepReport)] : []),
-			...github,
-		],
+		tools: [...(report.withTool ? [reportStepTool(input.stepReport)] : [])],
 		policy: codexPolicy(input.permissionMode),
 		config: {
 			...options.config,

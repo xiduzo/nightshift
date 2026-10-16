@@ -76,7 +76,7 @@ flowchart LR
   engine --> db
   engine -- "load + validate" --> flows
   agents -- "@tanstack/ai adapters" --> harness
-  agents -- "GitHub tools" --> gh
+  agents -- "CLI tools" --> gh
 ```
 
 ### Packages
@@ -90,7 +90,7 @@ flowchart LR
 | `packages/api` | oRPC contracts shared by server and web. |
 | `packages/flows` | The flow schema (zod), the loader, and the validator (unbounded loops, unknown skills, missing outcomes). |
 | `packages/engine` | Graph walk, run policy, gates, worktrees, For Each ordering. |
-| `packages/agents` | Harness sessions through `@tanstack/ai` adapters, session resume, usage-limit waits, the GitHub tools, the decider providers. |
+| `packages/agents` | Harness sessions through `@tanstack/ai` adapters, session resume, usage-limit waits, CLI tool permissions, the decider providers. |
 | `packages/ui` | Shared components and tokens. |
 
 ## 5. Delivery
@@ -193,7 +193,7 @@ Schedules: `.nightshift/schedules.json` in a project's clone, next to the flows.
 
 Settings: the Settings page saves daemon-wide values in the database: the scheduler switch, the run cap, the step cap, the run policy defaults (a flow's own `policy` numbers win), the defaults for new Agent and Decision nodes, and desktop notifications. A setting that is not saved reads the environment (`NIGHTSHIFT_*` in `apps/server/.env`), then its default. The engine reads them when they apply, so a change needs no restart. One exception: `NIGHTSHIFT_SCHEDULER=off` turns the scheduler off whatever the page says, so a dev daemon on a copy of the database never starts the night's schedules.
 
-Restarts: a daemon that stops (a crash, a restart) leaves its running steps open. The next daemon ends them, and their runs, as `interrupted`. A few seconds after it starts, it resumes each of those runs itself, through the same path as the Resume button: an Agent step continues its own harness session, with a prompt that says the daemon stopped mid-step and to check the worktree and the remote before it repeats anything. `RunResumed` records `by: "daemon"`, and the run view shows "Resumed by the daemon". A run stays `interrupted`, with the reason in its end reason, when the scheduler is off (a dev daemon on a copy of the database never continues the night's runs), when Settings → Run policy → Resume after a restart is off (`NIGHTSHIFT_RESUME_INTERRUPTED_RUNS=off`; a flow's `policy.resumeInterruptedRuns` wins), when its stop time has passed, when its worktree is gone, or after three daemon resumes in a row with no person in between (a crash loop). A full run cap queues the resume until a run ends. Runs a person stopped, failed runs and runs an earlier daemon interrupted are never resumed this way. The GitHub tools record what they do outside the worktree in the event log per step (`SideEffectStarted`, `SideEffectEnded`): `github_comment` posts a given comment once per step, and a comment started but not recorded is looked up on GitHub before it is posted again. Opening a pull request (it returns the branch's open one), pushing and labels are safe to repeat. What the agent does itself (its own `gh` or `git push`, an MCP server's tools) cannot be checked; the resume prompt asks it to look first.
+Restarts: a daemon that stops (a crash, a restart) leaves its running steps open. The next daemon ends them, and their runs, as `interrupted`. A few seconds after it starts, it resumes each of those runs itself, through the same path as the Resume button: an Agent step continues its own harness session, with a prompt that says the daemon stopped mid-step and to check the worktree and the remote before it repeats anything. `RunResumed` records `by: "daemon"`, and the run view shows "Resumed by the daemon". A run stays `interrupted`, with the reason in its end reason, when the scheduler is off (a dev daemon on a copy of the database never continues the night's runs), when Settings → Run policy → Resume after a restart is off (`NIGHTSHIFT_RESUME_INTERRUPTED_RUNS=off`; a flow's `policy.resumeInterruptedRuns` wins), when its stop time has passed, when its worktree is gone, or after three daemon resumes in a row with no person in between (a crash loop). A full run cap queues the resume until a run ends. Runs a person stopped, failed runs and runs an earlier daemon interrupted are never resumed this way. What the agent does outside the worktree (a CLI tool such as `gh`, `git push`, an MCP server's tools) cannot be checked; the resume prompt asks it to look first. The effect journal (`SideEffectStarted`, `SideEffectEnded`) stays for bridged tools that record their side effects; no tool uses it now.
 
 Harnesses: an Agent node runs `claude`, `opencode` or `codex` on this machine, with your own login for each. The Agents page adds and removes harnesses (the setting `harnesses`; all three by default, and a removed one refuses runs that need it), checks each one (`--version`, its login status), sets its path, and lists its models: the adapter's own list (`CLAUDE_CODE_MODELS`, `OPENCODE_MODELS`, `CODEX_MODELS`) plus, for OpenCode, what `opencode models` prints. Each path comes from the `PATH` unless set there or in `apps/server/.env` (the fallback):
 
@@ -232,7 +232,7 @@ Run bundles: "Export" on a run page downloads the run as one SQLite file, `<flow
 - Runs are never deleted, and nothing removes old transcripts. A run bundle could be the archive before a run is deleted; retention is not decided.
 - A run bundle leaves out command logs (`logs/<runId>/<stepId>.log`); the command step's transcript holds its output. The UI cannot open a bundle yet; only `openRunBundle` reads one.
 - A run bundle masks secret values only if they are saved or a connection references them. A value from the environment that a node's own `mcpServers` reads goes in as is.
-- Automatic resume after a restart is tested with fake harnesses and a fake clock only. The comment look-up (`gh api …/issues/<n>/comments --paginate --jq`) is tested against a fake `gh`. A Decision node's GitHub tools have no effect journal: a Decision step runs again from the start on resume.
+- Automatic resume after a restart is tested with fake harnesses and a fake clock only. A Decision step runs again from the start on resume.
 - When a guard changes during the few seconds before the daemon resumes a run (the scheduler switched off, the stop time came), the run stays `interrupted` with the plain end reason; only the daemon's log says why.
 - The run log trusts that its daemon is the only writer of the database. An event that anything else writes (a second daemon, a hand edit) does not show in the UI or the walk until the daemon restarts. It keeps the logs of open runs and of the latest ended runs, up to 20 000 events (about 14 MB), plus a small summary per run. A database of 50 000 events takes about 35 MB with every log in memory.
 - `@tanstack/ai-sandbox` 0.5.23 writes its projection marker to a doubled path when the workspace has a fixed directory. We set `workspace.root: '.'` to avoid it. Report it upstream.

@@ -65,6 +65,8 @@ function makeEngine(
 		| "decider"
 		| "settings"
 		| "scheduler"
+		| "cliNames"
+		| "findCli"
 	> = {},
 	internals: EngineInternals = {},
 ): Engine {
@@ -95,7 +97,6 @@ function agent(
 		model: "sonnet",
 		permissionMode: "acceptEdits",
 		session: "fresh",
-		tools: [],
 		...extra,
 	};
 }
@@ -1325,7 +1326,6 @@ function decision(
 		labels: labels.map((name) => ({ name })),
 		decider: "claude-code",
 		model: "haiku",
-		tools: [],
 		...extra,
 	};
 }
@@ -1434,7 +1434,6 @@ describe("decisions", () => {
 							{ name: "ship", description: "Good enough" },
 							{ name: "redo" },
 						],
-						tools: ["github"],
 					},
 				),
 				agent("shipper", "Ship it. {{decide.notes}} ({{decide.outcome}})"),
@@ -1457,7 +1456,6 @@ describe("decisions", () => {
 			prompt: "Worker said: Built the parser.",
 			labels: [{ name: "ship", description: "Good enough" }, { name: "redo" }],
 			model: "haiku",
-			tools: ["github"],
 		});
 		expect(harness.calls.map((c) => c.prompt)).toEqual([
 			"Build it",
@@ -1943,11 +1941,16 @@ describe("a full flow", () => {
 		const { decider, calls } = scriptedDecider((_input, call) =>
 			decided(answers[call] ?? "review", `call ${call + 1}`, 0.01),
 		);
-		const engine = makeEngine(harness, { decider, maxConcurrentRuns: 1 });
+		const engine = makeEngine(harness, {
+			decider,
+			maxConcurrentRuns: 1,
+			cliNames: () => new Set(["gh"]),
+			findCli: (name) => `/usr/local/bin/${name}`,
+		});
 		const flow = flowOf(
 			[
 				agent("worker", "Build it. Reviewer: {{gate.note}}", {
-					tools: ["github"],
+					clis: ["gh"],
 				}),
 				decision("decide", "Worker: {{worker.summary}}. Review it?", [
 					"retry",
@@ -2035,7 +2038,7 @@ describe("a full flow", () => {
 			"Build it. Reviewer: ",
 			"Build it. Reviewer: Add tests.",
 		]);
-		expect(harness.calls.every((c) => c.tools?.join() === "github")).toBe(true);
+		expect(harness.calls.every((c) => c.clis?.join() === "gh")).toBe(true);
 		expect(calls.map((c) => c.prompt)).toEqual([
 			"Worker: attempt 1. Review it?",
 			"Worker: attempt 2. Review it?",

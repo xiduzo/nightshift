@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -12,7 +12,6 @@ import {
 	labelsProblem,
 } from "./decider";
 import { fakeBin } from "./fixtures/bin";
-import { GITHUB_TOOL_IDS } from "./github";
 import type { DecisionInput } from "./types";
 
 let dir: string;
@@ -119,9 +118,6 @@ describe("decisionPrompt", () => {
 		expect(prompt).toContain("- `retry`");
 		expect(prompt).toContain("Call the `decide` tool exactly once");
 		expect(prompt).toContain("You have no other tools.");
-		expect(
-			decisionPrompt({ prompt: "Q?", labels: LABELS, tools: ["github"] }),
-		).toContain("`github_*` tools");
 	});
 });
 
@@ -235,49 +231,5 @@ describe("claudeCodeDecider", () => {
 			await d.decide(input({ labels: [{ name: "a" }, { name: "a" }] })),
 		).toMatchObject({ kind: "error", errorKind: "harness" });
 		expect(await claudeRuns()).toEqual([]);
-	});
-
-	test("with github: the GitHub tools next to decide", async () => {
-		const ghLog = join(dir, "gh.jsonl");
-		const rules = join(dir, "rules.json");
-		await writeFile(
-			rules,
-			JSON.stringify([
-				{
-					tool: "gh",
-					args: ["issue", "view", "3"],
-					stdout: JSON.stringify({ number: 3, title: "T", labels: [] }),
-				},
-			]),
-		);
-		const gh = await fakeBin(dir, "gh", "fake-gh", {
-			FAKE_TOOL: "gh",
-			FAKE_LOG: ghLog,
-			FAKE_RULES: rules,
-		});
-		const d = await decider(
-			[
-				{ name: "github_read_issue", arguments: { number: 3 } },
-				{ name: "decide", arguments: { label: "continue", notes: "ok" } },
-			],
-			{},
-			{ github: { gh } },
-		);
-		expect(await d.decide(input({ tools: ["github"] }))).toMatchObject({
-			kind: "decided",
-			label: "continue",
-		});
-		const argv = (await claudeRuns())[0]?.argv ?? [];
-		expect(flag(argv, "--allowedTools")?.split(",")).toEqual([
-			DECIDE_TOOL_ID,
-			...GITHUB_TOOL_IDS,
-		]);
-		expect(argv.slice(0, 3)).toEqual(["--strict-mcp-config", "--tools", ""]);
-		const ghCalls = (await readFile(ghLog, "utf8")).trim().split("\n");
-		expect(JSON.parse(ghCalls[0] ?? "{}").argv.slice(0, 3)).toEqual([
-			"issue",
-			"view",
-			"3",
-		]);
 	});
 });

@@ -23,7 +23,7 @@ Last updated: 2026-10-15
 
 ## Architecture
 
-- **Pattern:** Ports and adapters. The engine depends on interfaces. Harnesses, GitHub tools, and decider providers are adapters behind them.
+- **Pattern:** Ports and adapters. The engine depends on interfaces. Harnesses and decider providers are adapters behind them.
 - **Module structure:** A Bun workspace. `apps/server` is the daemon (Hono, oRPC, Better Auth, SSE). `apps/web` is the UI. `apps/desktop` is the Electrobun shell and holds no logic. `packages/db` owns the schema. `packages/api` owns the oRPC contracts. Planned: `packages/flows`, `packages/engine`, `packages/agents`. See `docs/PLAN.md`.
 - **State management:** The server stores durable facts in libsql and appends every change to an event log. The UI derives status from facts and subscribes to the event log over SSE through TanStack Query.
 - **Data flow:** UI → oRPC → engine → agents (harness or tool) → facts + event → SSE → UI. Everything runs in-process.

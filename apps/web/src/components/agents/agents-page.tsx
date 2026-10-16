@@ -41,15 +41,16 @@ import {
 	CircleAlertIcon,
 	GlobeIcon,
 	KeyRoundIcon,
+	PlugIcon,
 	PlusIcon,
 	SquareTerminalIcon,
-	WrenchIcon,
 } from "lucide-react";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import { CliCheckBadge } from "@/components/connections/cli-panel";
 import { ConnectionDialog } from "@/components/connections/connection-dialog";
 import { SecretsCard } from "@/components/connections/secrets-card";
 import type {
+	CliTool,
 	Connection,
 	ConnectionList,
 	SecretView,
@@ -58,9 +59,10 @@ import type {
 import { harnessInfo } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
 
+import { CliToolCheckBadge, CliToolDetail, CliToolDialog } from "./cli-tool";
 import { HarnessDetail, HarnessPicker } from "./harness-detail";
 import { newProfileDraft, ProfileDetail } from "./profile-detail";
-import { GithubToolsetDetail, ToolDetail, ToolPicker } from "./tool-detail";
+import { ToolDetail, ToolPicker } from "./tool-detail";
 import type { HarnessName, HarnessRow, ProfileRow } from "./types";
 
 /** What the detail pane shows, as it sits in the URL (`?item=profile:builder`). */
@@ -69,7 +71,7 @@ export type Selection =
 	| { kind: "new-profile" }
 	| { kind: "harness"; name: HarnessName }
 	| { kind: "tool"; name: string }
-	| { kind: "github" }
+	| { kind: "cli"; name: string }
 	| { kind: "secrets" };
 
 export function parseItem(item: string | undefined): Selection | null {
@@ -83,9 +85,9 @@ export function parseItem(item: string | undefined): Selection | null {
 				? { kind, name: name as HarnessName }
 				: null;
 		case "tool":
+		case "cli":
 			return name ? { kind, name } : null;
 		case "new-profile":
-		case "github":
 		case "secrets":
 			return { kind };
 		default:
@@ -114,6 +116,7 @@ export function AgentsPage({
 	const profiles = useQuery(orpc.profiles.list.queryOptions());
 	const harnesses = useQuery(orpc.harnesses.list.queryOptions());
 	const tools = useQuery(orpc.connections.list.queryOptions());
+	const cliTools = useQuery(orpc.cliTools.list.queryOptions());
 	const settings = useQuery(orpc.settings.get.queryOptions());
 	const [picking, setPicking] = useState<"harness" | "tool" | null>(null);
 	const [editing, setEditing] = useState<{
@@ -121,6 +124,10 @@ export function AgentsPage({
 		connection: Connection | null;
 		kind?: "command" | "url";
 	}>({ open: false, connection: null });
+	const [editingCli, setEditingCli] = useState<{
+		open: boolean;
+		tool: CliTool | null;
+	}>({ open: false, tool: null });
 
 	/** Shows it, unsaved changes or not: after a save, a delete, a cancel. */
 	const go = useCallback(
@@ -155,8 +162,13 @@ export function AgentsPage({
 	const isSel = (s: Selection) =>
 		selection !== null && itemOf(selection) === itemOf(s);
 
-	const error = profiles.error ?? harnesses.error ?? tools.error;
-	const loading = profiles.isPending || harnesses.isPending || tools.isPending;
+	const error =
+		profiles.error ?? harnesses.error ?? tools.error ?? cliTools.error;
+	const loading =
+		profiles.isPending ||
+		harnesses.isPending ||
+		tools.isPending ||
+		cliTools.isPending;
 
 	return (
 		<div className="flex h-[calc(100svh-3.5rem)] min-h-0">
@@ -229,17 +241,25 @@ export function AgentsPage({
 				<Separator />
 				<Group
 					title="Tools"
-					hint="MCP servers and tool sets"
+					hint="Programs and MCP servers for your agents"
 					addLabel="Add a tool"
 					onAdd={() => setPicking("tool")}
 				>
-					<ListItem
-						selected={isSel({ kind: "github" })}
-						onClick={() => select({ kind: "github" })}
-						icon={<WrenchIcon />}
-						title={<span className="font-mono">github</span>}
-						aside={<CliCheckBadge target="github" />}
-					/>
+					{cliTools.isPending ? (
+						<ListSkeleton />
+					) : (
+						(cliTools.data ?? []).map((t) => (
+							<ListItem
+								key={`cli:${t.name}`}
+								selected={isSel({ kind: "cli", name: t.name })}
+								onClick={() => select({ kind: "cli", name: t.name })}
+								icon={<SquareTerminalIcon />}
+								title={<span className="font-mono">{t.name}</span>}
+								description="CLI"
+								aside={<CliToolCheckBadge name={t.name} />}
+							/>
+						))
+					)}
 					{tools.isPending ? (
 						<ListSkeleton />
 					) : (
@@ -252,10 +272,9 @@ export function AgentsPage({
 									key={c.name}
 									selected={isSel({ kind: "tool", name: c.name })}
 									onClick={() => select({ kind: "tool", name: c.name })}
-									icon={
-										"url" in c.server ? <GlobeIcon /> : <SquareTerminalIcon />
-									}
+									icon={"url" in c.server ? <GlobeIcon /> : <PlugIcon />}
 									title={<span className="font-mono">{c.name}</span>}
+									description="MCP server"
 									aside={
 										missing > 0 ? (
 											<Badge variant="outline" className="text-status-waiting">
@@ -301,6 +320,7 @@ export function AgentsPage({
 										void profiles.refetch();
 										void harnesses.refetch();
 										void tools.refetch();
+										void cliTools.refetch();
 									}}
 								>
 									Try again
@@ -324,10 +344,12 @@ export function AgentsPage({
 						onGo={go}
 						onDirtyChange={setDirty}
 						onEditTool={(connection) => setEditing({ open: true, connection })}
+						onEditCliTool={(tool) => setEditingCli({ open: true, tool })}
 						data={{
 							profiles: profiles.data ?? [],
 							harnesses: harnesses.data ?? [],
 							connections,
+							cliTools: cliTools.data ?? [],
 							secrets,
 							settings: settings.data,
 						}}
@@ -346,8 +368,16 @@ export function AgentsPage({
 				onOpenChange={(open) => setPicking(open ? "tool" : null)}
 				onPick={(kind) => {
 					setPicking(null);
-					setEditing({ open: true, connection: null, kind });
+					if (kind === "cli") setEditingCli({ open: true, tool: null });
+					else setEditing({ open: true, connection: null, kind: "command" });
 				}}
+			/>
+			<CliToolDialog
+				open={editingCli.open}
+				onOpenChange={(open) => setEditingCli((e) => ({ ...e, open }))}
+				tool={editingCli.tool}
+				taken={(cliTools.data ?? []).map((t) => t.name)}
+				onSaved={(name) => select({ kind: "cli", name })}
 			/>
 			<ConnectionDialog
 				open={editing.open}
@@ -392,6 +422,7 @@ type PageData = {
 	profiles: ProfileRow[];
 	harnesses: HarnessRow[];
 	connections: ConnectionList["connections"];
+	cliTools: CliTool[];
 	secrets: SecretView[];
 	settings: SettingsView | undefined;
 };
@@ -402,6 +433,7 @@ function Detail({
 	onGo,
 	onDirtyChange,
 	onEditTool,
+	onEditCliTool,
 	data,
 }: {
 	selection: Selection | null;
@@ -411,6 +443,7 @@ function Detail({
 	onGo: (selection: Selection | null) => void;
 	onDirtyChange: (dirty: boolean) => void;
 	onEditTool: (connection: Connection) => void;
+	onEditCliTool: (tool: CliTool) => void;
 	data: PageData;
 }) {
 	const added = data.harnesses.filter((h) => h.added);
@@ -469,6 +502,7 @@ function Detail({
 					)}
 					profiles={data.profiles}
 					harnesses={added}
+					cliTools={data.cliTools}
 					connections={data.connections}
 					onSaved={(name) => onGo({ kind: "profile", name })}
 					onDeleted={() => onGo(null)}
@@ -506,16 +540,19 @@ function Detail({
 				/>
 			);
 		}
-		case "github":
+		case "cli": {
+			const tool = data.cliTools.find((t) => t.name === selection.name);
+			if (!tool) return <Gone what="tool" />;
 			return (
-				<GithubToolsetDetail
-					settings={data.settings}
-					profiles={data.profiles
-						.filter((p) => p.tools.includes("github"))
-						.map((p) => p.name)}
+				<CliToolDetail
+					key={tool.name}
+					tool={tool}
+					onEdit={() => onEditCliTool(tool)}
 					onOpenProfile={openProfile}
+					onRemoved={() => onGo(null)}
 				/>
 			);
+		}
 		case "secrets":
 			return (
 				<div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">

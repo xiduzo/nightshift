@@ -37,7 +37,7 @@
 			"effort": "high",
 			"permissionMode": "auto",
 			"session": "fresh",
-			"tools": ["github"],
+			"clis": ["gh"],
 			"timeoutMinutes": 90,
 			"idleMinutes": 30
 		},
@@ -76,7 +76,7 @@
 			"model": "opus",
 			"permissionMode": "auto",
 			"session": "resume",
-			"tools": ["github"],
+			"clis": ["gh"],
 			"timeoutMinutes": 75
 		},
 		{

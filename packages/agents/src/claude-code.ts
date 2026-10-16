@@ -19,11 +19,6 @@ import {
 	removeProjectionMarkers,
 	runAdapterSession,
 } from "./adapter-session";
-import {
-	GITHUB_TOOL_IDS,
-	type GithubToolsOptions,
-	githubTools,
-} from "./github";
 import { reportStepTool, stepReportSetup } from "./step-report";
 import { createTranslator, type Translator } from "./translate";
 import type {
@@ -43,15 +38,13 @@ export type ClaudeCodeProcessOptions = {
 	env?: Record<string, string>;
 	/** How long to wait for the process to stop after an abort. Default 5 s. */
 	abortGraceMs?: number;
-	/** How the GitHub tools run `gh` and `git` (tests use fakes). */
-	github?: Omit<GithubToolsOptions, "cwd">;
 };
 
 export type ClaudeCodeHarnessOptions = ClaudeCodeProcessOptions & {
 	/**
 	 * Built-in tools the session may use without a prompt (`--allowedTools`).
-	 * With `stepReport`, the report tool is added (see `step-report.ts`); with
-	 * the `github` tool set, the GitHub tools are added (see `github.ts`).
+	 * With `stepReport`, the report tool is added (see `step-report.ts`); the
+	 * session's CLI tools and MCP servers are added too (see `harnessSetup`).
 	 */
 	allowedTools?: string[];
 	/** Built-in tools removed from the session (`--disallowedTools`). */
@@ -296,24 +289,29 @@ export async function* runClaudeCodeSession(
 	});
 }
 
-/** The setup of an agent session: its prompt, the report tool, and the tool sets. */
+/**
+ * Claude Code permission rules that let the agent run each CLI tool in its
+ * shell without a prompt: `Bash(gh:*)` allows `gh` with any arguments. Plan
+ * mode runs nothing, so it gets none.
+ */
+export function cliAllowRules(
+	input: Pick<AgentSessionInput, "clis" | "permissionMode">,
+): string[] {
+	if (input.permissionMode === "plan") return [];
+	return (input.clis ?? []).map((name) => `Bash(${name}:*)`);
+}
+
+/** The setup of an agent session: its prompt, the report tool, its CLI tools and MCP servers. */
 export function harnessSetup(
 	input: AgentSessionInput,
 	options: ClaudeCodeHarnessOptions,
 ): SessionSetup {
 	const report = stepReportSetup(input, options.allowedTools);
-	const github = input.tools?.includes("github")
-		? githubTools({
-				...options.github,
-				cwd: input.cwd,
-				...(input.effects ? { effects: input.effects } : {}),
-			})
-		: [];
 	const mcpServers = input.mcpServers ?? {};
-	// The node lists its MCP servers on purpose, like its tool sets: their
-	// tools run without a prompt (`mcp__<server>` allows every tool of it).
+	// The node lists its CLI tools and MCP servers on purpose: they run
+	// without a prompt (`mcp__<server>` allows every tool of the server).
 	const extraAllowed = [
-		...(github.length > 0 ? GITHUB_TOOL_IDS : []),
+		...cliAllowRules(input),
 		...Object.keys(mcpServers).map((name) => `mcp__${name}`),
 	];
 	const allowedTools =
@@ -322,10 +320,7 @@ export function harnessSetup(
 			: report.allowedTools;
 	return {
 		prompt: report.prompt,
-		tools: [
-			...(report.withTool ? [reportStepTool(input.stepReport)] : []),
-			...github,
-		],
+		tools: [...(report.withTool ? [reportStepTool(input.stepReport)] : [])],
 		allowedTools,
 		...(options.disallowedTools
 			? { disallowedTools: options.disallowedTools }

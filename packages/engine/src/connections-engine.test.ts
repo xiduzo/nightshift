@@ -34,7 +34,7 @@ function makeEngine(
 	harness: AgentHarness,
 	options: Pick<
 		EngineOptions,
-		"settings" | "mcpServersFor" | "connectionNames"
+		"settings" | "mcpServersFor" | "connectionNames" | "cliNames" | "findCli"
 	> = {},
 	internals: EngineInternals = {},
 ): Engine {
@@ -60,7 +60,6 @@ function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
 		model: "sonnet",
 		permissionMode: "acceptEdits",
 		session: "fresh",
-		tools: [],
 		...extra,
 	};
 }
@@ -158,6 +157,57 @@ describe("connections at the start", () => {
 		names.add("tracker");
 		const run = await engine.startRun(input);
 		expect((await waitForEnd(engine, run.id)).status).toBe("finished");
+	});
+});
+
+describe("CLI tools at the start", () => {
+	test("a flow that names a CLI tool the daemon does not have refuses to start", async () => {
+		const harness = fakeHarness();
+		const engine = makeEngine(harness, {
+			cliNames: () => new Set(["gh"]),
+			findCli: (name) => `/bin/${name}`,
+		});
+		await expect(
+			engine.startRun({
+				projectId: await projectId(engine),
+				flow: flowOf([agent("worker", { clis: ["gh", "aws"] })]),
+			}),
+		).rejects.toThrow(
+			'The flow uses the CLI tool "aws" (worker), but no CLI tool has that name. Add it under Agents → Tools.',
+		);
+		expect(harness.calls).toHaveLength(0);
+	});
+
+	test("a flow that names a CLI tool this computer does not have refuses to start", async () => {
+		const engine = makeEngine(fakeHarness(), {
+			cliNames: () => new Set(["gh", "aws"]),
+			findCli: (name) => (name === "gh" ? "/bin/gh" : null),
+		});
+		await expect(
+			engine.startRun({
+				projectId: await projectId(engine),
+				flow: flowOf([agent("worker", { clis: ["gh", "aws"] })]),
+			}),
+		).rejects.toThrow(
+			'The flow uses the CLI tool "aws", but this computer does not have it. Install aws, or take it off the flow.',
+		);
+	});
+
+	test("the session gets the node's CLI tools", async () => {
+		const harness = fakeHarness();
+		const engine = makeEngine(harness, {
+			cliNames: () => new Set(["gh"]),
+			findCli: (name) => `/bin/${name}`,
+		});
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[agent("worker", { clis: ["gh"] }), agent("other")],
+				[{ id: "e1", from: "worker", outcome: "pass", to: "other" }],
+			),
+		});
+		expect((await waitForEnd(engine, run.id)).status).toBe("finished");
+		expect(harness.calls.map((c) => c.clis)).toEqual([["gh"], undefined]);
 	});
 });
 

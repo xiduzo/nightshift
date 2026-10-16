@@ -15,8 +15,7 @@
 			"harness": "claude-code",
 			"model": "sonnet",
 			"permissionMode": "acceptEdits",
-			"session": "fresh",
-			"tools": []
+			"session": "fresh"
 		}
 	],
 	"edges": []

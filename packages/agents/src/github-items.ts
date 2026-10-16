@@ -7,7 +7,7 @@
  * a shell. The query only reads.
  */
 import type { ListItem } from "@nightshift/flows";
-import { type ProcessResult, runProcess } from "./github";
+import { type ProcessResult, runProcess } from "./process";
 import type { GithubItemsInput } from "./types";
 
 /** One parent issue with one page of its sub-issues and their "blocked by" links. */

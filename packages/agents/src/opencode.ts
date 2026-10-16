@@ -16,10 +16,10 @@
  * session waiting. Every mode therefore sets each permission to `allow` or
  * `deny` (see `opencodePermission`); nothing asks.
  *
- * Tools. The adapter bridges `chat()` tools over MCP, so `report_step` and
- * the GitHub tools work as in Claude Code (OpenCode names them
- * `tanstack_<tool>`; the adapter maps them back). They are allowed in every
- * mode, plan mode too, so the report always uses the tool.
+ * Tools. The adapter bridges `chat()` tools over MCP, so `report_step` works
+ * as in Claude Code (OpenCode names it `tanstack_report_step`; the adapter
+ * maps it back). It is allowed in every mode, plan mode too, so the report
+ * always uses the tool.
  *
  * Versions. `@tanstack/ai-opencode` 0.5 speaks the OpenCode 1.x server API
  * (`@opencode-ai/sdk` 1.x). OpenCode 2.x serves a different API (`/api/…`,
@@ -56,7 +56,6 @@ import {
 	runAdapterSession,
 	shellQuote,
 } from "./adapter-session";
-import { type GithubToolsOptions, githubTools } from "./github";
 import { reportStepTool, stepReportSetup } from "./step-report";
 import {
 	createTranslator,
@@ -85,14 +84,14 @@ export type OpencodeHarnessOptions = {
 	config?: Record<string, unknown>;
 	/** How long to wait for the server to stop after an abort. Default 5 s. */
 	abortGraceMs?: number;
-	/** How the GitHub tools run `gh` and `git` (tests use fakes). */
-	github?: Omit<GithubToolsOptions, "cwd">;
 };
 
 /** The adapter's CUSTOM event with the session id. */
 export const OPENCODE_SESSION_EVENT = "opencode.session-id";
 
 type Action = "allow" | "deny";
+/** One permission: an action, or an action per pattern (`bash`: per command). */
+type Rule = Action | Record<string, Action>;
 
 /** OpenCode's built-in permissions (1.x). Each one is set, so none falls back to `ask`. */
 const PERMISSIONS = [
@@ -142,13 +141,16 @@ const READ_ONLY = new Set([
  *   edits, commands, the web and subagents are denied.
  *
  * Every mode denies `question` (no person to answer) and allows the bridged
- * tools (`tanstack_*`: `report_step`, the GitHub tools) and the tools of the
- * session's own MCP servers (`<server>_*`): the node listed them on purpose.
+ * tools (`tanstack_*`: `report_step`) and the tools of the session's own MCP
+ * servers (`<server>_*`): the node listed them on purpose. Its CLI tools
+ * (`clis`) are allowed in the shell when the mode denies other commands
+ * (`acceptEdits`, `default`); plan mode runs nothing.
  */
 export function opencodePermission(
 	mode: PermissionMode,
 	mcpServerNames: readonly string[] = [],
-): Record<string, Action> {
+	clis: readonly string[] = [],
+): Record<string, Rule> {
 	const set = (pick: (name: string) => Action): Record<string, Action> =>
 		Object.fromEntries(PERMISSIONS.map((name) => [name, pick(name)]));
 	let rules: Record<string, Action>;
@@ -192,7 +194,15 @@ export function opencodePermission(
 	rules.question = "deny";
 	rules["tanstack_*"] = "allow";
 	for (const name of mcpServerNames) rules[`${name}_*`] = "allow";
-	return rules;
+	if (rules.bash === "allow" || mode === "plan" || clis.length === 0) {
+		return rules;
+	}
+	const bash: Record<string, Action> = { "*": "deny" };
+	for (const name of clis) {
+		bash[name] = "allow";
+		bash[`${name} *`] = "allow";
+	}
+	return { ...rules, bash };
 }
 
 /** The adapter's own permission handler mode, for requests it does see. */
@@ -251,7 +261,7 @@ export function mergeConfig(
 
 /** The session's own OpenCode config, before the adapter's bridge. */
 export function opencodeSessionConfig(
-	input: Pick<AgentSessionInput, "permissionMode" | "mcpServers">,
+	input: Pick<AgentSessionInput, "permissionMode" | "mcpServers" | "clis">,
 	extra: Record<string, unknown> = {},
 ): Record<string, unknown> {
 	const servers = input.mcpServers ?? {};
@@ -259,7 +269,11 @@ export function opencodeSessionConfig(
 	return mergeConfig(extra, {
 		autoupdate: false,
 		share: "disabled",
-		permission: opencodePermission(input.permissionMode, names),
+		permission: opencodePermission(
+			input.permissionMode,
+			names,
+			input.clis ?? [],
+		),
 		...(names.length > 0 ? { mcp: opencodeMcpConfig(servers) } : {}),
 	});
 }
@@ -573,19 +587,9 @@ export function opencodeSetup(
 		{ ...input, permissionMode: "default" },
 		undefined,
 	);
-	const github = input.tools?.includes("github")
-		? githubTools({
-				...options.github,
-				cwd: input.cwd,
-				...(input.effects ? { effects: input.effects } : {}),
-			})
-		: [];
 	return {
 		prompt: report.prompt,
-		tools: [
-			...(report.withTool ? [reportStepTool(input.stepReport)] : []),
-			...github,
-		],
+		tools: [...(report.withTool ? [reportStepTool(input.stepReport)] : [])],
 		config: opencodeSessionConfig(input, options.config),
 	};
 }

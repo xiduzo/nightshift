@@ -28,19 +28,24 @@ const builder: AgentProfileSettings = {
 	model: "opus",
 	effort: "max",
 	permissionMode: "auto",
-	tools: ["github"],
+	clis: ["gh"],
 	connections: [],
 };
 
 function makeEngine(
 	harnesses: Partial<Record<HarnessName, AgentHarness>>,
-	options: Pick<EngineOptions, "profileFor" | "harnessNames"> = {},
+	options: Pick<
+		EngineOptions,
+		"profileFor" | "harnessNames" | "cliNames" | "findCli"
+	> = {},
 ): Engine {
 	return createEngine({
 		db: sandbox.db,
 		harnesses,
 		dataDir: sandbox.dataDir,
 		scheduler: false,
+		cliNames: () => new Set(["gh"]),
+		findCli: (name) => `/usr/local/bin/${name}`,
 		...options,
 	});
 }
@@ -53,7 +58,6 @@ function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
 		prompt: `Work as ${id}.`,
 		profile: "builder",
 		session: "fresh",
-		tools: [],
 		...extra,
 	};
 }
@@ -84,7 +88,7 @@ async function waitForEnd(engine: Engine, runId: string): Promise<RunDetail> {
 }
 
 describe("profiles at the start", () => {
-	test("the session runs with the profile's harness, model, effort, permission mode and tools", async () => {
+	test("the session runs with the profile's harness, model, effort, permission mode and CLI tools", async () => {
 		const harness = fakeHarness();
 		const engine = makeEngine(
 			{ "claude-code": harness },
@@ -100,7 +104,7 @@ describe("profiles at the start", () => {
 			model: "sonnet",
 			effort: "max",
 			permissionMode: "auto",
-			tools: ["github"],
+			clis: ["gh"],
 		});
 	});
 

@@ -433,6 +433,13 @@ export type EngineOptions = {
 	) => Promise<McpExpansion>;
 	/** The connections this daemon has. A flow that names another refuses to start. */
 	connectionNames?: () => ReadonlySet<string>;
+	/** The CLI tools this daemon has. A flow that names another refuses to start. */
+	cliNames?: () => ReadonlySet<string>;
+	/**
+	 * Where a CLI tool is on this computer, or null. A flow that names one it
+	 * cannot find refuses to start. Default: `Bun.which`.
+	 */
+	findCli?: (name: string) => string | null;
 	/**
 	 * The harnesses added on the Agents page, read when a run starts and
 	 * when a session starts. A harness left out cannot run an Agent node,

@@ -2,6 +2,7 @@ export {
 	type ClaudeCodeHarnessOptions,
 	type ClaudeCodeProcessOptions,
 	claudeCodeHarness,
+	cliAllowRules,
 } from "./claude-code";
 export {
 	type CodexHarnessOptions,
@@ -17,6 +18,7 @@ export {
 } from "./decider";
 export {
 	type CliCheck,
+	checkCli,
 	checkGithub,
 	checkHarness,
 	HARNESS_ADAPTERS,
@@ -24,6 +26,7 @@ export {
 	type HarnessModels,
 	harnessModels,
 	type McpTestResult,
+	pathPrograms,
 	resolveBin,
 	testMcpServer,
 } from "./doctor";
@@ -33,13 +36,6 @@ export {
 	fakeDecider,
 	fakeHarness,
 } from "./fake";
-export {
-	GITHUB_TOOL_IDS,
-	GITHUB_TOOL_NAMES,
-	type GithubToolName,
-	type GithubToolsOptions,
-	githubTools,
-} from "./github";
 export {
 	type GithubItemsOptions,
 	readGithubItems,
