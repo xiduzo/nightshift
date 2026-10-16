@@ -1,9 +1,9 @@
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@nightshift/ui/components/spinner";
 
 export default function Loader() {
 	return (
-		<div className="flex h-full items-center justify-center pt-8">
-			<Loader2 className="animate-spin" />
+		<div className="flex h-full flex-1 items-center justify-center p-8 text-muted-foreground">
+			<Spinner className="size-5" />
 		</div>
 	);
 }

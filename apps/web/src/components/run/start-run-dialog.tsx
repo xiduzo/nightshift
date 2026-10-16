@@ -1,6 +1,5 @@
 import type { FlowInputDef } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
-import { Checkbox } from "@nightshift/ui/components/checkbox";
 import {
 	Dialog,
 	DialogClose,
@@ -10,8 +9,17 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@nightshift/ui/components/dialog";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldGroup,
+	FieldLabel,
+	FieldSeparator,
+} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
-import { Label } from "@nightshift/ui/components/label";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import { Switch } from "@nightshift/ui/components/switch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { PlayIcon } from "lucide-react";
@@ -144,7 +152,7 @@ export function StartRunDialog({
 }) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent>
+			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
 				{open ? (
 					<StartRunForm
 						projectId={projectId}
@@ -240,52 +248,86 @@ function StartRunForm({
 				</DialogDescription>
 			</DialogHeader>
 
-			<FlowInputFields
-				idPrefix={id}
-				inputs={inputs}
-				values={values}
-				onChange={setValues}
-			/>
-
-			<div className="flex flex-col gap-1.5">
-				<Label htmlFor={`${id}-base`}>
-					Start from
-					<span className="text-muted-foreground">(optional)</span>
-				</Label>
-				<Input
-					id={`${id}-base`}
-					value={baseRef}
-					list={`${id}-refs`}
-					placeholder={
-						lastBase
-							? `The current branch (last: ${lastBase})`
-							: "The current branch"
-					}
-					className="font-mono"
-					autoComplete="off"
-					spellCheck={false}
-					aria-describedby={`${id}-base-hint`}
-					onChange={(event) => setBaseRef(event.target.value)}
+			<FieldGroup className="gap-6">
+				<FlowInputFields
+					idPrefix={id}
+					inputs={inputs}
+					values={values}
+					onChange={setValues}
 				/>
-				<datalist id={`${id}-refs`}>
-					{recentRefs.map((ref) => (
-						<option key={ref} value={ref} />
-					))}
-				</datalist>
-				<p id={`${id}-base-hint`} className="text-muted-foreground text-xs">
-					A branch, tag or commit to branch the worktree from, for example the
-					top of an open stack. Empty starts from the clone's current branch.
-				</p>
-			</div>
 
-			<div className="flex flex-col gap-2">
-				<div className="flex items-center gap-2">
-					<Checkbox
+				{inputs.length > 0 ? <FieldSeparator /> : null}
+
+				<Field>
+					<FieldLabel htmlFor={`${id}-base`}>
+						Start from
+						<span className="font-normal text-muted-foreground">
+							(optional)
+						</span>
+					</FieldLabel>
+					<Input
+						id={`${id}-base`}
+						value={baseRef}
+						list={`${id}-refs`}
+						placeholder={
+							lastBase
+								? `The current branch (last: ${lastBase})`
+								: "The current branch"
+						}
+						className="font-mono"
+						autoComplete="off"
+						spellCheck={false}
+						aria-describedby={`${id}-base-hint`}
+						onChange={(event) => setBaseRef(event.target.value)}
+					/>
+					<datalist id={`${id}-refs`}>
+						{recentRefs.map((ref) => (
+							<option key={ref} value={ref} />
+						))}
+					</datalist>
+					<FieldDescription id={`${id}-base-hint`}>
+						A branch, tag or commit to branch the worktree from, for example the
+						top of an open stack. Empty starts from the clone's current branch.
+					</FieldDescription>
+				</Field>
+
+				<Field
+					orientation="horizontal"
+					data-invalid={stopInvalid || undefined}
+					className="items-start"
+				>
+					<Switch
 						id={`${id}-on`}
 						checked={stop.on}
+						className="mt-0.5"
 						onCheckedChange={(on) => setStop((current) => ({ ...current, on }))}
 					/>
-					<Label htmlFor={`${id}-on`}>Stop at a time</Label>
+					<FieldContent>
+						<FieldLabel htmlFor={`${id}-on`}>Stop at a time</FieldLabel>
+						<FieldDescription
+							id={`${id}-hint`}
+							aria-live="polite"
+							className={stopInvalid ? "text-destructive" : undefined}
+						>
+							{!stop.on ? (
+								"No stop time: the run goes until its flow ends."
+							) : stopAt === null ? (
+								"Enter a time, for example 07:00."
+							) : (
+								<>
+									Stops{" "}
+									<time
+										dateTime={new Date(stopAt).toISOString()}
+										className="font-medium text-foreground"
+									>
+										{dayWord(stopAt, now)}, {formatDayTime(stopAt)}
+									</time>{" "}
+									(in {formatWaited(stopAt - now)}). No new step starts after
+									it; the run then ends as stopped.
+								</>
+							)}
+						</FieldDescription>
+					</FieldContent>
 					<Input
 						id={`${id}-time`}
 						type="time"
@@ -294,40 +336,13 @@ function StartRunForm({
 						aria-label="Stop time"
 						aria-invalid={stopInvalid}
 						aria-describedby={`${id}-hint`}
-						className="ml-auto h-7 w-28 font-mono tabular-nums"
+						className="w-28 shrink-0 font-mono tabular-nums"
 						onChange={(event) =>
 							setStop({ on: true, time: event.target.value })
 						}
 					/>
-				</div>
-				<p
-					id={`${id}-hint`}
-					aria-live="polite"
-					className={
-						stopInvalid
-							? "text-destructive text-xs"
-							: "text-muted-foreground text-xs"
-					}
-				>
-					{!stop.on ? (
-						"No stop time: the run goes until its flow ends."
-					) : stopAt === null ? (
-						"Enter a time, for example 07:00."
-					) : (
-						<>
-							Stops{" "}
-							<time
-								dateTime={new Date(stopAt).toISOString()}
-								className="font-medium text-foreground"
-							>
-								{dayWord(stopAt, now)}, {formatDayTime(stopAt)}
-							</time>{" "}
-							(in {formatWaited(stopAt - now)}). No new step starts after it;
-							the run then ends as stopped.
-						</>
-					)}
-				</p>
-			</div>
+				</Field>
+			</FieldGroup>
 
 			<DialogFooter>
 				<DialogClose render={<Button variant="outline" type="button" />}>
@@ -344,7 +359,11 @@ function StartRunForm({
 								: undefined
 					}
 				>
-					<PlayIcon data-icon="inline-start" />
+					{startRun.isPending ? (
+						<Spinner data-icon="inline-start" />
+					) : (
+						<PlayIcon data-icon="inline-start" />
+					)}
 					{startRun.isPending ? "Starting…" : "Start"}
 				</Button>
 			</DialogFooter>

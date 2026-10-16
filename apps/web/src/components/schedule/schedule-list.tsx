@@ -1,4 +1,5 @@
 import { describeCron, type Schedule } from "@nightshift/flows";
+import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -10,18 +11,43 @@ import {
 	AlertDialogTitle,
 } from "@nightshift/ui/components/alert-dialog";
 import { Button } from "@nightshift/ui/components/button";
-import { Checkbox } from "@nightshift/ui/components/checkbox";
+import {
+	Card,
+	CardAction,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@nightshift/ui/components/card";
 import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
+	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import { Switch } from "@nightshift/ui/components/switch";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@nightshift/ui/components/table";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@nightshift/ui/components/tooltip";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	CalendarClockIcon,
+	CircleAlertIcon,
 	PencilIcon,
 	PlusIcon,
 	Trash2Icon,
@@ -114,63 +140,108 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 	};
 
 	return (
-		<section
-			aria-labelledby="schedules-heading"
-			className="flex flex-col gap-3"
-		>
-			<div className="flex items-center gap-2">
-				<h2 id="schedules-heading" className="font-medium text-sm">
-					Schedules
-				</h2>
-				<Button
-					variant="outline"
-					size="xs"
-					className="ml-auto"
-					disabled={list.isLoading}
-					onClick={() => setEditing({ schedule: null })}
-				>
-					<PlusIcon data-icon="inline-start" />
-					New schedule
-				</Button>
-			</div>
+		<Card className="gap-0 pb-0">
+			<CardHeader className="border-b pb-4 [.border-b]:pb-4">
+				<CardTitle>
+					<h2 id="schedules-heading">Schedules</h2>
+				</CardTitle>
+				<CardDescription>
+					Flows the daemon starts on its own, saved in{" "}
+					<span className="font-mono text-xs">.nightshift/schedules.json</span>
+				</CardDescription>
+				<CardAction>
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={list.isLoading}
+						onClick={() => setEditing({ schedule: null })}
+					>
+						<PlusIcon data-icon="inline-start" />
+						<span className="max-sm:sr-only">New schedule</span>
+					</Button>
+				</CardAction>
+			</CardHeader>
+			<CardContent className="px-0">
+				<section aria-labelledby="schedules-heading">
+					{list.data && list.data.issues.length > 0 ? (
+						<div className="px-6 pt-4">
+							<Alert>
+								<CircleAlertIcon aria-hidden="true" />
+								<AlertDescription>
+									<IssueLines issues={list.data.issues} />
+								</AlertDescription>
+							</Alert>
+						</div>
+					) : null}
 
-			{list.data && list.data.issues.length > 0 ? (
-				<IssueLines issues={list.data.issues} />
-			) : null}
-
-			{list.isLoading ? (
-				<Skeleton className="h-14 w-full" />
-			) : schedules.length === 0 ? (
-				<Empty className="border p-6 md:p-6">
-					<EmptyHeader>
-						<EmptyTitle>No schedules</EmptyTitle>
-						<EmptyDescription>
-							{list.error
-								? list.error.message
-								: "Start a flow without a person, for example every night at 22:00 with a stop time of 07:00."}
-						</EmptyDescription>
-					</EmptyHeader>
-				</Empty>
-			) : (
-				<ul className="flex flex-col divide-y border">
-					{schedules.map((schedule) => (
-						<ScheduleRow
-							key={schedule.id}
-							schedule={schedule}
-							busy={save.isPending}
-							onToggle={(enabled) =>
-								saveAll(
-									schedules.map((s) =>
-										s.id === schedule.id ? { ...plain(s), enabled } : plain(s),
-									),
-								)
-							}
-							onEdit={() => setEditing({ schedule: plain(schedule) })}
-							onDelete={() => setToDelete(schedule)}
-						/>
-					))}
-				</ul>
-			)}
+					{list.isLoading ? (
+						<div className="flex flex-col gap-2 px-6 py-4">
+							<Skeleton className="h-10 w-full" />
+						</div>
+					) : schedules.length === 0 ? (
+						<Empty className="py-10 md:py-10">
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<CalendarClockIcon aria-hidden="true" />
+								</EmptyMedia>
+								<EmptyTitle>No schedules</EmptyTitle>
+								<EmptyDescription>
+									{list.error
+										? list.error.message
+										: "Start a flow without a person, for example every night at 22:00 with a stop time of 07:00."}
+								</EmptyDescription>
+							</EmptyHeader>
+							{list.error ? null : (
+								<EmptyContent>
+									<Button onClick={() => setEditing({ schedule: null })}>
+										<PlusIcon data-icon="inline-start" />
+										New schedule
+									</Button>
+								</EmptyContent>
+							)}
+						</Empty>
+					) : (
+						<Table>
+							<TableHeader>
+								<TableRow className="hover:bg-transparent">
+									<TableHead className="pl-6">Flow</TableHead>
+									<TableHead className="hidden md:table-cell">When</TableHead>
+									<TableHead className="hidden lg:table-cell">
+										Next start
+									</TableHead>
+									<TableHead className="hidden xl:table-cell">
+										Last start
+									</TableHead>
+									<TableHead className="w-0">On</TableHead>
+									<TableHead className="w-0 pr-6">
+										<span className="sr-only">Actions</span>
+									</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{schedules.map((schedule) => (
+									<ScheduleRow
+										key={schedule.id}
+										schedule={schedule}
+										busy={save.isPending}
+										onToggle={(enabled) =>
+											saveAll(
+												schedules.map((s) =>
+													s.id === schedule.id
+														? { ...plain(s), enabled }
+														: plain(s),
+												),
+											)
+										}
+										onEdit={() => setEditing({ schedule: plain(schedule) })}
+										onDelete={() => setToDelete(schedule)}
+									/>
+								))}
+							</TableBody>
+						</Table>
+					)}
+				</section>
+			</CardContent>
 
 			<ScheduleDialog
 				open={editing !== null}
@@ -214,12 +285,13 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 								);
 							}}
 						>
+							{save.isPending ? <Spinner data-icon="inline-start" /> : null}
 							{save.isPending ? "Removing…" : "Remove schedule"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-		</section>
+		</Card>
 	);
 }
 
@@ -237,82 +309,113 @@ function ScheduleRow({
 	onDelete: () => void;
 }) {
 	const now = useNow(30_000);
-	const toggleId = `schedule-${schedule.id}-on`;
 	const errors = schedule.issues.filter((issue) => issue.severity === "error");
+	const when = (
+		<>
+			{describeCron(schedule.cron)}
+			{schedule.stopAt ? `, stops ${schedule.stopAt}` : ""}
+		</>
+	);
+	const next = !schedule.enabled ? (
+		"Paused"
+	) : schedule.nextAt === null ? (
+		"No next start"
+	) : schedule.nextAt <= now ? (
+		"Starts now"
+	) : (
+		<>
+			<time
+				dateTime={new Date(schedule.nextAt).toISOString()}
+				title={formatDateTime(schedule.nextAt)}
+				className="text-foreground"
+			>
+				{dayWord(schedule.nextAt, now)}, {formatDayTime(schedule.nextAt)}
+			</time>{" "}
+			<span className="tabular-nums">
+				(in {formatWaited(schedule.nextAt - now)})
+			</span>
+		</>
+	);
 	return (
-		<li className="flex items-start gap-3 px-3 py-2">
-			<CalendarClockIcon
-				className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-				aria-hidden="true"
-			/>
-			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-				<div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-					<span className="truncate font-medium font-mono text-sm">
+		<TableRow
+			className={schedule.enabled ? undefined : "text-muted-foreground"}
+		>
+			<TableCell className="w-full max-w-0 whitespace-normal py-3 pl-6 align-top">
+				<div className="flex min-w-0 flex-col gap-0.5">
+					<span className="truncate font-medium font-mono">
 						{schedule.flow}
 					</span>
-					<span className="text-xs">
-						{describeCron(schedule.cron)}
-						{schedule.stopAt ? `, stops ${schedule.stopAt}` : ""}
+					<InputsLine inputs={schedule.inputs} baseRef={schedule.baseRef} />
+					{/* The hidden columns, as lines, on narrow screens. */}
+					<span className="text-xs md:hidden">{when}</span>
+					<span className="text-muted-foreground text-xs lg:hidden">
+						{schedule.enabled && schedule.nextAt !== null ? "Next " : null}
+						{next}
+					</span>
+					<div className="xl:hidden">
+						{schedule.last ? <LastResult result={schedule.last} /> : null}
+					</div>
+					{errors.length > 0 ? <IssueLines issues={errors} /> : null}
+				</div>
+			</TableCell>
+			<TableCell className="hidden whitespace-normal py-3 align-top md:table-cell">
+				<div className="flex flex-col gap-0.5">
+					<span>{when}</span>
+					<span className="font-mono text-muted-foreground text-xs">
+						{schedule.cron}
 					</span>
 				</div>
-				<InputsLine inputs={schedule.inputs} baseRef={schedule.baseRef} />
-				<p className="text-muted-foreground text-xs">
-					{!schedule.enabled ? (
-						"Paused"
-					) : schedule.nextAt === null ? (
-						"No next start"
-					) : schedule.nextAt <= now ? (
-						"Starts now"
-					) : (
-						<>
-							Next{" "}
-							<time
-								dateTime={new Date(schedule.nextAt).toISOString()}
-								title={formatDateTime(schedule.nextAt)}
-								className="text-foreground"
-							>
-								{dayWord(schedule.nextAt, now)},{" "}
-								{formatDayTime(schedule.nextAt)}
-							</time>{" "}
-							(in {formatWaited(schedule.nextAt - now)})
-						</>
-					)}
-				</p>
-				{schedule.last ? <LastResult result={schedule.last} /> : null}
-				{errors.length > 0 ? <IssueLines issues={errors} /> : null}
-			</div>
-			<div className="flex shrink-0 items-center gap-1">
-				<div className="mr-1 flex items-center gap-1.5">
-					<Checkbox
-						id={toggleId}
-						checked={schedule.enabled}
-						disabled={busy}
-						onCheckedChange={(checked) => onToggle(checked === true)}
-					/>
-					<label htmlFor={toggleId} className="text-xs">
-						On
-					</label>
+			</TableCell>
+			<TableCell className="hidden py-3 align-top text-muted-foreground lg:table-cell">
+				{next}
+			</TableCell>
+			<TableCell className="hidden py-3 align-top xl:table-cell">
+				{schedule.last ? <LastResult result={schedule.last} /> : "—"}
+			</TableCell>
+			<TableCell className="w-0 py-3 align-top">
+				<Switch
+					checked={schedule.enabled}
+					disabled={busy}
+					aria-label={`Schedule of ${schedule.flow} on`}
+					onCheckedChange={(checked) => onToggle(checked === true)}
+					className="mt-0.5"
+				/>
+			</TableCell>
+			<TableCell className="w-0 py-3 pr-6 align-top">
+				<div className="-my-1 flex items-center gap-0.5">
+					<Tooltip>
+						<TooltipTrigger
+							render={
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									aria-label={`Edit the schedule of ${schedule.flow}`}
+									onClick={onEdit}
+								/>
+							}
+						>
+							<PencilIcon />
+						</TooltipTrigger>
+						<TooltipContent>Edit schedule</TooltipContent>
+					</Tooltip>
+					<Tooltip>
+						<TooltipTrigger
+							render={
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									aria-label={`Remove the schedule of ${schedule.flow}`}
+									onClick={onDelete}
+								/>
+							}
+						>
+							<Trash2Icon />
+						</TooltipTrigger>
+						<TooltipContent>Remove schedule</TooltipContent>
+					</Tooltip>
 				</div>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label={`Edit the schedule of ${schedule.flow}`}
-					title="Edit schedule"
-					onClick={onEdit}
-				>
-					<PencilIcon />
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label={`Remove the schedule of ${schedule.flow}`}
-					title="Remove schedule"
-					onClick={onDelete}
-				>
-					<Trash2Icon />
-				</Button>
-			</div>
-		</li>
+			</TableCell>
+		</TableRow>
 	);
 }
 
@@ -329,7 +432,7 @@ function InputsLine({
 	);
 	if (parts.length === 0 && !baseRef) return null;
 	return (
-		<p className="truncate font-mono text-[11px] text-muted-foreground">
+		<p className="truncate font-mono text-muted-foreground text-xs">
 			{parts.join(" ")}
 			{baseRef ? `${parts.length > 0 ? " · " : ""}from ${baseRef}` : ""}
 		</p>
@@ -347,12 +450,12 @@ function LastResult({ result }: { result: ScheduleResult }) {
 	);
 	if (result.kind === "fired") {
 		return (
-			<p className="flex flex-wrap items-center gap-x-1.5 text-muted-foreground text-xs">
-				<span>Last {when}:</span>
+			<p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-muted-foreground text-xs">
+				<span>{when}</span>
 				<Link
 					to="/runs/$runId"
 					params={{ runId: result.runId }}
-					className="flex items-center gap-1.5 underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+					className="flex items-center gap-1.5 rounded-4xl underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
 				>
 					{result.runStatus ? (
 						<RunStatusBadge status={result.runStatus} />
@@ -365,13 +468,13 @@ function LastResult({ result }: { result: ScheduleResult }) {
 	}
 	if (result.kind === "failed") {
 		return (
-			<p className="text-destructive text-xs">
-				Last {when}: did not start. {result.error}
+			<p className="whitespace-normal text-destructive text-xs">
+				{when}: did not start. {result.error}
 			</p>
 		);
 	}
 	return (
-		<p className="text-muted-foreground text-xs">
+		<p className="whitespace-normal text-muted-foreground text-xs">
 			Skipped {formatTime(result.at)}: {result.reason}
 			{result.runId ? (
 				<>
@@ -397,8 +500,8 @@ function IssueLines({ issues }: { issues: readonly ScheduleIssue[] }) {
 					key={`${issue.scheduleId ?? ""}:${issue.message}`}
 					className={
 						issue.severity === "error"
-							? "text-destructive text-xs"
-							: "text-muted-foreground text-xs"
+							? "whitespace-normal text-destructive text-xs"
+							: "whitespace-normal text-muted-foreground text-xs"
 					}
 				>
 					{issue.message}

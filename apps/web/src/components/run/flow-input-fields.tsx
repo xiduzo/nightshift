@@ -1,6 +1,15 @@
 import type { FlowInputDef, JsonValue } from "@nightshift/flows";
+import { Badge } from "@nightshift/ui/components/badge";
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
-import { Label } from "@nightshift/ui/components/label";
 import { Textarea } from "@nightshift/ui/components/textarea";
 
 /** What the person typed per input: text, or JSON text for a `json` input. */
@@ -80,65 +89,70 @@ export function FlowInputFields({
 }) {
 	if (inputs.length === 0) return null;
 	return (
-		<fieldset className="flex flex-col gap-3">
-			<legend className="sr-only">Inputs</legend>
-			{inputs.map((input) => {
-				const fieldId = `${idPrefix}-input-${input.name}`;
-				const value = values[input.name] ?? "";
-				const problem = jsonProblem(input, value);
-				const hint = problem ? `Not JSON: ${problem}` : input.description;
-				const set = (next: string) =>
-					onChange({ ...values, [input.name]: next });
-				return (
-					<div key={input.name} className="flex flex-col gap-1.5">
-						<Label htmlFor={fieldId}>
-							{input.label || input.name}
+		<FieldSet className="gap-4">
+			<FieldLegend variant="label" className="sr-only">
+				Inputs
+			</FieldLegend>
+			<FieldGroup className="gap-5">
+				{inputs.map((input) => {
+					const fieldId = `${idPrefix}-input-${input.name}`;
+					const value = values[input.name] ?? "";
+					const problem = jsonProblem(input, value);
+					const hint = problem ? `Not JSON: ${problem}` : input.description;
+					const set = (next: string) =>
+						onChange({ ...values, [input.name]: next });
+					return (
+						<Field
+							key={input.name}
+							data-invalid={problem !== null || undefined}
+						>
+							<FieldLabel htmlFor={fieldId}>
+								{input.label || input.name}
+								{input.type === "json" ? (
+									<Badge variant="secondary" className="font-mono font-normal">
+										json
+									</Badge>
+								) : null}
+								{input.required ? (
+									<span className="font-normal text-muted-foreground">
+										(required)
+									</span>
+								) : null}
+							</FieldLabel>
 							{input.type === "json" ? (
-								<span className="font-mono text-muted-foreground">json</span>
+								<Textarea
+									id={fieldId}
+									value={value}
+									placeholder={input.default ?? '{"title": "…"}'}
+									className="max-h-60 min-h-20 font-mono text-xs md:text-xs"
+									spellCheck={false}
+									aria-required={input.required === true}
+									aria-invalid={problem !== null}
+									aria-describedby={hint ? `${fieldId}-hint` : undefined}
+									onChange={(event) => set(event.target.value)}
+								/>
+							) : (
+								<Input
+									id={fieldId}
+									value={value}
+									placeholder={input.default}
+									autoComplete="off"
+									aria-required={input.required === true}
+									aria-describedby={hint ? `${fieldId}-hint` : undefined}
+									onChange={(event) => set(event.target.value)}
+								/>
+							)}
+							{problem ? (
+								<FieldError id={`${fieldId}-hint`}>{hint}</FieldError>
+							) : hint ? (
+								<FieldDescription id={`${fieldId}-hint`}>
+									{hint}
+								</FieldDescription>
 							) : null}
-							{input.required ? (
-								<span className="text-muted-foreground">(required)</span>
-							) : null}
-						</Label>
-						{input.type === "json" ? (
-							<Textarea
-								id={fieldId}
-								value={value}
-								placeholder={input.default ?? '{"title": "…"}'}
-								className="max-h-60 min-h-20 font-mono text-xs"
-								spellCheck={false}
-								aria-required={input.required === true}
-								aria-invalid={problem !== null}
-								aria-describedby={hint ? `${fieldId}-hint` : undefined}
-								onChange={(event) => set(event.target.value)}
-							/>
-						) : (
-							<Input
-								id={fieldId}
-								value={value}
-								placeholder={input.default}
-								autoComplete="off"
-								aria-required={input.required === true}
-								aria-describedby={hint ? `${fieldId}-hint` : undefined}
-								onChange={(event) => set(event.target.value)}
-							/>
-						)}
-						{hint ? (
-							<p
-								id={`${fieldId}-hint`}
-								role={problem ? "alert" : undefined}
-								className={
-									problem
-										? "text-destructive text-xs"
-										: "text-muted-foreground text-xs"
-								}
-							>
-								{hint}
-							</p>
-						) : null}
-					</div>
-				);
-			})}
-		</fieldset>
+						</Field>
+					);
+				})}
+			</FieldGroup>
+		</FieldSet>
 	);
 }

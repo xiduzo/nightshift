@@ -6,7 +6,6 @@ import {
 	timeAndDaysToCron,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
-import { Checkbox } from "@nightshift/ui/components/checkbox";
 import {
 	Dialog,
 	DialogClose,
@@ -16,12 +15,33 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@nightshift/ui/components/dialog";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
-import { Label } from "@nightshift/ui/components/label";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import { Switch } from "@nightshift/ui/components/switch";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@nightshift/ui/components/tabs";
+import {
+	ToggleGroup,
+	ToggleGroupItem,
+} from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
@@ -97,7 +117,7 @@ export function ScheduleDialog({
 }) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
 				{open ? (
 					<ScheduleForm
 						projectId={projectId}
@@ -207,12 +227,19 @@ function ScheduleForm({
 		});
 	};
 
-	const toggleDay = (day: number) => {
-		if (when.mode !== "simple") return;
-		const days = when.days.includes(day)
-			? when.days.filter((d) => d !== day)
-			: [...when.days, day].sort((a, b) => a - b);
-		setWhen({ ...when, days });
+	/** Switches between time-and-days and a cron line, keeping what it can. */
+	const setMode = (mode: When["mode"]) => {
+		if (mode === when.mode) return;
+		if (mode === "cron") {
+			setWhen({ mode: "cron", cron: cron ?? "0 22 * * *" });
+		} else if (when.mode === "cron") {
+			const simple = cronToTimeAndDays(when.cron);
+			setWhen(
+				simple
+					? { mode: "simple", ...simple }
+					: { mode: "simple", time: DEFAULT_TIME, days: EVERY_DAY },
+			);
+		}
 	};
 
 	return (
@@ -232,234 +259,238 @@ function ScheduleForm({
 				</DialogDescription>
 			</DialogHeader>
 
-			<div className="flex flex-col gap-1.5">
-				<Label htmlFor={`${id}-flow`}>Flow</Label>
-				<NativeSelect
-					id={`${id}-flow`}
-					value={chosen}
-					disabled={flowNames.length === 0}
-					className="font-mono"
-					onChange={(event) => setFlow(event.target.value)}
-				>
-					{flowNames.length === 0 ? (
-						<NativeSelectOption value="">No flows yet</NativeSelectOption>
-					) : null}
-					{(list.data ?? []).map((item) => (
-						<NativeSelectOption key={item.name} value={item.name}>
-							{item.name}
-							{item.errorCount > 0 ? " (has errors)" : ""}
-						</NativeSelectOption>
-					))}
-				</NativeSelect>
-				{chosenItem && chosenItem.errorCount > 0 ? (
-					<p className="text-destructive text-xs">
-						This flow has errors: a start fails until they are fixed.
-					</p>
-				) : null}
-			</div>
-
-			<FlowInputFields
-				idPrefix={id}
-				inputs={inputs}
-				values={values}
-				onChange={setValues}
-			/>
-
-			<fieldset
-				className="flex flex-col gap-2"
-				aria-labelledby={`${id}-starts`}
-			>
-				<div className="flex items-center gap-2">
-					<span id={`${id}-starts`} className="font-medium text-xs">
-						Starts
-					</span>
-					<Button
-						type="button"
-						variant="link"
-						size="xs"
-						className="ml-auto h-auto px-0"
-						aria-pressed={when.mode === "cron"}
-						onClick={() => {
-							if (when.mode === "simple") {
-								setWhen({ mode: "cron", cron: cron ?? "0 22 * * *" });
-							} else {
-								const simple = cronToTimeAndDays(when.cron);
-								setWhen(
-									simple
-										? { mode: "simple", ...simple }
-										: { mode: "simple", time: DEFAULT_TIME, days: EVERY_DAY },
-								);
-							}
-						}}
-					>
-						{when.mode === "simple"
-							? "Advanced: cron line"
-							: "Simple: time and days"}
-					</Button>
-				</div>
-				{when.mode === "simple" ? (
-					<div className="flex flex-col gap-2">
-						<div className="flex items-center gap-2">
-							<Label htmlFor={`${id}-time`} className="sr-only">
-								Start time
-							</Label>
-							<Input
-								id={`${id}-time`}
-								type="time"
-								value={when.time}
-								className="h-7 w-28 font-mono tabular-nums"
-								onChange={(event) =>
-									setWhen({ ...when, time: event.target.value })
-								}
-							/>
-							<span className="text-muted-foreground text-xs">on</span>
-							<div className="ml-auto flex gap-1">
-								<Button
-									type="button"
-									size="xs"
-									variant="ghost"
-									onClick={() => setWhen({ ...when, days: EVERY_DAY })}
-								>
-									Every day
-								</Button>
-								<Button
-									type="button"
-									size="xs"
-									variant="ghost"
-									onClick={() => setWhen({ ...when, days: WEEKDAYS })}
-								>
-									Weekdays
-								</Button>
-							</div>
-						</div>
-						<fieldset className="grid grid-cols-7 gap-1" aria-label="Days">
-							{WEEK.map(({ day, short, long }) => {
-								const on = when.days.includes(day);
-								return (
-									<Button
-										key={day}
-										type="button"
-										size="xs"
-										variant={on ? "default" : "outline"}
-										aria-pressed={on}
-										aria-label={long}
-										onClick={() => toggleDay(day)}
-									>
-										{short}
-									</Button>
-								);
-							})}
-						</fieldset>
-					</div>
-				) : (
-					<div className="flex flex-col gap-1.5">
-						<Label htmlFor={`${id}-cron`} className="sr-only">
-							Cron line
-						</Label>
-						<Input
-							id={`${id}-cron`}
-							value={when.cron}
-							placeholder="0 22 * * 1-5"
-							className="font-mono"
-							autoComplete="off"
-							spellCheck={false}
-							aria-invalid={cronProblem !== null}
-							aria-describedby={`${id}-when`}
-							onChange={(event) =>
-								setWhen({ mode: "cron", cron: event.target.value })
-							}
-						/>
-						<p className="text-muted-foreground text-xs">
-							Five fields: minute, hour, day of the month, month, day of the
-							week. On the daemon's clock.
-						</p>
-					</div>
-				)}
-				<p
-					id={`${id}-when`}
-					aria-live="polite"
-					className={
-						cronProblem
-							? "text-destructive text-xs"
-							: "text-muted-foreground text-xs"
+			<FieldGroup className="gap-6">
+				<Field
+					data-invalid={
+						(chosenItem !== undefined && chosenItem.errorCount > 0) || undefined
 					}
 				>
-					{cronProblem ? (
-						`Does not parse: ${cronProblem}`
-					) : preview.data && preview.data.times.length > 0 ? (
-						<>
-							<span className="text-foreground">
-								{preview.data.description}
-							</span>
-							. Next:{" "}
-							{preview.data.times.map((time, index) => (
-								<span key={time}>
-									{index > 0 ? ", " : null}
-									<time dateTime={new Date(time).toISOString()}>
-										{formatDayTime(time)}
-									</time>
-								</span>
-							))}
-						</>
-					) : preview.data ? (
-						"This cron line never comes due."
-					) : (
-						" "
-					)}
-				</p>
-			</fieldset>
+					<FieldLabel htmlFor={`${id}-flow`}>Flow</FieldLabel>
+					<NativeSelect
+						id={`${id}-flow`}
+						value={chosen}
+						disabled={flowNames.length === 0}
+						className="w-full font-mono"
+						onChange={(event) => setFlow(event.target.value)}
+					>
+						{flowNames.length === 0 ? (
+							<NativeSelectOption value="">No flows yet</NativeSelectOption>
+						) : null}
+						{(list.data ?? []).map((item) => (
+							<NativeSelectOption key={item.name} value={item.name}>
+								{item.name}
+								{item.errorCount > 0 ? " (has errors)" : ""}
+							</NativeSelectOption>
+						))}
+					</NativeSelect>
+					{chosenItem && chosenItem.errorCount > 0 ? (
+						<FieldError>
+							This flow has errors: a start fails until they are fixed.
+						</FieldError>
+					) : null}
+				</Field>
 
-			<div className="flex flex-col gap-2">
-				<div className="flex items-center gap-2">
-					<Checkbox
+				<FlowInputFields
+					idPrefix={id}
+					inputs={inputs}
+					values={values}
+					onChange={setValues}
+				/>
+
+				<FieldSet className="gap-3">
+					<FieldLegend variant="label" className="mb-0">
+						Starts
+					</FieldLegend>
+					<Tabs
+						value={when.mode}
+						onValueChange={(mode) => setMode(mode as When["mode"])}
+					>
+						<TabsList className="w-full">
+							<TabsTrigger value="simple">Time and days</TabsTrigger>
+							<TabsTrigger value="cron">Cron line</TabsTrigger>
+						</TabsList>
+						<TabsContent value="simple" className="flex flex-col gap-3 pt-1">
+							{when.mode === "simple" ? (
+								<>
+									<div className="flex flex-wrap items-center gap-2">
+										<FieldLabel htmlFor={`${id}-time`} className="sr-only">
+											Start time
+										</FieldLabel>
+										<Input
+											id={`${id}-time`}
+											type="time"
+											value={when.time}
+											className="w-28 font-mono tabular-nums"
+											onChange={(event) =>
+												setWhen({ ...when, time: event.target.value })
+											}
+										/>
+										<span className="text-muted-foreground text-sm">on</span>
+										<div className="ml-auto flex gap-1">
+											<Button
+												type="button"
+												size="sm"
+												variant="ghost"
+												onClick={() => setWhen({ ...when, days: EVERY_DAY })}
+											>
+												Every day
+											</Button>
+											<Button
+												type="button"
+												size="sm"
+												variant="ghost"
+												onClick={() => setWhen({ ...when, days: WEEKDAYS })}
+											>
+												Weekdays
+											</Button>
+										</div>
+									</div>
+									<ToggleGroup
+										multiple
+										variant="outline"
+										size="sm"
+										spacing={0}
+										aria-label="Days"
+										className="w-full"
+										value={when.days.map(String)}
+										onValueChange={(days) =>
+											setWhen({
+												...when,
+												days: days.map(Number).sort((a, b) => a - b),
+											})
+										}
+									>
+										{WEEK.map(({ day, short, long }) => (
+											<ToggleGroupItem
+												key={day}
+												value={String(day)}
+												aria-label={long}
+												className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+											>
+												{short}
+											</ToggleGroupItem>
+										))}
+									</ToggleGroup>
+								</>
+							) : null}
+						</TabsContent>
+						<TabsContent value="cron" className="pt-1">
+							{when.mode === "cron" ? (
+								<Field data-invalid={cronProblem !== null || undefined}>
+									<FieldLabel htmlFor={`${id}-cron`} className="sr-only">
+										Cron line
+									</FieldLabel>
+									<Input
+										id={`${id}-cron`}
+										value={when.cron}
+										placeholder="0 22 * * 1-5"
+										className="font-mono"
+										autoComplete="off"
+										spellCheck={false}
+										aria-invalid={cronProblem !== null}
+										aria-describedby={`${id}-when`}
+										onChange={(event) =>
+											setWhen({ mode: "cron", cron: event.target.value })
+										}
+									/>
+									<FieldDescription>
+										Five fields: minute, hour, day of the month, month, day of
+										the week. On the daemon's clock.
+									</FieldDescription>
+								</Field>
+							) : null}
+						</TabsContent>
+					</Tabs>
+					<FieldDescription
+						id={`${id}-when`}
+						aria-live="polite"
+						className={cronProblem ? "text-destructive" : undefined}
+					>
+						{cronProblem ? (
+							`Does not parse: ${cronProblem}`
+						) : preview.data && preview.data.times.length > 0 ? (
+							<>
+								<span className="text-foreground">
+									{preview.data.description}
+								</span>
+								. Next:{" "}
+								{preview.data.times.map((time, index) => (
+									<span key={time}>
+										{index > 0 ? ", " : null}
+										<time dateTime={new Date(time).toISOString()}>
+											{formatDayTime(time)}
+										</time>
+									</span>
+								))}
+							</>
+						) : preview.data ? (
+							"This cron line never comes due."
+						) : (
+							" "
+						)}
+					</FieldDescription>
+				</FieldSet>
+
+				<Field
+					orientation="horizontal"
+					data-invalid={stopInvalid || undefined}
+					className="items-start"
+				>
+					<Switch
 						id={`${id}-stop`}
 						checked={stop.on}
+						className="mt-0.5"
 						onCheckedChange={(on) => setStop((current) => ({ ...current, on }))}
 					/>
-					<Label htmlFor={`${id}-stop`}>Stop at a time</Label>
+					<FieldContent>
+						<FieldLabel htmlFor={`${id}-stop`}>Stop at a time</FieldLabel>
+						<FieldDescription>
+							{stop.on
+								? `The first ${stop.time || "…"} after the start. No new step starts after it; the run then ends as stopped.`
+								: "No stop time: each run goes until its flow ends."}
+						</FieldDescription>
+					</FieldContent>
 					<Input
 						type="time"
 						value={stop.time}
 						disabled={!stop.on}
 						aria-label="Stop time"
 						aria-invalid={stopInvalid}
-						className="ml-auto h-7 w-28 font-mono tabular-nums"
+						className="w-28 shrink-0 font-mono tabular-nums"
 						onChange={(event) =>
 							setStop({ on: true, time: event.target.value })
 						}
 					/>
-				</div>
-				<p className="text-muted-foreground text-xs">
-					{stop.on
-						? `The first ${stop.time || "…"} after the start. No new step starts after it; the run then ends as stopped.`
-						: "No stop time: each run goes until its flow ends."}
-				</p>
-			</div>
+				</Field>
 
-			<div className="flex flex-col gap-1.5">
-				<Label htmlFor={`${id}-base`}>
-					Start from
-					<span className="text-muted-foreground">(optional)</span>
-				</Label>
-				<Input
-					id={`${id}-base`}
-					value={baseRef}
-					placeholder="The current branch"
-					className="font-mono"
-					autoComplete="off"
-					spellCheck={false}
-					onChange={(event) => setBaseRef(event.target.value)}
-				/>
-			</div>
+				<Field>
+					<FieldLabel htmlFor={`${id}-base`}>
+						Start from
+						<span className="font-normal text-muted-foreground">
+							(optional)
+						</span>
+					</FieldLabel>
+					<Input
+						id={`${id}-base`}
+						value={baseRef}
+						placeholder="The current branch"
+						className="font-mono"
+						autoComplete="off"
+						spellCheck={false}
+						onChange={(event) => setBaseRef(event.target.value)}
+					/>
+				</Field>
+			</FieldGroup>
 
 			<DialogFooter className="items-center">
 				{problem ? (
-					<p className="mr-auto text-muted-foreground text-xs">{problem}</p>
+					<p className="text-muted-foreground text-xs sm:mr-auto">{problem}</p>
 				) : null}
 				<DialogClose render={<Button variant="outline" type="button" />}>
 					Cancel
 				</DialogClose>
 				<Button type="submit" disabled={problem !== null || saving}>
+					{saving ? <Spinner data-icon="inline-start" /> : null}
 					{saving ? "Saving…" : schedule ? "Save" : "Add schedule"}
 				</Button>
 			</DialogFooter>

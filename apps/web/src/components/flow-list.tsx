@@ -1,4 +1,4 @@
-import { flowNameSchema } from "@nightshift/flows";
+import { type FlowInputDef, flowNameSchema } from "@nightshift/flows";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -12,19 +12,52 @@ import {
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
+	Card,
+	CardAction,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@nightshift/ui/components/card";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@nightshift/ui/components/dialog";
+import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
+	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldLabel,
+} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
-import { Label } from "@nightshift/ui/components/label";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@nightshift/ui/components/tooltip";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
 	CircleAlertIcon,
 	FileWarningIcon,
+	PencilIcon,
+	PlayIcon,
 	PlusIcon,
 	Trash2Icon,
 	WorkflowIcon,
@@ -32,11 +65,16 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
+import { StartRunDialog } from "@/components/run/start-run-dialog";
 import { useProjectFlows } from "@/hooks/use-project-flows";
 import type { FlowListItem } from "@/lib/api-types";
 import { callersOf, newFlow } from "@/lib/flow-draft";
 import { orpc } from "@/utils/orpc";
 
+/**
+ * The project's flow files as a grid of cards: name, description, inputs and
+ * callers, size and errors. Run one, open it in the editor, add or delete one.
+ */
 export function FlowList({ projectId }: { projectId: string }) {
 	const queryClient = useQueryClient();
 	const flows = useQuery(
@@ -46,6 +84,11 @@ export function FlowList({ projectId }: { projectId: string }) {
 	const loaded = useProjectFlows(projectId);
 	const [creating, setCreating] = useState(false);
 	const [toDelete, setToDelete] = useState<FlowListItem | null>(null);
+	// The flow to start. Kept after the dialog closes, so it does not empty while it fades.
+	const [starting, setStarting] = useState<{
+		name: string;
+		open: boolean;
+	} | null>(null);
 
 	const removeFlow = useMutation(
 		orpc.flows.remove.mutationOptions({
@@ -59,40 +102,38 @@ export function FlowList({ projectId }: { projectId: string }) {
 	);
 
 	return (
-		<section aria-labelledby="flows-heading" className="flex flex-col gap-3">
-			<div className="flex items-center gap-2">
-				<h2 id="flows-heading" className="font-medium text-sm">
-					Flows
-				</h2>
-				{creating ? null : (
-					<Button
-						variant="outline"
-						size="xs"
-						className="ml-auto"
-						onClick={() => setCreating(true)}
+		<section aria-labelledby="flows-heading" className="flex flex-col gap-4">
+			<div className="flex items-end gap-4">
+				<div className="flex min-w-0 flex-1 flex-col gap-1">
+					<h2
+						id="flows-heading"
+						className="font-semibold text-lg tracking-tight"
 					>
-						<PlusIcon data-icon="inline-start" />
-						New flow
-					</Button>
-				)}
+						Flows
+					</h2>
+					<p className="text-muted-foreground text-sm">
+						Graphs of steps, saved in{" "}
+						<span className="font-mono text-xs">.nightshift/flows/</span>
+					</p>
+				</div>
+				<Button variant="outline" size="sm" onClick={() => setCreating(true)}>
+					<PlusIcon data-icon="inline-start" />
+					New flow
+				</Button>
 			</div>
 
-			{creating ? (
-				<NewFlowForm
-					projectId={projectId}
-					taken={flows.data?.map((flow) => flow.name) ?? []}
-					onCancel={() => setCreating(false)}
-				/>
-			) : null}
-
 			{flows.isLoading ? (
-				<div className="flex flex-col gap-1.5">
-					<Skeleton className="h-12 w-full" />
-					<Skeleton className="h-12 w-full" />
+				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+					<Skeleton className="h-40 w-full rounded-xl" />
+					<Skeleton className="h-40 w-full rounded-xl" />
+					<Skeleton className="hidden h-40 w-full rounded-xl xl:block" />
 				</div>
 			) : !flows.data || flows.data.length === 0 ? (
-				<Empty className="border p-6 md:p-6">
+				<Empty className="border">
 					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<WorkflowIcon aria-hidden="true" />
+						</EmptyMedia>
 						<EmptyTitle>No flows yet</EmptyTitle>
 						<EmptyDescription>
 							{flows.error
@@ -100,49 +141,56 @@ export function FlowList({ projectId }: { projectId: string }) {
 								: "A flow is a graph of steps, saved in .nightshift/flows/ in the repository. Create one to draw it."}
 						</EmptyDescription>
 					</EmptyHeader>
+					<EmptyContent>
+						<Button onClick={() => setCreating(true)}>
+							<PlusIcon data-icon="inline-start" />
+							New flow
+						</Button>
+					</EmptyContent>
 				</Empty>
 			) : (
-				<ul className="flex flex-col divide-y border">
+				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 					{flows.data.map((flow) => (
-						<li key={flow.name} className="flex items-center gap-2 pr-2">
-							<Link
-								to="/projects/$projectId/flows/$name"
-								params={{ projectId, name: flow.name }}
-								className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 outline-none hover:bg-muted/50 focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring"
-							>
-								<WorkflowIcon
-									className="size-4 shrink-0 text-muted-foreground"
-									aria-hidden="true"
-								/>
-								<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-									<span className="truncate font-medium font-mono text-sm">
-										{flow.name}
-									</span>
-									<span className="truncate text-muted-foreground text-xs">
-										{flow.description ?? "No description"}
-									</span>
-									<FlowSignature
-										inputs={loaded.flows?.[flow.name]?.inputs}
-										callers={
-											loaded.flows ? callersOf(flow.name, loaded.flows) : []
-										}
-									/>
-								</span>
-								<FlowMeta flow={flow} />
-							</Link>
-							<Button
-								variant="ghost"
-								size="icon-sm"
-								aria-label={`Delete ${flow.name}`}
-								title="Delete flow"
-								onClick={() => setToDelete(flow)}
-							>
-								<Trash2Icon />
-							</Button>
-						</li>
+						<FlowCard
+							key={flow.name}
+							projectId={projectId}
+							flow={flow}
+							inputs={loaded.flows?.[flow.name]?.inputs}
+							callers={loaded.flows ? callersOf(flow.name, loaded.flows) : []}
+							runBlockedBy={
+								flow.nodeCount === null
+									? "This flow does not load. Open it to see why."
+									: flow.errorCount > 0
+										? "Fix the errors in the editor first."
+										: loaded.flows === undefined
+											? "Loading the flow…"
+											: null
+							}
+							onRun={() => setStarting({ name: flow.name, open: true })}
+							onDelete={() => setToDelete(flow)}
+						/>
 					))}
-				</ul>
+				</div>
 			)}
+
+			<NewFlowDialog
+				open={creating}
+				onOpenChange={setCreating}
+				projectId={projectId}
+				taken={flows.data?.map((flow) => flow.name) ?? []}
+			/>
+
+			{starting ? (
+				<StartRunDialog
+					open={starting.open}
+					onOpenChange={(open) =>
+						setStarting((current) => (current ? { ...current, open } : null))
+					}
+					projectId={projectId}
+					flowName={starting.name}
+					inputs={loaded.flows?.[starting.name]?.inputs ?? []}
+				/>
+			) : null}
 
 			<AlertDialog
 				open={toDelete !== null}
@@ -171,6 +219,9 @@ export function FlowList({ projectId }: { projectId: string }) {
 									removeFlow.mutate({ projectId, name: toDelete.name });
 							}}
 						>
+							{removeFlow.isPending ? (
+								<Spinner data-icon="inline-start" />
+							) : null}
 							{removeFlow.isPending ? "Deleting…" : "Delete flow"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
@@ -180,35 +231,149 @@ export function FlowList({ projectId }: { projectId: string }) {
 	);
 }
 
+function FlowCard({
+	projectId,
+	flow,
+	inputs,
+	callers,
+	runBlockedBy,
+	onRun,
+	onDelete,
+}: {
+	projectId: string;
+	flow: FlowListItem;
+	inputs: readonly FlowInputDef[] | undefined;
+	callers: string[];
+	/** Why the flow cannot start now, or null. */
+	runBlockedBy: string | null;
+	onRun: () => void;
+	onDelete: () => void;
+}) {
+	return (
+		<Card
+			size="sm"
+			className="relative transition-colors hover:bg-muted/40 has-[a[data-stretched]:focus-visible]:ring-2 has-[a[data-stretched]:focus-visible]:ring-ring/50"
+		>
+			<CardHeader>
+				<CardTitle className="flex min-w-0 items-center gap-2">
+					<WorkflowIcon
+						className="size-4 shrink-0 text-muted-foreground"
+						aria-hidden="true"
+					/>
+					{/* The link covers the card, so the card is one target. */}
+					<Link
+						to="/projects/$projectId/flows/$name"
+						params={{ projectId, name: flow.name }}
+						data-stretched=""
+						className="truncate font-mono outline-none after:absolute after:inset-0"
+					>
+						{flow.name}
+					</Link>
+				</CardTitle>
+				<CardDescription className="line-clamp-2">
+					{flow.description ?? "No description"}
+				</CardDescription>
+				<CardAction className="relative z-10">
+					<Tooltip>
+						<TooltipTrigger
+							render={
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									aria-label={`Delete ${flow.name}`}
+									className="text-muted-foreground"
+									onClick={onDelete}
+								/>
+							}
+						>
+							<Trash2Icon />
+						</TooltipTrigger>
+						<TooltipContent>Delete flow</TooltipContent>
+					</Tooltip>
+				</CardAction>
+			</CardHeader>
+			<FlowSignature inputs={inputs} callers={callers} />
+			<CardFooter className="mt-auto gap-2 border-t">
+				<FlowMeta flow={flow} />
+				<div className="relative z-10 ml-auto flex items-center gap-1.5">
+					<Button
+						variant="ghost"
+						size="sm"
+						nativeButton={false}
+						render={
+							<Link
+								to="/projects/$projectId/flows/$name"
+								params={{ projectId, name: flow.name }}
+							/>
+						}
+					>
+						<PencilIcon data-icon="inline-start" />
+						Edit
+					</Button>
+					<Tooltip>
+						<TooltipTrigger
+							render={
+								// A disabled button gets no hover; the span keeps the tooltip.
+								<span className="inline-flex" />
+							}
+						>
+							<Button
+								size="sm"
+								disabled={runBlockedBy !== null}
+								aria-label={`Run ${flow.name}`}
+								onClick={onRun}
+							>
+								<PlayIcon data-icon="inline-start" />
+								Run
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>
+							{runBlockedBy ?? "Run this flow in a new worktree"}
+						</TooltipContent>
+					</Tooltip>
+				</div>
+			</CardFooter>
+		</Card>
+	);
+}
+
 /** The flow's inputs, briefly, and the flows that call it. */
 function FlowSignature({
 	inputs,
 	callers,
 }: {
-	inputs: { name: string; type: string; required?: boolean }[] | undefined;
+	inputs: readonly FlowInputDef[] | undefined;
 	callers: string[];
 }) {
 	if ((!inputs || inputs.length === 0) && callers.length === 0) return null;
 	return (
-		<span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+		<CardContent className="flex flex-col gap-2 text-muted-foreground text-xs">
 			{inputs && inputs.length > 0 ? (
-				<span className="min-w-0 truncate font-mono" title="Inputs">
-					(
-					{inputs
-						.map(
-							(input) =>
-								`${input.name}${input.type === "json" ? ": json" : ""}${input.required ? "" : "?"}`,
-						)
-						.join(", ")}
-					)
-				</span>
+				<div className="flex flex-wrap items-center gap-1.5" title="Inputs">
+					<span className="sr-only">Inputs:</span>
+					{inputs.map((input) => (
+						<Badge
+							key={input.name}
+							variant="secondary"
+							className="font-mono font-normal"
+						>
+							<span>
+								{input.name}
+								{input.type === "json" ? (
+									<span className="text-muted-foreground">: json</span>
+								) : null}
+								{input.required ? "" : "?"}
+							</span>
+						</Badge>
+					))}
+				</div>
 			) : null}
 			{callers.length > 0 ? (
 				<span className="min-w-0 truncate">
-					called by <span className="font-mono">{callers.join(", ")}</span>
+					Called by <span className="font-mono">{callers.join(", ")}</span>
 				</span>
 			) : null}
-		</span>
+		</CardContent>
 	);
 }
 
@@ -222,8 +387,8 @@ function FlowMeta({ flow }: { flow: FlowListItem }) {
 		);
 	}
 	return (
-		<span className="flex shrink-0 items-center gap-2 text-muted-foreground text-xs">
-			<span>
+		<span className="flex min-w-0 items-center gap-2 text-muted-foreground text-xs">
+			<span className="tabular-nums">
 				{flow.nodeCount} {flow.nodeCount === 1 ? "node" : "nodes"}
 			</span>
 			{flow.errorCount > 0 ? (
@@ -236,14 +401,32 @@ function FlowMeta({ flow }: { flow: FlowListItem }) {
 	);
 }
 
+function NewFlowDialog({
+	open,
+	onOpenChange,
+	projectId,
+	taken,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	projectId: string;
+	taken: string[];
+}) {
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="sm:max-w-md">
+				{open ? <NewFlowForm projectId={projectId} taken={taken} /> : null}
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 function NewFlowForm({
 	projectId,
 	taken,
-	onCancel,
 }: {
 	projectId: string;
 	taken: string[];
-	onCancel: () => void;
 }) {
 	const id = useId();
 	const navigate = useNavigate();
@@ -275,25 +458,29 @@ function NewFlowForm({
 	);
 
 	const canCreate = trimmed !== "" && error === null && !createFlow.isPending;
+	const problem = error ?? createFlow.error?.message ?? null;
 
 	return (
 		<form
-			className="flex flex-col gap-2 border p-3"
+			className="contents"
 			onSubmit={(event) => {
 				event.preventDefault();
 				if (!canCreate) return;
 				createFlow.mutate({ projectId, name: trimmed, flow: newFlow() });
 			}}
 		>
-			<Label htmlFor={`${id}-name`}>Flow name</Label>
-			<div className="flex items-start gap-2">
+			<DialogHeader>
+				<DialogTitle>New flow</DialogTitle>
+				<DialogDescription>
+					Starts with one Agent node, worker. The editor opens next.
+				</DialogDescription>
+			</DialogHeader>
+			<Field data-invalid={error !== null || undefined}>
+				<FieldLabel htmlFor={`${id}-name`}>Flow name</FieldLabel>
 				<Input
 					id={`${id}-name`}
 					value={name}
 					onChange={(event) => setName(event.target.value)}
-					onKeyDown={(event) => {
-						if (event.key === "Escape") onCancel();
-					}}
 					placeholder="worker-check"
 					className="font-mono"
 					autoComplete="off"
@@ -302,26 +489,30 @@ function NewFlowForm({
 					aria-describedby={`${id}-hint`}
 					autoFocus
 				/>
+				{problem ? (
+					<FieldError id={`${id}-hint`}>{problem}</FieldError>
+				) : (
+					<FieldDescription id={`${id}-hint`}>
+						Saved as{" "}
+						<span className="font-mono">
+							.nightshift/flows/{trimmed || "<name>"}.json
+						</span>
+					</FieldDescription>
+				)}
+			</Field>
+			<DialogFooter>
+				<DialogClose render={<Button variant="outline" type="button" />}>
+					Cancel
+				</DialogClose>
 				<Button type="submit" disabled={!canCreate}>
+					{createFlow.isPending ? (
+						<Spinner data-icon="inline-start" />
+					) : (
+						<PlusIcon data-icon="inline-start" />
+					)}
 					{createFlow.isPending ? "Creating…" : "Create"}
 				</Button>
-				<Button type="button" variant="ghost" onClick={onCancel}>
-					Cancel
-				</Button>
-			</div>
-			<p
-				id={`${id}-hint`}
-				role={error || createFlow.error ? "alert" : undefined}
-				className={
-					error || createFlow.error
-						? "text-destructive text-xs"
-						: "text-muted-foreground text-xs"
-				}
-			>
-				{error ??
-					createFlow.error?.message ??
-					`Saved as .nightshift/flows/${trimmed || "<name>"}.json. Starts with one Agent node, worker.`}
-			</p>
+			</DialogFooter>
 		</form>
 	);
 }

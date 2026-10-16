@@ -1,18 +1,38 @@
+import { Badge } from "@nightshift/ui/components/badge";
+import { Button } from "@nightshift/ui/components/button";
+import {
+	Card,
+	CardAction,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@nightshift/ui/components/card";
 import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
+	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { HandIcon, MoonIcon } from "lucide-react";
+import {
+	ArrowLeftIcon,
+	FolderXIcon,
+	HourglassIcon,
+	MoonIcon,
+	ZapIcon,
+} from "lucide-react";
+import { useState } from "react";
 
 import { FlowList } from "@/components/flow-list";
-import { NewRunForm } from "@/components/new-run-form";
+import { QuickRunDialog } from "@/components/new-run-form";
 import { RunList } from "@/components/run-list";
 import { ScheduleList } from "@/components/schedule/schedule-list";
+import { SiteHeader } from "@/components/site-header";
 import { useOpenGates } from "@/hooks/use-open-gates";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
@@ -40,6 +60,7 @@ function ProjectComponent() {
 	});
 	const project = projects.data?.find((p) => p.id === projectId);
 	const gates = useOpenGates();
+	const [quickRun, setQuickRun] = useState(false);
 	const waiting =
 		gates.data?.filter((gate) => gate.projectId === projectId).length ?? 0;
 	const sleeping = runs.data?.filter((run) => run.status === "sleeping") ?? [];
@@ -50,69 +71,102 @@ function ProjectComponent() {
 
 	if (projects.isLoading) {
 		return (
-			<main className="mx-auto w-full max-w-6xl px-4 py-6">
-				<Skeleton className="h-10 w-80" />
-			</main>
+			<>
+				<SiteHeader
+					crumbs={[
+						{ label: "Home", link: { to: "/" } },
+						{ label: <Skeleton className="h-4 w-24" /> },
+					]}
+				/>
+				<div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+					<div className="flex flex-col gap-2">
+						<Skeleton className="h-8 w-56" />
+						<Skeleton className="h-4 w-80 max-w-full" />
+					</div>
+					<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+						<Skeleton className="h-40 w-full rounded-xl" />
+						<Skeleton className="h-40 w-full rounded-xl" />
+					</div>
+				</div>
+			</>
 		);
 	}
 
 	if (!project) {
 		return (
-			<main className="mx-auto w-full max-w-6xl px-4 py-6">
-				<Empty className="border">
-					<EmptyHeader>
-						<EmptyTitle>Project not found</EmptyTitle>
-						<EmptyDescription>
-							It may have been removed. <Link to="/">Back to projects</Link>
-						</EmptyDescription>
-					</EmptyHeader>
-				</Empty>
-			</main>
+			<>
+				<SiteHeader
+					crumbs={[
+						{ label: "Home", link: { to: "/" } },
+						{ label: "Not found" },
+					]}
+				/>
+				<div className="flex flex-1 flex-col p-4 md:p-6">
+					<Empty className="border">
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<FolderXIcon aria-hidden="true" />
+							</EmptyMedia>
+							<EmptyTitle>Project not found</EmptyTitle>
+							<EmptyDescription>It may have been removed.</EmptyDescription>
+						</EmptyHeader>
+						<EmptyContent>
+							<Button
+								variant="outline"
+								nativeButton={false}
+								render={<Link to="/" />}
+							>
+								<ArrowLeftIcon data-icon="inline-start" />
+								Back to projects
+							</Button>
+						</EmptyContent>
+					</Empty>
+				</div>
+			</>
 		);
 	}
 
 	return (
-		<main className="min-h-0 overflow-y-auto">
-			<div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6">
-				<header className="flex flex-col gap-0.5">
-					<h1 className="font-medium text-base">{project.name}</h1>
-					<p className="truncate font-mono text-muted-foreground text-xs">
+		<>
+			<SiteHeader
+				crumbs={[{ label: "Home", link: { to: "/" } }, { label: project.name }]}
+			>
+				<Button size="sm" onClick={() => setQuickRun(true)}>
+					<ZapIcon data-icon="inline-start" />
+					Quick run
+				</Button>
+			</SiteHeader>
+			<div className="flex flex-1 flex-col gap-8 p-4 md:p-6">
+				<div className="flex min-w-0 flex-col gap-1">
+					<h1 className="truncate font-semibold text-2xl tracking-tight">
+						{project.name}
+					</h1>
+					<p
+						className="truncate font-mono text-muted-foreground text-sm"
+						title={project.repoPath}
+					>
 						{project.repoPath}
 					</p>
-				</header>
-				<div className="grid gap-8 lg:grid-cols-2">
-					<div className="flex flex-col gap-8">
-						<FlowList projectId={project.id} />
-						<ScheduleList projectId={project.id} />
-						<section
-							aria-labelledby="new-run-heading"
-							className="flex flex-col gap-3"
-						>
-							<div className="flex flex-col gap-0.5">
-								<h2 id="new-run-heading" className="font-medium text-sm">
-									Quick run
-								</h2>
-								<p className="text-muted-foreground text-xs">
-									One Agent node with a prompt, no flow file.
-								</p>
-							</div>
-							<div className="border p-3">
-								<NewRunForm projectId={project.id} />
-							</div>
-						</section>
-					</div>
-					<section
-						aria-labelledby="runs-heading"
-						className="flex flex-col gap-3"
-					>
-						<div className="flex items-center gap-2">
-							<h2 id="runs-heading" className="font-medium text-sm">
-								Runs
-							</h2>
-							<div className="ml-auto flex items-center gap-3">
+				</div>
+
+				<FlowList projectId={project.id} />
+
+				<Card className="gap-0 pb-0">
+					<CardHeader className="border-b pb-4 [.border-b]:pb-4">
+						<CardTitle>
+							<h2 id="runs-heading">Runs</h2>
+						</CardTitle>
+						<CardDescription>
+							Each run works in its own worktree, on its own branch.
+						</CardDescription>
+						{sleeping.length > 0 || waiting > 0 ? (
+							<CardAction className="flex flex-wrap items-center justify-end gap-2">
 								{sleeping.length > 0 ? (
-									<span className="flex items-center gap-1 text-status-sleeping text-xs">
-										<MoonIcon className="size-3.5" aria-hidden="true" />
+									<Badge
+										variant="outline"
+										className="border-status-sleeping/40 bg-status-sleeping/10 text-status-sleeping"
+									>
+										<MoonIcon aria-hidden="true" />
 										{sleeping.length} sleeping
 										{nextWake ? (
 											<>
@@ -125,27 +179,45 @@ function ProjectComponent() {
 												</time>
 											</>
 										) : null}
-									</span>
+									</Badge>
 								) : null}
 								{waiting > 0 ? (
-									<Link
-										to="/inbox"
-										className="flex items-center gap-1 text-status-waiting text-xs underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+									<Badge
+										variant="outline"
+										className="border-status-waiting/40 bg-status-waiting/10 text-status-waiting"
+										render={<Link to="/inbox" />}
 									>
-										<HandIcon className="size-3.5" aria-hidden="true" />
+										<HourglassIcon aria-hidden="true" />
 										{waiting} waiting for you
-									</Link>
+									</Badge>
 								) : null}
-							</div>
-						</div>
-						<RunList
-							runs={runs.data}
-							isLoading={runs.isLoading}
-							emptyDescription="Run a flow or start a quick run. Each run works in its own worktree."
-						/>
-					</section>
-				</div>
+							</CardAction>
+						) : null}
+					</CardHeader>
+					<CardContent className="px-0">
+						<section aria-labelledby="runs-heading">
+							<RunList
+								runs={runs.data}
+								isLoading={runs.isLoading}
+								emptyDescription="Run a flow or start a quick run. Each run works in its own worktree."
+								emptyAction={
+									<Button onClick={() => setQuickRun(true)}>
+										<ZapIcon data-icon="inline-start" />
+										Quick run
+									</Button>
+								}
+							/>
+						</section>
+					</CardContent>
+				</Card>
+
+				<ScheduleList projectId={project.id} />
 			</div>
-		</main>
+			<QuickRunDialog
+				projectId={project.id}
+				open={quickRun}
+				onOpenChange={setQuickRun}
+			/>
+		</>
 	);
 }
