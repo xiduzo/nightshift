@@ -1,4 +1,18 @@
+import {
+	Alert,
+	AlertAction,
+	AlertDescription,
+	AlertTitle,
+} from "@nightshift/ui/components/alert";
+import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@nightshift/ui/components/card";
 import {
 	Empty,
 	EmptyContent,
@@ -7,28 +21,35 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
-import { Skeleton } from "@nightshift/ui/components/skeleton";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemSeparator,
+	ItemTitle,
+} from "@nightshift/ui/components/item";
+import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-	ChevronRightIcon,
-	HandIcon,
+	CircleAlertIcon,
+	FolderIcon,
 	InboxIcon,
 	MoonIcon,
 	SunriseIcon,
 } from "lucide-react";
+import { Fragment } from "react";
 import { toast } from "sonner";
 
-import { GateAnswer } from "@/components/gate/gate-answer";
+import { GateCard, GateCardSkeleton } from "@/components/gate/gate-card";
+import { SiteHeader } from "@/components/site-header";
 import { useNow } from "@/hooks/use-now";
 import { useOpenGates } from "@/hooks/use-open-gates";
-import type { OpenGate, Project, RunSummary } from "@/lib/api-types";
-import {
-	formatCountdown,
-	formatDateTime,
-	formatTime,
-	formatWaited,
-} from "@/lib/format";
+import type { Project, RunSummary } from "@/lib/api-types";
+import { formatCountdown, formatDateTime, formatTime } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/inbox")({
@@ -51,69 +72,98 @@ function InboxComponent() {
 		.filter((run) => run.status === "sleeping")
 		.sort((a, b) => (a.wakeAt ?? 0) - (b.wakeAt ?? 0));
 
+	const summary = gates.isLoading
+		? "Looking for open Gates…"
+		: gates.error && !gates.data
+			? "Runs that wait at a Gate for your answer."
+			: count === 0
+				? "No open Gates right now."
+				: `${count} ${count === 1 ? "Gate waits" : "Gates wait"} for your answer, oldest first. Each run goes on as soon as you pick a choice.`;
+
 	return (
-		<main className="min-h-0 overflow-y-auto">
-			<div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6">
-				<header className="flex flex-col gap-0.5">
-					<h1 className="flex items-center gap-2 font-medium text-base">
-						Needs you
+		<>
+			<SiteHeader crumbs={[{ label: "Inbox" }]} />
+			<div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+				<div className="flex w-full max-w-4xl flex-col gap-1">
+					<h1 className="flex items-center gap-2 font-semibold text-2xl tracking-tight">
+						Inbox
 						{count > 0 ? (
-							<span className="text-muted-foreground text-sm tabular-nums">
+							<Badge
+								variant="outline"
+								className="border-status-waiting/40 bg-status-waiting/10 text-status-waiting tabular-nums"
+							>
 								{count}
-							</span>
+							</Badge>
 						) : null}
 					</h1>
-					<p className="text-muted-foreground text-xs">
-						Runs that wait at a Gate for your answer, oldest first. Each one
-						goes on as soon as you pick a choice.
-					</p>
-				</header>
+					<p className="text-muted-foreground text-sm">{summary}</p>
+				</div>
 
-				{gates.isLoading ? (
-					<div className="flex flex-col gap-3">
-						<Skeleton className="h-48 w-full" />
-						<Skeleton className="h-48 w-full" />
-					</div>
-				) : gates.error && !gates.data ? (
-					<Empty className="border">
-						<EmptyHeader>
-							<EmptyTitle>The inbox did not load</EmptyTitle>
-							<EmptyDescription>{gates.error.message}</EmptyDescription>
-						</EmptyHeader>
-						<EmptyContent>
-							<Button variant="outline" onClick={() => void gates.refetch()}>
-								Try again
-							</Button>
-						</EmptyContent>
-					</Empty>
-				) : count === 0 ? (
-					<Empty className="border">
-						<EmptyHeader>
-							<EmptyMedia variant="icon">
-								<InboxIcon />
-							</EmptyMedia>
-							<EmptyTitle>Nothing needs you</EmptyTitle>
-							<EmptyDescription>
-								When a run reaches a Gate node, its question shows up here. Add
-								one to a flow to ask before a step that matters.
-							</EmptyDescription>
-						</EmptyHeader>
-					</Empty>
-				) : (
-					<ol className="flex flex-col gap-3" aria-label="Open gates">
-						{gates.data?.map((gate) => (
-							<li key={gate.stepId}>
-								<GateCard gate={gate} now={now} />
-							</li>
-						))}
-					</ol>
-				)}
+				<div className="flex w-full max-w-4xl flex-col gap-6">
+					{gates.isLoading ? (
+						<div className="flex flex-col gap-4">
+							<GateCardSkeleton />
+							<GateCardSkeleton />
+						</div>
+					) : gates.error && !gates.data ? (
+						<Alert variant="destructive">
+							<CircleAlertIcon />
+							<AlertTitle>The inbox did not load</AlertTitle>
+							<AlertDescription>{gates.error.message}</AlertDescription>
+							<AlertAction>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={gates.isFetching}
+									onClick={() => void gates.refetch()}
+								>
+									{gates.isFetching ? (
+										<Spinner data-icon="inline-start" />
+									) : null}
+									Try again
+								</Button>
+							</AlertAction>
+						</Alert>
+					) : count === 0 ? (
+						<Empty className="border border-dashed">
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<InboxIcon />
+								</EmptyMedia>
+								<EmptyTitle>Nothing waits for you</EmptyTitle>
+								<EmptyDescription>
+									When a run reaches a Gate node, its question shows up here.
+									Add one to a flow to ask before a step that matters.
+								</EmptyDescription>
+							</EmptyHeader>
+							<EmptyContent>
+								<Button
+									variant="outline"
+									size="sm"
+									nativeButton={false}
+									render={<Link to="/" />}
+								>
+									<FolderIcon data-icon="inline-start" />
+									Go to projects
+								</Button>
+							</EmptyContent>
+						</Empty>
+					) : (
+						<ol className="flex flex-col gap-4" aria-label="Open gates">
+							{gates.data?.map((gate) => (
+								<li key={gate.stepId}>
+									<GateCard gate={gate} now={now} />
+								</li>
+							))}
+						</ol>
+					)}
 
-				{sleeping.length > 0 ? (
-					<SleepingRuns runs={sleeping} projects={projects.data} />
-				) : null}
+					{sleeping.length > 0 ? (
+						<SleepingRuns runs={sleeping} projects={projects.data} />
+					) : null}
+				</div>
 			</div>
-		</main>
+		</>
 	);
 }
 
@@ -137,129 +187,95 @@ function SleepingRuns({
 	const projectNames = new Map(projects?.map((p) => [p.id, p.name]));
 
 	return (
-		<section
+		<Card
+			role="region"
 			aria-labelledby="sleeping-heading"
-			className="flex flex-col gap-2 pt-4"
+			className="gap-0 py-0"
 		>
-			<header className="flex flex-col gap-0.5">
-				<h2
-					id="sleeping-heading"
-					className="flex items-center gap-2 font-medium text-sm"
-				>
-					<MoonIcon
-						className="size-4 text-status-sleeping"
-						aria-hidden="true"
-					/>
-					Sleeping
-					<span className="text-muted-foreground tabular-nums">
-						{runs.length}
-					</span>
-				</h2>
-				<p className="text-muted-foreground text-xs">
+			<CardHeader className="border-b py-4 [.border-b]:pb-4">
+				<CardTitle className="text-sm">
+					<h2 id="sleeping-heading" className="flex items-center gap-2">
+						<MoonIcon
+							className="size-4 text-status-sleeping"
+							aria-hidden="true"
+						/>
+						Sleeping
+						<Badge
+							variant="outline"
+							className="border-status-sleeping/40 bg-status-sleeping/10 text-status-sleeping tabular-nums"
+						>
+							{runs.length}
+						</Badge>
+					</h2>
+				</CardTitle>
+				<CardDescription className="text-xs">
 					Runs that wait for a usage limit or the network. Each one continues
 					its session on its own; wake it to try now.
-				</p>
-			</header>
-			<ul className="flex flex-col divide-y border">
-				{runs.map((run) => (
-					<li
-						key={run.id}
-						className="flex flex-wrap items-center gap-x-3 gap-y-1 border-l-[3px] border-l-status-sleeping px-3 py-2 text-xs"
-					>
-						<span className="text-muted-foreground">
-							{projectNames.get(run.projectId) ?? "Project"}
-						</span>
-						<Link
-							to="/runs/$runId"
-							params={{ runId: run.id }}
-							className="min-w-0 flex-1 truncate font-medium text-sm underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
-						>
-							{run.title}
-						</Link>
-						{run.wakeAt ? (
-							<span className="text-status-sleeping">
-								wakes{" "}
-								<time
-									dateTime={new Date(run.wakeAt).toISOString()}
-									title={formatDateTime(run.wakeAt)}
-								>
-									{formatTime(run.wakeAt)}
-								</time>{" "}
-								<span className="font-mono tabular-nums">
-									({formatCountdown(run.wakeAt - now)})
-								</span>
-							</span>
-						) : null}
-						<Button
-							variant="outline"
-							size="xs"
-							disabled={wake.isPending && wake.variables?.runId === run.id}
-							onClick={() => wake.mutate({ runId: run.id })}
-						>
-							<SunriseIcon data-icon="inline-start" />
-							Wake now
-						</Button>
-					</li>
-				))}
-			</ul>
-		</section>
-	);
-}
-
-function GateCard({ gate, now }: { gate: OpenGate; now: number }) {
-	const headingId = `gate-${gate.stepId}`;
-	return (
-		<article
-			aria-labelledby={headingId}
-			className="flex flex-col gap-3 border border-l-[3px] border-l-status-waiting bg-card p-3"
-		>
-			<header className="flex flex-col gap-1">
-				<nav
-					aria-label="Where"
-					className="flex min-w-0 items-center gap-1 text-muted-foreground text-xs"
-				>
-					<Link
-						to="/projects/$projectId"
-						params={{ projectId: gate.projectId }}
-						className="truncate outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-					>
-						{gate.projectName}
-					</Link>
-					<ChevronRightIcon className="size-3 shrink-0" aria-hidden="true" />
-					<span className="flex shrink-0 items-center gap-1 font-mono">
-						<HandIcon className="size-3" aria-hidden="true" />
-						{gate.nodeId}
-					</span>
-					<span className="ml-auto shrink-0 pl-2">
-						waiting{" "}
-						<time
-							dateTime={new Date(gate.openedAt).toISOString()}
-							title={`Opened ${formatDateTime(gate.openedAt)}`}
-						>
-							{formatWaited(now - gate.openedAt)}
-						</time>
-					</span>
-				</nav>
-				<h2 id={headingId} className="min-w-0 font-medium text-sm">
-					<Link
-						to="/runs/$runId"
-						params={{ runId: gate.runId }}
-						className="line-clamp-2 break-words underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
-					>
-						{gate.runTitle}
-					</Link>
-				</h2>
-			</header>
-			<p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-				{gate.question}
-			</p>
-			<GateAnswer
-				runId={gate.runId}
-				stepId={gate.stepId}
-				nodeId={gate.nodeId}
-				choices={gate.choices}
-				runTitle={gate.runTitle}
-			/>
-		</article>
+				</CardDescription>
+			</CardHeader>
+			<CardContent className="px-0">
+				<ItemGroup className="gap-0">
+					{runs.map((run, index) => {
+						const waking = wake.isPending && wake.variables?.runId === run.id;
+						return (
+							<Fragment key={run.id}>
+								{index > 0 ? <ItemSeparator className="my-0" /> : null}
+								<Item size="sm" className="rounded-none px-4 md:px-6">
+									<ItemMedia variant="icon" className="text-status-sleeping">
+										<MoonIcon />
+									</ItemMedia>
+									<ItemContent className="min-w-0">
+										<ItemTitle className="w-full min-w-0">
+											<Link
+												to="/runs/$runId"
+												params={{ runId: run.id }}
+												className="truncate underline-offset-3 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+											>
+												{run.title}
+											</Link>
+										</ItemTitle>
+										<ItemDescription className="text-xs">
+											{projectNames.get(run.projectId) ?? "Project"}
+											{run.wakeAt ? (
+												<>
+													{" · "}
+													<span className="text-status-sleeping">
+														wakes{" "}
+														<time
+															dateTime={new Date(run.wakeAt).toISOString()}
+															title={formatDateTime(run.wakeAt)}
+														>
+															{formatTime(run.wakeAt)}
+														</time>{" "}
+														<span className="font-mono tabular-nums">
+															({formatCountdown(run.wakeAt - now)})
+														</span>
+													</span>
+												</>
+											) : null}
+										</ItemDescription>
+									</ItemContent>
+									<ItemActions>
+										<Button
+											variant="outline"
+											size="sm"
+											disabled={waking}
+											onClick={() => wake.mutate({ runId: run.id })}
+										>
+											{waking ? (
+												<Spinner data-icon="inline-start" />
+											) : (
+												<SunriseIcon data-icon="inline-start" />
+											)}
+											Wake now
+										</Button>
+									</ItemActions>
+								</Item>
+							</Fragment>
+						);
+					})}
+				</ItemGroup>
+			</CardContent>
+		</Card>
 	);
 }
