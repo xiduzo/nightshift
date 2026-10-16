@@ -262,23 +262,34 @@ export type LoggedEvent = {
 
 type EventOf<T extends EngineEventType> = Extract<LoggedEvent, { type: T }>;
 
+export type EventInput<T extends EngineEventType> = {
+	type: T;
+	payload: EnginePayloads[T];
+	runId?: string | null;
+	stepId?: string | null;
+	sessionId?: string | null;
+};
+
+/**
+ * Appends one event and returns it as committed, with its seq and time. The
+ * engine appends through its run log (`run-log.ts`), never here directly.
+ */
 export async function appendEvent<T extends EngineEventType>(
 	db: Database,
-	input: {
-		type: T;
-		payload: EnginePayloads[T];
-		runId?: string | null;
-		stepId?: string | null;
-		sessionId?: string | null;
-	},
-): Promise<void> {
-	await db.insert(event).values({
-		runId: input.runId ?? null,
-		stepId: input.stepId ?? null,
-		sessionId: input.sessionId ?? null,
-		type: input.type,
-		payload: JSON.stringify(input.payload),
-	});
+	input: EventInput<T>,
+): Promise<LoggedEvent> {
+	const [row] = await db
+		.insert(event)
+		.values({
+			runId: input.runId ?? null,
+			stepId: input.stepId ?? null,
+			sessionId: input.sessionId ?? null,
+			type: input.type,
+			payload: JSON.stringify(input.payload),
+		})
+		.returning();
+	if (!row) throw new Error(`Could not append ${input.type}.`);
+	return parseEventRow(row);
 }
 
 export function parseEventRow(row: typeof event.$inferSelect): LoggedEvent {
