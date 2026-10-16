@@ -1,0 +1,424 @@
+import {
+	Alert,
+	AlertDescription,
+	AlertTitle,
+} from "@nightshift/ui/components/alert";
+import { Button } from "@nightshift/ui/components/button";
+import {
+	Card,
+	CardContent,
+	CardFooter,
+	CardHeader,
+} from "@nightshift/ui/components/card";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@nightshift/ui/components/dialog";
+import {
+	Field,
+	FieldDescription,
+	FieldGroup,
+	FieldLabel,
+} from "@nightshift/ui/components/field";
+import { Input } from "@nightshift/ui/components/input";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemMedia,
+	ItemTitle,
+} from "@nightshift/ui/components/item";
+import { Skeleton } from "@nightshift/ui/components/skeleton";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	CircleAlertIcon,
+	FolderPenIcon,
+	RefreshCwIcon,
+	RotateCcwIcon,
+} from "lucide-react";
+import { useId, useState } from "react";
+import { toast } from "sonner";
+
+import { formatDateTime, formatTime } from "@/lib/format";
+import { orpc } from "@/utils/orpc";
+
+import {
+	CheckBadge,
+	type CheckState,
+	FactList,
+	MonoTile,
+	OffMachineNote,
+} from "./parts";
+import type { CheckTarget, CliCheck, SettingsView } from "./types";
+
+type BinKey = "claudeBin" | "opencodeBin" | "codexBin" | "ghBin";
+
+export type Tool = {
+	target: CheckTarget;
+	title: string;
+	initials: string;
+	/** What Night Shift uses it for. */
+	role: string;
+	setting: BinKey;
+	offMachine: (check: CliCheck | undefined) => string;
+};
+
+/** The CLIs Night Shift runs on this machine. */
+export const TOOLS: Tool[] = [
+	{
+		target: "claude-code",
+		title: "Claude Code",
+		initials: "CC",
+		role: "Harness for Agent nodes",
+		setting: "claudeBin",
+		offMachine: () =>
+			"Prompts and the worktree's code go to Anthropic under your Claude login.",
+	},
+	{
+		target: "opencode",
+		title: "OpenCode",
+		initials: "OC",
+		role: "Harness for Agent nodes",
+		setting: "opencodeBin",
+		offMachine: () =>
+			"Prompts and code go to the model provider OpenCode is set up with.",
+	},
+	{
+		target: "codex",
+		title: "Codex",
+		initials: "CX",
+		role: "Harness for Agent nodes",
+		setting: "codexBin",
+		offMachine: () => "Prompts and code go to OpenAI under your Codex login.",
+	},
+	{
+		target: "github",
+		title: "GitHub CLI",
+		initials: "GH",
+		role: "Issues and pull requests",
+		setting: "ghBin",
+		offMachine: (check) =>
+			`Reads issues and opens pull requests on GitHub as ${check?.account ?? "the account gh is logged in to"}.`,
+	},
+];
+
+function checkState(check: CliCheck | undefined): CheckState {
+	if (!check) return "checking";
+	if (!check.path) return "missing";
+	return check.problem ? "problem" : "ready";
+}
+
+/** Where the executable setting gets its value. */
+function sourceText(settings: SettingsView, key: BinKey): string {
+	const field = settings.fields[key];
+	if (field.source === "saved") return "Saved";
+	if (field.source === "env") return `From ${field.env}`;
+	return `Default: ${String(field.default)} on the PATH`;
+}
+
+/** The fallback once the saved value is gone. */
+function fallbackText(settings: SettingsView, key: BinKey): string {
+	const field = settings.fields[key];
+	const onPath = `${String(field.default)} on the PATH`;
+	return field.env
+		? `Without a saved path it uses ${field.env}, then ${onPath}.`
+		: `Without a saved path it uses ${onPath}.`;
+}
+
+export function HarnessCard({
+	tool,
+	settings,
+}: {
+	tool: Tool;
+	settings: SettingsView | undefined;
+}) {
+	const [changing, setChanging] = useState(false);
+	const check = useQuery({
+		...orpc.connections.check.queryOptions({ input: { target: tool.target } }),
+		staleTime: 60_000,
+		meta: { quietErrors: true },
+	});
+	const data = check.data;
+	const state = check.isPending ? "checking" : checkState(data);
+
+	return (
+		<Card className="gap-4">
+			<CardHeader>
+				<Item className="flex-nowrap p-0">
+					<ItemMedia>
+						<MonoTile>{tool.initials}</MonoTile>
+					</ItemMedia>
+					<ItemContent className="min-w-0">
+						<ItemTitle className="text-base">{tool.title}</ItemTitle>
+						<ItemDescription>{tool.role}</ItemDescription>
+					</ItemContent>
+					<ItemActions>
+						{check.error && !data ? (
+							<CheckBadge state="problem" />
+						) : (
+							<CheckBadge state={state} />
+						)}
+					</ItemActions>
+				</Item>
+			</CardHeader>
+			<CardContent className="flex-1 gap-4">
+				{check.isPending ? (
+					<div className="flex flex-col gap-2.5" aria-hidden>
+						<Skeleton className="h-4 w-3/4" />
+						<Skeleton className="h-4 w-1/2" />
+						<Skeleton className="h-4 w-2/3" />
+					</div>
+				) : check.error && !data ? (
+					<Alert variant="destructive">
+						<CircleAlertIcon />
+						<AlertTitle>The check did not run</AlertTitle>
+						<AlertDescription>{check.error.message}</AlertDescription>
+					</Alert>
+				) : data ? (
+					<>
+						<FactList
+							facts={[
+								{
+									label: "Path",
+									value: (
+										<span className="font-mono text-xs leading-5">
+											{data.path ?? (
+												<span className="text-muted-foreground">
+													{data.bin} not found
+												</span>
+											)}
+										</span>
+									),
+								},
+								...(data.version
+									? [
+											{
+												label: "Version",
+												value: (
+													<span className="font-mono text-xs leading-5">
+														{data.version}
+													</span>
+												),
+											},
+										]
+									: []),
+								...(data.account
+									? [{ label: "Account", value: data.account }]
+									: []),
+								...data.facts.map((fact) => ({
+									label: fact.label,
+									value: fact.value,
+								})),
+							]}
+						/>
+						{data.problem ? (
+							<Alert
+								variant={data.path ? "destructive" : "default"}
+								className={
+									data.path
+										? undefined
+										: "border-status-waiting/40 text-status-waiting"
+								}
+							>
+								<CircleAlertIcon />
+								<AlertDescription
+									className={data.path ? undefined : "text-foreground/80"}
+								>
+									{data.problem}
+								</AlertDescription>
+							</Alert>
+						) : null}
+					</>
+				) : null}
+				<OffMachineNote>{tool.offMachine(data)}</OffMachineNote>
+			</CardContent>
+			<CardFooter className="flex-wrap gap-2">
+				<Button
+					variant="outline"
+					size="sm"
+					disabled={check.isFetching}
+					onClick={() => void check.refetch()}
+				>
+					{check.isFetching ? (
+						<Spinner data-icon="inline-start" />
+					) : (
+						<RefreshCwIcon data-icon="inline-start" />
+					)}
+					{check.isFetching ? "Checking…" : "Check again"}
+				</Button>
+				<Button
+					variant="ghost"
+					size="sm"
+					disabled={!settings}
+					onClick={() => setChanging(true)}
+				>
+					<FolderPenIcon data-icon="inline-start" />
+					Change path
+				</Button>
+				{data ? (
+					<span
+						className="ml-auto text-muted-foreground text-xs"
+						title={formatDateTime(data.checkedAt)}
+					>
+						Checked {formatTime(data.checkedAt)}
+					</span>
+				) : null}
+			</CardFooter>
+			{settings ? (
+				<ChangePathDialog
+					open={changing}
+					onOpenChange={setChanging}
+					tool={tool}
+					settings={settings}
+				/>
+			) : null}
+		</Card>
+	);
+}
+
+/** Sets the executable Night Shift runs for one CLI, or goes back to the default. */
+function ChangePathDialog({
+	open,
+	onOpenChange,
+	tool,
+	settings,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	tool: Tool;
+	settings: SettingsView;
+}) {
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="sm:max-w-md">
+				{open ? (
+					<ChangePathForm
+						tool={tool}
+						settings={settings}
+						onDone={() => onOpenChange(false)}
+					/>
+				) : null}
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+function ChangePathForm({
+	tool,
+	settings,
+	onDone,
+}: {
+	tool: Tool;
+	settings: SettingsView;
+	onDone: () => void;
+}) {
+	const id = useId();
+	const queryClient = useQueryClient();
+	const key = tool.setting;
+	const current = settings.values[key];
+	const [value, setValue] = useState(current);
+	const saved = settings.fields[key].source === "saved";
+
+	const save = useMutation(
+		orpc.settings.save.mutationOptions({
+			onSuccess: (next, patch) => {
+				queryClient.setQueryData(orpc.settings.get.queryKey(), next);
+				void queryClient.invalidateQueries({
+					queryKey: orpc.settings.key(),
+				});
+				void queryClient.invalidateQueries({
+					queryKey: orpc.connections.check.queryKey({
+						input: { target: tool.target },
+					}),
+				});
+				toast.success(
+					patch[key] === null
+						? `${tool.title} uses the default again`
+						: `Saved the path for ${tool.title}`,
+				);
+				onDone();
+			},
+		}),
+	);
+	const trimmed = value.trim();
+
+	return (
+		<form
+			className="contents"
+			onSubmit={(event) => {
+				event.preventDefault();
+				if (!trimmed) return;
+				save.mutate({ [key]: trimmed });
+			}}
+		>
+			<DialogHeader>
+				<DialogTitle>Change the {tool.title} path</DialogTitle>
+				<DialogDescription>
+					The executable Night Shift runs. A name is looked up on the daemon's
+					PATH; a path is used as is.
+				</DialogDescription>
+			</DialogHeader>
+			<FieldGroup className="gap-5">
+				<Field>
+					<FieldLabel htmlFor={`${id}-bin`}>Executable</FieldLabel>
+					<Input
+						id={`${id}-bin`}
+						value={value}
+						onChange={(event) => setValue(event.target.value)}
+						placeholder={String(settings.fields[key].default)}
+						className="font-mono"
+						autoComplete="off"
+						spellCheck={false}
+						autoFocus
+						required
+						aria-describedby={`${id}-bin-hint`}
+					/>
+					<FieldDescription id={`${id}-bin-hint`}>
+						Now: <span className="font-mono">{current}</span> ·{" "}
+						{sourceText(settings, key)}. {fallbackText(settings, key)}
+					</FieldDescription>
+				</Field>
+				{save.error ? (
+					<Alert variant="destructive">
+						<CircleAlertIcon />
+						<AlertDescription>{save.error.message}</AlertDescription>
+					</Alert>
+				) : null}
+			</FieldGroup>
+			<DialogFooter className="gap-2 sm:justify-between">
+				{saved ? (
+					<Button
+						type="button"
+						variant="ghost"
+						disabled={save.isPending}
+						onClick={() => save.mutate({ [key]: null })}
+					>
+						<RotateCcwIcon data-icon="inline-start" />
+						Use the default
+					</Button>
+				) : (
+					<span className="hidden sm:block" />
+				)}
+				<div className="flex flex-col-reverse gap-2 sm:flex-row">
+					<DialogClose render={<Button variant="outline" type="button" />}>
+						Cancel
+					</DialogClose>
+					<Button
+						type="submit"
+						disabled={!trimmed || trimmed === current || save.isPending}
+					>
+						{save.isPending ? <Spinner data-icon="inline-start" /> : null}
+						{save.isPending ? "Saving…" : "Save"}
+					</Button>
+				</div>
+			</DialogFooter>
+		</form>
+	);
+}
