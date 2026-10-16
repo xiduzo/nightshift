@@ -169,29 +169,15 @@
     "packages/engine": {
       "name": "@nightshift/engine",
       "dependencies": {
+        "@langchain/core": "^1.2.18",
+        "@langchain/langgraph": "^1.5.0",
+        "@langchain/langgraph-checkpoint": "^1.2.0",
+        "@libsql/client": "0.18.0",
         "@nightshift/agents": "workspace:*",
         "@nightshift/db": "workspace:*",
         "@nightshift/flows": "workspace:*",
         "ajv": "^8.20.0",
         "drizzle-orm": "catalog:",
-        "zod": "catalog:",
-      },
-      "devDependencies": {
-        "@nightshift/config": "workspace:*",
-        "@types/bun": "catalog:",
-        "typescript": "catalog:",
-      },
-    },
-    "packages/engine-langgraph": {
-      "name": "@nightshift/engine-langgraph",
-      "dependencies": {
-        "@langchain/core": "^1.2.18",
-        "@langchain/langgraph": "^1.5.0",
-        "@langchain/langgraph-checkpoint": "^1.2.0",
-        "@langchain/langgraph-checkpoint-sqlite": "^1.1.0",
-        "@libsql/client": "0.18.0",
-        "@nightshift/agents": "workspace:*",
-        "@nightshift/flows": "workspace:*",
         "zod": "catalog:",
       },
       "devDependencies": {
@@ -487,8 +473,6 @@
 
     "@langchain/langgraph-checkpoint": ["@langchain/langgraph-checkpoint@1.2.0", "", { "peerDependencies": { "@langchain/core": "^1.1.48" } }, "sha512-a9F1tO/bKGS4AlLR0FVa859oImD0iQiQLAAPkP66Nnp7a5dXPgys2IpzdJQ9slKiVznsSAFjxxNCmM25dBOvWA=="],
 
-    "@langchain/langgraph-checkpoint-sqlite": ["@langchain/langgraph-checkpoint-sqlite@1.1.0", "", { "dependencies": { "better-sqlite3": "^12.10.0" }, "peerDependencies": { "@langchain/core": "^1.1.44", "@langchain/langgraph-checkpoint": "^1.2.0" } }, "sha512-bKoRJ3nSuWbFVXixDO/yngcAOvYvHSYMhUE8XiT6oW5nQRGaheTWVT2mNoMTp53o8IBT71sy6CdWxfmMg3jpkg=="],
-
     "@langchain/langgraph-sdk": ["@langchain/langgraph-sdk@1.12.4", "", { "dependencies": { "@langchain/protocol": "^0.0.19", "@types/json-schema": "^7.0.15", "p-queue": "^9.0.1", "p-retry": "^7.1.1" }, "peerDependencies": { "@langchain/core": "^1.1.48", "react": "^18 || ^19", "react-dom": "^18 || ^19" }, "optionalPeers": ["react", "react-dom"] }, "sha512-DuYk7HbajphOzBBtZYm+4LpCZuHj1/Csqepej5Ro1PJvchotA+bjg9XLh9LRsbz5j49Tl3owNoUp9ezj0lMCXA=="],
 
     "@langchain/protocol": ["@langchain/protocol@0.0.19", "", {}, "sha512-9hKcRrH7cBX6gfutdfXPoft1OCchHe4FEpALoDJMl5Qu+n/YG5ynZmyu8+8cxORlPwHBoKTxggvXz+76M1yX1Q=="],
@@ -534,8 +518,6 @@
     "@nightshift/db": ["@nightshift/db@workspace:packages/db"],
 
     "@nightshift/engine": ["@nightshift/engine@workspace:packages/engine"],
-
-    "@nightshift/engine-langgraph": ["@nightshift/engine-langgraph@workspace:packages/engine-langgraph"],
 
     "@nightshift/flows": ["@nightshift/flows@workspace:packages/flows"],
 

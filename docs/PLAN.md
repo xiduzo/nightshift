@@ -34,7 +34,7 @@ Each row is a settled decision. Change a row only with a new ADR.
 | Decisions | A Decision node returns one of its declared labels plus notes, validated against a schema. The decider is a provider behind an interface. The default provider is a small model through TanStack AI structured output. Other providers (for example an OpenRouter model) plug in behind the same interface. |
 | Run policy | Ported from the script: fresh session with a tight brief on retry, rescue by a stronger profile, blocked propagation, network grace, usage-limit waits that resume the same session, a stop time. Policy is engine code. A flow only sets its numbers. |
 | Worktrees | The user's own clone. Worktrees live in a sibling directory. Garbage collection never deletes a dirty tree. |
-| State model | Durable facts in libsql. Status is always derived. Every change appends to an event log that fans out to the UI over SSE. The daemon keeps each run's log in memory (the run log) and writes through it: an event is kept, and published, only after its insert returns. |
+| State model | Durable facts in libsql. Status is always derived. Every change appends to an event log that fans out to the UI over SSE. The daemon keeps each run's log in memory (the run log) and writes through it: an event is kept, and published, only after its insert returns. A run's control flow is a LangGraph thread; its checkpoints (`lg_checkpoint`, `lg_write`) are the engine's bookkeeping, never the read model (`docs/steering/langgraph-engine.md`, 2026-10-16). |
 | Session view | Structured transcript. "Take over" hands the user the resume command. |
 | Shell | Electrobun. Bun is the main process, so the daemon runs in-process with no sidecar. |
 | Platforms | macOS first. |
@@ -64,7 +64,7 @@ flowchart LR
     daemon["apps/server — Hono + oRPC daemon"]
     engine["packages/engine — flow runner"]
     agents["packages/agents — harness sessions + tools"]
-    db[("libsql — facts + event log")]
+    db[("libsql — facts + event log + checkpoints")]
   end
   flows[".nightshift/flows/*.json"]
   harness["claude, opencode, codex"]
@@ -89,13 +89,15 @@ flowchart LR
 | `packages/db` | Drizzle schema on libsql. Durable facts and the event log. Full transcripts live on disk, indexed here. |
 | `packages/api` | oRPC contracts shared by server and web. |
 | `packages/flows` | The flow schema (zod), the loader, and the validator (unbounded loops, unknown skills, missing outcomes). |
-| `packages/engine` | Graph walk, run policy, gates, worktrees, For Each ordering. |
+| `packages/engine` | The run engine on LangGraph (`docs/steering/langgraph-engine.md`): a flow compiled to a graph, one thread per run, run policy, gates, worktrees, For Each ordering. |
 | `packages/agents` | Harness sessions through `@tanstack/ai` adapters, session resume, usage-limit waits, the GitHub tools, the decider providers. |
 | `packages/ui` | Shared components and tokens. |
 
 ## 5. Delivery
 
 Status (2026-10-16): Slices 1 to 8 are built. Slices 1 to 4 run real nights: the night runs as flows in `examples/rpgdotexe/`. Slices 5 to 8 are tested with fake harnesses, fake CLIs and a fake clock; no night has run on them yet. `night-shift.py` retires after a flow runs a full Epic.
+
+Done (2026-10-16): the engine's hand-rolled walk, resume points and wait bookkeeping were replaced by LangGraph (`docs/steering/langgraph-engine.md`, after `docs/research/langgraph-spike.md`). A run is one LangGraph thread, checkpointed after every node in the daemon's database; waits, Gates and parked steps are interrupts, so a resume lands at the same node at any depth. The `Engine` interface, the event log, the API and the web app did not change; the engine test suites pass on it. No night has run on the new engine yet.
 
 ### Slice 1 — One agent node, live
 
@@ -193,7 +195,7 @@ Schedules: `.nightshift/schedules.json` in a project's clone, next to the flows.
 
 Settings: the Settings page saves daemon-wide values in the database: the scheduler switch, the run cap, the step cap, the run policy defaults (a flow's own `policy` numbers win), the defaults for new Agent and Decision nodes, and desktop notifications. A setting that is not saved reads the environment (`NIGHTSHIFT_*` in `apps/server/.env`), then its default. The engine reads them when they apply, so a change needs no restart. One exception: `NIGHTSHIFT_SCHEDULER=off` turns the scheduler off whatever the page says, so a dev daemon on a copy of the database never starts the night's schedules.
 
-Restarts: a daemon that stops (a crash, a restart) leaves its running steps open. The next daemon ends them, and their runs, as `interrupted`. A few seconds after it starts, it resumes each of those runs itself, through the same path as the Resume button: an Agent step continues its own harness session, with a prompt that says the daemon stopped mid-step and to check the worktree and the remote before it repeats anything. `RunResumed` records `by: "daemon"`, and the run view shows "Resumed by the daemon". A run stays `interrupted`, with the reason in its end reason, when the scheduler is off (a dev daemon on a copy of the database never continues the night's runs), when Settings → Run policy → Resume after a restart is off (`NIGHTSHIFT_RESUME_INTERRUPTED_RUNS=off`; a flow's `policy.resumeInterruptedRuns` wins), when its stop time has passed, when its worktree is gone, or after three daemon resumes in a row with no person in between (a crash loop). A full run cap queues the resume until a run ends. Runs a person stopped, failed runs and runs an earlier daemon interrupted are never resumed this way. The GitHub tools record what they do outside the worktree in the event log per step (`SideEffectStarted`, `SideEffectEnded`): `github_comment` posts a given comment once per step, and a comment started but not recorded is looked up on GitHub before it is posted again. Opening a pull request (it returns the branch's open one), pushing and labels are safe to repeat. What the agent does itself (its own `gh` or `git push`, an MCP server's tools) cannot be checked; the resume prompt asks it to look first.
+Restarts: a daemon that stops (a crash, a restart) leaves its running steps open. The next daemon ends them, and their runs, as `interrupted`. A few seconds after it starts, it resumes each of those runs itself, through the same path as the Resume button: the run's LangGraph thread runs the node it left pending again, and an Agent step continues its own harness session (the node finds it in the event log), with a prompt that says the daemon stopped mid-step and to check the worktree and the remote before it repeats anything. `RunResumed` records `by: "daemon"`, and the run view shows "Resumed by the daemon". A run stays `interrupted`, with the reason in its end reason, when the scheduler is off (a dev daemon on a copy of the database never continues the night's runs), when Settings → Run policy → Resume after a restart is off (`NIGHTSHIFT_RESUME_INTERRUPTED_RUNS=off`; a flow's `policy.resumeInterruptedRuns` wins), when its stop time has passed, when its worktree is gone, or after three daemon resumes in a row with no person in between (a crash loop). A full run cap queues the resume until a run ends. Runs a person stopped, failed runs and runs an earlier daemon interrupted are never resumed this way. The GitHub tools record what they do outside the worktree in the event log per step (`SideEffectStarted`, `SideEffectEnded`): `github_comment` posts a given comment once per step, and a comment started but not recorded is looked up on GitHub before it is posted again. Opening a pull request (it returns the branch's open one), pushing and labels are safe to repeat. What the agent does itself (its own `gh` or `git push`, an MCP server's tools) cannot be checked; the resume prompt asks it to look first.
 
 Harnesses: an Agent node runs `claude`, `opencode` or `codex` on this machine, with your own login for each. The Agents page adds and removes harnesses (the setting `harnesses`; all three by default, and a removed one refuses runs that need it), checks each one (`--version`, its login status), sets its path, and lists its models: the adapter's own list (`CLAUDE_CODE_MODELS`, `OPENCODE_MODELS`, `CODEX_MODELS`) plus, for OpenCode, what `opencode models` prints. Each path comes from the `PATH` unless set there or in `apps/server/.env` (the fallback):
 
@@ -236,3 +238,4 @@ Run bundles: "Export" on a run page downloads the run as one SQLite file, `<flow
 - When a guard changes during the few seconds before the daemon resumes a run (the scheduler switched off, the stop time came), the run stays `interrupted` with the plain end reason; only the daemon's log says why.
 - The run log trusts that its daemon is the only writer of the database. An event that anything else writes (a second daemon, a hand edit) does not show in the UI or the walk until the daemon restarts. It keeps the logs of open runs and of the latest ended runs, up to 20 000 events (about 14 MB), plus a small summary per run. A database of 50 000 events takes about 35 MB with every log in memory.
 - `@tanstack/ai-sandbox` 0.5.23 writes its projection marker to a doubled path when the workspace has a fixed directory. We set `workspace.root: '.'` to avoid it. Report it upstream.
+- A LangGraph checkpoint copies the whole run state after every node, node outputs and For Each lists included, so a long run's checkpoints grow with it, and nothing prunes `lg_checkpoint` or `lg_write` (the spike's gap 3). A failed Subflow or For Each body leaves its namespace parked for good; the caller fails as before and never continues it. The first real night on the LangGraph engine (2026-10-16) is the real test.

@@ -1,7 +1,12 @@
 # Spike: Night Shift flows on LangGraph
 
-**Date:** 2026-10-16 · **Branch:** `spike/langgraph` (throwaway) ·
-**Code:** `packages/engine-langgraph` on that branch
+> **This spike became the engine** (2026-10-16). The design that shipped is
+> `docs/steering/langgraph-engine.md`; the code lives in
+> `packages/engine/src/graph/`. The spike package `packages/engine-langgraph`
+> no longer exists. The rest of this page is the spike as it was written.
+
+**Date:** 2026-10-16 · **Branch:** `spike/langgraph` ·
+**Code:** `packages/engine-langgraph` on that branch (since deleted)
 
 **Question.** Could LangGraph (`@langchain/langgraph`, JS) replace the
 engine's hand-rolled walk, event log, waits and resumes, so Night Shift

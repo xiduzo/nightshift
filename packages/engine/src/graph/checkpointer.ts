@@ -1,13 +1,18 @@
 /**
- * SPIKE. A LangGraph checkpoint saver on `@libsql/client`, so a graph's
- * checkpoints live in Night Shift's own database (Bun cannot load the
- * official `@langchain/langgraph-checkpoint-sqlite`, which needs
- * better-sqlite3). A port of that package's SqliteSaver to an async client.
+ * A LangGraph checkpoint saver on `@libsql/client`, so a run's checkpoints
+ * live in Night Shift's own database next to its events. A port of
+ * `@langchain/langgraph-checkpoint-sqlite`'s SqliteSaver to an async client
+ * (Bun cannot load the official one, which needs better-sqlite3).
+ *
+ * The tables `lg_checkpoint` and `lg_write` are drizzle schema
+ * (`@nightshift/db/schema/nightshift`) and a migration owns them; the
+ * saver never creates them.
  */
 
 import type { RunnableConfig } from "@langchain/core/runnables";
 import {
 	BaseCheckpointSaver,
+	type ChannelVersions,
 	type Checkpoint,
 	type CheckpointListOptions,
 	type CheckpointMetadata,
@@ -20,6 +25,7 @@ import {
 	writesSortKey,
 } from "@langchain/langgraph-checkpoint";
 import type { Client, InValue, Row } from "@libsql/client";
+import type { Database } from "@nightshift/db";
 
 type WriteColumn = {
 	task_id: string;
@@ -51,50 +57,24 @@ SELECT
     SELECT json_group_array(json_object(
       'task_id', pw.task_id, 'channel', pw.channel, 'type', pw.type,
       'value', CAST(pw.value AS TEXT), 'task_path', pw.task_path, 'idx', pw.idx))
-    FROM lg_writes AS pw
-    WHERE pw.thread_id = lg_checkpoints.thread_id
-      AND pw.checkpoint_ns = lg_checkpoints.checkpoint_ns
-      AND pw.checkpoint_id = lg_checkpoints.checkpoint_id
+    FROM lg_write AS pw
+    WHERE pw.thread_id = lg_checkpoint.thread_id
+      AND pw.checkpoint_ns = lg_checkpoint.checkpoint_ns
+      AND pw.checkpoint_id = lg_checkpoint.checkpoint_id
   ) AS pending_writes
-FROM lg_checkpoints`;
+FROM lg_checkpoint`;
+
+/** The saver over the engine's database: drizzle exposes its libsql client as `db.$client`. */
+export function saverFor(db: Database): LibsqlSaver {
+	return new LibsqlSaver(db.$client);
+}
 
 export class LibsqlSaver extends BaseCheckpointSaver {
-	private ready: Promise<void> | null = null;
-
 	constructor(
 		private readonly client: Client,
 		serde?: SerializerProtocol,
 	) {
 		super(serde);
-	}
-
-	private setup(): Promise<void> {
-		this.ready ??= (async () => {
-			await this.client.executeMultiple(`
-CREATE TABLE IF NOT EXISTS lg_checkpoints (
-  thread_id TEXT NOT NULL,
-  checkpoint_ns TEXT NOT NULL DEFAULT '',
-  checkpoint_id TEXT NOT NULL,
-  parent_checkpoint_id TEXT,
-  type TEXT,
-  checkpoint BLOB,
-  metadata BLOB,
-  PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id)
-);
-CREATE TABLE IF NOT EXISTS lg_writes (
-  thread_id TEXT NOT NULL,
-  checkpoint_ns TEXT NOT NULL DEFAULT '',
-  checkpoint_id TEXT NOT NULL,
-  task_id TEXT NOT NULL,
-  task_path TEXT NOT NULL DEFAULT '',
-  idx INTEGER NOT NULL,
-  channel TEXT NOT NULL,
-  type TEXT,
-  value BLOB,
-  PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id, task_id, idx)
-);`);
-		})();
-		return this.ready;
 	}
 
 	private async toTuple(row: Row): Promise<CheckpointTuple> {
@@ -147,7 +127,6 @@ CREATE TABLE IF NOT EXISTS lg_writes (
 	}
 
 	async getTuple(config: RunnableConfig): Promise<CheckpointTuple | undefined> {
-		await this.setup();
 		const {
 			thread_id,
 			checkpoint_ns = "",
@@ -167,7 +146,6 @@ CREATE TABLE IF NOT EXISTS lg_writes (
 		config: RunnableConfig,
 		options?: CheckpointListOptions,
 	): AsyncGenerator<CheckpointTuple> {
-		await this.setup();
 		const where: string[] = [];
 		const args: InValue[] = [];
 		const threadId = config.configurable?.thread_id;
@@ -187,7 +165,8 @@ CREATE TABLE IF NOT EXISTS lg_writes (
 		}
 		for (const [key, value] of Object.entries(options?.filter ?? {})) {
 			if (value === undefined) continue;
-			where.push("json_extract(CAST(metadata AS TEXT), ?) = json(?)");
+			// `->` gives the JSON text of the value, so it compares with JSON.stringify.
+			where.push("CAST(metadata AS TEXT) -> ? = ?");
 			args.push(`$.${key}`, JSON.stringify(value));
 		}
 		let sql = SELECT;
@@ -202,8 +181,9 @@ CREATE TABLE IF NOT EXISTS lg_writes (
 		config: RunnableConfig,
 		checkpoint: Checkpoint,
 		metadata: CheckpointMetadata,
+		// The new channel versions are inside the checkpoint; this saver stores it whole.
+		_newVersions?: ChannelVersions,
 	): Promise<RunnableConfig> {
-		await this.setup();
 		const threadId = config.configurable?.thread_id;
 		if (!threadId) throw new Error("Missing thread_id in config.configurable.");
 		const ns = config.configurable?.checkpoint_ns ?? "";
@@ -217,7 +197,7 @@ CREATE TABLE IF NOT EXISTS lg_writes (
 			throw new Error("Checkpoint and metadata serialized to different types.");
 		}
 		await this.client.execute({
-			sql: `INSERT OR REPLACE INTO lg_checkpoints
+			sql: `INSERT OR REPLACE INTO lg_checkpoint
         (thread_id, checkpoint_ns, checkpoint_id, parent_checkpoint_id, type, checkpoint, metadata)
         VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			args: [
@@ -245,7 +225,6 @@ CREATE TABLE IF NOT EXISTS lg_writes (
 		taskId: string,
 		taskPath = "",
 	): Promise<void> {
-		await this.setup();
 		const threadId = config.configurable?.thread_id;
 		const checkpointId = config.configurable?.checkpoint_id;
 		if (!threadId || !checkpointId) {
@@ -258,7 +237,7 @@ CREATE TABLE IF NOT EXISTS lg_writes (
 			writes.map(async ([channel, value], idx) => {
 				const [type, serialized] = await this.serde.dumpsTyped(value);
 				return {
-					sql: `INSERT ${allSpecial ? "OR REPLACE" : "OR IGNORE"} INTO lg_writes
+					sql: `INSERT ${allSpecial ? "OR REPLACE" : "OR IGNORE"} INTO lg_write
             (thread_id, checkpoint_ns, checkpoint_id, task_id, task_path, idx, channel, type, value)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 					args: [
@@ -279,14 +258,13 @@ CREATE TABLE IF NOT EXISTS lg_writes (
 	}
 
 	async deleteThread(threadId: string): Promise<void> {
-		await this.setup();
 		await this.client.batch(
 			[
 				{
-					sql: "DELETE FROM lg_checkpoints WHERE thread_id = ?",
+					sql: "DELETE FROM lg_checkpoint WHERE thread_id = ?",
 					args: [threadId],
 				},
-				{ sql: "DELETE FROM lg_writes WHERE thread_id = ?", args: [threadId] },
+				{ sql: "DELETE FROM lg_write WHERE thread_id = ?", args: [threadId] },
 			],
 			"write",
 		);
