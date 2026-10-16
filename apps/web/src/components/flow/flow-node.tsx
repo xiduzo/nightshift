@@ -40,6 +40,7 @@ import {
 	stepStateStyle,
 } from "@/components/outcome-badge";
 import { agentSummary, firstLine, sourceSummary } from "@/lib/flow-draft";
+import { harnessInfo } from "@/lib/harnesses";
 
 import { NODE_TYPE } from "./node-type";
 import { OpenFlowContext } from "./open-flow-context";
@@ -288,6 +289,9 @@ function AgentBody({ node }: { node: AgentNode }) {
 	return (
 		<>
 			<span className="truncate text-[11px] text-muted-foreground">
+				{node.harness !== "claude-code"
+					? `${harnessInfo(node.harness).label} · `
+					: ""}
 				{node.model}
 				{node.effort ? ` · ${node.effort}` : ""}
 				{node.session === "resume" ? " · resumes session" : ""}

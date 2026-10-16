@@ -28,6 +28,12 @@ import {
 	type OptionNode,
 	withOptions,
 } from "@/lib/flow-draft";
+import {
+	HARNESSES,
+	type HarnessName,
+	harnessInfo,
+	switchHarness,
+} from "@/lib/harnesses";
 
 import {
 	CalledFlowField,
@@ -36,6 +42,7 @@ import {
 } from "./called-flow-fields";
 import { Field, PositiveIntInput } from "./fields";
 import { ForEachFields } from "./foreach-fields";
+import { McpServersField } from "./mcp-servers-field";
 import { OptionsEditor } from "./options-editor";
 import { OutputSchemaField } from "./output-schema-field";
 import { TemplateField } from "./template-field";
@@ -318,9 +325,28 @@ function AgentFields({
 	onSetOutcomes: (outcomes: NodeOption[] | undefined) => void;
 }) {
 	const id = useId();
+	const harness = harnessInfo(node.harness);
 
 	return (
 		<>
+			<Field id={`${id}-harness`} label="Harness" hint={harness.note}>
+				<NativeSelect
+					id={`${id}-harness`}
+					value={node.harness}
+					aria-describedby={`${id}-harness-hint`}
+					onChange={(event) => {
+						const next = event.target.value as HarnessName;
+						onChange((current) => switchHarness(current, next));
+					}}
+				>
+					{HARNESSES.map(({ value, label }) => (
+						<NativeSelectOption key={value} value={value}>
+							{label}
+						</NativeSelectOption>
+					))}
+				</NativeSelect>
+			</Field>
+
 			<TemplateField
 				id={`${id}-prompt`}
 				label="Prompt"
@@ -340,7 +366,7 @@ function AgentFields({
 				id={`${id}-skill`}
 				label="Skill"
 				optional
-				hint="A skill Claude Code already has, without the slash."
+				hint={`A skill ${harness.label} already has, without the slash.`}
 			>
 				<Input
 					id={`${id}-skill`}
@@ -372,7 +398,7 @@ function AgentFields({
 						}}
 					/>
 					<datalist id={`${id}-models`}>
-						{MODEL_SUGGESTIONS.map((value) => (
+						{harness.models.map((value) => (
 							<option key={value} value={value} />
 						))}
 					</datalist>
@@ -493,9 +519,19 @@ function AgentFields({
 				onChange={(tools) => onChange((current) => ({ ...current, tools }))}
 			/>
 
+			<McpServersField
+				id={`${id}-mcp`}
+				servers={node.mcpServers}
+				onChange={(mcpServers) =>
+					onChange(({ mcpServers: _, ...rest }) =>
+						mcpServers === undefined ? rest : { ...rest, mcpServers },
+					)
+				}
+			/>
+
 			<p className="text-muted-foreground text-xs">
-				Harness: <span className="text-foreground">Claude Code</span>. The agent
-				ends with a step report:{" "}
+				Harness: <span className="text-foreground">{harness.label}</span>. The
+				agent ends with a step report:{" "}
 				{node.outcomes
 					? `one of its own outcomes (${node.outcomes.map((o) => o.name).join(", ")})`
 					: "pass, fail, or needs input"}

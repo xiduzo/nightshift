@@ -261,7 +261,11 @@ test("harness session lookups", () => {
 		.harness("s2", "b", "h-2");
 	expect(lastHarnessSessionOfNode(events, "worker")).toBe("h-1");
 	expect(lastHarnessSessionOfNode(events, "check")).toBeNull();
-	expect(lastHarnessSession(events)).toBe("h-2");
+	// A session logged before Slice 8 names no harness: it ran on Claude Code.
+	expect(lastHarnessSession(events)).toEqual({
+		harness: "claude-code",
+		harnessSessionId: "h-2",
+	});
 });
 
 describe("deriveResumePoint", () => {

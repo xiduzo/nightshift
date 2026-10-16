@@ -85,6 +85,14 @@ export function RunHeader({
 		["Cost", formatCost(run.costUsd), false],
 		["Started", formatDateTime(run.createdAt), false],
 	];
+	// A manual run shows no trigger: that is the usual case.
+	if (run.trigger.kind === "schedule") {
+		details.splice(1, 0, [
+			"Trigger",
+			`scheduled · ${run.trigger.scheduleId}`,
+			false,
+		]);
+	}
 	const stoppable = STOPPABLE.includes(status);
 	const inputEntries = Object.entries(run.inputs ?? {}).map(
 		([name, value]) =>

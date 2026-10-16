@@ -1,4 +1,8 @@
-import type { AgentErrorKind, AgentUsage } from "@nightshift/agents/types";
+import type {
+	AgentErrorKind,
+	AgentUsage,
+	HarnessName,
+} from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema/nightshift";
 import type {
@@ -144,6 +148,8 @@ export type EnginePayloads = {
 		prompt: string;
 		/** The harness session this session continues, on a resume. */
 		resumeSessionId: string | null;
+		/** Absent in logs from before Slice 8: those sessions ran on Claude Code. */
+		harness?: HarnessName;
 	};
 	HarnessSessionAssigned: { harnessSessionId: string; model: string | null };
 	SessionEnded: {
@@ -517,6 +523,7 @@ export type DerivedSession = {
 	stepId: string | null;
 	prompt: string;
 	resumeSessionId: string | null;
+	harness: HarnessName;
 	harnessSessionId: string | null;
 	startedAt: number;
 	startSeq: number;
@@ -537,6 +544,7 @@ export function deriveSessions(
 				stepId: e.stepId,
 				prompt: e.payload.prompt,
 				resumeSessionId: e.payload.resumeSessionId,
+				harness: e.payload.harness ?? "claude-code",
 				harnessSessionId: null,
 				startedAt: e.at,
 				startSeq: e.seq,
@@ -797,14 +805,14 @@ export function lastHarnessSessionOfNode(
 	return sessions.findLast((s) => s.harnessSessionId)?.harnessSessionId ?? null;
 }
 
-/** The harness session id of the run's latest session that has one. */
+/** The run's latest session that has a harness session id. */
 export function lastHarnessSession(
 	events: readonly LoggedEvent[],
-): string | null {
-	return (
-		deriveSessions(events).findLast((s) => s.harnessSessionId)
-			?.harnessSessionId ?? null
-	);
+): { harness: HarnessName; harnessSessionId: string } | null {
+	const session = deriveSessions(events).findLast((s) => s.harnessSessionId);
+	return session?.harnessSessionId
+		? { harness: session.harness, harnessSessionId: session.harnessSessionId }
+		: null;
 }
 
 export type ResumePoint =

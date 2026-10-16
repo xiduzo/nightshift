@@ -25,7 +25,7 @@ Each row is a settled decision. Change a row only with a new ADR.
 | Templates | `{{name.path}}` reads a value: `name` is a node id, an input, or `run`. Node ids and inputs share one namespace. A path reaches into JSON: `{{planner.data.tasks}}`, `{{item.parent.number}}`. A command gets every value as an environment variable, never as shell text. |
 | Node types | Agent, Command, Decision, Gate, Subflow, For Each. See section 3. |
 | Edges | An edge leaves a node on a named outcome (`pass`, `fail`, an Agent's own outcome, a Decision label, or a Gate choice). An edge back to an earlier node is a retry loop. Every loop has a maximum count. The engine refuses a flow with an unbounded loop. |
-| Harnesses | Every Agent node runs as a harness session through a TanStack AI harness adapter: `@tanstack/ai-claude-code`, `@tanstack/ai-opencode`, `@tanstack/ai-codex`. Unattended Claude Code runs in `auto` permission mode. |
+| Harnesses | Every Agent node runs as a harness session through a TanStack AI harness adapter: `@tanstack/ai-claude-code`, `@tanstack/ai-opencode`, `@tanstack/ai-codex`. The node names its harness; a flow mixes them freely. Unattended Claude Code runs in `auto` permission mode. |
 | Daemon | Nights run on a stable daemon (`bun run night`): a built server without hot reload. Development uses `bun run dev` in a separate git worktree, so code changes never reload a daemon that runs a night. |
 | Skills | An Agent node names a skill that the harness already has (user, project, or plugin skills). No skill pack materialization. |
 | Lists | A For Each reads a list from a source: a JSON value (often another node's output), a command that prints JSON, files that match a glob, or a plugin such as GitHub sub-issues. An element is any JSON value. An object element may carry `id`, `title`, `dependsOn`, and `done`; the rest is free. |
@@ -95,7 +95,7 @@ flowchart LR
 
 ## 5. Delivery
 
-Status (2026-10-15): Slices 1 to 4 are built. The night runs as flows in `examples/rpgdotexe/`. `night-shift.py` retires after a flow runs a full Epic.
+Status (2026-10-16): Slices 1 to 8 are built. Slices 1 to 4 run real nights: the night runs as flows in `examples/rpgdotexe/`. Slices 5 to 8 are tested with fake harnesses, fake CLIs and a fake clock; no night has run on them yet. `night-shift.py` retires after a flow runs a full Epic.
 
 ### Slice 1 — One agent node, live
 
@@ -134,6 +134,8 @@ The first nights showed two things: the dev server reloads under a running night
 
 Proves: any flow can call any flow, and a list can come from anywhere.
 
+Status: built. Tested with fakes; the rpgdotexe flows on version 2 pass the validator and the migration tests. Not yet run in a real night.
+
 ### Slice 6 — Agents that answer in shape
 
 - Agent outcomes: an Agent node may declare its own outcomes (`approved`, `changes-requested`, …) instead of `pass`/`fail`/`needs-input`.
@@ -143,11 +145,15 @@ Proves: any flow can call any flow, and a list can come from anywhere.
 
 Proves: a planner agent can decide what the night does.
 
+Status: built. Tested with fakes. The starters validate; none has run against a real harness yet.
+
 ### Slice 7 — Triggers
 
 - Schedules in `.nightshift/schedules.json`: a flow, its inputs, a time of day or a cron line, and a stop time. The daemon starts the runs. The UI lists, adds, pauses, and removes schedules, and shows the next start.
 
 Proves: a night starts without a person.
+
+Status: built. Tested with a fake clock: no double fires, no overlap with a run of the same schedule that still runs, catch-up within 15 minutes. Not yet used for a real night.
 
 ### Slice 8 — More harnesses and tools
 
@@ -155,6 +161,8 @@ Proves: a night starts without a person.
 - MCP servers per Agent node, next to the built-in tool sets.
 
 Proves: a flow can mix harnesses.
+
+Status: built. An Agent node runs on the harness it names; a flow that names a harness the daemon does not have refuses to start. MCP servers read `${NAME}` from the daemon's environment. "Take over" gives the resume command of the harness that ran the last session. The OpenCode harness is tested against a fake `opencode` that replays what a live OpenCode 1.19 server sent. The Codex harness is tested against a fake `codex` only. The engine is tested with fake harnesses under each name.
 
 ### Then
 
@@ -177,11 +185,22 @@ bun run build          # everything, desktop last
 bun run night          # the stable daemon for a night (see below)
 ```
 
-Nights: `bun run night` builds the web app, then serves the API server and the built web app on the usual ports (3000 and 3001; set `PORT` and `WEB_PORT` to change them). The server runs from source with plain `bun`, without `--hot`, and the web app is a production build behind `vite preview`, so no file change restarts a running night. It reads the same env as `bun run dev` (`apps/server/.env` and `apps/web/.env` through varlock; `process.env` wins). When `PORT` or `WEB_PORT` is set, `BETTER_AUTH_URL`, `VITE_SERVER_URL` and `CORS_ORIGIN` follow, unless they are set too. Develop in a separate git worktree (`git worktree add ../nightshift-dev`) with `bun run dev` on other ports and its own `DATABASE_URL`, and pull the work into the night's clone between nights.
+Nights: `bun run night` builds the web app, then serves the API server and the built web app on the usual ports (3000 and 3001; set `PORT` and `WEB_PORT` to change them). The server runs from source with plain `bun`, without `--hot`, and the web app is a production build behind `vite preview`, so no file change restarts a running night. It reads the same env as `bun run dev` (`apps/server/.env` and `apps/web/.env` through varlock; `process.env` wins). When `PORT` or `WEB_PORT` is set, `BETTER_AUTH_URL`, `VITE_SERVER_URL` and `CORS_ORIGIN` follow, unless they are set too. Develop in a separate git worktree (`git worktree add ../nightshift-dev`) with `bun run dev` on other ports, its own `DATABASE_URL` and `NIGHTSHIFT_DATA_DIR`, and `NIGHTSHIFT_SCHEDULER=off`. Never point two daemons at one database. Pull the work into the night's clone between nights.
+
+Schedules: `.nightshift/schedules.json` in a project's clone, next to the flows. The UI lists, adds, pauses and removes them; the file can also be edited by hand. Each schedule names a flow, its input values, a cron line in the daemon's local time (`0 22 * * 1-5`), an optional stop time (`07:00`) and base ref. The daemon reads the file again on every tick (30 s), so an edit needs no restart. A cron time that is more than 15 minutes late is skipped, and a schedule does not start while its previous run still runs, waits or sleeps. Every daemon starts the schedules of the projects in its own database: keep the night's projects out of the dev database.
+
+Harnesses: an Agent node runs `claude`, `opencode` or `codex` on this machine, with your own login for each. They come from the `PATH` unless set in `apps/server/.env`:
+
+```bash
+NIGHTSHIFT_OPENCODE_BIN=/path/to/opencode   # must be a 1.x build (see section 7)
+NIGHTSHIFT_CODEX_BIN=/path/to/codex
+```
+
+An MCP server on an Agent node reads secrets as `${NAME}` in its env values and headers. The value comes from the daemon's environment when the step starts, so set it where `bun run night` starts. A missing variable fails the step with its name; values never go into the flow file or the logs.
 
 ## 7. Open items
 
-- Our own TanStack AI tools reach a Claude Code session over MCP as `mcp__tanstack__<name>` (Slice 2, the `report_step` tool). Plan mode denies them, so a plan-mode Agent node reports with a text line instead. Check OpenCode and Codex when their adapters arrive.
+- Our own TanStack AI tools reach a Claude Code session over MCP as `mcp__tanstack__<name>` (Slice 2, the `report_step` tool). Claude Code's plan mode denies them, so a plan-mode Claude Code node reports with a text line instead. OpenCode allows them in every mode. Codex is unverified.
 - Session resume works through the adapter (Slice 1). The usage-limit reset time is parsed from the harness's raw messages, but no real usage limit has tested it yet.
 - Electrobun packaging needs a static web build of TanStack Start. Confirm before the first desktop build.
 - The decider runs Claude Code with no built-in tools (`--tools "" --strict-mcp-config`). `@tanstack/ai-claude-code` 0.9 cannot pass that next to several bridged tools, so we append the flags to the `claude` executable string, which the adapter splits on spaces. Recheck on every adapter upgrade, and ask upstream for an option.
@@ -191,4 +210,10 @@ Nights: `bun run night` builds the web app, then serves the API server and the b
 - Usage-limit and network sleeps are tested with fakes only. The first real usage limit at night is the real test.
 - `@tanstack/ai-opencode` 0.5 drives OpenCode 1.x servers only (verified with 1.19.2). OpenCode 2.x serves a different API. Point the OpenCode harness at a 1.x `opencode` until the adapter catches up. The harness works around four adapter quirks (empty first tool input, the prompt echoed as text, a finish held until the next heartbeat, abort teardown): report them upstream.
 - The Codex harness is tested against a fake `codex` only: the event shapes, `exec resume`, error wording, and the TOML MCP overrides are unverified. In `workspace-write`, commits from a linked worktree may need the git common dir in `additionalDirectories`.
+- The take-over commands for OpenCode (`opencode --session <id>`) and Codex (`codex resume <id>`) come from the CLI docs. Neither was run against a real session.
+- Slices 5 to 8 have not run a real night. The first scheduled night, the first planner that feeds a For Each, and the first OpenCode or Codex step are the real tests.
+- Schedule catch-up looks only at the latest missed cron time. Earlier missed times are dropped without a log entry, so a daemon that was down for two nights starts at most one run.
+- Every daemon runs the scheduler, a dev daemon too. A project added to both databases starts its schedules twice. Consider a switch to turn the scheduler off in development.
+- An MCP `${NAME}` that the daemon lacks fails the step when it starts, not the run at its start. A night finds out at that node.
+- Two daemons must never share a database: the second one's startup recovery marks the first one's running steps as interrupted. A dev daemon uses its own `DATABASE_URL` and `NIGHTSHIFT_DATA_DIR`, and `NIGHTSHIFT_SCHEDULER=off`. A lock on the database would enforce this; add one.
 - `@tanstack/ai-sandbox` 0.5.23 writes its projection marker to a doubled path when the workspace has a fixed directory. We set `workspace.root: '.'` to avoid it. Report it upstream.

@@ -107,6 +107,7 @@ import {
 	toItemFacts,
 } from "./foreach";
 import { flowOutputs, renderBindings, resolveInputs } from "./inputs";
+import { expandMcpServers } from "./mcp";
 import { checkOutputData } from "./output-schema";
 import { planWait } from "./policy";
 import {
@@ -160,13 +161,25 @@ const STOP_AFTER_STEP_REASON = "Stopped after the running step, as asked.";
 const MAX_TIMER_MS = 2 ** 31 - 1;
 
 /**
- * The CLI a person runs to take over a harness session. Only Claude Code
- * sessions run today; the others are here so the record stays complete.
+ * The command a person runs in the worktree to take over a harness session,
+ * given the quoted session id.
+ *
+ * - Claude Code: `claude --resume <id>`.
+ * - OpenCode: `opencode --session <id>` opens the TUI on that session. The
+ *   flag is from the OpenCode CLI docs (`-s, --session`); it was not checked
+ *   against a 1.x binary here. Use the same 1.x build the daemon runs.
+ * - Codex: `codex resume <id>` opens the interactive CLI on that thread.
  */
-const takeOverCli: Record<HarnessName, string> = {
-	"claude-code": "claude",
-	opencode: "opencode",
-	codex: "codex",
+const takeOverCli: Record<HarnessName, (sessionId: string) => string> = {
+	"claude-code": (id) => `claude --resume ${id}`,
+	opencode: (id) => `opencode --session ${id}`,
+	codex: (id) => `codex resume ${id}`,
+};
+
+const HARNESS_LABEL: Record<HarnessName, string> = {
+	"claude-code": "Claude Code",
+	opencode: "OpenCode",
+	codex: "Codex",
 };
 
 type RunRow = typeof run.$inferSelect;
@@ -1358,6 +1371,17 @@ export function createEngine(
 			};
 		}
 
+		// `${NAME}` in env values and headers reads the daemon's environment.
+		// The expanded values go to the harness only, never into the log.
+		const mcp = expandMcpServers(node.mcpServers, process.env);
+		if (!mcp.ok) {
+			return {
+				outcome: "error",
+				outputs: { outcome: "error", visit },
+				error: mcp.message,
+			};
+		}
+
 		const sessionId = randomUUID();
 		await db
 			.insert(agentSession)
@@ -1367,7 +1391,7 @@ export function createEngine(
 			runId,
 			stepId,
 			sessionId,
-			payload: { prompt, resumeSessionId },
+			payload: { prompt, resumeSessionId, harness: node.harness },
 		});
 		bus.publish(runId, { kind: "step-changed", stepId });
 
@@ -1469,6 +1493,9 @@ export function createEngine(
 				stepReport: stepReportOf(node),
 				// A run snapshot from before Slice 3 has no `tools`.
 				tools: node.tools ?? [],
+				...(Object.keys(mcp.servers).length > 0
+					? { mcpServers: mcp.servers }
+					: {}),
 				signal,
 			});
 			await consumeStream(stream, {
@@ -2306,6 +2333,17 @@ export function createEngine(
 			);
 			const all = [flow, ...Object.values(calledFlows)];
 			const nodes = all.flatMap((f) => f.nodes);
+			const missing = missingHarnesses(nodes, harnesses);
+			if (missing.length > 0) {
+				throw new Error(
+					missing
+						.map(
+							({ harness, nodeIds }) =>
+								`The flow has ${nodeIds.length === 1 ? "an Agent node" : "Agent nodes"} on ${HARNESS_LABEL[harness]} (${nodeIds.join(", ")}), but no ${HARNESS_LABEL[harness]} harness is configured.`,
+						)
+						.join(" "),
+				);
+			}
 			if (!decider && nodes.some((n) => n.type === "decision")) {
 				throw new Error(
 					"The flow has a Decision node, but no decider is configured.",
@@ -2541,8 +2579,7 @@ export function createEngine(
 			await ready;
 			const row = await getRunRow(runId);
 			const events = await loadRunEvents(runId);
-			const harnessSessionId = lastHarnessSession(events);
-			const cli = takeOverCli["claude-code"];
+			const last = lastHarnessSession(events);
 			const detail: RunDetail = {
 				...toSummary(row, events),
 				flow: parseRunFlow(row),
@@ -2550,8 +2587,8 @@ export function createEngine(
 				steps: deriveSteps(events).map(toStepSummary),
 				// Edges of the top-level flow; body edges count per item.
 				traversals: deriveTraversals(events),
-				takeOverCommand: harnessSessionId
-					? `cd ${shellQuote(row.worktreePath)} && ${cli} --resume ${shellQuote(harnessSessionId)}`
+				takeOverCommand: last
+					? `cd ${shellQuote(row.worktreePath)} && ${takeOverCli[last.harness](shellQuote(last.harnessSessionId))}`
 					: null,
 			};
 			return detail;
@@ -2908,6 +2945,21 @@ async function readProjectFlowFiles(
 		}
 	}
 	return files;
+}
+
+/** The harnesses the Agent nodes name that the daemon has not configured, with their nodes. */
+function missingHarnesses(
+	nodes: readonly FlowNode[],
+	harnesses: EngineOptions["harnesses"],
+): { harness: HarnessName; nodeIds: string[] }[] {
+	const missing = new Map<HarnessName, string[]>();
+	for (const node of nodes) {
+		if (node.type !== "agent" || harnesses[node.harness]) continue;
+		const ids = missing.get(node.harness) ?? [];
+		if (!ids.includes(node.id)) ids.push(node.id);
+		missing.set(node.harness, ids);
+	}
+	return [...missing].map(([harness, nodeIds]) => ({ harness, nodeIds }));
 }
 
 /** The names of the flows a flow's Subflow and For Each nodes call. */

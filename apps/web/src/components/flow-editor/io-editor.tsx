@@ -148,7 +148,7 @@ export function InputsEditor({
 }
 
 /** A name that commits on blur or Enter, and goes back on Escape. */
-function NameInput({
+export function NameInput({
 	id,
 	name,
 	label,

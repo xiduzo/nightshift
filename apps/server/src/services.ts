@@ -4,6 +4,8 @@ import { join } from "node:path";
 import {
 	claudeCodeDecider,
 	claudeCodeHarness,
+	codexHarness,
+	opencodeHarness,
 	readGithubItems,
 } from "@nightshift/agents";
 import { createAuth } from "@nightshift/auth";
@@ -27,9 +29,20 @@ hot.nightshiftScheduler = scheduler;
 
 export const engine = await createEngine({
 	db,
-	harnesses: { "claude-code": claudeCodeHarness() },
+	harnesses: {
+		"claude-code": claudeCodeHarness(),
+		// Each harness spawns its CLI only when an Agent node names it.
+		opencode: opencodeHarness({
+			opencodeExecutable: ENV.NIGHTSHIFT_OPENCODE_BIN ?? "opencode",
+		}),
+		codex: codexHarness({
+			codexExecutable: ENV.NIGHTSHIFT_CODEX_BIN ?? "codex",
+		}),
+	},
 	decider: claudeCodeDecider(),
 	readGithubItems: (input) => readGithubItems(input),
 	dataDir: ENV.NIGHTSHIFT_DATA_DIR ?? join(homedir(), ".nightshift"),
-	scheduler: { signal: scheduler.signal },
+	// A dev daemon next to a night daemon must not start scheduled runs too.
+	scheduler:
+		ENV.NIGHTSHIFT_SCHEDULER === "off" ? false : { signal: scheduler.signal },
 });

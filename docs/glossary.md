@@ -16,12 +16,12 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 |------|---------|--------|
 | Project | A local clone that Runs can start in. | Slice 1 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
-| Node | One step of a Flow: Agent, Command, Decision, Gate, or For Each. Its id is also its name in templates. | PLAN §3 |
-| Agent Node | A Node that runs one harness session with a prompt and/or a skill, a model, an effort, and a permission mode. | PLAN §3 |
+| Node | One step of a Flow: Agent, Command, Decision, Gate, Subflow, or For Each. Its id is also its name in templates. | PLAN §3 |
+| Agent Node | A Node that runs one Session on its Harness, with a prompt and/or a skill, a model, an effort, and a permission mode. | PLAN §3 |
 | Command Node | A Node that runs one shell command in the Worktree. Exit 0 is `pass`. | PLAN §3 |
 | Decision Node | A Node that reads earlier outputs and returns one of its declared labels. | PLAN §3 |
 | Gate | A Node that waits for a person in the Needs-you inbox, with a question and its choices. | PLAN §3 |
-| For Each Node | A Node that runs a sub-flow once per item of a list. | PLAN §3 |
+| For Each Node | A Node that runs a Body Flow once per Item of a List. | PLAN §3 |
 | Start Node | The Node a Run begins at. | Slice 2 |
 | Input | A named value a Flow takes, like a function argument. The top-level Flow's Inputs are asked at start. | Slice 5 |
 | Output | A named value a Flow returns to the Node that called it. | Slice 5 |
@@ -35,7 +35,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Item Branch | The branch one Item works on, on top of the last Item that finished. Together they form the Stack. | Slice 4 |
 | Stack | The chain of Item Branches of one For Each, and the pull requests opened on them. | PLAN §5 |
 | Stop Time | The time after which a Run starts no new Step. | Slice 4 |
-| Outcome | How a Step ended: `pass`, `fail`, `needs-input`, or a Decision label. | PLAN §3 |
+| Outcome | How a Step ended: `pass`, `fail`, `needs-input`, an Agent Node's own outcome, a Decision label, or a Gate choice. | PLAN §3 |
 | Edge | A link from a Node to the next Node, taken on one Outcome. | PLAN §2 |
 | Max | How often a Run may take an Edge. Every loop needs an Edge with a Max. | Slice 2 |
 | Retry Loop | An Edge back to an earlier Node, bounded by a Max. | PLAN §2 |
@@ -47,8 +47,12 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Step | One visit of one Node in a Run. | Slice 2 |
 | Visit | The count of a Step among the Steps of the same Node: 1 for the first. | Slice 2 |
 | Session | One harness session of an Agent Step. A resumed Step has more than one. | Slice 1 |
-| Harness | A coding-agent CLI that runs Sessions: Claude Code, and later OpenCode and Codex. | PLAN §2 |
-| Step Report | The Outcome and summary an agent reports at the end of its Session. | PLAN §3 |
+| Harness | A coding-agent CLI that runs Sessions on this machine, with its own login. Each Agent Node names one: `claude-code` (Claude Code), `opencode` (OpenCode, a 1.x build), or `codex` (Codex). | Slice 8 |
+| MCP Server | A tool server an Agent Node adds to its Session, next to the Harness's own: a local command (stdio) or a URL. | Slice 8 |
+| Environment Reference | `${NAME}` in an MCP Server's env values or headers. The daemon puts in its environment variable `NAME` when the Step starts, so secrets stay out of Flow files. | Slice 8 |
+| Step Report | The Outcome, summary, and optional data an agent reports at the end of its Session. | PLAN §3 |
+| Output Schema | A JSON Schema for the data of an Agent Node's Step Report. The engine checks the data against it. | Slice 6 |
+| Starter | A small Flow in `examples/starters/` to copy into a Project. | Slice 6 |
 | Transcript | The structured record of a Step: agent messages, tool calls, and command output, on disk. | Slice 1 |
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |
 | Event | One appended record of a fact that changed. | Slice 1 |
@@ -81,7 +85,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | report | End a Session with a Step Report. | Slice 2 |
 | stop | Abort the running Step and end the Run as stopped. | Slice 1 |
 | resume | Continue a stopped, failed, or interrupted Run at its last Node. | Slice 1 |
-| take over | Hand a Session to a person with its resume command. | Slice 1 |
+| take over | Hand a Session to a person with its Harness's resume command, for example `claude --resume <id>`. | Slice 1 |
 | retry | Take a Retry Loop back to an earlier Node. | Slice 2 |
 | rescue | Retry a Node with a stronger model. | PLAN §2 |
 | resolve | Answer a Gate with one of its choices. | PLAN §3 |
@@ -110,3 +114,5 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | StopRequested | A person asked to stop the Run. |
 | GateOpened | A Gate put its question in the Needs-you inbox. |
 | RunEnded | The Run finished or failed, with the reason. |
+| ScheduleFired | A Schedule came due and started its Run, or failed to start it. |
+| ScheduleSkipped | A Schedule came due but did not start: too late, or its previous Run still runs. |
