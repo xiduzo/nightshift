@@ -22,8 +22,10 @@ import {
 import { asc } from "drizzle-orm";
 
 import { createEngine, type EngineInternals } from "./engine";
+import { createRunLog, type RunLog } from "./run-log";
 import {
 	createSandbox,
+	expectRunLogsInSync,
 	mustGit,
 	type Sandbox,
 	scriptedHarness,
@@ -39,11 +41,18 @@ import type {
 } from "./types";
 
 let sandbox: Sandbox;
+/** The run log of each engine the test made, oldest first: checked against the database after it. */
+let runLogs: RunLog[];
 beforeEach(async () => {
 	sandbox = await createSandbox();
+	runLogs = [];
 });
 afterEach(async () => {
-	await sandbox.cleanup();
+	try {
+		await expectRunLogsInSync(sandbox.db, runLogs);
+	} finally {
+		await sandbox.cleanup();
+	}
 });
 
 function makeEngine(
@@ -54,6 +63,8 @@ function makeEngine(
 	> = {},
 	internals: EngineInternals = {},
 ): Engine {
+	const runLog = createRunLog(sandbox.db);
+	runLogs.push(runLog);
 	return createEngine(
 		{
 			db: sandbox.db,
@@ -61,7 +72,7 @@ function makeEngine(
 			dataDir: sandbox.dataDir,
 			...options,
 		},
-		internals,
+		{ runLog, ...internals },
 	);
 }
 
@@ -1513,6 +1524,29 @@ describe("gates", () => {
 		);
 		const seqs = entriesOf(items).map((e) => e.seq);
 		expect(seqs).toEqual(seqs.map((_, i) => i + 1));
+	});
+
+	test("the run list and the inbox follow each append, as a new daemon reads them", async () => {
+		const engine = makeEngine(fakeHarness());
+		const id = await projectId(engine);
+		const run = await engine.startRun({ projectId: id, flow: gateFlow() });
+		const open = await openGateOf(engine, run.id);
+		// A new daemon reads the database, with nothing in memory.
+		const fresh = () =>
+			makeEngine(fakeHarness(), {}, { signal: AbortSignal.abort() });
+		expect(await engine.listRuns()).toEqual(await fresh().listRuns());
+		expect(await engine.listGates()).toEqual(await fresh().listGates());
+
+		await engine.resolveGate({
+			runId: run.id,
+			stepId: open.stepId,
+			choice: "approve",
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect(await engine.listGates()).toEqual([]);
+		const runs = await engine.listRuns();
+		expect(runs[0]?.status).toBe("finished");
+		expect(runs).toEqual(await fresh().listRuns());
 	});
 
 	test("a project with a waiting gate cannot be removed", async () => {

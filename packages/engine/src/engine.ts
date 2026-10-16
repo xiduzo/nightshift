@@ -62,7 +62,6 @@ import { createRunBus } from "./bus";
 import { runCommand } from "./command";
 import { consumeStream } from "./consume";
 import {
-	appendEvent,
 	countStepsSinceWalkBegan,
 	countVisits,
 	type DerivedStep,
@@ -79,6 +78,7 @@ import {
 	deriveTrigger,
 	type EngineEventType,
 	type EnginePayloads,
+	type EventInput,
 	groupByRun,
 	type InputValues,
 	type ItemFacts,
@@ -110,6 +110,7 @@ import { flowOutputs, renderBindings, resolveInputs } from "./inputs";
 import { expandMcpServers, type McpExpansion } from "./mcp";
 import { checkOutputData } from "./output-schema";
 import { planWait } from "./policy";
+import { createRunLog, type RunLog } from "./run-log";
 import {
 	createScheduler,
 	DEFAULT_SCHEDULE_TICK_MS,
@@ -294,9 +295,11 @@ export type EngineInternals = {
 	signal?: AbortSignal;
 	/** How often the scheduler looks for due schedules. Default 30 000 ms. */
 	scheduleTickMs?: number;
+	/** The run log the engine reads and appends through. Default: a new one on `options.db`. */
+	runLog?: RunLog;
 };
 
-/** Event types that open or close work. Recovery and the Gate inbox read only these. */
+/** Event types that open or close work. Startup recovery reads only these. */
 const LIFECYCLE_EVENT_TYPES = [
 	"RunStarted",
 	"RunResumed",
@@ -349,6 +352,16 @@ export function createEngine(
 				: expandMcpServers(node.mcpServers, process.env));
 
 	const bus = createRunBus();
+	const runLog = internals.runLog ?? createRunLog(db);
+	/**
+	 * Every append of the engine goes through the run log, so its copy of
+	 * each run's log stays exact. Same call shape as `appendEvent` in
+	 * events.ts, which this file does not import; the log has its own db.
+	 */
+	const appendEvent = <T extends EngineEventType>(
+		_db: typeof db,
+		input: EventInput<T>,
+	) => runLog.append(input);
 	/** Keyed by run id: the runs that walk in this process. */
 	const slots = new Map<string, Slot>();
 	/** The last transcript seq written per run. Loaded from disk on first use. */
@@ -489,27 +502,8 @@ export function createEngine(
 		return row;
 	}
 
-	async function loadRunEvents(runId: string): Promise<LoggedEvent[]> {
-		const rows = await db
-			.select()
-			.from(event)
-			.where(eq(event.runId, runId))
-			.orderBy(asc(event.seq));
-		return rows.map(parseEventRow);
-	}
-
-	async function loadEventsByRun(
-		runIds: readonly string[],
-		types?: readonly EngineEventType[],
-	): Promise<Map<string, LoggedEvent[]>> {
-		if (runIds.length === 0) return new Map();
-		const byRun = inArray(event.runId, [...runIds]);
-		const rows = await db
-			.select()
-			.from(event)
-			.where(types ? and(byRun, inArray(event.type, [...types])) : byRun)
-			.orderBy(asc(event.seq));
-		return groupByRun(rows.map(parseEventRow));
+	function loadRunEvents(runId: string): Promise<LoggedEvent[]> {
+		return runLog.events(runId);
 	}
 
 	function parseRunFlow(row: RunRow): Flow {
@@ -526,20 +520,14 @@ export function createEngine(
 		return flows;
 	}
 
-	function toSummary(row: RunRow, events: readonly LoggedEvent[]): RunSummary {
+	/** What a run summary reads from the log. The run log keeps it per run until the next append. */
+	function runFacts(events: readonly LoggedEvent[]) {
 		const state = deriveRunState(events);
 		const open =
 			state.status === "running" ||
 			state.status === "waiting" ||
 			state.status === "sleeping";
 		return {
-			id: row.id,
-			projectId: row.projectId,
-			flowName: row.flowName,
-			title: row.title,
-			worktreePath: row.worktreePath,
-			branch: row.branch,
-			baseRef: row.baseRef,
 			status: state.status,
 			reason: state.reason,
 			wakeAt:
@@ -549,9 +537,25 @@ export function createEngine(
 			inputs: deriveInputs(events),
 			stopAt: deriveStopAt(events),
 			stopAfterStep: open && deriveStopAfterStep(events),
-			createdAt: row.createdAt.getTime(),
 			costUsd: sumCostUsd(events),
 			trigger: deriveTrigger(events),
+		};
+	}
+
+	function toSummary(
+		row: RunRow,
+		facts: ReturnType<typeof runFacts>,
+	): RunSummary {
+		return {
+			id: row.id,
+			projectId: row.projectId,
+			flowName: row.flowName,
+			title: row.title,
+			worktreePath: row.worktreePath,
+			branch: row.branch,
+			baseRef: row.baseRef,
+			...facts,
+			createdAt: row.createdAt.getTime(),
 		};
 	}
 
@@ -2447,7 +2451,7 @@ export function createEngine(
 				payload: worktree,
 			});
 			launchWalk(row, { kind: "node", nodeId: flow.start });
-			return toSummary(row, await loadRunEvents(runId));
+			return toSummary(row, runFacts(await loadRunEvents(runId)));
 		} finally {
 			releaseStartingSlot(runId);
 		}
@@ -2483,11 +2487,10 @@ export function createEngine(
 	): Promise<ScheduleResult | null> {
 		if (!record) return null;
 		if (record.kind !== "fired") return record;
-		const events = await loadEventsByRun([record.runId], LIFECYCLE_EVENT_TYPES);
-		const runEvents = events.get(record.runId);
+		const events = await loadRunEvents(record.runId);
 		return {
 			...record,
-			runStatus: runEvents ? deriveRunState(runEvents).status : null,
+			runStatus: events.length > 0 ? deriveRunState(events).status : null,
 		};
 	}
 
@@ -2605,8 +2608,13 @@ export function createEngine(
 				? query.where(eq(run.projectId, input.projectId))
 				: query
 			).orderBy(desc(run.createdAt));
-			const events = await loadEventsByRun(rows.map((r) => r.id));
-			return rows.map((row) => toSummary(row, events.get(row.id) ?? []));
+			const facts = await runLog.derive(
+				rows.map((r) => r.id),
+				runFacts,
+			);
+			return rows.map((row) =>
+				toSummary(row, facts.get(row.id) ?? runFacts([])),
+			);
 		},
 
 		async getRun(runId) {
@@ -2615,7 +2623,7 @@ export function createEngine(
 			const events = await loadRunEvents(runId);
 			const last = lastHarnessSession(events);
 			const detail: RunDetail = {
-				...toSummary(row, events),
+				...toSummary(row, runFacts(events)),
 				flow: parseRunFlow(row),
 				calledFlows: parseCalledFlows(row),
 				steps: deriveSteps(events).map(toStepSummary),
@@ -2745,25 +2753,25 @@ export function createEngine(
 
 		async listGates() {
 			await ready;
-			// Only runs that ever opened a Gate can wait at one.
-			const opened = await db
-				.selectDistinct({ runId: event.runId })
-				.from(event)
-				.where(eq(event.type, "GateOpened" satisfies EngineEventType));
-			const runIds = opened.flatMap((r) => (r.runId ? [r.runId] : []));
-			if (runIds.length === 0) return [];
 			const rows = await db
 				.select({ run, projectName: project.name })
 				.from(run)
 				.innerJoin(project, eq(run.projectId, project.id))
-				.where(and(inArray(run.id, runIds), isNull(project.removedAt)));
-			const byRun = await loadEventsByRun(
+				.where(isNull(project.removedAt));
+			// Only a waiting run has an open Gate. The run list keeps the same facts.
+			const facts = await runLog.derive(
 				rows.map((r) => r.run.id),
-				LIFECYCLE_EVENT_TYPES,
+				runFacts,
+			);
+			const open = await runLog.derive(
+				rows
+					.map((r) => r.run.id)
+					.filter((id) => facts.get(id)?.status === "waiting"),
+				deriveOpenGate,
 			);
 			const gates: OpenGate[] = [];
 			for (const { run: row, projectName } of rows) {
-				const gate = deriveOpenGate(byRun.get(row.id) ?? []);
+				const gate = open.get(row.id);
 				if (!gate) continue;
 				gates.push({
 					runId: row.id,

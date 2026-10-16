@@ -24,8 +24,10 @@ import type {
 
 import { createEngine } from "./engine";
 import { appendEvent } from "./events";
+import { createRunLog, type RunLog } from "./run-log";
 import {
 	createSandbox,
+	expectRunLogsInSync,
 	mustGit,
 	type Sandbox,
 	scriptedHarness,
@@ -40,23 +42,35 @@ import type { Engine, EngineOptions, RunDetail, StepSummary } from "./types";
  */
 
 let sandbox: Sandbox;
+/** The run log of each engine the test made, oldest first: checked against the database after it. */
+let runLogs: RunLog[];
 beforeEach(async () => {
 	sandbox = await createSandbox();
+	runLogs = [];
 });
 afterEach(async () => {
-	await sandbox.cleanup();
+	try {
+		await expectRunLogsInSync(sandbox.db, runLogs);
+	} finally {
+		await sandbox.cleanup();
+	}
 });
 
 function makeEngine(
 	harness: AgentHarness,
 	options: Partial<Pick<EngineOptions, "readGithubItems" | "decider">> = {},
 ): Engine {
-	return createEngine({
-		db: sandbox.db,
-		harnesses: { "claude-code": harness },
-		dataDir: sandbox.dataDir,
-		...options,
-	});
+	const runLog = createRunLog(sandbox.db);
+	runLogs.push(runLog);
+	return createEngine(
+		{
+			db: sandbox.db,
+			harnesses: { "claude-code": harness },
+			dataDir: sandbox.dataDir,
+			...options,
+		},
+		{ runLog },
+	);
 }
 
 function agent(

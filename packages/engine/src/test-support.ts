@@ -8,7 +8,11 @@ import type {
 } from "@nightshift/agents/types";
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
+import { event } from "@nightshift/db/schema/nightshift";
+import { asc, eq } from "drizzle-orm";
 
+import { parseEventRow } from "./events";
+import type { RunLog } from "./run-log";
 import { git } from "./worktrees";
 
 /** Test helpers: a temp git repo, a migrated temp database, scripted harnesses. */
@@ -188,4 +192,45 @@ export async function waitFor<T>(
 		await Bun.sleep(5);
 	}
 	throw new Error(`Timed out waiting for ${label}`);
+}
+
+/**
+ * Every run log keeps in memory exactly what a fresh read of the database
+ * gives. The run logs are the engines of one test, oldest first. A run that
+ * a later engine read is left out of the earlier ones: that engine is a
+ * daemon that a restart replaced, and the next one wrote behind its back
+ * (the lease rules this out for real daemons). Waits a little for appends
+ * still on their way.
+ */
+export async function expectRunLogsInSync(
+	db: Database,
+	runLogs: readonly RunLog[],
+): Promise<void> {
+	const deadline = Date.now() + 2_000;
+	while (true) {
+		const drift: string[] = [];
+		const takenOver = new Set<string>();
+		for (const runLog of [...runLogs].reverse()) {
+			const cached = runLog.cached();
+			for (const [runId, events] of cached) {
+				if (takenOver.has(runId)) continue;
+				const rows = await db
+					.select()
+					.from(event)
+					.where(eq(event.runId, runId))
+					.orderBy(asc(event.seq));
+				if (!Bun.deepEquals(events, rows.map(parseEventRow), true)) {
+					drift.push(runId);
+				}
+			}
+			for (const runId of cached.keys()) takenOver.add(runId);
+		}
+		if (drift.length === 0) return;
+		if (Date.now() > deadline) {
+			throw new Error(
+				`The run log differs from the database for run ${drift.join(", ")}`,
+			);
+		}
+		await Bun.sleep(10);
+	}
 }
