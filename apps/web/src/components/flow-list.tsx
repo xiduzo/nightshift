@@ -457,6 +457,8 @@ function NewFlowForm({
 		}),
 	);
 
+	// The first Agent node starts with the daemon's defaults (Settings → New Agent nodes).
+	const settings = useQuery(orpc.settings.get.queryOptions());
 	const canCreate = trimmed !== "" && error === null && !createFlow.isPending;
 	const problem = error ?? createFlow.error?.message ?? null;
 
@@ -466,7 +468,11 @@ function NewFlowForm({
 			onSubmit={(event) => {
 				event.preventDefault();
 				if (!canCreate) return;
-				createFlow.mutate({ projectId, name: trimmed, flow: newFlow() });
+				createFlow.mutate({
+					projectId,
+					name: trimmed,
+					flow: newFlow(settings.data?.values),
+				});
 			}}
 		>
 			<DialogHeader>
