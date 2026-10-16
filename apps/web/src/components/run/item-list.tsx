@@ -1,9 +1,29 @@
+import { Button } from "@nightshift/ui/components/button";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyTitle,
+} from "@nightshift/ui/components/empty";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemTitle,
+} from "@nightshift/ui/components/item";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
 import { ArrowUpRightIcon, GitBranchIcon, ScanSearchIcon } from "lucide-react";
 
 import { ItemStateBadge } from "@/components/outcome-badge";
 import { useNow } from "@/hooks/use-now";
-import type { ItemSummary, StepSummary } from "@/lib/api-types";
+import type { ItemState, ItemSummary, StepSummary } from "@/lib/api-types";
 import { formatDuration, formatTime } from "@/lib/format";
 import { type ItemScope, itemsOf, scopeKey } from "@/lib/run-steps";
 
@@ -28,49 +48,61 @@ export function ItemList({
 }) {
 	const now = useNow(1000);
 	const items = itemsOf(step, steps);
-	const counts = new Map<string, number>();
+	const counts = new Map<ItemState, number>();
 	for (const item of items) {
 		counts.set(item.state, (counts.get(item.state) ?? 0) + 1);
+	}
+
+	if (items.length === 0) {
+		return (
+			<Empty className="py-10">
+				<EmptyHeader>
+					<EmptyTitle className="text-sm">No elements yet</EmptyTitle>
+					<EmptyDescription className="text-xs">
+						None started yet.
+					</EmptyDescription>
+				</EmptyHeader>
+			</Empty>
+		);
 	}
 
 	return (
 		<section
 			aria-labelledby={`items-${step.id}`}
-			className="flex min-h-0 flex-col border-b"
+			className="flex flex-col gap-3 p-4"
 		>
-			<header className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-xs">
-				<h3 id={`items-${step.id}`} className="font-medium">
-					Elements
+			<header className="flex flex-wrap items-center gap-2">
+				<h3 id={`items-${step.id}`} className="font-medium text-sm">
+					{items.length} {items.length === 1 ? "element" : "elements"}
 				</h3>
-				<span className="text-muted-foreground">
-					{items.length === 0
-						? "None started yet"
-						: [...counts]
-								.map(([state, count]) => `${count} ${state}`)
-								.join(" · ")}
-				</span>
+				{[...counts].map(([state, count]) => (
+					<span
+						key={state}
+						className="flex items-center gap-1 text-muted-foreground text-xs tabular-nums"
+					>
+						<ItemStateBadge state={state} />
+						{count}
+					</span>
+				))}
 			</header>
-			{items.length > 0 ? (
-				<ol className="max-h-56 divide-y overflow-y-auto border-t">
-					{items.map((item) => {
-						const scope = { parentStepId: step.id, itemId: item.id };
-						return (
-							<li key={item.id}>
-								<ItemRow
-									item={item}
-									now={now}
-									selected={scopeKey(selectedItem) === scopeKey(scope)}
-									onFocus={() =>
-										onSelectItem(
-											scopeKey(selectedItem) === scopeKey(scope) ? null : scope,
-										)
-									}
-								/>
-							</li>
-						);
-					})}
-				</ol>
-			) : null}
+			<ItemGroup className="gap-2">
+				{items.map((item) => {
+					const scope = { parentStepId: step.id, itemId: item.id };
+					return (
+						<ItemRow
+							key={item.id}
+							item={item}
+							now={now}
+							selected={scopeKey(selectedItem) === scopeKey(scope)}
+							onFocus={() =>
+								onSelectItem(
+									scopeKey(selectedItem) === scopeKey(scope) ? null : scope,
+								)
+							}
+						/>
+					);
+				})}
+			</ItemGroup>
 		</section>
 	);
 }
@@ -88,18 +120,20 @@ function ItemRow({
 }) {
 	const label = item.id;
 	const showId = item.title !== item.id;
+	const focusLabel = selected
+		? "Show the whole run again"
+		: `Focus on ${label}: its steps and the flow it ran`;
 	return (
-		<div
-			className={cn(
-				"grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2 gap-y-0.5 px-4 py-1.5 text-xs",
-				selected && "bg-muted",
-			)}
+		<Item
+			variant="outline"
+			size="sm"
+			className={cn("items-start", selected && "border-ring/40 bg-muted")}
 		>
-			<ItemStateBadge state={item.state} className="mt-px" />
-			<div className="flex min-w-0 flex-col gap-0.5">
-				<p className="flex min-w-0 items-center gap-1.5">
+			<ItemContent className="min-w-0 gap-1.5">
+				<ItemTitle className="w-full min-w-0 text-xs">
+					<ItemStateBadge state={item.state} />
 					{showId ? (
-						<span className="max-w-[40%] shrink-0 truncate font-mono text-muted-foreground">
+						<span className="max-w-[40%] shrink-0 truncate font-mono font-normal text-muted-foreground">
 							{label}
 						</span>
 					) : null}
@@ -108,7 +142,7 @@ function ItemRow({
 							href={item.url}
 							target="_blank"
 							rel="noreferrer"
-							className="flex min-w-0 items-center gap-1 underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+							className="flex min-w-0 items-center gap-1 rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
 							title={`Open ${item.url}`}
 						>
 							<span className="truncate">{item.title}</span>
@@ -120,9 +154,9 @@ function ItemRow({
 					) : (
 						<span className="truncate">{item.title}</span>
 					)}
-				</p>
+				</ItemTitle>
 				{item.branch ? (
-					<p className="flex min-w-0 items-center gap-1 text-muted-foreground">
+					<ItemDescription className="flex min-w-0 items-center gap-1 text-xs">
 						<GitBranchIcon className="size-3 shrink-0" aria-hidden="true" />
 						<span className="truncate font-mono text-foreground/80">
 							{item.branch}
@@ -134,46 +168,45 @@ function ItemRow({
 								<span className="truncate font-mono">{item.baseBranch}</span>
 							</>
 						) : null}
-					</p>
+					</ItemDescription>
 				) : null}
 				{item.reason ? (
-					<p className="whitespace-pre-wrap break-words text-muted-foreground">
+					<ItemDescription className="line-clamp-none whitespace-pre-wrap break-words text-xs">
 						{item.reason}
-					</p>
+					</ItemDescription>
 				) : null}
 				{item.value !== null && item.value !== undefined ? (
 					<JsonDetails summary="Element (JSON)" value={item.value} />
 				) : null}
-			</div>
-			<div className="flex items-center gap-1">
+			</ItemContent>
+			<ItemActions className="gap-1">
 				<span
-					className="text-muted-foreground tabular-nums"
+					className="text-muted-foreground text-xs tabular-nums"
 					title={`Started ${formatTime(item.startedAt)}`}
 				>
 					{formatDuration((item.endedAt ?? now) - item.startedAt)}
 				</span>
-				<button
-					type="button"
-					onClick={onFocus}
-					aria-pressed={selected}
-					aria-label={
-						selected
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Button
+								variant={selected ? "secondary" : "ghost"}
+								size="icon-sm"
+								onClick={onFocus}
+								aria-pressed={selected}
+								aria-label={focusLabel}
+							/>
+						}
+					>
+						<ScanSearchIcon aria-hidden="true" />
+					</TooltipTrigger>
+					<TooltipContent>
+						{selected
 							? "Show the whole run again"
-							: `Focus on ${label}: its steps and the flow it ran`
-					}
-					title={
-						selected
-							? "Show the whole run again"
-							: "Focus on this element: its steps and the flow it ran"
-					}
-					className={cn(
-						"flex size-6 items-center justify-center text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring",
-						selected && "bg-background text-foreground ring-1 ring-ring",
-					)}
-				>
-					<ScanSearchIcon className="size-3.5" aria-hidden="true" />
-				</button>
-			</div>
-		</div>
+							: "Focus on this element: its steps and the flow it ran"}
+					</TooltipContent>
+				</Tooltip>
+			</ItemActions>
+		</Item>
 	);
 }

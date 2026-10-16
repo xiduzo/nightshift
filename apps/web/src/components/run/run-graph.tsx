@@ -101,7 +101,7 @@ export function RunGraph({
 	);
 
 	return (
-		<div className="relative h-full min-h-64">
+		<div className="relative size-full min-h-0">
 			<OutcomeMarkers />
 			<ReactFlow<FlowCanvasNode, FlowCanvasEdge>
 				nodes={nodes}

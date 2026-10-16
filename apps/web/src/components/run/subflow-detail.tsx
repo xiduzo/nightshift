@@ -1,4 +1,11 @@
-import { ScanSearchIcon } from "lucide-react";
+import { Button } from "@nightshift/ui/components/button";
+import {
+	Card,
+	CardContent,
+	CardHeader,
+	CardTitle,
+} from "@nightshift/ui/components/card";
+import { ScanSearchIcon, WorkflowIcon } from "lucide-react";
 
 import type { RunDetail, StepSummary } from "@/lib/api-types";
 import {
@@ -9,7 +16,7 @@ import {
 	stepsIn,
 } from "@/lib/run-steps";
 
-import { JsonBlock } from "./json-block";
+import { CodeView, JsonBlock } from "./json-block";
 
 /** Fields every Subflow step has; the rest are the called flow's outputs. */
 const OWN_FIELDS = new Set(["outcome", "ended", "visit"]);
@@ -45,103 +52,113 @@ export function SubflowDetail({
 	}).length;
 
 	return (
-		<section
-			aria-label="The called flow"
-			className="flex max-h-[40vh] min-h-0 flex-col gap-2 overflow-y-auto border-b px-4 py-2 text-xs"
-		>
-			<header className="flex flex-wrap items-center gap-2">
-				<h3 className="font-medium">
+		<section aria-label="The called flow" className="flex flex-col gap-4 p-4">
+			<header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+				<h3 className="flex min-w-0 items-center gap-2 font-medium text-sm">
+					<WorkflowIcon
+						className="size-4 shrink-0 text-muted-foreground"
+						aria-hidden="true"
+					/>
 					Called{" "}
-					<span className="font-mono">
+					<span className="truncate font-mono">
 						{node?.type === "subflow" ? node.flow : "a flow"}
 					</span>
 				</h3>
-				<span className="text-muted-foreground">
+				<span className="text-muted-foreground text-xs tabular-nums">
 					{childCount} {childCount === 1 ? "step" : "steps"}
 					{typeof ended === "string" && ended !== ""
 						? ` · ended on ${ended}`
 						: ""}
 				</span>
-				<button
-					type="button"
+				<Button
+					variant={focused ? "secondary" : "outline"}
+					size="sm"
+					className="ml-auto"
 					aria-pressed={focused}
 					onClick={() =>
 						onFocus(focused ? null : { parentStepId: step.id, itemId: null })
 					}
-					className="ml-auto flex items-center gap-1 text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-1 focus-visible:ring-ring"
 				>
-					<ScanSearchIcon className="size-3.5" aria-hidden="true" />
+					<ScanSearchIcon data-icon="inline-start" />
 					{focused ? "Show the whole run" : "Show its steps and graph"}
-				</button>
+				</Button>
 			</header>
-			<div className="grid gap-3 md:grid-cols-2">
-				<div className="flex min-w-0 flex-col gap-1">
-					<h4 className="text-muted-foreground">Inputs</h4>
-					{declared.length === 0 && bindings.length === 0 ? (
-						<p className="text-muted-foreground italic">None</p>
-					) : (
-						<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
-							{(declared.length > 0
-								? declared.map((input) => input.name)
-								: bindings.map(([name]) => name)
-							).map((name) => {
-								const template =
-									node?.type === "subflow" ? node.inputs[name] : undefined;
-								const input = declared.find((one) => one.name === name);
-								return (
-									<div key={name} className="contents">
-										<dt className="font-mono text-muted-foreground">{name}</dt>
-										<dd className="break-words font-mono">
-											{template ?? (
-												<span className="font-sans text-muted-foreground italic">
-													{input?.default !== undefined
-														? `default: ${input.default}`
-														: "not bound"}
-												</span>
-											)}
-										</dd>
-									</div>
-								);
-							})}
-						</dl>
-					)}
-				</div>
-				<div className="flex min-w-0 flex-col gap-1">
-					<h4 className="text-muted-foreground">Returned</h4>
-					{returned.length === 0 ? (
-						<p className="text-muted-foreground italic">
-							{step.outcome === null
-								? "Not yet: it is running."
-								: "No outputs."}
-						</p>
-					) : (
-						<dl className="flex flex-col gap-1.5">
-							{returned.map(([field, value]) => {
-								const json = jsonOutput(value);
-								return (
-									<div key={field} className="flex min-w-0 flex-col gap-0.5">
-										<dt className="font-mono text-muted-foreground">
-											{`{{${step.nodeId}.${field}}}`}
-										</dt>
-										<dd className="min-w-0">
-											{json !== undefined ? (
-												<JsonBlock value={json} className="max-h-40" />
-											) : (
-												<span className="whitespace-pre-wrap break-words font-mono">
-													{String(value) || (
-														<span className="text-muted-foreground italic">
-															empty
-														</span>
-													)}
-												</span>
-											)}
-										</dd>
-									</div>
-								);
-							})}
-						</dl>
-					)}
-				</div>
+			<div className="grid gap-4 xl:grid-cols-2">
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>Inputs</CardTitle>
+					</CardHeader>
+					<CardContent>
+						{declared.length === 0 && bindings.length === 0 ? (
+							<p className="text-muted-foreground text-xs italic">None</p>
+						) : (
+							<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
+								{(declared.length > 0
+									? declared.map((input) => input.name)
+									: bindings.map(([name]) => name)
+								).map((name) => {
+									const template =
+										node?.type === "subflow" ? node.inputs[name] : undefined;
+									const input = declared.find((one) => one.name === name);
+									return (
+										<div key={name} className="contents">
+											<dt className="font-mono text-muted-foreground">
+												{name}
+											</dt>
+											<dd className="break-words font-mono">
+												{template ?? (
+													<span className="font-sans text-muted-foreground italic">
+														{input?.default !== undefined
+															? `default: ${input.default}`
+															: "not bound"}
+													</span>
+												)}
+											</dd>
+										</div>
+									);
+								})}
+							</dl>
+						)}
+					</CardContent>
+				</Card>
+				<Card size="sm">
+					<CardHeader>
+						<CardTitle>Returned</CardTitle>
+					</CardHeader>
+					<CardContent>
+						{returned.length === 0 ? (
+							<p className="text-muted-foreground text-xs italic">
+								{step.outcome === null
+									? "Not yet: it is running."
+									: "No outputs."}
+							</p>
+						) : (
+							<dl className="flex flex-col gap-3 text-xs">
+								{returned.map(([field, value]) => {
+									const json = jsonOutput(value);
+									return (
+										<div key={field} className="flex min-w-0 flex-col gap-1.5">
+											<dt className="font-mono text-muted-foreground">
+												{`{{${step.nodeId}.${field}}}`}
+											</dt>
+											<dd className="min-w-0">
+												{json !== undefined ? (
+													<JsonBlock value={json} className="max-h-40" />
+												) : String(value) ? (
+													<CodeView code={String(value)} language="text" />
+												) : (
+													<span className="text-muted-foreground italic">
+														empty
+													</span>
+												)}
+											</dd>
+										</div>
+									);
+								})}
+							</dl>
+						)}
+					</CardContent>
+				</Card>
 			</div>
 		</section>
 	);

@@ -1,3 +1,20 @@
+import { Button } from "@nightshift/ui/components/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@nightshift/ui/components/collapsible";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+} from "@nightshift/ui/components/empty";
+import { Item } from "@nightshift/ui/components/item";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
 import { ChevronRightIcon, ScanSearchIcon, WorkflowIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -17,7 +34,7 @@ export function stepDuration(step: StepSummary, now = Date.now()): string {
 }
 
 /** Indent per level of nesting. */
-const INDENT_REM = 1;
+const INDENT_REM = 1.25;
 
 /**
  * Every visit of every node, in the order they started. The steps of a
@@ -54,9 +71,13 @@ export function StepTimeline({
 
 	if (steps.length === 0) {
 		return (
-			<p className="px-3 py-4 text-muted-foreground text-xs">
-				No steps yet. The first one starts in a moment.
-			</p>
+			<Empty className="py-8">
+				<EmptyHeader>
+					<EmptyDescription className="text-xs">
+						No steps yet. The first one starts in a moment.
+					</EmptyDescription>
+				</EmptyHeader>
+			</Empty>
 		);
 	}
 
@@ -64,9 +85,13 @@ export function StepTimeline({
 	const roots = stepsIn(steps, scope);
 	if (roots.length === 0) {
 		return (
-			<p className="px-3 py-4 text-muted-foreground text-xs">
-				No steps for this item yet.
-			</p>
+			<Empty className="py-8">
+				<EmptyHeader>
+					<EmptyDescription className="text-xs">
+						No steps for this item yet.
+					</EmptyDescription>
+				</EmptyHeader>
+			</Empty>
 		);
 	}
 
@@ -88,30 +113,34 @@ export function StepTimeline({
 		const open = toggled.get(key) ?? defaultOpen;
 		return (
 			<li key={key}>
-				<GroupRow
-					label={label}
-					badge={badge}
-					depth={depth}
-					stepCount={children.length}
-					open={open}
-					selected={scopeKey(selectedItem) === key}
-					onToggle={() =>
-						setToggled((current) => new Map(current).set(key, !open))
+				<Collapsible
+					open={open && children.length > 0}
+					onOpenChange={(next) =>
+						setToggled((current) => new Map(current).set(key, next))
 					}
-					onFocus={() => onSelectItem(groupScope)}
-				/>
-				{open && children.length > 0 ? (
-					<ol className="divide-y border-t">
-						{renderSteps(children, depth + 1)}
-					</ol>
-				) : null}
+				>
+					<GroupRow
+						label={label}
+						badge={badge}
+						depth={depth}
+						stepCount={children.length}
+						open={open}
+						selected={scopeKey(selectedItem) === key}
+						onFocus={() => onSelectItem(groupScope)}
+					/>
+					<CollapsibleContent>
+						<ol className="flex flex-col gap-0.5 pt-0.5">
+							{renderSteps(children, depth + 1)}
+						</ol>
+					</CollapsibleContent>
+				</Collapsible>
 			</li>
 		);
 	};
 
 	const renderSteps = (list: StepSummary[], depth: number): ReactNode =>
 		list.map((step) => (
-			<li key={step.id}>
+			<li key={step.id} className="flex flex-col gap-0.5">
 				<StepRow
 					step={step}
 					number={numbers.get(step.id) ?? 0}
@@ -121,7 +150,10 @@ export function StepTimeline({
 					onSelect={() => onSelect(step.id)}
 				/>
 				{step.nodeType === "subflow" ? (
-					<ol aria-label={`Steps called by ${step.nodeId}`}>
+					<ol
+						aria-label={`Steps called by ${step.nodeId}`}
+						className="flex flex-col gap-0.5"
+					>
 						{renderGroup({
 							scope: { parentStepId: step.id, itemId: null },
 							depth: depth + 1,
@@ -142,7 +174,10 @@ export function StepTimeline({
 					</ol>
 				) : null}
 				{step.nodeType === "foreach" ? (
-					<ol aria-label={`Elements of ${step.nodeId}`}>
+					<ol
+						aria-label={`Elements of ${step.nodeId}`}
+						className="flex flex-col gap-0.5"
+					>
 						{itemsOf(step, steps).map((item, index, items) =>
 							renderGroup({
 								scope: { parentStepId: step.id, itemId: item.id },
@@ -159,9 +194,7 @@ export function StepTimeline({
 										<span className="min-w-0 truncate">{item.title}</span>
 									</>
 								),
-								badge: (
-									<ItemStateBadge state={item.state} className="ml-auto" />
-								),
+								badge: <ItemStateBadge state={item.state} />,
 							}),
 						)}
 					</ol>
@@ -169,7 +202,9 @@ export function StepTimeline({
 			</li>
 		));
 
-	return <ol className="flex flex-col divide-y">{renderSteps(roots, 0)}</ol>;
+	return (
+		<ol className="flex flex-col gap-0.5 p-1.5">{renderSteps(roots, 0)}</ol>
+	);
 }
 
 function StepRow({
@@ -189,17 +224,18 @@ function StepRow({
 }) {
 	const Icon = NODE_TYPE[step.nodeType].icon;
 	return (
-		<button
-			type="button"
+		<Item
+			size="xs"
+			render={<button type="button" />}
 			aria-current={selected ? "step" : undefined}
 			onClick={onSelect}
 			className={cn(
-				"flex w-full items-center gap-2 py-1.5 pr-3 pl-3 text-left text-xs outline-none hover:bg-muted/50 focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring",
-				selected && "bg-muted",
+				"flex-nowrap gap-2 py-1.5 text-left text-xs hover:bg-muted/60",
+				selected && "bg-muted hover:bg-muted",
 			)}
 			style={
 				depth > 0
-					? { paddingLeft: `${0.75 + depth * INDENT_REM}rem` }
+					? { paddingLeft: `${0.625 + depth * INDENT_REM}rem` }
 					: undefined
 			}
 		>
@@ -219,22 +255,22 @@ function StepRow({
 				</span>
 			) : null}
 			{step.nodeType === "foreach" && step.items.length > 0 ? (
-				<span className="shrink-0 text-muted-foreground">
+				<span className="hidden shrink-0 text-muted-foreground tabular-nums sm:inline">
 					{step.items.filter((item) => item.state === "done").length}/
 					{step.items.length} done
 				</span>
 			) : null}
 			<OutcomeBadge state={stepState(step, runStatus)} className="ml-auto" />
 			<span
-				className="w-14 shrink-0 text-right text-muted-foreground tabular-nums"
+				className="w-12 shrink-0 text-right text-muted-foreground tabular-nums"
 				title={`Started ${formatTime(step.startedAt)}`}
 			>
 				{stepDuration(step)}
 			</span>
-			<span className="w-14 shrink-0 text-right text-muted-foreground tabular-nums">
+			<span className="hidden w-12 shrink-0 text-right text-muted-foreground tabular-nums sm:inline">
 				{hasCost(step.nodeType) ? formatCost(step.costUsd) : "—"}
 			</span>
-		</button>
+		</Item>
 	);
 }
 
@@ -246,7 +282,6 @@ function GroupRow({
 	stepCount,
 	open,
 	selected,
-	onToggle,
 	onFocus,
 }: {
 	label: ReactNode;
@@ -255,23 +290,19 @@ function GroupRow({
 	stepCount: number;
 	open: boolean;
 	selected: boolean;
-	onToggle: () => void;
 	onFocus: () => void;
 }) {
 	return (
 		<div
 			className={cn(
-				"group/item flex items-center border-t bg-muted/20 text-xs",
-				selected && "bg-muted",
+				"flex items-center gap-1 rounded-md pr-1 text-xs",
+				selected ? "bg-muted" : "hover:bg-muted/40",
 			)}
 			style={{ paddingLeft: `${depth * INDENT_REM}rem` }}
 		>
-			<button
-				type="button"
-				aria-expanded={open}
-				onClick={onToggle}
+			<CollapsibleTrigger
 				disabled={stepCount === 0}
-				className="flex min-w-0 flex-1 items-center gap-2 py-1 pr-2 pl-3 text-left outline-none hover:bg-muted/50 focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default disabled:hover:bg-transparent"
+				className="group/row flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 pr-1 pl-2.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-default"
 				title={
 					stepCount === 0
 						? "No steps yet"
@@ -284,26 +315,35 @@ function GroupRow({
 					aria-hidden="true"
 					className={cn(
 						"size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
-						open && "rotate-90",
+						open && stepCount > 0 && "rotate-90",
 						stepCount === 0 && "opacity-30",
 					)}
 				/>
 				{label}
-				<span className="shrink-0 text-muted-foreground">
+				<span className="hidden shrink-0 text-muted-foreground tabular-nums sm:inline">
 					{stepCount} {stepCount === 1 ? "step" : "steps"}
 				</span>
-				{badge}
-			</button>
-			<button
-				type="button"
-				onClick={onFocus}
-				aria-pressed={selected}
-				aria-label="Focus on this call: its steps and the flow it ran"
-				title="Focus on this call: its steps and the flow it ran"
-				className="mr-1 flex size-6 shrink-0 items-center justify-center text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-			>
-				<ScanSearchIcon className="size-3.5" aria-hidden="true" />
-			</button>
+				{badge ? <span className="ml-auto shrink-0">{badge}</span> : null}
+			</CollapsibleTrigger>
+			<Tooltip>
+				<TooltipTrigger
+					render={
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							onClick={onFocus}
+							aria-pressed={selected}
+							aria-label="Focus on this call: its steps and the flow it ran"
+							className="text-muted-foreground"
+						/>
+					}
+				>
+					<ScanSearchIcon aria-hidden="true" />
+				</TooltipTrigger>
+				<TooltipContent>
+					Focus on this call: its steps and the flow it ran
+				</TooltipContent>
+			</Tooltip>
 		</div>
 	);
 }

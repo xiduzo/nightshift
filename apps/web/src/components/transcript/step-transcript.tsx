@@ -1,8 +1,41 @@
 import {
+	Alert,
+	AlertDescription,
+	AlertTitle,
+} from "@nightshift/ui/components/alert";
+import { Badge } from "@nightshift/ui/components/badge";
+import { Bubble, BubbleContent } from "@nightshift/ui/components/bubble";
+import { Button } from "@nightshift/ui/components/button";
+import {
+	Card,
+	CardContent,
+	CardHeader,
+	CardTitle,
+} from "@nightshift/ui/components/card";
+import {
+	CodeBlock,
+	CodeBlockActions,
+	CodeBlockContent,
+	CodeBlockCopyButton,
+	CodeBlockLine,
+} from "@nightshift/ui/components/code-block";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemTitle,
+} from "@nightshift/ui/components/item";
+import {
 	Marker,
 	MarkerContent,
 	MarkerIcon,
 } from "@nightshift/ui/components/marker";
+import {
+	Message,
+	MessageContent,
+	MessageHeader,
+} from "@nightshift/ui/components/message";
 import {
 	MessageScroller,
 	MessageScrollerButton,
@@ -11,6 +44,7 @@ import {
 	MessageScrollerProvider,
 	MessageScrollerViewport,
 } from "@nightshift/ui/components/message-scroller";
+import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
 	CircleCheckIcon,
@@ -20,22 +54,21 @@ import {
 	GitBranchIcon,
 	HandIcon,
 	ListChecksIcon,
-	LoaderCircleIcon,
+	type LucideIcon,
 	MoonIcon,
 	SplitIcon,
 	SunriseIcon,
 } from "lucide-react";
-import { memo, type ReactNode } from "react";
+import { memo, type ReactNode, useState } from "react";
 
 import { GateAnswer } from "@/components/gate/gate-answer";
 import {
 	ItemStateBadge,
-	itemStateStyle,
 	outcomeLabel,
 	outcomeStyle,
 	stepStateStyle,
 } from "@/components/outcome-badge";
-import { JsonBlock } from "@/components/run/json-block";
+import { CodeView, JsonBlock } from "@/components/run/json-block";
 import type { SessionSummary, StepSummary } from "@/lib/api-types";
 import {
 	formatCost,
@@ -120,7 +153,7 @@ export function StepTranscript({
 				<MessageScrollerViewport aria-label={`Transcript of ${step.nodeId}`}>
 					<MessageScrollerContent
 						aria-live="off"
-						className="mx-auto w-full max-w-4xl gap-3 px-4 py-4"
+						className="mx-auto w-full max-w-3xl gap-4 px-4 py-5 md:px-6"
 					>
 						{transcript.items.map((item) => (
 							<MessageScrollerItem key={item.key} messageId={item.key}>
@@ -174,27 +207,34 @@ export function StepTranscript({
 							</MessageScrollerItem>
 						))}
 						{isEmpty ? (
-							<p className="py-8 text-center text-muted-foreground text-xs">
-								{connecting ? "Loading transcript…" : "No transcript yet."}
-							</p>
+							<Marker className="justify-center py-10 text-xs">
+								{connecting ? (
+									<MarkerIcon>
+										<Spinner className="size-3.5" />
+									</MarkerIcon>
+								) : null}
+								<MarkerContent>
+									{connecting ? "Loading transcript…" : "No transcript yet."}
+								</MarkerContent>
+							</Marker>
 						) : null}
 						{step.error ? (
-							<div className="flex gap-2 border border-destructive/50 bg-destructive/10 px-3 py-2 text-destructive text-sm">
-								<CircleXIcon
-									className="mt-0.5 size-4 shrink-0"
-									aria-hidden="true"
-								/>
-								<p className="whitespace-pre-wrap break-words text-xs">
+							<Alert variant="destructive">
+								<CircleXIcon aria-hidden="true" />
+								<AlertTitle>The step failed</AlertTitle>
+								<AlertDescription className="whitespace-pre-wrap break-words font-mono text-xs">
 									{step.error}
-								</p>
-							</div>
+								</AlertDescription>
+							</Alert>
 						) : null}
 						{running && !gateOpen ? (
-							<Marker className="py-1">
+							<Marker className="text-xs">
 								<MarkerIcon>
-									<LoaderCircleIcon className="animate-spin text-status-running motion-reduce:animate-none" />
+									<Spinner className="size-3.5 text-status-running" />
 								</MarkerIcon>
-								<MarkerContent>{RUNNING_TEXT[step.nodeType]}</MarkerContent>
+								<MarkerContent className="text-status-running">
+									{RUNNING_TEXT[step.nodeType]}
+								</MarkerContent>
 							</Marker>
 						) : null}
 					</MessageScrollerContent>
@@ -249,12 +289,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 		case "error":
 			return <SessionError item={item} />;
 		case "command":
-			return (
-				<p className="break-words font-mono text-xs">
-					<span className="select-none text-muted-foreground">$ </span>
-					{item.command}
-				</p>
-			);
+			return <CodeView code={item.command} language="bash" title="Command" />;
 		case "log":
 			return <CommandLog item={item} />;
 		case "exit":
@@ -280,11 +315,34 @@ const TranscriptItemView = memo(function TranscriptItemView({
 	}
 });
 
+/** A section break in the transcript: a session, an element, a decision. */
+function Divider({
+	title,
+	at,
+	details,
+}: {
+	title: ReactNode;
+	at: number;
+	details: (string | null | undefined)[];
+}) {
+	return (
+		<Marker variant="separator" className="text-xs">
+			<MarkerContent>
+				<h3 className="inline font-medium text-foreground">{title}</h3>
+				<span title={formatDateTime(at)}>
+					{" "}
+					· {details.filter(Boolean).join(" · ")}
+				</span>
+			</MarkerContent>
+		</Marker>
+	);
+}
+
 function ItemsRead({ item }: { item: ItemsReadItem }) {
 	return (
-		<Marker>
+		<Marker className="text-xs">
 			<MarkerIcon>
-				<ListChecksIcon />
+				<ListChecksIcon className="size-3.5" />
 			</MarkerIcon>
 			<MarkerContent>
 				Read {item.count} {item.count === 1 ? "element" : "elements"} ·{" "}
@@ -296,29 +354,32 @@ function ItemsRead({ item }: { item: ItemsReadItem }) {
 
 function ItemStart({ item }: { item: ItemStartItem }) {
 	return (
-		<div className="flex flex-col gap-1 pt-2">
-			<Marker variant="separator">
-				<MarkerContent>
-					<h3 className="inline font-medium text-foreground">
+		<div className="flex flex-col gap-1.5 pt-2">
+			<Divider
+				title={
+					<>
 						{item.title}
 						{item.title !== item.itemId ? (
-							<span className="ml-1 font-mono font-normal text-muted-foreground">
+							<span className="ml-1.5 font-mono font-normal text-muted-foreground">
 								{item.itemId}
 							</span>
 						) : null}
-					</h3>
-					<span title={formatDateTime(item.at)}> · {formatTime(item.at)}</span>
-				</MarkerContent>
-			</Marker>
+					</>
+				}
+				at={item.at}
+				details={[formatTime(item.at)]}
+			/>
 			{item.branch ? (
-				<p className="flex items-center justify-center gap-1 text-muted-foreground text-xs">
-					<GitBranchIcon className="size-3" aria-hidden="true" />
-					<span className="font-mono text-foreground">{item.branch}</span>
+				<p className="flex min-w-0 items-center justify-center gap-1 text-muted-foreground text-xs">
+					<GitBranchIcon className="size-3 shrink-0" aria-hidden="true" />
+					<span className="truncate font-mono text-foreground">
+						{item.branch}
+					</span>
 					{item.baseBranch ? (
 						<>
 							<span aria-hidden="true">→</span>
 							<span className="sr-only">on top of</span>
-							<span className="font-mono">{item.baseBranch}</span>
+							<span className="truncate font-mono">{item.baseBranch}</span>
 						</>
 					) : null}
 				</p>
@@ -328,34 +389,34 @@ function ItemStart({ item }: { item: ItemStartItem }) {
 }
 
 function ItemEnd({ item, title }: { item: ItemEndItem; title?: string }) {
-	const { color } = itemStateStyle(item.state);
 	return (
-		<div
-			className="flex flex-wrap items-center gap-x-2 gap-y-1 border border-l-[3px] bg-card px-3 py-1.5 text-xs"
-			style={{ borderLeftColor: color }}
-		>
-			<ItemStateBadge state={item.state} />
-			<span className="min-w-0 truncate">
-				{title && title !== item.itemId ? (
-					<>
-						{title}{" "}
-						<span className="font-mono text-muted-foreground">
-							{item.itemId}
-						</span>
-					</>
-				) : (
-					<span className="font-mono">{item.itemId}</span>
-				)}
-			</span>
-			<span className="ml-auto text-muted-foreground">
+		<Item variant="outline" size="sm" className="bg-card">
+			<ItemContent className="min-w-0">
+				<ItemTitle className="w-full min-w-0 text-xs">
+					<ItemStateBadge state={item.state} />
+					<span className="min-w-0 truncate">
+						{title && title !== item.itemId ? (
+							<>
+								{title}{" "}
+								<span className="font-mono font-normal text-muted-foreground">
+									{item.itemId}
+								</span>
+							</>
+						) : (
+							<span className="font-mono">{item.itemId}</span>
+						)}
+					</span>
+				</ItemTitle>
+				{item.reason ? (
+					<ItemDescription className="line-clamp-none whitespace-pre-wrap break-words text-xs">
+						{item.reason}
+					</ItemDescription>
+				) : null}
+			</ItemContent>
+			<ItemActions className="self-start text-muted-foreground text-xs tabular-nums">
 				{formatTime(item.at)}
-			</span>
-			{item.reason ? (
-				<p className="basis-full whitespace-pre-wrap break-words text-muted-foreground">
-					{item.reason}
-				</p>
-			) : null}
-		</div>
+			</ItemActions>
+		</Item>
 	);
 }
 
@@ -367,44 +428,100 @@ const WAIT_TITLE: Record<WaitItem["reason"], string> = {
 /** The run sleeps on this step, and when it continues the same session. */
 function WaitCard({ item }: { item: WaitItem }) {
 	return (
-		<div className="flex gap-2 border border-status-sleeping/50 bg-status-sleeping/10 px-3 py-2 text-sm">
-			<MoonIcon
-				className="mt-0.5 size-4 shrink-0 text-status-sleeping"
-				aria-hidden="true"
-			/>
-			<div className="flex min-w-0 flex-col gap-1">
-				<p className="font-medium text-status-sleeping">
-					{WAIT_TITLE[item.reason]} · sleeping
-				</p>
+		<Alert
+			role="status"
+			className="border-status-sleeping/40 bg-status-sleeping/10"
+		>
+			<MoonIcon aria-hidden="true" className="text-status-sleeping!" />
+			<AlertTitle className="text-status-sleeping">
+				{WAIT_TITLE[item.reason]} · sleeping
+			</AlertTitle>
+			<AlertDescription className="flex flex-col gap-1">
 				{item.message ? (
-					<p className="whitespace-pre-wrap break-words text-xs">
+					<p className="whitespace-pre-wrap break-words text-foreground">
 						{item.message}
 					</p>
 				) : null}
-				<p className="text-muted-foreground text-xs">
+				<p>
 					Continues the same session at{" "}
 					<time
 						dateTime={new Date(item.until).toISOString()}
 						title={formatDateTime(item.until)}
-						className="text-foreground"
+						className="text-foreground tabular-nums"
 					>
 						{formatTime(item.until)}
 					</time>{" "}
 					({formatRelative(item.until)}).
 				</p>
-			</div>
-		</div>
+			</AlertDescription>
+		</Alert>
 	);
 }
 
 function WakeMarker({ item }: { item: WakeItem }) {
 	return (
-		<Marker>
+		<Marker className="text-xs">
 			<MarkerIcon>
-				<SunriseIcon className="text-status-sleeping" />
+				<SunriseIcon className="size-3.5 text-status-sleeping" />
 			</MarkerIcon>
 			<MarkerContent>Woke up · {formatTime(item.at)}</MarkerContent>
 		</Marker>
+	);
+}
+
+/** Prompts longer than this many lines start folded. */
+const PROMPT_FOLD_LINES = 12;
+
+/** A prompt to the agent or the decider, as a message bubble on the right. */
+function PromptBubble({
+	label,
+	prompt,
+	empty,
+	children,
+}: {
+	label: string;
+	prompt: string;
+	/** Shown in place of an empty prompt. */
+	empty: string;
+	children?: ReactNode;
+}) {
+	const long =
+		prompt.split("\n").length > PROMPT_FOLD_LINES || prompt.length > 1200;
+	const [open, setOpen] = useState(false);
+	return (
+		<Message align="end">
+			<MessageContent>
+				<MessageHeader className="justify-end">{label}</MessageHeader>
+				<Bubble variant="muted" align="end" className="max-w-[92%]">
+					<BubbleContent className="flex flex-col gap-2">
+						{prompt.trim() === "" ? (
+							<p className="text-muted-foreground italic">{empty}</p>
+						) : (
+							<p
+								className={cn(
+									"whitespace-pre-wrap break-words",
+									long && !open && "line-clamp-[12]",
+								)}
+							>
+								{prompt}
+							</p>
+						)}
+						{long ? (
+							<Button
+								variant="link"
+								size="xs"
+								className="self-start px-0"
+								aria-expanded={open}
+								onClick={() => setOpen((value) => !value)}
+							>
+								{open ? "Show less" : "Show the whole prompt"}
+							</Button>
+						) : null}
+						{children}
+					</BubbleContent>
+				</Bubble>
+			</MessageContent>
+		</Message>
 	);
 }
 
@@ -420,72 +537,92 @@ function SessionBoundary({
 	prompt: string;
 }) {
 	const resumed = number !== undefined && number > 1;
-	const title = number === undefined ? "Session" : `Session ${number}`;
-	const details = [
-		resumed ? "resumed" : null,
-		formatTime(at),
-		model ?? null,
-	].filter(Boolean);
-
 	return (
-		<div className="flex flex-col gap-2 pt-2">
-			<Marker variant="separator">
-				<MarkerContent>
-					<h3 className="inline font-medium text-foreground">{title}</h3>
-					<span title={formatDateTime(at)}> · {details.join(" · ")}</span>
-				</MarkerContent>
-			</Marker>
-			<div className="border-primary/40 border-l-2 bg-muted/40 px-3 py-2">
-				<p className="mb-1 text-muted-foreground text-xs">
-					{resumed ? "Follow-up prompt" : "Prompt"}
-				</p>
-				{prompt.trim() === "" ? (
-					<p className="text-muted-foreground text-sm italic">
-						{resumed ? "Resumed without a new prompt." : "No prompt."}
-					</p>
-				) : (
-					<p className="whitespace-pre-wrap break-words text-sm">{prompt}</p>
-				)}
-			</div>
+		<div className="flex flex-col gap-3 pt-2">
+			<Divider
+				title={number === undefined ? "Session" : `Session ${number}`}
+				at={at}
+				details={[resumed ? "resumed" : null, formatTime(at), model]}
+			/>
+			<PromptBubble
+				label={resumed ? "Follow-up prompt" : "Prompt"}
+				prompt={prompt}
+				empty={resumed ? "Resumed without a new prompt." : "No prompt."}
+			/>
 		</div>
 	);
 }
 
+/** The agent's own words. */
 function MessageBlock({ item }: { item: MessageItem }) {
 	return (
-		<div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-			{item.text}
-		</div>
+		<Message>
+			<MessageContent className="whitespace-pre-wrap text-sm leading-relaxed">
+				{item.text}
+			</MessageContent>
+		</Message>
+	);
+}
+
+/** A result in the transcript: a report, a decision, an answer. */
+function ResultCard({
+	icon: Icon,
+	kicker,
+	value,
+	tone,
+	extra,
+	children,
+	className,
+}: {
+	icon: LucideIcon;
+	kicker?: string;
+	value: ReactNode;
+	/** Text colour class of the outcome. */
+	tone: string;
+	extra?: ReactNode;
+	children?: ReactNode;
+	className?: string;
+}) {
+	return (
+		// Inset ring: transcript items skip painting offscreen (content-visibility), which clips an outer ring.
+		<Card size="sm" className={cn("ring-inset", className)}>
+			<CardHeader>
+				<CardTitle className="flex flex-wrap items-center gap-x-1.5 gap-y-1 font-normal text-xs">
+					<Icon className={cn("size-4", tone)} aria-hidden="true" />
+					{kicker ? (
+						<span className="text-muted-foreground">{kicker}</span>
+					) : null}
+					<span className={cn("font-medium", tone)}>{value}</span>
+					{extra}
+				</CardTitle>
+			</CardHeader>
+			{children ? <CardContent>{children}</CardContent> : null}
+		</Card>
 	);
 }
 
 /** The agent's step report: the outcome the flow follows, and its summary. */
 function ReportCard({ item }: { item: ReportItem }) {
-	const { label, icon: Icon, text, color } = stepStateStyle(item.outcome);
+	const { label, icon, text } = stepStateStyle(item.outcome);
+	const hasSummary = item.summary.trim() !== "";
 	return (
-		<div
-			className="flex gap-2 border border-l-[3px] bg-card px-3 py-2"
-			style={{ borderLeftColor: color }}
-		>
-			<Icon className={cn("mt-0.5 size-4 shrink-0", text)} aria-hidden="true" />
-			<div className="flex min-w-0 flex-col gap-1">
-				<p className="text-xs">
-					<span className="text-muted-foreground">Step report · </span>
-					<span className={cn("font-medium", text)}>{label}</span>
-				</p>
-				{item.summary.trim() ? (
-					<p className="whitespace-pre-wrap break-words text-sm">
-						{item.summary}
-					</p>
-				) : null}
-				{item.data !== undefined ? (
-					<div className="flex flex-col gap-1">
-						<p className="text-muted-foreground text-xs">Data</p>
-						<JsonBlock value={item.data} />
-					</div>
-				) : null}
-			</div>
-		</div>
+		<ResultCard icon={icon} kicker="Step report ·" value={label} tone={text}>
+			{hasSummary || item.data !== undefined ? (
+				<>
+					{hasSummary ? (
+						<p className="whitespace-pre-wrap break-words leading-relaxed">
+							{item.summary}
+						</p>
+					) : null}
+					{item.data !== undefined ? (
+						<div className="flex flex-col gap-1.5">
+							<p className="text-muted-foreground text-xs">Data</p>
+							<JsonBlock value={item.data} />
+						</div>
+					) : null}
+				</>
+			) : null}
+		</ResultCard>
 	);
 }
 
@@ -499,11 +636,13 @@ function SessionFinished({ item }: { item: FinishedItem }) {
 		if (usage.costUsd !== undefined) parts.push(formatCost(usage.costUsd));
 	}
 	return (
-		<Marker>
+		<Marker className="text-xs">
 			<MarkerIcon>
-				<CircleCheckIcon className="text-status-finished" />
+				<CircleCheckIcon className="size-3.5 text-status-finished" />
 			</MarkerIcon>
-			<MarkerContent>{parts.join(" · ")}</MarkerContent>
+			<MarkerContent className="tabular-nums">
+				{parts.join(" · ")}
+			</MarkerContent>
 		</Marker>
 	);
 }
@@ -511,9 +650,9 @@ function SessionFinished({ item }: { item: FinishedItem }) {
 function SessionError({ item }: { item: ErrorItem }) {
 	if (item.errorKind === "aborted") {
 		return (
-			<Marker>
+			<Marker className="text-xs">
 				<MarkerIcon>
-					<CircleStopIcon />
+					<CircleStopIcon className="size-3.5 text-status-stopped" />
 				</MarkerIcon>
 				<MarkerContent>
 					Stopped at {formatTime(item.at)}
@@ -527,17 +666,15 @@ function SessionError({ item }: { item: ErrorItem }) {
 	const Icon = usageLimit ? ClockIcon : CircleXIcon;
 
 	return (
-		<div className="flex gap-2 border border-destructive/50 bg-destructive/10 px-3 py-2 text-destructive text-sm">
-			<Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-			<div className="flex min-w-0 flex-col gap-1">
-				<p className="font-medium">
-					{usageLimit ? "Usage limit reached" : "The agent failed"}
-				</p>
-				<p className="whitespace-pre-wrap break-words text-xs">
-					{item.message}
-				</p>
+		<Alert variant="destructive">
+			<Icon aria-hidden="true" />
+			<AlertTitle>
+				{usageLimit ? "Usage limit reached" : "The agent failed"}
+			</AlertTitle>
+			<AlertDescription className="flex flex-col gap-1">
+				<p className="whitespace-pre-wrap break-words">{item.message}</p>
 				{usageLimit && item.resetAt ? (
-					<p className="text-xs">
+					<p>
 						Resets{" "}
 						<time dateTime={new Date(item.resetAt).toISOString()}>
 							{formatDateTime(item.resetAt)}
@@ -545,36 +682,48 @@ function SessionError({ item }: { item: ErrorItem }) {
 						({formatRelative(item.resetAt)}). Resume the run after that.
 					</p>
 				) : null}
-			</div>
-		</div>
+			</AlertDescription>
+		</Alert>
 	);
 }
 
+/** A command's output as it streamed; stderr in the destructive colour. */
 function CommandLog({ item }: { item: LogItem }) {
 	return (
-		<pre className="max-h-[36rem] overflow-auto whitespace-pre-wrap break-words border bg-muted/40 p-2 font-mono text-xs leading-relaxed">
-			{item.chunks.map((chunk, index) => (
-				<span
-					// Chunks only grow at the end, so the index is stable.
-					key={index}
-					className={chunk.stream === "stderr" ? "text-destructive" : undefined}
-				>
-					{chunk.text}
-				</span>
-			))}
-		</pre>
+		<CodeBlock size="sm">
+			<CodeBlockActions>
+				<CodeBlockCopyButton
+					value={item.chunks.map((chunk) => chunk.text).join("")}
+				/>
+			</CodeBlockActions>
+			<CodeBlockContent wrap className="max-h-[36rem]">
+				<CodeBlockLine className="wrap-anywhere">
+					{item.chunks.map((chunk, index) => (
+						<span
+							// Chunks only grow at the end, so the index is stable.
+							key={index}
+							className={
+								chunk.stream === "stderr" ? "text-destructive" : undefined
+							}
+						>
+							{chunk.text}
+						</span>
+					))}
+				</CodeBlockLine>
+			</CodeBlockContent>
+		</CodeBlock>
 	);
 }
 
 function CommandExit({ item }: { item: ExitItem }) {
 	const passed = item.exitCode === 0;
 	return (
-		<Marker>
+		<Marker className="text-xs">
 			<MarkerIcon>
 				{passed ? (
-					<CircleCheckIcon className="text-outcome-pass" />
+					<CircleCheckIcon className="size-3.5 text-outcome-pass" />
 				) : (
-					<CircleXIcon className="text-outcome-fail" />
+					<CircleXIcon className="size-3.5 text-outcome-fail" />
 				)}
 			</MarkerIcon>
 			<MarkerContent>
@@ -590,66 +739,48 @@ function CommandExit({ item }: { item: ExitItem }) {
 /** What the decider was asked, with the labels it could pick. */
 function DecisionAsk({ item }: { item: DecisionAskItem }) {
 	return (
-		<div className="flex flex-col gap-2">
-			<Marker variant="separator">
-				<MarkerContent>
-					<h3 className="inline font-medium text-foreground">Decision</h3>
-					<span title={formatDateTime(item.at)}>
-						{" "}
-						· {formatTime(item.at)} · {item.model}
-					</span>
-				</MarkerContent>
-			</Marker>
-			<div className="border-primary/40 border-l-2 bg-muted/40 px-3 py-2">
-				<p className="mb-1 text-muted-foreground text-xs">Prompt</p>
-				<p className="whitespace-pre-wrap break-words text-sm">{item.prompt}</p>
-				<p className="mt-2 flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
+		<div className="flex flex-col gap-3">
+			<Divider
+				title="Decision"
+				at={item.at}
+				details={[formatTime(item.at), item.model]}
+			/>
+			<PromptBubble label="Prompt" prompt={item.prompt} empty="No prompt.">
+				<p className="flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
 					Picks one of
 					{item.labels.map((label) => (
-						<span
+						<Badge
 							key={label}
-							className={cn(
-								"border bg-background px-1 font-mono",
-								outcomeStyle(label).text,
-							)}
+							variant="outline"
+							className={cn("font-mono", outcomeStyle(label).badge)}
 						>
 							{outcomeLabel(label)}
-						</span>
+						</Badge>
 					))}
 				</p>
-			</div>
+			</PromptBubble>
 		</div>
 	);
 }
 
 /** The label the decider picked, and its notes on why. */
 function DecisionCard({ item }: { item: DecisionItem }) {
-	const { text, color } = outcomeStyle(item.label);
+	const { text } = outcomeStyle(item.label);
 	return (
-		<div
-			className="flex gap-2 border border-l-[3px] bg-card px-3 py-2"
-			style={{ borderLeftColor: color }}
+		<ResultCard
+			icon={SplitIcon}
+			kicker="Decided ·"
+			value={<span className="font-mono">{outcomeLabel(item.label)}</span>}
+			tone={text}
 		>
-			<SplitIcon
-				className={cn("mt-0.5 size-4 shrink-0", text)}
-				aria-hidden="true"
-			/>
-			<div className="flex min-w-0 flex-col gap-1">
-				<p className="text-xs">
-					<span className="text-muted-foreground">Decided · </span>
-					<span className={cn("font-medium font-mono", text)}>
-						{outcomeLabel(item.label)}
-					</span>
+			{item.notes.trim() ? (
+				<p className="whitespace-pre-wrap break-words leading-relaxed">
+					{item.notes}
 				</p>
-				{item.notes.trim() ? (
-					<p className="whitespace-pre-wrap break-words text-sm">
-						{item.notes}
-					</p>
-				) : (
-					<p className="text-muted-foreground text-sm italic">No notes.</p>
-				)}
-			</div>
-		</div>
+			) : (
+				<p className="text-muted-foreground italic">No notes.</p>
+			)}
+		</ResultCard>
 	);
 }
 
@@ -662,17 +793,12 @@ function GateQuestion({
 	answer: ReactNode;
 }) {
 	return (
-		<div
-			className={cn(
-				"flex flex-col gap-3 border bg-card px-3 py-3",
-				answer && "border-status-waiting/60",
-			)}
-		>
-			<p className="flex items-center gap-1.5 text-xs">
-				<HandIcon className="size-3.5 text-status-waiting" aria-hidden="true" />
-				<span className="font-medium text-status-waiting">
-					{answer ? "Waiting for you" : "Gate"}
-				</span>
+		<ResultCard
+			icon={HandIcon}
+			value={answer ? "Waiting for you" : "Gate"}
+			tone="text-status-waiting"
+			className={cn(answer && "ring-status-waiting/50")}
+			extra={
 				<span className="text-muted-foreground">
 					· opened{" "}
 					<time
@@ -682,50 +808,44 @@ function GateQuestion({
 						{formatRelative(item.at)}
 					</time>
 				</span>
-			</p>
-			<p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+			}
+		>
+			<p className="whitespace-pre-wrap break-words leading-relaxed">
 				{item.question}
 			</p>
 			{answer}
-		</div>
+		</ResultCard>
 	);
 }
 
 /** The answer a person gave, and their note. */
 function GateResolved({ item }: { item: GateResolvedItem }) {
-	const { text, color } = outcomeStyle(item.choice);
+	const { text } = outcomeStyle(item.choice);
 	return (
-		<div
-			className="flex gap-2 border border-l-[3px] bg-card px-3 py-2"
-			style={{ borderLeftColor: color }}
+		<ResultCard
+			icon={HandIcon}
+			kicker="Answered ·"
+			value={<span className="font-mono">{outcomeLabel(item.choice)}</span>}
+			tone={text}
+			extra={
+				<span className="text-muted-foreground">
+					·{" "}
+					<time
+						dateTime={new Date(item.at).toISOString()}
+						title={formatDateTime(item.at)}
+					>
+						{formatTime(item.at)}
+					</time>
+				</span>
+			}
 		>
-			<HandIcon
-				className={cn("mt-0.5 size-4 shrink-0", text)}
-				aria-hidden="true"
-			/>
-			<div className="flex min-w-0 flex-col gap-1">
-				<p className="text-xs">
-					<span className="text-muted-foreground">Answered · </span>
-					<span className={cn("font-medium font-mono", text)}>
-						{outcomeLabel(item.choice)}
-					</span>
-					<span className="text-muted-foreground">
-						{" "}
-						·{" "}
-						<time
-							dateTime={new Date(item.at).toISOString()}
-							title={formatDateTime(item.at)}
-						>
-							{formatTime(item.at)}
-						</time>
-					</span>
+			{item.note.trim() ? (
+				<p className="whitespace-pre-wrap break-words leading-relaxed">
+					{item.note}
 				</p>
-				{item.note.trim() ? (
-					<p className="whitespace-pre-wrap break-words text-sm">{item.note}</p>
-				) : (
-					<p className="text-muted-foreground text-sm italic">No note.</p>
-				)}
-			</div>
-		</div>
+			) : (
+				<p className="text-muted-foreground italic">No note.</p>
+			)}
+		</ResultCard>
 	);
 }

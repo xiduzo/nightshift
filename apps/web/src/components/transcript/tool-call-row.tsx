@@ -1,7 +1,28 @@
 import { Button } from "@nightshift/ui/components/button";
-import { ChevronRightIcon, LoaderCircleIcon, WrenchIcon } from "lucide-react";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import {
+	Trace,
+	TraceCollapsible,
+	TraceCollapsibleContent,
+	TraceCollapsibleTrigger,
+	TraceDescription,
+	TraceIcon,
+	TraceLine,
+	TraceTitle,
+} from "@nightshift/ui/components/trace";
+import {
+	CheckIcon,
+	FilePenIcon,
+	FileTextIcon,
+	GlobeIcon,
+	type LucideIcon,
+	SearchIcon,
+	SquareTerminalIcon,
+	WrenchIcon,
+} from "lucide-react";
 import { memo, useState } from "react";
 
+import { CodeView } from "@/components/run/json-block";
 import { truncate } from "@/lib/format";
 import {
 	formatToolInput,
@@ -12,6 +33,32 @@ import {
 const RESULT_PREVIEW_CHARS = 1500;
 const RESULT_PREVIEW_LINES = 20;
 
+/** A recognisable icon for the common harness tools; a wrench for the rest. */
+function toolIcon(name: string): LucideIcon {
+	const lower = name.toLowerCase();
+	if (lower === "bash" || lower.includes("shell") || lower.includes("exec"))
+		return SquareTerminalIcon;
+	if (lower === "read" || lower.includes("view")) return FileTextIcon;
+	if (lower.includes("edit") || lower.includes("write")) return FilePenIcon;
+	if (lower.includes("grep") || lower.includes("glob") || lower === "search")
+		return SearchIcon;
+	if (lower.includes("web") || lower.includes("fetch")) return GlobeIcon;
+	return WrenchIcon;
+}
+
+/** The command a shell tool ran, when its input has one. */
+function commandOf(input: unknown): string | null {
+	if (input && typeof input === "object" && "command" in input) {
+		const command = (input as { command: unknown }).command;
+		if (typeof command === "string") return command;
+	}
+	return null;
+}
+
+/**
+ * One tool call as a trace line: icon, tool name, the argument it acts on,
+ * and whether it is still running. It opens on the full input and result.
+ */
 export const ToolCallRow = memo(function ToolCallRow({
 	item,
 	running,
@@ -22,52 +69,69 @@ export const ToolCallRow = memo(function ToolCallRow({
 }) {
 	const summary = item.hasInput ? summarizeToolInput(item.input) : "";
 	const inProgress = running && item.result === undefined;
+	const Icon = toolIcon(item.name);
+	const command = item.hasInput ? commandOf(item.input) : null;
 
 	return (
-		<details className="group/tool border bg-card/40 text-xs">
-			<summary className="flex cursor-pointer list-none items-center gap-2 px-2 py-1.5 outline-none hover:bg-muted/50 focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-				<ChevronRightIcon
-					className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open/tool:rotate-90 motion-reduce:transition-none"
-					aria-hidden="true"
-				/>
-				<WrenchIcon
-					className="size-3.5 shrink-0 text-muted-foreground"
-					aria-hidden="true"
-				/>
-				<span className="shrink-0 font-medium font-mono">{item.name}</span>
-				<span className="min-w-0 flex-1 truncate font-mono text-muted-foreground">
-					{truncate(summary.replace(/\s+/g, " "), 200)}
-				</span>
-				{inProgress ? (
-					<LoaderCircleIcon
-						className="size-3.5 shrink-0 animate-spin text-status-running motion-reduce:animate-none"
-						aria-label="In progress"
-					/>
-				) : null}
-			</summary>
-			<div className="flex flex-col gap-2 border-t px-2 py-2">
-				<section className="flex flex-col gap-1">
-					<h4 className="text-muted-foreground">Input</h4>
-					{item.hasInput ? (
-						<pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-muted/40 p-2 font-mono">
-							{formatToolInput(item.input)}
-						</pre>
-					) : (
-						<p className="text-muted-foreground">Not received yet.</p>
-					)}
-				</section>
-				<section className="flex flex-col gap-1">
-					<h4 className="text-muted-foreground">Result</h4>
-					{item.result === undefined ? (
-						<p className="text-muted-foreground">
-							{inProgress ? "Waiting for the result." : "No result."}
-						</p>
-					) : (
-						<ToolResult content={item.result} />
-					)}
-				</section>
-			</div>
-		</details>
+		<Trace>
+			<TraceCollapsible>
+				<TraceCollapsibleTrigger className="w-full">
+					<TraceLine
+						status={
+							inProgress
+								? "running"
+								: item.result === undefined
+									? "pending"
+									: undefined
+						}
+						className="w-full text-xs"
+					>
+						<TraceIcon>
+							<Icon className="size-3.5" />
+						</TraceIcon>
+						<TraceTitle className="shrink-0 font-medium font-mono text-foreground">
+							{item.name}
+						</TraceTitle>
+						<TraceDescription className="min-w-0 shrink truncate font-mono">
+							{truncate(summary.replace(/\s+/g, " "), 200)}
+						</TraceDescription>
+						{inProgress ? (
+							<Spinner
+								className="size-3.5 text-status-running"
+								aria-label="In progress"
+							/>
+						) : item.result !== undefined ? (
+							<CheckIcon
+								className="size-3.5 shrink-0 text-status-finished"
+								aria-label="Done"
+							/>
+						) : null}
+					</TraceLine>
+				</TraceCollapsibleTrigger>
+				<TraceCollapsibleContent className="flex flex-col gap-3 text-xs">
+					<section className="flex flex-col gap-1.5">
+						<h4 className="font-medium">Input</h4>
+						{item.hasInput ? (
+							command !== null ? (
+								<CodeView code={command} language="bash" />
+							) : (
+								<CodeView code={formatToolInput(item.input)} language="json" />
+							)
+						) : (
+							<p>Not received yet.</p>
+						)}
+					</section>
+					<section className="flex flex-col gap-1.5">
+						<h4 className="font-medium">Result</h4>
+						{item.result === undefined ? (
+							<p>{inProgress ? "Waiting for the result." : "No result."}</p>
+						) : (
+							<ToolResult content={item.result} />
+						)}
+					</section>
+				</TraceCollapsibleContent>
+			</TraceCollapsible>
+		</Trace>
 	);
 });
 
@@ -86,14 +150,12 @@ function ToolResult({ content }: { content: string }) {
 				);
 
 	if (content.trim() === "") {
-		return <p className="text-muted-foreground">Empty.</p>;
+		return <p>Empty.</p>;
 	}
 
 	return (
 		<div className="flex flex-col items-start gap-1">
-			<pre className="max-h-[32rem] w-full overflow-auto whitespace-pre-wrap break-words bg-muted/40 p-2 font-mono">
-				{shown}
-			</pre>
+			<CodeView code={shown} language="text" contentClassName="max-h-[32rem]" />
 			{tooLong ? (
 				<Button
 					variant="link"

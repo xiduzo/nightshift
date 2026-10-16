@@ -1,5 +1,12 @@
-import { Button } from "@nightshift/ui/components/button";
-import { Textarea } from "@nightshift/ui/components/textarea";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupButton,
+	InputGroupText,
+	InputGroupTextarea,
+} from "@nightshift/ui/components/input-group";
+import { Kbd } from "@nightshift/ui/components/kbd";
+import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PlayIcon } from "lucide-react";
 import { useId, useState } from "react";
@@ -45,45 +52,62 @@ export function ResumeComposer({
 
 	return (
 		<form
-			className="border-t bg-background px-4 py-3"
+			className="flex shrink-0 flex-col gap-2 border-t p-3"
 			onSubmit={(event) => {
 				event.preventDefault();
 				submit();
 			}}
 		>
-			<div className="mx-auto flex max-w-4xl flex-col gap-2">
-				<label
-					htmlFor={`${id}-prompt`}
-					className="text-muted-foreground text-xs"
-				>
-					Follow-up prompt (optional). {where}
-				</label>
-				<div className="flex items-end gap-2">
-					<Textarea
-						id={`${id}-prompt`}
-						value={prompt}
-						onChange={(event) => setPrompt(event.target.value)}
-						onKeyDown={(event) => {
-							if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-								event.preventDefault();
-								submit();
-							}
-						}}
-						placeholder="Tell the agent what to do next…"
-						className="max-h-40 min-h-9 text-sm md:text-sm"
-						rows={1}
-					/>
-					<Button type="submit" disabled={resumeRun.isPending}>
-						<PlayIcon data-icon="inline-start" />
+			<label
+				htmlFor={`${id}-prompt`}
+				className="text-muted-foreground text-xs leading-relaxed"
+			>
+				<span className="font-medium text-foreground">
+					Follow-up prompt (optional).
+				</span>{" "}
+				{where}
+			</label>
+			<InputGroup className="bg-background">
+				<InputGroupTextarea
+					id={`${id}-prompt`}
+					value={prompt}
+					onChange={(event) => setPrompt(event.target.value)}
+					onKeyDown={(event) => {
+						if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+							event.preventDefault();
+							submit();
+						}
+					}}
+					placeholder="Tell the agent what to do next…"
+					className="max-h-40 min-h-12 text-sm md:text-sm"
+					rows={2}
+				/>
+				<InputGroupAddon align="block-end">
+					<InputGroupText className="hidden text-xs sm:flex">
+						<Kbd>⌘</Kbd>
+						<Kbd>Enter</Kbd>
+					</InputGroupText>
+					<InputGroupButton
+						type="submit"
+						variant="default"
+						size="sm"
+						className="ml-auto"
+						disabled={resumeRun.isPending}
+					>
+						{resumeRun.isPending ? (
+							<Spinner data-icon="inline-start" />
+						) : (
+							<PlayIcon data-icon="inline-start" />
+						)}
 						{resumeRun.isPending ? "Resuming…" : "Resume"}
-					</Button>
-				</div>
-				{resumeRun.error ? (
-					<p role="alert" className="text-destructive text-xs">
-						{resumeRun.error.message}
-					</p>
-				) : null}
-			</div>
+					</InputGroupButton>
+				</InputGroupAddon>
+			</InputGroup>
+			{resumeRun.error ? (
+				<p role="alert" className="text-destructive text-xs">
+					{resumeRun.error.message}
+				</p>
+			) : null}
 		</form>
 	);
 }
