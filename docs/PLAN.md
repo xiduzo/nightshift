@@ -34,7 +34,7 @@ Each row is a settled decision. Change a row only with a new ADR.
 | Decisions | A Decision node returns one of its declared labels plus notes, validated against a schema. The decider is a provider behind an interface. The default provider is a small model through TanStack AI structured output. Other providers (for example an OpenRouter model) plug in behind the same interface. |
 | Run policy | Ported from the script: fresh session with a tight brief on retry, rescue by a stronger profile, blocked propagation, network grace, usage-limit waits that resume the same session, a stop time. Policy is engine code. A flow only sets its numbers. |
 | Worktrees | The user's own clone. Worktrees live in a sibling directory. Garbage collection never deletes a dirty tree. |
-| State model | Durable facts in libsql. Status is always derived. Every change appends to an event log that fans out to the UI over SSE. |
+| State model | Durable facts in libsql. Status is always derived. Every change appends to an event log that fans out to the UI over SSE. The daemon keeps each run's log in memory (the run log) and writes through it: an event is kept, and published, only after its insert returns. |
 | Session view | Structured transcript. "Take over" hands the user the resume command. |
 | Shell | Electrobun. Bun is the main process, so the daemon runs in-process with no sidecar. |
 | Platforms | macOS first. |
@@ -232,4 +232,5 @@ Run bundles: "Export" on a run page downloads the run as one SQLite file, `<flow
 - A run bundle masks secret values only if they are saved or a connection references them. A value from the environment that a node's own `mcpServers` reads goes in as is.
 - Automatic resume after a restart is tested with fake harnesses and a fake clock only. The comment look-up (`gh api …/issues/<n>/comments --paginate --jq`) is tested against a fake `gh`. A Decision node's GitHub tools have no effect journal: a Decision step runs again from the start on resume.
 - When a guard changes during the few seconds before the daemon resumes a run (the scheduler switched off, the stop time came), the run stays `interrupted` with the plain end reason; only the daemon's log says why.
+- The run log trusts that its daemon is the only writer of the database. An event that anything else writes (a second daemon, a hand edit) does not show in the UI or the walk until the daemon restarts. It keeps the logs of open runs and of the latest ended runs, up to 20 000 events (about 14 MB), plus a small summary per run. A database of 50 000 events takes about 35 MB with every log in memory.
 - `@tanstack/ai-sandbox` 0.5.23 writes its projection marker to a doubled path when the workspace has a fixed directory. We set `workspace.root: '.'` to avoid it. Report it upstream.
