@@ -920,6 +920,41 @@ describe("For Each", () => {
 		);
 		expect(new Set(bodyUpdates)).toEqual(new Set(["1", "2"]));
 	});
+
+	test("a loop over 30 elements finishes in one drive: the graph's own super-step limit is out of the way", async () => {
+		await saveBody("build", [command("note", "echo {{item.title}}")]);
+		const items = Array.from({ length: 30 }, (_, i) => ({
+			id: String(i + 1),
+			title: `element ${i + 1}`,
+		}));
+		const engine = makeEngine(fakeHarness());
+		const started = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([
+				forEach("loop", "build", "", {
+					source: { kind: "json", value: JSON.stringify(items) },
+					branch: "shared",
+				}),
+			]),
+		});
+		const detail = await waitFor(
+			async () => {
+				const found = await engine.getRun(started.id);
+				return found.status === "running" ? null : found;
+			},
+			{ label: "the loop to end", timeoutMs: 60_000 },
+		);
+		expect(detail.status).toBe("finished");
+		expect(detail.reason).toBeNull();
+		expect(detail.resumes).toEqual([]);
+		const loop = forEachStep(detail);
+		expect(loop.outcome).toBe("done");
+		expect(loop.items.map((i) => i.state)).toEqual(Array(30).fill("done"));
+		expect(detail.steps.filter((s) => s.nodeId === "note")).toHaveLength(30);
+		// One walk, ended once.
+		const logged = await loggedEvents(started.id);
+		expect(logged.filter((e) => e.type === "RunEnded")).toHaveLength(1);
+	});
 });
 
 describe("run policy", () => {

@@ -24,6 +24,7 @@ import type {
 
 import { createEngine } from "./engine";
 import { appendEvent } from "./events";
+import { saverFor } from "./graph/checkpointer";
 import { createRunLog, type RunLog } from "./run-log";
 import {
 	createSandbox,
@@ -553,6 +554,83 @@ describe("Subflow", () => {
 		// The same Subflow step and the same worker step continued.
 		expect(detail.steps.filter((s) => s.nodeId === "call")).toHaveLength(1);
 		expect(detail.steps.filter((s) => s.nodeId === "worker")).toHaveLength(1);
+	});
+
+	test("a run whose thread has no checkpoint (from before this engine) resumes from the log: the stopped step goes on, a later Subflow starts a new visit, templates and edge counts hold", async () => {
+		await saveFlow(
+			"sub",
+			flowOf([command("say", `echo "note={{note}}"`)], [], {
+				inputs: [{ name: "note", type: "text", required: true }],
+			}),
+		);
+		const { harness, sessions } = scriptedHarness();
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[
+					agent("plan", "Plan it"),
+					subflow("call", "sub", { note: "exit {{check.exit_code}}" }),
+					command("check", "exit 1"),
+				],
+				[
+					edge("e1", "plan", "pass", "call"),
+					edge("e2", "call", "pass", "check"),
+					{ id: "e3", from: "check", outcome: "fail", to: "plan", max: 1 },
+				],
+			),
+		});
+		(await waitFor(() => sessions[0])).finish();
+		// check fails and e3 leads back to plan, whose second visit is stopped.
+		await waitFor(() => sessions[1]);
+		await engine.stopRun(run.id);
+		const stopped = await engine.getRun(run.id);
+		expect(stopped.status).toBe("stopped");
+		expect(
+			stopped.steps
+				.filter((s) => s.scope === null)
+				.map((s) => [s.nodeId, s.visit, s.outcome]),
+		).toEqual([
+			["plan", 1, "pass"],
+			["call", 1, "pass"],
+			["check", 1, "fail"],
+			["plan", 2, "stopped"],
+		]);
+
+		// The previous engine walked this run: its thread has no checkpoint.
+		await saverFor(sandbox.db).deleteThread(run.id);
+
+		await engine.resumeRun(run.id, "Go on.");
+		const resumed = await waitFor(() => sessions[2]);
+		expect(resumed.input.resumeSessionId).toBe("harness-1");
+		expect(resumed.input.prompt).toBe("Go on.");
+		resumed.finish();
+		const detail = await waitForEnd(engine, run.id);
+		// check failed again, and e3 had been taken once before the resume.
+		expect(detail.status).toBe("failed");
+		expect(detail.reason).toContain('edge "e3"');
+		expect(detail.reason).toContain("reached its max");
+		expect(sessions).toHaveLength(3);
+		const top = detail.steps.filter((s) => s.scope === null);
+		expect(top.map((s) => [s.nodeId, s.visit, s.outcome])).toEqual([
+			["plan", 1, "pass"],
+			["call", 1, "pass"],
+			["check", 1, "fail"],
+			["plan", 2, "pass"],
+			["call", 2, "pass"],
+			["check", 2, "fail"],
+		]);
+		expect(top[3]?.sessions.map((s) => s.outcome)).toEqual([
+			"stopped",
+			"finished",
+		]);
+		// The Subflow's second visit bound check's output from the log.
+		expect(
+			detail.steps
+				.filter((s) => s.nodeId === "say")
+				.map((s) => s.outputs.log_tail),
+		).toEqual(["note=exit", "note=exit 1"]);
+		expect(detail.traversals).toEqual({ e1: 2, e2: 2, e3: 1 });
 	});
 });
 

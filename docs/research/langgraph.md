@@ -1,5 +1,10 @@
 # Research: LangGraph for Night Shift
 
+> **Superseded** (2026-10-16): after the spike (`langgraph-spike.md`) and the
+> probes (`langgraph-probe.md`), the engine moved onto LangGraph. See
+> `docs/steering/langgraph-engine.md`. The event log stays the read model;
+> the checkpoint is the walk's own bookkeeping, not a second source of truth.
+>
 > Question: How can LangGraph (LangGraph.js) help Night Shift, first in the proof of concept (Slices 1–4) and later in a possible product? The answer can be "don't".
 >
 > Date: 2026-10-15. Versions checked: `@langchain/langgraph` 1.5.0 (2026-10-12), `@langchain/core` 1.2.17, Bun 1.3.10.

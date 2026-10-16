@@ -1,53 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type {
-	AgentErrorKind,
-	AgentEvent,
-	AgentHarness,
-	AgentSessionInput,
-	Decider,
-	DecisionInput,
-	DecisionResult,
-	EffectJournal,
-	HarnessName,
-	StepReportOutcome,
-	StepReportSpec,
-} from "@nightshift/agents/types";
-import {
-	agentSession,
-	event,
-	project,
-	run,
-	step,
-} from "@nightshift/db/schema/nightshift";
+import type { AgentHarness, HarnessName } from "@nightshift/agents/types";
+import { event, project, run, step } from "@nightshift/db/schema/nightshift";
 import {
 	type AgentNode,
-	blockersFirst,
-	type CommandNode,
-	type DecisionNode,
 	type Flow,
 	type FlowIssue,
 	type FlowNode,
-	type ForEachNode,
 	flowSchema,
-	type GateNode,
-	type JsonValue,
-	type ListItem,
 	migrateFlow,
-	newlyBlocked,
-	nextEdge,
-	nextItem,
-	type Outcome,
 	type Policy,
 	parseFlow,
 	type ResolvedPolicy,
-	renderCommand,
-	renderTemplate,
-	resolvedAgent,
 	resolveFlowProfiles,
-	type SubflowNode,
-	type TemplateContext,
 	validateFlow,
 } from "@nightshift/flows";
 import {
@@ -62,21 +28,14 @@ import {
 import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { createRunBus } from "./bus";
-import { runCommand } from "./command";
-import { consumeStream } from "./consume";
 import {
 	countDaemonResumes,
-	countStepsSinceWalkBegan,
-	countVisits,
 	type DerivedStep,
 	deriveEndedAt,
 	deriveInputs,
-	deriveNodeOutputs,
 	deriveOpenGate,
-	deriveResumePoint,
 	deriveResumes,
 	deriveRunState,
-	deriveSideEffect,
 	deriveSleep,
 	deriveSteps,
 	deriveStopAfterStep,
@@ -84,40 +43,25 @@ import {
 	deriveTraversals,
 	deriveTrigger,
 	type EngineEventType,
-	type EnginePayloads,
-	type EventInput,
 	groupByRun,
-	type InputValues,
-	type ItemFacts,
-	itemStates,
 	type LoggedEvent,
 	lastHarnessSession,
-	lastHarnessSessionOfNode,
 	openWork,
-	parkedSteps,
 	parseEventRow,
 	type ResumedBy,
-	type ResumePoint,
-	type RunEnding,
 	type Scope,
-	type StepOutputs,
-	scopeKey,
 	sumCostUsd,
-	type WaitReason,
-	waitStreak,
 } from "./events";
 import {
-	fileItems,
-	forEachOutputs,
-	itemLabel,
-	jsonSourceItems,
-	parseCommandItems,
-	toItemFacts,
-} from "./foreach";
-import { flowOutputs, renderBindings, resolveInputs } from "./inputs";
+	DEFAULT_RESUME_PROMPT,
+	getRunRow as getRunRowOf,
+	HARNESS_LABEL,
+	messageOf,
+	type RunRow,
+} from "./graph/context";
+import { createRunner, type ThreadState } from "./graph/runner";
+import { resolveInputs } from "./inputs";
 import { expandMcpServers, type McpExpansion } from "./mcp";
-import { checkOutputData } from "./output-schema";
-import { planWait } from "./policy";
 import { createRunLog, type RunLog } from "./run-log";
 import {
 	createScheduler,
@@ -125,12 +69,7 @@ import {
 	type ScheduleRecord,
 } from "./scheduler";
 import { defaultRunSettings, type RunSettings } from "./settings";
-import {
-	commandLogPath,
-	openTranscriptWriter,
-	readRunTranscript,
-	transcriptPath,
-} from "./transcripts";
+import { readRunTranscript } from "./transcripts";
 import type {
 	Engine,
 	EngineOptions,
@@ -144,25 +83,21 @@ import type {
 	RunTrigger,
 	ScheduleResult,
 	StartRunInput,
-	StepEvent,
-	StepOutcome,
 	StepSummary,
 	TranscriptEntry,
 } from "./types";
-import {
-	createAndCheckoutBranch,
-	createWorktree,
-	currentBranch,
-	freeBranchName,
-	itemBranchName,
-	resolveRepoTopLevel,
-} from "./worktrees";
+import { createWorktree, resolveRepoTopLevel } from "./worktrees";
+
+/**
+ * The engine: projects, flows, schedules, Gates and runs, over the event
+ * log as the read model. A run is one LangGraph thread that the runner
+ * (`graph/runner.ts`) drives; `startRun`, `stopRun`, `resumeRun` and
+ * `resolveGate` validate, write the run-level facts (`RunStarted`,
+ * `RunResumed`, `StopAfterStepRequested`) and hand the thread to it.
+ */
 
 const DEFAULT_MAX_CONCURRENT_RUNS = 2;
 const DEFAULT_MAX_STEPS_PER_RUN = 500;
-/** How long a stopped harness may take to end its stream. */
-const STOP_GRACE_MS = 5_000;
-const DEFAULT_RESUME_PROMPT = "Continue where you left off.";
 const INTERRUPTED_REASON = "Night Shift stopped while this run ran.";
 /** How long a new daemon waits before it resumes the runs the last one stopped mid-step. */
 const DAEMON_RESUME_GRACE_MS = 5_000;
@@ -174,10 +109,6 @@ const DAEMON_RESUME_PROMPT =
 	"Night Shift stopped while you worked on this, so your last actions may or may not have happened. Before you repeat any of them, check the worktree (git status, git log) and the remote (pushed branches, pull requests, comments). Then continue where you left off.";
 const TITLE_MAX_CHARS = 80;
 const QUICK_RUN_TITLE = "Quick run";
-const STOP_TIME_REASON = "Reached the stop time";
-const STOP_AFTER_STEP_REASON = "Stopped after the running step, as asked.";
-/** setTimeout cannot wait longer; a longer wait checks the clock and waits again. */
-const MAX_TIMER_MS = 2 ** 31 - 1;
 
 /**
  * The command a person runs in the worktree to take over a harness session,
@@ -193,113 +124,6 @@ const takeOverCli: Record<HarnessName, (sessionId: string) => string> = {
 	"claude-code": (id) => `claude --resume ${id}`,
 	opencode: (id) => `opencode --session ${id}`,
 	codex: (id) => `codex resume ${id}`,
-};
-
-const HARNESS_LABEL: Record<HarnessName, string> = {
-	"claude-code": "Claude Code",
-	opencode: "OpenCode",
-	codex: "Codex",
-};
-
-type RunRow = typeof run.$inferSelect;
-type SessionEnding = EnginePayloads["SessionEnded"];
-
-/** Why a step's signal aborted. */
-type AbortReason = "stopped" | "timeout" | "idle";
-
-type ActiveWalk = {
-	/** Aborts when a person stops the run. */
-	controller: AbortController;
-	done: Promise<void>;
-};
-
-/** A slot is reserved before any await, so two calls cannot both pass the cap. */
-type Slot = ActiveWalk | "starting";
-
-/** Where a walk (of the run, or of a For Each body for one item) begins. */
-type WalkStart =
-	| { kind: "node"; nodeId: string }
-	/** A person resumed: the ended Agent step runs again in its harness session. */
-	| {
-			kind: "session";
-			stepId: string;
-			nodeId: string;
-			harnessSessionId: string;
-			prompt: string;
-	  }
-	/** A wait ended: the step that waited (still open) continues. */
-	| { kind: "continue"; stepId: string; nodeId: string; prompt: string | null }
-	/** The node already ended with this outcome (a person answered its Gate): take its edge. */
-	| { kind: "outcome"; nodeId: string; outcome: Outcome }
-	/**
-	 * Continue a Subflow or For Each step. A For Each continues the element
-	 * `itemId` at `inner` (the called flow's start when null), or without an
-	 * element, its loop with the next element. A Subflow (`itemId` null)
-	 * continues its called flow at `inner` (its start when null).
-	 */
-	| {
-			kind: "call";
-			nodeId: string;
-			stepId: string;
-			itemId: string | null;
-			inner: WalkStart | null;
-	  };
-
-/** How a step ended: exactly what `StepEnded` records. */
-type StepResult = EnginePayloads["StepEnded"];
-
-/**
- * How the walk of one scope ended. `finished` and `failed` are the scope's
- * own ends (an item's body result, or the run's at the top level). The
- * others unwind every scope up to the run.
- */
-type ScopeEnd =
-	| { kind: "finished"; node: FlowNode; outcome: Outcome }
-	| { kind: "failed"; reason: string }
-	/** A Gate opened or a step sleeps: the walk returns and frees its slot. */
-	| { kind: "paused" }
-	| { kind: "stopped"; reason: string | null }
-	/** The run fails as a whole (the step cap), wherever the walk is. */
-	| { kind: "aborted"; reason: string };
-
-type UnwindEnd = Extract<ScopeEnd, { kind: "paused" | "stopped" | "aborted" }>;
-type Unwind = { kind: "unwind"; end: UnwindEnd };
-
-/** An Agent or Decision step that hit a usage limit or lost the network. */
-type WaitRequest = {
-	kind: "wait";
-	reason: WaitReason;
-	message: string;
-	resetAt: number | null;
-	costUsd?: number | null;
-};
-
-type RunContext = {
-	row: RunRow;
-	flow: Flow;
-	/** The snapshots of every flow the run can call, by name. */
-	calledFlows: Record<string, Flow>;
-	policy: ResolvedPolicy;
-	walk: ActiveWalk;
-};
-
-/**
- * One level of the walk: the top-level flow, or a flow that a Subflow or a
- * For Each (for one element) called. Templates inside read the frame's own
- * nodes, its inputs, and its `run` fields.
- */
-type Frame = {
-	flow: Flow;
-	/** The flow's name: its file, or the run's title for a quick run. */
-	flowName: string;
-	scope: Scope | null;
-	key: string;
-	inputs: InputValues;
-	/**
-	 * `{{run.branch}}`: the run's branch, or the element's. `base_branch` and
-	 * `index` (from 0) are set for a For Each element, "" elsewhere.
-	 */
-	run: { branch: string; base_branch: string; index: string };
 };
 
 /** Knobs for tests only. Not part of the engine contract. */
@@ -332,10 +156,6 @@ const LIFECYCLE_EVENT_TYPES = [
 	"WaitStarted",
 	"WaitEnded",
 ] as const satisfies readonly EngineEventType[];
-
-const isWaitKind = (
-	kind: AgentErrorKind | null | undefined,
-): kind is WaitReason => kind === "usage-limit" || kind === "network";
 
 export function createEngine(
 	options: EngineOptions,
@@ -375,25 +195,6 @@ export function createEngine(
 
 	const bus = createRunBus();
 	const runLog = internals.runLog ?? createRunLog(db);
-	/**
-	 * Every append of the engine goes through the run log, so its copy of
-	 * each run's log stays exact. Same call shape as `appendEvent` in
-	 * events.ts, which this file does not import; the log has its own db.
-	 */
-	const appendEvent = <T extends EngineEventType>(
-		_db: typeof db,
-		input: EventInput<T>,
-	) => runLog.append(input);
-	/** Keyed by run id: the runs that walk in this process. */
-	const slots = new Map<string, Slot>();
-	/** The last transcript seq written per run. Loaded from disk on first use. */
-	const lastSeqs = new Map<string, number>();
-	/** Per-run queues: answering, stopping, waking and closing never interleave. */
-	const runLocks = new Map<string, Promise<void>>();
-	/** Timers that end the waits of sleeping runs, by run id. */
-	const wakeTimers = new Map<string, ReturnType<typeof setTimeout>>();
-	/** Sleeping runs whose wait ended while the run cap was full. */
-	const pendingWakes = new Set<string>();
 	/** Interrupted runs the daemon resumes when a slot frees. */
 	const pendingResumes = new Set<string>();
 	let resumeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -402,14 +203,36 @@ export function createEngine(
 		"abort",
 		() => {
 			disposed = true;
-			for (const timer of wakeTimers.values()) clearTimeout(timer);
-			wakeTimers.clear();
-			pendingWakes.clear();
 			clearTimeout(resumeTimer);
 			pendingResumes.clear();
 		},
 		{ once: true },
 	);
+
+	const runner = createRunner({
+		db,
+		log: runLog,
+		bus,
+		dataDir,
+		now,
+		minuteMs,
+		settings: runSettings,
+		harnessFor,
+		...(decider ? { decider } : {}),
+		...(readGithubItems ? { readGithubItems } : {}),
+		mcpServersFor,
+		flowOf: parseRunFlow,
+		calledFlowsOf: parseCalledFlows,
+		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
+		...(internals.signal ? { signal: internals.signal } : {}),
+		onSlotFreed() {
+			if (disposed) return;
+			for (const runId of [...pendingResumes]) {
+				pendingResumes.delete(runId);
+				void resumeAfterRestart(runId);
+			}
+		},
+	});
 
 	const ready = recoverInterruptedWork();
 	// Every method awaits `ready` and sees the error there.
@@ -440,7 +263,7 @@ export function createEngine(
 		for (const [runId, events] of byRun) {
 			const open = openWork(events);
 			for (const session of open.sessions) {
-				await appendEvent(db, {
+				await runLog.append({
 					type: "SessionEnded",
 					runId,
 					stepId: session.stepId,
@@ -456,7 +279,7 @@ export function createEngine(
 				});
 			}
 			for (const open_ of open.steps) {
-				await appendEvent(db, {
+				await runLog.append({
 					type: "StepEnded",
 					runId,
 					stepId: open_.id,
@@ -469,7 +292,7 @@ export function createEngine(
 			}
 			if (open.runOpen) {
 				const why = await daemonResumeBlock(runId, events);
-				await appendEvent(db, {
+				await runLog.append({
 					type: "RunEnded",
 					runId,
 					payload: {
@@ -482,7 +305,7 @@ export function createEngine(
 				if (!why) toResume.push(runId);
 			}
 			const sleep = deriveSleep(events);
-			if (sleep && !open.runOpen) scheduleWake(runId, sleep.until);
+			if (sleep && !open.runOpen) runner.scheduleWake(runId, sleep.until);
 		}
 		if (toResume.length > 0 && !disposed) {
 			resumeTimer = setTimeout(() => {
@@ -541,7 +364,10 @@ export function createEngine(
 		try {
 			await ready;
 			const events = await loadRunEvents(runId);
-			if (slots.has(runId) || deriveRunState(events).status !== "interrupted") {
+			if (
+				runner.isActive(runId) ||
+				deriveRunState(events).status !== "interrupted"
+			) {
 				return;
 			}
 			const why = await daemonResumeBlock(runId, events);
@@ -557,45 +383,7 @@ export function createEngine(
 		}
 	}
 
-	/** Runs `fn` after every earlier `exclusive` call for the same run has settled. */
-	function exclusive<T>(runId: string, fn: () => Promise<T>): Promise<T> {
-		const previous = runLocks.get(runId) ?? Promise.resolve();
-		const current = previous.then(fn);
-		const tail = current.then(
-			() => {},
-			() => {},
-		);
-		runLocks.set(runId, tail);
-		void tail.then(() => {
-			if (runLocks.get(runId) === tail) runLocks.delete(runId);
-		});
-		return current;
-	}
-
-	function reserveSlot(runId: string): void {
-		if (slots.has(runId)) {
-			throw new Error(
-				"This run is still running. Stop it or wait for it to end.",
-			);
-		}
-		const runCap = runSettings().maxConcurrentRuns;
-		if (slots.size >= runCap) {
-			throw new Error(
-				`The run cap is reached: ${slots.size} of ${runCap} runs are running. Stop a run or wait for one to end.`,
-			);
-		}
-		slots.set(runId, "starting");
-	}
-
-	function releaseStartingSlot(runId: string): void {
-		if (slots.get(runId) === "starting") slots.delete(runId);
-	}
-
-	async function getRunRow(runId: string): Promise<RunRow> {
-		const [row] = await db.select().from(run).where(eq(run.id, runId));
-		if (!row) throw new Error(`Run not found: ${runId}`);
-		return row;
-	}
+	const getRunRow = (runId: string): Promise<RunRow> => getRunRowOf(db, runId);
 
 	/** A project that a person has not removed. */
 	async function getProjectRow(projectId: string) {
@@ -704,697 +492,20 @@ export function createEngine(
 		};
 	}
 
-	async function lastSeqOf(runId: string): Promise<number> {
-		const known = lastSeqs.get(runId);
-		if (known !== undefined) return known;
-		const rows = await db
-			.select({ transcriptPath: step.transcriptPath })
-			.from(step)
-			.where(eq(step.runId, runId));
-		const entries = await readRunTranscript(rows.map((r) => r.transcriptPath));
-		const last = entries.at(-1)?.seq ?? 0;
-		// A step of this run may have written meanwhile; keep the larger.
-		const current = Math.max(last, lastSeqs.get(runId) ?? 0);
-		lastSeqs.set(runId, current);
-		return current;
-	}
-
-	function topFrame(
-		ctx: { row: RunRow; flow: Flow },
-		events: readonly LoggedEvent[],
-	): Frame {
-		return {
-			flow: ctx.flow,
-			flowName: ctx.row.flowName ?? ctx.row.title,
-			scope: null,
-			key: "",
-			inputs: deriveInputs(events),
-			run: { branch: ctx.row.branch, base_branch: "", index: "" },
-		};
-	}
-
-	/** Templates inside a frame read its own nodes, its inputs and the run. */
-	function frameContext(
-		row: RunRow,
-		frame: Frame,
-		events: readonly LoggedEvent[],
-	): TemplateContext {
-		return {
-			nodes: deriveNodeOutputs(events, frame.key),
-			inputs: frame.inputs,
-			run: {
-				...frame.run,
-				worktree: row.worktreePath,
-				base_ref: row.baseRef,
-				flow: frame.flowName,
-			},
-		};
-	}
-
-	/** The frame of a flow that the step `stepId` calls (for one element of a For Each). */
-	function calledFrame(input: {
-		flow: Flow;
-		flowName: string;
-		stepId: string;
-		itemId: string | null;
-		inputs: InputValues;
-		run: Frame["run"];
-	}): Frame {
-		const scope: Scope = { parentStepId: input.stepId, itemId: input.itemId };
-		return {
-			flow: input.flow,
-			flowName: input.flowName,
-			scope,
-			key: scopeKey(scope),
-			inputs: input.inputs,
-			run: input.run,
-		};
-	}
-
-	/** The declared outputs of the flow a frame walked, from its own nodes. */
-	async function outputsOf(row: RunRow, frame: Frame): Promise<StepOutputs> {
-		return flowOutputs(
-			frame.flow,
-			frameContext(row, frame, await loadRunEvents(row.id)),
-		);
-	}
-
-	async function endRun(
-		runId: string,
-		status: RunEnding,
-		reason: string | null,
-	): Promise<void> {
-		try {
-			await appendEvent(db, {
-				type: "RunEnded",
-				runId,
-				payload: { status, reason },
-			});
-		} catch (error) {
-			// The next start marks the run interrupted.
-			console.error(`[engine] could not record the end of run ${runId}`, error);
-		}
-	}
-
 	/**
-	 * Takes over a reserved slot and walks the flow in the background. The
-	 * slot is released when the walk ends, however it ends.
-	 */
-	function launchWalk(row: RunRow, start: WalkStart): void {
-		const walk: ActiveWalk = {
-			controller: new AbortController(),
-			done: Promise.resolve(),
-		};
-		const flow = parseRunFlow(row);
-		const ctx: RunContext = {
-			row,
-			flow,
-			calledFlows: parseCalledFlows(row),
-			policy: resolvePolicy(flow.policy, runSettings().policy),
-			walk,
-		};
-		slots.set(row.id, walk);
-		bus.publish(row.id, { kind: "status-changed" });
-		walk.done = walkFlow(ctx, start).finally(() => {
-			if (slots.get(row.id) === walk) slots.delete(row.id);
-			bus.publish(row.id, { kind: "status-changed" });
-			drainPendingWakes();
-		});
-	}
-
-	/**
-	 * The walk of the run: the top-level flow, with For Each bodies walked
-	 * inside their steps. Every step is closed in the log before the next
-	 * edge is chosen, and every choice reads the log again, so the log alone
-	 * is enough to continue after a stop, a wait or a crash.
-	 */
-	async function walkFlow(ctx: RunContext, start: WalkStart): Promise<void> {
-		const runId = ctx.row.id;
-		try {
-			const top = topFrame(ctx, await loadRunEvents(runId));
-			const end = await walkScope(ctx, top, start);
-			switch (end.kind) {
-				case "finished": {
-					const { node, outcome } = end;
-					const chosen =
-						(outcome === "pass" && node.type !== "foreach") ||
-						(outcome === "done" && node.type === "foreach");
-					await endRun(
-						runId,
-						"finished",
-						chosen ? null : `Ended at node "${node.id}" with "${outcome}".`,
-					);
-					return;
-				}
-				case "failed":
-				case "aborted":
-					await endRun(runId, "failed", end.reason);
-					return;
-				case "stopped":
-					await endRun(runId, "stopped", end.reason);
-					return;
-				case "paused":
-					// The walk pauses and frees its slot. A stop that came in while
-					// the Gate opened or the wait began closes it at once.
-					if (ctx.walk.controller.signal.aborted) await closeParked(runId);
-					return;
-			}
-		} catch (error) {
-			console.error(`[engine] the walk of run ${runId} failed`, error);
-			await endRun(runId, "failed", `The engine failed: ${messageOf(error)}`);
-		}
-	}
-
-	/** Why the walk must stop before a new step or item, or null. */
-	function stopBeforeNext(events: readonly LoggedEvent[]): string | null {
-		if (deriveStopAfterStep(events)) return STOP_AFTER_STEP_REASON;
-		const stopAt = deriveStopAt(events);
-		if (stopAt !== null && now() >= stopAt) return STOP_TIME_REASON;
-		return null;
-	}
-
-	/** Walks one flow (the run's, or a body for one item) until it ends or unwinds. */
-	async function walkScope(
-		ctx: RunContext,
-		frame: Frame,
-		start: WalkStart,
-	): Promise<ScopeEnd> {
-		const runId = ctx.row.id;
-		const signal = ctx.walk.controller.signal;
-		let next: WalkStart = start;
-		while (true) {
-			if (signal.aborted) return { kind: "stopped", reason: null };
-			const events = await loadRunEvents(runId);
-			if (next.kind === "node") {
-				const stop = stopBeforeNext(events);
-				if (stop) return { kind: "stopped", reason: stop };
-				const limit = ctx.policy.maxSteps ?? runSettings().maxStepsPerRun;
-				if (countStepsSinceWalkBegan(events) >= limit) {
-					return {
-						kind: "aborted",
-						reason: `The run reached the limit of ${limit} steps before node "${next.nodeId}". Resume it to continue.`,
-					};
-				}
-			}
-			const nodeId = next.nodeId;
-			const node = frame.flow.nodes.find((n) => n.id === nodeId);
-			if (!node) {
-				return { kind: "failed", reason: `The flow has no node "${nodeId}".` };
-			}
-
-			let outcome: Outcome;
-			if (next.kind === "outcome") {
-				outcome = next.outcome;
-			} else {
-				const result = await runStep(ctx, frame, node, next, events);
-				if ("kind" in result) return result.end;
-				if (result.outcome === "stopped") {
-					return { kind: "stopped", reason: null };
-				}
-				if (result.outcome === "error" || result.outcome === "interrupted") {
-					return {
-						kind: "failed",
-						reason: `Node "${node.id}" failed: ${result.error ?? "unknown error"}`,
-					};
-				}
-				outcome = result.outcome;
-			}
-
-			const traversals = deriveTraversals(
-				await loadRunEvents(runId),
-				frame.key,
-			);
-			const choice = nextEdge({
-				flow: frame.flow,
-				from: node.id,
-				outcome,
-				traversals,
-			});
-			if (choice.kind === "end") {
-				// `fail` and `needs-input` without an edge fail the walk. `pass`, a
-				// Decision label, a Gate choice, an Agent's own outcome or a For
-				// Each outcome without an edge is a chosen end.
-				if (isChosenEnd(node, outcome)) {
-					return { kind: "finished", node, outcome };
-				}
-				return {
-					kind: "failed",
-					reason: `Node "${node.id}" ended with "${outcome}" and no edge leaves it on that outcome.`,
-				};
-			}
-			if (choice.kind === "exhausted") {
-				const edges = choice.edges
-					.map(
-						(e) =>
-							`"${e.id}" (${e.from} → ${e.to} on ${e.outcome}, max ${e.max ?? "∞"})`,
-					)
-					.join(", ");
-				return {
-					kind: "failed",
-					reason: `Node "${node.id}" ended with "${outcome}", but edge ${edges} reached its max.`,
-				};
-			}
-			const { edge } = choice;
-			await appendEvent(db, {
-				type: "EdgeTaken",
-				runId,
-				payload: {
-					edgeId: edge.id,
-					from: edge.from,
-					to: edge.to,
-					outcome,
-					scope: frame.scope,
-				},
-			});
-			next = { kind: "node", nodeId: edge.to };
-		}
-	}
-
-	/**
-	 * Opens a step's transcript for appending. `seq` continues the run's
-	 * count. Each entry is on disk before it is published on the bus.
-	 */
-	async function openRecorder(runId: string, stepId: string, path: string) {
-		await lastSeqOf(runId);
-		const writer = openTranscriptWriter(path);
-		return {
-			record(sessionId: string | null, stepEvent: StepEvent): void {
-				const seq = (lastSeqs.get(runId) ?? 0) + 1;
-				lastSeqs.set(runId, seq);
-				const entry: TranscriptEntry = {
-					seq,
-					stepId,
-					sessionId,
-					at: Date.now(),
-					event: stepEvent,
-				};
-				// On disk first, then on the bus: watchRun depends on this order.
-				writer.append(entry);
-				bus.publish(runId, { kind: "transcript", entry });
-			},
-			close: () => writer.close(),
-		};
-	}
-
-	type Recorder = Awaited<ReturnType<typeof openRecorder>>;
-
-	/** Writes one transcript entry to a step that has no recorder open. */
-	async function recordOnce(
-		runId: string,
-		stepId: string,
-		path: string,
-		stepEvent: StepEvent,
-	): Promise<void> {
-		const recorder = await openRecorder(runId, stepId, path);
-		try {
-			recorder.record(null, stepEvent);
-		} finally {
-			recorder.close();
-		}
-	}
-
-	/**
-	 * Runs one visit of a node (or reopens or continues a step) and closes it
-	 * in the log. A Gate step opens and stays open, and a step that waits for
-	 * a usage limit or the network stays open too: both unwind as `paused`.
-	 */
-	async function runStep(
-		ctx: RunContext,
-		frame: Frame,
-		node: FlowNode,
-		start: WalkStart,
-		events: readonly LoggedEvent[],
-	): Promise<StepResult | Unwind> {
-		if (node.type === "foreach") {
-			return runForEachStep(ctx, frame, node, start, events);
-		}
-		if (node.type === "subflow") {
-			return runSubflowStep(ctx, frame, node, start, events);
-		}
-		const runId = ctx.row.id;
-		let stepId: string;
-		let path: string;
-		let visit: number;
-
-		if (start.kind === "session" || start.kind === "continue") {
-			const existing = deriveSteps(events).find((s) => s.id === start.stepId);
-			if (!existing) throw new Error(`Step not found: ${start.stepId}`);
-			stepId = existing.id;
-			path = existing.transcriptPath;
-			visit = existing.visit;
-			if (start.kind === "session") {
-				await appendEvent(db, {
-					type: "StepReopened",
-					runId,
-					stepId,
-					payload: { prompt: start.prompt },
-				});
-			}
-		} else {
-			stepId = randomUUID();
-			path = transcriptPath(dataDir, runId, stepId);
-			visit = countVisits(events, node.id, frame.key) + 1;
-			const logPath =
-				node.type === "command" ? commandLogPath(dataDir, runId, stepId) : null;
-			await db.insert(step).values({
-				id: stepId,
-				runId,
-				nodeId: node.id,
-				nodeType: node.type,
-				visit,
-				transcriptPath: path,
-			});
-			await appendEvent(db, {
-				type: "StepStarted",
-				runId,
-				stepId,
-				payload: {
-					nodeId: node.id,
-					nodeType: node.type,
-					visit,
-					transcriptPath: path,
-					logPath,
-					scope: frame.scope,
-				},
-			});
-		}
-		bus.publish(runId, { kind: "step-changed", stepId });
-
-		const recorder = await openRecorder(runId, stepId, path);
-		if (node.type === "gate") {
-			let failure: StepResult | null = null;
-			try {
-				await openGate({ row: ctx.row, frame, node, stepId, events, recorder });
-			} catch (error) {
-				failure = {
-					outcome: "error",
-					outputs: { outcome: "error", note: "", visit },
-					error: `The Gate could not open: ${messageOf(error)}`,
-				};
-			} finally {
-				recorder.close();
-			}
-			if (!failure) return { kind: "unwind", end: { kind: "paused" } };
-			await appendEvent(db, {
-				type: "StepEnded",
-				runId,
-				stepId,
-				payload: failure,
-			});
-			bus.publish(runId, { kind: "step-changed", stepId });
-			return failure;
-		}
-
-		// The step's own signal: a stop of the run, the node's time budget, or
-		// no activity for too long.
-		const stepController = new AbortController();
-		const runSignal = ctx.walk.controller.signal;
-		const onStop = () => stepController.abort("stopped" satisfies AbortReason);
-		if (runSignal.aborted) onStop();
-		else runSignal.addEventListener("abort", onStop, { once: true });
-		const timer = node.timeoutMinutes
-			? setTimeout(
-					() => stepController.abort("timeout" satisfies AbortReason),
-					node.timeoutMinutes * minuteMs,
-				)
-			: undefined;
-		const idleMinutes = node.type === "agent" ? node.idleMinutes : undefined;
-		let idleTimer: ReturnType<typeof setTimeout> | undefined;
-		const touch = () => {
-			if (idleMinutes === undefined || stepController.signal.aborted) return;
-			clearTimeout(idleTimer);
-			idleTimer = setTimeout(
-				() => stepController.abort("idle" satisfies AbortReason),
-				idleMinutes * minuteMs,
-			);
-		};
-		touch();
-
-		const abortResult = (outputs: StepOutputs): StepResult | null => {
-			if (!stepController.signal.aborted) return null;
-			const reason = stepController.signal.reason as AbortReason;
-			if (reason === "timeout" || reason === "idle") {
-				return {
-					outcome: "error",
-					outputs: { ...outputs, outcome: "error" },
-					error:
-						reason === "timeout"
-							? `The step ran past its time budget of ${node.timeoutMinutes} min.`
-							: `No activity for ${idleMinutes} min.`,
-				};
-			}
-			return {
-				outcome: "stopped",
-				outputs: { ...outputs, outcome: "stopped" },
-				error: null,
-			};
-		};
-
-		let result: StepResult;
-		try {
-			const tctx = frameContext(ctx.row, frame, events);
-			const input: StepRunInput = {
-				row: ctx.row,
-				frame,
-				stepId,
-				visit,
-				tctx,
-				signal: stepController.signal,
-				record: recorder.record,
-				abortResult,
-				touch,
-			};
-			let raw: StepResult | WaitRequest;
-			switch (node.type) {
-				case "agent":
-					raw = await runAgentStep({ ...input, node, start, events });
-					break;
-				case "command":
-					raw = await runCommandStep({ ...input, node });
-					break;
-				case "decision":
-					raw = await runDecisionStep({ ...input, node });
-					break;
-			}
-			if ("kind" in raw) {
-				const waited = await beginWait(ctx, stepId, visit, raw, recorder);
-				if ("kind" in waited) return waited;
-				result = waited;
-			} else {
-				result = raw;
-			}
-		} catch (error) {
-			result = {
-				outcome: "error",
-				outputs: { outcome: "error", visit },
-				error: messageOf(error),
-			};
-		} finally {
-			recorder.close();
-			clearTimeout(timer);
-			clearTimeout(idleTimer);
-			runSignal.removeEventListener("abort", onStop);
-		}
-
-		await appendEvent(db, {
-			type: "StepEnded",
-			runId,
-			stepId,
-			payload: result,
-		});
-		bus.publish(runId, { kind: "step-changed", stepId });
-		return result;
-	}
-
-	/**
-	 * The run policy: a usage limit or a network failure waits, and the same
-	 * step continues later. The wait is a fact in the log; the timer only
-	 * carries it out. Gives up (a step error) once the network grace is spent.
-	 */
-	async function beginWait(
-		ctx: RunContext,
-		stepId: string,
-		visit: number,
-		request: WaitRequest,
-		recorder: Recorder,
-	): Promise<Unwind | StepResult> {
-		const runId = ctx.row.id;
-		const plan = planWait({
-			reason: request.reason,
-			streak: waitStreak(await loadRunEvents(runId), stepId, request.reason),
-			message: request.message,
-			resetAt: request.resetAt,
-			policy: ctx.policy,
-			now: now(),
-			minuteMs,
-		});
-		if (plan.kind === "give-up") {
-			return {
-				outcome: "error",
-				outputs: { outcome: "error", visit },
-				error: plan.error,
-				...(request.costUsd !== undefined ? { costUsd: request.costUsd } : {}),
-			};
-		}
-		await appendEvent(db, {
-			type: "WaitStarted",
-			runId,
-			stepId,
-			payload: {
-				reason: request.reason,
-				until: plan.until,
-				message: plan.message,
-				since: plan.since,
-			},
-		});
-		recorder.record(null, {
-			type: "wait",
-			reason: request.reason,
-			until: plan.until,
-			message: plan.message,
-		});
-		bus.publish(runId, { kind: "step-changed", stepId });
-		scheduleWake(runId, plan.until);
-		return { kind: "unwind", end: { kind: "paused" } };
-	}
-
-	function clearWakeTimer(runId: string): void {
-		const timer = wakeTimers.get(runId);
-		if (timer !== undefined) clearTimeout(timer);
-		wakeTimers.delete(runId);
-	}
-
-	function scheduleWake(runId: string, until: number): void {
-		clearWakeTimer(runId);
-		if (disposed) return;
-		const delay = Math.min(Math.max(0, until - now()), MAX_TIMER_MS);
-		const timer = setTimeout(() => {
-			wakeTimers.delete(runId);
-			wake(runId, { early: false }).catch((error) => {
-				console.error(`[engine] could not wake run ${runId}`, error);
-			});
-		}, delay);
-		timer.unref?.();
-		wakeTimers.set(runId, timer);
-	}
-
-	function drainPendingWakes(): void {
-		if (disposed) return;
-		for (const runId of [...pendingWakes]) {
-			pendingWakes.delete(runId);
-			wake(runId, { early: false }).catch((error) => {
-				console.error(`[engine] could not wake run ${runId}`, error);
-			});
-		}
-		for (const runId of [...pendingResumes]) {
-			pendingResumes.delete(runId);
-			void resumeAfterRestart(runId);
-		}
-	}
-
-	/**
-	 * Ends the wait of a sleeping run and continues the step that waited.
-	 * `early`: a person resumed the run before its time (a full run cap then
-	 * fails); otherwise a full cap queues the wake until a slot frees.
-	 */
-	async function wake(
-		runId: string,
-		input: { early: boolean; prompt?: string },
-	): Promise<void> {
-		if (disposed) return;
-		// The walk that began the wait may still be unwinding.
-		const slot = slots.get(runId);
-		if (slot && slot !== "starting") await slot.done;
-		await exclusive(runId, async () => {
-			if (disposed) return;
-			const events = await loadRunEvents(runId);
-			const sleep = deriveSleep(events);
-			if (!sleep || deriveRunState(events).status !== "sleeping") return;
-			if (!input.early && now() < sleep.until) {
-				scheduleWake(runId, sleep.until);
-				return;
-			}
-			clearWakeTimer(runId);
-			try {
-				reserveSlot(runId);
-			} catch (error) {
-				if (input.early) throw error;
-				pendingWakes.add(runId);
-				return;
-			}
-			try {
-				const row = await getRunRow(runId);
-				const steps = deriveSteps(events);
-				const waiting = steps.find((s) => s.id === sleep.stepId);
-				if (!waiting) throw new Error(`Step not found: ${sleep.stepId}`);
-				await appendEvent(db, {
-					type: "WaitEnded",
-					runId,
-					stepId: waiting.id,
-					payload: { early: input.early },
-				});
-				await recordOnce(runId, waiting.id, waiting.transcriptPath, {
-					type: "wake",
-				});
-				bus.publish(runId, { kind: "step-changed", stepId: waiting.id });
-				launchWalk(
-					row,
-					wrapInScopes(steps, waiting.scope, {
-						kind: "continue",
-						stepId: waiting.id,
-						nodeId: waiting.nodeId,
-						prompt: input.prompt ?? null,
-					}),
-				);
-			} finally {
-				releaseStartingSlot(runId);
-			}
-		});
-	}
-
-	/**
-	 * Closes the step the run is parked at (an open Gate or a sleeping step)
-	 * and the For Each steps around it without an answer, and ends the run
-	 * as `stopped`. False when the run is not parked.
-	 */
-	async function closeParked(runId: string): Promise<boolean> {
-		const status = "stopped";
-		const parked = parkedSteps(await loadRunEvents(runId));
-		if (parked.length === 0) return false;
-		clearWakeTimer(runId);
-		pendingWakes.delete(runId);
-		for (const open of parked) {
-			const outputs: StepOutputs =
-				open.nodeType === "foreach"
-					? forEachOutputs({
-							items: open.items,
-							visit: open.visit,
-							outcome: status,
-							waitingCount: 0,
-						})
-					: open.nodeType === "gate"
-						? { outcome: status, note: "", visit: open.visit }
-						: open.nodeType === "subflow"
-							? { outcome: status, ended: "", visit: open.visit }
-							: { ...open.outputs, outcome: status };
-			await appendEvent(db, {
-				type: "StepEnded",
-				runId,
-				stepId: open.id,
-				payload: { outcome: status, outputs, error: null },
-			});
-			bus.publish(runId, { kind: "step-changed", stepId: open.id });
-		}
-		await endRun(runId, status, null);
-		bus.publish(runId, { kind: "status-changed" });
-		return true;
-	}
-
-	/**
-	 * Continues a stopped, failed or interrupted run at its resume point, or
-	 * wakes a sleeping one. A person's resume and the daemon's after a
-	 * restart both come here; `RunResumed` says which. The daemon's queues
-	 * on a full run cap, like a wake.
+	 * Continues a stopped, failed or interrupted run, or wakes a sleeping
+	 * one. A person's resume and the daemon's after a restart both come
+	 * here; `RunResumed` says which, and is appended before the thread
+	 * moves (design rule 9). The daemon's queues on a full run cap, like a
+	 * wake. Where the thread continues comes from its checkpoint:
+	 *
+	 * - at a wait or a parked step → `Command({ resume: { kind: "resume", prompt } })`;
+	 * - at a Gate (the run was stopped there) → `{ kind: "reopen" }`;
+	 * - a node pending without an interrupt (the daemon died, or the engine
+	 *   failed, while it ran) → `invoke(null)` re-runs that node;
+	 * - a thread that ended or never ran (a run from before this engine, or
+	 *   a finished one whose checkpoints the runner deleted) → jump to the
+	 *   top-level node the log points at, with the state seeded from the log.
 	 */
 	async function resume(
 		runId: string,
@@ -1404,7 +515,7 @@ export function createEngine(
 		const row = await getRunRow(runId);
 		const before = await loadRunEvents(runId);
 		if (deriveRunState(before).status === "sleeping") {
-			await wake(runId, {
+			await runner.wake(runId, {
 				early: true,
 				...(prompt !== undefined ? { prompt } : {}),
 			});
@@ -1412,13 +523,13 @@ export function createEngine(
 		}
 		if (
 			input.by === "daemon" &&
-			!slots.has(runId) &&
-			slots.size >= runSettings().maxConcurrentRuns
+			!runner.isActive(runId) &&
+			runner.activeCount() >= runSettings().maxConcurrentRuns
 		) {
 			pendingResumes.add(runId);
 			return;
 		}
-		reserveSlot(runId);
+		runner.reserveSlot(runId);
 		try {
 			const events = await loadRunEvents(runId);
 			const status = deriveRunState(events).status;
@@ -1438,1070 +549,76 @@ export function createEngine(
 				);
 			}
 			const flow = parseRunFlow(row);
-			const point = deriveResumePoint(events);
-			const start: WalkStart = point
-				? fromResumePoint(
-						point,
-						prompt ??
-							(input.by === "daemon"
-								? DAEMON_RESUME_PROMPT
-								: DEFAULT_RESUME_PROMPT),
-					)
-				: { kind: "node", nodeId: flow.start };
-			const innermost = innermostOf(start);
-			const steps = deriveSteps(events);
+			const target = resumeTarget(events) ?? {
+				nodeId: flow.start,
+				stepId: null,
+				scope: null,
+				topNodeId: flow.start,
+			};
+			const thread: ThreadState = await runner.threadState(row);
+			const resumedPrompt =
+				prompt ??
+				(input.by === "daemon" ? DAEMON_RESUME_PROMPT : DEFAULT_RESUME_PROMPT);
 			const stopAt = deriveStopAt(events);
-			await appendEvent(db, {
+			await runLog.append({
 				type: "RunResumed",
 				runId,
 				payload: {
-					nodeId: innermost.nodeId,
-					stepId: innermost.kind === "session" ? innermost.stepId : null,
-					prompt: innermost.kind === "session" ? innermost.prompt : null,
-					scope: scopeOfStart(steps, start),
+					nodeId: target.nodeId,
+					stepId: target.stepId,
+					prompt: target.stepId ? resumedPrompt : null,
+					scope: target.scope,
 					...(stopAt !== null && now() >= stopAt ? { clearStopAt: true } : {}),
 					by: input.by,
 					...(input.by === "daemon" ? { reason: DAEMON_RESUME_REASON } : {}),
 				},
 			});
-			launchWalk(row, start);
+			switch (thread.kind) {
+				case "interrupted":
+					runner.resume(
+						row,
+						thread.value.kind === "gate"
+							? { kind: "reopen" }
+							: { kind: "resume", prompt: resumedPrompt },
+					);
+					break;
+				case "pending":
+					runner.continueRun(row);
+					break;
+				case "ended":
+				case "fresh":
+					runner.reenter(row, target.topNodeId, events);
+					break;
+			}
 		} finally {
-			releaseStartingSlot(runId);
-		}
-	}
-
-	/** Wraps a start inside the calling steps around `scope`, from the inside out. */
-	function wrapInScopes(
-		steps: readonly DerivedStep[],
-		scope: Scope | null,
-		inner: WalkStart,
-	): WalkStart {
-		const byId = new Map(steps.map((s) => [s.id, s]));
-		let start = inner;
-		for (let at = scope; at; ) {
-			const caller = byId.get(at.parentStepId);
-			if (!caller) break;
-			start = {
-				kind: "call",
-				nodeId: caller.nodeId,
-				stepId: caller.id,
-				itemId: at.itemId,
-				inner: start,
-			};
-			at = caller.scope;
-		}
-		return start;
-	}
-
-	/**
-	 * Asks the Gate's question. The fact goes in the log first, so the Gate is
-	 * open even when the daemon dies before the transcript line is written.
-	 */
-	async function openGate(input: {
-		row: RunRow;
-		frame: Frame;
-		node: GateNode;
-		stepId: string;
-		events: readonly LoggedEvent[];
-		recorder: Recorder;
-	}): Promise<void> {
-		const { row, node, stepId, recorder } = input;
-		const question = renderTemplate(
-			node.question,
-			frameContext(row, input.frame, input.events),
-		);
-		const choices = node.choices.map((c) =>
-			c.description === undefined
-				? { name: c.name }
-				: { name: c.name, description: c.description },
-		);
-		await appendEvent(db, {
-			type: "GateOpened",
-			runId: row.id,
-			stepId,
-			payload: { question, choices },
-		});
-		recorder.record(null, { type: "gate-open", question, choices });
-		bus.publish(row.id, { kind: "step-changed", stepId });
-	}
-
-	/**
-	 * The effect journal of one step, kept in the event log: an action with
-	 * the same key acts once across the step's sessions.
-	 */
-	function effectJournal(runId: string, stepId: string): EffectJournal {
-		const ended = (
-			action: string,
-			key: string,
-			result: unknown,
-			error: string | null,
-		) =>
-			appendEvent(db, {
-				type: "SideEffectEnded",
-				runId,
-				stepId,
-				payload: { action, key, result: (result ?? null) as JsonValue, error },
-			});
-		return {
-			async once<T>(input: {
-				action: string;
-				key: string;
-				act: () => Promise<T>;
-				find?: () => Promise<T | null>;
-			}): Promise<{ result: T; earlier: boolean }> {
-				const { action, key } = input;
-				const fact = deriveSideEffect(
-					await loadRunEvents(runId),
-					stepId,
-					action,
-					key,
-				);
-				if (fact?.state === "ended") {
-					return { result: fact.result as T, earlier: true };
-				}
-				if (fact?.state === "started" && input.find) {
-					// Started, never recorded: the daemon may have stopped after the act.
-					const found = await input.find();
-					if (found !== null) {
-						await ended(action, key, found, null);
-						return { result: found, earlier: true };
-					}
-				}
-				await appendEvent(db, {
-					type: "SideEffectStarted",
-					runId,
-					stepId,
-					payload: { action, key },
-				});
-				let result: T;
-				try {
-					result = await input.act();
-				} catch (error) {
-					await ended(action, key, null, messageOf(error));
-					throw error;
-				}
-				await ended(action, key, result, null);
-				return { result, earlier: false };
-			},
-		};
-	}
-
-	type StepRunInput = {
-		row: RunRow;
-		frame: Frame;
-		stepId: string;
-		visit: number;
-		tctx: TemplateContext;
-		signal: AbortSignal;
-		record: (sessionId: string | null, stepEvent: StepEvent) => void;
-		abortResult: (outputs: StepOutputs) => StepResult | null;
-		/** Resets the idle clock. */
-		touch: () => void;
-	};
-
-	async function runAgentStep(
-		input: StepRunInput & {
-			node: AgentNode;
-			start: WalkStart;
-			events: readonly LoggedEvent[];
-		},
-	): Promise<StepResult | WaitRequest> {
-		const { row, node, stepId, visit, start, events, signal, record } = input;
-		const runId = row.id;
-
-		const render = () => {
-			const rendered = renderTemplate(node.prompt, input.tctx);
-			return node.skill ? `/${node.skill} ${rendered}`.trim() : rendered;
-		};
-		let prompt: string;
-		let resumeSessionId: string | null;
-		if (start.kind === "session") {
-			prompt = start.prompt;
-			resumeSessionId = start.harnessSessionId;
-		} else if (start.kind === "continue") {
-			// After a wait: the step's own harness session, if it got one.
-			const own = deriveSteps(events).find((s) => s.id === stepId);
-			resumeSessionId =
-				own?.sessions.findLast((s) => s.harnessSessionId)?.harnessSessionId ??
-				null;
-			prompt = resumeSessionId
-				? (start.prompt ?? DEFAULT_RESUME_PROMPT)
-				: render();
-		} else {
-			prompt = render();
-			resumeSessionId =
-				node.session === "resume"
-					? lastHarnessSessionOfNode(events, node.id, input.frame.key)
-					: null;
-		}
-
-		// The run resolved the node's profile when it started.
-		const agent = resolvedAgent(node);
-		if (!agent) {
-			return {
-				outcome: "error",
-				outputs: { outcome: "error", visit },
-				error: `Agent node "${node.id}" has no harness, model or permission mode: name a profile, or set them on the node.`,
-			};
-		}
-		const harness = harnessFor(agent.harness);
-		if (!harness) {
-			return {
-				outcome: "error",
-				outputs: { outcome: "error", visit },
-				error: `No ${HARNESS_LABEL[agent.harness]} harness is added. Add it under Agents.`,
-			};
-		}
-
-		// The node's connections and its own servers. `${NAME}` in env values
-		// and headers reads the keychain, then the daemon's environment. The
-		// expanded values go to the harness only, never into the log.
-		const mcp = await mcpServersFor(node);
-		if (!mcp.ok) {
-			return {
-				outcome: "error",
-				outputs: { outcome: "error", visit },
-				error: mcp.message,
-			};
-		}
-
-		const sessionId = randomUUID();
-		await db
-			.insert(agentSession)
-			.values({ id: sessionId, runId, stepId, prompt });
-		await appendEvent(db, {
-			type: "SessionStarted",
-			runId,
-			stepId,
-			sessionId,
-			payload: { prompt, resumeSessionId, harness: agent.harness },
-		});
-		bus.publish(runId, { kind: "step-changed", stepId });
-
-		let harnessSessionId: string | null = resumeSessionId;
-		let ending: SessionEnding | null = null;
-		let report: AgentReport | null = null;
-		/** The text after the last tool call: the agent's final message. */
-		let output = "";
-		let afterTool = false;
-		let lastMessageId: string | null = null;
-		const stoppedByPerson = () => signal.aborted && signal.reason === "stopped";
-
-		const onEvent = async (agentEvent: AgentEvent): Promise<void> => {
-			input.touch();
-			record(sessionId, agentEvent);
-			switch (agentEvent.type) {
-				case "session":
-					harnessSessionId = agentEvent.sessionId;
-					await db
-						.update(agentSession)
-						.set({ harnessSessionId: agentEvent.sessionId })
-						.where(eq(agentSession.id, sessionId));
-					await appendEvent(db, {
-						type: "HarnessSessionAssigned",
-						runId,
-						stepId,
-						sessionId,
-						payload: {
-							harnessSessionId: agentEvent.sessionId,
-							model: agentEvent.model ?? null,
-						},
-					});
-					bus.publish(runId, { kind: "step-changed", stepId });
-					break;
-				case "text":
-					// The output is the last message: a tool call or a new message starts it over.
-					if (afterTool || agentEvent.messageId !== lastMessageId) {
-						output = "";
-						afterTool = false;
-						lastMessageId = agentEvent.messageId;
-					}
-					output += agentEvent.delta;
-					break;
-				case "tool-start":
-				case "tool-end":
-				case "tool-result":
-					afterTool = true;
-					break;
-				case "report":
-					afterTool = true;
-					report = {
-						outcome: agentEvent.outcome,
-						summary: agentEvent.summary,
-						data: agentEvent.data,
-					};
-					break;
-				case "finished":
-					ending = {
-						outcome: "finished",
-						error: null,
-						errorKind: null,
-						usage: agentEvent.usage ?? null,
-						costUsd: agentEvent.usage?.costUsd ?? null,
-						resetAt: null,
-					};
-					break;
-				case "error":
-					ending = {
-						outcome: stoppedByPerson() ? "stopped" : "failed",
-						error: agentEvent.message,
-						errorKind: agentEvent.kind,
-						usage: null,
-						costUsd: null,
-						resetAt: agentEvent.resetAt ?? null,
-					};
-					break;
-			}
-		};
-
-		const endWithoutResult = (message: string): SessionEnding => ({
-			outcome: stoppedByPerson() ? "stopped" : "failed",
-			error: signal.aborted ? "The session was aborted." : message,
-			errorKind: signal.aborted ? "aborted" : "harness",
-			usage: null,
-			costUsd: null,
-			resetAt: null,
-		});
-
-		try {
-			// A stop that came in while the session was being recorded.
-			if (signal.aborted) throw new Error("The session was aborted.");
-			const stream = harness.run({
-				cwd: row.worktreePath,
-				prompt,
-				model: agent.model,
-				permissionMode: agent.permissionMode,
-				effort: agent.effort,
-				resumeSessionId: resumeSessionId ?? undefined,
-				stepReport: stepReportOf(node),
-				effects: effectJournal(runId, stepId),
-				// A run snapshot from before Slice 3 has no `tools`.
-				tools: node.tools ?? [],
-				...(Object.keys(mcp.servers).length > 0
-					? { mcpServers: mcp.servers }
-					: {}),
-				signal,
-			});
-			await consumeStream(stream, {
-				signal,
-				graceMs: STOP_GRACE_MS,
-				onItem: onEvent,
-				isLast: (e) => e.type === "finished" || e.type === "error",
-			});
-		} catch (error) {
-			ending ??= endWithoutResult(messageOf(error));
-		}
-		const final: SessionEnding =
-			ending ?? endWithoutResult("The harness stream ended without a result.");
-		await appendEvent(db, {
-			type: "SessionEnded",
-			runId,
-			stepId,
-			sessionId,
-			payload: final,
-		});
-
-		const finalReport = report as AgentReport | null;
-		const outputs: StepOutputs = {
-			visit,
-			output,
-			summary: finalReport?.summary || output,
-			session_id: harnessSessionId ?? "",
-		};
-		if (finalReport?.data !== undefined) {
-			outputs.data = finalReport.data as JsonValue;
-		}
-		const aborted = input.abortResult(outputs);
-		if (aborted) return aborted;
-		if (final.outcome === "failed" && isWaitKind(final.errorKind)) {
-			return {
-				kind: "wait",
-				reason: final.errorKind,
-				message: final.error ?? final.errorKind,
-				resetAt: final.resetAt,
-			};
-		}
-		const stepError = (error: string): StepResult => ({
-			outcome: "error",
-			outputs: { ...outputs, outcome: "error" },
-			error,
-		});
-		if (finalReport) {
-			const outcomes = agentOutcomes(node);
-			if (!outcomes.includes(finalReport.outcome)) {
-				return stepError(
-					`The agent reported "${finalReport.outcome}", which is not an outcome of this node. Its outcomes are: ${outcomes.join(", ")}.`,
-				);
-			}
-			if (node.output) {
-				const problem = checkOutputData(node.output, finalReport.data);
-				if (problem) return stepError(problem);
-			}
-			return {
-				outcome: finalReport.outcome,
-				outputs: { ...outputs, outcome: finalReport.outcome },
-				error: null,
-			};
-		}
-		if (final.outcome === "finished") {
-			if (node.outcomes) {
-				return stepError(
-					`The agent finished with no step report. This node needs one of its outcomes: ${agentOutcomes(node).join(", ")}.`,
-				);
-			}
-			if (node.output) {
-				return stepError(
-					"The agent finished with no step report, so it gave no data for the output schema.",
-				);
-			}
-			return {
-				outcome: "pass",
-				outputs: { ...outputs, outcome: "pass" },
-				error: null,
-			};
-		}
-		return {
-			outcome: "error",
-			outputs: { ...outputs, outcome: "error" },
-			error: final.error ?? "The agent session failed.",
-		};
-	}
-
-	async function runCommandStep(
-		input: StepRunInput & { node: CommandNode },
-	): Promise<StepResult> {
-		const { row, node, stepId, visit, signal, record } = input;
-		const { command, env } = renderCommand(node.command, input.tctx);
-		record(null, { type: "command-start", command });
-		const result = await runCommand({
-			command,
-			cwd: row.worktreePath,
-			env,
-			logPath: commandLogPath(dataDir, row.id, stepId),
-			signal,
-			onOutput: (stream, text) =>
-				record(null, { type: "command-output", stream, text }),
-		});
-		record(null, { type: "command-exit", exitCode: result.exitCode });
-
-		const outputs: StepOutputs = { visit, log_tail: result.logTail };
-		if (result.exitCode !== null) outputs.exit_code = result.exitCode;
-		const aborted = input.abortResult(outputs);
-		if (aborted) return aborted;
-		if (result.spawnError) {
-			return {
-				outcome: "error",
-				outputs: { ...outputs, outcome: "error" },
-				error: `The command could not start: ${result.spawnError}`,
-			};
-		}
-		const outcome = result.exitCode === 0 ? "pass" : "fail";
-		return { outcome, outputs: { ...outputs, outcome }, error: null };
-	}
-
-	async function runDecisionStep(
-		input: StepRunInput & { node: DecisionNode },
-	): Promise<StepResult | WaitRequest> {
-		const { row, node, visit, signal, record } = input;
-		const prompt = renderTemplate(node.prompt, input.tctx);
-		const labels = node.labels.map((label) => label.name);
-		record(null, {
-			type: "decision-start",
-			prompt,
-			labels,
-			model: node.model,
-		});
-		if (!decider) {
-			return {
-				outcome: "error",
-				outputs: { visit, notes: "", outcome: "error" },
-				error: "No decider is configured for Decision nodes.",
-			};
-		}
-		const result = await decideWithin(
-			decider,
-			{
-				cwd: row.worktreePath,
-				prompt,
-				labels: node.labels.map((label) =>
-					label.description === undefined
-						? { name: label.name }
-						: { name: label.name, description: label.description },
-				),
-				model: node.model,
-				tools: node.tools ?? [],
-				signal,
-			},
-			signal,
-		);
-		const costUsd = result.costUsd;
-		if (result.kind === "decided") {
-			record(null, {
-				type: "decision",
-				label: result.label,
-				notes: result.notes,
-			});
-		}
-		const outputs: StepOutputs = {
-			visit,
-			notes: result.kind === "decided" ? result.notes : "",
-		};
-		const aborted = input.abortResult(outputs);
-		if (aborted) return { ...aborted, costUsd };
-		if (result.kind === "error") {
-			if (isWaitKind(result.errorKind)) {
-				return {
-					kind: "wait",
-					reason: result.errorKind,
-					message: result.message,
-					resetAt: null,
-					costUsd,
-				};
-			}
-			return {
-				outcome: "error",
-				outputs: { ...outputs, outcome: "error" },
-				error: `The decider failed: ${result.message}`,
-				costUsd,
-			};
-		}
-		if (!labels.includes(result.label)) {
-			return {
-				outcome: "error",
-				outputs: { ...outputs, outcome: "error" },
-				error: `The decider picked "${result.label}", which is not a label of this node. The labels are: ${labels.join(", ")}.`,
-				costUsd,
-			};
-		}
-		return {
-			outcome: result.label,
-			outputs: { ...outputs, outcome: result.label },
-			error: null,
-			costUsd,
-		};
-	}
-
-	/**
-	 * Reads a For Each source as list items: a JSON value, the JSON a command
-	 * prints in the worktree, files that match a glob, or GitHub sub-issues of
-	 * the rendered parent. Throws with a readable message.
-	 */
-	async function readSource(
-		ctx: RunContext,
-		node: ForEachNode,
-		tctx: TemplateContext,
-		stepId: string,
-		signal: AbortSignal,
-	): Promise<ListItem[]> {
-		const row = ctx.row;
-		const source = node.source;
-		switch (source.kind) {
-			case "json":
-				return jsonSourceItems(source.value, tctx);
-			case "files":
-				return fileItems(row.worktreePath, renderTemplate(source.glob, tctx));
-			case "github": {
-				if (!readGithubItems) {
-					throw new Error(
-						"No GitHub reader is configured for For Each sources.",
-					);
-				}
-				const text = renderTemplate(source.parent, tctx).trim();
-				const parent = Number(text.replace(/^#/, ""));
-				if (!Number.isInteger(parent) || parent <= 0) {
-					throw new Error(
-						`The parent issue "${text}" (from "${source.parent}") is not an issue number.`,
-					);
-				}
-				return readGithubItems({
-					cwd: row.worktreePath,
-					parent,
-					...(source.requireLabel !== undefined
-						? { requireLabel: source.requireLabel }
-						: {}),
-					doneLabels: source.doneLabels ?? [],
-					skipLabels: source.skipLabels ?? [],
-					signal,
-				});
-			}
-			case "command": {
-				const { command, env } = renderCommand(source.command, tctx);
-				let stdout = "";
-				const result = await runCommand({
-					command,
-					cwd: row.worktreePath,
-					env,
-					logPath: commandLogPath(dataDir, row.id, stepId),
-					signal,
-					onOutput: (stream, text) => {
-						if (stream === "stdout") stdout += text;
-					},
-				});
-				if (result.spawnError) {
-					throw new Error(
-						`The source command could not start: ${result.spawnError}`,
-					);
-				}
-				if (result.exitCode !== 0) {
-					throw new Error(
-						`The source command failed. Its last output:\n${result.logTail}`,
-					);
-				}
-				return parseCommandItems(stdout);
-			}
+			runner.releaseStartingSlot(runId);
 		}
 	}
 
 	/**
-	 * Opens the step of a Subflow or For Each node: a new visit, or (a
-	 * `call` start) the existing step, reopened when it had ended.
+	 * Resolves once `done` holds for the run's log, or the run's drive ended
+	 * without it. Subscribes before the first look, so an append between the
+	 * two is not missed.
 	 */
-	async function openCallStep(
-		ctx: RunContext,
-		frame: Frame,
-		node: SubflowNode | ForEachNode,
-		start: WalkStart,
-		events: readonly LoggedEvent[],
-	): Promise<{ stepId: string; path: string; visit: number }> {
-		const runId = ctx.row.id;
-		if (start.kind === "call") {
-			const existing = deriveSteps(events).find((s) => s.id === start.stepId);
-			if (!existing) throw new Error(`Step not found: ${start.stepId}`);
-			if (existing.endedAt !== null) {
-				await appendEvent(db, {
-					type: "StepReopened",
-					runId,
-					stepId: existing.id,
-					payload: { prompt: null },
-				});
+	function untilLogged(
+		runId: string,
+		done: (events: readonly LoggedEvent[]) => boolean,
+	): Promise<void> {
+		return new Promise<void>((resolve) => {
+			let settled = false;
+			const unsubscribe = bus.subscribe(runId, () => void check());
+			async function check(): Promise<void> {
+				if (settled) return;
+				const events = await loadRunEvents(runId);
+				if (settled) return;
+				if (done(events) || !runner.isActive(runId)) {
+					settled = true;
+					unsubscribe();
+					resolve();
+				}
 			}
-			return {
-				stepId: existing.id,
-				path: existing.transcriptPath,
-				visit: existing.visit,
-			};
-		}
-		const stepId = randomUUID();
-		const path = transcriptPath(dataDir, runId, stepId);
-		const visit = countVisits(events, node.id, frame.key) + 1;
-		await db.insert(step).values({
-			id: stepId,
-			runId,
-			nodeId: node.id,
-			nodeType: node.type,
-			visit,
-			transcriptPath: path,
+			void check();
 		});
-		await appendEvent(db, {
-			type: "StepStarted",
-			runId,
-			stepId,
-			payload: {
-				nodeId: node.id,
-				nodeType: node.type,
-				visit,
-				transcriptPath: path,
-				logPath:
-					node.type === "foreach" && node.source.kind === "command"
-						? commandLogPath(dataDir, runId, stepId)
-						: null,
-				scope: frame.scope,
-			},
-		});
-		return { stepId, path, visit };
-	}
-
-	/**
-	 * One visit of a Subflow node: binds the called flow's inputs, walks it in
-	 * a frame of its own, and returns its declared outputs. `pass` when the
-	 * called flow finished (on any chosen end), `fail` when it failed.
-	 */
-	async function runSubflowStep(
-		ctx: RunContext,
-		frame: Frame,
-		node: SubflowNode,
-		start: WalkStart,
-		events: readonly LoggedEvent[],
-	): Promise<StepResult | Unwind> {
-		const runId = ctx.row.id;
-		const { stepId, visit } = await openCallStep(
-			ctx,
-			frame,
-			node,
-			start,
-			events,
-		);
-		const changed = () => bus.publish(runId, { kind: "step-changed", stepId });
-		changed();
-
-		const endStep = async (
-			outcome: StepOutcome,
-			outputs: StepOutputs,
-			error: string | null,
-		): Promise<StepResult> => {
-			const result: StepResult = {
-				outcome,
-				outputs: { ...outputs, ended: outputs.ended ?? "", outcome, visit },
-				error,
-			};
-			await appendEvent(db, {
-				type: "StepEnded",
-				runId,
-				stepId,
-				payload: result,
-			});
-			changed();
-			return result;
-		};
-
-		const called = ctx.calledFlows[node.flow];
-		if (!called) {
-			return endStep(
-				"error",
-				{},
-				`The flow "${node.flow}" is not in the run's snapshot.`,
-			);
-		}
-
-		const existing = deriveSteps(events).find((s) => s.id === stepId);
-		let inputs: InputValues;
-		if (start.kind === "call" && existing?.call) {
-			inputs = existing.call.inputs;
-		} else {
-			try {
-				inputs = resolveInputs(
-					called.inputs ?? [],
-					renderBindings(node.inputs, frameContext(ctx.row, frame, events)),
-					{ what: `The flow "${node.flow}"`, jsonText: "lenient" },
-				);
-			} catch (error) {
-				return endStep("error", {}, messageOf(error));
-			}
-			await appendEvent(db, {
-				type: "FlowCalled",
-				runId,
-				stepId,
-				payload: { flow: node.flow, inputs },
-			});
-		}
-
-		const child = calledFrame({
-			flow: called,
-			flowName: node.flow,
-			stepId,
-			itemId: null,
-			inputs,
-			run: { branch: frame.run.branch, base_branch: "", index: "" },
-		});
-		const inner: WalkStart = (start.kind === "call" ? start.inner : null) ?? {
-			kind: "node",
-			nodeId: called.start,
-		};
-		const end = await walkScope(ctx, child, inner);
-		switch (end.kind) {
-			case "paused":
-				// The step stays open: the called flow continues after the wait.
-				return { kind: "unwind", end };
-			case "stopped":
-				await endStep("stopped", {}, null);
-				return { kind: "unwind", end };
-			case "aborted":
-				await endStep("error", {}, end.reason);
-				return { kind: "unwind", end };
-		}
-		const outputs = await outputsOf(ctx.row, child);
-		if (end.kind === "finished") {
-			return endStep(
-				"pass",
-				{ ...outputs, ended: endedLabel(end.node, end.outcome) },
-				null,
-			);
-		}
-		return endStep("fail", outputs, end.reason);
-	}
-
-	/**
-	 * One visit of a For Each node: read the source, mark blocked elements,
-	 * start the next free element and walk the called flow for it, then read
-	 * again. Ends `done` when no element is left to start, `halted` when a
-	 * called flow ends on a `haltOn` label. A failed element does not fail the
-	 * step: the elements it blocks are marked blocked and the loop goes on
-	 * with free work.
-	 */
-	async function runForEachStep(
-		ctx: RunContext,
-		frame: Frame,
-		node: ForEachNode,
-		start: WalkStart,
-		events: readonly LoggedEvent[],
-	): Promise<StepResult | Unwind> {
-		const runId = ctx.row.id;
-		const signal = ctx.walk.controller.signal;
-		const { stepId, path, visit } = await openCallStep(
-			ctx,
-			frame,
-			node,
-			start,
-			events,
-		);
-		let resume: { itemId: string; inner: WalkStart | null } | null =
-			start.kind === "call" && start.itemId !== null
-				? { itemId: start.itemId, inner: start.inner }
-				: null;
-		const changed = () => bus.publish(runId, { kind: "step-changed", stepId });
-		changed();
-
-		const record = (stepEvent: StepEvent) =>
-			recordOnce(runId, stepId, path, stepEvent);
-		const current = async (): Promise<DerivedStep> => {
-			const found = deriveSteps(await loadRunEvents(runId)).find(
-				(s) => s.id === stepId,
-			);
-			if (!found) throw new Error(`Step not found: ${stepId}`);
-			return found;
-		};
-		/** The latest read of the source, for `waiting_count`. */
-		let lastRead: ListItem[] | null = null;
-
-		const endStep = async (
-			outcome: StepOutcome,
-			error: string | null,
-		): Promise<StepResult> => {
-			const derived = await current();
-			const states = itemStates(derived);
-			const waitingCount = (lastRead ?? []).filter(
-				(item) => !item.done && !Object.hasOwn(states, item.id),
-			).length;
-			const result: StepResult = {
-				outcome,
-				outputs: forEachOutputs({
-					items: derived.items,
-					visit,
-					outcome,
-					waitingCount,
-				}),
-				error,
-			};
-			await appendEvent(db, {
-				type: "StepEnded",
-				runId,
-				stepId,
-				payload: result,
-			});
-			changed();
-			return result;
-		};
-		const unwind = async (end: UnwindEnd): Promise<Unwind> => {
-			// A pause keeps the step open: the element continues after the wait.
-			if (end.kind === "stopped") await endStep("stopped", null);
-			else if (end.kind === "aborted") await endStep("error", end.reason);
-			return { kind: "unwind", end };
-		};
-		const endItem = async (
-			itemId: string,
-			state: EnginePayloads["ItemEnded"]["state"],
-			reason: string | null,
-			outputs: StepOutputs,
-		) => {
-			await appendEvent(db, {
-				type: "ItemEnded",
-				runId,
-				stepId,
-				payload: { itemId, state, reason, outputs },
-			});
-			await record({ type: "item-end", itemId, state, reason });
-			changed();
-		};
-
-		const called = ctx.calledFlows[node.flow];
-		if (!called) {
-			return endStep(
-				"error",
-				`The flow "${node.flow}" is not in the run's snapshot.`,
-			);
-		}
-		const as = node.as ?? "item";
-		const haltOn = node.haltOn ?? ["halt"];
-		const perItem = (node.branch ?? "per-item") === "per-item";
-		const worktree = ctx.row.worktreePath;
-
-		while (true) {
-			let facts: ItemFacts;
-			let index: number;
-			let branch: string | null;
-			let baseBranch: string | null;
-			let inputs: InputValues;
-			let inner: WalkStart;
-
-			const continuing = resume
-				? (await current()).items.findLast(
-						(i) => i.facts.id === resume?.itemId && i.open,
-					)
-				: undefined;
-			if (resume && continuing && continuing.index !== null) {
-				facts = continuing.facts;
-				index = continuing.index;
-				branch = continuing.branch;
-				baseBranch = continuing.baseBranch;
-				// Before flow format 2 the element was the only input.
-				inputs = continuing.inputs ?? { [as]: facts.value };
-				inner = resume.inner ?? { kind: "node", nodeId: called.start };
-				resume = null;
-			} else {
-				resume = null;
-				if (signal.aborted) return unwind({ kind: "stopped", reason: null });
-				const stop = stopBeforeNext(await loadRunEvents(runId));
-				if (stop) return unwind({ kind: "stopped", reason: stop });
-
-				const tctx = frameContext(ctx.row, frame, await loadRunEvents(runId));
-				let items: ListItem[];
-				try {
-					items = await readSource(ctx, node, tctx, stepId, signal);
-				} catch (error) {
-					if (signal.aborted) return unwind({ kind: "stopped", reason: null });
-					return endStep("error", messageOf(error));
-				}
-				const ordered = blockersFirst(items);
-				if (!ordered.ok) {
-					const names = ordered.cycle.map((id) => itemLabel({ id }));
-					return endStep(
-						"error",
-						`The "blocked by" links of the items make a cycle: ${names.join(" → ")}.`,
-					);
-				}
-				lastRead = ordered.items;
-				let derived = await current();
-				let states = itemStates(derived);
-				const open = ordered.items.filter(
-					(item) => !item.done && !Object.hasOwn(states, item.id),
-				).length;
-				await appendEvent(db, {
-					type: "ItemsRead",
-					runId,
-					stepId,
-					payload: { count: items.length, open },
-				});
-				await record({ type: "items-read", count: items.length, open });
-
-				const blocked = newlyBlocked(ordered.items, states);
-				for (const { item, blocker } of blocked) {
-					const reason = `blocked by ${itemLabel({ id: blocker })}`;
-					await appendEvent(db, {
-						type: "ItemBlocked",
-						runId,
-						stepId,
-						payload: { item: toItemFacts(item), blocker, reason },
-					});
-					await record({
-						type: "item-end",
-						itemId: item.id,
-						state: "blocked",
-						reason,
-					});
-				}
-				if (blocked.length > 0) {
-					changed();
-					derived = await current();
-					states = itemStates(derived);
-				}
-
-				const started = derived.items.filter((i) => i.index !== null).length;
-				if (node.maxItems !== undefined && started >= node.maxItems) {
-					return endStep("done", null);
-				}
-				const picked = nextItem(ordered.items, states);
-				if (picked.kind !== "item") return endStep("done", null);
-
-				facts = toItemFacts(picked.item);
-				try {
-					inputs = resolveInputs(
-						called.inputs ?? [],
-						{ ...renderBindings(node.inputs, tctx), [as]: facts.value },
-						{ what: `The flow "${node.flow}"`, jsonText: "lenient" },
-					);
-				} catch (error) {
-					return endStep("error", messageOf(error));
-				}
-				index = started + 1;
-				branch = null;
-				baseBranch = null;
-				let failure: string | null = null;
-				if (perItem) {
-					try {
-						const startBranch =
-							derived.items.find((i) => i.index !== null)?.baseBranch ??
-							(await currentBranch(worktree)) ??
-							frame.run.branch;
-						baseBranch =
-							derived.items.findLast((i) => i.state === "done" && i.branch)
-								?.branch ?? startBranch;
-						const name = await freeBranchName(
-							worktree,
-							itemBranchName(runId.slice(0, 8), facts),
-						);
-						await createAndCheckoutBranch(worktree, name, baseBranch);
-						branch = name;
-					} catch (error) {
-						failure = messageOf(error);
-					}
-				}
-				await appendEvent(db, {
-					type: "ItemStarted",
-					runId,
-					stepId,
-					payload: { item: facts, index, branch, baseBranch, inputs },
-				});
-				await record({
-					type: "item-start",
-					itemId: facts.id,
-					title: facts.title,
-					branch,
-					baseBranch,
-				});
-				changed();
-				if (failure !== null) {
-					await endItem(facts.id, "failed", failure, {});
-					continue;
-				}
-				inner = { kind: "node", nodeId: called.start };
-			}
-
-			const child = calledFrame({
-				flow: called,
-				flowName: node.flow,
-				stepId,
-				itemId: facts.id,
-				inputs,
-				run: {
-					branch: branch ?? frame.run.branch,
-					base_branch: baseBranch ?? "",
-					index: String(index - 1),
-				},
-			});
-			const end = await walkScope(ctx, child, inner);
-			if (
-				end.kind === "paused" ||
-				end.kind === "stopped" ||
-				end.kind === "aborted"
-			) {
-				return unwind(end);
-			}
-			const outputs = await outputsOf(ctx.row, child);
-			if (end.kind === "finished" && haltOn.includes(end.outcome)) {
-				await endItem(
-					facts.id,
-					"halted",
-					`Ended at node "${end.node.id}" with "${end.outcome}".`,
-					outputs,
-				);
-				return endStep("halted", null);
-			}
-			if (end.kind === "finished") {
-				await endItem(facts.id, "done", null, outputs);
-			} else {
-				await endItem(facts.id, "failed", end.reason, outputs);
-			}
-		}
 	}
 
 	function shellQuote(value: string): string {
@@ -2600,7 +717,7 @@ export function createEngine(
 
 	/**
 	 * Validates the flow (refuses one with errors), snapshots it, creates the
-	 * worktree, starts walking at the start node, and returns at once.
+	 * worktree, starts the thread at the start node, and returns at once.
 	 */
 	async function startRunWith(
 		input: StartRunInput,
@@ -2608,7 +725,7 @@ export function createEngine(
 	): Promise<RunSummary> {
 		await ready;
 		const runId = randomUUID();
-		reserveSlot(runId);
+		runner.reserveSlot(runId);
 		try {
 			const projectRow = await getProjectRow(input.projectId);
 			const loaded = await flowsForRun(projectRow.repoPath, input);
@@ -2716,7 +833,7 @@ export function createEngine(
 				})
 				.returning();
 			if (!row) throw new Error("Could not create the run.");
-			await appendEvent(db, {
+			await runLog.append({
 				type: "RunStarted",
 				runId,
 				payload: {
@@ -2729,15 +846,15 @@ export function createEngine(
 					trigger,
 				},
 			});
-			await appendEvent(db, {
+			await runLog.append({
 				type: "WorktreeCreated",
 				runId,
 				payload: worktree,
 			});
-			launchWalk(row, { kind: "node", nodeId: flow.start });
+			runner.start(row, inputs);
 			return toSummary(row, runFacts(await loadRunEvents(runId)));
 		} finally {
-			releaseStartingSlot(runId);
+			runner.releaseStartingSlot(runId);
 		}
 	}
 
@@ -2804,7 +921,7 @@ export function createEngine(
 					.where(eq(project.id, existing.id))
 					.returning();
 				if (!restored) throw new Error("Could not restore the project.");
-				await appendEvent(db, {
+				await runLog.append({
 					type: "ProjectRestored",
 					payload: { projectId: existing.id },
 				});
@@ -2818,7 +935,7 @@ export function createEngine(
 				.values({ id, name, repoPath })
 				.returning();
 			if (!row) throw new Error("Could not add the project.");
-			await appendEvent(db, {
+			await runLog.append({
 				type: "ProjectAdded",
 				payload: { projectId: id, name, repoPath },
 			});
@@ -2832,7 +949,7 @@ export function createEngine(
 				.select({ id: run.id })
 				.from(run)
 				.where(eq(run.projectId, projectId));
-			if (runs.some((r) => slots.has(r.id))) {
+			if (runs.some((r) => runner.isActive(r.id))) {
 				throw new Error(
 					"A run of this project is still running. Stop it first.",
 				);
@@ -2855,7 +972,7 @@ export function createEngine(
 				.update(project)
 				.set({ removedAt: new Date() })
 				.where(eq(project.id, projectId));
-			await appendEvent(db, {
+			await runLog.append({
 				type: "ProjectRemoved",
 				payload: { projectId },
 			});
@@ -2929,7 +1046,7 @@ export function createEngine(
 			await ready;
 			await getRunRow(runId);
 			if (stopOptions?.when === "after-step") {
-				await exclusive(runId, async () => {
+				await runner.exclusive(runId, async () => {
 					const events = await loadRunEvents(runId);
 					const status = deriveRunState(events).status;
 					if (
@@ -2940,7 +1057,7 @@ export function createEngine(
 						return;
 					}
 					if (deriveStopAfterStep(events)) return;
-					await appendEvent(db, {
+					await runLog.append({
 						type: "StopAfterStepRequested",
 						runId,
 						payload: {},
@@ -2949,34 +1066,7 @@ export function createEngine(
 				});
 				return;
 			}
-			await exclusive(runId, async () => {
-				const slot = slots.get(runId);
-				if (slot === "starting") return;
-				let requested = false;
-				if (slot) {
-					if (!slot.controller.signal.aborted) {
-						await appendEvent(db, {
-							type: "StopRequested",
-							runId,
-							payload: {},
-						});
-						requested = true;
-						slot.controller.abort();
-					}
-					await slot.done;
-				}
-				// A run that waits at a Gate or sleeps, or reached one while it stopped.
-				const status = deriveRunState(await loadRunEvents(runId)).status;
-				if (status !== "waiting" && status !== "sleeping") return;
-				if (!requested) {
-					await appendEvent(db, {
-						type: "StopRequested",
-						runId,
-						payload: {},
-					});
-				}
-				await closeParked(runId);
-			});
+			await runner.stop(runId);
 		},
 
 		async resumeRun(runId, prompt) {
@@ -3057,7 +1147,7 @@ export function createEngine(
 		async resolveGate({ runId, stepId, choice, note }) {
 			await ready;
 			const row = await getRunRow(runId);
-			await exclusive(runId, async () => {
+			await runner.exclusive(runId, async () => {
 				const events = await loadRunEvents(runId);
 				const gate = deriveOpenGate(events);
 				if (!gate) throw new Error("This run does not wait at a Gate.");
@@ -3069,41 +1159,22 @@ export function createEngine(
 						`"${choice}" is not a choice of this Gate. Choose one of: ${gate.choices.map((c) => c.name).join(", ")}.`,
 					);
 				}
-				// The walk continues at once, so it needs a slot. A full cap
+				// The thread continues at once, so it needs a slot. A full cap
 				// leaves the Gate open.
-				reserveSlot(runId);
+				runner.reserveSlot(runId);
 				try {
-					const text = note ?? "";
-					await appendEvent(db, {
-						type: "StepEnded",
+					// The Gate node ends the step on the answer. Return once it has,
+					// so the run no longer waits when the caller looks again.
+					const answered = untilLogged(
 						runId,
-						stepId,
-						payload: {
-							outcome: choice,
-							outputs: { outcome: choice, note: text, visit: gate.visit },
-							error: null,
-						},
-					});
-					const steps = deriveSteps(events);
-					const gateStep = steps.find((s) => s.id === stepId);
-					if (gateStep) {
-						await recordOnce(runId, stepId, gateStep.transcriptPath, {
-							type: "gate-resolved",
-							choice,
-							note: text,
-						});
-					}
-					bus.publish(runId, { kind: "step-changed", stepId });
-					launchWalk(
-						row,
-						wrapInScopes(steps, gateStep?.scope ?? null, {
-							kind: "outcome",
-							nodeId: gate.nodeId,
-							outcome: choice,
-						}),
+						(events) =>
+							deriveSteps(events).find((s) => s.id === stepId)?.endedAt !==
+							null,
 					);
+					runner.resume(row, { kind: "gate", choice, note: note ?? "" });
+					await answered;
 				} finally {
-					releaseStartingSlot(runId);
+					runner.releaseStartingSlot(runId);
 				}
 			});
 		},
@@ -3200,6 +1271,58 @@ export function createEngine(
 }
 
 /**
+ * What `RunResumed` records: the node the run continues at, from the log.
+ * When the run took an edge after its last step started (it stopped or
+ * died between steps), that edge's target; else the last step's node, with
+ * its id when it is an Agent step with a harness session to continue, and
+ * its scope. `topNodeId` is the top-level node around it, for a thread
+ * that has to be re-entered from the root. Null when the run never
+ * started a step.
+ */
+function resumeTarget(events: readonly LoggedEvent[]): {
+	nodeId: string;
+	stepId: string | null;
+	scope: Scope | null;
+	topNodeId: string;
+} | null {
+	const steps = deriveSteps(events);
+	const last = steps.at(-1);
+	let lastEdge: Extract<LoggedEvent, { type: "EdgeTaken" }> | null = null;
+	for (const e of events) {
+		if (e.type === "EdgeTaken" && (!lastEdge || e.seq > lastEdge.seq)) {
+			lastEdge = e;
+		}
+	}
+	let nodeId: string;
+	let stepId: string | null = null;
+	let scope: Scope | null;
+	if (lastEdge && (!last || lastEdge.seq > last.startSeq)) {
+		nodeId = lastEdge.payload.to;
+		scope = lastEdge.payload.scope ?? null;
+	} else if (last) {
+		nodeId = last.nodeId;
+		scope = last.scope;
+		if (
+			last.nodeType === "agent" &&
+			last.sessions.some((s) => s.harnessSessionId)
+		) {
+			stepId = last.id;
+		}
+	} else {
+		return null;
+	}
+	const byId = new Map(steps.map((s) => [s.id, s]));
+	let topNodeId = nodeId;
+	for (let at = scope; at; ) {
+		const caller = byId.get(at.parentStepId);
+		if (!caller) break;
+		topNodeId = caller.nodeId;
+		at = caller.scope;
+	}
+	return { nodeId, stepId, scope, topNodeId };
+}
+
+/**
  * The raw JSON of every flow file of a project, by name. A file that is not
  * JSON reads as null. A missing directory is an empty record.
  */
@@ -3291,156 +1414,4 @@ function snapshotFlow(json: unknown): Flow {
 	const migrated = migrateFlow(json);
 	const parsed = flowSchema.safeParse(migrated);
 	return parsed.success ? parsed.data : (migrated as Flow);
-}
-
-/** The agent's step report, as the walk keeps it. */
-type AgentReport = {
-	outcome: StepReportOutcome;
-	summary: string;
-	data?: unknown;
-};
-
-const BUILT_IN_AGENT_OUTCOMES = ["pass", "fail", "needs-input"];
-
-/** The outcomes an Agent node may report. */
-function agentOutcomes(node: AgentNode): string[] {
-	return node.outcomes?.map((o) => o.name) ?? BUILT_IN_AGENT_OUTCOMES;
-}
-
-/** What the harness asks the agent to report: a spec for own outcomes or an output schema. */
-function stepReportOf(node: AgentNode): AgentSessionInput["stepReport"] {
-	if (!node.outcomes && !node.output) return true;
-	const spec: StepReportSpec = {};
-	if (node.outcomes) {
-		spec.outcomes = node.outcomes.map((o) =>
-			o.description === undefined
-				? { name: o.name }
-				: { name: o.name, description: o.description },
-		);
-	}
-	if (node.output) spec.output = node.output;
-	return spec;
-}
-
-/** An Agent's own outcome, other than one named `fail` or `needs-input`. */
-function isOwnAgentLabel(node: FlowNode, outcome: Outcome): boolean {
-	return (
-		node.type === "agent" &&
-		node.outcomes !== undefined &&
-		outcome !== "fail" &&
-		outcome !== "needs-input"
-	);
-}
-
-/**
- * Whether ending at `node` with `outcome` and no edge to take is a chosen
- * end of the flow: `pass`, a Decision label, a Gate choice, an Agent's own
- * outcome, or a For Each outcome. `fail` and `needs-input` are failures.
- */
-function isChosenEnd(node: FlowNode, outcome: Outcome): boolean {
-	return (
-		outcome === "pass" ||
-		node.type === "decision" ||
-		node.type === "gate" ||
-		node.type === "foreach" ||
-		isOwnAgentLabel(node, outcome)
-	);
-}
-
-/** A Subflow's `ended`: the label or choice its flow ended on, or "". */
-function endedLabel(node: FlowNode, outcome: Outcome): string {
-	return node.type === "decision" ||
-		node.type === "gate" ||
-		isOwnAgentLabel(node, outcome)
-		? outcome
-		: "";
-}
-
-function fromResumePoint(point: ResumePoint, prompt: string): WalkStart {
-	switch (point.kind) {
-		case "session":
-			return { ...point, prompt };
-		case "node":
-			return point;
-		case "call":
-			return {
-				...point,
-				inner: point.inner ? fromResumePoint(point.inner, prompt) : null,
-			};
-	}
-}
-
-/** The deepest start of a chain of calling starts. */
-function innermostOf(start: WalkStart): WalkStart {
-	let at = start;
-	while (at.kind === "call" && at.inner) at = at.inner;
-	return at;
-}
-
-/** The scope the innermost start runs in. */
-function scopeOfStart(
-	steps: readonly DerivedStep[],
-	start: WalkStart,
-): Scope | null {
-	let scope: Scope | null = null;
-	let at = start;
-	while (at.kind === "call" && at.inner) {
-		scope = { parentStepId: at.stepId, itemId: at.itemId };
-		at = at.inner;
-	}
-	if (at.kind === "call" && !at.inner) {
-		// The calling step itself continues: its own scope.
-		return steps.find((s) => s.id === at.stepId)?.scope ?? scope;
-	}
-	return scope;
-}
-
-function messageOf(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
-
-/**
- * Asks the decider, but never waits on it longer than `STOP_GRACE_MS` past
- * an abort: a decider that ignores its signal cannot hold the walk. A decider
- * that throws (against its contract) counts as an error.
- */
-async function decideWithin(
-	decider: Decider,
-	input: DecisionInput,
-	signal: AbortSignal,
-): Promise<DecisionResult> {
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	let onAbort: (() => void) | undefined;
-	const late = new Promise<DecisionResult>((resolve) => {
-		onAbort = () => {
-			timer = setTimeout(
-				() =>
-					resolve({
-						kind: "error",
-						errorKind: "aborted",
-						message: "The decider did not stop when it was aborted.",
-						costUsd: null,
-					}),
-				STOP_GRACE_MS,
-			);
-		};
-		if (signal.aborted) onAbort();
-		else signal.addEventListener("abort", onAbort, { once: true });
-	});
-	try {
-		return await Promise.race([
-			decider.decide(input).catch(
-				(error): DecisionResult => ({
-					kind: "error",
-					errorKind: "harness",
-					message: messageOf(error),
-					costUsd: null,
-				}),
-			),
-			late,
-		]);
-	} finally {
-		clearTimeout(timer);
-		if (onAbort) signal.removeEventListener("abort", onAbort);
-	}
 }

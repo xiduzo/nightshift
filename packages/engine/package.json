@@ -11,6 +11,10 @@
 		"test": "bun test"
 	},
 	"dependencies": {
+		"@langchain/core": "^1.2.18",
+		"@langchain/langgraph": "^1.5.0",
+		"@langchain/langgraph-checkpoint": "^1.2.0",
+		"@libsql/client": "0.18.0",
 		"@nightshift/agents": "workspace:*",
 		"@nightshift/db": "workspace:*",
 		"@nightshift/flows": "workspace:*",
