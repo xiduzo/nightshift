@@ -574,7 +574,11 @@ export function opencodeSetup(
 		undefined,
 	);
 	const github = input.tools?.includes("github")
-		? githubTools({ ...options.github, cwd: input.cwd })
+		? githubTools({
+				...options.github,
+				cwd: input.cwd,
+				...(input.effects ? { effects: input.effects } : {}),
+			})
 		: [];
 	return {
 		prompt: report.prompt,

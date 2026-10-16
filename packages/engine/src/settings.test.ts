@@ -113,6 +113,28 @@ describe("the scheduler switch", () => {
 	});
 });
 
+describe("automatic resume", () => {
+	test("on by default; NIGHTSHIFT_RESUME_INTERRUPTED_RUNS turns it off, and a saved value wins", async () => {
+		expect((await store()).run().resumeInterruptedRuns).toBe(true);
+		const s = await store({ NIGHTSHIFT_RESUME_INTERRUPTED_RUNS: " Off " });
+		expect(s.run().resumeInterruptedRuns).toBe(false);
+		expect(s.view().fields.resumeInterruptedRuns).toEqual({
+			source: "env",
+			default: true,
+			env: "NIGHTSHIFT_RESUME_INTERRUPTED_RUNS",
+			envValue: false,
+		});
+		await s.save({ resumeInterruptedRuns: true });
+		expect(s.run().resumeInterruptedRuns).toBe(true);
+	});
+
+	test("a NIGHTSHIFT_RESUME_INTERRUPTED_RUNS that is not on or off is ignored", async () => {
+		const s = await store({ NIGHTSHIFT_RESUME_INTERRUPTED_RUNS: "maybe" });
+		expect(s.run().resumeInterruptedRuns).toBe(true);
+		expect(s.view().fields.resumeInterruptedRuns.source).toBe("default");
+	});
+});
+
 describe("save", () => {
 	test("a saved value lasts across a reload, and null forgets it", async () => {
 		const env = { NIGHTSHIFT_MAX_STEPS_PER_RUN: "800" };
@@ -242,6 +264,7 @@ test("run() is the engine's part of the current values", async () => {
 		scheduler: false,
 		maxConcurrentRuns: 3,
 		maxStepsPerRun: 50,
+		resumeInterruptedRuns: true,
 		policy: {
 			usageLimitFirstWaitMinutes: 5,
 			usageLimitMaxWaitMinutes: 60,

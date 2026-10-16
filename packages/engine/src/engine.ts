@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type {
 	AgentErrorKind,
@@ -9,6 +9,7 @@ import type {
 	Decider,
 	DecisionInput,
 	DecisionResult,
+	EffectJournal,
 	HarnessName,
 	StepReportOutcome,
 	StepReportSpec,
@@ -63,6 +64,7 @@ import { runCommand } from "./command";
 import { consumeStream } from "./consume";
 import {
 	appendEvent,
+	countDaemonResumes,
 	countStepsSinceWalkBegan,
 	countVisits,
 	type DerivedStep,
@@ -70,7 +72,9 @@ import {
 	deriveNodeOutputs,
 	deriveOpenGate,
 	deriveResumePoint,
+	deriveResumes,
 	deriveRunState,
+	deriveSideEffect,
 	deriveSleep,
 	deriveSteps,
 	deriveStopAfterStep,
@@ -89,6 +93,7 @@ import {
 	openWork,
 	parkedSteps,
 	parseEventRow,
+	type ResumedBy,
 	type ResumePoint,
 	type RunEnding,
 	type Scope,
@@ -154,6 +159,15 @@ const DEFAULT_MAX_STEPS_PER_RUN = 500;
 /** How long a stopped harness may take to end its stream. */
 const STOP_GRACE_MS = 5_000;
 const DEFAULT_RESUME_PROMPT = "Continue where you left off.";
+const INTERRUPTED_REASON = "The daemon stopped while this run ran.";
+/** How long a new daemon waits before it resumes the runs the last one stopped mid-step. */
+const DAEMON_RESUME_GRACE_MS = 5_000;
+/** Daemon resumes in a row (no person in between) before a run waits for a person. */
+const MAX_DAEMON_RESUMES = 3;
+const DAEMON_RESUME_REASON = "The daemon restarted.";
+/** The follow-up prompt of an Agent session that the daemon continues after a restart. */
+const DAEMON_RESUME_PROMPT =
+	"The daemon stopped while you worked on this, so your last actions may or may not have happened. Before you repeat any of them, check the worktree (git status, git log) and the remote (pushed branches, pull requests, comments). Then continue where you left off.";
 const TITLE_MAX_CHARS = 80;
 const QUICK_RUN_TITLE = "Quick run";
 const STOP_TIME_REASON = "Reached the stop time";
@@ -294,6 +308,8 @@ export type EngineInternals = {
 	signal?: AbortSignal;
 	/** How often the scheduler looks for due schedules. Default 30 000 ms. */
 	scheduleTickMs?: number;
+	/** How long after its start the engine resumes the runs recovery interrupted. Default 5 000 ms. */
+	resumeGraceMs?: number;
 };
 
 /** Event types that open or close work. Recovery and the Gate inbox read only these. */
@@ -359,6 +375,9 @@ export function createEngine(
 	const wakeTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	/** Sleeping runs whose wait ended while the run cap was full. */
 	const pendingWakes = new Set<string>();
+	/** Interrupted runs the daemon resumes when a slot frees. */
+	const pendingResumes = new Set<string>();
+	let resumeTimer: ReturnType<typeof setTimeout> | undefined;
 	let disposed = false;
 	internals.signal?.addEventListener(
 		"abort",
@@ -367,6 +386,8 @@ export function createEngine(
 			for (const timer of wakeTimers.values()) clearTimeout(timer);
 			wakeTimers.clear();
 			pendingWakes.clear();
+			clearTimeout(resumeTimer);
+			pendingResumes.clear();
 		},
 		{ once: true },
 	);
@@ -377,9 +398,11 @@ export function createEngine(
 
 	/**
 	 * A daemon that died left sessions, steps and runs open. They become
-	 * `interrupted`. Nothing continues on its own: a person resumes. Open
-	 * Gates and sleeping steps are facts, not lost work: a sleeping run gets
-	 * its timer back (a wake time in the past fires at once).
+	 * `interrupted`. A moment later the daemon resumes those runs itself, as
+	 * a person would, unless `daemonResumeBlock` says why not; the run's end
+	 * reason says it. Open Gates and sleeping steps are facts, not lost work:
+	 * a sleeping run gets its timer back (a wake time in the past fires at
+	 * once).
 	 */
 	async function recoverInterruptedWork(): Promise<void> {
 		const rows = await db
@@ -394,6 +417,7 @@ export function createEngine(
 			.orderBy(asc(event.seq));
 		const byRun = groupByRun(rows.map(parseEventRow));
 		const error = "The daemon stopped while this ran.";
+		const toResume: string[] = [];
 		for (const [runId, events] of byRun) {
 			const open = openWork(events);
 			for (const session of open.sessions) {
@@ -425,17 +449,92 @@ export function createEngine(
 				});
 			}
 			if (open.runOpen) {
+				const why = await daemonResumeBlock(runId, events);
 				await appendEvent(db, {
 					type: "RunEnded",
 					runId,
 					payload: {
 						status: "interrupted",
-						reason: "The daemon stopped while this run ran.",
+						reason: why
+							? `${INTERRUPTED_REASON} It did not continue on its own: ${why}`
+							: INTERRUPTED_REASON,
 					},
 				});
+				if (!why) toResume.push(runId);
 			}
 			const sleep = deriveSleep(events);
 			if (sleep && !open.runOpen) scheduleWake(runId, sleep.until);
+		}
+		if (toResume.length > 0 && !disposed) {
+			resumeTimer = setTimeout(() => {
+				for (const runId of toResume) void resumeAfterRestart(runId);
+			}, internals.resumeGraceMs ?? DAEMON_RESUME_GRACE_MS);
+			resumeTimer.unref?.();
+		}
+	}
+
+	/**
+	 * Why the daemon must not resume a run it stopped mid-step, or null. Only
+	 * a daemon with the scheduler on resumes: a dev daemon on a copy of the
+	 * database never continues the night's runs on real repos.
+	 */
+	async function daemonResumeBlock(
+		runId: string,
+		events: readonly LoggedEvent[],
+	): Promise<string | null> {
+		try {
+			if (options.scheduler === false || !runSettings().scheduler) {
+				return "the scheduler is off on this daemon.";
+			}
+			const [row] = await db.select().from(run).where(eq(run.id, runId));
+			if (!row) return "the run's record is missing.";
+			const own = parseRunFlow(row).policy?.resumeInterruptedRuns;
+			if (!(own ?? runSettings().resumeInterruptedRuns)) {
+				return own === false
+					? "its flow's policy turns automatic resume off."
+					: "automatic resume is off in Settings.";
+			}
+			const resumes = countDaemonResumes(events);
+			if (resumes >= MAX_DAEMON_RESUMES) {
+				return `it continued on its own ${resumes} times in a row, and each time the daemon stopped again.`;
+			}
+			const stopAt = deriveStopAt(events);
+			if (stopAt !== null && now() >= stopAt) {
+				return "its stop time has passed.";
+			}
+			const worktree = await stat(row.worktreePath).catch(() => null);
+			if (!worktree?.isDirectory()) {
+				return `its worktree is gone (${row.worktreePath}).`;
+			}
+			return null;
+		} catch (error) {
+			return `the daemon could not check it: ${messageOf(error)}`;
+		}
+	}
+
+	/**
+	 * Resumes a run that startup recovery interrupted, through the same path
+	 * as a person's resume. Checks again first: a person may have resumed it,
+	 * or the stop time came meanwhile. A full run cap queues it.
+	 */
+	async function resumeAfterRestart(runId: string): Promise<void> {
+		if (disposed) return;
+		try {
+			await ready;
+			const events = await loadRunEvents(runId);
+			if (slots.has(runId) || deriveRunState(events).status !== "interrupted") {
+				return;
+			}
+			const why = await daemonResumeBlock(runId, events);
+			if (why) {
+				console.warn(
+					`[engine] run ${runId} did not continue on its own: ${why}`,
+				);
+				return;
+			}
+			await resume(runId, { by: "daemon" });
+		} catch (error) {
+			console.error(`[engine] could not resume run ${runId}`, error);
 		}
 	}
 
@@ -1176,6 +1275,10 @@ export function createEngine(
 				console.error(`[engine] could not wake run ${runId}`, error);
 			});
 		}
+		for (const runId of [...pendingResumes]) {
+			pendingResumes.delete(runId);
+			void resumeAfterRestart(runId);
+		}
 	}
 
 	/**
@@ -1276,6 +1379,86 @@ export function createEngine(
 		return true;
 	}
 
+	/**
+	 * Continues a stopped, failed or interrupted run at its resume point, or
+	 * wakes a sleeping one. A person's resume and the daemon's after a
+	 * restart both come here; `RunResumed` says which. The daemon's queues
+	 * on a full run cap, like a wake.
+	 */
+	async function resume(
+		runId: string,
+		input: { by: ResumedBy; prompt?: string },
+	): Promise<void> {
+		const { prompt } = input;
+		const row = await getRunRow(runId);
+		const before = await loadRunEvents(runId);
+		if (deriveRunState(before).status === "sleeping") {
+			await wake(runId, {
+				early: true,
+				...(prompt !== undefined ? { prompt } : {}),
+			});
+			return;
+		}
+		if (
+			input.by === "daemon" &&
+			!slots.has(runId) &&
+			slots.size >= runSettings().maxConcurrentRuns
+		) {
+			pendingResumes.add(runId);
+			return;
+		}
+		reserveSlot(runId);
+		try {
+			const events = await loadRunEvents(runId);
+			const status = deriveRunState(events).status;
+			if (status === "running") {
+				throw new Error(
+					"This run is still running. Stop it or wait for it to end.",
+				);
+			}
+			if (status === "waiting") {
+				throw new Error(
+					"This run waits at a Gate. Answer the Gate, or stop the run first.",
+				);
+			}
+			if (status === "sleeping") {
+				throw new Error(
+					"This run sleeps until a wait ends. Resume it again to wake it now.",
+				);
+			}
+			const flow = parseRunFlow(row);
+			const point = deriveResumePoint(events);
+			const start: WalkStart = point
+				? fromResumePoint(
+						point,
+						prompt ??
+							(input.by === "daemon"
+								? DAEMON_RESUME_PROMPT
+								: DEFAULT_RESUME_PROMPT),
+					)
+				: { kind: "node", nodeId: flow.start };
+			const innermost = innermostOf(start);
+			const steps = deriveSteps(events);
+			const stopAt = deriveStopAt(events);
+			await appendEvent(db, {
+				type: "RunResumed",
+				runId,
+				payload: {
+					nodeId: innermost.nodeId,
+					stepId: innermost.kind === "session" ? innermost.stepId : null,
+					prompt: innermost.kind === "session" ? innermost.prompt : null,
+					scope: scopeOfStart(steps, start),
+					...(stopAt !== null && now() >= stopAt ? { clearStopAt: true } : {}),
+					by: input.by,
+					...(input.by === "daemon" ? { reason: DAEMON_RESUME_REASON } : {}),
+				},
+			});
+			launchWalk(row, start);
+		} finally {
+			releaseStartingSlot(runId);
+		}
+	}
+
 	/** Wraps a start inside the calling steps around `scope`, from the inside out. */
 	function wrapInScopes(
 		steps: readonly DerivedStep[],
@@ -1329,6 +1512,67 @@ export function createEngine(
 		});
 		recorder.record(null, { type: "gate-open", question, choices });
 		bus.publish(row.id, { kind: "step-changed", stepId });
+	}
+
+	/**
+	 * The effect journal of one step, kept in the event log: an action with
+	 * the same key acts once across the step's sessions.
+	 */
+	function effectJournal(runId: string, stepId: string): EffectJournal {
+		const ended = (
+			action: string,
+			key: string,
+			result: unknown,
+			error: string | null,
+		) =>
+			appendEvent(db, {
+				type: "SideEffectEnded",
+				runId,
+				stepId,
+				payload: { action, key, result: (result ?? null) as JsonValue, error },
+			});
+		return {
+			async once<T>(input: {
+				action: string;
+				key: string;
+				act: () => Promise<T>;
+				find?: () => Promise<T | null>;
+			}): Promise<{ result: T; earlier: boolean }> {
+				const { action, key } = input;
+				const fact = deriveSideEffect(
+					await loadRunEvents(runId),
+					stepId,
+					action,
+					key,
+				);
+				if (fact?.state === "ended") {
+					return { result: fact.result as T, earlier: true };
+				}
+				if (fact?.state === "started" && input.find) {
+					// Started, never recorded: the daemon may have stopped after the act.
+					const found = await input.find();
+					if (found !== null) {
+						await ended(action, key, found, null);
+						return { result: found, earlier: true };
+					}
+				}
+				await appendEvent(db, {
+					type: "SideEffectStarted",
+					runId,
+					stepId,
+					payload: { action, key },
+				});
+				let result: T;
+				try {
+					result = await input.act();
+				} catch (error) {
+					await ended(action, key, null, messageOf(error));
+					throw error;
+				}
+				await ended(action, key, result, null);
+				return { result, earlier: false };
+			},
+		};
 	}
 
 	type StepRunInput = {
@@ -1510,6 +1754,7 @@ export function createEngine(
 				effort: node.effort,
 				resumeSessionId: resumeSessionId ?? undefined,
 				stepReport: stepReportOf(node),
+				effects: effectJournal(runId, stepId),
 				// A run snapshot from before Slice 3 has no `tools`.
 				tools: node.tools ?? [],
 				...(Object.keys(mcp.servers).length > 0
@@ -2624,6 +2869,7 @@ export function createEngine(
 				takeOverCommand: last
 					? `cd ${shellQuote(row.worktreePath)} && ${takeOverCli[last.harness](shellQuote(last.harnessSessionId))}`
 					: null,
+				resumes: deriveResumes(events),
 			};
 			return detail;
 		},
@@ -2688,59 +2934,10 @@ export function createEngine(
 
 		async resumeRun(runId, prompt) {
 			await ready;
-			const row = await getRunRow(runId);
-			const before = await loadRunEvents(runId);
-			if (deriveRunState(before).status === "sleeping") {
-				await wake(runId, {
-					early: true,
-					...(prompt !== undefined ? { prompt } : {}),
-				});
-				return;
-			}
-			reserveSlot(runId);
-			try {
-				const events = await loadRunEvents(runId);
-				const status = deriveRunState(events).status;
-				if (status === "running") {
-					throw new Error(
-						"This run is still running. Stop it or wait for it to end.",
-					);
-				}
-				if (status === "waiting") {
-					throw new Error(
-						"This run waits at a Gate. Answer the Gate, or stop the run first.",
-					);
-				}
-				if (status === "sleeping") {
-					throw new Error(
-						"This run sleeps until a wait ends. Resume it again to wake it now.",
-					);
-				}
-				const flow = parseRunFlow(row);
-				const point = deriveResumePoint(events);
-				const start: WalkStart = point
-					? fromResumePoint(point, prompt ?? DEFAULT_RESUME_PROMPT)
-					: { kind: "node", nodeId: flow.start };
-				const innermost = innermostOf(start);
-				const steps = deriveSteps(events);
-				const stopAt = deriveStopAt(events);
-				await appendEvent(db, {
-					type: "RunResumed",
-					runId,
-					payload: {
-						nodeId: innermost.nodeId,
-						stepId: innermost.kind === "session" ? innermost.stepId : null,
-						prompt: innermost.kind === "session" ? innermost.prompt : null,
-						scope: scopeOfStart(steps, start),
-						...(stopAt !== null && now() >= stopAt
-							? { clearStopAt: true }
-							: {}),
-					},
-				});
-				launchWalk(row, start);
-			} finally {
-				releaseStartingSlot(runId);
-			}
+			await resume(runId, {
+				by: "person",
+				...(prompt !== undefined ? { prompt } : {}),
+			});
 		},
 
 		async listGates() {

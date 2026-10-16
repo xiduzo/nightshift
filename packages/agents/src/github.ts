@@ -13,11 +13,20 @@
  *
  * A failed command throws. The bridge then returns a tool error to the agent
  * with `gh`'s stderr in it, and the agent can try again.
+ *
+ * A session that continues a step (after a daemon restart or a wait) may
+ * call a tool again. `github_comment` goes through the step's effect journal,
+ * so the same comment is posted once. The others are safe to repeat:
+ * `github_open_pr` returns the open pull request of the branch, a push of the
+ * same commits changes nothing, and labels end up the same.
  */
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { toolDefinition } from "@tanstack/ai";
 import { BRIDGED_MCP_SERVER_NAME } from "@tanstack/ai-claude-code";
 import { z } from "zod";
+
+import type { EffectJournal } from "./types";
 
 export const GITHUB_TOOL_NAMES = [
 	"github_read_issue",
@@ -44,6 +53,8 @@ export type GithubToolsOptions = {
 	git?: string;
 	/** Extra environment variables for `gh` and `git`. */
 	env?: Record<string, string>;
+	/** The step's effect journal. Without one, every call acts. */
+	effects?: EffectJournal;
 };
 
 export type ProcessResult = { code: number; stdout: string; stderr: string };
@@ -392,15 +403,28 @@ export function githubTools(options: GithubToolsOptions) {
 		),
 		githubTool(
 			"github_comment",
-			"Post a comment on a GitHub issue or pull request of this repository.",
+			"Post a comment on a GitHub issue or pull request of this repository. The same comment is posted once per step: a repeat returns the first one.",
 			commentInput,
 			async ({ number, body }, signal) => {
-				const out = await run.gh(
-					["issue", "comment", String(number), "--body-file", "-"],
-					body,
-					signal,
-				);
-				return { number, url: out.trim() };
+				const post = async () => {
+					const out = await run.gh(
+						["issue", "comment", String(number), "--body-file", "-"],
+						body,
+						signal,
+					);
+					return { number, url: out.trim() };
+				};
+				if (!options.effects) return post();
+				const { result, earlier } = await options.effects.once({
+					action: "github_comment",
+					key: `${number}:${sha256(body)}`,
+					act: post,
+					find: async () => {
+						const url = await findComment(run, number, body, signal);
+						return url === null ? null : { number, url };
+					},
+				});
+				return earlier ? { ...result, alreadyPosted: true } : result;
 			},
 		),
 		githubTool(
@@ -495,3 +519,39 @@ export function githubTools(options: GithubToolsOptions) {
 }
 
 export type GithubTool = ReturnType<typeof githubTools>[number];
+
+function sha256(text: string): string {
+	return createHash("sha256").update(text).digest("hex");
+}
+
+/**
+ * The URL of the latest comment on the issue or pull request with exactly
+ * this body, or null. One line per comment: `[url, body]` as JSON.
+ */
+async function findComment(
+	run: Runner,
+	number: number,
+	body: string,
+	signal: AbortSignal | undefined,
+): Promise<string | null> {
+	const out = await run.gh(
+		[
+			"api",
+			`repos/{owner}/{repo}/issues/${number}/comments`,
+			"--paginate",
+			"--jq",
+			".[] | [.html_url, .body] | @json",
+		],
+		undefined,
+		signal,
+	);
+	let found: string | null = null;
+	for (const line of out.split("\n")) {
+		if (line.trim() === "") continue;
+		const entry = parseJson(line, "gh api");
+		if (Array.isArray(entry) && entry[1] === body && str(entry[0])) {
+			found = entry[0];
+		}
+	}
+	return found;
+}

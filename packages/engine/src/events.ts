@@ -14,6 +14,7 @@ import type {
 } from "@nightshift/flows";
 
 import type {
+	RunResume,
 	RunStatus,
 	RunTrigger,
 	SessionSummary,
@@ -73,6 +74,9 @@ export type ItemFacts = {
 
 export type WaitReason = "usage-limit" | "network";
 
+/** Who resumed a run: a person, or the daemon after a restart. */
+export type ResumedBy = RunResume["by"];
+
 export type EnginePayloads = {
 	ProjectAdded: { projectId: string; name: string; repoPath: string };
 	ProjectRemoved: { projectId: string };
@@ -94,7 +98,10 @@ export type EnginePayloads = {
 		trigger?: RunTrigger;
 	};
 	WorktreeCreated: { worktreePath: string; branch: string; baseRef: string };
-	/** A person continued a stopped, failed or interrupted run. */
+	/**
+	 * A person continued a stopped, failed or interrupted run, or the daemon
+	 * continued a run it had stopped mid-step, after a restart.
+	 */
 	RunResumed: {
 		/** The node the walk continues at. */
 		nodeId: string;
@@ -105,6 +112,10 @@ export type EnginePayloads = {
 		scope?: Scope | null;
 		/** The stop time had passed: a person resumed past it, so it no longer applies. */
 		clearStopAt?: boolean;
+		/** Absent before automatic resume: a person. */
+		by?: ResumedBy;
+		/** Why the daemon resumed the run. */
+		reason?: string;
 	};
 	/** A new visit of a node. */
 	StepStarted: {
@@ -214,6 +225,19 @@ export type EnginePayloads = {
 	};
 	/** The wait is over: the step continues. `early` when a person resumed the run. */
 	WaitEnded: { early: boolean };
+	/**
+	 * A tool of a step began an action outside the worktree, for example a
+	 * GitHub comment. `key` is stable across the step's sessions, so a
+	 * session that continues the step does not act twice.
+	 */
+	SideEffectStarted: { action: string; key: string };
+	/** The action ended: its result, or the error (then a repeat acts again). */
+	SideEffectEnded: {
+		action: string;
+		key: string;
+		result: JsonValue | null;
+		error: string | null;
+	};
 	StopRequested: Record<string, never>;
 	/** A person asked to stop the run before its next step or item. */
 	StopAfterStepRequested: Record<string, never>;
@@ -489,6 +513,60 @@ export function deriveStopAt(events: readonly LoggedEvent[]): number | null {
 		else if (e.type === "RunResumed" && e.payload.clearStopAt) stopAt = null;
 	}
 	return stopAt;
+}
+
+/**
+ * How often the daemon resumed the run on its own since it started or a
+ * person last resumed it.
+ */
+export function countDaemonResumes(events: readonly LoggedEvent[]): number {
+	let count = 0;
+	for (const e of bySeq(events)) {
+		if (e.type === "RunStarted") count = 0;
+		else if (e.type === "RunResumed") {
+			count = e.payload.by === "daemon" ? count + 1 : 0;
+		}
+	}
+	return count;
+}
+
+/** Every resume of the run, oldest first. */
+export function deriveResumes(events: readonly LoggedEvent[]): RunResume[] {
+	return ofType(bySeq(events), "RunResumed").map((e) => ({
+		at: e.at,
+		by: e.payload.by ?? "person",
+		nodeId: e.payload.nodeId,
+		reason: e.payload.reason ?? null,
+	}));
+}
+
+/**
+ * What a step's tools did about one action and key: `ended` with its
+ * result, `started` when no result was recorded (the daemon stopped in
+ * between), or null when nothing happened yet or the last try failed.
+ */
+export function deriveSideEffect(
+	events: readonly LoggedEvent[],
+	stepId: string,
+	action: string,
+	key: string,
+): { state: "started" } | { state: "ended"; result: JsonValue | null } | null {
+	let fact:
+		| { state: "started" }
+		| { state: "ended"; result: JsonValue | null }
+		| null = null;
+	for (const e of bySeq(events)) {
+		if (e.stepId !== stepId) continue;
+		if (e.type !== "SideEffectStarted" && e.type !== "SideEffectEnded") {
+			continue;
+		}
+		if (e.payload.action !== action || e.payload.key !== key) continue;
+		if (e.type === "SideEffectStarted") fact = { state: "started" };
+		else if (e.payload.error === null) {
+			fact = { state: "ended", result: e.payload.result };
+		} else fact = null;
+	}
+	return fact;
 }
 
 /** The values of the top-level flow's inputs (the params of a run from before flow format 2). */

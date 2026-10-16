@@ -11,7 +11,7 @@ import { Link } from "@tanstack/react-router";
 import { SettingsIcon, WorkflowIcon } from "lucide-react";
 import { useId } from "react";
 
-import { POLICY_DEFAULTS, setPolicyNumber } from "@/lib/flow-draft";
+import { POLICY_DEFAULTS, setPolicyValue } from "@/lib/flow-draft";
 
 import {
 	Field,
@@ -23,7 +23,7 @@ import {
 import { InputsEditor, OutputsEditor } from "./io-editor";
 
 const POLICY_FIELDS: {
-	key: keyof Policy;
+	key: Exclude<keyof Policy, "resumeInterruptedRuns">;
 	label: string;
 	hint: string;
 	whole?: boolean;
@@ -183,11 +183,48 @@ export function FlowInspector({
 							}
 							describedBy={`${id}-${key}-hint`}
 							onChange={(value) =>
-								onChange((current) => setPolicyNumber(current, key, value))
+								onChange((current) => setPolicyValue(current, key, value))
 							}
 						/>
 					</Field>
 				))}
+				<Field
+					id={`${id}-resume`}
+					label="After a daemon restart"
+					hint="A run the daemon stopped mid-step continues on its own in the same session, or waits for you. Only with the scheduler on."
+				>
+					<NativeSelect
+						id={`${id}-resume`}
+						value={
+							flow.policy?.resumeInterruptedRuns === undefined
+								? ""
+								: flow.policy.resumeInterruptedRuns
+									? "on"
+									: "off"
+						}
+						aria-describedby={`${id}-resume-hint`}
+						onChange={(event) => {
+							const picked = event.target.value;
+							onChange((current) =>
+								setPolicyValue(
+									current,
+									"resumeInterruptedRuns",
+									picked === "" ? undefined : picked === "on",
+								),
+							);
+						}}
+					>
+						<NativeSelectOption value="">
+							{`${(policyDefaults ?? POLICY_DEFAULTS).resumeInterruptedRuns ? "Resume" : "Wait"} (${policyDefaults ? "from Settings" : "default"})`}
+						</NativeSelectOption>
+						<NativeSelectOption value="on">
+							Resume on its own
+						</NativeSelectOption>
+						<NativeSelectOption value="off">
+							Wait for a person
+						</NativeSelectOption>
+					</NativeSelect>
+				</Field>
 				<Button
 					variant="link"
 					size="sm"

@@ -9,6 +9,7 @@ import {
 	githubTools,
 	summarizeChecks,
 } from "./github";
+import type { EffectJournal } from "./types";
 
 type LogEntry = { tool: string; argv: string[]; stdin: string; cwd: string };
 type Rule = {
@@ -36,7 +37,7 @@ afterEach(async () => {
 	await rm(cwd, { recursive: true, force: true });
 });
 
-async function setup(rules: Rule[] = []) {
+async function setup(rules: Rule[] = [], effects?: EffectJournal) {
 	await writeFile(rulesFile, JSON.stringify(rules));
 	const env = { FAKE_LOG: logFile, FAKE_RULES: rulesFile };
 	const gh = await fakeBin(dir, "gh", "fake-gh", { ...env, FAKE_TOOL: "gh" });
@@ -44,7 +45,7 @@ async function setup(rules: Rule[] = []) {
 		...env,
 		FAKE_TOOL: "git",
 	});
-	const tools = githubTools({ cwd, gh, git });
+	const tools = githubTools({ cwd, gh, git, ...(effects ? { effects } : {}) });
 	const call = (name: string, args: unknown) => {
 		const tool = tools.find((t) => t.name === name);
 		if (!tool?.execute) throw new Error(`no tool ${name}`);
@@ -182,6 +183,75 @@ describe("githubTools", () => {
 		const [entry] = await readLog();
 		expect(entry?.argv).toEqual(["issue", "comment", "7", "--body-file", "-"]);
 		expect(entry?.stdin).toBe(body);
+	});
+
+	test("comment: posted once per step; a repeat gets the first one back", async () => {
+		const { call } = await setup(
+			[
+				{
+					tool: "gh",
+					args: ["issue", "comment", "7"],
+					stdout: "https://github.com/o/r/issues/7#issuecomment-1\n",
+				},
+			],
+			memoryJournal(),
+		);
+		const first = await call("github_comment", { number: 7, body: "Done." });
+		expect(first).toEqual({
+			number: 7,
+			url: "https://github.com/o/r/issues/7#issuecomment-1",
+		});
+		expect(await call("github_comment", { number: 7, body: "Done." })).toEqual({
+			...(first as object),
+			alreadyPosted: true,
+		});
+		await call("github_comment", { number: 7, body: "Another." });
+		expect((await readLog()).map((e) => e.stdin)).toEqual([
+			"Done.",
+			"Another.",
+		]);
+	});
+
+	test("comment: started but not recorded, it looks for the comment before posting", async () => {
+		const body = "Line one\nLine two";
+		const listed = [
+			["https://github.com/o/r/issues/7#issuecomment-1", "Other"],
+			["https://github.com/o/r/issues/7#issuecomment-2", body],
+		]
+			.map((entry) => JSON.stringify(entry))
+			.join("\n");
+		const { call } = await setup(
+			[{ tool: "gh", args: ["api"], stdout: `${listed}\n` }],
+			memoryJournal({ started: true }),
+		);
+		expect(await call("github_comment", { number: 7, body })).toEqual({
+			number: 7,
+			url: "https://github.com/o/r/issues/7#issuecomment-2",
+			alreadyPosted: true,
+		});
+		const log = await readLog();
+		expect(log.map((e) => e.argv.slice(0, 2))).toEqual([
+			["api", "repos/{owner}/{repo}/issues/7/comments"],
+		]);
+	});
+
+	test("comment: started but not found, it posts", async () => {
+		const { call } = await setup(
+			[
+				{ tool: "gh", args: ["api"], stdout: "" },
+				{
+					tool: "gh",
+					args: ["issue", "comment", "7"],
+					stdout: "https://github.com/o/r/issues/7#issuecomment-3\n",
+				},
+			],
+			memoryJournal({ started: true }),
+		);
+		expect(await call("github_comment", { number: 7, body: "Done." })).toEqual({
+			number: 7,
+			url: "https://github.com/o/r/issues/7#issuecomment-3",
+		});
+		expect((await readLog()).map((e) => e.argv[0])).toEqual(["api", "issue"]);
 	});
 
 	test("set_labels: add and remove lists", async () => {
@@ -419,3 +489,29 @@ describe("githubTools", () => {
 		expect((await readLog()).map((e) => e.tool)).toEqual(["git"]);
 	});
 });
+
+/**
+ * The engine's journal in memory: a result per action and key. `started`:
+ * every key looks started by an earlier session that never recorded a result.
+ */
+function memoryJournal(options: { started?: boolean } = {}): EffectJournal {
+	const done = new Map<string, unknown>();
+	return {
+		async once({ action, key, act, find }) {
+			const id = `${action}/${key}`;
+			if (done.has(id)) {
+				return { result: done.get(id) as never, earlier: true };
+			}
+			if (options.started) {
+				const found = await find?.();
+				if (found != null) {
+					done.set(id, found);
+					return { result: found, earlier: true };
+				}
+			}
+			const result = await act();
+			done.set(id, result);
+			return { result, earlier: false };
+		},
+	};
+}

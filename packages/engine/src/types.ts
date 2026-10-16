@@ -146,6 +146,16 @@ export type RunSummary = {
 	costUsd: number;
 };
 
+/** A resume of a run: by a person, or by the daemon after a restart. */
+export type RunResume = {
+	at: number;
+	by: "person" | "daemon";
+	/** The node the walk continued at. */
+	nodeId: string;
+	/** Why the daemon resumed the run. Null for a person. */
+	reason: string | null;
+};
+
 export type RunDetail = RunSummary & {
 	/** The copy of the flow taken when the run started. Edits to the file do not change it. */
 	flow: Flow;
@@ -157,6 +167,8 @@ export type RunDetail = RunSummary & {
 	traversals: Record<string, number>;
 	/** The resume command for the last harness session, to take over in a terminal. */
 	takeOverCommand: string | null;
+	/** Every resume, oldest first. */
+	resumes: RunResume[];
 };
 
 /** What a Decision step writes to its transcript. */

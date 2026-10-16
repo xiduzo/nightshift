@@ -954,6 +954,8 @@ function RunPolicyCard({ data }: { data: SettingsView }) {
 				</CardHeader>
 				<CardContent>
 					<FieldGroup>
+						<ResumeSetting data={data} />
+						<FieldSeparator />
 						<div className="grid gap-6 sm:grid-cols-2">
 							<TextSetting
 								form={form}
@@ -989,6 +991,43 @@ function RunPolicyCard({ data }: { data: SettingsView }) {
 				<FormFooter form={form} label="Save run policy" />
 			</CardForm>
 		</Card>
+	);
+}
+
+/** Whether a run the daemon stopped mid-step continues on its own. Saves at once. */
+function ResumeSetting({ data }: { data: SettingsView }) {
+	const id = useId();
+	const toggle = useToggleSetting();
+	const label = "Resume after a restart";
+	return (
+		<Field orientation="horizontal">
+			<FieldContent>
+				<FieldLabel htmlFor={`${id}-resume`}>{label}</FieldLabel>
+				<FieldDescription>
+					A run the daemon stopped mid-step continues on its own a few seconds
+					after the daemon starts again, in the same session. Only with the
+					scheduler on, before the run's stop time, and at most 3 times in a
+					row. Off: it waits for you to resume it.
+				</FieldDescription>
+				<SettingSource
+					field={data.fields.resumeInterruptedRuns}
+					label={label}
+					format={(value) => (value ? "on" : "off")}
+					resetting={
+						toggle.isPending && toggle.variables?.resumeInterruptedRuns === null
+					}
+					onReset={() => toggle.mutate({ resumeInterruptedRuns: null })}
+				/>
+			</FieldContent>
+			<Switch
+				id={`${id}-resume`}
+				checked={data.values.resumeInterruptedRuns}
+				disabled={toggle.isPending}
+				onCheckedChange={(checked) =>
+					toggle.mutate({ resumeInterruptedRuns: checked })
+				}
+			/>
+		</Field>
 	);
 }
 

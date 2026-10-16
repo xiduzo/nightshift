@@ -119,6 +119,7 @@ function Editor({
 			usageLimitMaxWaitMinutes: values.usageLimitMaxWaitMinutes,
 			networkGraceMinutes: values.networkGraceMinutes,
 			maxSteps: values.maxStepsPerRun,
+			resumeInterruptedRuns: values.resumeInterruptedRuns,
 		};
 	}, [settings.data]);
 	const connections = daemonConnections.data?.connections;
