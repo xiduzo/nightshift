@@ -67,7 +67,7 @@ export const flowOf = (
 	extra: Partial<Omit<FlowInput, "version">> = {},
 ): Flow =>
 	flowSchema.parse({
-		version: 2,
+		version: 3,
 		start: nodes[0]?.id ?? "",
 		nodes,
 		edges,

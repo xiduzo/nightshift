@@ -52,7 +52,7 @@ function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
 
 function flowOf(nodes: AgentNode[], edges: FlowEdge[] = []): Flow {
 	return {
-		version: 2,
+		version: 3,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

@@ -148,11 +148,9 @@ export async function bodyOutputs(
 	});
 }
 
-/** A Subflow's `ended`: the label or choice its flow ended on, or "". */
+/** A Subflow's `ended`: the Decision option or Agent outcome its flow ended on, or "". */
 export function endedLabel(node: FlowNode, outcome: Outcome): string {
-	return node.type === "decision" ||
-		node.type === "gate" ||
-		isOwnAgentLabel(node, outcome)
+	return node.type === "decision" || isOwnAgentLabel(node, outcome)
 		? outcome
 		: "";
 }

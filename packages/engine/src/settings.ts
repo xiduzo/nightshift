@@ -175,7 +175,11 @@ export type SettingsView = {
 /** The settings the engine reads when they apply. */
 export type RunSettings = Pick<
 	Settings,
-	"scheduler" | "maxConcurrentRuns" | "maxStepsPerRun" | "resumeInterruptedRuns"
+	| "scheduler"
+	| "maxConcurrentRuns"
+	| "maxStepsPerRun"
+	| "resumeInterruptedRuns"
+	| "decisionModel"
 > & { policy: Omit<ResolvedPolicy, "maxSteps" | "resumeInterruptedRuns"> };
 
 export type SettingsStore = {
@@ -318,6 +322,7 @@ export function createSettingsStore(options: {
 				maxConcurrentRuns: s.maxConcurrentRuns,
 				maxStepsPerRun: s.maxStepsPerRun,
 				resumeInterruptedRuns: s.resumeInterruptedRuns,
+				decisionModel: s.decisionModel,
 				policy: {
 					usageLimitFirstWaitMinutes: s.usageLimitFirstWaitMinutes,
 					usageLimitMaxWaitMinutes: s.usageLimitMaxWaitMinutes,
@@ -335,6 +340,7 @@ export function defaultRunSettings(): RunSettings {
 		maxConcurrentRuns: DEFS.maxConcurrentRuns.default,
 		maxStepsPerRun: DEFS.maxStepsPerRun.default,
 		resumeInterruptedRuns: DEFS.resumeInterruptedRuns.default,
+		decisionModel: DEFS.decisionModel.default,
 		policy: {
 			usageLimitFirstWaitMinutes: DEFS.usageLimitFirstWaitMinutes.default,
 			usageLimitMaxWaitMinutes: DEFS.usageLimitMaxWaitMinutes.default,

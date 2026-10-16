@@ -174,12 +174,23 @@ export type RunDetail = RunSummary & {
 	resumes: RunResume[];
 };
 
-/** What a Decision step writes to its transcript. */
+/** What a Decision step decided by a model writes to its transcript. */
 export type DecisionEvent =
 	| { type: "decision-start"; prompt: string; labels: string[]; model: string }
 	| { type: "decision"; label: string; notes: string };
 
-/** What a Gate step writes to its transcript. */
+/**
+ * What a Decision step decided by a rule writes to its transcript: the
+ * option that matched (null when none did) and what each rule gave, in
+ * order, up to the match. A default option (no rule) gives null.
+ */
+export type RuleEvent = {
+	type: "rule";
+	matched: string | null;
+	evaluated: { option: string; result: JsonValue | null }[];
+};
+
+/** What a Decision step decided by a person (a Gate) writes to its transcript. */
 export type GateEvent =
 	| {
 			type: "gate-open";
@@ -225,6 +236,7 @@ export type StepEvent =
 	| AgentEvent
 	| CommandEvent
 	| DecisionEvent
+	| RuleEvent
 	| GateEvent
 	| ForEachEvent
 	| WaitEvent;

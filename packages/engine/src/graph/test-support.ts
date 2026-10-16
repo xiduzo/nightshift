@@ -25,7 +25,7 @@ import type { Parked, RunEvent, RunStateValues } from "./state";
  */
 
 export const flowOf = (input: Omit<FlowInput, "version">): Flow =>
-	flowSchema.parse({ version: 2, ...input });
+	flowSchema.parse({ version: 3, ...input });
 
 /** How long one minute of a timeout or a policy wait lasts in these tests. */
 export const MINUTE = 1_000;

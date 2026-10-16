@@ -56,7 +56,7 @@ const agent = (id: string, extra: Record<string, unknown> = {}) => ({
 });
 
 const flowOf = (input: Omit<FlowInput, "version">): Flow =>
-	flowSchema.parse({ version: 2, ...input });
+	flowSchema.parse({ version: 3, ...input });
 
 const MINUTE = 1_000;
 

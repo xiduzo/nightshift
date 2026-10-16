@@ -22,8 +22,8 @@ import type {
  * end, or the node's park node. Ported from `walkScope` in engine.ts.
  *
  * Node naming in the compiled graph: the step node is the flow node's id;
- * its park node is `park__<id>`; the wait node of an Agent or a Decision
- * node is `wait__<id>`.
+ * its park node is `park__<id>`; the wait node of an Agent node or a
+ * Decision decided by a model is `wait__<id>`.
  */
 
 export const parkNodeId = (nodeId: string) => `park__${nodeId}`;
@@ -57,14 +57,13 @@ export function isOwnAgentLabel(node: FlowNode, outcome: Outcome): boolean {
 
 /**
  * Whether ending at `node` with `outcome` and no edge to take is a chosen
- * end of the flow: `pass`, a Decision label, a Gate choice, an Agent's own
- * outcome, or a For Each outcome. `fail` and `needs-input` are failures.
+ * end of the flow: `pass`, a Decision option, an Agent's own outcome, or a
+ * For Each outcome. `fail` and `needs-input` are failures.
  */
 export function isChosenEnd(node: FlowNode, outcome: Outcome): boolean {
 	return (
 		outcome === "pass" ||
 		node.type === "decision" ||
-		node.type === "gate" ||
 		node.type === "foreach" ||
 		isOwnAgentLabel(node, outcome)
 	);
@@ -119,8 +118,8 @@ export function parkCommand(input: {
  * - `stopped` parks as stopped with no reason.
  * - `error` and `interrupted` park as failed: `Node "x" failed: <error>`.
  * - no edge: `fail` and `needs-input` park as failed; `pass`, a Decision
- *   label, a Gate choice, an Agent's own outcome or a For Each outcome is a
- *   chosen end (`ended` set, goto END).
+ *   option, an Agent's own outcome or a For Each outcome is a chosen end
+ *   (`ended` set, goto END).
  * - every edge on the outcome at its max parks as failed.
  */
 export async function route(

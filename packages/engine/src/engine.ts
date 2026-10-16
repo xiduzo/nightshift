@@ -10,6 +10,7 @@ import {
 	type FlowNode,
 	flowSchema,
 	migrateFlow,
+	optionProblem,
 	type Policy,
 	parseFlow,
 	type ResolvedPolicy,
@@ -814,9 +815,12 @@ export function createEngine(
 						.join(" "),
 				);
 			}
-			if (!decider && nodes.some((n) => n.type === "decision")) {
+			if (
+				!decider &&
+				nodes.some((n) => n.type === "decision" && n.by === "model")
+			) {
 				throw new Error(
-					"The flow has a Decision node, but no decider is configured.",
+					"The flow has a Decision node decided by a model, but no decider is configured.",
 				);
 			}
 			if (
@@ -1186,11 +1190,8 @@ export function createEngine(
 				if (gate.stepId !== stepId) {
 					throw new Error(`Step ${stepId} is not the open Gate of this run.`);
 				}
-				if (!gate.choices.some((c) => c.name === choice)) {
-					throw new Error(
-						`"${choice}" is not a choice of this Gate. Choose one of: ${gate.choices.map((c) => c.name).join(", ")}.`,
-					);
-				}
+				const problem = optionProblem(gate.choices, choice);
+				if (problem !== null) throw new Error(problem);
 				// The thread continues at once, so it needs a slot. A full cap
 				// leaves the Gate open.
 				runner.reserveSlot(runId);

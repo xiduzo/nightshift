@@ -92,7 +92,7 @@ describe("decideTool", () => {
 		const recorded: unknown[] = [];
 		const tool = decideTool(LABELS, (d) => recorded.push(d));
 		expect(() => run(tool, { label: "maybe", notes: "x" })).toThrow(
-			/must be one of: "continue", "stop"/,
+			/Choose one of: continue, stop/,
 		);
 		expect(() => run(tool, { label: "stop" })).toThrow(/Invalid decision/);
 		expect(recorded).toEqual([]);

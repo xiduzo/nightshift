@@ -539,7 +539,7 @@ export function createRunner(deps: RunnerDeps) {
 							outcome: status,
 							waitingCount: 0,
 						})
-					: open.nodeType === "gate"
+					: open.nodeType === "decision"
 						? { outcome: status, note: "", visit: open.visit }
 						: open.nodeType === "subflow"
 							? { outcome: status, ended: "", visit: open.visit }

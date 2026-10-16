@@ -64,11 +64,9 @@ function log() {
 					nodeType:
 						nodeId === "check"
 							? "command"
-							: nodeId === "gate"
-								? "gate"
-								: nodeId === "decide"
-									? "decision"
-									: "agent",
+							: nodeId === "gate" || nodeId === "decide"
+								? "decision"
+								: "agent",
 					visit,
 					transcriptPath: `/t/${stepId}`,
 					logPath: null,

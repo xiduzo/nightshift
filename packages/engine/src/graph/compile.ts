@@ -2,21 +2,22 @@ import { END, START, StateGraph } from "@langchain/langgraph";
 import type { Flow } from "@nightshift/flows";
 
 import type { NodeAction, StepContext } from "./context";
-import { agentNode, agentWaitNode } from "./nodes/agent";
+import { agentNode } from "./nodes/agent";
 import { commandNode } from "./nodes/command";
-import { decisionNode, decisionWaitNode } from "./nodes/decision";
+import { decisionNode } from "./nodes/decision";
 import { forEachNode } from "./nodes/foreach";
-import { gateNode } from "./nodes/gate";
 import { subflowNode } from "./nodes/subflow";
 import { parkNode, parkNodeId, waitNodeId } from "./route";
 import { RunState } from "./state";
+import { waitNode } from "./wait";
 
 /**
  * Compiles a Night Shift flow (the run's snapshot) into a LangGraph
  * StateGraph. Every flow node is one graph node named by its id, with a
  * park node `park__<id>` (design rule 2: a failed or stopped step parks
- * the run there, and only a chosen end reaches END); an Agent or a
- * Decision node also has a wait node `wait__<id>` (rule 8). No static
+ * the run there, and only a chosen end reaches END); an Agent node or a
+ * Decision decided by a model also has a wait node `wait__<id>` (rule 8),
+ * the shared `waitNode`. No static
  * edges besides START → `flow.start`: every node returns `new Command({
  * update, goto })`, built by `route()`.
  *
@@ -41,7 +42,7 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 				action = agentNode(node, ctx);
 				const wait = waitNodeId(node.id);
 				own = [park, wait];
-				graph.addNode(wait, agentWaitNode(node, ctx), { ends: [node.id] });
+				graph.addNode(wait, waitNode(node.id), { ends: [node.id] });
 				break;
 			}
 			case "command":
@@ -49,14 +50,13 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 				break;
 			case "decision": {
 				action = decisionNode(node, ctx);
-				const wait = waitNodeId(node.id);
-				own = [park, wait];
-				graph.addNode(wait, decisionWaitNode(node, ctx), { ends: [node.id] });
+				if (node.by === "model") {
+					const wait = waitNodeId(node.id);
+					own = [park, wait];
+					graph.addNode(wait, waitNode(node.id), { ends: [node.id] });
+				}
 				break;
 			}
-			case "gate":
-				action = gateNode(node, ctx);
-				break;
 			case "subflow":
 				action = subflowNode(node, ctx);
 				break;
