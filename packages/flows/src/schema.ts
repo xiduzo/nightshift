@@ -312,7 +312,7 @@ export const flowEdgeSchema = z.object({
  * Only the top-level flow of a run sets them.
  */
 /**
- * The run policy of one flow. Every number is optional: a number the flow
+ * The run policy of one flow. Every value is optional: a value the flow
  * leaves out comes from the daemon's settings (Settings → Run policy).
  */
 export const policySchema = z.object({
@@ -323,6 +323,11 @@ export const policySchema = z.object({
 	networkGraceMinutes: z.number().positive().optional(),
 	/** Safety net: the most steps a run may take before it stops (resumable). */
 	maxSteps: z.number().int().positive().optional(),
+	/**
+	 * After a daemon restart, a run the daemon stopped mid-step continues on
+	 * its own (true) or waits for a person (false).
+	 */
+	resumeInterruptedRuns: z.boolean().optional(),
 });
 
 /**
@@ -375,9 +380,15 @@ export type SubflowNode = z.infer<typeof subflowNodeSchema>;
 export type ForEachNode = z.infer<typeof forEachNodeSchema>;
 export type ListSource = z.infer<typeof listSourceSchema>;
 export type Policy = z.infer<typeof policySchema>;
-/** A policy with every number filled in: the flow's own, else the daemon's setting. */
-export type ResolvedPolicy = Required<Omit<Policy, "maxSteps">> &
-	Pick<Policy, "maxSteps">;
+/**
+ * A policy with every wait filled in: the flow's own, else the daemon's
+ * setting. `maxSteps` and `resumeInterruptedRuns` stay the flow's own: the
+ * engine reads the setting when it applies.
+ */
+export type ResolvedPolicy = Required<
+	Omit<Policy, "maxSteps" | "resumeInterruptedRuns">
+> &
+	Pick<Policy, "maxSteps" | "resumeInterruptedRuns">;
 export type FlowInputDef = z.infer<typeof flowInputSchema>;
 export type FlowOutputDef = z.infer<typeof flowOutputSchema>;
 export type FlowEdge = z.infer<typeof flowEdgeSchema>;

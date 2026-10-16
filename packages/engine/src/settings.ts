@@ -27,6 +27,13 @@ const int = (raw: string) => {
 };
 const text = (raw: string) => (raw.trim() === "" ? undefined : raw.trim());
 
+const onOff = (raw: string) => {
+	const value = raw.trim().toLowerCase();
+	if (["on", "true", "1"].includes(value)) return true;
+	if (["off", "false", "0"].includes(value)) return false;
+	return undefined;
+};
+
 const positiveMinutes = z.number().positive().max(10_080);
 
 const DEFS = {
@@ -60,6 +67,12 @@ const DEFS = {
 		schema: positiveMinutes,
 		default: 240,
 	} satisfies Def<number>,
+	resumeInterruptedRuns: {
+		schema: z.boolean(),
+		default: true,
+		env: "NIGHTSHIFT_RESUME_INTERRUPTED_RUNS",
+		fromEnv: onOff,
+	} satisfies Def<boolean>,
 	claudeBin: {
 		schema: z.string().trim().min(1),
 		default: "claude",
@@ -152,8 +165,8 @@ export type SettingsView = {
 /** The settings the engine reads when they apply. */
 export type RunSettings = Pick<
 	Settings,
-	"scheduler" | "maxConcurrentRuns" | "maxStepsPerRun"
-> & { policy: Omit<ResolvedPolicy, "maxSteps"> };
+	"scheduler" | "maxConcurrentRuns" | "maxStepsPerRun" | "resumeInterruptedRuns"
+> & { policy: Omit<ResolvedPolicy, "maxSteps" | "resumeInterruptedRuns"> };
 
 export type SettingsStore = {
 	/** Reads the saved values. Call once before `current`. */
@@ -294,6 +307,7 @@ export function createSettingsStore(options: {
 				scheduler: s.scheduler,
 				maxConcurrentRuns: s.maxConcurrentRuns,
 				maxStepsPerRun: s.maxStepsPerRun,
+				resumeInterruptedRuns: s.resumeInterruptedRuns,
 				policy: {
 					usageLimitFirstWaitMinutes: s.usageLimitFirstWaitMinutes,
 					usageLimitMaxWaitMinutes: s.usageLimitMaxWaitMinutes,
@@ -310,6 +324,7 @@ export function defaultRunSettings(): RunSettings {
 		scheduler: DEFS.scheduler.default,
 		maxConcurrentRuns: DEFS.maxConcurrentRuns.default,
 		maxStepsPerRun: DEFS.maxStepsPerRun.default,
+		resumeInterruptedRuns: DEFS.resumeInterruptedRuns.default,
 		policy: {
 			usageLimitFirstWaitMinutes: DEFS.usageLimitFirstWaitMinutes.default,
 			usageLimitMaxWaitMinutes: DEFS.usageLimitMaxWaitMinutes.default,
