@@ -72,10 +72,11 @@ export function ConnectionsField({
 			<Note>
 				This daemon has no connections yet.{" "}
 				<Link
-					to="/connections"
+					to="/agents"
+					search={{ item: undefined }}
 					className="text-foreground underline underline-offset-4 hover:text-primary"
 				>
-					Add one under Connections
+					Add one under Agents → Tools
 				</Link>
 				, then pick it here.
 			</Note>
@@ -167,8 +168,10 @@ export function ConnectionsField({
 			))}
 			<FieldDescription id={`${id}-hint`} className="text-xs">
 				MCP servers defined once under{" "}
-				<Link to="/connections">Connections</Link>. Secrets come from the
-				keychain or the daemon's environment.
+				<Link to="/agents" search={{ item: undefined }}>
+					Agents → Tools
+				</Link>
+				. Secrets come from the keychain or the daemon's environment.
 			</FieldDescription>
 		</FieldSet>
 	);

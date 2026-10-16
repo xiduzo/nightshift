@@ -25,6 +25,7 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Textarea } from "@nightshift/ui/components/textarea";
+import { useQuery } from "@tanstack/react-query";
 import {
 	ArrowRightIcon,
 	PlayIcon,
@@ -35,8 +36,15 @@ import {
 } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 
+import { ModelCombobox } from "@/components/agents/model-combobox";
+import type { ProfileRow } from "@/components/agents/types";
 import { NODE_TYPE } from "@/components/flow/node-type";
 import { outcomeLabel } from "@/components/outcome-badge";
+import {
+	EFFORTS,
+	PERMISSION_MODES,
+	permissionLabel,
+} from "@/lib/agent-options";
 import type { Effort, PermissionMode } from "@/lib/api-types";
 import {
 	calledFlow,
@@ -53,7 +61,7 @@ import {
 	harnessInfo,
 	switchHarness,
 } from "@/lib/harnesses";
-
+import { orpc } from "@/utils/orpc";
 import {
 	CalledFlowField,
 	type CalledFlowSupport,
@@ -72,18 +80,48 @@ import { ForEachFields } from "./foreach-fields";
 import { McpServersField } from "./mcp-servers-field";
 import { OptionsEditor } from "./options-editor";
 import { OutputSchemaField } from "./output-schema-field";
+
 import { TemplateField } from "./template-field";
 import { ToolSetsField } from "./tool-sets-field";
 
-const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
-	{ value: "auto", label: "Auto (approves safe actions, for nights)" },
-	{ value: "acceptEdits", label: "Accept edits (no shell commands)" },
-	{ value: "default", label: "Ask for each tool" },
-	{ value: "plan", label: "Plan only" },
-	{ value: "bypassPermissions", label: "Bypass permissions" },
-];
+/** The node without one of its own fields: it comes from the profile again. */
+function withoutField(
+	node: AgentNode,
+	key: "harness" | "model" | "effort" | "permissionMode",
+): AgentNode {
+	const { [key]: _dropped, ...rest } = node;
+	return rest as AgentNode;
+}
 
-const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
+/**
+ * The node on another profile, or on none. Picking a profile hands it the
+ * harness, model, effort and permission mode (the node's own go); picking
+ * none keeps what the old profile gave, so the node runs as before.
+ */
+function pickProfile(
+	node: AgentNode,
+	next: ProfileRow | undefined,
+	before: ProfileRow | undefined,
+): AgentNode {
+	const {
+		profile: _profile,
+		harness,
+		model,
+		effort,
+		permissionMode,
+		...rest
+	} = node;
+	if (next) return { ...rest, profile: next.name };
+	const kept: AgentNode = {
+		...rest,
+		harness: harness ?? before?.harness ?? "claude-code",
+		model: model ?? before?.model ?? harnessInfo("claude-code").defaultModel,
+		permissionMode: permissionMode ?? before?.permissionMode ?? "auto",
+	};
+	const keptEffort = effort ?? before?.effort;
+	if (keptEffort !== undefined) kept.effort = keptEffort;
+	return kept;
+}
 
 /** The edges of the selected node, and the actions on them. */
 export type NodeEdgeSupport = {
@@ -590,21 +628,85 @@ function AgentFields({
 	onSetOutcomes: (outcomes: NodeOption[] | undefined) => void;
 }) {
 	const id = useId();
-	const harness = harnessInfo(node.harness);
+	const profiles = useQuery({
+		...orpc.profiles.list.queryOptions(),
+		staleTime: 30_000,
+		meta: { quietErrors: true },
+	});
+	const profile =
+		node.profile === undefined
+			? undefined
+			: profiles.data?.find((p) => p.name === node.profile);
+	const unknownProfile =
+		node.profile !== undefined && profiles.data !== undefined && !profile;
+	// With a profile, a field the node leaves out comes from the profile.
+	const harnessName: HarnessName =
+		node.harness ?? profile?.harness ?? "claude-code";
+	const harness = harnessInfo(harnessName);
+	const fromProfile = (value: string) => `From the profile (${value})`;
 
 	return (
 		<>
 			<InspectorSection title="Task">
+				<Field
+					id={`${id}-profile`}
+					label="Profile"
+					hint={
+						unknownProfile
+							? `This daemon has no profile named ${node.profile}: the flow refuses to start. Pick another, or add it under Agents.`
+							: profile
+								? "The node runs with the profile's harness, model, effort, permission mode and tools. Set a field below to override it here."
+								: "An agent setup from the Agents page. Without one, set the harness and model on this node."
+					}
+				>
+					<NativeSelect
+						id={`${id}-profile`}
+						value={node.profile ?? ""}
+						aria-describedby={`${id}-profile-hint`}
+						aria-invalid={unknownProfile || undefined}
+						onChange={(event) => {
+							const name = event.target.value;
+							const next = profiles.data?.find((p) => p.name === name);
+							onChange((current) => pickProfile(current, next, profile));
+						}}
+					>
+						<NativeSelectOption value="">
+							None: set it on this node
+						</NativeSelectOption>
+						{(profiles.data ?? []).map((p) => (
+							<NativeSelectOption key={p.name} value={p.name}>
+								{p.name} · {harnessInfo(p.harness).label} · {p.model}
+							</NativeSelectOption>
+						))}
+						{unknownProfile ? (
+							<NativeSelectOption value={node.profile}>
+								{node.profile} (not on this daemon)
+							</NativeSelectOption>
+						) : null}
+					</NativeSelect>
+				</Field>
+
 				<Field id={`${id}-harness`} label="Harness" hint={harness.note}>
 					<NativeSelect
 						id={`${id}-harness`}
-						value={node.harness}
+						value={node.harness ?? ""}
 						aria-describedby={`${id}-harness-hint`}
 						onChange={(event) => {
-							const next = event.target.value as HarnessName;
-							onChange((current) => switchHarness(current, next));
+							const next = event.target.value as HarnessName | "";
+							onChange((current) =>
+								next === ""
+									? withoutField(current, "harness")
+									: switchHarness(current, next),
+							);
 						}}
 					>
+						{node.profile !== undefined ? (
+							<NativeSelectOption value="">
+								{fromProfile(
+									profile ? harnessInfo(profile.harness).label : "unknown",
+								)}
+							</NativeSelectOption>
+						) : null}
 						{HARNESSES.map(({ value, label }) => (
 							<NativeSelectOption key={value} value={value}>
 								{label}
@@ -656,24 +758,24 @@ function AgentFields({
 			<InspectorSection title="Model">
 				<div className="grid grid-cols-2 gap-3">
 					<Field id={`${id}-model`} label="Model">
-						<Input
+						<ModelCombobox
 							id={`${id}-model`}
-							list={`${id}-models`}
-							value={node.model}
-							className="font-mono"
-							autoComplete="off"
-							spellCheck={false}
-							aria-invalid={node.model.trim() === ""}
-							onChange={(event) => {
-								const model = event.target.value;
-								onChange((current) => ({ ...current, model }));
-							}}
+							harness={harnessName}
+							value={node.model ?? ""}
+							placeholder={
+								node.profile !== undefined
+									? profile?.model
+									: harness.defaultModel
+							}
+							invalid={node.profile === undefined && !node.model?.trim()}
+							onChange={(model) =>
+								onChange((current) =>
+									model === "" && current.profile !== undefined
+										? withoutField(current, "model")
+										: { ...current, model },
+								)
+							}
 						/>
-						<datalist id={`${id}-models`}>
-							{harness.models.map((value) => (
-								<option key={value} value={value} />
-							))}
-						</datalist>
 					</Field>
 					<Field id={`${id}-effort`} label="Effort">
 						<NativeSelect
@@ -683,10 +785,18 @@ function AgentFields({
 								const effort = (event.target.value || undefined) as
 									| Effort
 									| undefined;
-								onChange((current) => ({ ...current, effort }));
+								onChange((current) =>
+									effort === undefined
+										? withoutField(current, "effort")
+										: { ...current, effort },
+								);
 							}}
 						>
-							<NativeSelectOption value="">Model default</NativeSelectOption>
+							<NativeSelectOption value="">
+								{profile
+									? fromProfile(profile.effort ?? "model default")
+									: "Model default"}
+							</NativeSelectOption>
 							{EFFORTS.map((value) => (
 								<NativeSelectOption key={value} value={value}>
 									{value}
@@ -699,19 +809,40 @@ function AgentFields({
 				<Field id={`${id}-permission`} label="Permission mode">
 					<NativeSelect
 						id={`${id}-permission`}
-						value={node.permissionMode}
+						value={node.permissionMode ?? ""}
+						aria-invalid={
+							node.profile === undefined && node.permissionMode === undefined
+								? true
+								: undefined
+						}
 						onChange={(event) => {
-							const permissionMode = event.target.value as PermissionMode;
-							onChange((current) => ({ ...current, permissionMode }));
+							const permissionMode = event.target.value as PermissionMode | "";
+							onChange((current) =>
+								permissionMode === ""
+									? withoutField(current, "permissionMode")
+									: { ...current, permissionMode },
+							);
 						}}
 					>
+						{node.profile !== undefined ? (
+							<NativeSelectOption value="">
+								{fromProfile(
+									profile ? permissionLabel(profile.permissionMode) : "unknown",
+								)}
+							</NativeSelectOption>
+						) : node.permissionMode === undefined ? (
+							<NativeSelectOption value="" disabled>
+								Pick a permission mode
+							</NativeSelectOption>
+						) : null}
 						{PERMISSION_MODES.map(({ value, label }) => (
 							<NativeSelectOption key={value} value={value}>
 								{label}
 							</NativeSelectOption>
 						))}
 					</NativeSelect>
-					{node.permissionMode === "bypassPermissions" ? (
+					{(node.permissionMode ?? profile?.permissionMode) ===
+					"bypassPermissions" ? (
 						<p className="flex items-start gap-1.5 text-status-waiting text-xs">
 							<TriangleAlertIcon
 								className="mt-px size-3.5 shrink-0"
@@ -759,8 +890,9 @@ function AgentFields({
 				onSetOutcomes={onSetOutcomes}
 				note={
 					<Note>
-						Harness: <span className="text-foreground">{harness.label}</span>.
-						The agent ends with a step report:{" "}
+						Harness: <span className="text-foreground">{harness.label}</span>
+						{profile && node.harness === undefined ? " (from the profile)" : ""}
+						. The agent ends with a step report:{" "}
 						{node.outcomes
 							? `one of its own outcomes (${node.outcomes.map((o) => o.name).join(", ")})`
 							: "pass, fail, or needs input"}
@@ -783,6 +915,15 @@ function AgentAdvanced({
 	connections: readonly DaemonConnection[] | undefined;
 	onChange: (change: (node: AgentNode) => AgentNode) => void;
 }) {
+	const profiles = useQuery({
+		...orpc.profiles.list.queryOptions(),
+		staleTime: 30_000,
+		meta: { quietErrors: true },
+	});
+	const profile =
+		node.profile === undefined
+			? undefined
+			: profiles.data?.find((p) => p.name === node.profile);
 	const id = useId();
 	const serverCount = Object.keys(node.mcpServers ?? {}).length;
 	const toolCount = node.tools?.length ?? 0;
@@ -826,6 +967,15 @@ function AgentAdvanced({
 					) : null
 				}
 			>
+				{profile && profile.tools.length > 0 ? (
+					<Note>
+						The profile adds{" "}
+						<span className="font-mono text-foreground">
+							{profile.tools.join(", ")}
+						</span>
+						. Tick more here for this node only.
+					</Note>
+				) : null}
 				<ToolSetsField
 					id={`${id}-tools`}
 					tools={node.tools ?? []}
@@ -849,6 +999,15 @@ function AgentAdvanced({
 					) : null
 				}
 			>
+				{profile && profile.connections.length > 0 ? (
+					<Note>
+						The profile adds{" "}
+						<span className="font-mono text-foreground">
+							{profile.connections.join(", ")}
+						</span>
+						. Pick more here for this node only.
+					</Note>
+				) : null}
 				<ConnectionsField
 					id={`${id}-connections`}
 					names={named}

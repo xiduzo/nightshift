@@ -127,9 +127,15 @@ function Editor({
 		() => connections?.map((connection) => connection.name),
 		[connections],
 	);
+	const daemonProfiles = useQuery(orpc.profiles.list.queryOptions());
+	const profileNames = useMemo(
+		() => daemonProfiles.data?.map((profile) => profile.name),
+		[daemonProfiles.data],
+	);
 	const check = useMemo(
-		() => checkFlow(draft, projectFlows.flows, name, connectionNames),
-		[draft, projectFlows.flows, name, connectionNames],
+		() =>
+			checkFlow(draft, projectFlows.flows, name, connectionNames, profileNames),
+		[draft, projectFlows.flows, name, connectionNames, profileNames],
 	);
 	const [starting, setStarting] = useState(false);
 	const savable = useMemo(() => isSavable(draft), [draft]);

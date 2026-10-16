@@ -713,6 +713,11 @@ export function missingConnectionMessage(name: string): string {
 	return `No connection named ${name} on this daemon. The run refuses to start.`;
 }
 
+/** What the editor says about a profile the daemon does not have. */
+export function missingProfileMessage(name: string): string {
+	return `No profile named ${name} on this daemon. The run refuses to start.`;
+}
+
 /** `base`, else `base-2`, `base-3`, … whichever the node does not use yet. */
 export function uniqueOptionName(options: NodeOption[], base: string): string {
 	const taken = new Set(options.map((option) => option.name));
@@ -945,14 +950,16 @@ const POLICY_MESSAGES: Record<string, string> = {
  * `flows` holds the project's flow files by name, so Subflow and For Each
  * nodes can check the flows they call; leave it out while they load. `name`
  * is the draft's own file name: the draft stands in for that file, and a
- * flow that reaches itself is reported with the chain. `connections` holds
- * the names of the daemon's connections; leave it out while they load.
+ * flow that reaches itself is reported with the chain. `connections` and
+ * `profiles` hold the names of the daemon's connections and Agent Profiles;
+ * leave them out while they load.
  */
 export function checkFlow(
 	flow: Flow,
 	flows?: ProjectFlowMap,
 	name?: string,
 	connections?: readonly string[],
+	profiles?: readonly string[],
 ): FlowCheck {
 	const issues: FlowIssue[] = [];
 	const parsed = flowSchema.safeParse(flow);
@@ -998,6 +1005,18 @@ export function checkFlow(
 					nodeId: node.id,
 				});
 			}
+		}
+	}
+
+	if (profiles) {
+		for (const node of flow.nodes) {
+			if (node.type !== "agent" || node.profile === undefined) continue;
+			if (profiles.includes(node.profile)) continue;
+			issues.push({
+				severity: "error",
+				message: missingProfileMessage(node.profile),
+				nodeId: node.id,
+			});
 		}
 	}
 

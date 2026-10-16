@@ -5,12 +5,6 @@ import {
 } from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import {
-	Card,
-	CardContent,
-	CardFooter,
-	CardHeader,
-} from "@nightshift/ui/components/card";
-import {
 	Dialog,
 	DialogClose,
 	DialogContent,
@@ -26,14 +20,6 @@ import {
 	FieldLabel,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemMedia,
-	ItemTitle,
-} from "@nightshift/ui/components/item";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -49,13 +35,7 @@ import { toast } from "sonner";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
 
-import {
-	CheckBadge,
-	type CheckState,
-	FactList,
-	MonoTile,
-	OffMachineNote,
-} from "./parts";
+import { CheckBadge, type CheckState, FactList, OffMachineNote } from "./parts";
 import type { CheckTarget, CliCheck, SettingsView } from "./types";
 
 type BinKey = "claudeBin" | "opencodeBin" | "codexBin" | "ghBin";
@@ -132,7 +112,11 @@ function fallbackText(settings: SettingsView, key: BinKey): string {
 		: `Without a saved path it uses ${onPath}.`;
 }
 
-export function HarnessCard({
+/**
+ * One CLI on this machine: where it is, its version and login, why it cannot
+ * run (if so), and where its prompts go. Check again and change its path.
+ */
+export function CliPanel({
 	tool,
 	settings,
 }: {
@@ -140,106 +124,81 @@ export function HarnessCard({
 	settings: SettingsView | undefined;
 }) {
 	const [changing, setChanging] = useState(false);
-	const check = useQuery({
-		...orpc.connections.check.queryOptions({ input: { target: tool.target } }),
-		staleTime: 60_000,
-		meta: { quietErrors: true },
-	});
+	const check = useCliCheck(tool.target);
 	const data = check.data;
-	const state = check.isPending ? "checking" : checkState(data);
 
 	return (
-		<Card className="gap-4">
-			<CardHeader>
-				<Item className="flex-nowrap p-0">
-					<ItemMedia>
-						<MonoTile>{tool.initials}</MonoTile>
-					</ItemMedia>
-					<ItemContent className="min-w-0">
-						<ItemTitle className="text-base">{tool.title}</ItemTitle>
-						<ItemDescription>{tool.role}</ItemDescription>
-					</ItemContent>
-					<ItemActions>
-						{check.error && !data ? (
-							<CheckBadge state="problem" />
-						) : (
-							<CheckBadge state={state} />
-						)}
-					</ItemActions>
-				</Item>
-			</CardHeader>
-			<CardContent className="flex-1 gap-4">
-				{check.isPending ? (
-					<div className="flex flex-col gap-2.5" aria-hidden>
-						<Skeleton className="h-4 w-3/4" />
-						<Skeleton className="h-4 w-1/2" />
-						<Skeleton className="h-4 w-2/3" />
-					</div>
-				) : check.error && !data ? (
-					<Alert variant="destructive">
-						<CircleAlertIcon />
-						<AlertTitle>The check did not run</AlertTitle>
-						<AlertDescription>{check.error.message}</AlertDescription>
-					</Alert>
-				) : data ? (
-					<>
-						<FactList
-							facts={[
-								{
-									label: "Path",
-									value: (
-										<span className="font-mono text-xs leading-5">
-											{data.path ?? (
-												<span className="text-muted-foreground">
-													{data.bin} not found
+		<div className="flex flex-col gap-4">
+			{check.isPending ? (
+				<div className="flex flex-col gap-2.5" aria-hidden>
+					<Skeleton className="h-4 w-3/4" />
+					<Skeleton className="h-4 w-1/2" />
+					<Skeleton className="h-4 w-2/3" />
+				</div>
+			) : check.error && !data ? (
+				<Alert variant="destructive">
+					<CircleAlertIcon />
+					<AlertTitle>The check did not run</AlertTitle>
+					<AlertDescription>{check.error.message}</AlertDescription>
+				</Alert>
+			) : data ? (
+				<>
+					<FactList
+						facts={[
+							{
+								label: "Path",
+								value: (
+									<span className="font-mono text-xs leading-5">
+										{data.path ?? (
+											<span className="text-muted-foreground">
+												{data.bin} not found
+											</span>
+										)}
+									</span>
+								),
+							},
+							...(data.version
+								? [
+										{
+											label: "Version",
+											value: (
+												<span className="font-mono text-xs leading-5">
+													{data.version}
 												</span>
-											)}
-										</span>
-									),
-								},
-								...(data.version
-									? [
-											{
-												label: "Version",
-												value: (
-													<span className="font-mono text-xs leading-5">
-														{data.version}
-													</span>
-												),
-											},
-										]
-									: []),
-								...(data.account
-									? [{ label: "Account", value: data.account }]
-									: []),
-								...data.facts.map((fact) => ({
-									label: fact.label,
-									value: fact.value,
-								})),
-							]}
-						/>
-						{data.problem ? (
-							<Alert
-								variant={data.path ? "destructive" : "default"}
-								className={
-									data.path
-										? undefined
-										: "border-status-waiting/40 text-status-waiting"
-								}
+											),
+										},
+									]
+								: []),
+							...(data.account
+								? [{ label: "Account", value: data.account }]
+								: []),
+							...data.facts.map((fact) => ({
+								label: fact.label,
+								value: fact.value,
+							})),
+						]}
+					/>
+					{data.problem ? (
+						<Alert
+							variant={data.path ? "destructive" : "default"}
+							className={
+								data.path
+									? undefined
+									: "border-status-waiting/40 text-status-waiting"
+							}
+						>
+							<CircleAlertIcon />
+							<AlertDescription
+								className={data.path ? undefined : "text-foreground/80"}
 							>
-								<CircleAlertIcon />
-								<AlertDescription
-									className={data.path ? undefined : "text-foreground/80"}
-								>
-									{data.problem}
-								</AlertDescription>
-							</Alert>
-						) : null}
-					</>
-				) : null}
-				<OffMachineNote>{tool.offMachine(data)}</OffMachineNote>
-			</CardContent>
-			<CardFooter className="flex-wrap gap-2">
+								{data.problem}
+							</AlertDescription>
+						</Alert>
+					) : null}
+				</>
+			) : null}
+			<OffMachineNote>{tool.offMachine(data)}</OffMachineNote>
+			<div className="flex flex-wrap items-center gap-2">
 				<Button
 					variant="outline"
 					size="sm"
@@ -270,7 +229,7 @@ export function HarnessCard({
 						Checked {formatTime(data.checkedAt)}
 					</span>
 				) : null}
-			</CardFooter>
+			</div>
 			{settings ? (
 				<ChangePathDialog
 					open={changing}
@@ -279,8 +238,30 @@ export function HarnessCard({
 					settings={settings}
 				/>
 			) : null}
-		</Card>
+		</div>
 	);
+}
+
+/** The read-only check of one CLI, shared by the list badges and the detail. */
+export function useCliCheck(target: CheckTarget) {
+	return useQuery({
+		...orpc.connections.check.queryOptions({ input: { target } }),
+		staleTime: 60_000,
+		meta: { quietErrors: true },
+	});
+}
+
+/** The badge of a check: ready, problem, not found, or checking. */
+export function CliCheckBadge({ target }: { target: CheckTarget }) {
+	const check = useCliCheck(target);
+	if (check.error && !check.data) return <CheckBadge state="problem" />;
+	return (
+		<CheckBadge state={check.isPending ? "checking" : checkState(check.data)} />
+	);
+}
+
+export function toolFor(target: CheckTarget): Tool {
+	return TOOLS.find((t) => t.target === target) as Tool;
 }
 
 /** Sets the executable Night Shift runs for one CLI, or goes back to the default. */

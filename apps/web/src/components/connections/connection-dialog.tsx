@@ -66,14 +66,14 @@ type Draft = {
 	headers: KeyValueRow[];
 };
 
-function draftFrom(connection: Connection | null): Draft {
+function draftFrom(connection: Connection | null, kind?: Kind): Draft {
 	const server = connection?.server;
 	const command = server && "command" in server ? server : null;
 	const remote = server && "url" in server ? server : null;
 	return {
 		name: connection?.name ?? "",
 		description: connection?.description ?? "",
-		kind: remote ? "url" : "command",
+		kind: remote ? "url" : connection ? "command" : (kind ?? "command"),
 		command: command?.command ?? "",
 		args: command?.args.join("\n") ?? "",
 		env: rowsFrom(command?.env),
@@ -116,12 +116,18 @@ export function ConnectionDialog({
 	onOpenChange,
 	connection,
 	taken,
+	kind,
+	onSaved,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	connection: Connection | null;
 	/** Names already in use, to warn before the server does. */
 	taken: string[];
+	/** What a new server starts as. */
+	kind?: Kind;
+	/** After a save, with the name it has now. */
+	onSaved?: (name: string) => void;
 }) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -130,7 +136,11 @@ export function ConnectionDialog({
 					<ConnectionForm
 						connection={connection}
 						taken={taken}
-						onDone={() => onOpenChange(false)}
+						kind={kind}
+						onDone={(name) => {
+							onOpenChange(false);
+							if (name) onSaved?.(name);
+						}}
 					/>
 				) : null}
 			</DialogContent>
@@ -141,15 +151,18 @@ export function ConnectionDialog({
 function ConnectionForm({
 	connection,
 	taken,
+	kind,
 	onDone,
 }: {
 	connection: Connection | null;
 	taken: string[];
-	onDone: () => void;
+	kind?: Kind;
+	/** `name`: what it was saved as. Undefined when nothing was saved. */
+	onDone: (name?: string) => void;
 }) {
 	const id = useId();
 	const queryClient = useQueryClient();
-	const [draft, setDraft] = useState(() => draftFrom(connection));
+	const [draft, setDraft] = useState(() => draftFrom(connection, kind));
 	const set = (patch: Partial<Draft>) =>
 		setDraft((current) => ({ ...current, ...patch }));
 
@@ -169,7 +182,11 @@ function ConnectionForm({
 				void queryClient.invalidateQueries({
 					queryKey: orpc.connections.list.key(),
 				});
-				onDone();
+				// A rename reaches the profiles that name it.
+				void queryClient.invalidateQueries({
+					queryKey: orpc.profiles.list.key(),
+				});
+				onDone(saved.name);
 			},
 		}),
 	);

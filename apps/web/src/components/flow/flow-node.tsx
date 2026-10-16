@@ -301,16 +301,37 @@ function ToolSets({ tools }: { tools: readonly string[] }) {
 	);
 }
 
+/**
+ * What the node sets itself: its harness (unless the default Claude Code
+ * without a profile), model and effort. A profile's own values show on the
+ * Agents page, not here.
+ */
+function agentParts(node: AgentNode): string[] {
+	const parts: string[] = [];
+	if (
+		node.harness !== undefined &&
+		(node.harness !== "claude-code" || node.profile !== undefined)
+	) {
+		parts.push(harnessInfo(node.harness).label);
+	}
+	if (node.model !== undefined) parts.push(node.model);
+	if (node.effort !== undefined) parts.push(node.effort);
+	return parts;
+}
+
 function AgentBody({ node }: { node: AgentNode }) {
 	const summary = agentSummary(node);
 	return (
 		<>
 			<span className="truncate text-[11px] text-muted-foreground">
-				{node.harness !== "claude-code"
-					? `${harnessInfo(node.harness).label} · `
-					: ""}
-				{node.model}
-				{node.effort ? ` · ${node.effort}` : ""}
+				{node.profile !== undefined ? (
+					<span className="font-mono text-foreground/80">{node.profile}</span>
+				) : null}
+				{agentParts(node)
+					.map((part, i) =>
+						i === 0 && node.profile === undefined ? part : ` · ${part}`,
+					)
+					.join("")}
 				{node.session === "resume" ? " · resumes session" : ""}
 				{node.output ? " · data schema" : ""}
 				<ToolSets tools={node.tools ?? []} />
