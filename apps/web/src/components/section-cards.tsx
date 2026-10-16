@@ -38,10 +38,8 @@ import { useNow } from "@/hooks/use-now";
 import { useOpenGates } from "@/hooks/use-open-gates";
 import type { OpenGate, Project, RunSummary } from "@/lib/api-types";
 import { formatCost, formatDateTime, formatTime } from "@/lib/format";
-import { lastNights, nightOf } from "@/lib/nights";
 
 const DAY_MS = 24 * HOUR_MS;
-const SPARK_NIGHTS = 14;
 const SPARK_HOURS = 24;
 /** Which card's details are open. */
 type Details = "activity" | "gates" | "spend" | "runs";
@@ -278,12 +276,10 @@ export function SectionCards({
 	);
 }
 
-/** Spend per night over the last two weeks. */
+/** Spend per hour over the last 24 hours, by when the run started. */
 function SpendSparkline({ runs, now }: { runs: RunSummary[]; now: number }) {
-	const data = lastNights(SPARK_NIGHTS, now).map((night) => ({
-		cost: runs
-			.filter((run) => nightOf(run.createdAt) === night)
-			.reduce((sum, run) => sum + run.costUsd, 0),
+	const data = startedPerHour(runs, now).map((ofHour) => ({
+		cost: ofHour.reduce((sum, run) => sum + run.costUsd, 0),
 	}));
 	return <Sparkline data={data} config={SPEND_CONFIG} />;
 }
@@ -316,15 +312,31 @@ function GatesSparkline({ gates, now }: { gates: OpenGate[]; now: number }) {
 	return <Sparkline data={data} config={GATES_CONFIG} />;
 }
 
-/** Runs per night over the last two weeks, by how they ended. */
+/** Runs per hour over the last 24 hours, by how they ended. */
 function OutcomesSparkline({ runs, now }: { runs: RunSummary[]; now: number }) {
-	const data = lastNights(SPARK_NIGHTS, now).map((night) => {
-		const ofNight = runs.filter((run) => nightOf(run.createdAt) === night);
-		const finished = ofNight.filter((run) => run.status === "finished").length;
-		const failed = ofNight.filter((run) => run.status === "failed").length;
-		return { finished, failed, other: ofNight.length - finished - failed };
+	const data = startedPerHour(runs, now).map((ofHour) => {
+		const finished = ofHour.filter((run) => run.status === "finished").length;
+		const failed = ofHour.filter((run) => run.status === "failed").length;
+		return { finished, failed, other: ofHour.length - finished - failed };
 	});
 	return <Sparkline data={data} config={OUTCOMES_CONFIG} />;
+}
+
+/**
+ * The runs started in the last day, by the hour they started, so the bars
+ * add up to the card's number. The day reaches back into the hour before
+ * the first bar; those runs count in the first hour.
+ */
+function startedPerHour(runs: RunSummary[], now: number): RunSummary[][] {
+	const hours = lastHours(SPARK_HOURS, now);
+	const first = hours[0] ?? now;
+	const lastDay = runs.filter((run) => run.createdAt >= now - DAY_MS);
+	return hours.map((hour) =>
+		lastDay.filter((run) => {
+			const started = Math.max(run.createdAt, first);
+			return started >= hour && started < hour + HOUR_MS;
+		}),
+	);
 }
 
 /**
