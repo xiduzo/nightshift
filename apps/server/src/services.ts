@@ -5,7 +5,6 @@ import {
 	type AgentHarness,
 	acpHarness,
 	checkCli,
-	checkGithub,
 	checkHarness,
 	claudeCodeHarness,
 	cliHelp,
@@ -14,7 +13,6 @@ import {
 	harnessModels,
 	opencodeHarness,
 	pathPrograms,
-	readGithubItems,
 	tanstackDecider,
 	testMcpServer,
 } from "@nightshift/agents";
@@ -159,10 +157,8 @@ export const engine = await createEngine({
 			acpHarness("cursor", { executable: settings.current().cursorBin }),
 		),
 	},
-	// Decision nodes: TanStack AI deciders, with API keys from the secrets.
+	// Decision nodes decided by a model: TanStack AI deciders, with API keys from the secrets.
 	decider: tanstackDecider({ secret: (name) => connections.secret(name) }),
-	readGithubItems: (input) =>
-		readGithubItems(input, { gh: settings.current().ghBin }),
 	dataDir,
 	settings: () => settings.run(),
 	mcpServersFor: (node) => connections.mcpServersFor(node),
@@ -187,7 +183,6 @@ export const engine = await createEngine({
 
 export const checks: Context["checks"] = {
 	harness: checkHarness,
-	github: checkGithub,
 	cli: (name) => checkCli(name),
 	programs: () => pathPrograms(),
 	mcp: (config, redact) => testMcpServer(config, { redact }),

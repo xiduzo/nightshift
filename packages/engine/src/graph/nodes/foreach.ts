@@ -431,9 +431,8 @@ function stopBeforeNext(
 
 /**
  * Reads the source as list items: a JSON value, the JSON a command prints
- * in the worktree, files that match a glob, or GitHub sub-issues of the
- * rendered parent. Throws with a readable message. Ported from
- * `readSource` in engine.ts.
+ * in the worktree, or files that match a glob. Throws with a readable
+ * message. Ported from `readSource` in engine.ts.
  */
 async function readSource(
 	ctx: StepContext,
@@ -448,28 +447,6 @@ async function readSource(
 			return jsonSourceItems(source.value, tctx);
 		case "files":
 			return fileItems(worktree, renderTemplate(source.glob, tctx));
-		case "github": {
-			if (!ctx.readGithubItems) {
-				throw new Error("No GitHub reader is configured for For Each sources.");
-			}
-			const text = renderTemplate(source.parent, tctx).trim();
-			const parent = Number(text.replace(/^#/, ""));
-			if (!Number.isInteger(parent) || parent <= 0) {
-				throw new Error(
-					`The parent issue "${text}" (from "${source.parent}") is not an issue number.`,
-				);
-			}
-			return ctx.readGithubItems({
-				cwd: worktree,
-				parent,
-				...(source.requireLabel !== undefined
-					? { requireLabel: source.requireLabel }
-					: {}),
-				doneLabels: source.doneLabels ?? [],
-				skipLabels: source.skipLabels ?? [],
-				signal: ctx.signal(),
-			});
-		}
 		case "command": {
 			const { command, env } = renderCommand(source.command, tctx);
 			let stdout = "";

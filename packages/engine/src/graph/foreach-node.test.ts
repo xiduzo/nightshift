@@ -647,7 +647,7 @@ describe("the For Each node", () => {
 		);
 	});
 
-	test("the sources: a command (with its log, read again before each element), files, GitHub without a reader, no JSON, a cycle", async () => {
+	test("the sources: a command (with its log, read again before each element), files, no JSON, a cycle", async () => {
 		const itemsFile = join(sandbox.root, "items.json");
 		await writeFile(itemsFile, JSON.stringify([{ id: "1", title: "a" }]));
 		const build = body([agent("worker", "Build {{item.title}}")]);
@@ -726,31 +726,6 @@ describe("the For Each node", () => {
 				},
 			},
 		]);
-
-		const github = await startRun(
-			sandbox,
-			flowOf([
-				forEach("loop", "build", {
-					kind: "github",
-					parent: "#7",
-					doneLabels: [],
-					skipLabels: [],
-				}),
-			]),
-			harness,
-			{ flows: { build } },
-		);
-		const refused = await drive(github, { inputs: {} });
-		expect(refused.parked[0]).toMatchObject({
-			status: "failed",
-			reason:
-				'Node "loop" failed: No GitHub reader is configured for For Each sources.',
-		});
-		expect(payloads(await github.events(), "StepEnded")[0]).toMatchObject({
-			outcome: "error",
-			outputs: { outcome: "error", done_count: 0, results: [], visit: 1 },
-			error: "No GitHub reader is configured for For Each sources.",
-		});
 
 		const bad = await startRun(
 			sandbox,

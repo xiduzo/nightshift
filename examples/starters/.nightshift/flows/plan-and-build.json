@@ -1,5 +1,5 @@
 {
-	"version": 2,
+	"version": 3,
 	"description": "A planner splits a goal into tasks, each task is built and checked on its own branch of a stack, and a reviewer reads the result.",
 	"inputs": [
 		{
@@ -101,9 +101,9 @@
 				"x": 320,
 				"y": 200
 			},
-			"type": "gate",
-			"question": "The planner cannot plan this goal yet:\n\n{{goal}}\n\nIts question:\n\n{{planner.summary}}\n\nAnswer in the note and pick `answered`, or stop.",
-			"choices": [
+			"type": "decision",
+			"prompt": "The planner cannot plan this goal yet:\n\n{{goal}}\n\nIts question:\n\n{{planner.summary}}\n\nAnswer in the note and pick `answered`, or stop.",
+			"options": [
 				{
 					"name": "answered",
 					"description": "The note holds the answer; the planner tries again."
@@ -112,7 +112,8 @@
 					"name": "stop",
 					"description": "End the run."
 				}
-			]
+			],
+			"by": "person"
 		},
 		{
 			"id": "build",

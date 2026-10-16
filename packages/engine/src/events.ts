@@ -225,19 +225,6 @@ export type EnginePayloads = {
 	};
 	/** The wait is over: the step continues. `early` when a person resumed the run. */
 	WaitEnded: { early: boolean };
-	/**
-	 * A tool of a step began an action outside the worktree, for example a
-	 * GitHub comment. `key` is stable across the step's sessions, so a
-	 * session that continues the step does not act twice.
-	 */
-	SideEffectStarted: { action: string; key: string };
-	/** The action ended: its result, or the error (then a repeat acts again). */
-	SideEffectEnded: {
-		action: string;
-		key: string;
-		result: JsonValue | null;
-		error: string | null;
-	};
 	StopRequested: Record<string, never>;
 	/** A person asked to stop the run before its next step or item. */
 	StopAfterStepRequested: Record<string, never>;
@@ -555,35 +542,6 @@ export function deriveResumes(events: readonly LoggedEvent[]): RunResume[] {
 		nodeId: e.payload.nodeId,
 		reason: e.payload.reason ?? null,
 	}));
-}
-
-/**
- * What a step's tools did about one action and key: `ended` with its
- * result, `started` when no result was recorded (the daemon stopped in
- * between), or null when nothing happened yet or the last try failed.
- */
-export function deriveSideEffect(
-	events: readonly LoggedEvent[],
-	stepId: string,
-	action: string,
-	key: string,
-): { state: "started" } | { state: "ended"; result: JsonValue | null } | null {
-	let fact:
-		| { state: "started" }
-		| { state: "ended"; result: JsonValue | null }
-		| null = null;
-	for (const e of bySeq(events)) {
-		if (e.stepId !== stepId) continue;
-		if (e.type !== "SideEffectStarted" && e.type !== "SideEffectEnded") {
-			continue;
-		}
-		if (e.payload.action !== action || e.payload.key !== key) continue;
-		if (e.type === "SideEffectStarted") fact = { state: "started" };
-		else if (e.payload.error === null) {
-			fact = { state: "ended", result: e.payload.result };
-		} else fact = null;
-	}
-	return fact;
 }
 
 /** The values of the top-level flow's inputs (the params of a run from before flow format 2). */

@@ -1,3 +1,4 @@
+import type { JsonValue } from "@nightshift/flows";
 import {
 	Alert,
 	AlertDescription,
@@ -60,7 +61,6 @@ import {
 	SunriseIcon,
 } from "lucide-react";
 import { memo, type ReactNode, useState } from "react";
-
 import { GateAnswer } from "@/components/gate/gate-answer";
 import {
 	ItemStateBadge,
@@ -69,6 +69,7 @@ import {
 	stepStateStyle,
 } from "@/components/outcome-badge";
 import { CodeView, JsonBlock } from "@/components/run/json-block";
+
 import type { SessionSummary, StepSummary } from "@/lib/api-types";
 import {
 	formatCost,
@@ -91,6 +92,7 @@ import type {
 	LogItem,
 	MessageItem,
 	ReportItem,
+	RuleItem,
 	TranscriptItem,
 	TranscriptState,
 	WaitItem,
@@ -102,9 +104,9 @@ import { ToolCallRow } from "./tool-call-row";
 /**
  * The transcript of one step. An agent step reads as a conversation: session
  * boundaries with their prompt, messages, tool calls, and the step report. A
- * command step reads as a terminal log. A decision step shows what the decider
- * was asked and what it picked. A gate step shows its question, and while it
- * is open, the choices to answer it with.
+ * command step reads as a terminal log. A decision step shows what the model
+ * was asked and what it picked, or which rule held. A gate step shows its
+ * question, and while it is open, the options to answer it with.
  */
 export function StepTranscript({
 	runId,
@@ -120,7 +122,7 @@ export function StepTranscript({
 }) {
 	const running = step.outcome === null;
 	// A gate step without an outcome waits for a person: it gets the answer form.
-	const gateOpen = step.nodeType === "gate" && running;
+	const gateOpen = step.gate !== null && running;
 	const sessionNumbers = new Map(
 		step.sessions.map((session, position) => [session.id, position + 1]),
 	);
@@ -248,8 +250,7 @@ export function StepTranscript({
 const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	agent: "The agent is working…",
 	command: "The command is running…",
-	decision: "The decider is choosing…",
-	gate: "Waiting for an answer…",
+	decision: "Deciding…",
 	subflow: "The called flow is running…",
 	foreach: "Working through the items…",
 };
@@ -298,6 +299,8 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			return <DecisionAsk item={item} />;
 		case "decision":
 			return <DecisionCard item={item} />;
+		case "rule":
+			return <RuleCard item={item} />;
 		case "gate-open":
 			return <GateQuestion item={item} answer={null} />;
 		case "gate-resolved":
@@ -472,7 +475,7 @@ function WakeMarker({ item }: { item: WakeItem }) {
 /** Prompts longer than this many lines start folded. */
 const PROMPT_FOLD_LINES = 12;
 
-/** A prompt to the agent or the decider, as a message bubble on the right. */
+/** A prompt to the agent or the model, as a message bubble on the right. */
 function PromptBubble({
 	label,
 	prompt,
@@ -738,7 +741,7 @@ function CommandExit({ item }: { item: ExitItem }) {
 	);
 }
 
-/** What the decider was asked, with the labels it could pick. */
+/** What the model was asked, with the options it could pick. */
 function DecisionAsk({ item }: { item: DecisionAskItem }) {
 	return (
 		<div className="flex flex-col gap-3">
@@ -765,7 +768,7 @@ function DecisionAsk({ item }: { item: DecisionAskItem }) {
 	);
 }
 
-/** The label the decider picked, and its notes on why. */
+/** The option the model picked, and its notes on why. */
 function DecisionCard({ item }: { item: DecisionItem }) {
 	const { text } = outcomeStyle(item.label);
 	return (
@@ -784,6 +787,53 @@ function DecisionCard({ item }: { item: DecisionItem }) {
 			)}
 		</ResultCard>
 	);
+}
+
+/** Which option the rule picked, and what each rule gave on the way there. */
+function RuleCard({ item }: { item: RuleItem }) {
+	const matched = item.matched;
+	const { text } = matched ? outcomeStyle(matched) : { text: "" };
+	return (
+		<ResultCard
+			icon={SplitIcon}
+			kicker={matched ? "Rule picked ·" : undefined}
+			value={
+				matched ? (
+					<span className="font-mono">{outcomeLabel(matched)}</span>
+				) : (
+					"No option matched"
+				)
+			}
+			tone={matched ? text : "text-destructive"}
+		>
+			<ul className="flex flex-col gap-1 text-xs">
+				{item.evaluated.map((entry) => (
+					<li key={entry.option} className="flex items-center gap-2">
+						<Badge
+							variant="outline"
+							className={cn("font-mono", outcomeStyle(entry.option).badge)}
+						>
+							{outcomeLabel(entry.option)}
+						</Badge>
+						<span className="text-muted-foreground">
+							{entry.result === null
+								? entry.option === matched
+									? "no rule: the default"
+									: "no value"
+								: ruleResultText(entry.result)}
+						</span>
+					</li>
+				))}
+			</ul>
+		</ResultCard>
+	);
+}
+
+/** A rule's value in words: held or did not hold for a boolean, else the value. */
+function ruleResultText(result: JsonValue): string {
+	if (result === true) return "held";
+	if (result === false) return "did not hold";
+	return typeof result === "string" ? result : JSON.stringify(result);
 }
 
 /** The question a Gate asks. While the gate is open, the answer form follows. */

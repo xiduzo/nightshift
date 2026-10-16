@@ -7,10 +7,10 @@ import { z } from "zod";
  *
  * A flow is a function: it declares `inputs`, runs its nodes, and returns
  * `outputs` to whoever called it (a run, a Subflow node, or a For Each node).
- * Version 1 files migrate on load (`migrateFlow`).
+ * Older files migrate on load (`migrateFlow`).
  */
 
-export const FLOW_VERSION = 2;
+export const FLOW_VERSION = 3;
 
 /**
  * A node id or an input name. Both are names in templates (`{{check.log_tail}}`,
@@ -33,9 +33,9 @@ export const flowNameSchema = z
 	);
 
 /**
- * An outcome: `pass`, `fail`, `needs-input`, an Agent's own outcome, a
- * Decision label, or a Gate choice. "error", "stopped", "interrupted" and
- * "waiting" are reserved for the engine.
+ * An outcome: `pass`, `fail`, `needs-input`, an Agent's own outcome, or a
+ * Decision option. "error", "stopped", "interrupted" and "waiting" are
+ * reserved for the engine.
  */
 export const labelSchema = z
 	.string()
@@ -113,10 +113,21 @@ export const permissionModeSchema = z.enum([
 
 const option = z.object({
 	name: labelSchema,
-	/** Tells the agent, the decider or the person what this option means. */
+	/** Tells the agent, the model or the person what this option means. */
 	description: z.string().optional(),
+	/**
+	 * Decision nodes decided by a rule only: a JSONata expression over the
+	 * run's values (`build.data.tests_passed = true and check.exit_code = 0`).
+	 * The first option whose rule holds is the outcome. An option without a
+	 * rule is the default: at most one, and it goes last.
+	 */
+	when: z.string().optional(),
 });
 export type Option = z.infer<typeof option>;
+
+/** Who decides a Decision node: you (a Gate), a rule, or a model. */
+export const decidedBySchema = z.enum(["person", "rule", "model"]);
+export type DecidedBy = z.infer<typeof decidedBySchema>;
 
 /**
  * An MCP server an Agent node adds to its session: a local command (stdio)
@@ -247,25 +258,27 @@ export const commandNodeSchema = z.object({
 	command: z.string().min(1),
 });
 
+/**
+ * Picks one of its options, which is the step's outcome. `by` says who:
+ * `person` (a Gate: the question waits in the Needs-you inbox), `rule`
+ * (the first option whose `when` holds, no cost), or `model` (a small
+ * model reads the prompt and picks).
+ */
 export const decisionNodeSchema = z.object({
 	...nodeBase,
 	type: z.literal("decision"),
-	/** What to decide, with the context it needs. Supports templates. */
-	prompt: z.string().min(1),
-	/** The labels the decider picks from. Each one is an outcome. */
-	labels: z.array(option).min(2),
+	/**
+	 * The question for a person, the brief for a model, or a note on what
+	 * the rule checks. Supports templates.
+	 */
+	prompt: z.string(),
+	/** The options to pick from. Each one is an outcome, with its own edge. */
+	options: z.array(option).min(1),
+	by: decidedBySchema,
+	/** `by: "model"` only: the decision model that picks. */
 	decider: deciderNameSchema.default("typesafe"),
-	/** The decider's model. Unset: the decider's default (`jev-latest` for TypeSafe). */
+	/** `by: "model"` only. The decider's model. Unset: the decider's default (`jev-latest` for TypeSafe). */
 	model: z.string().min(1).optional(),
-});
-
-export const gateNodeSchema = z.object({
-	...nodeBase,
-	type: z.literal("gate"),
-	/** What the person is asked, with the context they need. Supports templates. */
-	question: z.string().min(1),
-	/** The answers the person can give. Each one is an outcome. */
-	choices: z.array(option).min(1),
 });
 
 /**
@@ -290,7 +303,11 @@ export const jsonSourceSchema = z.object({
 	value: z.string().min(1),
 });
 
-/** A command (sh -c in the worktree) that prints a JSON array on stdout. */
+/**
+ * A command (sh -c in the worktree) that prints a JSON array. Template
+ * values arrive as environment variables, as in a Command node. An issue
+ * tracker is a command on its CLI: `gh`, `glab`, `acli`.
+ */
 export const commandSourceSchema = z.object({
 	kind: z.literal("command"),
 	command: z.string().min(1),
@@ -306,31 +323,10 @@ export const filesSourceSchema = z.object({
 	glob: z.string().min(1),
 });
 
-/**
- * GitHub sub-issues of one parent issue. Each element is
- * `{ id, number, title, body, url, state, labels, parent: { number, title },
- * dependsOn, done }`; `dependsOn` comes from the "blocked by" links.
- */
-export const githubSourceSchema = z.object({
-	kind: z.literal("github"),
-	/** The parent issue number. Supports templates, for example `{{epic}}` or `{{item.number}}`. */
-	parent: z.string().min(1),
-	/** Only sub-issues with this label become elements. */
-	requireLabel: z.string().min(1).optional(),
-	/** Sub-issues with any of these labels count as done before the run. */
-	doneLabels: z.array(z.string().min(1)).default([]),
-	/**
-	 * Sub-issues with any of these labels are left out (for example `draft`).
-	 * Elements that depend on them wait, because a left-out dependency is not done.
-	 */
-	skipLabels: z.array(z.string().min(1)).default([]),
-});
-
 export const listSourceSchema = z.discriminatedUnion("kind", [
 	jsonSourceSchema,
 	commandSourceSchema,
 	filesSourceSchema,
-	githubSourceSchema,
 ]);
 
 /**
@@ -355,7 +351,7 @@ export const forEachNodeSchema = z.object({
 	 * the branch that is checked out.
 	 */
 	branch: z.enum(["per-item", "shared"]).default("per-item"),
-	/** A called flow that ends on one of these labels or choices stops the loop with `halted`. */
+	/** A called flow that ends on one of these options stops the loop with `halted`. */
 	haltOn: z.array(labelSchema).default(["halt"]),
 	/** Safety net: the most elements one visit may start. */
 	maxItems: z.number().int().positive().optional(),
@@ -365,7 +361,6 @@ export const flowNodeSchema = z.discriminatedUnion("type", [
 	agentNodeSchema,
 	commandNodeSchema,
 	decisionNodeSchema,
-	gateNodeSchema,
 	subflowNodeSchema,
 	forEachNodeSchema,
 ]);
@@ -454,7 +449,6 @@ export type FlowNode = z.infer<typeof flowNodeSchema>;
 export type AgentNode = z.infer<typeof agentNodeSchema>;
 export type CommandNode = z.infer<typeof commandNodeSchema>;
 export type DecisionNode = z.infer<typeof decisionNodeSchema>;
-export type GateNode = z.infer<typeof gateNodeSchema>;
 export type SubflowNode = z.infer<typeof subflowNodeSchema>;
 export type ForEachNode = z.infer<typeof forEachNodeSchema>;
 export type ListSource = z.infer<typeof listSourceSchema>;
@@ -493,14 +487,26 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 		case "command":
 			return ["pass", "fail"];
 		case "decision":
-			return node.labels.map((label) => label.name);
-		case "gate":
-			return node.choices.map((choice) => choice.name);
+			return node.options.map((option) => option.name);
 		case "subflow":
 			return ["pass", "fail"];
 		case "foreach":
 			return ["done", "halted"];
 	}
+}
+
+/**
+ * Why `name` is not an option of the node, or null when it is one. The one
+ * check for an answer from a person, a model or a rule: the engine, the
+ * Gate API and the model's `decide` tool all use it.
+ */
+export function optionProblem(
+	options: readonly Pick<Option, "name">[],
+	name: string,
+): string | null {
+	const names = options.map((option) => option.name);
+	if (names.includes(name)) return null;
+	return `"${name}" is not an option of this node. Choose one of: ${names.join(", ")}.`;
 }
 
 /**
@@ -514,10 +520,8 @@ export const outputFieldsByType = {
 	agent: ["outcome", "output", "summary", "data", "visit", "session_id"],
 	/** log_tail: the last lines of stdout and stderr together. */
 	command: ["outcome", "exit_code", "log_tail", "visit"],
-	/** outcome: the label. notes: why the decider picked it. */
-	decision: ["outcome", "notes", "visit"],
-	/** outcome: the choice. note: what the person wrote with it. */
-	gate: ["outcome", "note", "visit"],
+	/** outcome: the option. note: what the person wrote, or why the model picked it. */
+	decision: ["outcome", "note", "visit"],
 	/** ended: the label or choice the called flow ended on, or "". */
 	subflow: ["outcome", "ended", "visit"],
 	/**

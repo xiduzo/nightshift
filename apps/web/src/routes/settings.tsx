@@ -1389,8 +1389,7 @@ function DaemonCard({
 						<ItemContent>
 							<ItemTitle>Coding agents</ItemTitle>
 							<ItemDescription className="line-clamp-none">
-								Check where your harnesses and the GitHub CLI are installed, on
-								the Agents page.
+								Check where your harnesses are installed, on the Agents page.
 							</ItemDescription>
 						</ItemContent>
 						<ItemActions>

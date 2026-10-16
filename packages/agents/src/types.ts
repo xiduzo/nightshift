@@ -56,31 +56,8 @@ export type AgentSessionInput = {
 	clis?: string[];
 	/** MCP servers by name, added to the harness's own configuration. */
 	mcpServers?: Record<string, McpServerConfig>;
-	/** Where the tools record what they did outside the worktree. See `EffectJournal`. */
-	effects?: EffectJournal;
 	/** Aborting stops the harness process. The stream then ends with an `error` event of kind `aborted`. */
 	signal: AbortSignal;
-};
-
-/**
- * Remembers what a step's tools did outside the worktree (a GitHub comment),
- * so a session that continues the step does not do it again. The engine keeps
- * it in the event log, per step.
- */
-export type EffectJournal = {
-	/**
-	 * Runs `act` once per `action` and `key` in this step. A repeat gets the
-	 * recorded result back (`earlier`). When an earlier session started the
-	 * action but never recorded its result (the daemon stopped in between),
-	 * `find` looks for it first; null means it did not happen. The result
-	 * must be JSON.
-	 */
-	once<T>(input: {
-		action: string;
-		key: string;
-		act: () => Promise<T>;
-		find?: () => Promise<T | null>;
-	}): Promise<{ result: T; earlier: boolean }>;
 };
 
 export type AgentUsage = {
@@ -171,15 +148,3 @@ export interface Decider {
 	/** Never throws: failures come back as `kind: "error"`. */
 	decide(input: DecisionInput): Promise<DecisionResult>;
 }
-
-/** Input for reading For Each items from GitHub sub-issues. */
-export type GithubItemsInput = {
-	/** A directory in the repo; `gh` resolves the repo from its remote. */
-	cwd: string;
-	parent: number;
-	requireLabel?: string;
-	doneLabels: string[];
-	/** Sub-issues with one of these labels are left out of the list. */
-	skipLabels?: string[];
-	signal: AbortSignal;
-};

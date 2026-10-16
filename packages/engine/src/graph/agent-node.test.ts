@@ -30,7 +30,6 @@ import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { compileFlow } from "./compile";
 import {
-	createEffectJournal,
 	createRecorders,
 	DEFAULT_RESUME_PROMPT,
 	type StepContext,
@@ -56,7 +55,7 @@ const agent = (id: string, extra: Record<string, unknown> = {}) => ({
 });
 
 const flowOf = (input: Omit<FlowInput, "version">): Flow =>
-	flowSchema.parse({ version: 2, ...input });
+	flowSchema.parse({ version: 3, ...input });
 
 const MINUTE = 1_000;
 
@@ -138,7 +137,6 @@ async function startRun(
 		recorder: (stepId, path) => recorders.open(runId, stepId, path),
 		harnessFor: (name) => (name === "claude-code" ? harness : undefined),
 		mcpServersFor: async () => ({ ok: true, servers: {} }),
-		effectJournal: (id, stepId) => createEffectJournal(log, id, stepId),
 		signal: () => options.signal ?? controller.signal,
 		now: Date.now,
 		minuteMs: MINUTE,

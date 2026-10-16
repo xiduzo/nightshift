@@ -29,7 +29,6 @@ export {
 	type CliCheck,
 	type CliToolCheck,
 	checkCli,
-	checkGithub,
 	checkHarness,
 	cliHelp,
 	cliHelpAt,
@@ -49,11 +48,6 @@ export {
 	fakeDecider,
 	fakeHarness,
 } from "./fake";
-export {
-	type GithubItemsOptions,
-	readGithubItems,
-	SUB_ISSUES_QUERY,
-} from "./github-items";
 export {
 	type GrokBuildHarnessOptions,
 	grokBuildHarness,

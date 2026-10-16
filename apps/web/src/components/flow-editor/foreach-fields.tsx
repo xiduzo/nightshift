@@ -1,6 +1,12 @@
 import type { Flow, ForEachNode, ListSource } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@nightshift/ui/components/dropdown-menu";
+import {
 	FieldDescription,
 	FieldLegend,
 	FieldSet,
@@ -10,8 +16,8 @@ import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { PlusIcon, TriangleAlertIcon } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
+import { useId, useRef } from "react";
 
 import {
 	calledFlow,
@@ -19,6 +25,7 @@ import {
 	nodeOptions,
 	SOURCE_KINDS,
 } from "@/lib/flow-draft";
+import { LIST_RECIPES } from "@/lib/list-recipes";
 
 import {
 	CalledFlowField,
@@ -29,12 +36,7 @@ import { Field, InspectorSection, Note, PositiveIntInput } from "./fields";
 import { OptionsEditor } from "./options-editor";
 import { TemplateField } from "./template-field";
 
-const SOURCE_ORDER: ListSource["kind"][] = [
-	"json",
-	"command",
-	"files",
-	"github",
-];
+const SOURCE_ORDER: ListSource["kind"][] = ["json", "command", "files"];
 
 export function ForEachFields({
 	flow,
@@ -213,19 +215,24 @@ function SourceFields({
 			);
 		case "command":
 			return (
-				<TemplateField
-					id={`${id}-command`}
-					label="Source command"
-					hint="A shell command that prints the list as JSON, for example cat tasks.json."
-					flow={flow}
-					nodeId={node.id}
-					value={source.command}
-					invalid={source.command.trim() === ""}
-					className="min-h-16"
-					variablesOpen={false}
-					placeholder="cat tasks.json"
-					onChange={(command) => onChange({ kind: "command", command })}
-				/>
+				<div className="flex flex-col gap-2">
+					<TemplateField
+						id={`${id}-command`}
+						label="Source command"
+						hint="A shell command that prints the list as JSON, for example cat tasks.json. A recipe replaces what is here."
+						flow={flow}
+						nodeId={node.id}
+						value={source.command}
+						invalid={source.command.trim() === ""}
+						className="min-h-16"
+						variablesOpen={false}
+						placeholder="cat tasks.json"
+						onChange={(command) => onChange({ kind: "command", command })}
+					/>
+					<RecipePicker
+						onPick={(command) => onChange({ kind: "command", command })}
+					/>
+				</div>
 			);
 		case "files":
 			return (
@@ -249,154 +256,43 @@ function SourceFields({
 					onChange={(glob) => onChange({ kind: "files", glob })}
 				/>
 			);
-		case "github":
-			return (
-				<GitHubSourceFields flow={flow} source={source} onChange={onChange} />
-			);
 	}
 }
 
-function GitHubSourceFields({
-	flow,
-	source,
-	onChange,
-}: {
-	flow: Flow;
-	source: Extract<ListSource, { kind: "github" }>;
-	onChange: (source: Extract<ListSource, { kind: "github" }>) => void;
-}) {
-	const id = useId();
-	const inputs = flow.inputs;
-	const example = inputs[0]
-		? inputs[0].type === "json"
-			? `{{${inputs[0].name}.number}}`
-			: `{{${inputs[0].name}}}`
-		: "42";
+/**
+ * Fills the source command with a recipe: a command on a tracker's CLI or
+ * a file that prints the list as JSON. The person edits it from there.
+ */
+function RecipePicker({ onPick }: { onPick: (command: string) => void }) {
 	return (
-		<>
-			<Field
-				id={`${id}-parent`}
-				label="Parent issue"
-				hint={
-					<>
-						The issue whose sub-issues become the items, for example{" "}
-						<code className="font-mono">{example}</code>. Sub-issues run in the
-						order of their "blocked by" links.
-					</>
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<Button
+						variant="outline"
+						size="sm"
+						className="self-start font-normal"
+					/>
 				}
 			>
-				<Input
-					id={`${id}-parent`}
-					value={source.parent}
-					placeholder={example}
-					className="font-mono text-xs"
-					autoComplete="off"
-					spellCheck={false}
-					aria-invalid={source.parent.trim() === ""}
-					aria-describedby={`${id}-parent-hint`}
-					onChange={(event) =>
-						onChange({ ...source, parent: event.target.value })
-					}
-				/>
-			</Field>
-			<Field
-				id={`${id}-label`}
-				label="Required label"
-				optional
-				hint="Only sub-issues with this label become items."
-			>
-				<Input
-					id={`${id}-label`}
-					value={source.requireLabel ?? ""}
-					placeholder="trace"
-					className="font-mono"
-					autoComplete="off"
-					spellCheck={false}
-					aria-describedby={`${id}-label-hint`}
-					onChange={(event) => {
-						const requireLabel = event.target.value.trim();
-						onChange({ ...source, requireLabel: requireLabel || undefined });
-					}}
-				/>
-			</Field>
-			<Field
-				id={`${id}-done`}
-				label="Done labels"
-				optional
-				hint="Sub-issues with one of these labels count as done, like closed ones. Separate with commas."
-			>
-				<ListInput
-					id={`${id}-done`}
-					values={source.doneLabels}
-					placeholder="done, shipped"
-					describedBy={`${id}-done-hint`}
-					onChange={(doneLabels) => onChange({ ...source, doneLabels })}
-				/>
-			</Field>
-			<Field
-				id={`${id}-skip`}
-				label="Skip labels"
-				optional
-				hint="Sub-issues with one of these labels are left out, and items that depend on them wait. Separate with commas."
-			>
-				<ListInput
-					id={`${id}-skip`}
-					values={source.skipLabels ?? []}
-					placeholder="draft"
-					describedBy={`${id}-skip-hint`}
-					onChange={(skipLabels) => onChange({ ...source, skipLabels })}
-				/>
-			</Field>
-		</>
-	);
-}
-
-function parseList(text: string): string[] {
-	return text
-		.split(",")
-		.map((part) => part.trim())
-		.filter((part) => part !== "");
-}
-
-/** A comma-separated list. Keeps what the person types; commits the parsed list. */
-function ListInput({
-	id,
-	values,
-	placeholder,
-	describedBy,
-	onChange,
-}: {
-	id: string;
-	values: string[];
-	placeholder?: string;
-	describedBy?: string;
-	onChange: (values: string[]) => void;
-}) {
-	const [text, setText] = useState(values.join(", "));
-
-	// Follow outside changes, but keep a half-typed list that means the same.
-	useEffect(() => {
-		setText((current) =>
-			parseList(current).join("\u0000") === values.join("\u0000")
-				? current
-				: values.join(", "),
-		);
-	}, [values]);
-
-	return (
-		<Input
-			id={id}
-			value={text}
-			placeholder={placeholder}
-			className="font-mono"
-			autoComplete="off"
-			spellCheck={false}
-			aria-describedby={describedBy}
-			onChange={(event) => {
-				setText(event.target.value);
-				onChange(parseList(event.target.value));
-			}}
-		/>
+				Start from a recipe
+				<ChevronDownIcon data-icon="inline-end" aria-hidden="true" />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="start" className="w-80">
+				{LIST_RECIPES.map((recipe) => (
+					<DropdownMenuItem
+						key={recipe.name}
+						className="flex-col items-start gap-0.5"
+						onClick={() => onPick(recipe.command)}
+					>
+						<span>{recipe.name}</span>
+						<span className="text-muted-foreground text-xs">
+							{recipe.description}
+						</span>
+					</DropdownMenuItem>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }
 
@@ -500,9 +396,7 @@ function HaltOnField({
 	const suggestions = [
 		...new Set(
 			(called?.nodes ?? []).flatMap((calledNode) =>
-				calledNode.type === "decision" ||
-				calledNode.type === "gate" ||
-				calledNode.type === "agent"
+				calledNode.type === "decision" || calledNode.type === "agent"
 					? nodeOptions(calledNode).map((option) => option.name)
 					: [],
 			),
@@ -519,7 +413,7 @@ function HaltOnField({
 				halted.
 			</FieldDescription>
 			<OptionsEditor
-				kind="label"
+				kind="option"
 				options={node.haltOn.map((name) => ({ name }))}
 				min={0}
 				newName="halt"

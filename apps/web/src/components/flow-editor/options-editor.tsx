@@ -10,14 +10,15 @@ import { useEffect, useId, useRef, useState } from "react";
 import { outcomeStyle } from "@/components/outcome-badge";
 import { type NodeOption, uniqueOptionName } from "@/lib/flow-draft";
 
-type Kind = "label" | "choice" | "outcome";
+type Kind = "option" | "outcome";
 
 const RESERVED: readonly string[] = reservedOutcomes;
 
 /**
- * The labels of a Decision node or the choices of a Gate node. Each one is an
- * outcome with its own handle. A name commits on blur or Enter, so the edges
- * on it follow one rename and not every keystroke. Without `onDescribe` and
+ * The options of a Decision node or the outcomes of an Agent node. Each one
+ * is an outcome with its own handle. A name commits on blur or Enter, so the
+ * edges on it follow one rename and not every keystroke. With `onRule`, each
+ * row also takes the rule (`when`) that picks it. Without `onDescribe` and
  * `onMove` it edits a plain list of names, for example a For Each's halt-on
  * labels.
  */
@@ -29,6 +30,7 @@ export function OptionsEditor({
 	newName,
 	onRename,
 	onDescribe,
+	onRule,
 	onAdd,
 	onRemove,
 	onMove,
@@ -43,6 +45,8 @@ export function OptionsEditor({
 	/** Returns an error when the name cannot be used. */
 	onRename: (index: number, name: string) => string | null;
 	onDescribe?: (index: number, description: string | undefined) => void;
+	/** Decisions decided by a rule: the rule of each option. Empty removes it. */
+	onRule?: (index: number, when: string | undefined) => void;
 	onAdd: (option: NodeOption) => void;
 	onRemove: (index: number) => void;
 	onMove?: (index: number, to: number) => void;
@@ -78,6 +82,7 @@ export function OptionsEditor({
 								? (description) => onDescribe(index, description)
 								: undefined
 						}
+						onRule={onRule ? (when) => onRule(index, when) : undefined}
 						onRemove={() => onRemove(index)}
 						onMove={onMove ? (to) => onMove(index, to) : undefined}
 					/>
@@ -110,6 +115,7 @@ function OptionRow({
 	autoFocus,
 	onRename,
 	onDescribe,
+	onRule,
 	onRemove,
 	onMove,
 }: {
@@ -123,6 +129,7 @@ function OptionRow({
 	autoFocus: boolean;
 	onRename: (name: string) => string | null;
 	onDescribe?: (description: string | undefined) => void;
+	onRule?: (when: string | undefined) => void;
 	onRemove: () => void;
 	onMove?: (to: number) => void;
 }) {
@@ -241,6 +248,25 @@ function OptionRow({
 				<FieldError id={`${id}-error`} className="text-xs">
 					{error}
 				</FieldError>
+			) : null}
+			{onRule ? (
+				<Input
+					id={`${id}-when`}
+					value={option.when ?? ""}
+					aria-label={`Rule of ${position}`}
+					placeholder={
+						index === count - 1 && count > 1
+							? "No rule: picked when none above holds"
+							: "build.data.tests_passed = true"
+					}
+					className="h-8 font-mono text-xs"
+					autoComplete="off"
+					spellCheck={false}
+					onChange={(event) => {
+						const when = event.target.value;
+						onRule(when || undefined);
+					}}
+				/>
 			) : null}
 			{onDescribe ? (
 				<Input

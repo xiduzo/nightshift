@@ -27,7 +27,7 @@ Last updated: 2026-10-15
 - **Module structure:** A Bun workspace. `apps/server` is the daemon (Hono, oRPC, Better Auth, SSE). `apps/web` is the UI. `apps/desktop` is the Electrobun shell and holds no logic. `packages/db` owns the schema. `packages/api` owns the oRPC contracts. Planned: `packages/flows`, `packages/engine`, `packages/agents`. See `docs/PLAN.md`.
 - **State management:** The server stores durable facts in libsql and appends every change to an event log. The UI derives status from facts and subscribes to the event log over SSE through TanStack Query.
 - **Data flow:** UI → oRPC → engine → agents (harness or tool) → facts + event → SSE → UI. Everything runs in-process.
-- **Flow execution:** A flow is a JSON file in `.nightshift/flows/`, validated by a zod schema. Every Agent node runs as a harness session through a TanStack AI harness adapter and names a skill the harness already has. A Decision node returns a schema-validated label.
+- **Flow execution:** A flow is a JSON file in `.nightshift/flows/`, validated by a zod schema. Every Agent node runs as a harness session through a TanStack AI harness adapter and names a skill the harness already has. A Decision node picks one of its options: you (a Gate), a rule (a JSONata expression over the run's values), or a model whose pick is checked against the options.
 
 ## Key Constraints
 
@@ -95,7 +95,7 @@ bun lefthook install
 | Every step on a harness | Skills already assume a coding agent's tool belt. Re-implementing it on a raw model is waste. | 2026-10-10 |
 | Stateless orchestrator | A resident orchestrator agent is a single point of failure. Short Decision nodes that read durable state are not. | 2026-10-10 |
 | Durable facts, derived status, event log | Removes the class of bugs where a late hook overwrites a state. | 2026-10-10 |
-| GitHub as TanStack AI tools on `gh` | `gh` already holds the user's login and matches what the skills call. Tools make it callable from Agent and Decision nodes. | 2026-10-15 |
+| GitHub as TanStack AI tools on `gh` | `gh` already holds the user's login and matches what the skills call. Tools make it callable from Agent and Decision nodes. Superseded on 2026-10-16: GitHub is a CLI tool and a command recipe; the engine knows no tracker. | 2026-10-15 |
 | Better Auth always | One identity model. Local mode auto-creates one user. | 2026-10-10 |
 | Flows as repo files | Versioned, reviewable, diffable. Configuration drift was the main pain in the tool this replaces. | 2026-10-15 |
 | The flow is the method | A personal tool needs no method plugin system. A flow with prompts and skills expresses WTF or any other method. | 2026-10-15 |

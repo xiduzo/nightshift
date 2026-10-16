@@ -2,7 +2,6 @@ import type {
 	AgentEvent,
 	AgentHarness,
 	Decider,
-	GithubItemsInput,
 	HarnessName,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
@@ -15,7 +14,6 @@ import type {
 	FlowNodeType,
 	ItemState,
 	JsonValue,
-	ListItem,
 	LoadedFlow,
 	Outcome,
 	Schedule,
@@ -96,6 +94,16 @@ export type StepSummary = {
 	/** Agent steps only. Several when a person resumed the step or a wait continued it. */
 	sessions: SessionSummary[];
 	costUsd: number;
+	/**
+	 * A Decision decided by a person (a Gate): what it asked, once it
+	 * opened. Null for every other step. With `outcome` null, the Gate
+	 * waits in the Needs-you inbox.
+	 */
+	gate: {
+		question: string;
+		choices: { name: string; description?: string }[];
+		openedAt: number;
+	} | null;
 };
 
 /** One item of a For Each visit. */
@@ -175,12 +183,23 @@ export type RunDetail = RunSummary & {
 	resumes: RunResume[];
 };
 
-/** What a Decision step writes to its transcript. */
+/** What a Decision step decided by a model writes to its transcript. */
 export type DecisionEvent =
 	| { type: "decision-start"; prompt: string; labels: string[]; model: string }
 	| { type: "decision"; label: string; notes: string };
 
-/** What a Gate step writes to its transcript. */
+/**
+ * What a Decision step decided by a rule writes to its transcript: the
+ * option that matched (null when none did) and what each rule gave, in
+ * order, up to the match. A default option (no rule) gives null.
+ */
+export type RuleEvent = {
+	type: "rule";
+	matched: string | null;
+	evaluated: { option: string; result: JsonValue | null }[];
+};
+
+/** What a Decision step decided by a person (a Gate) writes to its transcript. */
 export type GateEvent =
 	| {
 			type: "gate-open";
@@ -226,6 +245,7 @@ export type StepEvent =
 	| AgentEvent
 	| CommandEvent
 	| DecisionEvent
+	| RuleEvent
 	| GateEvent
 	| ForEachEvent
 	| WaitEvent;
@@ -404,8 +424,6 @@ export type EngineOptions = {
 	harnesses: Partial<Record<HarnessName, AgentHarness>>;
 	/** Decides Decision nodes. A flow with a Decision node fails to start without one. */
 	decider?: Decider;
-	/** Reads GitHub For Each sources. A flow with one fails to start without it. */
-	readGithubItems?: (input: GithubItemsInput) => Promise<ListItem[]>;
 	/** Root for transcripts, command logs and other on-disk state, for example ~/.nightshift. */
 	dataDir: string;
 	/** How many runs may run a step at once. A run waiting at a Gate does not count. Default 2. */

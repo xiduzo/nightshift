@@ -1,9 +1,5 @@
 import { randomUUID } from "node:crypto";
-import {
-	Command,
-	interrupt,
-	type LangGraphRunnableConfig,
-} from "@langchain/langgraph";
+import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import type {
 	AgentEvent,
 	AgentSessionInput,
@@ -46,12 +42,7 @@ import {
 	type WaitRequest,
 } from "../context";
 import { route, type StepEnd, scopeOf, waitNodeId } from "../route";
-import type {
-	Parked,
-	PendingParked,
-	ResumeValue,
-	RunStateValues,
-} from "../state";
+import type { RunStateValues } from "../state";
 
 /**
  * The Agent node: one harness session per visit, ported from `runAgentStep`
@@ -84,8 +75,9 @@ import type {
  *    last harness session (`lastHarnessSessionOfNode`).
  *
  * A usage limit or a network failure plans a wait (`beginWait`) and jumps
- * to the wait node (`wait__<id>`), which interrupts; a give-up ends the
- * step `error`. Everything else ends the step and routes (`route()`).
+ * to the wait node (`wait__<id>`, the shared `waitNode` in graph/wait.ts),
+ * which interrupts; a give-up ends the step `error`. Everything else ends
+ * the step and routes (`route()`).
  */
 export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 	return async (state, config) => {
@@ -127,52 +119,6 @@ export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 			);
 		}
 		return route(ctx, state, node, result, config);
-	};
-}
-
-/**
- * The Agent node's wait node: interrupts with the planned wait (the runner
- * schedules the wake timer from it) and, on the resume, jumps back to the
- * Agent node. A `wake` continues the step with its prompt; a `resume` (the
- * run was stopped while it slept, and a person resumed it) reopens the
- * step, as the engine does today after `closeParked`.
- */
-export function agentWaitNode(node: AgentNode, _ctx: StepContext): NodeAction {
-	return async (state: RunStateValues) => {
-		const pending = state.pending;
-		if (pending?.kind !== "wait" || pending.nodeId !== node.id) {
-			throw new Error(`Nothing waits at node "${node.id}".`);
-		}
-		const value: Parked = {
-			kind: "wait",
-			stepId: pending.stepId,
-			nodeId: node.id,
-			reason: pending.reason,
-			until: pending.until,
-			message: pending.message,
-		};
-		const answer = interrupt<Parked, ResumeValue | undefined>(value);
-		if (answer?.kind === "resume") {
-			const parked: PendingParked = {
-				kind: "parked",
-				stepId: pending.stepId,
-				nodeId: node.id,
-				visit: pending.visit,
-				harnessSessionId: pending.harnessSessionId,
-				prompt: answer.prompt ?? null,
-				status: "stopped",
-				reason: null,
-			};
-			return new Command({ update: { pending: parked }, goto: node.id });
-		}
-		const prompt =
-			answer?.kind === "wake" && answer.prompt !== undefined
-				? answer.prompt
-				: pending.prompt;
-		return new Command({
-			update: { pending: { ...pending, prompt } },
-			goto: node.id,
-		});
 	};
 }
 
@@ -497,7 +443,6 @@ async function runSession(
 			effort: agent.effort,
 			resumeSessionId: resumeSessionId ?? undefined,
 			stepReport: stepReportOf(node),
-			effects: ctx.effectJournal(runId, stepId),
 			...(node.clis && node.clis.length > 0 ? { clis: node.clis } : {}),
 			...(Object.keys(mcp.servers).length > 0
 				? { mcpServers: mcp.servers }

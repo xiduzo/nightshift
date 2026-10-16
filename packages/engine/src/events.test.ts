@@ -7,7 +7,6 @@ import {
 	deriveNodeOutputs,
 	deriveOpenGate,
 	deriveRunState,
-	deriveSideEffect,
 	deriveSleep,
 	deriveSteps,
 	deriveStopAfterStep,
@@ -64,11 +63,9 @@ function log() {
 					nodeType:
 						nodeId === "check"
 							? "command"
-							: nodeId === "gate"
-								? "gate"
-								: nodeId === "decide"
-									? "decision"
-									: "agent",
+							: nodeId === "gate" || nodeId === "decide"
+								? "decision"
+								: "agent",
 					visit,
 					transcriptPath: `/t/${stepId}`,
 					logPath: null,
@@ -563,30 +560,5 @@ describe("automatic resume", () => {
 		expect(countDaemonResumes(l.events)).toBe(0);
 		daemon();
 		expect(countDaemonResumes(l.events)).toBe(1);
-	});
-
-	test("deriveSideEffect: started, ended, or failed (then nothing), per step and key", () => {
-		const l = log().runStarted();
-		const fact = (stepId = "s1", key = "k") =>
-			deriveSideEffect(l.events, stepId, "github_comment", key);
-		const effect = { action: "github_comment", key: "k" };
-		expect(fact()).toBeNull();
-		l.push("SideEffectStarted", effect, { stepId: "s1" });
-		expect(fact()).toEqual({ state: "started" });
-		l.push(
-			"SideEffectEnded",
-			{ ...effect, result: null, error: "gh failed" },
-			{ stepId: "s1" },
-		);
-		expect(fact()).toBeNull();
-		l.push("SideEffectStarted", effect, { stepId: "s1" });
-		l.push(
-			"SideEffectEnded",
-			{ ...effect, result: { url: "u" }, error: null },
-			{ stepId: "s1" },
-		);
-		expect(fact()).toEqual({ state: "ended", result: { url: "u" } });
-		expect(fact("s2")).toBeNull();
-		expect(fact("s1", "other")).toBeNull();
 	});
 });

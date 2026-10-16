@@ -27,10 +27,11 @@ const gate = (
 	choices: { name: string; description?: string }[],
 ) => ({
 	id,
-	type: "gate" as const,
+	type: "decision" as const,
 	position: { x: 0, y: 0 },
-	question,
-	choices,
+	prompt: question,
+	options: choices,
+	by: "person" as const,
 });
 
 const command = (id: string, cmd: string) => ({
@@ -123,7 +124,7 @@ describe("the Gate node", () => {
 		expect(payloads(logged, "StepStarted")).toEqual([
 			{
 				nodeId: "gate",
-				nodeType: "gate",
+				nodeType: "decision",
 				visit: 1,
 				transcriptPath: gateStep?.transcriptPath as string,
 				logPath: null,
@@ -338,7 +339,7 @@ describe("the Gate node", () => {
 		let logged = await h.events();
 		expect(payloads(logged, "StepStarted")[1]).toMatchObject({
 			nodeId: "gate",
-			nodeType: "gate",
+			nodeType: "decision",
 			visit: 2,
 		});
 		expect(deriveOpenGate(logged)).toMatchObject({ stepId: second, visit: 2 });
@@ -448,7 +449,7 @@ describe("the Gate node", () => {
 				nodeId: "gate",
 				status: "failed",
 				reason:
-					'Node "gate" failed: "maybe" is not a choice of this Gate. Choose one of: approve, reject.',
+					'Node "gate" failed: "maybe" is not an option of this node. Choose one of: approve, reject.',
 			},
 		]);
 		expect(payloads(await h.events(), "StepEnded")).toEqual([
@@ -456,7 +457,7 @@ describe("the Gate node", () => {
 				outcome: "error",
 				outputs: { outcome: "error", note: "", visit: 1 },
 				error:
-					'"maybe" is not a choice of this Gate. Choose one of: approve, reject.',
+					'"maybe" is not an option of this node. Choose one of: approve, reject.',
 			},
 		]);
 	});
@@ -509,5 +510,57 @@ describe("the Gate node", () => {
 			},
 		]);
 		expect(await h.types()).toEqual(["RunStarted", "StopAfterStepRequested"]);
+	});
+});
+
+describe("a Gate's time budget", () => {
+	test("a Gate waits as long as it must: timeoutMinutes starts no timer", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "gate",
+				nodes: [
+					{
+						...gate("gate", "Ship it?", [{ name: "approve" }]),
+						timeoutMinutes: 1,
+					},
+				],
+				edges: [],
+			}),
+		);
+		h.ctx.minuteMs = 20;
+		const first = await drive(h, { inputs: {} });
+		expect(first.parked[0]).toMatchObject({ kind: "gate" });
+		await new Promise((resolve) => setTimeout(resolve, 60));
+		expect(await h.types()).toEqual([
+			"RunStarted",
+			"StepStarted",
+			"GateOpened",
+		]);
+		const answered = await drive(
+			h,
+			new Command({ resume: { kind: "gate", choice: "approve" } }),
+			h.graph(),
+		);
+		expect(answered.state.ended).toMatchObject({ outcome: "approve" });
+	});
+
+	test("the answer ends the step without announcing a start again", async () => {
+		const h = await startRun(sandbox, gateFlow());
+		await drive(h, { inputs: { task: "it" } });
+		const answered = await drive(
+			h,
+			new Command({ resume: { kind: "gate", choice: "approve" } }),
+			h.graph(),
+		);
+		expect(answered.events.map((e) => e.type)).toEqual([
+			"transcript",
+			"step-ended",
+			"step-started",
+			"transcript",
+			"transcript",
+			"transcript",
+			"step-ended",
+		]);
 	});
 });

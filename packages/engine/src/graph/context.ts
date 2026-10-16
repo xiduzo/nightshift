@@ -5,8 +5,6 @@ import type {
 	AgentErrorKind,
 	AgentHarness,
 	Decider,
-	EffectJournal,
-	GithubItemsInput,
 	HarnessName,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
@@ -15,8 +13,6 @@ import type {
 	AgentNode,
 	Flow,
 	FlowNode,
-	JsonValue,
-	ListItem,
 	ResolvedPolicy,
 	TemplateContext,
 } from "@nightshift/flows";
@@ -28,7 +24,6 @@ import {
 	countStepsSinceWalkBegan,
 	countVisits,
 	type DerivedStep,
-	deriveSideEffect,
 	deriveSteps,
 	deriveStopAfterStep,
 	deriveStopAt,
@@ -130,14 +125,12 @@ export type StepContext = {
 	/** The harness of that name, when it is added and built. */
 	harnessFor(name: HarnessName): AgentHarness | undefined;
 	decider?: Decider;
-	readGithubItems?: (input: GithubItemsInput) => Promise<ListItem[]>;
 	/** An Agent node's MCP servers, expanded. The values go to the harness only. */
 	mcpServersFor(
 		node: Pick<AgentNode, "connections" | "mcpServers">,
 	): Promise<McpExpansion>;
 	/** What an agent learns about its CLI tools. Without it: nothing. */
 	cliToolsFor?: (names: readonly string[]) => Promise<CliToolGuide[]>;
-	effectJournal(runId: string, stepId: string): EffectJournal;
 	/** The run's abort signal: a person stopped the run. */
 	signal(): AbortSignal;
 	now(): number;
@@ -214,71 +207,6 @@ export function createRecorders(input: { db: Database; bus: RunBus }) {
 	};
 }
 
-/**
- * The effect journal of one step, kept in the event log: an action with
- * the same key acts once across the step's sessions. Ported from engine.ts.
- */
-export function createEffectJournal(
-	log: RunLog,
-	runId: string,
-	stepId: string,
-): EffectJournal {
-	const ended = (
-		action: string,
-		key: string,
-		result: unknown,
-		error: string | null,
-	) =>
-		log.append({
-			type: "SideEffectEnded",
-			runId,
-			stepId,
-			payload: { action, key, result: (result ?? null) as JsonValue, error },
-		});
-	return {
-		async once<T>(input: {
-			action: string;
-			key: string;
-			act: () => Promise<T>;
-			find?: () => Promise<T | null>;
-		}): Promise<{ result: T; earlier: boolean }> {
-			const { action, key } = input;
-			const fact = deriveSideEffect(
-				await log.events(runId),
-				stepId,
-				action,
-				key,
-			);
-			if (fact?.state === "ended") {
-				return { result: fact.result as T, earlier: true };
-			}
-			if (fact?.state === "started" && input.find) {
-				// Started, never recorded: the daemon may have stopped after the act.
-				const found = await input.find();
-				if (found !== null) {
-					await ended(action, key, found, null);
-					return { result: found, earlier: true };
-				}
-			}
-			await log.append({
-				type: "SideEffectStarted",
-				runId,
-				stepId,
-				payload: { action, key },
-			});
-			let result: T;
-			try {
-				result = await input.act();
-			} catch (error) {
-				await ended(action, key, null, messageOf(error));
-				throw error;
-			}
-			await ended(action, key, result, null);
-			return { result, earlier: false };
-		},
-	};
-}
-
 /** Templates of a node read the state's node outputs, the inputs and the run. */
 function templateContext(
 	ctx: StepContext,
@@ -334,12 +262,14 @@ export type AbortReason = "stopped" | "timeout" | "idle";
  * How a node enters: a new visit (the default), or an existing step of the
  * node: `reopen` appends `StepReopened` (a person resumed a parked step, or
  * the daemon re-runs the node after a restart); `continue` appends nothing
- * (the step waited, and the wait ended).
+ * (the step waited, and the wait ended). A `quiet` continue also tells the
+ * bus and the custom stream nothing: the step did not start again (a Gate
+ * that ends on its answer).
  */
 export type StepStart =
 	| { kind: "new" }
 	| { kind: "reopen"; stepId: string; prompt: string | null }
-	| { kind: "continue"; stepId: string };
+	| { kind: "continue"; stepId: string; quiet?: boolean };
 
 /** A step in progress: what the node body needs, and how it ends. */
 export type StepHandle = {
@@ -480,14 +410,16 @@ export async function beginStep(
 			});
 		}
 	}
-	ctx.bus.publish(runId, { kind: "step-changed", stepId });
-	emit(config, {
-		type: "step-started",
-		stepId,
-		nodeId: node.id,
-		visit,
-		reopened: start.kind !== "new",
-	});
+	if (!(start.kind === "continue" && start.quiet)) {
+		ctx.bus.publish(runId, { kind: "step-changed", stepId });
+		emit(config, {
+			type: "step-started",
+			stepId,
+			nodeId: node.id,
+			visit,
+			reopened: start.kind !== "new",
+		});
+	}
 
 	const recorder = await ctx.recorder(stepId, path);
 
@@ -498,10 +430,15 @@ export async function beginStep(
 	const onStop = () => stepController.abort("stopped" satisfies AbortReason);
 	if (runSignal.aborted) onStop();
 	else runSignal.addEventListener("abort", onStop, { once: true });
-	const timer = node.timeoutMinutes
+	// A Gate (a Decision decided by a person) waits as long as it must.
+	const timeoutMinutes =
+		node.type === "decision" && node.by === "person"
+			? undefined
+			: node.timeoutMinutes;
+	const timer = timeoutMinutes
 		? setTimeout(
 				() => stepController.abort("timeout" satisfies AbortReason),
-				node.timeoutMinutes * ctx.minuteMs,
+				timeoutMinutes * ctx.minuteMs,
 			)
 		: undefined;
 	const idleMinutes = node.type === "agent" ? node.idleMinutes : undefined;
@@ -604,7 +541,7 @@ export async function beginStep(
 	return { kind: "step", step: handle };
 }
 
-/** An Agent or Decision step that hit a usage limit or lost the network. */
+/** An Agent step, or a Decision step decided by a model, that hit a usage limit or lost the network. */
 export type WaitRequest = {
 	reason: WaitReason;
 	/** The harness's error message. */

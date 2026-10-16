@@ -1,5 +1,5 @@
 {
-	"version": 2,
+	"version": 3,
 	"description": "One Feature: its Traces, blockers first, each on its own branch of the stack. Then the checkpoint: the validator verifies and tunes, the orchestrator steers, and a decision continues or halts the night.",
 	"inputs": [
 		{
@@ -32,11 +32,8 @@
 			},
 			"type": "foreach",
 			"source": {
-				"kind": "github",
-				"parent": "{{item.number}}",
-				"requireLabel": "trace",
-				"doneLabels": ["implemented"],
-				"skipLabels": ["draft"]
+				"kind": "command",
+				"command": "gh api graphql -F owner='{owner}' -F name='{repo}' -F number=\"{{item.number}}\" -f query='\nquery($owner: String!, $name: String!, $number: Int!) {\n  repository(owner: $owner, name: $name) {\n    issue(number: $number) {\n      number title\n      subIssues(first: 100) {\n        nodes {\n          number title body state url\n          labels(first: 30) { nodes { name } }\n          blockedBy(first: 50) { nodes { number state } }\n        }\n      }\n    }\n  }\n}' --jq '\n\"trace\" as $require | [\"draft\"] as $skip | [\"implemented\"] as $done\n| .data.repository.issue as $parent\n| [ $parent.subIssues.nodes[]\n    | (.labels.nodes | map(.name | ascii_downcase)) as $labels\n    | select($require == null or any($labels[]; . == $require))\n    | select(any($labels[]; IN($skip[])) | not)\n    | { id: (.number | tostring), number, title, body: (.body // \"\"), url, state,\n        labels: [.labels.nodes[].name],\n        parent: { number: $parent.number, title: $parent.title },\n        dependsOn: [ .blockedBy.nodes[] | { id: (.number | tostring), done: (.state == \"CLOSED\") } ],\n        done: (.state == \"CLOSED\" or any($labels[]; IN($done[]))) } ]'"
 			},
 			"flow": "trace",
 			"as": "item",
@@ -150,7 +147,9 @@
 			},
 			"type": "decision",
 			"prompt": "You decide whether an unattended night build (\"night-shift\") continues after Feature #{{item.number}} ({{item.title}}) of Epic #{{item.parent.number}}. Nobody is awake: decide from the reports below.\n\nThe Traces of this Feature:\n{{traces.summary}}\n\nThe validator verified and tuned the work. Its summary:\n\n{{validate.summary}}\n\nThe tuning of the validator, when it did not pass the check, was removed (\"pass\" here means removed, empty means kept): {{drop_tune.outcome}}\n\nThe orchestrator read the work and steered the next workers. Its report:\n\n{{steer.summary}}\n\nPick \"halt\" only when work on top of this code would be wrong: the code misses its spec in a way that the validator could not correct, or the spec contradicts itself or the code so that the owner must decide. In each other case pick \"continue\". In the notes: 1 to 3 sentences on why, then each step or decision for the owner.",
-			"labels": [
+			"model": "opus",
+			"timeoutMinutes": 30,
+			"options": [
 				{
 					"name": "continue",
 					"description": "The work is a sound base: the night goes on with the next Feature."
@@ -160,9 +159,7 @@
 					"description": "Work on top of this code would be wrong: it misses its spec in a way the validator could not correct, or the spec contradicts itself or the code. The night stops for the owner."
 				}
 			],
-			"decider": "claude-code",
-			"model": "opus",
-			"timeoutMinutes": 30
+			"by": "model"
 		}
 	],
 	"edges": [

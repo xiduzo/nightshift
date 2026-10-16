@@ -11,6 +11,7 @@ import {
 	type FlowNode,
 	flowSchema,
 	migrateFlow,
+	optionProblem,
 	type Policy,
 	parseFlow,
 	type ResolvedPolicy,
@@ -168,7 +169,7 @@ export function createEngine(
 ): Engine {
 	const minuteMs = internals.minuteMs ?? 60_000;
 	const now = internals.now ?? Date.now;
-	const { db, harnesses, dataDir, decider, readGithubItems } = options;
+	const { db, harnesses, dataDir, decider } = options;
 	const maxConcurrentRuns =
 		options.maxConcurrentRuns ?? DEFAULT_MAX_CONCURRENT_RUNS;
 	if (!Number.isInteger(maxConcurrentRuns) || maxConcurrentRuns < 1) {
@@ -224,7 +225,6 @@ export function createEngine(
 		settings: runSettings,
 		harnessFor,
 		...(decider ? { decider } : {}),
-		...(readGithubItems ? { readGithubItems } : {}),
 		mcpServersFor,
 		...(options.cliToolsFor ? { cliToolsFor: options.cliToolsFor } : {}),
 		flowOf: parseRunFlow,
@@ -495,6 +495,13 @@ export function createEngine(
 				costUsd: s.ending?.costUsd ?? null,
 			})),
 			costUsd: derived.costUsd,
+			gate: derived.gate
+				? {
+						question: derived.gate.question,
+						choices: derived.gate.choices,
+						openedAt: derived.gate.openedAt,
+					}
+				: null,
 		};
 	}
 
@@ -815,17 +822,12 @@ export function createEngine(
 						.join(" "),
 				);
 			}
-			if (!decider && nodes.some((n) => n.type === "decision")) {
-				throw new Error(
-					"The flow has a Decision node, but no decider is configured.",
-				);
-			}
 			if (
-				!readGithubItems &&
-				nodes.some((n) => n.type === "foreach" && n.source.kind === "github")
+				!decider &&
+				nodes.some((n) => n.type === "decision" && n.by === "model")
 			) {
 				throw new Error(
-					"The flow has a For Each node over GitHub issues, but no GitHub reader is configured.",
+					"The flow has a Decision node decided by a model, but no decider is configured.",
 				);
 			}
 			if (input.stopAt !== undefined && input.stopAt <= now()) {
@@ -1185,11 +1187,8 @@ export function createEngine(
 				if (gate.stepId !== stepId) {
 					throw new Error(`Step ${stepId} is not the open Gate of this run.`);
 				}
-				if (!gate.choices.some((c) => c.name === choice)) {
-					throw new Error(
-						`"${choice}" is not a choice of this Gate. Choose one of: ${gate.choices.map((c) => c.name).join(", ")}.`,
-					);
-				}
+				const problem = optionProblem(gate.choices, choice);
+				if (problem !== null) throw new Error(problem);
 				// The thread continues at once, so it needs a slot. A full cap
 				// leaves the Gate open.
 				runner.reserveSlot(runId);

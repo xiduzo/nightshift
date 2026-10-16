@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 
 import {
 	checkCli,
-	checkGithub,
 	checkHarness,
 	cliHelp,
 	cliHelpAt,
@@ -322,74 +321,6 @@ describe("checkHarness: codex", () => {
 		});
 		expect((await checkHarness("codex", bin)).problem).toBe(
 			"Not logged in. Run `codex login`.",
-		);
-	});
-});
-
-describe("checkGithub", () => {
-	const GH_VERSION = {
-		stdout:
-			"gh version 2.80.0 (2025-10-01)\nhttps://github.com/cli/cli/releases/tag/v2.80.0\n",
-	};
-
-	test("a logged-in gh: account and token scopes", async () => {
-		const bin = await fakeCli("gh", {
-			"--version": GH_VERSION,
-			"auth status --hostname github.com": {
-				stderr: [
-					"github.com",
-					"  ✓ Logged in to github.com account octocat (keyring)",
-					"  - Active account: true",
-					"  - Git operations protocol: https",
-					"  - Token: gho_************************************",
-					"  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'",
-					"",
-				].join("\n"),
-			},
-		});
-		expect(await checkGithub(bin)).toEqual({
-			bin,
-			path: bin,
-			version: "2.80.0 (2025-10-01)",
-			account: "octocat",
-			facts: [{ label: "Scopes", value: "gist, read:org, repo, workflow" }],
-			problem: null,
-			checkedAt: expect.any(Number),
-		});
-	});
-
-	test("a login without token scopes has no facts", async () => {
-		const bin = await fakeCli("gh", {
-			"--version": GH_VERSION,
-			"auth status --hostname github.com": {
-				stdout:
-					"github.com\n  ✓ Logged in to github.com account octocat (GH_TOKEN)\n",
-			},
-		});
-		const check = await checkGithub(bin);
-		expect(check.account).toBe("octocat");
-		expect(check.facts).toEqual([]);
-	});
-
-	test("not logged in is a problem", async () => {
-		const bin = await fakeCli("gh", {
-			"--version": GH_VERSION,
-			"auth status --hostname github.com": {
-				stderr:
-					"You are not logged into any GitHub hosts. To log in, run: gh auth login\n",
-				code: 1,
-			},
-		});
-		const check = await checkGithub(bin);
-		expect(check.account).toBeNull();
-		expect(check.problem).toBe(
-			"Not logged in to github.com. Run `gh auth login`.",
-		);
-	});
-
-	test("a missing gh is a problem", async () => {
-		expect((await checkGithub("nightshift-no-such-gh")).problem).toBe(
-			"The GitHub CLI is not installed, or Night Shift cannot find it. Install it, or enter its path.",
 		);
 	});
 });

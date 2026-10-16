@@ -47,7 +47,7 @@ const check: CommandNode = {
 	command: "echo checked",
 };
 const flow: Flow = {
-	version: 2,
+	version: 3,
 	inputs: [],
 	outputs: [],
 	start: "work",

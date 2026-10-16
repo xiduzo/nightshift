@@ -11,7 +11,6 @@ export async function fakeBin(
 	dir: string,
 	name: string,
 	fixture:
-		| "fake-gh"
 		| "fake-claude"
 		| "fake-opencode"
 		| "fake-codex"

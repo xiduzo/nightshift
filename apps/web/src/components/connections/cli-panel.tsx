@@ -51,7 +51,7 @@ export type Tool = {
 	offMachine: (check: CliCheck | undefined) => string;
 };
 
-/** The CLIs Night Shift runs on this machine: every harness, and the GitHub CLI. */
+/** The CLIs Night Shift runs on this machine: every harness. */
 export const TOOLS: Tool[] = [
 	...HARNESSES.map(
 		(h): Tool => ({
@@ -63,15 +63,6 @@ export const TOOLS: Tool[] = [
 			offMachine: () => h.offMachine,
 		}),
 	),
-	{
-		target: "github",
-		title: "GitHub CLI",
-		initials: "GH",
-		role: "Issues and pull requests",
-		setting: "ghBin",
-		offMachine: (check) =>
-			`Reads issues and opens pull requests on GitHub as ${check?.account ?? "the account you use with the GitHub CLI"}.`,
-	},
 ];
 
 export function checkState(check: CliCheck | undefined): CheckState {

@@ -1,5 +1,5 @@
 {
-	"version": 2,
+	"version": 3,
 	"description": "One task of plan-and-build: runs implement-and-check with the task's title and details.",
 	"inputs": [
 		{

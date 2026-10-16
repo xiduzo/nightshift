@@ -28,7 +28,8 @@ const decision = (
 	type: "decision" as const,
 	position: { x: 0, y: 0 },
 	prompt: "Go on {{task}}?",
-	labels,
+	options: labels,
+	by: "model" as const,
 	decider: "typesafe" as const,
 	model: "jev-1.13.0",
 	...extra,
@@ -134,7 +135,7 @@ describe("the Decision node", () => {
 		});
 		expect(payloads(logged, "StepEnded")[0]).toEqual({
 			outcome: "ship",
-			outputs: { outcome: "ship", notes: "The tests pass.", visit: 1 },
+			outputs: { outcome: "ship", note: "The tests pass.", visit: 1 },
 			error: null,
 			costUsd: 0.02,
 		});
@@ -166,7 +167,7 @@ describe("the Decision node", () => {
 
 		expect(state.nodes.decide).toEqual({
 			outcome: "ship",
-			notes: "The tests pass.",
+			note: "The tests pass.",
 			visit: 1,
 		});
 		expect(state.visits).toEqual({ decide: 1, done: 1 });
@@ -213,7 +214,7 @@ describe("the Decision node", () => {
 		expect(payloads(await h.events(), "StepEnded")).toEqual([
 			{
 				outcome: "error",
-				outputs: { outcome: "error", notes: "", visit: 1 },
+				outputs: { outcome: "error", note: "", visit: 1 },
 				error: "The decider failed: boom",
 				costUsd: 0.03,
 			},
@@ -245,9 +246,8 @@ describe("the Decision node", () => {
 		expect(parked[0]).toMatchObject({ status: "failed" });
 		expect(payloads(await h.events(), "StepEnded")[0]).toEqual({
 			outcome: "error",
-			outputs: { outcome: "error", notes: "Unsure.", visit: 1 },
-			error:
-				'The decider picked "maybe", which is not a label of this node. The labels are: yes, no.',
+			outputs: { outcome: "error", note: "Unsure.", visit: 1 },
+			error: '"maybe" is not an option of this node. Choose one of: yes, no.',
 			costUsd: null,
 		});
 	});
@@ -269,7 +269,7 @@ describe("the Decision node", () => {
 		});
 		expect(payloads(await h.events(), "StepEnded")[0]).toEqual({
 			outcome: "error",
-			outputs: { outcome: "error", notes: "", visit: 1 },
+			outputs: { outcome: "error", note: "", visit: 1 },
 			error: "No decider is configured for Decision nodes.",
 		});
 	});
@@ -293,7 +293,7 @@ describe("the Decision node", () => {
 		expect(payloads(await h.events(), "StepEnded")).toEqual([
 			{
 				outcome: "stopped",
-				outputs: { outcome: "stopped", notes: "", visit: 1 },
+				outputs: { outcome: "stopped", note: "", visit: 1 },
 				error: null,
 				costUsd: 0.001,
 			},
@@ -479,7 +479,7 @@ describe("the Decision node", () => {
 			stepId,
 			payload: {
 				outcome: "interrupted",
-				outputs: { outcome: "interrupted", visit: 1, notes: "" },
+				outputs: { outcome: "interrupted", visit: 1, note: "" },
 				error: "Night Shift stopped while this ran.",
 			},
 		});
@@ -529,5 +529,253 @@ describe("the Decision node", () => {
 			outcome: "yes",
 			costUsd: 0.01,
 		});
+	});
+});
+
+/** A Decision decided by a rule: `[name, when]` per option; no `when` is the default. */
+const ruled = (
+	id: string,
+	options: [string, string?][],
+	extra: Record<string, unknown> = {},
+) => ({
+	id,
+	type: "decision" as const,
+	position: { x: 0, y: 0 },
+	prompt: "",
+	options: options.map(([name, when]) =>
+		when === undefined ? { name } : { name, when },
+	),
+	by: "rule" as const,
+	...extra,
+});
+
+describe("the Decision node decided by a rule", () => {
+	test("the first option whose rule holds is the outcome; the step has no cost, no session and no wait node", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				inputs: [{ name: "build", type: "json" }],
+				start: "check",
+				nodes: [
+					command("check", "exit 2"),
+					ruled("pick", [
+						["ship", "build.tests_passed = true and check.exit_code = 0"],
+						["retry", "check.exit_code = 2 and build.tests_passed"],
+						["stop"],
+					]),
+					command("again", "true"),
+				],
+				edges: [
+					{ id: "e1", from: "check", outcome: "fail", to: "pick" },
+					{ id: "e2", from: "pick", outcome: "retry", to: "again" },
+				],
+			}),
+		);
+		const { parked, state, events } = await drive(h, {
+			inputs: { build: { tests_passed: true } },
+		});
+		expect(parked).toEqual([]);
+		expect(state.ended?.nodeId).toBe("again");
+		expect(state.nodes.pick).toEqual({ outcome: "retry", note: "", visit: 1 });
+		expect(h.graph().getGraph().nodes).not.toHaveProperty("wait__pick");
+
+		const logged = await h.events();
+		expect(await h.types()).toEqual([
+			"RunStarted",
+			"StepStarted",
+			"StepEnded",
+			"EdgeTaken",
+			"StepStarted",
+			"StepEnded",
+			"EdgeTaken",
+			"StepStarted",
+			"StepEnded",
+		]);
+		expect(payloads(logged, "StepStarted")[1]).toMatchObject({
+			nodeId: "pick",
+			nodeType: "decision",
+			visit: 1,
+		});
+		expect(payloads(logged, "StepEnded")[1]).toEqual({
+			outcome: "retry",
+			outputs: { outcome: "retry", note: "", visit: 1 },
+			error: null,
+		});
+		const [, pick] = deriveSteps(logged);
+		expect(pick?.costUsd).toBe(0);
+		expect(pick?.sessions).toEqual([]);
+		const transcript = await readTranscriptFile(pick?.transcriptPath as string);
+		expect(transcript.map((e) => e.event)).toEqual([
+			{
+				type: "rule",
+				matched: "retry",
+				evaluated: [
+					{ option: "ship", result: false },
+					{ option: "retry", result: true },
+				],
+			},
+		]);
+		expect(
+			events.filter((e) => e.type !== "transcript").map((e) => e.type),
+		).toEqual([
+			"step-started",
+			"step-ended",
+			"step-started",
+			"step-ended",
+			"step-started",
+			"step-ended",
+		]);
+	});
+
+	test("the option without a rule is the default", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "pick",
+				nodes: [ruled("pick", [["ship", "run.branch = 'nope'"], ["stop"]])],
+				edges: [],
+			}),
+		);
+		const { state } = await drive(h, { inputs: {} });
+		expect(state.ended).toEqual({
+			status: "finished",
+			nodeId: "pick",
+			outcome: "stop",
+			reason: 'Ended at node "pick" with "stop".',
+		});
+		const [pick] = deriveSteps(await h.events());
+		expect(
+			(await readTranscriptFile(pick?.transcriptPath as string)).map(
+				(e) => e.event,
+			),
+		).toEqual([
+			{
+				type: "rule",
+				matched: "stop",
+				evaluated: [
+					{ option: "ship", result: false },
+					{ option: "stop", result: null },
+				],
+			},
+		]);
+	});
+
+	test("no rule holds and there is no default: the step ends as error", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "pick",
+				nodes: [
+					ruled("pick", [
+						["ship", "run.branch = 'nope'"],
+						["retry", "ghost.exit_code"],
+					]),
+				],
+				edges: [],
+			}),
+		);
+		const { parked } = await drive(h, { inputs: {} });
+		expect(parked[0]).toMatchObject({
+			status: "failed",
+			reason:
+				'Node "pick" failed: No option matched: no rule held, and no option is without a rule.',
+		});
+		expect(payloads(await h.events(), "StepEnded")).toEqual([
+			{
+				outcome: "error",
+				outputs: { outcome: "error", note: "", visit: 1 },
+				error:
+					"No option matched: no rule held, and no option is without a rule.",
+			},
+		]);
+		const [pick] = deriveSteps(await h.events());
+		expect(
+			(await readTranscriptFile(pick?.transcriptPath as string)).map(
+				(e) => e.event,
+			),
+		).toEqual([
+			{
+				type: "rule",
+				matched: null,
+				evaluated: [
+					{ option: "ship", result: false },
+					{ option: "retry", result: null },
+				],
+			},
+		]);
+	});
+
+	test("a rule that fails ends the step as error with JSONata's message", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "pick",
+				nodes: [ruled("pick", [["boom", "$error('no way')"], ["stop"]])],
+				edges: [],
+			}),
+		);
+		const { parked } = await drive(h, { inputs: {} });
+		expect(parked[0]).toMatchObject({
+			status: "failed",
+			reason: 'Node "pick" failed: The rule of option "boom" failed: no way',
+		});
+		expect(payloads(await h.events(), "StepEnded")[0]).toMatchObject({
+			outcome: "error",
+			error: 'The rule of option "boom" failed: no way',
+		});
+	});
+
+	test("a daemon death mid-step: the node runs a new visit on the same values, nothing is reopened", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "pick",
+				nodes: [ruled("pick", [["go", "$exists(run.worktree)"], ["stop"]])],
+				edges: [],
+			}),
+		);
+		const recorder = h.ctx.recorder;
+		h.ctx.recorder = async () => {
+			throw new Error("the daemon died");
+		};
+		await expect(drive(h, { inputs: {} })).rejects.toThrow("the daemon died");
+		h.ctx.recorder = recorder;
+		const [first] = deriveSteps(await h.events());
+		expect(first).toMatchObject({ nodeId: "pick", visit: 1, endedAt: null });
+
+		// Recovery ended the step `interrupted`; the engine appended RunResumed
+		// and re-runs the node with invoke(null).
+		await h.log.append({
+			type: "StepEnded",
+			runId: h.runId,
+			stepId: first?.id as string,
+			payload: {
+				outcome: "interrupted",
+				outputs: { outcome: "interrupted", note: "", visit: 1 },
+				error: "Night Shift stopped while this ran.",
+			},
+		});
+		await h.log.append({
+			type: "RunResumed",
+			runId: h.runId,
+			payload: {
+				nodeId: "pick",
+				stepId: null,
+				prompt: null,
+				scope: null,
+				by: "daemon",
+				reason: "Night Shift restarted.",
+			},
+		});
+		const again = await drive(h, null);
+		expect(again.parked).toEqual([]);
+		expect(again.state.ended).toMatchObject({ nodeId: "pick", outcome: "go" });
+		expect(await h.types()).not.toContain("StepReopened");
+		expect(
+			deriveSteps(await h.events()).map((s) => [s.visit, s.outcome]),
+		).toEqual([
+			[1, "interrupted"],
+			[2, "go"],
+		]);
 	});
 });

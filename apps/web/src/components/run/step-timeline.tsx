@@ -51,7 +51,7 @@ function spanOf(list: StepSummary[], now = Date.now()): string | undefined {
 /** What the steps that can cost cost together; undefined when none did. */
 function costOf(list: StepSummary[]): string | undefined {
 	const costs = list
-		.filter((step) => hasCost(step.nodeType) && step.costUsd != null)
+		.filter((step) => hasCost(step) && step.costUsd != null)
 		.map((step) => step.costUsd ?? 0);
 	return costs.length === 0
 		? undefined
@@ -185,7 +185,7 @@ export function StepTimeline({
 					cost={
 						callsFlow(step)
 							? costOf(calledSteps(steps, step))
-							: hasCost(step.nodeType)
+							: hasCost(step)
 								? formatCost(step.costUsd)
 								: undefined
 					}

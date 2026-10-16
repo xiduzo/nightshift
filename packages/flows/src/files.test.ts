@@ -103,7 +103,7 @@ describe("readFlowFile", () => {
 		await mkdir(flowsDir(repo), { recursive: true });
 		await writeFile(
 			join(flowsDir(repo), "wrong.json"),
-			JSON.stringify({ version: 3, start: "a", nodes: [], edges: [] }),
+			JSON.stringify({ version: 99, start: "a", nodes: [], edges: [] }),
 		);
 		const loaded = await readFlowFile(repo, "wrong");
 		expect(loaded.flow).toBeNull();
@@ -212,19 +212,19 @@ describe("version 1 files", () => {
 		const loaded = await readFlowFile(repo, "old");
 		expect(loaded.issues).toEqual([]);
 		expect(loaded.flow).toMatchObject({
-			version: 2,
+			version: 3,
 			inputs: [{ name: "epic", type: "text", required: true }],
 			outputs: [],
 			nodes: [{ prompt: "Build Epic {{epic}}" }],
 		});
-		expect((await loadAllFlows(repo)).old?.version).toBe(2);
+		expect((await loadAllFlows(repo)).old?.version).toBe(3);
 		expect(await listFlowFiles(repo)).toEqual([
 			expect.objectContaining({ name: "old", errorCount: 0, nodeCount: 1 }),
 		]);
 		expect(await readFile(path, "utf8")).toBe(text);
 	});
 
-	test("writing a read flow saves version 2", async () => {
+	test("writing a read flow saves version 3", async () => {
 		await mkdir(flowsDir(repo), { recursive: true });
 		await writeFile(join(flowsDir(repo), "old.json"), JSON.stringify(v1));
 		const loaded = await readFlowFile(repo, "old");
@@ -233,7 +233,7 @@ describe("version 1 files", () => {
 		const saved = JSON.parse(
 			await readFile(join(flowsDir(repo), "old.json"), "utf8"),
 		);
-		expect(saved.version).toBe(2);
+		expect(saved.version).toBe(3);
 		expect(saved).not.toHaveProperty("params");
 		expect(saved.inputs).toEqual([
 			{ name: "epic", type: "text", required: true },
@@ -249,7 +249,7 @@ describe("calls between flow files", () => {
 
 	/** One For Each node running `called`. */
 	const outer = (called: string): Flow => ({
-		version: 2,
+		version: 3,
 		inputs: [],
 		outputs: [],
 		start: "each",
@@ -258,7 +258,7 @@ describe("calls between flow files", () => {
 				id: "each",
 				type: "foreach",
 				position: { x: 0, y: 0 },
-				source: { kind: "github", parent: "7", doneLabels: [], skipLabels: [] },
+				source: { kind: "command", command: "./list 7" },
 				flow: called,
 				as: "item",
 				inputs: {},

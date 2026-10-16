@@ -4,7 +4,6 @@ import {
 	type DecisionNode,
 	type Flow,
 	type FlowNode,
-	type GateNode,
 	nodeIdSchema,
 	nodeOutcomes,
 	type Outcome,
@@ -25,6 +24,10 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Textarea } from "@nightshift/ui/components/textarea";
+import {
+	ToggleGroup,
+	ToggleGroupItem,
+} from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import {
 	ArrowRightIcon,
@@ -38,7 +41,7 @@ import { type ReactNode, useId, useState } from "react";
 
 import { ModelCombobox } from "@/components/agents/model-combobox";
 import type { ProfileRow } from "@/components/agents/types";
-import { NODE_TYPE } from "@/components/flow/node-type";
+import { DECIDED_BY_ICON, NODE_TYPE } from "@/components/flow/node-type";
 import { outcomeLabel } from "@/components/outcome-badge";
 import {
 	EFFORTS,
@@ -52,6 +55,7 @@ import {
 	nodeOptions,
 	type OptionNode,
 	withConnections,
+	withDecidedBy,
 	withOptions,
 } from "@/lib/flow-draft";
 import {
@@ -279,19 +283,6 @@ export function NodeInspector({
 					onRemoveOutcome={onRemoveOutcome}
 				/>
 			) : null}
-			{node.type === "gate" ? (
-				<GateFields
-					flow={flow}
-					node={node}
-					onChange={(change) =>
-						onChange((current) =>
-							current.type === "gate" ? change(current) : current,
-						)
-					}
-					onRenameOutcome={onRenameOutcome}
-					onRemoveOutcome={onRemoveOutcome}
-				/>
-			) : null}
 
 			{node.type === "subflow" ? (
 				<SubflowFields
@@ -333,53 +324,56 @@ export function NodeInspector({
 				/>
 			) : null}
 
-			<InspectorSection
-				title="Limits"
-				collapsible
-				defaultOpen={
-					node.timeoutMinutes !== undefined ||
-					(node.type === "agent" && node.idleMinutes !== undefined)
-				}
-			>
-				<Field
-					id={`${id}-timeout`}
-					label="Timeout in minutes"
-					optional
-					hint="The step fails when one visit runs longer."
+			{/* A Gate (a Decision decided by you) waits as long as it must: no limits. */}
+			{node.type === "decision" && node.by === "person" ? null : (
+				<InspectorSection
+					title="Limits"
+					collapsible
+					defaultOpen={
+						node.timeoutMinutes !== undefined ||
+						(node.type === "agent" && node.idleMinutes !== undefined)
+					}
 				>
-					<PositiveIntInput
-						id={`${id}-timeout`}
-						value={node.timeoutMinutes}
-						placeholder="No limit"
-						describedBy={`${id}-timeout-hint`}
-						onChange={(timeoutMinutes) =>
-							onChange((current) => ({ ...current, timeoutMinutes }))
-						}
-					/>
-				</Field>
-				{node.type === "agent" ? (
 					<Field
-						id={`${id}-idle`}
-						label="Idle timeout in minutes"
+						id={`${id}-timeout`}
+						label="Timeout in minutes"
 						optional
-						hint="The step fails when the agent shows no activity for this long."
+						hint="The step fails when one visit runs longer."
 					>
 						<PositiveIntInput
-							id={`${id}-idle`}
-							value={node.idleMinutes}
+							id={`${id}-timeout`}
+							value={node.timeoutMinutes}
 							placeholder="No limit"
-							describedBy={`${id}-idle-hint`}
-							onChange={(idleMinutes) =>
-								onChange((current) =>
-									current.type === "agent"
-										? { ...current, idleMinutes }
-										: current,
-								)
+							describedBy={`${id}-timeout-hint`}
+							onChange={(timeoutMinutes) =>
+								onChange((current) => ({ ...current, timeoutMinutes }))
 							}
 						/>
 					</Field>
-				) : null}
-			</InspectorSection>
+					{node.type === "agent" ? (
+						<Field
+							id={`${id}-idle`}
+							label="Idle timeout in minutes"
+							optional
+							hint="The step fails when the agent shows no activity for this long."
+						>
+							<PositiveIntInput
+								id={`${id}-idle`}
+								value={node.idleMinutes}
+								placeholder="No limit"
+								describedBy={`${id}-idle-hint`}
+								onChange={(idleMinutes) =>
+									onChange((current) =>
+										current.type === "agent"
+											? { ...current, idleMinutes }
+											: current,
+									)
+								}
+							/>
+						</Field>
+					) : null}
+				</InspectorSection>
+			)}
 		</div>
 	);
 }
@@ -1093,23 +1087,26 @@ function CommandFields({
 	);
 }
 
-/** The labels or choices of a node, with the edits that keep its edges in step. */
+/** The options or outcomes of a node, with the edits that keep its edges in step. */
 function NodeOptionsField<T extends OptionNode>({
 	id,
 	kind,
 	node,
 	min,
 	hint,
+	rules = false,
 	onChange,
 	onRenameOutcome,
 	onRemoveOutcome,
 	children,
 }: {
 	id: string;
-	kind: "label" | "choice" | "outcome";
+	kind: "option" | "outcome";
 	node: T;
 	min: number;
 	hint: string;
+	/** Each option takes a rule (a Decision decided by a rule). */
+	rules?: boolean;
 	onChange: (change: (node: T) => T) => void;
 	onRenameOutcome: (index: number, name: string) => string | null;
 	onRemoveOutcome: (index: number) => void;
@@ -1122,9 +1119,7 @@ function NodeOptionsField<T extends OptionNode>({
 
 	return (
 		<InspectorSection
-			title={
-				kind === "label" ? "Labels" : kind === "choice" ? "Choices" : "Outcomes"
-			}
+			title={kind === "option" ? "Options" : "Outcomes"}
 			aside={
 				<Badge variant="secondary" className="tabular-nums">
 					{options.length}
@@ -1153,6 +1148,18 @@ function NodeOptionsField<T extends OptionNode>({
 						}),
 					)
 				}
+				onRule={
+					rules
+						? (index, when) =>
+								change((list) =>
+									list.map((option, at) => {
+										if (at !== index) return option;
+										const { when: _, ...rest } = option;
+										return when === undefined ? rest : { ...rest, when };
+									}),
+								)
+						: undefined
+				}
 				onAdd={(option) => change((list) => [...list, option])}
 				onMove={(from, to) =>
 					change((list) => {
@@ -1168,6 +1175,21 @@ function NodeOptionsField<T extends OptionNode>({
 	);
 }
 
+/** Who decides, in the order the toggle shows them. */
+const DECIDED_BY: {
+	by: DecisionNode["by"];
+	label: string;
+}[] = [
+	{ by: "person", label: "You" },
+	{ by: "rule", label: "A rule" },
+	{ by: "model", label: "A model" },
+];
+
+/**
+ * One Decision node, three ways to decide. The prompt is the question for
+ * you, a note for a rule, or the brief for a model. The options are the
+ * outcomes; with a rule, each option carries the rule that picks it.
+ */
 function DecisionFields({
 	flow,
 	node,
@@ -1182,154 +1204,190 @@ function DecisionFields({
 	onRemoveOutcome: (index: number) => void;
 }) {
 	const id = useId();
+	const { by } = node;
+	const prompt =
+		by === "person"
+			? {
+					label: "Question",
+					hint: "What you are asked in the Needs-you inbox, with the context you need to answer. The run waits until you do.",
+					placeholder:
+						"The worker opened {{worker.summary}}. Merge it and go on?",
+					invalid: node.prompt.trim() === "",
+				}
+			: by === "model"
+				? {
+						label: "Prompt",
+						hint: "What to decide, with the context it needs. The model picks one option and notes why.",
+						placeholder:
+							"Read {{check.log_tail}}. Is the build green enough to open a pull request?",
+						invalid: node.prompt.trim() === "",
+					}
+				: {
+						label: "Note",
+						hint: "Optional. A note for you on what the rules check. Nothing reads it.",
+						placeholder: "Ship when the tests pass and the check exits 0.",
+						invalid: false,
+					};
+	const optionsHint =
+		by === "person"
+			? "Each option is a button in the inbox, with its own edge."
+			: by === "model"
+				? "The model picks exactly one. Each option gets its own edge. A description tells the model when to pick it."
+				: "Night Shift tries the rules from top to bottom and picks the first option whose rule holds. Leave the last option without a rule: it is picked when none holds.";
+
 	const deciders = useQuery(orpc.deciders.list.queryOptions());
 	const decider = deciders.data?.find((d) => d.name === node.decider);
 	const keyMissing = decider?.apiKeySource === "missing";
 	return (
 		<>
 			<InspectorSection title="Decision">
+				<Field
+					id={`${id}-by`}
+					label="Decided by"
+					hint={
+						by === "person"
+							? "The run waits in the Needs-you inbox until you pick an option."
+							: by === "rule"
+								? "A rule reads the values of earlier nodes and inputs. No model, no cost."
+								: "A small model reads the prompt and picks an option."
+					}
+				>
+					<ToggleGroup
+						variant="outline"
+						size="sm"
+						spacing={0}
+						aria-label="Decided by"
+						className="w-full"
+						value={[by]}
+						onValueChange={(value) => {
+							const next = value[0] as DecisionNode["by"] | undefined;
+							if (next) onChange((current) => withDecidedBy(current, next));
+						}}
+					>
+						{DECIDED_BY.map((entry) => {
+							const Icon = DECIDED_BY_ICON[entry.by];
+							return (
+								<ToggleGroupItem
+									key={entry.by}
+									value={entry.by}
+									className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+								>
+									<Icon />
+									{entry.label}
+								</ToggleGroupItem>
+							);
+						})}
+					</ToggleGroup>
+				</Field>
 				<TemplateField
 					id={`${id}-prompt`}
-					label="Prompt"
-					hint="What to decide, with the context it needs. A decision model picks one label."
+					label={prompt.label}
+					hint={prompt.hint}
 					flow={flow}
 					nodeId={node.id}
 					value={node.prompt}
-					invalid={node.prompt.trim() === ""}
-					placeholder="Read {{check.log_tail}}. Is the build green enough to open a pull request?"
-					onChange={(prompt) => onChange((current) => ({ ...current, prompt }))}
-				/>
-			</InspectorSection>
-
-			<NodeOptionsField
-				id={`${id}-labels`}
-				kind="label"
-				node={node}
-				min={2}
-				hint="The model picks exactly one. Each label gets its own edge. A description tells the model when to pick it."
-				onChange={onChange}
-				onRenameOutcome={onRenameOutcome}
-				onRemoveOutcome={onRemoveOutcome}
-			/>
-
-			<InspectorSection title="Decided by">
-				<Field
-					id={`${id}-decider`}
-					label="Decider"
-					hint={
-						keyMissing && decider?.apiKey
-							? `Add the secret ${decider.apiKey} on the Agents page, or this node cannot decide.`
-							: "The decision model that picks the label."
-					}
-				>
-					<NativeSelect
-						id={`${id}-decider`}
-						value={node.decider}
-						aria-invalid={keyMissing}
-						aria-describedby={`${id}-decider-hint`}
-						onChange={(event) => {
-							const next = event.target.value as DecisionNode["decider"];
-							// A model belongs to its decider: the new one starts on its default.
-							onChange((current) => ({
-								...withoutField(current, "model"),
-								decider: next,
-							}));
-						}}
-					>
-						{(deciders.data ?? []).map((d) => (
-							<NativeSelectOption key={d.name} value={d.name}>
-								{d.label}
-							</NativeSelectOption>
-						))}
-					</NativeSelect>
-				</Field>
-				<Field
-					id={`${id}-model`}
-					label="Model"
-					hint="Leave it empty to use the decider's default model."
-				>
-					<Input
-						id={`${id}-model`}
-						list={`${id}-models`}
-						value={node.model ?? ""}
-						placeholder={decider?.defaultModel}
-						className="font-mono"
-						autoComplete="off"
-						spellCheck={false}
-						aria-describedby={`${id}-model-hint`}
-						onChange={(event) => {
-							const model = event.target.value.trim();
-							onChange((current) =>
-								model === ""
-									? withoutField(current, "model")
-									: { ...current, model },
-							);
-						}}
-					/>
-					<datalist id={`${id}-models`}>
-						{(decider?.models ?? []).map((value) => (
-							<option key={value} value={value} />
-						))}
-					</datalist>
-				</Field>
-				<Note>
-					Later nodes read <code>{`{{${node.id}.outcome}}`}</code> and{" "}
-					<code>{`{{${node.id}.notes}}`}</code>.
-				</Note>
-			</InspectorSection>
-		</>
-	);
-}
-
-function GateFields({
-	flow,
-	node,
-	onChange,
-	onRenameOutcome,
-	onRemoveOutcome,
-}: {
-	flow: Flow;
-	node: GateNode;
-	onChange: (change: (node: GateNode) => GateNode) => void;
-	onRenameOutcome: (index: number, name: string) => string | null;
-	onRemoveOutcome: (index: number) => void;
-}) {
-	const id = useId();
-	return (
-		<>
-			<InspectorSection title="Gate">
-				<TemplateField
-					id={`${id}-question`}
-					label="Question"
-					hint="What you are asked in the Needs-you inbox, with the context you need to answer. The run waits until you do."
-					flow={flow}
-					nodeId={node.id}
-					value={node.question}
-					invalid={node.question.trim() === ""}
-					className="font-sans text-sm"
-					placeholder="The worker opened {{worker.summary}}. Merge it and go on?"
-					onChange={(question) =>
-						onChange((current) => ({ ...current, question }))
+					invalid={prompt.invalid}
+					className={by === "person" ? "font-sans text-sm" : undefined}
+					placeholder={prompt.placeholder}
+					onChange={(text) =>
+						onChange((current) => ({ ...current, prompt: text }))
 					}
 				/>
 			</InspectorSection>
 
 			<NodeOptionsField
-				id={`${id}-choices`}
-				kind="choice"
+				id={`${id}-options`}
+				kind="option"
 				node={node}
 				min={1}
-				hint="Each choice is a button in the inbox, with its own edge."
+				hint={optionsHint}
+				rules={by === "rule"}
 				onChange={onChange}
 				onRenameOutcome={onRenameOutcome}
 				onRemoveOutcome={onRemoveOutcome}
 			>
-				<Note>
-					Later nodes read your answer as{" "}
-					<code>{`{{${node.id}.outcome}}`}</code> and your note as{" "}
-					<code>{`{{${node.id}.note}}`}</code>.
-				</Note>
+				{by === "rule" ? (
+					<Note>
+						A rule is a JSONata expression over the run's values. Write a node
+						id or an input name, then a path:{" "}
+						<code>build.data.tests_passed = true and check.exit_code = 0</code>.
+						Put a name with a dash in backticks: <code>`my-input` = "x"</code>.
+						Later nodes read the pick as <code>{`{{${node.id}.outcome}}`}</code>
+						.
+					</Note>
+				) : (
+					<Note>
+						Later nodes read the pick as <code>{`{{${node.id}.outcome}}`}</code>{" "}
+						and {by === "person" ? "your note" : "why the model picked it"} as{" "}
+						<code>{`{{${node.id}.note}}`}</code>.
+					</Note>
+				)}
 			</NodeOptionsField>
+
+			{by === "model" ? (
+				<InspectorSection title="Model">
+					<Field
+						id={`${id}-decider`}
+						label="Decider"
+						hint={
+							keyMissing && decider?.apiKey
+								? `Add the secret ${decider.apiKey} on the Agents page, or this node cannot decide.`
+								: "The decision model that picks the option."
+						}
+					>
+						<NativeSelect
+							id={`${id}-decider`}
+							value={node.decider}
+							aria-invalid={keyMissing}
+							aria-describedby={`${id}-decider-hint`}
+							onChange={(event) => {
+								const next = event.target.value as DecisionNode["decider"];
+								// A model belongs to its decider: the new one starts on its default.
+								onChange((current) => ({
+									...withoutField(current, "model"),
+									decider: next,
+								}));
+							}}
+						>
+							{(deciders.data ?? []).map((d) => (
+								<NativeSelectOption key={d.name} value={d.name}>
+									{d.label}
+								</NativeSelectOption>
+							))}
+						</NativeSelect>
+					</Field>
+					<Field
+						id={`${id}-model`}
+						label="Model"
+						optional
+						hint="Leave it empty to use the decider's default model."
+					>
+						<Input
+							id={`${id}-model`}
+							list={`${id}-models`}
+							value={node.model ?? ""}
+							placeholder={decider?.defaultModel}
+							className="font-mono"
+							autoComplete="off"
+							spellCheck={false}
+							aria-describedby={`${id}-model-hint`}
+							onChange={(event) => {
+								const model = event.target.value.trim();
+								onChange((current) =>
+									model === ""
+										? withoutField(current, "model")
+										: { ...current, model },
+								);
+							}}
+						/>
+						<datalist id={`${id}-models`}>
+							{(decider?.models ?? []).map((value) => (
+								<option key={value} value={value} />
+							))}
+						</datalist>
+					</Field>
+				</InspectorSection>
+			) : null}
 		</>
 	);
 }

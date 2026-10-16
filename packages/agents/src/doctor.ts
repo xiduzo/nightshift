@@ -399,39 +399,6 @@ export async function harnessModels(
 	}
 }
 
-/** `gh`: the For Each GitHub source and the GitHub tools run it with the user's login. */
-export async function checkGithub(bin: string): Promise<CliCheck> {
-	const { resolved, ...check } = await baseCheck(bin, "The GitHub CLI");
-	if (!resolved || check.problem) return check;
-	try {
-		// `auth status` prints to stderr and never shows the token in full.
-		const out = await run([
-			resolved,
-			"auth",
-			"status",
-			"--hostname",
-			"github.com",
-		]);
-		const text = `${out.stdout}\n${out.stderr}`;
-		const account = text.match(/Logged in to github\.com account (\S+)/)?.[1];
-		if (out.code !== 0 || !account) {
-			return {
-				...check,
-				problem: "Not logged in to github.com. Run `gh auth login`.",
-			};
-		}
-		const scopes = text.match(/Token scopes: (.+)/)?.[1]?.replaceAll("'", "");
-		return {
-			...check,
-			version: check.version?.replace(/^gh version /, "") ?? null,
-			account,
-			facts: scopes ? [{ label: "Scopes", value: scopes }] : [],
-		};
-	} catch {
-		return check;
-	}
-}
-
 /** A CLI tool's check: the CLI check, plus the help the agents read. */
 export type CliToolCheck = CliCheck & {
 	/** The program's own help (`--help`), cut to `HELP_MAX_CHARS`. Null when it has none. */
@@ -441,15 +408,14 @@ export type CliToolCheck = CliCheck & {
 /**
  * A CLI tool (a program the agents may run): where it is, its version and
  * its help. Many programs do not know `--version`, so a missing version is
- * no problem. `gh` gets the GitHub CLI check, with its login.
+ * no problem. A login (`gh auth status`, `aws sts get-caller-identity`) is
+ * the agent's own business: the check is the same for every program.
  */
 export async function checkCli(
 	name: string,
 	searchPath: string = process.env.PATH ?? "",
 ): Promise<CliToolCheck> {
-	const check = await (name === "gh"
-		? checkGithub(name)
-		: programCheck(name, searchPath));
+	const check = await programCheck(name, searchPath);
 	return { ...check, help: check.path ? await cliHelpAt(check.path) : null };
 }
 

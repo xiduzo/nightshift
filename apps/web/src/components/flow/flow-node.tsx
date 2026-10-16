@@ -4,7 +4,6 @@ import {
 	type FlowNode,
 	type FlowNodeType,
 	type ForEachNode,
-	type GateNode,
 	type ListSource,
 	nodeOutcomes,
 	type SubflowNode,
@@ -27,7 +26,6 @@ import {
 	CircleAlertIcon,
 	FilesIcon,
 	GitBranchIcon,
-	ListTreeIcon,
 	PlayIcon,
 	SquareTerminalIcon,
 	TriangleAlertIcon,
@@ -45,7 +43,7 @@ import {
 import { agentSummary, firstLine, sourceSummary } from "@/lib/flow-draft";
 import { harnessInfo } from "@/lib/harnesses";
 
-import { NODE_TYPE } from "./node-type";
+import { DECIDED_BY_ICON, NODE_TYPE } from "./node-type";
 import { OpenFlowContext } from "./open-flow-context";
 
 export type NodeRunState = {
@@ -86,12 +84,10 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 	}
 	const options =
 		node.type === "decision"
-			? node.labels
-			: node.type === "gate"
-				? node.choices
-				: node.type === "agent"
-					? (node.outcomes ?? [])
-					: [];
+			? node.options
+			: node.type === "agent"
+				? (node.outcomes ?? [])
+				: [];
 	return new Map(options.map((option) => [option.name, option.description]));
 }
 
@@ -120,7 +116,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 }: NodeProps<FlowCanvasNode>) {
 	const { node, isStart, errorCount, warningCount, run } = data;
 	const meta = NODE_TYPE[node.type];
-	const Icon = meta.icon;
+	const Icon = node.type === "decision" ? DECIDED_BY_ICON[node.by] : meta.icon;
 	const runColor = run ? stepStateStyle(run.state).color : undefined;
 	const active = run?.state === "running";
 	const waiting = run?.state === "waiting";
@@ -128,7 +124,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	// One handle per outcome, unique by name (a draft can repeat a label).
 	const outcomes = [...new Set(nodeOutcomes(node))];
 	const descriptions = optionDescriptions(node);
-	// Labels and choices come and go: React Flow must measure the handles again,
+	// Options come and go: React Flow must measure the handles again,
 	// or edges on a renamed handle do not find it.
 	// On mount React Flow measures them anyway, so only a change after it counts.
 	const updateNodeInternals = useUpdateNodeInternals();
@@ -232,7 +228,6 @@ const FlowNodeCard = memo(function FlowNodeCard({
 				<div className="flex min-w-0 flex-col gap-1.5 border-t px-3 py-2">
 					{node.type === "agent" ? <AgentBody node={node} /> : null}
 					{node.type === "decision" ? <DecisionBody node={node} /> : null}
-					{node.type === "gate" ? <GateBody node={node} /> : null}
 					{node.type === "subflow" ? <SubflowBody node={node} /> : null}
 					{node.type === "foreach" ? <ForEachBody node={node} /> : null}
 					{node.type === "command" ? (
@@ -260,17 +255,11 @@ const FlowNodeCard = memo(function FlowNodeCard({
 
 				<ul
 					className="flex flex-col border-t py-1"
-					aria-label={
-						node.type === "decision"
-							? "Labels"
-							: node.type === "gate"
-								? "Choices"
-								: "Outcomes"
-					}
+					aria-label={node.type === "decision" ? "Options" : "Outcomes"}
 				>
 					{outcomes.length === 0 ? (
 						<li className="flex h-5 items-center justify-end pr-3.5 text-[11px] text-muted-foreground italic">
-							{node.type === "decision" ? "No labels yet" : "No choices yet"}
+							No options yet
 						</li>
 					) : null}
 					{outcomes.map((outcome) => {
@@ -389,36 +378,33 @@ function AgentBody({ node }: { node: AgentNode }) {
 	);
 }
 
+/** Who decides, then the prompt: the question for you, the brief for a model, a note for a rule. */
 function DecisionBody({ node }: { node: DecisionNode }) {
 	const summary = firstLine(node.prompt);
+	const who =
+		node.by === "person"
+			? "You decide"
+			: node.by === "rule"
+				? "A rule decides"
+				: `A model decides${node.model ? ` · ${node.model}` : ""}`;
+	const empty =
+		node.by === "person"
+			? "No question yet"
+			: node.by === "rule"
+				? "No note"
+				: "No prompt yet";
 	return (
 		<>
-			<span className="truncate text-[11px] text-muted-foreground">
-				{node.model}
-			</span>
+			<span className="truncate text-[11px] text-muted-foreground">{who}</span>
 			<p
 				className={cn(
 					"line-clamp-2 break-words",
 					summary === "" && "text-muted-foreground italic",
 				)}
 			>
-				{summary === "" ? "No prompt yet" : summary}
+				{summary === "" ? empty : summary}
 			</p>
 		</>
-	);
-}
-
-function GateBody({ node }: { node: GateNode }) {
-	const question = node.question.trim();
-	return (
-		<p
-			className={cn(
-				"line-clamp-3 whitespace-pre-line break-words",
-				question === "" && "text-muted-foreground italic",
-			)}
-		>
-			{question === "" ? "No question yet" : question}
-		</p>
 	);
 }
 
@@ -490,28 +476,22 @@ const SOURCE_ICON: Record<ListSource["kind"], typeof BracesIcon> = {
 	json: BracesIcon,
 	command: SquareTerminalIcon,
 	files: FilesIcon,
-	github: ListTreeIcon,
 };
 
 const SOURCE_EMPTY: Record<ListSource["kind"], string> = {
 	json: "No list yet",
 	command: "No source command yet",
 	files: "No file pattern yet",
-	github: "No parent issue yet",
 };
 
 /** Where the elements come from, which flow runs per element, and on which branch. */
 function ForEachBody({ node }: { node: ForEachNode }) {
 	const summary = sourceSummary(node.source);
 	const SourceIcon = SOURCE_ICON[node.source.kind];
-	const code = node.source.kind !== "github";
 	return (
 		<>
 			<p
-				className={cn(
-					"flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[11px]",
-					code && "font-mono",
-				)}
+				className="flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 font-mono text-[11px]"
 				title={summary}
 			>
 				<SourceIcon
@@ -553,7 +533,6 @@ export const nodeTypes: NodeTypes = {
 	agent: FlowNodeCard,
 	command: FlowNodeCard,
 	decision: FlowNodeCard,
-	gate: FlowNodeCard,
 	subflow: FlowNodeCard,
 	foreach: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;

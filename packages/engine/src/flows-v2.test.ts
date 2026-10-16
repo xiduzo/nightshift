@@ -6,11 +6,7 @@ import {
 	fakeHarness,
 	reportingScript,
 } from "@nightshift/agents/fake";
-import type {
-	AgentHarness,
-	AgentSessionInput,
-	GithubItemsInput,
-} from "@nightshift/agents/types";
+import type { AgentHarness, AgentSessionInput } from "@nightshift/agents/types";
 import type {
 	AgentNode,
 	CommandNode,
@@ -18,7 +14,6 @@ import type {
 	FlowEdge,
 	FlowInput,
 	ForEachNode,
-	ListItem,
 	SubflowNode,
 } from "@nightshift/flows";
 
@@ -59,7 +54,7 @@ afterEach(async () => {
 
 function makeEngine(
 	harness: AgentHarness,
-	options: Partial<Pick<EngineOptions, "readGithubItems" | "decider">> = {},
+	options: Partial<Pick<EngineOptions, "decider">> = {},
 ): Engine {
 	const runLog = createRunLog(sandbox.db);
 	runLogs.push(runLog);
@@ -137,7 +132,7 @@ function flowOf(
 	extra: Partial<Flow> = {},
 ): Flow {
 	return {
-		version: 2,
+		version: 3,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -479,10 +474,12 @@ describe("Subflow", () => {
 				[
 					{
 						id: "gate",
-						type: "gate",
+						type: "decision",
 						position: { x: 0, y: 0 },
-						question: "Ship {{what}}?",
-						choices: [{ name: "yes" }, { name: "no" }],
+						prompt: "Ship {{what}}?",
+						options: [{ name: "yes" }, { name: "no" }],
+						by: "person",
+						decider: "typesafe",
 					},
 				],
 				[],
@@ -1218,7 +1215,7 @@ describe("flow format 1", () => {
 			inputs: { epic: "7" },
 		});
 		const loaded = await engine.getRun(runId);
-		expect(loaded.flow.version).toBe(2);
+		expect(loaded.flow.version).toBe(3);
 		expect(loaded.flow.inputs).toEqual([
 			expect.objectContaining({ name: "epic", type: "text", required: true }),
 		]);
@@ -1278,45 +1275,56 @@ describe("flow format 1", () => {
 		]);
 		const bin = join(sandbox.root, "bin");
 		await mkdir(bin, { recursive: true });
-		await writeFile(join(bin, "gh"), "#!/bin/sh\necho 'A body from gh'\n");
+		// The migrated For Each sources ask `gh api graphql` for the sub-issues
+		// of their parent: the fake answers with the items, per parent number,
+		// and logs each parent it was asked for.
+		const reads = join(sandbox.root, "gh-reads.txt");
+		const issue = (
+			number: number,
+			title: string,
+			parent: { number: number; title: string },
+		) => ({
+			id: String(number),
+			number,
+			title,
+			body: `Body of #${number}`,
+			url: `https://github.test/issues/${number}`,
+			state: "OPEN",
+			labels: [],
+			parent,
+			dependsOn: [],
+			done: false,
+		});
+		const answers: Record<string, unknown[]> = {
+			"1097": [issue(5, "A Feature", { number: 1097, title: "The Epic" })],
+			"5": [issue(7, "A Trace", { number: 5, title: "A Feature" })],
+		};
+		await writeFile(
+			join(bin, "gh"),
+			[
+				"#!/bin/sh",
+				'if [ "$1" = api ] && [ "$2" = graphql ]; then',
+				`  for arg in "$@"; do case "$arg" in number=*) parent="\${arg#number=}" ;; esac; done`,
+				`  echo "$parent" >> '${reads}'`,
+				'  case "$parent" in',
+				...Object.entries(answers).map(
+					([parent, items]) =>
+						`    ${parent}) printf '%s' '${JSON.stringify(items)}' ;;`,
+				),
+				"    *) echo '[]' ;;",
+				"  esac",
+				"  exit 0",
+				"fi",
+				"echo 'A body from gh'",
+				"",
+			].join("\n"),
+		);
 		await chmod(join(bin, "gh"), 0o755);
 		const path = process.env.PATH;
 		process.env.PATH = `${bin}:${path}`;
 		try {
-			const reads: GithubItemsInput[] = [];
-			const issue = (
-				number: number,
-				title: string,
-				parent: { number: number; title: string },
-			): ListItem => ({
-				id: String(number),
-				title,
-				url: `https://github.test/issues/${number}`,
-				value: {
-					id: String(number),
-					number,
-					title,
-					body: `Body of #${number}`,
-					url: `https://github.test/issues/${number}`,
-					state: "OPEN",
-					labels: [],
-					parent,
-					dependsOn: [],
-					done: false,
-				},
-				dependsOn: [],
-				done: false,
-			});
 			const { harness, sessions } = scriptedHarness();
-			const engine = makeEngine(harness, {
-				decider: fakeDecider([]),
-				readGithubItems: async (input) => {
-					reads.push(input);
-					return input.parent === 1097
-						? [issue(5, "A Feature", { number: 1097, title: "The Epic" })]
-						: [issue(7, "A Trace", { number: 5, title: "A Feature" })];
-				},
-			});
+			const engine = makeEngine(harness, { decider: fakeDecider([]) });
 			const id = await projectId(engine);
 			const run = await engine.startRun({
 				projectId: id,
@@ -1328,7 +1336,10 @@ describe("flow format 1", () => {
 				label: "the worker's session",
 				timeoutMs: 15_000,
 			});
-			expect(reads.map((r) => r.parent)).toEqual([1097, 5]);
+			expect((await Bun.file(reads).text()).trim().split("\n")).toEqual([
+				"1097",
+				"5",
+			]);
 			const prompt = session.input.prompt;
 			expect(prompt).toContain("Trace #7: A Trace");
 			expect(prompt).toContain("Feature #5: A Feature");
