@@ -181,17 +181,18 @@ export const POLICY_DEFAULTS: Required<Policy> = {
 	usageLimitMaxWaitMinutes: 60,
 	networkGraceMinutes: 240,
 	maxSteps: 500,
+	resumeInterruptedRuns: true,
 };
 
 /**
- * Sets one number of the run policy, or clears it (back to the daemon's
- * setting). A policy with no numbers left is dropped, so the file stays
+ * Sets one value of the run policy, or clears it (back to the daemon's
+ * setting). A policy with no values left is dropped, so the file stays
  * minimal.
  */
-export function setPolicyNumber(
+export function setPolicyValue<K extends keyof Policy>(
 	flow: Flow,
-	key: keyof Policy,
-	value: number | undefined,
+	key: K,
+	value: Policy[K] | undefined,
 ): Flow {
 	const next: Partial<Policy> = { ...flow.policy, [key]: value };
 	if (value === undefined) delete next[key];

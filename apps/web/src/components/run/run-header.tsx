@@ -49,6 +49,7 @@ import {
 	HandIcon,
 	InboxIcon,
 	MoonIcon,
+	RotateCcwIcon,
 	SkipForwardIcon,
 	SunriseIcon,
 	WorkflowIcon,
@@ -98,6 +99,7 @@ export function RunHeader({
 	onShowGate: () => void;
 }) {
 	const stoppable = STOPPABLE.includes(status);
+	const daemonResumes = run.resumes.filter((resume) => resume.by === "daemon");
 	const inputEntries = Object.entries(run.inputs ?? {}).map(
 		([name, value]) =>
 			[
@@ -136,6 +138,21 @@ export function RunHeader({
 								>
 									<AlarmClockIcon aria-hidden="true" />
 									Stops {dayWord(run.stopAt)} {formatTime(run.stopAt)}
+								</Badge>
+							) : null}
+							{daemonResumes.length > 0 ? (
+								<Badge
+									variant="outline"
+									title={daemonResumes
+										.map(
+											(resume) =>
+												`${formatDayTime(resume.at)}: ${resume.reason ?? "The daemon restarted."} It continued the run at ${resume.nodeId}.`,
+										)
+										.join("\n")}
+								>
+									<RotateCcwIcon aria-hidden="true" />
+									Resumed by the daemon
+									{daemonResumes.length > 1 ? ` ${daemonResumes.length}×` : ""}
 								</Badge>
 							) : null}
 							{reconnecting ? (
