@@ -360,7 +360,7 @@ export function forEachNode(node: ForEachNode, ctx: StepContext): NodeAction {
 				return next(element);
 			}
 			case "finished": {
-				const outputs = await bodyOutputs(ctx, body);
+				const outputs = await bodyOutputs(ctx, body, ended.nodes);
 				if (haltOn.includes(ended.outcome)) {
 					await endItem(
 						element.facts.id,

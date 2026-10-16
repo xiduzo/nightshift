@@ -19,7 +19,6 @@ import {
 	deriveInputs,
 	deriveNodeOutputs,
 	deriveRunState,
-	deriveSleep,
 	deriveSteps,
 	deriveTraversals,
 	type LoggedEvent,
@@ -462,8 +461,14 @@ export function createRunner(deps: RunnerDeps) {
 		await exclusive(runId, async () => {
 			if (disposed) return;
 			const events = await log.events(runId);
-			const sleep = deriveSleep(events);
-			if (!sleep || deriveRunState(events).status !== "sleeping") return;
+			// The log says whether the run still sleeps (a stop ends the sleep
+			// with the thread left at its wait); the wait itself is the
+			// interrupt the thread sits at.
+			if (deriveRunState(events).status !== "sleeping") return;
+			const row = await getRunRow(db, runId);
+			const thread = await threadState(row);
+			if (thread.kind !== "interrupted" || thread.value.kind !== "wait") return;
+			const sleep = thread.value;
 			if (!input.early && deps.now() < sleep.until) {
 				scheduleWake(runId, sleep.until);
 				return;
@@ -477,7 +482,6 @@ export function createRunner(deps: RunnerDeps) {
 				return;
 			}
 			try {
-				const row = await getRunRow(db, runId);
 				const waiting = deriveSteps(events).find((s) => s.id === sleep.stepId);
 				if (!waiting) throw new Error(`Step not found: ${sleep.stepId}`);
 				await log.append({

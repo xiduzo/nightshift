@@ -229,9 +229,26 @@ function entryOf(
 		prompt: null,
 		resumeSessionId:
 			node.session === "resume"
-				? lastHarnessSessionOfNode(events, node.id, scopeKey(scopeOf(config)))
+				? lastSessionOf(node, state, events, config)
 				: null,
 	};
+}
+
+/**
+ * The harness session a `session: "resume"` visit continues: the one the
+ * node's latest committed visit ended with (`state.nodes[id].session_id`),
+ * else the log's (a visit that ended before its session got an id, or a
+ * thread re-entered from the log).
+ */
+function lastSessionOf(
+	node: AgentNode,
+	state: RunStateValues,
+	events: readonly LoggedEvent[],
+	config: LangGraphRunnableConfig,
+): string | null {
+	const own = state.nodes[node.id]?.session_id;
+	if (typeof own === "string" && own !== "") return own;
+	return lastHarnessSessionOfNode(events, node.id, scopeKey(scopeOf(config)));
 }
 
 const BUILT_IN_AGENT_OUTCOMES = ["pass", "fail", "needs-input"];
