@@ -1,7 +1,15 @@
 import type { Context as ApiContext } from "@nightshift/api/context";
 import type { Context as HonoContext } from "hono";
 
-import { auth, db, engine } from "./services";
+import {
+	auth,
+	checks,
+	connections,
+	daemon,
+	db,
+	engine,
+	settings,
+} from "./services";
 
 export type CreateContextOptions = {
 	context: HonoContext;
@@ -17,6 +25,10 @@ export async function createContext({
 		db,
 		engine,
 		session,
+		settings,
+		connections,
+		checks,
+		daemon,
 	};
 }
 
