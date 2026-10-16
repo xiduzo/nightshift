@@ -1,9 +1,4 @@
 import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui/components/alert";
-import {
 	AlertDialog,
 	AlertDialogAction,
 	AlertDialogCancel,
@@ -18,17 +13,21 @@ import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { ButtonGroup } from "@nightshift/ui/components/button-group";
 import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-} from "@nightshift/ui/components/card";
-import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
+import { ScrollArea } from "@nightshift/ui/components/scroll-area";
+import { Separator } from "@nightshift/ui/components/separator";
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from "@nightshift/ui/components/sheet";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
 	Tooltip,
@@ -41,18 +40,12 @@ import { Link } from "@tanstack/react-router";
 import {
 	AlarmClockIcon,
 	ChevronDownIcon,
-	CircleAlertIcon,
 	CircleStopIcon,
-	CircleXIcon,
 	ClipboardCopyIcon,
 	CopyIcon,
 	DownloadIcon,
-	HandIcon,
-	InboxIcon,
-	MoonIcon,
-	RotateCcwIcon,
+	InfoIcon,
 	SkipForwardIcon,
-	SunriseIcon,
 	WorkflowIcon,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -60,17 +53,15 @@ import { toast } from "sonner";
 
 import { RunStatusBadge } from "@/components/run-status-badge";
 import { ENV } from "@/env";
-import { useNow } from "@/hooks/use-now";
-import type { RunDetail, RunStatus } from "@/lib/api-types";
+import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
 import {
 	dayWord,
 	formatCost,
-	formatCountdown,
 	formatDateTime,
 	formatDayTime,
+	formatDuration,
 	formatTime,
 } from "@/lib/format";
-import type { CurrentWait } from "@/lib/transcript";
 import { orpc } from "@/utils/orpc";
 
 const STOPPABLE: RunStatus[] = ["running", "waiting", "sleeping"];
@@ -79,235 +70,201 @@ const STOPPABLE: RunStatus[] = ["running", "waiting", "sleeping"];
 const SHA = /^[0-9a-f]{40}$/i;
 
 /**
- * The run's title, status and facts in a card, and below it an alert for a
- * state that needs attention: an open gate, a sleep, a failure, an interruption.
+ * The run on one line: its title, status and stop plans, and how long it ran
+ * and what it cost. The rest of its facts sit in `RunDetails`.
  */
-export function RunHeader({
+export function RunTitle({
 	run,
+	steps,
 	status,
 	reconnecting,
-	openGateNodeId,
-	onShowGate,
-	wait,
 }: {
 	run: RunDetail;
+	steps: StepSummary[];
 	status: RunStatus;
 	reconnecting: boolean;
-	/** The latest wait of the run policy without a wake after it. */
-	wait: CurrentWait | null;
-	/** The node of the Gate the run waits at, if any. */
-	openGateNodeId: string | null;
-	/** Selects the open Gate's step, so its answer form shows. */
-	onShowGate: () => void;
 }) {
 	const stoppable = STOPPABLE.includes(status);
-	const daemonResumes = run.resumes.filter((resume) => resume.by === "daemon");
-	const inputEntries = Object.entries(run.inputs ?? {}).map(
+	const lastEnd = Math.max(
+		run.createdAt,
+		...steps.map((step) => step.endedAt ?? Date.now()),
+	);
+
+	return (
+		<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-3 lg:px-5 lg:pt-4">
+			<h1 className="min-w-0 truncate font-semibold text-lg tracking-tight">
+				{run.title}
+			</h1>
+			<div aria-live="polite" className="flex flex-wrap items-center gap-2">
+				<RunStatusBadge status={status} />
+				{stoppable && run.stopAfterStep ? (
+					<Badge
+						variant="outline"
+						className="border-status-stopped/40 text-status-stopped"
+						title="The running step finishes, then the run stops."
+					>
+						<SkipForwardIcon aria-hidden="true" />
+						Stops after this step
+					</Badge>
+				) : null}
+				{stoppable && run.stopAt ? (
+					<Badge
+						variant="outline"
+						title={`No new step starts after ${formatDateTime(run.stopAt)}.`}
+					>
+						<AlarmClockIcon aria-hidden="true" />
+						Stops {dayWord(run.stopAt)} {formatTime(run.stopAt)}
+					</Badge>
+				) : null}
+				{reconnecting ? (
+					<span className="flex items-center gap-1.5 text-muted-foreground text-xs">
+						<Spinner className="size-3" />
+						Reconnecting…
+					</span>
+				) : null}
+			</div>
+			<p className="ml-auto shrink-0 text-muted-foreground text-sm tabular-nums">
+				<span className="sr-only">Ran for </span>
+				{formatDuration(lastEnd - run.createdAt)}
+				<span aria-hidden="true"> · </span>
+				<span className="sr-only">, cost </span>
+				{formatCost(run.costUsd)}
+			</p>
+		</div>
+	);
+}
+
+/** A button in the page header that opens every fact of the run in a Sheet. */
+export function RunDetails({ run }: { run: RunDetail }) {
+	return (
+		<Sheet>
+			<SheetTrigger
+				render={<Button variant="outline" size="sm" aria-label="Details" />}
+			>
+				<InfoIcon data-icon="inline-start" />
+				<span className="hidden sm:inline">Details</span>
+			</SheetTrigger>
+			<SheetContent>
+				<SheetHeader>
+					<SheetTitle>Run details</SheetTitle>
+					<SheetDescription>
+						What started it, where it ran, and what it cost.
+					</SheetDescription>
+				</SheetHeader>
+				<ScrollArea className="min-h-0 flex-1">
+					<div className="px-4 pb-6">
+						<RunFacts run={run} />
+					</div>
+				</ScrollArea>
+			</SheetContent>
+		</Sheet>
+	);
+}
+
+/** Every fact of the run, one per row, in three groups: what, where, when. */
+function RunFacts({ run }: { run: RunDetail }) {
+	const inputs = Object.entries(run.inputs ?? {}).map(
 		([name, value]) =>
 			[
 				name,
 				typeof value === "string" ? value : JSON.stringify(value),
 			] as const,
 	);
+	const daemonResumes = run.resumes.filter((resume) => resume.by === "daemon");
 
 	return (
-		<section aria-label="About this run" className="flex flex-col gap-3">
-			<Card size="sm" className="gap-4">
-				<CardHeader className="gap-2">
-					<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-						<h1 className="line-clamp-2 min-w-0 whitespace-pre-wrap break-words font-semibold text-xl tracking-tight">
-							{run.title}
-						</h1>
-						<div
-							aria-live="polite"
-							className="flex flex-wrap items-center gap-2"
-						>
-							<RunStatusBadge status={status} />
-							{stoppable && run.stopAfterStep ? (
-								<Badge
-									variant="outline"
-									className="border-status-stopped/40 text-status-stopped"
-									title="The running step finishes, then the run stops."
-								>
-									<SkipForwardIcon aria-hidden="true" />
-									Stops after this step
-								</Badge>
-							) : null}
-							{stoppable && run.stopAt ? (
-								<Badge
-									variant="outline"
-									title={`No new step starts after ${formatDateTime(run.stopAt)}.`}
-								>
-									<AlarmClockIcon aria-hidden="true" />
-									Stops {dayWord(run.stopAt)} {formatTime(run.stopAt)}
-								</Badge>
-							) : null}
-							{daemonResumes.length > 0 ? (
-								<Badge
-									variant="outline"
-									title={daemonResumes
-										.map(
-											(resume) =>
-												`${formatDayTime(resume.at)}: ${resume.reason ?? "The daemon restarted."} It continued the run at ${resume.nodeId}.`,
-										)
-										.join("\n")}
-								>
-									<RotateCcwIcon aria-hidden="true" />
-									Resumed by the daemon
-									{daemonResumes.length > 1 ? ` ${daemonResumes.length}×` : ""}
-								</Badge>
-							) : null}
-							{reconnecting ? (
-								<span className="flex items-center gap-1.5 text-muted-foreground text-xs">
-									<Spinner className="size-3" />
-									Reconnecting to the live transcript…
-								</span>
-							) : null}
-						</div>
-					</div>
-					<CardDescription className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
-						<WorkflowIcon className="size-3.5 shrink-0" aria-hidden="true" />
-						{run.flowName ? (
-							<Link
-								to="/projects/$projectId/flows/$name"
-								params={{ projectId: run.projectId, name: run.flowName }}
-								className="rounded-sm font-medium font-mono text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-							>
-								{run.flowName}
-							</Link>
-						) : (
-							<span>Quick run</span>
-						)}
-						{inputEntries.map(([name, value]) => (
-							<Badge
-								key={name}
-								variant="secondary"
-								className="max-w-full font-mono font-normal"
-								title={`${name}: ${value}`}
-							>
-								<span className="text-muted-foreground">{name}</span>
-								<span className="truncate">{value}</span>
-							</Badge>
-						))}
-						<span aria-hidden="true">·</span>
-						<span>
-							{run.trigger.kind === "schedule"
-								? `Scheduled · ${run.trigger.scheduleId}`
-								: "Started by hand"}
-						</span>
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 xl:grid-cols-6">
-						<Fact
-							label="Branch"
-							className="col-span-2 sm:col-span-1 xl:col-span-2"
-						>
-							<CopyValue label="branch" value={run.branch} />
-						</Fact>
-						<Fact label="Base">
-							<CopyValue
-								label="base ref"
-								value={run.baseRef}
-								short={
-									SHA.test(run.baseRef) ? run.baseRef.slice(0, 12) : undefined
-								}
-							/>
-						</Fact>
-						<Fact label="Cost">
-							<span className="font-medium tabular-nums">
-								{formatCost(run.costUsd)}
-							</span>
-						</Fact>
-						<Fact label="Started">
-							<time
-								dateTime={new Date(run.createdAt).toISOString()}
-								className="truncate tabular-nums"
-							>
-								{formatDateTime(run.createdAt)}
-							</time>
-						</Fact>
-						<Fact label="Stop time">
-							{run.stopAt ? (
-								<time
-									dateTime={new Date(run.stopAt).toISOString()}
-									className="truncate tabular-nums"
-								>
-									{formatDayTime(run.stopAt)}
-								</time>
-							) : (
-								<span className="text-muted-foreground">None</span>
-							)}
-						</Fact>
-						<Fact
-							label="Worktree"
-							className="col-span-2 sm:col-span-3 xl:col-span-6"
-						>
-							<CopyValue label="worktree path" value={run.worktreePath} />
-						</Fact>
-					</dl>
-				</CardContent>
-			</Card>
-			{status === "waiting" && openGateNodeId ? (
-				<Alert
-					role="status"
-					className="border-status-waiting/40 bg-status-waiting/10"
-				>
-					<HandIcon aria-hidden="true" className="text-status-waiting!" />
-					<AlertTitle className="text-status-waiting">
-						Waiting for your answer
-					</AlertTitle>
-					<AlertDescription>
-						The run waits at the gate{" "}
-						<span className="font-mono text-foreground">{openGateNodeId}</span>{" "}
-						until someone answers it.
-					</AlertDescription>
-					<div className="col-start-2 mt-2 flex flex-wrap gap-2">
-						<Button size="sm" onClick={onShowGate}>
-							<HandIcon data-icon="inline-start" />
-							Answer it
-						</Button>
-						<Button size="sm" variant="outline" render={<Link to="/inbox" />}>
-							<InboxIcon data-icon="inline-start" />
-							Open the inbox
-						</Button>
-					</div>
-				</Alert>
-			) : null}
-			{status === "sleeping" ? (
-				<SleepBanner runId={run.id} wakeAt={run.wakeAt} wait={wait} />
-			) : null}
-			{status === "failed" && run.reason ? (
-				<Alert
-					variant="destructive"
-					className="border-destructive/40 bg-destructive/10"
-				>
-					<CircleXIcon aria-hidden="true" />
-					<AlertTitle>The run failed</AlertTitle>
-					<AlertDescription className="whitespace-pre-wrap break-words">
-						{run.reason}
-					</AlertDescription>
-				</Alert>
-			) : null}
-			{status === "interrupted" ? (
-				<Alert
-					role="status"
-					className="border-status-interrupted/40 bg-status-interrupted/10"
-				>
-					<CircleAlertIcon
+		<div className="flex flex-col gap-5">
+			<dl className="flex flex-col gap-3">
+				<Fact label="Flow">
+					<WorkflowIcon
+						className="size-3.5 shrink-0 text-muted-foreground"
 						aria-hidden="true"
-						className="text-status-interrupted!"
 					/>
-					<AlertTitle className="text-status-interrupted">
-						The run was interrupted
-					</AlertTitle>
-					<AlertDescription className="whitespace-pre-wrap break-words">
-						{run.reason ?? "The daemon stopped while this run ran."} Resume it
-						to continue in the same worktree.
-					</AlertDescription>
-				</Alert>
-			) : null}
-		</section>
+					{run.flowName ? (
+						<Link
+							to="/projects/$projectId/flows/$name"
+							params={{ projectId: run.projectId, name: run.flowName }}
+							className="truncate rounded-sm font-mono underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+						>
+							{run.flowName}
+						</Link>
+					) : (
+						"Quick run"
+					)}
+				</Fact>
+				{inputs.map(([name, value]) => (
+					<Fact key={name} label={`Input · ${name}`}>
+						<span className="truncate font-mono text-xs" title={value}>
+							{value}
+						</span>
+					</Fact>
+				))}
+				<Fact label="Started by">
+					{run.trigger.kind === "schedule"
+						? `Schedule · ${run.trigger.scheduleId}`
+						: "Hand"}
+				</Fact>
+			</dl>
+			<Separator />
+			<dl className="flex flex-col gap-3">
+				<Fact label="Branch">
+					<CopyValue label="branch" value={run.branch} />
+				</Fact>
+				<Fact label="Base">
+					<CopyValue
+						label="base ref"
+						value={run.baseRef}
+						short={SHA.test(run.baseRef) ? run.baseRef.slice(0, 12) : undefined}
+					/>
+				</Fact>
+				<Fact label="Worktree">
+					<CopyValue label="worktree path" value={run.worktreePath} />
+				</Fact>
+			</dl>
+			<Separator />
+			<dl className="flex flex-col gap-3">
+				<Fact label="Cost">
+					<span className="font-medium tabular-nums">
+						{formatCost(run.costUsd)}
+					</span>
+				</Fact>
+				<Fact label="Started">
+					<time
+						dateTime={new Date(run.createdAt).toISOString()}
+						className="truncate tabular-nums"
+					>
+						{formatDateTime(run.createdAt)}
+					</time>
+				</Fact>
+				<Fact label="Stop time">
+					{run.stopAt ? (
+						<time
+							dateTime={new Date(run.stopAt).toISOString()}
+							className="truncate tabular-nums"
+						>
+							{formatDayTime(run.stopAt)}
+						</time>
+					) : (
+						<span className="text-muted-foreground">None</span>
+					)}
+				</Fact>
+				{daemonResumes.length > 0 ? (
+					<Fact label="Resumed by the daemon">
+						<ul className="flex min-w-0 flex-col gap-1 text-xs">
+							{daemonResumes.map((resume) => (
+								<li key={resume.at}>
+									<span className="tabular-nums">
+										{formatDayTime(resume.at)}
+									</span>
+									, at <span className="font-mono">{resume.nodeId}</span>:{" "}
+									{resume.reason ?? "The daemon restarted."}
+								</li>
+							))}
+						</ul>
+					</Fact>
+				) : null}
+			</dl>
+		</div>
 	);
 }
 
@@ -576,89 +533,5 @@ function StopMenu({
 				</AlertDialogContent>
 			</AlertDialog>
 		</>
-	);
-}
-
-const SLEEP_REASON = {
-	"usage-limit": "The harness hit a usage limit.",
-	network: "The network is down.",
-} as const;
-
-/** Why the run sleeps, a live countdown to when it wakes, and a way to wake it now. */
-function SleepBanner({
-	runId,
-	wakeAt,
-	wait,
-}: {
-	runId: string;
-	wakeAt: number | null;
-	wait: CurrentWait | null;
-}) {
-	const now = useNow(1000);
-	const queryClient = useQueryClient();
-	const wake = useMutation(
-		orpc.runs.resume.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.runs.key() }),
-			onError: (error) => toast.error(`Could not wake: ${error.message}`),
-		}),
-	);
-	const until = wakeAt ?? wait?.until ?? null;
-
-	return (
-		<Alert
-			role="status"
-			className="border-status-sleeping/40 bg-status-sleeping/10"
-		>
-			<MoonIcon aria-hidden="true" className="text-status-sleeping!" />
-			<AlertTitle className="flex flex-wrap items-center gap-x-2 text-status-sleeping">
-				Sleeping
-				{until ? (
-					<span className="font-mono tabular-nums" role="timer" aria-live="off">
-						{formatCountdown(until - now)}
-					</span>
-				) : null}
-			</AlertTitle>
-			<AlertDescription className="flex flex-col gap-1">
-				<p>
-					{wait ? SLEEP_REASON[wait.reason] : "The run sleeps."} It continues
-					the same session
-					{until ? (
-						<>
-							{" "}
-							at{" "}
-							<time
-								dateTime={new Date(until).toISOString()}
-								title={formatDateTime(until)}
-								className="font-medium text-foreground tabular-nums"
-							>
-								{formatTime(until)}
-							</time>
-						</>
-					) : null}
-					.
-				</p>
-				{wait?.message ? (
-					<p className="truncate" title={wait.message}>
-						{wait.message}
-					</p>
-				) : null}
-			</AlertDescription>
-			<div className="col-start-2 mt-2">
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={wake.isPending}
-					onClick={() => wake.mutate({ runId })}
-				>
-					{wake.isPending ? (
-						<Spinner data-icon="inline-start" />
-					) : (
-						<SunriseIcon data-icon="inline-start" />
-					)}
-					{wake.isPending ? "Waking…" : "Wake now"}
-				</Button>
-			</div>
-		</Alert>
 	);
 }

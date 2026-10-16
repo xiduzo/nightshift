@@ -68,10 +68,10 @@ CLI when you need them.
 | ✓ [Breadcrumb](https://ui.shadcn.com/docs/components/breadcrumb) | Where a page sits: Projects › rpgdotexe › night. |
 | [Navigation Menu](https://ui.shadcn.com/docs/components/navigation-menu) | Top-of-site links with dropdown panels (marketing sites). |
 | ✓ [Sidebar](https://ui.shadcn.com/docs/components/sidebar) | The app shell: `SidebarProvider`, `Sidebar`, `SidebarHeader`/`Content`/`Footer`, `SidebarGroup`, `SidebarMenu`, `SidebarMenuButton`, `SidebarMenuBadge`, `SidebarInset`, `SidebarTrigger`. Collapses to icons, turns into a Sheet on mobile. |
-| ✓ [Tabs](https://ui.shadcn.com/docs/components/tabs) | Switch between views of one thing (Transcript / Events / Output). `variant="line"` for underline tabs. |
+| ✓ [Tabs](https://ui.shadcn.com/docs/components/tabs) | Switch between views of one thing (a step's Summary / Transcript / Outputs). `variant="line"` for underline tabs. |
 | ✓ [Separator](https://ui.shadcn.com/docs/components/separator) | A thin rule between sections or toolbar items. |
 | ✓ [Scroll Area](https://ui.shadcn.com/docs/components/scroll-area) | A scroll region with styled scrollbars (transcripts, long lists in a fixed height). |
-| ✓ [Resizable](https://ui.shadcn.com/docs/components/resizable) | Panels with a drag handle between them (canvas beside an inspector). |
+| ✓ [Resizable](https://ui.shadcn.com/docs/components/resizable) | Panels with a drag handle between them (canvas beside an inspector). On a run: steps beside the flow, and the step console below, a `collapsible` panel whose collapsed size is its one-line bar. |
 
 ### Overlays and dialogs
 
@@ -79,7 +79,7 @@ CLI when you need them.
 | --- | --- |
 | ✓ [Dialog](https://ui.shadcn.com/docs/components/dialog) | A modal task: start a run, edit a schedule. |
 | ✓ [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog) | Confirm a destructive or irreversible step (stop a run, delete a flow). |
-| ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, the mobile sidebar. |
+| ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), the mobile sidebar. |
 | [Drawer](https://ui.shadcn.com/docs/components/drawer) | A bottom sheet for mobile (Vaul). |
 | ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form. |
 | ✓ [Tooltip](https://ui.shadcn.com/docs/components/tooltip) | A short label on hover or focus, mostly for icon buttons. Needs `TooltipProvider` (in the root). |
@@ -120,7 +120,7 @@ CLI when you need them.
 
 | Component | What it is for |
 | --- | --- |
-| ✓ [Collapsible](https://ui.shadcn.com/docs/components/collapsible) | One section that opens and closes (a tool call's input, raw JSON). |
+| ✓ [Collapsible](https://ui.shadcn.com/docs/components/collapsible) | One section that opens and closes (a tool call's input, raw JSON, the flow editor's issues, a run's status under its flow). |
 | ✓ [Toggle](https://ui.shadcn.com/docs/components/toggle) | A button that stays pressed (show/hide a panel). |
 | ✓ [Toggle Group](https://ui.shadcn.com/docs/components/toggle-group) | A set of toggles where one or many are on: a segmented control (Canvas / JSON, transcript levels). |
 | [Pagination](https://ui.shadcn.com/docs/components/pagination) | Page links under a long list. |

@@ -7,6 +7,7 @@ import {
 } from "@nightshift/ui/components/input-group";
 import { Kbd } from "@nightshift/ui/components/kbd";
 import { Spinner } from "@nightshift/ui/components/spinner";
+import { cn } from "@nightshift/ui/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PlayIcon } from "lucide-react";
 import { useId, useState } from "react";
@@ -18,9 +19,11 @@ import { orpc } from "@/utils/orpc";
 export function ResumeComposer({
 	runId,
 	lastStep,
+	className,
 }: {
 	runId: string;
 	lastStep: StepSummary | undefined;
+	className?: string;
 }) {
 	const id = useId();
 	const queryClient = useQueryClient();
@@ -52,7 +55,7 @@ export function ResumeComposer({
 
 	return (
 		<form
-			className="flex shrink-0 flex-col gap-2 border-t p-3"
+			className={cn("flex shrink-0 flex-col gap-2", className)}
 			onSubmit={(event) => {
 				event.preventDefault();
 				submit();

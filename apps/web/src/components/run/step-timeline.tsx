@@ -27,10 +27,46 @@ import {
 } from "@/components/outcome-badge";
 import type { RunStatus, StepSummary } from "@/lib/api-types";
 import { formatCost, formatDuration, formatTime } from "@/lib/format";
-import { type ItemScope, itemsOf, scopeKey, stepsIn } from "@/lib/run-steps";
+import {
+	callsFlow,
+	type ItemScope,
+	itemsOf,
+	scopeKey,
+	stepsIn,
+	stepsUnder,
+} from "@/lib/run-steps";
 
 export function stepDuration(step: StepSummary, now = Date.now()): string {
 	return formatDuration((step.endedAt ?? now) - step.startedAt);
+}
+
+/** From the first step's start to the last one's end, or now while one runs. */
+function spanOf(list: StepSummary[], now = Date.now()): string | undefined {
+	if (list.length === 0) return undefined;
+	const start = Math.min(...list.map((step) => step.startedAt));
+	const end = Math.max(...list.map((step) => step.endedAt ?? now));
+	return formatDuration(end - start);
+}
+
+/** What the steps that can cost cost together; undefined when none did. */
+function costOf(list: StepSummary[]): string | undefined {
+	const costs = list
+		.filter((step) => hasCost(step.nodeType) && step.costUsd != null)
+		.map((step) => step.costUsd ?? 0);
+	return costs.length === 0
+		? undefined
+		: formatCost(costs.reduce((sum, cost) => sum + cost, 0));
+}
+
+/** Every step a Subflow or For Each step called, nested ones included. */
+function calledSteps(steps: StepSummary[], step: StepSummary): StepSummary[] {
+	const ids = new Set([step.id]);
+	// Steps start after their caller, so one pass in order finds every level.
+	return steps.filter((other) => {
+		if (!other.scope || !ids.has(other.scope.parentStepId)) return false;
+		ids.add(other.id);
+		return true;
+	});
 }
 
 /** Indent per level of nesting. */
@@ -110,6 +146,7 @@ export function StepTimeline({
 	}) => {
 		const key = scopeKey(groupScope);
 		const children = stepsIn(steps, groupScope);
+		const nested = stepsUnder(steps, groupScope);
 		const open = toggled.get(key) ?? defaultOpen;
 		return (
 			<li key={key}>
@@ -122,6 +159,8 @@ export function StepTimeline({
 					<GroupRow
 						label={label}
 						badge={badge}
+						duration={spanOf(nested)}
+						cost={costOf(nested)}
 						depth={depth}
 						stepCount={children.length}
 						open={open}
@@ -143,6 +182,13 @@ export function StepTimeline({
 			<li key={step.id} className="flex flex-col gap-0.5">
 				<StepRow
 					step={step}
+					cost={
+						callsFlow(step)
+							? costOf(calledSteps(steps, step))
+							: hasCost(step.nodeType)
+								? formatCost(step.costUsd)
+								: undefined
+					}
 					number={numbers.get(step.id) ?? 0}
 					depth={depth}
 					runStatus={runStatus}
@@ -207,8 +253,43 @@ export function StepTimeline({
 	);
 }
 
+/**
+ * The columns every row ends in, so they line up down the list: its state,
+ * how long it took, what it cost, and a slot for the focus button.
+ */
+function RowStats({
+	badge,
+	duration,
+	durationTitle,
+	cost,
+}: {
+	badge: ReactNode;
+	duration: string | undefined;
+	durationTitle?: string;
+	cost: string | undefined;
+}) {
+	return (
+		<>
+			<span className="ml-auto flex w-28 shrink-0 justify-start">{badge}</span>
+			<span
+				className="w-14 shrink-0 whitespace-nowrap text-right text-muted-foreground tabular-nums"
+				title={durationTitle}
+			>
+				{duration}
+			</span>
+			<span className="hidden w-16 shrink-0 whitespace-nowrap text-right text-muted-foreground tabular-nums sm:inline">
+				{cost}
+			</span>
+		</>
+	);
+}
+
+/** The height of every row in the list. */
+const ROW = "h-8";
+
 function StepRow({
 	step,
+	cost,
 	number,
 	depth,
 	runStatus,
@@ -216,6 +297,8 @@ function StepRow({
 	onSelect,
 }: {
 	step: StepSummary;
+	/** Its own cost, or what the steps it called cost together. */
+	cost: string | undefined;
 	number: number;
 	depth: number;
 	runStatus: RunStatus;
@@ -230,7 +313,8 @@ function StepRow({
 			aria-current={selected ? "step" : undefined}
 			onClick={onSelect}
 			className={cn(
-				"flex-nowrap gap-2 py-1.5 text-left text-xs hover:bg-muted/60",
+				ROW,
+				"flex-nowrap gap-2 py-0 pr-1 text-left text-xs hover:bg-muted/60",
 				selected && "bg-muted hover:bg-muted",
 			)}
 			style={
@@ -260,16 +344,14 @@ function StepRow({
 					{step.items.length} done
 				</span>
 			) : null}
-			<OutcomeBadge state={stepState(step, runStatus)} className="ml-auto" />
-			<span
-				className="w-12 shrink-0 text-right text-muted-foreground tabular-nums"
-				title={`Started ${formatTime(step.startedAt)}`}
-			>
-				{stepDuration(step)}
-			</span>
-			<span className="hidden w-12 shrink-0 text-right text-muted-foreground tabular-nums sm:inline">
-				{hasCost(step.nodeType) ? formatCost(step.costUsd) : "—"}
-			</span>
+			<RowStats
+				badge={<OutcomeBadge state={stepState(step, runStatus)} />}
+				duration={stepDuration(step)}
+				durationTitle={`Started ${formatTime(step.startedAt)}`}
+				cost={cost}
+			/>
+			{/* The focus button's slot on a call's row. */}
+			<span className="size-6 shrink-0" aria-hidden="true" />
 		</Item>
 	);
 }
@@ -278,6 +360,8 @@ function StepRow({
 function GroupRow({
 	label,
 	badge,
+	duration,
+	cost,
 	depth,
 	stepCount,
 	open,
@@ -286,6 +370,8 @@ function GroupRow({
 }: {
 	label: ReactNode;
 	badge: ReactNode;
+	duration: string | undefined;
+	cost: string | undefined;
 	depth: number;
 	stepCount: number;
 	open: boolean;
@@ -295,6 +381,7 @@ function GroupRow({
 	return (
 		<div
 			className={cn(
+				ROW,
 				"flex items-center gap-1 rounded-md pr-1 text-xs",
 				selected ? "bg-muted" : "hover:bg-muted/40",
 			)}
@@ -302,7 +389,7 @@ function GroupRow({
 		>
 			<CollapsibleTrigger
 				disabled={stepCount === 0}
-				className="group/row flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 pr-1 pl-2.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-default"
+				className="group/row flex h-full min-w-0 flex-1 items-center gap-2 rounded-md pr-1 pl-2.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-default"
 				title={
 					stepCount === 0
 						? "No steps yet"
@@ -311,19 +398,21 @@ function GroupRow({
 							: "Show its steps"
 				}
 			>
-				<ChevronRightIcon
-					aria-hidden="true"
-					className={cn(
-						"size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
-						open && stepCount > 0 && "rotate-90",
-						stepCount === 0 && "opacity-30",
-					)}
-				/>
+				<span className="flex w-5 shrink-0 justify-end">
+					<ChevronRightIcon
+						aria-hidden="true"
+						className={cn(
+							"size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none",
+							open && stepCount > 0 && "rotate-90",
+							stepCount === 0 && "opacity-30",
+						)}
+					/>
+				</span>
 				{label}
 				<span className="hidden shrink-0 text-muted-foreground tabular-nums sm:inline">
 					{stepCount} {stepCount === 1 ? "step" : "steps"}
 				</span>
-				{badge ? <span className="ml-auto shrink-0">{badge}</span> : null}
+				<RowStats badge={badge} duration={duration} cost={cost} />
 			</CollapsibleTrigger>
 			<Tooltip>
 				<TooltipTrigger

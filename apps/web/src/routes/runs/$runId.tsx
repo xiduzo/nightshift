@@ -8,12 +8,7 @@ import {
 	BreadcrumbSeparator,
 } from "@nightshift/ui/components/breadcrumb";
 import { Button } from "@nightshift/ui/components/button";
-import {
-	Card,
-	CardAction,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui/components/card";
+import { Card } from "@nightshift/ui/components/card";
 import {
 	Empty,
 	EmptyContent,
@@ -29,44 +24,40 @@ import {
 } from "@nightshift/ui/components/resizable";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@nightshift/ui/components/tabs";
 import { cn } from "@nightshift/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
 	ArrowDownToLineIcon,
-	BracesIcon,
 	ChevronRightIcon,
-	ListTreeIcon,
-	MessagesSquareIcon,
 	SearchXIcon,
 	WorkflowIcon,
 	XIcon,
 } from "lucide-react";
 import {
+	type ComponentProps,
 	Fragment,
 	type ReactNode,
 	useMemo,
+	useRef,
 	useState,
 	useSyncExternalStore,
 } from "react";
 
-import { ItemList } from "@/components/run/item-list";
-import { ResumeComposer } from "@/components/run/resume-composer";
 import { RunGraph } from "@/components/run/run-graph";
-import { RunActions, RunHeader } from "@/components/run/run-header";
-import { StepHeader, StepOutputs } from "@/components/run/step-header";
+import { RunActions, RunDetails, RunTitle } from "@/components/run/run-header";
+import { RunStatusPanel } from "@/components/run/run-status-panel";
+import {
+	CONSOLE_BAR_PX,
+	type ConsoleTab,
+	StepConsole,
+} from "@/components/run/step-console";
+import { StepSummary as StepSummaryView } from "@/components/run/step-summary";
 import { StepTimeline } from "@/components/run/step-timeline";
-import { SubflowDetail } from "@/components/run/subflow-detail";
-import { SiteHeader } from "@/components/site-header";
+import { type Crumb, SiteHeader } from "@/components/site-header";
 import { StepTranscript } from "@/components/transcript/step-transcript";
 import { mergeSteps, useRunStream } from "@/hooks/use-run-stream";
-import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
+import type { RunDetail, StepSummary } from "@/lib/api-types";
 import {
 	calledFlowName,
 	calledFlowOf,
@@ -87,12 +78,18 @@ export const Route = createFileRoute("/runs/$runId")({
 	component: RunComponent,
 });
 
-const RESUMABLE: RunStatus[] = ["stopped", "failed", "interrupted"];
-
-/** The views of the selected step. */
-type DetailTab = "transcript" | "elements" | "called" | "outputs";
-
 const DESKTOP = "(min-width: 1024px)";
+
+/** The closed console's panel: its bar, and the gaps above and below its card. */
+const CONSOLE_CLOSED_PX = CONSOLE_BAR_PX + 8 + 16;
+
+/** The imperative handle of a resizable panel: collapse, expand, resize. */
+type PanelHandle = NonNullable<
+	Extract<
+		NonNullable<ComponentProps<typeof ResizablePanel>["panelRef"]>,
+		{ current: unknown }
+	>["current"]
+>;
 
 /** Whether a media query matches, following changes. The route renders in the browser only. */
 function useMediaQuery(query: string): boolean {
@@ -107,6 +104,11 @@ function useMediaQuery(query: string): boolean {
 	);
 }
 
+/**
+ * A run: its steps and the flow behind them fill the page. The selected step
+ * sits in a console along the bottom: one line, or open on its summary,
+ * transcript and outputs. The run's facts open from the header.
+ */
 function RunComponent() {
 	const { runId } = Route.useParams();
 	const run = useQuery(orpc.runs.get.queryOptions({ input: { runId } }));
@@ -117,8 +119,11 @@ function RunComponent() {
 	const [pickedStepId, setPickedStepId] = useState<string | null>(null);
 	/** The call in focus (a Subflow step or a For Each element): the steps and the graph narrow to it. */
 	const [focus, setFocus] = useState<ItemScope>(null);
-	/** The view of the step detail; one the step lacks falls back to the transcript. */
-	const [tab, setTab] = useState<DetailTab>("transcript");
+	const [consoleOpen, setConsoleOpen] = useState(false);
+	const [consoleTab, setConsoleTab] = useState<ConsoleTab>("summary");
+	const consolePanel = useRef<PanelHandle>(null);
+	/** The height the console last had open, to open it at again. */
+	const consoleSize = useRef<string>("45%");
 
 	const steps = useMemo(
 		() => mergeSteps(run.data?.steps ?? [], stream.steps),
@@ -131,15 +136,16 @@ function RunComponent() {
 				<SiteHeader
 					crumbs={[{ label: "Home", link: { to: "/" } }, { label: "Run" }]}
 				/>
-				<div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-					<Skeleton className="h-36 w-full rounded-xl" />
-					<div className="grid flex-1 gap-4 lg:grid-cols-[5fr_7fr]">
-						<div className="flex flex-col gap-4">
-							<Skeleton className="h-64 rounded-xl" />
-							<Skeleton className="h-72 rounded-xl" />
-						</div>
-						<Skeleton className="min-h-96 rounded-xl" />
+				<div className="flex flex-1 flex-col gap-3 p-3 lg:p-4">
+					<div className="flex items-center gap-3">
+						<Skeleton className="h-6 w-64" />
+						<Skeleton className="h-5 w-16 rounded-full" />
 					</div>
+					<div className="grid flex-1 gap-4 lg:grid-cols-[2fr_3fr]">
+						<Skeleton className="min-h-72 rounded-xl" />
+						<Skeleton className="min-h-72 rounded-xl" />
+					</div>
+					<Skeleton className="h-11 rounded-xl" />
 				</div>
 			</>
 		);
@@ -224,63 +230,57 @@ function RunComponent() {
 		);
 	};
 
-	const graphCard = (
-		<Card className="h-full gap-0 py-0">
-			<CardHeader className="flex min-h-11 items-center gap-2 border-b py-2!">
-				<CardTitle className="flex min-w-0 items-center gap-2 text-sm">
-					<WorkflowIcon
-						className="size-4 shrink-0 text-muted-foreground"
-						aria-hidden="true"
-					/>
-					{graphScope ? (
-						<FocusBreadcrumb
-							run={runData}
-							steps={steps}
-							focus={graphScope}
-							onSelect={selectItem}
-						/>
-					) : (
-						<span className="truncate font-mono">
-							{runData.flowName ?? "Quick run"}
-						</span>
-					)}
-				</CardTitle>
-			</CardHeader>
-			<div className="min-h-0 flex-1 bg-muted/20">
-				<RunGraph
-					key={
-						graphScope
-							? `${graphScope.parentStepId}:${graphScope.itemId ?? ""}`
-							: "top"
-					}
-					flow={graphFlow}
-					steps={graphSteps}
-					runStatus={status}
-					traversals={graphTraversals}
-					selectedNodeId={graphSelected?.nodeId ?? null}
-					onSelectNode={selectNode}
-					label={graphScope ? "The flow of the call in focus" : undefined}
-				/>
-			</div>
-		</Card>
-	);
+	/** Opens or closes the console. On a desktop it is a panel that drags too. */
+	const showConsole = (open: boolean) => {
+		setConsoleOpen(open);
+		const panel = consolePanel.current;
+		if (!panel) return;
+		if (open && panel.isCollapsed()) panel.resize(consoleSize.current);
+		if (!open && !panel.isCollapsed()) panel.collapse();
+	};
 
-	const stepsCard = (
-		<Card
-			role="region"
+	const showGate = () => {
+		if (!openGate) return;
+		setFocus(null);
+		setPickedStepId(openGate.id);
+		setConsoleTab("transcript");
+		showConsole(true);
+	};
+
+	const crumbs: Crumb[] = [
+		{ label: "Home", link: { to: "/" } },
+		{
+			label: project?.name ?? "Project",
+			link: {
+				to: "/projects/$projectId",
+				params: { projectId: runData.projectId },
+			},
+		},
+		{
+			label: "Runs",
+			link: {
+				to: "/projects/$projectId/runs",
+				params: { projectId: runData.projectId },
+			},
+		},
+		{ label: runData.title },
+	];
+
+	const stepsPane = (
+		<section
 			aria-labelledby="steps-heading"
-			className={cn("gap-0 py-0", desktop && "h-full")}
+			className={cn("flex flex-col", desktop && "h-full")}
 		>
-			<CardHeader className="flex min-h-11 flex-wrap items-center gap-2 border-b py-2!">
-				<CardTitle
+			<div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
+				<h2
 					id="steps-heading"
-					className="flex items-center gap-2 text-sm"
+					className="flex items-center gap-2 font-medium text-sm"
 				>
 					Steps
 					<Badge variant="secondary" className="tabular-nums">
 						{visible.length}
 					</Badge>
-				</CardTitle>
+				</h2>
 				{focus ? (
 					<FocusChip
 						steps={steps}
@@ -289,19 +289,18 @@ function RunComponent() {
 					/>
 				) : null}
 				{pickedStepId ? (
-					<CardAction className="col-start-auto row-span-1 ml-auto self-center">
-						<Button
-							variant="ghost"
-							size="xs"
-							title="Follow the latest step as the run walks"
-							onClick={() => setPickedStepId(null)}
-						>
-							<ArrowDownToLineIcon data-icon="inline-start" />
-							Follow latest
-						</Button>
-					</CardAction>
+					<Button
+						variant="ghost"
+						size="xs"
+						className="ml-auto"
+						title="Follow the latest step as the run walks"
+						onClick={() => setPickedStepId(null)}
+					>
+						<ArrowDownToLineIcon data-icon="inline-start" />
+						Follow latest
+					</Button>
 				) : null}
-			</CardHeader>
+			</div>
 			<ScrollArea
 				className={cn(
 					"min-h-0 flex-1",
@@ -319,33 +318,84 @@ function RunComponent() {
 					calledName={(step) => calledFlowName(runData, steps, step)}
 				/>
 			</ScrollArea>
-		</Card>
+		</section>
 	);
 
-	const tabs: DetailTab[] = selectedStep
-		? [
-				"transcript",
-				...(selectedStep.nodeType === "foreach" ? (["elements"] as const) : []),
-				...(selectedStep.nodeType === "subflow" ? (["called"] as const) : []),
-				"outputs",
-			]
-		: [];
-	const activeTab = tabs.includes(tab) ? tab : "transcript";
-	const outputCount = selectedStep
-		? Object.keys(selectedStep.outputs).length
-		: 0;
-
-	const detailCard = (
-		<Card
-			role="region"
-			aria-label="The selected step"
-			className="h-full gap-0 py-0"
+	const flowPane = (
+		<section
+			aria-label="The flow"
+			className={cn("flex min-h-0 flex-col gap-3", desktop && "h-full")}
 		>
-			{selectedStep ? (
-				<>
-					<StepHeader
+			<div className="flex h-7 shrink-0 items-center gap-2 px-1 text-sm">
+				<WorkflowIcon
+					className="size-4 shrink-0 text-muted-foreground"
+					aria-hidden="true"
+				/>
+				{graphScope ? (
+					<FocusBreadcrumb
+						run={runData}
+						steps={steps}
+						focus={graphScope}
+						onSelect={selectItem}
+					/>
+				) : (
+					<span className="truncate font-medium font-mono">
+						{runData.flowName ?? "Quick run"}
+					</span>
+				)}
+			</div>
+			<div
+				className={cn(
+					"relative min-h-0 overflow-hidden rounded-xl border bg-muted/40 dark:bg-muted/20",
+					desktop ? "flex-1" : "h-72",
+				)}
+			>
+				<RunGraph
+					key={
+						graphScope
+							? `${graphScope.parentStepId}:${graphScope.itemId ?? ""}`
+							: "top"
+					}
+					flow={graphFlow}
+					steps={graphSteps}
+					runStatus={status}
+					traversals={graphTraversals}
+					selectedNodeId={graphSelected?.nodeId ?? null}
+					onSelectNode={selectNode}
+					label={graphScope ? "The flow of the call in focus" : undefined}
+				/>
+			</div>
+			<RunStatusPanel
+				// Opens again when the status changes.
+				key={status}
+				run={runData}
+				status={status}
+				openGateNodeId={openGate?.nodeId ?? null}
+				onShowGate={showGate}
+				wait={stream.transcript.lastWait}
+				lastStep={lastStep}
+			/>
+		</section>
+	);
+
+	const stepConsole = (
+		<StepConsole
+			step={selectedStep}
+			runStatus={status}
+			open={consoleOpen}
+			onOpenChange={showConsole}
+			tab={consoleTab}
+			onTabChange={setConsoleTab}
+			empty={status === "running" ? "Waiting for the first step…" : "No steps."}
+			className="h-full"
+			summary={
+				selectedStep ? (
+					<StepSummaryView
+						run={runData}
+						steps={steps}
 						step={selectedStep}
-						runStatus={status}
+						focus={focus}
+						onSelectItem={selectItem}
 						context={
 							selectedStep.scope ? (
 								<StepContext
@@ -357,181 +407,96 @@ function RunComponent() {
 							) : undefined
 						}
 					/>
-					<Tabs
-						value={activeTab}
-						onValueChange={(value) => setTab(value as DetailTab)}
-						className="min-h-0 flex-1 gap-0"
-					>
-						<div className="overflow-x-auto border-b px-3">
-							<TabsList variant="line" className="h-10">
-								<TabsTrigger value="transcript">
-									<MessagesSquareIcon aria-hidden="true" />
-									Transcript
-								</TabsTrigger>
-								{tabs.includes("elements") ? (
-									<TabsTrigger value="elements">
-										<ListTreeIcon aria-hidden="true" />
-										Elements
-										<Badge variant="secondary" className="tabular-nums">
-											{selectedStep.items.length}
-										</Badge>
-									</TabsTrigger>
-								) : null}
-								{tabs.includes("called") ? (
-									<TabsTrigger value="called">
-										<WorkflowIcon aria-hidden="true" />
-										Called flow
-									</TabsTrigger>
-								) : null}
-								<TabsTrigger value="outputs">
-									<BracesIcon aria-hidden="true" />
-									Outputs
-									{outputCount > 0 ? (
-										<Badge variant="secondary" className="tabular-nums">
-											{outputCount}
-										</Badge>
-									) : null}
-								</TabsTrigger>
-							</TabsList>
-						</div>
-						<TabsContent
-							value="transcript"
-							className="flex min-h-0 flex-1 flex-col"
-						>
-							<StepTranscript
-								key={selectedStep.id}
-								runId={runData.id}
-								step={selectedStep}
-								transcript={
-									stream.transcript.steps.get(selectedStep.id) ??
-									emptyTranscript
-								}
-								connecting={stream.connection === "connecting"}
-							/>
-						</TabsContent>
-						{tabs.includes("elements") ? (
-							<TabsContent value="elements" className="min-h-0 flex-1">
-								<ScrollArea className="size-full">
-									<ItemList
-										step={selectedStep}
-										steps={steps}
-										selectedItem={focus}
-										onSelectItem={selectItem}
-									/>
-								</ScrollArea>
-							</TabsContent>
-						) : null}
-						{tabs.includes("called") ? (
-							<TabsContent value="called" className="min-h-0 flex-1">
-								<ScrollArea className="size-full">
-									<SubflowDetail
-										run={runData}
-										steps={steps}
-										step={selectedStep}
-										focused={
-											focus?.parentStepId === selectedStep.id &&
-											focus.itemId === null
-										}
-										onFocus={selectItem}
-									/>
-								</ScrollArea>
-							</TabsContent>
-						) : null}
-						<TabsContent value="outputs" className="min-h-0 flex-1">
-							<ScrollArea className="size-full">
-								<StepOutputs step={selectedStep} />
-							</ScrollArea>
-						</TabsContent>
-					</Tabs>
-				</>
-			) : (
-				<Empty className="flex-1">
-					<EmptyHeader>
-						<EmptyMedia variant="icon">
-							<MessagesSquareIcon />
-						</EmptyMedia>
-						<EmptyTitle>
-							{status === "running" ? "Starting" : "No steps"}
-						</EmptyTitle>
-						<EmptyDescription>
-							{status === "running"
-								? "Waiting for the first step…"
-								: "This run has no steps."}
-						</EmptyDescription>
-					</EmptyHeader>
-				</Empty>
-			)}
-			{RESUMABLE.includes(status) ? (
-				<ResumeComposer runId={runData.id} lastStep={lastStep} />
-			) : null}
-		</Card>
+				) : null
+			}
+			transcript={
+				selectedStep ? (
+					<StepTranscript
+						key={selectedStep.id}
+						runId={runData.id}
+						step={selectedStep}
+						transcript={
+							stream.transcript.steps.get(selectedStep.id) ?? emptyTranscript
+						}
+						connecting={stream.connection === "connecting"}
+					/>
+				) : null
+			}
+		/>
 	);
 
 	return (
 		<>
-			<SiteHeader
-				crumbs={[
-					{ label: "Home", link: { to: "/" } },
-					{
-						label: project?.name ?? "Project",
-						link: {
-							to: "/projects/$projectId",
-							params: { projectId: runData.projectId },
-						},
-					},
-					{ label: runData.title },
-				]}
-			>
+			<SiteHeader crumbs={crumbs}>
 				<RunActions run={runData} status={status} />
+				<RunDetails run={runData} />
 			</SiteHeader>
-			<div className="flex flex-1 flex-col gap-4 p-4 md:p-6 lg:h-[calc(100svh-3.5rem)] lg:min-h-0 lg:flex-none">
-				<RunHeader
+			<div className="flex flex-1 flex-col lg:h-[calc(100svh-3.5rem)] lg:min-h-0 lg:flex-none">
+				<RunTitle
 					run={runData}
+					steps={steps}
 					status={status}
 					reconnecting={stream.connection === "reconnecting"}
-					openGateNodeId={openGate?.nodeId ?? null}
-					onShowGate={() => {
-						if (!openGate) return;
-						setFocus(null);
-						setPickedStepId(openGate.id);
-						setTab("transcript");
-					}}
-					wait={stream.transcript.lastWait}
 				/>
 				{desktop ? (
 					<ResizablePanelGroup
-						orientation="horizontal"
+						orientation="vertical"
 						className="min-h-[28rem] flex-1"
 					>
-						<ResizablePanel defaultSize="42%" minSize="28%" className="p-px">
-							<ResizablePanelGroup orientation="vertical">
+						<ResizablePanel minSize="25%">
+							<ResizablePanelGroup orientation="horizontal">
 								<ResizablePanel
-									defaultSize="45%"
-									minSize="20%"
-									className="p-px"
+									defaultSize="38%"
+									minSize="22%"
+									className="min-h-0 min-w-0 pt-3 pr-2 pb-2 pl-4"
 								>
-									{graphCard}
+									<Card className="h-full gap-0 py-0">{stepsPane}</Card>
 								</ResizablePanel>
-								<ResizableHandle withHandle className="my-1.5 bg-transparent" />
+								<ResizableHandle
+									withHandle
+									className="bg-transparent focus-visible:bg-ring"
+								/>
 								<ResizablePanel
-									defaultSize="55%"
-									minSize="20%"
-									className="p-px"
+									defaultSize="62%"
+									minSize="30%"
+									className="min-h-0 min-w-0 pt-3 pr-4 pb-2 pl-2"
 								>
-									{stepsCard}
+									{flowPane}
 								</ResizablePanel>
 							</ResizablePanelGroup>
 						</ResizablePanel>
-						<ResizableHandle withHandle className="mx-1.5 bg-transparent" />
-						<ResizablePanel defaultSize="58%" minSize="35%" className="p-px">
-							{detailCard}
+						<ResizableHandle
+							withHandle
+							className="bg-transparent focus-visible:bg-ring"
+						/>
+						<ResizablePanel
+							panelRef={consolePanel}
+							collapsible
+							collapsedSize={CONSOLE_CLOSED_PX}
+							minSize={220}
+							defaultSize={CONSOLE_CLOSED_PX}
+							className="min-h-0 px-4 pt-2 pb-4"
+							onResize={(size) => {
+								const open = size.inPixels > CONSOLE_CLOSED_PX + 1;
+								if (open) consoleSize.current = `${size.asPercentage}%`;
+								setConsoleOpen(open);
+							}}
+						>
+							<Card className="h-full gap-0 py-0">{stepConsole}</Card>
 						</ResizablePanel>
 					</ResizablePanelGroup>
 				) : (
-					<div className="flex flex-col gap-4">
-						<div className="h-72">{graphCard}</div>
-						{stepsCard}
-						<div className="h-[85svh] min-h-[32rem]">{detailCard}</div>
+					<div className="flex flex-col gap-3 p-3">
+						<Card className="gap-0 py-0">{stepsPane}</Card>
+						{flowPane}
+						<Card
+							className={cn(
+								"gap-0 py-0",
+								consoleOpen && "h-[85svh] min-h-[32rem]",
+							)}
+						>
+							{stepConsole}
+						</Card>
 					</div>
 				)}
 			</div>
