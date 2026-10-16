@@ -15,6 +15,7 @@ import {
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
 import { AppSidebar } from "@/components/app-sidebar";
+import { NightNotifications } from "@/hooks/use-night-notifications";
 import type { orpc } from "@/utils/orpc";
 
 import appCss from "../index.css?url";
@@ -70,6 +71,7 @@ function RootDocument() {
 						</SidebarProvider>
 					</TooltipProvider>
 					<Toaster richColors />
+					<NightNotifications />
 				</ThemeProvider>
 				<TanStackRouterDevtools position="bottom-left" />
 				<ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />

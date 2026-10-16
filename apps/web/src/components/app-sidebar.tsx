@@ -27,6 +27,8 @@ import {
 	MonitorIcon,
 	MoonIcon,
 	MoonStarIcon,
+	PlugIcon,
+	Settings2Icon,
 	SunIcon,
 	SunMoonIcon,
 } from "lucide-react";
@@ -122,6 +124,31 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 								</SidebarMenuButton>
 							</SidebarMenuItem>
 						))}
+					</SidebarMenu>
+				</SidebarGroup>
+				<SidebarGroup className="mt-auto">
+					<SidebarGroupLabel>This Mac</SidebarGroupLabel>
+					<SidebarMenu>
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								tooltip="Connections"
+								isActive={Boolean(matchRoute({ to: "/connections" }))}
+								render={<Link to="/connections" />}
+							>
+								<PlugIcon aria-hidden="true" />
+								<span>Connections</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								tooltip="Settings"
+								isActive={Boolean(matchRoute({ to: "/settings" }))}
+								render={<Link to="/settings" />}
+							>
+								<Settings2Icon aria-hidden="true" />
+								<span>Settings</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
 					</SidebarMenu>
 				</SidebarGroup>
 			</SidebarContent>
