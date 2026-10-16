@@ -104,3 +104,42 @@ export const event = sqliteTable(
 	},
 	(table) => [index("event_runId_idx").on(table.runId)],
 );
+
+const updatedAt = () =>
+	integer("updated_at", { mode: "timestamp_ms" })
+		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+		.notNull();
+
+/**
+ * A daemon setting changed in the UI. A key without a row falls back to the
+ * daemon's environment, then to the built-in default.
+ */
+export const setting = sqliteTable("setting", {
+	key: text("key").primaryKey(),
+	/** JSON-encoded value. */
+	value: text("value").notNull(),
+	updatedAt: updatedAt(),
+});
+
+/**
+ * An MCP server defined once on this daemon. Agent nodes name it in
+ * `connections`. Secrets stay `${NAME}` references, never values.
+ */
+export const connection = sqliteTable("connection", {
+	name: text("name").primaryKey(),
+	description: text("description"),
+	/** JSON: the MCP server, a command (stdio) or a URL (streamable HTTP). */
+	server: text("server").notNull(),
+	createdAt: createdAt(),
+	updatedAt: updatedAt(),
+});
+
+/**
+ * The names of the secrets saved in the system keychain. The values live in
+ * the keychain only. A `${NAME}` reads the keychain first, then the environment.
+ */
+export const secret = sqliteTable("secret", {
+	name: text("name").primaryKey(),
+	createdAt: createdAt(),
+	updatedAt: updatedAt(),
+});

@@ -7,6 +7,7 @@ import type {
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import type {
+	AgentNode,
 	Flow,
 	FlowIssue,
 	FlowListItem,
@@ -19,6 +20,9 @@ import type {
 	Schedule,
 	ScheduleIssue,
 } from "@nightshift/flows";
+
+import type { McpExpansion } from "./mcp";
+import type { RunSettings } from "./settings";
 
 /**
  * The engine's public contract. The API layer only calls this interface.
@@ -399,4 +403,19 @@ export type EngineOptions = {
 	 * replaces the engine.
 	 */
 	scheduler?: false | { signal?: AbortSignal };
+	/**
+	 * The daemon's settings, read each time one applies: the run cap, the
+	 * step cap, the policy defaults and the scheduler switch. Overrides
+	 * `maxConcurrentRuns` and `maxStepsPerRun` when set.
+	 */
+	settings?: () => RunSettings;
+	/**
+	 * An Agent node's MCP servers: its connections and its own servers, with
+	 * `${NAME}` expanded. Default: its own servers, from `process.env`.
+	 */
+	mcpServersFor?: (
+		node: Pick<AgentNode, "connections" | "mcpServers">,
+	) => Promise<McpExpansion>;
+	/** The connections this daemon has. A flow that names another refuses to start. */
+	connectionNames?: () => ReadonlySet<string>;
 };

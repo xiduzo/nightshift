@@ -68,6 +68,8 @@ export type SchedulerDeps = {
 	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
 	/** The run's status, or null when the log knows no such run. */
 	runStatus(runId: string): Promise<RunStatus | null>;
+	/** Read on every tick: false skips the tick, like a pause of every schedule. Default on. */
+	enabled?: () => boolean;
 };
 
 export type Scheduler = {
@@ -113,6 +115,10 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 	const history = new Map<string, History>();
 	/** The first tick that saw each enabled schedule. Forgotten while it is paused. */
 	const watchedSince = new Map<string, number>();
+	/** Whether the last tick found the scheduler switched off. */
+	let off = false;
+	/** The first tick after the scheduler was switched on again: a cron time before it neither fires nor counts as missed. */
+	let onSince: number | null = null;
 	let cursor = 0;
 	let running: Promise<void> | null = null;
 	let timer: ReturnType<typeof setInterval> | undefined;
@@ -224,6 +230,8 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		if (due === null) return;
 		const current = history.get(key);
 		if (current && due <= current.lastAt) return;
+		// It came due while the scheduler was off.
+		if (onSince !== null && due < onSince) return;
 
 		const late = at - due;
 		if (late > SCHEDULE_GRACE_MS) {
@@ -288,7 +296,17 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 
 	async function pass(): Promise<void> {
 		await refresh();
+		if (deps.enabled && !deps.enabled()) {
+			// Off counts as paused: turning it on again starts from now.
+			watchedSince.clear();
+			off = true;
+			return;
+		}
 		const at = now();
+		if (off) {
+			off = false;
+			onSince = at;
+		}
 		const projects = await db
 			.select({ id: project.id, repoPath: project.repoPath })
 			.from(project)

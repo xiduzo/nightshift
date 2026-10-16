@@ -50,7 +50,7 @@ export function expandMcpServers(
 				names.length === 1 ? ["variable", "it"] : ["variables", "them"];
 			return {
 				ok: false,
-				message: `The MCP server "${name}" reads the environment ${noun} ${names.join(", ")}, but the daemon does not have ${it}. Set ${it} where the daemon starts, or remove the reference.`,
+				message: `The MCP server "${name}" reads the environment ${noun} ${names.join(", ")}, but the daemon does not have ${it}. Save ${it} under Connections → Secrets, set ${it} where the daemon starts, or remove the reference.`,
 			};
 		}
 		expanded[name] = config;

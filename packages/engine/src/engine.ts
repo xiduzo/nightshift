@@ -40,7 +40,7 @@ import {
 	type Outcome,
 	type Policy,
 	parseFlow,
-	policySchema,
+	type ResolvedPolicy,
 	renderCommand,
 	renderTemplate,
 	type SubflowNode,
@@ -107,7 +107,7 @@ import {
 	toItemFacts,
 } from "./foreach";
 import { flowOutputs, renderBindings, resolveInputs } from "./inputs";
-import { expandMcpServers } from "./mcp";
+import { expandMcpServers, type McpExpansion } from "./mcp";
 import { checkOutputData } from "./output-schema";
 import { planWait } from "./policy";
 import {
@@ -115,6 +115,7 @@ import {
 	DEFAULT_SCHEDULE_TICK_MS,
 	type ScheduleRecord,
 } from "./scheduler";
+import { defaultRunSettings, type RunSettings } from "./settings";
 import {
 	commandLogPath,
 	openTranscriptWriter,
@@ -260,7 +261,7 @@ type RunContext = {
 	flow: Flow;
 	/** The snapshots of every flow the run can call, by name. */
 	calledFlows: Record<string, Flow>;
-	policy: Policy;
+	policy: ResolvedPolicy;
 	walk: ActiveWalk;
 };
 
@@ -330,6 +331,22 @@ export function createEngine(
 	if (!Number.isInteger(maxStepsPerRun) || maxStepsPerRun < 1) {
 		throw new Error("maxStepsPerRun must be a positive integer.");
 	}
+	/** The daemon's settings, read when they apply. Without a store: the options, then the defaults. */
+	const runSettings = (): RunSettings =>
+		options.settings?.() ?? {
+			...defaultRunSettings(),
+			maxConcurrentRuns,
+			maxStepsPerRun,
+		};
+	const mcpServersFor =
+		options.mcpServersFor ??
+		(async (node: AgentNode): Promise<McpExpansion> =>
+			(node.connections ?? []).length > 0
+				? {
+						ok: false,
+						message: `The node names connections (${node.connections?.join(", ")}), but this daemon has none.`,
+					}
+				: expandMcpServers(node.mcpServers, process.env));
 
 	const bus = createRunBus();
 	/** Keyed by run id: the runs that walk in this process. */
@@ -443,9 +460,10 @@ export function createEngine(
 				"This run is still running. Stop it or wait for it to end.",
 			);
 		}
-		if (slots.size >= maxConcurrentRuns) {
+		const runCap = runSettings().maxConcurrentRuns;
+		if (slots.size >= runCap) {
 			throw new Error(
-				`The run cap is reached: ${slots.size} of ${maxConcurrentRuns} runs are running. Stop a run or wait for one to end.`,
+				`The run cap is reached: ${slots.size} of ${runCap} runs are running. Stop a run or wait for one to end.`,
 			);
 		}
 		slots.set(runId, "starting");
@@ -682,7 +700,7 @@ export function createEngine(
 			row,
 			flow,
 			calledFlows: parseCalledFlows(row),
-			policy: policySchema.parse(flow.policy ?? {}),
+			policy: resolvePolicy(flow.policy, runSettings().policy),
 			walk,
 		};
 		slots.set(row.id, walk);
@@ -760,7 +778,7 @@ export function createEngine(
 			if (next.kind === "node") {
 				const stop = stopBeforeNext(events);
 				if (stop) return { kind: "stopped", reason: stop };
-				const limit = ctx.policy.maxSteps ?? maxStepsPerRun;
+				const limit = ctx.policy.maxSteps ?? runSettings().maxStepsPerRun;
 				if (countStepsSinceWalkBegan(events) >= limit) {
 					return {
 						kind: "aborted",
@@ -1371,9 +1389,10 @@ export function createEngine(
 			};
 		}
 
-		// `${NAME}` in env values and headers reads the daemon's environment.
-		// The expanded values go to the harness only, never into the log.
-		const mcp = expandMcpServers(node.mcpServers, process.env);
+		// The node's connections and its own servers. `${NAME}` in env values
+		// and headers reads the keychain, then the daemon's environment. The
+		// expanded values go to the harness only, never into the log.
+		const mcp = await mcpServersFor(node);
 		if (!mcp.ok) {
 			return {
 				outcome: "error",
@@ -2333,6 +2352,20 @@ export function createEngine(
 			);
 			const all = [flow, ...Object.values(calledFlows)];
 			const nodes = all.flatMap((f) => f.nodes);
+			const unknownConnections = missingConnections(
+				nodes,
+				options.connectionNames?.() ?? new Set(),
+			);
+			if (unknownConnections.length > 0) {
+				throw new Error(
+					unknownConnections
+						.map(
+							({ name, nodeIds }) =>
+								`The flow names the connection "${name}" (${nodeIds.join(", ")}), but this daemon does not have it. Add it under Connections.`,
+						)
+						.join(" "),
+				);
+			}
 			const missing = missingHarnesses(nodes, harnesses);
 			if (missing.length > 0) {
 				throw new Error(
@@ -2425,6 +2458,7 @@ export function createEngine(
 		now,
 		tickMs: internals.scheduleTickMs ?? DEFAULT_SCHEDULE_TICK_MS,
 		startRun: startRunWith,
+		enabled: () => runSettings().scheduler,
 		async runStatus(runId) {
 			const events = await loadRunEvents(runId);
 			return events.length === 0 ? null : deriveRunState(events).status;
@@ -2960,6 +2994,40 @@ function missingHarnesses(
 		missing.set(node.harness, ids);
 	}
 	return [...missing].map(([harness, nodeIds]) => ({ harness, nodeIds }));
+}
+
+/** The connections the Agent nodes name that the daemon does not have, with their nodes. */
+function missingConnections(
+	nodes: readonly FlowNode[],
+	names: ReadonlySet<string>,
+): { name: string; nodeIds: string[] }[] {
+	const missing = new Map<string, string[]>();
+	for (const node of nodes) {
+		if (node.type !== "agent") continue;
+		for (const name of node.connections ?? []) {
+			if (names.has(name)) continue;
+			const ids = missing.get(name) ?? [];
+			if (!ids.includes(node.id)) ids.push(node.id);
+			missing.set(name, ids);
+		}
+	}
+	return [...missing].map(([name, nodeIds]) => ({ name, nodeIds }));
+}
+
+/** The flow's own policy numbers, else the daemon's settings. */
+function resolvePolicy(
+	own: Policy | undefined,
+	defaults: RunSettings["policy"],
+): ResolvedPolicy {
+	return {
+		usageLimitFirstWaitMinutes:
+			own?.usageLimitFirstWaitMinutes ?? defaults.usageLimitFirstWaitMinutes,
+		usageLimitMaxWaitMinutes:
+			own?.usageLimitMaxWaitMinutes ?? defaults.usageLimitMaxWaitMinutes,
+		networkGraceMinutes:
+			own?.networkGraceMinutes ?? defaults.networkGraceMinutes,
+		...(own?.maxSteps !== undefined ? { maxSteps: own.maxSteps } : {}),
+	};
 }
 
 /** The names of the flows a flow's Subflow and For Each nodes call. */

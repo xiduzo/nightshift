@@ -8,6 +8,7 @@ import { asc, inArray } from "drizzle-orm";
 import { createEngine, type EngineInternals } from "./engine";
 import { type EnginePayloads, parseEventRow } from "./events";
 import { SCHEDULE_GRACE_MS } from "./scheduler";
+import { defaultRunSettings, type RunSettings } from "./settings";
 import { createSandbox, type Sandbox, waitFor } from "./test-support";
 import type { Engine, EngineOptions, RunSummary } from "./types";
 
@@ -37,7 +38,10 @@ function at(day: number, hours: number, minutes = 0, seconds = 0): number {
 
 /** A daemon. Abort its controller to let it die. */
 function startDaemon(
-	options: Pick<EngineOptions, "maxConcurrentRuns" | "scheduler"> = {},
+	options: Pick<
+		EngineOptions,
+		"maxConcurrentRuns" | "scheduler" | "settings"
+	> = {},
 	internals: EngineInternals = {},
 ): { engine: Engine; die: () => void } {
 	const controller = new AbortController();
@@ -477,5 +481,72 @@ describe("the scheduler", () => {
 		clock = at(16, 22, 1);
 		await settle();
 		expect(await scheduleFacts()).toEqual([]);
+	});
+
+	describe("the settings' scheduler switch", () => {
+		/** Settings with the switch the test flips. */
+		function switchable(on: boolean) {
+			const settings: RunSettings = { ...defaultRunSettings(), scheduler: on };
+			return { settings, read: () => settings };
+		}
+
+		test("off skips every tick: nothing fires", async () => {
+			const { read } = switchable(false);
+			const { engine } = startDaemon({ settings: read });
+			const project = await setup(engine, [nightly()]);
+			clock = at(16, 22, 0, 20);
+			await settle();
+			expect(await scheduleFacts()).toEqual([]);
+			expect(await engine.listRuns()).toEqual([]);
+			expect(
+				(await engine.listSchedules(project.id)).schedules[0]?.last,
+			).toBeNull();
+		});
+
+		test("turned on again, it neither fires nor reports a time that came due while off", async () => {
+			const { settings, read } = switchable(true);
+			const { engine } = startDaemon({ settings: read });
+			await setup(engine, [nightly()]);
+			// Watching from 21:59, then off before the time.
+			await settle();
+			settings.scheduler = false;
+			await settle();
+			clock = at(16, 22, 30);
+			await settle();
+			settings.scheduler = true;
+			await settle();
+			expect(await scheduleFacts()).toEqual([]);
+			expect(await engine.listRuns()).toEqual([]);
+
+			// The next time fires as usual.
+			clock = at(17, 22, 0, 10);
+			const [fired] = await waitForFacts(1);
+			expect(fired).toMatchObject({
+				type: "ScheduleFired",
+				payload: { at: at(17, 22), error: null },
+			});
+			await waitForEnd(engine, firedRunId(fired));
+		});
+
+		test("turned on within the grace of a time that came due while off, it does not fire it", async () => {
+			const { settings, read } = switchable(false);
+			const { engine } = startDaemon({ settings: read });
+			await setup(engine, [nightly()]);
+			await settle();
+			clock = at(16, 22, 5);
+			await settle();
+			settings.scheduler = true;
+			await settle();
+			expect(await scheduleFacts()).toEqual([]);
+			expect(await engine.listRuns()).toEqual([]);
+
+			clock = at(17, 22, 0, 10);
+			const [fired] = await waitForFacts(1);
+			expect(fired).toMatchObject({
+				type: "ScheduleFired",
+				payload: { at: at(17, 22), error: null },
+			});
+			await waitForEnd(engine, firedRunId(fired));
+		});
 	});
 });

@@ -133,6 +133,12 @@ export const agentNodeSchema = z.object({
 	tools: z.array(toolSetSchema).default([]),
 	/** The step fails when the agent shows no activity for this long. */
 	idleMinutes: z.number().int().positive().optional(),
+	/**
+	 * Connections by name: MCP servers defined once on this daemon (the
+	 * Connections page), added to the harness's own configuration. A flow
+	 * that names a connection the daemon does not have refuses to start.
+	 */
+	connections: z.array(nameSchema).optional(),
 	/** MCP servers by name, added to the harness's own configuration. */
 	mcpServers: z.record(nameSchema, mcpServerSchema).optional(),
 	/**
@@ -305,13 +311,17 @@ export const flowEdgeSchema = z.object({
  * limit or a network failure waits and then continues the same session.
  * Only the top-level flow of a run sets them.
  */
+/**
+ * The run policy of one flow. Every number is optional: a number the flow
+ * leaves out comes from the daemon's settings (Settings → Run policy).
+ */
 export const policySchema = z.object({
 	/** The first wait after a usage limit without a known reset time. Doubles each time. */
-	usageLimitFirstWaitMinutes: z.number().positive().default(5),
-	usageLimitMaxWaitMinutes: z.number().positive().default(60),
+	usageLimitFirstWaitMinutes: z.number().positive().optional(),
+	usageLimitMaxWaitMinutes: z.number().positive().optional(),
 	/** The longest total wait for the network before the step fails. */
-	networkGraceMinutes: z.number().positive().default(240),
-	/** Safety net: the most steps a run may take before it stops (resumable). Default 500. */
+	networkGraceMinutes: z.number().positive().optional(),
+	/** Safety net: the most steps a run may take before it stops (resumable). */
 	maxSteps: z.number().int().positive().optional(),
 });
 
@@ -365,6 +375,9 @@ export type SubflowNode = z.infer<typeof subflowNodeSchema>;
 export type ForEachNode = z.infer<typeof forEachNodeSchema>;
 export type ListSource = z.infer<typeof listSourceSchema>;
 export type Policy = z.infer<typeof policySchema>;
+/** A policy with every number filled in: the flow's own, else the daemon's setting. */
+export type ResolvedPolicy = Required<Omit<Policy, "maxSteps">> &
+	Pick<Policy, "maxSteps">;
 export type FlowInputDef = z.infer<typeof flowInputSchema>;
 export type FlowOutputDef = z.infer<typeof flowOutputSchema>;
 export type FlowEdge = z.infer<typeof flowEdgeSchema>;

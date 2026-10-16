@@ -1,4 +1,4 @@
-import type { Policy } from "@nightshift/flows";
+import type { ResolvedPolicy } from "@nightshift/flows";
 
 import type { EnginePayloads, WaitReason } from "./events";
 
@@ -24,7 +24,7 @@ export function planWait(input: {
 	/** The harness's error message. */
 	message: string;
 	resetAt: number | null;
-	policy: Policy;
+	policy: ResolvedPolicy;
 	now: number;
 	minuteMs: number;
 }): WaitPlan {
