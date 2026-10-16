@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness, reportingScript } from "@nightshift/agents/fake";
 import type {
@@ -22,6 +22,7 @@ import {
 import { asc } from "drizzle-orm";
 
 import { createEngine, type EngineInternals } from "./engine";
+import { defaultRunSettings, type RunSettings } from "./settings";
 import {
 	createSandbox,
 	mustGit,
@@ -50,7 +51,11 @@ function makeEngine(
 	harness: AgentHarness,
 	options: Pick<
 		EngineOptions,
-		"maxConcurrentRuns" | "maxStepsPerRun" | "decider"
+		| "maxConcurrentRuns"
+		| "maxStepsPerRun"
+		| "decider"
+		| "settings"
+		| "scheduler"
 	> = {},
 	internals: EngineInternals = {},
 ): Engine {
@@ -930,8 +935,14 @@ describe("watchRun", () => {
 	});
 });
 
+/** The defaults with a change: a daemon's settings, read when they apply. */
+const settingsWith = (patch: Partial<RunSettings>) => (): RunSettings => ({
+	...defaultRunSettings(),
+	...patch,
+});
+
 describe("recovery", () => {
-	test("work the daemon lost is interrupted, never continued on its own", async () => {
+	test("with automatic resume off, work the daemon lost is interrupted and waits for a person", async () => {
 		// The first daemon's harness never ends: the daemon "dies" mid-step.
 		const dying = scriptedHarness({ hang: true });
 		const first = makeEngine(dying.harness);
@@ -950,7 +961,11 @@ describe("recovery", () => {
 		const { harness, sessions } = scriptedHarness({
 			harnessSessionId: () => "harness-0",
 		});
-		const second = makeEngine(harness);
+		const second = makeEngine(
+			harness,
+			{ settings: settingsWith({ resumeInterruptedRuns: false }) },
+			{ resumeGraceMs: 0 },
+		);
 		const detail = await second.getRun(run.id);
 		expect(detail.status).toBe("interrupted");
 		expect(detail.steps[0]).toMatchObject({ outcome: "interrupted" });
@@ -975,6 +990,313 @@ describe("recovery", () => {
 			["worker", "pass"],
 			["check", "pass"],
 		]);
+	});
+});
+
+describe("automatic resume after a restart", () => {
+	/** A daemon that dies mid-step: its harness never ends. Returns the run. */
+	async function dieMidStep(
+		flow: Flow = flowOf(
+			[agent("worker", "Go"), command("check", "true")],
+			[edge("e1", "worker", "pass", "check")],
+		),
+		start: { stopAt?: number } = {},
+	) {
+		const dying = scriptedHarness({
+			hang: true,
+			harnessSessionId: () => "harness-0",
+		});
+		const first = makeEngine(dying.harness);
+		const run = await first.startRun({
+			projectId: await projectId(first),
+			flow,
+			...start,
+		});
+		const lost = await waitFor(() => dying.sessions[0]);
+		return { run, lost, dying };
+	}
+
+	/** A new daemon on the same database, with automatic resume after `resumeGraceMs` 0. */
+	function restart(
+		options: Parameters<typeof makeEngine>[1] = {},
+		internals: EngineInternals = {},
+	) {
+		const { harness, sessions } = scriptedHarness({
+			harnessSessionId: () => "harness-0",
+		});
+		const engine = makeEngine(harness, options, {
+			resumeGraceMs: 0,
+			...internals,
+		});
+		return { engine, sessions };
+	}
+
+	/** Gives a resume that should not come time to show up, then checks it did not. */
+	async function expectNotResumed(
+		engine: Engine,
+		runId: string,
+		sessions: unknown[],
+		why: string,
+	) {
+		await Bun.sleep(60);
+		expect(sessions).toHaveLength(0);
+		const detail = await engine.getRun(runId);
+		expect(detail.status).toBe("interrupted");
+		expect(detail.reason).toBe(
+			`The daemon stopped while this run ran. It did not continue on its own: ${why}`,
+		);
+		return detail;
+	}
+
+	test("an open run continues on its own, in the same session, with the daemon as the cause", async () => {
+		const { run } = await dieMidStep();
+		const { engine, sessions } = restart({}, { resumeGraceMs: 30 });
+		const interrupted = await engine.getRun(run.id);
+		expect(interrupted.status).toBe("interrupted");
+		expect(interrupted.reason).toBe("The daemon stopped while this run ran.");
+
+		const resumed = await waitFor(() => sessions[0]);
+		expect(resumed.input.resumeSessionId).toBe("harness-0");
+		expect(resumed.input.prompt).toContain(
+			"The daemon stopped while you worked on this",
+		);
+		expect(resumed.input.prompt).toContain("check the worktree");
+		resumed.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+
+		const detail = await engine.getRun(run.id);
+		expect(detail.resumes).toEqual([
+			{
+				at: expect.any(Number),
+				by: "daemon",
+				nodeId: "worker",
+				reason: "The daemon restarted.",
+			},
+		]);
+		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["worker", "pass"],
+			["check", "pass"],
+		]);
+		expect(detail.steps[0]?.sessions).toHaveLength(2);
+	});
+
+	test.each([
+		["the Settings switch", { settings: settingsWith({ scheduler: false }) }],
+		["NIGHTSHIFT_SCHEDULER=off", { scheduler: false as const }],
+	])(
+		"with the scheduler off (%s), a run does not continue on its own",
+		async (_name, options) => {
+			const { run } = await dieMidStep();
+			const { engine, sessions } = restart(options);
+			const detail = await expectNotResumed(
+				engine,
+				run.id,
+				sessions,
+				"the scheduler is off on this daemon.",
+			);
+			expect(detail.resumes).toEqual([]);
+		},
+	);
+
+	test("past its stop time, a run does not continue on its own", async () => {
+		const { run } = await dieMidStep(undefined, {
+			stopAt: Date.now() + 60_000,
+		});
+		const { engine, sessions } = restart(
+			{},
+			{ now: () => Date.now() + 2 * 60_000 },
+		);
+		await expectNotResumed(
+			engine,
+			run.id,
+			sessions,
+			"its stop time has passed.",
+		);
+	});
+
+	test("a run whose worktree is gone does not continue on its own", async () => {
+		const { run } = await dieMidStep();
+		await rm(run.worktreePath, { recursive: true, force: true });
+		const { engine, sessions } = restart();
+		await expectNotResumed(
+			engine,
+			run.id,
+			sessions,
+			`its worktree is gone (${run.worktreePath}).`,
+		);
+	});
+
+	test("a flow's policy turns it off, and on over the Settings", async () => {
+		const off = await dieMidStep({
+			...flowOf([agent("worker", "Go")]),
+			policy: { resumeInterruptedRuns: false },
+		});
+		const first = restart();
+		await expectNotResumed(
+			first.engine,
+			off.run.id,
+			first.sessions,
+			"its flow's policy turns automatic resume off.",
+		);
+
+		const on = await dieMidStep({
+			...flowOf([agent("worker", "Go")]),
+			policy: { resumeInterruptedRuns: true },
+		});
+		const second = restart({
+			settings: settingsWith({ resumeInterruptedRuns: false }),
+		});
+		const resumed = await waitFor(() => second.sessions[0]);
+		resumed.finish();
+		expect(await waitForEnd(second.engine, on.run.id)).toBe("finished");
+		// The first run stays as it was: off by its own policy.
+		expect((await second.engine.getRun(off.run.id)).status).toBe("interrupted");
+	});
+
+	test("a run a person stopped stays stopped", async () => {
+		const { harness, sessions } = scriptedHarness();
+		const first = makeEngine(harness);
+		const run = await first.startRun({
+			projectId: await projectId(first),
+			flow: flowOf([agent("worker", "Go")]),
+		});
+		await waitFor(() => sessions[0]);
+		await first.stopRun(run.id);
+		expect(await statusOf(first, run.id)).toBe("stopped");
+
+		const second = restart();
+		await Bun.sleep(60);
+		expect(second.sessions).toHaveLength(0);
+		const detail = await second.engine.getRun(run.id);
+		expect(detail.status).toBe("stopped");
+		expect(detail.resumes).toEqual([]);
+	});
+
+	test("after three automatic resumes in a row, a run waits for a person", async () => {
+		const { run, dying } = await dieMidStep();
+		// Each new daemon resumes the run, and dies in the same step again.
+		for (let restarts = 1; restarts <= 3; restarts++) {
+			makeEngine(dying.harness, {}, { resumeGraceMs: 0 });
+			await waitFor(() => dying.sessions[restarts], {
+				label: `session ${restarts + 1}`,
+			});
+		}
+		const { engine, sessions } = restart();
+		await expectNotResumed(
+			engine,
+			run.id,
+			sessions,
+			"it continued on its own 3 times in a row, and each time the daemon stopped again.",
+		);
+
+		// A person's resume counts from zero again.
+		await engine.resumeRun(run.id);
+		const resumed = await waitFor(() => sessions[0]);
+		expect(resumed.input.prompt).toBe("Continue where you left off.");
+		resumed.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect((await engine.getRun(run.id)).resumes.map((r) => r.by)).toEqual([
+			"daemon",
+			"daemon",
+			"daemon",
+			"person",
+		]);
+	});
+
+	test("with the run cap full, a run waits for a free slot", async () => {
+		const dying = scriptedHarness({ hang: true });
+		const first = makeEngine(dying.harness);
+		const input = {
+			projectId: await projectId(first),
+			flow: flowOf([agent("worker", "Go")]),
+		};
+		const a = await first.startRun(input);
+		const b = await first.startRun(input);
+		await waitFor(() => dying.sessions[1]);
+
+		const { engine, sessions } = restart({
+			settings: settingsWith({ maxConcurrentRuns: 1 }),
+		});
+		const one = await waitFor(() => sessions[0]);
+		await Bun.sleep(60);
+		expect(sessions).toHaveLength(1);
+		const statuses = async () =>
+			[await statusOf(engine, a.id), await statusOf(engine, b.id)].sort();
+		expect(await statuses()).toEqual(["interrupted", "running"]);
+
+		one.finish();
+		const two = await waitFor(() => sessions[1]);
+		two.finish();
+		await waitFor(async () =>
+			(await statuses()).every((status) => status === "finished"),
+		);
+	});
+
+	test("a side effect a step recorded is not repeated when the step continues", async () => {
+		const { run, lost } = await dieMidStep();
+		let acted = 0;
+		const comment = () =>
+			({
+				action: "github_comment",
+				key: "7:abc",
+				act: async () => {
+					acted++;
+					return { url: "https://github.com/o/r/issues/7#issuecomment-1" };
+				},
+			}) as const;
+		expect(await lost.input.effects?.once(comment())).toEqual({
+			result: { url: "https://github.com/o/r/issues/7#issuecomment-1" },
+			earlier: false,
+		});
+
+		const { engine, sessions } = restart();
+		const resumed = await waitFor(() => sessions[0]);
+		expect(await resumed.input.effects?.once(comment())).toEqual({
+			result: { url: "https://github.com/o/r/issues/7#issuecomment-1" },
+			earlier: true,
+		});
+		expect(acted).toBe(1);
+		resumed.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+	});
+
+	test("a side effect started but never recorded is looked up before it acts again", async () => {
+		const { run, lost } = await dieMidStep();
+		// The daemon dies while the comment is being posted.
+		void lost.input.effects?.once({
+			action: "github_comment",
+			key: "7:abc",
+			act: () => new Promise(() => {}),
+		});
+		await waitFor(async () =>
+			(await loggedTypes()).includes("SideEffectStarted"),
+		);
+
+		const { engine, sessions } = restart();
+		const resumed = await waitFor(() => sessions[0]);
+		let acted = 0;
+		const once = (found: { url: string } | null) =>
+			resumed.input.effects?.once({
+				action: "github_comment",
+				key: "7:abc",
+				act: async () => {
+					acted++;
+					return { url: "posted" };
+				},
+				find: async () => found,
+			});
+		expect(await once({ url: "found" })).toEqual({
+			result: { url: "found" },
+			earlier: true,
+		});
+		// Found once, recorded: no second look-up, no post.
+		expect(await once(null)).toEqual({
+			result: { url: "found" },
+			earlier: true,
+		});
+		expect(acted).toBe(0);
+		resumed.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
 	});
 });
 

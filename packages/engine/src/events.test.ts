@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+	countDaemonResumes,
 	countStepsSinceWalkBegan,
 	countVisits,
 	deriveNodeOutputs,
 	deriveOpenGate,
 	deriveResumePoint,
 	deriveRunState,
+	deriveSideEffect,
 	deriveSleep,
 	deriveSteps,
 	deriveStopAfterStep,
@@ -650,5 +652,52 @@ describe("For Each scopes", () => {
 		});
 		expect(deriveStopAfterStep(b.events)).toBe(false);
 		expect(deriveStopAt(b.events)).toBeNull();
+	});
+});
+
+describe("automatic resume", () => {
+	test("countDaemonResumes counts the daemon's resumes since the start or a person's resume", () => {
+		const l = log().runStarted();
+		const daemon = () =>
+			l.push("RunResumed", {
+				nodeId: "worker",
+				stepId: null,
+				prompt: null,
+				by: "daemon",
+			});
+		expect(countDaemonResumes(l.events)).toBe(0);
+		daemon();
+		daemon();
+		expect(countDaemonResumes(l.events)).toBe(2);
+		// A person's resume (no `by` in older logs) starts over.
+		l.resumed("worker");
+		expect(countDaemonResumes(l.events)).toBe(0);
+		daemon();
+		expect(countDaemonResumes(l.events)).toBe(1);
+	});
+
+	test("deriveSideEffect: started, ended, or failed (then nothing), per step and key", () => {
+		const l = log().runStarted();
+		const fact = (stepId = "s1", key = "k") =>
+			deriveSideEffect(l.events, stepId, "github_comment", key);
+		const effect = { action: "github_comment", key: "k" };
+		expect(fact()).toBeNull();
+		l.push("SideEffectStarted", effect, { stepId: "s1" });
+		expect(fact()).toEqual({ state: "started" });
+		l.push(
+			"SideEffectEnded",
+			{ ...effect, result: null, error: "gh failed" },
+			{ stepId: "s1" },
+		);
+		expect(fact()).toBeNull();
+		l.push("SideEffectStarted", effect, { stepId: "s1" });
+		l.push(
+			"SideEffectEnded",
+			{ ...effect, result: { url: "u" }, error: null },
+			{ stepId: "s1" },
+		);
+		expect(fact()).toEqual({ state: "ended", result: { url: "u" } });
+		expect(fact("s2")).toBeNull();
+		expect(fact("s1", "other")).toBeNull();
 	});
 });
