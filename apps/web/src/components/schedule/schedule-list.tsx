@@ -50,6 +50,7 @@ import {
 	CircleAlertIcon,
 	PencilIcon,
 	PlusIcon,
+	PowerOffIcon,
 	Trash2Icon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -96,6 +97,10 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 	);
 	const [toDelete, setToDelete] = useState<ScheduleSummary | null>(null);
 	const schedules = list.data?.schedules ?? [];
+	// Settings → Runs can turn the scheduler off; then no schedule starts.
+	const settings = useQuery(orpc.settings.get.queryOptions());
+	const schedulerOff = settings.data ? !settings.data.values.scheduler : false;
+	const schedulerLock = settings.data?.fields.scheduler.locked;
 
 	// A schedule that fired started a run: the run lists should show it.
 	const fired = schedules
@@ -174,6 +179,26 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 						</div>
 					) : null}
 
+					{schedulerOff && schedules.length > 0 ? (
+						<div className="px-6 pt-4">
+							<Alert>
+								<PowerOffIcon aria-hidden="true" />
+								<AlertDescription>
+									{schedulerLock ??
+										"The scheduler is off on this daemon. No schedule starts until it is on again."}{" "}
+									{schedulerLock ? null : (
+										<Link
+											to="/settings"
+											className="underline underline-offset-4"
+										>
+											Settings
+										</Link>
+									)}
+								</AlertDescription>
+							</Alert>
+						</div>
+					) : null}
+
 					{list.isLoading ? (
 						<div className="flex flex-col gap-2 px-6 py-4">
 							<Skeleton className="h-10 w-full" />
@@ -224,6 +249,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 										key={schedule.id}
 										schedule={schedule}
 										busy={save.isPending}
+										schedulerOff={schedulerOff}
 										onToggle={(enabled) =>
 											saveAll(
 												schedules.map((s) =>
@@ -298,12 +324,15 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 function ScheduleRow({
 	schedule,
 	busy,
+	schedulerOff,
 	onToggle,
 	onEdit,
 	onDelete,
 }: {
 	schedule: ScheduleSummary;
 	busy: boolean;
+	/** The daemon's scheduler is off: nothing starts, whatever the cron says. */
+	schedulerOff: boolean;
 	onToggle: (enabled: boolean) => void;
 	onEdit: () => void;
 	onDelete: () => void;
@@ -318,6 +347,8 @@ function ScheduleRow({
 	);
 	const next = !schedule.enabled ? (
 		"Paused"
+	) : schedulerOff ? (
+		"Scheduler off"
 	) : schedule.nextAt === null ? (
 		"No next start"
 	) : schedule.nextAt <= now ? (
@@ -349,7 +380,9 @@ function ScheduleRow({
 					{/* The hidden columns, as lines, on narrow screens. */}
 					<span className="text-xs md:hidden">{when}</span>
 					<span className="text-muted-foreground text-xs lg:hidden">
-						{schedule.enabled && schedule.nextAt !== null ? "Next " : null}
+						{schedule.enabled && !schedulerOff && schedule.nextAt !== null
+							? "Next "
+							: null}
 						{next}
 					</span>
 					<div className="xl:hidden">
