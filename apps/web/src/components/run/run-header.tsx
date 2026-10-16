@@ -46,6 +46,7 @@ import {
 	CircleXIcon,
 	ClipboardCopyIcon,
 	CopyIcon,
+	DownloadIcon,
 	HandIcon,
 	InboxIcon,
 	MoonIcon,
@@ -57,6 +58,7 @@ import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 
 import { RunStatusBadge } from "@/components/run-status-badge";
+import { ENV } from "@/env";
 import { useNow } from "@/hooks/use-now";
 import type { RunDetail, RunStatus } from "@/lib/api-types";
 import {
@@ -409,6 +411,33 @@ export function RunActions({
 				</TooltipTrigger>
 				<TooltipContent className="max-w-sm break-all font-mono">
 					{run.takeOverCommand ?? "No agent session to take over yet."}
+				</TooltipContent>
+			</Tooltip>
+			<Tooltip>
+				<TooltipTrigger
+					render={
+						<Button
+							variant="outline"
+							size="sm"
+							nativeButton={false}
+							render={
+								<a
+									href={`${ENV.VITE_SERVER_URL.replace(/\/$/, "")}/api/runs/${run.id}/export`}
+									download
+									aria-label="Export run"
+								/>
+							}
+						/>
+					}
+				>
+					<DownloadIcon data-icon="inline-start" />
+					<span className="hidden sm:inline">Export</span>
+				</TooltipTrigger>
+				<TooltipContent className="max-w-sm">
+					Downloads the run as one SQLite file: the flow, steps, events and
+					transcripts. Saved secret values are taken out, but a transcript holds
+					whatever the agents read or printed. Check it before you share the
+					file.
 				</TooltipContent>
 			</Tooltip>
 			{STOPPABLE.includes(status) ? (
