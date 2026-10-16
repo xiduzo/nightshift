@@ -48,7 +48,6 @@ import {
 import type { Effort, PermissionMode } from "@/lib/api-types";
 import {
 	calledFlow,
-	MODEL_SUGGESTIONS,
 	type NodeOption,
 	nodeOptions,
 	type OptionNode,
@@ -84,13 +83,16 @@ import { OutputSchemaField } from "./output-schema-field";
 
 import { TemplateField } from "./template-field";
 
-/** The node without one of its own fields: it comes from the profile again. */
-function withoutField(
-	node: AgentNode,
+/**
+ * The node without one of its optional fields: it comes from the default
+ * again (an Agent node's profile, a Decision node's decider).
+ */
+function withoutField<N extends AgentNode | DecisionNode>(
+	node: N,
 	key: "harness" | "model" | "effort" | "permissionMode",
-): AgentNode {
-	const { [key]: _dropped, ...rest } = node;
-	return rest as AgentNode;
+): N {
+	const { [key as keyof N]: _dropped, ...rest } = node;
+	return rest as N;
 }
 
 /**
@@ -1180,13 +1182,16 @@ function DecisionFields({
 	onRemoveOutcome: (index: number) => void;
 }) {
 	const id = useId();
+	const deciders = useQuery(orpc.deciders.list.queryOptions());
+	const decider = deciders.data?.find((d) => d.name === node.decider);
+	const keyMissing = decider?.apiKeySource === "missing";
 	return (
 		<>
 			<InspectorSection title="Decision">
 				<TemplateField
 					id={`${id}-prompt`}
 					label="Prompt"
-					hint="What to decide, with the context it needs. A model picks one label and notes why."
+					hint="What to decide, with the context it needs. A decision model picks one label."
 					flow={flow}
 					nodeId={node.id}
 					value={node.prompt}
@@ -1207,35 +1212,68 @@ function DecisionFields({
 				onRemoveOutcome={onRemoveOutcome}
 			/>
 
-			<InspectorSection title="Model">
+			<InspectorSection title="Decided by">
+				<Field
+					id={`${id}-decider`}
+					label="Decider"
+					hint={
+						keyMissing && decider?.apiKey
+							? `Add the secret ${decider.apiKey} on the Agents page, or this node cannot decide.`
+							: "The decision model that picks the label."
+					}
+				>
+					<NativeSelect
+						id={`${id}-decider`}
+						value={node.decider}
+						aria-invalid={keyMissing}
+						aria-describedby={`${id}-decider-hint`}
+						onChange={(event) => {
+							const next = event.target.value as DecisionNode["decider"];
+							// A model belongs to its decider: the new one starts on its default.
+							onChange((current) => ({
+								...withoutField(current, "model"),
+								decider: next,
+							}));
+						}}
+					>
+						{(deciders.data ?? []).map((d) => (
+							<NativeSelectOption key={d.name} value={d.name}>
+								{d.label}
+							</NativeSelectOption>
+						))}
+					</NativeSelect>
+				</Field>
 				<Field
 					id={`${id}-model`}
 					label="Model"
-					hint="A small, fast model is enough to pick a label."
+					hint="Leave it empty to use the decider's default model."
 				>
 					<Input
 						id={`${id}-model`}
 						list={`${id}-models`}
-						value={node.model}
+						value={node.model ?? ""}
+						placeholder={decider?.defaultModel}
 						className="font-mono"
 						autoComplete="off"
 						spellCheck={false}
-						aria-invalid={node.model.trim() === ""}
 						aria-describedby={`${id}-model-hint`}
 						onChange={(event) => {
-							const model = event.target.value;
-							onChange((current) => ({ ...current, model }));
+							const model = event.target.value.trim();
+							onChange((current) =>
+								model === ""
+									? withoutField(current, "model")
+									: { ...current, model },
+							);
 						}}
 					/>
 					<datalist id={`${id}-models`}>
-						{MODEL_SUGGESTIONS.map((value) => (
+						{(decider?.models ?? []).map((value) => (
 							<option key={value} value={value} />
 						))}
 					</datalist>
 				</Field>
 				<Note>
-					Runs on <span className="text-foreground">Claude Code</span>. Later
-					nodes read <code>{`{{${node.id}.outcome}}`}</code> and{" "}
+					Later nodes read <code>{`{{${node.id}.outcome}}`}</code> and{" "}
 					<code>{`{{${node.id}.notes}}`}</code>.
 				</Note>
 			</InspectorSection>

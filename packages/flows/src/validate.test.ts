@@ -48,8 +48,7 @@ function decision(
 		position: { x: 0, y: 0 },
 		prompt: "Should we go on?",
 		labels: labels.map((name) => ({ name })),
-		decider: "claude-code",
-		model: "haiku",
+		decider: "typesafe",
 		...extra,
 	};
 }
@@ -437,10 +436,8 @@ describe("validateFlow: decisions and gates", () => {
 		delete json.nodes[1].model;
 		const parsed = parseFlow(json);
 		expect(parsed.issues).toEqual([]);
-		expect(parsed.flow?.nodes[1]).toMatchObject({
-			decider: "claude-code",
-			model: "haiku",
-		});
+		expect(parsed.flow?.nodes[1]).toMatchObject({ decider: "typesafe" });
+		expect(parsed.flow?.nodes[1]).not.toHaveProperty("model");
 	});
 
 	test("an edge outcome must be a label or choice of its source", () => {

@@ -67,9 +67,34 @@ export const cliNameSchema = z
 		"Use the program name only, for example gh or aws.",
 	);
 
-/** The coding-agent CLIs an Agent node can run on: the TanStack AI harness adapters. */
-export const harnessNameSchema = z.enum(["claude-code", "opencode", "codex"]);
+/**
+ * The coding-agent CLIs an Agent node can run on. The first four have their
+ * own TanStack AI harness adapter; the others speak the Agent Client
+ * Protocol and run through `@tanstack/ai-acp`.
+ */
+export const harnessNameSchema = z.enum([
+	"claude-code",
+	"opencode",
+	"codex",
+	"grok-build",
+	"copilot",
+	"gemini",
+	"cursor",
+]);
 export type HarnessName = z.infer<typeof harnessNameSchema>;
+
+/**
+ * Who decides a Decision node: a TanStack AI decision model, through
+ * `decide()`. TypeSafe and OpenRouter serve Jev, OpenAI its Decisions API,
+ * Ollaya a `laya` model on this computer.
+ */
+export const deciderNameSchema = z.enum([
+	"typesafe",
+	"openrouter",
+	"openai",
+	"ollaya",
+]);
+export type DeciderName = z.infer<typeof deciderNameSchema>;
 
 export const effortSchema = z.enum(["low", "medium", "high", "xhigh", "max"]);
 
@@ -229,10 +254,9 @@ export const decisionNodeSchema = z.object({
 	prompt: z.string().min(1),
 	/** The labels the decider picks from. Each one is an outcome. */
 	labels: z.array(option).min(2),
-	/** The decider provider. Only Claude Code for now, with no tools of its own. */
-	decider: z.literal("claude-code").default("claude-code"),
-	/** A small, fast model is enough. */
-	model: z.string().min(1).default("haiku"),
+	decider: deciderNameSchema.default("typesafe"),
+	/** The decider's model. Unset: the decider's default (`jev-latest` for TypeSafe). */
+	model: z.string().min(1).optional(),
 });
 
 export const gateNodeSchema = z.object({

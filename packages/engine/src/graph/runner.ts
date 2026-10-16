@@ -15,6 +15,7 @@ import type {
 } from "@nightshift/flows";
 
 import type { RunBus } from "../bus";
+import type { CliToolGuide } from "../cli-tools";
 import {
 	countVisits,
 	deriveInputs,
@@ -137,6 +138,7 @@ export type RunnerDeps = {
 	mcpServersFor(
 		node: Pick<AgentNode, "connections" | "mcpServers">,
 	): Promise<McpExpansion>;
+	cliToolsFor?: (names: readonly string[]) => Promise<CliToolGuide[]>;
 	/** The run's flow snapshot and its called flows, parsed. */
 	flowOf(row: RunRow): Flow;
 	calledFlowsOf(row: RunRow): Record<string, Flow>;
@@ -230,6 +232,7 @@ export function createRunner(deps: RunnerDeps) {
 				? { readGithubItems: deps.readGithubItems }
 				: {}),
 			mcpServersFor: deps.mcpServersFor,
+			...(deps.cliToolsFor ? { cliToolsFor: deps.cliToolsFor } : {}),
 			effectJournal: (runId, stepId) => createEffectJournal(log, runId, stepId),
 			signal: () => thread.controller.signal,
 			now: deps.now,

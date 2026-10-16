@@ -253,10 +253,9 @@ describe("fakeHarness", () => {
 
 function decisionInput(overrides: Partial<DecisionInput> = {}): DecisionInput {
 	return {
-		cwd: "/tmp/fake",
+		decider: "typesafe",
 		prompt: "Continue?",
 		labels: [{ name: "continue" }, { name: "stop" }],
-		model: "haiku",
 		signal: new AbortController().signal,
 		...overrides,
 	};

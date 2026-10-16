@@ -53,6 +53,7 @@ import { toast } from "sonner";
 import { checkState } from "@/components/connections/cli-panel";
 import { CheckBadge, FactList } from "@/components/connections/parts";
 import type { CliTool } from "@/components/connections/types";
+import { CodeView } from "@/components/run/json-block";
 import { orpc } from "@/utils/orpc";
 
 import { DetailSection, DetailShell } from "./detail-shell";
@@ -134,8 +135,8 @@ export function CliToolDetail({
 					<>
 						Agents with this tool run{" "}
 						<span className="font-mono">{tool.name}</span> with any arguments,
-						without asking. Codex has no list of allowed programs: its
-						permission mode decides.
+						without asking. Only Claude Code and OpenCode keep a list of allowed
+						programs. On other harnesses, the permission mode decides.
 					</>
 				}
 			>
@@ -201,6 +202,27 @@ export function CliToolDetail({
 					</div>
 				</div>
 			</DetailSection>
+
+			{data?.path ? (
+				<DetailSection
+					title="Help for agents"
+					description="Agents with this tool read this help and its description when a step starts. Write a description that says when to use it."
+				>
+					{data.help ? (
+						<CodeView
+							code={data.help}
+							language="text"
+							title={<span className="font-mono">{`${tool.name} --help`}</span>}
+							contentClassName="max-h-96"
+						/>
+					) : (
+						<p className="text-muted-foreground text-sm">
+							<span className="font-mono">{tool.name}</span> shows no help.
+							Agents get its name and description only.
+						</p>
+					)}
+				</DetailSection>
+			) : null}
 
 			<UsedBySection
 				profiles={tool.profiles}
@@ -432,6 +454,10 @@ function CliToolForm({
 						autoComplete="off"
 						autoFocus={tool !== null}
 					/>
+					<FieldDescription>
+						Agents read this before the help text of the program. Example:
+						"Jira: read and update issues in the PROJ project."
+					</FieldDescription>
 				</Field>
 
 				{save.error ? (

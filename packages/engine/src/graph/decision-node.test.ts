@@ -29,8 +29,8 @@ const decision = (
 	position: { x: 0, y: 0 },
 	prompt: "Go on {{task}}?",
 	labels,
-	decider: "claude-code" as const,
-	model: "haiku",
+	decider: "typesafe" as const,
+	model: "jev-1.13.0",
 	...extra,
 });
 
@@ -50,7 +50,6 @@ function scriptedDecider(
 ) {
 	const calls: DecisionInput[] = [];
 	const decider: Decider = {
-		name: "test",
 		async decide(input) {
 			calls.push(input);
 			return answer(input, calls.length - 1);
@@ -111,10 +110,10 @@ describe("the Decision node", () => {
 		expect(state.ended?.nodeId).toBe("done");
 		expect(decider.calls).toHaveLength(1);
 		expect(decider.calls[0]).toMatchObject({
-			cwd: sandbox.repoPath,
+			decider: "typesafe",
 			prompt: "Go on the thing?",
 			labels: [{ name: "ship", description: "Good enough" }, { name: "redo" }],
-			model: "haiku",
+			model: "jev-1.13.0",
 		});
 
 		expect(await h.types()).toEqual([
@@ -159,7 +158,7 @@ describe("the Decision node", () => {
 				type: "decision-start",
 				prompt: "Go on the thing?",
 				labels: ["ship", "redo"],
-				model: "haiku",
+				model: "jev-1.13.0",
 			},
 			{ type: "decision", label: "ship", notes: "The tests pass." },
 		]);

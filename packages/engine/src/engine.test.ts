@@ -1371,8 +1371,8 @@ function decision(
 		position: { x: 0, y: 0 },
 		prompt,
 		labels: labels.map((name) => ({ name })),
-		decider: "claude-code",
-		model: "haiku",
+		decider: "typesafe",
+		model: "jev-1.13.0",
 		...extra,
 	};
 }
@@ -1408,7 +1408,6 @@ function scriptedDecider(
 ) {
 	const calls: DecisionInput[] = [];
 	const decider: Decider = {
-		name: "test",
 		async decide(input) {
 			calls.push(input);
 			return answer(input, calls.length - 1);
@@ -1499,10 +1498,10 @@ describe("decisions", () => {
 
 		expect(calls).toHaveLength(1);
 		expect(calls[0]).toMatchObject({
-			cwd: run.worktreePath,
+			decider: "typesafe",
 			prompt: "Worker said: Built the parser.",
 			labels: [{ name: "ship", description: "Good enough" }, { name: "redo" }],
-			model: "haiku",
+			model: "jev-1.13.0",
 		});
 		expect(harness.calls.map((c) => c.prompt)).toEqual([
 			"Build it",
@@ -1530,7 +1529,7 @@ describe("decisions", () => {
 				type: "decision-start",
 				prompt: "Worker said: Built the parser.",
 				labels: ["ship", "redo"],
-				model: "haiku",
+				model: "jev-1.13.0",
 			},
 			{ type: "decision", label: "ship", notes: "The tests pass." },
 		]);

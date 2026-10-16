@@ -85,6 +85,10 @@ export type ConnectionStore = {
 	save(input: ConnectionInput): Promise<Connection>;
 	remove(name: string): Promise<void>;
 	secrets(): SecretView[];
+	/** A secret's value: the keychain, then the daemon's environment. */
+	secret(name: string): Promise<string | undefined>;
+	/** Where a secret's value comes from. */
+	secretSource(name: string): SecretSource;
 	setSecret(name: string, value: string): Promise<void>;
 	removeSecret(name: string): Promise<void>;
 	/** An Agent node's MCP servers: its connections, then its own, with `${NAME}` expanded. */
@@ -234,6 +238,10 @@ export function createConnectionStore(options: {
 				usedBy: usedBy.get(name) ?? [],
 			}));
 		},
+		async secret(name) {
+			return (await envFor([name]))[name];
+		},
+		secretSource: source,
 		async setSecret(name, value) {
 			secretNameSchema.parse(name);
 			if (value === "") throw new Error("A secret needs a value.");

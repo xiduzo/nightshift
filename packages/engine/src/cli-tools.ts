@@ -84,3 +84,47 @@ export function createCliToolStore(options: { db: Database }): CliToolStore {
 		},
 	};
 }
+
+/** What an agent learns about one of its CLI tools when its session starts. */
+export type CliToolGuide = {
+	name: string;
+	description: string | null;
+	/** The program's own help (`--help`). Null when it has none. */
+	help: string | null;
+};
+
+/**
+ * The prompt section that tells an agent which CLI tools it has: each
+ * name, the description its owner wrote, and the program's help. The help
+ * is quoted in a fence longer than any backtick run inside it.
+ */
+export function cliToolsInstruction(tools: readonly CliToolGuide[]): string {
+	if (tools.length === 0) return "";
+	const sections = tools.map((tool) => {
+		const lines = [`### ${tool.name}`];
+		if (tool.description) lines.push("", tool.description);
+		if (tool.help) {
+			const longest = Math.max(
+				0,
+				...(tool.help.match(/`+/g) ?? []).map((run) => run.length),
+			);
+			const fence = "`".repeat(Math.max(3, longest + 1));
+			lines.push(
+				"",
+				`\`${tool.name} --help\`:`,
+				"",
+				`${fence}text`,
+				tool.help,
+				fence,
+			);
+		}
+		return lines.join("\n");
+	});
+	return [
+		"## CLI tools",
+		"",
+		"You can run these programs in your shell. Use them instead of guessing at an API. For the details of one command, run it with `--help`.",
+		"",
+		sections.join("\n\n"),
+	].join("\n");
+}

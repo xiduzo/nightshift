@@ -1,4 +1,13 @@
 export {
+	ACP_AGENTS,
+	ACP_DEFAULT_MODEL,
+	type AcpAgentName,
+	type AcpHarnessOptions,
+	acpHarness,
+	acpPermission,
+	isAcpAgent,
+} from "./acp";
+export {
 	type ClaudeCodeHarnessOptions,
 	type ClaudeCodeProcessOptions,
 	claudeCodeHarness,
@@ -11,19 +20,23 @@ export {
 	codexPolicy,
 } from "./codex";
 export {
-	type ClaudeCodeDeciderOptions,
-	claudeCodeDecider,
-	DECIDE_TOOL_ID,
-	DECIDE_TOOL_NAME,
+	DECIDER_ADAPTERS,
+	type DeciderAdapter,
+	type TanstackDeciderOptions,
+	tanstackDecider,
 } from "./decider";
 export {
 	type CliCheck,
+	type CliToolCheck,
 	checkCli,
 	checkGithub,
 	checkHarness,
+	cliHelp,
+	cliHelpAt,
 	HARNESS_ADAPTERS,
 	type HarnessAdapter,
 	type HarnessModels,
+	HELP_MAX_CHARS,
 	harnessModels,
 	type McpTestResult,
 	pathPrograms,
@@ -41,6 +54,11 @@ export {
 	readGithubItems,
 	SUB_ISSUES_QUERY,
 } from "./github-items";
+export {
+	type GrokBuildHarnessOptions,
+	grokBuildHarness,
+	grokPolicy,
+} from "./grok-build";
 export {
 	type OpencodeHarnessOptions,
 	opencodeHarness,

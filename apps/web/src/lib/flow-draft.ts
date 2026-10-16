@@ -33,9 +33,6 @@ import {
 export type Position = { x: number; y: number };
 
 export const DEFAULT_MODEL = "sonnet";
-/** A small, fast model is enough to pick a label. */
-export const DEFAULT_DECISION_MODEL = "haiku";
-export const MODEL_SUGGESTIONS = ["sonnet", "opus", "haiku"];
 
 /** The flow files of a project, by name. Null when a file does not load. */
 export type ProjectFlowMap = Readonly<Record<string, Flow | null>>;
@@ -53,7 +50,7 @@ export type NodeDefaults = {
 	agentHarness?: AgentNode["harness"];
 	agentModel?: string;
 	agentPermissionMode?: AgentNode["permissionMode"];
-	decisionModel?: string;
+	decisionDecider?: DecisionNode["decider"];
 };
 
 export function agentNode(
@@ -93,8 +90,7 @@ export function decisionNode(
 			{ name: "continue", description: "The work is on track." },
 			{ name: "stop", description: "Something needs a person first." },
 		],
-		decider: "claude-code",
-		model: defaults.decisionModel ?? DEFAULT_DECISION_MODEL,
+		decider: defaults.decisionDecider ?? "typesafe",
 	};
 }
 

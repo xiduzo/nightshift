@@ -56,7 +56,7 @@ import type {
 	SecretView,
 	SettingsView,
 } from "@/components/connections/types";
-import { harnessInfo } from "@/lib/harnesses";
+import { harnessInfo, isHarnessName } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
 
 import { CliToolCheckBadge, CliToolDetail, CliToolDialog } from "./cli-tool";
@@ -81,9 +81,7 @@ export function parseItem(item: string | undefined): Selection | null {
 		case "profile":
 			return name ? { kind, name } : null;
 		case "harness":
-			return ["claude-code", "opencode", "codex"].includes(name)
-				? { kind, name: name as HarnessName }
-				: null;
+			return isHarnessName(name) ? { kind, name } : null;
 		case "tool":
 		case "cli":
 			return name ? { kind, name } : null;
@@ -486,7 +484,7 @@ function Detail({
 						<EmptyHeader>
 							<EmptyTitle>Add a harness first</EmptyTitle>
 							<EmptyDescription>
-								A profile runs on a harness: Claude Code, OpenCode or Codex. Add
+								A profile runs on a harness, such as Claude Code or Codex. Add
 								one with + next to Harnesses.
 							</EmptyDescription>
 						</EmptyHeader>

@@ -1,4 +1,5 @@
 import { Command, interrupt } from "@langchain/langgraph";
+import { DECIDER_ADAPTERS } from "@nightshift/agents/decider";
 import type {
 	Decider,
 	DecisionInput,
@@ -167,11 +168,12 @@ async function decide(
 	const { visit, signal } = step;
 	const prompt = renderTemplate(node.prompt, step.tctx);
 	const labels = node.labels.map((label) => label.name);
+	const model = node.model ?? DECIDER_ADAPTERS[node.decider].defaultModel;
 	step.record(null, {
 		type: "decision-start",
 		prompt,
 		labels,
-		model: node.model,
+		model,
 	});
 	if (!ctx.decider) {
 		return step.end(
@@ -183,14 +185,14 @@ async function decide(
 	const result = await decideWithin(
 		ctx.decider,
 		{
-			cwd: ctx.run.worktreePath,
+			decider: node.decider,
 			prompt,
 			labels: node.labels.map((label) =>
 				label.description === undefined
 					? { name: label.name }
 					: { name: label.name, description: label.description },
 			),
-			model: node.model,
+			model,
 			signal,
 		},
 		signal,
