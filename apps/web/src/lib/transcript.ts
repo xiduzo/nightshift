@@ -1,3 +1,5 @@
+import type { JsonValue } from "@nightshift/flows";
+
 import type {
 	AgentErrorKind,
 	AgentUsage,
@@ -87,6 +89,13 @@ export type DecisionItem = ItemBase & {
 	notes: string;
 };
 
+/** A rule decided: the option that matched (null when none did), and what each rule gave. */
+export type RuleItem = ItemBase & {
+	kind: "rule";
+	matched: string | null;
+	evaluated: { option: string; result: JsonValue | null }[];
+};
+
 /** A Gate opened: the rendered question and the choices. */
 export type GateOpenItem = ItemBase & {
 	kind: "gate-open";
@@ -144,6 +153,7 @@ export type TranscriptItem =
 	| WakeItem
 	| DecisionAskItem
 	| DecisionItem
+	| RuleItem
 	| GateOpenItem
 	| GateResolvedItem
 	| MessageItem
@@ -414,6 +424,15 @@ function applyStepEntries(
 					key: `decision:${entry.seq}`,
 					label: event.label,
 					notes: event.notes,
+				});
+				break;
+			case "rule":
+				push({
+					...base,
+					kind: "rule",
+					key: `rule:${entry.seq}`,
+					matched: event.matched,
+					evaluated: event.evaluated,
 				});
 				break;
 			case "gate-open":

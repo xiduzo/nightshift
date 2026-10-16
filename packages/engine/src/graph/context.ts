@@ -260,12 +260,14 @@ export type AbortReason = "stopped" | "timeout" | "idle";
  * How a node enters: a new visit (the default), or an existing step of the
  * node: `reopen` appends `StepReopened` (a person resumed a parked step, or
  * the daemon re-runs the node after a restart); `continue` appends nothing
- * (the step waited, and the wait ended).
+ * (the step waited, and the wait ended). A `quiet` continue also tells the
+ * bus and the custom stream nothing: the step did not start again (a Gate
+ * that ends on its answer).
  */
 export type StepStart =
 	| { kind: "new" }
 	| { kind: "reopen"; stepId: string; prompt: string | null }
-	| { kind: "continue"; stepId: string };
+	| { kind: "continue"; stepId: string; quiet?: boolean };
 
 /** A step in progress: what the node body needs, and how it ends. */
 export type StepHandle = {
@@ -406,14 +408,16 @@ export async function beginStep(
 			});
 		}
 	}
-	ctx.bus.publish(runId, { kind: "step-changed", stepId });
-	emit(config, {
-		type: "step-started",
-		stepId,
-		nodeId: node.id,
-		visit,
-		reopened: start.kind !== "new",
-	});
+	if (!(start.kind === "continue" && start.quiet)) {
+		ctx.bus.publish(runId, { kind: "step-changed", stepId });
+		emit(config, {
+			type: "step-started",
+			stepId,
+			nodeId: node.id,
+			visit,
+			reopened: start.kind !== "new",
+		});
+	}
 
 	const recorder = await ctx.recorder(stepId, path);
 
@@ -424,10 +428,15 @@ export async function beginStep(
 	const onStop = () => stepController.abort("stopped" satisfies AbortReason);
 	if (runSignal.aborted) onStop();
 	else runSignal.addEventListener("abort", onStop, { once: true });
-	const timer = node.timeoutMinutes
+	// A Gate (a Decision decided by a person) waits as long as it must.
+	const timeoutMinutes =
+		node.type === "decision" && node.by === "person"
+			? undefined
+			: node.timeoutMinutes;
+	const timer = timeoutMinutes
 		? setTimeout(
 				() => stepController.abort("timeout" satisfies AbortReason),
-				node.timeoutMinutes * ctx.minuteMs,
+				timeoutMinutes * ctx.minuteMs,
 			)
 		: undefined;
 	const idleMinutes = node.type === "agent" ? node.idleMinutes : undefined;
@@ -530,7 +539,7 @@ export async function beginStep(
 	return { kind: "step", step: handle };
 }
 
-/** An Agent or Decision step that hit a usage limit or lost the network. */
+/** An Agent step, or a Decision step decided by a model, that hit a usage limit or lost the network. */
 export type WaitRequest = {
 	reason: WaitReason;
 	/** The harness's error message. */

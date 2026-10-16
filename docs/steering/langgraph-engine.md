@@ -33,8 +33,9 @@ packages/engine/src/
                            20261016155422_langgraph_checkpoints).
   graph/compile.ts         compileFlow(flow, ctx): StateGraph. START →
                            flow.start; every flow node plus its park node
-                           park__<id>; Agent and Decision nodes also get a
-                           wait node wait__<id>. No static edges.
+                           park__<id>; Agent nodes and Decisions decided by
+                           a model also get a wait node wait__<id>. No
+                           static edges.
   graph/route.ts           route(): picks the edge with `nextEdge`, logs
                            EdgeTaken and returns `new Command({ update,
                            goto })`; or ends the flow (isChosenEnd,
@@ -42,10 +43,14 @@ packages/engine/src/
                            the node ids, scopeOf.
   graph/context.ts         StepContext (below), beginStep, beginWait,
                            uncommittedStep, recorders.
-  graph/nodes/agent.ts     agent node + agentWaitNode
+  graph/wait.ts            waitNode(nodeId): the one wait node of Agent
+                           nodes and Decisions decided by a model.
+  graph/nodes/agent.ts     agent node
   graph/nodes/command.ts
-  graph/nodes/decision.ts  decision node + decisionWaitNode
-  graph/nodes/gate.ts
+  graph/nodes/decision.ts  decision node: routes on the step; a chooser
+                           per `by` gets the option.
+  graph/nodes/choosers/    person.ts (the Gate), rule.ts (JSONata rules),
+                           model.ts (the decider).
   graph/nodes/subflow.ts
   graph/nodes/foreach.ts
   graph/nodes/body.ts      What Subflow and For Each share: bodyGraph,
@@ -93,7 +98,7 @@ packages/engine/src/
    `step` and `agent_session` rows and the transcript files too. The API,
    the derivations in `events.ts` and the web app keep working unchanged.
 4. **Code before `interrupt()` re-runs on resume.** Only the wait, park
-   and gate nodes interrupt, and nothing before their `interrupt()` call
+   nodes and the Gate chooser interrupt, and nothing before their `interrupt()` call
    has side effects. Everything else happens in the step node, which runs
    once per visit.
 5. **Mid-step facts come from the event log on re-entry.** A node's state
@@ -125,7 +130,7 @@ packages/engine/src/
    is parked → `resume: { kind: "resume", prompt }`. Interrupted (daemon
    died) → the last checkpoint is before the node → `invoke(null)` re-runs
    it (rule 5). Sleeping → wake early. Stopped while at a Gate →
-   `resume: { kind: "reopen" }` and the gate node asks again (it loops on
+   `resume: { kind: "reopen" }` and the Gate asks again (it loops on
    `interrupt()` until it gets a choice). `RunResumed` is appended by the
    engine before any of these.
 10. **Finish.** When the root stream ends with `state.ended.status ===
@@ -173,16 +178,35 @@ Decisions taken while implementing, from the code and its comments:
   task, so a new namespace); bodies compile without `checkpointer: true`.
   A stop, a step-cap abort or a wait or Gate inside the body does rethrow
   the interrupt, so those park or pause the run at any depth.
-- **A Gate reopened after a stop is a new visit** (`graph/nodes/gate.ts`).
+- **Decision and Gate are one node, with the chooser behind a seam**
+  (`graph/nodes/decision.ts`). The node routes on its step's end; who
+  gets the option is `node.by`: `choosers/person.ts` (the Gate),
+  `choosers/rule.ts` (JSONata rules) or `choosers/model.ts` (the decider).
+  Every chooser ends its step with `{ outcome, note, visit }`. The option
+  check is one function in `packages/flows` (`optionProblem`), shared by
+  the choosers, `resolveGate` and the decider's `decide` tool. The inbox,
+  run status `waiting`, `listGates` and `resolveGate` key on the Gate the
+  step opened (`GateOpened`), not on a node type.
+- **A Gate reopened after a stop is a new visit** (`choosers/person.ts`).
   `{ kind: "reopen" }` asks the Gate again with `StepStarted` (visit + 1),
   `GateOpened` and the transcript `gate-open`, as the old `closeParked`
   path did. The opening is guarded by the log (`uncommittedStep`): a
-  re-run that finds the Gate still open logs nothing.
-- **The Decision node has a wait node too** (`graph/nodes/decision.ts`,
-  `wait__<id>`). A usage limit or a network failure of the decider plans a
-  wait with `beginWait` and parks at `decisionWaitNode`, like the Agent
-  node; a give-up ends the step `error`. A parked or interrupted Decision
-  step starts a new visit: it has no session to reopen.
+  re-run that finds the Gate still open logs nothing. The answer ends the
+  step through a quiet `beginStep({ kind: "continue", quiet: true })`,
+  which announces no start. A Gate starts no time budget: it waits as
+  long as it must.
+- **A rule Decision is pure** (`choosers/rule.ts`). It opens its step,
+  evaluates each option's `when` in order and ends the step in one go,
+  with no session, no cost and no wait node. A step the daemon left open
+  is not continued: recovery ends it `interrupted` and the node runs a new
+  visit on the same values. The transcript gets one `rule` entry with what
+  each rule gave.
+- **A model Decision has a wait node too** (`choosers/model.ts`,
+  `wait__<id>`, the shared `waitNode`). A usage limit or a network failure
+  of the decider plans a wait with `beginWait` and parks at the wait node,
+  like the Agent node; a give-up ends the step `error`. A parked or
+  interrupted model Decision step starts a new visit: it has no session to
+  reopen.
 - **`resumeRun` of a thread that ended or never ran re-enters with a
   `Command({ goto })`** (`runner.reenter`). A run from before this engine,
   or a finished one whose checkpoints were deleted (rule 10), has no
@@ -199,8 +223,8 @@ Decisions taken while implementing, from the code and its comments:
   node body with the aborted signal and ends `stopped` there, with its
   harness session, so a later resume can reopen it.
 - **A step recovery ended after a wake is reopened** (`StepReopened`),
-  not continued, in the Agent and Decision nodes as in `continueStep` for
-  Subflow and For Each, so the log keeps one open step to end and the read
+  not continued, in the Agent node and the model chooser as in
+  `continueStep` for Subflow and For Each, so the log keeps one open step to end and the read
   model shows the step's real outcome and cost.
 - **The runner publishes `status-changed` on step chunks**
   (`runner.onCustom`). The `step-started` and `step-ended` custom stream

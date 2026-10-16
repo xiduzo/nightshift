@@ -103,8 +103,8 @@ function decision(id: string, labels: string[]): DecisionNode {
 		type: "decision",
 		position: { x: 0, y: 0 },
 		prompt: "Go on with {{item.title}}?",
-		labels: labels.map((name) => ({ name })),
-		decider: "claude-code",
+		options: labels.map((name) => ({ name })),
+		by: "model",
 		model: "haiku",
 	};
 }
@@ -144,7 +144,7 @@ function flowOf(
 	extra: Partial<Flow> = {},
 ): Flow {
 	return {
-		version: 2,
+		version: 3,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -759,10 +759,11 @@ describe("For Each", () => {
 		await saveBody("build", [
 			{
 				id: "ask",
-				type: "gate",
+				type: "decision",
 				position: { x: 0, y: 0 },
-				question: "Ship {{item.title}}?",
-				choices: [{ name: "yes" }, { name: "halt" }],
+				prompt: "Ship {{item.title}}?",
+				options: [{ name: "yes" }, { name: "halt" }],
+				by: "person",
 			},
 		]);
 		const engine = makeEngine(fakeHarness());

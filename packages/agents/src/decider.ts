@@ -17,6 +17,8 @@
  * settings tier by default, so no user hooks, plugins, or memory files reach
  * it.
  */
+
+import { optionProblem } from "@nightshift/flows";
 import { toolDefinition } from "@tanstack/ai";
 import {
 	BRIDGED_MCP_SERVER_NAME,
@@ -101,8 +103,12 @@ export function decideTool(
 		}
 		const parsed = schema.safeParse(raw);
 		if (!parsed.success) {
+			const label =
+				typeof raw === "object" && raw !== null && "label" in raw
+					? String(raw.label)
+					: "";
 			throw new Error(
-				`Invalid decision. \`label\` must be one of: ${names.map((n) => `"${n}"`).join(", ")}, and \`notes\` a string.`,
+				`Invalid decision. ${optionProblem(labels, label) ?? "`notes` must be a string."}`,
 			);
 		}
 		decided = { label: parsed.data.label, notes: parsed.data.notes.trim() };

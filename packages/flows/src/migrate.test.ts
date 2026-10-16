@@ -91,7 +91,7 @@ describe("migrateFlow", () => {
 		}
 	});
 
-	test("is idempotent: a version 2 flow comes back as it is", () => {
+	test("is idempotent: a current flow comes back as it is", () => {
 		const once = migrateFlow(v1Body);
 		expect(migrateFlow(once)).toBe(once);
 		expect(migrateFlow(structuredClone(once))).toEqual(once);
@@ -105,7 +105,7 @@ describe("migrateFlow", () => {
 
 	test("input item becomes a required json input; there are no outputs", () => {
 		const flow = migrateFlow(v1Body) as Record<string, unknown>;
-		expect(flow.version).toBe(2);
+		expect(flow.version).toBe(3);
 		expect(flow.inputs).toEqual([
 			{ name: "item", type: "json", required: true },
 		]);
@@ -139,8 +139,6 @@ describe("migrateFlow", () => {
 				case "agent":
 				case "decision":
 					return node.prompt;
-				case "gate":
-					return node.question;
 				case "foreach":
 					return node.source.kind === "command" ? node.source.command : "";
 				default:
@@ -188,7 +186,7 @@ describe("migrateFlow", () => {
 			edges: [],
 		});
 		expect(flow).toMatchObject({
-			version: 2,
+			version: 3,
 			inputs: [
 				{ name: "epic", label: "Epic", required: true, type: "text" },
 				{ name: "base", default: "main", type: "text" },
@@ -321,7 +319,7 @@ describe("the rpgdotexe night, as version 1", () => {
 
 describe("migrateFlow: tool sets", () => {
 	const current = (nodes: unknown[]) => ({
-		version: 2,
+		version: 3,
 		inputs: [],
 		outputs: [],
 		start: "work",
@@ -340,7 +338,8 @@ describe("migrateFlow: tool sets", () => {
 					type: "decision",
 					position: { x: 0, y: 0 },
 					prompt: "Go on?",
-					labels: [{ name: "yes" }, { name: "no" }],
+					options: [{ name: "yes" }, { name: "no" }],
+					by: "model",
 					tools: ["github"],
 				},
 			]),
@@ -371,7 +370,7 @@ describe("migrateFlow: tool sets", () => {
 
 describe("migrateFlow: list sources", () => {
 	const current = (source: unknown, extra: Record<string, unknown> = {}) => ({
-		version: 2,
+		version: 3,
 		inputs: [{ name: "epic", type: "text", required: true }],
 		outputs: [],
 		start: "each",
@@ -576,4 +575,131 @@ describe("migrateFlow: list sources", () => {
 			expect(fields[3]).toStartWith("query=");
 		},
 	);
+});
+
+describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
+	const v2 = () => ({
+		version: 2,
+		inputs: [],
+		outputs: [{ name: "why", value: "{{decide.notes}} / {{ask.note}}" }],
+		start: "worker",
+		nodes: [
+			{
+				...agent,
+				id: "worker",
+				prompt: "Last time: {{decide.notes}} {{ask.notes}} {{notes.notes}}",
+			},
+			{
+				id: "decide",
+				type: "decision",
+				position: { x: 0, y: 0 },
+				label: "Go on?",
+				prompt: "Go on? {{worker.summary}}",
+				labels: [{ name: "go", description: "On track" }, { name: "halt" }],
+				decider: "claude-code",
+				model: "haiku",
+				timeoutMinutes: 5,
+			},
+			{
+				id: "ask",
+				type: "gate",
+				position: { x: 1, y: 1 },
+				question: "Ship it? {{ decide.notes }}",
+				choices: [{ name: "ship" }, { name: "wait" }],
+			},
+			{
+				id: "run_it",
+				type: "command",
+				position: { x: 0, y: 0 },
+				command: 'echo "{{decide.notes}}"',
+			},
+			{
+				id: "sub",
+				type: "subflow",
+				position: { x: 0, y: 0 },
+				flow: "other",
+				inputs: { why: "{{decide.notes}}" },
+			},
+			{
+				id: "each",
+				type: "foreach",
+				position: { x: 0, y: 0 },
+				source: { kind: "json", value: "{{decide.notes}}" },
+				flow: "other",
+				as: "thing",
+				inputs: { why: "{{decide.notes}}" },
+				branch: "shared",
+			},
+		],
+		edges: [
+			{ id: "a", from: "worker", outcome: "pass", to: "decide" },
+			{ id: "b", from: "decide", outcome: "go", to: "ask" },
+			{ id: "c", from: "ask", outcome: "ship", to: "run_it" },
+		],
+	});
+
+	test("a Gate becomes a Decision decided by you; a Decision one decided by a model", () => {
+		const flow = migrateFlow(v2()) as { version: number; nodes: unknown[] };
+		expect(flow.version).toBe(3);
+		expect(flow.nodes[1]).toEqual({
+			id: "decide",
+			type: "decision",
+			position: { x: 0, y: 0 },
+			label: "Go on?",
+			prompt: "Go on? {{worker.summary}}",
+			options: [{ name: "go", description: "On track" }, { name: "halt" }],
+			by: "model",
+			model: "haiku",
+			timeoutMinutes: 5,
+		});
+		expect(flow.nodes[2]).toEqual({
+			id: "ask",
+			type: "decision",
+			position: { x: 1, y: 1 },
+			prompt: "Ship it? {{decide.note}}",
+			options: [{ name: "ship" }, { name: "wait" }],
+			by: "person",
+		});
+		expect(flowSchema.safeParse(flow).success).toBe(true);
+	});
+
+	test("{{<decision>.notes}} becomes {{<decision>.note}} in every template, and nowhere else", () => {
+		const flow = flowSchema.parse(migrateFlow(v2()));
+		const byId = Object.fromEntries(flow.nodes.map((n) => [n.id, n]));
+		expect(byId.worker).toMatchObject({
+			prompt: "Last time: {{decide.note}} {{ask.notes}} {{notes.notes}}",
+		});
+		expect(byId.run_it).toMatchObject({ command: 'echo "{{decide.note}}"' });
+		expect(byId.sub).toMatchObject({ inputs: { why: "{{decide.note}}" } });
+		expect(byId.each).toMatchObject({
+			source: { kind: "json", value: "{{decide.note}}" },
+			inputs: { why: "{{decide.note}}" },
+			as: "thing",
+			branch: "shared",
+		});
+		expect(flow.outputs).toEqual([
+			{ name: "why", value: "{{decide.note}} / {{ask.note}}" },
+		]);
+	});
+
+	test("a version 1 flow goes through both steps", () => {
+		const flow = flowSchema.parse(migrateFlow(v1Body));
+		expect(flow.version).toBe(3);
+		expect(flow.nodes.find((n) => n.id === "decide")).toMatchObject({
+			type: "decision",
+			by: "model",
+			options: [{ name: "go" }, { name: "halt" }],
+		});
+		expect(flow.nodes.find((n) => n.id === "ask")).toMatchObject({
+			type: "decision",
+			by: "person",
+			prompt: "Ship {{item.url}} on {{run.branch}}?",
+			options: [{ name: "ship" }],
+		});
+	});
+
+	test("a version 3 flow is left alone", () => {
+		const flow = flowSchema.parse(migrateFlow(v2()));
+		expect(migrateFlow(flow)).toBe(flow);
+	});
 });

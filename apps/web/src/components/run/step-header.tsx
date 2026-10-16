@@ -3,7 +3,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@nightshift/ui/components/collapsible";
-import { ChevronRightIcon } from "lucide-react";
+import { ChevronRightIcon, HandIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { hasCost, NODE_TYPE } from "@/components/flow/node-type";
@@ -23,7 +23,8 @@ export function StepLine({
 	step: StepSummary;
 	runStatus: RunStatus;
 }) {
-	const { icon: Icon, label } = NODE_TYPE[step.nodeType];
+	const { icon: typeIcon, label } = NODE_TYPE[step.nodeType];
+	const Icon = step.gate !== null ? HandIcon : typeIcon;
 	return (
 		<div className="flex min-w-0 items-center gap-2">
 			<Icon
@@ -49,7 +50,7 @@ export function StepLine({
 				</time>
 				{" · "}
 				{stepDuration(step)}
-				{hasCost(step.nodeType) ? ` · ${formatCost(step.costUsd)}` : ""}
+				{hasCost(step) ? ` · ${formatCost(step.costUsd)}` : ""}
 			</span>
 		</div>
 	);
@@ -58,11 +59,10 @@ export function StepLine({
 /** The output that says in words what a step did, by node type. */
 const PROSE_OUTPUT: Partial<Record<StepSummary["nodeType"], string>> = {
 	agent: "summary",
-	decision: "notes",
-	gate: "note",
+	decision: "note",
 };
 
-/** What the step did, in its own words: an Agent's summary, a Decision's notes, a Gate's note. */
+/** What the step did, in its own words: an Agent's summary, or a Decision's note. */
 export function stepProse(step: StepSummary): string | undefined {
 	const field = PROSE_OUTPUT[step.nodeType];
 	const value = field ? step.outputs[field] : undefined;
@@ -98,7 +98,7 @@ export function StepFacts({ step }: { step: StepSummary }) {
 		},
 		{ label: "Took", value: stepDuration(step) },
 	];
-	if (hasCost(step.nodeType)) {
+	if (hasCost(step)) {
 		facts.push({ label: "Cost", value: formatCost(step.costUsd) });
 	}
 	if (step.visit > 1) facts.push({ label: "Visit", value: step.visit });

@@ -16,12 +16,14 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 |------|---------|--------|
 | Project | A local clone that Runs can start in. | Slice 1 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
-| Node | One step of a Flow: Agent, Command, Decision, Gate, Subflow, or For Each. Its id is also its name in templates. | PLAN §3 |
+| Node | One step of a Flow: Agent, Command, Decision, Subflow, or For Each. Its id is also its name in templates. | PLAN §3 |
 | Agent Node | A Node that runs one Session on its Harness, with a prompt and/or a skill, a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. | PLAN §3 |
 | Agent Profile | A Harness, a model, an effort, a permission mode, CLI Tools and Connections under one name, defined once on the daemon (the Agents page). Agent Nodes name it in `profile`. A Run resolves it when it starts, so a later change reaches the next Run. A Flow that names a profile the daemon does not have refuses to start. | Agents |
 | Command Node | A Node that runs one shell command in the Worktree. Exit 0 is `pass`. | PLAN §3 |
-| Decision Node | A Node that reads earlier outputs and returns one of its declared labels. | PLAN §3 |
-| Gate | A Node that waits for a person in the Needs-you inbox, with a question and its choices. It holds the Run with an Interrupt until the answer comes. | PLAN §3 |
+| Decision Node | A Node that picks one of its Options, which is the Step's Outcome. Who picks is `by`: you (a Gate), a Rule, or a model (the Decider). Its prompt is the question for you, the brief for the model, or a note on the Rules. Later Nodes read `outcome` and `note`. | PLAN §3 |
+| Option | One of the things a Decision Node can pick, with a name, a description, and (for a Rule) `when`. Each Option has its own Edge. | PLAN §3 |
+| Gate | A Decision decided by you: it waits in the Needs-you inbox with its question and its Options, and holds the Run with an Interrupt until you answer. It waits as long as it must. | PLAN §3 |
+| Rule | A JSONata expression on an Option of a Decision decided by a rule, over the same values templates see (`build.data.tests_passed = true and check.exit_code = 0`). The first Option whose Rule holds is picked; the one Option without a Rule is the default. No model, no cost. | Decision |
 | For Each Node | A Node that runs a Body Flow once per Item of a List. | PLAN §3 |
 | Start Node | The Node a Run begins at. | Slice 2 |
 | Input | A named value a Flow takes, like a function argument. The top-level Flow's Inputs are asked at start. | Slice 5 |
@@ -41,7 +43,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Item Branch | The branch one Item works on, on top of the last Item that finished. Together they form the Stack. | Slice 4 |
 | Stack | The chain of Item Branches of one For Each. The engine makes the branches; a flow opens pull requests on them with a CLI tool such as `gh`. | PLAN §5 |
 | Stop Time | The time after which a Run starts no new Step. | Slice 4 |
-| Outcome | How a Step ended: `pass`, `fail`, `needs-input`, an Agent Node's own outcome, a Decision label, or a Gate choice. | PLAN §3 |
+| Outcome | How a Step ended: `pass`, `fail`, `needs-input`, an Agent Node's own outcome, or a Decision Option. | PLAN §3 |
 | Edge | A link from a Node to the next Node, taken on one Outcome. | PLAN §2 |
 | Max | How often a Run may take an Edge. Every loop needs an Edge with a Max. | Slice 2 |
 | Retry Loop | An Edge back to an earlier Node, bounded by a Max. | PLAN §2 |
@@ -54,7 +56,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Thread | The LangGraph thread of a Run. Its id is the Run's id, and it holds the Run's Checkpoints. | LangGraph |
 | Checkpoint | The run state LangGraph writes after every Node, in the tables `lg_checkpoint` and `lg_write`: outputs for templates, visit and edge counts, For Each cursors, and the pending Step. The engine's bookkeeping, never the read model. | LangGraph |
 | Interrupt | How a Thread parks: a Wait, an open Gate, or a Step that failed or was stopped. A resume answers it, and the Run continues at the same Node, at any depth. | LangGraph |
-| Wait | A Step's sleep on a usage limit or a network failure. The Node's wait node holds it with an Interrupt; a wake continues the same Session. Agent and Decision Nodes wait. | LangGraph |
+| Wait | A Step's sleep on a usage limit or a network failure. The Node's wait node holds it with an Interrupt; a wake continues the same Session. Agent Nodes and Decisions decided by a model wait. | LangGraph |
 | Visit | The count of a Step among the Steps of the same Node: 1 for the first. | Slice 2 |
 | Session | One harness session of an Agent Step. A resumed Step has more than one. | Slice 1 |
 | Harness | A coding-agent CLI that runs Sessions on this machine, with its own login, through a TanStack AI harness adapter: `claude-code` (Claude Code), `opencode` (OpenCode, a 1.x build), or `codex` (Codex). Added on the Agents page; an Agent Profile or an Agent Node names one. | Slice 8 |
@@ -71,7 +73,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Run Log | The daemon's copy in memory of each Run's Events. Every append goes through it, and it keeps an Event only after the database has it. | Run state |
 | Run Policy | The rules for retries, rescue, blocked propagation, network grace, usage-limit waits, the stop time, and resume after a restart. | PLAN §2 |
 | Needs-you inbox | The list of open Gates. | PLAN §3 |
-| Decider | The provider behind a Decision Node. The default is a small model with structured output. | PLAN §2 |
+| Decider | The provider behind a Decision decided by a model: a short Claude Code session whose only tool is `decide`, which checks the answer against the Options. | PLAN §2 |
 | CLI Tool | A program on this computer, by its name (`gh`, `aws`), defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `clis`: its agent may run it without a prompt. A Flow that names one the daemon does not have, or that the computer cannot find, refuses to start. | CLI tools |
 
 ## Run status
@@ -81,7 +83,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | running | A Step runs, or the Run is between Steps. |
 | waiting | A Gate waits for a person in the Needs-you inbox. |
 | sleeping | A usage limit or a network failure: a timer continues the same Session. |
-| finished | The Run reached `pass`, a Decision label, or a Gate choice with no Edge left to take. |
+| finished | The Run reached `pass` or a Decision Option with no Edge left to take. |
 | stopped | A person stopped the Run. |
 | failed | A Step errored, a `fail` or `needs-input` had no Edge, or a Retry Loop hit its Max. |
 | interrupted | The daemon stopped while a Step ran. The next daemon resumes it on its own a few seconds after it starts, unless its end reason says why not. |
@@ -101,7 +103,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | take over | Hand a Session to a person with its Harness's resume command, for example `claude --resume <id>`. | Slice 1 |
 | retry | Take a Retry Loop back to an earlier Node. | Slice 2 |
 | rescue | Retry a Node with a stronger model. | PLAN §2 |
-| resolve | Answer a Gate with one of its choices. | PLAN §3 |
+| resolve | Answer a Gate with one of its Options. | PLAN §3 |
 | block | Skip an Item because an Item it waits on failed. | Slice 4 |
 | halt | End a For Each early because a Body Flow ended on a halt label. | Slice 4 |
 | sleep | Wait on a timer after a usage limit or a network failure. | Slice 4 |

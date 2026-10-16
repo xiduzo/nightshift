@@ -11,6 +11,9 @@
  * - For Each: `branchPerItem` → `branch` (`per-item` / `shared`), `as: "item"`.
  * - Every template in prompts, commands, questions, sources and outputs.
  *
+ * Version 2 → 3 (`migrateDecisionNodes`): a Gate is a Decision decided by
+ * a person, a Decision one decided by a model, and both have `options`.
+ *
  * Any version:
  * - The built-in tool set `tools: ["github"]` → the CLI tool `clis: ["gh"]`
  *   (see `migrateToolSets`).
@@ -18,7 +21,10 @@
  *   for the same items (see `migrateListSource`).
  */
 export function migrateFlow(json: unknown): unknown {
-	const current = isRecord(json) && json.version === 1 ? migrateV1(json) : json;
+	let current = isRecord(json) && json.version === 1 ? migrateV1(json) : json;
+	if (isRecord(current) && current.version === 2) {
+		current = migrateDecisionNodes(current);
+	}
 	if (!isRecord(current) || !Array.isArray(current.nodes)) return current;
 	let changed = false;
 	const nodes = current.nodes.map((node) => {
@@ -134,6 +140,115 @@ export function githubSubIssuesCommand(source: GithubSource): string {
 /** A jq literal inside the single-quoted shell argument: JSON, with any `'` escaped for the shell. */
 function jqValue(value: string | string[] | null): string {
 	return JSON.stringify(value).replace(/'/g, `'\\''`);
+}
+
+/**
+ * Version 2 → 3. A Gate node becomes a Decision node decided by a person
+ * (`by: "person"`, `prompt: question`, `options: choices`); a Decision node
+ * one decided by a model (`by: "model"`, `options: labels`, no `decider`).
+ * Every template of the flow that read `{{<decision>.notes}}` reads
+ * `{{<decision>.note}}`, the one field both have now.
+ */
+export function migrateDecisionNodes(
+	json: Record<string, unknown>,
+): Record<string, unknown> {
+	const nodes = Array.isArray(json.nodes) ? json.nodes : [];
+	const decisions = new Set<string>();
+	for (const node of nodes) {
+		if (
+			isRecord(node) &&
+			node.type === "decision" &&
+			typeof node.id === "string"
+		)
+			decisions.add(node.id);
+	}
+	const text = (value: unknown) =>
+		typeof value === "string" ? migrateNotes(value, decisions) : value;
+	const migratedNodes = nodes.map((node) => {
+		if (!isRecord(node)) return node;
+		switch (node.type) {
+			case "gate": {
+				const { question, choices, ...rest } = node;
+				return {
+					...rest,
+					type: "decision",
+					prompt: text(question),
+					options: choices,
+					by: "person",
+				};
+			}
+			case "decision": {
+				const { labels, decider: _decider, ...rest } = node;
+				return {
+					...rest,
+					prompt: text(node.prompt),
+					options: labels,
+					by: "model",
+				};
+			}
+			default:
+				return rewriteTemplatesV2(node, text);
+		}
+	});
+	const outputs = Array.isArray(json.outputs)
+		? json.outputs.map((output) =>
+				isRecord(output) ? { ...output, value: text(output.value) } : output,
+			)
+		: json.outputs;
+	return {
+		...json,
+		version: 3,
+		nodes: migratedNodes,
+		...(outputs === undefined ? {} : { outputs }),
+	};
+}
+
+/** Applies `text` to every template of a version 2 node that is not a Decision or a Gate. */
+function rewriteTemplatesV2(
+	node: Record<string, unknown>,
+	text: (value: unknown) => unknown,
+): Record<string, unknown> {
+	const bindings = (inputs: unknown) =>
+		isRecord(inputs)
+			? Object.fromEntries(
+					Object.entries(inputs).map(([name, value]) => [name, text(value)]),
+				)
+			: inputs;
+	switch (node.type) {
+		case "agent":
+			return { ...node, prompt: text(node.prompt) };
+		case "command":
+			return { ...node, command: text(node.command) };
+		case "subflow":
+			return { ...node, inputs: bindings(node.inputs) };
+		case "foreach": {
+			const source = isRecord(node.source)
+				? Object.fromEntries(
+						Object.entries(node.source).map(([key, value]) => [
+							key,
+							key === "value" ||
+							key === "command" ||
+							key === "parent" ||
+							key === "glob"
+								? text(value)
+								: value,
+						]),
+					)
+				: node.source;
+			return { ...node, source, inputs: bindings(node.inputs) };
+		}
+		default:
+			return node;
+	}
+}
+
+/** `{{<decision>.notes}}` → `{{<decision>.note}}`, for the ids in `decisions`. */
+function migrateNotes(text: string, decisions: ReadonlySet<string>): string {
+	return text.replace(
+		/\{\{\s*([a-z][a-z0-9_]*)\.notes\s*\}\}/g,
+		(raw: string, name: string) =>
+			decisions.has(name) ? `{{${name}.note}}` : raw,
+	);
 }
 
 /**

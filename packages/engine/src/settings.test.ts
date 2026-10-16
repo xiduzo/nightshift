@@ -265,6 +265,7 @@ test("run() is the engine's part of the current values", async () => {
 		maxConcurrentRuns: 3,
 		maxStepsPerRun: 50,
 		resumeInterruptedRuns: true,
+		decisionModel: "haiku",
 		policy: {
 			usageLimitFirstWaitMinutes: 5,
 			usageLimitMaxWaitMinutes: 60,

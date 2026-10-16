@@ -12,6 +12,7 @@
 	},
 	"dependencies": {
 		"croner": "^10.0.1",
+		"jsonata": "^2.2.2",
 		"zod": "catalog:"
 	},
 	"devDependencies": {

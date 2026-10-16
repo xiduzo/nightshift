@@ -1,5 +1,5 @@
 {
-	"version": 2,
+	"version": 3,
 	"description": "An agent reviews a pull request; after a person agrees, a command posts the review with `gh pr review`.",
 	"inputs": [
 		{
@@ -79,9 +79,9 @@
 				"x": 320,
 				"y": 0
 			},
-			"type": "gate",
-			"question": "The review of {{pr}} says `{{review.outcome}}`:\n\n{{review.data.summary}}\n\nComments:\n\n{{review.data.comments}}\n\nPost it on GitHub?",
-			"choices": [
+			"type": "decision",
+			"prompt": "The review of {{pr}} says `{{review.outcome}}`:\n\n{{review.data.summary}}\n\nComments:\n\n{{review.data.comments}}\n\nPost it on GitHub?",
+			"options": [
 				{
 					"name": "post",
 					"description": "Post the review as it is."
@@ -90,7 +90,8 @@
 					"name": "skip",
 					"description": "Post nothing."
 				}
-			]
+			],
+			"by": "person"
 		},
 		{
 			"id": "post",

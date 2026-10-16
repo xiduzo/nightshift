@@ -160,11 +160,11 @@ export function outcomeStyle(outcome: Outcome): Omit<Style, "label"> {
  * or For Each step keeps running: one of the steps it called sleeps).
  */
 export function stepState(
-	step: Pick<StepSummary, "outcome" | "nodeType">,
+	step: Pick<StepSummary, "outcome" | "nodeType" | "gate">,
 	runStatus?: RunStatus,
 ): StepState {
 	if (step.outcome !== null) return step.outcome;
-	if (step.nodeType === "gate") return "waiting";
+	if (step.gate !== null) return "waiting";
 	if (
 		runStatus === "sleeping" &&
 		step.nodeType !== "foreach" &&

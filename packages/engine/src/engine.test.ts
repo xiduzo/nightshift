@@ -16,7 +16,6 @@ import {
 	type DecisionNode,
 	type Flow,
 	type FlowEdge,
-	type GateNode,
 	singleAgentFlow,
 } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
@@ -119,7 +118,7 @@ function edge(
 
 function flowOf(nodes: Flow["nodes"], edges: FlowEdge[] = []): Flow {
 	return {
-		version: 2,
+		version: 3,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -1303,25 +1302,27 @@ function decision(
 		type: "decision",
 		position: { x: 0, y: 0 },
 		prompt,
-		labels: labels.map((name) => ({ name })),
-		decider: "claude-code",
+		options: labels.map((name) => ({ name })),
+		by: "model",
 		model: "haiku",
 		...extra,
 	};
 }
 
+/** A Gate: a Decision decided by a person. */
 function gate(
 	id: string,
 	question: string,
 	choices: string[],
-	extra: Partial<GateNode> = {},
-): GateNode {
+	extra: Partial<DecisionNode> = {},
+): DecisionNode {
 	return {
 		id,
-		type: "gate",
+		type: "decision",
 		position: { x: 0, y: 0 },
-		question,
-		choices: choices.map((name) => ({ name })),
+		prompt: question,
+		options: choices.map((name) => ({ name })),
+		by: "person",
 		...extra,
 	};
 }
@@ -1410,13 +1411,13 @@ describe("decisions", () => {
 					"Worker said: {{worker.summary}}",
 					["ship", "redo"],
 					{
-						labels: [
+						options: [
 							{ name: "ship", description: "Good enough" },
 							{ name: "redo" },
 						],
 					},
 				),
-				agent("shipper", "Ship it. {{decide.notes}} ({{decide.outcome}})"),
+				agent("shipper", "Ship it. {{decide.note}} ({{decide.outcome}})"),
 			],
 			[
 				edge("e1", "worker", "pass", "decide"),
@@ -1450,7 +1451,7 @@ describe("decisions", () => {
 			nodeType: "decision",
 			outcome: "ship",
 			error: null,
-			outputs: { outcome: "ship", notes: "The tests pass.", visit: 1 },
+			outputs: { outcome: "ship", note: "The tests pass.", visit: 1 },
 			sessions: [],
 		});
 		expect(step?.costUsd).toBeCloseTo(0.02);
@@ -1489,7 +1490,7 @@ describe("decisions", () => {
 		expect(detail.steps[0]).toMatchObject({
 			outcome: "error",
 			error: "The decider failed: boom",
-			outputs: { outcome: "error", notes: "", visit: 1 },
+			outputs: { outcome: "error", note: "", visit: 1 },
 		});
 		expect(detail.reason).toBe(
 			'Node "decide" failed: The decider failed: boom',
@@ -1511,7 +1512,7 @@ describe("decisions", () => {
 		const detail = await engine.getRun(run.id);
 		expect(detail.steps[0]?.outcome).toBe("error");
 		expect(detail.steps[0]?.error).toBe(
-			'The decider picked "maybe", which is not a label of this node. The labels are: yes, no.',
+			'"maybe" is not an option of this node. Choose one of: yes, no.',
 		);
 		expect(detail.steps).toHaveLength(1);
 	});
@@ -1613,7 +1614,7 @@ describe("gates", () => {
 		let detail = await engine.getRun(run.id);
 		expect(detail.steps.at(-1)).toMatchObject({
 			id: open?.stepId,
-			nodeType: "gate",
+			nodeType: "decision",
 			outcome: null,
 			endedAt: null,
 		});
@@ -1715,7 +1716,7 @@ describe("gates", () => {
 		await expect(
 			engine.resolveGate({ runId: run.id, stepId: open.stepId, choice: "yes" }),
 		).rejects.toThrow(
-			'"yes" is not a choice of this Gate. Choose one of: approve, reject.',
+			'"yes" is not an option of this node. Choose one of: approve, reject.',
 		);
 		await expect(
 			engine.resolveGate({
@@ -1936,7 +1937,7 @@ describe("a full flow", () => {
 					"retry",
 					"review",
 				]),
-				gate("gate", "{{worker.summary}} ({{decide.notes}}). Ship it?", [
+				gate("gate", "{{worker.summary}} ({{decide.note}}). Ship it?", [
 					"approve",
 					"rework",
 				]),

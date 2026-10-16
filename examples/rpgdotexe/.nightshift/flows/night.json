@@ -1,5 +1,5 @@
 {
-	"version": 2,
+	"version": 3,
 	"description": "The rpgdotexe night: builds each Feature of one Epic, blockers first, like `night-shift.py <epic>`.",
 	"inputs": [
 		{

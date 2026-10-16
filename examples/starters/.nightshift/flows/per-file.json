@@ -1,5 +1,5 @@
 {
-	"version": 2,
+	"version": 3,
 	"description": "One agent per file that matches a glob applies the same instruction, all on one branch; then one commit.",
 	"inputs": [
 		{

@@ -396,9 +396,7 @@ function HaltOnField({
 	const suggestions = [
 		...new Set(
 			(called?.nodes ?? []).flatMap((calledNode) =>
-				calledNode.type === "decision" ||
-				calledNode.type === "gate" ||
-				calledNode.type === "agent"
+				calledNode.type === "decision" || calledNode.type === "agent"
 					? nodeOptions(calledNode).map((option) => option.name)
 					: [],
 			),
@@ -415,7 +413,7 @@ function HaltOnField({
 				halted.
 			</FieldDescription>
 			<OptionsEditor
-				kind="label"
+				kind="option"
 				options={node.haltOn.map((name) => ({ name }))}
 				min={0}
 				newName="halt"

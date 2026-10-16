@@ -132,7 +132,7 @@ function flowOf(
 	extra: Partial<Flow> = {},
 ): Flow {
 	return {
-		version: 2,
+		version: 3,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -474,10 +474,11 @@ describe("Subflow", () => {
 				[
 					{
 						id: "gate",
-						type: "gate",
+						type: "decision",
 						position: { x: 0, y: 0 },
-						question: "Ship {{what}}?",
-						choices: [{ name: "yes" }, { name: "no" }],
+						prompt: "Ship {{what}}?",
+						options: [{ name: "yes" }, { name: "no" }],
+						by: "person",
 					},
 				],
 				[],
@@ -1213,7 +1214,7 @@ describe("flow format 1", () => {
 			inputs: { epic: "7" },
 		});
 		const loaded = await engine.getRun(runId);
-		expect(loaded.flow.version).toBe(2);
+		expect(loaded.flow.version).toBe(3);
 		expect(loaded.flow.inputs).toEqual([
 			expect.objectContaining({ name: "epic", type: "text", required: true }),
 		]);
