@@ -109,7 +109,7 @@ CLI when you need them.
 | ✓ [Card](https://ui.shadcn.com/docs/components/card) | A bordered group of content: `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`. Stat tiles, gate cards, flow cards. |
 | ✓ [Table](https://ui.shadcn.com/docs/components/table) | Rows and columns of data (runs, schedules, events). |
 | [Data Table](https://ui.shadcn.com/docs/components/data-table) | A Table with TanStack Table: sorting, filters, pagination, row selection. A guide, not a component. |
-| [Chart](https://ui.shadcn.com/docs/components/chart) | Recharts with theme colors, `ChartTooltip` and `ChartLegend` (cost per night, runs per day). |
+| ✓ [Chart](https://ui.shadcn.com/docs/components/chart) | Recharts with theme colors, `ChartTooltip` and `ChartLegend`. The run-status donut (sidebar, Run outcomes), a sparkline in every stat card, and the history chart in each card's details dialog. Recharts keeps a 5px margin by default; set `margin` to zero on tiny charts. A chart whose values are all zero draws no bars; give it a hidden `YAxis` with a domain of at least 1. |
 | [Carousel](https://ui.shadcn.com/docs/components/carousel) | Slides you swipe through (Embla). |
 | [Aspect Ratio](https://ui.shadcn.com/docs/components/aspect-ratio) | Keeps media at a fixed ratio. |
 | [Typography](https://ui.shadcn.com/docs/components/typography) | Class recipes for headings, paragraphs, lists, blockquotes and inline code. Copy the classes; there is nothing to install. |
