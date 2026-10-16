@@ -22,6 +22,14 @@ export {
 	pidAlive,
 } from "./lease";
 export {
+	exportRun,
+	openRunBundle,
+	RUN_BUNDLE_FORMAT_VERSION,
+	type RunBundle,
+	type RunBundleMeta,
+	type RunBundleSummary,
+} from "./run-bundle";
+export {
 	createSettingsStore,
 	type RunSettings,
 	type SettingField,

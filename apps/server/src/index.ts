@@ -10,7 +10,8 @@ import { logger } from "hono/logger";
 
 import { createContext } from "./context";
 import { desktopOrigins, ENV } from "./env.server";
-import { auth } from "./services";
+import { runExportResponse } from "./run-export";
+import { auth, connections, db } from "./services";
 
 const app = new Hono();
 
@@ -26,6 +27,12 @@ app.use(
 );
 
 app.on(["POST", "GET"], "/api/auth/*", async (c) => auth.handler(c.req.raw));
+
+// A file download, not an oRPC call. Public like the procedures: local
+// single-user mode has no session yet.
+app.get("/api/runs/:id/export", (c) =>
+	runExportResponse({ db, connections }, c.req.param("id")),
+);
 
 export const apiHandler = new OpenAPIHandler(appRouter, {
 	plugins: [

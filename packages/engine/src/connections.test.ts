@@ -464,3 +464,29 @@ describe("expandForTest", () => {
 		expect(values).toEqual([]);
 	});
 });
+
+describe("secretValues", () => {
+	test("saved secrets and the variables of saved connections, nothing else", async () => {
+		const { store } = await makeStore({
+			TEAM: "night",
+			TRACKER_TOKEN: "env-token",
+			HOME: "/home/someone",
+		});
+		await store.save(docs);
+		await store.save(tracker);
+		await store.setSecret("DOCS_TOKEN", "docs-secret");
+		await store.setSecret("UNUSED", "unused-secret");
+		expect((await store.secretValues()).sort()).toEqual([
+			"docs-secret",
+			"env-token",
+			"night",
+			"unused-secret",
+		]);
+	});
+
+	test("a referenced variable without a value adds nothing", async () => {
+		const { store } = await makeStore();
+		await store.save(tracker);
+		expect(await store.secretValues()).toEqual([]);
+	});
+});
