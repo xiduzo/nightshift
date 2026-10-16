@@ -303,7 +303,11 @@ export function harnessSetup(
 ): SessionSetup {
 	const report = stepReportSetup(input, options.allowedTools);
 	const github = input.tools?.includes("github")
-		? githubTools({ ...options.github, cwd: input.cwd })
+		? githubTools({
+				...options.github,
+				cwd: input.cwd,
+				...(input.effects ? { effects: input.effects } : {}),
+			})
 		: [];
 	const mcpServers = input.mcpServers ?? {};
 	// The node lists its MCP servers on purpose, like its tool sets: their

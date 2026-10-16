@@ -230,7 +230,11 @@ export function codexSetup(
 		undefined,
 	);
 	const github = input.tools?.includes("github")
-		? githubTools({ ...options.github, cwd: input.cwd })
+		? githubTools({
+				...options.github,
+				cwd: input.cwd,
+				...(input.effects ? { effects: input.effects } : {}),
+			})
 		: [];
 	const ownEffort: Record<string, string> =
 		input.effort !== undefined && !KNOWN_MODELS.has(input.model)
