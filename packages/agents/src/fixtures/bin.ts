@@ -10,7 +10,12 @@ const quote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
 export async function fakeBin(
 	dir: string,
 	name: string,
-	fixture: "fake-claude" | "fake-opencode" | "fake-codex",
+	fixture:
+		| "fake-claude"
+		| "fake-opencode"
+		| "fake-codex"
+		| "fake-acp"
+		| "fake-grok",
 	env: Record<string, string> = {},
 ): Promise<string> {
 	const path = join(dir, name);

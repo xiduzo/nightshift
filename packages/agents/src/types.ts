@@ -1,10 +1,11 @@
 /**
  * The harness-agnostic contract between the engine and an agent harness.
- * The engine only sees these types. A harness adapter (Claude Code, and later
- * OpenCode and Codex) translates its own stream into AgentEvent values.
+ * The engine only sees these types. A harness adapter translates its own
+ * stream into AgentEvent values.
  */
+import type { DeciderName, HarnessName } from "@nightshift/flows";
 
-export type HarnessName = "claude-code" | "opencode" | "codex";
+export type { DeciderName, HarnessName };
 
 /** An MCP server for one session, with `${NAME}` already expanded by the engine. */
 export type McpServerConfig =
@@ -121,12 +122,13 @@ export interface AgentHarness {
 }
 
 export type DecisionInput = {
-	/** The worktree. The decider runs there. */
-	cwd: string;
+	/** Which decision model answers. */
+	decider: DeciderName;
 	/** The rendered question with its context. */
 	prompt: string;
 	labels: { name: string; description?: string }[];
-	model: string;
+	/** Unset: the decider's default model. */
+	model?: string;
 	signal: AbortSignal;
 };
 
@@ -141,13 +143,8 @@ export type DecisionResult =
 			costUsd: number | null;
 	  };
 
-/**
- * Picks one label for a Decision node. The default provider is a short
- * Claude Code session whose only way to answer is a `decide` tool whose
- * input is checked against the labels. Other providers plug in behind this.
- */
+/** Picks one label for a Decision node: `decide()` with a TanStack AI decider. */
 export interface Decider {
-	readonly name: string;
 	/** Never throws: failures come back as `kind: "error"`. */
 	decide(input: DecisionInput): Promise<DecisionResult>;
 }

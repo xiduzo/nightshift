@@ -479,6 +479,7 @@ describe("Subflow", () => {
 						prompt: "Ship {{what}}?",
 						options: [{ name: "yes" }, { name: "no" }],
 						by: "person",
+						decider: "typesafe",
 					},
 				],
 				[],

@@ -172,7 +172,7 @@ describe("save", () => {
 		["a negative wait", { networkGraceMinutes: -1 }],
 		["a wait over a week", { networkGraceMinutes: 10_081 }],
 		["a blank binary", { codexBin: "  " }],
-		["an unknown harness", { agentHarness: "cursor" }],
+		["an unknown harness", { agentHarness: "aider" }],
 		["a wrong type", { scheduler: "yes" }],
 	])("refuses %s and saves nothing", async (_label, patch) => {
 		const s = await store();
@@ -265,7 +265,6 @@ test("run() is the engine's part of the current values", async () => {
 		maxConcurrentRuns: 3,
 		maxStepsPerRun: 50,
 		resumeInterruptedRuns: true,
-		decisionModel: "haiku",
 		policy: {
 			usageLimitFirstWaitMinutes: 5,
 			usageLimitMaxWaitMinutes: 60,

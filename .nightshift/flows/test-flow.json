@@ -7,8 +7,21 @@
 		{
 			"id": "worker",
 			"position": {
-				"x": 0,
+				"x": -200,
 				"y": 0
+			},
+			"type": "agent",
+			"prompt": "",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"session": "fresh"
+		},
+		{
+			"id": "agent",
+			"position": {
+				"x": 152,
+				"y": -88
 			},
 			"type": "agent",
 			"prompt": "",

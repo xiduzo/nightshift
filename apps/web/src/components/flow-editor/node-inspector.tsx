@@ -51,7 +51,6 @@ import {
 import type { Effort, PermissionMode } from "@/lib/api-types";
 import {
 	calledFlow,
-	MODEL_SUGGESTIONS,
 	type NodeOption,
 	nodeOptions,
 	type OptionNode,
@@ -88,13 +87,16 @@ import { OutputSchemaField } from "./output-schema-field";
 
 import { TemplateField } from "./template-field";
 
-/** The node without one of its own fields: it comes from the profile again. */
-function withoutField(
-	node: AgentNode,
+/**
+ * The node without one of its optional fields: it comes from the default
+ * again (an Agent node's profile, a Decision node's decider).
+ */
+function withoutField<N extends AgentNode | DecisionNode>(
+	node: N,
 	key: "harness" | "model" | "effort" | "permissionMode",
-): AgentNode {
-	const { [key]: _dropped, ...rest } = node;
-	return rest as AgentNode;
+): N {
+	const { [key as keyof N]: _dropped, ...rest } = node;
+	return rest as N;
 }
 
 /**
@@ -1233,6 +1235,9 @@ function DecisionFields({
 				? "The model picks exactly one. Each option gets its own edge. A description tells the model when to pick it."
 				: "Night Shift tries the rules from top to bottom and picks the first option whose rule holds. Leave the last option without a rule: it is picked when none holds.";
 
+	const deciders = useQuery(orpc.deciders.list.queryOptions());
+	const decider = deciders.data?.find((d) => d.name === node.decider);
+	const keyMissing = decider?.apiKeySource === "missing";
 	return (
 		<>
 			<InspectorSection title="Decision">
@@ -1322,37 +1327,65 @@ function DecisionFields({
 			{by === "model" ? (
 				<InspectorSection title="Model">
 					<Field
+						id={`${id}-decider`}
+						label="Decider"
+						hint={
+							keyMissing && decider?.apiKey
+								? `Add the secret ${decider.apiKey} on the Agents page, or this node cannot decide.`
+								: "The decision model that picks the option."
+						}
+					>
+						<NativeSelect
+							id={`${id}-decider`}
+							value={node.decider}
+							aria-invalid={keyMissing}
+							aria-describedby={`${id}-decider-hint`}
+							onChange={(event) => {
+								const next = event.target.value as DecisionNode["decider"];
+								// A model belongs to its decider: the new one starts on its default.
+								onChange((current) => ({
+									...withoutField(current, "model"),
+									decider: next,
+								}));
+							}}
+						>
+							{(deciders.data ?? []).map((d) => (
+								<NativeSelectOption key={d.name} value={d.name}>
+									{d.label}
+								</NativeSelectOption>
+							))}
+						</NativeSelect>
+					</Field>
+					<Field
 						id={`${id}-model`}
 						label="Model"
 						optional
-						hint="A small, fast model is enough to pick an option. Left empty, the model from Settings is used."
+						hint="Leave it empty to use the decider's default model."
 					>
 						<Input
 							id={`${id}-model`}
 							list={`${id}-models`}
 							value={node.model ?? ""}
-							placeholder="From Settings"
+							placeholder={decider?.defaultModel}
 							className="font-mono"
 							autoComplete="off"
 							spellCheck={false}
 							aria-describedby={`${id}-model-hint`}
 							onChange={(event) => {
 								const model = event.target.value.trim();
-								onChange((current) => {
-									const { model: _, ...rest } = current;
-									return model === "" ? rest : { ...rest, model };
-								});
+								onChange((current) =>
+									model === ""
+										? withoutField(current, "model")
+										: { ...current, model },
+								);
 							}}
 						/>
 						<datalist id={`${id}-models`}>
-							{MODEL_SUGGESTIONS.map((value) => (
+							{(decider?.models ?? []).map((value) => (
 								<option key={value} value={value} />
 							))}
 						</datalist>
 					</Field>
-					<Note>
-						Runs on <span className="text-foreground">Claude Code</span>.
-					</Note>
 				</InspectorSection>
 			) : null}
 		</>

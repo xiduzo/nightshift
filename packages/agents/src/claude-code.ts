@@ -75,15 +75,8 @@ export type SessionSetup = {
 	disallowedTools?: string[];
 	/** Turn `report_step` calls into `report` events (`true` or a spec). */
 	stepReport: boolean | StepReportSpec;
-	/**
-	 * Turn off every built-in tool (`--tools ""`) and every MCP server but the
-	 * bridge (`--strict-mcp-config`): the bridged tools are the only tools.
-	 */
-	bridgedToolsOnly?: boolean;
 	/** Settings tiers to load (`--setting-sources`). */
 	settingSources: ClaudeCodeSettingSource[];
-	/** `--max-turns`. */
-	maxTurns?: number;
 	/** The session's own MCP servers, next to the bridge (`--mcp-config`). */
 	mcpServers?: Record<string, McpServerConfig>;
 };
@@ -114,11 +107,7 @@ const KNOWN_REASONING_MODELS = new Set([
 
 /**
  * The `claude` command for `claudeExecutable`. The adapter splits that value
- * on spaces into argv (no shell) and puts it before its own flags. It only
- * passes `--tools "" --strict-mcp-config` itself for `toolChoice: 'none'` or
- * a named tool, and then bridges at most that one tool. A session that needs
- * several bridged tools and no built-in ones adds the flags here: the trailing
- * space makes the empty `--tools` value.
+ * on spaces into argv (no shell) and puts it before its own flags.
  *
  * `mcpConfigPath` adds the session's own MCP servers with `--mcp-config`.
  * The adapter passes its bridge with a second `--mcp-config`; the flag is
@@ -126,14 +115,12 @@ const KNOWN_REASONING_MODELS = new Set([
  */
 export function claudeCommand(
 	executable: string | undefined,
-	bridgedToolsOnly: boolean | undefined,
 	mcpConfigPath?: string,
 ): string {
-	const command = [
+	return [
 		executable ?? "claude",
 		...(mcpConfigPath !== undefined ? ["--mcp-config", mcpConfigPath] : []),
 	].join(" ");
-	return bridgedToolsOnly ? `${command} --strict-mcp-config --tools ` : command;
 }
 
 /** Claude Code's `--mcp-config` JSON for the session's MCP servers. */
@@ -220,12 +207,7 @@ function startChat(
 		...(setup.disallowedTools
 			? { disallowedTools: setup.disallowedTools }
 			: {}),
-		...(setup.maxTurns !== undefined ? { maxTurns: setup.maxTurns } : {}),
-		claudeExecutable: claudeCommand(
-			options.claudeExecutable,
-			setup.bridgedToolsOnly,
-			mcpConfigPath,
-		),
+		claudeExecutable: claudeCommand(options.claudeExecutable, mcpConfigPath),
 		env: {
 			...effortEnv(input.model, input.effort, (model) =>
 				KNOWN_REASONING_MODELS.has(model),

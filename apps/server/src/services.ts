@@ -3,14 +3,17 @@ import { join } from "node:path";
 
 import {
 	type AgentHarness,
+	acpHarness,
 	checkCli,
 	checkHarness,
-	claudeCodeDecider,
 	claudeCodeHarness,
+	cliHelp,
 	codexHarness,
+	grokBuildHarness,
 	harnessModels,
 	opencodeHarness,
 	pathPrograms,
+	tanstackDecider,
 	testMcpServer,
 } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
@@ -141,20 +144,35 @@ export const engine = await createEngine({
 				codexExecutable: settings.current().codexBin,
 			}),
 		),
+		"grok-build": perSession("grok-build", () =>
+			grokBuildHarness({ grokExecutable: settings.current().grokBin }),
+		),
+		copilot: perSession("copilot", () =>
+			acpHarness("copilot", { executable: settings.current().copilotBin }),
+		),
+		gemini: perSession("gemini", () =>
+			acpHarness("gemini", { executable: settings.current().geminiBin }),
+		),
+		cursor: perSession("cursor", () =>
+			acpHarness("cursor", { executable: settings.current().cursorBin }),
+		),
 	},
-	decider: {
-		name: "claude-code",
-		decide: (input) =>
-			claudeCodeDecider({
-				claudeExecutable: settings.current().claudeBin,
-			}).decide(input),
-	},
+	// Decision nodes decided by a model: TanStack AI deciders, with API keys from the secrets.
+	decider: tanstackDecider({ secret: (name) => connections.secret(name) }),
 	dataDir,
 	settings: () => settings.run(),
 	mcpServersFor: (node) => connections.mcpServersFor(node),
 	connectionNames: () => connections.names(),
 	cliNames: () => cliTools.names(),
 	findCli: (name) => Bun.which(name),
+	cliToolsFor: (names) =>
+		Promise.all(
+			names.map(async (name) => ({
+				name,
+				description: cliTools.get(name)?.description ?? null,
+				help: await cliHelp(name),
+			})),
+		),
 	harnessNames: () => new Set(settings.current().harnesses),
 	profileFor: (name) => profiles.settingsFor(name),
 	// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.

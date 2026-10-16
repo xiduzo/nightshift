@@ -20,6 +20,7 @@ import type {
 	ScheduleIssue,
 } from "@nightshift/flows";
 
+import type { CliToolGuide } from "./cli-tools";
 import type { McpExpansion } from "./mcp";
 import type { RunSettings } from "./settings";
 
@@ -458,6 +459,12 @@ export type EngineOptions = {
 	 * cannot find refuses to start. Default: `Bun.which`.
 	 */
 	findCli?: (name: string) => string | null;
+	/**
+	 * What an agent learns about its CLI tools: each description and help.
+	 * A new agent session gets them at the end of its prompt. Without it the
+	 * agent may run them, but nobody tells it they are there.
+	 */
+	cliToolsFor?: (names: readonly string[]) => Promise<CliToolGuide[]>;
 	/**
 	 * The harnesses added on the Agents page, read when a run starts and
 	 * when a session starts. A harness left out cannot run an Agent node,

@@ -15,6 +15,7 @@ import {
 } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 
+import { cliToolsInstruction } from "../../cli-tools";
 import { consumeStream } from "../../consume";
 import {
 	type DerivedStep,
@@ -320,6 +321,19 @@ async function runSession(
 		return end("error", { outcome: "error", visit }, mcp.message, null);
 	}
 
+	// A new session learns its CLI tools after the prompt. A resumed session
+	// has them already. Plan mode runs no command. The log keeps the node's
+	// prompt only, like the report instruction the harness adds.
+	const clis = node.clis ?? [];
+	const cliGuide =
+		!resumeSessionId &&
+		agent.permissionMode !== "plan" &&
+		clis.length > 0 &&
+		ctx.cliToolsFor
+			? cliToolsInstruction(await ctx.cliToolsFor(clis))
+			: "";
+	const harnessPrompt = cliGuide ? `${prompt}\n\n${cliGuide}` : prompt;
+
 	const sessionId = randomUUID();
 	await ctx.db
 		.insert(agentSession)
@@ -423,7 +437,7 @@ async function runSession(
 		if (signal.aborted) throw new Error("The session was aborted.");
 		const stream = harness.run({
 			cwd: ctx.run.worktreePath,
-			prompt,
+			prompt: harnessPrompt,
 			model: agent.model,
 			permissionMode: agent.permissionMode,
 			effort: agent.effort,

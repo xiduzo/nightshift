@@ -1,4 +1,5 @@
 import { Command } from "@langchain/langgraph";
+import { DECIDER_ADAPTERS } from "@nightshift/agents/decider";
 import type {
 	Decider,
 	DecisionInput,
@@ -27,12 +28,12 @@ import type { RunStateValues } from "../../state";
 import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
 
 /**
- * A Decision decided by a model: the decider (a short Claude Code session
- * with one `decide` tool) reads the rendered prompt and picks an option.
- * The transcript gets `decision-start` (the prompt, the option names, the
- * model) and, on an answer, `decision`; `StepEnded` carries the decider's
- * cost as `costUsd`, also on an error or a stop. The model's reasons go
- * in the `note` output.
+ * A Decision decided by a model: the node's decider (a TanStack AI
+ * decision model, `decide()`) reads the rendered prompt and picks an
+ * option. The transcript gets `decision-start` (the prompt, the option
+ * names, the model) and, on an answer, `decision`; `StepEnded` carries the
+ * decider's cost as `costUsd`, also on an error or a stop. The decider's
+ * reasons go in the `note` output.
  *
  * How the step opens: with `pending.kind === "wait"` for this node, the
  * step that waited for a usage limit or the network continues (same step
@@ -118,7 +119,7 @@ async function decide(
 	const { visit, signal } = step;
 	const prompt = renderTemplate(node.prompt, step.tctx);
 	const options = visibleOptions(node);
-	const model = node.model ?? ctx.settings().decisionModel;
+	const model = node.model ?? DECIDER_ADAPTERS[node.decider].defaultModel;
 	step.record(null, {
 		type: "decision-start",
 		prompt,
@@ -134,7 +135,7 @@ async function decide(
 	}
 	const result = await decideWithin(
 		ctx.decider,
-		{ cwd: ctx.run.worktreePath, prompt, labels: options, model, signal },
+		{ decider: node.decider, prompt, labels: options, model, signal },
 		signal,
 	);
 	const costUsd = result.costUsd;

@@ -48,6 +48,7 @@ function decision(
 		prompt: "Should we go on?",
 		options: options.map((name) => ({ name })),
 		by: "model",
+		decider: "typesafe",
 		model: "haiku",
 		...extra,
 	};
@@ -66,6 +67,7 @@ function gate(
 		prompt: "Ship it?",
 		options: options.map((name) => ({ name })),
 		by: "person",
+		decider: "typesafe",
 		...extra,
 	};
 }
@@ -85,6 +87,7 @@ function ruled(
 			when === undefined ? { name } : { name, when },
 		),
 		by: "rule",
+		decider: "typesafe",
 		...extra,
 	};
 }
@@ -456,6 +459,7 @@ describe("validateFlow: decisions and gates", () => {
 		delete json.nodes[1].model;
 		const parsed = parseFlow(json);
 		expect(parsed.issues).toEqual([]);
+		expect(parsed.flow?.nodes[1]).toMatchObject({ decider: "typesafe" });
 		expect(parsed.flow?.nodes[1]).not.toHaveProperty("model");
 	});
 

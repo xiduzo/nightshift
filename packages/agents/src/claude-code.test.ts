@@ -38,24 +38,12 @@ function input(overrides: Partial<AgentSessionInput> = {}): AgentSessionInput {
 }
 
 describe("claudeCommand", () => {
-	test("adds the flags that leave only the bridged tools", () => {
-		expect(claudeCommand(undefined, false)).toBe("claude");
-		expect(claudeCommand("/bin/claude", true).split(" ")).toEqual([
-			"/bin/claude",
-			"--strict-mcp-config",
-			"--tools",
-			"",
-		]);
-	});
-
-	test("adds the session's MCP config before the bridge flags", () => {
-		expect(claudeCommand("claude", true, "/tmp/m.json").split(" ")).toEqual([
+	test("adds the session's MCP config", () => {
+		expect(claudeCommand(undefined)).toBe("claude");
+		expect(claudeCommand("claude", "/tmp/m.json").split(" ")).toEqual([
 			"claude",
 			"--mcp-config",
 			"/tmp/m.json",
-			"--strict-mcp-config",
-			"--tools",
-			"",
 		]);
 	});
 });
@@ -126,7 +114,6 @@ describe("harnessSetup", () => {
 		const setup = harnessSetup(input(), { allowedTools: ["Read"] });
 		expect(setup.tools).toEqual([]);
 		expect(setup.allowedTools).toEqual(["Read"]);
-		expect(setup.bridgedToolsOnly).toBeUndefined();
 	});
 
 	test("CLI tools: allowed in the shell, no bridged tools", () => {
@@ -141,8 +128,6 @@ describe("harnessSetup", () => {
 			"Bash(gh:*)",
 			"Bash(aws:*)",
 		]);
-		// Agent sessions keep their built-in tools.
-		expect(setup.bridgedToolsOnly).toBeUndefined();
 	});
 
 	test("CLI tools without allowedTools allow only the CLI tools", () => {

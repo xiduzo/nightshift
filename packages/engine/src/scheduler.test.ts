@@ -90,6 +90,7 @@ function gateFlow(): Flow {
 				prompt: "Go on?",
 				options: [{ name: "yes" }],
 				by: "person",
+				decider: "typesafe",
 			},
 		],
 		edges: [],

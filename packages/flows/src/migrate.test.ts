@@ -358,6 +358,29 @@ describe("migrateFlow: tool sets", () => {
 		expect(migrateFlow(flow)).toBe(flow);
 	});
 
+	test("a Decision node on the Claude Code decider gets the default decider", () => {
+		const decision = {
+			id: "decide",
+			type: "decision",
+			position: { x: 0, y: 0 },
+			prompt: "Go on?",
+			options: [{ name: "yes" }, { name: "no" }],
+			by: "model",
+		};
+		const migrated = migrateFlow(
+			current([
+				{ ...decision, decider: "claude-code", model: "haiku" },
+				{ ...decision, id: "other", decider: "ollaya", model: "laya:en" },
+			]),
+		) as { nodes: Record<string, unknown>[] };
+		expect(migrated.nodes.map((n) => [n.decider, n.model])).toEqual([
+			[undefined, undefined],
+			["ollaya", "laya:en"],
+		]);
+		const parsed = flowSchema.parse(migrated);
+		expect(parsed.nodes[0]).toMatchObject({ decider: "typesafe" });
+	});
+
 	test("version 1 tool sets migrate too", () => {
 		const migrated = migrateFlow({
 			...v1Body,
@@ -638,7 +661,7 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 		],
 	});
 
-	test("a Gate becomes a Decision decided by you; a Decision one decided by a model", () => {
+	test("a Gate becomes a Decision decided by you; a Decision one decided by a model, off the Claude Code decider", () => {
 		const flow = migrateFlow(v2()) as { version: number; nodes: unknown[] };
 		expect(flow.version).toBe(3);
 		expect(flow.nodes[1]).toEqual({
@@ -649,7 +672,6 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 			prompt: "Go on? {{worker.summary}}",
 			options: [{ name: "go", description: "On track" }, { name: "halt" }],
 			by: "model",
-			model: "haiku",
 			timeoutMinutes: 5,
 		});
 		expect(flow.nodes[2]).toEqual({

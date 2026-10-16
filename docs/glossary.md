@@ -73,7 +73,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Run Log | The daemon's copy in memory of each Run's Events. Every append goes through it, and it keeps an Event only after the database has it. | Run state |
 | Run Policy | The rules for retries, rescue, blocked propagation, network grace, usage-limit waits, the stop time, and resume after a restart. | PLAN §2 |
 | Needs-you inbox | The list of open Gates. | PLAN §3 |
-| Decider | The provider behind a Decision decided by a model: a short Claude Code session whose only tool is `decide`, which checks the answer against the Options. | PLAN §2 |
+| Decider | The TanStack AI decision model behind a Decision decided by a model: TypeSafe Jev by default, or Jev on OpenRouter, OpenAI Decisions, Ollaya. Its API key is a Secret. | PLAN §2 |
 | CLI Tool | A program on this computer, by its name (`gh`, `aws`), defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `clis`: its agent may run it without a prompt. A Flow that names one the daemon does not have, or that the computer cannot find, refuses to start. | CLI tools |
 
 ## Run status

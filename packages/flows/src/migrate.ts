@@ -17,6 +17,7 @@
  * Any version:
  * - The built-in tool set `tools: ["github"]` → the CLI tool `clis: ["gh"]`
  *   (see `migrateToolSets`).
+ * - The old Claude Code decider → the default decider (see `migrateDecider`).
  * - A For Each source `kind: "github"` → a `command` source that asks `gh`
  *   for the same items (see `migrateListSource`).
  */
@@ -28,7 +29,7 @@ export function migrateFlow(json: unknown): unknown {
 	if (!isRecord(current) || !Array.isArray(current.nodes)) return current;
 	let changed = false;
 	const nodes = current.nodes.map((node) => {
-		const migrated = migrateListSource(migrateToolSets(node));
+		const migrated = migrateListSource(migrateDecider(migrateToolSets(node)));
 		if (migrated !== node) changed = true;
 		return migrated;
 	});
@@ -145,7 +146,8 @@ function jqValue(value: string | string[] | null): string {
 /**
  * Version 2 → 3. A Gate node becomes a Decision node decided by a person
  * (`by: "person"`, `prompt: question`, `options: choices`); a Decision node
- * one decided by a model (`by: "model"`, `options: labels`, no `decider`).
+ * one decided by a model (`by: "model"`, `options: labels`). Its `decider`
+ * and `model` stay for `migrateDecider`.
  * Every template of the flow that read `{{<decision>.notes}}` reads
  * `{{<decision>.note}}`, the one field both have now.
  */
@@ -178,7 +180,7 @@ export function migrateDecisionNodes(
 				};
 			}
 			case "decision": {
-				const { labels, decider: _decider, ...rest } = node;
+				const { labels, ...rest } = node;
 				return {
 					...rest,
 					prompt: text(node.prompt),
@@ -249,6 +251,17 @@ function migrateNotes(text: string, decisions: ReadonlySet<string>): string {
 		(raw: string, name: string) =>
 			decisions.has(name) ? `{{${name}.note}}` : raw,
 	);
+}
+
+/**
+ * A Decision node on the old Claude Code decider loses `decider` and its
+ * Claude `model`, so it gets the default decider and that decider's model.
+ * Returns the input unchanged otherwise.
+ */
+export function migrateDecider(json: unknown): unknown {
+	if (!isRecord(json) || json.decider !== "claude-code") return json;
+	const { decider: _decider, model: _model, ...rest } = json;
+	return rest;
 }
 
 /**

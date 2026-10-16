@@ -33,7 +33,6 @@ import {
 export type Position = { x: number; y: number };
 
 export const DEFAULT_MODEL = "sonnet";
-export const MODEL_SUGGESTIONS = ["sonnet", "opus", "haiku"];
 
 /** What the palette adds: a node type, or a Gate (a Decision decided by you). */
 export type NodeKind = FlowNodeType | "gate";
@@ -54,7 +53,7 @@ export type NodeDefaults = {
 	agentHarness?: AgentNode["harness"];
 	agentModel?: string;
 	agentPermissionMode?: AgentNode["permissionMode"];
-	decisionModel?: string;
+	decisionDecider?: DecisionNode["decider"];
 };
 
 export function agentNode(
@@ -81,9 +80,14 @@ export function commandNode(id: string, position: Position): CommandNode {
 
 /**
  * A rule decides, with the options yes and no and no rule yet; the issues
- * panel asks for one. A model's name comes from Settings when left out.
+ * panel asks for one. Switched to a model, the node starts on the decider
+ * from Settings and that decider's default model.
  */
-export function decisionNode(id: string, position: Position): DecisionNode {
+export function decisionNode(
+	id: string,
+	position: Position,
+	defaults: NodeDefaults = {},
+): DecisionNode {
 	return {
 		id,
 		type: "decision",
@@ -91,11 +95,16 @@ export function decisionNode(id: string, position: Position): DecisionNode {
 		prompt: "",
 		options: [{ name: "yes" }, { name: "no" }],
 		by: "rule",
+		decider: defaults.decisionDecider ?? "typesafe",
 	};
 }
 
 /** A Gate: a Decision decided by you. The question starts empty; the issues panel asks for one. */
-export function gateNode(id: string, position: Position): DecisionNode {
+export function gateNode(
+	id: string,
+	position: Position,
+	defaults: NodeDefaults = {},
+): DecisionNode {
 	return {
 		id,
 		type: "decision",
@@ -103,6 +112,7 @@ export function gateNode(id: string, position: Position): DecisionNode {
 		prompt: "",
 		options: [{ name: "approve" }, { name: "reject" }],
 		by: "person",
+		decider: defaults.decisionDecider ?? "typesafe",
 	};
 }
 

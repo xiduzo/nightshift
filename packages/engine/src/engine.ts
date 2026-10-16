@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { HARNESS_ADAPTERS } from "@nightshift/agents/doctor";
 import type { AgentHarness, HarnessName } from "@nightshift/agents/types";
 import { event, project, run, step } from "@nightshift/db/schema/nightshift";
 import {
@@ -111,21 +112,25 @@ const DAEMON_RESUME_PROMPT =
 const TITLE_MAX_CHARS = 80;
 const QUICK_RUN_TITLE = "Quick run";
 
+/** Quote one value for a shell, only when it needs it. */
+function shellQuote(value: string): string {
+	if (/^[\w@%+=:,./-]+$/.test(value)) return value;
+	return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
 /**
- * The command a person runs in the worktree to take over a harness session,
- * given the quoted session id.
- *
- * - Claude Code: `claude --resume <id>`.
- * - OpenCode: `opencode --session <id>` opens the TUI on that session. The
- *   flag is from the OpenCode CLI docs (`-s, --session`); it was not checked
- *   against a 1.x binary here. Use the same 1.x build the daemon runs.
- * - Codex: `codex resume <id>` opens the interactive CLI on that thread.
+ * The command a person runs in the worktree to take over the last harness
+ * session, from the harness's `takeOver`. Null when there is none, or when
+ * the harness has no command for it.
  */
-const takeOverCli: Record<HarnessName, (sessionId: string) => string> = {
-	"claude-code": (id) => `claude --resume ${id}`,
-	opencode: (id) => `opencode --session ${id}`,
-	codex: (id) => `codex resume ${id}`,
-};
+function takeOverCommand(
+	worktreePath: string,
+	last: { harness: HarnessName; harnessSessionId: string } | null | undefined,
+): string | null {
+	const takeOver = last ? HARNESS_ADAPTERS[last.harness].takeOver : null;
+	if (!last || !takeOver) return null;
+	return `cd ${shellQuote(worktreePath)} && ${takeOver(shellQuote(last.harnessSessionId))}`;
+}
 
 /** Knobs for tests only. Not part of the engine contract. */
 export type EngineInternals = {
@@ -221,6 +226,7 @@ export function createEngine(
 		harnessFor,
 		...(decider ? { decider } : {}),
 		mcpServersFor,
+		...(options.cliToolsFor ? { cliToolsFor: options.cliToolsFor } : {}),
 		flowOf: parseRunFlow,
 		calledFlowsOf: parseCalledFlows,
 		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
@@ -626,11 +632,6 @@ export function createEngine(
 			}
 			void check();
 		});
-	}
-
-	function shellQuote(value: string): string {
-		if (/^[\w@%+=:,./-]+$/.test(value)) return value;
-		return `'${value.replaceAll("'", `'\\''`)}'`;
 	}
 
 	function toProject(row: typeof project.$inferSelect): Project {
@@ -1064,9 +1065,7 @@ export function createEngine(
 				steps: deriveSteps(events).map(toStepSummary),
 				// Edges of the top-level flow; body edges count per item.
 				traversals: deriveTraversals(events),
-				takeOverCommand: last
-					? `cd ${shellQuote(row.worktreePath)} && ${takeOverCli[last.harness](shellQuote(last.harnessSessionId))}`
-					: null,
+				takeOverCommand: takeOverCommand(row.worktreePath, last),
 				resumes: deriveResumes(events),
 			};
 			return detail;

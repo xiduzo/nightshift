@@ -4,12 +4,60 @@
  * `session-stream.ts`). Each harness (`claude-code.ts`, `opencode.ts`,
  * `codex.ts`) only starts its own `chat()`.
  */
+import { randomUUID } from "node:crypto";
 import { readdir, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { join } from "node:path";
+import {
+	defineSandbox,
+	defineWorkspace,
+	localSource,
+	mcpSkill,
+	type SandboxPolicy,
+} from "@tanstack/ai-sandbox";
+import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
 import { streamSession } from "./session-stream";
 import type { Translator } from "./translate";
-import type { AgentEvent } from "./types";
+import type { AgentEvent, McpServerConfig } from "./types";
+
+/**
+ * The sandbox of one session on this computer: the local-process provider
+ * in `cwd`, which it never deletes. `mcpServers` go into the workspace as
+ * MCP skills: the ACP adapters (ACP agents, Grok Build) hand those to the
+ * agent. They take URL servers only. Returns a problem text when a server
+ * is a command. `policy` is for adapters that map it onto their own flags.
+ */
+export function hostSandbox(
+	cwd: string,
+	mcpServers: Record<string, McpServerConfig> = {},
+	policy?: SandboxPolicy,
+): { sandbox: ReturnType<typeof defineSandbox>; id: string } | string {
+	const commands = Object.entries(mcpServers)
+		.filter(([, server]) => !("url" in server))
+		.map(([name]) => name);
+	if (commands.length > 0) {
+		return `This harness can use connections with a URL only. Remove ${commands.join(", ")} from the node, or run it on another harness.`;
+	}
+	const skills = Object.entries(mcpServers).map(([name, server]) =>
+		mcpSkill(name, "url" in server ? { ...server } : {}),
+	);
+	// One id per session: the middleware keys its instances by sandbox id.
+	const id = `nightshift-${randomUUID()}`;
+	const sandbox = defineSandbox({
+		id,
+		provider: localProcessSandbox({ dir: cwd, removeOnDestroy: false }),
+		fileEvents: false,
+		// The relative root keeps the adapter's marker at the top of `cwd`.
+		workspace: defineWorkspace({
+			source: localSource(cwd),
+			root: ".",
+			...(skills.length > 0 ? { skills } : {}),
+		}),
+		lifecycle: { reuse: "none", destroyOnComplete: true },
+		...(policy ? { policy } : {}),
+	});
+	return { sandbox, id };
+}
 
 /**
  * `chat({ debug })` that feeds the adapter's raw harness messages to the

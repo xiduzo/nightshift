@@ -105,7 +105,8 @@ function decision(id: string, labels: string[]): DecisionNode {
 		prompt: "Go on with {{item.title}}?",
 		options: labels.map((name) => ({ name })),
 		by: "model",
-		model: "haiku",
+		decider: "typesafe",
+		model: "jev-1.13.0",
 	};
 }
 
@@ -764,6 +765,7 @@ describe("For Each", () => {
 				prompt: "Ship {{item.title}}?",
 				options: [{ name: "yes" }, { name: "halt" }],
 				by: "person",
+				decider: "typesafe",
 			},
 		]);
 		const engine = makeEngine(fakeHarness());

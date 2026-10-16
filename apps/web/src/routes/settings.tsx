@@ -145,7 +145,7 @@ const KINDS: Partial<Record<SettingKey, Kind>> = {
 	agentHarness: { type: "choice" },
 	agentModel: { type: "text" },
 	agentPermissionMode: { type: "choice" },
-	decisionModel: { type: "text" },
+	decisionDecider: { type: "choice" },
 };
 
 const MAX_MINUTES = 10_080;
@@ -214,8 +214,6 @@ const PERMISSION_MODES: {
 			"Runs every tool, shell commands included, without asking. Use it only on a repository you trust.",
 	},
 ];
-
-const DECISION_MODELS = ["haiku", "sonnet", "opus"];
 
 function SettingsComponent() {
 	const settings = useQuery(orpc.settings.get.queryOptions());
@@ -1017,7 +1015,7 @@ const AGENT_KEYS = [
 	"agentHarness",
 	"agentModel",
 	"agentPermissionMode",
-	"decisionModel",
+	"decisionDecider",
 ] as const;
 
 function AgentDefaultsCard({ data }: { data: SettingsView }) {
@@ -1026,6 +1024,11 @@ function AgentDefaultsCard({ data }: { data: SettingsView }) {
 	const mode = PERMISSION_MODES.find(
 		(option) => option.value === form.value("agentPermissionMode"),
 	);
+	const deciders = useQuery(orpc.deciders.list.queryOptions());
+	const deciderOptions = (deciders.data ?? []).map((d) => ({
+		value: d.name,
+		label: d.label,
+	}));
 
 	return (
 		<Card>
@@ -1086,14 +1089,13 @@ function AgentDefaultsCard({ data }: { data: SettingsView }) {
 								}
 								options={PERMISSION_MODES}
 							/>
-							<TextSetting
+							<SelectSetting
 								form={form}
 								data={data}
-								settingKey="decisionModel"
-								label="Decision model"
-								description="A new Decision node picks its label with this model. A small, fast one is enough."
-								mono
-								suggestions={DECISION_MODELS}
+								settingKey="decisionDecider"
+								label="Decider"
+								description="A new Decision node picks its label with this decision model."
+								options={deciderOptions}
 							/>
 						</div>
 						<SaveError error={form.saveError} />
@@ -1387,8 +1389,7 @@ function DaemonCard({
 						<ItemContent>
 							<ItemTitle>Coding agents</ItemTitle>
 							<ItemDescription className="line-clamp-none">
-								Check where Claude Code, OpenCode and Codex are installed, on
-								the Agents page.
+								Check where your harnesses are installed, on the Agents page.
 							</ItemDescription>
 						</ItemContent>
 						<ItemActions>

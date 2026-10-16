@@ -1,8 +1,9 @@
-import { HARNESS_ADAPTERS } from "@nightshift/agents";
+import { DECIDER_ADAPTERS, HARNESS_ADAPTERS } from "@nightshift/agents";
 import {
 	chooseFolder,
 	cliToolInputSchema,
 	connectionInputSchema,
+	type SettingKey,
 	secretNameSchema,
 	settingsPatchSchema,
 } from "@nightshift/engine";
@@ -10,9 +11,11 @@ import type { Engine } from "@nightshift/engine/types";
 import {
 	agentProfileSchema,
 	cronError,
+	deciderNameSchema,
 	describeCron,
 	flowNameSchema,
 	flowSchema,
+	type HarnessName,
 	harnessNameSchema,
 	nextCronTimes,
 	scheduleSchema,
@@ -196,13 +199,18 @@ const settings = {
 		})),
 };
 
+/** The setting that holds each harness's executable. */
 const HARNESS_BIN = {
 	"claude-code": "claudeBin",
 	opencode: "opencodeBin",
 	codex: "codexBin",
-} as const;
+	"grok-build": "grokBin",
+	copilot: "copilotBin",
+	gemini: "geminiBin",
+	cursor: "cursorBin",
+} as const satisfies Record<HarnessName, SettingKey>;
 
-const checkTarget = z.enum(["claude-code", "opencode", "codex"]);
+const checkTarget = z.enum(harnessNameSchema.options);
 
 type FlowRef = { projectId: string; projectName: string; flowName: string };
 
@@ -272,7 +280,11 @@ const harnesses = {
 			return {
 				name,
 				label: adapter.label,
+				initials: adapter.initials,
 				pkg: adapter.pkg,
+				note: adapter.note,
+				offMachine: adapter.offMachine,
+				defaultModel: adapter.defaultModel,
 				models: [...adapter.models],
 				listing: adapter.listing
 					? [adapter.bin, ...adapter.listing].join(" ")
@@ -514,7 +526,7 @@ const cliTools = {
 	}),
 	/** The programs this computer can run by name, to pick one from. */
 	programs: publicProcedure.handler(({ context }) => context.checks.programs()),
-	/** Where the program is and its version. Read-only. */
+	/** Where the program is, its version and the help the agents read. Read-only. */
 	check: publicProcedure
 		.input(z.object({ name: cliToolInputSchema.shape.name }))
 		.handler(({ context, input }) => context.checks.cli(input.name)),
@@ -538,6 +550,26 @@ const cliTools = {
 		}),
 };
 
+/** The decision models Decision nodes pick from, and whether each has its API key. */
+const deciders = {
+	list: publicProcedure.handler(({ context }) =>
+		deciderNameSchema.options.map((name) => {
+			const adapter = DECIDER_ADAPTERS[name];
+			return {
+				name,
+				label: adapter.label,
+				pkg: adapter.pkg,
+				models: [...adapter.models],
+				defaultModel: adapter.defaultModel,
+				apiKey: adapter.apiKey,
+				apiKeySource: adapter.apiKey
+					? context.connections.secretSource(adapter.apiKey)
+					: null,
+			};
+		}),
+	),
+};
+
 export const appRouter = {
 	healthCheck: publicProcedure.handler(() => "OK"),
 	projects,
@@ -549,6 +581,7 @@ export const appRouter = {
 	connections,
 	cliTools,
 	harnesses,
+	deciders,
 	profiles,
 };
 export type AppRouter = typeof appRouter;

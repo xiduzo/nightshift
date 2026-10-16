@@ -1,8 +1,10 @@
 export {
 	type CliTool,
+	type CliToolGuide,
 	type CliToolInput,
 	type CliToolStore,
 	cliToolInputSchema,
+	cliToolsInstruction,
 	createCliToolStore,
 } from "./cli-tools";
 export {

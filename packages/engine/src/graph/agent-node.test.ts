@@ -635,6 +635,62 @@ describe("the Agent node", () => {
 		expect(harness.calls[1]?.resumeSessionId).toBe("fake-session-1");
 	});
 
+	test("a new session learns its CLI tools after the prompt; the log and a continued session do not", async () => {
+		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
+			call === 0 ? usageLimitScript() : reportingScript("pass"),
+		);
+		const h = await startRun(
+			flowOf({
+				start: "worker",
+				nodes: [agent("worker", { clis: ["acli"] })],
+				edges: [],
+			}),
+			harness,
+		);
+		const asked: string[][] = [];
+		h.ctx.cliToolsFor = async (names) => {
+			asked.push([...names]);
+			return names.map((name) => ({
+				name,
+				description: "Jira issues",
+				help: "Usage: acli <command>",
+			}));
+		};
+		await drive(h, { inputs: {} });
+		expect(asked).toEqual([["acli"]]);
+		const first = harness.calls[0]?.prompt ?? "";
+		expect(first.startsWith("Work on worker: \n\n## CLI tools")).toBe(true);
+		expect(first).toContain("### acli\n\nJira issues");
+		expect(first).toContain("```text\nUsage: acli <command>\n```");
+		expect(
+			payloads(await h.events(), "SessionStarted").map((p) => p.prompt),
+		).toEqual(["Work on worker: "]);
+
+		await drive(
+			h,
+			new Command({ resume: { kind: "wake", early: true, prompt: "Go on." } }),
+		);
+		expect(harness.calls[1]?.prompt).toBe("Go on.");
+		expect(asked).toHaveLength(1);
+	});
+
+	test("plan mode runs no command: the session gets no CLI tools", async () => {
+		const harness = fakeHarness(() => reportingScript("pass"));
+		const h = await startRun(
+			flowOf({
+				start: "worker",
+				nodes: [agent("worker", { clis: ["acli"], permissionMode: "plan" })],
+				edges: [],
+			}),
+			harness,
+		);
+		h.ctx.cliToolsFor = async () => {
+			throw new Error("not asked in plan mode");
+		};
+		await drive(h, { inputs: {} });
+		expect(harness.calls[0]?.prompt).toBe("Work on worker: ");
+	});
+
 	test("a stop that lands between the wake and the node's entry ends the continued step stopped, with its session; a resume reopens it", async () => {
 		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
 			call === 0 ? usageLimitScript() : reportingScript("pass"),
