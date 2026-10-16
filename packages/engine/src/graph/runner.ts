@@ -67,8 +67,9 @@ import type {
  *   the log already); a `gate` needs nothing (the Gate node logged
  *   `GateOpened`); `parked` appends `RunEnded` with its status and reason.
  * - A stream that ends with `state.ended` set appends `RunEnded finished`
- *   and deletes the thread's checkpoints (the log is the record); one that
- *   throws appends `RunEnded failed` with `The engine failed: …`.
+ *   and prunes the thread to its latest checkpoint (the log is the
+ *   record); one that throws appends `RunEnded failed` with `The engine
+ *   failed: …`.
  * - The custom stream chunks (`RunEvent`) are the runner's bookkeeping:
  *   transcript entries reach the bus from the recorder already.
  */
@@ -77,24 +78,15 @@ import type {
 const MAX_TIMER_MS = 2 ** 31 - 1;
 
 /**
- * The state a thread without a usable checkpoint is re-entered with, from
- * the log: the inputs, the committed visits of every top-level node, the
- * node outputs for templates and the edge counts. Without it every node
- * with a step in the log looks uncommitted (`uncommittedStep`), so a
- * Subflow or For Each later in the flow would reopen a finished step,
- * `{{node.output}}` would render empty and edge `max` counts would start
- * over. Bodies get fresh namespaces and read their scope from the log.
- *
- * One step stays uncommitted on purpose: the last top-level step, when the
- * walk did not move on from it (no later top-level `EdgeTaken`). It is the
- * step the resume targets (`resumeTarget` in engine.ts picks the same), so
- * the node reopens it as the old walk did: an Agent continues its harness
- * session with the resume prompt, a Subflow or For Each goes on inside it.
+ * The top-level node a re-entry reopens: the one of the last top-level
+ * step, when the walk did not move on from it (no later top-level
+ * `EdgeTaken`). It is the step the resume targets (`resumeTarget` in
+ * engine.ts picks the same). Its visit is left uncommitted on purpose, so
+ * the node reopens the step as the old walk did: an Agent continues its
+ * harness session with the resume prompt, a Subflow or For Each goes on
+ * inside it. Null when the run moved on, or never started a step.
  */
-export function reentryUpdate(
-	flow: Flow,
-	events: readonly LoggedEvent[],
-): RunStateUpdate {
+export function reenteredNode(events: readonly LoggedEvent[]): string | null {
 	const last = deriveSteps(events).findLast((s) => scopeKey(s.scope) === "");
 	const movedOn =
 		last !== undefined &&
@@ -104,7 +96,25 @@ export function reentryUpdate(
 				scopeKey(e.payload.scope) === "" &&
 				e.seq > last.startSeq,
 		);
-	const reentered = last && !movedOn ? last.nodeId : null;
+	return last && !movedOn ? last.nodeId : null;
+}
+
+/**
+ * The state a thread without a checkpoint (a run from before this engine)
+ * is re-entered with, from the log: the inputs and the stop time, the
+ * committed visits of every top-level node, the node outputs for templates
+ * and the edge counts. Without it every node with a step in the log looks
+ * uncommitted (`uncommittedStep`), so a Subflow or For Each later in the
+ * flow would reopen a finished step, `{{node.output}}` would render empty
+ * and edge `max` counts would start over. Bodies get fresh namespaces and
+ * read their scope from the log. The `reenteredNode`'s last visit stays
+ * uncommitted.
+ */
+export function reentryUpdate(
+	flow: Flow,
+	events: readonly LoggedEvent[],
+): RunStateUpdate {
+	const reentered = reenteredNode(events);
 	const visits: Record<string, number> = {};
 	for (const node of flow.nodes) {
 		const count =
@@ -367,17 +377,17 @@ export function createRunner(deps: RunnerDeps) {
 	}
 
 	/**
-	 * Deletes a finished run's checkpoints and pending writes. They were the
-	 * walk's bookkeeping; the event log is the record. A finished run is
-	 * never resumed through its thread: `resumeRun` of one finds the thread
-	 * `fresh` and re-enters it from the log (`reenter`).
+	 * Keeps a finished run's latest checkpoint and deletes the older ones
+	 * and the body namespaces. The history was the walk's bookkeeping and
+	 * the event log is the record; the final state is what `resumeRun` of a
+	 * finished run re-enters on (`reenter`).
 	 */
 	async function pruneThread(runId: string): Promise<void> {
 		try {
-			await saver.deleteThread(runId);
+			await saver.pruneThread(runId);
 		} catch (error) {
 			console.error(
-				`[engine] could not delete the checkpoints of run ${runId}`,
+				`[engine] could not prune the checkpoints of run ${runId}`,
 				error,
 			);
 		}
@@ -635,21 +645,40 @@ export function createRunner(deps: RunnerDeps) {
 			drive(row, new Command({ resume: value, ...(update ? { update } : {}) }));
 		},
 		/**
-		 * Jumps to a top-level node of a thread that reached END or never ran
-		 * (a run from before this engine, or a finished one whose checkpoints
-		 * were pruned), with the state seeded from the log (`reentryUpdate`).
+		 * Jumps to a top-level node of a thread that reached END or never
+		 * ran. A finished run re-enters on its own latest checkpoint: `ended`
+		 * and `pending` cleared, and the `reenteredNode`'s last visit taken
+		 * back so the node reopens its step. A thread with no checkpoint (a
+		 * run from before this engine) is seeded from the log
+		 * (`reentryUpdate`). `update` writes on top (a cleared stop time).
 		 */
-		reenter(
+		async reenter(
 			row: RunRow,
 			nodeId: string,
 			events: readonly LoggedEvent[],
 			update?: RunStateUpdate,
-		): void {
+		): Promise<void> {
 			const thread = threadOf(row);
+			const snapshot = await thread.graph.getState(configOf(row.id));
+			let seed: RunStateUpdate;
+			if (snapshot.config?.configurable?.checkpoint_id === undefined) {
+				seed = reentryUpdate(thread.ctx.flow, events);
+			} else {
+				const reentered = reenteredNode(events);
+				const visits = (snapshot.values as RunStateValues).visits;
+				const committed = reentered ? (visits[reentered] ?? 0) : 0;
+				seed = {
+					ended: null,
+					pending: null,
+					...(reentered && committed > 0
+						? { visits: { [reentered]: committed - 1 } }
+						: {}),
+				};
+			}
 			// The node names are the flow's, which the graph's type cannot know.
 			const jump = new Command({
 				goto: nodeId,
-				update: { ...reentryUpdate(thread.ctx.flow, events), ...update },
+				update: { ...seed, ...update },
 			}) as unknown as StreamInput;
 			drive(row, jump);
 		},

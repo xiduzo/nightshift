@@ -605,7 +605,7 @@ export function createEngine(
 					break;
 				case "ended":
 				case "fresh":
-					runner.reenter(row, target.topNodeId, events, update);
+					await runner.reenter(row, target.topNodeId, events, update);
 					break;
 			}
 		} finally {
