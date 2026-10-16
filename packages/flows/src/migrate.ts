@@ -12,18 +12,30 @@
  * - Every template in prompts, commands, questions, sources and outputs.
  *
  * Any version: the built-in tool set `tools: ["github"]` → the CLI tool
- * `clis: ["gh"]` (see `migrateToolSets`).
+ * `clis: ["gh"]` (see `migrateToolSets`), and the old Claude Code decider
+ * → the default decider (see `migrateDecider`).
  */
 export function migrateFlow(json: unknown): unknown {
 	const current = isRecord(json) && json.version === 1 ? migrateV1(json) : json;
 	if (!isRecord(current) || !Array.isArray(current.nodes)) return current;
 	let changed = false;
 	const nodes = current.nodes.map((node) => {
-		const migrated = migrateToolSets(node);
+		const migrated = migrateDecider(migrateToolSets(node));
 		if (migrated !== node) changed = true;
 		return migrated;
 	});
 	return changed ? { ...current, nodes } : current;
+}
+
+/**
+ * A Decision node on the old Claude Code decider loses `decider` and its
+ * Claude `model`, so it gets the default decider and that decider's model.
+ * Returns the input unchanged otherwise.
+ */
+export function migrateDecider(json: unknown): unknown {
+	if (!isRecord(json) || json.decider !== "claude-code") return json;
+	const { decider: _decider, model: _model, ...rest } = json;
+	return rest;
 }
 
 /**

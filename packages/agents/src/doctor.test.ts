@@ -8,9 +8,13 @@ import {
 	checkCli,
 	checkGithub,
 	checkHarness,
+	cliHelp,
+	cliHelpAt,
 	HARNESS_ADAPTERS,
+	HELP_MAX_CHARS,
 	harnessModels,
 	pathPrograms,
+	plainHelp,
 	resolveBin,
 	testMcpServer,
 } from "./doctor";
@@ -98,6 +102,59 @@ describe("checkCli", () => {
 		const check = await checkCli("nightshift-not-anywhere", dir);
 		expect(check.path).toBeNull();
 		expect(check.problem).toContain("cannot find nightshift-not-anywhere");
+	});
+});
+
+describe("CLI tool help", () => {
+	test("checkCli has the help the program prints for --help", async () => {
+		await fakeCli("acli", {
+			"--version": { stdout: "acli 1.2.3\n" },
+			"--help": { stdout: "Usage: acli <command>\n\n  jira  Jira\n" },
+		});
+		expect((await checkCli("acli", dir)).help).toBe(
+			"Usage: acli <command>\n\n  jira  Jira",
+		);
+	});
+
+	test("help on stderr with a non-zero exit counts when it has a usage line", async () => {
+		const path = await fakeCli("old", {
+			"--help": { stderr: "usage: old [-v] file\n", code: 1 },
+		});
+		expect(await cliHelpAt(path)).toBe("usage: old [-v] file");
+	});
+
+	test("-h when --help is not known; nothing when neither answers", async () => {
+		const short = await fakeCli("short", {
+			"--help": { stderr: "unknown flag --help", code: 2 },
+			"-h": { stdout: "short: does one thing\n" },
+		});
+		expect(await cliHelpAt(short)).toBe("short: does one thing");
+		const silent = await fakeCli("silent", {});
+		expect(await cliHelpAt(silent)).toBeNull();
+	});
+
+	test("long help is cut at a whole line", async () => {
+		const line = `${"x".repeat(99)}\n`;
+		const path = await fakeCli("big", {
+			"--help": { stdout: line.repeat(200) },
+		});
+		const help = (await cliHelpAt(path)) ?? "";
+		expect(help.length).toBeLessThanOrEqual(HELP_MAX_CHARS + 2);
+		expect(help).toEndWith(`${"x".repeat(99)}\n…`);
+	});
+
+	test("terminal escapes and man-page overstrike go", () => {
+		expect(
+			plainHelp(
+				"\x1b[1mNAME\x1b[0m\r\nN\bNA\bAM\bME\bE  \n\n\n\n_\bt_\bo_\bo_\bl",
+			),
+		).toBe("NAME\nNAME\n\ntool");
+	});
+
+	test("cliHelp finds the program by name, and nothing for a missing one", async () => {
+		await fakeCli("acli", { "--help": { stdout: "Usage: acli\n" } });
+		expect(await cliHelp("acli", dir)).toBe("Usage: acli");
+		expect(await cliHelp("nightshift-not-anywhere", dir)).toBeNull();
 	});
 });
 

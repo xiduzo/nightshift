@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { agentProfile } from "@nightshift/db/schema/nightshift";
 
-import { createCliToolStore } from "./cli-tools";
+import { cliToolsInstruction, createCliToolStore } from "./cli-tools";
 import { createProfileStore } from "./profiles";
 import { createSandbox, type Sandbox } from "./test-support";
 
@@ -63,5 +63,30 @@ describe("profiles saved with the GitHub tool set", () => {
 		const profiles = createProfileStore({ db: sandbox.db });
 		await profiles.load();
 		expect(profiles.settingsFor("builder")).toMatchObject({ clis: ["gh"] });
+	});
+});
+
+describe("cliToolsInstruction", () => {
+	test("no CLI tools: nothing", () => {
+		expect(cliToolsInstruction([])).toBe("");
+	});
+
+	test("each tool with its description and help; a tool without either is its name", () => {
+		const text = cliToolsInstruction([
+			{ name: "gh", description: "GitHub", help: "Usage: gh <command>" },
+			{ name: "jq", description: null, help: null },
+		]);
+		expect(text).toStartWith("## CLI tools\n\nYou can run these programs");
+		expect(text).toContain(
+			"### gh\n\nGitHub\n\n`gh --help`:\n\n```text\nUsage: gh <command>\n```\n\n### jq",
+		);
+		expect(text).toEndWith("### jq");
+	});
+
+	test("help with a code fence of its own gets a longer fence", () => {
+		const text = cliToolsInstruction([
+			{ name: "x", description: null, help: "Example:\n```\nx run\n```" },
+		]);
+		expect(text).toContain("````text\nExample:\n```\nx run\n```\n````");
 	});
 });

@@ -1,5 +1,6 @@
 import type {
 	CliCheck,
+	CliToolCheck,
 	HarnessModels,
 	McpServerConfig,
 	McpTestResult,
@@ -27,8 +28,8 @@ export type Context = {
 	checks: {
 		harness(harness: HarnessName, bin: string): Promise<CliCheck>;
 		github(bin: string): Promise<CliCheck>;
-		/** A CLI tool by name: where it is and its version. */
-		cli(name: string): Promise<CliCheck>;
+		/** A CLI tool by name: where it is, its version and its help. */
+		cli(name: string): Promise<CliToolCheck>;
 		/** The programs this computer can run by name, for the CLI tool picker. */
 		programs(): Promise<string[]>;
 		mcp(config: McpServerConfig, redact: string[]): Promise<McpTestResult>;

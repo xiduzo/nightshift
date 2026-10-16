@@ -1,235 +1,132 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import {
-	type ClaudeCodeDeciderOptions,
-	claudeCodeDecider,
-	DECIDE_ACK,
-	DECIDE_TOOL_ID,
-	decideTool,
-	decisionPrompt,
-	labelsProblem,
-} from "./decider";
-import { fakeBin } from "./fixtures/bin";
+import { afterEach, describe, expect, test } from "bun:test";
+import { DECIDER_ADAPTERS, tanstackDecider } from "./decider";
 import type { DecisionInput } from "./types";
 
-let dir: string;
-let cwd: string;
-let claudeLog: string;
-
-beforeEach(async () => {
-	dir = await mkdtemp(join(tmpdir(), "nightshift-decider-"));
-	cwd = await mkdtemp(join(tmpdir(), "nightshift-decider-cwd-"));
-	claudeLog = join(dir, "claude.jsonl");
+const realFetch = globalThis.fetch;
+afterEach(() => {
+	globalThis.fetch = realFetch;
 });
 
-afterEach(async () => {
-	await rm(dir, { recursive: true, force: true });
-	await rm(cwd, { recursive: true, force: true });
-});
+type Sent = { url: string; auth: string | null; body: Record<string, unknown> };
 
-const LABELS = [
-	{ name: "continue", description: "The work can go on." },
-	{ name: "stop", description: "Stop the run." },
-];
-
-function input(overrides: Partial<DecisionInput> = {}): DecisionInput {
-	return {
-		cwd,
-		prompt: "The check output says 3 tests failed. Continue or stop?",
-		labels: LABELS,
-		model: "haiku",
-		signal: new AbortController().signal,
-		...overrides,
-	};
-}
-
-async function decider(
-	calls: { name: string; arguments: unknown }[],
-	env: Record<string, string> = {},
-	options: ClaudeCodeDeciderOptions = {},
-) {
-	const claude = await fakeBin(dir, "claude", "fake-claude", {
-		FAKE_CLAUDE_LOG: claudeLog,
-		FAKE_CLAUDE_CALLS: JSON.stringify(calls),
-		...env,
-	});
-	return claudeCodeDecider({ claudeExecutable: claude, ...options });
-}
-
-async function claudeRuns(): Promise<{ argv: string[]; prompt: string }[]> {
-	try {
-		return (await readFile(claudeLog, "utf8"))
-			.trim()
-			.split("\n")
-			.filter(Boolean)
-			.map((line) => JSON.parse(line));
-	} catch {
-		return [];
-	}
-}
-
-function flag(argv: string[], name: string): string | undefined {
-	const at = argv.indexOf(name);
-	return at >= 0 ? argv[at + 1] : undefined;
-}
-
-describe("labelsProblem", () => {
-	test("accepts distinct labels, refuses none, empty, and duplicates", () => {
-		expect(labelsProblem(LABELS)).toBeUndefined();
-		expect(labelsProblem([])).toMatch(/at least one/);
-		expect(labelsProblem([{ name: " " }])).toMatch(/empty/);
-		expect(labelsProblem([{ name: "a" }, { name: "a" }])).toMatch(/twice/);
-	});
-});
-
-describe("decideTool", () => {
-	const run = (tool: ReturnType<typeof decideTool>, args: unknown) =>
-		(tool.execute as (args: unknown) => unknown)(args);
-
-	test("records a valid label once, refuses an unknown label and a second call", () => {
-		const recorded: unknown[] = [];
-		const tool = decideTool(LABELS, (d) => recorded.push(d));
-		expect(() => run(tool, { label: "maybe", notes: "x" })).toThrow(
-			/must be one of: "continue", "stop"/,
-		);
-		expect(() => run(tool, { label: "stop" })).toThrow(/Invalid decision/);
-		expect(recorded).toEqual([]);
-		expect(run(tool, { label: "stop", notes: " Too many failures. " })).toBe(
-			DECIDE_ACK,
-		);
-		expect(recorded).toEqual([{ label: "stop", notes: "Too many failures." }]);
-		expect(() => run(tool, { label: "continue", notes: "" })).toThrow(
-			/already recorded/,
-		);
-		expect(recorded).toHaveLength(1);
-	});
-});
-
-describe("decisionPrompt", () => {
-	test("holds the question, the labels with descriptions, and the rule", () => {
-		const prompt = decisionPrompt({
-			prompt: "Q?",
-			labels: [...LABELS, { name: "retry" }],
+/** Answers TypeSafe's `/v1/systemone` with `respond`, and records each request. */
+function stubTypesafe(respond: () => Response): Sent[] {
+	const sent: Sent[] = [];
+	globalThis.fetch = (async (url: string, init: RequestInit) => {
+		sent.push({
+			url,
+			auth: new Headers(init.headers).get("authorization"),
+			body: JSON.parse(String(init.body)),
 		});
-		expect(prompt).toContain("Q?");
-		expect(prompt).toContain("- `continue`: The work can go on.");
-		expect(prompt).toContain("- `retry`");
-		expect(prompt).toContain("Call the `decide` tool exactly once");
-		expect(prompt).toContain("You have no other tools.");
+		return respond();
+	}) as typeof fetch;
+	return sent;
+}
+
+const answer = (choice: string, probability: number) =>
+	Response.json({
+		model: "jev-1.13.0",
+		answers: {
+			label: {
+				type: "choice",
+				choice,
+				probabilities: { [choice]: probability },
+				confidence: probability,
+			},
+		},
+		usage: { input_tokens: 40, output_tokens: 1 },
 	});
+
+const input = (extra: Partial<DecisionInput> = {}): DecisionInput => ({
+	decider: "typesafe",
+	prompt: "The tests pass. Ship it?",
+	labels: [
+		{ name: "ship", description: "Everything is green" },
+		{ name: "hold" },
+	],
+	signal: new AbortController().signal,
+	...extra,
 });
 
-describe("claudeCodeDecider", () => {
-	test("returns the decided label, notes, and cost; built-in tools are off", async () => {
-		const d = await decider([
-			{ name: "decide", arguments: { label: "stop", notes: "3 tests fail." } },
-		]);
-		expect(d.name).toBe("claude-code");
-		expect(await d.decide(input())).toEqual({
+const withKey = tanstackDecider({
+	secret: async (name) => (name === "TYPESAFE_API_KEY" ? "ts-key" : undefined),
+});
+
+describe("tanstackDecider", () => {
+	test("asks one choice question with the labels as options", async () => {
+		const sent = stubTypesafe(() => answer("ship", 0.87));
+		const result = await withKey.decide(input());
+		expect(result).toEqual({
 			kind: "decided",
-			label: "stop",
-			notes: "3 tests fail.",
-			costUsd: 0.0012,
-		});
-		const [run] = await claudeRuns();
-		const argv = run?.argv ?? [];
-		// `--tools ""` and `--strict-mcp-config`: no built-in tools, no other MCP servers.
-		expect(argv.slice(0, 3)).toEqual(["--strict-mcp-config", "--tools", ""]);
-		expect(flag(argv, "--permission-mode")).toBe("default");
-		expect(flag(argv, "--allowedTools")).toBe(DECIDE_TOOL_ID);
-		expect(flag(argv, "--setting-sources")).toBe("");
-		expect(flag(argv, "--max-turns")).toBe("10");
-		expect(flag(argv, "--model")).toBe("haiku");
-		expect(flag(argv, "--mcp-config")).toBeDefined();
-		expect(run?.prompt).toContain("The check output says 3 tests failed.");
-		// The worktree stays clean: no adapter temp files, no projection marker.
-		expect(await readdir(cwd)).toEqual([]);
-	});
-
-	test("a wrong label is refused; a corrected call counts", async () => {
-		const d = await decider([
-			{ name: "decide", arguments: { label: "halt", notes: "x" } },
-			{ name: "decide", arguments: { label: "continue", notes: "Fine." } },
-		]);
-		expect(await d.decide(input())).toMatchObject({
-			kind: "decided",
-			label: "continue",
-			notes: "Fine.",
-		});
-	});
-
-	test("only a wrong label: a harness error", async () => {
-		const d = await decider([
-			{ name: "decide", arguments: { label: "halt", notes: "x" } },
-		]);
-		expect(await d.decide(input())).toEqual({
-			kind: "error",
-			errorKind: "harness",
-			message: "The decider ended without a valid `decide` call.",
-			costUsd: 0.0012,
-		});
-	});
-
-	test("no decide call: a harness error with the cost", async () => {
-		const d = await decider([]);
-		expect(await d.decide(input())).toMatchObject({
-			kind: "error",
-			errorKind: "harness",
-			costUsd: 0.0012,
-		});
-	});
-
-	test("a network failure maps to a network error", async () => {
-		const d = await decider([], {
-			FAKE_CLAUDE_RESULT_ERROR: "API Error: Connection error.",
-		});
-		expect(await d.decide(input())).toEqual({
-			kind: "error",
-			errorKind: "network",
-			message: "API Error: Connection error.",
+			label: "ship",
+			notes: "TypeSafe Jev picked it with 87% probability.",
 			costUsd: null,
 		});
+		expect(sent).toHaveLength(1);
+		expect(sent[0]?.url).toEndWith("/v1/systemone");
+		expect(sent[0]?.auth).toBe("Bearer ts-key");
+		expect(sent[0]?.body).toMatchObject({
+			model: "jev-latest",
+			state: "The tests pass. Ship it?",
+			questions: {
+				label: {
+					type: "choice",
+					criteria: { ship: "Everything is green", hold: null },
+				},
+			},
+		});
 	});
 
-	test("a usage limit maps to a usage-limit error", async () => {
-		const d = await decider([], {
-			FAKE_CLAUDE_RESULT_ERROR: "You've hit your limit · resets 3pm",
-		});
-		expect(await d.decide(input())).toMatchObject({
-			kind: "error",
+	test("uses the node's model when it has one", async () => {
+		const sent = stubTypesafe(() => answer("hold", 0.6));
+		await withKey.decide(input({ model: "jev-1.13.0" }));
+		expect(sent[0]?.body.model).toBe("jev-1.13.0");
+	});
+
+	test("a missing API key names the secret, and sends nothing", async () => {
+		const sent = stubTypesafe(() => answer("ship", 1));
+		const result = await tanstackDecider({
+			secret: async () => undefined,
+		}).decide(input());
+		expect(result).toMatchObject({ kind: "error", errorKind: "harness" });
+		expect(result.kind === "error" && result.message).toContain(
+			"TYPESAFE_API_KEY",
+		);
+		expect(sent).toHaveLength(0);
+	});
+
+	test("a rate limit is a usage limit, a 503 a network error", async () => {
+		stubTypesafe(() => new Response("slow down", { status: 429 }));
+		expect(await withKey.decide(input())).toMatchObject({
 			errorKind: "usage-limit",
 		});
-	});
-
-	test("abort stops the session and returns aborted", async () => {
-		const d = await decider(
-			[],
-			{ FAKE_CLAUDE_SLEEP_MS: "20000" },
-			{
-				abortGraceMs: 500,
-			},
+		stubTypesafe(
+			() =>
+				new Response("down", {
+					status: 503,
+					statusText: "Service Unavailable",
+				}),
 		);
-		const controller = new AbortController();
-		const started = Date.now();
-		setTimeout(() => controller.abort(), 500);
-		const result = await d.decide(input({ signal: controller.signal }));
-		expect(result).toMatchObject({ kind: "error", errorKind: "aborted" });
-		expect(Date.now() - started).toBeLessThan(5_000);
+		expect(await withKey.decide(input())).toMatchObject({
+			errorKind: "network",
+		});
 	});
 
-	test("an aborted signal and bad labels never start claude", async () => {
-		const d = await decider([]);
+	test("an aborted decision asks nothing", async () => {
+		const sent = stubTypesafe(() => answer("ship", 1));
 		const controller = new AbortController();
 		controller.abort();
-		expect(await d.decide(input({ signal: controller.signal }))).toMatchObject({
-			kind: "error",
-			errorKind: "aborted",
-		});
 		expect(
-			await d.decide(input({ labels: [{ name: "a" }, { name: "a" }] })),
-		).toMatchObject({ kind: "error", errorKind: "harness" });
-		expect(await claudeRuns()).toEqual([]);
+			await withKey.decide(input({ signal: controller.signal })),
+		).toMatchObject({ kind: "error", errorKind: "aborted" });
+		expect(sent).toHaveLength(0);
+	});
+
+	test("every decider has a default model and says whether it needs a key", () => {
+		for (const spec of Object.values(DECIDER_ADAPTERS)) {
+			expect(spec.defaultModel).not.toBe("");
+			expect(spec.models).toContain(spec.defaultModel);
+		}
+		expect(DECIDER_ADAPTERS.ollaya.apiKey).toBeNull();
 	});
 });

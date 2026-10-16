@@ -300,5 +300,5 @@ export function fakeDecider(
 		};
 	}
 
-	return { name: "fake", calls, decide };
+	return { calls, decide };
 }

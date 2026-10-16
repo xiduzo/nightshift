@@ -108,8 +108,8 @@ function decision(id: string, labels: string[]): DecisionNode {
 		position: { x: 0, y: 0 },
 		prompt: "Go on with {{item.title}}?",
 		labels: labels.map((name) => ({ name })),
-		decider: "claude-code",
-		model: "haiku",
+		decider: "typesafe",
+		model: "jev-1.13.0",
 	};
 }
 

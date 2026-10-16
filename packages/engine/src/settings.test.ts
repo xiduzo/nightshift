@@ -172,7 +172,7 @@ describe("save", () => {
 		["a negative wait", { networkGraceMinutes: -1 }],
 		["a wait over a week", { networkGraceMinutes: 10_081 }],
 		["a blank binary", { codexBin: "  " }],
-		["an unknown harness", { agentHarness: "cursor" }],
+		["an unknown harness", { agentHarness: "aider" }],
 		["a wrong type", { scheduler: "yes" }],
 	])("refuses %s and saves nothing", async (_label, patch) => {
 		const s = await store();

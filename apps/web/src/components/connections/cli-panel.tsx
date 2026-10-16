@@ -33,12 +33,13 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import { formatDateTime, formatTime } from "@/lib/format";
+import { HARNESSES, type HarnessInfo } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
 
 import { CheckBadge, type CheckState, FactList, OffMachineNote } from "./parts";
 import type { CheckTarget, CliCheck, SettingsView } from "./types";
 
-type BinKey = "claudeBin" | "opencodeBin" | "codexBin" | "ghBin";
+type BinKey = HarnessInfo["setting"] & keyof SettingsView["fields"];
 
 export type Tool = {
 	target: CheckTarget;
@@ -50,34 +51,18 @@ export type Tool = {
 	offMachine: (check: CliCheck | undefined) => string;
 };
 
-/** The CLIs Night Shift runs on this machine. */
+/** The CLIs Night Shift runs on this machine: every harness, and the GitHub CLI. */
 export const TOOLS: Tool[] = [
-	{
-		target: "claude-code",
-		title: "Claude Code",
-		initials: "CC",
-		role: "Harness for Agent nodes",
-		setting: "claudeBin",
-		offMachine: () =>
-			"Prompts and your project's code go to Anthropic under your Claude login.",
-	},
-	{
-		target: "opencode",
-		title: "OpenCode",
-		initials: "OC",
-		role: "Harness for Agent nodes",
-		setting: "opencodeBin",
-		offMachine: () =>
-			"Prompts and code go to the model provider OpenCode is set up with.",
-	},
-	{
-		target: "codex",
-		title: "Codex",
-		initials: "CX",
-		role: "Harness for Agent nodes",
-		setting: "codexBin",
-		offMachine: () => "Prompts and code go to OpenAI under your Codex login.",
-	},
+	...HARNESSES.map(
+		(h): Tool => ({
+			target: h.value,
+			title: h.label,
+			initials: h.initials,
+			role: "Harness for Agent nodes",
+			setting: h.setting as BinKey,
+			offMachine: () => h.offMachine,
+		}),
+	),
 	{
 		target: "github",
 		title: "GitHub CLI",

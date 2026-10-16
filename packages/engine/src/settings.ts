@@ -1,6 +1,8 @@
 import type { Database } from "@nightshift/db";
 import { setting } from "@nightshift/db/schema/nightshift";
 import {
+	type DeciderName,
+	deciderNameSchema,
 	type HarnessName,
 	harnessNameSchema,
 	permissionModeSchema,
@@ -96,10 +98,38 @@ const DEFS = {
 		env: "NIGHTSHIFT_CODEX_BIN",
 		fromEnv: text,
 	} satisfies Def<string>,
-	/** The harnesses added on the Agents page. Agent nodes may run only on these. */
+	grokBin: {
+		schema: z.string().trim().min(1),
+		default: "grok",
+		env: "NIGHTSHIFT_GROK_BIN",
+		fromEnv: text,
+	} satisfies Def<string>,
+	copilotBin: {
+		schema: z.string().trim().min(1),
+		default: "copilot",
+		env: "NIGHTSHIFT_COPILOT_BIN",
+		fromEnv: text,
+	} satisfies Def<string>,
+	geminiBin: {
+		schema: z.string().trim().min(1),
+		default: "gemini",
+		env: "NIGHTSHIFT_GEMINI_BIN",
+		fromEnv: text,
+	} satisfies Def<string>,
+	cursorBin: {
+		schema: z.string().trim().min(1),
+		default: "agent",
+		env: "NIGHTSHIFT_CURSOR_BIN",
+		fromEnv: text,
+	} satisfies Def<string>,
+	/**
+	 * The harnesses added on the Agents page. Agent nodes may run only on
+	 * these. The default is the harnesses Night Shift had before Grok Build
+	 * and the ACP agents, so an install with no saved list keeps them.
+	 */
 	harnesses: {
 		schema: z.array(harnessNameSchema).max(harnessNameSchema.options.length),
-		default: [...harnessNameSchema.options],
+		default: ["claude-code", "opencode", "codex"],
 	} satisfies Def<HarnessName[]>,
 	ghBin: {
 		schema: z.string().trim().min(1),
@@ -119,10 +149,11 @@ const DEFS = {
 		schema: permissionModeSchema,
 		default: "acceptEdits",
 	} satisfies Def<z.infer<typeof permissionModeSchema>>,
-	decisionModel: {
-		schema: z.string().trim().min(1),
-		default: "haiku",
-	} satisfies Def<string>,
+	/** New Decision nodes start on this decider. */
+	decisionDecider: {
+		schema: deciderNameSchema,
+		default: "typesafe",
+	} satisfies Def<DeciderName>,
 	notifyGateOpened: {
 		schema: z.boolean(),
 		default: true,

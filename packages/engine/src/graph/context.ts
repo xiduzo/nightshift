@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Command, LangGraphRunnableConfig } from "@langchain/langgraph";
+import { HARNESS_ADAPTERS } from "@nightshift/agents/doctor";
 import type {
 	AgentErrorKind,
 	AgentHarness,
@@ -22,6 +23,7 @@ import type {
 import { eq } from "drizzle-orm";
 
 import type { RunBus } from "../bus";
+import type { CliToolGuide } from "../cli-tools";
 import {
 	countStepsSinceWalkBegan,
 	countVisits,
@@ -70,11 +72,9 @@ export async function getRunRow(db: Database, runId: string): Promise<RunRow> {
 }
 
 /** The harness name as a person reads it, for error texts. */
-export const HARNESS_LABEL: Record<HarnessName, string> = {
-	"claude-code": "Claude Code",
-	opencode: "OpenCode",
-	codex: "Codex",
-};
+export const HARNESS_LABEL = Object.fromEntries(
+	Object.values(HARNESS_ADAPTERS).map((h) => [h.name, h.label]),
+) as Record<HarnessName, string>;
 
 /** A harness or decider error the run policy waits out, rather than a failure. */
 export const isWaitKind = (
@@ -135,6 +135,8 @@ export type StepContext = {
 	mcpServersFor(
 		node: Pick<AgentNode, "connections" | "mcpServers">,
 	): Promise<McpExpansion>;
+	/** What an agent learns about its CLI tools. Without it: nothing. */
+	cliToolsFor?: (names: readonly string[]) => Promise<CliToolGuide[]>;
 	effectJournal(runId: string, stepId: string): EffectJournal;
 	/** The run's abort signal: a person stopped the run. */
 	signal(): AbortSignal;
