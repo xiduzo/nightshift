@@ -4,7 +4,6 @@ import type {
 	AgentErrorKind,
 	AgentHarness,
 	Decider,
-	EffectJournal,
 	GithubItemsInput,
 	HarnessName,
 } from "@nightshift/agents/types";
@@ -14,7 +13,6 @@ import type {
 	AgentNode,
 	Flow,
 	FlowNode,
-	JsonValue,
 	ListItem,
 	ResolvedPolicy,
 	TemplateContext,
@@ -26,7 +24,6 @@ import {
 	countStepsSinceWalkBegan,
 	countVisits,
 	type DerivedStep,
-	deriveSideEffect,
 	deriveSteps,
 	deriveStopAfterStep,
 	deriveStopAt,
@@ -135,7 +132,6 @@ export type StepContext = {
 	mcpServersFor(
 		node: Pick<AgentNode, "connections" | "mcpServers">,
 	): Promise<McpExpansion>;
-	effectJournal(runId: string, stepId: string): EffectJournal;
 	/** The run's abort signal: a person stopped the run. */
 	signal(): AbortSignal;
 	now(): number;
@@ -208,71 +204,6 @@ export function createRecorders(input: { db: Database; bus: RunBus }) {
 				},
 				close: () => writer.close(),
 			};
-		},
-	};
-}
-
-/**
- * The effect journal of one step, kept in the event log: an action with
- * the same key acts once across the step's sessions. Ported from engine.ts.
- */
-export function createEffectJournal(
-	log: RunLog,
-	runId: string,
-	stepId: string,
-): EffectJournal {
-	const ended = (
-		action: string,
-		key: string,
-		result: unknown,
-		error: string | null,
-	) =>
-		log.append({
-			type: "SideEffectEnded",
-			runId,
-			stepId,
-			payload: { action, key, result: (result ?? null) as JsonValue, error },
-		});
-	return {
-		async once<T>(input: {
-			action: string;
-			key: string;
-			act: () => Promise<T>;
-			find?: () => Promise<T | null>;
-		}): Promise<{ result: T; earlier: boolean }> {
-			const { action, key } = input;
-			const fact = deriveSideEffect(
-				await log.events(runId),
-				stepId,
-				action,
-				key,
-			);
-			if (fact?.state === "ended") {
-				return { result: fact.result as T, earlier: true };
-			}
-			if (fact?.state === "started" && input.find) {
-				// Started, never recorded: the daemon may have stopped after the act.
-				const found = await input.find();
-				if (found !== null) {
-					await ended(action, key, found, null);
-					return { result: found, earlier: true };
-				}
-			}
-			await log.append({
-				type: "SideEffectStarted",
-				runId,
-				stepId,
-				payload: { action, key },
-			});
-			let result: T;
-			try {
-				result = await input.act();
-			} catch (error) {
-				await ended(action, key, null, messageOf(error));
-				throw error;
-			}
-			await ended(action, key, result, null);
-			return { result, earlier: false };
 		},
 	};
 }

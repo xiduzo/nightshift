@@ -38,7 +38,7 @@ import { orpc } from "@/utils/orpc";
 import { CheckBadge, type CheckState, FactList, OffMachineNote } from "./parts";
 import type { CheckTarget, CliCheck, SettingsView } from "./types";
 
-type BinKey = "claudeBin" | "opencodeBin" | "codexBin" | "ghBin";
+type BinKey = "claudeBin" | "opencodeBin" | "codexBin";
 
 export type Tool = {
 	target: CheckTarget;
@@ -77,15 +77,6 @@ export const TOOLS: Tool[] = [
 		role: "Harness for Agent nodes",
 		setting: "codexBin",
 		offMachine: () => "Prompts and code go to OpenAI under your Codex login.",
-	},
-	{
-		target: "github",
-		title: "GitHub CLI",
-		initials: "GH",
-		role: "Issues and pull requests",
-		setting: "ghBin",
-		offMachine: (check) =>
-			`Reads issues and opens pull requests on GitHub as ${check?.account ?? "the account you use with the GitHub CLI"}.`,
 	},
 ];
 

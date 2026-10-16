@@ -41,7 +41,7 @@ packages/engine/src/
                            finishedReason); or parks (parkCommand). parkNode,
                            the node ids, scopeOf.
   graph/context.ts         StepContext (below), beginStep, beginWait,
-                           uncommittedStep, recorders, the EffectJournal.
+                           uncommittedStep, recorders.
   graph/nodes/agent.ts     agent node + agentWaitNode
   graph/nodes/command.ts
   graph/nodes/decision.ts  decision node + decisionWaitNode
@@ -89,7 +89,7 @@ packages/engine/src/
    order: `StepStarted`, `SessionStarted`, `HarnessSessionAssigned`,
    `SessionEnded`, `StepEnded`, `EdgeTaken`, `GateOpened`, `WaitStarted`,
    `WaitEnded`, `FlowCalled`, `ItemsRead`, `ItemStarted`, `ItemBlocked`,
-   `ItemEnded`, `SideEffectStarted/Ended`, `RunResumed`, `RunEnded`. The
+   `ItemEnded`, `RunResumed`, `RunEnded`. The
    `step` and `agent_session` rows and the transcript files too. The API,
    the derivations in `events.ts` and the web app keep working unchanged.
 4. **Code before `interrupt()` re-runs on resume.** Only the wait, park
@@ -101,7 +101,7 @@ packages/engine/src/
    re-runs from the last checkpoint. It finds its step id in
    `state.pending` (or the open step of that node in the log) and
    continues the harness session the log assigned
-   (`HarnessSessionAssigned`). The `EffectJournal` keeps working the same way.
+   (`HarnessSessionAssigned`).
 6. **Scopes.** A Subflow or For Each body is a subgraph invoked from the
    node with the config passed through (so it checkpoints under the node's
    namespace). The scope `{ parentStepId, itemId }` travels in
@@ -228,7 +228,6 @@ type StepContext = {
   decider?: Decider;
   readGithubItems?: ...;
   mcpServersFor(node): Promise<McpExpansion>;
-  effectJournal(runId, stepId): EffectJournal;
   signal(): AbortSignal;             // the run's abort signal
   now(): number; minuteMs: number;
   dataDir: string;

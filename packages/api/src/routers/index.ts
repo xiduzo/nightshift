@@ -202,7 +202,7 @@ const HARNESS_BIN = {
 	codex: "codexBin",
 } as const;
 
-const checkTarget = z.enum(["claude-code", "opencode", "codex", "github"]);
+const checkTarget = z.enum(["claude-code", "opencode", "codex"]);
 
 type FlowRef = { projectId: string; projectName: string; flowName: string };
 
@@ -407,12 +407,10 @@ const connections = {
 		.input(z.object({ target: checkTarget }))
 		.handler(({ context, input }) => {
 			const values = context.settings.current();
-			return input.target === "github"
-				? context.checks.github(values.ghBin)
-				: context.checks.harness(
-						input.target,
-						values[HARNESS_BIN[input.target]],
-					);
+			return context.checks.harness(
+				input.target,
+				values[HARNESS_BIN[input.target]],
+			);
 		}),
 	save: publicProcedure
 		.input(

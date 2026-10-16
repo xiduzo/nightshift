@@ -51,7 +51,7 @@ export type Decision = { label: string; notes: string };
 export type ClaudeCodeDeciderOptions = ClaudeCodeProcessOptions & {
 	/** Settings tiers to load. Default none: no user hooks, plugins, or memory. */
 	settingSources?: ClaudeCodeSettingSource[];
-	/** `--max-turns`. Default 10, room for a few GitHub reads. */
+	/** `--max-turns`. Default 10, room for a few reads. */
 	maxTurns?: number;
 };
 

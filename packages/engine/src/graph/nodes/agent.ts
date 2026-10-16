@@ -483,7 +483,6 @@ async function runSession(
 			effort: agent.effort,
 			resumeSessionId: resumeSessionId ?? undefined,
 			stepReport: stepReportOf(node),
-			effects: ctx.effectJournal(runId, stepId),
 			...(node.clis && node.clis.length > 0 ? { clis: node.clis } : {}),
 			...(Object.keys(mcp.servers).length > 0
 				? { mcpServers: mcp.servers }

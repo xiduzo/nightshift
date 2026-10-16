@@ -30,7 +30,6 @@ import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { compileFlow } from "./compile";
 import {
-	createEffectJournal,
 	createRecorders,
 	DEFAULT_RESUME_PROMPT,
 	type StepContext,
@@ -138,7 +137,6 @@ async function startRun(
 		recorder: (stepId, path) => recorders.open(runId, stepId, path),
 		harnessFor: (name) => (name === "claude-code" ? harness : undefined),
 		mcpServersFor: async () => ({ ok: true, servers: {} }),
-		effectJournal: (id, stepId) => createEffectJournal(log, id, stepId),
 		signal: () => options.signal ?? controller.signal,
 		now: Date.now,
 		minuteMs: MINUTE,

@@ -26,7 +26,6 @@ export type Context = {
 	/** Read-only checks of the CLIs and MCP servers on this machine. */
 	checks: {
 		harness(harness: HarnessName, bin: string): Promise<CliCheck>;
-		github(bin: string): Promise<CliCheck>;
 		/** A CLI tool by name: where it is and its version. */
 		cli(name: string): Promise<CliCheck>;
 		/** The programs this computer can run by name, for the CLI tool picker. */

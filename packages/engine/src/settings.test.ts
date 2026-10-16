@@ -81,9 +81,9 @@ describe("precedence", () => {
 	});
 
 	test("a blank binary path in the environment is ignored", async () => {
-		const s = await store({ NIGHTSHIFT_GH_BIN: "   " });
-		expect(s.current().ghBin).toBe("gh");
-		expect(s.view().fields.ghBin.source).toBe("default");
+		const s = await store({ NIGHTSHIFT_CODEX_BIN: "   " });
+		expect(s.current().codexBin).toBe("codex");
+		expect(s.view().fields.codexBin.source).toBe("default");
 	});
 });
 

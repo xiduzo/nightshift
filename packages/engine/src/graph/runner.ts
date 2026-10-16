@@ -36,7 +36,6 @@ import type { RunSettings } from "../settings";
 import { saverFor } from "./checkpointer";
 import { compileFlow } from "./compile";
 import {
-	createEffectJournal,
 	createRecorders,
 	getRunRow,
 	messageOf,
@@ -230,7 +229,6 @@ export function createRunner(deps: RunnerDeps) {
 				? { readGithubItems: deps.readGithubItems }
 				: {}),
 			mcpServersFor: deps.mcpServersFor,
-			effectJournal: (runId, stepId) => createEffectJournal(log, runId, stepId),
 			signal: () => thread.controller.signal,
 			now: deps.now,
 			minuteMs: deps.minuteMs,

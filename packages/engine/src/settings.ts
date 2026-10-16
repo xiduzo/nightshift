@@ -101,12 +101,6 @@ const DEFS = {
 		schema: z.array(harnessNameSchema).max(harnessNameSchema.options.length),
 		default: [...harnessNameSchema.options],
 	} satisfies Def<HarnessName[]>,
-	ghBin: {
-		schema: z.string().trim().min(1),
-		default: "gh",
-		env: "NIGHTSHIFT_GH_BIN",
-		fromEnv: text,
-	} satisfies Def<string>,
 	agentHarness: {
 		schema: harnessNameSchema,
 		default: "claude-code",

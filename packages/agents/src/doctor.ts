@@ -304,49 +304,16 @@ export async function harnessModels(
 	}
 }
 
-/** `gh`: the For Each GitHub source and the GitHub tools run it with the user's login. */
-export async function checkGithub(bin: string): Promise<CliCheck> {
-	const { resolved, ...check } = await baseCheck(bin, "The GitHub CLI");
-	if (!resolved || check.problem) return check;
-	try {
-		// `auth status` prints to stderr and never shows the token in full.
-		const out = await run([
-			resolved,
-			"auth",
-			"status",
-			"--hostname",
-			"github.com",
-		]);
-		const text = `${out.stdout}\n${out.stderr}`;
-		const account = text.match(/Logged in to github\.com account (\S+)/)?.[1];
-		if (out.code !== 0 || !account) {
-			return {
-				...check,
-				problem: "Not logged in to github.com. Run `gh auth login`.",
-			};
-		}
-		const scopes = text.match(/Token scopes: (.+)/)?.[1]?.replaceAll("'", "");
-		return {
-			...check,
-			version: check.version?.replace(/^gh version /, "") ?? null,
-			account,
-			facts: scopes ? [{ label: "Scopes", value: scopes }] : [],
-		};
-	} catch {
-		return check;
-	}
-}
-
 /**
  * A CLI tool (a program the agents may run): where it is and its version.
  * Many programs do not know `--version`, so a missing version is no
- * problem. `gh` gets the GitHub CLI check, with its login.
+ * problem. A login (`gh auth status`, `aws sts get-caller-identity`) is the
+ * agent's own business: the check is the same for every program.
  */
 export async function checkCli(
 	name: string,
 	searchPath: string = process.env.PATH ?? "",
 ): Promise<CliCheck> {
-	if (name === "gh") return checkGithub(name);
 	const path = Bun.which(name, { PATH: searchPath });
 	const check: CliCheck = {
 		bin: name,

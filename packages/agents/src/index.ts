@@ -19,7 +19,6 @@ export {
 export {
 	type CliCheck,
 	checkCli,
-	checkGithub,
 	checkHarness,
 	HARNESS_ADAPTERS,
 	type HarnessAdapter,

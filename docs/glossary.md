@@ -70,7 +70,6 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Run Bundle | One Run exported as its own SQLite file: its rows, its Events, and its Transcripts, in the daemon's table names. Secret values are masked. | Run export |
 | Run Log | The daemon's copy in memory of each Run's Events. Every append goes through it, and it keeps an Event only after the database has it. | Run state |
 | Run Policy | The rules for retries, rescue, blocked propagation, network grace, usage-limit waits, the stop time, and resume after a restart. | PLAN §2 |
-| Side Effect | What a Step's tool did outside the Worktree, for example a GitHub comment. The Event Log keeps it per Step and key, so a Session that continues the Step does not do it twice. | Restarts |
 | Needs-you inbox | The list of open Gates. | PLAN §3 |
 | Decider | The provider behind a Decision Node. The default is a small model with structured output. | PLAN §2 |
 | CLI Tool | A program on this computer, by its name (`gh`, `aws`), defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `clis`: its agent may run it without a prompt. A Flow that names one the daemon does not have, or that the computer cannot find, refuses to start. | CLI tools |
@@ -126,8 +125,6 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | HarnessSessionAssigned | The Harness reported its own session id. |
 | SessionEnded | A Session ended, with its cost. |
 | EdgeTaken | The Run followed an Edge to the next Node. |
-| SideEffectStarted | A tool of a Step began a Side Effect. |
-| SideEffectEnded | The Side Effect ended, with its result or its error. |
 | StopRequested | A person asked to stop the Run. |
 | GateOpened | A Gate put its question in the Needs-you inbox. |
 | RunEnded | The Run finished or failed, with the reason. |

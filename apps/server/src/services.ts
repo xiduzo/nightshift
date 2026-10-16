@@ -4,7 +4,6 @@ import { join } from "node:path";
 import {
 	type AgentHarness,
 	checkCli,
-	checkGithub,
 	checkHarness,
 	claudeCodeDecider,
 	claudeCodeHarness,
@@ -151,8 +150,7 @@ export const engine = await createEngine({
 				claudeExecutable: settings.current().claudeBin,
 			}).decide(input),
 	},
-	readGithubItems: (input) =>
-		readGithubItems(input, { gh: settings.current().ghBin }),
+	readGithubItems: (input) => readGithubItems(input),
 	dataDir,
 	settings: () => settings.run(),
 	mcpServersFor: (node) => connections.mcpServersFor(node),
@@ -169,7 +167,6 @@ export const engine = await createEngine({
 
 export const checks: Context["checks"] = {
 	harness: checkHarness,
-	github: checkGithub,
 	cli: (name) => checkCli(name),
 	programs: () => pathPrograms(),
 	mcp: (config, redact) => testMcpServer(config, { redact }),

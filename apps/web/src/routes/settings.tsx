@@ -1387,8 +1387,8 @@ function DaemonCard({
 						<ItemContent>
 							<ItemTitle>Coding agents</ItemTitle>
 							<ItemDescription className="line-clamp-none">
-								Check where Claude Code, OpenCode, Codex and the GitHub CLI are
-								installed, on the Agents page.
+								Check where Claude Code, OpenCode and Codex are installed, on
+								the Agents page.
 							</ItemDescription>
 						</ItemContent>
 						<ItemActions>

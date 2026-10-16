@@ -10,11 +10,7 @@ import { createRunLog, type RunLog } from "../run-log";
 import { defaultRunSettings } from "../settings";
 import type { Sandbox } from "../test-support";
 import { compileFlow } from "./compile";
-import {
-	createEffectJournal,
-	createRecorders,
-	type StepContext,
-} from "./context";
+import { createRecorders, type StepContext } from "./context";
 import type { Parked, RunEvent, RunStateValues } from "./state";
 
 /**
@@ -108,7 +104,6 @@ export async function startRun(
 			name === "claude-code" ? options.harness : undefined,
 		...(options.decider ? { decider: options.decider } : {}),
 		mcpServersFor: async () => ({ ok: true, servers: {} }),
-		effectJournal: (id, stepId) => createEffectJournal(log, id, stepId),
 		signal: () => options.signal ?? controller.signal,
 		now: Date.now,
 		minuteMs: MINUTE,
