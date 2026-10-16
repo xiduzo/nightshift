@@ -1,6 +1,11 @@
 import type { Database } from "@nightshift/db";
 import { setting } from "@nightshift/db/schema/nightshift";
-import { agentNodeSchema, type ResolvedPolicy } from "@nightshift/flows";
+import {
+	type HarnessName,
+	harnessNameSchema,
+	permissionModeSchema,
+	type ResolvedPolicy,
+} from "@nightshift/flows";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -91,6 +96,11 @@ const DEFS = {
 		env: "NIGHTSHIFT_CODEX_BIN",
 		fromEnv: text,
 	} satisfies Def<string>,
+	/** The harnesses added on the Agents page. Agent nodes may run only on these. */
+	harnesses: {
+		schema: z.array(harnessNameSchema).max(harnessNameSchema.options.length),
+		default: [...harnessNameSchema.options],
+	} satisfies Def<HarnessName[]>,
 	ghBin: {
 		schema: z.string().trim().min(1),
 		default: "gh",
@@ -98,17 +108,17 @@ const DEFS = {
 		fromEnv: text,
 	} satisfies Def<string>,
 	agentHarness: {
-		schema: agentNodeSchema.shape.harness,
+		schema: harnessNameSchema,
 		default: "claude-code",
-	} satisfies Def<z.infer<typeof agentNodeSchema.shape.harness>>,
+	} satisfies Def<HarnessName>,
 	agentModel: {
 		schema: z.string().trim().min(1),
 		default: "sonnet",
 	} satisfies Def<string>,
 	agentPermissionMode: {
-		schema: agentNodeSchema.shape.permissionMode,
+		schema: permissionModeSchema,
 		default: "acceptEdits",
-	} satisfies Def<z.infer<typeof agentNodeSchema.shape.permissionMode>>,
+	} satisfies Def<z.infer<typeof permissionModeSchema>>,
 	decisionModel: {
 		schema: z.string().trim().min(1),
 		default: "haiku",

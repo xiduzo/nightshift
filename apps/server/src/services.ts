@@ -8,6 +8,7 @@ import {
 	claudeCodeDecider,
 	claudeCodeHarness,
 	codexHarness,
+	harnessModels,
 	opencodeHarness,
 	readGithubItems,
 	testMcpServer,
@@ -20,6 +21,7 @@ import {
 	acquireLease,
 	createConnectionStore,
 	createEngine,
+	createProfileStore,
 	createSettingsStore,
 	keychainSecrets,
 	LEASE_HEARTBEAT_MS,
@@ -93,7 +95,8 @@ export const connections = createConnectionStore({
 	env,
 	secrets: keychainSecrets(),
 });
-await Promise.all([settings.load(), connections.load()]);
+export const profiles = createProfileStore({ db });
+await Promise.all([settings.load(), connections.load(), profiles.load()]);
 
 /** A harness built per session, so a changed path in Settings applies to the next session. */
 function perSession(
@@ -150,6 +153,8 @@ export const engine = await createEngine({
 	settings: () => settings.run(),
 	mcpServersFor: (node) => connections.mcpServersFor(node),
 	connectionNames: () => connections.names(),
+	harnessNames: () => new Set(settings.current().harnesses),
+	profileFor: (name) => profiles.settingsFor(name),
 	// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.
 	// Otherwise the Settings switch is read on every tick.
 	scheduler:
@@ -160,6 +165,7 @@ export const checks: Context["checks"] = {
 	harness: checkHarness,
 	github: checkGithub,
 	mcp: (config, redact) => testMcpServer(config, { redact }),
+	models: harnessModels,
 };
 
 export const daemon: Context["daemon"] = {

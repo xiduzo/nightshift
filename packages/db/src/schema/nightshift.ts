@@ -135,6 +135,20 @@ export const connection = sqliteTable("connection", {
 });
 
 /**
+ * An Agent Profile: a harness, a model and its tools under one name, defined
+ * once on this daemon. An Agent node names it in `profile`; a run resolves it
+ * into the node when it starts.
+ */
+export const agentProfile = sqliteTable("agent_profile", {
+	name: text("name").primaryKey(),
+	description: text("description"),
+	/** JSON: the profile's agent settings (harness, model, effort, permission mode, tools, connections). */
+	settings: text("settings").notNull(),
+	createdAt: createdAt(),
+	updatedAt: updatedAt(),
+});
+
+/**
  * The names of the secrets saved in the system keychain. The values live in
  * the keychain only. A `${NAME}` reads the keychain first, then the environment.
  */

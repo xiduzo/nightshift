@@ -4,7 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { checkGithub, checkHarness, resolveBin, testMcpServer } from "./doctor";
+import {
+	checkGithub,
+	checkHarness,
+	HARNESS_ADAPTERS,
+	harnessModels,
+	resolveBin,
+	testMcpServer,
+} from "./doctor";
 
 /** Every CLI here is a tiny fake script: the checks never run a real one. */
 
@@ -378,5 +385,44 @@ await server.connect(new StdioServerTransport());
 			error: "No answer within 1 s.",
 		});
 		expect(result.ms).toBeGreaterThanOrEqual(900);
+	});
+});
+
+describe("harnessModels", () => {
+	test("adds what `opencode models` lists to the adapter's models", async () => {
+		const known = HARNESS_ADAPTERS.opencode.models[0] as string;
+		const bin = await fakeCli("opencode", {
+			models: {
+				stdout: `${known}\nollama/qwen3-coder:30b\nopenrouter/z-ai/glm-4.6\nnot a model line\n`,
+			},
+		});
+		const result = await harnessModels("opencode", bin);
+		expect(result.problem).toBeNull();
+		expect(result.listed).toBe(2);
+		expect(
+			result.models.slice(0, HARNESS_ADAPTERS.opencode.models.length),
+		).toEqual([...HARNESS_ADAPTERS.opencode.models]);
+		expect(result.models.slice(-2)).toEqual([
+			"ollama/qwen3-coder:30b",
+			"openrouter/z-ai/glm-4.6",
+		]);
+	});
+
+	test("a listing that fails leaves the adapter's models, with the reason", async () => {
+		const bin = await fakeCli("opencode", {
+			models: { stderr: "no providers configured", code: 1 },
+		});
+		const result = await harnessModels("opencode", bin);
+		expect(result.models).toEqual([...HARNESS_ADAPTERS.opencode.models]);
+		expect(result.problem).toBe("no providers configured");
+	});
+
+	test("a harness without a listing runs nothing", async () => {
+		const result = await harnessModels("claude-code", join(dir, "missing"));
+		expect(result).toMatchObject({
+			models: [...HARNESS_ADAPTERS["claude-code"].models],
+			listed: 0,
+			problem: null,
+		});
 	});
 });

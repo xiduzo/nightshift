@@ -58,6 +58,25 @@ export const reservedNames = ["run"] as const;
 export const toolSetSchema = z.enum(["github"]);
 export type ToolSet = z.infer<typeof toolSetSchema>;
 
+/** The coding-agent CLIs an Agent node can run on: the TanStack AI harness adapters. */
+export const harnessNameSchema = z.enum(["claude-code", "opencode", "codex"]);
+export type HarnessName = z.infer<typeof harnessNameSchema>;
+
+export const effortSchema = z.enum(["low", "medium", "high", "xhigh", "max"]);
+
+/**
+ * `auto` lets Claude Code's classifier approve safe actions, such as
+ * running tests, with nobody awake. `acceptEdits` approves file edits
+ * only: every shell command is refused in an unattended run.
+ */
+export const permissionModeSchema = z.enum([
+	"default",
+	"acceptEdits",
+	"auto",
+	"bypassPermissions",
+	"plan",
+]);
+
 const option = z.object({
 	name: labelSchema,
 	/** Tells the agent, the decider or the person what this option means. */
@@ -108,22 +127,24 @@ export const agentNodeSchema = z.object({
 	prompt: z.string(),
 	/** A skill the harness already has, run as `/<skill> <prompt>`. */
 	skill: z.string().min(1).optional(),
-	/** The coding-agent CLI that runs the session. Each uses its own login. */
-	harness: z.enum(["claude-code", "opencode", "codex"]),
-	model: z.string().min(1),
-	effort: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
 	/**
-	 * `auto` lets Claude Code's classifier approve safe actions, such as
-	 * running tests, with nobody awake. `acceptEdits` approves file edits
-	 * only: every shell command is refused in an unattended run.
+	 * An Agent Profile defined on the daemon (the Agents page): its harness,
+	 * model, effort, permission mode, tool sets and connections. A field the
+	 * node sets itself wins over the profile; tool sets and connections add
+	 * up. A run resolves the profile when it starts, and a flow that names a
+	 * profile the daemon does not have refuses to start.
 	 */
-	permissionMode: z.enum([
-		"default",
-		"acceptEdits",
-		"auto",
-		"bypassPermissions",
-		"plan",
-	]),
+	profile: nameSchema.optional(),
+	/**
+	 * The coding-agent CLI that runs the session. Each uses its own login.
+	 * Required without a profile.
+	 */
+	harness: harnessNameSchema.optional(),
+	/** Required without a profile. */
+	model: z.string().min(1).optional(),
+	effort: effortSchema.optional(),
+	/** Required without a profile. */
+	permissionMode: permissionModeSchema.optional(),
 	/**
 	 * `fresh`: every visit starts a new harness session (the script's retry
 	 * policy). `resume`: a later visit continues this node's last session.
@@ -153,6 +174,27 @@ export const agentNodeSchema = z.object({
 	 */
 	output: jsonSchemaSchema.optional(),
 });
+
+/**
+ * What an Agent Profile sets on the nodes that name it. Defined once on the
+ * daemon (the Agents page), never in a flow file.
+ */
+export const agentProfileSettingsSchema = z.object({
+	harness: harnessNameSchema,
+	model: z.string().trim().min(1),
+	effort: effortSchema.optional(),
+	permissionMode: permissionModeSchema,
+	tools: z.array(toolSetSchema).default([]),
+	/** Connections (MCP servers on this daemon) by name. */
+	connections: z.array(nameSchema).default([]),
+});
+export type AgentProfileSettings = z.infer<typeof agentProfileSettingsSchema>;
+
+export const agentProfileSchema = agentProfileSettingsSchema.extend({
+	name: nameSchema,
+	description: z.string().trim().max(500).optional(),
+});
+export type AgentProfile = z.infer<typeof agentProfileSchema>;
 
 export const commandNodeSchema = z.object({
 	...nodeBase,

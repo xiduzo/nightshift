@@ -1,3 +1,4 @@
+import { HARNESS_ADAPTERS } from "@nightshift/agents";
 import {
 	connectionInputSchema,
 	secretNameSchema,
@@ -5,10 +6,12 @@ import {
 } from "@nightshift/engine";
 import type { Engine } from "@nightshift/engine/types";
 import {
+	agentProfileSchema,
 	cronError,
 	describeCron,
 	flowNameSchema,
 	flowSchema,
+	harnessNameSchema,
 	nextCronTimes,
 	scheduleSchema,
 } from "@nightshift/flows";
@@ -195,50 +198,184 @@ const HARNESS_BIN = {
 
 const checkTarget = z.enum(["claude-code", "opencode", "codex", "github"]);
 
-/** The flows, by project, whose Agent nodes name each connection. */
-async function connectionUse(
-	engine: Engine,
-): Promise<
-	Map<string, { projectId: string; projectName: string; flowName: string }[]>
-> {
-	const use = new Map<
-		string,
-		{ projectId: string; projectName: string; flowName: string }[]
-	>();
+type FlowRef = { projectId: string; projectName: string; flowName: string };
+
+/**
+ * Who uses what, from every flow of every project: the flows whose Agent
+ * nodes name each connection, and the Agent nodes that name each profile.
+ */
+async function flowUse(engine: Engine): Promise<{
+	connections: Map<string, FlowRef[]>;
+	profiles: Map<string, (FlowRef & { nodeIds: string[] })[]>;
+}> {
+	const connections = new Map<string, FlowRef[]>();
+	const profiles = new Map<string, (FlowRef & { nodeIds: string[] })[]>();
 	for (const project of await engine.listProjects()) {
 		const files = await engine.listFlows(project.id).catch(() => []);
 		for (const file of files) {
 			const loaded = await engine
 				.getFlow(project.id, file.name)
 				.catch(() => null);
-			const names = new Set(
-				(loaded?.flow?.nodes ?? []).flatMap((n) =>
-					n.type === "agent" ? (n.connections ?? []) : [],
-				),
+			const ref = {
+				projectId: project.id,
+				projectName: project.name,
+				flowName: file.name,
+			};
+			const agents = (loaded?.flow?.nodes ?? []).flatMap((n) =>
+				n.type === "agent" ? [n] : [],
 			);
-			for (const name of names) {
-				use.set(name, [
-					...(use.get(name) ?? []),
-					{
-						projectId: project.id,
-						projectName: project.name,
-						flowName: file.name,
-					},
+			for (const name of new Set(agents.flatMap((n) => n.connections ?? []))) {
+				connections.set(name, [...(connections.get(name) ?? []), ref]);
+			}
+			const byProfile = new Map<string, string[]>();
+			for (const node of agents) {
+				if (node.profile === undefined) continue;
+				byProfile.set(node.profile, [
+					...(byProfile.get(node.profile) ?? []),
+					node.id,
+				]);
+			}
+			for (const [name, nodeIds] of byProfile) {
+				profiles.set(name, [
+					...(profiles.get(name) ?? []),
+					{ ...ref, nodeIds },
 				]);
 			}
 		}
 	}
-	return use;
+	return { connections, profiles };
 }
+
+/**
+ * The harnesses Agent nodes run on: every TanStack AI harness adapter, and
+ * which of them are added on this daemon. A harness's path is the setting
+ * `<harness>Bin` (Settings API); this adds, removes and lists models.
+ */
+const harnesses = {
+	list: publicProcedure.handler(({ context }) => {
+		const values = context.settings.current();
+		const view = context.settings.view();
+		return harnessNameSchema.options.map((name) => {
+			const adapter = HARNESS_ADAPTERS[name];
+			return {
+				name,
+				label: adapter.label,
+				pkg: adapter.pkg,
+				models: [...adapter.models],
+				listing: adapter.listing
+					? [adapter.bin, ...adapter.listing].join(" ")
+					: null,
+				added: values.harnesses.includes(name),
+				bin: values[HARNESS_BIN[name]],
+				binSetting: HARNESS_BIN[name],
+				binSource: view.fields[HARNESS_BIN[name]],
+				profiles: context.profiles
+					.list()
+					.filter((p) => p.harness === name)
+					.map((p) => p.name),
+			};
+		});
+	}),
+	add: publicProcedure
+		.input(z.object({ harness: harnessNameSchema }))
+		.handler(async ({ context, input }) => {
+			const added = context.settings.current().harnesses;
+			if (added.includes(input.harness)) return;
+			await context.settings.save({ harnesses: [...added, input.harness] });
+		}),
+	/** Refused while a profile runs on it. */
+	remove: publicProcedure
+		.input(z.object({ harness: harnessNameSchema }))
+		.handler(async ({ context, input }) => {
+			const using = context.profiles
+				.list()
+				.filter((p) => p.harness === input.harness)
+				.map((p) => p.name);
+			if (using.length > 0) {
+				throw new Error(
+					`The ${using.length === 1 ? "profile" : "profiles"} ${using.join(", ")} run on ${HARNESS_ADAPTERS[input.harness].label}. Move ${using.length === 1 ? "it" : "them"} to another harness first.`,
+				);
+			}
+			const added = context.settings.current().harnesses;
+			await context.settings.save({
+				harnesses: added.filter((h) => h !== input.harness),
+			});
+		}),
+	/** The adapter's models, plus what the CLI lists itself. Never throws. */
+	models: publicProcedure
+		.input(z.object({ harness: harnessNameSchema }))
+		.handler(({ context, input }) =>
+			context.checks.models(
+				input.harness,
+				context.settings.current()[HARNESS_BIN[input.harness]],
+			),
+		),
+};
+
+/** Agent Profiles: a harness, a model and its tools under one name. Agent nodes name them. */
+const profiles = {
+	list: publicProcedure.handler(async ({ context }) => {
+		const use = await flowUse(context.engine);
+		return context.profiles.list().map((p) => ({
+			...p,
+			usedBy: use.profiles.get(p.name) ?? [],
+		}));
+	}),
+	save: publicProcedure
+		.input(
+			agentProfileSchema.extend({
+				/** The name it had, when the edit renames it. */
+				previousName: z.string().optional(),
+			}),
+		)
+		.handler(async ({ context, input }) => {
+			const { previousName, ...profile } = input;
+			const renamed =
+				previousName !== undefined && previousName !== profile.name;
+			if (
+				(previousName === undefined || renamed) &&
+				context.profiles.get(profile.name)
+			) {
+				throw new Error(`A profile named "${profile.name}" exists.`);
+			}
+			if (renamed) {
+				const use = (await flowUse(context.engine)).profiles.get(previousName);
+				if (use && use.length > 0) {
+					throw new Error(
+						`Flows name "${previousName}" (${use.map((u) => u.flowName).join(", ")}). Rename it there too, or keep the name.`,
+					);
+				}
+			}
+			const unknown = profile.connections.filter(
+				(name) => !context.connections.get(name),
+			);
+			if (unknown.length > 0) {
+				throw new Error(
+					`This daemon has no connection named ${unknown.map((n) => `"${n}"`).join(", ")}.`,
+				);
+			}
+			const saved = await context.profiles.save(profile);
+			if (renamed) await context.profiles.remove(previousName);
+			return saved;
+		}),
+	/** Flows that name it refuse to start until they name another profile. */
+	remove: publicProcedure
+		.input(z.object({ name: z.string() }))
+		.handler(({ context, input }) => context.profiles.remove(input.name)),
+};
 
 /** The CLIs Night Shift runs (harnesses, gh) and the MCP servers Agent nodes name. */
 const connections = {
 	list: publicProcedure.handler(async ({ context }) => {
-		const use = await connectionUse(context.engine);
+		const use = (await flowUse(context.engine)).connections;
 		return {
 			connections: context.connections.list().map((c) => ({
 				...c,
 				usedBy: use.get(c.name) ?? [],
+				profiles: context.profiles
+					.list()
+					.filter((p) => p.connections.includes(c.name))
+					.map((p) => p.name),
 			})),
 			secrets: context.connections.secrets(),
 		};
@@ -273,12 +410,33 @@ const connections = {
 			const saved = await context.connections.save(connection);
 			if (previousName && previousName !== connection.name) {
 				await context.connections.remove(previousName);
+				for (const p of context.profiles.list()) {
+					if (!p.connections.includes(previousName)) continue;
+					const { updatedAt: _at, ...profile } = p;
+					await context.profiles.save({
+						...profile,
+						connections: p.connections.map((c) =>
+							c === previousName ? connection.name : c,
+						),
+					});
+				}
 			}
 			return saved;
 		}),
+	/** Also takes it off the profiles that name it. */
 	remove: publicProcedure
 		.input(z.object({ name: z.string() }))
-		.handler(({ context, input }) => context.connections.remove(input.name)),
+		.handler(async ({ context, input }) => {
+			await context.connections.remove(input.name);
+			for (const p of context.profiles.list()) {
+				if (!p.connections.includes(input.name)) continue;
+				const { updatedAt: _at, ...profile } = p;
+				await context.profiles.save({
+					...profile,
+					connections: p.connections.filter((c) => c !== input.name),
+				});
+			}
+		}),
 	/** Connects to the server, lists its tools, and disconnects. A saved connection or a draft. */
 	test: publicProcedure
 		.input(
@@ -325,6 +483,8 @@ export const appRouter = {
 	runs,
 	settings,
 	connections,
+	harnesses,
+	profiles,
 };
 export type AppRouter = typeof appRouter;
 export type AppRouterClient = RouterClient<typeof appRouter>;

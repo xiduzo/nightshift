@@ -44,6 +44,8 @@ import {
 	type ResolvedPolicy,
 	renderCommand,
 	renderTemplate,
+	resolvedAgent,
+	resolveFlowProfiles,
 	type SubflowNode,
 	type TemplateContext,
 	validateFlow,
@@ -366,6 +368,9 @@ export function createEngine(
 						message: `The node names connections (${node.connections?.join(", ")}), but this daemon has none.`,
 					}
 				: expandMcpServers(node.mcpServers, process.env));
+	/** The harness of that name, when it is added (Agents page) and built. */
+	const harnessFor = (name: HarnessName): AgentHarness | undefined =>
+		(options.harnessNames?.().has(name) ?? true) ? harnesses[name] : undefined;
 
 	const bus = createRunBus();
 	const runLog = internals.runLog ?? createRunLog(db);
@@ -1628,12 +1633,21 @@ export function createEngine(
 					: null;
 		}
 
-		const harness: AgentHarness | undefined = harnesses[node.harness];
+		// The run resolved the node's profile when it started.
+		const agent = resolvedAgent(node);
+		if (!agent) {
+			return {
+				outcome: "error",
+				outputs: { outcome: "error", visit },
+				error: `Agent node "${node.id}" has no harness, model or permission mode: name a profile, or set them on the node.`,
+			};
+		}
+		const harness = harnessFor(agent.harness);
 		if (!harness) {
 			return {
 				outcome: "error",
 				outputs: { outcome: "error", visit },
-				error: `No harness is configured for "${node.harness}".`,
+				error: `No ${HARNESS_LABEL[agent.harness]} harness is added. Add it under Agents.`,
 			};
 		}
 
@@ -1658,7 +1672,7 @@ export function createEngine(
 			runId,
 			stepId,
 			sessionId,
-			payload: { prompt, resumeSessionId, harness: node.harness },
+			payload: { prompt, resumeSessionId, harness: agent.harness },
 		});
 		bus.publish(runId, { kind: "step-changed", stepId });
 
@@ -1753,9 +1767,9 @@ export function createEngine(
 			const stream = harness.run({
 				cwd: row.worktreePath,
 				prompt,
-				model: node.model,
-				permissionMode: node.permissionMode,
-				effort: node.effort,
+				model: agent.model,
+				permissionMode: agent.permissionMode,
+				effort: agent.effort,
 				resumeSessionId: resumeSessionId ?? undefined,
 				stepReport: stepReportOf(node),
 				effects: effectJournal(runId, stepId),
@@ -2595,10 +2609,33 @@ export function createEngine(
 		reserveSlot(runId);
 		try {
 			const projectRow = await getProjectRow(input.projectId);
-			const { flow, flowName, calledFlows } = await flowsForRun(
-				projectRow.repoPath,
-				input,
+			const loaded = await flowsForRun(projectRow.repoPath, input);
+			const { flowName } = loaded;
+			// The run's copy holds the profiles as they are now: a later
+			// change to a profile reaches the next run, not this one.
+			const unknownProfiles = new Map<string, string[]>();
+			const profileFor = options.profileFor ?? (() => null);
+			const flow = resolveFlowProfiles(
+				loaded.flow,
+				profileFor,
+				unknownProfiles,
 			);
+			const calledFlows = Object.fromEntries(
+				Object.entries(loaded.calledFlows).map(([name, called]) => [
+					name,
+					resolveFlowProfiles(called, profileFor, unknownProfiles),
+				]),
+			);
+			if (unknownProfiles.size > 0) {
+				throw new Error(
+					[...unknownProfiles]
+						.map(
+							([name, nodeIds]) =>
+								`The flow names the profile "${name}" (${nodeIds.join(", ")}), but this daemon does not have it. Add it under Agents.`,
+						)
+						.join(" "),
+				);
+			}
 			const all = [flow, ...Object.values(calledFlows)];
 			const nodes = all.flatMap((f) => f.nodes);
 			const unknownConnections = missingConnections(
@@ -2610,18 +2647,18 @@ export function createEngine(
 					unknownConnections
 						.map(
 							({ name, nodeIds }) =>
-								`The flow names the connection "${name}" (${nodeIds.join(", ")}), but this daemon does not have it. Add it under Connections.`,
+								`The flow names the connection "${name}" (${nodeIds.join(", ")}), but this daemon does not have it. Add it under Agents → Tools.`,
 						)
 						.join(" "),
 				);
 			}
-			const missing = missingHarnesses(nodes, harnesses);
+			const missing = missingHarnesses(nodes, harnessFor);
 			if (missing.length > 0) {
 				throw new Error(
 					missing
 						.map(
 							({ harness, nodeIds }) =>
-								`The flow has ${nodeIds.length === 1 ? "an Agent node" : "Agent nodes"} on ${HARNESS_LABEL[harness]} (${nodeIds.join(", ")}), but no ${HARNESS_LABEL[harness]} harness is configured.`,
+								`The flow has ${nodeIds.length === 1 ? "an Agent node" : "Agent nodes"} on ${HARNESS_LABEL[harness]} (${nodeIds.join(", ")}), but no ${HARNESS_LABEL[harness]} harness is added. Add it under Agents.`,
 						)
 						.join(" "),
 				);
@@ -3189,11 +3226,12 @@ async function readProjectFlowFiles(
 /** The harnesses the Agent nodes name that the daemon has not configured, with their nodes. */
 function missingHarnesses(
 	nodes: readonly FlowNode[],
-	harnesses: EngineOptions["harnesses"],
+	harnessFor: (name: HarnessName) => AgentHarness | undefined,
 ): { harness: HarnessName; nodeIds: string[] }[] {
 	const missing = new Map<HarnessName, string[]>();
 	for (const node of nodes) {
-		if (node.type !== "agent" || harnesses[node.harness]) continue;
+		if (node.type !== "agent" || node.harness === undefined) continue;
+		if (harnessFor(node.harness)) continue;
 		const ids = missing.get(node.harness) ?? [];
 		if (!ids.includes(node.id)) ids.push(node.id);
 		missing.set(node.harness, ids);

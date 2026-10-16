@@ -17,7 +17,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Project | A local clone that Runs can start in. | Slice 1 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
 | Node | One step of a Flow: Agent, Command, Decision, Gate, Subflow, or For Each. Its id is also its name in templates. | PLAN §3 |
-| Agent Node | A Node that runs one Session on its Harness, with a prompt and/or a skill, a model, an effort, and a permission mode. | PLAN §3 |
+| Agent Node | A Node that runs one Session on its Harness, with a prompt and/or a skill, a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. | PLAN §3 |
+| Agent Profile | A Harness, a model, an effort, a permission mode, Tool Sets and Connections under one name, defined once on the daemon (the Agents page). Agent Nodes name it in `profile`. A Run resolves it when it starts, so a later change reaches the next Run. A Flow that names a profile the daemon does not have refuses to start. | Agents |
 | Command Node | A Node that runs one shell command in the Worktree. Exit 0 is `pass`. | PLAN §3 |
 | Decision Node | A Node that reads earlier outputs and returns one of its declared labels. | PLAN §3 |
 | Gate | A Node that waits for a person in the Needs-you inbox, with a question and its choices. | PLAN §3 |
@@ -28,8 +29,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Subflow Node | A Node that runs another Flow once, with its Inputs bound. | Slice 5 |
 | Body Flow | The Flow a For Each Node runs once per Item. Any Flow can be a Body Flow. | Slice 4 |
 | Item | One element of a For Each List: any JSON value, optionally with `id`, `title`, `dependsOn`, and `done`. | Slice 4 |
-| Connection | An MCP server defined once on the daemon (the Connections page). An Agent Node names it in `connections`. Holds `${NAME}` references, never secret values. | Connections |
-| Secret | A value a `${NAME}` reads: from the system keychain (saved on the Connections page), else the daemon's environment. Never in a Flow file, the database, or the log. | Connections |
+| Connection | An MCP server defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `connections`. Holds `${NAME}` references, never secret values. | Connections |
+| Secret | A value a `${NAME}` reads: from the system keychain (saved on the Agents page, under Secrets), else the daemon's environment. Never in a Flow file, the database, or the log. | Connections |
 | Lease | The right of one daemon to write to a database. The daemon takes it at start, keeps it with a heartbeat, and gives it up on a clean stop. A second daemon on the same database refuses to start. Each acquisition has an Epoch one higher than the last. | Lease |
 | Epoch | The number of a Lease acquisition. A daemon whose Epoch is no longer the Lease's lost it, and exits (self-fence). | Lease |
 | Setting | A daemon-wide value changed on the Settings page and saved in the database. Unset, it reads the environment, then its default. A Flow's own policy wins over the Settings' policy. | Settings |
@@ -52,7 +53,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Step | One visit of one Node in a Run. | Slice 2 |
 | Visit | The count of a Step among the Steps of the same Node: 1 for the first. | Slice 2 |
 | Session | One harness session of an Agent Step. A resumed Step has more than one. | Slice 1 |
-| Harness | A coding-agent CLI that runs Sessions on this machine, with its own login. Each Agent Node names one: `claude-code` (Claude Code), `opencode` (OpenCode, a 1.x build), or `codex` (Codex). | Slice 8 |
+| Harness | A coding-agent CLI that runs Sessions on this machine, with its own login, through a TanStack AI harness adapter: `claude-code` (Claude Code), `opencode` (OpenCode, a 1.x build), or `codex` (Codex). Added on the Agents page; an Agent Profile or an Agent Node names one. | Slice 8 |
 | MCP Server | A tool server an Agent Node adds to its Session, next to the Harness's own: a local command (stdio) or a URL. | Slice 8 |
 | Environment Reference | `${NAME}` in an MCP Server's env values or headers. The daemon puts in its environment variable `NAME` when the Step starts, so secrets stay out of Flow files. | Slice 8 |
 | Step Report | The Outcome, summary, and optional data an agent reports at the end of its Session. | PLAN §3 |

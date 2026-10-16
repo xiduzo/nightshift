@@ -8,6 +8,7 @@ import {
 	daemon,
 	db,
 	engine,
+	profiles,
 	settings,
 } from "./services";
 
@@ -27,6 +28,7 @@ export async function createContext({
 		session,
 		settings,
 		connections,
+		profiles,
 		checks,
 		daemon,
 	};

@@ -149,6 +149,23 @@ function validateIn(
 				if (node.prompt.trim() === "" && node.skill === undefined) {
 					error(`Agent node "${node.id}" needs a prompt or a skill.`, at);
 				}
+				if (node.profile === undefined) {
+					const unset = [
+						node.harness === undefined ? "harness" : null,
+						node.model === undefined ? "model" : null,
+						node.permissionMode === undefined ? "permission mode" : null,
+					].filter((x) => x !== null);
+					if (unset.length > 0) {
+						const list =
+							unset.length === 1
+								? unset[0]
+								: `${unset.slice(0, -1).join(", ")} and ${unset.at(-1)}`;
+						error(
+							`Agent node "${node.id}" needs a profile, or its own ${list}.`,
+							at,
+						);
+					}
+				}
 				template(node.prompt, "prompt");
 				if (node.outcomes !== undefined) {
 					checkOptions(node, flow, error, warning);

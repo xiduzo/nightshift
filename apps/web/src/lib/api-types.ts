@@ -34,7 +34,7 @@ export type ScheduleSummary = ScheduleList["schedules"][number];
 export type ScheduleResult = NonNullable<ScheduleSummary["last"]>;
 export type ScheduleIssue = ScheduleSummary["issues"][number];
 
-export type PermissionMode = AgentNode["permissionMode"];
+export type PermissionMode = NonNullable<AgentNode["permissionMode"]>;
 export type Effort = NonNullable<AgentNode["effort"]>;
 export type { Outcome };
 

@@ -8,6 +8,10 @@ import {
 } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
+import { CLAUDE_CODE_MODELS } from "@tanstack/ai-claude-code";
+import { CODEX_MODELS } from "@tanstack/ai-codex";
+import { OPENCODE_MODELS } from "@tanstack/ai-opencode";
+
 import type { HarnessName, McpServerConfig } from "./types";
 
 /**
@@ -194,6 +198,107 @@ export async function checkHarness(
 			return opencodeCheck(bin);
 		case "codex":
 			return codexCheck(bin);
+	}
+}
+
+/** A harness adapter: the TanStack AI package that drives one coding-agent CLI. */
+export type HarnessAdapter = {
+	name: HarnessName;
+	label: string;
+	/** The `@tanstack/ai-*` package. */
+	pkg: string;
+	/** The CLI it runs, as found on the PATH. */
+	bin: string;
+	/** The models the adapter knows, for autocomplete: any other id works too. */
+	models: readonly string[];
+	/** The CLI's own command that lists the models it can reach, if it has one. */
+	listing: readonly string[] | null;
+};
+
+/**
+ * Every TanStack AI harness adapter (packages tagged `harness`). The other
+ * `@tanstack/ai-*` adapters (Anthropic, OpenAI, Ollama, …) are chat
+ * adapters: they cannot run tools in a worktree, so they cannot run an
+ * Agent node.
+ */
+export const HARNESS_ADAPTERS: Record<HarnessName, HarnessAdapter> = {
+	"claude-code": {
+		name: "claude-code",
+		label: "Claude Code",
+		pkg: "@tanstack/ai-claude-code",
+		bin: "claude",
+		models: CLAUDE_CODE_MODELS,
+		// Claude Code has no listing; its aliases (sonnet, opus, haiku) are in the adapter's list.
+		listing: null,
+	},
+	opencode: {
+		name: "opencode",
+		label: "OpenCode",
+		pkg: "@tanstack/ai-opencode",
+		bin: "opencode",
+		models: OPENCODE_MODELS,
+		listing: ["models"],
+	},
+	codex: {
+		name: "codex",
+		label: "Codex",
+		pkg: "@tanstack/ai-codex",
+		bin: "codex",
+		models: CODEX_MODELS,
+		listing: null,
+	},
+};
+
+export type HarnessModels = {
+	/** The adapter's models, then the ones only the CLI listed. */
+	models: string[];
+	/** How many of `models` came from the CLI's listing and not the adapter. */
+	listed: number;
+	/** Why the CLI's listing did not answer. Null when it did, or when it has none. */
+	problem: string | null;
+	checkedAt: number;
+};
+
+/**
+ * The models a harness offers: the adapter's list, plus what the CLI lists
+ * itself when it can (`opencode models`: one `provider/model` per line).
+ * Never throws: a CLI that cannot answer leaves the adapter's list, so the
+ * picker is never empty.
+ */
+export async function harnessModels(
+	harness: HarnessName,
+	bin: string,
+): Promise<HarnessModels> {
+	const adapter = HARNESS_ADAPTERS[harness];
+	const known = [...adapter.models];
+	const result = (listedModels: string[], problem: string | null) => {
+		const extra = listedModels.filter((m) => !known.includes(m));
+		return {
+			models: [...known, ...extra],
+			listed: extra.length,
+			problem,
+			checkedAt: Date.now(),
+		};
+	};
+	if (!adapter.listing) return result([], null);
+	const path = await resolveBin(bin);
+	if (!path) return result([], `${bin} is not there.`);
+	try {
+		const out = await run([path, ...adapter.listing]);
+		if (out.code !== 0) {
+			return result(
+				[],
+				firstLine(out.stderr) ??
+					`${adapter.listing.join(" ")} exited with ${out.code}.`,
+			);
+		}
+		const listed = out.stdout
+			.split("\n")
+			.map((line) => line.trim())
+			.filter((line) => line.includes("/") && !/\s/.test(line));
+		return result([...new Set(listed)], null);
+	} catch (error) {
+		return result([], String(error));
 	}
 }
 

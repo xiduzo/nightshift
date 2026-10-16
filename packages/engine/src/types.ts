@@ -8,6 +8,7 @@ import type {
 import type { Database } from "@nightshift/db";
 import type {
 	AgentNode,
+	AgentProfileSettings,
 	Flow,
 	FlowIssue,
 	FlowListItem,
@@ -430,4 +431,16 @@ export type EngineOptions = {
 	) => Promise<McpExpansion>;
 	/** The connections this daemon has. A flow that names another refuses to start. */
 	connectionNames?: () => ReadonlySet<string>;
+	/**
+	 * The harnesses added on the Agents page, read when a run starts and
+	 * when a session starts. A harness left out cannot run an Agent node,
+	 * even when `harnesses` has it. Without it: every harness in `harnesses`.
+	 */
+	harnessNames?: () => ReadonlySet<HarnessName>;
+	/**
+	 * An Agent Profile by name. A run resolves the profiles its Agent nodes
+	 * name when it starts; a flow that names a profile this returns null for
+	 * refuses to start. Without it, no profile exists.
+	 */
+	profileFor?: (name: string) => AgentProfileSettings | null;
 };

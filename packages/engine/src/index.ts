@@ -22,6 +22,11 @@ export {
 	pidAlive,
 } from "./lease";
 export {
+	createProfileStore,
+	type ProfileStore,
+	type ProfileView,
+} from "./profiles";
+export {
 	exportRun,
 	openRunBundle,
 	RUN_BUNDLE_FORMAT_VERSION,

@@ -126,7 +126,7 @@ describe("connections at the start", () => {
 				),
 			}),
 		).rejects.toThrow(
-			'The flow names the connection "ghost" (planner, builder), but this daemon does not have it. Add it under Connections. The flow names the connection "phantom" (builder), but this daemon does not have it. Add it under Connections.',
+			'The flow names the connection "ghost" (planner, builder), but this daemon does not have it. Add it under Agents → Tools. The flow names the connection "phantom" (builder), but this daemon does not have it. Add it under Agents → Tools.',
 		);
 		expect(await engine.listRuns()).toEqual([]);
 		expect(harness.calls).toHaveLength(0);

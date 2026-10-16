@@ -1,6 +1,7 @@
 // Browser-safe. File access lives in "@nightshift/flows/files".
 export * from "./items";
 export * from "./migrate";
+export * from "./profiles";
 export * from "./quick";
 export * from "./schedules";
 export * from "./schema";

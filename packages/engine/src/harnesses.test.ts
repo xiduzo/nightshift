@@ -180,7 +180,7 @@ describe("harnesses", () => {
 				),
 			}),
 		).rejects.toThrow(
-			"The flow has Agent nodes on OpenCode (builder, fixer), but no OpenCode harness is configured. The flow has an Agent node on Codex (reviewer), but no Codex harness is configured.",
+			"The flow has Agent nodes on OpenCode (builder, fixer), but no OpenCode harness is added. Add it under Agents. The flow has an Agent node on Codex (reviewer), but no Codex harness is added. Add it under Agents.",
 		);
 		expect(await engine.listRuns()).toEqual([]);
 		expect(claude.calls).toHaveLength(0);
@@ -268,7 +268,7 @@ describe("MCP servers", () => {
 		const step = (await engine.getRun(run.id)).steps[0];
 		expect(step?.outcome).toBe("error");
 		expect(step?.error).toBe(
-			'The MCP server "tracker" reads the environment variable NIGHTSHIFT_TEST_NOT_SET, but the daemon does not have it. Save it under Connections → Secrets, set it where the daemon starts, or remove the reference.',
+			'The MCP server "tracker" reads the environment variable NIGHTSHIFT_TEST_NOT_SET, but the daemon does not have it. Save it under Agents → Secrets, set it where the daemon starts, or remove the reference.',
 		);
 		expect(step?.error).not.toContain(SECRET);
 		expect(step?.sessions).toEqual([]);
@@ -332,7 +332,7 @@ describe("expandMcpServers", () => {
 		expect(result).toEqual({
 			ok: false,
 			message:
-				'The MCP server "a" reads the environment variables MISSING_ONE, MISSING_TWO, but the daemon does not have them. Save them under Connections → Secrets, set them where the daemon starts, or remove the reference.',
+				'The MCP server "a" reads the environment variables MISSING_ONE, MISSING_TWO, but the daemon does not have them. Save them under Agents → Secrets, set them where the daemon starts, or remove the reference.',
 		});
 	});
 

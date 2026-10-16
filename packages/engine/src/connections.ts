@@ -261,7 +261,7 @@ export function createConnectionStore(options: {
 				if (!found) {
 					return {
 						ok: false,
-						message: `The connection "${name}" does not exist on this daemon. Add it under Connections, or remove it from the node.`,
+						message: `The connection "${name}" does not exist on this daemon. Add it under Agents → Tools, or remove it from the node.`,
 					};
 				}
 				servers[name] = found.server;

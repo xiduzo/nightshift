@@ -1,6 +1,6 @@
 import type { AgentNode } from "@nightshift/flows";
 
-export type HarnessName = AgentNode["harness"];
+export type HarnessName = NonNullable<AgentNode["harness"]>;
 
 export type HarnessInfo = {
 	value: HarnessName;
@@ -69,12 +69,13 @@ export function switchHarness(
 	harness: HarnessName,
 ): AgentNode {
 	if (node.harness === harness) return node;
-	const before = harnessInfo(node.harness);
+	const before = node.harness ? harnessInfo(node.harness) : null;
+	const model = node.model ?? "";
 	const keepModel =
-		node.model.trim() !== "" && !before.models.includes(node.model);
+		model.trim() !== "" && before !== null && !before.models.includes(model);
 	return {
 		...node,
 		harness,
-		model: keepModel ? node.model : harnessInfo(harness).defaultModel,
+		model: keepModel ? model : harnessInfo(harness).defaultModel,
 	};
 }
