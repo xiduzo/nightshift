@@ -3,7 +3,7 @@ import {
 	isGraphInterrupt,
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
-import type { Flow, FlowNode, Outcome } from "@nightshift/flows";
+import type { Flow, FlowNode, NodeOutputs, Outcome } from "@nightshift/flows";
 
 import {
 	type DerivedStep,
@@ -51,7 +51,13 @@ import type { Parked, RunStateValues } from "../state";
 export type BodyRun = { branch: string; base_branch: string; index: string };
 
 export type BodyEnd =
-	| { kind: "finished"; node: FlowNode; outcome: Outcome }
+	| {
+			kind: "finished";
+			node: FlowNode;
+			outcome: Outcome;
+			/** The body's node outputs, from its final state. */
+			nodes: NodeOutputs;
+	  }
 	| { kind: "failed"; reason: string }
 	| { kind: "stopped"; reason: string | null; interrupt: GraphInterrupt }
 	| { kind: "aborted"; reason: string; interrupt: GraphInterrupt }
@@ -80,6 +86,8 @@ export async function runBody(input: {
 	config: LangGraphRunnableConfig;
 	scope: Scope;
 	run: BodyRun;
+	/** The caller's stop time, as `stopAtOf` reads it: the body checks the same one. */
+	stopAt: number | null;
 }): Promise<BodyEnd> {
 	const config: LangGraphRunnableConfig = {
 		...input.config,
@@ -87,6 +95,7 @@ export async function runBody(input: {
 			...input.config.configurable,
 			scope: input.scope,
 			run: input.run,
+			stopAt: input.stopAt,
 		},
 	};
 	let result: RunStateValues;
@@ -121,10 +130,19 @@ export async function runBody(input: {
 			`The flow "${input.flowName}" has no node "${ended.nodeId}".`,
 		);
 	}
-	return { kind: "finished", node, outcome: ended.outcome as Outcome };
+	return {
+		kind: "finished",
+		node,
+		outcome: ended.outcome as Outcome,
+		nodes: result.nodes,
+	};
 }
 
-/** The called flow's declared outputs, rendered in the body's own context from the log. */
+/**
+ * The called flow's declared outputs, rendered in the body's own context:
+ * from the node outputs of a finished body's state, or from the log for a
+ * body that failed (its state was never returned).
+ */
 export async function bodyOutputs(
 	ctx: StepContext,
 	input: {
@@ -134,10 +152,15 @@ export async function bodyOutputs(
 		scope: Scope;
 		run: BodyRun;
 	},
+	nodes?: NodeOutputs,
 ): Promise<StepOutputs> {
-	const events = await ctx.log.events(ctx.run.id);
 	return flowOutputs(input.called, {
-		nodes: deriveNodeOutputs(events, scopeKey(input.scope)),
+		nodes:
+			nodes ??
+			deriveNodeOutputs(
+				await ctx.log.events(ctx.run.id),
+				scopeKey(input.scope),
+			),
 		inputs: input.inputs,
 		run: {
 			...input.run,

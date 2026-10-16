@@ -385,7 +385,7 @@ describe("runs", () => {
 		expect(transcript.at(-1)?.event.type).toBe("finished");
 	});
 
-	test("a finished run's checkpoints are deleted; a resume of it re-enters from the log and continues the last session", async () => {
+	test("a finished run keeps its latest checkpoint only; a resume re-enters on it and continues the last session", async () => {
 		const harness = fakeHarness(reportingScript("pass", "Done"));
 		const engine = makeEngine(harness);
 		const run = await engine.startRun({
@@ -407,14 +407,14 @@ describe("runs", () => {
 					.from(lgWrite)
 					.where(eq(lgWrite.threadId, run.id))
 			).length;
-		// The log is the record; the thread's bookkeeping goes.
-		await waitFor(async () => (await checkpoints()) === 0, {
-			label: "the checkpoints to be deleted",
+		// The log is the record; the thread's history goes, its final state stays.
+		await waitFor(async () => (await checkpoints()) === 1, {
+			label: "the checkpoints to be pruned",
 		});
 		expect(await writes()).toBe(0);
 
-		// A resume finds no thread and re-enters from the log at the last
-		// step, continuing its harness session with the person's prompt.
+		// A resume re-enters the thread on that checkpoint at the last step,
+		// continuing its harness session with the person's prompt.
 		await engine.resumeRun(run.id, "Once more.");
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 		expect(harness.calls).toHaveLength(2);
@@ -427,8 +427,8 @@ describe("runs", () => {
 			["worker", 1, "pass"],
 		]);
 		expect(detail.steps[0]?.sessions).toHaveLength(2);
-		await waitFor(async () => (await checkpoints()) === 0, {
-			label: "the checkpoints to be deleted again",
+		await waitFor(async () => (await checkpoints()) === 1, {
+			label: "the checkpoints to be pruned again",
 		});
 	});
 

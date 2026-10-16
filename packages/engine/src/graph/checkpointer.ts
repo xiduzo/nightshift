@@ -257,6 +257,31 @@ export class LibsqlSaver extends BaseCheckpointSaver {
 		if (statements.length > 0) await this.client.batch(statements, "write");
 	}
 
+	/**
+	 * Keeps the thread's latest root checkpoint (with its pending writes) and
+	 * deletes every other checkpoint and write of the thread: the older root
+	 * ones and every subgraph namespace. The thread stays re-enterable from
+	 * its final state; its history goes.
+	 */
+	async pruneThread(threadId: string): Promise<void> {
+		const latest = `(SELECT MAX(checkpoint_id) FROM lg_checkpoint
+        WHERE thread_id = ? AND checkpoint_ns = '')`;
+		const keep = `checkpoint_ns = '' AND checkpoint_id = ${latest}`;
+		await this.client.batch(
+			[
+				{
+					sql: `DELETE FROM lg_checkpoint WHERE thread_id = ? AND NOT (${keep})`,
+					args: [threadId, threadId],
+				},
+				{
+					sql: `DELETE FROM lg_write WHERE thread_id = ? AND NOT (${keep})`,
+					args: [threadId, threadId],
+				},
+			],
+			"write",
+		);
+	}
+
 	async deleteThread(threadId: string): Promise<void> {
 		await this.client.batch(
 			[

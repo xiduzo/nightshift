@@ -131,6 +131,63 @@ describe("LibsqlSaver", () => {
 		]);
 	});
 
+	test("pruneThread keeps the latest root checkpoint and its writes, drops the rest of the thread", async () => {
+		const body = (threadId: string) => ({
+			configurable: { thread_id: threadId, checkpoint_ns: "sub:task-1" },
+		});
+		const older = await saver.put(
+			thread("run-1"),
+			checkpoint({ count: 1 }),
+			metadata(-1),
+			{},
+		);
+		await saver.putWrites(older, [["count", 1]], "task-a");
+		const inBody = await saver.put(
+			body("run-1"),
+			checkpoint({ count: 9 }),
+			metadata(0),
+			{},
+		);
+		await saver.putWrites(inBody, [["count", 9]], "task-b");
+		const latest = await saver.put(
+			{ ...thread("run-1"), ...older },
+			checkpoint({ count: 2 }),
+			metadata(1),
+			{},
+		);
+		await saver.putWrites(latest, [["count", 2]], "task-c");
+		const other = await saver.put(
+			thread("run-2"),
+			checkpoint({ count: 5 }),
+			metadata(-1),
+			{},
+		);
+		await saver.putWrites(other, [["count", 5]], "task-d");
+
+		await saver.pruneThread("run-1");
+
+		const kept = await saver.getTuple(thread("run-1"));
+		expect(kept?.checkpoint.channel_values).toEqual({ count: 2 });
+		expect(kept?.pendingWrites).toEqual([["task-c", "count", 2]]);
+		expect(await saver.getTuple(body("run-1"))).toBeUndefined();
+		const count = async (table: string, threadId: string) =>
+			Number(
+				(
+					await sandbox.db.$client.execute({
+						sql: `SELECT count(*) AS n FROM ${table} WHERE thread_id = ?`,
+						args: [threadId],
+					})
+				).rows[0]?.n,
+			);
+		expect(await count("lg_checkpoint", "run-1")).toBe(1);
+		expect(await count("lg_write", "run-1")).toBe(1);
+		expect(await count("lg_checkpoint", "run-2")).toBe(1);
+		expect(await count("lg_write", "run-2")).toBe(1);
+		// Pruning an already pruned thread changes nothing.
+		await saver.pruneThread("run-1");
+		expect(await count("lg_checkpoint", "run-1")).toBe(1);
+	});
+
 	test("deleteThread removes the thread's checkpoints and writes, nothing else", async () => {
 		const gone = await saver.put(
 			thread("gone"),

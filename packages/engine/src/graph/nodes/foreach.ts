@@ -15,7 +15,6 @@ import {
 	type DerivedStep,
 	deriveSteps,
 	deriveStopAfterStep,
-	deriveStopAt,
 	type EnginePayloads,
 	type InputValues,
 	type ItemFacts,
@@ -49,6 +48,7 @@ import {
 	STOP_TIME_REASON,
 	type StepContext,
 	type StepStart,
+	stopAtOf,
 	uncommittedStep,
 } from "../context";
 import { parkCommand, route, type StepEnd, scopeOf } from "../route";
@@ -210,7 +210,11 @@ export function forEachNode(node: ForEachNode, ctx: StepContext): NodeAction {
 			};
 		} else {
 			if (ctx.signal().aborted) return parkStopped(null);
-			const stop = stopBeforeNext(ctx, await ctx.log.events(runId));
+			const stop = stopBeforeNext(
+				ctx,
+				stopAtOf(state, config),
+				await ctx.log.events(runId),
+			);
 			if (stop) return parkStopped(stop);
 
 			let items: ListItem[];
@@ -342,7 +346,12 @@ export function forEachNode(node: ForEachNode, ctx: StepContext): NodeAction {
 			},
 		};
 		graph ??= bodyGraph(ctx, called, node.flow);
-		const ended = await runBody({ graph, config, ...body });
+		const ended = await runBody({
+			graph,
+			config,
+			stopAt: stopAtOf(state, config),
+			...body,
+		});
 		switch (ended.kind) {
 			case "paused":
 				// The step stays open: the element continues after the wait.
@@ -360,7 +369,7 @@ export function forEachNode(node: ForEachNode, ctx: StepContext): NodeAction {
 				return next(element);
 			}
 			case "finished": {
-				const outputs = await bodyOutputs(ctx, body);
+				const outputs = await bodyOutputs(ctx, body, ended.nodes);
 				if (haltOn.includes(ended.outcome)) {
 					await endItem(
 						element.facts.id,
@@ -421,10 +430,10 @@ function entryOf(
 /** Why the loop must stop before the next element, or null. */
 function stopBeforeNext(
 	ctx: StepContext,
+	stopAt: number | null,
 	events: readonly LoggedEvent[],
 ): string | null {
 	if (deriveStopAfterStep(events)) return STOP_AFTER_STEP_REASON;
-	const stopAt = deriveStopAt(events);
 	if (stopAt !== null && ctx.now() >= stopAt) return STOP_TIME_REASON;
 	return null;
 }

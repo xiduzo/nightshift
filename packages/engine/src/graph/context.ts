@@ -26,13 +26,11 @@ import {
 	type DerivedStep,
 	deriveSteps,
 	deriveStopAfterStep,
-	deriveStopAt,
 	type LoggedEvent,
 	type Scope,
 	type StepOutputs,
 	scopeKey,
 	type WaitReason,
-	waitStreak,
 } from "../events";
 import type { McpExpansion } from "../mcp";
 import { planWait } from "../policy";
@@ -255,6 +253,20 @@ export function uncommittedStep(
 	);
 }
 
+/**
+ * The run's stop time as this graph sees it (epoch ms, or null). The root
+ * reads its state; a body reads its caller's, which `runBody` puts in
+ * `configurable.stopAt` on every invoke, so a stop time a resume cleared
+ * at the root reaches a body that resumes from its own checkpoint.
+ */
+export function stopAtOf(
+	state: RunStateValues,
+	config: LangGraphRunnableConfig,
+): number | null {
+	const own = config.configurable?.stopAt as number | null | undefined;
+	return own === undefined ? state.stopAt : own;
+}
+
 /** Why a step's signal aborted. */
 export type AbortReason = "stopped" | "timeout" | "idle";
 
@@ -355,7 +367,7 @@ export async function beginStep(
 		if (deriveStopAfterStep(events)) {
 			return parked("stopped", STOP_AFTER_STEP_REASON);
 		}
-		const stopAt = deriveStopAt(events);
+		const stopAt = stopAtOf(state, config);
 		if (stopAt !== null && ctx.now() >= stopAt) {
 			return parked("stopped", STOP_TIME_REASON);
 		}
@@ -559,23 +571,32 @@ export type WaitRequest = {
  * interrupts; a wake re-enters the node, which continues the step. The
  * runner appends `WaitEnded` and the transcript `wake` entry on the wake,
  * not the node. Gives up (the step ends `error`) once the grace is spent.
+ *
+ * The streak is the one the step's pending wait carries (`pending.streak`)
+ * when the step continues after a wait for the same reason; a new or
+ * reopened step, or the other reason, starts a new one.
  */
 export async function beginWait(
 	ctx: StepContext,
 	node: FlowNode,
+	state: RunStateValues,
 	step: StepHandle,
 	request: WaitRequest,
 ): Promise<
 	{ kind: "wait"; pending: PendingWait } | { kind: "give-up"; error: string }
 > {
 	const runId = ctx.run.id;
+	const previous = state.pending;
+	const streak =
+		step.opened === "continue" &&
+		previous?.kind === "wait" &&
+		previous.stepId === step.stepId &&
+		previous.reason === request.reason
+			? previous.streak
+			: null;
 	const plan = planWait({
 		reason: request.reason,
-		streak: waitStreak(
-			await ctx.log.events(runId),
-			step.stepId,
-			request.reason,
-		),
+		streak,
 		message: request.message,
 		resetAt: request.resetAt,
 		policy: ctx.policy(),
@@ -615,6 +636,7 @@ export async function beginWait(
 			until: plan.until,
 			message: plan.message,
 			resetAt: request.resetAt,
+			streak: { count: (streak?.count ?? 0) + 1, since: plan.since },
 		},
 	};
 }

@@ -100,7 +100,8 @@ describe("the Gate node", () => {
 		const first = await drive(h, { inputs: { task: "the thing" } });
 		const [gateStep] = deriveSteps(await h.events());
 		const stepId = gateStep?.id as string;
-		expect(first.next).toEqual(["gate"]);
+		// The node opened the Gate and committed it; its ask node interrupts.
+		expect(first.next).toEqual(["ask__gate"]);
 		expect(first.parked).toEqual([
 			{
 				kind: "gate",
@@ -110,9 +111,16 @@ describe("the Gate node", () => {
 				choices: CHOICES,
 			},
 		]);
-		// Nothing committed: the step is open in the log only.
+		// The visit commits on the answer; the open Gate is in the checkpoint.
 		expect(first.state.visits).toEqual({});
-		expect(first.state.pending).toBeNull();
+		expect(first.state.pending).toEqual({
+			kind: "gate",
+			stepId,
+			nodeId: "gate",
+			visit: 1,
+			question: "Ship the thing?",
+			choices: CHOICES,
+		});
 		expect(first.state.ended).toBeNull();
 
 		expect(await h.types()).toEqual([
@@ -271,10 +279,10 @@ describe("the Gate node", () => {
 		const before = await h.events();
 		const stepId = deriveSteps(before)[0]?.id as string;
 
-		// invoke(null) on a new compile: the node re-runs from its top.
+		// invoke(null) on a new compile: the ask node interrupts again.
 		const again = await drive(h, null, h.graph());
 		expect(again.parked).toEqual(first.parked);
-		expect(again.next).toEqual(["gate"]);
+		expect(again.next).toEqual(["ask__gate"]);
 		expect(again.events).toEqual([]);
 		expect(await h.events()).toEqual(before);
 		expect(
@@ -295,6 +303,69 @@ describe("the Gate node", () => {
 		expect(
 			(await h.events()).filter((e) => e.type === "GateOpened"),
 		).toHaveLength(1);
+		expect((await h.events()).find((e) => e.type === "StepEnded")?.stepId).toBe(
+			stepId,
+		);
+	});
+
+	test("a daemon death between GateOpened and the checkpoint opens no second Gate", async () => {
+		const h = await startRun(sandbox, gateFlow());
+		// The node appended GateOpened and the transcript line and returned,
+		// then the daemon died before its writes reached the checkpointer:
+		// the thread is pending at the node, and only the log knows the Gate
+		// is open.
+		const putWrites = h.saver.putWrites.bind(h.saver);
+		const put = h.saver.put.bind(h.saver);
+		let dying = false;
+		h.saver.putWrites = async (config, writes, taskId, taskPath) => {
+			if (!dying && writes.some(([channel]) => channel === "pending")) {
+				dying = true;
+				throw new Error("the daemon died");
+			}
+			return putWrites(config, writes, taskId, taskPath);
+		};
+		h.saver.put = async (config, checkpoint, metadata) => {
+			if (dying) throw new Error("the daemon died");
+			return put(config, checkpoint, metadata);
+		};
+		await expect(drive(h, { inputs: { task: "it" } })).rejects.toThrow(
+			"the daemon died",
+		);
+		h.saver.put = put;
+		h.saver.putWrites = putWrites;
+		const dead = await h.graph().getState(h.config);
+		expect(dead.next).toEqual(["gate"]);
+		expect(dead.values.pending).toBeNull();
+		const before = await h.events();
+		expect(before.map((e) => e.type)).toEqual([
+			"RunStarted",
+			"StepStarted",
+			"GateOpened",
+		]);
+		const stepId = deriveSteps(before)[0]?.id as string;
+
+		// The re-run finds the open Gate in the log and asks it, logging nothing.
+		const again = await drive(h, null, h.graph());
+		expect(again.next).toEqual(["ask__gate"]);
+		expect(again.parked).toEqual([
+			{
+				kind: "gate",
+				stepId,
+				nodeId: "gate",
+				question: "Ship it?",
+				choices: CHOICES,
+			},
+		]);
+		expect(again.state.pending).toMatchObject({ kind: "gate", stepId });
+		expect(await h.events()).toEqual(before);
+
+		const answered = await drive(
+			h,
+			new Command({ resume: { kind: "gate", choice: "approve" } }),
+			h.graph(),
+		);
+		expect(answered.state.ended?.nodeId).toBe("ship");
+		expect(answered.state.visits).toEqual({ gate: 1, ship: 1 });
 		expect((await h.events()).find((e) => e.type === "StepEnded")?.stepId).toBe(
 			stepId,
 		);

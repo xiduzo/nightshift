@@ -54,7 +54,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Quick Run | A Run of a one-node Flow made from a prompt, without a Flow file. | Slice 2 |
 | Step | One visit of one Node in a Run. The graph node of that Node runs it; its facts are Events. | Slice 2 |
 | Thread | The LangGraph thread of a Run. Its id is the Run's id, and it holds the Run's Checkpoints. | LangGraph |
-| Checkpoint | The run state LangGraph writes after every Node, in the tables `lg_checkpoint` and `lg_write`: outputs for templates, visit and edge counts, For Each cursors, and the pending Step. The engine's bookkeeping, never the read model. | LangGraph |
+| Checkpoint | The run state LangGraph writes after every Node, in the tables `lg_checkpoint` and `lg_write`: inputs, the stop time, outputs for templates, visit and edge counts, For Each cursors, and the pending Step (a Wait with its streak, a parked Step, or an open Gate). The walk reads it; people read the Event Log. A finished Run keeps its latest Checkpoint only. | LangGraph |
 | Interrupt | How a Thread parks: a Wait, an open Gate, or a Step that failed or was stopped. A resume answers it, and the Run continues at the same Node, at any depth. | LangGraph |
 | Wait | A Step's sleep on a usage limit or a network failure. The Node's wait node holds it with an Interrupt; a wake continues the same Session. Agent Nodes and Decisions decided by a model wait. | LangGraph |
 | Visit | The count of a Step among the Steps of the same Node: 1 for the first. | Slice 2 |

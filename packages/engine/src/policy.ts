@@ -1,6 +1,6 @@
 import type { ResolvedPolicy } from "@nightshift/flows";
 
-import type { EnginePayloads, WaitReason } from "./events";
+import type { WaitReason } from "./events";
 
 /**
  * The run policy's waits, ported from night-shift.py. A usage limit waits
@@ -17,10 +17,13 @@ export type WaitPlan =
 	| { kind: "wait"; until: number; since: number; message: string }
 	| { kind: "give-up"; error: string };
 
+/** The earlier waits of a step for one reason: how many, and when the first began. */
+export type WaitStreak = { count: number; since: number };
+
 export function planWait(input: {
 	reason: WaitReason;
-	/** The earlier waits of this streak, oldest first. */
-	streak: readonly EnginePayloads["WaitStarted"][];
+	/** The earlier waits of this streak; null for the first. */
+	streak: WaitStreak | null;
 	/** The harness's error message. */
 	message: string;
 	resetAt: number | null;
@@ -28,8 +31,9 @@ export function planWait(input: {
 	now: number;
 	minuteMs: number;
 }): WaitPlan {
-	const { reason, streak, policy, now, minuteMs } = input;
-	const since = streak[0]?.since ?? now;
+	const { reason, policy, now, minuteMs } = input;
+	const earlier = input.streak?.count ?? 0;
+	const since = input.streak?.since ?? now;
 	if (reason === "usage-limit") {
 		if (input.resetAt !== null) {
 			const until = Math.max(input.resetAt + minuteMs, now);
@@ -41,7 +45,7 @@ export function planWait(input: {
 			};
 		}
 		const minutes = Math.min(
-			policy.usageLimitFirstWaitMinutes * 2 ** streak.length,
+			policy.usageLimitFirstWaitMinutes * 2 ** earlier,
 			policy.usageLimitMaxWaitMinutes,
 		);
 		return {
@@ -53,7 +57,7 @@ export function planWait(input: {
 	}
 	const minutes =
 		NETWORK_WAITS_MINUTES[
-			Math.min(streak.length, NETWORK_WAITS_MINUTES.length - 1)
+			Math.min(earlier, NETWORK_WAITS_MINUTES.length - 1)
 		] ?? 15;
 	const pause = minutes * minuteMs;
 	if (now - since + pause > policy.networkGraceMinutes * minuteMs) {

@@ -573,6 +573,9 @@ export function createEngine(
 				prompt ??
 				(input.by === "daemon" ? DAEMON_RESUME_PROMPT : DEFAULT_RESUME_PROMPT);
 			const stopAt = deriveStopAt(events);
+			// A resume past the stop time clears it: in the log, and in the
+			// thread's state before the node continues.
+			const clearStopAt = stopAt !== null && now() >= stopAt;
 			await runLog.append({
 				type: "RunResumed",
 				runId,
@@ -581,11 +584,12 @@ export function createEngine(
 					stepId: target.stepId,
 					prompt: target.stepId ? resumedPrompt : null,
 					scope: target.scope,
-					...(stopAt !== null && now() >= stopAt ? { clearStopAt: true } : {}),
+					...(clearStopAt ? { clearStopAt: true } : {}),
 					by: input.by,
 					...(input.by === "daemon" ? { reason: DAEMON_RESUME_REASON } : {}),
 				},
 			});
+			const update = clearStopAt ? { stopAt: null } : undefined;
 			switch (thread.kind) {
 				case "interrupted":
 					runner.resume(
@@ -593,14 +597,15 @@ export function createEngine(
 						thread.value.kind === "gate"
 							? { kind: "reopen" }
 							: { kind: "resume", prompt: resumedPrompt },
+						update,
 					);
 					break;
 				case "pending":
-					runner.continueRun(row);
+					runner.continueRun(row, update);
 					break;
 				case "ended":
 				case "fresh":
-					runner.reenter(row, target.topNodeId, events);
+					await runner.reenter(row, target.topNodeId, events, update);
 					break;
 			}
 		} finally {
@@ -886,7 +891,7 @@ export function createEngine(
 				runId,
 				payload: worktree,
 			});
-			runner.start(row, inputs);
+			runner.start(row, inputs, input.stopAt ?? null);
 			return toSummary(row, runFacts(await loadRunEvents(runId)));
 		} finally {
 			runner.releaseStartingSlot(runId);

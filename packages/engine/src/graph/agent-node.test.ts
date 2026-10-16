@@ -525,6 +525,7 @@ describe("the Agent node", () => {
 			message:
 				"Usage limit: You've hit your limit. The step continues a minute after the reset.",
 			resetAt,
+			streak: { count: 1, since: expect.any(Number) },
 		});
 		expect(first.state.ended).toBeNull();
 		expect(await h.types()).toEqual([
