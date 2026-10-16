@@ -156,8 +156,8 @@ export function outcomeStyle(outcome: Outcome): Omit<Style, "label"> {
 
 /**
  * What a step shows: its outcome, else running, or waiting for an open Gate.
- * In a sleeping run, the step that has not ended sleeps with it (a For Each
- * step keeps running: one of its body steps sleeps).
+ * In a sleeping run, the step that has not ended sleeps with it (a Subflow
+ * or For Each step keeps running: one of the steps it called sleeps).
  */
 export function stepState(
 	step: Pick<StepSummary, "outcome" | "nodeType">,
@@ -165,7 +165,11 @@ export function stepState(
 ): StepState {
 	if (step.outcome !== null) return step.outcome;
 	if (step.nodeType === "gate") return "waiting";
-	if (runStatus === "sleeping" && step.nodeType !== "foreach") {
+	if (
+		runStatus === "sleeping" &&
+		step.nodeType !== "foreach" &&
+		step.nodeType !== "subflow"
+	) {
 		return "sleeping";
 	}
 	return "running";

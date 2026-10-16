@@ -1,17 +1,25 @@
 import { describe, expect, test } from "bun:test";
-import { blockersFirst, type ItemState, newlyBlocked, nextItem } from "./items";
-import type { SourceItem } from "./types";
+import {
+	blockersFirst,
+	type ItemState,
+	newlyBlocked,
+	nextItem,
+	normalizeList,
+} from "./items";
+import type { ListItem } from "./types";
 
-/** An item blocked by the given ids; a blocker counts as not done. */
+/** An item that depends on the given ids; a dependency counts as not done. */
 function item(
 	id: string,
-	blockedBy: (string | { id: string; done: boolean })[] = [],
-	extra: Partial<SourceItem> = {},
-): SourceItem {
+	dependsOn: (string | { id: string; done: boolean })[] = [],
+	extra: Partial<ListItem> = {},
+): ListItem {
 	return {
 		id,
 		title: `Item ${id}`,
-		blockedBy: blockedBy.map((entry) =>
+		url: null,
+		value: { id },
+		dependsOn: dependsOn.map((entry) =>
 			typeof entry === "string" ? { id: entry, done: false } : entry,
 		),
 		done: false,
@@ -19,15 +27,15 @@ function item(
 	};
 }
 
-function nth(list: readonly SourceItem[], index: number): SourceItem {
+function nth(list: readonly ListItem[], index: number): ListItem {
 	const found = list[index];
 	if (found === undefined) throw new Error(`no item at ${index}`);
 	return found;
 }
 
-const ids = (items: readonly SourceItem[]) => items.map((entry) => entry.id);
+const ids = (items: readonly ListItem[]) => items.map((entry) => entry.id);
 
-function ordered(items: SourceItem[]): SourceItem[] {
+function ordered(items: ListItem[]): ListItem[] {
 	const result = blockersFirst(items);
 	if (!result.ok) throw new Error(`cycle: ${result.cycle.join(", ")}`);
 	return result.items;
@@ -223,5 +231,182 @@ describe("newlyBlocked", () => {
 		for (const state of ["running", "halted", "done"] as const) {
 			expect(newlyBlocked(items, { "1": state })).toEqual([]);
 		}
+	});
+});
+
+describe("normalizeList", () => {
+	const items = (value: Parameters<typeof normalizeList>[0]) => {
+		const result = normalizeList(value);
+		if (!result.ok) throw new Error(result.error);
+		return result.items;
+	};
+
+	test("an object element gives id, title, url, dependsOn and done", () => {
+		const element = {
+			id: "login",
+			title: "Add login",
+			url: "https://example.com/1",
+			dependsOn: ["setup", { id: "db", done: false }, { id: "ci", done: true }],
+			done: false,
+			extra: { kept: [1, 2] },
+		};
+		expect(items([element])).toEqual([
+			{
+				id: "login",
+				title: "Add login",
+				url: "https://example.com/1",
+				value: element,
+				dependsOn: [
+					{ id: "setup", done: true },
+					{ id: "db", done: false },
+					{ id: "ci", done: true },
+				],
+				done: false,
+			},
+		]);
+	});
+
+	test("ids may be numbers; name stands in for id and title", () => {
+		expect(
+			items([
+				{ id: 12, title: "Twelve" },
+				{ name: "lint" },
+				{ name: 7, title: "Seven" },
+			]).map((entry) => [entry.id, entry.title]),
+		).toEqual([
+			["12", "Twelve"],
+			["lint", "lint"],
+			["7", "Seven"],
+		]);
+	});
+
+	test("without id or name, the id is the position", () => {
+		expect(
+			items([{ title: "a" }, { title: "b" }]).map((entry) => entry.id),
+		).toEqual(["0", "1"]);
+	});
+
+	test("blockedBy is read like dependsOn", () => {
+		expect(
+			items([{ id: "2", blockedBy: [1, { id: "3", done: false }] }])[0]
+				?.dependsOn,
+		).toEqual([
+			{ id: "1", done: true },
+			{ id: "3", done: false },
+		]);
+	});
+
+	test("dependency entries without an id are left out", () => {
+		expect(
+			items([{ id: "a", dependsOn: [null, true, "", { done: true }, "b"] }])[0]
+				?.dependsOn,
+		).toEqual([{ id: "b", done: true }]);
+	});
+
+	test("done is true only for true", () => {
+		expect(
+			items([
+				{ id: "a", done: true },
+				{ id: "b", done: "yes" },
+				{ id: "c" },
+			]).map((entry) => entry.done),
+		).toEqual([true, false, false]);
+	});
+
+	test("an element that is not an object keeps its value; title is short text", () => {
+		const long = "x".repeat(100);
+		expect(items(["src/a.ts", 42, [1, 2], null, long])).toEqual([
+			{
+				id: "0",
+				title: "src/a.ts",
+				url: null,
+				value: "src/a.ts",
+				dependsOn: [],
+				done: false,
+			},
+			{
+				id: "1",
+				title: "42",
+				url: null,
+				value: 42,
+				dependsOn: [],
+				done: false,
+			},
+			{
+				id: "2",
+				title: "[1,2]",
+				url: null,
+				value: [1, 2],
+				dependsOn: [],
+				done: false,
+			},
+			{
+				id: "3",
+				title: "null",
+				url: null,
+				value: null,
+				dependsOn: [],
+				done: false,
+			},
+			{
+				id: "4",
+				title: `${"x".repeat(59)}…`,
+				url: null,
+				value: long,
+				dependsOn: [],
+				done: false,
+			},
+		]);
+	});
+
+	test("an object without title or name gets a short text of itself", () => {
+		expect(items([{ id: "a", path: "src/a.ts" }])[0]?.title).toBe(
+			'{"id":"a","path":"src/a.ts"}',
+		);
+	});
+
+	test("a url that is not a string is null", () => {
+		expect(items([{ id: "a", url: 5 }])[0]?.url).toBeNull();
+	});
+
+	test("an empty array is an empty list", () => {
+		expect(normalizeList([])).toEqual({ ok: true, items: [] });
+	});
+
+	test("a value that is not an array is an error", () => {
+		for (const value of [{ tasks: [] }, "[]", null, 3]) {
+			const result = normalizeList(value);
+			expect(result.ok).toBe(false);
+			if (!result.ok) expect(result.error).toContain("not a JSON array");
+		}
+	});
+
+	test("duplicate ids are an error that names the id", () => {
+		expect(normalizeList([{ id: "a" }, { name: "a" }])).toEqual({
+			ok: false,
+			error: 'The list has the id "a" more than once (element 1).',
+		});
+		expect(normalizeList([{ id: 1 }, { id: "1" }]).ok).toBe(false);
+	});
+
+	test("normalized items order blockers first", () => {
+		const list = items([{ id: "b", dependsOn: ["a"] }, { id: "a" }]);
+		expect(ids(ordered(list))).toEqual(["a", "b"]);
+		// "a" is in the list and not done: "b" waits for it.
+		expect(nextItem(ordered(list), {})).toMatchObject({
+			kind: "item",
+			item: { id: "a" },
+		});
+		expect(nextItem(ordered(list), { a: "running" })).toMatchObject({
+			kind: "waiting",
+		});
+	});
+
+	test("a plain dependency outside the list counts as done", () => {
+		const list = items([{ id: "b", dependsOn: ["gone"] }]);
+		expect(nextItem(list, {})).toMatchObject({
+			kind: "item",
+			item: { id: "b" },
+		});
 	});
 });

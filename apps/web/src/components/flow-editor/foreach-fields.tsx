@@ -1,40 +1,34 @@
-import {
-	type Flow,
-	type ForEachNode,
-	flowNameSchema,
-	type ItemSource,
-} from "@nightshift/flows";
-import { Button } from "@nightshift/ui/components/button";
-import { Checkbox } from "@nightshift/ui/components/checkbox";
+import type { Flow, ForEachNode, ListSource } from "@nightshift/flows";
 import { Input } from "@nightshift/ui/components/input";
-import { Label } from "@nightshift/ui/components/label";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { ExternalLinkIcon, PlusIcon } from "lucide-react";
+import { TriangleAlertIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { emptySource } from "@/lib/flow-draft";
+import {
+	calledFlow,
+	emptySource,
+	nodeOptions,
+	SOURCE_KINDS,
+} from "@/lib/flow-draft";
 
+import {
+	CalledFlowField,
+	type CalledFlowSupport,
+	InputBindings,
+} from "./called-flow-fields";
 import { Field, PositiveIntInput } from "./fields";
 import { OptionsEditor } from "./options-editor";
 import { TemplateField } from "./template-field";
 
-/** What the For Each inspector needs from the editor around it. */
-export type BodyFlowSupport = {
-	/** The name of the flow open in the editor. */
-	flowName: string;
-	/** The project's other flow files, by name. Undefined while they load. */
-	flows: Readonly<Record<string, Flow | null>> | undefined;
-	/** Opens a flow of the project in the editor. */
-	onOpen: (name: string) => void;
-	/** Creates a body flow, points the node at it, and opens it. */
-	onCreate: (nodeId: string, name: string) => void;
-	creating: boolean;
-};
-
-const ITEM_SHAPE = "{ id, title, body?, url?, blockedBy?: id[], done? }";
+const SOURCE_ORDER: ListSource["kind"][] = [
+	"json",
+	"command",
+	"files",
+	"github",
+];
 
 export function ForEachFields({
 	flow,
@@ -44,101 +38,101 @@ export function ForEachFields({
 }: {
 	flow: Flow;
 	node: ForEachNode;
-	support: BodyFlowSupport;
+	support: CalledFlowSupport;
 	onChange: (change: (node: ForEachNode) => ForEachNode) => void;
 }) {
 	const id = useId();
 	// Switching the source kind back and forth keeps what was typed.
-	const lastSource = useRef<Partial<Record<ItemSource["kind"], ItemSource>>>(
+	const lastSource = useRef<Partial<Record<ListSource["kind"], ListSource>>>(
 		{},
 	);
-	const setSource = (source: ItemSource) =>
+	const setSource = (source: ListSource) =>
 		onChange((current) => ({ ...current, source }));
 
-	const body = node.flow ? support.flows?.[node.flow] : undefined;
+	const called = calledFlow(node, support.flows);
 
 	return (
 		<>
 			<Field
 				id={`${id}-kind`}
-				label="Items from"
-				hint="Read again before each item, so items added during the run get built too. Items wait for their blockers."
+				label="Elements from"
+				hint="Read again before each element, so elements added during the run run too. An element is any JSON value; an object may carry id, title, url, dependsOn and done."
 			>
 				<NativeSelect
 					id={`${id}-kind`}
 					value={node.source.kind}
 					aria-describedby={`${id}-kind-hint`}
 					onChange={(event) => {
-						const kind = event.target.value as ItemSource["kind"];
+						const kind = event.target.value as ListSource["kind"];
 						if (kind === node.source.kind) return;
 						lastSource.current[node.source.kind] = node.source;
 						setSource(lastSource.current[kind] ?? emptySource(kind));
 					}}
 				>
-					<NativeSelectOption value="github">
-						GitHub sub-issues
-					</NativeSelectOption>
-					<NativeSelectOption value="command">A command</NativeSelectOption>
+					{SOURCE_ORDER.map((kind) => (
+						<NativeSelectOption key={kind} value={kind}>
+							{SOURCE_KINDS[kind]}
+						</NativeSelectOption>
+					))}
 				</NativeSelect>
 			</Field>
 
-			{node.source.kind === "github" ? (
-				<GitHubSourceFields
-					flow={flow}
-					source={node.source}
-					onChange={(source) => setSource(source)}
-				/>
-			) : (
-				<TemplateField
-					id={`${id}-command`}
-					label="Source command"
-					hint={
-						<>
-							Runs with sh -c in the worktree and prints a JSON array of items:{" "}
-							<code className="font-mono">{ITEM_SHAPE}</code>.
-						</>
-					}
-					flow={flow}
-					nodeId={node.id}
-					value={node.source.command}
-					invalid={node.source.command.trim() === ""}
-					className="min-h-16"
-					placeholder="cat traces.json"
-					onChange={(command) => setSource({ kind: "command", command })}
-				/>
-			)}
+			<SourceFields flow={flow} node={node} onChange={setSource} />
 
-			<BodyFlowField
-				id={`${id}-body`}
+			<CalledFlowField
+				id={`${id}-flow`}
 				node={node}
 				support={support}
+				hint="Runs once per element. Any flow of the project; the element goes to one of its inputs."
 				onPick={(name) => onChange((current) => ({ ...current, flow: name }))}
 			/>
 
-			<div className="flex items-start gap-2">
-				<Checkbox
+			<AsField
+				id={`${id}-as`}
+				node={node}
+				called={called}
+				onChange={(as) => onChange((current) => ({ ...current, as }))}
+			/>
+
+			<InputBindings
+				flow={flow}
+				node={node}
+				called={called}
+				skip={node.as}
+				onChange={(inputs) => onChange((current) => ({ ...current, inputs }))}
+			/>
+
+			<Field
+				id={`${id}-branch`}
+				label="Branch"
+				hint={
+					node.branch === "per-item"
+						? "Each element gets its own branch, on top of the last element that finished: a stack. Read it as {{run.branch}} and {{run.base_branch}}."
+						: "All elements work on the branch that is checked out, one after the other."
+				}
+			>
+				<NativeSelect
 					id={`${id}-branch`}
-					checked={node.branchPerItem}
-					className="mt-0.5"
+					value={node.branch}
 					aria-describedby={`${id}-branch-hint`}
-					onCheckedChange={(checked) =>
-						onChange((current) => ({ ...current, branchPerItem: checked }))
-					}
-				/>
-				<div className="flex flex-col gap-0.5">
-					<Label htmlFor={`${id}-branch`}>Branch per item</Label>
-					<p id={`${id}-branch-hint`} className="text-muted-foreground text-xs">
-						{node.branchPerItem
-							? "Each item gets its own branch, on top of the last item that finished: a stack."
-							: "All items work on the run's branch, one after the other."}
-					</p>
-				</div>
-			</div>
+					onChange={(event) => {
+						const branch = event.target.value as ForEachNode["branch"];
+						onChange((current) => ({ ...current, branch }));
+					}}
+				>
+					<NativeSelectOption value="per-item">
+						A branch per element (a stack)
+					</NativeSelectOption>
+					<NativeSelectOption value="shared">
+						One shared branch
+					</NativeSelectOption>
+				</NativeSelect>
+			</Field>
 
 			<HaltOnField
 				id={`${id}-halt`}
 				node={node}
-				body={body ?? null}
+				called={called}
 				onChange={(haltOn) => onChange((current) => ({ ...current, haltOn }))}
 			/>
 
@@ -146,7 +140,7 @@ export function ForEachFields({
 				id={`${id}-max`}
 				label="Max items"
 				optional
-				hint="A safety net: the most items one visit may start."
+				hint="A safety net: the most elements one visit may start."
 			>
 				<PositiveIntInput
 					id={`${id}-max`}
@@ -160,14 +154,95 @@ export function ForEachFields({
 			</Field>
 
 			<p className="text-muted-foreground text-xs">
-				Ends with <span className="text-foreground">done</span> when no item is
-				left to start, or <span className="text-foreground">halted</span>. A
-				failed item blocks the items that wait on it. Later nodes read{" "}
-				<code className="font-mono">{`{{${node.id}.summary}}`}</code> and{" "}
-				<code className="font-mono">{`{{${node.id}.done_count}}`}</code>.
+				Ends with <span className="text-foreground">done</span> when no element
+				is left to start, or <span className="text-foreground">halted</span>. A
+				failed element blocks the elements that depend on it. Later nodes read{" "}
+				<code className="font-mono">{`{{${node.id}.summary}}`}</code>,{" "}
+				<code className="font-mono">{`{{${node.id}.done_count}}`}</code>, and
+				each element's result in{" "}
+				<code className="font-mono">{`{{${node.id}.results}}`}</code>.
 			</p>
 		</>
 	);
+}
+
+/** The fields of the picked source kind. */
+function SourceFields({
+	flow,
+	node,
+	onChange,
+}: {
+	flow: Flow;
+	node: ForEachNode;
+	onChange: (source: ListSource) => void;
+}) {
+	const id = useId();
+	const { source } = node;
+	switch (source.kind) {
+		case "json":
+			return (
+				<TemplateField
+					id={`${id}-value`}
+					label="List"
+					hint={
+						<>
+							A JSON array, e.g.{" "}
+							<code className="font-mono">{"{{planner.data.tasks}}"}</code>, or
+							the array itself.
+						</>
+					}
+					flow={flow}
+					nodeId={node.id}
+					value={source.value}
+					invalid={source.value.trim() === ""}
+					multiline={false}
+					placeholder="{{planner.data.tasks}}"
+					onChange={(value) => onChange({ kind: "json", value })}
+				/>
+			);
+		case "command":
+			return (
+				<TemplateField
+					id={`${id}-command`}
+					label="Source command"
+					hint="Runs with sh -c in the worktree and prints a JSON array on stdout."
+					flow={flow}
+					nodeId={node.id}
+					value={source.command}
+					invalid={source.command.trim() === ""}
+					className="min-h-16"
+					variablesOpen={false}
+					placeholder="cat tasks.json"
+					onChange={(command) => onChange({ kind: "command", command })}
+				/>
+			);
+		case "files":
+			return (
+				<TemplateField
+					id={`${id}-glob`}
+					label="Glob"
+					hint={
+						<>
+							Files in the worktree that match, sorted by path. Each element is{" "}
+							<code className="font-mono">{"{ id, title, path }"}</code>: read{" "}
+							<code className="font-mono">{`{{${node.as}.path}}`}</code>.
+						</>
+					}
+					flow={flow}
+					nodeId={node.id}
+					value={source.glob}
+					invalid={source.glob.trim() === ""}
+					multiline={false}
+					variablesOpen={false}
+					placeholder="src/**/*.test.ts"
+					onChange={(glob) => onChange({ kind: "files", glob })}
+				/>
+			);
+		case "github":
+			return (
+				<GitHubSourceFields flow={flow} source={source} onChange={onChange} />
+			);
+	}
 }
 
 function GitHubSourceFields({
@@ -176,53 +251,37 @@ function GitHubSourceFields({
 	onChange,
 }: {
 	flow: Flow;
-	source: Extract<ItemSource, { kind: "github" }>;
-	onChange: (source: Extract<ItemSource, { kind: "github" }>) => void;
+	source: Extract<ListSource, { kind: "github" }>;
+	onChange: (source: Extract<ListSource, { kind: "github" }>) => void;
 }) {
 	const id = useId();
-	const inBody = flow.input === "item";
-	const params = inBody ? [] : (flow.params ?? []);
+	const inputs = flow.inputs;
+	const example = inputs[0]
+		? inputs[0].type === "json"
+			? `{{${inputs[0].name}.number}}`
+			: `{{${inputs[0].name}}}`
+		: "42";
 	return (
 		<>
 			<Field
 				id={`${id}-parent`}
 				label="Parent issue"
 				hint={
-					inBody ? (
-						<>
-							The issue whose sub-issues become the items.{" "}
-							<code className="font-mono">{"{{item.number}}"}</code> reads the
-							current item of this body flow: the Traces of a Feature.{" "}
-							<code className="font-mono">{"{{params.<name>}}"}</code> reads the
-							run parameters of the top-level flow.
-						</>
-					) : params.length > 0 ? (
-						<>
-							The issue number whose sub-issues become the items, for example an
-							Epic. Takes templates, such as{" "}
-							{params.map((param, index) => (
-								<span key={param.name}>
-									{index > 0 ? ", " : null}
-									<code className="font-mono">{`{{params.${param.name}}}`}</code>
-								</span>
-							))}
-							.
-						</>
-					) : (
-						"The issue number whose sub-issues become the items, for example an Epic. Takes templates."
-					)
+					<>
+						The issue number whose sub-issues become the elements. Takes
+						templates, such as <code className="font-mono">{example}</code>.
+						Each element holds the sub-issue:{" "}
+						<code className="font-mono">
+							number, title, body, url, labels, parent
+						</code>
+						; its "blocked by" links order the list.
+					</>
 				}
 			>
 				<Input
 					id={`${id}-parent`}
 					value={source.parent}
-					placeholder={
-						inBody
-							? "{{item.number}}"
-							: params[0]
-								? `{{params.${params[0].name}}}`
-								: "42"
-					}
+					placeholder={example}
 					className="font-mono"
 					autoComplete="off"
 					spellCheck={false}
@@ -237,7 +296,7 @@ function GitHubSourceFields({
 				id={`${id}-label`}
 				label="Required label"
 				optional
-				hint="Only sub-issues with this label become items."
+				hint="Only sub-issues with this label become elements."
 			>
 				<Input
 					id={`${id}-label`}
@@ -271,7 +330,7 @@ function GitHubSourceFields({
 				id={`${id}-skip`}
 				label="Skip labels"
 				optional
-				hint="Sub-issues with any of these labels are left out. Items they block wait. Separate with commas."
+				hint="Sub-issues with any of these labels are left out. Elements that depend on them wait. Separate with commas."
 			>
 				<ListInput
 					id={`${id}-skip`}
@@ -334,210 +393,110 @@ function ListInput({
 	);
 }
 
-/** Picks the body flow among the project's flows with `input: "item"`, or creates one. */
-function BodyFlowField({
+/**
+ * The input of the called flow that takes the element: a pick among its
+ * inputs (JSON ones first), or free text while the flow is not picked.
+ */
+function AsField({
 	id,
 	node,
-	support,
-	onPick,
-}: {
-	id: string;
-	node: ForEachNode;
-	support: BodyFlowSupport;
-	onPick: (name: string) => void;
-}) {
-	const [creating, setCreating] = useState(false);
-	const { flows } = support;
-	const bodies = flows
-		? Object.entries(flows)
-				.filter(
-					([name, flow]) => name !== support.flowName && flow?.input === "item",
-				)
-				.map(([name]) => name)
-				.sort()
-		: [];
-	const current = node.flow;
-	const known = current !== "" && bodies.includes(current);
-	const problem =
-		current === "" || !flows
-			? null
-			: current === support.flowName
-				? "a For Each cannot run its own flow"
-				: !(current in flows)
-					? "no such flow"
-					: flows[current] === null
-						? "does not load"
-						: "not a body flow";
-
-	return (
-		<div className="flex flex-col gap-1.5">
-			<Label htmlFor={id}>Body flow</Label>
-			<div className="flex items-center gap-1">
-				<NativeSelect
-					id={id}
-					value={current}
-					disabled={!flows}
-					aria-invalid={current === "" || (!known && flows !== undefined)}
-					aria-describedby={`${id}-hint`}
-					onChange={(event) => onPick(event.target.value)}
-				>
-					<NativeSelectOption value="">
-						{flows ? "Pick a body flow" : "Loading flows…"}
-					</NativeSelectOption>
-					{bodies.map((name) => (
-						<NativeSelectOption key={name} value={name}>
-							{name}
-						</NativeSelectOption>
-					))}
-					{current !== "" && !known ? (
-						<NativeSelectOption value={current}>
-							{problem ? `${current} (${problem})` : current}
-						</NativeSelectOption>
-					) : null}
-				</NativeSelect>
-				<Button
-					variant="outline"
-					size="icon-sm"
-					disabled={!known}
-					aria-label={known ? `Open ${current}` : "Open the body flow"}
-					title={known ? `Open ${current}` : "Pick a body flow first"}
-					onClick={() => support.onOpen(current)}
-				>
-					<ExternalLinkIcon />
-				</Button>
-			</div>
-			<p id={`${id}-hint`} className="text-muted-foreground text-xs">
-				Runs once per item. A body flow is a flow file marked as one; its
-				templates read the item:{" "}
-				<code className="font-mono">{"{{item.title}}"}</code>,{" "}
-				<code className="font-mono">{"{{item.body}}"}</code>, …
-				{flows && bodies.length === 0 ? " This project has none yet." : ""}
-			</p>
-			{creating ? (
-				<NewBodyFlowForm
-					taken={flows ? Object.keys(flows) : []}
-					suggestion={`${support.flowName}-${node.id}`.replace(/_/g, "-")}
-					reserved={support.flowName}
-					pending={support.creating}
-					onCancel={() => setCreating(false)}
-					onCreate={(name) => support.onCreate(node.id, name)}
-				/>
-			) : (
-				<Button
-					variant="outline"
-					size="xs"
-					className="self-start"
-					disabled={!flows}
-					onClick={() => setCreating(true)}
-				>
-					<PlusIcon data-icon="inline-start" />
-					New body flow
-				</Button>
-			)}
-		</div>
-	);
-}
-
-function NewBodyFlowForm({
-	taken,
-	suggestion,
-	reserved,
-	pending,
-	onCancel,
-	onCreate,
-}: {
-	taken: string[];
-	suggestion: string;
-	reserved: string;
-	pending: boolean;
-	onCancel: () => void;
-	onCreate: (name: string) => void;
-}) {
-	const id = useId();
-	const [name, setName] = useState(() =>
-		flowNameSchema.safeParse(suggestion).success ? suggestion : "",
-	);
-	const trimmed = name.trim();
-	const parsed = flowNameSchema.safeParse(trimmed);
-	const error =
-		trimmed === ""
-			? null
-			: !parsed.success
-				? (parsed.error.issues[0]?.message ?? "Not a valid name.")
-				: taken.includes(trimmed) || trimmed === reserved
-					? "A flow with this name exists."
-					: null;
-	const canCreate = trimmed !== "" && error === null && !pending;
-
-	return (
-		<div className="flex flex-col gap-1.5 border bg-muted/30 p-2">
-			<Label htmlFor={`${id}-name`}>New body flow name</Label>
-			<div className="flex items-start gap-1">
-				<Input
-					id={`${id}-name`}
-					value={name}
-					className="h-7 font-mono"
-					autoComplete="off"
-					spellCheck={false}
-					aria-invalid={error !== null}
-					aria-describedby={`${id}-hint`}
-					autoFocus
-					onChange={(event) => setName(event.target.value)}
-					onKeyDown={(event) => {
-						if (event.key === "Enter") {
-							event.preventDefault();
-							if (canCreate) onCreate(trimmed);
-						} else if (event.key === "Escape") {
-							onCancel();
-						}
-					}}
-				/>
-				<Button
-					size="sm"
-					disabled={!canCreate}
-					onClick={() => onCreate(trimmed)}
-				>
-					{pending ? "Creating…" : "Create"}
-				</Button>
-				<Button variant="ghost" size="sm" onClick={onCancel}>
-					Cancel
-				</Button>
-			</div>
-			<p
-				id={`${id}-hint`}
-				role={error ? "alert" : undefined}
-				className={
-					error ? "text-destructive text-xs" : "text-muted-foreground text-xs"
-				}
-			>
-				{error ??
-					"Creates the file with one Agent node that works on the item, saves this flow, and opens the new one."}
-			</p>
-		</div>
-	);
-}
-
-/** The labels and choices that stop the loop, with the body's own ones as suggestions. */
-function HaltOnField({
-	id,
-	node,
-	body,
+	called,
 	onChange,
 }: {
 	id: string;
 	node: ForEachNode;
-	/** The body flow, when it loads. */
-	body: Flow | null;
+	called: Flow | null;
+	onChange: (as: string) => void;
+}) {
+	const inputs = called
+		? [...called.inputs].sort(
+				(a, b) => Number(b.type === "json") - Number(a.type === "json"),
+			)
+		: [];
+	const picked = inputs.find((input) => input.name === node.as);
+	const missing = called !== null && !picked;
+	const hint =
+		picked?.type === "text"
+			? "A text input gets the element as JSON text. A json input keeps its fields."
+			: `The input of the called flow that receives the element. That flow reads it as {{${node.as}}} or {{${node.as}.title}}.`;
+
+	return (
+		<Field
+			id={id}
+			label="Element goes to input"
+			hint={hint}
+			error={
+				missing
+					? `${node.flow} has no input ${node.as}. Pick one, or add a json input to it.`
+					: null
+			}
+		>
+			{called && inputs.length > 0 ? (
+				<NativeSelect
+					id={id}
+					value={node.as}
+					aria-invalid={missing}
+					aria-describedby={`${id}-hint`}
+					onChange={(event) => onChange(event.target.value)}
+				>
+					{missing ? (
+						<NativeSelectOption value={node.as}>
+							{node.as} (missing)
+						</NativeSelectOption>
+					) : null}
+					{inputs.map((input) => (
+						<NativeSelectOption key={input.name} value={input.name}>
+							{input.name} · {input.type}
+							{input.label ? ` · ${input.label}` : ""}
+						</NativeSelectOption>
+					))}
+				</NativeSelect>
+			) : (
+				<Input
+					id={id}
+					value={node.as}
+					className="font-mono"
+					autoComplete="off"
+					spellCheck={false}
+					aria-invalid={missing}
+					aria-describedby={`${id}-hint`}
+					onChange={(event) => onChange(event.target.value.trim())}
+				/>
+			)}
+			{picked?.type === "text" ? (
+				<p className="flex items-start gap-1.5 text-status-interrupted text-xs">
+					<TriangleAlertIcon
+						className="mt-px size-3.5 shrink-0"
+						aria-hidden="true"
+					/>
+					{node.as} is a text input.
+				</p>
+			) : null}
+		</Field>
+	);
+}
+
+/** The outcomes that stop the loop, with the called flow's own ones as suggestions. */
+function HaltOnField({
+	id,
+	node,
+	called,
+	onChange,
+}: {
+	id: string;
+	node: ForEachNode;
+	/** The called flow, when it loads. */
+	called: Flow | null;
 	onChange: (haltOn: string[]) => void;
 }) {
 	const suggestions = [
 		...new Set(
-			(body?.nodes ?? []).flatMap((bodyNode) =>
-				bodyNode.type === "decision"
-					? bodyNode.labels.map((label) => label.name)
-					: bodyNode.type === "gate"
-						? bodyNode.choices.map((choice) => choice.name)
-						: [],
+			(called?.nodes ?? []).flatMap((calledNode) =>
+				calledNode.type === "decision" ||
+				calledNode.type === "gate" ||
+				calledNode.type === "agent"
+					? nodeOptions(calledNode).map((option) => option.name)
+					: [],
 			),
 		),
 	].filter((name) => !node.haltOn.includes(name));
@@ -551,8 +510,8 @@ function HaltOnField({
 				Halt on
 			</h3>
 			<p id={`${id}-hint`} className="text-muted-foreground text-xs">
-				A body that ends on one of these Decision labels or Gate choices stops
-				the loop with halted.
+				A called flow that ends on one of these outcomes stops the loop with
+				halted.
 			</p>
 			<OptionsEditor
 				kind="label"
@@ -571,7 +530,7 @@ function HaltOnField({
 			/>
 			{suggestions.length > 0 ? (
 				<p className="flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
-					From the body:
+					From {node.flow}:
 					{suggestions.map((name) => (
 						<button
 							key={name}

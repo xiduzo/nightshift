@@ -16,6 +16,8 @@ import type {
 	ListItem,
 	LoadedFlow,
 	Outcome,
+	Schedule,
+	ScheduleIssue,
 } from "@nightshift/flows";
 
 /**
@@ -72,8 +74,11 @@ export type StepSummary = {
 	endedAt: number | null;
 	/** Null while the step runs. */
 	outcome: StepOutcome | null;
-	/** The node's template outputs, for example `log_tail` or `summary`. */
-	outputs: Record<string, string | number>;
+	/**
+	 * The node's template outputs, for example `log_tail` or `summary`. JSON
+	 * values: an Agent's `data` and a For Each's `results` hold objects.
+	 */
+	outputs: Record<string, JsonValue>;
 	error: string | null;
 	/**
 	 * Set when the step ran inside a called flow: the Subflow or For Each
@@ -104,9 +109,16 @@ export type ItemSummary = {
 	reason: string | null;
 };
 
+/** What started a run: a person, or a schedule of `.nightshift/schedules.json`. */
+export type RunTrigger =
+	| { kind: "manual" }
+	/** `at`: the cron time the run started for (epoch ms). */
+	| { kind: "schedule"; scheduleId: string; at: number };
+
 export type RunSummary = {
 	id: string;
 	projectId: string;
+	trigger: RunTrigger;
 	/** The flow file the run started from. Null for a quick run. */
 	flowName: string | null;
 	/** The flow name, or the prompt of a quick run. */
@@ -250,6 +262,43 @@ export type StartRunInput = {
 	| { flow: Flow; flowName?: never }
 );
 
+/** How the last cron time of a schedule went. */
+export type ScheduleResult =
+	| {
+			kind: "fired";
+			/** The cron time (epoch ms). */
+			at: number;
+			runId: string;
+			/** The run's status now. Null when the run is gone. */
+			runStatus: RunStatus | null;
+	  }
+	/** The run did not start, for example the flow has errors or the run cap was reached. */
+	| { kind: "failed"; at: number; error: string }
+	/** The time was not started: missed while the daemon was down, or an earlier run still runs. */
+	| {
+			kind: "skipped";
+			at: number;
+			reason: string;
+			/** The earlier run that still ran, when that is the reason. */
+			runId: string | null;
+	  };
+
+export type ScheduleSummary = Schedule & {
+	/** The next start (epoch ms). Null when paused or the cron line does not parse. */
+	nextAt: number | null;
+	last: ScheduleResult | null;
+	/** Problems of this schedule. One with an error fails to start. */
+	issues: ScheduleIssue[];
+};
+
+export type ScheduleList = {
+	/** Absolute path of `.nightshift/schedules.json`. */
+	path: string;
+	schedules: ScheduleSummary[];
+	/** Problems of the whole file, for example JSON that does not parse. */
+	issues: ScheduleIssue[];
+};
+
 export interface Engine {
 	listProjects(): Promise<Project[]>;
 	/** Fails when the path is not the top level of a git repository. */
@@ -266,6 +315,20 @@ export interface Engine {
 
 	/** Open Gates over all runs, oldest first. The Needs-you inbox. A Gate stays open across daemon restarts. */
 	listGates(): Promise<OpenGate[]>;
+
+	/**
+	 * The schedules of `.nightshift/schedules.json` in the project's clone,
+	 * with the next start and how the last cron time went.
+	 */
+	listSchedules(projectId: string): Promise<ScheduleList>;
+	/**
+	 * Writes the schedules file. Saves schedules with problems too; returns
+	 * the issues. The scheduler reads the file on its next tick.
+	 */
+	saveSchedules(
+		projectId: string,
+		schedules: readonly Schedule[],
+	): Promise<ScheduleIssue[]>;
 	/**
 	 * Answers an open Gate with one of its choices and continues the walk on
 	 * that outcome. Fails when the step is not an open Gate or the choice is
@@ -329,4 +392,11 @@ export type EngineOptions = {
 	maxConcurrentRuns?: number;
 	/** Safety net against runaway flows: the most steps one run may take, unless the flow's policy sets `maxSteps`. Default 500. */
 	maxStepsPerRun?: number;
+	/**
+	 * The scheduler starts the runs of `.nightshift/schedules.json` when
+	 * their cron times come due. On by default; `false` turns it off.
+	 * Aborting `signal` stops it for good, for example when a hot reload
+	 * replaces the engine.
+	 */
+	scheduler?: false | { signal?: AbortSignal };
 };

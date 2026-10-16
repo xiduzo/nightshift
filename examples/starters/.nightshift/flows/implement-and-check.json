@@ -1,0 +1,123 @@
+{
+	"version": 2,
+	"description": "An agent implements a task, a command checks it; a failed check goes back to a fresh agent with the log (3 tries), then a rescue on Opus.",
+	"inputs": [
+		{
+			"name": "task",
+			"type": "text",
+			"label": "Task",
+			"description": "What to build or fix, in plain words.",
+			"required": true
+		},
+		{
+			"name": "check",
+			"type": "text",
+			"label": "Check",
+			"description": "The shell command that proves the work, for example the tests. Exit 0 passes.",
+			"default": "bun test"
+		}
+	],
+	"outputs": [
+		{
+			"name": "summary",
+			"value": "{{implement.summary}}",
+			"description": "What the agent reports it did."
+		}
+	],
+	"start": "implement",
+	"nodes": [
+		{
+			"id": "implement",
+			"label": "Implement",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "agent",
+			"prompt": "Implement this task in the repository of your working directory:\n\n{{task}}\n\nWhen you are done, `{{check}}` must pass. Run it yourself before you report. Keep the change small and focused, and commit it with a clear message.\n\nThe last check failed with this log (empty on the first try):\n\n{{verify.log_tail}}",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "auto",
+			"effort": "high",
+			"timeoutMinutes": 60,
+			"idleMinutes": 20
+		},
+		{
+			"id": "verify",
+			"label": "Check",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "command",
+			"command": "# The input `check` arrives as an environment variable: run it as a shell command.\nsh -c \"{{check}}\"",
+			"timeoutMinutes": 30
+		},
+		{
+			"id": "rescue",
+			"label": "Rescue",
+			"position": {
+				"x": 320,
+				"y": 200
+			},
+			"type": "agent",
+			"prompt": "Another agent could not finish this task: it gave up, or the check still failed after 3 tries. Nobody is awake: do not ask a question, decide.\n\nThe task:\n\n{{task}}\n\nThe check: `{{check}}`. Its last log:\n\n{{verify.log_tail}}\n\nFind the cause, fix it, run the check until it passes, and commit. Report `fail` when you cannot get it to pass.",
+			"harness": "claude-code",
+			"model": "opus",
+			"permissionMode": "auto",
+			"effort": "high",
+			"timeoutMinutes": 60,
+			"idleMinutes": 20
+		},
+		{
+			"id": "reverify",
+			"label": "Check the rescue",
+			"position": {
+				"x": 640,
+				"y": 200
+			},
+			"type": "command",
+			"command": "sh -c \"{{check}}\"",
+			"timeoutMinutes": 30
+		}
+	],
+	"edges": [
+		{
+			"id": "implement-pass-verify",
+			"from": "implement",
+			"outcome": "pass",
+			"to": "verify"
+		},
+		{
+			"id": "implement-fail-rescue",
+			"from": "implement",
+			"outcome": "fail",
+			"to": "rescue"
+		},
+		{
+			"id": "implement-needs-input-rescue",
+			"from": "implement",
+			"outcome": "needs-input",
+			"to": "rescue"
+		},
+		{
+			"id": "verify-fail-implement",
+			"from": "verify",
+			"outcome": "fail",
+			"to": "implement",
+			"max": 2
+		},
+		{
+			"id": "verify-fail-rescue",
+			"from": "verify",
+			"outcome": "fail",
+			"to": "rescue"
+		},
+		{
+			"id": "rescue-pass-reverify",
+			"from": "rescue",
+			"outcome": "pass",
+			"to": "reverify"
+		}
+	]
+}

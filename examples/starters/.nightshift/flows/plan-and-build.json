@@ -1,0 +1,207 @@
+{
+	"version": 2,
+	"description": "A planner splits a goal into tasks, each task is built and checked on its own branch of a stack, and a reviewer reads the result.",
+	"inputs": [
+		{
+			"name": "goal",
+			"type": "text",
+			"label": "Goal",
+			"description": "What the night should build.",
+			"required": true
+		},
+		{
+			"name": "check",
+			"type": "text",
+			"label": "Check",
+			"description": "The shell command that proves each task, for example the tests.",
+			"default": "bun test"
+		}
+	],
+	"outputs": [
+		{
+			"name": "tasks",
+			"value": "{{planner.data.tasks}}",
+			"description": "The plan."
+		},
+		{
+			"name": "results",
+			"value": "{{build.results}}",
+			"description": "The result of each task."
+		},
+		{
+			"name": "issues",
+			"value": "{{review.data.issues}}",
+			"description": "What the reviewer found."
+		}
+	],
+	"policy": {
+		"maxSteps": 500
+	},
+	"start": "planner",
+	"nodes": [
+		{
+			"id": "planner",
+			"label": "Plan",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "agent",
+			"prompt": "Plan this goal for the repository of your working directory. Read the code first; do not change it.\n\nThe goal:\n\n{{goal}}\n\nThe person answered your earlier question (empty when you did not ask one):\n\n{{clarify.note}}\n\nSplit the goal into small tasks that an agent can each build and test in under an hour. Give each task a short `id` (lowercase, for example `t1`), a `title`, the `details` the builder needs (files, behaviour, how to test it), and `dependsOn`: the ids of the tasks it builds on. Order them so a task comes after the tasks it depends on.\n\nReport `planned` with the tasks. When the goal is too unclear to plan, report `unclear` with an empty task list, and put your question in the summary.",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "auto",
+			"effort": "high",
+			"timeoutMinutes": 30,
+			"outcomes": [
+				{
+					"name": "planned",
+					"description": "The tasks are in the data."
+				},
+				{
+					"name": "unclear",
+					"description": "The goal needs an answer from the person first; the question is in the summary."
+				}
+			],
+			"output": {
+				"type": "object",
+				"properties": {
+					"tasks": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"id": {
+									"type": "string"
+								},
+								"title": {
+									"type": "string"
+								},
+								"details": {
+									"type": "string"
+								},
+								"dependsOn": {
+									"type": "array",
+									"items": {
+										"type": "string"
+									}
+								}
+							},
+							"required": ["id", "title", "details"]
+						}
+					}
+				},
+				"required": ["tasks"]
+			}
+		},
+		{
+			"id": "clarify",
+			"label": "Ask the person",
+			"position": {
+				"x": 320,
+				"y": 200
+			},
+			"type": "gate",
+			"question": "The planner cannot plan this goal yet:\n\n{{goal}}\n\nIts question:\n\n{{planner.summary}}\n\nAnswer in the note and pick `answered`, or stop.",
+			"choices": [
+				{
+					"name": "answered",
+					"description": "The note holds the answer; the planner tries again."
+				},
+				{
+					"name": "stop",
+					"description": "End the run."
+				}
+			]
+		},
+		{
+			"id": "build",
+			"label": "Build each task",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "foreach",
+			"source": {
+				"kind": "json",
+				"value": "{{planner.data.tasks}}"
+			},
+			"flow": "build-task",
+			"as": "item",
+			"inputs": {
+				"check": "{{check}}"
+			},
+			"branch": "per-item"
+		},
+		{
+			"id": "review",
+			"label": "Review",
+			"position": {
+				"x": 640,
+				"y": 0
+			},
+			"type": "agent",
+			"prompt": "Review the work of an unattended run in the repository of your working directory. Do not change the code.\n\nThe goal:\n\n{{goal}}\n\nThe tasks and how they ended:\n\n{{build.summary}}\n\nRead the changes since `{{run.base_ref}}` (for example `git log {{run.base_ref}}..HEAD` and `git diff {{run.base_ref}}...HEAD`). Check that they reach the goal, are tested, and do not break anything.\n\nReport `approved` when the work is ready to merge, else `changes-requested`. List each problem in `issues`, one short sentence each (an empty list when there are none).",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "auto",
+			"effort": "high",
+			"timeoutMinutes": 30,
+			"outcomes": [
+				{
+					"name": "approved",
+					"description": "Ready to merge."
+				},
+				{
+					"name": "changes-requested",
+					"description": "The issues must be fixed first."
+				}
+			],
+			"output": {
+				"type": "object",
+				"properties": {
+					"issues": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					}
+				},
+				"required": ["issues"]
+			}
+		}
+	],
+	"edges": [
+		{
+			"id": "planner-planned-build",
+			"from": "planner",
+			"outcome": "planned",
+			"to": "build"
+		},
+		{
+			"id": "planner-unclear-clarify",
+			"from": "planner",
+			"outcome": "unclear",
+			"to": "clarify"
+		},
+		{
+			"id": "clarify-answered-planner",
+			"from": "clarify",
+			"outcome": "answered",
+			"to": "planner",
+			"max": 2
+		},
+		{
+			"id": "build-done-review",
+			"from": "build",
+			"outcome": "done",
+			"to": "review"
+		},
+		{
+			"id": "build-halted-review",
+			"from": "build",
+			"outcome": "halted",
+			"to": "review"
+		}
+	]
+}

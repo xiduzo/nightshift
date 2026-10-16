@@ -42,6 +42,7 @@ const PALETTE: FlowNodeType[] = [
 	"command",
 	"decision",
 	"gate",
+	"subflow",
 	"foreach",
 ];
 

@@ -1,0 +1,67 @@
+{
+	"version": 2,
+	"description": "One agent per file that matches a glob applies the same instruction, all on one branch; then one commit.",
+	"inputs": [
+		{
+			"name": "glob",
+			"type": "text",
+			"label": "Files",
+			"description": "A glob, relative to the repository root.",
+			"default": "src/**/*.ts"
+		},
+		{
+			"name": "instruction",
+			"type": "text",
+			"label": "Instruction",
+			"description": "What to change in each file.",
+			"required": true
+		}
+	],
+	"start": "each",
+	"nodes": [
+		{
+			"id": "each",
+			"label": "Each file",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "foreach",
+			"source": {
+				"kind": "files",
+				"glob": "{{glob}}"
+			},
+			"flow": "edit-file",
+			"as": "item",
+			"inputs": {
+				"instruction": "{{instruction}}"
+			},
+			"branch": "shared"
+		},
+		{
+			"id": "commit",
+			"label": "Commit",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "command",
+			"command": "set -e\ngit add -A\nif git diff --cached --quiet; then\n\techo 'Nothing changed.'\n\texit 0\nfi\ngit commit -m \"per-file: {{glob}}\" -m \"{{instruction}}\" -m \"{{each.summary}}\"",
+			"timeoutMinutes": 5
+		}
+	],
+	"edges": [
+		{
+			"id": "each-done-commit",
+			"from": "each",
+			"outcome": "done",
+			"to": "commit"
+		},
+		{
+			"id": "each-halted-commit",
+			"from": "each",
+			"outcome": "halted",
+			"to": "commit"
+		}
+	]
+}

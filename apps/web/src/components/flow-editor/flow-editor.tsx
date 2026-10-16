@@ -19,7 +19,6 @@ import {
 	CircleAlertIcon,
 	CircleDotIcon,
 	PlayIcon,
-	RepeatIcon,
 	SaveIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -30,15 +29,21 @@ import { outcomeLabel } from "@/components/outcome-badge";
 import { StartRunDialog } from "@/components/run/start-run-dialog";
 import { useProjectFlows } from "@/hooks/use-project-flows";
 import {
+	callersOf,
 	checkFlow,
 	isSavable,
-	newBodyFlow,
+	type NodeOption,
+	newElementFlow,
+	newFlow,
+	optionNoun,
 	removeEdge,
 	removeNode,
 	removeOutcome,
 	renameNode,
 	renameOutcome,
+	restoreAgentOutcomes,
 	restoreOutcome,
+	setAgentOutcomes,
 	updateEdge,
 	updateNode,
 } from "@/lib/flow-draft";
@@ -49,6 +54,7 @@ import { EditorCanvas, type Selection } from "./editor-canvas";
 import { FlowInspector } from "./flow-inspector";
 import { IssuesPanel } from "./issues-panel";
 import { NodeInspector } from "./node-inspector";
+import { ProjectFlowsContext } from "./project-flows-context";
 
 type Props = {
 	projectId: string;
@@ -88,7 +94,7 @@ function Editor({
 		() => JSON.stringify(draft) !== savedJson,
 		[draft, savedJson],
 	);
-	// The other flow files, for For Each body references. The draft stands in for this one.
+	// The other flow files, for Subflow and For Each calls. The draft stands in for this one.
 	const projectFlows = useProjectFlows(projectId, name);
 	const check = useMemo(
 		() => checkFlow(draft, projectFlows.flows, name),
@@ -160,29 +166,33 @@ function Editor({
 		[navigate, projectId],
 	);
 
-	// A new body flow: write it, point the node at it, save this flow, open it.
-	const createBody = useMutation(orpc.flows.save.mutationOptions());
-	const createBodyFlow = async (nodeId: string, bodyName: string) => {
+	// A new called flow: write it, point the node at it, save this flow, open it.
+	const createCalled = useMutation(orpc.flows.save.mutationOptions());
+	const createCalledFlow = async (nodeId: string, calledName: string) => {
+		const node = draft.nodes.find((candidate) => candidate.id === nodeId);
+		if (node?.type !== "subflow" && node?.type !== "foreach") return;
 		try {
-			await createBody.mutateAsync({
+			await createCalled.mutateAsync({
 				projectId,
-				name: bodyName,
-				flow: newBodyFlow(),
+				name: calledName,
+				flow: node.type === "foreach" ? newElementFlow(node.as) : newFlow(),
 			});
 		} catch (error) {
 			toast.error(
-				`Could not create ${bodyName}: ${error instanceof Error ? error.message : String(error)}`,
+				`Could not create ${calledName}: ${error instanceof Error ? error.message : String(error)}`,
 			);
 			return;
 		}
 		void queryClient.invalidateQueries({ queryKey: orpc.flows.list.key() });
-		const next = updateNode(draft, nodeId, (node) =>
-			node.type === "foreach" ? { ...node, flow: bodyName } : node,
+		const next = updateNode(draft, nodeId, (current) =>
+			current.type === "subflow" || current.type === "foreach"
+				? { ...current, flow: calledName }
+				: current,
 		);
 		setDraft(next);
 		if (!isSavable(next)) {
 			toast.info(
-				`Created ${bodyName}. Fix this flow's fields and save it, then open the body from the node.`,
+				`Created ${calledName}. Fix this flow's fields and save it, then open ${calledName} from the node.`,
 			);
 			return;
 		}
@@ -196,10 +206,10 @@ function Editor({
 		} catch {
 			return;
 		}
-		toast.success(`Created ${bodyName} and saved ${name}.`);
+		toast.success(`Created ${calledName} and saved ${name}.`);
 		// The save has not rendered yet; leaving must not ask about it.
 		dirtyRef.current = false;
-		openFlow(bodyName);
+		openFlow(calledName);
 	};
 
 	useEffect(() => {
@@ -222,14 +232,12 @@ function Editor({
 		withResolver: true,
 	});
 
-	const isBody = draft.input === "item";
-	const runBlockedBy = isBody
-		? "A body flow runs inside a For Each. Run the flow that holds it."
-		: dirty
-			? "Save the flow first."
-			: errorCount > 0
-				? "Fix the errors first."
-				: null;
+	const runBlockedBy = dirty
+		? "Save the flow first."
+		: errorCount > 0
+			? "Fix the errors first."
+			: null;
+	const callers = projectFlows.flows ? callersOf(name, projectFlows.flows) : [];
 
 	const selectIssue = (issue: FlowIssue) => {
 		if (issue.nodeId && draft.nodes.some((node) => node.id === issue.nodeId)) {
@@ -265,6 +273,10 @@ function Editor({
 		if (draft.nodes.some((other) => other.id === next)) {
 			return `${next} is taken by another node.`;
 		}
+		if (draft.inputs.some((input) => input.name === next)) {
+			return `${next} is an input of this flow. Node ids and inputs share one namespace.`;
+		}
+		if (next === "run") return "run is reserved for the run's fields.";
 		setDraft((current) => renameNode(current, node.id, next));
 		setSelection({ kind: "node", id: next });
 		return null;
@@ -283,7 +295,7 @@ function Editor({
 		if (!option) return;
 		setDraft((current) => removeOutcome(current, node.id, index).flow);
 		if (dropped.length === 0) return;
-		const noun = node.type === "decision" ? "label" : "choice";
+		const noun = optionNoun(node);
 		toast.info(
 			`Removed the ${noun} ${outcomeLabel(option.name)} and ${dropped.length} ${dropped.length === 1 ? "edge" : "edges"} on it.`,
 			{
@@ -300,6 +312,33 @@ function Editor({
 			},
 		);
 	};
+
+	// Own outcomes on or off: edges on outcomes the node drops go too, with an undo.
+	const setSelectedAgentOutcomes =
+		(node: FlowNode) => (outcomes: NodeOption[] | undefined) => {
+			const result = setAgentOutcomes(draft, node.id, outcomes);
+			setDraft((current) => setAgentOutcomes(current, node.id, outcomes).flow);
+			const { dropped, previous } = result;
+			if (dropped.length === 0) return;
+			toast.info(
+				`Dropped ${dropped.length} ${dropped.length === 1 ? "edge" : "edges"} on outcomes ${node.id} no longer has.`,
+				{
+					description: dropped
+						.map(
+							(edge) =>
+								`${edge.from} ${outcomeLabel(edge.outcome)} → ${edge.to}`,
+						)
+						.join(", "),
+					action: {
+						label: "Undo",
+						onClick: () =>
+							setDraft((current) =>
+								restoreAgentOutcomes(current, node.id, previous, dropped),
+							),
+					},
+				},
+			);
+		};
 
 	return (
 		<main className="grid min-h-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr]">
@@ -320,14 +359,37 @@ function Editor({
 					<ChevronRightIcon className="size-3 shrink-0" aria-hidden="true" />
 				</nav>
 				<h1 className="font-medium font-mono text-sm">{name}</h1>
-				{isBody ? (
-					<Badge
-						variant="outline"
-						title="Runs once per item inside a For Each node"
+				{draft.inputs.length > 0 ? (
+					<span
+						className="hidden truncate font-mono text-muted-foreground text-xs sm:inline"
+						title="The inputs of this flow"
 					>
-						<RepeatIcon aria-hidden="true" />
-						Body flow
-					</Badge>
+						(
+						{draft.inputs
+							.map(
+								(input) =>
+									`${input.name}${input.type === "json" ? ": json" : ""}`,
+							)
+							.join(", ")}
+						)
+					</span>
+				) : null}
+				{callers.length > 0 ? (
+					<span className="hidden text-muted-foreground text-xs md:inline">
+						Called by{" "}
+						{callers.map((caller, index) => (
+							<span key={caller}>
+								{index > 0 ? ", " : null}
+								<Link
+									to="/projects/$projectId/flows/$name"
+									params={{ projectId, name: caller }}
+									className="font-mono underline-offset-2 hover:text-foreground hover:underline"
+								>
+									{caller}
+								</Link>
+							</span>
+						))}
+					</span>
 				) : null}
 				<div aria-live="polite" className="flex items-center gap-2">
 					{dirty ? (
@@ -360,11 +422,6 @@ function Editor({
 						<SaveIcon data-icon="inline-start" />
 						{saveFlow.isPending ? "Saving…" : "Save"}
 					</Button>
-					{isBody ? (
-						<span className="hidden text-muted-foreground text-xs sm:inline">
-							A body flow runs inside a For Each
-						</span>
-					) : null}
 					<Button
 						size="sm"
 						onClick={() => setStarting(true)}
@@ -378,75 +435,78 @@ function Editor({
 			</header>
 
 			<div className="grid min-h-0 auto-rows-max grid-cols-[minmax(0,1fr)] grid-rows-[60vh] overflow-y-auto md:grid-cols-[minmax(0,1fr)_22rem] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden">
-				<OpenFlowContext.Provider value={openFlow}>
-					<EditorCanvas
-						flow={draft}
-						check={check}
-						selection={selection}
-						onFlowChange={changeFlow}
-						onSelect={setSelection}
-					/>
-				</OpenFlowContext.Provider>
-				<aside
-					aria-label="Inspector"
-					className="grid min-h-0 grid-rows-[1fr_auto] border-t md:border-t-0 md:border-l"
-				>
-					<div className="min-h-0 overflow-y-auto p-3">
-						{selectedNode ? (
-							<NodeInspector
-								key={selectedNode.id}
-								flow={draft}
-								node={selectedNode}
-								onChange={(change) =>
-									setDraft((current) =>
-										updateNode(current, selectedNode.id, change),
-									)
-								}
-								onRename={renameSelected(selectedNode)}
-								onRenameOutcome={renameSelectedOutcome(selectedNode)}
-								onRemoveOutcome={removeSelectedOutcome(selectedNode)}
-								onSetStart={() =>
-									setDraft((current) => ({
-										...current,
-										start: selectedNode.id,
-									}))
-								}
-								onDelete={() => {
-									setDraft((current) => removeNode(current, selectedNode.id));
-									setSelection(null);
-								}}
-								bodyFlows={{
-									flowName: name,
-									flows: projectFlows.flows,
-									onOpen: openFlow,
-									onCreate: (nodeId, bodyName) =>
-										void createBodyFlow(nodeId, bodyName),
-									creating: createBody.isPending || saveFlow.isPending,
-								}}
-							/>
-						) : selectedEdge ? (
-							<EdgeInspector
-								key={selectedEdge.id}
-								flow={draft}
-								edge={selectedEdge}
-								onChange={(change) =>
-									setDraft((current) =>
-										updateEdge(current, selectedEdge.id, change),
-									)
-								}
-								onDelete={() => {
-									setDraft((current) => removeEdge(current, selectedEdge.id));
-									setSelection(null);
-								}}
-							/>
-						) : (
-							<FlowInspector flow={draft} onChange={changeFlow} />
-						)}
-					</div>
-					<div className="flex max-h-64 min-h-0 flex-col">
-						<IssuesPanel check={check} onSelect={selectIssue} />
-					</div>
-				</aside>
+				<ProjectFlowsContext.Provider value={projectFlows.flows}>
+					<OpenFlowContext.Provider value={openFlow}>
+						<EditorCanvas
+							flow={draft}
+							check={check}
+							selection={selection}
+							onFlowChange={changeFlow}
+							onSelect={setSelection}
+						/>
+					</OpenFlowContext.Provider>
+					<aside
+						aria-label="Inspector"
+						className="grid min-h-0 grid-rows-[1fr_auto] border-t md:border-t-0 md:border-l"
+					>
+						<div className="min-h-0 overflow-y-auto p-3">
+							{selectedNode ? (
+								<NodeInspector
+									key={selectedNode.id}
+									flow={draft}
+									node={selectedNode}
+									onChange={(change) =>
+										setDraft((current) =>
+											updateNode(current, selectedNode.id, change),
+										)
+									}
+									onRename={renameSelected(selectedNode)}
+									onRenameOutcome={renameSelectedOutcome(selectedNode)}
+									onRemoveOutcome={removeSelectedOutcome(selectedNode)}
+									onSetAgentOutcomes={setSelectedAgentOutcomes(selectedNode)}
+									onSetStart={() =>
+										setDraft((current) => ({
+											...current,
+											start: selectedNode.id,
+										}))
+									}
+									onDelete={() => {
+										setDraft((current) => removeNode(current, selectedNode.id));
+										setSelection(null);
+									}}
+									calledFlows={{
+										flowName: name,
+										flows: projectFlows.flows,
+										onOpen: openFlow,
+										onCreate: (nodeId, calledName) =>
+											void createCalledFlow(nodeId, calledName),
+										creating: createCalled.isPending || saveFlow.isPending,
+									}}
+								/>
+							) : selectedEdge ? (
+								<EdgeInspector
+									key={selectedEdge.id}
+									flow={draft}
+									edge={selectedEdge}
+									onChange={(change) =>
+										setDraft((current) =>
+											updateEdge(current, selectedEdge.id, change),
+										)
+									}
+									onDelete={() => {
+										setDraft((current) => removeEdge(current, selectedEdge.id));
+										setSelection(null);
+									}}
+								/>
+							) : (
+								<FlowInspector flow={draft} onChange={changeFlow} />
+							)}
+						</div>
+						<div className="flex max-h-64 min-h-0 flex-col">
+							<IssuesPanel check={check} onSelect={selectIssue} />
+						</div>
+					</aside>
+				</ProjectFlowsContext.Provider>
 			</div>
 
 			<StartRunDialog
@@ -454,7 +514,7 @@ function Editor({
 				onOpenChange={setStarting}
 				projectId={projectId}
 				flowName={name}
-				params={draft.params}
+				inputs={draft.inputs}
 			/>
 
 			<AlertDialog

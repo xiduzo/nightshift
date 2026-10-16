@@ -47,8 +47,11 @@ export type ToolItem = ItemBase & {
 
 export type ReportItem = ItemBase & {
 	kind: "report";
-	outcome: "pass" | "fail" | "needs-input";
+	/** pass, fail, needs-input, or one of the node's own outcomes. */
+	outcome: string;
 	summary: string;
+	/** The report's structured data, when the node has an output schema. */
+	data?: unknown;
 };
 
 export type FinishedItem = ItemBase & { kind: "finished"; usage?: AgentUsage };
@@ -333,6 +336,7 @@ function applyStepEntries(
 					key: `report:${entry.seq}`,
 					outcome: event.outcome,
 					summary: event.summary,
+					data: event.data,
 				});
 				break;
 			case "finished":

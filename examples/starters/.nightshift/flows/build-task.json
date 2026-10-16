@@ -1,0 +1,45 @@
+{
+	"version": 2,
+	"description": "One task of plan-and-build: runs implement-and-check with the task's title and details.",
+	"inputs": [
+		{
+			"name": "item",
+			"type": "json",
+			"label": "Task",
+			"description": "A task of the planner: { id, title, details, dependsOn? }.",
+			"required": true
+		},
+		{
+			"name": "check",
+			"type": "text",
+			"label": "Check",
+			"description": "The shell command that proves the work.",
+			"default": "bun test"
+		}
+	],
+	"outputs": [
+		{
+			"name": "summary",
+			"value": "{{implement.summary}}",
+			"description": "What the agent reports it did."
+		}
+	],
+	"start": "implement",
+	"nodes": [
+		{
+			"id": "implement",
+			"label": "Implement and check",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "subflow",
+			"flow": "implement-and-check",
+			"inputs": {
+				"task": "{{item.title}}: {{item.details}}",
+				"check": "{{check}}"
+			}
+		}
+	],
+	"edges": []
+}

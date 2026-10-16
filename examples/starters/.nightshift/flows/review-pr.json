@@ -1,0 +1,127 @@
+{
+	"version": 2,
+	"description": "An agent reviews a pull request; after a person agrees, a command posts the review with `gh pr review`.",
+	"inputs": [
+		{
+			"name": "pr",
+			"type": "text",
+			"label": "Pull request",
+			"description": "The number or the URL of the pull request.",
+			"required": true
+		}
+	],
+	"outputs": [
+		{
+			"name": "review",
+			"value": "{{review.data}}",
+			"description": "The summary and the comments."
+		}
+	],
+	"start": "review",
+	"nodes": [
+		{
+			"id": "review",
+			"label": "Review",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "agent",
+			"prompt": "Review pull request {{pr}} of this repository. Read it with your GitHub tools: its description, the linked issue, and the diff (`gh pr diff {{pr}}` works too). Do not change the code and do not post anything: a person reads your review first.\n\nLook for bugs, missing tests, and changes the description does not explain. Report `approve` when it can merge as it is, else `request-changes`. Put a short `summary` of your verdict in the data, and one entry in `comments` per finding: the file `path`, the `line` in the new version, and the `body`.",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "auto",
+			"effort": "high",
+			"tools": ["github"],
+			"timeoutMinutes": 30,
+			"outcomes": [
+				{
+					"name": "approve",
+					"description": "It can merge as it is."
+				},
+				{
+					"name": "request-changes",
+					"description": "The comments must be addressed first."
+				}
+			],
+			"output": {
+				"type": "object",
+				"properties": {
+					"summary": {
+						"type": "string"
+					},
+					"comments": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"path": {
+									"type": "string"
+								},
+								"line": {
+									"type": "integer"
+								},
+								"body": {
+									"type": "string"
+								}
+							},
+							"required": ["path", "line", "body"]
+						}
+					}
+				},
+				"required": ["summary", "comments"]
+			}
+		},
+		{
+			"id": "confirm",
+			"label": "Post it?",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "gate",
+			"question": "The review of {{pr}} says `{{review.outcome}}`:\n\n{{review.data.summary}}\n\nComments:\n\n{{review.data.comments}}\n\nPost it on GitHub?",
+			"choices": [
+				{
+					"name": "post",
+					"description": "Post the review as it is."
+				},
+				{
+					"name": "skip",
+					"description": "Post nothing."
+				}
+			]
+		},
+		{
+			"id": "post",
+			"label": "Post the review",
+			"position": {
+				"x": 640,
+				"y": 0
+			},
+			"type": "command",
+			"command": "# Templates arrive as environment variables, so the review text is never shell code.\nset -e\ncase \"{{review.outcome}}\" in\n\tapprove) verdict=--approve ;;\n\t*) verdict=--request-changes ;;\nesac\nbody=$(\n\tprintf '%s\\n\\n' \"{{review.data.summary}}\"\n\tprintf '%s' \"{{review.data.comments}}\" | jq -r '.[] | \"- `\\(.path):\\(.line)`: \\(.body)\"'\n)\ngh pr review \"{{pr}}\" \"$verdict\" --body \"$body\"",
+			"timeoutMinutes": 5
+		}
+	],
+	"edges": [
+		{
+			"id": "review-approve-confirm",
+			"from": "review",
+			"outcome": "approve",
+			"to": "confirm"
+		},
+		{
+			"id": "review-request-changes-confirm",
+			"from": "review",
+			"outcome": "request-changes",
+			"to": "confirm"
+		},
+		{
+			"id": "confirm-post-post",
+			"from": "confirm",
+			"outcome": "post",
+			"to": "post"
+		}
+	]
+}

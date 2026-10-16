@@ -1,0 +1,39 @@
+{
+	"version": 2,
+	"description": "One agent applies an instruction to one file. The body of per-file.",
+	"inputs": [
+		{
+			"name": "item",
+			"type": "json",
+			"label": "File",
+			"description": "A file element: { id, title, path }.",
+			"required": true
+		},
+		{
+			"name": "instruction",
+			"type": "text",
+			"label": "Instruction",
+			"description": "What to change in the file.",
+			"required": true
+		}
+	],
+	"start": "edit",
+	"nodes": [
+		{
+			"id": "edit",
+			"label": "Edit the file",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "agent",
+			"prompt": "Apply this instruction to the file `{{item.path}}`, and only to that file:\n\n{{instruction}}\n\nWhen the instruction does not apply to this file, change nothing and report `pass`. Do not commit: other agents work on the same branch, and the flow commits at the end.",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "auto",
+			"timeoutMinutes": 20,
+			"idleMinutes": 10
+		}
+	],
+	"edges": []
+}

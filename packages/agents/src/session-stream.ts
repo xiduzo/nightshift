@@ -38,7 +38,8 @@ async function closeWithin(
 /**
  * Drive a chunk stream through a translator and keep the AgentHarness
  * contract: events in order, one terminal event last, no throw. An abort ends
- * the stream right away, without waiting for the next chunk.
+ * the stream right away, without waiting for the next chunk; so does a
+ * settled translator (see `Translator.settled`).
  */
 export async function* streamSession(options: {
 	chunks: AsyncIterable<unknown>;
@@ -68,6 +69,14 @@ export async function* streamSession(options: {
 					break;
 				}
 				for (const event of translator.push(result.value)) yield event;
+				if (translator.settled()) {
+					// The turn is over: let the source shut down in the
+					// background (OpenCode's adapter holds RUN_FINISHED until its
+					// event subscription sees one more server event).
+					sourceDone = true;
+					void closeWithin(iterator, graceMs);
+					break;
+				}
 			}
 		} catch (error) {
 			thrown = error;

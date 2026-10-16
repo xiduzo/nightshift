@@ -13,7 +13,7 @@ export function blockersFirst(
 	const out: ListItem[] = [];
 	// An item blocked by itself is not waiting on anything (as in the script).
 	const waitsOnLeft = (item: ListItem, ids: ReadonlySet<string>) =>
-		item.blockedBy.some(
+		item.dependsOn.some(
 			(blocker) => blocker.id !== item.id && ids.has(blocker.id),
 		);
 	while (left.length > 0) {
@@ -37,7 +37,7 @@ function findCycle(left: readonly ListItem[]): string[] {
 		if (seen !== -1) return path.slice(seen);
 		path.push(item.id);
 		const self = item.id;
-		const blocker = item.blockedBy.find(
+		const blocker = item.dependsOn.find(
 			(entry) => entry.id !== self && byId.has(entry.id),
 		);
 		item = blocker === undefined ? undefined : byId.get(blocker.id);
@@ -78,7 +78,7 @@ export function nextItem(
 	for (const item of ordered) {
 		if (item.done || Object.hasOwn(states, item.id) || doomed.has(item.id))
 			continue;
-		const blockers = item.blockedBy.filter((blocker) => blocker.id !== item.id);
+		const blockers = item.dependsOn.filter((blocker) => blocker.id !== item.id);
 		if (blockers.every(isDone)) return { kind: "item", item };
 		waiting.push(item);
 	}
@@ -105,7 +105,7 @@ export function newlyBlocked(
 		for (const item of ordered) {
 			if (item.done || Object.hasOwn(states, item.id) || marked.has(item.id))
 				continue;
-			const blocker = item.blockedBy.find(
+			const blocker = item.dependsOn.find(
 				(entry) => entry.id !== item.id && stuck.has(entry.id),
 			);
 			if (blocker === undefined) continue;
@@ -127,5 +127,94 @@ export function newlyBlocked(
 export function normalizeList(
 	value: JsonValue,
 ): { ok: true; items: ListItem[] } | { ok: false; error: string } {
-	throw new Error("Not implemented");
+	if (!Array.isArray(value)) {
+		return {
+			ok: false,
+			error: `The list is not a JSON array: ${shortText(value)}`,
+		};
+	}
+	const items: ListItem[] = [];
+	const seen = new Set<string>();
+	for (const [index, element] of value.entries()) {
+		const item = toItem(element, index);
+		if (seen.has(item.id)) {
+			return {
+				ok: false,
+				error: `The list has the id "${item.id}" more than once (element ${index}).`,
+			};
+		}
+		seen.add(item.id);
+		items.push(item);
+	}
+	return { ok: true, items };
+}
+
+type JsonObject = { [key: string]: JsonValue };
+
+function isObject(value: JsonValue | undefined): value is JsonObject {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** A non-empty string, or a finite number as text. */
+function key(value: JsonValue | undefined): string | null {
+	if (typeof value === "string") return value === "" ? null : value;
+	if (typeof value === "number" && Number.isFinite(value)) return String(value);
+	return null;
+}
+
+function toItem(element: JsonValue, index: number): ListItem {
+	if (!isObject(element)) {
+		return {
+			id: String(index),
+			title: shortText(element),
+			url: null,
+			value: element,
+			dependsOn: [],
+			done: false,
+		};
+	}
+	const name = typeof element.name === "string" ? element.name : null;
+	const title =
+		typeof element.title === "string" && element.title !== ""
+			? element.title
+			: name !== null && name !== ""
+				? name
+				: shortText(element);
+	return {
+		id: key(element.id) ?? key(element.name) ?? String(index),
+		title,
+		url: typeof element.url === "string" ? element.url : null,
+		value: element,
+		dependsOn: dependencies(element.dependsOn ?? element.blockedBy),
+		done: element.done === true,
+	};
+}
+
+/**
+ * Ids, or `{ id, done }`. A plain id (or an object without `done`) counts
+ * as done when it is not in the list. Entries without an id are left out.
+ */
+function dependencies(value: JsonValue | undefined): ListItem["dependsOn"] {
+	if (!Array.isArray(value)) return [];
+	const out: ListItem["dependsOn"] = [];
+	for (const entry of value) {
+		if (isObject(entry)) {
+			const id = key(entry.id);
+			if (id !== null)
+				out.push({
+					id,
+					done: typeof entry.done === "boolean" ? entry.done : true,
+				});
+			continue;
+		}
+		const id = key(entry);
+		if (id !== null) out.push({ id, done: true });
+	}
+	return out;
+}
+
+/** A short text of any JSON value, for titles and errors. */
+function shortText(value: JsonValue): string {
+	const text = typeof value === "string" ? value : JSON.stringify(value);
+	return text.length > 60 ? `${text.slice(0, 59)}…` : text;
 }

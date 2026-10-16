@@ -31,6 +31,7 @@
   "type": "module",
   "scripts": {
     "dev": "turbo run dev",
+    "night": "bun scripts/night.ts",
     "build": "turbo run build --filter='!desktop' && turbo run build -F desktop",
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web --",

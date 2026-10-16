@@ -12,8 +12,11 @@ Status: pre-alpha. The concept, decisions, and delivery order are in [docs/PLAN.
 bun install
 bun run db:push
 bun run dev            # web UI and API with hot reload
+bun run night          # a night: the built web UI and API, no hot reload
 bun run dev:desktop    # the Electrobun shell
 ```
+
+Run nights with `bun run night`, and develop in a separate git worktree, so a code change never reloads the daemon in the middle of a night. Starter flows to copy into a project are in [examples/starters/](examples/starters/).
 
 ## Contribute
 

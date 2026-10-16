@@ -8,7 +8,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { outcomeStyle } from "@/components/outcome-badge";
 import { type NodeOption, uniqueOptionName } from "@/lib/flow-draft";
 
-type Kind = "label" | "choice";
+type Kind = "label" | "choice" | "outcome";
 
 const RESERVED: readonly string[] = reservedOutcomes;
 
@@ -46,7 +46,7 @@ export function OptionsEditor({
 	onMove?: (index: number, to: number) => void;
 }) {
 	const id = useId();
-	const noun = kind === "label" ? "label" : "choice";
+	const noun = kind;
 	const [focusIndex, setFocusIndex] = useState<number | null>(null);
 
 	return (

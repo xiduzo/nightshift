@@ -1,6 +1,6 @@
 import { cn } from "@nightshift/ui/lib/utils";
-import { ChevronRightIcon, ScanSearchIcon } from "lucide-react";
-import { useState } from "react";
+import { ChevronRightIcon, ScanSearchIcon, WorkflowIcon } from "lucide-react";
+import { type ReactNode, useState } from "react";
 
 import { hasCost, NODE_TYPE } from "@/components/flow/node-type";
 import {
@@ -8,26 +8,22 @@ import {
 	OutcomeBadge,
 	stepState,
 } from "@/components/outcome-badge";
-import type { ItemSummary, RunStatus, StepSummary } from "@/lib/api-types";
-import {
-	formatCost,
-	formatDuration,
-	formatTime,
-	itemLabel,
-} from "@/lib/format";
+import type { RunStatus, StepSummary } from "@/lib/api-types";
+import { formatCost, formatDuration, formatTime } from "@/lib/format";
 import { type ItemScope, itemsOf, scopeKey, stepsIn } from "@/lib/run-steps";
 
 export function stepDuration(step: StepSummary, now = Date.now()): string {
 	return formatDuration((step.endedAt ?? now) - step.startedAt);
 }
 
-/** Indent per level of For Each nesting. */
+/** Indent per level of nesting. */
 const INDENT_REM = 1;
 
 /**
- * Every visit of every node, in the order they started. The steps of a For
- * Each body sit under their For Each step, grouped per item, indented and
- * collapsible. With `scope`, only the steps of that item show.
+ * Every visit of every node, in the order they started. The steps of a
+ * called flow sit under the Subflow step that called it, or under their For
+ * Each step grouped per element, indented and collapsible. With `scope`,
+ * only the steps of that call show.
  */
 export function StepTimeline({
 	steps,
@@ -37,6 +33,7 @@ export function StepTimeline({
 	selectedItem,
 	onSelect,
 	onSelectItem,
+	calledName,
 }: {
 	/** All steps of the run, in the order they started. */
 	steps: StepSummary[];
@@ -47,6 +44,8 @@ export function StepTimeline({
 	selectedItem: ItemScope;
 	onSelect: (stepId: string) => void;
 	onSelectItem: (scope: ItemScope) => void;
+	/** The name of the flow a Subflow or For Each step calls. */
+	calledName?: (step: StepSummary) => string | undefined;
 }) {
 	/** Groups the person opened or closed; the rest follow `defaultOpen`. */
 	const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(
@@ -71,7 +70,46 @@ export function StepTimeline({
 		);
 	}
 
-	const renderSteps = (list: StepSummary[], depth: number) =>
+	const renderGroup = ({
+		scope: groupScope,
+		depth,
+		defaultOpen,
+		label,
+		badge,
+	}: {
+		scope: NonNullable<ItemScope>;
+		depth: number;
+		defaultOpen: boolean;
+		label: ReactNode;
+		badge: ReactNode;
+	}) => {
+		const key = scopeKey(groupScope);
+		const children = stepsIn(steps, groupScope);
+		const open = toggled.get(key) ?? defaultOpen;
+		return (
+			<li key={key}>
+				<GroupRow
+					label={label}
+					badge={badge}
+					depth={depth}
+					stepCount={children.length}
+					open={open}
+					selected={scopeKey(selectedItem) === key}
+					onToggle={() =>
+						setToggled((current) => new Map(current).set(key, !open))
+					}
+					onFocus={() => onSelectItem(groupScope)}
+				/>
+				{open && children.length > 0 ? (
+					<ol className="divide-y border-t">
+						{renderSteps(children, depth + 1)}
+					</ol>
+				) : null}
+			</li>
+		);
+	};
+
+	const renderSteps = (list: StepSummary[], depth: number): ReactNode =>
 		list.map((step) => (
 			<li key={step.id}>
 				<StepRow
@@ -82,36 +120,50 @@ export function StepTimeline({
 					selected={step.id === selectedStepId}
 					onSelect={() => onSelect(step.id)}
 				/>
-				{step.nodeType === "foreach" ? (
-					<ol aria-label={`Items of ${step.nodeId}`}>
-						{itemsOf(step, steps).map((item, index, items) => {
-							const itemScope = { forEachStepId: step.id, itemId: item.id };
-							const key = scopeKey(itemScope);
-							const children = stepsIn(steps, itemScope);
-							const open =
-								toggled.get(key) ??
-								(item.state === "running" || index === items.length - 1);
-							return (
-								<li key={key}>
-									<ItemGroupRow
-										item={item}
-										depth={depth + 1}
-										stepCount={children.length}
-										open={open}
-										selected={scopeKey(selectedItem) === key}
-										onToggle={() =>
-											setToggled((current) => new Map(current).set(key, !open))
-										}
-										onFocus={() => onSelectItem(itemScope)}
+				{step.nodeType === "subflow" ? (
+					<ol aria-label={`Steps called by ${step.nodeId}`}>
+						{renderGroup({
+							scope: { parentStepId: step.id, itemId: null },
+							depth: depth + 1,
+							defaultOpen: true,
+							label: (
+								<>
+									<WorkflowIcon
+										className="size-3.5 shrink-0 text-muted-foreground"
+										aria-hidden="true"
 									/>
-									{open && children.length > 0 ? (
-										<ol className="divide-y border-t">
-											{renderSteps(children, depth + 2)}
-										</ol>
-									) : null}
-								</li>
-							);
+									<span className="min-w-0 truncate font-mono">
+										{calledName?.(step) ?? "called flow"}
+									</span>
+								</>
+							),
+							badge: null,
 						})}
+					</ol>
+				) : null}
+				{step.nodeType === "foreach" ? (
+					<ol aria-label={`Elements of ${step.nodeId}`}>
+						{itemsOf(step, steps).map((item, index, items) =>
+							renderGroup({
+								scope: { parentStepId: step.id, itemId: item.id },
+								depth: depth + 1,
+								defaultOpen:
+									item.state === "running" || index === items.length - 1,
+								label: (
+									<>
+										{item.title !== item.id ? (
+											<span className="max-w-[35%] shrink-0 truncate font-mono text-muted-foreground">
+												{item.id}
+											</span>
+										) : null}
+										<span className="min-w-0 truncate">{item.title}</span>
+									</>
+								),
+								badge: (
+									<ItemStateBadge state={item.state} className="ml-auto" />
+								),
+							}),
+						)}
 					</ol>
 				) : null}
 			</li>
@@ -186,9 +238,10 @@ function StepRow({
 	);
 }
 
-/** One item of a For Each step: opens and closes its steps, or focuses on it. */
-function ItemGroupRow({
-	item,
+/** One call of a flow (a Subflow step, or one element of a For Each step): opens and closes its steps, or focuses on it. */
+function GroupRow({
+	label,
+	badge,
 	depth,
 	stepCount,
 	open,
@@ -196,7 +249,8 @@ function ItemGroupRow({
 	onToggle,
 	onFocus,
 }: {
-	item: ItemSummary;
+	label: ReactNode;
+	badge: ReactNode;
 	depth: number;
 	stepCount: number;
 	open: boolean;
@@ -234,21 +288,18 @@ function ItemGroupRow({
 						stepCount === 0 && "opacity-30",
 					)}
 				/>
-				<span className="shrink-0 font-mono text-muted-foreground">
-					{itemLabel(item.id, item.number)}
-				</span>
-				<span className="min-w-0 truncate">{item.title}</span>
+				{label}
 				<span className="shrink-0 text-muted-foreground">
 					{stepCount} {stepCount === 1 ? "step" : "steps"}
 				</span>
-				<ItemStateBadge state={item.state} className="ml-auto" />
+				{badge}
 			</button>
 			<button
 				type="button"
 				onClick={onFocus}
 				aria-pressed={selected}
-				aria-label={`Focus on ${itemLabel(item.id, item.number)}: its steps and its body flow`}
-				title="Focus on this item: its steps and its body flow"
+				aria-label="Focus on this call: its steps and the flow it ran"
+				title="Focus on this call: its steps and the flow it ran"
 				className="mr-1 flex size-6 shrink-0 items-center justify-center text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
 			>
 				<ScanSearchIcon className="size-3.5" aria-hidden="true" />

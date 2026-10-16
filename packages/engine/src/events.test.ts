@@ -433,12 +433,9 @@ describe("gates", () => {
 describe("For Each scopes", () => {
 	const item = (id: string) => ({
 		id,
-		number: null,
 		title: id,
-		body: null,
 		url: null,
-		parentNumber: null,
-		parentTitle: null,
+		value: { id, title: id },
 	});
 	const started = (
 		b: ReturnType<typeof log>,
@@ -472,12 +469,12 @@ describe("For Each scopes", () => {
 		started(b, "outer", "loop", "foreach", null);
 		itemStarted(b, "outer", "A");
 		started(b, "inner", "traces", "foreach", {
-			forEachStepId: "outer",
+			parentStepId: "outer",
 			itemId: "A",
 		});
 		itemStarted(b, "inner", "a1");
 		started(b, "w", "worker", "agent", {
-			forEachStepId: "inner",
+			parentStepId: "inner",
 			itemId: "a1",
 		});
 		b.sessionStarted("w", "s").harness("w", "s", "h-1");
@@ -492,7 +489,7 @@ describe("For Each scopes", () => {
 			from: "worker",
 			to: "check",
 			outcome: "pass",
-			scope: { forEachStepId: "inner", itemId: "a1" },
+			scope: { parentStepId: "inner", itemId: "a1" },
 		});
 		started(b, "top", "worker", "agent", null);
 		b.stepEnded("top", "pass", { summary: "top" });
@@ -514,12 +511,12 @@ describe("For Each scopes", () => {
 		b.stepEnded("inner", "stopped").stepEnded("outer", "stopped");
 		b.ended("stopped");
 		expect(deriveResumePoint(b.events)).toEqual({
-			kind: "foreach",
+			kind: "call",
 			nodeId: "loop",
 			stepId: "outer",
 			itemId: "A",
 			inner: {
-				kind: "foreach",
+				kind: "call",
 				nodeId: "traces",
 				stepId: "inner",
 				itemId: "a1",
@@ -546,10 +543,10 @@ describe("For Each scopes", () => {
 		b.stepEnded("inner", "stopped").stepEnded("outer", "stopped");
 		b.ended("stopped");
 		expect(deriveResumePoint(b.events)).toMatchObject({
-			kind: "foreach",
+			kind: "call",
 			stepId: "outer",
 			itemId: "A",
-			inner: { kind: "foreach", stepId: "inner", itemId: null, inner: null },
+			inner: { kind: "call", stepId: "inner", itemId: null, inner: null },
 		});
 
 		const c = nested();
@@ -564,7 +561,7 @@ describe("For Each scopes", () => {
 		c.stepEnded("inner", "done");
 		c.ended("failed");
 		expect(deriveResumePoint(c.events)).toMatchObject({
-			kind: "foreach",
+			kind: "call",
 			stepId: "outer",
 			itemId: "A",
 			inner: { kind: "node", nodeId: "traces" },
@@ -588,7 +585,7 @@ describe("For Each scopes", () => {
 		const outer = () => deriveSteps(b.events).find((s) => s.id === "outer");
 		expect(outer()?.items[0]).toMatchObject({ state: "running", open: true });
 		const inner = deriveSteps(b.events).find((s) => s.id === "inner");
-		expect(inner?.scope).toEqual({ forEachStepId: "outer", itemId: "A" });
+		expect(inner?.scope).toEqual({ parentStepId: "outer", itemId: "A" });
 		expect(inner?.items.map((i) => [i.facts.id, i.state, i.reason])).toEqual([
 			["a1", "failed", "boom"],
 			["a2", "blocked", "blocked by #a1"],

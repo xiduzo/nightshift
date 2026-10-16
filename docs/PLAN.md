@@ -174,7 +174,10 @@ bun run dev:desktop    # the Electrobun shell with hot reload
 bun run check          # Biome lint + format
 bun run check-types    # TypeScript
 bun run build          # everything, desktop last
+bun run night          # the stable daemon for a night (see below)
 ```
+
+Nights: `bun run night` builds the web app, then serves the API server and the built web app on the usual ports (3000 and 3001; set `PORT` and `WEB_PORT` to change them). The server runs from source with plain `bun`, without `--hot`, and the web app is a production build behind `vite preview`, so no file change restarts a running night. It reads the same env as `bun run dev` (`apps/server/.env` and `apps/web/.env` through varlock; `process.env` wins). When `PORT` or `WEB_PORT` is set, `BETTER_AUTH_URL`, `VITE_SERVER_URL` and `CORS_ORIGIN` follow, unless they are set too. Develop in a separate git worktree (`git worktree add ../nightshift-dev`) with `bun run dev` on other ports and its own `DATABASE_URL`, and pull the work into the night's clone between nights.
 
 ## 7. Open items
 
@@ -182,9 +185,10 @@ bun run build          # everything, desktop last
 - Session resume works through the adapter (Slice 1). The usage-limit reset time is parsed from the harness's raw messages, but no real usage limit has tested it yet.
 - Electrobun packaging needs a static web build of TanStack Start. Confirm before the first desktop build.
 - The decider runs Claude Code with no built-in tools (`--tools "" --strict-mcp-config`). `@tanstack/ai-claude-code` 0.9 cannot pass that next to several bridged tools, so we append the flags to the `claude` executable string, which the adapter splits on spaces. Recheck on every adapter upgrade, and ask upstream for an option.
-- Flows have no run parameters yet: the rpgdotexe example hardcodes the Epic number in `night.json`. Add parameters (`{{params.epic}}`) set in the start dialog.
 - An item cut short by a stop or a daemon death shows `failed` with a reason, and runs again on resume. Consider `stopped` and `interrupted` item states.
 - `timeoutMinutes` on a For Each node is not enforced. Every step inside the body keeps its own limit.
 - Item branches are `nightshift/<run8>-<id>-<title>`: git cannot nest a branch under the run branch `nightshift/<run8>`.
 - Usage-limit and network sleeps are tested with fakes only. The first real usage limit at night is the real test.
+- `@tanstack/ai-opencode` 0.5 drives OpenCode 1.x servers only (verified with 1.19.2). OpenCode 2.x serves a different API. Point the OpenCode harness at a 1.x `opencode` until the adapter catches up. The harness works around four adapter quirks (empty first tool input, the prompt echoed as text, a finish held until the next heartbeat, abort teardown): report them upstream.
+- The Codex harness is tested against a fake `codex` only: the event shapes, `exec resume`, error wording, and the TOML MCP overrides are unverified. In `workspace-write`, commits from a linked worktree may need the git common dir in `additionalDirectories`.
 - `@tanstack/ai-sandbox` 0.5.23 writes its projection marker to a doubled path when the workspace has a fixed directory. We set `workspace.root: '.'` to avoid it. Report it upstream.

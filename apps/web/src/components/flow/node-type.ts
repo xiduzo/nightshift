@@ -5,6 +5,7 @@ import {
 	type LucideIcon,
 	RepeatIcon,
 	SplitIcon,
+	SquareFunctionIcon,
 	SquareTerminalIcon,
 } from "lucide-react";
 
@@ -33,10 +34,15 @@ export const NODE_TYPE: Record<
 		icon: HandIcon,
 		blurb: "Waits for you to pick a choice in the inbox.",
 	},
+	subflow: {
+		label: "Subflow",
+		icon: SquareFunctionIcon,
+		blurb: "Runs another flow once, with its inputs bound.",
+	},
 	foreach: {
 		label: "For Each",
 		icon: RepeatIcon,
-		blurb: "Runs a body flow once per item of a list.",
+		blurb: "Runs a flow once per element of a list.",
 	},
 };
 

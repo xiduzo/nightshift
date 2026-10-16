@@ -4,6 +4,12 @@ export {
 	claudeCodeHarness,
 } from "./claude-code";
 export {
+	type CodexHarnessOptions,
+	type CodexPolicy,
+	codexHarness,
+	codexPolicy,
+} from "./codex";
+export {
 	type ClaudeCodeDeciderOptions,
 	claudeCodeDecider,
 	DECIDE_TOOL_ID,
@@ -27,4 +33,9 @@ export {
 	readGithubItems,
 	SUB_ISSUES_QUERY,
 } from "./github-items";
+export {
+	type OpencodeHarnessOptions,
+	opencodeHarness,
+	opencodePermission,
+} from "./opencode";
 export type * from "./types";

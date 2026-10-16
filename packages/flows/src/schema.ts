@@ -65,6 +65,25 @@ const option = z.object({
 });
 export type Option = z.infer<typeof option>;
 
+/**
+ * An MCP server an Agent node adds to its session: a local command (stdio)
+ * or a URL (streamable HTTP). Flow files live in repos: never put secrets
+ * here. `${NAME}` in `env` values and `headers` reads the daemon's
+ * environment when the session starts.
+ */
+export const mcpServerSchema = z.union([
+	z.object({
+		command: z.string().min(1),
+		args: z.array(z.string()).default([]),
+		env: z.record(z.string(), z.string()).default({}),
+	}),
+	z.object({
+		url: z.url(),
+		headers: z.record(z.string(), z.string()).default({}),
+	}),
+]);
+export type McpServer = z.infer<typeof mcpServerSchema>;
+
 /** A JSON Schema object (draft 2020-12 subset), kept as data. */
 export const jsonSchemaSchema = z.record(z.string(), z.unknown());
 
@@ -89,7 +108,8 @@ export const agentNodeSchema = z.object({
 	prompt: z.string(),
 	/** A skill the harness already has, run as `/<skill> <prompt>`. */
 	skill: z.string().min(1).optional(),
-	harness: z.literal("claude-code"),
+	/** The coding-agent CLI that runs the session. Each uses its own login. */
+	harness: z.enum(["claude-code", "opencode", "codex"]),
 	model: z.string().min(1),
 	effort: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
 	/**
@@ -113,6 +133,8 @@ export const agentNodeSchema = z.object({
 	tools: z.array(toolSetSchema).default([]),
 	/** The step fails when the agent shows no activity for this long. */
 	idleMinutes: z.number().int().positive().optional(),
+	/** MCP servers by name, added to the harness's own configuration. */
+	mcpServers: z.record(nameSchema, mcpServerSchema).optional(),
 	/**
 	 * The agent's own outcomes, each with an edge. Replaces `pass`, `fail`
 	 * and `needs-input` when set. The agent reports one of them.
@@ -191,7 +213,8 @@ export const commandSourceSchema = z.object({
 
 /**
  * Files in the worktree that match a glob, sorted by path. Each element is
- * `{ id: path, title: path, path }`.
+ * `{ id: path, title: path, path }`. The glob supports templates, for
+ * example `{{glob}}`, and stays inside the worktree.
  */
 export const filesSourceSchema = z.object({
 	kind: z.literal("files"),
@@ -427,3 +450,19 @@ export const runFields = [
 	"flow",
 ] as const;
 export type RunField = (typeof runFields)[number];
+
+/**
+ * The fields a later node can read from `node`: `outputFieldsByType`, plus
+ * for a Subflow node the output names of the flow it calls, when known.
+ */
+export function nodeOutputFields(
+	node: FlowNode,
+	called?: Flow | null,
+): readonly string[] {
+	const fields: readonly string[] = outputFieldsByType[node.type];
+	if (node.type !== "subflow" || !called) return fields;
+	const outputs = called.outputs
+		.map((output) => output.name)
+		.filter((name) => !fields.includes(name));
+	return [...fields, ...outputs];
+}

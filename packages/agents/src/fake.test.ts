@@ -195,6 +195,41 @@ describe("fakeHarness", () => {
 		},
 	);
 
+	test("reporting script: a spec's own outcome with data", async () => {
+		const spec = {
+			outcomes: [{ name: "approved" }, { name: "changes-requested" }],
+			output: { type: "object" },
+		};
+		const harness = fakeHarness({
+			...reportingScript("changes-requested", "Two issues.", {
+				issues: ["a", "b"],
+			}),
+			delayMs: 0,
+		});
+		const events = await collect(harness.run(input({ stepReport: spec })));
+		expectContract(events);
+		expect(events.at(-2)).toEqual({
+			type: "report",
+			outcome: "changes-requested",
+			summary: "Two issues.",
+			data: { issues: ["a", "b"] },
+		});
+		expect(harness.calls[0]?.stepReport).toEqual(spec);
+	});
+
+	test("reporting script without data has no data key", async () => {
+		const events = await collect(
+			fakeHarness({ ...reportingScript("approved"), delayMs: 0 }).run(
+				input({ stepReport: { outcomes: [{ name: "approved" }] } }),
+			),
+		);
+		expect(events.at(-2)).toEqual({
+			type: "report",
+			outcome: "approved",
+			summary: "Fake report: approved",
+		});
+	});
+
 	test("report steps keep their place among the other steps", async () => {
 		const events = await collect(
 			fakeHarness({

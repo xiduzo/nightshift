@@ -18,8 +18,16 @@ export type FakeStep =
 			chunkSize?: number;
 	  }
 	| { type: "tool"; name: string; input?: unknown; result?: string }
-	/** The agent's step report: one `report` event. */
-	| { type: "report"; outcome: StepReportOutcome; summary: string }
+	/**
+	 * The agent's step report: one `report` event. `data` is passed on as is
+	 * (the fake never checks it against a spec, like the real harness).
+	 */
+	| {
+			type: "report";
+			outcome: StepReportOutcome;
+			summary: string;
+			data?: unknown;
+	  }
 	| { type: "wait"; ms: number };
 
 export type FakeOutcome =
@@ -81,15 +89,24 @@ export function usageLimitScript(resetAt?: number): FakeScript {
 	};
 }
 
-/** A script that reports its step outcome, then finishes. */
+/**
+ * A script that reports its step outcome (any outcome name, for a spec's
+ * own outcomes), with `data` when given, then finishes.
+ */
 export function reportingScript(
 	outcome: StepReportOutcome,
 	summary = `Fake report: ${outcome}`,
+	data?: unknown,
 ): FakeScript {
 	return {
 		steps: [
 			{ type: "text", text: "Working on it." },
-			{ type: "report", outcome, summary },
+			{
+				type: "report",
+				outcome,
+				summary,
+				...(data !== undefined ? { data } : {}),
+			},
 		],
 		outcome: { type: "finished" },
 	};
@@ -157,6 +174,7 @@ export function fakeHarness(script: FakeScriptSource = {}): FakeHarness {
 						type: "report",
 						outcome: step.outcome,
 						summary: step.summary,
+						...(step.data !== undefined ? { data: step.data } : {}),
 					};
 				} else if (step.type === "text") {
 					const messageId = `fake-message-${++ids}`;

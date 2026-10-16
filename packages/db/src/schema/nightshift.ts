@@ -31,7 +31,7 @@ export const run = sqliteTable(
 		flowName: text("flow_name"),
 		/** JSON copy of the flow at start. The run never reads the file again. */
 		flow: text("flow").notNull(),
-		/** JSON copies of the For Each body flows at start, by flow name. */
+		/** JSON copies of every flow the run can call (Subflow and For Each) at start, by flow name. */
 		bodyFlows: text("body_flows").notNull().default("{}"),
 		title: text("title").notNull(),
 		/** Absolute path of the worktree the run works in. */

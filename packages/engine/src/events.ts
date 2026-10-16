@@ -4,11 +4,17 @@ import { event } from "@nightshift/db/schema/nightshift";
 import type {
 	FlowNodeType,
 	ItemState,
+	JsonValue,
 	NodeOutputs,
 	Outcome,
 } from "@nightshift/flows";
 
-import type { RunStatus, SessionSummary, StepOutcome } from "./types";
+import type {
+	RunStatus,
+	RunTrigger,
+	SessionSummary,
+	StepOutcome,
+} from "./types";
 
 /**
  * Every fact the engine appends to the event log, and the pure functions
@@ -28,32 +34,37 @@ export type SessionOutcome = NonNullable<SessionSummary["outcome"]>;
 /** How a run ended. `running` is never logged: it is the absence of an end. */
 export type RunEnding = Exclude<RunStatus, "running">;
 
-export type StepOutputs = Record<string, string | number>;
+/** A step's template outputs: JSON values, so `{{planner.data.tasks}}` can take a path. */
+export type StepOutputs = Record<string, JsonValue>;
+
+/** Input values of a flow, by input name. */
+export type InputValues = Record<string, JsonValue>;
 
 export type GateChoice = { name: string; description?: string };
 
 /**
- * Where a step runs: null at the top level of the run's flow, or inside the
- * body of a For Each step for one item. Step ids are unique, so the innermost
- * For Each step and the item are enough: a nested For Each step has a scope
- * of its own, and the chain of scopes leads up to the top level.
+ * Where a step runs: null at the top level of the run's flow, or inside a
+ * flow that a Subflow or For Each step called. `parentStepId` is that step;
+ * `itemId` is the element of a For Each (null for a Subflow). Step ids are
+ * unique, so the innermost caller is enough: the caller has a scope of its
+ * own, and the chain of scopes leads up to the top level. Logs written
+ * before flow format 2 say `forEachStepId`; `parseEventRow` reads them as
+ * `parentStepId`.
  */
-export type Scope = { forEachStepId: string; itemId: string };
+export type Scope = { parentStepId: string; itemId: string | null };
 
 /** The key that separates node ids, visits, outputs and edge counts per scope. */
 export function scopeKey(scope: Scope | null | undefined): string {
-	return scope ? `${scope.forEachStepId}/${scope.itemId}` : "";
+	return scope ? `${scope.parentStepId}/${scope.itemId ?? ""}` : "";
 }
 
-/** What the engine keeps of a source item when it starts or blocks it. */
+/** What the engine keeps of a list element when it starts or blocks it. */
 export type ItemFacts = {
 	id: string;
-	number: number | null;
 	title: string;
-	body: string | null;
 	url: string | null;
-	parentNumber: number | null;
-	parentTitle: string | null;
+	/** The element as the source gave it. */
+	value: JsonValue;
 };
 
 export type WaitReason = "usage-limit" | "network";
@@ -71,8 +82,12 @@ export type EnginePayloads = {
 		start: string;
 		/** Epoch ms: no new step or item starts after it. Absent before Slice 4. */
 		stopAt?: number | null;
-		/** The run parameters, defaults applied. Absent on older runs. */
+		/** The values of the flow's inputs, defaults applied. Absent before flow format 2. */
+		inputs?: InputValues;
+		/** Flow format 1: the run parameters. Read as `inputs`. */
 		params?: Record<string, string>;
+		/** What started the run. Absent before Slice 7: a person. */
+		trigger?: RunTrigger;
 	};
 	WorktreeCreated: { worktreePath: string; branch: string; baseRef: string };
 	/** A person continued a stopped, failed or interrupted run. */
@@ -82,7 +97,7 @@ export type EnginePayloads = {
 		/** Set when the walk continues an existing Agent step's session. */
 		stepId: string | null;
 		prompt: string | null;
-		/** The scope of `nodeId`: the For Each item the walk continues in. */
+		/** The scope of `nodeId`: the called flow (and element) the walk continues in. */
 		scope?: Scope | null;
 		/** The stop time had passed: a person resumed past it, so it no longer applies. */
 		clearStopAt?: boolean;
@@ -100,7 +115,7 @@ export type EnginePayloads = {
 	};
 	/**
 	 * An ended step runs again: an Agent step in a new session of the same
-	 * harness session, a For Each step to continue its items.
+	 * harness session, a Subflow or For Each step to continue its called flow.
 	 */
 	StepReopened: { prompt: string | null };
 	StepEnded: {
@@ -148,9 +163,14 @@ export type EnginePayloads = {
 		/** The scope the edge belongs to. Null (or absent) at the top level. */
 		scope?: Scope | null;
 	};
+	/**
+	 * A Subflow step calls its flow with these input values (bindings
+	 * rendered, defaults applied). The called flow runs in the step's scope.
+	 */
+	FlowCalled: { flow: string; inputs: InputValues };
 	/** A For Each step read its source. */
 	ItemsRead: { count: number; open: number };
-	/** A For Each step starts an item: its body runs in the scope of this item. */
+	/** A For Each step starts an element: its flow runs in the scope of this element. */
 	ItemStarted: {
 		item: ItemFacts;
 		/** 1 for the first item the visit started. */
@@ -158,6 +178,11 @@ export type EnginePayloads = {
 		/** Null without a branch per item. */
 		branch: string | null;
 		baseBranch: string | null;
+		/**
+		 * The input values of the called flow for this element. Absent before
+		 * flow format 2: the element was the only input, `item`.
+		 */
+		inputs?: InputValues;
 	};
 	/** An item that never starts: a blocker of it failed or is blocked. */
 	ItemBlocked: { item: ItemFacts; blocker: string; reason: string };
@@ -165,6 +190,8 @@ export type EnginePayloads = {
 		itemId: string;
 		state: Exclude<ItemState, "running" | "blocked">;
 		reason: string | null;
+		/** The called flow's declared outputs for this element. Absent before flow format 2. */
+		outputs?: StepOutputs;
 	};
 	/**
 	 * A step waits for a usage limit to reset or for the network. The step
@@ -185,6 +212,32 @@ export type EnginePayloads = {
 	/** A person asked to stop the run before its next step or item. */
 	StopAfterStepRequested: Record<string, never>;
 	RunEnded: { status: RunEnding; reason: string | null };
+	/**
+	 * A schedule came due and the scheduler started its run (`runId`), or
+	 * tried to and could not (`error`). `at` is the cron time, not the
+	 * moment of the tick: no cron time of a schedule fires twice. Logged
+	 * without a run id on the row; the run is in the payload.
+	 */
+	ScheduleFired: {
+		projectId: string;
+		scheduleId: string;
+		at: number;
+		runId: string | null;
+		error: string | null;
+	};
+	/**
+	 * A cron time of a schedule that did not start: missed by more than the
+	 * grace (the daemon was down or the computer slept), or an earlier run
+	 * of the same schedule was still running, waiting or sleeping.
+	 */
+	ScheduleSkipped: {
+		projectId: string;
+		scheduleId: string;
+		at: number;
+		reason: string;
+		/** The earlier run that still runs, when that is the reason. */
+		runId: string | null;
+	};
 };
 
 export type EngineEventType = keyof EnginePayloads;
@@ -223,15 +276,71 @@ export async function appendEvent<T extends EngineEventType>(
 }
 
 export function parseEventRow(row: typeof event.$inferSelect): LoggedEvent {
+	const type = row.type as EngineEventType;
 	return {
 		seq: row.seq,
 		runId: row.runId,
 		stepId: row.stepId,
 		sessionId: row.sessionId,
-		type: row.type as EngineEventType,
-		payload: JSON.parse(row.payload),
+		type,
+		payload: upgradePayload(type, JSON.parse(row.payload)),
 		at: row.at.getTime(),
 	} as LoggedEvent;
+}
+
+type Raw = Record<string, unknown>;
+
+/**
+ * Reads payloads written before flow format 2 in today's shape: a scope
+ * `{ forEachStepId, itemId }` becomes `{ parentStepId, itemId }`, and the
+ * item facts of a GitHub issue (`number`, `body`, `parentNumber`, …) become
+ * an element `value`. The log itself is never rewritten.
+ */
+function upgradePayload(type: EngineEventType, payload: Raw): Raw {
+	if (!payload || typeof payload !== "object") return payload;
+	if (
+		(type === "StepStarted" || type === "RunResumed" || type === "EdgeTaken") &&
+		payload.scope
+	) {
+		return { ...payload, scope: upgradeScope(payload.scope as Raw) };
+	}
+	if ((type === "ItemStarted" || type === "ItemBlocked") && payload.item) {
+		return { ...payload, item: upgradeItemFacts(payload.item as Raw) };
+	}
+	return payload;
+}
+
+function upgradeScope(scope: Raw): Scope {
+	if (typeof scope.parentStepId === "string") return scope as Scope;
+	return {
+		parentStepId: String(scope.forEachStepId),
+		itemId: typeof scope.itemId === "string" ? scope.itemId : null,
+	};
+}
+
+function upgradeItemFacts(item: Raw): ItemFacts {
+	if (Object.hasOwn(item, "value")) return item as ItemFacts;
+	const value: Record<string, JsonValue> = {};
+	const keep = (key: string, from: unknown) => {
+		if (from !== null && from !== undefined) value[key] = from as JsonValue;
+	};
+	keep("id", item.id);
+	keep("number", item.number);
+	keep("title", item.title);
+	keep("body", item.body);
+	keep("url", item.url);
+	if (item.parentNumber != null || item.parentTitle != null) {
+		const parent: Record<string, JsonValue> = {};
+		if (item.parentNumber != null) parent.number = item.parentNumber as number;
+		if (item.parentTitle != null) parent.title = item.parentTitle as string;
+		value.parent = parent;
+	}
+	return {
+		id: String(item.id),
+		title: typeof item.title === "string" ? item.title : String(item.id),
+		url: typeof item.url === "string" ? item.url : null,
+		value,
+	};
 }
 
 function ofType<T extends EngineEventType>(
@@ -376,11 +485,18 @@ export function deriveStopAt(events: readonly LoggedEvent[]): number | null {
 	return stopAt;
 }
 
-export function deriveParams(
-	events: readonly LoggedEvent[],
-): Record<string, string> {
+/** The values of the top-level flow's inputs (the params of a run from before flow format 2). */
+export function deriveInputs(events: readonly LoggedEvent[]): InputValues {
 	const started = events.find((e) => e.type === "RunStarted");
-	return started?.type === "RunStarted" ? (started.payload.params ?? {}) : {};
+	if (started?.type !== "RunStarted") return {};
+	return started.payload.inputs ?? started.payload.params ?? {};
+}
+
+/** What started the run: a person unless `RunStarted` names a schedule. */
+export function deriveTrigger(events: readonly LoggedEvent[]): RunTrigger {
+	const started = events.find((e) => e.type === "RunStarted");
+	if (started?.type !== "RunStarted") return { kind: "manual" };
+	return started.payload.trigger ?? { kind: "manual" };
 }
 
 /** How often the run took each edge of one scope (default: the top level), by edge id. */
@@ -454,6 +570,10 @@ export type DerivedItem = {
 	open: boolean;
 	branch: string | null;
 	baseBranch: string | null;
+	/** The called flow's input values. Null before flow format 2. */
+	inputs: InputValues | null;
+	/** The called flow's declared outputs for this element, once it ended. */
+	outputs: StepOutputs;
 	startedAt: number;
 	endedAt: number | null;
 	reason: string | null;
@@ -488,6 +608,8 @@ export type DerivedStep = {
 	} | null;
 	/** For Each steps only: its items in the order they started or were blocked. */
 	items: DerivedItem[];
+	/** Subflow steps only: the call, once its inputs were bound. */
+	call: EnginePayloads["FlowCalled"] | null;
 };
 
 /**
@@ -519,6 +641,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 				costUsd: 0,
 				gate: null,
 				items: [],
+				call: null,
 			});
 			continue;
 		}
@@ -542,6 +665,8 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 			step.outputs = e.payload.outputs;
 			step.error = e.payload.error;
 			step.costUsd += e.payload.costUsd ?? 0;
+		} else if (e.type === "FlowCalled") {
+			step.call = e.payload;
 		} else if (e.type === "ItemStarted") {
 			step.items.push({
 				facts: e.payload.item,
@@ -550,6 +675,8 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 				open: true,
 				branch: e.payload.branch,
 				baseBranch: e.payload.baseBranch,
+				inputs: e.payload.inputs ?? null,
+				outputs: {},
 				startedAt: e.at,
 				endedAt: null,
 				reason: null,
@@ -562,6 +689,8 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 				open: false,
 				branch: null,
 				baseBranch: null,
+				inputs: null,
+				outputs: {},
 				startedAt: e.at,
 				endedAt: e.at,
 				reason: e.payload.reason,
@@ -574,6 +703,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 				item.open = false;
 				item.state = e.payload.state;
 				item.reason = e.payload.reason;
+				item.outputs = e.payload.outputs ?? {};
 				item.endedAt = e.at;
 			}
 		}
@@ -688,19 +818,28 @@ export type ResumePoint =
 	/** Start a new visit of this node. */
 	| { kind: "node"; nodeId: string }
 	/**
-	 * Continue this For Each step: the item `itemId` at `inner` (its body's
-	 * start when null), or, without an item, the loop with its next item.
+	 * Continue this Subflow or For Each step. A For Each continues the
+	 * element `itemId` at `inner` (the called flow's start when null), or,
+	 * without an element, its loop with the next element. A Subflow
+	 * (`itemId` null) continues its called flow at `inner`.
 	 */
 	| {
-			kind: "foreach";
+			kind: "call";
 			nodeId: string;
 			stepId: string;
 			itemId: string | null;
 			inner: ResumePoint | null;
 	  };
 
-/** For Each outcomes that end a visit as the flow means it. */
-const forEachEndings: readonly (StepOutcome | null)[] = ["done", "halted"];
+/** Outcomes of a calling step that end a visit as the flow means it. */
+const callEndings: Partial<Record<FlowNodeType, readonly StepOutcome[]>> = {
+	foreach: ["done", "halted"],
+	subflow: ["pass", "fail"],
+};
+
+const endedAsMeant = (step: DerivedStep): boolean =>
+	step.outcome !== null &&
+	(callEndings[step.nodeType]?.includes(step.outcome) ?? false);
 
 /**
  * Where `resumeRun` continues. When the run took an edge after its last step
@@ -708,10 +847,11 @@ const forEachEndings: readonly (StepOutcome | null)[] = ["done", "halted"];
  * edge's target. Otherwise it continues at the last step's node: an Agent
  * step with a harness session continues that session, a For Each step that
  * did not end with `done` or `halted` continues its loop, any other step
- * runs its node again. Inside a For Each body, the point is wrapped in its
- * For Each steps, from the inside out: an item that is still open continues
- * there, an item that ended continues the loop with the next item, and a
- * For Each that ended with its outcome runs again. Null when the run never
+ * runs its node again. Inside a called flow, the point is wrapped in its
+ * calling steps, from the inside out: a Subflow that is not over continues
+ * its flow there; a For Each element that is still open continues there, an
+ * element that ended continues the loop with the next element; a calling
+ * step that ended with its own outcome runs again. Null when the run never
  * started a step: it starts over at `start`.
  */
 export function deriveResumePoint(
@@ -737,38 +877,47 @@ export function deriveResumePoint(
 	}
 	const byId = new Map(steps.map((s) => [s.id, s]));
 	while (scope) {
-		const forEach = byId.get(scope.forEachStepId);
-		if (!forEach) break;
-		const item = forEach.items.findLast((i) => i.facts.id === scope?.itemId);
-		if (forEachEndings.includes(forEach.outcome)) {
-			point = { kind: "node", nodeId: forEach.nodeId };
-		} else if (!item?.open) {
+		const caller = byId.get(scope.parentStepId);
+		if (!caller) break;
+		if (endedAsMeant(caller)) {
+			point = { kind: "node", nodeId: caller.nodeId };
+		} else if (caller.nodeType === "subflow") {
 			point = {
-				kind: "foreach",
-				nodeId: forEach.nodeId,
-				stepId: forEach.id,
+				kind: "call",
+				nodeId: caller.nodeId,
+				stepId: caller.id,
 				itemId: null,
-				inner: null,
-			};
-		} else {
-			point = {
-				kind: "foreach",
-				nodeId: forEach.nodeId,
-				stepId: forEach.id,
-				itemId: item.facts.id,
 				inner: point,
 			};
+		} else {
+			const itemId = scope.itemId;
+			const item = caller.items.findLast((i) => i.facts.id === itemId);
+			point = item?.open
+				? {
+						kind: "call",
+						nodeId: caller.nodeId,
+						stepId: caller.id,
+						itemId: item.facts.id,
+						inner: point,
+					}
+				: {
+						kind: "call",
+						nodeId: caller.nodeId,
+						stepId: caller.id,
+						itemId: null,
+						inner: null,
+					};
 		}
-		scope = forEach.scope;
+		scope = caller.scope;
 	}
 	return point;
 }
 
 function stepResumePoint(step: DerivedStep): ResumePoint {
-	if (step.nodeType === "foreach" && !forEachEndings.includes(step.outcome)) {
+	if (step.nodeType === "foreach" && !endedAsMeant(step)) {
 		const open = step.items.findLast((i) => i.open);
 		return {
-			kind: "foreach",
+			kind: "call",
 			nodeId: step.nodeId,
 			stepId: step.id,
 			itemId: open?.facts.id ?? null,
@@ -788,6 +937,7 @@ function stepResumePoint(step: DerivedStep): ResumePoint {
 			harnessSessionId,
 		};
 	}
+	// A Subflow step that started nothing in its flow yet runs again.
 	return { kind: "node", nodeId: step.nodeId };
 }
 
@@ -849,7 +999,7 @@ export function deriveOpenGate(
 
 /**
  * The step the run is parked at (an open Gate or a sleeping step) and the
- * For Each steps around it, from the inside out. Empty when the run is not
+ * calling steps around it, from the inside out. Empty when the run is not
  * parked. These steps stay open while the run waits or sleeps.
  */
 export function parkedSteps(events: readonly LoggedEvent[]): DerivedStep[] {
@@ -859,7 +1009,7 @@ export function parkedSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 	return withEnclosing(steps, stepId);
 }
 
-/** The step and the For Each steps whose bodies it runs in, from the inside out. */
+/** The step and the calling steps (Subflow, For Each) it runs in, from the inside out. */
 export function withEnclosing(
 	steps: readonly DerivedStep[],
 	stepId: string,
@@ -869,7 +1019,7 @@ export function withEnclosing(
 	for (
 		let step = byId.get(stepId);
 		step;
-		step = step.scope ? byId.get(step.scope.forEachStepId) : undefined
+		step = step.scope ? byId.get(step.scope.parentStepId) : undefined
 	) {
 		chain.push(step);
 	}
@@ -880,7 +1030,7 @@ export function withEnclosing(
  * What a daemon that died left open, per run: sessions and steps that
  * started but never ended, and whether the run itself never ended. An open
  * Gate or a sleeping step is not lost work: it waits for a person or a
- * timer, so it stays open (with the For Each steps around it) and its run
+ * timer, so it stays open (with the calling steps around it) and its run
  * stays `waiting` or `sleeping`.
  */
 export function openWork(events: readonly LoggedEvent[]): {

@@ -1,4 +1,4 @@
-import type { Param } from "@nightshift/flows";
+import type { FlowInputDef } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Checkbox } from "@nightshift/ui/components/checkbox";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@nightshift/ui/components/dialog";
 import { Input } from "@nightshift/ui/components/input";
 import { Label } from "@nightshift/ui/components/label";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { PlayIcon } from "lucide-react";
 import { useId, useState } from "react";
@@ -26,6 +26,14 @@ import {
 	nextOccurrence,
 } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
+
+import {
+	FlowInputFields,
+	filledInputs,
+	type InputTexts,
+	jsonProblem,
+	missingInputs,
+} from "./flow-input-fields";
 
 const STORAGE_KEY = "nightshift:stop-time";
 const DEFAULT_TIME = "07:00";
@@ -56,24 +64,31 @@ function writeStoredStop(stop: StoredStop) {
 	}
 }
 
-type ParamValues = Record<string, string>;
+type InputValues = InputTexts;
 
-function paramsKey(projectId: string, flowName: string) {
+function inputsKey(projectId: string, flowName: string) {
+	return `nightshift:inputs:${projectId}:${flowName}`;
+}
+
+/** Before inputs: run parameters, by the same names. */
+function legacyKey(projectId: string, flowName: string) {
 	return `nightshift:params:${projectId}:${flowName}`;
 }
 
-/** The parameter values of the last start of this flow, for the names it still declares. */
-function readStoredParams(
+/** The values of the last start of this flow, for the names it still declares. */
+function readStoredInputs(
 	projectId: string,
 	flowName: string,
-	params: Param[],
-): ParamValues {
-	const values: ParamValues = {};
+	inputs: FlowInputDef[],
+): InputValues {
+	const values: InputValues = {};
 	try {
-		const raw = window.localStorage.getItem(paramsKey(projectId, flowName));
+		const raw =
+			window.localStorage.getItem(inputsKey(projectId, flowName)) ??
+			window.localStorage.getItem(legacyKey(projectId, flowName));
 		const parsed: unknown = raw ? JSON.parse(raw) : null;
 		if (parsed && typeof parsed === "object") {
-			for (const { name } of params) {
+			for (const { name } of inputs) {
 				const value = (parsed as Record<string, unknown>)[name];
 				if (typeof value === "string") values[name] = value;
 			}
@@ -84,14 +99,14 @@ function readStoredParams(
 	return values;
 }
 
-function writeStoredParams(
+function writeStoredInputs(
 	projectId: string,
 	flowName: string,
-	values: ParamValues,
+	values: InputValues,
 ) {
 	try {
 		window.localStorage.setItem(
-			paramsKey(projectId, flowName),
+			inputsKey(projectId, flowName),
 			JSON.stringify(values),
 		);
 	} catch {
@@ -99,30 +114,33 @@ function writeStoredParams(
 	}
 }
 
-/** The values to send: trimmed, and only the ones filled in. Empty takes the default. */
-function filledParams(params: Param[], values: ParamValues): ParamValues {
-	const filled: ParamValues = {};
-	for (const { name } of params) {
-		const value = values[name]?.trim() ?? "";
-		if (value !== "") filled[name] = value;
+/** Only what was filled in, as typed, to remember for the next start. */
+function typedInputs(inputs: FlowInputDef[], values: InputValues): InputValues {
+	const typed: InputValues = {};
+	for (const { name } of inputs) {
+		const text = values[name]?.trim() ?? "";
+		if (text !== "") typed[name] = text;
 	}
-	return filled;
+	return typed;
 }
 
-/** Starts a flow file in a new worktree, with its run parameters and an optional stop time. */
+/**
+ * Starts a flow file in a new worktree: its inputs, the ref to start from,
+ * and an optional stop time.
+ */
 export function StartRunDialog({
 	open,
 	onOpenChange,
 	projectId,
 	flowName,
-	params = [],
+	inputs = [],
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	projectId: string;
 	flowName: string;
-	/** The flow's run parameters, asked before the start. */
-	params?: Param[];
+	/** The flow's inputs, asked before the start. */
+	inputs?: FlowInputDef[];
 }) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -131,7 +149,7 @@ export function StartRunDialog({
 					<StartRunForm
 						projectId={projectId}
 						flowName={flowName}
-						params={params}
+						inputs={inputs}
 						onStarted={() => onOpenChange(false)}
 					/>
 				) : null}
@@ -143,12 +161,12 @@ export function StartRunDialog({
 function StartRunForm({
 	projectId,
 	flowName,
-	params,
+	inputs,
 	onStarted,
 }: {
 	projectId: string;
 	flowName: string;
-	params: Param[];
+	inputs: FlowInputDef[];
 	onStarted: () => void;
 }) {
 	const id = useId();
@@ -156,19 +174,24 @@ function StartRunForm({
 	const queryClient = useQueryClient();
 	const [stop, setStop] = useState(readStoredStop);
 	const [values, setValues] = useState(() =>
-		readStoredParams(projectId, flowName, params),
+		readStoredInputs(projectId, flowName, inputs),
 	);
+	const [baseRef, setBaseRef] = useState("");
 	const now = useNow(15_000);
+	// Recent branches of this project's runs: a night can go on from an open stack.
+	const runs = useQuery(orpc.runs.list.queryOptions({ input: { projectId } }));
+	const recentRefs = [
+		...new Set((runs.data ?? []).flatMap((run) => [run.branch, run.baseRef])),
+	].slice(0, 12);
+	const lastBase = runs.data?.[0]?.baseRef;
 
 	const stopAt = stop.on ? nextOccurrence(stop.time, now) : null;
-	const missing = params.filter(
-		(param) =>
-			param.required &&
-			!param.default &&
-			(values[param.name]?.trim() ?? "") === "",
+	const missing = missingInputs(inputs, values);
+	const badJson = inputs.filter(
+		(input) => jsonProblem(input, values[input.name]) !== null,
 	);
 	const stopInvalid = stop.on && stopAt === null;
-	const invalid = stopInvalid || missing.length > 0;
+	const invalid = stopInvalid || missing.length > 0 || badJson.length > 0;
 
 	const startRun = useMutation(
 		orpc.runs.start.mutationOptions({
@@ -184,14 +207,17 @@ function StartRunForm({
 	const start = () => {
 		if (invalid || startRun.isPending) return;
 		writeStoredStop(stop);
-		const filled = filledParams(params, values);
-		if (params.length > 0) writeStoredParams(projectId, flowName, filled);
+		const filled = filledInputs(inputs, values);
+		if (inputs.length > 0)
+			writeStoredInputs(projectId, flowName, typedInputs(inputs, values));
+		const ref = baseRef.trim();
 		// Computed at the click, so a dialog left open does not start with a stale time.
 		const at = stop.on ? nextOccurrence(stop.time) : null;
 		startRun.mutate({
 			projectId,
 			flowName,
-			...(Object.keys(filled).length === 0 ? {} : { params: filled }),
+			...(Object.keys(filled).length === 0 ? {} : { inputs: filled }),
+			...(ref === "" ? {} : { baseRef: ref }),
 			...(at === null ? {} : { stopAt: at }),
 		});
 	};
@@ -214,52 +240,43 @@ function StartRunForm({
 				</DialogDescription>
 			</DialogHeader>
 
-			{params.length > 0 ? (
-				<fieldset className="flex flex-col gap-3">
-					<legend className="sr-only">Run parameters</legend>
-					{params.map((param) => {
-						const fieldId = `${id}-param-${param.name}`;
-						const value = values[param.name] ?? "";
-						const isMissing = missing.includes(param);
-						return (
-							<div key={param.name} className="flex flex-col gap-1.5">
-								<Label htmlFor={fieldId}>
-									{param.label || param.name}
-									{param.required ? (
-										<span className="text-muted-foreground">(required)</span>
-									) : null}
-								</Label>
-								<Input
-									id={fieldId}
-									value={value}
-									placeholder={param.default}
-									autoComplete="off"
-									aria-required={param.required === true}
-									aria-invalid={isMissing && value !== ""}
-									aria-describedby={
-										param.description ? `${fieldId}-hint` : undefined
-									}
-									onChange={(event) => {
-										const next = event.target.value;
-										setValues((current) => ({
-											...current,
-											[param.name]: next,
-										}));
-									}}
-								/>
-								{param.description ? (
-									<p
-										id={`${fieldId}-hint`}
-										className="text-muted-foreground text-xs"
-									>
-										{param.description}
-									</p>
-								) : null}
-							</div>
-						);
-					})}
-				</fieldset>
-			) : null}
+			<FlowInputFields
+				idPrefix={id}
+				inputs={inputs}
+				values={values}
+				onChange={setValues}
+			/>
+
+			<div className="flex flex-col gap-1.5">
+				<Label htmlFor={`${id}-base`}>
+					Start from
+					<span className="text-muted-foreground">(optional)</span>
+				</Label>
+				<Input
+					id={`${id}-base`}
+					value={baseRef}
+					list={`${id}-refs`}
+					placeholder={
+						lastBase
+							? `The current branch (last: ${lastBase})`
+							: "The current branch"
+					}
+					className="font-mono"
+					autoComplete="off"
+					spellCheck={false}
+					aria-describedby={`${id}-base-hint`}
+					onChange={(event) => setBaseRef(event.target.value)}
+				/>
+				<datalist id={`${id}-refs`}>
+					{recentRefs.map((ref) => (
+						<option key={ref} value={ref} />
+					))}
+				</datalist>
+				<p id={`${id}-base-hint`} className="text-muted-foreground text-xs">
+					A branch, tag or commit to branch the worktree from, for example the
+					top of an open stack. Empty starts from the clone's current branch.
+				</p>
+			</div>
 
 			<div className="flex flex-col gap-2">
 				<div className="flex items-center gap-2">
@@ -321,8 +338,10 @@ function StartRunForm({
 					disabled={invalid || startRun.isPending}
 					title={
 						missing.length > 0
-							? `Fill in ${missing.map((param) => param.label || param.name).join(", ")} first.`
-							: undefined
+							? `Fill in ${missing.map((input) => input.label || input.name).join(", ")} first.`
+							: badJson.length > 0
+								? `Fix the JSON of ${badJson.map((input) => input.label || input.name).join(", ")} first.`
+								: undefined
 					}
 				>
 					<PlayIcon data-icon="inline-start" />

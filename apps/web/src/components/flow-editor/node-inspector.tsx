@@ -6,6 +6,7 @@ import {
 	type FlowNode,
 	type GateNode,
 	nodeIdSchema,
+	type SubflowNode,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Input } from "@nightshift/ui/components/input";
@@ -20,6 +21,7 @@ import { useId, useState } from "react";
 import { NODE_TYPE } from "@/components/flow/node-type";
 import type { Effort, PermissionMode } from "@/lib/api-types";
 import {
+	calledFlow,
 	MODEL_SUGGESTIONS,
 	type NodeOption,
 	nodeOptions,
@@ -27,11 +29,17 @@ import {
 	withOptions,
 } from "@/lib/flow-draft";
 
+import {
+	CalledFlowField,
+	type CalledFlowSupport,
+	InputBindings,
+} from "./called-flow-fields";
 import { Field, PositiveIntInput } from "./fields";
-import { type BodyFlowSupport, ForEachFields } from "./foreach-fields";
-import { GitHubToolsField } from "./github-tools-field";
+import { ForEachFields } from "./foreach-fields";
 import { OptionsEditor } from "./options-editor";
+import { OutputSchemaField } from "./output-schema-field";
 import { TemplateField } from "./template-field";
+import { ToolSetsField } from "./tool-sets-field";
 
 const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
 	{ value: "auto", label: "Auto (approves safe actions, for nights)" },
@@ -50,21 +58,24 @@ export function NodeInspector({
 	onRename,
 	onRenameOutcome,
 	onRemoveOutcome,
+	onSetAgentOutcomes,
 	onSetStart,
 	onDelete,
-	bodyFlows,
+	calledFlows,
 }: {
 	flow: Flow;
 	node: FlowNode;
-	/** For Each nodes: the project's flows and the actions on body flows. */
-	bodyFlows: BodyFlowSupport;
+	/** Subflow and For Each nodes: the project's flows and the actions on them. */
+	calledFlows: CalledFlowSupport;
 	onChange: (change: (node: FlowNode) => FlowNode) => void;
 	/** Returns an error message when the new id is taken. */
 	onRename: (id: string) => string | null;
-	/** Renames a Decision label or Gate choice and moves its edges along. */
+	/** Renames a Decision label, Gate choice or Agent outcome and moves its edges along. */
 	onRenameOutcome: (index: number, name: string) => string | null;
-	/** Removes a Decision label or Gate choice and drops its edges. */
+	/** Removes a Decision label, Gate choice or Agent outcome and drops its edges. */
 	onRemoveOutcome: (index: number) => void;
+	/** Gives an Agent node its own outcomes, or back the standard ones; drops edges that no longer fit. */
+	onSetAgentOutcomes: (outcomes: NodeOption[] | undefined) => void;
 	onSetStart: () => void;
 	onDelete: () => void;
 }) {
@@ -134,6 +145,9 @@ export function NodeInspector({
 							current.type === "agent" ? change(current) : current,
 						)
 					}
+					onRenameOutcome={onRenameOutcome}
+					onRemoveOutcome={onRemoveOutcome}
+					onSetOutcomes={onSetAgentOutcomes}
 				/>
 			) : null}
 			{node.type === "command" ? (
@@ -173,11 +187,24 @@ export function NodeInspector({
 				/>
 			) : null}
 
+			{node.type === "subflow" ? (
+				<SubflowFields
+					flow={flow}
+					node={node}
+					support={calledFlows}
+					onChange={(change) =>
+						onChange((current) =>
+							current.type === "subflow" ? change(current) : current,
+						)
+					}
+				/>
+			) : null}
+
 			{node.type === "foreach" ? (
 				<ForEachFields
 					flow={flow}
 					node={node}
-					support={bodyFlows}
+					support={calledFlows}
 					onChange={(change) =>
 						onChange((current) =>
 							current.type === "foreach" ? change(current) : current,
@@ -279,10 +306,16 @@ function AgentFields({
 	flow,
 	node,
 	onChange,
+	onRenameOutcome,
+	onRemoveOutcome,
+	onSetOutcomes,
 }: {
 	flow: Flow;
 	node: AgentNode;
 	onChange: (change: (node: AgentNode) => AgentNode) => void;
+	onRenameOutcome: (index: number, name: string) => string | null;
+	onRemoveOutcome: (index: number) => void;
+	onSetOutcomes: (outcomes: NodeOption[] | undefined) => void;
 }) {
 	const id = useId();
 
@@ -433,15 +466,41 @@ function AgentFields({
 				/>
 			</Field>
 
-			<GitHubToolsField
-				id={`${id}-github`}
+			<AgentOutcomesField
+				id={`${id}-outcomes`}
+				node={node}
+				flow={flow}
+				onChange={onChange}
+				onRenameOutcome={onRenameOutcome}
+				onRemoveOutcome={onRemoveOutcome}
+				onSetOutcomes={onSetOutcomes}
+			/>
+
+			<OutputSchemaField
+				id={`${id}-output`}
+				nodeId={node.id}
+				output={node.output}
+				onChange={(output) =>
+					onChange(({ output: _, ...rest }) =>
+						output === undefined ? rest : { ...rest, output },
+					)
+				}
+			/>
+
+			<ToolSetsField
+				id={`${id}-tools`}
 				tools={node.tools ?? []}
 				onChange={(tools) => onChange((current) => ({ ...current, tools }))}
 			/>
 
 			<p className="text-muted-foreground text-xs">
 				Harness: <span className="text-foreground">Claude Code</span>. The agent
-				ends with a step report: pass, fail, or needs input.
+				ends with a step report:{" "}
+				{node.outcomes
+					? `one of its own outcomes (${node.outcomes.map((o) => o.name).join(", ")})`
+					: "pass, fail, or needs input"}
+				, a summary
+				{node.output ? ", and data that matches the output schema" : ""}.
 			</p>
 		</>
 	);
@@ -490,7 +549,7 @@ function NodeOptionsField<T extends OptionNode>({
 	onRemoveOutcome,
 }: {
 	id: string;
-	kind: "label" | "choice";
+	kind: "label" | "choice" | "outcome";
 	node: T;
 	min: number;
 	hint: string;
@@ -508,7 +567,11 @@ function NodeOptionsField<T extends OptionNode>({
 			className="flex flex-col gap-1.5"
 		>
 			<h3 id={`${id}-heading`} className="text-xs leading-none">
-				{kind === "label" ? "Labels" : "Choices"}
+				{kind === "label"
+					? "Labels"
+					: kind === "choice"
+						? "Choices"
+						: "Own outcomes"}
 			</h3>
 			<p id={`${id}-hint`} className="text-muted-foreground text-xs">
 				{hint}
@@ -609,8 +672,8 @@ function DecisionFields({
 				</datalist>
 			</Field>
 
-			<GitHubToolsField
-				id={`${id}-github`}
+			<ToolSetsField
+				id={`${id}-tools`}
 				tools={node.tools ?? []}
 				onChange={(tools) => onChange((current) => ({ ...current, tools }))}
 			/>
@@ -670,6 +733,142 @@ function GateFields({
 				Later nodes read your answer as{" "}
 				<code className="font-mono">{`{{${node.id}.outcome}}`}</code> and your
 				note as <code className="font-mono">{`{{${node.id}.note}}`}</code>.
+			</p>
+		</>
+	);
+}
+
+/**
+ * An Agent node reports pass, fail or needs-input, or one of its own
+ * outcomes. Each own outcome has a handle; renaming one moves its edges,
+ * removing one drops them (with an undo).
+ */
+function AgentOutcomesField({
+	id,
+	node,
+	flow,
+	onChange,
+	onRenameOutcome,
+	onRemoveOutcome,
+	onSetOutcomes,
+}: {
+	id: string;
+	node: AgentNode;
+	flow: Flow;
+	onChange: (change: (node: AgentNode) => AgentNode) => void;
+	onRenameOutcome: (index: number, name: string) => string | null;
+	onRemoveOutcome: (index: number) => void;
+	onSetOutcomes: (outcomes: NodeOption[] | undefined) => void;
+}) {
+	if (!node.outcomes) {
+		// Keep the edges the node has: seed with the standard outcomes they use.
+		const used = new Set(
+			flow.edges
+				.filter((edge) => edge.from === node.id)
+				.map((edge) => edge.outcome),
+		);
+		const seed: NodeOption[] = [
+			{ name: "pass", description: "The work is done." },
+			{ name: "fail", description: "The work could not be done." },
+			...(used.has("needs-input")
+				? [{ name: "needs-input", description: "A person must answer first." }]
+				: []),
+		];
+		return (
+			<section
+				aria-labelledby={`${id}-heading`}
+				className="flex flex-col gap-1.5"
+			>
+				<h3 id={`${id}-heading`} className="text-xs leading-none">
+					Own outcomes
+				</h3>
+				<p className="text-muted-foreground text-xs">
+					The agent reports pass, fail, or needs input. Give it its own
+					outcomes, such as approved and changes-requested, each with its own
+					edge.
+				</p>
+				<Button
+					variant="outline"
+					size="xs"
+					className="self-start"
+					onClick={() => onSetOutcomes(seed)}
+				>
+					Use own outcomes
+				</Button>
+			</section>
+		);
+	}
+	return (
+		<div className="flex flex-col gap-1.5">
+			<NodeOptionsField
+				id={id}
+				kind="outcome"
+				node={node}
+				min={1}
+				hint="The agent reports exactly one. Each outcome is a handle with its own edge. A description tells the agent when to pick it."
+				onChange={onChange}
+				onRenameOutcome={onRenameOutcome}
+				onRemoveOutcome={onRemoveOutcome}
+			/>
+			<Button
+				variant="ghost"
+				size="xs"
+				className="self-start"
+				onClick={() => onSetOutcomes(undefined)}
+			>
+				Back to pass, fail and needs input
+			</Button>
+		</div>
+	);
+}
+
+/** The flow a Subflow node calls once, and its inputs bound by templates. */
+function SubflowFields({
+	flow,
+	node,
+	support,
+	onChange,
+}: {
+	flow: Flow;
+	node: SubflowNode;
+	support: CalledFlowSupport;
+	onChange: (change: (node: SubflowNode) => SubflowNode) => void;
+}) {
+	const id = useId();
+	const called = calledFlow(node, support.flows);
+	const outputs = called?.outputs ?? [];
+	return (
+		<>
+			<CalledFlowField
+				id={`${id}-flow`}
+				node={node}
+				support={support}
+				hint="Runs once, in the same worktree, then this node ends with pass (it finished) or fail."
+				onPick={(name) => onChange((current) => ({ ...current, flow: name }))}
+			/>
+			<InputBindings
+				flow={flow}
+				node={node}
+				called={called}
+				onChange={(inputs) => onChange((current) => ({ ...current, inputs }))}
+			/>
+			<p className="text-muted-foreground text-xs">
+				Later nodes read{" "}
+				<code className="font-mono">{`{{${node.id}.ended}}`}</code> (the outcome
+				the called flow ended on)
+				{outputs.length > 0 ? (
+					<>
+						{" "}
+						and its outputs:{" "}
+						{outputs.map((output, index) => (
+							<span key={output.name}>
+								{index > 0 ? ", " : null}
+								<code className="font-mono">{`{{${node.id}.${output.name}}}`}</code>
+							</span>
+						))}
+					</>
+				) : null}
+				.
 			</p>
 		</>
 	);

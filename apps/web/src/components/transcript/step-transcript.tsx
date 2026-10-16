@@ -35,6 +35,7 @@ import {
 	outcomeStyle,
 	stepStateStyle,
 } from "@/components/outcome-badge";
+import { JsonBlock } from "@/components/run/json-block";
 import type { SessionSummary, StepSummary } from "@/lib/api-types";
 import {
 	formatCost,
@@ -42,7 +43,6 @@ import {
 	formatRelative,
 	formatTime,
 	formatTokens,
-	itemLabel,
 } from "@/lib/format";
 import type {
 	DecisionAskItem,
@@ -210,7 +210,8 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	command: "The command is running…",
 	decision: "The decider is choosing…",
 	gate: "Waiting for an answer…",
-	foreach: "Working through the items…",
+	subflow: "The called flow is running…",
+	foreach: "Working through the elements…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({
@@ -286,8 +287,8 @@ function ItemsRead({ item }: { item: ItemsReadItem }) {
 				<ListChecksIcon />
 			</MarkerIcon>
 			<MarkerContent>
-				Read {item.count} {item.count === 1 ? "item" : "items"} · {item.open}{" "}
-				open · {formatTime(item.at)}
+				Read {item.count} {item.count === 1 ? "element" : "elements"} ·{" "}
+				{item.open} open · {formatTime(item.at)}
 			</MarkerContent>
 		</Marker>
 	);
@@ -299,7 +300,12 @@ function ItemStart({ item }: { item: ItemStartItem }) {
 			<Marker variant="separator">
 				<MarkerContent>
 					<h3 className="inline font-medium text-foreground">
-						{itemLabel(item.itemId)} {item.title}
+						{item.title}
+						{item.title !== item.itemId ? (
+							<span className="ml-1 font-mono font-normal text-muted-foreground">
+								{item.itemId}
+							</span>
+						) : null}
 					</h3>
 					<span title={formatDateTime(item.at)}> · {formatTime(item.at)}</span>
 				</MarkerContent>
@@ -330,8 +336,16 @@ function ItemEnd({ item, title }: { item: ItemEndItem; title?: string }) {
 		>
 			<ItemStateBadge state={item.state} />
 			<span className="min-w-0 truncate">
-				<span className="font-mono">{itemLabel(item.itemId)}</span>
-				{title ? ` ${title}` : ""}
+				{title && title !== item.itemId ? (
+					<>
+						{title}{" "}
+						<span className="font-mono text-muted-foreground">
+							{item.itemId}
+						</span>
+					</>
+				) : (
+					<span className="font-mono">{item.itemId}</span>
+				)}
 			</span>
 			<span className="ml-auto text-muted-foreground">
 				{formatTime(item.at)}
@@ -463,6 +477,12 @@ function ReportCard({ item }: { item: ReportItem }) {
 					<p className="whitespace-pre-wrap break-words text-sm">
 						{item.summary}
 					</p>
+				) : null}
+				{item.data !== undefined ? (
+					<div className="flex flex-col gap-1">
+						<p className="text-muted-foreground text-xs">Data</p>
+						<JsonBlock value={item.data} />
+					</div>
 				) : null}
 			</div>
 		</div>

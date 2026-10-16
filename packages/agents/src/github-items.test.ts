@@ -151,31 +151,48 @@ describe("readGithubItems", () => {
 				]),
 			},
 		]);
+		const parent = { number: 10, title: "Feature: combat" };
 		expect(await readGithubItems(input(), { gh })).toEqual([
 			{
 				id: "11",
-				number: 11,
 				title: "First",
-				body: "Do the first thing.",
 				url: "https://github.com/acme/game/issues/11",
-				blockedBy: [],
+				value: {
+					id: "11",
+					number: 11,
+					title: "First",
+					body: "Do the first thing.",
+					url: "https://github.com/acme/game/issues/11",
+					state: "OPEN",
+					labels: [],
+					parent,
+					dependsOn: [],
+					done: false,
+				},
+				dependsOn: [],
 				done: false,
-				parentNumber: 10,
-				parentTitle: "Feature: combat",
 			},
 			{
 				id: "12",
-				number: 12,
 				title: "Second",
-				body: "",
 				url: "https://github.com/acme/game/issues/12",
-				blockedBy: [
+				value: {
+					id: "12",
+					number: 12,
+					title: "Second",
+					body: "",
+					url: "https://github.com/acme/game/issues/12",
+					state: "OPEN",
+					labels: [],
+					parent,
+					dependsOn: ["11", "3"],
+					done: false,
+				},
+				dependsOn: [
 					{ id: "11", done: false },
 					{ id: "3", done: true },
 				],
 				done: false,
-				parentNumber: 10,
-				parentTitle: "Feature: combat",
 			},
 		]);
 		const log = await readLog();
@@ -250,6 +267,21 @@ describe("readGithubItems", () => {
 			["11", true],
 			["12", true],
 			["13", false],
+		]);
+		// The value carries the same flag, GitHub's state, and the labels as named.
+		expect(
+			items.map((item) => {
+				const { state, labels, done } = item.value as {
+					state: string;
+					labels: string[];
+					done: boolean;
+				};
+				return { state, labels, done };
+			}),
+		).toEqual([
+			{ state: "CLOSED", labels: [], done: true },
+			{ state: "OPEN", labels: ["trace", "Shipped"], done: true },
+			{ state: "OPEN", labels: ["trace"], done: false },
 		]);
 	});
 

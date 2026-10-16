@@ -1,32 +1,45 @@
+import { migrateFlow } from "./migrate";
 import {
 	type Flow,
 	type FlowNode,
 	type ForEachNode,
 	flowSchema,
-	itemFields,
+	jsonOutputFields,
 	labelSchema,
+	nameSchema,
 	nodeOutcomes,
+	nodeOutputFields,
 	outputFieldsByType,
+	reservedNames,
 	reservedOutcomes,
 	runFields,
+	type SubflowNode,
 } from "./schema";
 import { templateRefs } from "./template";
 import type { FlowIssue, ValidateOptions } from "./types";
 
+type At = Pick<FlowIssue, "nodeId" | "edgeId">;
+type Report = (message: string, at: At) => void;
+
+/** The flows a check may look up, by name; null when a file does not parse. */
+type Flows = Readonly<Record<string, Flow | null>>;
+
 /**
- * Checks what the schema cannot: unique ids, a known start node, edges between
- * known nodes with outcomes the source node can produce, an Agent node with a
- * prompt or a skill, Decision labels and Gate choices that are unique and not
- * reserved, template references to known nodes and fields, and no cycle
- * without an edge that has a `max` (a Gate in a cycle too: a person could
- * loop forever). Warns about unreachable nodes and about Decision labels or
- * Gate choices without an edge, since picking one ends the run as failed.
+ * Checks what the schema cannot: unique names (node ids and inputs share one
+ * namespace, `run` is reserved), a known start node, edges between known
+ * nodes with outcomes the source node can produce, an Agent node with a
+ * prompt or a skill, outcomes, labels and choices that are unique and not
+ * reserved, an Agent output schema that describes an object, template
+ * references to known names and fields, outputs, and no cycle without an edge
+ * that has a `max` (a Gate in a cycle too: a person could loop forever).
+ * Warns about unreachable nodes and about outcomes without an edge, since
+ * ending on one ends the run as failed.
  *
- * `{{item.<field>}}` works only in a flow with `input: "item"`. With
- * `options.flows`, a For Each body must exist, parse and have
- * `input: "item"`, and a flow may not run itself through For Each bodies.
- * Issues inside a body are not repeated: a body with errors gives one error
- * on the For Each node.
+ * With `options.flows`, a Subflow or For Each node must call a flow that
+ * exists and parses, bind only inputs it declares and every required input
+ * it has no default for, and a flow may not call itself through Subflow or
+ * For Each nodes. Issues inside a called flow are not repeated: a called
+ * flow with errors gives one error on the calling node.
  */
 export function validateFlow(
 	flow: Flow,
@@ -35,20 +48,28 @@ export function validateFlow(
 	return validateIn(flow, options, []);
 }
 
-/** `ancestors`: the flows whose For Each bodies led here, outermost first. */
+/** `ancestors`: the flows whose calls led here, outermost first. */
 function validateIn(
 	flow: Flow,
 	options: ValidateOptions,
 	ancestors: readonly string[],
 ): FlowIssue[] {
 	const issues: FlowIssue[] = [];
-	const error = (message: string, at: Pick<FlowIssue, "nodeId" | "edgeId">) =>
+	const error: Report = (message, at) =>
 		issues.push({ severity: "error", message, ...at });
-	const warning = (message: string, at: Pick<FlowIssue, "nodeId" | "edgeId">) =>
+	const warning: Report = (message, at) =>
 		issues.push({ severity: "warning", message, ...at });
+
+	const flows: Flows | undefined =
+		options.flows === undefined
+			? undefined
+			: options.name === undefined
+				? options.flows
+				: { ...options.flows, [options.name]: flow };
 
 	// Nodes: first occurrence of each id wins.
 	const nodes = new Map<string, FlowNode>();
+	const reserved: readonly string[] = reservedNames;
 	for (const node of flow.nodes) {
 		if (nodes.has(node.id)) {
 			error(`Node id "${node.id}" is used more than once.`, {
@@ -57,7 +78,7 @@ function validateIn(
 			continue;
 		}
 		nodes.set(node.id, node);
-		if (node.id === "run" || node.id === "item" || node.id === "params") {
+		if (reserved.includes(node.id)) {
 			error(
 				`Node id "${node.id}" is reserved for {{${node.id}.<field>}} templates.`,
 				{ nodeId: node.id },
@@ -65,7 +86,7 @@ function validateIn(
 		}
 	}
 
-	checkParams(flow, error);
+	checkInputs(flow, nodes, error);
 
 	if (!nodes.has(flow.start)) {
 		error(`Start node "${flow.start}" does not exist.`, {
@@ -118,60 +139,76 @@ function validateIn(
 	}
 
 	// Node content.
+	const scope: Scope = { flow, nodes, flows };
 	for (const node of nodes.values()) {
+		const at = { nodeId: node.id };
+		const template = (text: string, where: string) =>
+			checkTemplate(text, `The ${where} of "${node.id}"`, at, scope, error);
 		switch (node.type) {
 			case "agent":
 				if (node.prompt.trim() === "" && node.skill === undefined) {
-					error(`Agent node "${node.id}" needs a prompt or a skill.`, {
-						nodeId: node.id,
-					});
+					error(`Agent node "${node.id}" needs a prompt or a skill.`, at);
 				}
-				checkTemplate(node, node.prompt, "prompt", nodes, flow, error);
+				template(node.prompt, "prompt");
+				if (node.outcomes !== undefined) {
+					checkOptions(node, flow, error, warning);
+				}
+				if (node.output !== undefined && !isObjectSchema(node.output)) {
+					error(
+						`The output schema of agent node "${node.id}" must describe an object: give it "type": "object" or "properties".`,
+						at,
+					);
+				}
 				break;
 			case "command":
-				checkTemplate(node, node.command, "command", nodes, flow, error);
+				template(node.command, "command");
 				break;
 			case "decision":
-				checkOptions(node, "label", "the decider", flow, error, warning);
-				checkTemplate(node, node.prompt, "prompt", nodes, flow, error);
+				checkOptions(node, flow, error, warning);
+				template(node.prompt, "prompt");
 				break;
 			case "gate":
-				checkOptions(node, "choice", "the person", flow, error, warning);
-				checkTemplate(node, node.question, "question", nodes, flow, error);
+				checkOptions(node, flow, error, warning);
+				template(node.question, "question");
+				break;
+			case "subflow":
+				for (const [name, value] of Object.entries(node.inputs)) {
+					template(value, `input "${name}"`);
+				}
 				break;
 			case "foreach":
-				if (node.source.kind === "github") {
-					checkTemplate(
-						node,
-						node.source.parent,
-						"source parent",
-						nodes,
-						flow,
-						error,
-					);
-				} else {
-					checkTemplate(
-						node,
-						node.source.command,
-						"source command",
-						nodes,
-						flow,
-						error,
-					);
+				switch (node.source.kind) {
+					case "json":
+						template(node.source.value, "source value");
+						break;
+					case "command":
+						template(node.source.command, "source command");
+						break;
+					case "github":
+						template(node.source.parent, "source parent");
+						break;
+					case "files":
+						template(node.source.glob, "source glob");
+						break;
+				}
+				for (const [name, value] of Object.entries(node.inputs)) {
+					template(value, `input "${name}"`);
 				}
 				checkHaltOn(node, error);
 				break;
 		}
 	}
 
-	// For Each bodies, when the project's flows are known.
-	if (options.flows !== undefined) {
-		const flows: Record<string, Flow | null> = { ...options.flows };
-		if (options.name !== undefined) flows[options.name] = flow;
+	checkOutputs(scope, error);
+
+	// Called flows, when the project's flows are known.
+	if (flows !== undefined) {
 		const chain =
 			options.name === undefined ? ancestors : [...ancestors, options.name];
 		for (const node of nodes.values()) {
-			if (node.type === "foreach") checkBody(node, flows, chain, error);
+			if (node.type === "subflow" || node.type === "foreach") {
+				checkCall(node, flows, chain, error, warning);
+			}
 		}
 	}
 
@@ -211,33 +248,251 @@ function validateIn(
 	return issues;
 }
 
+/** What a template may refer to. */
+type Scope = {
+	flow: Flow;
+	nodes: ReadonlyMap<string, FlowNode>;
+	/** Undefined when the project's flows are not known. */
+	flows: Flows | undefined;
+};
+
 /**
- * The body must exist, parse and take an item. It may not lead back to the
- * flow being checked (the last of `chain`). Cycles through an outer flow are
- * left to that flow, so each is reported once.
+ * Inputs: unique names, valid and not reserved, not the id of a node, and a
+ * `json` default that parses as JSON.
  */
-function checkBody(
-	node: ForEachNode,
-	flows: Readonly<Record<string, Flow | null>>,
+function checkInputs(
+	flow: Flow,
+	nodes: ReadonlyMap<string, FlowNode>,
+	error: Report,
+): void {
+	const reserved: readonly string[] = reservedNames;
+	const seen = new Set<string>();
+	for (const input of flow.inputs) {
+		const name = input.name;
+		if (seen.has(name)) {
+			error(`The input "${name}" is declared more than once.`, {});
+			continue;
+		}
+		seen.add(name);
+		const valid = nameSchema.safeParse(name);
+		if (!valid.success) {
+			error(
+				`The input "${name}" is not a valid name: ${valid.error.issues[0]?.message ?? "not allowed"}`,
+				{},
+			);
+		} else if (reserved.includes(name)) {
+			error(
+				`The input "${name}" is reserved for {{${name}.<field>}} templates.`,
+				{},
+			);
+		}
+		if (nodes.has(name)) {
+			error(
+				`The input "${name}" has the same name as node "${name}". Node ids and inputs share one namespace: rename one.`,
+				{ nodeId: name },
+			);
+		}
+		if (input.type === "json" && input.default !== undefined) {
+			try {
+				JSON.parse(input.default);
+			} catch {
+				error(`The default of the json input "${name}" is not valid JSON.`, {});
+			}
+		}
+	}
+}
+
+/** Outputs: unique, valid names that every caller can read, and known templates. */
+function checkOutputs(scope: Scope, error: Report): void {
+	const seen = new Set<string>();
+	const builtIn: readonly string[] = outputFieldsByType.subflow;
+	for (const output of scope.flow.outputs) {
+		const name = output.name;
+		if (seen.has(name)) {
+			error(`The output "${name}" is declared more than once.`, {});
+			continue;
+		}
+		seen.add(name);
+		const valid = nameSchema.safeParse(name);
+		if (!valid.success) {
+			error(
+				`The output "${name}" is not a valid name: ${valid.error.issues[0]?.message ?? "not allowed"}`,
+				{},
+			);
+		} else if (builtIn.includes(name)) {
+			error(
+				`The output "${name}" clashes with a field every Subflow node has: ${builtIn.join(", ")}.`,
+				{},
+			);
+		}
+		checkTemplate(
+			output.value,
+			`The value of output "${name}"`,
+			{},
+			scope,
+			error,
+		);
+	}
+}
+
+/**
+ * Each reference names `run`, an input, or a node. `run`: one field of
+ * `runFields`. A `text` input: no path. A `json` input: any path. A node:
+ * one of its output fields first; deeper keys only below a JSON field (and
+ * below a Subflow node's flow outputs, which hold JSON).
+ */
+function checkTemplate(
+	text: string,
+	subject: string,
+	at: At,
+	scope: Scope,
+	error: Report,
+): void {
+	const inputs = new Map(scope.flow.inputs.map((input) => [input.name, input]));
+	for (const ref of templateRefs(text)) {
+		const uses = `${subject} uses ${ref.raw}`;
+		const [field, ...deeper] = ref.path;
+		if (ref.name === "run") {
+			const fields: readonly string[] = runFields;
+			if (field === undefined || !fields.includes(field)) {
+				error(
+					`${uses}, but the run has no field ${field === undefined ? "there" : `"${field}"`}. Use one of: ${fields.join(", ")}.`,
+					at,
+				);
+			} else if (deeper.length > 0) {
+				error(`${uses}, but run.${field} is text: it takes no path.`, at);
+			}
+			continue;
+		}
+
+		const input = inputs.get(ref.name);
+		if (input !== undefined) {
+			if (input.type === "text" && field !== undefined) {
+				error(
+					`${uses}, but the input "${ref.name}" is text: it takes no path. Write {{${ref.name}}}, or make it a json input.`,
+					at,
+				);
+			}
+			continue;
+		}
+
+		const node = scope.nodes.get(ref.name);
+		if (node === undefined) {
+			error(`${uses}, but there is no node or input "${ref.name}".`, at);
+			continue;
+		}
+
+		let fields: readonly string[] = outputFieldsByType[node.type];
+		/** Fields that take a deeper path. */
+		let json: readonly string[] = jsonOutputFields;
+		if (node.type === "subflow") {
+			const called = calledFlow(node, scope.flows);
+			// Unknown until the flows load, or broken: the call reports that.
+			if (called === undefined) continue;
+			fields = nodeOutputFields(node, called);
+			json = [...json, ...called.outputs.map((output) => output.name)];
+		}
+		if (field === undefined) {
+			error(
+				`${uses}, but a node needs a field: {{${ref.name}.<field>}}. Use one of: ${fields.join(", ")}.`,
+				at,
+			);
+		} else if (!fields.includes(field)) {
+			error(
+				`${uses}, but "${ref.name}" has no field "${field}". Use one of: ${fields.join(", ")}.`,
+				at,
+			);
+		} else if (deeper.length > 0 && !json.includes(field)) {
+			error(`${uses}, but ${ref.name}.${field} is text: it takes no path.`, at);
+		}
+	}
+}
+
+/** The flow a Subflow node calls; undefined when it is not known or broken. */
+function calledFlow(
+	node: SubflowNode,
+	flows: Flows | undefined,
+): Flow | undefined {
+	if (flows === undefined || !Object.hasOwn(flows, node.flow)) return undefined;
+	return flows[node.flow] ?? undefined;
+}
+
+/** A JSON Schema for an object: `type: "object"`, or `properties`. */
+function isObjectSchema(schema: Record<string, unknown>): boolean {
+	return (
+		schema.type === "object" ||
+		(typeof schema.properties === "object" && schema.properties !== null)
+	);
+}
+
+/**
+ * The called flow must exist and parse, take every binding, and get every
+ * required input without a default. It may not lead back to the flow being
+ * checked (the last of `chain`). Cycles through an outer flow are left to
+ * that flow, so each is reported once.
+ */
+function checkCall(
+	node: SubflowNode | ForEachNode,
+	flows: Flows,
 	chain: readonly string[],
-	error: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
+	error: Report,
+	warning: Report,
 ): void {
 	const at = { nodeId: node.id };
-	const runs = `For Each node "${node.id}" runs flow "${node.flow}"`;
+	const kind = node.type === "subflow" ? "Subflow" : "For Each";
+	const runs = `${kind} node "${node.id}" runs flow "${node.flow}"`;
 	if (!Object.hasOwn(flows, node.flow)) {
 		error(`${runs}, which does not exist.`, at);
 		return;
 	}
-	const body = flows[node.flow];
-	if (!body) {
+	const called = flows[node.flow];
+	if (!called) {
 		error(`${runs}, which does not parse. Fix that file first.`, at);
 		return;
 	}
-	if (body.input !== "item") {
-		error(
-			`${runs}, which is not a For Each body. Set its input to "item".`,
-			at,
-		);
+
+	const inputs = new Map(called.inputs.map((input) => [input.name, input]));
+	const bound = new Set(Object.keys(node.inputs));
+	if (node.type === "foreach") {
+		const as = inputs.get(node.as);
+		if (as === undefined) {
+			error(
+				`${runs}, which has no input "${node.as}" to take each element. Add a json input "${node.as}" to it, or change "as".`,
+				at,
+			);
+		} else if (as.type === "text") {
+			warning(
+				`${runs}, whose input "${node.as}" is text: an element that is an object or an array arrives as JSON text. Make it a json input.`,
+				at,
+			);
+		}
+		if (bound.has(node.as)) {
+			error(
+				`For Each node "${node.id}" binds the input "${node.as}", which already takes each element.`,
+				at,
+			);
+		}
+		bound.add(node.as);
+	}
+	for (const name of Object.keys(node.inputs)) {
+		if (!inputs.has(name)) {
+			error(
+				`${kind} node "${node.id}" binds the input "${name}", but flow "${node.flow}" has no such input.`,
+				at,
+			);
+		}
+	}
+	for (const input of called.inputs) {
+		if (
+			input.required &&
+			input.default === undefined &&
+			!bound.has(input.name)
+		) {
+			error(
+				`${kind} node "${node.id}" does not bind the required input "${input.name}" of flow "${node.flow}".`,
+				at,
+			);
+		}
 	}
 
 	const self = chain.at(-1);
@@ -252,25 +507,25 @@ function checkBody(
 	}
 	if (chain.includes(node.flow)) return;
 
-	const count = validateIn(body, { flows, name: node.flow }, chain).filter(
+	const count = validateIn(called, { flows, name: node.flow }, chain).filter(
 		(issue) => issue.severity === "error",
 	).length;
 	if (count > 0) {
 		error(
-			`Body flow "${node.flow}" of For Each node "${node.id}" has ${count} ${count === 1 ? "error" : "errors"}.`,
+			`Flow "${node.flow}" of ${kind} node "${node.id}" has ${count} ${count === 1 ? "error" : "errors"}.`,
 			at,
 		);
 	}
 }
 
 /**
- * The shortest chain of For Each bodies from `start` to `target`, both
- * included, or null. Does not pass through `skip`.
+ * The shortest chain of calls (Subflow and For Each nodes) from `start` to
+ * `target`, both included, or null. Does not pass through `skip`.
  */
 function pathBack(
 	start: string,
 	target: string,
-	flows: Readonly<Record<string, Flow | null>>,
+	flows: Flows,
 	skip: ReadonlySet<string>,
 ): string[] | null {
 	if (start === target) return [start];
@@ -280,7 +535,8 @@ function pathBack(
 	for (let name = queue.shift(); name !== undefined; name = queue.shift()) {
 		const flow = Object.hasOwn(flows, name) ? flows[name] : null;
 		for (const node of flow?.nodes ?? []) {
-			if (node.type !== "foreach" || parent.has(node.flow)) continue;
+			if (node.type !== "foreach" && node.type !== "subflow") continue;
+			if (parent.has(node.flow)) continue;
 			parent.set(node.flow, name);
 			if (node.flow === target) {
 				const path = [target];
@@ -297,11 +553,8 @@ function pathBack(
 	return null;
 }
 
-/** Halt labels are outcomes of the body: valid labels, not reserved. */
-function checkHaltOn(
-	node: ForEachNode,
-	error: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
-): void {
+/** Halt labels are outcomes of the called flow: valid labels, not reserved. */
+function checkHaltOn(node: ForEachNode, error: Report): void {
 	const reserved: readonly string[] = reservedOutcomes;
 	for (const label of node.haltOn) {
 		const parsed = labelSchema.safeParse(label);
@@ -320,125 +573,68 @@ function checkHaltOn(
 }
 
 function describeNode(node: FlowNode): string {
-	return node.type === "agent" || node.type === "command"
+	return node.type === "command" ||
+		(node.type === "agent" && node.outcomes === undefined)
 		? `a ${node.type} node`
 		: `"${node.id}"`;
 }
 
+const optionWords = {
+	agent: { title: "Agent", kind: "outcome", picker: "the agent reports" },
+	decision: { title: "Decision", kind: "label", picker: "the decider picks" },
+	gate: { title: "Gate", kind: "choice", picker: "the person picks" },
+} as const;
+
 /**
- * Decision labels and Gate choices are outcomes: each must be unique within
- * its node and not reserved for the engine. One without an edge is allowed,
- * but picking it ends the run as failed.
+ * Agent outcomes, Decision labels and Gate choices are outcomes: each must be
+ * a valid label, unique within its node and not reserved for the engine. One
+ * without an edge is allowed, but ending on it ends the run there: a warning,
+ * except an Agent's own `fail` or `needs-input`, which fail the step anyway.
  */
 function checkOptions(
-	node: Extract<FlowNode, { type: "decision" | "gate" }>,
-	kind: "label" | "choice",
-	picker: string,
+	node: Extract<FlowNode, { type: "agent" | "decision" | "gate" }>,
 	flow: Flow,
-	error: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
-	warning: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
+	error: Report,
+	warning: Report,
 ): void {
-	const title = node.type === "decision" ? "Decision" : "Gate";
-	const names = nodeOutcomes(node);
+	const { title, kind, picker } = optionWords[node.type];
+	const at = { nodeId: node.id };
 	const reserved: readonly string[] = reservedOutcomes;
 	const seen = new Set<string>();
-	for (const name of names) {
+	for (const name of nodeOutcomes(node)) {
 		if (seen.has(name)) {
 			error(
 				`${title} node "${node.id}" has the ${kind} "${name}" more than once.`,
-				{ nodeId: node.id },
+				at,
 			);
 			continue;
 		}
 		seen.add(name);
+		const valid = labelSchema.safeParse(name);
+		if (!valid.success) {
+			error(
+				`${title} node "${node.id}" has the ${kind} "${name}", which is not a valid label: ${valid.error.issues[0]?.message ?? "not allowed"}`,
+				at,
+			);
+			continue;
+		}
 		if (reserved.includes(name)) {
 			error(
 				`${title} node "${node.id}" uses the ${kind} "${name}", which is reserved. Do not use: ${reserved.join(", ")}.`,
-				{ nodeId: node.id },
+				at,
 			);
 			continue;
 		}
 		const routed = flow.edges.some(
 			(edge) => edge.from === node.id && edge.outcome === name,
 		);
-		if (!routed) {
+		// An agent that reports fail or needs-input fails anyway: no surprise.
+		const failing =
+			node.type === "agent" && (name === "fail" || name === "needs-input");
+		if (!routed && !failing) {
 			warning(
-				`${title} node "${node.id}" has no edge for "${name}": the run ends there when ${picker} picks "${name}".`,
-				{ nodeId: node.id },
-			);
-		}
-	}
-}
-
-function checkParams(
-	flow: Flow,
-	error: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
-): void {
-	const params = flow.params ?? [];
-	if (params.length > 0 && flow.input === "item") {
-		error(
-			"A body flow cannot declare params: it reads the params of the top-level flow that runs it.",
-			{},
-		);
-	}
-	const seen = new Set<string>();
-	for (const param of params) {
-		if (seen.has(param.name)) {
-			error(`The param "${param.name}" is declared more than once.`, {});
-		}
-		seen.add(param.name);
-	}
-}
-
-function checkTemplate(
-	node: FlowNode,
-	text: string,
-	where: string,
-	nodes: ReadonlyMap<string, FlowNode>,
-	flow: Flow,
-	error: (message: string, at: Pick<FlowIssue, "nodeId">) => void,
-): void {
-	const input = flow.input;
-	for (const ref of templateRefs(text)) {
-		let fields: readonly string[];
-		if (ref.scope === "params") {
-			// A body flow reads the params of whichever top-level flow runs it.
-			if (input === "item") continue;
-			fields = (flow.params ?? []).map((param) => param.name);
-			if (!fields.includes(ref.field)) {
-				error(
-					`The ${where} of "${node.id}" uses ${ref.raw}, but the flow has no param "${ref.field}". Add it to the flow's params.`,
-					{ nodeId: node.id },
-				);
-			}
-			continue;
-		}
-		if (ref.scope === "run") {
-			fields = runFields;
-		} else if (ref.scope === "item") {
-			if (input !== "item") {
-				error(
-					`The ${where} of "${node.id}" uses ${ref.raw}, but only a For Each body can read item fields. Set the flow's input to "item".`,
-					{ nodeId: node.id },
-				);
-				continue;
-			}
-			fields = itemFields;
-		} else {
-			const target = nodes.get(ref.scope);
-			if (!target) {
-				error(
-					`The ${where} of "${node.id}" uses ${ref.raw}, but there is no node "${ref.scope}".`,
-					{ nodeId: node.id },
-				);
-				continue;
-			}
-			fields = outputFieldsByType[target.type];
-		}
-		if (!fields.includes(ref.field)) {
-			error(
-				`The ${where} of "${node.id}" uses ${ref.raw}, but "${ref.scope}" has no field "${ref.field}". Use one of: ${fields.join(", ")}.`,
-				{ nodeId: node.id },
+				`${title} node "${node.id}" has no edge for "${name}": the run ends there when ${picker} "${name}".`,
+				at,
 			);
 		}
 	}
@@ -533,12 +729,15 @@ function cycleThrough(
 	return [start];
 }
 
-/** Parses unknown JSON and validates it. Schema errors come back as issues. */
+/**
+ * Migrates (`migrateFlow`), parses and validates unknown JSON. Schema errors
+ * come back as issues.
+ */
 export function parseFlow(
 	json: unknown,
 	options: ValidateOptions = {},
 ): { flow: Flow; issues: FlowIssue[] } | { flow: null; issues: FlowIssue[] } {
-	const result = flowSchema.safeParse(json);
+	const result = flowSchema.safeParse(migrateFlow(json));
 	if (!result.success) {
 		return {
 			flow: null,

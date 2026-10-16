@@ -17,7 +17,7 @@ import type {
 	FlowEdge,
 	FlowInput,
 	ForEachNode,
-	SourceItem,
+	ListItem,
 } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
 
@@ -116,7 +116,9 @@ function forEach(
 		position: { x: 0, y: 0 },
 		source: { kind: "command", command: sourceCommand },
 		flow: body,
-		branchPerItem: true,
+		as: "item",
+		inputs: {},
+		branch: "per-item",
 		haltOn: ["halt"],
 		...extra,
 	};
@@ -136,10 +138,18 @@ function flowOf(
 	edges: FlowEdge[] = [],
 	extra: Partial<Flow> = {},
 ): Flow {
-	return { version: 1, start: nodes[0]?.id ?? "", nodes, edges, ...extra };
+	return {
+		version: 2,
+		inputs: [],
+		outputs: [],
+		start: nodes[0]?.id ?? "",
+		nodes,
+		edges,
+		...extra,
+	};
 }
 
-/** Writes a body flow file (`input: "item"`) into the clone. */
+/** Writes a called flow file (with the input `item`) into the clone. */
 async function saveBody(
 	name: string,
 	nodes: Flow["nodes"],
@@ -147,7 +157,10 @@ async function saveBody(
 ): Promise<void> {
 	const dir = join(sandbox.repoPath, ".nightshift", "flows");
 	await mkdir(dir, { recursive: true });
-	const flow: FlowInput = { ...flowOf(nodes, edges), input: "item" };
+	const flow: FlowInput = {
+		...flowOf(nodes, edges),
+		inputs: [{ name: "item", type: "json", required: true }],
+	};
 	await writeFile(join(dir, `${name}.json`), JSON.stringify(flow));
 }
 
@@ -157,7 +170,7 @@ function printItems(items: unknown[]): string {
 }
 
 /** Commits a file named after the item, so the worktree is clean for the next item. */
-const commitItem = `echo "{{item.branch}}" > "item-{{item.id}}.txt" && git add -A && git -c user.name=t -c user.email=t@nightshift.invalid -c commit.gpgsign=false commit -q -m "item {{item.id}}"`;
+const commitItem = `echo "{{run.branch}}" > "item-{{item.id}}.txt" && git add -A && git -c user.name=t -c user.email=t@nightshift.invalid -c commit.gpgsign=false commit -q -m "item {{item.id}}"`;
 
 async function projectId(engine: Engine): Promise<string> {
 	return (await engine.addProject({ repoPath: sandbox.repoPath })).id;
@@ -277,7 +290,7 @@ describe("For Each", () => {
 		expect(await mustGit(wt, ["rev-parse", `${second?.branch}^`])).toBe(
 			await mustGit(wt, ["rev-parse", started.branch]),
 		);
-		// {{item.branch}} reached the body's command.
+		// {{run.branch}} reached the body's command.
 		expect(await mustGit(wt, ["show", `${first?.branch}:item-1.txt`])).toBe(
 			first?.branch ?? "",
 		);
@@ -290,7 +303,7 @@ describe("For Each", () => {
 			["worker", "1", 1],
 			["commit", "1", 1],
 		]);
-		expect(new Set(bodySteps.map((s) => s.scope?.forEachStepId))).toEqual(
+		expect(new Set(bodySteps.map((s) => s.scope?.parentStepId))).toEqual(
 			new Set([loop.id]),
 		);
 
@@ -334,7 +347,7 @@ describe("For Each", () => {
 						{ id: "1", title: "a" },
 						{ id: "2", title: "b" },
 					]),
-					{ branchPerItem: false },
+					{ branch: "shared" },
 				),
 			]),
 		});
@@ -422,7 +435,7 @@ describe("For Each", () => {
 						{ id: "2", title: "two" },
 						{ id: "3", title: "three" },
 					]),
-					{ branchPerItem: false },
+					{ branch: "shared" },
 				),
 			]),
 		});
@@ -461,7 +474,7 @@ describe("For Each", () => {
 			projectId: await projectId(engine),
 			flow: flowOf([
 				forEach("loop", "build", `cat '${itemsFile}'`, {
-					branchPerItem: false,
+					branch: "shared",
 				}),
 			]),
 		});
@@ -489,7 +502,7 @@ describe("For Each", () => {
 						{ id: "2", title: "b" },
 						{ id: "3", title: "c" },
 					]),
-					{ branchPerItem: false, maxItems: 2 },
+					{ branch: "shared", maxItems: 2 },
 				),
 			]),
 		});
@@ -597,7 +610,7 @@ describe("For Each", () => {
 							{ id: "f1", title: "one" },
 							{ id: "f2", title: "two" },
 						]),
-						{ branchPerItem: false },
+						{ branch: "shared" },
 					),
 					agent("worker", "Top {{loop.done_count}}"),
 				],
@@ -606,7 +619,10 @@ describe("For Each", () => {
 		});
 		const detail = await waitForEnd(engine, started.id);
 		expect(detail.status).toBe("finished");
-		expect(Object.keys(detail.bodyFlows).sort()).toEqual(["feature", "trace"]);
+		expect(Object.keys(detail.calledFlows).sort()).toEqual([
+			"feature",
+			"trace",
+		]);
 		const short = started.id.slice(0, 8);
 		const t1 = `nightshift/${short}-f1-1-t`;
 		const t2 = `nightshift/${short}-f2-1-t`;
@@ -624,13 +640,13 @@ describe("For Each", () => {
 		const outer = forEachStep(detail, "loop");
 		const inner = detail.steps.filter((s) => s.nodeId === "traces");
 		expect(inner.map((s) => s.scope)).toEqual([
-			{ forEachStepId: outer.id, itemId: "f1" },
-			{ forEachStepId: outer.id, itemId: "f2" },
+			{ parentStepId: outer.id, itemId: "f1" },
+			{ parentStepId: outer.id, itemId: "f2" },
 		]);
 		const traceWorkers = detail.steps.filter(
-			(s) => s.nodeId === "worker" && s.scope?.itemId.endsWith("-1"),
+			(s) => s.nodeId === "worker" && s.scope?.itemId?.endsWith("-1"),
 		);
-		expect(traceWorkers.map((s) => s.scope?.forEachStepId)).toEqual(
+		expect(traceWorkers.map((s) => s.scope?.parentStepId)).toEqual(
 			inner.map((s) => s.id),
 		);
 		// Every "worker" counts its own visits per scope.
@@ -667,7 +683,7 @@ describe("For Each", () => {
 		await saveBody("fine", [agent("worker", "Build {{item.title}}")]);
 		await expect(
 			engine.startRun({ projectId: id, flowName: "fine" }),
-		).rejects.toThrow("is a For Each body");
+		).rejects.toThrow("The flow needs a value for: item.");
 		expect(await engine.listRuns()).toEqual([]);
 	});
 
@@ -679,7 +695,7 @@ describe("For Each", () => {
 			[
 				command("pick", "echo 42"),
 				{
-					...forEach("loop", "build", "unused", { branchPerItem: false }),
+					...forEach("loop", "build", "unused", { branch: "shared" }),
 					source: {
 						kind: "github",
 						parent: "{{pick.exit_code}}7",
@@ -697,8 +713,15 @@ describe("For Each", () => {
 		).rejects.toThrow("no GitHub reader");
 
 		const inputs: GithubItemsInput[] = [];
-		const items: SourceItem[] = [
-			{ id: "12", number: 12, title: "first", blockedBy: [], done: false },
+		const items: ListItem[] = [
+			{
+				id: "12",
+				title: "first",
+				url: "https://github.test/issues/12",
+				value: { id: "12", number: 12, title: "first" },
+				dependsOn: [],
+				done: false,
+			},
 		];
 		const harness = fakeHarness();
 		const engine = makeEngine(harness, {
@@ -723,8 +746,9 @@ describe("For Each", () => {
 		expect(harness.calls[0]?.prompt).toBe("Build #12 first");
 		expect(forEachStep(detail).items[0]).toMatchObject({
 			id: "12",
-			number: 12,
 			title: "first",
+			url: "https://github.test/issues/12",
+			value: { id: "12", number: 12, title: "first" },
 		});
 	});
 
@@ -810,7 +834,7 @@ describe("For Each", () => {
 						{ id: "1", title: "a" },
 						{ id: "2", title: "b" },
 					]),
-					{ branchPerItem: false },
+					{ branch: "shared" },
 				),
 			]),
 		});
@@ -852,7 +876,7 @@ describe("For Each", () => {
 						{ id: "1", title: "a" },
 						{ id: "2", title: "b" },
 					]),
-					{ branchPerItem: false },
+					{ branch: "shared" },
 				),
 			]),
 		});
@@ -898,7 +922,8 @@ describe("run policy", () => {
 			flow: flowOf([agent("worker", "Go")]),
 		});
 		const sleeping = await waitForStatus(engine, started.id, "sleeping");
-		expect(sleeping.wakeAt).toBeGreaterThan(Date.now());
+		// The reset time, not a fixed delay: a busy machine may reach it already.
+		expect(sleeping.wakeAt).toBeGreaterThan(started.createdAt);
 		const detail = await waitForEnd(engine, started.id);
 		expect(detail.status).toBe("finished");
 		expect(detail.wakeAt).toBeNull();
@@ -1028,7 +1053,7 @@ describe("run policy", () => {
 			projectId: await projectId(engine1),
 			flow: flowOf([
 				forEach("loop", "build", printItems([{ id: "1", title: "a" }]), {
-					branchPerItem: false,
+					branch: "shared",
 				}),
 			]),
 		});
@@ -1144,7 +1169,7 @@ describe("stop modes", () => {
 						{ id: "1", title: "a" },
 						{ id: "2", title: "b" },
 					]),
-					{ branchPerItem: false },
+					{ branch: "shared" },
 				),
 			]),
 		});
@@ -1177,7 +1202,7 @@ describe("stop modes", () => {
 						{ id: "1", title: "a" },
 						{ id: "2", title: "b" },
 					]),
-					{ branchPerItem: false },
+					{ branch: "shared" },
 				),
 			]),
 		});
@@ -1255,44 +1280,54 @@ describe("stop modes", () => {
 	});
 });
 
-describe("run params", () => {
-	test("params reach top-level and body templates, defaults apply", async () => {
+describe("run inputs", () => {
+	test("inputs reach top-level templates, bindings reach the called flow, defaults apply", async () => {
 		const engine = makeEngine(fakeHarness());
-		await saveBody("body", [
-			command("note", `echo "body sees epic {{params.epic}} for {{item.id}}"`),
-		]);
+		const dir = join(sandbox.repoPath, ".nightshift", "flows");
+		await mkdir(dir, { recursive: true });
+		const body: FlowInput = {
+			...flowOf([
+				command("note", `echo "body sees epic {{epic}} for {{item.id}}"`),
+			]),
+			inputs: [
+				{ name: "item", type: "json", required: true },
+				{ name: "epic", required: true },
+			],
+		};
+		await writeFile(join(dir, "body.json"), JSON.stringify(body));
 		const flow = flowOf(
 			[
-				command("hello", `echo "epic {{params.epic}} model {{params.model}}"`),
+				command("hello", `echo "epic {{epic}} model {{model}}"`),
 				forEach("loop", "body", printItems([{ id: "1", title: "a" }]), {
-					branchPerItem: false,
+					branch: "shared",
+					inputs: { epic: "{{epic}}" },
 				}),
 			],
 			[edge("e1", "hello", "pass", "loop")],
 			{
-				params: [
-					{ name: "epic", required: true },
-					{ name: "model", default: "sonnet" },
+				inputs: [
+					{ name: "epic", type: "text", required: true },
+					{ name: "model", type: "text", default: "sonnet" },
 				],
 			},
 		);
 		const id = await projectId(engine);
 
 		await expect(engine.startRun({ projectId: id, flow })).rejects.toThrow(
-			"The run needs a value for: epic.",
+			"The flow needs a value for: epic.",
 		);
 		await expect(
-			engine.startRun({ projectId: id, flow, params: { nope: "x" } }),
-		).rejects.toThrow('The flow has no param "nope".');
+			engine.startRun({ projectId: id, flow, inputs: { nope: "x" } }),
+		).rejects.toThrow('The flow has no input "nope".');
 
 		const run = await engine.startRun({
 			projectId: id,
 			flow,
-			params: { epic: " 1097 " },
+			inputs: { epic: " 1097 " },
 		});
 		const detail = await waitForEnd(engine, run.id);
 		expect(detail.status).toBe("finished");
-		expect(detail.params).toEqual({ epic: "1097", model: "sonnet" });
+		expect(detail.inputs).toEqual({ epic: "1097", model: "sonnet" });
 		const outputs = detail.steps.map((s) => s.outputs.log_tail);
 		expect(outputs).toContain("epic 1097 model sonnet");
 		expect(outputs).toContain("body sees epic 1097 for 1");

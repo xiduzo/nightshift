@@ -19,5 +19,12 @@ export function singleAgentFlow(
 	};
 	if (input.effort !== undefined) node.effort = input.effort;
 	if (input.skill !== undefined) node.skill = input.skill;
-	return { version: FLOW_VERSION, start: "agent", nodes: [node], edges: [] };
+	return {
+		version: FLOW_VERSION,
+		inputs: [],
+		outputs: [],
+		start: "agent",
+		nodes: [node],
+		edges: [],
+	};
 }

@@ -26,6 +26,13 @@ export type StepScope = NonNullable<StepSummary["scope"]>;
 export type RunStatus = RunSummary["status"];
 export type StepOutcome = NonNullable<StepSummary["outcome"]>;
 export type StartRunInput = Inputs["runs"]["start"];
+export type RunTrigger = RunSummary["trigger"];
+
+/** `.nightshift/schedules.json`, with the next start and the last result of each schedule. */
+export type ScheduleList = Outputs["schedules"]["list"];
+export type ScheduleSummary = ScheduleList["schedules"][number];
+export type ScheduleResult = NonNullable<ScheduleSummary["last"]>;
+export type ScheduleIssue = ScheduleSummary["issues"][number];
 
 export type PermissionMode = AgentNode["permissionMode"];
 export type Effort = NonNullable<AgentNode["effort"]>;

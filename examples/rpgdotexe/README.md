@@ -2,17 +2,19 @@
 
 These three flows rebuild `tools/night-shift/night-shift.py` of the rpgdotexe repo as Night Shift flows. They build the Features and the Traces of one Epic while nobody is present, and leave a stack of pull requests for the morning.
 
-| Flow | Input | Does |
+Night Shift knows nothing of Epics, Features, or Traces. A flow is a function with inputs, and these three call each other: `night` takes the Epic number as its input `epic`. Its For Each reads the Epic's sub-issues from GitHub and calls `feature` once per Feature, with the issue as the input `item`. `feature` does the same for its Traces and `trace`. A flow reads its input with a path (`{{item.number}}`, `{{item.parent.number}}`) and the engine's facts about the element from `run` (`{{run.branch}}`, `{{run.base_branch}}`). The files are format version 2.
+
+| Flow | Inputs | Does |
 | --- | --- | --- |
-| `night.json` | none (the run starts here) | For Each Feature of the Epic (label `feature`), blockers first: runs `feature`. Halts the night when a Feature ends on `halt`. Then writes `.build/night/STATUS.md`. |
-| `feature.json` | a Feature | For Each Trace of the Feature (label `trace`, not `implemented`), blockers first, each on its own branch on top of the last: runs `trace`. Then the checkpoint: the validator verifies and tunes on a `tune/` branch, the orchestrator writes steering notes, and a decision picks `continue` or `halt`. |
-| `trace.json` | a Trace | The worker builds the Trace, the check runs, a failed check goes back to a fresh worker (3 tries), then a rescue on Opus. A Trace that passes gets a pull request on the stack and the label `implemented`. A Trace that still fails ends as failed, so the Traces that wait on it are blocked. |
+| `night.json` | `epic` (text, required): the Epic's issue number. The run starts here. | For Each Feature of the Epic (label `feature`), blockers first: runs `feature`. Halts the night when a Feature ends on `halt`. Then writes `.build/night/STATUS.md`. |
+| `feature.json` | `item` (json, required): the Feature issue. | For Each Trace of the Feature (label `trace`, not `implemented`), blockers first, each on its own branch on top of the last: runs `trace`. Then the checkpoint: the validator verifies and tunes on a `tune/` branch, the orchestrator writes steering notes, and a decision picks `continue` or `halt`. |
+| `trace.json` | `item` (json, required): the Trace issue. | The worker builds the Trace, the check runs, a failed check goes back to a fresh worker (3 tries), then a rescue on Opus. A Trace that passes gets a pull request on the stack and the label `implemented`. A Trace that still fails ends as failed, so the Traces that wait on it are blocked. |
 
 ## How to use it
 
 1. Copy `.nightshift/flows/` into your rpgdotexe clone.
 2. Add the clone as a project in Night Shift.
-3. Run the flow `night`: the start dialog asks for the Epic number (the `epic` param, like `night-shift.py <epic>`) and a stop time. A stop starts no new work; the next run continues, because a Trace with the label `implemented` counts as done.
+3. Run the flow `night`: the start dialog asks for the Epic number (the input `epic`, like `night-shift.py <epic>`) and a stop time. A stop starts no new work; the next run continues, because a Trace with the label `implemented` counts as done.
 4. In the morning, read the pull requests, `.build/night/STATUS.md` in the run's worktree, and the comment of the checkpoint on each Feature.
 
 The flows call `python3 tools/night-shift/night-shift.py gate` (the check) and import two helpers from that file. Keep the script in the repo until the check moves somewhere else.
@@ -22,7 +24,7 @@ The flows call `python3 tools/night-shift/night-shift.py gate` (the check) and i
 | Script (`night-shift.py`) | Flow node |
 | --- | --- |
 | `fetch_plan`, `blockers_first`, Features first | `night` → `features` (For Each, GitHub source, `requireLabel: feature`) |
-| Traces of a Feature, `next_action`, a blocked Trace skips its dependents | `feature` → `traces` (For Each, `requireLabel: trace`, `doneLabels: [implemented]`, `branchPerItem`) |
+| Traces of a Feature, `next_action`, a blocked Trace skips its dependents | `feature` → `traces` (For Each, `requireLabel: trace`, `doneLabels: [implemented]`, `branch: per-item`) |
 | `build_trace`: branch, `write_context` (`context.json`, `TRACE.md`, `FEATURE.md`) | `trace` → `prepare` (the engine makes the branch) |
 | `worker_prompt` + `RULES` + `trace_task` / `fix_task`, a new session each try | `trace` → `worker` (Sonnet, effort high, `session: fresh`, 90 min, idle 30) |
 | `format_swift` | `trace` → `format` |
@@ -65,5 +67,5 @@ The agents get the script's prompts, not the `wtf.*` skills: those skills ask th
 
 - One worktree per run. `.build/night/` is ignored by git, so the files there (the base, the steering notes, the reports) survive the checkouts between items.
 - In `feature.json`, after `traces`, the worktree is on the tip of the stack. `tune_start` branches off it. The engine does not know the `tune/` branch, so the next Feature's Traces do not build on the tuning.
-- The night's For Each has `branchPerItem: false`: the stack is the Traces. The first Trace of the next Feature must start on the last Trace that finished, also across Features.
+- The night's For Each has `branch: shared`: the stack is the Traces. The first Trace of the next Feature must start on the last Trace that finished, also across Features.
 - `session: resume` resumes the node's session of the same item, not of an earlier item.

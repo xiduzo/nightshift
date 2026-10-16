@@ -1,131 +1,108 @@
-import type { ItemField, SourceItem } from "@nightshift/flows";
-import { z } from "zod";
+import {
+	type JsonValue,
+	type ListItem,
+	normalizeList,
+	renderValue,
+	type TemplateContext,
+} from "@nightshift/flows";
 
 import type { DerivedItem, ItemFacts, StepOutputs } from "./events";
 
 /**
- * The pure parts of a For Each step: parsing a command source, the facts the
- * log keeps of an item, its template fields, and the step's outputs.
+ * The pure parts of a For Each step: turning a source's JSON into list
+ * items, the facts the log keeps of an element, and the step's outputs.
  */
 
-const idSchema = z.union([z.string().min(1), z.number()]).transform(String);
-
-const commandItemSchema = z.object({
-	id: idSchema,
-	title: z.string(),
-	number: z.number().int().optional(),
-	body: z.string().optional(),
-	url: z.string().optional(),
-	/** Ids of items that must be done first, or `{ id, done }` for one outside the list. */
-	blockedBy: z
-		.array(
-			z.union([
-				idSchema,
-				z.object({ id: idSchema, done: z.boolean().default(false) }),
-			]),
-		)
-		.default([]),
-	done: z.boolean().default(false),
-	parentNumber: z.number().int().optional(),
-	parentTitle: z.string().optional(),
-});
+/** Normalizes a source's JSON value, or throws with a readable message. */
+export function listOf(value: JsonValue, what: string): ListItem[] {
+	const result = normalizeList(value);
+	if (!result.ok) throw new Error(`${what}: ${result.error}`);
+	return result.items;
+}
 
 /**
- * Parses what a command source prints: a JSON array of
- * `{ id, title, body?, url?, blockedBy?: id[], done?: boolean }`. A blocker
- * in the list is done when that item is; one outside the list is not, unless
- * it says `{ id, done: true }`. Throws with a readable message.
+ * The list of a `json` source. One reference keeps its value (often an
+ * agent's `data`); any other text, or a reference to text, is parsed as JSON.
  */
-export function parseCommandItems(stdout: string): SourceItem[] {
-	let json: unknown;
+export function jsonSourceItems(
+	template: string,
+	context: TemplateContext,
+): ListItem[] {
+	let value = renderValue(template, context);
+	if (typeof value === "string") {
+		const text = value;
+		try {
+			value = JSON.parse(text) as JsonValue;
+		} catch {
+			const shown = text.length > 200 ? `${text.slice(0, 200)}…` : text;
+			throw new Error(
+				`The list "${template}" did not render a JSON array: ${shown || "(empty)"}`,
+			);
+		}
+	}
+	return listOf(value, `The list "${template}"`);
+}
+
+/** Parses what a command source prints: a JSON array of elements. */
+export function parseCommandItems(stdout: string): ListItem[] {
+	let json: JsonValue;
 	try {
-		json = JSON.parse(stdout);
+		json = JSON.parse(stdout) as JsonValue;
 	} catch (error) {
 		throw new Error(
 			`The source command did not print JSON: ${error instanceof Error ? error.message : String(error)}`,
 		);
 	}
-	const result = z.array(commandItemSchema).safeParse(json);
-	if (!result.success) {
-		const issue = result.error.issues[0];
-		const at = issue?.path.length ? ` at ${issue.path.join(".")}` : "";
+	return listOf(json, "The source command printed JSON that is not a list");
+}
+
+/**
+ * The files in `cwd` that match `pattern`, sorted by path, as elements
+ * `{ id: path, title: path, path }`. The pattern stays inside `cwd`: an
+ * absolute pattern or a `..` segment is refused.
+ */
+export async function fileItems(
+	cwd: string,
+	glob: string,
+): Promise<ListItem[]> {
+	const trimmed = glob.trim();
+	if (trimmed === "") throw new Error("The glob of the files source is empty.");
+	if (
+		trimmed.startsWith("/") ||
+		trimmed.startsWith("~") ||
+		/^[A-Za-z]:[\\/]/.test(trimmed) ||
+		/(^|[\\/{,])\.\.([\\/},]|$)/.test(trimmed)
+	) {
 		throw new Error(
-			`The source command printed JSON that is not a list of items${at}: ${issue?.message ?? "invalid"}`,
+			`The glob "${trimmed}" reaches outside the worktree. Use a path relative to it, without "..".`,
 		);
 	}
-	const parsed = result.data;
-	const ids = new Set<string>();
-	for (const item of parsed) {
-		if (ids.has(item.id)) {
-			throw new Error(
-				`The source command printed the item id "${item.id}" more than once.`,
-			);
-		}
-		ids.add(item.id);
+	const pattern = trimmed;
+	const paths: string[] = [];
+	for await (const path of new Bun.Glob(pattern).scan({
+		cwd,
+		onlyFiles: true,
+	})) {
+		if (path === ".git" || path.startsWith(".git/")) continue;
+		paths.push(path);
 	}
-	const doneById = new Map(parsed.map((item) => [item.id, item.done]));
-	return parsed.map((item) => {
-		const source: SourceItem = {
-			id: item.id,
-			title: item.title,
-			blockedBy: item.blockedBy.map((blocker) =>
-				typeof blocker === "string"
-					? { id: blocker, done: doneById.get(blocker) ?? false }
-					: { id: blocker.id, done: doneById.get(blocker.id) ?? blocker.done },
-			),
-			done: item.done,
-		};
-		if (item.number !== undefined) source.number = item.number;
-		else if (/^\d+$/.test(item.id)) source.number = Number(item.id);
-		if (item.body !== undefined) source.body = item.body;
-		if (item.url !== undefined) source.url = item.url;
-		if (item.parentNumber !== undefined)
-			source.parentNumber = item.parentNumber;
-		if (item.parentTitle !== undefined) source.parentTitle = item.parentTitle;
-		return source;
-	});
+	paths.sort();
+	return listOf(
+		paths.map((path) => ({ id: path, title: path, path })),
+		`The files "${pattern}"`,
+	);
 }
 
-export function toItemFacts(item: SourceItem): ItemFacts {
-	return {
-		id: item.id,
-		number: item.number ?? null,
-		title: item.title,
-		body: item.body ?? null,
-		url: item.url ?? null,
-		parentNumber: item.parentNumber ?? null,
-		parentTitle: item.parentTitle ?? null,
-	};
+export function toItemFacts(item: ListItem): ItemFacts {
+	return { id: item.id, title: item.title, url: item.url, value: item.value };
 }
 
-/** How an item reads in summaries: `#12`. */
-export function itemLabel(item: { id: string; number: number | null }): string {
-	return `#${item.number ?? item.id}`;
+/** How an element reads in summaries: `#12` for a number, else its id. */
+export function itemLabel(item: { id: string }): string {
+	return /^\d+$/.test(item.id) ? `#${item.id}` : item.id;
 }
 
-/** `{{item.<field>}}` values of the item a body runs for. */
-export function itemTemplateFields(input: {
-	facts: ItemFacts;
-	index: number;
-	branch: string;
-	baseBranch: string | null;
-}): Partial<Record<ItemField, string | number>> {
-	const { facts } = input;
-	return {
-		id: facts.id,
-		number: facts.number ?? "",
-		title: facts.title,
-		body: facts.body ?? "",
-		url: facts.url ?? "",
-		index: input.index,
-		branch: input.branch,
-		base_branch: input.baseBranch ?? "",
-		parent_number: facts.parentNumber ?? "",
-		parent_title: facts.parentTitle ?? "",
-	};
-}
-
-/** One line per item: `#12 done`, `#13 blocked by #12`, `#14 failed: …`. */
+/** One line per element: `#12 done`, `#13 blocked by #12`, `#14 failed: …`. */
 export function itemLine(item: DerivedItem): string {
 	const label = itemLabel(item.facts);
 	switch (item.state) {
@@ -165,6 +142,13 @@ export function forEachOutputs(input: {
 		blocked_count: count("blocked"),
 		waiting_count: input.waitingCount,
 		summary: input.items.map(itemLine).join("\n"),
+		results: input.items.map((item) => ({
+			id: item.facts.id,
+			title: item.facts.title,
+			state: item.state,
+			reason: item.reason,
+			outputs: item.outputs,
+		})),
 		visit: input.visit,
 	};
 }

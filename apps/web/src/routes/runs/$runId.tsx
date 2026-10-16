@@ -16,13 +16,13 @@ import { RunGraph } from "@/components/run/run-graph";
 import { RunHeader } from "@/components/run/run-header";
 import { StepHeader } from "@/components/run/step-header";
 import { StepTimeline } from "@/components/run/step-timeline";
+import { SubflowDetail } from "@/components/run/subflow-detail";
 import { StepTranscript } from "@/components/transcript/step-transcript";
 import { mergeSteps, useRunStream } from "@/hooks/use-run-stream";
 import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
-import { itemLabel } from "@/lib/format";
 import {
-	bodyFlowName,
-	bodyFlowOf,
+	calledFlowName,
+	calledFlowOf,
 	derivedTraversals,
 	type ItemScope,
 	itemsOf,
@@ -48,7 +48,7 @@ function RunComponent() {
 	const stream = useRunStream(runId);
 	/** Null follows the latest step as the run walks. */
 	const [pickedStepId, setPickedStepId] = useState<string | null>(null);
-	/** The For Each item in focus: the steps and the graph narrow to it. */
+	/** The call in focus (a Subflow step or a For Each element): the steps and the graph narrow to it. */
 	const [focus, setFocus] = useState<ItemScope>(null);
 
 	const steps = useMemo(
@@ -100,15 +100,15 @@ function RunComponent() {
 					.find((step) => step.nodeType === "gate" && step.outcome === null)
 			: undefined;
 
-	// The graph: the top-level flow, or the body flow of the item in focus.
+	// The graph: the top-level flow, or the called flow of the call in focus.
 	const focusStep = focus
-		? steps.find((step) => step.id === focus.forEachStepId)
+		? steps.find((step) => step.id === focus.parentStepId)
 		: undefined;
-	const bodyFlow = focusStep
-		? bodyFlowOf(runData, steps, focusStep)
+	const focusFlow = focusStep
+		? calledFlowOf(runData, steps, focusStep)
 		: undefined;
-	const graphFlow = (focus && bodyFlow) || runData.flow;
-	const graphScope: ItemScope = focus && bodyFlow ? focus : null;
+	const graphFlow = (focus && focusFlow) || runData.flow;
+	const graphScope: ItemScope = focus && focusFlow ? focus : null;
 	const graphSteps = stepsIn(steps, graphScope);
 	const graphTraversals = graphScope
 		? derivedTraversals(graphFlow, graphSteps)
@@ -160,7 +160,7 @@ function RunComponent() {
 					<RunGraph
 						key={
 							graphScope
-								? `${graphScope.forEachStepId}:${graphScope.itemId}`
+								? `${graphScope.parentStepId}:${graphScope.itemId ?? ""}`
 								: "top"
 						}
 						flow={graphFlow}
@@ -170,7 +170,7 @@ function RunComponent() {
 						selectedNodeId={graphSelected?.nodeId ?? null}
 						onSelectNode={selectNode}
 						breadcrumb={breadcrumb}
-						label={graphScope ? "Body flow of the item in focus" : undefined}
+						label={graphScope ? "The flow of the call in focus" : undefined}
 					/>
 					<section
 						aria-labelledby="steps-heading"
@@ -209,13 +209,15 @@ function RunComponent() {
 								selectedItem={focus}
 								onSelect={setPickedStepId}
 								onSelectItem={selectItem}
+								calledName={(step) => calledFlowName(runData, steps, step)}
 							/>
 						</div>
 					</section>
 				</div>
 				<div
 					className={
-						selectedStep?.nodeType === "foreach"
+						selectedStep?.nodeType === "foreach" ||
+						selectedStep?.nodeType === "subflow"
 							? "grid h-[75vh] grid-rows-[auto_auto_1fr_auto] lg:h-auto lg:min-h-0"
 							: "grid h-[75vh] grid-rows-[auto_1fr_auto] lg:h-auto lg:min-h-0"
 					}
@@ -242,6 +244,18 @@ function RunComponent() {
 									steps={steps}
 									selectedItem={focus}
 									onSelectItem={selectItem}
+								/>
+							) : null}
+							{selectedStep.nodeType === "subflow" ? (
+								<SubflowDetail
+									run={runData}
+									steps={steps}
+									step={selectedStep}
+									focused={
+										focus?.parentStepId === selectedStep.id &&
+										focus.itemId === null
+									}
+									onFocus={selectItem}
 								/>
 							) : null}
 							<StepTranscript
@@ -271,7 +285,7 @@ function RunComponent() {
 	);
 }
 
-/** One crumb per For Each level, from the run's flow down to the item in focus. */
+/** One crumb per call, from the run's flow down to the call in focus. */
 function useCrumbs(
 	run: RunDetail,
 	steps: StepSummary[],
@@ -280,28 +294,36 @@ function useCrumbs(
 	const crumbs: { key: string; label: ReactNode; scope: ItemScope }[] = [
 		{ key: "top", label: run.flowName ?? "Run", scope: null },
 	];
-	for (const { forEachStep, itemId } of scopeChain(steps, focus)) {
-		const item = itemsOf(forEachStep, steps).find((one) => one.id === itemId);
-		const body = bodyFlowName(run, steps, forEachStep);
+	for (const { parentStep, itemId } of scopeChain(steps, focus)) {
+		const called = calledFlowName(run, steps, parentStep);
+		const item =
+			itemId === null
+				? undefined
+				: itemsOf(parentStep, steps).find((one) => one.id === itemId);
 		crumbs.push({
-			key: `${forEachStep.id}:${itemId}`,
+			key: `${parentStep.id}:${itemId ?? ""}`,
 			label: (
 				<>
-					<span className="text-muted-foreground">{forEachStep.nodeId} ·</span>{" "}
-					{itemLabel(itemId, item?.number)}
-					{item && item.title !== itemId ? ` ${item.title}` : ""}
-					{body ? (
-						<span className="text-muted-foreground"> · {body}</span>
-					) : null}
+					<span className="text-muted-foreground">{parentStep.nodeId} ·</span>{" "}
+					{itemId === null ? (
+						<span className="font-mono">{called ?? "called flow"}</span>
+					) : (
+						<>
+							{item?.title ?? itemId}
+							{called ? (
+								<span className="text-muted-foreground"> · {called}</span>
+							) : null}
+						</>
+					)}
 				</>
 			),
-			scope: { forEachStepId: forEachStep.id, itemId },
+			scope: { parentStepId: parentStep.id, itemId },
 		});
 	}
 	return crumbs;
 }
 
-/** Over the graph: where the body flow sits, with a way back up. */
+/** Over the graph: where the called flow sits, with a way back up. */
 function FocusBreadcrumb({
 	run,
 	steps,
@@ -346,7 +368,7 @@ function FocusBreadcrumb({
 	);
 }
 
-/** Above the step list: which item it shows, and a way back to the whole run. */
+/** Above the step list: which call it shows, and a way back to the whole run. */
 function FocusChip({
 	steps,
 	focus,
@@ -356,15 +378,17 @@ function FocusChip({
 	focus: NonNullable<ItemScope>;
 	onClear: () => void;
 }) {
-	const forEachStep = steps.find((step) => step.id === focus.forEachStepId);
-	const item = forEachStep
-		? itemsOf(forEachStep, steps).find((one) => one.id === focus.itemId)
-		: undefined;
+	const parentStep = steps.find((step) => step.id === focus.parentStepId);
+	const item =
+		parentStep && focus.itemId !== null
+			? itemsOf(parentStep, steps).find((one) => one.id === focus.itemId)
+			: undefined;
 	return (
 		<span className="flex min-w-0 items-center gap-1 border bg-muted px-1.5 text-xs">
 			<span className="min-w-0 truncate">
-				{itemLabel(focus.itemId, item?.number)}
-				{item && item.title !== focus.itemId ? ` ${item.title}` : ""}
+				{focus.itemId === null
+					? `${parentStep?.nodeId ?? "call"}`
+					: (item?.title ?? focus.itemId)}
 			</span>
 			<button
 				type="button"
@@ -377,7 +401,7 @@ function FocusChip({
 	);
 }
 
-/** For a body step: the For Each and the item it ran for. Clicking focuses the item. */
+/** For a step in a called flow: the calls it ran under. Clicking one focuses it. */
 function StepContext({
 	run,
 	steps,
@@ -401,7 +425,7 @@ function StepContext({
 					<button
 						type="button"
 						className="text-foreground underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
-						title="Focus on this item"
+						title="Focus on this call"
 						onClick={() => onSelect(crumb.scope)}
 					>
 						{crumb.label}

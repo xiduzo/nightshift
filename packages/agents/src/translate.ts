@@ -1,18 +1,19 @@
 /**
- * Pure translation from the TanStack AI stream of a Claude Code session to
- * normalized AgentEvent values.
+ * Pure translation from the TanStack AI stream of a harness session (Claude
+ * Code, OpenCode, Codex) to normalized AgentEvent values.
  *
  * Two inputs feed one translator:
  * - AG-UI chunks yielded by `chat()` (`push`).
- * - Raw Claude Code stream-json messages (`observeSdk`), tapped from the
- *   adapter's provider log. The AG-UI translation drops what usage-limit
- *   detection needs (`rate_limit_event`, the assistant `error` field, the
- *   result's `is_error`), so those are read from the raw messages.
+ * - Raw harness messages (`observeSdk`), tapped from the adapter's provider
+ *   log. The AG-UI translation drops what usage-limit detection needs (for
+ *   Claude Code: `rate_limit_event`, the assistant `error` field, the
+ *   result's `is_error`), so those are read from the raw messages. A
+ *   `HarnessProfile` says how to read them; the default is Claude Code's.
  *
  * The translator enforces the stream contract: one `session` event first and
  * one terminal `finished` / `error` event last (from `finish`).
  *
- * Step reports (`stepReport` on), see `step-report.ts`:
+ * Step reports (`stepReport` on: `true` or a spec), see `step-report.ts`:
  * - A `report_step` tool call becomes one `report` event, emitted when its
  *   successful result arrives. The call itself is harness plumbing: its
  *   `tool-start` / `tool-end` / `tool-result` events are not emitted. A call
@@ -27,9 +28,15 @@ import {
 	isReportTool,
 	parseStepReport,
 	parseTextReport,
+	reportRules,
 	type StepReport,
 } from "./step-report";
-import type { AgentErrorKind, AgentEvent, AgentUsage } from "./types";
+import type {
+	AgentErrorKind,
+	AgentEvent,
+	AgentUsage,
+	StepReportSpec,
+} from "./types";
 
 /** The AG-UI chunk shape this module reads. Every field is checked at runtime. */
 export type AgUiChunk = { type: string; [key: string]: unknown };
@@ -52,6 +59,16 @@ export type SdkSignals = {
 	resultUsage?: AgentUsage;
 	/** The `result` text of the result message: the final assistant text. */
 	resultText?: string;
+	/**
+	 * The harness's turn is over (OpenCode: the prompt call returned). The
+	 * translator settles: the session can end without waiting for the
+	 * adapter's RUN_FINISHED.
+	 */
+	done?: boolean;
+	/** Tool inputs by call id, read from the raw messages (the last one wins). */
+	toolInputs?: Readonly<Record<string, unknown>>;
+	/** Text message ids that are not assistant text (OpenCode echoes the prompt). */
+	hiddenTextIds?: ReadonlySet<string>;
 };
 
 export type FinishInput = {
@@ -92,8 +109,10 @@ const USAGE_LIMIT_TEXT =
  * TLS, HTTP 5xx, and GitHub's secondary rate limit (a short back-off, not an
  * exhausted account). Ported from `OFFLINE` in `night-shift.py` (without its
  * own "did not finish in" timeout text), plus the wording of Claude Code's API
- * errors (`API Error: 529 …`, `Connection error.`, `Request timed out.`) and
- * Node's socket error codes.
+ * errors (`API Error: 529 …`, `Connection error.`, `Request timed out.`),
+ * Bun's fetch errors as OpenCode reports them (`Unable to connect`), Codex's
+ * (`stream disconnected …`, `error sending request …`), and Node's socket
+ * error codes.
  */
 const NETWORK_TEXT = new RegExp(
 	[
@@ -111,6 +130,10 @@ const NETWORK_TEXT = new RegExp(
 		"remote end hung up",
 		"socket hang up",
 		"fetch failed",
+		"unable to connect",
+		"socket connection was closed",
+		"stream disconnected",
+		"error sending request",
 		"\\bHTTP 5\\d\\d\\b",
 		"\\bapi error\\W{0,3}5\\d\\d\\b",
 		"bad gateway",
@@ -118,7 +141,7 @@ const NETWORK_TEXT = new RegExp(
 		"gateway time-?out",
 		"overloaded",
 		"secondary rate.?limit",
-		"\\b(?:ECONNREFUSED|ECONNRESET|ECONNABORTED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|ENETDOWN|EHOSTUNREACH|EPIPE)\\b",
+		"\\b(?:ECONNREFUSED|ECONNRESET|ECONNABORTED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|ENETDOWN|EHOSTUNREACH|EPIPE|ConnectionRefused)\\b",
 	].join("|"),
 	"i",
 );
@@ -327,10 +350,10 @@ function isErrorResult(chunk: AgUiChunk): boolean {
 /** The result the adapter synthesizes for a call the run never resolved. */
 const INTERRUPTED_RESULT = JSON.stringify({ status: "interrupted" });
 
-function errorMessage(error: unknown): string {
+function errorMessage(error: unknown, label: string): string {
 	if (error instanceof Error && error.message) return error.message;
 	if (typeof error === "string" && error) return error;
-	return "Claude Code session failed";
+	return `${label} session failed`;
 }
 
 function errorEvent(
@@ -346,21 +369,66 @@ function errorEvent(
 	};
 }
 
+/** How a translator reads one harness: its name, session event, and raw messages. */
+export type HarnessProfile = {
+	/** The harness name in error texts, for example "Claude Code". */
+	label: string;
+	/** The name of the adapter's CUSTOM event that carries the session id. */
+	sessionEvent: string;
+	/**
+	 * A fresh fold of the raw messages into signals, one per session (it may
+	 * keep state). Claude Code's is `observeSdkMessage`.
+	 */
+	createObserver: () => (signals: SdkSignals, message: unknown) => SdkSignals;
+	/**
+	 * Report `resultUsage` instead of the RUN_FINISHED usage: the harness's
+	 * own total over every step of the turn.
+	 */
+	usageFromSignals?: boolean;
+	/**
+	 * The adapter's TOOL_CALL_END carries no input yet (OpenCode opens a call
+	 * on its first, empty update). Emit `tool-end` with the result instead,
+	 * with the input from `toolInputs`.
+	 */
+	toolInputFromSignals?: boolean;
+};
+
+export const CLAUDE_CODE_PROFILE: HarnessProfile = {
+	label: "Claude Code",
+	sessionEvent: SESSION_ID_EVENT,
+	createObserver: () => observeSdkMessage,
+};
+
 export type Translator = {
 	/** Translate one AG-UI chunk. Returns the events to emit now. */
 	push(chunk: unknown): AgentEvent[];
-	/** Record one raw Claude Code stream-json message. */
+	/** Record one raw harness message (Claude Code: a stream-json message). */
 	observeSdk(message: unknown): void;
 	/** End the stream. Returns the remaining events, the terminal one last. */
 	finish(input: FinishInput): AgentEvent[];
+	/** The raw messages say the turn is over (`done`): no need to wait for more chunks. */
+	settled(): boolean;
 };
 
 export function createTranslator(options: {
 	/** Session id to report when the harness ends before it reports one. */
 	fallbackSessionId: string;
-	/** Turn `report_step` tool calls into `report` events. */
-	stepReport?: boolean;
+	/**
+	 * Turn `report_step` tool calls into `report` events, checked against the
+	 * spec's outcomes and output (see `parseStepReport`).
+	 */
+	stepReport?: boolean | StepReportSpec;
+	/** The harness. Default: Claude Code. */
+	profile?: HarnessProfile;
+	/**
+	 * A session id known before the harness reports one (a resumed session).
+	 * The `session` event goes out with the first chunk instead of waiting.
+	 */
+	knownSessionId?: string;
 }): Translator {
+	const rules = reportRules(options.stepReport);
+	const profile = options.profile ?? CLAUDE_CODE_PROFILE;
+	const observe = profile.createObserver();
 	let sessionEmitted = false;
 	let finished = false;
 	/** Events that arrived before the session id; flushed after it. */
@@ -370,14 +438,17 @@ export function createTranslator(options: {
 	let runError: string | undefined;
 	/** Tool names by call id: `chat()` can drop the name from TOOL_CALL_END. */
 	const toolNames = new Map<string, string>();
+	/** `tool-end` events held for their input (`toolInputFromSignals`). */
+	const heldEnds = new Map<string, Extract<AgentEvent, { type: "tool-end" }>>();
+	const rawInput = (toolCallId: string, fallback: unknown): unknown =>
+		signals.toolInputs?.[toolCallId] ?? fallback;
 	/** Report tool calls by call id, with their input once it is complete. */
 	const reportCalls = new Map<
 		string,
 		{ name: string; input?: unknown; report?: StepReport }
 	>();
 	const isReportCall = (toolCallId: string, name: string | undefined) =>
-		options.stepReport === true &&
-		(reportCalls.has(toolCallId) || isReportTool(name));
+		rules !== undefined && (reportCalls.has(toolCallId) || isReportTool(name));
 
 	function emit(events: AgentEvent[]): AgentEvent[] {
 		if (sessionEmitted) return events;
@@ -388,7 +459,7 @@ export function createTranslator(options: {
 	function translate(chunk: AgUiChunk): AgentEvent[] {
 		switch (chunk.type) {
 			case "CUSTOM": {
-				if (chunk.name !== SESSION_ID_EVENT || sessionEmitted) return [];
+				if (chunk.name !== profile.sessionEvent || sessionEmitted) return [];
 				const value = isRecord(chunk.value) ? chunk.value : {};
 				const sessionId = asString(value.sessionId);
 				if (!sessionId) return [];
@@ -403,6 +474,7 @@ export function createTranslator(options: {
 				const delta = asString(chunk.delta);
 				const messageId = asString(chunk.messageId);
 				if (!delta || !messageId) return [];
+				if (signals.hiddenTextIds?.has(messageId)) return [];
 				return emit([{ type: "text", messageId, delta }]);
 			}
 			case "TOOL_CALL_START": {
@@ -425,18 +497,21 @@ export function createTranslator(options: {
 						name:
 							reportCalls.get(toolCallId)?.name ?? toolName(chunk) ?? "unknown",
 						input,
-						report: parseStepReport(input),
+						report: parseStepReport(input, rules),
 					});
 					return [];
 				}
-				return emit([
-					{
-						type: "tool-end",
-						toolCallId,
-						name: toolName(chunk) ?? toolNames.get(toolCallId) ?? "unknown",
-						input: toolInput(chunk),
-					},
-				]);
+				const end: Extract<AgentEvent, { type: "tool-end" }> = {
+					type: "tool-end",
+					toolCallId,
+					name: toolName(chunk) ?? toolNames.get(toolCallId) ?? "unknown",
+					input: toolInput(chunk),
+				};
+				if (profile.toolInputFromSignals) {
+					heldEnds.set(toolCallId, end);
+					return [];
+				}
+				return emit([end]);
 			}
 			case "TOOL_CALL_RESULT": {
 				const toolCallId = asString(chunk.toolCallId);
@@ -445,6 +520,10 @@ export function createTranslator(options: {
 				const call = reportCalls.get(toolCallId);
 				if (call) {
 					reportCalls.delete(toolCallId);
+					if (profile.toolInputFromSignals) {
+						call.input = rawInput(toolCallId, call.input);
+						call.report = parseStepReport(call.input, rules);
+					}
 					if (call.report && !isErrorResult(chunk)) {
 						if (content === INTERRUPTED_RESULT) return [];
 						return emit([{ type: "report", ...call.report }]);
@@ -466,7 +545,12 @@ export function createTranslator(options: {
 						},
 					]);
 				}
+				const held = heldEnds.get(toolCallId);
+				heldEnds.delete(toolCallId);
 				return emit([
+					...(held
+						? [{ ...held, input: rawInput(toolCallId, held.input) }]
+						: []),
 					{
 						type: "tool-result",
 						toolCallId,
@@ -487,7 +571,7 @@ export function createTranslator(options: {
 				runError ??=
 					asString(chunk.message) ??
 					asString(error?.message) ??
-					"Claude Code run failed";
+					`${profile.label} run failed`;
 				return [];
 			}
 			default:
@@ -501,7 +585,7 @@ export function createTranslator(options: {
 		const failure =
 			signals.resultError ??
 			runError ??
-			(thrown !== undefined ? errorMessage(thrown) : undefined);
+			(thrown !== undefined ? errorMessage(thrown, profile.label) : undefined);
 
 		if (signals.usageLimit) {
 			const { message, resetAt } = signals.usageLimit;
@@ -525,14 +609,32 @@ export function createTranslator(options: {
 			}
 			return errorEvent("harness", failure);
 		}
-		if (runFinished) {
-			const usage = runFinished.usage ?? signals.resultUsage;
+		if (runFinished || signals.done) {
+			const usage = finishedUsage(runFinished?.usage, signals.resultUsage);
 			return { type: "finished", ...(usage ? { usage } : {}) };
 		}
 		if (signals.networkError !== undefined) {
 			return errorEvent("network", signals.networkError);
 		}
-		return errorEvent("harness", "Claude Code ended without a result");
+		return errorEvent("harness", `${profile.label} ended without a result`);
+	}
+
+	/** The chunk's usage (or the harness's own total), with the cost from the raw messages when the chunk has none. */
+	function finishedUsage(
+		chunk: AgentUsage | undefined,
+		raw: AgentUsage | undefined,
+	): AgentUsage | undefined {
+		const usage = profile.usageFromSignals ? (raw ?? chunk) : (chunk ?? raw);
+		if (!usage || usage.costUsd !== undefined || raw?.costUsd === undefined) {
+			return usage;
+		}
+		return { ...usage, costUsd: raw.costUsd };
+	}
+
+	function startKnownSession(): AgentEvent[] {
+		if (sessionEmitted || options.knownSessionId === undefined) return [];
+		sessionEmitted = true;
+		return [{ type: "session", sessionId: options.knownSessionId }];
 	}
 
 	return {
@@ -540,10 +642,10 @@ export function createTranslator(options: {
 			if (finished || !isRecord(chunk) || typeof chunk.type !== "string") {
 				return [];
 			}
-			return translate(chunk as AgUiChunk);
+			return [...startKnownSession(), ...translate(chunk as AgUiChunk)];
 		},
 		observeSdk(message) {
-			signals = observeSdkMessage(signals, message);
+			signals = observe(signals, message);
 		},
 		finish(input) {
 			if (finished) return [];
@@ -551,19 +653,32 @@ export function createTranslator(options: {
 			const head: AgentEvent[] = sessionEmitted
 				? []
 				: [
-						{ type: "session", sessionId: options.fallbackSessionId },
+						{
+							type: "session",
+							sessionId: options.knownSessionId ?? options.fallbackSessionId,
+						},
 						...pending.splice(0),
 					];
 			sessionEmitted = true;
+			// Calls that never got a result: show them with the input they had.
+			const ends = [...heldEnds.values()].map((end) => ({
+				...end,
+				input: rawInput(end.toolCallId, end.input),
+			}));
+			heldEnds.clear();
 			const textReport =
-				options.stepReport && !input.aborted && signals.resultText
-					? parseTextReport(signals.resultText)
+				rules && !input.aborted && signals.resultText
+					? parseTextReport(signals.resultText, rules)
 					: undefined;
 			return [
 				...head,
+				...ends,
 				...(textReport ? [{ type: "report" as const, ...textReport }] : []),
 				terminal(input),
 			];
+		},
+		settled() {
+			return signals.done === true;
 		},
 	};
 }

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { readdir, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chat } from "@tanstack/ai";
 import {
@@ -14,11 +15,15 @@ import {
 } from "@tanstack/ai-sandbox";
 import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
 import {
+	providerTap,
+	removeProjectionMarkers,
+	runAdapterSession,
+} from "./adapter-session";
+import {
 	GITHUB_TOOL_IDS,
 	type GithubToolsOptions,
 	githubTools,
 } from "./github";
-import { streamSession } from "./session-stream";
 import { reportStepTool, stepReportSetup } from "./step-report";
 import { createTranslator, type Translator } from "./translate";
 import type {
@@ -26,6 +31,8 @@ import type {
 	AgentHarness,
 	AgentSessionInput,
 	Effort,
+	McpServerConfig,
+	StepReportSpec,
 } from "./types";
 
 /** How a `claude` process is started. Shared by the harness and the decider. */
@@ -73,8 +80,8 @@ export type SessionSetup = {
 	allowedTools: string[] | undefined;
 	/** `--disallowedTools`. */
 	disallowedTools?: string[];
-	/** Turn `report_step` calls into `report` events. */
-	stepReport: boolean;
+	/** Turn `report_step` calls into `report` events (`true` or a spec). */
+	stepReport: boolean | StepReportSpec;
 	/**
 	 * Turn off every built-in tool (`--tools ""`) and every MCP server but the
 	 * bridge (`--strict-mcp-config`): the bridged tools are the only tools.
@@ -84,10 +91,9 @@ export type SessionSetup = {
 	settingSources: ClaudeCodeSettingSource[];
 	/** `--max-turns`. */
 	maxTurns?: number;
+	/** The session's own MCP servers, next to the bridge (`--mcp-config`). */
+	mcpServers?: Record<string, McpServerConfig>;
 };
-
-/** The marker file the sandbox middleware writes into the workspace root. */
-const PROJECTION_MARKER_PREFIX = ".tanstack-projected-";
 
 /**
  * The adapter maps `chat({ reasoning })` only for the models it knows. For
@@ -113,44 +119,6 @@ const KNOWN_REASONING_MODELS = new Set([
 	"haiku",
 ]);
 
-/** Remove the sandbox marker so the worktree stays clean. Best effort. */
-async function removeProjectionMarkers(dir: string): Promise<void> {
-	try {
-		const entries = await readdir(dir);
-		await Promise.all(
-			entries
-				.filter((name) => name.startsWith(PROJECTION_MARKER_PREFIX))
-				.map((name) => rm(join(dir, name), { force: true })),
-		);
-	} catch {
-		// The directory is gone or unreadable: nothing to clean.
-	}
-}
-
-/** A logger that feeds the raw Claude Code messages to the translator. */
-function sdkTap(translator: Translator) {
-	const ignore = () => {};
-	return {
-		logger: {
-			debug: (_message: string, meta?: Record<string, unknown>) => {
-				if (meta && "chunk" in meta) translator.observeSdk(meta.chunk);
-			},
-			info: ignore,
-			warn: ignore,
-			error: ignore,
-		},
-		provider: true,
-		output: false,
-		middleware: false,
-		tools: false,
-		agentLoop: false,
-		config: false,
-		errors: false,
-		request: false,
-		sandbox: false,
-	};
-}
-
 /**
  * The `claude` command for `claudeExecutable`. The adapter splits that value
  * on spaces into argv (no shell) and puts it before its own flags. It only
@@ -158,13 +126,62 @@ function sdkTap(translator: Translator) {
  * a named tool, and then bridges at most that one tool. A session that needs
  * several bridged tools and no built-in ones adds the flags here: the trailing
  * space makes the empty `--tools` value.
+ *
+ * `mcpConfigPath` adds the session's own MCP servers with `--mcp-config`.
+ * The adapter passes its bridge with a second `--mcp-config`; the flag is
+ * variadic, and Claude Code loads the servers of both.
  */
 export function claudeCommand(
 	executable: string | undefined,
 	bridgedToolsOnly: boolean | undefined,
+	mcpConfigPath?: string,
 ): string {
-	const command = executable ?? "claude";
+	const command = [
+		executable ?? "claude",
+		...(mcpConfigPath !== undefined ? ["--mcp-config", mcpConfigPath] : []),
+	].join(" ");
 	return bridgedToolsOnly ? `${command} --strict-mcp-config --tools ` : command;
+}
+
+/** Claude Code's `--mcp-config` JSON for the session's MCP servers. */
+export function claudeMcpConfig(
+	servers: Record<string, McpServerConfig>,
+): string {
+	const mcpServers: Record<string, unknown> = {};
+	for (const [name, server] of Object.entries(servers)) {
+		mcpServers[name] =
+			"url" in server
+				? { type: "http", url: server.url, headers: server.headers }
+				: {
+						type: "stdio",
+						command: server.command,
+						args: server.args,
+						env: server.env,
+					};
+	}
+	return JSON.stringify({ mcpServers });
+}
+
+/**
+ * Write the session's MCP servers to a private temp file, outside the
+ * worktree (it may hold secrets). Returns its path and a cleanup.
+ */
+async function writeMcpConfig(
+	servers: Record<string, McpServerConfig> | undefined,
+): Promise<{ path?: string; cleanup: () => Promise<void> }> {
+	if (!servers || Object.keys(servers).length === 0) {
+		return { cleanup: async () => {} };
+	}
+	const dir = await mkdtemp(join(tmpdir(), "nightshift-mcp-"));
+	const path = join(dir, "mcp.json");
+	const cleanup = () => rm(dir, { recursive: true, force: true });
+	if (/\s/.test(path)) {
+		await cleanup();
+		// The adapter splits the executable string on spaces.
+		throw new Error(`The temp directory has a space in its path: ${path}`);
+	}
+	await writeFile(path, claudeMcpConfig(servers), { mode: 0o600 });
+	return { path, cleanup };
 }
 
 function startChat(
@@ -173,6 +190,7 @@ function startChat(
 	options: ClaudeCodeProcessOptions,
 	translator: Translator,
 	abortController: AbortController,
+	mcpConfigPath: string | undefined,
 ): AsyncIterable<unknown> {
 	// One id per session: the sandbox middleware keys its in-memory instances
 	// by sandbox id and thread id, so concurrent sessions never share one.
@@ -213,6 +231,7 @@ function startChat(
 		claudeExecutable: claudeCommand(
 			options.claudeExecutable,
 			setup.bridgedToolsOnly,
+			mcpConfigPath,
 		),
 		env: {
 			...effortEnv(input.model, input.effort, (model) =>
@@ -233,7 +252,7 @@ function startChat(
 		...(input.effort ? { reasoning: { level: input.effort } } : {}),
 		middleware: [withSandbox(sandbox)],
 		abortController,
-		debug: sdkTap(translator),
+		debug: providerTap(translator),
 	}) as AsyncIterable<unknown>;
 }
 
@@ -251,35 +270,30 @@ export async function* runClaudeCodeSession(
 		fallbackSessionId: input.resumeSessionId ?? randomUUID(),
 		stepReport: setup.stepReport,
 	});
-	const abortController = new AbortController();
-	const forwardAbort = () => abortController.abort(input.signal.reason);
-	if (input.signal.aborted) forwardAbort();
-	else input.signal.addEventListener("abort", forwardAbort, { once: true });
-
-	// Start lazily so a synchronous throw from chat() becomes a stream error.
-	async function* chunks(): AsyncGenerator<unknown> {
-		yield* startChat(input, setup, options, translator, abortController);
-	}
-
-	let ended = false;
-	try {
-		for await (const event of streamSession({
-			chunks: chunks(),
-			translator,
-			signal: input.signal,
-			...(options.abortGraceMs !== undefined
-				? { abortGraceMs: options.abortGraceMs }
-				: {}),
-		})) {
-			if (event.type === "finished" || event.type === "error") ended = true;
-			yield event;
-		}
-	} finally {
-		input.signal.removeEventListener("abort", forwardAbort);
-		// The consumer stopped early: stop the claude process too.
-		if (!ended) abortController.abort();
-		await removeProjectionMarkers(input.cwd);
-	}
+	let removeMcpConfig = async () => {};
+	yield* runAdapterSession({
+		signal: input.signal,
+		translator,
+		start: async function* (abortController) {
+			const mcp = await writeMcpConfig(setup.mcpServers);
+			removeMcpConfig = mcp.cleanup;
+			yield* startChat(
+				input,
+				setup,
+				options,
+				translator,
+				abortController,
+				mcp.path,
+			);
+		},
+		...(options.abortGraceMs !== undefined
+			? { abortGraceMs: options.abortGraceMs }
+			: {}),
+		cleanup: async () => {
+			await removeMcpConfig();
+			await removeProjectionMarkers(input.cwd);
+		},
+	});
 }
 
 /** The setup of an agent session: its prompt, the report tool, and the tool sets. */
@@ -291,19 +305,30 @@ export function harnessSetup(
 	const github = input.tools?.includes("github")
 		? githubTools({ ...options.github, cwd: input.cwd })
 		: [];
+	const mcpServers = input.mcpServers ?? {};
+	// The node lists its MCP servers on purpose, like its tool sets: their
+	// tools run without a prompt (`mcp__<server>` allows every tool of it).
+	const extraAllowed = [
+		...(github.length > 0 ? GITHUB_TOOL_IDS : []),
+		...Object.keys(mcpServers).map((name) => `mcp__${name}`),
+	];
 	const allowedTools =
-		github.length > 0
-			? [...new Set([...(report.allowedTools ?? []), ...GITHUB_TOOL_IDS])]
+		extraAllowed.length > 0
+			? [...new Set([...(report.allowedTools ?? []), ...extraAllowed])]
 			: report.allowedTools;
 	return {
 		prompt: report.prompt,
-		tools: [...(report.withTool ? [reportStepTool()] : []), ...github],
+		tools: [
+			...(report.withTool ? [reportStepTool(input.stepReport)] : []),
+			...github,
+		],
 		allowedTools,
 		...(options.disallowedTools
 			? { disallowedTools: options.disallowedTools }
 			: {}),
-		stepReport: input.stepReport === true,
+		stepReport: input.stepReport ?? false,
 		settingSources: options.settingSources ?? ["user", "project", "local"],
+		...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
 	};
 }
 

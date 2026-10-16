@@ -11,6 +11,7 @@
 		"test": "bun test"
 	},
 	"dependencies": {
+		"croner": "^10.0.1",
 		"zod": "catalog:"
 	},
 	"devDependencies": {

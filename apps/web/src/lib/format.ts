@@ -128,9 +128,3 @@ export function nextOccurrence(hhmm: string, now = Date.now()): number | null {
 	if (date.getTime() <= now) date.setDate(date.getDate() + 1);
 	return date.getTime();
 }
-
-/** "#12" for a GitHub issue number, else the item id itself. */
-export function itemLabel(itemId: string, number?: number | null): string {
-	if (number != null) return `#${number}`;
-	return /^\d+$/.test(itemId) ? `#${itemId}` : itemId;
-}

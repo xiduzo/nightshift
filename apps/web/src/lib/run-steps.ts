@@ -1,18 +1,25 @@
-import type { Flow } from "@nightshift/flows";
+import type { Flow, FlowNode } from "@nightshift/flows";
 
 import type { ItemSummary, StepSummary } from "@/lib/api-types";
 
 /**
  * The steps of a run form a tree: the top-level flow's steps, and under each
- * For Each step, per item, the steps of its body flow (which can hold a For
- * Each of its own). A scope names one level of that tree.
+ * Subflow step the steps of the flow it called, and under each For Each step,
+ * per element, the steps of the flow it called (which can call flows of
+ * their own). A scope names one level of that tree.
  */
 
-/** One item of one For Each step. Null is the top-level flow. */
-export type ItemScope = { forEachStepId: string; itemId: string } | null;
+/**
+ * One call of a flow: a Subflow step (`itemId` null) or one element of a
+ * For Each step. Null is the top-level flow.
+ */
+export type ItemScope = { parentStepId: string; itemId: string | null } | null;
+
+/** What the run view needs of a run: its flow and the flows it can call. */
+export type RunFlows = { flow: Flow; calledFlows: Record<string, Flow> };
 
 export function scopeKey(scope: ItemScope): string {
-	return scope ? `${scope.forEachStepId}:${scope.itemId}` : "";
+	return scope ? `${scope.parentStepId}:${scope.itemId ?? ""}` : "";
 }
 
 export function sameScope(a: ItemScope, b: ItemScope): boolean {
@@ -40,7 +47,7 @@ export function stepsUnder(
 		let current: StepSummary | undefined = step;
 		while (current?.scope) {
 			if (scopeKey(current.scope) === key) return true;
-			current = byId.get(current.scope.forEachStepId);
+			current = byId.get(current.scope.parentStepId);
 		}
 		return false;
 	};
@@ -49,7 +56,7 @@ export function stepsUnder(
 
 /**
  * The step that stands for `step` in `scope`: the step itself when it is
- * directly in the scope, else its For Each ancestor that is. Undefined when
+ * directly in the scope, else its calling ancestor that is. Undefined when
  * the step is not under the scope.
  */
 export function stepAtScope(
@@ -62,51 +69,63 @@ export function stepAtScope(
 	let current: StepSummary | undefined = step;
 	while (current) {
 		if (scopeKey(current.scope) === key) return current;
-		current = current.scope ? byId.get(current.scope.forEachStepId) : undefined;
+		current = current.scope ? byId.get(current.scope.parentStepId) : undefined;
 	}
 	return undefined;
 }
 
-/** The flow a step's node belongs to: the run's flow or a body flow. */
+/** The flow a step's node belongs to: the run's flow or a called flow. */
 export function flowOfStep(
-	run: { flow: Flow; bodyFlows: Record<string, Flow> },
+	run: RunFlows,
 	steps: readonly StepSummary[],
 	step: StepSummary,
 ): Flow | undefined {
 	if (!step.scope) return run.flow;
-	const parent = steps.find((other) => other.id === step.scope?.forEachStepId);
-	return parent ? bodyFlowOf(run, steps, parent) : undefined;
+	const parent = steps.find((other) => other.id === step.scope?.parentStepId);
+	return parent ? calledFlowOf(run, steps, parent) : undefined;
 }
 
-/** The body flow a For Each step runs per item, from the run's copies. */
-export function bodyFlowOf(
-	run: { flow: Flow; bodyFlows: Record<string, Flow> },
+/** The node a step visited, from the run's copies of its flows. */
+export function nodeOfStep(
+	run: RunFlows,
 	steps: readonly StepSummary[],
-	forEachStep: StepSummary,
-): Flow | undefined {
-	const flow = flowOfStep(run, steps, forEachStep);
-	const node = flow?.nodes.find(
-		(candidate) => candidate.id === forEachStep.nodeId,
+	step: StepSummary,
+): FlowNode | undefined {
+	return flowOfStep(run, steps, step)?.nodes.find(
+		(candidate) => candidate.id === step.nodeId,
 	);
-	return node?.type === "foreach" ? run.bodyFlows[node.flow] : undefined;
 }
 
-/** The body flow's name for a For Each step, from the run's flows. */
-export function bodyFlowName(
-	run: { flow: Flow; bodyFlows: Record<string, Flow> },
+/** The name of the flow a Subflow or For Each step calls. */
+export function calledFlowName(
+	run: RunFlows,
 	steps: readonly StepSummary[],
-	forEachStep: StepSummary,
+	parentStep: StepSummary,
 ): string | undefined {
-	const flow = flowOfStep(run, steps, forEachStep);
-	const node = flow?.nodes.find(
-		(candidate) => candidate.id === forEachStep.nodeId,
-	);
-	return node?.type === "foreach" ? node.flow : undefined;
+	const node = nodeOfStep(run, steps, parentStep);
+	return node?.type === "subflow" || node?.type === "foreach"
+		? node.flow
+		: undefined;
+}
+
+/** The flow a Subflow or For Each step calls, from the run's copies. */
+export function calledFlowOf(
+	run: RunFlows,
+	steps: readonly StepSummary[],
+	parentStep: StepSummary,
+): Flow | undefined {
+	const name = calledFlowName(run, steps, parentStep);
+	return name === undefined ? undefined : run.calledFlows[name];
+}
+
+/** Whether a step calls a flow, so other steps nest under it. */
+export function callsFlow(step: StepSummary): boolean {
+	return step.nodeType === "subflow" || step.nodeType === "foreach";
 }
 
 /**
  * The items of a For Each step: its own list, plus any item that only shows
- * through the scope of a body step (a summary that lags the stream).
+ * through the scope of a called step (a summary that lags the stream).
  */
 export function itemsOf(
 	step: StepSummary,
@@ -115,14 +134,15 @@ export function itemsOf(
 	const items = [...step.items];
 	const known = new Set(items.map((item) => item.id));
 	for (const other of steps) {
-		if (other.scope?.forEachStepId !== step.id) continue;
-		if (known.has(other.scope.itemId)) continue;
-		known.add(other.scope.itemId);
+		const itemId = other.scope?.itemId;
+		if (other.scope?.parentStepId !== step.id || itemId == null) continue;
+		if (known.has(itemId)) continue;
+		known.add(itemId);
 		items.push({
-			id: other.scope.itemId,
-			number: null,
-			title: other.scope.itemId,
+			id: itemId,
+			title: itemId,
 			url: null,
+			value: null,
 			state: "running",
 			branch: null,
 			baseBranch: null,
@@ -136,8 +156,8 @@ export function itemsOf(
 
 /**
  * How often the steps of one scope took each edge of its flow: one step to
- * the next, on the first step's outcome. The engine counts edges per run; an
- * item's own walk is derived here.
+ * the next, on the first step's outcome. The engine counts edges per run; a
+ * called flow's own walk is derived here.
  */
 export function derivedTraversals(
 	flow: Flow,
@@ -163,16 +183,38 @@ export function derivedTraversals(
 export function scopeChain(
 	steps: readonly StepSummary[],
 	scope: ItemScope,
-): { forEachStep: StepSummary; itemId: string }[] {
-	const chain: { forEachStep: StepSummary; itemId: string }[] = [];
+): { parentStep: StepSummary; itemId: string | null }[] {
+	const chain: { parentStep: StepSummary; itemId: string | null }[] = [];
 	let current = scope;
 	while (current) {
-		const forEachStep = steps.find(
-			(step) => step.id === current?.forEachStepId,
-		);
-		if (!forEachStep) break;
-		chain.unshift({ forEachStep, itemId: current.itemId });
-		current = forEachStep.scope;
+		const parentStep = steps.find((step) => step.id === current?.parentStepId);
+		if (!parentStep) break;
+		chain.unshift({ parentStep, itemId: current.itemId });
+		current = parentStep.scope;
 	}
 	return chain;
+}
+
+/** A JSON value as text to read: strings as they are, the rest pretty-printed. */
+export function formatJson(value: unknown): string {
+	if (typeof value === "string") return value;
+	if (value === undefined) return "";
+	return JSON.stringify(value, null, 2);
+}
+
+/**
+ * An output value that may hold JSON as text (an Agent's `data`, a For Each's
+ * `results`, a called flow's output): the parsed value when it is a JSON
+ * object or array, else undefined.
+ */
+export function jsonOutput(value: unknown): unknown {
+	if (typeof value === "object" && value !== null) return value;
+	if (typeof value !== "string") return undefined;
+	const text = value.trim();
+	if (!(text.startsWith("{") || text.startsWith("["))) return undefined;
+	try {
+		return JSON.parse(text);
+	} catch {
+		return undefined;
+	}
 }

@@ -116,12 +116,16 @@ async function repoOf(
 const lower = (name: string) => name.toLowerCase();
 
 /**
- * Reads the sub-issues of one parent issue as For Each items, with their
- * "blocked by" links (and whether each blocker is closed). Items come in
- * GitHub's sub-issue order; the engine orders them blockers first. A
- * sub-issue without `requireLabel`, or with one of `skipLabels`, is left out. Closed sub-issues and those
- * with a done label are `done`. Pages through all sub-issues. Label names
- * match without case, as on GitHub. Throws when `gh` fails (its stderr is in
+ * Reads the sub-issues of one parent issue as list items. An item's `value`
+ * is `{ id, number, title, body, url, state, labels, parent: { number,
+ * title }, dependsOn, done }`: `state` is GitHub's `OPEN` / `CLOSED`,
+ * `labels` keep their case, and `dependsOn` holds the ids of the "blocked
+ * by" issues. The item's own `dependsOn` also says whether each blocker is
+ * closed. Items come in GitHub's sub-issue order; the engine orders them
+ * blockers first. A sub-issue without `requireLabel`, or with one of
+ * `skipLabels`, is left out. Closed sub-issues and those with a done label
+ * are `done`. Pages through all sub-issues. Label names match without case,
+ * as on GitHub. Throws when `gh` fails (its stderr is in
  * the message) or the parent issue does not exist; aborting the signal kills
  * `gh`.
  */
@@ -168,26 +172,38 @@ export async function readGithubItems(
 		for (const node of parent.subIssues.nodes) {
 			if (!node) continue;
 			const labels = (node.labels?.nodes ?? []).flatMap((label) =>
-				label ? [lower(label.name)] : [],
+				label ? [label.name] : [],
 			);
-			if (required !== undefined && !labels.includes(required)) continue;
-			if (labels.some((label) => skipLabels.has(label))) continue;
+			const matching = labels.map(lower);
+			if (required !== undefined && !matching.includes(required)) continue;
+			if (matching.some((label) => skipLabels.has(label))) continue;
+			const id = String(node.number);
+			const dependsOn = (node.blockedBy?.nodes ?? []).flatMap((blocker) =>
+				blocker
+					? [{ id: String(blocker.number), done: blocker.state === "CLOSED" }]
+					: [],
+			);
+			const done =
+				node.state === "CLOSED" ||
+				matching.some((label) => doneLabels.has(label));
 			items.push({
-				id: String(node.number),
-				number: node.number,
+				id,
 				title: node.title,
-				body: node.body ?? "",
 				url: node.url,
-				blockedBy: (node.blockedBy?.nodes ?? []).flatMap((blocker) =>
-					blocker
-						? [{ id: String(blocker.number), done: blocker.state === "CLOSED" }]
-						: [],
-				),
-				done:
-					node.state === "CLOSED" ||
-					labels.some((label) => doneLabels.has(label)),
-				parentNumber: parent.number,
-				parentTitle: parent.title,
+				value: {
+					id,
+					number: node.number,
+					title: node.title,
+					body: node.body ?? "",
+					url: node.url,
+					state: node.state,
+					labels,
+					parent: { number: parent.number, title: parent.title },
+					dependsOn: dependsOn.map((blocker) => blocker.id),
+					done,
+				},
+				dependsOn,
+				done,
 			});
 		}
 		const page = parent.subIssues.pageInfo;

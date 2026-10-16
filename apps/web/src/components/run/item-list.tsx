@@ -4,14 +4,16 @@ import { ArrowUpRightIcon, GitBranchIcon, ScanSearchIcon } from "lucide-react";
 import { ItemStateBadge } from "@/components/outcome-badge";
 import { useNow } from "@/hooks/use-now";
 import type { ItemSummary, StepSummary } from "@/lib/api-types";
-import { formatDuration, formatTime, itemLabel } from "@/lib/format";
+import { formatDuration, formatTime } from "@/lib/format";
 import { type ItemScope, itemsOf, scopeKey } from "@/lib/run-steps";
 
+import { JsonDetails } from "./json-block";
+
 /**
- * The items of one For Each step, in the order they started: state, the
- * issue it builds (linked), its branch and base, how long it took, and why it
- * failed, is blocked, or halted. Focusing an item narrows the steps and the
- * graph to it.
+ * The elements of one For Each step, in the order they started: state, id
+ * and title (linked when the element has a `url`), its branch and base, how
+ * long it took, why it failed, is blocked, or halted, and the element itself
+ * as JSON. Focusing one narrows the steps and the graph to it.
  */
 export function ItemList({
 	step,
@@ -38,7 +40,7 @@ export function ItemList({
 		>
 			<header className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 text-xs">
 				<h3 id={`items-${step.id}`} className="font-medium">
-					Items
+					Elements
 				</h3>
 				<span className="text-muted-foreground">
 					{items.length === 0
@@ -51,7 +53,7 @@ export function ItemList({
 			{items.length > 0 ? (
 				<ol className="max-h-56 divide-y overflow-y-auto border-t">
 					{items.map((item) => {
-						const scope = { forEachStepId: step.id, itemId: item.id };
+						const scope = { parentStepId: step.id, itemId: item.id };
 						return (
 							<li key={item.id}>
 								<ItemRow
@@ -84,7 +86,8 @@ function ItemRow({
 	selected: boolean;
 	onFocus: () => void;
 }) {
-	const label = itemLabel(item.id, item.number);
+	const label = item.id;
+	const showId = item.title !== item.id;
 	return (
 		<div
 			className={cn(
@@ -95,17 +98,19 @@ function ItemRow({
 			<ItemStateBadge state={item.state} className="mt-px" />
 			<div className="flex min-w-0 flex-col gap-0.5">
 				<p className="flex min-w-0 items-center gap-1.5">
+					{showId ? (
+						<span className="max-w-[40%] shrink-0 truncate font-mono text-muted-foreground">
+							{label}
+						</span>
+					) : null}
 					{item.url ? (
 						<a
 							href={item.url}
 							target="_blank"
 							rel="noreferrer"
 							className="flex min-w-0 items-center gap-1 underline-offset-2 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
-							title={`Open ${label} on GitHub`}
+							title={`Open ${item.url}`}
 						>
-							<span className="shrink-0 font-mono text-muted-foreground">
-								{label}
-							</span>
 							<span className="truncate">{item.title}</span>
 							<ArrowUpRightIcon
 								className="size-3 shrink-0 text-muted-foreground"
@@ -113,12 +118,7 @@ function ItemRow({
 							/>
 						</a>
 					) : (
-						<>
-							<span className="shrink-0 font-mono text-muted-foreground">
-								{label}
-							</span>
-							<span className="truncate">{item.title}</span>
-						</>
+						<span className="truncate">{item.title}</span>
 					)}
 				</p>
 				{item.branch ? (
@@ -141,6 +141,9 @@ function ItemRow({
 						{item.reason}
 					</p>
 				) : null}
+				{item.value !== null && item.value !== undefined ? (
+					<JsonDetails summary="Element (JSON)" value={item.value} />
+				) : null}
 			</div>
 			<div className="flex items-center gap-1">
 				<span
@@ -156,12 +159,12 @@ function ItemRow({
 					aria-label={
 						selected
 							? "Show the whole run again"
-							: `Focus on ${label}: its steps and its body flow`
+							: `Focus on ${label}: its steps and the flow it ran`
 					}
 					title={
 						selected
 							? "Show the whole run again"
-							: "Focus on this item: its steps and its body flow"
+							: "Focus on this element: its steps and the flow it ran"
 					}
 					className={cn(
 						"flex size-6 items-center justify-center text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring",

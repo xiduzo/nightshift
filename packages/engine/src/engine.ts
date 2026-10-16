@@ -1,13 +1,17 @@
 import { randomUUID } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type {
 	AgentErrorKind,
 	AgentEvent,
 	AgentHarness,
+	AgentSessionInput,
 	Decider,
 	DecisionInput,
 	DecisionResult,
 	HarnessName,
 	StepReportOutcome,
+	StepReportSpec,
 } from "@nightshift/agents/types";
 import {
 	agentSession,
@@ -25,8 +29,11 @@ import {
 	type FlowIssue,
 	type FlowNode,
 	type ForEachNode,
+	flowSchema,
 	type GateNode,
-	type ItemField,
+	type JsonValue,
+	type ListItem,
+	migrateFlow,
 	newlyBlocked,
 	nextEdge,
 	nextItem,
@@ -36,16 +43,18 @@ import {
 	policySchema,
 	renderCommand,
 	renderTemplate,
-	type SourceItem,
+	type SubflowNode,
 	type TemplateContext,
 	validateFlow,
 } from "@nightshift/flows";
 import {
 	deleteFlowFile,
+	flowsDir,
 	listFlowFiles,
-	loadAllFlows,
 	readFlowFile,
+	readSchedulesFile,
 	writeFlowFile,
+	writeSchedulesFile,
 } from "@nightshift/flows/files";
 import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
@@ -57,9 +66,9 @@ import {
 	countStepsSinceWalkBegan,
 	countVisits,
 	type DerivedStep,
+	deriveInputs,
 	deriveNodeOutputs,
 	deriveOpenGate,
-	deriveParams,
 	deriveResumePoint,
 	deriveRunState,
 	deriveSleep,
@@ -67,9 +76,11 @@ import {
 	deriveStopAfterStep,
 	deriveStopAt,
 	deriveTraversals,
+	deriveTrigger,
 	type EngineEventType,
 	type EnginePayloads,
 	groupByRun,
+	type InputValues,
 	type ItemFacts,
 	itemStates,
 	type LoggedEvent,
@@ -88,13 +99,21 @@ import {
 	waitStreak,
 } from "./events";
 import {
+	fileItems,
 	forEachOutputs,
 	itemLabel,
-	itemTemplateFields,
+	jsonSourceItems,
 	parseCommandItems,
 	toItemFacts,
 } from "./foreach";
+import { flowOutputs, renderBindings, resolveInputs } from "./inputs";
+import { checkOutputData } from "./output-schema";
 import { planWait } from "./policy";
+import {
+	createScheduler,
+	DEFAULT_SCHEDULE_TICK_MS,
+	type ScheduleRecord,
+} from "./scheduler";
 import {
 	commandLogPath,
 	openTranscriptWriter,
@@ -111,6 +130,8 @@ import type {
 	RunStatus,
 	RunStreamItem,
 	RunSummary,
+	RunTrigger,
+	ScheduleResult,
 	StartRunInput,
 	StepEvent,
 	StepOutcome,
@@ -138,9 +159,14 @@ const STOP_AFTER_STEP_REASON = "Stopped after the running step, as asked.";
 /** setTimeout cannot wait longer; a longer wait checks the clock and waits again. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
 
-/** The CLI a person runs to take over a harness session. */
+/**
+ * The CLI a person runs to take over a harness session. Only Claude Code
+ * sessions run today; the others are here so the record stays complete.
+ */
 const takeOverCli: Record<HarnessName, string> = {
 	"claude-code": "claude",
+	opencode: "opencode",
+	codex: "codex",
 };
 
 type RunRow = typeof run.$inferSelect;
@@ -174,11 +200,13 @@ type WalkStart =
 	/** The node already ended with this outcome (a person answered its Gate): take its edge. */
 	| { kind: "outcome"; nodeId: string; outcome: Outcome }
 	/**
-	 * Continue a For Each step: the item `itemId` at `inner` (the body's
-	 * start when null), or without an item, its loop with the next item.
+	 * Continue a Subflow or For Each step. A For Each continues the element
+	 * `itemId` at `inner` (the called flow's start when null), or without an
+	 * element, its loop with the next element. A Subflow (`itemId` null)
+	 * continues its called flow at `inner` (its start when null).
 	 */
 	| {
-			kind: "foreach";
+			kind: "call";
 			nodeId: string;
 			stepId: string;
 			itemId: string | null;
@@ -217,19 +245,29 @@ type WaitRequest = {
 type RunContext = {
 	row: RunRow;
 	flow: Flow;
-	bodyFlows: Record<string, Flow>;
+	/** The snapshots of every flow the run can call, by name. */
+	calledFlows: Record<string, Flow>;
 	policy: Policy;
 	walk: ActiveWalk;
 };
 
-/** One level of the walk: the top-level flow, or a For Each body for one item. */
+/**
+ * One level of the walk: the top-level flow, or a flow that a Subflow or a
+ * For Each (for one element) called. Templates inside read the frame's own
+ * nodes, its inputs, and its `run` fields.
+ */
 type Frame = {
 	flow: Flow;
+	/** The flow's name: its file, or the run's title for a quick run. */
+	flowName: string;
 	scope: Scope | null;
 	key: string;
-	/** `{{run.branch}}`: the run's branch, or the item's. */
-	branch: string;
-	item: Partial<Record<ItemField, string | number>> | null;
+	inputs: InputValues;
+	/**
+	 * `{{run.branch}}`: the run's branch, or the element's. `base_branch` and
+	 * `index` (from 0) are set for a For Each element, "" elsewhere.
+	 */
+	run: { branch: string; base_branch: string; index: string };
 };
 
 /** Knobs for tests only. Not part of the engine contract. */
@@ -238,8 +276,10 @@ export type EngineInternals = {
 	minuteMs?: number;
 	/** The clock for waits and the stop time. Default `Date.now`. */
 	now?: () => number;
-	/** Aborting it clears the engine's wake timers: a test's way to let a daemon die. */
+	/** Aborting it clears the engine's wake timers and stops its scheduler: a test's way to let a daemon die. */
 	signal?: AbortSignal;
+	/** How often the scheduler looks for due schedules. Default 30 000 ms. */
+	scheduleTickMs?: number;
 };
 
 /** Event types that open or close work. Recovery and the Gate inbox read only these. */
@@ -260,35 +300,6 @@ const LIFECYCLE_EVENT_TYPES = [
 const isWaitKind = (
 	kind: AgentErrorKind | null | undefined,
 ): kind is WaitReason => kind === "usage-limit" || kind === "network";
-
-/**
- * The run's param values: the given value, else the default. Refuses names
- * the flow does not declare and required params without a value.
- */
-export function resolveParams(
-	flow: Flow,
-	given: Record<string, string> | undefined,
-): Record<string, string> {
-	const declared = flow.params ?? [];
-	const names = new Set(declared.map((param) => param.name));
-	const unknown = Object.keys(given ?? {}).filter((name) => !names.has(name));
-	if (unknown.length > 0) {
-		throw new Error(
-			`The flow has no param ${unknown.map((n) => `"${n}"`).join(", ")}.`,
-		);
-	}
-	const values: Record<string, string> = {};
-	const missing: string[] = [];
-	for (const param of declared) {
-		const value = given?.[param.name]?.trim() || param.default || "";
-		if (value === "" && param.required) missing.push(param.label ?? param.name);
-		values[param.name] = value;
-	}
-	if (missing.length > 0) {
-		throw new Error(`The run needs a value for: ${missing.join(", ")}.`);
-	}
-	return values;
-}
 
 export function createEngine(
 	options: EngineOptions,
@@ -471,11 +482,17 @@ export function createEngine(
 	}
 
 	function parseRunFlow(row: RunRow): Flow {
-		return JSON.parse(row.flow) as Flow;
+		return snapshotFlow(JSON.parse(row.flow));
 	}
 
-	function parseBodyFlows(row: RunRow): Record<string, Flow> {
-		return JSON.parse(row.bodyFlows || "{}") as Record<string, Flow>;
+	/** The `body_flows` column holds every called flow (Subflow and For Each). */
+	function parseCalledFlows(row: RunRow): Record<string, Flow> {
+		const raw = JSON.parse(row.bodyFlows || "{}") as Record<string, unknown>;
+		const flows: Record<string, Flow> = {};
+		for (const [name, flow] of Object.entries(raw)) {
+			flows[name] = snapshotFlow(flow);
+		}
+		return flows;
 	}
 
 	function toSummary(row: RunRow, events: readonly LoggedEvent[]): RunSummary {
@@ -498,11 +515,12 @@ export function createEngine(
 				state.status === "sleeping"
 					? (deriveSleep(events)?.until ?? null)
 					: null,
-			params: deriveParams(events),
+			inputs: deriveInputs(events),
 			stopAt: deriveStopAt(events),
 			stopAfterStep: open && deriveStopAfterStep(events),
 			createdAt: row.createdAt.getTime(),
 			costUsd: sumCostUsd(events),
+			trigger: deriveTrigger(events),
 		};
 	}
 
@@ -521,9 +539,9 @@ export function createEngine(
 			items: derived.items.map(
 				(item): ItemSummary => ({
 					id: item.facts.id,
-					number: item.facts.number,
 					title: item.facts.title,
 					url: item.facts.url,
+					value: item.facts.value,
 					state: item.state,
 					branch: item.branch,
 					baseBranch: item.baseBranch,
@@ -560,34 +578,64 @@ export function createEngine(
 		return current;
 	}
 
-	function topFrame(ctx: { row: RunRow; flow: Flow }): Frame {
+	function topFrame(
+		ctx: { row: RunRow; flow: Flow },
+		events: readonly LoggedEvent[],
+	): Frame {
 		return {
 			flow: ctx.flow,
+			flowName: ctx.row.flowName ?? ctx.row.title,
 			scope: null,
 			key: "",
-			branch: ctx.row.branch,
-			item: null,
+			inputs: deriveInputs(events),
+			run: { branch: ctx.row.branch, base_branch: "", index: "" },
 		};
 	}
 
-	/** Templates inside a frame read its own nodes, its item and the run. */
+	/** Templates inside a frame read its own nodes, its inputs and the run. */
 	function frameContext(
 		row: RunRow,
 		frame: Frame,
 		events: readonly LoggedEvent[],
 	): TemplateContext {
-		const context: TemplateContext = {
+		return {
 			nodes: deriveNodeOutputs(events, frame.key),
+			inputs: frame.inputs,
 			run: {
-				branch: frame.branch,
+				...frame.run,
 				worktree: row.worktreePath,
 				base_ref: row.baseRef,
-				flow: row.flowName ?? row.title,
+				flow: frame.flowName,
 			},
-			params: deriveParams(events),
 		};
-		if (frame.item) context.item = frame.item;
-		return context;
+	}
+
+	/** The frame of a flow that the step `stepId` calls (for one element of a For Each). */
+	function calledFrame(input: {
+		flow: Flow;
+		flowName: string;
+		stepId: string;
+		itemId: string | null;
+		inputs: InputValues;
+		run: Frame["run"];
+	}): Frame {
+		const scope: Scope = { parentStepId: input.stepId, itemId: input.itemId };
+		return {
+			flow: input.flow,
+			flowName: input.flowName,
+			scope,
+			key: scopeKey(scope),
+			inputs: input.inputs,
+			run: input.run,
+		};
+	}
+
+	/** The declared outputs of the flow a frame walked, from its own nodes. */
+	async function outputsOf(row: RunRow, frame: Frame): Promise<StepOutputs> {
+		return flowOutputs(
+			frame.flow,
+			frameContext(row, frame, await loadRunEvents(row.id)),
+		);
 	}
 
 	async function endRun(
@@ -620,7 +668,7 @@ export function createEngine(
 		const ctx: RunContext = {
 			row,
 			flow,
-			bodyFlows: parseBodyFlows(row),
+			calledFlows: parseCalledFlows(row),
 			policy: policySchema.parse(flow.policy ?? {}),
 			walk,
 		};
@@ -642,7 +690,8 @@ export function createEngine(
 	async function walkFlow(ctx: RunContext, start: WalkStart): Promise<void> {
 		const runId = ctx.row.id;
 		try {
-			const end = await walkScope(ctx, topFrame(ctx), start);
+			const top = topFrame(ctx, await loadRunEvents(runId));
+			const end = await walkScope(ctx, top, start);
 			switch (end.kind) {
 				case "finished": {
 					const { node, outcome } = end;
@@ -742,14 +791,9 @@ export function createEngine(
 			});
 			if (choice.kind === "end") {
 				// `fail` and `needs-input` without an edge fail the walk. `pass`, a
-				// Decision label, a Gate choice or a For Each outcome without an
-				// edge is a chosen end.
-				if (
-					outcome === "pass" ||
-					node.type === "decision" ||
-					node.type === "gate" ||
-					node.type === "foreach"
-				) {
+				// Decision label, a Gate choice, an Agent's own outcome or a For
+				// Each outcome without an edge is a chosen end.
+				if (isChosenEnd(node, outcome)) {
 					return { kind: "finished", node, outcome };
 				}
 				return {
@@ -842,6 +886,9 @@ export function createEngine(
 	): Promise<StepResult | Unwind> {
 		if (node.type === "foreach") {
 			return runForEachStep(ctx, frame, node, start, events);
+		}
+		if (node.type === "subflow") {
+			return runSubflowStep(ctx, frame, node, start, events);
 		}
 		const runId = ctx.row.id;
 		let stepId: string;
@@ -1182,7 +1229,9 @@ export function createEngine(
 						})
 					: open.nodeType === "gate"
 						? { outcome: status, note: "", visit: open.visit }
-						: { ...open.outputs, outcome: status };
+						: open.nodeType === "subflow"
+							? { outcome: status, ended: "", visit: open.visit }
+							: { ...open.outputs, outcome: status };
 			await appendEvent(db, {
 				type: "StepEnded",
 				runId,
@@ -1196,7 +1245,7 @@ export function createEngine(
 		return true;
 	}
 
-	/** Wraps a start inside the For Each steps around `scope`, from the inside out. */
+	/** Wraps a start inside the calling steps around `scope`, from the inside out. */
 	function wrapInScopes(
 		steps: readonly DerivedStep[],
 		scope: Scope | null,
@@ -1205,16 +1254,16 @@ export function createEngine(
 		const byId = new Map(steps.map((s) => [s.id, s]));
 		let start = inner;
 		for (let at = scope; at; ) {
-			const forEach = byId.get(at.forEachStepId);
-			if (!forEach) break;
+			const caller = byId.get(at.parentStepId);
+			if (!caller) break;
 			start = {
-				kind: "foreach",
-				nodeId: forEach.nodeId,
-				stepId: forEach.id,
+				kind: "call",
+				nodeId: caller.nodeId,
+				stepId: caller.id,
 				itemId: at.itemId,
 				inner: start,
 			};
-			at = forEach.scope;
+			at = caller.scope;
 		}
 		return start;
 	}
@@ -1324,7 +1373,7 @@ export function createEngine(
 
 		let harnessSessionId: string | null = resumeSessionId;
 		let ending: SessionEnding | null = null;
-		let report: { outcome: StepReportOutcome; summary: string } | null = null;
+		let report: AgentReport | null = null;
 		/** The text after the last tool call: the agent's final message. */
 		let output = "";
 		let afterTool = false;
@@ -1369,7 +1418,11 @@ export function createEngine(
 					break;
 				case "report":
 					afterTool = true;
-					report = { outcome: agentEvent.outcome, summary: agentEvent.summary };
+					report = {
+						outcome: agentEvent.outcome,
+						summary: agentEvent.summary,
+						data: agentEvent.data,
+					};
 					break;
 				case "finished":
 					ending = {
@@ -1413,7 +1466,7 @@ export function createEngine(
 				permissionMode: node.permissionMode,
 				effort: node.effort,
 				resumeSessionId: resumeSessionId ?? undefined,
-				stepReport: true,
+				stepReport: stepReportOf(node),
 				// A run snapshot from before Slice 3 has no `tools`.
 				tools: node.tools ?? [],
 				signal,
@@ -1437,16 +1490,16 @@ export function createEngine(
 			payload: final,
 		});
 
-		const finalReport = report as {
-			outcome: StepReportOutcome;
-			summary: string;
-		} | null;
+		const finalReport = report as AgentReport | null;
 		const outputs: StepOutputs = {
 			visit,
 			output,
 			summary: finalReport?.summary || output,
 			session_id: harnessSessionId ?? "",
 		};
+		if (finalReport?.data !== undefined) {
+			outputs.data = finalReport.data as JsonValue;
+		}
 		const aborted = input.abortResult(outputs);
 		if (aborted) return aborted;
 		if (final.outcome === "failed" && isWaitKind(final.errorKind)) {
@@ -1457,7 +1510,22 @@ export function createEngine(
 				resetAt: final.resetAt,
 			};
 		}
+		const stepError = (error: string): StepResult => ({
+			outcome: "error",
+			outputs: { ...outputs, outcome: "error" },
+			error,
+		});
 		if (finalReport) {
+			const outcomes = agentOutcomes(node);
+			if (!outcomes.includes(finalReport.outcome)) {
+				return stepError(
+					`The agent reported "${finalReport.outcome}", which is not an outcome of this node. Its outcomes are: ${outcomes.join(", ")}.`,
+				);
+			}
+			if (node.output) {
+				const problem = checkOutputData(node.output, finalReport.data);
+				if (problem) return stepError(problem);
+			}
 			return {
 				outcome: finalReport.outcome,
 				outputs: { ...outputs, outcome: finalReport.outcome },
@@ -1465,6 +1533,16 @@ export function createEngine(
 			};
 		}
 		if (final.outcome === "finished") {
+			if (node.outcomes) {
+				return stepError(
+					`The agent finished with no step report. This node needs one of its outcomes: ${agentOutcomes(node).join(", ")}.`,
+				);
+			}
+			if (node.output) {
+				return stepError(
+					"The agent finished with no step report, so it gave no data for the output schema.",
+				);
+			}
 			return {
 				outcome: "pass",
 				outputs: { ...outputs, outcome: "pass" },
@@ -1593,72 +1671,251 @@ export function createEngine(
 	}
 
 	/**
-	 * Reads a For Each source: GitHub sub-issues of the rendered parent, or
-	 * the JSON a command prints in the worktree. Throws with a readable message.
+	 * Reads a For Each source as list items: a JSON value, the JSON a command
+	 * prints in the worktree, files that match a glob, or GitHub sub-issues of
+	 * the rendered parent. Throws with a readable message.
 	 */
 	async function readSource(
 		ctx: RunContext,
-		frame: Frame,
 		node: ForEachNode,
+		tctx: TemplateContext,
 		stepId: string,
 		signal: AbortSignal,
-	): Promise<SourceItem[]> {
+	): Promise<ListItem[]> {
 		const row = ctx.row;
-		const tctx = frameContext(row, frame, await loadRunEvents(row.id));
 		const source = node.source;
-		if (source.kind === "github") {
-			if (!readGithubItems) {
-				throw new Error("No GitHub reader is configured for For Each sources.");
+		switch (source.kind) {
+			case "json":
+				return jsonSourceItems(source.value, tctx);
+			case "files":
+				return fileItems(row.worktreePath, renderTemplate(source.glob, tctx));
+			case "github": {
+				if (!readGithubItems) {
+					throw new Error(
+						"No GitHub reader is configured for For Each sources.",
+					);
+				}
+				const text = renderTemplate(source.parent, tctx).trim();
+				const parent = Number(text.replace(/^#/, ""));
+				if (!Number.isInteger(parent) || parent <= 0) {
+					throw new Error(
+						`The parent issue "${text}" (from "${source.parent}") is not an issue number.`,
+					);
+				}
+				return readGithubItems({
+					cwd: row.worktreePath,
+					parent,
+					...(source.requireLabel !== undefined
+						? { requireLabel: source.requireLabel }
+						: {}),
+					doneLabels: source.doneLabels ?? [],
+					skipLabels: source.skipLabels ?? [],
+					signal,
+				});
 			}
-			const text = renderTemplate(source.parent, tctx).trim();
-			const parent = Number(text.replace(/^#/, ""));
-			if (!Number.isInteger(parent) || parent <= 0) {
-				throw new Error(
-					`The parent issue "${text}" (from "${source.parent}") is not an issue number.`,
-				);
+			case "command": {
+				const { command, env } = renderCommand(source.command, tctx);
+				let stdout = "";
+				const result = await runCommand({
+					command,
+					cwd: row.worktreePath,
+					env,
+					logPath: commandLogPath(dataDir, row.id, stepId),
+					signal,
+					onOutput: (stream, text) => {
+						if (stream === "stdout") stdout += text;
+					},
+				});
+				if (result.spawnError) {
+					throw new Error(
+						`The source command could not start: ${result.spawnError}`,
+					);
+				}
+				if (result.exitCode !== 0) {
+					throw new Error(
+						`The source command failed with exit code ${result.exitCode ?? "none"}:\n${result.logTail}`,
+					);
+				}
+				return parseCommandItems(stdout);
 			}
-			return readGithubItems({
-				cwd: row.worktreePath,
-				parent,
-				...(source.requireLabel !== undefined
-					? { requireLabel: source.requireLabel }
-					: {}),
-				doneLabels: source.doneLabels ?? [],
-				skipLabels: source.skipLabels ?? [],
-				signal,
-			});
 		}
-		const { command, env } = renderCommand(source.command, tctx);
-		let stdout = "";
-		const result = await runCommand({
-			command,
-			cwd: row.worktreePath,
-			env,
-			logPath: commandLogPath(dataDir, row.id, stepId),
-			signal,
-			onOutput: (stream, text) => {
-				if (stream === "stdout") stdout += text;
-			},
-		});
-		if (result.spawnError) {
-			throw new Error(
-				`The source command could not start: ${result.spawnError}`,
-			);
-		}
-		if (result.exitCode !== 0) {
-			throw new Error(
-				`The source command failed with exit code ${result.exitCode ?? "none"}:\n${result.logTail}`,
-			);
-		}
-		return parseCommandItems(stdout);
 	}
 
 	/**
-	 * One visit of a For Each node: read the source, mark blocked items, start
-	 * the next free item and walk the body for it, then read again. Ends
-	 * `done` when no item is left to start, `halted` when a body ends on a
-	 * `haltOn` label. A failed item does not fail the step: the items it
-	 * blocks are marked blocked and the loop goes on with free work.
+	 * Opens the step of a Subflow or For Each node: a new visit, or (a
+	 * `call` start) the existing step, reopened when it had ended.
+	 */
+	async function openCallStep(
+		ctx: RunContext,
+		frame: Frame,
+		node: SubflowNode | ForEachNode,
+		start: WalkStart,
+		events: readonly LoggedEvent[],
+	): Promise<{ stepId: string; path: string; visit: number }> {
+		const runId = ctx.row.id;
+		if (start.kind === "call") {
+			const existing = deriveSteps(events).find((s) => s.id === start.stepId);
+			if (!existing) throw new Error(`Step not found: ${start.stepId}`);
+			if (existing.endedAt !== null) {
+				await appendEvent(db, {
+					type: "StepReopened",
+					runId,
+					stepId: existing.id,
+					payload: { prompt: null },
+				});
+			}
+			return {
+				stepId: existing.id,
+				path: existing.transcriptPath,
+				visit: existing.visit,
+			};
+		}
+		const stepId = randomUUID();
+		const path = transcriptPath(dataDir, runId, stepId);
+		const visit = countVisits(events, node.id, frame.key) + 1;
+		await db.insert(step).values({
+			id: stepId,
+			runId,
+			nodeId: node.id,
+			nodeType: node.type,
+			visit,
+			transcriptPath: path,
+		});
+		await appendEvent(db, {
+			type: "StepStarted",
+			runId,
+			stepId,
+			payload: {
+				nodeId: node.id,
+				nodeType: node.type,
+				visit,
+				transcriptPath: path,
+				logPath:
+					node.type === "foreach" && node.source.kind === "command"
+						? commandLogPath(dataDir, runId, stepId)
+						: null,
+				scope: frame.scope,
+			},
+		});
+		return { stepId, path, visit };
+	}
+
+	/**
+	 * One visit of a Subflow node: binds the called flow's inputs, walks it in
+	 * a frame of its own, and returns its declared outputs. `pass` when the
+	 * called flow finished (on any chosen end), `fail` when it failed.
+	 */
+	async function runSubflowStep(
+		ctx: RunContext,
+		frame: Frame,
+		node: SubflowNode,
+		start: WalkStart,
+		events: readonly LoggedEvent[],
+	): Promise<StepResult | Unwind> {
+		const runId = ctx.row.id;
+		const { stepId, visit } = await openCallStep(
+			ctx,
+			frame,
+			node,
+			start,
+			events,
+		);
+		const changed = () => bus.publish(runId, { kind: "step-changed", stepId });
+		changed();
+
+		const endStep = async (
+			outcome: StepOutcome,
+			outputs: StepOutputs,
+			error: string | null,
+		): Promise<StepResult> => {
+			const result: StepResult = {
+				outcome,
+				outputs: { ...outputs, ended: outputs.ended ?? "", outcome, visit },
+				error,
+			};
+			await appendEvent(db, {
+				type: "StepEnded",
+				runId,
+				stepId,
+				payload: result,
+			});
+			changed();
+			return result;
+		};
+
+		const called = ctx.calledFlows[node.flow];
+		if (!called) {
+			return endStep(
+				"error",
+				{},
+				`The flow "${node.flow}" is not in the run's snapshot.`,
+			);
+		}
+
+		const existing = deriveSteps(events).find((s) => s.id === stepId);
+		let inputs: InputValues;
+		if (start.kind === "call" && existing?.call) {
+			inputs = existing.call.inputs;
+		} else {
+			try {
+				inputs = resolveInputs(
+					called.inputs ?? [],
+					renderBindings(node.inputs, frameContext(ctx.row, frame, events)),
+					{ what: `The flow "${node.flow}"`, jsonText: "lenient" },
+				);
+			} catch (error) {
+				return endStep("error", {}, messageOf(error));
+			}
+			await appendEvent(db, {
+				type: "FlowCalled",
+				runId,
+				stepId,
+				payload: { flow: node.flow, inputs },
+			});
+		}
+
+		const child = calledFrame({
+			flow: called,
+			flowName: node.flow,
+			stepId,
+			itemId: null,
+			inputs,
+			run: { branch: frame.run.branch, base_branch: "", index: "" },
+		});
+		const inner: WalkStart = (start.kind === "call" ? start.inner : null) ?? {
+			kind: "node",
+			nodeId: called.start,
+		};
+		const end = await walkScope(ctx, child, inner);
+		switch (end.kind) {
+			case "paused":
+				// The step stays open: the called flow continues after the wait.
+				return { kind: "unwind", end };
+			case "stopped":
+				await endStep("stopped", {}, null);
+				return { kind: "unwind", end };
+			case "aborted":
+				await endStep("error", {}, end.reason);
+				return { kind: "unwind", end };
+		}
+		const outputs = await outputsOf(ctx.row, child);
+		if (end.kind === "finished") {
+			return endStep(
+				"pass",
+				{ ...outputs, ended: endedLabel(end.node, end.outcome) },
+				null,
+			);
+		}
+		return endStep("fail", outputs, end.reason);
+	}
+
+	/**
+	 * One visit of a For Each node: read the source, mark blocked elements,
+	 * start the next free element and walk the called flow for it, then read
+	 * again. Ends `done` when no element is left to start, `halted` when a
+	 * called flow ends on a `haltOn` label. A failed element does not fail the
+	 * step: the elements it blocks are marked blocked and the loop goes on
+	 * with free work.
 	 */
 	async function runForEachStep(
 		ctx: RunContext,
@@ -1669,57 +1926,17 @@ export function createEngine(
 	): Promise<StepResult | Unwind> {
 		const runId = ctx.row.id;
 		const signal = ctx.walk.controller.signal;
-		let stepId: string;
-		let path: string;
-		let visit: number;
-		let resume: { itemId: string; inner: WalkStart | null } | null = null;
-
-		if (start.kind === "foreach") {
-			const existing = deriveSteps(events).find((s) => s.id === start.stepId);
-			if (!existing) throw new Error(`Step not found: ${start.stepId}`);
-			stepId = existing.id;
-			path = existing.transcriptPath;
-			visit = existing.visit;
-			if (existing.endedAt !== null) {
-				await appendEvent(db, {
-					type: "StepReopened",
-					runId,
-					stepId,
-					payload: { prompt: null },
-				});
-			}
-			if (start.itemId !== null) {
-				resume = { itemId: start.itemId, inner: start.inner };
-			}
-		} else {
-			stepId = randomUUID();
-			path = transcriptPath(dataDir, runId, stepId);
-			visit = countVisits(events, node.id, frame.key) + 1;
-			await db.insert(step).values({
-				id: stepId,
-				runId,
-				nodeId: node.id,
-				nodeType: node.type,
-				visit,
-				transcriptPath: path,
-			});
-			await appendEvent(db, {
-				type: "StepStarted",
-				runId,
-				stepId,
-				payload: {
-					nodeId: node.id,
-					nodeType: node.type,
-					visit,
-					transcriptPath: path,
-					logPath:
-						node.source.kind === "command"
-							? commandLogPath(dataDir, runId, stepId)
-							: null,
-					scope: frame.scope,
-				},
-			});
-		}
+		const { stepId, path, visit } = await openCallStep(
+			ctx,
+			frame,
+			node,
+			start,
+			events,
+		);
+		let resume: { itemId: string; inner: WalkStart | null } | null =
+			start.kind === "call" && start.itemId !== null
+				? { itemId: start.itemId, inner: start.inner }
+				: null;
 		const changed = () => bus.publish(runId, { kind: "step-changed", stepId });
 		changed();
 
@@ -1733,7 +1950,7 @@ export function createEngine(
 			return found;
 		};
 		/** The latest read of the source, for `waiting_count`. */
-		let lastRead: SourceItem[] | null = null;
+		let lastRead: ListItem[] | null = null;
 
 		const endStep = async (
 			outcome: StepOutcome,
@@ -1764,7 +1981,7 @@ export function createEngine(
 			return result;
 		};
 		const unwind = async (end: UnwindEnd): Promise<Unwind> => {
-			// A pause keeps the step open: the item continues after the wait.
+			// A pause keeps the step open: the element continues after the wait.
 			if (end.kind === "stopped") await endStep("stopped", null);
 			else if (end.kind === "aborted") await endStep("error", end.reason);
 			return { kind: "unwind", end };
@@ -1773,26 +1990,28 @@ export function createEngine(
 			itemId: string,
 			state: EnginePayloads["ItemEnded"]["state"],
 			reason: string | null,
+			outputs: StepOutputs,
 		) => {
 			await appendEvent(db, {
 				type: "ItemEnded",
 				runId,
 				stepId,
-				payload: { itemId, state, reason },
+				payload: { itemId, state, reason, outputs },
 			});
 			await record({ type: "item-end", itemId, state, reason });
 			changed();
 		};
 
-		const body = ctx.bodyFlows[node.flow];
-		if (!body) {
+		const called = ctx.calledFlows[node.flow];
+		if (!called) {
 			return endStep(
 				"error",
-				`The body flow "${node.flow}" is not in the run's snapshot.`,
+				`The flow "${node.flow}" is not in the run's snapshot.`,
 			);
 		}
+		const as = node.as ?? "item";
 		const haltOn = node.haltOn ?? ["halt"];
-		const branchPerItem = node.branchPerItem ?? true;
+		const perItem = (node.branch ?? "per-item") === "per-item";
 		const worktree = ctx.row.worktreePath;
 
 		while (true) {
@@ -1800,6 +2019,7 @@ export function createEngine(
 			let index: number;
 			let branch: string | null;
 			let baseBranch: string | null;
+			let inputs: InputValues;
 			let inner: WalkStart;
 
 			const continuing = resume
@@ -1812,7 +2032,9 @@ export function createEngine(
 				index = continuing.index;
 				branch = continuing.branch;
 				baseBranch = continuing.baseBranch;
-				inner = resume.inner ?? { kind: "node", nodeId: body.start };
+				// Before flow format 2 the element was the only input.
+				inputs = continuing.inputs ?? { [as]: facts.value };
+				inner = resume.inner ?? { kind: "node", nodeId: called.start };
 				resume = null;
 			} else {
 				resume = null;
@@ -1820,22 +2042,20 @@ export function createEngine(
 				const stop = stopBeforeNext(await loadRunEvents(runId));
 				if (stop) return unwind({ kind: "stopped", reason: stop });
 
-				let items: SourceItem[];
+				const tctx = frameContext(ctx.row, frame, await loadRunEvents(runId));
+				let items: ListItem[];
 				try {
-					items = await readSource(ctx, frame, node, stepId, signal);
+					items = await readSource(ctx, node, tctx, stepId, signal);
 				} catch (error) {
 					if (signal.aborted) return unwind({ kind: "stopped", reason: null });
 					return endStep("error", messageOf(error));
 				}
 				const ordered = blockersFirst(items);
 				if (!ordered.ok) {
-					const byId = new Map(items.map((i) => [i.id, i]));
-					const names = ordered.cycle.map((id) =>
-						itemLabel({ id, number: byId.get(id)?.number ?? null }),
-					);
+					const names = ordered.cycle.map((id) => itemLabel({ id }));
 					return endStep(
 						"error",
-						`The "blocked by" links of the items make a cycle: ${names.join(" → ")}.`,
+						`The "blocked by" links of the elements make a cycle: ${names.join(" → ")}.`,
 					);
 				}
 				lastRead = ordered.items;
@@ -1854,8 +2074,7 @@ export function createEngine(
 
 				const blocked = newlyBlocked(ordered.items, states);
 				for (const { item, blocker } of blocked) {
-					const blockerItem = ordered.items.find((i) => i.id === blocker);
-					const reason = `blocked by ${itemLabel({ id: blocker, number: blockerItem?.number ?? null })}`;
+					const reason = `blocked by ${itemLabel({ id: blocker })}`;
 					await appendEvent(db, {
 						type: "ItemBlocked",
 						runId,
@@ -1883,16 +2102,25 @@ export function createEngine(
 				if (picked.kind !== "item") return endStep("done", null);
 
 				facts = toItemFacts(picked.item);
+				try {
+					inputs = resolveInputs(
+						called.inputs ?? [],
+						{ ...renderBindings(node.inputs, tctx), [as]: facts.value },
+						{ what: `The flow "${node.flow}"`, jsonText: "lenient" },
+					);
+				} catch (error) {
+					return endStep("error", messageOf(error));
+				}
 				index = started + 1;
 				branch = null;
 				baseBranch = null;
 				let failure: string | null = null;
-				if (branchPerItem) {
+				if (perItem) {
 					try {
 						const startBranch =
 							derived.items.find((i) => i.index !== null)?.baseBranch ??
 							(await currentBranch(worktree)) ??
-							frame.branch;
+							frame.run.branch;
 						baseBranch =
 							derived.items.findLast((i) => i.state === "done" && i.branch)
 								?.branch ?? startBranch;
@@ -1910,7 +2138,7 @@ export function createEngine(
 					type: "ItemStarted",
 					runId,
 					stepId,
-					payload: { item: facts, index, branch, baseBranch },
+					payload: { item: facts, index, branch, baseBranch, inputs },
 				});
 				await record({
 					type: "item-start",
@@ -1921,26 +2149,25 @@ export function createEngine(
 				});
 				changed();
 				if (failure !== null) {
-					await endItem(facts.id, "failed", failure);
+					await endItem(facts.id, "failed", failure, {});
 					continue;
 				}
-				inner = { kind: "node", nodeId: body.start };
+				inner = { kind: "node", nodeId: called.start };
 			}
 
-			const itemBranch = branch ?? frame.branch;
-			const bodyFrame: Frame = {
-				flow: body,
-				scope: { forEachStepId: stepId, itemId: facts.id },
-				key: scopeKey({ forEachStepId: stepId, itemId: facts.id }),
-				branch: itemBranch,
-				item: itemTemplateFields({
-					facts,
-					index,
-					branch: itemBranch,
-					baseBranch,
-				}),
-			};
-			const end = await walkScope(ctx, bodyFrame, inner);
+			const child = calledFrame({
+				flow: called,
+				flowName: node.flow,
+				stepId,
+				itemId: facts.id,
+				inputs,
+				run: {
+					branch: branch ?? frame.run.branch,
+					base_branch: baseBranch ?? "",
+					index: String(index - 1),
+				},
+			});
+			const end = await walkScope(ctx, child, inner);
 			if (
 				end.kind === "paused" ||
 				end.kind === "stopped" ||
@@ -1948,16 +2175,21 @@ export function createEngine(
 			) {
 				return unwind(end);
 			}
+			const outputs = await outputsOf(ctx.row, child);
 			if (end.kind === "finished" && haltOn.includes(end.outcome)) {
 				await endItem(
 					facts.id,
 					"halted",
 					`Ended at node "${end.node.id}" with "${end.outcome}".`,
+					outputs,
 				);
 				return endStep("halted", null);
 			}
-			if (end.kind === "finished") await endItem(facts.id, "done", null);
-			else await endItem(facts.id, "failed", end.reason);
+			if (end.kind === "finished") {
+				await endItem(facts.id, "done", null, outputs);
+			} else {
+				await endItem(facts.id, "failed", end.reason, outputs);
+			}
 		}
 	}
 
@@ -1993,8 +2225,9 @@ export function createEngine(
 	}
 
 	/**
-	 * Loads, parses and validates the flow a run starts from, and every For
-	 * Each body it reaches (by name, from the project's flow files).
+	 * Loads, parses and validates the flow a run starts from, and every flow
+	 * it can call through Subflow and For Each nodes (by name, from the
+	 * project's flow files). Version 1 files migrate first.
 	 */
 	async function flowsForRun(
 		repoPath: string,
@@ -2002,53 +2235,188 @@ export function createEngine(
 	): Promise<{
 		flow: Flow;
 		flowName: string | null;
-		bodyFlows: Record<string, Flow>;
+		calledFlows: Record<string, Flow>;
 	}> {
-		const files = await loadAllFlows(repoPath);
+		const raw = await readProjectFlowFiles(repoPath);
+		const files: Record<string, Flow | null> = {};
+		for (const [name, json] of Object.entries(raw)) {
+			const parsed = flowSchema.safeParse(migrateFlow(json));
+			files[name] = parsed.success ? parsed.data : null;
+		}
 		let flow: Flow;
 		let flowName: string | null;
 		if (input.flowName !== undefined) {
-			const loaded = await readFlowFile(repoPath, input.flowName);
-			if (!loaded.flow) {
-				refuseErrors(loaded.issues);
+			if (!Object.hasOwn(raw, input.flowName)) {
+				throw new Error(`The flow "${input.flowName}" does not exist.`);
+			}
+			const parsed = parseFlow(migrateFlow(raw[input.flowName]), {
+				flows: files,
+				name: input.flowName,
+			});
+			refuseErrors(parsed.issues);
+			if (!parsed.flow) {
 				throw new Error(`The flow "${input.flowName}" does not parse.`);
 			}
-			refuseErrors(
-				validateFlow(loaded.flow, { flows: files, name: input.flowName }),
-			);
-			flow = loaded.flow;
+			flow = parsed.flow;
 			flowName = input.flowName;
 		} else {
-			const parsed = parseFlow(input.flow, { flows: files });
+			const parsed = parseFlow(migrateFlow(input.flow), { flows: files });
 			refuseErrors(parsed.issues);
 			if (!parsed.flow) throw new Error("The flow does not parse.");
 			flow = parsed.flow;
 			flowName = null;
 		}
-		if (flow.input === "item") {
-			throw new Error(
-				"This flow is a For Each body (its input is an item). It runs inside a For Each node, not on its own.",
-			);
-		}
-		const bodyFlows: Record<string, Flow> = {};
-		const queue = forEachBodies(flow);
+		const calledFlows: Record<string, Flow> = {};
+		const queue = calledFlowNames(flow);
 		while (queue.length > 0) {
 			const name = queue.shift() as string;
-			if (Object.hasOwn(bodyFlows, name)) continue;
-			const body = files[name];
-			if (!body) {
+			if (Object.hasOwn(calledFlows, name)) continue;
+			const called = name === flowName ? flow : files[name];
+			if (!called) {
 				throw new Error(
-					`The For Each body flow "${name}" ${body === null ? "does not parse" : "does not exist"}.`,
+					`The called flow "${name}" ${called === null ? "does not parse" : "does not exist"}.`,
 				);
 			}
 			refuseErrors(
-				validateFlow(body, { flows: files, name }),
-				`The body flow "${name}"`,
+				validateFlow(called, { flows: files, name }),
+				`The called flow "${name}"`,
 			);
-			bodyFlows[name] = body;
-			queue.push(...forEachBodies(body));
+			calledFlows[name] = called;
+			queue.push(...calledFlowNames(called));
 		}
-		return { flow, flowName, bodyFlows };
+		return { flow, flowName, calledFlows };
+	}
+
+	/**
+	 * Validates the flow (refuses one with errors), snapshots it, creates the
+	 * worktree, starts walking at the start node, and returns at once.
+	 */
+	async function startRunWith(
+		input: StartRunInput,
+		trigger: RunTrigger,
+	): Promise<RunSummary> {
+		await ready;
+		const runId = randomUUID();
+		reserveSlot(runId);
+		try {
+			const projectRow = await getProjectRow(input.projectId);
+			const { flow, flowName, calledFlows } = await flowsForRun(
+				projectRow.repoPath,
+				input,
+			);
+			const all = [flow, ...Object.values(calledFlows)];
+			const nodes = all.flatMap((f) => f.nodes);
+			if (!decider && nodes.some((n) => n.type === "decision")) {
+				throw new Error(
+					"The flow has a Decision node, but no decider is configured.",
+				);
+			}
+			if (
+				!readGithubItems &&
+				nodes.some((n) => n.type === "foreach" && n.source.kind === "github")
+			) {
+				throw new Error(
+					"The flow has a For Each node over GitHub issues, but no GitHub reader is configured.",
+				);
+			}
+			if (input.stopAt !== undefined && input.stopAt <= now()) {
+				throw new Error("The stop time has passed already.");
+			}
+			const inputs = resolveInputs(flow.inputs ?? [], input.inputs, {
+				what: "The flow",
+				jsonText: "strict",
+			});
+			const textInputs = (flow.inputs ?? []).flatMap((def) => {
+				const value = inputs[def.name];
+				return (def.type ?? "text") === "text" &&
+					typeof value === "string" &&
+					value !== ""
+					? [`${def.name} ${value}`]
+					: [];
+			});
+			const title = flowName
+				? [flowName, ...textInputs].join(" · ").slice(0, 120)
+				: quickRunTitle(flow);
+			const worktree = await createWorktree({
+				repoPath: projectRow.repoPath,
+				shortId: runId.slice(0, 8),
+				baseRef: input.baseRef,
+			});
+			const [row] = await db
+				.insert(run)
+				.values({
+					id: runId,
+					projectId: projectRow.id,
+					flowName,
+					flow: JSON.stringify(flow),
+					bodyFlows: JSON.stringify(calledFlows),
+					title,
+					worktreePath: worktree.worktreePath,
+					branch: worktree.branch,
+					baseRef: worktree.baseRef,
+				})
+				.returning();
+			if (!row) throw new Error("Could not create the run.");
+			await appendEvent(db, {
+				type: "RunStarted",
+				runId,
+				payload: {
+					projectId: projectRow.id,
+					flowName,
+					title,
+					start: flow.start,
+					stopAt: input.stopAt ?? null,
+					inputs,
+					trigger,
+				},
+			});
+			await appendEvent(db, {
+				type: "WorktreeCreated",
+				runId,
+				payload: worktree,
+			});
+			launchWalk(row, { kind: "node", nodeId: flow.start });
+			return toSummary(row, await loadRunEvents(runId));
+		} finally {
+			releaseStartingSlot(runId);
+		}
+	}
+
+	const scheduler = createScheduler({
+		db,
+		now,
+		tickMs: internals.scheduleTickMs ?? DEFAULT_SCHEDULE_TICK_MS,
+		startRun: startRunWith,
+		async runStatus(runId) {
+			const events = await loadRunEvents(runId);
+			return events.length === 0 ? null : deriveRunState(events).status;
+		},
+	});
+	if (options.scheduler !== false) {
+		const schedulerSignal = options.scheduler?.signal;
+		internals.signal?.addEventListener("abort", () => scheduler.stop(), {
+			once: true,
+		});
+		ready.then(
+			() => {
+				if (!disposed) scheduler.start(schedulerSignal);
+			},
+			() => {},
+		);
+	}
+
+	/** A logged schedule fact, with the status of the run it started. */
+	async function scheduleResult(
+		record: ScheduleRecord | null,
+	): Promise<ScheduleResult | null> {
+		if (!record) return null;
+		if (record.kind !== "fired") return record;
+		const events = await loadEventsByRun([record.runId], LIFECYCLE_EVENT_TYPES);
+		const runEvents = events.get(record.runId);
+		return {
+			...record,
+			runStatus: runEvents ? deriveRunState(runEvents).status : null,
+		};
 	}
 
 	const engine: Engine = {
@@ -2178,7 +2546,7 @@ export function createEngine(
 			const detail: RunDetail = {
 				...toSummary(row, events),
 				flow: parseRunFlow(row),
-				bodyFlows: parseBodyFlows(row),
+				calledFlows: parseCalledFlows(row),
 				steps: deriveSteps(events).map(toStepSummary),
 				// Edges of the top-level flow; body edges count per item.
 				traversals: deriveTraversals(events),
@@ -2189,82 +2557,8 @@ export function createEngine(
 			return detail;
 		},
 
-		async startRun(input: StartRunInput) {
-			await ready;
-			const runId = randomUUID();
-			reserveSlot(runId);
-			try {
-				const projectRow = await getProjectRow(input.projectId);
-				const { flow, flowName, bodyFlows } = await flowsForRun(
-					projectRow.repoPath,
-					input,
-				);
-				const all = [flow, ...Object.values(bodyFlows)];
-				const nodes = all.flatMap((f) => f.nodes);
-				if (!decider && nodes.some((n) => n.type === "decision")) {
-					throw new Error(
-						"The flow has a Decision node, but no decider is configured.",
-					);
-				}
-				if (
-					!readGithubItems &&
-					nodes.some((n) => n.type === "foreach" && n.source.kind === "github")
-				) {
-					throw new Error(
-						"The flow has a For Each node over GitHub issues, but no GitHub reader is configured.",
-					);
-				}
-				if (input.stopAt !== undefined && input.stopAt <= now()) {
-					throw new Error("The stop time has passed already.");
-				}
-				const params = resolveParams(flow, input.params);
-				const title = flowName
-					? [flowName, ...Object.entries(params).map(([k, v]) => `${k} ${v}`)]
-							.join(" · ")
-							.slice(0, 120)
-					: quickRunTitle(flow);
-				const worktree = await createWorktree({
-					repoPath: projectRow.repoPath,
-					shortId: runId.slice(0, 8),
-					baseRef: input.baseRef,
-				});
-				const [row] = await db
-					.insert(run)
-					.values({
-						id: runId,
-						projectId: projectRow.id,
-						flowName,
-						flow: JSON.stringify(flow),
-						bodyFlows: JSON.stringify(bodyFlows),
-						title,
-						worktreePath: worktree.worktreePath,
-						branch: worktree.branch,
-						baseRef: worktree.baseRef,
-					})
-					.returning();
-				if (!row) throw new Error("Could not create the run.");
-				await appendEvent(db, {
-					type: "RunStarted",
-					runId,
-					payload: {
-						projectId: projectRow.id,
-						flowName,
-						title,
-						start: flow.start,
-						stopAt: input.stopAt ?? null,
-						params,
-					},
-				});
-				await appendEvent(db, {
-					type: "WorktreeCreated",
-					runId,
-					payload: worktree,
-				});
-				launchWalk(row, { kind: "node", nodeId: flow.start });
-				return toSummary(row, await loadRunEvents(runId));
-			} finally {
-				releaseStartingSlot(runId);
-			}
+		startRun(input: StartRunInput) {
+			return startRunWith(input, { kind: "manual" });
 		},
 
 		async stopRun(runId, stopOptions) {
@@ -2415,6 +2709,36 @@ export function createEngine(
 			return gates.sort((a, b) => a.openedAt - b.openedAt);
 		},
 
+		async listSchedules(projectId) {
+			await ready;
+			const row = await getProjectRow(projectId);
+			const loaded = await readSchedulesFile(row.repoPath);
+			await scheduler.refresh();
+			const at = now();
+			const schedules = [];
+			for (const schedule of loaded.schedules) {
+				schedules.push({
+					...schedule,
+					nextAt: scheduler.nextAt(row.id, schedule, at),
+					last: await scheduleResult(scheduler.last(row.id, schedule.id)),
+					issues: loaded.issues.filter(
+						(issue) => issue.scheduleId === schedule.id,
+					),
+				});
+			}
+			return {
+				path: loaded.path,
+				schedules,
+				issues: loaded.issues.filter((issue) => issue.scheduleId === undefined),
+			};
+		},
+
+		async saveSchedules(projectId, schedules) {
+			await ready;
+			const row = await getProjectRow(projectId);
+			return writeSchedulesFile(row.repoPath, schedules);
+		},
+
 		async resolveGate({ runId, stepId, choice, note }) {
 			await ready;
 			const row = await getRunRow(runId);
@@ -2560,9 +2884,111 @@ export function createEngine(
 	return engine;
 }
 
-/** The body flow names a flow's For Each nodes run. */
-function forEachBodies(flow: Flow): string[] {
-	return flow.nodes.flatMap((n) => (n.type === "foreach" ? [n.flow] : []));
+/**
+ * The raw JSON of every flow file of a project, by name. A file that is not
+ * JSON reads as null. A missing directory is an empty record.
+ */
+async function readProjectFlowFiles(
+	repoPath: string,
+): Promise<Record<string, unknown>> {
+	const dir = flowsDir(repoPath);
+	let names: string[];
+	try {
+		names = await readdir(dir);
+	} catch {
+		return {};
+	}
+	const files: Record<string, unknown> = {};
+	for (const file of names.filter((n) => n.endsWith(".json")).sort()) {
+		const text = await readFile(join(dir, file), "utf8");
+		try {
+			files[file.slice(0, -".json".length)] = JSON.parse(text);
+		} catch {
+			files[file.slice(0, -".json".length)] = null;
+		}
+	}
+	return files;
+}
+
+/** The names of the flows a flow's Subflow and For Each nodes call. */
+function calledFlowNames(flow: Flow): string[] {
+	return flow.nodes.flatMap((n) =>
+		n.type === "foreach" || n.type === "subflow" ? [n.flow] : [],
+	);
+}
+
+/**
+ * A flow from a run's snapshot, in today's format: version 1 snapshots
+ * migrate, and defaults apply. A snapshot that no longer parses is used as
+ * it is, so an old run still shows.
+ */
+function snapshotFlow(json: unknown): Flow {
+	const migrated = migrateFlow(json);
+	const parsed = flowSchema.safeParse(migrated);
+	return parsed.success ? parsed.data : (migrated as Flow);
+}
+
+/** The agent's step report, as the walk keeps it. */
+type AgentReport = {
+	outcome: StepReportOutcome;
+	summary: string;
+	data?: unknown;
+};
+
+const BUILT_IN_AGENT_OUTCOMES = ["pass", "fail", "needs-input"];
+
+/** The outcomes an Agent node may report. */
+function agentOutcomes(node: AgentNode): string[] {
+	return node.outcomes?.map((o) => o.name) ?? BUILT_IN_AGENT_OUTCOMES;
+}
+
+/** What the harness asks the agent to report: a spec for own outcomes or an output schema. */
+function stepReportOf(node: AgentNode): AgentSessionInput["stepReport"] {
+	if (!node.outcomes && !node.output) return true;
+	const spec: StepReportSpec = {};
+	if (node.outcomes) {
+		spec.outcomes = node.outcomes.map((o) =>
+			o.description === undefined
+				? { name: o.name }
+				: { name: o.name, description: o.description },
+		);
+	}
+	if (node.output) spec.output = node.output;
+	return spec;
+}
+
+/** An Agent's own outcome, other than one named `fail` or `needs-input`. */
+function isOwnAgentLabel(node: FlowNode, outcome: Outcome): boolean {
+	return (
+		node.type === "agent" &&
+		node.outcomes !== undefined &&
+		outcome !== "fail" &&
+		outcome !== "needs-input"
+	);
+}
+
+/**
+ * Whether ending at `node` with `outcome` and no edge to take is a chosen
+ * end of the flow: `pass`, a Decision label, a Gate choice, an Agent's own
+ * outcome, or a For Each outcome. `fail` and `needs-input` are failures.
+ */
+function isChosenEnd(node: FlowNode, outcome: Outcome): boolean {
+	return (
+		outcome === "pass" ||
+		node.type === "decision" ||
+		node.type === "gate" ||
+		node.type === "foreach" ||
+		isOwnAgentLabel(node, outcome)
+	);
+}
+
+/** A Subflow's `ended`: the label or choice its flow ended on, or "". */
+function endedLabel(node: FlowNode, outcome: Outcome): string {
+	return node.type === "decision" ||
+		node.type === "gate" ||
+		isOwnAgentLabel(node, outcome)
+		? outcome
+		: "";
 }
 
 function fromResumePoint(point: ResumePoint, prompt: string): WalkStart {
@@ -2571,7 +2997,7 @@ function fromResumePoint(point: ResumePoint, prompt: string): WalkStart {
 			return { ...point, prompt };
 		case "node":
 			return point;
-		case "foreach":
+		case "call":
 			return {
 				...point,
 				inner: point.inner ? fromResumePoint(point.inner, prompt) : null,
@@ -2579,10 +3005,10 @@ function fromResumePoint(point: ResumePoint, prompt: string): WalkStart {
 	}
 }
 
-/** The deepest start of a chain of For Each starts. */
+/** The deepest start of a chain of calling starts. */
 function innermostOf(start: WalkStart): WalkStart {
 	let at = start;
-	while (at.kind === "foreach" && at.inner) at = at.inner;
+	while (at.kind === "call" && at.inner) at = at.inner;
 	return at;
 }
 
@@ -2593,12 +3019,12 @@ function scopeOfStart(
 ): Scope | null {
 	let scope: Scope | null = null;
 	let at = start;
-	while (at.kind === "foreach" && at.inner && at.itemId !== null) {
-		scope = { forEachStepId: at.stepId, itemId: at.itemId };
+	while (at.kind === "call" && at.inner) {
+		scope = { parentStepId: at.stepId, itemId: at.itemId };
 		at = at.inner;
 	}
-	if (at.kind === "foreach" && !at.inner) {
-		// The For Each step itself continues: its own scope.
+	if (at.kind === "call" && !at.inner) {
+		// The calling step itself continues: its own scope.
 		return steps.find((s) => s.id === at.stepId)?.scope ?? scope;
 	}
 	return scope;

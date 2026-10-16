@@ -14,6 +14,7 @@
 		"@nightshift/agents": "workspace:*",
 		"@nightshift/db": "workspace:*",
 		"@nightshift/flows": "workspace:*",
+		"ajv": "^8.20.0",
 		"drizzle-orm": "catalog:",
 		"zod": "catalog:"
 	},

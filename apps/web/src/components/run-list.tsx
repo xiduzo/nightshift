@@ -6,6 +6,7 @@ import {
 } from "@nightshift/ui/components/empty";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Link } from "@tanstack/react-router";
+import { CalendarClockIcon } from "lucide-react";
 
 import type { Project, RunSummary } from "@/lib/api-types";
 import {
@@ -67,6 +68,15 @@ export function RunList({
 							<span className="min-w-0 flex-1 truncate text-sm">
 								{run.title}
 							</span>
+							{run.trigger.kind === "schedule" ? (
+								<span
+									className="flex shrink-0 items-center gap-1 text-muted-foreground text-xs"
+									title={`Started by the schedule ${run.trigger.scheduleId}, for ${formatDateTime(run.trigger.at)}`}
+								>
+									<CalendarClockIcon className="size-3.5" aria-hidden="true" />
+									scheduled
+								</span>
+							) : null}
 							{run.status === "sleeping" && run.wakeAt ? (
 								<span className="shrink-0 text-status-sleeping text-xs">
 									wakes{" "}

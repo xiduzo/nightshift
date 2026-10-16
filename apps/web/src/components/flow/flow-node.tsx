@@ -5,7 +5,9 @@ import {
 	type FlowNodeType,
 	type ForEachNode,
 	type GateNode,
+	type ListSource,
 	nodeOutcomes,
+	type SubflowNode,
 } from "@nightshift/flows";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
@@ -17,12 +19,16 @@ import {
 	useUpdateNodeInternals,
 } from "@xyflow/react";
 import {
+	BracesIcon,
 	CircleAlertIcon,
+	FilesIcon,
 	GitBranchIcon,
-	GitPullRequestIcon,
+	ListTreeIcon,
 	PlayIcon,
+	SquareTerminalIcon,
 	TriangleAlertIcon,
 	WorkflowIcon,
+	WrenchIcon,
 } from "lucide-react";
 import { memo, useContext, useEffect, useRef } from "react";
 
@@ -59,13 +65,19 @@ export type FlowCanvasNode = Node<FlowNodeData, FlowNodeType>;
 function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 	if (node.type === "foreach") {
 		return new Map([
-			["done", "Every item ran"],
+			["done", "No element left to start"],
 			[
 				"halted",
 				node.haltOn.length > 0
-					? `A body ended on ${node.haltOn.join(", ")}`
+					? `A call ended on ${node.haltOn.join(", ")}`
 					: undefined,
 			],
+		]);
+	}
+	if (node.type === "subflow") {
+		return new Map([
+			["pass", "It finished"],
+			["fail", "It failed"],
 		]);
 	}
 	const options =
@@ -73,7 +85,9 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 			? node.labels
 			: node.type === "gate"
 				? node.choices
-				: [];
+				: node.type === "agent"
+					? (node.outcomes ?? [])
+					: [];
 	return new Map(options.map((option) => [option.name, option.description]));
 }
 
@@ -175,6 +189,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 				{node.type === "agent" ? <AgentBody node={node} /> : null}
 				{node.type === "decision" ? <DecisionBody node={node} /> : null}
 				{node.type === "gate" ? <GateBody node={node} /> : null}
+				{node.type === "subflow" ? <SubflowBody node={node} /> : null}
 				{node.type === "foreach" ? <ForEachBody node={node} /> : null}
 				{node.type === "command" ? (
 					<code className="block truncate bg-muted/60 px-1.5 py-1 font-mono text-[11px]">
@@ -251,18 +266,18 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	);
 });
 
-/** A small "GitHub" mark when the node has the GitHub tools. */
-function GitHubTools({ tools }: { tools: readonly string[] }) {
-	if (!tools.includes("github")) return null;
+/** A small mark per tool set the node has. */
+function ToolSets({ tools }: { tools: readonly string[] }) {
+	if (tools.length === 0) return null;
 	return (
 		<>
 			{" · "}
 			<span
-				className="inline-flex items-center gap-0.5 align-bottom text-foreground/80"
-				title="Has the GitHub tools"
+				className="inline-flex items-center gap-0.5 align-bottom font-mono text-foreground/80"
+				title={`Tool sets: ${tools.join(", ")}`}
 			>
-				<GitPullRequestIcon className="size-3" aria-hidden="true" />
-				GitHub
+				<WrenchIcon className="size-3" aria-hidden="true" />
+				{tools.join(", ")}
 			</span>
 		</>
 	);
@@ -276,7 +291,8 @@ function AgentBody({ node }: { node: AgentNode }) {
 				{node.model}
 				{node.effort ? ` · ${node.effort}` : ""}
 				{node.session === "resume" ? " · resumes session" : ""}
-				<GitHubTools tools={node.tools ?? []} />
+				{node.output ? " · data schema" : ""}
+				<ToolSets tools={node.tools ?? []} />
 			</span>
 			<p
 				className={cn(
@@ -297,7 +313,7 @@ function DecisionBody({ node }: { node: DecisionNode }) {
 		<>
 			<span className="truncate text-[11px] text-muted-foreground">
 				{node.model}
-				<GitHubTools tools={node.tools ?? []} />
+				<ToolSets tools={node.tools ?? []} />
 			</span>
 			<p
 				className={cn(
@@ -325,65 +341,129 @@ function GateBody({ node }: { node: GateNode }) {
 	);
 }
 
-/** Where the items come from, which body flow runs per item, and on which branch. */
-function ForEachBody({ node }: { node: ForEachNode }) {
+/** The called flow's name: a link in the editor, plain text elsewhere. */
+function CalledFlowName({ name, prefix }: { name: string; prefix: string }) {
 	const openFlow = useContext(OpenFlowContext);
-	const summary = sourceSummary(node.source);
-	const command = node.source.kind === "command";
+	return (
+		<span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+			<WorkflowIcon className="size-3 shrink-0" aria-hidden="true" />
+			<span className="shrink-0">{prefix}</span>
+			{name === "" ? (
+				<span className="italic">no flow picked yet</span>
+			) : openFlow ? (
+				<button
+					type="button"
+					className="nodrag nopan min-w-0 truncate font-mono text-foreground underline decoration-foreground/30 underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-1 focus-visible:ring-ring"
+					title={`Open the flow ${name}`}
+					onClick={(event) => {
+						event.stopPropagation();
+						openFlow(name);
+					}}
+				>
+					{name}
+				</button>
+			) : (
+				<span className="min-w-0 truncate font-mono text-foreground">
+					{name}
+				</span>
+			)}
+		</span>
+	);
+}
+
+/** The inputs bound by templates, one per line: `epic ← {{epic}}`. */
+function Bindings({ bindings }: { bindings: Record<string, string> }) {
+	const entries = Object.entries(bindings);
+	if (entries.length === 0) return null;
+	return (
+		<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-1.5 gap-y-0.5 bg-muted/60 px-1.5 py-1 font-mono text-[11px]">
+			{entries.slice(0, 4).map(([name, value]) => (
+				<div key={name} className="contents">
+					<dt className="text-muted-foreground">{name} ←</dt>
+					<dd className="truncate" title={value}>
+						{value}
+					</dd>
+				</div>
+			))}
+			{entries.length > 4 ? (
+				<dd className="col-span-2 text-muted-foreground">
+					+{entries.length - 4} more
+				</dd>
+			) : null}
+		</dl>
+	);
+}
+
+/** Which flow it calls, and the inputs it binds. */
+function SubflowBody({ node }: { node: SubflowNode }) {
 	return (
 		<>
-			{command ? (
-				<code className="block truncate bg-muted/60 px-1.5 py-1 font-mono text-[11px]">
-					{summary === "" ? (
-						<span className="text-muted-foreground italic">
-							No source command yet
-						</span>
-					) : (
-						<>
+			<CalledFlowName name={node.flow} prefix="Runs" />
+			<Bindings bindings={node.inputs} />
+		</>
+	);
+}
+
+const SOURCE_ICON: Record<ListSource["kind"], typeof BracesIcon> = {
+	json: BracesIcon,
+	command: SquareTerminalIcon,
+	files: FilesIcon,
+	github: ListTreeIcon,
+};
+
+const SOURCE_EMPTY: Record<ListSource["kind"], string> = {
+	json: "No list yet",
+	command: "No source command yet",
+	files: "No glob yet",
+	github: "No parent issue yet",
+};
+
+/** Where the elements come from, which flow runs per element, and on which branch. */
+function ForEachBody({ node }: { node: ForEachNode }) {
+	const summary = sourceSummary(node.source);
+	const SourceIcon = SOURCE_ICON[node.source.kind];
+	const code = node.source.kind !== "github";
+	return (
+		<>
+			<p
+				className={cn(
+					"flex min-w-0 items-center gap-1.5 bg-muted/60 px-1.5 py-1 text-[11px]",
+					code && "font-mono",
+				)}
+				title={summary}
+			>
+				<SourceIcon
+					className="size-3 shrink-0 text-muted-foreground"
+					aria-label={`From ${node.source.kind}`}
+				/>
+				{summary === "" ? (
+					<span className="font-sans text-muted-foreground italic">
+						{SOURCE_EMPTY[node.source.kind]}
+					</span>
+				) : (
+					<span className="truncate">
+						{node.source.kind === "command" ? (
 							<span className="text-muted-foreground" aria-hidden="true">
 								${" "}
 							</span>
-							{summary}
-						</>
-					)}
-				</code>
-			) : (
-				<p
-					className={cn(
-						"line-clamp-2 break-words",
-						summary === "" && "text-muted-foreground italic",
-					)}
-				>
-					{summary === "" ? "No parent issue yet" : summary}
-				</p>
-			)}
-			<span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
-				<WorkflowIcon className="size-3 shrink-0" aria-hidden="true" />
-				<span className="shrink-0">Body</span>
-				{node.flow === "" ? (
-					<span className="italic">not picked yet</span>
-				) : openFlow ? (
-					<button
-						type="button"
-						className="nodrag nopan min-w-0 truncate font-mono text-foreground underline decoration-foreground/30 underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-1 focus-visible:ring-ring"
-						title={`Open the body flow ${node.flow}`}
-						onClick={(event) => {
-							event.stopPropagation();
-							openFlow(node.flow);
-						}}
-					>
-						{node.flow}
-					</button>
-				) : (
-					<span className="min-w-0 truncate font-mono text-foreground">
-						{node.flow}
+						) : null}
+						{summary}
 					</span>
 				)}
+			</p>
+			<CalledFlowName name={node.flow} prefix="Each runs" />
+			<span className="truncate font-mono text-[11px] text-muted-foreground">
+				as {node.as}
+				{Object.keys(node.inputs).length > 0
+					? ` · binds ${Object.keys(node.inputs).join(", ")}`
+					: ""}
 			</span>
 			<span className="flex min-w-0 items-center gap-1 truncate text-[11px] text-muted-foreground">
 				<GitBranchIcon className="size-3 shrink-0" aria-hidden="true" />
-				{node.branchPerItem ? "Branch per item" : "One shared branch"}
-				{node.maxItems ? ` · max ${node.maxItems} items` : ""}
+				{node.branch === "per-item"
+					? "Branch per element"
+					: "One shared branch"}
+				{node.maxItems ? ` · max ${node.maxItems}` : ""}
 			</span>
 		</>
 	);
@@ -394,5 +474,6 @@ export const nodeTypes: NodeTypes = {
 	command: FlowNodeCard,
 	decision: FlowNodeCard,
 	gate: FlowNodeCard,
+	subflow: FlowNodeCard,
 	foreach: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;

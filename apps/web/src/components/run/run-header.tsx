@@ -86,7 +86,13 @@ export function RunHeader({
 		["Started", formatDateTime(run.createdAt), false],
 	];
 	const stoppable = STOPPABLE.includes(status);
-	const paramEntries = Object.entries(run.params ?? {});
+	const inputEntries = Object.entries(run.inputs ?? {}).map(
+		([name, value]) =>
+			[
+				name,
+				typeof value === "string" ? value : JSON.stringify(value),
+			] as const,
+	);
 
 	return (
 		<header className="flex flex-col gap-2 border-b px-4 py-3">
@@ -112,14 +118,14 @@ export function RunHeader({
 							>
 								{run.flowName}
 							</Link>
-							{paramEntries.length > 0 ? (
+							{inputEntries.length > 0 ? (
 								<span
-									className="truncate font-mono text-foreground"
-									title={paramEntries
+									className="max-w-md truncate font-mono text-foreground"
+									title={inputEntries
 										.map(([name, value]) => `${name}: ${value}`)
 										.join("\n")}
 								>
-									{paramEntries
+									{inputEntries
 										.map(([name, value]) => `${name} ${value}`)
 										.join(" · ")}
 								</span>

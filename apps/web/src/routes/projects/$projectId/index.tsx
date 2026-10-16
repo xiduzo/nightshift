@@ -12,6 +12,7 @@ import { HandIcon, MoonIcon } from "lucide-react";
 import { FlowList } from "@/components/flow-list";
 import { NewRunForm } from "@/components/new-run-form";
 import { RunList } from "@/components/run-list";
+import { ScheduleList } from "@/components/schedule/schedule-list";
 import { useOpenGates } from "@/hooks/use-open-gates";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
@@ -82,6 +83,7 @@ function ProjectComponent() {
 				<div className="grid gap-8 lg:grid-cols-2">
 					<div className="flex flex-col gap-8">
 						<FlowList projectId={project.id} />
+						<ScheduleList projectId={project.id} />
 						<section
 							aria-labelledby="new-run-heading"
 							className="flex flex-col gap-3"

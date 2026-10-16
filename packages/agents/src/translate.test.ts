@@ -2,10 +2,12 @@ import { describe, expect, test } from "bun:test";
 import {
 	createTranslator,
 	failureKind,
+	type HarnessProfile,
 	isNetworkText,
 	isUsageLimitText,
 	observeSdkMessage,
 	parseLegacyResetAt,
+	type SdkSignals,
 	type Translator,
 } from "./translate";
 import type { AgentEvent } from "./types";
@@ -571,6 +573,77 @@ describe("step reports", () => {
 		const events = feed(reporting(), [session, runFinished]);
 		expect(events.map((e) => e.type)).toEqual(["session", "finished"]);
 	});
+
+	describe("with a spec", () => {
+		const reviewing = () =>
+			createTranslator({
+				fallbackSessionId: "fallback",
+				stepReport: {
+					outcomes: [{ name: "approved" }, { name: "changes-requested" }],
+					output: { type: "object" },
+				},
+			});
+
+		test("a custom outcome with data becomes a report with data", () => {
+			const events = feed(reviewing(), [
+				session,
+				...reportCall({
+					outcome: "changes-requested",
+					summary: "Two issues.",
+					data: { issues: ["a", "b"] },
+				}),
+				runFinished,
+			]);
+			expect(events.map((e) => e.type)).toEqual([
+				"session",
+				"report",
+				"finished",
+			]);
+			expect(events[1]).toEqual({
+				type: "report",
+				outcome: "changes-requested",
+				summary: "Two issues.",
+				data: { issues: ["a", "b"] },
+			});
+		});
+
+		test.each([
+			["a default outcome", { outcome: "pass", summary: "x", data: {} }],
+			["missing data", { outcome: "approved", summary: "x" }],
+		])("shows the call instead of a report for %s", (_name, input) => {
+			const events = feed(reviewing(), [
+				session,
+				...reportCall(input),
+				runFinished,
+			]);
+			expect(events.map((e) => e.type)).toEqual([
+				"session",
+				"tool-start",
+				"tool-end",
+				"tool-result",
+				"finished",
+			]);
+		});
+
+		test("a text report with a custom outcome and data", () => {
+			const translator = reviewing();
+			translator.observeSdk({
+				type: "result",
+				subtype: "success",
+				result:
+					'NIGHTSHIFT-REPORT: {"outcome": "approved", "summary": "Fine.", "data": {"issues": []}}',
+			});
+			expect(feed(translator, [session, runFinished]).slice(1)).toEqual([
+				{
+					type: "report",
+					outcome: "approved",
+					summary: "Fine.",
+					data: { issues: [] },
+				},
+				expect.objectContaining({ type: "finished" }),
+			]);
+		});
+	});
 });
 
 describe("observeSdkMessage", () => {
@@ -826,6 +899,142 @@ describe("network errors", () => {
 		expect(feed(translator, [session, runFinished]).at(-1)).toMatchObject({
 			type: "error",
 			kind: "usage-limit",
+		});
+	});
+});
+
+describe("harness profiles", () => {
+	/** A profile whose raw messages are SdkSignals patches. */
+	const profile = (extra: Partial<HarnessProfile> = {}): HarnessProfile => ({
+		label: "Other",
+		sessionEvent: "other.session-id",
+		createObserver: () => (signals, raw) => ({
+			...signals,
+			...(raw as SdkSignals),
+		}),
+		...extra,
+	});
+
+	test("its own session event, and its label in errors", () => {
+		const t = createTranslator({
+			fallbackSessionId: "f",
+			profile: profile(),
+		});
+		expect(t.push(session)).toEqual([]);
+		expect(
+			t.push({
+				type: "CUSTOM",
+				name: "other.session-id",
+				value: { sessionId: "o-1" },
+			}),
+		).toEqual([{ type: "session", sessionId: "o-1" }]);
+		expect(t.finish({ aborted: false }).at(-1)).toEqual({
+			type: "error",
+			kind: "harness",
+			message: "Other ended without a result",
+		});
+	});
+
+	test("a known session id goes out with the first chunk", () => {
+		const t = createTranslator({
+			fallbackSessionId: "f",
+			knownSessionId: "k-1",
+			profile: profile(),
+		});
+		expect(
+			t.push({ type: "TEXT_MESSAGE_CONTENT", messageId: "m", delta: "Hi" }),
+		).toEqual([
+			{ type: "session", sessionId: "k-1" },
+			{ type: "text", messageId: "m", delta: "Hi" },
+		]);
+	});
+
+	test("settles on `done` and finishes with the raw usage", () => {
+		const t = createTranslator({
+			fallbackSessionId: "f",
+			profile: profile({ usageFromSignals: true }),
+		});
+		expect(t.settled()).toBe(false);
+		t.observeSdk({
+			done: true,
+			resultUsage: { inputTokens: 3, outputTokens: 2, costUsd: 0.5 },
+		});
+		expect(t.settled()).toBe(true);
+		expect(t.finish({ aborted: false }).at(-1)).toEqual({
+			type: "finished",
+			usage: { inputTokens: 3, outputTokens: 2, costUsd: 0.5 },
+		});
+	});
+
+	test("hidden text ids are not assistant text", () => {
+		const t = createTranslator({ fallbackSessionId: "f", profile: profile() });
+		t.observeSdk({ hiddenTextIds: new Set(["echo"]) });
+		expect(
+			t.push({ type: "TEXT_MESSAGE_CONTENT", messageId: "echo", delta: "x" }),
+		).toEqual([]);
+	});
+
+	test("tool inputs from the raw messages, emitted with the result", () => {
+		const t = createTranslator({
+			fallbackSessionId: "f",
+			stepReport: true,
+			profile: profile({ toolInputFromSignals: true }),
+		});
+		t.push({
+			type: "CUSTOM",
+			name: "other.session-id",
+			value: { sessionId: "s" },
+		});
+		const call = (id: string, name: string) => [
+			{ type: "TOOL_CALL_START", toolCallId: id, toolCallName: name },
+			{ type: "TOOL_CALL_END", toolCallId: id, toolCallName: name, input: {} },
+		];
+		expect(call("c1", "read").flatMap((c) => t.push(c))).toEqual([
+			{ type: "tool-start", toolCallId: "c1", name: "read" },
+		]);
+		t.observeSdk({ toolInputs: { c1: { path: "a" } } });
+		expect(
+			t.push({ type: "TOOL_CALL_RESULT", toolCallId: "c1", content: "ok" }),
+		).toEqual([
+			{
+				type: "tool-end",
+				toolCallId: "c1",
+				name: "read",
+				input: { path: "a" },
+			},
+			{ type: "tool-result", toolCallId: "c1", content: "ok" },
+		]);
+		// The report tool: its first input is empty, the real one comes later.
+		for (const c of call("c2", "report_step")) t.push(c);
+		t.observeSdk({
+			toolInputs: { c2: { outcome: "pass", summary: "Fine." } },
+		});
+		expect(
+			t.push({ type: "TOOL_CALL_RESULT", toolCallId: "c2", content: "ok" }),
+		).toEqual([{ type: "report", outcome: "pass", summary: "Fine." }]);
+		// A call without a result still shows, before the terminal event.
+		for (const c of call("c3", "bash")) t.push(c);
+		expect(t.finish({ aborted: true })).toEqual([
+			{ type: "tool-end", toolCallId: "c3", name: "bash", input: {} },
+			{ type: "error", kind: "aborted", message: "The session was aborted" },
+		]);
+	});
+
+	test("the raw cost fills in a chunk usage without one", () => {
+		const t = createTranslator({ fallbackSessionId: "f" });
+		t.observeSdk({
+			type: "result",
+			subtype: "success",
+			total_cost_usd: 0.25,
+			usage: { input_tokens: 1, output_tokens: 1 },
+		});
+		t.push({
+			type: "RUN_FINISHED",
+			usage: { promptTokens: 10, completionTokens: 4 },
+		});
+		expect(t.finish({ aborted: false }).at(-1)).toEqual({
+			type: "finished",
+			usage: { inputTokens: 10, outputTokens: 4, costUsd: 0.25 },
 		});
 	});
 });

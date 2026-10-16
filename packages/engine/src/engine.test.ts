@@ -101,7 +101,14 @@ function edge(
 }
 
 function flowOf(nodes: Flow["nodes"], edges: FlowEdge[] = []): Flow {
-	return { version: 1, start: nodes[0]?.id ?? "", nodes, edges };
+	return {
+		version: 2,
+		inputs: [],
+		outputs: [],
+		start: nodes[0]?.id ?? "",
+		nodes,
+		edges,
+	};
 }
 
 /** Counts its own runs in the worktree and fails until the given attempt. */

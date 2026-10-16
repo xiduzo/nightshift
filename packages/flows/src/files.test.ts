@@ -103,7 +103,7 @@ describe("readFlowFile", () => {
 		await mkdir(flowsDir(repo), { recursive: true });
 		await writeFile(
 			join(flowsDir(repo), "wrong.json"),
-			JSON.stringify({ version: 2, start: "a", nodes: [], edges: [] }),
+			JSON.stringify({ version: 3, start: "a", nodes: [], edges: [] }),
 		);
 		const loaded = await readFlowFile(repo, "wrong");
 		expect(loaded.flow).toBeNull();
@@ -185,12 +185,73 @@ describe("flow names", () => {
 	});
 });
 
-describe("For Each references", () => {
-	const body = (): Flow => ({ ...quick(), input: "item" });
-
-	/** One For Each node running `bodyName`. */
-	const outer = (bodyName: string): Flow => ({
+describe("version 1 files", () => {
+	const v1 = {
 		version: 1,
+		params: [{ name: "epic", required: true }],
+		start: "worker",
+		nodes: [
+			{
+				id: "worker",
+				type: "agent",
+				position: { x: 0, y: 0 },
+				prompt: "Build Epic {{params.epic}}",
+				harness: "claude-code",
+				model: "sonnet",
+				permissionMode: "acceptEdits",
+			},
+		],
+		edges: [],
+	};
+
+	test("reading migrates in memory and leaves the file alone", async () => {
+		await mkdir(flowsDir(repo), { recursive: true });
+		const path = join(flowsDir(repo), "old.json");
+		const text = JSON.stringify(v1, null, 2);
+		await writeFile(path, text);
+		const loaded = await readFlowFile(repo, "old");
+		expect(loaded.issues).toEqual([]);
+		expect(loaded.flow).toMatchObject({
+			version: 2,
+			inputs: [{ name: "epic", type: "text", required: true }],
+			outputs: [],
+			nodes: [{ prompt: "Build Epic {{epic}}" }],
+		});
+		expect((await loadAllFlows(repo)).old?.version).toBe(2);
+		expect(await listFlowFiles(repo)).toEqual([
+			expect.objectContaining({ name: "old", errorCount: 0, nodeCount: 1 }),
+		]);
+		expect(await readFile(path, "utf8")).toBe(text);
+	});
+
+	test("writing a read flow saves version 2", async () => {
+		await mkdir(flowsDir(repo), { recursive: true });
+		await writeFile(join(flowsDir(repo), "old.json"), JSON.stringify(v1));
+		const loaded = await readFlowFile(repo, "old");
+		if (!loaded.flow) throw new Error("did not parse");
+		expect(await writeFlowFile(repo, "old", loaded.flow)).toEqual([]);
+		const saved = JSON.parse(
+			await readFile(join(flowsDir(repo), "old.json"), "utf8"),
+		);
+		expect(saved.version).toBe(2);
+		expect(saved).not.toHaveProperty("params");
+		expect(saved.inputs).toEqual([
+			{ name: "epic", type: "text", required: true },
+		]);
+	});
+});
+
+describe("calls between flow files", () => {
+	const body = (): Flow => ({
+		...quick(),
+		inputs: [{ name: "item", type: "json", required: true }],
+	});
+
+	/** One For Each node running `called`. */
+	const outer = (called: string): Flow => ({
+		version: 2,
+		inputs: [],
+		outputs: [],
 		start: "each",
 		nodes: [
 			{
@@ -198,8 +259,10 @@ describe("For Each references", () => {
 				type: "foreach",
 				position: { x: 0, y: 0 },
 				source: { kind: "github", parent: "7", doneLabels: [], skipLabels: [] },
-				flow: bodyName,
-				branchPerItem: true,
+				flow: called,
+				as: "item",
+				inputs: {},
+				branch: "per-item",
 				haltOn: ["halt"],
 			},
 		],
@@ -215,10 +278,10 @@ describe("For Each references", () => {
 		expect(Object.keys(flows).sort()).toEqual(["broken", "trace", "wrong"]);
 		expect(flows.broken).toBeNull();
 		expect(flows.wrong).toBeNull();
-		expect(flows.trace?.input).toBe("item");
+		expect(flows.trace?.inputs[0]?.name).toBe("item");
 	});
 
-	test("writeFlowFile checks the body against the repo's flows", async () => {
+	test("writeFlowFile checks the called flow against the repo's flows", async () => {
 		expect(await writeFlowFile(repo, "night", outer("trace"))).toEqual([
 			expect.objectContaining({
 				nodeId: "each",
@@ -230,7 +293,7 @@ describe("For Each references", () => {
 	});
 
 	test("writeFlowFile finds a flow that runs itself", async () => {
-		const self = { ...outer("loop"), input: "item" as const };
+		const self = { ...outer("loop"), inputs: body().inputs };
 		expect(await writeFlowFile(repo, "loop", self)).toEqual([
 			expect.objectContaining({
 				message: expect.stringContaining("loop → loop"),
@@ -238,13 +301,13 @@ describe("For Each references", () => {
 		]);
 	});
 
-	test("readFlowFile and listFlowFiles check bodies too", async () => {
+	test("readFlowFile and listFlowFiles check called flows too", async () => {
 		await writeFlowFile(repo, "night", outer("trace"));
-		await writeFlowFile(repo, "trace", { ...quick(), input: undefined });
+		await writeFlowFile(repo, "trace", quick());
 		const loaded = await readFlowFile(repo, "night");
 		expect(loaded.issues).toEqual([
 			expect.objectContaining({
-				message: expect.stringContaining('Set its input to "item"'),
+				message: expect.stringContaining('which has no input "item"'),
 			}),
 		]);
 		const list = await listFlowFiles(repo);

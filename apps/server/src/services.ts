@@ -18,10 +18,18 @@ await migrateDb(db);
 
 export const auth = createAuth(ENV, db, desktopOrigins);
 
+// `bun --hot` evaluates this module again on each reload. Only the newest
+// engine may start scheduled runs: the one before stops its scheduler.
+const hot = globalThis as { nightshiftScheduler?: AbortController };
+hot.nightshiftScheduler?.abort();
+const scheduler = new AbortController();
+hot.nightshiftScheduler = scheduler;
+
 export const engine = await createEngine({
 	db,
 	harnesses: { "claude-code": claudeCodeHarness() },
 	decider: claudeCodeDecider(),
 	readGithubItems: (input) => readGithubItems(input),
 	dataDir: ENV.NIGHTSHIFT_DATA_DIR ?? join(homedir(), ".nightshift"),
+	scheduler: { signal: scheduler.signal },
 });

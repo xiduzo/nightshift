@@ -4,6 +4,9 @@ import { OutcomeBadge, stepState } from "@/components/outcome-badge";
 
 import type { RunStatus, StepSummary } from "@/lib/api-types";
 import { formatCost, formatDateTime, formatTime } from "@/lib/format";
+import { jsonOutput } from "@/lib/run-steps";
+
+import { JsonBlock } from "./json-block";
 
 import { stepDuration } from "./step-timeline";
 
@@ -15,7 +18,7 @@ export function StepHeader({
 }: {
 	step: StepSummary;
 	runStatus: RunStatus;
-	/** Where the step ran, for a step inside a For Each body. */
+	/** Where the step ran, for a step inside a called flow. */
 	context?: ReactNode;
 }) {
 	const Icon = NODE_TYPE[step.nodeType].icon;
@@ -53,19 +56,30 @@ export function StepHeader({
 					<summary className="cursor-pointer select-none text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring">
 						Outputs ({outputs.length})
 					</summary>
-					<dl className="mt-1.5 grid max-h-48 grid-cols-[auto_1fr] gap-x-3 gap-y-1 overflow-y-auto">
-						{outputs.map(([field, value]) => (
-							<div key={field} className="contents">
-								<dt className="font-mono text-muted-foreground">
-									{`{{${step.nodeId}.${field}}}`}
-								</dt>
-								<dd className="line-clamp-3 whitespace-pre-wrap break-words font-mono">
-									{String(value) || (
-										<span className="text-muted-foreground italic">empty</span>
+					<dl className="mt-1.5 grid max-h-64 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 overflow-y-auto">
+						{outputs.map(([field, value]) => {
+							const json = jsonOutput(value);
+							return (
+								<div key={field} className="contents">
+									<dt className="font-mono text-muted-foreground">
+										{`{{${step.nodeId}.${field}}}`}
+									</dt>
+									{json !== undefined ? (
+										<dd className="min-w-0">
+											<JsonBlock value={json} className="max-h-40" />
+										</dd>
+									) : (
+										<dd className="line-clamp-3 whitespace-pre-wrap break-words font-mono">
+											{String(value) || (
+												<span className="text-muted-foreground italic">
+													empty
+												</span>
+											)}
+										</dd>
 									)}
-								</dd>
-							</div>
-						))}
+								</div>
+							);
+						})}
 					</dl>
 				</details>
 			) : null}

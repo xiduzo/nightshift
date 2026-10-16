@@ -4,7 +4,12 @@
  * OpenCode and Codex) translates its own stream into AgentEvent values.
  */
 
-export type HarnessName = "claude-code";
+export type HarnessName = "claude-code" | "opencode" | "codex";
+
+/** An MCP server for one session, with `${NAME}` already expanded by the engine. */
+export type McpServerConfig =
+	| { command: string; args: string[]; env: Record<string, string> }
+	| { url: string; headers: Record<string, string> };
 
 /**
  * `auto`: Claude Code's classifier approves safe actions (running tests,
@@ -42,6 +47,8 @@ export type AgentSessionInput = {
 	stepReport?: boolean | StepReportSpec;
 	/** Tool sets the session gets on top of the harness's own tools. */
 	tools?: ToolSet[];
+	/** MCP servers by name, added to the harness's own configuration. */
+	mcpServers?: Record<string, McpServerConfig>;
 	/** Aborting stops the harness process. The stream then ends with an `error` event of kind `aborted`. */
 	signal: AbortSignal;
 };

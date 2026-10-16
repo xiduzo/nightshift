@@ -32,8 +32,9 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
+import { useProjectFlows } from "@/hooks/use-project-flows";
 import type { FlowListItem } from "@/lib/api-types";
-import { newFlow } from "@/lib/flow-draft";
+import { callersOf, newFlow } from "@/lib/flow-draft";
 import { orpc } from "@/utils/orpc";
 
 export function FlowList({ projectId }: { projectId: string }) {
@@ -41,6 +42,8 @@ export function FlowList({ projectId }: { projectId: string }) {
 	const flows = useQuery(
 		orpc.flows.list.queryOptions({ input: { projectId } }),
 	);
+	// Each flow's inputs, and which flows call it.
+	const loaded = useProjectFlows(projectId);
 	const [creating, setCreating] = useState(false);
 	const [toDelete, setToDelete] = useState<FlowListItem | null>(null);
 
@@ -118,6 +121,12 @@ export function FlowList({ projectId }: { projectId: string }) {
 									<span className="truncate text-muted-foreground text-xs">
 										{flow.description ?? "No description"}
 									</span>
+									<FlowSignature
+										inputs={loaded.flows?.[flow.name]?.inputs}
+										callers={
+											loaded.flows ? callersOf(flow.name, loaded.flows) : []
+										}
+									/>
 								</span>
 								<FlowMeta flow={flow} />
 							</Link>
@@ -168,6 +177,38 @@ export function FlowList({ projectId }: { projectId: string }) {
 				</AlertDialogContent>
 			</AlertDialog>
 		</section>
+	);
+}
+
+/** The flow's inputs, briefly, and the flows that call it. */
+function FlowSignature({
+	inputs,
+	callers,
+}: {
+	inputs: { name: string; type: string; required?: boolean }[] | undefined;
+	callers: string[];
+}) {
+	if ((!inputs || inputs.length === 0) && callers.length === 0) return null;
+	return (
+		<span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+			{inputs && inputs.length > 0 ? (
+				<span className="min-w-0 truncate font-mono" title="Inputs">
+					(
+					{inputs
+						.map(
+							(input) =>
+								`${input.name}${input.type === "json" ? ": json" : ""}${input.required ? "" : "?"}`,
+						)
+						.join(", ")}
+					)
+				</span>
+			) : null}
+			{callers.length > 0 ? (
+				<span className="min-w-0 truncate">
+					called by <span className="font-mono">{callers.join(", ")}</span>
+				</span>
+			) : null}
+		</span>
 	);
 }
 

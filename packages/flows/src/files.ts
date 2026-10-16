@@ -1,10 +1,24 @@
 import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type Flow, flowNameSchema, flowSchema } from "./schema";
+import { migrateFlow } from "./migrate";
+import {
+	SCHEDULES_VERSION,
+	type Schedule,
+	type ScheduleFlowInfo,
+	type ScheduleIssue,
+	schedulesFileSchema,
+	validateSchedules,
+} from "./schedules";
+import { FLOW_VERSION, type Flow, flowNameSchema, flowSchema } from "./schema";
 import type { FlowIssue, FlowListItem, LoadedFlow } from "./types";
 import { parseFlow } from "./validate";
 
-/** Node-only: reads and writes `.nightshift/flows/*.json` in a repo. Not exported from the index. */
+/**
+ * Node-only: reads and writes `.nightshift/flows/*.json` and
+ * `.nightshift/schedules.json` in a repo. Not
+ * exported from the index. Reading migrates older versions in memory
+ * (`migrateFlow`); the file on disk changes only when it is written.
+ */
 
 export function flowsDir(repoPath: string): string {
 	return join(repoPath, ".nightshift", "flows");
@@ -55,8 +69,9 @@ export async function readFlowFile(
 }
 
 /**
- * Writes the flow as pretty JSON with a trailing newline, creating the
- * directory. Saves flows with validation errors too (drafts). Returns the issues.
+ * Writes the flow as pretty JSON with a trailing newline, as the current
+ * version, creating the directory. Saves flows with validation errors too
+ * (drafts). Returns the issues.
  */
 export async function writeFlowFile(
 	repoPath: string,
@@ -65,8 +80,10 @@ export async function writeFlowFile(
 ): Promise<FlowIssue[]> {
 	const path = flowPath(repoPath, name);
 	await mkdir(flowsDir(repoPath), { recursive: true });
-	await writeFile(path, `${JSON.stringify(flow, null, "\t")}\n`, "utf8");
-	return parseFlow(flow, { flows: await loadAllFlows(repoPath), name }).issues;
+	const current: Flow = { ...flow, version: FLOW_VERSION };
+	await writeFile(path, `${JSON.stringify(current, null, "\t")}\n`, "utf8");
+	return parseFlow(current, { flows: await loadAllFlows(repoPath), name })
+		.issues;
 }
 
 export async function deleteFlowFile(
@@ -80,6 +97,100 @@ export async function deleteFlowFile(
 		if (isNotFound(error)) throw notFound(name, path);
 		throw error;
 	}
+}
+
+export function schedulesPath(repoPath: string): string {
+	return join(repoPath, ".nightshift", "schedules.json");
+}
+
+/** The schedules file of a repo, read. */
+export type LoadedSchedules = {
+	/** Absolute path of `.nightshift/schedules.json`. */
+	path: string;
+	/** Empty when the file is missing, is not JSON, or does not match the schema. */
+	schedules: Schedule[];
+	/** Problems of the file (no `scheduleId`) and of each schedule. */
+	issues: ScheduleIssue[];
+};
+
+/**
+ * Reads `.nightshift/schedules.json`. A missing file is no schedules. A file
+ * that is not JSON or does not match the schema loads with no schedules and
+ * the issues. `validate` (default true) also checks each schedule against
+ * the repo's flow files; the scheduler turns it off on its ticks.
+ */
+export async function readSchedulesFile(
+	repoPath: string,
+	options: { validate?: boolean } = {},
+): Promise<LoadedSchedules> {
+	const path = schedulesPath(repoPath);
+	const file = await readJson(path);
+	if (file === null) return { path, schedules: [], issues: [] };
+	if (!("json" in file)) {
+		return {
+			path,
+			schedules: [],
+			issues: [
+				{ severity: "error", message: `Not valid JSON: ${file.jsonError}` },
+			],
+		};
+	}
+	const parsed = schedulesFileSchema.safeParse(file.json);
+	if (!parsed.success) {
+		return {
+			path,
+			schedules: [],
+			issues: parsed.error.issues.map((issue) => ({
+				severity: "error",
+				message: `${issue.path.length > 0 ? issue.path.map(String).join(".") : "(root)"}: ${issue.message}`,
+			})),
+		};
+	}
+	const schedules = parsed.data.schedules;
+	const issues =
+		options.validate === false
+			? []
+			: validateSchedules(schedules, await scheduleFlowInfos(repoPath));
+	return { path, schedules, issues };
+}
+
+/**
+ * Writes `.nightshift/schedules.json` as pretty JSON with a trailing newline,
+ * creating the directory. Saves schedules with problems too (like flow
+ * drafts). Returns the issues.
+ */
+export async function writeSchedulesFile(
+	repoPath: string,
+	schedules: readonly Schedule[],
+): Promise<ScheduleIssue[]> {
+	await mkdir(join(repoPath, ".nightshift"), { recursive: true });
+	const file = { version: SCHEDULES_VERSION, schedules };
+	await writeFile(
+		schedulesPath(repoPath),
+		`${JSON.stringify(file, null, "\t")}\n`,
+		"utf8",
+	);
+	return validateSchedules(schedules, await scheduleFlowInfos(repoPath));
+}
+
+/** The inputs and the error count of every flow file, for `validateSchedules`. */
+async function scheduleFlowInfos(
+	repoPath: string,
+): Promise<Record<string, ScheduleFlowInfo | null>> {
+	const files = await readAll(repoPath);
+	const flows = flowsOf(files);
+	const infos: Record<string, ScheduleFlowInfo | null> = {};
+	for (const [name, file] of files) {
+		const loaded = loadedFlow(repoPath, name, file, flows);
+		infos[name] = loaded.flow
+			? {
+					inputs: loaded.flow.inputs,
+					errorCount: loaded.issues.filter((i) => i.severity === "error")
+						.length,
+				}
+			: null;
+	}
+	return infos;
 }
 
 /** What one flow file holds: parsed JSON, or why it is not JSON. */
@@ -131,7 +242,8 @@ function flowsOf(
 ): Record<string, Flow | null> {
 	const flows: Record<string, Flow | null> = {};
 	for (const [name, file] of files) {
-		const result = "json" in file ? flowSchema.safeParse(file.json) : null;
+		const result =
+			"json" in file ? flowSchema.safeParse(migrateFlow(file.json)) : null;
 		flows[name] = result?.success ? result.data : null;
 	}
 	return flows;

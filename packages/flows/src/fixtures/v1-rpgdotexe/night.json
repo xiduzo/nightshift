@@ -1,0 +1,64 @@
+{
+	"version": 1,
+	"description": "The rpgdotexe night: builds each Feature of one Epic, blockers first, like `night-shift.py <epic>`.",
+	"params": [
+		{
+			"name": "epic",
+			"label": "Epic",
+			"description": "The issue number of the Epic to build, as in night-shift.py <epic>.",
+			"required": true
+		}
+	],
+	"policy": {
+		"usageLimitFirstWaitMinutes": 5,
+		"usageLimitMaxWaitMinutes": 60,
+		"networkGraceMinutes": 240,
+		"maxSteps": 2000
+	},
+	"start": "features",
+	"nodes": [
+		{
+			"id": "features",
+			"label": "Each Feature of the Epic",
+			"position": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "foreach",
+			"source": {
+				"kind": "github",
+				"parent": "{{params.epic}}",
+				"requireLabel": "feature",
+				"doneLabels": []
+			},
+			"flow": "feature",
+			"branchPerItem": false,
+			"haltOn": ["halt"]
+		},
+		{
+			"id": "summary",
+			"label": "Night report",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "command",
+			"command": "# The report of the night, as STATUS.md in the worktree and in the log.\nmkdir -p .build/night\n{\n\tprintf '# The night: %s\\n\\n' \"{{features.outcome}}\"\n\tprintf 'Features: %s done, %s failed, %s blocked, %s waiting.\\n\\n' \"{{features.done_count}}\" \"{{features.failed_count}}\" \"{{features.blocked_count}}\" \"{{features.waiting_count}}\"\n\tprintf '%s\\n\\n' \"{{features.summary}}\"\n\tprintf 'Your open pull requests, to read in the morning:\\n\\n'\n\tgh pr list --state open --author @me --json number,title,url --jq '.[] | \"- #\\(.number) \\(.title) \\(.url)\"' || true\n} | tee .build/night/STATUS.md",
+			"timeoutMinutes": 10
+		}
+	],
+	"edges": [
+		{
+			"id": "features-done-summary",
+			"from": "features",
+			"outcome": "done",
+			"to": "summary"
+		},
+		{
+			"id": "features-halted-summary",
+			"from": "features",
+			"outcome": "halted",
+			"to": "summary"
+		}
+	]
+}

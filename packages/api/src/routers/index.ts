@@ -1,4 +1,11 @@
-import { flowNameSchema, flowSchema } from "@nightshift/flows";
+import {
+	cronError,
+	describeCron,
+	flowNameSchema,
+	flowSchema,
+	nextCronTimes,
+	scheduleSchema,
+} from "@nightshift/flows";
 import type { RouterClient } from "@orpc/server";
 import { z } from "zod";
 
@@ -60,6 +67,41 @@ const gates = {
 			}),
 		)
 		.handler(({ context, input }) => context.engine.resolveGate(input)),
+};
+
+/** `.nightshift/schedules.json`: runs the daemon starts on a cron line. */
+const schedules = {
+	list: publicProcedure
+		.input(z.object({ projectId: z.string() }))
+		.handler(({ context, input }) =>
+			context.engine.listSchedules(input.projectId),
+		),
+	/** Replaces the whole file. Saves schedules with problems too. Returns the issues. */
+	save: publicProcedure
+		.input(
+			z.object({ projectId: z.string(), schedules: z.array(scheduleSchema) }),
+		)
+		.handler(({ context, input }) =>
+			context.engine.saveSchedules(input.projectId, input.schedules),
+		),
+	/** The next times of a cron line on the daemon's clock, and how it reads. */
+	preview: publicProcedure
+		.input(
+			z.object({
+				cron: z.string(),
+				count: z.number().int().min(1).max(10).optional(),
+			}),
+		)
+		.handler(({ input }) => {
+			const error = cronError(input.cron);
+			return {
+				error,
+				description: error ? null : describeCron(input.cron),
+				times: error
+					? []
+					: nextCronTimes(input.cron, Date.now(), input.count ?? 3),
+			};
+		}),
 };
 
 const runs = {
@@ -129,6 +171,7 @@ export const appRouter = {
 	projects,
 	flows,
 	gates,
+	schedules,
 	runs,
 };
 export type AppRouter = typeof appRouter;
