@@ -448,6 +448,12 @@ export function deriveRunStatus(events: readonly LoggedEvent[]): RunStatus {
 	return deriveRunState(events).status;
 }
 
+/** When the run ended: the time of its `RunEnded`, or null while it is open again or never ended. */
+export function deriveEndedAt(events: readonly LoggedEvent[]): number | null {
+	const latest = latestRunEvent(events);
+	return latest?.type === "RunEnded" ? latest.at : null;
+}
+
 export type SleepFact = {
 	stepId: string;
 	reason: WaitReason;

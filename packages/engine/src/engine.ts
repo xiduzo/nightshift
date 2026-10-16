@@ -69,6 +69,7 @@ import {
 	countStepsSinceWalkBegan,
 	countVisits,
 	type DerivedStep,
+	deriveEndedAt,
 	deriveInputs,
 	deriveNodeOutputs,
 	deriveOpenGate,
@@ -642,6 +643,7 @@ export function createEngine(
 			stopAt: deriveStopAt(events),
 			stopAfterStep: open && deriveStopAfterStep(events),
 			costUsd: sumCostUsd(events),
+			endedAt: deriveEndedAt(events),
 			trigger: deriveTrigger(events),
 		};
 	}

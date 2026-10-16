@@ -143,6 +143,8 @@ export type RunSummary = {
 	/** Set when a person asked to stop after the running step. */
 	stopAfterStep: boolean;
 	createdAt: number;
+	/** When the run ended. Null while it is running, waiting or sleeping, or when it never ended. */
+	endedAt: number | null;
 	/** Sum over all steps. */
 	costUsd: number;
 };
