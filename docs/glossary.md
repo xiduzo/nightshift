@@ -60,6 +60,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |
 | Event | One appended record of a fact that changed. | Slice 1 |
 | Event Log | The append-only list of Events. Run status is derived from it. | Slice 1 |
+| Run Log | The daemon's copy in memory of each Run's Events. Every append goes through it, and it keeps an Event only after the database has it. | Run state |
 | Run Policy | The rules for retries, rescue, blocked propagation, network grace, usage-limit waits, and the stop time. | PLAN §2 |
 | Needs-you inbox | The list of open Gates. | PLAN §3 |
 | Decider | The provider behind a Decision Node. The default is a small model with structured output. | PLAN §2 |
