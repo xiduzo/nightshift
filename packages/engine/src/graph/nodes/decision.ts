@@ -15,7 +15,8 @@ import { ruleChooser } from "./choosers/rule";
  * the chooser behind the seam gets the option:
  *
  * - `person` (a Gate): `choosers/person.ts` opens the Gate in the log
- *   (`GateOpened`, the Needs-you inbox) and interrupts until the answer.
+ *   (`GateOpened`, the Needs-you inbox) and jumps to the node's ask node
+ *   (`ask__<id>`), which interrupts until the answer and then routes.
  * - `rule`: `choosers/rule.ts` evaluates each option's `when` in order,
  *   with no session and no cost; pure, so a re-run is safe.
  * - `model`: `choosers/model.ts` asks the decider, and waits out a usage

@@ -23,11 +23,13 @@ import type {
  *
  * Node naming in the compiled graph: the step node is the flow node's id;
  * its park node is `park__<id>`; the wait node of an Agent node or a
- * Decision decided by a model is `wait__<id>`.
+ * Decision decided by a model is `wait__<id>`; the ask node of a Decision
+ * decided by a person (a Gate) is `ask__<id>`.
  */
 
 export const parkNodeId = (nodeId: string) => `park__${nodeId}`;
 export const waitNodeId = (nodeId: string) => `wait__${nodeId}`;
+export const askNodeId = (nodeId: string) => `ask__${nodeId}`;
 
 /** The scope of the flow this graph runs in: null at the top level. */
 export function scopeOf(config: LangGraphRunnableConfig): Scope | null {

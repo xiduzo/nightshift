@@ -48,6 +48,7 @@ const waitReasonSchema = z.enum(["usage-limit", "network"]);
  *   harness session) when it has one, else starts a new visit. `stepId` is
  *   null when the run parked before the node's step started (stop after
  *   step, stop time, step cap): the node then starts a new visit.
+ * - `gate`: a Gate is open (below).
  *
  * Every node clears `pending` when it routes on (`route()` sets it null).
  */
@@ -84,12 +85,29 @@ const pendingParkedSchema = z.object({
 	/** The run's end reason, as `RunEnded` records it. */
 	reason: z.string().nullable(),
 });
+/**
+ * A Gate the node opened (`GateOpened` is in the log) for its ask node to
+ * interrupt with. Committed by the open node before the interrupt, so the
+ * checkpoint, not only the log, knows the Gate is open.
+ */
+const pendingGateSchema = z.object({
+	kind: z.literal("gate"),
+	stepId: z.string(),
+	nodeId: z.string(),
+	visit: z.number(),
+	question: z.string(),
+	choices: z.array(
+		z.object({ name: z.string(), description: z.string().optional() }),
+	),
+});
 const pendingSchema = z.discriminatedUnion("kind", [
 	pendingWaitSchema,
 	pendingParkedSchema,
+	pendingGateSchema,
 ]);
 export type PendingWait = z.infer<typeof pendingWaitSchema>;
 export type PendingParked = z.infer<typeof pendingParkedSchema>;
+export type PendingGate = z.infer<typeof pendingGateSchema>;
 export type Pending = z.infer<typeof pendingSchema>;
 
 /**

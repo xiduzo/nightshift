@@ -1,5 +1,5 @@
 import {
-	type Command,
+	Command,
 	interrupt,
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
@@ -13,12 +13,18 @@ import type { DerivedStep, GateChoice } from "../../../events";
 import {
 	beginStep,
 	messageOf,
+	type NodeAction,
 	type StepContext,
 	type StepHandle,
 	uncommittedStep,
 } from "../../context";
-import { type StepEnd, scopeOf } from "../../route";
-import type { Parked, ResumeValue, RunStateValues } from "../../state";
+import { askNodeId, route, type StepEnd, scopeOf } from "../../route";
+import type {
+	Parked,
+	PendingGate,
+	ResumeValue,
+	RunStateValues,
+} from "../../state";
 import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
 
 /**
@@ -29,55 +35,64 @@ import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
  * outputs: { outcome, note, visit } }` and the transcript `gate-resolved`.
  * A Gate waits as long as it must: its step has no time budget.
  *
- * The chooser interrupts with `{ kind: "gate", stepId, nodeId, question,
- * choices }` and loops until the resume value is `{ kind: "gate", choice,
- * note }`:
+ * Two graph nodes share the work, so the checkpoint knows the Gate is
+ * open (a node's writes before an `interrupt()` are never committed):
  *
- * - `{ kind: "reopen" }`: a person resumed a run that was stopped while the
- *   Gate was open. The runner appended `StepEnded stopped` and `RunEnded`,
- *   and the engine `RunResumed`. The Gate is asked again in a new visit
- *   (`StepStarted` with visit + 1, `GateOpened`, `gate-open`), and the
- *   chooser interrupts again.
- * - any other value asks again the same way.
- *
- * Everything before an `interrupt()` re-runs on every resume (design rule
- * 4), and a daemon restart re-runs the node with `invoke(null)` while the
- * Gate is still open. So the opening is guarded by the log: the chooser
- * looks for the latest step of the node in this scope the graph never
- * committed (`uncommittedStep`). When that step is open with its Gate
- * asked, it is the one (nothing is logged); when it ended (stopped) or
- * there is none, a new visit opens. A re-run that finds the Gate open logs
- * nothing.
+ * - the node itself (`personChooser`) opens the Gate and commits it as
+ *   `pending: { kind: "gate", stepId, nodeId, visit, question, choices }`
+ *   with a jump to its ask node;
+ * - the ask node (`gateAskNode`, `ask__<id>`) interrupts with that Gate
+ *   `{ kind: "gate", stepId, nodeId, question, choices }` and, on
+ *   `{ kind: "gate", choice, note }`, ends the step and routes; on
+ *   `{ kind: "reopen" }` (a person resumed a run that was stopped while the
+ *   Gate was open: the runner appended `StepEnded stopped` and `RunEnded`,
+ *   the engine `RunResumed`) it clears `pending` and jumps back to the
+ *   node, which asks again in a new visit (`StepStarted` with visit + 1,
+ *   `GateOpened`, `gate-open`). Any other value asks again the same way.
  *
  * The engine refuses an answer that is not one of the options before it
- * resumes the thread (`optionProblem`); the chooser checks again, and ends
- * the step `error` should a bad one slip through.
+ * resumes the thread (`optionProblem`); the ask node checks again, and
+ * ends the step `error` should a bad one slip through.
  */
 export function personChooser(node: DecisionNode, ctx: StepContext): Chooser {
 	return async (state, config) => {
-		let asked = await ensureOpen(ctx, node, state, config);
+		const asked = await ensureOpen(ctx, node, state, config);
 		if (asked.kind === "parked") return asked.command;
 		if (asked.kind === "failed") return asked.end;
+		const pending: PendingGate = {
+			kind: "gate",
+			stepId: asked.stepId,
+			nodeId: node.id,
+			visit: asked.visit,
+			question: asked.question,
+			choices: asked.choices,
+		};
+		return new Command({ update: { pending }, goto: askNodeId(node.id) });
+	};
+}
 
-		while (true) {
-			const value: Parked = {
-				kind: "gate",
-				stepId: asked.stepId,
-				nodeId: node.id,
-				question: asked.question,
-				choices: asked.choices,
-			};
-			const answer = interrupt<Parked, ResumeValue | undefined>(value);
-			if (answer?.kind === "gate") {
-				const done = await resolve(ctx, node, state, config, asked, answer);
-				if (done.kind === "parked") return done.command;
-				return done.end;
-			}
-			// A reopen, or anything else: ask again.
-			asked = await ensureOpen(ctx, node, state, config);
-			if (asked.kind === "parked") return asked.command;
-			if (asked.kind === "failed") return asked.end;
+/** The ask node of a Gate: interrupts with the Gate the node opened and ends the step on the answer. */
+export function gateAskNode(node: DecisionNode, ctx: StepContext): NodeAction {
+	return async (state, config) => {
+		const pending = state.pending;
+		if (pending?.kind !== "gate" || pending.nodeId !== node.id) {
+			throw new Error(`No Gate is open at node "${node.id}".`);
 		}
+		const value: Parked = {
+			kind: "gate",
+			stepId: pending.stepId,
+			nodeId: node.id,
+			question: pending.question,
+			choices: pending.choices,
+		};
+		const answer = interrupt<Parked, ResumeValue | undefined>(value);
+		if (answer?.kind !== "gate") {
+			// A reopen, or anything else: the node asks again in a new visit.
+			return new Command({ update: { pending: null }, goto: node.id });
+		}
+		const done = await resolve(ctx, node, state, config, pending, answer);
+		if (done.kind === "parked") return done.command;
+		return route(ctx, state, node, done.end, config);
 	};
 }
 
@@ -104,9 +119,16 @@ function isAsked(step: DerivedStep): boolean {
 
 /**
  * Makes sure a Gate of this node is open in the log, and says what it asks.
- * Leaves an open, asked Gate alone; otherwise (no uncommitted step, or one
- * that ended when the run was stopped) opens a new visit, unless the entry
- * checks park the run instead.
+ * Opens a new visit, unless the entry checks park the run instead.
+ *
+ * The log guard is the crash-only path: the node's own writes (`pending`)
+ * commit with the checkpoint after it returns, so a daemon that dies
+ * between `GateOpened` and that commit leaves the Gate open in the log
+ * only. The re-run (`invoke(null)`, design rule 5) then finds the latest
+ * step of the node in this scope the graph never committed
+ * (`uncommittedStep`) open with its Gate asked, and jumps to the ask node
+ * with it instead of opening a second Gate. A step that ended (the run was
+ * stopped at the Gate) is not reused: a new visit opens.
  */
 async function ensureOpen(
 	ctx: StepContext,
@@ -183,7 +205,7 @@ async function resolve(
 	node: DecisionNode,
 	state: RunStateValues,
 	config: LangGraphRunnableConfig,
-	gate: OpenGate,
+	gate: PendingGate,
 	answer: Extract<ResumeValue, { kind: "gate" }>,
 ): Promise<
 	{ kind: "parked"; command: Command } | { kind: "ended"; end: StepEnd }
