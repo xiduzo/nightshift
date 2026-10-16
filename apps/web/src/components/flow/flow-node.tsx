@@ -18,6 +18,8 @@ import {
 	type NodeProps,
 	type NodeTypes,
 	Position,
+	type ReactFlowState,
+	useStore,
 	useUpdateNodeInternals,
 } from "@xyflow/react";
 import {
@@ -94,6 +96,23 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 	return new Map(options.map((option) => [option.name, option.description]));
 }
 
+/** Below this zoom a node's text is too small to read, so the node shows its
+ *  type and id in large type instead, and a big flow reads as an overview. */
+const OVERVIEW_ZOOM = 0.55;
+/** The id's size on screen in the overview, and the most it may take up in
+ *  the node. */
+const OVERVIEW_TEXT = 14;
+const OVERVIEW_TEXT_MAX = 44;
+
+/** The zoom in steps of 0.05 below `OVERVIEW_ZOOM`, else null: a node redraws
+ *  a few times in a zoom gesture, not on every frame. */
+function overviewZoom(state: ReactFlowState): number | null {
+	const zoom = state.transform[2];
+	return zoom < OVERVIEW_ZOOM
+		? Math.max(0.05, Math.round(zoom * 20) / 20)
+		: null;
+}
+
 const FlowNodeCard = memo(function FlowNodeCard({
 	id,
 	data,
@@ -123,6 +142,10 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	}, [id, outcomesKey, updateNodeInternals]);
 
 	const label = node.label?.trim();
+	const overview = useStore(overviewZoom);
+	const overviewText = overview
+		? Math.min(OVERVIEW_TEXT / overview, OVERVIEW_TEXT_MAX)
+		: 0;
 
 	return (
 		<div
@@ -147,139 +170,157 @@ const FlowNodeCard = memo(function FlowNodeCard({
 				className="size-2.5! min-h-0! min-w-0! border-2! border-card! bg-muted-foreground!"
 				style={{ top: 20 }}
 			/>
-			<div className="flex min-w-0 flex-col gap-0.5 px-3 pt-2.5 pb-2">
-				<div className="flex h-5 min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wider">
-					<Icon className="size-3.5 shrink-0" aria-hidden="true" />
-					<span className="truncate">{meta.label}</span>
-					{isStart ? (
-						<Badge
-							variant="outline"
-							className="h-4 gap-0.5 px-1.5 font-mono text-[10px] text-foreground lowercase tracking-normal"
-							title="The run starts here"
-						>
-							<PlayIcon aria-hidden="true" />
-							start
-						</Badge>
-					) : null}
-					<span className="ml-auto flex shrink-0 items-center gap-1.5 normal-case tracking-normal">
-						{errorCount > 0 ? (
-							<Badge
-								variant="destructive"
-								className="h-4 gap-0.5 px-1.5 text-[10px] tabular-nums"
-								title={`${errorCount} ${errorCount === 1 ? "error" : "errors"}`}
-							>
-								<CircleAlertIcon aria-hidden="true" />
-								<span className="sr-only">Errors:</span>
-								{errorCount}
-							</Badge>
-						) : warningCount > 0 ? (
+			{/* Kept in the overview, only hidden: the node keeps its size, so
+			    the layout and the edges stay where they are. */}
+			<div className={cn(overview && "invisible")}>
+				<div className="flex min-w-0 flex-col gap-0.5 px-3 pt-2.5 pb-2">
+					<div className="flex h-5 min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wider">
+						<Icon className="size-3.5 shrink-0" aria-hidden="true" />
+						<span className="truncate">{meta.label}</span>
+						{isStart ? (
 							<Badge
 								variant="outline"
-								className="h-4 gap-0.5 border-status-waiting/40 bg-status-waiting/10 px-1.5 text-[10px] text-status-waiting tabular-nums"
-								title={`${warningCount} ${warningCount === 1 ? "warning" : "warnings"}`}
+								className="h-4 gap-0.5 px-1.5 font-mono text-[10px] text-foreground lowercase tracking-normal"
+								title="The run starts here"
 							>
-								<TriangleAlertIcon aria-hidden="true" />
-								<span className="sr-only">Warnings:</span>
-								{warningCount}
+								<PlayIcon aria-hidden="true" />
+								start
 							</Badge>
 						) : null}
-						{run ? (
-							<OutcomeBadge
-								state={run.state}
-								className="h-4 px-1.5 text-[10px]"
-							/>
-						) : null}
+						<span className="ml-auto flex shrink-0 items-center gap-1.5 normal-case tracking-normal">
+							{errorCount > 0 ? (
+								<Badge
+									variant="destructive"
+									className="h-4 gap-0.5 px-1.5 text-[10px] tabular-nums"
+									title={`${errorCount} ${errorCount === 1 ? "error" : "errors"}`}
+								>
+									<CircleAlertIcon aria-hidden="true" />
+									<span className="sr-only">Errors:</span>
+									{errorCount}
+								</Badge>
+							) : warningCount > 0 ? (
+								<Badge
+									variant="outline"
+									className="h-4 gap-0.5 border-status-waiting/40 bg-status-waiting/10 px-1.5 text-[10px] text-status-waiting tabular-nums"
+									title={`${warningCount} ${warningCount === 1 ? "warning" : "warnings"}`}
+								>
+									<TriangleAlertIcon aria-hidden="true" />
+									<span className="sr-only">Warnings:</span>
+									{warningCount}
+								</Badge>
+							) : null}
+							{run ? (
+								<OutcomeBadge
+									state={run.state}
+									className="h-4 px-1.5 text-[10px]"
+								/>
+							) : null}
+						</span>
+					</div>
+					<span
+						className="truncate font-medium font-mono text-sm leading-6"
+						title={node.id}
+					>
+						{node.id}
+					</span>
+					{label && label !== node.id ? (
+						<span className="truncate text-muted-foreground" title={label}>
+							{label}
+						</span>
+					) : null}
+				</div>
+
+				<div className="flex min-w-0 flex-col gap-1.5 border-t px-3 py-2">
+					{node.type === "agent" ? <AgentBody node={node} /> : null}
+					{node.type === "decision" ? <DecisionBody node={node} /> : null}
+					{node.type === "gate" ? <GateBody node={node} /> : null}
+					{node.type === "subflow" ? <SubflowBody node={node} /> : null}
+					{node.type === "foreach" ? <ForEachBody node={node} /> : null}
+					{node.type === "command" ? (
+						<code className="block truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px]">
+							{node.command.trim() === "" ? (
+								<span className="font-sans text-muted-foreground italic">
+									No command yet
+								</span>
+							) : (
+								<>
+									<span className="text-muted-foreground" aria-hidden="true">
+										${" "}
+									</span>
+									{node.command}
+								</>
+							)}
+						</code>
+					) : null}
+					{run && run.visits > 1 ? (
+						<span className="text-[11px] text-muted-foreground tabular-nums">
+							{run.visits} visits
+						</span>
+					) : null}
+				</div>
+
+				<ul
+					className="flex flex-col border-t py-1"
+					aria-label={
+						node.type === "decision"
+							? "Labels"
+							: node.type === "gate"
+								? "Choices"
+								: "Outcomes"
+					}
+				>
+					{outcomes.length === 0 ? (
+						<li className="flex h-5 items-center justify-end pr-3.5 text-[11px] text-muted-foreground italic">
+							{node.type === "decision" ? "No labels yet" : "No choices yet"}
+						</li>
+					) : null}
+					{outcomes.map((outcome) => {
+						const style = outcomeStyle(outcome);
+						const description = descriptions.get(outcome);
+						return (
+							<li
+								key={outcome}
+								className="relative flex h-5 items-center justify-end gap-2 pr-3.5 pl-3 text-[11px]"
+								title={description}
+							>
+								{description ? (
+									<span className="min-w-0 flex-1 truncate text-muted-foreground">
+										{description}
+									</span>
+								) : null}
+								<span
+									className={cn("shrink-0 font-medium font-mono", style.text)}
+								>
+									{outcomeLabel(outcome)}
+								</span>
+								<Handle
+									type="source"
+									id={outcome}
+									position={Position.Right}
+									isConnectable={isConnectable}
+									className="size-2.5! min-h-0! min-w-0! border-2! border-card!"
+									style={{ background: style.color }}
+									title={`Drag to connect the ${outcomeLabel(outcome)} outcome`}
+								/>
+							</li>
+						);
+					})}
+				</ul>
+			</div>
+			{overview ? (
+				<div
+					className="absolute inset-0 flex flex-col items-center justify-center gap-[0.3em] overflow-hidden p-3 text-center"
+					style={{ fontSize: overviewText }}
+				>
+					<Icon
+						className="size-[0.9em] shrink-0 text-muted-foreground"
+						aria-hidden="true"
+					/>
+					<span className="line-clamp-3 break-all font-medium font-mono leading-tight">
+						{node.id}
 					</span>
 				</div>
-				<span
-					className="truncate font-medium font-mono text-sm leading-6"
-					title={node.id}
-				>
-					{node.id}
-				</span>
-				{label && label !== node.id ? (
-					<span className="truncate text-muted-foreground" title={label}>
-						{label}
-					</span>
-				) : null}
-			</div>
-
-			<div className="flex min-w-0 flex-col gap-1.5 border-t px-3 py-2">
-				{node.type === "agent" ? <AgentBody node={node} /> : null}
-				{node.type === "decision" ? <DecisionBody node={node} /> : null}
-				{node.type === "gate" ? <GateBody node={node} /> : null}
-				{node.type === "subflow" ? <SubflowBody node={node} /> : null}
-				{node.type === "foreach" ? <ForEachBody node={node} /> : null}
-				{node.type === "command" ? (
-					<code className="block truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px]">
-						{node.command.trim() === "" ? (
-							<span className="font-sans text-muted-foreground italic">
-								No command yet
-							</span>
-						) : (
-							<>
-								<span className="text-muted-foreground" aria-hidden="true">
-									${" "}
-								</span>
-								{node.command}
-							</>
-						)}
-					</code>
-				) : null}
-				{run && run.visits > 1 ? (
-					<span className="text-[11px] text-muted-foreground tabular-nums">
-						{run.visits} visits
-					</span>
-				) : null}
-			</div>
-
-			<ul
-				className="flex flex-col border-t py-1"
-				aria-label={
-					node.type === "decision"
-						? "Labels"
-						: node.type === "gate"
-							? "Choices"
-							: "Outcomes"
-				}
-			>
-				{outcomes.length === 0 ? (
-					<li className="flex h-5 items-center justify-end pr-3.5 text-[11px] text-muted-foreground italic">
-						{node.type === "decision" ? "No labels yet" : "No choices yet"}
-					</li>
-				) : null}
-				{outcomes.map((outcome) => {
-					const style = outcomeStyle(outcome);
-					const description = descriptions.get(outcome);
-					return (
-						<li
-							key={outcome}
-							className="relative flex h-5 items-center justify-end gap-2 pr-3.5 pl-3 text-[11px]"
-							title={description}
-						>
-							{description ? (
-								<span className="min-w-0 flex-1 truncate text-muted-foreground">
-									{description}
-								</span>
-							) : null}
-							<span
-								className={cn("shrink-0 font-medium font-mono", style.text)}
-							>
-								{outcomeLabel(outcome)}
-							</span>
-							<Handle
-								type="source"
-								id={outcome}
-								position={Position.Right}
-								isConnectable={isConnectable}
-								className="size-2.5! min-h-0! min-w-0! border-2! border-card!"
-								style={{ background: style.color }}
-								title={`Drag to connect the ${outcomeLabel(outcome)} outcome`}
-							/>
-						</li>
-					);
-				})}
-			</ul>
+			) : null}
 		</div>
 	);
 });
