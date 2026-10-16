@@ -44,12 +44,12 @@ function parse(
 		value = JSON.parse(text);
 	} catch (error) {
 		return {
-			error: `Not JSON: ${error instanceof Error ? error.message : String(error)}`,
+			error: `This is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
 		};
 	}
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
 		return {
-			error: 'A JSON Schema is an object, for example {"type": "array"}.',
+			error: 'Start with { and end with }, for example {"type": "array"}.',
 		};
 	}
 	return { schema: value as Schema };
@@ -138,7 +138,7 @@ export function OutputSchemaField({
 					className="text-xs [&_code]:font-mono"
 				>
 					{output === undefined ? (
-						"A JSON Schema for the report's data. The step fails when the data does not match."
+						"The shape of the data the agent must report. The step fails when the data does not fit."
 					) : (
 						<>
 							Later nodes read{" "}

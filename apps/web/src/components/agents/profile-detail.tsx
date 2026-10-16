@@ -269,7 +269,7 @@ export function ProfileDetail({
 							</FieldError>
 						) : usedBy.length > 0 ? (
 							<FieldDescription id={`${id}-name-hint`}>
-								Flows name it, so the name stays.
+								Flows use this name, so you cannot change it.
 							</FieldDescription>
 						) : null}
 					</Field>
@@ -288,7 +288,7 @@ export function ProfileDetail({
 
 			<DetailSection
 				title="Runs on"
-				description="The harness that runs the session, and the model it asks for."
+				description="The coding agent and the model this profile uses."
 			>
 				<FieldGroup>
 					<RadioGroup
@@ -473,7 +473,7 @@ export function ProfileDetail({
 
 			<DetailSection
 				title="Used in flows"
-				description="Agent nodes that name this profile. A change here reaches their next run."
+				description="Agent nodes that use this profile. Your changes apply from their next run."
 			>
 				{usedBy.length === 0 ? (
 					<p className="text-muted-foreground text-sm">No flow uses it yet.</p>
@@ -517,8 +517,8 @@ export function ProfileDetail({
 						<AlertDialogTitle>Delete {profile?.name}?</AlertDialogTitle>
 						<AlertDialogDescription>
 							{nodeCount > 0
-								? `${nodeCount} Agent ${nodeCount === 1 ? "node names" : "nodes name"} it. ${nodeCount === 1 ? "Its flow refuses" : "Their flows refuse"} to start until ${nodeCount === 1 ? "it names" : "they name"} another profile.`
-								: "No flow names it."}
+								? `${nodeCount} Agent ${nodeCount === 1 ? "node uses" : "nodes use"} it. ${nodeCount === 1 ? "Its flow" : "Their flows"} cannot run until you pick another profile.`
+								: "No flow uses it."}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

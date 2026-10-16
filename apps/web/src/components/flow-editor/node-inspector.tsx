@@ -418,9 +418,9 @@ function IdField({
 			error={error}
 			hint={
 				<>
-					Other nodes read its outputs as{" "}
+					Later nodes use its outputs as{" "}
 					<code className="font-mono">{`{{${nodeId}.field}}`}</code>. Renaming
-					updates edges, the start, and those references.
+					it updates every edge and reference.
 				</>
 			}
 		>
@@ -643,10 +643,10 @@ function AgentFields({
 					label="Profile"
 					hint={
 						unknownProfile
-							? `This daemon has no profile named ${node.profile}: the flow refuses to start. Pick another, or add it under Agents.`
+							? `There is no profile named ${node.profile}. The flow cannot run until you pick another or add it under Agents.`
 							: profile
-								? "The node runs with the profile's harness, model, effort, permission mode and tools. Set a field below to override it here."
-								: "An agent setup from the Agents page. Without one, set the harness and model on this node."
+								? "This node uses the profile's settings. Change a field below to override it for this node only."
+								: "A saved agent setup from the Agents page. Without one, set the harness and model below."
 					}
 				>
 					<NativeSelect
@@ -670,7 +670,7 @@ function AgentFields({
 						))}
 						{unknownProfile ? (
 							<NativeSelectOption value={node.profile}>
-								{node.profile} (not on this daemon)
+								{node.profile} (not found)
 							</NativeSelectOption>
 						) : null}
 					</NativeSelect>
@@ -710,7 +710,7 @@ function AgentFields({
 					label="Prompt"
 					hint={
 						node.skill
-							? `Runs as /${node.skill} followed by the prompt.`
+							? `The agent gets /${node.skill}, then this prompt.`
 							: "What the agent should do. Leave it empty only when a skill is set."
 					}
 					flow={flow}
@@ -724,7 +724,7 @@ function AgentFields({
 					id={`${id}-skill`}
 					label="Skill"
 					optional
-					hint={`A skill ${harness.label} already has, without the slash.`}
+					hint={`A skill that ${harness.label} already has. Leave out the slash.`}
 				>
 					<Input
 						id={`${id}-skill`}
@@ -849,8 +849,8 @@ function AgentFields({
 					label="Session on a later visit"
 					hint={
 						node.session === "fresh"
-							? "A retry starts a new session with only the prompt: a tight brief."
-							: "A retry continues this node's last session, with its full context."
+							? "A retry starts over with only the prompt."
+							: "A retry continues where the agent left off, with everything it knew."
 					}
 				>
 					<NativeSelect
@@ -882,12 +882,12 @@ function AgentFields({
 					<Note>
 						Harness: <span className="text-foreground">{harness.label}</span>
 						{profile && node.harness === undefined ? " (from the profile)" : ""}
-						. The agent ends with a step report:{" "}
+						. When it is done, the agent reports{" "}
 						{node.outcomes
 							? `one of its own outcomes (${node.outcomes.map((o) => o.name).join(", ")})`
 							: "pass, fail, or needs input"}
 						, a summary
-						{node.output ? ", and data that matches the output schema" : ""}.
+						{node.output ? ", and data in the shape of the output schema" : ""}.
 					</Note>
 				}
 			/>
@@ -1071,7 +1071,7 @@ function CommandFields({
 			<Field
 				id={`${id}-command`}
 				label="Command"
-				hint='Runs with sh -c in the worktree. Exit 0 is pass, anything else is fail. Templates arrive as environment variables, so quote them: echo "{{worker.summary}}".'
+				hint='The step passes when the command succeeds, and fails when it does not. Put templates in quotes, for example: echo "{{worker.summary}}".'
 			>
 				<Textarea
 					id={`${id}-command`}
@@ -1186,7 +1186,7 @@ function DecisionFields({
 				<TemplateField
 					id={`${id}-prompt`}
 					label="Prompt"
-					hint="What to decide, with the context it needs. The decider reads it, picks one label, and writes notes on why."
+					hint="What to decide, with the context it needs. A model picks one label and notes why."
 					flow={flow}
 					nodeId={node.id}
 					value={node.prompt}
@@ -1201,7 +1201,7 @@ function DecisionFields({
 				kind="label"
 				node={node}
 				min={2}
-				hint="The decider returns exactly one. Each label is an outcome with its own edge. A description tells the decider when to pick it."
+				hint="The model picks exactly one. Each label gets its own edge. A description tells the model when to pick it."
 				onChange={onChange}
 				onRenameOutcome={onRenameOutcome}
 				onRemoveOutcome={onRemoveOutcome}
@@ -1234,7 +1234,7 @@ function DecisionFields({
 					</datalist>
 				</Field>
 				<Note>
-					Decider: <span className="text-foreground">Claude Code</span>. Later
+					Runs on <span className="text-foreground">Claude Code</span>. Later
 					nodes read <code>{`{{${node.id}.outcome}}`}</code> and{" "}
 					<code>{`{{${node.id}.notes}}`}</code>.
 				</Note>
@@ -1281,7 +1281,7 @@ function GateFields({
 				kind="choice"
 				node={node}
 				min={1}
-				hint="One button each in the inbox. Each choice is an outcome with its own edge."
+				hint="Each choice is a button in the inbox, with its own edge."
 				onChange={onChange}
 				onRenameOutcome={onRenameOutcome}
 				onRemoveOutcome={onRemoveOutcome}
@@ -1364,7 +1364,7 @@ function AgentOutcomesField({
 			kind="outcome"
 			node={node}
 			min={1}
-			hint="The agent reports exactly one. Each outcome is a handle with its own edge. A description tells the agent when to pick it."
+			hint="The agent picks exactly one. Each outcome gets its own edge. A description tells the agent when to pick it."
 			onChange={onChange}
 			onRenameOutcome={onRenameOutcome}
 			onRemoveOutcome={onRemoveOutcome}
@@ -1403,7 +1403,7 @@ function SubflowFields({
 				id={`${id}-flow`}
 				node={node}
 				support={support}
-				hint="Runs once, in the same worktree, then this node ends with pass (it finished) or fail."
+				hint="Runs once. This node passes when the called flow finishes, and fails when it does not."
 				onPick={(name) => onChange((current) => ({ ...current, flow: name }))}
 			/>
 			<InputBindings

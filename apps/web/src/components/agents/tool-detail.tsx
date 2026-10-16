@@ -122,8 +122,8 @@ export function ToolDetail({
 				title="Server"
 				description={
 					remote
-						? "A server that is already running. Night Shift connects for each session."
-						: "The daemon starts it for each session, in the run's worktree."
+						? "A server that is already running. Night Shift connects to it when an agent needs its tools."
+						: "Night Shift starts it on this computer when an agent needs its tools."
 				}
 			>
 				<div className="flex flex-col gap-4">
@@ -187,9 +187,9 @@ export function ToolDetail({
 				title="Secrets"
 				description={
 					<>
-						The <span className="font-mono">${"{NAME}"}</span> references in its
-						env values or headers. Each reads the keychain, then the daemon's
-						environment.
+						The secrets it uses, written as{" "}
+						<span className="font-mono">${"{NAME}"}</span>. Save their values
+						under Secrets.
 					</>
 				}
 			>
@@ -232,10 +232,10 @@ export function ToolDetail({
 						<AlertDialogDescription>
 							{[
 								connection.profiles.length > 0
-									? `It comes off the profiles ${connection.profiles.join(", ")}.`
+									? `It is taken off the profiles ${connection.profiles.join(", ")}.`
 									: null,
 								connection.usedBy.length > 0
-									? `Flows that name it (${connection.usedBy.map((u) => u.flowName).join(", ")}) refuse to start until they drop it.`
+									? `Flows that use it (${connection.usedBy.map((u) => u.flowName).join(", ")}) cannot run until you take it out of their nodes.`
 									: null,
 							]
 								.filter(Boolean)
@@ -270,7 +270,7 @@ export function UsedBySection({
 	return (
 		<DetailSection
 			title="Used by"
-			description="The profiles that hand it out, and the flows whose Agent nodes name it themselves."
+			description="The profiles and flows that use it."
 		>
 			{profiles.length === 0 && flows.length === 0 ? (
 				<p className="text-muted-foreground text-sm">Nothing uses it yet.</p>

@@ -202,7 +202,7 @@ function RunFacts({ run }: { run: RunDetail }) {
 				<Fact label="Started by">
 					{run.trigger.kind === "schedule"
 						? `Schedule · ${run.trigger.scheduleId}`
-						: "Hand"}
+						: "You"}
 				</Fact>
 			</dl>
 			<Separator />
@@ -212,13 +212,13 @@ function RunFacts({ run }: { run: RunDetail }) {
 				</Fact>
 				<Fact label="Base">
 					<CopyValue
-						label="base ref"
+						label="base"
 						value={run.baseRef}
 						short={SHA.test(run.baseRef) ? run.baseRef.slice(0, 12) : undefined}
 					/>
 				</Fact>
-				<Fact label="Worktree">
-					<CopyValue label="worktree path" value={run.worktreePath} />
+				<Fact label="Folder">
+					<CopyValue label="folder path" value={run.worktreePath} />
 				</Fact>
 			</dl>
 			<Separator />
@@ -249,7 +249,7 @@ function RunFacts({ run }: { run: RunDetail }) {
 					)}
 				</Fact>
 				{daemonResumes.length > 0 ? (
-					<Fact label="Resumed by the daemon">
+					<Fact label="Resumed automatically">
 						<ul className="flex min-w-0 flex-col gap-1 text-xs">
 							{daemonResumes.map((resume) => (
 								<li key={resume.at}>
@@ -257,7 +257,7 @@ function RunFacts({ run }: { run: RunDetail }) {
 										{formatDayTime(resume.at)}
 									</span>
 									, at <span className="font-mono">{resume.nodeId}</span>:{" "}
-									{resume.reason ?? "The daemon restarted."}
+									{resume.reason ?? "Night Shift restarted."}
 								</li>
 							))}
 						</ul>
@@ -408,10 +408,9 @@ export function RunActions({
 					<span className="hidden sm:inline">Export</span>
 				</TooltipTrigger>
 				<TooltipContent className="max-w-sm">
-					Downloads the run as one SQLite file: the flow, steps, events and
-					transcripts. Saved secret values are taken out, but a transcript holds
-					whatever the agents read or printed. Check it before you share the
-					file.
+					Downloads the run as one file, with its flow, steps and transcripts.
+					Saved secrets are removed, but a transcript shows everything the
+					agents read or printed. Check it before you share it.
 				</TooltipContent>
 			</Tooltip>
 			{STOPPABLE.includes(status) ? (
@@ -430,7 +429,7 @@ export function RunActions({
 const STOP_NOW_TEXT: Partial<Record<RunStatus, string>> = {
 	waiting: "This closes the open gate without an answer and stops the run.",
 	sleeping: "This ends the sleep and stops the run.",
-	running: "This aborts the running step and stops the run.",
+	running: "This cancels the running step and stops the run.",
 };
 
 /** Stop now (after a confirmation), or let the running step finish first. */
@@ -485,7 +484,7 @@ function StopMenu({
 							<span className="flex flex-col">
 								Stop now
 								<span className="text-muted-foreground text-xs">
-									Aborts the running step.
+									Cancels the running step.
 								</span>
 							</span>
 						</DropdownMenuItem>
@@ -499,7 +498,7 @@ function StopMenu({
 								<span className="text-muted-foreground text-xs">
 									{stopAfterStep
 										? "Already asked."
-										: "The running step finishes; no new one starts."}
+										: "The running step finishes, then the run stops."}
 								</span>
 							</span>
 						</DropdownMenuItem>
@@ -515,7 +514,7 @@ function StopMenu({
 						<AlertDialogTitle>Stop this run now?</AlertDialogTitle>
 						<AlertDialogDescription>
 							{STOP_NOW_TEXT[status] ?? "This stops the run."} You can resume it
-							later in the same worktree.
+							later.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

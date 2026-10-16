@@ -6,7 +6,6 @@ import {
 	countVisits,
 	deriveNodeOutputs,
 	deriveOpenGate,
-	deriveResumePoint,
 	deriveRunState,
 	deriveSideEffect,
 	deriveSleep,
@@ -270,52 +269,6 @@ test("harness session lookups", () => {
 	});
 });
 
-describe("deriveResumePoint", () => {
-	test("an agent step with a harness session continues that session", () => {
-		const { events } = log()
-			.runStarted()
-			.stepStarted("s1", "worker")
-			.sessionStarted("s1", "a")
-			.harness("s1", "a", "h-1")
-			.sessionEnded("s1", "a", "stopped")
-			.stepEnded("s1", "stopped")
-			.ended("stopped");
-		expect(deriveResumePoint(events)).toEqual({
-			kind: "session",
-			stepId: "s1",
-			nodeId: "worker",
-			harnessSessionId: "h-1",
-		});
-	});
-
-	test("a command step runs its node again", () => {
-		const { events } = log()
-			.stepStarted("s1", "check")
-			.stepEnded("s1", "fail")
-			.ended("failed");
-		expect(deriveResumePoint(events)).toEqual({
-			kind: "node",
-			nodeId: "check",
-		});
-	});
-
-	test("an edge taken after the last step continues at its target", () => {
-		const { events } = log()
-			.stepStarted("s1", "check")
-			.stepEnded("s1", "fail")
-			.edge("e2", "check", "worker")
-			.ended("stopped");
-		expect(deriveResumePoint(events)).toEqual({
-			kind: "node",
-			nodeId: "worker",
-		});
-	});
-
-	test("a run without steps has no resume point", () => {
-		expect(deriveResumePoint(log().runStarted().events)).toBeNull();
-	});
-});
-
 test("sumCostUsd adds the cost of each ended session once", () => {
 	const { events } = log()
 		.sessionStarted("s1", "a")
@@ -423,7 +376,7 @@ describe("gates", () => {
 		expect(open.runOpen).toBe(false);
 	});
 
-	test("a Gate closed by a stop resumes as a new visit of the Gate", () => {
+	test("a Gate closed by a stop is no longer open", () => {
 		const { events } = log()
 			.runStarted()
 			.stepStarted("s1", "gate")
@@ -432,7 +385,6 @@ describe("gates", () => {
 			.ended("stopped");
 		expect(deriveOpenGate(events)).toBeNull();
 		expect(deriveRunState(events).status).toBe("stopped");
-		expect(deriveResumePoint(events)).toEqual({ kind: "node", nodeId: "gate" });
 	});
 });
 
@@ -511,69 +463,6 @@ describe("For Each scopes", () => {
 		expect(lastHarnessSessionOfNode(b.events, "worker")).toBeNull();
 	});
 
-	test("resume inside nested items wraps the point in its For Each steps", () => {
-		const b = nested();
-		b.sessionEnded("w", "s", "stopped").stepEnded("w", "stopped");
-		b.stepEnded("inner", "stopped").stepEnded("outer", "stopped");
-		b.ended("stopped");
-		expect(deriveResumePoint(b.events)).toEqual({
-			kind: "call",
-			nodeId: "loop",
-			stepId: "outer",
-			itemId: "A",
-			inner: {
-				kind: "call",
-				nodeId: "traces",
-				stepId: "inner",
-				itemId: "a1",
-				inner: {
-					kind: "session",
-					stepId: "w",
-					nodeId: "worker",
-					harnessSessionId: "h-1",
-				},
-			},
-		});
-	});
-
-	test("an ended item continues the loop; an ended For Each runs again", () => {
-		const b = nested();
-		b.stepEnded("w", "pass");
-		b.push(
-			"ItemEnded",
-			{ itemId: "a1", state: "done", reason: null },
-			{
-				stepId: "inner",
-			},
-		);
-		b.stepEnded("inner", "stopped").stepEnded("outer", "stopped");
-		b.ended("stopped");
-		expect(deriveResumePoint(b.events)).toMatchObject({
-			kind: "call",
-			stepId: "outer",
-			itemId: "A",
-			inner: { kind: "call", stepId: "inner", itemId: null, inner: null },
-		});
-
-		const c = nested();
-		c.stepEnded("w", "pass");
-		c.push(
-			"ItemEnded",
-			{ itemId: "a1", state: "done", reason: null },
-			{
-				stepId: "inner",
-			},
-		);
-		c.stepEnded("inner", "done");
-		c.ended("failed");
-		expect(deriveResumePoint(c.events)).toMatchObject({
-			kind: "call",
-			stepId: "outer",
-			itemId: "A",
-			inner: { kind: "node", nodeId: "traces" },
-		});
-	});
-
 	test("items derive their states, blocked ones included", () => {
 		const b = nested();
 		b.push(
@@ -600,7 +489,7 @@ describe("For Each scopes", () => {
 		b.stepEnded("outer", "interrupted");
 		expect(outer()?.items[0]).toMatchObject({
 			state: "failed",
-			reason: "The daemon stopped during this item.",
+			reason: "Night Shift stopped during this item.",
 			open: true,
 		});
 		b.stepReopened("outer");

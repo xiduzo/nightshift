@@ -789,7 +789,7 @@ describe("validateFlow: names and inputs", () => {
 		expect(errors(validateFlow(f))).toEqual([
 			expect.objectContaining({
 				nodeId: "worker",
-				message: expect.stringContaining("share one namespace"),
+				message: expect.stringContaining("Rename one of them"),
 			}),
 		]);
 	});
@@ -809,7 +809,7 @@ describe("validateFlow: names and inputs", () => {
 			{ name: "run", type: "text" },
 		]);
 		expect(errors(validateFlow(f)).map((issue) => issue.message)).toEqual([
-			'The input "run" is reserved for {{run.<field>}} templates.',
+			'The input name "run" is reserved. Pick another name.',
 		]);
 	});
 
@@ -1251,7 +1251,7 @@ describe("validateFlow: For Each", () => {
 		expect(errors(validateFlow(night(), { flows: { trace: null } }))).toEqual([
 			expect.objectContaining({
 				nodeId: "each",
-				message: expect.stringContaining("does not parse"),
+				message: expect.stringContaining("is not valid"),
 			}),
 		]);
 	});
@@ -1305,7 +1305,7 @@ describe("validateFlow: For Each", () => {
 			).map((issue) => issue.message),
 		).toEqual([
 			'The input "epic" of "each" uses {{nope}}, but there is no node or input "nope".',
-			'For Each node "each" binds the input "item", which already takes each element.',
+			'For Each node "each" binds the input "item", which already takes each item.',
 			'For Each node "each" binds the input "other", but flow "trace" has no such input.',
 		]);
 	});
@@ -1547,7 +1547,7 @@ describe("validateFlow: Subflow", () => {
 			errors(validateFlow(caller("x"), { flows: { review: null } })).map(
 				(i) => i.message,
 			),
-		).toEqual([expect.stringContaining("which does not parse")]);
+		).toEqual([expect.stringContaining("which is not valid")]);
 	});
 
 	test("bindings: declared inputs only, every required input bound", () => {

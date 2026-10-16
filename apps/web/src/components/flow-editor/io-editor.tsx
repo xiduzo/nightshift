@@ -97,7 +97,7 @@ export function InputsEditor({
 							autoFocus={focusIndex === index}
 							onRename={(name) => {
 								if (name === "run")
-									return "run is reserved for the run's fields.";
+									return "The name run is taken. Pick another name.";
 								if (
 									inputs.some(
 										(other, at) => at !== index && other.name === name,
@@ -105,7 +105,7 @@ export function InputsEditor({
 								)
 									return `Another input is named ${name}.`;
 								if (flow.nodes.some((node) => node.id === name))
-									return `A node is named ${name}. Inputs and node ids share one namespace.`;
+									return `A node is already named ${name}. Pick another name.`;
 								onChange((current) => renameInput(current, index, name));
 								return null;
 							}}
@@ -403,7 +403,7 @@ function InputRow({
 			)}
 			{defaultError ? (
 				<FieldError id={`${id}-default-error`} className="text-xs">
-					The default is not JSON: {defaultError}
+					The default is not valid JSON: {defaultError}
 				</FieldError>
 			) : null}
 			<Field orientation="horizontal" className="gap-2 pt-0.5">
@@ -422,7 +422,9 @@ function InputRow({
 				>
 					Required
 					{input.default ? (
-						<span className="text-muted-foreground">· the default counts</span>
+						<span className="text-muted-foreground">
+							· the default is enough
+						</span>
 					) : null}
 				</FieldLabel>
 			</Field>
@@ -483,7 +485,7 @@ export function OutputsEditor({
 									autoFocus={focusIndex === index}
 									onCommit={(name) => {
 										if (RESERVED_OUTPUTS.includes(name))
-											return `${name} is a field every Subflow node has. Pick another name.`;
+											return `The name ${name} is taken. Pick another name.`;
 										if (
 											outputs.some(
 												(other, at) => at !== index && other.name === name,

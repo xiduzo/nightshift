@@ -267,7 +267,7 @@ describe("MCP servers", () => {
 		const step = (await engine.getRun(run.id)).steps[0];
 		expect(step?.outcome).toBe("error");
 		expect(step?.error).toBe(
-			'The MCP server "tracker" reads the environment variable NIGHTSHIFT_TEST_NOT_SET, but the daemon does not have it. Save it under Agents → Secrets, set it where the daemon starts, or remove the reference.',
+			'The MCP server "tracker" needs the secret NIGHTSHIFT_TEST_NOT_SET, but it is not saved. Save it under Agents → Secrets, or remove the reference.',
 		);
 		expect(step?.error).not.toContain(SECRET);
 		expect(step?.sessions).toEqual([]);
@@ -331,7 +331,7 @@ describe("expandMcpServers", () => {
 		expect(result).toEqual({
 			ok: false,
 			message:
-				'The MCP server "a" reads the environment variables MISSING_ONE, MISSING_TWO, but the daemon does not have them. Save them under Agents → Secrets, set them where the daemon starts, or remove the reference.',
+				'The MCP server "a" needs the secrets MISSING_ONE, MISSING_TWO, but they are not saved. Save them under Agents → Secrets, or remove the reference.',
 		});
 	});
 

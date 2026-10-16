@@ -112,8 +112,7 @@ export function FlowList({ projectId }: { projectId: string }) {
 						Flows
 					</h1>
 					<p className="text-muted-foreground text-sm">
-						Graphs of steps, saved in{" "}
-						<span className="font-mono text-xs">.nightshift/flows/</span>
+						The steps an agent follows. Run one, or open it to edit.
 					</p>
 				</div>
 				<Button variant="outline" size="sm" onClick={() => setCreating(true)}>
@@ -138,7 +137,7 @@ export function FlowList({ projectId }: { projectId: string }) {
 						<EmptyDescription>
 							{flows.error
 								? flows.error.message
-								: "A flow is a graph of steps, saved in .nightshift/flows/ in the repository. Create one to draw it."}
+								: "A flow is the set of steps an agent follows. Create one to start."}
 						</EmptyDescription>
 					</EmptyHeader>
 					<EmptyContent>
@@ -202,11 +201,8 @@ export function FlowList({ projectId }: { projectId: string }) {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete {toDelete?.name}?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This removes{" "}
-							<span className="font-mono">
-								.nightshift/flows/{toDelete?.name}.json
-							</span>{" "}
-							from the repository. Runs that used it keep their copy.
+							This removes the flow from the project. Its past runs stay as they
+							are.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -328,7 +324,7 @@ function FlowCard({
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent>
-							{runBlockedBy ?? "Run this flow in a new worktree"}
+							{runBlockedBy ?? "Start a run of this flow"}
 						</TooltipContent>
 					</Tooltip>
 				</div>
@@ -478,7 +474,7 @@ function NewFlowForm({
 			<DialogHeader>
 				<DialogTitle>New flow</DialogTitle>
 				<DialogDescription>
-					Starts with one Agent node, worker. The editor opens next.
+					The flow starts with one Agent node. The editor opens next.
 				</DialogDescription>
 			</DialogHeader>
 			<Field data-invalid={error !== null || undefined}>
@@ -499,10 +495,7 @@ function NewFlowForm({
 					<FieldError id={`${id}-hint`}>{problem}</FieldError>
 				) : (
 					<FieldDescription id={`${id}-hint`}>
-						Saved as{" "}
-						<span className="font-mono">
-							.nightshift/flows/{trimmed || "<name>"}.json
-						</span>
+						Use lowercase letters, digits and dashes.
 					</FieldDescription>
 				)}
 			</Field>

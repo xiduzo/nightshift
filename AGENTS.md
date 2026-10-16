@@ -25,6 +25,38 @@ Night Shift uses it. Read it before you build UI.
 - Style is `base-vega` on Base UI: use the `render` prop where Radix docs say
   `asChild`.
 
+# UI copy: guide the person, hide the internals
+
+Every visible string tells the person what a control does for them and what
+happens next. It does not explain how Night Shift works inside. This covers
+titles, descriptions, hints, placeholders, empty states, tooltips, toasts,
+aria-labels, and the messages the server sends to the UI (run end reasons,
+schedule reasons, flow issues). Use the `ux-copy` and `ste-writing` skills.
+
+- **No implementation details.** Do not show: the daemon, worktrees, file
+  paths (`.nightshift/...`), PATH, environment variables, `sh -c`, stdout,
+  stdio, exit codes, adapters, leases, event names, "parse".
+  Bad: "The daemon starts the flow at these times, each run in a new
+  worktree. Saved in .nightshift/schedules.json."
+  Good: "Choose a flow and when it runs. Night Shift starts it for you at
+  those times."
+- **Say instead:** "Night Shift" or "this computer" for the daemon. Leave
+  worktrees out, or say "its own copy of the project" only when the person
+  must know it. "Schedules are paused" for the scheduler being off. "Not
+  valid" for "does not parse". "Check the format of X" for "Fix the JSON of X".
+- **Keep the product words** from `docs/glossary.md`: flow, run, step, node,
+  gate, schedule, profile, connection, secret, input, output, outcome. One
+  name for one thing.
+- **Technical fields stay technical, with an example.** A cron field, a JSON
+  value, a shell command, an MCP server, `{{template}}` and `${NAME}` syntax
+  keep their words. Give one short example, not a definition.
+- **Write plainly.** Address the person as "you". Lead with the action or
+  the result. One idea per sentence, max 20 words, active voice, simple
+  present. No semicolons, no contractions, no marketing adjectives.
+  A description that only repeats its label goes.
+- **Patterns.** Empty state: what this is, and how to start. Error: what
+  happened, and how to fix it. Button: verb and object ("Add schedule").
+
 <!-- BEGIN:turborepo-agent-rules -->
 
 # This is NOT the Turborepo you know

@@ -81,7 +81,7 @@ export function CalledFlowField({
 				: !(current in flows)
 					? "no such flow"
 					: flows[current] === null
-						? "does not load"
+						? "not valid"
 						: null;
 
 	return (
@@ -102,7 +102,7 @@ export function CalledFlowField({
 					</NativeSelectOption>
 					{names.map((name) => (
 						<NativeSelectOption key={name} value={name}>
-							{flows?.[name] === null ? `${name} (does not load)` : name}
+							{flows?.[name] === null ? `${name} (not valid)` : name}
 						</NativeSelectOption>
 					))}
 					{current !== "" && !known ? (
@@ -227,8 +227,7 @@ function NewFlowForm({
 				</FieldError>
 			) : (
 				<FieldDescription id={`${id}-hint`} className="text-xs">
-					Creates the file with one Agent node, saves this flow, and opens the
-					new one.
+					Saves this flow, then opens the new flow with one Agent node in it.
 				</FieldDescription>
 			)}
 		</FieldSet>
@@ -285,7 +284,7 @@ export function InputBindings({
 						? skip
 							? "It takes no other input."
 							: "It takes no input."
-						: "A template per input. Empty takes the input's default."}
+						: "Fill in each input. Leave one empty to use its default."}
 				</FieldDescription>
 			</div>
 			{inputs.map((input) => {
@@ -340,7 +339,7 @@ export function InputBindings({
 						<span>
 							<span className="font-mono">{name}</span>{" "}
 							{name === skip
-								? "is bound to the element; this binding is ignored."
+								? "already gets the item. This value is not used."
 								: `is not an input of ${node.flow}.`}
 						</span>
 					</ItemContent>
@@ -348,8 +347,8 @@ export function InputBindings({
 						<Button
 							variant="ghost"
 							size="icon-xs"
-							aria-label={`Remove the binding ${name}`}
-							title="Remove this binding"
+							aria-label={`Remove the value for ${name}`}
+							title="Remove this value"
 							onClick={() => set(name, "")}
 						>
 							<XIcon />

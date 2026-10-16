@@ -218,8 +218,7 @@ function ConnectionForm({
 					{connection ? `Edit ${connection.name}` : "Add MCP server"}
 				</DialogTitle>
 				<DialogDescription>
-					Define a server once on this daemon. Agent nodes name it to get its
-					tools.
+					Add it once here. Profiles and Agent nodes can then use its tools.
 				</DialogDescription>
 			</DialogHeader>
 
@@ -246,13 +245,13 @@ function ConnectionForm({
 						</FieldError>
 					) : nameTaken ? (
 						<FieldError id={`${id}-name-hint`}>
-							A connection named {name} exists.
+							A connection named {name} already exists.
 						</FieldError>
 					) : (
 						<FieldDescription id={`${id}-name-hint`}>
-							Agent nodes name it like this.
+							Profiles and Agent nodes use it by this name.
 							{connection && name !== connection.name
-								? " Flows that name the old one will refuse to start until you change their nodes."
+								? " Flows that use the old name cannot run until you update their nodes."
 								: null}
 						</FieldDescription>
 					)}
@@ -320,7 +319,8 @@ function ConnectionForm({
 								spellCheck={false}
 							/>
 							<FieldDescription>
-								Started on this machine for each Agent node that names it.
+								Night Shift runs it on this computer when an agent needs its
+								tools.
 							</FieldDescription>
 						</Field>
 						<Field>
@@ -367,7 +367,8 @@ function ConnectionForm({
 								<FieldError>Use an http or https URL.</FieldError>
 							) : (
 								<FieldDescription>
-									A Streamable HTTP endpoint. Tool calls go there.
+									The address of the MCP server. Your agents send their tool
+									calls there.
 								</FieldDescription>
 							)}
 						</Field>
@@ -386,10 +387,9 @@ function ConnectionForm({
 				)}
 
 				<FieldDescription>
-					Write secrets as <span className="font-mono">${"{NAME}"}</span>. The
-					value comes from the keychain (Secrets below), else the daemon's
-					environment. Never paste a token here — flow files and this database
-					never hold values.
+					Do not paste a token here. Write it as{" "}
+					<span className="font-mono">${"{NAME}"}</span> and save the value
+					under Secrets.
 				</FieldDescription>
 
 				{test.isPending || test.data || test.error ? (

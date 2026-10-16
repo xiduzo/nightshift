@@ -76,11 +76,7 @@ export function HarnessDetail({
 	return (
 		<DetailShell
 			icon={<SquareTerminalIcon />}
-			kicker={
-				<>
-					Harness · <span className="font-mono">{harness.pkg}</span>
-				</>
-			}
+			kicker="Harness"
 			title={harness.label}
 			subtitle={tool.offMachine(undefined)}
 			actions={[
@@ -92,8 +88,8 @@ export function HarnessDetail({
 			]}
 		>
 			<DetailSection
-				title="CLI"
-				description={`The ${harness.label} executable the adapter runs, with your own login. A name is looked up on the daemon's PATH.`}
+				title="On this computer"
+				description={`Night Shift uses your own ${harness.label} and its login.`}
 			>
 				<CliPanel tool={tool} settings={settings} />
 			</DetailSection>
@@ -101,15 +97,9 @@ export function HarnessDetail({
 			<DetailSection
 				title="Models"
 				description={
-					harness.listing ? (
-						<>
-							From {harness.pkg}, plus what{" "}
-							<span className="font-mono">{harness.listing}</span> lists on this
-							machine. Profiles and Agent nodes pick from these.
-						</>
-					) : (
-						`From ${harness.pkg}. ${harness.label} has no listing command; any id it knows works.`
-					)
+					harness.listing
+						? `The models Night Shift knows, plus the ones ${harness.label} has on this computer. Profiles and Agent nodes pick from these.`
+						: `The models Night Shift knows. ${harness.label} also takes any other model it supports.`
 				}
 			>
 				<div className="flex flex-col gap-3">
@@ -176,7 +166,7 @@ export function HarnessDetail({
 						<AlertDialogDescription>
 							{harness.profiles.length > 0
 								? `Move ${harness.profiles.join(", ")} to another harness first.`
-								: `Agent nodes on ${harness.label} stop running until you add it again. Its path stays saved.`}
+								: `Agent nodes that use ${harness.label} cannot run until you add it again.`}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -230,7 +220,7 @@ export function HarnessPicker({
 				<DialogHeader>
 					<DialogTitle>Add a harness</DialogTitle>
 					<DialogDescription>
-						Every TanStack AI harness adapter. Each runs its CLI on this machine
+						Pick the coding agent your profiles use. It runs on this computer
 						with your own login.
 					</DialogDescription>
 				</DialogHeader>
@@ -253,8 +243,8 @@ export function HarnessPicker({
 							</ItemMedia>
 							<ItemContent>
 								<ItemTitle>{h.label}</ItemTitle>
-								<ItemDescription className="font-mono text-xs">
-									{h.pkg} · {h.models.length} known models
+								<ItemDescription className="text-xs">
+									{h.models.length} known models
 								</ItemDescription>
 							</ItemContent>
 							<ItemActions>

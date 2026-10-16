@@ -59,11 +59,11 @@ export function ForEachFields({
 
 	return (
 		<>
-			<InspectorSection title="Elements">
+			<InspectorSection title="Items">
 				<Field
 					id={`${id}-kind`}
-					label="Elements from"
-					hint="Read again before each element, so elements added during the run run too. An element is any JSON value; an object may carry id, title, url, dependsOn and done."
+					label="Items from"
+					hint="Night Shift reads the list again before each item, so items added during the run run too."
 				>
 					<NativeSelect
 						id={`${id}-kind`}
@@ -87,12 +87,12 @@ export function ForEachFields({
 				<SourceFields flow={flow} node={node} onChange={setSource} />
 			</InspectorSection>
 
-			<InspectorSection title="Each element runs">
+			<InspectorSection title="Each item runs">
 				<CalledFlowField
 					id={`${id}-flow`}
 					node={node}
 					support={support}
-					hint="Runs once per element. Any flow of the project; the element goes to one of its inputs."
+					hint="Runs once for each item. The item goes to one of its inputs."
 					onPick={(name) => onChange((current) => ({ ...current, flow: name }))}
 				/>
 
@@ -118,8 +118,8 @@ export function ForEachFields({
 					label="Branch"
 					hint={
 						node.branch === "per-item"
-							? "Each element gets its own branch, on top of the last element that finished: a stack. Read it as {{run.branch}} and {{run.base_branch}}."
-							: "All elements work on the branch that is checked out, one after the other."
+							? "Each item gets its own branch, on top of the last item that finished. Use {{run.branch}} and {{run.base_branch}} to read them."
+							: "All items work on the same branch, one after the other."
 					}
 				>
 					<NativeSelect
@@ -132,7 +132,7 @@ export function ForEachFields({
 						}}
 					>
 						<NativeSelectOption value="per-item">
-							A branch per element (a stack)
+							A branch per item (a stack)
 						</NativeSelectOption>
 						<NativeSelectOption value="shared">
 							One shared branch
@@ -151,7 +151,7 @@ export function ForEachFields({
 					id={`${id}-max`}
 					label="Max items"
 					optional
-					hint="A safety net: the most elements one visit may start."
+					hint="The most items to start, as a safety net."
 				>
 					<PositiveIntInput
 						id={`${id}-max`}
@@ -165,13 +165,12 @@ export function ForEachFields({
 				</Field>
 
 				<Note>
-					Ends with <span className="text-foreground">done</span> when no
-					element is left to start, or{" "}
-					<span className="text-foreground">halted</span>. A failed element
-					blocks the elements that depend on it. Later nodes read{" "}
+					Ends with <span className="text-foreground">done</span> when no item
+					is left to start, or <span className="text-foreground">halted</span>.
+					A failed item blocks the items that depend on it. Later nodes read{" "}
 					<code>{`{{${node.id}.summary}}`}</code>,{" "}
-					<code>{`{{${node.id}.done_count}}`}</code>, and each element's result
-					in <code>{`{{${node.id}.results}}`}</code>.
+					<code>{`{{${node.id}.done_count}}`}</code>, and each item's result in{" "}
+					<code>{`{{${node.id}.results}}`}</code>.
 				</Note>
 			</InspectorSection>
 		</>
@@ -198,9 +197,9 @@ function SourceFields({
 					label="List"
 					hint={
 						<>
-							A JSON array, e.g.{" "}
+							A list, for example{" "}
 							<code className="font-mono">{"{{planner.data.tasks}}"}</code>, or
-							the array itself.
+							the list itself as JSON.
 						</>
 					}
 					flow={flow}
@@ -217,7 +216,7 @@ function SourceFields({
 				<TemplateField
 					id={`${id}-command`}
 					label="Source command"
-					hint="Runs with sh -c in the worktree and prints a JSON array on stdout."
+					hint="A shell command that prints the list as JSON, for example cat tasks.json."
 					flow={flow}
 					nodeId={node.id}
 					value={source.command}
@@ -232,12 +231,12 @@ function SourceFields({
 			return (
 				<TemplateField
 					id={`${id}-glob`}
-					label="Glob"
+					label="File pattern"
 					hint={
 						<>
-							Files in the worktree that match, sorted by path. Each element is{" "}
-							<code className="font-mono">{"{ id, title, path }"}</code>: read{" "}
-							<code className="font-mono">{`{{${node.as}.path}}`}</code>.
+							Each matching file is one item, in path order. Use{" "}
+							<code className="font-mono">{`{{${node.as}.path}}`}</code> for its
+							path.
 						</>
 					}
 					flow={flow}
@@ -280,13 +279,9 @@ function GitHubSourceFields({
 				label="Parent issue"
 				hint={
 					<>
-						The issue number whose sub-issues become the elements. Takes
-						templates, such as <code className="font-mono">{example}</code>.
-						Each element holds the sub-issue:{" "}
-						<code className="font-mono">
-							number, title, body, url, labels, parent
-						</code>
-						; its "blocked by" links order the list.
+						The issue whose sub-issues become the items, for example{" "}
+						<code className="font-mono">{example}</code>. Sub-issues run in the
+						order of their "blocked by" links.
 					</>
 				}
 			>
@@ -308,7 +303,7 @@ function GitHubSourceFields({
 				id={`${id}-label`}
 				label="Required label"
 				optional
-				hint="Only sub-issues with this label become elements."
+				hint="Only sub-issues with this label become items."
 			>
 				<Input
 					id={`${id}-label`}
@@ -328,7 +323,7 @@ function GitHubSourceFields({
 				id={`${id}-done`}
 				label="Done labels"
 				optional
-				hint="Sub-issues with any of these labels count as done before the run, like closed ones. Separate with commas."
+				hint="Sub-issues with one of these labels count as done, like closed ones. Separate with commas."
 			>
 				<ListInput
 					id={`${id}-done`}
@@ -342,7 +337,7 @@ function GitHubSourceFields({
 				id={`${id}-skip`}
 				label="Skip labels"
 				optional
-				hint="Sub-issues with any of these labels are left out. Elements that depend on them wait. Separate with commas."
+				hint="Sub-issues with one of these labels are left out, and items that depend on them wait. Separate with commas."
 			>
 				<ListInput
 					id={`${id}-skip`}
@@ -429,13 +424,13 @@ function AsField({
 	const missing = called !== null && !picked;
 	const hint =
 		picked?.type === "text"
-			? "A text input gets the element as JSON text. A json input keeps its fields."
-			: `The input of the called flow that receives the element. That flow reads it as {{${node.as}}} or {{${node.as}.title}}.`;
+			? "A text input gets the item as text. Use a json input to read its fields."
+			: `The called flow gets the item in this input, and reads it as {{${node.as}}} or {{${node.as}.title}}.`;
 
 	return (
 		<Field
 			id={id}
-			label="Element goes to input"
+			label="Item goes to input"
 			hint={hint}
 			error={
 				missing
@@ -520,7 +515,7 @@ function HaltOnField({
 				Halt on
 			</FieldLegend>
 			<FieldDescription id={`${id}-hint`} className="text-xs">
-				A called flow that ends on one of these outcomes stops the loop with
+				When the called flow ends on one of these outcomes, the loop stops as
 				halted.
 			</FieldDescription>
 			<OptionsEditor

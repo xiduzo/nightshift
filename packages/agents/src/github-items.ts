@@ -76,9 +76,7 @@ async function runGh(
 	});
 	if (result.code !== 0) {
 		const detail = result.stderr.trim() || result.stdout.trim() || "no output";
-		throw new Error(
-			`gh ${args.slice(0, 2).join(" ")} failed (exit ${result.code}): ${detail}`,
-		);
+		throw new Error(`gh ${args.slice(0, 2).join(" ")} failed: ${detail}`);
 	}
 	return result.stdout;
 }

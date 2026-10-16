@@ -103,7 +103,7 @@ export function StepSummary({
 			{hasBody ? null : (
 				<p className="text-muted-foreground text-xs">
 					{step.outcome === null
-						? "Still running. The summary shows when the step ends; the transcript follows it live."
+						? "Still running. The summary shows when the step ends. The transcript follows it live."
 						: "This step left no summary. The transcript shows what it did."}
 				</p>
 			)}

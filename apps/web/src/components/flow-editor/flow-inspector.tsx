@@ -31,12 +31,12 @@ const POLICY_FIELDS: {
 	{
 		key: "usageLimitFirstWaitMinutes",
 		label: "Usage limit: first wait (minutes)",
-		hint: "When the harness hits a usage limit without a reset time. Doubles each time.",
+		hint: "How long to wait when an agent reaches its usage limit and gives no reset time. The wait doubles each time.",
 	},
 	{
 		key: "usageLimitMaxWaitMinutes",
 		label: "Usage limit: longest wait (minutes)",
-		hint: "The doubling stops here.",
+		hint: "The wait does not grow past this.",
 	},
 	{
 		key: "networkGraceMinutes",
@@ -46,7 +46,7 @@ const POLICY_FIELDS: {
 	{
 		key: "maxSteps",
 		label: "Max steps",
-		hint: "A safety net: the run stops (resumable) after this many steps.",
+		hint: "The run stops after this many steps, as a safety net. You can resume it.",
 		whole: true,
 	},
 ];
@@ -132,11 +132,9 @@ export function FlowInspector({
 				className="gap-3"
 			>
 				<Note id={`${id}-inputs-hint`}>
-					What the flow takes, like a function. A run asks for them when it
-					starts; a Subflow or For Each node binds them. Read one as{" "}
-					<code>{"{{name}}"}</code>, a JSON one with a path:{" "}
-					<code>{"{{item.title}}"}</code>. Renaming one updates the references
-					in this flow.
+					Values the flow asks for when you run it, or gets from the node that
+					calls it. Use one as <code>{"{{name}}"}</code>, or a field of a JSON
+					input as <code>{"{{item.title}}"}</code>.
 				</Note>
 				<InputsEditor
 					flow={flow}
@@ -157,8 +155,7 @@ export function FlowInspector({
 				className="gap-3"
 			>
 				<Note id={`${id}-outputs-hint`}>
-					What the flow returns to the node that calls it, rendered when it
-					ends. A value that is one reference keeps its JSON:{" "}
+					Values the flow gives back to the node that calls it, for example{" "}
 					<code>{"{{review.data}}"}</code>.
 				</Note>
 				<OutputsEditor
@@ -172,7 +169,7 @@ export function FlowInspector({
 				title="Run policy"
 				collapsible
 				defaultOpen={policySet}
-				description="Used when this flow is the top level of a run; a called flow uses its caller's. A usage limit or a network failure puts the run to sleep, then continues the same session. Empty uses the daemon's setting."
+				description="These apply when you run this flow itself, not when another flow calls it. Leave a field empty to use Settings."
 			>
 				{POLICY_FIELDS.map(({ key, label, hint, whole }) => (
 					<Field key={key} id={`${id}-${key}`} label={label} hint={hint}>
@@ -194,8 +191,8 @@ export function FlowInspector({
 				))}
 				<Field
 					id={`${id}-resume`}
-					label="After a daemon restart"
-					hint="A run the daemon stopped mid-step continues on its own in the same session, or waits for you. Only with the scheduler on."
+					label="After Night Shift restarts"
+					hint="A run that stopped halfway continues where it left off, or waits for you. It continues only while schedules are on."
 				>
 					<NativeSelect
 						id={`${id}-resume`}
@@ -262,8 +259,8 @@ export function FlowInspector({
 						edges along.
 					</li>
 					<li>
-						A Subflow node calls another flow once; a For Each node calls one
-						per element of a list.
+						A Subflow node runs another flow once. A For Each node runs one for
+						each item in a list.
 					</li>
 					<li>
 						An edge back to an earlier node is a retry loop. Give one edge in

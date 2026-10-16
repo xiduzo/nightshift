@@ -125,7 +125,7 @@ describe("connections at the start", () => {
 				),
 			}),
 		).rejects.toThrow(
-			'The flow names the connection "ghost" (planner, builder), but this daemon does not have it. Add it under Agents → Tools. The flow names the connection "phantom" (builder), but this daemon does not have it. Add it under Agents → Tools.',
+			'The flow uses the connection "ghost" (planner, builder), but no connection has that name. Add it under Agents → Tools. The flow uses the connection "phantom" (builder), but no connection has that name. Add it under Agents → Tools.',
 		);
 		expect(await engine.listRuns()).toEqual([]);
 		expect(harness.calls).toHaveLength(0);
@@ -139,7 +139,7 @@ describe("connections at the start", () => {
 				flow: flowOf([agent("worker", { connections: ["tracker"] })]),
 			}),
 		).rejects.toThrow(
-			'The flow names the connection "tracker" (worker), but this daemon does not have it.',
+			'The flow uses the connection "tracker" (worker), but no connection has that name.',
 		);
 	});
 
@@ -281,7 +281,7 @@ describe("mcpServersFor", () => {
 		expect(detail.steps[0]).toMatchObject({
 			outcome: "error",
 			error:
-				"The node names connections (tracker, docs), but this daemon has none.",
+				"The node uses connections (tracker, docs), but there are none. Add them under Agents → Tools.",
 		});
 		expect(harness.calls).toHaveLength(0);
 	});

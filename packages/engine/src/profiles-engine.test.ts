@@ -144,7 +144,7 @@ describe("profiles at the start", () => {
 				),
 			}),
 		).rejects.toThrow(
-			'The flow names the profile "planner" (plan), but this daemon does not have it. Add it under Agents.',
+			'The flow uses the profile "planner" (plan), but no profile has that name. Add it under Agents.',
 		);
 		expect(await engine.listRuns()).toEqual([]);
 		expect(harness.calls).toHaveLength(0);

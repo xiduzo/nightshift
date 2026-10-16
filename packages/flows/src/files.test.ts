@@ -85,7 +85,7 @@ describe("readFlowFile", () => {
 
 	test("throws a clear error when the file is missing", async () => {
 		await expect(readFlowFile(repo, "missing")).rejects.toThrow(
-			/Flow "missing" not found/,
+			/The flow "missing" does not exist/,
 		);
 	});
 
@@ -157,7 +157,7 @@ describe("deleteFlowFile", () => {
 
 	test("throws when the file is missing", async () => {
 		await expect(deleteFlowFile(repo, "missing")).rejects.toThrow(
-			/Flow "missing" not found/,
+			/The flow "missing" does not exist/,
 		);
 	});
 });

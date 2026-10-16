@@ -219,7 +219,7 @@ export function AgentsPage({
 				<Separator />
 				<Group
 					title="Harnesses"
-					hint="TanStack AI harness adapters"
+					hint="Coding agents your profiles use"
 					addLabel="Add a harness"
 					onAdd={() => setPicking("harness")}
 				>
@@ -241,7 +241,7 @@ export function AgentsPage({
 				<Separator />
 				<Group
 					title="Tools"
-					hint="Programs and MCP servers for your agents"
+					hint="Extra tools for your agents"
 					addLabel="Add a tool"
 					onAdd={() => setPicking("tool")}
 				>
@@ -458,8 +458,8 @@ function Detail({
 					</EmptyMedia>
 					<EmptyTitle>No agent profiles yet</EmptyTitle>
 					<EmptyDescription>
-						A profile is a harness, a model and its tools under one name. Agent
-						nodes pick one; change it here and every flow follows.
+						A profile gives a harness, a model and tools one name. Agent nodes
+						use it, so one change here reaches every flow.
 					</EmptyDescription>
 				</EmptyHeader>
 				<EmptyContent>
@@ -486,7 +486,8 @@ function Detail({
 						<EmptyHeader>
 							<EmptyTitle>Add a harness first</EmptyTitle>
 							<EmptyDescription>
-								A profile runs on a harness: Claude Code, OpenCode or Codex.
+								A profile runs on a harness: Claude Code, OpenCode or Codex. Add
+								one with + next to Harnesses.
 							</EmptyDescription>
 						</EmptyHeader>
 					</Empty>
@@ -568,7 +569,7 @@ function Gone({ what }: { what: string }) {
 			<EmptyHeader>
 				<EmptyTitle>No such {what}</EmptyTitle>
 				<EmptyDescription>
-					It was removed, or renamed. Pick another one on the left.
+					It was removed or renamed. Pick another one on the left.
 				</EmptyDescription>
 			</EmptyHeader>
 		</Empty>

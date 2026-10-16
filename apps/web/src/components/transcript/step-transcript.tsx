@@ -251,7 +251,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	decision: "The decider is choosing…",
 	gate: "Waiting for an answer…",
 	subflow: "The called flow is running…",
-	foreach: "Working through the elements…",
+	foreach: "Working through the items…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({
@@ -345,8 +345,8 @@ function ItemsRead({ item }: { item: ItemsReadItem }) {
 				<ListChecksIcon className="size-3.5" />
 			</MarkerIcon>
 			<MarkerContent>
-				Read {item.count} {item.count === 1 ? "element" : "elements"} ·{" "}
-				{item.open} open · {formatTime(item.at)}
+				Read {item.count} {item.count === 1 ? "item" : "items"} · {item.open}{" "}
+				open · {formatTime(item.at)}
 			</MarkerContent>
 		</Marker>
 	);
@@ -443,7 +443,7 @@ function WaitCard({ item }: { item: WaitItem }) {
 					</p>
 				) : null}
 				<p>
-					Continues the same session at{" "}
+					Continues where it left off at{" "}
 					<time
 						dateTime={new Date(item.until).toISOString()}
 						title={formatDateTime(item.until)}
@@ -728,8 +728,10 @@ function CommandExit({ item }: { item: ExitItem }) {
 			</MarkerIcon>
 			<MarkerContent>
 				{item.exitCode === null
-					? "The command ended without an exit code"
-					: `Exited with code ${item.exitCode}`}{" "}
+					? "The command ended without a result"
+					: passed
+						? "The command succeeded"
+						: `The command failed with code ${item.exitCode}`}{" "}
 				· {formatTime(item.at)}
 			</MarkerContent>
 		</Marker>

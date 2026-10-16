@@ -21,7 +21,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Agent Profile | A Harness, a model, an effort, a permission mode, CLI Tools and Connections under one name, defined once on the daemon (the Agents page). Agent Nodes name it in `profile`. A Run resolves it when it starts, so a later change reaches the next Run. A Flow that names a profile the daemon does not have refuses to start. | Agents |
 | Command Node | A Node that runs one shell command in the Worktree. Exit 0 is `pass`. | PLAN §3 |
 | Decision Node | A Node that reads earlier outputs and returns one of its declared labels. | PLAN §3 |
-| Gate | A Node that waits for a person in the Needs-you inbox, with a question and its choices. | PLAN §3 |
+| Gate | A Node that waits for a person in the Needs-you inbox, with a question and its choices. It holds the Run with an Interrupt until the answer comes. | PLAN §3 |
 | For Each Node | A Node that runs a Body Flow once per Item of a List. | PLAN §3 |
 | Start Node | The Node a Run begins at. | Slice 2 |
 | Input | A named value a Flow takes, like a function argument. The top-level Flow's Inputs are asked at start. | Slice 5 |
@@ -48,9 +48,13 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Template Variable | A reference to a value in a prompt or command: a Node output, an Input, or a Run field, with an optional JSON path, for example `{{check.log_tail}}`, `{{item.parent.number}}`, or `{{run.branch}}`. | PLAN §3 |
 | Output | A named value a Step leaves for later Nodes, for example `summary` or `exit_code`. | Slice 2 |
 | Issue | One problem the validator finds in a Flow. A Flow with an error cannot run. | Slice 2 |
-| Run | One walk of a Flow in its own Worktree. It keeps a copy of the Flow from its start. | Slice 2 |
+| Run | One walk of a Flow in its own Worktree, driven as one Thread. It keeps a copy of the Flow from its start. | Slice 2 |
 | Quick Run | A Run of a one-node Flow made from a prompt, without a Flow file. | Slice 2 |
-| Step | One visit of one Node in a Run. | Slice 2 |
+| Step | One visit of one Node in a Run. The graph node of that Node runs it; its facts are Events. | Slice 2 |
+| Thread | The LangGraph thread of a Run. Its id is the Run's id, and it holds the Run's Checkpoints. | LangGraph |
+| Checkpoint | The run state LangGraph writes after every Node, in the tables `lg_checkpoint` and `lg_write`: outputs for templates, visit and edge counts, For Each cursors, and the pending Step. The engine's bookkeeping, never the read model. | LangGraph |
+| Interrupt | How a Thread parks: a Wait, an open Gate, or a Step that failed or was stopped. A resume answers it, and the Run continues at the same Node, at any depth. | LangGraph |
+| Wait | A Step's sleep on a usage limit or a network failure. The Node's wait node holds it with an Interrupt; a wake continues the same Session. Agent and Decision Nodes wait. | LangGraph |
 | Visit | The count of a Step among the Steps of the same Node: 1 for the first. | Slice 2 |
 | Session | One harness session of an Agent Step. A resumed Step has more than one. | Slice 1 |
 | Harness | A coding-agent CLI that runs Sessions on this machine, with its own login, through a TanStack AI harness adapter: `claude-code` (Claude Code), `opencode` (OpenCode, a 1.x build), or `codex` (Codex). Added on the Agents page; an Agent Profile or an Agent Node names one. | Slice 8 |
@@ -62,7 +66,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Transcript | The structured record of a Step: agent messages, tool calls, and command output, on disk. | Slice 1 |
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |
 | Event | One appended record of a fact that changed. | Slice 1 |
-| Event Log | The append-only list of Events. Run status is derived from it. | Slice 1 |
+| Event Log | The append-only list of Events: the read model. Run status is derived from it, never from a Checkpoint. | Slice 1 |
 | Run Bundle | One Run exported as its own SQLite file: its rows, its Events, and its Transcripts, in the daemon's table names. Secret values are masked. | Run export |
 | Run Log | The daemon's copy in memory of each Run's Events. Every append goes through it, and it keeps an Event only after the database has it. | Run state |
 | Run Policy | The rules for retries, rescue, blocked propagation, network grace, usage-limit waits, the stop time, and resume after a restart. | PLAN §2 |
@@ -90,10 +94,11 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | draw | Edit a Flow in the editor. | PLAN §1 |
 | validate | Check a Flow and list its Issues. | Slice 2 |
 | start | Begin a Run of a Flow. | Slice 1 |
-| walk | Run the Steps of a Flow one after another, following Edges. | Slice 2 |
+| walk | Run the Steps of a Flow one after another, following Edges. LangGraph drives the walk, one Node per super-step of the Thread. | Slice 2 |
 | report | End a Session with a Step Report. | Slice 2 |
 | stop | Abort the running Step and end the Run as stopped. | Slice 1 |
-| resume | Continue a stopped, failed, or interrupted Run at its last Node. A person resumes, or the daemon after a restart. | Slice 1 |
+| park | Hold a Thread at an Interrupt: a Wait, a Gate, or a Step that failed or was stopped. | LangGraph |
+| resume | Continue a stopped, failed, or interrupted Run at its last Node. A person resumes, or the daemon after a restart. The Thread answers its Interrupt, or runs the Node the daemon left pending again. | Slice 1 |
 | take over | Hand a Session to a person with its Harness's resume command, for example `claude --resume <id>`. | Slice 1 |
 | retry | Take a Retry Loop back to an earlier Node. | Slice 2 |
 | rescue | Retry a Node with a stronger model. | PLAN §2 |

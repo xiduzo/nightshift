@@ -315,9 +315,9 @@ function Editor({
 			return `${next} is taken by another node.`;
 		}
 		if (draft.inputs.some((input) => input.name === next)) {
-			return `${next} is an input of this flow. Node ids and inputs share one namespace.`;
+			return `An input of this flow is already named ${next}. Pick another name.`;
 		}
-		if (next === "run") return "run is reserved for the run's fields.";
+		if (next === "run") return "The name run is taken. Pick another name.";
 		setDraft((current) => renameNode(current, node.id, next));
 		setSelection({ kind: "node", id: next });
 		return null;
@@ -362,7 +362,7 @@ function Editor({
 			const { dropped, previous } = result;
 			if (dropped.length === 0) return;
 			toast.info(
-				`Dropped ${dropped.length} ${dropped.length === 1 ? "edge" : "edges"} on outcomes ${node.id} no longer has.`,
+				`Removed ${dropped.length} ${dropped.length === 1 ? "edge" : "edges"} on outcomes ${node.id} no longer has.`,
 				{
 					description: dropped
 						.map(
@@ -490,7 +490,7 @@ function Editor({
 					title={
 						savable
 							? "Save (⌘/Ctrl + S)"
-							: "Fix the fields marked in the issues first. The file would not load."
+							: "Fix the fields marked in the issues first."
 					}
 				>
 					{saveFlow.isPending ? (
@@ -504,7 +504,7 @@ function Editor({
 					size="sm"
 					onClick={() => setStarting(true)}
 					disabled={runBlockedBy !== null}
-					title={runBlockedBy ?? "Run this flow in a new worktree"}
+					title={runBlockedBy ?? "Run this flow"}
 				>
 					<PlayIcon data-icon="inline-start" />
 					Run

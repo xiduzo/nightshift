@@ -9,7 +9,7 @@ import type {
 	DecisionInput,
 	DecisionResult,
 } from "@nightshift/agents/types";
-import { event } from "@nightshift/db/schema/nightshift";
+import { event, lgCheckpoint, lgWrite } from "@nightshift/db/schema/nightshift";
 import {
 	type AgentNode,
 	type CommandNode,
@@ -19,7 +19,7 @@ import {
 	type GateNode,
 	singleAgentFlow,
 } from "@nightshift/flows";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import { createEngine, type EngineInternals } from "./engine";
 import { createRunLog, type RunLog } from "./run-log";
@@ -214,7 +214,7 @@ describe("projects", () => {
 		const plain = join(sandbox.root, "plain");
 		await mkdir(plain);
 		await expect(engine.addProject({ repoPath: plain })).rejects.toThrow(
-			"Not a git repository",
+			"is not a git repository",
 		);
 		expect(await engine.listProjects()).toEqual([]);
 	});
@@ -384,6 +384,53 @@ describe("runs", () => {
 			transcript.map((_, i) => i + 1),
 		);
 		expect(transcript.at(-1)?.event.type).toBe("finished");
+	});
+
+	test("a finished run's checkpoints are deleted; a resume of it re-enters from the log and continues the last session", async () => {
+		const harness = fakeHarness(reportingScript("pass", "Done"));
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([agent("worker", "Go")]),
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		const checkpoints = async () =>
+			(
+				await sandbox.db
+					.select()
+					.from(lgCheckpoint)
+					.where(eq(lgCheckpoint.threadId, run.id))
+			).length;
+		const writes = async () =>
+			(
+				await sandbox.db
+					.select()
+					.from(lgWrite)
+					.where(eq(lgWrite.threadId, run.id))
+			).length;
+		// The log is the record; the thread's bookkeeping goes.
+		await waitFor(async () => (await checkpoints()) === 0, {
+			label: "the checkpoints to be deleted",
+		});
+		expect(await writes()).toBe(0);
+
+		// A resume finds no thread and re-enters from the log at the last
+		// step, continuing its harness session with the person's prompt.
+		await engine.resumeRun(run.id, "Once more.");
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect(harness.calls).toHaveLength(2);
+		expect(harness.calls[1]).toMatchObject({
+			prompt: "Once more.",
+			resumeSessionId: "fake-session-1",
+		});
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps.map((s) => [s.nodeId, s.visit, s.outcome])).toEqual([
+			["worker", 1, "pass"],
+		]);
+		expect(detail.steps[0]?.sessions).toHaveLength(2);
+		await waitFor(async () => (await checkpoints()) === 0, {
+			label: "the checkpoints to be deleted again",
+		});
 	});
 
 	test("worker → check → worker retries until the check passes", async () => {
@@ -1055,7 +1102,7 @@ describe("automatic resume after a restart", () => {
 		const detail = await engine.getRun(runId);
 		expect(detail.status).toBe("interrupted");
 		expect(detail.reason).toBe(
-			`The daemon stopped while this run ran. It did not continue on its own: ${why}`,
+			`Night Shift stopped while this run ran. It did not continue on its own: ${why}`,
 		);
 		return detail;
 	}
@@ -1065,12 +1112,12 @@ describe("automatic resume after a restart", () => {
 		const { engine, sessions } = restart({}, { resumeGraceMs: 30 });
 		const interrupted = await engine.getRun(run.id);
 		expect(interrupted.status).toBe("interrupted");
-		expect(interrupted.reason).toBe("The daemon stopped while this run ran.");
+		expect(interrupted.reason).toBe("Night Shift stopped while this run ran.");
 
 		const resumed = await waitFor(() => sessions[0]);
 		expect(resumed.input.resumeSessionId).toBe("harness-0");
 		expect(resumed.input.prompt).toContain(
-			"The daemon stopped while you worked on this",
+			"Night Shift stopped while you worked on this",
 		);
 		expect(resumed.input.prompt).toContain("check the worktree");
 		resumed.finish();
@@ -1082,7 +1129,7 @@ describe("automatic resume after a restart", () => {
 				at: expect.any(Number),
 				by: "daemon",
 				nodeId: "worker",
-				reason: "The daemon restarted.",
+				reason: "Night Shift restarted.",
 			},
 		]);
 		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
@@ -1104,7 +1151,7 @@ describe("automatic resume after a restart", () => {
 				engine,
 				run.id,
 				sessions,
-				"the scheduler is off on this daemon.",
+				"schedules are paused.",
 			);
 			expect(detail.resumes).toEqual([]);
 		},
@@ -1134,7 +1181,7 @@ describe("automatic resume after a restart", () => {
 			engine,
 			run.id,
 			sessions,
-			`its worktree is gone (${run.worktreePath}).`,
+			"the copy of the project it worked in is gone.",
 		);
 	});
 
@@ -1148,7 +1195,7 @@ describe("automatic resume after a restart", () => {
 			first.engine,
 			off.run.id,
 			first.sessions,
-			"its flow's policy turns automatic resume off.",
+			"its flow turns automatic resume off.",
 		);
 
 		const on = await dieMidStep({
@@ -1198,7 +1245,7 @@ describe("automatic resume after a restart", () => {
 			engine,
 			run.id,
 			sessions,
-			"it continued on its own 3 times in a row, and each time the daemon stopped again.",
+			"it continued on its own 3 times in a row, and each time Night Shift stopped again.",
 		);
 
 		// A person's resume counts from zero again.

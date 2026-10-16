@@ -63,7 +63,7 @@ export async function readFlowFile(
 ): Promise<LoadedFlow> {
 	const path = flowPath(repoPath, name);
 	const file = await readJson(path);
-	if (file === null) throw notFound(name, path);
+	if (file === null) throw notFound(name);
 	const flows = await loadAllFlows(repoPath);
 	return loadedFlow(repoPath, name, file, flows);
 }
@@ -94,7 +94,7 @@ export async function deleteFlowFile(
 	try {
 		await unlink(path);
 	} catch (error) {
-		if (isNotFound(error)) throw notFound(name, path);
+		if (isNotFound(error)) throw notFound(name);
 		throw error;
 	}
 }
@@ -280,8 +280,8 @@ function flowPath(repoPath: string, name: string): string {
 	return join(flowsDir(repoPath), `${name}.json`);
 }
 
-function notFound(name: string, path: string): Error {
-	return new Error(`Flow "${name}" not found: ${path} does not exist.`);
+function notFound(name: string): Error {
+	return new Error(`The flow "${name}" does not exist.`);
 }
 
 function isNotFound(error: unknown): boolean {

@@ -153,7 +153,7 @@ function OptionRow({
 			return;
 		}
 		if (RESERVED.includes(next)) {
-			setError(`${next} is reserved for the engine. Pick another name.`);
+			setError(`Night Shift uses the name ${next} itself. Pick another name.`);
 			return;
 		}
 		setError(onRename(next));

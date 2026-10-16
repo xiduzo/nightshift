@@ -39,7 +39,7 @@ describe("resolveRepoTopLevel", () => {
 		const plain = join(sandbox.root, "plain");
 		await mkdir(plain);
 		await expect(resolveRepoTopLevel(plain)).rejects.toThrow(
-			"Not a git repository",
+			"is not a git repository",
 		);
 	});
 
@@ -52,7 +52,9 @@ describe("resolveRepoTopLevel", () => {
 	test("rejects a subdirectory of a repository", async () => {
 		const sub = join(sandbox.repoPath, "sub");
 		await mkdir(sub);
-		await expect(resolveRepoTopLevel(sub)).rejects.toThrow("not its top level");
+		await expect(resolveRepoTopLevel(sub)).rejects.toThrow(
+			"not the top folder",
+		);
 	});
 });
 
@@ -97,7 +99,7 @@ describe("createWorktree", () => {
 				shortId: "nope0001",
 				baseRef: "does-not-exist",
 			}),
-		).rejects.toThrow('Unknown git ref "does-not-exist"');
+		).rejects.toThrow('The branch or commit "does-not-exist"');
 	});
 });
 
@@ -136,7 +138,7 @@ describe("item branches", () => {
 		expect(await uncommittedChanges(wt)).toEqual(["?? loose.txt"]);
 		await expect(
 			createAndCheckoutBranch(wt, `${name}-2`, name),
-		).rejects.toThrow("commits nothing on your behalf");
+		).rejects.toThrow("Night Shift does not commit for you");
 		await expect(checkoutBranch(wt, name)).rejects.toThrow("loose.txt");
 		expect(await currentBranch(wt)).toBe(worktree.branch);
 		expect(await branchExists(wt, `${name}-2`)).toBe(false);

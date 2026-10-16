@@ -89,7 +89,7 @@ export function GateAnswer({
 					disabled={resolve.isPending}
 				/>
 				<FieldDescription id={`${id}-note-hint`} className="text-xs">
-					Later nodes read it as{" "}
+					The next steps of the run get your note, as{" "}
 					<code className="font-mono">{`{{${nodeId}.note}}`}</code>.
 				</FieldDescription>
 			</Field>

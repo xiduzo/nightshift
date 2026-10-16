@@ -102,8 +102,8 @@ async function baseCheck(
 		return {
 			...base,
 			problem: bin.includes("/")
-				? `${bin} does not exist.`
-				: `${label} is not on the daemon's PATH. Install it, or set its path.`,
+				? `Nothing is installed at ${bin}. Check the path.`
+				: `${label} is not installed, or Night Shift cannot find it. Install it, or enter its path.`,
 		};
 	}
 	try {
@@ -111,7 +111,9 @@ async function baseCheck(
 		if (out.code !== 0) {
 			return {
 				...base,
-				problem: firstLine(out.stderr) ?? `--version exited with ${out.code}.`,
+				problem:
+					firstLine(out.stderr) ??
+					`${label} failed when Night Shift checked its version.`,
 			};
 		}
 		return { ...base, version: firstLine(out.stdout) };
@@ -164,7 +166,7 @@ async function opencodeCheck(bin: string): Promise<CliCheck> {
 		return {
 			...check,
 			version,
-			problem: `OpenCode ${version} is not supported: @tanstack/ai-opencode 0.5 drives OpenCode 1.x only. Point the path at a 1.x build.`,
+			problem: `OpenCode ${version} is not supported. Night Shift works with OpenCode 1.x only. Install a 1.x version, or enter the path of one.`,
 		};
 	}
 	return { ...check, version };
@@ -283,14 +285,13 @@ export async function harnessModels(
 	};
 	if (!adapter.listing) return result([], null);
 	const path = await resolveBin(bin);
-	if (!path) return result([], `${bin} is not there.`);
+	if (!path) return result([], `Night Shift cannot find ${bin}.`);
 	try {
 		const out = await run([path, ...adapter.listing]);
 		if (out.code !== 0) {
 			return result(
 				[],
-				firstLine(out.stderr) ??
-					`${adapter.listing.join(" ")} exited with ${out.code}.`,
+				firstLine(out.stderr) ?? "Night Shift could not list the models.",
 			);
 		}
 		const listed = out.stdout
