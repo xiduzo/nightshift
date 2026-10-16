@@ -3,12 +3,6 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
-import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyTitle,
-} from "@nightshift/ui/components/empty";
 import { CircleXIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -56,7 +50,7 @@ export function StepSummary({
 		step.nodeType === "subflow";
 
 	return (
-		<div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 md:px-6">
+		<div className="flex min-w-0 flex-col gap-4">
 			{context ? (
 				<div className="min-w-0 text-muted-foreground text-xs">{context}</div>
 			) : null}
@@ -107,18 +101,11 @@ export function StepSummary({
 				</div>
 			) : null}
 			{hasBody ? null : (
-				<Empty className="py-8">
-					<EmptyHeader>
-						<EmptyTitle className="text-sm">
-							{step.outcome === null ? "Still running" : "Nothing to sum up"}
-						</EmptyTitle>
-						<EmptyDescription className="text-xs">
-							{step.outcome === null
-								? "The summary shows when the step ends. The transcript follows it live."
-								: "This step left no summary. The transcript shows what it did."}
-						</EmptyDescription>
-					</EmptyHeader>
-				</Empty>
+				<p className="text-muted-foreground text-xs">
+					{step.outcome === null
+						? "Still running. The summary shows when the step ends; the transcript follows it live."
+						: "This step left no summary. The transcript shows what it did."}
+				</p>
 			)}
 		</div>
 	);

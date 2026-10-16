@@ -1,15 +1,16 @@
 import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyTitle,
-} from "@nightshift/ui/components/empty";
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@nightshift/ui/components/collapsible";
+import { ChevronRightIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { hasCost, NODE_TYPE } from "@/components/flow/node-type";
 import { OutcomeBadge, stepState } from "@/components/outcome-badge";
 import type { RunStatus, StepSummary } from "@/lib/api-types";
 import { formatCost, formatDateTime, formatTime } from "@/lib/format";
-import { jsonOutput } from "@/lib/run-steps";
+import { formatJson, jsonOutput } from "@/lib/run-steps";
 
 import { CodeView, JsonBlock } from "./json-block";
 import { stepDuration } from "./step-timeline";
@@ -80,48 +81,100 @@ export function stepGist(step: StepSummary): string | undefined {
 	return undefined;
 }
 
-/** The outputs later nodes can read from the step, as `{{node.field}}`. */
+/** The step's facts in a grid of small label-over-value cells: when, how long, cost, visit, exit code, sessions. */
+export function StepFacts({ step }: { step: StepSummary }) {
+	const exit = step.outputs.exit_code;
+	const facts: { label: string; value: ReactNode }[] = [
+		{
+			label: "Started",
+			value: (
+				<time
+					dateTime={new Date(step.startedAt).toISOString()}
+					title={formatDateTime(step.startedAt)}
+				>
+					{formatTime(step.startedAt)}
+				</time>
+			),
+		},
+		{ label: "Took", value: stepDuration(step) },
+	];
+	if (hasCost(step.nodeType)) {
+		facts.push({ label: "Cost", value: formatCost(step.costUsd) });
+	}
+	if (step.visit > 1) facts.push({ label: "Visit", value: step.visit });
+	if (exit !== undefined && exit !== "") {
+		facts.push({ label: "Exit code", value: String(exit) });
+	}
+	if (step.sessions.length > 0) {
+		facts.push({ label: "Sessions", value: step.sessions.length });
+	}
+	return (
+		<dl className="grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-x-4 gap-y-3">
+			{facts.map((fact) => (
+				<div key={fact.label} className="flex min-w-0 flex-col gap-0.5">
+					<dt className="text-muted-foreground text-xs">{fact.label}</dt>
+					<dd className="truncate text-sm tabular-nums">{fact.value}</dd>
+				</div>
+			))}
+		</dl>
+	);
+}
+
+/**
+ * The outputs later nodes can read from the step, one row each: the field
+ * and its value on one line. A row opens on the whole value.
+ */
 export function StepOutputs({ step }: { step: StepSummary }) {
 	const outputs = Object.entries(step.outputs);
 	if (outputs.length === 0) {
 		return (
-			<Empty className="py-10">
-				<EmptyHeader>
-					<EmptyTitle className="text-sm">No outputs</EmptyTitle>
-					<EmptyDescription className="text-xs">
-						{step.outcome === null
-							? "The step has not ended yet."
-							: "This step left nothing for later nodes to read."}
-					</EmptyDescription>
-				</EmptyHeader>
-			</Empty>
+			<p className="text-muted-foreground text-xs">
+				{step.outcome === null
+					? "The step has not ended yet."
+					: "This step left nothing for later nodes to read."}
+			</p>
 		);
 	}
 	return (
-		<dl className="flex flex-col gap-4 p-4 text-xs">
+		<ul className="flex flex-col divide-y rounded-lg border">
 			{outputs.map(([field, value]) => {
 				const json = jsonOutput(value);
+				const text = json !== undefined ? formatJson(json) : String(value);
 				return (
-					<div key={field} className="flex min-w-0 flex-col gap-1.5">
-						<dt className="font-medium font-mono text-muted-foreground">
-							{`{{${step.nodeId}.${field}}}`}
-						</dt>
-						{json !== undefined ? (
-							<dd className="min-w-0">
-								<JsonBlock value={json} />
-							</dd>
-						) : (
-							<dd className="min-w-0">
-								{String(value) ? (
-									<CodeView code={String(value)} language="text" />
+					<li key={field}>
+						<Collapsible>
+							<CollapsibleTrigger
+								className="group/output flex w-full min-w-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+								title={`{{${step.nodeId}.${field}}}`}
+							>
+								<ChevronRightIcon
+									aria-hidden="true"
+									className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open/output:rotate-90 motion-reduce:transition-none"
+								/>
+								<span className="shrink-0 font-mono text-muted-foreground">
+									{field}
+								</span>
+								<span className="min-w-0 flex-1 truncate font-mono group-data-panel-open/output:invisible">
+									{text.replace(/\s+/g, " ") || (
+										<span className="text-muted-foreground italic">empty</span>
+									)}
+								</span>
+							</CollapsibleTrigger>
+							<CollapsibleContent className="px-2.5 pb-2.5">
+								{json !== undefined ? (
+									<JsonBlock value={json} />
+								) : text ? (
+									<CodeView code={text} language="text" />
 								) : (
-									<span className="text-muted-foreground italic">empty</span>
+									<span className="text-muted-foreground text-xs italic">
+										empty
+									</span>
 								)}
-							</dd>
-						)}
-					</div>
+							</CollapsibleContent>
+						</Collapsible>
+					</li>
 				);
 			})}
-		</dl>
+		</ul>
 	);
 }

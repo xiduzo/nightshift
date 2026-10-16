@@ -47,11 +47,7 @@ import {
 import { RunGraph } from "@/components/run/run-graph";
 import { RunActions, RunDetails, RunTitle } from "@/components/run/run-header";
 import { RunStatusPanel } from "@/components/run/run-status-panel";
-import {
-	CONSOLE_BAR_PX,
-	type ConsoleTab,
-	StepConsole,
-} from "@/components/run/step-console";
+import { CONSOLE_BAR_PX, StepConsole } from "@/components/run/step-console";
 import { StepSummary as StepSummaryView } from "@/components/run/step-summary";
 import { StepTimeline } from "@/components/run/step-timeline";
 import { type Crumb, SiteHeader } from "@/components/site-header";
@@ -120,7 +116,6 @@ function RunComponent() {
 	/** The call in focus (a Subflow step or a For Each element): the steps and the graph narrow to it. */
 	const [focus, setFocus] = useState<ItemScope>(null);
 	const [consoleOpen, setConsoleOpen] = useState(false);
-	const [consoleTab, setConsoleTab] = useState<ConsoleTab>("summary");
 	const consolePanel = useRef<PanelHandle>(null);
 	/** The height the console last had open, to open it at again. */
 	const consoleSize = useRef<string>("45%");
@@ -243,7 +238,6 @@ function RunComponent() {
 		if (!openGate) return;
 		setFocus(null);
 		setPickedStepId(openGate.id);
-		setConsoleTab("transcript");
 		showConsole(true);
 	};
 
@@ -384,8 +378,6 @@ function RunComponent() {
 			runStatus={status}
 			open={consoleOpen}
 			onOpenChange={showConsole}
-			tab={consoleTab}
-			onTabChange={setConsoleTab}
 			empty={status === "running" ? "Waiting for the first step…" : "No steps."}
 			className="h-full"
 			summary={
