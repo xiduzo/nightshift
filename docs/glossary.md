@@ -23,9 +23,15 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Gate | A Node that waits for a person in the Needs-you inbox, with a question and its choices. | PLAN §3 |
 | For Each Node | A Node that runs a sub-flow once per item of a list. | PLAN §3 |
 | Start Node | The Node a Run begins at. | Slice 2 |
-| Body Flow | A Flow with `input: "item"` that a For Each Node runs once per Item. | Slice 4 |
-| Item | One entry of a For Each source: a GitHub sub-issue, or one object of a command's JSON list. | Slice 4 |
-| Source | Where a For Each Node reads its Items, again before each Item. | Slice 4 |
+| Input | A named value a Flow takes, like a function argument. The top-level Flow's Inputs are asked at start. | Slice 5 |
+| Output | A named value a Flow returns to the Node that called it. | Slice 5 |
+| Subflow Node | A Node that runs another Flow once, with its Inputs bound. | Slice 5 |
+| Body Flow | The Flow a For Each Node runs once per Item. Any Flow can be a Body Flow. | Slice 4 |
+| Item | One element of a For Each List: any JSON value, optionally with `id`, `title`, `dependsOn`, and `done`. | Slice 4 |
+| List | The elements a For Each Node runs over, read from a Source. | Slice 5 |
+| Source | Where a For Each Node reads its List, again before each Item: a JSON value, a command, a glob of files, or a plugin such as GitHub. | Slice 4 |
+| Schedule | A Flow, its Inputs, a time, and a Stop Time: the daemon starts a Run from it. | Slice 7 |
+| Trigger | What starts a Run: a person, or a Schedule. | Slice 7 |
 | Item Branch | The branch one Item works on, on top of the last Item that finished. Together they form the Stack. | Slice 4 |
 | Stack | The chain of Item Branches of one For Each, and the pull requests opened on them. | PLAN §5 |
 | Stop Time | The time after which a Run starts no new Step. | Slice 4 |
@@ -33,7 +39,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Edge | A link from a Node to the next Node, taken on one Outcome. | PLAN §2 |
 | Max | How often a Run may take an Edge. Every loop needs an Edge with a Max. | Slice 2 |
 | Retry Loop | An Edge back to an earlier Node, bounded by a Max. | PLAN §2 |
-| Template Variable | A reference to an earlier output in a prompt or command, for example `{{check.log_tail}}` or `{{run.branch}}`. | PLAN §3 |
+| Template Variable | A reference to a value in a prompt or command: a Node output, an Input, or a Run field, with an optional JSON path, for example `{{check.log_tail}}`, `{{item.parent.number}}`, or `{{run.branch}}`. | PLAN §3 |
 | Output | A named value a Step leaves for later Nodes, for example `summary` or `exit_code`. | Slice 2 |
 | Issue | One problem the validator finds in a Flow. A Flow with an error cannot run. | Slice 2 |
 | Run | One walk of a Flow in its own Worktree. It keeps a copy of the Flow from its start. | Slice 2 |

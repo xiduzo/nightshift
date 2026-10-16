@@ -20,11 +20,16 @@ Each row is a settled decision. Change a row only with a new ADR.
 | --- | --- |
 | Users | One developer: the author. Better Auth stays, and local mode auto-creates one user and one session. |
 | The method | The flow is the method. No method packages and no `method.json`. A WTF night is one flow among others. |
-| Flows | A directed graph that you edit in React Flow (`@xyflow/react`). Stored as a versioned JSON file in the repo: `.nightshift/flows/<name>.json`, with a published zod schema. |
-| Node types | Agent, Command, Decision, Gate, For Each. See section 3. |
-| Edges | An edge leaves a node on a named outcome (`pass`, `fail`, or a Decision label). An edge back to an earlier node is a retry loop. Every loop has a maximum count. The engine refuses a flow with an unbounded loop. |
-| Harnesses | Every Agent node runs as a harness session through a TanStack AI harness adapter: `@tanstack/ai-claude-code`, `@tanstack/ai-opencode`, `@tanstack/ai-codex`. |
+| Flows | A directed graph that you edit in React Flow (`@xyflow/react`). Stored as a versioned JSON file in the repo: `.nightshift/flows/<name>.json`, with a published zod schema. Night Shift knows no method: GitHub, WTF, and the rpgdotexe night are flows and plugins, never engine concepts. |
+| Flow I/O | A flow declares **inputs** and **outputs**, like a function. The inputs of the top-level flow are asked when a run starts. A Subflow node calls a flow once with bound inputs; a For Each node calls a flow once per list element, bound to an input. The outputs come back to the caller. Version 1 files (with `params` and `input: "item"`) migrate on load. |
+| Templates | `{{name.path}}` reads a value: `name` is a node id, an input, or `run`. Node ids and inputs share one namespace. A path reaches into JSON: `{{planner.data.tasks}}`, `{{item.parent.number}}`. A command gets every value as an environment variable, never as shell text. |
+| Node types | Agent, Command, Decision, Gate, Subflow, For Each. See section 3. |
+| Edges | An edge leaves a node on a named outcome (`pass`, `fail`, an Agent's own outcome, a Decision label, or a Gate choice). An edge back to an earlier node is a retry loop. Every loop has a maximum count. The engine refuses a flow with an unbounded loop. |
+| Harnesses | Every Agent node runs as a harness session through a TanStack AI harness adapter: `@tanstack/ai-claude-code`, `@tanstack/ai-opencode`, `@tanstack/ai-codex`. Unattended Claude Code runs in `auto` permission mode. |
+| Daemon | Nights run on a stable daemon (`bun run night`): a built server without hot reload. Development uses `bun run dev` in a separate git worktree, so code changes never reload a daemon that runs a night. |
 | Skills | An Agent node names a skill that the harness already has (user, project, or plugin skills). No skill pack materialization. |
+| Lists | A For Each reads a list from a source: a JSON value (often another node's output), a command that prints JSON, files that match a glob, or a plugin such as GitHub sub-issues. An element is any JSON value. An object element may carry `id`, `title`, `dependsOn`, and `done`; the rest is free. |
+| Triggers | A run starts by hand, or from a schedule stored in the project (`.nightshift/schedules.json`), for example every night at 22:00 with a stop time of 07:00. |
 | GitHub | GitHub is a set of TanStack AI tools (read issue, write comment, set label, open pull request, link stack) on top of the `gh` CLI. Agent and Decision nodes can call them. The engine also calls them directly for fixed work. |
 | Decisions | A Decision node returns one of its declared labels plus notes, validated against a schema. The decider is a provider behind an interface. The default provider is a small model through TanStack AI structured output. Other providers (for example an OpenRouter model) plug in behind the same interface. |
 | Run policy | Ported from the script: fresh session with a tight brief on retry, rescue by a stronger profile, blocked propagation, network grace, usage-limit waits that resume the same session, a stop time. Policy is engine code. A flow only sets its numbers. |
@@ -41,13 +46,14 @@ Dropped from the earlier plan: method packages and `method.json`, the OpenSpec m
 
 | Node | Does | Outcomes |
 | --- | --- | --- |
-| Agent | Runs one harness session in the run's worktree. Holds a prompt and/or a skill, a harness, a model, an effort, a permission mode, and a time budget. Ends with a structured Step Report. | `pass`, `fail`, `needs-input` |
-| Command | Runs one shell command in the worktree, for example the gate check. Keeps the full log on disk and the tail in the report. | `pass` (exit 0), `fail` |
-| Decision | Reads the reports of earlier nodes and returns one declared label plus notes. | One edge per label |
+| Agent | Runs one harness session in the run's worktree. Holds a prompt and/or a skill, a harness, a model, an effort, a permission mode, tools, and time budgets. Ends with a Step Report: an outcome, a summary, and optional structured `data` that matches the node's output schema. | `pass`, `fail`, `needs-input`, or the node's own outcomes |
+| Command | Runs one shell command in the worktree. Keeps the full log on disk and the tail in the outputs. | `pass` (exit 0), `fail` |
+| Decision | Reads earlier outputs and returns one declared label plus notes. | One edge per label |
 | Gate | Waits for a person in the Needs-you inbox. Holds a question and the choices. | One edge per choice |
-| For Each | Runs a sub-flow once per item of a list. The first source is "the Traces of an Epic, blockers first", read again before each item. A failed item blocks the items that wait on it. | `done`, `halted` |
+| Subflow | Runs another flow once, with its inputs bound by templates. Its outputs are the called flow's outputs plus `ended` (the label it ended on). | `pass` (finished), `fail` |
+| For Each | Runs a flow once per element of a list, bound to one of its inputs (`as`, default `item`). Reads the list again before each element. Orders by `dependsOn`; a failed element blocks the elements that depend on it. Each element can work on its own branch, stacked on the last one that finished. Its outputs hold the results of every element. | `done`, `halted` |
 
-A node reads the outputs of earlier nodes through template variables, for example `{{check.log_tail}}` or `{{item.body}}`.
+A node reads earlier values through templates, for example `{{check.log_tail}}`, `{{item.title}}`, or `{{epic}}`.
 
 ## 4. Architecture
 
@@ -115,9 +121,44 @@ Add the For Each node and the full run policy. Rebuild the rpgdotexe night as a 
 
 Proves: parity with the script.
 
+### Slice 5 — Safe nights, flows as functions
+
+The first nights showed two things: the dev server reloads under a running night, and the flows were built around one method. Slice 5 makes nights safe and flows generic. All of it is built in a separate git worktree while a night runs.
+
+- `bun run night`: the built server and web app, no hot reload.
+- Flow format version 2: `inputs` and `outputs` on every flow, templates with JSON paths, inputs and node ids in one namespace. `params` and `input: "item"` migrate on load; run snapshots of version 1 migrate when read.
+- The Subflow node.
+- For Each over any list: `json` (a template that renders a JSON array, for example `{{planner.data.tasks}}`), `command`, `files` (a glob), `github` (sub-issues). Elements are free-form JSON with optional `id`, `title`, `dependsOn`, `done`. `as` names the input; `branch` is `per-item` or `shared`. Engine facts per element move to `run`: `{{run.branch}}`, `{{run.base_branch}}`, `{{run.index}}`.
+- Start from a branch: the start dialog takes a base ref, so a night can continue on an open stack.
+- The rpgdotexe flows move to version 2.
+
+Proves: any flow can call any flow, and a list can come from anywhere.
+
+### Slice 6 — Agents that answer in shape
+
+- Agent outcomes: an Agent node may declare its own outcomes (`approved`, `changes-requested`, …) instead of `pass`/`fail`/`needs-input`.
+- Agent output schema: an Agent node may declare a JSON schema for `data` in its Step Report. The engine validates it; the step fails on a mismatch. `{{planner.data.tasks}}` feeds a For Each.
+- Generic items in the UI: id, title, a link when the element has `url`, and the raw JSON.
+- A starter flow library in `examples/starters/`: implement → check → retry; plan → For Each task → review; review a pull request; one agent per file of a glob.
+
+Proves: a planner agent can decide what the night does.
+
+### Slice 7 — Triggers
+
+- Schedules in `.nightshift/schedules.json`: a flow, its inputs, a time of day or a cron line, and a stop time. The daemon starts the runs. The UI lists, adds, pauses, and removes schedules, and shows the next start.
+
+Proves: a night starts without a person.
+
+### Slice 8 — More harnesses and tools
+
+- OpenCode and Codex Agent nodes through `@tanstack/ai-opencode` and `@tanstack/ai-codex`.
+- MCP servers per Agent node, next to the built-in tool sets.
+
+Proves: a flow can mix harnesses.
+
 ### Then
 
-Only when the personal tool runs every night: a flow library to share, other methods, Jira, server mode, Windows.
+A flow library to share, server mode, Windows.
 
 ## 6. Setup
 
