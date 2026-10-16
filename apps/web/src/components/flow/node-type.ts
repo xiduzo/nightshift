@@ -17,12 +17,12 @@ export const NODE_TYPE: Record<
 	agent: {
 		label: "Agent",
 		icon: BotIcon,
-		blurb: "Runs a Claude Code session in the worktree.",
+		blurb: "A coding agent works on a task.",
 	},
 	command: {
 		label: "Command",
 		icon: SquareTerminalIcon,
-		blurb: "Runs a shell command in the worktree.",
+		blurb: "Runs a shell command.",
 	},
 	decision: {
 		label: "Decision",
@@ -37,12 +37,12 @@ export const NODE_TYPE: Record<
 	subflow: {
 		label: "Subflow",
 		icon: SquareFunctionIcon,
-		blurb: "Runs another flow once, with its inputs bound.",
+		blurb: "Runs another flow once.",
 	},
 	foreach: {
 		label: "For Each",
 		icon: RepeatIcon,
-		blurb: "Runs a flow once per element of a list.",
+		blurb: "Runs a flow once for each item in a list.",
 	},
 };
 

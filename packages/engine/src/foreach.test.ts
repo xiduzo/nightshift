@@ -580,7 +580,9 @@ describe("For Each", () => {
 			["2", "failed"],
 		]);
 		expect(loop.items[1]?.reason).toContain("loose.txt");
-		expect(loop.items[1]?.reason).toContain("commits nothing on your behalf");
+		expect(loop.items[1]?.reason).toContain(
+			"Night Shift does not commit for you",
+		);
 		expect(loop.items[1]?.branch).toBeNull();
 	});
 

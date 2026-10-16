@@ -91,7 +91,7 @@ function WhereBadges({ secret }: { secret: SecretView }) {
 					</Badge>
 				</TooltipTrigger>
 				<TooltipContent className="max-w-64">
-					Set it here, or set it where the daemon starts.
+					No value yet. Choose Set to save one.
 				</TooltipContent>
 			</Tooltip>
 		);
@@ -106,7 +106,9 @@ function WhereBadges({ secret }: { secret: SecretView }) {
 					Keychain
 				</Badge>
 			) : null}
-			{secret.inEnv ? <Badge variant="secondary">Environment</Badge> : null}
+			{secret.inEnv ? (
+				<Badge variant="secondary">Outside Night Shift</Badge>
+			) : null}
 		</span>
 	);
 }
@@ -124,9 +126,9 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 					<h2 id="secrets-heading">Secrets</h2>
 				</CardTitle>
 				<CardDescription>
-					The values behind <span className="font-mono">${"{NAME}"}</span>. A
-					saved value lives in the macOS keychain and wins over the daemon's
-					environment. Night Shift never shows one again.
+					Tokens and passwords your tools use, written as{" "}
+					<span className="font-mono">${"{NAME}"}</span>. Night Shift keeps them
+					in your macOS keychain and never shows them again.
 				</CardDescription>
 				<CardAction>
 					<Button variant="outline" size="sm" onClick={() => setSetting("")}>
@@ -144,9 +146,9 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 							</EmptyMedia>
 							<EmptyTitle>No secrets yet</EmptyTitle>
 							<EmptyDescription>
-								A secret shows up here once a connection names it as{" "}
-								<span className="font-mono">${"{NAME}"}</span>, or when you add
-								one.
+								Add a secret, or write{" "}
+								<span className="font-mono">${"{NAME}"}</span> in a tool's
+								settings and it shows up here.
 							</EmptyDescription>
 						</EmptyHeader>
 					</Empty>
@@ -305,11 +307,9 @@ function SecretForm({
 					)}
 				</DialogTitle>
 				<DialogDescription>
-					Saved in the macOS keychain under the service{" "}
-					<span className="font-mono">nightshift</span>. Night Shift reads it
-					when a connection starts and never shows it again.
+					Night Shift keeps it in your macOS keychain and never shows it again.
 					{secret?.inEnv
-						? " It takes the place of the value in the daemon's environment."
+						? " It replaces the value that is set outside Night Shift."
 						: null}
 				</DialogDescription>
 			</DialogHeader>
@@ -334,7 +334,7 @@ function SecretForm({
 							</FieldError>
 						) : (
 							<FieldDescription>
-								Connections read it as{" "}
+								Tools use it as{" "}
 								<span className="font-mono">
 									${"{"}
 									{trimmedName || "NAME"}
@@ -417,10 +417,10 @@ function RemoveSecretDialog({
 					</AlertDialogTitle>
 					<AlertDialogDescription>
 						{usedBy.length === 0
-							? "No connection names it."
+							? "No tool uses it."
 							: secret?.inEnv
-								? `${usedBy.join(", ")} will read it from the daemon's environment instead.`
-								: `${usedBy.join(", ")} will have no value for it, and Agent nodes that name ${usedBy.length === 1 ? "that connection" : "those connections"} will fail to start.`}
+								? `${usedBy.join(", ")} will use the value that is set outside Night Shift instead.`
+								: `${usedBy.join(", ")} will have no value for it. Agent nodes that use ${usedBy.length === 1 ? "that tool" : "those tools"} cannot run until you set it again.`}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>

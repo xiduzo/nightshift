@@ -70,7 +70,7 @@ export type FlowCanvasNode = Node<FlowNodeData, FlowNodeType>;
 function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 	if (node.type === "foreach") {
 		return new Map([
-			["done", "No element left to start"],
+			["done", "No item left to start"],
 			[
 				"halted",
 				node.haltOn.length > 0
@@ -498,7 +498,7 @@ const SOURCE_ICON: Record<ListSource["kind"], typeof BracesIcon> = {
 const SOURCE_EMPTY: Record<ListSource["kind"], string> = {
 	json: "No list yet",
 	command: "No source command yet",
-	files: "No glob yet",
+	files: "No file pattern yet",
 	github: "No parent issue yet",
 };
 
@@ -544,9 +544,7 @@ function ForEachBody({ node }: { node: ForEachNode }) {
 			</span>
 			<span className="flex min-w-0 items-center gap-1 truncate text-[11px] text-muted-foreground">
 				<GitBranchIcon className="size-3 shrink-0" aria-hidden="true" />
-				{node.branch === "per-item"
-					? "Branch per element"
-					: "One shared branch"}
+				{node.branch === "per-item" ? "Branch per item" : "One shared branch"}
 				{node.maxItems ? ` · max ${node.maxItems}` : ""}
 			</span>
 		</>

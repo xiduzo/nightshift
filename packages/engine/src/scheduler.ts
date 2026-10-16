@@ -243,7 +243,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 					projectId,
 					schedule.id,
 					due,
-					`Missed by ${lateness(late)}: the daemon was not running, or the computer slept, when it came due. A start may be at most ${SCHEDULE_GRACE_MS / 60_000} min late.`,
+					`Missed by ${lateness(late)}: Night Shift was not running, or the computer was asleep, at that time. A schedule can start at most ${SCHEDULE_GRACE_MS / 60_000} min late.`,
 				);
 			}
 			return;

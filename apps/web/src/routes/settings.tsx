@@ -188,19 +188,19 @@ const PERMISSION_MODES: {
 		value: "auto",
 		label: "Auto",
 		description:
-			"Claude Code's classifier approves safe actions, with nobody awake to ask. Made for nights.",
+			"Claude Code approves safe actions on its own, so nobody needs to be awake. Made for nights.",
 	},
 	{
 		value: "acceptEdits",
 		label: "Accept edits",
 		description:
-			"File edits only. Every shell command is refused in an unattended run.",
+			"The agent can edit files. It cannot run commands while nobody is there to approve them.",
 	},
 	{
 		value: "default",
 		label: "Ask for each tool",
 		description:
-			"Asks before each tool. Nobody answers in an unattended run, so the tool is refused.",
+			"Asks before each tool. At night nobody answers, so the agent cannot use its tools.",
 	},
 	{
 		value: "plan",
@@ -230,8 +230,8 @@ function SettingsComponent() {
 					</p>
 					<h1 className="font-semibold text-2xl tracking-tight">Settings</h1>
 					<p className="text-muted-foreground text-sm">
-						How this daemon runs flows, what a new Agent node starts with, and
-						what this Mac tells you.
+						How Night Shift runs your flows, what a new Agent node starts with,
+						and when this Mac tells you.
 					</p>
 				</div>
 
@@ -469,7 +469,7 @@ function SettingSource({
 }) {
 	const fallback =
 		field.envValue !== undefined
-			? `${format(field.envValue)} from ${field.env}`
+			? `${format(field.envValue)}, set outside Night Shift`
 			: `${format(field.default)}, the default`;
 	return (
 		<div className="flex min-h-6 flex-wrap items-center gap-2">
@@ -491,7 +491,7 @@ function SettingSource({
 				</>
 			) : field.source === "env" ? (
 				<Badge variant="outline" className="font-mono">
-					From {field.env}
+					Set outside Night Shift
 				</Badge>
 			) : (
 				<Badge variant="outline" className="text-muted-foreground">
@@ -694,8 +694,8 @@ function ProjectsCard() {
 					<h2>Projects</h2>
 				</CardTitle>
 				<CardDescription>
-					Git repositories Night Shift works in. Each run gets its own worktree
-					in the clone.
+					The git repositories Night Shift works in. Each run works on its own
+					copy, so your checkout stays as it is.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="px-0">
@@ -713,7 +713,6 @@ function ProjectsCard() {
 							<EmptyTitle>No projects yet</EmptyTitle>
 							<EmptyDescription>
 								Add a git repository with + next to Projects in the sidebar.
-								Each run gets its own worktree in it.
 							</EmptyDescription>
 						</EmptyHeader>
 					</Empty>
@@ -722,9 +721,7 @@ function ProjectsCard() {
 						<TableHeader>
 							<TableRow>
 								<TableHead className="pl-6">Project</TableHead>
-								<TableHead className="hidden md:table-cell">
-									Clone path
-								</TableHead>
+								<TableHead className="hidden md:table-cell">Folder</TableHead>
 								<TableHead className="pr-6 text-right">
 									<span className="sr-only">Actions</span>
 								</TableHead>
@@ -853,11 +850,10 @@ function RunsCard({ data }: { data: SettingsView }) {
 							data-disabled={scheduler.locked ? true : undefined}
 						>
 							<FieldContent>
-								<FieldLabel htmlFor={`${id}-scheduler`}>Scheduler</FieldLabel>
+								<FieldLabel htmlFor={`${id}-scheduler`}>Schedules</FieldLabel>
 								<FieldDescription>
-									Starts the schedules in each project's{" "}
-									<span className="font-mono">.nightshift/schedules.json</span>.
-									Off: only the runs you start yourself.
+									Night Shift starts flows at the times you schedule. Turn it
+									off to run flows only when you start them.
 								</FieldDescription>
 							</FieldContent>
 							<Switch
@@ -876,7 +872,7 @@ function RunsCard({ data }: { data: SettingsView }) {
 							<Alert id={`${id}-scheduler-lock`}>
 								<LockIcon />
 								<AlertTitle className="flex flex-wrap items-center gap-2">
-									Locked off by the environment
+									Schedules are paused on this computer
 									<Badge
 										variant="outline"
 										className="border-status-waiting/40 bg-status-waiting/10 font-mono text-status-waiting"
@@ -894,7 +890,7 @@ function RunsCard({ data }: { data: SettingsView }) {
 								data={data}
 								settingKey="maxConcurrentRuns"
 								label="Max concurrent runs"
-								description="Runs that work at the same time. A run over the limit waits for a free place."
+								description="How many runs can work at the same time. Extra runs wait their turn."
 								inputMode="numeric"
 							/>
 							<TextSetting
@@ -931,8 +927,7 @@ function RunPolicyCard({ data }: { data: SettingsView }) {
 						<h2>Run policy</h2>
 					</CardTitle>
 					<CardDescription>
-						Defaults for flows that do not set their own policy. A flow's own
-						policy wins.
+						Defaults for flows that do not set their own.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -945,7 +940,7 @@ function RunPolicyCard({ data }: { data: SettingsView }) {
 								data={data}
 								settingKey="usageLimitFirstWaitMinutes"
 								label="First usage-limit wait"
-								description="A harness hits its usage limit with no reset time: the run sleeps this long, then tries again."
+								description="An agent hits its usage limit and gives no reset time. The run waits this long, then tries again."
 								unit="min"
 								inputMode="decimal"
 							/>
@@ -987,10 +982,10 @@ function ResumeSetting({ data }: { data: SettingsView }) {
 			<FieldContent>
 				<FieldLabel htmlFor={`${id}-resume`}>{label}</FieldLabel>
 				<FieldDescription>
-					A run the daemon stopped mid-step continues on its own a few seconds
-					after the daemon starts again, in the same session. Only with the
-					scheduler on, before the run's stop time, and at most 3 times in a
-					row. Off: it waits for you to resume it.
+					When Night Shift stops in the middle of a run, the run continues on
+					its own after Night Shift starts again. This works only with schedules
+					on, before the run's stop time, and up to 3 times in a row. Turn it
+					off to resume runs yourself.
 				</FieldDescription>
 				<SettingSource
 					field={data.fields.resumeInterruptedRuns}
@@ -1067,7 +1062,7 @@ function AgentDefaultsCard({ data }: { data: SettingsView }) {
 								data={data}
 								settingKey="agentModel"
 								label="Model"
-								description={`Any model ${harness.label} knows. Suggestions: ${harness.models.slice(0, 3).join(", ")}.`}
+								description={`Any model ${harness.label} supports, for example ${harness.models.slice(0, 3).join(", ")}.`}
 								mono
 								suggestions={harness.models}
 							/>
@@ -1124,7 +1119,7 @@ const NOTIFICATIONS: {
 	{
 		key: "notifyGateOpened",
 		label: "A Gate opens",
-		description: "The one change that needs you.",
+		description: "A run waits for your answer.",
 	},
 	{
 		key: "notifyRunFinished",
@@ -1134,7 +1129,7 @@ const NOTIFICATIONS: {
 	{
 		key: "notifyRunFailed",
 		label: "A run fails",
-		description: "With the reason from the event log.",
+		description: "With the reason it failed.",
 	},
 ];
 
@@ -1265,9 +1260,7 @@ function AppearanceCard() {
 				<CardTitle>
 					<h2>Appearance</h2>
 				</CardTitle>
-				<CardDescription>
-					Saved in this browser, not on the daemon.
-				</CardDescription>
+				<CardDescription>Saved in this browser only.</CardDescription>
 			</CardHeader>
 			<CardContent>
 				<RadioGroup
@@ -1313,9 +1306,9 @@ function DaemonCard({
 		<Card>
 			<CardHeader>
 				<CardTitle>
-					<h2>This daemon</h2>
+					<h2>This computer</h2>
 				</CardTitle>
-				<CardDescription>Where Night Shift keeps its state.</CardDescription>
+				<CardDescription>Where Night Shift keeps its data.</CardDescription>
 			</CardHeader>
 			<CardContent>
 				<ItemGroup>
@@ -1324,7 +1317,7 @@ function DaemonCard({
 							<FolderIcon aria-hidden="true" />
 						</ItemMedia>
 						<ItemContent className="min-w-0">
-							<ItemTitle>Data directory</ItemTitle>
+							<ItemTitle>Data folder</ItemTitle>
 							<ItemDescription
 								className="truncate font-mono text-xs"
 								title={dataDir}
@@ -1337,7 +1330,7 @@ function DaemonCard({
 								<Button
 									variant="ghost"
 									size="icon-sm"
-									aria-label="Copy the data directory"
+									aria-label="Copy the data folder path"
 									onClick={() => {
 										void navigator.clipboard
 											.writeText(dataDir)
@@ -1355,13 +1348,12 @@ function DaemonCard({
 							<LockIcon aria-hidden="true" />
 						</ItemMedia>
 						<ItemContent>
-							<ItemTitle>Database lease</ItemTitle>
+							<ItemTitle>Status</ItemTitle>
 							<ItemDescription className="line-clamp-none">
 								{lease ? (
 									<>
-										Held by pid {lease.pid} on {lease.host} since{" "}
-										{formatDateTime(lease.since)}. Only one daemon may use a
-										database. Another one refuses to start.
+										On {lease.host} since {formatDateTime(lease.since)}. Only
+										one Night Shift at a time can use this data.
 									</>
 								) : (
 									<Skeleton className="h-4 w-64" />
@@ -1370,7 +1362,7 @@ function DaemonCard({
 						</ItemContent>
 						{lease ? (
 							<ItemActions>
-								<Badge variant="outline">Epoch {lease.epoch}</Badge>
+								<Badge variant="outline">Running</Badge>
 							</ItemActions>
 						) : null}
 					</Item>
@@ -1380,10 +1372,10 @@ function DaemonCard({
 							<DatabaseIcon aria-hidden="true" />
 						</ItemMedia>
 						<ItemContent>
-							<ItemTitle>Where settings live</ItemTitle>
+							<ItemTitle>Your settings</ItemTitle>
 							<ItemDescription className="line-clamp-none">
-								Saved in this daemon's database. A setting you leave unset reads
-								the environment, then its default.
+								Saved on this computer. A setting you do not change uses its
+								default.
 							</ItemDescription>
 						</ItemContent>
 					</Item>
@@ -1393,10 +1385,10 @@ function DaemonCard({
 							<PlugIcon aria-hidden="true" />
 						</ItemMedia>
 						<ItemContent>
-							<ItemTitle>Harness paths</ItemTitle>
+							<ItemTitle>Coding agents</ItemTitle>
 							<ItemDescription className="line-clamp-none">
-								The claude, opencode, codex and gh binaries live under
-								Connections.
+								Check where Claude Code, OpenCode, Codex and the GitHub CLI are
+								installed, on the Agents page.
 							</ItemDescription>
 						</ItemContent>
 						<ItemActions>
@@ -1406,7 +1398,7 @@ function DaemonCard({
 								nativeButton={false}
 								render={<Link to="/connections" />}
 							>
-								Connections
+								Agents
 							</Button>
 						</ItemActions>
 					</Item>

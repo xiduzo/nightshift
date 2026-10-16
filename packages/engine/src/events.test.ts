@@ -600,7 +600,7 @@ describe("For Each scopes", () => {
 		b.stepEnded("outer", "interrupted");
 		expect(outer()?.items[0]).toMatchObject({
 			state: "failed",
-			reason: "The daemon stopped during this item.",
+			reason: "Night Shift stopped during this item.",
 			open: true,
 		});
 		b.stepReopened("outer");

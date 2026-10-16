@@ -832,7 +832,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 /** Why an item that was still running ended with its For Each step. */
 const cutShort: Record<string, string> = {
 	stopped: "The run stopped during this item.",
-	interrupted: "The daemon stopped during this item.",
+	interrupted: "Night Shift stopped during this item.",
 	error: "The For Each step failed during this item.",
 };
 

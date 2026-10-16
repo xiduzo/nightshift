@@ -221,7 +221,7 @@ export function StepTimeline({
 				) : null}
 				{step.nodeType === "foreach" ? (
 					<ol
-						aria-label={`Elements of ${step.nodeId}`}
+						aria-label={`Items of ${step.nodeId}`}
 						className="flex flex-col gap-0.5"
 					>
 						{itemsOf(step, steps).map((item, index, items) =>

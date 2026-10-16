@@ -79,10 +79,9 @@ function validateIn(
 		}
 		nodes.set(node.id, node);
 		if (reserved.includes(node.id)) {
-			error(
-				`Node id "${node.id}" is reserved for {{${node.id}.<field>}} templates.`,
-				{ nodeId: node.id },
-			);
+			error(`The node id "${node.id}" is reserved. Give the node another id.`, {
+				nodeId: node.id,
+			});
 		}
 	}
 
@@ -298,14 +297,11 @@ function checkInputs(
 				{},
 			);
 		} else if (reserved.includes(name)) {
-			error(
-				`The input "${name}" is reserved for {{${name}.<field>}} templates.`,
-				{},
-			);
+			error(`The input name "${name}" is reserved. Pick another name.`, {});
 		}
 		if (nodes.has(name)) {
 			error(
-				`The input "${name}" has the same name as node "${name}". Node ids and inputs share one namespace: rename one.`,
+				`The input "${name}" has the same name as the node "${name}". Rename one of them.`,
 				{ nodeId: name },
 			);
 		}
@@ -464,7 +460,7 @@ function checkCall(
 	}
 	const called = flows[node.flow];
 	if (!called) {
-		error(`${runs}, which does not parse. Fix that file first.`, at);
+		error(`${runs}, which is not valid. Open that flow and fix it first.`, at);
 		return;
 	}
 
@@ -474,18 +470,18 @@ function checkCall(
 		const as = inputs.get(node.as);
 		if (as === undefined) {
 			error(
-				`${runs}, which has no input "${node.as}" to take each element. Add a json input "${node.as}" to it, or change "as".`,
+				`${runs}, which has no input "${node.as}" to take each item. Add a json input "${node.as}" to it, or change "as".`,
 				at,
 			);
 		} else if (as.type === "text") {
 			warning(
-				`${runs}, whose input "${node.as}" is text: an element that is an object or an array arrives as JSON text. Make it a json input.`,
+				`${runs}, whose input "${node.as}" is text: an item that is an object or an array arrives as JSON text. Make it a json input.`,
 				at,
 			);
 		}
 		if (bound.has(node.as)) {
 			error(
-				`For Each node "${node.id}" binds the input "${node.as}", which already takes each element.`,
+				`For Each node "${node.id}" binds the input "${node.as}", which already takes each item.`,
 				at,
 			);
 		}

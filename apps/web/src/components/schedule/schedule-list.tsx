@@ -151,8 +151,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 					<h1 id="schedules-heading">Schedules</h1>
 				</CardTitle>
 				<CardDescription>
-					Flows the daemon starts on its own, saved in{" "}
-					<span className="font-mono text-xs">.nightshift/schedules.json</span>
+					Flows that start on their own at set times.
 				</CardDescription>
 				<CardAction>
 					<Button
@@ -184,15 +183,18 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 							<Alert>
 								<PowerOffIcon aria-hidden="true" />
 								<AlertDescription>
-									{schedulerLock ??
-										"The scheduler is off on this daemon. No schedule starts until it is on again."}{" "}
-									{schedulerLock ? null : (
-										<Link
-											to="/settings"
-											className="underline underline-offset-4"
-										>
-											Settings
-										</Link>
+									{schedulerLock ?? (
+										<>
+											Schedules are paused, so no flow starts on its own. Turn
+											them on in{" "}
+											<Link
+												to="/settings"
+												className="underline underline-offset-4"
+											>
+												Settings
+											</Link>
+											.
+										</>
 									)}
 								</AlertDescription>
 							</Alert>
@@ -213,7 +215,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 								<EmptyDescription>
 									{list.error
 										? list.error.message
-										: "Start a flow without a person, for example every night at 22:00 with a stop time of 07:00."}
+										: "Let a flow run on its own, for example every night from 22:00 to 07:00."}
 								</EmptyDescription>
 							</EmptyHeader>
 							{list.error ? null : (
@@ -294,8 +296,8 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 						<AlertDialogTitle>Remove this schedule?</AlertDialogTitle>
 						<AlertDialogDescription>
 							<span className="font-mono">{toDelete?.flow}</span>,{" "}
-							{toDelete ? describeCron(toDelete.cron) : null}. Runs it started
-							stay. To keep it but start nothing, pause it instead.
+							{toDelete ? describeCron(toDelete.cron) : null}. Its past runs
+							stay. To stop it for a while, pause it instead.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -348,7 +350,7 @@ function ScheduleRow({
 	const next = !schedule.enabled ? (
 		"Paused"
 	) : schedulerOff ? (
-		"Scheduler off"
+		"Schedules paused"
 	) : schedule.nextAt === null ? (
 		"No next start"
 	) : schedule.nextAt <= now ? (

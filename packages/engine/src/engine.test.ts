@@ -213,7 +213,7 @@ describe("projects", () => {
 		const plain = join(sandbox.root, "plain");
 		await mkdir(plain);
 		await expect(engine.addProject({ repoPath: plain })).rejects.toThrow(
-			"Not a git repository",
+			"is not a git repository",
 		);
 		expect(await engine.listProjects()).toEqual([]);
 	});
@@ -1054,7 +1054,7 @@ describe("automatic resume after a restart", () => {
 		const detail = await engine.getRun(runId);
 		expect(detail.status).toBe("interrupted");
 		expect(detail.reason).toBe(
-			`The daemon stopped while this run ran. It did not continue on its own: ${why}`,
+			`Night Shift stopped while this run ran. It did not continue on its own: ${why}`,
 		);
 		return detail;
 	}
@@ -1064,12 +1064,12 @@ describe("automatic resume after a restart", () => {
 		const { engine, sessions } = restart({}, { resumeGraceMs: 30 });
 		const interrupted = await engine.getRun(run.id);
 		expect(interrupted.status).toBe("interrupted");
-		expect(interrupted.reason).toBe("The daemon stopped while this run ran.");
+		expect(interrupted.reason).toBe("Night Shift stopped while this run ran.");
 
 		const resumed = await waitFor(() => sessions[0]);
 		expect(resumed.input.resumeSessionId).toBe("harness-0");
 		expect(resumed.input.prompt).toContain(
-			"The daemon stopped while you worked on this",
+			"Night Shift stopped while you worked on this",
 		);
 		expect(resumed.input.prompt).toContain("check the worktree");
 		resumed.finish();
@@ -1081,7 +1081,7 @@ describe("automatic resume after a restart", () => {
 				at: expect.any(Number),
 				by: "daemon",
 				nodeId: "worker",
-				reason: "The daemon restarted.",
+				reason: "Night Shift restarted.",
 			},
 		]);
 		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
@@ -1103,7 +1103,7 @@ describe("automatic resume after a restart", () => {
 				engine,
 				run.id,
 				sessions,
-				"the scheduler is off on this daemon.",
+				"schedules are paused.",
 			);
 			expect(detail.resumes).toEqual([]);
 		},
@@ -1133,7 +1133,7 @@ describe("automatic resume after a restart", () => {
 			engine,
 			run.id,
 			sessions,
-			`its worktree is gone (${run.worktreePath}).`,
+			"the copy of the project it worked in is gone.",
 		);
 	});
 
@@ -1147,7 +1147,7 @@ describe("automatic resume after a restart", () => {
 			first.engine,
 			off.run.id,
 			first.sessions,
-			"its flow's policy turns automatic resume off.",
+			"its flow turns automatic resume off.",
 		);
 
 		const on = await dieMidStep({
@@ -1197,7 +1197,7 @@ describe("automatic resume after a restart", () => {
 			engine,
 			run.id,
 			sessions,
-			"it continued on its own 3 times in a row, and each time the daemon stopped again.",
+			"it continued on its own 3 times in a row, and each time Night Shift stopped again.",
 		);
 
 		// A person's resume counts from zero again.

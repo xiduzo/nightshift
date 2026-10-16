@@ -98,7 +98,9 @@ export function FlowInputFields({
 					const fieldId = `${idPrefix}-input-${input.name}`;
 					const value = values[input.name] ?? "";
 					const problem = jsonProblem(input, value);
-					const hint = problem ? `Not JSON: ${problem}` : input.description;
+					const hint = problem
+						? `Not valid JSON: ${problem}`
+						: input.description;
 					const set = (next: string) =>
 						onChange({ ...values, [input.name]: next });
 					return (

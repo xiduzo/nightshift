@@ -96,7 +96,7 @@ describe("the scheduler switch", () => {
 		const field = s.view().fields.scheduler;
 		expect(field.source).toBe("env");
 		expect(field.envValue).toBe(false);
-		expect(field.locked).toContain("NIGHTSHIFT_SCHEDULER=off");
+		expect(field.locked).toContain("started with schedules turned off");
 	});
 
 	test("any other NIGHTSHIFT_SCHEDULER value leaves it on, and a saved false wins", async () => {

@@ -108,7 +108,7 @@ export function IssuesPanel({
 										className="mt-px size-3.5 shrink-0"
 										aria-hidden="true"
 									/>
-									Only the schema was checked. The validator is not available:{" "}
+									Some checks could not run, so this list may be incomplete:{" "}
 									{check.validatorError}
 								</p>
 							) : null}

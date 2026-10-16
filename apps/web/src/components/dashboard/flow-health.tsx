@@ -153,7 +153,7 @@ export function FlowHealth({
 											) : (
 												<span
 													className="flex items-center gap-2"
-													title={`${finished} of ${ended} finished; stopped runs left out`}
+													title={`${finished} of ${ended} finished. Stopped runs do not count.`}
 												>
 													<Progress
 														value={rate}

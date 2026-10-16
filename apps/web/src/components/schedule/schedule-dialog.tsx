@@ -202,13 +202,13 @@ function ScheduleForm({
 			: cron === null
 				? when.mode === "simple"
 					? "Choose a time and at least one day."
-					: "Enter a cron line."
+					: "Enter a cron expression."
 				: cronProblem
-					? `The cron line does not parse: ${cronProblem}`
+					? `This cron expression is not valid: ${cronProblem}`
 					: missing.length > 0
 						? `Fill in ${missing.map((input) => input.label || input.name).join(", ")}.`
 						: badJson.length > 0
-							? `Fix the JSON of ${badJson.map((input) => input.label || input.name).join(", ")}.`
+							? `Check the format of ${badJson.map((input) => input.label || input.name).join(", ")}.`
 							: stopInvalid
 								? "Enter a stop time, for example 07:00."
 								: null;
@@ -253,9 +253,8 @@ function ScheduleForm({
 			<DialogHeader>
 				<DialogTitle>{schedule ? "Edit schedule" : "New schedule"}</DialogTitle>
 				<DialogDescription>
-					The daemon starts the flow at these times, each run in a new worktree.
-					Saved in <span className="font-mono">.nightshift/schedules.json</span>
-					.
+					Choose a flow and when it runs. Night Shift starts it for you at those
+					times.
 				</DialogDescription>
 			</DialogHeader>
 
@@ -285,7 +284,7 @@ function ScheduleForm({
 					</NativeSelect>
 					{chosenItem && chosenItem.errorCount > 0 ? (
 						<FieldError>
-							This flow has errors: a start fails until they are fixed.
+							This flow has errors. Fix them, or the schedule cannot start it.
 						</FieldError>
 					) : null}
 				</Field>
@@ -299,7 +298,7 @@ function ScheduleForm({
 
 				<FieldSet className="gap-3">
 					<FieldLegend variant="label" className="mb-0">
-						Starts
+						When
 					</FieldLegend>
 					<Tabs
 						value={when.mode}
@@ -307,7 +306,7 @@ function ScheduleForm({
 					>
 						<TabsList className="w-full">
 							<TabsTrigger value="simple">Time and days</TabsTrigger>
-							<TabsTrigger value="cron">Cron line</TabsTrigger>
+							<TabsTrigger value="cron">Cron</TabsTrigger>
 						</TabsList>
 						<TabsContent value="simple" className="flex flex-col gap-3 pt-1">
 							{when.mode === "simple" ? (
@@ -378,7 +377,7 @@ function ScheduleForm({
 							{when.mode === "cron" ? (
 								<Field data-invalid={cronProblem !== null || undefined}>
 									<FieldLabel htmlFor={`${id}-cron`} className="sr-only">
-										Cron line
+										Cron expression
 									</FieldLabel>
 									<Input
 										id={`${id}-cron`}
@@ -394,8 +393,8 @@ function ScheduleForm({
 										}
 									/>
 									<FieldDescription>
-										Five fields: minute, hour, day of the month, month, day of
-										the week. On the daemon's clock.
+										For example, 0 22 * * 1-5 runs at 22:00 on weekdays. Times
+										are in this computer's time zone.
 									</FieldDescription>
 								</Field>
 							) : null}
@@ -407,7 +406,7 @@ function ScheduleForm({
 						className={cronProblem ? "text-destructive" : undefined}
 					>
 						{cronProblem ? (
-							`Does not parse: ${cronProblem}`
+							`Not valid: ${cronProblem}`
 						) : preview.data && preview.data.times.length > 0 ? (
 							<>
 								<span className="text-foreground">
@@ -424,7 +423,7 @@ function ScheduleForm({
 								))}
 							</>
 						) : preview.data ? (
-							"This cron line never comes due."
+							"This schedule never runs."
 						) : (
 							" "
 						)}
@@ -443,11 +442,11 @@ function ScheduleForm({
 						onCheckedChange={(on) => setStop((current) => ({ ...current, on }))}
 					/>
 					<FieldContent>
-						<FieldLabel htmlFor={`${id}-stop`}>Stop at a time</FieldLabel>
+						<FieldLabel htmlFor={`${id}-stop`}>Stop by a set time</FieldLabel>
 						<FieldDescription>
 							{stop.on
-								? `The first ${stop.time || "…"} after the start. No new step starts after it; the run then ends as stopped.`
-								: "No stop time: each run goes until its flow ends."}
+								? `After ${stop.time || "…"}, the run starts no new steps and stops.`
+								: "Each run continues until the flow is done."}
 						</FieldDescription>
 					</FieldContent>
 					<Input

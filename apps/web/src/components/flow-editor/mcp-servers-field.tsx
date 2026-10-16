@@ -107,9 +107,9 @@ export function McpServersField({
 				Add MCP server
 			</Button>
 			<FieldDescription id={`${id}-hint`} className="text-xs">
-				Added to the harness's own MCP servers for this step. Never put secrets
-				here — use <code className="font-mono">{envRef("NAME")}</code> to read
-				the daemon's environment.
+				Adds tools for this node only, next to its built-in tools. Do not type
+				secrets here. Write <code className="font-mono">{envRef("NAME")}</code>{" "}
+				and Night Shift fills in the secret NAME.
 			</FieldDescription>
 		</FieldSet>
 	);
@@ -172,12 +172,8 @@ function ServerRow({
 					)
 				}
 			>
-				<NativeSelectOption value="stdio">
-					Local command (stdio)
-				</NativeSelectOption>
-				<NativeSelectOption value="url">
-					URL (streamable HTTP)
-				</NativeSelectOption>
+				<NativeSelectOption value="stdio">Local command</NativeSelectOption>
+				<NativeSelectOption value="url">Remote URL</NativeSelectOption>
 			</NativeSelect>
 			{isStdio ? (
 				<StdioFields id={id} name={name} server={server} onUpdate={onUpdate} />

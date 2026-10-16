@@ -59,7 +59,7 @@ export const TOOLS: Tool[] = [
 		role: "Harness for Agent nodes",
 		setting: "claudeBin",
 		offMachine: () =>
-			"Prompts and the worktree's code go to Anthropic under your Claude login.",
+			"Prompts and your project's code go to Anthropic under your Claude login.",
 	},
 	{
 		target: "opencode",
@@ -85,7 +85,7 @@ export const TOOLS: Tool[] = [
 		role: "Issues and pull requests",
 		setting: "ghBin",
 		offMachine: (check) =>
-			`Reads issues and opens pull requests on GitHub as ${check?.account ?? "the account gh is logged in to"}.`,
+			`Reads issues and opens pull requests on GitHub as ${check?.account ?? "the account you use with the GitHub CLI"}.`,
 	},
 ];
 
@@ -98,18 +98,17 @@ function checkState(check: CliCheck | undefined): CheckState {
 /** Where the executable setting gets its value. */
 function sourceText(settings: SettingsView, key: BinKey): string {
 	const field = settings.fields[key];
-	if (field.source === "saved") return "Saved";
-	if (field.source === "env") return `From ${field.env}`;
-	return `Default: ${String(field.default)} on the PATH`;
+	if (field.source === "saved") return "You set this path";
+	if (field.source === "env") return "Set outside Night Shift";
+	return "Found automatically";
 }
 
 /** The fallback once the saved value is gone. */
 function fallbackText(settings: SettingsView, key: BinKey): string {
 	const field = settings.fields[key];
-	const onPath = `${String(field.default)} on the PATH`;
-	return field.env
-		? `Without a saved path it uses ${field.env}, then ${onPath}.`
-		: `Without a saved path it uses ${onPath}.`;
+	return field.source === "saved"
+		? "Choose Use the default to let Night Shift find it again."
+		: "Change it only if Night Shift uses the wrong copy.";
 }
 
 /**
@@ -342,13 +341,13 @@ function ChangePathForm({
 			<DialogHeader>
 				<DialogTitle>Change the {tool.title} path</DialogTitle>
 				<DialogDescription>
-					The executable Night Shift runs. A name is looked up on the daemon's
-					PATH; a path is used as is.
+					Where {tool.title} is installed on this computer. Enter its full path
+					or its command name.
 				</DialogDescription>
 			</DialogHeader>
 			<FieldGroup className="gap-5">
 				<Field>
-					<FieldLabel htmlFor={`${id}-bin`}>Executable</FieldLabel>
+					<FieldLabel htmlFor={`${id}-bin`}>Path</FieldLabel>
 					<Input
 						id={`${id}-bin`}
 						value={value}

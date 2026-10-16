@@ -21,14 +21,14 @@ export const HARNESSES: readonly HarnessInfo[] = [
 	{
 		value: "claude-code",
 		label: "Claude Code",
-		note: "Runs claude with your Claude login. Model: an alias such as sonnet, or a full model id.",
+		note: "Uses your Claude login. Model: an alias such as sonnet, or a full model id.",
 		defaultModel: "sonnet",
 		models: ["sonnet", "opus", "haiku"],
 	},
 	{
 		value: "opencode",
 		label: "OpenCode",
-		note: "Model as provider/model. Needs an OpenCode 1.x build: 2.x does not work yet (NIGHTSHIFT_OPENCODE_BIN).",
+		note: "Model as provider/model. Needs OpenCode 1.x. Version 2.x does not work yet.",
 		defaultModel: "anthropic/claude-sonnet-4-5",
 		models: [
 			"anthropic/claude-sonnet-4-5",
@@ -41,7 +41,7 @@ export const HARNESSES: readonly HarnessInfo[] = [
 	{
 		value: "codex",
 		label: "Codex",
-		note: "Unverified: tested against a fake codex only. Runs codex exec with your Codex login.",
+		note: "Not fully tested yet. Uses your Codex login.",
 		defaultModel: "gpt-5.3-codex",
 		models: [
 			"gpt-5.3-codex",

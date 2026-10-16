@@ -110,7 +110,7 @@ export function SubflowDetail({
 													<span className="font-sans text-muted-foreground italic">
 														{input?.default !== undefined
 															? `default: ${input.default}`
-															: "not bound"}
+															: "not set"}
 													</span>
 												)}
 											</dd>
@@ -129,7 +129,7 @@ export function SubflowDetail({
 						{returned.length === 0 ? (
 							<p className="text-muted-foreground text-xs italic">
 								{step.outcome === null
-									? "Not yet: it is running."
+									? "Not yet. The flow is still running."
 									: "No outputs."}
 							</p>
 						) : (

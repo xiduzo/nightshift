@@ -119,8 +119,8 @@ export function QuickRunDialog({
 					<DialogHeader>
 						<DialogTitle>Quick run</DialogTitle>
 						<DialogDescription>
-							One Agent node with a prompt, no flow file. It works in a new
-							worktree on its own branch.
+							One agent with a prompt, no flow needed. It works on a new branch
+							in its own copy of the project.
 						</DialogDescription>
 					</DialogHeader>
 
@@ -225,7 +225,7 @@ export function QuickRunDialog({
 							</Field>
 							<Field>
 								<FieldLabel htmlFor={`${id}-base-ref`}>
-									Base ref{" "}
+									Start from{" "}
 									<span className="font-normal text-muted-foreground">
 										(optional)
 									</span>
@@ -234,7 +234,7 @@ export function QuickRunDialog({
 									id={`${id}-base-ref`}
 									value={baseRef}
 									onChange={(event) => setBaseRef(event.target.value)}
-									placeholder="Current HEAD"
+									placeholder="The current branch"
 									className="font-mono"
 									autoComplete="off"
 									spellCheck={false}

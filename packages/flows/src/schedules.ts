@@ -60,7 +60,7 @@ export const scheduleSchema = z.object({
 	 * Five fields (minute hour day-of-month month day-of-week) in the
 	 * daemon's local time zone, for example `0 22 * * 1-5`.
 	 */
-	cron: z.string().trim().min(1, "Enter a cron line."),
+	cron: z.string().trim().min(1, "Enter a cron expression."),
 	/** The stop time: the first such time of day after the run starts. */
 	stopAt: timeOfDaySchema.optional(),
 	/** The git ref to branch the worktree from. Default: the clone's current HEAD. */
@@ -293,7 +293,7 @@ export function validateSchedules(
 		seen.add(schedule.id);
 
 		const cronProblem = cronError(schedule.cron);
-		if (cronProblem) error(`The cron line does not parse: ${cronProblem}`);
+		if (cronProblem) error(`The cron expression is not valid: ${cronProblem}`);
 
 		if (!Object.hasOwn(flows, schedule.flow)) {
 			error(`The flow "${schedule.flow}" does not exist.`);
@@ -301,12 +301,12 @@ export function validateSchedules(
 		}
 		const flow = flows[schedule.flow];
 		if (!flow) {
-			error(`The flow "${schedule.flow}" does not load.`);
+			error(`The flow "${schedule.flow}" is not valid. Open it and fix it.`);
 			continue;
 		}
 		if (flow.errorCount > 0) {
 			error(
-				`The flow "${schedule.flow}" has ${flow.errorCount === 1 ? "an error" : `${flow.errorCount} errors`}: it cannot run.`,
+				`The flow "${schedule.flow}" has ${flow.errorCount === 1 ? "an error" : `${flow.errorCount} errors`}. Fix the flow so this schedule can run.`,
 			);
 		}
 		const declared = new Map(flow.inputs.map((input) => [input.name, input]));

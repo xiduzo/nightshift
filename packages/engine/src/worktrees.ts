@@ -76,16 +76,18 @@ export async function resolveRepoTopLevel(path: string): Promise<string> {
 	try {
 		real = await realpath(path);
 	} catch {
-		throw new Error(`Not a git repository: ${path} does not exist.`);
+		throw new Error(`The folder ${path} does not exist.`);
 	}
 	const result = await git(real, ["rev-parse", "--show-toplevel"]);
 	if (result.exitCode !== 0 || !result.stdout) {
-		throw new Error(`Not a git repository: ${path}`);
+		throw new Error(
+			`${path} is not a git repository. Pick the folder of a git clone.`,
+		);
 	}
 	const topLevel = await realpath(result.stdout);
 	if (topLevel !== real) {
 		throw new Error(
-			`${path} is inside a git repository but is not its top level. Use ${topLevel}.`,
+			`${path} is inside a git repository, but it is not the top folder. Use ${topLevel}.`,
 		);
 	}
 	return topLevel;
@@ -103,7 +105,9 @@ export async function resolveCommit(
 		`${ref}^{commit}`,
 	]);
 	if (result.exitCode !== 0 || !result.stdout) {
-		throw new Error(`Unknown git ref "${ref}" in ${repoPath}`);
+		throw new Error(
+			`The branch or commit "${ref}" does not exist in this project.`,
+		);
 	}
 	return result.stdout;
 }
@@ -241,7 +245,7 @@ async function refuseDirty(cwd: string): Promise<void> {
 		.join(", ");
 	const more = changes.length > 5 ? ` and ${changes.length - 5} more` : "";
 	throw new DirtyWorktreeError(
-		`The worktree has changes that are not committed (${shown}${more}). Night Shift commits nothing on your behalf: the body flow should commit its work.`,
+		`The run's copy of the project has changes that are not committed (${shown}${more}). Night Shift does not commit for you. Make the body flow commit its work.`,
 	);
 }
 

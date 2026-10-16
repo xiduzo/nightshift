@@ -384,7 +384,7 @@ describe("normalizeList", () => {
 	test("duplicate ids are an error that names the id", () => {
 		expect(normalizeList([{ id: "a" }, { name: "a" }])).toEqual({
 			ok: false,
-			error: 'The list has the id "a" more than once (element 1).',
+			error: 'The list has the id "a" more than once (item 2).',
 		});
 		expect(normalizeList([{ id: 1 }, { id: "1" }]).ok).toBe(false);
 	});

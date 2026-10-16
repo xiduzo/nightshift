@@ -47,11 +47,11 @@ export function ResumeComposer({
 		? `Resuming continues at ${lastStep.nodeId}, inside the For Each, with the same item.`
 		: lastStep
 			? lastStep.nodeType === "agent"
-				? `Resuming continues at ${lastStep.nodeId}: the agent picks up its last session in the same worktree.`
+				? `Resuming continues at ${lastStep.nodeId}: the agent picks up where it left off.`
 				: lastStep.nodeType === "gate"
 					? `Resuming opens the gate ${lastStep.nodeId} again and waits for your answer.`
-					: `Resuming runs ${lastStep.nodeId} again in the same worktree.`
-			: "Resuming continues the run in the same worktree.";
+					: `Resuming runs ${lastStep.nodeId} again.`
+			: "Resuming continues the run where it left off.";
 
 	return (
 		<form
