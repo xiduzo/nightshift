@@ -7,24 +7,24 @@
  * so color is never the only signal.
  */
 :root {
-	--status-running: oklch(0.5 0.17 255);
-	--status-finished: oklch(0.5 0.13 150);
-	--status-stopped: oklch(0.48 0 0);
-	--status-failed: oklch(0.55 0.22 27);
-	--status-interrupted: oklch(0.52 0.13 65);
-	--status-waiting: oklch(0.5 0.2 305);
+	--status-running: oklch(0.5 0.16 250);
+	--status-finished: oklch(0.5 0.13 155);
+	--status-stopped: oklch(0.45 0 0);
+	--status-failed: oklch(0.53 0.2 27);
+	--status-interrupted: oklch(0.55 0.15 45);
+	--status-waiting: oklch(0.52 0.12 65);
 	/* A usage limit or the network: quieter than running, it continues on a timer. */
-	--status-sleeping: oklch(0.5 0.07 235);
+	--status-sleeping: oklch(0.49 0.12 290);
 }
 
 .dark {
-	--status-running: oklch(0.75 0.13 250);
-	--status-finished: oklch(0.78 0.15 155);
-	--status-stopped: oklch(0.72 0 0);
-	--status-failed: oklch(0.704 0.191 22.216);
-	--status-interrupted: oklch(0.82 0.14 80);
-	--status-waiting: oklch(0.76 0.14 305);
-	--status-sleeping: oklch(0.78 0.06 235);
+	--status-running: oklch(0.74 0.13 245);
+	--status-finished: oklch(0.77 0.15 155);
+	--status-stopped: oklch(0.74 0 0);
+	--status-failed: oklch(0.71 0.18 25);
+	--status-interrupted: oklch(0.76 0.15 50);
+	--status-waiting: oklch(0.83 0.14 80);
+	--status-sleeping: oklch(0.76 0.09 290);
 }
 
 /*
@@ -35,7 +35,7 @@
 :root {
 	--outcome-pass: var(--status-finished);
 	--outcome-fail: var(--status-failed);
-	--outcome-needs-input: var(--status-interrupted);
+	--outcome-needs-input: var(--status-waiting);
 	--outcome-label: oklch(0.52 0.1 200);
 }
 
@@ -73,7 +73,7 @@
 	--xy-node-color: var(--card-foreground);
 	--xy-node-background-color: var(--card);
 	--xy-node-border: 1px solid var(--border);
-	--xy-node-border-radius: 0;
+	--xy-node-border-radius: var(--radius);
 	--xy-handle-background-color: var(--muted-foreground);
 	--xy-handle-border-color: var(--card);
 	--xy-selection-background-color: color-mix(

@@ -1,4 +1,9 @@
+import {
+	SidebarInset,
+	SidebarProvider,
+} from "@nightshift/ui/components/sidebar";
 import { Toaster } from "@nightshift/ui/components/sonner";
+import { TooltipProvider } from "@nightshift/ui/components/tooltip";
 import type { QueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import {
@@ -8,10 +13,9 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-
+import { ThemeProvider } from "next-themes";
+import { AppSidebar } from "@/components/app-sidebar";
 import type { orpc } from "@/utils/orpc";
-
-import Header from "../components/header";
 
 import appCss from "../index.css?url";
 export interface RouterAppContext {
@@ -46,16 +50,27 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 function RootDocument() {
 	return (
-		<html lang="en" className="dark">
+		<html lang="en" suppressHydrationWarning>
 			<head>
 				<HeadContent />
 			</head>
 			<body>
-				<div className="grid h-svh grid-rows-[auto_1fr]">
-					<Header />
-					<Outlet />
-				</div>
-				<Toaster richColors />
+				<ThemeProvider
+					attribute="class"
+					defaultTheme="dark"
+					enableSystem
+					disableTransitionOnChange
+				>
+					<TooltipProvider>
+						<SidebarProvider>
+							<AppSidebar />
+							<SidebarInset className="min-w-0">
+								<Outlet />
+							</SidebarInset>
+						</SidebarProvider>
+					</TooltipProvider>
+					<Toaster richColors />
+				</ThemeProvider>
 				<TanStackRouterDevtools position="bottom-left" />
 				<ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
 				<Scripts />
