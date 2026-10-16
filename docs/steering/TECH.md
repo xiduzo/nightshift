@@ -100,6 +100,8 @@ bun lefthook install
 | Flows as repo files | Versioned, reviewable, diffable. Configuration drift was the main pain in the tool this replaces. | 2026-10-15 |
 | The flow is the method | A personal tool needs no method plugin system. A flow with prompts and skills expresses WTF or any other method. | 2026-10-15 |
 | React Flow for the editor | Mature graph editor for React. Custom nodes per node type. | 2026-10-15 |
+| Step timing, stop and waits stay engine code, not LangGraph's `TimeoutPolicy`, `RunControl` or `retryPolicy` | A LangGraph node timeout drops the node's writes and leaves it running; a drain is not persisted; retries sleep in-process. See `docs/research/langgraph-thinning.md`. | 2026-10-17 |
+| The walk reads the checkpoint; the event log is the read model for people, and the crash-recovery source | Writes before `interrupt()` are not committed, and a daemon death mid-node leaves only the log. What the checkpoint holds for sure (outputs, stop time, streak, open Gate) is read there. | 2026-10-17 |
 
 Full ADRs go in `docs/adr/` when a decision needs more than one line of rationale.
 

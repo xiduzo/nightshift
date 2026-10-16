@@ -1,7 +1,8 @@
 # The run engine on LangGraph
 
 **Status:** implemented (2026-10-16). **Spike:** `docs/research/langgraph-spike.md`.
-**Probes:** `docs/research/langgraph-probe.md`.
+**Probes:** `docs/research/langgraph-probe.md`. **Thinning (2026-10-17):**
+`docs/research/langgraph-thinning.md`.
 
 Night Shift's run engine (`packages/engine`) runs its control flow and
 durability on LangGraph (`@langchain/langgraph`). A run is one LangGraph
@@ -22,20 +23,23 @@ suites were the acceptance criteria.
 
 ```
 packages/engine/src/
-  graph/state.ts           RunState (zod): inputs, nodes, visits, traversals,
-                           loops, pending, ended. Also the typed
-                           payloads that cross the graph's boundary: Parked
-                           (an interrupt), ResumeValue, RunEvent (custom
-                           stream chunks).
+  graph/state.ts           RunState (zod): inputs, stopAt, nodes, visits,
+                           traversals, loops, pending (a wait with its
+                           streak, a parked step, or an open Gate), ended.
+                           Also the typed payloads that cross the graph's
+                           boundary: Parked (an interrupt), ResumeValue,
+                           RunEvent (custom stream chunks).
   graph/checkpointer.ts    LibsqlSaver: BaseCheckpointSaver on db.$client.
                            Tables lg_checkpoint and lg_write (drizzle schema in
                            packages/db, migration
-                           20261016155422_langgraph_checkpoints).
+                           20261016155422_langgraph_checkpoints). pruneThread
+                           keeps a thread's latest root checkpoint.
   graph/compile.ts         compileFlow(flow, ctx): StateGraph. START →
                            flow.start; every flow node plus its park node
                            park__<id>; Agent nodes and Decisions decided by
-                           a model also get a wait node wait__<id>. No
-                           static edges.
+                           a model also get a wait node wait__<id>; a
+                           Decision decided by a person gets an ask node
+                           ask__<id>. No static edges.
   graph/route.ts           route(): picks the edge with `nextEdge`, logs
                            EdgeTaken and returns `new Command({ update,
                            goto })`; or ends the flow (isChosenEnd,
@@ -49,7 +53,8 @@ packages/engine/src/
   graph/nodes/command.ts
   graph/nodes/decision.ts  decision node: routes on the step; a chooser
                            per `by` gets the option.
-  graph/nodes/choosers/    person.ts (the Gate), rule.ts (JSONata rules),
+  graph/nodes/choosers/    person.ts (the Gate: the node opens it, its ask
+                           node interrupts), rule.ts (JSONata rules),
                            model.ts (the decider).
   graph/nodes/subflow.ts
   graph/nodes/foreach.ts
@@ -57,10 +62,11 @@ packages/engine/src/
                            runBody (a called flow as a subgraph of the node)
                            and BodyEnd (how the body ended).
   graph/runner.ts          Per-run driver: start, continueRun, resume,
-                           reenter (reentryUpdate), wake, stop, closeParked.
-                           Streams the graph, publishes to the bus, reacts
-                           to interrupts, owns slots and wake timers, and
-                           prunes a finished run's thread.
+                           reenter (reentryUpdate for threads with no
+                           checkpoint), wake, stop, closeParked. Streams the
+                           graph, publishes to the bus, reacts to
+                           interrupts, owns slots and wake timers, and prunes
+                           a finished run's thread to its latest checkpoint.
   graph/test-support.ts    Graph-level test helpers: a compiled flow on a
                            MemorySaver, drive() collecting the root's
                            interrupts and custom events.
@@ -98,15 +104,23 @@ packages/engine/src/
    `step` and `agent_session` rows and the transcript files too. The API,
    the derivations in `events.ts` and the web app keep working unchanged.
 4. **Code before `interrupt()` re-runs on resume.** Only the wait, park
-   nodes and the Gate chooser interrupt, and nothing before their `interrupt()` call
+   and ask nodes interrupt, and nothing before their `interrupt()` call
    has side effects. Everything else happens in the step node, which runs
-   once per visit.
+   once per visit. A node's writes before an `interrupt()` are never
+   committed, so a fact that must survive the park is committed by one
+   node and the next node interrupts (the Gate's open and ask nodes).
 5. **Mid-step facts come from the event log on re-entry.** A node's state
    update commits when it returns, so after a daemon death the Agent node
    re-runs from the last checkpoint. It finds its step id in
    `state.pending` (or the open step of that node in the log) and
    continues the harness session the log assigned
-   (`HarnessSessionAssigned`).
+   (`HarnessSessionAssigned`). What the checkpoint holds for sure, the
+   walk reads there: the inputs, the stop time (`stopAt`, cleared by a
+   resume's `Command` update), node outputs (also the session an Agent
+   node with `session: "resume"` continues, and a finished body's
+   outputs), a waiting step's streak (`pending.streak`), an open Gate
+   (`pending.kind === "gate"`), the wait a wake ends (the interrupt).
+   The log is the read model for people and the crash-recovery source.
 6. **Scopes.** A Subflow or For Each body is a subgraph invoked from the
    node with the config passed through (so it checkpoints under the node's
    namespace). The scope `{ parentStepId, itemId }` travels in
@@ -118,9 +132,14 @@ packages/engine/src/
    stays at its interrupt. `stopRun({ when: "after-step" })` appends
    `StopAfterStepRequested`; every step node checks it (and `stopAt`, and
    the step cap) on entry before `StepStarted`, and parks `stopped` with the
-   same reasons as before.
+   same reasons as before. The stop time is the state's: the start input
+   sets `stopAt`, a resume past it writes it null, and a body reads its
+   caller's through `configurable.stopAt` (set on every invoke, because a
+   resume's update reaches the root namespace only).
 8. **Waits.** The Agent node plans the wait with `planWait` as before,
-   appends `WaitStarted`, records the transcript `wait` entry and returns
+   from the streak the pending wait carries (`pending.streak`: how many
+   waits for this reason, and when the first began), appends
+   `WaitStarted`, records the transcript `wait` entry and returns
    `goto: wait__<nodeId>`; the wait node interrupts
    `{ kind: "wait", until, reason }`. The runner schedules the wake timer
    from the interrupt (and rebuilds timers from `deriveSleep` at startup).
@@ -136,11 +155,13 @@ packages/engine/src/
 10. **Finish.** When the root stream ends with `state.ended.status ===
     "finished"`, the runner appends `RunEnded finished` with the reason
     the old walk used (`Ended at node "x" with "y".` for a non-`pass`
-    chosen end), then deletes the thread's checkpoints and pending writes
-    (`saver.deleteThread`). They were the walk's bookkeeping; the event
-    log is the record. A finished run is never resumed through its thread:
-    `resumeRun` of one finds the thread `fresh` and re-enters it from the
-    log (rule 9).
+    chosen end), then prunes the thread to its latest checkpoint
+    (`saver.pruneThread`: the older root checkpoints and the body
+    namespaces go). The history was the walk's bookkeeping and the event
+    log is the record; the final state is what `resumeRun` of a finished
+    run re-enters on: `Command({ goto, update: { ended: null, pending:
+    null } })` with the last step's visit taken back, so its node reopens
+    the step (rule 9).
 11. **Durability** is `"sync"`: the checkpoint is written before the next
     node starts. Subgraphs inherit it through the config `runBody` passes
     on, as they inherit the drive's `recursionLimit`
@@ -187,14 +208,22 @@ Decisions taken while implementing, from the code and its comments:
   the choosers, `resolveGate` and the decider's `decide` tool. The inbox,
   run status `waiting`, `listGates` and `resolveGate` key on the Gate the
   step opened (`GateOpened`), not on a node type.
-- **A Gate reopened after a stop is a new visit** (`choosers/person.ts`).
-  `{ kind: "reopen" }` asks the Gate again with `StepStarted` (visit + 1),
-  `GateOpened` and the transcript `gate-open`, as the old `closeParked`
-  path did. The opening is guarded by the log (`uncommittedStep`): a
-  re-run that finds the Gate still open logs nothing. The answer ends the
-  step through a quiet `beginStep({ kind: "continue", quiet: true })`,
-  which announces no start. A Gate starts no time budget: it waits as
-  long as it must.
+- **A Gate is two graph nodes** (`choosers/person.ts`, `compile.ts`). The
+  node opens the Gate (`StepStarted`, `GateOpened`, the transcript
+  `gate-open`) and commits it as `pending: { kind: "gate", stepId,
+  nodeId, visit, question, choices }` with a jump to its ask node
+  `ask__<id>`, which interrupts with that Gate. So the checkpoint knows
+  the Gate is open, not only the log (a node's writes before an
+  `interrupt()` are never committed). The answer ends the step in the ask
+  node through a quiet `beginStep({ kind: "continue", quiet: true })`,
+  which announces no start, and routes. `{ kind: "reopen" }` (a resume
+  after a stop at the Gate) clears `pending` and jumps back to the node,
+  which asks again with `StepStarted` (visit + 1), `GateOpened` and
+  `gate-open`, as the old `closeParked` path did. The log guard in the
+  node (`uncommittedStep` with the Gate asked) is the crash-only path: a
+  daemon that dies between `GateOpened` and the checkpoint commit must
+  not open a second Gate on the re-run. A Gate starts no time budget: it
+  waits as long as it must.
 - **A rule Decision is pure** (`choosers/rule.ts`). It opens its step,
   evaluates each option's `when` in order and ends the step in one go,
   with no session, no cost and no wait node. A step the daemon left open
@@ -208,15 +237,17 @@ Decisions taken while implementing, from the code and its comments:
   interrupted model Decision step starts a new visit: it has no session to
   reopen.
 - **`resumeRun` of a thread that ended or never ran re-enters with a
-  `Command({ goto })`** (`runner.reenter`). A run from before this engine,
-  or a finished one whose checkpoints were deleted (rule 10), has no
-  checkpoint at an interrupt, so the engine jumps to the top-level node
-  the log points at instead of `Command({ resume })` (rule 9). The update
-  is seeded from the log (`reentryUpdate`: `inputs`, `visits`, `nodes`,
-  `traversals`), so `uncommittedStep` and templates behave; the one step
-  left uncommitted is the last top-level step the walk did not move on
-  from, which the node reopens as the old walk did (an Agent continues
-  its session with the resume prompt).
+  `Command({ goto, update })`** (`runner.reenter`). A finished run (rule
+  10) or a run from before this engine has no checkpoint at an interrupt,
+  so the engine jumps to the top-level node the log points at instead of
+  `Command({ resume })` (rule 9). A finished run re-enters on its own
+  latest checkpoint: `ended` and `pending` cleared. A thread with no
+  checkpoint is seeded from the log (`reentryUpdate`: `inputs`, `stopAt`,
+  `visits`, `nodes`, `traversals`), so `uncommittedStep` and templates
+  behave. Either way the one step left uncommitted is the last top-level
+  step the walk did not move on from (`reenteredNode`), which the node
+  reopens as the old walk did (an Agent continues its session with the
+  resume prompt).
 - **A continued or reopened step never parks at entry** (`beginStep`).
   The entry checks (a stop, stop after step, the stop time, the step cap)
   run for a new visit only; a step that is already in the log enters the
