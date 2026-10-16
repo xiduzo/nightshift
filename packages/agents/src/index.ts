@@ -16,6 +16,14 @@ export {
 	DECIDE_TOOL_NAME,
 } from "./decider";
 export {
+	type CliCheck,
+	checkGithub,
+	checkHarness,
+	type McpTestResult,
+	resolveBin,
+	testMcpServer,
+} from "./doctor";
+export {
 	type FakeDecider,
 	type FakeDecision,
 	fakeDecider,
