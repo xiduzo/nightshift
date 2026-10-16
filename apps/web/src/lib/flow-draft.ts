@@ -45,15 +45,30 @@ export type NodeOption = DecisionNode["labels"][number];
 /** A node whose outcomes are its own options. */
 export type OptionNode = DecisionNode | GateNode | AgentNode;
 
-export function agentNode(id: string, position: Position): AgentNode {
+/**
+ * What a new Agent or Decision node starts with: the daemon's settings
+ * (Settings → New nodes). Each one left out keeps the built-in default.
+ */
+export type NodeDefaults = {
+	agentHarness?: AgentNode["harness"];
+	agentModel?: string;
+	agentPermissionMode?: AgentNode["permissionMode"];
+	decisionModel?: string;
+};
+
+export function agentNode(
+	id: string,
+	position: Position,
+	defaults: NodeDefaults = {},
+): AgentNode {
 	return {
 		id,
 		type: "agent",
 		position,
 		prompt: "",
-		harness: "claude-code",
-		model: DEFAULT_MODEL,
-		permissionMode: "acceptEdits",
+		harness: defaults.agentHarness ?? "claude-code",
+		model: defaults.agentModel ?? DEFAULT_MODEL,
+		permissionMode: defaults.agentPermissionMode ?? "acceptEdits",
 		session: "fresh",
 		tools: [],
 	};
@@ -65,7 +80,11 @@ export function commandNode(id: string, position: Position): CommandNode {
 }
 
 /** The prompt starts empty; the issues panel asks for one. */
-export function decisionNode(id: string, position: Position): DecisionNode {
+export function decisionNode(
+	id: string,
+	position: Position,
+	defaults: NodeDefaults = {},
+): DecisionNode {
 	return {
 		id,
 		type: "decision",
@@ -76,7 +95,7 @@ export function decisionNode(id: string, position: Position): DecisionNode {
 			{ name: "stop", description: "Something needs a person first." },
 		],
 		decider: "claude-code",
-		model: DEFAULT_DECISION_MODEL,
+		model: defaults.decisionModel ?? DEFAULT_DECISION_MODEL,
 		tools: [],
 	};
 }
@@ -153,7 +172,10 @@ export function sourceSummary(source: ListSource): string {
 	}
 }
 
-/** The defaults of the run policy, shown as placeholders. */
+/**
+ * The built-in defaults of the run policy. A number the flow leaves out comes
+ * from the daemon's settings; these stand in while the settings load.
+ */
 export const POLICY_DEFAULTS: Required<Policy> = {
 	usageLimitFirstWaitMinutes: 5,
 	usageLimitMaxWaitMinutes: 60,
@@ -162,9 +184,9 @@ export const POLICY_DEFAULTS: Required<Policy> = {
 };
 
 /**
- * Sets one number of the run policy, or clears it (back to its default). A
- * policy with no numbers left is dropped, so the file stays minimal. The file
- * may hold only some numbers; the schema fills in the rest when it loads.
+ * Sets one number of the run policy, or clears it (back to the daemon's
+ * setting). A policy with no numbers left is dropped, so the file stays
+ * minimal.
  */
 export function setPolicyNumber(
 	flow: Flow,
@@ -174,8 +196,7 @@ export function setPolicyNumber(
 	const next: Partial<Policy> = { ...flow.policy, [key]: value };
 	if (value === undefined) delete next[key];
 	const empty = Object.keys(next).length === 0;
-	// A partial policy is valid input; the draft only lives as input.
-	return { ...flow, policy: empty ? undefined : (next as Policy) };
+	return { ...flow, policy: empty ? undefined : next };
 }
 
 /** Replaces the flow's inputs. */
@@ -256,13 +277,13 @@ export function renameInput(flow: Flow, index: number, to: string): Flow {
 }
 
 /** A new flow: one Agent node named `worker`. */
-export function newFlow(): Flow {
+export function newFlow(defaults?: NodeDefaults): Flow {
 	return {
 		version: FLOW_VERSION,
 		inputs: [],
 		outputs: [],
 		start: "worker",
-		nodes: [agentNode("worker", { x: 0, y: 0 })],
+		nodes: [agentNode("worker", { x: 0, y: 0 }, defaults)],
 		edges: [],
 	};
 }
@@ -271,7 +292,7 @@ export function newFlow(): Flow {
  * A new flow for a For Each: one JSON input (named `as`) that takes the
  * element, and one Agent node that works on it.
  */
-export function newElementFlow(as: string): Flow {
+export function newElementFlow(as: string, defaults?: NodeDefaults): Flow {
 	return {
 		version: FLOW_VERSION,
 		inputs: [{ name: as, type: "json", required: true }],
@@ -279,7 +300,7 @@ export function newElementFlow(as: string): Flow {
 		start: "worker",
 		nodes: [
 			{
-				...agentNode("worker", { x: 0, y: 0 }),
+				...agentNode("worker", { x: 0, y: 0 }, defaults),
 				prompt: `Work on {{${as}.title}}.\n\nThe element:\n{{${as}}}`,
 			},
 		],
@@ -303,7 +324,14 @@ function uniqueEdgeId(flow: Flow, base: string): string {
 
 const NEW_NODE: Record<
 	FlowNodeType,
-	{ id: string; create: (id: string, position: Position) => FlowNode }
+	{
+		id: string;
+		create: (
+			id: string,
+			position: Position,
+			defaults: NodeDefaults,
+		) => FlowNode;
+	}
 > = {
 	agent: { id: "agent", create: agentNode },
 	command: { id: "check", create: commandNode },
@@ -313,9 +341,15 @@ const NEW_NODE: Record<
 	foreach: { id: "each", create: forEachNode },
 };
 
-export function addNode(flow: Flow, type: FlowNodeType, position: Position) {
+/** Adds a node of `type`; a new Agent or Decision node starts with `defaults`. */
+export function addNode(
+	flow: Flow,
+	type: FlowNodeType,
+	position: Position,
+	defaults: NodeDefaults = {},
+) {
 	const id = uniqueNodeId(flow, NEW_NODE[type].id);
-	const node = NEW_NODE[type].create(id, position);
+	const node = NEW_NODE[type].create(id, position, defaults);
 	const next: Flow = {
 		...flow,
 		nodes: [...flow.nodes, node],
@@ -640,6 +674,44 @@ export function restoreAgentOutcomes(
 	return restoreEdges(next, dropped);
 }
 
+/**
+ * The Agent node naming these connections, in the order given and without
+ * repeats. None left drops the field, so the file stays minimal.
+ */
+export function withConnections(
+	node: AgentNode,
+	names: readonly string[],
+): AgentNode {
+	const unique = [...new Set(names)];
+	const { connections: _, ...rest } = node;
+	return unique.length > 0 ? { ...rest, connections: unique } : rest;
+}
+
+/** Sets the connections an Agent node names; see `withConnections`. */
+export function setAgentConnections(
+	flow: Flow,
+	nodeId: string,
+	names: readonly string[],
+): Flow {
+	return updateNode(flow, nodeId, (node) =>
+		node.type === "agent" ? withConnections(node, names) : node,
+	);
+}
+
+/** The connections an Agent node names that the daemon does not have. */
+export function missingConnections(
+	node: FlowNode,
+	known: readonly string[],
+): string[] {
+	if (node.type !== "agent") return [];
+	return (node.connections ?? []).filter((name) => !known.includes(name));
+}
+
+/** What the editor says about a connection the daemon does not have. */
+export function missingConnectionMessage(name: string): string {
+	return `No connection named ${name} on this daemon. The run refuses to start.`;
+}
+
 /** `base`, else `base-2`, `base-3`, … whichever the node does not use yet. */
 export function uniqueOptionName(options: NodeOption[], base: string): string {
 	const taken = new Set(options.map((option) => option.name));
@@ -872,12 +944,14 @@ const POLICY_MESSAGES: Record<string, string> = {
  * `flows` holds the project's flow files by name, so Subflow and For Each
  * nodes can check the flows they call; leave it out while they load. `name`
  * is the draft's own file name: the draft stands in for that file, and a
- * flow that reaches itself is reported with the chain.
+ * flow that reaches itself is reported with the chain. `connections` holds
+ * the names of the daemon's connections; leave it out while they load.
  */
 export function checkFlow(
 	flow: Flow,
 	flows?: ProjectFlowMap,
 	name?: string,
+	connections?: readonly string[],
 ): FlowCheck {
 	const issues: FlowIssue[] = [];
 	const parsed = flowSchema.safeParse(flow);
@@ -910,6 +984,18 @@ export function checkFlow(
 				issues.push({ severity: "error", message: "Pick a start node." });
 			} else {
 				issues.push({ severity: "error", message });
+			}
+		}
+	}
+
+	if (connections) {
+		for (const node of flow.nodes) {
+			for (const missing of missingConnections(node, connections)) {
+				issues.push({
+					severity: "error",
+					message: missingConnectionMessage(missing),
+					nodeId: node.id,
+				});
 			}
 		}
 	}

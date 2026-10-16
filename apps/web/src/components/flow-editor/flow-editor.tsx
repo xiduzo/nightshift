@@ -1,4 +1,4 @@
-import type { Flow, FlowIssue, FlowNode } from "@nightshift/flows";
+import type { Flow, FlowIssue, FlowNode, Policy } from "@nightshift/flows";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -19,7 +19,7 @@ import {
 } from "@nightshift/ui/components/resizable";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { CheckIcon, CircleDotIcon, PlayIcon, SaveIcon } from "lucide-react";
@@ -107,9 +107,28 @@ function Editor({
 	);
 	// The other flow files, for Subflow and For Each calls. The draft stands in for this one.
 	const projectFlows = useProjectFlows(projectId, name);
+	// The daemon's settings (new-node defaults, run policy) and connections.
+	const settings = useQuery(orpc.settings.get.queryOptions());
+	const daemonConnections = useQuery(orpc.connections.list.queryOptions());
+	const nodeDefaults = settings.data?.values;
+	const policyDefaults = useMemo((): Required<Policy> | undefined => {
+		const values = settings.data?.values;
+		if (!values) return undefined;
+		return {
+			usageLimitFirstWaitMinutes: values.usageLimitFirstWaitMinutes,
+			usageLimitMaxWaitMinutes: values.usageLimitMaxWaitMinutes,
+			networkGraceMinutes: values.networkGraceMinutes,
+			maxSteps: values.maxStepsPerRun,
+		};
+	}, [settings.data]);
+	const connections = daemonConnections.data?.connections;
+	const connectionNames = useMemo(
+		() => connections?.map((connection) => connection.name),
+		[connections],
+	);
 	const check = useMemo(
-		() => checkFlow(draft, projectFlows.flows, name),
-		[draft, projectFlows.flows, name],
+		() => checkFlow(draft, projectFlows.flows, name, connectionNames),
+		[draft, projectFlows.flows, name, connectionNames],
 	);
 	const [starting, setStarting] = useState(false);
 	const savable = useMemo(() => isSavable(draft), [draft]);
@@ -187,7 +206,10 @@ function Editor({
 			await createCalled.mutateAsync({
 				projectId,
 				name: calledName,
-				flow: node.type === "foreach" ? newElementFlow(node.as) : newFlow(),
+				flow:
+					node.type === "foreach"
+						? newElementFlow(node.as, nodeDefaults)
+						: newFlow(nodeDefaults),
 			});
 		} catch (error) {
 			toast.error(
@@ -384,6 +406,7 @@ function Editor({
 				setSelection(null);
 			}}
 			calledFlows={flowsSupport}
+			connections={connections}
 			edges={{
 				onAdd: (outcome, to) =>
 					setDraft(
@@ -409,7 +432,12 @@ function Editor({
 			}}
 		/>
 	) : (
-		<FlowInspector flow={draft} name={name} onChange={changeFlow} />
+		<FlowInspector
+			flow={draft}
+			name={name}
+			policyDefaults={policyDefaults}
+			onChange={changeFlow}
+		/>
 	);
 
 	return (
@@ -490,6 +518,7 @@ function Editor({
 									flow={draft}
 									onFlowChange={changeFlow}
 									onSelect={setSelection}
+									defaults={nodeDefaults}
 								/>
 								<FlowSignature
 									projectId={projectId}

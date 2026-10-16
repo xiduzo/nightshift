@@ -50,6 +50,7 @@ import {
 	addNode,
 	type FlowCheck,
 	moveNode,
+	type NodeDefaults,
 	removeEdge,
 	removeNode,
 } from "@/lib/flow-draft";
@@ -83,6 +84,7 @@ function useAddNode(
 	flow: Flow,
 	onFlowChange: (change: (flow: Flow) => Flow) => void,
 	onSelect: SelectionSetter,
+	defaults: NodeDefaults | undefined,
 ) {
 	const { screenToFlowPosition } = useReactFlow();
 	const store = useStoreApi();
@@ -105,7 +107,7 @@ function useAddNode(
 		) {
 			position = { x: position.x + ADD_OFFSET, y: position.y + ADD_OFFSET };
 		}
-		const result = addNode(flow, type, position);
+		const result = addNode(flow, type, position, defaults);
 		onFlowChange(() => result.flow);
 		onSelect({ kind: "node", id: result.id });
 	};
@@ -119,12 +121,15 @@ export function NodePalette({
 	flow,
 	onFlowChange,
 	onSelect,
+	defaults,
 }: {
 	flow: Flow;
 	onFlowChange: (change: (flow: Flow) => Flow) => void;
 	onSelect: SelectionSetter;
+	/** What a new Agent or Decision node starts with: the daemon's settings. */
+	defaults?: NodeDefaults;
 }) {
-	const add = useAddNode(flow, onFlowChange, onSelect);
+	const add = useAddNode(flow, onFlowChange, onSelect, defaults);
 	return (
 		<div className="min-w-0">
 			<ButtonGroup aria-label="Add a node" className="@3xl:flex hidden">

@@ -44,6 +44,7 @@ import {
 	type NodeOption,
 	nodeOptions,
 	type OptionNode,
+	withConnections,
 	withOptions,
 } from "@/lib/flow-draft";
 import {
@@ -58,6 +59,7 @@ import {
 	type CalledFlowSupport,
 	InputBindings,
 } from "./called-flow-fields";
+import { ConnectionsField, type DaemonConnection } from "./connections-field";
 import { OutcomePill } from "./edge-inspector";
 import {
 	Field,
@@ -103,9 +105,12 @@ export function NodeInspector({
 	onDelete,
 	calledFlows,
 	edges,
+	connections,
 }: {
 	flow: Flow;
 	node: FlowNode;
+	/** The daemon's connections, for an Agent node; undefined while they load. */
+	connections?: readonly DaemonConnection[];
 	/** Subflow and For Each nodes: the project's flows and the actions on them. */
 	calledFlows: CalledFlowSupport;
 	/** The node's outgoing edges. Without it the inspector does not list them. */
@@ -279,6 +284,7 @@ export function NodeInspector({
 			{node.type === "agent" ? (
 				<AgentAdvanced
 					node={node}
+					connections={connections}
 					onChange={(change) =>
 						onChange((current) =>
 							current.type === "agent" ? change(current) : current,
@@ -770,14 +776,20 @@ function AgentFields({
 /** An Agent node's advanced settings, below its edges. */
 function AgentAdvanced({
 	node,
+	connections,
 	onChange,
 }: {
 	node: AgentNode;
+	connections: readonly DaemonConnection[] | undefined;
 	onChange: (change: (node: AgentNode) => AgentNode) => void;
 }) {
 	const id = useId();
 	const serverCount = Object.keys(node.mcpServers ?? {}).length;
 	const toolCount = node.tools?.length ?? 0;
+	const named = node.connections ?? [];
+	const missing = connections
+		? named.filter((name) => !connections.some((c) => c.name === name))
+		: [];
 	return (
 		<>
 			<InspectorSection
@@ -822,7 +834,40 @@ function AgentAdvanced({
 			</InspectorSection>
 
 			<InspectorSection
-				title="MCP servers"
+				title="Connections"
+				collapsible
+				defaultOpen={named.length > 0 || (connections?.length ?? 0) > 0}
+				aside={
+					missing.length > 0 ? (
+						<Badge variant="destructive" className="tabular-nums">
+							{missing.length} missing
+						</Badge>
+					) : named.length > 0 ? (
+						<Badge variant="secondary" className="tabular-nums">
+							{named.length}
+						</Badge>
+					) : null
+				}
+			>
+				<ConnectionsField
+					id={`${id}-connections`}
+					names={named}
+					connections={connections}
+					onChange={(names) =>
+						onChange((current) => withConnections(current, names))
+					}
+				/>
+			</InspectorSection>
+
+			<InspectorSection
+				title={
+					<>
+						Inline MCP servers{" "}
+						<span className="normal-case tracking-normal">
+							(this flow only)
+						</span>
+					</>
+				}
 				collapsible
 				defaultOpen={serverCount > 0}
 				aside={

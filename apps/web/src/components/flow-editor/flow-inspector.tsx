@@ -1,12 +1,14 @@
 import type { Flow, Policy } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
+import { Button } from "@nightshift/ui/components/button";
 import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Textarea } from "@nightshift/ui/components/textarea";
-import { WorkflowIcon } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { SettingsIcon, WorkflowIcon } from "lucide-react";
 import { useId } from "react";
 
 import { POLICY_DEFAULTS, setPolicyNumber } from "@/lib/flow-draft";
@@ -53,11 +55,14 @@ const POLICY_FIELDS: {
 export function FlowInspector({
 	flow,
 	name,
+	policyDefaults,
 	onChange,
 }: {
 	flow: Flow;
 	/** The flow's file name, for the header. */
 	name?: string;
+	/** The daemon's run policy settings: what an empty number uses. Undefined while they load. */
+	policyDefaults?: Required<Policy>;
 	onChange: (change: (flow: Flow) => Flow) => void;
 }) {
 	const id = useId();
@@ -163,7 +168,7 @@ export function FlowInspector({
 				title="Run policy"
 				collapsible
 				defaultOpen={policySet}
-				description="Used when this flow is the top level of a run; a called flow uses its caller's. A usage limit or a network failure puts the run to sleep, then continues the same session. Empty uses the default."
+				description="Used when this flow is the top level of a run; a called flow uses its caller's. A usage limit or a network failure puts the run to sleep, then continues the same session. Empty uses the daemon's setting."
 			>
 				{POLICY_FIELDS.map(({ key, label, hint, whole }) => (
 					<Field key={key} id={`${id}-${key}`} label={label} hint={hint}>
@@ -171,7 +176,11 @@ export function FlowInspector({
 							id={`${id}-${key}`}
 							decimal={!whole}
 							value={flow.policy?.[key]}
-							placeholder={`${POLICY_DEFAULTS[key]} (default)`}
+							placeholder={
+								policyDefaults
+									? `${policyDefaults[key]} (from Settings)`
+									: `${POLICY_DEFAULTS[key]} (default)`
+							}
 							describedBy={`${id}-${key}-hint`}
 							onChange={(value) =>
 								onChange((current) => setPolicyNumber(current, key, value))
@@ -179,6 +188,16 @@ export function FlowInspector({
 						/>
 					</Field>
 				))}
+				<Button
+					variant="link"
+					size="sm"
+					className="h-auto self-start px-0"
+					nativeButton={false}
+					render={<Link to="/settings" />}
+				>
+					<SettingsIcon data-icon="inline-start" />
+					Change in Settings
+				</Button>
 			</InspectorSection>
 
 			<InspectorSection
