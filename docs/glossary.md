@@ -28,6 +28,9 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Subflow Node | A Node that runs another Flow once, with its Inputs bound. | Slice 5 |
 | Body Flow | The Flow a For Each Node runs once per Item. Any Flow can be a Body Flow. | Slice 4 |
 | Item | One element of a For Each List: any JSON value, optionally with `id`, `title`, `dependsOn`, and `done`. | Slice 4 |
+| Connection | An MCP server defined once on the daemon (the Connections page). An Agent Node names it in `connections`. Holds `${NAME}` references, never secret values. | Connections |
+| Secret | A value a `${NAME}` reads: from the system keychain (saved on the Connections page), else the daemon's environment. Never in a Flow file, the database, or the log. | Connections |
+| Setting | A daemon-wide value changed on the Settings page and saved in the database. Unset, it reads the environment, then its default. A Flow's own policy wins over the Settings' policy. | Settings |
 | List | The elements a For Each Node runs over, read from a Source. | Slice 5 |
 | Source | Where a For Each Node reads its List, again before each Item: a JSON value, a command, a glob of files, or a plugin such as GitHub. | Slice 4 |
 | Schedule | A Flow, its Inputs, a time, and a Stop Time: the daemon starts a Run from it. | Slice 7 |

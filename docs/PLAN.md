@@ -189,14 +189,18 @@ Nights: `bun run night` builds the web app, then serves the API server and the b
 
 Schedules: `.nightshift/schedules.json` in a project's clone, next to the flows. The UI lists, adds, pauses and removes them; the file can also be edited by hand. Each schedule names a flow, its input values, a cron line in the daemon's local time (`0 22 * * 1-5`), an optional stop time (`07:00`) and base ref. The daemon reads the file again on every tick (30 s), so an edit needs no restart. A cron time that is more than 15 minutes late is skipped, and a schedule does not start while its previous run still runs, waits or sleeps. Every daemon starts the schedules of the projects in its own database: keep the night's projects out of the dev database.
 
-Harnesses: an Agent node runs `claude`, `opencode` or `codex` on this machine, with your own login for each. They come from the `PATH` unless set in `apps/server/.env`:
+Settings: the Settings page saves daemon-wide values in the database: the scheduler switch, the run cap, the step cap, the run policy defaults (a flow's own `policy` numbers win), the defaults for new Agent and Decision nodes, and desktop notifications. A setting that is not saved reads the environment (`NIGHTSHIFT_*` in `apps/server/.env`), then its default. The engine reads them when they apply, so a change needs no restart. One exception: `NIGHTSHIFT_SCHEDULER=off` turns the scheduler off whatever the page says, so a dev daemon on a copy of the database never starts the night's schedules.
+
+Harnesses: an Agent node runs `claude`, `opencode` or `codex` on this machine, with your own login for each. The Connections page checks each one (`--version`, its login status) and sets its path; each comes from the `PATH` unless set there or in `apps/server/.env` (the fallback):
 
 ```bash
+NIGHTSHIFT_CLAUDE_BIN=/path/to/claude
 NIGHTSHIFT_OPENCODE_BIN=/path/to/opencode   # must be a 1.x build (see section 7)
 NIGHTSHIFT_CODEX_BIN=/path/to/codex
+NIGHTSHIFT_GH_BIN=/path/to/gh
 ```
 
-An MCP server on an Agent node reads secrets as `${NAME}` in its env values and headers. The value comes from the daemon's environment when the step starts, so set it where `bun run night` starts. A missing variable fails the step with its name; values never go into the flow file or the logs.
+Connections: an MCP server is defined once on the Connections page and named by Agent nodes (`"connections": ["linear"]`). A node may still define its own `mcpServers`; one of the same name wins over the connection. A flow that names a connection the daemon does not have refuses to start. `${NAME}` in env values and headers reads the macOS keychain first (service `nightshift`, saved under Connections → Secrets through `Bun.secrets`), then the daemon's environment. The database keeps only the names of saved secrets. A missing variable fails the step with its name; values never go into the flow file, the database or the logs. "Test" connects to a server, lists its tools and disconnects.
 
 ## 7. Open items
 
@@ -214,6 +218,7 @@ An MCP server on an Agent node reads secrets as `${NAME}` in its env values and 
 - Slices 5 to 8 have not run a real night. The first scheduled night, the first planner that feeds a For Each, and the first OpenCode or Codex step are the real tests.
 - Schedule catch-up looks only at the latest missed cron time. Earlier missed times are dropped without a log entry, so a daemon that was down for two nights starts at most one run.
 - Every daemon runs the scheduler, a dev daemon too. A project added to both databases starts its schedules twice. Consider a switch to turn the scheduler off in development.
-- An MCP `${NAME}` that the daemon lacks fails the step when it starts, not the run at its start. A night finds out at that node.
+- An MCP `${NAME}` that the daemon lacks fails the step when it starts, not the run at its start. A night finds out at that node. The Connections page shows each variable as Keychain, Environment or Missing; a start check could refuse the run instead.
+- Secrets use the macOS keychain through `Bun.secrets`. A packaged desktop build signs a different binary: check that it can read items saved by the `bun` daemon.
 - Two daemons must never share a database: the second one's startup recovery marks the first one's running steps as interrupted. A dev daemon uses its own `DATABASE_URL` and `NIGHTSHIFT_DATA_DIR`, and `NIGHTSHIFT_SCHEDULER=off`. A lock on the database would enforce this; add one.
 - `@tanstack/ai-sandbox` 0.5.23 writes its projection marker to a doubled path when the workspace has a fixed directory. We set `workspace.root: '.'` to avoid it. Report it upstream.
