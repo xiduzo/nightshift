@@ -7,7 +7,6 @@ import type {
 	FlowEdge,
 	FlowNode,
 	ForEachNode,
-	GateNode,
 	SubflowNode,
 } from "./schema";
 import type { FlowIssue } from "./types";
@@ -39,7 +38,7 @@ function command(id: string, extra: Partial<CommandNode> = {}): CommandNode {
 
 function decision(
 	id: string,
-	labels: string[],
+	options: string[],
 	extra: Partial<DecisionNode> = {},
 ): DecisionNode {
 	return {
@@ -47,24 +46,45 @@ function decision(
 		type: "decision",
 		position: { x: 0, y: 0 },
 		prompt: "Should we go on?",
-		labels: labels.map((name) => ({ name })),
-		decider: "claude-code",
+		options: options.map((name) => ({ name })),
+		by: "model",
 		model: "haiku",
 		...extra,
 	};
 }
 
+/** A Gate: a Decision decided by a person. */
 function gate(
 	id: string,
-	choices: string[],
-	extra: Partial<GateNode> = {},
-): GateNode {
+	options: string[],
+	extra: Partial<DecisionNode> = {},
+): DecisionNode {
 	return {
 		id,
-		type: "gate",
+		type: "decision",
 		position: { x: 0, y: 0 },
-		question: "Ship it?",
-		choices: choices.map((name) => ({ name })),
+		prompt: "Ship it?",
+		options: options.map((name) => ({ name })),
+		by: "person",
+		...extra,
+	};
+}
+
+/** A Decision decided by a rule: `[name, when]` per option; no `when` is the default. */
+function ruled(
+	id: string,
+	options: [string, string?][],
+	extra: Partial<DecisionNode> = {},
+): DecisionNode {
+	return {
+		id,
+		type: "decision",
+		position: { x: 0, y: 0 },
+		prompt: "",
+		options: options.map(([name, when]) =>
+			when === undefined ? { name } : { name, when },
+		),
+		by: "rule",
 		...extra,
 	};
 }
@@ -116,7 +136,7 @@ function edge(
 }
 
 function flow(nodes: FlowNode[], edges: FlowEdge[], start = "worker"): Flow {
-	return { version: 2, inputs: [], outputs: [], start, nodes, edges };
+	return { version: 3, inputs: [], outputs: [], start, nodes, edges };
 }
 
 const errors = (issues: FlowIssue[]) =>
@@ -414,7 +434,7 @@ function decideAndGate(): Flow {
 				prompt: "The worker reported: {{worker.summary}}. Go on?",
 			}),
 			gate("gate", ["approve", "reject"], {
-				question: "The decider said {{decide.outcome}}: {{decide.notes}}",
+				prompt: "The model said {{decide.outcome}}: {{decide.note}}",
 			}),
 			command("ship", { command: "gh pr ready" }),
 			agent("wrap_up", { prompt: "Write down why we stopped." }),
@@ -433,14 +453,10 @@ describe("validateFlow: decisions and gates", () => {
 	test("worker → decide → gate → ship validates", () => {
 		expect(validateFlow(decideAndGate())).toEqual([]);
 		const json = JSON.parse(JSON.stringify(decideAndGate()));
-		delete json.nodes[1].decider;
 		delete json.nodes[1].model;
 		const parsed = parseFlow(json);
 		expect(parsed.issues).toEqual([]);
-		expect(parsed.flow?.nodes[1]).toMatchObject({
-			decider: "claude-code",
-			model: "haiku",
-		});
+		expect(parsed.flow?.nodes[1]).not.toHaveProperty("model");
 	});
 
 	test("an edge outcome must be a label or choice of its source", () => {
@@ -486,7 +502,7 @@ describe("validateFlow: decisions and gates", () => {
 		expect(errors(issues).map((issue) => issue.edgeId)).toEqual(["a", "b"]);
 	});
 
-	test("duplicate decision labels and gate choices", () => {
+	test("duplicate decision options", () => {
 		const issues = validateFlow(
 			flow(
 				[
@@ -504,18 +520,18 @@ describe("validateFlow: decisions and gates", () => {
 		expect(issues).toEqual([
 			{
 				severity: "error",
-				message: expect.stringContaining('label "go" more than once'),
+				message: expect.stringContaining('option "go" more than once'),
 				nodeId: "decide",
 			},
 			{
 				severity: "error",
-				message: expect.stringContaining('choice "yes" more than once'),
+				message: expect.stringContaining('option "yes" more than once'),
 				nodeId: "gate",
 			},
 		]);
 	});
 
-	test("reserved outcomes cannot be labels or choices", () => {
+	test("reserved outcomes cannot be options", () => {
 		const issues = validateFlow(
 			flow(
 				[
@@ -546,7 +562,7 @@ describe("validateFlow: decisions and gates", () => {
 		expect(warnings(issues)).toEqual([]);
 	});
 
-	test("a label or choice without an edge is a warning", () => {
+	test("an option without an edge is a warning, worded by who decides", () => {
 		const issues = validateFlow(
 			flow(
 				[
@@ -565,13 +581,13 @@ describe("validateFlow: decisions and gates", () => {
 			{
 				severity: "warning",
 				message:
-					'Decision node "decide" has no edge for "stop": the run ends there when the decider picks "stop".',
+					'Decision node "decide" has no edge for "stop": the run ends there when the model picks "stop".',
 				nodeId: "decide",
 			},
 			{
 				severity: "warning",
 				message:
-					'Gate node "gate" has no edge for "reject": the run ends there when the person picks "reject".',
+					'Decision node "gate" has no edge for "reject": the run ends there when you pick "reject".',
 				nodeId: "gate",
 			},
 		]);
@@ -586,8 +602,8 @@ describe("validateFlow: decisions and gates", () => {
 						prompt: "{{worker.summary}} {{worker.log_tail}} {{ghost.notes}}",
 					}),
 					gate("gate", ["ok"], {
-						question:
-							"{{decide.notes}} {{decide.summary}} {{run.branch}} {{gate.note}} {{gate.notes}}",
+						prompt:
+							"{{decide.note}} {{decide.summary}} {{run.branch}} {{gate.note}} {{gate.notes}}",
 					}),
 				],
 				[
@@ -610,9 +626,7 @@ describe("validateFlow: decisions and gates", () => {
 			["decide", expect.stringContaining("{{ghost.notes}}")],
 			[
 				"gate",
-				expect.stringContaining(
-					'The question of "gate" uses {{decide.summary}}',
-				),
+				expect.stringContaining('The prompt of "gate" uses {{decide.summary}}'),
 			],
 			["gate", expect.stringContaining("{{gate.notes}}")],
 		]);
@@ -626,7 +640,7 @@ describe("validateFlow: decisions and gates", () => {
 					gate("gate", ["ok"]),
 					agent("worker", {
 						prompt:
-							"{{decide.outcome}} {{decide.notes}} {{decide.visit}} {{gate.outcome}} {{gate.note}} {{gate.visit}}",
+							"{{decide.outcome}} {{decide.note}} {{decide.visit}} {{gate.outcome}} {{gate.note}} {{gate.visit}}",
 					}),
 				],
 				[
@@ -668,6 +682,143 @@ describe("validateFlow: decisions and gates", () => {
 		]);
 	});
 
+	test("a Decision decided by you or a model needs a prompt", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					gate("ask", ["ok"], { prompt: " " }),
+					decision("decide", ["go", "stop"], { prompt: "" }),
+					ruled("pick", [["go", "ask.outcome = 'ok'"], ["stop"]]),
+				],
+				[
+					edge("a", "ask", "ok", "decide"),
+					edge("b", "decide", "go", "pick"),
+					edge("c", "decide", "stop", "pick"),
+					edge("d", "pick", "go", "ask", 1),
+				],
+				"ask",
+			),
+		);
+		expect(
+			errors(issues).map((issue) => [issue.nodeId, issue.message]),
+		).toEqual([
+			["ask", 'Decision node "ask" needs a question for you to answer.'],
+			["decide", 'Decision node "decide" needs a prompt for the model.'],
+		]);
+	});
+
+	test("a rule belongs to a Decision decided by a rule", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					gate("ask", ["ok", "no"], {
+						options: [{ name: "ok", when: "true" }, { name: "no" }],
+					}),
+					decision("decide", ["go"], {
+						options: [{ name: "go", when: "1 = 1" }],
+					}),
+				],
+				[edge("a", "ask", "ok", "decide"), edge("b", "ask", "no", "decide")],
+				"ask",
+			),
+		);
+		expect(errors(issues).map((issue) => issue.message)).toEqual([
+			'Decision node "ask" has a rule on "ok", but you decide it. Remove the rule, or let a rule decide.',
+			'Decision node "decide" has a rule on "go", but a model decides it. Remove the rule, or let a rule decide.',
+		]);
+	});
+
+	test("a rule Decision: every option but the default has a rule, and the default goes last", () => {
+		const twoDefaults = validateFlow(
+			flow(
+				[
+					command("check"),
+					ruled("pick", [["go", "check.exit_code = 0"], ["stop"], ["later"]]),
+				],
+				[edge("a", "check", "pass", "pick")],
+				"check",
+			),
+		);
+		expect(errors(twoDefaults).map((issue) => issue.message)).toEqual([
+			'Decision node "pick" has 2 options without a rule ("stop", "later"). Give all but one a rule: the one without is the default.',
+		]);
+
+		const defaultFirst = validateFlow(
+			flow(
+				[
+					command("check"),
+					ruled("pick", [["stop"], ["go", "check.exit_code = 0"]]),
+				],
+				[edge("a", "check", "pass", "pick")],
+				"check",
+			),
+		);
+		expect(errors(defaultFirst)).toEqual([]);
+		expect(warnings(defaultFirst).map((issue) => issue.message)).toContain(
+			'Decision node "pick": the option "stop" has no rule, so it always matches. Put it last, or the options after it are never picked.',
+		);
+
+		// No default at all is fine: no match ends the step as error at run time.
+		const noDefault = validateFlow(
+			flow(
+				[
+					command("check"),
+					ruled("pick", [
+						["go", "check.exit_code = 0"],
+						["stop", "check.exit_code != 0"],
+					]),
+				],
+				[edge("a", "check", "pass", "pick")],
+				"check",
+			),
+		);
+		expect(errors(noDefault)).toEqual([]);
+	});
+
+	test("a rule must parse and read known names", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					command("check"),
+					ruled("pick", [
+						["broken", "check.exit_code = ("],
+						["ghost", "ghost.data.ok = true and check.exit_code = 0"],
+						[
+							"fine",
+							"$contains(run.branch, 'x') or glob = 'y' or `check`.exit_code = 1",
+						],
+						["stop"],
+					]),
+				],
+				[edge("a", "check", "pass", "pick")],
+				"check",
+			),
+		);
+		const flowWithInput = (issues: FlowIssue[]) =>
+			issues
+				.filter((issue) => issue.severity === "error")
+				.map((i) => i.message);
+		expect(flowWithInput(issues)).toEqual([
+			expect.stringContaining(
+				'The rule of option "broken" of "pick" is not valid:',
+			),
+			'The rule of option "ghost" of "pick" reads "ghost", but there is no node or input "ghost".',
+			'The rule of option "fine" of "pick" reads "glob", but there is no node or input "glob".',
+		]);
+	});
+
+	test("a rule may read the flow's inputs", () => {
+		const issues = validateFlow({
+			...flow(
+				[command("check"), ruled("pick", [["go", "mode = 'fast'"], ["stop"]])],
+				[edge("a", "check", "pass", "pick")],
+				"check",
+			),
+			inputs: [{ name: "mode", type: "text" }],
+		});
+		expect(errors(issues)).toEqual([]);
+	});
+
 	test("a loop through a decision still needs a max", () => {
 		const issues = validateFlow(
 			flow(
@@ -704,7 +855,7 @@ describe("parseFlow", () => {
 
 	test("turns schema errors into one issue per zod issue, with the path", () => {
 		const result = parseFlow({
-			version: 2,
+			version: 3,
 			start: "Worker",
 			nodes: [{ ...agent("worker"), model: "" }],
 			edges: [{ id: "a", from: "worker", outcome: "Maybe", to: "check" }],
@@ -1607,7 +1758,7 @@ describe("validateFlow: Subflow", () => {
 describe("parseFlow with options", () => {
 	test("passes the options to validateFlow", () => {
 		const json = {
-			version: 2,
+			version: 3,
 			start: "each",
 			nodes: [
 				{
@@ -1646,7 +1797,7 @@ describe("parseFlow with options", () => {
 		});
 		expect(parsed.issues).toEqual([]);
 		expect(parsed.flow).toMatchObject({
-			version: 2,
+			version: 3,
 			inputs: [{ name: "epic", type: "text", required: true }],
 			nodes: [{ prompt: "Epic {{epic}}" }],
 		});

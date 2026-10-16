@@ -3,6 +3,7 @@ export * from "./items";
 export * from "./migrate";
 export * from "./profiles";
 export * from "./quick";
+export * from "./rule";
 export * from "./schedules";
 export * from "./schema";
 export * from "./template";

@@ -1,5 +1,5 @@
 {
-	"version": 2,
+	"version": 3,
 	"description": "One Feature: its Traces, blockers first, each on its own branch of the stack. Then the checkpoint: the validator verifies and tunes, the orchestrator steers, and a decision continues or halts the night.",
 	"inputs": [
 		{
@@ -150,7 +150,9 @@
 			},
 			"type": "decision",
 			"prompt": "You decide whether an unattended night build (\"night-shift\") continues after Feature #{{item.number}} ({{item.title}}) of Epic #{{item.parent.number}}. Nobody is awake: decide from the reports below.\n\nThe Traces of this Feature:\n{{traces.summary}}\n\nThe validator verified and tuned the work. Its summary:\n\n{{validate.summary}}\n\nThe tuning of the validator, when it did not pass the check, was removed (\"pass\" here means removed, empty means kept): {{drop_tune.outcome}}\n\nThe orchestrator read the work and steered the next workers. Its report:\n\n{{steer.summary}}\n\nPick \"halt\" only when work on top of this code would be wrong: the code misses its spec in a way that the validator could not correct, or the spec contradicts itself or the code so that the owner must decide. In each other case pick \"continue\". In the notes: 1 to 3 sentences on why, then each step or decision for the owner.",
-			"labels": [
+			"model": "opus",
+			"timeoutMinutes": 30,
+			"options": [
 				{
 					"name": "continue",
 					"description": "The work is a sound base: the night goes on with the next Feature."
@@ -160,9 +162,7 @@
 					"description": "Work on top of this code would be wrong: it misses its spec in a way the validator could not correct, or the spec contradicts itself or the code. The night stops for the owner."
 				}
 			],
-			"decider": "claude-code",
-			"model": "opus",
-			"timeoutMinutes": 30
+			"by": "model"
 		}
 	],
 	"edges": [

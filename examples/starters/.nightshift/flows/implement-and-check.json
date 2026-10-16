@@ -1,5 +1,5 @@
 {
-	"version": 2,
+	"version": 3,
 	"description": "An agent implements a task, a command checks it; a failed check goes back to a fresh agent with the log (3 tries), then a rescue on Opus.",
 	"inputs": [
 		{

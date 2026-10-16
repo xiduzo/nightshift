@@ -1,5 +1,7 @@
 import { migrateFlow } from "./migrate";
+import { ruleNames, ruleProblem } from "./rule";
 import {
+	type DecisionNode,
 	type Flow,
 	type FlowNode,
 	type ForEachNode,
@@ -28,10 +30,11 @@ type Flows = Readonly<Record<string, Flow | null>>;
  * Checks what the schema cannot: unique names (node ids and inputs share one
  * namespace, `run` is reserved), a known start node, edges between known
  * nodes with outcomes the source node can produce, an Agent node with a
- * prompt or a skill, outcomes, labels and choices that are unique and not
- * reserved, an Agent output schema that describes an object, template
- * references to known names and fields, outputs, and no cycle without an edge
- * that has a `max` (a Gate in a cycle too: a person could loop forever).
+ * prompt or a skill, outcomes and options that are unique and not reserved,
+ * a Decision's rules (`when`) that parse and read known names, an Agent
+ * output schema that describes an object, template references to known
+ * names and fields, outputs, and no cycle without an edge that has a `max`
+ * (a Gate in a cycle too: a person could loop forever).
  * Warns about unreachable nodes and about outcomes without an edge, since
  * ending on one ends the run as failed.
  *
@@ -181,11 +184,8 @@ function validateIn(
 				break;
 			case "decision":
 				checkOptions(node, flow, error, warning);
+				checkDecision(node, scope, error, warning);
 				template(node.prompt, "prompt");
-				break;
-			case "gate":
-				checkOptions(node, flow, error, warning);
-				template(node.question, "question");
 				break;
 			case "subflow":
 				for (const [name, value] of Object.entries(node.inputs)) {
@@ -594,23 +594,101 @@ function describeNode(node: FlowNode): string {
 
 const optionWords = {
 	agent: { title: "Agent", kind: "outcome", picker: "the agent reports" },
-	decision: { title: "Decision", kind: "label", picker: "the decider picks" },
-	gate: { title: "Gate", kind: "choice", picker: "the person picks" },
+	decision: { title: "Decision", kind: "option", picker: "" },
 } as const;
 
+/** Who picks a Decision's option, for the warning on an option without an edge. */
+const pickerWords: Record<DecisionNode["by"], string> = {
+	person: "you pick",
+	rule: "the rule picks",
+	model: "the model picks",
+};
+
 /**
- * Agent outcomes, Decision labels and Gate choices are outcomes: each must be
- * a valid label, unique within its node and not reserved for the engine. One
+ * A Decision decided by a person or a model needs a prompt. Rules (`when`)
+ * belong to a Decision decided by a rule, where every option but the last
+ * has one: the first rule that holds picks its option, and the option
+ * without a rule is the default. A rule must parse, and the names it reads
+ * must be inputs or nodes of the flow.
+ */
+function checkDecision(
+	node: DecisionNode,
+	scope: Scope,
+	error: Report,
+	warning: Report,
+): void {
+	const at = { nodeId: node.id };
+	const ruled = node.options.filter(
+		(option) => option.when !== undefined && option.when.trim() !== "",
+	);
+	if (node.by !== "rule") {
+		if (node.prompt.trim() === "") {
+			error(
+				node.by === "person"
+					? `Decision node "${node.id}" needs a question for you to answer.`
+					: `Decision node "${node.id}" needs a prompt for the model.`,
+				at,
+			);
+		}
+		if (ruled.length > 0) {
+			error(
+				`Decision node "${node.id}" has a rule on "${ruled[0]?.name}", but ${node.by === "person" ? "you decide" : "a model decides"} it. Remove the rule, or let a rule decide.`,
+				at,
+			);
+		}
+		return;
+	}
+	const defaults = node.options.filter((option) => !ruled.includes(option));
+	if (defaults.length > 1) {
+		error(
+			`Decision node "${node.id}" has ${defaults.length} options without a rule (${defaults.map((o) => `"${o.name}"`).join(", ")}). Give all but one a rule: the one without is the default.`,
+			at,
+		);
+	} else if (defaults.length === 1 && node.options.at(-1) !== defaults[0]) {
+		warning(
+			`Decision node "${node.id}": the option "${defaults[0]?.name}" has no rule, so it always matches. Put it last, or the options after it are never picked.`,
+			at,
+		);
+	}
+	const known = new Set<string>([
+		"run",
+		...scope.flow.inputs.map((input) => input.name),
+		...scope.nodes.keys(),
+	]);
+	for (const option of ruled) {
+		const when = option.when ?? "";
+		const problem = ruleProblem(when);
+		const rule = `The rule of option "${option.name}" of "${node.id}"`;
+		if (problem !== null) {
+			error(`${rule} is not valid: ${problem}`, at);
+			continue;
+		}
+		for (const name of ruleNames(when)) {
+			if (!known.has(name)) {
+				error(
+					`${rule} reads "${name}", but there is no node or input "${name}".`,
+					at,
+				);
+			}
+		}
+	}
+}
+
+/**
+ * Agent outcomes and Decision options are outcomes: each must be a valid
+ * label, unique within its node and not reserved for the engine. One
  * without an edge is allowed, but ending on it ends the run there: a warning,
  * except an Agent's own `fail` or `needs-input`, which fail the step anyway.
  */
 function checkOptions(
-	node: Extract<FlowNode, { type: "agent" | "decision" | "gate" }>,
+	node: Extract<FlowNode, { type: "agent" | "decision" }>,
 	flow: Flow,
 	error: Report,
 	warning: Report,
 ): void {
-	const { title, kind, picker } = optionWords[node.type];
+	const { title, kind } = optionWords[node.type];
+	const picker =
+		node.type === "decision" ? pickerWords[node.by] : optionWords.agent.picker;
 	const at = { nodeId: node.id };
 	const reserved: readonly string[] = reservedOutcomes;
 	const seen = new Set<string>();
