@@ -1,6 +1,7 @@
 import {
 	type AgentNode,
 	type CommandNode,
+	type DecidedBy,
 	type DecisionNode,
 	FLOW_VERSION,
 	type Flow,
@@ -12,7 +13,6 @@ import {
 	type FlowOutputDef,
 	type ForEachNode,
 	flowSchema,
-	type GateNode,
 	type ListSource,
 	nameSchema,
 	nodeOutcomes,
@@ -33,17 +33,18 @@ import {
 export type Position = { x: number; y: number };
 
 export const DEFAULT_MODEL = "sonnet";
-/** A small, fast model is enough to pick a label. */
-export const DEFAULT_DECISION_MODEL = "haiku";
 export const MODEL_SUGGESTIONS = ["sonnet", "opus", "haiku"];
+
+/** What the palette adds: a node type, or a Gate (a Decision decided by you). */
+export type NodeKind = FlowNodeType | "gate";
 
 /** The flow files of a project, by name. Null when a file does not load. */
 export type ProjectFlowMap = Readonly<Record<string, Flow | null>>;
 
-/** A Decision label, a Gate choice, or an Agent's own outcome. Each one is an outcome of its node. */
-export type NodeOption = DecisionNode["labels"][number];
+/** A Decision option or an Agent's own outcome. Each one is an outcome of its node. */
+export type NodeOption = DecisionNode["options"][number];
 /** A node whose outcomes are its own options. */
-export type OptionNode = DecisionNode | GateNode | AgentNode;
+export type OptionNode = DecisionNode | AgentNode;
 
 /**
  * What a new Agent or Decision node starts with: the daemon's settings
@@ -78,35 +79,41 @@ export function commandNode(id: string, position: Position): CommandNode {
 	return { id, type: "command", position, command: "" };
 }
 
-/** The prompt starts empty; the issues panel asks for one. */
-export function decisionNode(
-	id: string,
-	position: Position,
-	defaults: NodeDefaults = {},
-): DecisionNode {
+/**
+ * A rule decides, with the options yes and no and no rule yet; the issues
+ * panel asks for one. A model's name comes from Settings when left out.
+ */
+export function decisionNode(id: string, position: Position): DecisionNode {
 	return {
 		id,
 		type: "decision",
 		position,
 		prompt: "",
-		labels: [
-			{ name: "continue", description: "The work is on track." },
-			{ name: "stop", description: "Something needs a person first." },
-		],
-		decider: "claude-code",
-		model: defaults.decisionModel ?? DEFAULT_DECISION_MODEL,
+		options: [{ name: "yes" }, { name: "no" }],
+		by: "rule",
 	};
 }
 
-/** The question starts empty; the issues panel asks for one. */
-export function gateNode(id: string, position: Position): GateNode {
+/** A Gate: a Decision decided by you. The question starts empty; the issues panel asks for one. */
+export function gateNode(id: string, position: Position): DecisionNode {
 	return {
 		id,
-		type: "gate",
+		type: "decision",
 		position,
-		question: "",
-		choices: [{ name: "approve" }, { name: "reject" }],
+		prompt: "",
+		options: [{ name: "approve" }, { name: "reject" }],
+		by: "person",
 	};
+}
+
+/** Changes who decides. A rule's `when` fields go; a model's name stays for when it comes back. */
+export function withDecidedBy(node: DecisionNode, by: DecidedBy): DecisionNode {
+	if (by === node.by) return node;
+	const options =
+		by === "rule"
+			? node.options
+			: node.options.map(({ when: _, ...option }) => option);
+	return { ...node, by, options };
 }
 
 /** The called flow starts empty; the issues panel asks for one. */
@@ -322,7 +329,7 @@ function uniqueEdgeId(flow: Flow, base: string): string {
 }
 
 const NEW_NODE: Record<
-	FlowNodeType,
+	NodeKind,
 	{
 		id: string;
 		create: (
@@ -340,10 +347,10 @@ const NEW_NODE: Record<
 	foreach: { id: "each", create: forEachNode },
 };
 
-/** Adds a node of `type`; a new Agent or Decision node starts with `defaults`. */
+/** Adds a node of `type`; a new Agent node starts with `defaults`. */
 export function addNode(
 	flow: Flow,
-	type: FlowNodeType,
+	type: NodeKind,
 	position: Position,
 	defaults: NodeDefaults = {},
 ) {
@@ -426,8 +433,6 @@ function rewriteTemplates(
 			return { ...node, prompt: rewrite(node.prompt) };
 		case "command":
 			return { ...node, command: rewrite(node.command) };
-		case "gate":
-			return { ...node, question: rewrite(node.question) };
 		case "subflow":
 			return { ...node, inputs: rewriteBindings(node.inputs, rewrite) };
 		case "foreach":
@@ -481,39 +486,25 @@ export function renameNode(flow: Flow, from: string, to: string): Flow {
 }
 
 export function isOptionNode(node: FlowNode): node is OptionNode {
-	return (
-		node.type === "decision" || node.type === "gate" || node.type === "agent"
-	);
+	return node.type === "decision" || node.type === "agent";
 }
 
-/** The labels of a Decision node, the choices of a Gate node, or an Agent's own outcomes. */
+/** The options of a Decision node, or an Agent's own outcomes. */
 export function nodeOptions(node: OptionNode): NodeOption[] {
-	switch (node.type) {
-		case "decision":
-			return node.labels;
-		case "gate":
-			return node.choices;
-		case "agent":
-			return node.outcomes ?? [];
-	}
+	return node.type === "decision" ? node.options : (node.outcomes ?? []);
 }
 
 export function withOptions<T extends OptionNode>(
 	node: T,
 	options: NodeOption[],
 ): T {
-	if (node.type === "decision") return { ...node, labels: options };
-	if (node.type === "gate") return { ...node, choices: options };
+	if (node.type === "decision") return { ...node, options };
 	return { ...node, outcomes: options };
 }
 
-/** What an option is called on its node: a label, a choice, or an outcome. */
-export function optionNoun(node: FlowNode): "label" | "choice" | "outcome" {
-	return node.type === "decision"
-		? "label"
-		: node.type === "gate"
-			? "choice"
-			: "outcome";
+/** What an option is called on its node: an option, or an outcome. */
+export function optionNoun(node: FlowNode): "option" | "outcome" {
+	return node.type === "decision" ? "option" : "outcome";
 }
 
 function changeOptions(
@@ -911,10 +902,8 @@ export type FlowCheck = {
 
 const FIELD_MESSAGES: Record<string, string> = {
 	command: "The command is empty.",
-	prompt: "Write what to decide.",
-	question: "Write the question.",
-	labels: "A decision needs at least two labels.",
-	choices: "A gate needs at least one choice.",
+	prompt: "Write the prompt.",
+	options: "A decision needs at least one option.",
 	outcomes: "An agent with its own outcomes needs at least one.",
 	output: "The output schema must be a JSON object.",
 	model: "Set a model.",
@@ -1034,16 +1023,11 @@ function optionMessage(
 	rest: PropertyKey[],
 ): string | undefined {
 	const [list, at, field] = rest;
-	if (
-		(list !== "labels" && list !== "choices" && list !== "outcomes") ||
-		field !== "name"
-	)
-		return;
+	if ((list !== "options" && list !== "outcomes") || field !== "name") return;
 	const node = typeof index === "number" ? flow.nodes[index] : undefined;
 	if (!node || !isOptionNode(node)) return;
 	const name = nodeOptions(node)[Number(at)]?.name ?? "";
-	const kind =
-		list === "labels" ? "Label" : list === "choices" ? "Choice" : "Outcome";
+	const kind = list === "options" ? "Option" : "Outcome";
 	return name === ""
 		? `A ${kind.toLowerCase()} has no name.`
 		: `${kind} "${name}": use lowercase letters, digits and -, starting with a letter.`;

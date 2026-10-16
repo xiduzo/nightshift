@@ -190,7 +190,7 @@ function RunComponent() {
 		status === "waiting"
 			? [...steps]
 					.reverse()
-					.find((step) => step.nodeType === "gate" && step.outcome === null)
+					.find((step) => step.gate !== null && step.outcome === null)
 			: undefined;
 
 	// The graph: the top-level flow, or the called flow of the call in focus.

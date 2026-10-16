@@ -490,6 +490,13 @@ export function createEngine(
 				costUsd: s.ending?.costUsd ?? null,
 			})),
 			costUsd: derived.costUsd,
+			gate: derived.gate
+				? {
+						question: derived.gate.question,
+						choices: derived.gate.choices,
+						openedAt: derived.gate.openedAt,
+					}
+				: null,
 		};
 	}
 

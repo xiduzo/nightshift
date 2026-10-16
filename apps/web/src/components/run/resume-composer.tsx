@@ -48,7 +48,7 @@ export function ResumeComposer({
 		: lastStep
 			? lastStep.nodeType === "agent"
 				? `Resuming continues at ${lastStep.nodeId}: the agent picks up where it left off.`
-				: lastStep.nodeType === "gate"
+				: lastStep.gate !== null
 					? `Resuming opens the gate ${lastStep.nodeId} again and waits for your answer.`
 					: `Resuming runs ${lastStep.nodeId} again.`
 			: "Resuming continues the run where it left off.";
