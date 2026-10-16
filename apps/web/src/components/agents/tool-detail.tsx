@@ -124,8 +124,8 @@ export function ToolDetail({
 				title="Server"
 				description={
 					remote
-						? "A server that is already running. Night Shift connects for each session."
-						: "The daemon starts it for each session, in the run's worktree."
+						? "A server that is already running. Night Shift connects to it when an agent needs its tools."
+						: "Night Shift starts it on this computer when an agent needs its tools."
 				}
 			>
 				<div className="flex flex-col gap-4">
@@ -189,9 +189,9 @@ export function ToolDetail({
 				title="Secrets"
 				description={
 					<>
-						The <span className="font-mono">${"{NAME}"}</span> references in its
-						env values or headers. Each reads the keychain, then the daemon's
-						environment.
+						The secrets it uses, written as{" "}
+						<span className="font-mono">${"{NAME}"}</span>. Save their values
+						under Secrets.
 					</>
 				}
 			>
@@ -234,10 +234,10 @@ export function ToolDetail({
 						<AlertDialogDescription>
 							{[
 								connection.profiles.length > 0
-									? `It comes off the profiles ${connection.profiles.join(", ")}.`
+									? `It is taken off the profiles ${connection.profiles.join(", ")}.`
 									: null,
 								connection.usedBy.length > 0
-									? `Flows that name it (${connection.usedBy.map((u) => u.flowName).join(", ")}) refuse to start until they drop it.`
+									? `Flows that use it (${connection.usedBy.map((u) => u.flowName).join(", ")}) cannot run until you take it out of their nodes.`
 									: null,
 							]
 								.filter(Boolean)
@@ -272,7 +272,7 @@ function UsedBySection({
 	return (
 		<DetailSection
 			title="Used by"
-			description="The profiles that hand it out, and the flows whose Agent nodes name it themselves."
+			description="The profiles and flows that use it."
 		>
 			{profiles.length === 0 && flows.length === 0 ? (
 				<p className="text-muted-foreground text-sm">Nothing uses it yet.</p>
@@ -342,11 +342,11 @@ export function GithubToolsetDetail({
 			kicker="Tool · built-in tool set"
 			title="github"
 			mono
-			subtitle="Read issues and pull requests, comment, set labels, and open a pull request. The For Each GitHub source uses it too."
+			subtitle="Read issues and pull requests, comment, set labels, and open a pull request. For Each nodes also use it to read lists from GitHub."
 		>
 			<DetailSection
 				title="GitHub CLI"
-				description="The tools run gh with your own login. Nothing to set up beyond that."
+				description="Uses your own GitHub CLI login. There is nothing else to set up."
 			>
 				<CliPanel tool={toolFor("github")} settings={settings} />
 			</DetailSection>
@@ -373,7 +373,8 @@ export function ToolPicker({
 		{
 			kind: "command" as const,
 			title: "MCP server · local command",
-			blurb: "The daemon starts it for each session, for example npx or bunx.",
+			blurb:
+				"Night Shift starts it on this computer, for example with npx or bunx.",
 			icon: SquareTerminalIcon,
 		},
 		{
@@ -389,8 +390,8 @@ export function ToolPicker({
 				<DialogHeader>
 					<DialogTitle>Add a tool</DialogTitle>
 					<DialogDescription>
-						An MCP server that profiles hand to their sessions, next to the
-						harness's own tools. The github tool set is built in.
+						Give your agents more tools through an MCP server, next to their
+						built-in tools. The github tools are already included.
 					</DialogDescription>
 				</DialogHeader>
 				<ItemGroup className="gap-2">

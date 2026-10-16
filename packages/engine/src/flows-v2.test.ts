@@ -809,7 +809,7 @@ describe("For Each over any list", () => {
 			const failed = await waitForEnd(engine, escaping.id);
 			expect(failed.status).toBe("failed");
 			expect(stepOf(failed, "files").error).toContain(
-				"reaches outside the worktree",
+				"points outside the project",
 			);
 		}
 	});

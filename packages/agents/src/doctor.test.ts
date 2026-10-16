@@ -141,7 +141,7 @@ describe("checkHarness: claude-code", () => {
 	test("a silent failing --version names its exit code", async () => {
 		const bin = await fakeCli("claude", { "--version": { code: 4 } });
 		expect((await checkHarness("claude-code", bin)).problem).toBe(
-			"--version exited with 4.",
+			"Claude Code failed when Night Shift checked its version.",
 		);
 	});
 
@@ -151,12 +151,12 @@ describe("checkHarness: claude-code", () => {
 			bin: byPath,
 			path: null,
 			version: null,
-			problem: `${byPath} does not exist.`,
+			problem: `Nothing is installed at ${byPath}. Check the path.`,
 		});
 		expect(
 			(await checkHarness("claude-code", "nightshift-no-such-claude")).problem,
 		).toBe(
-			"Claude Code is not on the daemon's PATH. Install it, or set its path.",
+			"Claude Code is not installed, or Night Shift cannot find it. Install it, or enter its path.",
 		);
 	});
 });
@@ -184,7 +184,7 @@ describe("checkHarness: opencode", () => {
 		expect(
 			(await checkHarness("opencode", "nightshift-no-such-opencode")).problem,
 		).toBe(
-			"OpenCode is not on the daemon's PATH. Install it, or set its path.",
+			"OpenCode is not installed, or Night Shift cannot find it. Install it, or enter its path.",
 		);
 	});
 });
@@ -287,7 +287,7 @@ describe("checkGithub", () => {
 
 	test("a missing gh is a problem", async () => {
 		expect((await checkGithub("nightshift-no-such-gh")).problem).toBe(
-			"The GitHub CLI is not on the daemon's PATH. Install it, or set its path.",
+			"The GitHub CLI is not installed, or Night Shift cannot find it. Install it, or enter its path.",
 		);
 	});
 });

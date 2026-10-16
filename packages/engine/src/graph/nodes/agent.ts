@@ -573,7 +573,7 @@ async function runSession(
 	return end(
 		"error",
 		{ ...outputs, outcome: "error" },
-		final.error ?? "The harness failed.",
+		final.error ?? "The agent session failed.",
 		harnessSessionId,
 	);
 }

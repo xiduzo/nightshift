@@ -202,8 +202,8 @@ export function TemplateVariables({
 				<Note>
 					A value marked <code>.…</code> holds JSON: add a path, such as{" "}
 					<code>{"{{planner.data.tasks}}"}</code> or{" "}
-					<code>{"{{item.title}}"}</code>. A node that has not run yet renders
-					as an empty string.
+					<code>{"{{item.title}}"}</code>. A node that has not run yet gives an
+					empty value.
 				</Note>
 			</CollapsibleContent>
 		</Collapsible>

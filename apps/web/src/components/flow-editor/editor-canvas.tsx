@@ -33,8 +33,10 @@ import {
 	MaximizeIcon,
 	MinusIcon,
 	PlusIcon,
+	WorkflowIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { toast } from "sonner";
 
 import { type FlowCanvasNode, nodeTypes } from "@/components/flow/flow-node";
 import { NODE_TYPE } from "@/components/flow/node-type";
@@ -54,6 +56,7 @@ import {
 	removeEdge,
 	removeNode,
 } from "@/lib/flow-draft";
+import { layoutFlow } from "@/lib/flow-layout";
 
 export type Selection =
 	| { kind: "node"; id: string }
@@ -193,8 +196,8 @@ export function NodePalette({
 	);
 }
 
-/** Zoom in, zoom out and fit, as a vertical shadcn button group. */
-function ZoomControls() {
+/** Zoom in, zoom out, fit and auto layout, as a vertical shadcn button group. */
+function CanvasControls({ onAutoLayout }: { onAutoLayout: () => void }) {
 	const { zoomIn, zoomOut, fitView } = useReactFlow();
 	const controls = [
 		{
@@ -212,10 +215,15 @@ function ZoomControls() {
 			icon: MaximizeIcon,
 			onClick: () => void fitView({ duration: 200, maxZoom: 1, padding: 0.15 }),
 		},
+		{
+			label: "Auto layout",
+			icon: WorkflowIcon,
+			onClick: onAutoLayout,
+		},
 	];
 	return (
 		<Panel position="bottom-left" className="m-3!">
-			<ButtonGroup orientation="vertical" aria-label="Canvas zoom">
+			<ButtonGroup orientation="vertical" aria-label="Canvas controls">
 				{controls.map(({ label, icon: Icon, onClick }) => (
 					<Tooltip key={label}>
 						<TooltipTrigger
@@ -422,6 +430,35 @@ export function EditorCanvas({
 		[flow.edges],
 	);
 
+	// Every node moves at once, so the toast offers the old places back. Fit
+	// after React Flow has the new positions: a layout you cannot see looks
+	// like nothing happened. The layout fills the canvas the fit will show,
+	// less its padding, so a long flow wraps into rows.
+	const store = useStoreApi<FlowCanvasNode, FlowCanvasEdge>();
+	const autoLayout = useCallback(() => {
+		const before = new Map(flow.nodes.map((node) => [node.id, node.position]));
+		const { width, height } = store.getState();
+		const viewport = { width: width / 1.15, height: height / 1.15 };
+		onFlowChange((current) =>
+			layoutFlow(current, { sizes: measured, viewport }),
+		);
+		requestAnimationFrame(
+			() => void fitView({ duration: 200, maxZoom: 1, padding: 0.15 }),
+		);
+		toast.info("Laid out the flow.", {
+			action: {
+				label: "Undo",
+				onClick: () =>
+					onFlowChange((current) =>
+						current.nodes.reduce((next, node) => {
+							const position = before.get(node.id);
+							return position ? moveNode(next, node.id, position) : next;
+						}, current),
+					),
+			},
+		});
+	}, [flow.nodes, measured, onFlowChange, fitView, store]);
+
 	const selectEdge = useCallback(
 		(id: string) => onSelect({ kind: "edge", id }),
 		[onSelect],
@@ -458,7 +495,7 @@ export function EditorCanvas({
 						size={1.25}
 						color="color-mix(in oklch, var(--foreground) 16%, transparent)"
 					/>
-					<ZoomControls />
+					<CanvasControls onAutoLayout={autoLayout} />
 					{flow.nodes.length > 4 ? (
 						<MiniMap
 							pannable

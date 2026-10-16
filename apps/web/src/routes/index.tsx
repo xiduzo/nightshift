@@ -118,7 +118,7 @@ function HomeComponent() {
 							Projects
 						</h2>
 						<p className="text-muted-foreground text-sm">
-							Git repositories Night Shift works in.
+							The code Night Shift works on. Open one to see its flows and runs.
 						</p>
 					</div>
 					<ProjectList
@@ -172,8 +172,8 @@ function ProjectList({
 					</EmptyMedia>
 					<EmptyTitle>No projects yet</EmptyTitle>
 					<EmptyDescription>
-						Add a git repository with + next to Projects in the sidebar. Each
-						run gets its own worktree in it.
+						A project is a git repository Night Shift works on. Add one with +
+						next to Projects in the sidebar.
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>

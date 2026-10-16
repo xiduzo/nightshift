@@ -102,10 +102,10 @@ function FlowEditorRoute() {
 						<EmptyMedia variant="icon">
 							<FileWarningIcon />
 						</EmptyMedia>
-						<EmptyTitle>The flow file does not load</EmptyTitle>
+						<EmptyTitle>This flow cannot be opened</EmptyTitle>
 						<EmptyDescription>
-							<span className="font-mono">{loaded.data.path}</span> does not
-							match the flow schema. Fix the file by hand, or start over.
+							The saved flow is not valid. Fix the problems below in its file,
+							or start over.
 						</EmptyDescription>
 					</EmptyHeader>
 					<EmptyContent>

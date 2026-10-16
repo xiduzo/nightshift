@@ -243,8 +243,8 @@ function StartRunForm({
 					Run <span className="font-mono">{flowName}</span>
 				</DialogTitle>
 				<DialogDescription>
-					The run works in a new worktree on its own branch. You can stop it at
-					any time.
+					The run works on a new branch in its own copy of the project. You can
+					stop it at any time.
 				</DialogDescription>
 			</DialogHeader>
 
@@ -286,8 +286,8 @@ function StartRunForm({
 						))}
 					</datalist>
 					<FieldDescription id={`${id}-base-hint`}>
-						A branch, tag or commit to branch the worktree from, for example the
-						top of an open stack. Empty starts from the clone's current branch.
+						The branch, tag or commit the run starts from, for example the top
+						of an open stack. Leave it empty to use your current branch.
 					</FieldDescription>
 				</Field>
 
@@ -310,7 +310,7 @@ function StartRunForm({
 							className={stopInvalid ? "text-destructive" : undefined}
 						>
 							{!stop.on ? (
-								"No stop time: the run goes until its flow ends."
+								"No stop time. The run goes until the flow ends."
 							) : stopAt === null ? (
 								"Enter a time, for example 07:00."
 							) : (
@@ -323,7 +323,7 @@ function StartRunForm({
 										{dayWord(stopAt, now)}, {formatDayTime(stopAt)}
 									</time>{" "}
 									(in {formatWaited(stopAt - now)}). No new step starts after
-									it; the run then ends as stopped.
+									that time, and the run stops.
 								</>
 							)}
 						</FieldDescription>
@@ -355,7 +355,7 @@ function StartRunForm({
 						missing.length > 0
 							? `Fill in ${missing.map((input) => input.label || input.name).join(", ")} first.`
 							: badJson.length > 0
-								? `Fix the JSON of ${badJson.map((input) => input.label || input.name).join(", ")} first.`
+								? `Check the format of ${badJson.map((input) => input.label || input.name).join(", ")} first.`
 								: undefined
 					}
 				>

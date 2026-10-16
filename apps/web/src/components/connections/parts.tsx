@@ -129,7 +129,7 @@ export function KindBadge({ kind }: { kind: "command" | "url" }) {
 
 const SOURCE_LABEL: Record<SecretSource, string> = {
 	keychain: "Keychain",
-	env: "Environment",
+	env: "Outside Night Shift",
 	missing: "Missing",
 };
 
@@ -164,7 +164,7 @@ export function VariableBadge({
 				{badge}
 			</TooltipTrigger>
 			<TooltipContent className="max-w-64">
-				Save it under Secrets below or set it where the daemon starts.
+				No value yet. Save one under Secrets below.
 			</TooltipContent>
 		</Tooltip>
 	);

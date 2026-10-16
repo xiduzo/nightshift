@@ -369,7 +369,7 @@ describe("mcpServersFor", () => {
 		});
 		expect(result.ok).toBe(false);
 		expect(!result.ok && result.message).toContain('"ghost"');
-		expect(!result.ok && result.message).toContain("does not exist");
+		expect(!result.ok && result.message).toContain("There is no connection");
 	});
 
 	test("a missing variable refuses with a message that names it, never a value", async () => {
@@ -379,7 +379,7 @@ describe("mcpServersFor", () => {
 		expect(result).toEqual({
 			ok: false,
 			message: expect.stringContaining(
-				'The MCP server "docs" reads the environment variable DOCS_TOKEN',
+				'The MCP server "docs" needs the secret DOCS_TOKEN',
 			),
 		});
 		expect(JSON.stringify(result)).not.toContain("team-value");
@@ -447,7 +447,7 @@ describe("expandForTest", () => {
 		expect(await store.expandForTest({ name: "ghost" })).toEqual({
 			expansion: {
 				ok: false,
-				message: 'The connection "ghost" does not exist on this daemon.',
+				message: 'There is no connection named "ghost".',
 			},
 			values: [],
 		});

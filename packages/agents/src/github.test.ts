@@ -316,7 +316,7 @@ describe("githubTools", () => {
 		const tools = githubTools({ cwd, gh: join(dir, "no-such-gh") });
 		const execute = tools.find((t) => t.name === "github_read_issue")
 			?.execute as (args: unknown) => Promise<unknown>;
-		await expect(execute({ number: 1 })).rejects.toThrow(/not found/);
+		await expect(execute({ number: 1 })).rejects.toThrow(/cannot find/);
 	});
 
 	test("read_pr: checks summary and review decision", async () => {

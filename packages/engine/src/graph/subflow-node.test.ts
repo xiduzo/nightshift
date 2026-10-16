@@ -483,7 +483,7 @@ describe("the Subflow node", () => {
 				payload: {
 					outcome: "interrupted",
 					outputs: { outcome: "interrupted", visit: 1 },
-					error: "The daemon stopped while this ran.",
+					error: "Night Shift stopped while this ran.",
 				},
 			});
 		await interrupted(crashed[2]?.id as string);
@@ -497,7 +497,7 @@ describe("the Subflow node", () => {
 				prompt: null,
 				scope: { parentStepId: crashed[0]?.id as string, itemId: null },
 				by: "daemon",
-				reason: "The daemon restarted.",
+				reason: "Night Shift restarted.",
 			},
 		});
 		const { parked, state } = await drive(h, null);

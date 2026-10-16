@@ -13,7 +13,7 @@ const TOOL_SETS: { value: ToolSet; label: string; hint: string }[] = [
 	{
 		value: "github",
 		label: "github",
-		hint: "Read issues and pull requests, comment, set labels, and open a pull request, through your own gh login.",
+		hint: "Read issues and pull requests, comment, set labels, and open pull requests with your GitHub account.",
 	},
 ];
 

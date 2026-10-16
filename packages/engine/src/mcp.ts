@@ -46,11 +46,13 @@ export function expandMcpServers(
 				: { url: server.url, headers: expand(server.headers) };
 		if (missing.length > 0) {
 			const names = [...new Set(missing)];
-			const [noun, it] =
-				names.length === 1 ? ["variable", "it"] : ["variables", "them"];
+			const [noun, isNot, it] =
+				names.length === 1
+					? ["secret", "it is", "it"]
+					: ["secrets", "they are", "them"];
 			return {
 				ok: false,
-				message: `The MCP server "${name}" reads the environment ${noun} ${names.join(", ")}, but the daemon does not have ${it}. Save ${it} under Agents → Secrets, set ${it} where the daemon starts, or remove the reference.`,
+				message: `The MCP server "${name}" needs the ${noun} ${names.join(", ")}, but ${isNot} not saved. Save ${it} under Agents → Secrets, or remove the reference.`,
 			};
 		}
 		expanded[name] = config;

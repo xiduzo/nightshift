@@ -225,7 +225,7 @@ export function forEachNode(node: ForEachNode, ctx: StepContext): NodeAction {
 				const names = ordered.cycle.map((id) => itemLabel({ id }));
 				return finish(
 					"error",
-					`The "blocked by" links of the elements make a cycle: ${names.join(" → ")}.`,
+					`The "blocked by" links of the items make a cycle: ${names.join(" → ")}.`,
 				);
 			}
 			lastRead = ordered.items;
@@ -490,7 +490,7 @@ async function readSource(
 			}
 			if (result.exitCode !== 0) {
 				throw new Error(
-					`The source command failed with exit code ${result.exitCode ?? "none"}:\n${result.logTail}`,
+					`The source command failed. Its last output:\n${result.logTail}`,
 				);
 			}
 			return parseCommandItems(stdout);

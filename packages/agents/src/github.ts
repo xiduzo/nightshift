@@ -102,7 +102,11 @@ export function runProcess(
 			if (error.name === "AbortError") {
 				reject(new Error(`${command} was aborted`));
 			} else if (error.code === "ENOENT") {
-				reject(new Error(`${command} not found. Is it installed and on PATH?`));
+				reject(
+					new Error(
+						`Night Shift cannot find ${command}. Make sure it is installed.`,
+					),
+				);
 			} else {
 				reject(error);
 			}

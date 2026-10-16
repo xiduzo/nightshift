@@ -55,7 +55,8 @@ function ProjectRunsComponent() {
 								<h1 id="runs-heading">Runs</h1>
 							</CardTitle>
 							<CardDescription>
-								Each run works in its own worktree, on its own branch.
+								Every flow and quick run you start. Open one to follow its
+								steps.
 							</CardDescription>
 							{sleeping.length > 0 || waiting > 0 ? (
 								<CardAction className="flex flex-wrap items-center justify-end gap-2">
@@ -97,7 +98,7 @@ function ProjectRunsComponent() {
 								<RunList
 									runs={runs.data}
 									isLoading={runs.isLoading}
-									emptyDescription="Run a flow or start a quick run. Each run works in its own worktree."
+									emptyDescription="Start a quick run, or run a flow from Flows. Your runs show up here."
 									emptyAction={
 										<Button onClick={() => setQuickRun(true)}>
 											<ZapIcon data-icon="inline-start" />

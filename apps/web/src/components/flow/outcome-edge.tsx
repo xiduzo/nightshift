@@ -105,6 +105,61 @@ function useLane(id: string, source: string, target: string): number {
 	);
 }
 
+/** How far an edge runs out of its handle before it turns. */
+const STEP_OFFSET = 28;
+/** Between an edge that runs between rows and the nodes above and below it. */
+const ROW_CLEARANCE = 40;
+
+/**
+ * Where an edge that runs back and down crosses: the carry-over of a flow laid
+ * out in rows, from the end of one row to the start of the next. Left alone,
+ * the step path crosses halfway between its ends, through the nodes of both
+ * rows. This puts the crossing above the target, clear of every node it would
+ * pass. Undefined for every other edge, and when there is no clear way.
+ */
+function useCarryY(
+	source: string,
+	target: string,
+	sourceX: number,
+	targetX: number,
+): number | undefined {
+	return useStore(
+		useCallback(
+			(state: ReactFlowState) => {
+				const from = state.nodeLookup.get(source);
+				const to = state.nodeLookup.get(target);
+				if (!from || !to || targetX >= sourceX) return undefined;
+				const top = (node: typeof from) => node.internals.positionAbsolute.y;
+				const bottom = (node: typeof from) =>
+					top(node) + (node.measured.height ?? 0);
+				if (top(to) <= bottom(from)) return undefined;
+
+				const left = targetX - STEP_OFFSET;
+				const right = sourceX + STEP_OFFSET;
+				let y = top(to) - ROW_CLEARANCE;
+				let blocked = true;
+				while (blocked && y > bottom(from)) {
+					blocked = false;
+					for (const node of state.nodeLookup.values()) {
+						const x = node.internals.positionAbsolute.x;
+						if (x > right || x + (node.measured.width ?? 0) < left) continue;
+						if (
+							// Strictly below the clear line, or `y` would not move.
+							y > top(node) - ROW_CLEARANCE &&
+							y <= bottom(node) + ROW_CLEARANCE
+						) {
+							y = top(node) - ROW_CLEARANCE;
+							blocked = true;
+						}
+					}
+				}
+				return blocked ? undefined : y;
+			},
+			[source, target, sourceX, targetX],
+		),
+	);
+}
+
 const OutcomeEdge = memo(function OutcomeEdge({
 	id,
 	source,
@@ -120,6 +175,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 }: EdgeProps<FlowCanvasEdge>) {
 	const selectEdge = useContext(SelectEdgeContext);
 	const lane = useLane(id, source, target);
+	const carryY = useCarryY(source, target, sourceX, targetX);
 	const [path, labelX, labelY] = getSmoothStepPath({
 		sourceX,
 		sourceY,
@@ -128,8 +184,9 @@ const OutcomeEdge = memo(function OutcomeEdge({
 		sourcePosition,
 		targetPosition,
 		borderRadius: 10,
-		offset: 28,
+		offset: STEP_OFFSET,
 		centerX: (sourceX + targetX) / 2 + lane * LANE_GAP,
+		centerY: carryY,
 	});
 	if (!data) return null;
 

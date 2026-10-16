@@ -140,7 +140,7 @@ export function normalizeList(
 		if (seen.has(item.id)) {
 			return {
 				ok: false,
-				error: `The list has the id "${item.id}" more than once (element ${index}).`,
+				error: `The list has the id "${item.id}" more than once (item ${index + 1}).`,
 			};
 		}
 		seen.add(item.id);

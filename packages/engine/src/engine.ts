@@ -98,15 +98,15 @@ import { createWorktree, resolveRepoTopLevel } from "./worktrees";
 
 const DEFAULT_MAX_CONCURRENT_RUNS = 2;
 const DEFAULT_MAX_STEPS_PER_RUN = 500;
-const INTERRUPTED_REASON = "The daemon stopped while this run ran.";
+const INTERRUPTED_REASON = "Night Shift stopped while this run ran.";
 /** How long a new daemon waits before it resumes the runs the last one stopped mid-step. */
 const DAEMON_RESUME_GRACE_MS = 5_000;
 /** Daemon resumes in a row (no person in between) before a run waits for a person. */
 const MAX_DAEMON_RESUMES = 3;
-const DAEMON_RESUME_REASON = "The daemon restarted.";
+const DAEMON_RESUME_REASON = "Night Shift restarted.";
 /** The follow-up prompt of an Agent session that the daemon continues after a restart. */
 const DAEMON_RESUME_PROMPT =
-	"The daemon stopped while you worked on this, so your last actions may or may not have happened. Before you repeat any of them, check the worktree (git status, git log) and the remote (pushed branches, pull requests, comments). Then continue where you left off.";
+	"Night Shift stopped while you worked on this, so your last actions may or may not have happened. Before you repeat any of them, check the worktree (git status, git log) and the remote (pushed branches, pull requests, comments). Then continue where you left off.";
 const TITLE_MAX_CHARS = 80;
 const QUICK_RUN_TITLE = "Quick run";
 
@@ -186,7 +186,7 @@ export function createEngine(
 			(node.connections ?? []).length > 0
 				? {
 						ok: false,
-						message: `The node names connections (${node.connections?.join(", ")}), but this daemon has none.`,
+						message: `The node uses connections (${node.connections?.join(", ")}), but there are none. Add them under Agents → Tools.`,
 					}
 				: expandMcpServers(node.mcpServers, process.env));
 	/** The harness of that name, when it is added (Agents page) and built. */
@@ -258,7 +258,7 @@ export function createEngine(
 			)
 			.orderBy(asc(event.seq));
 		const byRun = groupByRun(rows.map(parseEventRow));
-		const error = "The daemon stopped while this ran.";
+		const error = "Night Shift stopped while this ran.";
 		const toResume: string[] = [];
 		for (const [runId, events] of byRun) {
 			const open = openWork(events);
@@ -326,19 +326,19 @@ export function createEngine(
 	): Promise<string | null> {
 		try {
 			if (options.scheduler === false || !runSettings().scheduler) {
-				return "the scheduler is off on this daemon.";
+				return "schedules are paused.";
 			}
 			const [row] = await db.select().from(run).where(eq(run.id, runId));
 			if (!row) return "the run's record is missing.";
 			const own = parseRunFlow(row).policy?.resumeInterruptedRuns;
 			if (!(own ?? runSettings().resumeInterruptedRuns)) {
 				return own === false
-					? "its flow's policy turns automatic resume off."
+					? "its flow turns automatic resume off."
 					: "automatic resume is off in Settings.";
 			}
 			const resumes = countDaemonResumes(events);
 			if (resumes >= MAX_DAEMON_RESUMES) {
-				return `it continued on its own ${resumes} times in a row, and each time the daemon stopped again.`;
+				return `it continued on its own ${resumes} times in a row, and each time Night Shift stopped again.`;
 			}
 			const stopAt = deriveStopAt(events);
 			if (stopAt !== null && now() >= stopAt) {
@@ -346,11 +346,11 @@ export function createEngine(
 			}
 			const worktree = await stat(row.worktreePath).catch(() => null);
 			if (!worktree?.isDirectory()) {
-				return `its worktree is gone (${row.worktreePath}).`;
+				return "the copy of the project it worked in is gone.";
 			}
 			return null;
 		} catch (error) {
-			return `the daemon could not check it: ${messageOf(error)}`;
+			return `Night Shift could not check it: ${messageOf(error)}`;
 		}
 	}
 
@@ -683,14 +683,14 @@ export function createEngine(
 			});
 			refuseErrors(parsed.issues);
 			if (!parsed.flow) {
-				throw new Error(`The flow "${input.flowName}" does not parse.`);
+				throw new Error(`The flow "${input.flowName}" is not valid.`);
 			}
 			flow = parsed.flow;
 			flowName = input.flowName;
 		} else {
 			const parsed = parseFlow(migrateFlow(input.flow), { flows: files });
 			refuseErrors(parsed.issues);
-			if (!parsed.flow) throw new Error("The flow does not parse.");
+			if (!parsed.flow) throw new Error("The flow is not valid.");
 			flow = parsed.flow;
 			flowName = null;
 		}
@@ -702,7 +702,7 @@ export function createEngine(
 			const called = name === flowName ? flow : files[name];
 			if (!called) {
 				throw new Error(
-					`The called flow "${name}" ${called === null ? "does not parse" : "does not exist"}.`,
+					`The called flow "${name}" ${called === null ? "is not valid" : "does not exist"}.`,
 				);
 			}
 			refuseErrors(
@@ -750,7 +750,7 @@ export function createEngine(
 					[...unknownProfiles]
 						.map(
 							([name, nodeIds]) =>
-								`The flow names the profile "${name}" (${nodeIds.join(", ")}), but this daemon does not have it. Add it under Agents.`,
+								`The flow uses the profile "${name}" (${nodeIds.join(", ")}), but no profile has that name. Add it under Agents.`,
 						)
 						.join(" "),
 				);
@@ -766,7 +766,7 @@ export function createEngine(
 					unknownConnections
 						.map(
 							({ name, nodeIds }) =>
-								`The flow names the connection "${name}" (${nodeIds.join(", ")}), but this daemon does not have it. Add it under Agents → Tools.`,
+								`The flow uses the connection "${name}" (${nodeIds.join(", ")}), but no connection has that name. Add it under Agents → Tools.`,
 						)
 						.join(" "),
 				);

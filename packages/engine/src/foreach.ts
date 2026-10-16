@@ -74,7 +74,7 @@ export async function fileItems(
 		/(^|[\\/{,])\.\.([\\/},]|$)/.test(trimmed)
 	) {
 		throw new Error(
-			`The glob "${trimmed}" reaches outside the worktree. Use a path relative to it, without "..".`,
+			`The glob "${trimmed}" points outside the project. Use a path inside the project, without "..".`,
 		);
 	}
 	const pattern = trimmed;

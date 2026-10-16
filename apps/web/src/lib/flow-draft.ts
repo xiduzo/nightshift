@@ -302,7 +302,7 @@ export function newElementFlow(as: string, defaults?: NodeDefaults): Flow {
 		nodes: [
 			{
 				...agentNode("worker", { x: 0, y: 0 }, defaults),
-				prompt: `Work on {{${as}.title}}.\n\nThe element:\n{{${as}}}`,
+				prompt: `Work on {{${as}.title}}.\n\nThe item:\n{{${as}}}`,
 			},
 		],
 		edges: [],
@@ -710,12 +710,12 @@ export function missingConnections(
 
 /** What the editor says about a connection the daemon does not have. */
 export function missingConnectionMessage(name: string): string {
-	return `No connection named ${name} on this daemon. The run refuses to start.`;
+	return `No connection named ${name}. The flow cannot run until you add it on the Agents page.`;
 }
 
 /** What the editor says about a profile the daemon does not have. */
 export function missingProfileMessage(name: string): string {
-	return `No profile named ${name} on this daemon. The run refuses to start.`;
+	return `No profile named ${name}. The flow cannot run until you add it on the Agents page.`;
 }
 
 /** `base`, else `base-2`, `base-3`, … whichever the node does not use yet. */
@@ -926,7 +926,7 @@ const FIELD_MESSAGES: Record<string, string> = {
 	id: "Use lowercase letters, digits and _, starting with a letter.",
 	idleMinutes: "The idle timeout must be a whole number of minutes above 0.",
 	flow: "Pick a flow to run.",
-	as: "Pick the input that takes the element.",
+	as: "Pick the input that gets the item.",
 	"source.value": "Set the list: a template that gives a JSON array.",
 	"source.command": "The source command is empty.",
 	"source.glob": "The glob is empty.",

@@ -92,8 +92,8 @@ export function ModelCombobox({
 			/>
 			<ComboboxContent>
 				<ComboboxEmpty>
-					Not in the list. {harnessInfo(harness).label} still takes any id it
-					knows.
+					Not in the list. {harnessInfo(harness).label} still takes any model it
+					supports.
 				</ComboboxEmpty>
 				<ComboboxList>
 					{(model: string) => (
@@ -122,9 +122,7 @@ export function ModelSourceHint({
 			<span className="flex items-center gap-1.5">
 				<Spinner className="size-3" />
 				{listing ? (
-					<>
-						Asking <span className="font-mono">{listing}</span>…
-					</>
+					<>Asking {harnessInfo(harness).label} for its models…</>
 				) : (
 					"Loading the models…"
 				)}
@@ -137,12 +135,14 @@ export function ModelSourceHint({
 			{query.models.length} models
 			{data && data.listed > 0 && listing ? (
 				<>
-					, {data.listed} of them from{" "}
-					<span className="font-mono">{listing}</span>
+					, {data.listed} of them from {harnessInfo(harness).label} on this
+					computer
 				</>
 			) : null}
-			. Any other id works too.
-			{data?.problem ? ` ${listing} did not answer: ${data.problem}` : ""}{" "}
+			. You can also type any other model.
+			{data?.problem
+				? ` ${harnessInfo(harness).label} did not list its models: ${data.problem}`
+				: ""}{" "}
 			<Button
 				variant="link"
 				size="xs"

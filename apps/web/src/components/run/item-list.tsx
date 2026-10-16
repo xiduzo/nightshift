@@ -57,9 +57,9 @@ export function ItemList({
 		return (
 			<Empty className="py-10">
 				<EmptyHeader>
-					<EmptyTitle className="text-sm">No elements yet</EmptyTitle>
+					<EmptyTitle className="text-sm">No items yet</EmptyTitle>
 					<EmptyDescription className="text-xs">
-						None started yet.
+						They show here once the For Each starts them.
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
@@ -73,7 +73,7 @@ export function ItemList({
 		>
 			<header className="flex flex-wrap items-center gap-2">
 				<h3 id={`items-${step.id}`} className="font-medium text-sm">
-					{items.length} {items.length === 1 ? "element" : "elements"}
+					{items.length} {items.length === 1 ? "item" : "items"}
 				</h3>
 				{[...counts].map(([state, count]) => (
 					<span
@@ -176,7 +176,7 @@ function ItemRow({
 					</ItemDescription>
 				) : null}
 				{item.value !== null && item.value !== undefined ? (
-					<JsonDetails summary="Element (JSON)" value={item.value} />
+					<JsonDetails summary="Item (JSON)" value={item.value} />
 				) : null}
 			</ItemContent>
 			<ItemActions className="gap-1">
@@ -203,7 +203,7 @@ function ItemRow({
 					<TooltipContent>
 						{selected
 							? "Show the whole run again"
-							: "Focus on this element: its steps and the flow it ran"}
+							: "Show only this item: its steps and the flow it ran"}
 					</TooltipContent>
 				</Tooltip>
 			</ItemActions>

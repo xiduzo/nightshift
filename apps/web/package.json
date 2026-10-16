@@ -7,9 +7,11 @@
 		"serve": "vite preview",
 		"dev": "vite dev",
 		"check-types": "tsc -b ../../packages/api && vite build && tsc --noEmit",
+		"test": "bun test",
 		"env:generate": "varlock codegen"
 	},
 	"dependencies": {
+		"@dagrejs/dagre": "3.1.1",
 		"@nightshift/api": "workspace:*",
 		"@nightshift/flows": "workspace:*",
 		"@nightshift/ui": "workspace:*",

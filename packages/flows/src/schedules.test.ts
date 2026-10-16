@@ -192,9 +192,12 @@ describe("validateSchedules", () => {
 		);
 		expect(issues.map((i) => [i.scheduleId, i.message])).toEqual([
 			["a", 'The flow "missing" does not exist.'],
-			["b", 'The flow "unreadable" does not load.'],
-			["c", 'The flow "broken" has 2 errors: it cannot run.'],
-			["d", expect.stringContaining("The cron line does not parse")],
+			["b", 'The flow "unreadable" is not valid. Open it and fix it.'],
+			[
+				"c",
+				'The flow "broken" has 2 errors. Fix the flow so this schedule can run.',
+			],
+			["d", expect.stringContaining("The cron expression is not valid")],
 			["e", 'The flow "night" has no input "other".'],
 			["e", 'The input "epic" needs a value.'],
 			["e", 'The value of input "plan" is not valid JSON.'],

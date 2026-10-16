@@ -1040,7 +1040,7 @@ describe("the Agent node", () => {
 			payload: { harnessSessionId: "harness-0", model: null },
 		});
 		const interrupted = {
-			error: "The daemon stopped while this ran.",
+			error: "Night Shift stopped while this ran.",
 			errorKind: null,
 			usage: null,
 			costUsd: null,
@@ -1069,10 +1069,10 @@ describe("the Agent node", () => {
 			payload: {
 				nodeId: "worker",
 				stepId,
-				prompt: "The daemon stopped while you worked on this. Continue.",
+				prompt: "Night Shift stopped while you worked on this. Continue.",
 				scope: null,
 				by: "daemon",
-				reason: "The daemon restarted.",
+				reason: "Night Shift restarted.",
 			},
 		});
 
@@ -1083,7 +1083,7 @@ describe("the Agent node", () => {
 		expect(harness.calls).toHaveLength(1);
 		expect(harness.calls[0]?.resumeSessionId).toBe("harness-0");
 		expect(harness.calls[0]?.prompt).toBe(
-			"The daemon stopped while you worked on this. Continue.",
+			"Night Shift stopped while you worked on this. Continue.",
 		);
 		const logged = await h.events();
 		expect(logged.slice(-5).map((e) => e.type)).toEqual([
@@ -1137,7 +1137,7 @@ describe("the Agent node", () => {
 		// Recovery ended the step; the engine appended RunResumed with the
 		// daemon's prompt and re-runs the node with invoke(null).
 		const daemonPrompt =
-			"The daemon stopped while you worked on this. Continue.";
+			"Night Shift stopped while you worked on this. Continue.";
 		await h.log.append({
 			type: "StepEnded",
 			runId: h.runId,
@@ -1145,7 +1145,7 @@ describe("the Agent node", () => {
 			payload: {
 				outcome: "interrupted",
 				outputs: { outcome: "interrupted", visit: 1 },
-				error: "The daemon stopped while this ran.",
+				error: "Night Shift stopped while this ran.",
 			},
 		});
 		await h.log.append({
@@ -1157,7 +1157,7 @@ describe("the Agent node", () => {
 				prompt: daemonPrompt,
 				scope: null,
 				by: "daemon",
-				reason: "The daemon restarted.",
+				reason: "Night Shift restarted.",
 			},
 		});
 		const third = await drive(h, null);

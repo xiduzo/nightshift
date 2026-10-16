@@ -10,15 +10,22 @@ import {
 } from "@nightshift/ui/components/dialog";
 import {
 	Field,
-	FieldDescription,
 	FieldError,
 	FieldGroup,
 	FieldLabel,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemMedia,
+	ItemTitle,
+} from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { PlusIcon } from "lucide-react";
+import { FolderGitIcon, FolderOpenIcon, PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
@@ -47,6 +54,15 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 	const [repoPath, setRepoPath] = useState("");
 	const [name, setName] = useState("");
 
+	// The server opens the native folder picker on this Mac.
+	const chooseFolder = useMutation(
+		orpc.projects.chooseFolder.mutationOptions({
+			onSuccess: (path) => {
+				if (path) setRepoPath(path);
+			},
+		}),
+	);
+
 	const addProject = useMutation(
 		orpc.projects.add.mutationOptions({
 			onSuccess: (project) => {
@@ -61,53 +77,75 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 		}),
 	);
 
-	const trimmedPath = repoPath.trim();
-	const pathIsAbsolute = trimmedPath.startsWith("/");
-	const pathInvalid = trimmedPath !== "" && !pathIsAbsolute;
+	const folderName = repoPath.split("/").at(-1) || repoPath;
 
 	return (
 		<form
 			className="contents"
 			onSubmit={(event) => {
 				event.preventDefault();
-				if (!pathIsAbsolute) return;
-				addProject.mutate({
-					repoPath: trimmedPath,
-					name: name.trim() || undefined,
-				});
+				if (!repoPath) return;
+				addProject.mutate({ repoPath, name: name.trim() || undefined });
 			}}
 		>
 			<DialogHeader>
 				<DialogTitle>Add project</DialogTitle>
 				<DialogDescription>
-					A git repository on this Mac. Each run gets its own worktree in it.
+					Choose a git repository on this Mac. Each run works in its own copy,
+					so your files stay as they are.
 				</DialogDescription>
 			</DialogHeader>
 			<FieldGroup className="gap-5">
-				<Field data-invalid={pathInvalid || undefined}>
-					<FieldLabel htmlFor={`${id}-path`}>Repository path</FieldLabel>
-					<Input
-						id={`${id}-path`}
-						value={repoPath}
-						onChange={(event) => setRepoPath(event.target.value)}
-						placeholder="/Users/you/code/repo"
-						className="font-mono"
-						autoComplete="off"
-						spellCheck={false}
-						required
-						autoFocus
-						aria-invalid={pathInvalid}
-						aria-describedby={`${id}-path-hint`}
-					/>
-					{pathInvalid ? (
-						<FieldError id={`${id}-path-hint`}>
-							Use an absolute path, starting with /.
-						</FieldError>
+				<Field data-invalid={chooseFolder.error ? true : undefined}>
+					<FieldLabel>Repository</FieldLabel>
+					{repoPath ? (
+						<Item variant="outline" size="sm">
+							<ItemMedia variant="icon">
+								<FolderGitIcon />
+							</ItemMedia>
+							<ItemContent className="min-w-0">
+								<ItemTitle>{folderName}</ItemTitle>
+								<ItemDescription
+									className="truncate font-mono"
+									title={repoPath}
+								>
+									{repoPath}
+								</ItemDescription>
+							</ItemContent>
+							<ItemActions>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									disabled={chooseFolder.isPending}
+									onClick={() => chooseFolder.mutate()}
+								>
+									{chooseFolder.isPending ? (
+										<Spinner data-icon="inline-start" />
+									) : null}
+									Change
+								</Button>
+							</ItemActions>
+						</Item>
 					) : (
-						<FieldDescription id={`${id}-path-hint`}>
-							The top level of a git repository.
-						</FieldDescription>
+						<Button
+							type="button"
+							variant="outline"
+							disabled={chooseFolder.isPending}
+							onClick={() => chooseFolder.mutate()}
+							autoFocus
+						>
+							{chooseFolder.isPending ? (
+								<Spinner data-icon="inline-start" />
+							) : (
+								<FolderOpenIcon data-icon="inline-start" />
+							)}
+							{chooseFolder.isPending ? "Choosing…" : "Choose folder…"}
+						</Button>
 					)}
+					{chooseFolder.error ? (
+						<FieldError>{chooseFolder.error.message}</FieldError>
+					) : null}
 				</Field>
 				<Field>
 					<FieldLabel htmlFor={`${id}-name`}>
@@ -120,7 +158,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 						id={`${id}-name`}
 						value={name}
 						onChange={(event) => setName(event.target.value)}
-						placeholder="Folder name"
+						placeholder={folderName || "Folder name"}
 						autoComplete="off"
 					/>
 				</Field>
@@ -132,10 +170,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 				<DialogClose render={<Button variant="outline" type="button" />}>
 					Cancel
 				</DialogClose>
-				<Button
-					type="submit"
-					disabled={!pathIsAbsolute || addProject.isPending}
-				>
+				<Button type="submit" disabled={!repoPath || addProject.isPending}>
 					{addProject.isPending ? (
 						<Spinner data-icon="inline-start" />
 					) : (

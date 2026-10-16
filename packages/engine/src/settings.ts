@@ -189,7 +189,7 @@ export type SettingsStore = {
 };
 
 const SCHEDULER_LOCK =
-	"NIGHTSHIFT_SCHEDULER=off turns the scheduler off on this daemon. A dev daemon sets it, so only the night daemon starts scheduled runs.";
+	"Night Shift was started with schedules turned off, so you cannot turn them on here. To use schedules, restart Night Shift without this setting.";
 
 export function createSettingsStore(options: {
 	db: Database;

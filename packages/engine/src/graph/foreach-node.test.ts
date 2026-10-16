@@ -811,7 +811,7 @@ describe("the For Each node", () => {
 			["2", "failed"],
 		]);
 		expect(loop.items[1]?.reason).toContain("loose.txt");
-		expect(loop.items[1]?.reason).toContain("commits nothing on your behalf");
+		expect(loop.items[1]?.reason).toContain("does not commit for you");
 		expect(loop.items[1]?.branch).toBeNull();
 		expect(payloads(await h.events(), "ItemEnded")[1]).toMatchObject({
 			itemId: "2",
@@ -1286,7 +1286,7 @@ describe("the For Each node", () => {
 				payload: {
 					outcome: "interrupted",
 					outputs: { outcome: "interrupted", visit: 1 },
-					error: "The daemon stopped while this ran.",
+					error: "Night Shift stopped while this ran.",
 				},
 			});
 		await interrupted(dead?.id as string);
@@ -1300,7 +1300,7 @@ describe("the For Each node", () => {
 				prompt: null,
 				scope: { parentStepId: loop.id, itemId: "2" },
 				by: "daemon",
-				reason: "The daemon restarted.",
+				reason: "Night Shift restarted.",
 			},
 		});
 		const { parked, state } = await drive(h, null);

@@ -209,8 +209,8 @@ function SleepingRuns({
 					</h2>
 				</CardTitle>
 				<CardDescription className="text-xs">
-					Runs that wait for a usage limit or the network. Each one continues
-					its session on its own; wake it to try now.
+					Runs that wait for a usage limit or the network. Each one goes on by
+					itself. Wake one to try now.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="px-0">

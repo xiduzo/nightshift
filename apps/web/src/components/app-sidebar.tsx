@@ -345,10 +345,10 @@ function DaemonStatus({
 	loading: boolean;
 }) {
 	const label = loading
-		? "Connecting to the daemon…"
+		? "Connecting to Night Shift…"
 		: reachable
-			? "Daemon running on this Mac"
-			: "Daemon not reachable";
+			? "Night Shift is running"
+			: "Cannot reach Night Shift";
 	return (
 		<SidebarMenuButton
 			tooltip={label}

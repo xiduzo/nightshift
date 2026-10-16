@@ -484,7 +484,7 @@ describe("the Decision node", () => {
 			payload: {
 				outcome: "interrupted",
 				outputs: { outcome: "interrupted", visit: 1, notes: "" },
-				error: "The daemon stopped while this ran.",
+				error: "Night Shift stopped while this ran.",
 			},
 		});
 		await h.log.append({
@@ -496,7 +496,7 @@ describe("the Decision node", () => {
 				prompt: null,
 				scope: null,
 				by: "daemon",
-				reason: "The daemon restarted.",
+				reason: "Night Shift restarted.",
 			},
 		});
 		const third = await drive(h, null);

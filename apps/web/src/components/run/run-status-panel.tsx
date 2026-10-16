@@ -33,7 +33,7 @@ import { orpc } from "@/utils/orpc";
 import { ResumeComposer } from "./resume-composer";
 
 const SLEEP_REASON = {
-	"usage-limit": "The harness hit a usage limit.",
+	"usage-limit": "The agent hit its usage limit.",
 	network: "The network is down.",
 } as const;
 
@@ -192,7 +192,7 @@ function noticeOf({
 				gist: reason,
 				body: (
 					<>
-						{reason} It continues the same session
+						{reason} It continues where it left off
 						{until ? (
 							<>
 								{" "}
@@ -226,8 +226,10 @@ function noticeOf({
 				icon: CircleAlertIcon,
 				tone: "text-status-interrupted",
 				title: "The run was interrupted",
-				gist: firstLine(run.reason) ?? "The daemon stopped while this run ran.",
-				body: `${run.reason ?? "The daemon stopped while this run ran."} Resume it to continue in the same worktree.`,
+				gist:
+					firstLine(run.reason) ??
+					"Night Shift stopped while this run was going.",
+				body: `${run.reason ?? "Night Shift stopped while this run was going."} Resume it to continue where it left off.`,
 				resumable: true,
 			};
 		case "stopped":
@@ -238,7 +240,7 @@ function noticeOf({
 				gist: firstLine(run.reason) ?? "Resume it to continue.",
 				body:
 					run.reason ??
-					"The run stopped before its end. Resume it to continue in the same worktree.",
+					"The run stopped before its end. Resume it to continue where it left off.",
 				resumable: true,
 			};
 		default:

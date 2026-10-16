@@ -287,7 +287,7 @@ function RunComponent() {
 						variant="ghost"
 						size="xs"
 						className="ml-auto"
-						title="Follow the latest step as the run walks"
+						title="Follow the latest step as the run goes on"
 						onClick={() => setPickedStepId(null)}
 					>
 						<ArrowDownToLineIcon data-icon="inline-start" />
