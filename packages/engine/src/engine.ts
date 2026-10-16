@@ -127,7 +127,7 @@ import {
 } from "./worktrees";
 
 const DEFAULT_MAX_CONCURRENT_RUNS = 2;
-const DEFAULT_MAX_STEPS_PER_RUN = 50;
+const DEFAULT_MAX_STEPS_PER_RUN = 500;
 /** How long a stopped harness may take to end its stream. */
 const STOP_GRACE_MS = 5_000;
 const DEFAULT_RESUME_PROMPT = "Continue where you left off.";
@@ -698,10 +698,11 @@ export function createEngine(
 			if (next.kind === "node") {
 				const stop = stopBeforeNext(events);
 				if (stop) return { kind: "stopped", reason: stop };
-				if (countStepsSinceWalkBegan(events) >= maxStepsPerRun) {
+				const limit = ctx.policy.maxSteps ?? maxStepsPerRun;
+				if (countStepsSinceWalkBegan(events) >= limit) {
 					return {
 						kind: "aborted",
-						reason: `The run reached the limit of ${maxStepsPerRun} steps before node "${next.nodeId}". Resume it to continue.`,
+						reason: `The run reached the limit of ${limit} steps before node "${next.nodeId}". Resume it to continue.`,
 					};
 				}
 			}

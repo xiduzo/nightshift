@@ -321,6 +321,6 @@ export type EngineOptions = {
 	dataDir: string;
 	/** How many runs may run a step at once. A run waiting at a Gate does not count. Default 2. */
 	maxConcurrentRuns?: number;
-	/** Safety net against runaway flows: the most steps one run may take. Default 50. */
+	/** Safety net against runaway flows: the most steps one run may take, unless the flow's policy sets `maxSteps`. Default 500. */
 	maxStepsPerRun?: number;
 };

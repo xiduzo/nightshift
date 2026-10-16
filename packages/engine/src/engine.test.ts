@@ -601,6 +601,26 @@ describe("runs", () => {
 		expect(detail.reason).toContain("limit of 3 steps");
 	});
 
+	test("the flow's policy maxSteps overrides the engine's limit", async () => {
+		const engine = makeEngine(fakeHarness(), { maxStepsPerRun: 3 });
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: {
+				...retryFlow("exit 1", 10),
+				policy: {
+					usageLimitFirstWaitMinutes: 5,
+					usageLimitMaxWaitMinutes: 60,
+					networkGraceMinutes: 240,
+					maxSteps: 5,
+				},
+			},
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("failed");
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps).toHaveLength(5);
+		expect(detail.reason).toContain("limit of 5 steps");
+	});
+
 	test("refuses a flow with errors and leaves nothing behind", async () => {
 		const engine = makeEngine(scriptedHarness().harness);
 		const id = await projectId(engine);

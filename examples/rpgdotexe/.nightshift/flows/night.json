@@ -12,7 +12,8 @@
 	"policy": {
 		"usageLimitFirstWaitMinutes": 5,
 		"usageLimitMaxWaitMinutes": 60,
-		"networkGraceMinutes": 240
+		"networkGraceMinutes": 240,
+		"maxSteps": 2000
 	},
 	"start": "features",
 	"nodes": [

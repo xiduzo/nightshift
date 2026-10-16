@@ -18,7 +18,8 @@ import { orpc } from "@/utils/orpc";
 const MODELS = ["sonnet", "opus", "haiku"];
 
 const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
-	{ value: "acceptEdits", label: "Accept edits" },
+	{ value: "auto", label: "Auto (approves safe actions, for nights)" },
+	{ value: "acceptEdits", label: "Accept edits (no shell commands)" },
 	{ value: "default", label: "Ask for each tool" },
 	{ value: "plan", label: "Plan only" },
 	{ value: "bypassPermissions", label: "Bypass permissions" },

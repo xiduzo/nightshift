@@ -74,9 +74,15 @@ export const agentNodeSchema = z.object({
 	harness: z.literal("claude-code"),
 	model: z.string().min(1),
 	effort: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
+	/**
+	 * `auto` lets Claude Code's classifier approve safe actions, such as
+	 * running tests, with nobody awake. `acceptEdits` approves file edits
+	 * only: every shell command is refused in an unattended run.
+	 */
 	permissionMode: z.enum([
 		"default",
 		"acceptEdits",
+		"auto",
 		"bypassPermissions",
 		"plan",
 	]),
@@ -211,6 +217,8 @@ export const policySchema = z.object({
 	usageLimitMaxWaitMinutes: z.number().positive().default(60),
 	/** The longest total wait for the network before the step fails. */
 	networkGraceMinutes: z.number().positive().default(240),
+	/** Safety net: the most steps a run may take before it stops (resumable). Default 500. */
+	maxSteps: z.number().int().positive().optional(),
 });
 
 /** A run parameter: a value a person gives when they start the run, read as `{{params.<name>}}`. */

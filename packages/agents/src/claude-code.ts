@@ -200,7 +200,9 @@ function startChat(
 	// to that model's own levels at runtime.
 	const adapter = claudeCodeText(input.model as "opus", {
 		authMode: "host",
-		permissionMode: input.permissionMode,
+		// The adapter's type lists four modes but passes the string to
+		// `claude --permission-mode` as is, so `auto` works.
+		permissionMode: input.permissionMode as "default",
 		settingSources: setup.settingSources,
 		emitDiff: false,
 		...(setup.allowedTools ? { allowedTools: setup.allowedTools } : {}),

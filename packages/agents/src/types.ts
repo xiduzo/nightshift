@@ -6,9 +6,15 @@
 
 export type HarnessName = "claude-code";
 
+/**
+ * `auto`: Claude Code's classifier approves safe actions (running tests,
+ * reading, editing) without a person, and blocks risky ones. The mode for
+ * unattended nights, as night-shift.py used.
+ */
 export type PermissionMode =
 	| "default"
 	| "acceptEdits"
+	| "auto"
 	| "bypassPermissions"
 	| "plan";
 

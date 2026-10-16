@@ -34,7 +34,8 @@ import { OptionsEditor } from "./options-editor";
 import { TemplateField } from "./template-field";
 
 const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
-	{ value: "acceptEdits", label: "Accept edits" },
+	{ value: "auto", label: "Auto (approves safe actions, for nights)" },
+	{ value: "acceptEdits", label: "Accept edits (no shell commands)" },
 	{ value: "default", label: "Ask for each tool" },
 	{ value: "plan", label: "Plan only" },
 	{ value: "bypassPermissions", label: "Bypass permissions" },
