@@ -4,7 +4,6 @@ import type {
 	AgentErrorKind,
 	AgentHarness,
 	Decider,
-	GithubItemsInput,
 	HarnessName,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
@@ -13,7 +12,6 @@ import type {
 	AgentNode,
 	Flow,
 	FlowNode,
-	ListItem,
 	ResolvedPolicy,
 	TemplateContext,
 } from "@nightshift/flows";
@@ -127,7 +125,6 @@ export type StepContext = {
 	/** The harness of that name, when it is added and built. */
 	harnessFor(name: HarnessName): AgentHarness | undefined;
 	decider?: Decider;
-	readGithubItems?: (input: GithubItemsInput) => Promise<ListItem[]>;
 	/** An Agent node's MCP servers, expanded. The values go to the harness only. */
 	mcpServersFor(
 		node: Pick<AgentNode, "connections" | "mcpServers">,

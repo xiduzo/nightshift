@@ -78,7 +78,7 @@ function foreach(
 		id,
 		type: "foreach",
 		position: { x: 0, y: 0 },
-		source: { kind: "github", parent: "12", doneLabels: [], skipLabels: [] },
+		source: { kind: "command", command: "./list 12" },
 		flow: body,
 		as: "item",
 		inputs: {},
@@ -1125,22 +1125,6 @@ describe("validateFlow: For Each", () => {
 	});
 
 	test("the source templates are checked", () => {
-		const github = night(
-			foreach("each", "trace", {
-				source: {
-					kind: "github",
-					parent: "{{nope.number}}",
-					doneLabels: [],
-					skipLabels: [],
-				},
-			}),
-		);
-		expect(errors(validateFlow(github))).toEqual([
-			expect.objectContaining({
-				nodeId: "each",
-				message: expect.stringContaining("source parent"),
-			}),
-		]);
 		const command = night(
 			foreach("each", "trace", {
 				source: { kind: "command", command: "list {{item.number}}" },
@@ -1204,12 +1188,7 @@ describe("validateFlow: For Each", () => {
 		const features = body(
 			night(
 				foreach("each", "trace", {
-					source: {
-						kind: "github",
-						parent: "{{item.number}}",
-						doneLabels: [],
-						skipLabels: [],
-					},
+					source: { kind: "command", command: "./list {{item.number}}" },
 				}),
 			),
 		);

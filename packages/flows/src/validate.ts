@@ -200,9 +200,6 @@ function validateIn(
 					case "command":
 						template(node.source.command, "source command");
 						break;
-					case "github":
-						template(node.source.parent, "source parent");
-						break;
 					case "files":
 						template(node.source.glob, "source glob");
 						break;

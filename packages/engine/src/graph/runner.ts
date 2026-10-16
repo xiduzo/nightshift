@@ -2,7 +2,6 @@ import { Command } from "@langchain/langgraph";
 import type {
 	AgentHarness,
 	Decider,
-	GithubItemsInput,
 	HarnessName,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
@@ -10,7 +9,6 @@ import type {
 	AgentNode,
 	Flow,
 	JsonValue,
-	ListItem,
 	ResolvedPolicy,
 } from "@nightshift/flows";
 
@@ -132,7 +130,6 @@ export type RunnerDeps = {
 	settings(): RunSettings;
 	harnessFor(name: HarnessName): AgentHarness | undefined;
 	decider?: Decider;
-	readGithubItems?: (input: GithubItemsInput) => Promise<ListItem[]>;
 	mcpServersFor(
 		node: Pick<AgentNode, "connections" | "mcpServers">,
 	): Promise<McpExpansion>;
@@ -225,9 +222,6 @@ export function createRunner(deps: RunnerDeps) {
 			recorder: (stepId, path) => recorders.open(row.id, stepId, path),
 			harnessFor: deps.harnessFor,
 			...(deps.decider ? { decider: deps.decider } : {}),
-			...(deps.readGithubItems
-				? { readGithubItems: deps.readGithubItems }
-				: {}),
 			mcpServersFor: deps.mcpServersFor,
 			signal: () => thread.controller.signal,
 			now: deps.now,

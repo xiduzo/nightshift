@@ -15,7 +15,7 @@ a resume always lands back at the exact node, at any depth.
 What did **not** change: the `Engine` interface (`types.ts`), the API, the
 web app, the event log as the read model, transcripts on disk, the bus,
 the scheduler, worktrees, leases, run bundles, settings, profiles,
-connections, the GitHub tools and the harnesses. The existing engine test
+connections and the harnesses. The existing engine test
 suites were the acceptance criteria.
 
 ## Layering
@@ -146,8 +146,8 @@ packages/engine/src/
     sessions, steps and runs become `interrupted`; sleeping runs get their
     timers back; open Gates stay; and the daemon resumes interrupted runs
     itself under the same policy as before, now by `invoke(null)`.
-13. **For Each** keeps its semantics: sources json, command, files and
-    github; `blockersFirst`/`nextItem` ordering; blocked items; per-item
+13. **For Each** keeps its semantics: sources json, command and files;
+    `blockersFirst`/`nextItem` ordering; blocked items; per-item
     branches on top of the last finished element (`branch: "per-item"`)
     or the shared branch; `haltOn`; `maxItems`; the list is read again
     before each element. One element per super-step: the node runs the
@@ -226,7 +226,6 @@ type StepContext = {
   recorder(stepId, path): Recorder;  // transcript writer, as openRecorder today
   harnessFor(name): AgentHarness | undefined;
   decider?: Decider;
-  readGithubItems?: ...;
   mcpServersFor(node): Promise<McpExpansion>;
   signal(): AbortSignal;             // the run's abort signal
   now(): number; minuteMs: number;

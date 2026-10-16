@@ -27,7 +27,6 @@ import {
 	CircleAlertIcon,
 	FilesIcon,
 	GitBranchIcon,
-	ListTreeIcon,
 	PlayIcon,
 	SquareTerminalIcon,
 	TriangleAlertIcon,
@@ -490,28 +489,22 @@ const SOURCE_ICON: Record<ListSource["kind"], typeof BracesIcon> = {
 	json: BracesIcon,
 	command: SquareTerminalIcon,
 	files: FilesIcon,
-	github: ListTreeIcon,
 };
 
 const SOURCE_EMPTY: Record<ListSource["kind"], string> = {
 	json: "No list yet",
 	command: "No source command yet",
 	files: "No file pattern yet",
-	github: "No parent issue yet",
 };
 
 /** Where the elements come from, which flow runs per element, and on which branch. */
 function ForEachBody({ node }: { node: ForEachNode }) {
 	const summary = sourceSummary(node.source);
 	const SourceIcon = SOURCE_ICON[node.source.kind];
-	const code = node.source.kind !== "github";
 	return (
 		<>
 			<p
-				className={cn(
-					"flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[11px]",
-					code && "font-mono",
-				)}
+				className="flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 font-mono text-[11px]"
 				title={summary}
 			>
 				<SourceIcon

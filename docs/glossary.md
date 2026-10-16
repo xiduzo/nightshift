@@ -35,11 +35,11 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Epoch | The number of a Lease acquisition. A daemon whose Epoch is no longer the Lease's lost it, and exits (self-fence). | Lease |
 | Setting | A daemon-wide value changed on the Settings page and saved in the database. Unset, it reads the environment, then its default. A Flow's own policy wins over the Settings' policy. | Settings |
 | List | The elements a For Each Node runs over, read from a Source. | Slice 5 |
-| Source | Where a For Each Node reads its List, again before each Item: a JSON value, a command, a glob of files, or a plugin such as GitHub. | Slice 4 |
+| Source | Where a For Each Node reads its List, again before each Item: a JSON value, a command that prints JSON, or a glob of files. A tracker is a command on its CLI (`gh`, `glab`, `acli`); the engine knows none. | Slice 4 |
 | Schedule | A Flow, its Inputs, a time, and a Stop Time: the daemon starts a Run from it. | Slice 7 |
 | Trigger | What starts a Run: a person, or a Schedule. | Slice 7 |
 | Item Branch | The branch one Item works on, on top of the last Item that finished. Together they form the Stack. | Slice 4 |
-| Stack | The chain of Item Branches of one For Each, and the pull requests opened on them. | PLAN §5 |
+| Stack | The chain of Item Branches of one For Each. The engine makes the branches; a flow opens pull requests on them with a CLI tool such as `gh`. | PLAN §5 |
 | Stop Time | The time after which a Run starts no new Step. | Slice 4 |
 | Outcome | How a Step ended: `pass`, `fail`, `needs-input`, an Agent Node's own outcome, a Decision label, or a Gate choice. | PLAN §3 |
 | Edge | A link from a Node to the next Node, taken on one Outcome. | PLAN §2 |

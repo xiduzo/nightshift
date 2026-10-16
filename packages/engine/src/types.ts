@@ -2,7 +2,6 @@ import type {
 	AgentEvent,
 	AgentHarness,
 	Decider,
-	GithubItemsInput,
 	HarnessName,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
@@ -15,7 +14,6 @@ import type {
 	FlowNodeType,
 	ItemState,
 	JsonValue,
-	ListItem,
 	LoadedFlow,
 	Outcome,
 	Schedule,
@@ -403,8 +401,6 @@ export type EngineOptions = {
 	harnesses: Partial<Record<HarnessName, AgentHarness>>;
 	/** Decides Decision nodes. A flow with a Decision node fails to start without one. */
 	decider?: Decider;
-	/** Reads GitHub For Each sources. A flow with one fails to start without it. */
-	readGithubItems?: (input: GithubItemsInput) => Promise<ListItem[]>;
 	/** Root for transcripts, command logs and other on-disk state, for example ~/.nightshift. */
 	dataDir: string;
 	/** How many runs may run a step at once. A run waiting at a Gate does not count. Default 2. */

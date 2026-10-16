@@ -266,7 +266,11 @@ export const jsonSourceSchema = z.object({
 	value: z.string().min(1),
 });
 
-/** A command (sh -c in the worktree) that prints a JSON array on stdout. */
+/**
+ * A command (sh -c in the worktree) that prints a JSON array. Template
+ * values arrive as environment variables, as in a Command node. An issue
+ * tracker is a command on its CLI: `gh`, `glab`, `acli`.
+ */
 export const commandSourceSchema = z.object({
 	kind: z.literal("command"),
 	command: z.string().min(1),
@@ -282,31 +286,10 @@ export const filesSourceSchema = z.object({
 	glob: z.string().min(1),
 });
 
-/**
- * GitHub sub-issues of one parent issue. Each element is
- * `{ id, number, title, body, url, state, labels, parent: { number, title },
- * dependsOn, done }`; `dependsOn` comes from the "blocked by" links.
- */
-export const githubSourceSchema = z.object({
-	kind: z.literal("github"),
-	/** The parent issue number. Supports templates, for example `{{epic}}` or `{{item.number}}`. */
-	parent: z.string().min(1),
-	/** Only sub-issues with this label become elements. */
-	requireLabel: z.string().min(1).optional(),
-	/** Sub-issues with any of these labels count as done before the run. */
-	doneLabels: z.array(z.string().min(1)).default([]),
-	/**
-	 * Sub-issues with any of these labels are left out (for example `draft`).
-	 * Elements that depend on them wait, because a left-out dependency is not done.
-	 */
-	skipLabels: z.array(z.string().min(1)).default([]),
-});
-
 export const listSourceSchema = z.discriminatedUnion("kind", [
 	jsonSourceSchema,
 	commandSourceSchema,
 	filesSourceSchema,
-	githubSourceSchema,
 ]);
 
 /**

@@ -2,7 +2,7 @@
 
 These three flows rebuild `tools/night-shift/night-shift.py` of the rpgdotexe repo as Night Shift flows. They build the Features and the Traces of one Epic while nobody is present, and leave a stack of pull requests for the morning.
 
-Night Shift knows nothing of Epics, Features, or Traces. A flow is a function with inputs, and these three call each other: `night` takes the Epic number as its input `epic`. Its For Each reads the Epic's sub-issues from GitHub and calls `feature` once per Feature, with the issue as the input `item`. `feature` does the same for its Traces and `trace`. A flow reads its input with a path (`{{item.number}}`, `{{item.parent.number}}`) and the engine's facts about the element from `run` (`{{run.branch}}`, `{{run.base_branch}}`). The files are format version 2.
+Night Shift knows nothing of Epics, Features, or Traces. A flow is a function with inputs, and these three call each other: `night` takes the Epic number as its input `epic`. Its For Each reads the Epic's sub-issues with `gh` and calls `feature` once per Feature, with the issue as the input `item`. `feature` does the same for its Traces and `trace`. A flow reads its input with a path (`{{item.number}}`, `{{item.parent.number}}`) and the engine's facts about the element from `run` (`{{run.branch}}`, `{{run.base_branch}}`). The files are format version 2.
 
 | Flow | Inputs | Does |
 | --- | --- | --- |
@@ -23,8 +23,8 @@ The flows call `python3 tools/night-shift/night-shift.py gate` (the check) and i
 
 | Script (`night-shift.py`) | Flow node |
 | --- | --- |
-| `fetch_plan`, `blockers_first`, Features first | `night` → `features` (For Each, GitHub source, `requireLabel: feature`) |
-| Traces of a Feature, `next_action`, a blocked Trace skips its dependents | `feature` → `traces` (For Each, `requireLabel: trace`, `doneLabels: [implemented]`, `branch: per-item`) |
+| `fetch_plan`, `blockers_first`, Features first | `night` → `features` (For Each, a `gh api graphql` command: label `feature`) |
+| Traces of a Feature, `next_action`, a blocked Trace skips its dependents | `feature` → `traces` (For Each, a `gh api graphql` command: label `trace`, done on `implemented`, not `draft`; `branch: per-item`) |
 | `build_trace`: branch, `write_context` (`context.json`, `TRACE.md`, `FEATURE.md`) | `trace` → `prepare` (the engine makes the branch) |
 | `worker_prompt` + `RULES` + `trace_task` / `fix_task`, a new session each try | `trace` → `worker` (Sonnet, effort high, `session: fresh`, 90 min, idle 30) |
 | `format_swift` | `trace` → `format` |
@@ -52,10 +52,10 @@ The agents get the script's prompts, not the `wtf.*` skills: those skills ask th
 
 ## Not ported, and why
 
-- **Draft Traces** (`--draft-missing`). A flow cannot create issues from a plan file with the script's checks yet. The Trace source skips Traces with the label `draft` (`skipLabels`), and the Traces they block wait, as in the script.
+- **Draft Traces** (`--draft-missing`). A flow cannot create issues from a plan file with the script's checks yet. The Trace source leaves out Traces with the label `draft` (`$skip` in its jq), and the Traces they block wait, as in the script.
 - **Human gates** (`human-gate`, `--gate`). A Feature with that label is built like the others; its dependents do not wait for a person to close it.
 - **Merge delivery** (`--delivery merge`). Only the stack. Merge it with `gh stack merge` in the morning.
-- **`gh stack link`.** Each pull request goes on the branch below it (`--base`), but the flow does not link the stack on GitHub: that needs the list of all layers of the night. Link it in the morning, or wait for the engine's "link stack" tool.
+- **`gh stack link`.** Each pull request goes on the branch below it (`--base`), but the flow does not link the stack on GitHub: that needs the list of all layers of the night. Link it in the morning, or add a Command node that runs `gh stack link` after the loop.
 - **One session per scenario.** The script gives each claimed scenario with no test its own worker session. Here one worker session builds all claimed scenarios of a try.
 - **`--review-at skeleton|trace`, `--accept`, `--only`, `--max-traces`, `--retry-blocked`, `--require-label`.** One checkpoint per Feature only. A run after a `halt` runs the checkpoint of that Feature again.
 - **The Trace Plan tick and `Closes #<feature>`.** The checkpoint sets the label `verified`, but does not tick the Trace in the Feature's Trace Plan. The last Trace's pull request does not close the Feature.

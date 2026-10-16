@@ -38,7 +38,7 @@ Night Shift is for its author first. It runs on the author's machine with the au
 | Flow | What a flow is: nodes, edges, outcomes, loop limits, the schema, the validator. | Flow, Node, Edge, Outcome, Agent Profile |
 | Run | Executing a flow: graph walk, run policy, For Each ordering, gates, decisions. | Run, Step Run, Gate, Decision, Run Policy |
 | Session | One harness session: transcript, tool calls, needs-input, resume. | Session, Transcript, Step Report, Needs Input |
-| Tools | What an agent can call outside its harness: GitHub through `gh`. | Tool, Pull Request, Stack |
+| Tools | What an agent can call outside its harness: CLI tools such as `gh` and `acli`, and MCP connections. The engine knows no tracker. | CLI Tool, Connection, Profile |
 | Workspace | Projects, repos, and local settings. | Workspace, Project, Repo Binding |
 
 The Run context speaks only in Flow, Node, Step Run, and Gate. A method's own words (Epic, Feature, Trace) live in prompts, skills, and the For Each source, never in the engine.
@@ -54,7 +54,7 @@ The Run context speaks only in Flow, Node, Step Run, and Gate. A method's own wo
 
 ## Open Questions
 
-- Can a TanStack AI harness adapter give our own tools (GitHub) to the harness session?
+- Answered 2026-10-16: Night Shift gives the harness no tools of its own. The harness runs CLI tools and MCP connections itself.
 - Do the harness adapters expose session resume and the usage-limit reset time?
 
 <!-- MANUAL ADDITIONS START -->

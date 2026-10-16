@@ -11,7 +11,6 @@ import {
 	harnessModels,
 	opencodeHarness,
 	pathPrograms,
-	readGithubItems,
 	testMcpServer,
 } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
@@ -150,7 +149,6 @@ export const engine = await createEngine({
 				claudeExecutable: settings.current().claudeBin,
 			}).decide(input),
 	},
-	readGithubItems: (input) => readGithubItems(input),
 	dataDir,
 	settings: () => settings.run(),
 	mcpServersFor: (node) => connections.mcpServersFor(node),

@@ -36,11 +36,6 @@ export {
 	fakeHarness,
 } from "./fake";
 export {
-	type GithubItemsOptions,
-	readGithubItems,
-	SUB_ISSUES_QUERY,
-} from "./github-items";
-export {
 	type OpencodeHarnessOptions,
 	opencodeHarness,
 	opencodePermission,

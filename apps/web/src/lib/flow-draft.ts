@@ -140,8 +140,6 @@ export function emptySource(kind: ListSource["kind"]): ListSource {
 			return { kind: "command", command: "" };
 		case "files":
 			return { kind: "files", glob: "" };
-		case "github":
-			return { kind: "github", parent: "", doneLabels: [], skipLabels: [] };
 	}
 }
 
@@ -150,7 +148,6 @@ export const SOURCE_KINDS: Record<ListSource["kind"], string> = {
 	json: "A JSON value",
 	command: "A command",
 	files: "Files (a glob)",
-	github: "GitHub sub-issues",
 };
 
 /** One line for a source: where the elements come from. Empty when it is not set yet. */
@@ -162,11 +159,6 @@ export function sourceSummary(source: ListSource): string {
 			return source.command.trim().split("\n")[0] ?? "";
 		case "files":
 			return source.glob.trim();
-		case "github": {
-			const parent = source.parent.trim();
-			if (parent === "") return "";
-			return `Sub-issues of ${/^\d+$/.test(parent) ? `#${parent}` : parent}${source.requireLabel ? ` · label ${source.requireLabel}` : ""}`;
-		}
 	}
 }
 
@@ -407,8 +399,6 @@ function rewriteSource(
 			return { ...source, command: rewrite(source.command) };
 		case "files":
 			return { ...source, glob: rewrite(source.glob) };
-		case "github":
-			return { ...source, parent: rewrite(source.parent) };
 	}
 }
 
@@ -928,8 +918,6 @@ const FIELD_MESSAGES: Record<string, string> = {
 	"source.value": "Set the list: a template that gives a JSON array.",
 	"source.command": "The source command is empty.",
 	"source.glob": "The glob is empty.",
-	"source.parent": "Set the parent issue.",
-	"source.requireLabel": "The required label is empty.",
 	maxItems: "Max items must be a whole number above 0.",
 };
 

@@ -7,7 +7,7 @@ import {
 	fakeHarness,
 	usageLimitScript,
 } from "@nightshift/agents/fake";
-import type { AgentHarness, GithubItemsInput } from "@nightshift/agents/types";
+import type { AgentHarness } from "@nightshift/agents/types";
 import { event } from "@nightshift/db/schema/nightshift";
 import type {
 	AgentNode,
@@ -17,7 +17,6 @@ import type {
 	FlowEdge,
 	FlowInput,
 	ForEachNode,
-	ListItem,
 } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
 
@@ -59,10 +58,7 @@ afterEach(async () => {
 function makeEngine(
 	harness: AgentHarness,
 	options: Partial<
-		Pick<
-			EngineOptions,
-			"maxConcurrentRuns" | "maxStepsPerRun" | "decider" | "readGithubItems"
-		>
+		Pick<EngineOptions, "maxConcurrentRuns" | "maxStepsPerRun" | "decider">
 	> = {},
 	internals: EngineInternals = {},
 ): Engine {
@@ -696,71 +692,6 @@ describe("For Each", () => {
 			engine.startRun({ projectId: id, flowName: "fine" }),
 		).rejects.toThrow("The flow needs a value for: item.");
 		expect(await engine.listRuns()).toEqual([]);
-	});
-
-	test("a GitHub source needs a reader, and reads the rendered parent", async () => {
-		await saveBody("build", [
-			agent("worker", "Build #{{item.number}} {{item.title}}"),
-		]);
-		const flow = flowOf(
-			[
-				command("pick", "echo 42"),
-				{
-					...forEach("loop", "build", "unused", { branch: "shared" }),
-					source: {
-						kind: "github",
-						parent: "{{pick.exit_code}}7",
-						requireLabel: "ready",
-						doneLabels: ["done"],
-						skipLabels: ["later"],
-					},
-				},
-			],
-			[edge("e1", "pick", "pass", "loop")],
-		);
-		const without = makeEngine(fakeHarness());
-		await expect(
-			without.startRun({ projectId: await projectId(without), flow }),
-		).rejects.toThrow("no GitHub reader");
-
-		const inputs: GithubItemsInput[] = [];
-		const items: ListItem[] = [
-			{
-				id: "12",
-				title: "first",
-				url: "https://github.test/issues/12",
-				value: { id: "12", number: 12, title: "first" },
-				dependsOn: [],
-				done: false,
-			},
-		];
-		const harness = fakeHarness();
-		const engine = makeEngine(harness, {
-			readGithubItems: async (input) => {
-				inputs.push(input);
-				return items;
-			},
-		});
-		const started = await engine.startRun({
-			projectId: await projectId(engine),
-			flow,
-		});
-		const detail = await waitForEnd(engine, started.id);
-		expect(detail.status).toBe("finished");
-		expect(inputs[0]).toMatchObject({
-			cwd: started.worktreePath,
-			parent: 7,
-			requireLabel: "ready",
-			doneLabels: ["done"],
-			skipLabels: ["later"],
-		});
-		expect(harness.calls[0]?.prompt).toBe("Build #12 first");
-		expect(forEachStep(detail).items[0]).toMatchObject({
-			id: "12",
-			title: "first",
-			url: "https://github.test/issues/12",
-			value: { id: "12", number: 12, title: "first" },
-		});
 	});
 
 	test("stop inside an item, then resume continues the same item, and the loop after it", async () => {

@@ -151,15 +151,3 @@ export interface Decider {
 	/** Never throws: failures come back as `kind: "error"`. */
 	decide(input: DecisionInput): Promise<DecisionResult>;
 }
-
-/** Input for reading For Each items from GitHub sub-issues. */
-export type GithubItemsInput = {
-	/** A directory in the repo; `gh` resolves the repo from its remote. */
-	cwd: string;
-	parent: number;
-	requireLabel?: string;
-	doneLabels: string[];
-	/** Sub-issues with one of these labels are left out of the list. */
-	skipLabels?: string[];
-	signal: AbortSignal;
-};

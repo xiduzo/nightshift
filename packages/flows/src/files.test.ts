@@ -258,7 +258,7 @@ describe("calls between flow files", () => {
 				id: "each",
 				type: "foreach",
 				position: { x: 0, y: 0 },
-				source: { kind: "github", parent: "7", doneLabels: [], skipLabels: [] },
+				source: { kind: "command", command: "./list 7" },
 				flow: called,
 				as: "item",
 				inputs: {},

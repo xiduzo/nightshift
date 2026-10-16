@@ -163,7 +163,7 @@ export function createEngine(
 ): Engine {
 	const minuteMs = internals.minuteMs ?? 60_000;
 	const now = internals.now ?? Date.now;
-	const { db, harnesses, dataDir, decider, readGithubItems } = options;
+	const { db, harnesses, dataDir, decider } = options;
 	const maxConcurrentRuns =
 		options.maxConcurrentRuns ?? DEFAULT_MAX_CONCURRENT_RUNS;
 	if (!Number.isInteger(maxConcurrentRuns) || maxConcurrentRuns < 1) {
@@ -219,7 +219,6 @@ export function createEngine(
 		settings: runSettings,
 		harnessFor,
 		...(decider ? { decider } : {}),
-		...(readGithubItems ? { readGithubItems } : {}),
 		mcpServersFor,
 		flowOf: parseRunFlow,
 		calledFlowsOf: parseCalledFlows,
@@ -817,14 +816,6 @@ export function createEngine(
 			if (!decider && nodes.some((n) => n.type === "decision")) {
 				throw new Error(
 					"The flow has a Decision node, but no decider is configured.",
-				);
-			}
-			if (
-				!readGithubItems &&
-				nodes.some((n) => n.type === "foreach" && n.source.kind === "github")
-			) {
-				throw new Error(
-					"The flow has a For Each node over GitHub issues, but no GitHub reader is configured.",
 				);
 			}
 			if (input.stopAt !== undefined && input.stopAt <= now()) {

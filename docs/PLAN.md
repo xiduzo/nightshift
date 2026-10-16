@@ -20,7 +20,7 @@ Each row is a settled decision. Change a row only with a new ADR.
 | --- | --- |
 | Users | One developer: the author. Better Auth stays, and local mode auto-creates one user and one session. |
 | The method | The flow is the method. No method packages and no `method.json`. A WTF night is one flow among others. |
-| Flows | A directed graph that you edit in React Flow (`@xyflow/react`). Stored as a versioned JSON file in the repo: `.nightshift/flows/<name>.json`, with a published zod schema. Night Shift knows no method: GitHub, WTF, and the rpgdotexe night are flows and plugins, never engine concepts. |
+| Flows | A directed graph that you edit in React Flow (`@xyflow/react`). Stored as a versioned JSON file in the repo: `.nightshift/flows/<name>.json`, with a published zod schema. Night Shift knows no method and no tracker: GitHub, WTF, and the rpgdotexe night are flows, CLI tools and commands, never engine concepts. |
 | Flow I/O | A flow declares **inputs** and **outputs**, like a function. The inputs of the top-level flow are asked when a run starts. A Subflow node calls a flow once with bound inputs; a For Each node calls a flow once per list element, bound to an input. The outputs come back to the caller. Version 1 files (with `params` and `input: "item"`) migrate on load. |
 | Templates | `{{name.path}}` reads a value: `name` is a node id, an input, or `run`. Node ids and inputs share one namespace. A path reaches into JSON: `{{planner.data.tasks}}`, `{{item.parent.number}}`. A command gets every value as an environment variable, never as shell text. |
 | Node types | Agent, Command, Decision, Gate, Subflow, For Each. See section 3. |
@@ -28,9 +28,9 @@ Each row is a settled decision. Change a row only with a new ADR.
 | Harnesses | Every Agent node runs as a harness session through a TanStack AI harness adapter: `@tanstack/ai-claude-code`, `@tanstack/ai-opencode`, `@tanstack/ai-codex`. The node names its harness; a flow mixes them freely. Unattended Claude Code runs in `auto` permission mode. |
 | Daemon | Nights run on a stable daemon (`bun run night`): a built server without hot reload. Development uses `bun run dev` in a separate git worktree, so code changes never reload a daemon that runs a night. |
 | Skills | An Agent node names a skill that the harness already has (user, project, or plugin skills). No skill pack materialization. |
-| Lists | A For Each reads a list from a source: a JSON value (often another node's output), a command that prints JSON, files that match a glob, or a plugin such as GitHub sub-issues. An element is any JSON value. An object element may carry `id`, `title`, `dependsOn`, and `done`; the rest is free. |
+| Lists | A For Each reads a list from a source: a JSON value (often another node's output), a command that prints JSON, or files that match a glob. An issue tracker is a command on its CLI: the editor offers recipes for `gh`, `glab` and `acli`. An element is any JSON value. An object element may carry `id`, `title`, `dependsOn`, and `done`; the rest is free. |
 | Triggers | A run starts by hand, or from a schedule stored in the project (`.nightshift/schedules.json`), for example every night at 22:00 with a stop time of 07:00. |
-| GitHub | GitHub is a set of TanStack AI tools (read issue, write comment, set label, open pull request, link stack) on top of the `gh` CLI. Agent and Decision nodes can call them. The engine also calls them directly for fixed work. |
+| GitHub | GitHub is a CLI tool (`gh`) and a command recipe (the sub-issues of an issue, the issues with a label). An Agent node that lists `gh` runs it with the user's login; a Command node or a list source runs it in the worktree. Nothing in the engine knows GitHub. |
 | Decisions | A Decision node returns one of its declared labels plus notes, validated against a schema. The decider is a provider behind an interface. The default provider is a small model through TanStack AI structured output. Other providers (for example an OpenRouter model) plug in behind the same interface. |
 | Run policy | Ported from the script: fresh session with a tight brief on retry, rescue by a stronger profile, blocked propagation, network grace, usage-limit waits that resume the same session, a stop time. Policy is engine code. A flow only sets its numbers. |
 | Worktrees | The user's own clone. Worktrees live in a sibling directory. Garbage collection never deletes a dirty tree. |
@@ -51,7 +51,7 @@ Dropped from the earlier plan: method packages and `method.json`, the OpenSpec m
 | Decision | Reads earlier outputs and returns one declared label plus notes. | One edge per label |
 | Gate | Waits for a person in the Needs-you inbox. Holds a question and the choices. | One edge per choice |
 | Subflow | Runs another flow once, with its inputs bound by templates. Its outputs are the called flow's outputs plus `ended` (the label it ended on). | `pass` (finished), `fail` |
-| For Each | Runs a flow once per element of a list, bound to one of its inputs (`as`, default `item`). Reads the list again before each element. Orders by `dependsOn`; a failed element blocks the elements that depend on it. Each element can work on its own branch, stacked on the last one that finished. Its outputs hold the results of every element. | `done`, `halted` |
+| For Each | Runs a flow once per element of a list (a JSON value, the JSON a command prints, or files that match a glob), bound to one of its inputs (`as`, default `item`). Reads the list again before each element. Orders by `dependsOn`; a failed element blocks the elements that depend on it. Each element can work on its own branch, stacked on the last one that finished. Its outputs hold the results of every element. | `done`, `halted` |
 
 A node reads earlier values through templates, for example `{{check.log_tail}}`, `{{item.title}}`, or `{{epic}}`.
 
@@ -130,7 +130,7 @@ The first nights showed two things: the dev server reloads under a running night
 - `bun run night`: the built server and web app, no hot reload.
 - Flow format version 2: `inputs` and `outputs` on every flow, templates with JSON paths, inputs and node ids in one namespace. `params` and `input: "item"` migrate on load; run snapshots of version 1 migrate when read.
 - The Subflow node.
-- For Each over any list: `json` (a template that renders a JSON array, for example `{{planner.data.tasks}}`), `command`, `files` (a glob), `github` (sub-issues). Elements are free-form JSON with optional `id`, `title`, `dependsOn`, `done`. `as` names the input; `branch` is `per-item` or `shared`. Engine facts per element move to `run`: `{{run.branch}}`, `{{run.base_branch}}`, `{{run.index}}`.
+- For Each over any list: `json` (a template that renders a JSON array, for example `{{planner.data.tasks}}`), `command`, `files` (a glob). A fourth source, `github` (sub-issues), went on 2026-10-16: it is a `command` recipe on `gh` now, and old files migrate on load. Elements are free-form JSON with optional `id`, `title`, `dependsOn`, `done`. `as` names the input; `branch` is `per-item` or `shared`. Engine facts per element move to `run`: `{{run.branch}}`, `{{run.base_branch}}`, `{{run.index}}`.
 - Start from a branch: the start dialog takes a base ref, so a night can continue on an open stack.
 - The rpgdotexe flows move to version 2.
 
