@@ -22,5 +22,9 @@ export type Context = {
 		mcp(config: McpServerConfig, redact: string[]): Promise<McpTestResult>;
 	};
 	/** Facts about this daemon that change only on a restart. */
-	daemon: { dataDir: string };
+	daemon: {
+		dataDir: string;
+		/** The database lease this daemon holds. `since` is epoch ms. */
+		lease: { host: string; pid: number; epoch: number; since: number };
+	};
 };

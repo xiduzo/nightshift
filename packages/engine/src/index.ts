@@ -13,6 +13,15 @@ export {
 } from "./connections";
 export { createEngine } from "./engine";
 export {
+	acquireLease,
+	LEASE_HEARTBEAT_MS,
+	LEASE_STALE_AFTER_MS,
+	type Lease,
+	LeaseHeldError,
+	type LeaseHolder,
+	pidAlive,
+} from "./lease";
+export {
 	createSettingsStore,
 	type RunSettings,
 	type SettingField,

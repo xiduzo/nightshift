@@ -17,16 +17,70 @@ import { createAuth } from "@nightshift/auth";
 import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import {
+	acquireLease,
 	createConnectionStore,
 	createEngine,
 	createSettingsStore,
 	keychainSecrets,
+	LEASE_HEARTBEAT_MS,
+	type Lease,
+	LeaseHeldError,
 } from "@nightshift/engine";
 
 import { desktopOrigins, ENV } from "./env.server";
 
 export const db = createDb(ENV);
 await migrateDb(db);
+
+/**
+ * One daemon per database: take the lease before the engine recovers
+ * interrupted work or the scheduler starts. Another live daemon on this
+ * database stops this one here. A daemon that loses the lease later (its
+ * machine slept past the stale window and another daemon started) fences
+ * itself: it exits with code 3 and writes nothing more.
+ */
+async function holdLease(): Promise<Lease> {
+	let lease: Lease;
+	try {
+		lease = await acquireLease({
+			db,
+			onLost: (reason) => {
+				console.error(
+					`SELF-FENCE: ${reason} Another daemon holds this database now. Exiting without writing anything more.`,
+				);
+				process.exit(3);
+			},
+		});
+	} catch (error) {
+		if (!(error instanceof LeaseHeldError)) throw error;
+		console.error(error.message);
+		process.exit(1);
+	}
+	setInterval(() => {
+		lease.heartbeat().catch((error) => {
+			// A failed write is not a lost lease: the next heartbeat tries again.
+			console.error("The lease heartbeat failed:", error);
+		});
+	}, LEASE_HEARTBEAT_MS).unref();
+	// A clean stop gives the lease up, so the next daemon starts at once.
+	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+		process.once(signal, () => {
+			void Promise.race([lease.release(), Bun.sleep(2_000)])
+				.catch(() => {})
+				.finally(() => process.exit(0));
+		});
+	}
+	console.log(
+		`Holding the database lease: epoch ${lease.epoch}, pid ${lease.pid} on ${lease.host}.`,
+	);
+	return lease;
+}
+
+// `bun --hot` evaluates this module again on each reload, in the same
+// process: keep the lease this process holds.
+const held = globalThis as { nightshiftLease?: Lease };
+held.nightshiftLease ??= await holdLease();
+export const lease = held.nightshiftLease;
 
 export const auth = createAuth(ENV, db, desktopOrigins);
 
@@ -108,4 +162,12 @@ export const checks: Context["checks"] = {
 	mcp: (config, redact) => testMcpServer(config, { redact }),
 };
 
-export const daemon: Context["daemon"] = { dataDir };
+export const daemon: Context["daemon"] = {
+	dataDir,
+	lease: {
+		host: lease.host,
+		pid: lease.pid,
+		epoch: lease.epoch,
+		since: lease.since.getTime(),
+	},
+};

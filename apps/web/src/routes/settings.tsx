@@ -117,6 +117,7 @@ import { AddProjectDialog } from "@/components/add-project-form";
 import { SiteHeader } from "@/components/site-header";
 import { notificationsSupported } from "@/hooks/use-night-notifications";
 import type { PermissionMode, Project } from "@/lib/api-types";
+import { formatDateTime } from "@/lib/format";
 import { HARNESSES, type HarnessName, harnessInfo } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
 
@@ -274,7 +275,10 @@ function SettingsComponent() {
 						</>
 					)}
 					<AppearanceCard />
-					<DaemonCard dataDir={settings.data?.daemon.dataDir} />
+					<DaemonCard
+						dataDir={settings.data?.daemon.dataDir}
+						lease={settings.data?.daemon.lease}
+					/>
 				</div>
 			</div>
 		</>
@@ -1274,7 +1278,15 @@ function AppearanceCard() {
  * This daemon
  * ------------------------------------------------------------------------- */
 
-function DaemonCard({ dataDir }: { dataDir: string | undefined }) {
+function DaemonCard({
+	dataDir,
+	lease,
+}: {
+	dataDir: string | undefined;
+	lease:
+		| { host: string; pid: number; epoch: number; since: number }
+		| undefined;
+}) {
 	return (
 		<Card>
 			<CardHeader>
@@ -1312,6 +1324,31 @@ function DaemonCard({ dataDir }: { dataDir: string | undefined }) {
 								>
 									<CopyIcon />
 								</Button>
+							</ItemActions>
+						) : null}
+					</Item>
+					<ItemSeparator />
+					<Item size="sm" className="px-0">
+						<ItemMedia variant="icon">
+							<LockIcon aria-hidden="true" />
+						</ItemMedia>
+						<ItemContent>
+							<ItemTitle>Database lease</ItemTitle>
+							<ItemDescription className="line-clamp-none">
+								{lease ? (
+									<>
+										Held by pid {lease.pid} on {lease.host} since{" "}
+										{formatDateTime(lease.since)}. Only one daemon may use a
+										database. Another one refuses to start.
+									</>
+								) : (
+									<Skeleton className="h-4 w-64" />
+								)}
+							</ItemDescription>
+						</ItemContent>
+						{lease ? (
+							<ItemActions>
+								<Badge variant="outline">Epoch {lease.epoch}</Badge>
 							</ItemActions>
 						) : null}
 					</Item>

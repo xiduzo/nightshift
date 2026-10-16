@@ -30,6 +30,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Item | One element of a For Each List: any JSON value, optionally with `id`, `title`, `dependsOn`, and `done`. | Slice 4 |
 | Connection | An MCP server defined once on the daemon (the Connections page). An Agent Node names it in `connections`. Holds `${NAME}` references, never secret values. | Connections |
 | Secret | A value a `${NAME}` reads: from the system keychain (saved on the Connections page), else the daemon's environment. Never in a Flow file, the database, or the log. | Connections |
+| Lease | The right of one daemon to write to a database. The daemon takes it at start, keeps it with a heartbeat, and gives it up on a clean stop. A second daemon on the same database refuses to start. Each acquisition has an Epoch one higher than the last. | Lease |
+| Epoch | The number of a Lease acquisition. A daemon whose Epoch is no longer the Lease's lost it, and exits (self-fence). | Lease |
 | Setting | A daemon-wide value changed on the Settings page and saved in the database. Unset, it reads the environment, then its default. A Flow's own policy wins over the Settings' policy. | Settings |
 | List | The elements a For Each Node runs over, read from a Source. | Slice 5 |
 | Source | Where a For Each Node reads its List, again before each Item: a JSON value, a command, a glob of files, or a plugin such as GitHub. | Slice 4 |
@@ -96,6 +98,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | halt | End a For Each early because a Body Flow ended on a halt label. | Slice 4 |
 | sleep | Wait on a timer after a usage limit or a network failure. | Slice 4 |
 | wake | End a sleep and continue the same Session. | Slice 4 |
+| self-fence | Exit at once, writing nothing more, because the daemon lost its Lease to another daemon. Exit code 3. | Lease |
 
 ## Events
 
