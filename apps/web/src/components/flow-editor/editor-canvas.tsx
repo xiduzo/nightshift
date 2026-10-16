@@ -1,18 +1,40 @@
 import type { Flow, FlowNodeType, Outcome } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
+import { ButtonGroup } from "@nightshift/ui/components/button-group";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuTrigger,
+} from "@nightshift/ui/components/dropdown-menu";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@nightshift/ui/components/tooltip";
 import {
 	Background,
 	BackgroundVariant,
 	type Connection,
-	Controls,
 	type EdgeChange,
 	type IsValidConnection,
+	MiniMap,
 	type NodeChange,
 	Panel,
 	ReactFlow,
+	useNodesInitialized,
 	useReactFlow,
+	useStoreApi,
 } from "@xyflow/react";
-import { useCallback, useMemo, useRef } from "react";
+import {
+	ChevronDownIcon,
+	MaximizeIcon,
+	MinusIcon,
+	PlusIcon,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { type FlowCanvasNode, nodeTypes } from "@/components/flow/flow-node";
 import { NODE_TYPE } from "@/components/flow/node-type";
@@ -37,6 +59,10 @@ export type Selection =
 	| { kind: "edge"; id: string }
 	| null;
 
+type SelectionSetter = (
+	selection: Selection | ((current: Selection) => Selection),
+) => void;
+
 const PALETTE: FlowNodeType[] = [
 	"agent",
 	"command",
@@ -49,6 +75,165 @@ const PALETTE: FlowNodeType[] = [
 /** Below the node a new one lands on, so repeated adds do not stack exactly. */
 const ADD_OFFSET = 32;
 
+/**
+ * Adds a node in the middle of the visible canvas, a third from the top,
+ * nudged past nodes already on that spot, and selects it.
+ */
+function useAddNode(
+	flow: Flow,
+	onFlowChange: (change: (flow: Flow) => Flow) => void,
+	onSelect: SelectionSetter,
+) {
+	const { screenToFlowPosition } = useReactFlow();
+	const store = useStoreApi();
+	return (type: FlowNodeType) => {
+		const rect = store.getState().domNode?.getBoundingClientRect();
+		const center = rect
+			? screenToFlowPosition({
+					x: rect.left + rect.width / 2,
+					y: rect.top + rect.height / 3,
+				})
+			: { x: 0, y: 0 };
+		// Nudge down past nodes that already sit on that spot.
+		let position = { x: Math.round(center.x - 120), y: Math.round(center.y) };
+		while (
+			flow.nodes.some(
+				(node) =>
+					Math.abs(node.position.x - position.x) < ADD_OFFSET &&
+					Math.abs(node.position.y - position.y) < ADD_OFFSET,
+			)
+		) {
+			position = { x: position.x + ADD_OFFSET, y: position.y + ADD_OFFSET };
+		}
+		const result = addNode(flow, type, position);
+		onFlowChange(() => result.flow);
+		onSelect({ kind: "node", id: result.id });
+	};
+}
+
+/**
+ * The node types to add: a button group when the toolbar is wide enough,
+ * an "Add node" menu when it is not. Lives in the toolbar above the canvas.
+ */
+export function NodePalette({
+	flow,
+	onFlowChange,
+	onSelect,
+}: {
+	flow: Flow;
+	onFlowChange: (change: (flow: Flow) => Flow) => void;
+	onSelect: SelectionSetter;
+}) {
+	const add = useAddNode(flow, onFlowChange, onSelect);
+	return (
+		<div className="min-w-0">
+			<ButtonGroup aria-label="Add a node" className="@3xl:flex hidden">
+				{PALETTE.map((type) => {
+					const { label, icon: Icon, blurb } = NODE_TYPE[type];
+					return (
+						<Tooltip key={type}>
+							<TooltipTrigger
+								render={
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => add(type)}
+										aria-label={`Add a ${label} node`}
+									/>
+								}
+							>
+								<Icon data-icon="inline-start" />
+								{label}
+							</TooltipTrigger>
+							<TooltipContent side="bottom">{blurb}</TooltipContent>
+						</Tooltip>
+					);
+				})}
+			</ButtonGroup>
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					render={
+						<Button variant="outline" size="sm" className="@3xl:hidden" />
+					}
+				>
+					<PlusIcon data-icon="inline-start" />
+					Add node
+					<ChevronDownIcon data-icon="inline-end" />
+				</DropdownMenuTrigger>
+				<DropdownMenuContent className="w-72">
+					<DropdownMenuGroup>
+						<DropdownMenuLabel>Add a node</DropdownMenuLabel>
+						{PALETTE.map((type) => {
+							const { label, icon: Icon, blurb } = NODE_TYPE[type];
+							return (
+								<DropdownMenuItem
+									key={type}
+									className="items-start"
+									onClick={() => add(type)}
+								>
+									<Icon className="mt-0.5" aria-hidden="true" />
+									<span className="flex flex-col gap-0.5">
+										<span className="font-medium">{label}</span>
+										<span className="text-muted-foreground text-xs">
+											{blurb}
+										</span>
+									</span>
+								</DropdownMenuItem>
+							);
+						})}
+					</DropdownMenuGroup>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</div>
+	);
+}
+
+/** Zoom in, zoom out and fit, as a vertical shadcn button group. */
+function ZoomControls() {
+	const { zoomIn, zoomOut, fitView } = useReactFlow();
+	const controls = [
+		{
+			label: "Zoom in",
+			icon: PlusIcon,
+			onClick: () => void zoomIn({ duration: 150 }),
+		},
+		{
+			label: "Zoom out",
+			icon: MinusIcon,
+			onClick: () => void zoomOut({ duration: 150 }),
+		},
+		{
+			label: "Fit view",
+			icon: MaximizeIcon,
+			onClick: () => void fitView({ duration: 200, maxZoom: 1, padding: 0.15 }),
+		},
+	];
+	return (
+		<Panel position="bottom-left" className="m-3!">
+			<ButtonGroup orientation="vertical" aria-label="Canvas zoom">
+				{controls.map(({ label, icon: Icon, onClick }) => (
+					<Tooltip key={label}>
+						<TooltipTrigger
+							render={
+								<Button
+									variant="outline"
+									size="icon-sm"
+									className="bg-background dark:bg-background"
+									aria-label={label}
+									onClick={onClick}
+								/>
+							}
+						>
+							<Icon />
+						</TooltipTrigger>
+						<TooltipContent side="right">{label}</TooltipContent>
+					</Tooltip>
+				))}
+			</ButtonGroup>
+		</Panel>
+	);
+}
+
 export function EditorCanvas({
 	flow,
 	check,
@@ -60,13 +245,23 @@ export function EditorCanvas({
 	check: FlowCheck;
 	selection: Selection;
 	onFlowChange: (change: (flow: Flow) => Flow) => void;
-	onSelect: (
-		selection: Selection | ((current: Selection) => Selection),
-	) => void;
+	onSelect: SelectionSetter;
 }) {
-	const wrapper = useRef<HTMLDivElement>(null);
-	const { screenToFlowPosition } = useReactFlow();
 	const [measured, applyDimensions] = useMeasured();
+	const { fitView } = useReactFlow();
+
+	// Fit once more when every node has its size: the first fit runs before
+	// the nodes are measured and the panels have their final size.
+	const initialized = useNodesInitialized();
+	const fitted = useRef(false);
+	useEffect(() => {
+		if (!initialized || fitted.current) return;
+		fitted.current = true;
+		const frame = requestAnimationFrame(
+			() => void fitView({ maxZoom: 1, padding: 0.15 }),
+		);
+		return () => cancelAnimationFrame(frame);
+	}, [initialized, fitView]);
 
 	const counts = useMemo(() => {
 		const byNode = new Map<string, { errors: number; warnings: number }>();
@@ -222,37 +417,13 @@ export function EditorCanvas({
 		[flow.edges],
 	);
 
-	const add = (type: FlowNodeType) => {
-		const rect = wrapper.current?.getBoundingClientRect();
-		const center = rect
-			? screenToFlowPosition({
-					x: rect.left + rect.width / 2,
-					y: rect.top + rect.height / 3,
-				})
-			: { x: 0, y: 0 };
-		// Nudge down past nodes that already sit on that spot.
-		let position = { x: Math.round(center.x - 120), y: Math.round(center.y) };
-		while (
-			flow.nodes.some(
-				(node) =>
-					Math.abs(node.position.x - position.x) < ADD_OFFSET &&
-					Math.abs(node.position.y - position.y) < ADD_OFFSET,
-			)
-		) {
-			position = { x: position.x + ADD_OFFSET, y: position.y + ADD_OFFSET };
-		}
-		const result = addNode(flow, type, position);
-		onFlowChange(() => result.flow);
-		onSelect({ kind: "node", id: result.id });
-	};
-
 	const selectEdge = useCallback(
 		(id: string) => onSelect({ kind: "edge", id }),
 		[onSelect],
 	);
 
 	return (
-		<div ref={wrapper} className="relative h-full min-h-80">
+		<div className="relative h-full min-h-0 overflow-hidden rounded-xl border bg-muted/40 dark:bg-muted/20">
 			<SelectEdgeContext.Provider value={selectEdge}>
 				<OutcomeMarkers />
 				<ReactFlow<FlowCanvasNode, FlowCanvasEdge>
@@ -271,33 +442,29 @@ export function EditorCanvas({
 					snapToGrid
 					snapGrid={[8, 8]}
 					fitView
-					fitViewOptions={{ maxZoom: 1, padding: 0.3 }}
+					fitViewOptions={{ maxZoom: 1, padding: 0.15 }}
 					minZoom={0.2}
+					className="[--xy-background-color:transparent]"
 					aria-label="Flow canvas"
 				>
-					<Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-					<Controls showInteractive={false} position="bottom-left" />
-					<Panel
-						position="top-left"
-						className="m-2 flex flex-wrap gap-1 border bg-card p-1"
-						aria-label="Add a node"
-					>
-						{PALETTE.map((type) => {
-							const { label, icon: Icon, blurb } = NODE_TYPE[type];
-							return (
-								<Button
-									key={type}
-									variant="ghost"
-									size="sm"
-									onClick={() => add(type)}
-									title={`Add a ${label} node. ${blurb}`}
-								>
-									<Icon data-icon="inline-start" />
-									{label}
-								</Button>
-							);
-						})}
-					</Panel>
+					<Background
+						variant={BackgroundVariant.Dots}
+						gap={16}
+						size={1.25}
+						color="color-mix(in oklch, var(--foreground) 16%, transparent)"
+					/>
+					<ZoomControls />
+					{flow.nodes.length > 4 ? (
+						<MiniMap
+							pannable
+							zoomable
+							ariaLabel="Mini map"
+							className="m-3! hidden overflow-hidden rounded-lg border shadow-xs lg:block"
+							style={{ width: 168, height: 112 }}
+							nodeBorderRadius={6}
+							nodeColor="color-mix(in oklch, var(--muted-foreground) 45%, transparent)"
+						/>
+					) : null}
 				</ReactFlow>
 			</SelectEdgeContext.Provider>
 		</div>

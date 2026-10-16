@@ -1,5 +1,10 @@
 import { Button } from "@nightshift/ui/components/button";
-import { Label } from "@nightshift/ui/components/label";
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldLabel,
+} from "@nightshift/ui/components/field";
 import { Textarea } from "@nightshift/ui/components/textarea";
 import { useEffect, useState } from "react";
 
@@ -82,18 +87,19 @@ export function OutputSchemaField({
 	const fields = schemaFields(output);
 
 	return (
-		<section className="flex flex-col gap-1.5" aria-labelledby={`${id}-label`}>
+		<Field className="gap-2" data-invalid={error !== null ? true : undefined}>
 			<div className="flex flex-wrap items-center gap-1">
-				<Label id={`${id}-label`} htmlFor={id} className="shrink-0">
+				<FieldLabel id={`${id}-label`} htmlFor={id} className="shrink-0">
 					Output schema
-					<span className="text-muted-foreground">(optional)</span>
-				</Label>
+					<span className="font-normal text-muted-foreground">(optional)</span>
+				</FieldLabel>
 				<div className="ml-auto flex items-center gap-1">
 					{PRESETS.map((preset) => (
 						<Button
 							key={preset.label}
-							variant="ghost"
+							variant="outline"
 							size="xs"
+							className="font-normal"
 							title={`Start from: ${preset.label}`}
 							onClick={() => {
 								setText(show(preset.schema));
@@ -111,7 +117,7 @@ export function OutputSchemaField({
 				placeholder={
 					'{\n  "type": "array",\n  "items": { "type": "string" }\n}'
 				}
-				className="max-h-80 min-h-20 font-mono text-xs"
+				className="max-h-80 min-h-24 font-mono text-xs leading-relaxed"
 				spellCheck={false}
 				aria-invalid={error !== null}
 				aria-describedby={`${id}-hint`}
@@ -122,15 +128,16 @@ export function OutputSchemaField({
 					if ("schema" in parsed) onChange(parsed.schema);
 				}}
 			/>
-			<p
-				id={`${id}-hint`}
-				role={error ? "alert" : undefined}
-				className={
-					error ? "text-destructive text-xs" : "text-muted-foreground text-xs"
-				}
-			>
-				{error ??
-					(output === undefined ? (
+			{error ? (
+				<FieldError id={`${id}-hint`} className="text-xs">
+					{error}
+				</FieldError>
+			) : (
+				<FieldDescription
+					id={`${id}-hint`}
+					className="text-xs [&_code]:font-mono"
+				>
+					{output === undefined ? (
 						"A JSON Schema for the report's data. The step fails when the data does not match."
 					) : (
 						<>
@@ -150,8 +157,9 @@ export function OutputSchemaField({
 							) : null}
 							. A list feeds a For Each.
 						</>
-					))}
-			</p>
-		</section>
+					)}
+				</FieldDescription>
+			)}
+		</Field>
 	);
 }

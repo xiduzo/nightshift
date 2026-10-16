@@ -11,24 +11,35 @@ import {
 } from "@nightshift/ui/components/alert-dialog";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
+import { Card } from "@nightshift/ui/components/card";
+import {
+	ResizableHandle,
+	ResizablePanel,
+	ResizablePanelGroup,
+} from "@nightshift/ui/components/resizable";
+import { ScrollArea } from "@nightshift/ui/components/scroll-area";
+import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
+import { CheckIcon, CircleDotIcon, PlayIcon, SaveIcon } from "lucide-react";
 import {
-	ChevronRightIcon,
-	CircleAlertIcon,
-	CircleDotIcon,
-	PlayIcon,
-	SaveIcon,
-} from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
 import { toast } from "sonner";
 
 import { OpenFlowContext } from "@/components/flow/open-flow-context";
 import { outcomeLabel } from "@/components/outcome-badge";
 import { StartRunDialog } from "@/components/run/start-run-dialog";
+import { SiteHeader } from "@/components/site-header";
 import { useProjectFlows } from "@/hooks/use-project-flows";
 import {
+	addEdge,
 	callersOf,
 	checkFlow,
 	isSavable,
@@ -50,7 +61,7 @@ import {
 import { orpc } from "@/utils/orpc";
 
 import { EdgeInspector } from "./edge-inspector";
-import { EditorCanvas, type Selection } from "./editor-canvas";
+import { EditorCanvas, NodePalette, type Selection } from "./editor-canvas";
 import { FlowInspector } from "./flow-inspector";
 import { IssuesPanel } from "./issues-panel";
 import { NodeInspector } from "./node-inspector";
@@ -102,6 +113,7 @@ function Editor({
 	);
 	const [starting, setStarting] = useState(false);
 	const savable = useMemo(() => isSavable(draft), [draft]);
+	const wide = useMediaQuery("(min-width: 1024px)");
 	const errorCount = check.issues.filter(
 		(issue) => issue.severity === "error",
 	).length;
@@ -340,174 +352,190 @@ function Editor({
 			);
 		};
 
+	const flowsSupport = {
+		flowName: name,
+		flows: projectFlows.flows,
+		onOpen: openFlow,
+		onCreate: (nodeId: string, calledName: string) =>
+			void createCalledFlow(nodeId, calledName),
+		creating: createCalled.isPending || saveFlow.isPending,
+	};
+
+	const inspector = selectedNode ? (
+		<NodeInspector
+			key={selectedNode.id}
+			flow={draft}
+			node={selectedNode}
+			onChange={(change) =>
+				setDraft((current) => updateNode(current, selectedNode.id, change))
+			}
+			onRename={renameSelected(selectedNode)}
+			onRenameOutcome={renameSelectedOutcome(selectedNode)}
+			onRemoveOutcome={removeSelectedOutcome(selectedNode)}
+			onSetAgentOutcomes={setSelectedAgentOutcomes(selectedNode)}
+			onSetStart={() =>
+				setDraft((current) => ({
+					...current,
+					start: selectedNode.id,
+				}))
+			}
+			onDelete={() => {
+				setDraft((current) => removeNode(current, selectedNode.id));
+				setSelection(null);
+			}}
+			calledFlows={flowsSupport}
+			edges={{
+				onAdd: (outcome, to) =>
+					setDraft(
+						(current) =>
+							addEdge(current, selectedNode.id, outcome, to)?.flow ?? current,
+					),
+				onSelect: (edgeId) => setSelection({ kind: "edge", id: edgeId }),
+				onDelete: (edgeId) =>
+					setDraft((current) => removeEdge(current, edgeId)),
+			}}
+		/>
+	) : selectedEdge ? (
+		<EdgeInspector
+			key={selectedEdge.id}
+			flow={draft}
+			edge={selectedEdge}
+			onChange={(change) =>
+				setDraft((current) => updateEdge(current, selectedEdge.id, change))
+			}
+			onDelete={() => {
+				setDraft((current) => removeEdge(current, selectedEdge.id));
+				setSelection(null);
+			}}
+		/>
+	) : (
+		<FlowInspector flow={draft} name={name} onChange={changeFlow} />
+	);
+
 	return (
-		<main className="grid min-h-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr]">
-			<header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2">
-				<nav
-					aria-label="Breadcrumb"
-					className="flex min-w-0 items-center gap-1 text-muted-foreground text-xs"
+		<>
+			<SiteHeader
+				crumbs={[
+					{ label: "Home", link: { to: "/" } },
+					{
+						label: projectName ?? "Project",
+						link: { to: "/projects/$projectId", params: { projectId } },
+					},
+					{ label: <span className="font-mono">{name}</span> },
+				]}
+			>
+				<div
+					aria-live="polite"
+					className="sr-only sm:not-sr-only sm:flex sm:items-center"
 				>
-					<Link
-						to="/projects/$projectId"
-						params={{ projectId }}
-						className="truncate outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-					>
-						{projectName ?? "Project"}
-					</Link>
-					<ChevronRightIcon className="size-3 shrink-0" aria-hidden="true" />
-					<span>Flows</span>
-					<ChevronRightIcon className="size-3 shrink-0" aria-hidden="true" />
-				</nav>
-				<h1 className="font-medium font-mono text-sm">{name}</h1>
-				{draft.inputs.length > 0 ? (
-					<span
-						className="hidden truncate font-mono text-muted-foreground text-xs sm:inline"
-						title="The inputs of this flow"
-					>
-						(
-						{draft.inputs
-							.map(
-								(input) =>
-									`${input.name}${input.type === "json" ? ": json" : ""}`,
-							)
-							.join(", ")}
-						)
-					</span>
-				) : null}
-				{callers.length > 0 ? (
-					<span className="hidden text-muted-foreground text-xs md:inline">
-						Called by{" "}
-						{callers.map((caller, index) => (
-							<span key={caller}>
-								{index > 0 ? ", " : null}
-								<Link
-									to="/projects/$projectId/flows/$name"
-									params={{ projectId, name: caller }}
-									className="font-mono underline-offset-2 hover:text-foreground hover:underline"
-								>
-									{caller}
-								</Link>
-							</span>
-						))}
-					</span>
-				) : null}
-				<div aria-live="polite" className="flex items-center gap-2">
 					{dirty ? (
-						<Badge variant="outline" className="text-status-interrupted">
+						<Badge
+							variant="outline"
+							className="border-status-waiting/40 bg-status-waiting/10 text-status-waiting"
+						>
 							<CircleDotIcon aria-hidden="true" />
 							Unsaved changes
 						</Badge>
 					) : (
-						<span className="text-muted-foreground text-xs">Saved</span>
-					)}
-					{errorCount > 0 ? (
-						<Badge variant="destructive">
-							<CircleAlertIcon aria-hidden="true" />
-							{errorCount} {errorCount === 1 ? "error" : "errors"}
+						<Badge variant="outline" className="text-muted-foreground">
+							<CheckIcon aria-hidden="true" />
+							Saved
 						</Badge>
-					) : null}
+					)}
 				</div>
-				<div className="ml-auto flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={save}
-						disabled={!canSave}
-						title={
-							savable
-								? "Save (⌘/Ctrl + S)"
-								: "Fix the fields marked in the issues first. The file would not load."
-						}
-					>
+				<Button
+					variant="outline"
+					size="sm"
+					onClick={save}
+					disabled={!canSave}
+					title={
+						savable
+							? "Save (⌘/Ctrl + S)"
+							: "Fix the fields marked in the issues first. The file would not load."
+					}
+				>
+					{saveFlow.isPending ? (
+						<Spinner data-icon="inline-start" />
+					) : (
 						<SaveIcon data-icon="inline-start" />
-						{saveFlow.isPending ? "Saving…" : "Save"}
-					</Button>
-					<Button
-						size="sm"
-						onClick={() => setStarting(true)}
-						disabled={runBlockedBy !== null}
-						title={runBlockedBy ?? "Run this flow in a new worktree"}
-					>
-						<PlayIcon data-icon="inline-start" />
-						Run
-					</Button>
-				</div>
-			</header>
+					)}
+					{saveFlow.isPending ? "Saving…" : "Save"}
+				</Button>
+				<Button
+					size="sm"
+					onClick={() => setStarting(true)}
+					disabled={runBlockedBy !== null}
+					title={runBlockedBy ?? "Run this flow in a new worktree"}
+				>
+					<PlayIcon data-icon="inline-start" />
+					Run
+				</Button>
+			</SiteHeader>
 
-			<div className="grid min-h-0 auto-rows-max grid-cols-[minmax(0,1fr)] grid-rows-[60vh] overflow-y-auto md:grid-cols-[minmax(0,1fr)_22rem] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden">
-				<ProjectFlowsContext.Provider value={projectFlows.flows}>
-					<OpenFlowContext.Provider value={openFlow}>
-						<EditorCanvas
-							flow={draft}
-							check={check}
-							selection={selection}
-							onFlowChange={changeFlow}
-							onSelect={setSelection}
-						/>
-					</OpenFlowContext.Provider>
-					<aside
-						aria-label="Inspector"
-						className="grid min-h-0 grid-rows-[1fr_auto] border-t md:border-t-0 md:border-l"
+			<ProjectFlowsContext.Provider value={projectFlows.flows}>
+				<div className="flex h-[calc(100svh-3.5rem)] min-h-0 flex-col">
+					<ResizablePanelGroup
+						key={wide ? "wide" : "narrow"}
+						orientation={wide ? "horizontal" : "vertical"}
+						className="min-h-0 flex-1"
 					>
-						<div className="min-h-0 overflow-y-auto p-3">
-							{selectedNode ? (
-								<NodeInspector
-									key={selectedNode.id}
+						<ResizablePanel
+							id="canvas"
+							defaultSize={wide ? "70%" : "58%"}
+							minSize={wide ? "35%" : 200}
+							className="flex min-h-0 min-w-0 flex-col gap-3 p-3 pb-1.5 lg:p-4 lg:pr-2"
+						>
+							<div className="@container flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+								<NodePalette
 									flow={draft}
-									node={selectedNode}
-									onChange={(change) =>
-										setDraft((current) =>
-											updateNode(current, selectedNode.id, change),
-										)
-									}
-									onRename={renameSelected(selectedNode)}
-									onRenameOutcome={renameSelectedOutcome(selectedNode)}
-									onRemoveOutcome={removeSelectedOutcome(selectedNode)}
-									onSetAgentOutcomes={setSelectedAgentOutcomes(selectedNode)}
-									onSetStart={() =>
-										setDraft((current) => ({
-											...current,
-											start: selectedNode.id,
-										}))
-									}
-									onDelete={() => {
-										setDraft((current) => removeNode(current, selectedNode.id));
-										setSelection(null);
-									}}
-									calledFlows={{
-										flowName: name,
-										flows: projectFlows.flows,
-										onOpen: openFlow,
-										onCreate: (nodeId, calledName) =>
-											void createCalledFlow(nodeId, calledName),
-										creating: createCalled.isPending || saveFlow.isPending,
-									}}
+									onFlowChange={changeFlow}
+									onSelect={setSelection}
 								/>
-							) : selectedEdge ? (
-								<EdgeInspector
-									key={selectedEdge.id}
-									flow={draft}
-									edge={selectedEdge}
-									onChange={(change) =>
-										setDraft((current) =>
-											updateEdge(current, selectedEdge.id, change),
-										)
-									}
-									onDelete={() => {
-										setDraft((current) => removeEdge(current, selectedEdge.id));
-										setSelection(null);
-									}}
+								<FlowSignature
+									projectId={projectId}
+									inputs={draft.inputs}
+									callers={callers}
 								/>
-							) : (
-								<FlowInspector flow={draft} onChange={changeFlow} />
-							)}
-						</div>
-						<div className="flex max-h-64 min-h-0 flex-col">
-							<IssuesPanel check={check} onSelect={selectIssue} />
-						</div>
-					</aside>
-				</ProjectFlowsContext.Provider>
-			</div>
+							</div>
+							<div className="min-h-0 flex-1">
+								<OpenFlowContext.Provider value={openFlow}>
+									<EditorCanvas
+										flow={draft}
+										check={check}
+										selection={selection}
+										onFlowChange={changeFlow}
+										onSelect={setSelection}
+									/>
+								</OpenFlowContext.Provider>
+							</div>
+							<IssuesPanel
+								check={check}
+								onSelect={selectIssue}
+								defaultOpen={wide}
+							/>
+						</ResizablePanel>
+						<ResizableHandle
+							withHandle
+							className="bg-transparent focus-visible:bg-ring"
+						/>
+						<ResizablePanel
+							id="inspector"
+							defaultSize={wide ? "30%" : "42%"}
+							minSize={wide ? 320 : 160}
+							maxSize={wide ? "55%" : undefined}
+							className="min-h-0 min-w-0 p-3 pt-1.5 lg:p-4 lg:pl-2"
+						>
+							<aside aria-label="Inspector" className="h-full">
+								<Card className="h-full gap-0 py-0">
+									<ScrollArea className="h-full min-h-0">
+										<div key={selectionKey(selection)}>{inspector}</div>
+									</ScrollArea>
+								</Card>
+							</aside>
+						</ResizablePanel>
+					</ResizablePanelGroup>
+				</div>
+			</ProjectFlowsContext.Provider>
 
 			<StartRunDialog
 				open={starting}
@@ -527,7 +555,8 @@ function Editor({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Leave without saving?</AlertDialogTitle>
 						<AlertDialogDescription>
-							The changes to {name} are not saved. They are lost when you leave.
+							The changes to <span className="font-mono">{name}</span> are not
+							saved. They are lost when you leave.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -541,6 +570,84 @@ function Editor({
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-		</main>
+		</>
+	);
+}
+
+function selectionKey(selection: Selection): string {
+	return selection ? `${selection.kind}:${selection.id}` : "flow";
+}
+
+/** True while the viewport is at least `query` wide; follows resizes. */
+function useMediaQuery(query: string): boolean {
+	return useSyncExternalStore(
+		(onChange) => {
+			const list = window.matchMedia(query);
+			list.addEventListener("change", onChange);
+			return () => list.removeEventListener("change", onChange);
+		},
+		() => window.matchMedia(query).matches,
+		() => true,
+	);
+}
+
+/** The flow's inputs, like a function signature, and the flows that call it. */
+function FlowSignature({
+	projectId,
+	inputs,
+	callers,
+}: {
+	projectId: string;
+	inputs: Flow["inputs"];
+	callers: string[];
+}) {
+	if (inputs.length === 0 && callers.length === 0) return null;
+	return (
+		<div className="ml-auto @xl:flex hidden min-w-0 items-center gap-3 text-muted-foreground text-xs">
+			{inputs.length > 0 ? (
+				<span
+					className="flex min-w-0 items-center gap-1.5"
+					title="The inputs of this flow"
+				>
+					<span className="shrink-0">Inputs</span>
+					<span className="flex min-w-0 flex-wrap gap-1">
+						{inputs.map((input) => (
+							<Badge
+								key={input.name}
+								variant="outline"
+								className="font-mono font-normal"
+							>
+								{input.name}
+								{input.type === "json" ? (
+									<span className="text-muted-foreground">: json</span>
+								) : null}
+							</Badge>
+						))}
+					</span>
+				</span>
+			) : null}
+			{callers.length > 0 ? (
+				<span className="flex min-w-0 items-center gap-1">
+					<span className="shrink-0">Called by</span>
+					{callers.map((caller) => (
+						<Button
+							key={caller}
+							variant="link"
+							size="xs"
+							className="h-auto px-0.5 font-mono text-muted-foreground hover:text-foreground"
+							nativeButton={false}
+							render={
+								<Link
+									to="/projects/$projectId/flows/$name"
+									params={{ projectId, name: caller }}
+								/>
+							}
+						>
+							{caller}
+						</Button>
+					))}
+				</span>
+			) : null}
+		</div>
 	);
 }

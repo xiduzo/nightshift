@@ -6,8 +6,9 @@ import {
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Checkbox } from "@nightshift/ui/components/checkbox";
+import { Field, FieldError, FieldLabel } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
-import { Label } from "@nightshift/ui/components/label";
+import { Item } from "@nightshift/ui/components/item";
 import {
 	NativeSelect,
 	NativeSelectOption,
@@ -84,7 +85,7 @@ export function InputsEditor({
 	return (
 		<div className="flex flex-col gap-2">
 			{inputs.length > 0 ? (
-				<ol className="flex flex-col gap-2" aria-describedby={describedBy}>
+				<ol className="flex flex-col gap-1.5" aria-describedby={describedBy}>
 					{inputs.map((input, index) => (
 						<InputRow
 							// Inputs have no ids; the row follows its place in the list.
@@ -128,7 +129,7 @@ export function InputsEditor({
 			) : null}
 			<Button
 				variant="outline"
-				size="xs"
+				size="sm"
 				className="self-start"
 				onClick={() => {
 					setFocusIndex(inputs.length);
@@ -196,7 +197,7 @@ export function NameInput({
 
 	return (
 		<>
-			<div className="flex items-center gap-1">
+			<div className="flex items-center gap-0.5">
 				<Input
 					ref={ref}
 					id={id}
@@ -204,7 +205,7 @@ export function NameInput({
 					aria-label={label}
 					aria-invalid={error !== null}
 					aria-describedby={error ? `${id}-error` : undefined}
-					className="h-7 flex-1 font-mono"
+					className="h-8 min-w-0 flex-1 font-mono text-xs"
 					autoComplete="off"
 					spellCheck={false}
 					onChange={(event) => {
@@ -225,9 +226,9 @@ export function NameInput({
 				{children}
 			</div>
 			{error ? (
-				<p id={`${id}-error`} role="alert" className="text-destructive text-xs">
+				<FieldError id={`${id}-error`} className="text-xs">
 					{error}
-				</p>
+				</FieldError>
 			) : null}
 		</>
 	);
@@ -252,7 +253,7 @@ function RowButtons({
 		<>
 			<Button
 				variant="ghost"
-				size="icon-xs"
+				size="icon-sm"
 				aria-label={`Move ${name} up`}
 				title="Move up"
 				disabled={index === 0}
@@ -262,7 +263,7 @@ function RowButtons({
 			</Button>
 			<Button
 				variant="ghost"
-				size="icon-xs"
+				size="icon-sm"
 				aria-label={`Move ${name} down`}
 				title="Move down"
 				disabled={index === count - 1}
@@ -272,7 +273,7 @@ function RowButtons({
 			</Button>
 			<Button
 				variant="ghost"
-				size="icon-xs"
+				size="icon-sm"
 				aria-label={`Remove ${name}`}
 				title={`Remove this ${noun}`}
 				onClick={onRemove}
@@ -320,7 +321,12 @@ function InputRow({
 	const defaultError = isJson ? jsonError(input.default) : null;
 
 	return (
-		<li className="flex flex-col gap-1.5 border bg-card p-2">
+		<Item
+			render={<li />}
+			variant="outline"
+			size="xs"
+			className="flex-col items-stretch gap-1.5 bg-card"
+		>
 			<NameInput
 				id={`${id}-name`}
 				name={input.name}
@@ -331,9 +337,10 @@ function InputRow({
 				<div className="w-20 shrink-0">
 					<NativeSelect
 						id={`${id}-type`}
+						size="sm"
 						value={input.type}
 						aria-label={`Type of ${position}`}
-						className="h-7"
+						className="w-full font-mono text-xs"
 						onChange={(event) => {
 							const type = event.target.value as FlowInputDef["type"];
 							onUpdate((current) => ({ ...current, type }));
@@ -357,7 +364,7 @@ function InputRow({
 				value={input.label ?? ""}
 				aria-label={`Label of ${position}`}
 				placeholder="Label in the start dialog (optional)"
-				className="h-7"
+				className="h-8 text-xs"
 				autoComplete="off"
 				onChange={(event) => setOptional("label", event.target.value)}
 			/>
@@ -366,7 +373,7 @@ function InputRow({
 				value={input.description ?? ""}
 				aria-label={`Description of ${position}`}
 				placeholder="What to enter (optional)"
-				className="h-7"
+				className="h-8 text-xs"
 				autoComplete="off"
 				onChange={(event) => setOptional("description", event.target.value)}
 			/>
@@ -388,22 +395,18 @@ function InputRow({
 					value={input.default ?? ""}
 					aria-label={`Default of ${position}`}
 					placeholder="Default (optional)"
-					className="h-7 font-mono"
+					className="h-8 font-mono text-xs"
 					autoComplete="off"
 					spellCheck={false}
 					onChange={(event) => setOptional("default", event.target.value)}
 				/>
 			)}
 			{defaultError ? (
-				<p
-					id={`${id}-default-error`}
-					role="alert"
-					className="text-destructive text-xs"
-				>
+				<FieldError id={`${id}-default-error`} className="text-xs">
 					The default is not JSON: {defaultError}
-				</p>
+				</FieldError>
 			) : null}
-			<div className="flex items-center gap-2">
+			<Field orientation="horizontal" className="gap-2 pt-0.5">
 				<Checkbox
 					id={`${id}-required`}
 					checked={input.required === true}
@@ -413,14 +416,17 @@ function InputRow({
 						)
 					}
 				/>
-				<Label htmlFor={`${id}-required`} className="font-normal text-xs">
+				<FieldLabel
+					htmlFor={`${id}-required`}
+					className="gap-1 font-normal text-xs"
+				>
 					Required
 					{input.default ? (
 						<span className="text-muted-foreground">· the default counts</span>
 					) : null}
-				</Label>
-			</div>
-		</li>
+				</FieldLabel>
+			</Field>
+		</Item>
 	);
 }
 
@@ -457,15 +463,18 @@ export function OutputsEditor({
 	return (
 		<div className="flex flex-col gap-2">
 			{outputs.length > 0 ? (
-				<ol className="flex flex-col gap-2" aria-describedby={describedBy}>
+				<ol className="flex flex-col gap-1.5" aria-describedby={describedBy}>
 					{outputs.map((output, index) => {
 						const rowId = `${id}-${index}`;
 						const position = `output ${index + 1}`;
 						return (
-							<li
+							<Item
+								render={<li />}
 								// Outputs have no ids; the row follows its place in the list.
 								key={index}
-								className="flex flex-col gap-1.5 border bg-card p-2"
+								variant="outline"
+								size="xs"
+								className="flex-col items-stretch gap-1.5 bg-card"
 							>
 								<NameInput
 									id={`${rowId}-name`}
@@ -523,7 +532,7 @@ export function OutputsEditor({
 									value={output.description ?? ""}
 									aria-label={`Description of ${position}`}
 									placeholder="What it holds (optional)"
-									className="h-7"
+									className="h-8 text-xs"
 									autoComplete="off"
 									onChange={(event) => {
 										const description = event.target.value;
@@ -532,14 +541,14 @@ export function OutputsEditor({
 										);
 									}}
 								/>
-							</li>
+							</Item>
 						);
 					})}
 				</ol>
 			) : null}
 			<Button
 				variant="outline"
-				size="xs"
+				size="sm"
 				className="self-start"
 				onClick={() => {
 					setFocusIndex(outputs.length);

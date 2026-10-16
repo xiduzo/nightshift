@@ -9,6 +9,8 @@ import {
 	nodeOutcomes,
 	type SubflowNode,
 } from "@nightshift/flows";
+import { Badge } from "@nightshift/ui/components/badge";
+import { Button } from "@nightshift/ui/components/button";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
 	Handle,
@@ -120,82 +122,98 @@ const FlowNodeCard = memo(function FlowNodeCard({
 		updateNodeInternals(id);
 	}, [id, outcomesKey, updateNodeInternals]);
 
+	const label = node.label?.trim();
+
 	return (
 		<div
 			className={cn(
-				"relative w-60 border bg-card text-card-foreground text-xs shadow-xs transition-[box-shadow,opacity] motion-reduce:transition-none",
-				selected && "border-foreground/50 ring-1 ring-ring",
-				errorCount > 0 && "border-destructive/70",
+				"relative w-64 rounded-lg border bg-card text-card-foreground text-xs shadow-xs transition-[box-shadow,opacity,border-color] motion-reduce:transition-none",
+				selected && "ring-2 ring-ring",
+				errorCount > 0 && "border-destructive",
 				active &&
-					"shadow-[0_0_0_2px_var(--status-running),0_0_16px_0_color-mix(in_oklch,var(--status-running)_40%,transparent)]",
+					"shadow-[0_0_0_1px_var(--status-running),0_0_18px_0_color-mix(in_oklch,var(--status-running)_35%,transparent)]",
 				waiting &&
-					"shadow-[0_0_0_2px_var(--status-waiting),0_0_20px_2px_color-mix(in_oklch,var(--status-waiting)_45%,transparent)]",
+					"shadow-[0_0_0_1px_var(--status-waiting),0_0_20px_2px_color-mix(in_oklch,var(--status-waiting)_40%,transparent)]",
 				run === null && "opacity-55",
 			)}
 			style={
-				runColor ? { borderLeftColor: runColor, borderLeftWidth: 3 } : undefined
+				runColor ? { borderLeftColor: runColor, borderLeftWidth: 4 } : undefined
 			}
 		>
 			<Handle
 				type="target"
 				position={Position.Left}
 				isConnectable={isConnectable}
-				className="size-3 border-2 border-card bg-muted-foreground"
-				style={{ top: 17 }}
+				className="size-2.5! min-h-0! min-w-0! border-2! border-card! bg-muted-foreground!"
+				style={{ top: 20 }}
 			/>
-			<div className="flex min-w-0 items-center gap-1.5 border-b px-2 py-1.5">
-				<Icon
-					className="size-3.5 shrink-0 text-muted-foreground"
-					aria-label={meta.label}
-				/>
-				<span className="min-w-0 flex-1 truncate font-medium">
-					{node.label || node.id}
+			<div className="flex min-w-0 flex-col gap-0.5 px-3 pt-2.5 pb-2">
+				<div className="flex h-5 min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wider">
+					<Icon className="size-3.5 shrink-0" aria-hidden="true" />
+					<span className="truncate">{meta.label}</span>
+					{isStart ? (
+						<Badge
+							variant="outline"
+							className="h-4 gap-0.5 px-1.5 font-mono text-[10px] text-foreground lowercase tracking-normal"
+							title="The run starts here"
+						>
+							<PlayIcon aria-hidden="true" />
+							start
+						</Badge>
+					) : null}
+					<span className="ml-auto flex shrink-0 items-center gap-1.5 normal-case tracking-normal">
+						{errorCount > 0 ? (
+							<Badge
+								variant="destructive"
+								className="h-4 gap-0.5 px-1.5 text-[10px] tabular-nums"
+								title={`${errorCount} ${errorCount === 1 ? "error" : "errors"}`}
+							>
+								<CircleAlertIcon aria-hidden="true" />
+								<span className="sr-only">Errors:</span>
+								{errorCount}
+							</Badge>
+						) : warningCount > 0 ? (
+							<Badge
+								variant="outline"
+								className="h-4 gap-0.5 border-status-waiting/40 bg-status-waiting/10 px-1.5 text-[10px] text-status-waiting tabular-nums"
+								title={`${warningCount} ${warningCount === 1 ? "warning" : "warnings"}`}
+							>
+								<TriangleAlertIcon aria-hidden="true" />
+								<span className="sr-only">Warnings:</span>
+								{warningCount}
+							</Badge>
+						) : null}
+						{run ? (
+							<OutcomeBadge
+								state={run.state}
+								className="h-4 px-1.5 text-[10px]"
+							/>
+						) : null}
+					</span>
+				</div>
+				<span
+					className="truncate font-medium font-mono text-sm leading-6"
+					title={node.id}
+				>
+					{node.id}
 				</span>
-				{isStart ? (
-					<span
-						className="flex shrink-0 items-center gap-0.5 border border-foreground/20 bg-muted px-1 text-[10px] text-muted-foreground uppercase tracking-wide"
-						title="The run starts here"
-					>
-						<PlayIcon className="size-2.5" aria-hidden="true" />
-						Start
-					</span>
-				) : null}
-				{errorCount > 0 ? (
-					<span
-						className="flex shrink-0 items-center gap-0.5 text-destructive"
-						title={`${errorCount} ${errorCount === 1 ? "error" : "errors"}`}
-					>
-						<CircleAlertIcon className="size-3.5" aria-hidden="true" />
-						<span className="sr-only">Errors:</span>
-						{errorCount}
-					</span>
-				) : warningCount > 0 ? (
-					<span
-						className="flex shrink-0 items-center gap-0.5 text-status-interrupted"
-						title={`${warningCount} ${warningCount === 1 ? "warning" : "warnings"}`}
-					>
-						<TriangleAlertIcon className="size-3.5" aria-hidden="true" />
-						<span className="sr-only">Warnings:</span>
-						{warningCount}
+				{label && label !== node.id ? (
+					<span className="truncate text-muted-foreground" title={label}>
+						{label}
 					</span>
 				) : null}
 			</div>
 
-			<div className="flex min-w-0 flex-col gap-1 px-2 py-1.5">
-				{node.label ? (
-					<span className="truncate font-mono text-[11px] text-muted-foreground">
-						{node.id}
-					</span>
-				) : null}
+			<div className="flex min-w-0 flex-col gap-1.5 border-t px-3 py-2">
 				{node.type === "agent" ? <AgentBody node={node} /> : null}
 				{node.type === "decision" ? <DecisionBody node={node} /> : null}
 				{node.type === "gate" ? <GateBody node={node} /> : null}
 				{node.type === "subflow" ? <SubflowBody node={node} /> : null}
 				{node.type === "foreach" ? <ForEachBody node={node} /> : null}
 				{node.type === "command" ? (
-					<code className="block truncate bg-muted/60 px-1.5 py-1 font-mono text-[11px]">
+					<code className="block truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px]">
 						{node.command.trim() === "" ? (
-							<span className="text-muted-foreground italic">
+							<span className="font-sans text-muted-foreground italic">
 								No command yet
 							</span>
 						) : (
@@ -208,13 +226,10 @@ const FlowNodeCard = memo(function FlowNodeCard({
 						)}
 					</code>
 				) : null}
-				{run ? (
-					<div className="flex items-center gap-1.5 pt-0.5">
-						<OutcomeBadge state={run.state} />
-						{run.visits > 1 ? (
-							<span className="text-muted-foreground">{run.visits} visits</span>
-						) : null}
-					</div>
+				{run && run.visits > 1 ? (
+					<span className="text-[11px] text-muted-foreground tabular-nums">
+						{run.visits} visits
+					</span>
 				) : null}
 			</div>
 
@@ -239,7 +254,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 					return (
 						<li
 							key={outcome}
-							className="relative flex h-5 items-center justify-end gap-2 pr-3.5 pl-2 text-[11px]"
+							className="relative flex h-5 items-center justify-end gap-2 pr-3.5 pl-3 text-[11px]"
 							title={description}
 						>
 							{description ? (
@@ -247,7 +262,9 @@ const FlowNodeCard = memo(function FlowNodeCard({
 									{description}
 								</span>
 							) : null}
-							<span className={cn("shrink-0 font-medium", style.text)}>
+							<span
+								className={cn("shrink-0 font-medium font-mono", style.text)}
+							>
 								{outcomeLabel(outcome)}
 							</span>
 							<Handle
@@ -255,7 +272,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 								id={outcome}
 								position={Position.Right}
 								isConnectable={isConnectable}
-								className="size-3 border-2 border-card"
+								className="size-2.5! min-h-0! min-w-0! border-2! border-card!"
 								style={{ background: style.color }}
 								title={`Drag to connect the ${outcomeLabel(outcome)} outcome`}
 							/>
@@ -355,17 +372,18 @@ function CalledFlowName({ name, prefix }: { name: string; prefix: string }) {
 			{name === "" ? (
 				<span className="italic">no flow picked yet</span>
 			) : openFlow ? (
-				<button
-					type="button"
-					className="nodrag nopan min-w-0 truncate font-mono text-foreground underline decoration-foreground/30 underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-1 focus-visible:ring-ring"
+				<Button
+					variant="link"
+					size="xs"
+					className="nodrag nopan h-auto min-w-0 justify-start truncate px-0 font-mono text-[11px] text-foreground underline decoration-foreground/30 hover:decoration-foreground"
 					title={`Open the flow ${name}`}
 					onClick={(event) => {
 						event.stopPropagation();
 						openFlow(name);
 					}}
 				>
-					{name}
-				</button>
+					<span className="truncate">{name}</span>
+				</Button>
 			) : (
 				<span className="min-w-0 truncate font-mono text-foreground">
 					{name}
@@ -380,7 +398,7 @@ function Bindings({ bindings }: { bindings: Record<string, string> }) {
 	const entries = Object.entries(bindings);
 	if (entries.length === 0) return null;
 	return (
-		<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-1.5 gap-y-0.5 bg-muted/60 px-1.5 py-1 font-mono text-[11px]">
+		<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-1.5 gap-y-0.5 rounded-md bg-muted px-2 py-1 font-mono text-[11px]">
 			{entries.slice(0, 4).map(([name, value]) => (
 				<div key={name} className="contents">
 					<dt className="text-muted-foreground">{name} ←</dt>
@@ -431,7 +449,7 @@ function ForEachBody({ node }: { node: ForEachNode }) {
 		<>
 			<p
 				className={cn(
-					"flex min-w-0 items-center gap-1.5 bg-muted/60 px-1.5 py-1 text-[11px]",
+					"flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[11px]",
 					code && "font-mono",
 				)}
 				title={summary}

@@ -1,4 +1,5 @@
 import type { Outcome } from "@nightshift/flows";
+import { Badge } from "@nightshift/ui/components/badge";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
 	BaseEdge,
@@ -7,8 +8,10 @@ import {
 	type EdgeProps,
 	type EdgeTypes,
 	getSmoothStepPath,
+	type ReactFlowState,
+	useStore,
 } from "@xyflow/react";
-import { createContext, memo, useContext } from "react";
+import { createContext, memo, useCallback, useContext } from "react";
 
 import {
 	OUTCOME_TONES,
@@ -74,8 +77,38 @@ function edgeLabel(data: OutcomeEdgeData): string {
 	return data.max ? `${label} · max ${data.max}` : label;
 }
 
+/** Between the vertical runs of edges that share both ends. */
+const LANE_GAP = 14;
+/** Between the labels of edges that share both ends. */
+const LABEL_GAP = 24;
+
+/**
+ * Where an edge sits among the edges with the same source and target: its
+ * offset from the middle, in lanes. Two outcomes of one node that lead to the
+ * same node would otherwise share one vertical run and stack their labels.
+ */
+function useLane(id: string, source: string, target: string): number {
+	return useStore(
+		useCallback(
+			(state: ReactFlowState) => {
+				let index = 0;
+				let count = 0;
+				for (const edge of state.edges) {
+					if (edge.source !== source || edge.target !== target) continue;
+					if (edge.id === id) index = count;
+					count += 1;
+				}
+				return index - (count - 1) / 2;
+			},
+			[id, source, target],
+		),
+	);
+}
+
 const OutcomeEdge = memo(function OutcomeEdge({
 	id,
+	source,
+	target,
 	sourceX,
 	sourceY,
 	targetX,
@@ -86,6 +119,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 	selected,
 }: EdgeProps<FlowCanvasEdge>) {
 	const selectEdge = useContext(SelectEdgeContext);
+	const lane = useLane(id, source, target);
 	const [path, labelX, labelY] = getSmoothStepPath({
 		sourceX,
 		sourceY,
@@ -95,6 +129,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 		targetPosition,
 		borderRadius: 10,
 		offset: 28,
+		centerX: (sourceX + targetX) / 2 + lane * LANE_GAP,
 	});
 	if (!data) return null;
 
@@ -116,25 +151,33 @@ const OutcomeEdge = memo(function OutcomeEdge({
 				}}
 			/>
 			<EdgeLabelRenderer>
-				<button
-					type="button"
-					tabIndex={selectEdge ? 0 : -1}
-					disabled={!selectEdge}
-					onClick={() => selectEdge?.(id)}
+				<Badge
+					variant="outline"
+					render={
+						<button
+							type="button"
+							tabIndex={selectEdge ? 0 : -1}
+							disabled={!selectEdge}
+							onClick={() => selectEdge?.(id)}
+						/>
+					}
 					className={cn(
-						"nodrag nopan pointer-events-auto absolute border bg-card px-1.5 py-0.5 font-medium text-[11px] outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default",
+						"nodrag nopan pointer-events-auto absolute h-5 bg-card font-mono text-[11px] shadow-xs disabled:cursor-default",
 						style.text,
-						selected && "ring-1 ring-ring",
-						data.hasError && "border-destructive",
+						selected && "ring-2 ring-ring",
+						data.hasError && "border-destructive border-dashed",
 						untaken && "opacity-60",
+						selectEdge && "cursor-pointer hover:bg-muted",
 					)}
 					style={{
-						transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-						borderColor: data.hasError ? undefined : color,
+						transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY + lane * LABEL_GAP}px)`,
+						borderColor: data.hasError
+							? undefined
+							: `color-mix(in oklch, ${color} 55%, transparent)`,
 					}}
 				>
 					{edgeLabel(data)}
-				</button>
+				</Badge>
 			</EdgeLabelRenderer>
 		</>
 	);

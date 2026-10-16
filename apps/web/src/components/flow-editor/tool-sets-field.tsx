@@ -1,6 +1,13 @@
 import type { ToolSet } from "@nightshift/flows";
 import { Checkbox } from "@nightshift/ui/components/checkbox";
-import { Label } from "@nightshift/ui/components/label";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@nightshift/ui/components/field";
 
 const TOOL_SETS: { value: ToolSet; label: string; hint: string }[] = [
 	{
@@ -21,18 +28,17 @@ export function ToolSetsField({
 	onChange: (tools: ToolSet[]) => void;
 }) {
 	return (
-		<fieldset className="flex flex-col gap-1.5">
-			<legend className="mb-1.5 text-xs leading-none">
-				Tool sets <span className="text-muted-foreground">(optional)</span>
-			</legend>
+		<FieldSet className="gap-3">
+			<FieldLegend variant="label" className="sr-only">
+				Tool sets (optional)
+			</FieldLegend>
 			{TOOL_SETS.map(({ value, label, hint }) => {
 				const checked = tools.includes(value);
 				return (
-					<div key={value} className="flex items-start gap-2">
+					<Field key={value} orientation="horizontal">
 						<Checkbox
 							id={`${id}-${value}`}
 							checked={checked}
-							className="mt-0.5"
 							aria-describedby={`${id}-${value}-hint`}
 							onCheckedChange={(next) =>
 								onChange(
@@ -42,20 +48,17 @@ export function ToolSetsField({
 								)
 							}
 						/>
-						<div className="flex flex-col gap-0.5">
-							<Label htmlFor={`${id}-${value}`} className="font-mono">
+						<FieldContent>
+							<FieldLabel htmlFor={`${id}-${value}`} className="font-mono">
 								{label}
-							</Label>
-							<p
-								id={`${id}-${value}-hint`}
-								className="text-muted-foreground text-xs"
-							>
+							</FieldLabel>
+							<FieldDescription id={`${id}-${value}-hint`} className="text-xs">
 								{hint}
-							</p>
-						</div>
-					</div>
+							</FieldDescription>
+						</FieldContent>
+					</Field>
 				);
 			})}
-		</fieldset>
+		</FieldSet>
 	);
 }

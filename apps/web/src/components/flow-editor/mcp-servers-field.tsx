@@ -1,6 +1,13 @@
 import type { McpServer } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
+import {
+	FieldDescription,
+	FieldError,
+	FieldLegend,
+	FieldSet,
+} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
+import { Item } from "@nightshift/ui/components/item";
 import {
 	NativeSelect,
 	NativeSelectOption,
@@ -56,12 +63,12 @@ export function McpServersField({
 		onChange(Object.keys(next).length > 0 ? next : undefined);
 
 	return (
-		<fieldset className="flex flex-col gap-1.5" aria-describedby={`${id}-hint`}>
-			<legend className="mb-1.5 text-xs leading-none">
-				MCP servers <span className="text-muted-foreground">(optional)</span>
-			</legend>
+		<FieldSet className="gap-2" aria-describedby={`${id}-hint`}>
+			<FieldLegend variant="label" className="sr-only">
+				MCP servers (optional)
+			</FieldLegend>
 			{entries.length > 0 ? (
-				<ul className="flex flex-col gap-2">
+				<ul className="flex flex-col gap-1.5">
 					{entries.map(([name, server], index) => (
 						<ServerRow
 							// The name can change; the row follows its place in the list.
@@ -88,7 +95,7 @@ export function McpServersField({
 			) : null}
 			<Button
 				variant="outline"
-				size="xs"
+				size="sm"
 				className="self-start"
 				onClick={() => {
 					const name = uniqueServerName(servers ?? {});
@@ -99,12 +106,12 @@ export function McpServersField({
 				<PlusIcon data-icon="inline-start" />
 				Add MCP server
 			</Button>
-			<p id={`${id}-hint`} className="text-muted-foreground text-xs">
+			<FieldDescription id={`${id}-hint`} className="text-xs">
 				Added to the harness's own MCP servers for this step. Never put secrets
 				here — use <code className="font-mono">{envRef("NAME")}</code> to read
 				the daemon's environment.
-			</p>
-		</fieldset>
+			</FieldDescription>
+		</FieldSet>
 	);
 }
 
@@ -128,7 +135,12 @@ function ServerRow({
 	const isStdio = "command" in server;
 
 	return (
-		<li className="flex flex-col gap-1.5 border bg-card p-2">
+		<Item
+			render={<li />}
+			variant="outline"
+			size="xs"
+			className="flex-col items-stretch gap-1.5 bg-card"
+		>
 			<NameInput
 				id={`${id}-name`}
 				name={name}
@@ -138,7 +150,7 @@ function ServerRow({
 			>
 				<Button
 					variant="ghost"
-					size="icon-xs"
+					size="icon-sm"
 					aria-label={`Remove ${name}`}
 					title="Remove this server"
 					onClick={onRemove}
@@ -149,7 +161,8 @@ function ServerRow({
 			<NativeSelect
 				id={`${id}-kind`}
 				aria-label={`How ${name} runs`}
-				className="h-7"
+				size="sm"
+				className="w-full text-xs"
 				value={isStdio ? "stdio" : "url"}
 				onChange={(event) =>
 					onUpdate(
@@ -171,7 +184,7 @@ function ServerRow({
 			) : (
 				<UrlFields id={id} name={name} server={server} onUpdate={onUpdate} />
 			)}
-		</li>
+		</Item>
 	);
 }
 
@@ -193,7 +206,7 @@ function StdioFields({
 				aria-label={`Command of ${name}`}
 				value={server.command}
 				placeholder="npx -y @modelcontextprotocol/server-filesystem"
-				className="h-7 font-mono"
+				className="h-8 font-mono text-xs"
 				autoComplete="off"
 				spellCheck={false}
 				aria-invalid={server.command.trim() === ""}
@@ -249,7 +262,7 @@ function UrlFields({
 				type="url"
 				value={server.url}
 				placeholder="https://mcp.example.com/mcp"
-				className="h-7 font-mono"
+				className="h-8 font-mono text-xs"
 				autoComplete="off"
 				spellCheck={false}
 				aria-invalid={!URL.canParse(server.url)}
@@ -349,9 +362,9 @@ function LinesField<T>({
 				}}
 			/>
 			{error ? (
-				<p id={errorId} role="alert" className="text-destructive text-xs">
+				<FieldError id={errorId} className="text-xs">
 					{error}
-				</p>
+				</FieldError>
 			) : null}
 		</div>
 	);

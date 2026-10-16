@@ -1,12 +1,19 @@
 import type { Flow } from "@nightshift/flows";
+import { Button } from "@nightshift/ui/components/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@nightshift/ui/components/collapsible";
 import { Input } from "@nightshift/ui/components/input";
 import { Textarea } from "@nightshift/ui/components/textarea";
 import { cn } from "@nightshift/ui/lib/utils";
+import { BracesIcon, ChevronRightIcon } from "lucide-react";
 import { type ReactNode, useRef } from "react";
 
 import { type TemplateVariable, templateVariables } from "@/lib/flow-draft";
 
-import { Field } from "./fields";
+import { Field, Note, Optional } from "./fields";
 import { useProjectFlowMap } from "./project-flows-context";
 
 /**
@@ -67,14 +74,14 @@ export function TemplateField({
 	const describedBy = hint ? `${id}-hint` : undefined;
 
 	return (
-		<div className="flex flex-col gap-1.5">
+		<div className="flex flex-col gap-2">
 			<Field
 				id={id}
 				label={
 					required ? (
 						<>
 							{label}
-							<span className="text-muted-foreground">(required)</span>
+							<Optional>required</Optional>
 						</>
 					) : (
 						label
@@ -88,7 +95,10 @@ export function TemplateField({
 						id={id}
 						value={value}
 						placeholder={placeholder}
-						className={cn("max-h-80 min-h-28 font-mono", className)}
+						className={cn(
+							"max-h-80 min-h-28 font-mono text-xs leading-relaxed",
+							className,
+						)}
 						aria-invalid={invalid}
 						aria-required={required}
 						aria-describedby={describedBy}
@@ -100,7 +110,7 @@ export function TemplateField({
 						id={id}
 						value={value}
 						placeholder={placeholder}
-						className={cn("font-mono", className)}
+						className={cn("font-mono text-xs", className)}
 						autoComplete="off"
 						spellCheck={false}
 						aria-invalid={invalid}
@@ -129,6 +139,7 @@ export function TemplateVariables({
 }: {
 	flow: Flow;
 	nodeId: string | null;
+	/** Whether the list starts open. */
 	open: boolean;
 	onInsert: (variable: TemplateVariable) => void;
 }) {
@@ -136,50 +147,65 @@ export function TemplateVariables({
 	const groups = templateVariables(flow, nodeId, flows);
 
 	return (
-		<details className="group/vars border bg-muted/30 text-xs" open={open}>
-			<summary className="cursor-pointer select-none px-2 py-1.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring">
+		<Collapsible defaultOpen={open} className="rounded-lg border border-dashed">
+			<CollapsibleTrigger
+				render={
+					<Button
+						variant="ghost"
+						size="xs"
+						className="group/vars h-7 w-full justify-start rounded-[inherit] font-normal text-muted-foreground"
+					/>
+				}
+			>
+				<ChevronRightIcon
+					className="transition-transform group-data-panel-open/vars:rotate-90 motion-reduce:transition-none"
+					aria-hidden="true"
+				/>
+				<BracesIcon aria-hidden="true" />
 				Template variables · click to insert
-			</summary>
-			<dl className="flex flex-col gap-1.5 border-t px-2 py-2">
-				{groups.map(({ scope, variables }) => (
-					<div key={scope} className="flex flex-col gap-1">
-						<dt className="font-mono text-muted-foreground">{scope}</dt>
-						<dd className="flex flex-wrap gap-1">
-							{variables.map((variable) => (
-								<button
-									key={variable.text}
-									type="button"
-									className="border bg-background px-1 py-0.5 font-mono text-[11px] outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring"
-									onClick={() => onInsert(variable)}
-									title={[
-										`Insert ${variable.text}`,
-										variable.json
-											? `Holds JSON: add a path, for example ${variable.text.slice(0, -2)}.name}}`
-											: null,
-										variable.description ?? null,
-									]
-										.filter(Boolean)
-										.join("\n")}
-								>
-									{variable.label}
-									{variable.json ? (
-										<span className="text-muted-foreground">.…</span>
-									) : null}
-								</button>
-							))}
-						</dd>
-					</div>
-				))}
-			</dl>
-			<div className="flex flex-col gap-1 border-t px-2 py-1.5 text-muted-foreground">
-				<p>
-					A value marked <span className="font-mono">.…</span> holds JSON: add a
-					path, such as{" "}
-					<code className="font-mono">{"{{planner.data.tasks}}"}</code> or{" "}
-					<code className="font-mono">{"{{item.title}}"}</code>.
-				</p>
-				<p>A node that has not run yet renders as an empty string.</p>
-			</div>
-		</details>
+			</CollapsibleTrigger>
+			<CollapsibleContent className="flex flex-col gap-3 border-t border-dashed px-2.5 py-2.5">
+				<dl className="flex flex-col gap-2.5">
+					{groups.map(({ scope, variables }) => (
+						<div key={scope} className="flex flex-col gap-1.5">
+							<dt className="font-mono text-[11px] text-muted-foreground">
+								{scope}
+							</dt>
+							<dd className="flex flex-wrap gap-1">
+								{variables.map((variable) => (
+									<Button
+										key={variable.text}
+										variant="outline"
+										size="xs"
+										className="h-6 px-1.5 font-mono font-normal text-[11px]"
+										onClick={() => onInsert(variable)}
+										title={[
+											`Insert ${variable.text}`,
+											variable.json
+												? `Holds JSON: add a path, for example ${variable.text.slice(0, -2)}.name}}`
+												: null,
+											variable.description ?? null,
+										]
+											.filter(Boolean)
+											.join("\n")}
+									>
+										{variable.label}
+										{variable.json ? (
+											<span className="text-muted-foreground">.…</span>
+										) : null}
+									</Button>
+								))}
+							</dd>
+						</div>
+					))}
+				</dl>
+				<Note>
+					A value marked <code>.…</code> holds JSON: add a path, such as{" "}
+					<code>{"{{planner.data.tasks}}"}</code> or{" "}
+					<code>{"{{item.title}}"}</code>. A node that has not run yet renders
+					as an empty string.
+				</Note>
+			</CollapsibleContent>
+		</Collapsible>
 	);
 }

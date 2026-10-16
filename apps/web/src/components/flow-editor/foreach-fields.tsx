@@ -1,10 +1,16 @@
 import type { Flow, ForEachNode, ListSource } from "@nightshift/flows";
+import { Button } from "@nightshift/ui/components/button";
+import {
+	FieldDescription,
+	FieldLegend,
+	FieldSet,
+} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { TriangleAlertIcon } from "lucide-react";
+import { PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import {
@@ -19,7 +25,7 @@ import {
 	type CalledFlowSupport,
 	InputBindings,
 } from "./called-flow-fields";
-import { Field, PositiveIntInput } from "./fields";
+import { Field, InspectorSection, Note, PositiveIntInput } from "./fields";
 import { OptionsEditor } from "./options-editor";
 import { TemplateField } from "./template-field";
 
@@ -53,115 +59,121 @@ export function ForEachFields({
 
 	return (
 		<>
-			<Field
-				id={`${id}-kind`}
-				label="Elements from"
-				hint="Read again before each element, so elements added during the run run too. An element is any JSON value; an object may carry id, title, url, dependsOn and done."
-			>
-				<NativeSelect
+			<InspectorSection title="Elements">
+				<Field
 					id={`${id}-kind`}
-					value={node.source.kind}
-					aria-describedby={`${id}-kind-hint`}
-					onChange={(event) => {
-						const kind = event.target.value as ListSource["kind"];
-						if (kind === node.source.kind) return;
-						lastSource.current[node.source.kind] = node.source;
-						setSource(lastSource.current[kind] ?? emptySource(kind));
-					}}
+					label="Elements from"
+					hint="Read again before each element, so elements added during the run run too. An element is any JSON value; an object may carry id, title, url, dependsOn and done."
 				>
-					{SOURCE_ORDER.map((kind) => (
-						<NativeSelectOption key={kind} value={kind}>
-							{SOURCE_KINDS[kind]}
-						</NativeSelectOption>
-					))}
-				</NativeSelect>
-			</Field>
+					<NativeSelect
+						id={`${id}-kind`}
+						value={node.source.kind}
+						aria-describedby={`${id}-kind-hint`}
+						onChange={(event) => {
+							const kind = event.target.value as ListSource["kind"];
+							if (kind === node.source.kind) return;
+							lastSource.current[node.source.kind] = node.source;
+							setSource(lastSource.current[kind] ?? emptySource(kind));
+						}}
+					>
+						{SOURCE_ORDER.map((kind) => (
+							<NativeSelectOption key={kind} value={kind}>
+								{SOURCE_KINDS[kind]}
+							</NativeSelectOption>
+						))}
+					</NativeSelect>
+				</Field>
 
-			<SourceFields flow={flow} node={node} onChange={setSource} />
+				<SourceFields flow={flow} node={node} onChange={setSource} />
+			</InspectorSection>
 
-			<CalledFlowField
-				id={`${id}-flow`}
-				node={node}
-				support={support}
-				hint="Runs once per element. Any flow of the project; the element goes to one of its inputs."
-				onPick={(name) => onChange((current) => ({ ...current, flow: name }))}
-			/>
-
-			<AsField
-				id={`${id}-as`}
-				node={node}
-				called={called}
-				onChange={(as) => onChange((current) => ({ ...current, as }))}
-			/>
-
-			<InputBindings
-				flow={flow}
-				node={node}
-				called={called}
-				skip={node.as}
-				onChange={(inputs) => onChange((current) => ({ ...current, inputs }))}
-			/>
-
-			<Field
-				id={`${id}-branch`}
-				label="Branch"
-				hint={
-					node.branch === "per-item"
-						? "Each element gets its own branch, on top of the last element that finished: a stack. Read it as {{run.branch}} and {{run.base_branch}}."
-						: "All elements work on the branch that is checked out, one after the other."
-				}
-			>
-				<NativeSelect
-					id={`${id}-branch`}
-					value={node.branch}
-					aria-describedby={`${id}-branch-hint`}
-					onChange={(event) => {
-						const branch = event.target.value as ForEachNode["branch"];
-						onChange((current) => ({ ...current, branch }));
-					}}
-				>
-					<NativeSelectOption value="per-item">
-						A branch per element (a stack)
-					</NativeSelectOption>
-					<NativeSelectOption value="shared">
-						One shared branch
-					</NativeSelectOption>
-				</NativeSelect>
-			</Field>
-
-			<HaltOnField
-				id={`${id}-halt`}
-				node={node}
-				called={called}
-				onChange={(haltOn) => onChange((current) => ({ ...current, haltOn }))}
-			/>
-
-			<Field
-				id={`${id}-max`}
-				label="Max items"
-				optional
-				hint="A safety net: the most elements one visit may start."
-			>
-				<PositiveIntInput
-					id={`${id}-max`}
-					value={node.maxItems}
-					placeholder="No limit"
-					describedBy={`${id}-max-hint`}
-					onChange={(maxItems) =>
-						onChange((current) => ({ ...current, maxItems }))
-					}
+			<InspectorSection title="Each element runs">
+				<CalledFlowField
+					id={`${id}-flow`}
+					node={node}
+					support={support}
+					hint="Runs once per element. Any flow of the project; the element goes to one of its inputs."
+					onPick={(name) => onChange((current) => ({ ...current, flow: name }))}
 				/>
-			</Field>
 
-			<p className="text-muted-foreground text-xs">
-				Ends with <span className="text-foreground">done</span> when no element
-				is left to start, or <span className="text-foreground">halted</span>. A
-				failed element blocks the elements that depend on it. Later nodes read{" "}
-				<code className="font-mono">{`{{${node.id}.summary}}`}</code>,{" "}
-				<code className="font-mono">{`{{${node.id}.done_count}}`}</code>, and
-				each element's result in{" "}
-				<code className="font-mono">{`{{${node.id}.results}}`}</code>.
-			</p>
+				<AsField
+					id={`${id}-as`}
+					node={node}
+					called={called}
+					onChange={(as) => onChange((current) => ({ ...current, as }))}
+				/>
+
+				<InputBindings
+					flow={flow}
+					node={node}
+					called={called}
+					skip={node.as}
+					onChange={(inputs) => onChange((current) => ({ ...current, inputs }))}
+				/>
+			</InspectorSection>
+
+			<InspectorSection title="Loop">
+				<Field
+					id={`${id}-branch`}
+					label="Branch"
+					hint={
+						node.branch === "per-item"
+							? "Each element gets its own branch, on top of the last element that finished: a stack. Read it as {{run.branch}} and {{run.base_branch}}."
+							: "All elements work on the branch that is checked out, one after the other."
+					}
+				>
+					<NativeSelect
+						id={`${id}-branch`}
+						value={node.branch}
+						aria-describedby={`${id}-branch-hint`}
+						onChange={(event) => {
+							const branch = event.target.value as ForEachNode["branch"];
+							onChange((current) => ({ ...current, branch }));
+						}}
+					>
+						<NativeSelectOption value="per-item">
+							A branch per element (a stack)
+						</NativeSelectOption>
+						<NativeSelectOption value="shared">
+							One shared branch
+						</NativeSelectOption>
+					</NativeSelect>
+				</Field>
+
+				<HaltOnField
+					id={`${id}-halt`}
+					node={node}
+					called={called}
+					onChange={(haltOn) => onChange((current) => ({ ...current, haltOn }))}
+				/>
+
+				<Field
+					id={`${id}-max`}
+					label="Max items"
+					optional
+					hint="A safety net: the most elements one visit may start."
+				>
+					<PositiveIntInput
+						id={`${id}-max`}
+						value={node.maxItems}
+						placeholder="No limit"
+						describedBy={`${id}-max-hint`}
+						onChange={(maxItems) =>
+							onChange((current) => ({ ...current, maxItems }))
+						}
+					/>
+				</Field>
+
+				<Note>
+					Ends with <span className="text-foreground">done</span> when no
+					element is left to start, or{" "}
+					<span className="text-foreground">halted</span>. A failed element
+					blocks the elements that depend on it. Later nodes read{" "}
+					<code>{`{{${node.id}.summary}}`}</code>,{" "}
+					<code>{`{{${node.id}.done_count}}`}</code>, and each element's result
+					in <code>{`{{${node.id}.results}}`}</code>.
+				</Note>
+			</InspectorSection>
 		</>
 	);
 }
@@ -282,7 +294,7 @@ function GitHubSourceFields({
 					id={`${id}-parent`}
 					value={source.parent}
 					placeholder={example}
-					className="font-mono"
+					className="font-mono text-xs"
 					autoComplete="off"
 					spellCheck={false}
 					aria-invalid={source.parent.trim() === ""}
@@ -435,6 +447,7 @@ function AsField({
 				<NativeSelect
 					id={id}
 					value={node.as}
+					className="font-mono"
 					aria-invalid={missing}
 					aria-describedby={`${id}-hint`}
 					onChange={(event) => onChange(event.target.value)}
@@ -464,7 +477,7 @@ function AsField({
 				/>
 			)}
 			{picked?.type === "text" ? (
-				<p className="flex items-start gap-1.5 text-status-interrupted text-xs">
+				<p className="flex items-start gap-1.5 text-status-waiting text-xs">
 					<TriangleAlertIcon
 						className="mt-px size-3.5 shrink-0"
 						aria-hidden="true"
@@ -502,17 +515,14 @@ function HaltOnField({
 	].filter((name) => !node.haltOn.includes(name));
 
 	return (
-		<section
-			aria-labelledby={`${id}-heading`}
-			className="flex flex-col gap-1.5"
-		>
-			<h3 id={`${id}-heading`} className="text-xs leading-none">
+		<FieldSet className="gap-2">
+			<FieldLegend variant="label" className="mb-0">
 				Halt on
-			</h3>
-			<p id={`${id}-hint`} className="text-muted-foreground text-xs">
+			</FieldLegend>
+			<FieldDescription id={`${id}-hint`} className="text-xs">
 				A called flow that ends on one of these outcomes stops the loop with
 				halted.
-			</p>
+			</FieldDescription>
 			<OptionsEditor
 				kind="label"
 				options={node.haltOn.map((name) => ({ name }))}
@@ -529,21 +539,26 @@ function HaltOnField({
 				}
 			/>
 			{suggestions.length > 0 ? (
-				<p className="flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
-					From {node.flow}:
+				<div className="flex flex-wrap items-center gap-1 text-muted-foreground text-xs">
+					<span className="mr-0.5">
+						From <span className="font-mono">{node.flow}</span>:
+					</span>
 					{suggestions.map((name) => (
-						<button
+						<Button
 							key={name}
-							type="button"
-							className="border bg-background px-1 font-mono text-[11px] outline-none hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring"
+							variant="outline"
+							size="xs"
+							className="h-6 border-dashed px-1.5 font-mono font-normal text-[11px]"
 							title={`Halt on ${name}`}
+							aria-label={`+ ${name}`}
 							onClick={() => onChange([...node.haltOn, name])}
 						>
-							+ {name}
-						</button>
+							<PlusIcon data-icon="inline-start" aria-hidden="true" />
+							{name}
+						</Button>
 					))}
-				</p>
+				</div>
 			) : null}
-		</section>
+		</FieldSet>
 	);
 }

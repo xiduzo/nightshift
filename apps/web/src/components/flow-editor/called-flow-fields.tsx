@@ -5,13 +5,32 @@ import {
 	type SubflowNode,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
-import { Label } from "@nightshift/ui/components/label";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemMedia,
+} from "@nightshift/ui/components/item";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
-import { ExternalLinkIcon, PlusIcon, XIcon } from "lucide-react";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import {
+	ExternalLinkIcon,
+	PlusIcon,
+	TriangleAlertIcon,
+	XIcon,
+} from "lucide-react";
 import { useId, useState } from "react";
 
 import type { ProjectFlowMap } from "@/lib/flow-draft";
@@ -66,11 +85,12 @@ export function CalledFlowField({
 						: null;
 
 	return (
-		<div className="flex flex-col gap-1.5">
-			<Label htmlFor={id}>Flow to run</Label>
-			<div className="flex items-center gap-1">
+		<Field className="gap-2" data-invalid={problem !== null ? true : undefined}>
+			<FieldLabel htmlFor={id}>Flow to run</FieldLabel>
+			<div className="flex items-center gap-2">
 				<NativeSelect
 					id={id}
+					className="min-w-0 flex-1 font-mono"
 					value={current}
 					disabled={!flows}
 					aria-invalid={current === "" || problem !== null}
@@ -102,12 +122,12 @@ export function CalledFlowField({
 					<ExternalLinkIcon />
 				</Button>
 			</div>
-			<p id={`${id}-hint`} className="text-muted-foreground text-xs">
+			<FieldDescription id={`${id}-hint`} className="text-xs">
 				{hint}
 				{flows && names.length === 0
 					? " This project has no other flow yet."
 					: ""}
-			</p>
+			</FieldDescription>
 			{creating ? (
 				<NewFlowForm
 					taken={flows ? Object.keys(flows) : []}
@@ -118,18 +138,19 @@ export function CalledFlowField({
 					onCreate={(name) => support.onCreate(node.id, name)}
 				/>
 			) : (
-				<Button
-					variant="outline"
-					size="xs"
-					className="self-start"
-					disabled={!flows}
-					onClick={() => setCreating(true)}
-				>
-					<PlusIcon data-icon="inline-start" />
-					New flow
-				</Button>
+				<div>
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={!flows}
+						onClick={() => setCreating(true)}
+					>
+						<PlusIcon data-icon="inline-start" />
+						New flow
+					</Button>
+				</div>
 			)}
-		</div>
+		</Field>
 	);
 }
 
@@ -165,13 +186,14 @@ function NewFlowForm({
 	const canCreate = trimmed !== "" && error === null && !pending;
 
 	return (
-		<div className="flex flex-col gap-1.5 border bg-muted/30 p-2">
-			<Label htmlFor={`${id}-name`}>New flow name</Label>
-			<div className="flex items-start gap-1">
+		<FieldSet className="gap-2 rounded-lg border border-dashed bg-muted/30 p-3">
+			<FieldLegend className="sr-only">New flow</FieldLegend>
+			<FieldLabel htmlFor={`${id}-name`}>New flow name</FieldLabel>
+			<div className="flex items-start gap-1.5">
 				<Input
 					id={`${id}-name`}
 					value={name}
-					className="h-7 font-mono"
+					className="h-8 min-w-0 flex-1 font-mono text-xs"
 					autoComplete="off"
 					spellCheck={false}
 					aria-invalid={error !== null}
@@ -192,23 +214,24 @@ function NewFlowForm({
 					disabled={!canCreate}
 					onClick={() => onCreate(trimmed)}
 				>
+					{pending ? <Spinner data-icon="inline-start" /> : null}
 					{pending ? "Creating…" : "Create"}
 				</Button>
 				<Button variant="ghost" size="sm" onClick={onCancel}>
 					Cancel
 				</Button>
 			</div>
-			<p
-				id={`${id}-hint`}
-				role={error ? "alert" : undefined}
-				className={
-					error ? "text-destructive text-xs" : "text-muted-foreground text-xs"
-				}
-			>
-				{error ??
-					"Creates the file with one Agent node, saves this flow, and opens the new one."}
-			</p>
-		</div>
+			{error ? (
+				<FieldError id={`${id}-hint`} className="text-xs">
+					{error}
+				</FieldError>
+			) : (
+				<FieldDescription id={`${id}-hint`} className="text-xs">
+					Creates the file with one Agent node, saves this flow, and opens the
+					new one.
+				</FieldDescription>
+			)}
+		</FieldSet>
 	);
 }
 
@@ -251,19 +274,19 @@ export function InputBindings({
 	if (!called) return null;
 
 	return (
-		<section aria-labelledby={`${id}-heading`} className="flex flex-col gap-3">
-			<div className="flex flex-col gap-0.5">
-				<h3 id={`${id}-heading`} className="text-xs leading-none">
+		<FieldSet className="gap-4">
+			<div className="flex flex-col gap-1">
+				<FieldLegend variant="label" className="mb-0">
 					{skip ? "Other inputs" : "Inputs"} of{" "}
 					<span className="font-mono">{node.flow}</span>
-				</h3>
-				<p className="text-muted-foreground text-xs">
+				</FieldLegend>
+				<FieldDescription className="text-xs">
 					{inputs.length === 0
 						? skip
 							? "It takes no other input."
 							: "It takes no input."
 						: "A template per input. Empty takes the input's default."}
-				</p>
+				</FieldDescription>
 			</div>
 			{inputs.map((input) => {
 				const value = bindings[input.name] ?? "";
@@ -304,27 +327,36 @@ export function InputBindings({
 				);
 			})}
 			{stray.map((name) => (
-				<div
+				<Item
 					key={name}
-					className="flex items-center gap-2 border border-status-interrupted/40 bg-status-interrupted/10 px-2 py-1 text-xs"
+					variant="outline"
+					size="xs"
+					className="flex-nowrap border-status-waiting/40 bg-status-waiting/10"
 				>
-					<span className="min-w-0 flex-1">
-						<span className="font-mono">{name}</span>{" "}
-						{name === skip
-							? "is bound to the element; this binding is ignored."
-							: `is not an input of ${node.flow}.`}
-					</span>
-					<Button
-						variant="ghost"
-						size="icon-xs"
-						aria-label={`Remove the binding ${name}`}
-						title="Remove this binding"
-						onClick={() => set(name, "")}
-					>
-						<XIcon />
-					</Button>
-				</div>
+					<ItemMedia variant="icon" className="text-status-waiting">
+						<TriangleAlertIcon aria-hidden="true" />
+					</ItemMedia>
+					<ItemContent className="text-xs">
+						<span>
+							<span className="font-mono">{name}</span>{" "}
+							{name === skip
+								? "is bound to the element; this binding is ignored."
+								: `is not an input of ${node.flow}.`}
+						</span>
+					</ItemContent>
+					<ItemActions>
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							aria-label={`Remove the binding ${name}`}
+							title="Remove this binding"
+							onClick={() => set(name, "")}
+						>
+							<XIcon />
+						</Button>
+					</ItemActions>
+				</Item>
 			))}
-		</section>
+		</FieldSet>
 	);
 }

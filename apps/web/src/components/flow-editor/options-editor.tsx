@@ -1,6 +1,8 @@
 import { labelSchema, reservedOutcomes } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
+import { FieldError } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
+import { Item } from "@nightshift/ui/components/item";
 import { cn } from "@nightshift/ui/lib/utils";
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, XIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -51,7 +53,7 @@ export function OptionsEditor({
 
 	return (
 		<div className="flex flex-col gap-2">
-			<ol className="flex flex-col gap-2" aria-describedby={describedBy}>
+			<ol className="flex flex-col gap-1.5" aria-describedby={describedBy}>
 				{options.map((option, index) => (
 					<OptionRow
 						// Options have no ids; the row follows its place in the list.
@@ -83,7 +85,7 @@ export function OptionsEditor({
 			</ol>
 			<Button
 				variant="outline"
-				size="xs"
+				size="sm"
 				className="self-start"
 				onClick={() => {
 					setFocusIndex(options.length);
@@ -161,11 +163,14 @@ function OptionRow({
 	const position = `${noun} ${index + 1}`;
 
 	return (
-		<li
-			className="flex flex-col gap-1.5 border border-l-[3px] bg-card p-2"
+		<Item
+			render={<li />}
+			variant="outline"
+			size="xs"
+			className="flex-col items-stretch gap-1.5 border-l-4 bg-card"
 			style={{ borderLeftColor: style.color }}
 		>
-			<div className="flex items-center gap-1">
+			<div className="flex items-center gap-0.5">
 				<Input
 					ref={nameRef}
 					id={`${id}-name`}
@@ -173,7 +178,7 @@ function OptionRow({
 					aria-label={`Name of ${position}`}
 					aria-invalid={error !== null}
 					aria-describedby={error ? `${id}-error` : undefined}
-					className={cn("h-7 flex-1 font-mono", style.text)}
+					className={cn("h-8 flex-1 font-mono text-xs", style.text)}
 					autoComplete="off"
 					spellCheck={false}
 					onChange={(event) => {
@@ -195,7 +200,7 @@ function OptionRow({
 					<>
 						<Button
 							variant="ghost"
-							size="icon-xs"
+							size="icon-sm"
 							aria-label={`Move ${option.name} up`}
 							title="Move up"
 							disabled={index === 0}
@@ -205,7 +210,7 @@ function OptionRow({
 						</Button>
 						<Button
 							variant="ghost"
-							size="icon-xs"
+							size="icon-sm"
 							aria-label={`Move ${option.name} down`}
 							title="Move down"
 							disabled={index === count - 1}
@@ -217,7 +222,7 @@ function OptionRow({
 				) : null}
 				<Button
 					variant="ghost"
-					size="icon-xs"
+					size="icon-sm"
 					aria-label={`Remove ${option.name}`}
 					title={
 						canRemove
@@ -233,9 +238,9 @@ function OptionRow({
 				</Button>
 			</div>
 			{error ? (
-				<p id={`${id}-error`} role="alert" className="text-destructive text-xs">
+				<FieldError id={`${id}-error`} className="text-xs">
 					{error}
-				</p>
+				</FieldError>
 			) : null}
 			{onDescribe ? (
 				<Input
@@ -243,7 +248,7 @@ function OptionRow({
 					value={option.description ?? ""}
 					aria-label={`Description of ${position}`}
 					placeholder="What it means (optional)"
-					className="h-7"
+					className="h-8 text-xs"
 					autoComplete="off"
 					onChange={(event) => {
 						const description = event.target.value;
@@ -251,6 +256,6 @@ function OptionRow({
 					}}
 				/>
 			) : null}
-		</li>
+		</Item>
 	);
 }

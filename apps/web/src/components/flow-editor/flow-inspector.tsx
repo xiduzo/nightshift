@@ -1,14 +1,23 @@
 import type { Flow, Policy } from "@nightshift/flows";
+import { Badge } from "@nightshift/ui/components/badge";
+import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { Textarea } from "@nightshift/ui/components/textarea";
+import { WorkflowIcon } from "lucide-react";
 import { useId } from "react";
 
 import { POLICY_DEFAULTS, setPolicyNumber } from "@/lib/flow-draft";
 
-import { Field, PositiveIntInput } from "./fields";
+import {
+	Field,
+	InspectorHeader,
+	InspectorSection,
+	Note,
+	PositiveIntInput,
+} from "./fields";
 import { InputsEditor, OutputsEditor } from "./io-editor";
 
 const POLICY_FIELDS: {
@@ -43,107 +52,119 @@ const POLICY_FIELDS: {
 /** Shown when nothing is selected: the flow's own settings and how to edit. */
 export function FlowInspector({
 	flow,
+	name,
 	onChange,
 }: {
 	flow: Flow;
+	/** The flow's file name, for the header. */
+	name?: string;
 	onChange: (change: (flow: Flow) => Flow) => void;
 }) {
 	const id = useId();
+	const policySet = Object.values(flow.policy ?? {}).some(
+		(value) => value !== undefined,
+	);
 	return (
-		<div className="flex flex-col gap-4">
-			<h2 className="font-medium text-sm">Flow</h2>
-			<Field id={`${id}-description`} label="Description" optional>
-				<Textarea
-					id={`${id}-description`}
-					value={flow.description ?? ""}
-					placeholder="What this flow does, in one line."
-					onChange={(event) => {
-						const description = event.target.value;
-						onChange((current) => ({
-							...current,
-							description: description || undefined,
-						}));
-					}}
-				/>
-			</Field>
-			<Field id={`${id}-start`} label="Start node" hint="The run starts here.">
-				<NativeSelect
-					id={`${id}-start`}
-					value={flow.start}
-					aria-invalid={!flow.nodes.some((node) => node.id === flow.start)}
-					onChange={(event) => {
-						const start = event.target.value;
-						onChange((current) => ({ ...current, start }));
-					}}
-				>
-					{flow.nodes.some((node) => node.id === flow.start) ? null : (
-						<NativeSelectOption value={flow.start}>
-							Pick a node
-						</NativeSelectOption>
-					)}
-					{flow.nodes.map((node) => (
-						<NativeSelectOption key={node.id} value={node.id}>
-							{node.label ? `${node.label} (${node.id})` : node.id}
-						</NativeSelectOption>
-					))}
-				</NativeSelect>
-			</Field>
+		<div className="flex flex-col">
+			<InspectorHeader
+				icon={WorkflowIcon}
+				kicker="Flow"
+				title={name ?? "This flow"}
+			/>
 
-			<section aria-labelledby={`${id}-inputs`} className="flex flex-col gap-3">
-				<div className="flex flex-col gap-0.5">
-					<h3 id={`${id}-inputs`} className="font-medium text-xs">
-						Inputs
-					</h3>
-					<p id={`${id}-inputs-hint`} className="text-muted-foreground text-xs">
-						What the flow takes, like a function. A run asks for them when it
-						starts; a Subflow or For Each node binds them. Read one as{" "}
-						<code className="font-mono">{"{{name}}"}</code>, a JSON one with a
-						path: <code className="font-mono">{"{{item.title}}"}</code>.
-						Renaming one updates the references in this flow.
-					</p>
-				</div>
+			<InspectorSection title="General">
+				<Field id={`${id}-description`} label="Description" optional>
+					<Textarea
+						id={`${id}-description`}
+						value={flow.description ?? ""}
+						placeholder="What this flow does, in one line."
+						onChange={(event) => {
+							const description = event.target.value;
+							onChange((current) => ({
+								...current,
+								description: description || undefined,
+							}));
+						}}
+					/>
+				</Field>
+				<Field
+					id={`${id}-start`}
+					label="Start node"
+					hint="The run starts here."
+				>
+					<NativeSelect
+						id={`${id}-start`}
+						value={flow.start}
+						aria-invalid={!flow.nodes.some((node) => node.id === flow.start)}
+						onChange={(event) => {
+							const start = event.target.value;
+							onChange((current) => ({ ...current, start }));
+						}}
+					>
+						{flow.nodes.some((node) => node.id === flow.start) ? null : (
+							<NativeSelectOption value={flow.start}>
+								Pick a node
+							</NativeSelectOption>
+						)}
+						{flow.nodes.map((node) => (
+							<NativeSelectOption key={node.id} value={node.id}>
+								{node.label ? `${node.label} (${node.id})` : node.id}
+							</NativeSelectOption>
+						))}
+					</NativeSelect>
+				</Field>
+			</InspectorSection>
+
+			<InspectorSection
+				title="Inputs"
+				aside={
+					<Badge variant="secondary" className="tabular-nums">
+						{flow.inputs.length}
+					</Badge>
+				}
+				className="gap-3"
+			>
+				<Note id={`${id}-inputs-hint`}>
+					What the flow takes, like a function. A run asks for them when it
+					starts; a Subflow or For Each node binds them. Read one as{" "}
+					<code>{"{{name}}"}</code>, a JSON one with a path:{" "}
+					<code>{"{{item.title}}"}</code>. Renaming one updates the references
+					in this flow.
+				</Note>
 				<InputsEditor
 					flow={flow}
 					describedBy={`${id}-inputs-hint`}
 					onChange={onChange}
 				/>
-			</section>
+			</InspectorSection>
 
-			<section
-				aria-labelledby={`${id}-outputs`}
-				className="flex flex-col gap-3"
+			<InspectorSection
+				title="Outputs"
+				aside={
+					<Badge variant="secondary" className="tabular-nums">
+						{flow.outputs.length}
+					</Badge>
+				}
+				className="gap-3"
 			>
-				<div className="flex flex-col gap-0.5">
-					<h3 id={`${id}-outputs`} className="font-medium text-xs">
-						Outputs
-					</h3>
-					<p
-						id={`${id}-outputs-hint`}
-						className="text-muted-foreground text-xs"
-					>
-						What the flow returns to the node that calls it, rendered when it
-						ends. A value that is one reference keeps its JSON:{" "}
-						<code className="font-mono">{"{{review.data}}"}</code>.
-					</p>
-				</div>
+				<Note id={`${id}-outputs-hint`}>
+					What the flow returns to the node that calls it, rendered when it
+					ends. A value that is one reference keeps its JSON:{" "}
+					<code>{"{{review.data}}"}</code>.
+				</Note>
 				<OutputsEditor
 					flow={flow}
 					describedBy={`${id}-outputs-hint`}
 					onChange={onChange}
 				/>
-			</section>
+			</InspectorSection>
 
-			<section aria-labelledby={`${id}-policy`} className="flex flex-col gap-3">
-				<div className="flex flex-col gap-0.5">
-					<h3 id={`${id}-policy`} className="font-medium text-xs">
-						Run policy
-					</h3>
-					<p className="text-muted-foreground text-xs">
-						Used when this flow is the top level of a run; a called flow uses
-						its caller's. A usage limit or a network failure puts the run to
-						sleep, then continues the same session. Empty uses the default.
-					</p>
-				</div>
+			<InspectorSection
+				title="Run policy"
+				collapsible
+				defaultOpen={policySet}
+				description="Used when this flow is the top level of a run; a called flow uses its caller's. A usage limit or a network failure puts the run to sleep, then continues the same session. Empty uses the default."
+			>
 				{POLICY_FIELDS.map(({ key, label, hint, whole }) => (
 					<Field key={key} id={`${id}-${key}`} label={label} hint={hint}>
 						<PositiveIntInput
@@ -158,18 +179,23 @@ export function FlowInspector({
 						/>
 					</Field>
 				))}
-			</section>
-			<section aria-labelledby={`${id}-help`} className="flex flex-col gap-1.5">
-				<h3 id={`${id}-help`} className="font-medium text-xs">
-					How to edit
-				</h3>
-				<ul className="flex list-disc flex-col gap-1 pl-4 text-muted-foreground text-xs">
-					<li>Add a node with the buttons on the canvas.</li>
+			</InspectorSection>
+
+			<InspectorSection
+				title="How to edit"
+				collapsible
+				defaultOpen={flow.nodes.length <= 1}
+			>
+				<ul className="flex list-disc flex-col gap-1.5 pl-4 text-muted-foreground text-xs leading-relaxed marker:text-border">
+					<li>Add a node with the buttons above the canvas.</li>
 					<li>
 						Drag from an outcome dot on the right of a node to another node to
-						add an edge.
+						add an edge, or add one from the node's Edges section.
 					</li>
-					<li>Select a node or an edge to edit it. Backspace deletes it.</li>
+					<li>
+						Select a node or an edge to edit it. <Kbd>Backspace</Kbd> deletes
+						it.
+					</li>
 					<li>
 						A Decision node has one outcome per label, a Gate node one per
 						choice, an Agent node one per own outcome. Renaming one moves its
@@ -183,9 +209,20 @@ export function FlowInspector({
 						An edge back to an earlier node is a retry loop. Give one edge in
 						every loop a max.
 					</li>
-					<li>⌘/Ctrl + S saves.</li>
+					<li>
+						<KbdGroup>
+							<Kbd>⌘</Kbd>
+							<Kbd>S</Kbd>
+						</KbdGroup>{" "}
+						or{" "}
+						<KbdGroup>
+							<Kbd>Ctrl</Kbd>
+							<Kbd>S</Kbd>
+						</KbdGroup>{" "}
+						saves.
+					</li>
 				</ul>
-			</section>
+			</InspectorSection>
 		</div>
 	);
 }
