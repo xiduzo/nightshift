@@ -86,6 +86,8 @@ export async function runBody(input: {
 	config: LangGraphRunnableConfig;
 	scope: Scope;
 	run: BodyRun;
+	/** The caller's stop time, as `stopAtOf` reads it: the body checks the same one. */
+	stopAt: number | null;
 }): Promise<BodyEnd> {
 	const config: LangGraphRunnableConfig = {
 		...input.config,
@@ -93,6 +95,7 @@ export async function runBody(input: {
 			...input.config.configurable,
 			scope: input.scope,
 			run: input.run,
+			stopAt: input.stopAt,
 		},
 	};
 	let result: RunStateValues;

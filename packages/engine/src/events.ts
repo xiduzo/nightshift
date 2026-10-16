@@ -477,27 +477,6 @@ export function deriveSleep(events: readonly LoggedEvent[]): SleepFact | null {
 	};
 }
 
-/**
- * The waits of one step's current streak for one reason: those since the
- * step last opened and since its last wait for the other reason.
- */
-export function waitStreak(
-	events: readonly LoggedEvent[],
-	stepId: string,
-	reason: WaitReason,
-): EnginePayloads["WaitStarted"][] {
-	let streak: EnginePayloads["WaitStarted"][] = [];
-	for (const e of bySeq(events)) {
-		if (e.stepId !== stepId) continue;
-		if (e.type === "StepStarted" || e.type === "StepReopened") streak = [];
-		else if (e.type === "WaitStarted") {
-			if (e.payload.reason === reason) streak.push(e.payload);
-			else streak = [];
-		}
-	}
-	return streak;
-}
-
 /** A person asked to stop after the running step, since the current walk began. */
 export function deriveStopAfterStep(events: readonly LoggedEvent[]): boolean {
 	const began = walkBeganSeq(events);

@@ -20,6 +20,7 @@ import {
 	deriveNodeOutputs,
 	deriveRunState,
 	deriveSteps,
+	deriveStopAt,
 	deriveTraversals,
 	type LoggedEvent,
 	parkedSteps,
@@ -112,6 +113,7 @@ export function reentryUpdate(
 	}
 	return {
 		inputs: deriveInputs(events),
+		stopAt: deriveStopAt(events),
 		visits,
 		nodes: deriveNodeOutputs(events, ""),
 		traversals: deriveTraversals(events, ""),
@@ -613,29 +615,41 @@ export function createRunner(deps: RunnerDeps) {
 		isActive: (runId: string): boolean => slots.has(runId),
 		activeCount: (): number => slots.size,
 		exclusive,
-		/** Starts the thread at the flow's start node with the run's inputs. Takes over a reserved slot. */
-		start(row: RunRow, inputs: Record<string, JsonValue>): void {
-			drive(row, { inputs });
+		/** Starts the thread at the flow's start node with the run's inputs and stop time. Takes over a reserved slot. */
+		start(
+			row: RunRow,
+			inputs: Record<string, JsonValue>,
+			stopAt: number | null,
+		): void {
+			drive(row, { inputs, stopAt });
 		},
-		/** Re-runs the node the thread is pending at (a daemon death or an engine failure). */
-		continueRun(row: RunRow): void {
-			drive(row, null);
+		/**
+		 * Re-runs the node the thread is pending at (a daemon death or an
+		 * engine failure). `update` writes state first (a cleared stop time).
+		 */
+		continueRun(row: RunRow, update?: RunStateUpdate): void {
+			drive(row, update ? new Command({ update }) : null);
 		},
-		/** Answers the interrupt the thread sits at. */
-		resume(row: RunRow, value: ResumeValue): void {
-			drive(row, new Command({ resume: value }));
+		/** Answers the interrupt the thread sits at; `update` writes state before the node continues. */
+		resume(row: RunRow, value: ResumeValue, update?: RunStateUpdate): void {
+			drive(row, new Command({ resume: value, ...(update ? { update } : {}) }));
 		},
 		/**
 		 * Jumps to a top-level node of a thread that reached END or never ran
 		 * (a run from before this engine, or a finished one whose checkpoints
 		 * were pruned), with the state seeded from the log (`reentryUpdate`).
 		 */
-		reenter(row: RunRow, nodeId: string, events: readonly LoggedEvent[]): void {
+		reenter(
+			row: RunRow,
+			nodeId: string,
+			events: readonly LoggedEvent[],
+			update?: RunStateUpdate,
+		): void {
 			const thread = threadOf(row);
 			// The node names are the flow's, which the graph's type cannot know.
 			const jump = new Command({
 				goto: nodeId,
-				update: reentryUpdate(thread.ctx.flow, events),
+				update: { ...reentryUpdate(thread.ctx.flow, events), ...update },
 			}) as unknown as StreamInput;
 			drive(row, jump);
 		},

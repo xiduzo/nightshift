@@ -94,7 +94,7 @@ export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 				resumeSessionId: entry.resumeSessionId,
 			});
 			if ("reason" in result) {
-				const waited = await beginWait(ctx, node, step, result);
+				const waited = await beginWait(ctx, node, state, step, result);
 				if (waited.kind === "wait") {
 					return new Command({
 						update: {

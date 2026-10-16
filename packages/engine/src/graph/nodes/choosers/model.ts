@@ -59,7 +59,7 @@ export function modelChooser(node: DecisionNode, ctx: StepContext): Chooser {
 		try {
 			const decided = await decide(ctx, node, step);
 			if (!("reason" in decided)) return decided;
-			const waited = await beginWait(ctx, node, step, decided);
+			const waited = await beginWait(ctx, node, state, step, decided);
 			if (waited.kind === "wait") {
 				return new Command({
 					update: {

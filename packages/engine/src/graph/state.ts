@@ -15,9 +15,11 @@ import type { StepOutcome, TranscriptEntry } from "../types";
  * walk's own bookkeeping: node outputs for templates, visit and edge counts,
  * For Each cursors, and the step a park or a wait left pending, so that the
  * node the run re-enters continues the same step and harness session.
- * Nothing the log has is kept here twice: a finished run's checkpoints are
- * deleted (`runner.ts`), and a thread without checkpoints is re-entered
- * with these channels seeded from the log (`reentryUpdate`).
+ * The log keeps the facts a person reads and the ones crash recovery
+ * needs; the state keeps what the next node reads. A finished run keeps
+ * its latest checkpoint only (`runner.ts`), and a thread from before this
+ * engine, with no checkpoint, is re-entered with these channels seeded from
+ * the log (`reentryUpdate`).
  */
 
 /** A record channel whose updates merge in, key by key. */
@@ -62,6 +64,13 @@ const pendingWaitSchema = z.object({
 	until: z.number(),
 	message: z.string(),
 	resetAt: z.number().nullable(),
+	/**
+	 * The step's streak of waits for this reason, this one included: how
+	 * many, and when the first began (epoch ms). `planWait` grows the next
+	 * wait from it. A new or reopened step, or a wait for the other reason,
+	 * starts a new streak.
+	 */
+	streak: z.object({ count: z.number(), since: z.number() }),
 });
 const pendingParkedSchema = z.object({
 	kind: z.literal("parked"),
@@ -108,6 +117,16 @@ export const RunState = z.object({
 	/** The flow's input values, defaults applied. */
 	inputs: withLangGraph(z.record(z.string(), z.any()), {
 		default: () => ({}) as Record<string, JsonValue>,
+	}),
+	/**
+	 * The run's stop time (epoch ms, `RunStarted.stopAt`): no step starts
+	 * after it. Null without one, and once a person resumed the run past it
+	 * (the resume's `Command` writes it null). Only the root's is read:
+	 * a body gets its caller's through `configurable.stopAt` on every
+	 * invoke (`runBody`), so a cleared stop time reaches every depth.
+	 */
+	stopAt: withLangGraph(z.number().nullable(), {
+		default: () => null as number | null,
 	}),
 	/** `StepEnded.outputs` of each node's latest ended visit, for templates. */
 	nodes: mergedRecord<StepOutputs>(),

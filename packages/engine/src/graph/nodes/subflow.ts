@@ -9,6 +9,7 @@ import {
 	type NodeAction,
 	type StepContext,
 	type StepStart,
+	stopAtOf,
 	uncommittedStep,
 } from "../context";
 import { route, scopeOf } from "../route";
@@ -103,7 +104,12 @@ export function subflowNode(node: SubflowNode, ctx: StepContext): NodeAction {
 			scope: { parentStepId: stepId, itemId: null },
 			run: { branch: step.tctx.run.branch, base_branch: "", index: "" },
 		};
-		const ended = await runBody({ graph, config, ...body });
+		const ended = await runBody({
+			graph,
+			config,
+			stopAt: stopAtOf(state, config),
+			...body,
+		});
 		switch (ended.kind) {
 			case "paused":
 				// The step stays open: the called flow continues after the wait.
