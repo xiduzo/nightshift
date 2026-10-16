@@ -49,6 +49,10 @@ function FlowEditorRoute() {
 			label: projectName ?? "Project",
 			link: { to: "/projects/$projectId", params: { projectId } },
 		},
+		{
+			label: "Flows",
+			link: { to: "/projects/$projectId/flows", params: { projectId } },
+		},
 		{ label: <span className="font-mono">{name}</span> },
 	];
 
@@ -127,10 +131,13 @@ function FlowEditorRoute() {
 								variant="ghost"
 								nativeButton={false}
 								render={
-									<Link to="/projects/$projectId" params={{ projectId }} />
+									<Link
+										to="/projects/$projectId/flows"
+										params={{ projectId }}
+									/>
 								}
 							>
-								Back to the project
+								Back to flows
 							</Button>
 						</div>
 					</EmptyContent>
@@ -186,10 +193,12 @@ function Problem({
 					<Button
 						variant="outline"
 						nativeButton={false}
-						render={<Link to="/projects/$projectId" params={{ projectId }} />}
+						render={
+							<Link to="/projects/$projectId/flows" params={{ projectId }} />
+						}
 					>
 						<ArrowLeftIcon data-icon="inline-start" />
-						Back to the project
+						Back to flows
 					</Button>
 				</EmptyContent>
 			</Empty>

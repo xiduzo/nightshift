@@ -1,4 +1,9 @@
 import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@nightshift/ui/components/collapsible";
+import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuRadioGroup,
@@ -10,9 +15,11 @@ import {
 	SidebarContent,
 	SidebarFooter,
 	SidebarGroup,
+	SidebarGroupAction,
 	SidebarGroupLabel,
 	SidebarHeader,
 	SidebarMenu,
+	SidebarMenuAction,
 	SidebarMenuBadge,
 	SidebarMenuButton,
 	SidebarMenuItem,
@@ -21,21 +28,37 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
-	FolderGitIcon,
+	BotIcon,
+	CalendarClockIcon,
+	ChevronRightIcon,
+	FolderIcon,
+	FolderOpenIcon,
+	HistoryIcon,
 	HouseIcon,
 	InboxIcon,
+	type LucideIcon,
 	MonitorIcon,
 	MoonIcon,
-	MoonStarIcon,
-	PlugIcon,
+	PlusIcon,
 	Settings2Icon,
 	SunIcon,
 	SunMoonIcon,
+	WorkflowIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import type { ComponentProps } from "react";
+import {
+	type ComponentProps,
+	type ReactNode,
+	useEffect,
+	useState,
+} from "react";
 
+import { AddProjectDialog } from "@/components/add-project-form";
+import { Logo } from "@/components/logo";
+import { describeRunStatuses, RunsDonut } from "@/components/runs-donut";
 import { useOpenGates } from "@/hooks/use-open-gates";
+import { useProjectRuns } from "@/hooks/use-project-runs";
+import type { Project } from "@/lib/api-types";
 import { orpc } from "@/utils/orpc";
 
 /** The app shell's sidebar, after the shadcn `sidebar-07` block. */
@@ -51,13 +74,12 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 				<SidebarMenu>
 					<SidebarMenuItem>
 						<SidebarMenuButton size="lg" render={<Link to="/" />}>
-							<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-								<MoonStarIcon className="size-4" aria-hidden="true" />
-							</div>
+							{/* `!` beats the menu button's `[&_svg]:size-4`. */}
+							<Logo className="size-8!" />
 							<div className="grid flex-1 text-left text-sm leading-tight">
 								<span className="truncate font-semibold">Night Shift</span>
 								<span className="truncate text-muted-foreground text-xs">
-									Flows that run while you sleep
+									Let your night self handle it
 								</span>
 							</div>
 						</SidebarMenuButton>
@@ -98,45 +120,18 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 						</SidebarMenuItem>
 					</SidebarMenu>
 				</SidebarGroup>
-				<SidebarGroup>
-					<SidebarGroupLabel>Projects</SidebarGroupLabel>
-					<SidebarMenu>
-						{projects.data?.map((project) => (
-							<SidebarMenuItem key={project.id}>
-								<SidebarMenuButton
-									tooltip={project.name}
-									isActive={Boolean(
-										matchRoute({
-											to: "/projects/$projectId",
-											params: { projectId: project.id },
-											fuzzy: true,
-										}),
-									)}
-									render={
-										<Link
-											to="/projects/$projectId"
-											params={{ projectId: project.id }}
-										/>
-									}
-								>
-									<FolderGitIcon aria-hidden="true" />
-									<span>{project.name}</span>
-								</SidebarMenuButton>
-							</SidebarMenuItem>
-						))}
-					</SidebarMenu>
-				</SidebarGroup>
+				<NavProjects projects={projects.data} />
 				<SidebarGroup className="mt-auto">
 					<SidebarGroupLabel>This Mac</SidebarGroupLabel>
 					<SidebarMenu>
 						<SidebarMenuItem>
 							<SidebarMenuButton
-								tooltip="Connections"
-								isActive={Boolean(matchRoute({ to: "/connections" }))}
-								render={<Link to="/connections" />}
+								tooltip="Agents"
+								isActive={Boolean(matchRoute({ to: "/agents" }))}
+								render={<Link to="/agents" />}
 							>
-								<PlugIcon aria-hidden="true" />
-								<span>Connections</span>
+								<BotIcon aria-hidden="true" />
+								<span>Agents</span>
 							</SidebarMenuButton>
 						</SidebarMenuItem>
 						<SidebarMenuItem>
@@ -167,6 +162,178 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 			</SidebarFooter>
 			<SidebarRail />
 		</Sidebar>
+	);
+}
+
+/**
+ * The projects, each a folder with its flows, runs and schedules. The + on
+ * the group label is the one place to add a project.
+ */
+function NavProjects({ projects }: { projects: Project[] | undefined }) {
+	const [adding, setAdding] = useState(false);
+	return (
+		<SidebarGroup>
+			<SidebarGroupLabel>Projects</SidebarGroupLabel>
+			<SidebarGroupAction title="Add project" onClick={() => setAdding(true)}>
+				<PlusIcon aria-hidden="true" />
+				<span className="sr-only">Add project</span>
+			</SidebarGroupAction>
+			<SidebarMenu>
+				{projects?.map((project) => (
+					<ProjectFolder key={project.id} project={project} />
+				))}
+			</SidebarMenu>
+			<AddProjectDialog open={adding} onOpenChange={setAdding} />
+		</SidebarGroup>
+	);
+}
+
+/** One project: its name opens the dashboard, the chevron opens the folder. */
+function ProjectFolder({ project }: { project: Project }) {
+	const matchRoute = useMatchRoute();
+	const params = { projectId: project.id };
+	const inProject = Boolean(
+		matchRoute({ to: "/projects/$projectId", params, fuzzy: true }),
+	);
+	const [open, setOpen] = useState(inProject);
+	// Entering a project opens its folder; leaving it does not close it.
+	useEffect(() => {
+		if (inProject) setOpen(true);
+	}, [inProject]);
+	const Icon = open ? FolderOpenIcon : FolderIcon;
+
+	const flows = useQuery({
+		...orpc.flows.list.queryOptions({ input: params }),
+		staleTime: 30_000,
+		meta: { quietErrors: true },
+	});
+	const schedules = useQuery({
+		...orpc.schedules.list.queryOptions({ input: params }),
+		staleTime: 30_000,
+		meta: { quietErrors: true },
+	});
+	const runs = useProjectRuns(project.id);
+	const schedulesOn = schedules.data?.schedules.filter((s) => s.enabled);
+
+	return (
+		<Collapsible
+			open={open}
+			onOpenChange={setOpen}
+			render={<SidebarMenuItem />}
+		>
+			<SidebarMenuButton
+				tooltip={project.name}
+				isActive={Boolean(matchRoute({ to: "/projects/$projectId", params }))}
+				render={<Link to="/projects/$projectId" params={params} />}
+			>
+				<Icon aria-hidden="true" />
+				<span>{project.name}</span>
+			</SidebarMenuButton>
+			<CollapsibleTrigger
+				render={
+					<SidebarMenuAction className="transition-transform data-panel-open:rotate-90" />
+				}
+			>
+				<ChevronRightIcon aria-hidden="true" />
+				<span className="sr-only">
+					{open ? "Close" : "Open"} {project.name}
+				</span>
+			</CollapsibleTrigger>
+			<CollapsibleContent>
+				{/* Full-width rows, indented to the project name, so a count fits on the right. */}
+				<SidebarMenu className="mt-1 group-data-[collapsible=icon]:hidden">
+					<ProjectPageItem
+						to="/projects/$projectId/flows"
+						projectId={project.id}
+						label="Flows"
+						icon={WorkflowIcon}
+						badge={
+							flows.data ? (
+								<SidebarMenuBadge
+									aria-label={`${flows.data.length} ${flows.data.length === 1 ? "flow" : "flows"}`}
+								>
+									{flows.data.length}
+								</SidebarMenuBadge>
+							) : null
+						}
+					/>
+					<ProjectPageItem
+						to="/projects/$projectId/runs"
+						projectId={project.id}
+						label="Runs"
+						icon={HistoryIcon}
+						// The menu button hides its tooltip while the sidebar is open; this one is the breakdown.
+						tooltip={
+							runs.data && runs.data.length > 0
+								? { children: describeRunStatuses(runs.data), hidden: false }
+								: undefined
+						}
+						badge={
+							runs.data ? (
+								<SidebarMenuBadge
+									className="gap-1.5"
+									aria-label={describeRunStatuses(runs.data)}
+								>
+									{runs.data.length > 0 ? <RunsDonut runs={runs.data} /> : null}
+									{runs.data.length}
+								</SidebarMenuBadge>
+							) : null
+						}
+					/>
+					<ProjectPageItem
+						to="/projects/$projectId/schedules"
+						projectId={project.id}
+						label="Schedules"
+						icon={CalendarClockIcon}
+						badge={
+							schedules.data && schedulesOn ? (
+								<SidebarMenuBadge
+									aria-label={`${schedulesOn.length} of ${schedules.data.schedules.length} schedules on`}
+								>
+									{schedulesOn.length}
+								</SidebarMenuBadge>
+							) : null
+						}
+					/>
+				</SidebarMenu>
+			</CollapsibleContent>
+		</Collapsible>
+	);
+}
+
+function ProjectPageItem({
+	to,
+	projectId,
+	label,
+	icon: PageIcon,
+	tooltip,
+	badge,
+}: {
+	to:
+		| "/projects/$projectId/flows"
+		| "/projects/$projectId/runs"
+		| "/projects/$projectId/schedules";
+	projectId: string;
+	label: string;
+	icon: LucideIcon;
+	tooltip?: ComponentProps<typeof SidebarMenuButton>["tooltip"];
+	badge: ReactNode;
+}) {
+	const matchRoute = useMatchRoute();
+	const params = { projectId };
+	return (
+		<SidebarMenuItem>
+			<SidebarMenuButton
+				className="pl-8"
+				tooltip={tooltip}
+				isActive={Boolean(matchRoute({ to, params, fuzzy: true }))}
+				render={<Link to={to} params={params} />}
+			>
+				<PageIcon aria-hidden="true" />
+				<span>{label}</span>
+			</SidebarMenuButton>
+			{badge}
+		</SidebarMenuItem>
 	);
 }
 

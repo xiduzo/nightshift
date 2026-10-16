@@ -456,6 +456,10 @@ function Editor({
 						label: projectName ?? "Project",
 						link: { to: "/projects/$projectId", params: { projectId } },
 					},
+					{
+						label: "Flows",
+						link: { to: "/projects/$projectId/flows", params: { projectId } },
+					},
 					{ label: <span className="font-mono">{name}</span> },
 				]}
 			>

@@ -148,7 +148,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 		<Card className="gap-0 pb-0">
 			<CardHeader className="border-b pb-4 [.border-b]:pb-4">
 				<CardTitle>
-					<h2 id="schedules-heading">Schedules</h2>
+					<h1 id="schedules-heading">Schedules</h1>
 				</CardTitle>
 				<CardDescription>
 					Flows the daemon starts on its own, saved in{" "}

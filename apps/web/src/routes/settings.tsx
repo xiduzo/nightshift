@@ -19,7 +19,6 @@ import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Card,
-	CardAction,
 	CardContent,
 	CardDescription,
 	CardFooter,
@@ -28,7 +27,6 @@ import {
 } from "@nightshift/ui/components/card";
 import {
 	Empty,
-	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
@@ -103,7 +101,6 @@ import {
 	MonitorIcon,
 	MoonIcon,
 	PlugIcon,
-	PlusIcon,
 	SaveIcon,
 	SunIcon,
 	Trash2Icon,
@@ -113,7 +110,6 @@ import { useTheme } from "next-themes";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
-import { AddProjectDialog } from "@/components/add-project-form";
 import { SiteHeader } from "@/components/site-header";
 import { notificationsSupported } from "@/hooks/use-night-notifications";
 import type { PermissionMode, Project } from "@/lib/api-types";
@@ -679,7 +675,6 @@ function ProjectsCard() {
 			meta: { quietErrors: true },
 		})),
 	});
-	const [adding, setAdding] = useState(false);
 	const [toRemove, setToRemove] = useState<Project | null>(null);
 	const removeProject = useMutation(
 		orpc.projects.remove.mutationOptions({
@@ -702,12 +697,6 @@ function ProjectsCard() {
 					Git repositories Night Shift works in. Each run gets its own worktree
 					in the clone.
 				</CardDescription>
-				<CardAction>
-					<Button size="sm" variant="outline" onClick={() => setAdding(true)}>
-						<PlusIcon data-icon="inline-start" />
-						Add project
-					</Button>
-				</CardAction>
 			</CardHeader>
 			<CardContent className="px-0">
 				{projects.isLoading ? (
@@ -723,15 +712,10 @@ function ProjectsCard() {
 							</EmptyMedia>
 							<EmptyTitle>No projects yet</EmptyTitle>
 							<EmptyDescription>
-								Add a git repository. Each run gets its own worktree in it.
+								Add a git repository with + next to Projects in the sidebar.
+								Each run gets its own worktree in it.
 							</EmptyDescription>
 						</EmptyHeader>
-						<EmptyContent>
-							<Button onClick={() => setAdding(true)}>
-								<PlusIcon data-icon="inline-start" />
-								Add project
-							</Button>
-						</EmptyContent>
 					</Empty>
 				) : (
 					<Table>
@@ -801,7 +785,6 @@ function ProjectsCard() {
 					</Table>
 				)}
 			</CardContent>
-			<AddProjectDialog open={adding} onOpenChange={setAdding} />
 			<AlertDialog
 				open={toRemove !== null}
 				onOpenChange={(open) => {

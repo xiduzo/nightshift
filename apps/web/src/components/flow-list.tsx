@@ -105,12 +105,12 @@ export function FlowList({ projectId }: { projectId: string }) {
 		<section aria-labelledby="flows-heading" className="flex flex-col gap-4">
 			<div className="flex items-end gap-4">
 				<div className="flex min-w-0 flex-1 flex-col gap-1">
-					<h2
+					<h1
 						id="flows-heading"
-						className="font-semibold text-lg tracking-tight"
+						className="font-semibold text-2xl tracking-tight"
 					>
 						Flows
-					</h2>
+					</h1>
 					<p className="text-muted-foreground text-sm">
 						Graphs of steps, saved in{" "}
 						<span className="font-mono text-xs">.nightshift/flows/</span>
