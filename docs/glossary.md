@@ -60,7 +60,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |
 | Event | One appended record of a fact that changed. | Slice 1 |
 | Event Log | The append-only list of Events. Run status is derived from it. | Slice 1 |
-| Run Policy | The rules for retries, rescue, blocked propagation, network grace, usage-limit waits, and the stop time. | PLAN §2 |
+| Run Policy | The rules for retries, rescue, blocked propagation, network grace, usage-limit waits, the stop time, and resume after a restart. | PLAN §2 |
+| Side Effect | What a Step's tool did outside the Worktree, for example a GitHub comment. The Event Log keeps it per Step and key, so a Session that continues the Step does not do it twice. | Restarts |
 | Needs-you inbox | The list of open Gates. | PLAN §3 |
 | Decider | The provider behind a Decision Node. The default is a small model with structured output. | PLAN §2 |
 | GitHub Tools | The TanStack AI tools on top of `gh` that Agent and Decision Nodes can call. | PLAN §2 |
@@ -75,7 +76,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | finished | The Run reached `pass`, a Decision label, or a Gate choice with no Edge left to take. |
 | stopped | A person stopped the Run. |
 | failed | A Step errored, a `fail` or `needs-input` had no Edge, or a Retry Loop hit its Max. |
-| interrupted | The daemon stopped while a Step ran. |
+| interrupted | The daemon stopped while a Step ran. The next daemon resumes it on its own a few seconds after it starts, unless its end reason says why not. |
 
 ## Verbs
 
@@ -87,7 +88,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | walk | Run the Steps of a Flow one after another, following Edges. | Slice 2 |
 | report | End a Session with a Step Report. | Slice 2 |
 | stop | Abort the running Step and end the Run as stopped. | Slice 1 |
-| resume | Continue a stopped, failed, or interrupted Run at its last Node. | Slice 1 |
+| resume | Continue a stopped, failed, or interrupted Run at its last Node. A person resumes, or the daemon after a restart. | Slice 1 |
 | take over | Hand a Session to a person with its Harness's resume command, for example `claude --resume <id>`. | Slice 1 |
 | retry | Take a Retry Loop back to an earlier Node. | Slice 2 |
 | rescue | Retry a Node with a stronger model. | PLAN §2 |
@@ -106,7 +107,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | ProjectRestored | A removed Project's clone was added again. |
 | RunStarted | A Run began, with its copy of the Flow. |
 | WorktreeCreated | A Worktree was created for a Run. |
-| RunResumed | A person resumed a Run. |
+| RunResumed | A person resumed a Run, or the daemon did after a restart (`by: "daemon"`). |
 | StepStarted | A Step began a Visit of a Node. |
 | StepReopened | A resume continued an Agent Step's Session in place. |
 | StepEnded | A Step ended with an Outcome and its Outputs. |
@@ -114,6 +115,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | HarnessSessionAssigned | The Harness reported its own session id. |
 | SessionEnded | A Session ended, with its cost. |
 | EdgeTaken | The Run followed an Edge to the next Node. |
+| SideEffectStarted | A tool of a Step began a Side Effect. |
+| SideEffectEnded | The Side Effect ended, with its result or its error. |
 | StopRequested | A person asked to stop the Run. |
 | GateOpened | A Gate put its question in the Needs-you inbox. |
 | RunEnded | The Run finished or failed, with the reason. |
