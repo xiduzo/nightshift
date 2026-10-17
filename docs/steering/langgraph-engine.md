@@ -8,10 +8,11 @@ Night Shift's run engine (`packages/engine`) runs its control flow and
 durability on LangGraph (`@langchain/langgraph`). A run is one LangGraph
 thread (thread id = run id). The flow the run snapshotted at start compiles
 into a `StateGraph`; every flow node is one graph node; LangGraph checkpoints
-the run state in Night Shift's own database after every node; the two ways
-a run parks (a usage-limit or network wait, a Gate) and the three ways a run
-ends early (failed, stopped, needs a person) are LangGraph `interrupt`s, so
-a resume always lands back at the exact node, at any depth.
+the run state in Night Shift's own database after every node; the three ways
+a run parks (a usage-limit or network wait, a Wait node's own wait, a Gate)
+and the three ways a run ends early (failed, stopped, needs a person) are
+LangGraph `interrupt`s, so a resume always lands back at the exact node, at
+any depth.
 
 What did **not** change: the `Engine` interface (`types.ts`), the API, the
 web app, the event log as the read model, transcripts on disk, the bus,
@@ -48,7 +49,8 @@ packages/engine/src/
   graph/context.ts         StepContext (below), beginStep, beginWait,
                            uncommittedStep, recorders.
   graph/wait.ts            waitNode(nodeId): the one wait node of Agent
-                           nodes and Decisions decided by a model.
+                           nodes, Decisions decided by a model, and Wait
+                           nodes. Answers: wake, signal, resume.
   graph/nodes/agent.ts     agent node
   graph/nodes/command.ts
   graph/nodes/decision.ts  decision node: routes on the step; a chooser
@@ -58,6 +60,10 @@ packages/engine/src/
                            model.ts (the decider).
   graph/nodes/subflow.ts
   graph/nodes/foreach.ts
+  graph/nodes/wait.ts      Wait node: works out the wake time (a duration,
+                           a time, a command poll, a signal), appends
+                           WaitStarted and parks at its wait node; a wake
+                           ends it done or timeout, or sleeps again.
   graph/nodes/body.ts      What Subflow and For Each share: bodyGraph,
                            runBody (a called flow as a subgraph of the node)
                            and BodyEnd (how the body ended).
@@ -145,6 +151,11 @@ packages/engine/src/
    from the interrupt (and rebuilds timers from `deriveSleep` at startup).
    A wake is `Command({ resume: { kind: "wake", early, prompt } })`; the
    Agent node re-enters with `pending` and continues the session.
+   A Wait node parks the same way with its own `until` (`graph/nodes/wait.ts`,
+   below): the four kinds are `WaitReason`s next to the policy's two, a
+   wait with no time (a signal with no timeout) has `until: null` and no
+   timer, and a signal is `Command({ resume: { kind: "signal", name } })`
+   through the same `runner.wake` (`Engine.signalRun`).
 9. **Resume mapping** (`Engine.resumeRun`): stopped or failed → the thread
    is parked → `resume: { kind: "resume", prompt }`. Interrupted (daemon
    died) → the last checkpoint is before the node → `invoke(null)` re-runs
@@ -236,6 +247,21 @@ Decisions taken while implementing, from the code and its comments:
   like the Agent node; a give-up ends the step `error`. A parked or
   interrupted model Decision step starts a new visit: it has no session to
   reopen.
+- **A Wait node is a step that is all wait** (`graph/nodes/wait.ts`,
+  2026-10-17). It uses the shared `waitNode` and the pending wait's shape
+  as the Agent node does, with no field of its own: the streak's `since`
+  is when the wait began (the deadline `since + timeoutMinutes` and
+  `waited_minutes` count from it) and `count` how often it slept; the wake
+  time is cut to the deadline, so the timeout fires as a wake and the node
+  ends `timeout`. `beginStep` starts no timer for it, and the step's log
+  path is set when it polls a command. On a wake it runs
+  `beginStep({ kind: "continue" })`, so the entry checks do not run: it
+  checks the stop time itself and parks `stopped` with the stop-time reason,
+  as a new step would. A `duration` or `time` wake, early or not, ends
+  `done`; a `command` wake runs the command again; a `signal` wake that is
+  not the signal (a timer at the deadline, a person's "wake now") sleeps on.
+  `done` without an edge is a chosen end, `timeout` a failure. A parked or
+  interrupted Wait step starts a new visit, as a Command does.
 - **`resumeRun` of a thread that ended or never ran re-enters with a
   `Command({ goto, update })`** (`runner.reenter`). A finished run (rule
   10) or a run from before this engine has no checkpoint at an interrupt,
