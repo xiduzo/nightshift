@@ -19,7 +19,7 @@ export type TemplateContext = {
 };
 
 /**
- * One element of a For Each list, normalized. `value` is the element as the
+ * One element of a Call node's list (`each`), normalized. `value` is the element as the
  * source gave it, bound to the called flow's input.
  */
 export type ListItem = {
@@ -41,14 +41,14 @@ export type ListItem = {
 
 export type ValidateOptions = {
 	/**
-	 * Flow files that exist in the project, by name, for checking For Each
+	 * Flow files that exist in the project, by name, for checking Call
 	 * `flow` references. Leave out to skip those checks (for example in the
 	 * browser before the list loads).
 	 */
 	flows?: Readonly<Record<string, Flow | null>>;
 	/**
 	 * The name of the flow being checked. With `flows`, it finds a flow that
-	 * runs itself through For Each bodies, and the given flow replaces the
+	 * runs itself through Call nodes, and the given flow replaces the
 	 * saved one of that name (an edit that is not saved yet).
 	 */
 	name?: string;

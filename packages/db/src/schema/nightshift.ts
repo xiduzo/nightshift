@@ -38,7 +38,7 @@ export const run = sqliteTable(
 		flowName: text("flow_name"),
 		/** JSON copy of the flow at start. The run never reads the file again. */
 		flow: text("flow").notNull(),
-		/** JSON copies of every flow the run can call (Subflow and For Each) at start, by flow name. */
+		/** JSON copies of every flow the run can call (through Call nodes) at start, by flow name. */
 		bodyFlows: text("body_flows").notNull().default("{}"),
 		title: text("title").notNull(),
 		/** Absolute path of the worktree the run works in. */
@@ -204,7 +204,7 @@ export const lgCheckpoint = sqliteTable(
 	"lg_checkpoint",
 	{
 		threadId: text("thread_id").notNull(),
-		/** Empty for the root graph; a subgraph (Subflow, For Each body) checkpoints under its own namespace. */
+		/** Empty for the root graph; a subgraph (the body of a Call node) checkpoints under its own namespace. */
 		checkpointNs: text("checkpoint_ns").notNull().default(""),
 		checkpointId: text("checkpoint_id").notNull(),
 		parentCheckpointId: text("parent_checkpoint_id"),

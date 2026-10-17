@@ -155,7 +155,7 @@ export function OutputSchemaField({
 									))}
 								</>
 							) : null}
-							. A list feeds a For Each.
+							. A list feeds a Call that runs once per item.
 						</>
 					)}
 				</FieldDescription>

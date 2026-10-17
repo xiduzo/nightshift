@@ -80,16 +80,16 @@ export type StepSummary = {
 	outcome: StepOutcome | null;
 	/**
 	 * The node's template outputs, for example `log_tail` or `summary`. JSON
-	 * values: an Agent's `data` and a For Each's `results` hold objects.
+	 * values: an Agent's `data` and a Call's `results` hold objects.
 	 */
 	outputs: Record<string, JsonValue>;
 	error: string | null;
 	/**
-	 * Set when the step ran inside a called flow: the Subflow or For Each
-	 * step that called it, and (For Each) the element. Null at the top level.
+	 * Set when the step ran inside a called flow: the Call step that called
+	 * it, and (with `each`) the element. Null at the top level.
 	 */
 	scope: { parentStepId: string; itemId: string | null } | null;
-	/** For Each steps only: the items of this visit, in the order they started. */
+	/** Call steps with `each` only: the items of this visit, in the order they started. */
 	items: ItemSummary[];
 	/** Agent steps only. Several when a person resumed the step or a wait continued it. */
 	sessions: SessionSummary[];
@@ -106,7 +106,7 @@ export type StepSummary = {
 	} | null;
 };
 
-/** One item of a For Each visit. */
+/** One item of a Call step's visit (`each`). */
 export type ItemSummary = {
 	id: string;
 	title: string;
@@ -114,7 +114,7 @@ export type ItemSummary = {
 	/** The element as the source gave it. */
 	value: JsonValue;
 	state: ItemState;
-	/** Null when the For Each does not use a branch per item. */
+	/** Null when the Call does not use a branch per item. */
 	branch: string | null;
 	baseBranch: string | null;
 	startedAt: number;
@@ -171,7 +171,7 @@ export type RunResume = {
 export type RunDetail = RunSummary & {
 	/** The copy of the flow taken when the run started. Edits to the file do not change it. */
 	flow: Flow;
-	/** Copies of every flow the run can call (Subflow and For Each), by name, taken at start. */
+	/** Copies of every flow the run can call (through Call nodes), by name, taken at start. */
 	calledFlows: Record<string, Flow>;
 	/** In the order they started. */
 	steps: StepSummary[];
@@ -208,7 +208,7 @@ export type GateEvent =
 	  }
 	| { type: "gate-resolved"; choice: string; note: string };
 
-/** What a For Each step writes to its transcript. */
+/** What a Call step with `each` writes to its transcript. */
 export type ForEachEvent =
 	| { type: "items-read"; count: number; open: number }
 	| {
@@ -401,7 +401,7 @@ export interface Engine {
 	): Promise<void>;
 	/**
 	 * Continues a stopped, failed or interrupted run at its last step's node
-	 * (inside a For Each, at the same item). A sleeping run wakes at once.
+	 * (inside a Call with `each`, at the same item). A sleeping run wakes at once.
 	 * An Agent node with a harness session continues that session with the
 	 * prompt (default "Continue where you left off."). Any other node runs
 	 * again. Edge counts carry over. Fails while the run is running.

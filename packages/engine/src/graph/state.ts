@@ -13,7 +13,7 @@ import type { StepOutcome, TranscriptEntry } from "../types";
  *
  * The event log stays the read model (design rule 3). The state here is the
  * walk's own bookkeeping: node outputs for templates, visit and edge counts,
- * For Each cursors, and the step a park or a wait left pending, so that the
+ * Call cursors (`each`), and the step a park or a wait left pending, so that the
  * node the run re-enters continues the same step and harness session.
  * The log keeps the facts a person reads and the ones crash recovery
  * needs; the state keeps what the next node reads. A finished run keeps
@@ -113,7 +113,7 @@ export type Pending = z.infer<typeof pendingSchema>;
 /**
  * Set by the node that ended the flow on a chosen end (design rule 2: only a
  * finished run reaches END). `reason` is what `RunEnded` records: null for
- * `pass` (`done` for a For Each), else `Ended at node "x" with "y".`.
+ * `pass` (`done` for a Call with `each`), else `Ended at node "x" with "y".`.
  */
 const endedSchema = z.object({
 	status: z.literal("finished"),
@@ -124,7 +124,7 @@ const endedSchema = z.object({
 export type Ended = z.infer<typeof endedSchema>;
 
 /**
- * A For Each node's cursor: the `index` of the last element that ended. It
+ * The cursor of a Call node with `each`: the `index` of the last element that ended. It
  * marks the loop as mid-way (the node then continues its open step); the
  * list and the elements' states and results come from the log
  * (`ItemsRead`, `ItemStarted`, `ItemEnded`), not from the state.
@@ -158,7 +158,7 @@ export const RunState = z.object({
 	visits: mergedRecord<number>(),
 	/** How often each edge was taken. */
 	traversals: mergedRecord<number>(),
-	/** For Each cursors by node id; null once the loop ended. */
+	/** The cursors of Call nodes with `each`, by node id; null once the loop ended. */
 	loops: mergedRecord<Loop | null>(),
 	pending: withLangGraph(pendingSchema.nullable(), {
 		default: () => null as Pending | null,

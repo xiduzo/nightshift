@@ -58,7 +58,7 @@ function costOf(list: StepSummary[]): string | undefined {
 		: formatCost(costs.reduce((sum, cost) => sum + cost, 0));
 }
 
-/** Every step a Subflow or For Each step called, nested ones included. */
+/** Every step a Call step called, nested ones included. */
 function calledSteps(steps: StepSummary[], step: StepSummary): StepSummary[] {
 	const ids = new Set([step.id]);
 	// Steps start after their caller, so one pass in order finds every level.
@@ -74,8 +74,8 @@ const INDENT_REM = 1.25;
 
 /**
  * Every visit of every node, in the order they started. The steps of a
- * called flow sit under the Subflow step that called it, or under their For
- * Each step grouped per element, indented and collapsible. With `scope`,
+ * called flow sit under the Call step that called it, grouped per element
+ * for a Call with `each`, indented and collapsible. With `scope`,
  * only the steps of that call show.
  */
 export function StepTimeline({
@@ -87,6 +87,7 @@ export function StepTimeline({
 	onSelect,
 	onSelectItem,
 	calledName,
+	runsEach,
 }: {
 	/** All steps of the run, in the order they started. */
 	steps: StepSummary[];
@@ -97,13 +98,17 @@ export function StepTimeline({
 	selectedItem: ItemScope;
 	onSelect: (stepId: string) => void;
 	onSelectItem: (scope: ItemScope) => void;
-	/** The name of the flow a Subflow or For Each step calls. */
+	/** The name of the flow a Call step calls. */
 	calledName?: (step: StepSummary) => string | undefined;
+	/** Whether a Call step runs its flow once per item. Without it, a step that started items does. */
+	runsEach?: (step: StepSummary) => boolean;
 }) {
 	/** Groups the person opened or closed; the rest follow `defaultOpen`. */
 	const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(
 		() => new Map(),
 	);
+	const eachOf = (step: StepSummary) =>
+		runsEach?.(step) ?? step.items.length > 0;
 
 	if (steps.length === 0) {
 		return (
@@ -195,7 +200,7 @@ export function StepTimeline({
 					selected={step.id === selectedStepId}
 					onSelect={() => onSelect(step.id)}
 				/>
-				{step.nodeType === "subflow" ? (
+				{step.nodeType === "call" && !eachOf(step) ? (
 					<ol
 						aria-label={`Steps called by ${step.nodeId}`}
 						className="flex flex-col gap-0.5"
@@ -219,7 +224,7 @@ export function StepTimeline({
 						})}
 					</ol>
 				) : null}
-				{step.nodeType === "foreach" ? (
+				{step.nodeType === "call" && eachOf(step) ? (
 					<ol
 						aria-label={`Items of ${step.nodeId}`}
 						className="flex flex-col gap-0.5"
@@ -338,7 +343,7 @@ function StepRow({
 					visit {step.visit}
 				</span>
 			) : null}
-			{step.nodeType === "foreach" && step.items.length > 0 ? (
+			{step.nodeType === "call" && step.items.length > 0 ? (
 				<span className="hidden shrink-0 text-muted-foreground tabular-nums sm:inline">
 					{step.items.filter((item) => item.state === "done").length}/
 					{step.items.length} done
@@ -356,7 +361,7 @@ function StepRow({
 	);
 }
 
-/** One call of a flow (a Subflow step, or one element of a For Each step): opens and closes its steps, or focuses on it. */
+/** One call of a flow (a Call step, or one of its elements): opens and closes its steps, or focuses on it. */
 function GroupRow({
 	label,
 	badge,

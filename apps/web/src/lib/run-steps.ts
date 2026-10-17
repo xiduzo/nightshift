@@ -1,17 +1,17 @@
-import type { Flow, FlowNode } from "@nightshift/flows";
+import { type Flow, type FlowNode, runsEach } from "@nightshift/flows";
 
 import type { ItemSummary, StepSummary } from "@/lib/api-types";
 
 /**
  * The steps of a run form a tree: the top-level flow's steps, and under each
- * Subflow step the steps of the flow it called, and under each For Each step,
- * per element, the steps of the flow it called (which can call flows of
- * their own). A scope names one level of that tree.
+ * Call step the steps of the flow it called (once, or per element for a
+ * Call with `each`), which can call flows of their own. A scope names one
+ * level of that tree.
  */
 
 /**
- * One call of a flow: a Subflow step (`itemId` null) or one element of a
- * For Each step. Null is the top-level flow.
+ * One call of a flow: a Call step that ran once (`itemId` null) or one
+ * element of a Call step with `each`. Null is the top-level flow.
  */
 export type ItemScope = { parentStepId: string; itemId: string | null } | null;
 
@@ -96,19 +96,32 @@ export function nodeOfStep(
 	);
 }
 
-/** The name of the flow a Subflow or For Each step calls. */
+/** The name of the flow a Call step calls. */
 export function calledFlowName(
 	run: RunFlows,
 	steps: readonly StepSummary[],
 	parentStep: StepSummary,
 ): string | undefined {
 	const node = nodeOfStep(run, steps, parentStep);
-	return node?.type === "subflow" || node?.type === "foreach"
-		? node.flow
-		: undefined;
+	return node?.type === "call" ? node.flow : undefined;
 }
 
-/** The flow a Subflow or For Each step calls, from the run's copies. */
+/**
+ * Whether a Call step runs its flow once per item. From the run's copy of
+ * the flow; a step whose node is not in it counts as per item when it
+ * started items.
+ */
+export function stepRunsEach(
+	run: RunFlows,
+	steps: readonly StepSummary[],
+	step: StepSummary,
+): boolean {
+	if (step.nodeType !== "call") return false;
+	const node = nodeOfStep(run, steps, step);
+	return node ? runsEach(node) : step.items.length > 0;
+}
+
+/** The flow a Call step calls, from the run's copies. */
 export function calledFlowOf(
 	run: RunFlows,
 	steps: readonly StepSummary[],
@@ -120,11 +133,11 @@ export function calledFlowOf(
 
 /** Whether a step calls a flow, so other steps nest under it. */
 export function callsFlow(step: StepSummary): boolean {
-	return step.nodeType === "subflow" || step.nodeType === "foreach";
+	return step.nodeType === "call";
 }
 
 /**
- * The items of a For Each step: its own list, plus any item that only shows
+ * The items of a Call step with `each`: its own list, plus any item that only shows
  * through the scope of a called step (a summary that lags the stream).
  */
 export function itemsOf(
@@ -203,7 +216,7 @@ export function formatJson(value: unknown): string {
 }
 
 /**
- * An output value that may hold JSON as text (an Agent's `data`, a For Each's
+ * An output value that may hold JSON as text (an Agent's `data`, a Call's
  * `results`, a called flow's output): the parsed value when it is a JSON
  * object or array, else undefined.
  */

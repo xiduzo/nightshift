@@ -29,17 +29,15 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		icon: SplitIcon,
 		blurb: "Picks one of its options: you, a rule, or a model.",
 	},
-	subflow: {
-		label: "Subflow",
+	call: {
+		label: "Call",
 		icon: SquareFunctionIcon,
-		blurb: "Runs another flow once.",
-	},
-	foreach: {
-		label: "For Each",
-		icon: RepeatIcon,
-		blurb: "Runs a flow once for each item in a list.",
+		blurb: "Runs another flow once, or once per item in a list.",
 	},
 };
+
+/** The icon of a Call node that runs once per item. */
+export const CALL_EACH_ICON: LucideIcon = RepeatIcon;
 
 /** The icon of a Decision node, by who decides it. */
 export const DECIDED_BY_ICON: Record<DecidedBy, LucideIcon> = {

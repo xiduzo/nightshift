@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type {
 	AgentNode,
+	CallEach,
+	CallEachNode,
+	CallNode,
 	CommandNode,
 	DecisionNode,
 	Flow,
 	FlowEdge,
 	FlowNode,
-	ForEachNode,
-	SubflowNode,
 } from "./schema";
 import type { FlowIssue } from "./types";
 import { parseFlow, validateFlow } from "./validate";
@@ -32,6 +33,7 @@ function command(id: string, extra: Partial<CommandNode> = {}): CommandNode {
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: "bun test",
+		output: "text",
 		...extra,
 	};
 }
@@ -92,33 +94,37 @@ function ruled(
 	};
 }
 
-function foreach(
+/** A Call node with `each`: `extra` fills `each`, except `inputs`. */
+function callEach(
 	id: string,
 	body: string,
-	extra: Partial<ForEachNode> = {},
-): ForEachNode {
+	extra: Partial<CallEach> & { inputs?: CallNode["inputs"] } = {},
+): CallEachNode {
+	const { inputs, ...each } = extra;
 	return {
 		id,
-		type: "foreach",
+		type: "call",
 		position: { x: 0, y: 0 },
-		source: { kind: "command", command: "./list 12" },
 		flow: body,
-		as: "item",
-		inputs: {},
-		branch: "per-item",
-		haltOn: ["halt"],
-		...extra,
+		inputs: inputs ?? {},
+		each: {
+			source: { kind: "command", command: "./list 12" },
+			as: "item",
+			branch: "per-item",
+			haltOn: ["halt"],
+			...each,
+		},
 	};
 }
 
-function subflow(
+function call(
 	id: string,
 	called: string,
-	extra: Partial<SubflowNode> = {},
-): SubflowNode {
+	extra: Partial<CallNode> = {},
+): CallNode {
 	return {
 		id,
-		type: "subflow",
+		type: "call",
 		position: { x: 0, y: 0 },
 		flow: called,
 		inputs: {},
@@ -139,7 +145,7 @@ function edge(
 }
 
 function flow(nodes: FlowNode[], edges: FlowEdge[], start = "worker"): Flow {
-	return { version: 3, inputs: [], outputs: [], start, nodes, edges };
+	return { version: 4, inputs: [], outputs: [], start, nodes, edges };
 }
 
 const errors = (issues: FlowIssue[]) =>
@@ -859,7 +865,7 @@ describe("parseFlow", () => {
 
 	test("turns schema errors into one issue per zod issue, with the path", () => {
 		const result = parseFlow({
-			version: 3,
+			version: 4,
 			start: "Worker",
 			nodes: [{ ...agent("worker"), model: "" }],
 			edges: [{ id: "a", from: "worker", outcome: "Maybe", to: "check" }],
@@ -997,7 +1003,7 @@ describe("validateFlow: template paths", () => {
 		flow(
 			[
 				agent("planner"),
-				foreach("each", "trace"),
+				callEach("each", "trace"),
 				command("check"),
 				agent("worker", { prompt }),
 			],
@@ -1173,6 +1179,32 @@ describe("validateFlow: agent outcomes and output", () => {
 	});
 });
 
+describe("validateFlow: Command output", () => {
+	const f = (output: CommandNode["output"], prompt: string): Flow =>
+		flow(
+			[command("check", { output }), agent("worker", { prompt })],
+			[edge("a", "check", "pass", "worker")],
+			"check",
+		);
+
+	test("with output json, data and a path below it are read", () => {
+		expect(
+			validateFlow(f("json", "{{check.data}} {{check.data.tests.0}}")),
+		).toEqual([]);
+	});
+
+	test("with output text, data is an error that says how to fix it", () => {
+		expect(
+			errors(validateFlow(f("text", "{{check.data.tests}}"))).map(
+				(issue) => issue.message,
+			),
+		).toEqual([
+			'The prompt of "worker" uses {{check.data.tests}}, but the command node "check" prints text. Set its output to JSON to read data.',
+		]);
+		expect(validateFlow(f("text", "{{check.log_tail}}"))).toEqual([]);
+	});
+});
+
 describe("validateFlow: outputs", () => {
 	const f = (outputs: Flow["outputs"]): Flow =>
 		withInputs(
@@ -1211,7 +1243,7 @@ describe("validateFlow: outputs", () => {
 		]);
 	});
 
-	test("output names are unique, valid, and not a Subflow field", () => {
+	test("output names are unique, valid, and not a Call field", () => {
 		expect(
 			errors(
 				validateFlow(
@@ -1226,12 +1258,12 @@ describe("validateFlow: outputs", () => {
 		).toEqual([
 			'The output "report" is declared more than once.',
 			expect.stringContaining('The output "Bad" is not a valid name'),
-			'The output "ended" clashes with a field every Subflow node has: outcome, ended, visit.',
+			'The output "ended" clashes with a field every Call node has: outcome, ended, visit.',
 		]);
 	});
 });
 
-describe("validateFlow: For Each", () => {
+describe("validateFlow: Call with each", () => {
 	/** A flow that builds one element. */
 	const traceBody = (): Flow =>
 		withInputs(
@@ -1239,18 +1271,18 @@ describe("validateFlow: For Each", () => {
 			[itemInput],
 		);
 
-	/** A flow that takes an element, as the called flow of For Each nodes. */
+	/** A flow that takes an element, as the called flow of Call nodes with each. */
 	const body = (f: Flow): Flow => withInputs(f, [itemInput]);
 
 	/** each → report on done: the night. */
-	const night = (node: ForEachNode = foreach("each", "trace")): Flow =>
+	const night = (node: CallEachNode = callEach("each", "trace")): Flow =>
 		flow(
 			[node, agent("report", { prompt: "{{each.summary}}" })],
 			[edge("after", node.id, "done", "report")],
 			node.id,
 		);
 
-	test("a For Each over a flow with an item input is valid", () => {
+	test("a Call with each over a flow with an item input is valid", () => {
 		expect(validateFlow(night(), { flows: { trace: traceBody() } })).toEqual(
 			[],
 		);
@@ -1268,7 +1300,7 @@ describe("validateFlow: For Each", () => {
 		]);
 	});
 
-	test("a node may read the For Each fields", () => {
+	test("a node may read the each fields", () => {
 		const bad = night();
 		bad.nodes[1] = agent("report", { prompt: "{{each.output}}" });
 		expect(errors(validateFlow(bad))).toEqual([
@@ -1281,7 +1313,7 @@ describe("validateFlow: For Each", () => {
 
 	test("the source templates are checked", () => {
 		const command = night(
-			foreach("each", "trace", {
+			callEach("each", "trace", {
 				source: { kind: "command", command: "list {{item.number}}" },
 			}),
 		);
@@ -1294,7 +1326,7 @@ describe("validateFlow: For Each", () => {
 			}),
 		]);
 		const json = night(
-			foreach("each", "trace", {
+			callEach("each", "trace", {
 				source: { kind: "json", value: "{{plan.data.tasks}}" },
 			}),
 		);
@@ -1312,7 +1344,7 @@ describe("validateFlow: For Each", () => {
 		const f = flow(
 			[
 				agent("planner", { output: { type: "object" } }),
-				foreach("each", "trace", {
+				callEach("each", "trace", {
 					source: { kind: "json", value: "{{planner.data.tasks}}" },
 				}),
 			],
@@ -1325,7 +1357,7 @@ describe("validateFlow: For Each", () => {
 	test("the files source glob is checked too", () => {
 		const f = (glob: string) =>
 			withInputs(
-				night(foreach("each", "trace", { source: { kind: "files", glob } })),
+				night(callEach("each", "trace", { source: { kind: "files", glob } })),
 				[{ name: "dir", type: "text" }],
 			);
 		expect(validateFlow(f("{{dir}}/**/*.ts"))).toEqual([]);
@@ -1339,10 +1371,10 @@ describe("validateFlow: For Each", () => {
 		]);
 	});
 
-	test("a nested For Each may read the outer item", () => {
+	test("a nested Call with each may read the outer item", () => {
 		const features = body(
 			night(
-				foreach("each", "trace", {
+				callEach("each", "trace", {
 					source: { kind: "command", command: "./list {{item.number}}" },
 				}),
 			),
@@ -1352,7 +1384,7 @@ describe("validateFlow: For Each", () => {
 
 	test("halt labels must be valid and not reserved", () => {
 		const bad = night(
-			foreach("each", "trace", { haltOn: ["halt", "error", "Bad Label"] }),
+			callEach("each", "trace", { haltOn: ["halt", "error", "Bad Label"] }),
 		);
 		const issues = errors(validateFlow(bad));
 		expect(issues).toEqual([
@@ -1368,15 +1400,14 @@ describe("validateFlow: For Each", () => {
 	});
 
 	test("without flows the called flow is not checked", () => {
-		expect(validateFlow(night(foreach("each", "missing")))).toEqual([]);
+		expect(validateFlow(night(callEach("each", "missing")))).toEqual([]);
 	});
 
 	test("the called flow must exist", () => {
 		expect(errors(validateFlow(night(), { flows: {} }))).toEqual([
 			expect.objectContaining({
 				nodeId: "each",
-				message:
-					'For Each node "each" runs flow "trace", which does not exist.',
+				message: 'Call node "each" runs flow "trace", which does not exist.',
 			}),
 		]);
 	});
@@ -1400,7 +1431,7 @@ describe("validateFlow: For Each", () => {
 		]);
 		const task = withInputs(plain, [{ name: "task", type: "json" }]);
 		expect(
-			validateFlow(night(foreach("each", "trace", { as: "task" })), {
+			validateFlow(night(callEach("each", "trace", { as: "task" })), {
 				flows: { trace: task },
 			}),
 		).toEqual([]);
@@ -1426,7 +1457,7 @@ describe("validateFlow: For Each", () => {
 		]);
 		const flows = { trace: called };
 		const bound = (inputs: Record<string, string>) =>
-			withInputs(night(foreach("each", "trace", { inputs })), [
+			withInputs(night(callEach("each", "trace", { inputs })), [
 				{ name: "epic", type: "text" },
 			]);
 		expect(validateFlow(bound({ epic: "{{epic}}" }), { flows })).toEqual([]);
@@ -1439,8 +1470,8 @@ describe("validateFlow: For Each", () => {
 			).map((issue) => issue.message),
 		).toEqual([
 			'The input "epic" of "each" uses {{nope}}, but there is no node or input "nope".',
-			'For Each node "each" binds the input "item", which already takes each item.',
-			'For Each node "each" binds the input "other", but flow "trace" has no such input.',
+			'Call node "each" binds the input "item", which already takes each item.',
+			'Call node "each" binds the input "other", but flow "trace" has no such input.',
 		]);
 	});
 
@@ -1455,7 +1486,7 @@ describe("validateFlow: For Each", () => {
 				}),
 			).map((issue) => issue.message),
 		).toEqual([
-			'For Each node "each" does not bind the required input "epic" of flow "trace".',
+			'Call node "each" does not bind the required input "epic" of flow "trace".',
 		]);
 		for (const input of [
 			{ name: "epic", type: "text", required: true, default: "1" },
@@ -1474,7 +1505,7 @@ describe("validateFlow: For Each", () => {
 			{
 				severity: "error",
 				nodeId: "each",
-				message: 'Flow "trace" of For Each node "each" has 2 errors.',
+				message: 'Flow "trace" of Call node "each" has 2 errors.',
 			},
 		]);
 	});
@@ -1483,23 +1514,23 @@ describe("validateFlow: For Each", () => {
 		const broken = body(flow([agent("worker", { prompt: "{{nope.x}}" })], []));
 		expect(
 			errors(validateFlow(night(), { flows: { trace: broken } }))[0]?.message,
-		).toBe('Flow "trace" of For Each node "each" has 1 error.');
+		).toBe('Flow "trace" of Call node "each" has 1 error.');
 	});
 
 	test("errors of a nested called flow count once, on its caller", () => {
 		const feature = body(night());
 		const broken = body(flow([agent("worker", { prompt: "{{nope.x}}" })], []));
-		const top = night(foreach("each", "feature"));
+		const top = night(callEach("each", "feature"));
 		const flows = { feature, trace: broken };
 		expect(errors(validateFlow(top, { flows }))).toEqual([
 			expect.objectContaining({
-				message: 'Flow "feature" of For Each node "each" has 1 error.',
+				message: 'Flow "feature" of Call node "each" has 1 error.',
 			}),
 		]);
 	});
 
 	test("a flow that runs itself is an error with the chain", () => {
-		const self = body(night(foreach("each", "loop")));
+		const self = body(night(callEach("each", "loop")));
 		expect(
 			errors(validateFlow(self, { flows: { loop: self }, name: "loop" })),
 		).toEqual([
@@ -1511,8 +1542,8 @@ describe("validateFlow: For Each", () => {
 	});
 
 	test("A → B → A is an error on A with the chain", () => {
-		const a = body(night(foreach("each", "b")));
-		const b = body(night(foreach("each", "a")));
+		const a = body(night(callEach("each", "b")));
+		const b = body(night(callEach("each", "a")));
 		const issues = errors(validateFlow(a, { flows: { a, b }, name: "a" }));
 		expect(issues).toEqual([
 			expect.objectContaining({
@@ -1524,7 +1555,7 @@ describe("validateFlow: For Each", () => {
 
 	test("the flow being checked replaces its saved version", () => {
 		const saved = body(flow([agent("worker")], []));
-		const edited = body(night(foreach("each", "a")));
+		const edited = body(night(callEach("each", "a")));
 		expect(
 			errors(validateFlow(edited, { flows: { a: saved }, name: "a" })),
 		).toEqual([
@@ -1535,14 +1566,14 @@ describe("validateFlow: For Each", () => {
 	});
 
 	test("a cycle below a called flow is reported once, in that flow", () => {
-		const b = body(night(foreach("each", "c")));
-		const c = body(night(foreach("each", "b")));
-		const top = night(foreach("each", "b"));
+		const b = body(night(callEach("each", "c")));
+		const c = body(night(callEach("each", "b")));
+		const top = night(callEach("each", "b"));
 		expect(
 			errors(validateFlow(top, { flows: { b, c, top }, name: "top" })),
 		).toEqual([
 			expect.objectContaining({
-				message: 'Flow "b" of For Each node "each" has 1 error.',
+				message: 'Flow "b" of Call node "each" has 1 error.',
 			}),
 		]);
 		expect(
@@ -1555,18 +1586,18 @@ describe("validateFlow: For Each", () => {
 	});
 
 	test("without a name, a called flow that runs itself still shows up", () => {
-		const loop = body(night(foreach("each", "loop")));
-		const top = night(foreach("each", "loop"));
+		const loop = body(night(callEach("each", "loop")));
+		const top = night(callEach("each", "loop"));
 		expect(errors(validateFlow(top, { flows: { loop } }))).toEqual([
 			expect.objectContaining({
-				message: 'Flow "loop" of For Each node "each" has 1 error.',
+				message: 'Flow "loop" of Call node "each" has 1 error.',
 			}),
 		]);
 	});
 
-	test("two For Each nodes may share a called flow", () => {
+	test("two Call nodes may share a called flow", () => {
 		const twice = flow(
-			[foreach("first", "trace"), foreach("second", "trace")],
+			[callEach("first", "trace"), callEach("second", "trace")],
 			[edge("next", "first", "done", "second")],
 			"first",
 		);
@@ -1574,7 +1605,7 @@ describe("validateFlow: For Each", () => {
 	});
 });
 
-describe("validateFlow: Subflow", () => {
+describe("validateFlow: Call", () => {
 	/** A review flow: takes a pr, returns a verdict and a report. */
 	const reviewFlow = (): Flow => ({
 		...withInputs(
@@ -1599,7 +1630,7 @@ describe("validateFlow: Subflow", () => {
 	/** call → report: reads the called flow's outputs. */
 	const caller = (
 		prompt: string,
-		node: SubflowNode = subflow("call", "review", {
+		node: CallNode = call("call", "review", {
 			inputs: { pr: "{{pr}}" },
 		}),
 	): Flow =>
@@ -1617,7 +1648,7 @@ describe("validateFlow: Subflow", () => {
 
 	const flows = () => ({ review: reviewFlow() });
 
-	test("a Subflow node reads the called flow's outputs and its own fields", () => {
+	test("a Call node reads the called flow's outputs and its own fields", () => {
 		expect(
 			validateFlow(
 				caller(
@@ -1641,11 +1672,11 @@ describe("validateFlow: Subflow", () => {
 		]);
 	});
 
-	test("without flows any field of a Subflow node is accepted", () => {
+	test("without flows any field of a Call node is accepted", () => {
 		expect(validateFlow(caller("{{call.whatever.deep}}"))).toEqual([]);
 	});
 
-	test("a Subflow node ends with pass or fail", () => {
+	test("a Call node ends with pass or fail", () => {
 		const f = caller("x");
 		f.edges.push(edge("c", "call", "done", "report"));
 		expect(errors(validateFlow(f))).toEqual([
@@ -1659,7 +1690,7 @@ describe("validateFlow: Subflow", () => {
 	test("binding templates are checked", () => {
 		const f = caller(
 			"x",
-			subflow("call", "review", { inputs: { pr: "{{nope}}" } }),
+			call("call", "review", { inputs: { pr: "{{nope}}" } }),
 		);
 		expect(errors(validateFlow(f))).toEqual([
 			expect.objectContaining({
@@ -1674,9 +1705,7 @@ describe("validateFlow: Subflow", () => {
 	test("the called flow must exist and parse", () => {
 		expect(
 			errors(validateFlow(caller("x"), { flows: {} })).map((i) => i.message),
-		).toEqual([
-			'Subflow node "call" runs flow "review", which does not exist.',
-		]);
+		).toEqual(['Call node "call" runs flow "review", which does not exist.']);
 		expect(
 			errors(validateFlow(caller("x"), { flows: { review: null } })).map(
 				(i) => i.message,
@@ -1685,15 +1714,12 @@ describe("validateFlow: Subflow", () => {
 	});
 
 	test("bindings: declared inputs only, every required input bound", () => {
-		const f = caller(
-			"x",
-			subflow("call", "review", { inputs: { other: "1" } }),
-		);
+		const f = caller("x", call("call", "review", { inputs: { other: "1" } }));
 		expect(
 			errors(validateFlow(f, { flows: flows() })).map((i) => i.message),
 		).toEqual([
-			'Subflow node "call" binds the input "other", but flow "review" has no such input.',
-			'Subflow node "call" does not bind the required input "pr" of flow "review".',
+			'Call node "call" binds the input "other", but flow "review" has no such input.',
+			'Call node "call" does not bind the required input "pr" of flow "review".',
 		]);
 	});
 
@@ -1706,13 +1732,13 @@ describe("validateFlow: Subflow", () => {
 			{
 				severity: "error",
 				nodeId: "call",
-				message: 'Flow "review" of Subflow node "call" has 1 error.',
+				message: 'Flow "review" of Call node "call" has 1 error.',
 			},
 		]);
 	});
 
 	test("a flow that calls itself is an error", () => {
-		const self = caller("x", subflow("call", "self", { inputs: { pr: "1" } }));
+		const self = caller("x", call("call", "self", { inputs: { pr: "1" } }));
 		expect(
 			errors(validateFlow(self, { flows: { self }, name: "self" })),
 		).toEqual([
@@ -1723,12 +1749,12 @@ describe("validateFlow: Subflow", () => {
 		]);
 	});
 
-	test("a cycle through Subflow and For Each nodes is an error with the chain", () => {
-		// a calls b (Subflow), b runs a per element (For Each).
-		const a = withInputs(caller("x", subflow("call", "b", { inputs: {} })), [
+	test("a cycle through Call nodes is an error with the chain", () => {
+		// a calls b once, b runs a per element.
+		const a = withInputs(caller("x", call("call", "b", { inputs: {} })), [
 			itemInput,
 		]);
-		const b = flow([foreach("each", "a")], [], "each");
+		const b = flow([callEach("each", "a")], [], "each");
 		expect(errors(validateFlow(a, { flows: { a, b }, name: "a" }))).toEqual([
 			expect.objectContaining({
 				nodeId: "call",
@@ -1741,15 +1767,15 @@ describe("validateFlow: Subflow", () => {
 describe("parseFlow with options", () => {
 	test("passes the options to validateFlow", () => {
 		const json = {
-			version: 3,
+			version: 4,
 			start: "each",
 			nodes: [
 				{
 					id: "each",
-					type: "foreach",
+					type: "call",
 					position: { x: 0, y: 0 },
-					source: { kind: "command", command: "./list-items" },
 					flow: "trace",
+					each: { source: { kind: "command", command: "./list-items" } },
 				},
 			],
 			edges: [],
@@ -1757,10 +1783,8 @@ describe("parseFlow with options", () => {
 		const parsed = parseFlow(json);
 		expect(parsed.issues).toEqual([]);
 		expect(parsed.flow?.nodes[0]).toMatchObject({
-			as: "item",
 			inputs: {},
-			branch: "per-item",
-			haltOn: ["halt"],
+			each: { as: "item", branch: "per-item", haltOn: ["halt"] },
 		});
 		expect(parsed.flow).toMatchObject({ inputs: [], outputs: [] });
 		expect(parseFlow(json, { flows: {} }).issues).toEqual([
@@ -1780,7 +1804,7 @@ describe("parseFlow with options", () => {
 		});
 		expect(parsed.issues).toEqual([]);
 		expect(parsed.flow).toMatchObject({
-			version: 3,
+			version: 4,
 			inputs: [{ name: "epic", type: "text", required: true }],
 			nodes: [{ prompt: "Epic {{epic}}" }],
 		});

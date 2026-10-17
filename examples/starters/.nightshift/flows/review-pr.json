@@ -1,5 +1,5 @@
 {
-	"version": 3,
+	"version": 4,
 	"description": "An agent reviews a pull request; after a person agrees, a command posts the review with `gh pr review`.",
 	"inputs": [
 		{

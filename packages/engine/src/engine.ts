@@ -409,7 +409,7 @@ export function createEngine(
 		return snapshotFlow(JSON.parse(row.flow));
 	}
 
-	/** The `body_flows` column holds every called flow (Subflow and For Each). */
+	/** The `body_flows` column holds every called flow (of Call nodes). */
 	function parseCalledFlows(row: RunRow): Record<string, Flow> {
 		const raw = JSON.parse(row.bodyFlows || "{}") as Record<string, unknown>;
 		const flows: Record<string, Flow> = {};
@@ -667,7 +667,7 @@ export function createEngine(
 
 	/**
 	 * Loads, parses and validates the flow a run starts from, and every flow
-	 * it can call through Subflow and For Each nodes (by name, from the
+	 * it can call through Call nodes (by name, from the
 	 * project's flow files). Version 1 files migrate first.
 	 */
 	async function flowsForRun(
@@ -1437,11 +1437,9 @@ function resolvePolicy(
 	};
 }
 
-/** The names of the flows a flow's Subflow and For Each nodes call. */
+/** The names of the flows a flow's Call nodes call. */
 function calledFlowNames(flow: Flow): string[] {
-	return flow.nodes.flatMap((n) =>
-		n.type === "foreach" || n.type === "subflow" ? [n.flow] : [],
-	);
+	return flow.nodes.flatMap((n) => (n.type === "call" ? [n.flow] : []));
 }
 
 /**

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { FlowNodeType } from "@nightshift/flows";
 
 import {
 	countDaemonResumes,
@@ -385,7 +386,34 @@ describe("gates", () => {
 	});
 });
 
-describe("For Each scopes", () => {
+describe("node types of runs from before flow version 4", () => {
+	test("a Subflow step and a For Each step read as Call steps", () => {
+		const b = log().runStarted();
+		const started = (stepId: string, nodeId: string, nodeType: string) =>
+			b.push(
+				"StepStarted",
+				{
+					nodeId,
+					nodeType: nodeType as FlowNodeType,
+					visit: 1,
+					transcriptPath: `/t/${stepId}`,
+					logPath: null,
+					scope: null,
+				},
+				{ stepId },
+			);
+		started("s1", "sub", "subflow");
+		started("s2", "loop", "foreach");
+		started("s3", "worker", "agent");
+		expect(deriveSteps(b.events).map((s) => s.nodeType)).toEqual([
+			"call",
+			"call",
+			"agent",
+		]);
+	});
+});
+
+describe("Call scopes", () => {
 	const item = (id: string) => ({
 		id,
 		title: id,
@@ -396,7 +424,7 @@ describe("For Each scopes", () => {
 		b: ReturnType<typeof log>,
 		stepId: string,
 		nodeId: string,
-		nodeType: "agent" | "foreach" | "command",
+		nodeType: "agent" | "call" | "command",
 		scope: Scope | null,
 	) =>
 		b.push(
@@ -421,9 +449,9 @@ describe("For Each scopes", () => {
 	/** loop (top) → item A → inner (For Each) → item a1 → worker. */
 	function nested() {
 		const b = log().runStarted();
-		started(b, "outer", "loop", "foreach", null);
+		started(b, "outer", "loop", "call", null);
 		itemStarted(b, "outer", "A");
-		started(b, "inner", "traces", "foreach", {
+		started(b, "inner", "traces", "call", {
 			parentStepId: "outer",
 			itemId: "A",
 		});

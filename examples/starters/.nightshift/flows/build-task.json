@@ -1,5 +1,5 @@
 {
-	"version": 3,
+	"version": 4,
 	"description": "One task of plan-and-build: runs implement-and-check with the task's title and details.",
 	"inputs": [
 		{
@@ -33,7 +33,7 @@
 				"x": 0,
 				"y": 0
 			},
-			"type": "subflow",
+			"type": "call",
 			"flow": "implement-and-check",
 			"inputs": {
 				"task": "{{item.title}}: {{item.details}}",

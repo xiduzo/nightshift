@@ -1,10 +1,11 @@
 import { migrateFlow } from "./migrate";
 import { ruleNames, ruleProblem } from "./rule";
 import {
+	type CallEachNode,
+	type CallNode,
 	type DecisionNode,
 	type Flow,
 	type FlowNode,
-	type ForEachNode,
 	flowSchema,
 	jsonOutputFields,
 	labelSchema,
@@ -15,7 +16,7 @@ import {
 	reservedNames,
 	reservedOutcomes,
 	runFields,
-	type SubflowNode,
+	runsEach,
 } from "./schema";
 import { templateRefs } from "./template";
 import type { FlowIssue, ValidateOptions } from "./types";
@@ -38,11 +39,11 @@ type Flows = Readonly<Record<string, Flow | null>>;
  * Warns about unreachable nodes and about outcomes without an edge, since
  * ending on one ends the run as failed.
  *
- * With `options.flows`, a Subflow or For Each node must call a flow that
- * exists and parses, bind only inputs it declares and every required input
- * it has no default for, and a flow may not call itself through Subflow or
- * For Each nodes. Issues inside a called flow are not repeated: a called
- * flow with errors gives one error on the calling node.
+ * With `options.flows`, a Call node must call a flow that exists and
+ * parses, bind only inputs it declares and every required input it has no
+ * default for, and a flow may not call itself through Call nodes. Issues
+ * inside a called flow are not repeated: a called flow with errors gives
+ * one error on the calling node.
  */
 export function validateFlow(
 	flow: Flow,
@@ -187,27 +188,24 @@ function validateIn(
 				checkDecision(node, scope, error, warning);
 				template(node.prompt, "prompt");
 				break;
-			case "subflow":
-				for (const [name, value] of Object.entries(node.inputs)) {
-					template(value, `input "${name}"`);
-				}
-				break;
-			case "foreach":
-				switch (node.source.kind) {
-					case "json":
-						template(node.source.value, "source value");
-						break;
-					case "command":
-						template(node.source.command, "source command");
-						break;
-					case "files":
-						template(node.source.glob, "source glob");
-						break;
+			case "call":
+				if (runsEach(node)) {
+					switch (node.each.source.kind) {
+						case "json":
+							template(node.each.source.value, "source value");
+							break;
+						case "command":
+							template(node.each.source.command, "source command");
+							break;
+						case "files":
+							template(node.each.source.glob, "source glob");
+							break;
+					}
+					checkHaltOn(node, error);
 				}
 				for (const [name, value] of Object.entries(node.inputs)) {
 					template(value, `input "${name}"`);
 				}
-				checkHaltOn(node, error);
 				break;
 		}
 	}
@@ -219,7 +217,7 @@ function validateIn(
 		const chain =
 			options.name === undefined ? ancestors : [...ancestors, options.name];
 		for (const node of nodes.values()) {
-			if (node.type === "subflow" || node.type === "foreach") {
+			if (node.type === "call") {
 				checkCall(node, flows, chain, error, warning);
 			}
 		}
@@ -315,7 +313,7 @@ function checkInputs(
 /** Outputs: unique, valid names that every caller can read, and known templates. */
 function checkOutputs(scope: Scope, error: Report): void {
 	const seen = new Set<string>();
-	const builtIn: readonly string[] = outputFieldsByType.subflow;
+	const builtIn: readonly string[] = outputFieldsByType.call;
 	for (const output of scope.flow.outputs) {
 		const name = output.name;
 		if (seen.has(name)) {
@@ -331,7 +329,7 @@ function checkOutputs(scope: Scope, error: Report): void {
 			);
 		} else if (builtIn.includes(name)) {
 			error(
-				`The output "${name}" clashes with a field every Subflow node has: ${builtIn.join(", ")}.`,
+				`The output "${name}" clashes with a field every Call node has: ${builtIn.join(", ")}.`,
 				{},
 			);
 		}
@@ -349,7 +347,8 @@ function checkOutputs(scope: Scope, error: Report): void {
  * Each reference names `run`, an input, or a node. `run`: one field of
  * `runFields`. A `text` input: no path. A `json` input: any path. A node:
  * one of its output fields first; deeper keys only below a JSON field (and
- * below a Subflow node's flow outputs, which hold JSON).
+ * below a Call node's flow outputs, which hold JSON). A Command node's
+ * `data` needs `output: "json"`.
  */
 function checkTemplate(
 	text: string,
@@ -392,15 +391,22 @@ function checkTemplate(
 			continue;
 		}
 
-		let fields: readonly string[] = outputFieldsByType[node.type];
+		let fields: readonly string[] = nodeOutputFields(node);
 		/** Fields that take a deeper path. */
 		let json: readonly string[] = jsonOutputFields;
-		if (node.type === "subflow") {
+		if (node.type === "call" && !runsEach(node)) {
 			const called = calledFlow(node, scope.flows);
 			// Unknown until the flows load, or broken: the call reports that.
 			if (called === undefined) continue;
 			fields = nodeOutputFields(node, called);
 			json = [...json, ...called.outputs.map((output) => output.name)];
+		}
+		if (node.type === "command" && field === "data" && node.output !== "json") {
+			error(
+				`${uses}, but the command node "${ref.name}" prints text. Set its output to JSON to read data.`,
+				at,
+			);
+			continue;
 		}
 		if (field === undefined) {
 			error(
@@ -418,9 +424,9 @@ function checkTemplate(
 	}
 }
 
-/** The flow a Subflow node calls; undefined when it is not known or broken. */
+/** The flow a Call node calls; undefined when it is not known or broken. */
 function calledFlow(
-	node: SubflowNode,
+	node: CallNode,
 	flows: Flows | undefined,
 ): Flow | undefined {
 	if (flows === undefined || !Object.hasOwn(flows, node.flow)) return undefined;
@@ -442,14 +448,14 @@ function isObjectSchema(schema: Record<string, unknown>): boolean {
  * that flow, so each is reported once.
  */
 function checkCall(
-	node: SubflowNode | ForEachNode,
+	node: CallNode,
 	flows: Flows,
 	chain: readonly string[],
 	error: Report,
 	warning: Report,
 ): void {
 	const at = { nodeId: node.id };
-	const kind = node.type === "subflow" ? "Subflow" : "For Each";
+	const kind = "Call";
 	const runs = `${kind} node "${node.id}" runs flow "${node.flow}"`;
 	if (!Object.hasOwn(flows, node.flow)) {
 		error(`${runs}, which does not exist.`, at);
@@ -463,26 +469,27 @@ function checkCall(
 
 	const inputs = new Map(called.inputs.map((input) => [input.name, input]));
 	const bound = new Set(Object.keys(node.inputs));
-	if (node.type === "foreach") {
-		const as = inputs.get(node.as);
+	if (runsEach(node)) {
+		const { as: name } = node.each;
+		const as = inputs.get(name);
 		if (as === undefined) {
 			error(
-				`${runs}, which has no input "${node.as}" to take each item. Add a json input "${node.as}" to it, or change "as".`,
+				`${runs}, which has no input "${name}" to take each item. Add a json input "${name}" to it, or change "as".`,
 				at,
 			);
 		} else if (as.type === "text") {
 			warning(
-				`${runs}, whose input "${node.as}" is text: an item that is an object or an array arrives as JSON text. Make it a json input.`,
+				`${runs}, whose input "${name}" is text: an item that is an object or an array arrives as JSON text. Make it a json input.`,
 				at,
 			);
 		}
-		if (bound.has(node.as)) {
+		if (bound.has(name)) {
 			error(
-				`For Each node "${node.id}" binds the input "${node.as}", which already takes each item.`,
+				`${kind} node "${node.id}" binds the input "${name}", which already takes each item.`,
 				at,
 			);
 		}
-		bound.add(node.as);
+		bound.add(name);
 	}
 	for (const name of Object.keys(node.inputs)) {
 		if (!inputs.has(name)) {
@@ -529,8 +536,8 @@ function checkCall(
 }
 
 /**
- * The shortest chain of calls (Subflow and For Each nodes) from `start` to
- * `target`, both included, or null. Does not pass through `skip`.
+ * The shortest chain of calls (Call nodes) from `start` to `target`, both
+ * included, or null. Does not pass through `skip`.
  */
 function pathBack(
 	start: string,
@@ -545,7 +552,7 @@ function pathBack(
 	for (let name = queue.shift(); name !== undefined; name = queue.shift()) {
 		const flow = Object.hasOwn(flows, name) ? flows[name] : null;
 		for (const node of flow?.nodes ?? []) {
-			if (node.type !== "foreach" && node.type !== "subflow") continue;
+			if (node.type !== "call") continue;
 			if (parent.has(node.flow)) continue;
 			parent.set(node.flow, name);
 			if (node.flow === target) {
@@ -564,18 +571,18 @@ function pathBack(
 }
 
 /** Halt labels are outcomes of the called flow: valid labels, not reserved. */
-function checkHaltOn(node: ForEachNode, error: Report): void {
+function checkHaltOn(node: CallEachNode, error: Report): void {
 	const reserved: readonly string[] = reservedOutcomes;
-	for (const label of node.haltOn) {
+	for (const label of node.each.haltOn) {
 		const parsed = labelSchema.safeParse(label);
 		if (!parsed.success) {
 			error(
-				`For Each node "${node.id}" halts on "${label}", which is not a valid label: ${parsed.error.issues[0]?.message ?? "not allowed"}`,
+				`Call node "${node.id}" halts on "${label}", which is not a valid label: ${parsed.error.issues[0]?.message ?? "not allowed"}`,
 				{ nodeId: node.id },
 			);
 		} else if (reserved.includes(label)) {
 			error(
-				`For Each node "${node.id}" halts on "${label}", which is reserved. Do not use: ${reserved.join(", ")}.`,
+				`Call node "${node.id}" halts on "${label}", which is reserved. Do not use: ${reserved.join(", ")}.`,
 				{ nodeId: node.id },
 			);
 		}

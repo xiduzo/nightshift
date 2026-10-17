@@ -62,6 +62,7 @@ import {
 	itemsOf,
 	scopeChain,
 	stepAtScope,
+	stepRunsEach,
 	stepsIn,
 	stepsUnder,
 } from "@/lib/run-steps";
@@ -113,7 +114,7 @@ function RunComponent() {
 	const desktop = useMediaQuery(DESKTOP);
 	/** Null follows the latest step as the run walks. */
 	const [pickedStepId, setPickedStepId] = useState<string | null>(null);
-	/** The call in focus (a Subflow step or a For Each element): the steps and the graph narrow to it. */
+	/** The call in focus (a Call step, or one of its elements): the steps and the graph narrow to it. */
 	const [focus, setFocus] = useState<ItemScope>(null);
 	const [consoleOpen, setConsoleOpen] = useState(false);
 	const consolePanel = useRef<PanelHandle>(null);
@@ -310,6 +311,7 @@ function RunComponent() {
 					onSelect={setPickedStepId}
 					onSelectItem={selectItem}
 					calledName={(step) => calledFlowName(runData, steps, step)}
+					runsEach={(step) => stepRunsEach(runData, steps, step)}
 				/>
 			</ScrollArea>
 		</section>

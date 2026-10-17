@@ -1,4 +1,4 @@
-import type { Flow, ForEachNode, ListSource } from "@nightshift/flows";
+import type { CallEach, CallNode, Flow, ListSource } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	DropdownMenu,
@@ -7,20 +7,25 @@ import {
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
 import {
+	FieldContent,
 	FieldDescription,
+	FieldLabel,
 	FieldLegend,
 	FieldSet,
+	Field as ShadcnField,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
+import { Switch } from "@nightshift/ui/components/switch";
 import { ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useRef } from "react";
 
 import {
 	calledFlow,
+	defaultEach,
 	emptySource,
 	nodeOptions,
 	SOURCE_KINDS,
@@ -38,26 +43,145 @@ import { TemplateField } from "./template-field";
 
 const SOURCE_ORDER: ListSource["kind"][] = ["json", "command", "files"];
 
-export function ForEachFields({
+/**
+ * One Call node, two ways to run: once, or once per item in a list. The
+ * switch reveals the list fields; `onSetEach` changes the node's outcomes
+ * with it (pass and fail, or done and halted), so the editor drops the
+ * edges that no longer fit.
+ */
+export function CallFields({
 	flow,
 	node,
 	support,
 	onChange,
+	onSetEach,
 }: {
 	flow: Flow;
-	node: ForEachNode;
+	node: CallNode;
 	support: CalledFlowSupport;
-	onChange: (change: (node: ForEachNode) => ForEachNode) => void;
+	onChange: (change: (node: CallNode) => CallNode) => void;
+	onSetEach: (each: CallEach | undefined) => void;
+}) {
+	const id = useId();
+	const called = calledFlow(node, support.flows);
+	// Switching "once per item" off and on keeps the list fields.
+	const lastEach = useRef<CallEach | undefined>(undefined);
+	const { each } = node;
+
+	return (
+		<>
+			<InspectorSection title="Called flow">
+				<CalledFlowField
+					id={`${id}-flow`}
+					node={node}
+					support={support}
+					hint={
+						each
+							? "Runs once for each item. The item goes to one of its inputs."
+							: "Runs once. This node passes when the called flow finishes, and fails when it does not."
+					}
+					onPick={(name) => onChange((current) => ({ ...current, flow: name }))}
+				/>
+
+				<ShadcnField orientation="horizontal" className="items-start">
+					<Switch
+						id={`${id}-each`}
+						checked={each !== undefined}
+						className="mt-0.5"
+						aria-describedby={`${id}-each-hint`}
+						onCheckedChange={(on) => {
+							if (on === (each !== undefined)) return;
+							if (!on) lastEach.current = each;
+							onSetEach(on ? (lastEach.current ?? defaultEach()) : undefined);
+						}}
+					/>
+					<FieldContent>
+						<FieldLabel htmlFor={`${id}-each`}>Run once per item</FieldLabel>
+						<FieldDescription id={`${id}-each-hint`} className="text-xs">
+							{each
+								? "The flow runs for each item in a list. This node ends with done or halted."
+								: "The flow runs one time. This node ends with pass or fail."}
+						</FieldDescription>
+					</FieldContent>
+				</ShadcnField>
+
+				{each ? null : (
+					<>
+						<InputBindings
+							flow={flow}
+							node={node}
+							called={called}
+							onChange={(inputs) =>
+								onChange((current) => ({ ...current, inputs }))
+							}
+						/>
+						<OnceNote node={node} called={called} />
+					</>
+				)}
+			</InspectorSection>
+
+			{each ? (
+				<EachFields
+					flow={flow}
+					node={node}
+					each={each}
+					called={called}
+					onChange={onChange}
+				/>
+			) : null}
+		</>
+	);
+}
+
+/** What later nodes read from a Call that runs once. */
+function OnceNote({ node, called }: { node: CallNode; called: Flow | null }) {
+	const outputs = called?.outputs ?? [];
+	return (
+		<Note>
+			Later nodes read <code>{`{{${node.id}.ended}}`}</code> (the outcome the
+			called flow ended on)
+			{outputs.length > 0 ? (
+				<>
+					{" "}
+					and its outputs:{" "}
+					{outputs.map((output, index) => (
+						<span key={output.name}>
+							{index > 0 ? ", " : null}
+							<code>{`{{${node.id}.${output.name}}}`}</code>
+						</span>
+					))}
+				</>
+			) : null}
+			.
+		</Note>
+	);
+}
+
+/** The list fields of a Call that runs once per item: the items, the input each goes to, the loop. */
+function EachFields({
+	flow,
+	node,
+	each,
+	called,
+	onChange,
+}: {
+	flow: Flow;
+	node: CallNode;
+	each: CallEach;
+	called: Flow | null;
+	onChange: (change: (node: CallNode) => CallNode) => void;
 }) {
 	const id = useId();
 	// Switching the source kind back and forth keeps what was typed.
 	const lastSource = useRef<Partial<Record<ListSource["kind"], ListSource>>>(
 		{},
 	);
+	const changeEach = (change: (each: CallEach) => CallEach) =>
+		onChange((current) =>
+			current.each ? { ...current, each: change(current.each) } : current,
+		);
 	const setSource = (source: ListSource) =>
-		onChange((current) => ({ ...current, source }));
-
-	const called = calledFlow(node, support.flows);
+		changeEach((current) => ({ ...current, source }));
 
 	return (
 		<>
@@ -69,12 +193,12 @@ export function ForEachFields({
 				>
 					<NativeSelect
 						id={`${id}-kind`}
-						value={node.source.kind}
+						value={each.source.kind}
 						aria-describedby={`${id}-kind-hint`}
 						onChange={(event) => {
 							const kind = event.target.value as ListSource["kind"];
-							if (kind === node.source.kind) return;
-							lastSource.current[node.source.kind] = node.source;
+							if (kind === each.source.kind) return;
+							lastSource.current[each.source.kind] = each.source;
 							setSource(lastSource.current[kind] ?? emptySource(kind));
 						}}
 					>
@@ -86,30 +210,28 @@ export function ForEachFields({
 					</NativeSelect>
 				</Field>
 
-				<SourceFields flow={flow} node={node} onChange={setSource} />
+				<SourceFields
+					flow={flow}
+					node={node}
+					each={each}
+					onChange={setSource}
+				/>
 			</InspectorSection>
 
 			<InspectorSection title="Each item runs">
-				<CalledFlowField
-					id={`${id}-flow`}
-					node={node}
-					support={support}
-					hint="Runs once for each item. The item goes to one of its inputs."
-					onPick={(name) => onChange((current) => ({ ...current, flow: name }))}
-				/>
-
 				<AsField
 					id={`${id}-as`}
 					node={node}
+					each={each}
 					called={called}
-					onChange={(as) => onChange((current) => ({ ...current, as }))}
+					onChange={(as) => changeEach((current) => ({ ...current, as }))}
 				/>
 
 				<InputBindings
 					flow={flow}
 					node={node}
 					called={called}
-					skip={node.as}
+					skip={each.as}
 					onChange={(inputs) => onChange((current) => ({ ...current, inputs }))}
 				/>
 			</InspectorSection>
@@ -119,18 +241,18 @@ export function ForEachFields({
 					id={`${id}-branch`}
 					label="Branch"
 					hint={
-						node.branch === "per-item"
+						each.branch === "per-item"
 							? "Each item gets its own branch, on top of the last item that finished. Use {{run.branch}} and {{run.base_branch}} to read them."
 							: "All items work on the same branch, one after the other."
 					}
 				>
 					<NativeSelect
 						id={`${id}-branch`}
-						value={node.branch}
+						value={each.branch}
 						aria-describedby={`${id}-branch-hint`}
 						onChange={(event) => {
-							const branch = event.target.value as ForEachNode["branch"];
-							onChange((current) => ({ ...current, branch }));
+							const branch = event.target.value as CallEach["branch"];
+							changeEach((current) => ({ ...current, branch }));
 						}}
 					>
 						<NativeSelectOption value="per-item">
@@ -145,8 +267,11 @@ export function ForEachFields({
 				<HaltOnField
 					id={`${id}-halt`}
 					node={node}
+					each={each}
 					called={called}
-					onChange={(haltOn) => onChange((current) => ({ ...current, haltOn }))}
+					onChange={(haltOn) =>
+						changeEach((current) => ({ ...current, haltOn }))
+					}
 				/>
 
 				<Field
@@ -157,11 +282,13 @@ export function ForEachFields({
 				>
 					<PositiveIntInput
 						id={`${id}-max`}
-						value={node.maxItems}
+						value={each.maxItems}
 						placeholder="No limit"
 						describedBy={`${id}-max-hint`}
 						onChange={(maxItems) =>
-							onChange((current) => ({ ...current, maxItems }))
+							changeEach(({ maxItems: _, ...current }) =>
+								maxItems === undefined ? current : { ...current, maxItems },
+							)
 						}
 					/>
 				</Field>
@@ -183,14 +310,16 @@ export function ForEachFields({
 function SourceFields({
 	flow,
 	node,
+	each,
 	onChange,
 }: {
 	flow: Flow;
-	node: ForEachNode;
+	node: CallNode;
+	each: CallEach;
 	onChange: (source: ListSource) => void;
 }) {
 	const id = useId();
-	const { source } = node;
+	const { source } = each;
 	switch (source.kind) {
 		case "json":
 			return (
@@ -242,7 +371,7 @@ function SourceFields({
 					hint={
 						<>
 							Each matching file is one item, in path order. Use{" "}
-							<code className="font-mono">{`{{${node.as}.path}}`}</code> for its
+							<code className="font-mono">{`{{${each.as}.path}}`}</code> for its
 							path.
 						</>
 					}
@@ -303,11 +432,13 @@ function RecipePicker({ onPick }: { onPick: (command: string) => void }) {
 function AsField({
 	id,
 	node,
+	each,
 	called,
 	onChange,
 }: {
 	id: string;
-	node: ForEachNode;
+	node: CallNode;
+	each: CallEach;
 	called: Flow | null;
 	onChange: (as: string) => void;
 }) {
@@ -316,12 +447,12 @@ function AsField({
 				(a, b) => Number(b.type === "json") - Number(a.type === "json"),
 			)
 		: [];
-	const picked = inputs.find((input) => input.name === node.as);
+	const picked = inputs.find((input) => input.name === each.as);
 	const missing = called !== null && !picked;
 	const hint =
 		picked?.type === "text"
 			? "A text input gets the item as text. Use a json input to read its fields."
-			: `The called flow gets the item in this input, and reads it as {{${node.as}}} or {{${node.as}.title}}.`;
+			: `The called flow gets the item in this input, and reads it as {{${each.as}}} or {{${each.as}.title}}.`;
 
 	return (
 		<Field
@@ -330,22 +461,22 @@ function AsField({
 			hint={hint}
 			error={
 				missing
-					? `${node.flow} has no input ${node.as}. Pick one, or add a json input to it.`
+					? `${node.flow} has no input ${each.as}. Pick one, or add a json input to it.`
 					: null
 			}
 		>
 			{called && inputs.length > 0 ? (
 				<NativeSelect
 					id={id}
-					value={node.as}
+					value={each.as}
 					className="font-mono"
 					aria-invalid={missing}
 					aria-describedby={`${id}-hint`}
 					onChange={(event) => onChange(event.target.value)}
 				>
 					{missing ? (
-						<NativeSelectOption value={node.as}>
-							{node.as} (missing)
+						<NativeSelectOption value={each.as}>
+							{each.as} (missing)
 						</NativeSelectOption>
 					) : null}
 					{inputs.map((input) => (
@@ -358,7 +489,7 @@ function AsField({
 			) : (
 				<Input
 					id={id}
-					value={node.as}
+					value={each.as}
 					className="font-mono"
 					autoComplete="off"
 					spellCheck={false}
@@ -373,7 +504,7 @@ function AsField({
 						className="mt-px size-3.5 shrink-0"
 						aria-hidden="true"
 					/>
-					{node.as} is a text input.
+					{each.as} is a text input.
 				</p>
 			) : null}
 		</Field>
@@ -384,11 +515,13 @@ function AsField({
 function HaltOnField({
 	id,
 	node,
+	each,
 	called,
 	onChange,
 }: {
 	id: string;
-	node: ForEachNode;
+	node: CallNode;
+	each: CallEach;
 	/** The called flow, when it loads. */
 	called: Flow | null;
 	onChange: (haltOn: string[]) => void;
@@ -401,7 +534,7 @@ function HaltOnField({
 					: [],
 			),
 		),
-	].filter((name) => !node.haltOn.includes(name));
+	].filter((name) => !each.haltOn.includes(name));
 
 	return (
 		<FieldSet className="gap-2">
@@ -414,17 +547,17 @@ function HaltOnField({
 			</FieldDescription>
 			<OptionsEditor
 				kind="option"
-				options={node.haltOn.map((name) => ({ name }))}
+				options={each.haltOn.map((name) => ({ name }))}
 				min={0}
 				newName="halt"
 				describedBy={`${id}-hint`}
 				onRename={(index, name) => {
-					onChange(node.haltOn.map((old, at) => (at === index ? name : old)));
+					onChange(each.haltOn.map((old, at) => (at === index ? name : old)));
 					return null;
 				}}
-				onAdd={(option) => onChange([...node.haltOn, option.name])}
+				onAdd={(option) => onChange([...each.haltOn, option.name])}
 				onRemove={(index) =>
-					onChange(node.haltOn.filter((_, at) => at !== index))
+					onChange(each.haltOn.filter((_, at) => at !== index))
 				}
 			/>
 			{suggestions.length > 0 ? (
@@ -440,7 +573,7 @@ function HaltOnField({
 							className="h-6 border-dashed px-1.5 font-mono font-normal text-[11px]"
 							title={`Halt on ${name}`}
 							aria-label={`+ ${name}`}
-							onClick={() => onChange([...node.haltOn, name])}
+							onClick={() => onChange([...each.haltOn, name])}
 						>
 							<PlusIcon data-icon="inline-start" aria-hidden="true" />
 							{name}

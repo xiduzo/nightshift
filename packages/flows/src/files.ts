@@ -55,7 +55,7 @@ export async function loadAllFlows(
 
 /**
  * Fails when the file does not exist. A file that is not valid JSON loads with
- * flow null. For Each bodies are checked against the repo's other flow files.
+ * flow null. Called flows are checked against the repo's other flow files.
  */
 export async function readFlowFile(
 	repoPath: string,

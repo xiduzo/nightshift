@@ -9,12 +9,13 @@ import {
 import type { AgentHarness, AgentSessionInput } from "@nightshift/agents/types";
 import type {
 	AgentNode,
+	CallEach,
+	CallEachNode,
+	CallNode,
 	CommandNode,
 	Flow,
 	FlowEdge,
 	FlowInput,
-	ForEachNode,
-	SubflowNode,
 } from "@nightshift/flows";
 
 import { createEngine } from "./engine";
@@ -32,8 +33,8 @@ import {
 import type { Engine, EngineOptions, RunDetail, StepSummary } from "./types";
 
 /**
- * Flow format 2: inputs and outputs, templates with paths, the Subflow
- * node, For Each over any list, Agent outcomes and output schemas, and
+ * Flow format 2: inputs and outputs, templates with paths, the Call
+ * node (once, and over any list), Agent outcomes and output schemas, and
  * runs and flow files of format 1.
  */
 
@@ -91,34 +92,40 @@ function agent(
 }
 
 function command(id: string, cmd: string): CommandNode {
-	return { id, type: "command", position: { x: 0, y: 0 }, command: cmd };
+	return {
+		id,
+		type: "command",
+		position: { x: 0, y: 0 },
+		command: cmd,
+		output: "text",
+	};
 }
 
-function subflow(
+function callOnce(
 	id: string,
 	flow: string,
 	inputs: Record<string, string> = {},
-): SubflowNode {
-	return { id, type: "subflow", position: { x: 0, y: 0 }, flow, inputs };
+): CallNode {
+	return { id, type: "call", position: { x: 0, y: 0 }, flow, inputs };
 }
 
-function forEach(
+/** A Call node with `each`: `extra` fills `each`, except `inputs` and `timeoutMinutes`. */
+function callEach(
 	id: string,
 	flow: string,
-	source: ForEachNode["source"],
-	extra: Partial<ForEachNode> = {},
-): ForEachNode {
+	source: CallEach["source"],
+	extra: Partial<CallEach> &
+		Partial<Pick<CallNode, "inputs" | "timeoutMinutes">> = {},
+): CallEachNode {
+	const { inputs, timeoutMinutes, ...each } = extra;
 	return {
 		id,
-		type: "foreach",
+		type: "call",
 		position: { x: 0, y: 0 },
-		source,
 		flow,
-		as: "item",
-		inputs: {},
-		branch: "shared",
-		haltOn: ["halt"],
-		...extra,
+		inputs: inputs ?? {},
+		...(timeoutMinutes === undefined ? {} : { timeoutMinutes }),
+		each: { source, as: "item", branch: "shared", haltOn: ["halt"], ...each },
 	};
 }
 
@@ -132,7 +139,7 @@ function flowOf(
 	extra: Partial<Flow> = {},
 ): Flow {
 	return {
-		version: 3,
+		version: 4,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -277,7 +284,7 @@ describe("inputs at start", () => {
 	});
 });
 
-describe("Subflow", () => {
+describe("Call", () => {
 	test("binds inputs, runs the called flow in its own scope, and returns its outputs", async () => {
 		await saveFlow(
 			"greet",
@@ -307,7 +314,7 @@ describe("Subflow", () => {
 			flow: flowOf(
 				[
 					command("prep", "printf 'x'"),
-					subflow("sub", "greet", {
+					callOnce("sub", "greet", {
 						name: "{{who}}",
 						count: "{{prep.exit_code}}",
 					}),
@@ -324,7 +331,7 @@ describe("Subflow", () => {
 		expect(detail.status).toBe("finished");
 		expect(Object.keys(detail.calledFlows)).toEqual(["greet"]);
 		const sub = stepOf(detail, "sub");
-		expect(sub.nodeType).toBe("subflow");
+		expect(sub.nodeType).toBe("call");
 		expect(sub.outcome).toBe("pass");
 		expect(sub.outputs).toEqual({
 			greeting: "hi bob 0",
@@ -365,9 +372,9 @@ describe("Subflow", () => {
 			projectId: id,
 			flow: flowOf(
 				[
-					subflow("try", "broken"),
+					callOnce("try", "broken"),
 					command("cleanup", `echo "{{try.outcome}} {{try.why}}"`),
-					subflow("ask", "review"),
+					callOnce("ask", "review"),
 					command("verdict", `echo "{{ask.ended}}"`),
 				],
 				[
@@ -389,7 +396,7 @@ describe("Subflow", () => {
 		// Without an edge on `fail`, the run fails.
 		const failing = await engine.startRun({
 			projectId: id,
-			flow: flowOf([subflow("try", "broken")]),
+			flow: flowOf([callOnce("try", "broken")]),
 		});
 		const failed = await waitForEnd(engine, failing.id);
 		expect(failed.status).toBe("failed");
@@ -409,7 +416,7 @@ describe("Subflow", () => {
 			flow: flowOf(
 				[
 					command("empty", "true"),
-					subflow("call", "needs", { must: "{{empty.log_tail}}" }),
+					callOnce("call", "needs", { must: "{{empty.log_tail}}" }),
 				],
 				[edge("e1", "empty", "pass", "call")],
 			),
@@ -434,7 +441,7 @@ describe("Subflow", () => {
 		);
 		await saveFlow(
 			"mid",
-			flowOf([subflow("inner", "leaf", { n: "{{payload}}" })], [], {
+			flowOf([callOnce("inner", "leaf", { n: "{{payload}}" })], [], {
 				inputs: [{ name: "payload", type: "json", required: true }],
 				outputs: [
 					{ name: "value", value: "{{inner.value}}" },
@@ -447,7 +454,7 @@ describe("Subflow", () => {
 			projectId: await projectId(engine),
 			flow: flowOf(
 				[
-					subflow("outer", "mid", { payload: '{"list": [1, 2]}' }),
+					callOnce("outer", "mid", { payload: '{"list": [1, 2]}' }),
 					command("end", `echo "{{outer.value}} / {{outer.list.1}}"`),
 				],
 				[edge("e1", "outer", "pass", "end")],
@@ -494,7 +501,7 @@ describe("Subflow", () => {
 			projectId: await projectId(engine),
 			flow: flowOf(
 				[
-					subflow("call", "ask", { what: "it" }),
+					callOnce("call", "ask", { what: "it" }),
 					command("after", `echo "{{call.ended}} {{call.note}}"`),
 				],
 				[edge("e1", "call", "pass", "after")],
@@ -529,7 +536,7 @@ describe("Subflow", () => {
 			projectId: await projectId(engine),
 			flow: flowOf(
 				[
-					subflow("call", "work", { topic: "trees" }),
+					callOnce("call", "work", { topic: "trees" }),
 					command("after", `echo "{{call.said}}"`),
 				],
 				[edge("e1", "call", "pass", "after")],
@@ -569,7 +576,7 @@ describe("Subflow", () => {
 			flow: flowOf(
 				[
 					agent("plan", "Plan it"),
-					subflow("call", "sub", { note: "exit {{check.exit_code}}" }),
+					callOnce("call", "sub", { note: "exit {{check.exit_code}}" }),
 					command("check", "exit 1"),
 				],
 				[
@@ -633,7 +640,7 @@ describe("Subflow", () => {
 	});
 });
 
-describe("For Each over any list", () => {
+describe("Call with each, over any list", () => {
 	test("a planner's data feeds a For Each; `as`, bindings, run fields and `results`", async () => {
 		await saveFlow(
 			"task",
@@ -680,7 +687,7 @@ describe("For Each over any list", () => {
 							properties: { tasks: { type: "array" } },
 						},
 					}),
-					forEach(
+					callEach(
 						"each",
 						"task",
 						{ kind: "json", value: "{{planner.data.tasks}}" },
@@ -771,7 +778,7 @@ describe("For Each over any list", () => {
 		const engine = makeEngine(fakeHarness());
 		const id = await projectId(engine);
 		const flow = flowOf(
-			[forEach("files", "lint", { kind: "files", glob: "{{pattern}}" })],
+			[callEach("files", "lint", { kind: "files", glob: "{{pattern}}" })],
 			[],
 			{
 				inputs: [{ name: "pattern", type: "text", default: "src/*.ts" }],
@@ -838,7 +845,7 @@ describe("For Each over any list", () => {
 		const strings = await engine.startRun({
 			projectId: id,
 			flow: flowOf([
-				forEach("loop", "echo", {
+				callEach("loop", "echo", {
 					kind: "command",
 					command: `printf '%s' '["x","y"]'`,
 				}),
@@ -871,7 +878,7 @@ describe("For Each over any list", () => {
 		const objects = await engine.startRun({
 			projectId: id,
 			flow: flowOf([
-				forEach("loop", "issue", {
+				callEach("loop", "issue", {
 					kind: "command",
 					command: `printf '%s' '${JSON.stringify(elements)}'`,
 				}),
@@ -1215,7 +1222,7 @@ describe("flow format 1", () => {
 			inputs: { epic: "7" },
 		});
 		const loaded = await engine.getRun(runId);
-		expect(loaded.flow.version).toBe(3);
+		expect(loaded.flow.version).toBe(4);
 		expect(loaded.flow.inputs).toEqual([
 			expect.objectContaining({ name: "epic", type: "text", required: true }),
 		]);
@@ -1223,6 +1230,8 @@ describe("flow format 1", () => {
 			expect.objectContaining({ name: "item", type: "json", required: true }),
 		]);
 		const loop = stepOf(loaded, "loop");
+		// A For Each step from before flow version 4 reads as a Call step.
+		expect(loop.nodeType).toBe("call");
 		expect(loop.items[0]).toMatchObject({
 			id: "12",
 			title: "first",

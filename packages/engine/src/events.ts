@@ -49,8 +49,8 @@ export type GateChoice = { name: string; description?: string };
 
 /**
  * Where a step runs: null at the top level of the run's flow, or inside a
- * flow that a Subflow or For Each step called. `parentStepId` is that step;
- * `itemId` is the element of a For Each (null for a Subflow). Step ids are
+ * flow that a Call step called. `parentStepId` is that step; `itemId` is
+ * the element of a Call with `each` (null for a Call once). Step ids are
  * unique, so the innermost caller is enough: the caller has a scope of its
  * own, and the chain of scopes leads up to the top level. Logs written
  * before flow format 2 say `forEachStepId`; `parseEventRow` reads them as
@@ -123,14 +123,14 @@ export type EnginePayloads = {
 		nodeType: FlowNodeType;
 		visit: number;
 		transcriptPath: string;
-		/** Command and For Each steps only. */
+		/** Command steps, and Call steps with a command source, only. */
 		logPath: string | null;
 		/** Null (or absent before Slice 4) at the top level. */
 		scope?: Scope | null;
 	};
 	/**
 	 * An ended step runs again: an Agent step in a new session of the same
-	 * harness session, a Subflow or For Each step to continue its called flow.
+	 * harness session, a Call step to continue its called flow.
 	 */
 	StepReopened: { prompt: string | null };
 	StepEnded: {
@@ -181,13 +181,13 @@ export type EnginePayloads = {
 		scope?: Scope | null;
 	};
 	/**
-	 * A Subflow step calls its flow with these input values (bindings
+	 * A Call step (once) calls its flow with these input values (bindings
 	 * rendered, defaults applied). The called flow runs in the step's scope.
 	 */
 	FlowCalled: { flow: string; inputs: InputValues };
-	/** A For Each step read its source. */
+	/** A Call step with `each` read its source. */
 	ItemsRead: { count: number; open: number };
-	/** A For Each step starts an element: its flow runs in the scope of this element. */
+	/** A Call step with `each` starts an element: its flow runs in the scope of this element. */
 	ItemStarted: {
 		item: ItemFacts;
 		/** 1 for the first item the visit started. */
@@ -595,13 +595,13 @@ export function deriveSessions(
 	return [...sessions.values()];
 }
 
-/** One item of a For Each visit, as the log tells it. */
+/** One item of a Call step's visit (`each`), as the log tells it. */
 export type DerivedItem = {
 	facts: ItemFacts;
 	/** 1-based among the started items; null for an item that was blocked. */
 	index: number | null;
 	/**
-	 * `running` only while the For Each step runs. An item whose For Each
+	 * `running` only while the Call step runs. An item whose Call step
 	 * step ended (stopped, failed, interrupted) before the item did shows
 	 * `failed` with the reason; `open` still tells that the item never ended.
 	 */
@@ -646,11 +646,26 @@ export type DerivedStep = {
 		openedAt: number;
 		openedSeq: number;
 	} | null;
-	/** For Each steps only: its items in the order they started or were blocked. */
+	/** Call steps with `each` only: its items in the order they started or were blocked. */
 	items: DerivedItem[];
-	/** Subflow steps only: the call, once its inputs were bound. */
+	/** Call steps (once) only: the call, once its inputs were bound. */
 	call: EnginePayloads["FlowCalled"] | null;
 };
+
+/**
+ * The node types of runs from before flow version 4, read as today's: a
+ * Subflow step and a For Each step are Call steps. The one place the read
+ * model maps them, so old runs render like new ones.
+ */
+const legacyNodeTypes: Readonly<Record<string, FlowNodeType>> = {
+	subflow: "call",
+	foreach: "call",
+};
+
+/** A logged node type as today's `FlowNodeType`. */
+export function nodeTypeOf(logged: string): FlowNodeType {
+	return legacyNodeTypes[logged] ?? (logged as FlowNodeType);
+}
 
 /**
  * Steps in the order they started. A step's outcome comes from the latest
@@ -665,7 +680,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 			steps.set(e.stepId, {
 				id: e.stepId,
 				nodeId: e.payload.nodeId,
-				nodeType: e.payload.nodeType,
+				nodeType: nodeTypeOf(e.payload.nodeType),
 				visit: e.payload.visit,
 				scope: e.payload.scope ?? null,
 				transcriptPath: e.payload.transcriptPath,
@@ -766,14 +781,14 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 	return [...steps.values()];
 }
 
-/** Why an item that was still running ended with its For Each step. */
+/** Why an item that was still running ended with its Call step. */
 const cutShort: Record<string, string> = {
 	stopped: "The run stopped during this item.",
 	interrupted: "Night Shift stopped during this item.",
-	error: "The For Each step failed during this item.",
+	error: "The step failed during this item.",
 };
 
-/** The state of each item of a For Each step's visit, by item id. */
+/** The state of each item of a Call step's visit, by item id. */
 export function itemStates(step: DerivedStep): Record<string, ItemState> {
 	const states: Record<string, ItemState> = {};
 	for (const item of step.items) states[item.facts.id] = item.state;
@@ -915,7 +930,7 @@ export function parkedSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 	return withEnclosing(steps, stepId);
 }
 
-/** The step and the calling steps (Subflow, For Each) it runs in, from the inside out. */
+/** The step and the calling steps (Call) it runs in, from the inside out. */
 export function withEnclosing(
 	steps: readonly DerivedStep[],
 	stepId: string,

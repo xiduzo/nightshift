@@ -44,7 +44,9 @@ export function ResumeComposer({
 	};
 
 	const where = lastStep?.scope
-		? `Resuming continues at ${lastStep.nodeId}, inside the For Each, with the same item.`
+		? lastStep.scope.itemId === null
+			? `Resuming continues at ${lastStep.nodeId}, inside the called flow.`
+			: `Resuming continues at ${lastStep.nodeId}, inside the called flow, with the same item.`
 		: lastStep
 			? lastStep.nodeType === "agent"
 				? `Resuming continues at ${lastStep.nodeId}: the agent picks up where it left off.`

@@ -1,4 +1,10 @@
-import type { Flow, FlowIssue, FlowNode, Policy } from "@nightshift/flows";
+import type {
+	CallEach,
+	Flow,
+	FlowIssue,
+	FlowNode,
+	Policy,
+} from "@nightshift/flows";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -53,8 +59,10 @@ import {
 	renameNode,
 	renameOutcome,
 	restoreAgentOutcomes,
+	restoreCallEach,
 	restoreOutcome,
 	setAgentOutcomes,
+	setCallEach,
 	updateEdge,
 	updateNode,
 } from "@/lib/flow-draft";
@@ -105,7 +113,7 @@ function Editor({
 		() => JSON.stringify(draft) !== savedJson,
 		[draft, savedJson],
 	);
-	// The other flow files, for Subflow and For Each calls. The draft stands in for this one.
+	// The other flow files, for Call nodes. The draft stands in for this one.
 	const projectFlows = useProjectFlows(projectId, name);
 	// The daemon's settings (new-node defaults, run policy) and connections.
 	const settings = useQuery(orpc.settings.get.queryOptions());
@@ -208,15 +216,14 @@ function Editor({
 	const createCalled = useMutation(orpc.flows.save.mutationOptions());
 	const createCalledFlow = async (nodeId: string, calledName: string) => {
 		const node = draft.nodes.find((candidate) => candidate.id === nodeId);
-		if (node?.type !== "subflow" && node?.type !== "foreach") return;
+		if (node?.type !== "call") return;
 		try {
 			await createCalled.mutateAsync({
 				projectId,
 				name: calledName,
-				flow:
-					node.type === "foreach"
-						? newElementFlow(node.as, nodeDefaults)
-						: newFlow(nodeDefaults),
+				flow: node.each
+					? newElementFlow(node.each.as, nodeDefaults)
+					: newFlow(nodeDefaults),
 			});
 		} catch (error) {
 			toast.error(
@@ -226,9 +233,7 @@ function Editor({
 		}
 		void queryClient.invalidateQueries({ queryKey: orpc.flows.list.key() });
 		const next = updateNode(draft, nodeId, (current) =>
-			current.type === "subflow" || current.type === "foreach"
-				? { ...current, flow: calledName }
-				: current,
+			current.type === "call" ? { ...current, flow: calledName } : current,
 		);
 		setDraft(next);
 		if (!isSavable(next)) {
@@ -355,6 +360,32 @@ function Editor({
 	};
 
 	// Own outcomes on or off: edges on outcomes the node drops go too, with an undo.
+	const setSelectedCallEach =
+		(node: FlowNode) => (each: CallEach | undefined) => {
+			const result = setCallEach(draft, node.id, each);
+			setDraft((current) => setCallEach(current, node.id, each).flow);
+			const { dropped, previous } = result;
+			if (dropped.length === 0) return;
+			toast.info(
+				`Removed ${dropped.length} ${dropped.length === 1 ? "edge" : "edges"} on outcomes ${node.id} no longer has.`,
+				{
+					description: dropped
+						.map(
+							(edge) =>
+								`${edge.from} ${outcomeLabel(edge.outcome)} → ${edge.to}`,
+						)
+						.join(", "),
+					action: {
+						label: "Undo",
+						onClick: () =>
+							setDraft((current) =>
+								restoreCallEach(current, node.id, previous, dropped),
+							),
+					},
+				},
+			);
+		};
+
 	const setSelectedAgentOutcomes =
 		(node: FlowNode) => (outcomes: NodeOption[] | undefined) => {
 			const result = setAgentOutcomes(draft, node.id, outcomes);
@@ -402,6 +433,7 @@ function Editor({
 			onRenameOutcome={renameSelectedOutcome(selectedNode)}
 			onRemoveOutcome={removeSelectedOutcome(selectedNode)}
 			onSetAgentOutcomes={setSelectedAgentOutcomes(selectedNode)}
+			onSetCallEach={setSelectedCallEach(selectedNode)}
 			onSetStart={() =>
 				setDraft((current) => ({
 					...current,

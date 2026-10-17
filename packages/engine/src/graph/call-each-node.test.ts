@@ -9,7 +9,7 @@ import {
 	reportingScript,
 	usageLimitScript,
 } from "@nightshift/agents/fake";
-import type { Flow, ForEachNode } from "@nightshift/flows";
+import type { CallEach, CallEachNode, CallNode, Flow } from "@nightshift/flows";
 
 import { type DerivedStep, deriveSteps } from "../events";
 import { defaultRunSettings } from "../settings";
@@ -29,10 +29,10 @@ import {
 } from "./node-test-support";
 
 /**
- * The For Each node on the compiled graph: one element per super-step,
+ * The Call node with `each` on the compiled graph: one element per super-step,
  * the body as a subgraph per element. The event log, the transcript and
  * the outputs are compared with what the engine writes today for the same
- * situations (foreach.test.ts "For Each", flows-v2.test.ts).
+ * situations (call-each.test.ts "Call with each", flows-v2.test.ts).
  */
 
 const RUN_BRANCH = "nightshift/test";
@@ -47,25 +47,27 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
-const forEach = (
+/** A Call node with `each`: `extra` fills `each`, except `inputs` and `timeoutMinutes`. */
+const callEach = (
 	id: string,
 	flow: string,
-	source: ForEachNode["source"],
-	extra: Partial<ForEachNode> = {},
-): ForEachNode => ({
-	id,
-	type: "foreach",
-	position: { x: 0, y: 0 },
-	source,
-	flow,
-	as: "item",
-	inputs: {},
-	branch: "per-item",
-	haltOn: ["halt"],
-	...extra,
-});
+	source: CallEach["source"],
+	extra: Partial<CallEach> &
+		Partial<Pick<CallNode, "inputs" | "timeoutMinutes">> = {},
+): CallEachNode => {
+	const { inputs, timeoutMinutes, ...each } = extra;
+	return {
+		id,
+		type: "call",
+		position: { x: 0, y: 0 },
+		flow,
+		inputs: inputs ?? {},
+		...(timeoutMinutes === undefined ? {} : { timeoutMinutes }),
+		each: { source, as: "item", branch: "per-item", haltOn: ["halt"], ...each },
+	};
+};
 
-const json = (items: unknown[]): ForEachNode["source"] => ({
+const json = (items: unknown[]): CallEach["source"] => ({
 	kind: "json",
 	value: JSON.stringify(items),
 });
@@ -85,17 +87,15 @@ const body = (
 const commitItem = `echo "{{run.branch}}" > "item-{{item.id}}.txt" && git add -A && git -c user.name=t -c user.email=t@nightshift.invalid -c commit.gpgsign=false commit -q -m "item {{item.id}}"`;
 
 const loopStep = (steps: DerivedStep[], nodeId = "loop"): DerivedStep => {
-	const found = steps.find(
-		(s) => s.nodeId === nodeId && s.nodeType === "foreach",
-	);
-	if (!found) throw new Error(`No For Each step ${nodeId}`);
+	const found = steps.find((s) => s.nodeId === nodeId && s.nodeType === "call");
+	if (!found) throw new Error(`No Call step ${nodeId}`);
 	return found;
 };
 
 const itemTypes = async (h: Harness) =>
 	(await h.types()).filter((t) => t.startsWith("Item"));
 
-describe("the For Each node", () => {
+describe("the Call node with each", () => {
 	test("runs the body per element, blockers first, each on a branch stacked on the last done one; the log, the transcript, the outputs and the state", async () => {
 		const build = body(
 			[agent("worker", "Build {{item.title}}"), command("commit", commitItem)],
@@ -105,7 +105,7 @@ describe("the For Each node", () => {
 		const h = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					json([
@@ -183,7 +183,7 @@ describe("the For Each node", () => {
 		// The event payloads, as the engine writes them.
 		expect(payloads(logged, "StepStarted")[0]).toMatchObject({
 			nodeId: "loop",
-			nodeType: "foreach",
+			nodeType: "call",
 			visit: 1,
 			logPath: null,
 			scope: null,
@@ -313,7 +313,7 @@ describe("the For Each node", () => {
 		const h = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					json([
@@ -347,7 +347,7 @@ describe("the For Each node", () => {
 			sandbox,
 			flowOf(
 				[
-					forEach(
+					callEach(
 						"loop",
 						"build",
 						json([
@@ -468,7 +468,7 @@ describe("the For Each node", () => {
 		const h = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					json([
@@ -513,7 +513,7 @@ describe("the For Each node", () => {
 		const h = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					json([
@@ -575,7 +575,7 @@ describe("the For Each node", () => {
 							properties: { tasks: { type: "array" } },
 						},
 					}),
-					forEach(
+					callEach(
 						"each",
 						"task",
 						{ kind: "json", value: "{{planner.data.tasks}}" },
@@ -666,7 +666,7 @@ describe("the For Each node", () => {
 		const h = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					{ kind: "command", command: `cat '${itemsFile}'` },
@@ -697,7 +697,7 @@ describe("the For Each node", () => {
 		const files = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					{ kind: "files", glob: "*.md" },
@@ -730,7 +730,10 @@ describe("the For Each node", () => {
 		const bad = await startRun(
 			sandbox,
 			flowOf([
-				forEach("loop", "build", { kind: "command", command: "echo not json" }),
+				callEach("loop", "build", {
+					kind: "command",
+					command: "echo not json",
+				}),
 			]),
 			harness,
 			{ flows: { build } },
@@ -743,7 +746,7 @@ describe("the For Each node", () => {
 		const cyclic = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					json([
@@ -766,7 +769,7 @@ describe("the For Each node", () => {
 		const h = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					json([
@@ -804,7 +807,7 @@ describe("the For Each node", () => {
 		const h = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					json([
@@ -894,7 +897,7 @@ describe("the For Each node", () => {
 		]);
 		// The loop step was never reopened (it stayed open), nor started twice.
 		expect(
-			deriveSteps(logged).filter((s) => s.nodeType === "foreach"),
+			deriveSteps(logged).filter((s) => s.nodeType === "call"),
 		).toHaveLength(1);
 		expect(logged.filter((e) => e.type === "StepReopened")).toHaveLength(0);
 		expect(
@@ -917,7 +920,7 @@ describe("the For Each node", () => {
 		const h = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					json([
@@ -1044,7 +1047,7 @@ describe("the For Each node", () => {
 		const h = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					json([
@@ -1131,7 +1134,7 @@ describe("the For Each node", () => {
 		h = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					json([
@@ -1200,7 +1203,7 @@ describe("the For Each node", () => {
 		const h = await startRun(
 			sandbox,
 			flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					json([

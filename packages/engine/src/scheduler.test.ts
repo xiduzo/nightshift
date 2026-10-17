@@ -65,11 +65,19 @@ function startDaemon(
 
 function commandFlow(command = "echo night", extra: Partial<Flow> = {}): Flow {
 	return {
-		version: 3,
+		version: 4,
 		inputs: [{ name: "epic", type: "text" }],
 		outputs: [],
 		start: "work",
-		nodes: [{ id: "work", type: "command", position: { x: 0, y: 0 }, command }],
+		nodes: [
+			{
+				id: "work",
+				type: "command",
+				position: { x: 0, y: 0 },
+				command,
+				output: "text",
+			},
+		],
 		edges: [],
 		...extra,
 	};
@@ -78,7 +86,7 @@ function commandFlow(command = "echo night", extra: Partial<Flow> = {}): Flow {
 /** Waits at a Gate until a person answers: a run that stays open. */
 function gateFlow(): Flow {
 	return {
-		version: 3,
+		version: 4,
 		inputs: [],
 		outputs: [],
 		start: "ask",

@@ -25,7 +25,7 @@ import type { RunStatus, StepSummary } from "@/lib/api-types";
 /**
  * The run's copy of its flow, read-only. Each node shows its latest step's
  * outcome and how often the run visited it; each edge how often it was taken.
- * The same view shows a For Each body flow with one item's steps.
+ * The same view shows a called flow with one item's steps.
  */
 export function RunGraph({
 	flow,

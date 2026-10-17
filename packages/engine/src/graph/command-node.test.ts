@@ -315,4 +315,83 @@ describe("the Command node", () => {
 		]);
 		expect(await h.types()).not.toContain("StepReopened");
 	});
+
+	test("output json: what the command prints is `data`, and a later node reads a path into it", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "check",
+				nodes: [
+					command("check", `echo '{"tests": 3, "names": ["a", "b"]}'`, {
+						output: "json",
+					}),
+					command(
+						"report",
+						`echo "{{check.data.tests}}:{{check.data.names.1}}"`,
+					),
+				],
+				edges: [{ id: "e1", from: "check", outcome: "pass", to: "report" }],
+			}),
+		);
+		const { parked, state } = await drive(h, { inputs: {} });
+		expect(parked).toEqual([]);
+		expect(state.ended?.nodeId).toBe("report");
+		const logged = await h.events();
+		expect(payloads(logged, "StepEnded")[0]).toEqual({
+			outcome: "pass",
+			outputs: {
+				outcome: "pass",
+				exit_code: 0,
+				log_tail: '{"tests": 3, "names": ["a", "b"]}',
+				data: { tests: 3, names: ["a", "b"] },
+				visit: 1,
+			},
+			error: null,
+		});
+		// One reference keeps the JSON value; a path reads into it.
+		expect(state.nodes.check?.data).toEqual({ tests: 3, names: ["a", "b"] });
+		expect(payloads(logged, "StepEnded")[1]?.outputs.log_tail).toBe("3:b");
+	});
+
+	test("output json: output that is not JSON fails the step with a plain reason", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "check",
+				nodes: [
+					command("check", "echo not json", { output: "json" }),
+					command("after", "true"),
+				],
+				edges: [{ id: "e1", from: "check", outcome: "fail", to: "after" }],
+			}),
+		);
+		const { parked, state } = await drive(h, { inputs: {} });
+		expect(parked).toEqual([]);
+		expect(state.ended?.nodeId).toBe("after");
+		const logged = await h.events();
+		expect(payloads(logged, "StepEnded")[0]).toEqual({
+			outcome: "fail",
+			outputs: {
+				outcome: "fail",
+				exit_code: 0,
+				log_tail: "not json",
+				visit: 1,
+			},
+			error: "The command's output is not valid JSON.",
+		});
+	});
+
+	test("output text keeps stdout out of the outputs", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "check",
+				nodes: [command("check", `echo '{"a": 1}'`)],
+				edges: [],
+			}),
+		);
+		await drive(h, { inputs: {} });
+		const [ended] = payloads(await h.events(), "StepEnded");
+		expect(ended?.outputs).not.toHaveProperty("data");
+	});
 });

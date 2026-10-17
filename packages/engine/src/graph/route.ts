@@ -4,7 +4,12 @@ import {
 	interrupt,
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
-import { type FlowNode, nextEdge, type Outcome } from "@nightshift/flows";
+import {
+	type FlowNode,
+	nextEdge,
+	type Outcome,
+	runsEach,
+} from "@nightshift/flows";
 
 import type { Scope, StepOutputs } from "../events";
 import type { StepOutcome } from "../types";
@@ -59,14 +64,14 @@ export function isOwnAgentLabel(node: FlowNode, outcome: Outcome): boolean {
 
 /**
  * Whether ending at `node` with `outcome` and no edge to take is a chosen
- * end of the flow: `pass`, a Decision option, an Agent's own outcome, or a
- * For Each outcome. `fail` and `needs-input` are failures.
+ * end of the flow: `pass`, a Decision option, an Agent's own outcome, or
+ * the outcome of a Call with `each`. `fail` and `needs-input` are failures.
  */
 export function isChosenEnd(node: FlowNode, outcome: Outcome): boolean {
 	return (
 		outcome === "pass" ||
 		node.type === "decision" ||
-		node.type === "foreach" ||
+		runsEach(node) ||
 		isOwnAgentLabel(node, outcome)
 	);
 }
@@ -76,9 +81,8 @@ export function finishedReason(
 	node: FlowNode,
 	outcome: Outcome,
 ): string | null {
-	const chosen =
-		(outcome === "pass" && node.type !== "foreach") ||
-		(outcome === "done" && node.type === "foreach");
+	const each = runsEach(node);
+	const chosen = (outcome === "pass" && !each) || (outcome === "done" && each);
 	return chosen ? null : `Ended at node "${node.id}" with "${outcome}".`;
 }
 
@@ -120,7 +124,7 @@ export function parkCommand(input: {
  * - `stopped` parks as stopped with no reason.
  * - `error` and `interrupted` park as failed: `Node "x" failed: <error>`.
  * - no edge: `fail` and `needs-input` park as failed; `pass`, a Decision
- *   option, an Agent's own outcome or a For Each outcome is a chosen end
+ *   option, an Agent's own outcome or the outcome of a Call with `each` is a chosen end
  *   (`ended` set, goto END).
  * - every edge on the outcome at its max parks as failed.
  */

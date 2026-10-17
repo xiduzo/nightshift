@@ -27,7 +27,7 @@ import {
 
 import { TemplateField } from "./template-field";
 
-/** Fields a Subflow node has on its own; an output may not shadow them. */
+/** Fields a Call node has on its own; an output may not shadow them. */
 const RESERVED_OUTPUTS = ["outcome", "ended", "visit"];
 
 type Change = (change: (flow: Flow) => Flow) => void;
@@ -51,8 +51,8 @@ function jsonError(text: string | undefined): string | null {
 }
 
 /**
- * The flow's inputs: what a run asks when it starts, and what a Subflow or
- * For Each binds when it calls the flow. A name commits on blur or Enter, so
+ * The flow's inputs: what a run asks when it starts, and what a Call node
+ * binds when it calls the flow. A name commits on blur or Enter, so
  * the `{{name}}` references in the flow follow one rename and not every
  * keystroke.
  */
@@ -433,7 +433,7 @@ function InputRow({
 }
 
 /**
- * The flow's outputs: values it returns to a Subflow or For Each that calls
+ * The flow's outputs: values it returns to the Call node that calls
  * it, rendered from templates when the flow ends.
  */
 export function OutputsEditor({

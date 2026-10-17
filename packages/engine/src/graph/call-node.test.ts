@@ -18,9 +18,9 @@ import {
 } from "./node-test-support";
 
 /**
- * The Subflow node on the compiled graph: the called flow as a subgraph.
+ * The Call node (once) on the compiled graph: the called flow as a subgraph.
  * The event log is compared with what the engine writes today for the same
- * situations (flows-v2.test.ts "Subflow").
+ * situations (flows-v2.test.ts "Call").
  */
 
 let sandbox: Sandbox;
@@ -51,20 +51,20 @@ const greet = flowOf(
 	},
 );
 
-const subflow = (
+const callOnce = (
 	id: string,
 	flow: string,
 	inputs: Record<string, string> = {},
-) => ({ id, type: "subflow", position: { x: 0, y: 0 }, flow, inputs }) as const;
+) => ({ id, type: "call", position: { x: 0, y: 0 }, flow, inputs }) as const;
 
-describe("the Subflow node", () => {
+describe("the Call node", () => {
 	test("a called flow that passes: FlowCalled, the body in the step's scope, the declared outputs plus ended and visit", async () => {
 		const h = await startRun(
 			sandbox,
 			flowOf(
 				[
 					command("prep", "printf 'x'"),
-					subflow("sub", "greet", {
+					callOnce("sub", "greet", {
 						name: "{{who}}",
 						count: "{{prep.exit_code}}",
 					}),
@@ -111,7 +111,7 @@ describe("the Subflow node", () => {
 		const logged = await h.events();
 		const steps = deriveSteps(logged);
 		const sub = steps.find((s) => s.nodeId === "sub");
-		expect(sub).toMatchObject({ nodeType: "subflow", visit: 1, scope: null });
+		expect(sub).toMatchObject({ nodeType: "call", visit: 1, scope: null });
 		expect(payloads(logged, "FlowCalled")).toEqual([
 			{ flow: "greet", inputs: { name: "bob", count: 0, mood: "glad" } },
 		]);
@@ -154,7 +154,7 @@ describe("the Subflow node", () => {
 			["after", "command"],
 			["hello", "command"],
 			["prep", "command"],
-			["sub", "subflow"],
+			["sub", "call"],
 			["where", "command"],
 		]);
 	});
@@ -174,9 +174,9 @@ describe("the Subflow node", () => {
 			sandbox,
 			flowOf(
 				[
-					subflow("try", "broken"),
+					callOnce("try", "broken"),
 					command("cleanup", `echo "{{try.outcome}} {{try.why}}"`),
-					subflow("ask", "review"),
+					callOnce("ask", "review"),
 					command("verdict", `echo "{{ask.ended}}"`),
 				],
 				[
@@ -242,7 +242,7 @@ describe("the Subflow node", () => {
 		// today's reason; a resume runs the Subflow again as a new visit.
 		const h2 = await startRun(
 			sandbox,
-			flowOf([subflow("try", "broken")]),
+			flowOf([callOnce("try", "broken")]),
 			harness,
 			{
 				flows,
@@ -289,7 +289,7 @@ describe("the Subflow node", () => {
 			flowOf(
 				[
 					command("empty", "true"),
-					subflow("call", "needs", { must: "{{empty.log_tail}}" }),
+					callOnce("call", "needs", { must: "{{empty.log_tail}}" }),
 				],
 				[edge("e1", "empty", "pass", "call")],
 			),
@@ -315,7 +315,7 @@ describe("the Subflow node", () => {
 
 		const h2 = await startRun(
 			sandbox,
-			flowOf([subflow("call", "gone")]),
+			flowOf([callOnce("call", "gone")]),
 			fakeHarness(),
 		);
 		const second = await drive(h2, { inputs: {} });
@@ -341,7 +341,10 @@ describe("the Subflow node", () => {
 		const h = await startRun(
 			sandbox,
 			flowOf(
-				[subflow("call", "work", { topic: "trees" }), command("after", "true")],
+				[
+					callOnce("call", "work", { topic: "trees" }),
+					command("after", "true"),
+				],
 				[edge("e1", "call", "pass", "after")],
 			),
 			harness,
@@ -447,7 +450,7 @@ describe("the Subflow node", () => {
 		);
 		const h = await startRun(
 			sandbox,
-			flowOf([subflow("call", "work")]),
+			flowOf([callOnce("call", "work")]),
 			harness,
 			{
 				flows: { work },

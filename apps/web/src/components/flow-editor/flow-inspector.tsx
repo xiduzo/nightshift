@@ -259,8 +259,7 @@ export function FlowInspector({
 						edges along.
 					</li>
 					<li>
-						A Subflow node runs another flow once. A For Each node runs one for
-						each item in a list.
+						A Call node runs another flow once, or once for each item in a list.
 					</li>
 					<li>
 						An edge back to an earlier node is a retry loop. Give one edge in

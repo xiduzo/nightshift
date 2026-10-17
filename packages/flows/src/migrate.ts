@@ -14,17 +14,23 @@
  * Version 2 → 3 (`migrateDecisionNodes`): a Gate is a Decision decided by
  * a person, a Decision one decided by a model, and both have `options`.
  *
+ * Version 3 → 4 (`migrateCallNodes`): a Subflow node is a Call node, and a
+ * For Each node a Call node with `each`.
+ *
  * Any version:
  * - The built-in tool set `tools: ["github"]` → the CLI tool `clis: ["gh"]`
  *   (see `migrateToolSets`).
  * - The old Claude Code decider → the default decider (see `migrateDecider`).
- * - A For Each source `kind: "github"` → a `command` source that asks `gh`
+ * - A list source `kind: "github"` → a `command` source that asks `gh`
  *   for the same items (see `migrateListSource`).
  */
 export function migrateFlow(json: unknown): unknown {
 	let current = isRecord(json) && json.version === 1 ? migrateV1(json) : json;
 	if (isRecord(current) && current.version === 2) {
 		current = migrateDecisionNodes(current);
+	}
+	if (isRecord(current) && current.version === 3) {
+		current = migrateCallNodes(current);
 	}
 	if (!isRecord(current) || !Array.isArray(current.nodes)) return current;
 	let changed = false;
@@ -48,13 +54,15 @@ type GithubSource = {
 };
 
 /**
- * A For Each node whose source was `kind: "github"` reads the same items
- * from a `command` source: `githubSubIssuesCommand` on `gh`. Returns the
- * input unchanged when it is any other node or source.
+ * A Call node with `each` whose source was `kind: "github"` reads the same
+ * items from a `command` source: `githubSubIssuesCommand` on `gh`. Returns
+ * the input unchanged when it is any other node or source.
  */
 export function migrateListSource(json: unknown): unknown {
-	if (!isRecord(json) || json.type !== "foreach") return json;
-	const source = json.source;
+	if (!isRecord(json) || json.type !== "call") return json;
+	const each = json.each;
+	if (!isRecord(each)) return json;
+	const source = each.source;
 	if (!isRecord(source) || source.kind !== "github") return json;
 	if (typeof source.parent !== "string") return json;
 	const labels = (value: unknown) =>
@@ -63,17 +71,62 @@ export function migrateListSource(json: unknown): unknown {
 			: [];
 	return {
 		...json,
-		source: {
-			kind: "command",
-			command: githubSubIssuesCommand({
-				parent: source.parent,
-				...(typeof source.requireLabel === "string"
-					? { requireLabel: source.requireLabel }
-					: {}),
-				doneLabels: labels(source.doneLabels),
-				skipLabels: labels(source.skipLabels),
-			}),
+		each: {
+			...each,
+			source: {
+				kind: "command",
+				command: githubSubIssuesCommand({
+					parent: source.parent,
+					...(typeof source.requireLabel === "string"
+						? { requireLabel: source.requireLabel }
+						: {}),
+					doneLabels: labels(source.doneLabels),
+					skipLabels: labels(source.skipLabels),
+				}),
+			},
 		},
+	};
+}
+
+/**
+ * Version 3 → 4. A Subflow node becomes a Call node (`type: "call"`, the
+ * rest as it was); a For Each node a Call node whose list fields (`source`,
+ * `as`, `branch`, `haltOn`, `maxItems`) move under `each`, unchanged. Edges
+ * keep their outcomes: `pass`/`fail` for a Call, `done`/`halted` for a
+ * Call with `each`.
+ */
+export function migrateCallNodes(
+	json: Record<string, unknown>,
+): Record<string, unknown> {
+	const nodes = Array.isArray(json.nodes)
+		? json.nodes.map((node) => {
+				if (!isRecord(node)) return node;
+				switch (node.type) {
+					case "subflow":
+						return { ...node, type: "call" };
+					case "foreach": {
+						const { source, as, branch, haltOn, maxItems, ...rest } = node;
+						return {
+							...rest,
+							type: "call",
+							each: {
+								source,
+								...(as === undefined ? {} : { as }),
+								...(branch === undefined ? {} : { branch }),
+								...(haltOn === undefined ? {} : { haltOn }),
+								...(maxItems === undefined ? {} : { maxItems }),
+							},
+						};
+					}
+					default:
+						return node;
+				}
+			})
+		: json.nodes;
+	return {
+		...json,
+		version: 4,
+		...(nodes === undefined ? {} : { nodes }),
 	};
 }
 

@@ -88,15 +88,15 @@ export type Recorder = {
 };
 
 /**
- * What a node factory gets. One per run and per compiled flow: a Subflow or
- * For Each node compiles its called flow with `flow` and `flowName`
+ * What a node factory gets. One per run and per compiled flow: a Call
+ * node compiles its called flow with `flow` and `flowName`
  * replaced, everything else shared. Per-invocation facts (the scope, the
  * element's `run` template fields) travel in `config.configurable`:
  *
  * - `configurable.scope: Scope | null`: the calling step and element, null
  *   at the top level. Body nodes stamp it on their events (design rule 6).
  * - `configurable.run?: { branch, base_branch, index }`: the `{{run.*}}`
- *   fields of a For Each element; absent at the top level.
+ *   fields of a Call element (`each`); absent at the top level.
  */
 export type StepContext = {
 	db: Database;
@@ -106,7 +106,7 @@ export type StepContext = {
 	flow: Flow;
 	/** `{{run.flow}}`: the flow's file name, or the run's title for a quick run. */
 	flowName: string;
-	/** The run's called flows by name (Subflow and For Each bodies). */
+	/** The run's called flows by name (the bodies of Call nodes). */
 	flows: Record<string, Flow>;
 	/**
 	 * The run's policy, resolved at each use like `settings()`: a thread
@@ -383,7 +383,7 @@ export async function beginStep(
 		visit = countVisits(events, node.id, key) + 1;
 		const logPath =
 			node.type === "command" ||
-			(node.type === "foreach" && node.source.kind === "command")
+			(node.type === "call" && node.each?.source.kind === "command")
 				? commandLogPath(ctx.dataDir, runId, stepId)
 				: null;
 		await ctx.db.insert(step).values({

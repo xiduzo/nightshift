@@ -3,11 +3,10 @@ import type { Flow } from "@nightshift/flows";
 
 import type { NodeAction, StepContext } from "./context";
 import { agentNode } from "./nodes/agent";
+import { callNode } from "./nodes/call";
 import { gateAskNode } from "./nodes/choosers/person";
 import { commandNode } from "./nodes/command";
 import { decisionNode } from "./nodes/decision";
-import { forEachNode } from "./nodes/foreach";
-import { subflowNode } from "./nodes/subflow";
 import { askNodeId, parkNode, parkNodeId, waitNodeId } from "./route";
 import { RunState } from "./state";
 import { waitNode } from "./wait";
@@ -24,10 +23,9 @@ import { waitNode } from "./wait";
  * Command({ update, goto })`, built by `route()`.
  *
  * The runner compiles once per run (`compileFlow(flow, ctx).compile({
- * checkpointer })`) with the thread id set to the run id. A Subflow or For
- * Each node compiles its called flow the same way, with `ctx.flow` and
- * `ctx.flowName` replaced, and invokes it with the config passed through
- * (rule 6).
+ * checkpointer })`) with the thread id set to the run id. A Call node
+ * compiles its called flow the same way, with `ctx.flow` and `ctx.flowName`
+ * replaced, and invokes it with the config passed through (rule 6).
  */
 
 export function compileFlow(flow: Flow, ctx: StepContext) {
@@ -68,11 +66,8 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 				}
 				break;
 			}
-			case "subflow":
-				action = subflowNode(node, ctx);
-				break;
-			case "foreach":
-				action = forEachNode(node, ctx);
+			case "call":
+				action = callNode(node, ctx);
 				break;
 		}
 		graph.addNode(node.id, action, { ends: [...ends, ...own] });

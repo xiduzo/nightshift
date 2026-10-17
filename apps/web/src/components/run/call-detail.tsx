@@ -18,14 +18,15 @@ import {
 
 import { CodeView, JsonBlock } from "./json-block";
 
-/** Fields every Subflow step has; the rest are the called flow's outputs. */
+/** Fields every Call step has; the rest are the called flow's outputs. */
 const OWN_FIELDS = new Set(["outcome", "ended", "visit"]);
 
 /**
- * A Subflow step: the flow it called, the inputs it bound (templates from
- * the run's copy of the flow), and the outputs the flow returned.
+ * A Call step that ran once: the flow it called, the inputs it bound
+ * (templates from the run's copy of the flow), and the outputs the flow
+ * returned.
  */
-export function SubflowDetail({
+export function CallDetail({
 	run,
 	steps,
 	step,
@@ -40,7 +41,7 @@ export function SubflowDetail({
 }) {
 	const node = nodeOfStep(run, steps, step);
 	const called = calledFlowOf(run, steps, step);
-	const bindings = node?.type === "subflow" ? Object.entries(node.inputs) : [];
+	const bindings = node?.type === "call" ? Object.entries(node.inputs) : [];
 	const declared = called?.inputs ?? [];
 	const returned = Object.entries(step.outputs).filter(
 		([field]) => !OWN_FIELDS.has(field),
@@ -61,7 +62,7 @@ export function SubflowDetail({
 					/>
 					Called{" "}
 					<span className="truncate font-mono">
-						{node?.type === "subflow" ? node.flow : "a flow"}
+						{node?.type === "call" ? node.flow : "a flow"}
 					</span>
 				</h3>
 				<span className="text-muted-foreground text-xs tabular-nums">
@@ -98,7 +99,7 @@ export function SubflowDetail({
 									: bindings.map(([name]) => name)
 								).map((name) => {
 									const template =
-										node?.type === "subflow" ? node.inputs[name] : undefined;
+										node?.type === "call" ? node.inputs[name] : undefined;
 									const input = declared.find((one) => one.name === name);
 									return (
 										<div key={name} className="contents">
