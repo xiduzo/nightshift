@@ -8,6 +8,7 @@ import type {
 	FlowNode,
 	ForEachNode,
 	SubflowNode,
+	WaitNode,
 } from "./schema";
 import type { FlowIssue } from "./types";
 import { parseFlow, validateFlow } from "./validate";
@@ -1784,5 +1785,138 @@ describe("parseFlow with options", () => {
 			inputs: [{ name: "epic", type: "text", required: true }],
 			nodes: [{ prompt: "Epic {{epic}}" }],
 		});
+	});
+});
+
+describe("validateFlow: wait nodes", () => {
+	const wait = (
+		id: string,
+		until: WaitNode["until"],
+		extra: Partial<WaitNode> = {},
+	): WaitNode => ({
+		id,
+		type: "wait",
+		position: { x: 0, y: 0 },
+		until,
+		...extra,
+	});
+
+	test("the schema takes every kind and refuses a bad one", () => {
+		const base = { version: 3, start: "w", edges: [] };
+		for (const until of [
+			{ kind: "duration", minutes: 15 },
+			{ kind: "time", at: "{{deploy_window}}" },
+			{ kind: "command", command: "gh pr checks 1", everyMinutes: 5 },
+			{ kind: "signal", name: "deploy-finished" },
+		]) {
+			const parsed = parseFlow({
+				...base,
+				inputs: [{ name: "deploy_window" }],
+				nodes: [{ id: "w", type: "wait", position: { x: 0, y: 0 }, until }],
+			});
+			expect(parsed.issues).toEqual([]);
+			expect(parsed.flow?.nodes[0]).toMatchObject({ type: "wait", until });
+		}
+		for (const until of [
+			{ kind: "duration", minutes: 0 },
+			{ kind: "duration", minutes: 1.5 },
+			{ kind: "time", at: "" },
+			{ kind: "command", command: "", everyMinutes: 5 },
+			{ kind: "command", command: "true", everyMinutes: 0 },
+			{ kind: "signal", name: "Deploy Finished" },
+			{ kind: "webhook" },
+		]) {
+			const parsed = parseFlow({
+				...base,
+				nodes: [{ id: "w", type: "wait", position: { x: 0, y: 0 }, until }],
+			});
+			expect(parsed.flow).toBeNull();
+		}
+	});
+
+	test("ends done or timeout, and later nodes read waited_minutes and log_tail", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					wait("w", { kind: "duration", minutes: 15 }),
+					command("check", {
+						command: "echo {{w.waited_minutes}} {{w.log_tail}} {{w.visit}}",
+					}),
+					agent("worker", { prompt: "{{w.exit_code}}" }),
+				],
+				[
+					edge("a", "w", "done", "check"),
+					edge("b", "w", "timeout", "worker"),
+					edge("c", "w", "pass", "worker"),
+				],
+				"w",
+			),
+		);
+		expect(
+			errors(issues).map((issue) => [
+				issue.nodeId ?? issue.edgeId,
+				issue.message,
+			]),
+		).toEqual([
+			["c", expect.stringContaining('"w" ends with done, timeout')],
+			["worker", expect.stringContaining("{{w.exit_code}}")],
+		]);
+	});
+
+	test("the time and the command are templates over known names", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					wait("at", { kind: "time", at: "{{ghost.when}}" }),
+					wait("poll", {
+						kind: "command",
+						command: "gh pr checks {{ghost.pr}}",
+						everyMinutes: 5,
+					}),
+				],
+				[edge("a", "at", "done", "poll")],
+				"at",
+			),
+		);
+		expect(
+			errors(issues).map((issue) => [issue.nodeId, issue.message]),
+		).toEqual([
+			["at", expect.stringContaining("{{ghost.when}}")],
+			["poll", expect.stringContaining("{{ghost.pr}}")],
+		]);
+	});
+
+	test("a command wait needs a timeout longer than its interval", () => {
+		const bad = validateFlow(
+			flow(
+				[
+					wait(
+						"poll",
+						{ kind: "command", command: "true", everyMinutes: 5 },
+						{ timeoutMinutes: 5 },
+					),
+				],
+				[],
+				"poll",
+			),
+		);
+		expect(errors(bad).map((issue) => issue.message)).toEqual([
+			'Wait node "poll" runs its command every 5 min but times out after 5 min. Give it a longer timeout than the interval.',
+		]);
+		const good = validateFlow(
+			flow(
+				[
+					wait(
+						"poll",
+						{ kind: "command", command: "true", everyMinutes: 5 },
+						{ timeoutMinutes: 6 },
+					),
+					wait("w", { kind: "duration", minutes: 30 }, { timeoutMinutes: 5 }),
+				],
+				[edge("a", "poll", "done", "w")],
+				"poll",
+			),
+		);
+		expect(errors(good)).toEqual([]);
 	});
 });
