@@ -241,6 +241,21 @@ export type CommandEvent =
 	| { type: "command-output"; stream: "stdout" | "stderr"; text: string }
 	| { type: "command-exit"; exitCode: number | null };
 
+/**
+ * What a Value step writes to its transcript: what it was asked (the
+ * expression of a rule, or the rendered prompt and the model), then the
+ * value it made, or why it made none (`problem`: the expression failed,
+ * the model failed, or the data does not match the output schema).
+ */
+export type ValueEvent =
+	| {
+			type: "value-start";
+			by: "rule" | "model";
+			source: string;
+			model: string | null;
+	  }
+	| { type: "value"; data: JsonValue | null; problem: string | null };
+
 export type StepEvent =
 	| AgentEvent
 	| CommandEvent
@@ -248,7 +263,8 @@ export type StepEvent =
 	| RuleEvent
 	| GateEvent
 	| ForEachEvent
-	| WaitEvent;
+	| WaitEvent
+	| ValueEvent;
 
 /** A Gate that waits for a person. */
 export type OpenGate = {

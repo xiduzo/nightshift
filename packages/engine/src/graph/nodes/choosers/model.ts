@@ -89,10 +89,10 @@ export function modelChooser(node: DecisionNode, ctx: StepContext): Chooser {
  * The step continues after a wait, or is reopened (`StepReopened`) when
  * recovery ended it `interrupted` meanwhile (the daemon died after the
  * wake), so the log keeps one open step to end; anything else is a new
- * visit.
+ * visit. Shared with a Value node made by a model, which waits the same way.
  */
-function entryOf(
-	node: DecisionNode,
+export function entryOf(
+	node: Pick<DecisionNode, "id">,
 	state: RunStateValues,
 	events: readonly LoggedEvent[],
 ): StepStart {
@@ -175,31 +175,13 @@ async function decide(
  * an abort: a decider that ignores its signal cannot hold the run. A decider
  * that throws (against its contract) counts as an error.
  */
-async function decideWithin(
+function decideWithin(
 	decider: Decider,
 	input: DecisionInput,
 	signal: AbortSignal,
 ): Promise<DecisionResult> {
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	let onAbort: (() => void) | undefined;
-	const late = new Promise<DecisionResult>((resolve) => {
-		onAbort = () => {
-			timer = setTimeout(
-				() =>
-					resolve({
-						kind: "error",
-						errorKind: "aborted",
-						message: "The decider did not stop when it was aborted.",
-						costUsd: null,
-					}),
-				STOP_GRACE_MS,
-			);
-		};
-		if (signal.aborted) onAbort();
-		else signal.addEventListener("abort", onAbort, { once: true });
-	});
-	try {
-		return await Promise.race([
+	return withinGrace(
+		() =>
 			decider.decide(input).catch(
 				(error): DecisionResult => ({
 					kind: "error",
@@ -208,8 +190,37 @@ async function decideWithin(
 					costUsd: null,
 				}),
 			),
-			late,
-		]);
+		signal,
+		() => ({
+			kind: "error",
+			errorKind: "aborted",
+			message: "The decider did not stop when it was aborted.",
+			costUsd: null,
+		}),
+	);
+}
+
+/**
+ * Runs `ask` but settles with `late()` once `STOP_GRACE_MS` has passed
+ * after an abort: a decider that ignores its signal cannot hold the run.
+ * Shared by the Decision chooser and the Value producer.
+ */
+export async function withinGrace<T>(
+	ask: () => Promise<T>,
+	signal: AbortSignal,
+	late: () => T,
+): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	let onAbort: (() => void) | undefined;
+	const expired = new Promise<T>((resolve) => {
+		onAbort = () => {
+			timer = setTimeout(() => resolve(late()), STOP_GRACE_MS);
+		};
+		if (signal.aborted) onAbort();
+		else signal.addEventListener("abort", onAbort, { once: true });
+	});
+	try {
+		return await Promise.race([ask(), expired]);
 	} finally {
 		clearTimeout(timer);
 		if (onAbort) signal.removeEventListener("abort", onAbort);

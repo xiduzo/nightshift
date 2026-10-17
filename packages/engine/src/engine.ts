@@ -835,6 +835,14 @@ export function createEngine(
 					"The flow has a Decision node decided by a model, but no decider is configured.",
 				);
 			}
+			if (
+				!decider?.value &&
+				nodes.some((n) => n.type === "value" && n.by === "model")
+			) {
+				throw new Error(
+					"The flow has a Value node made by a model, but no decider is configured.",
+				);
+			}
 			if (input.stopAt !== undefined && input.stopAt <= now()) {
 				throw new Error("The stop time has passed already.");
 			}
