@@ -550,7 +550,11 @@ const cliTools = {
 		}),
 };
 
-/** The decision models Decision nodes pick from, and whether each has its API key. */
+/**
+ * The decision models Decision nodes pick from, and whether each has its API
+ * key. `value` says whether the decider can also make a value (a Value node
+ * made by a model), and which chat model it starts on.
+ */
 const deciders = {
 	list: publicProcedure.handler(({ context }) =>
 		deciderNameSchema.options.map((name) => {
@@ -564,6 +568,9 @@ const deciders = {
 				apiKey: adapter.apiKey,
 				apiKeySource: adapter.apiKey
 					? context.connections.secretSource(adapter.apiKey)
+					: null,
+				value: adapter.value
+					? { defaultModel: adapter.value.defaultModel }
 					: null,
 			};
 		}),

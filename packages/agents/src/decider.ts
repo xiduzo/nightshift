@@ -1,17 +1,28 @@
 /**
  * Decision nodes on TanStack AI's `decide()`: one `choice` question whose
- * options are the node's labels, answered by a decision model. The deciders
- * are TanStack's own adapters; this module only picks one and fills in its
- * API key.
+ * options are the node's labels, answered by a decision model. Value nodes
+ * made by a model on `chat()` with an output schema, on the same decider's
+ * text adapter. The deciders are TanStack's own adapters; this module only
+ * picks one and fills in its API key.
  */
-import { type AnyEvaluateAdapter, choice, decide } from "@tanstack/ai";
+
+import { canMakeValue, valueDeciderNameSchema } from "@nightshift/flows";
+import {
+	type AnyEvaluateAdapter,
+	type AnyTextAdapter,
+	chat,
+	choice,
+	decide,
+} from "@tanstack/ai";
 import { OLLAYA_EVALUATE_MODELS, ollayaDecider } from "@tanstack/ai-ollaya";
 import {
+	createOpenaiChat,
 	createOpenaiDecider,
 	OPENAI_EVALUATE_MODELS,
 } from "@tanstack/ai-openai";
 import {
 	createOpenRouterDecider,
+	createOpenRouterText,
 	OPENROUTER_EVALUATE_MODELS,
 } from "@tanstack/ai-openrouter";
 import {
@@ -25,7 +36,20 @@ import type {
 	DeciderName,
 	DecisionInput,
 	DecisionResult,
+	ValueInput,
+	ValueResult,
 } from "./types";
+
+/**
+ * How a decider makes a value: its TanStack AI text adapter and the chat
+ * model it starts on. Only deciders in `valueDeciderNameSchema` have one.
+ * TypeSafe and Ollaya ship an evaluate adapter only (choice, score, yes/no
+ * questions): they cannot answer with data.
+ */
+export type ValueAdapter = {
+	defaultModel: string;
+	create: (model: string, apiKey: string | undefined) => AnyTextAdapter;
+};
 
 export type DeciderAdapter = {
 	label: string;
@@ -37,6 +61,8 @@ export type DeciderAdapter = {
 	/** The secret that holds its API key. Null: it needs none. */
 	apiKey: string | null;
 	create: (model: string, apiKey: string | undefined) => AnyEvaluateAdapter;
+	/** Set when the decider can also make a value (a Value node made by a model). */
+	value?: ValueAdapter;
 };
 
 /** Every TanStack AI decider adapter (the `evaluate` activity). */
@@ -56,6 +82,14 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		defaultModel: "~typesafe/jev-latest",
 		apiKey: "OPENROUTER_API_KEY",
 		create: (model, key) => createOpenRouterDecider(model, key ?? ""),
+		value: {
+			defaultModel: "~openai/gpt-mini-latest",
+			create: (model, key) =>
+				createOpenRouterText(
+					model as Parameters<typeof createOpenRouterText>[0],
+					key ?? "",
+				),
+		},
 	},
 	openai: {
 		label: "OpenAI Decisions",
@@ -64,6 +98,14 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		defaultModel: "gpt-6-luna",
 		apiKey: "OPENAI_API_KEY",
 		create: (model, key) => createOpenaiDecider(model, key ?? ""),
+		value: {
+			defaultModel: "gpt-5-mini",
+			create: (model, key) =>
+				createOpenaiChat(
+					model as Parameters<typeof createOpenaiChat>[0],
+					key ?? "",
+				),
+		},
 	},
 	ollaya: {
 		label: "Ollaya on this computer",
@@ -74,6 +116,23 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		create: (model) => ollayaDecider(model),
 	},
 };
+
+/** The flows package and this table must agree on who can make a value. */
+for (const name of valueDeciderNameSchema.options) {
+	if (DECIDER_ADAPTERS[name].value === undefined) {
+		throw new Error(
+			`The decider "${name}" is listed as making values but has no text adapter.`,
+		);
+	}
+}
+
+/** What a decider without a text adapter answers a Value node. */
+export function cannotMakeValueMessage(name: DeciderName): string {
+	const able = valueDeciderNameSchema.options
+		.map((other) => DECIDER_ADAPTERS[other].label)
+		.join(" or ");
+	return `${DECIDER_ADAPTERS[name].label} cannot make a value. Choose ${able}.`;
+}
 
 export type TanstackDeciderOptions = {
 	/** A secret's value: the keychain, then the environment. */
@@ -120,7 +179,49 @@ async function decideOnce(
 	};
 }
 
-/** Decision nodes on `decide()`. Never throws. */
+function valueFailed(errorKind: AgentErrorKind, message: string): ValueResult {
+	return { kind: "error", errorKind, message, costUsd: null };
+}
+
+/**
+ * One `chat()` call held to the node's output schema, no tools, no
+ * streaming: TanStack asks the adapter's `structuredOutput` and parses the
+ * answer. The engine checks the data against the schema itself.
+ */
+async function valueOnce(
+	input: ValueInput,
+	options: TanstackDeciderOptions,
+): Promise<ValueResult> {
+	const spec = DECIDER_ADAPTERS[input.decider];
+	const maker = canMakeValue(input.decider) ? spec.value : undefined;
+	if (!maker)
+		return valueFailed("harness", cannotMakeValueMessage(input.decider));
+	const key = spec.apiKey ? await options.secret(spec.apiKey) : undefined;
+	if (spec.apiKey && !key) {
+		return valueFailed(
+			"harness",
+			`${spec.label} needs an API key. Add the secret ${spec.apiKey} on the Agents page.`,
+		);
+	}
+	const abortController = new AbortController();
+	const onAbort = () => abortController.abort();
+	input.signal.addEventListener("abort", onAbort, { once: true });
+	try {
+		const data: unknown = await chat({
+			adapter: maker.create(input.model ?? maker.defaultModel, key),
+			messages: [{ role: "user", content: input.prompt }],
+			outputSchema: input.output as Parameters<typeof chat>[0]["outputSchema"],
+			stream: false,
+			abortController,
+		});
+		// The adapters report tokens, not money.
+		return { kind: "made", data, costUsd: null };
+	} finally {
+		input.signal.removeEventListener("abort", onAbort);
+	}
+}
+
+/** Decision nodes on `decide()`, Value nodes on `chat()`. Never throws. */
 export function tanstackDecider(options: TanstackDeciderOptions): Decider {
 	return {
 		decide: async (input) => {
@@ -136,6 +237,20 @@ export function tanstackDecider(options: TanstackDeciderOptions): Decider {
 				}
 				// `usage-limit` and `network` make the engine wait and ask again.
 				return failed(failureKind(message) ?? "harness", message);
+			}
+		},
+		value: async (input) => {
+			if (input.signal.aborted) {
+				return valueFailed("aborted", "The value was aborted");
+			}
+			try {
+				return await valueOnce(input, options);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				if (input.signal.aborted) {
+					return valueFailed("aborted", "The value was aborted");
+				}
+				return valueFailed(failureKind(message) ?? "harness", message);
 			}
 		},
 	};
