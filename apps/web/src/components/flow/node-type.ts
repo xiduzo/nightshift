@@ -2,6 +2,7 @@ import type { DecidedBy, FlowNodeType } from "@nightshift/flows";
 import {
 	BotIcon,
 	HandIcon,
+	HourglassIcon,
 	type LucideIcon,
 	RepeatIcon,
 	SparklesIcon,
@@ -38,6 +39,11 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		label: "For Each",
 		icon: RepeatIcon,
 		blurb: "Runs a flow once for each item in a list.",
+	},
+	wait: {
+		label: "Wait",
+		icon: HourglassIcon,
+		blurb: "Waits for a time, a command to pass, or a signal.",
 	},
 };
 

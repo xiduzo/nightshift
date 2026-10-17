@@ -253,6 +253,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	decision: "Deciding…",
 	subflow: "The called flow is running…",
 	foreach: "Working through the items…",
+	wait: "Waiting…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({
@@ -426,10 +427,50 @@ function ItemEnd({ item, title }: { item: ItemEndItem; title?: string }) {
 const WAIT_TITLE: Record<WaitItem["reason"], string> = {
 	"usage-limit": "Usage limit reached",
 	network: "The network is down",
+	duration: "Waiting",
+	time: "Waiting for a time",
+	command: "Waiting for a command to pass",
+	signal: "Waiting for a signal",
 };
 
-/** The run sleeps on this step, and when it continues the same session. */
+/** A Wait node's own wait, or the run policy's (a usage limit, the network). */
+const isNodeWait = (reason: WaitItem["reason"]) =>
+	reason !== "usage-limit" && reason !== "network";
+
+/**
+ * The run sleeps on this step: the run policy continues the same session
+ * at a time; a Wait node goes on at its time, when its command passes, or
+ * when its signal comes.
+ */
 function WaitCard({ item }: { item: WaitItem }) {
+	const { until } = item;
+	const at =
+		until === null ? null : (
+			<>
+				<time
+					dateTime={new Date(until).toISOString()}
+					title={formatDateTime(until)}
+					className="text-foreground tabular-nums"
+				>
+					{formatTime(until)}
+				</time>{" "}
+				({formatRelative(until)})
+			</>
+		);
+	const next =
+		item.reason === "signal" ? (
+			<>
+				Goes on when the signal{" "}
+				<span className="font-mono text-foreground">{item.signal}</span> arrives
+				{at ? <>, or times out at {at}</> : null}.
+			</>
+		) : item.reason === "command" ? (
+			<>Tries the command again{at ? <> at {at}</> : null}.</>
+		) : isNodeWait(item.reason) ? (
+			<>Goes on{at ? <> at {at}</> : null}.</>
+		) : (
+			<>Continues where it left off{at ? <> at {at}</> : null}.</>
+		);
 	return (
 		<Alert
 			role="status"
@@ -445,17 +486,7 @@ function WaitCard({ item }: { item: WaitItem }) {
 						{item.message}
 					</p>
 				) : null}
-				<p>
-					Continues where it left off at{" "}
-					<time
-						dateTime={new Date(item.until).toISOString()}
-						title={formatDateTime(item.until)}
-						className="text-foreground tabular-nums"
-					>
-						{formatTime(item.until)}
-					</time>{" "}
-					({formatRelative(item.until)}).
-				</p>
+				<p>{next}</p>
 			</AlertDescription>
 		</Alert>
 	);
@@ -467,7 +498,16 @@ function WakeMarker({ item }: { item: WakeItem }) {
 			<MarkerIcon>
 				<SunriseIcon className="size-3.5 text-status-sleeping" />
 			</MarkerIcon>
-			<MarkerContent>Woke up · {formatTime(item.at)}</MarkerContent>
+			<MarkerContent>
+				{item.signal !== undefined ? (
+					<>
+						Signal <span className="font-mono">{item.signal}</span> received
+					</>
+				) : (
+					"Woke up"
+				)}{" "}
+				· {formatTime(item.at)}
+			</MarkerContent>
 		</Marker>
 	);
 }

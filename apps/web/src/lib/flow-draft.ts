@@ -23,6 +23,8 @@ import {
 	runFields,
 	type SubflowNode,
 	validateFlow,
+	type WaitNode,
+	type WaitUntil,
 } from "@nightshift/flows";
 
 /**
@@ -128,6 +130,52 @@ export function forEachNode(id: string, position: Position): ForEachNode {
 		branch: "per-item",
 		haltOn: ["halt"],
 	};
+}
+
+/** Waits 15 minutes until the inspector says otherwise. */
+export function waitNode(id: string, position: Position): WaitNode {
+	return {
+		id,
+		type: "wait",
+		position,
+		until: { kind: "duration", minutes: 15 },
+	};
+}
+
+/** What a Wait node of each kind starts with when the person switches to it. */
+export function emptyUntil(kind: WaitUntil["kind"]): WaitUntil {
+	switch (kind) {
+		case "duration":
+			return { kind: "duration", minutes: 15 };
+		case "time":
+			return { kind: "time", at: "" };
+		case "command":
+			return { kind: "command", command: "", everyMinutes: 5 };
+		case "signal":
+			return { kind: "signal", name: "" };
+	}
+}
+
+/** How each kind of wait reads in a picker. */
+export const WAIT_KINDS: Record<WaitUntil["kind"], string> = {
+	duration: "A duration",
+	time: "A time",
+	command: "A command",
+	signal: "A signal",
+};
+
+/** One line for a wait: what it waits for. Empty when it is not set yet. */
+export function waitSummary(until: WaitUntil): string {
+	switch (until.kind) {
+		case "duration":
+			return `${until.minutes} min`;
+		case "time":
+			return until.at.trim();
+		case "command":
+			return until.command.trim().split("\n")[0] ?? "";
+		case "signal":
+			return until.name.trim();
+	}
 }
 
 export function emptySource(kind: ListSource["kind"]): ListSource {
@@ -327,6 +375,7 @@ const NEW_NODE: Record<
 	decision: { id: "decide", create: decisionNode },
 	subflow: { id: "call", create: subflowNode },
 	foreach: { id: "each", create: forEachNode },
+	wait: { id: "wait", create: waitNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */
@@ -421,6 +470,21 @@ function rewriteTemplates(
 				source: rewriteSource(node.source, rewrite),
 				inputs: rewriteBindings(node.inputs, rewrite),
 			};
+		case "wait":
+			switch (node.until.kind) {
+				case "time":
+					return {
+						...node,
+						until: { ...node.until, at: rewrite(node.until.at) },
+					};
+				case "command":
+					return {
+						...node,
+						until: { ...node.until, command: rewrite(node.until.command) },
+					};
+				default:
+					return node;
+			}
 	}
 }
 
@@ -898,6 +962,13 @@ const FIELD_MESSAGES: Record<string, string> = {
 	"source.command": "The source command is empty.",
 	"source.glob": "The glob is empty.",
 	maxItems: "Max items must be a whole number above 0.",
+	"until.minutes": "The wait must be a whole number of minutes above 0.",
+	"until.at": "Set the time to wait for.",
+	"until.command": "The command to wait for is empty.",
+	"until.everyMinutes":
+		"The interval must be a whole number of minutes above 0.",
+	"until.name":
+		"Signal name: use lowercase letters, digits and -, starting with a letter.",
 };
 
 const POLICY_MESSAGES: Record<string, string> = {
