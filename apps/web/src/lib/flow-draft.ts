@@ -34,9 +34,6 @@ export type Position = { x: number; y: number };
 
 export const DEFAULT_MODEL = "sonnet";
 
-/** What the palette adds: a node type, or a Gate (a Decision decided by you). */
-export type NodeKind = FlowNodeType | "gate";
-
 /** The flow files of a project, by name. Null when a file does not load. */
 export type ProjectFlowMap = Readonly<Record<string, Flow | null>>;
 
@@ -80,8 +77,9 @@ export function commandNode(id: string, position: Position): CommandNode {
 
 /**
  * A rule decides, with the options yes and no and no rule yet; the issues
- * panel asks for one. Switched to a model, the node starts on the decider
- * from Settings and that decider's default model.
+ * panel asks for one. The inspector switches who decides: you (a Gate) or
+ * a model. Switched to a model, the node starts on the decider from
+ * Settings and that decider's default model.
  */
 export function decisionNode(
 	id: string,
@@ -95,23 +93,6 @@ export function decisionNode(
 		prompt: "",
 		options: [{ name: "yes" }, { name: "no" }],
 		by: "rule",
-		decider: defaults.decisionDecider ?? "typesafe",
-	};
-}
-
-/** A Gate: a Decision decided by you. The question starts empty; the issues panel asks for one. */
-export function gateNode(
-	id: string,
-	position: Position,
-	defaults: NodeDefaults = {},
-): DecisionNode {
-	return {
-		id,
-		type: "decision",
-		position,
-		prompt: "",
-		options: [{ name: "approve" }, { name: "reject" }],
-		by: "person",
 		decider: defaults.decisionDecider ?? "typesafe",
 	};
 }
@@ -331,7 +312,7 @@ function uniqueEdgeId(flow: Flow, base: string): string {
 }
 
 const NEW_NODE: Record<
-	NodeKind,
+	FlowNodeType,
 	{
 		id: string;
 		create: (
@@ -344,7 +325,6 @@ const NEW_NODE: Record<
 	agent: { id: "agent", create: agentNode },
 	command: { id: "check", create: commandNode },
 	decision: { id: "decide", create: decisionNode },
-	gate: { id: "ask", create: gateNode },
 	subflow: { id: "call", create: subflowNode },
 	foreach: { id: "each", create: forEachNode },
 };
@@ -352,7 +332,7 @@ const NEW_NODE: Record<
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */
 export function addNode(
 	flow: Flow,
-	type: NodeKind,
+	type: FlowNodeType,
 	position: Position,
 	defaults: NodeDefaults = {},
 ) {

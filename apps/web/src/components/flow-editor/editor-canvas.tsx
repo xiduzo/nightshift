@@ -1,4 +1,4 @@
-import type { Flow, Outcome } from "@nightshift/flows";
+import type { Flow, FlowNodeType, Outcome } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { ButtonGroup } from "@nightshift/ui/components/button-group";
 import {
@@ -39,7 +39,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
 import { type FlowCanvasNode, nodeTypes } from "@/components/flow/flow-node";
-import { PALETTE_ENTRY } from "@/components/flow/node-type";
+import { NODE_TYPE } from "@/components/flow/node-type";
 import {
 	edgeTypes,
 	type FlowCanvasEdge,
@@ -53,7 +53,6 @@ import {
 	type FlowCheck,
 	moveNode,
 	type NodeDefaults,
-	type NodeKind,
 	removeEdge,
 	removeNode,
 } from "@/lib/flow-draft";
@@ -68,11 +67,10 @@ type SelectionSetter = (
 	selection: Selection | ((current: Selection) => Selection),
 ) => void;
 
-const PALETTE: NodeKind[] = [
+const PALETTE: FlowNodeType[] = [
 	"agent",
 	"command",
 	"decision",
-	"gate",
 	"subflow",
 	"foreach",
 ];
@@ -92,7 +90,7 @@ function useAddNode(
 ) {
 	const { screenToFlowPosition } = useReactFlow();
 	const store = useStoreApi();
-	return (type: NodeKind) => {
+	return (type: FlowNodeType) => {
 		const rect = store.getState().domNode?.getBoundingClientRect();
 		const center = rect
 			? screenToFlowPosition({
@@ -138,7 +136,7 @@ export function NodePalette({
 		<div className="min-w-0">
 			<ButtonGroup aria-label="Add a node" className="@3xl:flex hidden">
 				{PALETTE.map((type) => {
-					const { label, icon: Icon, blurb } = PALETTE_ENTRY[type];
+					const { label, icon: Icon, blurb } = NODE_TYPE[type];
 					return (
 						<Tooltip key={type}>
 							<TooltipTrigger
@@ -173,7 +171,7 @@ export function NodePalette({
 					<DropdownMenuGroup>
 						<DropdownMenuLabel>Add a node</DropdownMenuLabel>
 						{PALETTE.map((type) => {
-							const { label, icon: Icon, blurb } = PALETTE_ENTRY[type];
+							const { label, icon: Icon, blurb } = NODE_TYPE[type];
 							return (
 								<DropdownMenuItem
 									key={type}

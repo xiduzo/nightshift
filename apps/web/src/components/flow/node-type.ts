@@ -10,8 +10,6 @@ import {
 	SquareTerminalIcon,
 } from "lucide-react";
 
-import type { NodeKind } from "@/lib/flow-draft";
-
 type NodeMeta = { label: string; icon: LucideIcon; blurb: string };
 
 /** How each node type shows in the editor, the run graph and the step list. */
@@ -48,16 +46,6 @@ export const DECIDED_BY_ICON: Record<DecidedBy, LucideIcon> = {
 	person: HandIcon,
 	rule: SplitIcon,
 	model: SparklesIcon,
-};
-
-/** What the palette offers: every node type, plus a Gate (a Decision decided by you). */
-export const PALETTE_ENTRY: Record<NodeKind, NodeMeta> = {
-	...NODE_TYPE,
-	gate: {
-		label: "Gate",
-		icon: HandIcon,
-		blurb: "Waits for you to pick an option in the Needs-you inbox.",
-	},
 };
 
 /**
