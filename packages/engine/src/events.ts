@@ -11,6 +11,7 @@ import type {
 	JsonValue,
 	NodeOutputs,
 	Outcome,
+	WaitUntil,
 } from "@nightshift/flows";
 
 import type {
@@ -72,7 +73,13 @@ export type ItemFacts = {
 	value: JsonValue;
 };
 
-export type WaitReason = "usage-limit" | "network";
+/** Why the run policy waits: a usage limit, or the network. */
+export type PolicyWaitReason = "usage-limit" | "network";
+/**
+ * Why a step waits: the run policy, or what a Wait node waits for (a
+ * duration, a time, a command that passes, a signal).
+ */
+export type WaitReason = PolicyWaitReason | WaitUntil["kind"];
 
 /** Who resumed a run: a person, or the daemon after a restart. */
 export type ResumedBy = RunResume["by"];
@@ -211,20 +218,22 @@ export type EnginePayloads = {
 		outputs?: StepOutputs;
 	};
 	/**
-	 * A step waits for a usage limit to reset or for the network. The step
-	 * stays open and the run sleeps. A fact, not a timer: a new daemon
-	 * rebuilds the timer from it.
+	 * A step waits for a usage limit to reset or for the network, or a Wait
+	 * node waits for what it was told to. The step stays open and the run
+	 * sleeps. A fact, not a timer: a new daemon rebuilds the timer from it.
 	 */
 	WaitStarted: {
 		reason: WaitReason;
-		/** Epoch ms when the step continues. */
-		until: number;
+		/** Epoch ms when the step continues. Null for a wait with no time: a signal with no timeout. */
+		until: number | null;
 		message: string;
 		/** Epoch ms of the first wait of this streak (the network grace counts from it). */
 		since: number;
+		/** A Wait node on a signal: the signal's name. */
+		signal?: string;
 	};
-	/** The wait is over: the step continues. `early` when a person resumed the run. */
-	WaitEnded: { early: boolean };
+	/** The wait is over: the step continues. `early` when a person resumed the run; `signal` when one arrived. */
+	WaitEnded: { early: boolean; signal?: string };
 	StopRequested: Record<string, never>;
 	/** A person asked to stop the run before its next step or item. */
 	StopAfterStepRequested: Record<string, never>;
@@ -444,8 +453,11 @@ export function deriveEndedAt(events: readonly LoggedEvent[]): number | null {
 export type SleepFact = {
 	stepId: string;
 	reason: WaitReason;
-	until: number;
+	/** When the step continues; null while it waits for a signal with no timeout. */
+	until: number | null;
 	message: string;
+	/** The signal the step waits for, else null. */
+	signal: string | null;
 };
 
 /**
@@ -474,6 +486,7 @@ export function deriveSleep(events: readonly LoggedEvent[]): SleepFact | null {
 		reason: wait.payload.reason,
 		until: wait.payload.until,
 		message: wait.payload.message,
+		signal: wait.payload.signal ?? null,
 	};
 }
 

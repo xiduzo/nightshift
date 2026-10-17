@@ -59,15 +59,17 @@ export function isOwnAgentLabel(node: FlowNode, outcome: Outcome): boolean {
 
 /**
  * Whether ending at `node` with `outcome` and no edge to take is a chosen
- * end of the flow: `pass`, a Decision option, an Agent's own outcome, or a
- * For Each outcome. `fail` and `needs-input` are failures.
+ * end of the flow: `pass`, a Decision option, an Agent's own outcome, a
+ * For Each outcome, or a Wait that is `done`. `fail`, `needs-input` and a
+ * Wait's `timeout` are failures.
  */
 export function isChosenEnd(node: FlowNode, outcome: Outcome): boolean {
 	return (
 		outcome === "pass" ||
 		node.type === "decision" ||
 		node.type === "foreach" ||
-		isOwnAgentLabel(node, outcome)
+		isOwnAgentLabel(node, outcome) ||
+		(node.type === "wait" && outcome === "done")
 	);
 }
 
@@ -78,7 +80,7 @@ export function finishedReason(
 ): string | null {
 	const chosen =
 		(outcome === "pass" && node.type !== "foreach") ||
-		(outcome === "done" && node.type === "foreach");
+		(outcome === "done" && (node.type === "foreach" || node.type === "wait"));
 	return chosen ? null : `Ended at node "${node.id}" with "${outcome}".`;
 }
 

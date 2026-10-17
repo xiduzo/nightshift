@@ -1,6 +1,6 @@
 import type { ResolvedPolicy } from "@nightshift/flows";
 
-import type { WaitReason } from "./events";
+import type { PolicyWaitReason } from "./events";
 
 /**
  * The run policy's waits, ported from night-shift.py. A usage limit waits
@@ -21,7 +21,7 @@ export type WaitPlan =
 export type WaitStreak = { count: number; since: number };
 
 export function planWait(input: {
-	reason: WaitReason;
+	reason: PolicyWaitReason;
 	/** The earlier waits of this streak; null for the first. */
 	streak: WaitStreak | null;
 	/** The harness's error message. */

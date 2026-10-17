@@ -17,6 +17,7 @@ import {
 	type Flow,
 	type FlowEdge,
 	singleAgentFlow,
+	type WaitNode,
 } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
 
@@ -2027,6 +2028,167 @@ describe("a full flow", () => {
 			"Worker: attempt 3. Review it?",
 		]);
 		expect(detail.costUsd).toBeCloseTo(sessionCostOf(detail) + 0.03);
+	});
+});
+
+describe("wait nodes", () => {
+	const wait = (id: string, until: WaitNode["until"]): WaitNode => ({
+		id,
+		type: "wait",
+		position: { x: 0, y: 0 },
+		until,
+	});
+
+	test("a duration sleeps the run on the engine's timer, and the wake continues the flow", async () => {
+		const engine = makeEngine(fakeHarness(), {}, { minuteMs: 50 });
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[
+					wait("pause", { kind: "duration", minutes: 2 }),
+					command("after", "echo {{pause.waited_minutes}}"),
+				],
+				[edge("e1", "pause", "done", "after")],
+			),
+		});
+		await waitForStatus(engine, run.id, "sleeping");
+		const sleeping = await engine.getRun(run.id);
+		expect(sleeping.wakeAt).toBeGreaterThan(sleeping.createdAt);
+		expect(sleeping.signal).toBeNull();
+		await waitForStatus(engine, run.id, "finished");
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["pause", "done"],
+			["after", "pass"],
+		]);
+		expect(detail.steps[1]?.outputs.log_tail).toBe("2");
+	});
+
+	test("a signal: the run waits with no wake time, the wrong name is refused, and the right one ends the wait", async () => {
+		const engine = makeEngine(fakeHarness());
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[
+					wait("deploy", { kind: "signal", name: "deployed" }),
+					command("after", "echo after"),
+				],
+				[edge("e1", "deploy", "done", "after")],
+			),
+		});
+		await waitForStatus(engine, run.id, "sleeping");
+		const sleeping = await engine.getRun(run.id);
+		expect(sleeping.wakeAt).toBeNull();
+		expect(sleeping.signal).toBe("deployed");
+
+		await expect(engine.signalRun(run.id, "tested")).rejects.toThrow(
+			"This run does not wait for that signal.",
+		);
+		await expect(engine.signalRun("missing", "deployed")).rejects.toThrow(
+			"Run not found",
+		);
+		expect(await statusOf(engine, run.id)).toBe("sleeping");
+
+		await engine.signalRun(run.id, "deployed");
+		await waitForStatus(engine, run.id, "finished");
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps[0]).toMatchObject({
+			nodeId: "deploy",
+			outcome: "done",
+			outputs: { outcome: "done", waited_minutes: 0, visit: 1 },
+		});
+		await expect(engine.signalRun(run.id, "deployed")).rejects.toThrow(
+			"This run does not wait for that signal.",
+		);
+		// The transcript says what woke it.
+		const items = await collect(engine, run.id, (_item, all) =>
+			entriesOf(all).some((e) => e.event.type === "wake"),
+		);
+		expect(
+			entriesOf(items)
+				.filter((e) => e.stepId === detail.steps[0]?.id)
+				.map((e) => e.event),
+		).toEqual([
+			{
+				type: "wait",
+				reason: "signal",
+				until: null,
+				message: 'Waits for the signal "deployed".',
+				signal: "deployed",
+			},
+			{ type: "wake", signal: "deployed" },
+		]);
+	});
+
+	test("a new daemon gets the wake timer of a sleeping Wait node back, and a signal wait stays open", async () => {
+		const dying = new AbortController();
+		const first = makeEngine(
+			fakeHarness(),
+			{},
+			{ minuteMs: 50, signal: dying.signal },
+		);
+		const id = await projectId(first);
+		const timed = await first.startRun({
+			projectId: id,
+			flow: flowOf(
+				[
+					wait("pause", { kind: "duration", minutes: 60 }),
+					command("after", "echo after"),
+				],
+				[edge("e1", "pause", "done", "after")],
+			),
+		});
+		const signalled = await first.startRun({
+			projectId: id,
+			flow: flowOf([wait("deploy", { kind: "signal", name: "deployed" })]),
+		});
+		await waitForStatus(first, timed.id, "sleeping");
+		await waitForStatus(first, signalled.id, "sleeping");
+		// The daemon dies: its timers go with it.
+		dying.abort();
+
+		// A new daemon on the same database, with a clock past the wake time:
+		// the timer fires at once.
+		const second = makeEngine(
+			fakeHarness(),
+			{},
+			{ minuteMs: 50, now: () => Date.now() + 61 * 50 },
+		);
+		expect(await statusOf(second, signalled.id)).toBe("sleeping");
+		await waitForStatus(second, timed.id, "finished");
+		const detail = await second.getRun(timed.id);
+		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["pause", "done"],
+			["after", "pass"],
+		]);
+		expect(await loggedTypes()).not.toContain("RunResumed");
+
+		// The signal wait survived the restart and still answers to its signal.
+		expect((await second.getRun(signalled.id)).signal).toBe("deployed");
+		await second.signalRun(signalled.id, "deployed");
+		await waitForStatus(second, signalled.id, "finished");
+	});
+
+	test("stop ends a sleeping Wait step, and resume starts it again", async () => {
+		const engine = makeEngine(fakeHarness());
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([wait("deploy", { kind: "signal", name: "deployed" })]),
+		});
+		await waitForStatus(engine, run.id, "sleeping");
+		await engine.stopRun(run.id);
+		expect(await statusOf(engine, run.id)).toBe("stopped");
+		expect((await engine.getRun(run.id)).steps[0]?.outcome).toBe("stopped");
+		await engine.resumeRun(run.id);
+		await waitForStatus(engine, run.id, "sleeping");
+		expect(
+			(await engine.getRun(run.id)).steps.map((s) => [s.visit, s.outcome]),
+		).toEqual([
+			[1, "stopped"],
+			[2, null],
+		]);
+		await engine.signalRun(run.id, "deployed");
+		await waitForStatus(engine, run.id, "finished");
 	});
 });
 

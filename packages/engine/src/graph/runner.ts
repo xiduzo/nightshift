@@ -412,7 +412,8 @@ export function createRunner(deps: RunnerDeps) {
 	): Promise<void> {
 		switch (parked.kind) {
 			case "wait":
-				scheduleWake(runId, parked.until);
+				// A wait with no time (a signal with no timeout) has no timer.
+				if (parked.until !== null) scheduleWake(runId, parked.until);
 				if (signal.aborted) await closeParked(runId);
 				return;
 			case "gate":
@@ -460,11 +461,13 @@ export function createRunner(deps: RunnerDeps) {
 	 * `WaitEnded`, the transcript `wake` entry, then `Command({ resume:
 	 * { kind: "wake" } })` into the wait node. `early`: a person resumed the
 	 * run before its time (a full run cap then fails); otherwise a full cap
-	 * queues the wake until a slot frees.
+	 * queues the wake until a slot frees. `signal`: someone sent the run
+	 * that signal; the resume is `{ kind: "signal" }` and the Wait node on
+	 * it ends `done`.
 	 */
 	async function wake(
 		runId: string,
-		input: { early: boolean; prompt?: string },
+		input: { early: boolean; prompt?: string; signal?: string },
 	): Promise<void> {
 		if (disposed) return;
 		// The drive that began the wait may still be unwinding.
@@ -481,7 +484,7 @@ export function createRunner(deps: RunnerDeps) {
 			const thread = await threadState(row);
 			if (thread.kind !== "interrupted" || thread.value.kind !== "wait") return;
 			const sleep = thread.value;
-			if (!input.early && deps.now() < sleep.until) {
+			if (!input.early && sleep.until !== null && deps.now() < sleep.until) {
 				scheduleWake(runId, sleep.until);
 				return;
 			}
@@ -496,11 +499,13 @@ export function createRunner(deps: RunnerDeps) {
 			try {
 				const waiting = deriveSteps(events).find((s) => s.id === sleep.stepId);
 				if (!waiting) throw new Error(`Step not found: ${sleep.stepId}`);
+				const signal =
+					input.signal !== undefined ? { signal: input.signal } : {};
 				await log.append({
 					type: "WaitEnded",
 					runId,
 					stepId: waiting.id,
-					payload: { early: input.early },
+					payload: { early: input.early, ...signal },
 				});
 				const recorder = await recorders.open(
 					runId,
@@ -508,21 +513,20 @@ export function createRunner(deps: RunnerDeps) {
 					waiting.transcriptPath,
 				);
 				try {
-					recorder.record(null, { type: "wake" });
+					recorder.record(null, { type: "wake", ...signal });
 				} finally {
 					recorder.close();
 				}
 				bus.publish(runId, { kind: "step-changed", stepId: waiting.id });
-				drive(
-					row,
-					new Command({
-						resume: {
-							kind: "wake",
-							early: input.early,
-							...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
-						} satisfies ResumeValue,
-					}),
-				);
+				const resume: ResumeValue =
+					input.signal !== undefined
+						? { kind: "signal", name: input.signal }
+						: {
+								kind: "wake",
+								early: input.early,
+								...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
+							};
+				drive(row, new Command({ resume }));
 			} finally {
 				releaseStartingSlot(runId);
 			}

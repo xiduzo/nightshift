@@ -34,14 +34,23 @@ function mergedRecord<V>() {
 	});
 }
 
-const waitReasonSchema = z.enum(["usage-limit", "network"]);
+const waitReasonSchema = z.enum([
+	"usage-limit",
+	"network",
+	"duration",
+	"time",
+	"command",
+	"signal",
+]);
 
 /**
  * The step a wait or a park left behind, for the node that re-enters.
  *
- * - `wait`: the step sleeps (a usage limit or the network). It is still open
- *   in the log. The Agent node continues it: same step id, same visit, the
- *   harness session the log assigned, `prompt` as the follow-up message.
+ * - `wait`: the step sleeps (a usage limit or the network, or a Wait node's
+ *   own wait). It is still open in the log. The Agent node continues it:
+ *   same step id, same visit, the harness session the log assigned,
+ *   `prompt` as the follow-up message. A Wait node reads `until`, the
+ *   streak (how many waits, and when the first began) and `signal`.
  * - `parked`: the step ended (`stopped` or `failed`) and the run parked at
  *   the node's park node. A resume sets `prompt` and jumps back to the node,
  *   which reopens the step (`StepReopened`, a new session of the same
@@ -61,10 +70,12 @@ const pendingWaitSchema = z.object({
 	/** The follow-up message of the continued session. */
 	prompt: z.string(),
 	reason: waitReasonSchema,
-	/** Epoch ms when the step continues (`WaitStarted.until`). */
-	until: z.number(),
+	/** Epoch ms when the step continues (`WaitStarted.until`); null for a signal with no timeout. */
+	until: z.number().nullable(),
 	message: z.string(),
 	resetAt: z.number().nullable(),
+	/** A Wait node on a signal: the signal that ended the wait, set by the wait node on a signal resume. */
+	signal: z.string().optional(),
 	/**
 	 * The step's streak of waits for this reason, this one included: how
 	 * many, and when the first began (epoch ms). `planWait` grows the next
@@ -183,7 +194,8 @@ export type Parked =
 			stepId: string;
 			nodeId: string;
 			reason: WaitReason;
-			until: number;
+			/** Null for a wait with no time (a signal with no timeout): no timer. */
+			until: number | null;
 			message: string;
 	  }
 	| {
@@ -213,12 +225,14 @@ export type Parked =
  * - `reopen`: a person resumed a run that was stopped at a Gate: the gate
  *   node asks again.
  * - `gate`: the answer to a Gate.
+ * - `signal`: someone sent the run a signal; a Wait node on it ends `done`.
  */
 export type ResumeValue =
 	| { kind: "wake"; early: boolean; prompt?: string }
 	| { kind: "resume"; prompt?: string }
 	| { kind: "reopen" }
-	| { kind: "gate"; choice: string; note?: string };
+	| { kind: "gate"; choice: string; note?: string }
+	| { kind: "signal"; name: string };
 
 /** What a step streams while it runs (LangGraph's `custom` stream mode). */
 export type RunEvent =
