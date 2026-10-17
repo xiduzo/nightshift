@@ -73,6 +73,7 @@ const PALETTE: FlowNodeType[] = [
 	"decision",
 	"value",
 	"call",
+	"wait",
 ];
 
 /** Below the node a new one lands on, so repeated adds do not stack exactly. */

@@ -87,6 +87,7 @@ import { OptionsEditor } from "./options-editor";
 import { OutputSchemaField } from "./output-schema-field";
 
 import { TemplateField } from "./template-field";
+import { WaitFields } from "./wait-fields";
 
 /**
  * The node without one of its optional fields: it comes from the default
@@ -309,6 +310,18 @@ export function NodeInspector({
 					onChange={(change) =>
 						onChange((current) =>
 							current.type === "value" ? change(current) : current,
+						)
+					}
+				/>
+			) : null}
+
+			{node.type === "wait" ? (
+				<WaitFields
+					flow={flow}
+					node={node}
+					onChange={(change) =>
+						onChange((current) =>
+							current.type === "wait" ? change(current) : current,
 						)
 					}
 				/>

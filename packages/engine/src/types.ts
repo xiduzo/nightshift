@@ -143,8 +143,10 @@ export type RunSummary = {
 	status: RunStatus;
 	/** Why the run failed, or which Decision label or Gate choice ended it. */
 	reason: string | null;
-	/** When a sleeping run continues. */
+	/** When a sleeping run continues. Null while it waits for a signal with no timeout. */
 	wakeAt: number | null;
+	/** The signal a sleeping run waits for (a Wait node), else null. */
+	signal: string | null;
 	/** The values of the top-level flow's inputs, defaults applied. */
 	inputs: Record<string, JsonValue>;
 	/** The stop time: no new step starts after it. */
@@ -225,15 +227,26 @@ export type ForEachEvent =
 			reason: string | null;
 	  };
 
-/** A wait of the run policy, written to the transcript of the step that waits. */
+/**
+ * A wait of the run policy, or of a Wait node, written to the transcript of
+ * the step that waits. `until` is null for a signal with no timeout;
+ * `signal` names the signal a Wait node waits for, or the one that woke it.
+ */
 export type WaitEvent =
 	| {
 			type: "wait";
-			reason: "usage-limit" | "network";
-			until: number;
+			reason:
+				| "usage-limit"
+				| "network"
+				| "duration"
+				| "time"
+				| "command"
+				| "signal";
+			until: number | null;
 			message: string;
+			signal?: string;
 	  }
-	| { type: "wake" };
+	| { type: "wake"; signal?: string };
 
 /** What a command step writes to its transcript. */
 export type CommandEvent =
@@ -396,6 +409,12 @@ export interface Engine {
 		choice: string;
 		note?: string;
 	}): Promise<void>;
+	/**
+	 * Sends a signal to a run whose Wait node waits for it: the step ends
+	 * `done` and the walk goes on. Fails when the run does not wait for a
+	 * signal of that name.
+	 */
+	signalRun(runId: string, name: string): Promise<void>;
 
 	listRuns(input?: { projectId?: string }): Promise<RunSummary[]>;
 	getRun(runId: string): Promise<RunDetail>;

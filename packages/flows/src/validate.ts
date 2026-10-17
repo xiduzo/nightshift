@@ -20,6 +20,7 @@ import {
 	runsEach,
 	type ValueNode,
 	valueDeciderNameSchema,
+	type WaitNode,
 } from "./schema";
 import { templateRefs } from "./template";
 import type { FlowIssue, ValidateOptions } from "./types";
@@ -215,6 +216,9 @@ function validateIn(
 			case "value":
 				checkValue(node, scope, error);
 				if (node.prompt !== undefined) template(node.prompt, "prompt");
+				break;
+			case "wait":
+				checkWait(node, template, error);
 				break;
 		}
 	}
@@ -592,6 +596,32 @@ function checkHaltOn(node: CallEachNode, error: Report): void {
 		} else if (reserved.includes(label)) {
 			error(
 				`Call node "${node.id}" halts on "${label}", which is reserved. Do not use: ${reserved.join(", ")}.`,
+				{ nodeId: node.id },
+			);
+		}
+	}
+}
+
+/**
+ * A Wait node's templates (the time, the command) read known names, and a
+ * command that runs every `everyMinutes` needs a timeout longer than that:
+ * a shorter one times out before the second try.
+ */
+function checkWait(
+	node: WaitNode,
+	template: (text: string, where: string) => void,
+	error: Report,
+): void {
+	const until = node.until;
+	if (until.kind === "time") template(until.at, "time");
+	if (until.kind === "command") {
+		template(until.command, "command");
+		if (
+			node.timeoutMinutes !== undefined &&
+			node.timeoutMinutes <= until.everyMinutes
+		) {
+			error(
+				`Wait node "${node.id}" runs its command every ${until.everyMinutes} min but times out after ${node.timeoutMinutes} min. Give it a longer timeout than the interval.`,
 				{ nodeId: node.id },
 			);
 		}

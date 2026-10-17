@@ -3,6 +3,7 @@ import {
 	BotIcon,
 	BracesIcon,
 	HandIcon,
+	HourglassIcon,
 	type LucideIcon,
 	RepeatIcon,
 	SparklesIcon,
@@ -40,6 +41,11 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		label: "Value",
 		icon: VariableIcon,
 		blurb: "Makes a value from a rule or a model.",
+	},
+	wait: {
+		label: "Wait",
+		icon: HourglassIcon,
+		blurb: "Waits for a time, a command to pass, or a signal.",
 	},
 };
 

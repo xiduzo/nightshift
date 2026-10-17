@@ -9,6 +9,8 @@ import {
 	nodeOutcomes,
 	runsEach,
 	type ValueNode,
+	type WaitNode,
+	type WaitUntil,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -24,11 +26,14 @@ import {
 	useUpdateNodeInternals,
 } from "@xyflow/react";
 import {
+	AlarmClockIcon,
 	BracesIcon,
 	CircleAlertIcon,
 	FilesIcon,
 	GitBranchIcon,
+	HourglassIcon,
 	PlayIcon,
+	RadioIcon,
 	SquareTerminalIcon,
 	TriangleAlertIcon,
 	WorkflowIcon,
@@ -47,6 +52,8 @@ import {
 	firstLine,
 	sourceSummary,
 	valueSummary,
+	WAIT_KINDS,
+	waitSummary,
 } from "@/lib/flow-draft";
 import { harnessInfo } from "@/lib/harnesses";
 
@@ -100,6 +107,17 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 			["fail", "No value made"],
 		]);
 	}
+	if (node.type === "wait") {
+		return new Map([
+			["done", WAIT_DONE[node.until.kind]],
+			[
+				"timeout",
+				node.timeoutMinutes
+					? `Not within ${node.timeoutMinutes} min`
+					: "Never: it has no timeout",
+			],
+		]);
+	}
 	const options =
 		node.type === "decision"
 			? node.options
@@ -108,6 +126,14 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 				: [];
 	return new Map(options.map((option) => [option.name, option.description]));
 }
+
+/** What ends a Wait node as done, by what it waits for. */
+const WAIT_DONE: Record<WaitUntil["kind"], string> = {
+	duration: "The time is up",
+	time: "The time came",
+	command: "The command passed",
+	signal: "The signal came",
+};
 
 /** Below this zoom a node's text is too small to read, so the node shows its
  *  type and id in large type instead, and a big flow reads as an overview. */
@@ -261,6 +287,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 						)
 					) : null}
 					{node.type === "value" ? <ValueBody node={node} /> : null}
+					{node.type === "wait" ? <WaitBody node={node} /> : null}
 					{node.type === "command" ? (
 						<code className="block truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px]">
 							{node.command.trim() === "" ? (
@@ -585,10 +612,68 @@ function ValueBody({ node }: { node: ValueNode }) {
 	);
 }
 
+const WAIT_ICON: Record<WaitUntil["kind"], typeof HourglassIcon> = {
+	duration: HourglassIcon,
+	time: AlarmClockIcon,
+	command: SquareTerminalIcon,
+	signal: RadioIcon,
+};
+
+const WAIT_EMPTY: Record<WaitUntil["kind"], string> = {
+	duration: "No duration yet",
+	time: "No time yet",
+	command: "No command yet",
+	signal: "No signal name yet",
+};
+
+/** What the node waits for, and how long it may: a duration, a time, a command, or a signal. */
+function WaitBody({ node }: { node: WaitNode }) {
+	const { until } = node;
+	const summary = waitSummary(until);
+	const Icon = WAIT_ICON[until.kind];
+	const mono = until.kind !== "duration";
+	return (
+		<>
+			<span className="truncate text-[11px] text-muted-foreground">
+				Waits for {WAIT_KINDS[until.kind].toLowerCase()}
+				{until.kind === "command" ? ` · every ${until.everyMinutes} min` : ""}
+				{node.timeoutMinutes ? ` · up to ${node.timeoutMinutes} min` : ""}
+			</span>
+			<p
+				className={cn(
+					"flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[11px]",
+					mono && "font-mono",
+				)}
+				title={summary}
+			>
+				<Icon
+					className="size-3 shrink-0 text-muted-foreground"
+					aria-hidden="true"
+				/>
+				{summary === "" ? (
+					<span className="font-sans text-muted-foreground italic">
+						{WAIT_EMPTY[until.kind]}
+					</span>
+				) : (
+					<span className="truncate">
+						{until.kind === "command" ? (
+							<span className="text-muted-foreground" aria-hidden="true">
+								${" "}
+							</span>
+						) : null}
+						{summary}
+					</span>
+				)}
+			</p>
+		</>
+	);
+}
+
 export const nodeTypes: NodeTypes = {
 	agent: FlowNodeCard,
 	command: FlowNodeCard,
 	decision: FlowNodeCard,
 	call: FlowNodeCard,
 	value: FlowNodeCard,
+	wait: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;

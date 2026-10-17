@@ -7,6 +7,7 @@ import { CircleXIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { RunDetail, StepSummary as Step } from "@/lib/api-types";
+import { formatWaited } from "@/lib/format";
 import { type ItemScope, stepRunsEach } from "@/lib/run-steps";
 import { CallDetail } from "./call-detail";
 import { ItemList } from "./item-list";
@@ -37,12 +38,22 @@ export function StepSummary({
 }) {
 	const prose = stepProse(step);
 	const logTail =
-		step.nodeType === "command" && typeof step.outputs.log_tail === "string"
+		(step.nodeType === "command" || step.nodeType === "wait") &&
+		typeof step.outputs.log_tail === "string"
 			? step.outputs.log_tail.trim()
 			: "";
 	const exitCode = step.outputs.exit_code;
 	const each = stepRunsEach(run, steps, step);
-	const hasBody = step.error || prose || logTail || step.nodeType === "call";
+	const waited =
+		step.nodeType === "wait" && typeof step.outputs.waited_minutes === "number"
+			? step.outputs.waited_minutes
+			: null;
+	const hasBody =
+		step.error ||
+		prose ||
+		logTail ||
+		waited !== null ||
+		step.nodeType === "call";
 
 	return (
 		<div className="flex min-w-0 flex-col gap-4">
@@ -61,6 +72,15 @@ export function StepSummary({
 			{prose ? (
 				<p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
 					{prose}
+				</p>
+			) : null}
+			{waited !== null ? (
+				<p className="text-sm leading-relaxed">
+					{step.outcome === "timeout"
+						? `Timed out after ${formatWaited(waited * 60_000)}.`
+						: step.outcome === null
+							? `Waiting for ${formatWaited(waited * 60_000)} so far.`
+							: `Waited ${formatWaited(waited * 60_000)}.`}
 				</p>
 			) : null}
 			{logTail ? (

@@ -19,6 +19,8 @@ import {
 	InboxIcon,
 	type LucideIcon,
 	MoonIcon,
+	RadioIcon,
+	SendIcon,
 	SunriseIcon,
 } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
@@ -32,10 +34,18 @@ import { orpc } from "@/utils/orpc";
 
 import { ResumeComposer } from "./resume-composer";
 
-const SLEEP_REASON = {
+const SLEEP_REASON: Record<CurrentWait["reason"], string> = {
 	"usage-limit": "The agent hit its usage limit.",
 	network: "The network is down.",
-} as const;
+	duration: "The flow waits a while.",
+	time: "The flow waits for a time.",
+	command: "The flow waits for a command to pass.",
+	signal: "The flow waits for a signal.",
+};
+
+/** A Wait node's own wait, not the run policy's. */
+const isNodeWait = (reason: CurrentWait["reason"]) =>
+	reason !== "usage-limit" && reason !== "network";
 
 type Notice = {
 	icon: LucideIcon;
@@ -184,29 +194,54 @@ function noticeOf({
 				: null;
 		case "sleeping": {
 			const until = run.wakeAt ?? wait?.until ?? null;
+			const signal = run.signal ?? wait?.signal ?? null;
 			const reason = wait ? SLEEP_REASON[wait.reason] : "The run sleeps.";
+			const at = until ? (
+				<time
+					dateTime={new Date(until).toISOString()}
+					title={formatDateTime(until)}
+					className="font-medium text-foreground tabular-nums"
+				>
+					{formatTime(until)}
+				</time>
+			) : null;
+			if (signal !== null) {
+				return {
+					icon: RadioIcon,
+					tone: "text-status-sleeping",
+					title: (
+						<>
+							Waiting for signal <span className="font-mono">{signal}</span>
+						</>
+					),
+					gist: `Send ${signal} to go on.`,
+					body: (
+						<>
+							The flow goes on when the run gets the signal{" "}
+							<span className="font-mono text-foreground">{signal}</span>
+							{at ? <>, or times out at {at}</> : null}. Send it here, or from
+							another system through the API.
+						</>
+					),
+					actions: <SignalButton runId={run.id} name={signal} />,
+				};
+			}
+			const nodeWait = wait ? isNodeWait(wait.reason) : false;
 			return {
 				icon: MoonIcon,
 				tone: "text-status-sleeping",
-				title: "Sleeping",
+				title: nodeWait ? "Waiting" : "Sleeping",
 				gist: reason,
 				body: (
 					<>
-						{reason} It continues where it left off
-						{until ? (
-							<>
-								{" "}
-								at{" "}
-								<time
-									dateTime={new Date(until).toISOString()}
-									title={formatDateTime(until)}
-									className="font-medium text-foreground tabular-nums"
-								>
-									{formatTime(until)}
-								</time>
-							</>
-						) : null}
-						.{wait?.message ? `\n${wait.message}` : null}
+						{reason}{" "}
+						{wait?.reason === "command"
+							? "It tries the command again"
+							: nodeWait
+								? "It goes on"
+								: "It continues where it left off"}
+						{at ? <> at {at}</> : null}.
+						{wait?.message ? `\n${wait.message}` : null}
 					</>
 				),
 				actions: <WakeButton runId={run.id} />,
@@ -272,6 +307,34 @@ function Countdown({
 		>
 			{formatCountdown(until - now)}
 		</span>
+	);
+}
+
+/** Sends the signal a run waits for, so its Wait step ends. */
+function SignalButton({ runId, name }: { runId: string; name: string }) {
+	const queryClient = useQueryClient();
+	const send = useMutation(
+		orpc.runs.signal.mutationOptions({
+			onSuccess: () => {
+				toast.success(`Sent ${name}. The flow goes on.`);
+				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+			},
+			onError: (error) => toast.error(`Could not send: ${error.message}`),
+		}),
+	);
+	return (
+		<Button
+			size="sm"
+			disabled={send.isPending}
+			onClick={() => send.mutate({ runId, name })}
+		>
+			{send.isPending ? (
+				<Spinner data-icon="inline-start" />
+			) : (
+				<SendIcon data-icon="inline-start" />
+			)}
+			{send.isPending ? "Sending…" : "Send signal"}
+		</Button>
 	);
 }
 

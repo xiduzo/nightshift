@@ -134,15 +134,21 @@ export type ItemEndItem = ItemBase & {
 
 export type WaitReason = Extract<WaitEvent, { type: "wait" }>["reason"];
 
-/** The run sleeps: a usage limit or a network failure, until a time. */
+/**
+ * The run sleeps: a usage limit or a network failure, or a Wait node's own
+ * wait, until a time (null for a signal with no timeout).
+ */
 export type WaitItem = ItemBase & {
 	kind: "wait";
 	reason: WaitReason;
-	until: number;
+	until: number | null;
 	message: string;
+	/** The signal a Wait node waits for. */
+	signal?: string;
 };
 
-export type WakeItem = ItemBase & { kind: "wake" };
+/** The sleep ended: a timer, a person, or (with `signal`) a signal. */
+export type WakeItem = ItemBase & { kind: "wake"; signal?: string };
 
 /** What a Value step was asked: a rule's expression, or the rendered prompt and the model. */
 export type ValueAskItem = ItemBase & {
@@ -198,8 +204,10 @@ export const emptyTranscript: TranscriptState = {
 export type CurrentWait = {
 	stepId: string;
 	reason: WaitReason;
-	until: number;
+	until: number | null;
 	message: string;
+	/** The signal a Wait node waits for. */
+	signal?: string;
 	at: number;
 };
 
@@ -242,6 +250,7 @@ export function applyEntries(
 				reason: event.reason,
 				until: event.until,
 				message: event.message,
+				...(event.signal !== undefined ? { signal: event.signal } : {}),
 				at: entry.at,
 			};
 		} else if (event.type === "wake") {
@@ -527,10 +536,16 @@ function applyStepEntries(
 					reason: event.reason,
 					until: event.until,
 					message: event.message,
+					...(event.signal !== undefined ? { signal: event.signal } : {}),
 				});
 				break;
 			case "wake":
-				push({ ...base, kind: "wake", key: `wake:${entry.seq}` });
+				push({
+					...base,
+					kind: "wake",
+					key: `wake:${entry.seq}`,
+					...(event.signal !== undefined ? { signal: event.signal } : {}),
+				});
 				break;
 		}
 	}

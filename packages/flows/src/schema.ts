@@ -413,12 +413,48 @@ export const valueNodeSchema = z.object({
 	model: z.string().min(1).optional(),
 });
 
+/**
+ * What a Wait node waits for. `duration`: a number of minutes. `time`: a
+ * template that renders a date and time (`2026-10-18T07:00`, with an
+ * optional zone) or a time of day (`07:00`: the next one on this computer's
+ * clock). `command`: a command (`sh -c` in the worktree, template values as
+ * environment variables, as in a Command node) run every `everyMinutes`
+ * until it exits 0. `signal`: a name someone sends to the run.
+ */
+export const waitUntilSchema = z.discriminatedUnion("kind", [
+	z.object({
+		kind: z.literal("duration"),
+		minutes: z.number().int().positive(),
+	}),
+	z.object({ kind: z.literal("time"), at: z.string().min(1) }),
+	z.object({
+		kind: z.literal("command"),
+		command: z.string().min(1),
+		everyMinutes: z.number().int().positive(),
+	}),
+	z.object({ kind: z.literal("signal"), name: labelSchema }),
+]);
+export type WaitUntil = z.infer<typeof waitUntilSchema>;
+
+/**
+ * Sleeps until a time, a command passes, or a signal arrives, then ends
+ * `done`. `timeoutMinutes` bounds every kind: the step ends `timeout` when
+ * it runs out. Outputs: `waited_minutes`, and the last `log_tail` of a
+ * command.
+ */
+export const waitNodeSchema = z.object({
+	...nodeBase,
+	type: z.literal("wait"),
+	until: waitUntilSchema,
+});
+
 export const flowNodeSchema = z.discriminatedUnion("type", [
 	agentNodeSchema,
 	commandNodeSchema,
 	decisionNodeSchema,
 	callNodeSchema,
 	valueNodeSchema,
+	waitNodeSchema,
 ]);
 
 export const outcomeSchema = labelSchema;
@@ -510,6 +546,7 @@ export type CallEach = z.infer<typeof callEachSchema>;
 /** A Call node with `each`: it runs its flow once per element. */
 export type CallEachNode = CallNode & { each: CallEach };
 export type ValueNode = z.infer<typeof valueNodeSchema>;
+export type WaitNode = z.infer<typeof waitNodeSchema>;
 export type ListSource = z.infer<typeof listSourceSchema>;
 export type Policy = z.infer<typeof policySchema>;
 /**
@@ -556,6 +593,8 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return node.each ? ["done", "halted"] : ["pass", "fail"];
 		case "value":
 			return ["pass", "fail"];
+		case "wait":
+			return ["done", "timeout"];
 	}
 }
 
@@ -592,6 +631,8 @@ export const outputFieldsByType = {
 	call: ["outcome", "ended", "visit"],
 	/** data: the value made (null on fail). note: why it failed, or the model's note. */
 	value: ["outcome", "data", "note", "visit"],
+	/** waited_minutes: how long the step waited. log_tail: the last output of a command it waited on. */
+	wait: ["outcome", "waited_minutes", "log_tail", "visit"],
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
 /**

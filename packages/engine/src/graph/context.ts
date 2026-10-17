@@ -27,10 +27,10 @@ import {
 	deriveSteps,
 	deriveStopAfterStep,
 	type LoggedEvent,
+	type PolicyWaitReason,
 	type Scope,
 	type StepOutputs,
 	scopeKey,
-	type WaitReason,
 } from "../events";
 import type { McpExpansion } from "../mcp";
 import { planWait } from "../policy";
@@ -72,7 +72,7 @@ export const HARNESS_LABEL = Object.fromEntries(
 /** A harness or decider error the run policy waits out, rather than a failure. */
 export const isWaitKind = (
 	kind: AgentErrorKind | null | undefined,
-): kind is WaitReason => kind === "usage-limit" || kind === "network";
+): kind is PolicyWaitReason => kind === "usage-limit" || kind === "network";
 
 export const DEFAULT_RESUME_PROMPT = "Continue where you left off.";
 export const STOP_TIME_REASON = "Reached the stop time";
@@ -383,7 +383,8 @@ export async function beginStep(
 		visit = countVisits(events, node.id, key) + 1;
 		const logPath =
 			node.type === "command" ||
-			(node.type === "call" && node.each?.source.kind === "command")
+			(node.type === "call" && node.each?.source.kind === "command") ||
+			(node.type === "wait" && node.until.kind === "command")
 				? commandLogPath(ctx.dataDir, runId, stepId)
 				: null;
 		await ctx.db.insert(step).values({
@@ -442,9 +443,10 @@ export async function beginStep(
 	const onStop = () => stepController.abort("stopped" satisfies AbortReason);
 	if (runSignal.aborted) onStop();
 	else runSignal.addEventListener("abort", onStop, { once: true });
-	// A Gate (a Decision decided by a person) waits as long as it must.
+	// A Gate (a Decision decided by a person) waits as long as it must. A
+	// Wait node keeps its own deadline across its sleeps (graph/nodes/wait.ts).
 	const timeoutMinutes =
-		node.type === "decision" && node.by === "person"
+		(node.type === "decision" && node.by === "person") || node.type === "wait"
 			? undefined
 			: node.timeoutMinutes;
 	const timer = timeoutMinutes
@@ -555,7 +557,7 @@ export async function beginStep(
 
 /** An Agent step, or a Decision step decided by a model, that hit a usage limit or lost the network. */
 export type WaitRequest = {
-	reason: WaitReason;
+	reason: PolicyWaitReason;
 	/** The harness's error message. */
 	message: string;
 	resetAt: number | null;

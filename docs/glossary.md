@@ -16,7 +16,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 |------|---------|--------|
 | Project | A local clone that Runs can start in. | Slice 1 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
-| Node | One step of a Flow: Agent, Command, Decision, Value, or Call. Its id is also its name in templates. | PLAN §3 |
+| Node | One step of a Flow: Agent, Command, Decision, Value, Wait, or Call. Its id is also its name in templates. | PLAN §3 |
 | Agent Node | A Node that runs one Session on its Harness, with a prompt and/or a skill, a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. | PLAN §3 |
 | Agent Profile | A Harness, a model, an effort, a permission mode, CLI Tools and Connections under one name, defined once on the daemon (the Agents page). Agent Nodes name it in `profile`. A Run resolves it when it starts, so a later change reaches the next Run. A Flow that names a profile the daemon does not have refuses to start. | Agents |
 | Command Node | A Node that runs one shell command in the Worktree. Exit 0 is `pass`. With `output: "json"`, what it prints is `data` for later Nodes; output that is not JSON is `fail`. | PLAN §3 |
@@ -25,6 +25,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Gate | A Decision decided by you: it waits in the Needs-you inbox with its question and its Options, and holds the Run with an Interrupt until you answer. It waits as long as it must. | PLAN §3 |
 | Rule | A JSONata expression over the same values templates see (`build.data.tests_passed = true and check.exit_code = 0`). On an Option of a Decision decided by a rule, the first Option whose Rule holds is picked, and the one Option without a Rule is the default. On a Value Node made by a rule, the expression's result is the data. No model, no cost. | Decision, Value |
 | Value Node | The twin of a Decision Node: a Decision picks a label, a Value makes `data` that matches its Output Schema. Who makes it is `by`: a Rule (an expression over the run's values) or a model (the Decider's chat model, held to the schema). `pass` with the data, or `fail` with why in `note`. Later Nodes read `data`, or a path into it. | Value |
+| Wait Node | A Node that waits for a duration, a time, a command that passes, or a Signal, then ends `done`. Its `timeoutMinutes` ends it `timeout`. Its whole job is a Wait: it parks the Run and the wake continues it. | PLAN §3 |
+| Signal | A name someone sends to a Run (`runs.signal`). A Wait Node that waits for that name ends `done`. A Run that does not wait for it refuses it. | PLAN §3 |
 | Start Node | The Node a Run begins at. | Slice 2 |
 | Input | A named value a Flow takes, like a function argument. The top-level Flow's Inputs are asked at start. | Slice 5 |
 | Output | A named value a Flow returns to the Node that called it. | Slice 5 |
@@ -56,7 +58,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Thread | The LangGraph thread of a Run. Its id is the Run's id, and it holds the Run's Checkpoints. | LangGraph |
 | Checkpoint | The run state LangGraph writes after every Node, in the tables `lg_checkpoint` and `lg_write`: inputs, the stop time, outputs for templates, visit and edge counts, the cursors of Call Nodes with `each`, and the pending Step (a Wait with its streak, a parked Step, or an open Gate). The walk reads it; people read the Event Log. A finished Run keeps its latest Checkpoint only. | LangGraph |
 | Interrupt | How a Thread parks: a Wait, an open Gate, or a Step that failed or was stopped. A resume answers it, and the Run continues at the same Node, at any depth. | LangGraph |
-| Wait | A Step's sleep on a usage limit or a network failure. The Node's wait node holds it with an Interrupt; a wake continues the same Session. Agent Nodes and Decisions decided by a model wait. | LangGraph |
+| Wait | A Step's sleep: on a usage limit or a network failure (Agent Nodes and Decisions decided by a model), or a Wait Node's own sleep, which is a Wait too. The Node's wait node holds it with an Interrupt until a wake time, or for a Signal; the wake continues the same Step. | LangGraph |
 | Visit | The count of a Step among the Steps of the same Node: 1 for the first. | Slice 2 |
 | Session | One harness session of an Agent Step. A resumed Step has more than one. | Slice 1 |
 | Harness | A coding-agent CLI that runs Sessions on this machine, with its own login, through a TanStack AI harness adapter: `claude-code` (Claude Code), `opencode` (OpenCode, a 1.x build), or `codex` (Codex). Added on the Agents page; an Agent Profile or an Agent Node names one. | Slice 8 |
@@ -106,8 +108,9 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | resolve | Answer a Gate with one of its Options. | PLAN §3 |
 | block | Skip an Item because an Item it waits on failed. | Slice 4 |
 | halt | End a Call with `each` early because a Body Flow ended on a halt label. | Slice 4 |
-| sleep | Wait on a timer after a usage limit or a network failure. | Slice 4 |
-| wake | End a sleep and continue the same Session. | Slice 4 |
+| sleep | Wait on a timer after a usage limit or a network failure, or because a Wait Node says so. | Slice 4 |
+| wake | End a sleep and continue the same Step: the timer, a person, or a Signal. | Slice 4 |
+| signal | Send a Signal to a Run. | PLAN §3 |
 | self-fence | Exit at once, writing nothing more, because the daemon lost its Lease to another daemon. Exit code 3. | Lease |
 
 ## Events
@@ -129,6 +132,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | EdgeTaken | The Run followed an Edge to the next Node. |
 | StopRequested | A person asked to stop the Run. |
 | GateOpened | A Gate put its question in the Needs-you inbox. |
+| WaitStarted | A Step began a Wait: why, until when (none for a Signal with no timeout), and which Signal. |
+| WaitEnded | The Wait is over: the timer, a person, or a Signal. |
 | RunEnded | The Run finished or failed, with the reason. |
 | ScheduleFired | A Schedule came due and started its Run, or failed to start it. |
 | ScheduleSkipped | A Schedule came due but did not start: too late, or its previous Run still runs. |

@@ -311,7 +311,9 @@ export function createEngine(
 				if (!why) toResume.push(runId);
 			}
 			const sleep = deriveSleep(events);
-			if (sleep && !open.runOpen) runner.scheduleWake(runId, sleep.until);
+			if (sleep && !open.runOpen && sleep.until !== null) {
+				runner.scheduleWake(runId, sleep.until);
+			}
 		}
 		if (toResume.length > 0 && !disposed) {
 			resumeTimer = setTimeout(() => {
@@ -432,6 +434,10 @@ export function createEngine(
 			wakeAt:
 				state.status === "sleeping"
 					? (deriveSleep(events)?.until ?? null)
+					: null,
+			signal:
+				state.status === "sleeping"
+					? (deriveSleep(events)?.signal ?? null)
 					: null,
 			inputs: deriveInputs(events),
 			stopAt: deriveStopAt(events),
@@ -1220,6 +1226,18 @@ export function createEngine(
 					runner.releaseStartingSlot(runId);
 				}
 			});
+		},
+
+		async signalRun(runId, name) {
+			await ready;
+			await getRunRow(runId);
+			const sleep = deriveSleep(await loadRunEvents(runId));
+			if (!sleep || sleep.signal !== name) {
+				throw new Error("This run does not wait for that signal.");
+			}
+			// The thread continues at once, like a wake a person asks for: a
+			// full run cap fails here rather than queueing the signal.
+			await runner.wake(runId, { early: true, signal: name });
 		},
 
 		watchRun(runId, { signal, afterSeq }) {
