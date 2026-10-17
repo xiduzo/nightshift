@@ -17,6 +17,7 @@ import {
 	flowSchema,
 	type HarnessName,
 	harnessNameSchema,
+	labelSchema,
 	nextCronTimes,
 	scheduleSchema,
 } from "@nightshift/flows";
@@ -182,6 +183,12 @@ const runs = {
 				afterSeq: input.afterSeq,
 			});
 		}),
+	/** Sends a signal to a run whose Wait node waits for it. */
+	signal: publicProcedure
+		.input(z.object({ runId: z.string(), name: labelSchema }))
+		.handler(({ context, input }) =>
+			context.engine.signalRun(input.runId, input.name),
+		),
 };
 
 /** Daemon settings: saved in the database, else the environment, else the default. */
