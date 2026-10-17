@@ -53,7 +53,7 @@ CLI when you need them.
 | ✓ [Radio Group](https://ui.shadcn.com/docs/components/radio-group) | One choice from a few visible options. |
 | ✓ [Select](https://ui.shadcn.com/docs/components/select) | One choice from a list, in a styled popup. |
 | ✓ [Native Select](https://ui.shadcn.com/docs/components/native-select) | One choice through the browser's own `<select>`. Good on touch screens and in dense forms. |
-| ✓ [Switch](https://ui.shadcn.com/docs/components/switch) | An on/off setting that applies at once (a schedule on or off). |
+| ✓ [Switch](https://ui.shadcn.com/docs/components/switch) | An on/off setting that applies at once (a schedule on or off, a Call node's "Run once per item"). |
 | [Slider](https://ui.shadcn.com/docs/components/slider) | A number in a range. |
 | [Calendar](https://ui.shadcn.com/docs/components/calendar) | Pick a date or range on a month grid. |
 | [Date Picker](https://ui.shadcn.com/docs/components/date-picker) | A button or input that opens a Calendar in a Popover. |
@@ -95,7 +95,7 @@ CLI when you need them.
 | --- | --- |
 | ✓ [Alert](https://ui.shadcn.com/docs/components/alert) | A message in the page flow: a run failed, a run sleeps until a reset, a flow has errors. |
 | ✓ [Sonner](https://ui.shadcn.com/docs/components/sonner) | Toasts (`toast()` from `sonner`). `<Toaster />` sits in the root. Toast is the older name for the same thing. |
-| ✓ [Progress](https://ui.shadcn.com/docs/components/progress) | How far something is (items done of a For Each, the night until stop time). |
+| ✓ [Progress](https://ui.shadcn.com/docs/components/progress) | How far something is (items done of a Call with `each`, the night until stop time). |
 | ✓ [Spinner](https://ui.shadcn.com/docs/components/spinner) | Something is loading or running. Put it in a Button while it is pending. |
 | ✓ [Skeleton](https://ui.shadcn.com/docs/components/skeleton) | A placeholder in the shape of content that is still loading. |
 | ✓ [Badge](https://ui.shadcn.com/docs/components/badge) | A short status or tag (run status, outcome, node type). Variants: `default`, `secondary`, `outline`, `destructive`, `ghost`, `link`. |
@@ -122,7 +122,7 @@ CLI when you need them.
 | --- | --- |
 | ✓ [Collapsible](https://ui.shadcn.com/docs/components/collapsible) | One section that opens and closes (a tool call's input, raw JSON, the flow editor's issues, a run's status under its flow). |
 | ✓ [Toggle](https://ui.shadcn.com/docs/components/toggle) | A button that stays pressed (show/hide a panel). |
-| ✓ [Toggle Group](https://ui.shadcn.com/docs/components/toggle-group) | A set of toggles where one or many are on: a segmented control (Canvas / JSON, transcript levels). |
+| ✓ [Toggle Group](https://ui.shadcn.com/docs/components/toggle-group) | A set of toggles where one or many are on: a segmented control (Canvas / JSON, transcript levels, a Command node's output Text / JSON). |
 | [Pagination](https://ui.shadcn.com/docs/components/pagination) | Page links under a long list. |
 | [Direction](https://ui.shadcn.com/docs/components/direction) | Right-to-left support. |
 

@@ -36,12 +36,12 @@ Night Shift is for its author first. It runs on the author's machine with the au
 | Context | Responsibility | Key domain objects |
 | --- | --- | --- |
 | Flow | What a flow is: nodes, edges, outcomes, loop limits, the schema, the validator. | Flow, Node, Edge, Outcome, Agent Profile |
-| Run | Executing a flow: graph walk, run policy, For Each ordering, gates, decisions. | Run, Step Run, Gate, Decision, Run Policy |
+| Run | Executing a flow: graph walk, run policy, item ordering of a Call with `each`, gates, decisions. | Run, Step Run, Gate, Decision, Run Policy |
 | Session | One harness session: transcript, tool calls, needs-input, resume. | Session, Transcript, Step Report, Needs Input |
 | Tools | What an agent can call outside its harness: CLI tools such as `gh` and `acli`, and MCP connections. The engine knows no tracker. | CLI Tool, Connection, Profile |
 | Workspace | Projects, repos, and local settings. | Workspace, Project, Repo Binding |
 
-The Run context speaks only in Flow, Node, Step Run, and Gate. A method's own words (Epic, Feature, Trace) live in prompts, skills, and the For Each source, never in the engine.
+The Run context speaks only in Flow, Node, Step Run, and Gate. A method's own words (Epic, Feature, Trace) live in prompts, skills, and the list source of a Call node, never in the engine.
 
 ## Out of Scope
 

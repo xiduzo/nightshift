@@ -16,32 +16,31 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 |------|---------|--------|
 | Project | A local clone that Runs can start in. | Slice 1 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
-| Node | One step of a Flow: Agent, Command, Decision, Subflow, or For Each. Its id is also its name in templates. | PLAN §3 |
+| Node | One step of a Flow: Agent, Command, Decision, or Call. Its id is also its name in templates. | PLAN §3 |
 | Agent Node | A Node that runs one Session on its Harness, with a prompt and/or a skill, a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. | PLAN §3 |
 | Agent Profile | A Harness, a model, an effort, a permission mode, CLI Tools and Connections under one name, defined once on the daemon (the Agents page). Agent Nodes name it in `profile`. A Run resolves it when it starts, so a later change reaches the next Run. A Flow that names a profile the daemon does not have refuses to start. | Agents |
-| Command Node | A Node that runs one shell command in the Worktree. Exit 0 is `pass`. | PLAN §3 |
+| Command Node | A Node that runs one shell command in the Worktree. Exit 0 is `pass`. With `output: "json"`, what it prints is `data` for later Nodes; output that is not JSON is `fail`. | PLAN §3 |
 | Decision Node | A Node that picks one of its Options, which is the Step's Outcome. Who picks is `by`: you (a Gate), a Rule, or a model (the Decider). Its prompt is the question for you, the brief for the model, or a note on the Rules. Later Nodes read `outcome` and `note`. | PLAN §3 |
 | Option | One of the things a Decision Node can pick, with a name, a description, and (for a Rule) `when`. Each Option has its own Edge. | PLAN §3 |
 | Gate | A Decision decided by you: it waits in the Needs-you inbox with its question and its Options, and holds the Run with an Interrupt until you answer. It waits as long as it must. | PLAN §3 |
 | Rule | A JSONata expression on an Option of a Decision decided by a rule, over the same values templates see (`build.data.tests_passed = true and check.exit_code = 0`). The first Option whose Rule holds is picked; the one Option without a Rule is the default. No model, no cost. | Decision |
-| For Each Node | A Node that runs a Body Flow once per Item of a List. | PLAN §3 |
 | Start Node | The Node a Run begins at. | Slice 2 |
 | Input | A named value a Flow takes, like a function argument. The top-level Flow's Inputs are asked at start. | Slice 5 |
 | Output | A named value a Flow returns to the Node that called it. | Slice 5 |
-| Subflow Node | A Node that runs another Flow once, with its Inputs bound. | Slice 5 |
-| Body Flow | The Flow a For Each Node runs once per Item. Any Flow can be a Body Flow. | Slice 4 |
-| Item | One element of a For Each List: any JSON value, optionally with `id`, `title`, `dependsOn`, and `done`. | Slice 4 |
+| Call Node | A Node that runs another Flow with its Inputs bound: once (`pass` or `fail`), or with `each` once per Item of a List (`done` or `halted`). | PLAN §3 |
+| Body Flow | The Flow a Call Node with `each` runs once per Item. Any Flow can be a Body Flow. | Slice 4 |
+| Item | One element of the List of a Call Node with `each`: any JSON value, optionally with `id`, `title`, `dependsOn`, and `done`. | Slice 4 |
 | Connection | An MCP server defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `connections`. Holds `${NAME}` references, never secret values. | Connections |
 | Secret | A value a `${NAME}` reads: from the system keychain (saved on the Agents page, under Secrets), else the daemon's environment. Never in a Flow file, the database, or the log. | Connections |
 | Lease | The right of one daemon to write to a database. The daemon takes it at start, keeps it with a heartbeat, and gives it up on a clean stop. A second daemon on the same database refuses to start. Each acquisition has an Epoch one higher than the last. | Lease |
 | Epoch | The number of a Lease acquisition. A daemon whose Epoch is no longer the Lease's lost it, and exits (self-fence). | Lease |
 | Setting | A daemon-wide value changed on the Settings page and saved in the database. Unset, it reads the environment, then its default. A Flow's own policy wins over the Settings' policy. | Settings |
-| List | The elements a For Each Node runs over, read from a Source. | Slice 5 |
-| Source | Where a For Each Node reads its List, again before each Item: a JSON value, a command that prints JSON, or a glob of files. A tracker is a command on its CLI (`gh`, `glab`, `acli`); the engine knows none. | Slice 4 |
+| List | The elements a Call Node with `each` runs over, read from a Source. | Slice 5 |
+| Source | Where a Call Node with `each` reads its List, again before each Item: a JSON value, a command that prints JSON, or a glob of files. A tracker is a command on its CLI (`gh`, `glab`, `acli`); the engine knows none. | Slice 4 |
 | Schedule | A Flow, its Inputs, a time, and a Stop Time: the daemon starts a Run from it. | Slice 7 |
 | Trigger | What starts a Run: a person, or a Schedule. | Slice 7 |
 | Item Branch | The branch one Item works on, on top of the last Item that finished. Together they form the Stack. | Slice 4 |
-| Stack | The chain of Item Branches of one For Each. The engine makes the branches; a flow opens pull requests on them with a CLI tool such as `gh`. | PLAN §5 |
+| Stack | The chain of Item Branches of one Call Node with `each`. The engine makes the branches; a flow opens pull requests on them with a CLI tool such as `gh`. | PLAN §5 |
 | Stop Time | The time after which a Run starts no new Step. | Slice 4 |
 | Outcome | How a Step ended: `pass`, `fail`, `needs-input`, an Agent Node's own outcome, or a Decision Option. | PLAN §3 |
 | Edge | A link from a Node to the next Node, taken on one Outcome. | PLAN §2 |
@@ -54,7 +53,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Quick Run | A Run of a one-node Flow made from a prompt, without a Flow file. | Slice 2 |
 | Step | One visit of one Node in a Run. The graph node of that Node runs it; its facts are Events. | Slice 2 |
 | Thread | The LangGraph thread of a Run. Its id is the Run's id, and it holds the Run's Checkpoints. | LangGraph |
-| Checkpoint | The run state LangGraph writes after every Node, in the tables `lg_checkpoint` and `lg_write`: inputs, the stop time, outputs for templates, visit and edge counts, For Each cursors, and the pending Step (a Wait with its streak, a parked Step, or an open Gate). The walk reads it; people read the Event Log. A finished Run keeps its latest Checkpoint only. | LangGraph |
+| Checkpoint | The run state LangGraph writes after every Node, in the tables `lg_checkpoint` and `lg_write`: inputs, the stop time, outputs for templates, visit and edge counts, the cursors of Call Nodes with `each`, and the pending Step (a Wait with its streak, a parked Step, or an open Gate). The walk reads it; people read the Event Log. A finished Run keeps its latest Checkpoint only. | LangGraph |
 | Interrupt | How a Thread parks: a Wait, an open Gate, or a Step that failed or was stopped. A resume answers it, and the Run continues at the same Node, at any depth. | LangGraph |
 | Wait | A Step's sleep on a usage limit or a network failure. The Node's wait node holds it with an Interrupt; a wake continues the same Session. Agent Nodes and Decisions decided by a model wait. | LangGraph |
 | Visit | The count of a Step among the Steps of the same Node: 1 for the first. | Slice 2 |
@@ -105,7 +104,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | rescue | Retry a Node with a stronger model. | PLAN §2 |
 | resolve | Answer a Gate with one of its Options. | PLAN §3 |
 | block | Skip an Item because an Item it waits on failed. | Slice 4 |
-| halt | End a For Each early because a Body Flow ended on a halt label. | Slice 4 |
+| halt | End a Call with `each` early because a Body Flow ended on a halt label. | Slice 4 |
 | sleep | Wait on a timer after a usage limit or a network failure. | Slice 4 |
 | wake | End a sleep and continue the same Session. | Slice 4 |
 | self-fence | Exit at once, writing nothing more, because the daemon lost its Lease to another daemon. Exit code 3. | Lease |

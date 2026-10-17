@@ -4,7 +4,7 @@
 
 ## What it does
 
-- **Flows.** Draw a flow in a graph editor. A node is an agent session, a shell command, a decision, a gate that waits for you, a call to another flow, or a For Each over a list. Flows are JSON files in your repo (`.nightshift/flows/`).
+- **Flows.** Draw a flow in a graph editor. A node is an agent session, a shell command, a decision, a gate that waits for you, or a call to another flow, once or once per item in a list. Flows are JSON files in your repo (`.nightshift/flows/`).
 - **Flows as functions.** A flow declares inputs and outputs. A flow can call another flow once, or once per element of a list. The list can come from a JSON value (for example a planner agent's output), a command (for example `gh` for the sub-issues of an issue), or a glob of files.
 - **Agents that answer in shape.** An agent ends with a step report: an outcome (`pass`, `fail`, or its own) and, when you ask for it, data that matches a JSON schema.
 - **Harnesses.** Each agent node runs on Claude Code, OpenCode, or Codex, with your own login for each. A node can add MCP servers.

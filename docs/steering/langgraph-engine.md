@@ -56,11 +56,15 @@ packages/engine/src/
   graph/nodes/choosers/    person.ts (the Gate: the node opens it, its ask
                            node interrupts), rule.ts (JSONata rules),
                            model.ts (the decider).
-  graph/nodes/subflow.ts
-  graph/nodes/foreach.ts
-  graph/nodes/body.ts      What Subflow and For Each share: bodyGraph,
+  graph/nodes/call.ts      the Call node: runs its flow once, or hands
+                           over to call-each.ts
+  graph/nodes/call-each.ts the per-element loop of a Call with `each`
+                           (one element per super-step)
+  graph/nodes/body.ts      What a Call does once and per element: bodyGraph,
                            runBody (a called flow as a subgraph of the node)
                            and BodyEnd (how the body ended).
+  ../each.ts               the pure parts of a Call with `each`: list items
+                           from a source, item facts, the step's outputs
   graph/runner.ts          Per-run driver: start, continueRun, resume,
                            reenter (reentryUpdate for threads with no
                            checkpoint), wake, stop, closeParked. Streams the
@@ -95,7 +99,7 @@ packages/engine/src/
    `interrupt({ kind: "parked", ... })`. The runner appends `RunEnded`
    when it sees that interrupt. A resume is `Command({ resume })` and
    re-enters the node. This is what makes "resume at the last step's node,
-   inside a For Each at the same item" free at any depth.
+   inside a Call with `each` at the same item" free at any depth.
 3. **The event log is written exactly as before.** Same payloads, same
    order: `StepStarted`, `SessionStarted`, `HarnessSessionAssigned`,
    `SessionEnded`, `StepEnded`, `EdgeTaken`, `GateOpened`, `WaitStarted`,
@@ -121,7 +125,7 @@ packages/engine/src/
    outputs), a waiting step's streak (`pending.streak`), an open Gate
    (`pending.kind === "gate"`), the wait a wake ends (the interrupt).
    The log is the read model for people and the crash-recovery source.
-6. **Scopes.** A Subflow or For Each body is a subgraph invoked from the
+6. **Scopes.** A Call body is a subgraph invoked from the
    node with the config passed through (so it checkpoints under the node's
    namespace). The scope `{ parentStepId, itemId }` travels in
    `config.configurable.scope`; body nodes stamp it on their events as before.
@@ -165,14 +169,14 @@ packages/engine/src/
 11. **Durability** is `"sync"`: the checkpoint is written before the next
     node starts. Subgraphs inherit it through the config `runBody` passes
     on, as they inherit the drive's `recursionLimit`
-    (`Number.MAX_SAFE_INTEGER`: every node visit, park, wait and For Each
+    (`Number.MAX_SAFE_INTEGER`: every node visit, park, wait and Call
     element is one super-step, and the walk's own step cap is enforced by
     `beginStep` from the log, not by the graph).
 12. **Recovery at startup** keeps `recoverInterruptedWork`'s facts: open
     sessions, steps and runs become `interrupted`; sleeping runs get their
     timers back; open Gates stay; and the daemon resumes interrupted runs
     itself under the same policy as before, now by `invoke(null)`.
-13. **For Each** keeps its semantics: sources json, command and files;
+13. **A Call with `each`** (the For Each node until flow version 4) keeps its semantics: sources json, command and files;
     `blockersFirst`/`nextItem` ordering; blocked items; per-item
     branches on top of the last finished element (`branch: "per-item"`)
     or the shared branch; `haltOn`; `maxItems`; the list is read again
@@ -191,8 +195,8 @@ packages/engine/src/
 Decisions taken while implementing, from the code and its comments:
 
 - **A body failure does not park the run** (`graph/nodes/body.ts`). A body
-  step that fails inside a Subflow or a For Each parks the *body's* thread
-  namespace (rule 2), but `runBody` swallows that interrupt: the Subflow
+  step that fails inside a Call parks the *body's* thread
+  namespace (rule 2), but `runBody` swallows that interrupt: the Call
   step ends `fail`, or the element ends `ItemEnded failed` and the items
   that depend on it block, and the walk goes on, as before. The parked
   namespace is never invoked again (the next invoke of the node is a new
@@ -255,7 +259,7 @@ Decisions taken while implementing, from the code and its comments:
   harness session, so a later resume can reopen it.
 - **A step recovery ended after a wake is reopened** (`StepReopened`),
   not continued, in the Agent node and the model chooser as in
-  `continueStep` for Subflow and For Each, so the log keeps one open step to end and the read
+  `continueStep` for a Call, so the log keeps one open step to end and the read
   model shows the step's real outcome and cost.
 - **The runner publishes `status-changed` on step chunks**
   (`runner.onCustom`). The `step-started` and `step-ended` custom stream
