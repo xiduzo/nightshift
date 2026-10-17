@@ -223,8 +223,8 @@ type FlowRef = { projectId: string; projectName: string; flowName: string };
 
 /**
  * Who uses what, from every flow of every project: the flows whose Agent
- * nodes name each connection and each CLI tool, and the Agent nodes that
- * name each profile.
+ * or Tool nodes name each connection, whose Agent nodes name each CLI
+ * tool, and the Agent nodes that name each profile.
  */
 async function flowUse(engine: Engine): Promise<{
 	connections: Map<string, FlowRef[]>;
@@ -248,7 +248,13 @@ async function flowUse(engine: Engine): Promise<{
 			const agents = (loaded?.flow?.nodes ?? []).flatMap((n) =>
 				n.type === "agent" ? [n] : [],
 			);
-			for (const name of new Set(agents.flatMap((n) => n.connections ?? []))) {
+			const toolConnections = (loaded?.flow?.nodes ?? []).flatMap((n) =>
+				n.type === "tool" ? [n.connection] : [],
+			);
+			for (const name of new Set([
+				...agents.flatMap((n) => n.connections ?? []),
+				...toolConnections,
+			])) {
 				connections.set(name, [...(connections.get(name) ?? []), ref]);
 			}
 			for (const name of new Set(agents.flatMap((n) => n.clis ?? []))) {
@@ -513,6 +519,24 @@ const connections = {
 		.handler(({ context, input }) =>
 			context.connections.removeSecret(input.name),
 		),
+	/**
+	 * The tools of a saved connection, for a Tool node's inspector: each
+	 * tool's name, description and input schema. Same client as `test`.
+	 * A connection that cannot be reached answers `ok: false` with why.
+	 */
+	tools: publicProcedure
+		.input(z.object({ name: z.string() }))
+		.handler(async ({ context, input }) => {
+			const { expansion, values } =
+				await context.connections.expandForTest(input);
+			if (!expansion.ok) {
+				return { ok: false, tools: [], error: expansion.message };
+			}
+			const [config] = Object.values(expansion.servers);
+			if (!config) throw new Error("Nothing to list.");
+			const result = await context.checks.mcp(config, values);
+			return { ok: result.ok, tools: result.tools, error: result.error };
+		}),
 };
 
 /**

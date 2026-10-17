@@ -16,11 +16,12 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 |------|---------|--------|
 | Project | A local clone that Runs can start in. | Slice 1 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
-| Node | One step of a Flow: Agent, Command, Decision, Value, Wait, or Call. Its id is also its name in templates. | PLAN §3 |
+| Node | One step of a Flow: Agent, Command, Tool, Decision, Value, Wait, or Call. Its id is also its name in templates. | PLAN §3 |
 | Agent Node | A Node that runs one Session on its Harness, with a prompt and/or a skill, a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. | PLAN §3 |
 | Agent Profile | A Harness, a model, an effort, a permission mode, CLI Tools and Connections under one name, defined once on the daemon (the Agents page). Agent Nodes name it in `profile`. A Run resolves it when it starts, so a later change reaches the next Run. A Flow that names a profile the daemon does not have refuses to start. | Agents |
 | Command Node | A Node that runs one shell command in the Worktree. Exit 0 is `pass`. With `output: "json"`, what it prints is `data` for later Nodes; output that is not JSON is `fail`. | PLAN §3 |
 | Decision Node | A Node that picks one of its Options, which is the Step's Outcome. Who picks is `by`: you (a Gate), a Rule, or a model (the Decider). Its prompt is the question for you, the brief for the model, or a note on the Rules. Later Nodes read `outcome` and `note`. | PLAN §3 |
+| Tool Node | A Node that calls one tool of a Connection itself, with arguments from templates, and no model in the loop. The MCP leg of "flow + CLI + MCP", next to the Command Node. `pass` when the tool answers; `fail` when it reports an error, the Connection has no such tool, or does not answer. Later Nodes read `data` (the tool's structured answer, else the JSON its text holds) and `text`. Not a CLI Tool: that is a program an agent may run. | Tool node |
 | Option | One of the things a Decision Node can pick, with a name, a description, and (for a Rule) `when`. Each Option has its own Edge. | PLAN §3 |
 | Gate | A Decision decided by you: it waits in the Needs-you inbox with its question and its Options, and holds the Run with an Interrupt until you answer. It waits as long as it must. | PLAN §3 |
 | Rule | A JSONata expression over the same values templates see (`build.data.tests_passed = true and check.exit_code = 0`). On an Option of a Decision decided by a rule, the first Option whose Rule holds is picked, and the one Option without a Rule is the default. On a Value Node made by a rule, the expression's result is the data. No model, no cost. | Decision, Value |
@@ -76,7 +77,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Run Policy | The rules for retries, rescue, blocked propagation, network grace, usage-limit waits, the stop time, and resume after a restart. | PLAN §2 |
 | Needs-you inbox | The list of open Gates. | PLAN §3 |
 | Decider | The TanStack AI decision model behind a Decision decided by a model: TypeSafe Jev by default, or Jev on OpenRouter, OpenAI Decisions, Ollaya. Its API key is a Secret. Jev on OpenRouter and OpenAI Decisions also have a chat model, so they can make a Value; TypeSafe and Ollaya only decide. | PLAN §2 |
-| CLI Tool | A program on this computer, by its name (`gh`, `aws`), defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `clis`: its agent may run it without a prompt. A Flow that names one the daemon does not have, or that the computer cannot find, refuses to start. | CLI tools |
+| CLI Tool | A program on this computer, by its name (`gh`, `aws`), defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `clis`: its agent may run it without a prompt. A Flow that names one the daemon does not have, or that the computer cannot find, refuses to start. Not a Tool Node: a CLI Tool is a program an agent runs; a Tool Node calls one MCP tool of a Connection itself. | CLI tools |
 
 ## Run status
 

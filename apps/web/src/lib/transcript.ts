@@ -45,6 +45,10 @@ export type ToolItem = ItemBase & {
 	input?: unknown;
 	hasInput: boolean;
 	result?: string;
+	/** A Tool node's call: the connection it called. Absent for an agent's tool call. */
+	connection?: string;
+	/** A Tool node's call that the tool answered with an error, or that could not be made. */
+	failed?: boolean;
 };
 
 export type ReportItem = ItemBase & {
@@ -547,6 +551,56 @@ function applyStepEntries(
 					...(event.signal !== undefined ? { signal: event.signal } : {}),
 				});
 				break;
+			case "tool-call":
+				// A Tool node's call reads as one tool row, like an agent's.
+				push({
+					...base,
+					kind: "tool",
+					key: `tool-call:${entry.seq}`,
+					toolCallId: String(entry.seq),
+					name: event.tool,
+					connection: event.connection,
+					input: event.arguments,
+					hasInput: true,
+				});
+				break;
+			case "tool-called": {
+				const result =
+					event.data !== null
+						? JSON.stringify(event.data, null, 2)
+						: event.text;
+				let open: ToolItem | undefined;
+				for (let at = items.length - 1; at >= 0 && !open; at--) {
+					const candidate = items[at];
+					if (
+						candidate?.kind === "tool" &&
+						candidate.connection !== undefined &&
+						candidate.result === undefined
+					) {
+						open = candidate;
+					}
+				}
+				if (open) {
+					update<ToolItem>(open.key, (item) => ({
+						...item,
+						result,
+						failed: event.isError,
+					}));
+				} else {
+					push({
+						...base,
+						kind: "tool",
+						key: `tool-called:${entry.seq}`,
+						toolCallId: String(entry.seq),
+						name: "",
+						connection: "",
+						hasInput: false,
+						result,
+						failed: event.isError,
+					});
+				}
+				break;
+			}
 		}
 	}
 

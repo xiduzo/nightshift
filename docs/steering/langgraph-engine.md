@@ -74,6 +74,11 @@ packages/engine/src/
                            a time, a command poll, a signal), appends
                            WaitStarted and parks at its wait node; a wake
                            ends it done or timeout, or sleeps again.
+  graph/nodes/tool.ts      tool node: one tools/call on a Connection's MCP
+                           server through @nightshift/agents/mcp, the
+                           Connection resolved by mcpServersFor as for an
+                           Agent node. No wait node: a transport failure
+                           is `fail`.
                            runBody (a called flow as a subgraph of the node)
                            and BodyEnd (how the body ended).
   ../each.ts               the pure parts of a Call with `each`: list items

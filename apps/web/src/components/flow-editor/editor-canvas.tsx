@@ -67,13 +67,15 @@ type SelectionSetter = (
 	selection: Selection | ((current: Selection) => Selection),
 ) => void;
 
+/** In four groups: do, decide, shape, wait, compose (docs/research/foundational-nodes.md §5). */
 const PALETTE: FlowNodeType[] = [
 	"agent",
 	"command",
+	"tool",
 	"decision",
 	"value",
-	"call",
 	"wait",
+	"call",
 ];
 
 /** Below the node a new one lands on, so repeated adds do not stack exactly. */

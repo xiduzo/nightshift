@@ -8,6 +8,7 @@ import {
 	type ListSource,
 	nodeOutcomes,
 	runsEach,
+	type ToolNode,
 	type ValueNode,
 	type WaitNode,
 	type WaitUntil,
@@ -33,6 +34,7 @@ import {
 	GitBranchIcon,
 	HourglassIcon,
 	PlayIcon,
+	PlugIcon,
 	RadioIcon,
 	SquareTerminalIcon,
 	TriangleAlertIcon,
@@ -116,6 +118,12 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 					? `Not within ${node.timeoutMinutes} min`
 					: "Never: it has no timeout",
 			],
+		]);
+	}
+	if (node.type === "tool") {
+		return new Map([
+			["pass", "The tool answered"],
+			["fail", "It reported an error"],
 		]);
 	}
 	const options =
@@ -288,6 +296,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 					) : null}
 					{node.type === "value" ? <ValueBody node={node} /> : null}
 					{node.type === "wait" ? <WaitBody node={node} /> : null}
+					{node.type === "tool" ? <ToolBody node={node} /> : null}
 					{node.type === "command" ? (
 						<code className="block truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px]">
 							{node.command.trim() === "" ? (
@@ -669,6 +678,42 @@ function WaitBody({ node }: { node: WaitNode }) {
 	);
 }
 
+/** Which connection it calls, which tool, and how many arguments it fills. */
+function ToolBody({ node }: { node: ToolNode }) {
+	const count = Object.keys(node.arguments).length;
+	return (
+		<>
+			<span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+				<PlugIcon className="size-3 shrink-0" aria-hidden="true" />
+				{node.connection === "" ? (
+					<span className="italic">no connection picked yet</span>
+				) : (
+					<span className="min-w-0 truncate font-mono text-foreground">
+						{node.connection}
+					</span>
+				)}
+			</span>
+			<p
+				className={cn(
+					"truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px]",
+					node.tool === "" && "font-sans text-muted-foreground italic",
+				)}
+				title={node.tool}
+			>
+				{node.tool === "" ? "No tool picked yet" : node.tool}
+			</p>
+			{count > 0 ? (
+				<span className="truncate text-[11px] text-muted-foreground tabular-nums">
+					{count} {count === 1 ? "argument" : "arguments"}:{" "}
+					<span className="font-mono">
+						{Object.keys(node.arguments).join(", ")}
+					</span>
+				</span>
+			) : null}
+		</>
+	);
+}
+
 export const nodeTypes: NodeTypes = {
 	agent: FlowNodeCard,
 	command: FlowNodeCard,
@@ -676,4 +721,5 @@ export const nodeTypes: NodeTypes = {
 	call: FlowNodeCard,
 	value: FlowNodeCard,
 	wait: FlowNodeCard,
+	tool: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;

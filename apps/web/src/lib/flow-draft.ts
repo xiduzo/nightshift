@@ -22,6 +22,7 @@ import {
 	type Outcome,
 	type Policy,
 	runFields,
+	type ToolNode,
 	type ValueBy,
 	type ValueNode,
 	validateFlow,
@@ -211,6 +212,18 @@ export function waitSummary(until: WaitUntil): string {
 		case "signal":
 			return until.name.trim();
 	}
+}
+
+/** The connection and the tool start empty; the issues panel asks for them. */
+export function toolNode(id: string, position: Position): ToolNode {
+	return {
+		id,
+		type: "tool",
+		position,
+		connection: "",
+		tool: "",
+		arguments: {},
+	};
 }
 
 export function emptySource(kind: ListSource["kind"]): ListSource {
@@ -411,6 +424,7 @@ const NEW_NODE: Record<
 	call: { id: "call", create: callNode },
 	value: { id: "value", create: valueNode },
 	wait: { id: "wait", create: waitNode },
+	tool: { id: "tool", create: toolNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */
@@ -530,6 +544,8 @@ function rewriteTemplates(
 				default:
 					return node;
 			}
+		case "tool":
+			return { ...node, arguments: rewriteBindings(node.arguments, rewrite) };
 	}
 }
 
@@ -823,13 +839,18 @@ export function setAgentConnections(
 	);
 }
 
-/** The connections an Agent node names that the daemon does not have. */
+/** The connections an Agent or Tool node names that the daemon does not have. */
 export function missingConnections(
 	node: FlowNode,
 	known: readonly string[],
 ): string[] {
-	if (node.type !== "agent") return [];
-	return (node.connections ?? []).filter((name) => !known.includes(name));
+	const named =
+		node.type === "agent"
+			? (node.connections ?? [])
+			: node.type === "tool" && node.connection !== ""
+				? [node.connection]
+				: [];
+	return named.filter((name) => !known.includes(name));
 }
 
 /** What the editor says about a connection the daemon does not have. */
@@ -1069,6 +1090,8 @@ const FIELD_MESSAGES: Record<string, string> = {
 		"The interval must be a whole number of minutes above 0.",
 	"until.name":
 		"Signal name: use lowercase letters, digits and -, starting with a letter.",
+	connection: "Pick a connection.",
+	tool: "Pick a tool.",
 };
 
 const POLICY_MESSAGES: Record<string, string> = {

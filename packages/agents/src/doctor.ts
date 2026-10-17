@@ -2,19 +2,13 @@ import { access, constants, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import {
-	getDefaultEnvironment,
-	StdioClientTransport,
-} from "@modelcontextprotocol/sdk/client/stdio.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-
 import { CLAUDE_CODE_MODELS } from "@tanstack/ai-claude-code";
 import { CODEX_MODELS } from "@tanstack/ai-codex";
 import { GROK_BUILD_MODELS } from "@tanstack/ai-grok-build";
 import { OPENCODE_MODELS } from "@tanstack/ai-opencode";
 
 import { ACP_DEFAULT_MODEL } from "./acp";
+import { type McpToolInfo, toolInfo, withMcpClient } from "./mcp";
 import type { HarnessName, McpServerConfig } from "./types";
 
 /**
@@ -565,64 +559,43 @@ export async function pathPrograms(
 export type McpTestResult = {
 	ok: boolean;
 	server: { name: string; version: string } | null;
-	tools: { name: string; description: string | null }[];
+	tools: McpToolInfo[];
 	error: string | null;
 	ms: number;
 };
 
 /**
- * Connects to one MCP server, lists its tools, and disconnects. A command
- * server starts in the home directory. `redact` lists secret values to
- * take out of any error text.
+ * Connects to one MCP server, lists its tools, and disconnects
+ * (`withMcpClient`). `redact` lists secret values to take out of any error
+ * text.
  */
 export async function testMcpServer(
 	config: McpServerConfig,
 	options: { redact?: string[]; timeoutMs?: number } = {},
 ): Promise<McpTestResult> {
 	const started = Date.now();
-	const client = new Client({ name: "nightshift", version: "1.0.0" });
-	const transport =
-		"command" in config
-			? new StdioClientTransport({
-					command: config.command,
-					args: config.args,
-					env: { ...getDefaultEnvironment(), ...config.env },
-					cwd: homedir(),
-					stderr: "pipe",
-				})
-			: new StreamableHTTPClientTransport(new URL(config.url), {
-					requestInit: { headers: config.headers },
-				});
 	const redact = (text: string) =>
 		(options.redact ?? [])
 			.filter((v) => v.length >= 4)
 			.reduce((t, v) => t.replaceAll(v, "•••"), text);
-	let timer: ReturnType<typeof setTimeout> | undefined;
 	try {
-		const timeout = new Promise<never>((_, reject) => {
-			timer = setTimeout(
-				() =>
-					reject(
-						new Error(
-							`No answer within ${Math.round((options.timeoutMs ?? 20_000) / 1000)} s.`,
-						),
-					),
-				options.timeoutMs ?? 20_000,
-			);
-		});
-		await Promise.race([client.connect(transport), timeout]);
-		const { tools } = await Promise.race([client.listTools(), timeout]);
-		const version = client.getServerVersion();
-		return {
-			ok: true,
-			server: version ? { name: version.name, version: version.version } : null,
-			tools: tools.map((t) => ({
-				name: t.name,
-				description: t.description ?? null,
-			})),
-			error: null,
-			ms: Date.now() - started,
-		};
+		return await withMcpClient(
+			config,
+			async (client) => {
+				const { tools } = await client.listTools();
+				const version = client.getServerVersion();
+				return {
+					ok: true,
+					server: version
+						? { name: version.name, version: version.version }
+						: null,
+					tools: tools.map(toolInfo),
+					error: null,
+					ms: Date.now() - started,
+				};
+			},
+			{ timeoutMs: options.timeoutMs },
+		);
 	} catch (error) {
 		return {
 			ok: false,
@@ -631,8 +604,5 @@ export async function testMcpServer(
 			error: redact(error instanceof Error ? error.message : String(error)),
 			ms: Date.now() - started,
 		};
-	} finally {
-		clearTimeout(timer);
-		await client.close().catch(() => {});
 	}
 }

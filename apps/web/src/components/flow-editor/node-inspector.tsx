@@ -87,6 +87,7 @@ import { OptionsEditor } from "./options-editor";
 import { OutputSchemaField } from "./output-schema-field";
 
 import { TemplateField } from "./template-field";
+import { ToolFields } from "./tool-fields";
 import { WaitFields } from "./wait-fields";
 
 /**
@@ -156,7 +157,7 @@ export function NodeInspector({
 }: {
 	flow: Flow;
 	node: FlowNode;
-	/** The daemon's connections, for an Agent node; undefined while they load. */
+	/** The daemon's connections, for an Agent or Tool node; undefined while they load. */
 	connections?: readonly DaemonConnection[];
 	/** Call nodes: the project's flows and the actions on them. */
 	calledFlows: CalledFlowSupport;
@@ -322,6 +323,19 @@ export function NodeInspector({
 					onChange={(change) =>
 						onChange((current) =>
 							current.type === "wait" ? change(current) : current,
+						)
+					}
+				/>
+			) : null}
+
+			{node.type === "tool" ? (
+				<ToolFields
+					flow={flow}
+					node={node}
+					connections={connections}
+					onChange={(change) =>
+						onChange((current) =>
+							current.type === "tool" ? change(current) : current,
 						)
 					}
 				/>

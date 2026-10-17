@@ -269,6 +269,25 @@ export type ValueEvent =
 	  }
 	| { type: "value"; data: JsonValue | null; problem: string | null };
 
+/**
+ * What a Tool step writes to its transcript: the call it makes (arguments
+ * rendered, never the server's config) and what the tool answered. `data`
+ * is the structured content, else the JSON the text holds, else null.
+ */
+export type ToolEvent =
+	| {
+			type: "tool-call";
+			connection: string;
+			tool: string;
+			arguments: Record<string, JsonValue>;
+	  }
+	| {
+			type: "tool-called";
+			isError: boolean;
+			text: string;
+			data: JsonValue | null;
+	  };
+
 export type StepEvent =
 	| AgentEvent
 	| CommandEvent
@@ -277,7 +296,8 @@ export type StepEvent =
 	| GateEvent
 	| ForEachEvent
 	| WaitEvent
-	| ValueEvent;
+	| ValueEvent
+	| ToolEvent;
 
 /** A Gate that waits for a person. */
 export type OpenGate = {

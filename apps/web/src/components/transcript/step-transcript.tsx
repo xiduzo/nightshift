@@ -257,6 +257,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	call: "The called flow is running…",
 	value: "Making the value…",
 	wait: "Waiting…",
+	tool: "Calling the tool…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({

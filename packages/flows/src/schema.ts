@@ -448,6 +448,29 @@ export const waitNodeSchema = z.object({
 	until: waitUntilSchema,
 });
 
+/**
+ * Calls one tool of a Connection (an MCP server defined once on this
+ * daemon) and gets its result, with no model in the loop. The MCP leg of
+ * "flow + CLI + MCP": a Command node runs a CLI, a Tool node calls a tool.
+ * The result's `isError`, a tool the server does not have, or a transport
+ * failure is `fail`.
+ */
+export const toolNodeSchema = z.object({
+	...nodeBase,
+	type: z.literal("tool"),
+	/** A Connection by name. A flow that names one the daemon does not have refuses to start. */
+	connection: nameSchema,
+	/** The tool's name, as the server lists it. */
+	tool: z.string().min(1),
+	/**
+	 * A template per argument. A template that is one reference keeps its
+	 * JSON value (`{{plan.data.tasks}}` stays an array); any other text is a
+	 * string, unless the tool's input schema says number, integer, boolean,
+	 * object or array: then the text is read as that.
+	 */
+	arguments: z.record(z.string(), z.string()).default({}),
+});
+
 export const flowNodeSchema = z.discriminatedUnion("type", [
 	agentNodeSchema,
 	commandNodeSchema,
@@ -455,6 +478,7 @@ export const flowNodeSchema = z.discriminatedUnion("type", [
 	callNodeSchema,
 	valueNodeSchema,
 	waitNodeSchema,
+	toolNodeSchema,
 ]);
 
 export const outcomeSchema = labelSchema;
@@ -547,6 +571,7 @@ export type CallEach = z.infer<typeof callEachSchema>;
 export type CallEachNode = CallNode & { each: CallEach };
 export type ValueNode = z.infer<typeof valueNodeSchema>;
 export type WaitNode = z.infer<typeof waitNodeSchema>;
+export type ToolNode = z.infer<typeof toolNodeSchema>;
 export type ListSource = z.infer<typeof listSourceSchema>;
 export type Policy = z.infer<typeof policySchema>;
 /**
@@ -595,6 +620,8 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return ["pass", "fail"];
 		case "wait":
 			return ["done", "timeout"];
+		case "tool":
+			return ["pass", "fail"];
 	}
 }
 
@@ -633,6 +660,11 @@ export const outputFieldsByType = {
 	value: ["outcome", "data", "note", "visit"],
 	/** waited_minutes: how long the step waited. log_tail: the last output of a command it waited on. */
 	wait: ["outcome", "waited_minutes", "log_tail", "visit"],
+	/**
+	 * data: the tool's structured content, else the JSON its text holds, else
+	 * null. text: the text content, joined.
+	 */
+	tool: ["outcome", "data", "text", "visit"],
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
 /**

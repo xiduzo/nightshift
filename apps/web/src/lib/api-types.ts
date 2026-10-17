@@ -63,9 +63,20 @@ export type ItemEvent = Extract<
 >;
 export type WaitEvent = Extract<StepEvent, { type: "wait" | "wake" }>;
 export type ValueEvent = Extract<StepEvent, { type: "value-start" | "value" }>;
+/** A Tool node's call and the tool's answer. */
+export type ToolNodeEvent = Extract<
+	StepEvent,
+	{ type: "tool-call" | "tool-called" }
+>;
 export type AgentEvent = Exclude<
 	StepEvent,
-	CommandEvent | DecisionEvent | GateEvent | ItemEvent | WaitEvent | ValueEvent
+	| CommandEvent
+	| DecisionEvent
+	| GateEvent
+	| ItemEvent
+	| WaitEvent
+	| ValueEvent
+	| ToolNodeEvent
 >;
 
 /** A Gate that waits for a person: the Needs-you inbox. */

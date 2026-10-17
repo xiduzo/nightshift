@@ -5,6 +5,7 @@ import {
 	HandIcon,
 	HourglassIcon,
 	type LucideIcon,
+	PlugIcon,
 	RepeatIcon,
 	SparklesIcon,
 	SplitIcon,
@@ -46,6 +47,11 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		label: "Wait",
 		icon: HourglassIcon,
 		blurb: "Waits for a time, a command to pass, or a signal.",
+	},
+	tool: {
+		label: "Tool",
+		icon: PlugIcon,
+		blurb: "Calls one tool of a connection.",
 	},
 };
 

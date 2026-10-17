@@ -7,6 +7,7 @@ import { callNode } from "./nodes/call";
 import { gateAskNode } from "./nodes/choosers/person";
 import { commandNode } from "./nodes/command";
 import { decisionNode } from "./nodes/decision";
+import { toolNode } from "./nodes/tool";
 import { valueNode } from "./nodes/value";
 import { waitStepNode } from "./nodes/wait";
 import { askNodeId, parkNode, parkNodeId, waitNodeId } from "./route";
@@ -88,6 +89,9 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 				graph.addNode(wait, waitNode(node.id), { ends: [node.id] });
 				break;
 			}
+			case "tool":
+				action = toolNode(node, ctx);
+				break;
 		}
 		graph.addNode(node.id, action, { ends: [...ends, ...own] });
 		graph.addNode(park, parkNode(node), { ends: [node.id] });
