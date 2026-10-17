@@ -1,5 +1,12 @@
 # Foundational nodes
 
+**Status, 2026-10-17 (later the same day):** built. Call (3.1), Command
+`output: "json"` (3.5), Value by rule and by model (3.2), Wait with duration,
+time, command and signal (3.4) and Tool (3.3) are on main. Deferred as planned:
+Value by person and `each.parallel`. One finding changed 3.2: TypeSafe Jev and
+Ollaya are evaluate-only adapters and cannot produce data, so a Value by model
+runs on Jev on OpenRouter or OpenAI Decisions, and the validator says so.
+
 2026-10-17. What the smallest set of node types is that lets a person draw any
 night, and which of today's nodes should merge. Follows the 2026-10-16 direction:
 a thin wrapper over LangGraph, no tracker and no method in the engine, structured
