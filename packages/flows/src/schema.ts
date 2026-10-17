@@ -357,12 +357,36 @@ export const forEachNodeSchema = z.object({
 	maxItems: z.number().int().positive().optional(),
 });
 
+/**
+ * Calls one tool of a Connection (an MCP server defined once on this
+ * daemon) and gets its result, with no model in the loop. The MCP leg of
+ * "flow + CLI + MCP": a Command node runs a CLI, a Tool node calls a tool.
+ * The result's `isError`, a tool the server does not have, or a transport
+ * failure is `fail`.
+ */
+export const toolNodeSchema = z.object({
+	...nodeBase,
+	type: z.literal("tool"),
+	/** A Connection by name. A flow that names one the daemon does not have refuses to start. */
+	connection: nameSchema,
+	/** The tool's name, as the server lists it. */
+	tool: z.string().min(1),
+	/**
+	 * A template per argument. A template that is one reference keeps its
+	 * JSON value (`{{plan.data.tasks}}` stays an array); any other text is a
+	 * string, unless the tool's input schema says number, integer, boolean,
+	 * object or array: then the text is read as that.
+	 */
+	arguments: z.record(z.string(), z.string()).default({}),
+});
+
 export const flowNodeSchema = z.discriminatedUnion("type", [
 	agentNodeSchema,
 	commandNodeSchema,
 	decisionNodeSchema,
 	subflowNodeSchema,
 	forEachNodeSchema,
+	toolNodeSchema,
 ]);
 
 export const outcomeSchema = labelSchema;
@@ -451,6 +475,7 @@ export type CommandNode = z.infer<typeof commandNodeSchema>;
 export type DecisionNode = z.infer<typeof decisionNodeSchema>;
 export type SubflowNode = z.infer<typeof subflowNodeSchema>;
 export type ForEachNode = z.infer<typeof forEachNodeSchema>;
+export type ToolNode = z.infer<typeof toolNodeSchema>;
 export type ListSource = z.infer<typeof listSourceSchema>;
 export type Policy = z.infer<typeof policySchema>;
 /**
@@ -492,6 +517,8 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return ["pass", "fail"];
 		case "foreach":
 			return ["done", "halted"];
+		case "tool":
+			return ["pass", "fail"];
 	}
 }
 
@@ -538,6 +565,11 @@ export const outputFieldsByType = {
 		"results",
 		"visit",
 	],
+	/**
+	 * data: the tool's structured content, else the JSON its text holds, else
+	 * null. text: the text content, joined.
+	 */
+	tool: ["outcome", "data", "text", "visit"],
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
 /** Output fields that hold JSON, so a template may take a path below them. */

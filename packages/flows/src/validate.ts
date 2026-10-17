@@ -209,6 +209,14 @@ function validateIn(
 				}
 				checkHaltOn(node, error);
 				break;
+			case "tool":
+				if (node.tool.trim() === "") {
+					error(`Tool node "${node.id}" needs the name of a tool.`, at);
+				}
+				for (const [name, value] of Object.entries(node.arguments)) {
+					template(value, `argument "${name}"`);
+				}
+				break;
 		}
 	}
 
