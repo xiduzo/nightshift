@@ -1,0 +1,32 @@
+[
+	{
+		"name": "worker",
+		"description": "Builds one Trace: Sonnet at high effort, a fresh session each try, with gh.",
+		"harness": "claude-code",
+		"model": "sonnet",
+		"effort": "high",
+		"permissionMode": "auto",
+		"clis": ["gh"],
+		"connections": []
+	},
+	{
+		"name": "validator",
+		"description": "Verifies and tunes a Feature at the checkpoint: Sonnet at high effort, with gh.",
+		"harness": "claude-code",
+		"model": "sonnet",
+		"effort": "high",
+		"permissionMode": "auto",
+		"clis": ["gh"],
+		"connections": []
+	},
+	{
+		"name": "orchestrator",
+		"description": "Rescues a Trace and steers the next workers: Opus at high effort, with gh.",
+		"harness": "claude-code",
+		"model": "opus",
+		"effort": "high",
+		"permissionMode": "auto",
+		"clis": ["gh"],
+		"connections": []
+	}
+]

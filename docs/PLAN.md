@@ -141,7 +141,7 @@ The first nights showed two things: the dev server reloads under a running night
 
 Proves: any flow can call any flow, and a list can come from anywhere.
 
-Status: built. Tested with fakes; the rpgdotexe flows on version 2 pass the validator and the migration tests. Not yet run in a real night.
+Status: built. Tested with fakes; the rpgdotexe flows pass the validator and the migration tests. Not yet run in a real night. 2026-10-17: the rpgdotexe flows were rebuilt on format version 4 with the seven node types and three Agent Profiles (`examples/rpgdotexe/README.md`): Decisions by rule, Values by rule over Call results, a Wait on CI, and JSON output from Commands replace the files and the shell checks the script passed between steps.
 
 ### Slice 6 — Agents that answer in shape
 

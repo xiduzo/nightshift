@@ -94,8 +94,8 @@ matches an Output Schema, and `by` says who:
 
 ```jsonc
 { "type": "value", "by": "rule",
-  "expression": "$filter(planner.data.tasks, function($t) { $t.size = 'small' })",
-  "output": { "type": "array" } }
+  "expression": "{ \"tasks\": [$filter(planner.data.tasks, function($t) { $t.size = 'small' })] }",
+  "output": { "type": "object", "properties": { "tasks": { "type": "array" } } } }
 
 { "type": "value", "by": "model", "decider": "typesafe",
   "prompt": "Extract the failing test names from {{check.log_tail}}",

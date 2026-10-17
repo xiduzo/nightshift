@@ -1,6 +1,6 @@
 {
 	"version": 4,
-	"description": "The rpgdotexe night: builds each Feature of one Epic, blockers first, like `night-shift.py <epic>`.",
+	"description": "The rpgdotexe night: builds each Feature of one Epic, blockers first, like `night-shift.py <epic>`. Then links the pull requests into a stack and writes the night report.",
 	"inputs": [
 		{
 			"name": "epic",
@@ -8,6 +8,18 @@
 			"label": "Epic",
 			"description": "The issue number of the Epic to build, as in night-shift.py <epic>.",
 			"required": true
+		}
+	],
+	"outputs": [
+		{
+			"name": "pull_requests",
+			"value": "{{stack.data.urls}}",
+			"description": "The pull requests of the night, bottom to top."
+		},
+		{
+			"name": "report",
+			"value": "{{summary.log_tail}}",
+			"description": "The night report."
 		}
 	],
 	"policy": {
@@ -30,7 +42,7 @@
 			"each": {
 				"source": {
 					"kind": "command",
-					"command": "gh api graphql -F owner='{owner}' -F name='{repo}' -F number=\"{{epic}}\" -f query='\nquery($owner: String!, $name: String!, $number: Int!) {\n  repository(owner: $owner, name: $name) {\n    issue(number: $number) {\n      number title\n      subIssues(first: 100) {\n        nodes {\n          number title body state url\n          labels(first: 30) { nodes { name } }\n          blockedBy(first: 50) { nodes { number state } }\n        }\n      }\n    }\n  }\n}' --jq '\n\"feature\" as $require | [] as $skip | [] as $done\n| .data.repository.issue as $parent\n| [ $parent.subIssues.nodes[]\n    | (.labels.nodes | map(.name | ascii_downcase)) as $labels\n    | select($require == null or any($labels[]; . == $require))\n    | select(any($labels[]; IN($skip[])) | not)\n    | { id: (.number | tostring), number, title, body: (.body // \"\"), url, state,\n        labels: [.labels.nodes[].name],\n        parent: { number: $parent.number, title: $parent.title },\n        dependsOn: [ .blockedBy.nodes[] | { id: (.number | tostring), done: (.state == \"CLOSED\") } ],\n        done: (.state == \"CLOSED\" or any($labels[]; IN($done[]))) } ]'"
+					"command": "gh api graphql -F owner='{owner}' -F name='{repo}' -F number=\"{{epic}}\" -f query='\nquery($owner: String!, $name: String!, $number: Int!) {\n  repository(owner: $owner, name: $name) {\n    issue(number: $number) {\n      number title\n      subIssues(first: 100) {\n        nodes {\n          number title body state url\n          labels(first: 30) { nodes { name } }\n          blockedBy(first: 50) { nodes { number state } }\n        }\n      }\n    }\n  }\n}' --jq '\n\"feature\" as $require | [] as $skip | [] as $done\n| .data.repository.issue as $parent\n| [ $parent.subIssues.nodes[]\n    | (.labels.nodes | map(.name | ascii_downcase)) as $labels\n    | select(any($labels[]; . == $require))\n    | select(any($labels[]; IN($skip[])) | not)\n    | { id: (.number | tostring), number, title, body: (.body // \"\"), url, state,\n        labels: [.labels.nodes[].name],\n        parent: { number: $parent.number, title: $parent.title },\n        dependsOn: [ .blockedBy.nodes[] | { id: (.number | tostring), done: (.state == \"CLOSED\") } ],\n        done: (.state == \"CLOSED\" or any($labels[]; IN($done[]))) } ]'"
 				},
 				"as": "item",
 				"branch": "shared",
@@ -38,28 +50,86 @@
 			}
 		},
 		{
-			"id": "summary",
-			"label": "Night report",
+			"id": "stack",
+			"label": "Pull requests of the night",
 			"position": {
 				"x": 320,
 				"y": 0
 			},
+			"type": "value",
+			"by": "rule",
+			"expression": "{ \"urls\": [$filter([features.results.outputs.prs], function($url) { $url != \"\" })] }",
+			"output": {
+				"type": "object",
+				"properties": {
+					"urls": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					}
+				},
+				"required": ["urls"]
+			}
+		},
+		{
+			"id": "link_stack",
+			"label": "Link the stack",
+			"position": {
+				"x": 640,
+				"y": 0
+			},
 			"type": "command",
-			"command": "# The report of the night, as STATUS.md in the worktree and in the log.\nmkdir -p .build/night\n{\n\tprintf '# The night: %s\\n\\n' \"{{features.outcome}}\"\n\tprintf 'Features: %s done, %s failed, %s blocked, %s waiting.\\n\\n' \"{{features.done_count}}\" \"{{features.failed_count}}\" \"{{features.blocked_count}}\" \"{{features.waiting_count}}\"\n\tprintf '%s\\n\\n' \"{{features.summary}}\"\n\tprintf 'Your open pull requests, to read in the morning:\\n\\n'\n\tgh pr list --state open --author @me --json number,title,url --jq '.[] | \"- #\\(.number) \\(.title) \\(.url)\"' || true\n} | tee .build/night/STATUS.md",
+			"command": "# Links the Trace pull requests of the night into one stack on GitHub, bottom to top. Needs the gh stack extension.\nurls=$(printf '%s' \"{{stack.data.urls}}\" | python3 -c 'import json, sys; print(\" \".join(json.load(sys.stdin)))')\nset -- $urls\nif [ \"$#\" -lt 2 ]; then\n\techo \"Fewer than 2 pull requests: nothing to link.\"\n\texit 0\nfi\nif ! gh stack --help >/dev/null 2>&1; then\n\techo \"The gh stack extension is not installed (gh extension install github/gh-stack). Link the stack by hand: gh stack link $*\"\n\texit 0\nfi\ngh stack link \"$@\"",
+			"timeoutMinutes": 10
+		},
+		{
+			"id": "summary",
+			"label": "Night report",
+			"position": {
+				"x": 960,
+				"y": 0
+			},
+			"type": "command",
+			"command": "# The report of the night, as STATUS.md in the worktree and in the log.\nmkdir -p .build/night\n{\n\tprintf '# The night: %s\\n\\n' \"{{features.outcome}}\"\n\tprintf 'Features: %s done, %s failed, %s blocked, %s waiting.\\n\\n' \"{{features.done_count}}\" \"{{features.failed_count}}\" \"{{features.blocked_count}}\" \"{{features.waiting_count}}\"\n\tprintf '%s\\n\\n' \"{{features.summary}}\"\n\tprintf 'The stack, bottom to top (linked on GitHub: %s):\\n\\n' \"{{link_stack.outcome}}\"\n\tprintf '%s' \"{{stack.data.urls}}\" | python3 -c 'import json, sys; print(\"\".join(\"- \" + url + \"\\n\" for url in json.load(sys.stdin)))'\n\tprintf '\\nYour open pull requests, to read in the morning:\\n\\n'\n\tgh pr list --state open --author @me --json number,title,url --jq '.[] | \"- #\\(.number) \\(.title) \\(.url)\"' || true\n} | tee .build/night/STATUS.md",
 			"timeoutMinutes": 10
 		}
 	],
 	"edges": [
 		{
-			"id": "features-done-summary",
+			"id": "features-done-stack",
 			"from": "features",
 			"outcome": "done",
+			"to": "stack"
+		},
+		{
+			"id": "features-halted-stack",
+			"from": "features",
+			"outcome": "halted",
+			"to": "stack"
+		},
+		{
+			"id": "stack-pass-link_stack",
+			"from": "stack",
+			"outcome": "pass",
+			"to": "link_stack"
+		},
+		{
+			"id": "stack-fail-summary",
+			"from": "stack",
+			"outcome": "fail",
 			"to": "summary"
 		},
 		{
-			"id": "features-halted-summary",
-			"from": "features",
-			"outcome": "halted",
+			"id": "link_stack-pass-summary",
+			"from": "link_stack",
+			"outcome": "pass",
+			"to": "summary"
+		},
+		{
+			"id": "link_stack-fail-summary",
+			"from": "link_stack",
+			"outcome": "fail",
 			"to": "summary"
 		}
 	]
