@@ -84,6 +84,17 @@ async function callTool(
 
 	const rendered = renderArguments(node.arguments, step.tctx);
 	let call: McpToolCall;
+	/** Whether the transcript has the call: every Tool step records one, then its answer. */
+	let recorded = false;
+	const recordCall = (args: Record<string, JsonValue>) => {
+		recorded = true;
+		step.record(null, {
+			type: "tool-call",
+			connection: node.connection,
+			tool: node.tool,
+			arguments: args,
+		});
+	};
 	try {
 		call = await withMcpClient(
 			server,
@@ -97,12 +108,7 @@ async function callTool(
 					);
 				}
 				const args = coerceArguments(rendered, toolInfo(tool).inputSchema);
-				step.record(null, {
-					type: "tool-call",
-					connection: node.connection,
-					tool: node.tool,
-					arguments: args,
-				});
+				recordCall(args);
 				// The step's signal bounds the call; the SDK's own request
 				// timeout (a minute) is too short for a tool that works.
 				return callMcpTool(client, node.tool, args, {
@@ -120,6 +126,7 @@ async function callTool(
 			error instanceof UnknownTool
 				? error.message
 				: `The connection "${node.connection}" did not answer: ${messageOf(error)}`;
+		if (!recorded) recordCall(rendered);
 		step.record(null, {
 			type: "tool-called",
 			isError: true,

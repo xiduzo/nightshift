@@ -297,6 +297,12 @@ describe("the Tool node", () => {
 		const [step] = deriveSteps(await h.events());
 		const transcript = await readTranscriptFile(step?.transcriptPath as string);
 		expect(transcript.map((e) => e.event)).toEqual([
+			{
+				type: "tool-call",
+				connection: "tracker",
+				tool: "close_issue",
+				arguments: { id: "1" },
+			},
 			{ type: "tool-called", isError: true, text: message, data: null },
 		]);
 	});
