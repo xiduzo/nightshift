@@ -96,6 +96,20 @@ export const deciderNameSchema = z.enum([
 ]);
 export type DeciderName = z.infer<typeof deciderNameSchema>;
 
+/**
+ * The deciders that can also make a value (a Value node made by a model):
+ * those with a TanStack AI text adapter, so `chat()` can hold their answer
+ * to a JSON Schema. TypeSafe and Ollaya are decision models only: they
+ * answer choice, score and yes/no questions, never with data.
+ */
+export const valueDeciderNameSchema = z.enum(["openrouter", "openai"]);
+export type ValueDeciderName = z.infer<typeof valueDeciderNameSchema>;
+
+/** Whether the decider can make a value. */
+export function canMakeValue(name: DeciderName): name is ValueDeciderName {
+	return valueDeciderNameSchema.safeParse(name).success;
+}
+
 export const effortSchema = z.enum(["low", "medium", "high", "xhigh", "max"]);
 
 /**
@@ -357,12 +371,48 @@ export const forEachNodeSchema = z.object({
 	maxItems: z.number().int().positive().optional(),
 });
 
+/**
+ * Who makes a Value node's data: a rule (a JSONata expression) or a model
+ * (a decider that can make a value). `person` (a form in the Needs-you
+ * inbox, drawn from the output schema) is left for later: add it here and
+ * a producer in the engine when a flow needs typed answers.
+ */
+export const valueBySchema = z.enum(["rule", "model"]);
+export type ValueBy = z.infer<typeof valueBySchema>;
+
+/**
+ * The twin of a Decision: a Decision picks a label, a Value makes `data`
+ * that matches `output`, and `by` says who. `pass` when the data matches,
+ * `fail` when the expression throws, the model fails, or the result does not
+ * match. Later nodes read `{{<node>.data}}` or a path into it.
+ */
+export const valueNodeSchema = z.object({
+	...nodeBase,
+	type: z.literal("value"),
+	by: valueBySchema,
+	/** A JSON Schema for `data`. The step passes only with data that matches it. */
+	output: jsonSchemaSchema,
+	/**
+	 * `by: "rule"` only: a JSONata expression over the run's values, the same
+	 * context a Decision's rule reads (`ruleContext`), for example
+	 * `$filter(planner.data.tasks, function($t) { $t.size = "small" })`.
+	 */
+	expression: z.string().optional(),
+	/** `by: "model"` only: the brief for the model. Supports templates. */
+	prompt: z.string().optional(),
+	/** `by: "model"` only: a decider that can make a value (`valueDeciderNameSchema`). */
+	decider: deciderNameSchema.default("openrouter"),
+	/** `by: "model"` only. The decider's model. Unset: the decider's default chat model. */
+	model: z.string().min(1).optional(),
+});
+
 export const flowNodeSchema = z.discriminatedUnion("type", [
 	agentNodeSchema,
 	commandNodeSchema,
 	decisionNodeSchema,
 	subflowNodeSchema,
 	forEachNodeSchema,
+	valueNodeSchema,
 ]);
 
 export const outcomeSchema = labelSchema;
@@ -451,6 +501,7 @@ export type CommandNode = z.infer<typeof commandNodeSchema>;
 export type DecisionNode = z.infer<typeof decisionNodeSchema>;
 export type SubflowNode = z.infer<typeof subflowNodeSchema>;
 export type ForEachNode = z.infer<typeof forEachNodeSchema>;
+export type ValueNode = z.infer<typeof valueNodeSchema>;
 export type ListSource = z.infer<typeof listSourceSchema>;
 export type Policy = z.infer<typeof policySchema>;
 /**
@@ -492,6 +543,8 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return ["pass", "fail"];
 		case "foreach":
 			return ["done", "halted"];
+		case "value":
+			return ["pass", "fail"];
 	}
 }
 
@@ -511,8 +564,8 @@ export function optionProblem(
 
 /**
  * The fields a later node can read with `{{<nodeId>.<field>}}`. A field of a
- * node that has not run yet renders as an empty string. `data` (Agent) and
- * `results` (For Each) hold JSON and take a deeper path. A Subflow node also
+ * node that has not run yet renders as an empty string. `data` (Agent,
+ * Value) and `results` (For Each) hold JSON and take a deeper path. A Subflow node also
  * has the outputs of the flow it calls (see `nodeOutputFields`).
  */
 export const outputFieldsByType = {
@@ -538,6 +591,8 @@ export const outputFieldsByType = {
 		"results",
 		"visit",
 	],
+	/** data: the value made (null on fail). note: why it failed, or the model's note. */
+	value: ["outcome", "data", "note", "visit"],
 } as const satisfies Record<FlowNodeType, readonly string[]>;
 
 /** Output fields that hold JSON, so a template may take a path below them. */

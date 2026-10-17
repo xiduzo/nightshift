@@ -8,7 +8,9 @@ import type {
 	FlowNode,
 	ForEachNode,
 	SubflowNode,
+	ValueNode,
 } from "./schema";
+import { nodeOutcomes, outputFieldsByType } from "./schema";
 import type { FlowIssue } from "./types";
 import { parseFlow, validateFlow } from "./validate";
 
@@ -1784,5 +1786,153 @@ describe("parseFlow with options", () => {
 			inputs: [{ name: "epic", type: "text", required: true }],
 			nodes: [{ prompt: "Epic {{epic}}" }],
 		});
+	});
+});
+
+describe("validateFlow: Value", () => {
+	const made = (
+		id: string,
+		extra: Partial<ValueNode> = {},
+		by: ValueNode["by"] = "rule",
+	): ValueNode => ({
+		id,
+		type: "value",
+		position: { x: 0, y: 0 },
+		by,
+		output: { type: "object", properties: { small: { type: "array" } } },
+		decider: "openrouter",
+		...(by === "rule"
+			? { expression: '{ "small": planner.data.tasks[size = "small"] }' }
+			: { prompt: "List the failing tests in {{check.log_tail}}." }),
+		...extra,
+	});
+
+	test("a Value made by a rule: pass and fail edges, data read with a path", () => {
+		const f = flow(
+			[
+				agent("planner", { output: { type: "object" } }),
+				made("small"),
+				agent("worker", { prompt: "Do {{small.data.small}} ({{small.note}})" }),
+			],
+			[
+				edge("a", "planner", "pass", "small"),
+				edge("b", "small", "pass", "worker"),
+				edge("c", "small", "fail", "planner", 2),
+			],
+			"planner",
+		);
+		expect(validateFlow(f)).toEqual([]);
+		expect(nodeOutcomes(made("x"))).toEqual(["pass", "fail"]);
+		expect(outputFieldsByType.value).toEqual([
+			"outcome",
+			"data",
+			"note",
+			"visit",
+		]);
+	});
+
+	/** A planner for the expression to read, then the Value node. */
+	const planned = (node: ValueNode): Flow =>
+		flow(
+			[agent("planner", { output: { type: "object" } }), node],
+			[edge("a", "planner", "pass", node.id)],
+			"planner",
+		);
+
+	test("the file takes a Value node with the default decider", () => {
+		const json = JSON.parse(JSON.stringify(planned(made("small"))));
+		delete json.nodes[1].decider;
+		const parsed = parseFlow(json);
+		expect(errors(parsed.issues)).toEqual([]);
+		expect(parsed.flow?.nodes[1]).toMatchObject({
+			type: "value",
+			decider: "openrouter",
+		});
+	});
+
+	test("a rule needs an expression that parses and reads known names", () => {
+		const empty = validateFlow(
+			flow([made("small", { expression: " " })], [], "small"),
+		);
+		expect(errors(empty)).toEqual([
+			expect.objectContaining({
+				nodeId: "small",
+				message: 'Value node "small" needs an expression.',
+			}),
+		]);
+		const broken = validateFlow(
+			flow([made("small", { expression: "planner.data[" })], [], "small"),
+		);
+		expect(errors(broken)).toEqual([
+			expect.objectContaining({
+				nodeId: "small",
+				message: expect.stringContaining(
+					'The expression of "small" is not valid:',
+				),
+			}),
+		]);
+		const unknown = validateFlow(
+			flow([made("small", { expression: "planner.data.tasks" })], [], "small"),
+		);
+		expect(errors(unknown)).toEqual([
+			expect.objectContaining({
+				nodeId: "small",
+				message:
+					'The expression of "small" reads "planner", but there is no node or input "planner".',
+			}),
+		]);
+	});
+
+	test("a model needs a prompt with known templates, and a decider that can make a value", () => {
+		const noPrompt = validateFlow(
+			flow([made("tests", { prompt: "" }, "model")], [], "tests"),
+		);
+		expect(errors(noPrompt)).toEqual([
+			expect.objectContaining({
+				nodeId: "tests",
+				message: 'Value node "tests" needs a prompt for the model.',
+			}),
+		]);
+		const typesafe = validateFlow(
+			flow(
+				[command("check"), made("tests", { decider: "typesafe" }, "model")],
+				[edge("a", "check", "fail", "tests")],
+				"check",
+			),
+		);
+		expect(errors(typesafe)).toEqual([
+			expect.objectContaining({
+				nodeId: "tests",
+				message:
+					'Value node "tests" uses the decider "typesafe", which cannot make a value. Choose one of: openrouter, openai.',
+			}),
+		]);
+		const unknownRef = validateFlow(
+			flow([made("tests", {}, "model")], [], "tests"),
+		);
+		expect(errors(unknownRef)).toEqual([
+			expect.objectContaining({
+				nodeId: "tests",
+				message: expect.stringContaining('there is no node or input "check"'),
+			}),
+		]);
+	});
+
+	test("the output schema must describe an object", () => {
+		const issues = validateFlow(
+			planned(made("small", { output: { type: "array" } })),
+		);
+		expect(errors(issues)).toEqual([
+			expect.objectContaining({
+				nodeId: "small",
+				message: expect.stringContaining(
+					'The output schema of value node "small" must describe an object',
+				),
+			}),
+		]);
+	});
+
+	test("a Value without edges is valid, like a Command", () => {
+		expect(validateFlow(planned(made("small")))).toEqual([]);
 	});
 });
