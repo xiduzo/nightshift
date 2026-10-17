@@ -22,7 +22,7 @@ import { isOwnAgentLabel } from "../route";
 import type { Parked, RunStateValues } from "../state";
 
 /**
- * What a Subflow and a For Each node share: running a called flow as a
+ * What a Call node does, once and per element: running a called flow as a
  * subgraph of the node and reading how it ended (design rule 6).
  *
  * The body is compiled once per node (`bodyGraph`) and invoked with the
@@ -35,7 +35,7 @@ import type { Parked, RunStateValues } from "../state";
  * - `finished`: the body reached a chosen end (`state.ended`).
  * - `failed`: a body step ended `fail`/`needs-input` with no edge, errored,
  *   or exhausted its edge: the body parked at that step (rule 2). The park
- *   is swallowed here, because today a failed body fails the Subflow step
+ *   is swallowed here, because today a failed body fails the Call step
  *   (`fail`) or the element (`ItemEnded failed`) and the walk goes on; the
  *   body's namespace is left parked and is never invoked again (the next
  *   invoke of the node is a new task, so a new namespace).
@@ -171,7 +171,7 @@ export async function bodyOutputs(
 	});
 }
 
-/** A Subflow's `ended`: the Decision option or Agent outcome its flow ended on, or "". */
+/** A Call's `ended`: the Decision option or Agent outcome its flow ended on, or "". */
 export function endedLabel(node: FlowNode, outcome: Outcome): string {
 	return node.type === "decision" || isOwnAgentLabel(node, outcome)
 		? outcome
@@ -179,7 +179,7 @@ export function endedLabel(node: FlowNode, outcome: Outcome): string {
 }
 
 /**
- * How a Subflow or For Each node enters an existing step of its own: it
+ * How a Call node enters an existing step of its own: it
  * continues an open one (nothing appended) and reopens an ended one
  * (`StepReopened` with no prompt), exactly `openCallStep`'s rule for a
  * `call` start.

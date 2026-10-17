@@ -34,10 +34,10 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
-const subflow = (id: string, flow: string) =>
+const callOnce = (id: string, flow: string) =>
 	({
 		id,
-		type: "subflow",
+		type: "call",
 		position: { x: 0, y: 0 },
 		flow,
 		inputs: {},
@@ -102,7 +102,7 @@ describe("the stop time in the state", () => {
 		);
 		const h = await startRun(
 			sandbox,
-			flowOf([subflow("sub", "body")]),
+			flowOf([callOnce("sub", "body")]),
 			harness,
 			{ flows: { body } },
 		);

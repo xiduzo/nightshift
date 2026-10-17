@@ -9,8 +9,8 @@ import {
 import type { DerivedItem, ItemFacts, StepOutputs } from "./events";
 
 /**
- * The pure parts of a For Each step: turning a source's JSON into list
- * items, the facts the log keeps of an element, and the step's outputs.
+ * The pure parts of a Call step with `each`: turning a source's JSON into
+ * list items, the facts the log keeps of an element, and the step's outputs.
  */
 
 /** Normalizes a source's JSON value, or throws with a readable message. */
@@ -43,16 +43,23 @@ export function jsonSourceItems(
 	return listOf(value, `The list "${template}"`);
 }
 
-/** Parses what a command source prints: a JSON array of elements. */
-export function parseCommandItems(stdout: string): ListItem[] {
-	let json: JsonValue;
+/**
+ * Parses what a command printed as one JSON value: a Command node with
+ * `output: "json"`, or a command source. Throws with a readable message.
+ */
+export function parseCommandJson(stdout: string, what: string): JsonValue {
 	try {
-		json = JSON.parse(stdout) as JsonValue;
+		return JSON.parse(stdout) as JsonValue;
 	} catch (error) {
 		throw new Error(
-			`The source command did not print JSON: ${error instanceof Error ? error.message : String(error)}`,
+			`${what} did not print JSON: ${error instanceof Error ? error.message : String(error)}`,
 		);
 	}
+}
+
+/** Parses what a command source prints: a JSON array of elements. */
+export function parseCommandItems(stdout: string): ListItem[] {
+	const json = parseCommandJson(stdout, "The source command");
 	return listOf(json, "The source command printed JSON that is not a list");
 }
 
@@ -126,8 +133,8 @@ function firstLine(text: string): string {
 	return text.split("\n")[0] ?? "";
 }
 
-/** The outputs of a For Each step (`outputFieldsByType.foreach`). */
-export function forEachOutputs(input: {
+/** The outputs of a Call step with `each` (`callEachOutputFields`). */
+export function eachOutputs(input: {
 	items: readonly DerivedItem[];
 	visit: number;
 	outcome: string;

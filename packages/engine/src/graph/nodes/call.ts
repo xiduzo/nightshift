@@ -1,5 +1,5 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import type { SubflowNode } from "@nightshift/flows";
+import { type CallNode, runsEach } from "@nightshift/flows";
 
 import type { InputValues, LoggedEvent, StepOutputs } from "../../events";
 import { renderBindings, resolveInputs } from "../../inputs";
@@ -22,13 +22,17 @@ import {
 	endedLabel,
 	runBody,
 } from "./body";
+import { callEachNode } from "./call-each";
 
 /**
- * The Subflow node, ported from `runSubflowStep` in engine.ts: binds the
- * called flow's inputs (`FlowCalled`), runs the flow as a subgraph in the
- * scope `{ parentStepId: stepId, itemId: null }` (design rule 6) and ends
- * `pass` with the flow's declared outputs, `ended` and `visit` when it
- * finished on a chosen end, `fail` with the reason when it failed.
+ * The Call node: runs another flow as a subgraph of the node (design rule
+ * 6). With `each` it runs the flow once per element of a list, one element
+ * per super-step (`callEachNode`); without, once, as below.
+ *
+ * Once: binds the called flow's inputs (`FlowCalled`), runs the flow in the
+ * scope `{ parentStepId: stepId, itemId: null }` and ends `pass` with the
+ * flow's declared outputs, `ended` and `visit` when it finished on a chosen
+ * end, `fail` with the reason when it failed.
  *
  * Everything before the body runs again on a resume and after a daemon
  * death (rule 4), so it is idempotent: the step the log has for this node
@@ -37,7 +41,8 @@ import {
  * the body resumes under the same namespace. A run parked at this node's
  * own park node (no edge on `fail`) resumes as a new visit, as today.
  */
-export function subflowNode(node: SubflowNode, ctx: StepContext): NodeAction {
+export function callNode(node: CallNode, ctx: StepContext): NodeAction {
+	if (runsEach(node)) return callEachNode(node, ctx);
 	let graph: BodyGraph | null = null;
 	return async (state, config) => {
 		const runId = ctx.run.id;
@@ -145,7 +150,7 @@ export function subflowNode(node: SubflowNode, ctx: StepContext): NodeAction {
  * continued or reopened; else a new visit.
  */
 function entryOf(
-	node: SubflowNode,
+	node: CallNode,
 	state: RunStateValues,
 	events: readonly LoggedEvent[],
 	config: LangGraphRunnableConfig,

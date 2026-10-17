@@ -26,7 +26,7 @@ import type { TranscriptEntry } from "./types";
  * database, so the queries and derivations that read the live log read a
  * bundle too. Nothing from settings, connections or secrets goes in.
  *
- * Subflow and For Each steps belong to the run that calls them (their
+ * Call steps belong to the run that calls them (their
  * scope names the calling step), so the run's own rows hold all of it.
  */
 

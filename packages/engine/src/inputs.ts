@@ -10,7 +10,7 @@ import type { InputValues } from "./events";
 
 /**
  * Binding the inputs of a flow: from the start dialog for the top-level flow
- * of a run, or from the templates of a Subflow or For Each node for a flow
+ * of a run, or from the templates of a Call node for a flow
  * it calls. A flow is a function; this is its argument list.
  */
 

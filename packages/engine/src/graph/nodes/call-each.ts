@@ -1,7 +1,7 @@
 import { Command } from "@langchain/langgraph";
 import {
 	blockersFirst,
-	type ForEachNode,
+	type CallEachNode,
 	type ListItem,
 	newlyBlocked,
 	nextItem,
@@ -11,6 +11,14 @@ import {
 } from "@nightshift/flows";
 
 import { runCommand } from "../../command";
+import {
+	eachOutputs,
+	fileItems,
+	itemLabel,
+	jsonSourceItems,
+	parseCommandItems,
+	toItemFacts,
+} from "../../each";
 import {
 	type DerivedStep,
 	deriveSteps,
@@ -23,14 +31,6 @@ import {
 	type Scope,
 	type StepOutputs,
 } from "../../events";
-import {
-	fileItems,
-	forEachOutputs,
-	itemLabel,
-	jsonSourceItems,
-	parseCommandItems,
-	toItemFacts,
-} from "../../foreach";
 import { renderBindings, resolveInputs } from "../../inputs";
 import { commandLogPath } from "../../transcripts";
 import type { StepOutcome } from "../../types";
@@ -63,8 +63,9 @@ import {
 } from "./body";
 
 /**
- * The For Each node, ported from `runForEachStep` in engine.ts (design
- * rule 13). One element per super-step: the node reads its source again,
+ * A Call node with `each`: the per-element loop of `callNode`, ported from
+ * `runForEachStep` in engine.ts (design rule 13). One element per
+ * super-step: the node reads its source again,
  * marks the elements a failed or blocked one blocks, starts the next free
  * element (`ItemStarted`, on its own branch on top of the last element
  * that finished with `branch: "per-item"`), runs the body as a subgraph in
@@ -85,7 +86,7 @@ import {
  * under the same namespace; an ended step (stopped, or `interrupted` by
  * recovery) is reopened first (`StepReopened`), as `openCallStep` does.
  */
-export function forEachNode(node: ForEachNode, ctx: StepContext): NodeAction {
+export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 	let graph: BodyGraph | null = null;
 	return async (state, config) => {
 		const runId = ctx.run.id;
@@ -125,7 +126,7 @@ export function forEachNode(node: ForEachNode, ctx: StepContext): NodeAction {
 			).length;
 			return step.end(
 				outcome,
-				forEachOutputs({ items: derived.items, visit, outcome, waitingCount }),
+				eachOutputs({ items: derived.items, visit, outcome, waitingCount }),
 				error,
 			);
 		};
@@ -189,9 +190,10 @@ export function forEachNode(node: ForEachNode, ctx: StepContext): NodeAction {
 				`The flow "${node.flow}" is not in the run's snapshot.`,
 			);
 		}
-		const as = node.as ?? "item";
-		const haltOn = node.haltOn ?? ["halt"];
-		const perItem = (node.branch ?? "per-item") === "per-item";
+		const { each } = node;
+		const as = each.as ?? "item";
+		const haltOn = each.haltOn ?? ["halt"];
+		const perItem = (each.branch ?? "per-item") === "per-item";
 		const worktree = ctx.run.worktreePath;
 
 		let element: Element;
@@ -273,7 +275,7 @@ export function forEachNode(node: ForEachNode, ctx: StepContext): NodeAction {
 			}
 
 			const started = derived.items.filter((i) => i.index !== null).length;
-			if (node.maxItems !== undefined && started >= node.maxItems) {
+			if (each.maxItems !== undefined && started >= each.maxItems) {
 				return finish("done", null);
 			}
 			const picked = nextItem(ordered.items, states);
@@ -404,7 +406,7 @@ type Element = {
  * running) is continued or reopened; else a new visit.
  */
 function entryOf(
-	node: ForEachNode,
+	node: CallEachNode,
 	state: RunStateValues,
 	events: readonly LoggedEvent[],
 	scope: Scope | null,
@@ -445,12 +447,12 @@ function stopBeforeNext(
  */
 async function readSource(
 	ctx: StepContext,
-	node: ForEachNode,
+	node: CallEachNode,
 	tctx: TemplateContext,
 	stepId: string,
 ): Promise<ListItem[]> {
 	const worktree = ctx.run.worktreePath;
-	const source = node.source;
+	const source = node.each.source;
 	switch (source.kind) {
 		case "json":
 			return jsonSourceItems(source.value, tctx);

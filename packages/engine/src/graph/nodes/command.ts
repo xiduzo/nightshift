@@ -1,6 +1,7 @@
 import { type CommandNode, renderCommand } from "@nightshift/flows";
 
 import { runCommand } from "../../command";
+import { parseCommandJson } from "../../each";
 import type { StepOutputs } from "../../events";
 import { commandLogPath } from "../../transcripts";
 import {
@@ -20,6 +21,10 @@ import { route, type StepEnd } from "../route";
  * of stdout and stderr, and `command-exit`; the output also goes to the
  * step's log file (`StepStarted.logPath`). A stop of the run or the node's
  * time budget aborts the step's signal, which kills the process group.
+ *
+ * With `output: "json"`, what the command printed on stdout is parsed as
+ * one JSON value into `data` (`{{check.data.tests}}`); output that is not
+ * JSON ends the step `fail`.
  *
  * Every visit is new: a parked or interrupted Command step has nothing to
  * continue, so a resume starts the next visit, as the engine does today.
@@ -44,6 +49,9 @@ export function commandNode(node: CommandNode, ctx: StepContext): NodeAction {
 	};
 }
 
+/** What the step says when the command's output is not JSON. */
+export const NOT_JSON_REASON = "The command's output is not valid JSON.";
+
 async function runShell(
 	ctx: StepContext,
 	node: CommandNode,
@@ -52,14 +60,18 @@ async function runShell(
 	const { stepId, visit, signal } = step;
 	const { command, env } = renderCommand(node.command, step.tctx);
 	step.record(null, { type: "command-start", command });
+	const json = node.output === "json";
+	let stdout = "";
 	const result = await runCommand({
 		command,
 		cwd: ctx.run.worktreePath,
 		env,
 		logPath: commandLogPath(ctx.dataDir, ctx.run.id, stepId),
 		signal,
-		onOutput: (stream, text) =>
-			step.record(null, { type: "command-output", stream, text }),
+		onOutput: (stream, text) => {
+			if (json && stream === "stdout") stdout += text;
+			step.record(null, { type: "command-output", stream, text });
+		},
 	});
 	step.record(null, { type: "command-exit", exitCode: result.exitCode });
 
@@ -74,6 +86,15 @@ async function runShell(
 			`The command could not start: ${result.spawnError}`,
 		);
 	}
-	const outcome = result.exitCode === 0 ? "pass" : "fail";
-	return step.end(outcome, { ...outputs, outcome }, null);
+	if (result.exitCode !== 0) {
+		return step.end("fail", { ...outputs, outcome: "fail" }, null);
+	}
+	if (json) {
+		try {
+			outputs.data = parseCommandJson(stdout, "The command");
+		} catch {
+			return step.end("fail", { ...outputs, outcome: "fail" }, NOT_JSON_REASON);
+		}
+	}
+	return step.end("pass", { ...outputs, outcome: "pass" }, null);
 }

@@ -11,12 +11,14 @@ import type { AgentHarness } from "@nightshift/agents/types";
 import { event } from "@nightshift/db/schema/nightshift";
 import type {
 	AgentNode,
+	CallEach,
+	CallEachNode,
+	CallNode,
 	CommandNode,
 	DecisionNode,
 	Flow,
 	FlowEdge,
 	FlowInput,
-	ForEachNode,
 } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
 
@@ -116,23 +118,29 @@ function decision(id: string, labels: string[]): DecisionNode {
 	};
 }
 
-function forEach(
+/** A Call node with `each`: `extra` fills `each`, except `inputs` and `timeoutMinutes`. */
+function callEach(
 	id: string,
 	body: string,
 	sourceCommand: string,
-	extra: Partial<ForEachNode> = {},
-): ForEachNode {
+	extra: Partial<CallEach> &
+		Partial<Pick<CallNode, "inputs" | "timeoutMinutes">> = {},
+): CallEachNode {
+	const { inputs, timeoutMinutes, ...each } = extra;
 	return {
 		id,
-		type: "foreach",
+		type: "call",
 		position: { x: 0, y: 0 },
-		source: { kind: "command", command: sourceCommand },
 		flow: body,
-		as: "item",
-		inputs: {},
-		branch: "per-item",
-		haltOn: ["halt"],
-		...extra,
+		inputs: inputs ?? {},
+		...(timeoutMinutes === undefined ? {} : { timeoutMinutes }),
+		each: {
+			source: { kind: "command", command: sourceCommand },
+			as: "item",
+			branch: "per-item",
+			haltOn: ["halt"],
+			...each,
+		},
 	};
 }
 
@@ -209,11 +217,11 @@ async function waitForEnd(engine: Engine, runId: string): Promise<RunDetail> {
 	);
 }
 
-const forEachStep = (detail: RunDetail, nodeId = "loop"): StepSummary => {
+const callEachStep = (detail: RunDetail, nodeId = "loop"): StepSummary => {
 	const found = detail.steps.find(
-		(s) => s.nodeId === nodeId && s.nodeType === "foreach",
+		(s) => s.nodeId === nodeId && s.nodeType === "call",
 	);
-	if (!found) throw new Error(`No For Each step ${nodeId}`);
+	if (!found) throw new Error(`No Call step ${nodeId}`);
 	return found;
 };
 
@@ -240,7 +248,7 @@ async function loggedEvents(runId: string) {
 	return rows.map((r) => ({ type: r.type, payload: JSON.parse(r.payload) }));
 }
 
-describe("For Each", () => {
+describe("Call with each", () => {
 	test("runs the body per item, blockers first, each item on a branch stacked on the last done one", async () => {
 		await saveBody(
 			"build",
@@ -252,7 +260,7 @@ describe("For Each", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					printItems([
@@ -271,7 +279,7 @@ describe("For Each", () => {
 			"Build first listed",
 		]);
 
-		const loop = forEachStep(detail);
+		const loop = callEachStep(detail);
 		expect(loop.outcome).toBe("done");
 		expect(loop.scope).toBeNull();
 		expect(loop.items.map((i) => [i.id, i.state])).toEqual([
@@ -352,7 +360,7 @@ describe("For Each", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					printItems([
@@ -365,7 +373,7 @@ describe("For Each", () => {
 		});
 		const detail = await waitForEnd(engine, started.id);
 		expect(detail.status).toBe("finished");
-		expect(forEachStep(detail).items.map((i) => i.branch)).toEqual([
+		expect(callEachStep(detail).items.map((i) => i.branch)).toEqual([
 			null,
 			null,
 		]);
@@ -388,7 +396,7 @@ describe("For Each", () => {
 			projectId: await projectId(engine),
 			flow: flowOf(
 				[
-					forEach(
+					callEach(
 						"loop",
 						"build",
 						printItems([
@@ -405,7 +413,7 @@ describe("For Each", () => {
 		});
 		const detail = await waitForEnd(engine, started.id);
 		expect(detail.status).toBe("finished");
-		const loop = forEachStep(detail);
+		const loop = callEachStep(detail);
 		expect(loop.items.map((i) => [i.id, i.state, i.reason])).toEqual([
 			["1", "failed", expect.any(String)],
 			["2", "blocked", "blocked by #1"],
@@ -439,7 +447,7 @@ describe("For Each", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					printItems([
@@ -454,7 +462,7 @@ describe("For Each", () => {
 		const detail = await waitForEnd(engine, started.id);
 		expect(detail.status).toBe("finished");
 		expect(detail.reason).toBe(`Ended at node "loop" with "halted".`);
-		const loop = forEachStep(detail);
+		const loop = callEachStep(detail);
 		expect(loop.outcome).toBe("halted");
 		expect(loop.items.map((i) => [i.id, i.state])).toEqual([
 			["1", "done"],
@@ -485,7 +493,7 @@ describe("For Each", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach("loop", "build", `cat '${itemsFile}'`, {
+				callEach("loop", "build", `cat '${itemsFile}'`, {
 					branch: "shared",
 				}),
 			]),
@@ -496,7 +504,7 @@ describe("For Each", () => {
 			"Build a",
 			"Build added",
 		]);
-		expect(forEachStep(detail).items.map((i) => i.id)).toEqual(["1", "2"]);
+		expect(callEachStep(detail).items.map((i) => i.id)).toEqual(["1", "2"]);
 	});
 
 	test("maxItems caps the items one visit starts", async () => {
@@ -506,7 +514,7 @@ describe("For Each", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					printItems([
@@ -520,7 +528,7 @@ describe("For Each", () => {
 		});
 		const detail = await waitForEnd(engine, started.id);
 		expect(harness.calls).toHaveLength(2);
-		expect(forEachStep(detail).outputs).toMatchObject({
+		expect(callEachStep(detail).outputs).toMatchObject({
 			outcome: "done",
 			done_count: 2,
 			waiting_count: 1,
@@ -533,17 +541,17 @@ describe("For Each", () => {
 		const id = await projectId(engine);
 		const bad = await engine.startRun({
 			projectId: id,
-			flow: flowOf([forEach("loop", "build", "echo not json")]),
+			flow: flowOf([callEach("loop", "build", "echo not json")]),
 		});
 		const badDetail = await waitForEnd(engine, bad.id);
 		expect(badDetail.status).toBe("failed");
-		expect(forEachStep(badDetail).outcome).toBe("error");
+		expect(callEachStep(badDetail).outcome).toBe("error");
 		expect(badDetail.reason).toContain("did not print JSON");
 
 		const cyclic = await engine.startRun({
 			projectId: id,
 			flow: flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					printItems([
@@ -564,7 +572,7 @@ describe("For Each", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					printItems([
@@ -575,7 +583,7 @@ describe("For Each", () => {
 			]),
 		});
 		const detail = await waitForEnd(engine, started.id);
-		const loop = forEachStep(detail);
+		const loop = callEachStep(detail);
 		expect(loop.items.map((i) => [i.id, i.state])).toEqual([
 			["1", "done"],
 			["2", "failed"],
@@ -592,7 +600,7 @@ describe("For Each", () => {
 		await saveBody(
 			"feature",
 			[
-				forEach(
+				callEach(
 					"traces",
 					"trace",
 					`printf '[{"id":"%s-1","title":"t"}]' "{{item.id}}"`,
@@ -617,7 +625,7 @@ describe("For Each", () => {
 			projectId: await projectId(engine),
 			flow: flowOf(
 				[
-					forEach(
+					callEach(
 						"loop",
 						"feature",
 						printItems([
@@ -651,7 +659,7 @@ describe("For Each", () => {
 		expect(harness.calls[1]?.resumeSessionId).toBeUndefined();
 		expect(harness.calls[3]?.resumeSessionId).toBeUndefined();
 
-		const outer = forEachStep(detail, "loop");
+		const outer = callEachStep(detail, "loop");
 		const inner = detail.steps.filter((s) => s.nodeId === "traces");
 		expect(inner.map((s) => s.scope)).toEqual([
 			{ parentStepId: outer.id, itemId: "f1" },
@@ -682,7 +690,7 @@ describe("For Each", () => {
 		await expect(
 			engine.startRun({
 				projectId: id,
-				flow: flowOf([forEach("loop", "missing", printItems([]))]),
+				flow: flowOf([callEach("loop", "missing", printItems([]))]),
 			}),
 		).rejects.toThrow("cannot run");
 
@@ -690,7 +698,7 @@ describe("For Each", () => {
 		await expect(
 			engine.startRun({
 				projectId: id,
-				flow: flowOf([forEach("loop", "broken", printItems([]))]),
+				flow: flowOf([callEach("loop", "broken", printItems([]))]),
 			}),
 		).rejects.toThrow("cannot run");
 
@@ -712,7 +720,7 @@ describe("For Each", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					printItems([
@@ -726,7 +734,7 @@ describe("For Each", () => {
 		await engine.stopRun(started.id);
 		const stopped = await engine.getRun(started.id);
 		expect(stopped.status).toBe("stopped");
-		const loopStopped = forEachStep(stopped);
+		const loopStopped = callEachStep(stopped);
 		expect(loopStopped.outcome).toBe("stopped");
 		// The item no longer runs: it shows failed with why, until a resume.
 		expect(
@@ -737,7 +745,7 @@ describe("For Each", () => {
 
 		await engine.resumeRun(started.id);
 		const resumed = await waitFor(() => sessions[1]);
-		const running = forEachStep(await engine.getRun(started.id));
+		const running = callEachStep(await engine.getRun(started.id));
 		expect(running.items.map((i) => [i.id, i.state, i.reason])).toEqual([
 			["1", "running", null],
 		]);
@@ -750,7 +758,7 @@ describe("For Each", () => {
 
 		const detail = await waitForEnd(engine, started.id);
 		expect(detail.status).toBe("finished");
-		const loop = forEachStep(detail);
+		const loop = callEachStep(detail);
 		expect(loop.id).toBe(loopStopped.id);
 		expect(loop.outcome).toBe("done");
 		expect(loop.items.map((i) => [i.id, i.state])).toEqual([
@@ -778,7 +786,7 @@ describe("For Each", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					printItems([
@@ -808,7 +816,7 @@ describe("For Each", () => {
 		});
 		const detail = await waitForEnd(engine, started.id);
 		expect(detail.status).toBe("finished");
-		expect(forEachStep(detail).items.map((i) => i.state)).toEqual([
+		expect(callEachStep(detail).items.map((i) => i.state)).toEqual([
 			"done",
 			"halted",
 		]);
@@ -820,7 +828,7 @@ describe("For Each", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					printItems([
@@ -844,7 +852,7 @@ describe("For Each", () => {
 		}
 		clearTimeout(timeout);
 		const loopUpdates = items.flatMap((i) =>
-			i.kind === "step" && i.step.nodeType === "foreach" ? [i.step] : [],
+			i.kind === "step" && i.step.nodeType === "call" ? [i.step] : [],
 		);
 		const seen = loopUpdates.map(
 			(s) =>
@@ -869,7 +877,7 @@ describe("For Each", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach("loop", "build", "", {
+				callEach("loop", "build", "", {
 					source: { kind: "json", value: JSON.stringify(items) },
 					branch: "shared",
 				}),
@@ -885,7 +893,7 @@ describe("For Each", () => {
 		expect(detail.status).toBe("finished");
 		expect(detail.reason).toBeNull();
 		expect(detail.resumes).toEqual([]);
-		const loop = forEachStep(detail);
+		const loop = callEachStep(detail);
 		expect(loop.outcome).toBe("done");
 		expect(loop.items.map((i) => i.state)).toEqual(Array(30).fill("done"));
 		expect(detail.steps.filter((s) => s.nodeId === "note")).toHaveLength(30);
@@ -1038,13 +1046,13 @@ describe("run policy", () => {
 		const started = await engine1.startRun({
 			projectId: await projectId(engine1),
 			flow: flowOf([
-				forEach("loop", "build", printItems([{ id: "1", title: "a" }]), {
+				callEach("loop", "build", printItems([{ id: "1", title: "a" }]), {
 					branch: "shared",
 				}),
 			]),
 		});
 		const sleeping = await waitForStatus(engine1, started.id, "sleeping");
-		expect(forEachStep(sleeping).endedAt).toBeNull();
+		expect(callEachStep(sleeping).endedAt).toBeNull();
 		dying.abort();
 
 		// A new daemon, ten minutes later.
@@ -1057,7 +1065,7 @@ describe("run policy", () => {
 		const detail = await waitForEnd(engine2, started.id);
 		expect(detail.status).toBe("finished");
 		expect(second.calls[0]?.resumeSessionId).toBe("fake-session-1");
-		expect(forEachStep(detail).items.map((i) => i.state)).toEqual(["done"]);
+		expect(callEachStep(detail).items.map((i) => i.state)).toEqual(["done"]);
 		expect(detail.steps.filter((s) => s.nodeId === "worker")).toHaveLength(1);
 	});
 
@@ -1148,7 +1156,7 @@ describe("stop modes", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					printItems([
@@ -1164,7 +1172,7 @@ describe("stop modes", () => {
 		session.finish();
 		const detail = await waitForEnd(engine, started.id);
 		expect(detail.status).toBe("stopped");
-		expect(forEachStep(detail).items.map((i) => [i.id, i.state])).toEqual([
+		expect(callEachStep(detail).items.map((i) => [i.id, i.state])).toEqual([
 			["1", "done"],
 		]);
 		expect(sessions).toHaveLength(1);
@@ -1181,7 +1189,7 @@ describe("stop modes", () => {
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([
-				forEach(
+				callEach(
 					"loop",
 					"build",
 					printItems([
@@ -1198,7 +1206,7 @@ describe("stop modes", () => {
 		const stopped = await waitForEnd(engine, started.id);
 		expect(stopped.status).toBe("stopped");
 		expect(stopped.reason).toBe("Stopped after the running step, as asked.");
-		const loop = forEachStep(stopped);
+		const loop = callEachStep(stopped);
 		expect(loop.outcome).toBe("stopped");
 		expect(loop.items.map((i) => [i.id, i.state, i.reason])).toEqual([
 			["1", "failed", "The run stopped during this item."],
@@ -1219,7 +1227,7 @@ describe("stop modes", () => {
 			["worker", "2", "pass"],
 			["check", "2", "pass"],
 		]);
-		expect(forEachStep(detail).items.map((i) => [i.id, i.state])).toEqual([
+		expect(callEachStep(detail).items.map((i) => [i.id, i.state])).toEqual([
 			["1", "done"],
 			["2", "done"],
 		]);
@@ -1284,7 +1292,7 @@ describe("run inputs", () => {
 		const flow = flowOf(
 			[
 				command("hello", `echo "epic {{epic}} model {{model}}"`),
-				forEach("loop", "body", printItems([{ id: "1", title: "a" }]), {
+				callEach("loop", "body", printItems([{ id: "1", title: "a" }]), {
 					branch: "shared",
 					inputs: { epic: "{{epic}}" },
 				}),

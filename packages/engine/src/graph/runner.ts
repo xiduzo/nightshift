@@ -5,17 +5,21 @@ import type {
 	HarnessName,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
-import type {
-	AgentNode,
-	Flow,
-	JsonValue,
-	ResolvedPolicy,
+import {
+	type AgentNode,
+	type Flow,
+	type FlowNode,
+	type JsonValue,
+	type ResolvedPolicy,
+	runsEach,
 } from "@nightshift/flows";
 
 import type { RunBus } from "../bus";
 import type { CliToolGuide } from "../cli-tools";
+import { eachOutputs } from "../each";
 import {
 	countVisits,
+	type DerivedStep,
 	deriveInputs,
 	deriveNodeOutputs,
 	deriveRunState,
@@ -28,7 +32,6 @@ import {
 	type StepOutputs,
 	scopeKey,
 } from "../events";
-import { forEachOutputs } from "../foreach";
 import type { McpExpansion } from "../mcp";
 import type { RunLog } from "../run-log";
 import type { RunSettings } from "../settings";
@@ -83,7 +86,7 @@ const MAX_TIMER_MS = 2 ** 31 - 1;
  * `EdgeTaken`). It is the step the resume targets (`resumeTarget` in
  * engine.ts picks the same). Its visit is left uncommitted on purpose, so
  * the node reopens the step as the old walk did: an Agent continues its
- * harness session with the resume prompt, a Subflow or For Each goes on
+ * harness session with the resume prompt, a Call goes on
  * inside it. Null when the run moved on, or never started a step.
  */
 export function reenteredNode(events: readonly LoggedEvent[]): string | null {
@@ -104,7 +107,7 @@ export function reenteredNode(events: readonly LoggedEvent[]): string | null {
  * is re-entered with, from the log: the inputs and the stop time, the
  * committed visits of every top-level node, the node outputs for templates
  * and the edge counts. Without it every node with a step in the log looks
- * uncommitted (`uncommittedStep`), so a Subflow or For Each later in the
+ * uncommitted (`uncommittedStep`), so a Call later in the
  * flow would reopen a finished step, `{{node.output}}` would render empty
  * and edge `max` counts would start over. Bodies get fresh namespaces and
  * read their scope from the log. The `reenteredNode`'s last visit stays
@@ -337,7 +340,7 @@ export function createRunner(deps: RunnerDeps) {
 				streamMode: ["updates", "custom"],
 				subgraphs: true,
 				durability: "sync",
-				// Every node visit, park, wait and For Each element is one
+				// Every node visit, park, wait and Call element is one
 				// super-step, and LangGraph's default stops a drive at 25. The
 				// step cap is the walk's own (`beginStep`, from the log), so the
 				// graph's limit is out of the way. Bodies inherit it through the
@@ -531,7 +534,7 @@ export function createRunner(deps: RunnerDeps) {
 
 	/**
 	 * Closes the step the run is parked at (an open Gate or a sleeping step)
-	 * and the For Each and Subflow steps around it without an answer, and
+	 * and the Call steps around it without an answer, and
 	 * ends the run as `stopped`. The thread stays at its interrupt: a resume
 	 * re-enters it (design rule 7). False when the run is not parked.
 	 */
@@ -541,10 +544,14 @@ export function createRunner(deps: RunnerDeps) {
 		if (parked.length === 0) return false;
 		clearWakeTimer(runId);
 		pendingWakes.delete(runId);
+		const row = await getRunRow(db, runId);
+		const nodes = nodesOf(deps.flowOf(row), deps.calledFlowsOf(row), parked);
 		for (const open of parked) {
+			const node = nodes.get(open.id);
+			const each = node ? runsEach(node) : open.items.length > 0;
 			const outputs: StepOutputs =
-				open.nodeType === "foreach"
-					? forEachOutputs({
+				open.nodeType === "call" && each
+					? eachOutputs({
 							items: open.items,
 							visit: open.visit,
 							outcome: status,
@@ -552,7 +559,7 @@ export function createRunner(deps: RunnerDeps) {
 						})
 					: open.nodeType === "decision"
 						? { outcome: status, note: "", visit: open.visit }
-						: open.nodeType === "subflow"
+						: open.nodeType === "call"
 							? { outcome: status, ended: "", visit: open.visit }
 							: { ...open.outputs, outcome: status };
 			await log.append({
@@ -691,4 +698,28 @@ export function createRunner(deps: RunnerDeps) {
 		drainPendingWakes,
 		dispose,
 	};
+}
+
+/**
+ * The node of each step in a chain of calling steps (inside out, as
+ * `parkedSteps` gives it): the outermost is in the run's flow, each inner
+ * one in the flow its caller's Call node names. Stops at a node the
+ * snapshot does not have.
+ */
+function nodesOf(
+	flow: Flow,
+	flows: Record<string, Flow>,
+	chain: readonly DerivedStep[],
+): Map<string, FlowNode> {
+	const nodes = new Map<string, FlowNode>();
+	let current: Flow | undefined = flow;
+	for (const step of [...chain].reverse()) {
+		const node: FlowNode | undefined = current?.nodes.find(
+			(n) => n.id === step.nodeId,
+		);
+		if (!node) break;
+		nodes.set(step.id, node);
+		current = node.type === "call" ? flows[node.flow] : undefined;
+	}
+	return nodes;
 }

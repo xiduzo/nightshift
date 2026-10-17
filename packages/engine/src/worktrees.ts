@@ -189,7 +189,7 @@ export function slugify(text: string, maxChars = 48): string {
 }
 
 /**
- * `nightshift/<run8>-<id>-<title>`: the branch of one For Each item. Not
+ * `nightshift/<run8>-<id>-<title>`: the branch of one Call item. Not
  * `nightshift/<run8>/…`: git cannot hold a branch inside the name of
  * another, and `nightshift/<run8>` is the run's own branch.
  */
