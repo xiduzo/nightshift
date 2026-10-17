@@ -361,9 +361,17 @@ await server.connect(new StdioServerTransport());
 			ok: true,
 			server: { name: "fixture", version: "1.2.3" },
 			tools: [
-				{ name: "echo", description: "Says it back." },
+				{
+					name: "echo",
+					description: "Says it back.",
+					inputSchema: { type: "object", properties: {} },
+				},
 				// The config's env reaches the server.
-				{ name: "from_env", description: null },
+				{
+					name: "from_env",
+					description: null,
+					inputSchema: { type: "object", properties: {} },
+				},
 			],
 			error: null,
 			ms: expect.any(Number),

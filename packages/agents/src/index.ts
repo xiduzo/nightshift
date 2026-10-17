@@ -54,6 +54,16 @@ export {
 	grokPolicy,
 } from "./grok-build";
 export {
+	callMcpTool,
+	listMcpTools,
+	MCP_TIMEOUT_MS,
+	type McpToolCall,
+	type McpToolInfo,
+	toolCallOf,
+	toolResultText,
+	withMcpClient,
+} from "./mcp";
+export {
 	type OpencodeHarnessOptions,
 	opencodeHarness,
 	opencodePermission,
