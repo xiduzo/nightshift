@@ -75,6 +75,7 @@ const PALETTE: NodeKind[] = [
 	"gate",
 	"subflow",
 	"foreach",
+	"value",
 ];
 
 /** Below the node a new one lands on, so repeated adds do not stack exactly. */
