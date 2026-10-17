@@ -6,11 +6,11 @@ import { z } from "zod";
  * loops, unknown names, template references, calls between flows).
  *
  * A flow is a function: it declares `inputs`, runs its nodes, and returns
- * `outputs` to whoever called it (a run, a Subflow node, or a For Each node).
- * Older files migrate on load (`migrateFlow`).
+ * `outputs` to whoever called it (a run, or a Call node). Older files
+ * migrate on load (`migrateFlow`).
  */
 
-export const FLOW_VERSION = 3;
+export const FLOW_VERSION = 4;
 
 /**
  * A node id or an input name. Both are names in templates (`{{check.log_tail}}`,
@@ -256,6 +256,12 @@ export const commandNodeSchema = z.object({
 	 * `echo "{{worker.summary}}"` and the shell sees `echo "${NS_WORKER_SUMMARY}"`.
 	 */
 	command: z.string().min(1),
+	/**
+	 * `text`: the output is the log tail only. `json`: the command prints
+	 * JSON, kept as `data` for later nodes (`{{check.data.tests}}`); output
+	 * that is not JSON ends the step `fail`.
+	 */
+	output: z.enum(["text", "json"]).default("text"),
 });
 
 /**
@@ -279,18 +285,6 @@ export const decisionNodeSchema = z.object({
 	decider: deciderNameSchema.default("typesafe"),
 	/** `by: "model"` only. The decider's model. Unset: the decider's default (`jev-latest` for TypeSafe). */
 	model: z.string().min(1).optional(),
-});
-
-/**
- * Runs another flow of the project once. `inputs` binds each input of the
- * called flow to a template. Its outputs are the called flow's outputs, plus
- * `ended` (the label or choice it ended on, or "") and `visit`.
- */
-export const subflowNodeSchema = z.object({
-	...nodeBase,
-	type: z.literal("subflow"),
-	flow: flowNameSchema,
-	inputs: bindings.default({}),
 });
 
 /**
@@ -330,21 +324,16 @@ export const listSourceSchema = z.discriminatedUnion("kind", [
 ]);
 
 /**
- * Runs a flow once per element of a list. An element is any JSON value. An
- * object element may carry `id` (else `name`, else its position), `title`,
- * `url`, `dependsOn` (ids, or `{ id, done }`), and `done` (true: skipped).
+ * How a Call node runs its flow once per element of a list. An element is
+ * any JSON value. An object element may carry `id` (else `name`, else its
+ * position), `title`, `url`, `dependsOn` (ids, or `{ id, done }`), and
+ * `done` (true: skipped).
  */
-export const forEachNodeSchema = z.object({
-	...nodeBase,
-	type: z.literal("foreach"),
+export const callEachSchema = z.object({
 	/** Read again before each element, so elements added during the run run too. */
 	source: listSourceSchema,
-	/** The flow to run per element. Any flow of the project that has the input named by `as`. */
-	flow: flowNameSchema,
 	/** The input of the called flow that receives the element. */
 	as: nameSchema.default("item"),
-	/** Templates for the called flow's other inputs, for example `{ "epic": "{{epic}}" }`. */
-	inputs: bindings.default({}),
 	/**
 	 * `per-item`: each element works on its own branch, created on top of the
 	 * last element that finished (the stack). `shared`: all elements work on
@@ -357,12 +346,29 @@ export const forEachNodeSchema = z.object({
 	maxItems: z.number().int().positive().optional(),
 });
 
+/**
+ * Runs another flow of the project: once, or once per element of a list
+ * with `each`. `inputs` binds each input of the called flow to a template
+ * (with `each`, the element goes to the input named by `each.as`).
+ *
+ * Once: ends `pass` or `fail`; its outputs are the called flow's outputs,
+ * plus `ended` (the label or choice it ended on, or "") and `visit`.
+ * With `each`: ends `done` or `halted`; its outputs count the elements and
+ * hold each one's result in `results` (`callEachOutputFields`).
+ */
+export const callNodeSchema = z.object({
+	...nodeBase,
+	type: z.literal("call"),
+	flow: flowNameSchema,
+	inputs: bindings.default({}),
+	each: callEachSchema.optional(),
+});
+
 export const flowNodeSchema = z.discriminatedUnion("type", [
 	agentNodeSchema,
 	commandNodeSchema,
 	decisionNodeSchema,
-	subflowNodeSchema,
-	forEachNodeSchema,
+	callNodeSchema,
 ]);
 
 export const outcomeSchema = labelSchema;
@@ -449,8 +455,10 @@ export type FlowNode = z.infer<typeof flowNodeSchema>;
 export type AgentNode = z.infer<typeof agentNodeSchema>;
 export type CommandNode = z.infer<typeof commandNodeSchema>;
 export type DecisionNode = z.infer<typeof decisionNodeSchema>;
-export type SubflowNode = z.infer<typeof subflowNodeSchema>;
-export type ForEachNode = z.infer<typeof forEachNodeSchema>;
+export type CallNode = z.infer<typeof callNodeSchema>;
+export type CallEach = z.infer<typeof callEachSchema>;
+/** A Call node with `each`: it runs its flow once per element. */
+export type CallEachNode = CallNode & { each: CallEach };
 export type ListSource = z.infer<typeof listSourceSchema>;
 export type Policy = z.infer<typeof policySchema>;
 /**
@@ -477,6 +485,11 @@ export type JsonValue =
 	| JsonValue[]
 	| { [key: string]: JsonValue };
 
+/** Whether the node is a Call node that runs its flow once per element. */
+export function runsEach(node: FlowNode): node is CallEachNode {
+	return node.type === "call" && node.each !== undefined;
+}
+
 /** The outcomes a node can end with, in the order its handles show. */
 export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 	switch (node.type) {
@@ -488,10 +501,8 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return ["pass", "fail"];
 		case "decision":
 			return node.options.map((option) => option.name);
-		case "subflow":
-			return ["pass", "fail"];
-		case "foreach":
-			return ["done", "halted"];
+		case "call":
+			return node.each ? ["done", "halted"] : ["pass", "fail"];
 	}
 }
 
@@ -511,42 +522,46 @@ export function optionProblem(
 
 /**
  * The fields a later node can read with `{{<nodeId>.<field>}}`. A field of a
- * node that has not run yet renders as an empty string. `data` (Agent) and
- * `results` (For Each) hold JSON and take a deeper path. A Subflow node also
- * has the outputs of the flow it calls (see `nodeOutputFields`).
+ * node that has not run yet renders as an empty string. `data` (Agent, and
+ * a Command with `output: "json"`) and `results` (a Call with `each`) hold
+ * JSON and take a deeper path. A Call node's fields depend on `each`, and
+ * without it the node also has the outputs of the flow it calls: use
+ * `nodeOutputFields`.
  */
 export const outputFieldsByType = {
 	/** output: the final message. summary: the report's summary, else the output. data: the report's JSON. */
 	agent: ["outcome", "output", "summary", "data", "visit", "session_id"],
-	/** log_tail: the last lines of stdout and stderr together. */
-	command: ["outcome", "exit_code", "log_tail", "visit"],
+	/** log_tail: the last lines of stdout and stderr together. data: the JSON it printed, with `output: "json"`. */
+	command: ["outcome", "exit_code", "log_tail", "data", "visit"],
 	/** outcome: the option. note: what the person wrote, or why the model picked it. */
 	decision: ["outcome", "note", "visit"],
-	/** ended: the label or choice the called flow ended on, or "". */
-	subflow: ["outcome", "ended", "visit"],
-	/**
-	 * Counts per element state; summary: one line per element; results: a JSON
-	 * array of `{ id, title, state, reason, outputs }` per element.
-	 */
-	foreach: [
-		"outcome",
-		"done_count",
-		"failed_count",
-		"blocked_count",
-		"waiting_count",
-		"summary",
-		"results",
-		"visit",
-	],
+	/** Without `each`. ended: the label or choice the called flow ended on, or "". */
+	call: ["outcome", "ended", "visit"],
 } as const satisfies Record<FlowNodeType, readonly string[]>;
+
+/**
+ * The fields of a Call node with `each`: counts per element state; summary:
+ * one line per element; results: a JSON array of `{ id, title, state,
+ * reason, outputs }` per element.
+ */
+export const callEachOutputFields = [
+	"outcome",
+	"done_count",
+	"failed_count",
+	"blocked_count",
+	"waiting_count",
+	"summary",
+	"results",
+	"visit",
+] as const;
 
 /** Output fields that hold JSON, so a template may take a path below them. */
 export const jsonOutputFields = ["data", "results"] as const;
 
 /**
- * Fields of the run: `{{run.branch}}`. Inside a For Each, `branch` is the
- * element's branch, `base_branch` the branch it builds on, and `index` the
- * element's position (from 0). Outside, both are "".
+ * Fields of the run: `{{run.branch}}`. Inside a Call with `each`, `branch`
+ * is the element's branch, `base_branch` the branch it builds on, and
+ * `index` the element's position (from 0). Outside, both are "".
  */
 export const runFields = [
 	"branch",
@@ -559,15 +574,17 @@ export const runFields = [
 export type RunField = (typeof runFields)[number];
 
 /**
- * The fields a later node can read from `node`: `outputFieldsByType`, plus
- * for a Subflow node the output names of the flow it calls, when known.
+ * The fields a later node can read from `node`: `outputFieldsByType`
+ * (`callEachOutputFields` for a Call with `each`), plus for a Call node
+ * without `each` the output names of the flow it calls, when known.
  */
 export function nodeOutputFields(
 	node: FlowNode,
 	called?: Flow | null,
 ): readonly string[] {
+	if (runsEach(node)) return callEachOutputFields;
 	const fields: readonly string[] = outputFieldsByType[node.type];
-	if (node.type !== "subflow" || !called) return fields;
+	if (node.type !== "call" || !called) return fields;
 	const outputs = called.outputs
 		.map((output) => output.name)
 		.filter((name) => !fields.includes(name));

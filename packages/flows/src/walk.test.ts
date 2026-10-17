@@ -4,7 +4,7 @@ import { nextEdge } from "./walk";
 
 function flowWith(edges: FlowEdge[]): Flow {
 	return {
-		version: 3,
+		version: 4,
 		inputs: [],
 		outputs: [],
 		start: "worker",
@@ -24,6 +24,7 @@ function flowWith(edges: FlowEdge[]): Flow {
 				type: "command",
 				position: { x: 200, y: 0 },
 				command: "bun test",
+				output: "text",
 			},
 		],
 		edges,

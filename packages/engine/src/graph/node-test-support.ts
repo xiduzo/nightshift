@@ -48,6 +48,7 @@ export const command = (id: string, cmd: string): CommandNode => ({
 	type: "command",
 	position: { x: 0, y: 0 },
 	command: cmd,
+	output: "text",
 });
 
 export const edge = (
@@ -63,7 +64,7 @@ export const flowOf = (
 	extra: Partial<Omit<FlowInput, "version">> = {},
 ): Flow =>
 	flowSchema.parse({
-		version: 3,
+		version: 4,
 		start: nodes[0]?.id ?? "",
 		nodes,
 		edges,

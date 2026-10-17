@@ -94,7 +94,13 @@ function agent(
 }
 
 function command(id: string, cmd: string): CommandNode {
-	return { id, type: "command", position: { x: 0, y: 0 }, command: cmd };
+	return {
+		id,
+		type: "command",
+		position: { x: 0, y: 0 },
+		command: cmd,
+		output: "text",
+	};
 }
 
 function decision(id: string, labels: string[]): DecisionNode {
@@ -145,7 +151,7 @@ function flowOf(
 	extra: Partial<Flow> = {},
 ): Flow {
 	return {
-		version: 3,
+		version: 4,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

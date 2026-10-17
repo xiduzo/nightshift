@@ -101,7 +101,13 @@ function agent(
 }
 
 function command(id: string, cmd: string): CommandNode {
-	return { id, type: "command", position: { x: 0, y: 0 }, command: cmd };
+	return {
+		id,
+		type: "command",
+		position: { x: 0, y: 0 },
+		command: cmd,
+		output: "text",
+	};
 }
 
 function edge(
@@ -118,7 +124,7 @@ function edge(
 
 function flowOf(nodes: Flow["nodes"], edges: FlowEdge[] = []): Flow {
 	return {
-		version: 3,
+		version: 4,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

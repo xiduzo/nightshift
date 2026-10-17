@@ -86,7 +86,7 @@ const v1Body = {
 
 describe("migrateFlow", () => {
 	test("leaves anything that is not a version 1 object alone", () => {
-		for (const value of [null, "x", 3, [1], { version: 3 }, {}]) {
+		for (const value of [null, "x", 3, [1], { version: 4 }, {}]) {
 			expect(migrateFlow(value)).toBe(value);
 		}
 	});
@@ -105,7 +105,7 @@ describe("migrateFlow", () => {
 
 	test("input item becomes a required json input; there are no outputs", () => {
 		const flow = migrateFlow(v1Body) as Record<string, unknown>;
-		expect(flow.version).toBe(3);
+		expect(flow.version).toBe(4);
 		expect(flow.inputs).toEqual([
 			{ name: "item", type: "json", required: true },
 		]);
@@ -139,8 +139,10 @@ describe("migrateFlow", () => {
 				case "agent":
 				case "decision":
 					return node.prompt;
-				case "foreach":
-					return node.source.kind === "command" ? node.source.command : "";
+				case "call":
+					return node.each?.source.kind === "command"
+						? node.each.source.command
+						: "";
 				default:
 					throw new Error(`no node ${id}`);
 			}
@@ -160,12 +162,16 @@ describe("migrateFlow", () => {
 		expect(text("listed")).toBe("./list {{item.parent.number}} {{run.branch}}");
 	});
 
-	test("For Each: branchPerItem becomes branch, as is item", () => {
+	test("For Each: branchPerItem becomes branch, as is item, all under each", () => {
 		const flow = flowSchema.parse(migrateFlow(v1Body));
-		const [subs, listed] = flow.nodes.filter((n) => n.type === "foreach");
-		expect(subs).toMatchObject({ branch: "shared", as: "item", inputs: {} });
-		expect(listed).toMatchObject({ branch: "per-item", as: "item" });
+		const [subs, listed] = flow.nodes.filter((n) => n.type === "call");
+		expect(subs).toMatchObject({
+			inputs: {},
+			each: { branch: "shared", as: "item" },
+		});
+		expect(listed).toMatchObject({ each: { branch: "per-item", as: "item" } });
 		expect(subs).not.toHaveProperty("branchPerItem");
+		expect(subs).not.toHaveProperty("source");
 	});
 
 	test("params become text inputs; {{params.x}} becomes {{x}}", () => {
@@ -186,7 +192,7 @@ describe("migrateFlow", () => {
 			edges: [],
 		});
 		expect(flow).toMatchObject({
-			version: 3,
+			version: 4,
 			inputs: [
 				{ name: "epic", label: "Epic", required: true, type: "text" },
 				{ name: "base", default: "main", type: "text" },
@@ -287,18 +293,20 @@ describe("the rpgdotexe night, as version 1", () => {
 			},
 		]);
 		expect(flows.night?.nodes[0]).toMatchObject({
-			type: "foreach",
-			source: {
-				kind: "command",
-				command: githubSubIssuesCommand({
-					parent: "{{epic}}",
-					requireLabel: "feature",
-					doneLabels: [],
-					skipLabels: [],
-				}),
+			type: "call",
+			each: {
+				source: {
+					kind: "command",
+					command: githubSubIssuesCommand({
+						parent: "{{epic}}",
+						requireLabel: "feature",
+						doneLabels: [],
+						skipLabels: [],
+					}),
+				},
+				as: "item",
+				branch: "shared",
 			},
-			as: "item",
-			branch: "shared",
 		});
 		expect(JSON.stringify(flows)).not.toContain('"github"');
 		expect(flows.feature?.inputs).toEqual([
@@ -306,7 +314,7 @@ describe("the rpgdotexe night, as version 1", () => {
 		]);
 		expect(
 			flows.feature?.nodes.find((node) => node.id === "traces"),
-		).toMatchObject({ branch: "per-item", as: "item" });
+		).toMatchObject({ each: { branch: "per-item", as: "item" } });
 		const deliver = flows.trace?.nodes.find((node) => node.id === "deliver");
 		const refs =
 			deliver?.type === "command"
@@ -319,7 +327,7 @@ describe("the rpgdotexe night, as version 1", () => {
 
 describe("migrateFlow: tool sets", () => {
 	const current = (nodes: unknown[]) => ({
-		version: 3,
+		version: 4,
 		inputs: [],
 		outputs: [],
 		start: "work",
@@ -392,23 +400,19 @@ describe("migrateFlow: tool sets", () => {
 });
 
 describe("migrateFlow: list sources", () => {
-	const current = (source: unknown, extra: Record<string, unknown> = {}) => ({
-		version: 3,
+	const current = (source: unknown) => ({
+		version: 4,
 		inputs: [{ name: "epic", type: "text", required: true }],
 		outputs: [],
 		start: "each",
 		nodes: [
 			{
 				id: "each",
-				type: "foreach",
+				type: "call",
 				position: { x: 0, y: 0 },
-				source,
 				flow: "trace",
-				as: "item",
 				inputs: {},
-				branch: "shared",
-				haltOn: ["halt"],
-				...extra,
+				each: { source, as: "item", branch: "shared", haltOn: ["halt"] },
 			},
 		],
 		edges: [],
@@ -423,16 +427,18 @@ describe("migrateFlow: list sources", () => {
 				doneLabels: ["Done", "shipped"],
 				skipLabels: ["draft"],
 			}),
-		) as { nodes: { source: unknown }[] };
+		) as { nodes: { each: Record<string, unknown> }[] };
 		const expected = githubSubIssuesCommand({
 			parent: "{{epic}}",
 			requireLabel: "Feature",
 			doneLabels: ["Done", "shipped"],
 			skipLabels: ["draft"],
 		});
-		expect(migrated.nodes[0]?.source).toEqual({
-			kind: "command",
-			command: expected,
+		expect(migrated.nodes[0]?.each).toEqual({
+			source: { kind: "command", command: expected },
+			as: "item",
+			branch: "shared",
+			haltOn: ["halt"],
 		});
 		expect(expected).toContain(`-F number="{{epic}}"`);
 		expect(expected).toContain("-F owner='{owner}' -F name='{repo}'");
@@ -663,7 +669,7 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 
 	test("a Gate becomes a Decision decided by you; a Decision one decided by a model, off the Claude Code decider", () => {
 		const flow = migrateFlow(v2()) as { version: number; nodes: unknown[] };
-		expect(flow.version).toBe(3);
+		expect(flow.version).toBe(4);
 		expect(flow.nodes[1]).toEqual({
 			id: "decide",
 			type: "decision",
@@ -694,10 +700,12 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 		expect(byId.run_it).toMatchObject({ command: 'echo "{{decide.note}}"' });
 		expect(byId.sub).toMatchObject({ inputs: { why: "{{decide.note}}" } });
 		expect(byId.each).toMatchObject({
-			source: { kind: "json", value: "{{decide.note}}" },
 			inputs: { why: "{{decide.note}}" },
-			as: "thing",
-			branch: "shared",
+			each: {
+				source: { kind: "json", value: "{{decide.note}}" },
+				as: "thing",
+				branch: "shared",
+			},
 		});
 		expect(flow.outputs).toEqual([
 			{ name: "why", value: "{{decide.note}} / {{ask.note}}" },
@@ -706,7 +714,7 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 
 	test("a version 1 flow goes through both steps", () => {
 		const flow = flowSchema.parse(migrateFlow(v1Body));
-		expect(flow.version).toBe(3);
+		expect(flow.version).toBe(4);
 		expect(flow.nodes.find((n) => n.id === "decide")).toMatchObject({
 			type: "decision",
 			by: "model",
@@ -720,8 +728,141 @@ describe("migrateFlow: version 2 → 3, Decision and Gate", () => {
 		});
 	});
 
-	test("a version 3 flow is left alone", () => {
+	test("a current flow is left alone", () => {
 		const flow = flowSchema.parse(migrateFlow(v2()));
 		expect(migrateFlow(flow)).toBe(flow);
+	});
+});
+
+describe("migrateFlow: version 3 → 4, Call", () => {
+	const v3 = () => ({
+		version: 3,
+		inputs: [{ name: "epic", type: "text", required: true }],
+		outputs: [{ name: "results", value: "{{each.results}}" }],
+		start: "sub",
+		nodes: [
+			{
+				id: "sub",
+				label: "Review",
+				type: "subflow",
+				position: { x: 0, y: 0 },
+				flow: "review",
+				inputs: { pr: "{{epic}}" },
+				timeoutMinutes: 5,
+			},
+			{
+				id: "each",
+				type: "foreach",
+				position: { x: 1, y: 1 },
+				source: { kind: "json", value: "{{sub.tasks}}" },
+				flow: "build",
+				as: "task",
+				inputs: { epic: "{{epic}}" },
+				branch: "shared",
+				haltOn: ["stop"],
+				maxItems: 3,
+			},
+			{
+				id: "bare",
+				type: "foreach",
+				position: { x: 2, y: 2 },
+				source: { kind: "files", glob: "*.md" },
+				flow: "build",
+			},
+			{
+				...agent,
+				id: "report",
+				prompt: "{{sub.ended}} {{each.summary}}",
+			},
+		],
+		edges: [
+			{ id: "a", from: "sub", outcome: "pass", to: "each" },
+			{ id: "b", from: "sub", outcome: "fail", to: "report" },
+			{ id: "c", from: "each", outcome: "done", to: "bare" },
+			{ id: "d", from: "each", outcome: "halted", to: "report" },
+			{ id: "e", from: "bare", outcome: "done", to: "report" },
+		],
+	});
+
+	test("a Subflow node becomes a Call node; a For Each node a Call node with each", () => {
+		const flow = migrateFlow(v3()) as { version: number; nodes: unknown[] };
+		expect(flow.version).toBe(4);
+		expect(flow.nodes[0]).toEqual({
+			id: "sub",
+			label: "Review",
+			type: "call",
+			position: { x: 0, y: 0 },
+			flow: "review",
+			inputs: { pr: "{{epic}}" },
+			timeoutMinutes: 5,
+		});
+		expect(flow.nodes[1]).toEqual({
+			id: "each",
+			type: "call",
+			position: { x: 1, y: 1 },
+			flow: "build",
+			inputs: { epic: "{{epic}}" },
+			each: {
+				source: { kind: "json", value: "{{sub.tasks}}" },
+				as: "task",
+				branch: "shared",
+				haltOn: ["stop"],
+				maxItems: 3,
+			},
+		});
+		// Fields the file left out stay out, so the schema's defaults apply.
+		expect(flow.nodes[2]).toEqual({
+			id: "bare",
+			type: "call",
+			position: { x: 2, y: 2 },
+			flow: "build",
+			each: { source: { kind: "files", glob: "*.md" } },
+		});
+		expect(flow.nodes[3]).toEqual(v3().nodes[3]);
+	});
+
+	test("the migrated flow parses, keeps its edges, and validates", () => {
+		const flow = flowSchema.parse(migrateFlow(v3()));
+		expect(flow.edges).toEqual(v3().edges);
+		expect(flow.nodes[2]).toMatchObject({
+			inputs: {},
+			each: { as: "item", branch: "per-item", haltOn: ["halt"] },
+		});
+		expect(validateFlow(flow)).toEqual([]);
+	});
+
+	test("a github source of a For Each node migrates along", () => {
+		const flow = migrateFlow({
+			...v3(),
+			nodes: [
+				{
+					id: "each",
+					type: "foreach",
+					position: { x: 0, y: 0 },
+					source: { kind: "github", parent: "{{epic}}" },
+					flow: "build",
+				},
+			],
+			edges: [],
+			start: "each",
+			outputs: [],
+		}) as { nodes: { each: { source: { kind: string; command: string } } }[] };
+		expect(flow.nodes[0]?.each.source).toEqual({
+			kind: "command",
+			command: githubSubIssuesCommand({ parent: "{{epic}}" }),
+		});
+	});
+
+	test("a version 1 flow goes through every step", () => {
+		const flow = flowSchema.parse(migrateFlow(v1Body));
+		expect(flow.version).toBe(4);
+		expect(flow.nodes.map((n) => n.type)).toEqual([
+			"command",
+			"agent",
+			"decision",
+			"decision",
+			"call",
+			"call",
+		]);
 	});
 });

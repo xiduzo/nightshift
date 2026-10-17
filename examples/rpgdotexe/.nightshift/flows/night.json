@@ -1,5 +1,5 @@
 {
-	"version": 3,
+	"version": 4,
 	"description": "The rpgdotexe night: builds each Feature of one Epic, blockers first, like `night-shift.py <epic>`.",
 	"inputs": [
 		{
@@ -25,15 +25,17 @@
 				"x": 0,
 				"y": 0
 			},
-			"type": "foreach",
-			"source": {
-				"kind": "command",
-				"command": "gh api graphql -F owner='{owner}' -F name='{repo}' -F number=\"{{epic}}\" -f query='\nquery($owner: String!, $name: String!, $number: Int!) {\n  repository(owner: $owner, name: $name) {\n    issue(number: $number) {\n      number title\n      subIssues(first: 100) {\n        nodes {\n          number title body state url\n          labels(first: 30) { nodes { name } }\n          blockedBy(first: 50) { nodes { number state } }\n        }\n      }\n    }\n  }\n}' --jq '\n\"feature\" as $require | [] as $skip | [] as $done\n| .data.repository.issue as $parent\n| [ $parent.subIssues.nodes[]\n    | (.labels.nodes | map(.name | ascii_downcase)) as $labels\n    | select($require == null or any($labels[]; . == $require))\n    | select(any($labels[]; IN($skip[])) | not)\n    | { id: (.number | tostring), number, title, body: (.body // \"\"), url, state,\n        labels: [.labels.nodes[].name],\n        parent: { number: $parent.number, title: $parent.title },\n        dependsOn: [ .blockedBy.nodes[] | { id: (.number | tostring), done: (.state == \"CLOSED\") } ],\n        done: (.state == \"CLOSED\" or any($labels[]; IN($done[]))) } ]'"
-			},
+			"type": "call",
 			"flow": "feature",
-			"as": "item",
-			"branch": "shared",
-			"haltOn": ["halt"]
+			"each": {
+				"source": {
+					"kind": "command",
+					"command": "gh api graphql -F owner='{owner}' -F name='{repo}' -F number=\"{{epic}}\" -f query='\nquery($owner: String!, $name: String!, $number: Int!) {\n  repository(owner: $owner, name: $name) {\n    issue(number: $number) {\n      number title\n      subIssues(first: 100) {\n        nodes {\n          number title body state url\n          labels(first: 30) { nodes { name } }\n          blockedBy(first: 50) { nodes { number state } }\n        }\n      }\n    }\n  }\n}' --jq '\n\"feature\" as $require | [] as $skip | [] as $done\n| .data.repository.issue as $parent\n| [ $parent.subIssues.nodes[]\n    | (.labels.nodes | map(.name | ascii_downcase)) as $labels\n    | select($require == null or any($labels[]; . == $require))\n    | select(any($labels[]; IN($skip[])) | not)\n    | { id: (.number | tostring), number, title, body: (.body // \"\"), url, state,\n        labels: [.labels.nodes[].name],\n        parent: { number: $parent.number, title: $parent.title },\n        dependsOn: [ .blockedBy.nodes[] | { id: (.number | tostring), done: (.state == \"CLOSED\") } ],\n        done: (.state == \"CLOSED\" or any($labels[]; IN($done[]))) } ]'"
+				},
+				"as": "item",
+				"branch": "shared",
+				"haltOn": ["halt"]
+			}
 		},
 		{
 			"id": "summary",

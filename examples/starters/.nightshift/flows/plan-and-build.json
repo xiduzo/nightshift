@@ -1,5 +1,5 @@
 {
-	"version": 3,
+	"version": 4,
 	"description": "A planner splits a goal into tasks, each task is built and checked on its own branch of a stack, and a reviewer reads the result.",
 	"inputs": [
 		{
@@ -122,17 +122,19 @@
 				"x": 320,
 				"y": 0
 			},
-			"type": "foreach",
-			"source": {
-				"kind": "json",
-				"value": "{{planner.data.tasks}}"
-			},
+			"type": "call",
 			"flow": "build-task",
-			"as": "item",
 			"inputs": {
 				"check": "{{check}}"
 			},
-			"branch": "per-item"
+			"each": {
+				"source": {
+					"kind": "json",
+					"value": "{{planner.data.tasks}}"
+				},
+				"as": "item",
+				"branch": "per-item"
+			}
 		},
 		{
 			"id": "review",

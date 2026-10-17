@@ -1,5 +1,5 @@
 {
-	"version": 3,
+	"version": 4,
 	"description": "One agent applies an instruction to one file. The body of per-file.",
 	"inputs": [
 		{

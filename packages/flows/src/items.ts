@@ -45,7 +45,7 @@ function findCycle(left: readonly ListItem[]): string[] {
 	return path;
 }
 
-/** How the engine sees one item during a For Each visit. */
+/** How the engine sees one item during a visit of a Call node with `each`. */
 export type ItemState = "done" | "failed" | "blocked" | "halted" | "running";
 
 export type NextItem =
