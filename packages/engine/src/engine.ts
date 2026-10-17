@@ -772,7 +772,12 @@ export function createEngine(
 			const nodes = all.flatMap((f) => f.nodes);
 			const unknownConnections = missingNames(
 				nodes,
-				(node) => node.connections ?? [],
+				(node) =>
+					node.type === "agent"
+						? (node.connections ?? [])
+						: node.type === "tool"
+							? [node.connection]
+							: [],
 				options.connectionNames?.() ?? new Set(),
 			);
 			if (unknownConnections.length > 0) {
@@ -787,7 +792,7 @@ export function createEngine(
 			}
 			const unknownClis = missingNames(
 				nodes,
-				(node) => node.clis ?? [],
+				(node) => (node.type === "agent" ? (node.clis ?? []) : []),
 				options.cliNames?.() ?? new Set(),
 			);
 			if (unknownClis.length > 0) {
@@ -1405,12 +1410,11 @@ function missingHarnesses(
  */
 function missingNames(
 	nodes: readonly FlowNode[],
-	listed: (node: AgentNode) => readonly string[],
+	listed: (node: FlowNode) => readonly string[],
 	names: ReadonlySet<string>,
 ): { name: string; nodeIds: string[] }[] {
 	const missing = new Map<string, string[]>();
 	for (const node of nodes) {
-		if (node.type !== "agent") continue;
 		for (const name of listed(node)) {
 			if (names.has(name)) continue;
 			const ids = missing.get(name) ?? [];

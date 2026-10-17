@@ -60,14 +60,19 @@ function transportFor(config: McpServerConfig) {
 }
 
 /**
- * Runs `work` against a connected client, within `timeoutMs` for the
- * connect and for every request, and closes the client after. An aborted
- * `signal` rejects with its reason and closes the client too.
+ * Runs `work` against a connected client and closes the client after.
+ * `timeoutMs` bounds the connect and, unless `timeout` is `"connect"`, the
+ * work too (a Tool node bounds its call with its own signal instead). An
+ * aborted `signal` rejects with its reason and closes the client too.
  */
 export async function withMcpClient<T>(
 	config: McpServerConfig,
 	work: (client: Client) => Promise<T>,
-	options: { timeoutMs?: number; signal?: AbortSignal } = {},
+	options: {
+		timeoutMs?: number;
+		signal?: AbortSignal;
+		timeout?: "connect" | "all";
+	} = {},
 ): Promise<T> {
 	const timeoutMs = options.timeoutMs ?? MCP_TIMEOUT_MS;
 	const client = new Client({ name: "nightshift", version: "1.0.0" });
@@ -97,6 +102,7 @@ export async function withMcpClient<T>(
 	stop.catch(() => {});
 	try {
 		await Promise.race([client.connect(transport), stop]);
+		if (options.timeout === "connect") clearTimeout(timer);
 		return await Promise.race([work(client), stop]);
 	} finally {
 		clearTimeout(timer);

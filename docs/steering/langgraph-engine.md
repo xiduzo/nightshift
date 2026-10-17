@@ -58,6 +58,11 @@ packages/engine/src/
                            model.ts (the decider).
   graph/nodes/subflow.ts
   graph/nodes/foreach.ts
+  graph/nodes/tool.ts      tool node: one tools/call on a Connection's MCP
+                           server through @nightshift/agents/mcp, the
+                           Connection resolved by mcpServersFor as for an
+                           Agent node. No wait node: a transport failure
+                           is `fail`.
   graph/nodes/body.ts      What Subflow and For Each share: bodyGraph,
                            runBody (a called flow as a subgraph of the node)
                            and BodyEnd (how the body ended).

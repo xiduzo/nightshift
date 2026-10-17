@@ -8,6 +8,7 @@ import { commandNode } from "./nodes/command";
 import { decisionNode } from "./nodes/decision";
 import { forEachNode } from "./nodes/foreach";
 import { subflowNode } from "./nodes/subflow";
+import { toolNode } from "./nodes/tool";
 import { askNodeId, parkNode, parkNodeId, waitNodeId } from "./route";
 import { RunState } from "./state";
 import { waitNode } from "./wait";
@@ -73,6 +74,9 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 				break;
 			case "foreach":
 				action = forEachNode(node, ctx);
+				break;
+			case "tool":
+				action = toolNode(node, ctx);
 				break;
 		}
 		graph.addNode(node.id, action, { ends: [...ends, ...own] });

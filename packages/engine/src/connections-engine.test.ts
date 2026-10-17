@@ -7,6 +7,7 @@ import type {
 	Flow,
 	FlowEdge,
 	Policy,
+	ToolNode,
 } from "@nightshift/flows";
 
 import { createEngine, type EngineInternals } from "./engine";
@@ -129,6 +130,34 @@ describe("connections at the start", () => {
 		);
 		expect(await engine.listRuns()).toEqual([]);
 		expect(harness.calls).toHaveLength(0);
+	});
+
+	test("a Tool node that names a connection the daemon does not have refuses to start too", async () => {
+		const engine = makeEngine(fakeHarness(), {
+			connectionNames: () => new Set(["tracker"]),
+			mcpServersFor: async () => ({ ok: true, servers: {} }),
+		});
+		const file: ToolNode = {
+			id: "file",
+			type: "tool",
+			position: { x: 0, y: 0 },
+			connection: "ghost",
+			tool: "create_issue",
+			arguments: {},
+		};
+		await expect(
+			engine.startRun({
+				projectId: await projectId(engine),
+				flow: {
+					...flowOf([agent("planner", { connections: ["tracker"] })]),
+					nodes: [agent("planner", { connections: ["tracker"] }), file],
+					edges: [{ id: "e1", from: "planner", outcome: "pass", to: "file" }],
+				},
+			}),
+		).rejects.toThrow(
+			'The flow uses the connection "ghost" (file), but no connection has that name. Add it under Agents → Tools.',
+		);
+		expect(await engine.listRuns()).toEqual([]);
 	});
 
 	test("without connection names, any connection is unknown", async () => {
