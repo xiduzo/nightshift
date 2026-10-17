@@ -3,6 +3,7 @@ import {
 	BotIcon,
 	HandIcon,
 	type LucideIcon,
+	PlugIcon,
 	RepeatIcon,
 	SparklesIcon,
 	SplitIcon,
@@ -40,6 +41,11 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		label: "For Each",
 		icon: RepeatIcon,
 		blurb: "Runs a flow once for each item in a list.",
+	},
+	tool: {
+		label: "Tool",
+		icon: PlugIcon,
+		blurb: "Calls one tool of a connection.",
 	},
 };
 

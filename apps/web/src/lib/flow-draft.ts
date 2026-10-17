@@ -22,6 +22,7 @@ import {
 	type Policy,
 	runFields,
 	type SubflowNode,
+	type ToolNode,
 	validateFlow,
 } from "@nightshift/flows";
 
@@ -146,6 +147,18 @@ export function forEachNode(id: string, position: Position): ForEachNode {
 		inputs: {},
 		branch: "per-item",
 		haltOn: ["halt"],
+	};
+}
+
+/** The connection and the tool start empty; the issues panel asks for them. */
+export function toolNode(id: string, position: Position): ToolNode {
+	return {
+		id,
+		type: "tool",
+		position,
+		connection: "",
+		tool: "",
+		arguments: {},
 	};
 }
 
@@ -347,6 +360,7 @@ const NEW_NODE: Record<
 	gate: { id: "ask", create: gateNode },
 	subflow: { id: "call", create: subflowNode },
 	foreach: { id: "each", create: forEachNode },
+	tool: { id: "tool", create: toolNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */
@@ -441,6 +455,8 @@ function rewriteTemplates(
 				source: rewriteSource(node.source, rewrite),
 				inputs: rewriteBindings(node.inputs, rewrite),
 			};
+		case "tool":
+			return { ...node, arguments: rewriteBindings(node.arguments, rewrite) };
 	}
 }
 
@@ -688,13 +704,18 @@ export function setAgentConnections(
 	);
 }
 
-/** The connections an Agent node names that the daemon does not have. */
+/** The connections an Agent or Tool node names that the daemon does not have. */
 export function missingConnections(
 	node: FlowNode,
 	known: readonly string[],
 ): string[] {
-	if (node.type !== "agent") return [];
-	return (node.connections ?? []).filter((name) => !known.includes(name));
+	const named =
+		node.type === "agent"
+			? (node.connections ?? [])
+			: node.type === "tool" && node.connection !== ""
+				? [node.connection]
+				: [];
+	return named.filter((name) => !known.includes(name));
 }
 
 /** What the editor says about a connection the daemon does not have. */
@@ -918,6 +939,8 @@ const FIELD_MESSAGES: Record<string, string> = {
 	"source.command": "The source command is empty.",
 	"source.glob": "The glob is empty.",
 	maxItems: "Max items must be a whole number above 0.",
+	connection: "Pick a connection.",
+	tool: "Pick a tool.",
 };
 
 const POLICY_MESSAGES: Record<string, string> = {

@@ -86,6 +86,7 @@ import { OptionsEditor } from "./options-editor";
 import { OutputSchemaField } from "./output-schema-field";
 
 import { TemplateField } from "./template-field";
+import { ToolFields } from "./tool-fields";
 
 /**
  * The node without one of its optional fields: it comes from the default
@@ -153,7 +154,7 @@ export function NodeInspector({
 }: {
 	flow: Flow;
 	node: FlowNode;
-	/** The daemon's connections, for an Agent node; undefined while they load. */
+	/** The daemon's connections, for an Agent or Tool node; undefined while they load. */
 	connections?: readonly DaemonConnection[];
 	/** Subflow and For Each nodes: the project's flows and the actions on them. */
 	calledFlows: CalledFlowSupport;
@@ -305,6 +306,19 @@ export function NodeInspector({
 					onChange={(change) =>
 						onChange((current) =>
 							current.type === "foreach" ? change(current) : current,
+						)
+					}
+				/>
+			) : null}
+
+			{node.type === "tool" ? (
+				<ToolFields
+					flow={flow}
+					node={node}
+					connections={connections}
+					onChange={(change) =>
+						onChange((current) =>
+							current.type === "tool" ? change(current) : current,
 						)
 					}
 				/>

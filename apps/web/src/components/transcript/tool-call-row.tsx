@@ -16,9 +16,11 @@ import {
 	FileTextIcon,
 	GlobeIcon,
 	type LucideIcon,
+	PlugIcon,
 	SearchIcon,
 	SquareTerminalIcon,
 	WrenchIcon,
+	XIcon,
 } from "lucide-react";
 import { memo, useState } from "react";
 
@@ -69,7 +71,8 @@ export const ToolCallRow = memo(function ToolCallRow({
 }) {
 	const summary = item.hasInput ? summarizeToolInput(item.input) : "";
 	const inProgress = running && item.result === undefined;
-	const Icon = toolIcon(item.name);
+	// A Tool node's call shows its connection; an agent's tool call, the tool.
+	const Icon = item.connection !== undefined ? PlugIcon : toolIcon(item.name);
 	const command = item.hasInput ? commandOf(item.input) : null;
 
 	return (
@@ -90,7 +93,16 @@ export const ToolCallRow = memo(function ToolCallRow({
 							<Icon className="size-3.5" />
 						</TraceIcon>
 						<TraceTitle className="shrink-0 font-medium font-mono text-foreground">
-							{item.name}
+							{item.connection ? (
+								<>
+									<span className="font-normal text-muted-foreground">
+										{item.connection} ›{" "}
+									</span>
+									{item.name}
+								</>
+							) : (
+								item.name
+							)}
 						</TraceTitle>
 						<TraceDescription className="min-w-0 shrink truncate font-mono">
 							{truncate(summary.replace(/\s+/g, " "), 200)}
@@ -99,6 +111,11 @@ export const ToolCallRow = memo(function ToolCallRow({
 							<Spinner
 								className="size-3.5 text-status-running"
 								aria-label="In progress"
+							/>
+						) : item.failed ? (
+							<XIcon
+								className="size-3.5 shrink-0 text-destructive"
+								aria-label="Failed"
 							/>
 						) : item.result !== undefined ? (
 							<CheckIcon

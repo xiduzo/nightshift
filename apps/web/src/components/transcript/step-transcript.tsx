@@ -253,6 +253,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	decision: "Deciding…",
 	subflow: "The called flow is running…",
 	foreach: "Working through the items…",
+	tool: "Calling the tool…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({

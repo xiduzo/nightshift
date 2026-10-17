@@ -7,6 +7,7 @@ import {
 	type ListSource,
 	nodeOutcomes,
 	type SubflowNode,
+	type ToolNode,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -27,6 +28,7 @@ import {
 	FilesIcon,
 	GitBranchIcon,
 	PlayIcon,
+	PlugIcon,
 	SquareTerminalIcon,
 	TriangleAlertIcon,
 	WorkflowIcon,
@@ -80,6 +82,12 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 		return new Map([
 			["pass", "It finished"],
 			["fail", "It failed"],
+		]);
+	}
+	if (node.type === "tool") {
+		return new Map([
+			["pass", "The tool answered"],
+			["fail", "It reported an error"],
 		]);
 	}
 	const options =
@@ -230,6 +238,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 					{node.type === "decision" ? <DecisionBody node={node} /> : null}
 					{node.type === "subflow" ? <SubflowBody node={node} /> : null}
 					{node.type === "foreach" ? <ForEachBody node={node} /> : null}
+					{node.type === "tool" ? <ToolBody node={node} /> : null}
 					{node.type === "command" ? (
 						<code className="block truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px]">
 							{node.command.trim() === "" ? (
@@ -529,10 +538,47 @@ function ForEachBody({ node }: { node: ForEachNode }) {
 	);
 }
 
+/** Which connection it calls, which tool, and how many arguments it fills. */
+function ToolBody({ node }: { node: ToolNode }) {
+	const count = Object.keys(node.arguments).length;
+	return (
+		<>
+			<span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+				<PlugIcon className="size-3 shrink-0" aria-hidden="true" />
+				{node.connection === "" ? (
+					<span className="italic">no connection picked yet</span>
+				) : (
+					<span className="min-w-0 truncate font-mono text-foreground">
+						{node.connection}
+					</span>
+				)}
+			</span>
+			<p
+				className={cn(
+					"truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px]",
+					node.tool === "" && "font-sans text-muted-foreground italic",
+				)}
+				title={node.tool}
+			>
+				{node.tool === "" ? "No tool picked yet" : node.tool}
+			</p>
+			{count > 0 ? (
+				<span className="truncate text-[11px] text-muted-foreground tabular-nums">
+					{count} {count === 1 ? "argument" : "arguments"}:{" "}
+					<span className="font-mono">
+						{Object.keys(node.arguments).join(", ")}
+					</span>
+				</span>
+			) : null}
+		</>
+	);
+}
+
 export const nodeTypes: NodeTypes = {
 	agent: FlowNodeCard,
 	command: FlowNodeCard,
 	decision: FlowNodeCard,
 	subflow: FlowNodeCard,
 	foreach: FlowNodeCard,
+	tool: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;
