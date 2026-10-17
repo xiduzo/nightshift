@@ -15,7 +15,7 @@ export type ProjectFlows = {
 
 /**
  * Every flow file of a project, loaded through `flows.get` and cached per
- * file, for checking For Each body references and for the body flow picker.
+ * file, for checking the flows Call nodes name and for the called flow picker.
  * `except` skips one name, usually the flow open in the editor: its draft is
  * newer than the file. `flows` stays undefined until every file has loaded.
  */

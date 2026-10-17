@@ -1,12 +1,13 @@
 import {
 	type AgentNode,
+	type CallEachNode,
+	type CallNode,
 	type DecisionNode,
 	type FlowNode,
 	type FlowNodeType,
-	type ForEachNode,
 	type ListSource,
 	nodeOutcomes,
-	type SubflowNode,
+	runsEach,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -43,7 +44,7 @@ import {
 import { agentSummary, firstLine, sourceSummary } from "@/lib/flow-draft";
 import { harnessInfo } from "@/lib/harnesses";
 
-import { DECIDED_BY_ICON, NODE_TYPE } from "./node-type";
+import { CALL_EACH_ICON, DECIDED_BY_ICON, NODE_TYPE } from "./node-type";
 import { OpenFlowContext } from "./open-flow-context";
 
 export type NodeRunState = {
@@ -65,18 +66,18 @@ export type FlowCanvasNode = Node<FlowNodeData, FlowNodeType>;
 
 /** The descriptions of a node's options, by name, to show beside their handles. */
 function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
-	if (node.type === "foreach") {
+	if (runsEach(node)) {
 		return new Map([
 			["done", "No item left to start"],
 			[
 				"halted",
-				node.haltOn.length > 0
-					? `A call ended on ${node.haltOn.join(", ")}`
+				node.each.haltOn.length > 0
+					? `A call ended on ${node.each.haltOn.join(", ")}`
 					: undefined,
 			],
 		]);
 	}
-	if (node.type === "subflow") {
+	if (node.type === "call") {
 		return new Map([
 			["pass", "It finished"],
 			["fail", "It failed"],
@@ -116,7 +117,12 @@ const FlowNodeCard = memo(function FlowNodeCard({
 }: NodeProps<FlowCanvasNode>) {
 	const { node, isStart, errorCount, warningCount, run } = data;
 	const meta = NODE_TYPE[node.type];
-	const Icon = node.type === "decision" ? DECIDED_BY_ICON[node.by] : meta.icon;
+	const Icon =
+		node.type === "decision"
+			? DECIDED_BY_ICON[node.by]
+			: runsEach(node)
+				? CALL_EACH_ICON
+				: meta.icon;
 	const runColor = run ? stepStateStyle(run.state).color : undefined;
 	const active = run?.state === "running";
 	const waiting = run?.state === "waiting";
@@ -228,8 +234,13 @@ const FlowNodeCard = memo(function FlowNodeCard({
 				<div className="flex min-w-0 flex-col gap-1.5 border-t px-3 py-2">
 					{node.type === "agent" ? <AgentBody node={node} /> : null}
 					{node.type === "decision" ? <DecisionBody node={node} /> : null}
-					{node.type === "subflow" ? <SubflowBody node={node} /> : null}
-					{node.type === "foreach" ? <ForEachBody node={node} /> : null}
+					{node.type === "call" ? (
+						runsEach(node) ? (
+							<EachBody node={node} />
+						) : (
+							<CallBody node={node} />
+						)
+					) : null}
 					{node.type === "command" ? (
 						<code className="block truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px]">
 							{node.command.trim() === "" ? (
@@ -462,8 +473,8 @@ function Bindings({ bindings }: { bindings: Record<string, string> }) {
 	);
 }
 
-/** Which flow it calls, and the inputs it binds. */
-function SubflowBody({ node }: { node: SubflowNode }) {
+/** A Call that runs once: which flow it calls, and the inputs it binds. */
+function CallBody({ node }: { node: CallNode }) {
 	return (
 		<>
 			<CalledFlowName name={node.flow} prefix="Runs" />
@@ -484,10 +495,11 @@ const SOURCE_EMPTY: Record<ListSource["kind"], string> = {
 	files: "No file pattern yet",
 };
 
-/** Where the elements come from, which flow runs per element, and on which branch. */
-function ForEachBody({ node }: { node: ForEachNode }) {
-	const summary = sourceSummary(node.source);
-	const SourceIcon = SOURCE_ICON[node.source.kind];
+/** A Call that runs once per item: where the items come from, which flow runs per item, and on which branch. */
+function EachBody({ node }: { node: CallEachNode }) {
+	const { each } = node;
+	const summary = sourceSummary(each.source);
+	const SourceIcon = SOURCE_ICON[each.source.kind];
 	return (
 		<>
 			<p
@@ -496,15 +508,15 @@ function ForEachBody({ node }: { node: ForEachNode }) {
 			>
 				<SourceIcon
 					className="size-3 shrink-0 text-muted-foreground"
-					aria-label={`From ${node.source.kind}`}
+					aria-label={`From ${each.source.kind}`}
 				/>
 				{summary === "" ? (
 					<span className="font-sans text-muted-foreground italic">
-						{SOURCE_EMPTY[node.source.kind]}
+						{SOURCE_EMPTY[each.source.kind]}
 					</span>
 				) : (
 					<span className="truncate">
-						{node.source.kind === "command" ? (
+						{each.source.kind === "command" ? (
 							<span className="text-muted-foreground" aria-hidden="true">
 								${" "}
 							</span>
@@ -515,15 +527,15 @@ function ForEachBody({ node }: { node: ForEachNode }) {
 			</p>
 			<CalledFlowName name={node.flow} prefix="Each runs" />
 			<span className="truncate font-mono text-[11px] text-muted-foreground">
-				as {node.as}
+				as {each.as}
 				{Object.keys(node.inputs).length > 0
 					? ` · binds ${Object.keys(node.inputs).join(", ")}`
 					: ""}
 			</span>
 			<span className="flex min-w-0 items-center gap-1 truncate text-[11px] text-muted-foreground">
 				<GitBranchIcon className="size-3 shrink-0" aria-hidden="true" />
-				{node.branch === "per-item" ? "Branch per item" : "One shared branch"}
-				{node.maxItems ? ` · max ${node.maxItems}` : ""}
+				{each.branch === "per-item" ? "Branch per item" : "One shared branch"}
+				{each.maxItems ? ` · max ${each.maxItems}` : ""}
 			</span>
 		</>
 	);
@@ -533,6 +545,5 @@ export const nodeTypes: NodeTypes = {
 	agent: FlowNodeCard,
 	command: FlowNodeCard,
 	decision: FlowNodeCard,
-	subflow: FlowNodeCard,
-	foreach: FlowNodeCard,
+	call: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;

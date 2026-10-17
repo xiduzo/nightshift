@@ -68,14 +68,7 @@ type SelectionSetter = (
 	selection: Selection | ((current: Selection) => Selection),
 ) => void;
 
-const PALETTE: NodeKind[] = [
-	"agent",
-	"command",
-	"decision",
-	"gate",
-	"subflow",
-	"foreach",
-];
+const PALETTE: NodeKind[] = ["agent", "command", "decision", "gate", "call"];
 
 /** Below the node a new one lands on, so repeated adds do not stack exactly. */
 const ADD_OFFSET = 32;

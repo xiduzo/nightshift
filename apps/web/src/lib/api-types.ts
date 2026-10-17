@@ -19,7 +19,7 @@ export type RunSummary = Outputs["runs"]["list"][number];
 export type RunDetail = Outputs["runs"]["get"];
 export type StepSummary = RunDetail["steps"][number];
 export type SessionSummary = StepSummary["sessions"][number];
-/** One item of a For Each visit. */
+/** One item of a Call step's visit (`each`). */
 export type ItemSummary = StepSummary["items"][number];
 export type ItemState = ItemSummary["state"];
 export type StepScope = NonNullable<StepSummary["scope"]>;
@@ -57,14 +57,14 @@ export type GateEvent = Extract<
 	StepEvent,
 	{ type: "gate-open" | "gate-resolved" }
 >;
-export type ForEachEvent = Extract<
+export type ItemEvent = Extract<
 	StepEvent,
 	{ type: "items-read" | "item-start" | "item-end" }
 >;
 export type WaitEvent = Extract<StepEvent, { type: "wait" | "wake" }>;
 export type AgentEvent = Exclude<
 	StepEvent,
-	CommandEvent | DecisionEvent | GateEvent | ForEachEvent | WaitEvent
+	CommandEvent | DecisionEvent | GateEvent | ItemEvent | WaitEvent
 >;
 
 /** A Gate that waits for a person: the Needs-you inbox. */

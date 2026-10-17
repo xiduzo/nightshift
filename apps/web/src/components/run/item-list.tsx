@@ -30,7 +30,7 @@ import { type ItemScope, itemsOf, scopeKey } from "@/lib/run-steps";
 import { JsonDetails } from "./json-block";
 
 /**
- * The elements of one For Each step, in the order they started: state, id
+ * The elements of one Call step with `each`, in the order they started: state, id
  * and title (linked when the element has a `url`), its branch and base, how
  * long it took, why it failed, is blocked, or halted, and the element itself
  * as JSON. Focusing one narrows the steps and the graph to it.
@@ -59,7 +59,7 @@ export function ItemList({
 				<EmptyHeader>
 					<EmptyTitle className="text-sm">No items yet</EmptyTitle>
 					<EmptyDescription className="text-xs">
-						They show here once the For Each starts them.
+						They show here once the call starts them.
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>

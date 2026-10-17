@@ -1,7 +1,7 @@
 import { githubSubIssuesCommand } from "@nightshift/flows";
 
 /**
- * A recipe fills the source command of a For Each node: a command on a
+ * A recipe fills the source command of a Call node that runs once per item: a command on a
  * tracker's CLI, or on a file, that prints the list as JSON. The person
  * edits it from there. Each item carries `id`, `title`, and when the
  * source knows them, `url`, `dependsOn` and `done`.

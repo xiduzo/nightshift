@@ -19,7 +19,7 @@ const RESERVED: readonly string[] = reservedOutcomes;
  * is an outcome with its own handle. A name commits on blur or Enter, so the
  * edges on it follow one rename and not every keystroke. With `onRule`, each
  * row also takes the rule (`when`) that picks it. Without `onDescribe` and
- * `onMove` it edits a plain list of names, for example a For Each's halt-on
+ * `onMove` it edits a plain list of names, for example a Call's halt-on
  * labels.
  */
 export function OptionsEditor({

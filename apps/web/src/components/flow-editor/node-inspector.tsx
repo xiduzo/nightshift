@@ -1,5 +1,6 @@
 import {
 	type AgentNode,
+	type CallEach,
 	type CommandNode,
 	type DecisionNode,
 	type Flow,
@@ -7,7 +8,6 @@ import {
 	nodeIdSchema,
 	nodeOutcomes,
 	type Outcome,
-	type SubflowNode,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -50,7 +50,6 @@ import {
 } from "@/lib/agent-options";
 import type { Effort, PermissionMode } from "@/lib/api-types";
 import {
-	calledFlow,
 	type NodeOption,
 	nodeOptions,
 	type OptionNode,
@@ -65,11 +64,8 @@ import {
 	switchHarness,
 } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
-import {
-	CalledFlowField,
-	type CalledFlowSupport,
-	InputBindings,
-} from "./called-flow-fields";
+import { CallFields } from "./call-fields";
+import type { CalledFlowSupport } from "./called-flow-fields";
 import { CliToolsField } from "./cli-tools-field";
 import { ConnectionsField, type DaemonConnection } from "./connections-field";
 import { OutcomePill } from "./edge-inspector";
@@ -80,7 +76,6 @@ import {
 	Note,
 	PositiveIntInput,
 } from "./fields";
-import { ForEachFields } from "./foreach-fields";
 import { McpServersField } from "./mcp-servers-field";
 import { OptionsEditor } from "./options-editor";
 import { OutputSchemaField } from "./output-schema-field";
@@ -145,6 +140,7 @@ export function NodeInspector({
 	onRenameOutcome,
 	onRemoveOutcome,
 	onSetAgentOutcomes,
+	onSetCallEach,
 	onSetStart,
 	onDelete,
 	calledFlows,
@@ -155,7 +151,7 @@ export function NodeInspector({
 	node: FlowNode;
 	/** The daemon's connections, for an Agent node; undefined while they load. */
 	connections?: readonly DaemonConnection[];
-	/** Subflow and For Each nodes: the project's flows and the actions on them. */
+	/** Call nodes: the project's flows and the actions on them. */
 	calledFlows: CalledFlowSupport;
 	/** The node's outgoing edges. Without it the inspector does not list them. */
 	edges?: NodeEdgeSupport;
@@ -168,6 +164,8 @@ export function NodeInspector({
 	onRemoveOutcome: (index: number) => void;
 	/** Gives an Agent node its own outcomes, or back the standard ones; drops edges that no longer fit. */
 	onSetAgentOutcomes: (outcomes: NodeOption[] | undefined) => void;
+	/** Makes a Call node run once per item (`each`) or once; drops edges that no longer fit. */
+	onSetCallEach: (each: CallEach | undefined) => void;
 	onSetStart: () => void;
 	onDelete: () => void;
 }) {
@@ -284,29 +282,17 @@ export function NodeInspector({
 				/>
 			) : null}
 
-			{node.type === "subflow" ? (
-				<SubflowFields
+			{node.type === "call" ? (
+				<CallFields
 					flow={flow}
 					node={node}
 					support={calledFlows}
 					onChange={(change) =>
 						onChange((current) =>
-							current.type === "subflow" ? change(current) : current,
+							current.type === "call" ? change(current) : current,
 						)
 					}
-				/>
-			) : null}
-
-			{node.type === "foreach" ? (
-				<ForEachFields
-					flow={flow}
-					node={node}
-					support={calledFlows}
-					onChange={(change) =>
-						onChange((current) =>
-							current.type === "foreach" ? change(current) : current,
-						)
-					}
+					onSetEach={onSetCallEach}
 				/>
 			) : null}
 
@@ -1054,6 +1040,12 @@ function AgentAdvanced({
 	);
 }
 
+/** What a Command node keeps of its output, in the order the toggle shows them. */
+const COMMAND_OUTPUTS: { value: CommandNode["output"]; label: string }[] = [
+	{ value: "text", label: "Text" },
+	{ value: "json", label: "JSON" },
+];
+
 function CommandFields({
 	node,
 	onChange,
@@ -1082,6 +1074,48 @@ function CommandFields({
 						onChange((current) => ({ ...current, command }));
 					}}
 				/>
+			</Field>
+			<Field
+				id={`${id}-output`}
+				label="Output"
+				hint={
+					node.output === "json" ? (
+						<>
+							The command prints JSON. Later nodes read it as{" "}
+							<code className="font-mono">{`{{${node.id}.data.tests}}`}</code>.
+							Output that is not JSON fails the step.
+						</>
+					) : (
+						<>
+							Later nodes read the last lines as{" "}
+							<code className="font-mono">{`{{${node.id}.log_tail}}`}</code>.
+						</>
+					)
+				}
+			>
+				<ToggleGroup
+					variant="outline"
+					size="sm"
+					spacing={0}
+					aria-label="Output"
+					aria-describedby={`${id}-output-hint`}
+					className="w-full"
+					value={[node.output]}
+					onValueChange={(value) => {
+						const output = value[0] as CommandNode["output"] | undefined;
+						if (output) onChange((current) => ({ ...current, output }));
+					}}
+				>
+					{COMMAND_OUTPUTS.map((entry) => (
+						<ToggleGroupItem
+							key={entry.value}
+							value={entry.value}
+							className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+						>
+							{entry.label}
+						</ToggleGroupItem>
+					))}
+				</ToggleGroup>
 			</Field>
 		</InspectorSection>
 	);
@@ -1475,56 +1509,5 @@ function AgentOutcomesField({
 			</Button>
 			{note}
 		</NodeOptionsField>
-	);
-}
-
-/** The flow a Subflow node calls once, and its inputs bound by templates. */
-function SubflowFields({
-	flow,
-	node,
-	support,
-	onChange,
-}: {
-	flow: Flow;
-	node: SubflowNode;
-	support: CalledFlowSupport;
-	onChange: (change: (node: SubflowNode) => SubflowNode) => void;
-}) {
-	const id = useId();
-	const called = calledFlow(node, support.flows);
-	const outputs = called?.outputs ?? [];
-	return (
-		<InspectorSection title="Called flow">
-			<CalledFlowField
-				id={`${id}-flow`}
-				node={node}
-				support={support}
-				hint="Runs once. This node passes when the called flow finishes, and fails when it does not."
-				onPick={(name) => onChange((current) => ({ ...current, flow: name }))}
-			/>
-			<InputBindings
-				flow={flow}
-				node={node}
-				called={called}
-				onChange={(inputs) => onChange((current) => ({ ...current, inputs }))}
-			/>
-			<Note>
-				Later nodes read <code>{`{{${node.id}.ended}}`}</code> (the outcome the
-				called flow ended on)
-				{outputs.length > 0 ? (
-					<>
-						{" "}
-						and its outputs:{" "}
-						{outputs.map((output, index) => (
-							<span key={output.name}>
-								{index > 0 ? ", " : null}
-								<code>{`{{${node.id}.${output.name}}}`}</code>
-							</span>
-						))}
-					</>
-				) : null}
-				.
-			</Note>
-		</InspectorSection>
 	);
 }

@@ -251,8 +251,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	agent: "The agent is working…",
 	command: "The command is running…",
 	decision: "Deciding…",
-	subflow: "The called flow is running…",
-	foreach: "Working through the items…",
+	call: "The called flow is running…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({

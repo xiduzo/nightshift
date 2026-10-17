@@ -7,17 +7,16 @@ import { CircleXIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { RunDetail, StepSummary as Step } from "@/lib/api-types";
-import type { ItemScope } from "@/lib/run-steps";
-
+import { type ItemScope, stepRunsEach } from "@/lib/run-steps";
+import { CallDetail } from "./call-detail";
 import { ItemList } from "./item-list";
 import { CodeView } from "./json-block";
 import { stepProse } from "./step-header";
-import { SubflowDetail } from "./subflow-detail";
 
 /**
  * What a step did, without the transcript: why it failed, what it said it
- * did, its command's last output, the elements of a For Each, or the flow a
- * Subflow called.
+ * did, its command's last output, the elements a Call step ran, or the flow
+ * it called.
  */
 export function StepSummary({
 	run,
@@ -42,12 +41,8 @@ export function StepSummary({
 			? step.outputs.log_tail.trim()
 			: "";
 	const exitCode = step.outputs.exit_code;
-	const hasBody =
-		step.error ||
-		prose ||
-		logTail ||
-		step.nodeType === "foreach" ||
-		step.nodeType === "subflow";
+	const each = stepRunsEach(run, steps, step);
+	const hasBody = step.error || prose || logTail || step.nodeType === "call";
 
 	return (
 		<div className="flex min-w-0 flex-col gap-4">
@@ -79,7 +74,7 @@ export function StepSummary({
 					}
 				/>
 			) : null}
-			{step.nodeType === "foreach" ? (
+			{step.nodeType === "call" && each ? (
 				<div className="overflow-hidden rounded-lg border">
 					<ItemList
 						step={step}
@@ -89,9 +84,9 @@ export function StepSummary({
 					/>
 				</div>
 			) : null}
-			{step.nodeType === "subflow" ? (
+			{step.nodeType === "call" && !each ? (
 				<div className="overflow-hidden rounded-lg border">
-					<SubflowDetail
+					<CallDetail
 						run={run}
 						steps={steps}
 						step={step}

@@ -1,5 +1,7 @@
 import {
 	type AgentNode,
+	type CallEach,
+	type CallNode,
 	type CommandNode,
 	type DecidedBy,
 	type DecisionNode,
@@ -11,17 +13,14 @@ import {
 	type FlowNode,
 	type FlowNodeType,
 	type FlowOutputDef,
-	type ForEachNode,
 	flowSchema,
 	type ListSource,
 	nameSchema,
 	nodeOutcomes,
 	nodeOutputFields,
 	type Outcome,
-	outputFieldsByType,
 	type Policy,
 	runFields,
-	type SubflowNode,
 	validateFlow,
 } from "@nightshift/flows";
 
@@ -75,7 +74,7 @@ export function agentNode(
 
 /** The command starts empty; the issues panel asks for one. */
 export function commandNode(id: string, position: Position): CommandNode {
-	return { id, type: "command", position, command: "" };
+	return { id, type: "command", position, command: "", output: "text" };
 }
 
 /**
@@ -126,24 +125,20 @@ export function withDecidedBy(node: DecisionNode, by: DecidedBy): DecisionNode {
 	return { ...node, by, options };
 }
 
-/** The called flow starts empty; the issues panel asks for one. */
-export function subflowNode(id: string, position: Position): SubflowNode {
-	return { id, type: "subflow", position, flow: "", inputs: {} };
+/** Runs a flow once. The called flow starts empty; the issues panel asks for one. */
+export function callNode(id: string, position: Position): CallNode {
+	return { id, type: "call", position, flow: "", inputs: {} };
 }
 
 /**
- * A JSON list by default, often another node's output. The list and the
- * called flow start empty; the issues panel asks for them.
+ * What a Call node loops over when "once per item" is switched on: a JSON
+ * list by default, often another node's output. The list starts empty; the
+ * issues panel asks for it.
  */
-export function forEachNode(id: string, position: Position): ForEachNode {
+export function defaultEach(): CallEach {
 	return {
-		id,
-		type: "foreach",
-		position,
 		source: emptySource("json"),
-		flow: "",
 		as: "item",
-		inputs: {},
 		branch: "per-item",
 		haltOn: ["halt"],
 	};
@@ -297,8 +292,8 @@ export function newFlow(defaults?: NodeDefaults): Flow {
 }
 
 /**
- * A new flow for a For Each: one JSON input (named `as`) that takes the
- * element, and one Agent node that works on it.
+ * A new flow for a Call that runs once per item: one JSON input (named
+ * `as`) that takes the element, and one Agent node that works on it.
  */
 export function newElementFlow(as: string, defaults?: NodeDefaults): Flow {
 	return {
@@ -345,8 +340,7 @@ const NEW_NODE: Record<
 	command: { id: "check", create: commandNode },
 	decision: { id: "decide", create: decisionNode },
 	gate: { id: "ask", create: gateNode },
-	subflow: { id: "call", create: subflowNode },
-	foreach: { id: "each", create: forEachNode },
+	call: { id: "call", create: callNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */
@@ -433,13 +427,18 @@ function rewriteTemplates(
 			return { ...node, prompt: rewrite(node.prompt) };
 		case "command":
 			return { ...node, command: rewrite(node.command) };
-		case "subflow":
-			return { ...node, inputs: rewriteBindings(node.inputs, rewrite) };
-		case "foreach":
+		case "call":
 			return {
 				...node,
-				source: rewriteSource(node.source, rewrite),
 				inputs: rewriteBindings(node.inputs, rewrite),
+				...(node.each
+					? {
+							each: {
+								...node.each,
+								source: rewriteSource(node.each.source, rewrite),
+							},
+						}
+					: {}),
 			};
 	}
 }
@@ -665,6 +664,52 @@ export function restoreAgentOutcomes(
 }
 
 /**
+ * Makes a Call node run once per item (`each`, the defaults or what it had
+ * before) or once (no `each`). Its outcomes change with it (pass and fail,
+ * or done and halted), so edges on an outcome the node no longer has are
+ * dropped and returned, for an undo.
+ */
+export function setCallEach(
+	flow: Flow,
+	nodeId: string,
+	each: CallEach | undefined,
+): { flow: Flow; dropped: FlowEdge[]; previous: CallEach | undefined } {
+	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
+	if (node?.type !== "call") return { flow, dropped: [], previous: undefined };
+	const { each: previous, ...rest } = node;
+	const changed: CallNode = each ? { ...rest, each } : rest;
+	const kept = new Set(nodeOutcomes(changed));
+	const dropped = flow.edges.filter(
+		(edge) => edge.from === nodeId && !kept.has(edge.outcome),
+	);
+	const next = updateNode(flow, nodeId, () => changed);
+	return {
+		flow: {
+			...next,
+			edges: next.edges.filter((edge) => !dropped.includes(edge)),
+		},
+		dropped,
+		previous,
+	};
+}
+
+/** Undoes `setCallEach`. */
+export function restoreCallEach(
+	flow: Flow,
+	nodeId: string,
+	previous: CallEach | undefined,
+	dropped: FlowEdge[],
+): Flow {
+	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
+	if (node?.type !== "call") return flow;
+	const { each: _, ...rest } = node;
+	const next = updateNode(flow, nodeId, () =>
+		previous ? { ...rest, each: previous } : rest,
+	);
+	return restoreEdges(next, dropped);
+}
+
+/**
  * The Agent node naming these connections, in the order given and without
  * repeats. None left drops the field, so the file stays minimal.
  */
@@ -767,12 +812,12 @@ export type VariableGroup = {
 	variables: TemplateVariable[];
 };
 
-/** The flow a Subflow or For Each node calls, when it loads. */
+/** The flow a Call node calls, when it loads. */
 export function calledFlow(
 	node: FlowNode,
 	flows: ProjectFlowMap | undefined,
 ): Flow | null {
-	if (node.type !== "subflow" && node.type !== "foreach") return null;
+	if (node.type !== "call") return null;
 	if (node.flow === "" || !flows) return null;
 	return flows[node.flow] ?? null;
 }
@@ -802,7 +847,7 @@ function nodeVariables(
 	flows: ProjectFlowMap | undefined,
 ): TemplateVariable[] {
 	const called = calledFlow(node, flows);
-	const own: readonly string[] = outputFieldsByType[node.type];
+	const own: readonly string[] = nodeOutputFields(node);
 	const variables: TemplateVariable[] = nodeOutputFields(node, called).map(
 		(field) => {
 			const output = own.includes(field)
@@ -815,7 +860,7 @@ function nodeVariables(
 				json: JSON_FIELDS.includes(field) || output !== undefined,
 				description: output
 					? (output.description ??
-						`An output of ${node.type === "subflow" ? node.flow : "the called flow"}`)
+						`An output of ${node.type === "call" ? node.flow : "the called flow"}`)
 					: undefined,
 			};
 		},
@@ -836,7 +881,7 @@ function nodeVariables(
 /**
  * The `{{…}}` variables a node can use: the flow's inputs, other nodes'
  * outputs, and the run's fields. With `nodeId` null (the flow's outputs),
- * every node counts. `flows` adds the outputs of the flows that Subflow
+ * every node counts. `flows` adds the outputs of the flows that Call
  * nodes call.
  */
 export function templateVariables(
@@ -878,16 +923,14 @@ export function templateVariables(
 	];
 }
 
-/** The flows of the project that call `name` through a Subflow or For Each node. */
+/** The flows of the project that call `name` through a Call node. */
 export function callersOf(name: string, flows: ProjectFlowMap): string[] {
 	return Object.entries(flows)
 		.filter(
 			([caller, flow]) =>
 				caller !== name &&
 				(flow?.nodes ?? []).some(
-					(node) =>
-						(node.type === "subflow" || node.type === "foreach") &&
-						node.flow === name,
+					(node) => node.type === "call" && node.flow === name,
 				),
 		)
 		.map(([caller]) => caller)
@@ -913,11 +956,11 @@ const FIELD_MESSAGES: Record<string, string> = {
 	id: "Use lowercase letters, digits and _, starting with a letter.",
 	idleMinutes: "The idle timeout must be a whole number of minutes above 0.",
 	flow: "Pick a flow to run.",
-	as: "Pick the input that gets the item.",
-	"source.value": "Set the list: a template that gives a JSON array.",
-	"source.command": "The source command is empty.",
-	"source.glob": "The glob is empty.",
-	maxItems: "Max items must be a whole number above 0.",
+	"each.as": "Pick the input that gets the item.",
+	"each.source.value": "Set the list: a template that gives a JSON array.",
+	"each.source.command": "The source command is empty.",
+	"each.source.glob": "The glob is empty.",
+	"each.maxItems": "Max items must be a whole number above 0.",
 };
 
 const POLICY_MESSAGES: Record<string, string> = {
@@ -932,8 +975,8 @@ const POLICY_MESSAGES: Record<string, string> = {
 /**
  * Checks the draft: the schema first (what the API would refuse to save), then
  * `validateFlow` for meaning. Schema issues point at their node or edge.
- * `flows` holds the project's flow files by name, so Subflow and For Each
- * nodes can check the flows they call; leave it out while they load. `name`
+ * `flows` holds the project's flow files by name, so Call nodes can check
+ * the flows they call; leave it out while they load. `name`
  * is the draft's own file name: the draft stands in for that file, and a
  * flow that reaches itself is reported with the chain. `connections` and
  * `profiles` hold the names of the daemon's connections and Agent Profiles;
@@ -1063,17 +1106,17 @@ function bindingMessage(
 	return `The binding "${String(key)}" is not a valid input name.`;
 }
 
-/** A bad halt-on label: `haltOn.0` reads as `Halt-on label "Stop": …`. */
+/** A bad halt-on label: `each.haltOn.0` reads as `Halt-on label "Stop": …`. */
 function haltOnMessage(
 	flow: Flow,
 	index: PropertyKey | undefined,
 	rest: PropertyKey[],
 ): string | undefined {
-	const [list, at] = rest;
-	if (list !== "haltOn") return;
+	const [group, list, at] = rest;
+	if (group !== "each" || list !== "haltOn") return;
 	const node = typeof index === "number" ? flow.nodes[index] : undefined;
-	if (node?.type !== "foreach") return;
-	const name = node.haltOn[Number(at)] ?? "";
+	if (node?.type !== "call" || !node.each) return;
+	const name = node.each.haltOn[Number(at)] ?? "";
 	return name === ""
 		? "A halt-on label has no name."
 		: `Halt-on label "${name}": use lowercase letters, digits and -, starting with a letter.`;

@@ -1,9 +1,4 @@
-import {
-	type Flow,
-	type ForEachNode,
-	flowNameSchema,
-	type SubflowNode,
-} from "@nightshift/flows";
+import { type CallNode, type Flow, flowNameSchema } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Field,
@@ -37,7 +32,7 @@ import type { ProjectFlowMap } from "@/lib/flow-draft";
 
 import { TemplateField } from "./template-field";
 
-/** What a Subflow or For Each inspector needs from the editor around it. */
+/** What a Call node's inspector needs from the editor around it. */
 export type CalledFlowSupport = {
 	/** The name of the flow open in the editor. */
 	flowName: string;
@@ -50,7 +45,7 @@ export type CalledFlowSupport = {
 	creating: boolean;
 };
 
-/** Picks the flow a Subflow or For Each node calls, among all the project's flows, or creates one. */
+/** Picks the flow a Call node calls, among all the project's flows, or creates one. */
 export function CalledFlowField({
 	id,
 	node,
@@ -59,7 +54,7 @@ export function CalledFlowField({
 	onPick,
 }: {
 	id: string;
-	node: SubflowNode | ForEachNode;
+	node: CallNode;
 	support: CalledFlowSupport;
 	hint: string;
 	onPick: (name: string) => void;
@@ -235,8 +230,8 @@ function NewFlowForm({
 }
 
 /**
- * A template per input of the called flow. `skip` is the input a For Each
- * binds to the element. A binding to a name the flow does not take shows
+ * A template per input of the called flow. `skip` is the input a Call with
+ * `each` binds to the element. A binding to a name the flow does not take shows
  * with a way to drop it.
  */
 export function InputBindings({
@@ -247,7 +242,7 @@ export function InputBindings({
 	onChange,
 }: {
 	flow: Flow;
-	node: SubflowNode | ForEachNode;
+	node: CallNode;
 	/** The called flow, when it loads. */
 	called: Flow | null;
 	skip?: string;

@@ -4,7 +4,7 @@ import type { ProjectFlowMap } from "@/lib/flow-draft";
 
 /**
  * The project's flow files, by name, for the editor's fields: the flows a
- * Subflow or For Each node can call, their inputs and outputs. Undefined
+ * Call node can call, their inputs and outputs. Undefined
  * while they load. The flow open in the editor is left out: its draft is newer.
  */
 export const ProjectFlowsContext = createContext<ProjectFlowMap | undefined>(

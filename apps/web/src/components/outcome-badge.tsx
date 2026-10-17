@@ -156,8 +156,8 @@ export function outcomeStyle(outcome: Outcome): Omit<Style, "label"> {
 
 /**
  * What a step shows: its outcome, else running, or waiting for an open Gate.
- * In a sleeping run, the step that has not ended sleeps with it (a Subflow
- * or For Each step keeps running: one of the steps it called sleeps).
+ * In a sleeping run, the step that has not ended sleeps with it (a Call
+ * step keeps running: one of the steps it called sleeps).
  */
 export function stepState(
 	step: Pick<StepSummary, "outcome" | "nodeType" | "gate">,
@@ -165,11 +165,7 @@ export function stepState(
 ): StepState {
 	if (step.outcome !== null) return step.outcome;
 	if (step.gate !== null) return "waiting";
-	if (
-		runStatus === "sleeping" &&
-		step.nodeType !== "foreach" &&
-		step.nodeType !== "subflow"
-	) {
+	if (runStatus === "sleeping" && step.nodeType !== "call") {
 		return "sleeping";
 	}
 	return "running";
@@ -221,7 +217,7 @@ export function itemStateStyle(state: ItemState): Style {
 	return ITEM_STATES[state];
 }
 
-/** The state of one For Each item. */
+/** The state of one item of a Call step. */
 export function ItemStateBadge({
 	state,
 	className,

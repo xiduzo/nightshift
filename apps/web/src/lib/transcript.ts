@@ -15,7 +15,7 @@ import type {
  * boundary per session, its step report, and the events that end a session.
  * A command step gets its command line, one log, and its exit code. A
  * decision step gets what was asked and the label it picked; a gate step its
- * question and the answer. A For Each step gets the item lists it read and a
+ * question and the answer. A Call step with `each` gets the item lists it read and a
  * start and an end per item. A wait of the run policy shows where it happens,
  * with the wake that ends it. Folding is incremental so a long replay and a fast
  * live stream only touch the items that change.
@@ -110,7 +110,7 @@ export type GateResolvedItem = ItemBase & {
 	note: string;
 };
 
-/** A For Each read its source. */
+/** A Call step with `each` read its source. */
 export type ItemsReadItem = ItemBase & {
 	kind: "items-read";
 	count: number;

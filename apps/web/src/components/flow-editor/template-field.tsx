@@ -20,7 +20,7 @@ import { useProjectFlowMap } from "./project-flows-context";
  * A text field that takes `{{name.path}}` templates, with the variables it
  * can use below it: the flow's inputs, other nodes' outputs, and `run`.
  * Clicking one inserts it at the cursor. A JSON value (an Agent's `data`, a
- * For Each's `results`, a JSON input) leaves the cursor before the closing
+ * Call's `results`, a JSON input) leaves the cursor before the closing
  * braces, ready for a path: `{{planner.data.tasks}}`.
  */
 export function TemplateField({
