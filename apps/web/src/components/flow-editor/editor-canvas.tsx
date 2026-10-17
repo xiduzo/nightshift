@@ -67,7 +67,13 @@ type SelectionSetter = (
 	selection: Selection | ((current: Selection) => Selection),
 ) => void;
 
-const PALETTE: FlowNodeType[] = ["agent", "command", "decision", "call"];
+const PALETTE: FlowNodeType[] = [
+	"agent",
+	"command",
+	"decision",
+	"value",
+	"call",
+];
 
 /** Below the node a new one lands on, so repeated adds do not stack exactly. */
 const ADD_OFFSET = 32;

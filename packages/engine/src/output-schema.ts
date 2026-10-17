@@ -1,9 +1,9 @@
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
 
 /**
- * Checks an Agent's report `data` against the node's output schema (JSON
- * Schema draft 2020-12). The harness shows the schema to the model; only the
- * engine enforces it.
+ * Checks data against a node's output schema (JSON Schema draft 2020-12):
+ * an Agent's report `data`, or the value a Value node made. The harness or
+ * the decider shows the schema to the model; only the engine enforces it.
  */
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
@@ -19,8 +19,22 @@ function compile(schema: Record<string, unknown>): ValidateFunction {
 	return validate;
 }
 
-/** Null when `data` matches the schema, else what is wrong, in one line. */
-export function checkOutputData(
+/** Null when the schema compiles, else why it is not a valid JSON Schema. */
+export function schemaProblem(schema: Record<string, unknown>): string | null {
+	try {
+		compile(schema);
+		return null;
+	} catch (error) {
+		return `The output schema of this node is not a valid JSON Schema: ${error instanceof Error ? error.message : String(error)}`;
+	}
+}
+
+/**
+ * Null when `data` matches the schema, else ajv's problems in one line
+ * (`data/tests must be array`). A schema that does not compile is reported
+ * the same way; check it first with `schemaProblem` when that matters.
+ */
+export function dataProblem(
 	schema: Record<string, unknown>,
 	data: unknown,
 ): string | null {
@@ -28,15 +42,23 @@ export function checkOutputData(
 	try {
 		validate = compile(schema);
 	} catch (error) {
-		return `The output schema of this node is not a valid JSON Schema: ${error instanceof Error ? error.message : String(error)}`;
+		return error instanceof Error ? error.message : String(error);
 	}
+	if (validate(data)) return null;
+	return ajv.errorsText(validate.errors, { dataVar: "data", separator: "; " });
+}
+
+/** Null when an Agent's report `data` matches the schema, else what is wrong, in one line. */
+export function checkOutputData(
+	schema: Record<string, unknown>,
+	data: unknown,
+): string | null {
+	const invalid = schemaProblem(schema);
+	if (invalid !== null) return invalid;
 	if (data === undefined) {
 		return "The agent's step report has no data, but this node has an output schema.";
 	}
-	if (validate(data)) return null;
-	const problems = ajv.errorsText(validate.errors, {
-		dataVar: "data",
-		separator: "; ",
-	});
+	const problems = dataProblem(schema, data);
+	if (problems === null) return null;
 	return `The agent's data does not match the output schema: ${problems}.`;
 }

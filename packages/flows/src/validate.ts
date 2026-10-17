@@ -3,6 +3,7 @@ import { ruleNames, ruleProblem } from "./rule";
 import {
 	type CallEachNode,
 	type CallNode,
+	canMakeValue,
 	type DecisionNode,
 	type Flow,
 	type FlowNode,
@@ -17,6 +18,8 @@ import {
 	reservedOutcomes,
 	runFields,
 	runsEach,
+	type ValueNode,
+	valueDeciderNameSchema,
 } from "./schema";
 import { templateRefs } from "./template";
 import type { FlowIssue, ValidateOptions } from "./types";
@@ -33,6 +36,8 @@ type Flows = Readonly<Record<string, Flow | null>>;
  * nodes with outcomes the source node can produce, an Agent node with a
  * prompt or a skill, outcomes and options that are unique and not reserved,
  * a Decision's rules (`when`) that parse and read known names, an Agent
+ * output schema that describes an object, a Value node with an expression
+ * (a rule) or a prompt and a decider that can make a value (a model) and an
  * output schema that describes an object, template references to known
  * names and fields, outputs, and no cycle without an edge that has a `max`
  * (a Gate in a cycle too: a person could loop forever).
@@ -206,6 +211,10 @@ function validateIn(
 				for (const [name, value] of Object.entries(node.inputs)) {
 					template(value, `input "${name}"`);
 				}
+				break;
+			case "value":
+				checkValue(node, scope, error);
+				if (node.prompt !== undefined) template(node.prompt, "prompt");
 				break;
 		}
 	}
@@ -674,6 +683,57 @@ function checkDecision(
 					at,
 				);
 			}
+		}
+	}
+}
+
+/**
+ * A Value node's output schema must describe an object. Made by a rule, it
+ * needs an expression that parses and reads only inputs or nodes of the
+ * flow. Made by a model, it needs a prompt and a decider that can make a
+ * value (one with a text adapter: TypeSafe and Ollaya only decide).
+ */
+function checkValue(node: ValueNode, scope: Scope, error: Report): void {
+	const at = { nodeId: node.id };
+	if (!isObjectSchema(node.output)) {
+		error(
+			`The output schema of value node "${node.id}" must describe an object: give it "type": "object" or "properties".`,
+			at,
+		);
+	}
+	if (node.by === "model") {
+		if (node.prompt === undefined || node.prompt.trim() === "") {
+			error(`Value node "${node.id}" needs a prompt for the model.`, at);
+		}
+		if (!canMakeValue(node.decider)) {
+			error(
+				`Value node "${node.id}" uses the decider "${node.decider}", which cannot make a value. Choose one of: ${valueDeciderNameSchema.options.join(", ")}.`,
+				at,
+			);
+		}
+		return;
+	}
+	const expression = node.expression ?? "";
+	if (expression.trim() === "") {
+		error(`Value node "${node.id}" needs an expression.`, at);
+		return;
+	}
+	const problem = ruleProblem(expression);
+	if (problem !== null) {
+		error(`The expression of "${node.id}" is not valid: ${problem}`, at);
+		return;
+	}
+	const known = new Set<string>([
+		"run",
+		...scope.flow.inputs.map((input) => input.name),
+		...scope.nodes.keys(),
+	]);
+	for (const name of ruleNames(expression)) {
+		if (!known.has(name)) {
+			error(
+				`The expression of "${node.id}" reads "${name}", but there is no node or input "${name}".`,
+				at,
+			);
 		}
 	}
 }

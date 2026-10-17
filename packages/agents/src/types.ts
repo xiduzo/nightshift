@@ -143,8 +143,38 @@ export type DecisionResult =
 			costUsd: number | null;
 	  };
 
-/** Picks one label for a Decision node: `decide()` with a TanStack AI decider. */
+/** What a Value node made by a model asks: a brief and the JSON Schema its answer must match. */
+export type ValueInput = {
+	/** Which decider answers. Only one with a text adapter can (`canMakeValue`). */
+	decider: DeciderName;
+	/** The rendered brief with its context. */
+	prompt: string;
+	/** A JSON Schema the model's answer is held to. */
+	output: Record<string, unknown>;
+	/** Unset: the decider's default chat model. */
+	model?: string;
+	signal: AbortSignal;
+};
+
+/** A value, or why there is none. The engine checks `data` against the schema. */
+export type ValueResult =
+	| { kind: "made"; data: unknown; costUsd: number | null }
+	| {
+			kind: "error";
+			/** `aborted` when the signal fired. */
+			errorKind: AgentErrorKind;
+			message: string;
+			costUsd: number | null;
+	  };
+
+/**
+ * Picks one label for a Decision node (`decide()` with a TanStack AI
+ * decider) and makes a value for a Value node (`chat()` with an output
+ * schema on the decider's text adapter).
+ */
 export interface Decider {
 	/** Never throws: failures come back as `kind: "error"`. */
 	decide(input: DecisionInput): Promise<DecisionResult>;
+	/** Never throws. A decider that cannot make a value answers `kind: "error"`. */
+	value?(input: ValueInput): Promise<ValueResult>;
 }

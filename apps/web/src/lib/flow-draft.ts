@@ -3,6 +3,7 @@ import {
 	type CallEach,
 	type CallNode,
 	type CommandNode,
+	canMakeValue,
 	type DecidedBy,
 	type DecisionNode,
 	FLOW_VERSION,
@@ -21,7 +22,10 @@ import {
 	type Outcome,
 	type Policy,
 	runFields,
+	type ValueBy,
+	type ValueNode,
 	validateFlow,
+	valueDeciderNameSchema,
 } from "@nightshift/flows";
 
 /**
@@ -123,6 +127,42 @@ export function defaultEach(): CallEach {
 		branch: "per-item",
 		haltOn: ["halt"],
 	};
+}
+
+/**
+ * A rule makes the value, with an object schema and no expression yet; the
+ * issues panel asks for one. Switched to a model, the node starts on the
+ * first decider that can make a value.
+ */
+export function valueNode(id: string, position: Position): ValueNode {
+	return {
+		id,
+		type: "value",
+		position,
+		by: "rule",
+		expression: "",
+		output: { type: "object" },
+		decider: valueDeciderNameSchema.options[0],
+	};
+}
+
+/**
+ * Changes who makes the value. The expression and the prompt both stay, for
+ * when their mode comes back. A model needs a decider that can make a value:
+ * one that cannot is swapped for the first that can.
+ */
+export function withValueBy(node: ValueNode, by: ValueBy): ValueNode {
+	if (by === node.by) return node;
+	const decider =
+		by === "model" && !canMakeValue(node.decider)
+			? valueDeciderNameSchema.options[0]
+			: node.decider;
+	return { ...node, by, decider };
+}
+
+/** The first line of what makes the value: the expression, or the prompt. */
+export function valueSummary(node: ValueNode): string {
+	return firstLine((node.by === "rule" ? node.expression : node.prompt) ?? "");
 }
 
 export function emptySource(kind: ListSource["kind"]): ListSource {
@@ -321,6 +361,7 @@ const NEW_NODE: Record<
 	command: { id: "check", create: commandNode },
 	decision: { id: "decide", create: decisionNode },
 	call: { id: "call", create: callNode },
+	value: { id: "value", create: valueNode },
 };
 
 /** Adds a node of `type`; a new Agent node starts with `defaults`. */
@@ -420,6 +461,11 @@ function rewriteTemplates(
 						}
 					: {}),
 			};
+		case "value":
+			// The expression reads names bare, as a Decision's rules do: not a template.
+			return node.prompt === undefined
+				? node
+				: { ...node, prompt: rewrite(node.prompt) };
 	}
 }
 
@@ -855,6 +901,16 @@ function nodeVariables(
 			});
 		}
 	}
+	if (node.type === "value") {
+		for (const field of schemaFields(node.output)) {
+			variables.push({
+				text: `{{${node.id}.data.${field.name}}}`,
+				label: `data.${field.name}`,
+				json: field.json,
+				description: "A field of the value",
+			});
+		}
+	}
 	return variables;
 }
 
@@ -941,6 +997,7 @@ const FIELD_MESSAGES: Record<string, string> = {
 	"each.source.command": "The source command is empty.",
 	"each.source.glob": "The glob is empty.",
 	"each.maxItems": "Max items must be a whole number above 0.",
+	expression: "Write the expression.",
 };
 
 const POLICY_MESSAGES: Record<string, string> = {

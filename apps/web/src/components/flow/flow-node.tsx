@@ -8,6 +8,7 @@ import {
 	type ListSource,
 	nodeOutcomes,
 	runsEach,
+	type ValueNode,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -41,10 +42,20 @@ import {
 	type StepState,
 	stepStateStyle,
 } from "@/components/outcome-badge";
-import { agentSummary, firstLine, sourceSummary } from "@/lib/flow-draft";
+import {
+	agentSummary,
+	firstLine,
+	sourceSummary,
+	valueSummary,
+} from "@/lib/flow-draft";
 import { harnessInfo } from "@/lib/harnesses";
 
-import { CALL_EACH_ICON, DECIDED_BY_ICON, NODE_TYPE } from "./node-type";
+import {
+	CALL_EACH_ICON,
+	DECIDED_BY_ICON,
+	NODE_TYPE,
+	VALUE_BY_ICON,
+} from "./node-type";
 import { OpenFlowContext } from "./open-flow-context";
 
 export type NodeRunState = {
@@ -81,6 +92,12 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 		return new Map([
 			["pass", "It finished"],
 			["fail", "It failed"],
+		]);
+	}
+	if (node.type === "value") {
+		return new Map([
+			["pass", "The data fits"],
+			["fail", "No value made"],
 		]);
 	}
 	const options =
@@ -120,9 +137,11 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	const Icon =
 		node.type === "decision"
 			? DECIDED_BY_ICON[node.by]
-			: runsEach(node)
-				? CALL_EACH_ICON
-				: meta.icon;
+			: node.type === "value"
+				? VALUE_BY_ICON[node.by]
+				: runsEach(node)
+					? CALL_EACH_ICON
+					: meta.icon;
 	const runColor = run ? stepStateStyle(run.state).color : undefined;
 	const active = run?.state === "running";
 	const waiting = run?.state === "waiting";
@@ -241,6 +260,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 							<CallBody node={node} />
 						)
 					) : null}
+					{node.type === "value" ? <ValueBody node={node} /> : null}
 					{node.type === "command" ? (
 						<code className="block truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px]">
 							{node.command.trim() === "" ? (
@@ -541,9 +561,34 @@ function EachBody({ node }: { node: CallEachNode }) {
 	);
 }
 
+/** Who makes the value, then the expression or the prompt. */
+function ValueBody({ node }: { node: ValueNode }) {
+	const summary = valueSummary(node);
+	const who =
+		node.by === "rule"
+			? "A rule makes it"
+			: `A model makes it${node.model ? ` · ${node.model}` : ""}`;
+	const empty = node.by === "rule" ? "No expression yet" : "No prompt yet";
+	return (
+		<>
+			<span className="truncate text-[11px] text-muted-foreground">{who}</span>
+			<p
+				className={cn(
+					"line-clamp-2 break-words",
+					node.by === "rule" && summary !== "" && "font-mono text-[11px]",
+					summary === "" && "text-muted-foreground italic",
+				)}
+			>
+				{summary === "" ? empty : summary}
+			</p>
+		</>
+	);
+}
+
 export const nodeTypes: NodeTypes = {
 	agent: FlowNodeCard,
 	command: FlowNodeCard,
 	decision: FlowNodeCard,
 	call: FlowNodeCard,
+	value: FlowNodeCard,
 } satisfies Record<FlowNodeType, unknown>;

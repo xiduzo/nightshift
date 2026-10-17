@@ -8,6 +8,7 @@ import {
 	nodeIdSchema,
 	nodeOutcomes,
 	type Outcome,
+	type ValueNode,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -41,7 +42,11 @@ import { type ReactNode, useId, useState } from "react";
 
 import { ModelCombobox } from "@/components/agents/model-combobox";
 import type { ProfileRow } from "@/components/agents/types";
-import { DECIDED_BY_ICON, NODE_TYPE } from "@/components/flow/node-type";
+import {
+	DECIDED_BY_ICON,
+	NODE_TYPE,
+	VALUE_BY_ICON,
+} from "@/components/flow/node-type";
 import { outcomeLabel } from "@/components/outcome-badge";
 import {
 	EFFORTS,
@@ -56,6 +61,7 @@ import {
 	withConnections,
 	withDecidedBy,
 	withOptions,
+	withValueBy,
 } from "@/lib/flow-draft";
 import {
 	HARNESSES,
@@ -84,9 +90,9 @@ import { TemplateField } from "./template-field";
 
 /**
  * The node without one of its optional fields: it comes from the default
- * again (an Agent node's profile, a Decision node's decider).
+ * again (an Agent node's profile, a Decision or Value node's decider).
  */
-function withoutField<N extends AgentNode | DecisionNode>(
+function withoutField<N extends AgentNode | DecisionNode | ValueNode>(
 	node: N,
 	key: "harness" | "model" | "effort" | "permissionMode",
 ): N {
@@ -293,6 +299,18 @@ export function NodeInspector({
 						)
 					}
 					onSetEach={onSetCallEach}
+				/>
+			) : null}
+
+			{node.type === "value" ? (
+				<ValueFields
+					flow={flow}
+					node={node}
+					onChange={(change) =>
+						onChange((current) =>
+							current.type === "value" ? change(current) : current,
+						)
+					}
 				/>
 			) : null}
 
@@ -1419,6 +1437,212 @@ function DecisionFields({
 								<option key={value} value={value} />
 							))}
 						</datalist>
+					</Field>
+				</InspectorSection>
+			) : null}
+		</>
+	);
+}
+
+const VALUE_BY: { by: ValueNode["by"]; label: string }[] = [
+	{ by: "rule", label: "A rule" },
+	{ by: "model", label: "A model" },
+];
+
+const EXPRESSION_EXAMPLE =
+	'$filter(planner.data.tasks, function($t) { $t.size = "small" })';
+
+/**
+ * A Value node makes data that fits its output schema. Who makes it is a
+ * toggle, as on a Decision: a rule (a JSONata expression) or a model (a
+ * decider that can make a value, with a prompt).
+ */
+function ValueFields({
+	flow,
+	node,
+	onChange,
+}: {
+	flow: Flow;
+	node: ValueNode;
+	onChange: (change: (node: ValueNode) => ValueNode) => void;
+}) {
+	const id = useId();
+	const { by } = node;
+	const deciders = useQuery(orpc.deciders.list.queryOptions());
+	const makers = (deciders.data ?? []).filter((d) => d.value !== null);
+	const decider = deciders.data?.find((d) => d.name === node.decider);
+	const keyMissing = decider?.apiKeySource === "missing";
+	const cannot = decider !== undefined && decider.value === null;
+	const expression = node.expression ?? "";
+	const prompt = node.prompt ?? "";
+	return (
+		<>
+			<InspectorSection title="Value">
+				<Field
+					id={`${id}-by`}
+					label="Made by"
+					hint={
+						by === "rule"
+							? "An expression reads the values of earlier nodes and inputs. No model, no cost."
+							: "A small model reads the prompt and answers with data in the shape below."
+					}
+				>
+					<ToggleGroup
+						variant="outline"
+						size="sm"
+						spacing={0}
+						aria-label="Made by"
+						className="w-full"
+						value={[by]}
+						onValueChange={(value) => {
+							const next = value[0] as ValueNode["by"] | undefined;
+							if (next) onChange((current) => withValueBy(current, next));
+						}}
+					>
+						{VALUE_BY.map((entry) => {
+							const Icon = VALUE_BY_ICON[entry.by];
+							return (
+								<ToggleGroupItem
+									key={entry.by}
+									value={entry.by}
+									className="flex-1 aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+								>
+									<Icon />
+									{entry.label}
+								</ToggleGroupItem>
+							);
+						})}
+					</ToggleGroup>
+				</Field>
+				{by === "rule" ? (
+					<Field
+						id={`${id}-expression`}
+						label="Expression"
+						hint="A JSONata expression over the run's values. Its result is the data."
+						error={expression.trim() === "" ? "Write the expression." : null}
+					>
+						<Textarea
+							id={`${id}-expression`}
+							value={expression}
+							placeholder={EXPRESSION_EXAMPLE}
+							className="min-h-24 font-mono text-xs leading-relaxed"
+							spellCheck={false}
+							aria-invalid={expression.trim() === ""}
+							aria-describedby={`${id}-expression-hint`}
+							onChange={(event) => {
+								const text = event.target.value;
+								onChange((current) => ({ ...current, expression: text }));
+							}}
+						/>
+					</Field>
+				) : (
+					<TemplateField
+						id={`${id}-prompt`}
+						label="Prompt"
+						hint="What to make, with the context it needs. The model answers with data in the shape below."
+						flow={flow}
+						nodeId={node.id}
+						value={prompt}
+						invalid={prompt.trim() === ""}
+						placeholder="List the failing tests in {{check.log_tail}}."
+						onChange={(text) =>
+							onChange((current) => ({ ...current, prompt: text }))
+						}
+					/>
+				)}
+				{by === "rule" ? (
+					<Note>
+						Write a node id or an input name, then a path:{" "}
+						<code>{EXPRESSION_EXAMPLE}</code>. Put a name with a dash in
+						backticks: <code>`my-input`.title</code>. Later nodes read the data
+						as <code>{`{{${node.id}.data}}`}</code> or a path into it.
+					</Note>
+				) : (
+					<Note>
+						Later nodes read the data as <code>{`{{${node.id}.data}}`}</code> or
+						a path into it, and why it failed as{" "}
+						<code>{`{{${node.id}.note}}`}</code>.
+					</Note>
+				)}
+			</InspectorSection>
+
+			<InspectorSection title="Data">
+				<OutputSchemaField
+					id={`${id}-output`}
+					nodeId={node.id}
+					output={node.output}
+					required
+					description="The shape of the data this node makes. The step fails when the result does not fit."
+					onChange={(output) =>
+						onChange((current) =>
+							output === undefined ? current : { ...current, output },
+						)
+					}
+				/>
+			</InspectorSection>
+
+			{by === "model" ? (
+				<InspectorSection title="Model">
+					<Field
+						id={`${id}-decider`}
+						label="Decider"
+						hint={
+							cannot
+								? "This decider cannot make a value. Choose one that can."
+								: keyMissing && decider?.apiKey
+									? `Add the secret ${decider.apiKey} on the Agents page, or this node cannot make a value.`
+									: "The decider whose model makes the value."
+						}
+					>
+						<NativeSelect
+							id={`${id}-decider`}
+							value={node.decider}
+							aria-invalid={keyMissing || cannot}
+							aria-describedby={`${id}-decider-hint`}
+							onChange={(event) => {
+								const next = event.target.value as ValueNode["decider"];
+								// A model belongs to its decider: the new one starts on its default.
+								onChange((current) => ({
+									...withoutField(current, "model"),
+									decider: next,
+								}));
+							}}
+						>
+							{cannot && decider ? (
+								<NativeSelectOption value={decider.name} disabled>
+									{decider.label}
+								</NativeSelectOption>
+							) : null}
+							{makers.map((d) => (
+								<NativeSelectOption key={d.name} value={d.name}>
+									{d.label}
+								</NativeSelectOption>
+							))}
+						</NativeSelect>
+					</Field>
+					<Field
+						id={`${id}-model`}
+						label="Model"
+						optional
+						hint="Leave it empty to use the decider's default model."
+					>
+						<Input
+							id={`${id}-model`}
+							value={node.model ?? ""}
+							placeholder={decider?.value?.defaultModel}
+							className="font-mono"
+							autoComplete="off"
+							spellCheck={false}
+							aria-describedby={`${id}-model-hint`}
+							onChange={(event) => {
+								const model = event.target.value.trim();
+								onChange((current) =>
+									model === ""
+										? withoutField(current, "model")
+										: { ...current, model },
+								);
+							}}
+						/>
 					</Field>
 				</InspectorSection>
 			) : null}

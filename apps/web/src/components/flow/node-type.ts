@@ -1,6 +1,7 @@
-import type { DecidedBy, FlowNodeType } from "@nightshift/flows";
+import type { DecidedBy, FlowNodeType, ValueBy } from "@nightshift/flows";
 import {
 	BotIcon,
+	BracesIcon,
 	HandIcon,
 	type LucideIcon,
 	RepeatIcon,
@@ -8,6 +9,7 @@ import {
 	SplitIcon,
 	SquareFunctionIcon,
 	SquareTerminalIcon,
+	VariableIcon,
 } from "lucide-react";
 
 type NodeMeta = { label: string; icon: LucideIcon; blurb: string };
@@ -34,6 +36,11 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		icon: SquareFunctionIcon,
 		blurb: "Runs another flow once, or once per item in a list.",
 	},
+	value: {
+		label: "Value",
+		icon: VariableIcon,
+		blurb: "Makes a value from a rule or a model.",
+	},
 };
 
 /** The icon of a Call node that runs once per item. */
@@ -46,9 +53,16 @@ export const DECIDED_BY_ICON: Record<DecidedBy, LucideIcon> = {
 	model: SparklesIcon,
 };
 
+/** The icon of a Value node, by who makes it. */
+export const VALUE_BY_ICON: Record<ValueBy, LucideIcon> = {
+	rule: BracesIcon,
+	model: SparklesIcon,
+};
+
 /**
- * Whether a step ran a model and so has a cost: an Agent step, or a
- * Decision step decided by a model (a Gate or a rule costs nothing).
+ * Whether a step ran a model and so has a cost: an Agent step, a Decision
+ * step decided by a model, or a Value step made by a model (a Gate or a
+ * rule costs nothing).
  */
 export function hasCost(step: {
 	nodeType: FlowNodeType;
@@ -57,6 +71,7 @@ export function hasCost(step: {
 }): boolean {
 	return (
 		step.nodeType === "agent" ||
-		(step.nodeType === "decision" && step.gate === null && step.costUsd > 0)
+		(step.nodeType === "decision" && step.gate === null && step.costUsd > 0) ||
+		(step.nodeType === "value" && step.costUsd > 0)
 	);
 }

@@ -144,6 +144,21 @@ export type WaitItem = ItemBase & {
 
 export type WakeItem = ItemBase & { kind: "wake" };
 
+/** What a Value step was asked: a rule's expression, or the rendered prompt and the model. */
+export type ValueAskItem = ItemBase & {
+	kind: "value-ask";
+	by: "rule" | "model";
+	source: string;
+	model: string | null;
+};
+
+/** The value made (`problem` null), or why there is none. */
+export type ValueItem = ItemBase & {
+	kind: "value";
+	data: JsonValue | null;
+	problem: string | null;
+};
+
 export type TranscriptItem =
 	| SessionItem
 	| ItemsReadItem
@@ -162,6 +177,8 @@ export type TranscriptItem =
 	| FinishedItem
 	| ErrorItem
 	| CommandItem
+	| ValueAskItem
+	| ValueItem
 	| LogItem
 	| ExitItem;
 
@@ -433,6 +450,25 @@ function applyStepEntries(
 					key: `rule:${entry.seq}`,
 					matched: event.matched,
 					evaluated: event.evaluated,
+				});
+				break;
+			case "value-start":
+				push({
+					...base,
+					kind: "value-ask",
+					key: `value-ask:${entry.seq}`,
+					by: event.by,
+					source: event.source,
+					model: event.model,
+				});
+				break;
+			case "value":
+				push({
+					...base,
+					kind: "value",
+					key: `value:${entry.seq}`,
+					data: event.data,
+					problem: event.problem,
 				});
 				break;
 			case "gate-open":

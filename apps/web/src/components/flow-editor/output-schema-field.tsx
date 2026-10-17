@@ -56,19 +56,26 @@ function parse(
 }
 
 /**
- * The JSON Schema for the `data` of an Agent's step report. Keeps what the
- * person types; commits only text that parses to an object (or empty).
+ * The JSON Schema for the `data` of an Agent's step report, or of the value
+ * a Value node makes (`required`, with its own `description`). Keeps what
+ * the person types; commits only text that parses to an object (or empty).
  */
 export function OutputSchemaField({
 	id,
 	nodeId,
 	output,
 	onChange,
+	required = false,
+	description = "The shape of the data the agent must report. The step fails when the data does not fit.",
 }: {
 	id: string;
 	nodeId: string;
 	output: Schema | undefined;
 	onChange: (output: Schema | undefined) => void;
+	/** The node cannot do without a schema: no "(optional)" on the label. */
+	required?: boolean;
+	/** What the schema is for, shown until the node has one. */
+	description?: string;
 }) {
 	const [text, setText] = useState(() => show(output));
 	const result = parse(text);
@@ -91,7 +98,11 @@ export function OutputSchemaField({
 			<div className="flex flex-wrap items-center gap-1">
 				<FieldLabel id={`${id}-label`} htmlFor={id} className="shrink-0">
 					Output schema
-					<span className="font-normal text-muted-foreground">(optional)</span>
+					{required ? null : (
+						<span className="font-normal text-muted-foreground">
+							(optional)
+						</span>
+					)}
 				</FieldLabel>
 				<div className="ml-auto flex items-center gap-1">
 					{PRESETS.map((preset) => (
@@ -137,8 +148,8 @@ export function OutputSchemaField({
 					id={`${id}-hint`}
 					className="text-xs [&_code]:font-mono"
 				>
-					{output === undefined ? (
-						"The shape of the data the agent must report. The step fails when the data does not fit."
+					{output === undefined || fields.length === 0 ? (
+						description
 					) : (
 						<>
 							Later nodes read{" "}

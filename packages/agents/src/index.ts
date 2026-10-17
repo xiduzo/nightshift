@@ -20,10 +20,12 @@ export {
 	codexPolicy,
 } from "./codex";
 export {
+	cannotMakeValueMessage,
 	DECIDER_ADAPTERS,
 	type DeciderAdapter,
 	type TanstackDeciderOptions,
 	tanstackDecider,
+	type ValueAdapter,
 } from "./decider";
 export {
 	type CliCheck,
@@ -45,6 +47,7 @@ export {
 export {
 	type FakeDecider,
 	type FakeDecision,
+	type FakeValue,
 	fakeDecider,
 	fakeHarness,
 } from "./fake";

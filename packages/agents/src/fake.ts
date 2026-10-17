@@ -8,6 +8,8 @@ import type {
 	DecisionInput,
 	DecisionResult,
 	StepReportOutcome,
+	ValueInput,
+	ValueResult,
 } from "./types";
 
 /** One step of a scripted fake session. */
@@ -240,9 +242,17 @@ export type FakeDecision =
 	| { label: string; notes?: string; costUsd?: number | null }
 	| DecisionResult;
 
+/** One scripted value: the data (with optional cost), or a whole ValueResult. */
+export type FakeValue =
+	| { data: unknown; costUsd?: number | null }
+	| ValueResult;
+
 export type FakeDecider = Decider & {
 	/** The inputs of every `decide` call, in order. */
 	readonly calls: DecisionInput[];
+	/** The inputs of every `value` call, in order. */
+	readonly valueCalls: ValueInput[];
+	value(input: ValueInput): Promise<ValueResult>;
 };
 
 /**
@@ -250,14 +260,20 @@ export type FakeDecider = Decider & {
  * in order, one per call, after `delayMs`. An abort during the pause returns
  * an `aborted` error. Like the real decider, it refuses a scripted label that
  * is not one of the input's labels, and it errors once the script runs out.
+ * `options.values` scripts `value` calls the same way (the data is passed on
+ * as is: the engine checks it against the schema, as with the real decider).
  */
 export function fakeDecider(
 	script:
 		| FakeDecision[]
 		| ((input: DecisionInput, call: number) => FakeDecision),
-	options: { delayMs?: number } = {},
+	options: {
+		delayMs?: number;
+		values?: FakeValue[] | ((input: ValueInput, call: number) => FakeValue);
+	} = {},
 ): FakeDecider {
 	const calls: DecisionInput[] = [];
+	const valueCalls: ValueInput[] = [];
 	const delayMs = options.delayMs ?? 5;
 
 	async function decide(input: DecisionInput): Promise<DecisionResult> {
@@ -300,5 +316,41 @@ export function fakeDecider(
 		};
 	}
 
-	return { calls, decide };
+	async function value(input: ValueInput): Promise<ValueResult> {
+		const call = valueCalls.length;
+		valueCalls.push(input);
+		const aborted: ValueResult = {
+			kind: "error",
+			errorKind: "aborted",
+			message: "The value was aborted",
+			costUsd: null,
+		};
+		if (input.signal.aborted) return aborted;
+		await pause(delayMs, input.signal);
+		if (input.signal.aborted) return aborted;
+
+		const values = options.values;
+		const step =
+			values === undefined
+				? undefined
+				: typeof values === "function"
+					? values(input, call)
+					: values[call];
+		if (step === undefined) {
+			return {
+				kind: "error",
+				errorKind: "harness",
+				message: `The fake decider has no scripted value for call ${call + 1}`,
+				costUsd: null,
+			};
+		}
+		if ("kind" in step) return step;
+		return {
+			kind: "made",
+			data: step.data,
+			costUsd: step.costUsd === undefined ? 0.0001 : step.costUsd,
+		};
+	}
+
+	return { calls, valueCalls, decide, value };
 }

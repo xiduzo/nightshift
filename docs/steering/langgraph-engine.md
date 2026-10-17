@@ -36,8 +36,9 @@ packages/engine/src/
                            keeps a thread's latest root checkpoint.
   graph/compile.ts         compileFlow(flow, ctx): StateGraph. START →
                            flow.start; every flow node plus its park node
-                           park__<id>; Agent nodes and Decisions decided by
-                           a model also get a wait node wait__<id>; a
+                           park__<id>; Agent nodes, Decisions decided by
+                           a model and Values made by a model also get a
+                           wait node wait__<id>; a
                            Decision decided by a person gets an ask node
                            ask__<id>. No static edges.
   graph/route.ts           route(): picks the edge with `nextEdge`, logs
@@ -61,6 +62,12 @@ packages/engine/src/
   graph/nodes/call-each.ts the per-element loop of a Call with `each`
                            (one element per super-step)
   graph/nodes/body.ts      What a Call does once and per element: bodyGraph,
+  graph/nodes/value.ts     value node, the Decision's twin: routes on the
+                           step; a producer per `by` makes the data, which
+                           is checked against the output schema.
+  graph/nodes/producers/   rule.ts (one JSONata expression), model.ts (the
+                           decider's text adapter, `chat()` with the
+                           schema; waits like a model Decision).
                            runBody (a called flow as a subgraph of the node)
                            and BodyEnd (how the body ended).
   ../each.ts               the pure parts of a Call with `each`: list items
@@ -240,6 +247,19 @@ Decisions taken while implementing, from the code and its comments:
   like the Agent node; a give-up ends the step `error`. A parked or
   interrupted model Decision step starts a new visit: it has no session to
   reopen.
+- **A Value node is a Decision with data instead of a label**
+  (`graph/nodes/value.ts`, `producers/`). The node routes on its step's end;
+  `node.by` picks the producer: `producers/rule.ts` evaluates one JSONata
+  expression (pure, no wait node), `producers/model.ts` asks the decider's
+  text adapter (`Decider.value`, TanStack AI `chat()` with the output
+  schema) and shares the model chooser's entry and wait rules (`entryOf`,
+  `withinGrace`, `wait__<id>`). Both end the step through one place
+  (`endWithValue`): the data is checked against the output schema with ajv
+  (`output-schema.ts`), `pass` with the data, or `fail` with why in `note`.
+  A schema that does not compile, or no decider, ends `error`. Only a
+  decider with a text adapter can make a value (`valueDeciderNameSchema` in
+  flows, `DECIDER_ADAPTERS[name].value` in agents): TypeSafe and Ollaya are
+  evaluate adapters only.
 - **`resumeRun` of a thread that ended or never ran re-enters with a
   `Command({ goto, update })`** (`runner.reenter`). A finished run (rule
   10) or a run from before this engine has no checkpoint at an interrupt,

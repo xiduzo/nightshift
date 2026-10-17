@@ -48,6 +48,7 @@ import {
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
+	BracesIcon,
 	CircleCheckIcon,
 	CircleStopIcon,
 	CircleXIcon,
@@ -95,6 +96,8 @@ import type {
 	RuleItem,
 	TranscriptItem,
 	TranscriptState,
+	ValueAskItem,
+	ValueItem,
 	WaitItem,
 	WakeItem,
 } from "@/lib/transcript";
@@ -252,6 +255,7 @@ const RUNNING_TEXT: Record<StepSummary["nodeType"], string> = {
 	command: "The command is running…",
 	decision: "Deciding…",
 	call: "The called flow is running…",
+	value: "Making the value…",
 };
 
 const TranscriptItemView = memo(function TranscriptItemView({
@@ -314,6 +318,10 @@ const TranscriptItemView = memo(function TranscriptItemView({
 			return <WaitCard item={item} />;
 		case "wake":
 			return <WakeMarker item={item} />;
+		case "value-ask":
+			return <ValueAsk item={item} />;
+		case "value":
+			return <ValueCard item={item} />;
 	}
 });
 
@@ -824,6 +832,47 @@ function RuleCard({ item }: { item: RuleItem }) {
 					</li>
 				))}
 			</ul>
+		</ResultCard>
+	);
+}
+
+/** What a Value step was asked: the expression a rule evaluates, or the prompt a model reads. */
+function ValueAsk({ item }: { item: ValueAskItem }) {
+	const rule = item.by === "rule";
+	return (
+		<div className="flex flex-col gap-3">
+			<Divider
+				title="Value"
+				at={item.at}
+				details={[formatTime(item.at), rule ? "a rule" : item.model]}
+			/>
+			<PromptBubble
+				label={rule ? "Expression" : "Prompt"}
+				prompt={item.source}
+				empty={rule ? "No expression." : "No prompt."}
+			/>
+		</div>
+	);
+}
+
+/** The value made, as data, or why there is none. */
+function ValueCard({ item }: { item: ValueItem }) {
+	const made = item.problem === null;
+	const { label, text } = stepStateStyle(made ? "pass" : "fail");
+	return (
+		<ResultCard
+			icon={BracesIcon}
+			kicker={made ? "Value made ·" : "No value ·"}
+			value={label}
+			tone={text}
+		>
+			{made ? (
+				<JsonBlock value={item.data} />
+			) : (
+				<p className="whitespace-pre-wrap break-words leading-relaxed">
+					{item.problem}
+				</p>
+			)}
 		</ResultCard>
 	);
 }

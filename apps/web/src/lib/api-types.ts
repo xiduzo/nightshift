@@ -62,9 +62,10 @@ export type ItemEvent = Extract<
 	{ type: "items-read" | "item-start" | "item-end" }
 >;
 export type WaitEvent = Extract<StepEvent, { type: "wait" | "wake" }>;
+export type ValueEvent = Extract<StepEvent, { type: "value-start" | "value" }>;
 export type AgentEvent = Exclude<
 	StepEvent,
-	CommandEvent | DecisionEvent | GateEvent | ItemEvent | WaitEvent
+	CommandEvent | DecisionEvent | GateEvent | ItemEvent | WaitEvent | ValueEvent
 >;
 
 /** A Gate that waits for a person: the Needs-you inbox. */
