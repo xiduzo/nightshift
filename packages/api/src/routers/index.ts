@@ -61,7 +61,7 @@ const projects = {
 	),
 	/** Opens the native folder picker on this Mac. Null when cancelled. */
 	chooseFolder: publicProcedure.handler(() =>
-		chooseFolder("Choose a git repository to add to Night Shift"),
+		chooseFolder("Choose a project folder to add to Night Shift"),
 	),
 	remove: publicProcedure
 		.input(z.object({ projectId: z.string() }))
