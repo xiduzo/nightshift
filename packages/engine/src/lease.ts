@@ -42,7 +42,7 @@ export class LeaseHeldError extends Error {
 		super(
 			[
 				`Another daemon holds this database: pid ${holder.pid} on ${holder.host}, since ${holder.since.toISOString()} (last heartbeat ${holder.heartbeatAt.toISOString()}).`,
-				"Two daemons must never share a database. Stop that daemon, or give this one its own DATABASE_URL and NIGHTSHIFT_DATA_DIR (see docs/PLAN.md, section 6).",
+				"Two daemons must never share a database. Stop that daemon, or give this one its own NIGHTSHIFT_DATA_DIR (see docs/PLAN.md, section 6).",
 			].join("\n"),
 		);
 		this.name = "LeaseHeldError";

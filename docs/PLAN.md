@@ -183,7 +183,7 @@ Daily commands:
 
 ```bash
 bun install            # dependencies
-bun run db:push        # apply the schema to local.db
+bun run db:push        # apply the schema to the dev database
 bun run dev            # web + server with hot reload
 bun run dev:desktop    # the Electrobun shell with hot reload
 bun run check          # Biome lint + format
@@ -192,7 +192,14 @@ bun run build          # everything, desktop last
 bun run night          # the stable daemon for a night (see below)
 ```
 
-Nights: `bun run night` builds the web app, then serves the API server and the built web app on the usual ports (3000 and 3001; set `PORT` and `WEB_PORT` to change them). The server runs from source with plain `bun`, without `--hot`, and the web app is a production build behind `vite preview`, so no file change restarts a running night. It reads the same env as `bun run dev` (`apps/server/.env` and `apps/web/.env` through varlock; `process.env` wins). When `PORT` or `WEB_PORT` is set, `BETTER_AUTH_URL`, `VITE_SERVER_URL` and `CORS_ORIGIN` follow, unless they are set too. Develop in a separate git worktree (`git worktree add ../nightshift-dev`) with `bun run dev` on other ports, its own `DATABASE_URL` and `NIGHTSHIFT_DATA_DIR`, and `NIGHTSHIFT_SCHEDULER=off`. Never point two daemons at one database: the lease (below) refuses the second one. Pull the work into the night's clone between nights.
+Nights: `bun run night` builds the web app, then serves the API server and the built web app on the usual ports (3000 and 3001; set `PORT` and `WEB_PORT` to change them). The server runs from source with plain `bun`, without `--hot`, and the web app is a production build behind `vite preview`, so no file change restarts a running night. It reads the same env as `bun run dev` (`apps/server/.env` and `apps/web/.env` through varlock; `process.env` wins). When `PORT` or `WEB_PORT` is set, `BETTER_AUTH_URL`, `VITE_SERVER_URL` and `CORS_ORIGIN` follow, unless they are set too. Develop in a separate git worktree (`git worktree add ../nightshift-dev`) with `bun run dev` on other ports and `NIGHTSHIFT_SCHEDULER=off`. Never point two daemons at one database: the lease (below) refuses the second one. Pull the work into the night's clone between nights.
+
+Data directory: a daemon keeps its database (`nightshift.db`), its transcripts (`transcripts/<run>/<step>.ndjson`) and its command logs (`logs/<run>/<step>.log`) together in one folder on this computer, never in a project. A project's `.nightshift/` folder holds only what you commit: flows and schedules.
+
+- `bun run night` and the desktop app use the app data folder of the OS: `~/Library/Application Support/Night Shift` on macOS, `$XDG_DATA_HOME/nightshift` (else `~/.local/share/nightshift`) on Linux, `%APPDATA%\Night Shift` on Windows.
+- `bun run dev` sets `NIGHTSHIFT_DEV=true` and uses `.nightshift-dev/` in its own checkout (gitignored). A dev daemon never opens the night's database, and two checkouts never share one. The `db:push`, `db:studio` and `db:migrate` scripts open the same dev database.
+- `NIGHTSHIFT_DATA_DIR` sets the folder for either one. `DATABASE_URL` sets only the database, for example a libsql server. Leave it unset otherwise.
+- History from before (the checkout's `local.db`, `~/.nightshift/transcripts` and `~/.nightshift/logs`) is never moved for you. The daemon names it at start. Stop the daemon and run `bun run data:migrate` (add `--dev` for the dev folder) to copy it into the data directory. It copies and never moves, and it refuses a data directory that has data already. Then remove `DATABASE_URL` from `apps/server/.env`.
 
 Projects: Add project checks the chosen folder before it adds it, in this order: git on this computer, the folder at the top of a git repository, a first commit (each run's worktree starts from one), and a git name and email when Night Shift must make that commit. Each failed step has a fix, and a fix runs only after you confirm it. Install git opens Apple's installer on macOS (`xcode-select --install`). On other systems it shows the package manager command to run (`sudo apt-get install git`, `winget install --id Git.Git`); Night Shift never runs `sudo`. Use top folder replaces a subfolder with the repository's top folder. Set up git runs `git init` when needed, writes a starter `.gitignore` when there is none, sets the name and email in the repository's own config (never `--global`), and commits every file as "Initial commit". A run refuses to start in a project that is not ready (`checkProjectFolder` in `packages/engine/src/project-setup.ts`).
 

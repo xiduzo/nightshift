@@ -72,7 +72,7 @@ describe("acquire", () => {
 		expect(refused).toBeInstanceOf(LeaseHeldError);
 		expect(refused.message).toContain("pid 100 on mac");
 		expect(refused.message).toContain(holder.since.toISOString());
-		expect(refused.message).toContain("DATABASE_URL and NIGHTSHIFT_DATA_DIR");
+		expect(refused.message).toContain("its own NIGHTSHIFT_DATA_DIR");
 		expect((await row())?.owner).toBe(holder.owner);
 	});
 

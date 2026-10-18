@@ -59,3 +59,6 @@ temp
 
 # Claude Code local settings (machine-specific hook paths)
 .claude/settings.local.json
+
+# Dev data directory (`bun run dev`): database, transcripts, logs
+.nightshift-dev/
