@@ -1,6 +1,6 @@
 {
 	"version": 4,
-	"description": "A planner splits a goal into tasks, each task is built and checked on its own branch of a stack, and a reviewer reads the result.",
+	"description": "An agent splits your goal into small tasks. Night Shift builds and checks each task on top of the one before. An agent then reviews the result.",
 	"inputs": [
 		{
 			"name": "goal",
@@ -60,7 +60,7 @@
 				},
 				{
 					"name": "unclear",
-					"description": "The goal needs an answer from the person first; the question is in the summary."
+					"description": "The goal needs an answer from the person first. The question is in the summary."
 				}
 			],
 			"output": {
@@ -106,7 +106,7 @@
 			"options": [
 				{
 					"name": "answered",
-					"description": "The note holds the answer; the planner tries again."
+					"description": "Your note holds the answer. The planner tries again."
 				},
 				{
 					"name": "stop",
@@ -116,10 +116,32 @@
 			"by": "person"
 		},
 		{
+			"id": "any_tasks",
+			"label": "Any tasks?",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "decision",
+			"prompt": "Stops the run when the plan has no tasks.",
+			"options": [
+				{
+					"name": "no-tasks",
+					"description": "The plan has no tasks, so there is nothing to build. The run ends.",
+					"when": "$count(planner.data.tasks) = 0"
+				},
+				{
+					"name": "has-tasks",
+					"description": "Build the tasks."
+				}
+			],
+			"by": "rule"
+		},
+		{
 			"id": "build",
 			"label": "Build each task",
 			"position": {
-				"x": 320,
+				"x": 640,
 				"y": 0
 			},
 			"type": "call",
@@ -140,7 +162,7 @@
 			"id": "review",
 			"label": "Review",
 			"position": {
-				"x": 640,
+				"x": 960,
 				"y": 0
 			},
 			"type": "agent",
@@ -176,9 +198,15 @@
 	],
 	"edges": [
 		{
-			"id": "planner-planned-build",
+			"id": "planner-planned-any_tasks",
 			"from": "planner",
 			"outcome": "planned",
+			"to": "any_tasks"
+		},
+		{
+			"id": "any_tasks-has-tasks-build",
+			"from": "any_tasks",
+			"outcome": "has-tasks",
 			"to": "build"
 		},
 		{

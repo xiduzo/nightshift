@@ -1,12 +1,12 @@
 {
 	"version": 4,
-	"description": "One agent applies an instruction to one file. The body of per-file.",
+	"description": "An agent applies an instruction to one file. per-file runs it once for each file.",
 	"inputs": [
 		{
 			"name": "item",
 			"type": "json",
 			"label": "File",
-			"description": "A file element: { id, title, path }.",
+			"description": "The file to change, for example { \"path\": \"src/app.ts\" }.",
 			"required": true
 		},
 		{
@@ -33,7 +33,31 @@
 			"permissionMode": "auto",
 			"timeoutMinutes": 20,
 			"idleMinutes": 10
+		},
+		{
+			"id": "restore",
+			"label": "Undo the changes to the file",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "command",
+			"command": "# Put the file back as it was, so half-done edits are not committed. Then fail the step.\ngit checkout -- \"{{item.path}}\" 2>/dev/null || true\nexit 1",
+			"timeoutMinutes": 5
 		}
 	],
-	"edges": []
+	"edges": [
+		{
+			"id": "edit-fail-restore",
+			"from": "edit",
+			"outcome": "fail",
+			"to": "restore"
+		},
+		{
+			"id": "edit-needs-input-restore",
+			"from": "edit",
+			"outcome": "needs-input",
+			"to": "restore"
+		}
+	]
 }
