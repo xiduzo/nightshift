@@ -8,6 +8,7 @@ import {
 	renderCommand,
 	renderTemplate,
 	type TemplateContext,
+	unfinishedBlockers,
 } from "@nightshift/flows";
 
 import { runCommand } from "../../command";
@@ -121,12 +122,15 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 		): Promise<StepEnd> => {
 			const derived = await current();
 			const states = itemStates(derived);
-			const waitingCount = lastRead.filter(
-				(item) => !item.done && !Object.hasOwn(states, item.id),
-			).length;
+			const waiting = lastRead
+				.filter((item) => !item.done && !Object.hasOwn(states, item.id))
+				.map((item) => ({
+					id: item.id,
+					blockers: unfinishedBlockers(item, lastRead, states),
+				}));
 			return step.end(
 				outcome,
-				eachOutputs({ items: derived.items, visit, outcome, waitingCount }),
+				eachOutputs({ items: derived.items, visit, outcome, waiting }),
 				error,
 			);
 		};

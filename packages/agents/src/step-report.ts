@@ -198,7 +198,8 @@ export function isReportTool(name: string | undefined): boolean {
 /**
  * Check a report: an outcome of the rules, a string summary, and `data`
  * when the rules have an output schema. Returns undefined when it is not a
- * valid report. `data` is passed on as is: the engine validates it.
+ * valid report. `data` is passed on as is (the engine validates it), except
+ * an object or array sent as JSON text, which models do now and then.
  */
 export function parseStepReport(
 	input: unknown,
@@ -213,8 +214,29 @@ export function parseStepReport(
 	return {
 		outcome,
 		summary: summary.trim(),
-		...(rules.output ? { data } : {}),
+		...(rules.output ? { data: unwrapJsonText(data, rules.output) } : {}),
 	};
+}
+
+/**
+ * `data` as the object or array it encodes, when it is JSON text and the
+ * schema does not ask for a string. Anything else is returned as is.
+ */
+function unwrapJsonText(
+	data: unknown,
+	schema: Record<string, unknown>,
+): unknown {
+	if (typeof data !== "string") return data;
+	const type = schema.type;
+	if (type === "string" || (Array.isArray(type) && type.includes("string"))) {
+		return data;
+	}
+	try {
+		const parsed: unknown = JSON.parse(data);
+		return typeof parsed === "object" && parsed !== null ? parsed : data;
+	} catch {
+		return data;
+	}
 }
 
 /**

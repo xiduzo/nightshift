@@ -47,7 +47,7 @@
 				"y": 0
 			},
 			"type": "command",
-			"command": "# Where this Feature starts, for the checkpoint after its Traces.\nset -e\nmkdir -p .build/night\ngit rev-parse HEAD > .build/night/feature-base\ngh issue view \"{{item.number}}\" --json body --jq .body > .build/night/FEATURE.md",
+			"command": "# Where this Feature starts, for the checkpoint after its Traces.\nset -e\nmkdir -p .build/night\ngit branch --show-current > .build/night/feature-start-branch\ngit rev-parse HEAD > .build/night/feature-base\ngh issue view \"{{item.number}}\" --json body --jq .body > .build/night/FEATURE.md",
 			"timeoutMinutes": 10
 		},
 		{
@@ -62,7 +62,7 @@
 			"each": {
 				"source": {
 					"kind": "command",
-					"command": "gh api graphql -F owner='{owner}' -F name='{repo}' -F number=\"{{item.number}}\" -f query='\nquery($owner: String!, $name: String!, $number: Int!) {\n  repository(owner: $owner, name: $name) {\n    issue(number: $number) {\n      number title\n      subIssues(first: 100) {\n        nodes {\n          number title body state url\n          labels(first: 30) { nodes { name } }\n          blockedBy(first: 50) { nodes { number state } }\n        }\n      }\n    }\n  }\n}' --jq '\n\"trace\" as $require | [\"draft\"] as $skip | [\"implemented\"] as $done\n| .data.repository.issue as $parent\n| [ $parent.subIssues.nodes[]\n    | (.labels.nodes | map(.name | ascii_downcase)) as $labels\n    | select(any($labels[]; . == $require))\n    | select(any($labels[]; IN($skip[])) | not)\n    | { id: (.number | tostring), number, title, body: (.body // \"\"), url, state,\n        labels: [.labels.nodes[].name],\n        parent: { number: $parent.number, title: $parent.title },\n        dependsOn: [ .blockedBy.nodes[] | { id: (.number | tostring), done: (.state == \"CLOSED\") } ],\n        done: (.state == \"CLOSED\" or any($labels[]; IN($done[]))) } ]'"
+					"command": "gh api graphql -F owner='{owner}' -F name='{repo}' -F number=\"{{item.number}}\" -f query='\nquery($owner: String!, $name: String!, $number: Int!) {\n  repository(owner: $owner, name: $name) {\n    issue(number: $number) {\n      number title\n      subIssues(first: 100) {\n        nodes {\n          number title body state url\n          labels(first: 30) { nodes { name } }\n          blockedBy(first: 50) { nodes { number state labels(first: 30) { nodes { name } } } }\n        }\n      }\n    }\n  }\n}' --jq '\n\"trace\" as $require | [\"draft\"] as $skip | [\"implemented\"] as $done\n| .data.repository.issue as $parent\n| [ $parent.subIssues.nodes[]\n    | (.labels.nodes | map(.name | ascii_downcase)) as $labels\n    | select(any($labels[]; . == $require))\n    | select(any($labels[]; IN($skip[])) | not)\n    | { id: (.number | tostring), number, title, body: (.body // \"\"), url, state,\n        labels: [.labels.nodes[].name],\n        parent: { number: $parent.number, title: $parent.title },\n        dependsOn: [ .blockedBy.nodes[] | { id: (.number | tostring), done: (.state == \"CLOSED\" or any(.labels.nodes[].name | ascii_downcase; . == \"implemented\")) } ],\n        done: (.state == \"CLOSED\" or any($labels[]; IN($done[]))) } ]'"
 				},
 				"as": "item",
 				"branch": "per-item"
@@ -79,6 +79,11 @@
 			"by": "rule",
 			"prompt": "The checkpoint runs only when every Trace of the Feature has its pull request. Else the Feature fails, and the Features that wait on it are blocked.",
 			"options": [
+				{
+					"name": "nothing",
+					"description": "No Trace was left to build.",
+					"when": "traces.done_count = 0 and traces.failed_count = 0 and traces.blocked_count = 0 and traces.waiting_count = 0"
+				},
 				{
 					"name": "incomplete",
 					"description": "A Trace failed, is blocked, or still waits.",
@@ -98,7 +103,7 @@
 				"y": 240
 			},
 			"type": "command",
-			"command": "# Not every Trace is built: say so on the Feature, and fail. The Features that wait on this one are blocked.\nprintf 'Not every Trace of Feature #%s is built, so the checkpoint did not run.\\n\\n%s\\n' \"{{item.number}}\" \"{{traces.summary}}\"\nprintf '### night-shift: the build stopped before the checkpoint\\n\\n%s\\n' \"{{traces.summary}}\" | gh issue comment \"{{item.number}}\" --body-file - || true\nexit 1",
+			"command": "# Not every Trace is built: say so on the Feature, go back to where the Feature started, and fail. The Features that wait on this one are blocked.\ncounts=$(printf 'Built: %s, failed: %s, blocked: %s, waiting: %s.' \"{{traces.done_count}}\" \"{{traces.failed_count}}\" \"{{traces.blocked_count}}\" \"{{traces.waiting_count}}\")\nprintf 'Not every Trace of Feature #%s is built, so the checkpoint did not run.\\n\\n%s\\n\\n%s\\n' \"{{item.number}}\" \"$counts\" \"{{traces.summary}}\"\nprintf '### night-shift: the build stopped before the checkpoint\\n\\n%s\\n\\n%s\\n' \"$counts\" \"{{traces.summary}}\" | gh issue comment \"{{item.number}}\" --body-file - || true\n# The next Feature must not build on the work of a failed Trace. That work stays on its own branch, committed.\nstart=$(cat .build/night/feature-start-branch)\nif [ \"$(git branch --show-current)\" != \"$start\" ] && [ -n \"$(git status --porcelain)\" ]; then\n\tgit add -A\n\tgit commit --no-verify -qm \"wip: the build of Feature #{{item.number}} that stopped\" || true\nfi\ngit checkout -q \"$start\" || true\nexit 1",
 			"timeoutMinutes": 5
 		},
 		{
@@ -110,7 +115,7 @@
 			},
 			"type": "value",
 			"by": "rule",
-			"expression": "{ \"scenarios\": [$distinct([traces.results.outputs.scenarios][$ != \"\"])] }",
+			"expression": "{ \"scenarios\": [$distinct(traces.results.outputs.scenarios[$type($) = \"string\" and $ != \"\"])] }",
 			"output": {
 				"type": "object",
 				"properties": {
@@ -216,7 +221,7 @@
 			},
 			"type": "command",
 			"output": "json",
-			"command": "# The tune/ branch gets a pull request on the stack when it has a commit. Then the label `verified` per Trace and a comment on the Feature, from the validator's report. Prints the tuning pull request as JSON.\nset -e\n# Everything below goes to the log. Only the JSON at the end is the output.\nexec 3>&1 1>&2\nbranch=\"tune/{{item.number}}\"\nbase_branch=$(cat .build/night/tune-base-branch)\nurl=\"\"\nif [ \"$(git rev-list --count \"$(cat .build/night/tune-base)..HEAD\")\" != 0 ]; then\n\tgit push --force-with-lease -u origin \"$branch\"\n\t# A base branch that is not on GitHub (the run's own branch): the pull request goes on the trunk.\n\tgit ls-remote --exit-code --heads origin \"$base_branch\" >/dev/null || base_branch=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)\n\t{\n\t\tprintf '## Summary\\n\\nThe tuning of Feature #%s (%s) after its build: the validator at the checkpoint of the night build.\\n\\n%s\\n' \"{{item.number}}\" \"{{item.title}}\" \"{{validate.data.summary}}\"\n\t\tprintf '\\n## Changes\\n\\n'\n\t\tgit log --reverse --format='- %s' \"$(cat .build/night/tune-base)..HEAD\"\n\t\tprintf '\\n## Test plan\\n\\n- [x] The local check against the start of the Feature: the guards, the format lint, the tests of the affected Verticals, and, for a change in `App/` or `Edge/`, the app builds and the UI smoke set\\n\\n## Related\\n\\nFeature #%s\\n' \"{{item.number}}\"\n\t} > .build/night/pr-body.md\n\turl=$(gh pr list --head \"$branch\" --state open --json url --jq '.[0].url // empty')\n\t[ -n \"$url\" ] || url=$(gh pr create --base \"$base_branch\" --head \"$branch\" --title \"refactor: tune {{item.title}}\" --body-file .build/night/pr-body.md | tail -1)\n\techo \"Tuning: $url\"\nelse\n\tgit checkout -q \"$base_branch\"\n\tgit branch -q -D \"$branch\"\n\techo \"The validator changed nothing: no tuning pull request.\"\nfi\n# The labels and the comment, from the validator's report (empty when it gave none).\npython3 -c '\nimport json, subprocess, sys\nfeature, url = sys.argv[1], sys.argv[3]\nreport = json.loads(sys.argv[2] or \"{}\")\nlines = [\"### night-shift: checkpoint after the build\", \"\", str(report.get(\"summary\") or \"The validator gave no report.\")]\nfor result in report.get(\"traces\") or []:\n    number, verified = str(result.get(\"number\", \"\")), bool(result.get(\"verified\"))\n    if verified and number.isdigit():\n        subprocess.run([\"gh\", \"issue\", \"edit\", number, \"--add-label\", \"verified\"], check=False)\n    note = (\". \" + str(result[\"note\"])) if result.get(\"note\") else \"\"\n    lines.append(\"- Trace #\" + number + \": \" + (\"verified\" if verified else \"NOT verified\") + note)\nneeds = report.get(\"needs_owner\") or []\nif needs:\n    lines += [\"\", \"Needs the owner:\"] + [\"- \" + str(item) for item in needs]\nif url:\n    lines += [\"\", \"Tuning: \" + url]\nsubprocess.run([\"gh\", \"issue\", \"comment\", feature, \"--body-file\", \"-\"], input=\"\\n\".join(lines) + \"\\n\", text=True, check=True)\n' \"{{item.number}}\" \"{{validate.data}}\" \"$url\"\n# The commit that the orchestrator must leave as it is.\ngit rev-parse HEAD > .build/night/tuned\nprintf '{\"url\": \"%s\"}\\n' \"$url\" >&3",
+			"command": "# The tune/ branch gets a pull request on the stack when it has a commit. Then the label `verified` per Trace and a comment on the Feature, from the validator's report. Prints the tuning pull request as JSON.\nset -e\n# Everything below goes to the log. Only the JSON at the end is the output.\nexec 3>&1 1>&2\nbranch=\"tune/{{item.number}}\"\nbase_branch=$(cat .build/night/tune-base-branch)\nurl=\"\"\nif [ \"$(git rev-list --count \"$(cat .build/night/tune-base)..HEAD\")\" != 0 ]; then\n\tgit push --force-with-lease -u origin \"$branch\"\n\t# A base branch that is not on GitHub (the run's own branch): the pull request goes on the trunk.\n\tgit ls-remote --exit-code --heads origin \"$base_branch\" >/dev/null || base_branch=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)\n\t{\n\t\tprintf '## Summary\\n\\nThe tuning of Feature #%s (%s) after its build: the validator at the checkpoint of the night build.\\n\\n%s\\n' \"{{item.number}}\" \"{{item.title}}\" \"{{validate.data.summary}}\"\n\t\tprintf '\\n## Changes\\n\\n'\n\t\tgit log --reverse --format='- %s' \"$(cat .build/night/tune-base)..HEAD\"\n\t\tprintf '\\n## Test plan\\n\\n- [x] The local check against the start of the Feature: the guards, the format lint, the tests of the affected Verticals, and, for a change in `App/` or `Edge/`, the app builds and the UI smoke set\\n\\n## Related\\n\\nFeature #%s\\n' \"{{item.number}}\"\n\t} > .build/night/pr-body.md\n\turl=$(gh pr list --head \"$branch\" --state open --json url --jq '.[0].url // empty')\n\tif [ -z \"$url\" ]; then\n\t\turl=$(gh pr create --base \"$base_branch\" --head \"$branch\" --title \"refactor: tune {{item.title}}\" --body-file .build/night/pr-body.md)\n\t\turl=$(printf '%s\\n' \"$url\" | tail -1)\n\tfi\n\t[ -n \"$url\" ] || { echo \"No tuning pull request was opened.\"; exit 1; }\n\techo \"Tuning: $url\"\nelse\n\tgit checkout -q \"$base_branch\"\n\tgit branch -q -D \"$branch\"\n\techo \"The validator changed nothing: no tuning pull request.\"\nfi\n# The labels and the comment, from the validator's report (empty when it gave none).\npython3 -c '\nimport json, subprocess, sys\nfeature, url = sys.argv[1], sys.argv[3]\nreport = json.loads(sys.argv[2] or \"{}\")\nlines = [\"### night-shift: checkpoint after the build\", \"\", str(report.get(\"summary\") or \"The validator gave no report.\")]\nfor result in report.get(\"traces\") or []:\n    number, verified = str(result.get(\"number\", \"\")), bool(result.get(\"verified\"))\n    if verified and number.isdigit():\n        subprocess.run([\"gh\", \"issue\", \"edit\", number, \"--add-label\", \"verified\"], check=False)\n    note = (\". \" + str(result[\"note\"])) if result.get(\"note\") else \"\"\n    lines.append(\"- Trace #\" + number + \": \" + (\"verified\" if verified else \"NOT verified\") + note)\nneeds = report.get(\"needs_owner\") or []\nif needs:\n    lines += [\"\", \"Needs the owner:\"] + [\"- \" + str(item) for item in needs]\nif url:\n    lines += [\"\", \"Tuning: \" + url]\nsubprocess.run([\"gh\", \"issue\", \"comment\", feature, \"--body-file\", \"-\"], input=\"\\n\".join(lines) + \"\\n\", text=True, check=True)\n' \"{{item.number}}\" \"{{validate.data}}\" \"$url\"\n# The commit that the orchestrator must leave as it is.\ngit rev-parse HEAD > .build/night/tuned\nprintf '{\"url\": \"%s\"}\\n' \"$url\" >&3",
 			"timeoutMinutes": 15
 		},
 		{
@@ -228,7 +233,7 @@
 			},
 			"type": "value",
 			"by": "rule",
-			"expression": "{ \"urls\": [$filter([traces.results.outputs.pr], function($url) { $url != \"\" })] }",
+			"expression": "{ \"urls\": [traces.results.outputs.pr[$type($) = \"string\" and $ != \"\"]] }",
 			"output": {
 				"type": "object",
 				"properties": {
@@ -252,7 +257,7 @@
 			"type": "wait",
 			"until": {
 				"kind": "command",
-				"command": "# Exit 0 when every pull request of the Feature has green checks. Else the wait sleeps and tries again.\nprintf '%s' \"{{prs.data.urls}}\" | python3 -c 'import json, sys; print(\"\\n\".join(json.load(sys.stdin)))' | while read -r url; do\n\t[ -n \"$url\" ] || continue\n\tgh pr checks \"$url\" >/dev/null 2>&1 || exit 1\ndone",
+				"command": "# Exit 0 when every pull request of the Feature, the tuning one too, has green checks or no checks. Else the wait sleeps and tries again.\n# A red check also tries again: the wait cannot end early as failed, so it ends at its time limit.\n{\n\tprintf '%s' \"{{prs.data.urls}}\" | python3 -c 'import json, sys; print(\"\\n\".join(json.load(sys.stdin)))'\n\tprintf '%s\\n' \"{{deliver_tune.data.url}}\"\n} | while read -r url; do\n\t[ -n \"$url\" ] || continue\n\tchecks=$(gh pr checks \"$url\" 2>&1) && continue\n\tcase \"$checks\" in\n\t*\"no checks reported\"*) continue ;;\n\tesac\n\tprintf '%s is not green yet:\\n%s\\n' \"$url\" \"$checks\"\n\texit 1\ndone",
 				"everyMinutes": 5
 			},
 			"timeoutMinutes": 30

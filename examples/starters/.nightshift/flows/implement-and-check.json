@@ -1,6 +1,6 @@
 {
 	"version": 4,
-	"description": "An agent implements a task, a command checks it; a failed check goes back to a fresh agent with the log (3 tries), then a rescue on Opus.",
+	"description": "An agent builds a task and a command checks it. A failed check goes back to an agent with the log, up to 3 tries. Then Opus tries to rescue it.",
 	"inputs": [
 		{
 			"name": "task",
@@ -13,7 +13,7 @@
 			"name": "check",
 			"type": "text",
 			"label": "Check",
-			"description": "The shell command that proves the work, for example the tests. Exit 0 passes.",
+			"description": "The shell command that proves the work, for example the tests.",
 			"default": "bun test"
 		}
 	],
@@ -22,6 +22,11 @@
 			"name": "summary",
 			"value": "{{implement.summary}}",
 			"description": "What the agent reports it did."
+		},
+		{
+			"name": "rescue",
+			"value": "{{rescue.summary}}",
+			"description": "What the rescue did. Empty when the work needed no rescue."
 		}
 	],
 	"start": "implement",
@@ -34,7 +39,7 @@
 				"y": 0
 			},
 			"type": "agent",
-			"prompt": "Implement this task in the repository of your working directory:\n\n{{task}}\n\nWhen you are done, `{{check}}` must pass. Run it yourself before you report. Keep the change small and focused, and commit it with a clear message.\n\nThe last check failed with this log (empty on the first try):\n\n{{verify.log_tail}}",
+			"prompt": "Implement this task in the repository of your working directory:\n\n{{task}}\n\nWhen you are done, `{{check}}` must pass. Run it yourself before you report. Keep the change small and focused, and commit it with a clear message. The check also fails when changes are not committed.\n\nThe last check failed with this log (empty on the first try):\n\n{{verify.log_tail}}",
 			"harness": "claude-code",
 			"model": "sonnet",
 			"permissionMode": "auto",
@@ -50,7 +55,7 @@
 				"y": 0
 			},
 			"type": "command",
-			"command": "# The input `check` arrives as an environment variable: run it as a shell command.\nsh -c \"{{check}}\"",
+			"command": "# The input `check` arrives as an environment variable: run it as a shell command.\nsh -c \"{{check}}\" || exit 1\nif [ -n \"$(git status --porcelain)\" ]; then\n\techo 'Commit your changes. Not committed:'\n\tgit status --short\n\texit 1\nfi",
 			"timeoutMinutes": 30
 		},
 		{
@@ -61,7 +66,7 @@
 				"y": 200
 			},
 			"type": "agent",
-			"prompt": "Another agent could not finish this task: it gave up, or the check still failed after 3 tries. Nobody is awake: do not ask a question, decide.\n\nThe task:\n\n{{task}}\n\nThe check: `{{check}}`. Its last log:\n\n{{verify.log_tail}}\n\nFind the cause, fix it, run the check until it passes, and commit. Report `fail` when you cannot get it to pass.",
+			"prompt": "Another agent could not finish this task: it gave up, or the check still failed after 3 tries. Nobody is awake: do not ask a question, decide.\n\nThe task:\n\n{{task}}\n\nThe check: `{{check}}`. Its last log:\n\n{{verify.log_tail}}\n\nFind the cause, fix it, run the check until it passes, and commit all changes. Report `fail` when you cannot get it to pass.",
 			"harness": "claude-code",
 			"model": "opus",
 			"permissionMode": "auto",
@@ -77,7 +82,7 @@
 				"y": 200
 			},
 			"type": "command",
-			"command": "sh -c \"{{check}}\"",
+			"command": "sh -c \"{{check}}\" || exit 1\nif [ -n \"$(git status --porcelain)\" ]; then\n\techo 'Commit your changes. Not committed:'\n\tgit status --short\n\texit 1\nfi",
 			"timeoutMinutes": 30
 		}
 	],

@@ -1,19 +1,19 @@
 {
 	"version": 4,
-	"description": "One task of plan-and-build: runs implement-and-check with the task's title and details.",
+	"description": "Builds and checks one task of a plan. plan-and-build runs it once for each task.",
 	"inputs": [
 		{
 			"name": "item",
 			"type": "json",
 			"label": "Task",
-			"description": "A task of the planner: { id, title, details, dependsOn? }.",
+			"description": "A task of the plan, for example { \"id\": \"t1\", \"title\": \"Add login\", \"details\": \"…\" }.",
 			"required": true
 		},
 		{
 			"name": "check",
 			"type": "text",
 			"label": "Check",
-			"description": "The shell command that proves the work.",
+			"description": "The shell command that proves the work, for example the tests.",
 			"default": "bun test"
 		}
 	],
@@ -22,6 +22,11 @@
 			"name": "summary",
 			"value": "{{implement.summary}}",
 			"description": "What the agent reports it did."
+		},
+		{
+			"name": "rescue",
+			"value": "{{implement.rescue}}",
+			"description": "What the rescue did. Empty when the work needed no rescue."
 		}
 	],
 	"start": "implement",
@@ -39,7 +44,25 @@
 				"task": "{{item.title}}: {{item.details}}",
 				"check": "{{check}}"
 			}
+		},
+		{
+			"id": "clean_up",
+			"label": "Undo unfinished changes",
+			"position": {
+				"x": 320,
+				"y": 0
+			},
+			"type": "command",
+			"command": "# Drop the changes a failed task leaves, so the next tasks start clean. Then fail the task.\ngit reset -q --hard && git clean -fdq\nexit 1",
+			"timeoutMinutes": 5
 		}
 	],
-	"edges": []
+	"edges": [
+		{
+			"id": "implement-fail-clean_up",
+			"from": "implement",
+			"outcome": "fail",
+			"to": "clean_up"
+		}
+	]
 }

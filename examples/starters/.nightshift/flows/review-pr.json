@@ -1,6 +1,6 @@
 {
 	"version": 4,
-	"description": "An agent reviews a pull request; after a person agrees, a command posts the review with `gh pr review`.",
+	"description": "An agent reviews a pull request. You read the review, and Night Shift posts it on GitHub when you agree.",
 	"inputs": [
 		{
 			"name": "pr",
@@ -73,18 +73,38 @@
 			}
 		},
 		{
-			"id": "confirm",
-			"label": "Post it?",
+			"id": "comments",
+			"label": "List the comments",
 			"position": {
 				"x": 320,
 				"y": 0
 			},
+			"type": "value",
+			"by": "rule",
+			"expression": "{ \"text\": $count(review.data.comments) = 0 ? \"No comments.\" : $join(review.data.comments.(\"- `\" & path & \":\" & $string(line) & \"`: \" & body), \"\\n\") }",
+			"output": {
+				"type": "object",
+				"properties": {
+					"text": {
+						"type": "string"
+					}
+				},
+				"required": ["text"]
+			}
+		},
+		{
+			"id": "confirm",
+			"label": "Post it?",
+			"position": {
+				"x": 640,
+				"y": 0
+			},
 			"type": "decision",
-			"prompt": "The review of {{pr}} says `{{review.outcome}}`:\n\n{{review.data.summary}}\n\nComments:\n\n{{review.data.comments}}\n\nPost it on GitHub?",
+			"prompt": "The review of {{pr}} says `{{review.outcome}}`:\n\n{{review.data.summary}}\n\nComments:\n\n{{comments.data.text}}\n\nPost it on GitHub?",
 			"options": [
 				{
 					"name": "post",
-					"description": "Post the review as it is."
+					"description": "Post the review on GitHub. On your own pull request, it posts as a comment."
 				},
 				{
 					"name": "skip",
@@ -97,25 +117,31 @@
 			"id": "post",
 			"label": "Post the review",
 			"position": {
-				"x": 640,
+				"x": 960,
 				"y": 0
 			},
 			"type": "command",
-			"command": "# Templates arrive as environment variables, so the review text is never shell code.\nset -e\ncase \"{{review.outcome}}\" in\n\tapprove) verdict=--approve ;;\n\t*) verdict=--request-changes ;;\nesac\nbody=$(\n\tprintf '%s\\n\\n' \"{{review.data.summary}}\"\n\tprintf '%s' \"{{review.data.comments}}\" | jq -r '.[] | \"- `\\(.path):\\(.line)`: \\(.body)\"'\n)\ngh pr review \"{{pr}}\" \"$verdict\" --body \"$body\"",
+			"command": "# Templates arrive as environment variables, so the review text is never shell code.\nset -e\ncase \"{{review.outcome}}\" in\n\tapprove) verdict=--approve ;;\n\t*) verdict=--request-changes ;;\nesac\n# GitHub refuses to approve or request changes on your own pull request: comment instead.\nauthor=$(gh pr view \"{{pr}}\" --json author --jq .author.login)\nme=$(gh api user --jq .login)\nif [ \"$author\" = \"$me\" ]; then\n\tverdict=--comment\nfi\nbody=$(printf '%s\\n\\n%s' \"{{review.data.summary}}\" \"{{comments.data.text}}\")\ngh pr review \"{{pr}}\" \"$verdict\" --body \"$body\"",
 			"timeoutMinutes": 5
 		}
 	],
 	"edges": [
 		{
-			"id": "review-approve-confirm",
+			"id": "review-approve-comments",
 			"from": "review",
 			"outcome": "approve",
-			"to": "confirm"
+			"to": "comments"
 		},
 		{
-			"id": "review-request-changes-confirm",
+			"id": "review-request-changes-comments",
 			"from": "review",
 			"outcome": "request-changes",
+			"to": "comments"
+		},
+		{
+			"id": "comments-pass-confirm",
+			"from": "comments",
+			"outcome": "pass",
 			"to": "confirm"
 		},
 		{

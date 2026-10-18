@@ -470,6 +470,11 @@ describe("Call with each", () => {
 		]);
 		expect(loop.items[1]?.reason).toBe(`Ended at node "ask" with "halt".`);
 		expect(loop.outputs.waiting_count).toBe(1);
+		expect(String(loop.outputs.summary).split("\n")).toEqual([
+			"#1 done",
+			`#2 halted: Ended at node "ask" with "halt".`,
+			"#3 not started",
+		]);
 		expect(decider.calls[1]?.prompt).toBe("Go on with two?");
 	});
 

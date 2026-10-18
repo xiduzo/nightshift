@@ -1,12 +1,12 @@
 {
 	"version": 4,
-	"description": "One agent per file that matches a glob applies the same instruction, all on one branch; then one commit.",
+	"description": "An agent applies the same instruction to each file that matches a glob. Night Shift then commits all changes at once.",
 	"inputs": [
 		{
 			"name": "glob",
 			"type": "text",
 			"label": "Files",
-			"description": "A glob, relative to the repository root.",
+			"description": "A glob, relative to the project folder, for example `src/**/*.ts`.",
 			"default": "src/**/*.ts"
 		},
 		{
@@ -57,12 +57,6 @@
 			"id": "each-done-commit",
 			"from": "each",
 			"outcome": "done",
-			"to": "commit"
-		},
-		{
-			"id": "each-halted-commit",
-			"from": "each",
-			"outcome": "halted",
 			"to": "commit"
 		}
 	]
