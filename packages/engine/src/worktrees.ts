@@ -37,10 +37,25 @@ function gitEnv(): Record<string, string> {
 	return env;
 }
 
+/** Git is not on this computer: the `git` program cannot start. */
+export class GitNotInstalledError extends Error {
+	constructor() {
+		super(
+			"Git is not installed on this computer. Install git, then try again.",
+		);
+		this.name = "GitNotInstalledError";
+	}
+}
+
+/**
+ * Runs git in `cwd`. Throws `GitNotInstalledError` when git cannot start,
+ * so that a missing git does not read as "not a repository".
+ */
 export async function git(
 	cwd: string,
 	args: string[],
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+	if (Bun.which("git") === null) throw new GitNotInstalledError();
 	const proc = Bun.spawn(["git", ...args], {
 		cwd,
 		env: gitEnv(),
@@ -56,7 +71,7 @@ export async function git(
 	return { exitCode, stdout: stdout.trim(), stderr: stderr.trim() };
 }
 
-async function gitOrThrow(cwd: string, args: string[]): Promise<string> {
+export async function gitOrThrow(cwd: string, args: string[]): Promise<string> {
 	const result = await git(cwd, args);
 	if (result.exitCode !== 0) {
 		throw new GitError(

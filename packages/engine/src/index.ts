@@ -37,6 +37,21 @@ export {
 	type ProfileView,
 } from "./profiles";
 export {
+	checkProjectFolder,
+	GIT_DOWNLOAD_URL,
+	type GitInstall,
+	type GitInstaller,
+	type GitProbe,
+	type ProjectReadiness,
+	probeGit,
+	type ReadinessFix,
+	type ReadinessStatus,
+	type ReadinessStep,
+	type ReadinessStepId,
+	setUpGit,
+	systemGitInstaller,
+} from "./project-setup";
+export {
 	exportRun,
 	openRunBundle,
 	RUN_BUNDLE_FORMAT_VERSION,

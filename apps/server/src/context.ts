@@ -10,6 +10,7 @@ import {
 	db,
 	engine,
 	profiles,
+	projectSetup,
 	settings,
 } from "./services";
 
@@ -32,6 +33,7 @@ export async function createContext({
 		cliTools,
 		profiles,
 		checks,
+		projectSetup,
 		daemon,
 	};
 }

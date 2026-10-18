@@ -38,6 +38,27 @@ const projects = {
 			}),
 		)
 		.handler(({ context, input }) => context.engine.addProject(input)),
+	/** What the folder needs before runs can start in it. Read-only. */
+	check: publicProcedure
+		.input(z.object({ path: z.string().min(1) }))
+		.handler(({ context, input }) => context.projectSetup.check(input.path)),
+	/**
+	 * The `set-up-git` fix: a repository, a starter `.gitignore` and a first
+	 * commit. A name and email go into the repository's own git config.
+	 */
+	setUpGit: publicProcedure
+		.input(
+			z.object({
+				path: z.string().min(1),
+				name: z.string().trim().min(1).optional(),
+				email: z.email().optional(),
+			}),
+		)
+		.handler(({ context, input }) => context.projectSetup.setUpGit(input)),
+	/** The `install-git` fix: starts the system's installer, or says what to run. */
+	installGit: publicProcedure.handler(({ context }) =>
+		context.projectSetup.installGit(),
+	),
 	/** Opens the native folder picker on this Mac. Null when cancelled. */
 	chooseFolder: publicProcedure.handler(() =>
 		chooseFolder("Choose a git repository to add to Night Shift"),
