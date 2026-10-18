@@ -5,6 +5,7 @@ import {
 	newlyBlocked,
 	nextItem,
 	normalizeList,
+	unfinishedBlockers,
 } from "./items";
 import type { ListItem } from "./types";
 
@@ -112,6 +113,27 @@ describe("blockersFirst", () => {
 			item("b", ["a"]),
 		]);
 		expect(result).toEqual({ ok: false, cycle: ["a", "b"] });
+	});
+});
+
+describe("unfinishedBlockers", () => {
+	test("names the blockers that are not done, listed or not", () => {
+		const items = [
+			item("1"),
+			item("2", [], { done: true }),
+			item("3"),
+			item("4", [
+				"1",
+				"2",
+				"3",
+				{ id: "9", done: false },
+				{ id: "8", done: true },
+			]),
+		];
+		expect(unfinishedBlockers(nth(items, 3), items, { "3": "done" })).toEqual([
+			"1",
+			"9",
+		]);
 	});
 });
 

@@ -559,7 +559,7 @@ export function createRunner(deps: RunnerDeps) {
 							items: open.items,
 							visit: open.visit,
 							outcome: status,
-							waitingCount: 0,
+							waiting: [],
 						})
 					: open.nodeType === "decision"
 						? { outcome: status, note: "", visit: open.visit }

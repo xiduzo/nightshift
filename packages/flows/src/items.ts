@@ -87,6 +87,26 @@ export function nextItem(
 		: { kind: "none" };
 }
 
+/**
+ * The ids of the blockers of `item` that are not done: not done before the
+ * run (as listed, or as the blocker link says) and not `done` in `states`.
+ */
+export function unfinishedBlockers(
+	item: ListItem,
+	ordered: readonly ListItem[],
+	states: Readonly<Record<string, ItemState>>,
+): string[] {
+	const listed = new Map(ordered.map((entry) => [entry.id, entry]));
+	return item.dependsOn
+		.filter(
+			(blocker) =>
+				blocker.id !== item.id &&
+				states[blocker.id] !== "done" &&
+				!(listed.get(blocker.id)?.done ?? blocker.done),
+		)
+		.map((blocker) => blocker.id);
+}
+
 /** Items without a state whose blocker failed or is blocked, transitively. */
 export function newlyBlocked(
 	ordered: readonly ListItem[],

@@ -949,7 +949,7 @@ describe("the Call node with each", () => {
 		expect(loopStopped.outcome).toBe("stopped");
 		expect(loopStopped.outputs).toMatchObject({
 			outcome: "stopped",
-			summary: "#1 running",
+			summary: "#1 running\n#2 not started",
 		});
 		// The item no longer runs: it shows failed with why, until a resume.
 		expect(

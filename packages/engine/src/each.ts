@@ -133,12 +133,23 @@ function firstLine(text: string): string {
 	return text.split("\n")[0] ?? "";
 }
 
+/** An element that did not start in this visit, and what it waits on. */
+export type WaitingItem = { id: string; blockers: readonly string[] };
+
+/** `#14 waits on #12, #13`, or `#14 not started` when no blocker holds it. */
+function waitingLine(item: WaitingItem): string {
+	const label = itemLabel(item);
+	return item.blockers.length > 0
+		? `${label} waits on ${item.blockers.map((id) => itemLabel({ id })).join(", ")}`
+		: `${label} not started`;
+}
+
 /** The outputs of a Call step with `each` (`callEachOutputFields`). */
 export function eachOutputs(input: {
 	items: readonly DerivedItem[];
 	visit: number;
 	outcome: string;
-	waitingCount: number;
+	waiting: readonly WaitingItem[];
 }): StepOutputs {
 	const count = (state: DerivedItem["state"]) =>
 		input.items.filter((item) => item.state === state).length;
@@ -147,8 +158,11 @@ export function eachOutputs(input: {
 		done_count: count("done"),
 		failed_count: count("failed"),
 		blocked_count: count("blocked"),
-		waiting_count: input.waitingCount,
-		summary: input.items.map(itemLine).join("\n"),
+		waiting_count: input.waiting.length,
+		summary: [
+			...input.items.map(itemLine),
+			...input.waiting.map(waitingLine),
+		].join("\n"),
 		results: input.items.map((item) => ({
 			id: item.facts.id,
 			title: item.facts.title,
