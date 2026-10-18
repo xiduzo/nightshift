@@ -282,6 +282,16 @@ describe("a spec with its own outcomes and an output schema", () => {
 			{ outcome: "changes-requested", summary: "x", data: null },
 			{ outcome: "changes-requested", summary: "x", data: null },
 		],
+		// An object sent as JSON text is read as the object.
+		[
+			{ outcome: "approved", summary: "x", data: '{"issues": ["a"]}' },
+			{ outcome: "approved", summary: "x", data: { issues: ["a"] } },
+		],
+		// Text that is not JSON stays text: the engine reports the mismatch.
+		[
+			{ outcome: "approved", summary: "x", data: "no issues" },
+			{ outcome: "approved", summary: "x", data: "no issues" },
+		],
 		[{ outcome: "approved", summary: "x" }, undefined],
 		[{ outcome: "pass", summary: "x", data: {} }, undefined],
 	] as Array<[unknown, StepReport | undefined]>)(
@@ -310,6 +320,13 @@ describe("a spec with its own outcomes and an output schema", () => {
 			parseStepReport({ outcome: "done", summary: "x", data: 1 }, own),
 		).toEqual({ outcome: "done", summary: "x" });
 		expect(reportInputSchema(own)).not.toHaveProperty("properties.data");
+	});
+
+	test("a string schema keeps JSON text as text", () => {
+		const own = reportRules({ output: { type: "string" } }) as ReportRules;
+		expect(
+			parseStepReport({ outcome: "pass", summary: "x", data: "[1]" }, own),
+		).toEqual({ outcome: "pass", summary: "x", data: "[1]" });
 	});
 
 	test("default outcomes with an output schema", () => {
