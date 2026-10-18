@@ -50,7 +50,7 @@ Last updated: 2026-10-15
 # Install
 bun install
 
-# Apply the schema to local.db
+# Apply the schema to the dev database (.nightshift-dev/)
 bun run db:push
 
 # Dev (web + server, hot reload)
@@ -102,6 +102,7 @@ bun lefthook install
 | React Flow for the editor | Mature graph editor for React. Custom nodes per node type. | 2026-10-15 |
 | Step timing, stop and waits stay engine code, not LangGraph's `TimeoutPolicy`, `RunControl` or `retryPolicy` | A LangGraph node timeout drops the node's writes and leaves it running; a drain is not persisted; retries sleep in-process. See `docs/research/langgraph-thinning.md`. | 2026-10-17 |
 | The walk reads the checkpoint; the event log is the read model for people, and the crash-recovery source | Writes before `interrupt()` are not committed, and a daemon death mid-node leaves only the log. What the checkpoint holds for sure (outputs, stop time, streak, open Gate) is read there. | 2026-10-17 |
+| Run history in one global app data directory per daemon, not per project | The dashboard, inbox and run list read across projects, and the per-database lease keeps the dev and night daemons apart. Transcripts can hold unredacted secrets and grow large, so they stay out of repos. Run export bundles cover sharing one run. | 2026-10-18 |
 
 Full ADRs go in `docs/adr/` when a decision needs more than one line of rationale.
 

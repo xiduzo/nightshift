@@ -183,7 +183,7 @@ Daily commands:
 
 ```bash
 bun install            # dependencies
-bun run db:push        # apply the schema to local.db
+bun run db:push        # apply the schema to the dev database
 bun run dev            # web + server with hot reload
 bun run dev:desktop    # the Electrobun shell with hot reload
 bun run check          # Biome lint + format
@@ -192,7 +192,14 @@ bun run build          # everything, desktop last
 bun run night          # the stable daemon for a night (see below)
 ```
 
-Nights: `bun run night` builds the web app, then serves the API server and the built web app on the usual ports (3000 and 3001; set `PORT` and `WEB_PORT` to change them). The server runs from source with plain `bun`, without `--hot`, and the web app is a production build behind `vite preview`, so no file change restarts a running night. It reads the same env as `bun run dev` (`apps/server/.env` and `apps/web/.env` through varlock; `process.env` wins). When `PORT` or `WEB_PORT` is set, `BETTER_AUTH_URL`, `VITE_SERVER_URL` and `CORS_ORIGIN` follow, unless they are set too. Develop in a separate git worktree (`git worktree add ../nightshift-dev`) with `bun run dev` on other ports, its own `DATABASE_URL` and `NIGHTSHIFT_DATA_DIR`, and `NIGHTSHIFT_SCHEDULER=off`. Never point two daemons at one database: the lease (below) refuses the second one. Pull the work into the night's clone between nights.
+Nights: `bun run night` builds the web app, then serves the API server and the built web app on the usual ports (3000 and 3001; set `PORT` and `WEB_PORT` to change them). The server runs from source with plain `bun`, without `--hot`, and the web app is a production build behind `vite preview`, so no file change restarts a running night. It reads the same env as `bun run dev` (`apps/server/.env` and `apps/web/.env` through varlock; `process.env` wins). When `PORT` or `WEB_PORT` is set, `BETTER_AUTH_URL`, `VITE_SERVER_URL` and `CORS_ORIGIN` follow, unless they are set too. Develop in a separate git worktree (`git worktree add ../nightshift-dev`) with `bun run dev` on other ports and `NIGHTSHIFT_SCHEDULER=off`. Never point two daemons at one database: the lease (below) refuses the second one. Pull the work into the night's clone between nights.
+
+Data directory: a daemon keeps its database (`nightshift.db`), its transcripts (`transcripts/<run>/<step>.ndjson`) and its command logs (`logs/<run>/<step>.log`) together in one folder on this computer, never in a project. A project's `.nightshift/` folder holds only what you commit: flows and schedules.
+
+- `bun run night` and the desktop app use the app data folder of the OS: `~/Library/Application Support/Night Shift` on macOS, `$XDG_DATA_HOME/nightshift` (else `~/.local/share/nightshift`) on Linux, `%APPDATA%\Night Shift` on Windows.
+- `bun run dev` sets `NIGHTSHIFT_DEV=true` and uses `.nightshift-dev/` in its own checkout (gitignored). A dev daemon never opens the night's database, and two checkouts never share one. The `db:push`, `db:studio` and `db:migrate` scripts open the same dev database.
+- `NIGHTSHIFT_DATA_DIR` sets the folder for either one. `DATABASE_URL` sets only the database, for example a libsql server. Leave it unset otherwise.
+- History from before (the checkout's `local.db`, `~/.nightshift/transcripts` and `~/.nightshift/logs`) is never moved for you. The daemon names it at start. Stop the daemon and run `bun run data:migrate` (add `--dev` for the dev folder) to copy it into the data directory. It copies and never moves, and it refuses a data directory that has data already. Then remove `DATABASE_URL` from `apps/server/.env`.
 
 Lease: one daemon per database. A daemon takes the lease (the `daemon_lease` row) before it recovers interrupted work or starts the scheduler, and writes a heartbeat every 10 seconds. A second daemon on the same database refuses to start: it prints the holder's host, pid and start time, and exits with code 1. The lease is free when its holder released it (a clean stop with Ctrl+C or SIGTERM), when the holder's pid no longer runs on this machine, or when its last heartbeat is older than 90 seconds. Every acquisition adds one to the epoch. A daemon whose machine slept keeps the lease on waking, unless another daemon took it in the meantime; then its next heartbeat fails, it logs `SELF-FENCE:` and exits with code 3 without writing anything more. Nothing restarts it: stop the other daemon first, then start this one again. The Settings page shows the lease under This daemon.
 
