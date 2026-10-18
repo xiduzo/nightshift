@@ -6,9 +6,10 @@
 		"build": "tsc -b ../../packages/api && tsdown",
 		"check-types": "tsc -b ../../packages/api && tsc --noEmit",
 		"compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile server",
-		"dev": "bun run --hot src/index.ts",
+		"dev": "NIGHTSHIFT_DEV=true bun run --hot src/index.ts",
 		"test": "bun test",
 		"start": "bun run dist/index.mjs",
+		"data:migrate": "bun src/data-migrate.ts",
 		"env:generate": "varlock codegen",
 		"auth:generate": "varlock run -- bun x auth@latest generate --config src/services.ts --output ../../packages/db/src/schema/auth.ts --yes"
 	},

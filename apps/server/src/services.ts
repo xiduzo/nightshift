@@ -1,6 +1,3 @@
-import { homedir } from "node:os";
-import { join } from "node:path";
-
 import {
 	type AgentHarness,
 	acpHarness,
@@ -19,6 +16,12 @@ import {
 import type { Context } from "@nightshift/api/context";
 import { createAuth } from "@nightshift/auth";
 import { createDb } from "@nightshift/db";
+import {
+	databaseUrl,
+	ensureDataDir,
+	legacyData,
+	resolveDataDir,
+} from "@nightshift/db/data-dir";
 import { migrateDb } from "@nightshift/db/migrate";
 import {
 	acquireLease,
@@ -35,7 +38,28 @@ import {
 
 import { desktopOrigins, ENV } from "./env.server";
 
-export const db = createDb(ENV);
+/** The database, the transcripts and the command logs, together. */
+const dev = ENV.NIGHTSHIFT_DEV === "true";
+const dataDir = ensureDataDir(
+	resolveDataDir({
+		NIGHTSHIFT_DATA_DIR: ENV.NIGHTSHIFT_DATA_DIR,
+		NIGHTSHIFT_DEV: dev,
+	}),
+);
+
+// Run history from before the data directory is never moved for you.
+const legacy = legacyData({
+	dataDir,
+	databaseUrlSet: Boolean(ENV.DATABASE_URL?.trim()),
+});
+const legacyPaths = [legacy.database, ...legacy.files].filter(Boolean);
+if (legacyPaths.length > 0) {
+	console.warn(
+		`Earlier run history is in ${legacyPaths.join(", ")}. This daemon keeps its data in ${dataDir}. To copy it there, stop the daemon and run \`bun run data:migrate${dev ? " --dev" : ""}\`.`,
+	);
+}
+
+export const db = createDb({ DATABASE_URL: databaseUrl(ENV, dataDir) });
 await migrateDb(db);
 
 /**
@@ -122,8 +146,6 @@ const hot = globalThis as { nightshiftScheduler?: AbortController };
 hot.nightshiftScheduler?.abort();
 const scheduler = new AbortController();
 hot.nightshiftScheduler = scheduler;
-
-const dataDir = ENV.NIGHTSHIFT_DATA_DIR ?? join(homedir(), ".nightshift");
 
 export const engine = await createEngine({
 	db,
