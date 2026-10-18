@@ -22,6 +22,7 @@ import type {
 
 import type { CliToolGuide } from "./cli-tools";
 import type { McpExpansion } from "./mcp";
+import type { GitProbe } from "./project-setup";
 import type { RunSettings } from "./settings";
 
 /**
@@ -390,7 +391,11 @@ export type ScheduleList = {
 
 export interface Engine {
 	listProjects(): Promise<Project[]>;
-	/** Fails when the path is not the top level of a git repository. */
+	/**
+	 * Fails when the path is not the top level of a git repository. A
+	 * repository without commits is added; `checkProjectFolder` says what it
+	 * still needs, and runs refuse to start until then.
+	 */
 	addProject(input: { repoPath: string; name?: string }): Promise<Project>;
 	/** Keeps the project's runs and events. Fails while one of its runs is running. */
 	removeProject(projectId: string): Promise<void>;
@@ -481,6 +486,8 @@ export type EngineOptions = {
 	decider?: Decider;
 	/** Root for transcripts, command logs and other on-disk state, for example ~/.nightshift. */
 	dataDir: string;
+	/** Finds git on this computer before a run starts. Default: `probeGit`. */
+	probeGit?: GitProbe;
 	/** How many runs may run a step at once. A run waiting at a Gate does not count. Default 2. */
 	maxConcurrentRuns?: number;
 	/** Safety net against runaway flows: the most steps one run may take, unless the flow's policy sets `maxSteps`. Default 500. */

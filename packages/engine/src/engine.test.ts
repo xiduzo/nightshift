@@ -225,6 +225,25 @@ describe("projects", () => {
 		expect(await engine.listProjects()).toEqual([]);
 	});
 
+	test("a project without commits refuses to start a run", async () => {
+		const engine = makeEngine(scriptedHarness().harness);
+		const empty = join(sandbox.root, "empty");
+		await mkdir(empty);
+		await mustGit(empty, ["init", "-q"]);
+		const project = await engine.addProject({ repoPath: empty });
+		await expect(
+			engine.startRun({
+				projectId: project.id,
+				flow: singleAgentFlow({
+					prompt: "Do it",
+					model: "sonnet",
+					permissionMode: "default",
+				}),
+			}),
+		).rejects.toThrow("The project has no commits yet.");
+		expect(await engine.listRuns()).toEqual([]);
+	});
+
 	test("addProject stores the repo top level and is idempotent", async () => {
 		const engine = makeEngine(scriptedHarness().harness);
 		const first = await engine.addProject({ repoPath: sandbox.repoPath });

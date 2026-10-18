@@ -64,6 +64,7 @@ import {
 import { createRunner, type ThreadState } from "./graph/runner";
 import { resolveInputs } from "./inputs";
 import { expandMcpServers, type McpExpansion } from "./mcp";
+import { checkProjectFolder } from "./project-setup";
 import { createRunLog, type RunLog } from "./run-log";
 import {
 	createScheduler,
@@ -872,6 +873,21 @@ export function createEngine(
 			const title = flowName
 				? [flowName, ...textInputs].join(" · ").slice(0, 120)
 				: quickRunTitle(flow);
+			const readiness = await checkProjectFolder(projectRow.repoPath, {
+				...(options.probeGit ? { probeGit: options.probeGit } : {}),
+			});
+			const notReady = readiness.steps.find(
+				(step) => step.status === "failed" && step.id !== "identity",
+			);
+			if (notReady) {
+				throw new Error(
+					`The project is not ready for runs. ${notReady.problem} ${
+						notReady.id === "git"
+							? "Install git, then start the run again."
+							: "Add the project again to fix it."
+					}`,
+				);
+			}
 			const worktree = await createWorktree({
 				repoPath: projectRow.repoPath,
 				shortId: runId.slice(0, 8),

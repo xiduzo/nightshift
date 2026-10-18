@@ -22,6 +22,7 @@ import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import {
 	acquireLease,
+	checkProjectFolder,
 	createCliToolStore,
 	createConnectionStore,
 	createEngine,
@@ -31,6 +32,8 @@ import {
 	LEASE_HEARTBEAT_MS,
 	type Lease,
 	LeaseHeldError,
+	setUpGit,
+	systemGitInstaller,
 } from "@nightshift/engine";
 
 import { desktopOrigins, ENV } from "./env.server";
@@ -187,6 +190,13 @@ export const checks: Context["checks"] = {
 	programs: () => pathPrograms(),
 	mcp: (config, redact) => testMcpServer(config, { redact }),
 	models: harnessModels,
+};
+
+const gitInstaller = systemGitInstaller();
+export const projectSetup: Context["projectSetup"] = {
+	check: (path) => checkProjectFolder(path),
+	setUpGit: (input) => setUpGit(input),
+	installGit: () => gitInstaller.install(),
 };
 
 export const daemon: Context["daemon"] = {

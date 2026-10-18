@@ -102,6 +102,7 @@ bun lefthook install
 | React Flow for the editor | Mature graph editor for React. Custom nodes per node type. | 2026-10-15 |
 | Step timing, stop and waits stay engine code, not LangGraph's `TimeoutPolicy`, `RunControl` or `retryPolicy` | A LangGraph node timeout drops the node's writes and leaves it running; a drain is not persisted; retries sleep in-process. See `docs/research/langgraph-thinning.md`. | 2026-10-17 |
 | The walk reads the checkpoint; the event log is the read model for people, and the crash-recovery source | Writes before `interrupt()` are not committed, and a daemon death mid-node leaves only the log. What the checkpoint holds for sure (outputs, stop time, streak, open Gate) is read there. | 2026-10-17 |
+| Project readiness check with guided fixes, never a silent install | Worktrees need git, a top-level repository and a first commit. Night Shift checks them in order and offers a fix per problem after one confirm: the OS installer for git (a command to run where it needs `sudo`), and `git init` plus a first commit with a repo-local name and email. | 2026-10-18 |
 
 Full ADRs go in `docs/adr/` when a decision needs more than one line of rationale.
 

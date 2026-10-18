@@ -11,7 +11,9 @@ import type { Database } from "@nightshift/db";
 import type {
 	CliToolStore,
 	ConnectionStore,
+	GitInstall,
 	ProfileStore,
+	ProjectReadiness,
 	SettingsStore,
 } from "@nightshift/engine";
 import type { Engine } from "@nightshift/engine/types";
@@ -34,6 +36,16 @@ export type Context = {
 		mcp(config: McpServerConfig, redact: string[]): Promise<McpTestResult>;
 		/** The models a harness offers: its adapter's list, plus the CLI's own listing. */
 		models(harness: HarnessName, bin: string): Promise<HarnessModels>;
+	};
+	/** What a folder needs before runs can start in it, and the fixes a person asks for. */
+	projectSetup: {
+		check(path: string): Promise<ProjectReadiness>;
+		setUpGit(input: {
+			path: string;
+			name?: string;
+			email?: string;
+		}): Promise<ProjectReadiness>;
+		installGit(): Promise<GitInstall>;
 	};
 	/** Facts about this daemon that change only on a restart. */
 	daemon: {

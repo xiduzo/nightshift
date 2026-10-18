@@ -24,14 +24,15 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderGitIcon, FolderOpenIcon, PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
+import { ProjectReadiness } from "@/components/project-readiness";
 import { orpc } from "@/utils/orpc";
 
-/** Adds a git repository as a project, in a dialog. */
+/** Adds a folder as a project, in a dialog, after its readiness check. */
 export function AddProjectDialog({
 	open,
 	onOpenChange,
@@ -77,6 +78,14 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 		}),
 	);
 
+	const readiness = useQuery(
+		orpc.projects.check.queryOptions({
+			input: { path: repoPath },
+			enabled: repoPath !== "",
+		}),
+	);
+	const ready = readiness.data?.ready === true;
+
 	const folderName = repoPath.split("/").at(-1) || repoPath;
 
 	return (
@@ -84,20 +93,20 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 			className="contents"
 			onSubmit={(event) => {
 				event.preventDefault();
-				if (!repoPath) return;
+				if (!repoPath || !ready) return;
 				addProject.mutate({ repoPath, name: name.trim() || undefined });
 			}}
 		>
 			<DialogHeader>
 				<DialogTitle>Add project</DialogTitle>
 				<DialogDescription>
-					Choose a git repository on this Mac. Each run works in its own copy,
+					Choose a project folder on this Mac. Each run works in its own copy,
 					so your files stay as they are.
 				</DialogDescription>
 			</DialogHeader>
 			<FieldGroup className="gap-5">
 				<Field data-invalid={chooseFolder.error ? true : undefined}>
-					<FieldLabel>Repository</FieldLabel>
+					<FieldLabel>Folder</FieldLabel>
 					{repoPath ? (
 						<Item variant="outline" size="sm">
 							<ItemMedia variant="icon">
@@ -147,6 +156,17 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 						<FieldError>{chooseFolder.error.message}</FieldError>
 					) : null}
 				</Field>
+				{readiness.data && !ready ? (
+					<ProjectReadiness
+						readiness={readiness.data}
+						checking={readiness.isFetching}
+						onRecheck={() => void readiness.refetch()}
+						onUseFolder={setRepoPath}
+					/>
+				) : null}
+				{readiness.error ? (
+					<FieldError>{readiness.error.message}</FieldError>
+				) : null}
 				<Field>
 					<FieldLabel htmlFor={`${id}-name`}>
 						Name{" "}
@@ -170,7 +190,10 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 				<DialogClose render={<Button variant="outline" type="button" />}>
 					Cancel
 				</DialogClose>
-				<Button type="submit" disabled={!repoPath || addProject.isPending}>
+				<Button
+					type="submit"
+					disabled={!repoPath || !ready || addProject.isPending}
+				>
 					{addProject.isPending ? (
 						<Spinner data-icon="inline-start" />
 					) : (
