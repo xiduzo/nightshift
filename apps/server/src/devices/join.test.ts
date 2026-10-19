@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import type { HostLinks } from "@nightshift/engine";
 
-import { joinHost } from "./join";
+import { hostPage, joinHost } from "./join";
 
 /**
  * A Host behind a proxy with its own private authority (Caddy's
@@ -110,4 +110,39 @@ describe("joining a Host", () => {
 			}
 		},
 	);
+});
+
+describe("the Host's page for the code", () => {
+	test("opens at the address the Host names", () => {
+		expect(
+			hostPage(
+				"https://studio.example.com/devices?pair=ABCD1234",
+				"https://studio.example.com",
+			),
+		).toBe("https://studio.example.com/devices?pair=ABCD1234");
+	});
+
+	test("is left out when the Host names its own localhost", () => {
+		// A desktop Host: its UI is on its own computer only.
+		expect(
+			hostPage(
+				"http://localhost:3001/devices?pair=ABCD1234",
+				"https://studio.example.com",
+			),
+		).toBeNull();
+		expect(
+			hostPage("http://127.0.0.1:3001/devices", "https://192.168.1.20"),
+		).toBeNull();
+	});
+
+	test("stays for a Host on this computer", () => {
+		expect(
+			hostPage("http://localhost:3001/devices", "http://127.0.0.1:3000"),
+		).toBe("http://localhost:3001/devices");
+	});
+
+	test("is left out when it is not a web page", () => {
+		expect(hostPage("javascript:alert(1)", "https://h.example")).toBeNull();
+		expect(hostPage("not a url", "https://h.example")).toBeNull();
+	});
 });

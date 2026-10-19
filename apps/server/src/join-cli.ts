@@ -81,8 +81,9 @@ export async function joinCommand(argv: string[], program: string) {
 						"To pair this computer, open Night Shift on the Host, go to Devices, choose Pair a device, and enter this code:",
 						"",
 						`    ${code}`,
-						"",
-						`Or open ${step.verificationUriComplete}`,
+						...(step.verificationUriComplete
+							? ["", `Or open ${step.verificationUriComplete}`]
+							: []),
 						"",
 						"On a Host without a screen, run this on the Host instead:",
 						`    nightshift pair ${code}`,
