@@ -13,6 +13,7 @@ import {
 	chat,
 	choice,
 	decide,
+	type TokenUsage,
 } from "@tanstack/ai";
 import { OLLAYA_EVALUATE_MODELS, ollayaDecider } from "@tanstack/ai-ollaya";
 import {
@@ -29,6 +30,7 @@ import {
 	createTypesafeDecider,
 	TYPESAFE_EVALUATE_MODELS,
 } from "@tanstack/ai-typesafe";
+import { type SettledCost, settleCost } from "./pricing";
 import { failureKind } from "./translate";
 import type {
 	AgentErrorKind,
@@ -63,6 +65,11 @@ export type DeciderAdapter = {
 	create: (model: string, apiKey: string | undefined) => AnyEvaluateAdapter;
 	/** Set when the decider can also make a value (a Value node made by a model). */
 	value?: ValueAdapter;
+	/**
+	 * How its tokens are priced: the provider in the price list, or free for
+	 * a model on this computer. Absent: the price list guesses from the model.
+	 */
+	pricing?: { providerId: string } | "free";
 };
 
 /** Every TanStack AI decider adapter (the `evaluate` activity). */
@@ -82,6 +89,7 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		defaultModel: "~typesafe/jev-latest",
 		apiKey: "OPENROUTER_API_KEY",
 		create: (model, key) => createOpenRouterDecider(model, key ?? ""),
+		pricing: { providerId: "openrouter" },
 		value: {
 			defaultModel: "~openai/gpt-mini-latest",
 			create: (model, key) =>
@@ -98,6 +106,7 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		defaultModel: "gpt-6-luna",
 		apiKey: "OPENAI_API_KEY",
 		create: (model, key) => createOpenaiDecider(model, key ?? ""),
+		pricing: { providerId: "openai" },
 		value: {
 			defaultModel: "gpt-5-mini",
 			create: (model, key) =>
@@ -114,6 +123,7 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		defaultModel: "laya:latest",
 		apiKey: null,
 		create: (model) => ollayaDecider(model),
+		pricing: "free",
 	},
 };
 
@@ -154,6 +164,36 @@ export type TanstackDeciderOptions = {
 	secret: (name: string) => Promise<string | undefined>;
 };
 
+/**
+ * What one decider call cost: the provider's own figure (OpenRouter sends
+ * one), else its tokens priced, else unknown. A model on this computer is
+ * free.
+ */
+function costOf(
+	spec: DeciderAdapter,
+	model: string,
+	usage: TokenUsage | undefined,
+): SettledCost {
+	if (spec.pricing === "free") return { costUsd: 0, costSource: "estimated" };
+	if (!usage) return { costUsd: null, costSource: null };
+	const settled = settleCost(
+		{
+			inputTokens: usage.promptTokens,
+			outputTokens: usage.completionTokens,
+			...(usage.promptTokensDetails?.cachedTokens !== undefined
+				? { cacheReadTokens: usage.promptTokensDetails.cachedTokens }
+				: {}),
+			...(usage.promptTokensDetails?.cacheWriteTokens !== undefined
+				? { cacheWriteTokens: usage.promptTokensDetails.cacheWriteTokens }
+				: {}),
+			...(usage.cost !== undefined ? { costUsd: usage.cost } : {}),
+		},
+		model,
+		spec.pricing ? { providerId: spec.pricing.providerId } : {},
+	);
+	return settled;
+}
+
 function failed(errorKind: AgentErrorKind, message: string): DecisionResult {
 	return { kind: "error", errorKind, message, costUsd: null };
 }
@@ -189,8 +229,7 @@ async function decideOnce(
 		kind: "decided",
 		label: result.label.value,
 		notes: `${spec.label} picked it with ${percent}% probability.`,
-		// The deciders report tokens, not money.
-		costUsd: null,
+		...costOf(spec, result.meta.model, result.meta.usage),
 	};
 }
 
@@ -221,16 +260,24 @@ async function valueOnce(
 	const abortController = new AbortController();
 	const onAbort = () => abortController.abort();
 	input.signal.addEventListener("abort", onAbort, { once: true });
+	const model = input.model ?? maker.defaultModel;
+	let usage: TokenUsage | undefined;
 	try {
 		const data: unknown = await chat({
-			adapter: maker.create(input.model ?? maker.defaultModel, key),
+			adapter: maker.create(model, key),
 			messages: [{ role: "user", content: input.prompt }],
 			outputSchema: input.output as Parameters<typeof chat>[0]["outputSchema"],
 			stream: false,
 			abortController,
+			middleware: [
+				{
+					onUsage: (_, reported) => {
+						usage = reported;
+					},
+				},
+			],
 		});
-		// The adapters report tokens, not money.
-		return { kind: "made", data, costUsd: null };
+		return { kind: "made", data, ...costOf(spec, model, usage) };
 	} finally {
 		input.signal.removeEventListener("abort", onAbort);
 	}

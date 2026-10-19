@@ -113,6 +113,7 @@
       "dependencies": {
         "@modelcontextprotocol/sdk": "1.32.1",
         "@nightshift/flows": "workspace:*",
+        "@pydantic/genai-prices": "0.1.13",
         "@tanstack/ai": "0.69.0",
         "@tanstack/ai-acp": "0.3.25",
         "@tanstack/ai-claude-code": "0.9.0",
@@ -623,6 +624,8 @@
     "@orpc/zod": ["@orpc/zod@1.15.5", "", { "dependencies": { "@orpc/json-schema": "1.15.5", "@orpc/openapi": "1.15.5", "@orpc/shared": "1.15.5", "escape-string-regexp": "^5.0.0", "wildcard-match": "^5.1.4" }, "peerDependencies": { "@orpc/contract": "1.15.5", "@orpc/server": "1.15.5", "zod": ">=3.25.0" } }, "sha512-hMZJKn09EFsaLavVmUsmZnHPf67eNfnHvWxFYEA7uKcTovkQRBTg5Nu7efcWpXlrY4DOeXj6i6h/4s2c8XK6sg=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.153.0", "", {}, "sha512-jSNrRIyvPVLL5E1z/tS5zLAprosGz/FuI1PWwEOz59j3E4TTTzSpqKb/RDGqJhhW0QHYISGXxq582wGx6T11Tw=="],
+
+    "@pydantic/genai-prices": ["@pydantic/genai-prices@0.1.13", "", { "bin": { "genai-prices": "dist/cli.js" } }, "sha512-kKzGgPFJmKK/muihOFYDtuS8PXYliRFFYWDfzwDFy7bOgyZUnEnDXpBZpo4eT2aM8bz3bXvO50F8AhFSKvMxlw=="],
 
     "@quansync/fs": ["@quansync/fs@1.1.0", "", { "dependencies": { "quansync": "^1.0.0" } }, "sha512-qAPG/t3HqML1TlN7sY/pTbEjzFVAKsMjNNMGheyDosro+kT4iw2KCUoHcVdmliwWjorm4elZbgNQyU2eD97eDg=="],
 

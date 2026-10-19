@@ -13,6 +13,7 @@
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "1.32.1",
 		"@nightshift/flows": "workspace:*",
+		"@pydantic/genai-prices": "0.1.13",
 		"@tanstack/ai": "0.69.0",
 		"@tanstack/ai-acp": "0.3.25",
 		"@tanstack/ai-claude-code": "0.9.0",

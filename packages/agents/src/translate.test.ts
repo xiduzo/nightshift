@@ -155,7 +155,13 @@ describe("createTranslator", () => {
 		const events = feed(translator, [session, { type: "RUN_FINISHED" }]);
 		expect(events.at(-1)).toEqual({
 			type: "finished",
-			usage: { inputTokens: 100, outputTokens: 7, costUsd: 0.5 },
+			usage: {
+				inputTokens: 100,
+				outputTokens: 7,
+				cacheReadTokens: 90,
+				cacheWriteTokens: 0,
+				costUsd: 0.5,
+			},
 		});
 	});
 

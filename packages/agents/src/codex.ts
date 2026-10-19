@@ -172,8 +172,10 @@ export function observeCodexEvent(
 			return {
 				...signals,
 				resultUsage: {
+					// Codex counts the cached tokens inside `input_tokens`.
 					inputTokens: count(usage.input_tokens),
 					outputTokens: count(usage.output_tokens),
+					cacheReadTokens: count(usage.cached_input_tokens),
 				},
 			};
 		}
