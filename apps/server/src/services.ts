@@ -32,17 +32,22 @@ import {
 	createEngine,
 	createProfileStore,
 	createSettingsStore,
+	type DeviceDocument,
+	HARNESS_BIN,
 	keychainSecrets,
 	LEASE_HEARTBEAT_MS,
 	type Lease,
 	LeaseHeldError,
 	localDevice,
+	openDeviceDocument,
+	refreshDeviceFacts,
 	selfDevice,
 	setUpGit,
 	systemGitInstaller,
 } from "@nightshift/engine";
 
 import { desktopOrigins, ENV } from "./env.server";
+import { createSync, thisComputerOnly } from "./sync";
 
 /** The database, the transcripts and the command logs, together. */
 const dev = ENV.NIGHTSHIFT_DEV === "true";
@@ -67,6 +72,9 @@ if (legacyPaths.length > 0) {
 
 export const db = createDb({ DATABASE_URL: databaseUrl(ENV, dataDir) });
 await migrateDb(db);
+
+/** This Device's document, once it is open (below). Kept across `bun --hot` reloads. */
+const opened = globalThis as { nightshiftDocument?: DeviceDocument };
 
 /**
  * One daemon per database: take the lease before the engine recovers
@@ -98,10 +106,15 @@ async function holdLease(): Promise<Lease> {
 			console.error("The lease heartbeat failed:", error);
 		});
 	}, LEASE_HEARTBEAT_MS).unref();
-	// A clean stop gives the lease up, so the next daemon starts at once.
+	// A clean stop writes what the Device document still has pending, and
+	// gives the lease up, so the next daemon starts at once.
 	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
 		process.once(signal, () => {
-			void Promise.race([lease.release(), Bun.sleep(2_000)])
+			const pending = opened.nightshiftDocument?.flush();
+			void Promise.race([
+				Promise.all([pending, lease.release()]),
+				Bun.sleep(2_000),
+			])
 				.catch(() => {})
 				.finally(() => process.exit(0));
 		});
@@ -123,23 +136,69 @@ export const auth = createAuth(ENV, db, desktopOrigins);
 /** This computer's Device: the Walker of its runs, the owner of its Clones. */
 export const device = await selfDevice(db);
 
+/**
+ * This Device's document: its profiles, CLI tools, connections, settings
+ * and facts. The stores below are views of it; the relay (`/sync`) serves
+ * it to this computer's clients, and their edits land in the same stores.
+ * `bun --hot` evaluates this module again on each reload: the document
+ * this process opened stays, so it has one writer.
+ */
+opened.nightshiftDocument ??= await openDeviceDocument({
+	db,
+	deviceId: device.id,
+});
+export const document = opened.nightshiftDocument;
+
 /** The environment is the fallback of every setting and every `${NAME}`. */
 const env: Record<string, string | undefined> = { ...process.env, ...ENV };
 
-export const settings = createSettingsStore({ db, env });
+export const settings = createSettingsStore({ document, env });
 export const connections = createConnectionStore({
-	db,
+	document,
 	env,
 	secrets: keychainSecrets(),
 });
-export const cliTools = createCliToolStore({ db });
-export const profiles = createProfileStore({ db });
+export const cliTools = createCliToolStore({ document });
+export const profiles = createProfileStore({ document });
 await Promise.all([
 	settings.load(),
 	connections.load(),
 	cliTools.load(),
 	profiles.load(),
 ]);
+
+/**
+ * The facts this computer reports in its document: written at start and
+ * every ten minutes after, in the background (listing the programs reads
+ * every PATH directory).
+ */
+function refreshFacts(): void {
+	refreshDeviceFacts({
+		db,
+		document,
+		deviceId: device.id,
+		harnesses: () => {
+			const s = settings.current();
+			return Object.fromEntries(
+				s.harnesses.map((name) => [name, Bun.which(s[HARNESS_BIN[name]])]),
+			);
+		},
+		programs: () => pathPrograms(),
+	}).catch((error) => {
+		console.error("This computer's facts were not updated:", error);
+	});
+}
+const facts = globalThis as { nightshiftFacts?: Timer };
+if (facts.nightshiftFacts) clearInterval(facts.nightshiftFacts);
+refreshFacts();
+facts.nightshiftFacts = setInterval(refreshFacts, 10 * 60_000);
+facts.nightshiftFacts.unref();
+
+/** The relay's document half: this computer's clients sync its document here. */
+export const sync = createSync({
+	document: (name) => (name === document.name ? document.doc : null),
+	authorize: thisComputerOnly([ENV.CORS_ORIGIN, ...desktopOrigins]),
+});
 
 /** A harness built per session, so a changed path in Settings applies to the next session. */
 function perSession(
