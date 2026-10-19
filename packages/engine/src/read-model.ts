@@ -1,0 +1,396 @@
+import { HARNESS_ADAPTERS } from "@nightshift/agents/doctor";
+import type { HarnessName } from "@nightshift/agents/types";
+import type { Database } from "@nightshift/db";
+import { project, run, step } from "@nightshift/db/schema/nightshift";
+import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
+import { desc, eq, isNull } from "drizzle-orm";
+
+import type { RunBus } from "./bus";
+import {
+	type DerivedStep,
+	deriveEndedAt,
+	deriveInputs,
+	deriveOpenGate,
+	deriveResumes,
+	deriveRunState,
+	deriveSleep,
+	deriveSteps,
+	deriveStopAfterStep,
+	deriveStopAt,
+	deriveTraversals,
+	deriveTrigger,
+	type LoggedEvent,
+	lastHarnessSession,
+	sumCostUsd,
+} from "./events";
+import { getRunRow, type RunRow } from "./graph/context";
+import type { RunLog } from "./run-log";
+import { readRunTranscript } from "./transcripts";
+import type {
+	ItemSummary,
+	OpenGate,
+	RunDetail,
+	RunStatus,
+	RunStreamItem,
+	RunSummary,
+	StepSummary,
+	TranscriptEntry,
+} from "./types";
+
+/**
+ * The read model: what people see of a run, derived from the event log
+ * (design rule: the log is the read model). This module only reads. The
+ * pure half (`runFacts`, `toSummary`, `toStepSummary`, `toRunDetail`,
+ * `takeOverCommand`, the flow snapshot parsers) turns rows and events into
+ * the `types.ts` shapes; `createReadModel` adds the queries that need the
+ * database, the run log and the bus (`listRuns`, `getRun`, `listGates`,
+ * `runStatus`, `watch`, `untilLogged`).
+ *
+ * The seam is narrow on purpose: the engine passes `db`, `log`, `bus` and
+ * `isActive` and gets the reads back, so the shape of a summary changes in
+ * one file (locality), and a test of a derivation needs no engine.
+ */
+
+/** Quote one value for a shell, only when it needs it. */
+function shellQuote(value: string): string {
+	if (/^[\w@%+=:,./-]+$/.test(value)) return value;
+	return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+/**
+ * The command a person runs in the worktree to take over the last harness
+ * session, from the harness's `takeOver`. Null when there is none, or when
+ * the harness has no command for it.
+ */
+export function takeOverCommand(
+	worktreePath: string,
+	last: { harness: HarnessName; harnessSessionId: string } | null | undefined,
+): string | null {
+	const takeOver = last ? HARNESS_ADAPTERS[last.harness].takeOver : null;
+	if (!last || !takeOver) return null;
+	return `cd ${shellQuote(worktreePath)} && ${takeOver(shellQuote(last.harnessSessionId))}`;
+}
+
+/**
+ * A flow from a run's snapshot, in today's format: version 1 snapshots
+ * migrate, and defaults apply. A snapshot that no longer parses is used as
+ * it is, so an old run still shows.
+ */
+export function snapshotFlow(json: unknown): Flow {
+	const migrated = migrateFlow(json);
+	const parsed = flowSchema.safeParse(migrated);
+	return parsed.success ? parsed.data : (migrated as Flow);
+}
+
+/** The flow the run started from, from the run's own snapshot. */
+export function parseRunFlow(row: RunRow): Flow {
+	return snapshotFlow(JSON.parse(row.flow));
+}
+
+/** The `body_flows` column holds every called flow (of Call nodes). */
+export function parseCalledFlows(row: RunRow): Record<string, Flow> {
+	const raw = JSON.parse(row.bodyFlows || "{}") as Record<string, unknown>;
+	const flows: Record<string, Flow> = {};
+	for (const [name, flow] of Object.entries(raw)) {
+		flows[name] = snapshotFlow(flow);
+	}
+	return flows;
+}
+
+/** What a run summary reads from the log. The run log keeps it per run until the next append. */
+export function runFacts(events: readonly LoggedEvent[]) {
+	const state = deriveRunState(events);
+	const open =
+		state.status === "running" ||
+		state.status === "waiting" ||
+		state.status === "sleeping";
+	return {
+		status: state.status,
+		reason: state.reason,
+		wakeAt:
+			state.status === "sleeping" ? (deriveSleep(events)?.until ?? null) : null,
+		signal:
+			state.status === "sleeping"
+				? (deriveSleep(events)?.signal ?? null)
+				: null,
+		inputs: deriveInputs(events),
+		stopAt: deriveStopAt(events),
+		stopAfterStep: open && deriveStopAfterStep(events),
+		costUsd: sumCostUsd(events),
+		endedAt: deriveEndedAt(events),
+		trigger: deriveTrigger(events),
+	};
+}
+
+export type RunFacts = ReturnType<typeof runFacts>;
+
+export function toSummary(row: RunRow, facts: RunFacts): RunSummary {
+	return {
+		id: row.id,
+		projectId: row.projectId,
+		flowName: row.flowName,
+		title: row.title,
+		worktreePath: row.worktreePath,
+		branch: row.branch,
+		baseRef: row.baseRef,
+		...facts,
+		createdAt: row.createdAt.getTime(),
+	};
+}
+
+export function toStepSummary(derived: DerivedStep): StepSummary {
+	return {
+		id: derived.id,
+		nodeId: derived.nodeId,
+		nodeType: derived.nodeType,
+		visit: derived.visit,
+		startedAt: derived.startedAt,
+		endedAt: derived.endedAt,
+		outcome: derived.outcome,
+		outputs: derived.outputs,
+		error: derived.error,
+		scope: derived.scope,
+		items: derived.items.map(
+			(item): ItemSummary => ({
+				id: item.facts.id,
+				title: item.facts.title,
+				url: item.facts.url,
+				value: item.facts.value,
+				state: item.state,
+				branch: item.branch,
+				baseBranch: item.baseBranch,
+				startedAt: item.startedAt,
+				endedAt: item.endedAt,
+				reason: item.reason,
+			}),
+		),
+		sessions: derived.sessions.map((s) => ({
+			id: s.id,
+			harnessSessionId: s.harnessSessionId,
+			prompt: s.prompt,
+			createdAt: s.startedAt,
+			outcome: s.ending?.outcome ?? null,
+			error: s.ending?.error ?? null,
+			costUsd: s.ending?.costUsd ?? null,
+		})),
+		costUsd: derived.costUsd,
+		gate: derived.gate
+			? {
+					question: derived.gate.question,
+					choices: derived.gate.choices,
+					openedAt: derived.gate.openedAt,
+				}
+			: null,
+	};
+}
+
+/** Everything the run page shows: the summary, the flows, the steps, the edges, the resumes. */
+export function toRunDetail(
+	row: RunRow,
+	events: readonly LoggedEvent[],
+): RunDetail {
+	const last = lastHarnessSession(events);
+	return {
+		...toSummary(row, runFacts(events)),
+		flow: parseRunFlow(row),
+		calledFlows: parseCalledFlows(row),
+		steps: deriveSteps(events).map(toStepSummary),
+		// Edges of the top-level flow; body edges count per item.
+		traversals: deriveTraversals(events),
+		takeOverCommand: takeOverCommand(row.worktreePath, last),
+		resumes: deriveResumes(events),
+	};
+}
+
+export type ReadModelDeps = {
+	db: Database;
+	log: RunLog;
+	bus: RunBus;
+	/** Whether the run holds a slot (the runner's `isActive`). */
+	isActive(runId: string): boolean;
+};
+
+export type ReadModel = ReturnType<typeof createReadModel>;
+
+/** The reads that need the database, the run log or the bus. */
+export function createReadModel(deps: ReadModelDeps) {
+	const { db, log, bus, isActive } = deps;
+
+	/** Every run, newest first, with the facts the log gives each one. */
+	async function listRuns(projectId?: string): Promise<RunSummary[]> {
+		const query = db.select().from(run);
+		const rows = await (projectId
+			? query.where(eq(run.projectId, projectId))
+			: query
+		).orderBy(desc(run.createdAt));
+		const facts = await log.derive(
+			rows.map((r) => r.id),
+			runFacts,
+		);
+		return rows.map((row) => toSummary(row, facts.get(row.id) ?? runFacts([])));
+	}
+
+	async function getRun(runId: string): Promise<RunDetail> {
+		const row = await getRunRow(db, runId);
+		const events = await log.events(runId);
+		return toRunDetail(row, events);
+	}
+
+	/** The run's status, or null for a run the log has nothing on. */
+	async function runStatus(runId: string): Promise<RunStatus | null> {
+		const events = await log.events(runId);
+		return events.length === 0 ? null : deriveRunState(events).status;
+	}
+
+	/** The open Gates of the runs of projects a person has not removed, oldest first. */
+	async function listGates(): Promise<OpenGate[]> {
+		const rows = await db
+			.select({ run, projectName: project.name })
+			.from(run)
+			.innerJoin(project, eq(run.projectId, project.id))
+			.where(isNull(project.removedAt));
+		// Only a waiting run has an open Gate. The run list keeps the same facts.
+		const facts = await log.derive(
+			rows.map((r) => r.run.id),
+			runFacts,
+		);
+		const open = await log.derive(
+			rows
+				.map((r) => r.run.id)
+				.filter((id) => facts.get(id)?.status === "waiting"),
+			deriveOpenGate,
+		);
+		const gates: OpenGate[] = [];
+		for (const { run: row, projectName } of rows) {
+			const gate = open.get(row.id);
+			if (!gate) continue;
+			gates.push({
+				runId: row.id,
+				runTitle: row.title,
+				projectId: row.projectId,
+				projectName,
+				stepId: gate.stepId,
+				nodeId: gate.nodeId,
+				question: gate.question,
+				choices: gate.choices,
+				openedAt: gate.openedAt,
+			});
+		}
+		return gates.sort((a, b) => a.openedAt - b.openedAt);
+	}
+
+	/**
+	 * Resolves once `done` holds for the run's log, or the run's drive ended
+	 * without it. Subscribes before the first look, so an append between the
+	 * two is not missed.
+	 */
+	function untilLogged(
+		runId: string,
+		done: (events: readonly LoggedEvent[]) => boolean,
+	): Promise<void> {
+		return new Promise<void>((resolve) => {
+			let settled = false;
+			const unsubscribe = bus.subscribe(runId, () => void check());
+			async function check(): Promise<void> {
+				if (settled) return;
+				const events = await log.events(runId);
+				if (settled) return;
+				if (done(events) || !isActive(runId)) {
+					settled = true;
+					unsubscribe();
+					resolve();
+				}
+			}
+			void check();
+		});
+	}
+
+	/**
+	 * The run's status, its steps and its transcript so far, then every
+	 * change as it happens, until `signal` aborts. Transcript entries up to
+	 * `afterSeq` are skipped.
+	 */
+	async function* watch(
+		runId: string,
+		signal: AbortSignal,
+		afterSeq: number,
+	): AsyncGenerator<RunStreamItem> {
+		await getRunRow(db, runId);
+		if (signal.aborted) return;
+
+		const queue: (
+			| { kind: "transcript"; entry: TranscriptEntry }
+			| { kind: "status-changed" }
+			| { kind: "step-changed"; stepId: string }
+		)[] = [];
+		let wakeWatcher: (() => void) | null = null;
+		const notify = () => {
+			const resolve = wakeWatcher;
+			wakeWatcher = null;
+			resolve?.();
+		};
+		// Subscribe before reading the log and the disk: an entry is on disk
+		// before it is published, so every entry is either on disk or queued.
+		const unsubscribe = bus.subscribe(runId, (item) => {
+			queue.push(item);
+			notify();
+		});
+		signal.addEventListener("abort", notify, { once: true });
+
+		try {
+			let lastSeq = afterSeq;
+			const events = await log.events(runId);
+			let lastStatus: RunStatus = deriveRunState(events).status;
+			yield { kind: "status", status: lastStatus };
+
+			const steps = deriveSteps(events);
+			for (const derived of steps) {
+				if (signal.aborted) return;
+				yield { kind: "step", step: toStepSummary(derived) };
+			}
+
+			const rows = await db
+				.select({ transcriptPath: step.transcriptPath })
+				.from(step)
+				.where(eq(step.runId, runId));
+			const replay = await readRunTranscript(rows.map((s) => s.transcriptPath));
+			for (const entry of replay) {
+				if (signal.aborted) return;
+				if (entry.seq <= lastSeq) continue;
+				lastSeq = entry.seq;
+				yield { kind: "transcript", entry };
+			}
+
+			while (!signal.aborted) {
+				const item = queue.shift();
+				if (!item) {
+					await new Promise<void>((resolve) => {
+						wakeWatcher = resolve;
+					});
+					continue;
+				}
+				if (item.kind === "transcript") {
+					if (item.entry.seq <= lastSeq) continue;
+					lastSeq = item.entry.seq;
+					yield item;
+				} else if (item.kind === "step-changed") {
+					const current = deriveSteps(await log.events(runId)).find(
+						(s) => s.id === item.stepId,
+					);
+					if (current) yield { kind: "step", step: toStepSummary(current) };
+				} else {
+					const status = deriveRunState(await log.events(runId)).status;
+					if (status !== lastStatus) {
+						lastStatus = status;
+						yield { kind: "status", status };
+					}
+				}
+			}
+		} finally {
+			unsubscribe();
+			signal.removeEventListener("abort", notify);
+		}
+	}
+
+	return { listRuns, getRun, runStatus, listGates, untilLogged, watch };
+}

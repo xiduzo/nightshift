@@ -102,12 +102,39 @@ packages/engine/src/
   graph/node-test-support.ts
                            The same for one node: agent(), command(),
                            edge(), flowOf(), startRun().
-  engine.ts                Projects, flows, schedules, gates, runs CRUD;
-                           startRun/stopRun/resumeRun/resolveGate/watchRun
-                           validate, write the run-level facts and hand the
-                           thread to the runner. The walk, frames, scopes,
-                           resume points, beginWait/wake/closeParked of the
-                           old engine are gone.
+  engine.ts                The composition root: createEngine wires the
+                           runner, recovery, run start, the read model and
+                           the scheduler, each behind a small seam that
+                           takes its dependencies (db, log, runner, bus,
+                           settings, clock). Keeps the projects, flows and
+                           schedules CRUD, and stopRun, resolveGate and
+                           signalRun, which write one run-level fact each.
+  run-start.ts             Run start. prepareRun loads and validates the
+                           flow and its called flows, resolves profiles and
+                           asks every requirement in REQUIREMENTS (one
+                           function per requirement: connections, CLI tools
+                           defined and installed, harnesses, the decider)
+                           whether this daemon has what the nodes need; it
+                           writes nothing. createRunStart(deps).start holds
+                           the slot, creates the worktree and the run row,
+                           appends RunStarted and WorktreeCreated and hands
+                           the thread to the runner.
+  recovery.ts              createRecovery(deps): recoverInterruptedWork
+                           (a dead daemon's open sessions, steps and runs
+                           become interrupted; sleeping runs get their
+                           timers back; after a grace period the daemon
+                           resumes the rest unless daemonResumeBlock says
+                           why not), resume (a person's and the daemon's,
+                           mapped from the thread's checkpoint through
+                           resumeTarget; appends RunResumed before the
+                           thread moves) and onSlotFreed (the queue on a
+                           full run cap).
+  read-model.ts            What people see of a run, from the log: runFacts,
+                           toSummary, toStepSummary, toRunDetail,
+                           takeOverCommand, the flow snapshot parsers;
+                           createReadModel(deps) adds listRuns, getRun,
+                           listGates, runStatus, watch and untilLogged.
+                           Reads only.
   events.ts                Unchanged payloads and derivations for the read
                            model. Derivations only the old walk used are
                            deleted.
