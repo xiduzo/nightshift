@@ -223,6 +223,11 @@ export type RunSummary = {
 	costUsd: number;
 	/** The runs of the flows its Call nodes called, in the order they started. */
 	subflows: SubflowRun[];
+	/**
+	 * Every Gate the run asked, also in called flows, oldest first.
+	 * `closedAt` is null while the Gate waits for an answer.
+	 */
+	gates: { openedAt: number; closedAt: number | null }[];
 };
 
 /**

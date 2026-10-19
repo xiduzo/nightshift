@@ -1021,6 +1021,42 @@ export function deriveOpenGate(
 }
 
 /**
+ * Every Gate the run asked, oldest first: when it opened and when it
+ * closed. A Gate closes when its step ends or reopens, or at the next
+ * run-level event (a stop ends the run, a resume asks again). Null while
+ * it is open.
+ */
+export function deriveGateWaits(events: readonly LoggedEvent[]): GateWait[] {
+	const waits: GateWait[] = [];
+	// By step: a step has one open Gate at most.
+	const open = new Map<string, GateWait>();
+	for (const e of bySeq(events)) {
+		if (e.type === "GateOpened" && e.stepId) {
+			const wait: GateWait = { openedAt: e.at, closedAt: null };
+			waits.push(wait);
+			open.set(e.stepId, wait);
+		} else if (
+			(e.type === "StepEnded" || e.type === "StepReopened") &&
+			e.stepId
+		) {
+			const wait = open.get(e.stepId);
+			if (wait) wait.closedAt = e.at;
+			open.delete(e.stepId);
+		} else if (
+			e.type === "RunStarted" ||
+			e.type === "RunResumed" ||
+			e.type === "RunEnded"
+		) {
+			for (const wait of open.values()) wait.closedAt = e.at;
+			open.clear();
+		}
+	}
+	return waits;
+}
+
+export type GateWait = { openedAt: number; closedAt: number | null };
+
+/**
  * The step the run is parked at (an open Gate or a sleeping step) and the
  * calling steps around it, from the inside out. Empty when the run is not
  * parked. These steps stay open while the run waits or sleeps.

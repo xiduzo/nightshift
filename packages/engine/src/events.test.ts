@@ -5,6 +5,7 @@ import {
 	countDaemonResumes,
 	countStepsSinceWalkBegan,
 	countVisits,
+	deriveGateWaits,
 	deriveNodeOutputs,
 	deriveOpenGate,
 	deriveRunState,
@@ -341,6 +342,25 @@ describe("gates", () => {
 			note: "yes",
 			visit: 1,
 		});
+	});
+
+	test("the Gates a run asked stay in its history after the answer", () => {
+		const b = log()
+			.runStarted()
+			.stepStarted("s1", "gate")
+			.gateOpened("s1")
+			.stepEnded("s1", "approve")
+			.stepStarted("s2", "gate", 2)
+			.gateOpened("s2");
+		const at = (type: EngineEventType, index = 0) =>
+			b.events.filter((e) => e.type === type)[index]?.at ?? 0;
+		expect(deriveGateWaits(b.events)).toEqual([
+			{ openedAt: at("GateOpened"), closedAt: at("StepEnded") },
+			{ openedAt: at("GateOpened", 1), closedAt: null },
+		]);
+
+		b.ended("stopped");
+		expect(deriveGateWaits(b.events)[1]?.closedAt).toBe(b.events.at(-1)?.at);
 	});
 
 	test("a Gate step that never opened is not waiting", () => {
