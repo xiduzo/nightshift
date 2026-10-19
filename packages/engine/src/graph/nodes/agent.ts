@@ -1,13 +1,17 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import type {
 	AgentEvent,
+	AgentHarness,
 	AgentSessionInput,
+	HarnessName,
 	StepReportOutcome,
 	StepReportSpec,
 } from "@nightshift/agents/types";
 import {
 	type AgentNode,
+	type FlowNode,
 	type JsonValue,
+	type Outcome,
 	optionProblem,
 	renderTemplate,
 	resolvedAgent,
@@ -28,6 +32,9 @@ import {
 	isWaitKind,
 	messageOf,
 	type NodeAction,
+	type NodeKind,
+	PLAIN_KIND,
+	type Requirement,
 	STOP_GRACE_MS,
 	type StepContext,
 } from "../context";
@@ -61,7 +68,7 @@ import { decideWithin } from "./choosers/model";
 export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 	return (state, config) =>
 		runStep(ctx, node, state, config, {
-			rules: RESUME_RULES.agent,
+			rules: AGENT.resumeRules(node),
 			body: (step, entry) =>
 				runSession(ctx, node, step, {
 					prompt: entry.kind === "new" ? null : entry.prompt,
@@ -69,6 +76,129 @@ export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 				}),
 		});
 }
+
+/** An Agent's own outcome, other than one named `fail` or `needs-input`. */
+export function isOwnAgentLabel(node: AgentNode, outcome: Outcome): boolean {
+	return (
+		node.outcomes !== undefined &&
+		outcome !== "fail" &&
+		outcome !== "needs-input"
+	);
+}
+
+/** Agent nodes name CLI tools the daemon defines. */
+export const cliToolsDefined: Requirement<AgentNode> = (nodes, has) => {
+	const unknown = missingNames(
+		nodes,
+		(node) => node.clis ?? [],
+		has.cliNames(),
+	);
+	if (unknown.length === 0) return null;
+	return unknown
+		.map(
+			({ name, nodeIds }) =>
+				`The flow uses the CLI tool "${name}" (${nodeIds.join(", ")}), but no CLI tool has that name. Add it under Agents → Tools.`,
+		)
+		.join(" ");
+};
+
+/** Every CLI tool an Agent node uses is on this computer. */
+export const cliToolsInstalled: Requirement<AgentNode> = (nodes, has) => {
+	const notFound = [
+		...new Set(
+			// A node's own CLI tools need no definition, but this computer must have them.
+			nodes.flatMap((n) => [...(n.clis ?? []), ...(n.nodeClis ?? [])]),
+		),
+	].filter((name) => has.findCli(name) === null);
+	if (notFound.length === 0) return null;
+	return notFound
+		.map(
+			(name) =>
+				`The flow uses the CLI tool "${name}", but this computer does not have it. Install ${name}, or take it off the flow.`,
+		)
+		.join(" ");
+};
+
+/** Agent nodes run on harnesses the daemon has added. */
+export const harnessesAdded: Requirement<AgentNode> = (nodes, has) => {
+	const missing = missingHarnesses(nodes, has.harnessFor);
+	if (missing.length === 0) return null;
+	return missing
+		.map(
+			({ harness, nodeIds }) =>
+				`The flow has ${nodeIds.length === 1 ? "an Agent node" : "Agent nodes"} on ${HARNESS_LABEL[harness]} (${nodeIds.join(", ")}), but no ${HARNESS_LABEL[harness]} harness is added. Add it under Agents.`,
+		)
+		.join(" ");
+};
+
+/** An Agent node's checker needs the decider. */
+export const checkersHaveDecider: Requirement<AgentNode> = (nodes, has) =>
+	!has.decider && nodes.some((n) => n.checker !== undefined)
+		? "The flow has an Agent node with a checker, but no decider is configured."
+		: null;
+
+/** The harnesses the Agent nodes name that the daemon has not configured, with their nodes. */
+function missingHarnesses(
+	nodes: readonly AgentNode[],
+	harnessFor: (name: HarnessName) => AgentHarness | undefined,
+): { harness: HarnessName; nodeIds: string[] }[] {
+	const missing = new Map<HarnessName, string[]>();
+	for (const node of nodes) {
+		if (node.harness === undefined) continue;
+		if (harnessFor(node.harness)) continue;
+		const ids = missing.get(node.harness) ?? [];
+		if (!ids.includes(node.id)) ids.push(node.id);
+		missing.set(node.harness, ids);
+	}
+	return [...missing].map(([harness, nodeIds]) => ({ harness, nodeIds }));
+}
+
+/** The names the nodes list that the daemon does not have, with their nodes. */
+export function missingNames<N extends FlowNode>(
+	nodes: readonly N[],
+	listed: (node: N) => readonly string[],
+	names: ReadonlySet<string>,
+): { name: string; nodeIds: string[] }[] {
+	const missing = new Map<string, string[]>();
+	for (const node of nodes) {
+		for (const name of listed(node)) {
+			if (names.has(name)) continue;
+			const ids = missing.get(name) ?? [];
+			if (!ids.includes(node.id)) ids.push(node.id);
+			missing.set(name, ids);
+		}
+	}
+	return [...missing].map(([name, nodeIds]) => ({ name, nodeIds }));
+}
+
+/**
+ * The Agent kind. A wait node for the policy's waits; `pass` and the
+ * node's own outcomes are chosen ends, and an own outcome is the label a
+ * Call reports; the idle timer is this kind's alone; the daemon must have
+ * its connections, CLI tools, harness and, for a checker, the decider.
+ */
+export const AGENT: NodeKind<AgentNode> = {
+	...PLAIN_KIND,
+	type: "agent",
+	make: agentNode,
+	resumeRules: () => RESUME_RULES.agent,
+	aux: () => [{ kind: "wait" }],
+	isChosenEnd: (node, outcome) =>
+		outcome === "pass" || isOwnAgentLabel(node, outcome),
+	endedLabel: (node, outcome) =>
+		isOwnAgentLabel(node, outcome) ? outcome : "",
+	timeBudget: (node) => ({
+		timeoutMinutes: node.timeoutMinutes,
+		idleMinutes: node.idleMinutes,
+	}),
+	connections: (node) => node.connections ?? [],
+	requirements: [
+		cliToolsDefined,
+		cliToolsInstalled,
+		harnessesAdded,
+		checkersHaveDecider,
+	],
+};
 
 /**
  * The harness session the visit continues: the one the resume point found

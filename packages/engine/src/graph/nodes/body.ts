@@ -15,7 +15,6 @@ import {
 import { flowOutputs } from "../../inputs";
 import { compileFlow } from "../compile";
 import type { StepContext } from "../context";
-import { isOwnAgentLabel } from "../route";
 import type { Parked, RunStateValues } from "../state";
 
 /**
@@ -179,9 +178,7 @@ export async function bodyOutputs(
 	});
 }
 
-/** A Call's `ended`: the Decision option or Agent outcome its flow ended on, or "". */
-export function endedLabel(node: FlowNode, outcome: Outcome): string {
-	return node.type === "decision" || isOwnAgentLabel(node, outcome)
-		? outcome
-		: "";
+/** Whether the Call node has an edge on `stopped`: it wraps the run up after the stop time. */
+export function hasStoppedEdge(flow: Flow, node: FlowNode): boolean {
+	return flow.edges.some((e) => e.from === node.id && e.outcome === "stopped");
 }

@@ -1,8 +1,16 @@
 import type { DecisionNode } from "@nightshift/flows";
 import type { StepOutputs } from "../../events";
-import type { NodeAction, StepContext } from "../context";
+import {
+	endedAtReason,
+	type NodeAction,
+	type NodeKind,
+	PLAIN_KIND,
+	type Requirement,
+	type StepContext,
+} from "../context";
+import { RESUME_RULES, type ResumeRules } from "../resume-point";
 import { modelChooser } from "./choosers/model";
-import { personChooser } from "./choosers/person";
+import { gateAskNode, personChooser } from "./choosers/person";
 import { ruleChooser } from "./choosers/rule";
 
 /**
@@ -42,6 +50,57 @@ function chooserFor(node: DecisionNode, ctx: StepContext): Chooser {
 			return modelChooser(node, ctx);
 	}
 }
+
+/** A Decision decided by a model needs the decider. */
+export const modelDecisionsHaveDecider: Requirement<DecisionNode> = (
+	nodes,
+	has,
+) =>
+	!has.decider && nodes.some((n) => n.by === "model")
+		? "The flow has a Decision node decided by a model, but no decider is configured."
+		: null;
+
+/** Which existing step a Decision takes up: the chooser's rule (`RESUME_RULES`). */
+function decisionRules(node: DecisionNode): ResumeRules {
+	switch (node.by) {
+		case "person":
+			return RESUME_RULES.gate;
+		case "rule":
+			return RESUME_RULES.fresh;
+		case "model":
+			return RESUME_RULES.model;
+	}
+}
+
+/**
+ * The Decision kind. Its facts follow `node.by`: a model gets a wait node,
+ * a person an ask node (the Gate), a rule neither. Every option is a
+ * chosen end and the label a Call reports; a Gate has no time budget; a
+ * stopped Gate ends with an empty note.
+ */
+export const DECISION: NodeKind<DecisionNode> = {
+	...PLAIN_KIND,
+	type: "decision",
+	make: decisionNode,
+	resumeRules: decisionRules,
+	aux: (node) =>
+		node.by === "model"
+			? [{ kind: "wait" }]
+			: node.by === "person"
+				? [{ kind: "ask", make: gateAskNode }]
+				: [],
+	isChosenEnd: () => true,
+	endReason: (node, outcome) =>
+		outcome === "pass" ? null : endedAtReason(node, outcome),
+	endedLabel: (_node, outcome) => outcome,
+	timeBudget: (node) => ({
+		// A Gate waits as long as it must.
+		timeoutMinutes: node.by === "person" ? undefined : node.timeoutMinutes,
+		idleMinutes: undefined,
+	}),
+	stoppedOutputs: (open) => decisionOutputs("stopped", "", open.visit),
+	requirements: [modelDecisionsHaveDecider],
+};
 
 /** The outputs every Decision step ends with. */
 export function decisionOutputs(

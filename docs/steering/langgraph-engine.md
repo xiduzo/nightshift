@@ -36,19 +36,25 @@ packages/engine/src/
                            20261016155422_langgraph_checkpoints). pruneThread
                            keeps a thread's latest root checkpoint.
   graph/compile.ts         compileFlow(flow, ctx): StateGraph. START →
-                           flow.start; every flow node plus its park node
-                           park__<id>; Agent nodes, Decisions decided by
-                           a model and Values made by a model also get a
-                           wait node wait__<id>; a
-                           Decision decided by a person gets an ask node
-                           ask__<id>. No static edges.
+                           flow.start; every flow node, made by its kind's
+                           factory, plus its park node park__<id> and the
+                           auxiliary nodes its kind asks for (a wait node
+                           wait__<id>, or the Gate's ask node ask__<id>).
+                           One loop over flow.nodes; no node type named.
+                           No static edges.
+  graph/node-kinds.ts      The registry (below): NODE_KINDS, one NodeKind
+                           descriptor per node type, exported by the
+                           kind's module; kindOf(node), kindOfType(type).
+                           The NodeKind interface itself is in context.ts.
   graph/route.ts           route(): picks the edge with `nextEdge`, logs
                            EdgeTaken and returns `new Command({ update,
-                           goto })`; or ends the flow (isChosenEnd,
-                           finishedReason); or parks (parkCommand). parkNode,
-                           the node ids, scopeOf.
-  graph/context.ts         StepContext (below), the recorders, the template
-                           context, stopAtOf.
+                           goto })`; or ends the flow (the kind's
+                           isChosenEnd and endReason); or parks
+                           (parkCommand). parkNode, the node ids, scopeOf.
+  graph/context.ts         StepContext (below), NodeKind (the descriptor a
+                           node module gives back, with PLAIN_KIND, the
+                           facts most kinds share), the recorders, the
+                           template context, stopAtOf.
   graph/step-runner.ts     The step runner (below): runStep() owns the step
                            lifecycle every node shares, from the resume
                            point to route(); beginStep/OpenStep is the lower
@@ -72,35 +78,39 @@ packages/engine/src/
                            node; the wait, park and ask nodes give it the
                            copy of pending the interrupt carries and what
                            the answer does.
-  graph/nodes/agent.ts     agent node: the body runSession
-  graph/nodes/command.ts   command node: the body runShell
+  graph/nodes/agent.ts     agent node: the body runSession; AGENT, with
+                           the Agent's requirements (CLI tools, harness,
+                           checker) and isOwnAgentLabel.
+  graph/nodes/command.ts   command node: the body runShell; COMMAND.
   graph/nodes/decision.ts  decision node: routes on the step; a chooser
-                           per `by` gets the option.
+                           per `by` gets the option. DECISION, whose
+                           facts follow `by`.
   graph/nodes/choosers/    person.ts (the Gate: the node opens it, its ask
                            node interrupts), rule.ts (JSONata rules),
                            model.ts (the decider).
   graph/nodes/call.ts      the Call node: runs its flow once, or hands
-                           over to call-each.ts
+                           over to call-each.ts; CALL, whose facts follow
+                           `each`.
   graph/nodes/call-each.ts the per-element loop of a Call with `each`
                            (one element per super-step)
   graph/nodes/body.ts      What a Call does once and per element: bodyGraph,
+                           runBody (a called flow as a subgraph of the node),
+                           BodyEnd (how the body ended) and hasStoppedEdge.
   graph/nodes/value.ts     value node, the Decision's twin: routes on the
                            step; a producer per `by` makes the data, which
-                           is checked against the output schema.
+                           is checked against the output schema. VALUE.
   graph/nodes/producers/   rule.ts (one JSONata expression), model.ts (the
                            decider's text adapter, `chat()` with the
                            schema; waits like a model Decision).
   graph/nodes/wait.ts      Wait node: works out the wake time (a duration,
                            a time, a command poll, a signal) and asks the
                            sleep module to sleep; a wake ends it done or
-                           timeout, or sleeps again.
+                           timeout, or sleeps again. WAIT.
   graph/nodes/tool.ts      tool node: one tools/call on a Connection's MCP
                            server through @nightshift/agents/mcp, the
                            Connection resolved by mcpServersFor as for an
                            Agent node. No wait node: a transport failure
-                           is `fail`.
-                           runBody (a called flow as a subgraph of the node)
-                           and BodyEnd (how the body ended).
+                           is `fail`. TOOL.
   ../each.ts               the pure parts of a Call with `each`: list items
                            from a source, item facts, the step's outputs
   graph/runner.ts          Per-run driver: start, continueRun, resume,
@@ -125,11 +135,12 @@ packages/engine/src/
                            signalRun, which write one run-level fact each.
   run-start.ts             Run start. prepareRun loads and validates the
                            flow and its called flows, resolves profiles and
-                           asks every requirement in REQUIREMENTS (one
-                           function per requirement: connections, CLI tools
-                           defined and installed, harnesses, the decider)
-                           whether this daemon has what the nodes need; it
-                           writes nothing. createRunStart(deps).start holds
+                           asks every requirement in REQUIREMENTS (the
+                           shared connections check, then each kind's own
+                           from its descriptor: CLI tools defined and
+                           installed, harnesses, the decider) whether this
+                           daemon has what the nodes need; it writes
+                           nothing. createRunStart(deps).start holds
                            the slot, creates the worktree and the run row,
                            appends RunStarted and WorktreeCreated and hands
                            the thread to the runner.
@@ -539,6 +550,74 @@ interrupt with a copy of it, jump back on the answer. The wait node, the
 park node and the Gate's ask node give it only the copy the interrupt
 carries and what the answer does. The interrupt payloads (`Parked`) did
 not change.
+
+## The node-kind descriptor (`graph/node-kinds.ts`)
+
+One module per node kind says what the engine must know about that kind.
+Each node module exports one `NodeKind<N>` next to its factory (`AGENT`,
+`COMMAND`, `TOOL`, `DECISION`, `VALUE`, `WAIT`, `CALL`); `NODE_KINDS` lists
+them by type, and `kindOf(node)` or `kindOfType(type)` gives a caller the
+descriptor. The interface is in `context.ts`, next to `StepContext`: what
+a node factory gets, and what a node module gives back. `PLAIN_KIND` holds
+the facts most kinds share; a kind spreads it and overrides what differs.
+
+Before the descriptor, a kind's facts were a switch spread over the engine.
+Adding the Tool node touched 16 files in 4 packages; adding the Wait node
+touched `state.ts`, `route.ts`, `context.ts` and `runner.ts` on top of its
+own module. Now the engine asks the descriptor:
+
+| Member | Who asks | What it replaced |
+| --- | --- | --- |
+| `make` | `compile.ts` | the `switch (node.type)` that picked the factory |
+| `aux(node)` | `compile.ts` | the same switch deciding wait and ask nodes, per `by` |
+| `resumeRules(node)` | the kind's own factory | the `RESUME_RULES` entry each factory named |
+| `isChosenEnd(node, outcome)` | `route()` | `isChosenEnd`, `isOwnAgentLabel`, `isSuccessExit` in route.ts |
+| `endReason(node, outcome)` | `route()` | `finishedReason` in route.ts |
+| `endedLabel(node, outcome)` | the Call node | `endedLabel` in body.ts |
+| `logsCommandOutput(node)` | `beginStep` | the three-kind `logPath` rule |
+| `timeBudget(node)` | `beginStep`, `abortEnd` | the Gate and Wait timeout rule, the Agent idle rule |
+| `stoppedOutputs(open, node)` | `runner.closeParked` | the `nodeType` ternary |
+| `connections(node)` | `run-start.connectionsExist` | the Agent-or-Tool branch |
+| `requirements` | `run-start.REQUIREMENTS` | the per-kind requirement functions |
+
+The deletion test picked the members: a fact is on the descriptor only
+when deleting the switch in a caller would make the fact reappear there.
+A fact may depend on `node.by` (Decision, Value) or `node.each` (Call);
+the chooser and producer seams stay as they are. Not on the descriptor, on
+purpose: the zod union in `packages/flows` and the web's `NODE_TYPE` record
+(inherent, outside this package); the transcript-event unions in `types.ts`
+(typed data, no switch asks them); the `WaitReason` enum in `state.ts` (a
+Wait node's `until` kinds and the policy's reasons, not node kinds); which
+flow a Call calls (`calledFlowNames`, `runner.nodesOf`: only a Call does,
+both read `node.flow`); the first Agent prompt a quick run is titled by;
+and the resume target's "an Agent step with a harness session".
+
+The registry's entries are getters. A node module imports `route.ts` and
+the step runner, which import the registry, so the modules form a cycle;
+a getter reads the descriptor when a caller asks, after every module
+evaluated. `graph/node-kinds.test.ts` holds every fact for every kind as
+a table.
+
+### How to add a node kind
+
+1. `packages/flows/src/schema.ts`: the node schema, in the `flowNodeSchema`
+   union; `packages/flows/src/validate.ts` for its checks; a flow version
+   bump when old flows must migrate.
+2. `packages/engine/src/graph/nodes/<kind>.ts`: the factory (`runStep` with
+   a body, or the lower seam `beginStep` for a loop-shaped node) and the
+   descriptor: `{ ...PLAIN_KIND, type, make, resumeRules, ... }`, overriding
+   only the facts that differ. A new way to re-enter is a new `RESUME_RULES`
+   entry in `resume-point.ts`.
+3. `packages/engine/src/graph/node-kinds.ts`: one getter in `NODE_KINDS`.
+   The type of the registry refuses a missing kind.
+4. `packages/engine/src/types.ts`: the kind's transcript events, when it
+   records any.
+5. `packages/engine/src/graph/node-kinds.test.ts`: the kind's row in every
+   table; a node test next to the others (`<kind>-node.test.ts`).
+6. `apps/web`: the `NODE_TYPE` record, the inspector form, the canvas node.
+7. Check that nothing else names the kind. From `packages/engine/src`:
+   `grep -rn -E 'node\.type ===|nodeType ===|case "<kind>"' --include='*.ts' . | grep -v '\.test\.ts'`
+   must show the kind in its own module only.
 
 ## StepContext (what a node factory gets)
 

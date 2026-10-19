@@ -50,16 +50,16 @@ import {
 	stopAtOf,
 } from "../context";
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
-import {
-	hasStoppedEdge,
-	parkCommand,
-	route,
-	type StepEnd,
-	scopeOf,
-} from "../route";
+import { parkCommand, route, type StepEnd, scopeOf } from "../route";
 import type { Loop } from "../state";
 import { beginStep } from "../step-runner";
-import { type BodyGraph, bodyGraph, bodyOutputs, runBody } from "./body";
+import {
+	type BodyGraph,
+	bodyGraph,
+	bodyOutputs,
+	hasStoppedEdge,
+	runBody,
+} from "./body";
 
 /**
  * A Call node with `each`: the per-element loop of `callNode`, ported from

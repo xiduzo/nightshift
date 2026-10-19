@@ -1,7 +1,14 @@
 import type { JsonValue, ValueNode } from "@nightshift/flows";
 import type { StepOutputs } from "../../events";
 import { dataProblem } from "../../output-schema";
-import type { NodeAction, StepContext } from "../context";
+import {
+	type NodeAction,
+	type NodeKind,
+	PLAIN_KIND,
+	type Requirement,
+	type StepContext,
+} from "../context";
+import { RESUME_RULES } from "../resume-point";
 import type { BodyEnd, StepHandle } from "../step-runner";
 import { modelProducer } from "./producers/model";
 import { ruleProducer } from "./producers/rule";
@@ -42,6 +49,26 @@ function producerFor(node: ValueNode, ctx: StepContext): Producer {
 			return modelProducer(node, ctx);
 	}
 }
+
+/** A Value made by a model needs a decider with a text adapter. */
+export const modelValuesHaveDecider: Requirement<ValueNode> = (nodes, has) =>
+	!has.decider?.value && nodes.some((n) => n.by === "model")
+		? "The flow has a Value node made by a model, but no decider is configured."
+		: null;
+
+/**
+ * The Value kind: the plain facts, with a wait node and the model's resume
+ * rules when a model makes the value, and the decider as a requirement.
+ */
+export const VALUE: NodeKind<ValueNode> = {
+	...PLAIN_KIND,
+	type: "value",
+	make: valueNode,
+	resumeRules: (node) =>
+		node.by === "model" ? RESUME_RULES.model : RESUME_RULES.fresh,
+	aux: (node) => (node.by === "model" ? [{ kind: "wait" }] : []),
+	requirements: [modelValuesHaveDecider],
+};
 
 /** The outputs every Value step ends with. */
 export function valueOutputs(

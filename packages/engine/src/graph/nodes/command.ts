@@ -1,10 +1,22 @@
-import { type CommandNode, exitFor, renderCommand } from "@nightshift/flows";
+import {
+	type CommandNode,
+	commandExits,
+	exitFor,
+	type Outcome,
+	renderCommand,
+} from "@nightshift/flows";
 
 import { runCommand } from "../../command";
 import { parseCommandJson } from "../../each";
 import type { StepOutputs } from "../../events";
 import { commandLogPath } from "../../transcripts";
-import type { NodeAction, StepContext } from "../context";
+import {
+	endedAtReason,
+	type NodeAction,
+	type NodeKind,
+	PLAIN_KIND,
+	type StepContext,
+} from "../context";
 import { RESUME_RULES } from "../resume-point";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 
@@ -30,10 +42,36 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 export function commandNode(node: CommandNode, ctx: StepContext): NodeAction {
 	return (state, config) =>
 		runStep(ctx, node, state, config, {
-			rules: RESUME_RULES.fresh,
+			rules: COMMAND.resumeRules(node),
 			body: (step) => runShell(ctx, node, step),
 		});
 }
+
+/**
+ * Whether `outcome` is the node's exit on code 0. A command's other exits,
+ * the catch-all among them, are failures.
+ */
+function isSuccessExit(node: CommandNode, outcome: Outcome): boolean {
+	return commandExits(node).some(
+		(exit) => exit.name === outcome && exit.code === 0,
+	);
+}
+
+/**
+ * The Command kind. The one kind whose chosen end is not `pass` by name
+ * but its exit on code 0, whatever that exit is called; every step writes
+ * the command log.
+ */
+export const COMMAND: NodeKind<CommandNode> = {
+	...PLAIN_KIND,
+	type: "command",
+	make: commandNode,
+	resumeRules: () => RESUME_RULES.fresh,
+	isChosenEnd: isSuccessExit,
+	endReason: (node, outcome) =>
+		isSuccessExit(node, outcome) ? null : endedAtReason(node, outcome),
+	logsCommandOutput: () => true,
+};
 
 /** What the step says when the command's output is not JSON. */
 export const NOT_JSON_REASON = "The command's output is not valid JSON.";

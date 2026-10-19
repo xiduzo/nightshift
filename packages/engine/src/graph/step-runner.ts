@@ -30,6 +30,7 @@ import {
 	stopAtOf,
 	templateContext,
 } from "./context";
+import { kindOf } from "./node-kinds";
 import {
 	entryOf,
 	type ResumePoint,
@@ -337,7 +338,7 @@ export function abortEnd(
 			error:
 				reason === "timeout"
 					? `The step ran past its time budget of ${node.timeoutMinutes} min.`
-					: `No activity for ${node.type === "agent" ? node.idleMinutes : undefined} min.`,
+					: `No activity for ${kindOf(node).timeBudget(node).idleMinutes} min.`,
 		};
 	}
 	return {
@@ -409,12 +410,9 @@ export async function beginStep(
 		stepId = randomUUID();
 		path = transcriptPath(ctx.dataDir, runId, stepId);
 		visit = countVisits(logged, node.id, key) + 1;
-		const logPath =
-			node.type === "command" ||
-			(node.type === "call" && node.each?.source.kind === "command") ||
-			(node.type === "wait" && node.until.kind === "command")
-				? commandLogPath(ctx.dataDir, runId, stepId)
-				: null;
+		const logPath = kindOf(node).logsCommandOutput(node)
+			? commandLogPath(ctx.dataDir, runId, stepId)
+			: null;
 		await ctx.db.insert(stepTable).values({
 			id: stepId,
 			runId,
@@ -473,19 +471,16 @@ export async function beginStep(
 	const onStop = () => stepController.abort("stopped" satisfies AbortReason);
 	if (runSignal.aborted) onStop();
 	else runSignal.addEventListener("abort", onStop, { once: true });
-	// A Gate (a Decision decided by a person) waits as long as it must. A
-	// Wait node keeps its own deadline across its sleeps (graph/nodes/wait.ts).
-	const timeoutMinutes =
-		(node.type === "decision" && node.by === "person") || node.type === "wait"
-			? undefined
-			: node.timeoutMinutes;
+	// The kind says which timers a step has: a Gate waits as long as it
+	// must, a Wait node keeps its own deadline across its sleeps, and only an
+	// Agent step has an idle clock.
+	const { timeoutMinutes, idleMinutes } = kindOf(node).timeBudget(node);
 	const timer = timeoutMinutes
 		? setTimeout(
 				() => stepController.abort("timeout" satisfies AbortReason),
 				timeoutMinutes * ctx.minuteMs,
 			)
 		: undefined;
-	const idleMinutes = node.type === "agent" ? node.idleMinutes : undefined;
 	let idleTimer: ReturnType<typeof setTimeout> | undefined;
 	const touch = () => {
 		if (idleMinutes === undefined || stepController.signal.aborted) return;
