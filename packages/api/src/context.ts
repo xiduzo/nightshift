@@ -26,8 +26,14 @@ import type {
 	RunRows,
 	SettingsStore,
 	SyncCursors,
+	WorkReply,
+	WorkRequest,
 } from "@nightshift/engine";
-import type { Engine } from "@nightshift/engine/types";
+import type {
+	Engine,
+	Placement,
+	StartRunInput,
+} from "@nightshift/engine/types";
 
 export type Context = {
 	/** The request's session. On this computer, the local Person's when the request has none. */
@@ -227,7 +233,36 @@ export type HostExchange = {
 	): Promise<void>;
 	/** A file of a run of a Space the key's Person is a Member of. Null when there is none. */
 	archiveGet(key: DeviceKeyAccess, ref: ArchiveRef): Promise<string | null>;
+	/**
+	 * The relay's work half (`devices.work`): the calls of the runs this
+	 * Host walks that are placed on the key's Device, and their cancels,
+	 * until the signal aborts.
+	 */
+	work(key: DeviceKeyAccess, signal?: AbortSignal): AsyncIterable<WorkDelivery>;
+	/** The key's Device answers a call it took. */
+	workReply(
+		key: DeviceKeyAccess,
+		input: { id: string; replies: WorkReply[]; done: boolean },
+	): Promise<void>;
+	/**
+	 * Starts a run placed on another Device, for the key's Person: this
+	 * Host walks it. Needs `run.start` in the Space.
+	 */
+	startRun(
+		key: DeviceKeyAccess,
+		input: StartRunInput & { spaceId: string; deviceId: string },
+	): Promise<{ runId: string }>;
+	/** The Devices of the key's Person a run of the project can run on. */
+	placements(
+		key: DeviceKeyAccess,
+		input: { spaceId: string; projectId: string },
+	): Promise<Placement[]>;
 };
+
+/** What a placed Device takes from its Host: a call to serve, or one to cancel. */
+export type WorkDelivery =
+	| { kind: "call"; id: string; request: WorkRequest }
+	| { kind: "cancel"; id: string };
 
 /** A pairing code, as the Person approving it sees it. */
 export type PairingReviewView = {

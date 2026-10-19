@@ -68,5 +68,21 @@ export function createRelay(deps: {
 			const client = await hostClient(hostId);
 			return client.archive.get({ ref });
 		},
+
+		async startRun(input) {
+			const hostId = await hostOf(input.spaceId);
+			if (hostId === null) throw new Error(HOST_OFFLINE);
+			const client = await hostClient(hostId);
+			// The Host starts it in the name of the key's Person.
+			const { startedBy: _person, ...start } = input;
+			return client.sync.startRun(start);
+		},
+
+		async placements(input) {
+			const hostId = await hostOf(input.spaceId);
+			if (hostId === null) return [];
+			const client = await hostClient(hostId);
+			return client.sync.placements(input);
+		},
 	};
 }

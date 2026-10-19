@@ -79,12 +79,13 @@ export type ListedProject = typeof project.$inferSelect & {
 
 /**
  * The folder of a project's Clone on this computer (the Replica's own
- * Device), or null: what `localDevice` works in.
+ * Device), or null: what `localDevice` works in. With a Space, a project of
+ * another Space has none.
  */
 export function clonePathOf(
 	db: Database,
-): (projectId: string) => Promise<string | null> {
-	return async (projectId) => {
+): (projectId: string, spaceId?: string) => Promise<string | null> {
+	return async (projectId, spaceId) => {
 		const [row] = await db
 			.select({ path: clone.path })
 			.from(clone)
@@ -95,6 +96,7 @@ export function clonePathOf(
 					eq(clone.projectId, projectId),
 					eq(device.self, true),
 					isNull(project.removedAt),
+					spaceId === undefined ? undefined : eq(project.spaceId, spaceId),
 				),
 			);
 		return row?.path ?? null;
