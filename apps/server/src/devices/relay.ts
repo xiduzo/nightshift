@@ -84,6 +84,13 @@ export function createRelay(deps: {
 			return client.archive.get({ ref });
 		},
 
+		async *follow(step, afterSeq, signal) {
+			const hostId = await hostOf(step.spaceId);
+			if (hostId === null) throw new Error(HOST_OFFLINE);
+			const client = await hostClient(hostId);
+			yield* await client.archive.follow({ step, afterSeq }, { signal });
+		},
+
 		async archivePut(ref, content) {
 			const hostId = await hostOf(ref.spaceId);
 			if (hostId === null) throw new Error(HOST_OFFLINE);

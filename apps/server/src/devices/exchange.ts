@@ -24,7 +24,9 @@ import type { Engine } from "@nightshift/engine/types";
  * - Pull: `sync.stream` from this Replica's cursors: other Walkers' rows
  *   as they land on the Host, and the commands for the runs this computer
  *   walks. A batch whose project has not arrived yet (its Space document
- *   is on its way) waits for it and is tried again.
+ *   is on its way) waits for it and is tried again. The stream also says
+ *   which steps of this computer's runs someone follows: their live
+ *   transcripts go to the Host (`archive.tail`) while they are wanted.
  *
  * A command is checked again here, from this Replica: the run is this
  * computer's, and the Person who asked is a Member of its Space with a
@@ -125,12 +127,22 @@ async function pullLoop(session: ExchangeSession): Promise<void> {
 	/** Commands applied in this session, until the Host has heard so. */
 	const applied = new Set<string>();
 	while (!signal.aborted) {
+		// The live transcripts the Host wants of this computer's runs. A
+		// stream that ends stops them: the next one says again what it wants.
+		const pumps = engine.exchange.feeds.pumps((step, entries, ended, stop) =>
+			client.archive.tail(
+				{ step, entries, ended },
+				{ signal: AbortSignal.any([signal, stop]) },
+			),
+		);
 		try {
 			const stream = await client.sync.stream(
 				{ cursors: await rows.cursorsWith(hostId) },
 				{ signal },
 			);
 			for await (const batch of stream) {
+				// A Host of an older version sends no follows.
+				pumps.set(batch.follows ?? []);
 				if (!isEmpty(batch.rows)) {
 					await ingestWhenReady(session, batch.rows);
 					await rows.advance(hostId, batch.cursors);
@@ -145,6 +157,8 @@ async function pullLoop(session: ExchangeSession): Promise<void> {
 		} catch (error) {
 			if (signal.aborted) return;
 			console.error("Run history was not received from the Host:", error);
+		} finally {
+			pumps.close();
 		}
 		await pause(session.retryMs ?? 2_000, signal);
 	}

@@ -68,6 +68,8 @@ const registry = {
 		const owners: Record<string, string> = {
 			"device-mine": ownerId,
 			"device-colleague": "colleague",
+			// Paired here, but its Person is in none of the owner's Spaces.
+			"device-stranger": "stranger",
 		};
 		return owners[id] ? { id, ownerId: owners[id], revokedAt: null } : null;
 	},
@@ -222,5 +224,144 @@ describe("a Walker's paths", () => {
 		expect(kept).toContain("run-colleague");
 		expect(kept).toContain("nightshift/theirs");
 		expect(kept).not.toContain("/home/colleague");
+	});
+});
+
+describe("live transcripts", () => {
+	/** A run the colleague's Device walks here, with one running step. */
+	async function colleagueRun() {
+		const now = Date.now();
+		await host().push(keyOf("device-colleague", "colleague"), {
+			runs: [
+				{
+					id: "run-live",
+					spaceId: sandbox.spaceId,
+					projectId,
+					flowName: null,
+					flow: "{}",
+					bodyFlows: "{}",
+					title: "Live",
+					worktreePath: "",
+					branch: "nightshift/live",
+					baseRef: "main",
+					walkerId: "device-colleague",
+					startedBy: "colleague",
+					deviceId: null,
+					placements: null,
+					createdAt: now,
+				},
+			],
+			steps: [
+				{
+					id: "step-live",
+					spaceId: sandbox.spaceId,
+					runId: "run-live",
+					nodeId: "hello",
+					nodeType: "command",
+					visit: 1,
+					transcriptPath: "",
+					deviceId: "device-colleague",
+					createdAt: now,
+				},
+			],
+			sessions: [],
+			events: [
+				{
+					spaceId: sandbox.spaceId,
+					runId: "run-live",
+					stepId: "step-live",
+					sessionId: null,
+					type: "StepStarted",
+					payload: JSON.stringify({
+						nodeId: "hello",
+						nodeType: "command",
+						visit: 1,
+						transcriptPath: "",
+						logPath: "",
+					}),
+					at: now,
+					walkerId: "device-colleague",
+					walkerSeq: 1,
+				},
+			],
+		});
+		return { spaceId: sandbox.spaceId, runId: "run-live", stepId: "step-live" };
+	}
+
+	const entry = (seq: number) =>
+		({
+			seq,
+			stepId: "step-live",
+			sessionId: null,
+			at: Date.now(),
+			event: { type: "command-output", stream: "stdout", text: `line ${seq}` },
+		}) as never;
+
+	test("a Member follows a step its Walker sends while someone follows it", async () => {
+		const step = await colleagueRun();
+		const exchange = host();
+		const walker = keyOf("device-colleague", "colleague");
+		expect((await exchange.pull(walker, {})).follows).toEqual([]);
+
+		const controller = new AbortController();
+		const got: number[] = [];
+		const following = (async () => {
+			for await (const e of exchange.archiveFollow(
+				keyOf("device-mine", ownerId),
+				{ step, afterSeq: 0 },
+				controller.signal,
+			)) {
+				got.push(e.seq);
+			}
+		})();
+		// The Walker's stream now names the step.
+		await waitFor(
+			async () => (await exchange.pull(walker, {})).follows.length === 1,
+		);
+		expect((await exchange.pull(walker, {})).follows).toEqual([
+			{ ...step, afterSeq: 0 },
+		]);
+
+		// Only the Walker may send its entries.
+		await expect(
+			exchange.archiveTail(keyOf("device-mine", ownerId), {
+				step,
+				entries: [entry(1)],
+				ended: false,
+			}),
+		).rejects.toThrow("only archive the runs it walks");
+
+		await exchange.archiveTail(walker, {
+			step,
+			entries: [entry(1), entry(2)],
+			ended: false,
+		});
+		await waitFor(() => got.length === 2);
+		await exchange.archiveTail(walker, {
+			step,
+			entries: [entry(2), entry(3)],
+			ended: true,
+		});
+		await following;
+		expect(got).toEqual([1, 2, 3]);
+		expect((await exchange.pull(walker, {})).follows).toEqual([]);
+		controller.abort();
+	});
+
+	test("a Person who is not a Member of the run's Space is refused", async () => {
+		const step = await colleagueRun();
+		const follow = async () => {
+			for await (const _ of host().archiveFollow(
+				keyOf("device-stranger", "stranger"),
+				{ step, afterSeq: 0 },
+				new AbortController().signal,
+			)) {
+				// Nothing reaches a stranger.
+			}
+		};
+		await expect(follow()).rejects.toThrow("not a member");
+		expect(
+			(await host().pull(keyOf("device-colleague", "colleague"), {})).follows,
+		).toEqual([]);
 	});
 });

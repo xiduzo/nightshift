@@ -14,6 +14,8 @@ import type {
 	ArchiveRef,
 	CliToolStore,
 	ConnectionStore,
+	FeedStep,
+	FollowWant,
 	GitInstall,
 	HostRole,
 	KeyStoreKind,
@@ -35,6 +37,7 @@ import type {
 	OwnDevice,
 	RunSummary,
 	StartRunInput,
+	TranscriptEntry,
 } from "@nightshift/engine/types";
 
 export type Context = {
@@ -196,6 +199,12 @@ export type SyncBatch = {
 	cursors: SyncCursors;
 	/** The commands that wait for the Device, as the Walker of their runs. */
 	commands: RunCommand[];
+	/**
+	 * The steps of runs the Device walks that someone follows now, with the
+	 * `seq` to send from: their live transcripts go to `archive.tail`.
+	 * The whole set each time; a step that left it is no longer wanted.
+	 */
+	follows: FollowWant[];
 };
 
 /**
@@ -251,6 +260,21 @@ export type HostExchange = {
 	): Promise<void>;
 	/** A file of a run of a Space the key's Person is a Member of. Null when there is none. */
 	archiveGet(key: DeviceKeyAccess, ref: ArchiveRef): Promise<string | null>;
+	/**
+	 * A step's live transcript, for a Member of its run's Space: its
+	 * entries after `afterSeq`, then each new one, until the step ends or
+	 * the signal aborts.
+	 */
+	archiveFollow(
+		key: DeviceKeyAccess,
+		input: { step: FeedStep; afterSeq: number },
+		signal?: AbortSignal,
+	): AsyncIterable<TranscriptEntry>;
+	/** The Walker sends live entries of a step of a run it walks; `ended`: they are its last. */
+	archiveTail(
+		key: DeviceKeyAccess,
+		input: { step: FeedStep; entries: TranscriptEntry[]; ended: boolean },
+	): Promise<void>;
 	/**
 	 * The relay's work half (`devices.work`): the calls of the runs this
 	 * Host walks that are placed on the key's Device, and their cancels,
