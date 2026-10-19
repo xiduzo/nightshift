@@ -91,7 +91,7 @@ async function runShell(
 	step.record(null, { type: "command-start", command });
 	const json = node.output === "json";
 	let stdout = "";
-	const result = await runCommand({
+	const result = await runCommand(step.device, {
 		command,
 		cwd: ctx.run.worktreePath,
 		env,

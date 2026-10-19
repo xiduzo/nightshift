@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
 
 import { deriveOpenGate, deriveSteps } from "../events";
-import { createSandbox, type Sandbox } from "../test-support";
+import { createSandbox, type Sandbox, TEST_DEVICE_ID } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import {
 	command,
@@ -131,6 +131,7 @@ describe("the Gate node", () => {
 				transcriptPath: gateStep?.transcriptPath as string,
 				logPath: null,
 				scope: null,
+				deviceId: TEST_DEVICE_ID,
 			},
 		]);
 		expect(payloads(logged, "GateOpened")).toEqual([

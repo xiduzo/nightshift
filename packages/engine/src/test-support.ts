@@ -12,11 +12,56 @@ import { migrateDb } from "@nightshift/db/migrate";
 import { event } from "@nightshift/db/schema/nightshift";
 import { asc, eq } from "drizzle-orm";
 
+import { type LocalDeviceDeps, localDevice } from "./device/local";
+import type { Device } from "./device/types";
 import { parseEventRow } from "./events";
 import type { RunLog } from "./run-log";
+import type { EngineOptions } from "./types";
 import { git } from "./worktrees";
 
 /** Test helpers: a temp git repo, a migrated temp database, scripted harnesses. */
+
+/** The id of the Device tests run on. */
+export const TEST_DEVICE_ID = "test-device";
+
+/** What a test's Device is made of: this computer's deps, over fakes. */
+export type TestDeviceDeps = Omit<LocalDeviceDeps, "id" | "name">;
+
+/** This computer as a Device, over the test's fakes. */
+export function testDevice(deps: TestDeviceDeps): Device {
+	return localDevice({ id: TEST_DEVICE_ID, name: "test", ...deps });
+}
+
+/** The engine's options with the Device's deps beside them, as a test writes them. */
+export type TestEngineOptions = Omit<EngineOptions, "device"> & TestDeviceDeps;
+
+/** Engine options whose Device is `testDevice` over the Device deps among them. */
+export function withDevice(options: TestEngineOptions): EngineOptions {
+	const {
+		harnesses,
+		harnessNames,
+		decider,
+		mcpServersFor,
+		connectionNames,
+		cliNames,
+		findCli,
+		cliToolsFor,
+		...engine
+	} = options;
+	return {
+		...engine,
+		device: testDevice({
+			harnesses,
+			harnessNames,
+			decider,
+			mcpServersFor,
+			connectionNames,
+			cliNames,
+			findCli,
+			cliToolsFor,
+		}),
+	};
+}
 
 export type Sandbox = {
 	root: string;

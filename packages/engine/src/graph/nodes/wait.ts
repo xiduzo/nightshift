@@ -227,7 +227,7 @@ async function poll(
 ): Promise<BodyResult | { kind: "again"; logTail: string }> {
 	const { command, env } = renderCommand(until.command, step.tctx);
 	step.record(null, { type: "command-start", command });
-	const result = await runCommand({
+	const result = await runCommand(step.device, {
 		command,
 		cwd: ctx.run.worktreePath,
 		env,

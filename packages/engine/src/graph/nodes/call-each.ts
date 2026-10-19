@@ -52,7 +52,7 @@ import {
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
 import { parkCommand, route, type StepEnd, scopeOf } from "../route";
 import type { Loop } from "../state";
-import { beginStep } from "../step-runner";
+import { beginStep, type StepHandle } from "../step-runner";
 import {
 	type BodyGraph,
 	bodyGraph,
@@ -249,7 +249,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 
 			let items: ListItem[];
 			try {
-				items = await readSource(ctx, node, tctx, stepId);
+				items = await readSource(ctx, node, tctx, step);
 			} catch (error) {
 				if (ctx.signal().aborted) return parkStopped(null);
 				return finish("error", messageOf(error));
@@ -456,7 +456,7 @@ async function readSource(
 	ctx: StepContext,
 	node: CallEachNode,
 	tctx: TemplateContext,
-	stepId: string,
+	step: StepHandle,
 ): Promise<ListItem[]> {
 	const worktree = ctx.run.worktreePath;
 	const source = node.each.source;
@@ -468,11 +468,11 @@ async function readSource(
 		case "command": {
 			const { command, env } = renderCommand(source.command, tctx);
 			let stdout = "";
-			const result = await runCommand({
+			const result = await runCommand(step.device, {
 				command,
 				cwd: worktree,
 				env,
-				logPath: commandLogPath(ctx.dataDir, ctx.run.id, stepId),
+				logPath: commandLogPath(ctx.dataDir, ctx.run.id, step.stepId),
 				signal: ctx.signal(),
 				onOutput: (stream, text) => {
 					if (stream === "stdout") stdout += text;

@@ -51,8 +51,10 @@ import type {
  * one file (locality), and a test of a derivation needs no engine.
  */
 
-/** The harness of that name as the engine built it, added or not. */
-export type HarnessOf = (name: HarnessName) => AgentHarness | undefined;
+/** The take-over facts of the harness of that name, or none. */
+export type HarnessOf = (
+	name: HarnessName,
+) => Pick<AgentHarness, "takeOverCommand"> | undefined;
 
 /**
  * The command a person runs in the worktree to take over the last harness

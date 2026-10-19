@@ -1,0 +1,367 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { defaultDeciderModel } from "@nightshift/agents/decider";
+import { fakeDecider, fakeHarness } from "@nightshift/agents/fake";
+import type { Decider, McpServerConfig } from "@nightshift/agents/types";
+
+import { createSandbox, mustGit, type Sandbox } from "../test-support";
+import { type LocalDeviceDeps, localDevice } from "./local";
+import type { Device, ExecEvent, SessionEvent, SessionInput } from "./types";
+
+/**
+ * This computer as a Device, through the port only: what it reports, and
+ * each call a step body makes, over fakes (harnesses, a decider, the MCP
+ * fixture server) and a real `sh` and git.
+ */
+
+const fakeMcp: McpServerConfig = {
+	command: process.execPath,
+	args: [
+		join(
+			import.meta.dir,
+			"..",
+			"..",
+			"..",
+			"agents",
+			"src",
+			"fixtures",
+			"fake-mcp.ts",
+		),
+	],
+	env: {},
+};
+
+let sandbox: Sandbox;
+beforeEach(async () => {
+	sandbox = await createSandbox();
+});
+afterEach(async () => {
+	await sandbox.cleanup();
+});
+
+function device(deps: Partial<LocalDeviceDeps> = {}): Device {
+	return localDevice({ id: "d1", name: "studio", harnesses: {}, ...deps });
+}
+
+async function collect<T>(stream: AsyncIterable<T>): Promise<T[]> {
+	const items: T[] = [];
+	for await (const item of stream) items.push(item);
+	return items;
+}
+
+const sessionInput = (extra: Partial<SessionInput> = {}): SessionInput => ({
+	harness: "claude-code",
+	cwd: "/tmp",
+	prompt: "Work.",
+	model: "sonnet",
+	permissionMode: "acceptEdits",
+	signal: new AbortController().signal,
+	...extra,
+});
+
+describe("what the Device reports", () => {
+	test("its id, its name, and that it is online", () => {
+		const d = device();
+		expect([d.id, d.name, d.state()]).toEqual([
+			"d1",
+			"studio",
+			{ online: true },
+		]);
+	});
+
+	test("the added harnesses, its connections, CLI tools, asked programs and decider", () => {
+		const d = device({
+			harnesses: { "claude-code": fakeHarness(), codex: fakeHarness() },
+			harnessNames: () => new Set(["codex"]),
+			connectionNames: () => new Set(["jira"]),
+			cliNames: () => new Set(["gh"]),
+			findCli: (name) => (name === "gh" ? "/usr/bin/gh" : null),
+			decider: fakeDecider([]),
+		});
+		const caps = d.capabilities({ programs: ["gh", "jq"] });
+		expect(caps).toMatchObject({
+			harnesses: ["codex"],
+			connections: ["jira"],
+			clis: ["gh"],
+			programs: { gh: "/usr/bin/gh", jq: null },
+			decider: { values: true },
+		});
+		expect(caps.decider?.defaultModels.openai).toEqual({
+			decision: defaultDeciderModel("openai", "decision"),
+			value: defaultDeciderModel("openai", "value"),
+		});
+	});
+
+	test("no decider, or one that makes no values", () => {
+		expect(device().capabilities().decider).toBeNull();
+		const textless: Decider = {
+			defaultModel: defaultDeciderModel,
+			decide: async () => ({
+				kind: "decided",
+				label: "a",
+				notes: "",
+				costUsd: null,
+			}),
+		};
+		expect(device({ decider: textless }).capabilities().decider?.values).toBe(
+			false,
+		);
+	});
+});
+
+describe("session", () => {
+	test("refuses a harness that is not added, before it starts anything", async () => {
+		const harness = fakeHarness();
+		const d = device({
+			harnesses: { "claude-code": harness },
+			harnessNames: () => new Set(),
+		});
+		expect(await collect(d.session(sessionInput()))).toEqual([
+			{
+				type: "refused",
+				message: "No Claude Code harness is added. Add it under Agents.",
+			},
+		]);
+		expect(harness.calls).toHaveLength(0);
+	});
+
+	test("refuses when a connection cannot be filled in", async () => {
+		const harness = fakeHarness();
+		const d = device({
+			harnesses: { "claude-code": harness },
+			mcpServersFor: async () => ({ ok: false, message: "Save JIRA_TOKEN." }),
+		});
+		const events = await collect(
+			d.session(sessionInput({ connections: ["jira"] })),
+		);
+		expect(events).toEqual([{ type: "refused", message: "Save JIRA_TOKEN." }]);
+		expect(harness.calls).toHaveLength(0);
+	});
+
+	test("says ready, then starts the harness only when the next event is read", async () => {
+		const harness = fakeHarness();
+		const d = device({ harnesses: { "claude-code": harness } });
+		const stream = d.session(sessionInput())[Symbol.asyncIterator]();
+		expect((await stream.next()).value).toEqual({ type: "ready" });
+		expect(harness.calls).toHaveLength(0);
+		const rest: SessionEvent[] = [];
+		for (
+			let next = await stream.next();
+			!next.done;
+			next = await stream.next()
+		) {
+			rest.push(next.value);
+		}
+		expect(harness.calls).toHaveLength(1);
+		expect(rest[0]).toMatchObject({ type: "session" });
+		expect(rest.at(-1)?.type).toBe("finished");
+	});
+
+	test("hands the harness the expanded servers and a new session's CLI tools", async () => {
+		const harness = fakeHarness();
+		const asked: string[][] = [];
+		const d = device({
+			harnesses: { "claude-code": harness },
+			mcpServersFor: async (node) => ({
+				ok: true,
+				servers: Object.fromEntries(
+					(node.connections ?? []).map((c) => [c, fakeMcp]),
+				),
+			}),
+			cliToolsFor: async (names) => {
+				asked.push([...names]);
+				return names.map((name) => ({
+					name,
+					description: null,
+					help: `${name} --help`,
+				}));
+			},
+		});
+		await collect(
+			d.session(sessionInput({ connections: ["tracker"], clis: ["gh"] })),
+		);
+		await collect(
+			d.session(
+				sessionInput({ clis: ["gh"], resumeSessionId: "s1", prompt: "Go on." }),
+			),
+		);
+		await collect(
+			d.session(sessionInput({ clis: ["gh"], permissionMode: "plan" })),
+		);
+		const [first, resumed, plan] = harness.calls;
+		expect(first?.mcpServers).toEqual({ tracker: fakeMcp });
+		expect(first?.clis).toEqual(["gh"]);
+		expect(first?.prompt).toStartWith("Work.\n\n## CLI tools");
+		expect(resumed?.prompt).toBe("Go on.");
+		expect(resumed?.mcpServers).toBeUndefined();
+		expect(plan?.prompt).toBe("Work.");
+		expect(asked).toEqual([["gh"]]);
+	});
+});
+
+describe("exec", () => {
+	test("streams each chunk of output, then one exit, in the given folder with the given env", async () => {
+		const events = await collect(
+			device().exec({
+				command: 'printf "%s" "$GREETING"; pwd; echo oops >&2; exit 3',
+				cwd: sandbox.repoPath,
+				env: { GREETING: "hi " },
+				signal: new AbortController().signal,
+			}),
+		);
+		const out = (stream: "stdout" | "stderr") =>
+			events
+				.filter(
+					(e): e is Extract<ExecEvent, { type: "output" }> =>
+						e.type === "output" && e.stream === stream,
+				)
+				.map((e) => e.text)
+				.join("");
+		expect(out("stdout")).toBe(`hi ${sandbox.repoPath}\n`);
+		expect(out("stderr")).toBe("oops\n");
+		expect(events.at(-1)).toEqual({
+			type: "exit",
+			exitCode: 3,
+			spawnError: null,
+		});
+		expect(events.filter((e) => e.type === "exit")).toHaveLength(1);
+	});
+
+	test("an abort kills the command: the exit has no code", async () => {
+		const controller = new AbortController();
+		const stream = device().exec({
+			command: "echo started; sleep 30",
+			cwd: sandbox.repoPath,
+			signal: controller.signal,
+		});
+		const events: ExecEvent[] = [];
+		for await (const event of stream) {
+			events.push(event);
+			if (event.type === "output") controller.abort();
+		}
+		expect(events.at(-1)).toEqual({
+			type: "exit",
+			exitCode: null,
+			spawnError: null,
+		});
+	});
+});
+
+describe("callTool", () => {
+	const tracker = (): Partial<LocalDeviceDeps> => ({
+		mcpServersFor: async (node) =>
+			(node.connections ?? []).includes("tracker")
+				? { ok: true, servers: { tracker: fakeMcp } }
+				: { ok: false, message: "No such connection." },
+	});
+	const signal = () => new AbortController().signal;
+
+	test("refuses a connection it cannot resolve, without calling anything", async () => {
+		expect(
+			await device(tracker()).callTool({
+				connection: "jira",
+				tool: "say",
+				arguments: {},
+				signal: signal(),
+			}),
+		).toEqual({ kind: "refused", message: "No such connection." });
+	});
+
+	test("calls the tool with the arguments typed by its schema", async () => {
+		const result = await device(tracker()).callTool({
+			connection: "tracker",
+			tool: "list_json",
+			arguments: { count: "1" },
+			signal: signal(),
+		});
+		expect(result).toEqual({
+			kind: "called",
+			arguments: { count: 1 },
+			text: '[{"n":1}]',
+			structuredContent: null,
+			isError: false,
+		});
+	});
+
+	test("a tool the server does not have fails before any arguments are sent", async () => {
+		const result = await device(tracker()).callTool({
+			connection: "tracker",
+			tool: "nope",
+			arguments: {},
+			signal: signal(),
+		});
+		expect(result).toMatchObject({ kind: "failed", arguments: null });
+		expect(result.kind === "failed" && result.message).toStartWith(
+			'The connection "tracker" has no tool named "nope". It has: ',
+		);
+	});
+});
+
+describe("decide", () => {
+	const signal = new AbortController().signal;
+
+	test("asks the decider for a decision or a value", async () => {
+		const d = device({
+			decider: fakeDecider([{ label: "ship", notes: "ok" }], {
+				values: [{ data: { n: 1 } }],
+			}),
+		});
+		expect(
+			await d.decide({
+				decider: "openai",
+				prompt: "Ship?",
+				labels: [{ name: "ship" }],
+				signal,
+			}),
+		).toMatchObject({ kind: "decided", label: "ship" });
+		expect(
+			await d.decide({
+				decider: "openai",
+				prompt: "Count.",
+				output: { type: "object" },
+				signal,
+			}),
+		).toMatchObject({ kind: "made", data: { n: 1 } });
+	});
+
+	test("without a decider it answers an error", async () => {
+		expect(
+			await device().decide({
+				decider: "openai",
+				prompt: "Ship?",
+				labels: [],
+				signal,
+			}),
+		).toMatchObject({
+			kind: "error",
+			message: "No decider is configured for Decision nodes.",
+		});
+		expect(
+			await device().decide({
+				decider: "openai",
+				prompt: "x",
+				output: {},
+				signal,
+			}),
+		).toMatchObject({
+			kind: "error",
+			message: "No decider is configured for Value nodes.",
+		});
+	});
+});
+
+describe("worktree", () => {
+	test("adds the run's worktree on its own branch beside the clone", async () => {
+		const worktree = await device().worktree({
+			id: "abcdef12-0000-0000-0000-000000000000",
+			repoPath: sandbox.repoPath,
+		});
+		expect(worktree).toEqual({
+			worktreePath: join(sandbox.root, "repo.nightshift", "abcdef12"),
+			branch: "nightshift/abcdef12",
+			baseRef: (await mustGit(sandbox.repoPath, ["rev-parse", "HEAD"])).trim(),
+		});
+		expect(existsSync(join(worktree.worktreePath, "README.md"))).toBe(true);
+	});
+});

@@ -3,11 +3,11 @@ import { join } from "node:path";
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import type { McpServerConfig } from "@nightshift/agents/types";
 import type { ToolNode } from "@nightshift/flows";
-
+import { coerceArguments } from "../device/tool-call";
 import { deriveSteps } from "../events";
 import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
-import { coerceArguments, dataOf } from "./nodes/tool";
+import { dataOf } from "./nodes/tool";
 import {
 	command,
 	drive,
@@ -72,7 +72,7 @@ async function start(
 		harness: fakeHarness(),
 		...options,
 	});
-	h.ctx.mcpServersFor = async (node) =>
+	h.local.mcpServersFor = async (node) =>
 		(node.connections ?? []).includes("tracker")
 			? { ok: true, servers: { tracker: fakeMcp } }
 			: {
@@ -314,7 +314,7 @@ describe("the Tool node", () => {
 
 	test("a server that cannot be reached fails the step with a readable error", async () => {
 		const h = await start(flowOf([tool("file", "say", { text: "hi" })]));
-		h.ctx.mcpServersFor = async () => ({
+		h.local.mcpServersFor = async () => ({
 			ok: true,
 			servers: {
 				tracker: { command: "/nonexistent/mcp-server", args: [], env: {} },

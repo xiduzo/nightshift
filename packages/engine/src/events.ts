@@ -134,6 +134,8 @@ export type EnginePayloads = {
 		logPath: string | null;
 		/** Null (or absent before Slice 4) at the top level. */
 		scope?: Scope | null;
+		/** The Device the step runs on. Absent before Devices: this computer. */
+		deviceId?: string;
 	};
 	/**
 	 * An ended step runs again: an Agent step in a new session of the same

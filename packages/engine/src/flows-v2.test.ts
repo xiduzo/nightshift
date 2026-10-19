@@ -28,9 +28,11 @@ import {
 	mustGit,
 	type Sandbox,
 	scriptedHarness,
+	type TestEngineOptions,
 	waitFor,
+	withDevice,
 } from "./test-support";
-import type { Engine, EngineOptions, RunDetail, StepSummary } from "./types";
+import type { Engine, RunDetail, StepSummary } from "./types";
 
 /**
  * Flow format 2: inputs and outputs, templates with paths, the Call
@@ -55,12 +57,12 @@ afterEach(async () => {
 
 function makeEngine(
 	harness: AgentHarness,
-	options: Partial<Pick<EngineOptions, "decider">> = {},
+	options: Partial<Pick<TestEngineOptions, "decider">> = {},
 ): Engine {
 	const runLog = createRunLog(sandbox.db);
 	runLogs.push(runLog);
 	return createEngine(
-		{
+		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },
 			dataDir: sandbox.dataDir,
@@ -68,7 +70,7 @@ function makeEngine(
 			cliNames: () => new Set(["gh"]),
 			findCli: (name) => `/usr/local/bin/${name}`,
 			...options,
-		},
+		}),
 		{ runLog },
 	);
 }

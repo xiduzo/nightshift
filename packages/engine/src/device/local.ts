@@ -1,0 +1,205 @@
+import { HARNESS_LABELS } from "@nightshift/agents/harness-facts";
+import type {
+	AgentHarness,
+	Decider,
+	DeciderName,
+	DecisionInput,
+	DecisionResult,
+	HarnessName,
+	ValueInput,
+	ValueResult,
+} from "@nightshift/agents/types";
+import { type AgentNode, deciderNameSchema } from "@nightshift/flows";
+
+import { type CliToolGuide, cliToolsInstruction } from "../cli-tools";
+import { spawnCommand } from "../command";
+import { expandMcpServers, type McpExpansion } from "../mcp";
+import { createWorktree } from "../worktrees";
+import { callServerTool } from "./tool-call";
+import type {
+	Capabilities,
+	DeciderFacts,
+	Device,
+	SessionEvent,
+	SessionInput,
+	ToolResult,
+} from "./types";
+
+/**
+ * Everything on this computer a step body may touch: the harnesses, the
+ * decider, the MCP connections with their secrets, the CLI tools, `sh -c`
+ * and git worktrees. `services.ts` wires it from the daemon's stores; a
+ * test wires it over fakes.
+ */
+export type LocalDeviceDeps = {
+	id: string;
+	name: string;
+	/** The harnesses built on this computer, by name. */
+	harnesses: Partial<Record<HarnessName, AgentHarness>>;
+	/**
+	 * The harnesses added on the Agents page, read at each question. A
+	 * harness left out cannot run a session, even when `harnesses` has it.
+	 * Without it: every harness in `harnesses`.
+	 */
+	harnessNames?: () => ReadonlySet<HarnessName>;
+	/** Decides Decision nodes and makes values for Value nodes. */
+	decider?: Decider;
+	/**
+	 * An Agent node's MCP servers: its connections and its own servers, with
+	 * `${NAME}` expanded. Default: its own servers, from `process.env`.
+	 */
+	mcpServersFor?: (
+		node: Pick<AgentNode, "connections" | "mcpServers">,
+	) => Promise<McpExpansion>;
+	/** The connections defined on this computer. */
+	connectionNames?: () => ReadonlySet<string>;
+	/** The CLI tools defined on this computer. */
+	cliNames?: () => ReadonlySet<string>;
+	/** Where a program is on this computer, or null. Default: `Bun.which`. */
+	findCli?: (name: string) => string | null;
+	/**
+	 * What an agent learns about its CLI tools: each description and help.
+	 * A new session gets them after its prompt. Without it, nothing.
+	 */
+	cliToolsFor?: (names: readonly string[]) => Promise<CliToolGuide[]>;
+};
+
+/** What `decide` answers on a Device without a decider (or one that makes no values). */
+function noDecider(
+	makes: "decision" | "value",
+): Extract<DecisionResult, { kind: "error" }> {
+	return {
+		kind: "error",
+		errorKind: "harness",
+		message: `No decider is configured for ${makes === "value" ? "Value" : "Decision"} nodes.`,
+		costUsd: null,
+	};
+}
+
+/** This computer as a Device. */
+export function localDevice(deps: LocalDeviceDeps): Device {
+	const { harnesses, decider } = deps;
+	const findCli = deps.findCli ?? ((name: string) => Bun.which(name));
+	const mcpServersFor =
+		deps.mcpServersFor ??
+		(async (
+			node: Pick<AgentNode, "connections" | "mcpServers">,
+		): Promise<McpExpansion> =>
+			(node.connections ?? []).length > 0
+				? {
+						ok: false,
+						message: `The node uses connections (${node.connections?.join(", ")}), but there are none. Add them under Agents → Tools.`,
+					}
+				: expandMcpServers(node.mcpServers, process.env));
+
+	/** The harness of that name, when it is added and built. */
+	const harnessFor = (name: HarnessName): AgentHarness | undefined =>
+		(deps.harnessNames?.().has(name) ?? true) ? harnesses[name] : undefined;
+
+	const deciderFacts: DeciderFacts | null = decider
+		? {
+				values: decider.value !== undefined,
+				defaultModels: Object.fromEntries(
+					deciderNameSchema.options.map((name) => [
+						name,
+						{
+							decision: decider.defaultModel(name, "decision"),
+							value: decider.defaultModel(name, "value"),
+						},
+					]),
+				) as Record<DeciderName, { decision: string; value: string }>,
+			}
+		: null;
+
+	async function* session(input: SessionInput): AsyncGenerator<SessionEvent> {
+		const { harness: name, connections, mcpServers, clis, ...rest } = input;
+		const harness = harnessFor(name);
+		if (!harness) {
+			yield {
+				type: "refused",
+				message: `No ${HARNESS_LABELS[name]} harness is added. Add it under Agents.`,
+			};
+			return;
+		}
+		// `${NAME}` in env values and headers reads the keychain, then the
+		// environment. The values go to the harness only, never into the log.
+		const mcp = await mcpServersFor({
+			...(connections ? { connections } : {}),
+			...(mcpServers ? { mcpServers } : {}),
+		});
+		if (!mcp.ok) {
+			yield { type: "refused", message: mcp.message };
+			return;
+		}
+		// A new session learns its CLI tools after the prompt. A resumed
+		// session has them already. Plan mode runs no command.
+		const guide =
+			!input.resumeSessionId &&
+			input.permissionMode !== "plan" &&
+			clis !== undefined &&
+			clis.length > 0 &&
+			deps.cliToolsFor
+				? cliToolsInstruction(await deps.cliToolsFor(clis))
+				: "";
+		yield { type: "ready" };
+		yield* harness.run({
+			...rest,
+			prompt: guide ? `${input.prompt}\n\n${guide}` : input.prompt,
+			...(clis && clis.length > 0 ? { clis } : {}),
+			...(Object.keys(mcp.servers).length > 0
+				? { mcpServers: mcp.servers }
+				: {}),
+		});
+	}
+
+	function decide(input: DecisionInput): Promise<DecisionResult>;
+	function decide(input: ValueInput): Promise<ValueResult>;
+	async function decide(
+		input: DecisionInput | ValueInput,
+	): Promise<DecisionResult | ValueResult> {
+		if ("output" in input) {
+			return decider?.value ? decider.value(input) : noDecider("value");
+		}
+		return decider ? decider.decide(input) : noDecider("decision");
+	}
+
+	return {
+		id: deps.id,
+		name: deps.name,
+		state: () => ({ online: true }),
+		capabilities(query = {}): Capabilities {
+			return {
+				harnesses: (Object.keys(harnesses) as HarnessName[]).filter(
+					(name) => harnessFor(name) !== undefined,
+				),
+				connections: [...(deps.connectionNames?.() ?? [])],
+				clis: [...(deps.cliNames?.() ?? [])],
+				programs: Object.fromEntries(
+					(query.programs ?? []).map((name) => [name, findCli(name)]),
+				),
+				decider: deciderFacts,
+			};
+		},
+		session,
+		exec: spawnCommand,
+		async callTool(input): Promise<ToolResult> {
+			const mcp = await mcpServersFor({ connections: [input.connection] });
+			if (!mcp.ok) return { kind: "refused", message: mcp.message };
+			const server = mcp.servers[input.connection];
+			if (!server) {
+				return {
+					kind: "refused",
+					message: `There is no connection named "${input.connection}". Add it under Agents → Tools, or pick another one.`,
+				};
+			}
+			return callServerTool(server, input);
+		},
+		decide,
+		worktree: (run) =>
+			createWorktree({
+				repoPath: run.repoPath,
+				shortId: run.id.slice(0, 8),
+				...(run.baseRef !== undefined ? { baseRef: run.baseRef } : {}),
+			}),
+	};
+}

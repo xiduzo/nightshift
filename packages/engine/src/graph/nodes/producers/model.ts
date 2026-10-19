@@ -36,16 +36,12 @@ export function modelProducer(node: ValueNode, ctx: StepContext): Producer {
 		runStep(ctx, node, state, config, {
 			rules: RESUME_RULES.model,
 			outputs: (step) => valueOutputs("", null, "", step.visit),
-			body: (step) => make(ctx, node, step),
+			body: (step) => make(node, step),
 		});
 }
 
 /** Asks the decider and ends the step on its answer, or asks for a wait. */
-async function make(
-	ctx: StepContext,
-	node: ValueNode,
-	step: StepHandle,
-): Promise<BodyResult> {
+async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 	const { visit, signal } = step;
 	const prompt = renderTemplate(node.prompt ?? "", step.tctx);
 	const fail = (error: string): BodyResult => ({
@@ -54,10 +50,12 @@ async function make(
 		outputs: valueOutputs("error", null, "", visit),
 		error,
 	});
-	const decider = ctx.decider;
-	if (!decider?.value) return fail("No decider is configured for Value nodes.");
-	// The decider port says which text model a node without one starts on.
-	const model = node.model ?? decider.defaultModel(node.decider, "value");
+	const decider = step.device.capabilities().decider;
+	if (!decider?.values) {
+		return fail("No decider is configured for Value nodes.");
+	}
+	// The Device says which text model a node without one starts on.
+	const model = node.model ?? decider.defaultModels[node.decider].value;
 	step.record(null, {
 		type: "value-start",
 		by: "model",
@@ -67,14 +65,13 @@ async function make(
 	const invalid = schemaProblem(node.output);
 	if (invalid !== null) return fail(invalid);
 	const ask = () =>
-		decider.value?.({
+		step.device.decide({
 			decider: node.decider,
 			prompt,
 			output: node.output,
 			model,
 			signal,
-		}) ??
-		Promise.resolve(lateResult("No decider is configured for Value nodes."));
+		});
 	const result = await withinGrace(
 		() =>
 			ask().catch(

@@ -30,11 +30,12 @@ import {
 	mustGit,
 	type Sandbox,
 	scriptedHarness,
+	type TestEngineOptions,
 	waitFor,
+	withDevice,
 } from "./test-support";
 import type {
 	Engine,
-	EngineOptions,
 	RunDetail,
 	RunStatus,
 	RunStreamItem,
@@ -60,19 +61,19 @@ afterEach(async () => {
 function makeEngine(
 	harness: AgentHarness,
 	options: Partial<
-		Pick<EngineOptions, "maxConcurrentRuns" | "maxStepsPerRun" | "decider">
+		Pick<TestEngineOptions, "maxConcurrentRuns" | "maxStepsPerRun" | "decider">
 	> = {},
 	internals: EngineInternals = {},
 ): Engine {
 	const runLog = createRunLog(sandbox.db);
 	runLogs.push(runLog);
 	return createEngine(
-		{
+		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },
 			dataDir: sandbox.dataDir,
 			...options,
-		},
+		}),
 		{ runLog, ...internals },
 	);
 }

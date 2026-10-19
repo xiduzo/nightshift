@@ -7,7 +7,7 @@ import { templateEnvName } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 
 import { deriveSteps } from "../events";
-import { createSandbox, type Sandbox } from "../test-support";
+import { createSandbox, type Sandbox, TEST_DEVICE_ID } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { drive, flowOf, payloads, startRun } from "./test-support";
 
@@ -72,6 +72,7 @@ describe("the Command node", () => {
 				),
 				logPath,
 				scope: null,
+				deviceId: TEST_DEVICE_ID,
 			},
 		]);
 		expect(payloads(logged, "StepEnded")).toEqual([

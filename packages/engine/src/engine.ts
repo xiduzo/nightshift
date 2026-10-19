@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { AgentHarness, HarnessName } from "@nightshift/agents/types";
+import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { project, run } from "@nightshift/db/schema/nightshift";
 import {
-	type AgentNode,
 	optionProblem,
 	type Policy,
 	type ResolvedPolicy,
@@ -27,7 +26,6 @@ import {
 } from "./events";
 import { getRunRow as getRunRowOf, type RunRow } from "./graph/context";
 import { createRunner } from "./graph/runner";
-import { expandMcpServers, type McpExpansion } from "./mcp";
 import { createReadModel, parseCalledFlows, parseRunFlow } from "./read-model";
 import { createRecovery } from "./recovery";
 import { createRunLog, type RunLog } from "./run-log";
@@ -96,7 +94,7 @@ export function createEngine(
 ): Engine {
 	const minuteMs = internals.minuteMs ?? 60_000;
 	const now = internals.now ?? Date.now;
-	const { db, harnesses, dataDir, decider } = options;
+	const { db, dataDir, device } = options;
 	const maxConcurrentRuns =
 		options.maxConcurrentRuns ?? DEFAULT_MAX_CONCURRENT_RUNS;
 	if (!Number.isInteger(maxConcurrentRuns) || maxConcurrentRuns < 1) {
@@ -113,18 +111,8 @@ export function createEngine(
 			maxConcurrentRuns,
 			maxStepsPerRun,
 		};
-	const mcpServersFor =
-		options.mcpServersFor ??
-		(async (node: AgentNode): Promise<McpExpansion> =>
-			(node.connections ?? []).length > 0
-				? {
-						ok: false,
-						message: `The node uses connections (${node.connections?.join(", ")}), but there are none. Add them under Agents → Tools.`,
-					}
-				: expandMcpServers(node.mcpServers, process.env));
-	/** The harness of that name, when it is added (Agents page) and built. */
-	const harnessFor = (name: HarnessName): AgentHarness | undefined =>
-		(options.harnessNames?.().has(name) ?? true) ? harnesses[name] : undefined;
+	// Placement is one Device for now: every step runs on this computer.
+	const deviceFor = () => device;
 
 	const bus = createRunBus();
 	const runLog = internals.runLog ?? createRunLog(db);
@@ -145,10 +133,7 @@ export function createEngine(
 		now,
 		minuteMs,
 		settings: runSettings,
-		harnessFor,
-		...(decider ? { decider } : {}),
-		mcpServersFor,
-		...(options.cliToolsFor ? { cliToolsFor: options.cliToolsFor } : {}),
+		deviceFor,
 		flowOf: parseRunFlow,
 		calledFlowsOf: parseCalledFlows,
 		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
@@ -178,8 +163,8 @@ export function createEngine(
 		log: runLog,
 		bus,
 		isActive: runner.isActive,
-		// Built harnesses, added or not: an old run's session stays takeable.
-		harnessOf: (name) => harnesses[name],
+		// Any harness, added or not: an old run's session stays takeable.
+		harnessOf: harnessFacts,
 	});
 
 	const runStart = createRunStart({
@@ -190,11 +175,7 @@ export function createEngine(
 		projectRow: getProjectRow,
 		profileFor: options.profileFor ?? (() => null),
 		...(options.probeGit ? { probeGit: options.probeGit } : {}),
-		harnessFor,
-		connectionNames: () => options.connectionNames?.() ?? new Set(),
-		cliNames: () => options.cliNames?.() ?? new Set(),
-		findCli: options.findCli ?? ((name: string) => Bun.which(name)),
-		decider,
+		device,
 	});
 
 	const getRunRow = (runId: string): Promise<RunRow> => getRunRowOf(db, runId);

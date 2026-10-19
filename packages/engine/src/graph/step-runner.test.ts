@@ -2,13 +2,14 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Command } from "@langchain/langgraph";
 
 import { deriveSteps, type EngineEventType } from "../events";
-import { createSandbox, type Sandbox } from "../test-support";
+import { createSandbox, type Sandbox, testDevice } from "../test-support";
 import { STOP_AFTER_STEP_REASON, STOP_TIME_REASON } from "./context";
 import { RESUME_RULES, type ResumePoint } from "./resume-point";
 import type { PendingWait, RunStateValues } from "./state";
 import { type BodyResult, runStep, type StepHandle } from "./step-runner";
 import {
 	command,
+	drive,
 	edge,
 	flowOf,
 	type Harness,
@@ -517,5 +518,32 @@ describe("the step runner", () => {
 			"WaitStarted",
 			"WaitStarted",
 		]);
+	});
+});
+
+describe("the step's Device", () => {
+	test("is asked once per step, runs the body's work, and is named on StepStarted", async () => {
+		const h = await startRun(sandbox, FLOW);
+		const asked: string[] = [];
+		const ran: string[] = [];
+		h.ctx.deviceFor = (node, run) => {
+			asked.push(`${node.id}@${run.id}`);
+			const device = testDevice({ harnesses: {} });
+			return {
+				...device,
+				id: "studio",
+				exec: (input) => {
+					ran.push(input.command);
+					return device.exec(input);
+				},
+			};
+		};
+		const { state } = await drive(h, { inputs: {} });
+		expect(state.ended?.status).toBe("finished");
+		expect(asked).toEqual([`n@${h.runId}`, `after@${h.runId}`]);
+		expect(ran).toEqual(["true", "true"]);
+		expect(
+			payloads(await h.events(), "StepStarted").map((p) => p.deviceId),
+		).toEqual(["studio", "studio"]);
 	});
 });
