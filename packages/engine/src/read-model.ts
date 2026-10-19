@@ -9,6 +9,7 @@ import type { RunBus } from "./bus";
 import {
 	type DerivedStep,
 	deriveEndedAt,
+	deriveGateWaits,
 	deriveInputs,
 	deriveOpenGate,
 	deriveResumes,
@@ -121,6 +122,7 @@ export function runFacts(events: readonly LoggedEvent[]) {
 		costUsd: sumCostUsd(events),
 		endedAt: deriveEndedAt(events),
 		trigger: deriveTrigger(events),
+		gates: deriveGateWaits(events),
 	};
 }
 

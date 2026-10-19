@@ -26,6 +26,7 @@ import { type ReactNode, useState } from "react";
 import { Bar, BarChart, YAxis } from "recharts";
 import {
 	activePerHour,
+	gatesPerHour,
 	HOUR_MS,
 	lastHours,
 } from "@/components/dashboard/activity";
@@ -36,7 +37,7 @@ import { SpendDialog } from "@/components/dashboard/spend-dialog";
 
 import { useNow } from "@/hooks/use-now";
 import { useOpenGates } from "@/hooks/use-open-gates";
-import type { OpenGate, Project, RunSummary } from "@/lib/api-types";
+import type { Project, RunSummary } from "@/lib/api-types";
 import { formatCost, formatDateTime, formatTime } from "@/lib/format";
 
 const DAY_MS = 24 * HOUR_MS;
@@ -50,7 +51,7 @@ const ACTIVE_CONFIG = {
 	active: { label: "Active runs", color: "var(--status-running)" },
 } satisfies ChartConfig;
 const GATES_CONFIG = {
-	gates: { label: "Open Gates", color: "var(--status-waiting)" },
+	gates: { label: "Gates", color: "var(--status-waiting)" },
 } satisfies ChartConfig;
 /** Bottom to top: failures sit on top, where they show. */
 const OUTCOMES_CONFIG = {
@@ -162,11 +163,7 @@ export function SectionCards({
 					label="Waiting for you"
 					onOpen={() => setDetails("gates")}
 					value={gates.isLoading ? null : gates.error ? "—" : waiting}
-					chart={
-						gates.isLoading ? null : (
-							<GatesSparkline gates={openGates} now={now} />
-						)
-					}
+					chart={isLoading ? null : <GatesSparkline runs={all} now={now} />}
 					className={
 						waiting > 0
 							? "ring-status-waiting/50 dark:ring-status-waiting/40"
@@ -296,20 +293,16 @@ function ActiveSparkline({ runs, now }: { runs: RunSummary[]; now: number }) {
 	);
 }
 
-/**
- * The open Gates by the hour they opened, over the last 24 hours: how long
- * the inbox has waited. Older Gates count in the first hour.
- */
-function GatesSparkline({ gates, now }: { gates: OpenGate[]; now: number }) {
-	const hours = lastHours(SPARK_HOURS, now);
-	const first = hours[0] ?? now;
-	const data = hours.map((hour) => ({
-		gates: gates.filter((gate) => {
-			const opened = Math.max(gate.openedAt, first);
-			return opened >= hour && opened < hour + HOUR_MS;
-		}).length,
-	}));
-	return <Sparkline data={data} config={GATES_CONFIG} />;
+/** How many Gates waited for you in each of the last 24 hours. */
+function GatesSparkline({ runs, now }: { runs: RunSummary[]; now: number }) {
+	return (
+		<Sparkline
+			data={gatesPerHour(runs, SPARK_HOURS, now).map(({ gates }) => ({
+				gates,
+			}))}
+			config={GATES_CONFIG}
+		/>
+	);
 }
 
 /** Runs per hour over the last 24 hours, by how they ended. */

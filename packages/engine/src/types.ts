@@ -169,6 +169,11 @@ export type RunSummary = {
 	endedAt: number | null;
 	/** Sum over all steps. */
 	costUsd: number;
+	/**
+	 * Every Gate the run asked, also in called flows, oldest first.
+	 * `closedAt` is null while the Gate waits for an answer.
+	 */
+	gates: { openedAt: number; closedAt: number | null }[];
 };
 
 /** A resume of a run: by a person, or by the daemon after a restart. */
