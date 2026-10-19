@@ -210,3 +210,37 @@ describe("migration spaces", () => {
 		expect(await personalOf(db, owner?.id ?? "")).toHaveLength(1);
 	});
 });
+
+describe("migration members", () => {
+	test("makes this computer's Person the Host admin and the starter of its runs", async () => {
+		const db = await databaseBefore("members");
+		for (const statement of [
+			"INSERT INTO user (id, name, email, created_at) VALUES ('u2', 'Bob', 'bob@example.com', 9999999999999)",
+			"INSERT INTO project (id, space_id, name) VALUES ('p1', 's', 'repo')",
+			"INSERT INTO run (id, space_id, project_id, flow, title, worktree_path, branch, base_ref, walker_id) VALUES ('r1', 's', 'p1', '{}', 'Run', '/w', 'b', 'main', 'd')",
+			"INSERT INTO run (id, space_id, project_id, flow, title, worktree_path, branch, base_ref, walker_id) VALUES ('r2', 's', 'p1', '{}', 'Nightly', '/w2', 'b2', 'main', 'd')",
+			`INSERT INTO event (run_id, space_id, type, payload, walker_id, walker_seq) VALUES ('r2', 's', 'RunStarted', '{"trigger":{"kind":"schedule","scheduleId":"n","at":1}}', 'd', 1)`,
+		]) {
+			await db.run(sql.raw(statement));
+		}
+
+		await migrateDb(db);
+
+		const [owner] = await rows<{ id: string }>(
+			db,
+			"SELECT owner_id AS id FROM device WHERE self = 1",
+		);
+		expect(
+			await rows(db, "SELECT id, role FROM user ORDER BY created_at"),
+		).toEqual([
+			{ id: owner?.id, role: "admin" },
+			{ id: "u2", role: "user" },
+		]);
+		expect(
+			await rows(db, "SELECT id, started_by FROM run ORDER BY id"),
+		).toEqual([
+			{ id: "r1", started_by: owner?.id },
+			{ id: "r2", started_by: null },
+		]);
+	});
+});
