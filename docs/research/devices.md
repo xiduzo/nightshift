@@ -860,6 +860,104 @@ iroh.
 7. **From anywhere.** TLS or tailnet guidance, the Linux binary, the
    desktop app as a Host or joining one.
 
+   *Landed (from anywhere):*
+   - **`nightshift`, one file** (`apps/server/scripts/build-binary.ts`,
+     `bun run --cwd apps/server build:binary --target all`): `bun build
+     --compile` for linux-x64, linux-arm64 and darwin-arm64. A generated
+     entry embeds the web build and every `migration.sql` (imports `with {
+     type: "file" }`) and hands them to the CLI (`src/headless/embedded.ts`).
+     Two build plugins: varlock's loader becomes `process.env` (the shims
+     the desktop app used, moved to `apps/server/src/shims`), and libsql's
+     run-time pick of `@libsql/<target>` becomes a fixed `require` of the
+     target's `index.node`, which the executable then embeds. Another
+     platform's native package is downloaded from npm once, checked against
+     the registry's integrity, and kept in `apps/server/.cache/`. No
+     sourcemap file; identifiers stay unminified so a stack trace reads.
+     Tested: the darwin binary on this Mac with a fresh data folder; both
+     Linux binaries in a Debian container (x64 under emulation).
+   - **The CLI** (`apps/server/src/cli.ts`): `nightshift serve` (flags
+     over the environment: `--port`, `--data-dir`, `--host-address`
+     repeated, `--listen`, `--tls-port`, `--web`), `nightshift join
+     <host> [--guest]`, and new `nightshift pair <code> [--yes]`, which
+     approves a code on a Host without a screen (it calls the local
+     daemon's `devices.review` and `approve` as this computer's Person;
+     `docker exec` works). `serve` fills the environment the way the
+     desktop app did (`apps/server/src/daemon-env.ts`, now shared):
+     `BETTER_AUTH_URL` and `CORS_ORIGIN` default to the first `https://`
+     Host address (the UI is served by the daemon itself), else
+     `http://localhost:<port>`. It extracts the migrations to
+     `<data dir>/migrations` before the server loads
+     (`migrateDb(db, { migrationsFolder })`).
+   - **The daemon serves its UI** when it has one (embedded, or
+     `NIGHTSHIFT_WEB_DIR`, `src/headless/web.ts`): GET only, never `/rpc`,
+     `/api`, `/sync`; `/` only for `Accept: text/html` (a probe still gets
+     "OK"); a prerendered page by path, else `index.html`, which routes in
+     the browser (React reports a recoverable hydration mismatch there).
+     Each page gets `<meta name="nightshift-daemon">`, and the UI then
+     calls the origin it came from instead of `VITE_SERVER_URL`
+     (`apps/web/src/lib/server-url.ts`): a Host has several addresses, and
+     the one the browser used is the one that answers.
+   - **Secrets without a keychain.** The auth secret: `BETTER_AUTH_SECRET`,
+     else the file `BETTER_AUTH_SECRET_FILE`, else `BETTER_AUTH_SECRET` in
+     the secrets folder, else made once in the data folder (0600). A
+     `${NAME}`: the environment, then a file `NAME` in the secrets folder
+     (`NIGHTSHIFT_SECRETS_DIR`, else systemd's `CREDENTIALS_DIRECTORY`),
+     read at start, under the environment. Secrets saved on the
+     Connections page go to the keychain where it works, else
+     `<data dir>/secrets/<NAME>` (0600), the same choice as Device keys
+     (`packages/engine/src/keychain.ts`, `NIGHTSHIFT_KEY_STORE=file`). The
+     Devices page says where: "Secrets and access to your Hosts".
+   - **Listening.** `NIGHTSHIFT_LISTEN` narrows where a Host binds (default
+     `0.0.0.0`): `127.0.0.1` when its way out runs on the same computer. A
+     daemon that is not a Host binds `127.0.0.1` whatever it says. With its
+     own certificate, `nightshift serve` and the desktop app keep plain
+     http on `127.0.0.1:PORT` for this computer (the window, the CLI) and
+     serve https on `NIGHTSHIFT_TLS_PORT` (default `PORT + 443`) at the
+     Host's hostname (`apps/server/src/serve.ts`). `bun run dev` keeps
+     slice 4's single listener.
+   - **A proxy is not this computer.** Every way out connects to the
+     daemon from the loopback. The local session now also needs no
+     forwarding header (`Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`,
+     `X-Real-IP`, `CF-Connecting-IP`, `Tailscale-User-Login`) and a
+     loopback name in the URL (a TCP tunnel such as rathole passes the
+     public name on). The daemon's own `http://localhost:PORT` and
+     `http://127.0.0.1:PORT` are trusted origins, for its UI over an SSH
+     tunnel.
+   - **The desktop app** starts the daemon with `serveDaemon`, so it binds
+     by the Host rules and serves its certificate (it passed no `tls`
+     before), flushes the Space documents on quit, and its Devices page
+     has **Join a Host** (`join-host-dialog.tsx`: address, home or guest,
+     the code and fingerprint, waits, closes when the Host allows it; the
+     same `devices.join` stream). A streaming procedure's error now
+     reaches the UI as its message (`readable`, `packages/api`); before,
+     "declined" or "expired" read "Internal server error". A certificate
+     this computer can neither trust nor pin (a proxy's private authority)
+     says so when joining.
+   - **Link order** was already right in part A: the Device saves the
+     Host's list from the pairing answer, learns it again from every
+     `hello` and heartbeat (the Host's order, then its own others), and
+     tries them in order. Tested with the binary: a Host with
+     `https://studio-lan.invalid:3932, https://localhost:3932`, joined at
+     the second, keeps both and is online at the second.
+   - **Deploy** (`deploy/`): a two-stage Dockerfile (Node for the Vite
+     build, whose prerender does not run on Bun alone; `oven/bun:1.3.10-slim`
+     with git and ssh to run), `docker-compose.yml` with Caddy, and a systemd
+     unit with `LoadCredential=`. Guides in `docs/deploy/`: LAN with a
+     self-signed certificate (`.local` by mDNS, first address), tailnet
+     (Serve, Funnel and its caveats), public server (Compose with Caddy,
+     Dokploy, plain Caddy), outbound tunnel (Cloudflare Tunnel, frp,
+     rathole). Tested end to end: the image behind Caddy, a computer
+     joining it as a guest, `docker exec … nightshift pair`. Tailscale,
+     Let's Encrypt, Cloudflare Tunnel, frp and rathole are written from
+     their docs.
+   - Not yet: a browser on another computer must sign in to a Host, and
+     sign-up stays open until slice 6 makes it invitation-only: the guides
+     say to publish a public address only then. A Host behind a proxy
+     trusts only `CORS_ORIGIN` and `BETTER_AUTH_URL` as page origins, not
+     every Host address. The desktop app does not serve its UI to other
+     computers' browsers. A container sees an SSH-tunnelled request as
+     another computer's.
+
 Slices 1 to 3 are refactors in the shape of the eight that landed on
 2026-10-19. Slice 4 is the first that needs a second computer.
 
@@ -901,8 +999,8 @@ Nothing is open. The next step is slice 1.
   1.7.7, with a test that one Person cannot approve another's code.
 - A headless Device has no keychain: secrets from its environment or a
   file its service manager provides. Say which on the Devices page.
-  Done for Device keys in slice 4 ("Access to your Hosts" says keychain
-  or file); secrets still to do.
+  Done for Device keys in slice 4 and for secrets in slice 7 (files in
+  the data folder, a secrets folder, systemd credentials).
 - A `${NAME}` the placed Device lacks should refuse at run start.
 - The usage-limit sleep is per harness login, so per Device. The sleep
   module needs the Device in its key.

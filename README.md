@@ -25,6 +25,8 @@ bun run night          # a night: the built web UI and API, no hot reload
 bun run dev:desktop    # the Electrobun shell
 ```
 
+To run Night Shift on a server, or to reach it from your other computers, see [docs/deploy/](docs/deploy/): the one-file `nightshift` binary, Docker, systemd, and ways to give a Host an `https://` address (LAN, Tailscale, a public server, a tunnel).
+
 Run nights with `bun run night`, and develop in a separate git worktree, so a code change never reloads the daemon in the middle of a night. A night keeps its database and transcripts in the app data folder of the OS (`~/Library/Application Support/Night Shift` on macOS). `bun run dev` keeps its own in `.nightshift-dev/` in the checkout. Your repo's `.nightshift/` folder holds only flows and schedules. Setup details (schedules, harness paths, MCP secrets) are in [docs/PLAN.md §6](docs/PLAN.md#6-setup).
 
 ## Contribute
