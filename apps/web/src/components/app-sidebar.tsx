@@ -234,6 +234,7 @@ function ProjectFolder({ project }: { project: Project }) {
 	});
 	const runs = useProjectRuns(project.id);
 	const schedulesOn = schedules.data?.schedules.filter((s) => s.enabled);
+	const running = runs.data?.some((run) => run.status === "running") ?? false;
 
 	return (
 		<Collapsible
@@ -242,12 +243,28 @@ function ProjectFolder({ project }: { project: Project }) {
 			render={<SidebarMenuItem />}
 		>
 			<SidebarMenuButton
-				tooltip={project.name}
+				tooltip={
+					running ? `${project.name}, a run is in progress` : project.name
+				}
 				isActive={Boolean(matchRoute({ to: "/projects/$projectId", params }))}
 				render={<Link to="/projects/$projectId" params={params} />}
 			>
-				<Icon aria-hidden="true" />
-				<span>{project.name}</span>
+				{/* A pulsing dot on the folder while a run in this project is in progress. */}
+				<span className="relative flex shrink-0">
+					<Icon aria-hidden="true" />
+					{running ? (
+						<span className="absolute -top-0.5 -right-0.5 flex size-2">
+							<span className="absolute inset-0 animate-ping rounded-full bg-status-running/60 motion-reduce:hidden" />
+							<span className="relative size-2 rounded-full bg-status-running" />
+						</span>
+					) : null}
+				</span>
+				<span>
+					{project.name}
+					{running ? (
+						<span className="sr-only">, a run is in progress</span>
+					) : null}
+				</span>
 			</SidebarMenuButton>
 			<CollapsibleTrigger
 				render={
