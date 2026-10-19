@@ -1,3 +1,4 @@
+import type { Permissions } from "@nightshift/auth";
 import { ORPCError, os } from "@orpc/server";
 
 import type { Context } from "./context";
@@ -21,17 +22,56 @@ const readableErrors = o.middleware(async ({ next }) => {
 	}
 });
 
+/** No session needed: the health check only. */
 export const publicProcedure = o.use(readableErrors);
 
-const requireAuth = o.middleware(async ({ context, next }) => {
-	if (!context.session?.user) {
-		throw new ORPCError("UNAUTHORIZED");
+/**
+ * A session in a Space. The handler gets `space`: the engine as that Space
+ * sees it, so nothing it reads or changes is of another Space.
+ */
+const requireSpace = o.middleware(async ({ context, next }) => {
+	if (!context.session?.user || !context.spaceId) {
+		throw new ORPCError("UNAUTHORIZED", {
+			message: "Sign in to use Night Shift.",
+		});
 	}
 	return next({
 		context: {
 			session: context.session,
+			spaceId: context.spaceId,
+			space: context.engine.space(context.spaceId),
 		},
 	});
 });
 
-export const protectedProcedure = publicProcedure.use(requireAuth);
+export const protectedProcedure = publicProcedure.use(requireSpace);
+
+/**
+ * A procedure that needs a role allowing `permissions` in the session's
+ * Space (`run.start`, `gate.resolve`, …), checked on the server.
+ */
+export function permitted(permissions: Permissions) {
+	return protectedProcedure.use(async ({ context, next }) => {
+		if (!(await context.can(permissions))) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "Your role in this Space does not allow this.",
+			});
+		}
+		return next();
+	});
+}
+
+/**
+ * This computer's own configuration (settings, harnesses, profiles,
+ * connections, CLI tools): private to the Person who owns it, in any Space.
+ */
+export const ownerProcedure = protectedProcedure.use(
+	async ({ context, next }) => {
+		if (context.session.user.id !== context.daemon.device.ownerId) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "Only the owner of this computer can see or change this.",
+			});
+		}
+		return next();
+	},
+);

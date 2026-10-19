@@ -54,8 +54,8 @@ import {
 } from "react";
 
 import { AddProjectDialog } from "@/components/add-project-form";
-import { Logo } from "@/components/logo";
 import { describeRunStatuses, RunsDonut } from "@/components/runs-donut";
+import { SpaceSwitcher } from "@/components/space-switcher";
 import { useOpenGates } from "@/hooks/use-open-gates";
 import { useProjectRuns } from "@/hooks/use-project-runs";
 import type { Project } from "@/lib/api-types";
@@ -71,20 +71,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 	return (
 		<Sidebar collapsible="icon" {...props}>
 			<SidebarHeader>
-				<SidebarMenu>
-					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" render={<Link to="/" />}>
-							{/* `!` beats the menu button's `[&_svg]:size-4`. */}
-							<Logo className="size-8!" />
-							<div className="grid flex-1 text-left text-sm leading-tight">
-								<span className="truncate font-semibold">Night Shift</span>
-								<span className="truncate text-muted-foreground text-xs">
-									Let your night self handle it
-								</span>
-							</div>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				</SidebarMenu>
+				<SpaceSwitcher />
 			</SidebarHeader>
 			<SidebarContent>
 				<SidebarGroup>
