@@ -20,8 +20,9 @@ const REFETCH_MS = 300;
 
 /**
  * Subscribes to `runs.watch` for one run. The server sends the status and
- * every step summary, replays the transcript from disk, then streams live
- * items. Transcript entries are grouped by step. When the stream drops, the
+ * every step summary, replays the transcript, then streams live items. A
+ * run another device walks streams the same way: the server follows its
+ * running step live through the Host. Transcript entries are grouped by step. When the stream drops, the
  * hook reconnects with backoff and passes the last seen seq as `afterSeq`, so
  * it only receives entries it does not have yet. Status and step items
  * refetch the run, which carries the edge traversals and the cost.
