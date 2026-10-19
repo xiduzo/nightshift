@@ -12,6 +12,7 @@ import {
 	MissingProjectError,
 	mergeCursors,
 	type SyncCursors,
+	withoutPrivatePaths,
 } from "@nightshift/engine";
 import type { Engine } from "@nightshift/engine/types";
 import { ORPCError } from "@orpc/server";
@@ -32,6 +33,11 @@ import { NOT_A_HOST } from "./host";
  *   this Host walks gets it at once; any other waits for its Walker.
  * - The archive keeps what a Walker puts for its own runs, and gives a
  *   Member what it asks of their Spaces' runs.
+ * - A Walker's paths (its worktree, its transcripts and logs on disk) stay
+ *   with its owner's Replicas: the Host drops them from the rows of a
+ *   Device of another Person before it keeps them, and from the rows it
+ *   serves to a Device whose owner is not the Walker's
+ *   (`withoutPrivatePaths`).
  */
 
 /** How long a stream with nothing new waits before it looks again. */
@@ -43,6 +49,8 @@ export function createHostExchange(deps: {
 	registry: DeviceRegistry;
 	/** This Host's Device id: the Walker of its own runs. */
 	selfId: string;
+	/** The Person who owns this Host: the owner of its own Walker's paths. */
+	ownerId: string;
 	isHost(): boolean;
 }): HostExchange {
 	const { db, engine, registry } = deps;
@@ -72,6 +80,12 @@ export function createHostExchange(deps: {
 		throw new ORPCError("FORBIDDEN", { message });
 	}
 
+	/** The Person who owns a Walker, as this Host knows it. */
+	async function ownerOf(walkerId: string): Promise<string | null> {
+		if (walkerId === deps.selfId) return deps.ownerId;
+		return (await registry.get(walkerId))?.ownerId ?? null;
+	}
+
 	async function batch(
 		key: DeviceKeyAccess,
 		cursors: SyncCursors,
@@ -82,8 +96,15 @@ export function createHostExchange(deps: {
 			cursors,
 			except: key.deviceId,
 		});
+		const owners = new Map<string, string | null>();
+		for (const walkerId of new Set(rows.runs.map((r) => r.walkerId))) {
+			owners.set(walkerId, await ownerOf(walkerId));
+		}
 		return {
-			rows,
+			rows: withoutPrivatePaths(
+				rows,
+				(walkerId) => owners.get(walkerId) === key.personId,
+			),
 			cursors: moved,
 			commands: await exchange.commands.pendingFor(key.deviceId),
 		};
@@ -131,7 +152,10 @@ export function createHostExchange(deps: {
 		async push(key, rows) {
 			await admit(key);
 			try {
-				const added = await exchange.rows.ingest(rows, {
+				// Another Person's Device: its paths never land in this Replica.
+				const kept =
+					key.personId === deps.ownerId ? rows : withoutPrivatePaths(rows);
+				const added = await exchange.rows.ingest(kept, {
 					walker: key.deviceId,
 					spaces: await memberSpaces(key),
 				});

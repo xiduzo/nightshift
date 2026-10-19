@@ -10,7 +10,9 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 |------|---------|--------|
 | Developer | Owns a clone of the repo and the coding-agent CLIs. Draws Flows, starts Runs, and answers Gates. In local mode, the only user. | PLAN §1 |
 | Person | A user account (Better Auth's user). The Person who owns this computer's Device is signed in for you: a request from this computer without a session of its own acts as them. | Devices, slice 2 |
-| Member | A Person in a Space, with a role: owner, admin, member or viewer. The role says what they may do there: start Runs, answer Gates, add Projects. A viewer only reads. | Devices, slice 2 |
+| Member | A Person in a Space, with a role: owner, admin, member or viewer. The role says what they may do there: start Runs, answer Gates, add Projects. A viewer only reads. Owners and admins invite people, change roles and remove Members on the Members page; only an owner deletes a Space. A removed Member no longer sees the Space. | Devices, slice 2, slice 6 |
+| Host admin | The first Person on a Host: on this computer, the Person who owns it. The admin plugin's `admin` role, not a role in a Space. | Devices, slice 6 |
+| Invitation | An offer to join one Space with a role, for one email. It is also the account: a Host takes new people by invitation only, so the person makes their account from the invitation's link (`/invite/<id>`), then joins. Night Shift sends no email: the Members page shows the link to copy. It works for seven days, until it is accepted or canceled. A personal Space takes none. | Devices, slice 6 |
 
 ## Objects
 
@@ -146,7 +148,10 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | CloneAdded | A folder became a Project's Clone on a Device: its `origin` named a known Project, or the Clone moved to a new folder. |
 | ProjectRenamed | A person gave a Project a new name. |
 | ProjectMoved | A person moved a Project, with its Clones, Runs and Events, from one Space to another. |
-| RunStarted | A Run began, with its copy of the Flow. |
+| MemberJoined | A Person joined a Space with a role: they accepted an Invitation, made the Space, or were added. Names who did it. |
+| MemberRoleChanged | A Member got another role, and who changed it. |
+| MemberRemoved | A Person is no longer a Member of a Space, and who removed them. |
+| RunStarted | A Run began, with its copy of the Flow, and the Person who started it (none for a Schedule). |
 | WorktreeCreated | A Worktree was created for a Run. |
 | RunResumed | A person resumed a Run, or the daemon did after a restart (`by: "daemon"`). |
 | StepStarted | A Step began a Visit of a Node. |

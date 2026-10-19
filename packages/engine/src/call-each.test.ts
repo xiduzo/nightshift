@@ -444,6 +444,12 @@ describe("Call with each", () => {
 		]);
 		const after = detail.steps.find((s) => s.nodeId === "after");
 		expect(after?.outputs.log_tail).toContain("#3 done");
+		// A blocked item never ran its flow.
+		const [listed] = await engine.listRuns();
+		expect(listed?.subflows.map((s) => [s.flowName, s.status])).toEqual([
+			["build", "failed"],
+			["build", "finished"],
+		]);
 		// Item 3 builds on the start: no item before it was done.
 		expect(loop.items[3]?.baseBranch).toBe(started.branch);
 	});
@@ -671,6 +677,17 @@ describe("Call with each", () => {
 		// A body's `session: "resume"` never resumes another item's session.
 		expect(harness.calls[1]?.resumeSessionId).toBeUndefined();
 		expect(harness.calls[3]?.resumeSessionId).toBeUndefined();
+
+		// Each item is a run of its flow, found in the flow that holds the Call.
+		const [listed] = await engine.listRuns();
+		expect(
+			listed?.subflows.map((s) => [s.flowName, s.status, s.costUsd]),
+		).toEqual([
+			["feature", "finished", 0.002],
+			["trace", "finished", 0.001],
+			["feature", "finished", 0.002],
+			["trace", "finished", 0.001],
+		]);
 
 		const outer = callEachStep(detail, "loop");
 		const inner = detail.steps.filter((s) => s.nodeId === "traces");
@@ -1379,6 +1396,11 @@ describe("stop modes", () => {
 		expect(
 			callEachStep(detail).items.map((i) => [i.id, i.state, i.reason]),
 		).toEqual([["1", "failed", "Not finished before the stop time."]]);
+		// The stop time cut the item: it counts as stopped, not failed.
+		const [listed] = await engine.listRuns();
+		expect(listed?.subflows.map((s) => [s.flowName, s.status])).toEqual([
+			["build", "stopped"],
+		]);
 		const report = detail.steps.find((s) => s.nodeId === "report");
 		expect(report?.outputs?.log_tail).toBe(
 			"#1 failed: Not finished before the stop time.\n#2 not started",

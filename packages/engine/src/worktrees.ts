@@ -147,11 +147,13 @@ export function worktreeLocation(repoPath: string, shortId: string) {
 /**
  * Adds a worktree on a new branch `nightshift/<shortId>` from `baseRef`
  * (default: the clone's current HEAD). Returns the resolved base commit.
+ * With `author`, the worktree gets that git identity in its own config.
  */
 export async function createWorktree(input: {
 	repoPath: string;
 	shortId: string;
 	baseRef?: string;
+	author?: { name: string; email: string };
 }): Promise<{ worktreePath: string; branch: string; baseRef: string }> {
 	const baseRef = await resolveCommit(input.repoPath, input.baseRef ?? "HEAD");
 	const { worktreePath, branch } = worktreeLocation(
@@ -167,7 +169,38 @@ export async function createWorktree(input: {
 		worktreePath,
 		baseRef,
 	]);
+	if (input.author) await setWorktreeAuthor(worktreePath, input.author);
 	return { worktreePath, branch, baseRef };
+}
+
+/**
+ * Gives one worktree its own `user.name` and `user.email`: commits in it
+ * are in that Person's name, and the clone and its other worktrees keep
+ * theirs. Per-worktree config needs `extensions.worktreeConfig`, which this
+ * turns on in the clone (as `git sparse-checkout` does); git ignores the
+ * worktree's own file without it.
+ */
+export async function setWorktreeAuthor(
+	worktreePath: string,
+	author: { name: string; email: string },
+): Promise<void> {
+	await gitOrThrow(worktreePath, [
+		"config",
+		"extensions.worktreeConfig",
+		"true",
+	]);
+	await gitOrThrow(worktreePath, [
+		"config",
+		"--worktree",
+		"user.name",
+		author.name,
+	]);
+	await gitOrThrow(worktreePath, [
+		"config",
+		"--worktree",
+		"user.email",
+		author.email,
+	]);
 }
 
 /** The checked-out branch of a worktree, or null when HEAD is detached. */

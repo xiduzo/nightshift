@@ -9,13 +9,11 @@ import {
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Textarea } from "@nightshift/ui/components/textarea";
 import { cn } from "@nightshift/ui/lib/utils";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
-import { toast } from "sonner";
 
 import { outcomeLabel, outcomeStyle } from "@/components/outcome-badge";
+import { useResolveGate } from "@/hooks/use-resolve-gate";
 import type { GateChoice } from "@/lib/api-types";
-import { orpc } from "@/utils/orpc";
 
 /**
  * Answers an open Gate: an optional note, then one button per choice. A click
@@ -41,41 +39,19 @@ export function GateAnswer({
 	className?: string;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
 	const [note, setNote] = useState("");
-
-	const resolve = useMutation(
-		orpc.gates.resolve.mutationOptions({
-			onSuccess: (_, input) => {
-				toast.success(
-					`Answered ${outcomeLabel(input.choice)}${runTitle ? ` · ${runTitle}` : ""}`,
-					{
-						description: walkerName
-							? `Sent to ${walkerName}. The run goes on when ${walkerName} is online.`
-							: "The run goes on.",
-					},
-				);
-				setNote("");
-				// Out of the inbox at once; the refetch confirms it.
-				queryClient.setQueryData(orpc.gates.list.queryKey(), (gates) =>
-					gates?.filter((gate) => gate.stepId !== input.stepId),
-				);
-				void queryClient.invalidateQueries({ queryKey: orpc.gates.key() });
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
-			},
-			onError: (error) => toast.error(`Could not answer: ${error.message}`),
-		}),
-	);
+	const resolve = useResolveGate({
+		...(runTitle ? { runTitle } : {}),
+		...(walkerName ? { walkerName } : {}),
+	});
 
 	const answer = (choice: string) => {
 		if (resolve.isPending) return;
 		const trimmed = note.trim();
-		resolve.mutate({
-			runId,
-			stepId,
-			choice,
-			note: trimmed === "" ? undefined : trimmed,
-		});
+		resolve.mutate(
+			{ runId, stepId, choice, note: trimmed === "" ? undefined : trimmed },
+			{ onSuccess: () => setNote("") },
+		);
 	};
 
 	return (

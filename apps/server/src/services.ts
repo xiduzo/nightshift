@@ -170,6 +170,9 @@ export const spaces = opened.nightshiftSpaces;
 
 export const auth = createAuth(ENV, db, desktopOrigins, {
 	onMembersChanged: (spaceId) => spaces.mirrorMembers(spaceId),
+	// The audit of Members, in the Space's event log. Called on requests,
+	// long after the engine below is made.
+	onMemberChange: (change) => engine.logMemberChange(change),
 });
 
 /** This computer's Device: the Walker of its runs, the owner of its Clones. */
@@ -406,6 +409,7 @@ export const hostExchange = createHostExchange({
 	engine,
 	registry: engine.devices,
 	selfId: device.id,
+	ownerId: person.userId,
 	isHost: host.isHost,
 });
 

@@ -29,7 +29,7 @@ import type { RunCommandInput } from "./exchange/commands";
 import { createEngineExchange } from "./exchange/engine-exchange";
 import { getRunRow as getRunRowOf, type RunRow } from "./graph/context";
 import { createRunner } from "./graph/runner";
-import { createProjects, type ProjectRow, toProject } from "./projects";
+import { createProjects, type ListedProject, toProject } from "./projects";
 import { createReadModel, parseCalledFlows, parseRunFlow } from "./read-model";
 import { createRecovery } from "./recovery";
 import { createRunLog, type RunLog } from "./run-log";
@@ -46,6 +46,7 @@ import type {
 	Actor,
 	Engine,
 	EngineOptions,
+	MemberChange,
 	RunStreamItem,
 	RunSummary,
 	RunTrigger,
@@ -379,7 +380,7 @@ export function createEngine(
 	}
 
 	/** Rows as the engine's Projects, with their Clones from the Space document. */
-	async function withClones(spaceId: string, rows: ProjectRow[]) {
+	async function withClones(spaceId: string, rows: ListedProject[]) {
 		const document = await documents.open(spaceId);
 		const deviceId = await runLog.walkerId();
 		return rows.map((row) => toProject(row, document, deviceId));
@@ -404,7 +405,7 @@ export function createEngine(
 		return {
 			async listProjects() {
 				await ready;
-				return withClones(spaceId, await projects.list(spaceId));
+				return withClones(spaceId, await projects.listInSpace(spaceId));
 			},
 
 			async addProject(input) {
@@ -675,10 +676,44 @@ export function createEngine(
 		yield* reads.watch(runId, signal, afterSeq);
 	}
 
+	async function logMemberChange(change: MemberChange): Promise<void> {
+		const { spaceId, personId, by } = change;
+		if (change.kind === "joined") {
+			await runLog.append({
+				type: "MemberJoined",
+				spaceId,
+				payload: {
+					personId,
+					role: change.role,
+					by,
+					...(change.invitedBy ? { invitedBy: change.invitedBy } : {}),
+				},
+			});
+		} else if (change.kind === "removed") {
+			await runLog.append({
+				type: "MemberRemoved",
+				spaceId,
+				payload: { personId, by },
+			});
+		} else {
+			await runLog.append({
+				type: "MemberRoleChanged",
+				spaceId,
+				payload: {
+					personId,
+					role: change.role,
+					previousRole: change.previousRole,
+					by,
+				},
+			});
+		}
+	}
+
 	return {
 		space,
 		devices: createDeviceRegistry({ db, log: runLog, now }),
 		exchange,
+		logMemberChange,
 	};
 }
 

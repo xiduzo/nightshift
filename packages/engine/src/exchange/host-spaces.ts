@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { member, organization } from "@nightshift/db/schema/auth";
-import { hostSpace } from "@nightshift/db/schema/nightshift";
+import { hostLink, hostSpace } from "@nightshift/db/schema/nightshift";
 import { and, eq, inArray, notInArray } from "drizzle-orm";
 
 /**
@@ -167,4 +167,22 @@ export async function isHostedElsewhere(
 		.from(hostSpace)
 		.where(eq(hostSpace.spaceId, spaceId));
 	return row !== undefined;
+}
+
+/**
+ * This computer's Person as the Host of a Space knows them (the Person of
+ * its link), or null for a Space this Replica keeps itself. A run this
+ * computer starts in a Host's Space names that Person, so every Replica of
+ * the Space reads the same `started_by`.
+ */
+export async function personOnHost(
+	db: Database,
+	spaceId: string,
+): Promise<string | null> {
+	const [row] = await db
+		.select({ personId: hostLink.personId })
+		.from(hostSpace)
+		.innerJoin(hostLink, eq(hostLink.hostId, hostSpace.hostId))
+		.where(eq(hostSpace.spaceId, spaceId));
+	return row?.personId ?? null;
 }

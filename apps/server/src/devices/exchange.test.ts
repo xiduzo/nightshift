@@ -160,8 +160,17 @@ describe("the event log exchange", () => {
 		});
 		await b.client.spaces.switch({ spaceId });
 
-		// B's folder of the same remote is a Clone of A's project, known on
-		// A, once the Space document has brought the project to B.
+		// The project is listed on B before B has a folder of it.
+		const listedOnB = await waitFor(
+			() => b.client.projects.list(),
+			(projects) => projects.some((p) => p.id === projectId),
+		);
+		expect(listedOnB.find((p) => p.id === projectId)?.repoPath).toBeNull();
+		expect(b.client.flows.list({ projectId })).rejects.toThrow(
+			"not on this computer",
+		);
+
+		// B's folder of the same remote is a Clone of A's project, known on A.
 		const folder = await repo("on-b");
 		const clone = await waitFor(
 			() => b.client.projects.add({ repoPath: folder }).catch(() => null),
@@ -191,6 +200,11 @@ describe("the event log exchange", () => {
 			(r) => r?.status === "waiting",
 		)) as RunSummary;
 		expect(seen.walker).toMatchObject({ id: bId, thisDevice: false });
+		// Started by the Person A knows, with B's paths: B is A's owner's own Device.
+		const personOfA = (await a.client.settings.get()).daemon.device.ownerId;
+		expect(seen.startedBy?.id).toBe(personOfA);
+		expect(seen.startedBy?.name).toBeTruthy();
+		expect(seen.worktreePath).not.toBe("");
 		expect(seen.walker.name).toBeTruthy();
 		const gate = await waitFor(
 			async () =>

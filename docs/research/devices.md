@@ -948,19 +948,114 @@ iroh.
      opens the transcript from the archive; a Space B's owner is not in
      never reaches B; a forged row is refused; B walks while A is down and
      A catches up.
-   - Not yet, and risky: run rows and event payloads carry the Walker's
-     paths (`worktree_path`, `transcript_path`, `WorktreeCreated`,
-     `StepStarted.transcriptPath`) to every Member's Replica; slice 6
-     should keep them from other Persons. A Person who leaves a Space
-     keeps the rows they had. A Device lists a Space's projects only once
-     it has a Clone of them. Pending commands show only on the Host. A
-     run bundle of a run walked elsewhere has no transcripts. The Members
-     page (slice 6) should treat a Host's Space as read-only on a Device.
+   - **A Walker's paths stay with its owner.** Where its worktree,
+     transcripts and command logs are on its disk is private to the
+     Walker's owner. The Host keeps them only from its own owner's
+     Devices, and serves them only to a Device whose owner is the
+     Walker's; every other Replica gets the rows without them
+     (`withoutPrivatePaths`). The rows keep their shape, so old readers
+     and the payload rule hold: `run.worktree_path`,
+     `step.transcript_path`, `WorktreeCreated.worktreePath` and
+     `StepStarted.transcriptPath` become `""`, and a `StepStarted.logPath`
+     that was set becomes `""` (still "this step has a log"). Clone paths
+     never leave their Device: `clone` rows and the facts of no run
+     (`CloneAdded`, `ProjectAdded`) are not exchanged, and the Space
+     document has none.
+   - **Who started it.** `run.started_by` travels with the run row. A run
+     this computer starts in a Host's Space names this computer's Person
+     as the Host knows them (the Person of its link), so every Replica of
+     the Space names the same Person; the git author stays the local one.
+   - **Every project of a Space is listed**, also without a Clone here:
+     `Project.repoPath` is null, and the UI says "Not on this computer"
+     (slice 5 starts runs placed on another Device from anywhere). Every
+     call that needs the folder (flows, branches, schedules, a run walked
+     here, rename and removal) says "This project is not on this
+     computer. Add its folder here to use it."
+   - Not yet, and risky: a Person who leaves a Space keeps the rows they
+     had. Pending commands show only on the Host. A run bundle of a run
+     walked elsewhere has no transcripts. Transcripts in the archive are
+     run content, readable by the Host's operator (as "What is
+     deliberately not promised" says). The Members page should treat a
+     Host's Space as read-only on a Device.
 
 5. **Placement.** Run-level, then per node with the Hand-off;
    `device-offline` sleep and reattach.
 6. **Sharing.** Invitation-only signup, Members and roles, Offers with the
    Device-side checks, audit events, per-Person git identity in worktrees.
+
+   *Landed (part A, Members):*
+   - **Invitation-only.** Better Auth's admin plugin: `user.role` is the
+     Person's role on the Host, `admin` for the Host admin, else `user`
+     (not a role in a Space). The first Person is the Host admin: the
+     user-create hook gives `admin` while the Host has none, and the
+     migration names this computer's Person (else the earliest account).
+     `localPerson`, which makes a Person without the hooks, claims it the
+     same way. Email and password sign-up (`/sign-up/email`) is refused by
+     a `hooks.before` unless the Host has nobody yet, or the body names a
+     pending, unexpired invitation of that email (`invitationId`): so the
+     link, not only the email, makes the account
+     (`packages/auth/src/members.ts`). The admin's own `createUser` stays
+     open to the Host admin. One person on one computer is untouched: the
+     local Person and the local session make no sign-up.
+   - **No email server.** Invitations are stored only (no
+     `sendInvitationEmail`); the Members page shows the link to copy:
+     `<the page's origin>/invite/<invitation id>`. The id is the link's
+     secret. Invitations last seven days (`INVITATION_DAYS`), since a
+     person passes the link on by hand. An email sender is the plugin's
+     `sendInvitationEmail` hook, later. The link uses the origin of the
+     browser that made it: open the Members page by the Host's `https://`
+     address to get a link a colleague can use.
+   - **Accepting** (`/invite/$invitationId`, outside the app's sidebar,
+     like `/login`): `invitations.get` is public (Space, inviter, role,
+     status, whether the email has an account here). No account: name and
+     password make one (the email is the invitation's), then
+     `invitations.accept`; an account: sign in, then accept; already
+     signed in with that email: Join. Accepting makes the Person a Member
+     and the session's active Space (the plugin does both), and the app
+     goes home in it. `/login` signs in only: "New here? Open the
+     invitation link."
+   - **Members page** (`/members`, sidebar under Inbox): `members.list`
+     (Members with name, email, role; pending invitations; what the
+     session may change), `members.invite` (admin, member or viewer),
+     `members.cancelInvitation`, `members.setRole`, `members.remove`, each
+     behind its `member.invite`, `member.role` or `member.remove` check
+     (`permitted`), then the organization plugin checks the role again
+     (an admin cannot touch an owner; nobody deletes a Space without
+     `space.delete`). Personal Space: "Nobody can join it" and Create
+     Space. Custom roles are not in this slice.
+   - **Audit.** The organization hooks report `MemberChange` (joined,
+     removed, role) with the Person whose session called the endpoint
+     (Better Auth's endpoint context, `tryGetCurrentAuthEndpointContext`).
+     The daemon logs `MemberJoined` (`personId`, `role`, `by`,
+     `invitedBy`), `MemberRoleChanged` (`previousRole`) and
+     `MemberRemoved` in that Space (`engine.logMemberChange`). Making a
+     Space logs its owner's `MemberJoined`. The Space document's member
+     mirror follows as before.
+   - **Who started a run.** `RunStarted` gains `startedBy` (appended), and
+     `run.started_by` (no foreign key, like `walker_id`). `runs.start`
+     passes the session's Person; a schedule's run has none. The migration
+     names this computer's Person for every run no schedule started. A
+     run's summary has `startedBy` (id and name, from the Replica's
+     accounts); the run page's "Started by" says You, their name, or the
+     schedule. Run bundles are format 4 (`started_by`); format 3 reads
+     with none.
+   - **Git identity per Person.** The worktree's own config gets the
+     starter's `user.name` and `user.email` (`RunRef.author`,
+     `setWorktreeAuthor`): `git config --worktree`, which needs
+     `extensions.worktreeConfig` in the clone, set once (as `git
+     sparse-checkout` does). The clone and its other worktrees keep their
+     identity. A Person with no real email (`…@nightshift.invalid`, this
+     computer's own) gets none: the repository's identity stays.
+   - Tests: sign-up refused without an invitation, for another email and
+     for a canceled one; the first Person is the Host admin; invite, sign
+     up, accept, member in the Space; a viewer cannot invite; an admin
+     cannot delete the Space; a removed member loses the Space (and its
+     document on the relay); role changes and removals name who made
+     them; `startedBy` and the worktree identity, and none for the local
+     Person.
+   - Not yet (part B, after placement): Offers and the offering Device's
+     own checks; the git identity on a Device that runs a colleague's
+     step comes with them.
 7. **From anywhere.** TLS or tailnet guidance, the Linux binary, the
    desktop app as a Host or joining one.
 

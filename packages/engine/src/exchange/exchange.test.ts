@@ -15,7 +15,12 @@ import {
 	withDevice,
 } from "../test-support";
 import type { Engine, Relay, RunStatus } from "../types";
-import { ForeignRowsError, MissingProjectError, NO_ROWS } from "./rows";
+import {
+	ForeignRowsError,
+	MissingProjectError,
+	NO_ROWS,
+	withoutPrivatePaths,
+} from "./rows";
 
 /**
  * The exchange between two Replicas, in one process: A walks runs, B gets
@@ -393,6 +398,68 @@ describe("a run walked elsewhere", () => {
 		expect(await commands.pendingFor("device-b")).toHaveLength(1);
 		await commands.done(kept.id, "device-b", null);
 		expect(await commands.pendingFor("device-b")).toEqual([]);
+	});
+});
+
+describe("a Walker's paths", () => {
+	test("leave the rows for another Person, with the rows' shape kept", async () => {
+		const engineA = engineOf(a);
+		const { id: projectId } = await engineA
+			.space(a.spaceId)
+			.addProject({ repoPath: a.repoPath });
+		const run = await engineA
+			.space(a.spaceId)
+			.startRun({ projectId, flow: gateFlow });
+		await untilStatus(engineA, a.spaceId, run.id, "waiting");
+		const { rows } = await engineA.exchange.rows.rowsAfter({
+			spaces: [a.spaceId],
+			cursors: {},
+		});
+		const payloadOf = (r: typeof rows, type: string) =>
+			JSON.parse(r.events.find((e) => e.type === type)?.payload ?? "{}");
+		expect(rows.runs[0]?.worktreePath).toContain(a.root);
+		expect(payloadOf(rows, "StepStarted").logPath).toContain(a.dataDir);
+
+		const stripped = withoutPrivatePaths(rows);
+		expect(stripped.runs[0]?.worktreePath).toBe("");
+		expect(stripped.steps.every((s) => s.transcriptPath === "")).toBe(true);
+		expect(payloadOf(stripped, "WorktreeCreated")).toMatchObject({
+			worktreePath: "",
+			branch: rows.runs[0]?.branch,
+		});
+		const started = payloadOf(stripped, "StepStarted");
+		expect(started).toMatchObject({
+			transcriptPath: "",
+			logPath: "",
+			nodeId: "hello",
+		});
+		// Nothing else changes, and nothing at all for a Walker that keeps them.
+		expect(stripped.events.map((e) => [e.walkerSeq, e.type])).toEqual(
+			rows.events.map((e) => [e.walkerSeq, e.type]),
+		);
+		expect(withoutPrivatePaths(rows, (w) => w === a.deviceId)).toEqual(rows);
+	});
+});
+
+describe("projects of a Space without a Clone here", () => {
+	test("are listed, and what needs their folder says so", async () => {
+		const engineA = engineOf(a);
+		const engineB = engineOf(b);
+		const { id: projectId } = await engineA
+			.space(a.spaceId)
+			.addProject({ repoPath: a.repoPath });
+		await projectOnB(projectId);
+		const listed = await engineB.space(a.spaceId).listProjects();
+		expect(listed).toEqual([
+			expect.objectContaining({ id: projectId, repoPath: null }),
+		]);
+		expect(listed[0]?.clones.some((c) => c.thisDevice)).toBe(false);
+		expect(engineB.space(a.spaceId).listFlows(projectId)).rejects.toThrow(
+			"not on this computer",
+		);
+		expect(
+			engineB.space(a.spaceId).startRun({ projectId, flow: gateFlow }),
+		).rejects.toThrow("not on this computer");
 	});
 });
 

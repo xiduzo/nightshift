@@ -75,6 +75,7 @@ export {
 	runRowsSchema,
 	type SyncCursors,
 	syncCursorsSchema,
+	withoutPrivatePaths,
 } from "./exchange/rows";
 export { chooseFolder } from "./folder-picker";
 export {

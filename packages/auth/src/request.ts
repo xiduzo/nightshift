@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 
-import type { Permissions } from "./access";
+import type { Permissions, Role } from "./access";
 import { type Auth, hasPermission, type Session } from "./index";
 import type { LocalSession } from "./local-session";
 import { activeSpaceId } from "./spaces";
@@ -28,6 +28,19 @@ export type RequestAccess = {
 	 * it the session's active one.
 	 */
 	createSpace(name: string): Promise<{ id: string }>;
+	/**
+	 * The Members of the session's Space, through the organization plugin
+	 * (which checks the role again). The caller checks `member.*` first.
+	 */
+	members: {
+		/** A pending invitation of that email, with a role. Its id is the link's secret. */
+		invite(email: string, role: Role): Promise<{ id: string }>;
+		cancelInvitation(invitationId: string): Promise<void>;
+		setRole(memberId: string, role: Role): Promise<void>;
+		remove(memberId: string): Promise<void>;
+		/** The session's Person accepts an invitation of their email: they join its Space and work in it. */
+		accept(invitationId: string): Promise<{ spaceId: string }>;
+	};
 };
 
 /**
@@ -46,6 +59,10 @@ export async function requestAccess(
 		: { session: await auth.api.getSession({ headers }), headers };
 	const { session } = resolved;
 	const spaceId = session ? await activeSpaceId(db, session.session) : null;
+	const inSpace = () => {
+		if (!spaceId) throw new Error("Sign in to use Night Shift.");
+		return spaceId;
+	};
 	return {
 		session,
 		spaceId,
@@ -61,6 +78,41 @@ export async function requestAccess(
 				headers: resolved.headers,
 				body: { organizationId: id },
 			});
+		},
+		members: {
+			async invite(email, role) {
+				const created = await auth.api.createInvitation({
+					headers: resolved.headers,
+					body: { email, role, organizationId: inSpace() },
+				});
+				return { id: created.id };
+			},
+			async cancelInvitation(invitationId) {
+				await auth.api.cancelInvitation({
+					headers: resolved.headers,
+					body: { invitationId },
+				});
+			},
+			async setRole(memberId, role) {
+				await auth.api.updateMemberRole({
+					headers: resolved.headers,
+					body: { memberId, role, organizationId: inSpace() },
+				});
+			},
+			async remove(memberId) {
+				await auth.api.removeMember({
+					headers: resolved.headers,
+					body: { memberIdOrEmail: memberId, organizationId: inSpace() },
+				});
+			},
+			async accept(invitationId) {
+				const accepted = await auth.api.acceptInvitation({
+					headers: resolved.headers,
+					body: { invitationId },
+				});
+				if (!accepted) throw new Error("Could not accept the invitation.");
+				return { spaceId: accepted.member.organizationId };
+			},
 		},
 		async createSpace(name) {
 			const created = await auth.api.createOrganization({

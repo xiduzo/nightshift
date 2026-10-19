@@ -61,12 +61,21 @@ import { originUrl, resolveRepoTopLevel } from "./worktrees";
  *   themselves change on the Host only.
  */
 
+/** A call that needs the project's folder on this computer, for a project without one. */
+export const NOT_ON_THIS_COMPUTER =
+	"This project is not on this computer. Add its folder here to use it.";
+
 /** A change this Replica cannot make to a Space a Host keeps. */
 export const HOSTED_ELSEWHERE =
 	"This Space is kept by another computer. Change its projects there.";
 
 /** A project row with the path of its Clone on this computer. */
 export type ProjectRow = typeof project.$inferSelect & { repoPath: string };
+
+/** A project row with the path of its Clone here, or null: not on this computer. */
+export type ListedProject = typeof project.$inferSelect & {
+	repoPath: string | null;
+};
 
 export type ProjectsDeps = {
 	db: Database;
@@ -86,7 +95,7 @@ export type Projects = ReturnType<typeof createProjects>;
  * (from the Space document).
  */
 export function toProject(
-	row: ProjectRow,
+	row: ListedProject,
 	document: SpaceDocument,
 	deviceId: string,
 ): Project {
@@ -96,7 +105,7 @@ export function toProject(
 		thisDevice: c.deviceId === deviceId,
 	}));
 	// A row the document has not seen yet still has its Clone here.
-	if (!clones.some((c) => c.thisDevice)) {
+	if (row.repoPath !== null && !clones.some((c) => c.thisDevice)) {
 		clones.unshift({ deviceId, deviceName: null, thisDevice: true });
 	}
 	return {
@@ -201,6 +210,24 @@ export function createProjects(deps: ProjectsDeps) {
 		},
 
 		/**
+		 * Every project of the Space a person has not removed, oldest first,
+		 * also those without a Clone on this computer (`repoPath` null): a
+		 * run of one can be walked by another Device.
+		 */
+		async listInSpace(spaceId: string): Promise<ListedProject[]> {
+			const deviceId = await deps.deviceId();
+			return db
+				.select({ ...getColumns(project), repoPath: clone.path })
+				.from(project)
+				.leftJoin(
+					clone,
+					and(eq(clone.projectId, project.id), eq(clone.deviceId, deviceId)),
+				)
+				.where(and(isNull(project.removedAt), eq(project.spaceId, spaceId)))
+				.orderBy(asc(project.createdAt));
+		},
+
+		/**
 		 * A project that a person has not removed, with its folder here. With
 		 * a Space, a project of another Space is not found.
 		 */
@@ -212,8 +239,20 @@ export function createProjects(deps: ProjectsDeps) {
 					inSpace(spaceId),
 				),
 			);
-			if (!row) throw new Error(`Project not found: ${projectId}`);
-			return row;
+			if (row) return row;
+			const [elsewhere] = await db
+				.select({ id: project.id })
+				.from(project)
+				.where(
+					and(
+						eq(project.id, projectId),
+						isNull(project.removedAt),
+						inSpace(spaceId),
+					),
+				);
+			throw new Error(
+				elsewhere ? NOT_ON_THIS_COMPUTER : `Project not found: ${projectId}`,
+			);
 		},
 
 		/**
