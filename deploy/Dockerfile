@@ -20,7 +20,7 @@ RUN bun install --frozen-lockfile --ignore-scripts \
 	&& bun run --cwd apps/server build:binary \
 	&& cp "apps/server/dist/bin/nightshift-linux-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')" /nightshift
 
-FROM oven/bun:1.3.10-slim
+FROM oven/bun:1.3.10-slim AS runtime
 # git for the projects and their worktrees, ssh for git remotes over SSH.
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends git openssh-client ca-certificates \
