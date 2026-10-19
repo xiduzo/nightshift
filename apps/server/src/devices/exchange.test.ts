@@ -3,9 +3,9 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { AppRouterClient } from "@nightshift/api/routers/index";
 import type { RunSummary } from "@nightshift/engine/types";
-import type { Flow } from "@nightshift/flows";
-import { ORPCError } from "@orpc/client";
+import { type InferClientInputs, ORPCError } from "@orpc/client";
 
 import { hostClient } from "./host-client";
 import {
@@ -26,6 +26,12 @@ import {
 
 const root = mkdtempSync(join(tmpdir(), "nightshift-exchange-"));
 const REMOTE = "https://example.com/acme/app.git";
+
+/** A flow as `runs.start` takes it inline. */
+type Flow = Extract<
+	InferClientInputs<AppRouterClient>["runs"]["start"],
+	{ flow: unknown }
+>["flow"];
 
 let a: Daemon;
 let b: Daemon;
