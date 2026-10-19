@@ -14,6 +14,7 @@ import {
 	deriveStopAfterStep,
 	deriveStopAt,
 	deriveTraversals,
+	deriveWarnings,
 	type EngineEventType,
 	type EnginePayloads,
 	type LoggedEvent,
@@ -22,7 +23,8 @@ import {
 	openWork,
 	type Scope,
 	type SessionOutcome,
-	sumCostUsd,
+	sessionCost,
+	sumCost,
 } from "./events";
 import type { StepOutcome } from "./types";
 
@@ -190,7 +192,7 @@ describe("deriveSteps", () => {
 			visit: 1,
 		});
 		expect(steps[0]?.sessions.map((s) => s.harnessSessionId)).toEqual(["h-1"]);
-		expect(steps[0]?.costUsd).toBe(0.25);
+		expect(steps[0]?.cost.usd).toBe(0.25);
 		expect(steps[2]?.endedAt).toBeNull();
 	});
 
@@ -268,7 +270,7 @@ test("harness session lookups", () => {
 	});
 });
 
-test("sumCostUsd adds the cost of each ended session once", () => {
+test("sumCost adds the cost of each ended session once", () => {
 	const { events } = log()
 		.sessionStarted("s1", "a")
 		.sessionEnded("s1", "a", "finished", 0.25)
@@ -277,7 +279,7 @@ test("sumCostUsd adds the cost of each ended session once", () => {
 		.sessionStarted("s2", "c")
 		.sessionEnded("s2", "c", "finished", 0.5)
 		.sessionEnded("s2", "c", "finished", 9);
-	expect(sumCostUsd(events)).toBe(0.75);
+	expect(sumCost(events).usd).toBe(0.75);
 });
 
 test("openWork lists what a dead daemon left open", () => {
@@ -296,7 +298,7 @@ test("openWork lists what a dead daemon left open", () => {
 	expect(openWork(done.events).runOpen).toBe(false);
 });
 
-test("sumCostUsd and step costs include what a step spent itself", () => {
+test("sumCost and step costs include what a step spent itself", () => {
 	const { events } = log()
 		.runStarted()
 		.stepStarted("s1", "worker")
@@ -310,8 +312,113 @@ test("sumCostUsd and step costs include what a step spent itself", () => {
 		// A late duplicate end of s2 does not count twice.
 		.stepEnded("s2", "continue", {}, 5);
 	const steps = deriveSteps(events);
-	expect(steps.map((s) => s.costUsd)).toEqual([0.25, 0.01, 0]);
-	expect(sumCostUsd(events)).toBeCloseTo(0.26);
+	expect(steps.map((s) => s.cost.usd)).toEqual([0.25, 0.01, 0]);
+	expect(sumCost(events).usd).toBeCloseTo(0.26);
+});
+
+test("a cost tally knows what it does not know", () => {
+	const { events, push } = log()
+		.runStarted()
+		.stepStarted("s1", "worker")
+		.sessionStarted("s1", "a");
+	// A harness that reported a cost, one priced from tokens, one without either.
+	push(
+		"SessionEnded",
+		{
+			outcome: "finished",
+			error: null,
+			errorKind: null,
+			usage: { inputTokens: 10, outputTokens: 1 },
+			costUsd: 0.5,
+			costSource: "estimated",
+			resetAt: null,
+		},
+		{ stepId: "s1", sessionId: "a" },
+	);
+	push(
+		"SessionStarted",
+		{ prompt: "go", resumeSessionId: null },
+		{
+			stepId: "s1",
+			sessionId: "b",
+		},
+	);
+	push(
+		"SessionEnded",
+		{
+			outcome: "finished",
+			error: null,
+			errorKind: null,
+			usage: null,
+			costUsd: null,
+			resetAt: null,
+		},
+		{ stepId: "s1", sessionId: "b" },
+	);
+	// A decider that answered without a cost, and one that failed before it asked.
+	push(
+		"StepEnded",
+		{
+			outcome: "pass",
+			outputs: { outcome: "pass" },
+			error: null,
+			costUsd: null,
+			costSource: null,
+		},
+		{ stepId: "s1" },
+	);
+	push(
+		"StepStarted",
+		{
+			nodeId: "decide",
+			nodeType: "decision",
+			visit: 1,
+			transcriptPath: "t",
+			logPath: null,
+		},
+		{ stepId: "s2" },
+	);
+	push(
+		"StepEnded",
+		{
+			outcome: "error",
+			outputs: { outcome: "error" },
+			error: "no key",
+			costUsd: null,
+		},
+		{ stepId: "s2" },
+	);
+	push(
+		"RunWarned",
+		{ kind: "cost-unknown", message: "Not known." },
+		{ stepId: "s1" },
+	);
+
+	const [worker, decide] = deriveSteps(events);
+	expect(worker?.cost).toEqual({ usd: 0.5, estimated: true, missing: 2 });
+	expect(decide?.cost).toEqual({ usd: 0, estimated: false, missing: 0 });
+	expect(sumCost(events)).toEqual({ usd: 0.5, estimated: true, missing: 2 });
+	expect(deriveWarnings(events)).toEqual([
+		{
+			stepId: "s1",
+			kind: "cost-unknown",
+			message: "Not known.",
+			at: expect.any(Number),
+		},
+	]);
+});
+
+test("a failed session without usage is not a missing cost", () => {
+	expect(
+		sessionCost({
+			outcome: "failed",
+			error: "boom",
+			errorKind: "harness",
+			usage: null,
+			costUsd: null,
+			resetAt: null,
+		}),
+	).toEqual({ usd: 0, estimated: false, missing: 0 });
 });
 
 describe("gates", () => {

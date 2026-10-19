@@ -12,6 +12,7 @@ import {
 	STOP_GRACE_MS,
 	type StepContext,
 } from "../../context";
+import { deciderCostSource, warnDeciderCost } from "../../cost";
 import { RESUME_RULES } from "../../resume-point";
 import { type BodyResult, runStep, type StepHandle } from "../../step-runner";
 import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
@@ -73,7 +74,11 @@ async function decide(
 		{ decider: node.decider, prompt, labels: options, model, signal },
 		signal,
 	);
-	const costUsd = result.costUsd;
+	const cost = {
+		costUsd: result.costUsd,
+		costSource: deciderCostSource(result),
+	};
+	await warnDeciderCost(step, cost.costSource, "decision", model);
 	if (result.kind === "decided") {
 		step.record(null, {
 			type: "decision",
@@ -87,13 +92,13 @@ async function decide(
 		outcome,
 		outputs: decisionOutputs(outcome, note, visit),
 		error,
-		costUsd,
+		...cost,
 	});
 	if (signal.aborted) {
 		return {
 			kind: "aborted",
 			outputs: decisionOutputs("", note, visit),
-			costUsd,
+			...cost,
 		};
 	}
 	if (result.kind === "error") {
@@ -104,7 +109,7 @@ async function decide(
 				message: result.message,
 				resetAt: null,
 				harnessSessionId: null,
-				costUsd,
+				...cost,
 			};
 		}
 		return end("error", `The decider failed: ${result.message}`);

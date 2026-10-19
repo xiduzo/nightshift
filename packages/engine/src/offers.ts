@@ -12,6 +12,7 @@ import type { WorkCall } from "./device/remote";
 import type {
 	Device,
 	ExecEvent,
+	ExecInput,
 	OfferedSessionInput,
 	SessionEvent,
 	SessionInput,
@@ -296,7 +297,7 @@ export function offerRefusal(
  * The offering Device's check of one call of another Person's run, given
  * its Offers in force into the run's Space: an offered session of one of
  * them, or the run's own folder work (its flows, its worktree, its files,
- * its item branches). Anything else is refused: a command, a tool, the
+ * its item branches, the Hand-off of its work to and from it). Anything else is refused: a command, a tool, the
  * decider, a session it did not offer, and its capabilities (private to
  * its owner). Null when it serves the call.
  */
@@ -311,6 +312,8 @@ export function offeredCallRefusal(
 		case "worktree":
 		case "files":
 		case "itemBranch":
+		case "handOff":
+		case "receiveHandOff":
 			return null;
 		case "session": {
 			if (!("offered" in call.input)) {
@@ -428,14 +431,21 @@ export function offeredDevice(
 		spaceId: string;
 		/** Called while an offered session runs, until the returned function is called. */
 		track?(profile: string): () => void;
+		/** Whether the run is the Device owner's own after all: then it is the Device as is. */
+		own?(): Promise<boolean>;
 	},
 ): Device {
+	const own = () => deps.own?.() ?? Promise.resolve(false);
 	const refused = (offers: readonly DeviceOffer[]) =>
 		`${inner.name} runs only the profiles its owner offers to this Space. ${offersNothingOr(inner.name, offers)}`;
 
 	async function* session(
 		input: SessionInput | OfferedSessionInput,
 	): AsyncGenerator<SessionEvent> {
+		if (await own()) {
+			yield* inner.session(input);
+			return;
+		}
 		const offers = await deps.inForce();
 		if (!("offered" in input)) {
 			yield { type: "refused", message: refused(offers) };
@@ -480,7 +490,11 @@ export function offeredDevice(
 		}
 	}
 
-	async function* exec(): AsyncGenerator<ExecEvent> {
+	async function* exec(input: ExecInput): AsyncGenerator<ExecEvent> {
+		if (await own()) {
+			yield* inner.exec(input);
+			return;
+		}
 		yield {
 			type: "exit",
 			exitCode: null,
@@ -492,14 +506,18 @@ export function offeredDevice(
 		...inner,
 		session,
 		exec,
-		async callTool() {
+		async callTool(input) {
+			if (await own()) return inner.callTool(input);
 			return { kind: "refused", message: refused(await deps.inForce()) };
 		},
-		decide: (async () => ({
-			kind: "error",
-			errorKind: "harness",
-			message: refused(await deps.inForce()),
-			costUsd: null,
-		})) as Device["decide"],
+		decide: (async (input: Parameters<Device["decide"]>[0]) => {
+			if (await own()) return inner.decide(input as never);
+			return {
+				kind: "error",
+				errorKind: "harness",
+				message: refused(await deps.inForce()),
+				costUsd: null,
+			};
+		}) as Device["decide"],
 	};
 }

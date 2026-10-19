@@ -137,9 +137,12 @@ describe("aux: the auxiliary graph nodes compile.ts adds", () => {
 		expect(aux[0]?.kind === "ask" && typeof aux[0].make).toBe("function");
 	});
 
-	test("a Command, a Tool, a Call and a rule Decision or Value have the park node only", () => {
-		expect(auxKinds(command())).toEqual([]);
-		expect(auxKinds(tool())).toEqual([]);
+	test("a Command and a Tool wait while their Device is offline", () => {
+		expect(auxKinds(command())).toEqual(["wait"]);
+		expect(auxKinds(tool())).toEqual(["wait"]);
+	});
+
+	test("a Call and a rule Decision or Value have the park node only", () => {
 		expect(auxKinds(call())).toEqual([]);
 		expect(auxKinds(callEach())).toEqual([]);
 		expect(auxKinds(decision("rule"))).toEqual([]);
@@ -428,5 +431,21 @@ describe("connections and requirements: what run start asks", () => {
 		for (const type of ["command", "tool", "wait", "call"] as const) {
 			expect(NODE_KINDS[type].requirements).toEqual([]);
 		}
+	});
+});
+
+describe("works: what a step needs of its Device", () => {
+	test("the worktree, the Device only, or nothing", () => {
+		const works = (n: FlowNode) => kindOf(n).works(n);
+		expect(works(agent())).toBe("worktree");
+		expect(works(command())).toBe("worktree");
+		expect(works(tool())).toBe("device");
+		expect(works(decision("model"))).toBe("device");
+		expect(works(decision("person"))).toBeNull();
+		expect(works(value("model"))).toBe("device");
+		expect(works(value("rule"))).toBeNull();
+		expect(works(wait({ kind: "duration", minutes: 1 }))).toBeNull();
+		expect(works(callEach())).toBe("worktree");
+		expect(works(call())).toBeNull();
 	});
 });

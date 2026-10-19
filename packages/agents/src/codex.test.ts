@@ -140,7 +140,10 @@ describe("codexHarness", () => {
 			{ type: "session", sessionId: "fake-thread" },
 			{ type: "report", outcome: "pass", summary: "Done it." },
 			{ type: "text", messageId: expect.any(String), delta: "All good." },
-			{ type: "finished", usage: { inputTokens: 120, outputTokens: 7 } },
+			{
+				type: "finished",
+				usage: { inputTokens: 120, outputTokens: 7, cacheReadTokens: 100 },
+			},
 		]);
 		const [line] = await readLog(log);
 		expect(line?.argv.slice(0, 2)).toEqual(["exec", "--experimental-json"]);

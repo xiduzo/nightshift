@@ -114,6 +114,11 @@ function Editor({
 	);
 	// The other flow files, for Call nodes. The draft stands in for this one.
 	const projectFlows = useProjectFlows(projectId, name);
+	// Your devices, for where a node runs.
+	const myDevices = useQuery({
+		...orpc.runs.devices.queryOptions({ input: { projectId } }),
+		meta: { quietErrors: true },
+	});
 	// The daemon's settings (new-node defaults, run policy) and connections.
 	const settings = useQuery(orpc.settings.get.queryOptions());
 	const daemonConnections = useQuery(orpc.connections.list.queryOptions());
@@ -425,6 +430,7 @@ function Editor({
 			key={selectedNode.id}
 			flow={draft}
 			node={selectedNode}
+			devices={myDevices.data}
 			onChange={(change) =>
 				setDraft((current) => updateNode(current, selectedNode.id, change))
 			}

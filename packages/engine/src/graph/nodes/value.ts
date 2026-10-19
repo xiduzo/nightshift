@@ -65,6 +65,7 @@ export const VALUE: NodeKind<ValueNode> = {
 	...PLAIN_KIND,
 	type: "value",
 	make: valueNode,
+	works: (node) => (node.by === "model" ? "device" : null),
 	resumeRules: (node) =>
 		node.by === "model" ? RESUME_RULES.model : RESUME_RULES.fresh,
 	aux: (node) => (node.by === "model" ? [{ kind: "wait" }] : []),
@@ -91,7 +92,7 @@ export function endWithValue(
 	node: ValueNode,
 	made: unknown,
 	note: string,
-	extra?: { costUsd?: number | null },
+	extra?: Pick<BodyEnd, "costUsd" | "costSource">,
 ): BodyEnd {
 	const problem = dataProblem(node.output, made);
 	if (problem !== null) {
@@ -116,7 +117,7 @@ export function endWithValue(
 export function endWithoutValue(
 	step: StepHandle,
 	why: string,
-	extra?: { costUsd?: number | null },
+	extra?: Pick<BodyEnd, "costUsd" | "costSource">,
 ): BodyEnd {
 	step.record(null, { type: "value", data: null, problem: why });
 	return {

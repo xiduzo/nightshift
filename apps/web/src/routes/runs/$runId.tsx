@@ -47,6 +47,7 @@ import {
 import { RunGraph } from "@/components/run/run-graph";
 import { RunActions, RunDetails, RunTitle } from "@/components/run/run-header";
 import { RunStatusPanel } from "@/components/run/run-status-panel";
+import { RunWarnings } from "@/components/run/run-warnings";
 import { CONSOLE_BAR_PX, StepConsole } from "@/components/run/step-console";
 import { StepSummary as StepSummaryView } from "@/components/run/step-summary";
 import { StepTimeline } from "@/components/run/step-timeline";
@@ -189,6 +190,11 @@ function RunComponent() {
 		steps.find((step) => step.id === pickedStepId) ??
 		visible[visible.length - 1];
 	const lastStep = steps[steps.length - 1];
+	const warnedStepIds = new Set(
+		runData.warnings.flatMap((warning) =>
+			warning.stepId ? [warning.stepId] : [],
+		),
+	);
 
 	// The newest step of a gate without an outcome is the one the run waits at.
 	const openGate =
@@ -316,6 +322,7 @@ function RunComponent() {
 					onSelectItem={selectItem}
 					calledName={(step) => calledFlowName(runData, steps, step)}
 					runsEach={(step) => stepRunsEach(runData, steps, step)}
+					warnedStepIds={warnedStepIds}
 				/>
 			</ScrollArea>
 		</section>
@@ -375,6 +382,7 @@ function RunComponent() {
 				wait={stream.transcript.lastWait}
 				lastStep={lastStep}
 			/>
+			<RunWarnings warnings={runData.warnings} onShowStep={setPickedStepId} />
 		</section>
 	);
 

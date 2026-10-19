@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+	defaultFakeScript,
 	failingScript,
 	fakeDecider,
 	fakeHarness,
@@ -190,7 +191,7 @@ describe("fakeHarness", () => {
 			expectContract(events);
 			expect(events.slice(-2)).toEqual([
 				{ type: "report", outcome, summary: "Summary." },
-				{ type: "finished" },
+				defaultFakeScript.outcome,
 			]);
 		},
 	);

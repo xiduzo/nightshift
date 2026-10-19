@@ -435,6 +435,21 @@ describe("the scheduler", () => {
 		);
 	});
 
+	test("a schedule that names another Device does not fire here; one that names this one does", async () => {
+		const { engine } = startDaemon();
+		await setup(engine, [
+			nightly({ id: "elsewhere", device: "hetzner-1" }),
+			nightly({ id: "here", device: "test" }),
+		]);
+		clock = at(16, 22, 1);
+		const facts = await waitForFacts(1);
+		await settle();
+		expect((await scheduleFacts()).map((f) => f.payload.scheduleId)).toEqual([
+			"here",
+		]);
+		expect(facts).toHaveLength(1);
+	});
+
 	test("picks up an edit of the file on the next tick, without a restart", async () => {
 		const { engine } = startDaemon();
 		const project = await setup(engine, [nightly({ cron: "0 23 * * *" })]);

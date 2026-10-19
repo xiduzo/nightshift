@@ -52,13 +52,12 @@ import {
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
-
+import { CostText } from "@/components/cost-text";
 import { RunStatusBadge } from "@/components/run-status-badge";
 import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
 import { authClient } from "@/lib/auth-client";
 import {
 	dayWord,
-	formatCost,
 	formatDateTime,
 	formatDayTime,
 	formatDuration,
@@ -67,6 +66,7 @@ import {
 import { SERVER_URL } from "@/lib/server-url";
 import { orpc } from "@/utils/orpc";
 
+import { MoveMenu } from "./move-menu";
 import { WalkerBadge, walkerName } from "./walker-badge";
 
 const STOPPABLE: RunStatus[] = ["running", "waiting", "sleeping"];
@@ -143,7 +143,7 @@ export function RunTitle({
 				{formatDuration(lastEnd - run.createdAt)}
 				<span aria-hidden="true"> · </span>
 				<span className="sr-only">, cost </span>
-				{formatCost(run.costUsd)}
+				<CostText cost={run} />
 			</p>
 		</div>
 	);
@@ -246,6 +246,20 @@ function RunFacts({ run }: { run: RunDetail }) {
 						{run.walker.thisDevice ? "This computer" : walkerName(run.walker)}
 					</Fact>
 				) : null}
+				{run.handOffs.length > 0 ? (
+					<Fact label="Work moved">
+						<ul className="flex min-w-0 flex-col gap-1 text-xs">
+							{run.handOffs.map((handOff) => (
+								<li key={`${handOff.at}-${handOff.commit}`}>
+									{deviceLabel(handOff.from)} → {deviceLabel(handOff.to)}{" "}
+									<span className="font-mono text-muted-foreground">
+										{handOff.commit.slice(0, 7)}
+									</span>
+								</li>
+							))}
+						</ul>
+					</Fact>
+				) : null}
 				{run.walker.thisDevice && run.device.thisDevice ? (
 					<Fact label="Folder">
 						<CopyValue label="folder path" value={run.worktreePath} />
@@ -255,9 +269,7 @@ function RunFacts({ run }: { run: RunDetail }) {
 			<Separator />
 			<dl className="flex flex-col gap-3">
 				<Fact label="Cost">
-					<span className="font-medium tabular-nums">
-						{formatCost(run.costUsd)}
-					</span>
+					<CostText cost={run} className="font-medium tabular-nums" />
 				</Fact>
 				<Fact label="Started">
 					<time
@@ -297,6 +309,11 @@ function RunFacts({ run }: { run: RunDetail }) {
 			</dl>
 		</div>
 	);
+}
+
+/** A device of the run, as people read it: this computer, or its name. */
+function deviceLabel(device: RunDetail["walker"]): string {
+	return device.thisDevice ? "This computer" : walkerName(device);
 }
 
 /** One fact of the run: a small muted label above its value. */
@@ -417,15 +434,20 @@ export function RunActions({
 
 	// A run of another device: its session and its files are there. Stop goes to it.
 	if (!run.walker.thisDevice) {
-		return STOPPABLE.includes(status) ? (
-			<StopMenu
-				key={run.id}
-				status={status}
-				stopAfterStep={run.stopAfterStep}
-				pending={stopRun.isPending}
-				onStop={(when) => stopRun.mutate({ runId: run.id, when })}
-			/>
-		) : null;
+		return (
+			<>
+				<MoveMenu run={run} status={status} />
+				{STOPPABLE.includes(status) ? (
+					<StopMenu
+						key={run.id}
+						status={status}
+						stopAfterStep={run.stopAfterStep}
+						pending={stopRun.isPending}
+						onStop={(when) => stopRun.mutate({ runId: run.id, when })}
+					/>
+				) : null}
+			</>
+		);
 	}
 
 	return (
@@ -477,6 +499,7 @@ export function RunActions({
 					agents read or printed. Check it before you share it.
 				</TooltipContent>
 			</Tooltip>
+			<MoveMenu run={run} status={status} />
 			{STOPPABLE.includes(status) ? (
 				<StopMenu
 					key={run.id}

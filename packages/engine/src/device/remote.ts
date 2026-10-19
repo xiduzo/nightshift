@@ -63,6 +63,8 @@ export type WorkCall =
 			base: string | null;
 			fallback: string;
 	  }
+	| { kind: "handOff"; cwd: string; runBranch: string }
+	| { kind: "receiveHandOff"; run: RunRef; branch: string; commit: string }
 	| {
 			kind: "session";
 			input: Omit<SessionInput, "signal"> | Omit<OfferedSessionInput, "signal">;
@@ -82,6 +84,8 @@ export const WORK_KINDS = [
 	"worktree",
 	"files",
 	"itemBranch",
+	"handOff",
+	"receiveHandOff",
 	"session",
 	"exec",
 	"callTool",
@@ -107,13 +111,20 @@ export type WorkReply =
 	| { kind: "item"; item: unknown }
 	/** The answer of a call that answers once. */
 	| { kind: "result"; value: unknown }
-	/** The call failed or was refused there; the message is for people. */
-	| { kind: "error"; message: string };
+	/**
+	 * The call failed or was refused there; the message is for people.
+	 * `offline`: the Device could not be reached, or went away mid-call.
+	 */
+	| { kind: "error"; message: string; offline?: boolean };
 
 export const workReplySchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("item"), item: z.unknown() }),
 	z.object({ kind: z.literal("result"), value: z.unknown() }),
-	z.object({ kind: z.literal("error"), message: z.string() }),
+	z.object({
+		kind: z.literal("error"),
+		message: z.string(),
+		offline: z.boolean().optional(),
+	}),
 ]);
 
 /** How the Walker reaches a placed Device. */
@@ -128,8 +139,8 @@ export type WorkRelay = {
 		request: WorkRequest,
 		signal?: AbortSignal,
 	): AsyncIterable<WorkReply>;
-	/** Whether the Device takes work now. */
-	online(deviceId: string): boolean;
+	/** Whether the Device takes work now, for a run of that Space. */
+	online(deviceId: string, spaceId: string): boolean | Promise<boolean>;
 };
 
 /** A placed Device that went quiet in the middle of a call. */
@@ -167,10 +178,16 @@ export function remoteDevice(
 		let ended = false;
 		for await (const reply of ask({ kind: "session", input: rest }, signal)) {
 			if (reply.kind === "error") {
+				// A Device that went away mid-session: a network kind lets the
+				// run's policy wait for it and continue the harness session.
 				yield started
 					? {
 							type: "error",
-							kind: signal.aborted ? "aborted" : "harness",
+							kind: signal.aborted
+								? "aborted"
+								: reply.offline
+									? "network"
+									: "harness",
 							message: reply.message,
 						}
 					: { type: "refused", message: reply.message };
@@ -240,7 +257,9 @@ export function remoteDevice(
 	return {
 		id: device.id,
 		name: device.name,
-		state: () => ({ online: relay.online(device.id) }),
+		state: async () => ({
+			online: await relay.online(device.id, forRun.spaceId),
+		}),
 		async capabilities(query = {}) {
 			const has = await once<Capabilities>({ kind: "capabilities", query });
 			return { ...has, elsewhere: device.name };
@@ -272,6 +291,10 @@ export function remoteDevice(
 		decide,
 		worktree: (run) => once<Worktree>({ kind: "worktree", run }),
 		files: (input) => once<string[]>({ kind: "files", ...input }),
+		handOff: (input) =>
+			once<{ commit: string; branch: string }>({ kind: "handOff", ...input }),
+		receiveHandOff: (input) =>
+			once<Worktree>({ kind: "receiveHandOff", ...input }),
 		itemBranch: (input) =>
 			once<{ branch: string; base: string }>({ kind: "itemBranch", ...input }),
 	};
@@ -311,6 +334,20 @@ export async function* serveWork(
 						name: call.name,
 						base: call.base,
 						fallback: call.fallback,
+					}),
+				);
+				return;
+			case "handOff":
+				yield result(
+					await device.handOff({ cwd: call.cwd, runBranch: call.runBranch }),
+				);
+				return;
+			case "receiveHandOff":
+				yield result(
+					await device.receiveHandOff({
+						run: call.run,
+						branch: call.branch,
+						commit: call.commit,
 					}),
 				);
 				return;

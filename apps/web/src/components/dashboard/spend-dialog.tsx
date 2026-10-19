@@ -1,3 +1,8 @@
+import {
+	Alert,
+	AlertDescription,
+	AlertTitle,
+} from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	ChartContainer,
@@ -15,15 +20,21 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Link } from "@tanstack/react-router";
-import { ArrowRightIcon, CoinsIcon } from "lucide-react";
+import { ArrowRightIcon, CircleHelpIcon, CoinsIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
+import { CostText } from "@/components/cost-text";
 import { DataTable, dataTableColumns } from "@/components/data-table";
 import { RunStatusBadge } from "@/components/run-status-badge";
 import { useNow } from "@/hooks/use-now";
 import type { Project, RunSummary } from "@/lib/api-types";
-import { formatCost, formatRelative } from "@/lib/format";
+import {
+	formatCost,
+	formatKnownCost,
+	formatRelative,
+	sumKnownCost,
+} from "@/lib/format";
 
 import {
 	ChartSection,
@@ -91,7 +102,9 @@ function SpendDetails({
 	const month = spendPerNight(runs, 30, groupOf, now);
 	const week = spendPerNight(runs, 7, groupOf, now);
 	const lastDay = runs.filter((run) => run.createdAt >= now - DAY_MS);
-	const spentLastDay = lastDay.reduce((sum, run) => sum + run.costUsd, 0);
+	const spentLastDay = sumKnownCost(lastDay);
+	// Runs with a step whose cost is not known: the totals leave that step out.
+	const unknown = history.inRange.filter((run) => run.costMissing > 0).length;
 	const latest = lastDay.reduce<number | null>(
 		(last, run) =>
 			last === null || run.createdAt > last ? run.createdAt : last,
@@ -119,9 +132,22 @@ function SpendDetails({
 					</ItemDescription>
 				</ItemContent>
 				<ItemActions className="font-semibold text-lg tabular-nums">
-					{formatCost(spentLastDay)}
+					{formatKnownCost(spentLastDay)}
 				</ItemActions>
 			</Item>
+
+			{unknown > 0 ? (
+				<Alert>
+					<CircleHelpIcon />
+					<AlertTitle>Some costs are not known</AlertTitle>
+					<AlertDescription>
+						{unknown === 1
+							? `1 run in the last ${range} nights has a step that did not report its cost.`
+							: `${unknown} runs in the last ${range} nights have a step that did not report its cost.`}{" "}
+						The totals leave those steps out. The run shows which step.
+					</AlertDescription>
+				</Alert>
+			) : null}
 
 			<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 				<Stat label="Last 7 nights" value={formatCost(week.total)} />
@@ -262,9 +288,10 @@ function SpendDetails({
 								</ItemContent>
 								<ItemActions>
 									<RunStatusBadge status={run.status} />
-									<span className="w-20 text-right font-medium tabular-nums">
-										{formatCost(run.costUsd)}
-									</span>
+									<CostText
+										cost={run}
+										className="w-20 text-right font-medium tabular-nums"
+									/>
 								</ItemActions>
 							</Item>
 						))}

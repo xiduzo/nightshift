@@ -540,6 +540,11 @@ describe("the step's Device", () => {
 				},
 			};
 		};
+		// The run's work is on studio already: no Hand-off.
+		h.ctx.deviceById = () => ({
+			...testDevice({ harnesses: {} }),
+			id: "studio",
+		});
 		const { state } = await drive(h, { inputs: {} });
 		expect(state.ended?.status).toBe("finished");
 		expect(asked).toEqual([`n@${h.runId}`, `after@${h.runId}`]);

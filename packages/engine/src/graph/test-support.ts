@@ -206,6 +206,8 @@ export async function startRun(
 		recorder: (stepId, path) => recorders.open(runId, stepId, path),
 		deviceFor: () =>
 			localDevice({ id: TEST_DEVICE_ID, name: "test", ...local }),
+		deviceById: () =>
+			localDevice({ id: TEST_DEVICE_ID, name: "test", ...local }),
 		signal: () => options.signal ?? controller.signal,
 		now: Date.now,
 		minuteMs: MINUTE,

@@ -13,6 +13,12 @@ export type FlowRun = {
 	calledBy: string | null;
 	/** Why a run of its own failed or ended. A subflow run has none of its own. */
 	reason: string | null;
+	/** Part of `costUsd` is estimated from tokens. */
+	costEstimated: boolean;
+	/** Steps that ended without a cost: their spend is not in `costUsd`. */
+	costMissing: number;
+	/** The warnings of a run of its own. A subflow run shows its warnings in the run that called it. */
+	warnings: RunSummary["warnings"];
 };
 
 /** The runs of the flow `name` in `runs`, on their own and as a subflow. */
@@ -26,8 +32,11 @@ export function runsOf(name: string, runs: RunSummary[]): FlowRun[] {
 						startedAt: run.createdAt,
 						endedAt: run.endedAt,
 						costUsd: run.costUsd,
+						costEstimated: run.costEstimated,
+						costMissing: run.costMissing,
 						calledBy: null,
 						reason: run.reason,
+						warnings: run.warnings,
 					},
 				]
 			: []),
@@ -39,8 +48,11 @@ export function runsOf(name: string, runs: RunSummary[]): FlowRun[] {
 				startedAt: subflow.startedAt,
 				endedAt: subflow.endedAt,
 				costUsd: subflow.costUsd,
+				costEstimated: subflow.costEstimated,
+				costMissing: subflow.costMissing,
 				calledBy: run.title,
 				reason: null,
+				warnings: [],
 			})),
 	]);
 }

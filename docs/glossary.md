@@ -22,8 +22,9 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Project | A repository, by its remote: the normalised `origin` (`github.com/acme/app`), so its ssh and https URLs are one Project. Its folders are its Clones. A repository without a remote is a Project on one Device only. | Devices |
 | Clone | A Project's repository on one Device, at a path. A Device has at most one Clone of a Project. Adding a folder whose `origin` names a known Project makes a Clone of it, not a second Project. | Devices |
 | Device | A computer that runs Night Shift, with its own database. One row of the `device` table is this computer: made on the first start, with a random id that never changes and the host name as its name. | Devices |
-| Walker | The Device that walks a Run and writes its Events, the only writer of them. A Run another Device walks is read-only here: answering its Gate, sending its Signal and stopping it travel to its Walker as Commands. | Devices |
-| Placement | Which Device a Run's Steps run on, and where its worktree lives: chosen when the Run starts ("Device" in Start run), this computer by default. One of the starter's own Devices that is online and has a Clone of the Project, or another Person's Device through its Offers into the Space. The Walker stays the Device that walks it and makes each Step's calls there through the Host (the work relay, `devices.work`); the placed Device checks every call itself. Per-node Placement comes later. | Devices, slice 5 |
+| Walker | The Device that walks a Run and writes its Events, the only writer of them. A Run another Device walks is read-only here: answering its Gate, sending its Signal, stopping and moving it travel to its Walker as Commands. "Move to…" gives the Run another Walker (`WalkerMoved`), which resumes from the archived checkpoint. | Devices |
+| Placement | Which Device a Step runs on: the node's `device`, else the profile's Device, else the Run's Device (chosen when the Run starts, "Device" in Start run; this computer by default), else the Walker. One of the starter's own Devices, or another Person's Device through its Offers into the Space. The Walker stays the Device that walks the Run and makes each Step's calls there through the Host (the work relay, `devices.work`, `devices.call`); the placed Device checks every call itself. A Step whose Device is offline sleeps (`device-offline`) until it is back. | Devices, slice 5 |
+| Hand-off | The Run's work moving to another Device before a Step there: the Device that has it pushes the Run's branch (a worktree with uncommitted changes fails the Step), the next one fetches it into its own worktree of the Run, and the Walker logs `HandedOff`. | Devices, slice 5 |
 | Offer | One of a Device's Agent Profiles made available to one Space by the Device's owner (an owner or admin there), with two limits: the widest permission mode its sessions run in, and how many of its sessions run at once (more wait). The only way a Member runs anything on a Device another Person owns: a run there names the offered profile, and the Device runs that profile as its owner set it, with their login and their tools. The Space sees the Device's name and the profile's name and limits, never its settings. Made on the Agents page ("Offer to a Space…"), withdrawn there or on the Devices page; a withdrawn Offer stops the steps that run it. | Devices, slice 6 |
 | Owner | The one Device that writes a row. Sync never merges two writers of one row: a Run's rows and Events are its Walker's, a Clone is its Device's. | Devices |
 | Replica | A Device's own database: everything it may see, as far as it has synced. A Host's Replica keeps every Run its Devices send it. | Devices |
@@ -68,7 +69,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Setting | A daemon-wide value changed on the Settings page and saved in the Device document. Unset, it reads the environment, then its default. A Flow's own policy wins over the Settings' policy. | Settings |
 | List | The elements a Call Node with `each` runs over, read from a Source. | Slice 5 |
 | Source | Where a Call Node with `each` reads its List, again before each Item: a JSON value, a command that prints JSON, or a glob of files. A tracker is a command on its CLI (`gh`, `glab`, `acli`); the engine knows none. | Slice 4 |
-| Schedule | A Flow, its Inputs, a time, and a Stop Time: the daemon starts a Run from it. | Slice 7 |
+| Schedule | A Flow, its Inputs, a time, and a Stop Time: the daemon starts a Run from it. Its `device` names the Device that fires it. A schedule on another Person's Device starts the Runs of the Person who saved it (`person`), through that Device's Offers only. | Slice 7, Devices slice 6 |
 | Trigger | What starts a Run: a person, or a Schedule. | Slice 7 |
 | Item Branch | The branch one Item works on, on top of the last Item that finished. Together they form the Stack. | Slice 4 |
 | Stack | The chain of Item Branches of one Call Node with `each`. The engine makes the branches; a flow opens pull requests on them with a CLI tool such as `gh`. | PLAN §5 |
@@ -98,6 +99,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Transcript | The structured record of a Step: agent messages, tool calls, and command output, on disk. | Slice 1 |
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |
 | Device | A computer that runs Night Shift. In code, the port a Step body uses to touch a computer (`packages/engine/src/device/`): it reports its Capabilities (harnesses, connections, CLI tools, programs, decider) and runs Sessions, commands, Tool calls, decisions and Worktrees. The step runner asks for the Step's Device once per Step; `StepStarted` names it. Today every Step runs on this computer (`localDevice`). | Devices, slice 1 |
+| Cost | What a Session or a model call cost, in US dollars at API prices, also on a subscription: the person sees what the work would cost. The harness reports it, or Night Shift estimates it from the tokens and a price list it updates daily. A cost that neither can tell is not known: totals leave it out and show "+", and the Run warns. | Costs |
+| Warning | Something that went wrong in a Run without failing a Step, such as a Step whose Cost is not known. Shown on the Run and grouped per Flow in Flow health. | Costs |
 | Event | One appended record of a fact that changed. Its identity is its Walker and its number among that Walker's Events (`walker_seq`); `seq` is only the order it landed in this Replica. | Slice 1 |
 | Event Log | The append-only list of Events: the read model. Run status is derived from it, never from a Checkpoint. | Slice 1 |
 | Run Bundle | One Run exported as its own SQLite file: its rows, its Events, and its Transcripts, in the daemon's table names. Secret values are masked. | Run export |
@@ -163,12 +166,13 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | StepEnded | A Step ended with an Outcome and its Outputs. |
 | SessionStarted | A harness Session began for an Agent Step. |
 | HarnessSessionAssigned | The Harness reported its own session id. |
-| SessionEnded | A Session ended, with its cost. |
+| SessionEnded | A Session ended, with its Cost and where it came from (reported or estimated). |
 | EdgeTaken | The Run followed an Edge to the next Node. |
 | StopRequested | A person asked to stop the Run. |
 | GateOpened | A Gate put its question in the Needs-you inbox. |
 | WaitStarted | A Step began a Wait: why, until when (none for a Signal with no timeout), and which Signal. |
 | WaitEnded | The Wait is over: the timer, a person, or a Signal. |
 | RunEnded | The Run finished or failed, with the reason. |
+| RunWarned | A Warning about the Run, with the Step it is about. |
 | ScheduleFired | A Schedule came due and started its Run, or failed to start it. |
 | ScheduleSkipped | A Schedule came due but did not start: too late, or its previous Run still runs. |

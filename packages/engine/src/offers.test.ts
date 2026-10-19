@@ -344,3 +344,132 @@ describe("another Person's run on the computer that walks it", () => {
 		expect(JSON.stringify(document.doc.toJSON())).not.toContain("sonnet");
 	});
 });
+
+describe("a schedule that fires on another Person's Device", () => {
+	const TICK_MS = 5;
+	const carol = "person-carol";
+	/** Local time, October 2026. */
+	const at = (day: number, hours: number, minutes = 0, seconds = 0) =>
+		new Date(2026, 9, day, hours, minutes, seconds).getTime();
+	let sandbox: Sandbox;
+	let documents: SpaceDocuments;
+	let signal: AbortController;
+	let own: DeviceOffer[];
+	let engine: Engine;
+	let clock: number;
+
+	beforeEach(async () => {
+		sandbox = await createSandbox();
+		documents = createSpaceDocuments({ db: sandbox.db });
+		signal = new AbortController();
+		own = [];
+		clock = at(16, 21, 59);
+		await sandbox.db
+			.insert(user)
+			.values({ id: carol, name: "Carol", email: "carol@example.com" });
+		engine = createEngine(
+			withDevice({
+				db: sandbox.db,
+				harnesses: { "claude-code": fakeHarness() },
+				deviceId: sandbox.deviceId,
+				dataDir: sandbox.dataDir,
+				spaceDocuments: documents,
+				profileFor: (name) =>
+					name === "coder" ? { ...coder, connections: [] } : null,
+				ownOffers: () => own,
+				mayUseOffers: async (_space, person) => person === carol,
+			}),
+			{ signal: signal.signal, now: () => clock, scheduleTickMs: TICK_MS },
+		);
+	});
+	afterEach(async () => {
+		signal.abort();
+		await Bun.sleep(TICK_MS * 4);
+		await documents.close();
+		await sandbox.cleanup();
+	});
+
+	test("is refused when saved without an Offer; through one it starts Carol's runs, until it is withdrawn", async () => {
+		const owner = engine.space(sandbox.spaceId);
+		const { id: projectId } = await owner.addProject({
+			repoPath: sandbox.repoPath,
+		});
+		await owner.saveFlow(projectId, "night", {
+			version: 4,
+			inputs: [],
+			outputs: [],
+			start: "work",
+			nodes: [agent({ profile: "coder" })],
+			edges: [],
+		});
+		// Carol saves a schedule that fires on this computer, which she does not own.
+		const space = engine.space(sandbox.spaceId, { personId: carol });
+		const [here] = await space.listDevices(projectId);
+		const schedule = {
+			id: "nightly",
+			flow: "night",
+			inputs: {},
+			cron: "0 22 * * *",
+			enabled: true,
+			device: here?.name as string,
+		};
+		await expect(space.saveSchedules(projectId, [schedule])).rejects.toThrow(
+			`The schedule "nightly" fires on another person's device. ${here?.name} is not your device. It offers nothing to this Space.`,
+		);
+
+		own = [
+			{
+				spaceId: sandbox.spaceId,
+				profile: "coder",
+				permissionCap: "acceptEdits",
+				sessionCap: 1,
+				offeredAt: 1,
+			},
+		];
+		await engine.offers.publish({
+			spaceId: sandbox.spaceId,
+			deviceId: sandbox.deviceId,
+			deviceName: here?.name as string,
+			profile: "coder",
+			permissionCap: "acceptEdits",
+			sessionCap: 1,
+			by: null,
+		});
+		await space.saveSchedules(projectId, [schedule]);
+		expect((await space.listSchedules(projectId)).schedules[0]?.person).toBe(
+			carol,
+		);
+
+		clock = at(16, 22, 0, 20);
+		const run = await waitFor(async () => (await owner.listRuns())[0], {
+			label: "the scheduled run",
+		});
+		expect(run.startedBy?.id).toBe(carol);
+		await waitFor(
+			async () => (await owner.getRun(run.id)).status === "finished",
+			{ label: "the run" },
+		);
+
+		await engine.offers.withdraw({
+			spaceId: sandbox.spaceId,
+			deviceId: sandbox.deviceId,
+			profile: "coder",
+			by: null,
+		});
+		clock = at(17, 22, 0, 20);
+		const failed = await waitFor(
+			async () =>
+				(
+					await sandbox.db
+						.select()
+						.from(event)
+						.where(eq(event.type, "ScheduleFired"))
+				)
+					.map((row) => parseEventRow(row).payload as { error: string | null })
+					.find((p) => p.error !== null),
+			{ label: "the refused fire" },
+		);
+		expect(failed.error).toContain("It offers nothing to this Space.");
+		expect(await owner.listRuns()).toHaveLength(1);
+	});
+});

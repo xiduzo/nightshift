@@ -15,14 +15,9 @@ import {
 import { Link } from "@tanstack/react-router";
 import { CalendarClockIcon, HistoryIcon } from "lucide-react";
 import type { ReactNode } from "react";
-
+import { CostText } from "@/components/cost-text";
 import type { Project, RunSummary } from "@/lib/api-types";
-import {
-	formatCost,
-	formatDateTime,
-	formatRelative,
-	formatTime,
-} from "@/lib/format";
+import { formatDateTime, formatRelative, formatTime } from "@/lib/format";
 
 import { DataTable, dataTableColumns } from "./data-table";
 import { WalkerBadge } from "./run/walker-badge";
@@ -146,7 +141,7 @@ function runColumns(projectNames: Map<string, string> | undefined) {
 		column.accessor("costUsd", {
 			header: "Cost",
 			enableSorting: true,
-			cell: ({ row }) => formatCost(row.original.costUsd),
+			cell: ({ row }) => <CostText cost={row.original} />,
 			meta: {
 				headClassName: "text-right max-sm:pr-6",
 				cellClassName: "py-3 text-right tabular-nums max-sm:pr-6",

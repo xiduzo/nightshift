@@ -42,6 +42,7 @@ const engine: Context["engine"] = {
 	exchange: {} as Context["engine"]["exchange"],
 	logMemberChange: async () => {},
 	offers: {} as Context["engine"]["offers"],
+	deviceBack: async () => {},
 };
 
 async function contextFor(headers: Headers | null): Promise<Context> {

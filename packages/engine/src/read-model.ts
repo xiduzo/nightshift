@@ -7,6 +7,8 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 
 import type { RunBus } from "./bus";
 import {
+	addCost,
+	type CostTally,
 	type DerivedStep,
 	deriveEndedAt,
 	deriveGateWaits,
@@ -20,11 +22,14 @@ import {
 	deriveStopAt,
 	deriveTraversals,
 	deriveTrigger,
+	deriveWarnings,
 	type LoggedEvent,
 	lastHarnessSession,
+	NO_COST,
 	type Scope,
 	scopeKey,
-	sumCostUsd,
+	sessionCost,
+	sumCost,
 } from "./events";
 import { getRunRow, type RunRow } from "./graph/context";
 import { namesOf, runPerson } from "./people";
@@ -39,6 +44,7 @@ import type {
 	RunStreamItem,
 	RunSummary,
 	RunWalker,
+	RunWarning,
 	StepOutcome,
 	StepSummary,
 	SubflowRun,
@@ -126,7 +132,8 @@ export function runFacts(events: readonly LoggedEvent[]) {
 		inputs: deriveInputs(events),
 		stopAt: deriveStopAt(events),
 		stopAfterStep: open && deriveStopAfterStep(events),
-		costUsd: sumCostUsd(events),
+		...costFields(sumCost(events)),
+		warnings: runWarnings(events),
 		endedAt: deriveEndedAt(events),
 		trigger: deriveTrigger(events),
 		calls: deriveCalls(events),
@@ -135,6 +142,29 @@ export function runFacts(events: readonly LoggedEvent[]) {
 }
 
 export type RunFacts = ReturnType<typeof runFacts>;
+
+/** A cost tally as the summaries carry it. */
+function costFields(cost: CostTally) {
+	return {
+		costUsd: cost.usd,
+		costEstimated: cost.estimated,
+		costMissing: cost.missing,
+	};
+}
+
+/** The run's warnings, each with the node of its step. */
+function runWarnings(events: readonly LoggedEvent[]): RunWarning[] {
+	const warnings = deriveWarnings(events);
+	if (warnings.length === 0) return [];
+	const nodes = new Map(deriveSteps(events).map((s) => [s.id, s.nodeId]));
+	return warnings.map((w) => ({
+		kind: w.kind,
+		message: w.message,
+		stepId: w.stepId,
+		nodeId: w.stepId ? (nodes.get(w.stepId) ?? null) : null,
+		at: w.at,
+	}));
+}
 
 /** The Device a run's steps run on: its own, else (a run from before Placement) its Walker. */
 export function runDeviceId(row: Pick<RunRow, "deviceId" | "walkerId">) {
@@ -187,6 +217,8 @@ type CallFact = {
 		/** Null while the call or the item is open. */
 		status: RunStatus | null;
 		costUsd: number;
+		costEstimated: boolean;
+		costMissing: number;
 		startedAt: number;
 		endedAt: number | null;
 	}[];
@@ -205,11 +237,11 @@ function deriveCalls(events: readonly LoggedEvent[]): CallFact[] {
 	const steps = deriveSteps(events);
 	const byId = new Map(steps.map((step) => [step.id, step]));
 	// The cost of each run of a called flow, with the flows it called, by scope key.
-	const cost = new Map<string, number>();
+	const cost = new Map<string, CostTally>();
 	for (const step of steps) {
 		for (let scope = step.scope; scope; ) {
 			const key = scopeKey(scope);
-			cost.set(key, (cost.get(key) ?? 0) + step.costUsd);
+			cost.set(key, addCost(cost.get(key) ?? NO_COST, step.cost));
 			scope = byId.get(scope.parentStepId)?.scope ?? null;
 		}
 	}
@@ -230,7 +262,7 @@ function deriveCalls(events: readonly LoggedEvent[]): CallFact[] {
 				? [
 						{
 							status: ended,
-							costUsd: cost.get(scopeKey(once)) ?? 0,
+							...costFields(cost.get(scopeKey(once)) ?? NO_COST),
 							startedAt: step.startedAt,
 							endedAt: step.endedAt,
 						},
@@ -248,8 +280,10 @@ function deriveCalls(events: readonly LoggedEvent[]): CallFact[] {
 												(ended === "stopped" || ended === "interrupted")
 											? ended
 											: "failed",
-							costUsd:
-								cost.get(scopeKey({ ...once, itemId: item.facts.id })) ?? 0,
+							...costFields(
+								cost.get(scopeKey({ ...once, itemId: item.facts.id })) ??
+									NO_COST,
+							),
 							startedAt: item.startedAt,
 							endedAt: item.endedAt,
 						})),
@@ -307,6 +341,13 @@ function subflowRuns(
 		.sort((a, b) => a.startedAt - b.startedAt);
 }
 
+/** A Device this Replica knows nothing of: a name is all it lacks. */
+const unnamed = (id: string): RunDevice => ({
+	id,
+	name: null,
+	thisDevice: false,
+});
+
 /** Names a Device by id, as this Replica knows it. */
 export type DeviceNamer = (id: string) => RunDevice;
 
@@ -347,8 +388,9 @@ export function toStepSummary(
 			outcome: s.ending?.outcome ?? null,
 			error: s.ending?.error ?? null,
 			costUsd: s.ending?.costUsd ?? null,
+			costEstimated: sessionCost(s.ending).estimated,
 		})),
-		costUsd: derived.costUsd,
+		...costFields(derived.cost),
 		device:
 			derived.deviceId === null
 				? null
@@ -391,6 +433,19 @@ export function toRunDetail(
 		takeOverCommand: takeOverCommand(row.worktreePath, last, harnessOf),
 		resumes: deriveResumes(events),
 		commands,
+		handOffs: events.flatMap((e) =>
+			e.type === "HandedOff"
+				? [
+						{
+							at: e.at,
+							stepId: e.stepId,
+							from: deviceOf?.(e.payload.from) ?? unnamed(e.payload.from),
+							to: deviceOf?.(e.payload.to) ?? unnamed(e.payload.to),
+							commit: e.payload.commit,
+						},
+					]
+				: [],
+		),
 	};
 }
 
@@ -494,6 +549,9 @@ export function createReadModel(deps: ReadModelDeps) {
 			row.walkerId,
 			runDeviceId(row),
 			...deriveSteps(events).map((s) => s.deviceId),
+			...events.flatMap((e) =>
+				e.type === "HandedOff" ? [e.payload.from, e.payload.to] : [],
+			),
 		]);
 		const walker = deviceOf(row.walkerId);
 		return toRunDetail(

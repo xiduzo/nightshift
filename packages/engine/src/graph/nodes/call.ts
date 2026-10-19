@@ -187,6 +187,14 @@ export const CALL: NodeKind<CallNode> = {
 	...PLAIN_KIND,
 	type: "call",
 	make: callNode,
+	// A Call with each works in the worktree: its item branches, its files
+	// or command source. Its body's nodes run where they are placed.
+	works: (node) =>
+		node.each !== undefined &&
+		((node.each.branch ?? "per-item") === "per-item" ||
+			node.each.source.kind !== "json")
+			? "worktree"
+			: null,
 	resumeRules: (node) =>
 		runsEach(node) ? RESUME_RULES.callEach : RESUME_RULES.call,
 	isChosenEnd: isChosenCallEnd,

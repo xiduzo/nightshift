@@ -1,4 +1,5 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import { settleCost } from "@nightshift/agents/pricing";
 import type {
 	AgentSessionInput,
 	HarnessName,
@@ -14,7 +15,6 @@ import {
 	renderTemplate,
 	resolvedAgent,
 } from "@nightshift/flows";
-
 import { consumeStream } from "../../consume";
 import type { SessionEvent } from "../../device/types";
 import {
@@ -37,6 +37,11 @@ import {
 	STOP_GRACE_MS,
 	type StepContext,
 } from "../context";
+import {
+	deciderCostSource,
+	sessionCostUnknown,
+	warnDeciderCost,
+} from "../cost";
 import { RESUME_RULES, type ResumePoint } from "../resume-point";
 import { scopeOf } from "../route";
 import type { RunStateValues } from "../state";
@@ -187,6 +192,7 @@ export const AGENT: NodeKind<AgentNode> = {
 	...PLAIN_KIND,
 	type: "agent",
 	make: agentNode,
+	works: () => "worktree",
 	resumeRules: () => RESUME_RULES.agent,
 	aux: () => [{ kind: "wait" }],
 	isChosenEnd: (node, outcome) =>
@@ -311,7 +317,7 @@ type SessionEnding = EnginePayloads["SessionEnded"];
  * output schema and the node's outcomes; or a wait request.
  */
 async function runSession(
-	ctx: StepContext,
+	_ctx: StepContext,
 	node: AgentNode,
 	step: StepHandle,
 	input: { prompt: string | null; resumeSessionId: string | null },
@@ -351,7 +357,7 @@ async function runSession(
 	// session learns its CLI tools from the Device after the prompt.
 	const clis = [...new Set(programsOf(node))];
 	const common = {
-		cwd: ctx.run.worktreePath,
+		cwd: step.worktree,
 		prompt,
 		resumeSessionId: resumeSessionId ?? undefined,
 		stepReport: stepReportOf(node),
@@ -406,6 +412,8 @@ async function runSession(
 	const sessionId = session.id;
 
 	let harnessSessionId: string | null = resumeSessionId;
+	/** The model the harness says it runs, else the one the node asked for: the price list prices it. */
+	let sessionModel: string | null = agent?.model || null;
 	let ending: SessionEnding | null = null;
 	let report: AgentReport | null = null;
 	/** The text after the last tool call: the agent's final message. */
@@ -421,6 +429,7 @@ async function runSession(
 		switch (agentEvent.type) {
 			case "session":
 				harnessSessionId = agentEvent.sessionId;
+				sessionModel = agentEvent.model ?? sessionModel;
 				await session.assigned(agentEvent.sessionId, agentEvent.model ?? null);
 				break;
 			case "text":
@@ -451,7 +460,8 @@ async function runSession(
 					error: null,
 					errorKind: null,
 					usage: agentEvent.usage ?? null,
-					costUsd: agentEvent.usage?.costUsd ?? null,
+					// The harness's cost, else its tokens priced for the model it ran.
+					...settleCost(agentEvent.usage, sessionModel),
 					resetAt: null,
 				};
 				break;
@@ -498,6 +508,16 @@ async function runSession(
 	const final: SessionEnding =
 		ending ?? endWithoutResult("The harness stream ended without a result.");
 	await session.ended(final);
+	if (final.outcome === "finished" && final.costUsd === null) {
+		await step.warn(
+			"cost-unknown",
+			sessionCostUnknown(
+				HARNESS_LABEL[harness],
+				sessionModel,
+				(final.usage?.inputTokens ?? 0) + (final.usage?.outputTokens ?? 0) > 0,
+			),
+		);
+	}
 
 	const finalReport = report as AgentReport | null;
 	if (finalReport && node.output) {
@@ -617,14 +637,14 @@ async function checkOutcome(
 		outcome: string,
 		note: string,
 		error: string | null,
-		costUsd: number | null,
+		cost: Pick<BodyResult & { kind: "end" }, "costUsd" | "costSource">,
 	): BodyResult => ({
 		kind: "end",
 		outcome,
 		outputs: { ...outputs, outcome, note },
 		error,
 		harnessSessionId,
-		costUsd,
+		...cost,
 	});
 	const decider = (await step.device.capabilities()).decider;
 	if (!decider) {
@@ -632,7 +652,7 @@ async function checkOutcome(
 			"error",
 			"",
 			"No decider is configured for the checker of this Agent node.",
-			null,
+			{ costUsd: null },
 		);
 	}
 	// The Device says which model a checker without one starts on.
@@ -649,7 +669,11 @@ async function checkOutcome(
 		{ decider: checker.decider, prompt, labels: options, model, signal },
 		signal,
 	);
-	const costUsd = result.costUsd;
+	const cost = {
+		costUsd: result.costUsd,
+		costSource: deciderCostSource(result),
+	};
+	await warnDeciderCost(step, cost.costSource, "check", model);
 	if (result.kind === "decided") {
 		step.record(null, {
 			type: "decision",
@@ -663,18 +687,13 @@ async function checkOutcome(
 			kind: "aborted",
 			outputs: { ...outputs, note },
 			harnessSessionId,
-			costUsd,
+			...cost,
 		};
 	}
 	if (result.kind === "error") {
-		return finish(
-			"error",
-			note,
-			`The checker failed: ${result.message}`,
-			costUsd,
-		);
+		return finish("error", note, `The checker failed: ${result.message}`, cost);
 	}
 	const problem = optionProblem(options, result.label);
-	if (problem !== null) return finish("error", note, problem, costUsd);
-	return finish(result.label, note, null, costUsd);
+	if (problem !== null) return finish("error", note, problem, cost);
+	return finish(result.label, note, null, cost);
 }

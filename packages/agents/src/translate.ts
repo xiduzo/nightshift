@@ -204,14 +204,16 @@ function usageFromSdkResult(
 ): AgentUsage | undefined {
 	const usage = message.usage;
 	if (!isRecord(usage)) return undefined;
+	const cacheReadTokens = asNumber(usage.cache_read_input_tokens) ?? 0;
+	const cacheWriteTokens = asNumber(usage.cache_creation_input_tokens) ?? 0;
 	const inputTokens =
-		(asNumber(usage.input_tokens) ?? 0) +
-		(asNumber(usage.cache_read_input_tokens) ?? 0) +
-		(asNumber(usage.cache_creation_input_tokens) ?? 0);
+		(asNumber(usage.input_tokens) ?? 0) + cacheReadTokens + cacheWriteTokens;
 	const costUsd = asNumber(message.total_cost_usd);
 	return {
 		inputTokens,
 		outputTokens: asNumber(usage.output_tokens) ?? 0,
+		cacheReadTokens,
+		cacheWriteTokens,
 		...(costUsd !== undefined ? { costUsd } : {}),
 	};
 }
@@ -312,9 +314,18 @@ function usageFromChunk(chunk: AgUiChunk): AgentUsage | undefined {
 		? usage.providerUsageDetails
 		: undefined;
 	const costUsd = details ? asNumber(details.totalCostUsd) : undefined;
+	const prompt = isRecord(usage.promptTokensDetails)
+		? usage.promptTokensDetails
+		: undefined;
+	const cacheReadTokens = prompt ? asNumber(prompt.cachedTokens) : undefined;
+	const cacheWriteTokens = prompt
+		? asNumber(prompt.cacheWriteTokens)
+		: undefined;
 	return {
 		inputTokens: asNumber(usage.promptTokens) ?? 0,
 		outputTokens: asNumber(usage.completionTokens) ?? 0,
+		...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+		...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
 		...(costUsd !== undefined ? { costUsd } : {}),
 	};
 }

@@ -112,7 +112,8 @@ export function reportingScript(
 				...(data !== undefined ? { data } : {}),
 			},
 		],
-		outcome: { type: "finished" },
+		// A harness reports what it used, as the default script does.
+		outcome: defaultFakeScript.outcome,
 	};
 }
 

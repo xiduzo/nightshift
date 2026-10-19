@@ -80,10 +80,13 @@ export function hasCost(step: {
 	nodeType: FlowNodeType;
 	gate: unknown | null;
 	costUsd: number;
+	costMissing: number;
 }): boolean {
 	return (
 		step.nodeType === "agent" ||
-		(step.nodeType === "decision" && step.gate === null && step.costUsd > 0) ||
-		(step.nodeType === "value" && step.costUsd > 0)
+		(step.nodeType === "decision" &&
+			step.gate === null &&
+			(step.costUsd > 0 || step.costMissing > 0)) ||
+		(step.nodeType === "value" && (step.costUsd > 0 || step.costMissing > 0))
 	);
 }

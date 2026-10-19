@@ -64,7 +64,9 @@ describe("tanstackDecider", () => {
 			kind: "decided",
 			label: "ship",
 			notes: "TypeSafe Jev picked it with 87% probability.",
-			costUsd: null,
+			// The stub's tokens, priced from the price list.
+			costUsd: expect.any(Number),
+			costSource: "estimated",
 		});
 		expect(sent).toHaveLength(1);
 		expect(sent[0]?.url).toEndWith("/v1/systemone");
@@ -233,7 +235,9 @@ describe("tanstackDecider: values", () => {
 		expect(result).toEqual({
 			kind: "made",
 			data: { tests: ["a.test.ts", "b.test.ts"] },
+			// The stub reports no usage.
 			costUsd: null,
+			costSource: null,
 		});
 		expect(sent).toHaveLength(1);
 		expect(sent[0]?.url).toEndWith("/chat/completions");

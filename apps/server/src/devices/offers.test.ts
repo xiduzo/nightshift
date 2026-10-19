@@ -329,9 +329,17 @@ describe("a colleague's run on another Person's Device", () => {
 		expect(args).not.toContain("bypassPermissions");
 		// The run's copy holds no setting of B's profile.
 		expect(JSON.stringify(detail)).not.toContain("sonnet");
+		// Where B keeps the run's worktree stays with B's owner.
+		expect(started.worktreePath).toBe("");
+		expect(detail.worktreePath).toBe("");
+		expect(detail.takeOverCommand).toBeNull();
+		const onA = await a.client.runs.get({ runId: started.id });
+		expect(onA.worktreePath.startsWith(join(root, "on-b.nightshift"))).toBe(
+			true,
+		);
 		// The worktree on B commits in the colleague's name.
 		expect(
-			git(started.worktreePath, "config", "--worktree", "--get", "user.email"),
+			git(onA.worktreePath, "config", "--worktree", "--get", "user.email"),
 		).toBe(COLLEAGUE);
 		const runStarted = eventsOnA("RunStarted").at(-1);
 		expect(runStarted?.startedBy).toBe(colleagueId);

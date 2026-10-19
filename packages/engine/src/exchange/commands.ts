@@ -19,6 +19,7 @@ export const runCommandKindSchema = z.enum([
 	"gate.resolve",
 	"signal.send",
 	"run.stop",
+	"run.move",
 ]);
 export type RunCommandKind = z.infer<typeof runCommandKindSchema>;
 
@@ -31,6 +32,7 @@ export const runCommandPayloadSchema = z.union([
 	}),
 	z.object({ name: z.string().min(1) }),
 	z.object({ when: z.enum(["now", "after-step"]).optional() }),
+	z.object({ to: z.string().min(1) }),
 ]);
 
 /** A command as the engine asks for it. */
@@ -40,7 +42,9 @@ export type RunCommandInput =
 			payload: { stepId: string; choice: string; note?: string };
 	  }
 	| { kind: "signal.send"; payload: { name: string } }
-	| { kind: "run.stop"; payload: { when?: "now" | "after-step" } };
+	| { kind: "run.stop"; payload: { when?: "now" | "after-step" } }
+	/** Another Device walks the run from here on. */
+	| { kind: "run.move"; payload: { to: string } };
 
 /** A command on its way to a Walker. */
 export type RunCommand = RunCommandInput & {
@@ -58,6 +62,7 @@ export const COMMAND_PERMISSION = {
 	"gate.resolve": { gate: ["resolve"] },
 	"signal.send": { signal: ["send"] },
 	"run.stop": { run: ["stop"] },
+	"run.move": { run: ["move"] },
 } as const satisfies Record<RunCommandKind, Record<string, string[]>>;
 
 export type RunCommands = ReturnType<typeof createRunCommands>;
@@ -168,6 +173,9 @@ export async function applyRunCommand(
 				command.runId,
 				command.payload.when ? { when: command.payload.when } : undefined,
 			);
+			return;
+		case "run.move":
+			await space.moveRun(command.runId, command.payload.to);
 			return;
 	}
 }

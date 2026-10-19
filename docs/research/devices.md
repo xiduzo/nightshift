@@ -1083,6 +1083,126 @@ iroh.
      Device never walks a run placed elsewhere. The transcript of a run
      walked here is live wherever its steps run (the Walker writes it); a
      run walked elsewhere still shows a step's transcript when it ends.
+
+   *Landed (part B, per-node Placement, the Hand-off, offline, Move to):*
+   - **A node's `device`** (`packages/flows`): a Device name on Agent,
+     Command, Tool, and model Decision and Value nodes; a Gate, a rule or a
+     timer that names one is a flow error ("Only a model runs on a
+     device"). `deviceNameSchema`: 1 to 64 characters. The flow editor's
+     Device section lists your Devices (`runs.devices`); a name that is not
+     one of yours stays, marked.
+   - **Where a step runs** (`packages/engine/src/device/placement.ts`, one
+     module for both halves): the node's `device`, else the profile's
+     Device, else the run's Device, else the Walker. "The profile's Device"
+     is the run's Device when it defines the profile, else this computer
+     when only it does (`Capabilities.profiles`: a Device reports the
+     profiles asked for). Run start resolves every name once, among the
+     starter's own Devices (`run.placements`: `{ name: deviceId }`, bundles
+     format 6; this computer by its name; two Devices of one name refuse),
+     and writes this computer's name into a node it places there for its
+     profile. `deviceFor` reads the node's name through `run.placements`.
+     Every placed Device answers the requirements for its own nodes, and
+     one whose nodes work in the worktree needs a Clone ("The flow runs node
+     "x" on hetzner-1, but that device does not have this project").
+     `NodeKind.works` says what a step needs: `worktree` (Agent, Command, a
+     Wait on a command, a Call with each that branches or reads files or a
+     command), `device` (Tool, a model), or nothing.
+   - **The Hand-off** (decision 3). One worktree per Device a run's work
+     reaches, all at `worktreeLocation(clone, run8)` on `nightshift/<run8>`.
+     Before a step that works in the worktree, the step runner
+     (`readyDevice`) compares its Device with the one that has the work
+     (`deriveWorktrees`: the run's Device, then each `HandedOff.to`). When
+     they differ, that Device's `handOff` refuses a worktree with
+     uncommitted changes (the step fails: "The run's work on studio cannot
+     move to hetzner-1. … has changes that are not committed (draft.txt).
+     Night Shift does not commit for you …"), else pushes the checked-out
+     branch and the run's own to `origin` (forced: they are the run's), and
+     this Device's `receiveHandOff` fetches it and checks it out at that
+     commit in its own worktree of the run (added when it has none, with
+     the starter's git identity). The Walker logs `HandedOff` (from, to,
+     commit, branch, worktreePath) and the step works there
+     (`StepHandle.worktree`). The run page lists them ("Work moved").
+     `HandedOff.worktreePath` stays with its owner, like the other paths.
+   - **The Walker → Host → Device leg.** A Device that walks a run calls
+     another of its Person's Devices through its Host: `devices.call`, a
+     stream over its link (closing it cancels the call); the Host relays it
+     through its hub, or serves it itself with its own `localDevice` when
+     it is the Device (`checkWork` with its owner). `devices.reachable`
+     says whether one takes work. `createWorkRelay` (apps/server) picks the
+     hub for a Space this computer keeps and the Host for the others. A
+     Device in a Host's Space learns its Person's Devices from the Host
+     (`sync.devices`). The Host still walks a run that a Device starts for
+     another Device (part A); a run the Device starts for itself, with
+     nodes placed elsewhere, is walked by the Device.
+   - **`device-offline`.** A step that needs a computer, whose Device (or
+     the Device that has the work) is offline when it must start, sleeps
+     through the sleep module (`SleepRequest` kind `device`, reason
+     `device-offline`, `WaitStarted.deviceId`) and looks again every
+     minute; Command and Tool nodes got a wait node for it. On a Host, a
+     Device whose link takes work again wakes those sleeps at once
+     (`createWorkHub({ onBack })` → `Engine.deviceBack`); a Device that
+     walks through its Host has the minute only. Online now means a work
+     stream is open; a call already made waits out a short drop (45 s).
+   - **Offline during a step.** The placed Device keeps the session and
+     its replies while they cannot reach the Host, up to ten minutes
+     (`REPLY_DEADLINE_MS`), and sends them when the link is back: the
+     Walker gets the events it missed (a short drop is a reattach). A call
+     the hub ends because the Device stayed away (45 s) is an `offline`
+     error: a session cut off that way ends with an error of kind
+     `network`, so the run's policy waits (network grace) and continues it
+     with the harness session id (`continue, with-session`).
+   - **A Host restart**, precisely: the hub is in memory and forgets its
+     calls. Recovery on the Host ends the open step `interrupted` and the
+     daemon's resume (after its grace) re-runs the node: an Agent step is
+     reopened with its harness session id, on its Device. The placed
+     Device, when its link takes work again, names the calls it still
+     serves; the Host cancels the ones it does not know, so the old session
+     stops there; a reply for an unknown call stops it too. So the Walker
+     does not ask the placed Device before re-running; the old session is
+     stopped when the Device is back, and the resumed one continues the
+     harness session. A Command step runs again from its start.
+   - **Usage limits per Device.** `WaitStarted.deviceId` names the Device
+     of a policy wait: a usage limit is that Device's harness login's (the
+     open item). Steps of other runs on that Device still try once
+     themselves (no wait shared across runs: it changed the run policy's
+     tested behaviour).
+   - **Move to…** (`runs.move`, `run.move` permission; the run page's "Move
+     to…", for a run that waits, sleeps or has stopped, not mid-step). The
+     Walker archives the run's latest checkpoint and its steps' transcripts
+     and logs where the Space is kept (itself, or its Host: `archive.put`),
+     appends `WalkerMoved` (from, to, by) as its last event and forgets the
+     run. Every Replica moves the run row's Walker with that event
+     (`applyWalkerMoves`; a run from before Placement keeps its old Walker
+     as its Device), and the exchange takes a moved run's rows from each of
+     its Walkers. The new Walker takes it over when the event arrives:
+     the checkpoint from the archive into its own tables
+     (`restoreCheckpoint`), and a sleeping run's timer; a run at a Gate
+     waits there, a stopped one for a resume. A run walked elsewhere moves
+     by a `run.move` command to its Walker. A moved step's transcript is
+     read from the archive.
+   - **Schedules**: `device` in `schedules.json` names the Device that
+     fires the schedule; without one, the Replica that keeps the Space
+     fires it (its Host, or the one Device of a Space without one), so a
+     schedule every Clone reads fires once. A Host without a Clone cannot
+     read the file: name a Device then. A schedule's run with placed nodes
+     uses this computer's owner's Devices.
+   - **The resume grace** now counts from when the engine is ready (it
+     started at recovery, before the engine's start ended: the flaky
+     "an open run continues on its own" test).
+   - Tests: `packages/engine/src/device/placement.test.ts` (per-node with
+     the Hand-off there and back, a dirty worktree fails the step, offline
+     then back, an unknown name, the profile's Device); `apps/server/src/
+     devices/handoff.test.ts` (two daemons with one bare remote: A walks a
+     run whose middle node runs on B, a dirty worktree, B walks a run with
+     a node on A through A, a node whose Device is offline sleeps and
+     continues when B is back, Move to: B takes over a run waiting at its
+     Gate, answers it, and its last step runs on A); `work.test.ts` (the
+     hub's cancels after a restart).
+   - Not yet: Offers (another Person's Device), a Device that walks a run
+     whose run Device is another (the Host walks those), a `${NAME}` the
+     placed Device lacks refusing at start, "Move to…" of a run mid-step.
+     A Device's name is its host name until a rename exists: two Devices
+     of one name cannot be told apart by a node (run start refuses it).
 6. **Sharing.** Invitation-only signup, Members and roles, Offers with the
    Device-side checks, audit events, per-Person git identity in worktrees.
 
@@ -1250,14 +1370,49 @@ iroh.
      refused at start, a run through the Offer on B under the caps in the
      colleague's name, a second session waits, withdrawing stops a running
      step and logs `OfferWithdrawn`).
-   - Not yet, and risky: a run's summary still shows its worktree path to
-     every Member of the Space, also when it is on another Person's
-     Device. Schedules in a shared repository fire on the computer that
-     reads them as its owner's runs; slice 5 part B gives them a `device`,
-     and they need the same Offer rule. The flow editor's per-node Device
-     field (slice 5 part B) should list the Space's Offers next to your
-     Devices. Withdrawing an Offer of another of your Devices from the
-     Host's page is not built: withdraw it on that Device.
+   - **With per-node Placement** (merged with slice 5 part B). Every
+     placed Device is checked on its own: a Device of another Person (by
+     the run's `deviceId`, or by the name a node gives it, also from the
+     Space's Offers when none of your Devices has that name) is a
+     `PlacedDevice` with `offered`, and run start applies `offerRefusal` to
+     the nodes placed there, and the requirements to the others. Its
+     nodes keep their profile unresolved; the "profile's Device" fallback
+     to this computer is skipped when the run's Device or this computer is
+     offered. The Device checks again per call (`checkWork`), on a Device
+     and on the Host for itself (`serveChecked`, shared). A Device that
+     walks a run reaches another Person's Device through the Host
+     (`devices.call`): the Host relays it when that Device offers to the
+     run's Space, and `devices.reachable` answers for it. The Hand-off
+     (`handOff`, `receiveHandOff`) is the run's own folder work, allowed
+     under an Offer. "Move to…" lists your own Devices only: an Offer runs
+     steps, it does not walk runs. Runs the Walker carries to an offered
+     Device are tracked for a withdrawal on that Walker; one withdrawn on
+     another Walker's Device is aborted there (the step fails).
+   - **Schedules.** A schedule whose `device` is another Person's Device
+     runs the saver's runs there: saving it (Schedules) stamps the saver
+     as its `person` (as the Space knows them) and is refused unless that
+     Device's Offers cover what the flow runs there ("The schedule
+     "nightly" fires on another person's device. hetzner-1 is not your
+     device. It offers nothing to this Space."). When it fires, the run is
+     that Person's (`startedBy`), so run start checks the Offers again: a
+     withdrawn Offer refuses the start, and `ScheduleFired` records the
+     reason. A schedule on your own Device names no Person.
+   - **Paths stay with the Device's owner.** `runs.list`, `runs.get` and
+     the start's answer show a run's `worktreePath` (and the take-over
+     command that names it) only to the owner of the run's Device;
+     everyone else gets `""` and no command. A Device whose owner this
+     Replica cannot tell shows none.
+   - **The flow editor's Device field** lists your Devices and, for an
+     Agent node, the Devices of other people that offer its profile to
+     the Space ("hetzner-1 (offers coder)"); `runs.devices` carries
+     `offers` for them.
+   - Not yet, and risky: a schedule file is the repository's, so a
+     schedule written by hand (without the Schedules page) has no
+     `person`, and its runs are the firing Device's owner's, as in slice
+     5 part B: anyone who can push the file can name a Device. Withdrawing
+     an Offer of another of your Devices from the Host's page is not
+     built: withdraw it on that Device. A Device rename and a `${NAME}`
+     the placed Device lacks refusing at start are not built.
 7. **From anywhere.** TLS or tailnet guidance, the Linux binary, the
    desktop app as a Host or joining one.
 
@@ -1413,8 +1568,9 @@ Nothing is open. The next step is slice 1.
   Done for Device keys in slice 4 and for secrets in slice 7 (files in
   the data folder, a secrets folder, systemd credentials).
 - A `${NAME}` the placed Device lacks should refuse at run start.
-- The usage-limit sleep is per harness login, so per Device. The sleep
-  module needs the Device in its key.
+- ~~The usage-limit sleep is per harness login, so per Device. The sleep
+  module needs the Device in its key.~~ Done in slice 5, part B
+  (`WaitStarted.deviceId`).
 - ~~Transcripts of a Run walked elsewhere are fetched from the archive on
   open.~~ Done in slice 4, part B. Archive retention is undecided, as run
   retention is today: everything is kept.

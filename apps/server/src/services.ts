@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
 	type AgentHarness,
 	acpHarness,
@@ -12,6 +13,7 @@ import {
 	harnessModels,
 	opencodeHarness,
 	pathPrograms,
+	startPriceUpdates,
 	tanstackDecider,
 	testMcpServer,
 } from "@nightshift/agents";
@@ -72,8 +74,14 @@ import { createHostExchange } from "./devices/host-exchange";
 import { createOffers } from "./devices/offers";
 import { createRelay } from "./devices/relay";
 import { certificateFingerprint } from "./devices/tls";
-import { createWorkServer, type WorkServer } from "./devices/work";
+import {
+	createOfferCalls,
+	createWorkServer,
+	type OfferDeps,
+	type WorkServer,
+} from "./devices/work";
 import { createWorkHub, type WorkHub } from "./devices/work-hub";
+import { createWorkRelay } from "./devices/work-relay";
 import {
 	desktopOrigins,
 	ENV,
@@ -385,6 +393,8 @@ const local = localDevice({
 		),
 	// The project's folder here: where its runs' worktrees branch from.
 	clonePath: clonePathOf(db),
+	// Its profiles, for a run placed here from another Device.
+	profileFor: (name) => profiles.settingsFor(name),
 });
 
 /**
@@ -393,14 +403,37 @@ const local = localDevice({
  * reloads, so a Device's stream outlives a reload.
  */
 const hotWork = globalThis as { nightshiftWork?: WorkHub };
-hotWork.nightshiftWork ??= createWorkHub();
+hotWork.nightshiftWork ??= createWorkHub({
+	// A Device is back: the steps that slept while it was away look again.
+	onBack: (deviceId) => {
+		engine.deviceBack(deviceId).catch((error) => {
+			console.error("Steps that waited for a device were not woken:", error);
+		});
+	},
+});
 const workHub = hotWork.nightshiftWork;
+/** The hub for the Spaces this computer keeps; its Hosts for the others. */
+const work = createWorkRelay({
+	hub: workHub,
+	engine: () => engine,
+	links: () => deviceLinks,
+});
 
 /**
  * The actions on rows another Device owns (a Gate of a run walked
  * elsewhere, a Clone in a Space a Host keeps), carried over the links.
  * Lazy: the engine and the links are made below.
  */
+/**
+ * The price list that prices tokens when a harness reports no cost: the
+ * bundled one, then a newer one fetched once a day into the data folder.
+ */
+// Not awaited: the daemon starts on the bundled list, never on the network.
+void startPriceUpdates({
+	file: join(dataDir, "prices.json"),
+	onError: (error) => console.warn("The price list was not updated:", error),
+});
+
 const relayToHosts = createRelay({
 	engine: () => engine,
 	registry: () => engine.devices,
@@ -411,7 +444,7 @@ export const engine = await createEngine({
 	db,
 	walkerId: device.id,
 	device: local,
-	work: workHub,
+	work,
 	relay: relayToHosts,
 	dataDir,
 	settings: () => settings.run(),
@@ -465,6 +498,17 @@ export const host = createHost({
 		sync.disconnect((context) => context.deviceId === deviceId),
 });
 
+/**
+ * This computer's Offers, for the steps of other Persons' runs it serves:
+ * the sessions and calls running under each, for every Host and itself.
+ */
+const offerDeps: OfferDeps = {
+	offers: () => deviceOffers(document),
+	profileFor: (name) => profiles.settingsFor(name),
+	slots: createOfferSlots(),
+	calls: createOfferCalls(),
+};
+
 /** This computer as the Host of run history: what paired Devices pull, push and archive. */
 export const hostExchange = createHostExchange({
 	db,
@@ -474,6 +518,8 @@ export const hostExchange = createHostExchange({
 	ownerId: person.userId,
 	isHost: host.isHost,
 	work: workHub,
+	local,
+	offerDeps,
 });
 
 /** A Device whose link says nothing for this long is offline. Its heartbeat comes every 15 s. */
@@ -487,9 +533,6 @@ presence.nightshiftPresence = setInterval(() => {
 }, 5_000);
 presence.nightshiftPresence.unref();
 
-/** The sessions running here under each of this computer's Offers, for every Host. */
-const offerSlots = createOfferSlots();
-
 /** Per Host: this computer as the Device the Host's runs are placed on. */
 const workServers = new Map<string, WorkServer>();
 function workServer(hostId: string): WorkServer {
@@ -500,9 +543,7 @@ function workServer(hostId: string): WorkServer {
 			db,
 			engine,
 			device: local,
-			offers: () => deviceOffers(document),
-			profileFor: (name) => profiles.settingsFor(name),
-			slots: offerSlots,
+			...offerDeps,
 		});
 		workServers.set(hostId, server);
 	}
@@ -517,11 +558,7 @@ export const offers = createOffers({
 	profiles,
 	self: { id: device.id, name: device.name },
 	ownerId: person.userId,
-	withdrawn: (spaceId, profile) => {
-		for (const server of workServers.values()) {
-			server.withdrawn(spaceId, profile);
-		}
-	},
+	withdrawn: (spaceId, profile) => offerDeps.calls.withdrawn(spaceId, profile),
 });
 
 /** This computer's links to the Hosts it paired with. Restarted on `bun --hot`. */

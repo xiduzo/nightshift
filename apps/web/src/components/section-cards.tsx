@@ -38,7 +38,12 @@ import { SpendDialog } from "@/components/dashboard/spend-dialog";
 import { useNow } from "@/hooks/use-now";
 import { useOpenGates } from "@/hooks/use-open-gates";
 import type { Project, RunSummary } from "@/lib/api-types";
-import { formatCost, formatDateTime, formatTime } from "@/lib/format";
+import {
+	formatDateTime,
+	formatKnownCost,
+	formatTime,
+	sumKnownCost,
+} from "@/lib/format";
 
 const DAY_MS = 24 * HOUR_MS;
 const SPARK_HOURS = 24;
@@ -96,8 +101,9 @@ export function SectionCards({
 		.flatMap((run) => (run.wakeAt ? [run.wakeAt] : []))
 		.sort((a, b) => a - b)[0];
 	const lastDay = all.filter((run) => run.createdAt >= now - DAY_MS);
-	const spent = lastDay.reduce((sum, run) => sum + run.costUsd, 0);
-	const spentAll = all.reduce((sum, run) => sum + run.costUsd, 0);
+	// A "+" when a run in it has a step without a known cost.
+	const spent = sumKnownCost(lastDay);
+	const spentAll = sumKnownCost(all);
 	const finished = lastDay.filter((run) => run.status === "finished").length;
 	const failed = lastDay.filter((run) => run.status === "failed").length;
 	const openGates =
@@ -199,7 +205,7 @@ export function SectionCards({
 				<StatCard
 					label="Spent, last 24 h"
 					onOpen={() => setDetails("spend")}
-					value={isLoading ? null : formatCost(spent)}
+					value={isLoading ? null : formatKnownCost(spent)}
 					chart={isLoading ? null : <SpendSparkline runs={all} now={now} />}
 					badge={
 						<Badge variant="outline" className="tabular-nums">
@@ -210,7 +216,7 @@ export function SectionCards({
 					footer={
 						<>
 							All time{" "}
-							<span className="tabular-nums">{formatCost(spentAll)}</span>
+							<span className="tabular-nums">{formatKnownCost(spentAll)}</span>
 						</>
 					}
 				/>

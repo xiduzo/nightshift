@@ -146,6 +146,8 @@ export function createRecovery(deps: RecoveryDeps) {
 	/** Interrupted runs the daemon resumes when a slot frees. */
 	const pendingResumes = new Set<string>();
 	let resumeTimer: ReturnType<typeof setTimeout> | undefined;
+	/** The runs startup recovery interrupted, to resume once the engine is ready. */
+	let toResume: string[] = [];
 	let disposed = false;
 	/** Startup recovery's promise; a daemon resume waits for it first. */
 	let recovered: Promise<void> = Promise.resolve();
@@ -188,7 +190,7 @@ export function createRecovery(deps: RecoveryDeps) {
 			.orderBy(asc(event.seq));
 		const byRun = groupByRun(rows.map(parseEventRow));
 		const error = "Night Shift stopped while this ran.";
-		const toResume: string[] = [];
+		toResume = [];
 		for (const [runId, events] of byRun) {
 			const open = openWork(events);
 			for (const session of open.sessions) {
@@ -236,12 +238,21 @@ export function createRecovery(deps: RecoveryDeps) {
 			// A sleeping run gets its timer back from the log (`deriveSleep`).
 			if (!open.runOpen) runner.sleeps.restore(runId, events);
 		}
-		if (toResume.length > 0 && !disposed) {
-			resumeTimer = setTimeout(() => {
-				for (const runId of toResume) void resumeAfterRestart(runId);
-			}, deps.resumeGraceMs);
-			resumeTimer.unref?.();
-		}
+	}
+
+	/**
+	 * Starts the grace before the interrupted runs continue on their own.
+	 * The engine calls it once it is ready, so the grace counts from then,
+	 * however long its start took.
+	 */
+	function armResumes(): void {
+		const runs = toResume;
+		toResume = [];
+		if (runs.length === 0 || disposed) return;
+		resumeTimer = setTimeout(() => {
+			for (const runId of runs) void resumeAfterRestart(runId);
+		}, deps.resumeGraceMs);
+		resumeTimer.unref?.();
 	}
 
 	/**
@@ -393,5 +404,5 @@ export function createRecovery(deps: RecoveryDeps) {
 		}
 	}
 
-	return { recoverInterruptedWork, resume, onSlotFreed };
+	return { recoverInterruptedWork, armResumes, resume, onSlotFreed };
 }

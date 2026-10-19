@@ -8,7 +8,11 @@ import type {
 	ValueInput,
 	ValueResult,
 } from "@nightshift/agents/types";
-import type { AgentNode, JsonValue } from "@nightshift/flows";
+import type {
+	AgentNode,
+	AgentProfileSettings,
+	JsonValue,
+} from "@nightshift/flows";
 import type { FlowSources } from "@nightshift/flows/files";
 
 /**
@@ -26,7 +30,8 @@ export type Device = {
 	id: string;
 	/** What its owner calls it, for example the host name. */
 	name: string;
-	state(): DeviceState;
+	/** Whether it takes work now. */
+	state(): Promise<DeviceState>;
 	/** What a run start checks before it writes anything. */
 	capabilities(query?: CapabilityQuery): Promise<Capabilities>;
 	/**
@@ -73,6 +78,27 @@ export type Device = {
 	 * free `name-2`, `name-3`, …, made at `base` (null: the checked-out
 	 * branch, else `fallback`) and checked out. Refuses a dirty worktree.
 	 */
+	/**
+	 * Hands the run's work on (`HandedOff`): refuses a worktree at `cwd`
+	 * with changes that are not committed (nothing is committed for you),
+	 * then pushes its checked-out branch, and the run's own, to the Clone's
+	 * `origin`. Returns the commit and the branch.
+	 */
+	handOff(input: {
+		cwd: string;
+		/** The run's own branch, `nightshift/<run8>`. */
+		runBranch: string;
+	}): Promise<{ commit: string; branch: string }>;
+	/**
+	 * Takes the run's work: fetches `branch` from the Clone's `origin` and
+	 * checks it out at `commit` in the run's worktree on this Device,
+	 * added when it has none. Refuses a worktree with uncommitted changes.
+	 */
+	receiveHandOff(input: {
+		run: RunRef;
+		branch: string;
+		commit: string;
+	}): Promise<Worktree>;
 	itemBranch(input: {
 		cwd: string;
 		name: string;
@@ -87,6 +113,8 @@ export type DeviceState = { online: boolean };
 export type CapabilityQuery = {
 	/** The programs to look for on the Device (CLI tools by name). */
 	programs?: readonly string[];
+	/** The Agent Profiles to look up on the Device, by name. */
+	profiles?: readonly string[];
 };
 
 export type Capabilities = {
@@ -103,6 +131,8 @@ export type Capabilities = {
 	clis: string[];
 	/** Where each asked program is on the Device, or null when it has none. */
 	programs: Record<string, string | null>;
+	/** The asked Agent Profiles the Device defines, by name; one it lacks is left out. */
+	profiles: Record<string, AgentProfileSettings>;
 	/** The decider, when one is configured. */
 	decider: DeciderFacts | null;
 };

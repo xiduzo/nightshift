@@ -81,6 +81,7 @@ export const WAIT: NodeKind<WaitNode> = {
 	...PLAIN_KIND,
 	type: "wait",
 	make: waitStepNode,
+	works: (node) => (node.until.kind === "command" ? "worktree" : null),
 	resumeRules: () => RESUME_RULES.wait,
 	aux: () => [{ kind: "wait" }],
 	isChosenEnd: (_node, outcome) => outcome === "pass" || outcome === "done",
@@ -229,7 +230,7 @@ async function poll(
 	step.record(null, { type: "command-start", command });
 	const result = await runCommand(step.device, {
 		command,
-		cwd: ctx.run.worktreePath,
+		cwd: step.worktree,
 		env,
 		logPath: commandLogPath(ctx.dataDir, ctx.run.id, step.stepId),
 		signal: step.signal,

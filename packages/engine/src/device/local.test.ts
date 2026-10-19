@@ -61,9 +61,9 @@ const sessionInput = (extra: Partial<SessionInput> = {}): SessionInput => ({
 });
 
 describe("what the Device reports", () => {
-	test("its id, its name, and that it is online", () => {
+	test("its id, its name, and that it is online", async () => {
 		const d = device();
-		expect([d.id, d.name, d.state()]).toEqual([
+		expect([d.id, d.name, await d.state()]).toEqual([
 			"d1",
 			"studio",
 			{ online: true },

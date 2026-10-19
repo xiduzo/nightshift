@@ -3,7 +3,9 @@
  * The engine only sees these types. A harness adapter translates its own
  * stream into AgentEvent values.
  */
+
 import type { DeciderName, HarnessName } from "@nightshift/flows";
+import type { CostSource } from "./pricing";
 
 export type { DeciderName, HarnessName };
 
@@ -61,8 +63,14 @@ export type AgentSessionInput = {
 };
 
 export type AgentUsage = {
+	/** Every input token, the cached ones included. */
 	inputTokens: number;
 	outputTokens: number;
+	/** The part of `inputTokens` read from the prompt cache, when the harness says. */
+	cacheReadTokens?: number;
+	/** The part of `inputTokens` written to the prompt cache, when the harness says. */
+	cacheWriteTokens?: number;
+	/** What the harness itself says the session cost. */
 	costUsd?: number;
 };
 
@@ -147,7 +155,14 @@ export type DecisionInput = {
 
 /** A decision, or why there is none. */
 export type DecisionResult =
-	| { kind: "decided"; label: string; notes: string; costUsd: number | null }
+	| {
+			kind: "decided";
+			label: string;
+			notes: string;
+			costUsd: number | null;
+			/** Absent: reported, when there is a cost. Null: no cost. */
+			costSource?: CostSource | null;
+	  }
 	| {
 			kind: "error";
 			/** `aborted` when the signal fired. */
@@ -171,7 +186,13 @@ export type ValueInput = {
 
 /** A value, or why there is none. The engine checks `data` against the schema. */
 export type ValueResult =
-	| { kind: "made"; data: unknown; costUsd: number | null }
+	| {
+			kind: "made";
+			data: unknown;
+			costUsd: number | null;
+			/** Absent: reported, when there is a cost. Null: no cost. */
+			costSource?: CostSource | null;
+	  }
 	| {
 			kind: "error";
 			/** `aborted` when the signal fired. */

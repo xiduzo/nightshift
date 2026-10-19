@@ -107,6 +107,8 @@ export type StepContext = {
 	 * a harness, a process, an MCP client or the decider itself.
 	 */
 	deviceFor(node: FlowNode, run: RunRow): Device;
+	/** A Device by id, as a step of the run reaches it: where its work is now, for a Hand-off. */
+	deviceById(id: string, run: RunRow): Device;
 	/** The run's abort signal: a person stopped the run. */
 	signal(): AbortSignal;
 	now(): number;
@@ -204,6 +206,13 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	programs(node: N): readonly string[];
 	/** The start-time requirements about this kind, in the order a person sees them. */
 	requirements: readonly Requirement<N>[];
+	/**
+	 * What a step of this node needs of its Device: `worktree` (it works in
+	 * the run's worktree there: the work is handed off to that Device
+	 * first), `device` (it asks the Device only: a model, a tool), or null
+	 * (it needs no computer: a Gate, a rule, a timer).
+	 */
+	works(node: N): "worktree" | "device" | null;
 };
 
 /** The `RunEnded` reason of a chosen end that is not the flow's plain end. */
@@ -233,6 +242,7 @@ export const PLAIN_KIND = {
 	connections: () => [],
 	programs: () => [],
 	requirements: [],
+	works: () => null,
 } satisfies Omit<NodeKind, "type" | "make" | "resumeRules">;
 
 export function messageOf(error: unknown): string {

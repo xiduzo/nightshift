@@ -74,6 +74,12 @@ export type SchedulerDeps = {
 	runStatus(runId: string): Promise<RunStatus | null>;
 	/** Read on every tick: false skips the tick, like a pause of every schedule. Default on. */
 	enabled?: () => boolean;
+	/**
+	 * Whether this Device fires the schedule: the one it names (`device`),
+	 * else the Space's Host, so a schedule every Clone reads fires once.
+	 * Default: every schedule fires here.
+	 */
+	firesHere?: (projectId: string, schedule: Schedule) => Promise<boolean>;
 };
 
 export type Scheduler = {
@@ -278,6 +284,8 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 					inputs: schedule.inputs,
 					...(schedule.baseRef ? { baseRef: schedule.baseRef } : {}),
 					...(stopAt !== undefined ? { stopAt } : {}),
+					// Another Person's schedule: their run, through the Offers here.
+					...(schedule.person ? { startedBy: schedule.person } : {}),
 				},
 				{ kind: "schedule", scheduleId: schedule.id, at: due },
 			);
@@ -328,7 +336,10 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 				if (seen.has(schedule.id)) continue;
 				seen.add(schedule.id);
 				const key = keyOf(projectId, schedule.id);
-				if (!schedule.enabled) {
+				if (
+					!schedule.enabled ||
+					(deps.firesHere && !(await deps.firesHere(projectId, schedule)))
+				) {
 					watchedSince.delete(key);
 					continue;
 				}

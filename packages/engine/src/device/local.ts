@@ -9,7 +9,11 @@ import type {
 	ValueInput,
 	ValueResult,
 } from "@nightshift/agents/types";
-import { type AgentNode, deciderNameSchema } from "@nightshift/flows";
+import {
+	type AgentNode,
+	type AgentProfileSettings,
+	deciderNameSchema,
+} from "@nightshift/flows";
 import { readFlowSources } from "@nightshift/flows/files";
 
 import { type CliToolGuide, cliToolsInstruction } from "../cli-tools";
@@ -22,6 +26,8 @@ import {
 	createWorktree,
 	currentBranch,
 	freeBranchName,
+	pullRunBranch,
+	pushRunBranch,
 } from "../worktrees";
 import { callServerTool } from "./tool-call";
 import type {
@@ -78,6 +84,8 @@ export type LocalDeviceDeps = {
 	clonePath?: (projectId: string) => Promise<string | null>;
 	/** Finds git on this computer before a worktree is added. Default: `probeGit`. */
 	probeGit?: GitProbe;
+	/** An Agent Profile defined on this computer, by name, or null. */
+	profileFor?: (name: string) => AgentProfileSettings | null;
 };
 
 /** What `decide` answers on a Device without a decider (or one that makes no values). */
@@ -199,7 +207,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	return {
 		id: deps.id,
 		name: deps.name,
-		state: () => ({ online: true }),
+		state: async () => ({ online: true }),
 		async capabilities(query = {}): Promise<Capabilities> {
 			return {
 				elsewhere: null,
@@ -210,6 +218,12 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				clis: [...(deps.cliNames?.() ?? [])],
 				programs: Object.fromEntries(
 					(query.programs ?? []).map((name) => [name, findCli(name)]),
+				),
+				profiles: Object.fromEntries(
+					(query.profiles ?? []).flatMap((name) => {
+						const profile = deps.profileFor?.(name) ?? null;
+						return profile ? [[name, profile]] : [];
+					}),
 				),
 				decider: deciderFacts,
 			};
@@ -264,6 +278,16 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				paths.push(path);
 			}
 			return paths.sort();
+		},
+		handOff: ({ cwd, runBranch }) => pushRunBranch(cwd, runBranch),
+		async receiveHandOff({ run, branch, commit }) {
+			return pullRunBranch({
+				repoPath: await cloneOf(run.projectId),
+				shortId: run.id.slice(0, 8),
+				branch,
+				commit,
+				...(run.author ? { author: run.author } : {}),
+			});
 		},
 		async itemBranch({ cwd, name, base, fallback }) {
 			const from = base ?? (await currentBranch(cwd)) ?? fallback;

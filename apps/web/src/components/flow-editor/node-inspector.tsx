@@ -77,6 +77,12 @@ import { orpc } from "@/utils/orpc";
 import { CallFields } from "./call-fields";
 import type { CalledFlowSupport } from "./called-flow-fields";
 import type { DaemonConnection } from "./connections-field";
+import {
+	type DeviceChoice,
+	DeviceField,
+	runsOnDevice,
+	withDevice,
+} from "./device-field";
 import { OutcomePill } from "./edge-inspector";
 import {
 	Field,
@@ -148,9 +154,12 @@ export function NodeInspector({
 	onDelete,
 	calledFlows,
 	connections,
+	devices,
 }: {
 	flow: Flow;
 	node: FlowNode;
+	/** Your devices, for where a step runs; undefined while they load. */
+	devices?: readonly DeviceChoice[];
 	/** The daemon's connections, for an Agent or Tool node; undefined while they load. */
 	connections?: readonly DaemonConnection[];
 	/** Subflow nodes: the project's flows and the actions on them. */
@@ -345,6 +354,23 @@ export function NodeInspector({
 						)
 					}
 				/>
+			) : null}
+
+			{runsOnDevice(node) ? (
+				<InspectorSection
+					title="Device"
+					defaultOpen={"device" in node && node.device !== undefined}
+				>
+					<DeviceField
+						id={`${id}-device`}
+						value={"device" in node ? node.device : undefined}
+						devices={devices}
+						profile={node.type === "agent" ? node.profile : undefined}
+						onChange={(device) =>
+							onChange((current) => withDevice(current, device))
+						}
+					/>
+				</InspectorSection>
 			) : null}
 
 			{/* A Gate (a Decision decided by you) waits as long as it must: no limits. */}

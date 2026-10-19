@@ -41,17 +41,8 @@ import type { Engine } from "@nightshift/engine/types";
  * the cap), and wait for a free session of the Offer while it runs its
  * session cap (`OfferSlots`): a session over the cap queues here, it is
  * not refused. Withdrawing an Offer aborts the calls under it
- * (`withdrawn`); the Host stops their runs first.
+ * (`OfferCalls.withdrawn`); the Walker stops their runs first.
  */
-
-export type WorkServer = {
-	/** Takes and serves the Host's calls while its link is online. */
-	whileOnline(client: AppRouterClient, signal: AbortSignal): Promise<void>;
-	/** The calls running here now. */
-	running(): number;
-	/** Aborts the calls running under an Offer that was withdrawn. */
-	withdrawn(spaceId: string, profile: string): void;
-};
 
 /** What this computer offers, for the runs of other Persons. */
 export type OfferDeps = {
@@ -61,10 +52,51 @@ export type OfferDeps = {
 	profileFor: ProfileStore["settingsFor"];
 	/** Shared by every Host: the sessions running under each Offer. */
 	slots: OfferSlots;
+	/** Shared by every Host: the calls running under each Offer. */
+	calls: OfferCalls;
+};
+
+/** The calls running here under each Offer, to abort when it is withdrawn. */
+export type OfferCalls = {
+	/** Notes a call under an Offer; the returned function forgets it. */
+	add(spaceId: string, profile: string, abort: () => void): () => void;
+	/** Aborts the calls under a withdrawn Offer. */
+	withdrawn(spaceId: string, profile: string): void;
+};
+
+export function createOfferCalls(): OfferCalls {
+	const running = new Map<symbol, { key: string; abort: () => void }>();
+	return {
+		add(spaceId, profile, abort) {
+			const id = Symbol(profile);
+			running.set(id, { key: slotKey(spaceId, profile), abort });
+			return () => running.delete(id);
+		},
+		withdrawn(spaceId, profile) {
+			const key = slotKey(spaceId, profile);
+			for (const call of running.values()) if (call.key === key) call.abort();
+		},
+	};
+}
+
+/**
+ * How long a call keeps running here while its replies cannot reach the
+ * Host: the session goes on and its events wait, and the Walker gets them
+ * when the link is back. After that the call stops: nothing runs for a
+ * Walker that is gone.
+ */
+export const REPLY_DEADLINE_MS = 10 * 60_000;
+
+export type WorkServer = {
+	/** Takes and serves the Host's calls while its link is online. */
+	whileOnline(client: AppRouterClient, signal: AbortSignal): Promise<void>;
+	/** The calls running here now. */
+	running(): number;
 };
 
 export function createWorkServer(
 	deps: {
+		/** The Host whose runs it serves. */
 		hostId: string;
 		db: Database;
 		engine: Engine;
@@ -72,13 +104,11 @@ export function createWorkServer(
 		device: Device;
 		retryMs?: number;
 		replyDeadlineMs?: number;
-	} & OfferDeps,
+	} & Partial<OfferDeps>,
 ): WorkServer {
 	const retryMs = deps.retryMs ?? 2_000;
-	const replyDeadlineMs = deps.replyDeadlineMs ?? 60_000;
+	const replyDeadlineMs = deps.replyDeadlineMs ?? REPLY_DEADLINE_MS;
 	const calls = new Map<string, AbortController>();
-	/** The Offer (its slot key) each offered session runs under. */
-	const underOffer = new Map<string, string>();
 	let client: AppRouterClient | null = null;
 
 	/** The replies of one call, sent in order, a batch at a time. */
@@ -97,8 +127,19 @@ export function createWorkServer(
 					const done = ended && pending.length === 0;
 					try {
 						if (!client) throw new Error("No link to the Host.");
-						await client.devices.workReply({ id, replies, done });
+						const { known } = await client.devices.workReply({
+							id,
+							replies,
+							done,
+						});
 						failingSince = null;
+						// The Host no longer waits for it (it restarted, or the
+						// Walker gave up): the call stops here.
+						if (!known) {
+							closed = true;
+							abort();
+							return;
+						}
 						if (done) {
 							closed = true;
 							return;
@@ -136,66 +177,20 @@ export function createWorkServer(
 		const out = outbox(id, () => controller.abort());
 		try {
 			const parsed = workRequestSchema.safeParse(raw);
-			const request = parsed.success
-				? (parsed.data as unknown as WorkRequest)
-				: null;
-			const admitted = request
-				? await admitWork(request, deps)
-				: {
-						refusal:
-							"This device cannot read that request. Update Night Shift on both computers.",
-					};
-			if ("refusal" in admitted || !request) {
+			if (!parsed.success) {
 				out.push({
 					kind: "error",
-					message: "refusal" in admitted ? admitted.refusal : "",
+					message:
+						"This device cannot read that request. Update Night Shift on both computers.",
 				});
 				return;
 			}
-			let served = request;
-			let release: (() => void) | null = null;
-			const { call } = request;
-			if (
-				admitted.offers !== null &&
-				call.kind === "session" &&
-				"offered" in call.input
-			) {
-				// Another Person's session: this computer's own profile, its caps.
-				const { profile } = call.input.offered;
-				const offer = admitted.offers.find((o) => o.profile === profile);
-				const settings = deps.profileFor(profile);
-				if (!offer || !settings) {
-					out.push({
-						kind: "error",
-						message: `${deps.device.name} no longer has the profile "${profile}".`,
-					});
-					return;
-				}
-				const key = slotKey(request.spaceId, profile);
-				underOffer.set(id, key);
-				release = await deps.slots.take(
-					key,
-					offer.sessionCap,
-					controller.signal,
-				);
-				served = {
-					...request,
-					call: {
-						kind: "session",
-						input: offeredSession(call.input, settings, offer.permissionCap),
-					},
-				};
-			}
-			try {
-				for await (const reply of serveWork(
-					deps.device,
-					served,
-					controller.signal,
-				)) {
-					out.push(reply);
-				}
-			} finally {
-				release?.();
+			for await (const reply of serveChecked(
+				parsed.data as unknown as WorkRequest,
+				deps,
+				controller.signal,
+			)) {
+				out.push(reply);
 			}
 		} catch (error) {
 			out.push({
@@ -204,19 +199,12 @@ export function createWorkServer(
 			});
 		} finally {
 			calls.delete(id);
-			underOffer.delete(id);
 			out.end();
 		}
 	}
 
 	return {
 		running: () => calls.size,
-		withdrawn(spaceId, profile) {
-			const key = slotKey(spaceId, profile);
-			for (const [id, offer] of underOffer) {
-				if (offer === key) calls.get(id)?.abort();
-			}
-		},
 		async whileOnline(next, signal) {
 			client = next;
 			while (!signal.aborted) {
@@ -250,9 +238,97 @@ function cwdOf(call: WorkCall): string | null {
 			return call.input.cwd;
 		case "files":
 		case "itemBranch":
+		case "handOff":
 			return call.cwd;
 		default:
 			return null;
+	}
+}
+
+/** The calls that work in the project's Clone; a model or a tool needs none. */
+const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
+	"flows",
+	"worktree",
+	"files",
+	"itemBranch",
+	"handOff",
+	"receiveHandOff",
+	"session",
+	"exec",
+]);
+
+/**
+ * Whom this computer serves calls for: through `hostId`, the Person of its
+ * link to that Host; on a Host serving itself for a Walker elsewhere,
+ * `ownerId`, its own owner, in a Space it keeps.
+ */
+export type WorkVia = { hostId: string } | { ownerId: string };
+
+/**
+ * Serves one call after this computer's own checks (`admitWork`): its
+ * owner's as the call asks, another Person's under the Offer it names,
+ * its profile resolved here with the caps. Never throws: a refusal or a
+ * failure is an `error` reply. Aborting `signal` ends it.
+ */
+export async function* serveChecked(
+	request: WorkRequest,
+	deps: WorkCheckDeps & { device: Device } & Partial<OfferDeps>,
+	signal: AbortSignal,
+): AsyncGenerator<WorkReply> {
+	const admitted = await admitWork(request, deps);
+	if ("refusal" in admitted) {
+		yield { kind: "error", message: admitted.refusal };
+		return;
+	}
+	let served = request;
+	let release: (() => void) | null = null;
+	let forget: (() => void) | null = null;
+	const { call } = request;
+	try {
+		if (
+			admitted.offers !== null &&
+			call.kind === "session" &&
+			"offered" in call.input
+		) {
+			// Another Person's session: this computer's own profile, its caps.
+			const { profile } = call.input.offered;
+			const offer = admitted.offers.find((o) => o.profile === profile);
+			const settings = deps.profileFor?.(profile) ?? null;
+			if (!offer || !settings || !deps.slots) {
+				yield {
+					kind: "error",
+					message: `${deps.device.name} no longer has the profile "${profile}".`,
+				};
+				return;
+			}
+			const stop = new AbortController();
+			const both = AbortSignal.any([signal, stop.signal]);
+			forget =
+				deps.calls?.add(request.spaceId, profile, () => stop.abort()) ?? null;
+			release = await deps.slots.take(
+				slotKey(request.spaceId, profile),
+				offer.sessionCap,
+				both,
+			);
+			served = {
+				...request,
+				call: {
+					kind: "session",
+					input: offeredSession(call.input, settings, offer.permissionCap),
+				},
+			};
+			yield* serveWork(deps.device, served, both);
+			return;
+		}
+		yield* serveWork(deps.device, served, signal);
+	} catch (error) {
+		yield {
+			kind: "error",
+			message: error instanceof Error ? error.message : String(error),
+		};
+	} finally {
+		release?.();
+		forget?.();
 	}
 }
 
@@ -260,16 +336,18 @@ function cwdOf(call: WorkCall): string | null {
  * Why this computer does not serve a call, or null: the placed Device's
  * own checks, from its own Replica, before it starts anything.
  *
- * - The Space is one it takes part in through this Host.
- * - Its owner's run (the Person who starts it is the Person of this
- *   computer's link): their role in the Space starts runs (the Space
- *   document's Member mirror).
+ * - The Space is one it takes part in through this Host (or, on a Host,
+ *   one it keeps).
+ * - Its owner's run (the Person of this computer's link; on a Host: its
+ *   owner): their role in the Space starts runs (the Space document's
+ *   Member mirror).
  * - Another Person's run: they are a Member whose role uses Offers, this
  *   computer has Offers in force into the Space (its own document holds
  *   them and the Space document lists them), and the call is one an
  *   Offer allows (`offeredCallRefusal`): an offered session, or the run's
  *   own folder work.
- * - It has a Clone of the project, in that Space.
+ * - A call that works in the Clone: it has one of the project, in that
+ *   Space. A model or a tool needs none.
  * - A call that works in a folder works in the run's own worktree.
  */
 export async function checkWork(
@@ -280,8 +358,7 @@ export async function checkWork(
 	return "refusal" in admitted ? admitted.refusal : null;
 }
 
-type WorkCheckDeps = {
-	hostId: string;
+export type WorkCheckDeps = WorkVia & {
 	db: Database;
 	engine: Engine;
 	/** This computer as a Device: its id and name. */
@@ -300,14 +377,23 @@ async function admitWork(
 	const { db, engine } = deps;
 	const { spaceId, projectId, personId, runId, call } = request;
 	const refuse = (refusal: string) => ({ refusal });
-	if ((await engine.exchange.hostSpaces.hostOf(spaceId)) !== deps.hostId) {
+	const hostOf = await engine.exchange.hostSpaces.hostOf(spaceId);
+	const owner =
+		"hostId" in deps
+			? hostOf === deps.hostId
+				? await personOnHost(db, spaceId)
+				: undefined
+			: hostOf === null
+				? deps.ownerId
+				: undefined;
+	if (owner === undefined) {
 		return refuse(
 			"This device does not take part in that Space through this Host.",
 		);
 	}
 	const role = await engine.exchange.memberRole(spaceId, personId);
 	let offers: DeviceOffer[] | null = null;
-	if ((await personOnHost(db, spaceId)) === personId) {
+	if (owner === personId) {
 		if (!role || !roleAllows(role, { run: ["start"] })) {
 			return refuse("Your role in this Space does not allow starting runs.");
 		}
@@ -330,6 +416,7 @@ async function admitWork(
 		const refusal = offeredCallRefusal(call, deps.device.name, offers);
 		if (refusal !== null) return refuse(refusal);
 	}
+	if (!NEEDS_CLONE.has(call.kind)) return { offers };
 	const repoPath = await clonePathOf(db)(projectId, spaceId);
 	if (repoPath === null) {
 		return refuse(
@@ -337,7 +424,7 @@ async function admitWork(
 		);
 	}
 	if (
-		call.kind === "worktree" &&
+		(call.kind === "worktree" || call.kind === "receiveHandOff") &&
 		(call.run.id !== runId || call.run.projectId !== projectId)
 	) {
 		return refuse("This device adds a folder only for the run that asks.");

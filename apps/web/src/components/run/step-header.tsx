@@ -5,11 +5,11 @@ import {
 } from "@nightshift/ui/components/collapsible";
 import { ChevronRightIcon, HandIcon } from "lucide-react";
 import type { ReactNode } from "react";
-
+import { CostText } from "@/components/cost-text";
 import { hasCost, NODE_TYPE } from "@/components/flow/node-type";
 import { OutcomeBadge, stepState } from "@/components/outcome-badge";
 import type { RunStatus, StepSummary } from "@/lib/api-types";
-import { formatCost, formatDateTime, formatTime } from "@/lib/format";
+import { formatDateTime, formatKnownCost, formatTime } from "@/lib/format";
 import { formatJson, jsonOutput } from "@/lib/run-steps";
 
 import { CodeView, JsonBlock } from "./json-block";
@@ -50,7 +50,7 @@ export function StepLine({
 				</time>
 				{" · "}
 				{stepDuration(step)}
-				{hasCost(step) ? ` · ${formatCost(step.costUsd)}` : ""}
+				{hasCost(step) ? ` · ${formatKnownCost(step)}` : ""}
 			</span>
 		</div>
 	);
@@ -99,7 +99,7 @@ export function StepFacts({ step }: { step: StepSummary }) {
 		{ label: "Took", value: stepDuration(step) },
 	];
 	if (hasCost(step)) {
-		facts.push({ label: "Cost", value: formatCost(step.costUsd) });
+		facts.push({ label: "Cost", value: <CostText cost={step} /> });
 	}
 	if (step.visit > 1) facts.push({ label: "Visit", value: step.visit });
 	if (exit !== undefined && exit !== "") {

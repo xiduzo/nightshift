@@ -133,6 +133,7 @@ describe("the Decision node", () => {
 			outputs: { outcome: "ship", note: "The tests pass.", visit: 1 },
 			error: null,
 			costUsd: 0.02,
+			costSource: "reported",
 		});
 		expect(payloads(logged, "EdgeTaken")).toEqual([
 			{
@@ -144,7 +145,7 @@ describe("the Decision node", () => {
 			},
 		]);
 		const [decide] = deriveSteps(logged);
-		expect(decide?.costUsd).toBeCloseTo(0.02);
+		expect(decide?.cost.usd).toBeCloseTo(0.02);
 		expect(decide?.sessions).toEqual([]);
 		const transcript = await readTranscriptFile(
 			decide?.transcriptPath as string,
@@ -212,9 +213,10 @@ describe("the Decision node", () => {
 				outputs: { outcome: "error", note: "", visit: 1 },
 				error: "The decider failed: boom",
 				costUsd: 0.03,
+				costSource: "reported",
 			},
 		]);
-		expect(decide?.costUsd).toBeCloseTo(0.03);
+		expect(decide?.cost.usd).toBeCloseTo(0.03);
 		const transcript = await readTranscriptFile(
 			decide?.transcriptPath as string,
 		);
@@ -244,6 +246,7 @@ describe("the Decision node", () => {
 			outputs: { outcome: "error", note: "Unsure.", visit: 1 },
 			error: '"maybe" is not an option of this node. Choose one of: yes, no.',
 			costUsd: null,
+			costSource: null,
 		});
 	});
 
@@ -291,6 +294,7 @@ describe("the Decision node", () => {
 				outputs: { outcome: "stopped", note: "", visit: 1 },
 				error: null,
 				costUsd: 0.001,
+				costSource: "reported",
 			},
 		]);
 	});
@@ -492,7 +496,7 @@ describe("the Decision node", () => {
 			id: stepId,
 			visit: 1,
 			outcome: "yes",
-			costUsd: 0.01,
+			cost: { usd: 0.01, estimated: false, missing: 0 },
 		});
 	});
 });
@@ -567,7 +571,7 @@ describe("the Decision node decided by a rule", () => {
 			error: null,
 		});
 		const [, pick] = deriveSteps(logged);
-		expect(pick?.costUsd).toBe(0);
+		expect(pick?.cost.usd).toBe(0);
 		expect(pick?.sessions).toEqual([]);
 		const transcript = await readTranscriptFile(pick?.transcriptPath as string);
 		expect(transcript.map((e) => e.event)).toEqual([
