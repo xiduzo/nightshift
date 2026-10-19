@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { defaultDeciderModel } from "@nightshift/agents/decider";
 import type { AgentHarness, Decider } from "@nightshift/agents/types";
 import type { Flow, FlowNode } from "@nightshift/flows";
 
@@ -38,6 +39,7 @@ function has(overrides: Partial<DaemonHas> = {}): DaemonHas {
 		cliNames: () => new Set(["gh"]),
 		findCli: () => "/usr/bin/tool",
 		decider: {
+			defaultModel: defaultDeciderModel,
 			decide: async () => ({}) as never,
 			value: async () => ({}) as never,
 		},
@@ -139,7 +141,10 @@ describe("harnessesAdded", () => {
 
 describe("the decider requirements", () => {
 	const noDecider = has({ decider: undefined });
-	const textless: Decider = { decide: async () => ({}) as never };
+	const textless: Decider = {
+		defaultModel: defaultDeciderModel,
+		decide: async () => ({}) as never,
+	};
 
 	test("a Decision decided by a model needs a decider", () => {
 		const nodes = [node({ id: "d", type: "decision", by: "model" })];

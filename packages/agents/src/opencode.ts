@@ -47,6 +47,7 @@ import {
 	harnessSession,
 	shellQuote,
 } from "./adapter-session";
+import { harnessFacts } from "./harness-facts";
 import type { HarnessProfile, SdkSignals } from "./translate";
 import type {
 	AgentHarness,
@@ -612,6 +613,7 @@ export function opencodeHarness(
 ): AgentHarness {
 	return {
 		name: "opencode",
+		...harnessFacts("opencode"),
 		run: (input) =>
 			harnessSession({
 				input,

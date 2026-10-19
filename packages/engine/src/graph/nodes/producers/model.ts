@@ -1,4 +1,3 @@
-import { DECIDER_ADAPTERS } from "@nightshift/agents/decider";
 import type { ValueResult } from "@nightshift/agents/types";
 import { renderTemplate, type ValueNode } from "@nightshift/flows";
 
@@ -49,25 +48,24 @@ async function make(
 ): Promise<BodyResult> {
 	const { visit, signal } = step;
 	const prompt = renderTemplate(node.prompt ?? "", step.tctx);
-	const adapter = DECIDER_ADAPTERS[node.decider];
-	const model =
-		node.model ?? adapter.value?.defaultModel ?? adapter.defaultModel;
-	step.record(null, {
-		type: "value-start",
-		by: "model",
-		source: prompt,
-		model,
-	});
 	const fail = (error: string): BodyResult => ({
 		kind: "end",
 		outcome: "error",
 		outputs: valueOutputs("error", null, "", visit),
 		error,
 	});
-	const invalid = schemaProblem(node.output);
-	if (invalid !== null) return fail(invalid);
 	const decider = ctx.decider;
 	if (!decider?.value) return fail("No decider is configured for Value nodes.");
+	// The decider port says which text model a node without one starts on.
+	const model = node.model ?? decider.defaultModel(node.decider, "value");
+	step.record(null, {
+		type: "value-start",
+		by: "model",
+		source: prompt,
+		model,
+	});
+	const invalid = schemaProblem(node.output);
+	if (invalid !== null) return fail(invalid);
 	const ask = () =>
 		decider.value?.({
 			decider: node.decider,

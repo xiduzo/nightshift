@@ -1,5 +1,5 @@
-import { HARNESS_ADAPTERS } from "@nightshift/agents/doctor";
-import type { HarnessName } from "@nightshift/agents/types";
+import { shellQuote } from "@nightshift/agents/harness-facts";
+import type { AgentHarness, HarnessName } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import { project, run, step } from "@nightshift/db/schema/nightshift";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
@@ -51,24 +51,24 @@ import type {
  * one file (locality), and a test of a derivation needs no engine.
  */
 
-/** Quote one value for a shell, only when it needs it. */
-function shellQuote(value: string): string {
-	if (/^[\w@%+=:,./-]+$/.test(value)) return value;
-	return `'${value.replaceAll("'", `'\\''`)}'`;
-}
+/** The harness of that name as the engine built it, added or not. */
+export type HarnessOf = (name: HarnessName) => AgentHarness | undefined;
 
 /**
  * The command a person runs in the worktree to take over the last harness
- * session, from the harness's `takeOver`. Null when there is none, or when
- * the harness has no command for it.
+ * session, from the harness port's `takeOverCommand`. Null when there is
+ * none, when the harness is not built, or when it has no command for it.
  */
 export function takeOverCommand(
 	worktreePath: string,
 	last: { harness: HarnessName; harnessSessionId: string } | null | undefined,
+	harnessOf: HarnessOf,
 ): string | null {
-	const takeOver = last ? HARNESS_ADAPTERS[last.harness].takeOver : null;
-	if (!last || !takeOver) return null;
-	return `cd ${shellQuote(worktreePath)} && ${takeOver(shellQuote(last.harnessSessionId))}`;
+	const command = last
+		? harnessOf(last.harness)?.takeOverCommand(last.harnessSessionId)
+		: null;
+	if (!command) return null;
+	return `cd ${shellQuote(worktreePath)} && ${command}`;
 }
 
 /**
@@ -188,6 +188,7 @@ export function toStepSummary(derived: DerivedStep): StepSummary {
 export function toRunDetail(
 	row: RunRow,
 	events: readonly LoggedEvent[],
+	harnessOf: HarnessOf,
 ): RunDetail {
 	const last = lastHarnessSession(events);
 	return {
@@ -197,7 +198,7 @@ export function toRunDetail(
 		steps: deriveSteps(events).map(toStepSummary),
 		// Edges of the top-level flow; body edges count per item.
 		traversals: deriveTraversals(events),
-		takeOverCommand: takeOverCommand(row.worktreePath, last),
+		takeOverCommand: takeOverCommand(row.worktreePath, last, harnessOf),
 		resumes: deriveResumes(events),
 	};
 }
@@ -208,13 +209,15 @@ export type ReadModelDeps = {
 	bus: RunBus;
 	/** Whether the run holds a slot (the runner's `isActive`). */
 	isActive(runId: string): boolean;
+	/** The harness port of that name, for its take-over command. */
+	harnessOf: HarnessOf;
 };
 
 export type ReadModel = ReturnType<typeof createReadModel>;
 
 /** The reads that need the database, the run log or the bus. */
 export function createReadModel(deps: ReadModelDeps) {
-	const { db, log, bus, isActive } = deps;
+	const { db, log, bus, isActive, harnessOf } = deps;
 
 	/** Every run, newest first, with the facts the log gives each one. */
 	async function listRuns(projectId?: string): Promise<RunSummary[]> {
@@ -233,7 +236,7 @@ export function createReadModel(deps: ReadModelDeps) {
 	async function getRun(runId: string): Promise<RunDetail> {
 		const row = await getRunRow(db, runId);
 		const events = await log.events(runId);
-		return toRunDetail(row, events);
+		return toRunDetail(row, events, harnessOf);
 	}
 
 	/** The run's status, or null for a run the log has nothing on. */

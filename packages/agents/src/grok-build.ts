@@ -26,6 +26,7 @@ import {
 	harnessSession,
 	shellQuote,
 } from "./adapter-session";
+import { harnessFacts } from "./harness-facts";
 import type { HarnessProfile, SdkSignals } from "./translate";
 import type { AgentHarness, AgentSessionInput, PermissionMode } from "./types";
 
@@ -140,6 +141,7 @@ export function grokBuildHarness(
 ): AgentHarness {
 	return {
 		name: "grok-build",
+		...harnessFacts("grok-build"),
 		run: (input) =>
 			harnessSession({
 				input,

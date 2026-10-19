@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
+import { defaultDeciderModel } from "@nightshift/agents/decider";
 import { fakeDecider } from "@nightshift/agents/fake";
 import type {
 	Decider,
@@ -51,6 +52,7 @@ function scriptedDecider(
 ) {
 	const calls: DecisionInput[] = [];
 	const decider: Decider = {
+		defaultModel: defaultDeciderModel,
 		async decide(input) {
 			calls.push(input);
 			return answer(input, calls.length - 1);

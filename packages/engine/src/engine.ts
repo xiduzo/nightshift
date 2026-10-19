@@ -178,6 +178,8 @@ export function createEngine(
 		log: runLog,
 		bus,
 		isActive: runner.isActive,
+		// Built harnesses, added or not: an old run's session stays takeable.
+		harnessOf: (name) => harnesses[name],
 	});
 
 	const runStart = createRunStart({

@@ -1,3 +1,5 @@
+import { defaultDeciderModel } from "./decider";
+import { harnessFacts } from "./harness-facts";
 import type {
 	AgentErrorKind,
 	AgentEvent,
@@ -231,7 +233,7 @@ export function fakeHarness(script: FakeScriptSource = {}): FakeHarness {
 				};
 	}
 
-	return { name: "claude-code", calls, run };
+	return { name: "claude-code", ...harnessFacts("claude-code"), calls, run };
 }
 
 /**
@@ -352,5 +354,11 @@ export function fakeDecider(
 		};
 	}
 
-	return { calls, valueCalls, decide, value };
+	return {
+		calls,
+		valueCalls,
+		defaultModel: defaultDeciderModel,
+		decide,
+		value,
+	};
 }
