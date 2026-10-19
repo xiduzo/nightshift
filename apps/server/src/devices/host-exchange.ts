@@ -214,6 +214,32 @@ export function createHostExchange(deps: {
 			await exchange.recordClone({ ...input, deviceId: key.deviceId });
 		},
 
+		async offer(key, input) {
+			await admit(key);
+			const role = await roleIn(db, key.personId, input.spaceId);
+			if (!role || !roleAllows(role, { offer: ["make"] })) {
+				forbidden("Your role in this Space does not allow offering profiles.");
+			}
+			await engine.offers.publish({
+				...input,
+				deviceId: key.deviceId,
+				by: key.personId,
+			});
+		},
+
+		async withdrawOffer(key, input) {
+			await admit(key);
+			// The Device's owner withdraws its own Offer, whatever their role now.
+			if (!(await isMember(key, input.spaceId))) {
+				throw new Error(`Space not found: ${input.spaceId}`);
+			}
+			await engine.offers.withdraw({
+				...input,
+				deviceId: key.deviceId,
+				by: key.personId,
+			});
+		},
+
 		async archivePut(key, ref, content) {
 			await admit(key);
 			await ownRun(key, ref);

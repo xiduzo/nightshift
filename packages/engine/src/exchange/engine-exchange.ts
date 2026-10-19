@@ -60,6 +60,8 @@ export type EngineExchange = {
 	}): Promise<void>;
 	/** A Person's role in a Space, as the Space document mirrors its Members. */
 	memberRole(spaceId: string, personId: string): Promise<string | null>;
+	/** A Member's name, as the Space document mirrors it (a Person this Replica has no account of). */
+	memberName(spaceId: string, personId: string): Promise<string | null>;
 };
 
 export function createEngineExchange(deps: {
@@ -133,6 +135,12 @@ export function createEngineExchange(deps: {
 		},
 		async memberRole(spaceId, personId) {
 			return memberRole(await documents.open(spaceId), personId);
+		},
+		async memberName(spaceId, personId) {
+			const entry = (await documents.open(spaceId)).members.get(personId) as
+				| { name?: unknown }
+				| undefined;
+			return typeof entry?.name === "string" ? entry.name : null;
 		},
 	};
 }

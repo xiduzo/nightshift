@@ -13,6 +13,7 @@ import type {
 	Device,
 	ExecEvent,
 	ExecInput,
+	OfferedSessionInput,
 	RunRef,
 	SessionEvent,
 	SessionInput,
@@ -62,7 +63,10 @@ export type WorkCall =
 			base: string | null;
 			fallback: string;
 	  }
-	| { kind: "session"; input: Omit<SessionInput, "signal"> }
+	| {
+			kind: "session";
+			input: Omit<SessionInput, "signal"> | Omit<OfferedSessionInput, "signal">;
+	  }
 	| { kind: "exec"; input: Omit<ExecInput, "signal"> }
 	| { kind: "callTool"; input: Omit<ToolCallInput, "signal"> }
 	| {
@@ -155,7 +159,9 @@ export function remoteDevice(
 		throw new Error(stopped(device.name));
 	}
 
-	async function* session(input: SessionInput): AsyncGenerator<SessionEvent> {
+	async function* session(
+		input: SessionInput | OfferedSessionInput,
+	): AsyncGenerator<SessionEvent> {
 		const { signal, ...rest } = input;
 		let started = false;
 		let ended = false;

@@ -18,6 +18,7 @@ import type {
 	HostRole,
 	KeyStoreKind,
 	ListedSpace,
+	OfferCaps,
 	PairedDevice,
 	ProfileStore,
 	ProjectReadiness,
@@ -32,6 +33,7 @@ import type {
 import type {
 	Engine,
 	Placement,
+	RunSummary,
 	StartRunInput,
 } from "@nightshift/engine/types";
 
@@ -66,6 +68,8 @@ export type Context = {
 	devices: Devices;
 	/** This computer as a Host of run history: what paired Devices pull, push and archive. */
 	exchange: HostExchange;
+	/** This computer's Offers, and the Devices of a Space as its Members see them. */
+	offers: Offers;
 	/** A new Space, its creator the owner, and the session's active one. */
 	createSpace(name: string): Promise<{ id: string }>;
 	/** The Members and invitations of the session's Space (the organization plugin). */
@@ -225,6 +229,20 @@ export type HostExchange = {
 		key: DeviceKeyAccess,
 		input: { spaceId: string; projectId: string; deviceName: string },
 	): Promise<void>;
+	/**
+	 * Publishes an Offer of the key's Device into a Space of this Host (or
+	 * its new caps). Needs `offer.make` there; logged in the key's
+	 * Person's name.
+	 */
+	offer(
+		key: DeviceKeyAccess,
+		input: OfferCaps & { spaceId: string; profile: string; deviceName: string },
+	): Promise<void>;
+	/** Withdraws an Offer of the key's Device from a Space of this Host. */
+	withdrawOffer(
+		key: DeviceKeyAccess,
+		input: { spaceId: string; profile: string },
+	): Promise<void>;
 	/** Keeps a file of a run the Device walks. */
 	archivePut(
 		key: DeviceKeyAccess,
@@ -323,4 +341,62 @@ export type Devices = {
 		input: { url: string; role: HostRole },
 		signal?: AbortSignal,
 	): AsyncIterable<JoinProgress>;
+};
+
+/** A run of another Person that ran (or runs) on this computer through an Offer. */
+export type OfferRun = {
+	id: string;
+	title: string;
+	status: RunSummary["status"];
+	/** The Person who started it, as this computer knows them. */
+	startedBy: string | null;
+	createdAt: number;
+};
+
+/** One of this computer's Offers, for its owner. */
+export type OfferView = OfferCaps & {
+	spaceId: string;
+	spaceName: string;
+	profile: string;
+	offeredAt: number;
+	/** The Space still lists it. False: it was withdrawn there, and runs no longer use it. */
+	listed: boolean;
+	/** "Runs for <Space>": the runs of other Persons on this computer in that Space, newest first. */
+	runs: OfferRun[];
+};
+
+/**
+ * A Device of a Space, as any Member sees it: its name, whether it is
+ * online, which of the Space's Projects it has a Clone of, and the
+ * profiles it offers. Nothing else of the Device.
+ */
+export type SpaceDeviceView = {
+	id: string;
+	name: string;
+	/** Null when this computer cannot tell (it is not the Space's Host). */
+	online: boolean | null;
+	thisDevice: boolean;
+	clones: { projectId: string; projectName: string }[];
+	offers: (OfferCaps & { profile: string })[];
+};
+
+/** This computer's Offers into Spaces, made by its owner. */
+export type Offers = {
+	/** Its Offers, every Space, oldest first. */
+	list(): Promise<OfferView[]>;
+	/** Offers one of its profiles to a Space, or changes the caps. */
+	make(
+		input: OfferCaps & { spaceId: string; profile: string },
+		by: string,
+	): Promise<void>;
+	/**
+	 * Withdraws it: the Space no longer lists it, its running steps end as
+	 * stopped, and this computer takes no more work under it.
+	 */
+	withdraw(
+		input: { spaceId: string; profile: string },
+		by: string,
+	): Promise<void>;
+	/** The Devices of a Space as its Members see them (`SpaceDeviceView`). */
+	spaceDevices(spaceId: string): Promise<SpaceDeviceView[]>;
 };

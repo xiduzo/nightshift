@@ -17,6 +17,7 @@ import {
 } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
 import { createAuth } from "@nightshift/auth";
+import { roleAllows } from "@nightshift/auth/access";
 import { createLocalSession } from "@nightshift/auth/local-session";
 import { localPerson } from "@nightshift/auth/spaces";
 import { createDb } from "@nightshift/db";
@@ -35,17 +36,20 @@ import {
 	createConnectionStore,
 	createEngine,
 	createHostLinks,
+	createOfferSlots,
 	createProfileStore,
 	createSettingsStore,
 	createSpaceDocuments,
 	type DeviceDocument,
 	deviceKeyStore,
+	deviceOffers,
 	documentRows,
 	HARNESS_BIN,
 	LEASE_HEARTBEAT_MS,
 	type Lease,
 	LeaseHeldError,
 	localDevice,
+	memberRole,
 	openDeviceDocument,
 	refreshDeviceFacts,
 	type SpaceDocuments,
@@ -65,6 +69,7 @@ import {
 } from "./devices";
 import { exchangeWithHost } from "./devices/exchange";
 import { createHostExchange } from "./devices/host-exchange";
+import { createOffers } from "./devices/offers";
 import { createRelay } from "./devices/relay";
 import { certificateFingerprint } from "./devices/tls";
 import { createWorkServer, type WorkServer } from "./devices/work";
@@ -411,6 +416,12 @@ export const engine = await createEngine({
 	dataDir,
 	settings: () => settings.run(),
 	profileFor: (name) => profiles.settingsFor(name),
+	// This computer's own Offers, and who may use Offers in a Space.
+	ownOffers: () => deviceOffers(document),
+	mayUseOffers: async (spaceId, personId) => {
+		const role = memberRole(await spaces.open(spaceId), personId);
+		return role !== null && roleAllows(role, { offer: ["use"] });
+	},
 	spaceDocuments: spaces,
 	// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.
 	// Otherwise the Settings switch is read on every tick.
@@ -476,16 +487,42 @@ presence.nightshiftPresence = setInterval(() => {
 }, 5_000);
 presence.nightshiftPresence.unref();
 
+/** The sessions running here under each of this computer's Offers, for every Host. */
+const offerSlots = createOfferSlots();
+
 /** Per Host: this computer as the Device the Host's runs are placed on. */
 const workServers = new Map<string, WorkServer>();
 function workServer(hostId: string): WorkServer {
 	let server = workServers.get(hostId);
 	if (!server) {
-		server = createWorkServer({ hostId, db, engine, device: local });
+		server = createWorkServer({
+			hostId,
+			db,
+			engine,
+			device: local,
+			offers: () => deviceOffers(document),
+			profileFor: (name) => profiles.settingsFor(name),
+			slots: offerSlots,
+		});
 		workServers.set(hostId, server);
 	}
 	return server;
 }
+
+/** This computer's Offers into Spaces, as its owner makes and withdraws them. */
+export const offers = createOffers({
+	db,
+	engine,
+	document,
+	profiles,
+	self: { id: device.id, name: device.name },
+	ownerId: person.userId,
+	withdrawn: (spaceId, profile) => {
+		for (const server of workServers.values()) {
+			server.withdrawn(spaceId, profile);
+		}
+	},
+});
 
 /** This computer's links to the Hosts it paired with. Restarted on `bun --hot`. */
 const hostLinks = createHostLinks(db);

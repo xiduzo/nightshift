@@ -62,6 +62,21 @@ export function createRelay(deps: {
 			});
 		},
 
+		async offer(input) {
+			const hostId = await hostOf(input.spaceId);
+			if (hostId === null) throw new Error(HOST_OFFLINE);
+			const client = await hostClient(hostId);
+			// The Host publishes it for the key's Device, in its Person's name.
+			await client.sync.offer(input);
+		},
+
+		async withdrawOffer(input) {
+			const hostId = await hostOf(input.spaceId);
+			if (hostId === null) throw new Error(HOST_OFFLINE);
+			const client = await hostClient(hostId);
+			await client.sync.withdrawOffer(input);
+		},
+
 		async archive(ref) {
 			const hostId = await hostOf(ref.spaceId);
 			if (hostId === null) return null;

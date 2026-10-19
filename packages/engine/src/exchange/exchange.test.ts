@@ -320,6 +320,8 @@ describe("a run walked elsewhere", () => {
 				throw new Error("not in this test");
 			},
 			placements: async () => [],
+			offer: async () => {},
+			withdrawOffer: async () => {},
 		};
 		const { engineB, run, stepId } = await waitingOnB(relay);
 		const space = engineB.space(a.spaceId, { personId: "person-a" });

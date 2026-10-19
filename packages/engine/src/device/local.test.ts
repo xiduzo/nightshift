@@ -143,7 +143,10 @@ describe("session", () => {
 		const harness = fakeHarness();
 		const d = device({ harnesses: { "claude-code": harness } });
 		const stream = d.session(sessionInput())[Symbol.asyncIterator]();
-		expect((await stream.next()).value).toEqual({ type: "ready" });
+		expect((await stream.next()).value).toEqual({
+			type: "ready",
+			harness: "claude-code",
+		});
 		expect(harness.calls).toHaveLength(0);
 		const rest: SessionEvent[] = [];
 		for (

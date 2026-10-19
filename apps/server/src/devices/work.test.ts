@@ -1,10 +1,18 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import type { WorkDelivery } from "@nightshift/api/context";
+import type { AppRouterClient } from "@nightshift/api/routers/index";
 import { user } from "@nightshift/db/schema/auth";
 import { clone, hostLink, project } from "@nightshift/db/schema/nightshift";
 import {
 	createEngine,
+	createOfferSlots,
 	createSpaceDocuments,
+	type Device,
+	type DeviceOffer,
+	type SessionInput,
+	type SpaceDocuments,
+	type WorkReply,
 	type WorkRequest,
 	worktreeLocation,
 } from "@nightshift/engine";
@@ -14,7 +22,7 @@ import {
 	withDevice,
 } from "@nightshift/engine/test-support";
 import type { Engine } from "@nightshift/engine/types";
-import { checkWork } from "./work";
+import { checkWork, createWorkServer } from "./work";
 import { createWorkHub } from "./work-hub";
 
 /**
@@ -31,11 +39,13 @@ const RUN = "abcdef12-0000-0000-0000-000000000000";
 
 let sandbox: Sandbox;
 let engine: Engine;
+let documents: SpaceDocuments;
 let worktree: string;
 
 beforeEach(async () => {
 	sandbox = await createSandbox();
-	const documents = createSpaceDocuments({ db: sandbox.db });
+	own = [];
+	documents = createSpaceDocuments({ db: sandbox.db });
 	engine = createEngine(
 		withDevice({
 			db: sandbox.db,
@@ -65,6 +75,7 @@ beforeEach(async () => {
 	document.doc.transact(() => {
 		document.members.set(ME, { name: "Me", role: "member" });
 		document.members.set("viewer", { name: "Viewer", role: "viewer" });
+		document.members.set("colleague", { name: "Colleague", role: "member" });
 	});
 	// Its Clone of the Space's project.
 	await sandbox.db
@@ -97,8 +108,39 @@ function request(overrides: Partial<WorkRequest> = {}): WorkRequest {
 	};
 }
 
+/** This computer's own Offers (its Device document), per test. */
+let own: DeviceOffer[] = [];
+const DEVICE = { id: "device-b", name: "hetzner-1" };
+
 const check = (r: WorkRequest) =>
-	checkWork(r, { hostId: HOST, db: sandbox.db, engine });
+	checkWork(r, {
+		hostId: HOST,
+		db: sandbox.db,
+		engine,
+		device: DEVICE,
+		offers: () => own,
+	});
+
+/** The Host lists an Offer of this computer in the Space's document. */
+async function listed(profile: string) {
+	const document = await documents.open(SPACE);
+	document.doc.transact(() => {
+		document.offers.set(`${DEVICE.id}/${profile}`, {
+			deviceId: DEVICE.id,
+			deviceName: DEVICE.name,
+			profile,
+			permissionCap: "acceptEdits",
+			sessionCap: 1,
+			offeredAt: 1,
+			by: ME,
+		});
+	});
+}
+
+const offered = (profile: string, cwd = worktree): WorkRequest["call"] => ({
+	kind: "session",
+	input: { cwd, prompt: "Do the work.", offered: { profile } },
+});
 
 describe("checkWork", () => {
 	test("serves its owner's run, in the run's own folder", async () => {
@@ -113,10 +155,98 @@ describe("checkWork", () => {
 		).toBeNull();
 	});
 
-	test("refuses another Person's run: that takes an Offer", async () => {
-		expect(await check(request({ personId: "colleague" }))).toBe(
-			"This device runs steps for its owner's runs only.",
+	test("another Person's run takes an Offer in force, even when the Host is bypassed", async () => {
+		const colleague = request({ personId: "colleague" });
+		expect(await check({ ...colleague, call: offered("coder") })).toBe(
+			"hetzner-1 offers nothing to this Space. Its owner can offer a profile on the Agents page.",
 		);
+		// Its own entry alone, or the Space's alone, is no Offer in force.
+		own = [
+			{
+				spaceId: SPACE,
+				profile: "coder",
+				permissionCap: "acceptEdits",
+				sessionCap: 1,
+				offeredAt: 1,
+			},
+		];
+		expect(await check({ ...colleague, call: offered("coder") })).toContain(
+			"offers nothing",
+		);
+		own = [];
+		await listed("coder");
+		expect(await check({ ...colleague, call: offered("coder") })).toContain(
+			"offers nothing",
+		);
+		own = [
+			{
+				spaceId: SPACE,
+				profile: "coder",
+				permissionCap: "acceptEdits",
+				sessionCap: 1,
+				offeredAt: 1,
+			},
+		];
+
+		// In force: an offered session of it, and the run's own folder work.
+		expect(await check({ ...colleague, call: offered("coder") })).toBeNull();
+		expect(
+			await check({
+				...colleague,
+				call: { kind: "worktree", run: { id: RUN, projectId: "p1" } },
+			}),
+		).toBeNull();
+		expect(await check({ ...colleague, call: { kind: "flows" } })).toBeNull();
+
+		// Anything else is refused.
+		expect(await check({ ...colleague, call: offered("claude") })).toBe(
+			'hetzner-1 offers "coder" to this Space, not "claude".',
+		);
+		for (const call of [
+			exec(worktree),
+			{ kind: "capabilities", query: {} },
+			{
+				kind: "callTool",
+				input: { connection: "github", tool: "x", arguments: {} },
+			},
+			{
+				kind: "session",
+				input: {
+					cwd: worktree,
+					prompt: "Do the work.",
+					harness: "claude-code",
+					model: "sonnet",
+					permissionMode: "bypassPermissions",
+				},
+			},
+		] as WorkRequest["call"][]) {
+			expect(await check({ ...colleague, call })).toBe(
+				'hetzner-1 runs only the profiles its owner offers to this Space. hetzner-1 offers "coder" to this Space.',
+			);
+		}
+		// Its own folder rules hold under an Offer too.
+		expect(await check({ ...colleague, call: offered("coder", "/") })).toBe(
+			"This device works only in the run's own folder.",
+		);
+	});
+
+	test("another Person's run: a Member whose role uses Offers", async () => {
+		own = [
+			{
+				spaceId: SPACE,
+				profile: "coder",
+				permissionCap: "acceptEdits",
+				sessionCap: 1,
+				offeredAt: 1,
+			},
+		];
+		await listed("coder");
+		expect(
+			await check(request({ personId: "stranger", call: offered("coder") })),
+		).toBe("This device runs steps for Members of this Space only.");
+		expect(
+			await check(request({ personId: "viewer", call: offered("coder") })),
+		).toBe("Your role in this Space does not allow using what others offer.");
 	});
 
 	test("refuses a Space it does not take part in through this Host, and a role that does not start runs", async () => {
@@ -152,6 +282,144 @@ describe("checkWork", () => {
 		).toBe("This device adds a folder only for the run that asks.");
 	});
 });
+
+/** A Host's side of the work stream, in memory: what it delivers, what comes back. */
+function fakeHost() {
+	const deliveries: WorkDelivery[] = [];
+	let wake: (() => void) | null = null;
+	const replies = new Map<string, WorkReply[]>();
+	const done = new Set<string>();
+	const client = {
+		devices: {
+			async work(_input: unknown, options: { signal: AbortSignal }) {
+				const { signal } = options;
+				return (async function* () {
+					while (!signal.aborted) {
+						const next = deliveries.shift();
+						if (next) {
+							yield next;
+							continue;
+						}
+						await new Promise<void>((resolve) => {
+							wake = resolve;
+							signal.addEventListener("abort", () => resolve(), { once: true });
+						});
+					}
+				})();
+			},
+			async workReply(input: {
+				id: string;
+				replies: WorkReply[];
+				done: boolean;
+			}) {
+				replies.set(input.id, [
+					...(replies.get(input.id) ?? []),
+					...input.replies,
+				]);
+				if (input.done) done.add(input.id);
+			},
+		},
+	} as unknown as AppRouterClient;
+	return {
+		client,
+		replies,
+		done,
+		deliver(id: string, request: WorkRequest) {
+			deliveries.push({ kind: "call", id, request });
+			wake?.();
+		},
+	};
+}
+
+describe("the work server under an Offer", () => {
+	test("runs the profile as its owner set it, the mode clamped to the cap; a session over the cap waits; withdrawing aborts it", async () => {
+		own = [
+			{
+				spaceId: SPACE,
+				profile: "coder",
+				permissionCap: "acceptEdits",
+				sessionCap: 1,
+				offeredAt: 1,
+			},
+		];
+		await listed("coder");
+		/** The sessions this computer ran, and how to end each. */
+		const sessions: { input: SessionInput; end: () => void }[] = [];
+		const device = {
+			...DEVICE,
+			async *session(input: SessionInput) {
+				let end = () => {};
+				const ended = new Promise<void>((resolve) => {
+					end = resolve;
+					input.signal.addEventListener("abort", () => resolve(), {
+						once: true,
+					});
+				});
+				sessions.push({ input, end });
+				yield { type: "ready", harness: input.harness };
+				await ended;
+			},
+		} as unknown as Device;
+		const server = createWorkServer({
+			hostId: HOST,
+			db: sandbox.db,
+			engine,
+			device,
+			offers: () => own,
+			profileFor: (name) =>
+				name === "coder"
+					? {
+							harness: "claude-code",
+							model: "sonnet",
+							permissionMode: "bypassPermissions",
+							clis: ["gh"],
+							connections: [],
+						}
+					: null,
+			slots: createOfferSlots(),
+		});
+		const host = fakeHost();
+		const online = new AbortController();
+		const serving = server.whileOnline(host.client, online.signal);
+		const colleague = request({
+			personId: "colleague",
+			call: offered("coder"),
+		});
+		host.deliver("first", colleague);
+		host.deliver("second", colleague);
+		await waitUntil(() => sessions.length === 1);
+		expect(sessions[0]?.input).toMatchObject({
+			harness: "claude-code",
+			model: "sonnet",
+			permissionMode: "acceptEdits",
+			clis: ["gh"],
+			cwd: worktree,
+			prompt: "Do the work.",
+		});
+		expect("offered" in (sessions[0]?.input ?? {})).toBe(false);
+		await Bun.sleep(50);
+		// The session cap is 1: the second waits for the first.
+		expect(sessions).toHaveLength(1);
+		sessions[0]?.end();
+		await waitUntil(() => sessions.length === 2);
+		await waitUntil(() => host.done.has("first"));
+
+		server.withdrawn(SPACE, "coder");
+		await waitUntil(() => host.done.has("second"));
+		expect(sessions[1]?.input.signal.aborted).toBe(true);
+		expect(server.running()).toBe(0);
+		online.abort();
+		await serving;
+	});
+});
+
+async function waitUntil(ok: () => boolean, timeoutMs = 5_000) {
+	const deadline = Date.now() + timeoutMs;
+	while (!ok()) {
+		if (Date.now() > deadline) throw new Error("Timed out.");
+		await Bun.sleep(10);
+	}
+}
 
 describe("the work hub", () => {
 	test("a call reaches the Device that takes its work; its replies reach the caller; a cancel follows an abort", async () => {

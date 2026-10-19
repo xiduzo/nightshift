@@ -21,6 +21,7 @@ import { kindOf, kindOfType, NODE_KINDS } from "./graph/node-kinds";
 import { missingNames } from "./graph/nodes/agent";
 import type { Runner } from "./graph/runner";
 import { resolveInputs } from "./inputs";
+import { type OfferedPlacement, offerRefusal } from "./offers";
 import { gitAuthorOf, namesOf } from "./people";
 import type { ListedProject } from "./projects";
 import { runFacts, toSummary } from "./read-model";
@@ -239,14 +240,28 @@ export type PreparedRun = {
  * the stop time is ahead; the inputs resolve. Throws the refusal, returns
  * the prepared run. The Device checks its Clone is ready when it adds the
  * worktree, before the run is written.
+ *
+ * `offered`: the run is another Person's on `device`, through its Offers.
+ * The profiles stay unresolved (the Device resolves them; the run's copy
+ * never holds their settings), and the Offer's rule (`offerRefusal`)
+ * replaces the requirements: the Device's capabilities are its owner's.
  */
 export async function prepareRun(
 	input: StartRunInput,
 	device: Pick<Device, "capabilities" | "flows">,
 	deps: PrepareRunDeps,
+	offered: OfferedPlacement | null = null,
 ): Promise<PreparedRun> {
 	const loaded = flowsForRun(await device.flows(input.projectId), input);
 	const { flowName } = loaded;
+	if (offered) {
+		const nodes = [loaded.flow, ...Object.values(loaded.calledFlows)].flatMap(
+			(f) => f.nodes,
+		);
+		const refusal = offerRefusal(nodes, offered);
+		if (refusal !== null) throw new Error(refusal);
+		return finishPrepare(input, deps, { ...loaded });
+	}
 	// The run's copy holds the profiles as they are now: a later
 	// change to a profile reaches the next run, not this one.
 	const unknownProfiles = new Map<string, string[]>();
@@ -275,6 +290,16 @@ export async function prepareRun(
 	const nodes = all.flatMap((f) => f.nodes);
 	const refusal = refusalOf(nodes, await capabilitiesFor(nodes, device));
 	if (refusal !== null) throw new Error(refusal);
+	return finishPrepare(input, deps, { flow, flowName, calledFlows });
+}
+
+/** The checks after the flow's own: the stop time, the inputs, the title. */
+function finishPrepare(
+	input: StartRunInput,
+	deps: PrepareRunDeps,
+	loaded: Pick<PreparedRun, "flow" | "flowName" | "calledFlows">,
+): PreparedRun {
+	const { flow, flowName, calledFlows } = loaded;
 	if (input.stopAt !== undefined && input.stopAt <= deps.now()) {
 		throw new Error("The stop time has passed already.");
 	}
@@ -315,6 +340,8 @@ export type RunStartDeps = PrepareRunDeps & {
 	/**
 	 * The Device the run's steps run on (the run's Placement): `deviceId`,
 	 * else this computer. Throws the refusal when the run cannot run there.
+	 * `offered`: the Device is another Person's, and the run may use its
+	 * Offers into the Space only.
 	 */
 	place(input: {
 		deviceId: string | undefined;
@@ -322,7 +349,7 @@ export type RunStartDeps = PrepareRunDeps & {
 		runId: string;
 		/** The Person who starts it, as the Space's Host knows them. */
 		personId: string | null;
-	}): Promise<Device>;
+	}): Promise<{ device: Device; offered: OfferedPlacement | null }>;
 	/** This computer's name: the Walker of the runs it starts. */
 	selfName: string;
 };
@@ -351,13 +378,13 @@ export function createRunStart(deps: RunStartDeps) {
 			const startedBy = input.startedBy
 				? ((await personOnHost(db, projectRow.spaceId)) ?? input.startedBy)
 				: null;
-			const device = await deps.place({
+			const { device, offered } = await deps.place({
 				deviceId: input.deviceId,
 				project: projectRow,
 				runId,
 				personId: startedBy,
 			});
-			const prepared = await prepareRun(input, device, deps);
+			const prepared = await prepareRun(input, device, deps, offered);
 			const { flow, flowName, calledFlows, inputs, title } = prepared;
 			const author = input.startedBy
 				? await gitAuthorOf(db, input.startedBy)

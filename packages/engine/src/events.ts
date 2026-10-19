@@ -139,6 +139,20 @@ export type EnginePayloads = {
 		previousRole: string;
 		by: string | null;
 	};
+	/**
+	 * A Device's owner offered one of its Agent Profiles to the Space, or
+	 * changed the caps of that Offer. `by` made it.
+	 */
+	OfferMade: {
+		deviceId: string;
+		deviceName: string;
+		profile: string;
+		permissionCap: string;
+		sessionCap: number;
+		by: string | null;
+	};
+	/** The Offer ended: its Device's owner withdrew it. Running steps under it end as stopped. */
+	OfferWithdrawn: { deviceId: string; profile: string; by: string | null };
 	/** A person gave the project a new name. */
 	ProjectRenamed: { projectId: string; name: string };
 	/** A person moved the project, with its Clones, runs and events, to another Space. */

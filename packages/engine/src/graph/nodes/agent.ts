@@ -332,9 +332,11 @@ async function runSession(
 		harnessSessionId: string | null,
 	): BodyResult => ({ kind: "end", outcome, outputs, error, harnessSessionId });
 
-	// The run resolved the node's profile when it started.
+	// The run resolved the node's profile when it started, unless the
+	// profile is another Person's Offer: the Device that offers it
+	// resolves it itself, and the Walker never learns its settings.
 	const agent = resolvedAgent(node);
-	if (!agent) {
+	if (!agent && node.profile === undefined) {
 		return end(
 			"error",
 			{ outcome: "error", visit },
@@ -348,26 +350,44 @@ async function runSession(
 	// prompt only, like the report instruction the harness adds; a new
 	// session learns its CLI tools from the Device after the prompt.
 	const clis = [...new Set(programsOf(node))];
+	const common = {
+		cwd: ctx.run.worktreePath,
+		prompt,
+		resumeSessionId: resumeSessionId ?? undefined,
+		stepReport: stepReportOf(node),
+		signal,
+	};
 	const stream = step.device
-		.session({
-			harness: agent.harness,
-			cwd: ctx.run.worktreePath,
-			prompt,
-			model: agent.model,
-			permissionMode: agent.permissionMode,
-			effort: agent.effort,
-			resumeSessionId: resumeSessionId ?? undefined,
-			stepReport: stepReportOf(node),
-			...(clis.length > 0 ? { clis } : {}),
-			...(node.connections ? { connections: node.connections } : {}),
-			...(node.mcpServers ? { mcpServers: node.mcpServers } : {}),
-			signal,
-		})
+		.session(
+			agent
+				? {
+						...common,
+						harness: agent.harness,
+						model: agent.model,
+						permissionMode: agent.permissionMode,
+						effort: agent.effort,
+						...(clis.length > 0 ? { clis } : {}),
+						...(node.connections ? { connections: node.connections } : {}),
+						...(node.mcpServers ? { mcpServers: node.mcpServers } : {}),
+					}
+				: {
+						...common,
+						offered: {
+							profile: node.profile as string,
+							...(node.permissionMode
+								? { permissionMode: node.permissionMode }
+								: {}),
+						},
+					},
+		)
 		[Symbol.asyncIterator]();
 	// The Device says first whether the session can start: no session is
 	// recorded for one that cannot.
 	const first = await stream.next();
-	if (first.done || first.value.type !== "ready") {
+	const harness =
+		agent?.harness ??
+		(!first.done && first.value.type === "ready" ? first.value.harness : null);
+	if (first.done || first.value.type !== "ready" || !harness) {
 		return end(
 			"error",
 			{ outcome: "error", visit },
@@ -381,7 +401,7 @@ async function runSession(
 	const session = await step.session({
 		prompt,
 		resumeSessionId,
-		harness: agent.harness,
+		harness,
 	});
 	const sessionId = session.id;
 
