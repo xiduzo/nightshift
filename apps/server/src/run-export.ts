@@ -46,7 +46,7 @@ export async function runExportResponse(
 		const { size } = await stat(summary.path);
 		const file = createReadStream(summary.path);
 		file.once("close", () => void remove());
-		return new Response(Readable.toWeb(file) as ReadableStream, {
+		return new Response(Readable.toWeb(file) as unknown as ReadableStream, {
 			headers: {
 				"Content-Type": "application/vnd.sqlite3",
 				"Content-Length": String(size),
