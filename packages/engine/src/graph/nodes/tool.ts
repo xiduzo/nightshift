@@ -13,7 +13,13 @@ import {
 } from "@nightshift/flows";
 
 import type { StepOutputs } from "../../events";
-import { messageOf, type NodeAction, type StepContext } from "../context";
+import {
+	messageOf,
+	type NodeAction,
+	type NodeKind,
+	PLAIN_KIND,
+	type StepContext,
+} from "../context";
 import { RESUME_RULES } from "../resume-point";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 
@@ -37,10 +43,22 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 export function toolNode(node: ToolNode, ctx: StepContext): NodeAction {
 	return (state, config) =>
 		runStep(ctx, node, state, config, {
-			rules: RESUME_RULES.fresh,
+			rules: TOOL.resumeRules(node),
 			body: (step) => callTool(ctx, node, step),
 		});
 }
+
+/**
+ * The Tool kind: the plain facts, plus the one connection the daemon must
+ * have. No wait node: a transport failure is `fail`.
+ */
+export const TOOL: NodeKind<ToolNode> = {
+	...PLAIN_KIND,
+	type: "tool",
+	make: toolNode,
+	resumeRules: () => RESUME_RULES.fresh,
+	connections: (node) => [node.connection],
+};
 
 /** The call could not be made: the server has no such tool. */
 class UnknownTool extends Error {}

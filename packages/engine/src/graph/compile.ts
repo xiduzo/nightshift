@@ -1,28 +1,22 @@
 import { END, START, StateGraph } from "@langchain/langgraph";
 import type { Flow } from "@nightshift/flows";
 
-import type { NodeAction, StepContext } from "./context";
-import { agentNode } from "./nodes/agent";
-import { callNode } from "./nodes/call";
-import { gateAskNode } from "./nodes/choosers/person";
-import { commandNode } from "./nodes/command";
-import { decisionNode } from "./nodes/decision";
-import { toolNode } from "./nodes/tool";
-import { valueNode } from "./nodes/value";
-import { waitStepNode } from "./nodes/wait";
+import type { StepContext } from "./context";
+import { kindOf } from "./node-kinds";
 import { askNodeId, parkNode, parkNodeId, waitNodeId } from "./route";
 import { waitNode } from "./sleep";
 import { RunState } from "./state";
 
 /**
  * Compiles a Night Shift flow (the run's snapshot) into a LangGraph
- * StateGraph. Every flow node is one graph node named by its id, with a
- * park node `park__<id>` (design rule 2: a failed or stopped step parks
- * the run there, and only a chosen end reaches END); an Agent node, a
- * Decision decided by a model, a Value made by a model or a Wait node also
- * has a wait node `wait__<id>` (rule 8), the sleep module's `waitNode`; a Decision
- * decided by a person (a Gate) has an
- * ask node `ask__<id>` that interrupts with the Gate the node opened. No
+ * StateGraph. Every flow node is one graph node named by its id, made by
+ * its kind's factory (`kindOf(node).make`), with a park node `park__<id>`
+ * (design rule 2: a failed or stopped step parks the run there, and only a
+ * chosen end reaches END) and the auxiliary graph nodes its kind asks for
+ * (`kindOf(node).aux`): a wait node `wait__<id>` (rule 8), the sleep
+ * module's `waitNode`, or an ask node `ask__<id>` that interrupts and
+ * routes on the answer (the Gate). This module knows no node type: adding a
+ * kind is adding its descriptor to the registry (`node-kinds.ts`). No
  * static edges besides START → `flow.start`: every node returns `new
  * Command({ update, goto })`, built by `route()`.
  *
@@ -38,62 +32,30 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 	const graph = new StateGraph(RunState);
 
 	for (const node of flow.nodes) {
+		const kind = kindOf(node);
 		const park = parkNodeId(node.id);
-		let action: NodeAction;
-		let own: string[] = [park];
-		switch (node.type) {
-			case "agent": {
-				action = agentNode(node, ctx);
-				const wait = waitNodeId(node.id);
-				own = [park, wait];
-				graph.addNode(wait, waitNode(node.id), { ends: [node.id] });
-				break;
-			}
-			case "command":
-				action = commandNode(node, ctx);
-				break;
-			case "decision": {
-				action = decisionNode(node, ctx);
-				if (node.by === "model") {
+		const own = [park];
+		for (const aux of kind.aux(node)) {
+			switch (aux.kind) {
+				case "wait": {
 					const wait = waitNodeId(node.id);
-					own = [park, wait];
+					own.push(wait);
 					graph.addNode(wait, waitNode(node.id), { ends: [node.id] });
+					break;
 				}
-				if (node.by === "person") {
+				case "ask": {
 					// The ask node interrupts and, on the answer, routes like the
 					// node itself; a reopen sends it back to the node.
 					const ask = askNodeId(node.id);
-					own = [park, ask];
-					graph.addNode(ask, gateAskNode(node, ctx), {
+					own.push(ask);
+					graph.addNode(ask, aux.make(node, ctx), {
 						ends: [...ends, park, node.id],
 					});
+					break;
 				}
-				break;
 			}
-			case "call":
-				action = callNode(node, ctx);
-				break;
-			case "value": {
-				action = valueNode(node, ctx);
-				if (node.by === "model") {
-					const wait = waitNodeId(node.id);
-					own = [park, wait];
-					graph.addNode(wait, waitNode(node.id), { ends: [node.id] });
-				}
-				break;
-			}
-			case "wait": {
-				action = waitStepNode(node, ctx);
-				const wait = waitNodeId(node.id);
-				own = [park, wait];
-				graph.addNode(wait, waitNode(node.id), { ends: [node.id] });
-				break;
-			}
-			case "tool":
-				action = toolNode(node, ctx);
-				break;
 		}
-		graph.addNode(node.id, action, { ends: [...ends, ...own] });
+		graph.addNode(node.id, kind.make(node, ctx), { ends: [...ends, ...own] });
 		graph.addNode(park, parkNode(node), { ends: [node.id] });
 	}
 	graph.addEdge(START, flow.start as typeof START);

@@ -1,17 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type {
-	AgentHarness,
-	Decider,
-	HarnessName,
-} from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import { type project, run } from "@nightshift/db/schema/nightshift";
 import {
 	type Flow,
 	type FlowIssue,
 	type FlowNode,
+	type FlowNodeType,
 	flowSchema,
 	migrateFlow,
 	parseFlow,
@@ -21,7 +17,9 @@ import {
 import { flowsDir } from "@nightshift/flows/files";
 
 import type { InputValues } from "./events";
-import { HARNESS_LABEL } from "./graph/context";
+import type { DaemonHas, NodeKind, Requirement } from "./graph/context";
+import { kindOf, kindOfType, NODE_KINDS } from "./graph/node-kinds";
+import { missingNames } from "./graph/nodes/agent";
 import type { Runner } from "./graph/runner";
 import { resolveInputs } from "./inputs";
 import { checkProjectFolder } from "./project-setup";
@@ -48,9 +46,13 @@ import { createWorktree } from "./worktrees";
  *   worktree and the run row, appends `RunStarted` and `WorktreeCreated`
  *   and hands the thread to the runner.
  *
- * The requirements are one function each and listed once, in `REQUIREMENTS`,
- * in the order the person sees them. A later change can move each one onto
- * the descriptor of the node kind it is about without touching the rest.
+ * The requirements are one function each (`Requirement`) and listed once,
+ * in `REQUIREMENTS`, in the order the person sees them. The ones about one
+ * kind live on that kind's descriptor (`NodeKind.requirements`: an Agent's
+ * CLI tools, harness and checker, a model Decision's and a model Value's
+ * decider); the connections check is the one shared requirement, and it
+ * asks each kind which connections its node names (`NodeKind.connections`).
+ * This module switches on no node type to ask them.
  */
 
 const TITLE_MAX_CHARS = 80;
@@ -59,36 +61,13 @@ const QUICK_RUN_TITLE = "Quick run";
 type ProjectRow = typeof project.$inferSelect;
 type ProfileFor = NonNullable<EngineOptions["profileFor"]>;
 
-/** What this daemon has: the question every requirement asks. */
-export type DaemonHas = {
-	/** The harness of that name, when it is added and built. */
-	harnessFor(name: HarnessName): AgentHarness | undefined;
-	connectionNames(): ReadonlySet<string>;
-	cliNames(): ReadonlySet<string>;
-	/** Where a CLI tool is on this computer, or null. */
-	findCli(name: string): string | null;
-	decider: Decider | undefined;
-};
+export type { DaemonHas, Requirement } from "./graph/context";
 
-/**
- * One requirement of a run's nodes on the daemon: the message that refuses
- * the run, or null when the daemon has what the nodes need.
- */
-export type Requirement = (
-	nodes: readonly FlowNode[],
-	has: DaemonHas,
-) => string | null;
-
-/** Agent and Tool nodes name connections the daemon has. */
+/** Every node names connections the daemon has (Agent and Tool nodes do). */
 export const connectionsExist: Requirement = (nodes, has) => {
 	const unknown = missingNames(
 		nodes,
-		(node) =>
-			node.type === "agent"
-				? (node.connections ?? [])
-				: node.type === "tool"
-					? [node.connection]
-					: [],
+		(node) => kindOf(node).connections(node),
 		has.connectionNames(),
 	);
 	if (unknown.length === 0) return null;
@@ -100,82 +79,30 @@ export const connectionsExist: Requirement = (nodes, has) => {
 		.join(" ");
 };
 
-/** Agent nodes name CLI tools the daemon defines. */
-export const cliToolsDefined: Requirement = (nodes, has) => {
-	const unknown = missingNames(
-		nodes,
-		(node) => (node.type === "agent" ? (node.clis ?? []) : []),
-		has.cliNames(),
-	);
-	if (unknown.length === 0) return null;
-	return unknown
-		.map(
-			({ name, nodeIds }) =>
-				`The flow uses the CLI tool "${name}" (${nodeIds.join(", ")}), but no CLI tool has that name. Add it under Agents → Tools.`,
-		)
-		.join(" ");
-};
-
-/** Every CLI tool an Agent node uses is on this computer. */
-export const cliToolsInstalled: Requirement = (nodes, has) => {
-	const notFound = [
-		...new Set(
-			// A node's own CLI tools need no definition, but this computer must have them.
-			nodes.flatMap((n) =>
-				n.type === "agent" ? [...(n.clis ?? []), ...(n.nodeClis ?? [])] : [],
+/**
+ * A kind's own requirements as ones over every node: each gets the nodes
+ * of its kind only, so it switches on nothing.
+ */
+function ofKind(kind: NodeKind): Requirement[] {
+	return kind.requirements.map(
+		(requirement) => (nodes, has) =>
+			requirement(
+				nodes.filter((n) => n.type === kind.type),
+				has,
 			),
-		),
-	].filter((name) => has.findCli(name) === null);
-	if (notFound.length === 0) return null;
-	return notFound
-		.map(
-			(name) =>
-				`The flow uses the CLI tool "${name}", but this computer does not have it. Install ${name}, or take it off the flow.`,
-		)
-		.join(" ");
-};
+	);
+}
 
-/** Agent nodes run on harnesses the daemon has added. */
-export const harnessesAdded: Requirement = (nodes, has) => {
-	const missing = missingHarnesses(nodes, has.harnessFor);
-	if (missing.length === 0) return null;
-	return missing
-		.map(
-			({ harness, nodeIds }) =>
-				`The flow has ${nodeIds.length === 1 ? "an Agent node" : "Agent nodes"} on ${HARNESS_LABEL[harness]} (${nodeIds.join(", ")}), but no ${HARNESS_LABEL[harness]} harness is added. Add it under Agents.`,
-		)
-		.join(" ");
-};
-
-/** A Decision decided by a model needs the decider. */
-export const modelDecisionsHaveDecider: Requirement = (nodes, has) =>
-	!has.decider && nodes.some((n) => n.type === "decision" && n.by === "model")
-		? "The flow has a Decision node decided by a model, but no decider is configured."
-		: null;
-
-/** An Agent node's checker needs the decider. */
-export const checkersHaveDecider: Requirement = (nodes, has) =>
-	!has.decider &&
-	nodes.some((n) => n.type === "agent" && n.checker !== undefined)
-		? "The flow has an Agent node with a checker, but no decider is configured."
-		: null;
-
-/** A Value made by a model needs a decider with a text adapter. */
-export const modelValuesHaveDecider: Requirement = (nodes, has) =>
-	!has.decider?.value &&
-	nodes.some((n) => n.type === "value" && n.by === "model")
-		? "The flow has a Value node made by a model, but no decider is configured."
-		: null;
-
-/** Every requirement, in the order a person sees them. */
+/**
+ * Every requirement, in the order a person sees them: the connections
+ * every kind names first, then each kind's own, kind by kind in the
+ * registry's order (`NODE_KINDS`).
+ */
 export const REQUIREMENTS: readonly Requirement[] = [
 	connectionsExist,
-	cliToolsDefined,
-	cliToolsInstalled,
-	harnessesAdded,
-	modelDecisionsHaveDecider,
-	checkersHaveDecider,
-	modelValuesHaveDecider,
+	...(Object.keys(NODE_KINDS) as FlowNodeType[]).flatMap((type) =>
+		ofKind(kindOfType(type)),
+	),
 ];
 
 /** The first requirement these nodes fail, as the message that refuses the run; null when all pass. */
@@ -188,43 +115,6 @@ export function refusalOf(
 		if (why !== null) return why;
 	}
 	return null;
-}
-
-/** The harnesses the Agent nodes name that the daemon has not configured, with their nodes. */
-function missingHarnesses(
-	nodes: readonly FlowNode[],
-	harnessFor: (name: HarnessName) => AgentHarness | undefined,
-): { harness: HarnessName; nodeIds: string[] }[] {
-	const missing = new Map<HarnessName, string[]>();
-	for (const node of nodes) {
-		if (node.type !== "agent" || node.harness === undefined) continue;
-		if (harnessFor(node.harness)) continue;
-		const ids = missing.get(node.harness) ?? [];
-		if (!ids.includes(node.id)) ids.push(node.id);
-		missing.set(node.harness, ids);
-	}
-	return [...missing].map(([harness, nodeIds]) => ({ harness, nodeIds }));
-}
-
-/**
- * The names the Agent nodes list (connections, CLI tools) that the daemon
- * does not have, with their nodes.
- */
-function missingNames(
-	nodes: readonly FlowNode[],
-	listed: (node: FlowNode) => readonly string[],
-	names: ReadonlySet<string>,
-): { name: string; nodeIds: string[] }[] {
-	const missing = new Map<string, string[]>();
-	for (const node of nodes) {
-		for (const name of listed(node)) {
-			if (names.has(name)) continue;
-			const ids = missing.get(name) ?? [];
-			if (!ids.includes(node.id)) ids.push(node.id);
-			missing.set(name, ids);
-		}
-	}
-	return [...missing].map(([name, nodeIds]) => ({ name, nodeIds }));
 }
 
 /** The names of the flows a flow's Call nodes call. */

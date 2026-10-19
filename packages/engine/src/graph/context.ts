@@ -12,6 +12,7 @@ import type {
 	AgentNode,
 	Flow,
 	FlowNode,
+	Outcome,
 	ResolvedPolicy,
 	TemplateContext,
 } from "@nightshift/flows";
@@ -19,16 +20,19 @@ import { eq } from "drizzle-orm";
 
 import type { RunBus } from "../bus";
 import type { CliToolGuide } from "../cli-tools";
-import type { PolicyWaitReason } from "../events";
+import type { DerivedStep, PolicyWaitReason, StepOutputs } from "../events";
 import type { McpExpansion } from "../mcp";
 import type { RunLog } from "../run-log";
 import type { RunSettings } from "../settings";
 import { openTranscriptWriter, readRunTranscript } from "../transcripts";
 import type { StepEvent, TranscriptEntry } from "../types";
+import type { ResumeRules } from "./resume-point";
 import type { RunEvent, RunStateValues } from "./state";
 
 /**
- * What every node factory gets (`StepContext`), the transcript recorders,
+ * What every node factory gets (`StepContext`) and what every node module
+ * gives back (`NodeKind`, the descriptor the registry in `node-kinds.ts`
+ * lists), the transcript recorders,
  * the template context and the stop time as a graph sees it. The step
  * lifecycle itself (the entry checks, the `step` row,
  * `StepStarted`/`StepReopened`/`StepEnded`, the timers, the abort
@@ -133,6 +137,111 @@ export type NodeFactory<N extends FlowNode = FlowNode> = (
 	node: N,
 	ctx: StepContext,
 ) => NodeAction;
+
+/*
+ * The node-kind descriptor: what a node module says about its kind, so the
+ * engine around it asks instead of switching on `node.type`. The design and
+ * the deletion test that picked these members are in `node-kinds.ts`.
+ */
+
+/** An auxiliary graph node a flow node needs besides its park node (`compile.ts`). */
+export type Aux<N extends FlowNode = FlowNode> =
+	/** `wait__<id>`: the sleep module's wait node (rule 8). */
+	| { kind: "wait" }
+	/** `ask__<id>`: a node that interrupts and routes on the answer (the Gate). */
+	| { kind: "ask"; make: NodeFactory<N> };
+
+/** A step's time budget: the step timer, and the idle timer an Agent step has. */
+export type TimeBudget = {
+	timeoutMinutes: number | undefined;
+	idleMinutes: number | undefined;
+};
+
+/** What this daemon has: the question every start-time requirement asks. */
+export type DaemonHas = {
+	/** The harness of that name, when it is added and built. */
+	harnessFor(name: HarnessName): AgentHarness | undefined;
+	connectionNames(): ReadonlySet<string>;
+	cliNames(): ReadonlySet<string>;
+	/** Where a CLI tool is on this computer, or null. */
+	findCli(name: string): string | null;
+	decider: Decider | undefined;
+};
+
+/**
+ * One requirement of a run's nodes on the daemon: the message that refuses
+ * the run, or null when the daemon has what the nodes need. A kind's own
+ * requirement gets the nodes of its kind only.
+ */
+export type Requirement<N extends FlowNode = FlowNode> = (
+	nodes: readonly N[],
+	has: DaemonHas,
+) => string | null;
+
+/**
+ * One node kind as the engine sees it. `N` is the kind's flow node; a fact
+ * may depend on `node.by` (Decision, Value) or `node.each` (Call).
+ */
+export type NodeKind<N extends FlowNode = FlowNode> = {
+	type: N["type"];
+	/** The graph node that runs one visit (`compile.ts`). */
+	make: NodeFactory<N>;
+	/** Which existing step a visit takes up (`RESUME_RULES`), as the factory passes it to the step runner. */
+	resumeRules(node: N): ResumeRules;
+	/** The auxiliary graph nodes `compile.ts` adds besides the park node. */
+	aux(node: N): readonly Aux<N>[];
+	/**
+	 * Whether ending with `outcome` and no edge is a chosen end of the flow
+	 * (`route()`): `ended` is set and the graph reaches END. Else the step
+	 * is a failure with no edge.
+	 */
+	isChosenEnd(node: N, outcome: Outcome): boolean;
+	/** The `RunEnded` reason of a chosen end: null for the flow's plain end, else which node and outcome. */
+	endReason(node: N, outcome: Outcome): string | null;
+	/** A Call's `ended` output when its flow ended at this node: the label, or "". */
+	endedLabel(node: N, outcome: Outcome): string;
+	/** Whether a step of this node writes a command log (`StepStarted.logPath`). */
+	logsCommandOutput(node: N): boolean;
+	/** The step's timers (`beginStep`), and the idle minutes an abort names. */
+	timeBudget(node: N): TimeBudget;
+	/**
+	 * The outputs a step of this node ends with when the run is stopped
+	 * while it is parked (`runner.closeParked`). `node` is undefined when
+	 * the run's flow snapshot has no node for the step.
+	 */
+	stoppedOutputs(open: DerivedStep, node: N | undefined): StepOutputs;
+	/** The connections the node needs the daemon to have (`run-start.connectionsExist`). */
+	connections(node: N): readonly string[];
+	/** The start-time requirements about this kind, in the order a person sees them. */
+	requirements: readonly Requirement<N>[];
+};
+
+/** The `RunEnded` reason of a chosen end that is not the flow's plain end. */
+export function endedAtReason(node: FlowNode, outcome: Outcome): string {
+	return `Ended at node "${node.id}" with "${outcome}".`;
+}
+
+/**
+ * The facts most kinds share, for a kind to spread and override: no
+ * auxiliary node, `pass` is the one chosen end and the plain end, no
+ * label for a Call, no command log, the node's own `timeoutMinutes`, a
+ * stopped step keeps its outputs, no connections, no requirements.
+ */
+export const PLAIN_KIND = {
+	aux: () => [],
+	isChosenEnd: (_node, outcome) => outcome === "pass",
+	endReason: (node, outcome) =>
+		outcome === "pass" ? null : endedAtReason(node, outcome),
+	endedLabel: () => "",
+	logsCommandOutput: () => false,
+	timeBudget: (node) => ({
+		timeoutMinutes: node.timeoutMinutes,
+		idleMinutes: undefined,
+	}),
+	stoppedOutputs: (open) => ({ ...open.outputs, outcome: "stopped" }),
+	connections: () => [],
+	requirements: [],
+} satisfies Omit<NodeKind, "type" | "make" | "resumeRules">;
 
 export function messageOf(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);

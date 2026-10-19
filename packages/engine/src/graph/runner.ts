@@ -5,25 +5,22 @@ import type {
 	HarnessName,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
-import {
-	type AgentNode,
-	type Flow,
-	type FlowNode,
-	type JsonValue,
-	type ResolvedPolicy,
-	runsEach,
+import type {
+	AgentNode,
+	Flow,
+	FlowNode,
+	JsonValue,
+	ResolvedPolicy,
 } from "@nightshift/flows";
 
 import type { RunBus } from "../bus";
 import type { CliToolGuide } from "../cli-tools";
-import { eachOutputs } from "../each";
 import {
 	type DerivedStep,
 	deriveRunState,
 	type LoggedEvent,
 	parkedSteps,
 	type RunEnding,
-	type StepOutputs,
 } from "../events";
 import type { McpExpansion } from "../mcp";
 import type { RunLog } from "../run-log";
@@ -37,6 +34,7 @@ import {
 	type RunRow,
 	type StepContext,
 } from "./context";
+import { kindOfType } from "./node-kinds";
 import { reenteredNode, reentryUpdate } from "./resume-point";
 import { createSleeps } from "./sleep";
 import type {
@@ -397,21 +395,12 @@ export function createRunner(deps: RunnerDeps) {
 		const row = await getRunRow(db, runId);
 		const nodes = nodesOf(deps.flowOf(row), deps.calledFlowsOf(row), parked);
 		for (const open of parked) {
-			const node = nodes.get(open.id);
-			const each = node ? runsEach(node) : open.items.length > 0;
-			const outputs: StepOutputs =
-				open.nodeType === "call" && each
-					? eachOutputs({
-							items: open.items,
-							visit: open.visit,
-							outcome: status,
-							waiting: [],
-						})
-					: open.nodeType === "decision"
-						? { outcome: status, note: "", visit: open.visit }
-						: open.nodeType === "call"
-							? { outcome: status, ended: "", visit: open.visit }
-							: { ...open.outputs, outcome: status };
+			// The kind says what a stopped step ends with; the node is the
+			// logged kind's, or missing when the snapshot has no node for it.
+			const outputs = kindOfType(open.nodeType).stoppedOutputs(
+				open,
+				nodes.get(open.id),
+			);
 			await log.append({
 				type: "StepEnded",
 				runId,

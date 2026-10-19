@@ -3,24 +3,21 @@ import {
 	END,
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
-import {
-	commandExits,
-	type Flow,
-	type FlowNode,
-	nextEdge,
-	type Outcome,
-	runsEach,
-} from "@nightshift/flows";
+import { type FlowNode, nextEdge } from "@nightshift/flows";
 
 import type { Scope, StepOutputs } from "../events";
 import type { StepOutcome } from "../types";
 import type { NodeAction, StepContext } from "./context";
 import { interruptNode } from "./interrupt";
+import { kindOf } from "./node-kinds";
 import type { PendingParked, RunStateUpdate, RunStateValues } from "./state";
 
 /**
  * Where a node goes after its step: the edge the outcome picks, a chosen
- * end, or the node's park node. Ported from `walkScope` in engine.ts.
+ * end, or the node's park node. Ported from `walkScope` in engine.ts. Which
+ * ends are chosen and what `RunEnded` says are the node kind's facts
+ * (`kindOf(node).isChosenEnd`, `endReason`): this module switches on no
+ * node type.
  *
  * Node naming in the compiled graph: the step node is the flow node's id;
  * its park node is `park__<id>`; the wait node of an Agent node or a
@@ -47,58 +44,6 @@ export type StepEnd = {
 	/** Agent steps: the harness session the step has, for a reopen. */
 	harnessSessionId?: string | null;
 };
-
-/** An Agent's own outcome, other than one named `fail` or `needs-input`. */
-export function isOwnAgentLabel(node: FlowNode, outcome: Outcome): boolean {
-	return (
-		node.type === "agent" &&
-		node.outcomes !== undefined &&
-		outcome !== "fail" &&
-		outcome !== "needs-input"
-	);
-}
-
-/**
- * Whether `outcome` is a Command node's exit on code 0. A command's other
- * exits, the catch-all among them, are failures.
- */
-function isSuccessExit(node: FlowNode, outcome: Outcome): boolean {
-	return (
-		node.type === "command" &&
-		commandExits(node).some((exit) => exit.name === outcome && exit.code === 0)
-	);
-}
-
-/**
- * Whether ending at `node` with `outcome` and no edge to take is a chosen
- * end of the flow: `pass`, a Decision option, an Agent's own outcome, the
- * outcome of a Call with `each`, a Command's exit on code 0, or a Wait that
- * is `done`. `fail`, `needs-input`, a Command's other exits and a Wait's
- * `timeout` are failures.
- */
-export function isChosenEnd(node: FlowNode, outcome: Outcome): boolean {
-	if (node.type === "command") return isSuccessExit(node, outcome);
-	return (
-		outcome === "pass" ||
-		node.type === "decision" ||
-		runsEach(node) ||
-		isOwnAgentLabel(node, outcome) ||
-		(node.type === "wait" && outcome === "done")
-	);
-}
-
-/** The `RunEnded` reason of a chosen end: null for the flow's plain end, else which node and outcome. */
-export function finishedReason(
-	node: FlowNode,
-	outcome: Outcome,
-): string | null {
-	const each = runsEach(node);
-	const chosen =
-		(node.type === "command" && isSuccessExit(node, outcome)) ||
-		(outcome === "pass" && !each) ||
-		(outcome === "done" && (each || node.type === "wait"));
-	return chosen ? null : `Ended at node "${node.id}" with "${outcome}".`;
-}
 
 /**
  * Parks the run at the node's park node (design rule 2): `pending` keeps
@@ -133,14 +78,6 @@ export function parkCommand(input: {
 	});
 }
 
-/** Whether the node has an edge on `stopped`: a Call node that wraps the run up after the stop time. */
-export function hasStoppedEdge(flow: Flow, node: FlowNode): boolean {
-	return (
-		node.type === "call" &&
-		flow.edges.some((e) => e.from === node.id && e.outcome === "stopped")
-	);
-}
-
 /**
  * Parks the run as stopped on a step that ended `stopped`, with the step's
  * outputs and visit in the state: the stop time came while it was open.
@@ -170,12 +107,14 @@ export function parkStopped(
  * the edge the outcome picks, with `EdgeTaken` in the log; or ends the flow
  * on a chosen end; or parks the run. Exactly `walkScope`'s rules:
  *
- * - `stopped` parks as stopped with no reason, except a Call node's
- *   `stopped` with `wrappingUp` in `extra`: it takes the edge.
+ * - `stopped` parks as stopped with no reason, except a step that ends
+ *   `stopped` with `wrappingUp` in `extra` (a Call node the stop time
+ *   ended, with a `stopped` edge): it takes the edge.
  * - `error` and `interrupted` park as failed: `Node "x" failed: <error>`.
- * - no edge: `fail` and `needs-input` park as failed; `pass`, a Decision
- *   option, an Agent's own outcome or the outcome of a Call with `each` is a chosen end
- *   (`ended` set, goto END).
+ * - no edge: a chosen end of the kind (`pass`, a Decision option, an
+ *   Agent's own outcome, a Command's exit on code 0, a Wait's `done`, the
+ *   outcome of a Call with `each`) ends the flow (`ended` set, goto END);
+ *   `fail`, `needs-input` and the rest park as failed.
  * - every edge on the outcome at its max parks as failed.
  */
 export async function route(
@@ -196,8 +135,9 @@ export async function route(
 	const park = (status: "failed" | "stopped", reason: string | null) =>
 		parkCommand({ node, status, reason, step: end, update });
 	// A stop parks. The one exception: a Call node the stop time ended
-	// follows its `stopped` edge to the nodes that wrap the run up.
-	if (outcome === "stopped" && !(node.type === "call" && extra?.wrappingUp)) {
+	// follows its `stopped` edge to the nodes that wrap the run up. Only a
+	// Call node passes `wrappingUp` (`hasStoppedEdge` in nodes/body.ts).
+	if (outcome === "stopped" && !extra?.wrappingUp) {
 		return park("stopped", null);
 	}
 	if (outcome === "error" || outcome === "interrupted") {
@@ -213,7 +153,8 @@ export async function route(
 		traversals: state.traversals,
 	});
 	if (choice.kind === "end") {
-		if (isChosenEnd(node, outcome)) {
+		const kind = kindOf(node);
+		if (kind.isChosenEnd(node, outcome)) {
 			return new Command({
 				update: {
 					...update,
@@ -221,7 +162,7 @@ export async function route(
 						status: "finished",
 						nodeId: node.id,
 						outcome,
-						reason: finishedReason(node, outcome),
+						reason: kind.endReason(node, outcome),
 					},
 				},
 				goto: END,

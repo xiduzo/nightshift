@@ -1,21 +1,25 @@
-import { type CallNode, runsEach } from "@nightshift/flows";
-
+import { type CallNode, type Outcome, runsEach } from "@nightshift/flows";
+import { eachOutputs } from "../../each";
 import type { InputValues, StepOutputs } from "../../events";
 import { renderBindings, resolveInputs } from "../../inputs";
 import {
+	endedAtReason,
 	messageOf,
 	type NodeAction,
+	type NodeKind,
+	PLAIN_KIND,
 	type StepContext,
 	stopAtOf,
 } from "../context";
+import { kindOf } from "../node-kinds";
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
-import { hasStoppedEdge, route, scopeOf } from "../route";
+import { route, scopeOf } from "../route";
 import { beginStep } from "../step-runner";
 import {
 	type BodyGraph,
 	bodyGraph,
 	bodyOutputs,
-	endedLabel,
+	hasStoppedEdge,
 	runBody,
 } from "./body";
 import { callEachNode } from "./call-each";
@@ -54,7 +58,13 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 			state,
 			config,
 			entryOf(
-				resumePoint(node, state, events, scopeOf(config), RESUME_RULES.call),
+				resumePoint(
+					node,
+					state,
+					events,
+					scopeOf(config),
+					CALL.resumeRules(node),
+				),
 			),
 			events,
 		);
@@ -148,7 +158,10 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 				const outputs = await bodyOutputs(ctx, body, ended.nodes);
 				const result = await end(
 					"pass",
-					{ ...outputs, ended: endedLabel(ended.node, ended.outcome) },
+					{
+						...outputs,
+						ended: kindOf(ended.node).endedLabel(ended.node, ended.outcome),
+					},
 					null,
 				);
 				return route(ctx, state, node, result, config);
@@ -156,3 +169,41 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 		}
 	};
 }
+
+/** A chosen end of a Call: `pass` once, and whatever outcome a Call with `each` ends on. */
+function isChosenCallEnd(node: CallNode, outcome: Outcome): boolean {
+	return outcome === "pass" || runsEach(node);
+}
+
+/**
+ * The Call kind. Its facts follow `node.each`: a Call with `each` takes up
+ * a cut-short loop, every outcome is a chosen end and `done` the plain
+ * end, a command source writes the command log, and a stopped step counts
+ * its items; a Call once reports `pass` as the plain end and an empty
+ * `ended` when stopped. The one kind that may follow a `stopped` edge
+ * (`hasStoppedEdge`, `wrappingUp`).
+ */
+export const CALL: NodeKind<CallNode> = {
+	...PLAIN_KIND,
+	type: "call",
+	make: callNode,
+	resumeRules: (node) =>
+		runsEach(node) ? RESUME_RULES.callEach : RESUME_RULES.call,
+	isChosenEnd: isChosenCallEnd,
+	endReason: (node, outcome) =>
+		outcome === (runsEach(node) ? "done" : "pass")
+			? null
+			: endedAtReason(node, outcome),
+	logsCommandOutput: (node) => node.each?.source.kind === "command",
+	stoppedOutputs: (open, node) => {
+		const each = node ? runsEach(node) : open.items.length > 0;
+		return each
+			? eachOutputs({
+					items: open.items,
+					visit: open.visit,
+					outcome: "stopped",
+					waiting: [],
+				})
+			: { outcome: "stopped", ended: "", visit: open.visit };
+	},
+};

@@ -8,7 +8,13 @@ import {
 import { runCommand, tailOf } from "../../command";
 import type { StepOutputs } from "../../events";
 import { commandLogPath } from "../../transcripts";
-import type { NodeAction, StepContext } from "../context";
+import {
+	endedAtReason,
+	type NodeAction,
+	type NodeKind,
+	PLAIN_KIND,
+	type StepContext,
+} from "../context";
 import { RESUME_RULES } from "../resume-point";
 import { type OwnWait, pendingWaitOf } from "../sleep";
 import type { PendingWait } from "../state";
@@ -51,7 +57,7 @@ export function waitStepNode(node: WaitNode, ctx: StepContext): NodeAction {
 	return (state, config) => {
 		const pending = pendingWaitOf(state.pending, node.id);
 		return runStep(ctx, node, state, config, {
-			rules: RESUME_RULES.wait,
+			rules: WAIT.resumeRules(node),
 			// A step that ends at its wake before the node spoke (the stop time
 			// passed) still says how long it waited.
 			outputs: (step) =>
@@ -65,6 +71,26 @@ export function waitStepNode(node: WaitNode, ctx: StepContext): NodeAction {
 		});
 	};
 }
+
+/**
+ * The Wait kind. A wait node for its own sleeps; `done` is its chosen end
+ * (`timeout` a failure); no step timer, as the node keeps its own deadline
+ * across its sleeps; a command poll writes the command log.
+ */
+export const WAIT: NodeKind<WaitNode> = {
+	...PLAIN_KIND,
+	type: "wait",
+	make: waitStepNode,
+	resumeRules: () => RESUME_RULES.wait,
+	aux: () => [{ kind: "wait" }],
+	isChosenEnd: (_node, outcome) => outcome === "pass" || outcome === "done",
+	endReason: (node, outcome) =>
+		outcome === "pass" || outcome === "done"
+			? null
+			: endedAtReason(node, outcome),
+	logsCommandOutput: (node) => node.until.kind === "command",
+	timeBudget: () => ({ timeoutMinutes: undefined, idleMinutes: undefined }),
+};
 
 /** The outputs of a wake: how long the step waited, and a command wait's last output. */
 async function waitedOutputs(

@@ -1,17 +1,26 @@
 import { describe, expect, test } from "bun:test";
 import { defaultDeciderModel } from "@nightshift/agents/decider";
 import type { AgentHarness, Decider } from "@nightshift/agents/types";
-import type { Flow, FlowNode } from "@nightshift/flows";
+import type {
+	AgentNode,
+	DecisionNode,
+	Flow,
+	FlowNode,
+	ValueNode,
+} from "@nightshift/flows";
 
 import {
+	AGENT,
 	checkersHaveDecider,
 	cliToolsDefined,
 	cliToolsInstalled,
+	harnessesAdded,
+} from "./graph/nodes/agent";
+import { DECISION, modelDecisionsHaveDecider } from "./graph/nodes/decision";
+import { modelValuesHaveDecider, VALUE } from "./graph/nodes/value";
+import {
 	connectionsExist,
 	type DaemonHas,
-	harnessesAdded,
-	modelDecisionsHaveDecider,
-	modelValuesHaveDecider,
 	quickRunTitle,
 	REQUIREMENTS,
 	refusalOf,
@@ -21,15 +30,20 @@ import {
  * The requirement checks of run start, each with fake daemon inventory.
  * The whole start path (worktree, run row, `RunStarted`) is covered by
  * engine.test.ts through the public interface; these pin the message each
- * requirement refuses with, so a later move onto node-kind descriptors has
- * a net under it.
+ * requirement refuses with. A kind's own requirements live on its
+ * descriptor (`NodeKind.requirements`) and get that kind's nodes only;
+ * `REQUIREMENTS` lists them over every node.
  */
 
 const node = (fields: Record<string, unknown>): FlowNode =>
 	fields as unknown as FlowNode;
 
 const agent = (id: string, fields: Record<string, unknown> = {}) =>
-	node({ id, type: "agent", prompt: "work", ...fields });
+	node({ id, type: "agent", prompt: "work", ...fields }) as AgentNode;
+const decision = (id: string, by: DecisionNode["by"]) =>
+	node({ id, type: "decision", by }) as DecisionNode;
+const value = (id: string, by: ValueNode["by"]) =>
+	node({ id, type: "value", by }) as ValueNode;
 
 /** A daemon that has everything, unless a test takes something away. */
 function has(overrides: Partial<DaemonHas> = {}): DaemonHas {
@@ -48,16 +62,26 @@ function has(overrides: Partial<DaemonHas> = {}): DaemonHas {
 }
 
 describe("REQUIREMENTS", () => {
-	test("lists every requirement once, in the order a person sees them", () => {
-		expect(REQUIREMENTS).toEqual([
-			connectionsExist,
+	test("lists the shared connections check, then every kind's own, once each", () => {
+		expect(REQUIREMENTS[0]).toBe(connectionsExist);
+		expect(REQUIREMENTS).toHaveLength(7);
+		expect(AGENT.requirements).toEqual([
 			cliToolsDefined,
 			cliToolsInstalled,
 			harnessesAdded,
-			modelDecisionsHaveDecider,
 			checkersHaveDecider,
-			modelValuesHaveDecider,
 		]);
+		expect(DECISION.requirements).toEqual([modelDecisionsHaveDecider]);
+		expect(VALUE.requirements).toEqual([modelValuesHaveDecider]);
+	});
+
+	test("a kind's requirement sees its own nodes only", () => {
+		// A Value made by a model fails its check, but a Decision's check must
+		// not answer for it: the first refusal is the Value's.
+		const nodes = [decision("d", "rule"), value("v", "model")];
+		expect(refusalOf(nodes, has({ decider: undefined }))).toBe(
+			"The flow has a Value node made by a model, but no decider is configured.",
+		);
 	});
 
 	test("a daemon that has everything refuses nothing", () => {
@@ -70,8 +94,8 @@ describe("REQUIREMENTS", () => {
 				checker: { prompt: "ok?" },
 			}),
 			node({ id: "t", type: "tool", connection: "github" }),
-			node({ id: "d", type: "decision", by: "model" }),
-			node({ id: "v", type: "value", by: "model" }),
+			decision("d", "model"),
+			value("v", "model"),
 		];
 		expect(refusalOf(nodes, has())).toBeNull();
 	});
@@ -147,7 +171,7 @@ describe("the decider requirements", () => {
 	};
 
 	test("a Decision decided by a model needs a decider", () => {
-		const nodes = [node({ id: "d", type: "decision", by: "model" })];
+		const nodes = [decision("d", "model")];
 		expect(modelDecisionsHaveDecider(nodes, noDecider)).toBe(
 			"The flow has a Decision node decided by a model, but no decider is configured.",
 		);
@@ -155,10 +179,7 @@ describe("the decider requirements", () => {
 			modelDecisionsHaveDecider(nodes, has({ decider: textless })),
 		).toBeNull();
 		expect(
-			modelDecisionsHaveDecider(
-				[node({ id: "d", type: "decision", by: "person" })],
-				noDecider,
-			),
+			modelDecisionsHaveDecider([decision("d", "person")], noDecider),
 		).toBeNull();
 	});
 
@@ -171,7 +192,7 @@ describe("the decider requirements", () => {
 	});
 
 	test("a Value made by a model needs a decider that makes values", () => {
-		const nodes = [node({ id: "v", type: "value", by: "model" })];
+		const nodes = [value("v", "model")];
 		expect(modelValuesHaveDecider(nodes, noDecider)).toBe(
 			"The flow has a Value node made by a model, but no decider is configured.",
 		);
