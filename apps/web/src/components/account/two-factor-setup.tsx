@@ -16,8 +16,8 @@ import {
 } from "@nightshift/ui/components/input-group";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { CopyIcon } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useId, useState } from "react";
-import QRCode from "react-qr-code";
 import { toast } from "sonner";
 
 import { BackupCodes } from "@/components/account/backup-codes";
@@ -187,8 +187,8 @@ function ScanStep({
 			<FieldGroup>
 				<Field>
 					<FieldLabel>Scan this QR code with your authenticator app</FieldLabel>
-					<div className="w-fit rounded-md bg-white p-3">
-						<QRCode
+					<div className="w-fit self-start rounded-md bg-white p-3">
+						<QRCodeSVG
 							value={totpURI}
 							size={168}
 							title="QR code for your authenticator app"

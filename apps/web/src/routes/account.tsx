@@ -31,9 +31,10 @@ export const Route = createFileRoute("/account")({
 
 /** You, and how you sign in: your email, two-factor sign-in, signing out. */
 function AccountRoute() {
+	// Not the session hook: it empties while it reloads, which would close
+	// a dialog in the middle of the two-factor setup.
 	const status = useQuery(orpc.account.status.queryOptions());
-	const session = authClient.useSession();
-	const user = session.data?.user;
+	const user = status.data?.person;
 
 	return (
 		<>

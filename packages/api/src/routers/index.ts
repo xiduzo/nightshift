@@ -969,6 +969,7 @@ const account = {
 		if (!session) {
 			return {
 				signedIn: false,
+				person: null,
 				thisComputer: context.fromThisComputer,
 				hasPassword: false,
 				twoFactor: { enabled: false, required, setUpNeeded: false },
@@ -976,6 +977,7 @@ const account = {
 		}
 		return {
 			signedIn: true,
+			person: { name: session.user.name, email: session.user.email },
 			thisComputer: context.fromThisComputer,
 			hasPassword: await hasLogin(context.db, session.user.id),
 			twoFactor: {

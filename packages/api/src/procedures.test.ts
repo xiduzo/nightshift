@@ -556,6 +556,7 @@ describe("a Host that requires two-factor sign-in", () => {
 			await call(appRouter.account.status, undefined, { context: refused }),
 		).toEqual({
 			signedIn: true,
+			person: { name: "Ada", email: "ada@example.com" },
 			thisComputer: false,
 			hasPassword: true,
 			twoFactor: { enabled: false, required: true, setUpNeeded: true },

@@ -48,7 +48,6 @@ function TwoFactorRoute() {
 	const router = useRouter();
 	const queryClient = useQueryClient();
 	const status = useQuery(orpc.account.status.queryOptions());
-	const session = authClient.useSession();
 	/**
 	 * The setup started. It turns two-factor on before the backup codes
 	 * show, so from now on only Done leaves the page.
@@ -85,9 +84,9 @@ function TwoFactorRoute() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					{session.data && started.current ? (
+					{status.data?.person && started.current ? (
 						<TwoFactorSetup
-							email={session.data.user.email}
+							email={status.data.person.email}
 							submitLabel="Continue to Night Shift"
 							onDone={leave}
 						/>
