@@ -42,7 +42,6 @@ import {
 	itemBranchName,
 } from "../../worktrees";
 import {
-	beginStep,
 	messageOf,
 	type NodeAction,
 	STOP_AFTER_STEP_REASON,
@@ -59,6 +58,7 @@ import {
 	scopeOf,
 } from "../route";
 import type { Loop } from "../state";
+import { beginStep } from "../step-runner";
 import { type BodyGraph, bodyGraph, bodyOutputs, runBody } from "./body";
 
 /**
@@ -92,6 +92,10 @@ import { type BodyGraph, bodyGraph, bodyOutputs, runBody } from "./body";
  * one. Mid-loop (`state.loops` set) the open step continues. Else the step
  * the log has that the graph never committed (the first element was
  * running) is continued or reopened; else a new visit.
+ *
+ * The node opens its step through the step runner's lower seam
+ * (`beginStep`, `OpenStep`), not `runStep`: one step spans many
+ * super-steps, and the entry checks between elements are the loop's own.
  */
 export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 	let graph: BodyGraph | null = null;
@@ -105,6 +109,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			state,
 			config,
 			entryOf(resumePoint(node, state, events, scope, RESUME_RULES.callEach)),
+			events,
 		);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;

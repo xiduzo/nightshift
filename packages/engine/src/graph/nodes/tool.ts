@@ -13,14 +13,9 @@ import {
 } from "@nightshift/flows";
 
 import type { StepOutputs } from "../../events";
-import {
-	beginStep,
-	messageOf,
-	type NodeAction,
-	type StepContext,
-	type StepHandle,
-} from "../context";
-import { route, type StepEnd } from "../route";
+import { messageOf, type NodeAction, type StepContext } from "../context";
+import { RESUME_RULES } from "../resume-point";
+import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 
 /**
  * The Tool node: one `tools/call` on a Connection's MCP server, with no
@@ -35,27 +30,16 @@ import { route, type StepEnd } from "../route";
  * (the text content joined) and `visit`.
  *
  * A stop of the run or the node's time budget aborts the step's signal,
- * which closes the client. Every visit is new: a parked or interrupted
- * Tool step has nothing to continue.
+ * which closes the client. Every visit is new (`RESUME_RULES.fresh`): a
+ * parked or interrupted Tool step has nothing to continue. The step
+ * lifecycle is the step runner's; this module is the body.
  */
 export function toolNode(node: ToolNode, ctx: StepContext): NodeAction {
-	return async (state, config) => {
-		const begun = await beginStep(ctx, node, state, config);
-		if (begun.kind === "parked") return begun.command;
-		const step = begun.step;
-
-		let result: StepEnd;
-		try {
-			result = await callTool(ctx, node, step);
-		} catch (error) {
-			result = await step.end(
-				"error",
-				{ outcome: "error", visit: step.visit },
-				messageOf(error),
-			);
-		}
-		return route(ctx, state, node, result, config);
-	};
+	return (state, config) =>
+		runStep(ctx, node, state, config, {
+			rules: RESUME_RULES.fresh,
+			body: (step) => callTool(ctx, node, step),
+		});
 }
 
 /** The call could not be made: the server has no such tool. */
@@ -65,19 +49,22 @@ async function callTool(
 	ctx: StepContext,
 	node: ToolNode,
 	step: StepHandle,
-): Promise<StepEnd> {
+): Promise<BodyResult> {
 	const { visit, signal } = step;
 	const empty: StepOutputs = { visit, data: null, text: "" };
+	const end = (
+		outcome: string,
+		outputs: StepOutputs,
+		error: string | null,
+	): BodyResult => ({ kind: "end", outcome, outputs, error });
 
 	const mcp = await ctx.mcpServersFor({ connections: [node.connection] });
-	if (!mcp.ok) {
-		return step.end("error", { ...empty, outcome: "error" }, mcp.message);
-	}
+	if (!mcp.ok) return end("error", empty, mcp.message);
 	const server = mcp.servers[node.connection];
 	if (!server) {
-		return step.end(
+		return end(
 			"error",
-			{ ...empty, outcome: "error" },
+			empty,
 			`There is no connection named "${node.connection}". Add it under Agents → Tools, or pick another one.`,
 		);
 	}
@@ -119,9 +106,7 @@ async function callTool(
 			{ signal, timeoutMs: MCP_TIMEOUT_MS, timeout: "connect" },
 		);
 	} catch (error) {
-		const aborted = step.abortResult(empty);
-		if (aborted)
-			return step.end(aborted.outcome, aborted.outputs, aborted.error);
+		if (signal.aborted) return { kind: "aborted", outputs: empty };
 		const message =
 			error instanceof UnknownTool
 				? error.message
@@ -133,7 +118,7 @@ async function callTool(
 			text: message,
 			data: null,
 		});
-		return step.end("fail", { ...empty, outcome: "fail" }, message);
+		return end("fail", empty, message);
 	}
 
 	const data = dataOf(call);
@@ -143,12 +128,11 @@ async function callTool(
 		text: call.text,
 		data,
 	});
-	const aborted = step.abortResult({ ...empty, data, text: call.text });
-	if (aborted) return step.end(aborted.outcome, aborted.outputs, aborted.error);
-	const outcome = call.isError ? "fail" : "pass";
-	return step.end(
-		outcome,
-		{ outcome, data, text: call.text, visit },
+	const outputs: StepOutputs = { ...empty, data, text: call.text };
+	if (signal.aborted) return { kind: "aborted", outputs };
+	return end(
+		call.isError ? "fail" : "pass",
+		outputs,
 		call.isError ? call.text || "The tool reported an error." : null,
 	);
 }

@@ -47,8 +47,14 @@ packages/engine/src/
                            goto })`; or ends the flow (isChosenEnd,
                            finishedReason); or parks (parkCommand). parkNode,
                            the node ids, scopeOf.
-  graph/context.ts         StepContext (below), beginStep, beginWait,
-                           recorders.
+  graph/context.ts         StepContext (below), the recorders, the template
+                           context, stopAtOf, beginWait (the run policy's
+                           wait).
+  graph/step-runner.ts     The step runner (below): runStep() owns the step
+                           lifecycle every node shares, from the resume
+                           point to route(); beginStep/OpenStep is the lower
+                           seam for the loop-shaped nodes (Call, Call with
+                           `each`, the Gate).
   graph/resume-point.ts    The one resume point (below): resumePoint()
                            decides how a node re-enters (new, continue,
                            reopen) from the checkpoint and the log, per
@@ -59,8 +65,8 @@ packages/engine/src/
   graph/wait.ts            waitNode(nodeId): the one wait node of Agent
                            nodes, Decisions decided by a model, and Wait
                            nodes. Answers: wake, signal, resume.
-  graph/nodes/agent.ts     agent node
-  graph/nodes/command.ts
+  graph/nodes/agent.ts     agent node: the body runSession
+  graph/nodes/command.ts   command node: the body runShell
   graph/nodes/decision.ts  decision node: routes on the step; a chooser
                            per `by` gets the option.
   graph/nodes/choosers/    person.ts (the Gate: the node opens it, its ask
@@ -317,11 +323,11 @@ Decisions taken while implementing, from the code and its comments:
   `waited_minutes` count from it) and `count` how often it slept; the wake
   time is cut to the deadline, so the timeout fires as a wake and the node
   ends `timeout`. `beginStep` starts no timer for it, and the step's log
-  path is set when it polls a command. On a wake it runs
-  `beginStep({ kind: "continue" })`, so the entry checks do not run: it
-  checks the stop time itself and parks `stopped` with the stop-time reason,
-  as a new step would. A `duration` or `time` wake, early or not, ends
-  `done`; a `command` wake runs the command again; a `signal` wake that is
+  path is set when it polls a command. On a wake the step continues, so
+  the entry checks do not run: the step runner checks the stop time and
+  parks `stopped` with the stop-time reason, as a new step would, with the
+  `waited_minutes` the node gives it. A `duration` or `time` wake, early
+  or not, ends `done`; a `command` wake runs the command again; a `signal` wake that is
   not the signal (a timer at the deadline, a person's "wake now") sleeps on.
   `done` without an edge is a chosen end, `timeout` a failure. A parked or
   interrupted Wait step starts a new visit, as a Command does.
@@ -397,6 +403,7 @@ all `ResumeRules` lets them say (`RESUME_RULES`):
 | Call with `each` | `cut-short`: reopen a `stopped`, `error` or `interrupted` step; an exhausted loop starts over | `take-up`, and `loop` for the cursor |
 | Gate | `new` | `asked-gate`: continue only while open with `GateOpened` after its latest opening |
 | Wait | `new` | `new` |
+| Command, Tool, Decision or Value by a rule (`fresh`) | `new` | `new` |
 
 The daemon side lives next to it, on the same helpers: `resumeTarget`
 (what `RunResumed` records: the node, and the Agent step whose harness
@@ -406,6 +413,60 @@ seed state of a thread with no checkpoint). The engine promises in
 `RunResumed` what the node finds when it re-enters, by construction.
 `graph/resume-point.test.ts` holds the rule as a table: one situation,
 every kind.
+
+## The step runner (`graph/step-runner.ts`)
+
+One module runs one visit of every step node: `runStep(ctx, node, state,
+config, spec)`. It is a deep module behind a small interface. The node
+gives a `StepSpec`: its resume rules (`RESUME_RULES`), its body, and the
+outputs of a step that ends before the body spoke. The runner does the
+rest, in this order:
+
+1. The entry: `resumePoint` decides new, continue or reopen.
+2. The entry checks, for a new visit only: a stop of the run, a stop after
+   the running step, the stop time, the step cap. Each parks the run before
+   the step (`beginStep`).
+3. The `step` row, `StepStarted` or `StepReopened`, the transcript
+   recorder, the step and idle timers.
+4. A continued step past the stop time ends `stopped` and parks with the
+   stop-time reason. The body does not run.
+5. The body, with a `StepHandle`. The runner catches what it throws: the
+   step ends `error` with the message.
+6. The end. The body returns a `BodyResult`:
+   - `end`: `StepEnded` with the outcome, the outputs, the error and the
+     cost; then `route()`.
+   - `aborted`: the body saw its signal abort. The runner reads the reason:
+     `stopped` for a person's stop, `error` with why for the time budget
+     or no activity. The outputs the body had are kept.
+   - `wait`: a usage limit or a network failure. The runner calls
+     `beginWait` (the one call site) and parks at the wait node, or ends
+     the step `stopped` (the wait would pass the stop time) or `error`
+     (the grace is spent).
+   - `sleep`: a Wait node's own wait. The runner leaves the step open and
+     parks at the wait node.
+
+The `StepHandle` a body gets is what a body reads and records: `stepId`,
+`visit`, `existing`, `events`, `tctx`, `signal`, `record()`, `touch()` and
+`session()`. `session()` records a harness session: the `agent_session`
+row, `SessionStarted`, `HarnessSessionAssigned`, `SessionEnded`. No node
+module writes a database row.
+
+The node modules keep their body only: `runSession` (Agent), `runShell`
+(Command), `callTool` (Tool), `decide` (Decision by a model), `make`
+(Value by a model), the rule chooser and producer, and the Wait node's
+`startWait` and `continueWait`. The Decision and Value seams stay: a
+`Chooser` or `Producer` is a `NodeAction` that runs `runStep` with its
+own body.
+
+Three nodes do not fit `runStep`: a Call once, a Call with `each` and the
+Gate. Their step stays open across a subgraph or an interrupt, or spans
+many super-steps, or ends in another graph node. They open and close the
+step through the lower seam, `beginStep` and `OpenStep` (`end()`,
+`leaveOpen()`, `opened`), in the same module.
+
+The log is written exactly as before (rule 3). `graph/step-runner.test.ts`
+holds the lifecycle as a table: a new or a continued entry, crossed with
+what the run and the body do.
 
 ## StepContext (what a node factory gets)
 
@@ -431,3 +492,5 @@ type StepContext = {
 ```
 
 A node factory is `(node, ctx) => (state, config) => Promise<Command>`.
+Only the step runner reads `db`: it writes the `step` and `agent_session`
+rows. The node modules read the rest.

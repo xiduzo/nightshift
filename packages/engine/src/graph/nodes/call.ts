@@ -3,7 +3,6 @@ import { type CallNode, runsEach } from "@nightshift/flows";
 import type { InputValues, StepOutputs } from "../../events";
 import { renderBindings, resolveInputs } from "../../inputs";
 import {
-	beginStep,
 	messageOf,
 	type NodeAction,
 	type StepContext,
@@ -11,6 +10,7 @@ import {
 } from "../context";
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
 import { hasStoppedEdge, route, scopeOf } from "../route";
+import { beginStep } from "../step-runner";
 import {
 	type BodyGraph,
 	bodyGraph,
@@ -37,6 +37,10 @@ import { callEachNode } from "./call-each";
  * `interrupted` by recovery) with its `FlowCalled` inputs, and the body
  * resumes under the same namespace. A run parked at this node's own park
  * node (no edge on `fail`) resumes as a new visit, as today.
+ *
+ * The node opens its step through the step runner's lower seam
+ * (`beginStep`, `OpenStep`), not `runStep`: its step stays open while the
+ * called flow runs as a subgraph and rethrows that flow's interrupts.
  */
 export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 	if (runsEach(node)) return callEachNode(node, ctx);
@@ -52,6 +56,7 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 			entryOf(
 				resumePoint(node, state, events, scopeOf(config), RESUME_RULES.call),
 			),
+			events,
 		);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;

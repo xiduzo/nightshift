@@ -4,14 +4,9 @@ import { runCommand } from "../../command";
 import { parseCommandJson } from "../../each";
 import type { StepOutputs } from "../../events";
 import { commandLogPath } from "../../transcripts";
-import {
-	beginStep,
-	messageOf,
-	type NodeAction,
-	type StepContext,
-	type StepHandle,
-} from "../context";
-import { route, type StepEnd } from "../route";
+import type { NodeAction, StepContext } from "../context";
+import { RESUME_RULES } from "../resume-point";
+import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 
 /**
  * The Command node: `sh -c` in the worktree. The exit code picks the
@@ -28,27 +23,16 @@ import { route, type StepEnd } from "../route";
  * one JSON value into `data` (`{{check.data.tests}}`); output that is not
  * JSON ends the step on the catch-all, as a command that cannot start does.
  *
- * Every visit is new: a parked or interrupted Command step has nothing to
- * continue, so a resume starts the next visit, as the engine does today.
+ * Every visit is new (`RESUME_RULES.fresh`): a parked or interrupted
+ * Command step has nothing to continue, so a resume starts the next visit.
+ * The step lifecycle is the step runner's; this module is the body.
  */
 export function commandNode(node: CommandNode, ctx: StepContext): NodeAction {
-	return async (state, config) => {
-		const begun = await beginStep(ctx, node, state, config);
-		if (begun.kind === "parked") return begun.command;
-		const step = begun.step;
-
-		let result: StepEnd;
-		try {
-			result = await runShell(ctx, node, step);
-		} catch (error) {
-			result = await step.end(
-				"error",
-				{ outcome: "error", visit: step.visit },
-				messageOf(error),
-			);
-		}
-		return route(ctx, state, node, result, config);
-	};
+	return (state, config) =>
+		runStep(ctx, node, state, config, {
+			rules: RESUME_RULES.fresh,
+			body: (step) => runShell(ctx, node, step),
+		});
 }
 
 /** What the step says when the command's output is not JSON. */
@@ -58,8 +42,13 @@ async function runShell(
 	ctx: StepContext,
 	node: CommandNode,
 	step: StepHandle,
-): Promise<StepEnd> {
+): Promise<BodyResult> {
 	const { stepId, visit, signal } = step;
+	const end = (
+		outcome: string,
+		outputs: StepOutputs,
+		error: string | null,
+	): BodyResult => ({ kind: "end", outcome, outputs, error });
 	const { command, env } = renderCommand(node.command, step.tctx);
 	step.record(null, { type: "command-start", command });
 	const json = node.output === "json";
@@ -79,29 +68,26 @@ async function runShell(
 
 	const outputs: StepOutputs = { visit, log_tail: result.logTail };
 	if (result.exitCode !== null) outputs.exit_code = result.exitCode;
-	const aborted = step.abortResult(outputs);
-	if (aborted) return step.end(aborted.outcome, aborted.outputs, aborted.error);
+	if (signal.aborted) return { kind: "aborted", outputs };
 	// The exit a code ends on, or an error step when the node has none.
 	const endOn = (code: number | null, reason: string | null) => {
 		const exit = exitFor(node, code);
 		if (!exit) {
-			return step.end(
+			return end(
 				"error",
-				{ ...outputs, outcome: "error" },
+				outputs,
 				reason ??
 					(code === null
 						? "The command did not exit normally, and the node has no exit for other codes."
 						: `The command exited with code ${code}, and the node has no exit for it.`),
 			);
 		}
-		return step.end(exit.name, { ...outputs, outcome: exit.name }, reason);
+		return end(exit.name, outputs, reason);
 	};
 	if (result.spawnError) {
 		const reason = `The command could not start: ${result.spawnError}`;
 		// A node without its own exits errors here, as it always has.
-		if (node.exits === undefined) {
-			return step.end("error", { ...outputs, outcome: "error" }, reason);
-		}
+		if (node.exits === undefined) return end("error", outputs, reason);
 		return endOn(null, reason);
 	}
 	const code = result.exitCode;

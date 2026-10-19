@@ -12,8 +12,9 @@ import {
 	type Scope,
 	scopeKey,
 } from "../events";
-import { DEFAULT_RESUME_PROMPT, type StepStart } from "./context";
+import { DEFAULT_RESUME_PROMPT } from "./context";
 import type { Pending, RunStateUpdate, RunStateValues } from "./state";
+import type { StepStart } from "./step-runner";
 
 /**
  * The one resume point: how a node re-enters after a park, a wake, a resume
@@ -124,6 +125,8 @@ export const RESUME_RULES = {
 	callEach: { parked: "cut-short", crashed: "take-up", loop: true },
 	gate: { parked: "new", crashed: "asked-gate" },
 	wait: { parked: "new", crashed: "new" },
+	/** A Command, a Tool, a Decision decided by a rule, a Value made by one: every visit is new. */
+	fresh: { parked: "new", crashed: "new" },
 } as const satisfies Record<string, ResumeRules>;
 
 /** Decides how `node` re-enters. Appends nothing. */

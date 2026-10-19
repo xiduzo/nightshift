@@ -1,6 +1,8 @@
 import { chooseByRule, type DecisionNode } from "@nightshift/flows";
 
-import { beginStep, messageOf, type StepContext } from "../../context";
+import type { StepContext } from "../../context";
+import { RESUME_RULES } from "../../resume-point";
+import { runStep } from "../../step-runner";
 import { type Chooser, decisionOutputs } from "../decision";
 
 /**
@@ -18,36 +20,32 @@ import { type Chooser, decisionOutputs } from "../decision";
  * to run → `error` with JSONata's message, naming the option.
  */
 export function ruleChooser(node: DecisionNode, ctx: StepContext): Chooser {
-	return async (state, config) => {
-		const begun = await beginStep(ctx, node, state, config, { kind: "new" });
-		if (begun.kind === "parked") return begun.command;
-		const step = begun.step;
-		const { visit } = step;
-		try {
-			const outcome = await chooseByRule(node.options, step.tctx);
-			step.record(null, {
-				type: "rule",
-				matched: outcome.matched,
-				evaluated: outcome.evaluated,
-			});
-			if (outcome.matched === null) {
-				return step.end(
-					"error",
-					decisionOutputs("error", "", visit),
-					"No option matched: no rule held, and no option is without a rule.",
-				);
-			}
-			return step.end(
-				outcome.matched,
-				decisionOutputs(outcome.matched, "", visit),
-				null,
-			);
-		} catch (error) {
-			return step.end(
-				"error",
-				decisionOutputs("error", "", visit),
-				messageOf(error),
-			);
-		}
-	};
+	return (state, config) =>
+		runStep(ctx, node, state, config, {
+			rules: RESUME_RULES.fresh,
+			outputs: (step) => decisionOutputs("", "", step.visit),
+			async body(step) {
+				const outcome = await chooseByRule(node.options, step.tctx);
+				step.record(null, {
+					type: "rule",
+					matched: outcome.matched,
+					evaluated: outcome.evaluated,
+				});
+				if (outcome.matched === null) {
+					return {
+						kind: "end",
+						outcome: "error",
+						outputs: decisionOutputs("error", "", step.visit),
+						error:
+							"No option matched: no rule held, and no option is without a rule.",
+					};
+				}
+				return {
+					kind: "end",
+					outcome: outcome.matched,
+					outputs: decisionOutputs(outcome.matched, "", step.visit),
+					error: null,
+				};
+			},
+		});
 }

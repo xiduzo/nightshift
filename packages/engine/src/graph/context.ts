@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type { Command, LangGraphRunnableConfig } from "@langchain/langgraph";
 import { HARNESS_ADAPTERS } from "@nightshift/agents/doctor";
 import type {
@@ -20,39 +19,24 @@ import { eq } from "drizzle-orm";
 
 import type { RunBus } from "../bus";
 import type { CliToolGuide } from "../cli-tools";
-import {
-	countStepsSinceWalkBegan,
-	countVisits,
-	type DerivedStep,
-	deriveSteps,
-	deriveStopAfterStep,
-	type LoggedEvent,
-	type PolicyWaitReason,
-	type Scope,
-	type StepOutputs,
-	scopeKey,
-} from "../events";
+import type { PolicyWaitReason } from "../events";
 import type { McpExpansion } from "../mcp";
 import { planWait } from "../policy";
 import type { RunLog } from "../run-log";
 import type { RunSettings } from "../settings";
-import {
-	commandLogPath,
-	openTranscriptWriter,
-	readRunTranscript,
-	transcriptPath,
-} from "../transcripts";
-import type { StepEvent, StepOutcome, TranscriptEntry } from "../types";
-import { parkCommand, type StepEnd, scopeOf } from "./route";
+import { openTranscriptWriter, readRunTranscript } from "../transcripts";
+import type { StepEvent, TranscriptEntry } from "../types";
 import type { PendingWait, RunEvent, RunStateValues } from "./state";
+import type { OpenStep } from "./step-runner";
 
 /**
- * What every node factory gets (`StepContext`), and the step scaffolding
- * every node shares (`beginStep`, `beginWait`): the entry checks, the
- * `step` row, `StepStarted`/`StepReopened`/`StepEnded`, the transcript
- * recorder, the step and idle timeouts, the bus and the custom stream.
- * Ported from `runStep` and `beginWait` in engine.ts; the log is written
- * exactly as there.
+ * What every node factory gets (`StepContext`), the transcript recorders,
+ * the template context, the stop time as a graph sees it, and the run
+ * policy's wait (`beginWait`). The step lifecycle itself (the entry checks,
+ * the `step` row, `StepStarted`/`StepReopened`/`StepEnded`, the timers, the
+ * abort translation, the routing) is the step runner's
+ * (`graph/step-runner.ts`). The log is written exactly as the old engine
+ * wrote it.
  */
 
 export type RunRow = typeof run.$inferSelect;
@@ -206,7 +190,7 @@ export function createRecorders(input: { db: Database; bus: RunBus }) {
 }
 
 /** Templates of a node read the state's node outputs, the inputs and the run. */
-function templateContext(
+export function templateContext(
 	ctx: StepContext,
 	state: RunStateValues,
 	config: LangGraphRunnableConfig,
@@ -245,298 +229,6 @@ export function stopAtOf(
 	if (state.wrappingUp) return null;
 	const own = config.configurable?.stopAt as number | null | undefined;
 	return own === undefined ? state.stopAt : own;
-}
-
-/** Why a step's signal aborted. */
-export type AbortReason = "stopped" | "timeout" | "idle";
-
-/**
- * How a node enters: a new visit (the default), or an existing step of the
- * node: `reopen` appends `StepReopened` (a person resumed a parked step, or
- * the daemon re-runs the node after a restart); `continue` appends nothing
- * (the step waited, and the wait ended). A `quiet` continue also tells the
- * bus and the custom stream nothing: the step did not start again (a Gate
- * that ends on its answer).
- */
-export type StepStart =
-	| { kind: "new" }
-	| { kind: "reopen"; stepId: string; prompt: string | null }
-	| { kind: "continue"; stepId: string; quiet?: boolean };
-
-/** A step in progress: what the node body needs, and how it ends. */
-export type StepHandle = {
-	stepId: string;
-	visit: number;
-	/** The transcript path. */
-	path: string;
-	scope: Scope | null;
-	/** `scopeKey(scope)`: for the per-scope derivations of events.ts. */
-	key: string;
-	/** How the step was opened. */
-	opened: StepStart["kind"];
-	/** The log as read on entry, before this step's own events. */
-	events: readonly LoggedEvent[];
-	/** The step as the log had it, for a reopened or continued step. */
-	existing: DerivedStep | null;
-	tctx: TemplateContext;
-	/** The step's own signal: a stop of the run, the node's time budget, or no activity for too long. */
-	signal: AbortSignal;
-	/** Writes one transcript entry (on disk, on the bus, on the custom stream). */
-	record(sessionId: string | null, event: StepEvent): void;
-	/** Resets the idle clock (Agent nodes with `idleMinutes`). */
-	touch(): void;
-	/** The result an aborted step ends with, or null while the signal is quiet. */
-	abortResult(outputs: StepOutputs): StepEnd | null;
-	/**
-	 * Closes the step: `StepEnded` in the log, the recorder and the timers
-	 * closed, the bus and the custom stream told. The node then routes on
-	 * the returned end (`route()`).
-	 */
-	end(
-		outcome: StepOutcome,
-		outputs: StepOutputs,
-		error: string | null,
-		extra?: { costUsd?: number | null; harnessSessionId?: string | null },
-	): Promise<StepEnd>;
-	/** Closes the recorder and the timers but leaves the step open in the log (a wait). */
-	leaveOpen(): void;
-};
-
-/** What `beginStep` gives: a step to run, or the run parked before it. */
-export type BeginStep =
-	| { kind: "step"; step: StepHandle }
-	| { kind: "parked"; command: Command };
-
-/**
- * Opens a step of `node` and returns what the node body needs. For a new
- * visit it first runs the walk's entry checks, in this order, and parks
- * the run when one fires: a stop of the run (stopped, no reason), a stop
- * after the running step, the stop time (both stopped, with today's
- * reasons), and the step cap (failed, with today's reason). A continued
- * or reopened step skips them all: it is already in the log, and a stop
- * must end it there (the old walk had no entry check for one). It then writes
- * the `step` row and `StepStarted` (with the transcript path, the command
- * log path and the scope), or `StepReopened` for a reopen, and opens the
- * transcript and the timers. Exactly `runStep`'s scaffolding.
- */
-export async function beginStep(
-	ctx: StepContext,
-	node: FlowNode,
-	state: RunStateValues,
-	config: LangGraphRunnableConfig,
-	start: StepStart = { kind: "new" },
-): Promise<BeginStep> {
-	const runId = ctx.run.id;
-	const scope = scopeOf(config);
-	const key = scopeKey(scope);
-	const events = await ctx.log.events(runId);
-	const parked = (
-		status: "failed" | "stopped",
-		reason: string | null,
-		atStopTime = false,
-	) => ({
-		kind: "parked" as const,
-		command: parkCommand({ node, status, reason, step: null, atStopTime }),
-	});
-
-	let stepId: string;
-	let path: string;
-	let visit: number;
-	let existing: DerivedStep | null = null;
-	if (start.kind === "new") {
-		// Only a new visit parks before its step: a continued or reopened step
-		// enters the node body with the aborted signal, so it ends `stopped`
-		// with its session and a later resume can reopen it.
-		if (ctx.signal().aborted) return parked("stopped", null);
-		if (deriveStopAfterStep(events)) {
-			return parked("stopped", STOP_AFTER_STEP_REASON);
-		}
-		const stopAt = stopAtOf(state, config);
-		if (stopAt !== null && ctx.now() >= stopAt) {
-			return parked("stopped", STOP_TIME_REASON, true);
-		}
-		const limit = ctx.policy().maxSteps ?? ctx.settings().maxStepsPerRun;
-		if (countStepsSinceWalkBegan(events) >= limit) {
-			return parked(
-				"failed",
-				`The run reached the limit of ${limit} steps before node "${node.id}". Resume it to continue.`,
-			);
-		}
-		stepId = randomUUID();
-		path = transcriptPath(ctx.dataDir, runId, stepId);
-		visit = countVisits(events, node.id, key) + 1;
-		const logPath =
-			node.type === "command" ||
-			(node.type === "call" && node.each?.source.kind === "command") ||
-			(node.type === "wait" && node.until.kind === "command")
-				? commandLogPath(ctx.dataDir, runId, stepId)
-				: null;
-		await ctx.db.insert(step).values({
-			id: stepId,
-			runId,
-			nodeId: node.id,
-			nodeType: node.type,
-			visit,
-			transcriptPath: path,
-		});
-		await ctx.log.append({
-			type: "StepStarted",
-			runId,
-			stepId,
-			payload: {
-				nodeId: node.id,
-				nodeType: node.type,
-				visit,
-				transcriptPath: path,
-				logPath,
-				scope,
-			},
-		});
-	} else {
-		existing = deriveSteps(events).find((s) => s.id === start.stepId) ?? null;
-		if (!existing) throw new Error(`Step not found: ${start.stepId}`);
-		stepId = existing.id;
-		path = existing.transcriptPath;
-		visit = existing.visit;
-		if (start.kind === "reopen") {
-			await ctx.log.append({
-				type: "StepReopened",
-				runId,
-				stepId,
-				payload: { prompt: start.prompt },
-			});
-		}
-	}
-	if (!(start.kind === "continue" && start.quiet)) {
-		ctx.bus.publish(runId, { kind: "step-changed", stepId });
-		emit(config, {
-			type: "step-started",
-			stepId,
-			nodeId: node.id,
-			visit,
-			reopened: start.kind !== "new",
-		});
-	}
-
-	const recorder = await ctx.recorder(stepId, path);
-
-	// The step's own signal: a stop of the run, the node's time budget, or
-	// no activity for too long.
-	const stepController = new AbortController();
-	const runSignal = ctx.signal();
-	const onStop = () => stepController.abort("stopped" satisfies AbortReason);
-	if (runSignal.aborted) onStop();
-	else runSignal.addEventListener("abort", onStop, { once: true });
-	// A Gate (a Decision decided by a person) waits as long as it must. A
-	// Wait node keeps its own deadline across its sleeps (graph/nodes/wait.ts).
-	const timeoutMinutes =
-		(node.type === "decision" && node.by === "person") || node.type === "wait"
-			? undefined
-			: node.timeoutMinutes;
-	const timer = timeoutMinutes
-		? setTimeout(
-				() => stepController.abort("timeout" satisfies AbortReason),
-				timeoutMinutes * ctx.minuteMs,
-			)
-		: undefined;
-	const idleMinutes = node.type === "agent" ? node.idleMinutes : undefined;
-	let idleTimer: ReturnType<typeof setTimeout> | undefined;
-	const touch = () => {
-		if (idleMinutes === undefined || stepController.signal.aborted) return;
-		clearTimeout(idleTimer);
-		idleTimer = setTimeout(
-			() => stepController.abort("idle" satisfies AbortReason),
-			idleMinutes * ctx.minuteMs,
-		);
-	};
-	touch();
-
-	let closed = false;
-	const leaveOpen = () => {
-		if (closed) return;
-		closed = true;
-		recorder.close();
-		clearTimeout(timer);
-		clearTimeout(idleTimer);
-		runSignal.removeEventListener("abort", onStop);
-	};
-
-	const abortResult = (outputs: StepOutputs): StepEnd | null => {
-		if (!stepController.signal.aborted) return null;
-		const reason = stepController.signal.reason as AbortReason;
-		if (reason === "timeout" || reason === "idle") {
-			return {
-				stepId,
-				visit,
-				outcome: "error",
-				outputs: { ...outputs, outcome: "error" },
-				error:
-					reason === "timeout"
-						? `The step ran past its time budget of ${node.timeoutMinutes} min.`
-						: `No activity for ${idleMinutes} min.`,
-			};
-		}
-		return {
-			stepId,
-			visit,
-			outcome: "stopped",
-			outputs: { ...outputs, outcome: "stopped" },
-			error: null,
-		};
-	};
-
-	const handle: StepHandle = {
-		stepId,
-		visit,
-		path,
-		scope,
-		key,
-		opened: start.kind,
-		events,
-		existing,
-		tctx: templateContext(ctx, state, config),
-		signal: stepController.signal,
-		record(sessionId, stepEvent) {
-			const entry = recorder.record(sessionId, stepEvent);
-			emit(config, { type: "transcript", entry });
-		},
-		touch,
-		abortResult,
-		async end(outcome, outputs, error, extra) {
-			leaveOpen();
-			await ctx.log.append({
-				type: "StepEnded",
-				runId,
-				stepId,
-				payload: {
-					outcome,
-					outputs,
-					error,
-					...(extra?.costUsd !== undefined ? { costUsd: extra.costUsd } : {}),
-				},
-			});
-			ctx.bus.publish(runId, { kind: "step-changed", stepId });
-			emit(config, {
-				type: "step-ended",
-				stepId,
-				nodeId: node.id,
-				visit,
-				outcome,
-			});
-			return {
-				stepId,
-				visit,
-				outcome,
-				outputs,
-				error,
-				...(extra?.harnessSessionId !== undefined
-					? { harnessSessionId: extra.harnessSessionId }
-					: {}),
-			};
-		},
-		leaveOpen,
-	};
-	return { kind: "step", step: handle };
 }
 
 /** An Agent step, or a Decision step decided by a model, that hit a usage limit or lost the network. */
@@ -586,7 +278,7 @@ export async function beginWait(
 	node: FlowNode,
 	state: RunStateValues,
 	config: LangGraphRunnableConfig,
-	step: StepHandle,
+	step: OpenStep,
 	request: WaitRequest,
 ): Promise<
 	| { kind: "wait"; pending: PendingWait }
