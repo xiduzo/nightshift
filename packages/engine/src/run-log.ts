@@ -10,6 +10,7 @@ import {
 	type LoggedEvent,
 	parseEventRow,
 } from "./events";
+import { selfDevice } from "./self-device";
 
 /**
  * The event log of each run, kept in memory by the daemon that writes it.
@@ -33,6 +34,8 @@ export type Derive<T> = (events: readonly LoggedEvent[]) => T;
 export type RunLogOptions = {
 	/** How many events of ended runs to keep in memory. Default 20 000. */
 	maxIdleEvents?: number;
+	/** The Walker that appends: the Device id every event gets. Default: this database's own Device. */
+	walkerId?: string;
 };
 
 const DEFAULT_MAX_IDLE_EVENTS = 20_000;
@@ -73,6 +76,13 @@ export function createRunLog(db: Database, options: RunLogOptions = {}) {
 	const memos = new Map<string, Map<Derive<unknown>, unknown>>();
 	/** Counts the appends per run, so a read that raced one is not kept. */
 	const versions = new Map<string, number>();
+	let walker: Promise<string> | undefined = options.walkerId
+		? Promise.resolve(options.walkerId)
+		: undefined;
+	const walkerId = (): Promise<string> => {
+		walker ??= selfDevice(db).then((self) => self.id);
+		return walker;
+	};
 
 	async function readRuns(runIds: readonly string[]) {
 		const rows = await db
@@ -179,14 +189,17 @@ export function createRunLog(db: Database, options: RunLogOptions = {}) {
 			return values;
 		},
 
+		/** The Device that appends: the Walker of the runs this log writes. */
+		walkerId,
+
 		/**
-		 * Appends one event. It is kept only after the insert returned, with
-		 * the seq and time the database gave it.
+		 * Appends one event as the Walker's next. It is kept only after the
+		 * insert returned, with the seq and time the database gave it.
 		 */
 		async append<T extends EngineEventType>(
 			input: EventInput<T>,
 		): Promise<LoggedEvent> {
-			const logged = await appendEvent(db, input);
+			const logged = await appendEvent(db, input, await walkerId());
 			const runId = logged.runId;
 			if (!runId) return logged;
 			versions.set(runId, (versions.get(runId) ?? 0) + 1);

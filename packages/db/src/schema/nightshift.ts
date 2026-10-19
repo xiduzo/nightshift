@@ -6,6 +6,7 @@ import {
 	primaryKey,
 	sqliteTable,
 	text,
+	uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 // Durable facts only. Status is derived from the event log, never stored.
@@ -15,16 +16,78 @@ const createdAt = () =>
 		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 		.notNull();
 
-/** A local clone that runs can start in. */
-export const project = sqliteTable("project", {
-	id: text("id").primaryKey(),
-	name: text("name").notNull(),
-	/** Absolute path of the user's own clone. */
-	repoPath: text("repo_path").notNull().unique(),
-	createdAt: createdAt(),
-	/** Set when a person removed the project. Its runs and events stay. Adding the path again clears it. */
-	removedAt: integer("removed_at", { mode: "timestamp_ms" }),
-});
+/**
+ * A computer that runs Night Shift. Exactly one row is this computer: the
+ * one with `self` set. It is made on the first start (by the migration
+ * that added this table, else by `selfDevice`) with a random id that never
+ * changes. `self` is this database's own knowledge: a row of another
+ * Device that sync brings in never has it.
+ */
+export const device = sqliteTable(
+	"device",
+	{
+		id: text("id").primaryKey(),
+		/** What the person calls it. The host name until they change it. */
+		name: text("name").notNull(),
+		/** `process.platform`: darwin, linux, win32. */
+		platform: text("platform").notNull(),
+		/** The address of the Host that keeps its private configuration. Null: none yet. */
+		homeHost: text("home_host"),
+		lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }),
+		/** This computer. At most one row has it. */
+		self: integer("self", { mode: "boolean" }).notNull().default(false),
+		createdAt: createdAt(),
+	},
+	(table) => [
+		uniqueIndex("device_self_idx").on(table.self).where(sql`${table.self} = 1`),
+	],
+);
+
+/**
+ * A repository that runs can start in, by its remote. Its folders are its
+ * Clones, one per Device at most.
+ */
+export const project = sqliteTable(
+	"project",
+	{
+		id: text("id").primaryKey(),
+		name: text("name").notNull(),
+		/**
+		 * The `origin` URL, normalised (`github.com/owner/repo`), so the ssh
+		 * and https URLs of one repository are one Project. Null for a
+		 * repository without a remote: that Project has one Clone, for good.
+		 */
+		remote: text("remote"),
+		createdAt: createdAt(),
+		/** Set when a person removed the project. Its runs and events stay. Adding its folder again clears it. */
+		removedAt: integer("removed_at", { mode: "timestamp_ms" }),
+	},
+	(table) => [uniqueIndex("project_remote_idx").on(table.remote)],
+);
+
+/** A Project's repository on one Device, at a path. Owned by that Device. */
+export const clone = sqliteTable(
+	"clone",
+	{
+		id: text("id").primaryKey(),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => project.id),
+		deviceId: text("device_id")
+			.notNull()
+			.references(() => device.id),
+		/** Absolute path of the folder on that Device. Known to its owner only. */
+		path: text("path").notNull(),
+		createdAt: createdAt(),
+	},
+	(table) => [
+		uniqueIndex("clone_deviceId_path_idx").on(table.deviceId, table.path),
+		uniqueIndex("clone_projectId_deviceId_idx").on(
+			table.projectId,
+			table.deviceId,
+		),
+	],
+);
 
 /** One walk of a flow in its own worktree. */
 export const run = sqliteTable(
@@ -45,6 +108,12 @@ export const run = sqliteTable(
 		worktreePath: text("worktree_path").notNull(),
 		branch: text("branch").notNull(),
 		baseRef: text("base_ref").notNull(),
+		/**
+		 * The Device that walks the run and writes its events: this
+		 * computer, for every run today. No foreign key: a run walked
+		 * elsewhere may arrive before its Device's row.
+		 */
+		walkerId: text("walker_id").notNull(),
 		createdAt: createdAt(),
 	},
 	(table) => [index("run_projectId_idx").on(table.projectId)],
@@ -64,6 +133,8 @@ export const step = sqliteTable(
 		visit: integer("visit").notNull(),
 		/** Absolute path of the step's NDJSON transcript on disk. */
 		transcriptPath: text("transcript_path").notNull(),
+		/** The Device the step's body ran on: the run's Walker, until steps are placed. */
+		deviceId: text("device_id"),
 		createdAt: createdAt(),
 	},
 	(table) => [index("step_runId_idx").on(table.runId)],
@@ -93,9 +164,15 @@ export const agentSession = sqliteTable(
 );
 
 /**
- * The append-only event log. One row per fact that changed. `seq` orders the
- * log globally. No foreign keys: nothing may delete a row here. Transcript
- * chunks (text deltas, tool calls, command output) stay on disk, not here.
+ * The append-only event log. One row per fact that changed. No foreign
+ * keys: nothing may delete a row here. Transcript chunks (text deltas, tool
+ * calls, command output) stay on disk, not here.
+ *
+ * Two orders: `seq` is this database's own, the order rows landed here (the
+ * read model and the stream cursors use it). `(walker_id, walker_seq)` is
+ * the event's identity everywhere: the Walker that wrote it and its count
+ * of the events it wrote, 1, 2, 3, … Sync asks a Device for a Walker's
+ * events after a `walker_seq`.
  */
 export const event = sqliteTable(
 	"event",
@@ -108,8 +185,18 @@ export const event = sqliteTable(
 		/** JSON-encoded payload. */
 		payload: text("payload").notNull().default("{}"),
 		at: createdAt(),
+		/** The Device that wrote the event: the run's Walker, or this computer for a fact of no run. */
+		walkerId: text("walker_id").notNull(),
+		/** The event's number among the Walker's events. */
+		walkerSeq: integer("walker_seq").notNull(),
 	},
-	(table) => [index("event_runId_idx").on(table.runId)],
+	(table) => [
+		index("event_runId_idx").on(table.runId),
+		uniqueIndex("event_walkerId_walkerSeq_idx").on(
+			table.walkerId,
+			table.walkerSeq,
+		),
+	],
 );
 
 const updatedAt = () =>

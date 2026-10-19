@@ -114,6 +114,7 @@ describe("exportRun", () => {
 		expect(tables.map((t) => t.name)).toEqual([
 			"agent_session",
 			"bundle",
+			"clone",
 			"event",
 			"project",
 			"run",
@@ -128,6 +129,7 @@ describe("exportRun", () => {
 			)[0]?.n;
 		expect(await count("run")).toBe(1);
 		expect(await count("project")).toBe(1);
+		expect(await count("clone")).toBe(1);
 		expect(await count("step")).toBe(2);
 		expect(await count("agent_session")).toBe(1);
 		expect(await count("event")).toBe((await liveEvents(runId)).length);
@@ -161,14 +163,14 @@ describe("exportRun", () => {
 
 		const opened = await openRunBundle(path);
 		expect(opened.meta).toMatchObject({
-			formatVersion: 1,
+			formatVersion: 2,
 			runId,
 			missingTranscripts: [],
 			redacted: 0,
 		});
 		expect(opened.meta.schema).toEqual(expect.any(String));
 		expect(opened.run.id).toBe(runId);
-		expect(opened.project?.repoPath).toBe(sandbox.repoPath);
+		expect(opened.clones[0]?.path).toBe(sandbox.repoPath);
 		expect(opened.events).toEqual(live);
 		expect(deriveRunState(opened.events)).toEqual(deriveRunState(live));
 		expect(deriveRunState(opened.events).status).toBe("finished");

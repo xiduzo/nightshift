@@ -14,6 +14,7 @@ import { asc, eq } from "drizzle-orm";
 
 import { parseEventRow } from "./events";
 import type { RunLog } from "./run-log";
+import { selfDevice } from "./self-device";
 import { git } from "./worktrees";
 
 /** Test helpers: a temp git repo, a migrated temp database, scripted harnesses. */
@@ -24,6 +25,8 @@ export type Sandbox = {
 	dataDir: string;
 	dbPath: string;
 	db: Database;
+	/** The database's own Device: the Walker of its runs. */
+	deviceId: string;
 	cleanup(): Promise<void>;
 };
 
@@ -55,6 +58,7 @@ export async function createSandbox(): Promise<Sandbox> {
 		dataDir: join(root, "data"),
 		dbPath,
 		db,
+		deviceId: (await selfDevice(db)).id,
 		cleanup: () => rm(root, { recursive: true, force: true }),
 	};
 }

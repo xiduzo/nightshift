@@ -60,6 +60,11 @@ export {
 	type RunBundleSummary,
 } from "./run-bundle";
 export {
+	hostDeviceName,
+	type SelfDevice,
+	selfDevice,
+} from "./self-device";
+export {
 	createSettingsStore,
 	type RunSettings,
 	type SettingField,

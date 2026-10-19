@@ -28,9 +28,7 @@ async function seedRun() {
 		transcriptPath,
 		`${JSON.stringify({ seq: 1, stepId: "s1", sessionId: null, at: 1, event: { type: "command-output", stream: "stdout", text: "token hunter2-secret" } })}\n`,
 	);
-	await sandbox.db
-		.insert(project)
-		.values({ id: "p1", name: "repo", repoPath: sandbox.repoPath });
+	await sandbox.db.insert(project).values({ id: "p1", name: "repo" });
 	await sandbox.db.insert(run).values({
 		id: RUN_ID,
 		projectId: "p1",
@@ -40,6 +38,7 @@ async function seedRun() {
 		worktreePath: join(sandbox.root, "wt"),
 		branch: "nightshift/x",
 		baseRef: "main",
+		walkerId: sandbox.deviceId,
 	});
 	await sandbox.db.insert(step).values({
 		id: "s1",
@@ -53,6 +52,8 @@ async function seedRun() {
 		runId: RUN_ID,
 		type: "RunEnded",
 		payload: JSON.stringify({ status: "finished", reason: null }),
+		walkerId: sandbox.deviceId,
+		walkerSeq: 1,
 	});
 }
 

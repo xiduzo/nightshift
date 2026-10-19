@@ -120,7 +120,9 @@ describe("run log", () => {
 		const held = new Promise<void>((resolve) => {
 			release = resolve;
 		});
-		const log = createRunLog(heldReads(sandbox.db, held));
+		const log = createRunLog(heldReads(sandbox.db, held), {
+			walkerId: sandbox.deviceId,
+		});
 		await log.append(started("r1"));
 		const read = log.events("r1");
 		await log.append(edge("r1", 1));
@@ -134,7 +136,9 @@ describe("run log", () => {
 		const held = new Promise<void>((resolve) => {
 			release = resolve;
 		});
-		const log = createRunLog(heldReads(sandbox.db, held));
+		const log = createRunLog(heldReads(sandbox.db, held), {
+			walkerId: sandbox.deviceId,
+		});
 		const count = (events: readonly LoggedEvent[]) => events.length;
 		await log.append(started("r1"));
 		const counted = log.derive(["r1"], count);
@@ -212,5 +216,47 @@ describe("run log", () => {
 		await log.append(edge("a", 1));
 		expect((await log.derive(["a", "b"], count)).get("a")).toBe(2);
 		expect(calls).toBe(4);
+	});
+});
+
+describe("event identity: (walker, walker seq)", () => {
+	const identities = async () =>
+		sandbox.db
+			.select({
+				seq: event.seq,
+				walkerId: event.walkerId,
+				walkerSeq: event.walkerSeq,
+			})
+			.from(event)
+			.orderBy(asc(event.seq));
+
+	test("each Walker counts its own events from 1; the local seq orders them all", async () => {
+		const here = createRunLog(sandbox.db);
+		const studio = createRunLog(sandbox.db, { walkerId: "studio" });
+		await here.append(started("r1"));
+		await studio.append(started("r2"));
+		await here.append(edge("r1", 1));
+		await studio.append(edge("r2", 1));
+		await here.append(edge("r1", 2));
+
+		expect(await here.walkerId()).toBe(sandbox.deviceId);
+		expect(await identities()).toEqual([
+			{ seq: 1, walkerId: sandbox.deviceId, walkerSeq: 1 },
+			{ seq: 2, walkerId: "studio", walkerSeq: 1 },
+			{ seq: 3, walkerId: sandbox.deviceId, walkerSeq: 2 },
+			{ seq: 4, walkerId: "studio", walkerSeq: 2 },
+			{ seq: 5, walkerId: sandbox.deviceId, walkerSeq: 3 },
+		]);
+	});
+
+	test("appends at once never share a number", async () => {
+		const log = createRunLog(sandbox.db);
+		await Promise.all(
+			Array.from({ length: 20 }, (_, i) => log.append(edge(`r${i % 3}`, i))),
+		);
+		const numbers = (await identities()).map((row) => row.walkerSeq);
+		expect(numbers.toSorted((a, b) => a - b)).toEqual(
+			Array.from({ length: 20 }, (_, i) => i + 1),
+		);
 	});
 });

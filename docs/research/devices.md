@@ -472,6 +472,51 @@ iroh.
 1. **The seam and the Owner rule.** The Device port with the local
    adapter. Projects by remote with Clones. `event.seq` per Walker. One
    Device row. No behaviour change.
+
+   *Landed (the Owner rule in the data):*
+   - **One Device row.** `device` (id, name, platform, home host, last
+     seen, created at, `self`). The row with `self` set is this computer;
+     a partial unique index allows one. `self` is the Replica's own fact:
+     a Device row that sync brings in never has it. The migration makes
+     the row (a random UUID) so it can stamp the old rows in SQL;
+     `selfDevice(db)` (engine) returns `{ id, name }`, makes the row in a
+     database without one, and fills a blank name from the host name
+     (without `.local`) and the platform. The daemon passes its id to the
+     engine as `walkerId`.
+   - **Projects by remote, with Clones.** `project.remote` is the
+     normalised `origin`: `host/path`, no scheme, user, password, port or
+     `.git`, host in lower case, path as is (`git@github.com:acme/app.git`
+     and `https://github.com/acme/app` are `github.com/acme/app`). A path
+     or `file:` remote is none. `repo_path` is gone; `clone` holds
+     (project, device, path), unique per (device, path) and per (project,
+     device): a Device has at most one Clone of a Project, so "this
+     computer's folder" of a Project is one path. The engine's `Project`
+     keeps `repoPath`, resolved from that Clone, and gains `remote`.
+   - **Adding a folder:** a Clone here at that path gives its Project; else
+     a Project with the folder's remote gets a Clone here (`CloneAdded`);
+     else a new Project. A second folder of a Project that already has a
+     Clone here is refused while the first folder exists; when the first
+     folder is gone, or the Project was removed, the Clone moves to the
+     new folder.
+   - **Remotes of old rows.** SQL cannot run git, so the migration leaves
+     `remote` null and gives every project a Clone here at its old path.
+     The engine reads the `origin` of every Project here without a remote
+     when it starts (`readRemotes`). A remote that another Project already
+     has stays off: two clones of one repository that were two Projects
+     stay two.
+   - **`(walkerId, seq)`.** `event.seq` stays this Replica's local
+     autoincrement: the read model, the run log and the stream cursors
+     order by it, unchanged. Identity is the new `(walker_id, walker_seq)`,
+     unique: the Walker that wrote the event and its own count, 1, 2, 3…
+     `appendEvent` takes the count in its insert statement
+     (`max(walker_seq) + 1` for that Walker), so two appends cannot share a
+     number. A fact of no run (a project, a schedule) is written by this
+     computer and counts in its sequence. Old events got `walker_seq = seq`.
+     The sync cursor of slice 4 is "Walker X after `walker_seq` N".
+   - `run.walker_id` (no foreign key: a run walked elsewhere may arrive
+     before its Device) and `step.device_id` are this computer for every
+     run and step today. Run bundles are format 2 (the project's Clones,
+     the Walker columns).
 2. **Spaces.** The organization plugin; every row gets a `space_id`; one
    personal Space holds everything; the Space switcher shows one. Sessions
    on the procedures replace public ones. No behaviour change for one

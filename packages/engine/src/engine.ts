@@ -1,6 +1,5 @@
-import { randomUUID } from "node:crypto";
 import type { AgentHarness, HarnessName } from "@nightshift/agents/types";
-import { project, run } from "@nightshift/db/schema/nightshift";
+import { run } from "@nightshift/db/schema/nightshift";
 import {
 	type AgentNode,
 	optionProblem,
@@ -15,7 +14,7 @@ import {
 	writeFlowFile,
 	writeSchedulesFile,
 } from "@nightshift/flows/files";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { createRunBus } from "./bus";
 import {
@@ -28,6 +27,7 @@ import {
 import { getRunRow as getRunRowOf, type RunRow } from "./graph/context";
 import { createRunner } from "./graph/runner";
 import { expandMcpServers, type McpExpansion } from "./mcp";
+import { createProjects, toProject } from "./projects";
 import { createReadModel, parseCalledFlows, parseRunFlow } from "./read-model";
 import { createRecovery } from "./recovery";
 import { createRunLog, type RunLog } from "./run-log";
@@ -41,20 +41,18 @@ import { defaultRunSettings, type RunSettings } from "./settings";
 import type {
 	Engine,
 	EngineOptions,
-	Project,
 	RunStreamItem,
 	RunSummary,
 	RunTrigger,
 	ScheduleResult,
 	StartRunInput,
 } from "./types";
-import { resolveRepoTopLevel } from "./worktrees";
 
 /**
  * The engine: projects, flows, schedules, Gates and runs, over the event
  * log as the read model. A run is one LangGraph thread that the runner
  * (`graph/runner.ts`) drives. `createEngine` is the composition root: it
- * wires four deep modules behind small seams and keeps the CRUD that is
+ * wires five deep modules behind small seams and keeps the CRUD that is
  * too shallow to earn a module of its own.
  *
  * - `run-start.ts`: `startRun` validates, checks what this daemon has,
@@ -63,6 +61,7 @@ import { resolveRepoTopLevel } from "./worktrees";
  *   `resumeRun` (both append `RunResumed` before the thread moves).
  * - `read-model.ts`: the summaries, `getRun`, `listGates`, `watchRun`.
  * - `scheduler.ts`: starts the runs of `.nightshift/schedules.json`.
+ * - `projects.ts`: projects by remote and their Clones on this computer.
  *
  * `stopRun`, `resolveGate` and `signalRun` write one run-level fact each
  * and stay here. Each module gets its dependencies (db, log, runner, bus,
@@ -127,7 +126,14 @@ export function createEngine(
 		(options.harnessNames?.().has(name) ?? true) ? harnesses[name] : undefined;
 
 	const bus = createRunBus();
-	const runLog = internals.runLog ?? createRunLog(db);
+	const runLog =
+		internals.runLog ??
+		createRunLog(db, options.walkerId ? { walkerId: options.walkerId } : {});
+	const projects = createProjects({
+		db,
+		log: runLog,
+		deviceId: runLog.walkerId,
+	});
 	let disposed = false;
 	internals.signal?.addEventListener(
 		"abort",
@@ -169,7 +175,11 @@ export function createEngine(
 		...(internals.signal ? { signal: internals.signal } : {}),
 	});
 
-	const ready = recovery.recoverInterruptedWork();
+	const ready = recovery.recoverInterruptedWork().then(() =>
+		// Projects from before Clones get their remote. A git that fails
+		// leaves it for the next start.
+		projects.readRemotes().catch(() => {}),
+	);
 	// Every method awaits `ready` and sees the error there.
 	ready.catch(() => {});
 
@@ -187,7 +197,7 @@ export function createEngine(
 		log: runLog,
 		runner,
 		now,
-		projectRow: getProjectRow,
+		projectRow: projects.get,
 		profileFor: options.profileFor ?? (() => null),
 		...(options.probeGit ? { probeGit: options.probeGit } : {}),
 		harnessFor,
@@ -199,32 +209,17 @@ export function createEngine(
 
 	const getRunRow = (runId: string): Promise<RunRow> => getRunRowOf(db, runId);
 
-	/** A project that a person has not removed. */
-	async function getProjectRow(projectId: string) {
-		const [row] = await db
-			.select()
-			.from(project)
-			.where(and(eq(project.id, projectId), isNull(project.removedAt)));
-		if (!row) throw new Error(`Project not found: ${projectId}`);
-		return row;
-	}
+	const getProjectRow = projects.get;
 
 	const loadRunEvents = (runId: string) => runLog.events(runId);
-
-	function toProject(row: typeof project.$inferSelect): Project {
-		return {
-			id: row.id,
-			name: row.name,
-			repoPath: row.repoPath,
-			createdAt: row.createdAt.getTime(),
-		};
-	}
 
 	const scheduler = createScheduler({
 		db,
 		now,
 		tickMs: internals.scheduleTickMs ?? DEFAULT_SCHEDULE_TICK_MS,
 		startRun: startRunWith,
+		log: runLog,
+		projects: projects.list,
 		enabled: () => runSettings().scheduler,
 		runStatus: reads.runStatus,
 	});
@@ -261,48 +256,12 @@ export function createEngine(
 	const engine: Engine = {
 		async listProjects() {
 			await ready;
-			const rows = await db
-				.select()
-				.from(project)
-				.where(isNull(project.removedAt))
-				.orderBy(asc(project.createdAt));
-			return rows.map(toProject);
+			return (await projects.list()).map(toProject);
 		},
 
 		async addProject(input) {
 			await ready;
-			const repoPath = await resolveRepoTopLevel(input.repoPath);
-			const [existing] = await db
-				.select()
-				.from(project)
-				.where(eq(project.repoPath, repoPath));
-			if (existing) {
-				if (existing.removedAt === null) return toProject(existing);
-				const [restored] = await db
-					.update(project)
-					.set({ removedAt: null })
-					.where(eq(project.id, existing.id))
-					.returning();
-				if (!restored) throw new Error("Could not restore the project.");
-				await runLog.append({
-					type: "ProjectRestored",
-					payload: { projectId: existing.id },
-				});
-				return toProject(restored);
-			}
-
-			const id = randomUUID();
-			const name = input.name ?? repoPath.split("/").at(-1) ?? repoPath;
-			const [row] = await db
-				.insert(project)
-				.values({ id, name, repoPath })
-				.returning();
-			if (!row) throw new Error("Could not add the project.");
-			await runLog.append({
-				type: "ProjectAdded",
-				payload: { projectId: id, name, repoPath },
-			});
-			return toProject(row);
+			return toProject(await projects.add(input));
 		},
 
 		async removeProject(projectId) {
@@ -331,14 +290,7 @@ export function createEngine(
 				}
 			}
 			// Runs, events and worktrees stay: a person may still need them.
-			await db
-				.update(project)
-				.set({ removedAt: new Date() })
-				.where(eq(project.id, projectId));
-			await runLog.append({
-				type: "ProjectRemoved",
-				payload: { projectId },
-			});
+			await projects.remove(projectId);
 		},
 
 		async listFlows(projectId) {

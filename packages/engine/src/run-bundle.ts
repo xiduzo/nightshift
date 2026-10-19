@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createDb, type Database } from "@nightshift/db";
 import {
 	agentSession,
+	clone,
 	event,
 	project,
 	run,
@@ -21,7 +22,7 @@ import type { TranscriptEntry } from "./types";
 
 /**
  * A run bundle is one run in its own small SQLite file: the run, its
- * project's name and path, its steps, sessions and events, and the lines of
+ * project and the project's Clones (its folders), its steps, sessions and events, and the lines of
  * its transcripts. The tables keep the names and columns of the daemon's
  * database, so the queries and derivations that read the live log read a
  * bundle too. Nothing from settings, connections or secrets goes in.
@@ -30,7 +31,8 @@ import type { TranscriptEntry } from "./types";
  * scope names the calling step), so the run's own rows hold all of it.
  */
 
-export const RUN_BUNDLE_FORMAT_VERSION = 1;
+/** 2: the project by its remote, with its Clones; the Walker on runs, steps and events. */
+export const RUN_BUNDLE_FORMAT_VERSION = 2;
 
 /** What stands in for a secret value that a bundle leaves out. */
 const MASK = "•••";
@@ -61,11 +63,12 @@ const createdAt =
 /** The live schema's columns, without foreign keys: a bundle is never written again. */
 const DDL = [
 	"CREATE TABLE `bundle` (`key` text PRIMARY KEY, `value` text NOT NULL)",
-	`CREATE TABLE \`project\` (\`id\` text PRIMARY KEY, \`name\` text NOT NULL, \`repo_path\` text NOT NULL, ${createdAt}, \`removed_at\` integer)`,
-	`CREATE TABLE \`run\` (\`id\` text PRIMARY KEY, \`project_id\` text NOT NULL, \`flow_name\` text, \`flow\` text NOT NULL, \`body_flows\` text DEFAULT '{}' NOT NULL, \`title\` text NOT NULL, \`worktree_path\` text NOT NULL, \`branch\` text NOT NULL, \`base_ref\` text NOT NULL, ${createdAt})`,
-	`CREATE TABLE \`step\` (\`id\` text PRIMARY KEY, \`run_id\` text NOT NULL, \`node_id\` text NOT NULL, \`node_type\` text NOT NULL, \`visit\` integer NOT NULL, \`transcript_path\` text NOT NULL, ${createdAt})`,
+	`CREATE TABLE \`project\` (\`id\` text PRIMARY KEY, \`name\` text NOT NULL, \`remote\` text, ${createdAt}, \`removed_at\` integer)`,
+	`CREATE TABLE \`clone\` (\`id\` text PRIMARY KEY, \`project_id\` text NOT NULL, \`device_id\` text NOT NULL, \`path\` text NOT NULL, ${createdAt})`,
+	`CREATE TABLE \`run\` (\`id\` text PRIMARY KEY, \`project_id\` text NOT NULL, \`flow_name\` text, \`flow\` text NOT NULL, \`body_flows\` text DEFAULT '{}' NOT NULL, \`title\` text NOT NULL, \`worktree_path\` text NOT NULL, \`branch\` text NOT NULL, \`base_ref\` text NOT NULL, \`walker_id\` text NOT NULL, ${createdAt})`,
+	`CREATE TABLE \`step\` (\`id\` text PRIMARY KEY, \`run_id\` text NOT NULL, \`node_id\` text NOT NULL, \`node_type\` text NOT NULL, \`visit\` integer NOT NULL, \`transcript_path\` text NOT NULL, \`device_id\` text, ${createdAt})`,
 	`CREATE TABLE \`agent_session\` (\`id\` text PRIMARY KEY, \`run_id\` text NOT NULL, \`step_id\` text NOT NULL, \`harness_session_id\` text, \`prompt\` text NOT NULL, ${createdAt})`,
-	`CREATE TABLE \`event\` (\`seq\` integer PRIMARY KEY, \`run_id\` text, \`step_id\` text, \`session_id\` text, \`type\` text NOT NULL, \`payload\` text DEFAULT '{}' NOT NULL, ${createdAt})`,
+	`CREATE TABLE \`event\` (\`seq\` integer PRIMARY KEY, \`run_id\` text, \`step_id\` text, \`session_id\` text, \`type\` text NOT NULL, \`payload\` text DEFAULT '{}' NOT NULL, ${createdAt}, \`walker_id\` text NOT NULL, \`walker_seq\` integer NOT NULL)`,
 	"CREATE TABLE `transcript` (`step_id` text NOT NULL, `line_no` integer NOT NULL, `seq` integer NOT NULL, `json` text NOT NULL, PRIMARY KEY (`step_id`, `line_no`))",
 ];
 
@@ -110,6 +113,10 @@ export async function exportRun(options: {
 		.select()
 		.from(project)
 		.where(eq(project.id, runRow.projectId));
+	const clones = await db
+		.select()
+		.from(clone)
+		.where(eq(clone.projectId, runRow.projectId));
 	const steps = await db
 		.select()
 		.from(step)
@@ -131,6 +138,7 @@ export async function exportRun(options: {
 	try {
 		for (const statement of DDL) await out.run(sql.raw(statement));
 		if (projectRow) await out.insert(project).values(projectRow);
+		if (clones.length > 0) await out.insert(clone).values(clones);
 		await out.insert(run).values({
 			...runRow,
 			title: redact.text(runRow.title),
@@ -198,6 +206,8 @@ export async function exportRun(options: {
 export type RunBundle = {
 	meta: RunBundleMeta;
 	project: typeof project.$inferSelect | null;
+	/** The project's folders, one per Device. */
+	clones: (typeof clone.$inferSelect)[];
 	run: typeof run.$inferSelect;
 	steps: (typeof step.$inferSelect)[];
 	sessions: (typeof agentSession.$inferSelect)[];
@@ -238,6 +248,10 @@ export async function openRunBundle(path: string): Promise<RunBundle> {
 			.select()
 			.from(project)
 			.where(eq(project.id, runRow.projectId));
+		const clones = await db
+			.select()
+			.from(clone)
+			.where(eq(clone.projectId, runRow.projectId));
 		const steps = await db
 			.select()
 			.from(step)
@@ -263,6 +277,7 @@ export async function openRunBundle(path: string): Promise<RunBundle> {
 				redacted: Number(meta.get("redacted") ?? 0),
 			},
 			project: projectRow ?? null,
+			clones,
 			run: runRow,
 			steps,
 			sessions,

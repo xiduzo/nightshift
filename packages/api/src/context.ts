@@ -50,6 +50,8 @@ export type Context = {
 	/** Facts about this daemon that change only on a restart. */
 	daemon: {
 		dataDir: string;
+		/** This computer's Device. */
+		device: { id: string; name: string };
 		/** The database lease this daemon holds. `since` is epoch ms. */
 		lease: { host: string; pid: number; epoch: number; since: number };
 	};

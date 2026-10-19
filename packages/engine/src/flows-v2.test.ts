@@ -1124,18 +1124,23 @@ describe("flow format 1", () => {
 			worktreePath: sandbox.repoPath,
 			branch: "main",
 			baseRef: "main",
+			walkerId: sandbox.deviceId,
 		});
 		const push = (
 			type: string,
 			payload: unknown,
 			stepId: string | null = null,
 		) =>
-			appendEvent(sandbox.db, {
-				type: type as "RunEnded",
-				runId,
-				stepId,
-				payload: payload as never,
-			});
+			appendEvent(
+				sandbox.db,
+				{
+					type: type as "RunEnded",
+					runId,
+					stepId,
+					payload: payload as never,
+				},
+				sandbox.deviceId,
+			);
 		const stepRow = (id: string, nodeId: string, nodeType: string) =>
 			sandbox.db.insert(step).values({
 				id,
