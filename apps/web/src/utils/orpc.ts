@@ -5,28 +5,36 @@ import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { isSignInRequired } from "@/lib/access";
 import { SERVER_URL } from "@/lib/server-url";
 import { isTwoFactorRequired } from "@/lib/two-factor";
 
 export function createQueryClient() {
 	/**
-	 * The Host refused the session until it turns two-factor on: read the
-	 * account again, and the root sends the person to the setup page.
+	 * The Host refused the session: nobody is signed in (or the session
+	 * ended), or two-factor must be on first. Read the account again, and
+	 * the root sends the person to sign in or to the setup page. No toast.
+	 * On this computer nobody signs in, so a refusal there still shows.
 	 */
-	const toSetup = (error: unknown) => {
-		if (!isTwoFactorRequired(error)) return false;
+	const toAccess = (error: unknown) => {
+		if (isSignInRequired(error)) {
+			const status = client.getQueryData(orpc.account.status.queryKey());
+			if (status?.thisComputer) return false;
+		} else if (!isTwoFactorRequired(error)) {
+			return false;
+		}
 		void client.invalidateQueries({ queryKey: orpc.account.status.key() });
 		return true;
 	};
 	const client = new QueryClient({
 		mutationCache: new MutationCache({
 			onError: (error) => {
-				toSetup(error);
+				toAccess(error);
 			},
 		}),
 		queryCache: new QueryCache({
 			onError: (error, query) => {
-				if (toSetup(error)) return;
+				if (toAccess(error)) return;
 				// Polling queries show their own error instead of a toast per poll.
 				if (query.meta?.quietErrors) return;
 				// A failed background refetch keeps the data it has; no toast either.

@@ -17,18 +17,9 @@ import {
 import { useCallback, useEffect, useRef } from "react";
 
 import { TwoFactorSetup } from "@/components/account/two-factor-setup";
+import { safeRedirect } from "@/lib/access";
 import { authClient } from "@/lib/auth-client";
 import { orpc } from "@/utils/orpc";
-
-/** Where to go after the setup: a page of this app, never another site. */
-function safeRedirect(value: unknown): string | undefined {
-	return typeof value === "string" &&
-		value.startsWith("/") &&
-		!value.startsWith("//") &&
-		!value.startsWith("/two-factor")
-		? value
-		: undefined;
-}
 
 export const Route = createFileRoute("/two-factor")({
 	ssr: false,
@@ -69,9 +60,10 @@ function TwoFactorRoute() {
 	// Nothing to set up here: not signed in, or two-factor is on already.
 	useEffect(() => {
 		if (!status.data || started.current) return;
-		if (!status.data.signedIn) void navigate({ to: "/login" });
-		else if (!status.data.twoFactor.setUpNeeded) void back();
-	}, [status.data, navigate, back]);
+		if (!status.data.signedIn) {
+			void navigate({ to: "/login", search: { redirect }, replace: true });
+		} else if (!status.data.twoFactor.setUpNeeded) void back();
+	}, [status.data, navigate, back, redirect]);
 
 	return (
 		<div className="flex min-h-svh items-center justify-center p-4 md:p-6">

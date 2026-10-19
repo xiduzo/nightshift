@@ -19,6 +19,7 @@ import { ThemeProvider } from "next-themes";
 import { useEffect } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { NightNotifications } from "@/hooks/use-night-notifications";
+import { accessRedirect, isOutsideApp } from "@/lib/access";
 import { orpc } from "@/utils/orpc";
 
 import appCss from "../index.css?url";
@@ -58,37 +59,38 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 });
 
 /**
- * Pages for someone who is not signed in yet (signing in, an invitation's
- * link), and the two-factor setup a Host may require first. They show
- * without the app's sidebar.
+ * Sends a browser that may not see the app yet to sign in, or to the
+ * two-factor setup the Host requires, and back to this page after. Says
+ * whether the app may show: not while the account is loading or a
+ * redirect is due, so its calls do not fail one by one. When the account
+ * does not load, the app shows and tells the person it cannot reach Night
+ * Shift.
  */
-const OUTSIDE_APP = ["/login", "/invite/", "/two-factor"];
-
-/** Pages a session may see before it turns on the two-factor sign-in the Host requires. */
-const BEFORE_TWO_FACTOR = ["/login", "/two-factor"];
-
-/**
- * Sends a session the Host refuses until it turns two-factor on to the
- * setup page, and back to this page after.
- */
-function TwoFactorGuard({ pathname }: { pathname: string }) {
+function useAccessGuard(pathname: string, href: string): boolean {
 	const navigate = useNavigate();
 	const status = useQuery({
 		...orpc.account.status.queryOptions(),
 		meta: { quietErrors: true },
 	});
-	const needed = status.data?.twoFactor.setUpNeeded === true;
+	const target = status.data
+		? accessRedirect(status.data, { pathname, href })
+		: null;
+	const to = target?.to;
+	const redirect = target?.redirect;
 	useEffect(() => {
-		if (!needed) return;
-		if (BEFORE_TWO_FACTOR.some((prefix) => pathname.startsWith(prefix))) return;
-		void navigate({ to: "/two-factor", search: { redirect: pathname } });
-	}, [needed, pathname, navigate]);
-	return null;
+		if (!to) return;
+		void navigate({ to, search: { redirect }, replace: true });
+	}, [to, redirect, navigate]);
+	if (status.data) return target === null;
+	// Not reached on the first try: show the app while the retries run.
+	return status.failureCount > 0;
 }
 
 function RootDocument() {
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
-	const outsideApp = OUTSIDE_APP.some((prefix) => pathname.startsWith(prefix));
+	const href = useRouterState({ select: (s) => s.location.href });
+	const outsideApp = isOutsideApp(pathname);
+	const appMayShow = useAccessGuard(pathname, href);
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
@@ -104,18 +106,17 @@ function RootDocument() {
 					<TooltipProvider>
 						{outsideApp ? (
 							<Outlet />
-						) : (
+						) : appMayShow ? (
 							<SidebarProvider>
 								<AppSidebar />
 								<SidebarInset className="min-w-0">
 									<Outlet />
 								</SidebarInset>
 							</SidebarProvider>
-						)}
+						) : null}
 					</TooltipProvider>
 					<Toaster richColors />
-					<TwoFactorGuard pathname={pathname} />
-					{outsideApp ? null : <NightNotifications />}
+					{outsideApp || !appMayShow ? null : <NightNotifications />}
 				</ThemeProvider>
 				<TanStackRouterDevtools position="bottom-left" />
 				<ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
