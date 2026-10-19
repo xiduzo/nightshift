@@ -25,12 +25,32 @@
 		"build:stable": {
 			"dependsOn": ["^build"],
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
-			"outputs": ["artifacts/**", "build/**"]
+			"outputs": ["artifacts/**", "build/**"],
+			"env": ["NIGHTSHIFT_VERSION", "NIGHTSHIFT_UPDATE_FEED"],
+			"passThroughEnv": [
+				"ELECTROBUN_DEVELOPER_ID",
+				"ELECTROBUN_TEAMID",
+				"ELECTROBUN_APPLEID",
+				"ELECTROBUN_APPLEIDPASS",
+				"ELECTROBUN_APPLEAPIKEY",
+				"ELECTROBUN_APPLEAPIISSUER",
+				"ELECTROBUN_APPLEAPIKEYPATH"
+			]
 		},
 		"build:canary": {
 			"dependsOn": ["^build"],
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
-			"outputs": ["artifacts/**", "build/**"]
+			"outputs": ["artifacts/**", "build/**"],
+			"env": ["NIGHTSHIFT_VERSION", "NIGHTSHIFT_UPDATE_FEED"],
+			"passThroughEnv": [
+				"ELECTROBUN_DEVELOPER_ID",
+				"ELECTROBUN_TEAMID",
+				"ELECTROBUN_APPLEID",
+				"ELECTROBUN_APPLEIDPASS",
+				"ELECTROBUN_APPLEAPIKEY",
+				"ELECTROBUN_APPLEAPIISSUER",
+				"ELECTROBUN_APPLEAPIKEYPATH"
+			]
 		},
 		"db:push": {
 			"cache": false,

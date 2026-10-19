@@ -1,0 +1,95 @@
+# Builds the desktop app for each platform and uploads the files a release
+# needs: the installers, the update bundles, update.json, and delta patches.
+# release.yml and nightly.yml call it. A pull request that changes the
+# desktop app runs it as a check, without signing and without a release.
+name: Desktop build
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit or tag to build.
+        type: string
+        required: true
+      version:
+        description: Version of the app, such as 0.2.0 or 0.2.1-nightly.20261020.12.
+        type: string
+        required: true
+      feed:
+        description: Update feed the build follows, stable or nightly.
+        type: string
+        required: true
+  pull_request:
+    paths:
+      - apps/desktop/**
+      - .github/workflows/desktop-build.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: macos-arm64
+          - os: macos-15-intel
+            target: macos-x64
+          - os: ubuntu-24.04
+            target: linux-x64
+    env:
+      # The packaged window calls the daemon it starts on this computer.
+      VITE_SERVER_URL: http://localhost:3000
+      NODE_ENV: production
+      NIGHTSHIFT_VERSION: ${{ inputs.version }}
+      NIGHTSHIFT_UPDATE_FEED: ${{ inputs.feed || 'stable' }}
+      # Release builds on macOS are signed and notarized when the Apple secrets
+      # exist. Without them the app is unsigned (see docs/releasing.md).
+      SIGN: ${{ startsWith(matrix.os, 'macos') && inputs.version != '' && secrets.MACOS_CERTIFICATE != '' && secrets.ELECTROBUN_DEVELOPER_ID != '' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      # Vite's prerender in the web build runs on Node.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # Electrobun keeps its toolchain and CEF here between builds.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.hutch
+          key: hutch-${{ matrix.target }}-${{ hashFiles('bun.lock') }}
+
+      - run: bun install --frozen-lockfile
+
+      - name: Import the signing certificate
+        if: env.SIGN == 'true'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CERTIFICATE }}
+          p12-password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+
+      - name: Build
+        run: bun run --cwd apps/desktop build:stable
+        env:
+          ELECTROBUN_DEVELOPER_ID: ${{ env.SIGN == 'true' && secrets.ELECTROBUN_DEVELOPER_ID || '' }}
+          ELECTROBUN_TEAMID: ${{ secrets.ELECTROBUN_TEAMID }}
+          ELECTROBUN_APPLEID: ${{ secrets.ELECTROBUN_APPLEID }}
+          ELECTROBUN_APPLEIDPASS: ${{ secrets.ELECTROBUN_APPLEIDPASS }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          path: apps/desktop/artifacts/*
+          if-no-files-found: error
+          retention-days: 7

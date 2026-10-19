@@ -7,6 +7,7 @@ import Electrobun, {
 } from "electrobun/main";
 
 import { type Daemon, PortTakenError, startDaemon } from "./daemon";
+import { startUpdates } from "./updates";
 
 const APP_NAME = "Night Shift";
 const WEB_DEV_SERVER_URL = "http://localhost:3001";
@@ -30,46 +31,97 @@ async function mainViewUrl(): Promise<string> {
 	return PACKAGED_VIEW_URL;
 }
 
-// The webview takes Cmd+C, Cmd+V and Cmd+Z only through menu roles.
-ApplicationMenu.setApplicationMenu([
-	{
-		submenu: [
-			{ role: "about" },
-			{ type: "divider" },
-			{ role: "hide", accelerator: "h" },
-			{ role: "hideOthers" },
-			{ role: "showAll" },
-			{ type: "divider" },
-			{ label: `Quit ${APP_NAME}`, action: "quit", accelerator: "q" },
-		],
-	},
-	{
-		label: "Edit",
-		submenu: [
-			{ role: "undo" },
-			{ role: "redo" },
-			{ type: "divider" },
-			{ role: "cut" },
-			{ role: "copy" },
-			{ role: "paste" },
-			{ role: "pasteAndMatchStyle" },
-			{ role: "delete" },
-			{ role: "selectAll" },
-		],
-	},
-	{
-		label: "Window",
-		submenu: [
-			{ role: "minimize" },
-			{ role: "zoom" },
-			{ role: "close" },
-			{ type: "divider" },
-			{ role: "bringAllToFront" },
-		],
-	},
-]);
+let daemon: Daemon | undefined;
+// Set once the daemon has given the database lease up: the app may quit.
+let released = false;
 
-let daemon: Daemon;
+const updates = await startUpdates({
+	onChange: () => setMenus(),
+	beforeRestart: async () => {
+		await daemon?.stop();
+		released = true;
+	},
+});
+
+/** "Check for Updates…" or the update that waits, and the nightly choice. */
+function updateItems() {
+	if (!updates.enabled) return [];
+	const ready = updates.readyVersion();
+	return [
+		ready
+			? { label: `Restart to Install ${ready}`, action: "install-update" }
+			: { label: "Check for Updates…", action: "check-updates" },
+		{
+			label: "Get Nightly Builds",
+			action: "toggle-nightly",
+			checked: updates.feed() === "nightly",
+		},
+	];
+}
+
+let tray: Tray | undefined;
+
+function setMenus(): void {
+	setApplicationMenu();
+	tray?.setMenu([
+		{ type: "normal", label: `Open ${APP_NAME}`, action: "open" },
+		{ type: "divider" },
+		...updateItems().map((item) => ({ type: "normal" as const, ...item })),
+		...(updates.enabled ? [{ type: "divider" as const }] : []),
+		{
+			type: "normal",
+			label:
+				daemon?.kind === "shared"
+					? `Close this window (${APP_NAME} keeps running in the terminal)`
+					: `Quit ${APP_NAME}`,
+			action: "quit",
+		},
+	]);
+}
+
+// The webview takes Cmd+C, Cmd+V and Cmd+Z only through menu roles.
+function setApplicationMenu(): void {
+	ApplicationMenu.setApplicationMenu([
+		{
+			submenu: [
+				{ role: "about" },
+				...updateItems(),
+				{ type: "divider" },
+				{ role: "hide", accelerator: "h" },
+				{ role: "hideOthers" },
+				{ role: "showAll" },
+				{ type: "divider" },
+				{ label: `Quit ${APP_NAME}`, action: "quit", accelerator: "q" },
+			],
+		},
+		{
+			label: "Edit",
+			submenu: [
+				{ role: "undo" },
+				{ role: "redo" },
+				{ type: "divider" },
+				{ role: "cut" },
+				{ role: "copy" },
+				{ role: "paste" },
+				{ role: "pasteAndMatchStyle" },
+				{ role: "delete" },
+				{ role: "selectAll" },
+			],
+		},
+		{
+			label: "Window",
+			submenu: [
+				{ role: "minimize" },
+				{ role: "zoom" },
+				{ role: "close" },
+				{ type: "divider" },
+				{ role: "bringAllToFront" },
+			],
+		},
+	]);
+}
+setMenus();
+
 try {
 	daemon = await startDaemon();
 } catch (error) {
@@ -114,23 +166,17 @@ function showWindow(): void {
 }
 
 // Runs go on when the window closes: the app stays in the menu bar until you quit.
-const tray = new Tray({ title: "☾" });
-tray.setMenu([
-	{ type: "normal", label: `Open ${APP_NAME}`, action: "open" },
-	{ type: "divider" },
-	{
-		type: "normal",
-		label:
-			daemon.kind === "own"
-				? `Quit ${APP_NAME}`
-				: `Close this window (${APP_NAME} keeps running in the terminal)`,
-		action: "quit",
-	},
-]);
+tray = new Tray({ title: "☾" });
+setMenus();
 
 function onAction(action: string): void {
 	if (action === "open") showWindow();
 	if (action === "quit") Utils.quit();
+	if (action === "check-updates") updates.checkNow();
+	if (action === "install-update") void updates.restart();
+	if (action === "toggle-nightly") {
+		updates.setFeed(updates.feed() === "nightly" ? "stable" : "nightly");
+	}
 }
 tray.on("tray-clicked", (event) => {
 	onAction((event as { data: { action: string } }).data.action);
@@ -142,11 +188,10 @@ ApplicationMenu.on("application-menu-clicked", (event) => {
 Electrobun.events.on("reopen", () => showWindow());
 
 // Quit once the daemon has given the database lease up.
-let released = false;
 Electrobun.events.on(
 	"before-quit",
 	(event: { response?: { allow: boolean } }) => {
-		if (released) return;
+		if (released || !daemon) return;
 		event.response = { allow: false };
 		void daemon.stop().finally(() => {
 			released = true;

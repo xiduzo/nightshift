@@ -112,6 +112,7 @@ Open a flow in the editor, change the prompts and the check to fit your project,
 | `bun run dev` | Work on Night Shift itself, with hot reload. Data stays in `.nightshift-dev/`. |
 | `bun run night` | Run real nights from a stable build that does not reload. Data stays in the OS app data folder. |
 | `bun run dev:desktop` | Start the desktop app. |
+| `bun run build:desktop` | Build the desktop app in `apps/desktop/build/`. Releases are in [docs/releasing.md](docs/releasing.md). |
 
 > [!TIP]
 > Run nights with `bun run night` and develop in a separate git worktree. A code change then never reloads Night Shift in the middle of a night.
