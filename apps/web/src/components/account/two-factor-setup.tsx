@@ -187,12 +187,16 @@ function ScanStep({
 			<FieldGroup>
 				<Field>
 					<FieldLabel>Scan this QR code with your authenticator app</FieldLabel>
-					<div className="w-fit self-start rounded-md bg-white p-3">
-						<QRCodeSVG
-							value={totpURI}
-							size={168}
-							title="QR code for your authenticator app"
-						/>
+					{/* Field stretches its children (`*:w-full`): the outer row takes
+					    the width and centers the white box, which hugs the code. */}
+					<div className="flex justify-center">
+						<div className="rounded-md bg-white p-3">
+							<QRCodeSVG
+								value={totpURI}
+								size={168}
+								title="QR code for your authenticator app"
+							/>
+						</div>
 					</div>
 					<FieldDescription>
 						Use any authenticator app, for example 1Password, Google
