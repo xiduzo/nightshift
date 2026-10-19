@@ -320,6 +320,8 @@ describe("a run walked elsewhere", () => {
 			startRun: async () => {
 				throw new Error("not in this test");
 			},
+			offer: async () => {},
+			withdrawOffer: async () => {},
 			devices: async () => [],
 		};
 		const { engineB, run, stepId } = await waitingOnB(relay);

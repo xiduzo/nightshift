@@ -41,8 +41,9 @@ export function MoveMenu({
 		...orpc.runs.devices.queryOptions({ input: { projectId: run.projectId } }),
 		meta: { quietErrors: true },
 	});
+	// Your own devices only: another person's device offers steps, not walks.
 	const targets = (devices.data ?? []).filter(
-		(d) => d.online && d.deviceId !== run.walker.id,
+		(d) => d.online && d.deviceId !== run.walker.id && d.offers === undefined,
 	);
 	const move = useMutation(
 		orpc.runs.move.mutationOptions({

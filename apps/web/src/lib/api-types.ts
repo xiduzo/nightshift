@@ -40,6 +40,8 @@ export type ThisComputer = NonNullable<DevicesOverview["thisComputer"]>;
 export type LinkedHost = ThisComputer["hosts"][number];
 export type PairedDevice = DevicesOverview["devices"][number];
 export type PairingReview = Outputs["devices"]["review"];
+export type OfferView = Outputs["offers"]["list"]["offers"][number];
+export type SpaceDevice = Outputs["devices"]["space"][number];
 
 export type PermissionMode = NonNullable<AgentNode["permissionMode"]>;
 export type Effort = NonNullable<AgentNode["effort"]>;

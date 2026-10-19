@@ -10,8 +10,31 @@ import {
 
 import { Field } from "./fields";
 
-/** One of your devices, by the name a node gives it. */
-export type DeviceChoice = { name: string; thisDevice: boolean };
+/**
+ * A device by the name a node gives it: one of yours, or another
+ * person's with the profiles it offers to the Space (`offers`).
+ */
+export type DeviceChoice = {
+	name: string;
+	thisDevice: boolean;
+	offers?: string[];
+};
+
+/**
+ * The devices a node can name: yours, and other people's that offer the
+ * node's profile to the Space. Only an Agent node with an offered profile
+ * runs on another person's device.
+ */
+export function choicesFor(
+	devices: readonly DeviceChoice[],
+	profile: string | undefined,
+): DeviceChoice[] {
+	return devices.filter(
+		(d) =>
+			d.offers === undefined ||
+			(profile !== undefined && d.offers.includes(profile)),
+	);
+}
 
 /** The node types whose step runs on a device; a Decision and a Value only when a model decides. */
 export function runsOnDevice(node: FlowNode): boolean {
@@ -51,20 +74,27 @@ export function DeviceField({
 	id,
 	value,
 	devices,
+	profile,
 	onChange,
 }: {
 	id: string;
 	value: string | undefined;
-	/** Your devices; undefined while they load. */
+	/** Your devices and the ones offered to the Space; undefined while they load. */
 	devices: readonly DeviceChoice[] | undefined;
+	/** The node's profile: other people's devices that offer it are listed. */
+	profile?: string | undefined;
 	onChange: (device: string | undefined) => void;
 }) {
-	const names = [...new Set((devices ?? []).map((d) => d.name))];
+	const listed = choicesFor(devices ?? [], profile);
+	const names = [...new Set(listed.map((d) => d.name))];
 	const unknown = value !== undefined && !names.includes(value);
 	const label = (name: string) => {
-		const own = devices?.find((d) => d.name === name);
-		if (!own) return `${name} (not one of your devices)`;
-		return own.thisDevice ? `${name} (this computer)` : name;
+		const known = listed.find((d) => d.name === name);
+		if (!known) return `${name} (not one of your devices)`;
+		if (known.offers !== undefined && !known.thisDevice) {
+			return `${name} (offers ${known.offers.join(", ")})`;
+		}
+		return known.thisDevice ? `${name} (this computer)` : name;
 	};
 	const items = [
 		{ value: RUN_DEVICE, label: "The device the run starts on" },
@@ -76,7 +106,7 @@ export function DeviceField({
 			id={id}
 			label="Device"
 			optional
-			hint="Pick one of your devices, for example the one with the tools this step needs."
+			hint="Pick one of your devices, or a device another person offers this node's profile on."
 		>
 			<Select
 				items={items}

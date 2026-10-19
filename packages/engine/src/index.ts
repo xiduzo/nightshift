@@ -104,6 +104,27 @@ export {
 	pidAlive,
 } from "./lease";
 export {
+	clampToCap,
+	createOfferSlots,
+	type DeviceOffer,
+	deviceOffers,
+	inForce,
+	MAX_SESSION_CAP,
+	type OfferCaps,
+	type OfferSlots,
+	offerCapsSchema,
+	offeredCallRefusal,
+	offeredSession,
+	PERMISSION_ORDER,
+	type PermissionMode,
+	removeDeviceOffer,
+	type SpaceOffer,
+	setDeviceOffer,
+	slotKey,
+	spaceOffers,
+	withinCap,
+} from "./offers";
+export {
 	createProfileStore,
 	type ProfileStore,
 	type ProfileView,

@@ -22,6 +22,7 @@ import { kindOf, kindOfType, NODE_KINDS } from "./graph/node-kinds";
 import { missingNames } from "./graph/nodes/agent";
 import type { Runner } from "./graph/runner";
 import { resolveInputs } from "./inputs";
+import { type OfferedPlacement, offerRefusal } from "./offers";
 import { gitAuthorOf, namesOf } from "./people";
 import type { ListedProject } from "./projects";
 import { runFacts, toSummary } from "./read-model";
@@ -224,6 +225,14 @@ export type PlacedDevice = {
 	thisDevice: boolean;
 	/** It has a Clone of the project: a step that works in the worktree can run there. */
 	hasClone: boolean;
+	/**
+	 * Another Person's Device (this computer too, for a Member who does not
+	 * own it): the run uses it through its Offers into the Space only. Its
+	 * nodes keep their profile unresolved (the Device resolves it), and the
+	 * Offer's rule (`offerRefusal`) replaces the requirements: its
+	 * capabilities are its owner's.
+	 */
+	offered?: OfferedPlacement;
 };
 
 /** What `prepareRun` needs: the Walker's profiles, the Devices nodes name, the clock. */
@@ -297,15 +306,16 @@ async function placeNodes(
 		set.add(profile);
 		wanted.set(at, set);
 	};
+	// Another Person's Device resolves its offered profiles itself.
+	const fallback =
+		walker && !walker.offered && !runDevice.offered ? walker : null;
 	for (const node of nodes) {
 		if (node.type !== "agent" || node.profile === undefined) continue;
 		const name = namedDevice(node);
-		if (name !== undefined) {
-			want(named.get(name) as PlacedDevice, node.profile);
-		} else {
-			want(runDevice, node.profile);
-			if (walker) want(walker, node.profile);
-		}
+		const at =
+			name !== undefined ? (named.get(name) as PlacedDevice) : runDevice;
+		if (!at.offered) want(at, node.profile);
+		if (name === undefined && fallback) want(fallback, node.profile);
 	}
 	const found = new Map<PlacedDevice, Record<string, AgentProfileSettings>>();
 	for (const [at, names] of wanted) {
@@ -334,6 +344,10 @@ async function placeNodes(
 		nodes: flow.nodes.map((node): FlowNode => {
 			if (node.type !== "agent" || node.profile === undefined) return node;
 			const name = namedDevice(node);
+			const placedAt =
+				name !== undefined ? (named.get(name) as PlacedDevice) : runDevice;
+			// Offered: the run's copy never holds the profile's settings.
+			if (placedAt.offered) return node;
 			if (name !== undefined) {
 				const at = named.get(name) as PlacedDevice;
 				const profile = found.get(at)?.[node.profile];
@@ -345,11 +359,11 @@ async function placeNodes(
 			}
 			const own = found.get(runDevice)?.[node.profile];
 			if (own) return resolveAgentNode(node, own);
-			const here = walker ? found.get(walker)?.[node.profile] : undefined;
-			if (walker && here) {
+			const here = fallback ? found.get(fallback)?.[node.profile] : undefined;
+			if (fallback && here) {
 				// The profile's Device: only this computer has it.
-				named.set(walker.name, walker);
-				return { ...resolveAgentNode(node, here), device: walker.name };
+				named.set(fallback.name, fallback);
+				return { ...resolveAgentNode(node, here), device: fallback.name };
 			}
 			miss(node.profile, node.id, runDevice.thisDevice ? null : runDevice.name);
 			return node;
@@ -409,7 +423,9 @@ export async function prepareRun(
 		groups.set(at, [...(groups.get(at) ?? []), node]);
 	}
 	for (const [at, nodes] of groups) {
-		const refusal = refusalOf(nodes, await capabilitiesFor(nodes, at.device));
+		const refusal = at.offered
+			? offerRefusal(nodes, at.offered)
+			: refusalOf(nodes, await capabilitiesFor(nodes, at.device));
 		if (refusal !== null) throw new Error(refusal);
 		const worker = nodes.find((n) => kindOf(n).works(n) === "worktree");
 		if (worker && !at.hasClone) {
@@ -499,9 +515,12 @@ export function createRunStart(deps: RunStartDeps) {
 		runner.reserveSlot(runId);
 		try {
 			const projectRow = await deps.projectRow(input.projectId);
-			// In a Host's Space, the Person as the Host knows them.
+			// In a Host's Space, the Person as the Host knows them. A
+			// schedule names its Person as the Space knows them already.
 			const startedBy = input.startedBy
-				? ((await personOnHost(db, projectRow.spaceId)) ?? input.startedBy)
+				? trigger.kind === "schedule"
+					? input.startedBy
+					: ((await personOnHost(db, projectRow.spaceId)) ?? input.startedBy)
 				: null;
 			const placement = await deps.place({
 				deviceId: input.deviceId,

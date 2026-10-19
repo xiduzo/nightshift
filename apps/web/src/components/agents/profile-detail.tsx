@@ -10,6 +10,7 @@ import {
 	AlertDialogTitle,
 } from "@nightshift/ui/components/alert-dialog";
 import { Badge } from "@nightshift/ui/components/badge";
+import { Button } from "@nightshift/ui/components/button";
 import { Checkbox } from "@nightshift/ui/components/checkbox";
 import {
 	Field,
@@ -23,6 +24,7 @@ import {
 import { Input } from "@nightshift/ui/components/input";
 import {
 	Item,
+	ItemActions,
 	ItemContent,
 	ItemDescription,
 	ItemGroup,
@@ -42,11 +44,12 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	BotIcon,
 	CircleAlertIcon,
+	ShareIcon,
 	SquareTerminalIcon,
 	WorkflowIcon,
 } from "lucide-react";
@@ -56,13 +59,18 @@ import { toast } from "sonner";
 import { CliCheckBadge } from "@/components/connections/cli-panel";
 import { KindBadge } from "@/components/connections/parts";
 import type { CliTool, Connection } from "@/components/connections/types";
-import { EFFORTS, PERMISSION_MODES } from "@/lib/agent-options";
-import type { Effort, PermissionMode } from "@/lib/api-types";
+import {
+	EFFORTS,
+	PERMISSION_MODES,
+	permissionLabel,
+} from "@/lib/agent-options";
+import type { Effort, OfferView, PermissionMode } from "@/lib/api-types";
 import { harnessInfo } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
 
 import { DetailSection, DetailShell } from "./detail-shell";
 import { ModelCombobox, ModelSourceHint } from "./model-combobox";
+import { OfferDialog, WithdrawOfferDialog } from "./offer-dialog";
 import type {
 	HarnessName,
 	HarnessRow,
@@ -140,6 +148,15 @@ export function ProfileDetail({
 	const saved = profile ? draftFrom(profile) : initial;
 	const [draft, setDraft] = useState<Draft>(saved);
 	const [deleting, setDeleting] = useState(false);
+	const [offering, setOffering] = useState(false);
+	const [withdrawing, setWithdrawing] = useState<OfferView | null>(null);
+	const offers = useQuery({
+		...orpc.offers.list.queryOptions(),
+		enabled: profile !== null,
+	});
+	const offered = (offers.data?.offers ?? []).filter(
+		(o) => o.profile === profile?.name,
+	);
 	const set = (patch: Partial<Draft>) =>
 		setDraft((current) => ({ ...current, ...patch }));
 
@@ -205,6 +222,10 @@ export function ProfileDetail({
 			actions={
 				profile
 					? [
+							{
+								label: "Offer to a Space…",
+								onSelect: () => setOffering(true),
+							},
 							{
 								label: "Delete",
 								destructive: true,
@@ -510,6 +531,71 @@ export function ProfileDetail({
 					</ItemGroup>
 				)}
 			</DetailSection>
+
+			{profile ? (
+				<DetailSection
+					title="Offered to Spaces"
+					description="People in these Spaces can run this profile on this computer, with your login and your tools."
+				>
+					{offered.length === 0 ? (
+						<div className="flex flex-wrap items-center gap-3">
+							<p className="text-muted-foreground text-sm">Only you run it.</p>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setOffering(true)}
+							>
+								<ShareIcon data-icon="inline-start" />
+								Offer to a Space…
+							</Button>
+						</div>
+					) : (
+						<ItemGroup className="gap-1">
+							{offered.map((offer) => (
+								<Item key={offer.spaceId} size="xs" variant="outline">
+									<ItemContent>
+										<ItemTitle>
+											{offer.spaceName}
+											{offer.listed ? null : (
+												<Badge variant="outline">Withdrawn in the Space</Badge>
+											)}
+										</ItemTitle>
+										<ItemDescription className="text-xs">
+											{permissionLabel(offer.permissionCap)} at most.{" "}
+											{offer.sessionCap === 1
+												? "One session at once."
+												: `${offer.sessionCap} sessions at once.`}
+										</ItemDescription>
+									</ItemContent>
+									<ItemActions>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => setWithdrawing(offer)}
+										>
+											Withdraw
+										</Button>
+									</ItemActions>
+								</Item>
+							))}
+						</ItemGroup>
+					)}
+				</DetailSection>
+			) : null}
+
+			{profile ? (
+				<OfferDialog
+					profile={profile.name}
+					open={offering}
+					onOpenChange={setOffering}
+				/>
+			) : null}
+			<WithdrawOfferDialog
+				offer={withdrawing}
+				onOpenChange={(open) => {
+					if (!open) setWithdrawing(null);
+				}}
+			/>
 
 			<AlertDialog open={deleting} onOpenChange={setDeleting}>
 				<AlertDialogContent>

@@ -34,6 +34,7 @@ import type {
 	Capabilities,
 	DeciderFacts,
 	Device,
+	OfferedSessionInput,
 	SessionEvent,
 	SessionInput,
 	ToolResult,
@@ -134,7 +135,17 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			}
 		: null;
 
-	async function* session(input: SessionInput): AsyncGenerator<SessionEvent> {
+	async function* session(
+		input: SessionInput | OfferedSessionInput,
+	): AsyncGenerator<SessionEvent> {
+		if ("offered" in input) {
+			// Resolved by the Offer's guard before it reaches this computer.
+			yield {
+				type: "refused",
+				message: `This device runs the profile "${input.offered.profile}" only through an Offer.`,
+			};
+			return;
+		}
 		const { harness: name, connections, mcpServers, clis, ...rest } = input;
 		const harness = harnessFor(name);
 		if (!harness) {
@@ -164,7 +175,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			deps.cliToolsFor
 				? cliToolsInstruction(await deps.cliToolsFor(clis))
 				: "";
-		yield { type: "ready" };
+		yield { type: "ready", harness: name };
 		yield* harness.run({
 			...rest,
 			prompt: guide ? `${input.prompt}\n\n${guide}` : input.prompt,

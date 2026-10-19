@@ -485,7 +485,7 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 				startedBy: personId,
 			}),
 		).rejects.toThrow(
-			'The flow names the device "nowhere", but you have no device of that name.',
+			'The flow names the device "nowhere", but you have no device of that name, and none of that name offers profiles to this Space.',
 		);
 	});
 

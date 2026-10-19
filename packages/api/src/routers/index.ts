@@ -1,4 +1,5 @@
 import { DECIDER_ADAPTERS, HARNESS_ADAPTERS } from "@nightshift/agents";
+import { roleAllows } from "@nightshift/auth/access";
 import { invitationView, membersOf } from "@nightshift/auth/members";
 import { spacesOf } from "@nightshift/auth/spaces";
 import {
@@ -8,6 +9,7 @@ import {
 	connectionInputSchema,
 	ForeignRowsError,
 	HARNESS_BIN,
+	offerCapsSchema,
 	runRowsSchema,
 	secretNameSchema,
 	settingsPatchSchema,
@@ -599,6 +601,41 @@ const profiles = {
 		.handler(({ context, input }) => context.profiles.remove(input.name)),
 };
 
+/**
+ * This computer's Offers: one of its profiles made available to a Space,
+ * with a permission-mode cap and a session cap. Made and withdrawn by the
+ * computer's owner, in a Space where their role allows `offer.make`.
+ */
+const offerRef = z.object({
+	spaceId: z.string().min(1),
+	profile: z.string().min(1).max(64),
+});
+const offers = {
+	/** Its Offers with "Runs for <Space>", and the Spaces it can offer to. */
+	list: ownerProcedure.handler(async ({ context }) => {
+		const spaces = (await spacesOf(context.db, context.session.user.id))
+			.filter((s) => !s.personal && roleAllows(s.role, { offer: ["make"] }))
+			.map((s) => ({ id: s.id, name: s.name }));
+		return { offers: await context.offers.list(), spaces };
+	}),
+	make: ownerProcedure
+		.input(offerRef.extend(offerCapsSchema.shape))
+		.handler(async ({ context, input }) => {
+			if (!(await context.can({ offer: ["make"] }, input.spaceId))) {
+				throw new ORPCError("FORBIDDEN", {
+					message: "Your role in that Space does not allow offering profiles.",
+				});
+			}
+			await context.offers.make(input, context.session.user.id);
+		}),
+	/** Its running steps under it end as stopped. */
+	withdraw: ownerProcedure
+		.input(offerRef)
+		.handler(({ context, input }) =>
+			context.offers.withdraw(input, context.session.user.id),
+		),
+};
+
 /** The CLIs Night Shift runs (harnesses, gh) and the MCP servers Agent nodes name. */
 const connections = {
 	list: ownerProcedure.handler(async ({ context }) => {
@@ -807,6 +844,13 @@ const devices = {
 			personId: context.session.user.id,
 			owner: context.session.user.id === context.daemon.device.ownerId,
 		}),
+	),
+	/**
+	 * The Devices of the session's Space, as every Member sees them: name,
+	 * online, Clones of its Projects, offered profiles. Nothing else.
+	 */
+	space: protectedProcedure.handler(({ context }) =>
+		context.offers.spaceDevices(context.spaceId),
 	),
 	/** Shows the device that waits with this code, and holds the code for the Person. */
 	review: protectedProcedure
@@ -1077,6 +1121,23 @@ const sync = {
 		.handler(({ context, input }) =>
 			context.exchange.devices(context.deviceKey, input),
 		),
+	/** The Device offers one of its profiles to a Space here (or changes its caps). */
+	offer: deviceProcedure("sync")
+		.input(
+			offerRef.extend({
+				...offerCapsSchema.shape,
+				deviceName: z.string().trim().min(1).max(64),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.exchange.offer(context.deviceKey, input),
+		),
+	/** The Device withdraws its Offer from a Space here. */
+	withdrawOffer: deviceProcedure("sync")
+		.input(offerRef)
+		.handler(({ context, input }) =>
+			context.exchange.withdrawOffer(context.deviceKey, input),
+		),
 	/** The Device has a Clone of a Project of a Space here. */
 	addClone: deviceProcedure("sync")
 		.input(
@@ -1123,6 +1184,7 @@ export const appRouter = {
 	harnesses,
 	deciders,
 	profiles,
+	offers,
 	devices,
 	account,
 	pairing,

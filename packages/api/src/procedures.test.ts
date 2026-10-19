@@ -41,6 +41,7 @@ const engine: Context["engine"] = {
 	devices: {} as Context["engine"]["devices"],
 	exchange: {} as Context["engine"]["exchange"],
 	logMemberChange: async () => {},
+	offers: {} as Context["engine"]["offers"],
 	deviceBack: async () => {},
 };
 

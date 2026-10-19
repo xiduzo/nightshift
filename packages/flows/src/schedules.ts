@@ -73,6 +73,13 @@ export const scheduleSchema = z.object({
 	 * Host, or the one Device of a Space without a Host.
 	 */
 	device: deviceNameSchema.optional(),
+	/**
+	 * The Person whose runs it starts, when its `device` is another
+	 * Person's: Night Shift writes it when you save the schedule, and the
+	 * runs use that Device through its Offers only. Unset: the runs are
+	 * the firing Device's owner's.
+	 */
+	person: z.string().trim().min(1).max(128).optional(),
 });
 
 export const schedulesFileSchema = z.object({

@@ -23,6 +23,7 @@ import {
 	SelectContent,
 	SelectGroup,
 	SelectItem,
+	SelectLabel,
 	SelectTrigger,
 	SelectValue,
 } from "@nightshift/ui/components/select";
@@ -289,7 +290,7 @@ function StartRunForm({
 						<Select
 							items={devices.map((d) => ({
 								value: d.deviceId,
-								label: d.thisDevice ? `${d.name} (this computer)` : d.name,
+								label: placementLabel(d),
 							}))}
 							value={device?.deviceId ?? null}
 							onValueChange={(value) => {
@@ -305,13 +306,27 @@ function StartRunForm({
 								<SelectValue placeholder="No device" />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectGroup>
-									{devices.map((d) => (
-										<SelectItem key={d.deviceId} value={d.deviceId}>
-											{d.thisDevice ? `${d.name} (this computer)` : d.name}
-										</SelectItem>
-									))}
-								</SelectGroup>
+								{[
+									{
+										label: "Your devices",
+										list: devices.filter((d) => d.offers === undefined),
+									},
+									{
+										label: "Offered to this Space",
+										list: devices.filter((d) => d.offers !== undefined),
+									},
+								].map((group) =>
+									group.list.length === 0 ? null : (
+										<SelectGroup key={group.label}>
+											<SelectLabel>{group.label}</SelectLabel>
+											{group.list.map((d) => (
+												<SelectItem key={d.deviceId} value={d.deviceId}>
+													{placementLabel(d)}
+												</SelectItem>
+											))}
+										</SelectGroup>
+									),
+								)}
 							</SelectContent>
 						</Select>
 						<FieldDescription
@@ -320,7 +335,9 @@ function StartRunForm({
 						>
 							{noDevice
 								? "None of your devices with this project is online. Start the run when one is."
-								: "Where the steps run. You see your devices that are online and have this project."}
+								: device?.offers !== undefined
+									? "Another person's device. The run can use only the profiles it offers to this Space."
+									: "Where the steps run: your devices that are online and have this project, and devices other people offer to this Space."}
 						</FieldDescription>
 					</Field>
 				) : null}
@@ -431,4 +448,17 @@ function StartRunForm({
 			</DialogFooter>
 		</form>
 	);
+}
+
+/** A Device in the list: this computer, or another person's with what it offers. */
+function placementLabel(d: {
+	name: string;
+	thisDevice: boolean;
+	offers?: string[];
+}): string {
+	const name = d.thisDevice ? `${d.name} (this computer)` : d.name;
+	if (d.offers === undefined) return name;
+	return d.offers.length === 0
+		? `${name} · offers nothing`
+		: `${name} · offers ${d.offers.join(", ")}`;
 }

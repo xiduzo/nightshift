@@ -1279,6 +1279,140 @@ iroh.
    - Not yet (part B, after placement): Offers and the offering Device's
      own checks; the git identity on a Device that runs a colleague's
      step comes with them.
+
+   *Landed (part B, Offers):*
+   - **An Offer is two entries** (`packages/engine/src/offers.ts`): the
+     Device's own, in its Device document's `offers` (`DeviceOffer`: Space,
+     profile, `permissionCap`, `sessionCap`, when), the caps the Device
+     enforces; and the publication in the Space document's `offers`
+     (`SpaceOffer`: Device id and name, profile name, the caps, when, by
+     whom; never the profile's settings, tools or secrets). An Offer is in
+     force when both hold it (`inForce`). Making publishes first, then
+     keeps the own entry; withdrawing removes the own entry first (the
+     Device refuses new work at once), then the publication.
+   - **Who makes one.** The Device's owner, on that Device's Agents page
+     ("Offer to a Space…" on a profile), into a shared Space where their
+     role allows the new `offer.make` (owner, admin; a member has
+     `offer.use` only). Not into a personal Space. The publication is
+     written by the Replica that keeps the Space: `engine.offers.publish`
+     here, or through the Host (`sync.offer`, `sync.withdrawOffer`, which
+     check the key's Person's role there and name them in the event).
+     `OfferMade` (Device id and name, profile, caps, `by`) and
+     `OfferWithdrawn` (Device id, profile, `by`) go in the Space's log.
+   - **Profiles stay on their Device.** A run of another Person through an
+     Offer is not resolved at start: the run's copy keeps the node's
+     `profile` and no settings, and the Agent node asks the Device for an
+     offered session (`OfferedSessionInput`: the profile's name and the
+     node's own permission mode, if any). The Device resolves its own
+     profile (`offeredSession`) and says which harness runs it in `ready`
+     (`harness`, appended), so the Walker records the session.
+   - **The Walker's check at run start** (`place`, then `offerRefusal`):
+     a run's Device of another Person needs Offers into the Space
+     (refused at once: "hetzner-1 is not your device. It offers nothing
+     to this Space."), and the starter's role must allow `offer.use`
+     (`EngineOptions.mayUseOffers`, from the Space document's Member
+     mirror). Every node that touches that Device must be an Agent node
+     that names an offered profile ("hetzner-1 offers "coder" to this
+     Space, not "claude"."), sets none of what the profile sets (harness,
+     model, effort, CLI tools, connections, MCP servers, checker), and
+     asks for no wider permission mode than the cap. A node that touches
+     nothing there (a Gate, a rule, a wait for a time or a signal, a Call)
+     needs no Offer; a command, a tool, a model decision or value, a wait
+     on a command and a list from a command are refused. The same rule
+     holds for this computer: another Person's run walked here uses it
+     through its own Offers (`offeredDevice`). Before, any Member could
+     run anything on the Host.
+   - **The Device's own checks** (`checkWork` in
+     `apps/server/src/devices/work.ts`, a second code path): for a run its
+     owner did not start, the requester is a Member (the Space
+     document's Member mirror) whose role allows `offer.use`; it has
+     Offers in force into that Space; the call is an offered session of
+     one of them, or the run's own folder work (flows, worktree, files,
+     item branches). A command, a tool, the decider, an own session and
+     its capabilities (private to its owner) are refused. The Clone and
+     run-folder checks of part A hold for both.
+   - **Caps.** The permission mode: the Walker refuses a node that asks
+     for more; the Device clamps whatever it gets to the cap (the
+     profile's own mode too). The session cap: a session over it **waits**
+     on the Device for a free one, first come first served
+     (`createOfferSlots`), and is not refused, so a colleague's runs slow
+     down instead of failing. Waiting ends with the call's abort.
+   - **Withdrawing** stops running steps as stopped: the Walker tracks the
+     offered sessions it carries (per run, Device, Space and profile) and
+     `engine.offers.withdraw` stops those runs; the Device then aborts
+     what still runs under it (`WorkServer.withdrawn`), also when its Host
+     cannot be reached.
+   - **Git identity** on a Device that runs a colleague's step: the run's
+     `worktree` call carries the starter as `RunRef.author`, as in part A.
+     Tested with the colleague's email in the worktree on B.
+   - **Visibility.** `devices.space` (any Member): the Space's Devices
+     with their name, online state (null where this computer cannot
+     tell), the Space's Projects they have a Clone of, and their offered
+     profiles with caps. Nothing else of a Device. Placements list other
+     Persons' Devices with `offers` (their profile names); Start run shows
+     them under "Offered to this Space".
+   - **UI.** The Agents page: "Offer to a Space…" on a profile (Space,
+     permission mode at most, sessions at once; the dialog says the agent
+     runs with your login and your tools: "A `gh pr create` in a flow a
+     colleague wrote uses your `gh`."), the Spaces it is offered to, and
+     Withdraw. The Devices page: "Offered to Spaces" (each Offer with
+     "Runs for <Space>": the runs of other people here, and Withdraw) and
+     "Devices in this Space".
+   - Tests: `packages/engine/src/offers.test.ts` (the run-start rule, the
+     clamp, the queue, another Person's run on the computer that walks it,
+     withdrawing stops it, the Space document's entry has only the public
+     fields); `apps/server/src/devices/work.test.ts` (`checkWork` called
+     directly, as a bypassed Host would: no Offer, an Offer on one side
+     only, another profile, a command, a non-member, a viewer; the work
+     server's clamp, queue and abort); `apps/server/src/devices/offers.test.ts`
+     (two daemons, two Persons: refused without an Offer, the offer
+     listed with nothing else of B, another profile and a wider mode
+     refused at start, a run through the Offer on B under the caps in the
+     colleague's name, a second session waits, withdrawing stops a running
+     step and logs `OfferWithdrawn`).
+   - **With per-node Placement** (merged with slice 5 part B). Every
+     placed Device is checked on its own: a Device of another Person (by
+     the run's `deviceId`, or by the name a node gives it, also from the
+     Space's Offers when none of your Devices has that name) is a
+     `PlacedDevice` with `offered`, and run start applies `offerRefusal` to
+     the nodes placed there, and the requirements to the others. Its
+     nodes keep their profile unresolved; the "profile's Device" fallback
+     to this computer is skipped when the run's Device or this computer is
+     offered. The Device checks again per call (`checkWork`), on a Device
+     and on the Host for itself (`serveChecked`, shared). A Device that
+     walks a run reaches another Person's Device through the Host
+     (`devices.call`): the Host relays it when that Device offers to the
+     run's Space, and `devices.reachable` answers for it. The Hand-off
+     (`handOff`, `receiveHandOff`) is the run's own folder work, allowed
+     under an Offer. "Move to…" lists your own Devices only: an Offer runs
+     steps, it does not walk runs. Runs the Walker carries to an offered
+     Device are tracked for a withdrawal on that Walker; one withdrawn on
+     another Walker's Device is aborted there (the step fails).
+   - **Schedules.** A schedule whose `device` is another Person's Device
+     runs the saver's runs there: saving it (Schedules) stamps the saver
+     as its `person` (as the Space knows them) and is refused unless that
+     Device's Offers cover what the flow runs there ("The schedule
+     "nightly" fires on another person's device. hetzner-1 is not your
+     device. It offers nothing to this Space."). When it fires, the run is
+     that Person's (`startedBy`), so run start checks the Offers again: a
+     withdrawn Offer refuses the start, and `ScheduleFired` records the
+     reason. A schedule on your own Device names no Person.
+   - **Paths stay with the Device's owner.** `runs.list`, `runs.get` and
+     the start's answer show a run's `worktreePath` (and the take-over
+     command that names it) only to the owner of the run's Device;
+     everyone else gets `""` and no command. A Device whose owner this
+     Replica cannot tell shows none.
+   - **The flow editor's Device field** lists your Devices and, for an
+     Agent node, the Devices of other people that offer its profile to
+     the Space ("hetzner-1 (offers coder)"); `runs.devices` carries
+     `offers` for them.
+   - Not yet, and risky: a schedule file is the repository's, so a
+     schedule written by hand (without the Schedules page) has no
+     `person`, and its runs are the firing Device's owner's, as in slice
+     5 part B: anyone who can push the file can name a Device. Withdrawing
+     an Offer of another of your Devices from the Host's page is not
+     built: withdraw it on that Device. A Device rename and a `${NAME}`
+     the placed Device lacks refusing at start are not built.
 7. **From anywhere.** TLS or tailnet guidance, the Linux binary, the
    desktop app as a Host or joining one.
 

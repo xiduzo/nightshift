@@ -19,6 +19,7 @@ import {
 } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
 import { createAuth } from "@nightshift/auth";
+import { roleAllows } from "@nightshift/auth/access";
 import { createLocalSession } from "@nightshift/auth/local-session";
 import { localPerson } from "@nightshift/auth/spaces";
 import { createDb } from "@nightshift/db";
@@ -37,17 +38,20 @@ import {
 	createConnectionStore,
 	createEngine,
 	createHostLinks,
+	createOfferSlots,
 	createProfileStore,
 	createSettingsStore,
 	createSpaceDocuments,
 	type DeviceDocument,
 	deviceKeyStore,
+	deviceOffers,
 	documentRows,
 	HARNESS_BIN,
 	LEASE_HEARTBEAT_MS,
 	type Lease,
 	LeaseHeldError,
 	localDevice,
+	memberRole,
 	openDeviceDocument,
 	refreshDeviceFacts,
 	type SpaceDocuments,
@@ -67,9 +71,15 @@ import {
 } from "./devices";
 import { exchangeWithHost } from "./devices/exchange";
 import { createHostExchange } from "./devices/host-exchange";
+import { createOffers } from "./devices/offers";
 import { createRelay } from "./devices/relay";
 import { certificateFingerprint } from "./devices/tls";
-import { createWorkServer, type WorkServer } from "./devices/work";
+import {
+	createOfferCalls,
+	createWorkServer,
+	type OfferDeps,
+	type WorkServer,
+} from "./devices/work";
 import { createWorkHub, type WorkHub } from "./devices/work-hub";
 import { createWorkRelay } from "./devices/work-relay";
 import {
@@ -439,6 +449,12 @@ export const engine = await createEngine({
 	dataDir,
 	settings: () => settings.run(),
 	profileFor: (name) => profiles.settingsFor(name),
+	// This computer's own Offers, and who may use Offers in a Space.
+	ownOffers: () => deviceOffers(document),
+	mayUseOffers: async (spaceId, personId) => {
+		const role = memberRole(await spaces.open(spaceId), personId);
+		return role !== null && roleAllows(role, { offer: ["use"] });
+	},
 	spaceDocuments: spaces,
 	// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.
 	// Otherwise the Settings switch is read on every tick.
@@ -482,6 +498,17 @@ export const host = createHost({
 		sync.disconnect((context) => context.deviceId === deviceId),
 });
 
+/**
+ * This computer's Offers, for the steps of other Persons' runs it serves:
+ * the sessions and calls running under each, for every Host and itself.
+ */
+const offerDeps: OfferDeps = {
+	offers: () => deviceOffers(document),
+	profileFor: (name) => profiles.settingsFor(name),
+	slots: createOfferSlots(),
+	calls: createOfferCalls(),
+};
+
 /** This computer as the Host of run history: what paired Devices pull, push and archive. */
 export const hostExchange = createHostExchange({
 	db,
@@ -492,6 +519,7 @@ export const hostExchange = createHostExchange({
 	isHost: host.isHost,
 	work: workHub,
 	local,
+	offerDeps,
 });
 
 /** A Device whose link says nothing for this long is offline. Its heartbeat comes every 15 s. */
@@ -510,11 +538,28 @@ const workServers = new Map<string, WorkServer>();
 function workServer(hostId: string): WorkServer {
 	let server = workServers.get(hostId);
 	if (!server) {
-		server = createWorkServer({ hostId, db, engine, device: local });
+		server = createWorkServer({
+			hostId,
+			db,
+			engine,
+			device: local,
+			...offerDeps,
+		});
 		workServers.set(hostId, server);
 	}
 	return server;
 }
+
+/** This computer's Offers into Spaces, as its owner makes and withdraws them. */
+export const offers = createOffers({
+	db,
+	engine,
+	document,
+	profiles,
+	self: { id: device.id, name: device.name },
+	ownerId: person.userId,
+	withdrawn: (spaceId, profile) => offerDeps.calls.withdrawn(spaceId, profile),
+});
 
 /** This computer's links to the Hosts it paired with. Restarted on `bun --hot`. */
 const hostLinks = createHostLinks(db);

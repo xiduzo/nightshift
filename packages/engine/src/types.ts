@@ -21,6 +21,7 @@ import type { RunWarningKind } from "./events";
 import type { ArchiveRef } from "./exchange/archive";
 import type { RunCommandInput, RunCommandKind } from "./exchange/commands";
 import type { EngineExchange } from "./exchange/engine-exchange";
+import type { DeviceOffer, OfferCaps, SpaceOffer } from "./offers";
 import type { RunSettings } from "./settings";
 import type { SpaceDocuments } from "./space/document";
 import type { Branches } from "./worktrees";
@@ -170,14 +171,20 @@ export type RunWalker = {
 export type RunDevice = RunWalker;
 
 /**
- * A Device a run of a project can be placed on: one of the Person's own,
- * online, with a Clone of the project.
+ * A Device a run of a project can be placed on, online, with a Clone of
+ * the project: one of the Person's own, or another Person's that offers
+ * profiles to the Space.
  */
 export type Placement = {
 	deviceId: string;
 	name: string;
 	/** This computer. */
 	thisDevice: boolean;
+	/**
+	 * Another Person's Device: the profiles it offers to the Space, the
+	 * only ones a run there may use. Absent for the Person's own Devices.
+	 */
+	offers?: string[];
 };
 
 /** One of a Person's Devices, as placement sees it. */
@@ -566,6 +573,8 @@ export interface Engine {
 	 * (`MemberJoined`, `MemberRemoved`, `MemberRoleChanged`), with who made it.
 	 */
 	logMemberChange(change: MemberChange): Promise<void>;
+	/** The Offers of the Spaces: published in their documents, with their audit. */
+	readonly offers: EngineOffers;
 	/**
 	 * A Device is back (its link to this Host took work again): the steps
 	 * of the runs this computer walks that sleep because a Device was
@@ -573,6 +582,43 @@ export interface Engine {
 	 */
 	deviceBack(deviceId: string): Promise<void>;
 }
+
+/**
+ * The Offers as the Space documents publish them. Who may make or
+ * withdraw one is the caller's check (the Device's owner, a role that
+ * allows `offer.make`); the Device's own entry is the daemon's (its
+ * Device document).
+ */
+export type EngineOffers = {
+	/** The Offers a Space lists, every Device's. */
+	list(spaceId: string): Promise<SpaceOffer[]>;
+	/**
+	 * Publishes an Offer (or its new caps) in the Space's document and logs
+	 * `OfferMade` there. A Space a Host keeps: through that Host, which
+	 * logs it in the name of this Device's owner.
+	 */
+	publish(
+		input: OfferCaps & {
+			spaceId: string;
+			deviceId: string;
+			deviceName: string;
+			profile: string;
+			by: string | null;
+		},
+	): Promise<void>;
+	/**
+	 * Takes an Offer off the Space's document, logs `OfferWithdrawn`, and
+	 * stops the runs walked here whose running step is a session under it:
+	 * the step ends as stopped. A Space a Host keeps: through that Host.
+	 * Nothing to withdraw is no error.
+	 */
+	withdraw(input: {
+		spaceId: string;
+		deviceId: string;
+		profile: string;
+		by: string | null;
+	}): Promise<void>;
+};
 
 /** A change of a Space's Members, as the auth hooks report it. */
 export type MemberChange =
@@ -750,6 +796,12 @@ export type Relay = {
 	}): Promise<void>;
 	/** A file of the archive from the Host that keeps the Space. Null when it has none. */
 	archive(ref: ArchiveRef): Promise<string | null>;
+	/** Publishes this Device's Offer in a Space a Host keeps, through that Host. */
+	offer(
+		input: OfferCaps & { spaceId: string; profile: string; deviceName: string },
+	): Promise<void>;
+	/** Withdraws this Device's Offer from a Space a Host keeps, through that Host. */
+	withdrawOffer(input: { spaceId: string; profile: string }): Promise<void>;
 	/** Keeps a file of a run this computer walks in the archive of the Host that keeps the Space. */
 	archivePut(ref: ArchiveRef, content: string): Promise<void>;
 	/**
@@ -814,6 +866,18 @@ export type EngineOptions = {
 	 * refuses to start. Without it, no profile exists.
 	 */
 	profileFor?: (name: string) => AgentProfileSettings | null;
+	/**
+	 * This computer's own Offers (its Device document). A run of another
+	 * Person placed here may use only those the Space also lists. Without
+	 * it, this computer offers nothing.
+	 */
+	ownOffers?: () => readonly DeviceOffer[];
+	/**
+	 * Whether a Person's role in a Space lets them use Offers (`offer.use`),
+	 * the Host's check before it places another Person's run through one.
+	 * Without it, nobody uses Offers here.
+	 */
+	mayUseOffers?: (spaceId: string, personId: string) => Promise<boolean>;
 	/**
 	 * The Space documents, where Projects are defined. The daemon passes
 	 * the ones the relay serves. Default: new ones over `db`.

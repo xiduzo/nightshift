@@ -365,6 +365,7 @@ export function NodeInspector({
 						id={`${id}-device`}
 						value={"device" in node ? node.device : undefined}
 						devices={devices}
+						profile={node.type === "agent" ? node.profile : undefined}
 						onChange={(device) =>
 							onChange((current) => withDevice(current, device))
 						}

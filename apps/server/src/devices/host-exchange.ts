@@ -13,14 +13,13 @@ import {
 	MissingProjectError,
 	mergeCursors,
 	type SyncCursors,
-	serveWork,
 	withoutPrivatePaths,
 } from "@nightshift/engine";
 import type { Engine } from "@nightshift/engine/types";
 import { ORPCError } from "@orpc/server";
 
 import { NOT_A_HOST } from "./host";
-import { checkWork } from "./work";
+import { type OfferDeps, serveChecked } from "./work";
 import type { WorkHub } from "./work-hub";
 
 /**
@@ -60,6 +59,8 @@ export function createHostExchange(deps: {
 	work: WorkHub;
 	/** This Host as a Device: it serves the calls of runs a Device walks with steps here. */
 	local?: Device;
+	/** This Host's own Offers, for the steps of other Persons' runs it serves itself. */
+	offerDeps?: OfferDeps;
 }): HostExchange {
 	const { db, engine, registry } = deps;
 	const { exchange } = engine;
@@ -219,6 +220,32 @@ export function createHostExchange(deps: {
 			await exchange.recordClone({ ...input, deviceId: key.deviceId });
 		},
 
+		async offer(key, input) {
+			await admit(key);
+			const role = await roleIn(db, key.personId, input.spaceId);
+			if (!role || !roleAllows(role, { offer: ["make"] })) {
+				forbidden("Your role in this Space does not allow offering profiles.");
+			}
+			await engine.offers.publish({
+				...input,
+				deviceId: key.deviceId,
+				by: key.personId,
+			});
+		},
+
+		async withdrawOffer(key, input) {
+			await admit(key);
+			// The Device's owner withdraws its own Offer, whatever their role now.
+			if (!(await isMember(key, input.spaceId))) {
+				throw new Error(`Space not found: ${input.spaceId}`);
+			}
+			await engine.offers.withdraw({
+				...input,
+				deviceId: key.deviceId,
+				by: key.personId,
+			});
+		},
+
 		async archivePut(key, ref, content) {
 			await admit(key);
 			await ownRun(key, ref);
@@ -287,32 +314,39 @@ export function createHostExchange(deps: {
 			await mayStart(key, request.spaceId);
 			if (deviceId === deps.selfId) {
 				const local = deps.local;
-				const refusal = local
-					? await checkWork(request, {
-							ownerId: deps.ownerId,
-							db,
-							engine,
-						})
-					: "This Host does not run steps.";
-				if (refusal !== null || !local) {
-					yield { kind: "error", message: refusal ?? "" };
+				if (!local) {
+					yield { kind: "error", message: "This Host does not run steps." };
 					return;
 				}
-				yield* serveWork(
-					local,
+				// Its owner's run, or another Person's through its Offers.
+				yield* serveChecked(
 					request,
+					{
+						ownerId: deps.ownerId,
+						db,
+						engine,
+						device: local,
+						...deps.offerDeps,
+					},
 					signal ?? new AbortController().signal,
 				);
 				return;
 			}
 			const paired = await registry.get(deviceId);
-			if (!paired || paired.revokedAt || paired.ownerId !== key.personId) {
+			if (
+				!paired ||
+				paired.revokedAt ||
+				(paired.ownerId !== key.personId &&
+					!(await offersInto(deviceId, request.spaceId)))
+			) {
 				yield {
 					kind: "error",
-					message: "That device is not one of yours on this Host.",
+					message:
+						"That device is not one of yours on this Host, and it offers nothing to this Space.",
 				};
 				return;
 			}
+			// Another Person's Device checks its Offers again itself.
 			yield* deps.work.call(deviceId, request, signal);
 		},
 
@@ -320,12 +354,25 @@ export function createHostExchange(deps: {
 			await admit(key);
 			if (deviceId === deps.selfId) return true;
 			const paired = await registry.get(deviceId);
-			if (!paired || paired.revokedAt || paired.ownerId !== key.personId) {
-				return false;
+			if (!paired || paired.revokedAt) return false;
+			if (paired.ownerId !== key.personId) {
+				// Another Person's: only one that offers to a Space of theirs.
+				let offering = false;
+				for (const space of await memberSpaces(key)) {
+					if (await offersInto(deviceId, space)) offering = true;
+				}
+				if (!offering) return false;
 			}
 			return deps.work.online(deviceId, "");
 		},
 	};
+
+	/** Whether a Device offers profiles to a Space (its document says so). */
+	async function offersInto(deviceId: string, spaceId: string) {
+		return (await engine.offers.list(spaceId)).some(
+			(o) => o.deviceId === deviceId,
+		);
+	}
 
 	/** Refuses a Person whose role in the Space does not start runs. */
 	async function mayStart(key: DeviceKeyAccess, spaceId: string) {

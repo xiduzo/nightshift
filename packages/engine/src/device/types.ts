@@ -44,8 +44,14 @@ export type Device = {
 	 * start: `refused` (the stream ends there) or `ready`; the harness
 	 * starts when the next item is read, so a caller records the session
 	 * between the two. Then the harness's own events.
+	 *
+	 * An `OfferedSessionInput` names a profile the Device offers instead
+	 * of the harness and its settings: only a Device that serves another
+	 * Person's run under its Offers takes one (`offers.ts`).
 	 */
-	session(input: SessionInput): AsyncIterable<SessionEvent>;
+	session(
+		input: SessionInput | OfferedSessionInput,
+	): AsyncIterable<SessionEvent>;
 	/** One `sh -c` in `cwd`: every chunk of output, then exactly one `exit`. */
 	exec(input: ExecInput): AsyncIterable<ExecEvent>;
 	/** One `tools/call` on a connection's MCP server. Never throws. */
@@ -152,9 +158,32 @@ export type SessionInput = Omit<
 	mcpServers?: AgentNode["mcpServers"];
 };
 
+/**
+ * A session of an Agent Profile the Device offers to the run's Space (an
+ * Offer). The Walker does not know the profile's settings: the Device
+ * that runs it resolves the profile itself, as its owner set it.
+ * `permissionMode` is what the node asks for; the Offer's cap bounds it.
+ */
+export type OfferedSessionInput = Omit<
+	SessionInput,
+	| "harness"
+	| "model"
+	| "permissionMode"
+	| "effort"
+	| "clis"
+	| "connections"
+	| "mcpServers"
+> & {
+	offered: {
+		profile: string;
+		permissionMode?: SessionInput["permissionMode"];
+	};
+};
+
 export type SessionEvent =
 	| AgentEvent
-	| { type: "ready" }
+	/** `harness`: what runs the session, for an offered profile the Walker cannot resolve. */
+	| { type: "ready"; harness?: HarnessName }
 	/** The session cannot start; the message says why, for the person. */
 	| { type: "refused"; message: string };
 

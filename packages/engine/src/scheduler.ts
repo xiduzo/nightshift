@@ -284,6 +284,8 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 					inputs: schedule.inputs,
 					...(schedule.baseRef ? { baseRef: schedule.baseRef } : {}),
 					...(stopAt !== undefined ? { stopAt } : {}),
+					// Another Person's schedule: their run, through the Offers here.
+					...(schedule.person ? { startedBy: schedule.person } : {}),
 				},
 				{ kind: "schedule", scheduleId: schedule.id, at: due },
 			);
