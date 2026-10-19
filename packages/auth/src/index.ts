@@ -33,6 +33,9 @@ export type AuthConfig = {
 
 const PERSONAL = "Nobody can join a personal Space. Create a Space to share.";
 
+/** How long an invitation link works. */
+export const INVITATION_DAYS = 7;
+
 export type AuthOptions = {
 	/**
 	 * A Space was made, or its Members changed (added, removed, a new role,
@@ -135,6 +138,8 @@ export function createAuth(
 			organization({
 				ac,
 				roles,
+				// No email server: a person shares the link by hand, which takes longer.
+				invitationExpiresIn: INVITATION_DAYS * 24 * 3600,
 				schema: {
 					organization: {
 						additionalFields: {
