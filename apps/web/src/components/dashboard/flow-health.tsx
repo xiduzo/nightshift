@@ -23,7 +23,8 @@ const NIGHTS = 30;
 
 /**
  * Each flow over the last 30 nights: its last run, how often it finished, and
- * what a run costs. A stopped run did not finish, so it counts against it.
+ * what a finished run costs. A stopped run did not finish, so it counts
+ * against it.
  * A flow a Subflow node ran counts too, inside the run that called it.
  */
 export function FlowHealth({
@@ -118,8 +119,10 @@ type FlowHealthRow = {
 	ended: number;
 	/** Percent of ended runs that finished; undefined when none ended. */
 	rate: number | undefined;
-	/** What an ended run cost; undefined when none ended. */
+	/** What a finished run cost; undefined when none finished. */
 	cost: CostSpread | undefined;
+	/** The runs that ended without finishing, and what they spent together. */
+	unfinished: { count: number; costUsd: number };
 };
 
 /** The five-number summary of what the runs of a flow cost. */
@@ -197,18 +200,25 @@ function flowHealthOf(
 			run.status === "stopped" ||
 			run.status === "interrupted",
 	);
-	const finished = ended.filter((run) => run.status === "finished").length;
+	const finished = ended.filter((run) => run.status === "finished");
+	// A run that failed early spent next to nothing, which would drag down
+	// what a run costs. Its spend shows on its own instead.
+	const unfinished = ended.filter((run) => run.status !== "finished");
 	return {
 		name,
 		last,
 		runs: recent.length,
-		finished,
+		finished: finished.length,
 		ended: ended.length,
 		rate:
 			ended.length > 0
-				? Math.round((finished / ended.length) * 100)
+				? Math.round((finished.length / ended.length) * 100)
 				: undefined,
-		cost: costSpreadOf(ended.map((run) => run.costUsd)),
+		cost: costSpreadOf(finished.map((run) => run.costUsd)),
+		unfinished: {
+			count: unfinished.length,
+			costUsd: unfinished.reduce((total, run) => total + run.costUsd, 0),
+		},
 	};
 }
 
@@ -287,15 +297,16 @@ function flowHealthColumns(projectId: string, now: number, scaleMax: number) {
 		}),
 		column.accessor((row) => row.cost?.median, {
 			id: "perRun",
-			header: "Median per run",
+			header: "Per finished run",
 			enableSorting: true,
 			sortUndefined: "last",
-			cell: ({ row: { original } }) =>
-				original.cost === undefined ? (
-					"—"
-				) : (
-					<CostCell cost={original.cost} scaleMax={scaleMax} />
-				),
+			cell: ({ row: { original } }) => (
+				<CostCell
+					cost={original.cost}
+					unfinished={original.unfinished}
+					scaleMax={scaleMax}
+				/>
+			),
 			meta: {
 				headClassName: "pr-6 text-right w-56",
 				cellClassName: "pr-6 text-right tabular-nums",
@@ -308,10 +319,43 @@ const PLOT_WIDTH = 96;
 const PLOT_HEIGHT = 14;
 
 /**
- * The median cost of a run, with a box plot of the spread: the whiskers
- * reach the cheapest and the dearest run, the box holds the middle half.
+ * The median cost of a finished run, with a box plot of the spread: the
+ * whiskers reach the cheapest and the dearest run, the box holds the middle
+ * half. What the runs that did not finish spent goes in the tooltip.
  */
-function CostCell({ cost, scaleMax }: { cost: CostSpread; scaleMax: number }) {
+function CostCell({
+	cost,
+	unfinished,
+	scaleMax,
+}: {
+	cost: CostSpread | undefined;
+	unfinished: FlowHealthRow["unfinished"];
+	scaleMax: number;
+}) {
+	const unfinishedLine =
+		unfinished.count > 0 ? (
+			<span>
+				{unfinished.count === 1
+					? "1 run that did not finish"
+					: `${unfinished.count} runs that did not finish`}{" "}
+				spent {formatCost(unfinished.costUsd)}.
+			</span>
+		) : null;
+	if (cost === undefined) {
+		return unfinishedLine ? (
+			<Tooltip>
+				<TooltipTrigger render={<span className="text-muted-foreground" />}>
+					—
+				</TooltipTrigger>
+				<TooltipContent className="flex flex-col items-start gap-0.5 tabular-nums">
+					<span>No run finished yet.</span>
+					{unfinishedLine}
+				</TooltipContent>
+			</Tooltip>
+		) : (
+			"—"
+		);
+	}
 	const x = (usd: number) =>
 		scaleMax > 0 ? 1 + (usd / scaleMax) * (PLOT_WIDTH - 2) : 1;
 	const mid = PLOT_HEIGHT / 2;
@@ -367,11 +411,11 @@ function CostCell({ cost, scaleMax }: { cost: CostSpread; scaleMax: number }) {
 				<span className="w-14">{formatCost(cost.median)}</span>
 			</TooltipTrigger>
 			<TooltipContent className="flex flex-col items-start gap-0.5 tabular-nums">
-				<span>A typical run costs {formatCost(cost.median)}.</span>
+				<span>A finished run typically costs {formatCost(cost.median)}.</span>
 				{cost.count > 1 ? (
 					<>
 						<span>
-							Half the runs cost {formatCost(cost.q1)} to {formatCost(cost.q3)}.
+							Half of them cost {formatCost(cost.q1)} to {formatCost(cost.q3)}.
 						</span>
 						<span>
 							The cheapest cost {formatCost(cost.min)}, the most{" "}
@@ -379,8 +423,11 @@ function CostCell({ cost, scaleMax }: { cost: CostSpread; scaleMax: number }) {
 						</span>
 					</>
 				) : null}
+				{unfinishedLine}
 				<span className="text-muted-foreground">
-					{cost.count === 1 ? "From 1 run." : `From ${cost.count} runs.`}
+					{cost.count === 1
+						? "From 1 finished run."
+						: `From ${cost.count} finished runs.`}
 				</span>
 			</TooltipContent>
 		</Tooltip>
