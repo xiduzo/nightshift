@@ -95,6 +95,8 @@ const pendingParkedSchema = z.object({
 	status: z.enum(["failed", "stopped"]),
 	/** The run's end reason, as `RunEnded` records it. */
 	reason: z.string().nullable(),
+	/** True when the stop time stopped the run, not a person: a Call node's `stopped` edge may then go on. */
+	atStopTime: z.boolean().optional(),
 });
 /**
  * A Gate the node opened (`GateOpened` is in the log) for its ask node to
@@ -157,6 +159,15 @@ export const RunState = z.object({
 	stopAt: withLangGraph(z.number().nullable(), {
 		default: () => null as number | null,
 	}),
+	/**
+	 * True once a Call node followed its `stopped` edge: the stop time came,
+	 * and the nodes after the edge wrap the run up. From then on steps start
+	 * past the stop time, in this graph and in the flows it calls
+	 * (`stopAtOf` reads no stop time).
+	 */
+	wrappingUp: withLangGraph(z.boolean(), {
+		default: () => false,
+	}),
 	/** `StepEnded.outputs` of each node's latest ended visit, for templates. */
 	nodes: mergedRecord<StepOutputs>(),
 	/**
@@ -212,6 +223,7 @@ export type Parked =
 			nodeId: string;
 			status: "failed" | "stopped";
 			reason: string | null;
+			atStopTime?: boolean;
 	  };
 
 /**

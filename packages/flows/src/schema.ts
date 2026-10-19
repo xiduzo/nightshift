@@ -369,6 +369,12 @@ export const callEachSchema = z.object({
  * plus `ended` (the label or choice it ended on, or "") and `visit`.
  * With `each`: ends `done` or `halted`; its outputs count the elements and
  * hold each one's result in `results` (`callEachOutputFields`).
+ *
+ * Either way it ends `stopped` when the run's stop time comes while it runs.
+ * Without an edge on `stopped` the run stops there, as anywhere. With one,
+ * the run goes on along it, and the nodes after it run past the stop time:
+ * they wrap the night up (a report, a stack of pull requests). The element
+ * that was running ends `failed`. The run then finishes, it cannot be resumed.
  */
 export const callNodeSchema = z.object({
 	...nodeBase,
@@ -615,7 +621,9 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 		case "decision":
 			return node.options.map((option) => option.name);
 		case "call":
-			return node.each ? ["done", "halted"] : ["pass", "fail"];
+			return node.each
+				? ["done", "halted", "stopped"]
+				: ["pass", "fail", "stopped"];
 		case "value":
 			return ["pass", "fail"];
 		case "wait":

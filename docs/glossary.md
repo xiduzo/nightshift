@@ -31,7 +31,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Start Node | The Node a Run begins at. | Slice 2 |
 | Input | A named value a Flow takes, like a function argument. The top-level Flow's Inputs are asked at start. | Slice 5 |
 | Output | A named value a Flow returns to the Node that called it. | Slice 5 |
-| Call Node | A Node that runs another Flow with its Inputs bound: once (`pass` or `fail`), or with `each` once per Item of a List (`done` or `halted`). | PLAN §3 |
+| Call Node | A Node that runs another Flow with its Inputs bound: once (`pass` or `fail`), or with `each` once per Item of a List (`done` or `halted`). Either way `stopped` at the stop time: an Edge on it leads to the Nodes that still run after the stop time. | PLAN §3 |
 | Body Flow | The Flow a Call Node with `each` runs once per Item. Any Flow can be a Body Flow. | Slice 4 |
 | Item | One element of the List of a Call Node with `each`: any JSON value, optionally with `id`, `title`, `dependsOn`, and `done`. | Slice 4 |
 | Connection | An MCP server defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `connections`. Holds `${NAME}` references, never secret values. | Connections |

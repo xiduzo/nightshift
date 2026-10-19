@@ -9,11 +9,13 @@ import {
 	beginWait,
 	isWaitKind,
 	messageOf,
+	pastStopTime,
+	STOP_TIME_REASON,
 	type StepContext,
 	type StepHandle,
 	type WaitRequest,
 } from "../../context";
-import { type StepEnd, waitNodeId } from "../../route";
+import { parkStopped, type StepEnd, waitNodeId } from "../../route";
 import { entryOf, withinGrace } from "../choosers/model";
 import {
 	endWithoutValue,
@@ -50,10 +52,30 @@ export function modelProducer(node: ValueNode, ctx: StepContext): Producer {
 		);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;
+		// The wait ended past the stop time: the step does not continue.
+		if (step.opened === "continue" && pastStopTime(ctx, state, config)) {
+			const end = await step.end(
+				"stopped",
+				valueOutputs("stopped", null, "", step.visit),
+				null,
+			);
+			return parkStopped(node, end, STOP_TIME_REASON);
+		}
 		try {
 			const made = await make(ctx, node, step);
 			if (!("reason" in made)) return made;
-			const waited = await beginWait(ctx, node, state, step, made);
+			const waited = await beginWait(ctx, node, state, config, step, made);
+			if (waited.kind === "stop-time") {
+				const end = await step.end(
+					"stopped",
+					valueOutputs("stopped", null, "", step.visit),
+					null,
+					{
+						costUsd: made.costUsd,
+					},
+				);
+				return parkStopped(node, end, waited.reason);
+			}
 			if (waited.kind === "wait") {
 				return new Command({
 					update: {

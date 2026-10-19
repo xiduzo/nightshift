@@ -99,8 +99,8 @@ export function CallFields({
 						<FieldLabel htmlFor={`${id}-each`}>Run once per item</FieldLabel>
 						<FieldDescription id={`${id}-each-hint`} className="text-xs">
 							{each
-								? "The flow runs for each item in a list. This node ends with done or halted."
-								: "The flow runs one time. This node ends with pass or fail."}
+								? "The flow runs for each item in a list. This node ends with done, halted, or stopped."
+								: "The flow runs one time. This node ends with pass, fail, or stopped."}
 						</FieldDescription>
 					</FieldContent>
 				</ShadcnField>
@@ -296,7 +296,10 @@ function EachFields({
 				<Note>
 					Ends with <span className="text-foreground">done</span> when no item
 					is left to start, or <span className="text-foreground">halted</span>.
-					A failed item blocks the items that depend on it. Later nodes read{" "}
+					It ends with <span className="text-foreground">stopped</span> at the
+					stop time. Connect <span className="text-foreground">stopped</span> to
+					nodes that still run after the stop time, for example a report. A
+					failed item blocks the items that depend on it. Later nodes read{" "}
 					<code>{`{{${node.id}.summary}}`}</code>,{" "}
 					<code>{`{{${node.id}.done_count}}`}</code>, and each item's result in{" "}
 					<code>{`{{${node.id}.results}}`}</code>.

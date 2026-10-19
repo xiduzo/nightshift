@@ -52,7 +52,13 @@ import {
 	stopAtOf,
 	uncommittedStep,
 } from "../context";
-import { parkCommand, route, type StepEnd, scopeOf } from "../route";
+import {
+	hasStoppedEdge,
+	parkCommand,
+	route,
+	type StepEnd,
+	scopeOf,
+} from "../route";
 import type { Loop, RunStateValues } from "../state";
 import {
 	type BodyGraph,
@@ -146,6 +152,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				status: "stopped",
 				reason,
 				step: end,
+				atStopTime: reason === STOP_TIME_REASON,
 				update: {
 					loops: { [node.id]: null },
 					nodes: { [node.id]: end.outputs },
@@ -153,6 +160,17 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				},
 			});
 		};
+		/**
+		 * The stop time ended the loop, and the node has a `stopped` edge: the
+		 * step ends `stopped` and the run goes on along the edge, past the
+		 * stop time, to the nodes that wrap it up.
+		 */
+		const wrapUp = async () =>
+			route(ctx, state, node, await endStep("stopped", null), config, {
+				loops: { [node.id]: null },
+				wrappingUp: true,
+			});
+		const wrapsUp = hasStoppedEdge(ctx.flow, node);
 		const endItem = async (
 			itemId: string,
 			itemState: EnginePayloads["ItemEnded"]["state"],
@@ -221,6 +239,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				stopAtOf(state, config),
 				await ctx.log.events(runId),
 			);
+			if (stop === STOP_TIME_REASON && wrapsUp) return wrapUp();
 			if (stop) return parkStopped(stop);
 
 			let items: ListItem[];
@@ -363,9 +382,20 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				// The step stays open: the element continues after the wait.
 				step.leaveOpen();
 				throw ended.interrupt;
-			case "stopped":
+			case "stopped": {
+				if (ended.atStopTime && wrapsUp) {
+					const outputs = await bodyOutputs(ctx, body);
+					await endItem(
+						element.facts.id,
+						"failed",
+						"Not finished before the stop time.",
+						outputs,
+					);
+					return wrapUp();
+				}
 				await endStep("stopped", null);
 				throw ended.interrupt;
+			}
 			case "aborted":
 				await endStep("error", ended.reason);
 				throw ended.interrupt;

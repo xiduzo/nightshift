@@ -1277,6 +1277,131 @@ describe("stop modes", () => {
 			}),
 		).rejects.toThrow("stop time has passed");
 	});
+
+	test("a usage limit that resets after the stop time stops the run at once; resume continues the same session", async () => {
+		const clock = Date.now();
+		const stopAt = clock + 60 * 60_000;
+		const harness = fakeHarness((_input, call) =>
+			call === 0 ? usageLimitScript(stopAt) : {},
+		);
+		const engine = makeEngine(harness, {}, { now: () => clock });
+		const started = await engine.startRun({
+			projectId: await projectId(engine),
+			stopAt,
+			flow: flowOf(
+				[agent("worker", "Go"), command("check", "true")],
+				[edge("e1", "worker", "pass", "check")],
+			),
+		});
+		const detail = await waitForEnd(engine, started.id);
+		expect(detail.status).toBe("stopped");
+		expect(detail.reason).toBe(
+			"Usage limit: You've hit your limit. It resets after the stop time, so the run stopped. Resume the run to continue.",
+		);
+		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["worker", "stopped"],
+		]);
+		const logged = await loggedEvents(started.id);
+		expect(logged.some((e) => e.type === "WaitStarted")).toBe(false);
+
+		await engine.resumeRun(started.id);
+		const resumed = await waitForEnd(engine, started.id);
+		expect(resumed.status).toBe("finished");
+		expect(harness.calls).toHaveLength(2);
+		expect(harness.calls[1]?.resumeSessionId).toBe("fake-session-1");
+		expect(resumed.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["worker", "pass"],
+			["check", "pass"],
+		]);
+	});
+
+	test("a usage limit that resets before the stop time still waits", async () => {
+		const clock = Date.now();
+		const harness = fakeHarness((_input, call) =>
+			call === 0 ? usageLimitScript(clock + 60_000) : {},
+		);
+		const engine = makeEngine(harness, {}, { now: () => clock });
+		const started = await engine.startRun({
+			projectId: await projectId(engine),
+			stopAt: clock + 60 * 60_000,
+			flow: flowOf([agent("worker", "Go")]),
+		});
+		const sleeping = await waitForStatus(engine, started.id, "sleeping");
+		expect(sleeping.wakeAt).toBe(clock + 2 * 60_000);
+		await engine.stopRun(started.id);
+		await waitForEnd(engine, started.id);
+	});
+
+	test("the stop time takes a Call's stopped edge: the item ends failed, and the nodes after it run past the stop time", async () => {
+		await saveBody(
+			"build",
+			[agent("worker", "Build {{item.id}}"), command("commit", commitItem)],
+			[edge("b1", "worker", "pass", "commit")],
+		);
+		let clock = Date.now();
+		const { harness, sessions } = scriptedHarness();
+		const engine = makeEngine(harness, {}, { now: () => clock });
+		const stopAt = clock + 60_000;
+		const started = await engine.startRun({
+			projectId: await projectId(engine),
+			stopAt,
+			flow: flowOf(
+				[
+					callEach("loop", "build", printItems([{ id: "1" }, { id: "2" }])),
+					command("report", `printf '%s' "{{loop.summary}}"`),
+				],
+				[
+					edge("e1", "loop", "done", "report"),
+					edge("e2", "loop", "stopped", "report"),
+				],
+			),
+		});
+		const session = await waitFor(() => sessions[0]);
+		clock = stopAt + 1;
+		session.finish();
+		const detail = await waitForEnd(engine, started.id);
+		expect(detail.status).toBe("finished");
+		expect(
+			detail.steps.map((s) => [s.nodeId, s.scope?.itemId ?? null, s.outcome]),
+		).toEqual([
+			["loop", null, "stopped"],
+			["worker", "1", "pass"],
+			["report", null, "pass"],
+		]);
+		expect(
+			callEachStep(detail).items.map((i) => [i.id, i.state, i.reason]),
+		).toEqual([["1", "failed", "Not finished before the stop time."]]);
+		const report = detail.steps.find((s) => s.nodeId === "report");
+		expect(report?.outputs?.log_tail).toBe(
+			"#1 failed: Not finished before the stop time.\n#2 not started",
+		);
+	});
+
+	test("without a stopped edge, the stop time inside a Call still stops the run there", async () => {
+		await saveBody("build", [agent("worker", "Build {{item.id}}")]);
+		let clock = Date.now();
+		const { harness, sessions } = scriptedHarness();
+		const engine = makeEngine(harness, {}, { now: () => clock });
+		const stopAt = clock + 60_000;
+		const started = await engine.startRun({
+			projectId: await projectId(engine),
+			stopAt,
+			flow: flowOf(
+				[
+					callEach("loop", "build", printItems([{ id: "1" }, { id: "2" }])),
+					command("report", "true"),
+				],
+				[edge("e1", "loop", "done", "report")],
+			),
+		});
+		const session = await waitFor(() => sessions[0]);
+		clock = stopAt + 1;
+		session.finish();
+		const detail = await waitForEnd(engine, started.id);
+		expect(detail.status).toBe("stopped");
+		expect(detail.reason).toBe("Reached the stop time");
+		expect(detail.steps.some((s) => s.nodeId === "report")).toBe(false);
+	});
 });
 
 describe("run inputs", () => {

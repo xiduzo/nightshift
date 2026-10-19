@@ -32,6 +32,7 @@ import { compileFlow } from "./compile";
 import {
 	createRecorders,
 	DEFAULT_RESUME_PROMPT,
+	STOP_TIME_REASON,
 	type StepContext,
 } from "./context";
 import type { Parked, RunEvent, RunStateValues } from "./state";
@@ -474,6 +475,18 @@ describe("the Agent node", () => {
 		const [ended] = payloads(await h2.events(), "StepEnded");
 		expect(ended).toMatchObject({ outcome: "error" });
 
+		// The object sent as JSON text counts as the object.
+		const asText = fakeHarness(
+			reportingScript("ship", "Shipped", JSON.stringify({ n: 2 })),
+		);
+		const h4 = await startRun(
+			flowOf({ start: "worker", nodes: [node()], edges: [] }),
+			asText,
+		);
+		const fourth = await drive(h4, { inputs: {} });
+		expect(fourth.parked).toEqual([]);
+		expect(fourth.state.nodes.worker).toMatchObject({ data: { n: 2 } });
+
 		const silent = fakeHarness({ steps: [], outcome: { type: "finished" } });
 		const h3 = await startRun(
 			flowOf({ start: "worker", nodes: [node()], edges: [] }),
@@ -610,6 +623,58 @@ describe("the Agent node", () => {
 		expect(worker?.sessions.map((s) => s.ending?.outcome)).toEqual([
 			"failed",
 			"finished",
+		]);
+	});
+
+	test("a wake past the stop time does not continue the step: it ends stopped with its session, for a resume", async () => {
+		const resetAt = Date.now() + 60 * MINUTE;
+		const stopAt = resetAt + 10 * MINUTE;
+		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
+			call === 0 ? usageLimitScript(resetAt) : reportingScript("pass"),
+		);
+		const h = await startRun(
+			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
+			harness,
+		);
+		const first = await drive(h, { inputs: {}, stopAt });
+		expect(first.next).toEqual(["wait__worker"]);
+		const [stepRow] = deriveSteps(await h.events());
+		const stepId = stepRow?.id as string;
+
+		// Night Shift was not running at the wake: it comes after the stop time.
+		h.ctx.now = () => stopAt + MINUTE;
+		await h.log.append({
+			type: "WaitEnded",
+			runId: h.runId,
+			stepId,
+			payload: { early: false },
+		});
+		const second = await drive(
+			h,
+			new Command({ resume: { kind: "wake", early: false } }),
+			h.graph(),
+		);
+		expect(second.parked).toEqual([
+			{
+				kind: "parked",
+				stepId,
+				nodeId: "worker",
+				status: "stopped",
+				reason: STOP_TIME_REASON,
+				atStopTime: true,
+			},
+		]);
+		expect(harness.calls).toHaveLength(1);
+		expect(second.state.pending).toMatchObject({
+			kind: "parked",
+			harnessSessionId: "fake-session-1",
+		});
+		expect(payloads(await h.events(), "StepEnded")).toEqual([
+			{
+				outcome: "stopped",
+				outputs: { outcome: "stopped", visit: 1 },
+				error: null,
+			},
 		]);
 	});
 

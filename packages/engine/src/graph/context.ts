@@ -257,12 +257,14 @@ export function uncommittedStep(
  * The run's stop time as this graph sees it (epoch ms, or null). The root
  * reads its state; a body reads its caller's, which `runBody` puts in
  * `configurable.stopAt` on every invoke, so a stop time a resume cleared
- * at the root reaches a body that resumes from its own checkpoint.
+ * at the root reaches a body that resumes from its own checkpoint. None
+ * while the graph wraps the run up after a `stopped` edge (`wrappingUp`).
  */
 export function stopAtOf(
 	state: RunStateValues,
 	config: LangGraphRunnableConfig,
 ): number | null {
+	if (state.wrappingUp) return null;
 	const own = config.configurable?.stopAt as number | null | undefined;
 	return own === undefined ? state.stopAt : own;
 }
@@ -350,9 +352,13 @@ export async function beginStep(
 	const scope = scopeOf(config);
 	const key = scopeKey(scope);
 	const events = await ctx.log.events(runId);
-	const parked = (status: "failed" | "stopped", reason: string | null) => ({
+	const parked = (
+		status: "failed" | "stopped",
+		reason: string | null,
+		atStopTime = false,
+	) => ({
 		kind: "parked" as const,
-		command: parkCommand({ node, status, reason, step: null }),
+		command: parkCommand({ node, status, reason, step: null, atStopTime }),
 	});
 
 	let stepId: string;
@@ -369,7 +375,7 @@ export async function beginStep(
 		}
 		const stopAt = stopAtOf(state, config);
 		if (stopAt !== null && ctx.now() >= stopAt) {
-			return parked("stopped", STOP_TIME_REASON);
+			return parked("stopped", STOP_TIME_REASON, true);
 		}
 		const limit = ctx.policy().maxSteps ?? ctx.settings().maxStepsPerRun;
 		if (countStepsSinceWalkBegan(events) >= limit) {
@@ -565,9 +571,28 @@ export type WaitRequest = {
 	harnessSessionId: string | null;
 };
 
+/** Why the run stopped instead of waiting: the wait would end after the stop time. */
+function stopTimeWaitReason(request: WaitRequest): string {
+	return request.reason === "usage-limit"
+		? `Usage limit: ${request.message}. It resets after the stop time, so the run stopped. Resume the run to continue.`
+		: `The network is down: ${request.message}. The next try is after the stop time, so the run stopped. Resume the run to continue.`;
+}
+
+/** True when the run has a stop time and it has passed. */
+export function pastStopTime(
+	ctx: StepContext,
+	state: RunStateValues,
+	config: LangGraphRunnableConfig,
+): boolean {
+	const stopAt = stopAtOf(state, config);
+	return stopAt !== null && ctx.now() >= stopAt;
+}
+
 /**
  * The run policy's wait (ported from `beginWait`): plans it with `planWait`
- * from the step's wait streak; on a wait, appends `WaitStarted`, records the
+ * from the step's wait streak. A wait that would end after the run's stop
+ * time is not started: the node ends the step `stopped` and parks the run
+ * (`stop-time`, with why). On a wait, appends `WaitStarted`, records the
  * transcript `wait` entry, tells the bus and leaves the step open. The node
  * then jumps to its wait node with the returned `pending`; the wait node
  * interrupts; a wake re-enters the node, which continues the step. The
@@ -582,10 +607,13 @@ export async function beginWait(
 	ctx: StepContext,
 	node: FlowNode,
 	state: RunStateValues,
+	config: LangGraphRunnableConfig,
 	step: StepHandle,
 	request: WaitRequest,
 ): Promise<
-	{ kind: "wait"; pending: PendingWait } | { kind: "give-up"; error: string }
+	| { kind: "wait"; pending: PendingWait }
+	| { kind: "give-up"; error: string }
+	| { kind: "stop-time"; reason: string }
 > {
 	const runId = ctx.run.id;
 	const previous = state.pending;
@@ -606,6 +634,12 @@ export async function beginWait(
 		minuteMs: ctx.minuteMs,
 	});
 	if (plan.kind === "give-up") return { kind: "give-up", error: plan.error };
+	// A wait that ends after the stop time would only continue the step past
+	// it: the run stops now, and a resume continues the step.
+	const stopAt = stopAtOf(state, config);
+	if (stopAt !== null && plan.until >= stopAt) {
+		return { kind: "stop-time", reason: stopTimeWaitReason(request) };
+	}
 	await ctx.log.append({
 		type: "WaitStarted",
 		runId,

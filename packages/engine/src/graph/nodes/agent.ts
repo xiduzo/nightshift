@@ -26,7 +26,7 @@ import {
 	type StepOutputs,
 	scopeKey,
 } from "../../events";
-import { checkOutputData } from "../../output-schema";
+import { checkOutputData, normalizeOutputData } from "../../output-schema";
 import {
 	beginStep,
 	beginWait,
@@ -35,13 +35,21 @@ import {
 	isWaitKind,
 	messageOf,
 	type NodeAction,
+	pastStopTime,
 	STOP_GRACE_MS,
+	STOP_TIME_REASON,
 	type StepContext,
 	type StepHandle,
 	type StepStart,
 	type WaitRequest,
 } from "../context";
-import { route, type StepEnd, scopeOf, waitNodeId } from "../route";
+import {
+	parkStopped,
+	route,
+	type StepEnd,
+	scopeOf,
+	waitNodeId,
+} from "../route";
 import type { RunStateValues } from "../state";
 
 /**
@@ -86,6 +94,17 @@ export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 		const begun = await beginStep(ctx, node, state, config, entry.start);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;
+		// The wait ended past the stop time (Night Shift was not running at
+		// the wake): the step does not continue, a resume continues it.
+		if (step.opened === "continue" && pastStopTime(ctx, state, config)) {
+			const end = await step.end(
+				"stopped",
+				{ outcome: "stopped", visit: step.visit },
+				null,
+				{ harnessSessionId: entry.resumeSessionId },
+			);
+			return parkStopped(node, end, STOP_TIME_REASON);
+		}
 
 		let result: StepEnd | WaitRequest;
 		try {
@@ -94,7 +113,16 @@ export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 				resumeSessionId: entry.resumeSessionId,
 			});
 			if ("reason" in result) {
-				const waited = await beginWait(ctx, node, state, step, result);
+				const waited = await beginWait(ctx, node, state, config, step, result);
+				if (waited.kind === "stop-time") {
+					const end = await step.end(
+						"stopped",
+						{ outcome: "stopped", visit: step.visit },
+						null,
+						{ harnessSessionId: result.harnessSessionId },
+					);
+					return parkStopped(node, end, waited.reason);
+				}
 				if (waited.kind === "wait") {
 					return new Command({
 						update: {
@@ -486,6 +514,9 @@ async function runSession(
 	});
 
 	const finalReport = report as AgentReport | null;
+	if (finalReport && node.output) {
+		finalReport.data = normalizeOutputData(node.output, finalReport.data);
+	}
 	const outputs: StepOutputs = {
 		visit,
 		output,

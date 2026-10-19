@@ -18,7 +18,7 @@ import {
 	type StepHandle,
 	stopAtOf,
 } from "../context";
-import { parkCommand, route, type StepEnd, waitNodeId } from "../route";
+import { parkStopped, route, type StepEnd, waitNodeId } from "../route";
 import type { PendingWait, RunStateValues } from "../state";
 
 /**
@@ -77,16 +77,7 @@ export function waitStepNode(node: WaitNode, ctx: StepContext): NodeAction {
 				});
 			}
 			if (next.kind === "stop-time") {
-				return parkCommand({
-					node,
-					status: "stopped",
-					reason: STOP_TIME_REASON,
-					step: next.end,
-					update: {
-						nodes: { [node.id]: next.end.outputs },
-						visits: { [node.id]: next.end.visit },
-					},
-				});
+				return parkStopped(node, next.end, STOP_TIME_REASON);
 			}
 			return route(ctx, state, node, next.end, config);
 		} catch (error) {

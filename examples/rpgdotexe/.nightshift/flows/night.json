@@ -109,6 +109,12 @@
 			"to": "stack"
 		},
 		{
+			"id": "features-stopped-stack",
+			"from": "features",
+			"outcome": "stopped",
+			"to": "stack"
+		},
+		{
 			"id": "stack-pass-link_stack",
 			"from": "stack",
 			"outcome": "pass",

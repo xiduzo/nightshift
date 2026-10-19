@@ -6,7 +6,7 @@ Night Shift knows nothing of Epics, Features, or Traces. A flow is a function wi
 
 | Flow | Inputs | Outputs | Does |
 | --- | --- | --- | --- |
-| `night.json` | `epic` (text, required): the Epic's issue number. The run starts here. | `pull_requests`, `report` | Runs `feature` for each Feature of the Epic (label `feature`), blockers first. Halts the night when a Feature ends on `halt`. Then links the pull requests into a stack and writes `.build/night/STATUS.md`. |
+| `night.json` | `epic` (text, required): the Epic's issue number. The run starts here. | `pull_requests`, `report` | Runs `feature` for each Feature of the Epic (label `feature`), blockers first. Halts the night when a Feature ends on `halt`. Then links the pull requests into a stack and writes `.build/night/STATUS.md`, also after the stop time (the edge on `stopped`). |
 | `feature.json` | `item` (json, required): the Feature issue. | `prs`, `tune_pr`, `checkpoint`, `ci`, `steering` | Runs `trace` for each Trace of the Feature (label `trace`, not `implemented`), blockers first, each on its own branch on top of the last. Then the checkpoint: a rule checks that every Trace is built, the validator verifies and tunes on a `tune/` branch, the night waits for CI, the orchestrator writes steering notes, and a rule continues or halts the night. |
 | `trace.json` | `item` (json, required): the Trace issue. | `pr`, `scenarios`, `tries` | The worker builds the Trace, the check runs, a failed check goes back to a fresh worker (3 tries), then the orchestrator rescues it. A Trace that passes gets a pull request on the stack and the label `implemented`. A Trace that still fails ends as failed, so the Traces that wait on it are blocked. |
 
@@ -29,7 +29,7 @@ The agents get the script's prompts, not the `wtf.*` skills: those skills ask th
 1. On the Agents page, add the CLI tool `gh` (under Tools), then the three profiles from `profiles.json`: `worker`, `validator` and `orchestrator`. Night Shift has no import for profiles yet, so add each one by hand with the values of the table.
 2. Copy `.nightshift/flows/` into your rpgdotexe clone.
 3. Add the clone as a project in Night Shift. A flow that names a profile or a CLI tool the daemon does not have refuses to start, and the editor lists it as an issue.
-4. Run the flow `night`: the start dialog asks for the Epic number (the input `epic`, like `night-shift.py <epic>`) and a stop time. A stop starts no new work; the next run continues, because a Trace with the label `implemented` counts as done.
+4. Run the flow `night`: the start dialog asks for the Epic number (the input `epic`, like `night-shift.py <epic>`) and a stop time. At the stop time the night starts no new work. The Trace that was running ends as failed, and the night still links the stack and writes the report. The next run continues, because a Trace with the label `implemented` counts as done. A usage limit that resets after the stop time ends the night at once.
 5. In the morning, read the stack of pull requests, `.build/night/STATUS.md` in the run's worktree, and the comment of the checkpoint on each Feature.
 
 The flows call `python3 tools/night-shift/night-shift.py gate` (the check) and import two helpers from that file. Keep the script in the repo until the check moves somewhere else. Linking the stack needs the `gh stack` extension (`gh extension install github/gh-stack`); without it, the night report prints the command to run by hand.

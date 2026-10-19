@@ -772,7 +772,7 @@ export function restoreAgentOutcomes(
 /**
  * Makes a Call node run once per item (`each`, the defaults or what it had
  * before) or once (no `each`). Its outcomes change with it (pass and fail,
- * or done and halted), so edges on an outcome the node no longer has are
+ * or done and halted; stopped stays), so edges on an outcome the node no longer has are
  * dropped and returned, for an undo.
  */
 export function setCallEach(

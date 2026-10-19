@@ -17,13 +17,15 @@ import {
 	beginWait,
 	isWaitKind,
 	messageOf,
+	pastStopTime,
 	STOP_GRACE_MS,
+	STOP_TIME_REASON,
 	type StepContext,
 	type StepHandle,
 	type StepStart,
 	type WaitRequest,
 } from "../../context";
-import { type StepEnd, waitNodeId } from "../../route";
+import { parkStopped, type StepEnd, waitNodeId } from "../../route";
 import type { RunStateValues } from "../../state";
 import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
 
@@ -56,10 +58,30 @@ export function modelChooser(node: DecisionNode, ctx: StepContext): Chooser {
 		);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;
+		// The wait ended past the stop time: the step does not continue.
+		if (step.opened === "continue" && pastStopTime(ctx, state, config)) {
+			const end = await step.end(
+				"stopped",
+				decisionOutputs("stopped", "", step.visit),
+				null,
+			);
+			return parkStopped(node, end, STOP_TIME_REASON);
+		}
 		try {
 			const decided = await decide(ctx, node, step);
 			if (!("reason" in decided)) return decided;
-			const waited = await beginWait(ctx, node, state, step, decided);
+			const waited = await beginWait(ctx, node, state, config, step, decided);
+			if (waited.kind === "stop-time") {
+				const end = await step.end(
+					"stopped",
+					decisionOutputs("stopped", "", step.visit),
+					null,
+					{
+						costUsd: decided.costUsd,
+					},
+				);
+				return parkStopped(node, end, waited.reason);
+			}
 			if (waited.kind === "wait") {
 				return new Command({
 					update: {

@@ -59,7 +59,13 @@ export type BodyEnd =
 			nodes: NodeOutputs;
 	  }
 	| { kind: "failed"; reason: string }
-	| { kind: "stopped"; reason: string | null; interrupt: GraphInterrupt }
+	| {
+			kind: "stopped";
+			reason: string | null;
+			/** The stop time stopped the body, not a person. */
+			atStopTime: boolean;
+			interrupt: GraphInterrupt;
+	  }
 	| { kind: "aborted"; reason: string; interrupt: GraphInterrupt }
 	| { kind: "paused"; interrupt: GraphInterrupt };
 
@@ -109,7 +115,12 @@ export async function runBody(input: {
 		const value = error.interrupts[0]?.value as Parked | undefined;
 		if (value?.kind !== "parked") return { kind: "paused", interrupt: error };
 		if (value.status === "stopped") {
-			return { kind: "stopped", reason: value.reason, interrupt: error };
+			return {
+				kind: "stopped",
+				reason: value.reason,
+				atStopTime: value.atStopTime === true,
+				interrupt: error,
+			};
 		}
 		if (value.stepId === null) {
 			return {

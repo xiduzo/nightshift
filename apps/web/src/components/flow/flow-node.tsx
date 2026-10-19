@@ -95,12 +95,14 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 					? `A call ended on ${node.each.haltOn.join(", ")}`
 					: undefined,
 			],
+			["stopped", "The stop time came"],
 		]);
 	}
 	if (node.type === "call") {
 		return new Map([
 			["pass", "It finished"],
 			["fail", "It failed"],
+			["stopped", "The stop time came"],
 		]);
 	}
 	if (node.type === "value") {

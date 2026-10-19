@@ -48,6 +48,26 @@ export function dataProblem(
 	return ajv.errorsText(validate.errors, { dataVar: "data", separator: "; " });
 }
 
+/**
+ * An Agent's report `data` as the schema wants it. A model sometimes sends
+ * the object as JSON text (`"{\"summary\": …}"`): when the schema does not
+ * accept a string and the text is valid JSON, the parsed value is used.
+ * Anything else stays as it came, for `checkOutputData` to judge.
+ */
+export function normalizeOutputData(
+	schema: Record<string, unknown>,
+	data: unknown,
+): unknown {
+	if (typeof data !== "string" || dataProblem(schema, data) === null) {
+		return data;
+	}
+	try {
+		return JSON.parse(data);
+	} catch {
+		return data;
+	}
+}
+
 /** Null when an Agent's report `data` matches the schema, else what is wrong, in one line. */
 export function checkOutputData(
 	schema: Record<string, unknown>,

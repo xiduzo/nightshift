@@ -12,7 +12,7 @@ import {
 	stopAtOf,
 	uncommittedStep,
 } from "../context";
-import { route, scopeOf } from "../route";
+import { hasStoppedEdge, route, scopeOf } from "../route";
 import type { RunStateValues } from "../state";
 import {
 	type BodyGraph,
@@ -120,9 +120,18 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 				// The step stays open: the called flow continues after the wait.
 				step.leaveOpen();
 				throw ended.interrupt;
-			case "stopped":
+			case "stopped": {
+				if (ended.atStopTime && hasStoppedEdge(ctx.flow, node)) {
+					// The stop time ended the called flow: wrap the run up along the edge.
+					const outputs = await bodyOutputs(ctx, body);
+					const result = await end("stopped", outputs, null);
+					return route(ctx, state, node, result, config, {
+						wrappingUp: true,
+					});
+				}
 				await end("stopped", {}, null);
 				throw ended.interrupt;
+			}
 			case "aborted":
 				await end("error", {}, ended.reason);
 				throw ended.interrupt;

@@ -615,6 +615,7 @@ describe("the Wait node", () => {
 				nodeId: "pause",
 				status: "stopped",
 				reason: "Reached the stop time",
+				atStopTime: true,
 			},
 		]);
 		expect(payloads(await h.events(), "StepEnded")).toEqual([

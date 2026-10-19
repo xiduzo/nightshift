@@ -5,6 +5,7 @@ import {
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
 import {
+	type Flow,
 	type FlowNode,
 	nextEdge,
 	type Outcome,
@@ -102,6 +103,8 @@ export function parkCommand(input: {
 	reason: string | null;
 	step: StepEnd | null;
 	update?: RunStateUpdate;
+	/** The stop time stopped the run (`PendingParked.atStopTime`). */
+	atStopTime?: boolean;
 }): Command {
 	const { node, step } = input;
 	const pending: PendingParked = {
@@ -113,10 +116,43 @@ export function parkCommand(input: {
 		prompt: null,
 		status: input.status,
 		reason: input.reason,
+		...(input.atStopTime ? { atStopTime: true } : {}),
 	};
 	return new Command({
 		update: { ...input.update, pending },
 		goto: parkNodeId(node.id),
+	});
+}
+
+/** Whether the node has an edge on `stopped`: a Call node that wraps the run up after the stop time. */
+export function hasStoppedEdge(flow: Flow, node: FlowNode): boolean {
+	return (
+		node.type === "call" &&
+		flow.edges.some((e) => e.from === node.id && e.outcome === "stopped")
+	);
+}
+
+/**
+ * Parks the run as stopped on a step that ended `stopped`, with the step's
+ * outputs and visit in the state: the stop time came while it was open.
+ */
+export function parkStopped(
+	node: FlowNode,
+	end: StepEnd,
+	reason: string,
+	update?: RunStateUpdate,
+): Command {
+	return parkCommand({
+		node,
+		status: "stopped",
+		reason,
+		step: end,
+		atStopTime: true,
+		update: {
+			...update,
+			nodes: { [node.id]: end.outputs },
+			visits: { [node.id]: end.visit },
+		},
 	});
 }
 
@@ -125,7 +161,8 @@ export function parkCommand(input: {
  * the edge the outcome picks, with `EdgeTaken` in the log; or ends the flow
  * on a chosen end; or parks the run. Exactly `walkScope`'s rules:
  *
- * - `stopped` parks as stopped with no reason.
+ * - `stopped` parks as stopped with no reason, except a Call node's
+ *   `stopped` with `wrappingUp` in `extra`: it takes the edge.
  * - `error` and `interrupted` park as failed: `Node "x" failed: <error>`.
  * - no edge: `fail` and `needs-input` park as failed; `pass`, a Decision
  *   option, an Agent's own outcome or the outcome of a Call with `each` is a chosen end
@@ -149,7 +186,11 @@ export async function route(
 	};
 	const park = (status: "failed" | "stopped", reason: string | null) =>
 		parkCommand({ node, status, reason, step: end, update });
-	if (outcome === "stopped") return park("stopped", null);
+	// A stop parks. The one exception: a Call node the stop time ended
+	// follows its `stopped` edge to the nodes that wrap the run up.
+	if (outcome === "stopped" && !(node.type === "call" && extra?.wrappingUp)) {
+		return park("stopped", null);
+	}
 	if (outcome === "error" || outcome === "interrupted") {
 		return park(
 			"failed",
@@ -233,6 +274,7 @@ export function parkNode(node: FlowNode) {
 			nodeId: node.id,
 			status: pending.status,
 			reason: pending.reason,
+			...(pending.atStopTime ? { atStopTime: true } : {}),
 		};
 		const answer = interrupt<Parked, ResumeValue | undefined>(value);
 		const prompt =
