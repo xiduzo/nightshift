@@ -177,7 +177,24 @@ export const auth = createAuth(ENV, db, [...desktopOrigins, ...localOrigins], {
 	// The audit of Members, in the Space's event log. Called on requests,
 	// long after the engine below is made.
 	onMemberChange: (change) => engine.logMemberChange(change),
+	// A browser may sign in at any of the Host's addresses. Read per
+	// request; Better Auth also asks once now, before the settings exist.
+	trustedOrigins: () => hostOrigins(hostAddresses()),
 });
+
+/** The Host's addresses, once the settings below exist. */
+let hostAddresses: () => readonly string[] = () => [];
+
+/** The origins of a Host's addresses (`https://name:port`). */
+function hostOrigins(addresses: readonly string[]): string[] {
+	return addresses.flatMap((address) => {
+		try {
+			return [new URL(address).origin];
+		} catch {
+			return [];
+		}
+	});
+}
 
 /** This computer's Device: the Walker of its runs, the owner of its Clones. */
 export const device = await selfDevice(db);
@@ -223,6 +240,7 @@ const keyStorePreference =
 	ENV.NIGHTSHIFT_KEY_STORE === "file" ? { prefer: "file" as const } : {};
 
 export const settings = createSettingsStore({ document, env });
+hostAddresses = () => settings.current().hostAddresses;
 export const connections = createConnectionStore({
 	document,
 	env,

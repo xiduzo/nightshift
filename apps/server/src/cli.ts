@@ -1,10 +1,12 @@
 import { join } from "node:path";
 
+import { hasLogin } from "@nightshift/auth/login";
+
 import { prepareDaemonEnv } from "./daemon-env";
 import { reachFor } from "./devices";
 import { embedded, extractMigrations } from "./headless/embedded";
 import { directoryWeb, embeddedWeb, webHandler } from "./headless/web";
-import { joinCommand, pairCommand } from "./join-cli";
+import { adminCommand, joinCommand, pairCommand } from "./join-cli";
 import { serveDaemon, tlsPortOf } from "./serve";
 
 /**
@@ -19,6 +21,8 @@ Usage:
   nightshift serve [options]                Run Night Shift on this computer.
   nightshift join <host-address> [--guest]  Pair this computer with a Host.
   nightshift pair <code> [--yes]            Allow a computer to pair with this Host.
+  nightshift admin --email <email>          Set how the Host admin signs in from
+                                            another computer.
 
 Options of serve (each has an environment variable too):
   --port <port>            The port. PORT, default 3000.
@@ -114,10 +118,8 @@ async function serve(argv: string[]) {
 
 	// Imported only now: the server reads its environment and takes the
 	// database lease when it loads.
-	const [{ default: daemon }, { settings }] = await Promise.all([
-		import("./index"),
-		import("./services"),
-	]);
+	const [{ default: daemon }, { settings, db, daemon: self }] =
+		await Promise.all([import("./index"), import("./services")]);
 	const web = files
 		? embeddedWeb(files.web)
 		: options.web
@@ -143,6 +145,12 @@ async function serve(argv: string[]) {
 		console.log(
 			"Only this computer can connect. To let other computers pair with it, be a Host: --host-address https://…",
 		);
+	} else if (!(await hasLogin(db, self.device.ownerId))) {
+		// A fresh Host: its admin signs in for nothing here, and has no
+		// sign-in for a browser elsewhere yet.
+		console.log(
+			"To sign in from a browser on another computer, set the Host admin's sign-in here first: nightshift admin --email you@example.com",
+		);
 	}
 	if (!ui) console.log("No web UI here: run it with --web <folder>.");
 }
@@ -156,6 +164,8 @@ export async function main(argv: string[]) {
 			return joinCommand(rest, "nightshift join");
 		case "pair":
 			return pairCommand(rest, "nightshift pair");
+		case "admin":
+			return adminCommand(rest, "nightshift admin");
 		case undefined:
 		case "help":
 		case "--help":

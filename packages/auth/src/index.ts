@@ -48,6 +48,11 @@ export type AuthOptions = {
 	 * The daemon logs it in the Space's event log.
 	 */
 	onMemberChange?: (change: MemberChange) => Promise<void>;
+	/**
+	 * More pages that may sign in, read per request: a Host's own
+	 * `https://` addresses, so a browser can use any of them.
+	 */
+	trustedOrigins?: () => readonly string[];
 };
 
 /**
@@ -80,7 +85,11 @@ export function createAuth(
 			provider: "sqlite",
 			schema,
 		}),
-		trustedOrigins: [env.CORS_ORIGIN, ...desktopOrigins],
+		trustedOrigins: () => [
+			env.CORS_ORIGIN,
+			...desktopOrigins,
+			...(options.trustedOrigins?.() ?? []),
+		],
 		emailAndPassword: { enabled: true },
 		secret: env.BETTER_AUTH_SECRET,
 		baseURL: env.BETTER_AUTH_URL,

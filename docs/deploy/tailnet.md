@@ -47,8 +47,8 @@ Funnel publishes the same name to everyone. Read the caveats first:
 - Funnel is in beta.
 - Funnel limits the bandwidth, and you cannot change the limit.
 - Funnel does no login check of its own. Anyone can reach the Host, so
-  Night Shift's own sign-in is the only check. Pairing still needs your
-  approval on the Host.
+  Night Shift's own sign-in is the only check: accounts by invitation only,
+  and pairing needs your approval on the Host.
 - Funnel listens on port 443, 8443 or 10000 only.
 - Your tailnet policy must give the Host the `funnel` attribute.
 

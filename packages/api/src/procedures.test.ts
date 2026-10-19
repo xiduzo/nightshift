@@ -558,3 +558,37 @@ describe("a streaming procedure", () => {
 		expect(seen).toEqual(["code"]);
 	});
 });
+
+describe("the owner's own sign-in", () => {
+	test("is set on this computer only", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const set: string[] = [];
+		const base = await contextFor(ada.headers);
+		const context = (fromThisComputer: boolean) =>
+			({
+				...base,
+				fromThisComputer,
+				daemon: {
+					...base.daemon,
+					device: { ...base.daemon.device, ownerId: ada.userId },
+				},
+				setLogin: async (personId: string, input: { email: string }) => {
+					set.push(personId);
+					return { email: input.email };
+				},
+			}) as unknown as Context;
+		const input = { email: "ada@example.com", password: "a-long-password" };
+		expect(
+			await errorOf(
+				call(appRouter.account.setLogin, input, { context: context(false) }),
+			),
+		).toBe("FORBIDDEN");
+		expect(set).toEqual([]);
+		expect(
+			await call(appRouter.account.setLogin, input, {
+				context: context(true),
+			}),
+		).toEqual({ email: "ada@example.com" });
+		expect(set).toEqual([ada.userId]);
+	});
+});

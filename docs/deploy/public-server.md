@@ -55,6 +55,19 @@ nightshift.example.com {
 Keep `NIGHTSHIFT_LISTEN=127.0.0.1` in the unit, so only Caddy reaches
 Night Shift.
 
+## Sign in
+
+Give the Host admin a sign-in on the server, then sign in at
+`https://nightshift.example.com/login`:
+
+```bash
+docker compose -f deploy/docker-compose.yml exec nightshift \
+  nightshift admin --email you@example.com
+```
+
+Without Docker, run `nightshift admin --email you@example.com` on the
+server. See [Sign in to a Host without a screen](README.md#sign-in-to-a-host-without-a-screen).
+
 ## Pair
 
 Follow [Pair a computer with the Host](README.md#pair-a-computer-with-the-host).

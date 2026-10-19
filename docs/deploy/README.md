@@ -15,8 +15,9 @@ are all the same.
 | [An outbound tunnel](tunnel.md) | Your Host is at home, without Tailscale and without an open port | `https://nightshift.example.com` |
 
 A public address (Funnel, a public server, a tunnel) shows Night Shift's
-sign-in page to everyone. Publish one only when sign-up on the Host is by
-invitation. A LAN or tailnet address reaches your own devices only.
+sign-in page to everyone. That is safe: a Host is invitation-only. Nobody
+makes an account without an invitation link from a Member, and the Host
+admin exists from the first start.
 
 A Host can have several addresses. Your other computers try them in order and
 keep the first that answers. Put the LAN name first, then the tailnet name,
@@ -72,7 +73,28 @@ A server has no keychain. Night Shift reads secrets from files instead:
 - A secret you save on the Connections page, and the access to your Hosts,
   go in the data folder, in files only the Night Shift user can read.
 
-### Open the UI of a Host without a screen
+### Sign in to a Host without a screen
+
+The Host admin is Night Shift's own Person on the Host. On the Host itself
+it is signed in for you. To sign in from a browser on another computer,
+give it an email and a password first. Run this on the Host:
+
+```bash
+nightshift admin --email you@example.com
+# In Docker:
+docker exec -it nightshift nightshift admin --email you@example.com
+```
+
+It asks for the password and does not show it. To give it from a script,
+pipe it in with `--password-stdin`. Run it again to change the password.
+
+Then open the Host's address in a browser, for example
+`https://nightshift.example.com/login`, and sign in. Invite others from
+Members: the invitation link uses the address you opened the page with.
+
+`nightshift serve` reminds you when the Host has no sign-in yet.
+
+### Open the UI over SSH
 
 On the Host itself, Night Shift signs you in. From your laptop, open an SSH
 tunnel and use the address it gives you:
@@ -83,8 +105,7 @@ open http://localhost:3000
 ```
 
 A container sees such a request come from outside it, so it asks you to
-sign in. To pair a computer with a Host in a container, use
-`nightshift pair` in the container (below).
+sign in: use the sign-in from `nightshift admin`.
 
 ## Pair a computer with the Host
 

@@ -1024,13 +1024,23 @@ iroh.
      joining it as a guest, `docker exec … nightshift pair`. Tailscale,
      Let's Encrypt, Cloudflare Tunnel, frp and rathole are written from
      their docs.
-   - Not yet: a browser on another computer must sign in to a Host, and
-     sign-up stays open until slice 6 makes it invitation-only: the guides
-     say to publish a public address only then. A Host behind a proxy
-     trusts only `CORS_ORIGIN` and `BETTER_AUTH_URL` as page origins, not
-     every Host address. The desktop app does not serve its UI to other
-     computers' browsers. A container sees an SSH-tunnelled request as
-     another computer's.
+   - **The Host admin's sign-in on a Host without a screen.** The Host
+     admin is this computer's Person (slice 6), which signs in for nothing
+     on the Host and has no password. `nightshift admin --email <email>`
+     (on the Host, or `docker exec`) gives it an email and a password,
+     asked without echo or piped with `--password-stdin`
+     (`account.setLogin`: the owner only, and only from this computer:
+     `Context.fromThisComputer`; `packages/auth/src/login.ts` links a
+     credential account or replaces its password). `nightshift serve`
+     reminds you while a Host's admin has none. Then the admin signs in at
+     the public address and invites from Members; the invitation link uses
+     the page's origin, so the public one. Better Auth trusts every Host
+     address as an origin (`AuthOptions.trustedOrigins`, read per request),
+     so sign-in works at each of them. Tested through Caddy with the
+     Docker image.
+   - Not yet: the desktop app does not serve its UI to other computers'
+     browsers. A container sees an SSH-tunnelled request as another
+     computer's.
 
 Slices 1 to 3 are refactors in the shape of the eight that landed on
 2026-10-19. Slice 4 is the first that needs a second computer.

@@ -166,6 +166,88 @@ export async function pairCommand(argv: string[], program: string) {
 	}
 }
 
+/**
+ * `nightshift admin --email <email>`: gives this computer's owner, the Host
+ * admin, an email and a password, to sign in from a browser on another
+ * computer and invite others. Run it on the Host (over SSH, or with
+ * `docker exec`). The password comes from a prompt that does not show it,
+ * or from standard input with `--password-stdin`.
+ */
+export async function adminCommand(argv: string[], program: string) {
+	const args = [...argv];
+	let email: string | null = null;
+	let name: string | undefined;
+	let fromStdin = false;
+	let daemon = defaultDaemonUrl();
+	while (args.length > 0) {
+		const arg = args.shift() as string;
+		if (arg === "--email") email = args.shift() ?? null;
+		else if (arg === "--name") name = args.shift();
+		else if (arg === "--password-stdin") fromStdin = true;
+		else if (arg === "--daemon") daemon = args.shift() ?? daemon;
+		else {
+			email = null;
+			break;
+		}
+	}
+	if (!email) {
+		console.log(
+			`Usage: ${program} --email <email> [--name <name>] [--password-stdin]\nRun it on the Host. It sets the email and password the Host admin signs in with from another computer.`,
+		);
+		process.exit(2);
+	}
+	const client = await daemonClient(daemon);
+	const password = fromStdin
+		? (await Bun.stdin.text()).replace(/\r?\n$/, "")
+		: await hiddenPrompt("Password: ");
+	try {
+		const login = await client.account.setLogin({ email, password, name });
+		const hello = await client.devices.list();
+		const address = hello.thisComputer?.host.addresses.find((a) =>
+			a.startsWith("https://"),
+		);
+		console.log(
+			`Done. Sign in as ${login.email}${address ? ` at ${address}/login` : ""}, then invite others from Members.`,
+		);
+	} catch (error) {
+		console.error(error instanceof Error ? error.message : error);
+		process.exit(1);
+	}
+}
+
+/** Reads a line from the terminal without showing it. */
+async function hiddenPrompt(question: string): Promise<string> {
+	const stdin = process.stdin;
+	if (!stdin.isTTY) {
+		console.error(
+			"Add --password-stdin to give the password without a terminal.",
+		);
+		process.exit(2);
+	}
+	process.stdout.write(question);
+	stdin.setRawMode(true);
+	stdin.resume();
+	let value = "";
+	return new Promise((resolve) => {
+		const onData = (chunk: Buffer) => {
+			for (const char of chunk.toString("utf8")) {
+				if (char === "\r" || char === "\n") {
+					stdin.setRawMode(false);
+					stdin.pause();
+					stdin.off("data", onData);
+					process.stdout.write("\n");
+					resolve(value);
+					return;
+				}
+				if (char === "\u0003") process.exit(130);
+				if (char === "\u007f") value = value.slice(0, -1);
+				else value += char;
+			}
+		};
+		stdin.on("data", onData);
+	});
+}
+
 if (import.meta.main) {
 	await joinCommand(process.argv.slice(2), "bun run join");
 }

@@ -38,6 +38,13 @@ export type Context = {
 	setActiveSpace(spaceId: string): Promise<void>;
 	/** The request's headers, with the local session when it got one: for Better Auth's own checks. */
 	headers: Headers;
+	/** The request came from this computer itself, not through a proxy or from elsewhere (`isThisComputer`). */
+	fromThisComputer: boolean;
+	/** Sets a Person's email and password (`@nightshift/auth/login`). */
+	setLogin(
+		personId: string,
+		input: { email: string; password: string; name?: string },
+	): Promise<{ email: string }>;
 	/**
 	 * The Device key the request carries (`Authorization: Bearer`), resolved.
 	 * A request with a key has no session: it is a Device, not a Person.
