@@ -43,12 +43,23 @@ let personId: string;
 let projectId: string;
 const B = "device-b";
 
+/** An Agent Profile on Claude Code. */
+const PROFILE = {
+	harness: "claude-code" as const,
+	model: "sonnet",
+	permissionMode: "auto" as const,
+	clis: [],
+	connections: [],
+};
+
 const bDevice = (projectOf: () => string) =>
 	testDevice(
 		{
 			harnesses: { "claude-code": fakeHarness(reportingScript("pass")) },
 			clonePath: async (id) => (id === projectOf() ? b.repoPath : null),
 			findCli: (name) => (name === "git" ? "/usr/bin/git" : null),
+			// B has the profile "everywhere"; only A has "here_only".
+			profileFor: (name) => (name === "everywhere" ? PROFILE : null),
 		},
 		B,
 	);
@@ -85,7 +96,9 @@ beforeEach(async () => {
 			db: a.db,
 			dataDir: a.dataDir,
 			scheduler: false,
-			harnesses: {},
+			harnesses: { "claude-code": fakeHarness(reportingScript("pass")) },
+			profileFor: (name) =>
+				name === "everywhere" || name === "here_only" ? PROFILE : null,
 			spaceDocuments: documents,
 			work,
 		}),
@@ -474,5 +487,36 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		).rejects.toThrow(
 			'The flow names the device "nowhere", but you have no device of that name.',
 		);
+	});
+
+	test("a node's profile picks its Device: the run's when it has it, else this computer", async () => {
+		await shareRemote();
+		const profiled = (id: string, profile: string) =>
+			({
+				id,
+				type: "agent",
+				position: { x: 0, y: 0 },
+				prompt: "Work.",
+				profile,
+			}) as Flow["nodes"][number];
+		const started = await space().startRun({
+			projectId,
+			flow: flow(
+				[profiled("there", "everywhere"), profiled("here", "here_only")],
+				[{ id: "e1", from: "there", outcome: "pass", to: "here" }],
+			),
+			startedBy: personId,
+			deviceId: B,
+		});
+		const run = await until(started.id, "finished");
+		expect(run.device.id).toBe(B);
+		expect(run.steps.map((s) => [s.nodeId, s.device?.id])).toEqual([
+			["there", B],
+			["here", run.walker.id === a.deviceId ? "test-device" : run.walker.id],
+		]);
+		// The snapshot names this computer for the node only it can run.
+		expect(
+			run.flow.nodes.map((n) => ("device" in n ? n.device : null)),
+		).toEqual([null, "test"]);
 	});
 });
