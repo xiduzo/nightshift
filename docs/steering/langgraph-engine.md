@@ -48,7 +48,14 @@ packages/engine/src/
                            finishedReason); or parks (parkCommand). parkNode,
                            the node ids, scopeOf.
   graph/context.ts         StepContext (below), beginStep, beginWait,
-                           uncommittedStep, recorders.
+                           recorders.
+  graph/resume-point.ts    The one resume point (below): resumePoint()
+                           decides how a node re-enters (new, continue,
+                           reopen) from the checkpoint and the log, per
+                           kind rules (RESUME_RULES); uncommittedStep,
+                           latestStepOf, sessionOf. The daemon side of the
+                           same question: reenteredNode, reentryUpdate,
+                           resumeTarget.
   graph/wait.ts            waitNode(nodeId): the one wait node of Agent
                            nodes, Decisions decided by a model, and Wait
                            nodes. Answers: wake, signal, resume.
@@ -84,8 +91,8 @@ packages/engine/src/
   ../each.ts               the pure parts of a Call with `each`: list items
                            from a source, item facts, the step's outputs
   graph/runner.ts          Per-run driver: start, continueRun, resume,
-                           reenter (reentryUpdate for threads with no
-                           checkpoint), wake, stop, closeParked. Streams the
+                           reenter (seeded by reentryUpdate for threads with
+                           no checkpoint), wake, stop, closeParked. Streams the
                            graph, publishes to the bus, reacts to
                            interrupts, owns slots and wake timers, and prunes
                            a finished run's thread to its latest checkpoint.
@@ -246,8 +253,8 @@ Decisions taken while implementing, from the code and its comments:
   which announces no start, and routes. `{ kind: "reopen" }` (a resume
   after a stop at the Gate) clears `pending` and jumps back to the node,
   which asks again with `StepStarted` (visit + 1), `GateOpened` and
-  `gate-open`, as the old `closeParked` path did. The log guard in the
-  node (`uncommittedStep` with the Gate asked) is the crash-only path: a
+  `gate-open`, as the old `closeParked` path did. The resume point's
+  `asked-gate` rule (`RESUME_RULES.gate`) is the crash-only path: a
   daemon that dies between `GateOpened` and the checkpoint commit must
   not open a second Gate on the re-run. A Gate starts no time budget: it
   waits as long as it must.
@@ -268,8 +275,8 @@ Decisions taken while implementing, from the code and its comments:
   `node.by` picks the producer: `producers/rule.ts` evaluates one JSONata
   expression (pure, no wait node), `producers/model.ts` asks the decider's
   text adapter (`Decider.value`, TanStack AI `chat()` with the output
-  schema) and shares the model chooser's entry and wait rules (`entryOf`,
-  `withinGrace`, `wait__<id>`). Both end the step through one place
+  schema) and shares the model chooser's entry and wait rules
+  (`RESUME_RULES.model`, `withinGrace`, `wait__<id>`). Both end the step through one place
   (`endWithValue`): the data is checked against the output schema with ajv
   (`output-schema.ts`), `pass` with the data, or `fail` with why in `note`.
   A schema that does not compile, or no decider, ends `error`. Only a
@@ -309,9 +316,10 @@ Decisions taken while implementing, from the code and its comments:
   node body with the aborted signal and ends `stopped` there, with its
   harness session, so a later resume can reopen it.
 - **A step recovery ended after a wake is reopened** (`StepReopened`),
-  not continued, in the Agent node and the model chooser as in
-  `continueStep` for a Call, so the log keeps one open step to end and the read
-  model shows the step's real outcome and cost.
+  not continued, for every node with a wait node (the Agent node, the
+  model chooser and producer, the Wait node), so the log keeps one open
+  step to end and the read model shows the step's real outcome and cost.
+  This is the resume point's one rule for an existing step (below).
 - **The runner publishes `status-changed` on step chunks**
   (`runner.onCustom`). The `step-started` and `step-ended` custom stream
   chunks (`RunEvent`) make the runner publish `{ kind: "status-changed" }`
@@ -320,6 +328,57 @@ Decisions taken while implementing, from the code and its comments:
   slot, resumes the thread with `{ kind: "gate", choice, note }` and
   returns once the log has the step's `StepEnded`, so the run no longer
   waits when the caller looks again. A full run cap leaves the Gate open.
+
+## The resume point (`graph/resume-point.ts`)
+
+One module answers one question for every node: how does the node
+re-enter after a park, a wake, a resume or a daemon death? It is a deep
+module behind a small interface. `resumePoint(node, state, events, scope,
+rules)` returns `{ kind: "new" }`, `{ kind: "continue", step }` or
+`{ kind: "reopen", step, prompt }`. `entryOf(point)` turns that into the
+`StepStart` for `beginStep`. The module appends nothing: it decides, and
+`beginStep` writes the log as before (rule 3).
+
+The rule, in this order:
+
+1. `pending` is this node's wait that ended: the step continues while it
+   is open in the log, and is reopened when recovery ended it after the
+   wake. The prompt is the latest `RunResumed` for the step, else the
+   wait's own follow-up.
+2. `pending` is this node's parked step and a person resumed: the step is
+   taken up when the kind's `parked` rule says so, else a new visit. The
+   prompt is the resume's, else "Continue where you left off.".
+3. The node loops over elements (`loops`): its latest step in this scope
+   continues (open) or is reopened (ended).
+4. The log has a step of this node in this scope that the checkpoint never
+   saw (`uncommittedStep`, rule 5): taken up when the kind's `crashed`
+   rule says so, else a new visit.
+5. Else a new visit.
+
+The prompt and the harness session are set only for a step with a harness
+session to continue, so a Call or Decision step reopens with `prompt:
+null`, as before.
+
+The node kinds differ only in which existing step they take up. That is
+all `ResumeRules` lets them say (`RESUME_RULES`):
+
+| Kind | `parked` | `crashed` |
+| --- | --- | --- |
+| Agent | `with-session`: reopen with the resume prompt | `with-session`: reopen, open or ended (the harness process is gone) |
+| Decision or Value by a model | `new` | `new` |
+| Call once | `new` | `take-up`: continue open, reopen ended |
+| Call with `each` | `cut-short`: reopen a `stopped`, `error` or `interrupted` step; an exhausted loop starts over | `take-up`, and `loop` for the cursor |
+| Gate | `new` | `asked-gate`: continue only while open with `GateOpened` after its latest opening |
+| Wait | `new` | `new` |
+
+The daemon side lives next to it, on the same helpers: `resumeTarget`
+(what `RunResumed` records: the node, and the Agent step whose harness
+session the resume continues, `sessionOf`), `reenteredNode` (the last
+top-level step the walk did not move on from) and `reentryUpdate` (the
+seed state of a thread with no checkpoint). The engine promises in
+`RunResumed` what the node finds when it re-enters, by construction.
+`graph/resume-point.test.ts` holds the rule as a table: one situation,
+every kind.
 
 ## StepContext (what a node factory gets)
 

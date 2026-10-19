@@ -11,7 +11,6 @@ import {
 	renderTemplate,
 } from "@nightshift/flows";
 
-import { deriveSteps, type LoggedEvent } from "../../../events";
 import {
 	beginStep,
 	beginWait,
@@ -22,11 +21,10 @@ import {
 	STOP_TIME_REASON,
 	type StepContext,
 	type StepHandle,
-	type StepStart,
 	type WaitRequest,
 } from "../../context";
-import { parkStopped, type StepEnd, waitNodeId } from "../../route";
-import type { RunStateValues } from "../../state";
+import { entryOf, RESUME_RULES, resumePoint } from "../../resume-point";
+import { parkStopped, type StepEnd, scopeOf, waitNodeId } from "../../route";
 import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
 
 /**
@@ -37,11 +35,12 @@ import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
  * decider's cost as `costUsd`, also on an error or a stop. The decider's
  * reasons go in the `note` output.
  *
- * How the step opens: with `pending.kind === "wait"` for this node, the
- * step that waited for a usage limit or the network continues (same step
- * id and visit; nothing is appended before the decider is asked again),
- * or is reopened first when recovery ended it after the wake. Otherwise a
- * new visit: a parked or interrupted step has no session to reopen.
+ * How the step opens is the one resume point (`resumePoint`,
+ * `RESUME_RULES.model`): the step that waited for a usage limit or the
+ * network continues (same step id and visit; nothing is appended before the
+ * decider is asked again), or is reopened first when recovery ended it
+ * after the wake. Otherwise a new visit: a parked or interrupted step has
+ * no session to reopen.
  *
  * A usage limit or a network failure plans a wait (`beginWait`) and jumps
  * to the node's wait node (`wait__<id>`), which interrupts; a give-up ends
@@ -54,7 +53,15 @@ export function modelChooser(node: DecisionNode, ctx: StepContext): Chooser {
 			node,
 			state,
 			config,
-			entryOf(node, state, await ctx.log.events(ctx.run.id)),
+			entryOf(
+				resumePoint(
+					node,
+					state,
+					await ctx.log.events(ctx.run.id),
+					scopeOf(config),
+					RESUME_RULES.model,
+				),
+			),
 		);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;
@@ -105,28 +112,6 @@ export function modelChooser(node: DecisionNode, ctx: StepContext): Chooser {
 			);
 		}
 	};
-}
-
-/**
- * The step continues after a wait, or is reopened (`StepReopened`) when
- * recovery ended it `interrupted` meanwhile (the daemon died after the
- * wake), so the log keeps one open step to end; anything else is a new
- * visit. Shared with a Value node made by a model, which waits the same way.
- */
-export function entryOf(
-	node: Pick<DecisionNode, "id">,
-	state: RunStateValues,
-	events: readonly LoggedEvent[],
-): StepStart {
-	const pending = state.pending;
-	if (pending?.kind === "wait" && pending.nodeId === node.id) {
-		const own = deriveSteps(events).find((s) => s.id === pending.stepId);
-		if (own && own.endedAt !== null) {
-			return { kind: "reopen", stepId: own.id, prompt: null };
-		}
-		return { kind: "continue", stepId: pending.stepId };
-	}
-	return { kind: "new" };
 }
 
 /** A wait request that also carries what the decider cost before it hit the limit. */

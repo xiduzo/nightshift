@@ -9,15 +9,15 @@ import {
 	renderTemplate,
 } from "@nightshift/flows";
 
-import type { DerivedStep, GateChoice } from "../../../events";
+import type { GateChoice } from "../../../events";
 import {
 	beginStep,
 	messageOf,
 	type NodeAction,
 	type StepContext,
 	type StepHandle,
-	uncommittedStep,
 } from "../../context";
+import { RESUME_RULES, resumePoint } from "../../resume-point";
 import { askNodeId, route, type StepEnd, scopeOf } from "../../route";
 import type {
 	Parked,
@@ -108,27 +108,18 @@ type Ensured =
 	| { kind: "parked"; command: Command }
 	| { kind: "failed"; end: StepEnd };
 
-/** The step's Gate is asked: `GateOpened` came after its latest opening. */
-function isAsked(step: DerivedStep): boolean {
-	return (
-		step.endedAt === null &&
-		step.gate !== null &&
-		step.gate.openedSeq > step.openedSeq
-	);
-}
-
 /**
  * Makes sure a Gate of this node is open in the log, and says what it asks.
  * Opens a new visit, unless the entry checks park the run instead.
  *
- * The log guard is the crash-only path: the node's own writes (`pending`)
- * commit with the checkpoint after it returns, so a daemon that dies
- * between `GateOpened` and that commit leaves the Gate open in the log
- * only. The re-run (`invoke(null)`, design rule 5) then finds the latest
- * step of the node in this scope the graph never committed
- * (`uncommittedStep`) open with its Gate asked, and jumps to the ask node
- * with it instead of opening a second Gate. A step that ended (the run was
- * stopped at the Gate) is not reused: a new visit opens.
+ * The resume point (`resumePoint`, `RESUME_RULES.gate`) is the crash-only
+ * path: the node's own writes (`pending`) commit with the checkpoint after
+ * it returns, so a daemon that dies between `GateOpened` and that commit
+ * leaves the Gate open in the log only. The re-run (`invoke(null)`, design
+ * rule 5) then finds the latest step of the node in this scope the graph
+ * never committed open with its Gate asked (`continue`), and jumps to the
+ * ask node with it instead of opening a second Gate. A step that ended (the
+ * run was stopped at the Gate) is not reused: a new visit opens.
  */
 async function ensureOpen(
 	ctx: StepContext,
@@ -137,14 +128,24 @@ async function ensureOpen(
 	config: LangGraphRunnableConfig,
 ): Promise<Ensured> {
 	const events = await ctx.log.events(ctx.run.id);
-	const own = uncommittedStep(node, state, events, scopeOf(config));
-	if (own && isAsked(own) && own.gate) {
+	const point = resumePoint(
+		node,
+		state,
+		events,
+		scopeOf(config),
+		RESUME_RULES.gate,
+	);
+	if (point.kind === "continue" && point.step.gate) {
+		const {
+			step: own,
+			step: { gate },
+		} = point;
 		return {
 			kind: "open",
 			stepId: own.id,
 			visit: own.visit,
-			question: own.gate.question,
-			choices: own.gate.choices,
+			question: gate.question,
+			choices: gate.choices,
 		};
 	}
 	const begun = await beginStep(ctx, node, state, config, { kind: "new" });

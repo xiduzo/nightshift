@@ -48,10 +48,9 @@ import {
 	STOP_AFTER_STEP_REASON,
 	STOP_TIME_REASON,
 	type StepContext,
-	type StepStart,
 	stopAtOf,
-	uncommittedStep,
 } from "../context";
+import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
 import {
 	hasStoppedEdge,
 	parkCommand,
@@ -59,15 +58,8 @@ import {
 	type StepEnd,
 	scopeOf,
 } from "../route";
-import type { Loop, RunStateValues } from "../state";
-import {
-	type BodyGraph,
-	bodyGraph,
-	bodyOutputs,
-	continueStep,
-	latestStepOf,
-	runBody,
-} from "./body";
+import type { Loop } from "../state";
+import { type BodyGraph, bodyGraph, bodyOutputs, runBody } from "./body";
 
 /**
  * A Call node with `each`: the per-element loop of `callNode`, ported from
@@ -92,6 +84,14 @@ import {
  * finds in the log (no `ItemStarted` or branch twice) and the body resumes
  * under the same namespace; an ended step (stopped, or `interrupted` by
  * recovery) is reopened first (`StepReopened`), as `openCallStep` does.
+ *
+ * How the node enters is the one resume point (`resumePoint`,
+ * `RESUME_RULES.callEach`): a run parked at this node's own park node (a
+ * stop between elements, or the step ended `error`) reopens the step and
+ * goes on with the loop; an ended visit with an exhausted edge starts a new
+ * one. Mid-loop (`state.loops` set) the open step continues. Else the step
+ * the log has that the graph never committed (the first element was
+ * running) is continued or reopened; else a new visit.
  */
 export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 	let graph: BodyGraph | null = null;
@@ -104,7 +104,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			node,
 			state,
 			config,
-			entryOf(node, state, events, scope),
+			entryOf(resumePoint(node, state, events, scope, RESUME_RULES.callEach)),
 		);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;
@@ -430,38 +430,6 @@ type Element = {
 	baseBranch: string | null;
 	inputs: InputValues;
 };
-
-/**
- * How the node enters. A run parked at this node's own park node (a stop
- * between elements, or the step ended `error`) reopens the step and goes
- * on with the loop; an ended visit with an exhausted edge starts a new
- * one. Mid-loop (`state.loops` set) the open step continues. Else the step
- * the log has that the graph never committed (the first element was
- * running) is continued or reopened; else a new visit.
- */
-function entryOf(
-	node: CallEachNode,
-	state: RunStateValues,
-	events: readonly LoggedEvent[],
-	scope: Scope | null,
-): StepStart {
-	const pending = state.pending;
-	if (pending?.nodeId === node.id) {
-		const own =
-			pending.kind === "parked" && pending.stepId
-				? (deriveSteps(events).find((s) => s.id === pending.stepId) ?? null)
-				: null;
-		const cutShort =
-			own?.outcome === "stopped" ||
-			own?.outcome === "error" ||
-			own?.outcome === "interrupted";
-		return cutShort ? continueStep(own) : { kind: "new" };
-	}
-	if (state.loops[node.id]) {
-		return continueStep(latestStepOf(node, events, scope));
-	}
-	return continueStep(uncommittedStep(node, state, events, scope));
-}
 
 /** Why the loop must stop before the next element, or null. */
 function stopBeforeNext(

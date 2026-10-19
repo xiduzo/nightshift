@@ -51,7 +51,6 @@ import {
 	openWork,
 	parseEventRow,
 	type ResumedBy,
-	type Scope,
 	sumCostUsd,
 } from "./events";
 import {
@@ -61,6 +60,7 @@ import {
 	messageOf,
 	type RunRow,
 } from "./graph/context";
+import { resumeTarget } from "./graph/resume-point";
 import { createRunner, type ThreadState } from "./graph/runner";
 import { resolveInputs } from "./inputs";
 import { expandMcpServers, type McpExpansion } from "./mcp";
@@ -1363,58 +1363,6 @@ export function createEngine(
 	}
 
 	return engine;
-}
-
-/**
- * What `RunResumed` records: the node the run continues at, from the log.
- * When the run took an edge after its last step started (it stopped or
- * died between steps), that edge's target; else the last step's node, with
- * its id when it is an Agent step with a harness session to continue, and
- * its scope. `topNodeId` is the top-level node around it, for a thread
- * that has to be re-entered from the root. Null when the run never
- * started a step.
- */
-function resumeTarget(events: readonly LoggedEvent[]): {
-	nodeId: string;
-	stepId: string | null;
-	scope: Scope | null;
-	topNodeId: string;
-} | null {
-	const steps = deriveSteps(events);
-	const last = steps.at(-1);
-	let lastEdge: Extract<LoggedEvent, { type: "EdgeTaken" }> | null = null;
-	for (const e of events) {
-		if (e.type === "EdgeTaken" && (!lastEdge || e.seq > lastEdge.seq)) {
-			lastEdge = e;
-		}
-	}
-	let nodeId: string;
-	let stepId: string | null = null;
-	let scope: Scope | null;
-	if (lastEdge && (!last || lastEdge.seq > last.startSeq)) {
-		nodeId = lastEdge.payload.to;
-		scope = lastEdge.payload.scope ?? null;
-	} else if (last) {
-		nodeId = last.nodeId;
-		scope = last.scope;
-		if (
-			last.nodeType === "agent" &&
-			last.sessions.some((s) => s.harnessSessionId)
-		) {
-			stepId = last.id;
-		}
-	} else {
-		return null;
-	}
-	const byId = new Map(steps.map((s) => [s.id, s]));
-	let topNodeId = nodeId;
-	for (let at = scope; at; ) {
-		const caller = byId.get(at.parentStepId);
-		if (!caller) break;
-		topNodeId = caller.nodeId;
-		at = caller.scope;
-	}
-	return { nodeId, stepId, scope, topNodeId };
 }
 
 /**

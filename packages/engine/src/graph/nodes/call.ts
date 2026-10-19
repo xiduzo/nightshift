@@ -1,24 +1,20 @@
-import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { type CallNode, runsEach } from "@nightshift/flows";
 
-import type { InputValues, LoggedEvent, StepOutputs } from "../../events";
+import type { InputValues, StepOutputs } from "../../events";
 import { renderBindings, resolveInputs } from "../../inputs";
 import {
 	beginStep,
 	messageOf,
 	type NodeAction,
 	type StepContext,
-	type StepStart,
 	stopAtOf,
-	uncommittedStep,
 } from "../context";
+import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
 import { hasStoppedEdge, route, scopeOf } from "../route";
-import type { RunStateValues } from "../state";
 import {
 	type BodyGraph,
 	bodyGraph,
 	bodyOutputs,
-	continueStep,
 	endedLabel,
 	runBody,
 } from "./body";
@@ -35,11 +31,12 @@ import { callEachNode } from "./call-each";
  * end, `fail` with the reason when it failed.
  *
  * Everything before the body runs again on a resume and after a daemon
- * death (rule 4), so it is idempotent: the step the log has for this node
- * that the graph never committed is continued (open) or reopened (ended:
- * stopped, or `interrupted` by recovery) with its `FlowCalled` inputs, and
- * the body resumes under the same namespace. A run parked at this node's
- * own park node (no edge on `fail`) resumes as a new visit, as today.
+ * death (rule 4), so it is idempotent: the resume point (`resumePoint`,
+ * `RESUME_RULES.call`) continues the step the log has for this node that
+ * the graph never committed (open) or reopens it (ended: stopped, or
+ * `interrupted` by recovery) with its `FlowCalled` inputs, and the body
+ * resumes under the same namespace. A run parked at this node's own park
+ * node (no edge on `fail`) resumes as a new visit, as today.
  */
 export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 	if (runsEach(node)) return callEachNode(node, ctx);
@@ -52,7 +49,9 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 			node,
 			state,
 			config,
-			entryOf(node, state, events, config),
+			entryOf(
+				resumePoint(node, state, events, scopeOf(config), RESUME_RULES.call),
+			),
 		);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;
@@ -151,19 +150,4 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 			}
 		}
 	};
-}
-
-/**
- * A run parked at this node (its step ended `fail` with no edge) starts a
- * new visit; else the step the log has that the graph never committed is
- * continued or reopened; else a new visit.
- */
-function entryOf(
-	node: CallNode,
-	state: RunStateValues,
-	events: readonly LoggedEvent[],
-	config: LangGraphRunnableConfig,
-): StepStart {
-	if (state.pending?.nodeId === node.id) return { kind: "new" };
-	return continueStep(uncommittedStep(node, state, events, scopeOf(config)));
 }

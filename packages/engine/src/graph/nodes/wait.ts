@@ -18,7 +18,14 @@ import {
 	type StepHandle,
 	stopAtOf,
 } from "../context";
-import { parkStopped, route, type StepEnd, waitNodeId } from "../route";
+import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
+import {
+	parkStopped,
+	route,
+	type StepEnd,
+	scopeOf,
+	waitNodeId,
+} from "../route";
 import type { PendingWait, RunStateValues } from "../state";
 
 /**
@@ -48,7 +55,8 @@ import type { PendingWait, RunStateValues } from "../state";
  * that does not parse, a command that cannot start) or `stopped`.
  *
  * A parked or interrupted Wait step has nothing to continue: a resume
- * starts the next visit, as a Command does.
+ * starts the next visit, as a Command does (`resumePoint` with
+ * `RESUME_RULES.wait`: only the pending wait's step is taken up).
  */
 export function waitStepNode(node: WaitNode, ctx: StepContext): NodeAction {
 	return async (state, config) => {
@@ -61,7 +69,15 @@ export function waitStepNode(node: WaitNode, ctx: StepContext): NodeAction {
 			node,
 			state,
 			config,
-			pending ? { kind: "continue", stepId: pending.stepId } : { kind: "new" },
+			entryOf(
+				resumePoint(
+					node,
+					state,
+					await ctx.log.events(ctx.run.id),
+					scopeOf(config),
+					RESUME_RULES.wait,
+				),
+			),
 		);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;
