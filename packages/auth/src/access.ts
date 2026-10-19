@@ -64,3 +64,13 @@ export const roles = {
 };
 
 export type Role = keyof typeof roles;
+
+/**
+ * Whether a role allows `permissions`, without a request: for checks that
+ * have a Person and a Space but no session headers (the sync socket). An
+ * unknown role allows nothing.
+ */
+export function roleAllows(role: string, permissions: Permissions): boolean {
+	const known = roles[role as Role] as (typeof roles)[Role] | undefined;
+	return known?.authorize(permissions).success === true;
+}

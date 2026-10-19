@@ -3,8 +3,9 @@ import { user } from "@nightshift/db/schema/auth";
 import { device } from "@nightshift/db/schema/nightshift";
 import { eq } from "drizzle-orm";
 
-import { hasPermission } from "./index";
+import { hasPermission, roleAllows } from "./index";
 import { createLocalSession } from "./local-session";
+import { requestAccess } from "./request";
 import { LOCAL_EMAIL, localPerson, personalSpaceId, spacesOf } from "./spaces";
 import { type AuthSandbox, createAuthSandbox } from "./test-support";
 
@@ -174,5 +175,47 @@ describe("the local Person", () => {
 		const ada = await sandbox.signUp("Ada");
 		const own = await sessions.resolve(ada.headers);
 		expect(own.session?.user.id).toBe(ada.userId);
+	});
+});
+
+describe("creating a Space", () => {
+	test("makes its creator the owner, works in it, and tells the daemon", async () => {
+		const changed: string[] = [];
+		const own = await createAuthSandbox({
+			onMembersChanged: async (spaceId) => {
+				changed.push(spaceId);
+			},
+		});
+		try {
+			const ada = await own.signUp("Ada");
+			const access = await requestAccess(own.auth, own.db, ada.headers, null);
+			const { id } = await access.createSpace("Platform team");
+
+			expect(await spacesOf(own.db, ada.userId)).toEqual([
+				expect.objectContaining({ personal: true }),
+				{ id, name: "Platform team", personal: false, role: "owner" },
+			]);
+			const after = await requestAccess(own.auth, own.db, ada.headers, null);
+			expect(after.spaceId).toBe(id);
+			expect(changed).toContain(id);
+			// A permission in another Space of the Person's.
+			const personal = await personalSpaceId(own.db, ada.userId);
+			expect(
+				await after.can({ project: ["move"] }, personal ?? undefined),
+			).toBe(true);
+			const bob = await own.signUp("Bob");
+			const outsider = await requestAccess(own.auth, own.db, bob.headers, null);
+			expect(await outsider.can({ project: ["move"] }, id)).toBe(false);
+		} finally {
+			own.cleanup();
+		}
+	});
+
+	test("roleAllows: what each role may do, without a request", () => {
+		expect(roleAllows("member", { project: ["add"] })).toBe(true);
+		expect(roleAllows("member", { project: ["move"] })).toBe(false);
+		expect(roleAllows("admin", { project: ["move"] })).toBe(true);
+		expect(roleAllows("viewer", { project: ["add"] })).toBe(false);
+		expect(roleAllows("nobody", { project: ["add"] })).toBe(false);
 	});
 });

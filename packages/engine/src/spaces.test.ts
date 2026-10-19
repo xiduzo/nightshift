@@ -9,9 +9,15 @@ import {
 	step,
 } from "@nightshift/db/schema/nightshift";
 import type { DecisionNode, Flow } from "@nightshift/flows";
+import { eq } from "drizzle-orm";
 
 import { createEngine, type EngineInternals } from "./engine";
 import { createRunLog, type RunLog } from "./run-log";
+import {
+	createSpaceDocuments,
+	type SpaceDocuments,
+	spaceProjects,
+} from "./space/document";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -30,16 +36,19 @@ import type { Engine } from "./types";
 let sandbox: Sandbox;
 let runLogs: RunLog[];
 let signal: AbortController;
+let documents: SpaceDocuments;
 beforeEach(async () => {
 	sandbox = await createSandbox();
 	runLogs = [];
 	signal = new AbortController();
+	documents = createSpaceDocuments({ db: sandbox.db });
 });
 afterEach(async () => {
 	signal.abort();
 	try {
 		await expectRunLogsInSync(sandbox.db, runLogs);
 	} finally {
+		await documents.close();
 		await sandbox.cleanup();
 	}
 });
@@ -54,6 +63,7 @@ function makeEngine(internals: EngineInternals = {}): Engine {
 			deviceId: sandbox.deviceId,
 			dataDir: sandbox.dataDir,
 			scheduler: false,
+			spaceDocuments: documents,
 		}),
 		{ runLog, signal: signal.signal, ...internals },
 	);
@@ -175,5 +185,65 @@ describe("Spaces", () => {
 		expect(
 			(await sandbox.db.select().from(agentSession)).length,
 		).toBeGreaterThan(0);
+	});
+
+	test("a moved project takes its Clones, runs, steps, sessions and events along", async () => {
+		const engine = makeEngine();
+		const mine = engine.space(sandbox.spaceId);
+		const platform = await otherSpace(sandbox.db, "Platform");
+		const theirs = engine.space(platform);
+
+		const added = await mine.addProject({ repoPath: sandbox.repoPath });
+		const started = await mine.startRun({ projectId: added.id, flow });
+		await waitFor(
+			async () => (await mine.getRun(started.id)).status === "waiting",
+			{ label: "the Gate" },
+		);
+
+		await mine.moveProject(added.id, platform);
+
+		for (const table of [project, clone, run, step, agentSession, event]) {
+			const spaces = new Set(
+				(await sandbox.db.select({ space: table.spaceId }).from(table)).map(
+					(r) => r.space,
+				),
+			);
+			expect(spaces).toEqual(new Set([platform]));
+		}
+		// The new Space has it, Gate and all; the old one does not.
+		expect(await mine.listProjects()).toEqual([]);
+		await expect(mine.getRun(started.id)).rejects.toThrow("Run not found");
+		expect((await theirs.listProjects()).map((p) => p.id)).toEqual([added.id]);
+		expect(await theirs.listGates()).toHaveLength(1);
+		const [moved] = await sandbox.db
+			.select({ payload: event.payload })
+			.from(event)
+			.where(eq(event.type, "ProjectMoved"));
+		expect(JSON.parse(moved?.payload ?? "{}")).toEqual({
+			projectId: added.id,
+			from: sandbox.spaceId,
+			to: platform,
+		});
+
+		// Both documents follow.
+		const before = await documents.open(sandbox.spaceId);
+		const after = await documents.open(platform);
+		expect(spaceProjects(before).has(added.id)).toBe(false);
+		expect(before.clones.size).toBe(0);
+		expect(spaceProjects(after).get(added.id)?.name).toBe(added.name);
+		expect([...after.clones.keys()]).toEqual([
+			`${added.id}/${sandbox.deviceId}`,
+		]);
+
+		await theirs.stopRun(started.id);
+	});
+
+	test("a move to a Space that does not exist is refused", async () => {
+		const mine = makeEngine().space(sandbox.spaceId);
+		const added = await mine.addProject({ repoPath: sandbox.repoPath });
+		await expect(mine.moveProject(added.id, "nowhere")).rejects.toThrow(
+			"That Space does not exist.",
+		);
+		expect((await mine.listProjects()).map((p) => p.id)).toEqual([added.id]);
 	});
 });

@@ -24,6 +24,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Owner | The one Device that writes a row. Sync never merges two writers of one row: a Run's rows and Events are its Walker's, a Clone is its Device's. | Devices |
 | Replica | A Device's own database: everything it may see, as far as it has synced. Today, the only one. | Devices |
 | Device document | A Device's configuration as one Yjs document, `device:<id>`: its Agent Profiles, CLI Tools, Connections, Settings, and its facts (harnesses, programs, secret names, Clones). Its Device is its Owner: it applies edits and saves the document in its Replica. Syncs at `/sync`, to its owner only. Never holds a secret value. | Devices, slice 3 |
+| Space document | A Space's definitions as one Yjs document, `space:<id>`: its Projects (name, remote, removed), which Devices have a Clone of each (never the path), and a mirror of its Members. Any Member with a role that may add Projects edits it; a viewer reads it. The Replica's project rows follow it. Syncs at `/sync`, to the Space's Members only. | Devices, slice 3 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
 | Node | One step of a Flow: Agent, Command, Tool, Decision, Value, Wait, or Subflow (`call` in the file). Its id is also its name in templates. | PLAN §3 |
 | Agent Node | A Node that runs one Session on its Harness, with a prompt or a skill (with arguments), a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. The agent picks its Outcome in its Step Report, or a Checker picks it. | PLAN §3 |
@@ -134,6 +135,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | ProjectRemoved | A person removed a Project. Its Runs and Events stay. |
 | ProjectRestored | A removed Project's clone was added again. |
 | CloneAdded | A folder became a Project's Clone on a Device: its `origin` named a known Project, or the Clone moved to a new folder. |
+| ProjectRenamed | A person gave a Project a new name. |
+| ProjectMoved | A person moved a Project, with its Clones, Runs and Events, from one Space to another. |
 | RunStarted | A Run began, with its copy of the Flow. |
 | WorktreeCreated | A Worktree was created for a Run. |
 | RunResumed | A person resumed a Run, or the daemon did after a restart (`by: "daemon"`). |

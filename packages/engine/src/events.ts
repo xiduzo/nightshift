@@ -101,6 +101,10 @@ export type EnginePayloads = {
 	 * names a Project already known, or a Clone that moved to a new folder.
 	 */
 	CloneAdded: { projectId: string; deviceId: string; path: string };
+	/** A person gave the project a new name. */
+	ProjectRenamed: { projectId: string; name: string };
+	/** A person moved the project, with its Clones, runs and events, to another Space. */
+	ProjectMoved: { projectId: string; from: string; to: string };
 	RunStarted: {
 		projectId: string;
 		flowName: string | null;

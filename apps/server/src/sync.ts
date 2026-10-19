@@ -1,8 +1,11 @@
 import { Hocuspocus } from "@hocuspocus/server";
 import type { Auth } from "@nightshift/auth";
+import { roleAllows } from "@nightshift/auth/access";
 import type { LocalSession } from "@nightshift/auth/local-session";
 import { requestAccess } from "@nightshift/auth/request";
+import { roleIn } from "@nightshift/auth/spaces";
 import type { Database } from "@nightshift/db";
+import { spaceIdOf } from "@nightshift/engine/space/document";
 import type { Server, ServerWebSocket, WebSocketHandler } from "bun";
 import * as Y from "yjs";
 
@@ -20,6 +23,12 @@ import { isThisComputer } from "./this-computer";
  * every update goes both ways until it unloads the document.
  */
 
+/**
+ * What a client may do with a document: change it, only read it (a
+ * read-only connection: Hocuspocus drops its updates), or nothing.
+ */
+export type SyncAccess = "write" | "read" | false;
+
 /** Who may open which document. Throws or returns false to refuse. */
 export type SyncAuthorize = (request: {
 	documentName: string;
@@ -29,7 +38,7 @@ export type SyncAuthorize = (request: {
 	peer: string | null;
 	/** The upgrade request: its headers carry `Origin` and the session cookie. */
 	request: Request;
-}) => boolean | Promise<boolean>;
+}) => SyncAccess | Promise<SyncAccess>;
 
 export type Sync = {
 	/** For the daemon's fetch handler: upgrades a request for the sync path. */
@@ -61,12 +70,19 @@ export function createSync(options: {
 
 	const hocuspocus = new Hocuspocus({
 		quiet: true,
-		async onAuthenticate({ documentName, token, request, context }) {
+		async onAuthenticate({
+			documentName,
+			token,
+			request,
+			context,
+			connectionConfig,
+		}) {
 			const peer = (context as { peer?: string | null }).peer ?? null;
-			const allowed =
+			const access =
 				options.document(documentName) !== null &&
 				(await options.authorize({ documentName, token, peer, request }));
-			if (!allowed) throw new Error("Not allowed.");
+			if (!access) throw new Error("Not allowed.");
+			connectionConfig.readOnly = access === "read";
 		},
 		async onLoadDocument({ documentName, document }) {
 			const owned = options.document(documentName);
@@ -131,14 +147,19 @@ export function createSync(options: {
 }
 
 /**
- * The Device document opens for its owner only: the Person whose session
- * the request carries. A request from this computer (`isThisComputer`)
- * without a session of its own gets the local Person's session, exactly
- * as the procedures do, so one rule decides both. Slice 4 adds the
- * Device key: its owner, and the home-Host rule (a Device document syncs
- * only to Devices of the same owner).
+ * Who may open which document, by its kind. The request's session decides:
+ * a request from this computer (`isThisComputer`) without a session of its
+ * own gets the local Person's session, exactly as the procedures do, so
+ * one rule decides both.
+ *
+ * - `device:<id>`: its owner only (this daemon serves its own only).
+ * - `space:<id>`: a Member of that Space. A role that may add projects
+ *   writes; any other role (a viewer) reads.
+ *
+ * Slice 4 adds the Device key (its owner), and the home-Host rule (a
+ * Device document syncs only to Devices of the same owner).
  */
-export function ownerOnly(options: {
+export function documentAccess(options: {
 	auth: Auth;
 	db: Database;
 	localSession: LocalSession;
@@ -146,7 +167,7 @@ export function ownerOnly(options: {
 	ownerId: string;
 	trustedOrigins: ReadonlySet<string>;
 }): SyncAuthorize {
-	return async ({ request, peer }) => {
+	return async ({ documentName, request, peer }) => {
 		const local = isThisComputer(
 			peer,
 			request.headers.get("origin"),
@@ -158,6 +179,25 @@ export function ownerOnly(options: {
 			request.headers,
 			local ? options.localSession : null,
 		);
-		return session?.user.id === options.ownerId;
+		if (!session) return false;
+		return personAccess(options, session.user.id, documentName);
 	};
+}
+
+/** What one Person may do with a document. */
+async function personAccess(
+	options: { db: Database; ownerId: string },
+	personId: string,
+	documentName: string,
+): Promise<SyncAccess> {
+	if (documentName.startsWith("device:")) {
+		return personId === options.ownerId ? "write" : false;
+	}
+	const spaceId = spaceIdOf(documentName);
+	if (spaceId) {
+		const role = await roleIn(options.db, personId, spaceId);
+		if (role === null) return false;
+		return roleAllows(role, { project: ["add"] }) ? "write" : "read";
+	}
+	return false;
 }
