@@ -9,7 +9,7 @@ import {
 	run,
 	step,
 } from "@nightshift/db/schema/nightshift";
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, eq, getColumns, sql } from "drizzle-orm";
 import {
 	integer,
 	primaryKey,
@@ -31,8 +31,21 @@ import type { TranscriptEntry } from "./types";
  * scope names the calling step), so the run's own rows hold all of it.
  */
 
-/** 2: the project by its remote, with its Clones; the Walker on runs, steps and events. */
+/**
+ * The format this Night Shift writes. 2: the project by its remote, with
+ * its Clones; the Walker on runs, steps and events. Format 1 bundles (a
+ * project's `repo_path`, no Walker) still open: see `openRunBundle`.
+ */
 export const RUN_BUNDLE_FORMAT_VERSION = 2;
+
+/** The formats `openRunBundle` reads. */
+const READABLE_FORMATS = [1, RUN_BUNDLE_FORMAT_VERSION];
+
+/**
+ * The Walker and Device of a format 1 bundle's rows: that bundle never
+ * said which computer walked the run.
+ */
+export const UNKNOWN_DEVICE = "unknown";
 
 /** What stands in for a secret value that a bundle leaves out. */
 const MASK = "•••";
@@ -236,37 +249,18 @@ export async function openRunBundle(path: string): Promise<RunBundle> {
 			]),
 		);
 		const formatVersion = Number(meta.get("format_version"));
-		if (formatVersion !== RUN_BUNDLE_FORMAT_VERSION) {
+		if (!READABLE_FORMATS.includes(formatVersion)) {
 			throw new Error(
-				`${path} is a run bundle of format ${formatVersion}. This Night Shift reads format ${RUN_BUNDLE_FORMAT_VERSION}.`,
+				`${path} is a run bundle of format ${formatVersion}. This Night Shift reads format ${READABLE_FORMATS.join(" and ")}.`,
 			);
 		}
 		const runId = String(meta.get("run_id"));
-		const [runRow] = await db.select().from(run).where(eq(run.id, runId));
+		const rows =
+			formatVersion === 1
+				? await readFormat1(db, runId)
+				: await readRows(db, runId);
+		const { run: runRow, project: projectRow, clones, steps, sessions } = rows;
 		if (!runRow) throw new Error(`${path} has no run ${runId}.`);
-		const [projectRow] = await db
-			.select()
-			.from(project)
-			.where(eq(project.id, runRow.projectId));
-		const clones = await db
-			.select()
-			.from(clone)
-			.where(eq(clone.projectId, runRow.projectId));
-		const steps = await db
-			.select()
-			.from(step)
-			.where(eq(step.runId, runId))
-			.orderBy(asc(step.createdAt));
-		const sessions = await db
-			.select()
-			.from(agentSession)
-			.where(eq(agentSession.runId, runId))
-			.orderBy(asc(agentSession.createdAt));
-		const events = await db
-			.select()
-			.from(event)
-			.where(eq(event.runId, runId))
-			.orderBy(asc(event.seq));
 		return {
 			meta: {
 				formatVersion,
@@ -281,7 +275,7 @@ export async function openRunBundle(path: string): Promise<RunBundle> {
 			run: runRow,
 			steps,
 			sessions,
-			events: events.map(parseEventRow),
+			events: rows.events.map(parseEventRow),
 			async transcript(stepId) {
 				const query = db.select({ json: transcript.json }).from(transcript);
 				const rows = await (stepId
@@ -296,6 +290,111 @@ export async function openRunBundle(path: string): Promise<RunBundle> {
 		db.$client.close();
 		throw error;
 	}
+}
+
+type BundleRows = {
+	project: typeof project.$inferSelect | undefined;
+	clones: (typeof clone.$inferSelect)[];
+	run: typeof run.$inferSelect | undefined;
+	steps: (typeof step.$inferSelect)[];
+	sessions: (typeof agentSession.$inferSelect)[];
+	events: (typeof event.$inferSelect)[];
+};
+
+/** A format 2 bundle: the live schema's tables. */
+async function readRows(db: Database, runId: string): Promise<BundleRows> {
+	const [runRow] = await db.select().from(run).where(eq(run.id, runId));
+	const projectId = runRow?.projectId ?? "";
+	const [projectRow] = await db
+		.select()
+		.from(project)
+		.where(eq(project.id, projectId));
+	return {
+		project: projectRow,
+		clones: await db.select().from(clone).where(eq(clone.projectId, projectId)),
+		run: runRow,
+		steps: await db
+			.select()
+			.from(step)
+			.where(eq(step.runId, runId))
+			.orderBy(asc(step.createdAt)),
+		sessions: await sessionsOf(db, runId),
+		events: await db
+			.select()
+			.from(event)
+			.where(eq(event.runId, runId))
+			.orderBy(asc(event.seq)),
+	};
+}
+
+/**
+ * A format 1 bundle, read as format 2: the project's `repo_path` is its one
+ * Clone, it has no remote, and every row's Walker is `UNKNOWN_DEVICE`.
+ */
+async function readFormat1(db: Database, runId: string): Promise<BundleRows> {
+	const { walkerId: _walker, ...runColumns } = getColumns(run);
+	const { deviceId: _device, ...stepColumns } = getColumns(step);
+	const {
+		walkerId: _eventWalker,
+		walkerSeq: _walkerSeq,
+		...eventColumns
+	} = getColumns(event);
+	const { remote: _remote, ...projectColumns } = getColumns(project);
+
+	const [runRow] = await db
+		.select(runColumns)
+		.from(run)
+		.where(eq(run.id, runId));
+	const [projectRow] = await db
+		.select({ ...projectColumns, repoPath: sql<string>`repo_path` })
+		.from(project)
+		.where(eq(project.id, runRow?.projectId ?? ""));
+	const steps = await db
+		.select(stepColumns)
+		.from(step)
+		.where(eq(step.runId, runId))
+		.orderBy(asc(step.createdAt));
+	const events = await db
+		.select(eventColumns)
+		.from(event)
+		.where(eq(event.runId, runId))
+		.orderBy(asc(event.seq));
+	return {
+		project: projectRow && {
+			id: projectRow.id,
+			name: projectRow.name,
+			remote: null,
+			createdAt: projectRow.createdAt,
+			removedAt: projectRow.removedAt,
+		},
+		clones: projectRow
+			? [
+					{
+						id: projectRow.id,
+						projectId: projectRow.id,
+						deviceId: UNKNOWN_DEVICE,
+						path: projectRow.repoPath,
+						createdAt: projectRow.createdAt,
+					},
+				]
+			: [],
+		run: runRow ? { ...runRow, walkerId: UNKNOWN_DEVICE } : undefined,
+		steps: steps.map((s) => ({ ...s, deviceId: null })),
+		sessions: await sessionsOf(db, runId),
+		events: events.map((e) => ({
+			...e,
+			walkerId: UNKNOWN_DEVICE,
+			walkerSeq: e.seq,
+		})),
+	};
+}
+
+function sessionsOf(db: Database, runId: string) {
+	return db
+		.select()
+		.from(agentSession)
+		.where(eq(agentSession.runId, runId))
+		.orderBy(asc(agentSession.createdAt));
 }
 
 /** Rows in slices: SQLite takes at most 32766 bound values per statement. */

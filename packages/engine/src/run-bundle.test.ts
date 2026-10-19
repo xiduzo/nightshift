@@ -16,7 +16,7 @@ import {
 	parseEventRow,
 	sumCostUsd,
 } from "./events";
-import { exportRun, openRunBundle } from "./run-bundle";
+import { exportRun, openRunBundle, UNKNOWN_DEVICE } from "./run-bundle";
 import { createSandbox, type Sandbox, waitFor } from "./test-support";
 import { readRunTranscript } from "./transcripts";
 
@@ -192,6 +192,46 @@ describe("exportRun", () => {
 				(e) => e.stepId === agentStep?.id,
 			),
 		).toBe(true);
+		opened.close();
+	});
+
+	test("a format 1 bundle still opens: its path is its one Clone, its Walker unknown", async () => {
+		const runId = await finishedRun();
+		const path = join(sandbox.root, "run.nightshift.sqlite");
+		await exportRun({ db: sandbox.db, runId, path });
+		const live = await liveEvents(runId);
+		// What a Night Shift before Clones wrote.
+		const file = createDb({ DATABASE_URL: `file:${path}` });
+		for (const statement of [
+			"ALTER TABLE run DROP COLUMN walker_id",
+			"ALTER TABLE step DROP COLUMN device_id",
+			"ALTER TABLE event DROP COLUMN walker_id",
+			"ALTER TABLE event DROP COLUMN walker_seq",
+			"ALTER TABLE project ADD repo_path text",
+			"UPDATE project SET repo_path = (SELECT path FROM clone)",
+			"ALTER TABLE project DROP COLUMN remote",
+			"DROP TABLE clone",
+			"UPDATE bundle SET value = '1' WHERE key = 'format_version'",
+		]) {
+			await file.run(sql.raw(statement));
+		}
+		file.$client.close();
+
+		const opened = await openRunBundle(path);
+		expect(opened.meta.formatVersion).toBe(1);
+		expect(opened.project).toMatchObject({ name: "repo", remote: null });
+		expect(opened.clones).toEqual([
+			expect.objectContaining({
+				projectId: opened.run.projectId,
+				deviceId: UNKNOWN_DEVICE,
+				path: sandbox.repoPath,
+			}),
+		]);
+		expect(opened.run.walkerId).toBe(UNKNOWN_DEVICE);
+		expect(opened.steps.map((s) => s.deviceId)).toEqual([null, null]);
+		expect(opened.events).toEqual(live);
+		expect(deriveRunState(opened.events).status).toBe("finished");
+		expect(sumCostUsd(opened.events)).toBe(0.25);
 		opened.close();
 	});
 

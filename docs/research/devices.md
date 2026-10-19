@@ -515,8 +515,10 @@ iroh.
      The sync cursor of slice 4 is "Walker X after `walker_seq` N".
    - `run.walker_id` (no foreign key: a run walked elsewhere may arrive
      before its Device) and `step.device_id` are this computer for every
-     run and step today. Run bundles are format 2 (the project's Clones,
-     the Walker columns).
+     run and step today. Run bundles are written in format 2 (the
+     project's Clones, the Walker columns). Format 1 bundles still open:
+     the old `repo_path` reads as the project's one Clone, the remote as
+     none, and the Walker and step Device as `unknown`.
 2. **Spaces.** The organization plugin; every row gets a `space_id`; one
    personal Space holds everything; the Space switcher shows one. Sessions
    on the procedures replace public ones. No behaviour change for one
