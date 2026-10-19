@@ -12,6 +12,7 @@ import { migrateDb } from "@nightshift/db/migrate";
 import { event } from "@nightshift/db/schema/nightshift";
 import { asc, eq } from "drizzle-orm";
 
+import { type DeviceDocument, openDeviceDocument } from "./device/document";
 import { type LocalDeviceDeps, localDevice } from "./device/local";
 import type { Device } from "./device/types";
 import { parseEventRow } from "./events";
@@ -83,6 +84,8 @@ export type Sandbox = {
 	db: Database;
 	/** The database's own Device: the Walker of its runs. */
 	deviceId: string;
+	/** Opens the Device document from the database, as a daemon start does. */
+	openDocument(): Promise<DeviceDocument>;
 	cleanup(): Promise<void>;
 };
 
@@ -108,13 +111,15 @@ export async function createSandbox(): Promise<Sandbox> {
 	const dbPath = join(root, "nightshift.db");
 	const db = createDb({ DATABASE_URL: `file:${dbPath}` });
 	await migrateDb(db);
+	const deviceId = (await selfDevice(db)).id;
 	return {
 		root,
 		repoPath,
 		dataDir: join(root, "data"),
 		dbPath,
 		db,
-		deviceId: (await selfDevice(db)).id,
+		deviceId,
+		openDocument: () => openDeviceDocument({ db, deviceId }),
 		cleanup: () => rm(root, { recursive: true, force: true }),
 	};
 }

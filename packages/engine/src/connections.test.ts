@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { connection, secret } from "@nightshift/db/schema/nightshift";
+import { connection } from "@nightshift/db/schema/nightshift";
 
 import {
 	type ConnectionInput,
@@ -39,17 +39,27 @@ function memorySecrets(initial: Record<string, string> = {}) {
 	return { backend, values, reads };
 }
 
+/** A store over the Device document as a daemon start opens it. */
 async function makeStore(
 	env: Record<string, string | undefined> = {},
 	secrets = memorySecrets(),
 ) {
 	const store = createConnectionStore({
-		db: sandbox.db,
+		document: await sandbox.openDocument(),
 		env,
 		secrets: secrets.backend,
 	});
 	await store.load();
 	return { store, secrets };
+}
+
+/** What the next start reads: the connection names and the facts' secret names. */
+async function savedNow() {
+	const document = await sandbox.openDocument();
+	return {
+		connections: [...document.connections.keys()].sort(),
+		secrets: (document.facts.get("secrets") as string[] | undefined) ?? [],
+	};
 }
 
 const tracker: ConnectionInput = {
@@ -128,9 +138,7 @@ describe("connections", () => {
 		await store.remove("tracker");
 		expect(store.get("tracker")).toBeNull();
 		expect(store.list().map((c) => c.name)).toEqual(["docs"]);
-		expect(
-			(await sandbox.db.select().from(connection)).map((r) => r.name),
-		).toEqual(["docs"]);
+		expect((await savedNow()).connections).toEqual(["docs"]);
 	});
 
 	test("saving a name again replaces the connection", async () => {
@@ -147,7 +155,7 @@ describe("connections", () => {
 			variables: [],
 		});
 		expect(store.list()).toHaveLength(1);
-		expect(await sandbox.db.select().from(connection)).toHaveLength(1);
+		expect((await savedNow()).connections).toEqual(["tracker"]);
 	});
 
 	test("refuses a bad name or server", async () => {
@@ -161,7 +169,7 @@ describe("connections", () => {
 		expect(store.list()).toEqual([]);
 	});
 
-	test("load restores the connections and the saved secret names from the database", async () => {
+	test("a restart restores the connections and the saved secret names", async () => {
 		const secrets = memorySecrets();
 		const { store } = await makeStore({}, secrets);
 		await store.save(tracker);
@@ -179,7 +187,7 @@ describe("connections", () => {
 		]);
 	});
 
-	test("load skips a row whose server no longer parses", async () => {
+	test("skips a row of an older version whose server no longer parses", async () => {
 		await sandbox.db.insert(connection).values([
 			{ name: "broken", server: "{not json" },
 			{ name: "wrong", server: JSON.stringify({ neither: true }) },
@@ -248,15 +256,15 @@ describe("secrets", () => {
 		]);
 	});
 
-	test("setSecret stores the value in the backend and only the name in the database", async () => {
+	test("setSecret stores the value in the backend and only the name in the document", async () => {
 		const secrets = memorySecrets();
 		const { store } = await makeStore({}, secrets);
 		await store.setSecret("TRACKER_TOKEN", "first-value");
 		await store.setSecret("TRACKER_TOKEN", "second-value");
 		expect(secrets.values.get("TRACKER_TOKEN")).toBe("second-value");
-		const rows = await sandbox.db.select().from(secret);
-		expect(rows.map((r) => r.name)).toEqual(["TRACKER_TOKEN"]);
-		expect(JSON.stringify(rows)).not.toContain("value");
+		expect((await savedNow()).secrets).toEqual(["TRACKER_TOKEN"]);
+		const document = await sandbox.openDocument();
+		expect(JSON.stringify(document.doc.toJSON())).not.toContain("value");
 	});
 
 	test.each([
@@ -270,7 +278,7 @@ describe("secrets", () => {
 		const { store } = await makeStore({}, secrets);
 		await expect(store.setSecret(name, "v")).rejects.toThrow();
 		expect(secrets.values.size).toBe(0);
-		expect(await sandbox.db.select().from(secret)).toEqual([]);
+		expect((await savedNow()).secrets).toEqual([]);
 	});
 
 	test("setSecret accepts a name with _ and digits", async () => {
@@ -296,7 +304,7 @@ describe("secrets", () => {
 		await store.setSecret("TRACKER_TOKEN", "keychain");
 		await store.removeSecret("TRACKER_TOKEN");
 		expect(secrets.values.has("TRACKER_TOKEN")).toBe(false);
-		expect(await sandbox.db.select().from(secret)).toEqual([]);
+		expect((await savedNow()).secrets).toEqual([]);
 		expect(store.get("tracker")?.variables).toEqual([
 			{ name: "TRACKER_TOKEN", source: "env" },
 		]);

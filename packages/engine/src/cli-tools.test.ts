@@ -15,19 +15,25 @@ afterEach(async () => {
 
 describe("createCliToolStore", () => {
 	test("a new daemon has no CLI tools", async () => {
-		const store = createCliToolStore({ db: sandbox.db });
+		const store = createCliToolStore({
+			document: await sandbox.openDocument(),
+		});
 		await store.load();
 		expect(store.list()).toEqual([]);
 	});
 
 	test("saves, lists sorted, changes a description, and removes", async () => {
-		const store = createCliToolStore({ db: sandbox.db });
+		const document = await sandbox.openDocument();
+		const store = createCliToolStore({ document });
 		await store.load();
 		await store.save({ name: "gh", description: "GitHub" });
 		await store.save({ name: "aws" });
 		await store.save({ name: "gh", description: "  " });
 
-		const again = createCliToolStore({ db: sandbox.db });
+		// After a restart.
+		const again = createCliToolStore({
+			document: await sandbox.openDocument(),
+		});
 		await again.load();
 		expect(again.list().map((t) => [t.name, t.description])).toEqual([
 			["aws", null],
@@ -37,12 +43,16 @@ describe("createCliToolStore", () => {
 
 		await again.remove("aws");
 		expect(again.get("aws")).toBeNull();
-		await store.load();
-		expect([...store.names()]).toEqual(["gh"]);
+		const third = createCliToolStore({
+			document: await sandbox.openDocument(),
+		});
+		expect([...third.names()]).toEqual(["gh"]);
 	});
 
 	test("a name that is not a program name is refused", async () => {
-		const store = createCliToolStore({ db: sandbox.db });
+		const store = createCliToolStore({
+			document: await sandbox.openDocument(),
+		});
 		await expect(store.save({ name: "gh pr" })).rejects.toThrow();
 		await expect(store.save({ name: "../gh" })).rejects.toThrow();
 	});
@@ -60,7 +70,9 @@ describe("profiles saved with the GitHub tool set", () => {
 				connections: [],
 			}),
 		});
-		const profiles = createProfileStore({ db: sandbox.db });
+		const profiles = createProfileStore({
+			document: await sandbox.openDocument(),
+		});
 		await profiles.load();
 		expect(profiles.settingsFor("builder")).toMatchObject({ clis: ["gh"] });
 	});

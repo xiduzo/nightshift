@@ -1,21 +1,20 @@
-import type { Database } from "@nightshift/db";
-import { connection, secret } from "@nightshift/db/schema/nightshift";
 import {
 	type AgentNode,
 	type McpServer,
 	mcpServerSchema,
 	nameSchema,
 } from "@nightshift/flows";
-import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { type DeviceDocument, mapView } from "./device/document";
 import { expandMcpServers, type McpExpansion } from "./mcp";
 
 /**
- * Connections: MCP servers defined once on this daemon, named by Agent nodes.
- * Secrets stay `${NAME}` references. A reference reads the system keychain
- * first (a secret saved on the Connections page), then the daemon's
- * environment. Values never reach the database, the log or the UI.
+ * Connections: MCP servers defined once in this Device's document, named
+ * by Agent nodes. Secrets stay `${NAME}` references. A reference reads the
+ * system keychain first (a secret saved on the Connections page), then the
+ * daemon's environment. Values never reach the database, the document, the
+ * log or the UI: the document holds the names of the saved secrets only.
  */
 
 /** `${NAME}`: an environment variable name, as a shell would read it. */
@@ -123,17 +122,48 @@ export function referencedVariables(server: McpServer): string[] {
 	return [...names];
 }
 
+/** A connection as the Device document holds it. */
+const entrySchema = z.object({
+	description: z.string().nullable(),
+	server: z.unknown(),
+	updatedAt: z.number(),
+});
+
 export function createConnectionStore(options: {
-	db: Database;
+	document: DeviceDocument;
 	env: Readonly<Record<string, string | undefined>>;
 	secrets: SecretBackend;
 }): ConnectionStore {
-	const { db, env, secrets } = options;
-	const connections = new Map<string, Omit<Connection, "variables">>();
-	const savedSecrets = new Set<string>();
+	const { document, env, secrets } = options;
+	const connectionView = mapView(document.connections, () => {
+		const out = new Map<string, Omit<Connection, "variables">>();
+		for (const [name, value] of document.connections.entries()) {
+			const entry = entrySchema.safeParse(value);
+			if (!entry.success) continue;
+			const server = mcpServerSchema.safeParse(entry.data.server);
+			if (!server.success) continue;
+			out.set(name, {
+				name,
+				description: entry.data.description,
+				server: server.data,
+				updatedAt: entry.data.updatedAt,
+			});
+		}
+		return out;
+	});
+	/** The secret names are a Device fact: the keychain cannot list them. */
+	const secretView = mapView(document.facts, () => {
+		const names = z.array(z.string()).safeParse(document.facts.get("secrets"));
+		return new Set(names.success ? names.data : []);
+	});
+	function writeSecretNames(names: Set<string>): Promise<void> {
+		return document.change(() => {
+			document.facts.set("secrets", [...names].sort());
+		});
+	}
 
 	function source(variable: string): SecretSource {
-		if (savedSecrets.has(variable)) return "keychain";
+		if (secretView().has(variable)) return "keychain";
 		return env[variable] === undefined ? "missing" : "env";
 	}
 
@@ -153,7 +183,7 @@ export function createConnectionStore(options: {
 	): Promise<Record<string, string | undefined>> {
 		const out: Record<string, string | undefined> = { ...env };
 		for (const name of names) {
-			if (!savedSecrets.has(name)) continue;
+			if (!secretView().has(name)) continue;
 			const value = await secrets.get(name);
 			if (value !== null) out[name] = value;
 		}
@@ -168,72 +198,50 @@ export function createConnectionStore(options: {
 	}
 
 	return {
-		async load() {
-			connections.clear();
-			savedSecrets.clear();
-			for (const row of await db.select().from(connection)) {
-				const parsed = mcpServerSchema.safeParse(safeJson(row.server));
-				if (!parsed.success) continue;
-				connections.set(row.name, {
-					name: row.name,
-					description: row.description,
-					server: parsed.data,
-					updatedAt: row.updatedAt.getTime(),
-				});
-			}
-			for (const row of await db.select({ name: secret.name }).from(secret)) {
-				savedSecrets.add(row.name);
-			}
-		},
-		names: () => new Set(connections.keys()),
+		// The document is read when it opens; a remote edit applies at once.
+		async load() {},
+		names: () => new Set(connectionView().keys()),
 		list: () =>
-			[...connections.values()]
+			[...connectionView().values()]
 				.sort((a, b) => a.name.localeCompare(b.name))
 				.map(withVariables),
 		get(name) {
-			const found = connections.get(name);
+			const found = connectionView().get(name);
 			return found ? withVariables(found) : null;
 		},
 		async save(input) {
 			const parsed = connectionInputSchema.parse(input);
-			const description = parsed.description || null;
-			const server = JSON.stringify(parsed.server);
-			const [row] = await db
-				.insert(connection)
-				.values({ name: parsed.name, description, server })
-				.onConflictDoUpdate({
-					target: connection.name,
-					set: {
-						description,
-						server,
-						updatedAt: sql`(cast(unixepoch('subsecond') * 1000 as integer))`,
-					},
-				})
-				.returning();
 			const saved = {
 				name: parsed.name,
-				description,
+				description: parsed.description || null,
 				server: parsed.server,
-				updatedAt: row?.updatedAt.getTime() ?? Date.now(),
+				updatedAt: Date.now(),
 			};
-			connections.set(parsed.name, saved);
+			await document.change(() => {
+				document.connections.set(parsed.name, {
+					description: saved.description,
+					server: saved.server,
+					updatedAt: saved.updatedAt,
+				});
+			});
 			return withVariables(saved);
 		},
 		async remove(name) {
-			await db.delete(connection).where(eq(connection.name, name));
-			connections.delete(name);
+			await document.change(() => {
+				document.connections.delete(name);
+			});
 		},
 		secrets() {
 			const usedBy = new Map<string, string[]>();
-			for (const c of connections.values()) {
+			for (const c of connectionView().values()) {
 				for (const name of referencedVariables(c.server)) {
 					usedBy.set(name, [...(usedBy.get(name) ?? []), c.name]);
 				}
 			}
-			const names = new Set([...usedBy.keys(), ...savedSecrets]);
+			const names = new Set([...usedBy.keys(), ...secretView()]);
 			return [...names].sort().map((name) => ({
 				name,
-				saved: savedSecrets.has(name),
+				saved: secretView().has(name),
 				inEnv: env[name] !== undefined,
 				usedBy: usedBy.get(name) ?? [],
 			}));
@@ -246,26 +254,18 @@ export function createConnectionStore(options: {
 			secretNameSchema.parse(name);
 			if (value === "") throw new Error("A secret needs a value.");
 			await secrets.set(name, value);
-			await db
-				.insert(secret)
-				.values({ name })
-				.onConflictDoUpdate({
-					target: secret.name,
-					set: {
-						updatedAt: sql`(cast(unixepoch('subsecond') * 1000 as integer))`,
-					},
-				});
-			savedSecrets.add(name);
+			await writeSecretNames(new Set([...secretView(), name]));
 		},
 		async removeSecret(name) {
 			await secrets.delete(name);
-			await db.delete(secret).where(eq(secret.name, name));
-			savedSecrets.delete(name);
+			const names = new Set(secretView());
+			names.delete(name);
+			await writeSecretNames(names);
 		},
 		async mcpServersFor(node) {
 			const servers: Record<string, McpServer> = {};
 			for (const name of node.connections ?? []) {
-				const found = connections.get(name);
+				const found = connectionView().get(name);
 				if (!found) {
 					return {
 						ok: false,
@@ -281,7 +281,7 @@ export function createConnectionStore(options: {
 			const server =
 				"server" in target
 					? mcpServerSchema.parse(target.server)
-					: connections.get(target.name)?.server;
+					: connectionView().get(target.name)?.server;
 			const name = "name" in target ? target.name : "draft";
 			if (!server) {
 				return {
@@ -300,20 +300,12 @@ export function createConnectionStore(options: {
 			};
 		},
 		async secretValues() {
-			const names = new Set(savedSecrets);
-			for (const c of connections.values()) {
+			const names = new Set(secretView());
+			for (const c of connectionView().values()) {
 				for (const name of referencedVariables(c.server)) names.add(name);
 			}
 			const vars = await envFor(names);
 			return [...names].flatMap((name) => (vars[name] ? [vars[name]] : []));
 		},
 	};
-}
-
-function safeJson(text: string): unknown {
-	try {
-		return JSON.parse(text);
-	} catch {
-		return null;
-	}
 }

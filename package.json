@@ -25,7 +25,9 @@
 			"@orpc/client": "^1.15.0",
 			"@types/react": "^19.2.18",
 			"@types/react-dom": "^19.2.7",
-			"drizzle-orm": "1.0.0-rc.4"
+			"drizzle-orm": "1.0.0-rc.4",
+			"yjs": "^13.6.33",
+			"y-protocols": "^1.0.7"
 		}
 	},
 	"type": "module",
