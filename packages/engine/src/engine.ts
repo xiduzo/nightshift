@@ -16,6 +16,7 @@ import {
 import { eq } from "drizzle-orm";
 
 import { createRunBus } from "./bus";
+import { createDeviceRegistry } from "./device/registry";
 import {
 	deriveOpenGate,
 	deriveRunState,
@@ -471,7 +472,10 @@ export function createEngine(
 		yield* reads.watch(runId, signal, afterSeq);
 	}
 
-	return { space };
+	return {
+		space,
+		devices: createDeviceRegistry({ db, log: runLog, now }),
+	};
 }
 
 /** The flow's own policy numbers, else the daemon's settings. */

@@ -11,15 +11,18 @@
 		"start": "bun run dist/index.mjs",
 		"data:migrate": "bun src/data-migrate.ts",
 		"env:generate": "varlock codegen",
-		"auth:generate": "varlock run -- bun x auth@latest generate --config src/services.ts --output ../../packages/db/src/schema/auth.ts --yes"
+		"auth:generate": "varlock run -- bun x auth@latest generate --config src/services.ts --output ../../packages/db/src/schema/auth.ts --yes",
+		"join": "bun src/join-cli.ts"
 	},
 	"dependencies": {
+		"@hocuspocus/provider": "^4.7.1",
 		"@hocuspocus/server": "^4.7.1",
 		"@nightshift/agents": "workspace:*",
 		"@nightshift/api": "workspace:*",
 		"@nightshift/auth": "workspace:*",
 		"@nightshift/db": "workspace:*",
 		"@nightshift/engine": "workspace:*",
+		"@orpc/client": "catalog:",
 		"@orpc/openapi": "catalog:",
 		"@orpc/server": "catalog:",
 		"@orpc/zod": "catalog:",
@@ -32,7 +35,6 @@
 		"zod": "catalog:"
 	},
 	"devDependencies": {
-		"@hocuspocus/provider": "^4.7.1",
 		"@nightshift/config": "workspace:*",
 		"@types/bun": "catalog:",
 		"tsdown": "^0.23.0",

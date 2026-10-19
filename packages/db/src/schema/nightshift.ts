@@ -49,9 +49,54 @@ export const device = sqliteTable(
 		/** This computer. At most one row has it. */
 		self: integer("self", { mode: "boolean" }).notNull().default(false),
 		createdAt: createdAt(),
+		/**
+		 * On a Host: when its owner removed the Device's access (its key is
+		 * gone). Pairing it again clears it.
+		 */
+		revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
 	},
 	(table) => [
 		uniqueIndex("device_self_idx").on(table.self).where(sql`${table.self} = 1`),
+	],
+);
+
+/**
+ * This computer's link to a Host it paired with (`nightshift join`): where
+ * the Host answers, which certificate it pinned, and whether the Host is its
+ * home or a guest Host. The Device key itself is not here: it is in the
+ * keychain, else in a file of the data directory (`key_store`).
+ */
+export const hostLink = sqliteTable(
+	"host_link",
+	{
+		/** The Host's Device id. */
+		hostId: text("host_id").primaryKey(),
+		/** The Host's name, as it told this computer. */
+		name: text("name").notNull(),
+		/** JSON: the Host's addresses, in the order to try them. */
+		addresses: text("addresses").notNull(),
+		/**
+		 * The PEM of the Host's self-signed certificate, pinned at pairing.
+		 * Null when the Host's certificate is trusted by this computer, or the
+		 * address is a loopback `http://` one.
+		 */
+		certificate: text("certificate"),
+		/** The SHA-256 fingerprint of `certificate`, as shown at pairing. */
+		fingerprint: text("fingerprint"),
+		/** "home": the Host keeps this Device's document. "guest": shared Spaces only. */
+		role: text("role", { enum: ["home", "guest"] }).notNull(),
+		/** The Person on the Host whose key this is (who approved the pairing). */
+		personId: text("person_id").notNull(),
+		/** Where the key is: "keychain" or "file". */
+		keyStore: text("key_store", { enum: ["keychain", "file"] }).notNull(),
+		createdAt: createdAt(),
+		/** When the Host refused the key: its owner removed this computer's access. */
+		revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+	},
+	(table) => [
+		uniqueIndex("host_link_home_idx")
+			.on(table.role)
+			.where(sql`${table.role} = 'home'`),
 	],
 );
 

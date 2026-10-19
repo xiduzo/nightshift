@@ -32,7 +32,22 @@ export {
 	refreshDeviceFacts,
 	setDeviceFacts,
 } from "./device/document";
+export {
+	createHostLinks,
+	type DeviceKeyStore,
+	deviceKeyStore,
+	type HostLink,
+	type HostLinks,
+	type HostRole,
+	type KeyStoreKind,
+	SECOND_HOME,
+} from "./device/host-links";
 export { type LocalDeviceDeps, localDevice } from "./device/local";
+export {
+	createDeviceRegistry,
+	type DeviceRegistry,
+	type PairedDevice,
+} from "./device/registry";
 export type * from "./device/types";
 export { createEngine } from "./engine";
 export { chooseFolder } from "./folder-picker";
@@ -83,6 +98,9 @@ export {
 export {
 	createSettingsStore,
 	HARNESS_BIN,
+	hostAddressSchema,
+	isHostAddress,
+	isLoopbackHost,
 	type RunSettings,
 	type SettingField,
 	type SettingKey,

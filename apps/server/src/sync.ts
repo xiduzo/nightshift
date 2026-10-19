@@ -1,5 +1,6 @@
 import { Hocuspocus } from "@hocuspocus/server";
 import type { Auth } from "@nightshift/auth";
+import { isDeviceKey } from "@nightshift/auth/device-keys";
 import type { LocalSession } from "@nightshift/auth/local-session";
 import { requestAccess } from "@nightshift/auth/request";
 import type { Database } from "@nightshift/db";
@@ -20,7 +21,11 @@ import { isThisComputer } from "./this-computer";
  * every update goes both ways until it unloads the document.
  */
 
-/** Who may open which document. Throws or returns false to refuse. */
+/**
+ * Who may open which document. Throws or returns false to refuse. An
+ * object allows, and becomes the connection's context (`disconnect`
+ * matches on it).
+ */
 export type SyncAuthorize = (request: {
 	documentName: string;
 	/** The token the client sent (the provider's `token`). */
@@ -29,7 +34,21 @@ export type SyncAuthorize = (request: {
 	peer: string | null;
 	/** The upgrade request: its headers carry `Origin` and the session cookie. */
 	request: Request;
-}) => boolean | Promise<boolean>;
+}) => SyncAllowed | Promise<SyncAllowed>;
+
+export type SyncAllowed = boolean | Record<string, unknown>;
+
+/**
+ * Documents a daemon keeps for others: a Host keeps the Device documents
+ * of the Devices whose home Host it is. Hocuspocus loads them from the
+ * Replica's `ydoc` rows and stores them back after changes.
+ */
+export type KeptDocuments = {
+	/** Whether this daemon keeps a document of that name. */
+	has(name: string): boolean | Promise<boolean>;
+	fetch(name: string): Promise<Uint8Array | null>;
+	store(name: string, state: Uint8Array): Promise<void>;
+};
 
 export type Sync = {
 	/** For the daemon's fetch handler: upgrades a request for the sync path. */
@@ -37,6 +56,8 @@ export type Sync = {
 	/** Bun's WebSocket handlers for the upgraded sockets. */
 	websocket: WebSocketHandler<SocketData>;
 	hocuspocus: Hocuspocus;
+	/** Ends the connections whose context matches: a Device whose access was removed. */
+	disconnect(match: (context: Record<string, unknown>) => boolean): void;
 	/** Closes every connection. */
 	close(): Promise<void>;
 };
@@ -55,21 +76,36 @@ const BRIDGE = Symbol("sync-bridge");
 export function createSync(options: {
 	/** The live document the daemon owns under that name, or null. */
 	document: (name: string) => Y.Doc | null;
+	/** The documents it keeps for others. None by default. */
+	kept?: KeptDocuments;
 	authorize: SyncAuthorize;
 }): Sync {
 	const unbind = new Map<string, () => void>();
+	const { kept } = options;
+	const isKept = async (name: string) =>
+		options.document(name) === null &&
+		kept !== undefined &&
+		(await kept.has(name));
 
 	const hocuspocus = new Hocuspocus({
 		quiet: true,
 		async onAuthenticate({ documentName, token, request, context }) {
 			const peer = (context as { peer?: string | null }).peer ?? null;
+			const known =
+				options.document(documentName) !== null || (await isKept(documentName));
 			const allowed =
-				options.document(documentName) !== null &&
+				known &&
 				(await options.authorize({ documentName, token, peer, request }));
 			if (!allowed) throw new Error("Not allowed.");
+			return typeof allowed === "object" ? allowed : undefined;
 		},
 		async onLoadDocument({ documentName, document }) {
 			const owned = options.document(documentName);
+			if (!owned && kept && (await isKept(documentName))) {
+				const state = await kept.fetch(documentName);
+				if (state) Y.applyUpdate(document, state);
+				return;
+			}
 			if (!owned) throw new Error(`No document ${documentName} here.`);
 			Y.applyUpdate(document, Y.encodeStateAsUpdate(owned), BRIDGE);
 			const toOwner = (update: Uint8Array, origin: unknown) => {
@@ -85,6 +121,12 @@ export function createSync(options: {
 				document.off("update", toOwner);
 				owned.off("update", toClients);
 			});
+		},
+		async onStoreDocument({ documentName, document }) {
+			// The Owner writes its own documents; this stores the kept ones.
+			if (kept && (await isKept(documentName))) {
+				await kept.store(documentName, Y.encodeStateAsUpdate(document));
+			}
 		},
 		async afterUnloadDocument({ documentName }) {
 			unbind.get(documentName)?.();
@@ -122,6 +164,15 @@ export function createSync(options: {
 				ws.data.connection?.touch();
 			},
 		},
+		disconnect(match) {
+			for (const document of hocuspocus.documents.values()) {
+				for (const connection of document.getConnections()) {
+					const context = (connection.context ?? {}) as Record<string, unknown>;
+					if (match(context))
+						connection.webSocket.close(4403, "Access removed.");
+				}
+			}
+		},
 		async close() {
 			hocuspocus.closeConnections();
 			for (const off of unbind.values()) off();
@@ -134,9 +185,14 @@ export function createSync(options: {
  * The Device document opens for its owner only: the Person whose session
  * the request carries. A request from this computer (`isThisComputer`)
  * without a session of its own gets the local Person's session, exactly
- * as the procedures do, so one rule decides both. Slice 4 adds the
- * Device key: its owner, and the home-Host rule (a Device document syncs
- * only to Devices of the same owner).
+ * as the procedures do, so one rule decides both.
+ *
+ * Another Device of the same owner opens it with its Device key (the
+ * provider's token), but only on its home Host: a key of a Device that
+ * joined this daemon as a guest Host opens no Device document. A token
+ * that is a Device key never falls back to the session rules. On a Host,
+ * the owner of a document it keeps for a paired Device is that Device's
+ * owner (`keptOwner`).
  */
 export function ownerOnly(options: {
 	auth: Auth;
@@ -145,8 +201,21 @@ export function ownerOnly(options: {
 	/** The Person who owns this Device. */
 	ownerId: string;
 	trustedOrigins: ReadonlySet<string>;
+	/** The owner of a document this daemon keeps for a paired Device, else null. */
+	keptOwner?: (documentName: string) => Promise<string | null>;
+	/**
+	 * A Device key, resolved: its Device, its owner here, and whether this
+	 * daemon is the Device's home Host. Null: not a valid key here.
+	 */
+	deviceKey?: (token: string) => Promise<SyncDeviceKey | null>;
 }): SyncAuthorize {
-	return async ({ request, peer }) => {
+	return async ({ documentName, token, request, peer }) => {
+		const owner = (await options.keptOwner?.(documentName)) ?? options.ownerId;
+		if (isDeviceKey(token)) {
+			const key = await options.deviceKey?.(token);
+			if (!key?.home || key.personId !== owner) return false;
+			return { deviceId: key.deviceId };
+		}
 		const local = isThisComputer(
 			peer,
 			request.headers.get("origin"),
@@ -158,6 +227,14 @@ export function ownerOnly(options: {
 			request.headers,
 			local ? options.localSession : null,
 		);
-		return session?.user.id === options.ownerId;
+		return session?.user.id === owner;
 	};
 }
+
+/** A Device key as the relay needs it. */
+export type SyncDeviceKey = {
+	deviceId: string;
+	personId: string;
+	/** This daemon is the Device's home Host. */
+	home: boolean;
+};

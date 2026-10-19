@@ -10,7 +10,9 @@ import {
 	connections,
 	daemon,
 	db,
+	devices,
 	engine,
+	host,
 	localSession,
 	profiles,
 	projectSetup,
@@ -22,25 +24,33 @@ export type CreateContextOptions = {
 	context: HonoContext;
 };
 
-/** The request's session and Space: the local session for this computer. */
+/**
+ * The request's session and Space: the local session for this computer. A
+ * request with a Device key (`Authorization: Bearer`) is a Device, never
+ * this computer's Person, even from a loopback address.
+ */
 export function access(context: HonoContext) {
-	return requestAccess(
-		auth,
-		db,
-		context.req.raw.headers,
-		fromThisComputer(context, trustedOrigins) ? localSession : null,
-	);
+	const headers = context.req.raw.headers;
+	const local =
+		!headers.has("authorization") && fromThisComputer(context, trustedOrigins);
+	return requestAccess(auth, db, headers, local ? localSession : null);
 }
 
 export async function createContext({
 	context,
 }: CreateContextOptions): Promise<ApiContext> {
-	const { session, spaceId, can, setActiveSpace } = await access(context);
+	const deviceKey = await host.keyOf(context.req.raw.headers);
+	const { session, spaceId, can, setActiveSpace, headers } = deviceKey
+		? await requestAccess(auth, db, new Headers(), null)
+		: await access(context);
 	return {
 		session,
 		spaceId,
 		can,
 		setActiveSpace,
+		headers,
+		deviceKey,
+		devices,
 		db,
 		engine,
 		settings,

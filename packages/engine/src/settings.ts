@@ -42,6 +42,48 @@ const onOff = (raw: string) => {
 
 const positiveMinutes = z.number().positive().max(10_080);
 
+/**
+ * A Host's address: an `https://` origin. A loopback `http://` one is
+ * allowed too, for tests and local development: it never leaves the
+ * computer.
+ */
+export const hostAddressSchema = z
+	.string()
+	.trim()
+	.refine(isHostAddress, {
+		message: "Use an https:// address, for example https://studio.example.com.",
+	})
+	.transform((value) => new URL(value).origin);
+
+export function isHostAddress(value: string): boolean {
+	let url: URL;
+	try {
+		url = new URL(value);
+	} catch {
+		return false;
+	}
+	if (url.protocol === "https:") return true;
+	return url.protocol === "http:" && isLoopbackHost(url.hostname);
+}
+
+/** `localhost`, `127.x.x.x` or `[::1]`. */
+export function isLoopbackHost(hostname: string): boolean {
+	return (
+		hostname === "localhost" ||
+		hostname === "[::1]" ||
+		hostname === "::1" ||
+		/^127\.\d+\.\d+\.\d+$/.test(hostname)
+	);
+}
+
+const list = (raw: string) => {
+	const items = raw
+		.split(/[\s,]+/)
+		.map((item) => item.trim())
+		.filter(Boolean);
+	return items.length > 0 ? items : undefined;
+};
+
 const DEFS = {
 	scheduler: {
 		schema: z.boolean(),
@@ -159,6 +201,32 @@ const DEFS = {
 		schema: z.boolean(),
 		default: true,
 	} satisfies Def<boolean>,
+	/**
+	 * "Be a Host": this computer lets other Devices pair with it and keeps
+	 * their documents. Off: it accepts no Device at all.
+	 */
+	host: {
+		schema: z.boolean(),
+		default: false,
+		env: "NIGHTSHIFT_HOST",
+		fromEnv: onOff,
+	} satisfies Def<boolean>,
+	/**
+	 * A Host's addresses, in the order a Device tries them: a LAN name, a
+	 * tailnet name, a public name. A Host listens beyond this computer only
+	 * when one of them is `https://`.
+	 */
+	hostAddresses: {
+		schema: z.array(hostAddressSchema).max(8),
+		default: [],
+		env: "NIGHTSHIFT_HOST_ADDRESSES",
+		fromEnv: list,
+	} satisfies Def<string[]>,
+	/** A Device key that goes this many days without use expires. */
+	deviceKeyIdleDays: {
+		schema: z.number().int().min(1).max(365),
+		default: 30,
+	} satisfies Def<number>,
 };
 
 type Defs = typeof DEFS;
