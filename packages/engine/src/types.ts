@@ -21,6 +21,7 @@ import type { RunWarningKind } from "./events";
 import type { ArchiveRef } from "./exchange/archive";
 import type { RunCommandInput, RunCommandKind } from "./exchange/commands";
 import type { EngineExchange } from "./exchange/engine-exchange";
+import type { FeedStep } from "./exchange/feeds";
 import type { DeviceOffer, OfferCaps, SpaceOffer } from "./offers";
 import type { RunSettings } from "./settings";
 import type { SpaceDocuments } from "./space/document";
@@ -796,6 +797,16 @@ export type Relay = {
 	}): Promise<void>;
 	/** A file of the archive from the Host that keeps the Space. Null when it has none. */
 	archive(ref: ArchiveRef): Promise<string | null>;
+	/**
+	 * A step's live transcript from the Host that keeps the Space: its
+	 * entries after `afterSeq`, then each new one, until the step ends.
+	 * Throws when that Host cannot be reached.
+	 */
+	follow?(
+		step: FeedStep,
+		afterSeq: number,
+		signal: AbortSignal,
+	): AsyncIterable<TranscriptEntry>;
 	/** Publishes this Device's Offer in a Space a Host keeps, through that Host. */
 	offer(
 		input: OfferCaps & { spaceId: string; profile: string; deviceName: string },

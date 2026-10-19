@@ -77,6 +77,16 @@ export {
 } from "./exchange/commands";
 export type { EngineExchange } from "./exchange/engine-exchange";
 export {
+	type FeedSend,
+	type FeedStep,
+	type FollowPumps,
+	type FollowWant,
+	feedStepSchema,
+	followWantSchema,
+	type TranscriptFeeds,
+	transcriptEntrySchema,
+} from "./exchange/feeds";
+export {
 	type HostSpaces,
 	type ListedSpace,
 	personOnHost,

@@ -116,20 +116,33 @@ export function createHostExchange(deps: {
 			),
 			cursors: moved,
 			commands: await exchange.commands.pendingFor(key.deviceId),
+			follows: exchange.feeds.wanted(key.deviceId),
 		};
 	}
 
-	/** Resolves when rows land, a command is kept, the time is up, or the signal aborts. */
-	function change(signal: AbortSignal): Promise<void> {
+	/**
+	 * Resolves when rows land, a command is kept, the steps someone follows
+	 * of the Device's runs change, the time is up, or the signal aborts.
+	 */
+	function change(signal: AbortSignal, deviceId: string): Promise<void> {
 		return new Promise((resolve) => {
 			const done = () => {
 				off();
+				offFollows();
 				resolve();
 			};
 			const off = exchange.commands.onEnqueued(done);
+			const offFollows = exchange.feeds.onWanted(deviceId, done);
 			void exchange.rows.landed(signal, STREAM_IDLE_MS).then(done);
 		});
 	}
+
+	/** The steps of the batch's follows, as one string to compare. */
+	const followsOf = (batch: SyncBatch) =>
+		batch.follows
+			.map((f) => f.stepId)
+			.sort()
+			.join();
 
 	return {
 		pull: batch,
@@ -137,17 +150,24 @@ export function createHostExchange(deps: {
 		async *stream(key, cursors, signal) {
 			let at = cursors;
 			let sentCommands = "";
+			let sentFollows = "";
 			while (!signal?.aborted) {
 				const cycle = new AbortController();
 				const signals = signal ? [signal, cycle.signal] : [cycle.signal];
 				// Listen before reading, so nothing lands unseen between the two.
-				const changed = change(AbortSignal.any(signals));
+				const changed = change(AbortSignal.any(signals), key.deviceId);
 				try {
 					const next = await batch(key, at);
 					const commands = next.commands.map((c) => c.id).join();
-					if (!isEmpty(next.rows) || commands !== sentCommands) {
+					const follows = followsOf(next);
+					if (
+						!isEmpty(next.rows) ||
+						commands !== sentCommands ||
+						follows !== sentFollows
+					) {
 						at = mergeCursors(at, next.cursors);
 						sentCommands = commands;
+						sentFollows = follows;
 						yield next;
 						continue;
 					}
@@ -269,6 +289,31 @@ export function createHostExchange(deps: {
 			return owner.walkerId === deps.selfId
 				? exchange.ownFile(ref)
 				: exchange.readArchive(ref);
+		},
+
+		async *archiveFollow(key, { step, afterSeq }, signal) {
+			await admit(key);
+			const owner = await exchange.runOwner(step.runId);
+			const found = await exchange.stepOwner(step.stepId);
+			if (
+				!owner ||
+				owner.spaceId !== step.spaceId ||
+				found?.runId !== step.runId ||
+				!(await isMember(key, owner.spaceId))
+			) {
+				forbidden("You are not a member of the Space of this run.");
+			}
+			yield* exchange.feeds.follow(
+				step,
+				afterSeq,
+				signal ?? new AbortController().signal,
+			);
+		},
+
+		async archiveTail(key, { step, entries, ended }) {
+			await admit(key);
+			await ownRun(key, { kind: "transcript", ...step });
+			exchange.feeds.deliver(key.deviceId, step, entries, ended);
 		},
 
 		async *work(key, input, signal) {

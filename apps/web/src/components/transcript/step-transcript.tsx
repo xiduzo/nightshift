@@ -145,8 +145,8 @@ export function StepTranscript({
 	const gateOpen = step.gate !== null && running;
 	const elsewhere =
 		walker && !walker.thisDevice ? (walker.name ?? "another device") : null;
-	// A run of another device shows a step's transcript once the step ended:
-	// its open Gate comes from the step itself.
+	// The transcript of a run of another device follows it live, but its
+	// gate entry may not be here yet: the open Gate comes from the step itself.
 	const openGate =
 		gateOpen &&
 		step.gate &&

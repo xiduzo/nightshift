@@ -8,17 +8,19 @@ import {
 	cliToolInputSchema,
 	connectionInputSchema,
 	ForeignRowsError,
+	feedStepSchema,
 	HARNESS_BIN,
 	offerCapsSchema,
 	runRowsSchema,
 	secretNameSchema,
 	settingsPatchSchema,
 	syncCursorsSchema,
+	transcriptEntrySchema,
 	type WorkRequest,
 	workReplySchema,
 	workRequestSchema,
 } from "@nightshift/engine";
-import type { SpaceEngine } from "@nightshift/engine/types";
+import type { SpaceEngine, TranscriptEntry } from "@nightshift/engine/types";
 import {
 	agentProfileSchema,
 	cronError,
@@ -1165,6 +1167,35 @@ const archive = {
 		.input(z.object({ ref: archiveRefSchema }))
 		.handler(({ context, input }) =>
 			context.exchange.archiveGet(context.deviceKey, input.ref),
+		),
+	/**
+	 * A step's live transcript, for a Member of its run's Space: its
+	 * entries after `afterSeq`, then each new one, until the step ends.
+	 */
+	follow: deviceProcedure("archive")
+		.input(
+			z.object({
+				step: feedStepSchema,
+				afterSeq: z.number().int().min(0),
+			}),
+		)
+		.handler(async function* ({ context, input, signal }) {
+			yield* context.exchange.archiveFollow(context.deviceKey, input, signal);
+		}),
+	/** The Walker's live entries of a step someone follows; `ended`: the step ended. */
+	tail: deviceProcedure("archive")
+		.input(
+			z.object({
+				step: feedStepSchema,
+				entries: z.array(transcriptEntrySchema).max(1_000),
+				ended: z.boolean(),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.exchange.archiveTail(context.deviceKey, {
+				...input,
+				entries: input.entries as TranscriptEntry[],
+			}),
 		),
 };
 

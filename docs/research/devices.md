@@ -108,7 +108,7 @@ data never needs conflict resolution.
 | Device configuration | its Agent Profiles, CLI Tools, Connections, Offers | the Device, edited from any of its owner's UIs | the Device document (Yjs): edits merge, the Owner applies them |
 | Space definitions | Projects by remote, which Devices have a Clone, Offers into the Space, Members (mirrored from auth) | any Member for Projects; the offering Device for Offers | the Space document (Yjs) |
 | Run history | runs, steps, sessions, events, `HandedOff` | the Walker | exchange by cursor: immutable rows, the union is the merge |
-| Run state | LangGraph checkpoints, transcripts, command logs | the Walker | copied to the Space's Host archive when a node ends; fetched on demand |
+| Run state | LangGraph checkpoints, transcripts, command logs | the Walker | copied to the Space's Host archive when a node ends; fetched on demand; a running step's transcript followed live while someone watches it |
 
 Consequences: status derives the same on every Replica (a Run's events
 come from one Walker in one order; `event.seq` becomes `(walkerId, seq)`),
@@ -387,9 +387,89 @@ Between two steps on different Devices: push, fetch and checkout,
 In the Host's daemon: Hocuspocus for the documents (`onAuthenticate`
 resolves the Device key to its owner and the documents that owner may
 open), and oRPC procedures, all called outbound by Devices: `sync.pull`,
-`sync.push`, `sync.stream`, `archive.put`, `archive.get`, `devices.work`
-(bodies and their event streams between Walker and placed Device). The
-Host never calls into a Device.
+`sync.push`, `sync.stream`, `archive.put`, `archive.get`,
+`archive.follow`, `archive.tail`, `devices.work` (bodies and their event
+streams between Walker and placed Device). The Host never calls into a
+Device.
+
+### Live transcripts
+
+A person who watches a running step of a run another Device walks sees
+its transcript grow as the Walker writes it, as for a run walked here.
+The Walker sends a step's entries only while someone follows that step:
+first everything up to now, then each new entry. Nobody watching, no
+extra traffic: the run history and the archive copy at the step's end
+travel as before.
+
+- **One feed per step.** Every Replica answers the same call,
+  `follow(step, afterSeq)`: the step's transcript entries after
+  `afterSeq`, first what was written, then each entry as it is written,
+  ending when the step ends (`packages/engine/src/exchange/feeds.ts`).
+  Where the entries come from depends on who walks the run:
+  - this Replica walks it: its own file, then its bus;
+  - this Replica keeps the Space (it is the Host) and a Device walks it:
+    the Host's tail of the step, which the Walker fills on demand;
+  - a Host keeps the Space: that Host's feed over the link
+    (`archive.follow`, an oRPC event iterator), which is one of the two
+    cases above there.
+- **The cursor is the entry's `seq`.** It grows by one per entry of the
+  run. Every receiver drops an entry at or below the last `seq` it has,
+  so a resend is harmless, and a viewer that reconnects with its last
+  `seq` gets what follows, with no duplicates and no gaps. Command output
+  is transcript entries too (`command-output`), so a running command's
+  log travels in the same feed; its `.log` file goes to the archive at
+  the step's end, as before.
+- **Demand rides on the existing stream.** The Host keeps a tail per
+  followed step, in memory, from the step's first entry. The steps a
+  Walker should send, each with the `seq` to send from, are in every
+  `sync.stream` batch for that Walker (`follows`, beside its commands).
+  The stream sends a batch when that set changes, and the whole set on
+  every (re)connect. The Walker starts a pump for a step new in the set
+  and stops the pump of a step that left it; a stream that drops stops
+  them all. A pump reads the step's file after the `seq`, then its bus,
+  and pushes what it has to `archive.tail`, one batch at a time, again
+  until the Host takes it. When the step ends, it pushes the rest with
+  `ended`. The Host takes a push only from the run's Walker, in a Space
+  its Person is a Member of (the rule of `archive.put`).
+- **Nobody follows, nothing moves.** The first follower of a step puts it
+  in its Walker's set. When the last follower leaves, or its connection
+  drops, the step leaves the set and the Walker stops sending. The Host
+  keeps the tail five more minutes, so a viewer that comes back is
+  served from it and the Walker sends only what is new. An ended tail
+  goes when its last follower has read it.
+- **The archive stays the truth.** At the step's end the Walker puts the
+  whole transcript and command log in the archive, as before. A step that
+  ended is read from the archive; one whose copy has not landed yet comes
+  from its Walker. Live entries are a cache: they are never written to
+  the archive, and a Host that restarts loses them (its followers
+  reconnect, and the Walker sends the step again from its start).
+- **The run page.** `runs.watch` of a run walked elsewhere goes through
+  its steps in the order they opened: an ended step from the archive, a
+  running one from its feed, the next one when the feed ends. When a
+  step has ended and its feed stays silent (a Walker of an older version,
+  a Host away), the archive copy takes its place once it lands. The web
+  run view is unchanged: it gets transcript entries on the same stream as
+  for a run walked here.
+- **Who may follow.** As for `archive.get`: a Member of the run's Space,
+  in any role (a viewer reads). The local UI watches runs of the
+  session's active Space only. A transcript entry holds no path of the
+  Walker's disk (its file path is in the step row, which
+  `withoutPrivatePaths` blanks).
+- **No new channel, no new library.** The demand rides on `sync.stream`,
+  the entries on two oRPC procedures under the `archive` permission. Yjs
+  stays with the documents: a transcript is a log, which it does not fit.
+- Tests: `packages/engine/src/exchange/feeds.test.ts` (three Replicas and
+  a fake link, through the feed's interface: catch-up then live, two
+  followers on one pump, the last follower leaving stops the Walker's
+  pushes, a reconnect from its cursor without duplicates or gaps, the
+  step's end closes the feed, a push of another Device is dropped);
+  `packages/engine/src/exchange/live-watch.test.ts` (the run page of a run
+  walked elsewhere shows a running command's output);
+  `apps/server/src/devices/host-exchange.test.ts` (the Walker's stream
+  names a followed step, only the Walker pushes, a non-Member is
+  refused); `apps/server/src/devices/live-transcripts.test.ts` (two
+  daemons: each watches a running step the other walks, and a viewer
+  resumes from its cursor).
 
 ### Connectivity
 
@@ -935,8 +1015,9 @@ iroh.
      elsewhere is read there, and fetched from the Host on demand when it
      is missing (kept once the step has ended); the Host serves its own
      runs from their own files. A transcript that lands tells the run's
-     watchers. A step of a run walked elsewhere shows its transcript once
-     it ended: there are no live transcript chunks across Devices yet.
+     watchers. A running step of a run walked elsewhere is followed live
+     while someone watches it (see "Live transcripts"); once it ended,
+     the archive copy is the truth.
      Retention is undecided, as for run history: everything is kept.
    - **Host offline**: every Device keeps walking its own runs; both loops
      start again at their cursors when the link is back.
@@ -1082,7 +1163,7 @@ iroh.
      through its Host (Walker → Host → placed Device) is not built, so a
      Device never walks a run placed elsewhere. The transcript of a run
      walked here is live wherever its steps run (the Walker writes it); a
-     run walked elsewhere still shows a step's transcript when it ends.
+     run walked elsewhere is live too (see "Live transcripts").
 
    *Landed (part B, per-node Placement, the Hand-off, offline, Move to):*
    - **A node's `device`** (`packages/flows`): a Device name on Agent,
@@ -1574,6 +1655,8 @@ Nothing is open. The next step is slice 1.
 - ~~Transcripts of a Run walked elsewhere are fetched from the archive on
   open.~~ Done in slice 4, part B. Archive retention is undecided, as run
   retention is today: everything is kept.
+- ~~A running step of a Run walked elsewhere shows its transcript only
+  once it ended.~~ Done: "Live transcripts", followed on demand.
 - Direct Device-to-Device sync on one LAN without the Host: later.
 - Identity across Hosts: a colleague has an account per Host until the
   OIDC provider plugin makes the home Host the login for guest Hosts.

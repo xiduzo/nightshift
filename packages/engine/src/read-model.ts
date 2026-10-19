@@ -31,6 +31,7 @@ import {
 	sessionCost,
 	sumCost,
 } from "./events";
+import type { FeedStep } from "./exchange/feeds";
 import { getRunRow, type RunRow } from "./graph/context";
 import { namesOf, runPerson } from "./people";
 import type { RunLog } from "./run-log";
@@ -473,7 +474,21 @@ export type ReadModelDeps = {
 		walker: RunWalker,
 		ended: boolean,
 	): Promise<TranscriptEntry[]>;
+	/**
+	 * A step's live transcript wherever its run is walked: its entries
+	 * after `afterSeq`, then each new one, until the step ends.
+	 */
+	followStep(
+		step: FeedStep,
+		afterSeq: number,
+		signal: AbortSignal,
+	): AsyncIterable<TranscriptEntry>;
 };
+
+/** How long a step that ended may keep its feed silent before the archive takes over. */
+const ENDED_GRACE_MS = 5_000;
+/** How long the run page waits before it follows a step again after its feed failed. */
+const FOLLOW_RETRY_MS = 2_000;
 
 /** A Walker the Replica knows nothing of: a name is all it lacks. */
 const walkerOf = (walkers: Map<string, RunWalker>, id: string): RunWalker =>
@@ -695,32 +710,40 @@ export function createReadModel(deps: ReadModelDeps) {
 				yield { kind: "step", step: toStepSummary(derived, deviceOf) };
 			}
 
-			const rows = await db
-				.select({
-					id: step.id,
-					runId: step.runId,
-					spaceId: step.spaceId,
-					transcriptPath: step.transcriptPath,
-				})
-				.from(step)
-				.where(eq(step.runId, runId));
-			const ended = new Set(
-				steps.filter((s) => s.endedAt !== null).map((s) => s.id),
-			);
-			const replay = (
-				await Promise.all(
-					rows.map((row) =>
-						deps.stepTranscript(row, walker, ended.has(row.id)),
-					),
+			if (walker.thisDevice) {
+				const rows = await db
+					.select({
+						id: step.id,
+						runId: step.runId,
+						spaceId: step.spaceId,
+						transcriptPath: step.transcriptPath,
+					})
+					.from(step)
+					.where(eq(step.runId, runId));
+				const ended = new Set(
+					steps.filter((s) => s.endedAt !== null).map((s) => s.id),
+				);
+				const replay = (
+					await Promise.all(
+						rows.map((row) =>
+							deps.stepTranscript(row, walker, ended.has(row.id)),
+						),
+					)
 				)
-			)
-				.flat()
-				.sort((a, b) => a.seq - b.seq);
-			for (const entry of replay) {
-				if (signal.aborted) return;
-				if (entry.seq <= lastSeq) continue;
-				lastSeq = entry.seq;
-				yield { kind: "transcript", entry };
+					.flat()
+					.sort((a, b) => a.seq - b.seq);
+				for (const entry of replay) {
+					if (signal.aborted) return;
+					if (entry.seq <= lastSeq) continue;
+					lastSeq = entry.seq;
+					yield { kind: "transcript", entry };
+				}
+			} else {
+				// Walked elsewhere: step by step, from the archive or live.
+				void tailElsewhere(runRow, walker, lastSeq, signal, (entry) => {
+					queue.push({ kind: "transcript", entry });
+					notify();
+				});
 			}
 
 			while (!signal.aborted) {
@@ -752,26 +775,6 @@ export function createReadModel(deps: ReadModelDeps) {
 						}
 						yield { kind: "step", step: toStepSummary(current, deviceOf) };
 					}
-					// A step walked elsewhere ended: its transcript is in the archive.
-					if (current && !walker.thisDevice && current.endedAt !== null) {
-						const [row] = rows.filter((r) => r.id === current.id);
-						const entries = await deps.stepTranscript(
-							row ?? {
-								id: current.id,
-								runId,
-								spaceId: runRow.spaceId,
-								transcriptPath: "",
-							},
-							walker,
-							true,
-						);
-						for (const entry of entries) {
-							if (signal.aborted) return;
-							if (entry.seq <= lastSeq) continue;
-							lastSeq = entry.seq;
-							yield { kind: "transcript", entry };
-						}
-					}
 				} else {
 					const status = deriveRunState(await log.events(runId)).status;
 					if (status !== lastStatus) {
@@ -782,6 +785,136 @@ export function createReadModel(deps: ReadModelDeps) {
 			}
 		} finally {
 			unsubscribe();
+			signal.removeEventListener("abort", notify);
+		}
+	}
+
+	/**
+	 * The transcript of a run another Device walks, step by step in the
+	 * order they opened: an ended step from the archive, a running one from
+	 * its live feed (`followStep`). It moves to the next step when the feed
+	 * ends. A step that ended while its feed stays silent (a Walker of an
+	 * older version, a Host away) is read from the archive once its copy
+	 * lands. Pushes each entry once, in `seq` order, until `signal` aborts.
+	 */
+	async function tailElsewhere(
+		runRow: RunRow,
+		walker: RunWalker,
+		afterSeq: number,
+		signal: AbortSignal,
+		push: (entry: TranscriptEntry) => void,
+	): Promise<void> {
+		const runId = runRow.id;
+		let last = afterSeq;
+		const emit = (entry: TranscriptEntry) => {
+			if (entry.seq <= last) return;
+			last = entry.seq;
+			push(entry);
+		};
+		/** Steps whose transcript went out whole, by id and opening. */
+		const complete = new Set<string>();
+		let pending = false;
+		let wake: (() => void) | null = null;
+		const notify = () => {
+			pending = true;
+			const resolve = wake;
+			wake = null;
+			resolve?.();
+		};
+		const off = bus.subscribe(runId, (item) => {
+			if (item.kind !== "transcript") notify();
+		});
+		signal.addEventListener("abort", notify, { once: true });
+		const changed = () =>
+			pending || signal.aborted
+				? Promise.resolve()
+				: new Promise<void>((resolve) => {
+						wake = resolve;
+					});
+		const endedNow = async (stepId: string) =>
+			deriveSteps(await log.events(runId)).find((s) => s.id === stepId)
+				?.endedAt != null;
+		try {
+			while (!signal.aborted) {
+				pending = false;
+				const steps = deriveSteps(await log.events(runId)).sort(
+					(a, b) => a.openedSeq - b.openedSeq,
+				);
+				const next = steps.find((s) => !complete.has(`${s.id}:${s.openedSeq}`));
+				if (!next) {
+					await changed();
+					continue;
+				}
+				const key = `${next.id}:${next.openedSeq}`;
+				const row = {
+					id: next.id,
+					runId,
+					spaceId: runRow.spaceId,
+					transcriptPath: next.transcriptPath,
+				};
+				if (next.endedAt !== null) {
+					const archived = await deps
+						.stepTranscript(row, walker, true)
+						.catch(() => []);
+					if (archived.length > 0) {
+						for (const entry of archived) emit(entry);
+						complete.add(key);
+						continue;
+					}
+				}
+				const feed = new AbortController();
+				const stop = () => feed.abort();
+				signal.addEventListener("abort", stop, { once: true });
+				let grace: ReturnType<typeof setTimeout> | null = null;
+				const giveUp = () => {
+					grace ??= setTimeout(stop, ENDED_GRACE_MS);
+				};
+				if (next.endedAt !== null) giveUp();
+				const offEnd = bus.subscribe(runId, (item) => {
+					if (grace || item.kind === "transcript") return;
+					void endedNow(next.id).then((ended) => {
+						if (ended) giveUp();
+					});
+				});
+				let finished = false;
+				try {
+					for await (const entry of deps.followStep(
+						{ spaceId: runRow.spaceId, runId, stepId: next.id },
+						last,
+						feed.signal,
+					)) {
+						emit(entry);
+					}
+					finished = !feed.signal.aborted;
+				} catch {
+					// The Host is away or does not know the feed: try again.
+				} finally {
+					offEnd();
+					if (grace) clearTimeout(grace);
+					signal.removeEventListener("abort", stop);
+				}
+				if (finished) {
+					complete.add(key);
+					continue;
+				}
+				if (signal.aborted) return;
+				await new Promise((resolve) => {
+					const timer = setTimeout(resolve, FOLLOW_RETRY_MS);
+					signal.addEventListener(
+						"abort",
+						() => {
+							clearTimeout(timer);
+							resolve(undefined);
+						},
+						{ once: true },
+					);
+				});
+			}
+		} catch (error) {
+			if (!signal.aborted)
+				console.error(`[engine] transcript of ${runId}`, error);
+		} finally {
+			off();
 			signal.removeEventListener("abort", notify);
 		}
 	}
