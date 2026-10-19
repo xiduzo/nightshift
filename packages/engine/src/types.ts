@@ -16,6 +16,7 @@ import type {
 
 import type { DeviceRegistry } from "./device/registry";
 import type { Device } from "./device/types";
+import type { RunWarningKind } from "./events";
 import type { ArchiveRef } from "./exchange/archive";
 import type { RunCommandInput, RunCommandKind } from "./exchange/commands";
 import type { EngineExchange } from "./exchange/engine-exchange";
@@ -84,6 +85,8 @@ export type SessionSummary = {
 	outcome: "finished" | "stopped" | "failed" | "interrupted" | null;
 	error: string | null;
 	costUsd: number | null;
+	/** `costUsd` is estimated from tokens: the harness reported no cost. */
+	costEstimated: boolean;
 };
 
 /** One visit of one node. */
@@ -113,6 +116,10 @@ export type StepSummary = {
 	/** Agent steps only. Several when a person resumed the step or a wait continued it. */
 	sessions: SessionSummary[];
 	costUsd: number;
+	/** Part of `costUsd` is estimated from tokens: the harness reported no cost. */
+	costEstimated: boolean;
+	/** Sessions or model calls that ended without a cost: their spend is not in `costUsd`. */
+	costMissing: number;
 	/**
 	 * A Decision decided by a person (a Gate): what it asked, once it
 	 * opened. Null for every other step. With `outcome` null, the Gate
@@ -199,6 +206,12 @@ export type RunSummary = {
 	endedAt: number | null;
 	/** Sum over all steps. */
 	costUsd: number;
+	/** Part of `costUsd` is estimated from tokens: the harness reported no cost. */
+	costEstimated: boolean;
+	/** Sessions or model calls that ended without a cost: their spend is not in `costUsd`. */
+	costMissing: number;
+	/** What went wrong without failing a step, oldest first. */
+	warnings: RunWarning[];
 	/** The runs of the flows its Call nodes called, in the order they started. */
 	subflows: SubflowRun[];
 	/**
@@ -218,8 +231,23 @@ export type SubflowRun = {
 	status: RunStatus;
 	/** Sum over the steps of the called flow, and of the flows it called. */
 	costUsd: number;
+	/** Part of `costUsd` is estimated from tokens: the harness reported no cost. */
+	costEstimated: boolean;
+	/** Sessions or model calls that ended without a cost: their spend is not in `costUsd`. */
+	costMissing: number;
 	startedAt: number;
 	endedAt: number | null;
+};
+
+/** Something that went wrong in a run without failing a step. */
+export type RunWarning = {
+	kind: RunWarningKind;
+	/** What happened and what to do, for a person. */
+	message: string;
+	/** The step and node it is about. Null for the run as a whole. */
+	stepId: string | null;
+	nodeId: string | null;
+	at: number;
 };
 
 /** A resume of a run: by a person, or by the daemon after a restart. */

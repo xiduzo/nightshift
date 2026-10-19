@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
 	type AgentHarness,
 	acpHarness,
@@ -12,6 +13,7 @@ import {
 	harnessModels,
 	opencodeHarness,
 	pathPrograms,
+	startPriceUpdates,
 	tanstackDecider,
 	testMcpServer,
 } from "@nightshift/agents";
@@ -382,6 +384,16 @@ const local = localDevice({
  * elsewhere, a Clone in a Space a Host keeps), carried over the links.
  * Lazy: the engine and the links are made below.
  */
+/**
+ * The price list that prices tokens when a harness reports no cost: the
+ * bundled one, then a newer one fetched once a day into the data folder.
+ */
+// Not awaited: the daemon starts on the bundled list, never on the network.
+void startPriceUpdates({
+	file: join(dataDir, "prices.json"),
+	onError: (error) => console.warn("The price list was not updated:", error),
+});
+
 const relayToHosts = createRelay({
 	engine: () => engine,
 	registry: () => engine.devices,

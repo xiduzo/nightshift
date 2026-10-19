@@ -90,7 +90,7 @@ export function endWithValue(
 	node: ValueNode,
 	made: unknown,
 	note: string,
-	extra?: { costUsd?: number | null },
+	extra?: Pick<BodyEnd, "costUsd" | "costSource">,
 ): BodyEnd {
 	const problem = dataProblem(node.output, made);
 	if (problem !== null) {
@@ -115,7 +115,7 @@ export function endWithValue(
 export function endWithoutValue(
 	step: StepHandle,
 	why: string,
-	extra?: { costUsd?: number | null },
+	extra?: Pick<BodyEnd, "costUsd" | "costSource">,
 ): BodyEnd {
 	step.record(null, { type: "value", data: null, problem: why });
 	return {

@@ -3,6 +3,7 @@ import { renderTemplate, type ValueNode } from "@nightshift/flows";
 
 import { schemaProblem } from "../../../output-schema";
 import { isWaitKind, messageOf, type StepContext } from "../../context";
+import { deciderCostSource, warnDeciderCost } from "../../cost";
 import { RESUME_RULES } from "../../resume-point";
 import { type BodyResult, runStep, type StepHandle } from "../../step-runner";
 import { withinGrace } from "../choosers/model";
@@ -85,12 +86,16 @@ async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 		signal,
 		() => lateResult("The decider did not stop when it was aborted."),
 	);
-	const costUsd = result.costUsd;
+	const cost = {
+		costUsd: result.costUsd,
+		costSource: deciderCostSource(result),
+	};
+	await warnDeciderCost(step, cost.costSource, "value", model);
 	if (signal.aborted) {
 		return {
 			kind: "aborted",
 			outputs: valueOutputs("", null, "", visit),
-			costUsd,
+			...cost,
 		};
 	}
 	if (result.kind === "error") {
@@ -101,14 +106,12 @@ async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 				message: result.message,
 				resetAt: null,
 				harnessSessionId: null,
-				costUsd,
+				...cost,
 			};
 		}
-		return endWithoutValue(step, `The model failed: ${result.message}`, {
-			costUsd,
-		});
+		return endWithoutValue(step, `The model failed: ${result.message}`, cost);
 	}
-	return endWithValue(step, node, result.data, "", { costUsd });
+	return endWithValue(step, node, result.data, "", cost);
 }
 
 function lateResult(message: string): ValueResult {

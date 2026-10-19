@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Command, LangGraphRunnableConfig } from "@langchain/langgraph";
+import type { CostSource } from "@nightshift/agents/pricing";
 import {
 	agentSession,
 	step as stepTable,
@@ -15,6 +16,7 @@ import {
 	deriveStopAfterStep,
 	type EnginePayloads,
 	type LoggedEvent,
+	type RunWarningKind,
 	type StepOutputs,
 	scopeKey,
 } from "../events";
@@ -127,6 +129,8 @@ export type StepHandle = {
 	 * returned record, so no node touches the database.
 	 */
 	session(start: EnginePayloads["SessionStarted"]): Promise<SessionRecord>;
+	/** Logs a warning about this step (`RunWarned`): it did not fail, but a person should know. */
+	warn(kind: RunWarningKind, message: string): Promise<void>;
 };
 
 /**
@@ -145,7 +149,11 @@ export type OpenStep = StepHandle & {
 		outcome: StepOutcome,
 		outputs: StepOutputs,
 		error: string | null,
-		extra?: { costUsd?: number | null; harnessSessionId?: string | null },
+		extra?: {
+			costUsd?: number | null;
+			costSource?: CostSource | null;
+			harnessSessionId?: string | null;
+		},
 	): Promise<StepEnd>;
 	/** Closes the recorder and the timers but leaves the step open in the log (a wait). */
 	leaveOpen(): void;
@@ -165,6 +173,8 @@ export type BodyEnd = {
 	error: string | null;
 	/** What a decider cost, when one was asked: on `StepEnded` as `costUsd`. */
 	costUsd?: number | null;
+	/** Where that cost came from. Null: the decider answered, its cost is not known. */
+	costSource?: CostSource | null;
 	/** Agent steps: the harness session the step has, for a reopen. */
 	harnessSessionId?: string | null;
 };
@@ -189,9 +199,14 @@ export type BodyResult =
 			kind: "aborted";
 			outputs: StepOutputs;
 			costUsd?: number | null;
+			costSource?: CostSource | null;
 			harnessSessionId?: string | null;
 	  }
-	| ({ kind: "wait"; costUsd?: number | null } & WaitRequest)
+	| ({
+			kind: "wait";
+			costUsd?: number | null;
+			costSource?: CostSource | null;
+	  } & WaitRequest)
 	| ({ kind: "sleep" } & OwnWait);
 
 /** What a node tells the runner: how it re-enters, what its body does, what an empty end looks like. */
@@ -264,9 +279,11 @@ export async function runStep(
 
 	const extraOf = (r: {
 		costUsd?: number | null;
+		costSource?: CostSource | null;
 		harnessSessionId?: string | null;
 	}) => ({
 		...(r.costUsd !== undefined ? { costUsd: r.costUsd } : {}),
+		...(r.costSource !== undefined ? { costSource: r.costSource } : {}),
 		...(r.harnessSessionId !== undefined
 			? { harnessSessionId: r.harnessSessionId }
 			: {}),
@@ -526,6 +543,15 @@ export async function beginStep(
 			emit(config, { type: "transcript", entry });
 		},
 		touch,
+		async warn(kind, message) {
+			await ctx.log.append({
+				type: "RunWarned",
+				runId,
+				stepId,
+				payload: { kind, message },
+			});
+			changed();
+		},
 		async session(started) {
 			const sessionId = randomUUID();
 			await ctx.db.insert(agentSession).values({
@@ -581,6 +607,9 @@ export async function beginStep(
 					outputs,
 					error,
 					...(extra?.costUsd !== undefined ? { costUsd: extra.costUsd } : {}),
+					...(extra?.costSource !== undefined
+						? { costSource: extra.costSource }
+						: {}),
 				},
 			});
 			changed();

@@ -113,7 +113,7 @@ describe("the Value node made by a rule", () => {
 			{ edgeId: "ok", from: "small", to: "done", outcome: "pass", scope: null },
 		]);
 		const [step] = deriveSteps(logged);
-		expect(step?.costUsd).toBe(0);
+		expect(step?.cost.usd).toBe(0);
 		expect(step?.sessions).toEqual([]);
 		const transcript = await readTranscriptFile(step?.transcriptPath as string);
 		expect(transcript.map((e) => e.event)).toEqual([
@@ -235,9 +235,10 @@ describe("the Value node made by a model", () => {
 			},
 			error: null,
 			costUsd: 0.02,
+			costSource: "reported",
 		});
 		const [step] = deriveSteps(logged);
-		expect(step?.costUsd).toBeCloseTo(0.02);
+		expect(step?.cost.usd).toBeCloseTo(0.02);
 		const transcript = await readTranscriptFile(step?.transcriptPath as string);
 		expect(transcript.map((e) => e.event)).toEqual([
 			{
@@ -280,6 +281,7 @@ describe("the Value node made by a model", () => {
 			},
 			error: null,
 			costUsd: 0.03,
+			costSource: "reported",
 		});
 	});
 
@@ -297,6 +299,7 @@ describe("the Value node made by a model", () => {
 				note: "The value does not match the output schema: data/small must be array.",
 			},
 			costUsd: 0.01,
+			costSource: "reported",
 		});
 	});
 

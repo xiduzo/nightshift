@@ -1,3 +1,4 @@
+import type { CostSource } from "@nightshift/agents/pricing";
 import type {
 	AgentErrorKind,
 	AgentUsage,
@@ -211,6 +212,11 @@ export type EnginePayloads = {
 		 * `SessionEnded`. Absent in logs written before Slice 3.
 		 */
 		costUsd?: number | null;
+		/**
+		 * Where `costUsd` came from. Null: the decider answered, but its cost
+		 * is not known. Absent in older logs, and when nothing was asked.
+		 */
+		costSource?: CostSource | null;
 	};
 	/**
 	 * A Gate step asks a person and waits. The step stays open until a person
@@ -237,6 +243,8 @@ export type EnginePayloads = {
 		errorKind: AgentErrorKind | null;
 		usage: AgentUsage | null;
 		costUsd: number | null;
+		/** Where `costUsd` came from. Absent in older logs: reported, when set. */
+		costSource?: CostSource | null;
 		/** Epoch ms when a usage limit resets, when the harness reports it. */
 		resetAt: number | null;
 	};
@@ -300,6 +308,12 @@ export type EnginePayloads = {
 	StopAfterStepRequested: Record<string, never>;
 	RunEnded: { status: RunEnding; reason: string | null };
 	/**
+	 * Something went wrong that did not fail the step, and that a person
+	 * should know: for example, what a step cost is not known. Logged with
+	 * the step it is about, when there is one.
+	 */
+	RunWarned: { kind: RunWarningKind; message: string };
+	/**
 	 * A schedule came due and the scheduler started its run (`runId`), or
 	 * tried to and could not (`error`). `at` is the cron time, not the
 	 * moment of the tick: no cron time of a schedule fires twice. Logged
@@ -328,6 +342,76 @@ export type EnginePayloads = {
 };
 
 export type EngineEventType = keyof EnginePayloads;
+
+/** What a run warning is about. `cost-unknown`: a step ended without a cost. */
+export type RunWarningKind = "cost-unknown";
+
+/**
+ * What something cost, as far as it is known: the reported and estimated
+ * dollars, whether part of them is an estimate, and how many sessions or
+ * model calls ended without a cost (their spend is not in `usd`).
+ */
+export type CostTally = { usd: number; estimated: boolean; missing: number };
+
+export const NO_COST: CostTally = { usd: 0, estimated: false, missing: 0 };
+
+export function addCost(a: CostTally, b: CostTally): CostTally {
+	return {
+		usd: a.usd + b.usd,
+		estimated: a.estimated || b.estimated,
+		missing: a.missing + b.missing,
+	};
+}
+
+/**
+ * A session's cost. A finished session without one is missing: it did work.
+ * A session that failed without usage spent what nobody knows, usually
+ * nothing, so it does not count.
+ */
+export function sessionCost(
+	ending: EnginePayloads["SessionEnded"] | null,
+): CostTally {
+	if (!ending) return NO_COST;
+	if (ending.costUsd === null) {
+		return ending.outcome === "finished" ? { ...NO_COST, missing: 1 } : NO_COST;
+	}
+	return {
+		usd: ending.costUsd,
+		estimated: ending.costSource === "estimated",
+		missing: 0,
+	};
+}
+
+/** What a step spent outside sessions (a decider), from its `StepEnded`. */
+export function stepEndCost(payload: EnginePayloads["StepEnded"]): CostTally {
+	if (payload.costUsd == null) {
+		return payload.costSource === null ? { ...NO_COST, missing: 1 } : NO_COST;
+	}
+	return {
+		usd: payload.costUsd,
+		estimated: payload.costSource === "estimated",
+		missing: 0,
+	};
+}
+
+/** One warning of a run, in the order they were logged. */
+export type DerivedWarning = {
+	stepId: string | null;
+	kind: RunWarningKind;
+	message: string;
+	at: number;
+};
+
+export function deriveWarnings(
+	events: readonly LoggedEvent[],
+): DerivedWarning[] {
+	return ofType(bySeq(events), "RunWarned").map((e) => ({
+		stepId: e.stepId,
+		kind: e.payload.kind,
+		message: e.payload.message,
+		at: e.at,
+	}));
+}
 
 export type LoggedEvent = {
 	[T in EngineEventType]: {
@@ -737,7 +821,7 @@ export type DerivedStep = {
 	error: string | null;
 	sessions: DerivedSession[];
 	/** Harness sessions plus what the step spent itself (a decider). */
-	costUsd: number;
+	cost: CostTally;
 	/** Gate steps only: the latest `GateOpened` of this step. */
 	gate: {
 		question: string;
@@ -792,7 +876,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 				outputs: { visit: e.payload.visit },
 				error: null,
 				sessions: [],
-				costUsd: 0,
+				cost: NO_COST,
 				gate: null,
 				items: [],
 				call: null,
@@ -818,7 +902,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 			step.outcome = e.payload.outcome;
 			step.outputs = e.payload.outputs;
 			step.error = e.payload.error;
-			step.costUsd += e.payload.costUsd ?? 0;
+			step.cost = addCost(step.cost, stepEndCost(e.payload));
 		} else if (e.type === "FlowCalled") {
 			step.call = e.payload;
 		} else if (e.type === "ItemStarted") {
@@ -866,7 +950,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 		const step = session.stepId ? steps.get(session.stepId) : undefined;
 		if (!step) continue;
 		step.sessions.push(session);
-		step.costUsd += session.ending?.costUsd ?? 0;
+		step.cost = addCost(step.cost, sessionCost(session.ending));
 	}
 	for (const step of steps.values()) {
 		if (step.endedAt === null) continue;
@@ -965,15 +1049,15 @@ export function lastHarnessSession(
  * The run's cost: what each ended session reported, plus what steps spent
  * outside sessions (a decider).
  */
-export function sumCostUsd(events: readonly LoggedEvent[]): number {
+export function sumCost(events: readonly LoggedEvent[]): CostTally {
 	const steps = deriveSteps(events);
 	const stepIds = new Set(steps.map((s) => s.id));
-	let total = 0;
-	for (const step of steps) total += step.costUsd;
+	let total = NO_COST;
+	for (const step of steps) total = addCost(total, step.cost);
 	// A session whose step is missing from the log still cost money.
 	for (const session of deriveSessions(events)) {
 		if (session.stepId && stepIds.has(session.stepId)) continue;
-		total += session.ending?.costUsd ?? 0;
+		total = addCost(total, sessionCost(session.ending));
 	}
 	return total;
 }

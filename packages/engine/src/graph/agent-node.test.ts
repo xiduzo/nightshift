@@ -50,6 +50,67 @@ afterEach(async () => {
 });
 
 describe("the Agent node", () => {
+	test("a harness without a cost: its tokens are priced for the model it ran", async () => {
+		const harness = fakeHarness({
+			...reportingScript("pass"),
+			model: "claude-sonnet-4-6",
+			outcome: {
+				type: "finished",
+				usage: { inputTokens: 1_000_000, outputTokens: 100_000 },
+			},
+		});
+		const h = await startRun(
+			sandbox,
+			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
+			{ harness },
+		);
+		await drive(h, { inputs: {} });
+		const logged = await h.events();
+		const [ended] = payloads(logged, "SessionEnded");
+		expect(ended?.costSource).toBe("estimated");
+		expect(ended?.costUsd).toBeCloseTo(4.5, 6);
+		expect(payloads(logged, "RunWarned")).toEqual([]);
+		const cost = deriveSteps(logged)[0]?.cost;
+		expect(cost?.usd).toBeCloseTo(4.5, 6);
+		expect(cost).toMatchObject({ estimated: true, missing: 0 });
+	});
+
+	test("no cost and no price: the cost is missing, and the run warns about it", async () => {
+		const harness = fakeHarness({
+			...reportingScript("pass"),
+			model: "a-model-without-a-price",
+			outcome: {
+				type: "finished",
+				usage: { inputTokens: 1_000, outputTokens: 100 },
+			},
+		});
+		const h = await startRun(
+			sandbox,
+			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
+			{ harness },
+		);
+		const { parked } = await drive(h, { inputs: {} });
+		// A warning, not a failure: the step passes.
+		expect(parked).toEqual([]);
+		const logged = await h.events();
+		expect(payloads(logged, "SessionEnded")[0]).toMatchObject({
+			costUsd: null,
+			costSource: null,
+		});
+		expect(payloads(logged, "RunWarned")).toEqual([
+			{
+				kind: "cost-unknown",
+				message:
+					'The cost of this step is not known. Claude Code reported no cost, and Night Shift has no price for "a-model-without-a-price". Spend totals leave it out.',
+			},
+		]);
+		expect(deriveSteps(logged)[0]?.cost).toEqual({
+			usd: 0,
+			estimated: false,
+			missing: 1,
+		});
+	});
+
 	test("a passing step: the log, the rows, the transcript and the state are as the engine writes them", async () => {
 		const harness = fakeHarness(reportingScript("pass", "Built it"));
 		const h = await startRun(
@@ -107,7 +168,8 @@ describe("the Agent node", () => {
 		expect(payloads(logged, "SessionEnded")[0]).toMatchObject({
 			outcome: "finished",
 			error: null,
-			costUsd: null,
+			costUsd: 0.001,
+			costSource: "reported",
 		});
 		expect(payloads(logged, "StepEnded")).toEqual([
 			{
@@ -996,6 +1058,7 @@ describe("the checker", () => {
 			},
 			error: null,
 			costUsd: 0.01,
+			costSource: "reported",
 		});
 		expect(state.nodes.worker?.note).toBe("No issues left.");
 		expect(h.types()).resolves.toContain("EdgeTaken");

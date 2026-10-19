@@ -14,7 +14,7 @@ import {
 	deriveRunState,
 	deriveSteps,
 	parseEventRow,
-	sumCostUsd,
+	sumCost,
 } from "./events";
 import {
 	exportRun,
@@ -207,7 +207,7 @@ describe("exportRun", () => {
 		expect(deriveNodeOutputs(opened.events, "")).toEqual(
 			deriveNodeOutputs(live, ""),
 		);
-		expect(sumCostUsd(opened.events)).toBe(0.25);
+		expect(sumCost(opened.events).usd).toBe(0.25);
 		expect(await opened.transcript()).toEqual(
 			await readRunTranscript(
 				(await liveSteps(runId)).map((s) => s.transcriptPath),
@@ -262,7 +262,7 @@ describe("exportRun", () => {
 		expect(opened.steps.map((s) => s.deviceId)).toEqual([null, null]);
 		expect(opened.events).toEqual(live);
 		expect(deriveRunState(opened.events).status).toBe("finished");
-		expect(sumCostUsd(opened.events)).toBe(0.25);
+		expect(sumCost(opened.events).usd).toBe(0.25);
 		opened.close();
 	});
 
