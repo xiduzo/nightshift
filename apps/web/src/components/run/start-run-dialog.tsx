@@ -18,6 +18,14 @@ import {
 	FieldSeparator,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@nightshift/ui/components/select";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -187,6 +195,19 @@ function StartRunForm({
 		readStoredInputs(projectId, flowName, inputs),
 	);
 	const [baseRef, setBaseRef] = useState("");
+	// Where the steps run: this computer when it has the project, else the first.
+	const placements = useQuery(
+		orpc.runs.placements.queryOptions({ input: { projectId } }),
+	);
+	const [chosenDevice, setChosenDevice] = useState<string | null>(null);
+	const devices = placements.data ?? [];
+	const device =
+		devices.find((d) => d.deviceId === chosenDevice) ??
+		devices.find((d) => d.thisDevice) ??
+		devices[0];
+	// One choice that is this computer: nothing to ask.
+	const askDevice = devices.length > 1 || (device && !device.thisDevice);
+	const noDevice = placements.isSuccess && devices.length === 0;
 	const now = useNow(15_000);
 	// Recent branches of this project's runs: a night can go on from an open stack.
 	const runs = useQuery(orpc.runs.list.queryOptions({ input: { projectId } }));
@@ -201,7 +222,8 @@ function StartRunForm({
 		(input) => jsonProblem(input, values[input.name]) !== null,
 	);
 	const stopInvalid = stop.on && stopAt === null;
-	const invalid = stopInvalid || missing.length > 0 || badJson.length > 0;
+	const invalid =
+		stopInvalid || missing.length > 0 || badJson.length > 0 || noDevice;
 
 	const startRun = useMutation(
 		orpc.runs.start.mutationOptions({
@@ -229,6 +251,7 @@ function StartRunForm({
 			...(Object.keys(filled).length === 0 ? {} : { inputs: filled }),
 			...(ref === "" ? {} : { baseRef: ref }),
 			...(at === null ? {} : { stopAt: at }),
+			...(device && !device.thisDevice ? { deviceId: device.deviceId } : {}),
 		});
 	};
 
@@ -259,6 +282,48 @@ function StartRunForm({
 				/>
 
 				{inputs.length > 0 ? <FieldSeparator /> : null}
+
+				{askDevice || noDevice ? (
+					<Field data-invalid={noDevice || undefined}>
+						<FieldLabel htmlFor={`${id}-device`}>Device</FieldLabel>
+						<Select
+							items={devices.map((d) => ({
+								value: d.deviceId,
+								label: d.thisDevice ? `${d.name} (this computer)` : d.name,
+							}))}
+							value={device?.deviceId ?? null}
+							onValueChange={(value) => {
+								if (value) setChosenDevice(value);
+							}}
+							disabled={noDevice}
+						>
+							<SelectTrigger
+								id={`${id}-device`}
+								className="w-full"
+								aria-describedby={`${id}-device-hint`}
+							>
+								<SelectValue placeholder="No device" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectGroup>
+									{devices.map((d) => (
+										<SelectItem key={d.deviceId} value={d.deviceId}>
+											{d.thisDevice ? `${d.name} (this computer)` : d.name}
+										</SelectItem>
+									))}
+								</SelectGroup>
+							</SelectContent>
+						</Select>
+						<FieldDescription
+							id={`${id}-device-hint`}
+							className={noDevice ? "text-destructive" : undefined}
+						>
+							{noDevice
+								? "None of your devices with this project is online. Start the run when one is."
+								: "Where the steps run. You see your devices that are online and have this project."}
+						</FieldDescription>
+					</Field>
+				) : null}
 
 				<Field>
 					<FieldLabel htmlFor={`${id}-base`}>
@@ -347,11 +412,13 @@ function StartRunForm({
 					type="submit"
 					disabled={invalid || startRun.isPending}
 					title={
-						missing.length > 0
-							? `Fill in ${missing.map((input) => input.label || input.name).join(", ")} first.`
-							: badJson.length > 0
-								? `Check the format of ${badJson.map((input) => input.label || input.name).join(", ")} first.`
-								: undefined
+						noDevice
+							? "None of your devices with this project is online."
+							: missing.length > 0
+								? `Fill in ${missing.map((input) => input.label || input.name).join(", ")} first.`
+								: badJson.length > 0
+									? `Check the format of ${badJson.map((input) => input.label || input.name).join(", ")} first.`
+									: undefined
 					}
 				>
 					{startRun.isPending ? (

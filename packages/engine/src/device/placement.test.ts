@@ -245,6 +245,11 @@ describe("a run placed on another Device", () => {
 		expect(String(ran.steps[0]?.outputs.log_tail).trim()).toBe("hi");
 	});
 
+	test("the project is removed without a Clone here", async () => {
+		await space().removeProject(projectId);
+		expect(await space().listProjects()).toEqual([]);
+	});
+
 	test("refusals name the Device: what it lacks, offline, not the starter's, no Clone", async () => {
 		await expect(
 			space().startRun({
