@@ -10,34 +10,46 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon } from "lucide-react";
+import { useState } from "react";
 import { DataTable, dataTableColumns } from "@/components/data-table";
 import { PageSection } from "@/components/page-heading";
 import { RunStatusBadge } from "@/components/run-status-badge";
 import { useNow } from "@/hooks/use-now";
-import type { RunStatus, RunSummary } from "@/lib/api-types";
+import type { Project, RunSummary } from "@/lib/api-types";
 import { formatCost, formatDateTime, formatRelative } from "@/lib/format";
 import { inLastNights } from "@/lib/nights";
 import { orpc } from "@/utils/orpc";
+
+import { FlowHealthDialog } from "./flow-health-dialog";
+import {
+	type FlowRun,
+	hasEnded,
+	runsOf,
+	type Spread,
+	spreadOf,
+} from "./flow-runs";
 
 const NIGHTS = 30;
 
 /**
  * Each flow over the last 30 nights: its last run, how often it finished, and
  * what a finished run costs. A stopped run did not finish, so it counts
- * against it.
- * A flow a Subflow node ran counts too, inside the run that called it.
+ * against it. A flow a Subflow node ran counts too, inside the run that
+ * called it. A row opens the details of its flow.
  */
 export function FlowHealth({
-	projectId,
+	project,
 	runs,
 }: {
-	projectId: string;
+	project: Project;
 	runs: RunSummary[] | undefined;
 }) {
 	const now = useNow(60_000);
 	const flows = useQuery(
-		orpc.flows.list.queryOptions({ input: { projectId } }),
+		orpc.flows.list.queryOptions({ input: { projectId: project.id } }),
 	);
+	// The name stays while the dialog closes, so its body does not go blank.
+	const [details, setDetails] = useState<{ name: string; open: boolean }>();
 
 	if (!flows.isLoading && (flows.data?.length ?? 0) === 0) return null;
 
@@ -51,7 +63,10 @@ export function FlowHealth({
 					size="sm"
 					nativeButton={false}
 					render={
-						<Link to="/projects/$projectId/flows" params={{ projectId }} />
+						<Link
+							to="/projects/$projectId/flows"
+							params={{ projectId: project.id }}
+						/>
 					}
 				>
 					Flows
@@ -68,47 +83,48 @@ export function FlowHealth({
 						</div>
 					) : (
 						<FlowHealthTable
-							projectId={projectId}
 							rows={(flows.data ?? []).map((flow) =>
 								flowHealthOf(flow.name, runs, now),
 							)}
 							now={now}
+							onOpen={(name) => setDetails({ name, open: true })}
 						/>
 					)}
 				</CardContent>
 			</Card>
+			{details && runs ? (
+				<FlowHealthDialog
+					open={details.open}
+					onOpenChange={(open) => setDetails({ ...details, open })}
+					flowName={details.name}
+					project={project}
+					runs={runs}
+				/>
+			) : null}
 		</PageSection>
 	);
 }
 
 function FlowHealthTable({
-	projectId,
 	rows,
 	now,
+	onOpen,
 }: {
-	projectId: string;
 	rows: FlowHealthRow[];
 	now: number;
+	onOpen: (name: string) => void;
 }) {
 	// One scale for every row, so the costs of two flows compare at a glance.
 	const scaleMax = Math.max(0, ...rows.map((row) => row.cost?.max ?? 0));
 	return (
 		<DataTable
-			columns={flowHealthColumns(projectId, now, scaleMax)}
+			columns={flowHealthColumns(now, scaleMax, onOpen)}
 			data={rows}
 			getRowId={(row) => row.name}
+			onRowClick={(row) => onOpen(row.name)}
 		/>
 	);
 }
-
-/** One run of a flow: a run of its own, or a Subflow run inside another run. */
-type FlowRun = {
-	/** The run it is part of. */
-	runId: string;
-	status: RunStatus;
-	startedAt: number;
-	costUsd: number;
-};
 
 type FlowHealthRow = {
 	name: string;
@@ -120,65 +136,10 @@ type FlowHealthRow = {
 	/** Percent of ended runs that finished; undefined when none ended. */
 	rate: number | undefined;
 	/** What a finished run cost; undefined when none finished. */
-	cost: CostSpread | undefined;
+	cost: Spread | undefined;
 	/** The runs that ended without finishing, and what they spent together. */
 	unfinished: { count: number; costUsd: number };
 };
-
-/** The five-number summary of what the runs of a flow cost. */
-type CostSpread = {
-	min: number;
-	q1: number;
-	median: number;
-	q3: number;
-	max: number;
-	/** How many runs it covers. */
-	count: number;
-};
-
-/** Linear interpolation between the closest ranks, like most spreadsheets. */
-function quantile(sorted: number[], q: number): number {
-	const at = (sorted.length - 1) * q;
-	const below = sorted[Math.floor(at)] ?? 0;
-	const above = sorted[Math.ceil(at)] ?? below;
-	return below + (above - below) * (at - Math.floor(at));
-}
-
-function costSpreadOf(costs: number[]): CostSpread | undefined {
-	if (costs.length === 0) return undefined;
-	const sorted = [...costs].sort((a, b) => a - b);
-	return {
-		min: sorted[0] ?? 0,
-		q1: quantile(sorted, 0.25),
-		median: quantile(sorted, 0.5),
-		q3: quantile(sorted, 0.75),
-		max: sorted.at(-1) ?? 0,
-		count: sorted.length,
-	};
-}
-
-function runsOf(name: string, runs: RunSummary[]): FlowRun[] {
-	return runs.flatMap((run) => [
-		...(run.flowName === name
-			? [
-					{
-						runId: run.id,
-						status: run.status,
-						startedAt: run.createdAt,
-						costUsd: run.costUsd,
-					},
-				]
-			: []),
-		...run.subflows
-			.filter((subflow) => subflow.flowName === name)
-			.map((subflow) => ({
-				runId: run.id,
-				status: subflow.status,
-				startedAt: subflow.startedAt,
-				costUsd: subflow.costUsd,
-			})),
-	]);
-}
 
 function flowHealthOf(
 	name: string,
@@ -192,14 +153,7 @@ function flowHealthOf(
 		undefined,
 	);
 	const recent = mine.filter((run) => inLastNights(run.startedAt, NIGHTS, now));
-	// A run still going has not ended, and what it spent so far is not its cost.
-	const ended = recent.filter(
-		(run) =>
-			run.status === "finished" ||
-			run.status === "failed" ||
-			run.status === "stopped" ||
-			run.status === "interrupted",
-	);
+	const ended = recent.filter(hasEnded);
 	const finished = ended.filter((run) => run.status === "finished");
 	// A run that failed early spent next to nothing, which would drag down
 	// what a run costs. Its spend shows on its own instead.
@@ -214,7 +168,7 @@ function flowHealthOf(
 			ended.length > 0
 				? Math.round((finished.length / ended.length) * 100)
 				: undefined,
-		cost: costSpreadOf(finished.map((run) => run.costUsd)),
+		cost: spreadOf(finished.map((run) => run.costUsd)),
 		unfinished: {
 			count: unfinished.length,
 			costUsd: unfinished.reduce((total, run) => total + run.costUsd, 0),
@@ -224,18 +178,23 @@ function flowHealthOf(
 
 const column = dataTableColumns<FlowHealthRow>();
 
-function flowHealthColumns(projectId: string, now: number, scaleMax: number) {
+function flowHealthColumns(
+	now: number,
+	scaleMax: number,
+	onOpen: (name: string) => void,
+) {
 	return column.columns([
 		column.accessor("name", {
 			header: "Flow",
 			cell: ({ row }) => (
-				<Link
-					to="/projects/$projectId/flows/$name"
-					params={{ projectId, name: row.original.name }}
-					className="font-medium font-mono text-xs underline-offset-4 hover:underline"
+				<Button
+					variant="link"
+					size="xs"
+					className="h-auto px-0 font-mono"
+					onClick={() => onOpen(row.original.name)}
 				>
 					{row.original.name}
-				</Link>
+				</Button>
 			),
 			meta: { headClassName: "pl-6", cellClassName: "pl-6" },
 		}),
@@ -248,18 +207,13 @@ function flowHealthColumns(projectId: string, now: number, scaleMax: number) {
 				original.last ? (
 					<span className="flex items-center gap-2">
 						<RunStatusBadge status={original.last.status} />
-						<Link
-							to="/runs/$runId"
-							params={{ runId: original.last.runId }}
-							className="text-muted-foreground text-xs underline-offset-4 hover:underline"
+						<time
+							dateTime={new Date(original.last.startedAt).toISOString()}
+							title={formatDateTime(original.last.startedAt)}
+							className="text-muted-foreground text-xs"
 						>
-							<time
-								dateTime={new Date(original.last.startedAt).toISOString()}
-								title={formatDateTime(original.last.startedAt)}
-							>
-								{formatRelative(original.last.startedAt, now)}
-							</time>
-						</Link>
+							{formatRelative(original.last.startedAt, now)}
+						</time>
 					</span>
 				) : (
 					<span className="text-muted-foreground text-xs">Never run</span>
@@ -308,9 +262,31 @@ function flowHealthColumns(projectId: string, now: number, scaleMax: number) {
 				/>
 			),
 			meta: {
-				headClassName: "pr-6 text-right w-56",
-				cellClassName: "pr-6 text-right tabular-nums",
+				headClassName: "text-right w-56",
+				cellClassName: "text-right tabular-nums",
 			},
+		}),
+		column.display({
+			id: "open",
+			header: () => <span className="sr-only">Actions</span>,
+			cell: ({ row: { original } }) =>
+				original.last ? (
+					<Button
+						variant="ghost"
+						size="xs"
+						nativeButton={false}
+						aria-label={`Open run, the last run of ${original.name}`}
+						// The row opens the details. This button opens the run.
+						onClick={(event) => event.stopPropagation()}
+						render={
+							<Link to="/runs/$runId" params={{ runId: original.last.runId }} />
+						}
+					>
+						Open run
+						<ArrowRightIcon data-icon="inline-end" />
+					</Button>
+				) : null,
+			meta: { headClassName: "pr-6 w-28", cellClassName: "pr-6 text-right" },
 		}),
 	]);
 }
@@ -328,7 +304,7 @@ function CostCell({
 	unfinished,
 	scaleMax,
 }: {
-	cost: CostSpread | undefined;
+	cost: Spread | undefined;
 	unfinished: FlowHealthRow["unfinished"];
 	scaleMax: number;
 }) {

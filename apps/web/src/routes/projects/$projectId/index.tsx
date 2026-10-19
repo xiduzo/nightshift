@@ -77,7 +77,7 @@ function ProjectDashboardComponent() {
 						</div>
 					</div>
 
-					<FlowHealth projectId={project.id} runs={runs.data} />
+					<FlowHealth project={project} runs={runs.data} />
 
 					<ProjectClones project={project} />
 

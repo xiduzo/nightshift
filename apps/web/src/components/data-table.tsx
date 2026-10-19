@@ -7,6 +7,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@nightshift/ui/components/table";
+import { cn } from "@nightshift/ui/lib/utils";
 import {
 	type ColumnDef,
 	createColumnHelper,
@@ -46,7 +47,9 @@ export function dataTableColumns<TData extends RowData>() {
 /**
  * A shadcn Table driven by TanStack Table, after the shadcn Data Table guide.
  * Columns set their classes through `meta`. A column sorts only when it sets
- * `enableSorting: true`; its header then becomes a button.
+ * `enableSorting: true`; its header then becomes a button. With
+ * `onRowClick` a click anywhere on a row calls it. That row still needs a
+ * button of its own for the keyboard, and other controls in it stop the click.
  */
 export function DataTable<TData extends RowData>({
 	columns,
@@ -54,6 +57,7 @@ export function DataTable<TData extends RowData>({
 	getRowId,
 	initialSorting,
 	rowClassName,
+	onRowClick,
 	...props
 }: {
 	// biome-ignore lint/suspicious/noExplicitAny: each column keeps its own value type.
@@ -62,6 +66,7 @@ export function DataTable<TData extends RowData>({
 	getRowId: (row: TData) => string;
 	initialSorting?: SortingState;
 	rowClassName?: (row: TData) => string | undefined;
+	onRowClick?: (row: TData) => void;
 } & Omit<ComponentProps<typeof Table>, "children">) {
 	const table = useTable({
 		features,
@@ -109,7 +114,14 @@ export function DataTable<TData extends RowData>({
 			</TableHeader>
 			<TableBody>
 				{table.getRowModel().rows.map((row) => (
-					<TableRow key={row.id} className={rowClassName?.(row.original)}>
+					<TableRow
+						key={row.id}
+						className={cn(
+							onRowClick && "cursor-pointer",
+							rowClassName?.(row.original),
+						)}
+						onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+					>
 						{row.getAllCells().map((cell) => (
 							<TableCell
 								key={cell.id}
