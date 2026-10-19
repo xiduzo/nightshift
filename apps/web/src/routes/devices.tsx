@@ -52,6 +52,10 @@ import { Fragment, useState } from "react";
 import { toast } from "sonner";
 
 import { JoinHostDialog } from "@/components/devices/join-host-dialog";
+import {
+	SpaceDevices,
+	ThisComputerOffers,
+} from "@/components/devices/offers-section";
 import { PairDeviceDialog } from "@/components/devices/pair-device-dialog";
 import { platformName } from "@/components/devices/platform";
 import { ThisComputerCard } from "@/components/devices/this-computer-card";
@@ -149,6 +153,8 @@ function DevicesRoute() {
 								isHost={isHost}
 								onPair={() => setOpen(true)}
 							/>
+							{computer ? <ThisComputerOffers /> : null}
+							<SpaceDevices />
 							{computer ? <Hosts hosts={computer.hosts} /> : null}
 						</>
 					)}
