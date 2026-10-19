@@ -12,7 +12,9 @@ import {
 	secretNameSchema,
 	settingsPatchSchema,
 	syncCursorsSchema,
+	type WorkRequest,
 	workReplySchema,
+	workRequestSchema,
 } from "@nightshift/engine";
 import type { SpaceEngine } from "@nightshift/engine/types";
 import {
@@ -830,6 +832,34 @@ const devices = {
 		.handler(async function* ({ context, input, signal }) {
 			yield* context.exchange.work(context.deviceKey, input, signal);
 		}),
+	/**
+	 * The Walker → Host → Device leg: a Device that walks a run calls
+	 * another of its Person's Devices (or this Host) through here; the
+	 * stream carries the replies, and closing it cancels the call.
+	 */
+	call: deviceProcedure("relay")
+		.input(
+			z.object({
+				deviceId: z.string().min(1).max(64),
+				request: workRequestSchema,
+			}),
+		)
+		.handler(async function* ({ context, input, signal }) {
+			yield* context.exchange.call(
+				context.deviceKey,
+				{
+					deviceId: input.deviceId,
+					request: input.request as unknown as WorkRequest,
+				},
+				signal,
+			);
+		}),
+	/** Whether one of the key's Person's Devices (or this Host) takes work now. */
+	reachable: deviceProcedure("relay")
+		.input(z.object({ deviceId: z.string().min(1).max(64) }))
+		.handler(({ context, input }) =>
+			context.exchange.reachable(context.deviceKey, input.deviceId),
+		),
 	/** The placed Device's answers to a call it took. */
 	workReply: deviceProcedure("relay")
 		.input(
@@ -1021,11 +1051,11 @@ const sync = {
 		.handler(({ context, input }) =>
 			context.exchange.startRun(context.deviceKey, input),
 		),
-	/** The key's Person's Devices a run of the project can run on. */
-	placements: deviceProcedure("sync")
+	/** The key's Person's Devices for a project: online, with a Clone or not. */
+	devices: deviceProcedure("sync")
 		.input(z.object({ spaceId: z.string().min(1), projectId: z.string() }))
 		.handler(({ context, input }) =>
-			context.exchange.placements(context.deviceKey, input),
+			context.exchange.devices(context.deviceKey, input),
 		),
 	/** The Device has a Clone of a Project of a Space here. */
 	addClone: deviceProcedure("sync")

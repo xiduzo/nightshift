@@ -300,10 +300,9 @@ export function createPlacement(deps: PlacementDeps) {
 			run,
 			walker,
 			async deviceNamed(name) {
-				if (name === device.name) return walker;
-				const matches = (await list()).filter(
-					(d) => d.name === name && !d.thisDevice,
-				);
+				const matches = (await list()).filter((d) => d.name === name);
+				if (matches.length === 0 && name === device.name) return walker;
+				if (matches.length === 1 && matches[0]?.thisDevice) return walker;
 				if (matches.length === 0) {
 					throw new Error(
 						`The flow names the device "${name}", but you have no device of that name. Check the node's device.`,
@@ -314,7 +313,8 @@ export function createPlacement(deps: PlacementDeps) {
 						`Two of your devices are named "${name}". Rename one on the Devices page.`,
 					);
 				}
-				return other((matches[0] as OwnDevice).deviceId);
+				const [match] = matches as [OwnDevice];
+				return match.thisDevice ? walker : other(match.deviceId);
 			},
 		};
 	}
@@ -326,8 +326,12 @@ export function createPlacement(deps: PlacementDeps) {
 	async function flowsElsewhere(
 		spaceId: string,
 		projectId: string,
-		personId: string | undefined,
+		actor: string | undefined,
 	): Promise<FlowSources> {
+		// In a Host's Space, the Person as the Host knows them.
+		const personId = actor
+			? ((await personOnHost(db, spaceId)) ?? actor)
+			: undefined;
 		const at = personId
 			? (await placements(spaceId, personId, projectId)).find(
 					(p) => !p.thisDevice,

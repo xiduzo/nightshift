@@ -30,12 +30,13 @@ export type WorkHub = WorkRelay & {
 	): AsyncIterable<WorkDelivery>;
 	/**
 	 * The placed Device answers a call it took. `done`: the call ended
-	 * there. A call of another Device, or one that ended here, is ignored.
+	 * there. A call of another Device, or one that ended here, is ignored:
+	 * false, and the Device stops it.
 	 */
 	reply(
 		deviceId: string,
 		input: { id: string; replies: WorkReply[]; done: boolean },
-	): void;
+	): boolean;
 };
 
 /** A call waiting for its replies. */
@@ -57,7 +58,13 @@ type Inbox = {
 	lost: Timer | null;
 };
 
-export function createWorkHub(options: { lostAfterMs?: number } = {}): WorkHub {
+export function createWorkHub(
+	options: {
+		lostAfterMs?: number;
+		/** A Device took work again after it had none: it is back. */
+		onBack?: (deviceId: string) => void;
+	} = {},
+): WorkHub {
 	const lostAfterMs = options.lostAfterMs ?? 45_000;
 	const inboxes = new Map<string, Inbox>();
 	const calls = new Map<string, OpenCall>();
@@ -89,7 +96,8 @@ export function createWorkHub(options: { lostAfterMs?: number } = {}): WorkHub {
 				[
 					{
 						kind: "error",
-						message: "The device of this run went offline.",
+						message: "The device of this step went offline.",
+						offline: true,
 					},
 				],
 				true,
@@ -104,11 +112,18 @@ export function createWorkHub(options: { lostAfterMs?: number } = {}): WorkHub {
 	}
 
 	return {
-		online: reachable,
+		// Online: a stream is open now. A new step on a Device without one
+		// waits for it (`device-offline`); a call already made waits out a
+		// short drop.
+		online: (deviceId) => (inboxes.get(deviceId)?.streams ?? 0) > 0,
 
 		async *call(deviceId, request, signal) {
 			if (!reachable(deviceId)) {
-				yield { kind: "error", message: "The device of this run is offline." };
+				yield {
+					kind: "error",
+					message: "The device of this step is offline.",
+					offline: true,
+				};
 				return;
 			}
 			const id = randomUUID();
@@ -169,18 +184,21 @@ export function createWorkHub(options: { lostAfterMs?: number } = {}): WorkHub {
 							{
 								kind: "error",
 								message:
-									"The device of this run stopped before the step ended.",
+									"The device of this step stopped before the step ended.",
+								offline: true,
 							},
 						],
 						true,
 					);
 				}
 			}
+			const back = box.streams === 0;
 			box.streams++;
 			if (box.lost) {
 				clearTimeout(box.lost);
 				box.lost = null;
 			}
+			if (back) options.onBack?.(deviceId);
 			let wake: (() => void) | null = null;
 			const notify = () => {
 				const resolve = wake;
@@ -216,9 +234,10 @@ export function createWorkHub(options: { lostAfterMs?: number } = {}): WorkHub {
 
 		reply(deviceId, { id, replies, done }) {
 			const call = calls.get(id);
-			if (!call || call.deviceId !== deviceId) return;
+			if (!call || call.deviceId !== deviceId) return false;
 			if (done) calls.delete(id);
 			call.push(replies, done);
+			return true;
 		},
 	};
 }

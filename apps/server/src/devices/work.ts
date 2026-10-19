@@ -29,6 +29,14 @@ import type { Engine } from "@nightshift/engine/types";
  * that is gone.
  */
 
+/**
+ * How long a call keeps running here while its replies cannot reach the
+ * Host: the session goes on and its events wait, and the Walker gets them
+ * when the link is back. After that the call stops: nothing runs for a
+ * Walker that is gone.
+ */
+export const REPLY_DEADLINE_MS = 10 * 60_000;
+
 export type WorkServer = {
 	/** Takes and serves the Host's calls while its link is online. */
 	whileOnline(client: AppRouterClient, signal: AbortSignal): Promise<void>;
@@ -37,6 +45,7 @@ export type WorkServer = {
 };
 
 export function createWorkServer(deps: {
+	/** The Host whose runs it serves. */
 	hostId: string;
 	db: Database;
 	engine: Engine;
@@ -46,7 +55,7 @@ export function createWorkServer(deps: {
 	replyDeadlineMs?: number;
 }): WorkServer {
 	const retryMs = deps.retryMs ?? 2_000;
-	const replyDeadlineMs = deps.replyDeadlineMs ?? 60_000;
+	const replyDeadlineMs = deps.replyDeadlineMs ?? REPLY_DEADLINE_MS;
 	const calls = new Map<string, AbortController>();
 	let client: AppRouterClient | null = null;
 
@@ -66,8 +75,19 @@ export function createWorkServer(deps: {
 					const done = ended && pending.length === 0;
 					try {
 						if (!client) throw new Error("No link to the Host.");
-						await client.devices.workReply({ id, replies, done });
+						const { known } = await client.devices.workReply({
+							id,
+							replies,
+							done,
+						});
 						failingSince = null;
+						// The Host no longer waits for it (it restarted, or the
+						// Walker gave up): the call stops here.
+						if (!known) {
+							closed = true;
+							abort();
+							return;
+						}
 						if (done) {
 							closed = true;
 							return;
@@ -168,46 +188,78 @@ function cwdOf(call: WorkCall): string | null {
 			return call.input.cwd;
 		case "files":
 		case "itemBranch":
+		case "handOff":
 			return call.cwd;
 		default:
 			return null;
 	}
 }
 
+/** The calls that work in the project's Clone; a model or a tool needs none. */
+const NEEDS_CLONE: ReadonlySet<WorkCall["kind"]> = new Set([
+	"flows",
+	"worktree",
+	"files",
+	"itemBranch",
+	"handOff",
+	"receiveHandOff",
+	"session",
+	"exec",
+]);
+
+/**
+ * Whom this computer serves calls for: through `hostId`, the Person of its
+ * link to that Host; on a Host serving itself for a Walker elsewhere,
+ * `ownerId`, its own owner, in a Space it keeps.
+ */
+export type WorkVia = { hostId: string } | { ownerId: string };
+
 /**
  * Why this computer does not serve a call, or null: the placed Device's
  * own checks, from its own Replica, before it starts anything.
  *
- * - The Space is one it takes part in through this Host.
+ * - The Space is one it takes part in through this Host (or, on a Host,
+ *   one it keeps).
  * - The run is its owner's: the Person who starts it is the Person of this
- *   computer's link (another Person's run needs an Offer, which is not
- *   built yet), with a role in the Space that starts runs (the Space
- *   document's Member mirror).
- * - It has a Clone of the project, in that Space.
+ *   computer's link (on a Host: its owner). Another Person's run needs an
+ *   Offer, which is not built yet. Their role in the Space starts runs
+ *   (the Space document's Member mirror).
+ * - A call that works in the Clone: it has one of the project, in that
+ *   Space. A model or a tool needs none.
  * - A call that works in a folder works in the run's own worktree.
  */
 export async function checkWork(
 	request: WorkRequest,
-	deps: { hostId: string; db: Database; engine: Engine },
+	deps: WorkVia & { db: Database; engine: Engine },
 ): Promise<string | null> {
 	const { db, engine } = deps;
 	const { spaceId, projectId, personId, runId, call } = request;
-	if ((await engine.exchange.hostSpaces.hostOf(spaceId)) !== deps.hostId) {
+	const hostOf = await engine.exchange.hostSpaces.hostOf(spaceId);
+	const owner =
+		"hostId" in deps
+			? hostOf === deps.hostId
+				? await personOnHost(db, spaceId)
+				: undefined
+			: hostOf === null
+				? deps.ownerId
+				: undefined;
+	if (owner === undefined) {
 		return "This device does not take part in that Space through this Host.";
 	}
-	if ((await personOnHost(db, spaceId)) !== personId) {
+	if (owner !== personId) {
 		return "This device runs steps for its owner's runs only.";
 	}
 	const role = await engine.exchange.memberRole(spaceId, personId);
 	if (!role || !roleAllows(role, { run: ["start"] })) {
 		return "Your role in this Space does not allow starting runs.";
 	}
+	if (!NEEDS_CLONE.has(call.kind)) return null;
 	const repoPath = await clonePathOf(db)(projectId, spaceId);
 	if (repoPath === null) {
 		return "This device does not have this project. Add its folder there first.";
 	}
 	if (
-		call.kind === "worktree" &&
+		(call.kind === "worktree" || call.kind === "receiveHandOff") &&
 		(call.run.id !== runId || call.run.projectId !== projectId)
 	) {
 		return "This device adds a folder only for the run that asks.";

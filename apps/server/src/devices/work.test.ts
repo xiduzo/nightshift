@@ -156,17 +156,21 @@ describe("checkWork", () => {
 describe("the work hub", () => {
 	test("a call reaches the Device that takes its work; its replies reach the caller; a cancel follows an abort", async () => {
 		const hub = createWorkHub();
-		expect(hub.online("b")).toBe(false);
+		expect(hub.online("b", "")).toBe(false);
 		const refused = [];
 		for await (const reply of hub.call("b", request())) refused.push(reply);
 		expect(refused).toEqual([
-			{ kind: "error", message: "The device of this run is offline." },
+			{
+				kind: "error",
+				message: "The device of this step is offline.",
+				offline: true,
+			},
 		]);
 
 		const taking = new AbortController();
 		const deliveries = hub.take("b", taking.signal)[Symbol.asyncIterator]();
 		const first = deliveries.next();
-		expect(hub.online("b")).toBe(true);
+		expect(hub.online("b", "")).toBe(true);
 
 		const caller = new AbortController();
 		const replies = hub
@@ -214,7 +218,8 @@ describe("the work hub", () => {
 		const next = after.next();
 		expect((await answered).value).toEqual({
 			kind: "error",
-			message: "The device of this run stopped before the step ended.",
+			message: "The device of this step stopped before the step ended.",
+			offline: true,
 		});
 		again.abort();
 		await next;
@@ -232,8 +237,9 @@ describe("the work hub", () => {
 		await deliveries.next();
 		expect((await answered).value).toEqual({
 			kind: "error",
-			message: "The device of this run went offline.",
+			message: "The device of this step went offline.",
+			offline: true,
 		});
-		expect(hub.online("b")).toBe(false);
+		expect(hub.online("b", "")).toBe(false);
 	});
 });

@@ -78,11 +78,11 @@ export function createRelay(deps: {
 			return client.sync.startRun(start);
 		},
 
-		async placements(input) {
+		async devices(input) {
 			const hostId = await hostOf(input.spaceId);
 			if (hostId === null) return [];
 			const client = await hostClient(hostId);
-			return client.sync.placements(input);
+			return client.sync.devices(input);
 		},
 	};
 }
