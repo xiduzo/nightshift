@@ -20,6 +20,7 @@ import {
 import type { Context } from "@nightshift/api/context";
 import { createAuth } from "@nightshift/auth";
 import { roleAllows } from "@nightshift/auth/access";
+import { hostPolicyFromEnv } from "@nightshift/auth/host-access";
 import { createLocalSession } from "@nightshift/auth/local-session";
 import { localPerson } from "@nightshift/auth/spaces";
 import { createDb } from "@nightshift/db";
@@ -201,6 +202,12 @@ export const auth = createAuth(ENV, db, [...desktopOrigins, ...localOrigins], {
 	trustedOrigins: () => hostOrigins(hostAddresses()),
 });
 
+/**
+ * The Host's rules for sessions from other computers: two-factor sign-in
+ * required or not (NIGHTSHIFT_REQUIRE_TWO_FACTOR). Read at start.
+ */
+export const hostPolicy = hostPolicyFromEnv(ENV);
+
 /** The Host's addresses, once the settings below exist. */
 let hostAddresses: () => readonly string[] = () => [];
 
@@ -321,6 +328,7 @@ relay.nightshiftSync ??= createSync({
 		localSession,
 		ownerId: person.userId,
 		trustedOrigins,
+		policy: hostPolicy,
 		keptOwner: (name) => engine.devices.keptDocumentOwner(name),
 		deviceKey: (token) => host.syncKey(token),
 	}),

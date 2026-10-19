@@ -8,6 +8,7 @@ import type {
 import type { HarnessName } from "@nightshift/agents/types";
 import type { Permissions, Session } from "@nightshift/auth";
 import type { DeviceKeyAccess } from "@nightshift/auth/device-keys";
+import type { HostAccess } from "@nightshift/auth/host-access";
 import type { RequestAccess } from "@nightshift/auth/request";
 import type { Database } from "@nightshift/db";
 import type {
@@ -57,10 +58,23 @@ export type Context = {
 	headers: Headers;
 	/** The request came from this computer itself, not through a proxy or from elsewhere (`isThisComputer`). */
 	fromThisComputer: boolean;
+	/**
+	 * Whether the session may use the Host (`@nightshift/auth/host-access`).
+	 * Refused: a session from another computer on a Host that requires
+	 * two-factor sign-in, whose Person has not turned it on.
+	 */
+	hostAccess: HostAccess;
+	/** The Host requires two-factor sign-in for sessions from other computers. */
+	requireTwoFactor: boolean;
 	/** Sets a Person's email and password (`@nightshift/auth/login`). */
 	setLogin(
 		personId: string,
-		input: { email: string; password: string; name?: string },
+		input: {
+			email: string;
+			password: string;
+			name?: string;
+			resetTwoFactor?: boolean;
+		},
 	): Promise<{ email: string }>;
 	/**
 	 * The Device key the request carries (`Authorization: Bearer`), resolved.

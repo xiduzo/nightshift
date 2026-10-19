@@ -47,7 +47,7 @@ CLI when you need them.
 | ✓ [Button Group](https://ui.shadcn.com/docs/components/button-group) | Joins related buttons (split buttons, prev/next, a button with a dropdown). |
 | ✓ [Input](https://ui.shadcn.com/docs/components/input) | One-line text. |
 | ✓ [Input Group](https://ui.shadcn.com/docs/components/input-group) | An input or textarea with addons inside the border: an icon, a prefix, a button, a counter. |
-| [Input OTP](https://ui.shadcn.com/docs/components/input-otp) | One-time codes, one box per digit. |
+| ✓ [Input OTP](https://ui.shadcn.com/docs/components/input-otp) | One-time codes, one box per digit: the two-factor code at sign-in and in its setup (`components/account/code-input.tsx`). |
 | ✓ [Textarea](https://ui.shadcn.com/docs/components/textarea) | Multi-line text: prompts, notes, JSON. |
 | ✓ [Checkbox](https://ui.shadcn.com/docs/components/checkbox) | One on/off choice inside a form, or several from a list. |
 | ✓ [Radio Group](https://ui.shadcn.com/docs/components/radio-group) | One choice from a few visible options. As cards (`FieldLabel` around a horizontal `Field`): a profile's harness, a Gate's choices in the inbox. |

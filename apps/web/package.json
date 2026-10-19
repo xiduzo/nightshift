@@ -30,6 +30,7 @@
 		"better-auth": "catalog:",
 		"lucide-react": "catalog:",
 		"next-themes": "catalog:",
+		"qrcode.react": "^4.2.0",
 		"react": "catalog:",
 		"react-dom": "catalog:",
 		"react-markdown": "^10.1.0",

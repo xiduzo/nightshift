@@ -45,6 +45,19 @@ Needs a Cloudflare account with your domain on it.
    sudo cloudflared service install
    ```
 
+Cloudflare Tunnel makes the Host public. Require two-factor sign-in for
+everyone who signs in through it:
+
+```bash
+nightshift serve --listen 127.0.0.1 --require-two-factor \
+  --host-address https://nightshift.example.com
+```
+
+In Docker, set `NIGHTSHIFT_REQUIRE_TWO_FACTOR=on` and publish the port on
+`127.0.0.1` only (`-p 127.0.0.1:3000:3000`). Night Shift limits sign-in
+tries per visitor by the `CF-Connecting-IP` header that Cloudflare adds. See
+[Require two-factor sign-in](README.md#require-two-factor-sign-in).
+
 Cloudflare Access can put a login in front. Your other computers cannot
 pass that login: they use their own access to the Host. Put Access only in
 front of a Host that browsers alone use.

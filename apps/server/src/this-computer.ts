@@ -65,10 +65,11 @@ export function fromThisComputer(
 	context: Context,
 	trustedOrigins: ReadonlySet<string>,
 ): boolean {
+	return isThisComputer(peerAddress(context), context.req.raw, trustedOrigins);
+}
+
+/** The address of the computer at the other end of the connection, as Bun saw it. */
+export function peerAddress(context: Context): string | null {
 	const server = context.env as BunServer | undefined;
-	return isThisComputer(
-		server?.requestIP?.(context.req.raw)?.address,
-		context.req.raw,
-		trustedOrigins,
-	);
+	return server?.requestIP?.(context.req.raw)?.address ?? null;
 }

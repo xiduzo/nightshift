@@ -1,4 +1,6 @@
 import { appRouter } from "@nightshift/api/routers/index";
+import { PEER_ADDRESS_HEADER } from "@nightshift/auth";
+import { authEndpointAllowed } from "@nightshift/auth/host-access";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { onError } from "@orpc/server";
@@ -13,6 +15,7 @@ import { desktopOrigins, ENV } from "./env.server";
 import { runExportResponse } from "./run-export";
 import { auth, connections, db, serve, sync } from "./services";
 import type { SocketData } from "./sync";
+import { peerAddress } from "./this-computer";
 
 const app = new Hono();
 
@@ -28,18 +31,37 @@ app.use(
 );
 
 // Better Auth's own endpoints (the session, the Spaces). A request from
-// this computer without a session goes in with the local session.
+// this computer without a session goes in with the local session. A
+// session the Host refuses (two-factor required, not on) may only set it
+// up and sign out. The connection's address goes along for the rate
+// limits: the client's own copy of the header never does.
 app.on(["POST", "GET"], "/api/auth/*", async (c) => {
-	const { headers } = await access(c);
-	return auth.handler(new Request(c.req.raw, { headers }));
+	const { headers, hostAccess } = await access(c);
+	if (!hostAccess.allowed) {
+		const path = c.req.path.replace(/^\/api\/auth/, "");
+		if (!authEndpointAllowed(hostAccess, path)) {
+			return c.json(
+				{ code: hostAccess.code, message: hostAccess.message },
+				403,
+			);
+		}
+	}
+	const forwarded = new Headers(headers);
+	forwarded.delete(PEER_ADDRESS_HEADER);
+	const peer = peerAddress(c);
+	if (peer) forwarded.set(PEER_ADDRESS_HEADER, peer);
+	return auth.handler(new Request(c.req.raw, { headers: forwarded }));
 });
 
 // A file download, not an oRPC call: the run of the session's Space, for a
 // role that may export runs.
 app.get("/api/runs/:id/export", async (c) => {
-	const { session, spaceId, can } = await access(c);
+	const { session, spaceId, can, hostAccess } = await access(c);
 	if (!session || !spaceId) {
 		return c.json({ message: "Sign in to use Night Shift." }, 401);
+	}
+	if (!hostAccess.allowed) {
+		return c.json({ code: hostAccess.code, message: hostAccess.message }, 403);
 	}
 	if (!(await can({ run: ["export"] }))) {
 		return c.json(

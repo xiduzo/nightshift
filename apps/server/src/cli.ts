@@ -1,5 +1,6 @@
 import { join } from "node:path";
 
+import { hostPolicyFromEnv } from "@nightshift/auth/host-access";
 import { hasLogin } from "@nightshift/auth/login";
 
 import { prepareDaemonEnv } from "./daemon-env";
@@ -22,7 +23,8 @@ Usage:
   nightshift join <host-address> [--guest]  Pair this computer with a Host.
   nightshift pair <code> [--yes]            Allow a computer to pair with this Host.
   nightshift admin --email <email>          Set how the Host admin signs in from
-                                            another computer.
+                                            another computer. --reset-two-factor
+                                            also turns two-factor sign-in off.
 
 Options of serve (each has an environment variable too):
   --port <port>            The port. PORT, default 3000.
@@ -35,6 +37,8 @@ Options of serve (each has an environment variable too):
   --tls-port <port>        The https:// port with NIGHTSHIFT_TLS_CERT and _KEY.
                            NIGHTSHIFT_TLS_PORT, default the port + 443.
   --web <folder>           Serve the web UI from this folder. NIGHTSHIFT_WEB_DIR.
+  --require-two-factor     People who sign in from another computer must use
+                           two-factor sign-in. NIGHTSHIFT_REQUIRE_TWO_FACTOR=on.
 
 The auth secret is BETTER_AUTH_SECRET, else the file BETTER_AUTH_SECRET_FILE,
 else BETTER_AUTH_SECRET in NIGHTSHIFT_SECRETS_DIR or systemd's credentials,
@@ -49,6 +53,8 @@ export type ServeOptions = {
 	/** This daemon's own address: the first https:// Host address, else this computer. */
 	url: string;
 	web: string | null;
+	/** People who sign in from another computer must use two-factor sign-in. */
+	requireTwoFactor: boolean;
 };
 
 /** `serve`'s flags over the environment. Throws on a flag it does not know. */
@@ -72,7 +78,9 @@ export function serveOptions(
 		else if (flag === "--listen") set.NIGHTSHIFT_LISTEN = value(flag);
 		else if (flag === "--tls-port") set.NIGHTSHIFT_TLS_PORT = value(flag);
 		else if (flag === "--web") set.NIGHTSHIFT_WEB_DIR = value(flag);
-		else throw new Error(`There is no option ${flag}.`);
+		else if (flag === "--require-two-factor") {
+			set.NIGHTSHIFT_REQUIRE_TWO_FACTOR = "on";
+		} else throw new Error(`There is no option ${flag}.`);
 	}
 	if (addresses.length > 0) {
 		set.NIGHTSHIFT_HOST = "on";
@@ -93,6 +101,8 @@ export function serveOptions(
 		env: set,
 		url: https ? new URL(https).origin : `http://localhost:${port}`,
 		web: merged.NIGHTSHIFT_WEB_DIR?.trim() || null,
+		// Checked here too, so a typo stops `serve` before anything starts.
+		requireTwoFactor: hostPolicyFromEnv(merged).requireTwoFactor,
 	};
 }
 
@@ -150,6 +160,11 @@ async function serve(argv: string[]) {
 		// sign-in for a browser elsewhere yet.
 		console.log(
 			"To sign in from a browser on another computer, set the Host admin's sign-in here first: nightshift admin --email you@example.com",
+		);
+	}
+	if (options.requireTwoFactor) {
+		console.log(
+			"Two-factor sign-in is required for people who sign in from another computer.",
 		);
 	}
 	if (!ui) console.log("No web UI here: run it with --web <folder>.");

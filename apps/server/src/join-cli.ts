@@ -178,12 +178,14 @@ export async function adminCommand(argv: string[], program: string) {
 	let email: string | null = null;
 	let name: string | undefined;
 	let fromStdin = false;
+	let resetTwoFactor = false;
 	let daemon = defaultDaemonUrl();
 	while (args.length > 0) {
 		const arg = args.shift() as string;
 		if (arg === "--email") email = args.shift() ?? null;
 		else if (arg === "--name") name = args.shift();
 		else if (arg === "--password-stdin") fromStdin = true;
+		else if (arg === "--reset-two-factor") resetTwoFactor = true;
 		else if (arg === "--daemon") daemon = args.shift() ?? daemon;
 		else {
 			email = null;
@@ -192,7 +194,7 @@ export async function adminCommand(argv: string[], program: string) {
 	}
 	if (!email) {
 		console.log(
-			`Usage: ${program} --email <email> [--name <name>] [--password-stdin]\nRun it on the Host. It sets the email and password the Host admin signs in with from another computer.`,
+			`Usage: ${program} --email <email> [--name <name>] [--password-stdin] [--reset-two-factor]\nRun it on the Host. It sets the email and password the Host admin signs in with from another computer.\n--reset-two-factor also turns two-factor sign-in off, for a lost authenticator app.`,
 		);
 		process.exit(2);
 	}
@@ -201,7 +203,12 @@ export async function adminCommand(argv: string[], program: string) {
 		? (await Bun.stdin.text()).replace(/\r?\n$/, "")
 		: await hiddenPrompt("Password: ");
 	try {
-		const login = await client.account.setLogin({ email, password, name });
+		const login = await client.account.setLogin({
+			email,
+			password,
+			name,
+			resetTwoFactor,
+		});
 		const hello = await client.devices.list();
 		const address = hello.thisComputer?.host.addresses.find((a) =>
 			a.startsWith("https://"),

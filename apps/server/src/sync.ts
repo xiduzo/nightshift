@@ -1,6 +1,7 @@
 import { Hocuspocus } from "@hocuspocus/server";
 import type { Auth } from "@nightshift/auth";
 import { isDeviceKey } from "@nightshift/auth/device-keys";
+import type { HostPolicy } from "@nightshift/auth/host-access";
 import type { LocalSession } from "@nightshift/auth/local-session";
 import { requestAccess } from "@nightshift/auth/request";
 import { roleIn } from "@nightshift/auth/spaces";
@@ -225,6 +226,11 @@ export function documentAccess(options: {
 	/** The Person who owns this Device. */
 	ownerId: string;
 	trustedOrigins: ReadonlySet<string>;
+	/**
+	 * The Host's rules for sessions from other computers. A session the
+	 * Host refuses (two-factor required, not on) opens no document.
+	 */
+	policy?: HostPolicy;
 	/** The owner of a document this daemon keeps for a paired Device, else null. */
 	keptOwner?: (documentName: string) => Promise<string | null>;
 	/**
@@ -251,13 +257,14 @@ export function documentAccess(options: {
 			return access ? { access, context } : false;
 		}
 		const local = isThisComputer(peer, request, options.trustedOrigins);
-		const { session } = await requestAccess(
+		const { session, hostAccess } = await requestAccess(
 			options.auth,
 			options.db,
 			request.headers,
 			local ? options.localSession : null,
+			options.policy,
 		);
-		if (!session) return false;
+		if (!session || !hostAccess.allowed) return false;
 		if (documentName.startsWith("device:")) {
 			return session.user.id === (await ownerOf(documentName))
 				? "write"

@@ -15,6 +15,9 @@ services:
     hostname: nightshift
     environment:
       NIGHTSHIFT_HOST_ADDRESSES: https://${NIGHTSHIFT_DOMAIN:?Set NIGHTSHIFT_DOMAIN}
+      # People who sign in from another computer must use two-factor sign-in.
+      # Give the Host admin a password first (docs/deploy/README.md).
+      # NIGHTSHIFT_REQUIRE_TWO_FACTOR: "on"
     volumes:
       - nightshift:/data
     # No ports: only Caddy reaches it, on the compose network.

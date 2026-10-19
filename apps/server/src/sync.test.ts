@@ -9,6 +9,7 @@ import {
 	type AuthSandbox,
 	createAuthSandbox,
 } from "@nightshift/auth/test-support";
+import { turnOnTwoFactor } from "@nightshift/auth/two-factor-support";
 import { project } from "@nightshift/db/schema/nightshift";
 import {
 	createCliToolStore,
@@ -321,6 +322,61 @@ describe("documentAccess: a Space document", () => {
 		const local = connect(name, { origin: ORIGIN });
 		await waitFor(() => local.failed.length > 0);
 		expect(local.provider.isSynced).toBe(false);
+	});
+});
+
+describe("documentAccess on a Host that requires two-factor", () => {
+	/** The relay's check, with the requirement on. */
+	const authorize = () =>
+		documentAccess({
+			auth: people.auth,
+			db: people.db,
+			localSession: createLocalSession(people.auth, people.db, ownerId),
+			ownerId,
+			trustedOrigins: new Set([ORIGIN]),
+			policy: { requireTwoFactor: true },
+		});
+
+	/** A socket's upgrade through a tunnel on this computer: it adds its header. */
+	function throughTunnel(headers: Headers, documentName: string) {
+		return authorize()({
+			documentName,
+			token: "browser",
+			peer: "127.0.0.1",
+			request: new Request("https://studio.example.com/sync", {
+				headers: {
+					origin: ORIGIN,
+					cookie: headers.get("cookie") ?? "",
+					"cf-connecting-ip": "203.0.113.9",
+				},
+			}),
+		});
+	}
+
+	test("a session from another computer opens nothing until its Person turns two-factor on", async () => {
+		const ada = await people.signUp("Ada");
+		const space = await people.auth.api.createOrganization({
+			headers: ada.headers,
+			body: { name: "Platform", slug: "platform" },
+		});
+		if (!space) throw new Error("no space");
+		await spaces.open(space.id);
+		const name = spaceDocumentName(space.id);
+		expect(await throughTunnel(ada.headers, name)).toBe(false);
+		const { headers } = await turnOnTwoFactor(people.auth, ada.headers);
+		expect(await throughTunnel(headers, name)).toBe("read");
+	});
+
+	test("this computer still opens its own document", async () => {
+		const access = await authorize()({
+			documentName: document.name,
+			token: "this-computer",
+			peer: "127.0.0.1",
+			request: new Request(`http://localhost:${server.port}/sync`, {
+				headers: { origin: ORIGIN },
+			}),
+		});
+		expect(access).toBe("write");
 	});
 });
 
