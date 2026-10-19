@@ -64,13 +64,14 @@ export function parseCommandItems(stdout: string): ListItem[] {
 }
 
 /**
- * The files in `cwd` that match `pattern`, sorted by path, as elements
- * `{ id: path, title: path, path }`. The pattern stays inside `cwd`: an
- * absolute pattern or a `..` segment is refused.
+ * The files that match `pattern` in the worktree, sorted by path, as
+ * elements `{ id: path, title: path, path }`. The pattern stays inside the
+ * worktree: an absolute pattern or a `..` segment is refused before
+ * `scan` (the Device that has the worktree) lists anything.
  */
 export async function fileItems(
-	cwd: string,
 	glob: string,
+	scan: (pattern: string) => Promise<string[]>,
 ): Promise<ListItem[]> {
 	const trimmed = glob.trim();
 	if (trimmed === "") throw new Error("The glob of the files source is empty.");
@@ -85,15 +86,7 @@ export async function fileItems(
 		);
 	}
 	const pattern = trimmed;
-	const paths: string[] = [];
-	for await (const path of new Bun.Glob(pattern).scan({
-		cwd,
-		onlyFiles: true,
-	})) {
-		if (path === ".git" || path.startsWith(".git/")) continue;
-		paths.push(path);
-	}
-	paths.sort();
+	const paths = await scan(pattern);
 	return listOf(
 		paths.map((path) => ({ id: path, title: path, path })),
 		`The files "${pattern}"`,

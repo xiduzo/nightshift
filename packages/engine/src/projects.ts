@@ -77,6 +77,30 @@ export type ListedProject = typeof project.$inferSelect & {
 	repoPath: string | null;
 };
 
+/**
+ * The folder of a project's Clone on this computer (the Replica's own
+ * Device), or null: what `localDevice` works in.
+ */
+export function clonePathOf(
+	db: Database,
+): (projectId: string) => Promise<string | null> {
+	return async (projectId) => {
+		const [row] = await db
+			.select({ path: clone.path })
+			.from(clone)
+			.innerJoin(device, eq(device.id, clone.deviceId))
+			.innerJoin(project, eq(project.id, clone.projectId))
+			.where(
+				and(
+					eq(clone.projectId, projectId),
+					eq(device.self, true),
+					isNull(project.removedAt),
+				),
+			);
+		return row?.path ?? null;
+	};
+}
+
 export type ProjectsDeps = {
 	db: Database;
 	log: RunLog;
@@ -225,6 +249,32 @@ export function createProjects(deps: ProjectsDeps) {
 				)
 				.where(and(isNull(project.removedAt), eq(project.spaceId, spaceId)))
 				.orderBy(asc(project.createdAt));
+		},
+
+		/**
+		 * A project that a person has not removed, with its folder here or
+		 * null: what a Space-level change (a rename, a removal, a move) and a
+		 * run placed on another Device need. With a Space, a project of
+		 * another Space is not found.
+		 */
+		async find(projectId: string, spaceId?: string): Promise<ListedProject> {
+			const deviceId = await deps.deviceId();
+			const [row] = await db
+				.select({ ...getColumns(project), repoPath: clone.path })
+				.from(project)
+				.leftJoin(
+					clone,
+					and(eq(clone.projectId, project.id), eq(clone.deviceId, deviceId)),
+				)
+				.where(
+					and(
+						eq(project.id, projectId),
+						isNull(project.removedAt),
+						inSpace(spaceId),
+					),
+				);
+			if (!row) throw new Error(`Project not found: ${projectId}`);
+			return row;
 		},
 
 		/**

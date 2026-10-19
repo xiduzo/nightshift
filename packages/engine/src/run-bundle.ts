@@ -32,15 +32,16 @@ import type { TranscriptEntry } from "./types";
  */
 
 /**
- * The format this Night Shift writes. 4: the Person who started the run.
+ * The format this Night Shift writes. 5: the Device the run's steps run
+ * on. 4: the Person who started the run.
  * 3: the Space on every row. 2: the project by its remote, with its
  * Clones; the Walker on runs, steps and events. Format 1 to 3 bundles
  * still open: see `openRunBundle`.
  */
-export const RUN_BUNDLE_FORMAT_VERSION = 4;
+export const RUN_BUNDLE_FORMAT_VERSION = 5;
 
 /** The formats `openRunBundle` reads. */
-const READABLE_FORMATS = [1, 2, 3, RUN_BUNDLE_FORMAT_VERSION];
+const READABLE_FORMATS = [1, 2, 3, 4, RUN_BUNDLE_FORMAT_VERSION];
 
 /**
  * The Walker and Device of a format 1 bundle's rows: that bundle never
@@ -82,7 +83,7 @@ const DDL = [
 	"CREATE TABLE `bundle` (`key` text PRIMARY KEY, `value` text NOT NULL)",
 	`CREATE TABLE \`project\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`name\` text NOT NULL, \`remote\` text, ${createdAt}, \`removed_at\` integer)`,
 	`CREATE TABLE \`clone\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`project_id\` text NOT NULL, \`device_id\` text NOT NULL, \`path\` text NOT NULL, ${createdAt})`,
-	`CREATE TABLE \`run\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`project_id\` text NOT NULL, \`flow_name\` text, \`flow\` text NOT NULL, \`body_flows\` text DEFAULT '{}' NOT NULL, \`title\` text NOT NULL, \`worktree_path\` text NOT NULL, \`branch\` text NOT NULL, \`base_ref\` text NOT NULL, \`walker_id\` text NOT NULL, \`started_by\` text, ${createdAt})`,
+	`CREATE TABLE \`run\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`project_id\` text NOT NULL, \`flow_name\` text, \`flow\` text NOT NULL, \`body_flows\` text DEFAULT '{}' NOT NULL, \`title\` text NOT NULL, \`worktree_path\` text NOT NULL, \`branch\` text NOT NULL, \`base_ref\` text NOT NULL, \`walker_id\` text NOT NULL, \`device_id\` text, \`started_by\` text, ${createdAt})`,
 	`CREATE TABLE \`step\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`run_id\` text NOT NULL, \`node_id\` text NOT NULL, \`node_type\` text NOT NULL, \`visit\` integer NOT NULL, \`transcript_path\` text NOT NULL, \`device_id\` text, ${createdAt})`,
 	`CREATE TABLE \`agent_session\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`run_id\` text NOT NULL, \`step_id\` text NOT NULL, \`harness_session_id\` text, \`prompt\` text NOT NULL, ${createdAt})`,
 	`CREATE TABLE \`event\` (\`seq\` integer PRIMARY KEY, \`space_id\` text NOT NULL, \`run_id\` text, \`step_id\` text, \`session_id\` text, \`type\` text NOT NULL, \`payload\` text DEFAULT '{}' NOT NULL, ${createdAt}, \`walker_id\` text NOT NULL, \`walker_seq\` integer NOT NULL)`,
@@ -268,7 +269,7 @@ export async function openRunBundle(path: string): Promise<RunBundle> {
 				? await readFormat1(db, runId)
 				: formatVersion === 2
 					? await readFormat2(db, runId)
-					: await readRows(db, runId, formatVersion >= 4);
+					: await readRows(db, runId, formatVersion);
 		const { run: runRow, project: projectRow, clones, steps, sessions } = rows;
 		if (!runRow) throw new Error(`${path} has no run ${runId}.`);
 		return {
@@ -311,26 +312,35 @@ type BundleRows = {
 	events: (typeof event.$inferSelect)[];
 };
 
-/** The run's columns of a bundle from before its Person: read with none. */
+/** The run's columns of a bundle from before its Person and its Device: read with none. */
 function withoutStartedBy() {
-	const { startedBy: _person, ...columns } = getColumns(run);
+	const { startedBy: _person, deviceId: _device, ...columns } = getColumns(run);
 	return columns;
 }
 
 /**
- * A format 3 or 4 bundle: the live schema's tables. Format 3 has no
- * `started_by`: read as null.
+ * A format 3, 4 or 5 bundle: the live schema's tables. Format 3 has no
+ * `started_by`, and formats 3 and 4 no `device_id`: read as null.
  */
 async function readRows(
 	db: Database,
 	runId: string,
-	hasStartedBy: boolean,
+	formatVersion: number,
 ): Promise<BundleRows> {
-	const [runRow] = hasStartedBy
-		? await db.select().from(run).where(eq(run.id, runId))
-		: (
-				await db.select(withoutStartedBy()).from(run).where(eq(run.id, runId))
-			).map((row) => ({ ...row, startedBy: null }));
+	const [runRow] =
+		formatVersion >= 5
+			? await db.select().from(run).where(eq(run.id, runId))
+			: (
+					await db
+						.select({
+							...withoutStartedBy(),
+							...(formatVersion >= 4
+								? { startedBy: getColumns(run).startedBy }
+								: {}),
+						})
+						.from(run)
+						.where(eq(run.id, runId))
+				).map((row) => ({ startedBy: null, ...row, deviceId: null }));
 	const projectId = runRow?.projectId ?? "";
 	const [projectRow] = await db
 		.select()
@@ -396,7 +406,7 @@ async function readFormat2(db: Database, runId: string): Promise<BundleRows> {
 	return {
 		project: projectRow && { ...projectRow, ...space },
 		clones: clones.map((c) => ({ ...c, ...space })),
-		run: runRow && { ...runRow, ...space, startedBy: null },
+		run: runRow && { ...runRow, ...space, startedBy: null, deviceId: null },
 		steps: steps.map((s) => ({ ...s, ...space })),
 		sessions: sessions.map((s) => ({ ...s, ...space })),
 		events: events.map((e) => ({ ...e, ...space })),
@@ -461,7 +471,13 @@ async function readFormat1(db: Database, runId: string): Promise<BundleRows> {
 				]
 			: [],
 		run: runRow
-			? { ...runRow, ...space, walkerId: UNKNOWN_DEVICE, startedBy: null }
+			? {
+					...runRow,
+					...space,
+					walkerId: UNKNOWN_DEVICE,
+					startedBy: null,
+					deviceId: null,
+				}
 			: undefined,
 		steps: steps.map((s) => ({ ...s, ...space, deviceId: null })),
 		sessions: (

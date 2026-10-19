@@ -70,7 +70,7 @@ describe("what the Device reports", () => {
 		]);
 	});
 
-	test("the added harnesses, its connections, CLI tools, asked programs and decider", () => {
+	test("the added harnesses, its connections, CLI tools, asked programs and decider", async () => {
 		const d = device({
 			harnesses: { "claude-code": fakeHarness(), codex: fakeHarness() },
 			harnessNames: () => new Set(["codex"]),
@@ -79,7 +79,7 @@ describe("what the Device reports", () => {
 			findCli: (name) => (name === "gh" ? "/usr/bin/gh" : null),
 			decider: fakeDecider([]),
 		});
-		const caps = d.capabilities({ programs: ["gh", "jq"] });
+		const caps = await d.capabilities({ programs: ["gh", "jq"] });
 		expect(caps).toMatchObject({
 			harnesses: ["codex"],
 			connections: ["jira"],
@@ -93,8 +93,8 @@ describe("what the Device reports", () => {
 		});
 	});
 
-	test("no decider, or one that makes no values", () => {
-		expect(device().capabilities().decider).toBeNull();
+	test("no decider, or one that makes no values", async () => {
+		expect((await device().capabilities()).decider).toBeNull();
 		const textless: Decider = {
 			defaultModel: defaultDeciderModel,
 			decide: async () => ({
@@ -104,9 +104,9 @@ describe("what the Device reports", () => {
 				costUsd: null,
 			}),
 		};
-		expect(device({ decider: textless }).capabilities().decider?.values).toBe(
-			false,
-		);
+		expect(
+			(await device({ decider: textless }).capabilities()).decider?.values,
+		).toBe(false);
 	});
 });
 
@@ -353,9 +353,12 @@ describe("decide", () => {
 
 describe("worktree", () => {
 	test("adds the run's worktree on its own branch beside the clone", async () => {
-		const worktree = await device().worktree({
+		const worktree = await device({
+			clonePath: async (projectId) =>
+				projectId === "project-1" ? sandbox.repoPath : null,
+		}).worktree({
 			id: "abcdef12-0000-0000-0000-000000000000",
-			repoPath: sandbox.repoPath,
+			projectId: "project-1",
 		});
 		expect(worktree).toEqual({
 			worktreePath: join(sandbox.root, "repo.nightshift", "abcdef12"),

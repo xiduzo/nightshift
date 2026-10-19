@@ -35,12 +35,7 @@ import {
 import { renderBindings, resolveInputs } from "../../inputs";
 import { commandLogPath } from "../../transcripts";
 import type { StepOutcome } from "../../types";
-import {
-	createAndCheckoutBranch,
-	currentBranch,
-	freeBranchName,
-	itemBranchName,
-} from "../../worktrees";
+import { itemBranchName } from "../../worktrees";
 import {
 	messageOf,
 	type NodeAction,
@@ -326,19 +321,19 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			let failure: string | null = null;
 			if (perItem) {
 				try {
-					const startBranch =
-						derived.items.find((i) => i.index !== null)?.baseBranch ??
-						(await currentBranch(worktree)) ??
-						tctx.run.branch;
-					baseBranch =
-						derived.items.findLast((i) => i.state === "done" && i.branch)
-							?.branch ?? startBranch;
-					const name = await freeBranchName(
-						worktree,
-						itemBranchName(runId.slice(0, 8), facts),
-					);
-					await createAndCheckoutBranch(worktree, name, baseBranch);
-					branch = name;
+					// The worktree is on the step's Device: so is the git work.
+					const made = await step.device.itemBranch({
+						cwd: worktree,
+						name: itemBranchName(runId.slice(0, 8), facts),
+						base:
+							derived.items.findLast((i) => i.state === "done" && i.branch)
+								?.branch ??
+							derived.items.find((i) => i.index !== null)?.baseBranch ??
+							null,
+						fallback: tctx.run.branch,
+					});
+					baseBranch = made.base;
+					branch = made.branch;
 				} catch (error) {
 					failure = messageOf(error);
 				}
@@ -464,7 +459,9 @@ async function readSource(
 		case "json":
 			return jsonSourceItems(source.value, tctx);
 		case "files":
-			return fileItems(worktree, renderTemplate(source.glob, tctx));
+			return fileItems(renderTemplate(source.glob, tctx), (glob) =>
+				step.device.files({ cwd: worktree, glob }),
+			);
 		case "command": {
 			const { command, env } = renderCommand(source.command, tctx);
 			let stdout = "";

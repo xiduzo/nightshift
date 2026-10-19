@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { Database } from "@nightshift/db";
 import { run } from "@nightshift/db/schema/nightshift";
 import {
@@ -8,25 +6,23 @@ import {
 	type FlowIssue,
 	type FlowNode,
 	type FlowNodeType,
-	flowSchema,
 	migrateFlow,
 	parseFlow,
 	resolveFlowProfiles,
 	validateFlow,
 } from "@nightshift/flows";
-import { flowsDir } from "@nightshift/flows/files";
+import { type FlowSources, parsedFlows } from "@nightshift/flows/files";
 
 import type { Capabilities, Device } from "./device/types";
 import type { InputValues } from "./events";
 import { personOnHost } from "./exchange/host-spaces";
-import type { NodeKind, Requirement } from "./graph/context";
+import { type NodeKind, onDevice, type Requirement } from "./graph/context";
 import { kindOf, kindOfType, NODE_KINDS } from "./graph/node-kinds";
 import { missingNames } from "./graph/nodes/agent";
 import type { Runner } from "./graph/runner";
 import { resolveInputs } from "./inputs";
 import { gitAuthorOf, namesOf } from "./people";
-import { checkProjectFolder } from "./project-setup";
-import type { ProjectRow } from "./projects";
+import type { ListedProject } from "./projects";
 import { runFacts, toSummary } from "./read-model";
 import type { RunLog } from "./run-log";
 import type {
@@ -45,9 +41,12 @@ import type {
  *   whether the run's Device has what the nodes need (its
  *   `capabilities`: connections, CLI tools, harnesses, a decider). It writes nothing; a refusal is an `Error` with
  *   the message the person sees, and a pass is a `PreparedRun`.
- * - `createRunStart(deps).start` holds the slot, prepares, has the Device
- *   create the worktree, writes the run row, appends `RunStarted` and `WorktreeCreated`
- *   and hands the thread to the runner.
+ * - `createRunStart(deps).start` holds the slot, places the run on its
+ *   Device (`deps.place`: this computer, or another of the starter's
+ *   Devices through the Host), prepares on that Device, has it create the
+ *   worktree, writes the run row, appends `RunStarted` and
+ *   `WorktreeCreated` and hands the thread to the runner. This computer
+ *   walks the run wherever its steps run.
  *
  * The requirements are one function each (`Requirement`) and listed once,
  * in `REQUIREMENTS`, in the order the person sees them. The ones about one
@@ -76,7 +75,7 @@ export const connectionsExist: Requirement = (nodes, has) => {
 	return unknown
 		.map(
 			({ name, nodeIds }) =>
-				`The flow uses the connection "${name}" (${nodeIds.join(", ")}), but no connection has that name. Add it under Agents → Tools.`,
+				`The flow uses the connection "${name}" (${nodeIds.join(", ")}), but no connection has that name${onDevice(has)}. Add it under Agents → Tools.`,
 		)
 		.join(" ");
 };
@@ -111,7 +110,7 @@ export const REQUIREMENTS: readonly Requirement[] = [
 export function capabilitiesFor(
 	nodes: readonly FlowNode[],
 	device: Pick<Device, "capabilities">,
-): Capabilities {
+): Promise<Capabilities> {
 	const programs = new Set(nodes.flatMap((n) => kindOf(n).programs(n)));
 	return device.capabilities({ programs: [...programs] });
 }
@@ -152,60 +151,35 @@ export function quickRunTitle(flow: Flow): string {
 }
 
 /**
- * The raw JSON of every flow file of a project, by name. A file that is not
- * JSON reads as null. A missing directory is an empty record.
- */
-export async function readProjectFlowFiles(
-	repoPath: string,
-): Promise<Record<string, unknown>> {
-	const dir = flowsDir(repoPath);
-	let names: string[];
-	try {
-		names = await readdir(dir);
-	} catch {
-		return {};
-	}
-	const files: Record<string, unknown> = {};
-	for (const file of names.filter((n) => n.endsWith(".json")).sort()) {
-		const text = await readFile(join(dir, file), "utf8");
-		try {
-			files[file.slice(0, -".json".length)] = JSON.parse(text);
-		} catch {
-			files[file.slice(0, -".json".length)] = null;
-		}
-	}
-	return files;
-}
-
-/**
  * Loads, parses and validates the flow a run starts from, and every flow
  * it can call through Call nodes (by name, from the project's flow files).
  * Version 1 files migrate first.
  */
-export async function flowsForRun(
-	repoPath: string,
+export function flowsForRun(
+	sources: FlowSources,
 	input: StartRunInput,
-): Promise<{
+): {
 	flow: Flow;
 	flowName: string | null;
 	calledFlows: Record<string, Flow>;
-}> {
-	const raw = await readProjectFlowFiles(repoPath);
-	const files: Record<string, Flow | null> = {};
-	for (const [name, json] of Object.entries(raw)) {
-		const parsed = flowSchema.safeParse(migrateFlow(json));
-		files[name] = parsed.success ? parsed.data : null;
-	}
+} {
+	const files = parsedFlows(sources);
 	let flow: Flow;
 	let flowName: string | null;
 	if (input.flowName !== undefined) {
-		if (!Object.hasOwn(raw, input.flowName)) {
+		const source = Object.hasOwn(sources, input.flowName)
+			? sources[input.flowName]
+			: undefined;
+		if (!source) {
 			throw new Error(`The flow "${input.flowName}" does not exist.`);
 		}
-		const parsed = parseFlow(migrateFlow(raw[input.flowName]), {
-			flows: files,
-			name: input.flowName,
-		});
+		const parsed = parseFlow(
+			migrateFlow("json" in source ? source.json : null),
+			{
+				flows: files,
+				name: input.flowName,
+			},
+		);
 		refuseErrors(parsed.issues);
 		if (!parsed.flow) {
 			throw new Error(`The flow "${input.flowName}" is not valid.`);
@@ -240,21 +214,15 @@ export async function flowsForRun(
 	return { flow, flowName, calledFlows };
 }
 
-/** What `prepareRun` needs: the project, the run's Device, the clock. */
+/** What `prepareRun` needs: the run's Device, the profiles, the clock. */
 export type PrepareRunDeps = {
-	/** The Device the run's requirements ask, and its worktree's home. */
-	device: Device;
-	/** A project that a person has not removed; throws for another id. */
-	projectRow(projectId: string): Promise<ProjectRow>;
 	/** An Agent Profile by name, or null. */
 	profileFor: ProfileFor;
-	probeGit?: EngineOptions["probeGit"];
 	now(): number;
 };
 
 /** A run that passed every check and can start. */
 export type PreparedRun = {
-	projectRow: ProjectRow;
 	flow: Flow;
 	flowName: string | null;
 	calledFlows: Record<string, Flow>;
@@ -265,17 +233,19 @@ export type PreparedRun = {
 
 /**
  * Checks a run before anything is written, in the order the person sees
- * the refusals: the flow and its called flows parse and validate; the
- * profiles exist (the run's copy holds them as they are now); every
- * `REQUIREMENTS` entry passes; the stop time is ahead; the inputs resolve;
- * the project folder is ready. Throws the refusal, returns the prepared run.
+ * the refusals: the flow and its called flows (from the project's Clone on
+ * `device`) parse and validate; the profiles exist (the run's copy holds
+ * them as they are now); every `REQUIREMENTS` entry passes on `device`;
+ * the stop time is ahead; the inputs resolve. Throws the refusal, returns
+ * the prepared run. The Device checks its Clone is ready when it adds the
+ * worktree, before the run is written.
  */
 export async function prepareRun(
 	input: StartRunInput,
+	device: Pick<Device, "capabilities" | "flows">,
 	deps: PrepareRunDeps,
 ): Promise<PreparedRun> {
-	const projectRow = await deps.projectRow(input.projectId);
-	const loaded = await flowsForRun(projectRow.repoPath, input);
+	const loaded = flowsForRun(await device.flows(input.projectId), input);
 	const { flowName } = loaded;
 	// The run's copy holds the profiles as they are now: a later
 	// change to a profile reaches the next run, not this one.
@@ -303,7 +273,7 @@ export async function prepareRun(
 	}
 	const all = [flow, ...Object.values(calledFlows)];
 	const nodes = all.flatMap((f) => f.nodes);
-	const refusal = refusalOf(nodes, capabilitiesFor(nodes, deps.device));
+	const refusal = refusalOf(nodes, await capabilitiesFor(nodes, device));
 	if (refusal !== null) throw new Error(refusal);
 	if (input.stopAt !== undefined && input.stopAt <= deps.now()) {
 		throw new Error("The stop time has passed already.");
@@ -323,23 +293,7 @@ export async function prepareRun(
 	const title = flowName
 		? [flowName, ...textInputs].join(" · ").slice(0, 120)
 		: quickRunTitle(flow);
-	const readiness = await checkProjectFolder(projectRow.repoPath, {
-		...(deps.probeGit ? { probeGit: deps.probeGit } : {}),
-	});
-	const notReady = readiness.steps.find(
-		(step) => step.status === "failed" && step.id !== "identity",
-	);
-	if (notReady) {
-		throw new Error(
-			`The project is not ready for runs. ${notReady.problem} ${
-				notReady.id === "git"
-					? "Install git, then start the run again."
-					: "Add the project again to fix it."
-			}`,
-		);
-	}
 	return {
-		projectRow,
 		flow,
 		flowName,
 		calledFlows,
@@ -353,6 +307,24 @@ export type RunStartDeps = PrepareRunDeps & {
 	db: Database;
 	log: RunLog;
 	runner: Runner;
+	/**
+	 * A project a person has not removed, in any Space (the run takes its
+	 * Space); throws for another id. Its Clone may be on another Device.
+	 */
+	projectRow(projectId: string): Promise<ListedProject>;
+	/**
+	 * The Device the run's steps run on (the run's Placement): `deviceId`,
+	 * else this computer. Throws the refusal when the run cannot run there.
+	 */
+	place(input: {
+		deviceId: string | undefined;
+		project: ListedProject;
+		runId: string;
+		/** The Person who starts it, as the Space's Host knows them. */
+		personId: string | null;
+	}): Promise<Device>;
+	/** This computer's name: the Walker of the runs it starts. */
+	selfName: string;
 };
 
 export type RunStart = ReturnType<typeof createRunStart>;
@@ -374,22 +346,30 @@ export function createRunStart(deps: RunStartDeps) {
 		const runId = randomUUID();
 		runner.reserveSlot(runId);
 		try {
-			const prepared = await prepareRun(input, deps);
-			const { projectRow, flow, flowName, calledFlows, inputs, title } =
-				prepared;
-			const author = input.startedBy
-				? await gitAuthorOf(db, input.startedBy)
-				: null;
+			const projectRow = await deps.projectRow(input.projectId);
 			// In a Host's Space, the Person as the Host knows them.
 			const startedBy = input.startedBy
 				? ((await personOnHost(db, projectRow.spaceId)) ?? input.startedBy)
 				: null;
-			const worktree = await deps.device.worktree({
+			const device = await deps.place({
+				deviceId: input.deviceId,
+				project: projectRow,
+				runId,
+				personId: startedBy,
+			});
+			const prepared = await prepareRun(input, device, deps);
+			const { flow, flowName, calledFlows, inputs, title } = prepared;
+			const author = input.startedBy
+				? await gitAuthorOf(db, input.startedBy)
+				: null;
+			// The worktree lives on the run's Device.
+			const worktree = await device.worktree({
 				id: runId,
-				repoPath: projectRow.repoPath,
+				projectId: projectRow.id,
 				...(input.baseRef !== undefined ? { baseRef: input.baseRef } : {}),
 				...(author ? { author } : {}),
 			});
+			const walkerId = await log.walkerId();
 			const [row] = await db
 				.insert(run)
 				.values({
@@ -404,7 +384,8 @@ export function createRunStart(deps: RunStartDeps) {
 					worktreePath: worktree.worktreePath,
 					branch: worktree.branch,
 					baseRef: worktree.baseRef,
-					walkerId: await log.walkerId(),
+					walkerId,
+					deviceId: device.id,
 					startedBy,
 				})
 				.returning();
@@ -433,7 +414,12 @@ export function createRunStart(deps: RunStartDeps) {
 				row,
 				runFacts(await log.events(runId)),
 				await namesOf(db, [row.startedBy]),
-				{ id: row.walkerId, name: deps.device.name, thisDevice: true },
+				{ id: walkerId, name: deps.selfName, thisDevice: true },
+				{
+					id: device.id,
+					name: device.id === walkerId ? deps.selfName : device.name,
+					thisDevice: device.id === walkerId,
+				},
 			);
 		} finally {
 			runner.releaseStartingSlot(runId);
