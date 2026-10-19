@@ -518,6 +518,14 @@ export function createRunner(deps: RunnerDeps) {
 			drive(row, jump);
 		},
 		threadState,
+		/**
+		 * Drops what this runner keeps of a run that another Device walks
+		 * now: its compiled thread and its wake timer.
+		 */
+		forget(runId: string): void {
+			threads.delete(runId);
+			sleeps.forget(runId);
+		},
 		/** The sleeping runs: `wake(runId, how)`, `restore(runId, events)` (`graph/sleep.ts`). */
 		sleeps,
 		stop,

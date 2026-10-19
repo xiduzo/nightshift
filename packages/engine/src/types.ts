@@ -659,6 +659,14 @@ export interface SpaceEngine {
 	 * again. Edge counts carry over. Fails while the run is running.
 	 */
 	resumeRun(runId: string, prompt?: string): Promise<void>;
+	/**
+	 * Moves the run's Walk to another of the actor's Devices (`WalkerMoved`):
+	 * this computer archives the run's checkpoint and files and stops
+	 * walking it; the new Walker resumes from the archive. Only a run that
+	 * is not in the middle of a step. A run walked elsewhere: its Walker
+	 * moves it.
+	 */
+	moveRun(runId: string, toDeviceId: string): Promise<void>;
 
 	/**
 	 * Emits the current status and every step summary, replays the full
@@ -701,6 +709,8 @@ export type Relay = {
 	}): Promise<void>;
 	/** A file of the archive from the Host that keeps the Space. Null when it has none. */
 	archive(ref: ArchiveRef): Promise<string | null>;
+	/** Keeps a file of a run this computer walks in the archive of the Host that keeps the Space. */
+	archivePut(ref: ArchiveRef, content: string): Promise<void>;
 	/**
 	 * Starts a run placed on another Device through the Host that keeps
 	 * the Space: the Host walks it. Returns the run's id; its rows follow

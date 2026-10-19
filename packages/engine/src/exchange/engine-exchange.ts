@@ -3,6 +3,7 @@ import { run, step } from "@nightshift/db/schema/nightshift";
 import { eq } from "drizzle-orm";
 
 import type { RunBus } from "../bus";
+import type { LoggedEvent } from "../events";
 import type { RunLog } from "../run-log";
 import {
 	memberRole,
@@ -68,6 +69,8 @@ export function createEngineExchange(deps: {
 	bus: RunBus;
 	dataDir: string;
 	documents: SpaceDocuments;
+	/** The events a batch added: a run moved here is taken over. */
+	onIngested?(added: readonly LoggedEvent[]): Promise<void>;
 }): EngineExchange {
 	const { db, log, dataDir, documents } = deps;
 
@@ -80,7 +83,7 @@ export function createEngineExchange(deps: {
 	}
 
 	return {
-		rows: createExchange(deps),
+		rows: withIngested(createExchange(deps), deps.onIngested),
 		commands: createRunCommands({ db }),
 		hostSpaces: createHostSpaces(db),
 		runOwner,
@@ -133,6 +136,22 @@ export function createEngineExchange(deps: {
 		},
 		async memberRole(spaceId, personId) {
 			return memberRole(await documents.open(spaceId), personId);
+		},
+	};
+}
+
+/** The exchange, with a hook on the events each ingested batch added. */
+function withIngested(
+	exchange: Exchange,
+	onIngested?: (added: readonly LoggedEvent[]) => Promise<void>,
+): Exchange {
+	if (!onIngested) return exchange;
+	return {
+		...exchange,
+		async ingest(rows, check) {
+			const added = await exchange.ingest(rows, check);
+			await onIngested(added);
+			return added;
 		},
 	};
 }

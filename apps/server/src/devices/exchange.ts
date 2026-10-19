@@ -189,7 +189,10 @@ async function apply(
 		return "The person who asked may not do this in this Space.";
 	}
 	try {
-		await applyRunCommand(engine.space(command.spaceId), command);
+		await applyRunCommand(
+			engine.space(command.spaceId, { personId: command.personId }),
+			command,
+		);
 		return null;
 	} catch (error) {
 		return error instanceof Error ? error.message : String(error);

@@ -289,4 +289,75 @@ describe("nodes on two Devices", () => {
 		const detail = await a.client.runs.get({ runId: started.id });
 		expect(String(detail.steps[1]?.outputs.log_tail).trim()).toBe("from B");
 	}, 120_000);
+
+	test("Move to: B walks a run A started, from A's archived checkpoint", async () => {
+		flowIn(folderOnA, "moving", [
+			shell("before", "echo before"),
+			{
+				id: "ask",
+				type: "decision",
+				position: { x: 0, y: 0 },
+				prompt: "Go on?",
+				options: [{ name: "pass" }],
+				by: "person",
+				decider: "typesafe",
+			},
+			shell("after", "echo after"),
+		]);
+		const started = await a.client.runs.start({
+			projectId,
+			flowName: "moving",
+		});
+		await waitFor(
+			() => runOn(a, started.id),
+			(r) => r?.status === "waiting",
+			30_000,
+		);
+		const bId = (await b.client.devices.list()).thisComputer?.id as string;
+		await waitFor(
+			() => runOn(b, started.id),
+			(r) => r?.status === "waiting",
+			30_000,
+		);
+		await a.client.runs.move({ runId: started.id, deviceId: bId });
+
+		// Both Replicas name B as its Walker now.
+		await waitFor(
+			() => runOn(a, started.id),
+			(r) => r?.walker.id === bId,
+		);
+		await waitFor(
+			() => runOn(b, started.id),
+			(r) => r?.walker.thisDevice === true,
+		);
+		// B answers its Gate itself; the last step runs on A, the run's Device.
+		const gate = await waitFor(
+			async () =>
+				(await b.client.gates.list()).find((g) => g.runId === started.id),
+			(g) => g !== undefined,
+		);
+		await b.client.gates.resolve({
+			runId: started.id,
+			stepId: gate?.stepId as string,
+			choice: "pass",
+		});
+		await waitFor(
+			() => runOn(b, started.id),
+			(r) => r?.status === "finished",
+			60_000,
+		);
+		const detail = await b.client.runs.get({ runId: started.id });
+		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["before", "pass"],
+			["ask", "pass"],
+			["after", "pass"],
+		]);
+		expect(detail.steps[2]?.device?.thisDevice).toBe(false);
+		expect(String(detail.steps[2]?.outputs.log_tail).trim()).toBe("after");
+		await waitFor(
+			() => runOn(a, started.id),
+			(r) => r?.status === "finished",
+			30_000,
+		);
+	}, 120_000);
 });

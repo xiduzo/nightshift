@@ -248,7 +248,7 @@ export function createExchange(deps: {
 		check: { walker?: string; spaces?: readonly string[] } = {},
 	): Promise<LoggedEvent[]> {
 		const known = await knownRuns(rows);
-		refuseForeign(rows, known, check);
+		refuseForeign(rows, known, check, await movedWalkers(rows));
 		const projectIds = [...new Set(rows.runs.map((r) => r.projectId))];
 		if (projectIds.length > 0) {
 			const found = new Set(
@@ -290,6 +290,8 @@ export function createExchange(deps: {
 				.onConflictDoNothing();
 		}
 		const added = await log.ingest(rows.events);
+		// The run's Walker follows its `WalkerMoved`, on every Replica.
+		await applyWalkerMoves(db, added);
 		for (const e of added) {
 			// The Walker's own copy of this fact, filled here from the fact.
 			if (e.type === "HarnessSessionAssigned" && e.sessionId) {
@@ -333,32 +335,81 @@ export function createExchange(deps: {
 		return runs;
 	}
 
+	/**
+	 * The Devices that walked each run a batch names before its latest
+	 * Walker: a moved run's earlier events, and its rows from the Device it
+	 * moved from, are that Device's to send.
+	 */
+	async function movedWalkers(
+		rows: RunRows,
+	): Promise<Map<string, Set<string>>> {
+		const moved = new Map<string, Set<string>>();
+		const add = (runId: string, walkerId: string) => {
+			const set = moved.get(runId) ?? new Set();
+			set.add(walkerId);
+			moved.set(runId, set);
+		};
+		const ids = [...new Set(rows.events.map((e) => e.runId))];
+		const logged =
+			ids.length === 0
+				? []
+				: await db
+						.select({ runId: event.runId, payload: event.payload })
+						.from(event)
+						.where(
+							and(inArray(event.runId, ids), eq(event.type, "WalkerMoved")),
+						);
+		const all = [
+			...logged.map((e) => ({ runId: e.runId, payload: e.payload })),
+			...rows.events.filter((e) => e.type === "WalkerMoved"),
+		];
+		for (const e of all) {
+			if (!e.runId) continue;
+			const payload = JSON.parse(e.payload) as { from?: string; to?: string };
+			if (payload.from) add(e.runId, payload.from);
+			if (payload.to) add(e.runId, payload.to);
+		}
+		return moved;
+	}
+
 	function refuseForeign(
 		rows: RunRows,
 		runs: Map<string, { walkerId: string; spaceId: string }>,
 		check: { walker?: string; spaces?: readonly string[] },
+		moved: Map<string, Set<string>> = new Map(),
 	): void {
 		const spaces = check.spaces ? new Set(check.spaces) : null;
 		const allowed = (walkerId: string | undefined, spaceId: string) =>
 			(check.walker === undefined || walkerId === check.walker) &&
 			(spaces === null || spaces.has(spaceId));
+		/** The run's Walkers: its latest, and those it moved from or to. */
+		const walkersOf = (runId: string) =>
+			new Set([
+				...(runs.get(runId) ? [runs.get(runId)?.walkerId as string] : []),
+				...(moved.get(runId) ?? []),
+			]);
 		const ofRun = (runId: string, spaceId: string) => {
 			const owner = runs.get(runId);
 			return (
 				owner !== undefined &&
 				owner.spaceId === spaceId &&
-				allowed(owner.walkerId, spaceId)
+				(check.walker === undefined || walkersOf(runId).has(check.walker)) &&
+				allowed(check.walker, spaceId)
 			);
 		};
 		const ok =
-			rows.runs.every((r) => allowed(r.walkerId, r.spaceId)) &&
+			rows.runs.every(
+				(r) =>
+					allowed(check.walker, r.spaceId) &&
+					(check.walker === undefined || walkersOf(r.id).has(check.walker)),
+			) &&
 			rows.steps.every((s) => ofRun(s.runId, s.spaceId)) &&
 			rows.sessions.every((s) => ofRun(s.runId, s.spaceId)) &&
 			rows.events.every(
 				(e) =>
 					allowed(e.walkerId, e.spaceId) &&
 					ofRun(e.runId, e.spaceId) &&
-					runs.get(e.runId)?.walkerId === e.walkerId,
+					walkersOf(e.runId).has(e.walkerId),
 			);
 		if (!ok) {
 			throw new ForeignRowsError(
@@ -498,4 +549,25 @@ export function mergeCursors(into: SyncCursors, by: SyncCursors): SyncCursors {
 /** Whether a batch has no rows. */
 export function isEmpty(rows: RunRows): boolean {
 	return rows.events.length === 0;
+}
+
+/**
+ * Applies `WalkerMoved` to the run rows: the run's Walker is the latest
+ * `to`. A run from before Placement keeps its steps' Device: the Walker it
+ * had.
+ */
+export async function applyWalkerMoves(
+	db: Database,
+	events: readonly LoggedEvent[],
+): Promise<void> {
+	for (const e of events) {
+		if (e.type !== "WalkerMoved" || !e.runId) continue;
+		await db
+			.update(run)
+			.set({
+				deviceId: sql`coalesce(${run.deviceId}, ${run.walkerId})`,
+				walkerId: e.payload.to,
+			})
+			.where(eq(run.id, e.runId));
+	}
 }

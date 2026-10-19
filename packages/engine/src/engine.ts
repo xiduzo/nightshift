@@ -1,5 +1,9 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
-import { device as deviceTable, run } from "@nightshift/db/schema/nightshift";
+import {
+	device as deviceTable,
+	run,
+	step as stepTable,
+} from "@nightshift/db/schema/nightshift";
 import {
 	optionProblem,
 	type Policy,
@@ -27,10 +31,18 @@ import {
 	deriveSteps,
 	deriveStopAfterStep,
 } from "./events";
-import { type ArchiveRef, readArchive, writeArchive } from "./exchange/archive";
+import {
+	type ArchiveRef,
+	checkpointSnapshot,
+	ownStepFiles,
+	readArchive,
+	restoreCheckpoint,
+	writeArchive,
+} from "./exchange/archive";
 import type { RunCommandInput } from "./exchange/commands";
 import { createEngineExchange } from "./exchange/engine-exchange";
-import { createHostSpaces } from "./exchange/host-spaces";
+import { createHostSpaces, personOnHost } from "./exchange/host-spaces";
+import { applyWalkerMoves } from "./exchange/rows";
 import { getRunRow as getRunRowOf, type RunRow } from "./graph/context";
 import { createRunner } from "./graph/runner";
 import { createProjects, type ListedProject, toProject } from "./projects";
@@ -239,7 +251,75 @@ export function createEngine(
 		bus,
 		dataDir,
 		documents,
+		// A run moved here: this computer walks it from now on.
+		onIngested: async (added) => {
+			const self = await runLog.walkerId();
+			for (const e of added) {
+				if (e.type !== "WalkerMoved" || !e.runId) continue;
+				if (e.payload.to !== self && e.payload.to !== device.id) continue;
+				await takeOver(e.runId).catch((error) => {
+					console.error(`[engine] could not take over run ${e.runId}`, error);
+				});
+			}
+		},
 	});
+
+	/**
+	 * This computer walks a run another Device moved here (`WalkerMoved`):
+	 * its checkpoint comes from the archive (this Replica's, else the Host's)
+	 * into the checkpoint tables, and a sleeping run gets its wake timer. A
+	 * run at a Gate waits for its answer here; a stopped one for a resume.
+	 */
+	async function takeOver(runId: string): Promise<void> {
+		const row = await getRunRowOf(db, runId);
+		const ref: ArchiveRef = {
+			kind: "checkpoint",
+			spaceId: row.spaceId,
+			runId,
+		};
+		const snapshot =
+			(await readArchive(dataDir, ref)) ??
+			(options.relay ? await options.relay.archive(ref) : null);
+		if (snapshot === null) {
+			throw new Error("The archive has no checkpoint of the run.");
+		}
+		await restoreCheckpoint(db, snapshot);
+		runner.forget(runId);
+		runner.sleeps.restore(runId, await runLog.events(runId));
+	}
+
+	/**
+	 * What a new Walker needs of a run this computer walks: its latest
+	 * checkpoint and its steps' transcripts and command logs, in the archive
+	 * of the Replica that keeps the Space (this one, or its Host).
+	 */
+	async function archiveForMove(row: RunRow): Promise<void> {
+		const keptHere = (await exchange.hostSpaces.hostOf(row.spaceId)) === null;
+		const put = async (ref: ArchiveRef, content: string) => {
+			if (keptHere) await writeArchive(dataDir, ref, content);
+			else if (options.relay) await options.relay.archivePut(ref, content);
+			else
+				throw new Error("This computer cannot reach the Host of this Space.");
+		};
+		const self = await runLog.walkerId();
+		const steps = await db
+			.select({ id: stepTable.id })
+			.from(stepTable)
+			.where(eq(stepTable.runId, row.id));
+		for (const s of steps) {
+			const files = await ownStepFiles(db, dataDir, s.id, self);
+			if (!files) continue;
+			const at = { spaceId: row.spaceId, runId: row.id, stepId: s.id };
+			if (files.transcript !== null) {
+				await put({ kind: "transcript", ...at }, files.transcript);
+			}
+			if (files.log !== null) await put({ kind: "log", ...at }, files.log);
+		}
+		await put(
+			{ kind: "checkpoint", spaceId: row.spaceId, runId: row.id },
+			await checkpointSnapshot(db, row.id),
+		);
+	}
 
 	/** The Walkers of runs of a Space: their names from the Device rows, else the Space document. */
 	async function walkers(
@@ -289,7 +369,11 @@ export function createEngine(
 		walker: RunWalker,
 		ended: boolean,
 	): Promise<TranscriptEntry[]> {
-		if (walker.thisDevice) return readTranscriptFile(row.transcriptPath);
+		if (walker.thisDevice) {
+			// A step of a run walked here before it moved here is in the archive.
+			const own = await readTranscriptFile(row.transcriptPath);
+			if (own.length > 0 || !ended) return own;
+		}
 		const ref: ArchiveRef = {
 			kind: "transcript",
 			spaceId: row.spaceId,
@@ -377,6 +461,13 @@ export function createEngine(
 		log: runLog,
 		projects: projects.list,
 		enabled: () => runSettings().scheduler,
+		// The Device a schedule names fires it; without one, the Replica that
+		// keeps the Space (its Host, or the one Device of a Space without one).
+		firesHere: async (projectId, schedule) => {
+			if (schedule.device !== undefined) return schedule.device === device.name;
+			const row = await projects.find(projectId);
+			return (await exchange.hostSpaces.hostOf(row.spaceId)) === null;
+		},
 		runStatus: reads.runStatus,
 	});
 	if (options.scheduler !== false) {
@@ -605,6 +696,54 @@ export function createEngine(
 					return;
 				}
 				await runner.stop(runId);
+			},
+
+			async moveRun(runId, to) {
+				await ready;
+				const row = await getRunRow(runId, spaceId);
+				if (!actor) throw new Error("Sign in to move a run.");
+				if (await walkedElsewhere(row)) {
+					await relay(row, actor, { kind: "run.move", payload: { to } });
+					return;
+				}
+				const self = await runLog.walkerId();
+				if (to === self || to === device.id) {
+					throw new Error("This computer walks the run already.");
+				}
+				await runner.exclusive(runId, async () => {
+					const events = await loadRunEvents(runId);
+					const status = deriveRunState(events).status;
+					if (status === "running" || runner.isActive(runId)) {
+						throw new Error(
+							"The run is in the middle of a step. Move it when it waits, sleeps or has stopped.",
+						);
+					}
+					if (status === "finished") {
+						throw new Error("The run has ended. There is nothing to move.");
+					}
+					const personId =
+						(await personOnHost(db, row.spaceId)) ?? actor.personId;
+					const target = (
+						await placement.ownDevices(row.spaceId, personId, row.projectId)
+					).find((d) => d.deviceId === to);
+					if (!target || target.thisDevice) {
+						throw new Error("That device is not one of yours.");
+					}
+					if (!target.online) {
+						throw new Error(
+							`${target.name} is offline. Move the run when it is online.`,
+						);
+					}
+					await archiveForMove(row);
+					runner.forget(runId);
+					const moved = await runLog.append({
+						type: "WalkerMoved",
+						runId,
+						payload: { from: self, to, by: actor.personId },
+					});
+					await applyWalkerMoves(db, [moved]);
+					bus.publish(runId, { kind: "status-changed" });
+				});
 			},
 
 			async resumeRun(runId, prompt) {

@@ -316,6 +316,7 @@ describe("a run walked elsewhere", () => {
 			},
 			addClone: async () => {},
 			archive: async () => null,
+			archivePut: async () => {},
 			startRun: async () => {
 				throw new Error("not in this test");
 			},

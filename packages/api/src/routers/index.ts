@@ -345,6 +345,21 @@ const runs = {
 		.handler(({ context, input }) =>
 			context.space.stopRun(input.runId, { when: input.when }),
 		),
+	/**
+	 * Another of the Person's Devices walks the run from here on: from its
+	 * archived checkpoint. Not while a step runs.
+	 */
+	move: permitted({ run: ["move"] })
+		.input(z.object({ runId: z.string(), deviceId: z.string().min(1).max(64) }))
+		.handler(({ context, input }) =>
+			context.space.moveRun(input.runId, input.deviceId),
+		),
+	/** The Person's Devices for the project: online, with a Clone or not (a node's Device, Move to). */
+	devices: protectedProcedure
+		.input(z.object({ projectId: z.string() }))
+		.handler(({ context, input }) =>
+			context.space.listDevices(input.projectId),
+		),
 	resume: permitted({ run: ["resume"] })
 		.input(
 			z.object({ runId: z.string(), prompt: z.string().min(1).optional() }),
@@ -1013,6 +1028,11 @@ const sync = {
 					payload: z.object({
 						when: z.enum(["now", "after-step"]).optional(),
 					}),
+				}),
+				z.object({
+					runId: z.string().min(1),
+					kind: z.literal("run.move"),
+					payload: z.object({ to: z.string().min(1).max(64) }),
 				}),
 			]),
 		)
