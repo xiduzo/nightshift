@@ -190,7 +190,10 @@ bun run check          # Biome lint + format
 bun run check-types    # TypeScript
 bun run build          # everything, desktop last
 bun run night          # the stable daemon for a night (see below)
+bun run build:desktop  # the desktop app: apps/desktop/artifacts/*.dmg
 ```
+
+Desktop app (v0.1): one app runs the daemon in its own Bun main process on port 3000 and shows the built web app in its window. It stays in the menu bar (☾) when the window closes, so runs go on; Quit there gives the database lease up. When a daemon already answers on port 3000 (`bun run night` or `bun run dev`), the app opens its window on that one and starts no daemon. The packaged app has no `.env` files: the bundle replaces varlock with `process.env` (`apps/desktop/src/bun/shims`), takes PATH from the login shell, and keeps its auth secret in the data folder (`auth-secret`). `PORT` moves the daemon, with a web build whose `VITE_SERVER_URL` matches. The build is not signed or notarized.
 
 Nights: `bun run night` builds the web app, then serves the API server and the built web app on the usual ports (3000 and 3001; set `PORT` and `WEB_PORT` to change them). The server runs from source with plain `bun`, without `--hot`, and the web app is a production build behind `vite preview`, so no file change restarts a running night. It reads the same env as `bun run dev` (`apps/server/.env` and `apps/web/.env` through varlock; `process.env` wins). When `PORT` or `WEB_PORT` is set, `BETTER_AUTH_URL`, `VITE_SERVER_URL` and `CORS_ORIGIN` follow, unless they are set too. Develop in a separate git worktree (`git worktree add ../nightshift-dev`) with `bun run dev` on other ports and `NIGHTSHIFT_SCHEDULER=off`. Never point two daemons at one database: the lease (below) refuses the second one. Pull the work into the night's clone between nights.
 
@@ -229,7 +232,8 @@ Run bundles: "Export" on a run page downloads the run as one SQLite file, `<flow
 
 - Our own TanStack AI tools reach a Claude Code session over MCP as `mcp__tanstack__<name>` (Slice 2, the `report_step` tool). Claude Code's plan mode denies them, so a plan-mode Claude Code node reports with a text line instead. OpenCode allows them in every mode. Codex is unverified.
 - Session resume works through the adapter (Slice 1). The usage-limit reset time is parsed from the harness's raw messages, but no real usage limit has tested it yet.
-- Electrobun packaging needs a static web build of TanStack Start. Confirm before the first desktop build.
+- The desktop window loads the prerendered TanStack Start build from `views://mainview`. Routes with parameters (a run page) are not prerendered: a reload there may not find the page. Navigation inside the app works.
+- The desktop app has no icon (`apps/desktop/icon.iconset`), no signing and no notarization yet. A daemon that holds the lease on another port makes the app quit at start with only a log line.
 - The decider runs Claude Code with no built-in tools (`--tools "" --strict-mcp-config`). `@tanstack/ai-claude-code` 0.9 cannot pass that next to several bridged tools, so we append the flags to the `claude` executable string, which the adapter splits on spaces. Recheck on every adapter upgrade, and ask upstream for an option.
 - An item cut short by a stop or a daemon death shows `failed` with a reason until the run resumes; after a daemon death that is a few seconds later, on its own. The item then continues. Consider `stopped` and `interrupted` item states.
 - `timeoutMinutes` on a Call node with `each` is not enforced. Every step inside the body keeps its own limit.
