@@ -17,8 +17,17 @@ import type { WorkRelay, WorkReply } from "@nightshift/engine";
  */
 
 export type WorkHub = WorkRelay & {
-	/** The placed Device's side: its calls and cancels, as they come, until the signal aborts. */
-	take(deviceId: string, signal: AbortSignal): AsyncIterable<WorkDelivery>;
+	/**
+	 * The placed Device's side: its calls and cancels, as they come, until
+	 * the signal aborts. `running`: the calls it still serves. A call it
+	 * took before and does not name ended there (it restarted, or the call
+	 * never reached it): it ends here with an error.
+	 */
+	take(
+		deviceId: string,
+		signal: AbortSignal,
+		running?: readonly string[],
+	): AsyncIterable<WorkDelivery>;
 	/**
 	 * The placed Device answers a call it took. `done`: the call ended
 	 * there. A call of another Device, or one that ended here, is ignored.
@@ -32,6 +41,8 @@ export type WorkHub = WorkRelay & {
 /** A call waiting for its replies. */
 type OpenCall = {
 	deviceId: string;
+	/** A stream of the Device took it. */
+	delivered: boolean;
 	push(replies: WorkReply[], done: boolean): void;
 };
 
@@ -111,6 +122,7 @@ export function createWorkHub(options: { lostAfterMs?: number } = {}): WorkHub {
 			};
 			calls.set(id, {
 				deviceId,
+				delivered: false,
 				push(replies, done) {
 					queue.push(...replies);
 					if (done) ended = true;
@@ -144,8 +156,26 @@ export function createWorkHub(options: { lostAfterMs?: number } = {}): WorkHub {
 			}
 		},
 
-		async *take(deviceId, signal) {
+		async *take(deviceId, signal, running) {
 			const box = inbox(deviceId);
+			if (running) {
+				const serving = new Set(running);
+				for (const [id, call] of calls) {
+					if (call.deviceId !== deviceId || !call.delivered) continue;
+					if (serving.has(id)) continue;
+					calls.delete(id);
+					call.push(
+						[
+							{
+								kind: "error",
+								message:
+									"The device of this run stopped before the step ended.",
+							},
+						],
+						true,
+					);
+				}
+			}
 			box.streams++;
 			if (box.lost) {
 				clearTimeout(box.lost);
@@ -163,6 +193,9 @@ export function createWorkHub(options: { lostAfterMs?: number } = {}): WorkHub {
 				while (!signal.aborted) {
 					const delivery = box.deliveries.shift();
 					if (delivery) {
+						const call =
+							delivery.kind === "call" ? calls.get(delivery.id) : undefined;
+						if (call) call.delivered = true;
 						yield delivery;
 						continue;
 					}

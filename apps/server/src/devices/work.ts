@@ -139,7 +139,10 @@ export function createWorkServer(deps: {
 			client = next;
 			while (!signal.aborted) {
 				try {
-					const stream = await next.devices.work(undefined, { signal });
+					const stream = await next.devices.work(
+						{ running: [...calls.keys()] },
+						{ signal },
+					);
 					for await (const delivery of stream) {
 						if (delivery.kind === "cancel") {
 							calls.get(delivery.id)?.abort();

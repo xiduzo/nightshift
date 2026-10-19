@@ -1023,9 +1023,11 @@ iroh.
      `devices.workReply`, a batch at a time (what accumulates while one is
      on its way). A cancel follows an abort. A Device whose stream drops
      keeps its calls for 45 s, then they end with "went offline"; calls
-     made in that window wait for it. Replies that cannot reach the Host
-     for a minute abort the call on the Device: nothing runs for a Walker
-     that is gone.
+     made in that window wait for it. A Device that takes its work again
+     names the calls it still serves; any other it took ended there (it
+     restarted, or the call never reached it) and ends with an error.
+     Replies that cannot reach the Host for a minute abort the call on the
+     Device: nothing runs for a Walker that is gone.
    - **Two checks, two code paths.** The Host, before it places a run
      (`place` in `engine.ts`): the Device is paired here and not revoked,
      its owner is the Person who starts the run (another Person's Device

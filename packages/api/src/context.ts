@@ -238,7 +238,11 @@ export type HostExchange = {
 	 * Host walks that are placed on the key's Device, and their cancels,
 	 * until the signal aborts.
 	 */
-	work(key: DeviceKeyAccess, signal?: AbortSignal): AsyncIterable<WorkDelivery>;
+	work(
+		key: DeviceKeyAccess,
+		input: { running: string[] },
+		signal?: AbortSignal,
+	): AsyncIterable<WorkDelivery>;
 	/** The key's Device answers a call it took. */
 	workReply(
 		key: DeviceKeyAccess,

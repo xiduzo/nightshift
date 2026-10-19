@@ -198,6 +198,28 @@ describe("the work hub", () => {
 		taking.abort();
 	});
 
+	test("a call the Device no longer serves when it comes back ends", async () => {
+		const hub = createWorkHub();
+		const first = new AbortController();
+		const before = hub.take("b", first.signal)[Symbol.asyncIterator]();
+		const delivered = before.next();
+		const replies = hub.call("b", request())[Symbol.asyncIterator]();
+		const answered = replies.next();
+		await delivered;
+		first.abort();
+		await before.next();
+		// It restarted: it serves nothing now.
+		const again = new AbortController();
+		const after = hub.take("b", again.signal, [])[Symbol.asyncIterator]();
+		const next = after.next();
+		expect((await answered).value).toEqual({
+			kind: "error",
+			message: "The device of this run stopped before the step ended.",
+		});
+		again.abort();
+		await next;
+	});
+
 	test("a Device that stays away ends its calls", async () => {
 		const hub = createWorkHub({ lostAfterMs: 20 });
 		const taking = new AbortController();

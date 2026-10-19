@@ -818,9 +818,18 @@ const devices = {
 	 * its Device key: the calls of the runs the Host walks on this Device,
 	 * as they come. The Host never dials a Device.
 	 */
-	work: deviceProcedure("relay").handler(async function* ({ context, signal }) {
-		yield* context.exchange.work(context.deviceKey, signal);
-	}),
+	work: deviceProcedure("relay")
+		.input(
+			z
+				.object({
+					/** The calls the Device still serves: any other it took has ended there. */
+					running: z.array(z.string().min(1).max(64)).max(1_000),
+				})
+				.default({ running: [] }),
+		)
+		.handler(async function* ({ context, input, signal }) {
+			yield* context.exchange.work(context.deviceKey, input, signal);
+		}),
 	/** The placed Device's answers to a call it took. */
 	workReply: deviceProcedure("relay")
 		.input(

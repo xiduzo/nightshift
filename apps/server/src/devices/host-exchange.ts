@@ -239,11 +239,12 @@ export function createHostExchange(deps: {
 				: exchange.readArchive(ref);
 		},
 
-		async *work(key, signal) {
+		async *work(key, input, signal) {
 			await admit(key);
 			yield* deps.work.take(
 				key.deviceId,
 				signal ?? new AbortController().signal,
+				input.running,
 			);
 		},
 
