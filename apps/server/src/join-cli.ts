@@ -37,7 +37,7 @@ async function main() {
 	const options = parse(process.argv.slice(2));
 	if (!options) {
 		console.log(USAGE);
-		process.exit(options === null ? 2 : 0);
+		process.exit(2);
 	}
 	const client: AppRouterClient = createORPCClient(
 		new RPCLink({ url: `${options.daemon.replace(/\/$/, "")}/rpc` }),
