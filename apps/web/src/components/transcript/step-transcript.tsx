@@ -13,6 +13,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@nightshift/ui/components/card";
+import { Checkbox } from "@nightshift/ui/components/checkbox";
 import {
 	CodeBlock,
 	CodeBlockActions,
@@ -53,15 +54,18 @@ import {
 	CircleStopIcon,
 	CircleXIcon,
 	ClockIcon,
+	CopyIcon,
 	GitBranchIcon,
 	HandIcon,
 	ListChecksIcon,
 	type LucideIcon,
+	MessagesSquareIcon,
 	MoonIcon,
 	SplitIcon,
 	SunriseIcon,
 } from "lucide-react";
 import { memo, type ReactNode, useState } from "react";
+import { toast } from "sonner";
 import { GateAnswer } from "@/components/gate/gate-answer";
 import {
 	ItemStateBadge,
@@ -70,6 +74,7 @@ import {
 	stepStateStyle,
 } from "@/components/outcome-badge";
 import { CodeView, JsonBlock } from "@/components/run/json-block";
+import { SectionTitle } from "@/components/run/step-console";
 
 import type { SessionSummary, StepSummary } from "@/lib/api-types";
 import {
@@ -101,6 +106,10 @@ import type {
 	WaitItem,
 	WakeItem,
 } from "@/lib/transcript";
+import {
+	markdownContext,
+	transcriptToMarkdown,
+} from "@/lib/transcript-markdown";
 
 import { ToolCallRow } from "./tool-call-row";
 
@@ -152,101 +161,237 @@ export function StepTranscript({
 		),
 	]);
 
+	// Select mode: a checkbox per part, to copy only some of them.
+	const [selecting, setSelecting] = useState(false);
+	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+	const [anchor, setAnchor] = useState<number | null>(null);
+	const keys = transcript.items.map((item) => item.key);
+	const select = (index: number, checked: boolean, range: boolean) => {
+		const from = range && anchor !== null ? Math.min(anchor, index) : index;
+		const to = range && anchor !== null ? Math.max(anchor, index) : index;
+		setSelected((current) => {
+			const next = new Set(current);
+			for (const key of keys.slice(from, to + 1)) {
+				if (checked) next.add(key);
+				else next.delete(key);
+			}
+			return next;
+		});
+		setAnchor(index);
+	};
+	const stopSelecting = () => {
+		setSelecting(false);
+		setSelected(new Set());
+		setAnchor(null);
+	};
+	const copy = async (items: readonly TranscriptItem[]) => {
+		const text = transcriptToMarkdown(
+			step,
+			items,
+			markdownContext(step, itemTitles),
+		);
+		try {
+			await navigator.clipboard.writeText(text);
+			toast.success(
+				items.length === transcript.items.length
+					? "Copied the transcript as Markdown."
+					: `Copied ${items.length} ${items.length === 1 ? "part" : "parts"} as Markdown.`,
+			);
+			stopSelecting();
+		} catch {
+			toast.error("Could not copy. Allow this page to use the clipboard.");
+		}
+	};
+	const picked = transcript.items.filter((item) => selected.has(item.key));
+
 	return (
-		<MessageScrollerProvider autoScroll defaultScrollPosition="end">
-			<MessageScroller className="min-h-0">
-				<MessageScrollerViewport aria-label={`Transcript of ${step.nodeId}`}>
-					<MessageScrollerContent
-						aria-live="off"
-						className="mx-auto w-full max-w-3xl gap-4 px-4 py-5 md:px-6"
-					>
-						{transcript.items.map((item) => (
-							<MessageScrollerItem key={item.key} messageId={item.key}>
-								{item.kind === "gate-open" ? (
-									<GateQuestion
-										item={item}
-										answer={
-											gateOpen ? (
-												<GateAnswer
-													runId={runId}
-													stepId={step.id}
-													nodeId={step.nodeId}
-													choices={item.choices}
-												/>
-											) : null
-										}
-									/>
-								) : (
-									<TranscriptItemView
-										item={item}
-										itemTitle={
-											item.kind === "item-end"
-												? itemTitles.get(item.itemId)
-												: undefined
-										}
-										running={running}
-										session={
-											item.sessionId
-												? sessionsById.get(item.sessionId)
-												: undefined
-										}
-										sessionNumber={
-											item.sessionId
-												? sessionNumbers.get(item.sessionId)
-												: undefined
-										}
-									/>
-								)}
-							</MessageScrollerItem>
-						))}
-						{pendingSessions.map((session) => (
-							<MessageScrollerItem
-								key={`pending:${session.id}`}
-								messageId={`pending:${session.id}`}
+		<>
+			<div className="flex h-9 shrink-0 items-center gap-2 border-b bg-background px-4">
+				<MessagesSquareIcon
+					className="size-3.5 text-muted-foreground"
+					aria-hidden="true"
+				/>
+				<SectionTitle id="step-transcript-heading">Transcript</SectionTitle>
+				<div className="ml-auto flex items-center gap-1">
+					{selecting ? (
+						<>
+							<span className="px-2 text-muted-foreground text-xs tabular-nums">
+								{picked.length === 0
+									? "Pick the parts to copy. Shift-click picks a range."
+									: `${picked.length} selected`}
+							</span>
+							<Button variant="ghost" size="xs" onClick={stopSelecting}>
+								Cancel
+							</Button>
+							<Button
+								size="xs"
+								disabled={picked.length === 0}
+								onClick={() => void copy(picked)}
 							>
-								<SessionBoundary
-									number={sessionNumbers.get(session.id)}
-									at={session.createdAt}
-									prompt={session.prompt}
-								/>
-							</MessageScrollerItem>
-						))}
-						{isEmpty ? (
-							<Marker className="justify-center py-10 text-xs">
-								{connecting ? (
+								<CopyIcon data-icon="inline-start" />
+								Copy selected
+							</Button>
+						</>
+					) : (
+						<>
+							<Button
+								variant="ghost"
+								size="xs"
+								disabled={transcript.items.length === 0}
+								onClick={() => setSelecting(true)}
+							>
+								<ListChecksIcon data-icon="inline-start" />
+								Select
+							</Button>
+							<Button
+								variant="ghost"
+								size="xs"
+								disabled={transcript.items.length === 0 && !step.error}
+								title="Copy the whole transcript as Markdown, to share it"
+								onClick={() => void copy(transcript.items)}
+							>
+								<CopyIcon data-icon="inline-start" />
+								Copy
+							</Button>
+						</>
+					)}
+				</div>
+			</div>
+			<MessageScrollerProvider autoScroll defaultScrollPosition="end">
+				<MessageScroller className="min-h-0">
+					<MessageScrollerViewport aria-label={`Transcript of ${step.nodeId}`}>
+						<MessageScrollerContent
+							aria-live="off"
+							className="mx-auto w-full max-w-3xl gap-4 px-4 py-5 md:px-6"
+						>
+							{transcript.items.map((item, index) => (
+								<MessageScrollerItem key={item.key} messageId={item.key}>
+									<Selectable
+										on={selecting}
+										checked={selected.has(item.key)}
+										onCheckedChange={(checked, range) =>
+											select(index, checked, range)
+										}
+									>
+										{item.kind === "gate-open" ? (
+											<GateQuestion
+												item={item}
+												answer={
+													gateOpen ? (
+														<GateAnswer
+															runId={runId}
+															stepId={step.id}
+															nodeId={step.nodeId}
+															choices={item.choices}
+														/>
+													) : null
+												}
+											/>
+										) : (
+											<TranscriptItemView
+												item={item}
+												itemTitle={
+													item.kind === "item-end"
+														? itemTitles.get(item.itemId)
+														: undefined
+												}
+												running={running}
+												session={
+													item.sessionId
+														? sessionsById.get(item.sessionId)
+														: undefined
+												}
+												sessionNumber={
+													item.sessionId
+														? sessionNumbers.get(item.sessionId)
+														: undefined
+												}
+											/>
+										)}
+									</Selectable>
+								</MessageScrollerItem>
+							))}
+							{pendingSessions.map((session) => (
+								<MessageScrollerItem
+									key={`pending:${session.id}`}
+									messageId={`pending:${session.id}`}
+								>
+									<SessionBoundary
+										number={sessionNumbers.get(session.id)}
+										at={session.createdAt}
+										prompt={session.prompt}
+									/>
+								</MessageScrollerItem>
+							))}
+							{isEmpty ? (
+								<Marker className="justify-center py-10 text-xs">
+									{connecting ? (
+										<MarkerIcon>
+											<Spinner className="size-3.5" />
+										</MarkerIcon>
+									) : null}
+									<MarkerContent>
+										{connecting ? "Loading transcript…" : "No transcript yet."}
+									</MarkerContent>
+								</Marker>
+							) : null}
+							{step.error ? (
+								<Alert variant="destructive">
+									<CircleXIcon aria-hidden="true" />
+									<AlertTitle>The step failed</AlertTitle>
+									<AlertDescription className="whitespace-pre-wrap break-words font-mono text-xs">
+										{step.error}
+									</AlertDescription>
+								</Alert>
+							) : null}
+							{running && !gateOpen ? (
+								<Marker className="text-xs">
 									<MarkerIcon>
-										<Spinner className="size-3.5" />
+										<Spinner className="size-3.5 text-status-running" />
 									</MarkerIcon>
-								) : null}
-								<MarkerContent>
-									{connecting ? "Loading transcript…" : "No transcript yet."}
-								</MarkerContent>
-							</Marker>
-						) : null}
-						{step.error ? (
-							<Alert variant="destructive">
-								<CircleXIcon aria-hidden="true" />
-								<AlertTitle>The step failed</AlertTitle>
-								<AlertDescription className="whitespace-pre-wrap break-words font-mono text-xs">
-									{step.error}
-								</AlertDescription>
-							</Alert>
-						) : null}
-						{running && !gateOpen ? (
-							<Marker className="text-xs">
-								<MarkerIcon>
-									<Spinner className="size-3.5 text-status-running" />
-								</MarkerIcon>
-								<MarkerContent className="text-status-running">
-									{RUNNING_TEXT[step.nodeType]}
-								</MarkerContent>
-							</Marker>
-						) : null}
-					</MessageScrollerContent>
-				</MessageScrollerViewport>
-				<MessageScrollerButton />
-			</MessageScroller>
-		</MessageScrollerProvider>
+									<MarkerContent className="text-status-running">
+										{RUNNING_TEXT[step.nodeType]}
+									</MarkerContent>
+								</Marker>
+							) : null}
+						</MessageScrollerContent>
+					</MessageScrollerViewport>
+					<MessageScrollerButton />
+				</MessageScroller>
+			</MessageScrollerProvider>
+		</>
+	);
+}
+
+/** One part of the transcript, with a checkbox in front while selecting. */
+function Selectable({
+	on,
+	checked,
+	onCheckedChange,
+	children,
+}: {
+	on: boolean;
+	checked: boolean;
+	/** `range`: Shift was held, so everything since the last click follows. */
+	onCheckedChange: (checked: boolean, range: boolean) => void;
+	children: ReactNode;
+}) {
+	if (!on) return children;
+	return (
+		<div className="flex items-start gap-3">
+			<Checkbox
+				className="mt-1"
+				checked={checked}
+				aria-label="Copy this part"
+				onCheckedChange={(next, details) =>
+					onCheckedChange(
+						next,
+						details.event instanceof MouseEvent && details.event.shiftKey,
+					)
+				}
+			/>
+			<div className="min-w-0 flex-1">{children}</div>
+		</div>
 	);
 }
 

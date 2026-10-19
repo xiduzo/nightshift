@@ -9,6 +9,7 @@ import { NightOutput } from "@/components/dashboard/night-output";
 import { RunOutcomes } from "@/components/dashboard/run-outcomes";
 import { UpNext } from "@/components/dashboard/up-next";
 import { QuickRunDialog } from "@/components/new-run-form";
+import { PageHeading } from "@/components/page-heading";
 import { ProjectPage } from "@/components/project-page";
 import { SectionCards } from "@/components/section-cards";
 import { useProjectRuns } from "@/hooks/use-project-runs";
@@ -28,28 +29,30 @@ function ProjectDashboardComponent() {
 	const [quickRun, setQuickRun] = useState(false);
 
 	return (
-		<ProjectPage
-			projectId={projectId}
-			actions={() => (
-				<Button size="sm" onClick={() => setQuickRun(true)}>
-					<ZapIcon data-icon="inline-start" />
-					Quick run
-				</Button>
-			)}
-		>
+		<ProjectPage projectId={projectId}>
 			{(project) => (
 				<>
-					<div className="flex min-w-0 flex-col gap-1">
-						<h1 className="truncate font-semibold text-2xl tracking-tight">
-							{project.name}
-						</h1>
-						<p
-							className="truncate font-mono text-muted-foreground text-sm"
-							title={project.repoPath}
-						>
-							{project.repoPath}
-						</p>
-					</div>
+					<PageHeading
+						title={project.name}
+						description={
+							<span
+								className="block truncate font-mono"
+								title={project.repoPath}
+							>
+								{project.repoPath}
+							</span>
+						}
+						actions={
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setQuickRun(true)}
+							>
+								<ZapIcon data-icon="inline-start" />
+								Quick run
+							</Button>
+						}
+					/>
 
 					<NeedsYou projectId={project.id} />
 

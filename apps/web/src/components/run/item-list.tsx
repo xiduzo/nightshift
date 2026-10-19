@@ -3,6 +3,7 @@ import {
 	Empty,
 	EmptyDescription,
 	EmptyHeader,
+	EmptyMedia,
 	EmptyTitle,
 } from "@nightshift/ui/components/empty";
 import {
@@ -19,7 +20,12 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
-import { ArrowUpRightIcon, GitBranchIcon, ScanSearchIcon } from "lucide-react";
+import {
+	ArrowUpRightIcon,
+	GitBranchIcon,
+	ListIcon,
+	ScanSearchIcon,
+} from "lucide-react";
 
 import { ItemStateBadge } from "@/components/outcome-badge";
 import { useNow } from "@/hooks/use-now";
@@ -55,10 +61,13 @@ export function ItemList({
 
 	if (items.length === 0) {
 		return (
-			<Empty className="py-10">
+			<Empty>
 				<EmptyHeader>
-					<EmptyTitle className="text-sm">No items yet</EmptyTitle>
-					<EmptyDescription className="text-xs">
+					<EmptyMedia variant="icon">
+						<ListIcon aria-hidden="true" />
+					</EmptyMedia>
+					<EmptyTitle>No items yet</EmptyTitle>
+					<EmptyDescription>
 						They show here once the call starts them.
 					</EmptyDescription>
 				</EmptyHeader>

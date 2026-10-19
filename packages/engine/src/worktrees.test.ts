@@ -17,6 +17,7 @@ import {
 	currentBranch,
 	freeBranchName,
 	itemBranchName,
+	listBranches,
 	resolveRepoTopLevel,
 	slugify,
 	uncommittedChanges,
@@ -100,6 +101,27 @@ describe("createWorktree", () => {
 				baseRef: "does-not-exist",
 			}),
 		).rejects.toThrow('The branch or commit "does-not-exist"');
+	});
+});
+
+describe("listBranches", () => {
+	test("lists local and remote branches, without the remote's HEAD", async () => {
+		await mustGit(sandbox.repoPath, ["branch", "feature/a"]);
+		const head = await mustGit(sandbox.repoPath, ["rev-parse", "HEAD"]);
+		await mustGit(sandbox.repoPath, [
+			"update-ref",
+			"refs/remotes/origin/main",
+			head,
+		]);
+		await mustGit(sandbox.repoPath, [
+			"symbolic-ref",
+			"refs/remotes/origin/HEAD",
+			"refs/remotes/origin/main",
+		]);
+		const branches = await listBranches(sandbox.repoPath);
+		expect(branches.current).toBe("main");
+		expect(branches.local.toSorted()).toEqual(["feature/a", "main"]);
+		expect(branches.remote).toEqual(["origin/main"]);
 	});
 });
 

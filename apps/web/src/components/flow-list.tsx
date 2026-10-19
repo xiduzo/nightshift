@@ -65,6 +65,7 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
+import { PageHeading } from "@/components/page-heading";
 import { StartRunDialog } from "@/components/run/start-run-dialog";
 import { useProjectFlows } from "@/hooks/use-project-flows";
 import type { FlowListItem } from "@/lib/api-types";
@@ -103,23 +104,17 @@ export function FlowList({ projectId }: { projectId: string }) {
 
 	return (
 		<section aria-labelledby="flows-heading" className="flex flex-col gap-4">
-			<div className="flex items-end gap-4">
-				<div className="flex min-w-0 flex-1 flex-col gap-1">
-					<h1
-						id="flows-heading"
-						className="font-semibold text-2xl tracking-tight"
-					>
-						Flows
-					</h1>
-					<p className="text-muted-foreground text-sm">
-						The steps an agent follows. Run one, or open it to edit.
-					</p>
-				</div>
-				<Button variant="outline" size="sm" onClick={() => setCreating(true)}>
-					<PlusIcon data-icon="inline-start" />
-					New flow
-				</Button>
-			</div>
+			<PageHeading
+				id="flows-heading"
+				title="Flows"
+				description="The steps an agent follows. Run one, or open it to edit."
+				actions={
+					<Button variant="outline" size="sm" onClick={() => setCreating(true)}>
+						<PlusIcon data-icon="inline-start" />
+						New flow
+					</Button>
+				}
+			/>
 
 			{flows.isLoading ? (
 				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -128,25 +123,29 @@ export function FlowList({ projectId }: { projectId: string }) {
 					<Skeleton className="hidden h-40 w-full rounded-xl xl:block" />
 				</div>
 			) : !flows.data || flows.data.length === 0 ? (
-				<Empty className="border">
-					<EmptyHeader>
-						<EmptyMedia variant="icon">
-							<WorkflowIcon aria-hidden="true" />
-						</EmptyMedia>
-						<EmptyTitle>No flows yet</EmptyTitle>
-						<EmptyDescription>
-							{flows.error
-								? flows.error.message
-								: "A flow is the set of steps an agent follows. Create one to start."}
-						</EmptyDescription>
-					</EmptyHeader>
-					<EmptyContent>
-						<Button onClick={() => setCreating(true)}>
-							<PlusIcon data-icon="inline-start" />
-							New flow
-						</Button>
-					</EmptyContent>
-				</Empty>
+				<Card>
+					<CardContent>
+						<Empty>
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<WorkflowIcon aria-hidden="true" />
+								</EmptyMedia>
+								<EmptyTitle>No flows yet</EmptyTitle>
+								<EmptyDescription>
+									{flows.error
+										? flows.error.message
+										: "A flow is the set of steps an agent follows. Create one to start."}
+								</EmptyDescription>
+							</EmptyHeader>
+							<EmptyContent>
+								<Button onClick={() => setCreating(true)}>
+									<PlusIcon data-icon="inline-start" />
+									New flow
+								</Button>
+							</EmptyContent>
+						</Empty>
+					</CardContent>
+				</Card>
 			) : (
 				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 					{flows.data.map((flow) => (

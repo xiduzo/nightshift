@@ -45,6 +45,7 @@ import type {
 	ScheduleResult,
 	StartRunInput,
 } from "./types";
+import { listBranches } from "./worktrees";
 
 /**
  * The engine: projects, flows, schedules, Gates and runs, over the event
@@ -272,6 +273,12 @@ export function createEngine(
 			}
 			// Runs, events and worktrees stay: a person may still need them.
 			await projects.remove(projectId);
+		},
+
+		async listBranches(projectId) {
+			await ready;
+			const row = await getProjectRow(projectId);
+			return listBranches(row.repoPath);
 		},
 
 		async listFlows(projectId) {

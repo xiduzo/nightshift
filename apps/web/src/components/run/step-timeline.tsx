@@ -8,6 +8,8 @@ import {
 	Empty,
 	EmptyDescription,
 	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
 } from "@nightshift/ui/components/empty";
 import { Item } from "@nightshift/ui/components/item";
 import {
@@ -16,7 +18,12 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
-import { ChevronRightIcon, ScanSearchIcon, WorkflowIcon } from "lucide-react";
+import {
+	ChevronRightIcon,
+	ListTodoIcon,
+	ScanSearchIcon,
+	WorkflowIcon,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { hasCost, NODE_TYPE } from "@/components/flow/node-type";
@@ -112,11 +119,13 @@ export function StepTimeline({
 
 	if (steps.length === 0) {
 		return (
-			<Empty className="py-8">
+			<Empty>
 				<EmptyHeader>
-					<EmptyDescription className="text-xs">
-						No steps yet. The first one starts in a moment.
-					</EmptyDescription>
+					<EmptyMedia variant="icon">
+						<ListTodoIcon aria-hidden="true" />
+					</EmptyMedia>
+					<EmptyTitle>No steps yet</EmptyTitle>
+					<EmptyDescription>The first one starts in a moment.</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
 		);
@@ -126,10 +135,14 @@ export function StepTimeline({
 	const roots = stepsIn(steps, scope);
 	if (roots.length === 0) {
 		return (
-			<Empty className="py-8">
+			<Empty>
 				<EmptyHeader>
-					<EmptyDescription className="text-xs">
-						No steps for this item yet.
+					<EmptyMedia variant="icon">
+						<ListTodoIcon aria-hidden="true" />
+					</EmptyMedia>
+					<EmptyTitle>No steps yet</EmptyTitle>
+					<EmptyDescription>
+						The steps for this item show here once they start.
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>

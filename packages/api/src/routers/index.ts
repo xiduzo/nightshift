@@ -38,6 +38,12 @@ const projects = {
 			}),
 		)
 		.handler(({ context, input }) => context.engine.addProject(input)),
+	/** The local and remote branches of the clone, for "Start from". Read-only, no fetch. */
+	branches: publicProcedure
+		.input(z.object({ projectId: z.string() }))
+		.handler(({ context, input }) =>
+			context.engine.listBranches(input.projectId),
+		),
 	/** What the folder needs before runs can start in it. Read-only. */
 	check: publicProcedure
 		.input(z.object({ path: z.string().min(1) }))

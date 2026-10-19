@@ -2,11 +2,7 @@ import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import { cn } from "@nightshift/ui/lib/utils";
-import {
-	ChevronDownIcon,
-	ChevronUpIcon,
-	MessagesSquareIcon,
-} from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { RunStatus, StepSummary } from "@/lib/api-types";
@@ -121,15 +117,7 @@ export function StepConsole({
 						aria-labelledby="step-transcript-heading"
 						className="flex min-h-0 flex-1 flex-col bg-muted/20"
 					>
-						<div className="flex h-9 shrink-0 items-center gap-2 border-b bg-background px-4">
-							<MessagesSquareIcon
-								className="size-3.5 text-muted-foreground"
-								aria-hidden="true"
-							/>
-							<SectionTitle id="step-transcript-heading">
-								Transcript
-							</SectionTitle>
-						</div>
+						{/* The transcript draws its own bar, with its copy actions. */}
 						<div className="flex min-h-0 flex-1 flex-col">{transcript}</div>
 					</section>
 				</div>
@@ -139,7 +127,7 @@ export function StepConsole({
 }
 
 /** The small uppercase heading of a part of the console. */
-function SectionTitle({
+export function SectionTitle({
 	id,
 	aside,
 	children,

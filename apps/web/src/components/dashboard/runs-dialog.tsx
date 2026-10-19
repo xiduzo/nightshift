@@ -14,19 +14,12 @@ import {
 	ItemMedia,
 	ItemTitle,
 } from "@nightshift/ui/components/item";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@nightshift/ui/components/table";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon, HistoryIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
+import { DataTable, dataTableColumns } from "@/components/data-table";
 import { RunStatusBadge } from "@/components/run-status-badge";
 import { countRunStatuses, RUN_STATUS_CHART } from "@/components/runs-donut";
 import { useNow } from "@/hooks/use-now";
@@ -266,38 +259,11 @@ function RunsDetails({
 			</ChartSection>
 
 			{groups.length > 0 ? (
-				<Table>
-					<TableHeader>
-						<TableRow>
-							<TableHead>{project ? "Flow" : "Project"}</TableHead>
-							<TableHead className="text-right">Runs</TableHead>
-							<TableHead className="text-right">Finished</TableHead>
-							<TableHead className="text-right">Failed</TableHead>
-							<TableHead className="text-right">Finished share</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{groups.map((group) => (
-							<TableRow key={group.label}>
-								<TableCell className="max-w-48 truncate font-mono text-xs">
-									{group.label}
-								</TableCell>
-								<TableCell className="text-right tabular-nums">
-									{group.runs}
-								</TableCell>
-								<TableCell className="text-right tabular-nums">
-									{group.finished}
-								</TableCell>
-								<TableCell className="text-right tabular-nums">
-									{group.failed}
-								</TableCell>
-								<TableCell className="text-right font-medium tabular-nums">
-									{`${Math.round((group.finished / group.runs) * 100)}%`}
-								</TableCell>
-							</TableRow>
-						))}
-					</TableBody>
-				</Table>
+				<DataTable
+					columns={groupColumns(project ? "Flow" : "Project")}
+					data={groups}
+					getRowId={(group) => group.label}
+				/>
 			) : null}
 
 			{failures.length > 0 ? (
@@ -358,4 +324,52 @@ function RunsDetails({
 			) : null}
 		</>
 	);
+}
+
+type GroupRow = {
+	label: string;
+	runs: number;
+	finished: number;
+	failed: number;
+};
+
+const groupColumn = dataTableColumns<GroupRow>();
+
+/** How runs went per flow or project. */
+function groupColumns(groupLabel: string) {
+	const count = {
+		headClassName: "text-right",
+		cellClassName: "text-right tabular-nums",
+	};
+	return groupColumn.columns([
+		groupColumn.accessor("label", {
+			header: groupLabel,
+			meta: { cellClassName: "max-w-48 truncate font-mono text-xs" },
+		}),
+		groupColumn.accessor("runs", {
+			header: "Runs",
+			enableSorting: true,
+			meta: count,
+		}),
+		groupColumn.accessor("finished", {
+			header: "Finished",
+			enableSorting: true,
+			meta: count,
+		}),
+		groupColumn.accessor("failed", {
+			header: "Failed",
+			enableSorting: true,
+			meta: count,
+		}),
+		groupColumn.accessor((group) => group.finished / group.runs, {
+			id: "share",
+			header: "Finished share",
+			enableSorting: true,
+			cell: ({ getValue }) => `${Math.round(getValue() * 100)}%`,
+			meta: {
+				headClassName: "text-right",
+				cellClassName: "text-right font-medium tabular-nums",
+			},
+		}),
+	]);
 }

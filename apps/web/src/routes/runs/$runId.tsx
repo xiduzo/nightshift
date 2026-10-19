@@ -8,7 +8,7 @@ import {
 	BreadcrumbSeparator,
 } from "@nightshift/ui/components/breadcrumb";
 import { Button } from "@nightshift/ui/components/button";
-import { Card } from "@nightshift/ui/components/card";
+import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Empty,
 	EmptyContent,
@@ -154,22 +154,26 @@ function RunComponent() {
 					crumbs={[{ label: "Home", link: { to: "/" } }, { label: "Run" }]}
 				/>
 				<div className="flex flex-1 flex-col p-4 md:p-6">
-					<Empty className="flex-1 border">
-						<EmptyHeader>
-							<EmptyMedia variant="icon">
-								<SearchXIcon />
-							</EmptyMedia>
-							<EmptyTitle>Run not available</EmptyTitle>
-							<EmptyDescription>
-								{run.error?.message ?? "This run does not exist."}
-							</EmptyDescription>
-						</EmptyHeader>
-						<EmptyContent>
-							<Button variant="outline" render={<Link to="/" />}>
-								Back to projects
-							</Button>
-						</EmptyContent>
-					</Empty>
+					<Card>
+						<CardContent>
+							<Empty>
+								<EmptyHeader>
+									<EmptyMedia variant="icon">
+										<SearchXIcon />
+									</EmptyMedia>
+									<EmptyTitle>Run not available</EmptyTitle>
+									<EmptyDescription>
+										{run.error?.message ?? "This run does not exist."}
+									</EmptyDescription>
+								</EmptyHeader>
+								<EmptyContent>
+									<Button variant="outline" render={<Link to="/" />}>
+										Back to projects
+									</Button>
+								</EmptyContent>
+							</Empty>
+						</CardContent>
+					</Card>
 				</div>
 			</>
 		);

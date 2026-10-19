@@ -5,6 +5,7 @@ import {
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
+import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Empty,
 	EmptyContent,
@@ -97,51 +98,57 @@ function FlowEditorRoute() {
 	if (!loaded.data.flow && !startOver) {
 		return (
 			<Shell crumbs={crumbs}>
-				<Empty className="mx-auto max-w-2xl flex-none border">
-					<EmptyHeader>
-						<EmptyMedia variant="icon">
-							<FileWarningIcon />
-						</EmptyMedia>
-						<EmptyTitle>This flow cannot be opened</EmptyTitle>
-						<EmptyDescription>
-							The saved flow is not valid. Fix the problems below in its file,
-							or start over.
-						</EmptyDescription>
-					</EmptyHeader>
-					<EmptyContent>
-						<Alert variant="destructive" className="text-left">
-							<CircleAlertIcon />
-							<AlertTitle>
-								{loaded.data.issues.length}{" "}
-								{loaded.data.issues.length === 1 ? "problem" : "problems"}
-							</AlertTitle>
-							<AlertDescription>
-								<ul className="flex list-disc flex-col gap-1 pl-4 text-xs">
-									{loaded.data.issues.map((issue, index) => (
-										<li key={`${issue.message}:${index}`}>{issue.message}</li>
-									))}
-								</ul>
-							</AlertDescription>
-						</Alert>
-						<div className="flex flex-wrap justify-center gap-2">
-							<Button variant="outline" onClick={() => setStartOver(true)}>
-								Start over with a new flow
-							</Button>
-							<Button
-								variant="ghost"
-								nativeButton={false}
-								render={
-									<Link
-										to="/projects/$projectId/flows"
-										params={{ projectId }}
-									/>
-								}
-							>
-								Back to flows
-							</Button>
-						</div>
-					</EmptyContent>
-				</Empty>
+				<Card className="mx-auto w-full max-w-2xl">
+					<CardContent>
+						<Empty>
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<FileWarningIcon />
+								</EmptyMedia>
+								<EmptyTitle>This flow cannot be opened</EmptyTitle>
+								<EmptyDescription>
+									The saved flow is not valid. Fix the problems below in its
+									file, or start over.
+								</EmptyDescription>
+							</EmptyHeader>
+							<EmptyContent>
+								<Alert variant="destructive" className="text-left">
+									<CircleAlertIcon />
+									<AlertTitle>
+										{loaded.data.issues.length}{" "}
+										{loaded.data.issues.length === 1 ? "problem" : "problems"}
+									</AlertTitle>
+									<AlertDescription>
+										<ul className="flex list-disc flex-col gap-1 pl-4 text-xs">
+											{loaded.data.issues.map((issue, index) => (
+												<li key={`${issue.message}:${index}`}>
+													{issue.message}
+												</li>
+											))}
+										</ul>
+									</AlertDescription>
+								</Alert>
+								<div className="flex flex-wrap justify-center gap-2">
+									<Button variant="outline" onClick={() => setStartOver(true)}>
+										Start over with a new flow
+									</Button>
+									<Button
+										variant="ghost"
+										nativeButton={false}
+										render={
+											<Link
+												to="/projects/$projectId/flows"
+												params={{ projectId }}
+											/>
+										}
+									>
+										Back to flows
+									</Button>
+								</div>
+							</EmptyContent>
+						</Empty>
+					</CardContent>
+				</Card>
 			</Shell>
 		);
 	}
@@ -181,27 +188,34 @@ function Problem({
 }) {
 	return (
 		<Shell crumbs={crumbs}>
-			<Empty className="mx-auto max-w-2xl flex-none border">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<FileWarningIcon />
-					</EmptyMedia>
-					<EmptyTitle>{title}</EmptyTitle>
-					<EmptyDescription>{description}</EmptyDescription>
-				</EmptyHeader>
-				<EmptyContent>
-					<Button
-						variant="outline"
-						nativeButton={false}
-						render={
-							<Link to="/projects/$projectId/flows" params={{ projectId }} />
-						}
-					>
-						<ArrowLeftIcon data-icon="inline-start" />
-						Back to flows
-					</Button>
-				</EmptyContent>
-			</Empty>
+			<Card className="mx-auto w-full max-w-2xl">
+				<CardContent>
+					<Empty>
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<FileWarningIcon />
+							</EmptyMedia>
+							<EmptyTitle>{title}</EmptyTitle>
+							<EmptyDescription>{description}</EmptyDescription>
+						</EmptyHeader>
+						<EmptyContent>
+							<Button
+								variant="outline"
+								nativeButton={false}
+								render={
+									<Link
+										to="/projects/$projectId/flows"
+										params={{ projectId }}
+									/>
+								}
+							>
+								<ArrowLeftIcon data-icon="inline-start" />
+								Back to flows
+							</Button>
+						</EmptyContent>
+					</Empty>
+				</CardContent>
+			</Card>
 		</Shell>
 	);
 }

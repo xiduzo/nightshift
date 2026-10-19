@@ -17,14 +17,7 @@ import {
 } from "@nightshift/ui/components/alert-dialog";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardFooter,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui/components/card";
+import { Card, CardContent, CardFooter } from "@nightshift/ui/components/card";
 import {
 	Empty,
 	EmptyDescription,
@@ -74,14 +67,6 @@ import {
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@nightshift/ui/components/table";
 import type { InferClientOutputs } from "@orpc/client";
 import {
 	useMutation,
@@ -111,6 +96,8 @@ import { useTheme } from "next-themes";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
+import { DataTable, dataTableColumns } from "@/components/data-table";
+import { PageHeading, PageSection } from "@/components/page-heading";
 import { SiteHeader } from "@/components/site-header";
 import { notificationsSupported } from "@/hooks/use-night-notifications";
 import type { PermissionMode, Project } from "@/lib/api-types";
@@ -223,15 +210,11 @@ function SettingsComponent() {
 		<>
 			<SiteHeader crumbs={[{ label: "Settings" }]} />
 			<div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-				<div className="mx-auto flex w-full max-w-4xl flex-col gap-1">
-					<p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-						This Mac
-					</p>
-					<h1 className="font-semibold text-2xl tracking-tight">Settings</h1>
-					<p className="text-muted-foreground text-sm">
-						How Night Shift runs your flows, what a new Agent node starts with,
-						and when this Mac tells you.
-					</p>
+				<div className="mx-auto w-full max-w-4xl">
+					<PageHeading
+						title="Settings"
+						description="How Night Shift runs your flows, what a new Agent node starts with, and when this Mac tells you."
+					/>
 				</div>
 
 				<div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
@@ -688,135 +671,78 @@ function ProjectsCard() {
 	);
 
 	return (
-		<Card className="gap-0 pb-0">
-			<CardHeader className="border-b">
-				<CardTitle>
-					<h2>Projects</h2>
-				</CardTitle>
-				<CardDescription>
-					The git repositories Night Shift works in. Each run works on its own
-					copy, so your checkout stays as it is.
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="px-0">
-				{projects.isLoading ? (
-					<div className="flex flex-col gap-3 p-6">
-						<Skeleton className="h-6 w-full" />
-						<Skeleton className="h-6 w-2/3" />
-					</div>
-				) : !projects.data || projects.data.length === 0 ? (
-					<Empty>
-						<EmptyHeader>
-							<EmptyMedia variant="icon">
-								<FolderGitIcon aria-hidden="true" />
-							</EmptyMedia>
-							<EmptyTitle>No projects yet</EmptyTitle>
-							<EmptyDescription>
-								Add a git repository with + next to Projects in the sidebar.
-							</EmptyDescription>
-						</EmptyHeader>
-					</Empty>
-				) : (
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead className="pl-6">Project</TableHead>
-								<TableHead className="hidden md:table-cell">Folder</TableHead>
-								<TableHead className="pr-6 text-right">
-									<span className="sr-only">Actions</span>
-								</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{projects.data.map((project, index) => {
-								const count = flows[index]?.data?.length;
-								return (
-									<TableRow key={project.id}>
-										<TableCell className="max-w-0 pl-6 md:max-w-none">
-											<div className="flex min-w-0 flex-col gap-0.5">
-												<Link
-													to="/projects/$projectId"
-													params={{ projectId: project.id }}
-													className="truncate font-medium underline-offset-4 hover:underline"
-												>
-													{project.name}
-												</Link>
-												<span className="text-muted-foreground text-xs tabular-nums">
-													{count === undefined
-														? "Flows…"
-														: `${count} ${count === 1 ? "flow" : "flows"}`}
-												</span>
-												<span
-													className="truncate font-mono text-muted-foreground text-xs md:hidden"
-													title={project.repoPath}
-												>
-													{project.repoPath}
-												</span>
-											</div>
-										</TableCell>
-										<TableCell className="hidden max-w-80 md:table-cell">
-											<span
-												className="block truncate font-mono text-muted-foreground text-xs"
-												title={project.repoPath}
-											>
-												{project.repoPath}
-											</span>
-										</TableCell>
-										<TableCell className="w-0 pr-6 text-right">
-											<Button
-												variant="ghost"
-												size="sm"
-												className="text-muted-foreground hover:text-destructive"
-												disabled={removeProject.isPending}
-												aria-label={`Remove ${project.name}`}
-												onClick={() => setToRemove(project)}
-											>
-												<Trash2Icon data-icon="inline-start" />
-												<span className="hidden sm:inline">Remove</span>
-											</Button>
-										</TableCell>
-									</TableRow>
-								);
+		<PageSection
+			title="Projects"
+			description="The git repositories Night Shift works in. Each run works on its own copy, so your checkout stays as it is."
+		>
+			<Card className="py-0">
+				<CardContent className="px-0">
+					{projects.isLoading ? (
+						<div className="flex flex-col gap-3 p-6">
+							<Skeleton className="h-6 w-full" />
+							<Skeleton className="h-6 w-2/3" />
+						</div>
+					) : !projects.data || projects.data.length === 0 ? (
+						<Empty>
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<FolderGitIcon aria-hidden="true" />
+								</EmptyMedia>
+								<EmptyTitle>No projects yet</EmptyTitle>
+								<EmptyDescription>
+									Add a git repository with + next to Projects in the sidebar.
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
+					) : (
+						<DataTable
+							columns={projectColumns({
+								flowCounts: flows.map((flow) => flow.data?.length),
+								removing: removeProject.isPending,
+								onRemove: setToRemove,
 							})}
-						</TableBody>
-					</Table>
-				)}
-			</CardContent>
-			<AlertDialog
-				open={toRemove !== null}
-				onOpenChange={(open) => {
-					if (!open) setToRemove(null);
-				}}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>
-							Remove {toRemove?.name} from Night Shift?
-						</AlertDialogTitle>
-						<AlertDialogDescription>
-							Night Shift forgets the project and its runs. The repository at{" "}
-							<span className="font-mono">{toRemove?.repoPath}</span> stays as
-							it is.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							variant="destructive"
-							disabled={removeProject.isPending}
-							onClick={() => {
-								if (toRemove) removeProject.mutate({ projectId: toRemove.id });
-							}}
-						>
-							{removeProject.isPending ? (
-								<Spinner data-icon="inline-start" />
-							) : null}
-							{removeProject.isPending ? "Removing…" : "Remove project"}
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
-		</Card>
+							data={projects.data}
+							getRowId={(project) => project.id}
+						/>
+					)}
+				</CardContent>
+				<AlertDialog
+					open={toRemove !== null}
+					onOpenChange={(open) => {
+						if (!open) setToRemove(null);
+					}}
+				>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>
+								Remove {toRemove?.name} from Night Shift?
+							</AlertDialogTitle>
+							<AlertDialogDescription>
+								Night Shift forgets the project and its runs. The repository at{" "}
+								<span className="font-mono">{toRemove?.repoPath}</span> stays as
+								it is.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Cancel</AlertDialogCancel>
+							<AlertDialogAction
+								variant="destructive"
+								disabled={removeProject.isPending}
+								onClick={() => {
+									if (toRemove)
+										removeProject.mutate({ projectId: toRemove.id });
+								}}
+							>
+								{removeProject.isPending ? (
+									<Spinner data-icon="inline-start" />
+								) : null}
+								{removeProject.isPending ? "Removing…" : "Remove project"}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
+			</Card>
+		</PageSection>
 	);
 }
 
@@ -826,6 +752,90 @@ function ProjectsCard() {
 
 const RUN_KEYS = ["maxConcurrentRuns", "maxStepsPerRun"] as const;
 
+const projectColumn = dataTableColumns<Project>();
+
+function projectColumns({
+	flowCounts,
+	removing,
+	onRemove,
+}: {
+	/** The number of flows of each project, in list order; undefined while it loads. */
+	flowCounts: (number | undefined)[];
+	removing: boolean;
+	onRemove: (project: Project) => void;
+}) {
+	return projectColumn.columns([
+		projectColumn.accessor("name", {
+			header: "Project",
+			cell: ({ row: { original: project, index } }) => {
+				const count = flowCounts[index];
+				return (
+					<div className="flex min-w-0 flex-col gap-0.5">
+						<Link
+							to="/projects/$projectId"
+							params={{ projectId: project.id }}
+							className="truncate font-medium underline-offset-4 hover:underline"
+						>
+							{project.name}
+						</Link>
+						<span className="text-muted-foreground text-xs tabular-nums">
+							{count === undefined
+								? "Flows…"
+								: `${count} ${count === 1 ? "flow" : "flows"}`}
+						</span>
+						<span
+							className="truncate font-mono text-muted-foreground text-xs md:hidden"
+							title={project.repoPath}
+						>
+							{project.repoPath}
+						</span>
+					</div>
+				);
+			},
+			meta: {
+				headClassName: "pl-6",
+				cellClassName: "max-w-0 pl-6 md:max-w-none",
+			},
+		}),
+		projectColumn.accessor("repoPath", {
+			header: "Folder",
+			cell: ({ row }) => (
+				<span
+					className="block truncate font-mono text-muted-foreground text-xs"
+					title={row.original.repoPath}
+				>
+					{row.original.repoPath}
+				</span>
+			),
+			meta: {
+				headClassName: "hidden md:table-cell",
+				cellClassName: "hidden max-w-80 md:table-cell",
+			},
+		}),
+		projectColumn.display({
+			id: "actions",
+			header: () => <span className="sr-only">Actions</span>,
+			cell: ({ row: { original: project } }) => (
+				<Button
+					variant="ghost"
+					size="sm"
+					className="text-muted-foreground hover:text-destructive"
+					disabled={removing}
+					aria-label={`Remove ${project.name}`}
+					onClick={() => onRemove(project)}
+				>
+					<Trash2Icon data-icon="inline-start" />
+					<span className="hidden sm:inline">Remove</span>
+				</Button>
+			),
+			meta: {
+				headClassName: "pr-6 text-right",
+				cellClassName: "w-0 pr-6 text-right",
+			},
+		}),
+	]);
+}
+
 function RunsCard({ data }: { data: SettingsView }) {
 	const form = useSettingsForm(data, RUN_KEYS);
 	const toggle = useToggleSetting();
@@ -833,81 +843,78 @@ function RunsCard({ data }: { data: SettingsView }) {
 	const id = useId();
 
 	return (
-		<Card>
-			<CardForm form={form}>
-				<CardHeader>
-					<CardTitle>
-						<h2>Runs</h2>
-					</CardTitle>
-					<CardDescription>
-						When runs start and how far one run may go.
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<FieldGroup>
-						<Field
-							orientation="horizontal"
-							data-disabled={scheduler.locked ? true : undefined}
-						>
-							<FieldContent>
-								<FieldLabel htmlFor={`${id}-scheduler`}>Schedules</FieldLabel>
-								<FieldDescription>
-									Night Shift starts flows at the times you schedule. Turn it
-									off to run flows only when you start them.
-								</FieldDescription>
-							</FieldContent>
-							<Switch
-								id={`${id}-scheduler`}
-								checked={data.values.scheduler}
-								disabled={Boolean(scheduler.locked) || toggle.isPending}
-								aria-describedby={
-									scheduler.locked ? `${id}-scheduler-lock` : undefined
-								}
-								onCheckedChange={(checked) =>
-									toggle.mutate({ scheduler: checked })
-								}
-							/>
-						</Field>
-						{scheduler.locked ? (
-							<Alert id={`${id}-scheduler-lock`}>
-								<LockIcon />
-								<AlertTitle className="flex flex-wrap items-center gap-2">
-									Schedules are paused on this computer
-									<Badge
-										variant="outline"
-										className="border-status-waiting/40 bg-status-waiting/10 font-mono text-status-waiting"
-									>
-										NIGHTSHIFT_SCHEDULER=off
-									</Badge>
-								</AlertTitle>
-								<AlertDescription>{scheduler.locked}</AlertDescription>
-							</Alert>
-						) : null}
-						<FieldSeparator />
-						<div className="grid gap-6 sm:grid-cols-2">
-							<TextSetting
-								form={form}
-								data={data}
-								settingKey="maxConcurrentRuns"
-								label="Max concurrent runs"
-								description="How many runs can work at the same time. Extra runs wait their turn."
-								inputMode="numeric"
-							/>
-							<TextSetting
-								form={form}
-								data={data}
-								settingKey="maxStepsPerRun"
-								label="Max steps per run"
-								description="A safety net for a flow that loops: the run stops after this many steps. You can resume it."
-								inputMode="numeric"
-							/>
-						</div>
-						<SaveError error={form.saveError} />
-					</FieldGroup>
-				</CardContent>
-				<FormFooter form={form} label="Save runs" />
-			</CardForm>
-		</Card>
+		<PageSection
+			title="Runs"
+			description="When runs start and how far one run may go."
+		>
+			<Card>
+				<CardForm form={form}>
+					<CardContent>
+						<FieldGroup>
+							<Field
+								orientation="horizontal"
+								data-disabled={scheduler.locked ? true : undefined}
+							>
+								<FieldContent>
+									<FieldLabel htmlFor={`${id}-scheduler`}>Schedules</FieldLabel>
+									<FieldDescription>
+										Night Shift starts flows at the times you schedule. Turn it
+										off to run flows only when you start them.
+									</FieldDescription>
+								</FieldContent>
+								<Switch
+									id={`${id}-scheduler`}
+									checked={data.values.scheduler}
+									disabled={Boolean(scheduler.locked) || toggle.isPending}
+									aria-describedby={
+										scheduler.locked ? `${id}-scheduler-lock` : undefined
+									}
+									onCheckedChange={(checked) =>
+										toggle.mutate({ scheduler: checked })
+									}
+								/>
+							</Field>
+							{scheduler.locked ? (
+								<Alert id={`${id}-scheduler-lock`}>
+									<LockIcon />
+									<AlertTitle className="flex flex-wrap items-center gap-2">
+										Schedules are paused on this computer
+										<Badge
+											variant="outline"
+											className="border-status-waiting/40 bg-status-waiting/10 font-mono text-status-waiting"
+										>
+											NIGHTSHIFT_SCHEDULER=off
+										</Badge>
+									</AlertTitle>
+									<AlertDescription>{scheduler.locked}</AlertDescription>
+								</Alert>
+							) : null}
+							<FieldSeparator />
+							<div className="grid gap-6 sm:grid-cols-2">
+								<TextSetting
+									form={form}
+									data={data}
+									settingKey="maxConcurrentRuns"
+									label="Max concurrent runs"
+									description="How many runs can work at the same time. Extra runs wait their turn."
+									inputMode="numeric"
+								/>
+								<TextSetting
+									form={form}
+									data={data}
+									settingKey="maxStepsPerRun"
+									label="Max steps per run"
+									description="A safety net for a flow that loops: the run stops after this many steps. You can resume it."
+									inputMode="numeric"
+								/>
+							</div>
+							<SaveError error={form.saveError} />
+						</FieldGroup>
+					</CardContent>
+					<FormFooter form={form} label="Save runs" />
+				</CardForm>
+			</Card>
+		</PageSection>
 	);
 }
 
@@ -920,55 +927,52 @@ const POLICY_KEYS = [
 function RunPolicyCard({ data }: { data: SettingsView }) {
 	const form = useSettingsForm(data, POLICY_KEYS);
 	return (
-		<Card>
-			<CardForm form={form}>
-				<CardHeader>
-					<CardTitle>
-						<h2>Run policy</h2>
-					</CardTitle>
-					<CardDescription>
-						Defaults for flows that do not set their own.
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<FieldGroup>
-						<ResumeSetting data={data} />
-						<FieldSeparator />
-						<div className="grid gap-6 sm:grid-cols-2">
-							<TextSetting
-								form={form}
-								data={data}
-								settingKey="usageLimitFirstWaitMinutes"
-								label="First usage-limit wait"
-								description="An agent hits its usage limit and gives no reset time. The run waits this long, then tries again."
-								unit="min"
-								inputMode="decimal"
-							/>
-							<TextSetting
-								form={form}
-								data={data}
-								settingKey="usageLimitMaxWaitMinutes"
-								label="Longest usage-limit wait"
-								description="Each next wait is twice as long, up to this."
-								unit="min"
-								inputMode="decimal"
-							/>
-							<TextSetting
-								form={form}
-								data={data}
-								settingKey="networkGraceMinutes"
-								label="Network grace"
-								description="The longest total wait for the network to come back. Then the step fails."
-								unit="min"
-								inputMode="decimal"
-							/>
-						</div>
-						<SaveError error={form.saveError} />
-					</FieldGroup>
-				</CardContent>
-				<FormFooter form={form} label="Save run policy" />
-			</CardForm>
-		</Card>
+		<PageSection
+			title="Run policy"
+			description="Defaults for flows that do not set their own."
+		>
+			<Card>
+				<CardForm form={form}>
+					<CardContent>
+						<FieldGroup>
+							<ResumeSetting data={data} />
+							<FieldSeparator />
+							<div className="grid gap-6 sm:grid-cols-2">
+								<TextSetting
+									form={form}
+									data={data}
+									settingKey="usageLimitFirstWaitMinutes"
+									label="First usage-limit wait"
+									description="An agent hits its usage limit and gives no reset time. The run waits this long, then tries again."
+									unit="min"
+									inputMode="decimal"
+								/>
+								<TextSetting
+									form={form}
+									data={data}
+									settingKey="usageLimitMaxWaitMinutes"
+									label="Longest usage-limit wait"
+									description="Each next wait is twice as long, up to this."
+									unit="min"
+									inputMode="decimal"
+								/>
+								<TextSetting
+									form={form}
+									data={data}
+									settingKey="networkGraceMinutes"
+									label="Network grace"
+									description="The longest total wait for the network to come back. Then the step fails."
+									unit="min"
+									inputMode="decimal"
+								/>
+							</div>
+							<SaveError error={form.saveError} />
+						</FieldGroup>
+					</CardContent>
+					<FormFooter form={form} label="Save run policy" />
+				</CardForm>
+			</Card>
+		</PageSection>
 	);
 }
 
@@ -1033,79 +1037,75 @@ function AgentDefaultsCard({ data }: { data: SettingsView }) {
 	}));
 
 	return (
-		<Card>
-			<CardForm form={form}>
-				<CardHeader>
-					<CardTitle>
-						<h2>New Agent nodes</h2>
-					</CardTitle>
-					<CardDescription>
-						What a new Agent or Decision node starts with in the flow editor.
-						Nodes you already made keep their own values.
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<FieldGroup>
-						<div className="grid gap-6 sm:grid-cols-2">
-							<SelectSetting
-								form={form}
-								data={data}
-								settingKey="agentHarness"
-								label="Harness"
-								description={harness.note}
-								options={HARNESSES}
-								onPick={(next) => {
-									// A model suggested for the old harness means nothing to the new one.
-									const model = form.value("agentModel");
-									if (harness.models.includes(model) || model.trim() === "") {
-										form.set("agentModel", harnessInfo(next).defaultModel);
+		<PageSection
+			title="New Agent nodes"
+			description="What a new Agent or Decision node starts with in the flow editor. Nodes you already made keep their own values."
+		>
+			<Card>
+				<CardForm form={form}>
+					<CardContent>
+						<FieldGroup>
+							<div className="grid gap-6 sm:grid-cols-2">
+								<SelectSetting
+									form={form}
+									data={data}
+									settingKey="agentHarness"
+									label="Harness"
+									description={harness.note}
+									options={HARNESSES}
+									onPick={(next) => {
+										// A model suggested for the old harness means nothing to the new one.
+										const model = form.value("agentModel");
+										if (harness.models.includes(model) || model.trim() === "") {
+											form.set("agentModel", harnessInfo(next).defaultModel);
+										}
+									}}
+								/>
+								<TextSetting
+									form={form}
+									data={data}
+									settingKey="agentModel"
+									label="Model"
+									description={`Any model ${harness.label} supports, for example ${harness.models.slice(0, 3).join(", ")}.`}
+									mono
+									suggestions={harness.models}
+								/>
+								<SelectSetting
+									form={form}
+									data={data}
+									settingKey="agentPermissionMode"
+									label="Permission mode"
+									description={
+										mode?.value === "bypassPermissions" ? (
+											<span className="flex items-start gap-1.5 text-status-waiting">
+												<TriangleAlertIcon
+													className="mt-0.5 size-3.5 shrink-0"
+													aria-hidden="true"
+												/>
+												{mode.description}
+											</span>
+										) : (
+											mode?.description
+										)
 									}
-								}}
-							/>
-							<TextSetting
-								form={form}
-								data={data}
-								settingKey="agentModel"
-								label="Model"
-								description={`Any model ${harness.label} supports, for example ${harness.models.slice(0, 3).join(", ")}.`}
-								mono
-								suggestions={harness.models}
-							/>
-							<SelectSetting
-								form={form}
-								data={data}
-								settingKey="agentPermissionMode"
-								label="Permission mode"
-								description={
-									mode?.value === "bypassPermissions" ? (
-										<span className="flex items-start gap-1.5 text-status-waiting">
-											<TriangleAlertIcon
-												className="mt-0.5 size-3.5 shrink-0"
-												aria-hidden="true"
-											/>
-											{mode.description}
-										</span>
-									) : (
-										mode?.description
-									)
-								}
-								options={PERMISSION_MODES}
-							/>
-							<SelectSetting
-								form={form}
-								data={data}
-								settingKey="decisionDecider"
-								label="Decider"
-								description="A new Decision node picks its label with this decision model."
-								options={deciderOptions}
-							/>
-						</div>
-						<SaveError error={form.saveError} />
-					</FieldGroup>
-				</CardContent>
-				<FormFooter form={form} label="Save defaults" />
-			</CardForm>
-		</Card>
+									options={PERMISSION_MODES}
+								/>
+								<SelectSetting
+									form={form}
+									data={data}
+									settingKey="decisionDecider"
+									label="Decider"
+									description="A new Decision node picks its label with this decision model."
+									options={deciderOptions}
+								/>
+							</div>
+							<SaveError error={form.saveError} />
+						</FieldGroup>
+					</CardContent>
+					<FormFooter form={form} label="Save defaults" />
+				</CardForm>
+			</Card>
+		</PageSection>
 	);
 }
 
@@ -1156,73 +1156,73 @@ function NotificationsCard({ data }: { data: SettingsView }) {
 	const anyOn = NOTIFICATIONS.some(({ key }) => data.values[key]);
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>
-					<h2>Notifications on this Mac</h2>
-				</CardTitle>
-				<CardDescription>
-					This browser shows them while Night Shift is open in a tab. Each
-					switch saves at once.
-				</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<FieldGroup>
-					{permission === "denied" && anyOn ? (
-						<Alert>
-							<BellOffIcon />
-							<AlertTitle>This browser blocks notifications</AlertTitle>
-							<AlertDescription>
-								Allow notifications for this site in the browser's site settings
-								(the icon left of the address). On macOS, also allow the browser
-								in System Settings, Notifications.
-							</AlertDescription>
-						</Alert>
-					) : permission === "unsupported" ? (
-						<Alert>
-							<BellOffIcon />
-							<AlertTitle>No notifications in this browser</AlertTitle>
-							<AlertDescription>
-								This browser cannot show desktop notifications.
-							</AlertDescription>
-						</Alert>
-					) : permission === "default" && anyOn ? (
-						<Alert>
-							<CircleAlertIcon />
-							<AlertTitle>The browser has not allowed them yet</AlertTitle>
-							<AlertDescription>
-								Nothing shows until you allow notifications for this site.
-							</AlertDescription>
-							<AlertAction>
-								<Button size="sm" variant="outline" onClick={() => void ask()}>
-									Allow
-								</Button>
-							</AlertAction>
-						</Alert>
-					) : null}
-					{NOTIFICATIONS.map(({ key, label, description }, index) => (
-						<div key={key} className="contents">
-							{index > 0 ? <FieldSeparator /> : null}
-							<Field orientation="horizontal">
-								<FieldContent>
-									<FieldLabel htmlFor={`${id}-${key}`}>{label}</FieldLabel>
-									<FieldDescription>{description}</FieldDescription>
-								</FieldContent>
-								<Switch
-									id={`${id}-${key}`}
-									checked={data.values[key]}
-									disabled={permission === "unsupported"}
-									onCheckedChange={(checked) => {
-										if (checked && permission === "default") void ask();
-										toggle.mutate({ [key]: checked });
-									}}
-								/>
-							</Field>
-						</div>
-					))}
-				</FieldGroup>
-			</CardContent>
-		</Card>
+		<PageSection
+			title="Notifications on this Mac"
+			description="This browser shows them while Night Shift is open in a tab. Each switch saves at once."
+		>
+			<Card>
+				<CardContent>
+					<FieldGroup>
+						{permission === "denied" && anyOn ? (
+							<Alert>
+								<BellOffIcon />
+								<AlertTitle>This browser blocks notifications</AlertTitle>
+								<AlertDescription>
+									Allow notifications for this site in the browser's site
+									settings (the icon left of the address). On macOS, also allow
+									the browser in System Settings, Notifications.
+								</AlertDescription>
+							</Alert>
+						) : permission === "unsupported" ? (
+							<Alert>
+								<BellOffIcon />
+								<AlertTitle>No notifications in this browser</AlertTitle>
+								<AlertDescription>
+									This browser cannot show desktop notifications.
+								</AlertDescription>
+							</Alert>
+						) : permission === "default" && anyOn ? (
+							<Alert>
+								<CircleAlertIcon />
+								<AlertTitle>The browser has not allowed them yet</AlertTitle>
+								<AlertDescription>
+									Nothing shows until you allow notifications for this site.
+								</AlertDescription>
+								<AlertAction>
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() => void ask()}
+									>
+										Allow
+									</Button>
+								</AlertAction>
+							</Alert>
+						) : null}
+						{NOTIFICATIONS.map(({ key, label, description }, index) => (
+							<div key={key} className="contents">
+								{index > 0 ? <FieldSeparator /> : null}
+								<Field orientation="horizontal">
+									<FieldContent>
+										<FieldLabel htmlFor={`${id}-${key}`}>{label}</FieldLabel>
+										<FieldDescription>{description}</FieldDescription>
+									</FieldContent>
+									<Switch
+										id={`${id}-${key}`}
+										checked={data.values[key]}
+										disabled={permission === "unsupported"}
+										onCheckedChange={(checked) => {
+											if (checked && permission === "default") void ask();
+											toggle.mutate({ [key]: checked });
+										}}
+									/>
+								</Field>
+							</div>
+						))}
+					</FieldGroup>
+				</CardContent>
+			</Card>
+		</PageSection>
 	);
 }
 
@@ -1259,37 +1259,33 @@ function AppearanceCard() {
 	useEffect(() => setMounted(true), []);
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>
-					<h2>Appearance</h2>
-				</CardTitle>
-				<CardDescription>Saved in this browser only.</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<RadioGroup
-					aria-label="Theme"
-					value={mounted ? (theme ?? "system") : null}
-					onValueChange={(value) => setTheme(String(value))}
-					className="grid gap-3 sm:grid-cols-3"
-				>
-					{THEMES.map(({ value, label, description, icon: Icon }) => (
-						<FieldLabel key={value} htmlFor={`${id}-${value}`}>
-							<Field orientation="horizontal">
-								<FieldContent>
-									<FieldTitle>
-										<Icon className="size-4" aria-hidden="true" />
-										{label}
-									</FieldTitle>
-									<FieldDescription>{description}</FieldDescription>
-								</FieldContent>
-								<RadioGroupItem value={value} id={`${id}-${value}`} />
-							</Field>
-						</FieldLabel>
-					))}
-				</RadioGroup>
-			</CardContent>
-		</Card>
+		<PageSection title="Appearance" description="Saved in this browser only.">
+			<Card>
+				<CardContent>
+					<RadioGroup
+						aria-label="Theme"
+						value={mounted ? (theme ?? "system") : null}
+						onValueChange={(value) => setTheme(String(value))}
+						className="grid gap-3 sm:grid-cols-3"
+					>
+						{THEMES.map(({ value, label, description, icon: Icon }) => (
+							<FieldLabel key={value} htmlFor={`${id}-${value}`}>
+								<Field orientation="horizontal">
+									<FieldContent>
+										<FieldTitle>
+											<Icon className="size-4" aria-hidden="true" />
+											{label}
+										</FieldTitle>
+										<FieldDescription>{description}</FieldDescription>
+									</FieldContent>
+									<RadioGroupItem value={value} id={`${id}-${value}`} />
+								</Field>
+							</FieldLabel>
+						))}
+					</RadioGroup>
+				</CardContent>
+			</Card>
+		</PageSection>
 	);
 }
 
@@ -1309,118 +1305,117 @@ function DaemonCard({
 		| undefined;
 }) {
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>
-					<h2>This computer</h2>
-				</CardTitle>
-				<CardDescription>Where Night Shift keeps its data.</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<ItemGroup>
-					<Item size="sm" className="px-0">
-						<ItemMedia variant="icon">
-							<LaptopIcon aria-hidden="true" />
-						</ItemMedia>
-						<ItemContent className="min-w-0">
-							<ItemTitle>Name</ItemTitle>
-							<ItemDescription className="truncate">
-								{deviceName ?? <Skeleton className="h-4 w-32" />}
-							</ItemDescription>
-						</ItemContent>
-					</Item>
-					<ItemSeparator />
-					<Item size="sm" className="px-0">
-						<ItemMedia variant="icon">
-							<FolderIcon aria-hidden="true" />
-						</ItemMedia>
-						<ItemContent className="min-w-0">
-							<ItemTitle>Data folder</ItemTitle>
-							<ItemDescription
-								className="truncate font-mono text-xs"
-								title={dataDir}
-							>
-								{dataDir ?? <Skeleton className="h-4 w-64" />}
-							</ItemDescription>
-						</ItemContent>
-						{dataDir ? (
+		<PageSection
+			title="This computer"
+			description="Where Night Shift keeps its data."
+		>
+			<Card>
+				<CardContent>
+					<ItemGroup>
+						<Item size="sm" className="px-0">
+							<ItemMedia variant="icon">
+								<LaptopIcon aria-hidden="true" />
+							</ItemMedia>
+							<ItemContent className="min-w-0">
+								<ItemTitle>Name</ItemTitle>
+								<ItemDescription className="truncate">
+									{deviceName ?? <Skeleton className="h-4 w-32" />}
+								</ItemDescription>
+							</ItemContent>
+						</Item>
+						<ItemSeparator />
+						<Item size="sm" className="px-0">
+							<ItemMedia variant="icon">
+								<FolderIcon aria-hidden="true" />
+							</ItemMedia>
+							<ItemContent className="min-w-0">
+								<ItemTitle>Data folder</ItemTitle>
+								<ItemDescription
+									className="truncate font-mono text-xs"
+									title={dataDir}
+								>
+									{dataDir ?? <Skeleton className="h-4 w-64" />}
+								</ItemDescription>
+							</ItemContent>
+							{dataDir ? (
+								<ItemActions>
+									<Button
+										variant="ghost"
+										size="icon-sm"
+										aria-label="Copy the data folder path"
+										onClick={() => {
+											void navigator.clipboard
+												.writeText(dataDir)
+												.then(() => toast.success("Path copied"));
+										}}
+									>
+										<CopyIcon />
+									</Button>
+								</ItemActions>
+							) : null}
+						</Item>
+						<ItemSeparator />
+						<Item size="sm" className="px-0">
+							<ItemMedia variant="icon">
+								<LockIcon aria-hidden="true" />
+							</ItemMedia>
+							<ItemContent>
+								<ItemTitle>Status</ItemTitle>
+								<ItemDescription className="line-clamp-none">
+									{lease ? (
+										<>
+											On {lease.host} since {formatDateTime(lease.since)}. Only
+											one Night Shift at a time can use this data.
+										</>
+									) : (
+										<Skeleton className="h-4 w-64" />
+									)}
+								</ItemDescription>
+							</ItemContent>
+							{lease ? (
+								<ItemActions>
+									<Badge variant="outline">Running</Badge>
+								</ItemActions>
+							) : null}
+						</Item>
+						<ItemSeparator />
+						<Item size="sm" className="px-0">
+							<ItemMedia variant="icon">
+								<DatabaseIcon aria-hidden="true" />
+							</ItemMedia>
+							<ItemContent>
+								<ItemTitle>Your settings</ItemTitle>
+								<ItemDescription className="line-clamp-none">
+									Saved on this computer. A setting you do not change uses its
+									default.
+								</ItemDescription>
+							</ItemContent>
+						</Item>
+						<ItemSeparator />
+						<Item size="sm" className="px-0">
+							<ItemMedia variant="icon">
+								<PlugIcon aria-hidden="true" />
+							</ItemMedia>
+							<ItemContent>
+								<ItemTitle>Coding agents</ItemTitle>
+								<ItemDescription className="line-clamp-none">
+									Check where your harnesses are installed, on the Agents page.
+								</ItemDescription>
+							</ItemContent>
 							<ItemActions>
 								<Button
-									variant="ghost"
-									size="icon-sm"
-									aria-label="Copy the data folder path"
-									onClick={() => {
-										void navigator.clipboard
-											.writeText(dataDir)
-											.then(() => toast.success("Path copied"));
-									}}
+									variant="outline"
+									size="sm"
+									nativeButton={false}
+									render={<Link to="/connections" />}
 								>
-									<CopyIcon />
+									Agents
 								</Button>
 							</ItemActions>
-						) : null}
-					</Item>
-					<ItemSeparator />
-					<Item size="sm" className="px-0">
-						<ItemMedia variant="icon">
-							<LockIcon aria-hidden="true" />
-						</ItemMedia>
-						<ItemContent>
-							<ItemTitle>Status</ItemTitle>
-							<ItemDescription className="line-clamp-none">
-								{lease ? (
-									<>
-										On {lease.host} since {formatDateTime(lease.since)}. Only
-										one Night Shift at a time can use this data.
-									</>
-								) : (
-									<Skeleton className="h-4 w-64" />
-								)}
-							</ItemDescription>
-						</ItemContent>
-						{lease ? (
-							<ItemActions>
-								<Badge variant="outline">Running</Badge>
-							</ItemActions>
-						) : null}
-					</Item>
-					<ItemSeparator />
-					<Item size="sm" className="px-0">
-						<ItemMedia variant="icon">
-							<DatabaseIcon aria-hidden="true" />
-						</ItemMedia>
-						<ItemContent>
-							<ItemTitle>Your settings</ItemTitle>
-							<ItemDescription className="line-clamp-none">
-								Saved on this computer. A setting you do not change uses its
-								default.
-							</ItemDescription>
-						</ItemContent>
-					</Item>
-					<ItemSeparator />
-					<Item size="sm" className="px-0">
-						<ItemMedia variant="icon">
-							<PlugIcon aria-hidden="true" />
-						</ItemMedia>
-						<ItemContent>
-							<ItemTitle>Coding agents</ItemTitle>
-							<ItemDescription className="line-clamp-none">
-								Check where your harnesses are installed, on the Agents page.
-							</ItemDescription>
-						</ItemContent>
-						<ItemActions>
-							<Button
-								variant="outline"
-								size="sm"
-								nativeButton={false}
-								render={<Link to="/connections" />}
-							>
-								Agents
-							</Button>
-						</ItemActions>
-					</Item>
-				</ItemGroup>
-			</CardContent>
-		</Card>
+						</Item>
+					</ItemGroup>
+				</CardContent>
+			</Card>
+		</PageSection>
 	);
 }

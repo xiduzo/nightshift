@@ -15,14 +15,7 @@ import {
 } from "@nightshift/ui/components/alert-dialog";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
-import {
-	Card,
-	CardAction,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui/components/card";
+import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Dialog,
 	DialogClose,
@@ -49,14 +42,6 @@ import {
 import { Input } from "@nightshift/ui/components/input";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@nightshift/ui/components/table";
-import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
@@ -71,6 +56,8 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
+import { DataTable, dataTableColumns } from "@/components/data-table";
+import { PageSection } from "@/components/page-heading";
 import { orpc } from "@/utils/orpc";
 
 import type { SecretView } from "./types";
@@ -113,6 +100,75 @@ function WhereBadges({ secret }: { secret: SecretView }) {
 	);
 }
 
+const column = dataTableColumns<SecretView>();
+
+function secretColumns({
+	onSet,
+	onRemove,
+}: {
+	onSet: (name: string) => void;
+	onRemove: (name: string) => void;
+}) {
+	return column.columns([
+		column.accessor("name", {
+			header: "Name",
+			meta: {
+				headClassName: "pl-4 md:pl-6",
+				cellClassName: "pl-4 font-mono md:pl-6",
+			},
+		}),
+		column.display({
+			id: "where",
+			header: "Where",
+			cell: ({ row }) => <WhereBadges secret={row.original} />,
+		}),
+		column.accessor("usedBy", {
+			header: "Used by",
+			cell: ({ row }) =>
+				row.original.usedBy.length > 0 ? row.original.usedBy.join(", ") : "—",
+			meta: { cellClassName: "font-mono text-muted-foreground" },
+		}),
+		column.display({
+			id: "actions",
+			header: () => <span className="sr-only">Actions</span>,
+			cell: ({ row: { original: secret } }) => (
+				<div className="flex justify-end gap-1">
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => onSet(secret.name)}
+					>
+						<KeyRoundIcon data-icon="inline-start" />
+						Set
+					</Button>
+					{secret.saved ? (
+						<Tooltip>
+							<TooltipTrigger
+								render={
+									<Button
+										variant="ghost"
+										size="icon-sm"
+										aria-label={`Remove ${secret.name} from the keychain`}
+										className="text-muted-foreground hover:text-destructive"
+										onClick={() => onRemove(secret.name)}
+									/>
+								}
+							>
+								<Trash2Icon />
+							</TooltipTrigger>
+							<TooltipContent>Remove from keychain</TooltipContent>
+						</Tooltip>
+					) : null}
+				</div>
+			),
+			meta: {
+				headClassName: "pr-4 text-right md:pr-6",
+				cellClassName: "pr-4 md:pr-6",
+			},
+		}),
+	]);
+}
+
 /** The `${NAME}` values connections read: saved in the keychain, or from the environment. */
 export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 	/** The secret being set; "" adds a new one. */
@@ -120,114 +176,67 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 	const [removing, setRemoving] = useState<string | null>(null);
 
 	return (
-		<Card className="gap-0 py-0">
-			<CardHeader className="border-b py-4 [.border-b]:pb-4">
-				<CardTitle>
-					<h2 id="secrets-heading">Secrets</h2>
-				</CardTitle>
-				<CardDescription>
+		<PageSection
+			title="Secrets"
+			description={
+				<>
 					Tokens and passwords your tools use, written as{" "}
 					<span className="font-mono">${"{NAME}"}</span>. Night Shift keeps them
 					in your macOS keychain and never shows them again.
-				</CardDescription>
-				<CardAction>
-					<Button variant="outline" size="sm" onClick={() => setSetting("")}>
-						<PlusIcon data-icon="inline-start" />
-						Add secret
-					</Button>
-				</CardAction>
-			</CardHeader>
-			<CardContent className="px-0">
-				{secrets.length === 0 ? (
-					<Empty className="py-8">
-						<EmptyHeader>
-							<EmptyMedia variant="icon">
-								<KeyRoundIcon />
-							</EmptyMedia>
-							<EmptyTitle>No secrets yet</EmptyTitle>
-							<EmptyDescription>
-								Add a secret, or write{" "}
-								<span className="font-mono">${"{NAME}"}</span> in a tool's
-								settings and it shows up here.
-							</EmptyDescription>
-						</EmptyHeader>
-					</Empty>
-				) : (
-					<Table aria-labelledby="secrets-heading">
-						<TableHeader>
-							<TableRow>
-								<TableHead className="pl-4 md:pl-6">Name</TableHead>
-								<TableHead>Where</TableHead>
-								<TableHead>Used by</TableHead>
-								<TableHead className="pr-4 text-right md:pr-6">
-									<span className="sr-only">Actions</span>
-								</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{secrets.map((secret) => (
-								<TableRow key={secret.name}>
-									<TableCell className="pl-4 font-mono md:pl-6">
-										{secret.name}
-									</TableCell>
-									<TableCell>
-										<WhereBadges secret={secret} />
-									</TableCell>
-									<TableCell className="font-mono text-muted-foreground">
-										{secret.usedBy.length > 0 ? secret.usedBy.join(", ") : "—"}
-									</TableCell>
-									<TableCell className="pr-4 md:pr-6">
-										<div className="flex justify-end gap-1">
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={() => setSetting(secret.name)}
-											>
-												<KeyRoundIcon data-icon="inline-start" />
-												Set
-											</Button>
-											{secret.saved ? (
-												<Tooltip>
-													<TooltipTrigger
-														render={
-															<Button
-																variant="ghost"
-																size="icon-sm"
-																aria-label={`Remove ${secret.name} from the keychain`}
-																className="text-muted-foreground hover:text-destructive"
-																onClick={() => setRemoving(secret.name)}
-															/>
-														}
-													>
-														<Trash2Icon />
-													</TooltipTrigger>
-													<TooltipContent>Remove from keychain</TooltipContent>
-												</Tooltip>
-											) : null}
-										</div>
-									</TableCell>
-								</TableRow>
-							))}
-						</TableBody>
-					</Table>
-				)}
-			</CardContent>
+				</>
+			}
+			actions={
+				<Button variant="outline" size="sm" onClick={() => setSetting("")}>
+					<PlusIcon data-icon="inline-start" />
+					Add secret
+				</Button>
+			}
+		>
+			<Card className="py-0">
+				<CardContent className="px-0">
+					{secrets.length === 0 ? (
+						<Empty>
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<KeyRoundIcon />
+								</EmptyMedia>
+								<EmptyTitle>No secrets yet</EmptyTitle>
+								<EmptyDescription>
+									Add a secret, or write{" "}
+									<span className="font-mono">${"{NAME}"}</span> in a tool's
+									settings and it shows up here.
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
+					) : (
+						<DataTable
+							aria-label="Secrets"
+							columns={secretColumns({
+								onSet: setSetting,
+								onRemove: setRemoving,
+							})}
+							data={secrets}
+							getRowId={(secret) => secret.name}
+						/>
+					)}
+				</CardContent>
 
-			<SecretDialog
-				name={setting}
-				secret={secrets.find((s) => s.name === setting) ?? null}
-				onOpenChange={(open) => {
-					if (!open) setSetting(null);
-				}}
-			/>
-			<RemoveSecretDialog
-				name={removing}
-				secret={secrets.find((s) => s.name === removing) ?? null}
-				onOpenChange={(open) => {
-					if (!open) setRemoving(null);
-				}}
-			/>
-		</Card>
+				<SecretDialog
+					name={setting}
+					secret={secrets.find((s) => s.name === setting) ?? null}
+					onOpenChange={(open) => {
+						if (!open) setSetting(null);
+					}}
+				/>
+				<RemoveSecretDialog
+					name={removing}
+					secret={secrets.find((s) => s.name === removing) ?? null}
+					onOpenChange={(open) => {
+						if (!open) setRemoving(null);
+					}}
+				/>
+			</Card>
+		</PageSection>
 	);
 }
 

@@ -176,6 +176,34 @@ export async function currentBranch(cwd: string): Promise<string | null> {
 	return result.exitCode === 0 && result.stdout ? result.stdout : null;
 }
 
+/** The branches of a clone, newest commit first. */
+export type Branches = {
+	/** The checked-out branch, or null when HEAD is detached. */
+	current: string | null;
+	local: string[];
+	/** As `origin/main`, without the remotes' `HEAD`. */
+	remote: string[];
+};
+
+/** The local and remote-tracking branches of a clone, as git knows them now (no fetch). */
+export async function listBranches(cwd: string): Promise<Branches> {
+	const refs = await gitOrThrow(cwd, [
+		"for-each-ref",
+		"--sort=-committerdate",
+		"--format=%(refname)",
+		"refs/heads",
+		"refs/remotes",
+	]);
+	const local: string[] = [];
+	const remote: string[] = [];
+	for (const ref of refs.split("\n")) {
+		if (ref.startsWith("refs/heads/")) local.push(ref.slice(11));
+		else if (ref.startsWith("refs/remotes/") && !ref.endsWith("/HEAD"))
+			remote.push(ref.slice(13));
+	}
+	return { current: await currentBranch(cwd), local, remote };
+}
+
 export async function branchExists(
 	cwd: string,
 	name: string,
