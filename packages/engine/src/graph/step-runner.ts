@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
+import type { Command, LangGraphRunnableConfig } from "@langchain/langgraph";
 import {
 	agentSession,
 	step as stepTable,
@@ -21,7 +21,6 @@ import {
 import { commandLogPath, transcriptPath } from "../transcripts";
 import type { StepEvent, StepOutcome } from "../types";
 import {
-	beginWait,
 	emit,
 	messageOf,
 	pastStopTime,
@@ -30,7 +29,6 @@ import {
 	type StepContext,
 	stopAtOf,
 	templateContext,
-	type WaitRequest,
 } from "./context";
 import {
 	entryOf,
@@ -44,9 +42,14 @@ import {
 	route,
 	type StepEnd,
 	scopeOf,
-	waitNodeId,
 } from "./route";
-import type { PendingWait, RunStateValues } from "./state";
+import {
+	type OwnWait,
+	type SleepRequest,
+	sleep,
+	type WaitRequest,
+} from "./sleep";
+import type { RunStateValues } from "./state";
 
 /**
  * The step runner: one deep module that owns the lifecycle every step node
@@ -56,8 +59,8 @@ import type { PendingWait, RunStateValues } from "./state";
  * (`resumePoint`), runs the entry checks of a new visit, writes the `step`
  * row and the step's log events, opens the transcript and the timers,
  * translates an abort into the step's outcome, catches what the body
- * throws, turns a wait request into a park at the wait node (`beginWait`,
- * called from here only) and routes on the end (`route()`).
+ * throws, hands a wait to the sleep module (`sleep()`, called from here
+ * only) and routes on the end (`route()`).
  *
  * Before this module every node repeated that skeleton around its own
  * work, and `StepHandle` was as wide as its implementation. Now the seam
@@ -171,12 +174,11 @@ export type BodyEnd = {
  *   runner reads the signal's reason and ends the step `stopped` (a person
  *   stopped the run) or `error` (the time budget, or no activity), with the
  *   outputs the body had so far.
- * - `wait`: a usage limit or a network failure (`WaitRequest`); the runner
- *   plans the policy's wait and parks at the wait node, or ends the step
- *   when the wait would pass the stop time or the grace is spent.
- * - `sleep`: a Wait node worked out its own wake time and appended
- *   `WaitStarted`; the runner leaves the step open and parks at the wait
- *   node with that pending wait.
+ * - `wait`: a usage limit or a network failure (`WaitRequest`); the sleep
+ *   module plans the policy's wait and parks at the wait node, or the step
+ *   ends when the wait would pass the stop time or the grace is spent.
+ * - `sleep`: a Wait node worked out its own wake time (`OwnWait`); the
+ *   sleep module persists it and parks at the wait node, the step open.
  */
 export type BodyResult =
 	| BodyEnd
@@ -187,7 +189,7 @@ export type BodyResult =
 			harnessSessionId?: string | null;
 	  }
 	| ({ kind: "wait"; costUsd?: number | null } & WaitRequest)
-	| { kind: "sleep"; pending: PendingWait };
+	| ({ kind: "sleep" } & OwnWait);
 
 /** What a node tells the runner: how it re-enters, what its body does, what an empty end looks like. */
 export type StepSpec = {
@@ -266,13 +268,6 @@ export async function runStep(
 			? { harnessSessionId: r.harnessSessionId }
 			: {}),
 	});
-	/** Parks at the node's wait node with the pending wait; the step stays open. */
-	const parkAtWait = (pending: PendingWait) =>
-		new Command({
-			update: { pending, visits: { [node.id]: step.visit } },
-			goto: waitNodeId(node.id),
-		});
-
 	switch (result.kind) {
 		case "end": {
 			const end = await step.end(
@@ -293,32 +288,34 @@ export async function runStep(
 			);
 			return route(ctx, state, node, end, config);
 		}
-		case "wait": {
-			const waited = await beginWait(ctx, node, state, config, step, result);
-			if (waited.kind === "wait") return parkAtWait(waited.pending);
+		case "wait":
+		case "sleep": {
+			const request: SleepRequest =
+				result.kind === "wait"
+					? { ...result, kind: "policy" }
+					: { ...result, kind: "own" };
+			const slept = await sleep(ctx, node, state, config, step, request);
+			if (slept.kind === "asleep") return slept.command;
 			// The step ends before its wait: with the session it has, and
 			// what the decider cost before it hit the limit.
-			const extra = extraOf(result);
-			if (waited.kind === "stop-time") {
+			const extra = result.kind === "wait" ? extraOf(result) : {};
+			if (slept.kind === "stop-time") {
 				const end = await step.end(
 					"stopped",
 					await blank("stopped"),
 					null,
 					extra,
 				);
-				return parkStopped(node, end, waited.reason);
+				return parkStopped(node, end, slept.reason);
 			}
 			const end = await step.end(
 				"error",
 				await blank("error"),
-				waited.error,
+				slept.error,
 				extra,
 			);
 			return route(ctx, state, node, end, config);
 		}
-		case "sleep":
-			step.leaveOpen();
-			return parkAtWait(result.pending);
 	}
 }
 

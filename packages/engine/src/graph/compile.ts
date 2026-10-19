@@ -11,8 +11,8 @@ import { toolNode } from "./nodes/tool";
 import { valueNode } from "./nodes/value";
 import { waitStepNode } from "./nodes/wait";
 import { askNodeId, parkNode, parkNodeId, waitNodeId } from "./route";
+import { waitNode } from "./sleep";
 import { RunState } from "./state";
-import { waitNode } from "./wait";
 
 /**
  * Compiles a Night Shift flow (the run's snapshot) into a LangGraph
@@ -20,7 +20,7 @@ import { waitNode } from "./wait";
  * park node `park__<id>` (design rule 2: a failed or stopped step parks
  * the run there, and only a chosen end reaches END); an Agent node, a
  * Decision decided by a model, a Value made by a model or a Wait node also
- * has a wait node `wait__<id>` (rule 8), the shared `waitNode`; a Decision
+ * has a wait node `wait__<id>` (rule 8), the sleep module's `waitNode`; a Decision
  * decided by a person (a Gate) has an
  * ask node `ask__<id>` that interrupts with the Gate the node opened. No
  * static edges besides START → `flow.start`: every node returns `new

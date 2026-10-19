@@ -535,14 +535,15 @@ describe("the Agent node", () => {
 			stepId,
 			nodeId: "worker",
 			visit: 1,
-			harnessSessionId: "fake-session-1",
-			prompt: DEFAULT_RESUME_PROMPT,
 			reason: "usage-limit",
 			until: resetAt + MINUTE,
 			message:
 				"Usage limit: You've hit your limit. The step continues a minute after the reset.",
-			resetAt,
 			streak: { count: 1, since: expect.any(Number) },
+			session: {
+				harnessSessionId: "fake-session-1",
+				prompt: DEFAULT_RESUME_PROMPT,
+			},
 		});
 		expect(first.state.ended).toBeNull();
 		expect(await h.types()).toEqual([

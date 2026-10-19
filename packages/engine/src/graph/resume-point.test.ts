@@ -138,13 +138,11 @@ const waitPending = (
 	stepId,
 	nodeId: NODE.id,
 	visit: 1,
-	harnessSessionId,
-	prompt: "Carry on.",
 	reason: "usage-limit",
 	until: 2_000,
 	message: "Waits.",
-	resetAt: null,
 	streak: { count: 1, since: 1_000 },
+	session: { harnessSessionId, prompt: "Carry on." },
 });
 const parkedPending = (
 	stepId: string | null,

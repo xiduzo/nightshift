@@ -370,8 +370,7 @@ describe("the Decision node", () => {
 			stepId,
 			nodeId: "decide",
 			visit: 1,
-			harnessSessionId: null,
-			prompt: DEFAULT_RESUME_PROMPT,
+			session: { harnessSessionId: null, prompt: DEFAULT_RESUME_PROMPT },
 			reason: "usage-limit",
 		});
 		expect(await h.types()).toEqual([

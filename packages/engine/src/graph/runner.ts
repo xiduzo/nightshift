@@ -20,7 +20,6 @@ import { eachOutputs } from "../each";
 import {
 	type DerivedStep,
 	deriveRunState,
-	deriveSteps,
 	type LoggedEvent,
 	parkedSteps,
 	type RunEnding,
@@ -39,6 +38,7 @@ import {
 	type StepContext,
 } from "./context";
 import { reenteredNode, reentryUpdate } from "./resume-point";
+import { createSleeps } from "./sleep";
 import type {
 	Ended,
 	Parked,
@@ -53,8 +53,10 @@ import type {
  * id) on a graph compiled from the run's flow snapshot (design rule 1).
  * The runner streams the graph, reacts to its interrupts, appends
  * `RunEnded`, and owns what the walk owned around the steps: the slots and
- * the run cap, the per-run `exclusive` queue, the wake timers of sleeping
- * runs, a stop with its grace, and `closeParked`.
+ * the run cap, the per-run `exclusive` queue, a stop with its grace, and
+ * `closeParked`. The wake timers and the wake of a sleeping run are the
+ * sleep module's (`sleeps`, `graph/sleep.ts`), given the runner's thread
+ * seam.
  *
  * - `start` streams `{ inputs }`; `continueRun` streams `null` (the node a
  *   dead daemon left pending re-runs, rule 5); `resume` streams
@@ -63,9 +65,10 @@ import type {
  *   and the seed state: `reenteredNode` and `reentryUpdate` in
  *   resume-point.ts, next to the rule the nodes re-enter by).
  * - Only the root namespace's `__interrupt__` counts (one interrupt repeats
- *   once per level). A `wait` schedules the wake timer (`WaitStarted` is in
- *   the log already); a `gate` needs nothing (the Gate node logged
- *   `GateOpened`); `parked` appends `RunEnded` with its status and reason.
+ *   once per level). A `wait` schedules the wake timer with the sleep
+ *   module (`WaitStarted` is in the log already); a `gate` needs nothing
+ *   (the Gate node logged `GateOpened`); `parked` appends `RunEnded` with
+ *   its status and reason.
  * - A stream that ends with `state.ended` set appends `RunEnded finished`
  *   and prunes the thread to its latest checkpoint (the log is the
  *   record); one that throws appends `RunEnded failed` with `The engine
@@ -73,9 +76,6 @@ import type {
  * - The custom stream chunks (`RunEvent`) are the runner's bookkeeping:
  *   transcript entries reach the bus from the recorder already.
  */
-
-/** setTimeout cannot wait longer; a longer wait checks the clock and waits again. */
-const MAX_TIMER_MS = 2 ** 31 - 1;
 
 export type RunnerDeps = {
 	db: Database;
@@ -98,7 +98,7 @@ export type RunnerDeps = {
 	policyFor(flow: Flow): ResolvedPolicy;
 	/** Aborting it clears the wake timers and ignores later wakes: the daemon dies. */
 	signal?: AbortSignal;
-	/** Called after a drive ended and its slot freed, once the pending wakes drained. */
+	/** Called after a drive ended and its slot freed, once the queued wakes drained. */
 	onSlotFreed?: () => void;
 };
 
@@ -143,17 +143,29 @@ export function createRunner(deps: RunnerDeps) {
 	const slots = new Map<string, Slot>();
 	/** Per-run queues: answering, stopping, waking and closing never interleave. */
 	const runLocks = new Map<string, Promise<void>>();
-	/** Timers that end the waits of sleeping runs, by run id. */
-	const wakeTimers = new Map<string, ReturnType<typeof setTimeout>>();
-	/** Sleeping runs whose wait ended while the run cap was full. */
-	const pendingWakes = new Set<string>();
-	let disposed = false;
+	/** The sleep module's daemon side, on this runner's thread seam (the functions below are hoisted). */
+	const sleeps = createSleeps({
+		db,
+		log,
+		bus,
+		now: deps.now,
+		recorders,
+		thread: {
+			async settled(runId) {
+				// The drive that began the wait may still be unwinding.
+				const slot = slots.get(runId);
+				if (slot && slot !== "starting") await slot.done;
+			},
+			exclusive,
+			state: threadState,
+			reserveSlot,
+			releaseStartingSlot,
+			resume: (row, value) => drive(row, new Command({ resume: value })),
+		},
+	});
 
 	function dispose(): void {
-		disposed = true;
-		for (const timer of wakeTimers.values()) clearTimeout(timer);
-		wakeTimers.clear();
-		pendingWakes.clear();
+		sleeps.dispose();
 		threads.clear();
 	}
 	deps.signal?.addEventListener("abort", dispose, { once: true });
@@ -263,7 +275,7 @@ export function createRunner(deps: RunnerDeps) {
 		walk.done = driveThread(row, walk.controller, input).finally(() => {
 			if (slots.get(runId) === walk) slots.delete(runId);
 			bus.publish(runId, { kind: "status-changed" });
-			drainPendingWakes();
+			sleeps.drain();
 			deps.onSlotFreed?.();
 		});
 	}
@@ -358,7 +370,7 @@ export function createRunner(deps: RunnerDeps) {
 		switch (parked.kind) {
 			case "wait":
 				// A wait with no time (a signal with no timeout) has no timer.
-				if (parked.until !== null) scheduleWake(runId, parked.until);
+				if (parked.until !== null) sleeps.schedule(runId, parked.until);
 				if (signal.aborted) await closeParked(runId);
 				return;
 			case "gate":
@@ -371,113 +383,6 @@ export function createRunner(deps: RunnerDeps) {
 		}
 	}
 
-	function clearWakeTimer(runId: string): void {
-		const timer = wakeTimers.get(runId);
-		if (timer !== undefined) clearTimeout(timer);
-		wakeTimers.delete(runId);
-	}
-
-	function scheduleWake(runId: string, until: number): void {
-		clearWakeTimer(runId);
-		if (disposed) return;
-		const delay = Math.min(Math.max(0, until - deps.now()), MAX_TIMER_MS);
-		const timer = setTimeout(() => {
-			wakeTimers.delete(runId);
-			wake(runId, { early: false }).catch((error) => {
-				console.error(`[engine] could not wake run ${runId}`, error);
-			});
-		}, delay);
-		timer.unref?.();
-		wakeTimers.set(runId, timer);
-	}
-
-	function drainPendingWakes(): void {
-		if (disposed) return;
-		for (const runId of [...pendingWakes]) {
-			pendingWakes.delete(runId);
-			wake(runId, { early: false }).catch((error) => {
-				console.error(`[engine] could not wake run ${runId}`, error);
-			});
-		}
-	}
-
-	/**
-	 * Ends the wait of a sleeping run and continues the step that waited:
-	 * `WaitEnded`, the transcript `wake` entry, then `Command({ resume:
-	 * { kind: "wake" } })` into the wait node. `early`: a person resumed the
-	 * run before its time (a full run cap then fails); otherwise a full cap
-	 * queues the wake until a slot frees. `signal`: someone sent the run
-	 * that signal; the resume is `{ kind: "signal" }` and the Wait node on
-	 * it ends `done`.
-	 */
-	async function wake(
-		runId: string,
-		input: { early: boolean; prompt?: string; signal?: string },
-	): Promise<void> {
-		if (disposed) return;
-		// The drive that began the wait may still be unwinding.
-		const slot = slots.get(runId);
-		if (slot && slot !== "starting") await slot.done;
-		await exclusive(runId, async () => {
-			if (disposed) return;
-			const events = await log.events(runId);
-			// The log says whether the run still sleeps (a stop ends the sleep
-			// with the thread left at its wait); the wait itself is the
-			// interrupt the thread sits at.
-			if (deriveRunState(events).status !== "sleeping") return;
-			const row = await getRunRow(db, runId);
-			const thread = await threadState(row);
-			if (thread.kind !== "interrupted" || thread.value.kind !== "wait") return;
-			const sleep = thread.value;
-			if (!input.early && sleep.until !== null && deps.now() < sleep.until) {
-				scheduleWake(runId, sleep.until);
-				return;
-			}
-			clearWakeTimer(runId);
-			try {
-				reserveSlot(runId);
-			} catch (error) {
-				if (input.early) throw error;
-				pendingWakes.add(runId);
-				return;
-			}
-			try {
-				const waiting = deriveSteps(events).find((s) => s.id === sleep.stepId);
-				if (!waiting) throw new Error(`Step not found: ${sleep.stepId}`);
-				const signal =
-					input.signal !== undefined ? { signal: input.signal } : {};
-				await log.append({
-					type: "WaitEnded",
-					runId,
-					stepId: waiting.id,
-					payload: { early: input.early, ...signal },
-				});
-				const recorder = await recorders.open(
-					runId,
-					waiting.id,
-					waiting.transcriptPath,
-				);
-				try {
-					recorder.record(null, { type: "wake", ...signal });
-				} finally {
-					recorder.close();
-				}
-				bus.publish(runId, { kind: "step-changed", stepId: waiting.id });
-				const resume: ResumeValue =
-					input.signal !== undefined
-						? { kind: "signal", name: input.signal }
-						: {
-								kind: "wake",
-								early: input.early,
-								...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
-							};
-				drive(row, new Command({ resume }));
-			} finally {
-				releaseStartingSlot(runId);
-			}
-		});
-	}
-
 	/**
 	 * Closes the step the run is parked at (an open Gate or a sleeping step)
 	 * and the Call steps around it without an answer, and
@@ -488,8 +393,7 @@ export function createRunner(deps: RunnerDeps) {
 		const status = "stopped";
 		const parked = parkedSteps(await log.events(runId));
 		if (parked.length === 0) return false;
-		clearWakeTimer(runId);
-		pendingWakes.delete(runId);
+		sleeps.forget(runId);
 		const row = await getRunRow(db, runId);
 		const nodes = nodesOf(deps.flowOf(row), deps.calledFlowsOf(row), parked);
 		for (const open of parked) {
@@ -636,12 +540,10 @@ export function createRunner(deps: RunnerDeps) {
 			drive(row, jump);
 		},
 		threadState,
-		wake,
+		/** The sleeping runs: `wake(runId, how)`, `restore(runId, events)` (`graph/sleep.ts`). */
+		sleeps,
 		stop,
 		closeParked,
-		scheduleWake,
-		clearWakeTimer,
-		drainPendingWakes,
 		dispose,
 	};
 }

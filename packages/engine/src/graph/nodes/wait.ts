@@ -10,18 +10,20 @@ import type { StepOutputs } from "../../events";
 import { commandLogPath } from "../../transcripts";
 import type { NodeAction, StepContext } from "../context";
 import { RESUME_RULES } from "../resume-point";
-import type { PendingWait, RunStateValues } from "../state";
+import { type OwnWait, pendingWaitOf } from "../sleep";
+import type { PendingWait } from "../state";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 
 /**
  * The Wait node: the first node whose whole job is the engine's park-and-wake
- * machinery. Its body works out when to wake, appends `WaitStarted`, records
- * the transcript `wait` entry and asks the step runner to sleep: the runner
- * leaves the step open and jumps to the node's wait node (`wait__<id>`, the
- * shared `waitNode`), which interrupts; the runner schedules the wake timer
- * from the interrupt and rebuilds it after a restart from `WaitStarted`. A
- * wake (the timer, a person, or a signal) re-enters the node with
- * `pending.kind === "wait"`, which continues the same step and decides:
+ * machinery. Its body works out when to wake and returns the sleep module
+ * an `OwnWait` (`{ kind: "sleep" }`): the sleep module appends
+ * `WaitStarted`, records the transcript `wait` entry, leaves the step open
+ * and parks at the node's wait node (`wait__<id>`), which interrupts; the
+ * runner schedules the wake timer from the interrupt and rebuilds it after
+ * a restart from `WaitStarted`. A wake (the timer, a person, or a signal)
+ * re-enters the node with its pending wait, which continues the same step
+ * and decides:
  *
  * - the stop time has passed: the step runner ends the step `stopped` and
  *   parks the run with the stop-time reason, as a new step would, with the
@@ -35,10 +37,11 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  *
  * The pending wait's streak carries what the node needs across its sleeps:
  * `since` is when the wait began (the deadline and `waited_minutes` count
- * from it) and `count` how many times it slept. A wake time past the
- * deadline is cut to it, so the timeout fires as a wake. Everything else
- * ends the step, and the runner routes: `done`, `timeout`, `error` (a time
- * that does not parse, a command that cannot start) or `stopped`.
+ * from it) and `count` how many times it slept. The sleep module cuts a
+ * wake time past the deadline to it, so the timeout fires as a wake.
+ * Everything else ends the step, and the runner routes: `done`, `timeout`,
+ * `error` (a time that does not parse, a command that cannot start) or
+ * `stopped`.
  *
  * A parked or interrupted Wait step has nothing to continue: a resume
  * starts the next visit, as a Command does (`RESUME_RULES.wait`: only the
@@ -46,7 +49,7 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  */
 export function waitStepNode(node: WaitNode, ctx: StepContext): NodeAction {
 	return (state, config) => {
-		const pending = pendingWaitOf(node, state);
+		const pending = pendingWaitOf(state.pending, node.id);
 		return runStep(ctx, node, state, config, {
 			rules: RESUME_RULES.wait,
 			// A step that ends at its wake before the node spoke (the stop time
@@ -61,16 +64,6 @@ export function waitStepNode(node: WaitNode, ctx: StepContext): NodeAction {
 					: startWait(ctx, node, step),
 		});
 	};
-}
-
-/** This node's pending wait: the step a wake re-enters with. */
-function pendingWaitOf(
-	node: WaitNode,
-	state: RunStateValues,
-): PendingWait | null {
-	return state.pending?.kind === "wait" && state.pending.nodeId === node.id
-		? state.pending
-		: null;
 }
 
 /** The outputs of a wake: how long the step waited, and a command wait's last output. */
@@ -100,9 +93,7 @@ async function startWait(
 	const outputs: StepOutputs = { visit: step.visit, waited_minutes: 0 };
 	switch (until.kind) {
 		case "duration":
-			return sleep(ctx, node, step, {
-				since: now,
-				count: 0,
+			return sleep(node, {
 				until: now + until.minutes * ctx.minuteMs,
 				deadline,
 				message: `Waits ${until.minutes} min.`,
@@ -118,9 +109,7 @@ async function startWait(
 					error: `The time "${text}" is not valid. Write a date and time like 2026-10-18T07:00, or a time like 07:00.`,
 				};
 			}
-			return sleep(ctx, node, step, {
-				since: now,
-				count: 0,
+			return sleep(node, {
 				until: at,
 				deadline,
 				message: `Waits until ${new Date(at).toISOString()}.`,
@@ -129,19 +118,14 @@ async function startWait(
 		case "command": {
 			const polled = await poll(ctx, step, until, outputs);
 			if (polled.kind !== "again") return polled;
-			return sleep(ctx, node, step, {
-				since: now,
-				count: 0,
+			return sleep(node, {
 				until: now + until.everyMinutes * ctx.minuteMs,
 				deadline,
 				message: `The command did not pass yet. Tries again in ${until.everyMinutes} min.`,
-				logTail: polled.logTail,
 			});
 		}
 		case "signal":
-			return sleep(ctx, node, step, {
-				since: now,
-				count: 0,
+			return sleep(node, {
 				until: null,
 				deadline,
 				message: `Waits for the signal "${until.name}".`,
@@ -186,20 +170,15 @@ async function continueWait(
 		case "command": {
 			const polled = await poll(ctx, step, until, outputs);
 			if (polled.kind !== "again") return polled;
-			return sleep(ctx, node, step, {
-				since,
-				count: pending.streak.count,
+			return sleep(node, {
 				until: now + until.everyMinutes * ctx.minuteMs,
 				deadline,
 				message: `The command did not pass yet. Tries again in ${until.everyMinutes} min.`,
-				logTail: polled.logTail,
 			});
 		}
 		case "signal":
 			// A timer or a person woke it before the signal came: keep waiting.
-			return sleep(ctx, node, step, {
-				since,
-				count: pending.streak.count,
+			return sleep(node, {
 				until: null,
 				deadline,
 				message: `Waits for the signal "${until.name}".`,
@@ -249,69 +228,13 @@ async function poll(
 }
 
 /**
- * Appends `WaitStarted`, records the transcript `wait` entry and tells the
- * bus, as `beginWait` does for the run policy. The wake time is cut to the
- * deadline, so the timeout fires as a wake. Returns the pending wait the
- * step runner parks at the wait node with, leaving the step open.
+ * Asks the sleep module to sleep: it plans the wake (cut to the deadline),
+ * appends `WaitStarted`, records the transcript `wait` entry and parks at
+ * the wait node with the step open. The streak (when the wait began, how
+ * often it slept) is the sleep module's to keep.
  */
-async function sleep(
-	ctx: StepContext,
-	node: WaitNode,
-	step: StepHandle,
-	plan: {
-		since: number;
-		/** Earlier sleeps of this step. */
-		count: number;
-		until: number | null;
-		deadline: number | null;
-		message: string;
-		signal?: string;
-		logTail?: string;
-	},
-): Promise<BodyResult> {
-	const until =
-		plan.deadline === null
-			? plan.until
-			: plan.until === null
-				? plan.deadline
-				: Math.min(plan.until, plan.deadline);
-	const signal = plan.signal !== undefined ? { signal: plan.signal } : {};
-	await ctx.log.append({
-		type: "WaitStarted",
-		runId: ctx.run.id,
-		stepId: step.stepId,
-		payload: {
-			reason: node.until.kind,
-			until,
-			message: plan.message,
-			since: plan.since,
-			...signal,
-		},
-	});
-	step.record(null, {
-		type: "wait",
-		reason: node.until.kind,
-		until,
-		message: plan.message,
-		...signal,
-	});
-	ctx.bus.publish(ctx.run.id, { kind: "step-changed", stepId: step.stepId });
-	return {
-		kind: "sleep",
-		pending: {
-			kind: "wait",
-			stepId: step.stepId,
-			nodeId: node.id,
-			visit: step.visit,
-			harnessSessionId: null,
-			prompt: "",
-			reason: node.until.kind,
-			until,
-			message: plan.message,
-			resetAt: null,
-			streak: { count: plan.count + 1, since: plan.since },
-		},
-	};
+function sleep(node: WaitNode, wait: Omit<OwnWait, "reason">): BodyResult {
+	return { kind: "sleep", reason: node.until.kind, ...wait };
 }
 
 /** The tail of the step's log file: every try of the command, appended. */

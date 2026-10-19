@@ -490,7 +490,7 @@ export function createEngine(
 			}
 			// The thread continues at once, like a wake a person asks for: a
 			// full run cap fails here rather than queueing the signal.
-			await runner.wake(runId, { early: true, signal: name });
+			await runner.sleeps.wake(runId, { early: true, signal: name });
 		},
 
 		watchRun(runId, { signal, afterSeq }) {

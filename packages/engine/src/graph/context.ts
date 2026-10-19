@@ -21,22 +21,20 @@ import type { RunBus } from "../bus";
 import type { CliToolGuide } from "../cli-tools";
 import type { PolicyWaitReason } from "../events";
 import type { McpExpansion } from "../mcp";
-import { planWait } from "../policy";
 import type { RunLog } from "../run-log";
 import type { RunSettings } from "../settings";
 import { openTranscriptWriter, readRunTranscript } from "../transcripts";
 import type { StepEvent, TranscriptEntry } from "../types";
-import type { PendingWait, RunEvent, RunStateValues } from "./state";
-import type { OpenStep } from "./step-runner";
+import type { RunEvent, RunStateValues } from "./state";
 
 /**
  * What every node factory gets (`StepContext`), the transcript recorders,
- * the template context, the stop time as a graph sees it, and the run
- * policy's wait (`beginWait`). The step lifecycle itself (the entry checks,
- * the `step` row, `StepStarted`/`StepReopened`/`StepEnded`, the timers, the
- * abort translation, the routing) is the step runner's
- * (`graph/step-runner.ts`). The log is written exactly as the old engine
- * wrote it.
+ * the template context and the stop time as a graph sees it. The step
+ * lifecycle itself (the entry checks, the `step` row,
+ * `StepStarted`/`StepReopened`/`StepEnded`, the timers, the abort
+ * translation, the routing) is the step runner's (`graph/step-runner.ts`);
+ * a step's sleep and wake are the sleep module's (`graph/sleep.ts`). The
+ * log is written exactly as the old engine wrote it.
  */
 
 export type RunRow = typeof run.$inferSelect;
@@ -233,23 +231,6 @@ export function stopAtOf(
 	return own === undefined ? state.stopAt : own;
 }
 
-/** An Agent step, or a Decision step decided by a model, that hit a usage limit or lost the network. */
-export type WaitRequest = {
-	reason: PolicyWaitReason;
-	/** The harness's error message. */
-	message: string;
-	resetAt: number | null;
-	/** The harness session the step continues after the wait, if it has one. */
-	harnessSessionId: string | null;
-};
-
-/** Why the run stopped instead of waiting: the wait would end after the stop time. */
-function stopTimeWaitReason(request: WaitRequest): string {
-	return request.reason === "usage-limit"
-		? `Usage limit: ${request.message}. It resets after the stop time, so the run stopped. Resume the run to continue.`
-		: `The network is down: ${request.message}. The next try is after the stop time, so the run stopped. Resume the run to continue.`;
-}
-
 /** True when the run has a stop time and it has passed. */
 export function pastStopTime(
 	ctx: StepContext,
@@ -258,93 +239,4 @@ export function pastStopTime(
 ): boolean {
 	const stopAt = stopAtOf(state, config);
 	return stopAt !== null && ctx.now() >= stopAt;
-}
-
-/**
- * The run policy's wait (ported from `beginWait`): plans it with `planWait`
- * from the step's wait streak. A wait that would end after the run's stop
- * time is not started: the node ends the step `stopped` and parks the run
- * (`stop-time`, with why). On a wait, appends `WaitStarted`, records the
- * transcript `wait` entry, tells the bus and leaves the step open. The node
- * then jumps to its wait node with the returned `pending`; the wait node
- * interrupts; a wake re-enters the node, which continues the step. The
- * runner appends `WaitEnded` and the transcript `wake` entry on the wake,
- * not the node. Gives up (the step ends `error`) once the grace is spent.
- *
- * The streak is the one the step's pending wait carries (`pending.streak`)
- * when the step continues after a wait for the same reason; a new or
- * reopened step, or the other reason, starts a new one.
- */
-export async function beginWait(
-	ctx: StepContext,
-	node: FlowNode,
-	state: RunStateValues,
-	config: LangGraphRunnableConfig,
-	step: OpenStep,
-	request: WaitRequest,
-): Promise<
-	| { kind: "wait"; pending: PendingWait }
-	| { kind: "give-up"; error: string }
-	| { kind: "stop-time"; reason: string }
-> {
-	const runId = ctx.run.id;
-	const previous = state.pending;
-	const streak =
-		step.opened === "continue" &&
-		previous?.kind === "wait" &&
-		previous.stepId === step.stepId &&
-		previous.reason === request.reason
-			? previous.streak
-			: null;
-	const plan = planWait({
-		reason: request.reason,
-		streak,
-		message: request.message,
-		resetAt: request.resetAt,
-		policy: ctx.policy(),
-		now: ctx.now(),
-		minuteMs: ctx.minuteMs,
-	});
-	if (plan.kind === "give-up") return { kind: "give-up", error: plan.error };
-	// A wait that ends after the stop time would only continue the step past
-	// it: the run stops now, and a resume continues the step.
-	const stopAt = stopAtOf(state, config);
-	if (stopAt !== null && plan.until >= stopAt) {
-		return { kind: "stop-time", reason: stopTimeWaitReason(request) };
-	}
-	await ctx.log.append({
-		type: "WaitStarted",
-		runId,
-		stepId: step.stepId,
-		payload: {
-			reason: request.reason,
-			until: plan.until,
-			message: plan.message,
-			since: plan.since,
-		},
-	});
-	step.record(null, {
-		type: "wait",
-		reason: request.reason,
-		until: plan.until,
-		message: plan.message,
-	});
-	ctx.bus.publish(runId, { kind: "step-changed", stepId: step.stepId });
-	step.leaveOpen();
-	return {
-		kind: "wait",
-		pending: {
-			kind: "wait",
-			stepId: step.stepId,
-			nodeId: node.id,
-			visit: step.visit,
-			harnessSessionId: request.harnessSessionId,
-			prompt: DEFAULT_RESUME_PROMPT,
-			reason: request.reason,
-			until: plan.until,
-			message: plan.message,
-			resetAt: request.resetAt,
-			streak: { count: (streak?.count ?? 0) + 1, since: plan.since },
-		},
-	};
 }
