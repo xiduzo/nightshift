@@ -17,9 +17,11 @@ import type { RunLog } from "../run-log";
 /**
  * The event log exchange: run history between Replicas, by cursor. Every
  * row of a run has one Owner, its Walker, so the merge is a union: a row
- * a Replica has already is skipped, and nothing is ever updated across
- * Devices. The cursor is "this Walker's events in this Space after
- * `walker_seq` N" (`sync_cursor`, per Host).
+ * a Replica has already is skipped, and nothing is updated across Devices
+ * but the run's Walker, which follows its `WalkerMoved` on every Replica.
+ * A moved run's rows are each of its Walkers' to send. The cursor is
+ * "this Walker's events in this Space after `walker_seq` N" (`sync_cursor`,
+ * per Host).
  *
  * - What moves: runs, steps, agent sessions and the events of runs. Facts
  *   of no run (a project's, a schedule's, a Device's) stay on the Replica
@@ -500,7 +502,8 @@ export function createExchange(deps: {
  * and command logs are on its disk. They are private to the Walker's
  * owner, so a Replica of another Person never gets them. Rows keep their
  * shape: a path becomes "" (`run.worktree_path`, `step.transcript_path`,
- * `WorktreeCreated.worktreePath`, `StepStarted.transcriptPath`), and a
+ * `WorktreeCreated.worktreePath`, `HandedOff.worktreePath`,
+ * `StepStarted.transcriptPath`), and a
  * `StepStarted.logPath` that was set becomes "" too, so it still says the
  * step has a log. `keep` says per Walker whose paths stay.
  */
@@ -521,10 +524,17 @@ export function withoutPrivatePaths(
 		sessions: rows.sessions,
 		events: rows.events.map((e) => {
 			if (!strip(e.walkerId)) return e;
-			if (e.type !== "WorktreeCreated" && e.type !== "StepStarted") return e;
+			if (
+				e.type !== "WorktreeCreated" &&
+				e.type !== "StepStarted" &&
+				e.type !== "HandedOff"
+			) {
+				return e;
+			}
 			const payload = JSON.parse(e.payload) as Record<string, unknown>;
-			if (e.type === "WorktreeCreated") payload.worktreePath = "";
-			else {
+			if (e.type === "WorktreeCreated" || e.type === "HandedOff") {
+				payload.worktreePath = "";
+			} else {
 				payload.transcriptPath = "";
 				if (typeof payload.logPath === "string") payload.logPath = "";
 			}

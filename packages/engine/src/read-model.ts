@@ -307,6 +307,13 @@ function subflowRuns(
 		.sort((a, b) => a.startedAt - b.startedAt);
 }
 
+/** A Device this Replica knows nothing of: a name is all it lacks. */
+const unnamed = (id: string): RunDevice => ({
+	id,
+	name: null,
+	thisDevice: false,
+});
+
 /** Names a Device by id, as this Replica knows it. */
 export type DeviceNamer = (id: string) => RunDevice;
 
@@ -391,6 +398,19 @@ export function toRunDetail(
 		takeOverCommand: takeOverCommand(row.worktreePath, last, harnessOf),
 		resumes: deriveResumes(events),
 		commands,
+		handOffs: events.flatMap((e) =>
+			e.type === "HandedOff"
+				? [
+						{
+							at: e.at,
+							stepId: e.stepId,
+							from: deviceOf?.(e.payload.from) ?? unnamed(e.payload.from),
+							to: deviceOf?.(e.payload.to) ?? unnamed(e.payload.to),
+							commit: e.payload.commit,
+						},
+					]
+				: [],
+		),
 	};
 }
 
@@ -494,6 +514,9 @@ export function createReadModel(deps: ReadModelDeps) {
 			row.walkerId,
 			runDeviceId(row),
 			...deriveSteps(events).map((s) => s.deviceId),
+			...events.flatMap((e) =>
+				e.type === "HandedOff" ? [e.payload.from, e.payload.to] : [],
+			),
 		]);
 		const walker = deviceOf(row.walkerId);
 		return toRunDetail(

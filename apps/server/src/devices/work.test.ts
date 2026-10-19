@@ -225,6 +225,20 @@ describe("the work hub", () => {
 		await next;
 	});
 
+	test("a call the Device serves that the Host does not know (it restarted) is cancelled there", async () => {
+		const hub = createWorkHub();
+		const taking = new AbortController();
+		const deliveries = hub
+			.take("b", taking.signal, ["from-before"])
+			[Symbol.asyncIterator]();
+		expect((await deliveries.next()).value).toEqual({
+			kind: "cancel",
+			id: "from-before",
+		});
+		taking.abort();
+		await deliveries.next();
+	});
+
 	test("a Device that stays away ends its calls", async () => {
 		const hub = createWorkHub({ lostAfterMs: 20 });
 		const taking = new AbortController();

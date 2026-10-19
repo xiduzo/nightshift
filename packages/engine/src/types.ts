@@ -280,6 +280,19 @@ export type RunDetail = RunSummary & {
 	 * oldest first. Known where they wait: on the Host.
 	 */
 	commands: PendingCommand[];
+	/** The run's work moving between Devices (`HandedOff`), oldest first. */
+	handOffs: HandOff[];
+};
+
+/** The run's work moved from one Device to another before a step there. */
+export type HandOff = {
+	at: number;
+	/** The step that needed the work on `to`. */
+	stepId: string | null;
+	from: RunDevice;
+	to: RunDevice;
+	/** The commit that moved. */
+	commit: string;
 };
 
 /** What a Decision step decided by a model writes to its transcript. */

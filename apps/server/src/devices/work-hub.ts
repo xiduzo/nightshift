@@ -191,6 +191,12 @@ export function createWorkHub(
 						true,
 					);
 				}
+				// A call it still serves that this hub does not know (the Host
+				// restarted): nobody waits for it, so it stops there. The
+				// Walker's recovery continues the step by its harness session.
+				for (const id of serving) {
+					if (!calls.has(id)) box.deliveries.push({ kind: "cancel", id });
+				}
 			}
 			const back = box.streams === 0;
 			box.streams++;
