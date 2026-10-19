@@ -43,3 +43,22 @@ export function activePerHour(runs: RunSummary[], count: number, now: number) {
 		).length,
 	}));
 }
+
+/**
+ * How many Gates waited for an answer in each of the last `count` hours,
+ * answered ones too. A Gate of a run that never ended counts for the hour
+ * it opened only.
+ */
+export function gatesPerHour(runs: RunSummary[], count: number, now: number) {
+	const spans = runs.flatMap((run) =>
+		run.gates.map((gate) => ({
+			from: gate.openedAt,
+			to: gate.closedAt ?? (run.status === "waiting" ? now : gate.openedAt),
+		})),
+	);
+	return lastHours(count, now).map((hour) => ({
+		hour,
+		gates: spans.filter((span) => span.from < hour + HOUR_MS && span.to >= hour)
+			.length,
+	}));
+}
