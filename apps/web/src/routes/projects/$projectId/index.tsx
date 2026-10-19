@@ -14,6 +14,7 @@ import { PageHeading } from "@/components/page-heading";
 import { ProjectPage } from "@/components/project-page";
 import { SectionCards } from "@/components/section-cards";
 import { useProjectRuns } from "@/hooks/use-project-runs";
+import { projectFolder } from "@/lib/projects";
 
 export const Route = createFileRoute("/projects/$projectId/")({
 	component: ProjectDashboardComponent,
@@ -38,9 +39,9 @@ function ProjectDashboardComponent() {
 						description={
 							<span
 								className="block truncate font-mono"
-								title={project.repoPath}
+								title={projectFolder(project)}
 							>
-								{project.repoPath}
+								{projectFolder(project)}
 							</span>
 						}
 						actions={

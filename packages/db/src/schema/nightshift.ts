@@ -295,6 +295,78 @@ export const ydoc = sqliteTable("ydoc", {
 	updatedAt: updatedAt(),
 });
 
+/**
+ * How far this Replica has exchanged run history with one Host, per Space
+ * and Walker: the last `walker_seq` it has. For another Walker, the last of
+ * its events this Replica pulled from that Host. For this computer, the
+ * last of its own events that Host took (a push). A Space starts at 0, so
+ * a Space this Device's owner joins later is exchanged from its start.
+ */
+export const syncCursor = sqliteTable(
+	"sync_cursor",
+	{
+		hostId: text("host_id").notNull(),
+		spaceId: text("space_id").notNull(),
+		walkerId: text("walker_id").notNull(),
+		walkerSeq: integer("walker_seq").notNull(),
+		updatedAt: updatedAt(),
+	},
+	(table) => [
+		primaryKey({ columns: [table.hostId, table.spaceId, table.walkerId] }),
+	],
+);
+
+/**
+ * A Space this computer takes part in through a Host: the Host keeps it,
+ * this Replica keeps a copy (its Space document, its runs). Its owner's
+ * role there comes with the Host's answer to the link; the Replica also
+ * gets an `organization` row and a `member` row for its own Person with
+ * that role, so sessions and permission checks work here unchanged.
+ */
+export const hostSpace = sqliteTable("host_space", {
+	spaceId: text("space_id").primaryKey(),
+	/** The Host's Device id. */
+	hostId: text("host_id").notNull(),
+	name: text("name").notNull(),
+	/** The role of this Device's owner in the Space, on the Host. */
+	role: text("role").notNull(),
+	/** The Space is the personal Space of this Device's owner on the Host. */
+	personal: integer("personal", { mode: "boolean" }).notNull().default(false),
+	updatedAt: updatedAt(),
+});
+
+/**
+ * A person's action on a run that another Device walks, on its way to the
+ * Walker: answer a Gate, send a signal, stop. The Walker is the only writer
+ * of its run's events, so the Host keeps the command until the Walker has
+ * applied it (`done_at`), with the Walker's reason when it refused.
+ */
+export const runCommand = sqliteTable(
+	"run_command",
+	{
+		id: text("id").primaryKey(),
+		spaceId: spaceId(),
+		runId: text("run_id").notNull(),
+		/** The Device that walks the run and applies the command. */
+		walkerId: text("walker_id").notNull(),
+		kind: text("kind", {
+			enum: ["gate.resolve", "signal.send", "run.stop"],
+		}).notNull(),
+		/** JSON: the action's input (the Gate's step, choice and note; the signal; when to stop). */
+		payload: text("payload").notNull(),
+		/** The Person who asked, on the Host. The Walker checks their role again. */
+		personId: text("person_id").notNull(),
+		createdAt: createdAt(),
+		doneAt: integer("done_at", { mode: "timestamp_ms" }),
+		/** Why the Walker did not apply it. Null when it did. */
+		error: text("error"),
+	},
+	(table) => [
+		index("run_command_walkerId_idx").on(table.walkerId),
+		index("run_command_runId_idx").on(table.runId),
+	],
+);
+
 /*
  * Read-only since the Device document: `setting`, `connection`, `cli_tool`,
  * `agent_profile` and `secret` are imported into it once, on the first

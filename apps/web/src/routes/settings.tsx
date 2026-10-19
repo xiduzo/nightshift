@@ -96,6 +96,7 @@ import { SiteHeader } from "@/components/site-header";
 import { notificationsSupported } from "@/hooks/use-night-notifications";
 import type { PermissionMode, Project } from "@/lib/api-types";
 import { HARNESSES, type HarnessName, harnessInfo } from "@/lib/harnesses";
+import { projectFolder } from "@/lib/projects";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/settings")({
@@ -708,8 +709,10 @@ function ProjectsCard() {
 							</AlertDialogTitle>
 							<AlertDialogDescription>
 								Night Shift forgets the project and its runs. The repository at{" "}
-								<span className="font-mono">{toRemove?.repoPath}</span> stays as
-								it is.
+								<span className="font-mono">
+									{toRemove ? projectFolder(toRemove) : null}
+								</span>{" "}
+								stays as it is.
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 						<AlertDialogFooter>
@@ -774,9 +777,9 @@ function projectColumns({
 						</span>
 						<span
 							className="truncate font-mono text-muted-foreground text-xs md:hidden"
-							title={project.repoPath}
+							title={projectFolder(project)}
 						>
-							{project.repoPath}
+							{projectFolder(project)}
 						</span>
 					</div>
 				);
@@ -791,9 +794,9 @@ function projectColumns({
 			cell: ({ row }) => (
 				<span
 					className="block truncate font-mono text-muted-foreground text-xs"
-					title={row.original.repoPath}
+					title={projectFolder(row.original)}
 				>
-					{row.original.repoPath}
+					{projectFolder(row.original)}
 				</span>
 			),
 			meta: {

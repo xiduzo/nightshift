@@ -26,7 +26,29 @@ import { selfDevice } from "./self-device";
  * - `derive` keeps a value derived from a run's log (a run summary, an open
  *   Gate) until the run's next append, also after its log was dropped. The
  *   run list reads it without parsing every run's log again.
+ * - `ingest` adds the events of runs another Device walks, as the exchange
+ *   brings them (`exchange/`): the same bookkeeping as an append, so the
+ *   copy here stays exactly the log on disk.
+ * - `onLanded` tells a listener about every event that landed, appended or
+ *   ingested: the exchange pushes and streams on it.
  */
+
+/** An event another Walker wrote, as the exchange carries it. */
+export type ForeignEvent = {
+	spaceId: string;
+	runId: string;
+	stepId: string | null;
+	sessionId: string | null;
+	type: string;
+	/** JSON, as the Walker wrote it. */
+	payload: string;
+	at: number;
+	walkerId: string;
+	walkerSeq: number;
+};
+
+/** Called with the events that just landed in this Replica. */
+export type LandedListener = (events: readonly LoggedEvent[]) => void;
 
 /** A pure function of one run's log, kept by identity. */
 export type Derive<T> = (events: readonly LoggedEvent[]) => T;
@@ -76,6 +98,17 @@ export function createRunLog(db: Database, options: RunLogOptions = {}) {
 	const memos = new Map<string, Map<Derive<unknown>, unknown>>();
 	/** Counts the appends per run, so a read that raced one is not kept. */
 	const versions = new Map<string, number>();
+	const landedListeners = new Set<LandedListener>();
+	function landed(events: readonly LoggedEvent[]): void {
+		if (events.length === 0) return;
+		for (const listener of [...landedListeners]) {
+			try {
+				listener(events);
+			} catch {
+				// A broken listener must not break the append.
+			}
+		}
+	}
 	let walker: Promise<string> | undefined = options.walkerId
 		? Promise.resolve(options.walkerId)
 		: undefined;
@@ -146,6 +179,24 @@ export function createRunLog(db: Database, options: RunLogOptions = {}) {
 		return value;
 	}
 
+	/** Keeps a committed event in its run's copy, and forgets what was derived from it. */
+	function keep(logged: LoggedEvent): void {
+		const runId = logged.runId;
+		if (!runId) return;
+		versions.set(runId, (versions.get(runId) ?? 0) + 1);
+		memos.delete(runId);
+		const log = logs.get(runId);
+		if (log) {
+			insertBySeq(log.events, logged);
+			if (isRunEvent(logged.type)) {
+				log.open = isOpen(log.events);
+				if (!log.open) trim(runId);
+			}
+		} else {
+			loading.get(runId)?.landed.push(logged);
+		}
+	}
+
 	return {
 		/** One run's events in seq order: a copy, so later appends do not change it. */
 		async events(runId: string): Promise<LoggedEvent[]> {
@@ -200,21 +251,48 @@ export function createRunLog(db: Database, options: RunLogOptions = {}) {
 			input: EventInput<T>,
 		): Promise<LoggedEvent> {
 			const logged = await appendEvent(db, input, await walkerId());
-			const runId = logged.runId;
-			if (!runId) return logged;
-			versions.set(runId, (versions.get(runId) ?? 0) + 1);
-			memos.delete(runId);
-			const log = logs.get(runId);
-			if (log) {
-				insertBySeq(log.events, logged);
-				if (isRunEvent(logged.type)) {
-					log.open = isOpen(log.events);
-					if (!log.open) trim(runId);
-				}
-			} else {
-				loading.get(runId)?.landed.push(logged);
-			}
+			keep(logged);
+			landed([logged]);
 			return logged;
+		},
+
+		/**
+		 * Adds events of runs another Device walks, in the order given (each
+		 * Walker's in its own order). An event this Replica has already (the
+		 * same Walker and `walker_seq`) is skipped. Returns the ones that
+		 * were new, as committed.
+		 */
+		async ingest(events: readonly ForeignEvent[]): Promise<LoggedEvent[]> {
+			const added: LoggedEvent[] = [];
+			for (const e of events) {
+				const [row] = await db
+					.insert(event)
+					.values({
+						spaceId: e.spaceId,
+						runId: e.runId,
+						stepId: e.stepId,
+						sessionId: e.sessionId,
+						type: e.type,
+						payload: e.payload,
+						at: new Date(e.at),
+						walkerId: e.walkerId,
+						walkerSeq: e.walkerSeq,
+					})
+					.onConflictDoNothing()
+					.returning();
+				if (!row) continue;
+				const logged = parseEventRow(row);
+				keep(logged);
+				added.push(logged);
+			}
+			landed(added);
+			return added;
+		},
+
+		/** Calls `listener` with every event that lands from now on. Returns the unsubscribe. */
+		onLanded(listener: LandedListener): () => void {
+			landedListeners.add(listener);
+			return () => landedListeners.delete(listener);
 		},
 
 		/** The logs in memory, by run id. For tests. */

@@ -2,12 +2,16 @@ import { DECIDER_ADAPTERS, HARNESS_ADAPTERS } from "@nightshift/agents";
 import { invitationView, membersOf } from "@nightshift/auth/members";
 import { spacesOf } from "@nightshift/auth/spaces";
 import {
+	archiveRefSchema,
 	chooseFolder,
 	cliToolInputSchema,
 	connectionInputSchema,
+	ForeignRowsError,
 	HARNESS_BIN,
+	runRowsSchema,
 	secretNameSchema,
 	settingsPatchSchema,
+	syncCursorsSchema,
 } from "@nightshift/engine";
 import type { SpaceEngine } from "@nightshift/engine/types";
 import {
@@ -857,6 +861,109 @@ const link = {
 	),
 };
 
+/**
+ * The event log exchange, as a paired Device calls it on its Host with its
+ * Device key: run history in and out by cursor, live, and the commands
+ * for the runs it walks. The Host filters every call by the membership of
+ * the key's Person.
+ */
+const sync = {
+	/** Rows of other Walkers after the Device's cursors, and its commands. */
+	pull: deviceProcedure("sync")
+		.input(z.object({ cursors: syncCursorsSchema }))
+		.handler(({ context, input }) =>
+			context.exchange.pull(context.deviceKey, input.cursors),
+		),
+	/** The same, then every new batch as it lands. */
+	stream: deviceProcedure("sync")
+		.input(z.object({ cursors: syncCursorsSchema }))
+		.handler(async function* ({ context, input, signal }) {
+			yield* context.exchange.stream(context.deviceKey, input.cursors, signal);
+		}),
+	/** The Device's own rows: runs it walks, in Spaces its owner is in. */
+	push: deviceProcedure("sync")
+		.input(runRowsSchema)
+		.handler(async ({ context, input }) => {
+			try {
+				return await context.exchange.push(context.deviceKey, input);
+			} catch (error) {
+				if (error instanceof ForeignRowsError) {
+					throw new ORPCError("FORBIDDEN", { message: error.message });
+				}
+				throw error;
+			}
+		}),
+	/** A person's action on a run walked elsewhere, in the name of the key's Person. */
+	command: deviceProcedure("sync")
+		.input(
+			z.discriminatedUnion("kind", [
+				z.object({
+					runId: z.string().min(1),
+					kind: z.literal("gate.resolve"),
+					payload: z.object({
+						stepId: z.string().min(1),
+						choice: z.string().min(1),
+						note: z.string().optional(),
+					}),
+				}),
+				z.object({
+					runId: z.string().min(1),
+					kind: z.literal("signal.send"),
+					payload: z.object({ name: labelSchema }),
+				}),
+				z.object({
+					runId: z.string().min(1),
+					kind: z.literal("run.stop"),
+					payload: z.object({
+						when: z.enum(["now", "after-step"]).optional(),
+					}),
+				}),
+			]),
+		)
+		.handler(({ context, input }) =>
+			context.exchange.command(context.deviceKey, input),
+		),
+	/** The Walker applied a command, or says why not. */
+	commandDone: deviceProcedure("sync")
+		.input(
+			z.object({
+				id: z.string().min(1),
+				error: z.string().max(2_000).nullable(),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.exchange.commandDone(context.deviceKey, input),
+		),
+	/** The Device has a Clone of a Project of a Space here. */
+	addClone: deviceProcedure("sync")
+		.input(
+			z.object({
+				spaceId: z.string().min(1),
+				projectId: z.string().min(1),
+				deviceName: z.string().trim().min(1).max(64),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.exchange.addClone(context.deviceKey, input),
+		),
+};
+
+/** The archive: the run state of runs walked elsewhere, per Space. */
+const archive = {
+	/** The Walker keeps a step's transcript or command log, or its run's checkpoints, here. */
+	put: deviceProcedure("archive")
+		.input(z.object({ ref: archiveRefSchema, content: z.string() }))
+		.handler(({ context, input }) =>
+			context.exchange.archivePut(context.deviceKey, input.ref, input.content),
+		),
+	/** A file of a run in a Space the Device's owner is in. Null when there is none. */
+	get: deviceProcedure("archive")
+		.input(z.object({ ref: archiveRefSchema }))
+		.handler(({ context, input }) =>
+			context.exchange.archiveGet(context.deviceKey, input.ref),
+		),
+};
+
 export const appRouter = {
 	healthCheck: publicProcedure.handler(() => "OK"),
 	spaces,
@@ -876,6 +983,8 @@ export const appRouter = {
 	devices,
 	pairing,
 	link,
+	sync,
+	archive,
 };
 export type AppRouter = typeof appRouter;
 export type AppRouterClient = RouterClient<typeof appRouter>;

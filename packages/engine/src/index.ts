@@ -50,6 +50,33 @@ export {
 } from "./device/registry";
 export type * from "./device/types";
 export { createEngine } from "./engine";
+export {
+	type ArchiveRef,
+	archiveRefSchema,
+} from "./exchange/archive";
+export {
+	applyRunCommand,
+	COMMAND_PERMISSION,
+	type RunCommand,
+	type RunCommandInput,
+	type RunCommandKind,
+	runCommandKindSchema,
+	runCommandPayloadSchema,
+} from "./exchange/commands";
+export type { EngineExchange } from "./exchange/engine-exchange";
+export type { HostSpaces, ListedSpace } from "./exchange/host-spaces";
+export {
+	ForeignRowsError,
+	isEmpty,
+	MissingProjectError,
+	mergeCursors,
+	NO_ROWS,
+	type RunRows,
+	runRowsSchema,
+	type SyncCursors,
+	syncCursorsSchema,
+	withoutPrivatePaths,
+} from "./exchange/rows";
 export { chooseFolder } from "./folder-picker";
 export {
 	acquireLease,
@@ -113,6 +140,7 @@ export {
 } from "./settings";
 export {
 	createSpaceDocuments,
+	memberRole,
 	projectClones,
 	type SpaceClone,
 	type SpaceDocument,

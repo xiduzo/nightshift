@@ -46,6 +46,9 @@ import type { RunSettings } from "./settings";
  */
 
 const INTERRUPTED_REASON = "Night Shift stopped while this run ran.";
+/** A person asked to resume a run another Device walks. */
+export const WALKED_ELSEWHERE =
+	"Another device runs this run. Resume it on that device.";
 /** Daemon resumes in a row (no person in between) before a run waits for a person. */
 const MAX_DAEMON_RESUMES = 3;
 const DAEMON_RESUME_REASON = "Night Shift restarted.";
@@ -162,12 +165,15 @@ export function createRecovery(deps: RecoveryDeps) {
 	}
 
 	async function recover(): Promise<void> {
+		// Only the runs this Device walks: a run walked elsewhere is its
+		// Walker's to recover.
 		const rows = await db
 			.select()
 			.from(event)
 			.where(
 				and(
 					isNotNull(event.runId),
+					eq(event.walkerId, await log.walkerId()),
 					inArray(event.type, [...LIFECYCLE_EVENT_TYPES]),
 				),
 			)
@@ -289,6 +295,9 @@ export function createRecovery(deps: RecoveryDeps) {
 	): Promise<void> {
 		const { prompt } = input;
 		const row = await getRunRow(db, runId);
+		if (row.walkerId !== (await log.walkerId())) {
+			throw new Error(WALKED_ELSEWHERE);
+		}
 		const before = await log.events(runId);
 		if (deriveRunState(before).status === "sleeping") {
 			await runner.sleeps.wake(runId, {

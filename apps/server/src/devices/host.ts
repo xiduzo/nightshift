@@ -18,6 +18,7 @@ import {
 	reviewPairing,
 	startPairing,
 } from "@nightshift/auth/pairing";
+import { spacesOf } from "@nightshift/auth/spaces";
 import type { Database } from "@nightshift/db";
 import type { DeviceRegistry, SettingsStore } from "@nightshift/engine";
 
@@ -228,6 +229,8 @@ export function createHost(deps: {
 				host: who(),
 				deviceId: key.deviceId,
 				personId: key.personId,
+				// What the Device takes part in here: its owner's Spaces.
+				spaces: await spacesOf(deps.db, key.personId),
 			};
 		},
 	};

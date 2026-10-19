@@ -45,6 +45,8 @@ import {
 	CopyIcon,
 	DownloadIcon,
 	InfoIcon,
+	MonitorIcon,
+	SendIcon,
 	SkipForwardIcon,
 	WorkflowIcon,
 } from "lucide-react";
@@ -64,6 +66,8 @@ import {
 	formatTime,
 } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
+
+import { WalkerBadge, walkerName } from "./walker-badge";
 
 const STOPPABLE: RunStatus[] = ["running", "waiting", "sleeping"];
 
@@ -98,6 +102,16 @@ export function RunTitle({
 			</h1>
 			<div aria-live="polite" className="flex flex-wrap items-center gap-2">
 				<RunStatusBadge status={status} />
+				<WalkerBadge walker={run.walker} />
+				{run.commands.length > 0 ? (
+					<Badge
+						variant="outline"
+						title={`It applies when ${walkerName(run.walker)} is online.`}
+					>
+						<SendIcon aria-hidden="true" />
+						Sent to {walkerName(run.walker)}
+					</Badge>
+				) : null}
 				{stoppable && run.stopAfterStep ? (
 					<Badge
 						variant="outline"
@@ -216,9 +230,18 @@ function RunFacts({ run }: { run: RunDetail }) {
 						short={SHA.test(run.baseRef) ? run.baseRef.slice(0, 12) : undefined}
 					/>
 				</Fact>
-				<Fact label="Folder">
-					<CopyValue label="folder path" value={run.worktreePath} />
+				<Fact label="Runs on">
+					<MonitorIcon
+						className="size-3.5 shrink-0 text-muted-foreground"
+						aria-hidden="true"
+					/>
+					{run.walker.thisDevice ? "This computer" : walkerName(run.walker)}
 				</Fact>
+				{run.walker.thisDevice ? (
+					<Fact label="Folder">
+						<CopyValue label="folder path" value={run.worktreePath} />
+					</Fact>
+				) : null}
 			</dl>
 			<Separator />
 			<dl className="flex flex-col gap-3">
@@ -382,6 +405,19 @@ export function RunActions({
 			toast.error("Could not copy. Copy the command from the tooltip.");
 		}
 	};
+
+	// A run of another device: its session and its files are there. Stop goes to it.
+	if (!run.walker.thisDevice) {
+		return STOPPABLE.includes(status) ? (
+			<StopMenu
+				key={run.id}
+				status={status}
+				stopAfterStep={run.stopAfterStep}
+				pending={stopRun.isPending}
+				onStop={(when) => stopRun.mutate({ runId: run.id, when })}
+			/>
+		) : null;
+	}
 
 	return (
 		<>

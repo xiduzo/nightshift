@@ -463,7 +463,7 @@ iroh.
 | `clone` | project, device, path | the Device |
 | `offer` | device, profile, space, permission cap, session cap | the Device |
 | `run`, `step`, `event` | `space_id`, `walker_id`, `device_id`, `started_by`; `seq` per Walker | the Walker |
-| `sync_cursor` | per Host and owner: the last seq seen | the Device |
+| `sync_cursor` | per Host, Space and owner: the last seq seen | the Device |
 | archive | checkpoints and transcripts per Space | the Host, copies only |
 | events | `StepStarted` gains `deviceId`; new `DeviceJoined`, `DeviceRevoked`, `DeviceOnline`, `DeviceOffline`, `HandedOff`, `WalkerMoved`, `MemberJoined`, `MemberRemoved`, `OfferMade`, `OfferWithdrawn`. Existing payloads keep their fields. | |
 
@@ -853,6 +853,131 @@ iroh.
      Spaces. Joining from the desktop app's UI calls the same
      `devices.join`. A Person removing their own home link, and moving a
      home, need a UI.
+   *Landed (part B, the event log exchange and the archive):*
+   - **What moves.** Runs, steps, agent sessions and the events of runs:
+     the Walker's rows. Facts of no run (a project's, a schedule's, a
+     Device's) stay on the Replica that wrote them; the Space document
+     carries the Space's definitions. The merge is a union: an insert
+     skips a row the Replica has (`(walker_id, walker_seq)`, row ids), and
+     nothing is updated across Devices. The one column that changes after
+     its insert, `agent_session.harness_session_id`, is the Walker's copy
+     of its `HarnessSessionAssigned` event: a receiver fills it from that
+     event. A batch carries its events in each Walker's order with the
+     run, step and session rows they name, so parents go in first and the
+     foreign keys hold (`packages/engine/src/exchange/rows.ts`).
+   - **Cursors** (`sync_cursor`): per Host, Space and Walker, the last
+     `walker_seq` this Replica has. Finer than "per Host and Walker", so a
+     Space the owner joins later is exchanged from its start. For this
+     computer's own Walker the row is the push cursor: what the Host took.
+   - **Over the Link** (`apps/server/src/devices/exchange.ts`, run while
+     the link is online): a push loop sends this computer's rows of the
+     Spaces the Host keeps, after the cursor, whenever an event lands; a
+     pull loop reads `sync.stream` (an oRPC event iterator: a batch, then
+     every new one as rows land on the Host or a command waits). The run
+     log ingests what arrives (`RunLog.ingest`, the same bookkeeping as an
+     append) and the bus tells the run's watchers, so a run page of a run
+     walked elsewhere updates live. `sync.pull` is the same batch once.
+   - **The Host filters** (`apps/server/src/devices/host-exchange.ts`): it
+     serves rows of the Spaces the key's Person is a Member of, never the
+     Device's own back; it takes only rows whose Walker is the key's
+     Device, in those Spaces, and refuses the whole batch otherwise
+     (`FORBIDDEN`). Its own Walker's rows are served like pushed ones; its
+     Replica keeps everything it receives.
+   - **The Host's Spaces on a Device.** `link.hello` (and every heartbeat)
+     lists the Spaces the key's Person is a Member of, with their role.
+     The Device keeps them in `host_space`, with an `organization` row and
+     a `member` row for its own Person in that role: this computer's
+     Person acts there as its owner does on the Host, so sessions, the
+     Space switcher and `hasPermission` work unchanged. A personal Space
+     there is "Personal on <Host>", never this computer's personal Space.
+     Their documents sync read-only over the link (one WebSocket per link
+     for every document); the copy here is the Host's: no import, no
+     member mirror. A batch whose project has not arrived waits for it
+     (`MissingProjectError`) and goes again.
+   - **Projects in a Space a Host keeps.** Adding a folder whose remote is
+     one of its projects records the Clone through the Host
+     (`sync.addClone`, which needs `project.add`), then the `clone` row
+     here. A new project, a rename, a removal or a move there is refused
+     on the Device: "change its projects there".
+   - **Commands** (`run_command`, `exchange/commands.ts`). The Walker is
+     the only writer of its run's events, so answering a Gate, sending a
+     signal and stopping a run walked elsewhere is a command. The Replica
+     that asks checks what it can first (the Gate is open, the choice is
+     one of its choices, the run waits for that signal), then the engine
+     hands it to its `Relay`: a Host keeps it for the Walker; a Device
+     sends it to the Host (`sync.command`), which checks the role of the
+     key's Person (`gate.resolve`, `signal.send`, `run.stop`) and applies
+     it at once when it walks the run itself. The Walker takes its
+     commands with the stream, checks again from its own Replica (the run
+     is its own; the Space document's Member mirror gives the Person a
+     role that allows it), applies it as the local action, and reports
+     it (`sync.commandDone`, with its reason when it refused). A command
+     to an offline Walker waits; the run page, the inbox and the run
+     header show it as sent ("Answer sent"). Pending commands are known
+     where they wait: on the Host. A Device whose Host is offline refuses
+     the action; there is no outbox.
+   - **Read-only elsewhere.** Recovery, the daemon's resume and a
+     person's resume touch only runs this Device walks. Every other
+     action on a run walked elsewhere is refused. `RunSummary.walker`
+     (`id`, `name`, `thisDevice`) names the Walker: its `device` row, else
+     the Space document's Device names. The UI shows it on the runs list,
+     the run page and the inbox; a run of another device has no take
+     over, wake, resume or export, and its folder is not shown.
+   - **The archive** (`archive.put`, `archive.get`, the `archive`
+     permission; `exchange/archive.ts`). After a pushed batch with a node
+     that ended, the Walker puts that step's transcript and command log,
+     and its run's latest checkpoint per namespace with its pending
+     writes (JSON, blobs in base64). Rows first, then files, then the
+     cursor: the Host takes files only of runs it has, from their Walker,
+     in its Person's Spaces. Layout, the same on a Host and as a Device's
+     cache: `<data dir>/archive/<space>/<run>/<step>.ndjson`,
+     `<step>.log`, `checkpoint.json`. A transcript of a run walked
+     elsewhere is read there, and fetched from the Host on demand when it
+     is missing (kept once the step has ended); the Host serves its own
+     runs from their own files. A transcript that lands tells the run's
+     watchers. A step of a run walked elsewhere shows its transcript once
+     it ended: there are no live transcript chunks across Devices yet.
+     Retention is undecided, as for run history: everything is kept.
+   - **Host offline**: every Device keeps walking its own runs; both loops
+     start again at their cursors when the link is back.
+   - Tests: `packages/engine/src/exchange/exchange.test.ts` (two
+     Replicas in one process) and `apps/server/src/devices/exchange.test.ts`
+     (two daemons, the harness of part A in `test-daemons.ts`): B walks a
+     run in A's Space, A gets it live with the same status and B's name,
+     answers its Gate from A, B applies it and the run finishes on both, A
+     opens the transcript from the archive; a Space B's owner is not in
+     never reaches B; a forged row is refused; B walks while A is down and
+     A catches up.
+   - **A Walker's paths stay with its owner.** Where its worktree,
+     transcripts and command logs are on its disk is private to the
+     Walker's owner. The Host keeps them only from its own owner's
+     Devices, and serves them only to a Device whose owner is the
+     Walker's; every other Replica gets the rows without them
+     (`withoutPrivatePaths`). The rows keep their shape, so old readers
+     and the payload rule hold: `run.worktree_path`,
+     `step.transcript_path`, `WorktreeCreated.worktreePath` and
+     `StepStarted.transcriptPath` become `""`, and a `StepStarted.logPath`
+     that was set becomes `""` (still "this step has a log"). Clone paths
+     never leave their Device: `clone` rows and the facts of no run
+     (`CloneAdded`, `ProjectAdded`) are not exchanged, and the Space
+     document has none.
+   - **Who started it.** `run.started_by` travels with the run row. A run
+     this computer starts in a Host's Space names this computer's Person
+     as the Host knows them (the Person of its link), so every Replica of
+     the Space names the same Person; the git author stays the local one.
+   - **Every project of a Space is listed**, also without a Clone here:
+     `Project.repoPath` is null, and the UI says "Not on this computer"
+     (slice 5 starts runs placed on another Device from anywhere). Every
+     call that needs the folder (flows, branches, schedules, a run walked
+     here, rename and removal) says "This project is not on this
+     computer. Add its folder here to use it."
+   - Not yet, and risky: a Person who leaves a Space keeps the rows they
+     had. Pending commands show only on the Host. A run bundle of a run
+     walked elsewhere has no transcripts. Transcripts in the archive are
+     run content, readable by the Host's operator (as "What is
+     deliberately not promised" says). The Members page should treat a
+     Host's Space as read-only on a Device.
+
 5. **Placement.** Run-level, then per node with the Hand-off;
    `device-offline` sleep and reattach.
 6. **Sharing.** Invitation-only signup, Members and roles, Offers with the
@@ -980,8 +1105,9 @@ Nothing is open. The next step is slice 1.
 - A `${NAME}` the placed Device lacks should refuse at run start.
 - The usage-limit sleep is per harness login, so per Device. The sleep
   module needs the Device in its key.
-- Transcripts of a Run walked elsewhere are fetched from the archive on
-  open. Archive retention is undecided, as run retention is today.
+- ~~Transcripts of a Run walked elsewhere are fetched from the archive on
+  open.~~ Done in slice 4, part B. Archive retention is undecided, as run
+  retention is today: everything is kept.
 - Direct Device-to-Device sync on one LAN without the Host: later.
 - Identity across Hosts: a colleague has an account per Host until the
   OIDC provider plugin makes the home Host the login for guest Hosts.

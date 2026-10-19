@@ -417,6 +417,10 @@ function RunComponent() {
 							stream.transcript.steps.get(selectedStep.id) ?? emptyTranscript
 						}
 						connecting={stream.connection === "connecting"}
+						walker={runData.walker}
+						answerPending={runData.commands.some(
+							(c) => c.kind === "gate.resolve",
+						)}
 					/>
 				) : null
 			}

@@ -18,6 +18,7 @@ import { flowsDir } from "@nightshift/flows/files";
 
 import type { Capabilities, Device } from "./device/types";
 import type { InputValues } from "./events";
+import { personOnHost } from "./exchange/host-spaces";
 import type { NodeKind, Requirement } from "./graph/context";
 import { kindOf, kindOfType, NODE_KINDS } from "./graph/node-kinds";
 import { missingNames } from "./graph/nodes/agent";
@@ -376,8 +377,13 @@ export function createRunStart(deps: RunStartDeps) {
 			const prepared = await prepareRun(input, deps);
 			const { projectRow, flow, flowName, calledFlows, inputs, title } =
 				prepared;
-			const startedBy = input.startedBy ?? null;
-			const author = startedBy ? await gitAuthorOf(db, startedBy) : null;
+			const author = input.startedBy
+				? await gitAuthorOf(db, input.startedBy)
+				: null;
+			// In a Host's Space, the Person as the Host knows them.
+			const startedBy = input.startedBy
+				? ((await personOnHost(db, projectRow.spaceId)) ?? input.startedBy)
+				: null;
 			const worktree = await deps.device.worktree({
 				id: runId,
 				repoPath: projectRow.repoPath,
@@ -427,6 +433,7 @@ export function createRunStart(deps: RunStartDeps) {
 				row,
 				runFacts(await log.events(runId)),
 				await namesOf(db, [row.startedBy]),
+				{ id: row.walkerId, name: deps.device.name, thisDevice: true },
 			);
 		} finally {
 			runner.releaseStartingSlot(runId);

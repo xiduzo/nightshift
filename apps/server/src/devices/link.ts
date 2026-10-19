@@ -27,6 +27,10 @@ import { pinnedWebSocket } from "./tls";
  * - A Host that refuses the key (its owner removed this computer's
  *   access) ends the link for good: `revoked`.
  * - Over a link to its home Host, this Device's own document syncs.
+ * - Over any link, the Space documents the Host lists (the Spaces this
+ *   Device's owner is a Member of there) sync read-only, and `whileOnline`
+ *   runs (the exchange of run history), stopped when the link drops.
+ * - Every document goes over one WebSocket per link.
  */
 export type Link = {
 	readonly hostId: string;
@@ -50,6 +54,17 @@ export type HttpsLinkOptions = {
 	key: string;
 	/** This Device's document: it syncs over a link to the home Host. */
 	document?: { name: string; doc: Y.Doc };
+	/**
+	 * The Space documents to sync from this Host, read-only: called with
+	 * every answer of the Host, so a Space it lists later syncs too.
+	 */
+	spaceDocuments?(hello: HostHello): Promise<{ name: string; doc: Y.Doc }[]>;
+	/** Runs while the link is online; `signal` aborts when it drops or closes. */
+	whileOnline?(
+		client: AppRouterClient,
+		hello: HostHello,
+		signal: AbortSignal,
+	): Promise<void>;
 	heartbeatMs?: number;
 	firstBackoffMs?: number;
 	maxBackoffMs?: number;
@@ -105,7 +120,9 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 	let addresses = [...link.addresses];
 	let state: LinkState = { status: "connecting", address: null, since: now() };
 	let current: AppRouterClient | null = null;
-	let provider: HocuspocusProvider | null = null;
+	let socket: HocuspocusProviderWebsocket | null = null;
+	const providers = new Map<string, HocuspocusProvider>();
+	let online: AbortController | null = null;
 	const stop = new AbortController();
 	/** Cuts the wait for the next heartbeat short. */
 	let nudge = new AbortController();
@@ -127,31 +144,65 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		options.onAddresses?.(next);
 	}
 
-	function syncDocument(address: string) {
-		if (link.role !== "home" || !options.document) return;
+	/** The one WebSocket of this link to the Host's relay. */
+	function socketTo(address: string): HocuspocusProviderWebsocket {
+		if (socket) return socket;
 		const url = new URL("/sync", address);
 		url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
 		// Bun's WebSocket does not fall back from `::1` to `127.0.0.1` as its
 		// fetch does, and a daemon on this computer listens on `127.0.0.1`.
 		if (url.hostname === "localhost") url.hostname = "127.0.0.1";
-		provider = new HocuspocusProvider({
-			websocketProvider: new HocuspocusProviderWebsocket({
-				url: url.toString(),
-				WebSocketPolyfill: pinnedWebSocket(link.certificate),
-			}),
-			name: options.document.name,
-			document: options.document.doc,
+		socket = new HocuspocusProviderWebsocket({
+			url: url.toString(),
+			WebSocketPolyfill: pinnedWebSocket(link.certificate),
+		});
+		return socket;
+	}
+
+	function attach(address: string, name: string, doc: Y.Doc) {
+		if (providers.has(name)) return;
+		const provider = new HocuspocusProvider({
+			websocketProvider: socketTo(address),
+			name,
+			document: doc,
 			token: key,
 			// The Host closed the socket (its owner may have removed this
 			// computer's access): ask now instead of at the next heartbeat.
 			onClose: () => nudge.abort(),
 		});
 		provider.attach();
+		providers.set(name, provider);
 	}
 
-	function stopDocument() {
-		provider?.destroy();
-		provider = null;
+	async function syncDocuments(address: string, hello: HostHello) {
+		if (link.role === "home" && options.document) {
+			attach(address, options.document.name, options.document.doc);
+		}
+		for (const document of (await options.spaceDocuments?.(hello)) ?? []) {
+			attach(address, document.name, document.doc);
+		}
+	}
+
+	function stopDocuments() {
+		for (const provider of providers.values()) provider.destroy();
+		providers.clear();
+		socket?.destroy();
+		socket = null;
+	}
+
+	function goOnline(client: AppRouterClient, hello: HostHello) {
+		online = new AbortController();
+		const signal = online.signal;
+		options.whileOnline?.(client, hello, signal).catch((error) => {
+			if (!signal.aborted) {
+				console.error(`The exchange with ${link.name} stopped:`, error);
+			}
+		});
+	}
+
+	function goOffline() {
+		online?.abort();
+		online = null;
 	}
 
 	async function answer(address: string): Promise<HostHello> {
@@ -174,7 +225,8 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 				learn(value, address);
 				setState("online", address);
 				failures = 0;
-				syncDocument(address);
+				await syncDocuments(address, value);
+				goOnline(current as AppRouterClient, value);
 				while (!stop.signal.aborted) {
 					nudge = new AbortController();
 					await sleep(
@@ -192,10 +244,12 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 						},
 					);
 					learn(hello, address);
+					await syncDocuments(address, hello);
 				}
 			} catch (error) {
 				current = null;
-				stopDocument();
+				goOffline();
+				stopDocuments();
 				if (stop.signal.aborted) break;
 				if (isRefusal(error)) {
 					setState("revoked", null);
@@ -222,7 +276,8 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		client: () => current,
 		async close() {
 			stop.abort();
-			stopDocument();
+			goOffline();
+			stopDocuments();
 			current = null;
 			await running;
 		},

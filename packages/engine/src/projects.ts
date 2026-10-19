@@ -22,6 +22,7 @@ import {
 	sql,
 } from "drizzle-orm";
 
+import { isHostedElsewhere } from "./exchange/host-spaces";
 import type { RunLog } from "./run-log";
 import {
 	cloneKey,
@@ -33,7 +34,7 @@ import {
 	type SpaceProject,
 	spaceProjectSchema,
 } from "./space/document";
-import type { Project } from "./types";
+import type { Project, Relay } from "./types";
 import { originUrl, resolveRepoTopLevel } from "./worktrees";
 
 /**
@@ -55,10 +56,26 @@ import { originUrl, resolveRepoTopLevel } from "./worktrees";
  *   document; the `project` row follows as its projection before the call
  *   returns. A Clone here is a `clone` row (with its path) and an entry in
  *   the Space document (without one).
+ * - In a Space a Host keeps, the document is the Host's: a Clone here is
+ *   recorded there through the Host (`relay.addClone`), and the Projects
+ *   themselves change on the Host only.
  */
+
+/** A call that needs the project's folder on this computer, for a project without one. */
+export const NOT_ON_THIS_COMPUTER =
+	"This project is not on this computer. Add its folder here to use it.";
+
+/** A change this Replica cannot make to a Space a Host keeps. */
+export const HOSTED_ELSEWHERE =
+	"This Space is kept by another computer. Change its projects there.";
 
 /** A project row with the path of its Clone on this computer. */
 export type ProjectRow = typeof project.$inferSelect & { repoPath: string };
+
+/** A project row with the path of its Clone here, or null: not on this computer. */
+export type ListedProject = typeof project.$inferSelect & {
+	repoPath: string | null;
+};
 
 export type ProjectsDeps = {
 	db: Database;
@@ -67,6 +84,8 @@ export type ProjectsDeps = {
 	deviceId(): Promise<string>;
 	/** The Space documents: the source of the Projects' definitions. */
 	documents: SpaceDocuments;
+	/** The Hosts: a Clone in a Space a Host keeps is recorded through it. */
+	relay?: Pick<Relay, "addClone">;
 };
 
 export type Projects = ReturnType<typeof createProjects>;
@@ -76,7 +95,7 @@ export type Projects = ReturnType<typeof createProjects>;
  * (from the Space document).
  */
 export function toProject(
-	row: ProjectRow,
+	row: ListedProject,
 	document: SpaceDocument,
 	deviceId: string,
 ): Project {
@@ -86,7 +105,7 @@ export function toProject(
 		thisDevice: c.deviceId === deviceId,
 	}));
 	// A row the document has not seen yet still has its Clone here.
-	if (!clones.some((c) => c.thisDevice)) {
+	if (row.repoPath !== null && !clones.some((c) => c.thisDevice)) {
 		clones.unshift({ deviceId, deviceName: null, thisDevice: true });
 	}
 	return {
@@ -111,6 +130,7 @@ export function createProjects(deps: ProjectsDeps) {
 		change: Partial<SpaceProject>,
 	): Promise<void> {
 		const document = await documents.open(row.spaceId);
+		if (document.hostedElsewhere) throw new Error(HOSTED_ELSEWHERE);
 		const parsed = spaceProjectSchema.safeParse(document.projects.get(row.id));
 		const entry = parsed.success ? parsed.data : projectEntry(row);
 		await document.change(() => {
@@ -133,13 +153,13 @@ export function createProjects(deps: ProjectsDeps) {
 			.from(device)
 			.where(eq(device.id, deviceId));
 		const document = await documents.open(spaceId);
-		await document.change(() =>
-			recordClone(document, {
-				projectId,
-				deviceId,
-				deviceName: self?.name ?? deviceId,
-			}),
-		);
+		const clone = { projectId, deviceId, deviceName: self?.name ?? deviceId };
+		if (document.hostedElsewhere) {
+			if (!deps.relay) throw new Error(HOSTED_ELSEWHERE);
+			await deps.relay.addClone({ spaceId, ...clone });
+			return;
+		}
+		await document.change(() => recordClone(document, clone));
 	}
 
 	/** Projects with a Clone on this computer, with its path, removed ones too. */
@@ -190,6 +210,24 @@ export function createProjects(deps: ProjectsDeps) {
 		},
 
 		/**
+		 * Every project of the Space a person has not removed, oldest first,
+		 * also those without a Clone on this computer (`repoPath` null): a
+		 * run of one can be walked by another Device.
+		 */
+		async listInSpace(spaceId: string): Promise<ListedProject[]> {
+			const deviceId = await deps.deviceId();
+			return db
+				.select({ ...getColumns(project), repoPath: clone.path })
+				.from(project)
+				.leftJoin(
+					clone,
+					and(eq(clone.projectId, project.id), eq(clone.deviceId, deviceId)),
+				)
+				.where(and(isNull(project.removedAt), eq(project.spaceId, spaceId)))
+				.orderBy(asc(project.createdAt));
+		},
+
+		/**
 		 * A project that a person has not removed, with its folder here. With
 		 * a Space, a project of another Space is not found.
 		 */
@@ -201,8 +239,20 @@ export function createProjects(deps: ProjectsDeps) {
 					inSpace(spaceId),
 				),
 			);
-			if (!row) throw new Error(`Project not found: ${projectId}`);
-			return row;
+			if (row) return row;
+			const [elsewhere] = await db
+				.select({ id: project.id })
+				.from(project)
+				.where(
+					and(
+						eq(project.id, projectId),
+						isNull(project.removedAt),
+						inSpace(spaceId),
+					),
+				);
+			throw new Error(
+				elsewhere ? NOT_ON_THIS_COMPUTER : `Project not found: ${projectId}`,
+			);
 		},
 
 		/**
@@ -236,6 +286,8 @@ export function createProjects(deps: ProjectsDeps) {
 						`This computer already has this project, in ${elsewhere.repoPath}. Remove it first to use this folder instead.`,
 					);
 				}
+				// The Space knows of the Clone first: through its Host, when a Host keeps it.
+				await recordCloneHere(known.id, spaceId, deviceId);
 				// A Clone that moved, or a removed project's: this folder now.
 				if (elsewhere) {
 					await db
@@ -253,7 +305,6 @@ export function createProjects(deps: ProjectsDeps) {
 						path,
 					});
 				}
-				await recordCloneHere(known.id, spaceId, deviceId);
 				await log.append({
 					type: "CloneAdded",
 					payload: { projectId: known.id, deviceId, path },
@@ -265,6 +316,11 @@ export function createProjects(deps: ProjectsDeps) {
 			const id = randomUUID();
 			const name = input.name ?? path.split("/").at(-1) ?? path;
 			const document = await documents.open(spaceId);
+			if (document.hostedElsewhere) {
+				throw new Error(
+					"This Space is kept by another computer. Add the project there first, then add this folder.",
+				);
+			}
 			const now = Date.now();
 			await document.change(() => {
 				document.projects.set(id, {
@@ -316,6 +372,12 @@ export function createProjects(deps: ProjectsDeps) {
 		 */
 		async move(projectId: string, from: string, to: string): Promise<void> {
 			if (from === to) return;
+			if (
+				(await isHostedElsewhere(db, from)) ||
+				(await isHostedElsewhere(db, to))
+			) {
+				throw new Error(HOSTED_ELSEWHERE);
+			}
 			const [target] = await db
 				.select({ id: organization.id })
 				.from(organization)

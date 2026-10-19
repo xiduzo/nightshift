@@ -1,4 +1,5 @@
-import type { LinkedHost } from "@nightshift/api/context";
+import type { HostHello, LinkedHost } from "@nightshift/api/context";
+import type { AppRouterClient } from "@nightshift/api/routers/index";
 import type { DeviceKeyStore, HostLink, HostLinks } from "@nightshift/engine";
 import type * as Y from "yjs";
 
@@ -27,6 +28,18 @@ export function createDeviceLinks(deps: {
 	keys: DeviceKeyStore;
 	/** This Device's document: it syncs with the home Host. */
 	document: { name: string; doc: Y.Doc };
+	/** The Space documents to sync from a Host, read-only (the Spaces it lists). */
+	spaceDocuments?(
+		link: HostLink,
+		hello: HostHello,
+	): Promise<{ name: string; doc: Y.Doc }[]>;
+	/** Runs while a link is online: the exchange of run history with its Host. */
+	whileOnline?(
+		link: HostLink,
+		client: AppRouterClient,
+		hello: HostHello,
+		signal: AbortSignal,
+	): Promise<void>;
 	/** For tests: shorter heartbeats and backoffs. */
 	linkOptions?: Pick<
 		HttpsLinkOptions,
@@ -53,6 +66,23 @@ export function createDeviceLinks(deps: {
 				link,
 				key: secret,
 				document: deps.document,
+				...(deps.spaceDocuments
+					? {
+							spaceDocuments: (hello: HostHello) =>
+								deps.spaceDocuments?.(link, hello) ?? Promise.resolve([]),
+						}
+					: {}),
+				...(deps.whileOnline
+					? {
+							whileOnline: (
+								client: AppRouterClient,
+								hello: HostHello,
+								signal: AbortSignal,
+							) =>
+								deps.whileOnline?.(link, client, hello, signal) ??
+								Promise.resolve(),
+						}
+					: {}),
 				onAddresses: (addresses) => {
 					deps.links.setAddresses(link.hostId, addresses).catch(() => {});
 				},
