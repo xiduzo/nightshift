@@ -7,6 +7,7 @@ import {
 	cliHelp,
 	codexHarness,
 	grokBuildHarness,
+	harnessFacts,
 	harnessModels,
 	opencodeHarness,
 	pathPrograms,
@@ -140,7 +141,7 @@ function perSession(
 	name: AgentHarness["name"],
 	build: () => AgentHarness,
 ): AgentHarness {
-	return { name, run: (input) => build().run(input) };
+	return { name, ...harnessFacts(name), run: (input) => build().run(input) };
 }
 
 // `bun --hot` evaluates this module again on each reload. Only the newest

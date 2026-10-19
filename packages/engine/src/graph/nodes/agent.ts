@@ -1,5 +1,4 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import { DECIDER_ADAPTERS } from "@nightshift/agents/decider";
 import type {
 	AgentEvent,
 	AgentSessionInput,
@@ -444,7 +443,6 @@ async function checkOutcome(
 	const checker = node.checker as NonNullable<AgentNode["checker"]>;
 	const { signal } = step;
 	const options = checkOutcomes(node);
-	const model = checker.model ?? DECIDER_ADAPTERS[checker.decider].defaultModel;
 	const task = renderTemplate(node.prompt, step.tctx);
 	const brief = checker.prompt
 		? renderTemplate(checker.prompt, step.tctx).trim()
@@ -462,12 +460,6 @@ async function checkOutcome(
 			: []),
 	];
 	const prompt = sections.join("\n\n");
-	step.record(null, {
-		type: "decision-start",
-		prompt,
-		labels: options.map((option) => option.name),
-		model,
-	});
 	const finish = (
 		outcome: string,
 		note: string,
@@ -489,6 +481,15 @@ async function checkOutcome(
 			null,
 		);
 	}
+	// The decider port says which model a checker without one starts on.
+	const model =
+		checker.model ?? ctx.decider.defaultModel(checker.decider, "decision");
+	step.record(null, {
+		type: "decision-start",
+		prompt,
+		labels: options.map((option) => option.name),
+		model,
+	});
 	const result = await decideWithin(
 		ctx.decider,
 		{ decider: checker.decider, prompt, labels: options, model, signal },

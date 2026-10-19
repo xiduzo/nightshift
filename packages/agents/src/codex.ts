@@ -22,6 +22,7 @@ import {
 	harnessSession,
 	shellQuote,
 } from "./adapter-session";
+import { harnessFacts } from "./harness-facts";
 import { failureKind, type HarnessProfile, type SdkSignals } from "./translate";
 import type {
 	AgentHarness,
@@ -265,6 +266,7 @@ function codexAdapter(
 export function codexHarness(options: CodexHarnessOptions = {}): AgentHarness {
 	return {
 		name: "codex",
+		...harnessFacts("codex"),
 		run: (input) =>
 			harnessSession({
 				input,

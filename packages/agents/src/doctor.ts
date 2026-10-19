@@ -8,6 +8,7 @@ import { GROK_BUILD_MODELS } from "@tanstack/ai-grok-build";
 import { OPENCODE_MODELS } from "@tanstack/ai-opencode";
 
 import { ACP_DEFAULT_MODEL } from "./acp";
+import { HARNESS_LABELS, HARNESS_TAKE_OVER } from "./harness-facts";
 import { type McpToolInfo, toolInfo, withMcpClient } from "./mcp";
 import type { HarnessName, McpServerConfig } from "./types";
 
@@ -231,7 +232,7 @@ export type HarnessAdapter = {
 	note: string;
 	/** Where prompts and code go. */
 	offMachine: string;
-	/** The command that opens a session in the CLI, given its quoted id. Null: it has none. */
+	/** The command that opens a session in the CLI, given its quoted id. Null: it has none. See `harness-facts.ts`. */
 	takeOver: ((sessionId: string) => string) | null;
 };
 
@@ -245,7 +246,7 @@ export type HarnessAdapter = {
 export const HARNESS_ADAPTERS: Record<HarnessName, HarnessAdapter> = {
 	"claude-code": {
 		name: "claude-code",
-		label: "Claude Code",
+		label: HARNESS_LABELS["claude-code"],
 		initials: "CC",
 		pkg: "@tanstack/ai-claude-code",
 		bin: "claude",
@@ -256,11 +257,11 @@ export const HARNESS_ADAPTERS: Record<HarnessName, HarnessAdapter> = {
 		note: "Uses your Claude login. Model: an alias such as sonnet, or a full model id.",
 		offMachine:
 			"Prompts and your project's code go to Anthropic under your Claude login.",
-		takeOver: (id) => `claude --resume ${id}`,
+		takeOver: HARNESS_TAKE_OVER["claude-code"],
 	},
 	opencode: {
 		name: "opencode",
-		label: "OpenCode",
+		label: HARNESS_LABELS.opencode,
 		initials: "OC",
 		pkg: "@tanstack/ai-opencode",
 		bin: "opencode",
@@ -270,12 +271,11 @@ export const HARNESS_ADAPTERS: Record<HarnessName, HarnessAdapter> = {
 		note: "Model as provider/model. Needs OpenCode 1.x. Version 2.x does not work yet.",
 		offMachine:
 			"Prompts and code go to the model provider OpenCode is set up with.",
-		// From the OpenCode CLI docs (`-s, --session`), not checked against 1.x.
-		takeOver: (id) => `opencode --session ${id}`,
+		takeOver: HARNESS_TAKE_OVER.opencode,
 	},
 	codex: {
 		name: "codex",
-		label: "Codex",
+		label: HARNESS_LABELS.codex,
 		initials: "CX",
 		pkg: "@tanstack/ai-codex",
 		bin: "codex",
@@ -284,11 +284,11 @@ export const HARNESS_ADAPTERS: Record<HarnessName, HarnessAdapter> = {
 		listing: null,
 		note: "Not fully tested yet. Uses your Codex login.",
 		offMachine: "Prompts and code go to OpenAI under your Codex login.",
-		takeOver: (id) => `codex resume ${id}`,
+		takeOver: HARNESS_TAKE_OVER.codex,
 	},
 	"grok-build": {
 		name: "grok-build",
-		label: "Grok Build",
+		label: HARNESS_LABELS["grok-build"],
 		initials: "GB",
 		pkg: "@tanstack/ai-grok-build",
 		bin: "grok",
@@ -297,11 +297,11 @@ export const HARNESS_ADAPTERS: Record<HarnessName, HarnessAdapter> = {
 		listing: null,
 		note: "Not fully tested yet. Uses your Grok login: run grok login once.",
 		offMachine: "Prompts and code go to xAI under your Grok login.",
-		takeOver: (id) => `grok --resume ${id}`,
+		takeOver: HARNESS_TAKE_OVER["grok-build"],
 	},
 	copilot: {
 		name: "copilot",
-		label: "GitHub Copilot",
+		label: HARNESS_LABELS.copilot,
 		initials: "GC",
 		pkg: "@tanstack/ai-acp",
 		bin: "copilot",
@@ -311,11 +311,11 @@ export const HARNESS_ADAPTERS: Record<HarnessName, HarnessAdapter> = {
 		note: "Not fully tested yet. Uses your GitHub login. Model default uses the model Copilot is set to.",
 		offMachine:
 			"Prompts and code go to GitHub Copilot under your GitHub login.",
-		takeOver: null,
+		takeOver: HARNESS_TAKE_OVER.copilot,
 	},
 	gemini: {
 		name: "gemini",
-		label: "Gemini CLI",
+		label: HARNESS_LABELS.gemini,
 		initials: "GE",
 		pkg: "@tanstack/ai-acp",
 		bin: "gemini",
@@ -324,11 +324,11 @@ export const HARNESS_ADAPTERS: Record<HarnessName, HarnessAdapter> = {
 		listing: null,
 		note: "Not fully tested yet. Uses your Gemini CLI login. Model default uses the model Gemini CLI is set to.",
 		offMachine: "Prompts and code go to Google under your Gemini CLI login.",
-		takeOver: null,
+		takeOver: HARNESS_TAKE_OVER.gemini,
 	},
 	cursor: {
 		name: "cursor",
-		label: "Cursor",
+		label: HARNESS_LABELS.cursor,
 		initials: "CU",
 		pkg: "@tanstack/ai-acp",
 		bin: "agent",
@@ -337,7 +337,7 @@ export const HARNESS_ADAPTERS: Record<HarnessName, HarnessAdapter> = {
 		listing: null,
 		note: "Not fully tested yet. Uses your Cursor login: run agent login once.",
 		offMachine: "Prompts and code go to Cursor under your Cursor login.",
-		takeOver: (id) => `agent --resume ${id}`,
+		takeOver: HARNESS_TAKE_OVER.cursor,
 	},
 };
 

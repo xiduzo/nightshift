@@ -134,6 +134,21 @@ export function cannotMakeValueMessage(name: DeciderName): string {
 	return `${DECIDER_ADAPTERS[name].label} cannot make a value. Choose ${able}.`;
 }
 
+/**
+ * The model a decider starts a node on when the node names none, from the
+ * registry: what `Decider.defaultModel` answers for the TanStack decider and
+ * the fake alike, so both sit at the same seam with the same values.
+ */
+export function defaultDeciderModel(
+	name: DeciderName,
+	makes: "decision" | "value",
+): string {
+	const adapter = DECIDER_ADAPTERS[name];
+	return makes === "value"
+		? (adapter.value?.defaultModel ?? adapter.defaultModel)
+		: adapter.defaultModel;
+}
+
 export type TanstackDeciderOptions = {
 	/** A secret's value: the keychain, then the environment. */
 	secret: (name: string) => Promise<string | undefined>;
@@ -224,6 +239,7 @@ async function valueOnce(
 /** Decision nodes on `decide()`, Value nodes on `chat()`. Never throws. */
 export function tanstackDecider(options: TanstackDeciderOptions): Decider {
 	return {
+		defaultModel: defaultDeciderModel,
 		decide: async (input) => {
 			if (input.signal.aborted) {
 				return failed("aborted", "The decision was aborted");

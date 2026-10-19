@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type FakeHarness, fakeHarness } from "@nightshift/agents/fake";
+import { harnessFacts } from "@nightshift/agents/harness-facts";
 import type { HarnessName } from "@nightshift/agents/types";
 import { event } from "@nightshift/db/schema/nightshift";
 import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
@@ -24,7 +25,7 @@ const ref = (name: string) => `\${${name}}`;
 
 /** A fake harness that answers to `name`. */
 function named(name: HarnessName): FakeHarness {
-	return { ...fakeHarness(), name };
+	return { ...fakeHarness(), name, ...harnessFacts(name) };
 }
 
 function makeEngine(harnesses: EngineOptions["harnesses"]): Engine {

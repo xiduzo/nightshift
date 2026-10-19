@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import { harnessFacts } from "@nightshift/agents/harness-facts";
 import type { McpServerConfig } from "@nightshift/agents/types";
 import type { ToolNode } from "@nightshift/flows";
 
@@ -81,6 +82,7 @@ async function start(
 function fakeHarness() {
 	return {
 		name: "claude-code" as const,
+		...harnessFacts("claude-code"),
 		run: async function* () {
 			yield { type: "finished" as const };
 		},

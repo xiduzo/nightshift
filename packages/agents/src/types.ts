@@ -123,8 +123,15 @@ export type AgentEvent =
 
 export interface AgentHarness {
 	readonly name: HarnessName;
+	/** The display name, for example "Claude Code". */
+	readonly label: string;
 	/** Start or resume one session. Never throws: failures end the stream with an `error` event. */
 	run(input: AgentSessionInput): AsyncIterable<AgentEvent>;
+	/**
+	 * The CLI command a person runs to take over this session in the
+	 * terminal, with the id quoted for the shell. Null when the CLI has none.
+	 */
+	takeOverCommand(sessionId: string): string | null;
 }
 
 export type DecisionInput = {
@@ -179,6 +186,12 @@ export type ValueResult =
  * schema on the decider's text adapter).
  */
 export interface Decider {
+	/**
+	 * The model a node on this decider starts on when it names none: the
+	 * decision model, or the text model that makes a value (the decision
+	 * model again for a decider without one).
+	 */
+	defaultModel(decider: DeciderName, makes: "decision" | "value"): string;
 	/** Never throws: failures come back as `kind: "error"`. */
 	decide(input: DecisionInput): Promise<DecisionResult>;
 	/** Never throws. A decider that cannot make a value answers `kind: "error"`. */

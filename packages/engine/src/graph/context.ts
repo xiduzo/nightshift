@@ -1,5 +1,5 @@
 import type { Command, LangGraphRunnableConfig } from "@langchain/langgraph";
-import { HARNESS_ADAPTERS } from "@nightshift/agents/doctor";
+import { HARNESS_LABELS } from "@nightshift/agents/harness-facts";
 import type {
 	AgentErrorKind,
 	AgentHarness,
@@ -48,10 +48,12 @@ export async function getRunRow(db: Database, runId: string): Promise<RunRow> {
 	return row;
 }
 
-/** The harness name as a person reads it, for error texts. */
-export const HARNESS_LABEL = Object.fromEntries(
-	Object.values(HARNESS_ADAPTERS).map((h) => [h.name, h.label]),
-) as Record<HarnessName, string>;
+/**
+ * Harness display names by name, for a message about a harness that is not
+ * added (no `AgentHarness` instance to ask). Sourced from the port side
+ * (`harness-facts.ts`), not the adapter registry.
+ */
+export const HARNESS_LABEL: Record<HarnessName, string> = HARNESS_LABELS;
 
 /** A harness or decider error the run policy waits out, rather than a failure. */
 export const isWaitKind = (

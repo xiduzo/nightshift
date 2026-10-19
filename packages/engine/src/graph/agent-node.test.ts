@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { Command, MemorySaver } from "@langchain/langgraph";
 import type { AgentHarness, AgentSessionInput } from "@nightshift/agents";
+import { defaultDeciderModel } from "@nightshift/agents/decider";
 import {
 	failingScript,
 	fakeDecider,
@@ -1451,6 +1452,7 @@ describe("the checker", () => {
 			{
 				// A decider that answers off the list (against its contract).
 				decider: {
+					defaultModel: defaultDeciderModel,
 					decide: async () => ({
 						kind: "decided",
 						label: "maybe",

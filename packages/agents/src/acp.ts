@@ -19,6 +19,7 @@ import {
 	harnessSession,
 	shellQuote,
 } from "./adapter-session";
+import { harnessFacts } from "./harness-facts";
 import type { SdkSignals } from "./translate";
 import type {
 	AgentHarness,
@@ -180,6 +181,7 @@ export function acpHarness(
 ): AgentHarness {
 	return {
 		name,
+		...harnessFacts(name),
 		run: (input) =>
 			harnessSession({
 				input,

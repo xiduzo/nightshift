@@ -1,4 +1,3 @@
-import { DECIDER_ADAPTERS } from "@nightshift/agents/decider";
 import type {
 	Decider,
 	DecisionInput,
@@ -56,13 +55,6 @@ async function decide(
 	const { visit, signal } = step;
 	const prompt = renderTemplate(node.prompt, step.tctx);
 	const options = visibleOptions(node);
-	const model = node.model ?? DECIDER_ADAPTERS[node.decider].defaultModel;
-	step.record(null, {
-		type: "decision-start",
-		prompt,
-		labels: options.map((option) => option.name),
-		model,
-	});
 	if (!ctx.decider) {
 		return {
 			kind: "end",
@@ -71,6 +63,15 @@ async function decide(
 			error: "No decider is configured for Decision nodes.",
 		};
 	}
+	// The decider port says which model a node without one starts on.
+	const model =
+		node.model ?? ctx.decider.defaultModel(node.decider, "decision");
+	step.record(null, {
+		type: "decision-start",
+		prompt,
+		labels: options.map((option) => option.name),
+		model,
+	});
 	const result = await decideWithin(
 		ctx.decider,
 		{ decider: node.decider, prompt, labels: options, model, signal },

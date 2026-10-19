@@ -23,6 +23,7 @@ export {
 	cannotMakeValueMessage,
 	DECIDER_ADAPTERS,
 	type DeciderAdapter,
+	defaultDeciderModel,
 	type TanstackDeciderOptions,
 	tanstackDecider,
 	type ValueAdapter,
@@ -56,6 +57,12 @@ export {
 	grokBuildHarness,
 	grokPolicy,
 } from "./grok-build";
+export {
+	HARNESS_LABELS,
+	HARNESS_TAKE_OVER,
+	harnessFacts,
+	shellQuote,
+} from "./harness-facts";
 export {
 	callMcpTool,
 	listMcpTools,

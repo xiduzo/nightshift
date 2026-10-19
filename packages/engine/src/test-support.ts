@@ -1,6 +1,7 @@
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { harnessFacts } from "@nightshift/agents/harness-facts";
 import type {
 	AgentEvent,
 	AgentHarness,
@@ -134,6 +135,7 @@ export function scriptedHarness(
 	const sessions: ScriptedSession[] = [];
 	const harness: AgentHarness = {
 		name: "claude-code",
+		...harnessFacts("claude-code"),
 		run(input) {
 			const channel = new Channel<AgentEvent>();
 			const index = sessions.length;

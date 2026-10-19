@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { defaultDeciderModel } from "@nightshift/agents/decider";
 import { fakeHarness, reportingScript } from "@nightshift/agents/fake";
 import type {
 	AgentHarness,
@@ -1370,6 +1371,7 @@ function scriptedDecider(
 ) {
 	const calls: DecisionInput[] = [];
 	const decider: Decider = {
+		defaultModel: defaultDeciderModel,
 		async decide(input) {
 			calls.push(input);
 			return answer(input, calls.length - 1);

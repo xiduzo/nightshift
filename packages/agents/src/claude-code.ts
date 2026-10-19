@@ -18,6 +18,7 @@ import {
 	harnessSession,
 	type SessionReport,
 } from "./adapter-session";
+import { harnessFacts } from "./harness-facts";
 import { CLAUDE_CODE_PROFILE } from "./translate";
 import type {
 	AgentHarness,
@@ -215,6 +216,7 @@ export function claudeCodeHarness(
 ): AgentHarness {
 	return {
 		name: "claude-code",
+		...harnessFacts("claude-code"),
 		run: (input) =>
 			harnessSession({
 				input,
