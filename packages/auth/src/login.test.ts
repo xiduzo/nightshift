@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { hasLogin, setLogin } from "./login";
 import { localPerson } from "./spaces";
 import { type AuthSandbox, createAuthSandbox } from "./test-support";
+import { turnOnTwoFactor } from "./two-factor-support";
 
 let sandbox: AuthSandbox;
 beforeEach(async () => {
@@ -68,5 +69,26 @@ describe("a login for the Host admin of a Host without a screen", () => {
 				password: "a-long-password",
 			}),
 		).rejects.toThrow("is not an email address");
+	});
+
+	test("--reset-two-factor: a new password signs in without the lost app", async () => {
+		const local = await localPerson(sandbox.db);
+		const login = { email: "ada@example.com", password: "a-long-password" };
+		await setLogin(sandbox.auth, local.userId, login);
+		await turnOnTwoFactor(
+			sandbox.auth,
+			await sandbox.signIn(login.email, login.password),
+		);
+		const asked = await sandbox.auth.api.signInEmail({ body: login });
+		expect(asked).toMatchObject({ twoFactorRedirect: true });
+
+		await setLogin(sandbox.auth, local.userId, {
+			...login,
+			password: "a-new-password",
+			resetTwoFactor: true,
+		});
+		const headers = await sandbox.signIn(login.email, "a-new-password");
+		const session = await sandbox.auth.api.getSession({ headers });
+		expect(session?.user.twoFactorEnabled).toBe(false);
 	});
 });

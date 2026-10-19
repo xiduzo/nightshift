@@ -11,7 +11,17 @@ import type { Auth } from "./index";
  * from a browser elsewhere and invite others: `nightshift admin` sets it,
  * on the Host itself.
  */
-export type LoginInput = { email: string; password: string; name?: string };
+export type LoginInput = {
+	email: string;
+	password: string;
+	name?: string;
+	/**
+	 * Also turn two-factor sign-in off: the way back in for a Person who
+	 * lost their authenticator app and their backup codes. Only on the
+	 * Host itself, like the rest of this.
+	 */
+	resetTwoFactor?: boolean;
+};
 
 export const MIN_PASSWORD_LENGTH = 8;
 
@@ -53,7 +63,14 @@ export async function setLogin(
 		email,
 		emailVerified: true,
 		...(input.name?.trim() ? { name: input.name.trim() } : {}),
+		...(input.resetTwoFactor ? { twoFactorEnabled: false } : {}),
 	});
+	if (input.resetTwoFactor) {
+		await ctx.adapter.deleteMany({
+			model: "twoFactor",
+			where: [{ field: "userId", value: personId }],
+		});
+	}
 	const hash = await ctx.password.hash(input.password);
 	const accounts = await ctx.internalAdapter.findAccounts(personId);
 	if (accounts.some((a) => a.providerId === "credential")) {

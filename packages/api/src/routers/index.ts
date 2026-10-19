@@ -993,6 +993,7 @@ const account = {
 				email: z.string().trim().min(3).max(254),
 				password: z.string().min(1).max(256),
 				name: z.string().trim().max(64).optional(),
+				resetTwoFactor: z.boolean().optional(),
 			}),
 		)
 		.handler(({ context, input }) => {

@@ -66,7 +66,12 @@ export type Context = {
 	/** Sets a Person's email and password (`@nightshift/auth/login`). */
 	setLogin(
 		personId: string,
-		input: { email: string; password: string; name?: string },
+		input: {
+			email: string;
+			password: string;
+			name?: string;
+			resetTwoFactor?: boolean;
+		},
 	): Promise<{ email: string }>;
 	/**
 	 * The Device key the request carries (`Authorization: Bearer`), resolved.

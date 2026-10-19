@@ -17,7 +17,9 @@ are all the same.
 A public address (Funnel, a public server, a tunnel) shows Night Shift's
 sign-in page to everyone. That is safe: a Host is invitation-only. Nobody
 makes an account without an invitation link from a Member, and the Host
-admin exists from the first start.
+admin exists from the first start. Night Shift limits sign-in attempts per
+client. For more, [require two-factor sign-in](#require-two-factor-sign-in):
+then a password alone does not get anyone in.
 
 A Host can have several addresses. Your other computers try them in order and
 keep the first that answers. Put the LAN name first, then the tailnet name,
@@ -93,6 +95,62 @@ Then open the Host's address in a browser, for example
 Members: the invitation link uses the address you opened the page with.
 
 `nightshift serve` reminds you when the Host has no sign-in yet.
+
+### Require two-factor sign-in
+
+With two-factor sign-in, a person enters a code from an authenticator app
+(1Password, Google Authenticator, Authy) after the password. Each person
+turns it on under Account in the web UI. You can also make the Host
+require it for everyone who signs in from another computer:
+
+```bash
+nightshift serve --require-two-factor ...
+# Or in the environment, for example in Docker:
+NIGHTSHIFT_REQUIRE_TWO_FACTOR=on
+```
+
+Then a person who has not turned it on can only set it up, or sign out.
+Night Shift shows them the setup after they sign in: the password, a QR
+code for the app, one code from it, and ten backup codes. Each backup code
+signs in once when the app is not at hand. Save them. Under Account, a
+person can make new backup codes or turn two-factor sign-in off.
+
+The requirement does not apply to:
+
+- the Host itself: the UI opened on the Host, or through an SSH tunnel to
+  it, outside a container;
+- your paired computers: they use their own access to the Host.
+
+Set it up for the Host admin first:
+
+1. Give the Host admin a password: `nightshift admin --email you@example.com`.
+2. Start the Host with the requirement (`--require-two-factor` or
+   `NIGHTSHIFT_REQUIRE_TWO_FACTOR=on`).
+3. Open the Host's address in a browser and sign in. Night Shift asks you
+   to set up two-factor sign-in. Scan the QR code, enter the code, and save
+   the backup codes.
+
+A value other than `on` or `off` stops the Host at start, so a typo never
+leaves it open. Restart the Host to change it.
+
+When the Host admin loses the app and the backup codes, run this on the
+Host. It sets a new password and turns two-factor sign-in off:
+
+```bash
+nightshift admin --email you@example.com --reset-two-factor
+# In Docker:
+docker exec -it nightshift nightshift admin --email you@example.com --reset-two-factor
+```
+
+Then sign in, and set up two-factor sign-in again. Other people have no
+reset yet: a browser they trusted still signs them in, and from there they
+can make new backup codes. Ask everyone to keep their backup codes.
+
+Sign-in and its codes are limited to five tries a minute per client. Behind
+Cloudflare the client is `CF-Connecting-IP`, behind another proxy
+`X-Forwarded-For`. So that nobody can send these headers themselves, keep
+the Host off the network behind the proxy: `--listen 127.0.0.1`, or no
+published port in Docker.
 
 ### Open the UI over SSH
 

@@ -23,7 +23,8 @@ Usage:
   nightshift join <host-address> [--guest]  Pair this computer with a Host.
   nightshift pair <code> [--yes]            Allow a computer to pair with this Host.
   nightshift admin --email <email>          Set how the Host admin signs in from
-                                            another computer.
+                                            another computer. --reset-two-factor
+                                            also turns two-factor sign-in off.
 
 Options of serve (each has an environment variable too):
   --port <port>            The port. PORT, default 3000.
