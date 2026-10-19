@@ -1,4 +1,3 @@
-import { Command } from "@langchain/langgraph";
 import { DECIDER_ADAPTERS } from "@nightshift/agents/decider";
 import type {
 	Decider,
@@ -12,19 +11,13 @@ import {
 } from "@nightshift/flows";
 
 import {
-	beginStep,
-	beginWait,
 	isWaitKind,
 	messageOf,
-	pastStopTime,
 	STOP_GRACE_MS,
-	STOP_TIME_REASON,
 	type StepContext,
-	type StepHandle,
-	type WaitRequest,
 } from "../../context";
-import { entryOf, RESUME_RULES, resumePoint } from "../../resume-point";
-import { parkStopped, type StepEnd, scopeOf, waitNodeId } from "../../route";
+import { RESUME_RULES } from "../../resume-point";
+import { type BodyResult, runStep, type StepHandle } from "../../step-runner";
 import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
 
 /**
@@ -35,94 +28,31 @@ import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
  * decider's cost as `costUsd`, also on an error or a stop. The decider's
  * reasons go in the `note` output.
  *
- * How the step opens is the one resume point (`resumePoint`,
+ * The step lifecycle is the step runner's (`runStep` with
  * `RESUME_RULES.model`): the step that waited for a usage limit or the
  * network continues (same step id and visit; nothing is appended before the
  * decider is asked again), or is reopened first when recovery ended it
  * after the wake. Otherwise a new visit: a parked or interrupted step has
- * no session to reopen.
- *
- * A usage limit or a network failure plans a wait (`beginWait`) and jumps
- * to the node's wait node (`wait__<id>`), which interrupts; a give-up ends
- * the step `error`.
+ * no session to reopen. A usage limit or a network failure is a wait
+ * request; the runner plans the wait and parks at the node's wait node
+ * (`wait__<id>`), or ends the step `error` on a give-up. This module is
+ * the body: `decide`.
  */
 export function modelChooser(node: DecisionNode, ctx: StepContext): Chooser {
-	return async (state, config) => {
-		const begun = await beginStep(
-			ctx,
-			node,
-			state,
-			config,
-			entryOf(
-				resumePoint(
-					node,
-					state,
-					await ctx.log.events(ctx.run.id),
-					scopeOf(config),
-					RESUME_RULES.model,
-				),
-			),
-		);
-		if (begun.kind === "parked") return begun.command;
-		const step = begun.step;
-		// The wait ended past the stop time: the step does not continue.
-		if (step.opened === "continue" && pastStopTime(ctx, state, config)) {
-			const end = await step.end(
-				"stopped",
-				decisionOutputs("stopped", "", step.visit),
-				null,
-			);
-			return parkStopped(node, end, STOP_TIME_REASON);
-		}
-		try {
-			const decided = await decide(ctx, node, step);
-			if (!("reason" in decided)) return decided;
-			const waited = await beginWait(ctx, node, state, config, step, decided);
-			if (waited.kind === "stop-time") {
-				const end = await step.end(
-					"stopped",
-					decisionOutputs("stopped", "", step.visit),
-					null,
-					{
-						costUsd: decided.costUsd,
-					},
-				);
-				return parkStopped(node, end, waited.reason);
-			}
-			if (waited.kind === "wait") {
-				return new Command({
-					update: {
-						pending: waited.pending,
-						visits: { [node.id]: step.visit },
-					},
-					goto: waitNodeId(node.id),
-				});
-			}
-			return step.end(
-				"error",
-				decisionOutputs("error", "", step.visit),
-				waited.error,
-				{ costUsd: decided.costUsd },
-			);
-		} catch (error) {
-			return step.end(
-				"error",
-				decisionOutputs("error", "", step.visit),
-				messageOf(error),
-			);
-		}
-	};
+	return (state, config) =>
+		runStep(ctx, node, state, config, {
+			rules: RESUME_RULES.model,
+			outputs: (step) => decisionOutputs("", "", step.visit),
+			body: (step) => decide(ctx, node, step),
+		});
 }
-
-/** A wait request that also carries what the decider cost before it hit the limit. */
-type DecisionWait = WaitRequest & { costUsd: number | null };
 
 /** Asks the decider and ends the step on its answer, or asks for a wait. */
 async function decide(
 	ctx: StepContext,
 	node: DecisionNode,
 	step: StepHandle,
-): Promise<StepEnd | DecisionWait> {
+): Promise<BodyResult> {
 	const { visit, signal } = step;
 	const prompt = renderTemplate(node.prompt, step.tctx);
 	const options = visibleOptions(node);
@@ -134,11 +64,12 @@ async function decide(
 		model,
 	});
 	if (!ctx.decider) {
-		return step.end(
-			"error",
-			decisionOutputs("error", "", visit),
-			"No decider is configured for Decision nodes.",
-		);
+		return {
+			kind: "end",
+			outcome: "error",
+			outputs: decisionOutputs("error", "", visit),
+			error: "No decider is configured for Decision nodes.",
+		};
 	}
 	const result = await decideWithin(
 		ctx.decider,
@@ -154,15 +85,24 @@ async function decide(
 		});
 	}
 	const note = result.kind === "decided" ? result.notes : "";
-	const end = (outcome: StepEnd["outcome"], error: string | null) =>
-		step.end(outcome, decisionOutputs(outcome, note, visit), error, {
+	const end = (outcome: string, error: string | null): BodyResult => ({
+		kind: "end",
+		outcome,
+		outputs: decisionOutputs(outcome, note, visit),
+		error,
+		costUsd,
+	});
+	if (signal.aborted) {
+		return {
+			kind: "aborted",
+			outputs: decisionOutputs("", note, visit),
 			costUsd,
-		});
-	const aborted = step.abortResult(decisionOutputs("", note, visit));
-	if (aborted) return end(aborted.outcome, aborted.error);
+		};
+	}
 	if (result.kind === "error") {
 		if (isWaitKind(result.errorKind)) {
 			return {
+				kind: "wait",
 				reason: result.errorKind,
 				message: result.message,
 				resetAt: null,

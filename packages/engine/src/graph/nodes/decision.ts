@@ -1,18 +1,14 @@
-import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import { Command } from "@langchain/langgraph";
 import type { DecisionNode } from "@nightshift/flows";
 import type { StepOutputs } from "../../events";
 import type { NodeAction, StepContext } from "../context";
-import { route, type StepEnd } from "../route";
-import type { RunStateValues } from "../state";
 import { modelChooser } from "./choosers/model";
 import { personChooser } from "./choosers/person";
 import { ruleChooser } from "./choosers/rule";
 
 /**
  * The Decision node: one of its options is the step's outcome, and who
- * picks it is `node.by`. The node routes on the step's end (`route()`);
- * the chooser behind the seam gets the option:
+ * picks it is `node.by`. The chooser behind the seam gets the option; the
+ * step runner (`runStep`) opens, ends and routes the step for it:
  *
  * - `person` (a Gate): `choosers/person.ts` opens the Gate in the log
  *   (`GateOpened`, the Needs-you inbox) and jumps to the node's ask node
@@ -26,23 +22,15 @@ import { ruleChooser } from "./choosers/rule";
  * the person's note, the model's reasons, or "" for a rule.
  */
 export function decisionNode(node: DecisionNode, ctx: StepContext): NodeAction {
-	const choose = chooserFor(node, ctx);
-	return async (state, config) => {
-		const chosen = await choose(state, config);
-		if (chosen instanceof Command) return chosen;
-		return route(ctx, state, node, chosen, config);
-	};
+	return chooserFor(node, ctx);
 }
 
 /**
  * A chooser runs one visit of the node: it opens the step (how depends on
- * who decides), gets the option, and ends the step. It returns the step's
- * end to route on, or a Command when the run parks or waits instead.
+ * who decides), gets the option, ends the step and routes on it, or parks
+ * or waits instead. It returns what the graph node returns.
  */
-export type Chooser = (
-	state: RunStateValues,
-	config: LangGraphRunnableConfig,
-) => Promise<StepEnd | Command>;
+export type Chooser = NodeAction;
 
 function chooserFor(node: DecisionNode, ctx: StepContext): Chooser {
 	switch (node.by) {

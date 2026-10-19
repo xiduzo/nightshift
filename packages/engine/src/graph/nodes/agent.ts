@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
+import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { DECIDER_ADAPTERS } from "@nightshift/agents/decider";
 import type {
 	AgentEvent,
@@ -7,7 +6,6 @@ import type {
 	StepReportOutcome,
 	StepReportSpec,
 } from "@nightshift/agents/types";
-import { agentSession } from "@nightshift/db/schema/nightshift";
 import {
 	type AgentNode,
 	type JsonValue,
@@ -15,7 +13,6 @@ import {
 	renderTemplate,
 	resolvedAgent,
 } from "@nightshift/flows";
-import { eq } from "drizzle-orm";
 
 import { cliToolsInstruction } from "../../cli-tools";
 import { consumeStream } from "../../consume";
@@ -28,29 +25,17 @@ import {
 } from "../../events";
 import { checkOutputData, normalizeOutputData } from "../../output-schema";
 import {
-	beginStep,
-	beginWait,
 	HARNESS_LABEL,
 	isWaitKind,
 	messageOf,
 	type NodeAction,
-	pastStopTime,
 	STOP_GRACE_MS,
-	STOP_TIME_REASON,
 	type StepContext,
-	type StepHandle,
-	type StepStart,
-	type WaitRequest,
 } from "../context";
-import { RESUME_RULES, resumePoint, entryOf as startOf } from "../resume-point";
-import {
-	parkStopped,
-	route,
-	type StepEnd,
-	scopeOf,
-	waitNodeId,
-} from "../route";
+import { RESUME_RULES, type ResumePoint } from "../resume-point";
+import { scopeOf } from "../route";
 import type { RunStateValues } from "../state";
+import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 import { decideWithin } from "./choosers/model";
 
 /**
@@ -58,120 +43,50 @@ import { decideWithin } from "./choosers/model";
  * in engine.ts. The log is written as there: `SessionStarted`,
  * `HarnessSessionAssigned`, `SessionEnded`, then the step's end.
  *
- * How the node enters is one resume point (`resumePoint`, graph/resume-point.ts,
- * `RESUME_RULES.agent`): a step that waited continues with its harness
- * session and `pending.prompt` as the follow-up (nothing is appended before
- * `SessionStarted`), or is reopened (`StepReopened`) when recovery ended it
- * after the wake; a parked step a person resumed, or a step the daemon died
- * in (design rule 5), is reopened when it has a harness session to
- * continue, with the resume prompt; else a new visit. With `session:
- * "resume"` a new visit continues the node's last harness session
- * (`lastHarnessSessionOfNode`).
+ * The step lifecycle is the step runner's (`runStep`, graph/step-runner.ts),
+ * which enters through the one resume point (`RESUME_RULES.agent`): a step
+ * that waited continues with its harness session and the pending prompt as
+ * the follow-up (nothing is appended before `SessionStarted`), or is
+ * reopened (`StepReopened`) when recovery ended it after the wake; a parked
+ * step a person resumed, or a step the daemon died in (design rule 5), is
+ * reopened when it has a harness session to continue, with the resume
+ * prompt; else a new visit. With `session: "resume"` a new visit continues
+ * the node's last harness session (`lastHarnessSessionOfNode`).
  *
- * A usage limit or a network failure plans a wait (`beginWait`) and jumps
- * to the wait node (`wait__<id>`, the shared `waitNode` in graph/wait.ts),
- * which interrupts; a give-up ends the step `error`. Everything else ends
- * the step and routes (`route()`).
+ * This module is the body, `runSession`: one harness session, recorded
+ * through the step's session record, and the step's end from the report. A
+ * usage limit or a network failure is a wait request; the runner plans the
+ * wait and parks at the wait node (`wait__<id>`, the shared `waitNode`), or
+ * ends the step `error` on a give-up.
  */
 export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
-	return async (state, config) => {
-		const events = await ctx.log.events(ctx.run.id);
-		const entry = entryOf(node, state, events, config);
-		const begun = await beginStep(ctx, node, state, config, entry.start);
-		if (begun.kind === "parked") return begun.command;
-		const step = begun.step;
-		// The wait ended past the stop time (Night Shift was not running at
-		// the wake): the step does not continue, a resume continues it.
-		if (step.opened === "continue" && pastStopTime(ctx, state, config)) {
-			const end = await step.end(
-				"stopped",
-				{ outcome: "stopped", visit: step.visit },
-				null,
-				{ harnessSessionId: entry.resumeSessionId },
-			);
-			return parkStopped(node, end, STOP_TIME_REASON);
-		}
-
-		let result: StepEnd | WaitRequest;
-		try {
-			result = await runSession(ctx, node, step, {
-				prompt: entry.prompt,
-				resumeSessionId: entry.resumeSessionId,
-			});
-			if ("reason" in result) {
-				const waited = await beginWait(ctx, node, state, config, step, result);
-				if (waited.kind === "stop-time") {
-					const end = await step.end(
-						"stopped",
-						{ outcome: "stopped", visit: step.visit },
-						null,
-						{ harnessSessionId: result.harnessSessionId },
-					);
-					return parkStopped(node, end, waited.reason);
-				}
-				if (waited.kind === "wait") {
-					return new Command({
-						update: {
-							pending: waited.pending,
-							visits: { [node.id]: step.visit },
-						},
-						goto: waitNodeId(node.id),
-					});
-				}
-				result = await step.end(
-					"error",
-					{ outcome: "error", visit: step.visit },
-					waited.error,
-					{ harnessSessionId: result.harnessSessionId },
-				);
-			}
-		} catch (error) {
-			result = await step.end(
-				"error",
-				{ outcome: "error", visit: step.visit },
-				messageOf(error),
-			);
-		}
-		return route(ctx, state, node, result, config);
-	};
+	return (state, config) =>
+		runStep(ctx, node, state, config, {
+			rules: RESUME_RULES.agent,
+			body: (step, entry) =>
+				runSession(ctx, node, step, {
+					prompt: entry.kind === "new" ? null : entry.prompt,
+					resumeSessionId: resumeSessionOf(node, entry, state, step, config),
+				}),
+		});
 }
 
-type Entry = {
-	start: StepStart;
-	/** The follow-up message of a continued session; null renders the node's prompt. */
-	prompt: string | null;
-	resumeSessionId: string | null;
-};
-
-/** The resume point, with the harness session a new `session: "resume"` visit continues. */
-function entryOf(
+/**
+ * The harness session the visit continues: the one the resume point found
+ * for a continued or reopened step, or with `session: "resume"` the node's
+ * last session for a new visit; else none.
+ */
+function resumeSessionOf(
 	node: AgentNode,
+	entry: ResumePoint,
 	state: RunStateValues,
-	events: readonly LoggedEvent[],
+	step: StepHandle,
 	config: LangGraphRunnableConfig,
-): Entry {
-	const point = resumePoint(
-		node,
-		state,
-		events,
-		scopeOf(config),
-		RESUME_RULES.agent,
-	);
-	if (point.kind === "new") {
-		return {
-			start: { kind: "new" },
-			prompt: null,
-			resumeSessionId:
-				node.session === "resume"
-					? lastSessionOf(node, state, events, config)
-					: null,
-		};
-	}
-	return {
-		start: startOf(point),
-		prompt: point.prompt,
-		resumeSessionId: point.harnessSessionId,
-	};
+): string | null {
+	if (entry.kind !== "new") return entry.harnessSessionId;
+	return node.session === "resume"
+		? lastSessionOf(node, state, step.events, config)
+		: null;
 }
 
 /**
@@ -264,9 +179,8 @@ async function runSession(
 	node: AgentNode,
 	step: StepHandle,
 	input: { prompt: string | null; resumeSessionId: string | null },
-): Promise<StepEnd | WaitRequest> {
-	const runId = ctx.run.id;
-	const { stepId, visit, signal } = step;
+): Promise<BodyResult> {
+	const { visit, signal } = step;
 	const { resumeSessionId } = input;
 	const prompt =
 		input.prompt ??
@@ -276,11 +190,11 @@ async function runSession(
 		})();
 
 	const end = (
-		outcome: StepEnd["outcome"],
+		outcome: string,
 		outputs: StepOutputs,
 		error: string | null,
 		harnessSessionId: string | null,
-	) => step.end(outcome, outputs, error, { harnessSessionId });
+	): BodyResult => ({ kind: "end", outcome, outputs, error, harnessSessionId });
 
 	// The run resolved the node's profile when it started.
 	const agent = resolvedAgent(node);
@@ -324,18 +238,12 @@ async function runSession(
 			: "";
 	const harnessPrompt = cliGuide ? `${prompt}\n\n${cliGuide}` : prompt;
 
-	const sessionId = randomUUID();
-	await ctx.db
-		.insert(agentSession)
-		.values({ id: sessionId, runId, stepId, prompt });
-	await ctx.log.append({
-		type: "SessionStarted",
-		runId,
-		stepId,
-		sessionId,
-		payload: { prompt, resumeSessionId, harness: agent.harness },
+	const session = await step.session({
+		prompt,
+		resumeSessionId,
+		harness: agent.harness,
 	});
-	ctx.bus.publish(runId, { kind: "step-changed", stepId });
+	const sessionId = session.id;
 
 	let harnessSessionId: string | null = resumeSessionId;
 	let ending: SessionEnding | null = null;
@@ -352,21 +260,7 @@ async function runSession(
 		switch (agentEvent.type) {
 			case "session":
 				harnessSessionId = agentEvent.sessionId;
-				await ctx.db
-					.update(agentSession)
-					.set({ harnessSessionId: agentEvent.sessionId })
-					.where(eq(agentSession.id, sessionId));
-				await ctx.log.append({
-					type: "HarnessSessionAssigned",
-					runId,
-					stepId,
-					sessionId,
-					payload: {
-						harnessSessionId: agentEvent.sessionId,
-						model: agentEvent.model ?? null,
-					},
-				});
-				ctx.bus.publish(runId, { kind: "step-changed", stepId });
+				await session.assigned(agentEvent.sessionId, agentEvent.model ?? null);
 				break;
 			case "text":
 				// The output is the last message: a tool call or a new message starts it over.
@@ -450,13 +344,7 @@ async function runSession(
 	}
 	const final: SessionEnding =
 		ending ?? endWithoutResult("The harness stream ended without a result.");
-	await ctx.log.append({
-		type: "SessionEnded",
-		runId,
-		stepId,
-		sessionId,
-		payload: final,
-	});
+	await session.ended(final);
 
 	const finalReport = report as AgentReport | null;
 	if (finalReport && node.output) {
@@ -471,17 +359,10 @@ async function runSession(
 	if (finalReport?.data !== undefined) {
 		outputs.data = finalReport.data as JsonValue;
 	}
-	const aborted = step.abortResult(outputs);
-	if (aborted) {
-		return end(
-			aborted.outcome,
-			aborted.outputs,
-			aborted.error,
-			harnessSessionId,
-		);
-	}
+	if (signal.aborted) return { kind: "aborted", outputs, harnessSessionId };
 	if (final.outcome === "failed" && isWaitKind(final.errorKind)) {
 		return {
+			kind: "wait",
 			reason: final.errorKind,
 			message: final.error ?? final.errorKind,
 			resetAt: final.resetAt,
@@ -559,7 +440,7 @@ async function checkOutcome(
 	step: StepHandle,
 	outputs: StepOutputs,
 	harnessSessionId: string | null,
-): Promise<StepEnd> {
+): Promise<BodyResult> {
 	const checker = node.checker as NonNullable<AgentNode["checker"]>;
 	const { signal } = step;
 	const options = checkOutcomes(node);
@@ -588,15 +469,18 @@ async function checkOutcome(
 		model,
 	});
 	const finish = (
-		outcome: StepEnd["outcome"],
+		outcome: string,
 		note: string,
 		error: string | null,
 		costUsd: number | null,
-	) =>
-		step.end(outcome, { ...outputs, outcome, note }, error, {
-			harnessSessionId,
-			costUsd,
-		});
+	): BodyResult => ({
+		kind: "end",
+		outcome,
+		outputs: { ...outputs, outcome, note },
+		error,
+		harnessSessionId,
+		costUsd,
+	});
 	if (!ctx.decider) {
 		return finish(
 			"error",
@@ -619,12 +503,13 @@ async function checkOutcome(
 		});
 	}
 	const note = result.kind === "decided" ? result.notes : "";
-	const aborted = step.abortResult({ ...outputs, note });
-	if (aborted) {
-		return step.end(aborted.outcome, aborted.outputs, aborted.error, {
+	if (signal.aborted) {
+		return {
+			kind: "aborted",
+			outputs: { ...outputs, note },
 			harnessSessionId,
 			costUsd,
-		});
+		};
 	}
 	if (result.kind === "error") {
 		return finish(

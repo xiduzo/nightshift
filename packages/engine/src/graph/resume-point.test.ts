@@ -337,6 +337,7 @@ describe("resumePoint", () => {
 					},
 					gate: NEW,
 					wait: NEW,
+					fresh: NEW,
 				},
 			);
 		});
@@ -374,6 +375,7 @@ describe("resumePoint", () => {
 					},
 					gate: NEW,
 					wait: NEW,
+					fresh: NEW,
 				},
 			);
 		});
@@ -424,6 +426,7 @@ describe("resumePoint", () => {
 					},
 					gate: NEW,
 					wait: NEW,
+					fresh: NEW,
 				},
 			);
 		});
@@ -480,6 +483,7 @@ describe("resumePoint", () => {
 					},
 					gate: NEW,
 					wait: NEW,
+					fresh: NEW,
 				},
 			);
 		});
@@ -515,6 +519,7 @@ describe("resumePoint", () => {
 					},
 					gate: NEW,
 					wait: NEW,
+					fresh: NEW,
 				},
 			);
 		});
@@ -540,6 +545,7 @@ describe("resumePoint", () => {
 					},
 					gate: NEW,
 					wait: NEW,
+					fresh: NEW,
 				},
 			);
 		});

@@ -5,7 +5,9 @@ import {
 } from "@nightshift/flows";
 
 import { schemaProblem } from "../../../output-schema";
-import { beginStep, messageOf, type StepContext } from "../../context";
+import { messageOf, type StepContext } from "../../context";
+import { RESUME_RULES } from "../../resume-point";
+import { runStep } from "../../step-runner";
 import {
 	endWithoutValue,
 	endWithValue,
@@ -29,36 +31,39 @@ import {
  * Schema → `error`: that is the flow's mistake, not the run's.
  */
 export function ruleProducer(node: ValueNode, ctx: StepContext): Producer {
-	return async (state, config) => {
-		const begun = await beginStep(ctx, node, state, config, { kind: "new" });
-		if (begun.kind === "parked") return begun.command;
-		const step = begun.step;
-		const expression = node.expression ?? "";
-		step.record(null, {
-			type: "value-start",
-			by: "rule",
-			source: expression,
-			model: null,
+	return (state, config) =>
+		runStep(ctx, node, state, config, {
+			rules: RESUME_RULES.fresh,
+			outputs: (step) => valueOutputs("", null, "", step.visit),
+			async body(step) {
+				const expression = node.expression ?? "";
+				step.record(null, {
+					type: "value-start",
+					by: "rule",
+					source: expression,
+					model: null,
+				});
+				const invalid = schemaProblem(node.output);
+				if (invalid !== null) {
+					return {
+						kind: "end",
+						outcome: "error",
+						outputs: valueOutputs("error", null, "", step.visit),
+						error: invalid,
+					};
+				}
+				let result: JsonValue | undefined;
+				try {
+					result = await evaluateRule(expression, step.tctx);
+				} catch (error) {
+					return endWithoutValue(
+						step,
+						`The expression failed: ${ruleMessage(error)}`,
+					);
+				}
+				return endWithValue(step, node, plainJson(result), "");
+			},
 		});
-		const invalid = schemaProblem(node.output);
-		if (invalid !== null) {
-			return step.end(
-				"error",
-				valueOutputs("error", null, "", step.visit),
-				invalid,
-			);
-		}
-		let result: JsonValue | undefined;
-		try {
-			result = await evaluateRule(expression, step.tctx);
-		} catch (error) {
-			return endWithoutValue(
-				step,
-				`The expression failed: ${ruleMessage(error)}`,
-			);
-		}
-		return endWithValue(step, node, plainJson(result), "");
-	};
 }
 
 /** JSONata throws plain objects with a `message`, not Errors. */

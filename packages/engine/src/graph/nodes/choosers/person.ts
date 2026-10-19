@@ -10,13 +10,7 @@ import {
 } from "@nightshift/flows";
 
 import type { GateChoice } from "../../../events";
-import {
-	beginStep,
-	messageOf,
-	type NodeAction,
-	type StepContext,
-	type StepHandle,
-} from "../../context";
+import { messageOf, type NodeAction, type StepContext } from "../../context";
 import { RESUME_RULES, resumePoint } from "../../resume-point";
 import { askNodeId, route, type StepEnd, scopeOf } from "../../route";
 import type {
@@ -25,6 +19,7 @@ import type {
 	ResumeValue,
 	RunStateValues,
 } from "../../state";
+import { beginStep, type OpenStep } from "../../step-runner";
 import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
 
 /**
@@ -53,12 +48,17 @@ import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
  * The engine refuses an answer that is not one of the options before it
  * resumes the thread (`optionProblem`); the ask node checks again, and
  * ends the step `error` should a bad one slip through.
+ *
+ * The Gate opens and ends its step through the step runner's lower seam
+ * (`beginStep`, `OpenStep`), not `runStep`: the step stays open across the
+ * ask node's interrupt and ends in another graph node.
  */
 export function personChooser(node: DecisionNode, ctx: StepContext): Chooser {
 	return async (state, config) => {
 		const asked = await ensureOpen(ctx, node, state, config);
 		if (asked.kind === "parked") return asked.command;
-		if (asked.kind === "failed") return asked.end;
+		if (asked.kind === "failed")
+			return route(ctx, state, node, asked.end, config);
 		const pending: PendingGate = {
 			kind: "gate",
 			stepId: asked.stepId,
@@ -148,7 +148,14 @@ async function ensureOpen(
 			choices: gate.choices,
 		};
 	}
-	const begun = await beginStep(ctx, node, state, config, { kind: "new" });
+	const begun = await beginStep(
+		ctx,
+		node,
+		state,
+		config,
+		{ kind: "new" },
+		events,
+	);
 	if (begun.kind === "parked") return begun;
 	const step = begun.step;
 	try {
@@ -174,7 +181,7 @@ async function ensureOpen(
 async function open(
 	ctx: StepContext,
 	node: DecisionNode,
-	step: StepHandle,
+	step: OpenStep,
 ): Promise<Omit<OpenGate, "kind">> {
 	const { stepId, visit } = step;
 	try {
