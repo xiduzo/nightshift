@@ -96,6 +96,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Transcript | The structured record of a Step: agent messages, tool calls, and command output, on disk. | Slice 1 |
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |
 | Device | A computer that runs Night Shift. In code, the port a Step body uses to touch a computer (`packages/engine/src/device/`): it reports its Capabilities (harnesses, connections, CLI tools, programs, decider) and runs Sessions, commands, Tool calls, decisions and Worktrees. The step runner asks for the Step's Device once per Step; `StepStarted` names it. Today every Step runs on this computer (`localDevice`). | Devices, slice 1 |
+| Cost | What a Session or a model call cost, in US dollars at API prices, also on a subscription: the person sees what the work would cost. The harness reports it, or Night Shift estimates it from the tokens and a price list it updates daily. A cost that neither can tell is not known: totals leave it out and show "+", and the Run warns. | Costs |
+| Warning | Something that went wrong in a Run without failing a Step, such as a Step whose Cost is not known. Shown on the Run and grouped per Flow in Flow health. | Costs |
 | Event | One appended record of a fact that changed. Its identity is its Walker and its number among that Walker's Events (`walker_seq`); `seq` is only the order it landed in this Replica. | Slice 1 |
 | Event Log | The append-only list of Events: the read model. Run status is derived from it, never from a Checkpoint. | Slice 1 |
 | Run Bundle | One Run exported as its own SQLite file: its rows, its Events, and its Transcripts, in the daemon's table names. Secret values are masked. | Run export |
@@ -161,12 +163,13 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | StepEnded | A Step ended with an Outcome and its Outputs. |
 | SessionStarted | A harness Session began for an Agent Step. |
 | HarnessSessionAssigned | The Harness reported its own session id. |
-| SessionEnded | A Session ended, with its cost. |
+| SessionEnded | A Session ended, with its Cost and where it came from (reported or estimated). |
 | EdgeTaken | The Run followed an Edge to the next Node. |
 | StopRequested | A person asked to stop the Run. |
 | GateOpened | A Gate put its question in the Needs-you inbox. |
 | WaitStarted | A Step began a Wait: why, until when (none for a Signal with no timeout), and which Signal. |
 | WaitEnded | The Wait is over: the timer, a person, or a Signal. |
 | RunEnded | The Run finished or failed, with the reason. |
+| RunWarned | A Warning about the Run, with the Step it is about. |
 | ScheduleFired | A Schedule came due and started its Run, or failed to start it. |
 | ScheduleSkipped | A Schedule came due but did not start: too late, or its previous Run still runs. |

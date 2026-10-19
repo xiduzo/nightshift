@@ -13,7 +13,7 @@ import {
 	TabsTrigger,
 } from "@nightshift/ui/components/tabs";
 import { Link } from "@tanstack/react-router";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, TriangleAlertIcon } from "lucide-react";
 import { useState } from "react";
 import {
 	Bar,
@@ -34,7 +34,9 @@ import {
 	formatCost,
 	formatDateTime,
 	formatDuration,
+	formatKnownCost,
 	formatRelative,
+	sumKnownCost,
 } from "@/lib/format";
 import {
 	formatNight,
@@ -59,7 +61,7 @@ const RANGES = [7, 30, 90] as const;
 type Range = (typeof RANGES)[number];
 /** Runs listed on the Runs tab. */
 const RUNS_MAX = 10;
-type Tab = "overview" | "cost" | "unfinished" | "runs";
+type Tab = "overview" | "cost" | "problems" | "runs";
 
 /**
  * One flow in detail, behind its Flow health row, in tabs so each view stays
@@ -113,17 +115,21 @@ function FlowHealthDetails({
 	const ended = inRange.filter(hasEnded);
 	const finished = ended.filter((run) => run.status === "finished");
 	const unfinished = ended.filter((run) => run.status !== "finished");
-	const cost = spreadOf(finished.map((run) => run.costUsd));
+	// A run with a step of unknown cost would look cheaper than it was.
+	const cost = spreadOf(
+		finished.filter((run) => run.costMissing === 0).map((run) => run.costUsd),
+	);
+	const warnings = inRange.reduce(
+		(total, run) => total + run.warnings.length,
+		0,
+	);
 	const length = spreadOf(
 		finished.flatMap((run) =>
 			run.endedAt === null ? [] : [run.endedAt - run.startedAt],
 		),
 	);
-	const spent = inRange.reduce((total, run) => total + run.costUsd, 0);
-	const spentUnfinished = unfinished.reduce(
-		(total, run) => total + run.costUsd,
-		0,
-	);
+	const spent = sumKnownCost(inRange);
+	const spentUnfinished = sumKnownCost(unfinished);
 
 	const dearest = ended.reduce<FlowRun | undefined>(
 		(top, run) => (top === undefined || run.costUsd > top.costUsd ? run : top),
@@ -139,11 +145,11 @@ function FlowHealthDetails({
 					<TabsList>
 						<TabsTrigger value="overview">Overview</TabsTrigger>
 						<TabsTrigger value="cost">Cost</TabsTrigger>
-						<TabsTrigger value="unfinished">
-							Not finished
-							{unfinished.length > 0 ? (
+						<TabsTrigger value="problems">
+							Problems
+							{unfinished.length + warnings > 0 ? (
 								<Badge variant="secondary" className="tabular-nums">
-									{unfinished.length}
+									{unfinished.length + warnings}
 								</Badge>
 							) : null}
 						</TabsTrigger>
@@ -208,10 +214,10 @@ function FlowHealthDetails({
 
 						<TabsContent value="cost" className="flex flex-col gap-6 pt-2">
 							<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-								<Stat label="Spent in all" value={formatCost(spent)} />
+								<Stat label="Spent in all" value={formatKnownCost(spent)} />
 								<Stat
 									label="Not finished"
-									value={formatCost(spentUnfinished)}
+									value={formatKnownCost(spentUnfinished)}
 									hint={
 										unfinished.length === 1
 											? "Spent by 1 run"
@@ -227,14 +233,19 @@ function FlowHealthDetails({
 							<CostPerRun runs={ended} median={cost?.median} />
 						</TabsContent>
 
-						<TabsContent value="unfinished" className="pt-2">
-							{unfinished.length === 0 ? (
+						<TabsContent value="problems" className="flex flex-col gap-6 pt-2">
+							{unfinished.length + warnings === 0 ? (
 								<DetailsEmpty>
-									Every run in the last {range} nights finished.
+									Every run in the last {range} nights finished, without
+									warnings.
 								</DetailsEmpty>
-							) : (
+							) : null}
+							{unfinished.length > 0 ? (
 								<WhyUnfinished runs={unfinished} now={now} />
-							)}
+							) : null}
+							{warnings > 0 ? (
+								<Warnings runs={inRange} now={now} onNavigate={onNavigate} />
+							) : null}
 						</TabsContent>
 
 						<TabsContent value="runs" className="pt-2">
@@ -465,6 +476,124 @@ function CostPerRun({
 	);
 }
 
+type WarningRow = {
+	key: string;
+	nodeId: string | null;
+	message: string;
+	/** The runs that warned this, each counted once. */
+	runs: number;
+	last: { runId: string; at: number };
+};
+
+/**
+ * The warnings of the runs, grouped by node and message, the most common
+ * first: a warning many runs share is a systematic problem, not bad luck.
+ */
+function Warnings({
+	runs,
+	now,
+	onNavigate,
+}: {
+	runs: FlowRun[];
+	now: number;
+	onNavigate: () => void;
+}) {
+	const byKey = new Map<string, WarningRow & { runIds: Set<string> }>();
+	for (const run of runs) {
+		for (const warning of run.warnings) {
+			const key = `${warning.nodeId ?? ""}\u0000${warning.message}`;
+			const row = byKey.get(key) ?? {
+				key,
+				nodeId: warning.nodeId,
+				message: warning.message,
+				runs: 0,
+				runIds: new Set<string>(),
+				last: { runId: run.runId, at: warning.at },
+			};
+			row.runIds.add(run.runId);
+			row.runs = row.runIds.size;
+			if (warning.at >= row.last.at)
+				row.last = { runId: run.runId, at: warning.at };
+			byKey.set(key, row);
+		}
+	}
+	const rows = [...byKey.values()].sort((a, b) => b.runs - a.runs);
+	return (
+		<ChartSection title="Warnings" hint="The most common warning first">
+			<DataTable
+				columns={warningColumns(now, onNavigate)}
+				data={rows}
+				getRowId={(row) => row.key}
+			/>
+		</ChartSection>
+	);
+}
+
+const warningColumn = dataTableColumns<WarningRow>();
+
+function warningColumns(now: number, onNavigate: () => void) {
+	return warningColumn.columns([
+		warningColumn.accessor("message", {
+			header: "Warning",
+			cell: ({ row: { original } }) => (
+				<span className="flex min-w-0 items-start gap-2">
+					<TriangleAlertIcon
+						className="mt-0.5 size-3.5 shrink-0 text-status-waiting"
+						aria-hidden="true"
+					/>
+					<span className="whitespace-normal text-xs">
+						{original.nodeId ? (
+							<span className="font-medium font-mono">{original.nodeId}: </span>
+						) : null}
+						{original.message}
+					</span>
+				</span>
+			),
+		}),
+		warningColumn.accessor("runs", {
+			header: "Runs",
+			enableSorting: true,
+			meta: {
+				headClassName: "text-right w-16",
+				cellClassName: "text-right tabular-nums",
+			},
+		}),
+		warningColumn.accessor((row) => row.last.at, {
+			id: "last",
+			header: "Last",
+			enableSorting: true,
+			cell: ({ row: { original } }) => (
+				<span className="flex items-center gap-2">
+					<time
+						dateTime={new Date(original.last.at).toISOString()}
+						title={formatDateTime(original.last.at)}
+						className="text-muted-foreground text-xs"
+					>
+						{formatRelative(original.last.at, now)}
+					</time>
+					<Button
+						variant="link"
+						size="xs"
+						className="h-auto px-0"
+						nativeButton={false}
+						aria-label={"Open run, the last run with this warning"}
+						render={
+							<Link
+								to="/runs/$runId"
+								params={{ runId: original.last.runId }}
+								onClick={onNavigate}
+							/>
+						}
+					>
+						Open run
+					</Button>
+				</span>
+			),
+			meta: { headClassName: "w-44" },
+		}),
+	]);
+}
+
 type ReasonRow = {
 	reason: string;
 	status: RunStatus;
@@ -630,8 +759,9 @@ function latestColumns(now: number, onNavigate: () => void) {
 			header: () => <span className="sr-only">Actions</span>,
 			cell: ({ row: { original } }) => (
 				<Button
-					variant="ghost"
+					variant="link"
 					size="xs"
+					className="h-auto px-0"
 					nativeButton={false}
 					aria-label={`Open run, started ${formatDateTime(original.startedAt)}`}
 					render={

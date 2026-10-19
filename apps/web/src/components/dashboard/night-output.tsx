@@ -24,11 +24,16 @@ import {
 	MoonStarIcon,
 	ZapIcon,
 } from "lucide-react";
-
+import { CostText } from "@/components/cost-text";
 import { PageSection } from "@/components/page-heading";
 import { RunStatusBadge } from "@/components/run-status-badge";
 import type { RunSummary } from "@/lib/api-types";
-import { formatCost, formatDateTime, formatTime } from "@/lib/format";
+import {
+	formatDateTime,
+	formatKnownCost,
+	formatTime,
+	sumKnownCost,
+} from "@/lib/format";
 import { formatNight, nightOf } from "@/lib/nights";
 
 const SHOWN = 4;
@@ -61,7 +66,7 @@ export function NightOutput({
 		.filter((run) => night !== null && nightOf(run.createdAt) === night)
 		.sort((a, b) => b.createdAt - a.createdAt);
 	const shown = ofNight.slice(0, SHOWN);
-	const cost = ofNight.reduce((sum, run) => sum + run.costUsd, 0);
+	const cost = sumKnownCost(ofNight);
 
 	return (
 		<PageSection
@@ -69,7 +74,7 @@ export function NightOutput({
 			description={
 				night === null
 					? "Runs and their branches, to review in the morning."
-					: `Night of ${formatNight(night)}, ${ofNight.length} ${ofNight.length === 1 ? "run" : "runs"}, ${formatCost(cost)}`
+					: `Night of ${formatNight(night)}, ${ofNight.length} ${ofNight.length === 1 ? "run" : "runs"}, ${formatKnownCost(cost)}`
 			}
 			className={className}
 			actions={
@@ -146,9 +151,10 @@ export function NightOutput({
 											{formatTime(run.createdAt)}
 										</time>
 										<RunStatusBadge status={run.status} />
-										<span className="w-16 text-right font-medium text-xs tabular-nums">
-											{formatCost(run.costUsd)}
-										</span>
+										<CostText
+											cost={run}
+											className="w-16 text-right font-medium text-xs tabular-nums"
+										/>
 									</ItemActions>
 								</Item>
 							))}

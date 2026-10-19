@@ -42,6 +42,47 @@ export function formatCost(usd: number | null | undefined): string {
 	}).format(usd);
 }
 
+/** A cost and how sure it is, as runs, steps and subflow runs carry it. */
+export type KnownCost = {
+	costUsd: number;
+	/** Part of it is estimated from tokens. */
+	costEstimated?: boolean;
+	/** Parts that ended without a cost: not in `costUsd`. */
+	costMissing?: number;
+};
+
+/** "$2.93"; "$2.93+" when part of the cost is not known; "—" when none of it is. */
+export function formatKnownCost(cost: KnownCost): string {
+	const missing = cost.costMissing ?? 0;
+	if (missing === 0) return formatCost(cost.costUsd);
+	return cost.costUsd > 0 ? `${formatCost(cost.costUsd)}+` : "—";
+}
+
+/** The costs of several runs or steps together. */
+export function sumKnownCost(costs: readonly KnownCost[]): KnownCost {
+	return {
+		costUsd: costs.reduce((sum, cost) => sum + cost.costUsd, 0),
+		costEstimated: costs.some((cost) => cost.costEstimated),
+		costMissing: costs.reduce((sum, cost) => sum + (cost.costMissing ?? 0), 0),
+	};
+}
+
+/** What a person should know about a cost, for its tooltip; undefined when nothing. */
+export function costNote(cost: KnownCost): string | undefined {
+	const missing = cost.costMissing ?? 0;
+	const notes = [
+		...(missing > 0
+			? [
+					missing === 1
+						? "1 step did not report its cost."
+						: `${missing} steps did not report their cost.`,
+				]
+			: []),
+		...(cost.costEstimated ? ["Part of it is estimated from tokens."] : []),
+	];
+	return notes.length > 0 ? notes.join(" ") : undefined;
+}
+
 export function formatTokens(count: number): string {
 	return new Intl.NumberFormat("en-US", { notation: "compact" }).format(count);
 }

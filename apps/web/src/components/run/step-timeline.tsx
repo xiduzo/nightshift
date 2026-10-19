@@ -22,6 +22,7 @@ import {
 	ChevronRightIcon,
 	ListTodoIcon,
 	ScanSearchIcon,
+	TriangleAlertIcon,
 	WorkflowIcon,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -33,7 +34,12 @@ import {
 	stepState,
 } from "@/components/outcome-badge";
 import type { RunStatus, StepSummary } from "@/lib/api-types";
-import { formatCost, formatDuration, formatTime } from "@/lib/format";
+import {
+	formatDuration,
+	formatKnownCost,
+	formatTime,
+	sumKnownCost,
+} from "@/lib/format";
 import {
 	callsFlow,
 	type ItemScope,
@@ -57,12 +63,10 @@ function spanOf(list: StepSummary[], now = Date.now()): string | undefined {
 
 /** What the steps that can cost cost together; undefined when none did. */
 function costOf(list: StepSummary[]): string | undefined {
-	const costs = list
-		.filter((step) => hasCost(step) && step.costUsd != null)
-		.map((step) => step.costUsd ?? 0);
-	return costs.length === 0
+	const costing = list.filter(hasCost);
+	return costing.length === 0
 		? undefined
-		: formatCost(costs.reduce((sum, cost) => sum + cost, 0));
+		: formatKnownCost(sumKnownCost(costing));
 }
 
 /** Every step a Call step called, nested ones included. */
@@ -95,6 +99,7 @@ export function StepTimeline({
 	onSelectItem,
 	calledName,
 	runsEach,
+	warnedStepIds,
 }: {
 	/** All steps of the run, in the order they started. */
 	steps: StepSummary[];
@@ -109,6 +114,8 @@ export function StepTimeline({
 	calledName?: (step: StepSummary) => string | undefined;
 	/** Whether a Call step runs its flow once per item. Without it, a step that started items does. */
 	runsEach?: (step: StepSummary) => boolean;
+	/** The steps the run warned about: their rows show a warning sign. */
+	warnedStepIds?: ReadonlySet<string>;
 }) {
 	/** Groups the person opened or closed; the rest follow `defaultOpen`. */
 	const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(
@@ -204,13 +211,14 @@ export function StepTimeline({
 						callsFlow(step)
 							? costOf(calledSteps(steps, step))
 							: hasCost(step)
-								? formatCost(step.costUsd)
+								? formatKnownCost(step)
 								: undefined
 					}
 					number={numbers.get(step.id) ?? 0}
 					depth={depth}
 					runStatus={runStatus}
 					selected={step.id === selectedStepId}
+					warned={warnedStepIds?.has(step.id) ?? false}
 					onSelect={() => onSelect(step.id)}
 				/>
 				{step.nodeType === "call" && !eachOf(step) ? (
@@ -312,6 +320,7 @@ function StepRow({
 	depth,
 	runStatus,
 	selected,
+	warned,
 	onSelect,
 }: {
 	step: StepSummary;
@@ -321,6 +330,8 @@ function StepRow({
 	depth: number;
 	runStatus: RunStatus;
 	selected: boolean;
+	/** The run warned about this step. */
+	warned: boolean;
 	onSelect: () => void;
 }) {
 	const Icon = NODE_TYPE[step.nodeType].icon;
@@ -351,6 +362,12 @@ function StepRow({
 			<span className="min-w-0 truncate font-medium font-mono">
 				{step.nodeId}
 			</span>
+			{warned ? (
+				<TriangleAlertIcon
+					className="size-3.5 shrink-0 text-status-waiting"
+					aria-label="This step has a warning"
+				/>
+			) : null}
 			{step.visit > 1 ? (
 				<span className="shrink-0 text-muted-foreground">
 					visit {step.visit}

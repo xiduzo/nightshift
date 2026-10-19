@@ -139,6 +139,8 @@ type FlowHealthRow = {
 	cost: Spread | undefined;
 	/** The runs that ended without finishing, and what they spent together. */
 	unfinished: { count: number; costUsd: number };
+	/** Finished runs with a step whose cost is not known: not in `cost`. */
+	unknownCost: number;
 };
 
 function flowHealthOf(
@@ -168,7 +170,11 @@ function flowHealthOf(
 			ended.length > 0
 				? Math.round((finished.length / ended.length) * 100)
 				: undefined,
-		cost: spreadOf(finished.map((run) => run.costUsd)),
+		// A run with a step of unknown cost would look cheaper than it was.
+		cost: spreadOf(
+			finished.filter((run) => run.costMissing === 0).map((run) => run.costUsd),
+		),
+		unknownCost: finished.filter((run) => run.costMissing > 0).length,
 		unfinished: {
 			count: unfinished.length,
 			costUsd: unfinished.reduce((total, run) => total + run.costUsd, 0),
@@ -258,6 +264,7 @@ function flowHealthColumns(
 				<CostCell
 					cost={original.cost}
 					unfinished={original.unfinished}
+					unknownCost={original.unknownCost}
 					scaleMax={scaleMax}
 				/>
 			),
@@ -272,8 +279,9 @@ function flowHealthColumns(
 			cell: ({ row: { original } }) =>
 				original.last ? (
 					<Button
-						variant="ghost"
+						variant="link"
 						size="xs"
+						className="h-auto px-0"
 						nativeButton={false}
 						aria-label={`Open run, the last run of ${original.name}`}
 						// The row opens the details. This button opens the run.
@@ -302,12 +310,22 @@ const PLOT_HEIGHT = 14;
 function CostCell({
 	cost,
 	unfinished,
+	unknownCost,
 	scaleMax,
 }: {
 	cost: Spread | undefined;
 	unfinished: FlowHealthRow["unfinished"];
+	unknownCost: number;
 	scaleMax: number;
 }) {
+	const unknownLine =
+		unknownCost > 0 ? (
+			<span>
+				{unknownCost === 1
+					? "1 finished run is left out: a step did not report its cost."
+					: `${unknownCost} finished runs are left out: a step did not report its cost.`}
+			</span>
+		) : null;
 	const unfinishedLine =
 		unfinished.count > 0 ? (
 			<span>
@@ -318,13 +336,14 @@ function CostCell({
 			</span>
 		) : null;
 	if (cost === undefined) {
-		return unfinishedLine ? (
+		return unfinishedLine || unknownLine ? (
 			<Tooltip>
 				<TooltipTrigger render={<span className="text-muted-foreground" />}>
 					—
 				</TooltipTrigger>
 				<TooltipContent className="flex flex-col items-start gap-0.5 tabular-nums">
-					<span>No run finished yet.</span>
+					<span>No finished run with a known cost.</span>
+					{unknownLine}
 					{unfinishedLine}
 				</TooltipContent>
 			</Tooltip>
@@ -399,6 +418,7 @@ function CostCell({
 						</span>
 					</>
 				) : null}
+				{unknownLine}
 				{unfinishedLine}
 				<span className="text-muted-foreground">
 					{cost.count === 1

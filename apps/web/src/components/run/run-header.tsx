@@ -52,13 +52,12 @@ import {
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
-
+import { CostText } from "@/components/cost-text";
 import { RunStatusBadge } from "@/components/run-status-badge";
 import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
 import { authClient } from "@/lib/auth-client";
 import {
 	dayWord,
-	formatCost,
 	formatDateTime,
 	formatDayTime,
 	formatDuration,
@@ -143,7 +142,7 @@ export function RunTitle({
 				{formatDuration(lastEnd - run.createdAt)}
 				<span aria-hidden="true"> · </span>
 				<span className="sr-only">, cost </span>
-				{formatCost(run.costUsd)}
+				<CostText cost={run} />
 			</p>
 		</div>
 	);
@@ -246,9 +245,7 @@ function RunFacts({ run }: { run: RunDetail }) {
 			<Separator />
 			<dl className="flex flex-col gap-3">
 				<Fact label="Cost">
-					<span className="font-medium tabular-nums">
-						{formatCost(run.costUsd)}
-					</span>
+					<CostText cost={run} className="font-medium tabular-nums" />
 				</Fact>
 				<Fact label="Started">
 					<time
