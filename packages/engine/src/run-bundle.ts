@@ -9,7 +9,7 @@ import {
 	run,
 	step,
 } from "@nightshift/db/schema/nightshift";
-import { asc, eq, getColumns, sql } from "drizzle-orm";
+import { and, asc, eq, getColumns, sql } from "drizzle-orm";
 import {
 	integer,
 	primaryKey,
@@ -32,20 +32,23 @@ import type { TranscriptEntry } from "./types";
  */
 
 /**
- * The format this Night Shift writes. 2: the project by its remote, with
- * its Clones; the Walker on runs, steps and events. Format 1 bundles (a
- * project's `repo_path`, no Walker) still open: see `openRunBundle`.
+ * The format this Night Shift writes. 3: the Space on every row. 2: the
+ * project by its remote, with its Clones; the Walker on runs, steps and
+ * events. Format 1 and 2 bundles still open: see `openRunBundle`.
  */
-export const RUN_BUNDLE_FORMAT_VERSION = 2;
+export const RUN_BUNDLE_FORMAT_VERSION = 3;
 
 /** The formats `openRunBundle` reads. */
-const READABLE_FORMATS = [1, RUN_BUNDLE_FORMAT_VERSION];
+const READABLE_FORMATS = [1, 2, RUN_BUNDLE_FORMAT_VERSION];
 
 /**
  * The Walker and Device of a format 1 bundle's rows: that bundle never
  * said which computer walked the run.
  */
 export const UNKNOWN_DEVICE = "unknown";
+
+/** The Space of a format 1 or 2 bundle's rows: those bundles never said. */
+export const UNKNOWN_SPACE = "unknown";
 
 /** What stands in for a secret value that a bundle leaves out. */
 const MASK = "•••";
@@ -76,12 +79,12 @@ const createdAt =
 /** The live schema's columns, without foreign keys: a bundle is never written again. */
 const DDL = [
 	"CREATE TABLE `bundle` (`key` text PRIMARY KEY, `value` text NOT NULL)",
-	`CREATE TABLE \`project\` (\`id\` text PRIMARY KEY, \`name\` text NOT NULL, \`remote\` text, ${createdAt}, \`removed_at\` integer)`,
-	`CREATE TABLE \`clone\` (\`id\` text PRIMARY KEY, \`project_id\` text NOT NULL, \`device_id\` text NOT NULL, \`path\` text NOT NULL, ${createdAt})`,
-	`CREATE TABLE \`run\` (\`id\` text PRIMARY KEY, \`project_id\` text NOT NULL, \`flow_name\` text, \`flow\` text NOT NULL, \`body_flows\` text DEFAULT '{}' NOT NULL, \`title\` text NOT NULL, \`worktree_path\` text NOT NULL, \`branch\` text NOT NULL, \`base_ref\` text NOT NULL, \`walker_id\` text NOT NULL, ${createdAt})`,
-	`CREATE TABLE \`step\` (\`id\` text PRIMARY KEY, \`run_id\` text NOT NULL, \`node_id\` text NOT NULL, \`node_type\` text NOT NULL, \`visit\` integer NOT NULL, \`transcript_path\` text NOT NULL, \`device_id\` text, ${createdAt})`,
-	`CREATE TABLE \`agent_session\` (\`id\` text PRIMARY KEY, \`run_id\` text NOT NULL, \`step_id\` text NOT NULL, \`harness_session_id\` text, \`prompt\` text NOT NULL, ${createdAt})`,
-	`CREATE TABLE \`event\` (\`seq\` integer PRIMARY KEY, \`run_id\` text, \`step_id\` text, \`session_id\` text, \`type\` text NOT NULL, \`payload\` text DEFAULT '{}' NOT NULL, ${createdAt}, \`walker_id\` text NOT NULL, \`walker_seq\` integer NOT NULL)`,
+	`CREATE TABLE \`project\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`name\` text NOT NULL, \`remote\` text, ${createdAt}, \`removed_at\` integer)`,
+	`CREATE TABLE \`clone\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`project_id\` text NOT NULL, \`device_id\` text NOT NULL, \`path\` text NOT NULL, ${createdAt})`,
+	`CREATE TABLE \`run\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`project_id\` text NOT NULL, \`flow_name\` text, \`flow\` text NOT NULL, \`body_flows\` text DEFAULT '{}' NOT NULL, \`title\` text NOT NULL, \`worktree_path\` text NOT NULL, \`branch\` text NOT NULL, \`base_ref\` text NOT NULL, \`walker_id\` text NOT NULL, ${createdAt})`,
+	`CREATE TABLE \`step\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`run_id\` text NOT NULL, \`node_id\` text NOT NULL, \`node_type\` text NOT NULL, \`visit\` integer NOT NULL, \`transcript_path\` text NOT NULL, \`device_id\` text, ${createdAt})`,
+	`CREATE TABLE \`agent_session\` (\`id\` text PRIMARY KEY, \`space_id\` text NOT NULL, \`run_id\` text NOT NULL, \`step_id\` text NOT NULL, \`harness_session_id\` text, \`prompt\` text NOT NULL, ${createdAt})`,
+	`CREATE TABLE \`event\` (\`seq\` integer PRIMARY KEY, \`space_id\` text NOT NULL, \`run_id\` text, \`step_id\` text, \`session_id\` text, \`type\` text NOT NULL, \`payload\` text DEFAULT '{}' NOT NULL, ${createdAt}, \`walker_id\` text NOT NULL, \`walker_seq\` integer NOT NULL)`,
 	"CREATE TABLE `transcript` (`step_id` text NOT NULL, `line_no` integer NOT NULL, `seq` integer NOT NULL, `json` text NOT NULL, PRIMARY KEY (`step_id`, `line_no`))",
 ];
 
@@ -106,19 +109,23 @@ export type RunBundleSummary = {
 };
 
 /**
- * Writes the run `runId` to a new SQLite file at `path`. Every value in
- * `redact` (4 characters or more) becomes `•••` in the copied texts:
- * transcripts, event payloads, prompts, the flow and the title. Returns
- * null when there is no such run.
+ * Writes the run `runId` of the Space `spaceId` to a new SQLite file at
+ * `path`. Every value in `redact` (4 characters or more) becomes `•••` in
+ * the copied texts: transcripts, event payloads, prompts, the flow and the
+ * title. Returns null when the Space has no such run.
  */
 export async function exportRun(options: {
 	db: Database;
 	runId: string;
+	spaceId: string;
 	path: string;
 	redact?: readonly string[];
 }): Promise<RunBundleSummary | null> {
 	const { db, runId, path } = options;
-	const [runRow] = await db.select().from(run).where(eq(run.id, runId));
+	const [runRow] = await db
+		.select()
+		.from(run)
+		.where(and(eq(run.id, runId), eq(run.spaceId, options.spaceId)));
 	if (!runRow) return null;
 	if (existsSync(path)) throw new Error(`${path} already exists.`);
 
@@ -258,7 +265,9 @@ export async function openRunBundle(path: string): Promise<RunBundle> {
 		const rows =
 			formatVersion === 1
 				? await readFormat1(db, runId)
-				: await readRows(db, runId);
+				: formatVersion === 2
+					? await readFormat2(db, runId)
+					: await readRows(db, runId);
 		const { run: runRow, project: projectRow, clones, steps, sessions } = rows;
 		if (!runRow) throw new Error(`${path} has no run ${runId}.`);
 		return {
@@ -327,19 +336,72 @@ async function readRows(db: Database, runId: string): Promise<BundleRows> {
 	};
 }
 
+/** The columns of a table without its Space. */
+function withoutSpace<T extends Record<string, unknown>>(
+	columns: T,
+): Omit<T, "spaceId"> {
+	const { spaceId: _space, ...rest } = columns;
+	return rest;
+}
+
+/** A format 2 bundle: the live schema's tables without `space_id`, read in `UNKNOWN_SPACE`. */
+async function readFormat2(db: Database, runId: string): Promise<BundleRows> {
+	const space = { spaceId: UNKNOWN_SPACE };
+	const [runRow] = await db
+		.select(withoutSpace(getColumns(run)))
+		.from(run)
+		.where(eq(run.id, runId));
+	const projectId = runRow?.projectId ?? "";
+	const [projectRow] = await db
+		.select(withoutSpace(getColumns(project)))
+		.from(project)
+		.where(eq(project.id, projectId));
+	const clones = await db
+		.select(withoutSpace(getColumns(clone)))
+		.from(clone)
+		.where(eq(clone.projectId, projectId));
+	const steps = await db
+		.select(withoutSpace(getColumns(step)))
+		.from(step)
+		.where(eq(step.runId, runId))
+		.orderBy(asc(step.createdAt));
+	const sessions = await db
+		.select(withoutSpace(getColumns(agentSession)))
+		.from(agentSession)
+		.where(eq(agentSession.runId, runId))
+		.orderBy(asc(agentSession.createdAt));
+	const events = await db
+		.select(withoutSpace(getColumns(event)))
+		.from(event)
+		.where(eq(event.runId, runId))
+		.orderBy(asc(event.seq));
+	return {
+		project: projectRow && { ...projectRow, ...space },
+		clones: clones.map((c) => ({ ...c, ...space })),
+		run: runRow && { ...runRow, ...space },
+		steps: steps.map((s) => ({ ...s, ...space })),
+		sessions: sessions.map((s) => ({ ...s, ...space })),
+		events: events.map((e) => ({ ...e, ...space })),
+	};
+}
+
 /**
- * A format 1 bundle, read as format 2: the project's `repo_path` is its one
- * Clone, it has no remote, and every row's Walker is `UNKNOWN_DEVICE`.
+ * A format 1 bundle, read as format 3: the project's `repo_path` is its one
+ * Clone, it has no remote, every row's Walker is `UNKNOWN_DEVICE` and its
+ * Space `UNKNOWN_SPACE`.
  */
 async function readFormat1(db: Database, runId: string): Promise<BundleRows> {
-	const { walkerId: _walker, ...runColumns } = getColumns(run);
-	const { deviceId: _device, ...stepColumns } = getColumns(step);
+	const space = { spaceId: UNKNOWN_SPACE };
+	const { walkerId: _walker, ...runColumns } = withoutSpace(getColumns(run));
+	const { deviceId: _device, ...stepColumns } = withoutSpace(getColumns(step));
 	const {
 		walkerId: _eventWalker,
 		walkerSeq: _walkerSeq,
 		...eventColumns
-	} = getColumns(event);
-	const { remote: _remote, ...projectColumns } = getColumns(project);
+	} = withoutSpace(getColumns(event));
+	const { remote: _remote, ...projectColumns } = withoutSpace(
+		getColumns(project),
+	);
 
 	const [runRow] = await db
 		.select(runColumns)
@@ -362,6 +424,7 @@ async function readFormat1(db: Database, runId: string): Promise<BundleRows> {
 	return {
 		project: projectRow && {
 			id: projectRow.id,
+			...space,
 			name: projectRow.name,
 			remote: null,
 			createdAt: projectRow.createdAt,
@@ -371,6 +434,7 @@ async function readFormat1(db: Database, runId: string): Promise<BundleRows> {
 			? [
 					{
 						id: projectRow.id,
+						...space,
 						projectId: projectRow.id,
 						deviceId: UNKNOWN_DEVICE,
 						path: projectRow.repoPath,
@@ -378,11 +442,18 @@ async function readFormat1(db: Database, runId: string): Promise<BundleRows> {
 					},
 				]
 			: [],
-		run: runRow ? { ...runRow, walkerId: UNKNOWN_DEVICE } : undefined,
-		steps: steps.map((s) => ({ ...s, deviceId: null })),
-		sessions: await sessionsOf(db, runId),
+		run: runRow ? { ...runRow, ...space, walkerId: UNKNOWN_DEVICE } : undefined,
+		steps: steps.map((s) => ({ ...s, ...space, deviceId: null })),
+		sessions: (
+			await db
+				.select(withoutSpace(getColumns(agentSession)))
+				.from(agentSession)
+				.where(eq(agentSession.runId, runId))
+				.orderBy(asc(agentSession.createdAt))
+		).map((s) => ({ ...s, ...space })),
 		events: events.map((e) => ({
 			...e,
+			...space,
 			walkerId: UNKNOWN_DEVICE,
 			walkerSeq: e.seq,
 		})),

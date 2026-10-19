@@ -384,6 +384,8 @@ export function createRunStart(deps: RunStartDeps) {
 				.insert(run)
 				.values({
 					id: runId,
+					// The run is in its project's Space, also when the scheduler starts it.
+					spaceId: projectRow.spaceId,
 					projectId: projectRow.id,
 					flowName,
 					flow: JSON.stringify(flow),

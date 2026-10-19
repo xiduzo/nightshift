@@ -821,6 +821,7 @@ describe("the Agent node", () => {
 		const stepId = "dead-step";
 		await sandbox.db.insert(step).values({
 			id: stepId,
+			spaceId: sandbox.spaceId,
 			runId: h.runId,
 			nodeId: "worker",
 			nodeType: "agent",

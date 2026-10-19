@@ -21,7 +21,7 @@ import {
 	waitFor,
 	withDevice,
 } from "./test-support";
-import type { Engine, RunDetail } from "./types";
+import type { RunDetail, SpaceEngine } from "./types";
 
 /** The engine's hooks for the daemon's settings and connections. */
 
@@ -40,7 +40,7 @@ function makeEngine(
 		"settings" | "mcpServersFor" | "connectionNames" | "cliNames" | "findCli"
 	> = {},
 	internals: EngineInternals = {},
-): Engine {
+): SpaceEngine {
 	return createEngine(
 		withDevice({
 			db: sandbox.db,
@@ -50,7 +50,7 @@ function makeEngine(
 			...options,
 		}),
 		internals,
-	);
+	).space(sandbox.spaceId);
 }
 
 function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
@@ -93,11 +93,14 @@ function flowOf(
 	};
 }
 
-async function projectId(engine: Engine): Promise<string> {
+async function projectId(engine: SpaceEngine): Promise<string> {
 	return (await engine.addProject({ repoPath: sandbox.repoPath })).id;
 }
 
-async function waitForEnd(engine: Engine, runId: string): Promise<RunDetail> {
+async function waitForEnd(
+	engine: SpaceEngine,
+	runId: string,
+): Promise<RunDetail> {
 	return waitFor(
 		async () => {
 			const detail = await engine.getRun(runId);

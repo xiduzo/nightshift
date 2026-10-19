@@ -17,6 +17,8 @@ import { originUrl, resolveRepoTopLevel } from "./worktrees";
  * - Adding a folder whose `origin` names a Project already known makes a
  *   Clone of it, not a second Project. A folder without a remote is a
  *   Project of its own, on this computer only.
+ * - A Project is in exactly one Space. A folder or a remote that is a
+ *   Project of another Space is refused, never joined across Spaces.
  * - `readRemotes` fills in the remote of the Projects that have none, from
  *   their Clone here. Rows from before the Clone table get theirs this way
  *   (a migration cannot run git). A remote another Project already has
@@ -75,31 +77,48 @@ export function createProjects(deps: ProjectsDeps) {
 		return { ...row, removedAt: null };
 	}
 
+	/** Only the Space's projects; every Space's without one (background work). */
+	const inSpace = (spaceId: string | undefined) =>
+		spaceId === undefined ? undefined : eq(project.spaceId, spaceId);
+
 	return {
-		/** The projects a person has not removed, oldest first. */
-		list(): Promise<ProjectRow[]> {
-			return withClone(isNull(project.removedAt));
+		/**
+		 * The projects a person has not removed, oldest first: the Space's,
+		 * or without a Space every Space's (the scheduler's).
+		 */
+		list(spaceId?: string): Promise<ProjectRow[]> {
+			return withClone(and(isNull(project.removedAt), inSpace(spaceId)));
 		},
 
-		/** A project that a person has not removed, with its folder here. */
-		async get(projectId: string): Promise<ProjectRow> {
+		/**
+		 * A project that a person has not removed, with its folder here. With
+		 * a Space, a project of another Space is not found.
+		 */
+		async get(projectId: string, spaceId?: string): Promise<ProjectRow> {
 			const [row] = await withClone(
-				and(eq(project.id, projectId), isNull(project.removedAt)),
+				and(
+					eq(project.id, projectId),
+					isNull(project.removedAt),
+					inSpace(spaceId),
+				),
 			);
 			if (!row) throw new Error(`Project not found: ${projectId}`);
 			return row;
 		},
 
 		/**
-		 * The project of the git repository at `path`: the one with a Clone
-		 * there, else the one with its remote, else a new one. A removed
-		 * project comes back.
+		 * The project of the git repository at `path` in the Space: the one
+		 * with a Clone there, else the one with its remote, else a new one. A
+		 * removed project comes back. A project of another Space is refused.
 		 */
-		async add(input: { repoPath: string; name?: string }): Promise<ProjectRow> {
+		async add(
+			input: { repoPath: string; name?: string },
+			spaceId: string,
+		): Promise<ProjectRow> {
 			const path = await resolveRepoTopLevel(input.repoPath);
 			const deviceId = await deps.deviceId();
 			const [here] = await withClone(eq(clone.path, path));
-			if (here) return restore(here);
+			if (here) return restore(ownSpace(here, spaceId));
 
 			const url = await originUrl(path);
 			const remote = url === null ? null : normaliseRemote(url);
@@ -107,6 +126,7 @@ export function createProjects(deps: ProjectsDeps) {
 				? await db.select().from(project).where(eq(project.remote, remote))
 				: [];
 			if (known) {
+				ownSpace(known, spaceId);
 				const [elsewhere] = await withClone(eq(project.id, known.id));
 				if (
 					elsewhere &&
@@ -126,9 +146,13 @@ export function createProjects(deps: ProjectsDeps) {
 							and(eq(clone.projectId, known.id), eq(clone.deviceId, deviceId)),
 						);
 				} else {
-					await db
-						.insert(clone)
-						.values({ id: randomUUID(), projectId: known.id, deviceId, path });
+					await db.insert(clone).values({
+						id: randomUUID(),
+						spaceId,
+						projectId: known.id,
+						deviceId,
+						path,
+					});
 				}
 				await log.append({
 					type: "CloneAdded",
@@ -141,12 +165,12 @@ export function createProjects(deps: ProjectsDeps) {
 			const name = input.name ?? path.split("/").at(-1) ?? path;
 			const [row] = await db
 				.insert(project)
-				.values({ id, name, remote })
+				.values({ id, spaceId, name, remote })
 				.returning();
 			if (!row) throw new Error("Could not add the project.");
 			await db
 				.insert(clone)
-				.values({ id: randomUUID(), projectId: id, deviceId, path });
+				.values({ id: randomUUID(), spaceId, projectId: id, deviceId, path });
 			await log.append({
 				type: "ProjectAdded",
 				payload: { projectId: id, name, repoPath: path, remote },
@@ -181,6 +205,16 @@ export function createProjects(deps: ProjectsDeps) {
 			}
 		},
 	};
+}
+
+/** The row, when it is in the Space. A folder is one Space's project at a time. */
+function ownSpace<T extends { spaceId: string }>(row: T, spaceId: string): T {
+	if (row.spaceId !== spaceId) {
+		throw new Error(
+			"This folder is a project in another Space. Switch to that Space to use it.",
+		);
+	}
+	return row;
 }
 
 /**

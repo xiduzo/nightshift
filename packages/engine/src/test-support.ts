@@ -9,8 +9,9 @@ import type {
 } from "@nightshift/agents/types";
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
-import { event } from "@nightshift/db/schema/nightshift";
-import { asc, eq } from "drizzle-orm";
+import { organization } from "@nightshift/db/schema/auth";
+import { device, event } from "@nightshift/db/schema/nightshift";
+import { asc, eq, sql } from "drizzle-orm";
 
 import { type LocalDeviceDeps, localDevice } from "./device/local";
 import type { Device } from "./device/types";
@@ -83,6 +84,8 @@ export type Sandbox = {
 	db: Database;
 	/** The database's own Device: the Walker of its runs. */
 	deviceId: string;
+	/** The personal Space of the Device's owner: where the migration puts everything. */
+	spaceId: string;
 	cleanup(): Promise<void>;
 };
 
@@ -94,6 +97,32 @@ const gitIdentity = [
 	"-c",
 	"commit.gpgsign=false",
 ];
+
+/** The personal Space of this computer's Person, as the migration made it. */
+export async function localSpaceId(db: Database): Promise<string> {
+	const [row] = await db
+		.select({ id: organization.id })
+		.from(organization)
+		.innerJoin(
+			device,
+			eq(organization.slug, sql`'personal-' || ${device.ownerId}`),
+		)
+		.where(eq(device.self, true));
+	if (!row) throw new Error("The database has no personal Space.");
+	return row.id;
+}
+
+/** Another Space with a member, as the organization plugin stores it. */
+export async function otherSpace(
+	db: Database,
+	name = "Other",
+): Promise<string> {
+	const id = `space-${name.toLowerCase()}`;
+	await db
+		.insert(organization)
+		.values({ id, name, slug: id, createdAt: new Date() });
+	return id;
+}
 
 export async function createSandbox(): Promise<Sandbox> {
 	const root = await realpath(
@@ -115,6 +144,7 @@ export async function createSandbox(): Promise<Sandbox> {
 		dbPath,
 		db,
 		deviceId: (await selfDevice(db)).id,
+		spaceId: await localSpaceId(db),
 		cleanup: () => rm(root, { recursive: true, force: true }),
 	};
 }

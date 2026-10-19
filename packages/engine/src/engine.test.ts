@@ -42,10 +42,10 @@ import {
 	withDevice,
 } from "./test-support";
 import type {
-	Engine,
 	RunDetail,
 	RunStatus,
 	RunStreamItem,
+	SpaceEngine,
 	TranscriptEntry,
 } from "./types";
 
@@ -77,7 +77,7 @@ function makeEngine(
 		| "findCli"
 	> = {},
 	internals: EngineInternals = {},
-): Engine {
+): SpaceEngine {
 	const runLog = createRunLog(sandbox.db);
 	runLogs.push(runLog);
 	return createEngine(
@@ -90,7 +90,7 @@ function makeEngine(
 			...options,
 		}),
 		{ runLog, ...internals },
-	);
+	).space(sandbox.spaceId);
 }
 
 function agent(
@@ -159,21 +159,31 @@ function retryFlow(check: string, max: number): Flow {
 	);
 }
 
-async function projectId(engine: Engine): Promise<string> {
+async function projectId(engine: SpaceEngine): Promise<string> {
 	return (await engine.addProject({ repoPath: sandbox.repoPath })).id;
 }
 
-async function statusOf(engine: Engine, runId: string): Promise<RunStatus> {
+async function statusOf(
+	engine: SpaceEngine,
+	runId: string,
+): Promise<RunStatus> {
 	return (await engine.getRun(runId)).status;
 }
 
-async function waitForStatus(engine: Engine, runId: string, status: RunStatus) {
+async function waitForStatus(
+	engine: SpaceEngine,
+	runId: string,
+	status: RunStatus,
+) {
 	await waitFor(async () => (await statusOf(engine, runId)) === status, {
 		label: `status ${status}`,
 	});
 }
 
-async function waitForEnd(engine: Engine, runId: string): Promise<RunStatus> {
+async function waitForEnd(
+	engine: SpaceEngine,
+	runId: string,
+): Promise<RunStatus> {
 	return waitFor(
 		async () => {
 			const status = await statusOf(engine, runId);
@@ -190,7 +200,7 @@ async function loggedTypes(): Promise<string[]> {
 
 /** Watches a run until `until` says stop, and returns every item. */
 async function collect(
-	engine: Engine,
+	engine: SpaceEngine,
 	runId: string,
 	until: (item: RunStreamItem, items: RunStreamItem[]) => boolean,
 	afterSeq?: number,
@@ -1154,7 +1164,7 @@ describe("automatic resume after a restart", () => {
 
 	/** Gives a resume that should not come time to show up, then checks it did not. */
 	async function expectNotResumed(
-		engine: Engine,
+		engine: SpaceEngine,
 		runId: string,
 		sessions: unknown[],
 		why: string,
@@ -1661,7 +1671,7 @@ function gateFlow(): Flow {
 	);
 }
 
-async function openGateOf(engine: Engine, runId: string) {
+async function openGateOf(engine: SpaceEngine, runId: string) {
 	return waitFor(
 		async () => (await engine.listGates()).find((g) => g.runId === runId),
 		{ label: "an open gate" },

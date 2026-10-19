@@ -3,7 +3,7 @@ import type { AgentHarness, HarnessName } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import { project, run, step } from "@nightshift/db/schema/nightshift";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
-import { desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import type { RunBus } from "./bus";
 import {
@@ -221,13 +221,21 @@ export type ReadModel = ReturnType<typeof createReadModel>;
 export function createReadModel(deps: ReadModelDeps) {
 	const { db, log, bus, isActive, harnessOf } = deps;
 
-	/** Every run, newest first, with the facts the log gives each one. */
-	async function listRuns(projectId?: string): Promise<RunSummary[]> {
-		const query = db.select().from(run);
-		const rows = await (projectId
-			? query.where(eq(run.projectId, projectId))
-			: query
-		).orderBy(desc(run.createdAt));
+	/** The Space's runs (of one project), newest first, with the facts the log gives each one. */
+	async function listRuns(
+		spaceId: string,
+		projectId?: string,
+	): Promise<RunSummary[]> {
+		const rows = await db
+			.select()
+			.from(run)
+			.where(
+				and(
+					eq(run.spaceId, spaceId),
+					projectId ? eq(run.projectId, projectId) : undefined,
+				),
+			)
+			.orderBy(desc(run.createdAt));
 		const facts = await log.derive(
 			rows.map((r) => r.id),
 			runFacts,
@@ -247,13 +255,13 @@ export function createReadModel(deps: ReadModelDeps) {
 		return events.length === 0 ? null : deriveRunState(events).status;
 	}
 
-	/** The open Gates of the runs of projects a person has not removed, oldest first. */
-	async function listGates(): Promise<OpenGate[]> {
+	/** The open Gates of the Space's runs of projects a person has not removed, oldest first. */
+	async function listGates(spaceId: string): Promise<OpenGate[]> {
 		const rows = await db
 			.select({ run, projectName: project.name })
 			.from(run)
 			.innerJoin(project, eq(run.projectId, project.id))
-			.where(isNull(project.removedAt));
+			.where(and(eq(run.spaceId, spaceId), isNull(project.removedAt)));
 		// Only a waiting run has an open Gate. The run list keeps the same facts.
 		const facts = await log.derive(
 			rows.map((r) => r.run.id),
