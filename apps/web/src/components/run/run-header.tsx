@@ -54,6 +54,7 @@ import { toast } from "sonner";
 import { RunStatusBadge } from "@/components/run-status-badge";
 import { ENV } from "@/env";
 import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
+import { authClient } from "@/lib/auth-client";
 import {
 	dayWord,
 	formatCost,
@@ -200,9 +201,7 @@ function RunFacts({ run }: { run: RunDetail }) {
 					</Fact>
 				))}
 				<Fact label="Started by">
-					{run.trigger.kind === "schedule"
-						? `Schedule · ${run.trigger.scheduleId}`
-						: "You"}
+					<StartedBy run={run} />
 				</Fact>
 			</dl>
 			<Separator />
@@ -269,6 +268,24 @@ function RunFacts({ run }: { run: RunDetail }) {
 }
 
 /** One fact of the run: a small muted label above its value. */
+/**
+ * Who started the run: a schedule, you, or another Member of the Space.
+ * Commits in the run are in the name of the person who started it.
+ */
+function StartedBy({ run }: { run: RunDetail }) {
+	const session = authClient.useSession();
+	if (run.trigger.kind === "schedule") {
+		return <>Schedule · {run.trigger.scheduleId}</>;
+	}
+	if (!run.startedBy) {
+		return <span className="text-muted-foreground">Not known</span>;
+	}
+	if (run.startedBy.id === session.data?.user.id) return <>You</>;
+	return (
+		<span className="truncate">{run.startedBy.name ?? "A former member"}</span>
+	);
+}
+
 function Fact({
 	label,
 	className,
