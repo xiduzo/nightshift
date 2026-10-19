@@ -370,7 +370,7 @@ describe("connections and requirements: what run start asks", () => {
 			programs: ["gh"],
 		});
 
-	test("an Agent names its connections, a Tool its one; the other kinds none", () => {
+	test("an Agent names its connections, a Tool its one; the other kinds none", async () => {
 		expect(
 			kindOf(agent({ connections: ["jira", "github"] })).connections(
 				agent({ connections: ["jira", "github"] }),
@@ -389,11 +389,12 @@ describe("connections and requirements: what run start asks", () => {
 		}
 	});
 
-	test("the Agent kind requires its CLI tools, its harness and, for a checker, the decider", () => {
+	test("the Agent kind requires its CLI tools, its harness and, for a checker, the decider", async () => {
+		const caps = await has();
 		const nodes = [
 			agent({ harness: "codex", clis: ["gh"], checker: { prompt: "ok?" } }),
 		];
-		expect(NODE_KINDS.agent.requirements.map((r) => r(nodes, has()))).toEqual([
+		expect(NODE_KINDS.agent.requirements.map((r) => r(nodes, caps))).toEqual([
 			'The flow uses the CLI tool "gh" (n), but no CLI tool has that name. Add it under Agents → Tools.',
 			'The flow uses the CLI tool "gh", but this computer does not have it. Install gh, or take it off the flow.',
 			"The flow has an Agent node on Codex (n), but no Codex harness is added. Add it under Agents.",
@@ -401,30 +402,29 @@ describe("connections and requirements: what run start asks", () => {
 		]);
 	});
 
-	test("a model Decision and a model Value require the decider; by a rule or a person they require nothing", () => {
+	test("a model Decision and a model Value require the decider; by a rule or a person they require nothing", async () => {
+		const caps = await has();
 		expect(
-			NODE_KINDS.decision.requirements.map((r) =>
-				r([decision("model")], has()),
-			),
+			NODE_KINDS.decision.requirements.map((r) => r([decision("model")], caps)),
 		).toEqual([
 			"The flow has a Decision node decided by a model, but no decider is configured.",
 		]);
 		expect(
 			NODE_KINDS.decision.requirements.map((r) =>
-				r([decision("person"), decision("rule")], has()),
+				r([decision("person"), decision("rule")], caps),
 			),
 		).toEqual([null]);
 		expect(
-			NODE_KINDS.value.requirements.map((r) => r([value("model")], has())),
+			NODE_KINDS.value.requirements.map((r) => r([value("model")], caps)),
 		).toEqual([
 			"The flow has a Value node made by a model, but no decider is configured.",
 		]);
 		expect(
-			NODE_KINDS.value.requirements.map((r) => r([value("rule")], has())),
+			NODE_KINDS.value.requirements.map((r) => r([value("rule")], caps)),
 		).toEqual([null]);
 	});
 
-	test("a Command, a Tool, a Wait and a Call require nothing of their own", () => {
+	test("a Command, a Tool, a Wait and a Call require nothing of their own", async () => {
 		for (const type of ["command", "tool", "wait", "call"] as const) {
 			expect(NODE_KINDS[type].requirements).toEqual([]);
 		}

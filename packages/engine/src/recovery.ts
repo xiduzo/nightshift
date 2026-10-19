@@ -80,6 +80,11 @@ export type ResumeBlockDeps = {
 	schedulerOn: boolean;
 	/** The run's flow, from its snapshot. */
 	flowOf(row: RunRow): Flow;
+	/**
+	 * Whether the run's steps run on another Device (its worktree is
+	 * there). Without it: every run's are on this computer.
+	 */
+	placedElsewhere?(row: RunRow): boolean;
 };
 
 /**
@@ -112,6 +117,9 @@ export async function daemonResumeBlock(
 		if (stopAt !== null && deps.now() >= stopAt) {
 			return "its stop time has passed.";
 		}
+		// A run placed on another Device has its worktree there: that Device
+		// says when it is gone.
+		if (deps.placedElsewhere?.(row)) return null;
 		const worktree = await stat(row.worktreePath).catch(() => null);
 		if (!worktree?.isDirectory()) {
 			return "the copy of the project it worked in is gone.";

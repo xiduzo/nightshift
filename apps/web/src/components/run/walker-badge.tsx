@@ -10,8 +10,8 @@ export function walkerName(walker: RunSummary["walker"]): string {
 }
 
 /**
- * Where a run runs, when it is not this computer: a Badge with the device's
- * name. Nothing for a run of this computer.
+ * Where a run runs (its steps' Device, or a Walker), when it is not this
+ * computer: a Badge with the device's name. Nothing for this computer.
  */
 export function WalkerBadge({
 	walker,

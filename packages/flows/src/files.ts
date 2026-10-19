@@ -26,7 +26,36 @@ export function flowsDir(repoPath: string): string {
 
 /** All flow files, sorted by name. A missing directory is an empty list. */
 export async function listFlowFiles(repoPath: string): Promise<FlowListItem[]> {
-	const files = await readAll(repoPath);
+	return listFlowSources(await readAll(repoPath), repoPath);
+}
+
+/**
+ * What one flow file holds, as plain data that can cross a wire: its
+ * parsed JSON, or why it is not JSON.
+ */
+export type FlowSource = { json: unknown } | { jsonError: string };
+
+/** Every flow file of a repo by name (valid names only, sorted). A missing directory is none. */
+export type FlowSources = Record<string, FlowSource>;
+
+/**
+ * The flow files of a repo as they are on disk, unparsed: what a Device
+ * hands the Walker of a run placed on it, which reads them with
+ * `listFlowSources`, `loadFlowSource` and `parsedFlows`.
+ */
+export async function readFlowSources(repoPath: string): Promise<FlowSources> {
+	return Object.fromEntries(await readAll(repoPath));
+}
+
+/**
+ * The list of `listFlowFiles`, from sources read elsewhere. `repoPath` is
+ * where the paths point: a Clone on another Device has a path there only.
+ */
+export function listFlowSources(
+	sources: FlowSources | ReadonlyMap<string, FlowSource>,
+	repoPath: string,
+): FlowListItem[] {
+	const files = asMap(sources);
 	const flows = flowsOf(files);
 	const items: FlowListItem[] = [];
 	for (const [name, file] of files) {
@@ -41,6 +70,35 @@ export async function listFlowFiles(repoPath: string): Promise<FlowListItem[]> {
 		});
 	}
 	return items;
+}
+
+/** `readFlowFile`, from sources read elsewhere. Fails when there is no such flow. */
+export function loadFlowSource(
+	sources: FlowSources,
+	name: string,
+	repoPath: string,
+): LoadedFlow {
+	const files = asMap(sources);
+	const file = files.get(name);
+	if (file === undefined) throw notFound(name);
+	return loadedFlow(repoPath, name, file, flowsOf(files));
+}
+
+/** Every source as a flow, null when it does not parse (`ValidateOptions.flows`). */
+export function parsedFlows(sources: FlowSources): Record<string, Flow | null> {
+	return flowsOf(asMap(sources));
+}
+
+function asMap(
+	sources: FlowSources | ReadonlyMap<string, FlowSource>,
+): ReadonlyMap<string, FlowSource> {
+	return sources instanceof Map
+		? sources
+		: new Map(
+				Object.entries(sources as FlowSources).sort(([a], [b]) =>
+					a < b ? -1 : a > b ? 1 : 0,
+				),
+			);
 }
 
 /**
@@ -193,8 +251,7 @@ async function scheduleFlowInfos(
 	return infos;
 }
 
-/** What one flow file holds: parsed JSON, or why it is not JSON. */
-type FileJson = { json: unknown } | { jsonError: string };
+type FileJson = FlowSource;
 
 /** Valid flow names only, sorted. */
 async function readAll(repoPath: string): Promise<Map<string, FileJson>> {

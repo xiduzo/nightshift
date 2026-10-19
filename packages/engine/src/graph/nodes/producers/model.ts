@@ -51,7 +51,7 @@ async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 		outputs: valueOutputs("error", null, "", visit),
 		error,
 	});
-	const decider = step.device.capabilities().decider;
+	const decider = (await step.device.capabilities()).decider;
 	if (!decider?.values) {
 		return fail("No decider is configured for Value nodes.");
 	}

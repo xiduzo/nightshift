@@ -101,7 +101,7 @@ export function RunTitle({
 			</h1>
 			<div aria-live="polite" className="flex flex-wrap items-center gap-2">
 				<RunStatusBadge status={status} />
-				<WalkerBadge walker={run.walker} />
+				<WalkerBadge walker={run.device} />
 				{run.commands.length > 0 ? (
 					<Badge
 						variant="outline"
@@ -234,9 +234,18 @@ function RunFacts({ run }: { run: RunDetail }) {
 						className="size-3.5 shrink-0 text-muted-foreground"
 						aria-hidden="true"
 					/>
-					{run.walker.thisDevice ? "This computer" : walkerName(run.walker)}
+					{run.device.thisDevice ? "This computer" : walkerName(run.device)}
 				</Fact>
-				{run.walker.thisDevice ? (
+				{run.walker.id !== run.device.id ? (
+					<Fact label="Walked by">
+						<MonitorIcon
+							className="size-3.5 shrink-0 text-muted-foreground"
+							aria-hidden="true"
+						/>
+						{run.walker.thisDevice ? "This computer" : walkerName(run.walker)}
+					</Fact>
+				) : null}
+				{run.walker.thisDevice && run.device.thisDevice ? (
 					<Fact label="Folder">
 						<CopyValue label="folder path" value={run.worktreePath} />
 					</Fact>
@@ -418,25 +427,27 @@ export function RunActions({
 
 	return (
 		<>
-			<Tooltip>
-				<TooltipTrigger
-					render={
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={takeOver}
-							disabled={!run.takeOverCommand}
-							aria-label="Take over"
-						/>
-					}
-				>
-					<ClipboardCopyIcon data-icon="inline-start" />
-					<span className="hidden sm:inline">Take over</span>
-				</TooltipTrigger>
-				<TooltipContent className="max-w-sm break-all font-mono">
-					{run.takeOverCommand ?? "No agent session to take over yet."}
-				</TooltipContent>
-			</Tooltip>
+			{run.device.thisDevice ? (
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={takeOver}
+								disabled={!run.takeOverCommand}
+								aria-label="Take over"
+							/>
+						}
+					>
+						<ClipboardCopyIcon data-icon="inline-start" />
+						<span className="hidden sm:inline">Take over</span>
+					</TooltipTrigger>
+					<TooltipContent className="max-w-sm break-all font-mono">
+						{run.takeOverCommand ?? "No agent session to take over yet."}
+					</TooltipContent>
+				</Tooltip>
+			) : null}
 			<Tooltip>
 				<TooltipTrigger
 					render={

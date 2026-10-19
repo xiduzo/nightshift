@@ -1,13 +1,17 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { device as deviceTable, run } from "@nightshift/db/schema/nightshift";
 import {
+	type FlowNode,
 	optionProblem,
 	type Policy,
 	type ResolvedPolicy,
 } from "@nightshift/flows";
 import {
 	deleteFlowFile,
+	type FlowSources,
 	listFlowFiles,
+	listFlowSources,
+	loadFlowSource,
 	readFlowFile,
 	readSchedulesFile,
 	writeFlowFile,
@@ -17,6 +21,8 @@ import { eq, inArray } from "drizzle-orm";
 
 import { createRunBus } from "./bus";
 import { createDeviceRegistry } from "./device/registry";
+import { remoteDevice, type WorkRelay } from "./device/remote";
+import type { Device } from "./device/types";
 import {
 	deriveOpenGate,
 	deriveRunState,
@@ -29,7 +35,12 @@ import type { RunCommandInput } from "./exchange/commands";
 import { createEngineExchange } from "./exchange/engine-exchange";
 import { getRunRow as getRunRowOf, type RunRow } from "./graph/context";
 import { createRunner } from "./graph/runner";
-import { createProjects, type ListedProject, toProject } from "./projects";
+import {
+	createProjects,
+	type ListedProject,
+	NOT_ON_THIS_COMPUTER,
+	toProject,
+} from "./projects";
 import { createReadModel, parseCalledFlows, parseRunFlow } from "./read-model";
 import { createRecovery } from "./recovery";
 import { createRunLog, type RunLog } from "./run-log";
@@ -40,13 +51,18 @@ import {
 	type ScheduleRecord,
 } from "./scheduler";
 import { defaultRunSettings, type RunSettings } from "./settings";
-import { createSpaceDocuments, deviceNameIn } from "./space/document";
+import {
+	createSpaceDocuments,
+	deviceNameIn,
+	projectClones,
+} from "./space/document";
 import { parseTranscript, readTranscriptFile } from "./transcripts";
 import type {
 	Actor,
 	Engine,
 	EngineOptions,
 	MemberChange,
+	Placement,
 	RunStreamItem,
 	RunSummary,
 	RunTrigger,
@@ -94,6 +110,20 @@ import { listBranches } from "./worktrees";
  * settings, clock) from this file, so a test can stand one up alone.
  */
 
+/** A work relay that reaches nobody: a run placed elsewhere on a computer without one. */
+const UNREACHABLE: WorkRelay = {
+	async *call() {
+		yield {
+			kind: "error",
+			message: "This computer cannot reach the device this run is placed on.",
+		};
+	},
+	online: () => false,
+};
+
+/** How long a Device waits for a run its Host started to arrive. */
+const RUN_ARRIVES_MS = 30_000;
+
 const DEFAULT_MAX_CONCURRENT_RUNS = 2;
 const DEFAULT_MAX_STEPS_PER_RUN = 500;
 /** How long a new daemon waits before it resumes the runs the last one stopped mid-step. */
@@ -138,14 +168,44 @@ export function createEngine(
 			maxConcurrentRuns,
 			maxStepsPerRun,
 		};
-	// Placement is one Device for now: every step runs on this computer.
-	const deviceFor = () => device;
-
 	const bus = createRunBus();
 	const runLog =
 		internals.runLog ??
 		createRunLog(db, options.walkerId ? { walkerId: options.walkerId } : {});
 	const documents = options.spaceDocuments ?? createSpaceDocuments({ db });
+	const registry = createDeviceRegistry({ db, log: runLog, now });
+
+	/** Other Devices' names, for the runs placed on them (messages only). */
+	const deviceNames = new Map<string, string>();
+
+	/** Whether a run's steps run on this computer: placed here, or before Placement. */
+	const placedHere = (row: RunRow) =>
+		row.deviceId === null ||
+		row.deviceId === device.id ||
+		row.deviceId === row.walkerId;
+
+	/**
+	 * The Device a step of a run runs on (its Placement): the run's Device,
+	 * chosen when it started. Another Device is reached through the Host's
+	 * work relay, for the Person who started the run. Per-node placement
+	 * changes this function only.
+	 */
+	function deviceFor(_node: FlowNode, row: RunRow): Device {
+		if (placedHere(row) || row.deviceId === null) return device;
+		return remoteDevice(
+			options.work ?? UNREACHABLE,
+			{
+				id: row.deviceId,
+				name: deviceNames.get(row.deviceId) ?? "The device of this run",
+			},
+			{
+				spaceId: row.spaceId,
+				projectId: row.projectId,
+				personId: row.startedBy ?? "",
+				runId: row.id,
+			},
+		);
+	}
 	const projects = createProjects({
 		db,
 		log: runLog,
@@ -187,6 +247,7 @@ export function createEngine(
 		settings: runSettings,
 		schedulerOn: options.scheduler !== false,
 		flowOf: parseRunFlow,
+		placedElsewhere: (row) => !placedHere(row),
 		resumeGraceMs: internals.resumeGraceMs ?? DAEMON_RESUME_GRACE_MS,
 		...(internals.signal ? { signal: internals.signal } : {}),
 	});
@@ -199,7 +260,15 @@ export function createEngine(
 			// Projects from before Clones get their remote. A git that fails
 			// leaves it for the next start.
 			projects.readRemotes().catch(() => {}),
-		);
+		)
+		.then(async () => {
+			// The names of the Devices runs may be placed on, for their messages.
+			for (const row of await db
+				.select({ id: deviceTable.id, name: deviceTable.name })
+				.from(deviceTable)) {
+				deviceNames.set(row.id, row.name);
+			}
+		});
 	// Every method awaits `ready` and sees the error there.
 	ready.catch(() => {});
 
@@ -218,7 +287,7 @@ export function createEngine(
 	): Promise<Map<string, RunWalker>> {
 		const self = await runLog.walkerId();
 		const unique = [...new Set(ids)];
-		const others = unique.filter((id) => id !== self);
+		const others = unique.filter((id) => id !== self && id !== device.id);
 		const named = new Map(
 			others.length === 0
 				? []
@@ -239,11 +308,11 @@ export function createEngine(
 				{
 					id,
 					name:
-						id === self
+						id === self || id === device.id
 							? device.name
 							: (named.get(id) ??
 								(document ? deviceNameIn(document, id) : null)),
-					thisDevice: id === self,
+					thisDevice: id === self || id === device.id,
 				},
 			]),
 		);
@@ -291,15 +360,147 @@ export function createEngine(
 		stepTranscript,
 	});
 
+	/**
+	 * Places a run on one of its starter's Devices, after the Host's own
+	 * checks: the Device is paired here and belongs to the Person who
+	 * starts the run (another Person's Device takes an Offer, later), it
+	 * takes work now, and it has a Clone of the project. The Device checks
+	 * again before it starts anything.
+	 */
+	async function place(input: {
+		deviceId: string | undefined;
+		project: ListedProject;
+		runId: string;
+		personId: string | null;
+	}): Promise<Device> {
+		const { deviceId, project } = input;
+		if (
+			deviceId === undefined ||
+			deviceId === device.id ||
+			deviceId === (await runLog.walkerId())
+		) {
+			return device;
+		}
+		const paired = await registry.get(deviceId);
+		if (!paired || paired.revokedAt !== null || !options.work) {
+			throw new Error(
+				"That device cannot take runs from this computer. Pair it with this computer, or choose another device.",
+			);
+		}
+		if (input.personId === null || paired.ownerId !== input.personId) {
+			throw new Error(
+				`${paired.name} is not your device. A run can use your own devices only.`,
+			);
+		}
+		if (!options.work.online(deviceId)) {
+			throw new Error(
+				`${paired.name} is offline. Start the run when it is online, or choose another device.`,
+			);
+		}
+		const document = await documents.open(project.spaceId);
+		if (
+			document.hostedElsewhere ||
+			!projectClones(document, project.id).some((c) => c.deviceId === deviceId)
+		) {
+			throw new Error(
+				`${paired.name} does not have this project. Add its folder there first.`,
+			);
+		}
+		deviceNames.set(deviceId, paired.name);
+		return remoteDevice(
+			options.work,
+			{ id: deviceId, name: paired.name },
+			{
+				spaceId: project.spaceId,
+				projectId: project.id,
+				personId: input.personId,
+				runId: input.runId,
+			},
+		);
+	}
+
+	/**
+	 * The Devices a run of the project can run on, for a Person: this
+	 * computer when it has a Clone, then their Devices paired here that are
+	 * online with a Clone. A Space a Host keeps: the Host's answer.
+	 */
+	async function placements(
+		spaceId: string,
+		personId: string,
+		projectId: string,
+	): Promise<Placement[]> {
+		const project = await projects.find(projectId, spaceId);
+		const self = await runLog.walkerId();
+		const here: Placement[] =
+			project.repoPath !== null
+				? [{ deviceId: self, name: device.name, thisDevice: true }]
+				: [];
+		if ((await exchange.hostSpaces.hostOf(spaceId)) !== null) {
+			const listed = options.relay
+				? await options.relay
+						.placements({ spaceId, projectId })
+						.catch(() => [] as Placement[])
+				: [];
+			return [
+				...here,
+				...listed
+					.filter((p) => p.deviceId !== self)
+					.map((p) => ({ ...p, thisDevice: false })),
+			];
+		}
+		const work = options.work;
+		if (!work) return here;
+		const withClone = new Set(
+			projectClones(await documents.open(spaceId), projectId).map(
+				(c) => c.deviceId,
+			),
+		);
+		const own = (await registry.list(personId)).filter(
+			(d) =>
+				d.revokedAt === null &&
+				d.id !== self &&
+				withClone.has(d.id) &&
+				work.online(d.id),
+		);
+		return [
+			...here,
+			...own.map((d) => ({ deviceId: d.id, name: d.name, thisDevice: false })),
+		];
+	}
+
+	/**
+	 * The flow files of a project without a Clone here: from the Clone of
+	 * another of the Person's Devices, through the Host's work relay.
+	 */
+	async function flowsElsewhere(
+		spaceId: string,
+		projectId: string,
+		actor: Actor | undefined,
+	): Promise<FlowSources> {
+		const work = options.work;
+		const at =
+			actor && work
+				? (await placements(spaceId, actor.personId, projectId)).find(
+						(p) => !p.thisDevice && work.online(p.deviceId),
+					)
+				: undefined;
+		if (!actor || !work || !at) throw new Error(NOT_ON_THIS_COMPUTER);
+		return remoteDevice(
+			work,
+			{ id: at.deviceId, name: at.name },
+			{ spaceId, projectId, personId: actor.personId, runId: null },
+		).flows(projectId);
+	}
+
 	const runStart = createRunStart({
 		db,
 		log: runLog,
 		runner,
 		now,
-		projectRow: projects.get,
+		projectRow: (projectId) => projects.find(projectId),
 		profileFor: options.profileFor ?? (() => null),
-		...(options.probeGit ? { probeGit: options.probeGit } : {}),
-		device,
+		place,
+		selfName: device.name,
 	});
 
 	/** The run's row when it is in the Space, else "not found". */
@@ -417,12 +618,13 @@ export function createEngine(
 				return added;
 			},
 
+			// A rename, a move and a removal are the Space's: they need no Clone here.
 			async renameProject(projectId, name) {
 				await ready;
-				await getProjectRow(projectId, spaceId);
+				await projects.find(projectId, spaceId);
 				await projects.rename(projectId, name);
 				const [renamed] = await withClones(spaceId, [
-					await getProjectRow(projectId, spaceId),
+					await projects.find(projectId, spaceId),
 				]);
 				if (!renamed) throw new Error(`Project not found: ${projectId}`);
 				return renamed;
@@ -430,14 +632,14 @@ export function createEngine(
 
 			async moveProject(projectId, toSpaceId) {
 				await ready;
-				await getProjectRow(projectId, spaceId);
+				await projects.find(projectId, spaceId);
 				await noActiveRun(projectId, "move the project");
 				await projects.move(projectId, spaceId, toSpaceId);
 			},
 
 			async removeProject(projectId) {
 				await ready;
-				await getProjectRow(projectId, spaceId);
+				await projects.find(projectId, spaceId);
 				const runs = await noActiveRun(projectId, "remove the project");
 				for (const r of runs) {
 					const status = deriveRunState(await loadRunEvents(r.id)).status;
@@ -462,16 +664,31 @@ export function createEngine(
 				return listBranches(row.repoPath);
 			},
 
+			async listPlacements(projectId) {
+				await ready;
+				if (!actor) throw new Error("Sign in to start a run.");
+				return placements(spaceId, actor.personId, projectId);
+			},
+
 			async listFlows(projectId) {
 				await ready;
-				const row = await getProjectRow(projectId, spaceId);
-				return listFlowFiles(row.repoPath);
+				const row = await projects.find(projectId, spaceId);
+				if (row.repoPath !== null) return listFlowFiles(row.repoPath);
+				return listFlowSources(
+					await flowsElsewhere(spaceId, projectId, actor),
+					"",
+				);
 			},
 
 			async getFlow(projectId, name) {
 				await ready;
-				const row = await getProjectRow(projectId, spaceId);
-				return readFlowFile(row.repoPath, name);
+				const row = await projects.find(projectId, spaceId);
+				if (row.repoPath !== null) return readFlowFile(row.repoPath, name);
+				return loadFlowSource(
+					await flowsElsewhere(spaceId, projectId, actor),
+					name,
+					"",
+				);
 			},
 
 			async saveFlow(projectId, name, flow) {
@@ -499,7 +716,17 @@ export function createEngine(
 
 			async startRun(input: StartRunInput) {
 				await ready;
-				await getProjectRow(input.projectId, spaceId);
+				await projects.find(input.projectId, spaceId);
+				const { deviceId } = input;
+				if (
+					deviceId !== undefined &&
+					deviceId !== device.id &&
+					deviceId !== (await runLog.walkerId()) &&
+					(await exchange.hostSpaces.hostOf(spaceId)) !== null
+				) {
+					// A run for another Device: the Space's Host walks it.
+					return startOnHost({ ...input, deviceId }, spaceId);
+				}
 				return startRunWith(input, { kind: "manual" });
 			},
 
@@ -665,6 +892,39 @@ export function createEngine(
 		};
 	}
 
+	/**
+	 * Has the Host of the Space start a run placed on another Device: the
+	 * Host walks it. Returns once the run's rows reached this Replica.
+	 */
+	async function startOnHost(
+		input: StartRunInput & { deviceId: string },
+		spaceId: string,
+	): Promise<RunSummary> {
+		if (!options.relay) {
+			throw new Error(
+				"The computer that keeps this Space cannot be reached. Try again when it is online.",
+			);
+		}
+		const { runId } = await options.relay.startRun({ ...input, spaceId });
+		const deadline = now() + RUN_ARRIVES_MS;
+		while (now() < deadline) {
+			const [row] = await db
+				.select({ id: run.id })
+				.from(run)
+				.where(eq(run.id, runId));
+			if (row && (await runLog.events(runId)).length > 0) {
+				const [summary] = (
+					await reads.listRuns(spaceId, input.projectId)
+				).filter((r) => r.id === runId);
+				if (summary) return summary;
+			}
+			await Bun.sleep(200);
+		}
+		throw new Error(
+			"The run started, but it has not reached this computer yet. It shows in the run list in a moment.",
+		);
+	}
+
 	async function* watch(
 		runId: string,
 		spaceId: string,
@@ -711,7 +971,7 @@ export function createEngine(
 
 	return {
 		space,
-		devices: createDeviceRegistry({ db, log: runLog, now }),
+		devices: registry,
 		exchange,
 		logMemberChange,
 	};

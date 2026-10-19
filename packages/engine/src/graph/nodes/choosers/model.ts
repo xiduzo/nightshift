@@ -52,7 +52,7 @@ async function decide(
 	const { visit, signal } = step;
 	const prompt = renderTemplate(node.prompt, step.tctx);
 	const options = visibleOptions(node);
-	const decider = step.device.capabilities().decider;
+	const decider = (await step.device.capabilities()).decider;
 	if (!decider) {
 		return {
 			kind: "end",

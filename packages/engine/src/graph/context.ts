@@ -159,6 +159,14 @@ export type Requirement<N extends FlowNode = FlowNode> = (
 ) => string | null;
 
 /**
+ * Where a refusal's Device is, for its message: "" on this computer, else
+ * " on <name>" ("… no connection has that name on hetzner-1").
+ */
+export function onDevice(has: Pick<Capabilities, "elsewhere">): string {
+	return has.elsewhere === null ? "" : ` on ${has.elsewhere}`;
+}
+
+/**
  * One node kind as the engine sees it. `N` is the kind's flow node; a fact
  * may depend on `node.by` (Decision, Value) or `node.each` (Call).
  */

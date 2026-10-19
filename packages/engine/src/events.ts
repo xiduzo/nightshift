@@ -810,6 +810,8 @@ export type DerivedStep = {
 	scope: Scope | null;
 	transcriptPath: string;
 	logPath: string | null;
+	/** The Device the step ran on (its Placement). Null before steps named it. */
+	deviceId: string | null;
 	startedAt: number;
 	startSeq: number;
 	/** The seq of the latest `StepStarted` or `StepReopened`. */
@@ -868,6 +870,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 				scope: e.payload.scope ?? null,
 				transcriptPath: e.payload.transcriptPath,
 				logPath: e.payload.logPath,
+				deviceId: e.payload.deviceId ?? null,
 				startedAt: e.at,
 				startSeq: e.seq,
 				openedSeq: e.seq,

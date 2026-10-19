@@ -32,6 +32,7 @@ import { migrateDb } from "@nightshift/db/migrate";
 import {
 	acquireLease,
 	checkProjectFolder,
+	clonePathOf,
 	createCliToolStore,
 	createConnectionStore,
 	createEngine,
@@ -68,6 +69,8 @@ import { exchangeWithHost } from "./devices/exchange";
 import { createHostExchange } from "./devices/host-exchange";
 import { createRelay } from "./devices/relay";
 import { certificateFingerprint } from "./devices/tls";
+import { createWorkServer, type WorkServer } from "./devices/work";
+import { createWorkHub, type WorkHub } from "./devices/work-hub";
 import {
 	desktopOrigins,
 	ENV,
@@ -377,7 +380,18 @@ const local = localDevice({
 				help: await cliHelp(name),
 			})),
 		),
+	// The project's folder here: where its runs' worktrees branch from.
+	clonePath: clonePathOf(db),
 });
+
+/**
+ * On a Host: the calls of the runs it walks, for the Devices they are
+ * placed on, which take them over their own links. Kept across `bun --hot`
+ * reloads, so a Device's stream outlives a reload.
+ */
+const hotWork = globalThis as { nightshiftWork?: WorkHub };
+hotWork.nightshiftWork ??= createWorkHub();
+const workHub = hotWork.nightshiftWork;
 
 /**
  * The actions on rows another Device owns (a Gate of a run walked
@@ -404,6 +418,7 @@ export const engine = await createEngine({
 	db,
 	walkerId: device.id,
 	device: local,
+	work: workHub,
 	relay: relayToHosts,
 	dataDir,
 	settings: () => settings.run(),
@@ -459,6 +474,7 @@ export const hostExchange = createHostExchange({
 	selfId: device.id,
 	ownerId: person.userId,
 	isHost: host.isHost,
+	work: workHub,
 });
 
 /** A Device whose link says nothing for this long is offline. Its heartbeat comes every 15 s. */
@@ -471,6 +487,17 @@ presence.nightshiftPresence = setInterval(() => {
 	});
 }, 5_000);
 presence.nightshiftPresence.unref();
+
+/** Per Host: this computer as the Device the Host's runs are placed on. */
+const workServers = new Map<string, WorkServer>();
+function workServer(hostId: string): WorkServer {
+	let server = workServers.get(hostId);
+	if (!server) {
+		server = createWorkServer({ hostId, db, engine, device: local });
+		workServers.set(hostId, server);
+	}
+	return server;
+}
 
 /** This computer's links to the Hosts it paired with. Restarted on `bun --hot`. */
 const hostLinks = createHostLinks(db);
@@ -500,15 +527,19 @@ linked.nightshiftLinks = createDeviceLinks({
 				}),
 		);
 	},
-	// Run history both ways, and the commands for the runs this computer walks.
+	// Run history both ways, the commands for the runs this computer walks,
+	// and the steps of the Host's runs placed on this computer.
 	whileOnline: (link, client, _hello, signal) =>
-		exchangeWithHost({
-			engine,
-			hostId: link.hostId,
-			client,
-			selfId: device.id,
-			signal,
-		}),
+		Promise.all([
+			exchangeWithHost({
+				engine,
+				hostId: link.hostId,
+				client,
+				selfId: device.id,
+				signal,
+			}),
+			workServer(link.hostId).whileOnline(client, signal),
+		]).then(() => {}),
 });
 await linked.nightshiftLinks.start();
 export const deviceLinks = linked.nightshiftLinks;

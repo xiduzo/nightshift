@@ -180,6 +180,13 @@ export const run = sqliteTable(
 		 */
 		walkerId: text("walker_id").notNull(),
 		/**
+		 * The Device the run's steps run on and its worktree lives on (its
+		 * Placement): the Walker, or another Device of the Person who
+		 * started it. Null for runs from before Placement: the Walker. No
+		 * foreign key, like `walker_id`.
+		 */
+		deviceId: text("device_id"),
+		/**
 		 * The Person who started the run. Null for a run a schedule started,
 		 * and for runs from before Members. No foreign key: a run walked
 		 * elsewhere may name a Person this Replica does not know.

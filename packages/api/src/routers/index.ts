@@ -12,6 +12,7 @@ import {
 	secretNameSchema,
 	settingsPatchSchema,
 	syncCursorsSchema,
+	workReplySchema,
 } from "@nightshift/engine";
 import type { SpaceEngine } from "@nightshift/engine/types";
 import {
@@ -293,33 +294,39 @@ const schedules = {
 		}),
 };
 
+/** What starts a run: a flow file or an inline flow, and where its steps run. */
+const runStartFields = {
+	projectId: z.string(),
+	baseRef: z.string().min(1).optional(),
+	stopAt: z.number().int().positive().optional(),
+	inputs: z.record(z.string(), z.json()).optional(),
+	/** The Device the run's steps run on. Default: this computer. */
+	deviceId: z.string().min(1).max(64).optional(),
+};
+const runStartInput = z.union([
+	z.object({ ...runStartFields, flowName: flowNameSchema }),
+	z.object({ ...runStartFields, flow: flowSchema }),
+]);
+
 const runs = {
+	/** The Person's Devices a run of the project can run on: this computer first. */
+	placements: protectedProcedure
+		.input(z.object({ projectId: z.string() }))
+		.handler(({ context, input }) =>
+			context.space.listPlacements(input.projectId),
+		),
 	list: protectedProcedure
 		.input(z.object({ projectId: z.string().optional() }).optional())
 		.handler(({ context, input }) => context.space.listRuns(input)),
 	get: protectedProcedure
 		.input(z.object({ runId: z.string() }))
 		.handler(({ context, input }) => context.space.getRun(input.runId)),
-	/** Starts a flow file by name, or a flow given inline (a quick run). */
+	/**
+	 * Starts a flow file by name, or a flow given inline (a quick run), on
+	 * one of the Person's Devices (`placements`; default this computer).
+	 */
 	start: permitted({ run: ["start"] })
-		.input(
-			z.union([
-				z.object({
-					projectId: z.string(),
-					flowName: flowNameSchema,
-					baseRef: z.string().min(1).optional(),
-					stopAt: z.number().int().positive().optional(),
-					inputs: z.record(z.string(), z.json()).optional(),
-				}),
-				z.object({
-					projectId: z.string(),
-					flow: flowSchema,
-					baseRef: z.string().min(1).optional(),
-					stopAt: z.number().int().positive().optional(),
-					inputs: z.record(z.string(), z.json()).optional(),
-				}),
-			]),
-		)
+		.input(runStartInput)
 		.handler(({ context, input }) =>
 			context.space.startRun({
 				...input,
@@ -807,6 +814,35 @@ const devices = {
 			context.devices.revoke(context.session.user.id, input.deviceId),
 		),
 	/**
+	 * The relay's work half, as a placed Device calls it on its Host with
+	 * its Device key: the calls of the runs the Host walks on this Device,
+	 * as they come. The Host never dials a Device.
+	 */
+	work: deviceProcedure("relay")
+		.input(
+			z
+				.object({
+					/** The calls the Device still serves: any other it took has ended there. */
+					running: z.array(z.string().min(1).max(64)).max(1_000),
+				})
+				.default({ running: [] }),
+		)
+		.handler(async function* ({ context, input, signal }) {
+			yield* context.exchange.work(context.deviceKey, input, signal);
+		}),
+	/** The placed Device's answers to a call it took. */
+	workReply: deviceProcedure("relay")
+		.input(
+			z.object({
+				id: z.string().min(1).max(64),
+				replies: z.array(workReplySchema).max(1_000),
+				done: z.boolean(),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.exchange.workReply(context.deviceKey, input),
+		),
+	/**
 	 * Pairs this computer with a Host (`nightshift join`): yields the code to
 	 * approve there, then the Host once it is approved.
 	 */
@@ -963,6 +999,33 @@ const sync = {
 		)
 		.handler(({ context, input }) =>
 			context.exchange.commandDone(context.deviceKey, input),
+		),
+	/** Starts a run placed on another Device, for the key's Person: this Host walks it. */
+	startRun: deviceProcedure("sync")
+		.input(
+			z.union([
+				z.object({
+					...runStartFields,
+					flowName: flowNameSchema,
+					spaceId: z.string().min(1),
+					deviceId: z.string().min(1).max(64),
+				}),
+				z.object({
+					...runStartFields,
+					flow: flowSchema,
+					spaceId: z.string().min(1),
+					deviceId: z.string().min(1).max(64),
+				}),
+			]),
+		)
+		.handler(({ context, input }) =>
+			context.exchange.startRun(context.deviceKey, input),
+		),
+	/** The key's Person's Devices a run of the project can run on. */
+	placements: deviceProcedure("sync")
+		.input(z.object({ spaceId: z.string().min(1), projectId: z.string() }))
+		.handler(({ context, input }) =>
+			context.exchange.placements(context.deviceKey, input),
 		),
 	/** The Device has a Clone of a Project of a Space here. */
 	addClone: deviceProcedure("sync")

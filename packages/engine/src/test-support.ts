@@ -17,6 +17,7 @@ import { type DeviceDocument, openDeviceDocument } from "./device/document";
 import { type LocalDeviceDeps, localDevice } from "./device/local";
 import type { Device } from "./device/types";
 import { parseEventRow } from "./events";
+import { clonePathOf } from "./projects";
 import type { RunLog } from "./run-log";
 import { selfDevice } from "./self-device";
 import type { EngineOptions } from "./types";
@@ -56,6 +57,8 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 		cliNames,
 		findCli,
 		cliToolsFor,
+		clonePath,
+		probeGit,
 		deviceId,
 		...engine
 	} = options;
@@ -71,6 +74,9 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 				cliNames,
 				findCli,
 				cliToolsFor,
+				// The Clones of the database's own Device, as the daemon wires it.
+				clonePath: clonePath ?? clonePathOf(engine.db),
+				probeGit,
 			},
 			deviceId,
 		),

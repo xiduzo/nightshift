@@ -15,12 +15,12 @@ import type {
 } from "@nightshift/flows";
 
 import type { DeviceRegistry } from "./device/registry";
+import type { WorkRelay } from "./device/remote";
 import type { Device } from "./device/types";
 import type { RunWarningKind } from "./events";
 import type { ArchiveRef } from "./exchange/archive";
 import type { RunCommandInput, RunCommandKind } from "./exchange/commands";
 import type { EngineExchange } from "./exchange/engine-exchange";
-import type { GitProbe } from "./project-setup";
 import type { RunSettings } from "./settings";
 import type { SpaceDocuments } from "./space/document";
 import type { Branches } from "./worktrees";
@@ -120,6 +120,8 @@ export type StepSummary = {
 	costEstimated: boolean;
 	/** Sessions or model calls that ended without a cost: their spend is not in `costUsd`. */
 	costMissing: number;
+	/** The Device the step ran on (its Placement). Null for steps from before Devices named it. */
+	device: RunDevice | null;
 	/**
 	 * A Decision decided by a person (a Gate): what it asked, once it
 	 * opened. Null for every other step. With `outcome` null, the Gate
@@ -164,6 +166,20 @@ export type RunWalker = {
 	thisDevice: boolean;
 };
 
+/** A Device a run names: the Device its steps run on, or one step's. */
+export type RunDevice = RunWalker;
+
+/**
+ * A Device a run of a project can be placed on: one of the Person's own,
+ * online, with a Clone of the project.
+ */
+export type Placement = {
+	deviceId: string;
+	name: string;
+	/** This computer. */
+	thisDevice: boolean;
+};
+
 /** A person's action on a run walked elsewhere, waiting for its Walker. */
 export type PendingCommand = {
 	id: string;
@@ -178,6 +194,12 @@ export type RunSummary = {
 	id: string;
 	projectId: string;
 	walker: RunWalker;
+	/**
+	 * The Device the run's steps run on and its worktree lives on (its
+	 * Placement): the Walker itself, or another Device of the Person who
+	 * started it.
+	 */
+	device: RunDevice;
 	trigger: RunTrigger;
 	/** The Person who started the run. Null for a schedule, and for runs from before Members. */
 	startedBy: RunPerson | null;
@@ -448,6 +470,12 @@ export type StartRunInput = {
 	 * worktree are in their name. Absent: a schedule, or nobody known.
 	 */
 	startedBy?: string;
+	/**
+	 * The Device the run's steps run on, and its worktree's home (its
+	 * Placement): one of the starter's Devices with a Clone of the project
+	 * (`listPlacements`). Default: this computer.
+	 */
+	deviceId?: string;
 } & (
 	| { flowName: string; flow?: never }
 	/** A flow that is not a file, for example a quick run. */
@@ -558,10 +586,21 @@ export interface SpaceEngine {
 	 */
 	moveProject(projectId: string, toSpaceId: string): Promise<void>;
 
+	/**
+	 * The Devices a run of the project can run on, for the actor: this
+	 * computer when it has a Clone, then their other Devices that are
+	 * online and have one. In a Space a Host keeps, the Host answers.
+	 */
+	listPlacements(projectId: string): Promise<Placement[]>;
+
 	/** The local and remote branches of the project's clone, newest first. A run can start from one. */
 	listBranches(projectId: string): Promise<Branches>;
 
-	/** The flow files in the project's clone, `.nightshift/flows/*.json`. */
+	/**
+	 * The flow files in the project's clone, `.nightshift/flows/*.json`:
+	 * this computer's, else the Clone of another of the actor's Devices
+	 * (read-only here).
+	 */
 	listFlows(projectId: string): Promise<FlowListItem[]>;
 	getFlow(projectId: string, name: string): Promise<LoadedFlow>;
 	/** Saves drafts with errors too. Returns the issues of the saved flow. */
@@ -670,6 +709,19 @@ export type Relay = {
 	}): Promise<void>;
 	/** A file of the archive from the Host that keeps the Space. Null when it has none. */
 	archive(ref: ArchiveRef): Promise<string | null>;
+	/**
+	 * Starts a run placed on another Device through the Host that keeps
+	 * the Space: the Host walks it. Returns the run's id; its rows follow
+	 * by the exchange.
+	 */
+	startRun(
+		input: StartRunInput & { spaceId: string; deviceId: string },
+	): Promise<{ runId: string }>;
+	/** The actor's Devices a run of the project can run on, as the Host that keeps the Space knows them. */
+	placements(input: {
+		spaceId: string;
+		projectId: string;
+	}): Promise<Placement[]>;
 };
 
 export type EngineOptions = {
@@ -684,13 +736,18 @@ export type EngineOptions = {
 	walkerId?: string;
 	/**
 	 * This computer as a Device (`localDevice`): its harnesses, decider,
-	 * connections, CLI tools, commands and worktrees. Every step runs on it.
+	 * connections, CLI tools, commands and worktrees. A run's steps run on
+	 * it unless the run is placed on another Device.
 	 */
 	device: Device;
+	/**
+	 * On a Host: how its runs reach the Devices they are placed on (the
+	 * hub those Devices pull their work from). Without it, every run runs
+	 * on this computer.
+	 */
+	work?: WorkRelay;
 	/** Root for transcripts, command logs and other on-disk state, for example ~/.nightshift. */
 	dataDir: string;
-	/** Finds git on this computer before a run starts. Default: `probeGit`. */
-	probeGit?: GitProbe;
 	/** How many runs may run a step at once. A run waiting at a Gate does not count. Default 2. */
 	maxConcurrentRuns?: number;
 	/** Safety net against runaway flows: the most steps one run may take, unless the flow's policy sets `maxSteps`. Default 500. */

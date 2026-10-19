@@ -980,6 +980,109 @@ iroh.
 
 5. **Placement.** Run-level, then per node with the Hand-off;
    `device-offline` sleep and reattach.
+
+   *Landed (part A, run-level Placement through the relay):*
+   - **A run's Device.** `run.device_id` (nullable, no foreign key, like
+     `walker_id`; null: a run from before it, on its Walker) is the Device
+     its steps run on and its worktree lives on. `StartRunInput.deviceId`
+     sets it; default this computer. `deviceFor(node, run)` returns it:
+     `localDevice` for this computer, else `remoteDevice`. Per-node
+     placement changes `deviceFor` only. `StepStarted.deviceId` and
+     `step.device_id` record it per step, as before. Run summaries have
+     `device` beside `walker`; steps have `device`. Exchanged run rows
+     carry `deviceId` (a Device of a version before it sends none). Run
+     bundles are format 5.
+   - **The Device port grew** what a run on another computer needs:
+     `capabilities()` is async and says whose they are (`elsewhere`: null
+     for this computer, else the Device's name); `flows(projectId)` reads
+     the Clone's flow files unparsed (`FlowSources`, plain JSON); `worktree`
+     takes the project, not a path: the Device resolves its own Clone
+     (`clonePathOf`) and checks the folder is ready (git, top level, a
+     commit) before it adds anything, so the readiness check moved from
+     `prepareRun` into `localDevice`. A Call's item branches
+     (`itemBranch`) and its glob source (`files`) run on the worktree's
+     Device too.
+   - **`remoteDevice(relay, device, forRun)`**
+     (`packages/engine/src/device/remote.ts`): every call is a
+     `WorkRequest`, plain data: who asks and for which run (`WorkFor`:
+     Space, project, the Person who starts or started the run as the Host
+     knows them, the run, null before it exists) and the call without its
+     signal. Replies are `WorkReply`: the items of a session or a command,
+     one result, or an error. Aborting the caller's signal cancels the call
+     on the Device. `serveWork(device, request, signal)` runs one on the
+     placed Device's `localDevice`. A stream that ends without its last
+     event becomes the step's end: `stopped` when this side aborted, else
+     an error of kind `network` (the run's policy waits and continues the
+     session, as for a network failure).
+   - **The relay's work half** (`devices.work`, the `relay` permission of a
+     Device key). On a Host, `createWorkHub` (`apps/server/src/devices/
+     work-hub.ts`, in memory) holds the calls of the runs the Host walks,
+     per placed Device. The placed Device takes them as a stream over its
+     own Link (`createWorkServer`, `work.ts`, beside the exchange in
+     `whileOnline`): the Host never dials a Device. It answers with
+     `devices.workReply`, a batch at a time (what accumulates while one is
+     on its way). A cancel follows an abort. A Device whose stream drops
+     keeps its calls for 45 s, then they end with "went offline"; calls
+     made in that window wait for it. A Device that takes its work again
+     names the calls it still serves; any other it took ended there (it
+     restarted, or the call never reached it) and ends with an error.
+     Replies that cannot reach the Host for a minute abort the call on the
+     Device: nothing runs for a Walker that is gone.
+   - **Two checks, two code paths.** The Host, before it places a run
+     (`place` in `engine.ts`): the Device is paired here and not revoked,
+     its owner is the Person who starts the run (another Person's Device
+     is Offers, part B: "colleague-laptop is not your device."), it takes
+     work now, and the Space document has its Clone of the project. The
+     placed Device, for every call, from its own Replica (`checkWork`):
+     the Space is one it takes part in through this Host; the Person is
+     its owner as that Host knows them (`personOnHost`) with a role that
+     allows `run.start` (the Space document's Member mirror, as commands
+     check); it has a Clone of the project in that Space; a call that works
+     in a folder works in the run's own worktree
+     (`worktreeLocation(clone, run8)`), and `worktree` is for the run that
+     asks.
+   - **Who walks.** A run started on the Replica that keeps its Space is
+     walked there, wherever its steps run. A Device whose Space a Host
+     keeps walks a run it starts for itself; a run it starts for another
+     Device goes to the Host (`sync.startRun`, `run.start` checked there)
+     and the Host walks it; the Device returns once the run's rows arrived
+     by the exchange. A schedule's run runs on this computer.
+   - **Run start reads the placed Device**: its flow files, its
+     capabilities (harnesses, connections, CLI tools, programs, decider),
+     its Clone. Refusals name it: "The flow uses the CLI tool "gh" on
+     hetzner-1, but that device does not have it. Install gh there, or
+     choose another device." Agent Profiles stay the Walker's (resolved at
+     start, as slice 1 decided); the profile's Device is part B.
+   - **Placements** (`runs.placements`, `SpaceEngine.listPlacements`): this
+     computer when it has a Clone, then the Person's paired Devices that
+     are online with a Clone; a Device in a Host's Space asks the Host
+     (`sync.placements`). The flows of a project without a Clone here come
+     from the first other placement (read-only). Rename, move and removal
+     of a project are the Space's: they no longer need a Clone here.
+   - **UI.** Start run asks for the Device when there is a choice
+     ("MacBook (this computer)", "hetzner-1"), this computer first; with
+     none online it says so and does not start. The run page: "Runs on"
+     (the run's Device), "Walked by" when that is another computer, "Ran
+     on" per step. Take over shows only for a run whose steps run here.
+     The runs list badges the run's Device.
+   - Tests: `packages/engine/src/device/placement.test.ts` (in-memory
+     relay: the steps and worktree on B, a stop ends B's command, flows from
+     B's Clone, rename and remove without a Clone, the refusals);
+     `apps/server/src/devices/work.test.ts` (`checkWork`, the hub);
+     `apps/server/src/devices/placement.test.ts` (two daemons: A the Host
+     without a Clone lists B's flows and walks a run whose command and
+     fake Claude Code steps run on B, the events and transcript land in A's
+     log, a stop on A kills B's session, another Person's Device is
+     refused).
+   - Not yet (part B): a node's own `device`, the Hand-off, the
+     `device-offline` sleep and reattach (today: a call to a Device that is
+     away ends the step), "Move to…", Offers. The hub forgets its calls
+     when the Host stops; recovery then treats the run as interrupted.
+     Only a Host's runs reach another Device: a `WorkRelay` from a Device
+     through its Host (Walker → Host → placed Device) is not built, so a
+     Device never walks a run placed elsewhere. The transcript of a run
+     walked here is live wherever its steps run (the Walker writes it); a
+     run walked elsewhere still shows a step's transcript when it ends.
 6. **Sharing.** Invitation-only signup, Members and roles, Offers with the
    Device-side checks, audit events, per-Person git identity in worktrees.
 

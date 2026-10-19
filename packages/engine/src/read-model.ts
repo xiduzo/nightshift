@@ -39,6 +39,7 @@ import type {
 	OpenGate,
 	PendingCommand,
 	RunDetail,
+	RunDevice,
 	RunStatus,
 	RunStreamItem,
 	RunSummary,
@@ -165,21 +166,29 @@ function runWarnings(events: readonly LoggedEvent[]): RunWarning[] {
 	}));
 }
 
+/** The Device a run's steps run on: its own, else (a run from before Placement) its Walker. */
+export function runDeviceId(row: Pick<RunRow, "deviceId" | "walkerId">) {
+	return row.deviceId ?? row.walkerId;
+}
+
 /**
  * A run's summary. `names`: the names of the Persons it names (`namesOf`).
- * `walker`: the Device that walks it.
+ * `walker`: the Device that walks it; `device`: the one its steps run on
+ * (default: the Walker).
  */
 export function toSummary(
 	row: RunRow,
 	facts: RunFacts,
 	names: ReadonlyMap<string, string>,
 	walker: RunWalker,
+	device: RunDevice = walker,
 ): RunSummary {
 	const { calls, ...rest } = facts;
 	return {
 		id: row.id,
 		projectId: row.projectId,
 		walker,
+		device,
 		startedBy: runPerson(row.startedBy, names),
 		flowName: row.flowName,
 		title: row.title,
@@ -332,7 +341,13 @@ function subflowRuns(
 		.sort((a, b) => a.startedAt - b.startedAt);
 }
 
-export function toStepSummary(derived: DerivedStep): StepSummary {
+/** Names a Device by id, as this Replica knows it. */
+export type DeviceNamer = (id: string) => RunDevice;
+
+export function toStepSummary(
+	derived: DerivedStep,
+	deviceOf?: DeviceNamer,
+): StepSummary {
 	return {
 		id: derived.id,
 		nodeId: derived.nodeId,
@@ -369,6 +384,14 @@ export function toStepSummary(derived: DerivedStep): StepSummary {
 			costEstimated: sessionCost(s.ending).estimated,
 		})),
 		...costFields(derived.cost),
+		device:
+			derived.deviceId === null
+				? null
+				: (deviceOf?.(derived.deviceId) ?? {
+						id: derived.deviceId,
+						name: null,
+						thisDevice: false,
+					}),
 		gate: derived.gate
 			? {
 					question: derived.gate.question,
@@ -387,14 +410,17 @@ export function toRunDetail(
 	names: ReadonlyMap<string, string>,
 	walker: RunWalker,
 	commands: PendingCommand[] = [],
+	deviceOf?: DeviceNamer,
 ): RunDetail {
-	// A run walked elsewhere: its worktree is on its Walker, not here.
-	const last = walker.thisDevice ? lastHarnessSession(events) : null;
+	const device = deviceOf?.(runDeviceId(row)) ?? walker;
+	// A run walked or placed elsewhere: its worktree is not on this computer.
+	const last =
+		walker.thisDevice && device.thisDevice ? lastHarnessSession(events) : null;
 	return {
-		...toSummary(row, runFacts(events), names, walker),
+		...toSummary(row, runFacts(events), names, walker, device),
 		flow: parseRunFlow(row),
 		calledFlows: parseCalledFlows(row),
-		steps: deriveSteps(events).map(toStepSummary),
+		steps: deriveSteps(events).map((step) => toStepSummary(step, deviceOf)),
 		// Edges of the top-level flow; body edges count per item.
 		traversals: deriveTraversals(events),
 		takeOverCommand: takeOverCommand(row.worktreePath, last, harnessOf),
@@ -411,7 +437,7 @@ export type ReadModelDeps = {
 	isActive(runId: string): boolean;
 	/** The harness port of that name, for its take-over command. */
 	harnessOf: HarnessOf;
-	/** The Walkers of runs of a Space, by id. */
+	/** The Walkers of runs of a Space (and the Devices their steps run on), by id. */
 	walkers(
 		spaceId: string,
 		ids: readonly string[],
@@ -439,6 +465,18 @@ export type ReadModel = ReturnType<typeof createReadModel>;
 export function createReadModel(deps: ReadModelDeps) {
 	const { db, log, bus, isActive, harnessOf } = deps;
 
+	/** Names the Devices a Space's runs name: their Walkers and Placements. */
+	async function namer(
+		spaceId: string,
+		ids: readonly (string | null)[],
+	): Promise<DeviceNamer> {
+		const known = await deps.walkers(
+			spaceId,
+			ids.filter((id): id is string => id !== null),
+		);
+		return (id) => walkerOf(known, id);
+	}
+
 	async function walkerOfRun(row: RunRow): Promise<RunWalker> {
 		return walkerOf(
 			await deps.walkers(row.spaceId, [row.walkerId]),
@@ -465,9 +503,9 @@ export function createReadModel(deps: ReadModelDeps) {
 			rows.map((r) => r.id),
 			runFacts,
 		);
-		const walkers = await deps.walkers(
+		const deviceOf = await namer(
 			spaceId,
-			rows.map((r) => r.walkerId),
+			rows.flatMap((r) => [r.walkerId, runDeviceId(r)]),
 		);
 		const names = await namesOf(
 			db,
@@ -478,7 +516,8 @@ export function createReadModel(deps: ReadModelDeps) {
 				row,
 				facts.get(row.id) ?? runFacts([]),
 				names,
-				walkerOf(walkers, row.walkerId),
+				deviceOf(row.walkerId),
+				deviceOf(runDeviceId(row)),
 			),
 		);
 	}
@@ -486,7 +525,12 @@ export function createReadModel(deps: ReadModelDeps) {
 	async function getRun(runId: string): Promise<RunDetail> {
 		const row = await getRunRow(db, runId);
 		const events = await log.events(runId);
-		const walker = await walkerOfRun(row);
+		const deviceOf = await namer(row.spaceId, [
+			row.walkerId,
+			runDeviceId(row),
+			...deriveSteps(events).map((s) => s.deviceId),
+		]);
+		const walker = deviceOf(row.walkerId);
 		return toRunDetail(
 			row,
 			events,
@@ -494,6 +538,7 @@ export function createReadModel(deps: ReadModelDeps) {
 			await namesOf(db, [row.startedBy]),
 			walker,
 			walker.thisDevice ? [] : await deps.pendingCommands(runId),
+			deviceOf,
 		);
 	}
 
@@ -618,9 +663,13 @@ export function createReadModel(deps: ReadModelDeps) {
 			yield { kind: "status", status: lastStatus };
 
 			const steps = deriveSteps(events);
+			let deviceOf = await namer(runRow.spaceId, [
+				runRow.walkerId,
+				...steps.map((s) => s.deviceId),
+			]);
 			for (const derived of steps) {
 				if (signal.aborted) return;
-				yield { kind: "step", step: toStepSummary(derived) };
+				yield { kind: "step", step: toStepSummary(derived, deviceOf) };
 			}
 
 			const rows = await db
@@ -667,7 +716,19 @@ export function createReadModel(deps: ReadModelDeps) {
 					const current = deriveSteps(await log.events(runId)).find(
 						(s) => s.id === item.stepId,
 					);
-					if (current) yield { kind: "step", step: toStepSummary(current) };
+					if (current) {
+						if (
+							current.deviceId !== null &&
+							!steps.some((s) => s.deviceId === current.deviceId)
+						) {
+							steps.push(current);
+							deviceOf = await namer(runRow.spaceId, [
+								runRow.walkerId,
+								...steps.map((s) => s.deviceId),
+							]);
+						}
+						yield { kind: "step", step: toStepSummary(current, deviceOf) };
+					}
 					// A step walked elsewhere ended: its transcript is in the archive.
 					if (current && !walker.thisDevice && current.endedAt !== null) {
 						const [row] = rows.filter((r) => r.id === current.id);

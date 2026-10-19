@@ -10,11 +10,19 @@ import type {
 	ValueResult,
 } from "@nightshift/agents/types";
 import { type AgentNode, deciderNameSchema } from "@nightshift/flows";
+import { readFlowSources } from "@nightshift/flows/files";
 
 import { type CliToolGuide, cliToolsInstruction } from "../cli-tools";
 import { spawnCommand } from "../command";
 import { expandMcpServers, type McpExpansion } from "../mcp";
-import { createWorktree } from "../worktrees";
+import { checkProjectFolder, type GitProbe } from "../project-setup";
+import { NOT_ON_THIS_COMPUTER } from "../projects";
+import {
+	createAndCheckoutBranch,
+	createWorktree,
+	currentBranch,
+	freeBranchName,
+} from "../worktrees";
 import { callServerTool } from "./tool-call";
 import type {
 	Capabilities,
@@ -62,6 +70,13 @@ export type LocalDeviceDeps = {
 	 * A new session gets them after its prompt. Without it, nothing.
 	 */
 	cliToolsFor?: (names: readonly string[]) => Promise<CliToolGuide[]>;
+	/**
+	 * The folder of a project's Clone on this computer, or null when it has
+	 * none. Without it, this computer has no Clones: a run cannot start here.
+	 */
+	clonePath?: (projectId: string) => Promise<string | null>;
+	/** Finds git on this computer before a worktree is added. Default: `probeGit`. */
+	probeGit?: GitProbe;
 };
 
 /** What `decide` answers on a Device without a decider (or one that makes no values). */
@@ -163,12 +178,20 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		return decider ? decider.decide(input) : noDecider("decision");
 	}
 
+	/** The folder of the project's Clone here; throws without one. */
+	async function cloneOf(projectId: string): Promise<string> {
+		const path = (await deps.clonePath?.(projectId)) ?? null;
+		if (path === null) throw new Error(NOT_ON_THIS_COMPUTER);
+		return path;
+	}
+
 	return {
 		id: deps.id,
 		name: deps.name,
 		state: () => ({ online: true }),
-		capabilities(query = {}): Capabilities {
+		async capabilities(query = {}): Promise<Capabilities> {
 			return {
+				elsewhere: null,
 				harnesses: (Object.keys(harnesses) as HarnessName[]).filter(
 					(name) => harnessFor(name) !== undefined,
 				),
@@ -195,12 +218,47 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			return callServerTool(server, input);
 		},
 		decide,
-		worktree: (run) =>
-			createWorktree({
-				repoPath: run.repoPath,
+		flows: async (projectId) => readFlowSources(await cloneOf(projectId)),
+		async worktree(run) {
+			const repoPath = await cloneOf(run.projectId);
+			const readiness = await checkProjectFolder(repoPath, {
+				...(deps.probeGit ? { probeGit: deps.probeGit } : {}),
+			});
+			const notReady = readiness.steps.find(
+				(step) => step.status === "failed" && step.id !== "identity",
+			);
+			if (notReady) {
+				throw new Error(
+					`The project is not ready for runs. ${notReady.problem} ${
+						notReady.id === "git"
+							? "Install git, then start the run again."
+							: "Add the project again to fix it."
+					}`,
+				);
+			}
+			return createWorktree({
+				repoPath,
 				shortId: run.id.slice(0, 8),
 				...(run.baseRef !== undefined ? { baseRef: run.baseRef } : {}),
 				...(run.author ? { author: run.author } : {}),
-			}),
+			});
+		},
+		async files({ cwd, glob }) {
+			const paths: string[] = [];
+			for await (const path of new Bun.Glob(glob).scan({
+				cwd,
+				onlyFiles: true,
+			})) {
+				if (path === ".git" || path.startsWith(".git/")) continue;
+				paths.push(path);
+			}
+			return paths.sort();
+		},
+		async itemBranch({ cwd, name, base, fallback }) {
+			const from = base ?? (await currentBranch(cwd)) ?? fallback;
+			const branch = await freeBranchName(cwd, name);
+			await createAndCheckoutBranch(cwd, branch, from);
+			return { branch, base: from };
+		},
 	};
 }

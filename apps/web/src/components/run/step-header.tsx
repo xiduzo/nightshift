@@ -108,6 +108,14 @@ export function StepFacts({ step }: { step: StepSummary }) {
 	if (step.sessions.length > 0) {
 		facts.push({ label: "Sessions", value: step.sessions.length });
 	}
+	if (step.device) {
+		facts.push({
+			label: "Ran on",
+			value: step.device.thisDevice
+				? "This computer"
+				: (step.device.name ?? "Another device"),
+		});
+	}
 	return (
 		<dl className="grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-x-4 gap-y-3">
 			{facts.map((fact) => (
