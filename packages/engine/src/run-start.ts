@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Database } from "@nightshift/db";
-import { type project, run } from "@nightshift/db/schema/nightshift";
+import { run } from "@nightshift/db/schema/nightshift";
 import {
 	type Flow,
 	type FlowIssue,
@@ -23,6 +23,7 @@ import { missingNames } from "./graph/nodes/agent";
 import type { Runner } from "./graph/runner";
 import { resolveInputs } from "./inputs";
 import { checkProjectFolder } from "./project-setup";
+import type { ProjectRow } from "./projects";
 import { runFacts, toSummary } from "./read-model";
 import type { RunLog } from "./run-log";
 import type {
@@ -58,7 +59,6 @@ import { createWorktree } from "./worktrees";
 const TITLE_MAX_CHARS = 80;
 const QUICK_RUN_TITLE = "Quick run";
 
-type ProjectRow = typeof project.$inferSelect;
 type ProfileFor = NonNullable<EngineOptions["profileFor"]>;
 
 export type { DaemonHas, Requirement } from "./graph/context";
@@ -381,6 +381,7 @@ export function createRunStart(deps: RunStartDeps) {
 					worktreePath: worktree.worktreePath,
 					branch: worktree.branch,
 					baseRef: worktree.baseRef,
+					walkerId: await log.walkerId(),
 				})
 				.returning();
 			if (!row) throw new Error("Could not create the run.");

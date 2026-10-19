@@ -3,12 +3,13 @@ import { readFile } from "node:fs/promises";
 import { createDb, type Database } from "@nightshift/db";
 import {
 	agentSession,
+	clone,
 	event,
 	project,
 	run,
 	step,
 } from "@nightshift/db/schema/nightshift";
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, eq, getColumns, sql } from "drizzle-orm";
 import {
 	integer,
 	primaryKey,
@@ -21,7 +22,7 @@ import type { TranscriptEntry } from "./types";
 
 /**
  * A run bundle is one run in its own small SQLite file: the run, its
- * project's name and path, its steps, sessions and events, and the lines of
+ * project and the project's Clones (its folders), its steps, sessions and events, and the lines of
  * its transcripts. The tables keep the names and columns of the daemon's
  * database, so the queries and derivations that read the live log read a
  * bundle too. Nothing from settings, connections or secrets goes in.
@@ -30,7 +31,21 @@ import type { TranscriptEntry } from "./types";
  * scope names the calling step), so the run's own rows hold all of it.
  */
 
-export const RUN_BUNDLE_FORMAT_VERSION = 1;
+/**
+ * The format this Night Shift writes. 2: the project by its remote, with
+ * its Clones; the Walker on runs, steps and events. Format 1 bundles (a
+ * project's `repo_path`, no Walker) still open: see `openRunBundle`.
+ */
+export const RUN_BUNDLE_FORMAT_VERSION = 2;
+
+/** The formats `openRunBundle` reads. */
+const READABLE_FORMATS = [1, RUN_BUNDLE_FORMAT_VERSION];
+
+/**
+ * The Walker and Device of a format 1 bundle's rows: that bundle never
+ * said which computer walked the run.
+ */
+export const UNKNOWN_DEVICE = "unknown";
 
 /** What stands in for a secret value that a bundle leaves out. */
 const MASK = "•••";
@@ -61,11 +76,12 @@ const createdAt =
 /** The live schema's columns, without foreign keys: a bundle is never written again. */
 const DDL = [
 	"CREATE TABLE `bundle` (`key` text PRIMARY KEY, `value` text NOT NULL)",
-	`CREATE TABLE \`project\` (\`id\` text PRIMARY KEY, \`name\` text NOT NULL, \`repo_path\` text NOT NULL, ${createdAt}, \`removed_at\` integer)`,
-	`CREATE TABLE \`run\` (\`id\` text PRIMARY KEY, \`project_id\` text NOT NULL, \`flow_name\` text, \`flow\` text NOT NULL, \`body_flows\` text DEFAULT '{}' NOT NULL, \`title\` text NOT NULL, \`worktree_path\` text NOT NULL, \`branch\` text NOT NULL, \`base_ref\` text NOT NULL, ${createdAt})`,
-	`CREATE TABLE \`step\` (\`id\` text PRIMARY KEY, \`run_id\` text NOT NULL, \`node_id\` text NOT NULL, \`node_type\` text NOT NULL, \`visit\` integer NOT NULL, \`transcript_path\` text NOT NULL, ${createdAt})`,
+	`CREATE TABLE \`project\` (\`id\` text PRIMARY KEY, \`name\` text NOT NULL, \`remote\` text, ${createdAt}, \`removed_at\` integer)`,
+	`CREATE TABLE \`clone\` (\`id\` text PRIMARY KEY, \`project_id\` text NOT NULL, \`device_id\` text NOT NULL, \`path\` text NOT NULL, ${createdAt})`,
+	`CREATE TABLE \`run\` (\`id\` text PRIMARY KEY, \`project_id\` text NOT NULL, \`flow_name\` text, \`flow\` text NOT NULL, \`body_flows\` text DEFAULT '{}' NOT NULL, \`title\` text NOT NULL, \`worktree_path\` text NOT NULL, \`branch\` text NOT NULL, \`base_ref\` text NOT NULL, \`walker_id\` text NOT NULL, ${createdAt})`,
+	`CREATE TABLE \`step\` (\`id\` text PRIMARY KEY, \`run_id\` text NOT NULL, \`node_id\` text NOT NULL, \`node_type\` text NOT NULL, \`visit\` integer NOT NULL, \`transcript_path\` text NOT NULL, \`device_id\` text, ${createdAt})`,
 	`CREATE TABLE \`agent_session\` (\`id\` text PRIMARY KEY, \`run_id\` text NOT NULL, \`step_id\` text NOT NULL, \`harness_session_id\` text, \`prompt\` text NOT NULL, ${createdAt})`,
-	`CREATE TABLE \`event\` (\`seq\` integer PRIMARY KEY, \`run_id\` text, \`step_id\` text, \`session_id\` text, \`type\` text NOT NULL, \`payload\` text DEFAULT '{}' NOT NULL, ${createdAt})`,
+	`CREATE TABLE \`event\` (\`seq\` integer PRIMARY KEY, \`run_id\` text, \`step_id\` text, \`session_id\` text, \`type\` text NOT NULL, \`payload\` text DEFAULT '{}' NOT NULL, ${createdAt}, \`walker_id\` text NOT NULL, \`walker_seq\` integer NOT NULL)`,
 	"CREATE TABLE `transcript` (`step_id` text NOT NULL, `line_no` integer NOT NULL, `seq` integer NOT NULL, `json` text NOT NULL, PRIMARY KEY (`step_id`, `line_no`))",
 ];
 
@@ -110,6 +126,10 @@ export async function exportRun(options: {
 		.select()
 		.from(project)
 		.where(eq(project.id, runRow.projectId));
+	const clones = await db
+		.select()
+		.from(clone)
+		.where(eq(clone.projectId, runRow.projectId));
 	const steps = await db
 		.select()
 		.from(step)
@@ -131,6 +151,7 @@ export async function exportRun(options: {
 	try {
 		for (const statement of DDL) await out.run(sql.raw(statement));
 		if (projectRow) await out.insert(project).values(projectRow);
+		if (clones.length > 0) await out.insert(clone).values(clones);
 		await out.insert(run).values({
 			...runRow,
 			title: redact.text(runRow.title),
@@ -198,6 +219,8 @@ export async function exportRun(options: {
 export type RunBundle = {
 	meta: RunBundleMeta;
 	project: typeof project.$inferSelect | null;
+	/** The project's folders, one per Device. */
+	clones: (typeof clone.$inferSelect)[];
 	run: typeof run.$inferSelect;
 	steps: (typeof step.$inferSelect)[];
 	sessions: (typeof agentSession.$inferSelect)[];
@@ -226,33 +249,18 @@ export async function openRunBundle(path: string): Promise<RunBundle> {
 			]),
 		);
 		const formatVersion = Number(meta.get("format_version"));
-		if (formatVersion !== RUN_BUNDLE_FORMAT_VERSION) {
+		if (!READABLE_FORMATS.includes(formatVersion)) {
 			throw new Error(
-				`${path} is a run bundle of format ${formatVersion}. This Night Shift reads format ${RUN_BUNDLE_FORMAT_VERSION}.`,
+				`${path} is a run bundle of format ${formatVersion}. This Night Shift reads format ${READABLE_FORMATS.join(" and ")}.`,
 			);
 		}
 		const runId = String(meta.get("run_id"));
-		const [runRow] = await db.select().from(run).where(eq(run.id, runId));
+		const rows =
+			formatVersion === 1
+				? await readFormat1(db, runId)
+				: await readRows(db, runId);
+		const { run: runRow, project: projectRow, clones, steps, sessions } = rows;
 		if (!runRow) throw new Error(`${path} has no run ${runId}.`);
-		const [projectRow] = await db
-			.select()
-			.from(project)
-			.where(eq(project.id, runRow.projectId));
-		const steps = await db
-			.select()
-			.from(step)
-			.where(eq(step.runId, runId))
-			.orderBy(asc(step.createdAt));
-		const sessions = await db
-			.select()
-			.from(agentSession)
-			.where(eq(agentSession.runId, runId))
-			.orderBy(asc(agentSession.createdAt));
-		const events = await db
-			.select()
-			.from(event)
-			.where(eq(event.runId, runId))
-			.orderBy(asc(event.seq));
 		return {
 			meta: {
 				formatVersion,
@@ -263,10 +271,11 @@ export async function openRunBundle(path: string): Promise<RunBundle> {
 				redacted: Number(meta.get("redacted") ?? 0),
 			},
 			project: projectRow ?? null,
+			clones,
 			run: runRow,
 			steps,
 			sessions,
-			events: events.map(parseEventRow),
+			events: rows.events.map(parseEventRow),
 			async transcript(stepId) {
 				const query = db.select({ json: transcript.json }).from(transcript);
 				const rows = await (stepId
@@ -281,6 +290,111 @@ export async function openRunBundle(path: string): Promise<RunBundle> {
 		db.$client.close();
 		throw error;
 	}
+}
+
+type BundleRows = {
+	project: typeof project.$inferSelect | undefined;
+	clones: (typeof clone.$inferSelect)[];
+	run: typeof run.$inferSelect | undefined;
+	steps: (typeof step.$inferSelect)[];
+	sessions: (typeof agentSession.$inferSelect)[];
+	events: (typeof event.$inferSelect)[];
+};
+
+/** A format 2 bundle: the live schema's tables. */
+async function readRows(db: Database, runId: string): Promise<BundleRows> {
+	const [runRow] = await db.select().from(run).where(eq(run.id, runId));
+	const projectId = runRow?.projectId ?? "";
+	const [projectRow] = await db
+		.select()
+		.from(project)
+		.where(eq(project.id, projectId));
+	return {
+		project: projectRow,
+		clones: await db.select().from(clone).where(eq(clone.projectId, projectId)),
+		run: runRow,
+		steps: await db
+			.select()
+			.from(step)
+			.where(eq(step.runId, runId))
+			.orderBy(asc(step.createdAt)),
+		sessions: await sessionsOf(db, runId),
+		events: await db
+			.select()
+			.from(event)
+			.where(eq(event.runId, runId))
+			.orderBy(asc(event.seq)),
+	};
+}
+
+/**
+ * A format 1 bundle, read as format 2: the project's `repo_path` is its one
+ * Clone, it has no remote, and every row's Walker is `UNKNOWN_DEVICE`.
+ */
+async function readFormat1(db: Database, runId: string): Promise<BundleRows> {
+	const { walkerId: _walker, ...runColumns } = getColumns(run);
+	const { deviceId: _device, ...stepColumns } = getColumns(step);
+	const {
+		walkerId: _eventWalker,
+		walkerSeq: _walkerSeq,
+		...eventColumns
+	} = getColumns(event);
+	const { remote: _remote, ...projectColumns } = getColumns(project);
+
+	const [runRow] = await db
+		.select(runColumns)
+		.from(run)
+		.where(eq(run.id, runId));
+	const [projectRow] = await db
+		.select({ ...projectColumns, repoPath: sql<string>`repo_path` })
+		.from(project)
+		.where(eq(project.id, runRow?.projectId ?? ""));
+	const steps = await db
+		.select(stepColumns)
+		.from(step)
+		.where(eq(step.runId, runId))
+		.orderBy(asc(step.createdAt));
+	const events = await db
+		.select(eventColumns)
+		.from(event)
+		.where(eq(event.runId, runId))
+		.orderBy(asc(event.seq));
+	return {
+		project: projectRow && {
+			id: projectRow.id,
+			name: projectRow.name,
+			remote: null,
+			createdAt: projectRow.createdAt,
+			removedAt: projectRow.removedAt,
+		},
+		clones: projectRow
+			? [
+					{
+						id: projectRow.id,
+						projectId: projectRow.id,
+						deviceId: UNKNOWN_DEVICE,
+						path: projectRow.repoPath,
+						createdAt: projectRow.createdAt,
+					},
+				]
+			: [],
+		run: runRow ? { ...runRow, walkerId: UNKNOWN_DEVICE } : undefined,
+		steps: steps.map((s) => ({ ...s, deviceId: null })),
+		sessions: await sessionsOf(db, runId),
+		events: events.map((e) => ({
+			...e,
+			walkerId: UNKNOWN_DEVICE,
+			walkerSeq: e.seq,
+		})),
+	};
+}
+
+function sessionsOf(db: Database, runId: string) {
+	return db
+		.select()
+		.from(agentSession)
+		.where(eq(agentSession.runId, runId))
+		.orderBy(asc(agentSession.createdAt));
 }
 
 /** Rows in slices: SQLite takes at most 32766 bound values per statement. */

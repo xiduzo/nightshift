@@ -36,6 +36,7 @@ import {
 	LEASE_HEARTBEAT_MS,
 	type Lease,
 	LeaseHeldError,
+	selfDevice,
 	setUpGit,
 	systemGitInstaller,
 } from "@nightshift/engine";
@@ -118,6 +119,9 @@ export const lease = held.nightshiftLease;
 
 export const auth = createAuth(ENV, db, desktopOrigins);
 
+/** This computer's Device: the Walker of its runs, the owner of its Clones. */
+export const device = await selfDevice(db);
+
 /** The environment is the fallback of every setting and every `${NAME}`. */
 const env: Record<string, string | undefined> = { ...process.env, ...ENV };
 
@@ -153,6 +157,7 @@ hot.nightshiftScheduler = scheduler;
 
 export const engine = await createEngine({
 	db,
+	walkerId: device.id,
 	harnesses: {
 		// Each harness spawns its CLI only when an Agent node names it.
 		"claude-code": perSession("claude-code", () =>
@@ -224,6 +229,7 @@ export const projectSetup: Context["projectSetup"] = {
 
 export const daemon: Context["daemon"] = {
 	dataDir,
+	device,
 	lease: {
 		host: lease.host,
 		pid: lease.pid,

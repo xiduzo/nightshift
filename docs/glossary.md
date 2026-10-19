@@ -14,7 +14,12 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 
 | Term | Meaning | Source |
 |------|---------|--------|
-| Project | A local clone that Runs can start in. | Slice 1 |
+| Project | A repository, by its remote: the normalised `origin` (`github.com/acme/app`), so its ssh and https URLs are one Project. Its folders are its Clones. A repository without a remote is a Project on one Device only. | Devices |
+| Clone | A Project's repository on one Device, at a path. A Device has at most one Clone of a Project. Adding a folder whose `origin` names a known Project makes a Clone of it, not a second Project. | Devices |
+| Device | A computer that runs Night Shift, with its own database. One row of the `device` table is this computer: made on the first start, with a random id that never changes and the host name as its name. | Devices |
+| Walker | The Device that walks a Run and writes its Events. Today every Run's Walker is this computer. | Devices |
+| Owner | The one Device that writes a row. Sync never merges two writers of one row: a Run's rows and Events are its Walker's, a Clone is its Device's. | Devices |
+| Replica | A Device's own database: everything it may see, as far as it has synced. Today, the only one. | Devices |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
 | Node | One step of a Flow: Agent, Command, Tool, Decision, Value, Wait, or Subflow (`call` in the file). Its id is also its name in templates. | PLAN §3 |
 | Agent Node | A Node that runs one Session on its Harness, with a prompt or a skill (with arguments), a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. The agent picks its Outcome in its Step Report, or a Checker picks it. | PLAN §3 |
@@ -72,7 +77,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Starter | A small Flow in `examples/starters/` to copy into a Project. | Slice 6 |
 | Transcript | The structured record of a Step: agent messages, tool calls, and command output, on disk. | Slice 1 |
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |
-| Event | One appended record of a fact that changed. | Slice 1 |
+| Event | One appended record of a fact that changed. Its identity is its Walker and its number among that Walker's Events (`walker_seq`); `seq` is only the order it landed in this Replica. | Slice 1 |
 | Event Log | The append-only list of Events: the read model. Run status is derived from it, never from a Checkpoint. | Slice 1 |
 | Run Bundle | One Run exported as its own SQLite file: its rows, its Events, and its Transcripts, in the daemon's table names. Secret values are masked. | Run export |
 | Run Log | The daemon's copy in memory of each Run's Events. Every append goes through it, and it keeps an Event only after the database has it. | Run state |
@@ -123,6 +128,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | ProjectAdded | A clone became a Project. |
 | ProjectRemoved | A person removed a Project. Its Runs and Events stay. |
 | ProjectRestored | A removed Project's clone was added again. |
+| CloneAdded | A folder became a Project's Clone on a Device: its `origin` named a known Project, or the Clone moved to a new folder. |
 | RunStarted | A Run began, with its copy of the Flow. |
 | WorktreeCreated | A Worktree was created for a Run. |
 | RunResumed | A person resumed a Run, or the daemon did after a restart (`by: "daemon"`). |

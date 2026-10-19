@@ -58,7 +58,13 @@ export {
 	type RunBundle,
 	type RunBundleMeta,
 	type RunBundleSummary,
+	UNKNOWN_DEVICE,
 } from "./run-bundle";
+export {
+	hostDeviceName,
+	type SelfDevice,
+	selfDevice,
+} from "./self-device";
 export {
 	createSettingsStore,
 	type RunSettings,

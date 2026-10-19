@@ -420,6 +420,8 @@ export async function beginStep(
 			nodeType: node.type,
 			visit,
 			transcriptPath: path,
+			// Until steps are placed, every step runs on its run's Walker.
+			deviceId: ctx.run.walkerId,
 		});
 		await ctx.log.append({
 			type: "StepStarted",

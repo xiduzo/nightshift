@@ -140,7 +140,7 @@ export async function startRun(
 	const flows = options.flows ?? {};
 	await db
 		.insert(project)
-		.values({ id: projectId, name: "repo", repoPath: sandbox.repoPath })
+		.values({ id: projectId, name: "repo" })
 		.onConflictDoNothing();
 	await db.insert(run).values({
 		id: runId,
@@ -152,6 +152,7 @@ export async function startRun(
 		worktreePath: sandbox.repoPath,
 		branch: options.branch ?? "nightshift/test",
 		baseRef: "main",
+		walkerId: sandbox.deviceId,
 	});
 	const log = createRunLog(db);
 	await log.append({
