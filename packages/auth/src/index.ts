@@ -13,7 +13,7 @@ import { PAIRING_CODE_TTL, PAIRING_POLL_INTERVAL } from "./pairing";
 import { activeSpaceId, ensurePersonalSpace } from "./spaces";
 
 export type { Permissions, Role } from "./access";
-export { statements } from "./access";
+export { roleAllows, statements } from "./access";
 export type { Space } from "./spaces";
 
 export type AuthConfig = {
@@ -23,6 +23,15 @@ export type AuthConfig = {
 };
 
 const PERSONAL = "Nobody can join a personal Space. Create a Space to share.";
+
+export type AuthOptions = {
+	/**
+	 * A Space was made, or its Members changed (added, removed, a new role,
+	 * an accepted invitation). The daemon mirrors the Members into the
+	 * Space's document.
+	 */
+	onMembersChanged?: (spaceId: string) => Promise<void>;
+};
 
 /**
  * Better Auth with the organization plugin: a Space is an organization.
@@ -38,7 +47,11 @@ export function createAuth(
 	env: AuthConfig,
 	database: Database,
 	desktopOrigins: readonly string[] = [],
+	options: AuthOptions = {},
 ) {
+	const membersChanged = async (data: { organization: { id: string } }) => {
+		await options.onMembersChanged?.(data.organization.id);
+	};
 	return betterAuth({
 		database: drizzleAdapter(database, {
 			provider: "sqlite",
@@ -111,6 +124,11 @@ export function createAuth(
 							refuse("A personal Space stays as long as its Person.");
 						}
 					},
+					afterCreateOrganization: membersChanged,
+					afterAddMember: membersChanged,
+					afterRemoveMember: membersChanged,
+					afterUpdateMemberRole: membersChanged,
+					afterAcceptInvitation: membersChanged,
 				},
 			}),
 		],
@@ -121,7 +139,8 @@ export function createAuth(
  * The device authorization plugin, typed by name: its inferred type names a
  * type `better-call` does not export, which a declaration cannot name.
  */
-type PairingPlugin = ReturnType<typeof deviceAuthorization<undefined>>;
+export interface PairingPlugin
+	extends ReturnType<typeof deviceAuthorization<undefined>> {}
 
 function pairingPlugin(): PairingPlugin {
 	return deviceAuthorization({

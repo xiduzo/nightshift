@@ -18,6 +18,7 @@ import type { DeviceRegistry } from "./device/registry";
 import type { Device } from "./device/types";
 import type { GitProbe } from "./project-setup";
 import type { RunSettings } from "./settings";
+import type { SpaceDocuments } from "./space/document";
 import type { Branches } from "./worktrees";
 
 /**
@@ -43,6 +44,17 @@ export type Project = {
 	/** The normalised `origin` (`github.com/acme/app`), null without one. */
 	remote: string | null;
 	createdAt: number;
+	/** The Devices with a Clone of it, from the Space document: this one first. */
+	clones: ProjectClone[];
+};
+
+/** That a Device has a Clone of a Project. Its path is that Device's own. */
+export type ProjectClone = {
+	deviceId: string;
+	/** The Device's name, as the Space document has it. */
+	deviceName: string | null;
+	/** This computer. */
+	thisDevice: boolean;
 };
 
 /**
@@ -416,6 +428,14 @@ export interface SpaceEngine {
 	addProject(input: { repoPath: string; name?: string }): Promise<Project>;
 	/** Keeps the project's runs and events. Fails while one of its runs is running. */
 	removeProject(projectId: string): Promise<void>;
+	/** Gives the project a new name, for every Member of the Space. */
+	renameProject(projectId: string, name: string): Promise<Project>;
+	/**
+	 * Moves the project to another Space, with its Clones, runs, steps,
+	 * sessions and events. Who may move it (in both Spaces) is the caller's
+	 * check. Fails while one of its runs is running.
+	 */
+	moveProject(projectId: string, toSpaceId: string): Promise<void>;
 
 	/** The local and remote branches of the project's clone, newest first. A run can start from one. */
 	listBranches(projectId: string): Promise<Branches>;
@@ -539,4 +559,9 @@ export type EngineOptions = {
 	 * refuses to start. Without it, no profile exists.
 	 */
 	profileFor?: (name: string) => AgentProfileSettings | null;
+	/**
+	 * The Space documents, where Projects are defined. The daemon passes
+	 * the ones the relay serves. Default: new ones over `db`.
+	 */
+	spaceDocuments?: SpaceDocuments;
 };

@@ -131,6 +131,9 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		if (link.role !== "home" || !options.document) return;
 		const url = new URL("/sync", address);
 		url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+		// Bun's WebSocket does not fall back from `::1` to `127.0.0.1` as its
+		// fetch does, and a daemon on this computer listens on `127.0.0.1`.
+		if (url.hostname === "localhost") url.hostname = "127.0.0.1";
 		provider = new HocuspocusProvider({
 			websocketProvider: new HocuspocusProviderWebsocket({
 				url: url.toString(),

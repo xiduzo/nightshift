@@ -119,6 +119,10 @@ export type EnginePayloads = {
 	DeviceOnline: { deviceId: string };
 	/** On a Host: the Device's link went silent, or its access was removed. */
 	DeviceOffline: { deviceId: string };
+	/** A person gave the project a new name. */
+	ProjectRenamed: { projectId: string; name: string };
+	/** A person moved the project, with its Clones, runs and events, to another Space. */
+	ProjectMoved: { projectId: string; from: string; to: string };
 	RunStarted: {
 		projectId: string;
 		flowName: string | null;

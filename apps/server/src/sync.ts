@@ -3,7 +3,9 @@ import type { Auth } from "@nightshift/auth";
 import { isDeviceKey } from "@nightshift/auth/device-keys";
 import type { LocalSession } from "@nightshift/auth/local-session";
 import { requestAccess } from "@nightshift/auth/request";
+import { roleIn } from "@nightshift/auth/spaces";
 import type { Database } from "@nightshift/db";
+import { spaceIdOf } from "@nightshift/engine/space/document";
 import type { Server, ServerWebSocket, WebSocketHandler } from "bun";
 import * as Y from "yjs";
 
@@ -22,10 +24,21 @@ import { isThisComputer } from "./this-computer";
  */
 
 /**
- * Who may open which document. Throws or returns false to refuse. An
- * object allows, and becomes the connection's context (`disconnect`
- * matches on it).
+ * What a client may do with a document: change it, only read it (a
+ * read-only connection: Hocuspocus drops its updates), or nothing.
  */
+export type SyncAccess = "write" | "read" | false;
+
+/**
+ * Access with the connection's context: `disconnect` matches on it (a
+ * Device whose access was removed).
+ */
+export type SyncGrant = {
+	access: Exclude<SyncAccess, false>;
+	context: Record<string, unknown>;
+};
+
+/** Who may open which document. Throws or returns false to refuse. */
 export type SyncAuthorize = (request: {
 	documentName: string;
 	/** The token the client sent (the provider's `token`). */
@@ -34,9 +47,7 @@ export type SyncAuthorize = (request: {
 	peer: string | null;
 	/** The upgrade request: its headers carry `Origin` and the session cookie. */
 	request: Request;
-}) => SyncAllowed | Promise<SyncAllowed>;
-
-export type SyncAllowed = boolean | Record<string, unknown>;
+}) => SyncAccess | SyncGrant | Promise<SyncAccess | SyncGrant>;
 
 /**
  * Documents a daemon keeps for others: a Host keeps the Device documents
@@ -89,15 +100,23 @@ export function createSync(options: {
 
 	const hocuspocus = new Hocuspocus({
 		quiet: true,
-		async onAuthenticate({ documentName, token, request, context }) {
+		async onAuthenticate({
+			documentName,
+			token,
+			request,
+			context,
+			connectionConfig,
+		}) {
 			const peer = (context as { peer?: string | null }).peer ?? null;
 			const known =
 				options.document(documentName) !== null || (await isKept(documentName));
-			const allowed =
+			const granted =
 				known &&
 				(await options.authorize({ documentName, token, peer, request }));
-			if (!allowed) throw new Error("Not allowed.");
-			return typeof allowed === "object" ? allowed : undefined;
+			const access = typeof granted === "object" ? granted.access : granted;
+			if (!access) throw new Error("Not allowed.");
+			connectionConfig.readOnly = access === "read";
+			return typeof granted === "object" ? granted.context : undefined;
 		},
 		async onLoadDocument({ documentName, document }) {
 			const owned = options.document(documentName);
@@ -182,19 +201,24 @@ export function createSync(options: {
 }
 
 /**
- * The Device document opens for its owner only: the Person whose session
- * the request carries. A request from this computer (`isThisComputer`)
- * without a session of its own gets the local Person's session, exactly
- * as the procedures do, so one rule decides both.
+ * Who may open which document, by its kind. The request's session decides:
+ * a request from this computer (`isThisComputer`) without a session of its
+ * own gets the local Person's session, exactly as the procedures do, so
+ * one rule decides both.
  *
- * Another Device of the same owner opens it with its Device key (the
- * provider's token), but only on its home Host: a key of a Device that
- * joined this daemon as a guest Host opens no Device document. A token
- * that is a Device key never falls back to the session rules. On a Host,
- * the owner of a document it keeps for a paired Device is that Device's
- * owner (`keptOwner`).
+ * - `device:<id>`: its owner, to change it. On a Host, the owner of a
+ *   document it keeps for a paired Device is that Device's owner
+ *   (`keptOwner`).
+ * - `space:<id>`: a Member of that Space, read-only. A Yjs update cannot
+ *   be checked per action (a rename, a removal), so every write to a
+ *   Space document goes through the procedures, which check the role
+ *   and log an event.
+ *
+ * A token that is a Device key (`deviceKey`) is a Device, never a session:
+ * it opens its own Device document, only on its home Host (to change it),
+ * and the Space documents of the Spaces its owner is a Member of (to read).
  */
-export function ownerOnly(options: {
+export function documentAccess(options: {
 	auth: Auth;
 	db: Database;
 	localSession: LocalSession;
@@ -209,12 +233,22 @@ export function ownerOnly(options: {
 	 */
 	deviceKey?: (token: string) => Promise<SyncDeviceKey | null>;
 }): SyncAuthorize {
+	const ownerOf = async (documentName: string) =>
+		(await options.keptOwner?.(documentName)) ?? options.ownerId;
 	return async ({ documentName, token, request, peer }) => {
-		const owner = (await options.keptOwner?.(documentName)) ?? options.ownerId;
 		if (isDeviceKey(token)) {
 			const key = await options.deviceKey?.(token);
-			if (!key?.home || key.personId !== owner) return false;
-			return { deviceId: key.deviceId };
+			if (!key) return false;
+			const context = { deviceId: key.deviceId };
+			if (documentName.startsWith("device:")) {
+				const own =
+					documentName === `device:${key.deviceId}` &&
+					key.home &&
+					(await ownerOf(documentName)) === key.personId;
+				return own ? { access: "write", context } : false;
+			}
+			const access = await spaceAccess(options.db, key.personId, documentName);
+			return access ? { access, context } : false;
 		}
 		const local = isThisComputer(
 			peer,
@@ -227,8 +261,25 @@ export function ownerOnly(options: {
 			request.headers,
 			local ? options.localSession : null,
 		);
-		return session?.user.id === owner;
+		if (!session) return false;
+		if (documentName.startsWith("device:")) {
+			return session.user.id === (await ownerOf(documentName))
+				? "write"
+				: false;
+		}
+		return spaceAccess(options.db, session.user.id, documentName);
 	};
+}
+
+/** A Space document: read-only for a Member of that Space. */
+async function spaceAccess(
+	db: Database,
+	personId: string,
+	documentName: string,
+): Promise<SyncAccess> {
+	const spaceId = spaceIdOf(documentName);
+	if (!spaceId) return false;
+	return (await roleIn(db, personId, spaceId)) === null ? false : "read";
 }
 
 /** A Device key as the relay needs it. */

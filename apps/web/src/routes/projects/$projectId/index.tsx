@@ -6,6 +6,7 @@ import { useState } from "react";
 import { FlowHealth } from "@/components/dashboard/flow-health";
 import { NeedsYou } from "@/components/dashboard/needs-you";
 import { NightOutput } from "@/components/dashboard/night-output";
+import { ProjectClones } from "@/components/dashboard/project-clones";
 import { RunOutcomes } from "@/components/dashboard/run-outcomes";
 import { UpNext } from "@/components/dashboard/up-next";
 import { QuickRunDialog } from "@/components/new-run-form";
@@ -77,6 +78,8 @@ function ProjectDashboardComponent() {
 					</div>
 
 					<FlowHealth projectId={project.id} runs={runs.data} />
+
+					<ProjectClones project={project} />
 
 					<QuickRunDialog
 						projectId={project.id}

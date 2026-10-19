@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 
-import { type Auth, createAuth } from "./index";
+import { type Auth, type AuthOptions, createAuth } from "./index";
 
 /** Test helpers: a migrated temp database with Better Auth on it. */
 
@@ -16,7 +16,9 @@ export type AuthSandbox = {
 	cleanup(): void;
 };
 
-export async function createAuthSandbox(): Promise<AuthSandbox> {
+export async function createAuthSandbox(
+	options: AuthOptions = {},
+): Promise<AuthSandbox> {
 	const root = mkdtempSync(join(tmpdir(), "nightshift-auth-"));
 	const db = createDb({ DATABASE_URL: `file:${join(root, "nightshift.db")}` });
 	await migrateDb(db);
@@ -27,6 +29,8 @@ export async function createAuthSandbox(): Promise<AuthSandbox> {
 			CORS_ORIGIN: "http://localhost:3001",
 		},
 		db,
+		[],
+		options,
 	);
 	return {
 		db,

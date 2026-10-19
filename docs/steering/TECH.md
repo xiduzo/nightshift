@@ -17,7 +17,7 @@ Last updated: 2026-10-19
 | API contract | oRPC with Zod | oRPC 1.15, Zod 4.5 |
 | Database | libsql (SQLite file) with Drizzle ORM | libsql 0.5, Drizzle 1.0.0-rc |
 | Auth | Better Auth | 1.7 |
-| Document sync | Yjs, served by Hocuspocus on Bun's WebSockets (the Device document) | Yjs 13.6, Hocuspocus 4.7 |
+| Document sync | Yjs, served by Hocuspocus on Bun's WebSockets (the Device and Space documents) | Yjs 13.6, Hocuspocus 4.7 |
 | Agents | `@tanstack/ai` with harness adapters (`ai-claude-code`, `ai-opencode`, `ai-codex`) | ai 0.69, claude-code 0.9, opencode 0.5, codex 0.6 (planned, not installed yet) |
 | Flow editor | React Flow (`@xyflow/react`) | 12.12 (planned, not installed yet) |
 | Tooling | Turborepo, Biome, Lefthook, varlock | Turbo 2.10, Biome 2.5 |

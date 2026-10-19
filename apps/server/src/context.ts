@@ -40,9 +40,10 @@ export async function createContext({
 	context,
 }: CreateContextOptions): Promise<ApiContext> {
 	const deviceKey = await host.keyOf(context.req.raw.headers);
-	const { session, spaceId, can, setActiveSpace, headers } = deviceKey
-		? await requestAccess(auth, db, new Headers(), null)
-		: await access(context);
+	const { session, spaceId, can, setActiveSpace, createSpace, headers } =
+		deviceKey
+			? await requestAccess(auth, db, new Headers(), null)
+			: await access(context);
 	return {
 		session,
 		spaceId,
@@ -51,6 +52,7 @@ export async function createContext({
 		headers,
 		deviceKey,
 		devices,
+		createSpace,
 		db,
 		engine,
 		settings,

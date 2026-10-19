@@ -1,10 +1,38 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import type { Database } from "@nightshift/db";
-import { clone, project } from "@nightshift/db/schema/nightshift";
-import { and, asc, eq, getColumns, isNull } from "drizzle-orm";
+import { organization } from "@nightshift/db/schema/auth";
+import {
+	agentSession,
+	clone,
+	device,
+	event,
+	project,
+	run,
+	step,
+} from "@nightshift/db/schema/nightshift";
+import {
+	and,
+	asc,
+	eq,
+	getColumns,
+	inArray,
+	isNull,
+	or,
+	sql,
+} from "drizzle-orm";
 
 import type { RunLog } from "./run-log";
+import {
+	cloneKey,
+	projectClones,
+	projectEntry,
+	recordClone,
+	type SpaceDocument,
+	type SpaceDocuments,
+	type SpaceProject,
+	spaceProjectSchema,
+} from "./space/document";
 import type { Project } from "./types";
 import { originUrl, resolveRepoTopLevel } from "./worktrees";
 
@@ -23,6 +51,10 @@ import { originUrl, resolveRepoTopLevel } from "./worktrees";
  *   their Clone here. Rows from before the Clone table get theirs this way
  *   (a migration cannot run git). A remote another Project already has
  *   stays off: the two stay apart, as they were.
+ * - A Project's definition (name, remote, removed) is written to its Space
+ *   document; the `project` row follows as its projection before the call
+ *   returns. A Clone here is a `clone` row (with its path) and an entry in
+ *   the Space document (without one).
  */
 
 /** A project row with the path of its Clone on this computer. */
@@ -33,22 +65,82 @@ export type ProjectsDeps = {
 	log: RunLog;
 	/** This computer's Device id. */
 	deviceId(): Promise<string>;
+	/** The Space documents: the source of the Projects' definitions. */
+	documents: SpaceDocuments;
 };
 
 export type Projects = ReturnType<typeof createProjects>;
 
-export function toProject(row: ProjectRow): Project {
+/**
+ * The engine's Project: the row, with the Devices that have a Clone of it
+ * (from the Space document).
+ */
+export function toProject(
+	row: ProjectRow,
+	document: SpaceDocument,
+	deviceId: string,
+): Project {
+	const clones = projectClones(document, row.id).map((c) => ({
+		deviceId: c.deviceId,
+		deviceName: c.deviceName,
+		thisDevice: c.deviceId === deviceId,
+	}));
+	// A row the document has not seen yet still has its Clone here.
+	if (!clones.some((c) => c.thisDevice)) {
+		clones.unshift({ deviceId, deviceName: null, thisDevice: true });
+	}
 	return {
 		id: row.id,
 		name: row.name,
 		repoPath: row.repoPath,
 		remote: row.remote,
 		createdAt: row.createdAt.getTime(),
+		clones,
 	};
 }
 
 export function createProjects(deps: ProjectsDeps) {
-	const { db, log } = deps;
+	const { db, log, documents } = deps;
+
+	/**
+	 * Changes the Project's entry in its Space document. An entry the
+	 * document lacks (a row from before it) starts from the row.
+	 */
+	async function define(
+		row: typeof project.$inferSelect,
+		change: Partial<SpaceProject>,
+	): Promise<void> {
+		const document = await documents.open(row.spaceId);
+		const parsed = spaceProjectSchema.safeParse(document.projects.get(row.id));
+		const entry = parsed.success ? parsed.data : projectEntry(row);
+		await document.change(() => {
+			document.projects.set(row.id, {
+				...entry,
+				...change,
+				updatedAt: Date.now(),
+			} satisfies SpaceProject);
+		});
+	}
+
+	/** Records this Device's Clone of the Project in its Space document. */
+	async function recordCloneHere(
+		projectId: string,
+		spaceId: string,
+		deviceId: string,
+	): Promise<void> {
+		const [self] = await db
+			.select({ name: device.name })
+			.from(device)
+			.where(eq(device.id, deviceId));
+		const document = await documents.open(spaceId);
+		await document.change(() =>
+			recordClone(document, {
+				projectId,
+				deviceId,
+				deviceName: self?.name ?? deviceId,
+			}),
+		);
+	}
 
 	/** Projects with a Clone on this computer, with its path, removed ones too. */
 	async function withClone(where?: ReturnType<typeof and>) {
@@ -66,15 +158,22 @@ export function createProjects(deps: ProjectsDeps) {
 
 	async function restore(row: ProjectRow): Promise<ProjectRow> {
 		if (row.removedAt === null) return row;
-		await db
-			.update(project)
-			.set({ removedAt: null })
-			.where(eq(project.id, row.id));
+		await define(row, { removedAt: null });
 		await log.append({
 			type: "ProjectRestored",
 			payload: { projectId: row.id },
 		});
 		return { ...row, removedAt: null };
+	}
+
+	/** The project's row, removed or not. */
+	async function rowOf(projectId: string) {
+		const [row] = await db
+			.select()
+			.from(project)
+			.where(eq(project.id, projectId));
+		if (!row) throw new Error(`Project not found: ${projectId}`);
+		return row;
 	}
 
 	/** Only the Space's projects; every Space's without one (background work). */
@@ -154,6 +253,7 @@ export function createProjects(deps: ProjectsDeps) {
 						path,
 					});
 				}
+				await recordCloneHere(known.id, spaceId, deviceId);
 				await log.append({
 					type: "CloneAdded",
 					payload: { projectId: known.id, deviceId, path },
@@ -161,16 +261,26 @@ export function createProjects(deps: ProjectsDeps) {
 				return restore({ ...known, repoPath: path });
 			}
 
+			// The Space document defines the Project; its row follows.
 			const id = randomUUID();
 			const name = input.name ?? path.split("/").at(-1) ?? path;
-			const [row] = await db
-				.insert(project)
-				.values({ id, spaceId, name, remote })
-				.returning();
+			const document = await documents.open(spaceId);
+			const now = Date.now();
+			await document.change(() => {
+				document.projects.set(id, {
+					name,
+					remote,
+					createdAt: now,
+					removedAt: null,
+					updatedAt: now,
+				} satisfies SpaceProject);
+			});
+			const [row] = await db.select().from(project).where(eq(project.id, id));
 			if (!row) throw new Error("Could not add the project.");
 			await db
 				.insert(clone)
 				.values({ id: randomUUID(), spaceId, projectId: id, deviceId, path });
+			await recordCloneHere(id, spaceId, deviceId);
 			await log.append({
 				type: "ProjectAdded",
 				payload: { projectId: id, name, repoPath: path, remote },
@@ -180,13 +290,109 @@ export function createProjects(deps: ProjectsDeps) {
 
 		/** Marks a project removed. Its runs, events and Clones stay. */
 		async remove(projectId: string): Promise<void> {
-			await db
-				.update(project)
-				.set({ removedAt: new Date() })
-				.where(eq(project.id, projectId));
+			await define(await rowOf(projectId), { removedAt: Date.now() });
 			await log.append({
 				type: "ProjectRemoved",
 				payload: { projectId },
+			});
+		},
+
+		/** Gives the project a new name, in its Space document and its row. */
+		async rename(projectId: string, name: string): Promise<void> {
+			const row = await rowOf(projectId);
+			if (row.name === name) return;
+			await define(row, { name });
+			await log.append({
+				type: "ProjectRenamed",
+				payload: { projectId, name },
+			});
+		},
+
+		/**
+		 * Moves the project to another Space: its row, Clones, runs, steps,
+		 * sessions and events take the new Space in one transaction. Then
+		 * the new Space's document gets its entry and Clones, and the old
+		 * one loses them. `ProjectMoved` is logged in the new Space.
+		 */
+		async move(projectId: string, from: string, to: string): Promise<void> {
+			if (from === to) return;
+			const [target] = await db
+				.select({ id: organization.id })
+				.from(organization)
+				.where(eq(organization.id, to));
+			if (!target) throw new Error("That Space does not exist.");
+			const row = await rowOf(projectId);
+			if (row.spaceId !== from) {
+				throw new Error(`Project not found: ${projectId}`);
+			}
+			const runs = db
+				.select({ id: run.id })
+				.from(run)
+				.where(eq(run.projectId, projectId));
+			await db.transaction(async (tx) => {
+				await tx
+					.update(project)
+					.set({ spaceId: to })
+					.where(eq(project.id, projectId));
+				await tx
+					.update(clone)
+					.set({ spaceId: to })
+					.where(eq(clone.projectId, projectId));
+				await tx
+					.update(step)
+					.set({ spaceId: to })
+					.where(inArray(step.runId, runs));
+				await tx
+					.update(agentSession)
+					.set({ spaceId: to })
+					.where(inArray(agentSession.runId, runs));
+				await tx
+					.update(event)
+					.set({ spaceId: to })
+					.where(
+						or(
+							inArray(event.runId, runs),
+							and(
+								isNull(event.runId),
+								sql`json_extract(${event.payload}, '$.projectId') = ${projectId}`,
+							),
+						),
+					);
+				await tx
+					.update(run)
+					.set({ spaceId: to })
+					.where(eq(run.projectId, projectId));
+			});
+
+			const source = await documents.open(from);
+			const destination = await documents.open(to);
+			const parsed = spaceProjectSchema.safeParse(
+				source.projects.get(projectId),
+			);
+			const entry = parsed.success ? parsed.data : projectEntry(row);
+			const clones = projectClones(source, projectId);
+			await destination.change(() => {
+				destination.projects.set(projectId, {
+					...entry,
+					updatedAt: Date.now(),
+				} satisfies SpaceProject);
+				for (const c of clones) {
+					recordClone(destination, {
+						projectId,
+						deviceId: c.deviceId,
+						deviceName: c.deviceName ?? c.deviceId,
+					});
+				}
+			});
+			await source.change(() => {
+				source.projects.delete(projectId);
+				for (const c of clones) {
+					source.clones.delete(cloneKey(projectId, c.deviceId));
+				}
+			});
+			await log.append({
+				type: "ProjectMoved",
+				payload: { projectId, from, to },
 			});
 		},
 
@@ -201,7 +407,7 @@ export function createProjects(deps: ProjectsDeps) {
 					.from(project)
 					.where(eq(project.remote, remote));
 				if (taken) continue;
-				await db.update(project).set({ remote }).where(eq(project.id, row.id));
+				await define(row, { remote });
 			}
 		},
 	};

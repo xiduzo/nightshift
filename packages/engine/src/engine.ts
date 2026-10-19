@@ -26,7 +26,7 @@ import {
 } from "./events";
 import { getRunRow as getRunRowOf, type RunRow } from "./graph/context";
 import { createRunner } from "./graph/runner";
-import { createProjects, toProject } from "./projects";
+import { createProjects, type ProjectRow, toProject } from "./projects";
 import { createReadModel, parseCalledFlows, parseRunFlow } from "./read-model";
 import { createRecovery } from "./recovery";
 import { createRunLog, type RunLog } from "./run-log";
@@ -37,6 +37,7 @@ import {
 	type ScheduleRecord,
 } from "./scheduler";
 import { defaultRunSettings, type RunSettings } from "./settings";
+import { createSpaceDocuments } from "./space/document";
 import type {
 	Engine,
 	EngineOptions,
@@ -63,6 +64,8 @@ import { listBranches } from "./worktrees";
  * - `read-model.ts`: the summaries, `getRun`, `listGates`, `watchRun`.
  * - `scheduler.ts`: starts the runs of `.nightshift/schedules.json`.
  * - `projects.ts`: projects by remote and their Clones on this computer.
+ *   A project is defined in its Space document (`space/document.ts`);
+ *   its `project` row is the document's projection.
  *
  * Spaces: `createEngine` returns the Device's engine; `space(id)` is what a
  * person does in one Space. Every method of that view reads and touches
@@ -127,10 +130,12 @@ export function createEngine(
 	const runLog =
 		internals.runLog ??
 		createRunLog(db, options.walkerId ? { walkerId: options.walkerId } : {});
+	const documents = options.spaceDocuments ?? createSpaceDocuments({ db });
 	const projects = createProjects({
 		db,
 		log: runLog,
 		deviceId: runLog.walkerId,
+		documents,
 	});
 	let disposed = false;
 	internals.signal?.addEventListener(
@@ -170,11 +175,15 @@ export function createEngine(
 		...(internals.signal ? { signal: internals.signal } : {}),
 	});
 
-	const ready = recovery.recoverInterruptedWork().then(() =>
-		// Projects from before Clones get their remote. A git that fails
-		// leaves it for the next start.
-		projects.readRemotes().catch(() => {}),
-	);
+	const ready = recovery
+		.recoverInterruptedWork()
+		// Every Space's document: Projects from before it are imported once.
+		.then(() => documents.openAll())
+		.then(() =>
+			// Projects from before Clones get their remote. A git that fails
+			// leaves it for the next start.
+			projects.readRemotes().catch(() => {}),
+		);
 	// Every method awaits `ready` and sees the error there.
 	ready.catch(() => {});
 
@@ -249,31 +258,66 @@ export function createEngine(
 		return { ...record, runStatus: await reads.runStatus(record.runId) };
 	}
 
+	/** Rows as the engine's Projects, with their Clones from the Space document. */
+	async function withClones(spaceId: string, rows: ProjectRow[]) {
+		const document = await documents.open(spaceId);
+		const deviceId = await runLog.walkerId();
+		return rows.map((row) => toProject(row, document, deviceId));
+	}
+
+	/** Refuses while a run of the project runs a step. */
+	async function noActiveRun(projectId: string, what: string) {
+		const runs = await db
+			.select({ id: run.id })
+			.from(run)
+			.where(eq(run.projectId, projectId));
+		if (runs.some((r) => runner.isActive(r.id))) {
+			throw new Error(
+				`A run of this project is still running. Stop it to ${what}.`,
+			);
+		}
+		return runs;
+	}
+
 	/** What a person does in one Space. */
 	function space(spaceId: string): SpaceEngine {
 		return {
 			async listProjects() {
 				await ready;
-				return (await projects.list(spaceId)).map(toProject);
+				return withClones(spaceId, await projects.list(spaceId));
 			},
 
 			async addProject(input) {
 				await ready;
-				return toProject(await projects.add(input, spaceId));
+				const [added] = await withClones(spaceId, [
+					await projects.add(input, spaceId),
+				]);
+				if (!added) throw new Error("Could not add the project.");
+				return added;
+			},
+
+			async renameProject(projectId, name) {
+				await ready;
+				await getProjectRow(projectId, spaceId);
+				await projects.rename(projectId, name);
+				const [renamed] = await withClones(spaceId, [
+					await getProjectRow(projectId, spaceId),
+				]);
+				if (!renamed) throw new Error(`Project not found: ${projectId}`);
+				return renamed;
+			},
+
+			async moveProject(projectId, toSpaceId) {
+				await ready;
+				await getProjectRow(projectId, spaceId);
+				await noActiveRun(projectId, "move the project");
+				await projects.move(projectId, spaceId, toSpaceId);
 			},
 
 			async removeProject(projectId) {
 				await ready;
 				await getProjectRow(projectId, spaceId);
-				const runs = await db
-					.select({ id: run.id })
-					.from(run)
-					.where(eq(run.projectId, projectId));
-				if (runs.some((r) => runner.isActive(r.id))) {
-					throw new Error(
-						"A run of this project is still running. Stop it first.",
-					);
-				}
+				const runs = await noActiveRun(projectId, "remove the project");
 				for (const r of runs) {
 					const status = deriveRunState(await loadRunEvents(r.id)).status;
 					if (status === "waiting") {

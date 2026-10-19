@@ -2,9 +2,11 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuGroup,
+	DropdownMenuItem,
 	DropdownMenuLabel,
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
 import {
@@ -15,9 +17,16 @@ import {
 } from "@nightshift/ui/components/sidebar";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronsUpDownIcon, UserIcon, UsersIcon } from "lucide-react";
+import {
+	ChevronsUpDownIcon,
+	PlusIcon,
+	UserIcon,
+	UsersIcon,
+} from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
+import { CreateSpaceDialog } from "@/components/create-space-dialog";
 import { Logo } from "@/components/logo";
 import { orpc } from "@/utils/orpc";
 
@@ -29,11 +38,13 @@ const spaceName = (space: { name: string; personal: boolean }) =>
  * The Space switcher, after the team switcher of the shadcn `sidebar-07`
  * block: the Space you work in, and the others you are a member of, the
  * personal one first. Switching shows that Space's projects, runs and Gates.
+ * "Create Space" makes a new one, with you as its owner.
  */
 export function SpaceSwitcher() {
 	const { isMobile } = useSidebar();
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
+	const [creating, setCreating] = useState(false);
 	const spaces = useQuery(orpc.spaces.list.queryOptions());
 	const active = spaces.data?.spaces.find(
 		(space) => space.id === spaces.data?.active,
@@ -111,8 +122,21 @@ export function SpaceSwitcher() {
 								})}
 							</DropdownMenuRadioGroup>
 						</DropdownMenuGroup>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem
+							className="gap-2 p-2"
+							onClick={() => setCreating(true)}
+						>
+							<span className="flex size-6 items-center justify-center rounded-md border bg-transparent">
+								<PlusIcon className="size-3.5" aria-hidden="true" />
+							</span>
+							<span className="font-medium text-muted-foreground">
+								Create Space
+							</span>
+						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
+				<CreateSpaceDialog open={creating} onOpenChange={setCreating} />
 			</SidebarMenuItem>
 		</SidebarMenu>
 	);

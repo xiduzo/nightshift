@@ -36,6 +36,7 @@ import {
 	createHostLinks,
 	createProfileStore,
 	createSettingsStore,
+	createSpaceDocuments,
 	type DeviceDocument,
 	deviceKeyStore,
 	documentRows,
@@ -47,6 +48,7 @@ import {
 	localDevice,
 	openDeviceDocument,
 	refreshDeviceFacts,
+	type SpaceDocuments,
 	selfDevice,
 	setUpGit,
 	systemGitInstaller,
@@ -62,7 +64,7 @@ import {
 } from "./devices";
 import { certificateFingerprint } from "./devices/tls";
 import { desktopOrigins, ENV, trustedOrigins } from "./env.server";
-import { createSync, ownerOnly, type Sync } from "./sync";
+import { createSync, documentAccess, type Sync } from "./sync";
 
 /** The database, the transcripts and the command logs, together. */
 const dev = ENV.NIGHTSHIFT_DEV === "true";
@@ -88,8 +90,14 @@ if (legacyPaths.length > 0) {
 export const db = createDb({ DATABASE_URL: databaseUrl(ENV, dataDir) });
 await migrateDb(db);
 
-/** This Device's document, once it is open (below). Kept across `bun --hot` reloads. */
-const opened = globalThis as { nightshiftDocument?: DeviceDocument };
+/**
+ * This Device's document and the Space documents, once they are open
+ * (below). Kept across `bun --hot` reloads, so each has one writer.
+ */
+const opened = globalThis as {
+	nightshiftDocument?: DeviceDocument;
+	nightshiftSpaces?: SpaceDocuments;
+};
 
 /**
  * One daemon per database: take the lease before the engine recovers
@@ -125,9 +133,12 @@ async function holdLease(): Promise<Lease> {
 	// gives the lease up, so the next daemon starts at once.
 	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
 		process.once(signal, () => {
-			const pending = opened.nightshiftDocument?.flush();
+			const pending = [
+				opened.nightshiftDocument?.flush(),
+				opened.nightshiftSpaces?.flush(),
+			];
 			void Promise.race([
-				Promise.all([pending, lease.release()]),
+				Promise.all([...pending, lease.release()]),
 				Bun.sleep(2_000),
 			])
 				.catch(() => {})
@@ -146,7 +157,17 @@ const held = globalThis as { nightshiftLease?: Lease };
 held.nightshiftLease ??= await holdLease();
 export const lease = held.nightshiftLease;
 
-export const auth = createAuth(ENV, db, desktopOrigins);
+/**
+ * The Space documents: each Space's Projects, Clones (existence only) and
+ * Members. The engine defines Projects in them, the relay serves them to
+ * Members, and the auth hooks keep their Members in step.
+ */
+opened.nightshiftSpaces ??= createSpaceDocuments({ db });
+export const spaces = opened.nightshiftSpaces;
+
+export const auth = createAuth(ENV, db, desktopOrigins, {
+	onMembersChanged: (spaceId) => spaces.mirrorMembers(spaceId),
+});
 
 /** This computer's Device: the Walker of its runs, the owner of its Clones. */
 export const device = await selfDevice(db);
@@ -166,6 +187,10 @@ export const document = opened.nightshiftDocument;
 
 /** The Person who owns this computer, and their personal Space. */
 const person = await localPerson(db);
+
+// Every Space's document, before the relay serves them: the Projects of a
+// Replica from before them are imported here, once.
+await spaces.openAll();
 
 /**
  * One person on one computer signs in to nothing: a request from this
@@ -224,14 +249,15 @@ facts.nightshiftFacts.unref();
  */
 const relay = globalThis as { nightshiftSync?: Sync };
 relay.nightshiftSync ??= createSync({
-	document: (name) => (name === document.name ? document.doc : null),
+	document: (name) =>
+		name === document.name ? document.doc : (spaces.byName(name)?.doc ?? null),
 	// On a Host: the documents of the Devices whose home Host this is.
 	kept: {
 		has: async (name) =>
 			(await engine.devices.keptDocumentOwner(name)) !== null,
 		...documentRows(db),
 	},
-	authorize: ownerOnly({
+	authorize: documentAccess({
 		auth,
 		db,
 		localSession,
@@ -316,6 +342,7 @@ export const engine = await createEngine({
 	dataDir,
 	settings: () => settings.run(),
 	profileFor: (name) => profiles.settingsFor(name),
+	spaceDocuments: spaces,
 	// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.
 	// Otherwise the Settings switch is read on every tick.
 	scheduler:

@@ -24,12 +24,13 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Owner | The one Device that writes a row. Sync never merges two writers of one row: a Run's rows and Events are its Walker's, a Clone is its Device's. | Devices |
 | Replica | A Device's own database: everything it may see, as far as it has synced. Today, the only one. | Devices |
 | Device document | A Device's configuration as one Yjs document, `device:<id>`: its Agent Profiles, CLI Tools, Connections, Settings, and its facts (harnesses, programs, secret names, Clones). Its Device is its Owner: it applies edits and saves the document in its Replica. Syncs at `/sync`, to its owner only: their sessions, and their other Devices on the Device's Home Host. Never holds a secret value. | Devices, slice 3 |
-| Host | A Device with "Be a Host" on: other Devices pair with it and connect to it. It has addresses (`https://` names, in the order to try them). It listens on this computer only until one of them is `https://`. It records each paired Device and keeps it online while its Link answers. Not an authority over a Device's data. | Devices, slice 4 |
+| Host | A Device with "Be a Host" on: other Devices pair with it and connect to it. It has addresses (`https://` names, in the order to try them). It listens on this computer only (`127.0.0.1`) until one of them is `https://`. It records each paired Device and keeps it online while its Link answers. Not an authority over a Device's data. | Devices, slice 4 |
 | Home Host | The one Host that keeps a Device's Device document. A Device has at most one. Its other Devices of the same owner open the document there. | Devices, slice 4 |
 | Guest Host | Any other Host a Device paired with: it gets the shared Spaces of the Device's owner there, never the Device document. | Devices, slice 4 |
 | Pairing | Joining a Device to a Host: `bun run join <host>` shows a code, a Person signed in on the Host enters it under Devices → Pair a device and allows it, and the Device gets its Device key. Device authorization (RFC 8628). | Devices, slice 4 |
 | Device key | What a paired Device signs in with on a Host: an API key of the Person who allowed the pairing, with the Device's id. Hashed on the Host; on the Device, in the keychain or a file only its user can read. Narrower than its Person: `sync`, `relay`, `archive`. Expires after days without use; "Remove access" deletes it. The UI says "access", not "key". | Devices, slice 4 |
 | Link | A Device's outbound connection to one Host (a port; `httpsLink` is its adapter): oRPC with the Device key and the relay's WebSocket to the same address. It tries the Host's addresses in order, keeps the first that answers, and sends a heartbeat. The Host never calls into a Device. | Devices, slice 4 |
+| Space document | A Space's definitions as one Yjs document, `space:<id>`: its Projects (name, remote, removed), which Devices have a Clone of each (never the path), and a mirror of its Members. Members read it at `/sync`; they change it only through Night Shift's actions (add, rename, remove, move a Project), which check their role and log an event. The Replica's project rows follow it. | Devices, slice 3 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
 | Node | One step of a Flow: Agent, Command, Tool, Decision, Value, Wait, or Subflow (`call` in the file). Its id is also its name in templates. | PLAN §3 |
 | Agent Node | A Node that runs one Session on its Harness, with a prompt or a skill (with arguments), a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. The agent picks its Outcome in its Step Report, or a Checker picks it. | PLAN §3 |
@@ -140,6 +141,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | ProjectRemoved | A person removed a Project. Its Runs and Events stay. |
 | ProjectRestored | A removed Project's clone was added again. |
 | CloneAdded | A folder became a Project's Clone on a Device: its `origin` named a known Project, or the Clone moved to a new folder. |
+| ProjectRenamed | A person gave a Project a new name. |
+| ProjectMoved | A person moved a Project, with its Clones, Runs and Events, from one Space to another. |
 | RunStarted | A Run began, with its copy of the Flow. |
 | WorktreeCreated | A Worktree was created for a Run. |
 | RunResumed | A person resumed a Run, or the daemon did after a restart (`by: "daemon"`). |

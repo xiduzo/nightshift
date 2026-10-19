@@ -31,9 +31,14 @@ export function reachFor(settings: {
 		: "this-computer";
 }
 
-/** The hostname Bun binds for a reach. */
+/**
+ * The hostname Bun binds for a reach. This computer: the IPv4 loopback.
+ * `127.0.0.1` callers reach it directly, and a `localhost` caller (curl, a
+ * browser, Bun's fetch) falls back from `::1` to it. Bun's own `localhost`
+ * binds `::1` only, which `127.0.0.1` callers cannot reach.
+ */
 export const LISTEN_HOSTNAME: Record<Reach, string> = {
-	"this-computer": "localhost",
+	"this-computer": "127.0.0.1",
 	network: "0.0.0.0",
 };
 

@@ -121,6 +121,13 @@ afterAll(async () => {
 });
 
 describe("two Devices", () => {
+	test("a daemon that is not a Host answers on 127.0.0.1 and localhost", async () => {
+		const port = new URL(b.url).port;
+		for (const host of ["127.0.0.1", "localhost"]) {
+			expect(await (await fetch(`http://${host}:${port}/`)).text()).toBe("OK");
+		}
+	});
+
 	test("B joins A, A's Person approves, B syncs its document with A, revoking ends B's link", async () => {
 		// B asks to join, from the command line: it prints the code.
 		const cli = Bun.spawn(
@@ -170,7 +177,7 @@ describe("two Devices", () => {
 		const copy = new Y.Doc();
 		const provider = new HocuspocusProvider({
 			websocketProvider: new HocuspocusProviderWebsocket({
-				url: `${a.url.replace("http", "ws")}/sync`,
+				url: `ws://127.0.0.1:${new URL(a.url).port}/sync`,
 			}),
 			name: `device:${bId}`,
 			document: copy,

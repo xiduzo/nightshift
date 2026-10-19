@@ -680,6 +680,74 @@ iroh.
    - Not yet: the Space document (part B), a UI that syncs the document
      live (the UI still reads and writes through oRPC; the Owner applies
      those writes to the document).
+
+   *Landed (part B, the Space document):*
+   - **One Yjs document per Space**, `space:<id>`, in `ydoc` like the
+     Device document (`packages/engine/src/space/document.ts`; both open
+     through `openPersistedDocument`, `packages/engine/src/ydoc.ts`). Its
+     maps: `projects` (id → name, remote, created, removed, updated),
+     `clones` (`<project>/<device>` → that the Device has a Clone, and
+     since when), `devices` (id → name, for the Devices with a Clone),
+     `offers` (empty until slice 6), `members` (user id → name, role) and
+     `meta`. A Clone's path is never in it: it stays in the Device's
+     `clone` row and its Device document.
+   - **The document is the source, the rows its projection.** The
+     Replica's `project` rows follow the document after every write, the
+     in the same queue as the save
+     (`projectSpace`): a new entry makes a row, a changed one updates
+     name, remote and removed. Engine queries stay in SQL. A projection
+     never deletes a row and never takes a row of another Space (only a
+     move changes a Project's Space); an entry the rows refuse (a remote
+     another Project has) is skipped and tried again on the next write.
+     `clone` rows stay the Device's own: SQL holds this Device's Clones
+     with their paths, the document holds every Device's without.
+   - **Import once.** The first open of a Space's document copies that
+     Space's `project` rows and its Clones' existence in, and records it in
+     `meta.importedAt`. The daemon and the engine open the document of
+     every Space the Replica knows at start (`openAll`: each organization,
+     and each Space a project row names) before the relay serves them.
+   - **The engine writes the document.** Adding a Project defines it in
+     the document first; its row follows before the call returns. Restore,
+     remove, rename and `readRemotes` change the entry, not the row. A
+     Clone added here is a `clone` row and a `clones` entry. An entry the
+     document lacks (a row from before it) starts from the row. New
+     events: `ProjectRenamed` and `ProjectMoved`. The engine logs the facts
+     it makes, and nothing else writes the document.
+   - **Members mirrored from auth.** On open, and from the organization
+     plugin's hooks (a Space made, a Member added or removed, a new role,
+     an invitation accepted: `createAuth(…, { onMembersChanged })`), the
+     Space's `member` and `user` rows are written into `members`.
+   - **Who may open it** (`documentAccess`, `apps/server/src/sync.ts`,
+     which `ownerOnly` became): `device:<id>` its owner, as before;
+     `space:<id>` a Member of that Space, by the same session rule, always
+     read-only (Hocuspocus's `connectionConfig.readOnly`: it drops the
+     client's updates). Anyone else is refused. The authorize function
+     returns `SyncAccess` (`"write"`, `"read"` or `false`).
+   - **Writes to a Space document go through the procedures.** A Yjs
+     update is a merge of bytes, not an action: the relay cannot tell a
+     rename from a removal, so it cannot check `project.remove` or log
+     `ProjectRemoved`. The procedures can: they check the role with
+     `hasPermission`, the engine writes the document and logs the event,
+     and the relay carries the change to every Member. Slice 6 lets
+     colleagues in, so no Member writes a Space document directly.
+   - **Create Space** (`spaces.create`, the Space switcher): the
+     organization plugin's `createOrganization`, slug `<name>-<8 hex>`, the
+     creator its owner, and the session's active Space. The hook opens its
+     document. The personal Space stays closed to others (slice 2's hooks).
+   - **Move to Space** (`projects.move`, the project card's menu): needs
+     `project.move` in both Spaces (`can(permissions, inSpace)`), and no
+     run of the project running a step. One SQL transaction gives the new
+     `space_id` to the project, its Clones, runs, steps, sessions and
+     events (the runs' events, and the project's facts of no run by
+     `payload.projectId`). Then the new Space's document gets the entry
+     and its Clones, the old one loses them, and `ProjectMoved` (`from`,
+     `to`) is logged in the new Space. The rows and the documents are not
+     one transaction: a stop between them leaves the entry in the old
+     document, whose projection cannot take the row back.
+   - **Projects per Space** show their Clones: the engine's `Project` has
+     `clones` (Device id, its name from the document, `thisDevice`). The
+     project dashboard lists them: "This computer", then other Devices by
+     name (none until slice 4). A project can be renamed from its card.
 4. **A second Device.** Pairing by device authorization; the event log
    exchange; the archive; inbox and runs from both Devices on both.
 
@@ -688,10 +756,14 @@ iroh.
      (`hostAddresses`, ordered, `https://`; `http://` on loopback for
      tests and development) and `deviceKeyIdleDays` (default 30) are
      settings in the Device document, with `NIGHTSHIFT_HOST` and
-     `NIGHTSHIFT_HOST_ADDRESSES` as fallbacks. A daemon binds `localhost`
+     `NIGHTSHIFT_HOST_ADDRESSES` as fallbacks. A daemon binds `127.0.0.1`
      until it is a Host with an `https://` address, then `0.0.0.0`
      (`reachFor`, read at start: the Devices page says when a restart
-     applies a change). The desktop app binds the same. Not a Host: no
+     applies a change). The desktop app binds the same. `127.0.0.1`, not
+     Bun's `localhost` (which binds `::1` only): `127.0.0.1` callers reach
+     it, and `localhost` callers (curl, browsers, Bun's fetch) fall back to
+     it. Bun's WebSocket does not fall back, so the Link dials `127.0.0.1`
+     for a `localhost` Host. Not a Host: no
      pairing, no Device key accepted (`hello` answers "not a Host", which
      a Device treats as offline, not as revoked).
    - **Certificates.** A Host behind an authority's certificate (Tailscale
@@ -736,9 +808,12 @@ iroh.
      nsd_…` is a Device: no session, never the local session, even from
      loopback. `deviceProcedure("sync")` takes it (`link.hello`,
      `link.heartbeat`); `pairing.start` and `pairing.redeem` are public.
-     On the relay, `ownerOnly` takes a Device key as the provider token:
-     the key's Person must own the document, and its Device must be home
-     here (`deviceKey` → `{ deviceId, personId, home }`). A Host keeps the
+     On the relay, `documentAccess` takes a Device key as the provider
+     token (`deviceKey` → `{ deviceId, personId, home }`): it opens the
+     Device's own document, only on its home Host and only for the
+     document's owner, to write; and the Space documents of the Spaces
+     its Person is a Member of, to read. Any other document is refused,
+     the Host's own Device document too. A Host keeps the
      Device documents of its home Devices (`KeptDocuments`: Hocuspocus
      loads and stores them in the Replica's `ydoc` rows); a guest Host
      keeps none, and refuses them.

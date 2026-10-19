@@ -18,7 +18,7 @@ describe("secure by default", () => {
 				hostAddresses: ["http://localhost:3000", "https://studio.local"],
 			}),
 		).toBe("network");
-		expect(LISTEN_HOSTNAME["this-computer"]).toBe("localhost");
+		expect(LISTEN_HOSTNAME["this-computer"]).toBe("127.0.0.1");
 	});
 
 	test("join addresses are https://, or http:// on this computer", () => {

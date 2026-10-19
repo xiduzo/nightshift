@@ -111,4 +111,16 @@ export {
 	type SettingsView,
 	settingsPatchSchema,
 } from "./settings";
+export {
+	createSpaceDocuments,
+	projectClones,
+	type SpaceClone,
+	type SpaceDocument,
+	type SpaceDocuments,
+	type SpaceMember,
+	type SpaceProject,
+	spaceDocumentName,
+	spaceIdOf,
+	spaceProjects,
+} from "./space/document";
 export type * from "./types";
