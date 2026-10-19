@@ -5,7 +5,7 @@ import type {
 	HostLinks,
 	HostRole,
 } from "@nightshift/engine";
-import { isHostAddress, SECOND_HOME } from "@nightshift/engine";
+import { isHostAddress, isLoopbackHost, SECOND_HOME } from "@nightshift/engine";
 
 import { hostClient } from "./host-client";
 import { hostCertificate } from "./tls";
@@ -62,8 +62,8 @@ export async function* joinHost(
 	yield {
 		kind: "code",
 		userCode: code.userCode,
-		verificationUri: code.verificationUri,
-		verificationUriComplete: code.verificationUriComplete,
+		verificationUri: hostPage(code.verificationUri, address),
+		verificationUriComplete: hostPage(code.verificationUriComplete, address),
 		fingerprint: pinned?.fingerprint ?? null,
 		expiresAt: Date.now() + code.expiresIn * 1000,
 	};
@@ -134,6 +134,24 @@ export function hostOrigin(url: string): string {
 		);
 	}
 	return new URL(withScheme).origin;
+}
+
+/**
+ * A page of the Host, as this computer can open it. A Host names its pages
+ * by the address of its own UI. On the desktop app that is `localhost`:
+ * from another computer it is this computer's own Night Shift, so no page.
+ */
+export function hostPage(page: string, address: string): string | null {
+	let url: URL;
+	try {
+		url = new URL(page);
+	} catch {
+		return null;
+	}
+	if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+	const remote = !isLoopbackHost(new URL(address).hostname);
+	if (remote && isLoopbackHost(url.hostname)) return null;
+	return url.toString();
 }
 
 /**

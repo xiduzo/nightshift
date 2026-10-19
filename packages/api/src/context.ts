@@ -350,8 +350,13 @@ export type JoinProgress =
 	| {
 			kind: "code";
 			userCode: string;
-			verificationUri: string;
-			verificationUriComplete: string;
+			/**
+			 * The Host's page where the Person enters the code, and the same
+			 * page with the code filled in. Null when this computer cannot
+			 * open it: the Host names its own `localhost`.
+			 */
+			verificationUri: string | null;
+			verificationUriComplete: string | null;
 			/** The fingerprint of the Host's self-signed certificate, pinned on approval. */
 			fingerprint: string | null;
 			expiresAt: number;

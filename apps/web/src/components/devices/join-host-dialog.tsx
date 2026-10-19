@@ -31,7 +31,7 @@ import {
 } from "@nightshift/ui/components/radio-group";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useQueryClient } from "@tanstack/react-query";
-import { ShieldCheckIcon } from "lucide-react";
+import { CopyIcon, ExternalLinkIcon, ShieldCheckIcon } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -48,6 +48,8 @@ type Step =
 	| {
 			kind: "code";
 			userCode: string;
+			/** The Host's page with the code filled in, when this computer can open it. */
+			page: string | null;
 			fingerprint: string | null;
 			expiresAt: number;
 	  };
@@ -110,6 +112,7 @@ function JoinHostSteps({
 					setStep({
 						kind: "code",
 						userCode: next.userCode,
+						page: next.verificationUriComplete,
 						fingerprint: next.fingerprint,
 						expiresAt: next.expiresAt,
 					});
@@ -132,43 +135,7 @@ function JoinHostSteps({
 	}
 
 	if (step.kind === "code") {
-		return (
-			<>
-				<DialogHeader>
-					<DialogTitle>Enter this code on the Host</DialogTitle>
-					<DialogDescription>
-						On the Host, open Devices, choose Pair a device, and enter this
-						code. This computer connects as soon as you allow it there.
-					</DialogDescription>
-				</DialogHeader>
-				<p className="text-center font-mono font-semibold text-3xl tracking-widest">
-					{formatUserCode(step.userCode)}
-				</p>
-				{step.fingerprint ? (
-					<Alert>
-						<ShieldCheckIcon />
-						<AlertTitle>Check the fingerprint</AlertTitle>
-						<AlertDescription>
-							The Host uses its own certificate. Allow this computer only if the
-							Host shows this fingerprint:
-							<span className="mt-1 block break-all font-mono text-xs">
-								{step.fingerprint}
-							</span>
-						</AlertDescription>
-					</Alert>
-				) : null}
-				<p className="flex items-center gap-2 text-muted-foreground text-sm">
-					<Spinner />
-					Waiting for the Host. The code works until{" "}
-					{new Date(step.expiresAt).toLocaleTimeString()}.
-				</p>
-				<DialogFooter>
-					<DialogClose render={<Button variant="outline" />}>
-						Cancel
-					</DialogClose>
-				</DialogFooter>
-			</>
-		);
+		return <CodeStep step={step} />;
 	}
 
 	const starting = step.kind === "starting";
@@ -257,5 +224,80 @@ function JoinHostSteps({
 				</Button>
 			</DialogFooter>
 		</form>
+	);
+}
+
+/**
+ * The code to allow on the Host. With the Host's page, one click opens it
+ * with the code filled in. Without it, the Person enters the code there.
+ */
+function CodeStep({ step }: { step: Extract<Step, { kind: "code" }> }) {
+	const code = formatUserCode(step.userCode);
+	async function copy() {
+		try {
+			await navigator.clipboard.writeText(code);
+			toast.success("Code copied");
+		} catch {
+			toast.error("Could not copy. Allow this page to use the clipboard.");
+		}
+	}
+	return (
+		<>
+			<DialogHeader>
+				<DialogTitle>Allow this computer on the Host</DialogTitle>
+				<DialogDescription>
+					{step.page
+						? "Open the Host, sign in, and allow this computer. It connects as soon as you do."
+						: "On the Host, open Devices, choose Pair a device, and enter this code. This computer connects as soon as you allow it there."}
+				</DialogDescription>
+			</DialogHeader>
+			<div className="flex items-center justify-center gap-2">
+				<p className="font-mono font-semibold text-3xl tracking-widest">
+					{code}
+				</p>
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					aria-label="Copy the code"
+					onClick={() => void copy()}
+				>
+					<CopyIcon />
+				</Button>
+			</div>
+			{step.fingerprint ? (
+				<Alert>
+					<ShieldCheckIcon />
+					<AlertTitle>Check the fingerprint</AlertTitle>
+					<AlertDescription>
+						The Host uses its own certificate. Allow this computer only if the
+						Host shows this fingerprint:
+						<span className="mt-1 block break-all font-mono text-xs">
+							{step.fingerprint}
+						</span>
+					</AlertDescription>
+				</Alert>
+			) : null}
+			<p className="flex items-center gap-2 text-muted-foreground text-sm">
+				<Spinner />
+				Keep this window open. The code works until{" "}
+				{new Date(step.expiresAt).toLocaleTimeString([], {
+					hour: "2-digit",
+					minute: "2-digit",
+				})}
+				.
+			</p>
+			<DialogFooter>
+				<DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+				{step.page ? (
+					<Button
+						nativeButton={false}
+						render={<a href={step.page} target="_blank" rel="noreferrer" />}
+					>
+						Open the Host
+						<ExternalLinkIcon data-icon="inline-end" />
+					</Button>
+				) : null}
+			</DialogFooter>
+		</>
 	);
 }
