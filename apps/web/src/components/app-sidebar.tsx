@@ -38,6 +38,7 @@ import {
 	InboxIcon,
 	type LucideIcon,
 	MonitorIcon,
+	MonitorSmartphoneIcon,
 	MoonIcon,
 	PlusIcon,
 	Settings2Icon,
@@ -119,6 +120,16 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 							>
 								<BotIcon aria-hidden="true" />
 								<span>Agents</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								tooltip="Devices"
+								isActive={Boolean(matchRoute({ to: "/devices" }))}
+								render={<Link to="/devices" />}
+							>
+								<MonitorSmartphoneIcon aria-hidden="true" />
+								<span>Devices</span>
 							</SidebarMenuButton>
 						</SidebarMenuItem>
 						<SidebarMenuItem>

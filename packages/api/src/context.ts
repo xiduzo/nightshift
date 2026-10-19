@@ -7,11 +7,15 @@ import type {
 } from "@nightshift/agents";
 import type { HarnessName } from "@nightshift/agents/types";
 import type { Permissions, Session } from "@nightshift/auth";
+import type { DeviceKeyAccess } from "@nightshift/auth/device-keys";
 import type { Database } from "@nightshift/db";
 import type {
 	CliToolStore,
 	ConnectionStore,
 	GitInstall,
+	HostRole,
+	KeyStoreKind,
+	PairedDevice,
 	ProfileStore,
 	ProjectReadiness,
 	SettingsStore,
@@ -31,6 +35,15 @@ export type Context = {
 	can(permissions: Permissions, inSpace?: string): Promise<boolean>;
 	/** Makes a Space of the Person the session's active one. */
 	setActiveSpace(spaceId: string): Promise<void>;
+	/** The request's headers, with the local session when it got one: for Better Auth's own checks. */
+	headers: Headers;
+	/**
+	 * The Device key the request carries (`Authorization: Bearer`), resolved.
+	 * A request with a key has no session: it is a Device, not a Person.
+	 */
+	deviceKey: DeviceKeyAccess | null;
+	/** This computer's Devices: as a Host (pairing, presence) and its links to Hosts. */
+	devices: Devices;
 	/** A new Space, its creator the owner, and the session's active one. */
 	createSpace(name: string): Promise<{ id: string }>;
 	db: Database;
@@ -69,4 +82,136 @@ export type Context = {
 		/** The database lease this daemon holds. `since` is epoch ms. */
 		lease: { host: string; pid: number; epoch: number; since: number };
 	};
+};
+
+/** What the Devices page shows, for one Person. */
+export type DevicesOverview = {
+	/** This computer, for its owner. Null for another Person. */
+	thisComputer: {
+		id: string;
+		name: string;
+		platform: string;
+		/** Where its Device keys are: the keychain, else a file only its user can read. */
+		keyStore: KeyStoreKind;
+		host: {
+			/** "Be a Host" is on. */
+			enabled: boolean;
+			/** In the order Devices try them. */
+			addresses: string[];
+			/** Whom this computer answers now: itself only, or the network. */
+			reachable: "this-computer" | "network";
+			/** The settings ask for another reach than it has: a restart applies them. */
+			restartNeeded: boolean;
+			/** The SHA-256 fingerprint of the certificate it serves itself, if any. */
+			fingerprint: string | null;
+		};
+		/** Its home Host and guest Hosts. */
+		hosts: LinkedHost[];
+	} | null;
+	/** The Person's Devices paired with this computer, when it is a Host. */
+	devices: PairedDevice[];
+};
+
+export type LinkStatus = "connecting" | "online" | "offline" | "revoked";
+
+/** A Host this computer paired with. */
+export type LinkedHost = {
+	hostId: string;
+	name: string;
+	role: HostRole;
+	addresses: string[];
+	/** The address that answers now. */
+	address: string | null;
+	status: LinkStatus;
+	/** Epoch ms of the last change of `status`. */
+	since: number;
+	fingerprint: string | null;
+};
+
+/** A pairing code for a joining Device, and where its Person approves it. */
+export type PairingStart = {
+	deviceCode: string;
+	userCode: string;
+	/** The page of the Host where the Person enters the code. */
+	verificationUri: string;
+	/** The same page with the code filled in. */
+	verificationUriComplete: string;
+	expiresIn: number;
+	interval: number;
+	/** The SHA-256 fingerprint of the certificate the Host serves itself, if any. */
+	fingerprint: string | null;
+};
+
+/** The Host's answer to a joining Device's poll. */
+export type PairingRedeemed =
+	| { status: "pending" | "slow-down" | "denied" | "expired" }
+	| {
+			status: "joined";
+			key: string;
+			personId: string;
+			host: HostHello["host"];
+	  };
+
+/** What a paired Device learns from its Host when its link answers. */
+export type HostHello = {
+	host: { id: string; name: string; addresses: string[] };
+	deviceId: string;
+	personId: string;
+};
+
+/** A pairing code, as the Person approving it sees it. */
+export type PairingReviewView = {
+	userCode: string;
+	status: "pending" | "approved" | "denied";
+	device: { id: string; name: string | null; platform: string | null };
+	/** This Host's certificate fingerprint, to compare with the one the device shows. */
+	fingerprint: string | null;
+};
+
+/** How `nightshift join` goes, step by step. */
+export type JoinProgress =
+	| {
+			kind: "code";
+			userCode: string;
+			verificationUri: string;
+			verificationUriComplete: string;
+			/** The fingerprint of the Host's self-signed certificate, pinned on approval. */
+			fingerprint: string | null;
+			expiresAt: number;
+	  }
+	| { kind: "joined"; hostId: string; hostName: string; role: HostRole };
+
+export type Devices = {
+	overview(input: {
+		personId: string;
+		owner: boolean;
+	}): Promise<DevicesOverview>;
+	/** A joining Device asks for a pairing code. Only a Host answers. */
+	startPairing(input: {
+		deviceId: string;
+		name: string;
+		platform: string;
+	}): Promise<PairingStart>;
+	/** A joining Device polls for the answer; on approval it gets its key. */
+	redeemPairing(input: {
+		deviceCode: string;
+		deviceId: string;
+		/** This Host is to be the Device's home Host. */
+		home: boolean;
+		/** The address the Device joined by. */
+		address: string;
+	}): Promise<PairingRedeemed>;
+	/** Binds the code to the Person whose session `headers` carry, and shows it. */
+	review(headers: Headers, userCode: string): Promise<PairingReviewView>;
+	approve(headers: Headers, userCode: string): Promise<void>;
+	deny(headers: Headers, userCode: string): Promise<void>;
+	/** Removes a Device's access: its key, its connections. The Person's own Devices only. */
+	revoke(personId: string, deviceId: string): Promise<void>;
+	/** A paired Device's link answered. */
+	hello(key: DeviceKeyAccess): Promise<HostHello>;
+	/** Pairs this computer with a Host, step by step (`nightshift join`). */
+	join(
+		input: { url: string; role: HostRole },
+		signal?: AbortSignal,
+	): AsyncIterable<JoinProgress>;
 };

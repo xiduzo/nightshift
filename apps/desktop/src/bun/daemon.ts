@@ -56,7 +56,8 @@ export async function startDaemon(): Promise<Daemon> {
 	]);
 
 	const server = Bun.serve({
-		hostname: "localhost",
+		// This computer only, until it is a Host with an https:// address.
+		hostname: daemon.hostname,
 		port: DAEMON_PORT,
 		fetch: daemon.fetch,
 		websocket: daemon.websocket,

@@ -34,6 +34,7 @@ const engine: Context["engine"] = {
 				return method === "listRuns" ? [] : { id: "run-1" };
 			},
 		}),
+	devices: {} as Context["engine"]["devices"],
 };
 
 async function contextFor(headers: Headers | null): Promise<Context> {
@@ -281,5 +282,62 @@ describe("procedures", () => {
 				}),
 			),
 		).toBe("FORBIDDEN");
+	});
+});
+
+describe("Device keys on the procedures", () => {
+	/** A Host whose `hello` answers with the key it was given. */
+	const devices = {
+		hello: async (key: { deviceId: string; personId: string }) => ({
+			host: { id: "host", name: "studio", addresses: [] },
+			deviceId: key.deviceId,
+			personId: key.personId,
+		}),
+	} as unknown as Context["devices"];
+
+	async function deviceContext(
+		permissions: Record<string, string[]> | null,
+	): Promise<Context> {
+		const context = await contextFor(null);
+		return {
+			...context,
+			devices,
+			deviceKey: permissions
+				? { keyId: "k", deviceId: "device-b", personId: "ada", permissions }
+				: null,
+		};
+	}
+
+	test("a Device's link needs a key that allows sync", async () => {
+		expect(
+			await errorOf(
+				call(appRouter.link.hello, undefined, {
+					context: await deviceContext(null),
+				}),
+			),
+		).toBe("UNAUTHORIZED");
+		expect(
+			await errorOf(
+				call(appRouter.link.heartbeat, undefined, {
+					context: await deviceContext({ archive: ["put", "get"] }),
+				}),
+			),
+		).toBe("FORBIDDEN");
+		expect(
+			await call(appRouter.link.hello, undefined, {
+				context: await deviceContext({ sync: ["pull", "push"] }),
+			}),
+		).toMatchObject({ deviceId: "device-b", personId: "ada" });
+	});
+
+	test("a Device key is not a Person: no Space, no runs, no settings", async () => {
+		const context = await deviceContext({ sync: ["pull", "push"] });
+		expect(
+			await errorOf(call(appRouter.runs.list, undefined, { context })),
+		).toBe("UNAUTHORIZED");
+		expect(
+			await errorOf(call(appRouter.devices.list, undefined, { context })),
+		).toBe("UNAUTHORIZED");
+		expect(calls).toEqual([]);
 	});
 });

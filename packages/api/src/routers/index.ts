@@ -25,6 +25,7 @@ import { ORPCError, type RouterClient } from "@orpc/server";
 import { z } from "zod";
 
 import {
+	deviceProcedure,
 	ownerProcedure,
 	permitted,
 	protectedProcedure,
@@ -679,6 +680,96 @@ const deciders = {
 	),
 };
 
+/**
+ * Devices: this computer's own (its Hosts, "Be a Host"), and on a Host the
+ * Person's paired Devices. A Person sees and removes their own Devices
+ * only; approving a code binds it to the Person who entered it.
+ */
+const devices = {
+	list: protectedProcedure.handler(({ context }) =>
+		context.devices.overview({
+			personId: context.session.user.id,
+			owner: context.session.user.id === context.daemon.device.ownerId,
+		}),
+	),
+	/** Shows the device that waits with this code, and holds the code for the Person. */
+	review: protectedProcedure
+		.input(z.object({ userCode: z.string().trim().min(1).max(32) }))
+		.handler(({ context, input }) =>
+			context.devices.review(context.headers, input.userCode),
+		),
+	approve: protectedProcedure
+		.input(z.object({ userCode: z.string().trim().min(1).max(32) }))
+		.handler(({ context, input }) =>
+			context.devices.approve(context.headers, input.userCode),
+		),
+	deny: protectedProcedure
+		.input(z.object({ userCode: z.string().trim().min(1).max(32) }))
+		.handler(({ context, input }) =>
+			context.devices.deny(context.headers, input.userCode),
+		),
+	/** Removes a Device's access to this computer. */
+	revoke: protectedProcedure
+		.input(z.object({ deviceId: z.string().min(1) }))
+		.handler(({ context, input }) =>
+			context.devices.revoke(context.session.user.id, input.deviceId),
+		),
+	/**
+	 * Pairs this computer with a Host (`nightshift join`): yields the code to
+	 * approve there, then the Host once it is approved.
+	 */
+	join: ownerProcedure
+		.input(
+			z.object({
+				url: z.string().trim().min(1),
+				role: z.enum(["home", "guest"]).default("home"),
+			}),
+		)
+		.handler(async function* ({ context, input, signal }) {
+			yield* context.devices.join(input, signal);
+		}),
+};
+
+const deviceId = z.string().regex(/^[\w-]{1,64}$/);
+
+/**
+ * Pairing, as a joining Device calls it before it has a key. Public: the
+ * device authorization flow is the check (a Person approves the code).
+ */
+const pairing = {
+	start: publicProcedure
+		.input(
+			z.object({
+				deviceId,
+				name: z.string().trim().min(1).max(64),
+				platform: z.string().trim().min(1).max(32),
+			}),
+		)
+		.handler(({ context, input }) => context.devices.startPairing(input)),
+	redeem: publicProcedure
+		.input(
+			z.object({
+				deviceCode: z.string().min(1).max(256),
+				deviceId,
+				home: z.boolean(),
+				address: z.string().url().max(512),
+			}),
+		)
+		.handler(({ context, input }) => context.devices.redeemPairing(input)),
+};
+
+/** A paired Device's link to this Host: with its Device key. */
+const link = {
+	/** The first call on a link: who the Host is, and its addresses now. */
+	hello: deviceProcedure("sync").handler(({ context }) =>
+		context.devices.hello(context.deviceKey),
+	),
+	/** Every few seconds: the Device is online while these answer. */
+	heartbeat: deviceProcedure("sync").handler(({ context }) =>
+		context.devices.hello(context.deviceKey),
+	),
+};
+
 export const appRouter = {
 	healthCheck: publicProcedure.handler(() => "OK"),
 	spaces,
@@ -693,6 +784,9 @@ export const appRouter = {
 	harnesses,
 	deciders,
 	profiles,
+	devices,
+	pairing,
+	link,
 };
 export type AppRouter = typeof appRouter;
 export type AppRouterClient = RouterClient<typeof appRouter>;

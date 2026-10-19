@@ -750,6 +750,109 @@ iroh.
      name (none until slice 4). A project can be renamed from its card.
 4. **A second Device.** Pairing by device authorization; the event log
    exchange; the archive; inbox and runs from both Devices on both.
+
+   *Landed (part A, pairing a Device with a Host):*
+   - **Host role.** "Be a Host" (`host`), the Host's addresses
+     (`hostAddresses`, ordered, `https://`; `http://` on loopback for
+     tests and development) and `deviceKeyIdleDays` (default 30) are
+     settings in the Device document, with `NIGHTSHIFT_HOST` and
+     `NIGHTSHIFT_HOST_ADDRESSES` as fallbacks. A daemon binds `127.0.0.1`
+     until it is a Host with an `https://` address, then `0.0.0.0`
+     (`reachFor`, read at start: the Devices page says when a restart
+     applies a change). The desktop app binds the same. `127.0.0.1`, not
+     Bun's `localhost` (which binds `::1` only): `127.0.0.1` callers reach
+     it, and `localhost` callers (curl, browsers, Bun's fetch) fall back to
+     it. Bun's WebSocket does not fall back, so the Link dials `127.0.0.1`
+     for a `localhost` Host. Not a Host: no
+     pairing, no Device key accepted (`hello` answers "not a Host", which
+     a Device treats as offline, not as revoked).
+   - **Certificates.** A Host behind an authority's certificate (Tailscale
+     Serve, a proxy, Cloudflare) needs nothing. A daemon serves `https://`
+     itself with `NIGHTSHIFT_TLS_CERT` and `NIGHTSHIFT_TLS_KEY`. A
+     self-signed certificate is pinned: the joining Device reads it with
+     a TLS handshake, prints its SHA-256 fingerprint with the code, the
+     Host shows the fingerprint of the certificate it serves in "Pair a
+     device" and on its Devices page, and the Device keeps the
+     certificate in `host_link.certificate`. Bun 1.3's `fetch` and
+     `WebSocket` never call `checkServerIdentity`, so the pin is the
+     certificate as the only authority (`tls: { ca }`): a changed
+     certificate fails the link (`apps/server/src/devices/tls.ts`). A
+     certificate this computer already trusts is not pinned (renewals).
+   - **Pairing** (`packages/auth/src/pairing.ts`): Better Auth 1.7.7's
+     device authorization plugin, client id = the joining Device's id,
+     codes valid 15 minutes, polled every 2 s. Reviewing a code binds it
+     to the Person who entered it; another Person cannot review, approve
+     or deny it (tested: CVE-2026-45337). The plugin's session token from
+     `/device/token` is deleted at once: the Host answers the redeem with
+     a Device key instead. The Device's name and platform are kept in
+     memory with its pending code (a Host restart forgets them; the code
+     still works, the Device shows as "Device").
+   - **Device keys** (`packages/auth/src/device-keys.ts`, the API key
+     plugin): prefix `nsd_`, bound to the approving Person, metadata
+     `{ deviceId }`, permissions `sync`, `relay`, `archive`, hashed at
+     rest, rate limit off. Idle expiry: a use moves `expiresAt` on, at
+     most once a day. Pairing again replaces the Device's key.
+   - **On the Host** (`apps/server/src/devices/host.ts`, the registry
+     `packages/engine/src/device/registry.ts`): the paired Device's
+     `device` row (name, platform, owner, `home_host` = the address it
+     joined by when this is its home Host, else null, `last_seen_at`,
+     new `revoked_at`), and `DeviceJoined`, `DeviceRevoked`,
+     `DeviceOnline`, `DeviceOffline` in the owner's personal Space (a
+     fact of no run names its Space: `EventInput.spaceId`). Online is
+     derived: a heartbeat within 45 s. A Host that starts again logs
+     `DeviceOffline` for a Device the log left online. Remove access:
+     the key goes, `DeviceRevoked`, and the relay closes the Device's
+     sockets (`sync.disconnect`, on the connection context the authorize
+     hook returns).
+   - **Device-key auth.** A procedure call with `Authorization: Bearer
+     nsd_…` is a Device: no session, never the local session, even from
+     loopback. `deviceProcedure("sync")` takes it (`link.hello`,
+     `link.heartbeat`); `pairing.start` and `pairing.redeem` are public.
+     On the relay, `documentAccess` takes a Device key as the provider
+     token (`deviceKey` → `{ deviceId, personId, home }`): it opens the
+     Device's own document, only on its home Host and only for the
+     document's owner, to write; and the Space documents of the Spaces
+     its Person is a Member of, to read. Any other document is refused,
+     the Host's own Device document too. A Host keeps the
+     Device documents of its home Devices (`KeptDocuments`: Hocuspocus
+     loads and stores them in the Replica's `ydoc` rows); a guest Host
+     keeps none, and refuses them.
+   - **The joining Device** (`apps/server/src/devices/join.ts`, `bun run
+     join <host> [--guest]` → the local daemon's `devices.join`, a
+     stream): the link goes in `host_link` (Host id and name, addresses,
+     pinned certificate, home or guest, the Person there, where the key
+     is), its key in the keychain (`Bun.secrets`, service
+     `nightshift-device-keys`), else in `<data dir>/device-keys/<host>`
+     with mode 0600 (`NIGHTSHIFT_KEY_STORE=file` forces it). One home
+     Host at most; a home link sets the self row's `home_host`.
+   - **The Link** (`apps/server/src/devices/link.ts`): `httpsLink` tries
+     the addresses in order (a refusal is an answer, a network error
+     falls through), keeps the first that answers, learns the Host's
+     list from each answer (the Host's order, then the ones it did not
+     name), heartbeats every 15 s, backs off 1 s doubling to 60 s, and
+     over a link to the home Host syncs this Device's document with the
+     Hocuspocus provider. A refused key ends the link (`revoked`, key
+     deleted). When the relay closes the socket it heartbeats at once, so
+     Remove access ends the link in a moment.
+   - **The Devices page** replaces Settings → "This computer" (Settings
+     links to it): this computer (name, Be a Host and addresses, where
+     its access to Hosts is saved, data folder), "Your devices" (online or
+     last seen, Remove access) and "Hosts of this computer" (home or
+     guest, status). "Pair a device" takes the code (Input OTP), shows
+     the device and the fingerprint, and allows or declines it. The code
+     link the CLI prints opens it filled in (`/devices?pair=`).
+   - `BETTER_AUTH_URL` and `CORS_ORIGIN` are not sensitive in
+     `.env.schema`: varlock refused responses that carried them.
+   - Tests: `apps/server/src/devices/two-devices.test.ts` runs two
+     daemons as processes (the services are one per process), B joins A
+     through the CLI, A's Person approves, B is online on A, B's document
+     opens on A, Remove access ends B's link, and A's log has the four
+     events.
+   - Not yet (part B): `sync.pull`/`push`/`stream`, the archive, the
+     Space document on a Host, an mDNS name, listing a guest Host's
+     Spaces. Joining from the desktop app's UI calls the same
+     `devices.join`. A Person removing their own home link, and moving a
+     home, need a UI.
 5. **Placement.** Run-level, then per node with the Hand-off;
    `device-offline` sleep and reattach.
 6. **Sharing.** Invitation-only signup, Members and roles, Offers with the
@@ -794,9 +897,12 @@ Nothing is open. The next step is slice 1.
   `WebSocket` (`apps/server/src/sync.test.ts`). The SQLite extension
   needs `better-sqlite3`, which Bun does not load: the Replica's own
   `ydoc` table is used instead.
-- Better Auth version: the device authorization plugin needs 1.6.11+.
+- ~~Better Auth version: the device authorization plugin needs 1.6.11+.~~
+  1.7.7, with a test that one Person cannot approve another's code.
 - A headless Device has no keychain: secrets from its environment or a
   file its service manager provides. Say which on the Devices page.
+  Done for Device keys in slice 4 ("Access to your Hosts" says keychain
+  or file); secrets still to do.
 - A `${NAME}` the placed Device lacks should refuse at run start.
 - The usage-limit sleep is per harness login, so per Device. The sleep
   module needs the Device in its key.
@@ -807,8 +913,8 @@ Nothing is open. The next step is slice 1.
   OIDC provider plugin makes the home Host the login for guest Hosts.
 - End-to-end encryption of Device documents: later; the home-Host rule
   covers the colleague case without it.
-- VISION lists "shared runners" and "server mode" as out of scope. This
-  proposal moves them in scope. Update VISION when slice 4 starts.
+- ~~VISION lists "shared runners" and "server mode" as out of scope.~~
+  Updated with slice 4.
 
 ## Sources
 

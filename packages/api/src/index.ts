@@ -1,4 +1,5 @@
 import type { Permissions } from "@nightshift/auth";
+import type { DeviceKeyPermission } from "@nightshift/auth/device-keys";
 import { ORPCError, os } from "@orpc/server";
 
 import type { Context } from "./context";
@@ -75,3 +76,24 @@ export const ownerProcedure = protectedProcedure.use(
 		return next();
 	},
 );
+
+/**
+ * A call of a paired Device, with its Device key, for a key that allows
+ * `need`. A Device is not a Person: it has no session and no Space here.
+ */
+export function deviceProcedure(need: DeviceKeyPermission) {
+	return publicProcedure.use(async ({ context, next }) => {
+		const key = context.deviceKey;
+		if (!key) {
+			throw new ORPCError("UNAUTHORIZED", {
+				message: "This device has no access here. Pair it again.",
+			});
+		}
+		if (!key.permissions[need]?.length) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "This device may not do this here.",
+			});
+		}
+		return next({ context: { deviceKey: key } });
+	});
+}

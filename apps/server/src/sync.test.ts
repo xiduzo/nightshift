@@ -26,7 +26,13 @@ import {
 import type { Server } from "bun";
 import * as Y from "yjs";
 
-import { createSync, documentAccess, type SocketData, type Sync } from "./sync";
+import {
+	createSync,
+	documentAccess,
+	type SocketData,
+	type Sync,
+	type SyncDeviceKey,
+} from "./sync";
 
 /**
  * Hocuspocus 4 under Bun 1.3, in-process: Bun.serve accepts the socket and
@@ -46,24 +52,45 @@ const providers: HocuspocusProvider[] = [];
 
 const ORIGIN = "http://localhost:3001";
 
+/** The Person who owns this computer. */
+let ownerId: string;
+/** Device keys this test's Host knows: token → the key, resolved. */
+let deviceKeys: Map<string, SyncDeviceKey>;
+/** Documents this test's Host keeps for paired Devices: name → owner. */
+let keptOwners: Map<string, string>;
+let keptRows: Map<string, Uint8Array>;
+
 beforeEach(async () => {
 	sandbox = await createSandbox();
 	document = await sandbox.openDocument();
 	people = await createAuthSandbox();
 	const owner = await localPerson(people.db);
+	ownerId = owner.userId;
 	stranger = (await people.signUp("Dee")).headers;
+	deviceKeys = new Map();
+	keptOwners = new Map();
+	keptRows = new Map();
 	spaces = createSpaceDocuments({ db: people.db });
 	sync = createSync({
 		document: (name) =>
 			name === document.name
 				? document.doc
 				: (spaces.byName(name)?.doc ?? null),
+		kept: {
+			has: (name) => keptOwners.has(name),
+			fetch: async (name) => keptRows.get(name) ?? null,
+			store: async (name, state) => {
+				keptRows.set(name, state);
+			},
+		},
 		authorize: documentAccess({
 			auth: people.auth,
 			db: people.db,
 			localSession: createLocalSession(people.auth, people.db, owner.userId),
 			ownerId: owner.userId,
 			trustedOrigins: new Set([ORIGIN]),
+			keptOwner: async (name) => keptOwners.get(name) ?? null,
+			deviceKey: async (token) => deviceKeys.get(token) ?? null,
 		}),
 	});
 	server = Bun.serve<SocketData>({
@@ -90,7 +117,7 @@ afterEach(async () => {
 /** A client of the relay, as a UI or another Device opens one. */
 function connect(
 	name = document.name,
-	options: { origin?: string; cookie?: string } = {},
+	options: { origin?: string; cookie?: string; token?: string } = {},
 ) {
 	const doc = new Y.Doc();
 	const failed: string[] = [];
@@ -110,7 +137,7 @@ function connect(
 		}),
 		name,
 		document: doc,
-		token: "this-computer",
+		token: options.token ?? "this-computer",
 		onAuthenticationFailed: ({ reason }) => {
 			failed.push(reason);
 		},
@@ -281,5 +308,116 @@ describe("documentAccess: a Space document", () => {
 		const local = connect(name, { origin: ORIGIN });
 		await waitFor(() => local.failed.length > 0);
 		expect(local.provider.isSynced).toBe(false);
+	});
+});
+
+describe("Device keys on the relay", () => {
+	const KEY = "nsd_the-key-of-device-b";
+	const B = "device:device-b";
+
+	/** Device B, paired with this Host as its home, of this computer's Person. */
+	function pairB(home = true) {
+		keptOwners.set(B, ownerId);
+		deviceKeys.set(KEY, { deviceId: "device-b", personId: ownerId, home });
+	}
+
+	test("a Device opens its own document on its home Host, and the Host keeps it", async () => {
+		pairB();
+		const device = connect(B, { token: KEY });
+		await waitFor(() => device.provider.isSynced);
+		device.doc.getMap("facts").set("platform", "darwin");
+
+		// The owner's UI on the Host sees it, and the Host stores it.
+		const ui = connect(B, { origin: ORIGIN });
+		await waitFor(() => ui.doc.getMap("facts").get("platform") === "darwin");
+		await waitFor(() => keptRows.has(B), { timeoutMs: 15_000 });
+
+		// Not for another Person.
+		const page = connect(B, {
+			origin: ORIGIN,
+			cookie: stranger.get("cookie") ?? "",
+		});
+		await waitFor(() => page.failed.length > 0);
+	}, 20_000);
+
+	test("a Device key opens no other Device's document, not even the Host's own", async () => {
+		pairB();
+		const client = connect(document.name, { token: KEY });
+		await waitFor(() => client.failed.length > 0);
+		expect(client.provider.isSynced).toBe(false);
+	});
+
+	test("a guest Host never opens a Device document to a key", async () => {
+		pairB(false);
+		const client = connect(B, { token: KEY });
+		await waitFor(() => client.failed.length > 0);
+		expect(client.provider.isSynced).toBe(false);
+	});
+
+	test("a key of another Person is refused", async () => {
+		keptOwners.set(B, ownerId);
+		deviceKeys.set(KEY, {
+			deviceId: "device-b",
+			personId: "someone",
+			home: true,
+		});
+		const client = connect(B, { token: KEY });
+		await waitFor(() => client.failed.length > 0);
+	});
+
+	test("an unknown key from this computer does not get the local session", async () => {
+		const client = connect(document.name, { token: "nsd_unknown" });
+		await waitFor(() => client.failed.length > 0);
+		expect(client.provider.isSynced).toBe(false);
+	});
+
+	test("a Device reads the Space documents of its owner's Spaces, and writes none", async () => {
+		const dee = (await people.signUp("Dee2")).userId;
+		const space = await people.auth.api.createOrganization({
+			body: { name: "Platform", slug: "platform", userId: ownerId },
+		});
+		if (!space) throw new Error("no space");
+		const opened = await spaces.open(space.id);
+		const name = spaceDocumentName(space.id);
+
+		deviceKeys.set(KEY, {
+			deviceId: "device-b",
+			personId: ownerId,
+			home: false,
+		});
+		const device = connect(name, { token: KEY });
+		await waitFor(() => device.provider.isSynced);
+		device.doc.getMap("projects").set("p-device", {
+			name: "From the Device",
+			remote: null,
+			createdAt: 1,
+			removedAt: null,
+			updatedAt: 1,
+		});
+		await Bun.sleep(100);
+		expect(opened.projects.has("p-device")).toBe(false);
+
+		// A Device of a Person outside the Space: refused.
+		deviceKeys.set("nsd_other", {
+			deviceId: "device-d",
+			personId: dee,
+			home: true,
+		});
+		const other = connect(name, { token: "nsd_other" });
+		await waitFor(() => other.failed.length > 0);
+	});
+
+	test("removing a Device's access ends its connections", async () => {
+		pairB();
+		const device = connect(B, { token: KEY });
+		const ui = connect(B);
+		await waitFor(() => device.provider.isSynced && ui.provider.isSynced);
+
+		deviceKeys.delete(KEY);
+		sync.disconnect((context) => context.deviceId === "device-b");
+		await waitFor(() => device.failed.length > 0);
+		// The owner's own client stays.
+		expect(ui.provider.isSynced).toBe(true);
+		expect(ui.failed).toEqual([]);
 	});
 });

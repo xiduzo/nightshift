@@ -14,6 +14,7 @@ import type {
 	ScheduleIssue,
 } from "@nightshift/flows";
 
+import type { DeviceRegistry } from "./device/registry";
 import type { Device } from "./device/types";
 import type { GitProbe } from "./project-setup";
 import type { RunSettings } from "./settings";
@@ -409,6 +410,11 @@ export interface Engine {
 	 * is of another Space: a project or run of another Space is "not found".
 	 */
 	space(spaceId: string): SpaceEngine;
+	/**
+	 * On a Host: the Devices that paired with it, their presence and the
+	 * audit of it. Each Person sees their own Devices only (the API's rule).
+	 */
+	readonly devices: DeviceRegistry;
 }
 
 /** The engine as a person in one Space sees it: the API layer only calls this. */

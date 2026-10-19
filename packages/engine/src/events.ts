@@ -101,6 +101,24 @@ export type EnginePayloads = {
 	 * names a Project already known, or a Clone that moved to a new folder.
 	 */
 	CloneAdded: { projectId: string; deviceId: string; path: string };
+	/**
+	 * On a Host: a Device paired with it. `ownerId` is the Person who
+	 * approved the pairing; `home`: this Host keeps the Device's document.
+	 * In the owner's personal Space.
+	 */
+	DeviceJoined: {
+		deviceId: string;
+		name: string;
+		platform: string;
+		ownerId: string;
+		home: boolean;
+	};
+	/** On a Host: the owner removed the Device's access. Its key is gone. */
+	DeviceRevoked: { deviceId: string };
+	/** On a Host: the Device's link answered after a silence. */
+	DeviceOnline: { deviceId: string };
+	/** On a Host: the Device's link went silent, or its access was removed. */
+	DeviceOffline: { deviceId: string };
 	/** A person gave the project a new name. */
 	ProjectRenamed: { projectId: string; name: string };
 	/** A person moved the project, with its Clones, runs and events, to another Space. */
@@ -306,6 +324,8 @@ export type EventInput<T extends EngineEventType> = {
 	runId?: string | null;
 	stepId?: string | null;
 	sessionId?: string | null;
+	/** The Space of a fact of no run and no project (a Device's). */
+	spaceId?: string;
 };
 
 /**
@@ -338,15 +358,16 @@ export async function appendEvent<T extends EngineEventType>(
 	return parseEventRow(row);
 }
 
-/** The Space of an event: its run's, else its project's. */
+/** The Space of an event: its run's, else its project's, else the one it names. */
 function spaceOf(input: EventInput<EngineEventType>) {
 	if (input.runId) {
 		return sql`(select ${run.spaceId} from ${run} where ${run.id} = ${input.runId})`;
 	}
+	if (input.spaceId) return input.spaceId;
 	const projectId = (input.payload as { projectId?: unknown }).projectId;
 	if (typeof projectId !== "string") {
 		throw new Error(
-			`${input.type} names no run and no project: its Space is unknown.`,
+			`${input.type} names no run, no project and no Space: its Space is unknown.`,
 		);
 	}
 	return sql`(select ${project.spaceId} from ${project} where ${project.id} = ${projectId})`;

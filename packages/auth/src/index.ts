@@ -1,11 +1,15 @@
+import { apiKey } from "@better-auth/api-key";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import type { Database } from "@nightshift/db";
 import * as schema from "@nightshift/db/schema/auth";
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
+import { deviceAuthorization } from "better-auth/plugins/device-authorization";
 import { organization } from "better-auth/plugins/organization";
 
 import { ac, type Permissions, roles } from "./access";
+import { DEVICE_KEY_PREFIX } from "./device-keys";
+import { PAIRING_CODE_TTL, PAIRING_POLL_INTERVAL } from "./pairing";
 import { activeSpaceId, ensurePersonalSpace } from "./spaces";
 
 export type { Permissions, Role } from "./access";
@@ -34,6 +38,10 @@ export type AuthOptions = {
  * Every Person gets a personal Space with their account, and every new
  * session starts in it. Nobody can be invited to, added to, or delete a
  * personal Space.
+ *
+ * Devices pair with a Host by device authorization (RFC 8628, the device
+ * authorization plugin) and sign in with a Device key (the API key
+ * plugin): see `pairing.ts` and `device-keys.ts`.
  */
 export function createAuth(
 	env: AuthConfig,
@@ -80,6 +88,15 @@ export function createAuth(
 			},
 		},
 		plugins: [
+			pairingPlugin(),
+			apiKey({
+				defaultPrefix: DEVICE_KEY_PREFIX,
+				enableMetadata: true,
+				// A Device calls its Host every few seconds; idle expiry, not a
+				// request count, ends a key nobody uses (`device-keys.ts`).
+				rateLimit: { enabled: false },
+				keyExpiration: { minExpiresIn: 1, maxExpiresIn: 365 },
+			}),
 			organization({
 				ac,
 				roles,
@@ -115,6 +132,22 @@ export function createAuth(
 				},
 			}),
 		],
+	});
+}
+
+/**
+ * The device authorization plugin, typed by name: its inferred type names a
+ * type `better-call` does not export, which a declaration cannot name.
+ */
+export interface PairingPlugin
+	extends ReturnType<typeof deviceAuthorization<undefined>> {}
+
+function pairingPlugin(): PairingPlugin {
+	return deviceAuthorization({
+		expiresIn: PAIRING_CODE_TTL,
+		interval: PAIRING_POLL_INTERVAL,
+		// The client is the joining Device: its id.
+		validateClient: (clientId) => /^[\w-]{1,64}$/.test(clientId),
 	});
 }
 

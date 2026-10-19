@@ -11,7 +11,7 @@ import { logger } from "hono/logger";
 import { access, createContext } from "./context";
 import { desktopOrigins, ENV } from "./env.server";
 import { runExportResponse } from "./run-export";
-import { auth, connections, db, sync } from "./services";
+import { auth, connections, db, serve, sync } from "./services";
 import type { SocketData } from "./sync";
 
 const app = new Hono();
@@ -107,6 +107,8 @@ export const SYNC_PATH = "/sync";
  * upgrades the socket itself, so the sync path never reaches Hono.
  */
 export default {
+	// This computer only, until it is a Host with an https:// address.
+	...serve,
 	fetch(request: Request, server: Bun.Server<SocketData>) {
 		if (new URL(request.url).pathname === SYNC_PATH) {
 			return sync.upgrade(request, server);

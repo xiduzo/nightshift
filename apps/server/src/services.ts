@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
 	type AgentHarness,
 	acpHarness,
@@ -32,10 +33,13 @@ import {
 	createCliToolStore,
 	createConnectionStore,
 	createEngine,
+	createHostLinks,
 	createProfileStore,
 	createSettingsStore,
 	createSpaceDocuments,
 	type DeviceDocument,
+	deviceKeyStore,
+	documentRows,
 	HARNESS_BIN,
 	keychainSecrets,
 	LEASE_HEARTBEAT_MS,
@@ -50,6 +54,15 @@ import {
 	systemGitInstaller,
 } from "@nightshift/engine";
 
+import {
+	createDeviceLinks,
+	createDevices,
+	createHost,
+	type DeviceLinks,
+	LISTEN_HOSTNAME,
+	reachFor,
+} from "./devices";
+import { certificateFingerprint } from "./devices/tls";
 import { desktopOrigins, ENV, trustedOrigins } from "./env.server";
 import { createSync, documentAccess, type Sync } from "./sync";
 
@@ -238,12 +251,20 @@ const relay = globalThis as { nightshiftSync?: Sync };
 relay.nightshiftSync ??= createSync({
 	document: (name) =>
 		name === document.name ? document.doc : (spaces.byName(name)?.doc ?? null),
+	// On a Host: the documents of the Devices whose home Host this is.
+	kept: {
+		has: async (name) =>
+			(await engine.devices.keptDocumentOwner(name)) !== null,
+		...documentRows(db),
+	},
 	authorize: documentAccess({
 		auth,
 		db,
 		localSession,
 		ownerId: person.userId,
 		trustedOrigins,
+		keptOwner: (name) => engine.devices.keptDocumentOwner(name),
+		deviceKey: (token) => host.syncKey(token),
 	}),
 });
 export const sync = relay.nightshiftSync;
@@ -326,6 +347,80 @@ export const engine = await createEngine({
 	// Otherwise the Settings switch is read on every tick.
 	scheduler:
 		ENV.NIGHTSHIFT_SCHEDULER === "off" ? false : { signal: scheduler.signal },
+});
+
+/*
+ * Devices. Secure by default: this daemon answers this computer only,
+ * until it is a Host with an https:// address (read at start: a change
+ * applies on the next start). It serves https:// itself when it has a
+ * certificate (NIGHTSHIFT_TLS_CERT, NIGHTSHIFT_TLS_KEY).
+ */
+const reach = reachFor(settings.current());
+const certificate =
+	ENV.NIGHTSHIFT_TLS_CERT && ENV.NIGHTSHIFT_TLS_KEY
+		? {
+				cert: readFileSync(ENV.NIGHTSHIFT_TLS_CERT, "utf8"),
+				key: readFileSync(ENV.NIGHTSHIFT_TLS_KEY, "utf8"),
+			}
+		: null;
+const fingerprint = certificate
+	? certificateFingerprint(certificate.cert)
+	: null;
+/** How Bun serves this daemon: the hostname of its reach, and its own TLS. */
+export const serve = {
+	hostname: LISTEN_HOSTNAME[reach],
+	...(certificate ? { tls: certificate } : {}),
+};
+
+/** This computer as a Host: pairing, Device keys, presence. */
+export const host = createHost({
+	auth,
+	db,
+	registry: engine.devices,
+	settings,
+	self: device,
+	devicesPage: new URL("/devices", ENV.CORS_ORIGIN).toString(),
+	fingerprint,
+	disconnect: (deviceId) =>
+		sync.disconnect((context) => context.deviceId === deviceId),
+});
+
+/** A Device whose link says nothing for this long is offline. Its heartbeat comes every 15 s. */
+const OFFLINE_AFTER_MS = 45_000;
+const presence = globalThis as { nightshiftPresence?: Timer };
+if (presence.nightshiftPresence) clearInterval(presence.nightshiftPresence);
+presence.nightshiftPresence = setInterval(() => {
+	engine.devices.sweep(OFFLINE_AFTER_MS).catch((error) => {
+		console.error("Device presence was not updated:", error);
+	});
+}, 5_000);
+presence.nightshiftPresence.unref();
+
+/** This computer's links to the Hosts it paired with. Restarted on `bun --hot`. */
+const hostLinks = createHostLinks(db);
+const keyStore = await deviceKeyStore({
+	dataDir,
+	...(ENV.NIGHTSHIFT_KEY_STORE === "file" ? { prefer: "file" as const } : {}),
+});
+const linked = globalThis as { nightshiftLinks?: DeviceLinks };
+await linked.nightshiftLinks?.close();
+linked.nightshiftLinks = createDeviceLinks({
+	links: hostLinks,
+	keys: keyStore,
+	document,
+});
+await linked.nightshiftLinks.start();
+export const deviceLinks = linked.nightshiftLinks;
+
+export const devices = createDevices({
+	host,
+	links: deviceLinks,
+	hostLinks,
+	keys: keyStore,
+	settings,
+	self: { id: device.id, name: device.name, platform: process.platform },
+	reach,
+	fingerprint,
 });
 
 export const checks: Context["checks"] = {
