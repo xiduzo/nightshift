@@ -42,6 +42,7 @@ import {
 	CircleHelpIcon,
 	GlobeIcon,
 	KeyRoundIcon,
+	LaptopIcon,
 	PlugIcon,
 	PlusIcon,
 	SquareTerminalIcon,
@@ -102,8 +103,9 @@ export function itemOf(selection: Selection): string {
 
 /**
  * The Agents page: Agent Profiles, the harnesses they run on, the tools they
- * hand out, and the secrets those tools read. A list on the left; the
- * selected thing opens on the right. Each pane scrolls on its own.
+ * hand out, and the secrets those tools read, grouped by the Device they
+ * belong to. A list on the left; the selected thing opens on the right.
+ * Each pane scrolls on its own.
  */
 export function AgentsPage({
 	item,
@@ -175,133 +177,146 @@ export function AgentsPage({
 				aria-label="Agents"
 				className="flex w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r p-4"
 			>
-				<Group
-					title="Profiles"
-					hint="What Agent nodes pick"
-					addLabel="Add a profile"
-					onAdd={() => select({ kind: "new-profile" })}
+				<DeviceSection
+					name={settings.data?.daemon.device.name}
+					description="This computer"
 				>
-					{profiles.isPending ? (
-						<ListSkeleton />
-					) : (
-						(profiles.data ?? []).map((p) => {
-							const nodes = p.usedBy.reduce((n, u) => n + u.nodeIds.length, 0);
-							return (
-								<ListItem
-									key={p.name}
-									selected={isSel({ kind: "profile", name: p.name })}
-									onClick={() => select({ kind: "profile", name: p.name })}
-									icon={<BotIcon />}
-									title={<span className="font-mono">{p.name}</span>}
-									description={`${harnessInfo(p.harness).label} · ${p.model}`}
-									aside={
-										<Badge
-											variant="secondary"
-											title={`${nodes} Agent ${nodes === 1 ? "node" : "nodes"}`}
-										>
-											{nodes}
-										</Badge>
-									}
-								/>
-							);
-						})
-					)}
-					{isSel({ kind: "new-profile" }) ? (
-						<ListItem
-							selected
-							onClick={() => {}}
-							icon={<BotIcon />}
-							title={<span className="text-muted-foreground">New profile</span>}
-						/>
-					) : null}
-				</Group>
-				<Separator />
-				<Group
-					title="Harnesses"
-					hint="Coding agents your profiles use"
-					addLabel="Add a harness"
-					onAdd={() => setPicking("harness")}
-				>
-					{harnesses.isPending ? (
-						<ListSkeleton />
-					) : (
-						added.map((h) => (
-							<ListItem
-								key={h.name}
-								selected={isSel({ kind: "harness", name: h.name })}
-								onClick={() => select({ kind: "harness", name: h.name })}
-								icon={<SquareTerminalIcon />}
-								title={h.label}
-								aside={<CliCheckBadge target={h.name} />}
-							/>
-						))
-					)}
-				</Group>
-				<Separator />
-				<Group
-					title="Tools"
-					hint="Extra tools for your agents"
-					addLabel="Add a tool"
-					onAdd={() => setPicking("tool")}
-				>
-					{cliTools.isPending ? (
-						<ListSkeleton />
-					) : (
-						(cliTools.data ?? []).map((t) => (
-							<ListItem
-								key={`cli:${t.name}`}
-								selected={isSel({ kind: "cli", name: t.name })}
-								onClick={() => select({ kind: "cli", name: t.name })}
-								icon={<SquareTerminalIcon />}
-								title={<span className="font-mono">{t.name}</span>}
-								description="CLI"
-								aside={<CliToolCheckBadge name={t.name} />}
-							/>
-						))
-					)}
-					{tools.isPending ? (
-						<ListSkeleton />
-					) : (
-						connections.map((c) => {
-							const missing = c.variables.filter(
-								(v) => v.source === "missing",
-							).length;
-							return (
-								<ListItem
-									key={c.name}
-									selected={isSel({ kind: "tool", name: c.name })}
-									onClick={() => select({ kind: "tool", name: c.name })}
-									icon={"url" in c.server ? <GlobeIcon /> : <PlugIcon />}
-									title={<span className="font-mono">{c.name}</span>}
-									description="MCP server"
-									aside={
-										missing > 0 ? (
-											<Badge variant="outline" className="text-status-waiting">
-												Secret missing
-											</Badge>
-										) : null
-									}
-								/>
-							);
-						})
-					)}
-				</Group>
-				<Separator />
-				<ListItem
-					selected={isSel({ kind: "secrets" })}
-					onClick={() => select({ kind: "secrets" })}
-					icon={<KeyRoundIcon />}
-					title="Secrets"
-					aside={
-						missingSecrets > 0 ? (
-							<Badge variant="outline" className="text-status-waiting">
-								{missingSecrets} missing
-							</Badge>
+					<Group
+						title="Profiles"
+						hint="What Agent nodes pick"
+						addLabel="Add a profile"
+						onAdd={() => select({ kind: "new-profile" })}
+					>
+						{profiles.isPending ? (
+							<ListSkeleton />
 						) : (
-							<Badge variant="secondary">{secrets.length}</Badge>
-						)
-					}
-				/>
+							(profiles.data ?? []).map((p) => {
+								const nodes = p.usedBy.reduce(
+									(n, u) => n + u.nodeIds.length,
+									0,
+								);
+								return (
+									<ListItem
+										key={p.name}
+										selected={isSel({ kind: "profile", name: p.name })}
+										onClick={() => select({ kind: "profile", name: p.name })}
+										icon={<BotIcon />}
+										title={<span className="font-mono">{p.name}</span>}
+										description={`${harnessInfo(p.harness).label} · ${p.model}`}
+										aside={
+											<Badge
+												variant="secondary"
+												title={`${nodes} Agent ${nodes === 1 ? "node" : "nodes"}`}
+											>
+												{nodes}
+											</Badge>
+										}
+									/>
+								);
+							})
+						)}
+						{isSel({ kind: "new-profile" }) ? (
+							<ListItem
+								selected
+								onClick={() => {}}
+								icon={<BotIcon />}
+								title={
+									<span className="text-muted-foreground">New profile</span>
+								}
+							/>
+						) : null}
+					</Group>
+					<Separator />
+					<Group
+						title="Harnesses"
+						hint="Coding agents your profiles use"
+						addLabel="Add a harness"
+						onAdd={() => setPicking("harness")}
+					>
+						{harnesses.isPending ? (
+							<ListSkeleton />
+						) : (
+							added.map((h) => (
+								<ListItem
+									key={h.name}
+									selected={isSel({ kind: "harness", name: h.name })}
+									onClick={() => select({ kind: "harness", name: h.name })}
+									icon={<SquareTerminalIcon />}
+									title={h.label}
+									aside={<CliCheckBadge target={h.name} />}
+								/>
+							))
+						)}
+					</Group>
+					<Separator />
+					<Group
+						title="Tools"
+						hint="Extra tools for your agents"
+						addLabel="Add a tool"
+						onAdd={() => setPicking("tool")}
+					>
+						{cliTools.isPending ? (
+							<ListSkeleton />
+						) : (
+							(cliTools.data ?? []).map((t) => (
+								<ListItem
+									key={`cli:${t.name}`}
+									selected={isSel({ kind: "cli", name: t.name })}
+									onClick={() => select({ kind: "cli", name: t.name })}
+									icon={<SquareTerminalIcon />}
+									title={<span className="font-mono">{t.name}</span>}
+									description="CLI"
+									aside={<CliToolCheckBadge name={t.name} />}
+								/>
+							))
+						)}
+						{tools.isPending ? (
+							<ListSkeleton />
+						) : (
+							connections.map((c) => {
+								const missing = c.variables.filter(
+									(v) => v.source === "missing",
+								).length;
+								return (
+									<ListItem
+										key={c.name}
+										selected={isSel({ kind: "tool", name: c.name })}
+										onClick={() => select({ kind: "tool", name: c.name })}
+										icon={"url" in c.server ? <GlobeIcon /> : <PlugIcon />}
+										title={<span className="font-mono">{c.name}</span>}
+										description="MCP server"
+										aside={
+											missing > 0 ? (
+												<Badge
+													variant="outline"
+													className="text-status-waiting"
+												>
+													Secret missing
+												</Badge>
+											) : null
+										}
+									/>
+								);
+							})
+						)}
+					</Group>
+					<Separator />
+					<ListItem
+						selected={isSel({ kind: "secrets" })}
+						onClick={() => select({ kind: "secrets" })}
+						icon={<KeyRoundIcon />}
+						title="Secrets"
+						aside={
+							missingSecrets > 0 ? (
+								<Badge variant="outline" className="text-status-waiting">
+									{missingSecrets} missing
+								</Badge>
+							) : (
+								<Badge variant="secondary">{secrets.length}</Badge>
+							)
+						}
+					/>
+				</DeviceSection>
 			</nav>
 
 			<div className="min-w-0 flex-1 overflow-y-auto">
@@ -578,6 +593,40 @@ function Gone({ what }: { what: string }) {
 				</EmptyDescription>
 			</EmptyHeader>
 		</Empty>
+	);
+}
+
+/**
+ * One Device's profiles, harnesses, tools and secrets, under its name.
+ * Today the only Device is this computer.
+ */
+function DeviceSection({
+	name,
+	description,
+	children,
+}: {
+	/** Undefined while it loads. */
+	name: string | undefined;
+	description: string;
+	children: ReactNode;
+}) {
+	return (
+		<section aria-label={name ?? description} className="flex flex-col gap-5">
+			<Item size="sm" variant="muted">
+				<ItemMedia variant="icon">
+					<LaptopIcon />
+				</ItemMedia>
+				<ItemContent className="min-w-0">
+					{name === undefined ? (
+						<Skeleton className="h-4 w-32" />
+					) : (
+						<ItemTitle className="max-w-full truncate">{name}</ItemTitle>
+					)}
+					<ItemDescription className="text-xs">{description}</ItemDescription>
+				</ItemContent>
+			</Item>
+			{children}
+		</section>
 	);
 }
 
