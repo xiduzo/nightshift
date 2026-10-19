@@ -49,6 +49,17 @@ export {
 	type DeviceRegistry,
 	type PairedDevice,
 } from "./device/registry";
+export {
+	remoteDevice,
+	serveWork,
+	type WorkCall,
+	type WorkFor,
+	type WorkRelay,
+	type WorkReply,
+	type WorkRequest,
+	workReplySchema,
+	workRequestSchema,
+} from "./device/remote";
 export type * from "./device/types";
 export { createEngine } from "./engine";
 export {
@@ -65,7 +76,11 @@ export {
 	runCommandPayloadSchema,
 } from "./exchange/commands";
 export type { EngineExchange } from "./exchange/engine-exchange";
-export type { HostSpaces, ListedSpace } from "./exchange/host-spaces";
+export {
+	type HostSpaces,
+	type ListedSpace,
+	personOnHost,
+} from "./exchange/host-spaces";
 export {
 	ForeignRowsError,
 	isEmpty,
@@ -108,6 +123,7 @@ export {
 	setUpGit,
 	systemGitInstaller,
 } from "./project-setup";
+export { clonePathOf, NOT_ON_THIS_COMPUTER } from "./projects";
 export {
 	exportRun,
 	openRunBundle,
@@ -153,3 +169,4 @@ export {
 	spaceProjects,
 } from "./space/document";
 export type * from "./types";
+export { worktreeLocation } from "./worktrees";

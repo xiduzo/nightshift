@@ -9,6 +9,7 @@ import type {
 	ValueResult,
 } from "@nightshift/agents/types";
 import type { AgentNode, JsonValue } from "@nightshift/flows";
+import type { FlowSources } from "@nightshift/flows/files";
 
 /**
  * The Device port: what a step body needs from a computer, as one
@@ -27,7 +28,12 @@ export type Device = {
 	name: string;
 	state(): DeviceState;
 	/** What a run start checks before it writes anything. */
-	capabilities(query?: CapabilityQuery): Capabilities;
+	capabilities(query?: CapabilityQuery): Promise<Capabilities>;
+	/**
+	 * The flow files of the project's Clone on this Device, unparsed: the
+	 * flows a run placed here starts from. Throws when it has no Clone.
+	 */
+	flows(projectId: string): Promise<FlowSources>;
 	/**
 	 * One harness session. The first item says whether the session can
 	 * start: `refused` (the stream ends there) or `ready`; the harness
@@ -45,8 +51,28 @@ export type Device = {
 	 */
 	decide(input: DecisionInput): Promise<DecisionResult>;
 	decide(input: ValueInput): Promise<ValueResult>;
-	/** Adds a run's worktree on its own branch, from the clone at `repoPath`. */
+	/**
+	 * Adds a run's worktree on its own branch, from the project's Clone on
+	 * this Device. Refuses a Clone that is not ready for runs (no git, not
+	 * the top of a repository, no commit), before it adds anything.
+	 */
 	worktree(run: RunRef): Promise<Worktree>;
+	/**
+	 * The files in the worktree at `cwd` that match a glob, relative and
+	 * sorted, without `.git`. The caller checks the glob stays inside.
+	 */
+	files(input: { cwd: string; glob: string }): Promise<string[]>;
+	/**
+	 * A Call item's branch in the worktree at `cwd`: `name`, else the first
+	 * free `name-2`, `name-3`, …, made at `base` (null: the checked-out
+	 * branch, else `fallback`) and checked out. Refuses a dirty worktree.
+	 */
+	itemBranch(input: {
+		cwd: string;
+		name: string;
+		base: string | null;
+		fallback: string;
+	}): Promise<{ branch: string; base: string }>;
 };
 
 export type DeviceState = { online: boolean };
@@ -58,6 +84,11 @@ export type CapabilityQuery = {
 };
 
 export type Capabilities = {
+	/**
+	 * The Device's name when it is not this computer, so a refusal says
+	 * where ("… on hetzner-1"). Null: this computer.
+	 */
+	elsewhere: string | null;
 	/** The harnesses added (the Agents page) and built. */
 	harnesses: HarnessName[];
 	/** The connections defined (Agents → Tools). */
@@ -147,8 +178,8 @@ export type ToolResult =
 /** A run, as the Device that holds its worktree sees it. */
 export type RunRef = {
 	id: string;
-	/** The clone the worktree branches from. */
-	repoPath: string;
+	/** The project: the worktree branches from its Clone on the Device. */
+	projectId: string;
 	/** Default: the clone's current HEAD. */
 	baseRef?: string;
 	/**

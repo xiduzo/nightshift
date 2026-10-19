@@ -17,6 +17,7 @@ import {
 import type { Engine } from "@nightshift/engine/types";
 
 import { createHostExchange } from "./host-exchange";
+import { createWorkHub } from "./work-hub";
 
 /**
  * The Host's privacy rule, in one process: a Walker's paths reach the
@@ -87,6 +88,7 @@ function host() {
 		selfId: sandbox.deviceId,
 		ownerId,
 		isHost: () => true,
+		work: createWorkHub(),
 	});
 }
 
@@ -157,6 +159,7 @@ describe("a Walker's paths", () => {
 					baseRef: "main",
 					walkerId: "device-colleague",
 					startedBy: "colleague",
+					deviceId: null,
 					createdAt: now,
 				},
 			],

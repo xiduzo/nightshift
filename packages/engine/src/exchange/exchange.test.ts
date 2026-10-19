@@ -316,6 +316,10 @@ describe("a run walked elsewhere", () => {
 			},
 			addClone: async () => {},
 			archive: async () => null,
+			startRun: async () => {
+				throw new Error("not in this test");
+			},
+			placements: async () => [],
 		};
 		const { engineB, run, stepId } = await waitingOnB(relay);
 		const space = engineB.space(a.spaceId, { personId: "person-a" });

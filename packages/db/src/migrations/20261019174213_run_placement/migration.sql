@@ -1,0 +1,1 @@
+ALTER TABLE `run` ADD `device_id` text;

@@ -18,6 +18,7 @@ import type { Engine } from "@nightshift/engine/types";
 import { ORPCError } from "@orpc/server";
 
 import { NOT_A_HOST } from "./host";
+import type { WorkHub } from "./work-hub";
 
 /**
  * This computer as the Host of run history for its paired Devices: the
@@ -52,6 +53,8 @@ export function createHostExchange(deps: {
 	/** The Person who owns this Host: the owner of its own Walker's paths. */
 	ownerId: string;
 	isHost(): boolean;
+	/** The calls of runs this Host walks, for the Devices they are placed on. */
+	work: WorkHub;
 }): HostExchange {
 	const { db, engine, registry } = deps;
 	const { exchange } = engine;
@@ -235,7 +238,49 @@ export function createHostExchange(deps: {
 				? exchange.ownFile(ref)
 				: exchange.readArchive(ref);
 		},
+
+		async *work(key, input, signal) {
+			await admit(key);
+			yield* deps.work.take(
+				key.deviceId,
+				signal ?? new AbortController().signal,
+				input.running,
+			);
+		},
+
+		async workReply(key, input) {
+			await admit(key);
+			deps.work.reply(key.deviceId, input);
+		},
+
+		async startRun(key, input) {
+			await admit(key);
+			const { spaceId, ...start } = input;
+			await mayStart(key, spaceId);
+			const run = await engine
+				.space(spaceId, { personId: key.personId })
+				.startRun({ ...start, startedBy: key.personId });
+			return { runId: run.id };
+		},
+
+		async placements(key, input) {
+			await admit(key);
+			if (!(await isMember(key, input.spaceId))) {
+				throw new Error(`Project not found: ${input.projectId}`);
+			}
+			return engine
+				.space(input.spaceId, { personId: key.personId })
+				.listPlacements(input.projectId);
+		},
 	};
+
+	/** Refuses a Person whose role in the Space does not start runs. */
+	async function mayStart(key: DeviceKeyAccess, spaceId: string) {
+		const role = await roleIn(db, key.personId, spaceId);
+		if (!role || !roleAllows(role, { run: ["start"] })) {
+			forbidden("Your role in this Space does not allow this.");
+		}
+	}
 
 	/** The archive takes a run's files from its Walker only, in its owner's Spaces. */
 	async function ownRun(key: DeviceKeyAccess, ref: ArchiveRef): Promise<void> {

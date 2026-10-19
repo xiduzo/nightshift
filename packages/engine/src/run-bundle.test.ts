@@ -4,7 +4,7 @@ import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness, reportingScript } from "@nightshift/agents/fake";
 import { createDb } from "@nightshift/db";
-import { event, step } from "@nightshift/db/schema/nightshift";
+import { event, run, step } from "@nightshift/db/schema/nightshift";
 import type { AgentNode, CommandNode, Flow } from "@nightshift/flows";
 import { asc, eq, sql } from "drizzle-orm";
 
@@ -191,13 +191,17 @@ describe("exportRun", () => {
 
 		const opened = await openRunBundle(path);
 		expect(opened.meta).toMatchObject({
-			formatVersion: 4,
+			formatVersion: 5,
 			runId,
 			missingTranscripts: [],
 			redacted: 0,
 		});
 		expect(opened.meta.schema).toEqual(expect.any(String));
 		expect(opened.run.id).toBe(runId);
+		expect(opened.run.deviceId).toBe(
+			(await sandbox.db.select().from(run).where(eq(run.id, runId)))[0]
+				?.deviceId ?? "missing",
+		);
 		expect(opened.run.spaceId).toBe(sandbox.spaceId);
 		expect(opened.clones[0]?.path).toBe(sandbox.repoPath);
 		expect(opened.events).toEqual(live);

@@ -31,6 +31,7 @@ import {
 	messageOf,
 	type NodeAction,
 	type NodeKind,
+	onDevice,
 	PLAIN_KIND,
 	type Requirement,
 	STOP_GRACE_MS,
@@ -95,24 +96,25 @@ export const cliToolsDefined: Requirement<AgentNode> = (nodes, has) => {
 	return unknown
 		.map(
 			({ name, nodeIds }) =>
-				`The flow uses the CLI tool "${name}" (${nodeIds.join(", ")}), but no CLI tool has that name. Add it under Agents → Tools.`,
+				`The flow uses the CLI tool "${name}" (${nodeIds.join(", ")}), but no CLI tool has that name${onDevice(has)}. Add it under Agents → Tools.`,
 		)
 		.join(" ");
 };
 
-/** Every CLI tool an Agent node uses is on this computer. */
+/** Every CLI tool an Agent node uses is on the Device. */
 export const cliToolsInstalled: Requirement<AgentNode> = (nodes, has) => {
 	const notFound = [
 		...new Set(
-			// A node's own CLI tools need no definition, but this computer must have them.
+			// A node's own CLI tools need no definition, but the Device must have them.
 			nodes.flatMap(programsOf),
 		),
 	].filter((name) => (has.programs[name] ?? null) === null);
 	if (notFound.length === 0) return null;
 	return notFound
-		.map(
-			(name) =>
-				`The flow uses the CLI tool "${name}", but this computer does not have it. Install ${name}, or take it off the flow.`,
+		.map((name) =>
+			has.elsewhere === null
+				? `The flow uses the CLI tool "${name}", but this computer does not have it. Install ${name}, or take it off the flow.`
+				: `The flow uses the CLI tool "${name}" on ${has.elsewhere}, but that device does not have it. Install ${name} there, or choose another device.`,
 		)
 		.join(" ");
 };
@@ -129,7 +131,7 @@ export const harnessesAdded: Requirement<AgentNode> = (nodes, has) => {
 	return missing
 		.map(
 			({ harness, nodeIds }) =>
-				`The flow has ${nodeIds.length === 1 ? "an Agent node" : "Agent nodes"} on ${HARNESS_LABEL[harness]} (${nodeIds.join(", ")}), but no ${HARNESS_LABEL[harness]} harness is added. Add it under Agents.`,
+				`The flow has ${nodeIds.length === 1 ? "an Agent node" : "Agent nodes"} on ${HARNESS_LABEL[harness]} (${nodeIds.join(", ")}), but no ${HARNESS_LABEL[harness]} harness is added${onDevice(has)}. Add it under Agents.`,
 		)
 		.join(" ");
 };
@@ -137,7 +139,7 @@ export const harnessesAdded: Requirement<AgentNode> = (nodes, has) => {
 /** An Agent node's checker needs the decider. */
 export const checkersHaveDecider: Requirement<AgentNode> = (nodes, has) =>
 	!has.decider && nodes.some((n) => n.checker !== undefined)
-		? "The flow has an Agent node with a checker, but no decider is configured."
+		? `The flow has an Agent node with a checker, but no decider is configured${onDevice(has)}.`
 		: null;
 
 /** The harnesses the Agent nodes name that the Device has not added, with their nodes. */
@@ -604,7 +606,7 @@ async function checkOutcome(
 		harnessSessionId,
 		costUsd,
 	});
-	const decider = step.device.capabilities().decider;
+	const decider = (await step.device.capabilities()).decider;
 	if (!decider) {
 		return finish(
 			"error",

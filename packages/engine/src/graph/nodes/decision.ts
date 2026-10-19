@@ -4,6 +4,7 @@ import {
 	endedAtReason,
 	type NodeAction,
 	type NodeKind,
+	onDevice,
 	PLAIN_KIND,
 	type Requirement,
 	type StepContext,
@@ -57,7 +58,7 @@ export const modelDecisionsHaveDecider: Requirement<DecisionNode> = (
 	has,
 ) =>
 	!has.decider && nodes.some((n) => n.by === "model")
-		? "The flow has a Decision node decided by a model, but no decider is configured."
+		? `The flow has a Decision node decided by a model, but no decider is configured${onDevice(has)}.`
 		: null;
 
 /** Which existing step a Decision takes up: the chooser's rule (`RESUME_RULES`). */
