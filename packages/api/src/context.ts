@@ -8,17 +8,24 @@ import type {
 import type { HarnessName } from "@nightshift/agents/types";
 import type { Permissions, Session } from "@nightshift/auth";
 import type { DeviceKeyAccess } from "@nightshift/auth/device-keys";
+import type { RequestAccess } from "@nightshift/auth/request";
 import type { Database } from "@nightshift/db";
 import type {
+	ArchiveRef,
 	CliToolStore,
 	ConnectionStore,
 	GitInstall,
 	HostRole,
 	KeyStoreKind,
+	ListedSpace,
 	PairedDevice,
 	ProfileStore,
 	ProjectReadiness,
+	RunCommand,
+	RunCommandInput,
+	RunRows,
 	SettingsStore,
+	SyncCursors,
 } from "@nightshift/engine";
 import type { Engine } from "@nightshift/engine/types";
 
@@ -37,6 +44,13 @@ export type Context = {
 	setActiveSpace(spaceId: string): Promise<void>;
 	/** The request's headers, with the local session when it got one: for Better Auth's own checks. */
 	headers: Headers;
+	/** The request came from this computer itself, not through a proxy or from elsewhere (`isThisComputer`). */
+	fromThisComputer: boolean;
+	/** Sets a Person's email and password (`@nightshift/auth/login`). */
+	setLogin(
+		personId: string,
+		input: { email: string; password: string; name?: string },
+	): Promise<{ email: string }>;
 	/**
 	 * The Device key the request carries (`Authorization: Bearer`), resolved.
 	 * A request with a key has no session: it is a Device, not a Person.
@@ -44,8 +58,12 @@ export type Context = {
 	deviceKey: DeviceKeyAccess | null;
 	/** This computer's Devices: as a Host (pairing, presence) and its links to Hosts. */
 	devices: Devices;
+	/** This computer as a Host of run history: what paired Devices pull, push and archive. */
+	exchange: HostExchange;
 	/** A new Space, its creator the owner, and the session's active one. */
 	createSpace(name: string): Promise<{ id: string }>;
+	/** The Members and invitations of the session's Space (the organization plugin). */
+	members: RequestAccess["members"];
 	db: Database;
 	/** The engine of this Device. Procedures use the view of the session's Space. */
 	engine: Engine;
@@ -157,6 +175,58 @@ export type HostHello = {
 	host: { id: string; name: string; addresses: string[] };
 	deviceId: string;
 	personId: string;
+	/** The Spaces the Device's owner is a Member of on the Host, with their role there. */
+	spaces: ListedSpace[];
+};
+
+/** One answer of the exchange: rows after the Device's cursors, and its commands. */
+export type SyncBatch = {
+	rows: RunRows;
+	/** The cursors moved past these rows. */
+	cursors: SyncCursors;
+	/** The commands that wait for the Device, as the Walker of their runs. */
+	commands: RunCommand[];
+};
+
+/**
+ * This computer as the Host of run history, for its paired Devices. Each
+ * call carries the Device key; the Host filters by its Person's membership
+ * and never lets a Device write a row of another Walker.
+ */
+export type HostExchange = {
+	/** Rows of the Spaces the key's Person is a Member of, after the cursors, but the Device's own. */
+	pull(key: DeviceKeyAccess, cursors: SyncCursors): Promise<SyncBatch>;
+	/** The same, then every new batch as rows land, until the signal aborts. */
+	stream(
+		key: DeviceKeyAccess,
+		cursors: SyncCursors,
+		signal?: AbortSignal,
+	): AsyncIterable<SyncBatch>;
+	/** Takes the Device's own rows. Refuses a batch with a row of another Walker or Space. */
+	push(key: DeviceKeyAccess, rows: RunRows): Promise<{ events: number }>;
+	/** A person's action on a run another Device walks, in the name of the key's Person. */
+	command(
+		key: DeviceKeyAccess,
+		input: RunCommandInput & { runId: string },
+	): Promise<void>;
+	/** The Walker applied a command, or says why not. */
+	commandDone(
+		key: DeviceKeyAccess,
+		input: { id: string; error: string | null },
+	): Promise<void>;
+	/** Records the Device's Clone of a Project in a Space of this Host. */
+	addClone(
+		key: DeviceKeyAccess,
+		input: { spaceId: string; projectId: string; deviceName: string },
+	): Promise<void>;
+	/** Keeps a file of a run the Device walks. */
+	archivePut(
+		key: DeviceKeyAccess,
+		ref: ArchiveRef,
+		content: string,
+	): Promise<void>;
+	/** A file of a run of a Space the key's Person is a Member of. Null when there is none. */
+	archiveGet(key: DeviceKeyAccess, ref: ArchiveRef): Promise<string | null>;
 };
 
 /** A pairing code, as the Person approving it sees it. */

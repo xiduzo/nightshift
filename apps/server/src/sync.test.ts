@@ -253,7 +253,9 @@ describe("documentAccess: a Space document", () => {
 		const cookie = (headers: Headers) => headers.get("cookie") ?? "";
 		return {
 			opened,
+			spaceId: space.id,
 			name: spaceDocumentName(space.id),
+			ada: ada.headers,
 			bob: cookie(bob.headers),
 			cy: cookie(cy.headers),
 		};
@@ -301,6 +303,17 @@ describe("documentAccess: a Space document", () => {
 		await waitFor(() => outsider.failed.length > 0);
 		expect(outsider.provider.isSynced).toBe(false);
 		expect(outsider.doc.getMap("members").size).toBe(0);
+	});
+
+	test("a removed member is refused", async () => {
+		const { spaceId, name, ada, bob } = await platform();
+		await people.auth.api.removeMember({
+			headers: ada,
+			body: { memberIdOrEmail: "bob@example.com", organizationId: spaceId },
+		});
+		const removed = connect(name, { origin: ORIGIN, cookie: bob });
+		await waitFor(() => removed.failed.length > 0);
+		expect(removed.provider.isSynced).toBe(false);
 	});
 
 	test("this computer's Person is not a member of another Person's Space", async () => {

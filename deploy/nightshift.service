@@ -1,0 +1,54 @@
+# Night Shift as a systemd service on a Linux server.
+#
+#   sudo install -m 755 nightshift-linux-x64 /usr/local/bin/nightshift
+#   sudo useradd --system --create-home --home-dir /home/nightshift nightshift
+#   sudo install -d -m 700 /etc/nightshift
+#   openssl rand -hex 32 | sudo tee /etc/nightshift/auth-secret >/dev/null
+#   sudo cp nightshift.service /etc/systemd/system/
+#   sudo systemctl enable --now nightshift
+#
+# The service runs as its own user: the agent logins (`claude`, `codex`), the
+# git identity and the SSH keys for git remotes go in /home/nightshift.
+
+[Unit]
+Description=Night Shift
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=nightshift
+Group=nightshift
+WorkingDirectory=~
+ExecStart=/usr/local/bin/nightshift serve
+
+# The database and the run history: /var/lib/nightshift.
+StateDirectory=nightshift
+StateDirectoryMode=0700
+Environment=NIGHTSHIFT_DATA_DIR=/var/lib/nightshift
+Environment=PORT=3000
+
+# Be a Host at these https:// addresses, in the order other computers try
+# them. Listen on 127.0.0.1 only, because the way out (Caddy, Tailscale Serve,
+# cloudflared) runs on this computer. See docs/deploy/.
+Environment=NIGHTSHIFT_HOST_ADDRESSES=https://nightshift.example.com
+Environment=NIGHTSHIFT_LISTEN=127.0.0.1
+
+# Secrets come as files, never in this unit. Night Shift reads the auth
+# secret as BETTER_AUTH_SECRET, and every other credential as the `${NAME}`
+# of the same name (for example a connection that uses ${GITHUB_TOKEN}).
+LoadCredential=BETTER_AUTH_SECRET:/etc/nightshift/auth-secret
+#LoadCredential=GITHUB_TOKEN:/etc/nightshift/github-token
+
+# A stop gives the database up at once. Exit code 3: another Night Shift took
+# the database. Start again, and it waits until that one stops.
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

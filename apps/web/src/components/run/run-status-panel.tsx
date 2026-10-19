@@ -33,6 +33,7 @@ import type { CurrentWait } from "@/lib/transcript";
 import { orpc } from "@/utils/orpc";
 
 import { ResumeComposer } from "./resume-composer";
+import { walkerName } from "./walker-badge";
 
 const SLEEP_REASON: Record<CurrentWait["reason"], string> = {
 	"usage-limit": "The agent hit its usage limit.",
@@ -157,8 +158,26 @@ function noticeOf({
 	onShowGate: () => void;
 	wait: CurrentWait | null;
 }): Notice | null {
+	// A run of another device: answers, signals and stops go to it; only it resumes.
+	const elsewhere = run.walker.thisDevice ? null : walkerName(run.walker);
+	const resumeHere = elsewhere
+		? `Only ${elsewhere} can resume it.`
+		: "Resume it to continue.";
 	switch (status) {
 		case "waiting":
+			if (
+				openGateNodeId &&
+				elsewhere &&
+				run.commands.some((c) => c.kind === "gate.resolve")
+			) {
+				return {
+					icon: SendIcon,
+					tone: "text-status-waiting",
+					title: "Answer sent",
+					gist: `It applies when ${elsewhere} is online.`,
+					body: `Your answer is on its way to ${elsewhere}. The run goes on when ${elsewhere} is online.`,
+				};
+			}
 			return openGateNodeId
 				? {
 						icon: HandIcon,
@@ -244,7 +263,7 @@ function noticeOf({
 						{wait?.message ? `\n${wait.message}` : null}
 					</>
 				),
-				actions: <WakeButton runId={run.id} />,
+				actions: elsewhere ? undefined : <WakeButton runId={run.id} />,
 			};
 		}
 		case "failed":
@@ -252,9 +271,9 @@ function noticeOf({
 				icon: CircleXIcon,
 				tone: "text-destructive",
 				title: "The run failed",
-				gist: firstLine(run.reason) ?? "Resume it to continue.",
-				body: run.reason ?? "The run failed. Resume it to continue.",
-				resumable: true,
+				gist: firstLine(run.reason) ?? resumeHere,
+				body: run.reason ?? `The run failed. ${resumeHere}`,
+				resumable: !elsewhere,
 			};
 		case "interrupted":
 			return {
@@ -264,19 +283,19 @@ function noticeOf({
 				gist:
 					firstLine(run.reason) ??
 					"Night Shift stopped while this run was going.",
-				body: `${run.reason ?? "Night Shift stopped while this run was going."} Resume it to continue where it left off.`,
-				resumable: true,
+				body: `${run.reason ?? "Night Shift stopped while this run was going."} ${elsewhere ? resumeHere : "Resume it to continue where it left off."}`,
+				resumable: !elsewhere,
 			};
 		case "stopped":
 			return {
 				icon: CircleStopIcon,
 				tone: "text-status-stopped",
 				title: "The run stopped",
-				gist: firstLine(run.reason) ?? "Resume it to continue.",
+				gist: firstLine(run.reason) ?? resumeHere,
 				body:
 					run.reason ??
-					"The run stopped before its end. Resume it to continue where it left off.",
-				resumable: true,
+					`The run stopped before its end. ${elsewhere ? resumeHere : "Resume it to continue where it left off."}`,
+				resumable: !elsewhere,
 			};
 		default:
 			return null;

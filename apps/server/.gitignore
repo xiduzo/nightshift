@@ -56,3 +56,6 @@ next-env.d.ts
 
 !.env.schema
 /src/env.ts
+
+# nightshift binary build
+/.cache/

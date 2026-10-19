@@ -181,9 +181,9 @@ function PairDeviceSteps({
 			<DialogHeader>
 				<DialogTitle>Pair a device</DialogTitle>
 				<DialogDescription>
-					On the other computer, run{" "}
-					<span className="font-mono">bun run join</span> with the address of
-					this one. Enter the code it shows.
+					On the other computer, open Devices and choose Join a Host, or run{" "}
+					<span className="font-mono">nightshift join</span>, with the address
+					of this one. Enter the code it shows.
 				</DialogDescription>
 			</DialogHeader>
 			<FieldGroup>

@@ -463,7 +463,7 @@ iroh.
 | `clone` | project, device, path | the Device |
 | `offer` | device, profile, space, permission cap, session cap | the Device |
 | `run`, `step`, `event` | `space_id`, `walker_id`, `device_id`, `started_by`; `seq` per Walker | the Walker |
-| `sync_cursor` | per Host and owner: the last seq seen | the Device |
+| `sync_cursor` | per Host, Space and owner: the last seq seen | the Device |
 | archive | checkpoints and transcripts per Space | the Host, copies only |
 | events | `StepStarted` gains `deviceId`; new `DeviceJoined`, `DeviceRevoked`, `DeviceOnline`, `DeviceOffline`, `HandedOff`, `WalkerMoved`, `MemberJoined`, `MemberRemoved`, `OfferMade`, `OfferWithdrawn`. Existing payloads keep their fields. | |
 
@@ -853,12 +853,319 @@ iroh.
      Spaces. Joining from the desktop app's UI calls the same
      `devices.join`. A Person removing their own home link, and moving a
      home, need a UI.
+   *Landed (part B, the event log exchange and the archive):*
+   - **What moves.** Runs, steps, agent sessions and the events of runs:
+     the Walker's rows. Facts of no run (a project's, a schedule's, a
+     Device's) stay on the Replica that wrote them; the Space document
+     carries the Space's definitions. The merge is a union: an insert
+     skips a row the Replica has (`(walker_id, walker_seq)`, row ids), and
+     nothing is updated across Devices. The one column that changes after
+     its insert, `agent_session.harness_session_id`, is the Walker's copy
+     of its `HarnessSessionAssigned` event: a receiver fills it from that
+     event. A batch carries its events in each Walker's order with the
+     run, step and session rows they name, so parents go in first and the
+     foreign keys hold (`packages/engine/src/exchange/rows.ts`).
+   - **Cursors** (`sync_cursor`): per Host, Space and Walker, the last
+     `walker_seq` this Replica has. Finer than "per Host and Walker", so a
+     Space the owner joins later is exchanged from its start. For this
+     computer's own Walker the row is the push cursor: what the Host took.
+   - **Over the Link** (`apps/server/src/devices/exchange.ts`, run while
+     the link is online): a push loop sends this computer's rows of the
+     Spaces the Host keeps, after the cursor, whenever an event lands; a
+     pull loop reads `sync.stream` (an oRPC event iterator: a batch, then
+     every new one as rows land on the Host or a command waits). The run
+     log ingests what arrives (`RunLog.ingest`, the same bookkeeping as an
+     append) and the bus tells the run's watchers, so a run page of a run
+     walked elsewhere updates live. `sync.pull` is the same batch once.
+   - **The Host filters** (`apps/server/src/devices/host-exchange.ts`): it
+     serves rows of the Spaces the key's Person is a Member of, never the
+     Device's own back; it takes only rows whose Walker is the key's
+     Device, in those Spaces, and refuses the whole batch otherwise
+     (`FORBIDDEN`). Its own Walker's rows are served like pushed ones; its
+     Replica keeps everything it receives.
+   - **The Host's Spaces on a Device.** `link.hello` (and every heartbeat)
+     lists the Spaces the key's Person is a Member of, with their role.
+     The Device keeps them in `host_space`, with an `organization` row and
+     a `member` row for its own Person in that role: this computer's
+     Person acts there as its owner does on the Host, so sessions, the
+     Space switcher and `hasPermission` work unchanged. A personal Space
+     there is "Personal on <Host>", never this computer's personal Space.
+     Their documents sync read-only over the link (one WebSocket per link
+     for every document); the copy here is the Host's: no import, no
+     member mirror. A batch whose project has not arrived waits for it
+     (`MissingProjectError`) and goes again.
+   - **Projects in a Space a Host keeps.** Adding a folder whose remote is
+     one of its projects records the Clone through the Host
+     (`sync.addClone`, which needs `project.add`), then the `clone` row
+     here. A new project, a rename, a removal or a move there is refused
+     on the Device: "change its projects there".
+   - **Commands** (`run_command`, `exchange/commands.ts`). The Walker is
+     the only writer of its run's events, so answering a Gate, sending a
+     signal and stopping a run walked elsewhere is a command. The Replica
+     that asks checks what it can first (the Gate is open, the choice is
+     one of its choices, the run waits for that signal), then the engine
+     hands it to its `Relay`: a Host keeps it for the Walker; a Device
+     sends it to the Host (`sync.command`), which checks the role of the
+     key's Person (`gate.resolve`, `signal.send`, `run.stop`) and applies
+     it at once when it walks the run itself. The Walker takes its
+     commands with the stream, checks again from its own Replica (the run
+     is its own; the Space document's Member mirror gives the Person a
+     role that allows it), applies it as the local action, and reports
+     it (`sync.commandDone`, with its reason when it refused). A command
+     to an offline Walker waits; the run page, the inbox and the run
+     header show it as sent ("Answer sent"). Pending commands are known
+     where they wait: on the Host. A Device whose Host is offline refuses
+     the action; there is no outbox.
+   - **Read-only elsewhere.** Recovery, the daemon's resume and a
+     person's resume touch only runs this Device walks. Every other
+     action on a run walked elsewhere is refused. `RunSummary.walker`
+     (`id`, `name`, `thisDevice`) names the Walker: its `device` row, else
+     the Space document's Device names. The UI shows it on the runs list,
+     the run page and the inbox; a run of another device has no take
+     over, wake, resume or export, and its folder is not shown.
+   - **The archive** (`archive.put`, `archive.get`, the `archive`
+     permission; `exchange/archive.ts`). After a pushed batch with a node
+     that ended, the Walker puts that step's transcript and command log,
+     and its run's latest checkpoint per namespace with its pending
+     writes (JSON, blobs in base64). Rows first, then files, then the
+     cursor: the Host takes files only of runs it has, from their Walker,
+     in its Person's Spaces. Layout, the same on a Host and as a Device's
+     cache: `<data dir>/archive/<space>/<run>/<step>.ndjson`,
+     `<step>.log`, `checkpoint.json`. A transcript of a run walked
+     elsewhere is read there, and fetched from the Host on demand when it
+     is missing (kept once the step has ended); the Host serves its own
+     runs from their own files. A transcript that lands tells the run's
+     watchers. A step of a run walked elsewhere shows its transcript once
+     it ended: there are no live transcript chunks across Devices yet.
+     Retention is undecided, as for run history: everything is kept.
+   - **Host offline**: every Device keeps walking its own runs; both loops
+     start again at their cursors when the link is back.
+   - Tests: `packages/engine/src/exchange/exchange.test.ts` (two
+     Replicas in one process) and `apps/server/src/devices/exchange.test.ts`
+     (two daemons, the harness of part A in `test-daemons.ts`): B walks a
+     run in A's Space, A gets it live with the same status and B's name,
+     answers its Gate from A, B applies it and the run finishes on both, A
+     opens the transcript from the archive; a Space B's owner is not in
+     never reaches B; a forged row is refused; B walks while A is down and
+     A catches up.
+   - **A Walker's paths stay with its owner.** Where its worktree,
+     transcripts and command logs are on its disk is private to the
+     Walker's owner. The Host keeps them only from its own owner's
+     Devices, and serves them only to a Device whose owner is the
+     Walker's; every other Replica gets the rows without them
+     (`withoutPrivatePaths`). The rows keep their shape, so old readers
+     and the payload rule hold: `run.worktree_path`,
+     `step.transcript_path`, `WorktreeCreated.worktreePath` and
+     `StepStarted.transcriptPath` become `""`, and a `StepStarted.logPath`
+     that was set becomes `""` (still "this step has a log"). Clone paths
+     never leave their Device: `clone` rows and the facts of no run
+     (`CloneAdded`, `ProjectAdded`) are not exchanged, and the Space
+     document has none.
+   - **Who started it.** `run.started_by` travels with the run row. A run
+     this computer starts in a Host's Space names this computer's Person
+     as the Host knows them (the Person of its link), so every Replica of
+     the Space names the same Person; the git author stays the local one.
+   - **Every project of a Space is listed**, also without a Clone here:
+     `Project.repoPath` is null, and the UI says "Not on this computer"
+     (slice 5 starts runs placed on another Device from anywhere). Every
+     call that needs the folder (flows, branches, schedules, a run walked
+     here, rename and removal) says "This project is not on this
+     computer. Add its folder here to use it."
+   - Not yet, and risky: a Person who leaves a Space keeps the rows they
+     had. Pending commands show only on the Host. A run bundle of a run
+     walked elsewhere has no transcripts. Transcripts in the archive are
+     run content, readable by the Host's operator (as "What is
+     deliberately not promised" says). The Members page should treat a
+     Host's Space as read-only on a Device.
+
 5. **Placement.** Run-level, then per node with the Hand-off;
    `device-offline` sleep and reattach.
 6. **Sharing.** Invitation-only signup, Members and roles, Offers with the
    Device-side checks, audit events, per-Person git identity in worktrees.
+
+   *Landed (part A, Members):*
+   - **Invitation-only.** Better Auth's admin plugin: `user.role` is the
+     Person's role on the Host, `admin` for the Host admin, else `user`
+     (not a role in a Space). The first Person is the Host admin: the
+     user-create hook gives `admin` while the Host has none, and the
+     migration names this computer's Person (else the earliest account).
+     `localPerson`, which makes a Person without the hooks, claims it the
+     same way. Email and password sign-up (`/sign-up/email`) is refused by
+     a `hooks.before` unless the Host has nobody yet, or the body names a
+     pending, unexpired invitation of that email (`invitationId`): so the
+     link, not only the email, makes the account
+     (`packages/auth/src/members.ts`). The admin's own `createUser` stays
+     open to the Host admin. One person on one computer is untouched: the
+     local Person and the local session make no sign-up.
+   - **No email server.** Invitations are stored only (no
+     `sendInvitationEmail`); the Members page shows the link to copy:
+     `<the page's origin>/invite/<invitation id>`. The id is the link's
+     secret. Invitations last seven days (`INVITATION_DAYS`), since a
+     person passes the link on by hand. An email sender is the plugin's
+     `sendInvitationEmail` hook, later. The link uses the origin of the
+     browser that made it: open the Members page by the Host's `https://`
+     address to get a link a colleague can use.
+   - **Accepting** (`/invite/$invitationId`, outside the app's sidebar,
+     like `/login`): `invitations.get` is public (Space, inviter, role,
+     status, whether the email has an account here). No account: name and
+     password make one (the email is the invitation's), then
+     `invitations.accept`; an account: sign in, then accept; already
+     signed in with that email: Join. Accepting makes the Person a Member
+     and the session's active Space (the plugin does both), and the app
+     goes home in it. `/login` signs in only: "New here? Open the
+     invitation link."
+   - **Members page** (`/members`, sidebar under Inbox): `members.list`
+     (Members with name, email, role; pending invitations; what the
+     session may change), `members.invite` (admin, member or viewer),
+     `members.cancelInvitation`, `members.setRole`, `members.remove`, each
+     behind its `member.invite`, `member.role` or `member.remove` check
+     (`permitted`), then the organization plugin checks the role again
+     (an admin cannot touch an owner; nobody deletes a Space without
+     `space.delete`). Personal Space: "Nobody can join it" and Create
+     Space. Custom roles are not in this slice.
+   - **Audit.** The organization hooks report `MemberChange` (joined,
+     removed, role) with the Person whose session called the endpoint
+     (Better Auth's endpoint context, `tryGetCurrentAuthEndpointContext`).
+     The daemon logs `MemberJoined` (`personId`, `role`, `by`,
+     `invitedBy`), `MemberRoleChanged` (`previousRole`) and
+     `MemberRemoved` in that Space (`engine.logMemberChange`). Making a
+     Space logs its owner's `MemberJoined`. The Space document's member
+     mirror follows as before.
+   - **Who started a run.** `RunStarted` gains `startedBy` (appended), and
+     `run.started_by` (no foreign key, like `walker_id`). `runs.start`
+     passes the session's Person; a schedule's run has none. The migration
+     names this computer's Person for every run no schedule started. A
+     run's summary has `startedBy` (id and name, from the Replica's
+     accounts); the run page's "Started by" says You, their name, or the
+     schedule. Run bundles are format 4 (`started_by`); format 3 reads
+     with none.
+   - **Git identity per Person.** The worktree's own config gets the
+     starter's `user.name` and `user.email` (`RunRef.author`,
+     `setWorktreeAuthor`): `git config --worktree`, which needs
+     `extensions.worktreeConfig` in the clone, set once (as `git
+     sparse-checkout` does). The clone and its other worktrees keep their
+     identity. A Person with no real email (`…@nightshift.invalid`, this
+     computer's own) gets none: the repository's identity stays.
+   - Tests: sign-up refused without an invitation, for another email and
+     for a canceled one; the first Person is the Host admin; invite, sign
+     up, accept, member in the Space; a viewer cannot invite; an admin
+     cannot delete the Space; a removed member loses the Space (and its
+     document on the relay); role changes and removals name who made
+     them; `startedBy` and the worktree identity, and none for the local
+     Person.
+   - Not yet (part B, after placement): Offers and the offering Device's
+     own checks; the git identity on a Device that runs a colleague's
+     step comes with them.
 7. **From anywhere.** TLS or tailnet guidance, the Linux binary, the
    desktop app as a Host or joining one.
+
+   *Landed (from anywhere):*
+   - **`nightshift`, one file** (`apps/server/scripts/build-binary.ts`,
+     `bun run --cwd apps/server build:binary --target all`): `bun build
+     --compile` for linux-x64, linux-arm64 and darwin-arm64. A generated
+     entry embeds the web build and every `migration.sql` (imports `with {
+     type: "file" }`) and hands them to the CLI (`src/headless/embedded.ts`).
+     Two build plugins: varlock's loader becomes `process.env` (the shims
+     the desktop app used, moved to `apps/server/src/shims`), and libsql's
+     run-time pick of `@libsql/<target>` becomes a fixed `require` of the
+     target's `index.node`, which the executable then embeds. Another
+     platform's native package is downloaded from npm once, checked against
+     the registry's integrity, and kept in `apps/server/.cache/`. No
+     sourcemap file; identifiers stay unminified so a stack trace reads.
+     Tested: the darwin binary on this Mac with a fresh data folder; both
+     Linux binaries in a Debian container (x64 under emulation).
+   - **The CLI** (`apps/server/src/cli.ts`): `nightshift serve` (flags
+     over the environment: `--port`, `--data-dir`, `--host-address`
+     repeated, `--listen`, `--tls-port`, `--web`), `nightshift join
+     <host> [--guest]`, and new `nightshift pair <code> [--yes]`, which
+     approves a code on a Host without a screen (it calls the local
+     daemon's `devices.review` and `approve` as this computer's Person;
+     `docker exec` works). `serve` fills the environment the way the
+     desktop app did (`apps/server/src/daemon-env.ts`, now shared):
+     `BETTER_AUTH_URL` and `CORS_ORIGIN` default to the first `https://`
+     Host address (the UI is served by the daemon itself), else
+     `http://localhost:<port>`. It extracts the migrations to
+     `<data dir>/migrations` before the server loads
+     (`migrateDb(db, { migrationsFolder })`).
+   - **The daemon serves its UI** when it has one (embedded, or
+     `NIGHTSHIFT_WEB_DIR`, `src/headless/web.ts`): GET only, never `/rpc`,
+     `/api`, `/sync`; `/` only for `Accept: text/html` (a probe still gets
+     "OK"); a prerendered page by path, else `index.html`, which routes in
+     the browser (React reports a recoverable hydration mismatch there).
+     Each page gets `<meta name="nightshift-daemon">`, and the UI then
+     calls the origin it came from instead of `VITE_SERVER_URL`
+     (`apps/web/src/lib/server-url.ts`): a Host has several addresses, and
+     the one the browser used is the one that answers.
+   - **Secrets without a keychain.** The auth secret: `BETTER_AUTH_SECRET`,
+     else the file `BETTER_AUTH_SECRET_FILE`, else `BETTER_AUTH_SECRET` in
+     the secrets folder, else made once in the data folder (0600). A
+     `${NAME}`: the environment, then a file `NAME` in the secrets folder
+     (`NIGHTSHIFT_SECRETS_DIR`, else systemd's `CREDENTIALS_DIRECTORY`),
+     read at start, under the environment. Secrets saved on the
+     Connections page go to the keychain where it works, else
+     `<data dir>/secrets/<NAME>` (0600), the same choice as Device keys
+     (`packages/engine/src/keychain.ts`, `NIGHTSHIFT_KEY_STORE=file`). The
+     Devices page says where: "Secrets and access to your Hosts".
+   - **Listening.** `NIGHTSHIFT_LISTEN` narrows where a Host binds (default
+     `0.0.0.0`): `127.0.0.1` when its way out runs on the same computer. A
+     daemon that is not a Host binds `127.0.0.1` whatever it says. With its
+     own certificate, `nightshift serve` and the desktop app keep plain
+     http on `127.0.0.1:PORT` for this computer (the window, the CLI) and
+     serve https on `NIGHTSHIFT_TLS_PORT` (default `PORT + 443`) at the
+     Host's hostname (`apps/server/src/serve.ts`). `bun run dev` keeps
+     slice 4's single listener.
+   - **A proxy is not this computer.** Every way out connects to the
+     daemon from the loopback. The local session now also needs no
+     forwarding header (`Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`,
+     `X-Real-IP`, `CF-Connecting-IP`, `Tailscale-User-Login`) and a
+     loopback name in the URL (a TCP tunnel such as rathole passes the
+     public name on). The daemon's own `http://localhost:PORT` and
+     `http://127.0.0.1:PORT` are trusted origins, for its UI over an SSH
+     tunnel.
+   - **The desktop app** starts the daemon with `serveDaemon`, so it binds
+     by the Host rules and serves its certificate (it passed no `tls`
+     before), flushes the Space documents on quit, and its Devices page
+     has **Join a Host** (`join-host-dialog.tsx`: address, home or guest,
+     the code and fingerprint, waits, closes when the Host allows it; the
+     same `devices.join` stream). A streaming procedure's error now
+     reaches the UI as its message (`readable`, `packages/api`); before,
+     "declined" or "expired" read "Internal server error". A certificate
+     this computer can neither trust nor pin (a proxy's private authority)
+     says so when joining.
+   - **Link order** was already right in part A: the Device saves the
+     Host's list from the pairing answer, learns it again from every
+     `hello` and heartbeat (the Host's order, then its own others), and
+     tries them in order. Tested with the binary: a Host with
+     `https://studio-lan.invalid:3932, https://localhost:3932`, joined at
+     the second, keeps both and is online at the second.
+   - **Deploy** (`deploy/`): a two-stage Dockerfile (Node for the Vite
+     build, whose prerender does not run on Bun alone; `oven/bun:1.3.10-slim`
+     with git and ssh to run), `docker-compose.yml` with Caddy, and a systemd
+     unit with `LoadCredential=`. Guides in `docs/deploy/`: LAN with a
+     self-signed certificate (`.local` by mDNS, first address), tailnet
+     (Serve, Funnel and its caveats), public server (Compose with Caddy,
+     Dokploy, plain Caddy), outbound tunnel (Cloudflare Tunnel, frp,
+     rathole). Tested end to end: the image behind Caddy, a computer
+     joining it as a guest, `docker exec … nightshift pair`. Tailscale,
+     Let's Encrypt, Cloudflare Tunnel, frp and rathole are written from
+     their docs.
+   - **The Host admin's sign-in on a Host without a screen.** The Host
+     admin is this computer's Person (slice 6), which signs in for nothing
+     on the Host and has no password. `nightshift admin --email <email>`
+     (on the Host, or `docker exec`) gives it an email and a password,
+     asked without echo or piped with `--password-stdin`
+     (`account.setLogin`: the owner only, and only from this computer:
+     `Context.fromThisComputer`; `packages/auth/src/login.ts` links a
+     credential account or replaces its password). `nightshift serve`
+     reminds you while a Host's admin has none. Then the admin signs in at
+     the public address and invites from Members; the invitation link uses
+     the page's origin, so the public one. Better Auth trusts every Host
+     address as an origin (`AuthOptions.trustedOrigins`, read per request),
+     so sign-in works at each of them. Tested through Caddy with the
+     Docker image.
+   - Not yet: the desktop app does not serve its UI to other computers'
+     browsers. A container sees an SSH-tunnelled request as another
+     computer's.
 
 Slices 1 to 3 are refactors in the shape of the eight that landed on
 2026-10-19. Slice 4 is the first that needs a second computer.
@@ -901,13 +1208,14 @@ Nothing is open. The next step is slice 1.
   1.7.7, with a test that one Person cannot approve another's code.
 - A headless Device has no keychain: secrets from its environment or a
   file its service manager provides. Say which on the Devices page.
-  Done for Device keys in slice 4 ("Access to your Hosts" says keychain
-  or file); secrets still to do.
+  Done for Device keys in slice 4 and for secrets in slice 7 (files in
+  the data folder, a secrets folder, systemd credentials).
 - A `${NAME}` the placed Device lacks should refuse at run start.
 - The usage-limit sleep is per harness login, so per Device. The sleep
   module needs the Device in its key.
-- Transcripts of a Run walked elsewhere are fetched from the archive on
-  open. Archive retention is undecided, as run retention is today.
+- ~~Transcripts of a Run walked elsewhere are fetched from the archive on
+  open.~~ Done in slice 4, part B. Archive retention is undecided, as run
+  retention is today: everything is kept.
 - Direct Device-to-Device sync on one LAN without the Host: later.
 - Identity across Hosts: a colleague has an account per Host until the
   OIDC provider plugin makes the home Host the login for guest Hosts.

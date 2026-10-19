@@ -10,7 +10,9 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 |------|---------|--------|
 | Developer | Owns a clone of the repo and the coding-agent CLIs. Draws Flows, starts Runs, and answers Gates. In local mode, the only user. | PLAN §1 |
 | Person | A user account (Better Auth's user). The Person who owns this computer's Device is signed in for you: a request from this computer without a session of its own acts as them. | Devices, slice 2 |
-| Member | A Person in a Space, with a role: owner, admin, member or viewer. The role says what they may do there: start Runs, answer Gates, add Projects. A viewer only reads. | Devices, slice 2 |
+| Member | A Person in a Space, with a role: owner, admin, member or viewer. The role says what they may do there: start Runs, answer Gates, add Projects. A viewer only reads. Owners and admins invite people, change roles and remove Members on the Members page; only an owner deletes a Space. A removed Member no longer sees the Space. | Devices, slice 2, slice 6 |
+| Host admin | The first Person on a Host: on this computer, the Person who owns it. The admin plugin's `admin` role, not a role in a Space. | Devices, slice 6 |
+| Invitation | An offer to join one Space with a role, for one email. It is also the account: a Host takes new people by invitation only, so the person makes their account from the invitation's link (`/invite/<id>`), then joins. Night Shift sends no email: the Members page shows the link to copy. It works for seven days, until it is accepted or canceled. A personal Space takes none. | Devices, slice 6 |
 
 ## Objects
 
@@ -20,16 +22,21 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Project | A repository, by its remote: the normalised `origin` (`github.com/acme/app`), so its ssh and https URLs are one Project. Its folders are its Clones. A repository without a remote is a Project on one Device only. | Devices |
 | Clone | A Project's repository on one Device, at a path. A Device has at most one Clone of a Project. Adding a folder whose `origin` names a known Project makes a Clone of it, not a second Project. | Devices |
 | Device | A computer that runs Night Shift, with its own database. One row of the `device` table is this computer: made on the first start, with a random id that never changes and the host name as its name. | Devices |
-| Walker | The Device that walks a Run and writes its Events. Today every Run's Walker is this computer. | Devices |
+| Walker | The Device that walks a Run and writes its Events, the only writer of them. A Run another Device walks is read-only here: answering its Gate, sending its Signal and stopping it travel to its Walker as Commands. | Devices |
 | Owner | The one Device that writes a row. Sync never merges two writers of one row: a Run's rows and Events are its Walker's, a Clone is its Device's. | Devices |
-| Replica | A Device's own database: everything it may see, as far as it has synced. Today, the only one. | Devices |
+| Replica | A Device's own database: everything it may see, as far as it has synced. A Host's Replica keeps every Run its Devices send it. | Devices |
 | Device document | A Device's configuration as one Yjs document, `device:<id>`: its Agent Profiles, CLI Tools, Connections, Settings, and its facts (harnesses, programs, secret names, Clones). Its Device is its Owner: it applies edits and saves the document in its Replica. Syncs at `/sync`, to its owner only: their sessions, and their other Devices on the Device's Home Host. Never holds a secret value. | Devices, slice 3 |
 | Host | A Device with "Be a Host" on: other Devices pair with it and connect to it. It has addresses (`https://` names, in the order to try them). It listens on this computer only (`127.0.0.1`) until one of them is `https://`. It records each paired Device and keeps it online while its Link answers. Not an authority over a Device's data. | Devices, slice 4 |
 | Home Host | The one Host that keeps a Device's Device document. A Device has at most one. Its other Devices of the same owner open the document there. | Devices, slice 4 |
 | Guest Host | Any other Host a Device paired with: it gets the shared Spaces of the Device's owner there, never the Device document. | Devices, slice 4 |
-| Pairing | Joining a Device to a Host: `bun run join <host>` shows a code, a Person signed in on the Host enters it under Devices → Pair a device and allows it, and the Device gets its Device key. Device authorization (RFC 8628). | Devices, slice 4 |
+| Pairing | Joining a Device to a Host: Devices → Join a Host (or `nightshift join <host>`) shows a code, a Person signed in on the Host enters it under Devices → Pair a device and allows it (or runs `nightshift pair <code>` on a Host without a screen), and the Device gets its Device key. Device authorization (RFC 8628). | Devices, slice 4 |
+| Way out | How a Host's `https://` address reaches it: its LAN name with its own certificate, a tailnet (Tailscale Serve, Funnel), a public server behind a proxy, or an outbound tunnel. A deployment choice; Night Shift ships none (`docs/deploy/`). | Devices, slice 7 |
+| `nightshift` | Night Shift in one file, for a computer without a screen: the daemon, its web UI and its migrations. `nightshift serve`, `join`, `pair`, and `admin` (the Host admin's email and password, set on the Host). | Devices, slice 7 |
 | Device key | What a paired Device signs in with on a Host: an API key of the Person who allowed the pairing, with the Device's id. Hashed on the Host; on the Device, in the keychain or a file only its user can read. Narrower than its Person: `sync`, `relay`, `archive`. Expires after days without use; "Remove access" deletes it. The UI says "access", not "key". | Devices, slice 4 |
 | Link | A Device's outbound connection to one Host (a port; `httpsLink` is its adapter): oRPC with the Device key and the relay's WebSocket to the same address. It tries the Host's addresses in order, keeps the first that answers, and sends a heartbeat. The Host never calls into a Device. | Devices, slice 4 |
+| Sync cursor | How far a Replica has exchanged Run history with one Host: per Space and Walker, the last Event it has. The exchange sends what comes after it, in the Walker's order. | Devices, slice 4 |
+| Command | A person's action on a Run another Device walks: answer its Gate, send its Signal, stop it. The Host checks the Person's role and keeps the Command until the Walker has applied it; the Walker checks again and applies it as its own action. Until then it shows as sent. | Devices, slice 4 |
+| Archive | The Host's copy of the Run state of Runs walked elsewhere, per Space: each ended Step's Transcript and command log, and the Run's latest Checkpoints. A Replica opens a Transcript of a Run walked elsewhere from it and keeps a copy. Everything is kept. | Devices, slice 4 |
 | Space document | A Space's definitions as one Yjs document, `space:<id>`: its Projects (name, remote, removed), which Devices have a Clone of each (never the path), and a mirror of its Members. Members read it at `/sync`; they change it only through Night Shift's actions (add, rename, remove, move a Project), which check their role and log an event. The Replica's project rows follow it. | Devices, slice 3 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
 | Node | One step of a Flow: Agent, Command, Tool, Decision, Value, Wait, or Subflow (`call` in the file). Its id is also its name in templates. | PLAN §3 |
@@ -143,7 +150,10 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | CloneAdded | A folder became a Project's Clone on a Device: its `origin` named a known Project, or the Clone moved to a new folder. |
 | ProjectRenamed | A person gave a Project a new name. |
 | ProjectMoved | A person moved a Project, with its Clones, Runs and Events, from one Space to another. |
-| RunStarted | A Run began, with its copy of the Flow. |
+| MemberJoined | A Person joined a Space with a role: they accepted an Invitation, made the Space, or were added. Names who did it. |
+| MemberRoleChanged | A Member got another role, and who changed it. |
+| MemberRemoved | A Person is no longer a Member of a Space, and who removed them. |
+| RunStarted | A Run began, with its copy of the Flow, and the Person who started it (none for a Schedule). |
 | WorktreeCreated | A Worktree was created for a Run. |
 | RunResumed | A person resumed a Run, or the daemon did after a restart (`by: "daemon"`). |
 | StepStarted | A Step began a Visit of a Node. |

@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import type * as Y from "yjs";
 import { z } from "zod";
 
+import { isHostedElsewhere } from "../exchange/host-spaces";
 import { openPersistedDocument, type PersistedDocument } from "../ydoc";
 
 /**
@@ -28,9 +29,15 @@ import { openPersistedDocument, type PersistedDocument } from "../ydoc";
  * SQL. A projection never deletes a row and never takes a row of another
  * Space: a Project changes Space only by a move, which updates the rows
  * itself. `clone` rows stay this Device's own.
+ *
+ * A Space kept by a Host (`host_space`) is the Host's document: this
+ * Replica receives it over its Link and projects it, but never writes it.
+ * No import, no member mirror: its Members are the Host's.
  */
 export type SpaceDocument = PersistedDocument & {
 	readonly spaceId: string;
+	/** A Host keeps this Space: the copy here only receives. */
+	readonly hostedElsewhere: boolean;
 	readonly projects: Y.Map<unknown>;
 	readonly clones: Y.Map<unknown>;
 	readonly devices: Y.Map<unknown>;
@@ -63,6 +70,26 @@ const spaceDeviceSchema = z.object({
 
 /** A Member as the mirror holds them. */
 export type SpaceMember = { name: string; role: string };
+
+/** The role of a Member as the document's mirror has it, or null for anyone else. */
+export function memberRole(
+	document: SpaceDocument,
+	personId: string,
+): string | null {
+	const entry = document.members.get(personId) as
+		| Partial<SpaceMember>
+		| undefined;
+	return typeof entry?.role === "string" ? entry.role : null;
+}
+
+/** The name of a Device as the document has it (a Device with a Clone), or null. */
+export function deviceNameIn(
+	document: SpaceDocument,
+	deviceId: string,
+): string | null {
+	const named = spaceDeviceSchema.safeParse(document.devices.get(deviceId));
+	return named.success ? named.data.name : null;
+}
 
 /** The name of a Space's document. */
 export function spaceDocumentName(spaceId: string): string {
@@ -175,9 +202,11 @@ export function createSpaceDocuments(options: {
 			},
 		});
 		const { doc } = persisted;
+		const hostedElsewhere = await isHostedElsewhere(db, spaceId);
 		const document: SpaceDocument = {
 			...persisted,
 			spaceId,
+			hostedElsewhere,
 			projects: doc.getMap("projects"),
 			clones: doc.getMap("clones"),
 			devices: doc.getMap("devices"),
@@ -185,8 +214,13 @@ export function createSpaceDocuments(options: {
 			members: doc.getMap("members"),
 		};
 		holder.document = document;
-		await importRows(db, document);
-		await mirror(db, document);
+		if (!hostedElsewhere) {
+			await importRows(db, document);
+			await mirror(db, document);
+		} else {
+			// What the Link brought before this start.
+			await projectSpace(db, document);
+		}
 		opened.set(document.name, document);
 		return document;
 	}
@@ -219,7 +253,8 @@ export function createSpaceDocuments(options: {
 		},
 		byName: (name) => opened.get(name) ?? null,
 		async mirrorMembers(spaceId) {
-			await mirror(db, await open(spaceId));
+			const document = await open(spaceId);
+			if (!document.hostedElsewhere) await mirror(db, document);
 		},
 		async flush() {
 			await Promise.all([...opened.values()].map((d) => d.flush()));

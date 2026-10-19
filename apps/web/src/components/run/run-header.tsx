@@ -45,6 +45,8 @@ import {
 	CopyIcon,
 	DownloadIcon,
 	InfoIcon,
+	MonitorIcon,
+	SendIcon,
 	SkipForwardIcon,
 	WorkflowIcon,
 } from "lucide-react";
@@ -52,8 +54,8 @@ import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 
 import { RunStatusBadge } from "@/components/run-status-badge";
-import { ENV } from "@/env";
 import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
+import { authClient } from "@/lib/auth-client";
 import {
 	dayWord,
 	formatCost,
@@ -62,7 +64,10 @@ import {
 	formatDuration,
 	formatTime,
 } from "@/lib/format";
+import { SERVER_URL } from "@/lib/server-url";
 import { orpc } from "@/utils/orpc";
+
+import { WalkerBadge, walkerName } from "./walker-badge";
 
 const STOPPABLE: RunStatus[] = ["running", "waiting", "sleeping"];
 
@@ -97,6 +102,16 @@ export function RunTitle({
 			</h1>
 			<div aria-live="polite" className="flex flex-wrap items-center gap-2">
 				<RunStatusBadge status={status} />
+				<WalkerBadge walker={run.walker} />
+				{run.commands.length > 0 ? (
+					<Badge
+						variant="outline"
+						title={`It applies when ${walkerName(run.walker)} is online.`}
+					>
+						<SendIcon aria-hidden="true" />
+						Sent to {walkerName(run.walker)}
+					</Badge>
+				) : null}
 				{stoppable && run.stopAfterStep ? (
 					<Badge
 						variant="outline"
@@ -200,9 +215,7 @@ function RunFacts({ run }: { run: RunDetail }) {
 					</Fact>
 				))}
 				<Fact label="Started by">
-					{run.trigger.kind === "schedule"
-						? `Schedule · ${run.trigger.scheduleId}`
-						: "You"}
+					<StartedBy run={run} />
 				</Fact>
 			</dl>
 			<Separator />
@@ -217,9 +230,18 @@ function RunFacts({ run }: { run: RunDetail }) {
 						short={SHA.test(run.baseRef) ? run.baseRef.slice(0, 12) : undefined}
 					/>
 				</Fact>
-				<Fact label="Folder">
-					<CopyValue label="folder path" value={run.worktreePath} />
+				<Fact label="Runs on">
+					<MonitorIcon
+						className="size-3.5 shrink-0 text-muted-foreground"
+						aria-hidden="true"
+					/>
+					{run.walker.thisDevice ? "This computer" : walkerName(run.walker)}
 				</Fact>
+				{run.walker.thisDevice ? (
+					<Fact label="Folder">
+						<CopyValue label="folder path" value={run.worktreePath} />
+					</Fact>
+				) : null}
 			</dl>
 			<Separator />
 			<dl className="flex flex-col gap-3">
@@ -269,6 +291,24 @@ function RunFacts({ run }: { run: RunDetail }) {
 }
 
 /** One fact of the run: a small muted label above its value. */
+/**
+ * Who started the run: a schedule, you, or another Member of the Space.
+ * Commits in the run are in the name of the person who started it.
+ */
+function StartedBy({ run }: { run: RunDetail }) {
+	const session = authClient.useSession();
+	if (run.trigger.kind === "schedule") {
+		return <>Schedule · {run.trigger.scheduleId}</>;
+	}
+	if (!run.startedBy) {
+		return <span className="text-muted-foreground">Not known</span>;
+	}
+	if (run.startedBy.id === session.data?.user.id) return <>You</>;
+	return (
+		<span className="truncate">{run.startedBy.name ?? "A former member"}</span>
+	);
+}
+
 function Fact({
 	label,
 	className,
@@ -366,6 +406,19 @@ export function RunActions({
 		}
 	};
 
+	// A run of another device: its session and its files are there. Stop goes to it.
+	if (!run.walker.thisDevice) {
+		return STOPPABLE.includes(status) ? (
+			<StopMenu
+				key={run.id}
+				status={status}
+				stopAfterStep={run.stopAfterStep}
+				pending={stopRun.isPending}
+				onStop={(when) => stopRun.mutate({ runId: run.id, when })}
+			/>
+		) : null;
+	}
+
 	return (
 		<>
 			<Tooltip>
@@ -396,7 +449,7 @@ export function RunActions({
 							nativeButton={false}
 							render={
 								<a
-									href={`${ENV.VITE_SERVER_URL.replace(/\/$/, "")}/api/runs/${run.id}/export`}
+									href={`${SERVER_URL}/api/runs/${run.id}/export`}
 									download
 									aria-label="Export run"
 								/>

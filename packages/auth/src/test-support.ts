@@ -8,11 +8,27 @@ import { type Auth, type AuthOptions, createAuth } from "./index";
 
 /** Test helpers: a migrated temp database with Better Auth on it. */
 
+const PASSWORD = "a-long-password";
+
+/** The session cookies a response sets, as request headers. */
+export function cookiesOf(response: Response): Headers {
+	const cookie = response.headers
+		.getSetCookie()
+		.map((c) => c.split(";")[0])
+		.join("; ");
+	return new Headers({ cookie });
+}
+
 export type AuthSandbox = {
 	db: Database;
 	auth: Auth;
-	/** A new Person with a password account, and the headers of their session. */
+	/**
+	 * A new Person with a password account, made as the Host admin makes
+	 * one (the Host is invitation-only), and the headers of their session.
+	 */
 	signUp(name: string): Promise<{ userId: string; headers: Headers }>;
+	/** Signs in with email and password: the headers of the new session. */
+	signIn(email: string, password?: string): Promise<Headers>;
 	cleanup(): void;
 };
 
@@ -32,25 +48,25 @@ export async function createAuthSandbox(
 		[],
 		options,
 	);
+	async function signIn(email: string, password = PASSWORD) {
+		const response = await auth.api.signInEmail({
+			body: { email, password },
+			asResponse: true,
+		});
+		if (!response.ok) throw new Error(`Sign-in failed: ${response.status}`);
+		return cookiesOf(response);
+	}
 	return {
 		db,
 		auth,
 		async signUp(name) {
-			const response = await auth.api.signUpEmail({
-				body: {
-					name,
-					email: `${name.toLowerCase()}@example.com`,
-					password: "a-long-password",
-				},
-				asResponse: true,
+			const email = `${name.toLowerCase()}@example.com`;
+			const { user } = await auth.api.createUser({
+				body: { name, email, password: PASSWORD },
 			});
-			const body = (await response.json()) as { user: { id: string } };
-			const cookie = response.headers
-				.getSetCookie()
-				.map((c) => c.split(";")[0])
-				.join("; ");
-			return { userId: body.user.id, headers: new Headers({ cookie }) };
+			return { userId: user.id, headers: await signIn(email) };
 		},
+		signIn,
 		cleanup: () => rmSync(root, { recursive: true, force: true }),
 	};
 }

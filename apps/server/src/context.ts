@@ -1,4 +1,5 @@
 import type { Context as ApiContext } from "@nightshift/api/context";
+import { setLogin } from "@nightshift/auth/login";
 import { requestAccess } from "@nightshift/auth/request";
 import type { Context as HonoContext } from "hono";
 
@@ -13,6 +14,7 @@ import {
 	devices,
 	engine,
 	host,
+	hostExchange,
 	localSession,
 	profiles,
 	projectSetup,
@@ -31,28 +33,50 @@ export type CreateContextOptions = {
  */
 export function access(context: HonoContext) {
 	const headers = context.req.raw.headers;
-	const local =
-		!headers.has("authorization") && fromThisComputer(context, trustedOrigins);
-	return requestAccess(auth, db, headers, local ? localSession : null);
+	return requestAccess(
+		auth,
+		db,
+		headers,
+		isLocal(context) ? localSession : null,
+	);
+}
+
+/** From this computer, and no Device: a Device is never this computer's Person. */
+function isLocal(context: HonoContext): boolean {
+	return (
+		!context.req.raw.headers.has("authorization") &&
+		fromThisComputer(context, trustedOrigins)
+	);
 }
 
 export async function createContext({
 	context,
 }: CreateContextOptions): Promise<ApiContext> {
 	const deviceKey = await host.keyOf(context.req.raw.headers);
-	const { session, spaceId, can, setActiveSpace, createSpace, headers } =
-		deviceKey
-			? await requestAccess(auth, db, new Headers(), null)
-			: await access(context);
+	const {
+		session,
+		spaceId,
+		can,
+		setActiveSpace,
+		createSpace,
+		members,
+		headers,
+	} = deviceKey
+		? await requestAccess(auth, db, new Headers(), null)
+		: await access(context);
 	return {
 		session,
 		spaceId,
 		can,
 		setActiveSpace,
 		headers,
+		fromThisComputer: !deviceKey && isLocal(context),
+		setLogin: (personId, input) => setLogin(auth, personId, input),
 		deviceKey,
 		devices,
+		exchange: hostExchange,
 		createSpace,
+		members,
 		db,
 		engine,
 		settings,

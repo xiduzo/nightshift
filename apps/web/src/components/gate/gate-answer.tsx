@@ -25,6 +25,7 @@ export function GateAnswer({
 	nodeId,
 	choices,
 	runTitle,
+	walkerName,
 	className,
 }: {
 	runId: string;
@@ -33,11 +34,16 @@ export function GateAnswer({
 	choices: GateChoice[];
 	/** Named in the confirmation toast. */
 	runTitle?: string;
+	/** The device that runs the run, when it is not this computer: the answer goes to it. */
+	walkerName?: string;
 	className?: string;
 }) {
 	const id = useId();
 	const [note, setNote] = useState("");
-	const resolve = useResolveGate({ runTitle });
+	const resolve = useResolveGate({
+		...(runTitle ? { runTitle } : {}),
+		...(walkerName ? { walkerName } : {}),
+	});
 
 	const answer = (choice: string) => {
 		if (resolve.isPending) return;

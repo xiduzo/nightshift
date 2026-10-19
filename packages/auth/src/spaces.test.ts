@@ -153,6 +153,12 @@ describe("the local Person", () => {
 		const again = await localPerson(sandbox.db);
 		expect(again.userId).not.toBe(first.userId);
 		expect(await spacesOf(sandbox.db, again.userId)).toHaveLength(1);
+		// The Host had no admin left: the new Person is it.
+		const [person] = await sandbox.db
+			.select({ role: user.role })
+			.from(user)
+			.where(eq(user.id, again.userId));
+		expect(person?.role).toBe("admin");
 	});
 
 	test("a request without a session acts as the local Person, in their personal Space", async () => {

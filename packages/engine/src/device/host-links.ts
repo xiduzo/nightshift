@@ -1,8 +1,9 @@
-import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Database } from "@nightshift/db";
 import { device, hostLink } from "@nightshift/db/schema/nightshift";
 import { and, asc, eq, isNull, ne } from "drizzle-orm";
+
+import { type KeyStoreKind, valueStore } from "../keychain";
 
 /**
  * This computer's links to the Hosts it paired with: one home Host at
@@ -168,8 +169,7 @@ function parseAddresses(text: string): string[] {
  * Device keys on the joining Device
  * ------------------------------------------------------------------------- */
 
-/** Where this computer keeps its Device keys. */
-export type KeyStoreKind = "keychain" | "file";
+export type { KeyStoreKind } from "../keychain";
 
 /** The Device keys this computer holds, one per Host. */
 export type DeviceKeyStore = {
@@ -186,58 +186,13 @@ const KEYCHAIN_SERVICE = "nightshift-device-keys";
  * in the data directory, readable by this user only (a headless computer
  * has no keychain). `prefer: "file"` skips the keychain.
  */
-export async function deviceKeyStore(options: {
+export function deviceKeyStore(options: {
 	dataDir: string;
 	prefer?: KeyStoreKind;
 }): Promise<DeviceKeyStore> {
-	if (options.prefer !== "file" && (await keychainWorks())) {
-		return {
-			kind: "keychain",
-			get: (hostId) =>
-				Bun.secrets.get({ service: KEYCHAIN_SERVICE, name: hostId }),
-			set: (hostId, key) =>
-				Bun.secrets.set({
-					service: KEYCHAIN_SERVICE,
-					name: hostId,
-					value: key,
-				}),
-			delete: async (hostId) => {
-				await Bun.secrets.delete({ service: KEYCHAIN_SERVICE, name: hostId });
-			},
-		};
-	}
-	const dir = join(options.dataDir, "device-keys");
-	const file = (hostId: string) => join(dir, safeName(hostId));
-	return {
-		kind: "file",
-		async get(hostId) {
-			try {
-				return (await readFile(file(hostId), "utf8")).trim() || null;
-			} catch {
-				return null;
-			}
-		},
-		async set(hostId, key) {
-			await mkdir(dir, { recursive: true, mode: 0o700 });
-			await chmod(dir, 0o700);
-			await writeFile(file(hostId), key, { mode: 0o600 });
-			await chmod(file(hostId), 0o600);
-		},
-		async delete(hostId) {
-			await rm(file(hostId), { force: true });
-		},
-	};
-}
-
-async function keychainWorks(): Promise<boolean> {
-	try {
-		await Bun.secrets.get({ service: KEYCHAIN_SERVICE, name: "probe" });
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function safeName(hostId: string): string {
-	return hostId.replace(/[^\w.-]/g, "_");
+	return valueStore({
+		service: KEYCHAIN_SERVICE,
+		dir: join(options.dataDir, "device-keys"),
+		prefer: options.prefer,
+	});
 }

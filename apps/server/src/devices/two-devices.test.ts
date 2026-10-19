@@ -7,11 +7,15 @@ import {
 	HocuspocusProvider,
 	HocuspocusProviderWebsocket,
 } from "@hocuspocus/provider";
-import type { AppRouterClient } from "@nightshift/api/routers/index";
-import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
-import type { Subprocess } from "bun";
 import * as Y from "yjs";
+
+import {
+	type Daemon,
+	SERVER_DIR,
+	startDaemon,
+	stopDaemon,
+	waitFor,
+} from "./test-daemons";
 
 /**
  * Two Devices, two daemons: A is a Host, B joins it. Each runs as its own
@@ -21,102 +25,20 @@ import * as Y from "yjs";
  * session), so on A it is A's Person who approves.
  */
 
-const SERVER_DIR = join(import.meta.dir, "../..");
 const root = mkdtempSync(join(tmpdir(), "nightshift-two-devices-"));
-
-type Daemon = {
-	url: string;
-	dataDir: string;
-	client: AppRouterClient;
-	process: Subprocess;
-};
 
 let a: Daemon;
 let b: Daemon;
 
-async function freePort(): Promise<number> {
-	const probe = Bun.serve({
-		port: 0,
-		hostname: "localhost",
-		fetch: () => new Response(),
-	});
-	const port = probe.port as number;
-	probe.stop(true);
-	return port;
-}
-
-async function startDaemon(
-	name: string,
-	env: Record<string, string>,
-): Promise<Daemon> {
-	const port = await freePort();
-	const url = `http://localhost:${port}`;
-	const dataDir = join(root, name);
-	const child = Bun.spawn(["bun", "src/index.ts"], {
-		cwd: SERVER_DIR,
-		env: {
-			PATH: process.env.PATH ?? "",
-			HOME: process.env.HOME ?? root,
-			NODE_ENV: "test",
-			PORT: String(port),
-			BETTER_AUTH_SECRET: `a-test-secret-of-at-least-32-characters-${name}`,
-			BETTER_AUTH_URL: url,
-			CORS_ORIGIN: "http://localhost:3001",
-			NIGHTSHIFT_DATA_DIR: dataDir,
-			NIGHTSHIFT_SCHEDULER: "off",
-			NIGHTSHIFT_KEY_STORE: "file",
-			...env,
-		},
-		stdout: "ignore",
-		stderr: "pipe",
-	});
-	const deadline = Date.now() + 30_000;
-	while (Date.now() < deadline) {
-		if (child.exitCode !== null) {
-			throw new Error(
-				`${name} stopped: ${await new Response(child.stderr).text()}`,
-			);
-		}
-		try {
-			if ((await fetch(url)).ok) break;
-		} catch {}
-		await Bun.sleep(100);
-	}
-	const client: AppRouterClient = createORPCClient(
-		new RPCLink({ url: `${url}/rpc` }),
-	);
-	return { url, dataDir, client, process: child };
-}
-
-async function waitFor<T>(
-	read: () => Promise<T> | T,
-	until: (value: T) => boolean,
-	timeoutMs = 20_000,
-): Promise<T> {
-	const deadline = Date.now() + timeoutMs;
-	let value = await read();
-	while (!until(value)) {
-		if (Date.now() > deadline) {
-			throw new Error(`Timed out; last value: ${JSON.stringify(value)}`);
-		}
-		await Bun.sleep(100);
-		value = await read();
-	}
-	return value;
-}
-
 beforeAll(async () => {
 	[a, b] = await Promise.all([
-		startDaemon("a", { NIGHTSHIFT_HOST: "on" }),
-		startDaemon("b", {}),
+		startDaemon(root, "a", { NIGHTSHIFT_HOST: "on" }),
+		startDaemon(root, "b", {}),
 	]);
 }, 60_000);
 
 afterAll(async () => {
-	for (const daemon of [a, b]) {
-		daemon?.process.kill("SIGTERM");
-		await daemon?.process.exited;
-	}
+	await Promise.all([stopDaemon(a), stopDaemon(b)]);
 	rmSync(root, { recursive: true, force: true });
 });
 

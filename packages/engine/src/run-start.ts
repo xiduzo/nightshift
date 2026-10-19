@@ -18,11 +18,13 @@ import { flowsDir } from "@nightshift/flows/files";
 
 import type { Capabilities, Device } from "./device/types";
 import type { InputValues } from "./events";
+import { personOnHost } from "./exchange/host-spaces";
 import type { NodeKind, Requirement } from "./graph/context";
 import { kindOf, kindOfType, NODE_KINDS } from "./graph/node-kinds";
 import { missingNames } from "./graph/nodes/agent";
 import type { Runner } from "./graph/runner";
 import { resolveInputs } from "./inputs";
+import { gitAuthorOf, namesOf } from "./people";
 import { checkProjectFolder } from "./project-setup";
 import type { ProjectRow } from "./projects";
 import { runFacts, toSummary } from "./read-model";
@@ -375,10 +377,18 @@ export function createRunStart(deps: RunStartDeps) {
 			const prepared = await prepareRun(input, deps);
 			const { projectRow, flow, flowName, calledFlows, inputs, title } =
 				prepared;
+			const author = input.startedBy
+				? await gitAuthorOf(db, input.startedBy)
+				: null;
+			// In a Host's Space, the Person as the Host knows them.
+			const startedBy = input.startedBy
+				? ((await personOnHost(db, projectRow.spaceId)) ?? input.startedBy)
+				: null;
 			const worktree = await deps.device.worktree({
 				id: runId,
 				repoPath: projectRow.repoPath,
 				...(input.baseRef !== undefined ? { baseRef: input.baseRef } : {}),
+				...(author ? { author } : {}),
 			});
 			const [row] = await db
 				.insert(run)
@@ -395,6 +405,7 @@ export function createRunStart(deps: RunStartDeps) {
 					branch: worktree.branch,
 					baseRef: worktree.baseRef,
 					walkerId: await log.walkerId(),
+					startedBy,
 				})
 				.returning();
 			if (!row) throw new Error("Could not create the run.");
@@ -409,6 +420,7 @@ export function createRunStart(deps: RunStartDeps) {
 					stopAt: prepared.stopAt,
 					inputs,
 					trigger,
+					startedBy,
 				},
 			});
 			await log.append({
@@ -417,7 +429,12 @@ export function createRunStart(deps: RunStartDeps) {
 				payload: worktree,
 			});
 			runner.start(row, inputs, prepared.stopAt);
-			return toSummary(row, runFacts(await log.events(runId)));
+			return toSummary(
+				row,
+				runFacts(await log.events(runId)),
+				await namesOf(db, [row.startedBy]),
+				{ id: row.walkerId, name: deps.device.name, thisDevice: true },
+			);
 		} finally {
 			runner.releaseStartingSlot(runId);
 		}
