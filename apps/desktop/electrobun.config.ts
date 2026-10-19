@@ -2,6 +2,8 @@ import { dirname, join } from "node:path";
 
 import type { ElectrobunConfig } from "electrobun";
 
+import { UPDATE_FEEDS } from "./src/bun/update-feeds";
+
 const webBuildDir = "../web/dist/client";
 const shims = join(import.meta.dir, "../server/src/shims");
 // The packaged app has no .env files and no varlock CLI (see the shims).
@@ -31,11 +33,21 @@ function libsqlNativePackage(): string {
 }
 const libsqlNative = libsqlNativePackage();
 
+// The release workflows set these. A local build is a stable build of 0.1.0.
+const version = process.env.NIGHTSHIFT_VERSION || "0.1.0";
+const feed =
+	process.env.NIGHTSHIFT_UPDATE_FEED === "nightly" ? "nightly" : "stable";
+// Signing runs only where the Apple credentials are set (see docs/releasing.md).
+const codesign = Boolean(process.env.ELECTROBUN_DEVELOPER_ID);
+const notarize =
+	codesign &&
+	Boolean(process.env.ELECTROBUN_APPLEID || process.env.ELECTROBUN_APPLEAPIKEY);
+
 export default {
 	app: {
 		name: "Night Shift",
 		identifier: "dev.bettertstack.nightshift.desktop",
-		version: "0.1.0",
+		version,
 	},
 	runtime: {
 		// The daemon keeps running runs with no window open. Quit from the menu bar.
@@ -59,6 +71,8 @@ export default {
 		},
 		watchIgnore: [`${webBuildDir}/**`],
 		mac: {
+			codesign,
+			notarize,
 			bundleCEF: true,
 			defaultRenderer: "cef",
 		},
@@ -70,5 +84,11 @@ export default {
 			bundleCEF: true,
 			defaultRenderer: "cef",
 		},
+	},
+	release: {
+		baseUrl: UPDATE_FEEDS[feed],
+		// A patch diffs against the last release on the feed. Only the release
+		// workflows download it: they set NIGHTSHIFT_VERSION.
+		generatePatch: Boolean(process.env.NIGHTSHIFT_VERSION),
 	},
 } satisfies ElectrobunConfig;
