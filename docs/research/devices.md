@@ -472,6 +472,34 @@ iroh.
 1. **The seam and the Owner rule.** The Device port with the local
    adapter. Projects by remote with Clones. `event.seq` per Walker. One
    Device row. No behaviour change.
+
+   **Landed (the Device port):** `packages/engine/src/device/`.
+   `types.ts` is the port, `local.ts` is `localDevice`, wired in
+   `services.ts`. Choices where this file was open:
+   - `capabilities(query?)` takes the programs to look up
+     (`{ programs }`), so a run start asks for the CLI tools its nodes
+     name. A kind says which with `NodeKind.programs`. Requirements read
+     the `Capabilities` data, not functions.
+   - `session` streams `ready` or `refused` first. The engine records
+     `SessionStarted` between that and the harness start, so a session
+     that cannot start writes no session, as before.
+   - The Device fills `${NAME}` and adds the CLI tool help. The input
+     carries connection names and the node's servers as written.
+   - `exec` streams output and one `exit`. The Walker writes the command
+     log and cuts `log_tail` (`runCommand(device, …)`).
+   - `decide` takes a decision or a value (overloads). The default models
+     come from `capabilities().decider.defaultModels`, so the transcript
+     names the model before the Device is asked.
+   - `callTool` answers once. The transcript gets the call and the answer
+     together when the tool answers.
+   - `worktree` adds the run's worktree. The git work of a Call with
+     `each` (its item branches) and its glob source stay on the Walker
+     until placement (slice 5).
+   - The engine takes one `device`. `deviceFor(node, run)` always gives
+     it. Agent Profiles stay on the engine (`profileFor`): a run resolves
+     them at start, before placement.
+   - `StepStarted` gains `deviceId`. `services.ts` uses `id: "local"` and
+     the host name until the `device` row gives the stable self id.
 2. **Spaces.** The organization plugin; every row gets a `space_id`; one
    personal Space holds everything; the Space switcher shows one. Sessions
    on the procedures replace public ones. No behaviour change for one

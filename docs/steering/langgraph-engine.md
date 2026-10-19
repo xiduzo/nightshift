@@ -107,10 +107,10 @@ packages/engine/src/
                            sleep module to sleep; a wake ends it done or
                            timeout, or sleeps again. WAIT.
   graph/nodes/tool.ts      tool node: one tools/call on a Connection's MCP
-                           server through @nightshift/agents/mcp, the
-                           Connection resolved by mcpServersFor as for an
-                           Agent node. No wait node: a transport failure
-                           is `fail`. TOOL.
+                           server through the step's Device
+                           (Device.callTool), the Connection resolved as
+                           for an Agent node. No wait node: a transport
+                           failure is `fail`. TOOL.
   ../each.ts               the pure parts of a Call with `each`: list items
                            from a source, item facts, the step's outputs
   graph/runner.ts          Per-run driver: start, continueRun, resume,
@@ -649,9 +649,7 @@ type StepContext = {
   log: RunLog;                       // appendEvent; events(runId) for lookups
   bus: RunBus;
   recorder(stepId, path): Recorder;  // transcript writer, as openRecorder today
-  harnessFor(name): AgentHarness | undefined;
-  decider?: Decider;
-  mcpServersFor(node): Promise<McpExpansion>;
+  deviceFor(node, run): Device;      // the step's Device; the runner asks once per step
   signal(): AbortSignal;             // the run's abort signal
   now(): number; minuteMs: number;
   dataDir: string;
@@ -661,4 +659,6 @@ type StepContext = {
 
 A node factory is `(node, ctx) => (state, config) => Promise<Command>`.
 Only the step runner reads `db`: it writes the `step` and `agent_session`
-rows. The node modules read the rest.
+rows. The node modules read the rest. A body touches a computer only
+through `step.device` (`device/types.ts`): sessions, commands, tool calls,
+the decider.
