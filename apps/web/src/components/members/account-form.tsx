@@ -10,7 +10,9 @@ import { Input } from "@nightshift/ui/components/input";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { type ReactNode, useId, useState } from "react";
 
+import { TwoFactorChallenge } from "@/components/account/two-factor-challenge";
 import { authClient } from "@/lib/auth-client";
+import { authErrorMessage } from "@/lib/two-factor";
 
 /** The shortest password Better Auth takes. */
 const PASSWORD_MIN = 8;
@@ -18,7 +20,8 @@ const PASSWORD_MIN = 8;
 /**
  * Sign in, or make an account from an invitation. With `email` the email
  * is fixed: the invitation's. A new account names its invitation, because
- * Night Shift takes new people by invitation only.
+ * Night Shift takes new people by invitation only. A Person with
+ * two-factor on enters a code after the password (`TwoFactorChallenge`).
  */
 export function AccountForm({
 	mode,
@@ -42,6 +45,8 @@ export function AccountForm({
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [pending, setPending] = useState(false);
+	/** The password was right: the second factor is next. */
+	const [challenge, setChallenge] = useState(false);
 
 	const ready =
 		email.trim() !== "" &&
@@ -63,11 +68,23 @@ export function AccountForm({
 		if (result.error) {
 			setPending(false);
 			setError(
-				result.error.message ??
-					(mode === "sign-in"
-						? "The email or the password is not correct."
-						: "The account was not made. Try again."),
+				authErrorMessage(
+					result.error,
+					result.error.message ??
+						(mode === "sign-in"
+							? "The email or the password is not correct."
+							: "The account was not made. Try again."),
+				),
 			);
+			return;
+		}
+		if (
+			result.data &&
+			"twoFactorRedirect" in result.data &&
+			result.data.twoFactorRedirect
+		) {
+			setPending(false);
+			setChallenge(true);
 			return;
 		}
 		try {
@@ -75,6 +92,18 @@ export function AccountForm({
 		} finally {
 			setPending(false);
 		}
+	}
+
+	if (challenge) {
+		return (
+			<TwoFactorChallenge
+				onDone={onDone}
+				onStartOver={() => {
+					setChallenge(false);
+					setPassword("");
+				}}
+			/>
+		);
 	}
 
 	return (

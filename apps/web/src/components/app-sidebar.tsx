@@ -31,6 +31,7 @@ import {
 	BotIcon,
 	CalendarClockIcon,
 	ChevronRightIcon,
+	CircleUserRoundIcon,
 	FolderIcon,
 	FolderOpenIcon,
 	HistoryIcon,
@@ -115,6 +116,16 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 							>
 								<UsersIcon aria-hidden="true" />
 								<span>Members</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								tooltip="Account"
+								isActive={Boolean(matchRoute({ to: "/account" }))}
+								render={<Link to="/account" />}
+							>
+								<CircleUserRoundIcon aria-hidden="true" />
+								<span>Account</span>
 							</SidebarMenuButton>
 						</SidebarMenuItem>
 					</SidebarMenu>
