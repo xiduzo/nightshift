@@ -1,7 +1,7 @@
 import { Cron } from "croner";
 import { z } from "zod";
 
-import { type FlowInputDef, flowNameSchema } from "./schema";
+import { deviceNameSchema, type FlowInputDef, flowNameSchema } from "./schema";
 
 /**
  * The schedules file: `.nightshift/schedules.json` in the project's clone,
@@ -67,6 +67,12 @@ export const scheduleSchema = z.object({
 	baseRef: z.string().trim().min(1).optional(),
 	/** A paused schedule stays in the file and starts nothing. */
 	enabled: z.boolean().default(true),
+	/**
+	 * The Device that fires it, by name: only that Device starts its runs,
+	 * so a schedule every Clone has never fires twice. Unset: the Space's
+	 * Host, or the one Device of a Space without a Host.
+	 */
+	device: deviceNameSchema.optional(),
 });
 
 export const schedulesFileSchema = z.object({

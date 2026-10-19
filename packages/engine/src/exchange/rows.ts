@@ -54,6 +54,8 @@ const runRowSchema = z.object({
 	startedBy: z.string().nullable().default(null),
 	/** The Device its steps run on (null: the Walker). A Device of a version before it sends none. */
 	deviceId: z.string().nullable().default(null),
+	/** The Devices its nodes name, by name (JSON). A Device of a version before it sends none. */
+	placements: z.string().nullable().default(null),
 	createdAt: z.number(),
 });
 

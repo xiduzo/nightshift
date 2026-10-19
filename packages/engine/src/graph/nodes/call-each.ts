@@ -47,7 +47,7 @@ import {
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
 import { parkCommand, route, type StepEnd, scopeOf } from "../route";
 import type { Loop } from "../state";
-import { beginStep, type StepHandle } from "../step-runner";
+import { beginStep, readyDevice, type StepHandle } from "../step-runner";
 import {
 	type BodyGraph,
 	bodyGraph,
@@ -144,6 +144,16 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			route(ctx, state, node, await endStep(outcome, error), config, {
 				loops: { [node.id]: null },
 			});
+		// Its item branches and its source work in the worktree: the run's
+		// work moves to this step's Device first.
+		const ready = await readyDevice(ctx, node, step);
+		if (ready?.kind === "end") return finish("error", ready.error);
+		if (ready?.kind === "offline") {
+			return finish(
+				"error",
+				`${ready.name} is offline. Resume the run when it is back.`,
+			);
+		}
 		/** The step ends `stopped` and the run parks here with the stop's reason (null for a person's stop). */
 		const parkStopped = async (reason: string | null) => {
 			const end = await endStep("stopped", null);
@@ -216,7 +226,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 		const as = each.as ?? "item";
 		const haltOn = each.haltOn ?? ["halt"];
 		const perItem = (each.branch ?? "per-item") === "per-item";
-		const worktree = ctx.run.worktreePath;
+		const worktree = step.worktree;
 
 		let element: Element;
 		const open = step.existing?.items.findLast(
@@ -453,7 +463,7 @@ async function readSource(
 	tctx: TemplateContext,
 	step: StepHandle,
 ): Promise<ListItem[]> {
-	const worktree = ctx.run.worktreePath;
+	const worktree = step.worktree;
 	const source = node.each.source;
 	switch (source.kind) {
 		case "json":

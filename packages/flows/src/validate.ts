@@ -90,6 +90,17 @@ function validateIn(
 			continue;
 		}
 		nodes.set(node.id, node);
+		if (
+			"device" in node &&
+			node.device !== undefined &&
+			(node.type === "decision" || node.type === "value") &&
+			node.by !== "model"
+		) {
+			error(
+				`Node "${node.id}" names the device "${node.device}", but ${node.type === "decision" ? (node.by === "person" ? "you decide it" : "a rule decides it") : "a rule makes it"}. Only a model runs on a device. Remove the device.`,
+				{ nodeId: node.id },
+			);
+		}
 		if (reserved.includes(node.id)) {
 			error(`The node id "${node.id}" is reserved. Give the node another id.`, {
 				nodeId: node.id,

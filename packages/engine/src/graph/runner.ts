@@ -78,6 +78,8 @@ export type RunnerDeps = {
 	settings(): RunSettings;
 	/** The Device a step of `node` runs on (`StepContext.deviceFor`). */
 	deviceFor(node: FlowNode, run: RunRow): Device;
+	/** A Device by id, for a run (`StepContext.deviceById`). */
+	deviceById(id: string, run: RunRow): Device;
 	/** The run's flow snapshot and its called flows, parsed. */
 	flowOf(row: RunRow): Flow;
 	calledFlowsOf(row: RunRow): Record<string, Flow>;
@@ -178,6 +180,7 @@ export function createRunner(deps: RunnerDeps) {
 			bus,
 			recorder: (stepId, path) => recorders.open(row.id, stepId, path),
 			deviceFor: deps.deviceFor,
+			deviceById: deps.deviceById,
 			signal: () => thread.controller.signal,
 			now: deps.now,
 			minuteMs: deps.minuteMs,

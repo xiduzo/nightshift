@@ -80,7 +80,11 @@ export type PolicyWaitReason = "usage-limit" | "network";
  * Why a step waits: the run policy, or what a Wait node waits for (a
  * duration, a time, a command that passes, a signal).
  */
-export type WaitReason = PolicyWaitReason | WaitUntil["kind"];
+export type WaitReason =
+	| PolicyWaitReason
+	| WaitUntil["kind"]
+	/** The step's Device is offline: it starts when the Device is back. */
+	| "device-offline";
 
 /** Who resumed a run: a person, or the daemon after a restart. */
 export type ResumedBy = RunResume["by"];
@@ -164,6 +168,24 @@ export type EnginePayloads = {
 		startedBy?: string | null;
 	};
 	WorktreeCreated: { worktreePath: string; branch: string; baseRef: string };
+	/**
+	 * The run's work moved to another Device before a step there: the
+	 * Device that had it pushed the branch (it had nothing uncommitted), and
+	 * the next one fetched it into its own worktree of the run.
+	 * `worktreePath` is that worktree, on `to`.
+	 */
+	HandedOff: {
+		from: string;
+		to: string;
+		commit: string;
+		branch: string;
+		worktreePath: string;
+	};
+	/**
+	 * Another Device walks the run from here on: the one that walked it
+	 * wrote this last; the new Walker resumes from the archived checkpoint.
+	 */
+	WalkerMoved: { from: string; to: string; by: string | null };
 	/**
 	 * A person continued a stopped, failed or interrupted run, or the daemon
 	 * continued a run it had stopped mid-step, after a restart.
@@ -292,6 +314,8 @@ export type EnginePayloads = {
 		since: number;
 		/** A Wait node on a signal: the signal's name. */
 		signal?: string;
+		/** The Device the step waits for or on: a usage limit is its harness login's. */
+		deviceId?: string;
 	};
 	/** The wait is over: the step continues. `early` when a person resumed the run; `signal` when one arrived. */
 	WaitEnded: { early: boolean; signal?: string };
@@ -574,6 +598,25 @@ export function deriveSleep(events: readonly LoggedEvent[]): SleepFact | null {
 		message: wait.payload.message,
 		signal: wait.payload.signal ?? null,
 	};
+}
+
+/**
+ * Where a run's work is: the Device that has it now (the run's Device,
+ * then the `to` of each `HandedOff`), and the run's worktree on each
+ * Device it reached.
+ */
+export function deriveWorktrees(
+	events: readonly LoggedEvent[],
+	run: { deviceId: string | null; walkerId: string; worktreePath: string },
+): { holder: string; paths: Map<string, string> } {
+	let holder = run.deviceId ?? run.walkerId;
+	const paths = new Map([[holder, run.worktreePath]]);
+	for (const e of bySeq(events)) {
+		if (e.type !== "HandedOff") continue;
+		holder = e.payload.to;
+		paths.set(holder, e.payload.worktreePath);
+	}
+	return { holder, paths };
 }
 
 /** A person asked to stop after the running step, since the current walk began. */

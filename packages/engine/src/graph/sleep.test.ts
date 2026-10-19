@@ -169,6 +169,8 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 				message:
 					"Usage limit: You've hit your limit. The step continues a minute after the reset.",
 				since: time.now(),
+				// A usage limit is the harness login's on the step's Device.
+				deviceId: "test-device",
 			},
 		]);
 		expect((await transcriptOf(h, stepId)).at(-1)).toMatchObject({

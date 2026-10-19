@@ -173,6 +173,14 @@ export type Placement = {
 	thisDevice: boolean;
 };
 
+/** One of a Person's Devices, as placement sees it. */
+export type OwnDevice = Placement & {
+	/** It takes work now. */
+	online: boolean;
+	/** It has a Clone of the project. */
+	hasClone: boolean;
+};
+
 /** A person's action on a run walked elsewhere, waiting for its Walker. */
 export type PendingCommand = {
 	id: string;
@@ -330,7 +338,8 @@ export type WaitEvent =
 				| "duration"
 				| "time"
 				| "command"
-				| "signal";
+				| "signal"
+				| "device-offline";
 			until: number | null;
 			message: string;
 			signal?: string;
@@ -516,6 +525,12 @@ export interface Engine {
 	 * (`MemberJoined`, `MemberRemoved`, `MemberRoleChanged`), with who made it.
 	 */
 	logMemberChange(change: MemberChange): Promise<void>;
+	/**
+	 * A Device is back (its link to this Host took work again): the steps
+	 * of the runs this computer walks that sleep because a Device was
+	 * offline look again now, instead of at their next try.
+	 */
+	deviceBack(deviceId: string): Promise<void>;
 }
 
 /** A change of a Space's Members, as the auth hooks report it. */
@@ -564,6 +579,11 @@ export interface SpaceEngine {
 	 * online and have one. In a Space a Host keeps, the Host answers.
 	 */
 	listPlacements(projectId: string): Promise<Placement[]>;
+	/**
+	 * The actor's Devices for a project: this computer first, each with
+	 * whether it is online and has a Clone (a node's Device picker).
+	 */
+	listDevices(projectId: string): Promise<OwnDevice[]>;
 
 	/** The local and remote branches of the project's clone, newest first. A run can start from one. */
 	listBranches(projectId: string): Promise<Branches>;
@@ -689,11 +709,11 @@ export type Relay = {
 	startRun(
 		input: StartRunInput & { spaceId: string; deviceId: string },
 	): Promise<{ runId: string }>;
-	/** The actor's Devices a run of the project can run on, as the Host that keeps the Space knows them. */
-	placements(input: {
-		spaceId: string;
-		projectId: string;
-	}): Promise<Placement[]>;
+	/**
+	 * The actor's Devices, as the Host that keeps the Space knows them:
+	 * whether each is online and has a Clone of the project.
+	 */
+	devices(input: { spaceId: string; projectId: string }): Promise<OwnDevice[]>;
 };
 
 export type EngineOptions = {
