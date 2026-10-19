@@ -514,3 +514,82 @@ describe("Device keys on the procedures", () => {
 		expect(calls).toEqual([]);
 	});
 });
+
+describe("a streaming procedure", () => {
+	test("passes an error written for people on, as it does for a plain call", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const base = await contextFor(ada.headers);
+		const context = {
+			...base,
+			daemon: {
+				...base.daemon,
+				device: { ...base.daemon.device, ownerId: ada.userId },
+			},
+			devices: {
+				async *join() {
+					yield {
+						kind: "code" as const,
+						userCode: "ABCDEFGH",
+						verificationUri: "https://studio.example.com/devices",
+						verificationUriComplete:
+							"https://studio.example.com/devices?pair=ABCDEFGH",
+						fingerprint: null,
+						expiresAt: 0,
+					};
+					throw new Error("The pairing was declined on the Host.");
+				},
+			},
+		} as unknown as Context;
+		const progress = await call(
+			appRouter.devices.join,
+			{ url: "https://studio.example.com", role: "guest" },
+			{ context },
+		);
+		const seen: string[] = [];
+		try {
+			for await (const step of progress) seen.push(step.kind);
+			throw new Error("The stream did not fail.");
+		} catch (error) {
+			expect(error).toBeInstanceOf(ORPCError);
+			expect((error as ORPCError<string, unknown>).code).toBe("BAD_REQUEST");
+			expect((error as Error).message).toBe(
+				"The pairing was declined on the Host.",
+			);
+		}
+		expect(seen).toEqual(["code"]);
+	});
+});
+
+describe("the owner's own sign-in", () => {
+	test("is set on this computer only", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const set: string[] = [];
+		const base = await contextFor(ada.headers);
+		const context = (fromThisComputer: boolean) =>
+			({
+				...base,
+				fromThisComputer,
+				daemon: {
+					...base.daemon,
+					device: { ...base.daemon.device, ownerId: ada.userId },
+				},
+				setLogin: async (personId: string, input: { email: string }) => {
+					set.push(personId);
+					return { email: input.email };
+				},
+			}) as unknown as Context;
+		const input = { email: "ada@example.com", password: "a-long-password" };
+		expect(
+			await errorOf(
+				call(appRouter.account.setLogin, input, { context: context(false) }),
+			),
+		).toBe("FORBIDDEN");
+		expect(set).toEqual([]);
+		expect(
+			await call(appRouter.account.setLogin, input, {
+				context: context(true),
+			}),
+		).toEqual({ email: "ada@example.com" });
+		expect(set).toEqual([ada.userId]);
+	});
+});

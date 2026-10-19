@@ -54,7 +54,6 @@ import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 
 import { RunStatusBadge } from "@/components/run-status-badge";
-import { ENV } from "@/env";
 import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -65,6 +64,7 @@ import {
 	formatDuration,
 	formatTime,
 } from "@/lib/format";
+import { SERVER_URL } from "@/lib/server-url";
 import { orpc } from "@/utils/orpc";
 
 import { WalkerBadge, walkerName } from "./walker-badge";
@@ -449,7 +449,7 @@ export function RunActions({
 							nativeButton={false}
 							render={
 								<a
-									href={`${ENV.VITE_SERVER_URL.replace(/\/$/, "")}/api/runs/${run.id}/export`}
+									href={`${SERVER_URL}/api/runs/${run.id}/export`}
 									download
 									aria-label="Export run"
 								/>

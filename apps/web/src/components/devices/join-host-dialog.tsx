@@ -1,0 +1,261 @@
+import {
+	Alert,
+	AlertDescription,
+	AlertTitle,
+} from "@nightshift/ui/components/alert";
+import { Button } from "@nightshift/ui/components/button";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@nightshift/ui/components/dialog";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+	FieldTitle,
+} from "@nightshift/ui/components/field";
+import { Input } from "@nightshift/ui/components/input";
+import {
+	RadioGroup,
+	RadioGroupItem,
+} from "@nightshift/ui/components/radio-group";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import { useQueryClient } from "@tanstack/react-query";
+import { ShieldCheckIcon } from "lucide-react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { toast } from "sonner";
+
+import { client, orpc } from "@/utils/orpc";
+
+import { formatUserCode } from "./platform";
+
+type Role = "home" | "guest";
+
+/** Where the pairing is: the form, the code to enter on the Host, or an error. */
+type Step =
+	| { kind: "form"; error: string | null }
+	| { kind: "starting" }
+	| {
+			kind: "code";
+			userCode: string;
+			fingerprint: string | null;
+			expiresAt: number;
+	  };
+
+/**
+ * "Join a Host": pairs this computer with a Host. This computer asks the
+ * Host for a code, the Person enters it on the Host, and this computer
+ * stays connected to it from then on. The same as `nightshift join`.
+ */
+export function JoinHostDialog({
+	open,
+	onOpenChange,
+	hasHome,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	/** This computer has a home Host already: a new one can only be a guest. */
+	hasHome: boolean;
+}) {
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="sm:max-w-md">
+				{open ? (
+					<JoinHostSteps hasHome={hasHome} onDone={() => onOpenChange(false)} />
+				) : null}
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+function JoinHostSteps({
+	hasHome,
+	onDone,
+}: {
+	hasHome: boolean;
+	onDone: () => void;
+}) {
+	const id = useId();
+	const queryClient = useQueryClient();
+	const [address, setAddress] = useState("");
+	const [role, setRole] = useState<Role>(hasHome ? "guest" : "home");
+	const [step, setStep] = useState<Step>({ kind: "form", error: null });
+	const pairing = useRef<AbortController | null>(null);
+
+	// Closing the dialog stops the pairing: the code then expires unused.
+	useEffect(() => () => pairing.current?.abort(), []);
+
+	async function join(event: FormEvent) {
+		event.preventDefault();
+		const stop = new AbortController();
+		pairing.current = stop;
+		setStep({ kind: "starting" });
+		try {
+			const progress = await client.devices.join(
+				{ url: address.trim(), role },
+				{ signal: stop.signal },
+			);
+			for await (const next of progress) {
+				if (next.kind === "code") {
+					setStep({
+						kind: "code",
+						userCode: next.userCode,
+						fingerprint: next.fingerprint,
+						expiresAt: next.expiresAt,
+					});
+				} else {
+					toast.success(`Paired with ${next.hostName}`);
+					void queryClient.invalidateQueries({
+						queryKey: orpc.devices.list.key(),
+					});
+					onDone();
+					return;
+				}
+			}
+		} catch (error) {
+			if (stop.signal.aborted) return;
+			setStep({
+				kind: "form",
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
+
+	if (step.kind === "code") {
+		return (
+			<>
+				<DialogHeader>
+					<DialogTitle>Enter this code on the Host</DialogTitle>
+					<DialogDescription>
+						On the Host, open Devices, choose Pair a device, and enter this
+						code. This computer connects as soon as you allow it there.
+					</DialogDescription>
+				</DialogHeader>
+				<p className="text-center font-mono font-semibold text-3xl tracking-widest">
+					{formatUserCode(step.userCode)}
+				</p>
+				{step.fingerprint ? (
+					<Alert>
+						<ShieldCheckIcon />
+						<AlertTitle>Check the fingerprint</AlertTitle>
+						<AlertDescription>
+							The Host uses its own certificate. Allow this computer only if the
+							Host shows this fingerprint:
+							<span className="mt-1 block break-all font-mono text-xs">
+								{step.fingerprint}
+							</span>
+						</AlertDescription>
+					</Alert>
+				) : null}
+				<p className="flex items-center gap-2 text-muted-foreground text-sm">
+					<Spinner />
+					Waiting for the Host. The code works until{" "}
+					{new Date(step.expiresAt).toLocaleTimeString()}.
+				</p>
+				<DialogFooter>
+					<DialogClose render={<Button variant="outline" />}>
+						Cancel
+					</DialogClose>
+				</DialogFooter>
+			</>
+		);
+	}
+
+	const starting = step.kind === "starting";
+	const error = step.kind === "form" ? step.error : null;
+	return (
+		<form onSubmit={join} className="flex flex-col gap-6">
+			<DialogHeader>
+				<DialogTitle>Join a Host</DialogTitle>
+				<DialogDescription>
+					Sync this computer through a Host: your other computer, a server, or a
+					colleague's Night Shift.
+				</DialogDescription>
+			</DialogHeader>
+			<FieldGroup>
+				<Field data-invalid={error ? true : undefined}>
+					<FieldLabel htmlFor={`${id}-address`}>Address of the Host</FieldLabel>
+					<Input
+						id={`${id}-address`}
+						type="url"
+						inputMode="url"
+						autoComplete="url"
+						placeholder="https://studio.example.com"
+						value={address}
+						onChange={(event) => setAddress(event.target.value)}
+						disabled={starting}
+						autoFocus
+					/>
+					{error ? (
+						<FieldError>{error}</FieldError>
+					) : (
+						<FieldDescription>
+							Any of the addresses on the Host's Devices page. This computer
+							learns the others when it pairs.
+						</FieldDescription>
+					)}
+				</Field>
+				<FieldSet>
+					<FieldLegend variant="label">What the Host keeps</FieldLegend>
+					<RadioGroup
+						value={role}
+						onValueChange={(next) => setRole(next as Role)}
+						disabled={starting}
+					>
+						<FieldLabel htmlFor={`${id}-home`}>
+							<Field
+								orientation="horizontal"
+								data-disabled={hasHome || undefined}
+							>
+								<FieldContent>
+									<FieldTitle>Home Host</FieldTitle>
+									<FieldDescription>
+										{hasHome
+											? "This computer has a home Host already."
+											: "Your own Host. It keeps the settings of this computer and syncs them to your other computers."}
+									</FieldDescription>
+								</FieldContent>
+								<RadioGroupItem
+									value="home"
+									id={`${id}-home`}
+									disabled={hasHome}
+								/>
+							</Field>
+						</FieldLabel>
+						<FieldLabel htmlFor={`${id}-guest`}>
+							<Field orientation="horizontal">
+								<FieldContent>
+									<FieldTitle>Guest Host</FieldTitle>
+									<FieldDescription>
+										Someone else's Host. It gets only the Spaces you share
+										there, never your settings.
+									</FieldDescription>
+								</FieldContent>
+								<RadioGroupItem value="guest" id={`${id}-guest`} />
+							</Field>
+						</FieldLabel>
+					</RadioGroup>
+				</FieldSet>
+			</FieldGroup>
+			<DialogFooter>
+				<DialogClose render={<Button variant="outline" type="button" />}>
+					Cancel
+				</DialogClose>
+				<Button type="submit" disabled={address.trim() === "" || starting}>
+					{starting ? <Spinner data-icon="inline-start" /> : null}
+					Join
+				</Button>
+			</DialogFooter>
+		</form>
+	);
+}

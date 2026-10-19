@@ -35,6 +35,7 @@ import {
 	permitted,
 	protectedProcedure,
 	publicProcedure,
+	readable,
 } from "../index";
 
 // Every procedure but the health check needs a session in a Space. One
@@ -817,7 +818,36 @@ const devices = {
 			}),
 		)
 		.handler(async function* ({ context, input, signal }) {
-			yield* context.devices.join(input, signal);
+			try {
+				yield* context.devices.join(input, signal);
+			} catch (error) {
+				throw readable(error);
+			}
+		}),
+};
+
+/**
+ * The owner's own sign-in, set on this computer: a Host without a screen
+ * has a Host admin who signs in for nothing there, and needs an email and a
+ * password to sign in from a browser elsewhere (`nightshift admin`).
+ */
+const account = {
+	setLogin: ownerProcedure
+		.input(
+			z.object({
+				email: z.string().trim().min(3).max(254),
+				password: z.string().min(1).max(256),
+				name: z.string().trim().max(64).optional(),
+			}),
+		)
+		.handler(({ context, input }) => {
+			if (!context.fromThisComputer) {
+				throw new ORPCError("FORBIDDEN", {
+					message:
+						"Set the sign-in of this computer's owner on the computer itself.",
+				});
+			}
+			return context.setLogin(context.session.user.id, input);
 		}),
 };
 
@@ -981,6 +1011,7 @@ export const appRouter = {
 	deciders,
 	profiles,
 	devices,
+	account,
 	pairing,
 	link,
 	sync,

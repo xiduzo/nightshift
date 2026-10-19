@@ -1,0 +1,16 @@
+# The build context of deploy/Dockerfile: the repository, without what the
+# build makes again.
+**/node_modules
+**/dist
+**/.cache
+**/.turbo
+**/.nightshift-dev
+**/*.db
+**/*.db-*
+**/.env
+**/.env.*
+!**/.env.schema
+.git
+.build
+apps/desktop/build
+apps/desktop/artifacts

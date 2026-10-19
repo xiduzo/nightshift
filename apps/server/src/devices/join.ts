@@ -47,14 +47,18 @@ export async function* joinHost(
 	const pinned = certificate && !certificate.trusted ? certificate : null;
 	const host = hostClient(address, { certificate: pinned?.pem ?? null });
 
-	const code = await host.pairing.start(
-		{
-			deviceId: deps.self.id,
-			name: deps.self.name,
-			platform: deps.self.platform,
-		},
-		{ signal },
-	);
+	const code = await host.pairing
+		.start(
+			{
+				deviceId: deps.self.id,
+				name: deps.self.name,
+				platform: deps.self.platform,
+			},
+			{ signal },
+		)
+		.catch((error: unknown) => {
+			throw certificateError(error) ?? error;
+		});
 	yield {
 		kind: "code",
 		userCode: code.userCode,
@@ -130,6 +134,26 @@ export function hostOrigin(url: string): string {
 		);
 	}
 	return new URL(withScheme).origin;
+}
+
+/**
+ * A certificate this computer cannot check: neither from an authority it
+ * trusts, nor one the Host signed itself (which it pins). A proxy with its
+ * own private authority (Caddy's `tls internal`) is that case.
+ */
+function certificateError(error: unknown): Error | null {
+	const codes = [error, (error as { cause?: unknown } | null)?.cause].map(
+		(e) => (e as { code?: unknown } | null)?.code,
+	);
+	const tls = codes.some(
+		(code) =>
+			typeof code === "string" &&
+			/CERT|ISSUER|SELF_SIGNED|LEAF_SIGNATURE/.test(code),
+	);
+	if (!tls) return null;
+	return new Error(
+		"This computer cannot check the certificate of the Host. Give the Host a certificate from a public authority, or one it signs itself.",
+	);
 }
 
 function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {

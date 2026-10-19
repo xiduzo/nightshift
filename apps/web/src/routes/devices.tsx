@@ -51,6 +51,7 @@ import {
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
 
+import { JoinHostDialog } from "@/components/devices/join-host-dialog";
 import { PairDeviceDialog } from "@/components/devices/pair-device-dialog";
 import { platformName } from "@/components/devices/platform";
 import { ThisComputerCard } from "@/components/devices/this-computer-card";
@@ -312,10 +313,21 @@ function DeviceStatus({ device }: { device: PairedDevice }) {
 
 /** The Hosts this computer paired with: its home Host and its guest Hosts. */
 function Hosts({ hosts }: { hosts: LinkedHost[] }) {
+	const [joining, setJoining] = useState(false);
+	const hasHome = hosts.some(
+		(host) => host.role === "home" && host.status !== "revoked",
+	);
+	const joinButton = (
+		<Button variant="outline" size="sm" onClick={() => setJoining(true)}>
+			<LinkIcon data-icon="inline-start" />
+			Join a Host
+		</Button>
+	);
 	return (
 		<PageSection
 			title="Hosts of this computer"
 			description="The computers this one syncs with. Its home Host keeps its settings. A guest Host gets shared Spaces only."
+			actions={hosts.length > 0 ? joinButton : undefined}
 		>
 			<Card>
 				<CardContent>
@@ -327,13 +339,11 @@ function Hosts({ hosts }: { hosts: LinkedHost[] }) {
 								</EmptyMedia>
 								<EmptyTitle>This computer works on its own</EmptyTitle>
 								<EmptyDescription>
-									To sync it with a Host, run this command here, with the
-									address of the Host:{" "}
-									<span className="font-mono">
-										bun run join https://studio.example.com
-									</span>
+									Join a Host to sync this computer with your other computers,
+									or with a colleague's Night Shift.
 								</EmptyDescription>
 							</EmptyHeader>
+							<EmptyContent>{joinButton}</EmptyContent>
 						</Empty>
 					) : (
 						<ItemGroup>
@@ -371,6 +381,11 @@ function Hosts({ hosts }: { hosts: LinkedHost[] }) {
 					)}
 				</CardContent>
 			</Card>
+			<JoinHostDialog
+				open={joining}
+				onOpenChange={setJoining}
+				hasHome={hasHome}
+			/>
 		</PageSection>
 	);
 }

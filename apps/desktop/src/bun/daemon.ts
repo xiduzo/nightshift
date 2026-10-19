@@ -1,3 +1,5 @@
+import { serveDaemon, tlsPortOf } from "server/src/serve";
+
 import { prepareDaemonEnv } from "./daemon-env";
 
 /**
@@ -50,28 +52,30 @@ export async function startDaemon(): Promise<Daemon> {
 	prepareDaemonEnv(DAEMON_URL, DAEMON_PORT);
 	// Imported only now: the server reads its env and takes the database lease
 	// when it loads.
-	const [{ default: daemon }, { document, lease }] = await Promise.all([
+	const [{ default: daemon }, { document, spaces, lease }] = await Promise.all([
 		import("server/src/index"),
 		import("server/src/services"),
 	]);
 
-	const server = Bun.serve({
-		// This computer only, until it is a Host with an https:// address.
-		hostname: daemon.hostname,
+	// This computer only, until it is a Host with an https:// address. With
+	// its own certificate it also serves https:// for other computers, on
+	// NIGHTSHIFT_TLS_PORT; this window keeps plain http on this computer.
+	const servers = serveDaemon(daemon, {
 		port: DAEMON_PORT,
-		fetch: daemon.fetch,
-		websocket: daemon.websocket,
+		tlsPort: tlsPortOf(process.env.NIGHTSHIFT_TLS_PORT),
 	});
-	console.log(`Night Shift daemon on ${server.url}`);
+	for (const server of servers) {
+		console.log(`Night Shift daemon on ${server.url}`);
+	}
 
 	let stopped: Promise<void> | undefined;
 	return {
 		kind: "own",
 		stop: () => {
 			stopped ??= (async () => {
-				server.stop(true);
+				for (const server of servers) server.stop(true);
 				await Promise.race([
-					Promise.all([document.flush(), lease.release()]),
+					Promise.all([document.flush(), spaces.flush(), lease.release()]),
 					Bun.sleep(2_000),
 				]).catch(() => {});
 			})();

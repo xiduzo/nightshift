@@ -15,13 +15,19 @@ const readableErrors = o.middleware(async ({ next }) => {
 	try {
 		return await next();
 	} catch (error) {
-		if (error instanceof ORPCError || !(error instanceof Error)) throw error;
-		throw new ORPCError("BAD_REQUEST", {
-			message: error.message,
-			cause: error,
-		});
+		throw readable(error);
 	}
 });
+
+/**
+ * An error written for people, as a bad request with its message. A
+ * streaming handler throws after the middleware returned, so it passes its
+ * errors through this itself.
+ */
+export function readable(error: unknown): unknown {
+	if (error instanceof ORPCError || !(error instanceof Error)) return error;
+	return new ORPCError("BAD_REQUEST", { message: error.message, cause: error });
+}
 
 /** No session needed: the health check only. */
 export const publicProcedure = o.use(readableErrors);

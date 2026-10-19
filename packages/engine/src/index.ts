@@ -19,6 +19,7 @@ export {
 	type SecretSource,
 	type SecretView,
 	secretNameSchema,
+	secretStore,
 } from "./connections";
 export {
 	type DeviceDocument,

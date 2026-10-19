@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { LISTEN_HOSTNAME, reachFor } from "./index";
+import { LISTEN_HOSTNAME, listenHostname, reachFor } from "./index";
 import { hostOrigin } from "./join";
 
 describe("secure by default", () => {
@@ -19,6 +19,14 @@ describe("secure by default", () => {
 			}),
 		).toBe("network");
 		expect(LISTEN_HOSTNAME["this-computer"]).toBe("127.0.0.1");
+	});
+
+	test("a Host listens on every network, or where NIGHTSHIFT_LISTEN says", () => {
+		expect(listenHostname("network")).toBe("0.0.0.0");
+		expect(listenHostname("network", "127.0.0.1")).toBe("127.0.0.1");
+		expect(listenHostname("network", " ")).toBe("0.0.0.0");
+		// Not a Host: the loopback, whatever NIGHTSHIFT_LISTEN says.
+		expect(listenHostname("this-computer", "0.0.0.0")).toBe("127.0.0.1");
 	});
 
 	test("join addresses are https://, or http:// on this computer", () => {
