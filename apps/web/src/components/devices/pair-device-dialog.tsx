@@ -36,7 +36,7 @@ import {
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { LaptopIcon, ShieldCheckIcon } from "lucide-react";
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import type { PairingReview } from "@/lib/api-types";
@@ -107,6 +107,15 @@ function PairDeviceSteps({
 			},
 		}),
 	);
+
+	// A link with the whole code opens on the device to allow, not the form.
+	const linked = useRef(false);
+	useEffect(() => {
+		if (linked.current) return;
+		linked.current = true;
+		const fromLink = cleanCode(initialCode);
+		if (fromLink.length === 8) find.mutate({ userCode: fromLink });
+	}, [initialCode, find.mutate]);
 
 	function submit(event: FormEvent) {
 		event.preventDefault();
