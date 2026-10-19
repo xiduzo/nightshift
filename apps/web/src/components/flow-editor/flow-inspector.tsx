@@ -77,7 +77,7 @@ export function FlowInspector({
 				title={name ?? "This flow"}
 			/>
 
-			<InspectorSection title="General" collapsible>
+			<InspectorSection title="General">
 				<Field id={`${id}-description`} label="Description" optional>
 					<Textarea
 						id={`${id}-description`}
@@ -122,7 +122,6 @@ export function FlowInspector({
 
 			<InspectorSection
 				title="Inputs"
-				collapsible
 				defaultOpen={flow.inputs.length > 0}
 				aside={
 					<Badge variant="secondary" className="tabular-nums">
@@ -145,7 +144,6 @@ export function FlowInspector({
 
 			<InspectorSection
 				title="Outputs"
-				collapsible
 				defaultOpen={flow.outputs.length > 0}
 				aside={
 					<Badge variant="secondary" className="tabular-nums">
@@ -167,7 +165,6 @@ export function FlowInspector({
 
 			<InspectorSection
 				title="Run policy"
-				collapsible
 				defaultOpen={policySet}
 				description="These apply when you run this flow itself, not when another flow calls it. Leave a field empty to use Settings."
 			>
@@ -240,26 +237,26 @@ export function FlowInspector({
 
 			<InspectorSection
 				title="How to edit"
-				collapsible
 				defaultOpen={flow.nodes.length <= 1}
 			>
 				<ul className="flex list-disc flex-col gap-1.5 pl-4 text-muted-foreground text-xs leading-relaxed marker:text-border">
 					<li>Add a node with the buttons above the canvas.</li>
 					<li>
 						Drag from an outcome dot on the right of a node to another node to
-						add an edge, or add one from the node's Edges section.
+						add an edge.
 					</li>
 					<li>
 						Select a node or an edge to edit it. <Kbd>Backspace</Kbd> deletes
 						it.
 					</li>
 					<li>
-						A Decision node has one outcome per label, a Gate node one per
-						choice, an Agent node one per own outcome. Renaming one moves its
+						A Decision node has one outcome per option, a Command node one per
+						exit code, an Agent node one per own outcome. Renaming one moves its
 						edges along.
 					</li>
 					<li>
-						A Call node runs another flow once, or once for each item in a list.
+						A Subflow node runs another flow once, or once for each item in a
+						list.
 					</li>
 					<li>
 						An edge back to an earlier node is a retry loop. Give one edge in

@@ -2,6 +2,7 @@ import {
 	type AgentNode,
 	type CallEachNode,
 	type CallNode,
+	commandExits,
 	type DecisionNode,
 	type FlowNode,
 	type FlowNodeType,
@@ -127,6 +128,14 @@ function optionDescriptions(node: FlowNode): Map<string, string | undefined> {
 			["pass", "The tool answered"],
 			["fail", "It reported an error"],
 		]);
+	}
+	if (node.type === "command") {
+		return new Map(
+			commandExits(node).map((exit) => [
+				exit.name,
+				exit.code === undefined ? "any other exit" : `exit ${exit.code}`,
+			]),
+		);
 	}
 	const options =
 		node.type === "decision"

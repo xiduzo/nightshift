@@ -46,6 +46,8 @@ export function ToolFields({
 	const missing =
 		picked && connections !== undefined && !known.includes(node.connection);
 
+	const noServers = connections?.length === 0 && !picked;
+
 	const tools = useQuery({
 		...orpc.connections.tools.queryOptions({
 			input: { name: node.connection },
@@ -66,20 +68,36 @@ export function ToolFields({
 		<InspectorSection title="Tool">
 			<Field
 				id={`${id}-connection`}
-				label="Connection"
+				label="MCP server"
 				error={missing ? missingConnectionMessage(node.connection) : null}
 				hint={
-					<>
-						A connection you set up once under{" "}
-						<Link to="/agents" search={{ item: undefined }}>
-							Agents → Tools
-						</Link>
-						.
-					</>
+					noServers ? undefined : (
+						<>
+							An MCP server you add once under{" "}
+							<Link to="/agents" search={{ item: undefined }}>
+								Agents → Tools
+							</Link>
+							.
+						</>
+					)
 				}
 			>
 				{connections === undefined ? (
 					<Skeleton className="h-9 w-full" aria-busy="true" />
+				) : noServers ? (
+					<Note>
+						This computer has no MCP servers yet. Programs such as gh are not
+						MCP servers. Run them in a Command node, or give them to an Agent
+						node.{" "}
+						<Link
+							to="/agents"
+							search={{ item: undefined }}
+							className="text-foreground underline underline-offset-4 hover:text-primary"
+						>
+							Add an MCP server under Agents → Tools
+						</Link>
+						.
+					</Note>
 				) : (
 					<NativeSelect
 						id={`${id}-connection`}
@@ -96,7 +114,7 @@ export function ToolFields({
 							);
 						}}
 					>
-						<NativeSelectOption value="">Pick a connection</NativeSelectOption>
+						<NativeSelectOption value="">Pick an MCP server</NativeSelectOption>
 						{connections.map((connection) => (
 							<NativeSelectOption key={connection.name} value={connection.name}>
 								{connection.name} · {connectionKind(connection)}
@@ -122,7 +140,7 @@ export function ToolFields({
 							: tools.isPending && !missing
 								? "Loading the tools…"
 								: listed && listed.length === 0
-									? "This connection has no tools."
+									? "This MCP server has no tools."
 									: "The tool this node calls.")
 					}
 				>

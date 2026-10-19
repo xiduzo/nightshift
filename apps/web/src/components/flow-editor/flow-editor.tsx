@@ -45,7 +45,6 @@ import { StartRunDialog } from "@/components/run/start-run-dialog";
 import { SiteHeader } from "@/components/site-header";
 import { useProjectFlows } from "@/hooks/use-project-flows";
 import {
-	addEdge,
 	callersOf,
 	checkFlow,
 	isSavable,
@@ -446,16 +445,6 @@ function Editor({
 			}}
 			calledFlows={flowsSupport}
 			connections={connections}
-			edges={{
-				onAdd: (outcome, to) =>
-					setDraft(
-						(current) =>
-							addEdge(current, selectedNode.id, outcome, to)?.flow ?? current,
-					),
-				onSelect: (edgeId) => setSelection({ kind: "edge", id: edgeId }),
-				onDelete: (edgeId) =>
-					setDraft((current) => removeEdge(current, edgeId)),
-			}}
 		/>
 	) : selectedEdge ? (
 		<EdgeInspector

@@ -343,3 +343,48 @@ describe("a spec with its own outcomes and an output schema", () => {
 		});
 	});
 });
+
+describe("a spec without an outcome (a checker picks it)", () => {
+	const spec: StepReportSpec = {
+		outcome: false,
+		output: { type: "object", properties: { pr: { type: "string" } } },
+	};
+	const rules = reportRules(spec) as ReportRules;
+
+	test("the tool asks for summary and data only", () => {
+		const tool = reportStepTool(spec);
+		expect(tool.description).toBe(
+			"Report the result of your task to Night Shift. Call it exactly once, at the end.",
+		);
+		expect(tool.inputSchema).toMatchObject({
+			required: ["summary", "data"],
+		});
+		expect(
+			(tool.inputSchema as { properties: Record<string, unknown> }).properties,
+		).not.toHaveProperty("outcome");
+	});
+
+	test("a report without an outcome is valid, and its outcome is empty", () => {
+		expect(
+			parseStepReport({ summary: " done ", data: { pr: "1" } }, rules),
+		).toEqual({
+			outcome: "",
+			summary: "done",
+			data: { pr: "1" },
+		});
+		// An outcome the agent sends anyway is ignored.
+		expect(
+			parseStepReport({ outcome: "nope", summary: "x", data: {} }, rules)
+				?.outcome,
+		).toBe("");
+	});
+
+	test("the instructions do not ask for an outcome", () => {
+		expect(toolReportInstruction(rules)).not.toContain("outcome");
+		const text = textReportInstruction(rules);
+		expect(text).toContain(
+			'NIGHTSHIFT-REPORT: {"summary": "One or two sentences about the result.", "data": <the structured result>}',
+		);
+		expect(text).not.toContain("Pick the outcome");
+	});
+});

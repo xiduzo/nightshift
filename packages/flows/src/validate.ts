@@ -3,7 +3,9 @@ import { ruleNames, ruleProblem } from "./rule";
 import {
 	type CallEachNode,
 	type CallNode,
+	type CommandNode,
 	canMakeValue,
+	commandExits,
 	type DecisionNode,
 	type Flow,
 	type FlowNode,
@@ -176,6 +178,8 @@ function validateIn(
 					}
 				}
 				template(node.prompt, "prompt");
+				if (node.checker?.prompt)
+					template(node.checker.prompt, "checker prompt");
 				if (node.outcomes !== undefined) {
 					checkOptions(node, flow, error, warning);
 				}
@@ -188,6 +192,10 @@ function validateIn(
 				break;
 			case "command":
 				template(node.command, "command");
+				if (node.exits !== undefined) {
+					checkOptions(node, flow, error, warning);
+					checkExits(node, error, warning);
+				}
 				break;
 			case "decision":
 				checkOptions(node, flow, error, warning);
@@ -350,7 +358,7 @@ function checkOutputs(scope: Scope, error: Report): void {
 			);
 		} else if (builtIn.includes(name)) {
 			error(
-				`The output "${name}" clashes with a field every Call node has: ${builtIn.join(", ")}.`,
+				`The output "${name}" clashes with a field every Subflow node has: ${builtIn.join(", ")}.`,
 				{},
 			);
 		}
@@ -476,7 +484,7 @@ function checkCall(
 	warning: Report,
 ): void {
 	const at = { nodeId: node.id };
-	const kind = "Call";
+	const kind = "Subflow";
 	const runs = `${kind} node "${node.id}" runs flow "${node.flow}"`;
 	if (!Object.hasOwn(flows, node.flow)) {
 		error(`${runs}, which does not exist.`, at);
@@ -598,12 +606,12 @@ function checkHaltOn(node: CallEachNode, error: Report): void {
 		const parsed = labelSchema.safeParse(label);
 		if (!parsed.success) {
 			error(
-				`Call node "${node.id}" halts on "${label}", which is not a valid label: ${parsed.error.issues[0]?.message ?? "not allowed"}`,
+				`Subflow node "${node.id}" halts on "${label}", which is not a valid label: ${parsed.error.issues[0]?.message ?? "not allowed"}`,
 				{ nodeId: node.id },
 			);
 		} else if (reserved.includes(label)) {
 			error(
-				`Call node "${node.id}" halts on "${label}", which is reserved. Do not use: ${reserved.join(", ")}.`,
+				`Subflow node "${node.id}" halts on "${label}", which is reserved. Do not use: ${reserved.join(", ")}.`,
 				{ nodeId: node.id },
 			);
 		}
@@ -637,14 +645,14 @@ function checkWait(
 }
 
 function describeNode(node: FlowNode): string {
-	return node.type === "command" ||
-		(node.type === "agent" && node.outcomes === undefined)
+	return node.type === "agent" && node.outcomes === undefined
 		? `a ${node.type} node`
 		: `"${node.id}"`;
 }
 
 const optionWords = {
 	agent: { title: "Agent", kind: "outcome", picker: "the agent reports" },
+	command: { title: "Command", kind: "exit", picker: "the command ends on" },
 	decision: { title: "Decision", kind: "option", picker: "" },
 } as const;
 
@@ -783,14 +791,16 @@ function checkValue(node: ValueNode, scope: Scope, error: Report): void {
  * except an Agent's own `fail` or `needs-input`, which fail the step anyway.
  */
 function checkOptions(
-	node: Extract<FlowNode, { type: "agent" | "decision" }>,
+	node: Extract<FlowNode, { type: "agent" | "decision" | "command" }>,
 	flow: Flow,
 	error: Report,
 	warning: Report,
 ): void {
 	const { title, kind } = optionWords[node.type];
 	const picker =
-		node.type === "decision" ? pickerWords[node.by] : optionWords.agent.picker;
+		node.type === "decision"
+			? pickerWords[node.by]
+			: optionWords[node.type].picker;
 	const at = { nodeId: node.id };
 	const reserved: readonly string[] = reservedOutcomes;
 	const seen = new Set<string>();
@@ -822,14 +832,54 @@ function checkOptions(
 			(edge) => edge.from === node.id && edge.outcome === name,
 		);
 		// An agent that reports fail or needs-input fails anyway: no surprise.
+		// A command ends the run on exit 0 and fails it on any other code.
 		const failing =
-			node.type === "agent" && (name === "fail" || name === "needs-input");
+			node.type === "command" ||
+			(node.type === "agent" && (name === "fail" || name === "needs-input"));
 		if (!routed && !failing) {
 			warning(
 				`${title} node "${node.id}" has no edge for "${name}": the run ends there when ${picker} "${name}".`,
 				at,
 			);
 		}
+	}
+}
+
+/**
+ * Each exit code at most once. The catch-all (an exit without a code) at
+ * most once and last. Without one, an exit code that is not listed errors
+ * the step: a warning.
+ */
+function checkExits(node: CommandNode, error: Report, warning: Report): void {
+	const at = { nodeId: node.id };
+	const codes = new Set<number>();
+	const exits = commandExits(node);
+	for (const exit of exits) {
+		if (exit.code === undefined) continue;
+		if (codes.has(exit.code)) {
+			error(
+				`Command node "${node.id}" has the exit code ${exit.code} more than once.`,
+				at,
+			);
+		}
+		codes.add(exit.code);
+	}
+	const catchAll = exits.filter((exit) => exit.code === undefined);
+	if (catchAll.length > 1) {
+		error(
+			`Command node "${node.id}" has ${catchAll.length} exits without a code (${catchAll.map((e) => `"${e.name}"`).join(", ")}). Keep one: it catches every other code.`,
+			at,
+		);
+	} else if (catchAll.length === 1 && exits.at(-1) !== catchAll[0]) {
+		error(
+			`Command node "${node.id}": the exit "${catchAll[0]?.name}" catches every other code. Put it last.`,
+			at,
+		);
+	} else if (catchAll.length === 0) {
+		warning(
+			`Command node "${node.id}" has no exit for other codes: the step fails on any code that is not listed.`,
+			at,
+		);
 	}
 }
 

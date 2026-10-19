@@ -394,4 +394,134 @@ describe("the Command node", () => {
 		const [ended] = payloads(await h.events(), "StepEnded");
 		expect(ended?.outputs).not.toHaveProperty("data");
 	});
+
+	describe("exits", () => {
+		const exits = [
+			{ name: "success", code: 0 },
+			{ name: "not-found", code: 127 },
+			{ name: "other" },
+		];
+
+		test("the exit code picks its exit and that edge", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [
+						command("check", "exit 127", { exits }),
+						command("install", "true"),
+					],
+					edges: [
+						{ id: "e1", from: "check", outcome: "not-found", to: "install" },
+					],
+				}),
+			);
+			const { parked, state } = await drive(h, { inputs: {} });
+			expect(parked).toEqual([]);
+			expect(state.ended?.nodeId).toBe("install");
+			expect(payloads(await h.events(), "StepEnded")[0]).toEqual({
+				outcome: "not-found",
+				outputs: {
+					outcome: "not-found",
+					exit_code: 127,
+					log_tail: "",
+					visit: 1,
+				},
+				error: null,
+			});
+		});
+
+		test("a code without an exit ends on the catch-all", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [
+						command("check", "exit 4", { exits }),
+						command("after", "true"),
+					],
+					edges: [{ id: "e1", from: "check", outcome: "other", to: "after" }],
+				}),
+			);
+			const { state } = await drive(h, { inputs: {} });
+			expect(state.ended?.nodeId).toBe("after");
+			expect(state.nodes.check?.outcome).toBe("other");
+			expect(state.nodes.check?.exit_code).toBe(4);
+		});
+
+		test("exit 0 without an edge finishes the run; another exit without an edge fails it", async () => {
+			const ok = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [command("check", "true", { exits })],
+					edges: [],
+				}),
+			);
+			const passed = await drive(ok, { inputs: {} });
+			expect(passed.parked).toEqual([]);
+			expect(passed.state.ended).toMatchObject({
+				status: "finished",
+				outcome: "success",
+				reason: null,
+			});
+
+			const bad = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [command("check", "exit 127", { exits })],
+					edges: [],
+				}),
+			);
+			const failed = await drive(bad, { inputs: {} });
+			expect(failed.parked[0]).toMatchObject({
+				status: "failed",
+				reason:
+					'Node "check" ended with "not-found" and no edge leaves it on that outcome.',
+			});
+		});
+
+		test("without a catch-all, a code that is not listed errors the step", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [
+						command("check", "exit 5", {
+							exits: [{ name: "success", code: 0 }],
+						}),
+					],
+					edges: [],
+				}),
+			);
+			const { parked } = await drive(h, { inputs: {} });
+			expect(parked[0]).toMatchObject({
+				status: "failed",
+				reason:
+					'Node "check" failed: The command exited with code 5, and the node has no exit for it.',
+			});
+		});
+
+		test("output json that is not JSON ends on the catch-all", async () => {
+			const h = await startRun(
+				sandbox,
+				flowOf({
+					start: "check",
+					nodes: [
+						command("check", "echo not json", { output: "json", exits }),
+						command("after", "true"),
+					],
+					edges: [{ id: "e1", from: "check", outcome: "other", to: "after" }],
+				}),
+			);
+			const { state } = await drive(h, { inputs: {} });
+			expect(state.ended?.nodeId).toBe("after");
+			const [ended] = payloads(await h.events(), "StepEnded");
+			expect(ended).toMatchObject({
+				outcome: "other",
+				error: "The command's output is not valid JSON.",
+			});
+		});
+	});
 });

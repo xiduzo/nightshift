@@ -5,6 +5,7 @@ import {
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
 import {
+	commandExits,
 	type Flow,
 	type FlowNode,
 	nextEdge,
@@ -64,12 +65,25 @@ export function isOwnAgentLabel(node: FlowNode, outcome: Outcome): boolean {
 }
 
 /**
+ * Whether `outcome` is a Command node's exit on code 0. A command's other
+ * exits, the catch-all among them, are failures.
+ */
+function isSuccessExit(node: FlowNode, outcome: Outcome): boolean {
+	return (
+		node.type === "command" &&
+		commandExits(node).some((exit) => exit.name === outcome && exit.code === 0)
+	);
+}
+
+/**
  * Whether ending at `node` with `outcome` and no edge to take is a chosen
  * end of the flow: `pass`, a Decision option, an Agent's own outcome, the
- * outcome of a Call with `each`, or a Wait that is `done`. `fail`,
- * `needs-input` and a Wait's `timeout` are failures.
+ * outcome of a Call with `each`, a Command's exit on code 0, or a Wait that
+ * is `done`. `fail`, `needs-input`, a Command's other exits and a Wait's
+ * `timeout` are failures.
  */
 export function isChosenEnd(node: FlowNode, outcome: Outcome): boolean {
+	if (node.type === "command") return isSuccessExit(node, outcome);
 	return (
 		outcome === "pass" ||
 		node.type === "decision" ||
@@ -86,6 +100,7 @@ export function finishedReason(
 ): string | null {
 	const each = runsEach(node);
 	const chosen =
+		(node.type === "command" && isSuccessExit(node, outcome)) ||
 		(outcome === "pass" && !each) ||
 		(outcome === "done" && (each || node.type === "wait"));
 	return chosen ? null : `Ended at node "${node.id}" with "${outcome}".`;

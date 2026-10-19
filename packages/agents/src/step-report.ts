@@ -45,6 +45,7 @@ export const DEFAULT_OUTCOMES: readonly StepReportOutcome[] = [
 ];
 
 export type StepReport = {
+	/** "" when the rules ask for no outcome. */
 	outcome: StepReportOutcome;
 	summary: string;
 	/** Only with an output schema; not validated against it. */
@@ -86,12 +87,15 @@ export type ReportRules = {
 	output?: Record<string, unknown>;
 	/** The default outcomes: the prompt and tool keep today's texts. */
 	defaultOutcomes: boolean;
+	/** False: the agent reports no outcome (a checker picks it). */
+	withOutcome: boolean;
 };
 
 /** The rules of `stepReport: true`. */
 export const DEFAULT_RULES: ReportRules = {
 	outcomes: DEFAULT_OUTCOMES.map((name) => ({ name })),
 	defaultOutcomes: true,
+	withOutcome: true,
 };
 
 /** The rules for a session's `stepReport`, or undefined when it is off. */
@@ -105,6 +109,7 @@ export function reportRules(
 		...(own.length > 0
 			? { outcomes: own, defaultOutcomes: false }
 			: DEFAULT_RULES),
+		withOutcome: stepReport.outcome !== false,
 		...(stepReport.output ? { output: stepReport.output } : {}),
 	};
 }
@@ -122,17 +127,20 @@ function outcomeList(rules: ReportRules): string {
 		.join(", ");
 }
 
-function outcomeRule(rules: ReportRules): string {
-	return rules.defaultOutcomes
-		? OUTCOME_RULE
-		: `Pick the outcome that fits: ${outcomeList(rules)}.`;
+function outcomeRule(rules: ReportRules): string[] {
+	if (!rules.withOutcome) return [];
+	return [
+		rules.defaultOutcomes
+			? OUTCOME_RULE
+			: `Pick the outcome that fits: ${outcomeList(rules)}.`,
+	];
 }
 
 /** The prompt instruction for the tool channel. */
 export function toolReportInstruction(rules: ReportRules): string {
 	return [
 		`When you are done, call the \`${REPORT_TOOL_NAME}\` tool exactly once, as your last action.`,
-		outcomeRule(rules),
+		...outcomeRule(rules),
 		SUMMARY_RULE,
 		...(rules.output
 			? [
@@ -144,12 +152,14 @@ export function toolReportInstruction(rules: ReportRules): string {
 
 /** The prompt instruction for the text channel (plan mode). */
 export function textReportInstruction(rules: ReportRules): string {
-	const outcome = JSON.stringify(rules.outcomes[0]?.name ?? "pass");
+	const outcome = rules.withOutcome
+		? `"outcome": ${JSON.stringify(rules.outcomes[0]?.name ?? "pass")}, `
+		: "";
 	const data = rules.output ? ', "data": <the structured result>' : "";
 	return [
 		"When you are done, end your final message with exactly one line in this format:",
-		`${REPORT_MARKER} {"outcome": ${outcome}, "summary": "One or two sentences about the result."${data}}`,
-		outcomeRule(rules),
+		`${REPORT_MARKER} {${outcome}"summary": "One or two sentences about the result."${data}}`,
+		...outcomeRule(rules),
 		...(rules.output
 			? [
 					`Put the structured result in "data", on that same line. It must match this JSON Schema: ${JSON.stringify(rules.output)}`,
@@ -207,12 +217,14 @@ export function parseStepReport(
 ): StepReport | undefined {
 	if (typeof input !== "object" || input === null) return undefined;
 	const { outcome, summary, data } = input as Record<string, unknown>;
-	if (typeof outcome !== "string") return undefined;
-	if (!outcomeNames(rules).includes(outcome)) return undefined;
+	if (rules.withOutcome) {
+		if (typeof outcome !== "string") return undefined;
+		if (!outcomeNames(rules).includes(outcome)) return undefined;
+	}
 	if (typeof summary !== "string") return undefined;
 	if (rules.output && data === undefined) return undefined;
 	return {
-		outcome,
+		outcome: rules.withOutcome ? (outcome as string) : "",
 		summary: summary.trim(),
 		...(rules.output ? { data: unwrapJsonText(data, rules.output) } : {}),
 	};
@@ -283,11 +295,13 @@ export function reportInputSchema(rules: ReportRules): Record<string, unknown> {
 		type: "string",
 		description: "One or two sentences about the result.",
 	};
+	const head = rules.withOutcome ? { outcome, summary } : { summary };
+	const required = rules.withOutcome ? ["outcome", "summary"] : ["summary"];
 	if (!rules.output) {
 		return {
 			type: "object",
-			properties: { outcome, summary },
-			required: ["outcome", "summary"],
+			properties: head,
+			required,
 			additionalProperties: false,
 		};
 	}
@@ -302,8 +316,8 @@ export function reportInputSchema(rules: ReportRules): Record<string, unknown> {
 	}
 	return {
 		type: "object",
-		properties: { outcome, summary, data },
-		required: ["outcome", "summary", "data"],
+		properties: { ...head, data },
+		required: [...required, "data"],
 		additionalProperties: false,
 		...root,
 	};
@@ -319,17 +333,23 @@ export function reportStepTool(
 ) {
 	const rules = reportRules(stepReport) ?? DEFAULT_RULES;
 	const expected = [
-		`outcome: ${outcomeNames(rules)
-			.map((o) => JSON.stringify(o))
-			.join(" | ")}`,
+		...(rules.withOutcome
+			? [
+					`outcome: ${outcomeNames(rules)
+						.map((o) => JSON.stringify(o))
+						.join(" | ")}`,
+				]
+			: []),
 		"summary: string",
 		...(rules.output ? ["data: (see the schema)"] : []),
 	].join(", ");
 	return toolDefinition({
 		name: REPORT_TOOL_NAME,
-		description: rules.defaultOutcomes
-			? TOOL_DESCRIPTION
-			: `${TOOL_DESCRIPTION} Outcomes: ${outcomeList(rules)}.`,
+		description: !rules.withOutcome
+			? "Report the result of your task to Night Shift. Call it exactly once, at the end."
+			: rules.defaultOutcomes
+				? TOOL_DESCRIPTION
+				: `${TOOL_DESCRIPTION} Outcomes: ${outcomeList(rules)}.`,
 		inputSchema: reportInputSchema(rules),
 	}).server((args: unknown) => {
 		if (!parseStepReport(args, rules)) {

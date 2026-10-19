@@ -5,12 +5,12 @@ import { Input } from "@nightshift/ui/components/input";
 import { Item } from "@nightshift/ui/components/item";
 import { cn } from "@nightshift/ui/lib/utils";
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, XIcon } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { outcomeStyle } from "@/components/outcome-badge";
 import { type NodeOption, uniqueOptionName } from "@/lib/flow-draft";
 
-type Kind = "option" | "outcome";
+type Kind = "option" | "outcome" | "exit";
 
 const RESERVED: readonly string[] = reservedOutcomes;
 
@@ -19,8 +19,8 @@ const RESERVED: readonly string[] = reservedOutcomes;
  * is an outcome with its own handle. A name commits on blur or Enter, so the
  * edges on it follow one rename and not every keystroke. With `onRule`, each
  * row also takes the rule (`when`) that picks it. Without `onDescribe` and
- * `onMove` it edits a plain list of names, for example a Call's halt-on
- * labels.
+ * `onMove` it edits a plain list of names, for example a Subflow's halt-on
+ * labels. With `onCode`, each row also takes an exit code (a Command node).
  */
 export function OptionsEditor({
 	kind,
@@ -31,7 +31,9 @@ export function OptionsEditor({
 	onRename,
 	onDescribe,
 	onRule,
+	onCode,
 	onAdd,
+	addControl,
 	onRemove,
 	onMove,
 }: {
@@ -47,7 +49,11 @@ export function OptionsEditor({
 	onDescribe?: (index: number, description: string | undefined) => void;
 	/** Decisions decided by a rule: the rule of each option. Empty removes it. */
 	onRule?: (index: number, when: string | undefined) => void;
+	/** Command nodes: the exit code of each row. Empty makes it the catch-all. */
+	onCode?: (index: number, code: number | undefined) => void;
 	onAdd: (option: NodeOption) => void;
+	/** Replaces the add button, for example with a menu of common entries. */
+	addControl?: ReactNode;
 	onRemove: (index: number) => void;
 	onMove?: (index: number, to: number) => void;
 }) {
@@ -83,23 +89,26 @@ export function OptionsEditor({
 								: undefined
 						}
 						onRule={onRule ? (when) => onRule(index, when) : undefined}
+						onCode={onCode ? (code) => onCode(index, code) : undefined}
 						onRemove={() => onRemove(index)}
 						onMove={onMove ? (to) => onMove(index, to) : undefined}
 					/>
 				))}
 			</ol>
-			<Button
-				variant="outline"
-				size="sm"
-				className="self-start"
-				onClick={() => {
-					setFocusIndex(options.length);
-					onAdd({ name: uniqueOptionName(options, newName ?? noun) });
-				}}
-			>
-				<PlusIcon data-icon="inline-start" />
-				Add {noun}
-			</Button>
+			{addControl ?? (
+				<Button
+					variant="outline"
+					size="sm"
+					className="self-start"
+					onClick={() => {
+						setFocusIndex(options.length);
+						onAdd({ name: uniqueOptionName(options, newName ?? noun) });
+					}}
+				>
+					<PlusIcon data-icon="inline-start" />
+					Add {noun}
+				</Button>
+			)}
 		</div>
 	);
 }
@@ -116,6 +125,7 @@ function OptionRow({
 	onRename,
 	onDescribe,
 	onRule,
+	onCode,
 	onRemove,
 	onMove,
 }: {
@@ -130,6 +140,7 @@ function OptionRow({
 	onRename: (name: string) => string | null;
 	onDescribe?: (description: string | undefined) => void;
 	onRule?: (when: string | undefined) => void;
+	onCode?: (code: number | undefined) => void;
 	onRemove: () => void;
 	onMove?: (to: number) => void;
 }) {
@@ -178,6 +189,14 @@ function OptionRow({
 			style={{ borderLeftColor: style.color }}
 		>
 			<div className="flex items-center gap-0.5">
+				{onCode ? (
+					<ExitCodeInput
+						id={`${id}-code`}
+						code={option.code}
+						label={`Exit code of ${position}`}
+						onChange={onCode}
+					/>
+				) : null}
 				<Input
 					ref={nameRef}
 					id={`${id}-name`}
@@ -283,5 +302,58 @@ function OptionRow({
 				/>
 			) : null}
 		</Item>
+	);
+}
+
+/**
+ * An exit code from 0 to 255, or empty for the catch-all. Keeps what the
+ * person types while it is not a valid code yet.
+ */
+function ExitCodeInput({
+	id,
+	code,
+	label,
+	onChange,
+}: {
+	id: string;
+	code: number | undefined;
+	label: string;
+	onChange: (code: number | undefined) => void;
+}) {
+	const [text, setText] = useState(code === undefined ? "" : String(code));
+
+	useEffect(() => {
+		setText(code === undefined ? "" : String(code));
+	}, [code]);
+
+	const valid = text.trim() === "" || /^(\d{1,3})$/.test(text.trim());
+	const value = Number(text.trim());
+	const inRange = text.trim() === "" || (valid && value <= 255);
+
+	return (
+		<Input
+			id={id}
+			value={text}
+			inputMode="numeric"
+			aria-label={label}
+			aria-invalid={!inRange}
+			title={
+				inRange
+					? "Exit code. Leave it empty for any other code."
+					: "Use 0 to 255."
+			}
+			placeholder="any"
+			className="h-8 w-14 shrink-0 text-center font-mono text-xs tabular-nums"
+			autoComplete="off"
+			onChange={(event) => {
+				const next = event.target.value;
+				setText(next);
+				const trimmed = next.trim();
+				if (trimmed === "") onChange(undefined);
+				else if (/^\d{1,3}$/.test(trimmed) && Number(trimmed) <= 255) {
+					onChange(Number(trimmed));
+				}
+			}}
+		/>
 	);
 }

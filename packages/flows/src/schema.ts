@@ -227,10 +227,31 @@ export const agentNodeSchema = z.object({
 	/** MCP servers by name, added to the harness's own configuration. */
 	mcpServers: z.record(nameSchema, mcpServerSchema).optional(),
 	/**
+	 * CLI tools for this node only: programs this computer has that are not
+	 * defined on the daemon. The agent may run them without a prompt. A flow
+	 * that names one this computer cannot find refuses to start.
+	 */
+	nodeClis: z.array(cliNameSchema).optional(),
+	/**
 	 * The agent's own outcomes, each with an edge. Replaces `pass`, `fail`
-	 * and `needs-input` when set. The agent reports one of them.
+	 * and `needs-input` when set. The agent reports one of them, or with a
+	 * `checker` the checker picks one.
 	 */
 	outcomes: z.array(option).min(1).optional(),
+	/**
+	 * Who picks the outcome. Unset: the agent itself, in its step report,
+	 * from the outcomes only. Set: the agent reports its summary and data,
+	 * then this decision model reads them and picks the outcome.
+	 */
+	checker: z
+		.object({
+			decider: deciderNameSchema.default("typesafe"),
+			/** Unset: the decider's default model. */
+			model: z.string().min(1).optional(),
+			/** What the checker looks for. Supports templates. */
+			prompt: z.string().optional(),
+		})
+		.optional(),
 	/**
 	 * A JSON Schema for the `data` of the step report. The agent must report
 	 * data that matches it, else the step ends as `error`. Later nodes read
@@ -261,11 +282,67 @@ export const agentProfileSchema = agentProfileSettingsSchema.extend({
 });
 export type AgentProfile = z.infer<typeof agentProfileSchema>;
 
+/**
+ * One exit of a Command node: an exit code and the outcome it ends with.
+ * The exit without a `code` is the catch-all: any other code, a command
+ * that cannot start, and JSON output that is not valid. At most one, last.
+ */
+export const commandExitSchema = z.object({
+	name: labelSchema,
+	code: z.number().int().min(0).max(255).optional(),
+	description: z.string().optional(),
+});
+export type CommandExit = z.infer<typeof commandExitSchema>;
+
+/** The exits of a Command node that does not list its own: today's pass and fail. */
+export const LEGACY_COMMAND_EXITS: CommandExit[] = [
+	{ name: "pass", code: 0 },
+	{ name: "fail" },
+];
+
+/** The exits a new Command node starts with. */
+export const DEFAULT_COMMAND_EXITS: CommandExit[] = [
+	{ name: "success", code: 0, description: "The command succeeded." },
+	{ name: "error", code: 1, description: "General error." },
+	{ name: "other", description: "Any other exit code." },
+];
+
+/**
+ * Common exit codes on Linux and macOS, offered when adding an exit.
+ * 128 + n is "killed by signal n".
+ */
+export const STANDARD_EXIT_CODES: CommandExit[] = [
+	{ name: "success", code: 0, description: "The command succeeded." },
+	{ name: "error", code: 1, description: "General error." },
+	{
+		name: "misuse",
+		code: 2,
+		description: "Wrong use of a shell builtin or wrong arguments.",
+	},
+	{
+		name: "cannot-execute",
+		code: 126,
+		description: "The command was found but cannot run.",
+	},
+	{ name: "not-found", code: 127, description: "The command was not found." },
+	{
+		name: "interrupted",
+		code: 130,
+		description: "Stopped with Ctrl+C (SIGINT).",
+	},
+	{
+		name: "killed",
+		code: 137,
+		description: "Killed (SIGKILL), often out of memory.",
+	},
+	{ name: "terminated", code: 143, description: "Terminated (SIGTERM)." },
+];
+
 export const commandNodeSchema = z.object({
 	...nodeBase,
 	type: z.literal("command"),
 	/**
-	 * Run with `sh -c` in the worktree. Exit 0 is `pass`. Template values
+	 * Run with `sh -c` in the worktree. The exit code picks the outcome (`exits`). Template values
 	 * arrive as environment variables, never as shell text: write
 	 * `echo "{{worker.summary}}"` and the shell sees `echo "${NS_WORKER_SUMMARY}"`.
 	 */
@@ -273,9 +350,15 @@ export const commandNodeSchema = z.object({
 	/**
 	 * `text`: the output is the log tail only. `json`: the command prints
 	 * JSON, kept as `data` for later nodes (`{{check.data.tests}}`); output
-	 * that is not JSON ends the step `fail`.
+	 * that is not JSON ends the step on the catch-all exit.
 	 */
 	output: z.enum(["text", "json"]).default("text"),
+	/**
+	 * The outcome per exit code, each with an edge. A code without an exit
+	 * ends on the catch-all; without a catch-all the step errors. Unset:
+	 * `pass` on 0 and `fail` on any other code (`commandExits`).
+	 */
+	exits: z.array(commandExitSchema).min(1).optional(),
 });
 
 /**
@@ -609,6 +692,27 @@ export function runsEach(node: FlowNode): node is CallEachNode {
 	return node.type === "call" && node.each !== undefined;
 }
 
+/** A Command node's exits: its own, else pass on 0 and fail on any other code. */
+export function commandExits(node: Pick<CommandNode, "exits">): CommandExit[] {
+	return node.exits ?? LEGACY_COMMAND_EXITS;
+}
+
+/**
+ * The exit a code ends on: the exit with that code, else the catch-all,
+ * else undefined (the step errors). A null code (the command did not start
+ * or its JSON is not valid) ends on the catch-all.
+ */
+export function exitFor(
+	node: Pick<CommandNode, "exits">,
+	code: number | null,
+): CommandExit | undefined {
+	const exits = commandExits(node);
+	return (
+		(code === null ? undefined : exits.find((exit) => exit.code === code)) ??
+		exits.find((exit) => exit.code === undefined)
+	);
+}
+
 /** The outcomes a node can end with, in the order its handles show. */
 export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 	switch (node.type) {
@@ -617,7 +721,7 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 				? node.outcomes.map((o) => o.name)
 				: ["pass", "fail", "needs-input"];
 		case "command":
-			return ["pass", "fail"];
+			return commandExits(node).map((exit) => exit.name);
 		case "decision":
 			return node.options.map((option) => option.name);
 		case "call":
@@ -656,8 +760,16 @@ export function optionProblem(
  * use `nodeOutputFields`.
  */
 export const outputFieldsByType = {
-	/** output: the final message. summary: the report's summary, else the output. data: the report's JSON. */
-	agent: ["outcome", "output", "summary", "data", "visit", "session_id"],
+	/** output: the final message. summary: the report's summary, else the output. data: the report's JSON. note: why the checker picked the outcome. */
+	agent: [
+		"outcome",
+		"output",
+		"summary",
+		"data",
+		"note",
+		"visit",
+		"session_id",
+	],
 	/** log_tail: the last lines of stdout and stderr together. data: the JSON it printed, with `output: "json"`. */
 	command: ["outcome", "exit_code", "log_tail", "data", "visit"],
 	/** outcome: the option. note: what the person wrote, or why the model picked it. */

@@ -16,10 +16,12 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 |------|---------|--------|
 | Project | A local clone that Runs can start in. | Slice 1 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
-| Node | One step of a Flow: Agent, Command, Tool, Decision, Value, Wait, or Call. Its id is also its name in templates. | PLAN §3 |
-| Agent Node | A Node that runs one Session on its Harness, with a prompt and/or a skill, a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. | PLAN §3 |
+| Node | One step of a Flow: Agent, Command, Tool, Decision, Value, Wait, or Subflow (`call` in the file). Its id is also its name in templates. | PLAN §3 |
+| Agent Node | A Node that runs one Session on its Harness, with a prompt or a skill (with arguments), a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. The agent picks its Outcome in its Step Report, or a Checker picks it. | PLAN §3 |
 | Agent Profile | A Harness, a model, an effort, a permission mode, CLI Tools and Connections under one name, defined once on the daemon (the Agents page). Agent Nodes name it in `profile`. A Run resolves it when it starts, so a later change reaches the next Run. A Flow that names a profile the daemon does not have refuses to start. | Agents |
-| Command Node | A Node that runs one shell command in the Worktree. Exit 0 is `pass`. With `output: "json"`, what it prints is `data` for later Nodes; output that is not JSON is `fail`. | PLAN §3 |
+| Command Node | A Node that runs one shell command in the Worktree. Its Exits map exit codes to Outcomes; without `exits`, 0 is `pass` and any other code `fail`. With `output: "json"`, what it prints is `data` for later Nodes; output that is not JSON ends on the catch-all Exit. | PLAN §3 |
+| Exit | One Outcome of a Command Node: an exit code (0–255) and a name. The Exit without a code is the catch-all: any other code, a command that cannot start, or JSON that is not valid. New nodes start with 0 `success`, 1 `error`, and `other`. | Command exits |
+| Checker | A decision model on an Agent Node (`checker`) that reads the Step Report after the Session and picks the Outcome, instead of the agent. | Agent checker |
 | Decision Node | A Node that picks one of its Options, which is the Step's Outcome. Who picks is `by`: you (a Gate), a Rule, or a model (the Decider). Its prompt is the question for you, the brief for the model, or a note on the Rules. Later Nodes read `outcome` and `note`. | PLAN §3 |
 | Tool Node | A Node that calls one tool of a Connection itself, with arguments from templates, and no model in the loop. The MCP leg of "flow + CLI + MCP", next to the Command Node. `pass` when the tool answers; `fail` when it reports an error, the Connection has no such tool, or does not answer. Later Nodes read `data` (the tool's structured answer, else the JSON its text holds) and `text`. Not a CLI Tool: that is a program an agent may run. | Tool node |
 | Option | One of the things a Decision Node can pick, with a name, a description, and (for a Rule) `when`. Each Option has its own Edge. | PLAN §3 |
@@ -31,7 +33,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Start Node | The Node a Run begins at. | Slice 2 |
 | Input | A named value a Flow takes, like a function argument. The top-level Flow's Inputs are asked at start. | Slice 5 |
 | Output | A named value a Flow returns to the Node that called it. | Slice 5 |
-| Call Node | A Node that runs another Flow with its Inputs bound: once (`pass` or `fail`), or with `each` once per Item of a List (`done` or `halted`). Either way `stopped` at the stop time: an Edge on it leads to the Nodes that still run after the stop time. | PLAN §3 |
+| Call Node | Shown as Subflow in the app. A Node that runs another Flow with its Inputs bound: once (`pass` or `fail`), or with `each` once per Item of a List (`done` or `halted`). Either way `stopped` at the stop time: an Edge on it leads to the Nodes that still run after the stop time. | PLAN §3 |
 | Body Flow | The Flow a Call Node with `each` runs once per Item. Any Flow can be a Body Flow. | Slice 4 |
 | Item | One element of the List of a Call Node with `each`: any JSON value, optionally with `id`, `title`, `dependsOn`, and `done`. | Slice 4 |
 | Connection | An MCP server defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `connections`. Holds `${NAME}` references, never secret values. | Connections |
@@ -63,10 +65,10 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Visit | The count of a Step among the Steps of the same Node: 1 for the first. | Slice 2 |
 | Session | One harness session of an Agent Step. A resumed Step has more than one. | Slice 1 |
 | Harness | A coding-agent CLI that runs Sessions on this machine, with its own login, through a TanStack AI harness adapter: `claude-code` (Claude Code), `opencode` (OpenCode, a 1.x build), or `codex` (Codex). Added on the Agents page; an Agent Profile or an Agent Node names one. | Slice 8 |
-| MCP Server | A tool server an Agent Node adds to its Session, next to the Harness's own: a local command (stdio) or a URL. | Slice 8 |
+| MCP Server | A tool server an Agent Node adds to its Session, next to the Harness's own: a local command (stdio) or a URL. Set on the Node, it is for that Node only. The editor shows MCP Servers, Connections and CLI Tools together as the Node's tools. | Slice 8 |
 | Environment Reference | `${NAME}` in an MCP Server's env values or headers. The daemon puts in its environment variable `NAME` when the Step starts, so secrets stay out of Flow files. | Slice 8 |
 | Step Report | The Outcome, summary, and optional data an agent reports at the end of its Session. | PLAN §3 |
-| Output Schema | A JSON Schema for the data of an Agent Node's Step Report. The engine checks the data against it. | Slice 6 |
+| Output Schema | A JSON Schema for the data of an Agent Node's Step Report or a Value Node's value. The editor builds it from fields (text, number, yes or no, choice, list, object). The engine checks the data against it. | Slice 6 |
 | Starter | A small Flow in `examples/starters/` to copy into a Project. | Slice 6 |
 | Transcript | The structured record of a Step: agent messages, tool calls, and command output, on disk. | Slice 1 |
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |
@@ -77,7 +79,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Run Policy | The rules for retries, rescue, blocked propagation, network grace, usage-limit waits, the stop time, and resume after a restart. | PLAN §2 |
 | Needs-you inbox | The list of open Gates. | PLAN §3 |
 | Decider | The TanStack AI decision model behind a Decision decided by a model: TypeSafe Jev by default, or Jev on OpenRouter, OpenAI Decisions, Ollaya. Its API key is a Secret. Jev on OpenRouter and OpenAI Decisions also have a chat model, so they can make a Value; TypeSafe and Ollaya only decide. | PLAN §2 |
-| CLI Tool | A program on this computer, by its name (`gh`, `aws`), defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `clis`: its agent may run it without a prompt. A Flow that names one the daemon does not have, or that the computer cannot find, refuses to start. Not a Tool Node: a CLI Tool is a program an agent runs; a Tool Node calls one MCP tool of a Connection itself. | CLI tools |
+| CLI Tool | A program on this computer, by its name (`gh`, `aws`), defined once on the daemon (the Agents page, under Tools). An Agent Profile or an Agent Node names it in `clis`: its agent may run it without a prompt. A Flow that names one the daemon does not have, or that the computer cannot find, refuses to start. An Agent Node can also name programs for itself only in `nodeClis`: not defined on the daemon, but the computer must find them. Not a Tool Node: a CLI Tool is a program an agent runs; a Tool Node calls one MCP tool of a Connection itself. | CLI tools |
 
 ## Run status
 

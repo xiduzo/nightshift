@@ -244,6 +244,30 @@ describe("CLI tools at the start", () => {
 		expect((await waitForEnd(engine, run.id)).status).toBe("finished");
 		expect(harness.calls.map((c) => c.clis)).toEqual([["gh"], undefined]);
 	});
+
+	test("the node's own CLI tools need no definition, but this computer must have them", async () => {
+		const harness = fakeHarness();
+		const engine = makeEngine(harness, {
+			cliNames: () => new Set(["gh"]),
+			findCli: (name) => (name === "jq" ? null : `/bin/${name}`),
+		});
+		const id = await projectId(engine);
+		const run = await engine.startRun({
+			projectId: id,
+			flow: flowOf([agent("worker", { clis: ["gh"], nodeClis: ["rg", "gh"] })]),
+		});
+		expect((await waitForEnd(engine, run.id)).status).toBe("finished");
+		expect(harness.calls[0]?.clis).toEqual(["gh", "rg"]);
+
+		await expect(
+			engine.startRun({
+				projectId: id,
+				flow: flowOf([agent("worker", { nodeClis: ["jq"] })]),
+			}),
+		).rejects.toThrow(
+			'The flow uses the CLI tool "jq", but this computer does not have it. Install jq, or take it off the flow.',
+		);
+	});
 });
 
 describe("mcpServersFor", () => {

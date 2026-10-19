@@ -1261,7 +1261,7 @@ describe("validateFlow: outputs", () => {
 		).toEqual([
 			'The output "report" is declared more than once.',
 			expect.stringContaining('The output "Bad" is not a valid name'),
-			'The output "ended" clashes with a field every Call node has: outcome, ended, visit.',
+			'The output "ended" clashes with a field every Subflow node has: outcome, ended, visit.',
 		]);
 	});
 });
@@ -1410,7 +1410,7 @@ describe("validateFlow: Call with each", () => {
 		expect(errors(validateFlow(night(), { flows: {} }))).toEqual([
 			expect.objectContaining({
 				nodeId: "each",
-				message: 'Call node "each" runs flow "trace", which does not exist.',
+				message: 'Subflow node "each" runs flow "trace", which does not exist.',
 			}),
 		]);
 	});
@@ -1473,8 +1473,8 @@ describe("validateFlow: Call with each", () => {
 			).map((issue) => issue.message),
 		).toEqual([
 			'The input "epic" of "each" uses {{nope}}, but there is no node or input "nope".',
-			'Call node "each" binds the input "item", which already takes each item.',
-			'Call node "each" binds the input "other", but flow "trace" has no such input.',
+			'Subflow node "each" binds the input "item", which already takes each item.',
+			'Subflow node "each" binds the input "other", but flow "trace" has no such input.',
 		]);
 	});
 
@@ -1489,7 +1489,7 @@ describe("validateFlow: Call with each", () => {
 				}),
 			).map((issue) => issue.message),
 		).toEqual([
-			'Call node "each" does not bind the required input "epic" of flow "trace".',
+			'Subflow node "each" does not bind the required input "epic" of flow "trace".',
 		]);
 		for (const input of [
 			{ name: "epic", type: "text", required: true, default: "1" },
@@ -1508,7 +1508,7 @@ describe("validateFlow: Call with each", () => {
 			{
 				severity: "error",
 				nodeId: "each",
-				message: 'Flow "trace" of Call node "each" has 2 errors.',
+				message: 'Flow "trace" of Subflow node "each" has 2 errors.',
 			},
 		]);
 	});
@@ -1517,7 +1517,7 @@ describe("validateFlow: Call with each", () => {
 		const broken = body(flow([agent("worker", { prompt: "{{nope.x}}" })], []));
 		expect(
 			errors(validateFlow(night(), { flows: { trace: broken } }))[0]?.message,
-		).toBe('Flow "trace" of Call node "each" has 1 error.');
+		).toBe('Flow "trace" of Subflow node "each" has 1 error.');
 	});
 
 	test("errors of a nested called flow count once, on its caller", () => {
@@ -1527,7 +1527,7 @@ describe("validateFlow: Call with each", () => {
 		const flows = { feature, trace: broken };
 		expect(errors(validateFlow(top, { flows }))).toEqual([
 			expect.objectContaining({
-				message: 'Flow "feature" of Call node "each" has 1 error.',
+				message: 'Flow "feature" of Subflow node "each" has 1 error.',
 			}),
 		]);
 	});
@@ -1576,7 +1576,7 @@ describe("validateFlow: Call with each", () => {
 			errors(validateFlow(top, { flows: { b, c, top }, name: "top" })),
 		).toEqual([
 			expect.objectContaining({
-				message: 'Flow "b" of Call node "each" has 1 error.',
+				message: 'Flow "b" of Subflow node "each" has 1 error.',
 			}),
 		]);
 		expect(
@@ -1593,7 +1593,7 @@ describe("validateFlow: Call with each", () => {
 		const top = night(callEach("each", "loop"));
 		expect(errors(validateFlow(top, { flows: { loop } }))).toEqual([
 			expect.objectContaining({
-				message: 'Flow "loop" of Call node "each" has 1 error.',
+				message: 'Flow "loop" of Subflow node "each" has 1 error.',
 			}),
 		]);
 	});
@@ -1708,7 +1708,9 @@ describe("validateFlow: Call", () => {
 	test("the called flow must exist and parse", () => {
 		expect(
 			errors(validateFlow(caller("x"), { flows: {} })).map((i) => i.message),
-		).toEqual(['Call node "call" runs flow "review", which does not exist.']);
+		).toEqual([
+			'Subflow node "call" runs flow "review", which does not exist.',
+		]);
 		expect(
 			errors(validateFlow(caller("x"), { flows: { review: null } })).map(
 				(i) => i.message,
@@ -1721,8 +1723,8 @@ describe("validateFlow: Call", () => {
 		expect(
 			errors(validateFlow(f, { flows: flows() })).map((i) => i.message),
 		).toEqual([
-			'Call node "call" binds the input "other", but flow "review" has no such input.',
-			'Call node "call" does not bind the required input "pr" of flow "review".',
+			'Subflow node "call" binds the input "other", but flow "review" has no such input.',
+			'Subflow node "call" does not bind the required input "pr" of flow "review".',
 		]);
 	});
 
@@ -1735,7 +1737,7 @@ describe("validateFlow: Call", () => {
 			{
 				severity: "error",
 				nodeId: "call",
-				message: 'Flow "review" of Call node "call" has 1 error.',
+				message: 'Flow "review" of Subflow node "call" has 1 error.',
 			},
 		]);
 	});

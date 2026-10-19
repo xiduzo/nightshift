@@ -78,6 +78,12 @@ export type StepReportSpec = {
 	 * engine does.
 	 */
 	output?: Record<string, unknown>;
+	/**
+	 * `false`: the agent reports its summary (and data) but no outcome,
+	 * because something else picks it (an Agent node's checker). The
+	 * report's `outcome` is then "". Default: true.
+	 */
+	outcome?: boolean;
 };
 
 /**

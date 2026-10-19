@@ -4,6 +4,8 @@ import {
 	type CallNode,
 	type CommandNode,
 	canMakeValue,
+	commandExits,
+	DEFAULT_COMMAND_EXITS,
 	type DecidedBy,
 	type DecisionNode,
 	FLOW_VERSION,
@@ -44,9 +46,10 @@ export const DEFAULT_MODEL = "sonnet";
 export type ProjectFlowMap = Readonly<Record<string, Flow | null>>;
 
 /** A Decision option or an Agent's own outcome. Each one is an outcome of its node. */
-export type NodeOption = DecisionNode["options"][number];
+/** A Decision option, an Agent outcome, or a Command exit (with its `code`). */
+export type NodeOption = DecisionNode["options"][number] & { code?: number };
 /** A node whose outcomes are its own options. */
-export type OptionNode = DecisionNode | AgentNode;
+export type OptionNode = DecisionNode | AgentNode | CommandNode;
 
 /**
  * What a new Agent or Decision node starts with: the daemon's settings
@@ -78,7 +81,14 @@ export function agentNode(
 
 /** The command starts empty; the issues panel asks for one. */
 export function commandNode(id: string, position: Position): CommandNode {
-	return { id, type: "command", position, command: "", output: "text" };
+	return {
+		id,
+		type: "command",
+		position,
+		command: "",
+		output: "text",
+		exits: DEFAULT_COMMAND_EXITS.map((exit) => ({ ...exit })),
+	};
 }
 
 /**
@@ -591,12 +601,16 @@ export function renameNode(flow: Flow, from: string, to: string): Flow {
 }
 
 export function isOptionNode(node: FlowNode): node is OptionNode {
-	return node.type === "decision" || node.type === "agent";
+	return (
+		node.type === "decision" || node.type === "agent" || node.type === "command"
+	);
 }
 
-/** The options of a Decision node, or an Agent's own outcomes. */
+/** The options of a Decision node, an Agent's own outcomes, or a Command's exits. */
 export function nodeOptions(node: OptionNode): NodeOption[] {
-	return node.type === "decision" ? node.options : (node.outcomes ?? []);
+	if (node.type === "decision") return node.options;
+	if (node.type === "command") return commandExits(node);
+	return node.outcomes ?? [];
 }
 
 export function withOptions<T extends OptionNode>(
@@ -604,12 +618,21 @@ export function withOptions<T extends OptionNode>(
 	options: NodeOption[],
 ): T {
 	if (node.type === "decision") return { ...node, options };
+	if (node.type === "command") {
+		const exits = options.map(({ name, code, description }) => ({
+			name,
+			...(code === undefined ? {} : { code }),
+			...(description === undefined ? {} : { description }),
+		}));
+		return { ...node, exits };
+	}
 	return { ...node, outcomes: options };
 }
 
-/** What an option is called on its node: an option, or an outcome. */
-export function optionNoun(node: FlowNode): "option" | "outcome" {
-	return node.type === "decision" ? "option" : "outcome";
+/** What an option is called on its node: an option, an outcome, or an exit. */
+export function optionNoun(node: FlowNode): "option" | "outcome" | "exit" {
+	if (node.type === "decision") return "option";
+	return node.type === "command" ? "exit" : "outcome";
 }
 
 function changeOptions(
@@ -1090,7 +1113,7 @@ const FIELD_MESSAGES: Record<string, string> = {
 		"The interval must be a whole number of minutes above 0.",
 	"until.name":
 		"Signal name: use lowercase letters, digits and -, starting with a letter.",
-	connection: "Pick a connection.",
+	connection: "Pick an MCP server.",
 	tool: "Pick a tool.",
 };
 
@@ -1195,11 +1218,16 @@ function optionMessage(
 	rest: PropertyKey[],
 ): string | undefined {
 	const [list, at, field] = rest;
-	if ((list !== "options" && list !== "outcomes") || field !== "name") return;
+	if (
+		(list !== "options" && list !== "outcomes" && list !== "exits") ||
+		field !== "name"
+	)
+		return;
 	const node = typeof index === "number" ? flow.nodes[index] : undefined;
 	if (!node || !isOptionNode(node)) return;
 	const name = nodeOptions(node)[Number(at)]?.name ?? "";
-	const kind = list === "options" ? "Option" : "Outcome";
+	const kind =
+		list === "options" ? "Option" : list === "exits" ? "Exit" : "Outcome";
 	return name === ""
 		? `A ${kind.toLowerCase()} has no name.`
 		: `${kind} "${name}": use lowercase letters, digits and -, starting with a letter.`;

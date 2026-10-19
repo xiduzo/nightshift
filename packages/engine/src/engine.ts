@@ -815,7 +815,12 @@ export function createEngine(
 			const findCli = options.findCli ?? ((name: string) => Bun.which(name));
 			const notFound = [
 				...new Set(
-					nodes.flatMap((n) => (n.type === "agent" ? (n.clis ?? []) : [])),
+					// A node's own CLI tools need no definition, but this computer must have them.
+					nodes.flatMap((n) =>
+						n.type === "agent"
+							? [...(n.clis ?? []), ...(n.nodeClis ?? [])]
+							: [],
+					),
 				),
 			].filter((name) => findCli(name) === null);
 			if (notFound.length > 0) {
@@ -845,6 +850,14 @@ export function createEngine(
 			) {
 				throw new Error(
 					"The flow has a Decision node decided by a model, but no decider is configured.",
+				);
+			}
+			if (
+				!decider &&
+				nodes.some((n) => n.type === "agent" && n.checker !== undefined)
+			) {
+				throw new Error(
+					"The flow has an Agent node with a checker, but no decider is configured.",
 				);
 			}
 			if (

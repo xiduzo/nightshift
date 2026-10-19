@@ -19,7 +19,7 @@ function flowOf(ids: string[], edges: FlowEdge[], start = ids[0] ?? ""): Flow {
 
 function edge(
 	from: string,
-	outcome: "pass" | "fail",
+	outcome: string,
 	to: string,
 	max?: number,
 ): FlowEdge {
@@ -52,7 +52,7 @@ describe("layoutFlow", () => {
 			layoutFlow(
 				flowOf(
 					["a", "onFail", "onPass"],
-					[edge("a", "fail", "onFail"), edge("a", "pass", "onPass")],
+					[edge("a", "error", "onFail"), edge("a", "success", "onPass")],
 				),
 			),
 		);

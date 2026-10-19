@@ -34,7 +34,7 @@ export const NODE_TYPE: Record<FlowNodeType, NodeMeta> = {
 		blurb: "Picks one of its options: you, a rule, or a model.",
 	},
 	call: {
-		label: "Call",
+		label: "Subflow",
 		icon: SquareFunctionIcon,
 		blurb: "Runs another flow once, or once per item in a list.",
 	},

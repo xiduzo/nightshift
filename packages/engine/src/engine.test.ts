@@ -1556,6 +1556,20 @@ describe("decisions", () => {
 		expect(existsSync(join(sandbox.root, "repo.nightshift"))).toBe(false);
 	});
 
+	test("startRun refuses a flow with an Agent checker when no decider is configured", async () => {
+		const engine = makeEngine(fakeHarness());
+		await expect(
+			engine.startRun({
+				projectId: await projectId(engine),
+				flow: flowOf([
+					agent("worker", "Work", { checker: { decider: "typesafe" } }),
+				]),
+			}),
+		).rejects.toThrow(
+			"The flow has an Agent node with a checker, but no decider is configured.",
+		);
+	});
+
 	test("a decision that runs past its timeout errors", async () => {
 		const { decider } = scriptedDecider(waitForAbort);
 		const engine = makeEngine(fakeHarness(), { decider }, { minuteMs: 50 });

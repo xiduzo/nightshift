@@ -4,10 +4,12 @@ import { Command, MemorySaver } from "@langchain/langgraph";
 import type { AgentHarness, AgentSessionInput } from "@nightshift/agents";
 import {
 	failingScript,
+	fakeDecider,
 	fakeHarness,
 	reportingScript,
 	usageLimitScript,
 } from "@nightshift/agents/fake";
+import type { Decider } from "@nightshift/agents/types";
 import {
 	agentSession,
 	project,
@@ -85,7 +87,7 @@ type Harness = {
 async function startRun(
 	flow: Flow,
 	harness: AgentHarness,
-	options: { signal?: AbortSignal } = {},
+	options: { signal?: AbortSignal; decider?: Decider } = {},
 ): Promise<Harness> {
 	const { db } = sandbox;
 	const runId = `run-${++runs}`;
@@ -143,6 +145,7 @@ async function startRun(
 		minuteMs: MINUTE,
 		dataDir: sandbox.dataDir,
 		settings: defaultRunSettings,
+		...(options.decider ? { decider: options.decider } : {}),
 	};
 	const saver = new MemorySaver();
 	return {
@@ -1312,6 +1315,156 @@ describe("the Agent node", () => {
 			visit: 1,
 			outcome: "pass",
 			outputs: { summary: "Recovered" },
+		});
+	});
+});
+
+describe("the checker", () => {
+	const review = {
+		outcomes: [
+			{ name: "approved", description: "The change can merge." },
+			{ name: "changes-requested" },
+		],
+		output: {
+			type: "object",
+			properties: { issues: { type: "array", items: { type: "string" } } },
+			required: ["issues"],
+		},
+		checker: {
+			decider: "typesafe",
+			prompt: "Approve only when {{task}} is done.",
+		},
+	};
+
+	test("the agent reports no outcome; the checker picks it, with its note and cost", async () => {
+		const harness = fakeHarness(
+			reportingScript("", "Reviewed it", { issues: [] }),
+		);
+		const decider = fakeDecider([
+			{ label: "approved", notes: "No issues left.", costUsd: 0.01 },
+		]);
+		const h = await startRun(
+			flowOf({
+				inputs: [{ name: "task" }],
+				start: "worker",
+				nodes: [
+					agent("worker", review),
+					{
+						id: "merge",
+						type: "command" as const,
+						position: { x: 0, y: 0 },
+						command: "true",
+					},
+				],
+				edges: [{ id: "e1", from: "worker", outcome: "approved", to: "merge" }],
+			}),
+			harness,
+			{ decider },
+		);
+		const { parked, state } = await drive(h, { inputs: { task: "the thing" } });
+		expect(parked).toEqual([]);
+		expect(harness.calls[0]?.stepReport).toEqual({
+			outcome: false,
+			output: review.output,
+		});
+		expect(decider.calls).toHaveLength(1);
+		const asked = decider.calls[0];
+		expect(asked?.labels).toEqual(review.outcomes);
+		expect(asked?.prompt).toBe(
+			[
+				"Approve only when the thing is done.",
+				"## The agent's task",
+				"Work on worker: the thing",
+				"## The agent's summary",
+				"Reviewed it",
+				"## The agent's final message",
+				"Working on it.",
+				"## The agent's data",
+				JSON.stringify({ issues: [] }, null, 2),
+			].join("\n\n"),
+		);
+		expect(payloads(await h.events(), "StepEnded")[0]).toEqual({
+			outcome: "approved",
+			outputs: {
+				outcome: "approved",
+				note: "No issues left.",
+				output: "Working on it.",
+				summary: "Reviewed it",
+				data: { issues: [] },
+				visit: 1,
+				session_id: "fake-session-1",
+			},
+			error: null,
+			costUsd: 0.01,
+		});
+		expect(state.nodes.worker?.note).toBe("No issues left.");
+		expect(h.types()).resolves.toContain("EdgeTaken");
+	});
+
+	test("without own outcomes the checker picks pass, fail or needs-input", async () => {
+		const harness = fakeHarness(reportingScript("", "Done"));
+		const decider = fakeDecider([{ label: "fail", notes: "Tests fail." }]);
+		const h = await startRun(
+			flowOf({
+				start: "worker",
+				nodes: [agent("worker", { checker: { decider: "typesafe" } })],
+				edges: [],
+			}),
+			harness,
+			{ decider },
+		);
+		const { parked } = await drive(h, { inputs: { task: "x" } });
+		expect(decider.calls[0]?.labels.map((l) => l.name)).toEqual([
+			"pass",
+			"fail",
+			"needs-input",
+		]);
+		expect(
+			decider.calls[0]?.prompt.startsWith(
+				"Read what the agent did, then pick the outcome that fits its result.",
+			),
+		).toBe(true);
+		expect(parked[0]).toMatchObject({
+			status: "failed",
+			reason:
+				'Node "worker" ended with "fail" and no edge leaves it on that outcome.',
+		});
+	});
+
+	test("a checker without a decider, or one that picks an unknown outcome, errors the step", async () => {
+		const flow = flowOf({
+			start: "worker",
+			nodes: [agent("worker", { checker: { decider: "typesafe" } })],
+			edges: [],
+		});
+		const none = await startRun(flow, fakeHarness(reportingScript("", "Done")));
+		const first = await drive(none, { inputs: { task: "x" } });
+		expect(first.parked[0]).toMatchObject({
+			status: "failed",
+			reason:
+				'Node "worker" failed: No decider is configured for the checker of this Agent node.',
+		});
+
+		const wrong = await startRun(
+			flow,
+			fakeHarness(reportingScript("", "Done")),
+			{
+				// A decider that answers off the list (against its contract).
+				decider: {
+					decide: async () => ({
+						kind: "decided",
+						label: "maybe",
+						notes: "",
+						costUsd: null,
+					}),
+				} as unknown as Decider,
+			},
+		);
+		const second = await drive(wrong, { inputs: { task: "x" } });
+		expect(second.parked[0]).toMatchObject({
+			status: "failed",
+			reason:
+				'Node "worker" failed: "maybe" is not an option of this node. Choose one of: pass, fail, needs-input.',
 		});
 	});
 });

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
+import { DECIDER_ADAPTERS } from "@nightshift/agents/decider";
 import type {
 	AgentEvent,
 	AgentSessionInput,
@@ -10,6 +11,7 @@ import { agentSession } from "@nightshift/db/schema/nightshift";
 import {
 	type AgentNode,
 	type JsonValue,
+	optionProblem,
 	renderTemplate,
 	resolvedAgent,
 } from "@nightshift/flows";
@@ -51,6 +53,7 @@ import {
 	waitNodeId,
 } from "../route";
 import type { RunStateValues } from "../state";
+import { decideWithin } from "./choosers/model";
 
 /**
  * The Agent node: one harness session per visit, ported from `runAgentStep`
@@ -286,8 +289,40 @@ function agentOutcomes(node: AgentNode): string[] {
 	return node.outcomes?.map((o) => o.name) ?? BUILT_IN_AGENT_OUTCOMES;
 }
 
-/** What the harness asks the agent to report: a spec for own outcomes or an output schema. */
+/** The built-in outcomes as a checker sees them. */
+const BUILT_IN_CHECK_OUTCOMES = [
+	{ name: "pass", description: "The task is done." },
+	{ name: "fail", description: "The task is not done." },
+	{
+		name: "needs-input",
+		description: "A person must decide or provide something first.",
+	},
+];
+
+/** The outcomes a checker picks from: name and description only. */
+function checkOutcomes(
+	node: AgentNode,
+): { name: string; description?: string }[] {
+	return (
+		node.outcomes?.map((o) =>
+			o.description === undefined
+				? { name: o.name }
+				: { name: o.name, description: o.description },
+		) ?? BUILT_IN_CHECK_OUTCOMES
+	);
+}
+
+/**
+ * What the harness asks the agent to report: a spec for own outcomes or an
+ * output schema. With a checker the agent reports no outcome: the checker
+ * picks it.
+ */
 function stepReportOf(node: AgentNode): AgentSessionInput["stepReport"] {
+	if (node.checker) {
+		return node.output
+			? { outcome: false, output: node.output }
+			: { outcome: false };
+	}
 	if (!node.outcomes && !node.output) return true;
 	const spec: StepReportSpec = {};
 	if (node.outcomes) {
@@ -369,7 +404,8 @@ async function runSession(
 	// A new session learns its CLI tools after the prompt. A resumed session
 	// has them already. Plan mode runs no command. The log keeps the node's
 	// prompt only, like the report instruction the harness adds.
-	const clis = node.clis ?? [];
+	// The daemon's CLI tools (with the profile's) and the node's own.
+	const clis = [...new Set([...(node.clis ?? []), ...(node.nodeClis ?? [])])];
 	const cliGuide =
 		!resumeSessionId &&
 		agent.permissionMode !== "plan" &&
@@ -488,7 +524,7 @@ async function runSession(
 			effort: agent.effort,
 			resumeSessionId: resumeSessionId ?? undefined,
 			stepReport: stepReportOf(node),
-			...(node.clis && node.clis.length > 0 ? { clis: node.clis } : {}),
+			...(clis.length > 0 ? { clis } : {}),
 			...(Object.keys(mcp.servers).length > 0
 				? { mcpServers: mcp.servers }
 				: {}),
@@ -545,6 +581,18 @@ async function runSession(
 	}
 	const stepError = (error: string) =>
 		end("error", { ...outputs, outcome: "error" }, error, harnessSessionId);
+	if (node.checker && (finalReport || final.outcome === "finished")) {
+		if (node.output) {
+			if (!finalReport) {
+				return stepError(
+					"The agent finished with no step report, so it gave no data for the output schema.",
+				);
+			}
+			const problem = checkOutputData(node.output, finalReport.data);
+			if (problem) return stepError(problem);
+		}
+		return checkOutcome(ctx, node, step, outputs, harnessSessionId);
+	}
 	if (finalReport) {
 		const outcomes = agentOutcomes(node);
 		if (!outcomes.includes(finalReport.outcome)) {
@@ -582,4 +630,102 @@ async function runSession(
 		final.error ?? "The agent session failed.",
 		harnessSessionId,
 	);
+}
+
+/** What the checker reads when its prompt is empty. */
+const DEFAULT_CHECK_BRIEF =
+	"Read what the agent did, then pick the outcome that fits its result.";
+
+/**
+ * The checker of an Agent node: after the session, its decider reads the
+ * agent's task, summary, final message and data, and picks one of the
+ * node's outcomes. The transcript gets `decision-start` and `decision` as
+ * for a Decision decided by a model; the checker's reasons are the `note`
+ * output and its cost goes on `StepEnded`. A usage limit or a network
+ * failure of the checker fails the step: waiting would run the agent again.
+ */
+async function checkOutcome(
+	ctx: StepContext,
+	node: AgentNode,
+	step: StepHandle,
+	outputs: StepOutputs,
+	harnessSessionId: string | null,
+): Promise<StepEnd> {
+	const checker = node.checker as NonNullable<AgentNode["checker"]>;
+	const { signal } = step;
+	const options = checkOutcomes(node);
+	const model = checker.model ?? DECIDER_ADAPTERS[checker.decider].defaultModel;
+	const task = renderTemplate(node.prompt, step.tctx);
+	const brief = checker.prompt
+		? renderTemplate(checker.prompt, step.tctx).trim()
+		: "";
+	const sections = [
+		brief || DEFAULT_CHECK_BRIEF,
+		"## The agent's task",
+		node.skill ? `/${node.skill} ${task}`.trim() : task,
+		"## The agent's summary",
+		String(outputs.summary ?? ""),
+		"## The agent's final message",
+		String(outputs.output ?? ""),
+		...(outputs.data !== undefined
+			? ["## The agent's data", JSON.stringify(outputs.data, null, 2)]
+			: []),
+	];
+	const prompt = sections.join("\n\n");
+	step.record(null, {
+		type: "decision-start",
+		prompt,
+		labels: options.map((option) => option.name),
+		model,
+	});
+	const finish = (
+		outcome: StepEnd["outcome"],
+		note: string,
+		error: string | null,
+		costUsd: number | null,
+	) =>
+		step.end(outcome, { ...outputs, outcome, note }, error, {
+			harnessSessionId,
+			costUsd,
+		});
+	if (!ctx.decider) {
+		return finish(
+			"error",
+			"",
+			"No decider is configured for the checker of this Agent node.",
+			null,
+		);
+	}
+	const result = await decideWithin(
+		ctx.decider,
+		{ decider: checker.decider, prompt, labels: options, model, signal },
+		signal,
+	);
+	const costUsd = result.costUsd;
+	if (result.kind === "decided") {
+		step.record(null, {
+			type: "decision",
+			label: result.label,
+			notes: result.notes,
+		});
+	}
+	const note = result.kind === "decided" ? result.notes : "";
+	const aborted = step.abortResult({ ...outputs, note });
+	if (aborted) {
+		return step.end(aborted.outcome, aborted.outputs, aborted.error, {
+			harnessSessionId,
+			costUsd,
+		});
+	}
+	if (result.kind === "error") {
+		return finish(
+			"error",
+			note,
+			`The checker failed: ${result.message}`,
+			costUsd,
+		);
+	}
+	const problem = optionProblem(options, result.label);
+	if (problem !== null) return finish("error", note, problem, costUsd);
+	return finish(result.label, note, null, costUsd);
 }

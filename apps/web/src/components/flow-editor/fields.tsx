@@ -149,14 +149,12 @@ function SectionTitle({ children }: { children: ReactNode }) {
 
 /**
  * One section of the inspector: a separator, a small uppercase heading, and
- * the fields. A collapsible section opens from its heading, for advanced
- * settings that most nodes leave alone.
+ * the fields. Every section folds from its heading.
  */
 export function InspectorSection({
 	title,
 	description,
 	aside,
-	collapsible = false,
 	defaultOpen = true,
 	children,
 	className,
@@ -165,7 +163,7 @@ export function InspectorSection({
 	description?: ReactNode;
 	/** A badge or count beside the heading. */
 	aside?: ReactNode;
-	collapsible?: boolean;
+	/** Closed at first: for settings that most nodes leave alone. */
 	defaultOpen?: boolean;
 	children: ReactNode;
 	className?: string;
@@ -178,21 +176,6 @@ export function InspectorSection({
 			{children}
 		</div>
 	);
-
-	if (!collapsible) {
-		return (
-			<>
-				<Separator />
-				<section aria-labelledby={id} className="flex flex-col gap-4 p-4">
-					<h3 id={id} className="flex min-h-5 items-center gap-2">
-						<SectionTitle>{title}</SectionTitle>
-						{aside}
-					</h3>
-					{body}
-				</section>
-			</>
-		);
-	}
 
 	return (
 		<>
