@@ -14,19 +14,12 @@ import {
 	ItemMedia,
 	ItemTitle,
 } from "@nightshift/ui/components/item";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@nightshift/ui/components/table";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon, CoinsIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
+import { DataTable, dataTableColumns } from "@/components/data-table";
 import { RunStatusBadge } from "@/components/run-status-badge";
 import { useNow } from "@/hooks/use-now";
 import type { Project, RunSummary } from "@/lib/api-types";
@@ -229,45 +222,14 @@ function SpendDetails({
 			</ChartSection>
 
 			{history.groups.length > 0 ? (
-				<Table>
-					<TableHeader>
-						<TableRow>
-							<TableHead>{project ? "Flow" : "Project"}</TableHead>
-							<TableHead className="text-right">Runs</TableHead>
-							<TableHead className="text-right">Per run</TableHead>
-							<TableHead className="text-right">Share</TableHead>
-							<TableHead className="text-right">Total</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{history.groups.map((group) => (
-							<TableRow key={group.key}>
-								<TableCell>
-									<span className="flex min-w-0 items-center gap-2">
-										<Swatch color={history.config[group.key]?.color} />
-										<span className="truncate font-mono text-xs">
-											{group.label}
-										</span>
-									</span>
-								</TableCell>
-								<TableCell className="text-right tabular-nums">
-									{group.runs}
-								</TableCell>
-								<TableCell className="text-right tabular-nums">
-									{formatCost(group.total / group.runs)}
-								</TableCell>
-								<TableCell className="text-right text-muted-foreground tabular-nums">
-									{history.total > 0
-										? `${Math.round((group.total / history.total) * 100)}%`
-										: "—"}
-								</TableCell>
-								<TableCell className="text-right font-medium tabular-nums">
-									{formatCost(group.total)}
-								</TableCell>
-							</TableRow>
-						))}
-					</TableBody>
-				</Table>
+				<DataTable
+					columns={spendColumns(project ? "Flow" : "Project", history.total)}
+					data={history.groups.map((group) => ({
+						...group,
+						color: history.config[group.key]?.color,
+					}))}
+					getRowId={(group) => group.key}
+				/>
 			) : null}
 
 			{priciest.length > 0 ? (
@@ -330,4 +292,69 @@ function SpendDetails({
 			) : null}
 		</>
 	);
+}
+
+type SpendRow = {
+	key: string;
+	label: string;
+	color: string | undefined;
+	runs: number;
+	total: number;
+};
+
+const spendColumn = dataTableColumns<SpendRow>();
+
+/** Spend per flow or project: runs, cost per run, share and total. */
+function spendColumns(groupLabel: string, total: number) {
+	return spendColumn.columns([
+		spendColumn.accessor("label", {
+			header: groupLabel,
+			cell: ({ row }) => (
+				<span className="flex min-w-0 items-center gap-2">
+					<Swatch color={row.original.color} />
+					<span className="truncate font-mono text-xs">
+						{row.original.label}
+					</span>
+				</span>
+			),
+		}),
+		spendColumn.accessor("runs", {
+			header: "Runs",
+			enableSorting: true,
+			meta: {
+				headClassName: "text-right",
+				cellClassName: "text-right tabular-nums",
+			},
+		}),
+		spendColumn.accessor((group) => group.total / group.runs, {
+			id: "perRun",
+			header: "Per run",
+			enableSorting: true,
+			cell: ({ getValue }) => formatCost(getValue()),
+			meta: {
+				headClassName: "text-right",
+				cellClassName: "text-right tabular-nums",
+			},
+		}),
+		spendColumn.accessor((group) => (total > 0 ? group.total / total : 0), {
+			id: "share",
+			header: "Share",
+			enableSorting: true,
+			cell: ({ getValue }) =>
+				total > 0 ? `${Math.round(getValue() * 100)}%` : "—",
+			meta: {
+				headClassName: "text-right",
+				cellClassName: "text-right text-muted-foreground tabular-nums",
+			},
+		}),
+		spendColumn.accessor("total", {
+			header: "Total",
+			enableSorting: true,
+			cell: ({ row }) => formatCost(row.original.total),
+			meta: {
+				headClassName: "text-right",
+				cellClassName: "text-right font-medium tabular-nums",
+			},
+		}),
+	]);
 }

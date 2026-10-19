@@ -1,12 +1,5 @@
 import { Button } from "@nightshift/ui/components/button";
-import {
-	Card,
-	CardAction,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui/components/card";
+import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Item,
 	ItemActions,
@@ -26,6 +19,7 @@ import {
 	OctagonPauseIcon,
 } from "lucide-react";
 
+import { PageSection } from "@/components/page-heading";
 import { useNow } from "@/hooks/use-now";
 import type { RunSummary } from "@/lib/api-types";
 import { dayWord, formatDateTime, formatTime } from "@/lib/format";
@@ -111,68 +105,64 @@ export function UpNext({
 		.slice(0, MAX_ITEMS);
 
 	return (
-		<Card size="sm">
-			<CardHeader>
-				<CardTitle>
-					<h2>Up next</h2>
-				</CardTitle>
-				<CardDescription>Starts, wake-ups and stop times.</CardDescription>
-				<CardAction>
-					<Button
-						variant="outline"
-						size="sm"
-						nativeButton={false}
-						render={
-							<Link
-								to="/projects/$projectId/schedules"
-								params={{ projectId }}
-							/>
-						}
-					>
-						Schedules
-						<ArrowRightIcon data-icon="inline-end" />
-					</Button>
-				</CardAction>
-			</CardHeader>
-			<CardContent>
-				{upcoming.length === 0 ? (
-					<p className="rounded-md border border-dashed px-4 py-6 text-center text-muted-foreground text-sm">
-						Nothing planned. Add a schedule to start a flow at night.
-					</p>
-				) : (
-					<ItemGroup className="gap-1">
-						{upcoming.map(
-							({ key, at, icon: Icon, title, description, link }) => (
-								<Item key={key} size="xs" render={<Link {...link} />}>
-									<ItemMedia variant="icon">
-										<Icon />
-									</ItemMedia>
-									<ItemContent className="min-w-0">
-										<ItemTitle className="w-full truncate font-mono text-xs">
-											{title}
-										</ItemTitle>
-										<ItemDescription className="truncate text-xs">
-											{description}
-										</ItemDescription>
-									</ItemContent>
-									<ItemActions className="text-right text-xs">
-										<time
-											dateTime={new Date(at).toISOString()}
-											title={formatDateTime(at)}
-											className="flex flex-col tabular-nums"
-										>
-											<span className="font-medium">{formatTime(at)}</span>
-											<span className="text-muted-foreground">
-												{dayWord(at, now)}
-											</span>
-										</time>
-									</ItemActions>
-								</Item>
-							),
-						)}
-					</ItemGroup>
-				)}
-			</CardContent>
-		</Card>
+		<PageSection
+			title="Up next"
+			description="Starts, wake-ups and stop times."
+			actions={
+				<Button
+					variant="outline"
+					size="sm"
+					nativeButton={false}
+					render={
+						<Link to="/projects/$projectId/schedules" params={{ projectId }} />
+					}
+				>
+					Schedules
+					<ArrowRightIcon data-icon="inline-end" />
+				</Button>
+			}
+		>
+			<Card size="sm">
+				<CardContent>
+					{upcoming.length === 0 ? (
+						<p className="rounded-md border border-dashed px-4 py-6 text-center text-muted-foreground text-sm">
+							Nothing planned. Add a schedule to start a flow at night.
+						</p>
+					) : (
+						<ItemGroup className="gap-1">
+							{upcoming.map(
+								({ key, at, icon: Icon, title, description, link }) => (
+									<Item key={key} size="xs" render={<Link {...link} />}>
+										<ItemMedia variant="icon">
+											<Icon />
+										</ItemMedia>
+										<ItemContent className="min-w-0">
+											<ItemTitle className="w-full truncate font-mono text-xs">
+												{title}
+											</ItemTitle>
+											<ItemDescription className="truncate text-xs">
+												{description}
+											</ItemDescription>
+										</ItemContent>
+										<ItemActions className="text-right text-xs">
+											<time
+												dateTime={new Date(at).toISOString()}
+												title={formatDateTime(at)}
+												className="flex flex-col tabular-nums"
+											>
+												<span className="font-medium">{formatTime(at)}</span>
+												<span className="text-muted-foreground">
+													{dayWord(at, now)}
+												</span>
+											</time>
+										</ItemActions>
+									</Item>
+								),
+							)}
+						</ItemGroup>
+					)}
+				</CardContent>
+			</Card>
+		</PageSection>
 	);
 }

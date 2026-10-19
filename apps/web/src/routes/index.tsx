@@ -45,7 +45,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-
+import { PageHeading, PageSection } from "@/components/page-heading";
 import { RunList } from "@/components/run-list";
 import { SectionCards } from "@/components/section-cards";
 import { SiteHeader } from "@/components/site-header";
@@ -72,12 +72,10 @@ function HomeComponent() {
 		<>
 			<SiteHeader crumbs={[{ label: "Home" }]} />
 			<div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-				<div className="flex flex-col gap-1">
-					<h1 className="font-semibold text-2xl tracking-tight">Tonight</h1>
-					<p className="text-muted-foreground text-sm">
-						What runs, what waits for you, and what it cost.
-					</p>
-				</div>
+				<PageHeading
+					title="Tonight"
+					description="What runs, what waits for you, and what it cost."
+				/>
 
 				<SectionCards
 					runs={runs.data}
@@ -85,48 +83,32 @@ function HomeComponent() {
 					projects={projects.data}
 				/>
 
-				<Card className="gap-0 pb-0">
-					<CardHeader className="border-b pb-4 [.border-b]:pb-4">
-						<CardTitle>
-							<h2 id="runs-heading">Recent runs</h2>
-						</CardTitle>
-						<CardDescription>
-							The last {RECENT_RUNS} runs over all projects, newest first.
-						</CardDescription>
-					</CardHeader>
-					<CardContent className="px-0">
-						<section aria-labelledby="runs-heading">
+				<PageSection
+					title="Recent runs"
+					description={`The last ${RECENT_RUNS} runs over all projects, newest first.`}
+				>
+					<Card className="py-0">
+						<CardContent className="px-0">
 							<RunList
 								runs={recentRuns}
 								projects={projects.data}
 								isLoading={runs.isLoading}
 								emptyDescription="Open a project and start a run. It shows up here."
 							/>
-						</section>
-					</CardContent>
-				</Card>
+						</CardContent>
+					</Card>
+				</PageSection>
 
-				<section
-					aria-labelledby="projects-heading"
-					className="flex flex-col gap-4"
+				<PageSection
+					title="Projects"
+					description="The code Night Shift works on. Open one to see its flows and runs."
 				>
-					<div className="flex flex-col gap-1">
-						<h2
-							id="projects-heading"
-							className="font-semibold text-lg tracking-tight"
-						>
-							Projects
-						</h2>
-						<p className="text-muted-foreground text-sm">
-							The code Night Shift works on. Open one to see its flows and runs.
-						</p>
-					</div>
 					<ProjectList
 						projects={projects.data}
 						runs={runs.data}
 						isLoading={projects.isLoading}
 					/>
-				</section>
+				</PageSection>
 			</div>
 		</>
 	);

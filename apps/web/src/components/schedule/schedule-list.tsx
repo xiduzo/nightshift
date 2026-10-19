@@ -24,14 +24,6 @@ import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
 import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@nightshift/ui/components/table";
-import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
@@ -46,9 +38,10 @@ import {
 	PowerOffIcon,
 	Trash2Icon,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-
+import { DataTable, dataTableColumns } from "@/components/data-table";
+import { PageHeading } from "@/components/page-heading";
 import { RunStatusBadge } from "@/components/run-status-badge";
 import { useNow } from "@/hooks/use-now";
 import type {
@@ -79,6 +72,7 @@ function plain(summary: ScheduleSummary): Schedule {
  */
 export function ScheduleList({ projectId }: { projectId: string }) {
 	const queryClient = useQueryClient();
+	const now = useNow(30_000);
 	const list = useQuery({
 		...orpc.schedules.list.queryOptions({ input: { projectId } }),
 		// The next start moves on and a schedule may have fired.
@@ -142,32 +136,26 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 			aria-labelledby="schedules-heading"
 			className="flex flex-col gap-4"
 		>
-			<div className="flex items-end gap-4">
-				<div className="flex min-w-0 flex-1 flex-col gap-1">
-					<h1
-						id="schedules-heading"
-						className="font-semibold text-2xl tracking-tight"
+			<PageHeading
+				id="schedules-heading"
+				title="Schedules"
+				description="Flows that start on their own at set times."
+				actions={
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={list.isLoading}
+						onClick={() => setEditing({ schedule: null })}
 					>
-						Schedules
-					</h1>
-					<p className="text-muted-foreground text-sm">
-						Flows that start on their own at set times.
-					</p>
-				</div>
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={list.isLoading}
-					onClick={() => setEditing({ schedule: null })}
-				>
-					<PlusIcon data-icon="inline-start" />
-					<span className="max-sm:sr-only">New schedule</span>
-				</Button>
-			</div>
-			<Card>
+						<PlusIcon data-icon="inline-start" />
+						<span className="max-sm:sr-only">New schedule</span>
+					</Button>
+				}
+			/>
+			<Card className="py-0">
 				<CardContent className="px-0">
 					{list.data && list.data.issues.length > 0 ? (
-						<div className="px-6 pt-4">
+						<div className="px-6 pt-4 pb-2">
 							<Alert>
 								<CircleAlertIcon aria-hidden="true" />
 								<AlertDescription>
@@ -178,7 +166,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 					) : null}
 
 					{schedulerOff && schedules.length > 0 ? (
-						<div className="px-6 pt-4">
+						<div className="px-6 pt-4 pb-2">
 							<Alert>
 								<PowerOffIcon aria-hidden="true" />
 								<AlertDescription>
@@ -227,45 +215,28 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 							)}
 						</Empty>
 					) : (
-						<Table>
-							<TableHeader>
-								<TableRow className="hover:bg-transparent">
-									<TableHead className="pl-6">Flow</TableHead>
-									<TableHead className="hidden md:table-cell">When</TableHead>
-									<TableHead className="hidden lg:table-cell">
-										Next start
-									</TableHead>
-									<TableHead className="hidden xl:table-cell">
-										Last start
-									</TableHead>
-									<TableHead className="w-0">On</TableHead>
-									<TableHead className="w-0 pr-6">
-										<span className="sr-only">Actions</span>
-									</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{schedules.map((schedule) => (
-									<ScheduleRow
-										key={schedule.id}
-										schedule={schedule}
-										busy={save.isPending}
-										schedulerOff={schedulerOff}
-										onToggle={(enabled) =>
-											saveAll(
-												schedules.map((s) =>
-													s.id === schedule.id
-														? { ...plain(s), enabled }
-														: plain(s),
-												),
-											)
-										}
-										onEdit={() => setEditing({ schedule: plain(schedule) })}
-										onDelete={() => setToDelete(schedule)}
-									/>
-								))}
-							</TableBody>
-						</Table>
+						<DataTable
+							columns={scheduleColumns({
+								now,
+								busy: save.isPending,
+								schedulerOff,
+								onToggle: (schedule, enabled) =>
+									saveAll(
+										schedules.map((s) =>
+											s.id === schedule.id
+												? { ...plain(s), enabled }
+												: plain(s),
+										),
+									),
+								onEdit: (schedule) => setEditing({ schedule: plain(schedule) }),
+								onDelete: setToDelete,
+							})}
+							data={schedules}
+							getRowId={(schedule) => schedule.id}
+							rowClassName={(schedule) =>
+								schedule.enabled ? undefined : "text-muted-foreground"
+							}
+						/>
 					)}
 				</CardContent>
 			</Card>
@@ -322,100 +293,159 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 	);
 }
 
-function ScheduleRow({
-	schedule,
+const column = dataTableColumns<ScheduleSummary>();
+
+/**
+ * When a schedule starts next, or why it does not. `stacked` puts the
+ * countdown on its own line, as the table column shows it.
+ */
+function nextStart(
+	schedule: ScheduleSummary,
+	now: number,
+	schedulerOff: boolean,
+	stacked = false,
+): ReactNode {
+	if (!schedule.enabled) return "Paused";
+	if (schedulerOff) return "Schedules paused";
+	if (schedule.nextAt === null) return "No next start";
+	if (schedule.nextAt <= now) return "Starts now";
+	const time = (
+		<time
+			dateTime={new Date(schedule.nextAt).toISOString()}
+			title={formatDateTime(schedule.nextAt)}
+			className="text-foreground"
+		>
+			{dayWord(schedule.nextAt, now)}, {formatDayTime(schedule.nextAt)}
+		</time>
+	);
+	const wait = formatWaited(schedule.nextAt - now);
+	if (stacked) {
+		return (
+			<div className="flex flex-col gap-0.5">
+				{time}
+				<span className="text-xs tabular-nums">in {wait}</span>
+			</div>
+		);
+	}
+	return (
+		<>
+			{time} <span className="tabular-nums">(in {wait})</span>
+		</>
+	);
+}
+
+function When({ schedule }: { schedule: ScheduleSummary }) {
+	return (
+		<>
+			{describeCron(schedule.cron)}
+			{schedule.stopAt ? `, stops ${schedule.stopAt}` : ""}
+		</>
+	);
+}
+
+function scheduleColumns({
+	now,
 	busy,
 	schedulerOff,
 	onToggle,
 	onEdit,
 	onDelete,
 }: {
-	schedule: ScheduleSummary;
+	now: number;
 	busy: boolean;
 	/** The daemon's scheduler is off: nothing starts, whatever the cron says. */
 	schedulerOff: boolean;
-	onToggle: (enabled: boolean) => void;
-	onEdit: () => void;
-	onDelete: () => void;
+	onToggle: (schedule: ScheduleSummary, enabled: boolean) => void;
+	onEdit: (schedule: ScheduleSummary) => void;
+	onDelete: (schedule: ScheduleSummary) => void;
 }) {
-	const now = useNow(30_000);
-	const errors = schedule.issues.filter((issue) => issue.severity === "error");
-	const when = (
-		<>
-			{describeCron(schedule.cron)}
-			{schedule.stopAt ? `, stops ${schedule.stopAt}` : ""}
-		</>
-	);
-	const next = !schedule.enabled ? (
-		"Paused"
-	) : schedulerOff ? (
-		"Schedules paused"
-	) : schedule.nextAt === null ? (
-		"No next start"
-	) : schedule.nextAt <= now ? (
-		"Starts now"
-	) : (
-		<>
-			<time
-				dateTime={new Date(schedule.nextAt).toISOString()}
-				title={formatDateTime(schedule.nextAt)}
-				className="text-foreground"
-			>
-				{dayWord(schedule.nextAt, now)}, {formatDayTime(schedule.nextAt)}
-			</time>{" "}
-			<span className="tabular-nums">
-				(in {formatWaited(schedule.nextAt - now)})
-			</span>
-		</>
-	);
-	return (
-		<TableRow
-			className={schedule.enabled ? undefined : "text-muted-foreground"}
-		>
-			<TableCell className="w-full max-w-0 whitespace-normal py-3 pl-6 align-top">
-				<div className="flex min-w-0 flex-col gap-0.5">
-					<span className="truncate font-medium font-mono">
-						{schedule.flow}
-					</span>
-					<InputsLine inputs={schedule.inputs} baseRef={schedule.baseRef} />
-					{/* The hidden columns, as lines, on narrow screens. */}
-					<span className="text-xs md:hidden">{when}</span>
-					<span className="text-muted-foreground text-xs lg:hidden">
-						{schedule.enabled && !schedulerOff && schedule.nextAt !== null
-							? "Next "
-							: null}
-						{next}
-					</span>
-					<div className="xl:hidden">
-						{schedule.last ? <LastResult result={schedule.last} /> : null}
+	return column.columns([
+		column.accessor("flow", {
+			header: "Flow",
+			cell: ({ row: { original: schedule } }) => {
+				const errors = schedule.issues.filter(
+					(issue) => issue.severity === "error",
+				);
+				return (
+					<div className="flex min-w-0 flex-col gap-0.5">
+						<span className="truncate font-medium font-mono">
+							{schedule.flow}
+						</span>
+						<InputsLine inputs={schedule.inputs} baseRef={schedule.baseRef} />
+						{/* The hidden columns, as lines, on narrow screens. */}
+						<span className="text-xs md:hidden">
+							<When schedule={schedule} />
+						</span>
+						<span className="text-muted-foreground text-xs lg:hidden">
+							{schedule.enabled && !schedulerOff && schedule.nextAt !== null
+								? "Next "
+								: null}
+							{nextStart(schedule, now, schedulerOff)}
+						</span>
+						<div className="xl:hidden">
+							{schedule.last ? <LastResult result={schedule.last} /> : null}
+						</div>
+						{errors.length > 0 ? <IssueLines issues={errors} /> : null}
 					</div>
-					{errors.length > 0 ? <IssueLines issues={errors} /> : null}
-				</div>
-			</TableCell>
-			<TableCell className="hidden whitespace-normal py-3 align-top md:table-cell">
+				);
+			},
+			meta: {
+				headClassName: "pl-6",
+				cellClassName: "w-2/5 max-w-0 whitespace-normal py-3 pl-6 align-top",
+			},
+		}),
+		column.accessor("cron", {
+			header: "When",
+			cell: ({ row: { original: schedule } }) => (
 				<div className="flex flex-col gap-0.5">
-					<span>{when}</span>
+					<span>
+						<When schedule={schedule} />
+					</span>
 					<span className="font-mono text-muted-foreground text-xs">
 						{schedule.cron}
 					</span>
 				</div>
-			</TableCell>
-			<TableCell className="hidden py-3 align-top text-muted-foreground lg:table-cell">
-				{next}
-			</TableCell>
-			<TableCell className="hidden py-3 align-top xl:table-cell">
-				{schedule.last ? <LastResult result={schedule.last} /> : "—"}
-			</TableCell>
-			<TableCell className="w-0 py-3 align-top">
+			),
+			meta: {
+				headClassName: "hidden md:table-cell",
+				cellClassName: "hidden py-3 align-top md:table-cell",
+			},
+		}),
+		column.accessor("nextAt", {
+			header: "Next start",
+			cell: ({ row }) => nextStart(row.original, now, schedulerOff, true),
+			meta: {
+				headClassName: "hidden lg:table-cell",
+				cellClassName:
+					"hidden py-3 align-top text-muted-foreground lg:table-cell",
+			},
+		}),
+		column.accessor("last", {
+			header: "Last start",
+			cell: ({ row }) =>
+				row.original.last ? <LastResult result={row.original.last} /> : "—",
+			meta: {
+				headClassName: "hidden xl:table-cell",
+				cellClassName: "hidden py-3 align-top xl:table-cell",
+			},
+		}),
+		column.accessor("enabled", {
+			header: "On",
+			cell: ({ row: { original: schedule } }) => (
 				<Switch
 					checked={schedule.enabled}
 					disabled={busy}
 					aria-label={`Schedule of ${schedule.flow} on`}
-					onCheckedChange={(checked) => onToggle(checked === true)}
+					onCheckedChange={(checked) => onToggle(schedule, checked === true)}
 					className="mt-0.5"
 				/>
-			</TableCell>
-			<TableCell className="w-0 py-3 pr-6 align-top">
+			),
+			meta: { headClassName: "w-0", cellClassName: "w-0 py-3 align-top" },
+		}),
+		column.display({
+			id: "actions",
+			header: () => <span className="sr-only">Actions</span>,
+			cell: ({ row: { original: schedule } }) => (
 				<div className="-my-1 flex items-center gap-0.5">
 					<Tooltip>
 						<TooltipTrigger
@@ -424,7 +454,7 @@ function ScheduleRow({
 									variant="ghost"
 									size="icon-sm"
 									aria-label={`Edit the schedule of ${schedule.flow}`}
-									onClick={onEdit}
+									onClick={() => onEdit(schedule)}
 								/>
 							}
 						>
@@ -439,7 +469,7 @@ function ScheduleRow({
 									variant="ghost"
 									size="icon-sm"
 									aria-label={`Remove the schedule of ${schedule.flow}`}
-									onClick={onDelete}
+									onClick={() => onDelete(schedule)}
 								/>
 							}
 						>
@@ -448,9 +478,13 @@ function ScheduleRow({
 						<TooltipContent>Remove schedule</TooltipContent>
 					</Tooltip>
 				</div>
-			</TableCell>
-		</TableRow>
-	);
+			),
+			meta: {
+				headClassName: "w-0 pr-6",
+				cellClassName: "w-0 py-3 pr-6 align-top",
+			},
+		}),
+	]);
 }
 
 function InputsLine({
