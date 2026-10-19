@@ -41,6 +41,11 @@ export async function readTranscriptFile(
 		if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
 		throw error;
 	}
+	return parseTranscript(text);
+}
+
+/** The entries of a transcript's text. A line that does not parse is skipped. */
+export function parseTranscript(text: string): TranscriptEntry[] {
 	const entries: TranscriptEntry[] = [];
 	for (const line of text.split("\n")) {
 		if (!line) continue;

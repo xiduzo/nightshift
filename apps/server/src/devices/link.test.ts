@@ -29,6 +29,7 @@ const hello = (addresses: string[]): HostHello => ({
 	host: { id: "host-a", name: "studio", addresses },
 	deviceId: "device-b",
 	personId: "person-a",
+	spaces: [],
 });
 
 const unreachable = () => Promise.reject(new TypeError("Unable to connect."));

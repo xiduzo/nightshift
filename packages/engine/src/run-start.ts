@@ -417,7 +417,11 @@ export function createRunStart(deps: RunStartDeps) {
 				payload: worktree,
 			});
 			runner.start(row, inputs, prepared.stopAt);
-			return toSummary(row, runFacts(await log.events(runId)));
+			return toSummary(row, runFacts(await log.events(runId)), {
+				id: row.walkerId,
+				name: deps.device.name,
+				thisDevice: true,
+			});
 		} finally {
 			runner.releaseStartingSlot(runId);
 		}

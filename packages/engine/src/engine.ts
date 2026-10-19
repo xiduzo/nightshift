@@ -1,5 +1,5 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
-import { run } from "@nightshift/db/schema/nightshift";
+import { device as deviceTable, run } from "@nightshift/db/schema/nightshift";
 import {
 	optionProblem,
 	type Policy,
@@ -13,7 +13,7 @@ import {
 	writeFlowFile,
 	writeSchedulesFile,
 } from "@nightshift/flows/files";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { createRunBus } from "./bus";
 import { createDeviceRegistry } from "./device/registry";
@@ -24,6 +24,9 @@ import {
 	deriveSteps,
 	deriveStopAfterStep,
 } from "./events";
+import { type ArchiveRef, readArchive, writeArchive } from "./exchange/archive";
+import type { RunCommandInput } from "./exchange/commands";
+import { createEngineExchange } from "./exchange/engine-exchange";
 import { getRunRow as getRunRowOf, type RunRow } from "./graph/context";
 import { createRunner } from "./graph/runner";
 import { createProjects, type ProjectRow, toProject } from "./projects";
@@ -37,16 +40,20 @@ import {
 	type ScheduleRecord,
 } from "./scheduler";
 import { defaultRunSettings, type RunSettings } from "./settings";
-import { createSpaceDocuments } from "./space/document";
+import { createSpaceDocuments, deviceNameIn } from "./space/document";
+import { parseTranscript, readTranscriptFile } from "./transcripts";
 import type {
+	Actor,
 	Engine,
 	EngineOptions,
 	RunStreamItem,
 	RunSummary,
 	RunTrigger,
+	RunWalker,
 	ScheduleResult,
 	SpaceEngine,
 	StartRunInput,
+	TranscriptEntry,
 } from "./types";
 import { listBranches } from "./worktrees";
 
@@ -75,7 +82,14 @@ import { listBranches } from "./worktrees";
  * write takes the Space of its project (`run-start`, `events`).
  *
  * `stopRun`, `resolveGate` and `signalRun` write one run-level fact each
- * and stay here. Each module gets its dependencies (db, log, runner, bus,
+ * and stay here. On a run another Device walks they write nothing: the
+ * Walker is the only writer of its run's events, so the action travels to
+ * it as a command (`options.relay`), and the Walker applies it. Every
+ * other action on such a run is refused; it is read-only here.
+ *
+ * The exchange (`exchange/`): run history in and out of this Replica by
+ * cursor, the commands a Host keeps for Walkers, and the archive. The
+ * daemon carries it over its Links. Each module gets its dependencies (db, log, runner, bus,
  * settings, clock) from this file, so a test can stand one up alone.
  */
 
@@ -136,6 +150,7 @@ export function createEngine(
 		log: runLog,
 		deviceId: runLog.walkerId,
 		documents,
+		...(options.relay ? { relay: options.relay } : {}),
 	});
 	let disposed = false;
 	internals.signal?.addEventListener(
@@ -187,6 +202,77 @@ export function createEngine(
 	// Every method awaits `ready` and sees the error there.
 	ready.catch(() => {});
 
+	const exchange = createEngineExchange({
+		db,
+		log: runLog,
+		bus,
+		dataDir,
+		documents,
+	});
+
+	/** The Walkers of runs of a Space: their names from the Device rows, else the Space document. */
+	async function walkers(
+		spaceId: string,
+		ids: readonly string[],
+	): Promise<Map<string, RunWalker>> {
+		const self = await runLog.walkerId();
+		const unique = [...new Set(ids)];
+		const others = unique.filter((id) => id !== self);
+		const named = new Map(
+			others.length === 0
+				? []
+				: (
+						await db
+							.select({ id: deviceTable.id, name: deviceTable.name })
+							.from(deviceTable)
+							.where(inArray(deviceTable.id, others))
+					).map((d) => [d.id, d.name]),
+		);
+		const document =
+			others.length > 0 && others.some((id) => !named.has(id))
+				? await documents.open(spaceId)
+				: null;
+		return new Map(
+			unique.map((id) => [
+				id,
+				{
+					id,
+					name:
+						id === self
+							? device.name
+							: (named.get(id) ??
+								(document ? deviceNameIn(document, id) : null)),
+					thisDevice: id === self,
+				},
+			]),
+		);
+	}
+
+	/**
+	 * A step's transcript: this Replica's own file, or for a run walked
+	 * elsewhere the archive's copy, fetched from the Host when this
+	 * Replica lacks it. A copy is kept once the step has ended.
+	 */
+	async function stepTranscript(
+		row: { id: string; runId: string; spaceId: string; transcriptPath: string },
+		walker: RunWalker,
+		ended: boolean,
+	): Promise<TranscriptEntry[]> {
+		if (walker.thisDevice) return readTranscriptFile(row.transcriptPath);
+		const ref: ArchiveRef = {
+			kind: "transcript",
+			spaceId: row.spaceId,
+			runId: row.runId,
+			stepId: row.id,
+		};
+		let text = await readArchive(dataDir, ref);
+		if (text === null && options.relay) {
+			text = await options.relay.archive(ref).catch(() => null);
+			if (text !== null && ended) await writeArchive(dataDir, ref, text);
+		}
+		return text === null ? [] : parseTranscript(text);
+	}
+
 	const reads = createReadModel({
 		db,
 		log: runLog,
@@ -194,6 +280,14 @@ export function createEngine(
 		isActive: runner.isActive,
 		// Any harness, added or not: an old run's session stays takeable.
 		harnessOf: harnessFacts,
+		walkers,
+		pendingCommands: async (runId) =>
+			(await exchange.commands.pendingOf(runId)).map((c) => ({
+				id: c.id,
+				kind: c.kind,
+				createdAt: c.createdAt,
+			})),
+		stepTranscript,
 	});
 
 	const runStart = createRunStart({
@@ -212,6 +306,32 @@ export function createEngine(
 		const row = await getRunRowOf(db, runId);
 		if (row.spaceId !== spaceId) throw new Error(`Run not found: ${runId}`);
 		return row;
+	}
+
+	/** Whether another Device walks the run. */
+	async function walkedElsewhere(row: RunRow): Promise<boolean> {
+		return row.walkerId !== (await runLog.walkerId());
+	}
+
+	/** Hands an action on a run walked elsewhere to its Walker, in the actor's name. */
+	async function relay(
+		row: RunRow,
+		actor: Actor | undefined,
+		command: RunCommandInput,
+	): Promise<void> {
+		if (!options.relay) {
+			throw new Error(
+				"Another device runs this run, and this computer cannot reach it.",
+			);
+		}
+		if (!actor) throw new Error("Sign in to act on a run of another device.");
+		await options.relay.command({
+			...command,
+			spaceId: row.spaceId,
+			runId: row.id,
+			walkerId: row.walkerId,
+			personId: actor.personId,
+		});
 	}
 
 	const getProjectRow = projects.get;
@@ -280,7 +400,7 @@ export function createEngine(
 	}
 
 	/** What a person does in one Space. */
-	function space(spaceId: string): SpaceEngine {
+	function space(spaceId: string, actor?: Actor): SpaceEngine {
 		return {
 			async listProjects() {
 				await ready;
@@ -384,7 +504,22 @@ export function createEngine(
 
 			async stopRun(runId, stopOptions) {
 				await ready;
-				await getRunRow(runId, spaceId);
+				const row = await getRunRow(runId, spaceId);
+				if (await walkedElsewhere(row)) {
+					const status = deriveRunState(await loadRunEvents(runId)).status;
+					if (
+						status !== "running" &&
+						status !== "waiting" &&
+						status !== "sleeping"
+					) {
+						return;
+					}
+					await relay(row, actor, {
+						kind: "run.stop",
+						payload: stopOptions?.when ? { when: stopOptions.when } : {},
+					});
+					return;
+				}
 				if (stopOptions?.when === "after-step") {
 					await runner.exclusive(runId, async () => {
 						const events = await loadRunEvents(runId);
@@ -458,6 +593,26 @@ export function createEngine(
 			async resolveGate({ runId, stepId, choice, note }) {
 				await ready;
 				const row = await getRunRow(runId, spaceId);
+				if (await walkedElsewhere(row)) {
+					const gate = deriveOpenGate(await loadRunEvents(runId));
+					if (!gate) throw new Error("This run does not wait at a Gate.");
+					if (gate.stepId !== stepId) {
+						throw new Error(`Step ${stepId} is not the open Gate of this run.`);
+					}
+					const problem = optionProblem(gate.choices, choice);
+					if (problem !== null) throw new Error(problem);
+					const pending = await exchange.commands.pendingOf(runId);
+					if (pending.some((c) => c.kind === "gate.resolve")) {
+						throw new Error(
+							"An answer to this Gate is already on its way to the device that runs it.",
+						);
+					}
+					await relay(row, actor, {
+						kind: "gate.resolve",
+						payload: { stepId, choice, ...(note ? { note } : {}) },
+					});
+					return;
+				}
 				await runner.exclusive(runId, async () => {
 					const events = await loadRunEvents(runId);
 					const gate = deriveOpenGate(events);
@@ -489,10 +644,14 @@ export function createEngine(
 
 			async signalRun(runId, name) {
 				await ready;
-				await getRunRow(runId, spaceId);
+				const row = await getRunRow(runId, spaceId);
 				const sleep = deriveSleep(await loadRunEvents(runId));
 				if (!sleep || sleep.signal !== name) {
 					throw new Error("This run does not wait for that signal.");
+				}
+				if (await walkedElsewhere(row)) {
+					await relay(row, actor, { kind: "signal.send", payload: { name } });
+					return;
 				}
 				// The thread continues at once, like a wake a person asks for: a
 				// full run cap fails here rather than queueing the signal.
@@ -519,6 +678,7 @@ export function createEngine(
 	return {
 		space,
 		devices: createDeviceRegistry({ db, log: runLog, now }),
+		exchange,
 	};
 }
 

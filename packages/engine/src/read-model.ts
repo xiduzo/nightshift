@@ -25,14 +25,15 @@ import {
 } from "./events";
 import { getRunRow, type RunRow } from "./graph/context";
 import type { RunLog } from "./run-log";
-import { readRunTranscript } from "./transcripts";
 import type {
 	ItemSummary,
 	OpenGate,
+	PendingCommand,
 	RunDetail,
 	RunStatus,
 	RunStreamItem,
 	RunSummary,
+	RunWalker,
 	StepSummary,
 	TranscriptEntry,
 } from "./types";
@@ -126,10 +127,15 @@ export function runFacts(events: readonly LoggedEvent[]) {
 
 export type RunFacts = ReturnType<typeof runFacts>;
 
-export function toSummary(row: RunRow, facts: RunFacts): RunSummary {
+export function toSummary(
+	row: RunRow,
+	facts: RunFacts,
+	walker: RunWalker,
+): RunSummary {
 	return {
 		id: row.id,
 		projectId: row.projectId,
+		walker,
 		flowName: row.flowName,
 		title: row.title,
 		worktreePath: row.worktreePath,
@@ -191,10 +197,13 @@ export function toRunDetail(
 	row: RunRow,
 	events: readonly LoggedEvent[],
 	harnessOf: HarnessOf,
+	walker: RunWalker,
+	commands: PendingCommand[] = [],
 ): RunDetail {
-	const last = lastHarnessSession(events);
+	// A run walked elsewhere: its worktree is on its Walker, not here.
+	const last = walker.thisDevice ? lastHarnessSession(events) : null;
 	return {
-		...toSummary(row, runFacts(events)),
+		...toSummary(row, runFacts(events), walker),
 		flow: parseRunFlow(row),
 		calledFlows: parseCalledFlows(row),
 		steps: deriveSteps(events).map(toStepSummary),
@@ -202,6 +211,7 @@ export function toRunDetail(
 		traversals: deriveTraversals(events),
 		takeOverCommand: takeOverCommand(row.worktreePath, last, harnessOf),
 		resumes: deriveResumes(events),
+		commands,
 	};
 }
 
@@ -213,13 +223,40 @@ export type ReadModelDeps = {
 	isActive(runId: string): boolean;
 	/** The harness port of that name, for its take-over command. */
 	harnessOf: HarnessOf;
+	/** The Walkers of runs of a Space, by id. */
+	walkers(
+		spaceId: string,
+		ids: readonly string[],
+	): Promise<Map<string, RunWalker>>;
+	/** The run's actions that wait for its Walker. */
+	pendingCommands(runId: string): Promise<PendingCommand[]>;
+	/**
+	 * A step's transcript. A step of a run walked elsewhere comes from the
+	 * archive; `ended` says whether it can change still.
+	 */
+	stepTranscript(
+		row: { id: string; runId: string; spaceId: string; transcriptPath: string },
+		walker: RunWalker,
+		ended: boolean,
+	): Promise<TranscriptEntry[]>;
 };
+
+/** A Walker the Replica knows nothing of: a name is all it lacks. */
+const walkerOf = (walkers: Map<string, RunWalker>, id: string): RunWalker =>
+	walkers.get(id) ?? { id, name: null, thisDevice: false };
 
 export type ReadModel = ReturnType<typeof createReadModel>;
 
 /** The reads that need the database, the run log or the bus. */
 export function createReadModel(deps: ReadModelDeps) {
 	const { db, log, bus, isActive, harnessOf } = deps;
+
+	async function walkerOfRun(row: RunRow): Promise<RunWalker> {
+		return walkerOf(
+			await deps.walkers(row.spaceId, [row.walkerId]),
+			row.walkerId,
+		);
+	}
 
 	/** The Space's runs (of one project), newest first, with the facts the log gives each one. */
 	async function listRuns(
@@ -240,13 +277,30 @@ export function createReadModel(deps: ReadModelDeps) {
 			rows.map((r) => r.id),
 			runFacts,
 		);
-		return rows.map((row) => toSummary(row, facts.get(row.id) ?? runFacts([])));
+		const walkers = await deps.walkers(
+			spaceId,
+			rows.map((r) => r.walkerId),
+		);
+		return rows.map((row) =>
+			toSummary(
+				row,
+				facts.get(row.id) ?? runFacts([]),
+				walkerOf(walkers, row.walkerId),
+			),
+		);
 	}
 
 	async function getRun(runId: string): Promise<RunDetail> {
 		const row = await getRunRow(db, runId);
 		const events = await log.events(runId);
-		return toRunDetail(row, events, harnessOf);
+		const walker = await walkerOfRun(row);
+		return toRunDetail(
+			row,
+			events,
+			harnessOf,
+			walker,
+			walker.thisDevice ? [] : await deps.pendingCommands(runId),
+		);
 	}
 
 	/** The run's status, or null for a run the log has nothing on. */
@@ -273,10 +327,20 @@ export function createReadModel(deps: ReadModelDeps) {
 				.filter((id) => facts.get(id)?.status === "waiting"),
 			deriveOpenGate,
 		);
+		const walkers = await deps.walkers(
+			spaceId,
+			rows.filter((r) => open.has(r.run.id)).map((r) => r.run.walkerId),
+		);
 		const gates: OpenGate[] = [];
 		for (const { run: row, projectName } of rows) {
 			const gate = open.get(row.id);
 			if (!gate) continue;
+			const walker = walkerOf(walkers, row.walkerId);
+			const answerPending =
+				!walker.thisDevice &&
+				(await deps.pendingCommands(row.id)).some(
+					(c) => c.kind === "gate.resolve",
+				);
 			gates.push({
 				runId: row.id,
 				runTitle: row.title,
@@ -287,6 +351,8 @@ export function createReadModel(deps: ReadModelDeps) {
 				question: gate.question,
 				choices: gate.choices,
 				openedAt: gate.openedAt,
+				walker,
+				answerPending,
 			});
 		}
 		return gates.sort((a, b) => a.openedAt - b.openedAt);
@@ -328,7 +394,8 @@ export function createReadModel(deps: ReadModelDeps) {
 		signal: AbortSignal,
 		afterSeq: number,
 	): AsyncGenerator<RunStreamItem> {
-		await getRunRow(db, runId);
+		const runRow = await getRunRow(db, runId);
+		const walker = await walkerOfRun(runRow);
 		if (signal.aborted) return;
 
 		const queue: (
@@ -363,10 +430,26 @@ export function createReadModel(deps: ReadModelDeps) {
 			}
 
 			const rows = await db
-				.select({ transcriptPath: step.transcriptPath })
+				.select({
+					id: step.id,
+					runId: step.runId,
+					spaceId: step.spaceId,
+					transcriptPath: step.transcriptPath,
+				})
 				.from(step)
 				.where(eq(step.runId, runId));
-			const replay = await readRunTranscript(rows.map((s) => s.transcriptPath));
+			const ended = new Set(
+				steps.filter((s) => s.endedAt !== null).map((s) => s.id),
+			);
+			const replay = (
+				await Promise.all(
+					rows.map((row) =>
+						deps.stepTranscript(row, walker, ended.has(row.id)),
+					),
+				)
+			)
+				.flat()
+				.sort((a, b) => a.seq - b.seq);
 			for (const entry of replay) {
 				if (signal.aborted) return;
 				if (entry.seq <= lastSeq) continue;
@@ -391,6 +474,26 @@ export function createReadModel(deps: ReadModelDeps) {
 						(s) => s.id === item.stepId,
 					);
 					if (current) yield { kind: "step", step: toStepSummary(current) };
+					// A step walked elsewhere ended: its transcript is in the archive.
+					if (current && !walker.thisDevice && current.endedAt !== null) {
+						const [row] = rows.filter((r) => r.id === current.id);
+						const entries = await deps.stepTranscript(
+							row ?? {
+								id: current.id,
+								runId,
+								spaceId: runRow.spaceId,
+								transcriptPath: "",
+							},
+							walker,
+							true,
+						);
+						for (const entry of entries) {
+							if (signal.aborted) return;
+							if (entry.seq <= lastSeq) continue;
+							lastSeq = entry.seq;
+							yield { kind: "transcript", entry };
+						}
+					}
 				} else {
 					const status = deriveRunState(await log.events(runId)).status;
 					if (status !== lastStatus) {

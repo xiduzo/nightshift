@@ -35,6 +35,7 @@ const engine: Context["engine"] = {
 			},
 		}),
 	devices: {} as Context["engine"]["devices"],
+	exchange: {} as Context["engine"]["exchange"],
 };
 
 async function contextFor(headers: Headers | null): Promise<Context> {

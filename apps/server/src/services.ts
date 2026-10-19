@@ -62,6 +62,9 @@ import {
 	LISTEN_HOSTNAME,
 	reachFor,
 } from "./devices";
+import { exchangeWithHost } from "./devices/exchange";
+import { createHostExchange } from "./devices/host-exchange";
+import { createRelay } from "./devices/relay";
 import { certificateFingerprint } from "./devices/tls";
 import { desktopOrigins, ENV, trustedOrigins } from "./env.server";
 import { createSync, documentAccess, type Sync } from "./sync";
@@ -335,10 +338,22 @@ const local = localDevice({
 		),
 });
 
+/**
+ * The actions on rows another Device owns (a Gate of a run walked
+ * elsewhere, a Clone in a Space a Host keeps), carried over the links.
+ * Lazy: the engine and the links are made below.
+ */
+const relayToHosts = createRelay({
+	engine: () => engine,
+	registry: () => engine.devices,
+	links: () => deviceLinks,
+});
+
 export const engine = await createEngine({
 	db,
 	walkerId: device.id,
 	device: local,
+	relay: relayToHosts,
 	dataDir,
 	settings: () => settings.run(),
 	profileFor: (name) => profiles.settingsFor(name),
@@ -385,6 +400,15 @@ export const host = createHost({
 		sync.disconnect((context) => context.deviceId === deviceId),
 });
 
+/** This computer as the Host of run history: what paired Devices pull, push and archive. */
+export const hostExchange = createHostExchange({
+	db,
+	engine,
+	registry: engine.devices,
+	selfId: device.id,
+	isHost: host.isHost,
+});
+
 /** A Device whose link says nothing for this long is offline. Its heartbeat comes every 15 s. */
 const OFFLINE_AFTER_MS = 45_000;
 const presence = globalThis as { nightshiftPresence?: Timer };
@@ -408,6 +432,34 @@ linked.nightshiftLinks = createDeviceLinks({
 	links: hostLinks,
 	keys: keyStore,
 	document,
+	// The Spaces the Host lists: kept here as the Host's, their documents
+	// synced read-only, before run rows that name their projects arrive.
+	spaceDocuments: async (link, hello) => {
+		const { hostSpaces } = engine.exchange;
+		await hostSpaces.update(
+			{ id: link.hostId, name: hello.host.name },
+			hello.spaces,
+			person.userId,
+		);
+		const kept = new Set(await hostSpaces.ofHost(link.hostId));
+		return Promise.all(
+			hello.spaces
+				.filter((space) => kept.has(space.id))
+				.map(async (space) => {
+					const opened = await spaces.open(space.id);
+					return { name: opened.name, doc: opened.doc };
+				}),
+		);
+	},
+	// Run history both ways, and the commands for the runs this computer walks.
+	whileOnline: (link, client, _hello, signal) =>
+		exchangeWithHost({
+			engine,
+			hostId: link.hostId,
+			client,
+			selfId: device.id,
+			signal,
+		}),
 });
 await linked.nightshiftLinks.start();
 export const deviceLinks = linked.nightshiftLinks;

@@ -16,6 +16,9 @@ import type {
 
 import type { DeviceRegistry } from "./device/registry";
 import type { Device } from "./device/types";
+import type { ArchiveRef } from "./exchange/archive";
+import type { RunCommandInput, RunCommandKind } from "./exchange/commands";
+import type { EngineExchange } from "./exchange/engine-exchange";
 import type { GitProbe } from "./project-setup";
 import type { RunSettings } from "./settings";
 import type { SpaceDocuments } from "./space/document";
@@ -140,9 +143,26 @@ export type RunTrigger =
 	/** `at`: the cron time the run started for (epoch ms). */
 	| { kind: "schedule"; scheduleId: string; at: number };
 
+/** The Device that walks a run and writes its events. */
+export type RunWalker = {
+	id: string;
+	/** Its name, as this Replica knows it. Null when it knows none. */
+	name: string | null;
+	/** This computer walks it. Any other Walker's run is read-only here, but for its commands. */
+	thisDevice: boolean;
+};
+
+/** A person's action on a run walked elsewhere, waiting for its Walker. */
+export type PendingCommand = {
+	id: string;
+	kind: RunCommandKind;
+	createdAt: number;
+};
+
 export type RunSummary = {
 	id: string;
 	projectId: string;
+	walker: RunWalker;
 	trigger: RunTrigger;
 	/** The flow file the run started from. Null for a quick run. */
 	flowName: string | null;
@@ -194,6 +214,11 @@ export type RunDetail = RunSummary & {
 	takeOverCommand: string | null;
 	/** Every resume, oldest first. */
 	resumes: RunResume[];
+	/**
+	 * Actions on a run walked elsewhere that its Walker has not applied yet,
+	 * oldest first. Known where they wait: on the Host.
+	 */
+	commands: PendingCommand[];
 };
 
 /** What a Decision step decided by a model writes to its transcript. */
@@ -322,6 +347,9 @@ export type OpenGate = {
 	question: string;
 	choices: { name: string; description?: string }[];
 	openedAt: number;
+	walker: RunWalker;
+	/** An answer is on its way to the Walker. */
+	answerPending: boolean;
 };
 
 /**
@@ -408,8 +436,12 @@ export interface Engine {
 	/**
 	 * What a person does in one Space. Nothing it reads, returns or changes
 	 * is of another Space: a project or run of another Space is "not found".
+	 * `actor` is the Person who acts: an action on a run walked elsewhere
+	 * travels to its Walker in their name.
 	 */
-	space(spaceId: string): SpaceEngine;
+	space(spaceId: string, actor?: Actor): SpaceEngine;
+	/** Run history between this Replica and others: rows, cursors, commands, the archive. */
+	readonly exchange: EngineExchange;
 	/**
 	 * On a Host: the Devices that paired with it, their presence and the
 	 * audit of it. Each Person sees their own Devices only (the API's rule).
@@ -519,8 +551,42 @@ export interface SpaceEngine {
 	): AsyncIterable<RunStreamItem>;
 }
 
+/** Who acts in a Space: the Person of the session. */
+export type Actor = { personId: string };
+
+/**
+ * What the engine asks of the Hosts this Device links to: the actions on
+ * rows another Device owns. The daemon gives it; without it, a run walked
+ * elsewhere is read-only.
+ */
+export type Relay = {
+	/**
+	 * Hands a person's action on a run walked elsewhere to its Walker,
+	 * through the Host. Throws when no Host takes it.
+	 */
+	command(
+		command: RunCommandInput & {
+			spaceId: string;
+			runId: string;
+			walkerId: string;
+			personId: string;
+		},
+	): Promise<void>;
+	/** Records this Device's Clone in a Space a Host keeps, through that Host. */
+	addClone(input: {
+		spaceId: string;
+		projectId: string;
+		deviceId: string;
+		deviceName: string;
+	}): Promise<void>;
+	/** A file of the archive from the Host that keeps the Space. Null when it has none. */
+	archive(ref: ArchiveRef): Promise<string | null>;
+};
+
 export type EngineOptions = {
 	db: Database;
+	/** The Hosts, for the actions on rows another Device owns. */
+	relay?: Relay;
 	/**
 	 * This computer's Device id (`selfDevice`): the Walker of the runs this
 	 * engine starts, and the Device whose Clones it works in. Default: the

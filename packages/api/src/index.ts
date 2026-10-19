@@ -40,7 +40,9 @@ const requireSpace = o.middleware(async ({ context, next }) => {
 		context: {
 			session: context.session,
 			spaceId: context.spaceId,
-			space: context.engine.space(context.spaceId),
+			space: context.engine.space(context.spaceId, {
+				personId: context.session.user.id,
+			}),
 		},
 	});
 });
