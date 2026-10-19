@@ -139,7 +139,7 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 			</CardHeader>
 			<CardContent className="px-0">
 				{secrets.length === 0 ? (
-					<Empty className="py-8">
+					<Empty>
 						<EmptyHeader>
 							<EmptyMedia variant="icon">
 								<KeyRoundIcon />

@@ -1,4 +1,5 @@
 import { Button } from "@nightshift/ui/components/button";
+import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Empty,
 	EmptyContent,
@@ -75,25 +76,29 @@ export function ProjectPage({
 					]}
 				/>
 				<div className="flex flex-1 flex-col p-4 md:p-6">
-					<Empty className="border">
-						<EmptyHeader>
-							<EmptyMedia variant="icon">
-								<FolderXIcon aria-hidden="true" />
-							</EmptyMedia>
-							<EmptyTitle>Project not found</EmptyTitle>
-							<EmptyDescription>It may have been removed.</EmptyDescription>
-						</EmptyHeader>
-						<EmptyContent>
-							<Button
-								variant="outline"
-								nativeButton={false}
-								render={<Link to="/" />}
-							>
-								<ArrowLeftIcon data-icon="inline-start" />
-								Back to Home
-							</Button>
-						</EmptyContent>
-					</Empty>
+					<Card>
+						<CardContent>
+							<Empty>
+								<EmptyHeader>
+									<EmptyMedia variant="icon">
+										<FolderXIcon aria-hidden="true" />
+									</EmptyMedia>
+									<EmptyTitle>Project not found</EmptyTitle>
+									<EmptyDescription>It may have been removed.</EmptyDescription>
+								</EmptyHeader>
+								<EmptyContent>
+									<Button
+										variant="outline"
+										nativeButton={false}
+										render={<Link to="/" />}
+									>
+										<ArrowLeftIcon data-icon="inline-start" />
+										Back to Home
+									</Button>
+								</EmptyContent>
+							</Empty>
+						</CardContent>
+					</Card>
 				</div>
 			</>
 		);

@@ -39,6 +39,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
 	BotIcon,
 	CircleAlertIcon,
+	CircleHelpIcon,
 	GlobeIcon,
 	KeyRoundIcon,
 	PlugIcon,
@@ -482,6 +483,9 @@ function Detail({
 				return (
 					<Empty className="h-full">
 						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<SquareTerminalIcon aria-hidden="true" />
+							</EmptyMedia>
 							<EmptyTitle>Add a harness first</EmptyTitle>
 							<EmptyDescription>
 								A profile runs on a harness, such as Claude Code or Codex. Add
@@ -565,6 +569,9 @@ function Gone({ what }: { what: string }) {
 	return (
 		<Empty className="h-full">
 			<EmptyHeader>
+				<EmptyMedia variant="icon">
+					<CircleHelpIcon aria-hidden="true" />
+				</EmptyMedia>
 				<EmptyTitle>No such {what}</EmptyTitle>
 				<EmptyDescription>
 					It was removed or renamed. Pick another one on the left.

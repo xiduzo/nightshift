@@ -65,7 +65,7 @@ export function RunList({
 
 	if (!runs || runs.length === 0) {
 		return (
-			<Empty className="py-10 md:py-10">
+			<Empty>
 				<EmptyHeader>
 					<EmptyMedia variant="icon">
 						<HistoryIcon aria-hidden="true" />

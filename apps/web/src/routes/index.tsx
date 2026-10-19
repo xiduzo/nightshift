@@ -165,18 +165,22 @@ function ProjectList({
 
 	if (!projects || projects.length === 0) {
 		return (
-			<Empty className="border">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<FolderGitIcon aria-hidden="true" />
-					</EmptyMedia>
-					<EmptyTitle>No projects yet</EmptyTitle>
-					<EmptyDescription>
-						A project is a git repository Night Shift works on. Add one with +
-						next to Projects in the sidebar.
-					</EmptyDescription>
-				</EmptyHeader>
-			</Empty>
+			<Card>
+				<CardContent>
+					<Empty>
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<FolderGitIcon aria-hidden="true" />
+							</EmptyMedia>
+							<EmptyTitle>No projects yet</EmptyTitle>
+							<EmptyDescription>
+								A project is a git repository Night Shift works on. Add one with
+								+ next to Projects in the sidebar.
+							</EmptyDescription>
+						</EmptyHeader>
+					</Empty>
+				</CardContent>
+			</Card>
 		);
 	}
 

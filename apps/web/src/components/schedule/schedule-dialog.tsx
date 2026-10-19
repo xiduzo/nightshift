@@ -44,7 +44,7 @@ import {
 } from "@nightshift/ui/components/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
-
+import { BaseRefCombobox } from "@/components/run/base-ref-combobox";
 import {
 	FlowInputFields,
 	filledInputs,
@@ -469,14 +469,12 @@ function ScheduleForm({
 							(optional)
 						</span>
 					</FieldLabel>
-					<Input
+					<BaseRefCombobox
 						id={`${id}-base`}
+						projectId={projectId}
 						value={baseRef}
 						placeholder="The current branch"
-						className="font-mono"
-						autoComplete="off"
-						spellCheck={false}
-						onChange={(event) => setBaseRef(event.target.value)}
+						onChange={setBaseRef}
 					/>
 				</Field>
 			</FieldGroup>

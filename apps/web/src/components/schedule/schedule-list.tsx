@@ -11,14 +11,7 @@ import {
 	AlertDialogTitle,
 } from "@nightshift/ui/components/alert-dialog";
 import { Button } from "@nightshift/ui/components/button";
-import {
-	Card,
-	CardAction,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui/components/card";
+import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Empty,
 	EmptyContent,
@@ -145,28 +138,34 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 	};
 
 	return (
-		<Card className="gap-0 pb-0">
-			<CardHeader className="border-b pb-4 [.border-b]:pb-4">
-				<CardTitle>
-					<h1 id="schedules-heading">Schedules</h1>
-				</CardTitle>
-				<CardDescription>
-					Flows that start on their own at set times.
-				</CardDescription>
-				<CardAction>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={list.isLoading}
-						onClick={() => setEditing({ schedule: null })}
+		<section
+			aria-labelledby="schedules-heading"
+			className="flex flex-col gap-4"
+		>
+			<div className="flex items-end gap-4">
+				<div className="flex min-w-0 flex-1 flex-col gap-1">
+					<h1
+						id="schedules-heading"
+						className="font-semibold text-2xl tracking-tight"
 					>
-						<PlusIcon data-icon="inline-start" />
-						<span className="max-sm:sr-only">New schedule</span>
-					</Button>
-				</CardAction>
-			</CardHeader>
-			<CardContent className="px-0">
-				<section aria-labelledby="schedules-heading">
+						Schedules
+					</h1>
+					<p className="text-muted-foreground text-sm">
+						Flows that start on their own at set times.
+					</p>
+				</div>
+				<Button
+					variant="outline"
+					size="sm"
+					disabled={list.isLoading}
+					onClick={() => setEditing({ schedule: null })}
+				>
+					<PlusIcon data-icon="inline-start" />
+					<span className="max-sm:sr-only">New schedule</span>
+				</Button>
+			</div>
+			<Card>
+				<CardContent className="px-0">
 					{list.data && list.data.issues.length > 0 ? (
 						<div className="px-6 pt-4">
 							<Alert>
@@ -206,7 +205,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 							<Skeleton className="h-10 w-full" />
 						</div>
 					) : schedules.length === 0 ? (
-						<Empty className="py-10 md:py-10">
+						<Empty>
 							<EmptyHeader>
 								<EmptyMedia variant="icon">
 									<CalendarClockIcon aria-hidden="true" />
@@ -268,8 +267,8 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 							</TableBody>
 						</Table>
 					)}
-				</section>
-			</CardContent>
+				</CardContent>
+			</Card>
 
 			<ScheduleDialog
 				open={editing !== null}
@@ -319,7 +318,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-		</Card>
+		</section>
 	);
 }
 

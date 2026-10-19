@@ -128,25 +128,29 @@ export function FlowList({ projectId }: { projectId: string }) {
 					<Skeleton className="hidden h-40 w-full rounded-xl xl:block" />
 				</div>
 			) : !flows.data || flows.data.length === 0 ? (
-				<Empty className="border">
-					<EmptyHeader>
-						<EmptyMedia variant="icon">
-							<WorkflowIcon aria-hidden="true" />
-						</EmptyMedia>
-						<EmptyTitle>No flows yet</EmptyTitle>
-						<EmptyDescription>
-							{flows.error
-								? flows.error.message
-								: "A flow is the set of steps an agent follows. Create one to start."}
-						</EmptyDescription>
-					</EmptyHeader>
-					<EmptyContent>
-						<Button onClick={() => setCreating(true)}>
-							<PlusIcon data-icon="inline-start" />
-							New flow
-						</Button>
-					</EmptyContent>
-				</Empty>
+				<Card>
+					<CardContent>
+						<Empty>
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<WorkflowIcon aria-hidden="true" />
+								</EmptyMedia>
+								<EmptyTitle>No flows yet</EmptyTitle>
+								<EmptyDescription>
+									{flows.error
+										? flows.error.message
+										: "A flow is the set of steps an agent follows. Create one to start."}
+								</EmptyDescription>
+							</EmptyHeader>
+							<EmptyContent>
+								<Button onClick={() => setCreating(true)}>
+									<PlusIcon data-icon="inline-start" />
+									New flow
+								</Button>
+							</EmptyContent>
+						</Empty>
+					</CardContent>
+				</Card>
 			) : (
 				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 					{flows.data.map((flow) => (

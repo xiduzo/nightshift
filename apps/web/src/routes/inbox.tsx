@@ -125,29 +125,33 @@ function InboxComponent() {
 							</AlertAction>
 						</Alert>
 					) : count === 0 ? (
-						<Empty className="border border-dashed">
-							<EmptyHeader>
-								<EmptyMedia variant="icon">
-									<InboxIcon />
-								</EmptyMedia>
-								<EmptyTitle>Nothing waits for you</EmptyTitle>
-								<EmptyDescription>
-									When a run reaches a Gate node, its question shows up here.
-									Add one to a flow to ask before a step that matters.
-								</EmptyDescription>
-							</EmptyHeader>
-							<EmptyContent>
-								<Button
-									variant="outline"
-									size="sm"
-									nativeButton={false}
-									render={<Link to="/" />}
-								>
-									<FolderIcon data-icon="inline-start" />
-									Go to projects
-								</Button>
-							</EmptyContent>
-						</Empty>
+						<Card>
+							<CardContent>
+								<Empty>
+									<EmptyHeader>
+										<EmptyMedia variant="icon">
+											<InboxIcon />
+										</EmptyMedia>
+										<EmptyTitle>Nothing waits for you</EmptyTitle>
+										<EmptyDescription>
+											When a run reaches a Gate node, its question shows up
+											here. Add one to a flow to ask before a step that matters.
+										</EmptyDescription>
+									</EmptyHeader>
+									<EmptyContent>
+										<Button
+											variant="outline"
+											size="sm"
+											nativeButton={false}
+											render={<Link to="/" />}
+										>
+											<FolderIcon data-icon="inline-start" />
+											Go to projects
+										</Button>
+									</EmptyContent>
+								</Empty>
+							</CardContent>
+						</Card>
 					) : (
 						<ol className="flex flex-col gap-4" aria-label="Open gates">
 							{gates.data?.map((gate) => (

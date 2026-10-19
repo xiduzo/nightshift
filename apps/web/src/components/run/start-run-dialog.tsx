@@ -35,6 +35,8 @@ import {
 } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
 
+import { BaseRefCombobox } from "./base-ref-combobox";
+
 import {
 	FlowInputFields,
 	filledInputs,
@@ -265,26 +267,19 @@ function StartRunForm({
 							(optional)
 						</span>
 					</FieldLabel>
-					<Input
+					<BaseRefCombobox
 						id={`${id}-base`}
+						projectId={projectId}
 						value={baseRef}
-						list={`${id}-refs`}
+						recent={recentRefs}
 						placeholder={
 							lastBase
 								? `The current branch (last: ${lastBase})`
 								: "The current branch"
 						}
-						className="font-mono"
-						autoComplete="off"
-						spellCheck={false}
-						aria-describedby={`${id}-base-hint`}
-						onChange={(event) => setBaseRef(event.target.value)}
+						describedBy={`${id}-base-hint`}
+						onChange={setBaseRef}
 					/>
-					<datalist id={`${id}-refs`}>
-						{recentRefs.map((ref) => (
-							<option key={ref} value={ref} />
-						))}
-					</datalist>
 					<FieldDescription id={`${id}-base-hint`}>
 						The branch, tag or commit the run starts from, for example the top
 						of an open stack. Leave it empty to use your current branch.

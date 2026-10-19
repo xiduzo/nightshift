@@ -24,6 +24,7 @@ import type { CliToolGuide } from "./cli-tools";
 import type { McpExpansion } from "./mcp";
 import type { GitProbe } from "./project-setup";
 import type { RunSettings } from "./settings";
+import type { Branches } from "./worktrees";
 
 /**
  * The engine's public contract. The API layer only calls this interface.
@@ -399,6 +400,9 @@ export interface Engine {
 	addProject(input: { repoPath: string; name?: string }): Promise<Project>;
 	/** Keeps the project's runs and events. Fails while one of its runs is running. */
 	removeProject(projectId: string): Promise<void>;
+
+	/** The local and remote branches of the project's clone, newest first. A run can start from one. */
+	listBranches(projectId: string): Promise<Branches>;
 
 	/** The flow files in the project's clone, `.nightshift/flows/*.json`. */
 	listFlows(projectId: string): Promise<FlowListItem[]>;
