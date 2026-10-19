@@ -47,9 +47,7 @@ import {
 	ItemActions,
 	ItemContent,
 	ItemDescription,
-	ItemGroup,
 	ItemMedia,
-	ItemSeparator,
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import {
@@ -78,15 +76,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
 	BellOffIcon,
 	CircleAlertIcon,
-	CopyIcon,
-	DatabaseIcon,
 	FolderGitIcon,
-	FolderIcon,
 	LaptopIcon,
 	LockIcon,
 	MonitorIcon,
 	MoonIcon,
-	PlugIcon,
 	SaveIcon,
 	SunIcon,
 	Trash2Icon,
@@ -101,7 +95,6 @@ import { PageHeading, PageSection } from "@/components/page-heading";
 import { SiteHeader } from "@/components/site-header";
 import { notificationsSupported } from "@/hooks/use-night-notifications";
 import type { PermissionMode, Project } from "@/lib/api-types";
-import { formatDateTime } from "@/lib/format";
 import { HARNESSES, type HarnessName, harnessInfo } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
 
@@ -253,11 +246,7 @@ function SettingsComponent() {
 						</>
 					)}
 					<AppearanceCard />
-					<DaemonCard
-						deviceName={settings.data?.daemon.device.name}
-						dataDir={settings.data?.daemon.dataDir}
-						lease={settings.data?.daemon.lease}
-					/>
+					<ThisComputerLink name={settings.data?.daemon.device.name} />
 				</div>
 			</div>
 		</>
@@ -1290,130 +1279,39 @@ function AppearanceCard() {
 }
 
 /* ----------------------------------------------------------------------------
- * This daemon
+ * This computer: on the Devices page
  * ------------------------------------------------------------------------- */
 
-function DaemonCard({
-	deviceName,
-	dataDir,
-	lease,
-}: {
-	deviceName: string | undefined;
-	dataDir: string | undefined;
-	lease:
-		| { host: string; pid: number; epoch: number; since: number }
-		| undefined;
-}) {
+function ThisComputerLink({ name }: { name: string | undefined }) {
 	return (
 		<PageSection
 			title="This computer"
-			description="Where Night Shift keeps its data."
+			description="Its name, where it keeps its data, and the computers it works with."
 		>
 			<Card>
 				<CardContent>
-					<ItemGroup>
-						<Item size="sm" className="px-0">
-							<ItemMedia variant="icon">
-								<LaptopIcon aria-hidden="true" />
-							</ItemMedia>
-							<ItemContent className="min-w-0">
-								<ItemTitle>Name</ItemTitle>
-								<ItemDescription className="truncate">
-									{deviceName ?? <Skeleton className="h-4 w-32" />}
-								</ItemDescription>
-							</ItemContent>
-						</Item>
-						<ItemSeparator />
-						<Item size="sm" className="px-0">
-							<ItemMedia variant="icon">
-								<FolderIcon aria-hidden="true" />
-							</ItemMedia>
-							<ItemContent className="min-w-0">
-								<ItemTitle>Data folder</ItemTitle>
-								<ItemDescription
-									className="truncate font-mono text-xs"
-									title={dataDir}
-								>
-									{dataDir ?? <Skeleton className="h-4 w-64" />}
-								</ItemDescription>
-							</ItemContent>
-							{dataDir ? (
-								<ItemActions>
-									<Button
-										variant="ghost"
-										size="icon-sm"
-										aria-label="Copy the data folder path"
-										onClick={() => {
-											void navigator.clipboard
-												.writeText(dataDir)
-												.then(() => toast.success("Path copied"));
-										}}
-									>
-										<CopyIcon />
-									</Button>
-								</ItemActions>
-							) : null}
-						</Item>
-						<ItemSeparator />
-						<Item size="sm" className="px-0">
-							<ItemMedia variant="icon">
-								<LockIcon aria-hidden="true" />
-							</ItemMedia>
-							<ItemContent>
-								<ItemTitle>Status</ItemTitle>
-								<ItemDescription className="line-clamp-none">
-									{lease ? (
-										<>
-											On {lease.host} since {formatDateTime(lease.since)}. Only
-											one Night Shift at a time can use this data.
-										</>
-									) : (
-										<Skeleton className="h-4 w-64" />
-									)}
-								</ItemDescription>
-							</ItemContent>
-							{lease ? (
-								<ItemActions>
-									<Badge variant="outline">Running</Badge>
-								</ItemActions>
-							) : null}
-						</Item>
-						<ItemSeparator />
-						<Item size="sm" className="px-0">
-							<ItemMedia variant="icon">
-								<DatabaseIcon aria-hidden="true" />
-							</ItemMedia>
-							<ItemContent>
-								<ItemTitle>Your settings</ItemTitle>
-								<ItemDescription className="line-clamp-none">
-									Saved on this computer. A setting you do not change uses its
-									default.
-								</ItemDescription>
-							</ItemContent>
-						</Item>
-						<ItemSeparator />
-						<Item size="sm" className="px-0">
-							<ItemMedia variant="icon">
-								<PlugIcon aria-hidden="true" />
-							</ItemMedia>
-							<ItemContent>
-								<ItemTitle>Coding agents</ItemTitle>
-								<ItemDescription className="line-clamp-none">
-									Check where your harnesses are installed, on the Agents page.
-								</ItemDescription>
-							</ItemContent>
-							<ItemActions>
-								<Button
-									variant="outline"
-									size="sm"
-									nativeButton={false}
-									render={<Link to="/connections" />}
-								>
-									Agents
-								</Button>
-							</ItemActions>
-						</Item>
-					</ItemGroup>
+					<Item size="sm" className="px-0">
+						<ItemMedia variant="icon">
+							<LaptopIcon aria-hidden="true" />
+						</ItemMedia>
+						<ItemContent className="min-w-0">
+							<ItemTitle>{name ?? <Skeleton className="h-4 w-32" />}</ItemTitle>
+							<ItemDescription className="line-clamp-none">
+								Be a Host, pair your other computers, and see where your data
+								is, on the Devices page.
+							</ItemDescription>
+						</ItemContent>
+						<ItemActions>
+							<Button
+								variant="outline"
+								size="sm"
+								nativeButton={false}
+								render={<Link to="/devices" />}
+							>
+								Devices
+							</Button>
+						</ItemActions>
+					</Item>
 				</CardContent>
 			</Card>
 		</PageSection>

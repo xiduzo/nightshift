@@ -34,6 +34,13 @@ export type ScheduleSummary = ScheduleList["schedules"][number];
 export type ScheduleResult = NonNullable<ScheduleSummary["last"]>;
 export type ScheduleIssue = ScheduleSummary["issues"][number];
 
+/** The Devices page: this computer, its Hosts, and the Person's paired Devices. */
+export type DevicesOverview = Outputs["devices"]["list"];
+export type ThisComputer = NonNullable<DevicesOverview["thisComputer"]>;
+export type LinkedHost = ThisComputer["hosts"][number];
+export type PairedDevice = DevicesOverview["devices"][number];
+export type PairingReview = Outputs["devices"]["review"];
+
 export type PermissionMode = NonNullable<AgentNode["permissionMode"]>;
 export type Effort = NonNullable<AgentNode["effort"]>;
 export type { Outcome };
