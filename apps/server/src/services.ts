@@ -16,6 +16,8 @@ import {
 } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
 import { createAuth } from "@nightshift/auth";
+import { createLocalSession } from "@nightshift/auth/local-session";
+import { localPerson } from "@nightshift/auth/spaces";
 import { createDb } from "@nightshift/db";
 import {
 	databaseUrl,
@@ -122,6 +124,15 @@ export const auth = createAuth(ENV, db, desktopOrigins);
 
 /** This computer's Device: the Walker of its runs, the owner of its Clones. */
 export const device = await selfDevice(db);
+
+/** The Person who owns this computer, and their personal Space. */
+const person = await localPerson(db);
+
+/**
+ * One person on one computer signs in to nothing: a request from this
+ * computer without a session gets the session of the Person who owns it.
+ */
+export const localSession = createLocalSession(auth, db, person.userId);
 
 /** The environment is the fallback of every setting and every `${NAME}`. */
 const env: Record<string, string | undefined> = { ...process.env, ...ENV };
@@ -237,7 +248,7 @@ export const projectSetup: Context["projectSetup"] = {
 
 export const daemon: Context["daemon"] = {
 	dataDir,
-	device,
+	device: { ...device, ownerId: person.userId },
 	lease: {
 		host: lease.host,
 		pid: lease.pid,

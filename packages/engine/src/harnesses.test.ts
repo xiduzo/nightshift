@@ -16,7 +16,7 @@ import {
 	waitFor,
 	withDevice,
 } from "./test-support";
-import type { Engine, RunStatus } from "./types";
+import type { RunStatus, SpaceEngine } from "./types";
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -34,7 +34,7 @@ function named(name: HarnessName): FakeHarness {
 	return { ...fakeHarness(), name, ...harnessFacts(name) };
 }
 
-function makeEngine(harnesses: TestEngineOptions["harnesses"]): Engine {
+function makeEngine(harnesses: TestEngineOptions["harnesses"]): SpaceEngine {
 	return createEngine(
 		withDevice({
 			db: sandbox.db,
@@ -42,7 +42,7 @@ function makeEngine(harnesses: TestEngineOptions["harnesses"]): Engine {
 			dataDir: sandbox.dataDir,
 			scheduler: false,
 		}),
-	);
+	).space(sandbox.spaceId);
 }
 
 function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
@@ -70,11 +70,14 @@ function flowOf(nodes: AgentNode[], edges: FlowEdge[] = []): Flow {
 	};
 }
 
-async function projectId(engine: Engine): Promise<string> {
+async function projectId(engine: SpaceEngine): Promise<string> {
 	return (await engine.addProject({ repoPath: sandbox.repoPath })).id;
 }
 
-async function waitForEnd(engine: Engine, runId: string): Promise<RunStatus> {
+async function waitForEnd(
+	engine: SpaceEngine,
+	runId: string,
+): Promise<RunStatus> {
 	return waitFor(
 		async () => {
 			const { status } = await engine.getRun(runId);

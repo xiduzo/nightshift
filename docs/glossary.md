@@ -9,11 +9,14 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Term | Meaning | Source |
 |------|---------|--------|
 | Developer | Owns a clone of the repo and the coding-agent CLIs. Draws Flows, starts Runs, and answers Gates. In local mode, the only user. | PLAN §1 |
+| Person | A user account (Better Auth's user). The Person who owns this computer's Device is signed in for you: a request from this computer without a session of its own acts as them. | Devices, slice 2 |
+| Member | A Person in a Space, with a role: owner, admin, member or viewer. The role says what they may do there: start Runs, answer Gates, add Projects. A viewer only reads. | Devices, slice 2 |
 
 ## Objects
 
 | Term | Meaning | Source |
 |------|---------|--------|
+| Space | What is shared, and with whom: Projects, their Runs and Gates, and the Members. A Better Auth organization. Every Person has a personal Space ("Personal") that nobody can be invited to, and everything starts there. Every row of a Project, Clone, Run, Step, Session or Event carries its Space; a person always works in one Space at a time (the session's active Space). | Devices, slice 2 |
 | Project | A repository, by its remote: the normalised `origin` (`github.com/acme/app`), so its ssh and https URLs are one Project. Its folders are its Clones. A repository without a remote is a Project on one Device only. | Devices |
 | Clone | A Project's repository on one Device, at a path. A Device has at most one Clone of a Project. Adding a folder whose `origin` names a known Project makes a Clone of it, not a second Project. | Devices |
 | Device | A computer that runs Night Shift, with its own database. One row of the `device` table is this computer: made on the first start, with a random id that never changes and the host name as its name. | Devices |

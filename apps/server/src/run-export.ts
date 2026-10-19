@@ -11,7 +11,8 @@ import {
 } from "@nightshift/engine";
 
 /**
- * `GET /api/runs/:id/export`: the run as one SQLite file, a run bundle. The
+ * `GET /api/runs/:id/export`: the run of the Space `spaceId` as one SQLite
+ * file, a run bundle (a run of another Space is not found). The
  * file goes to a new temp directory, streams out, and the directory is
  * removed when the stream closes, also when the client goes away. The
  * values of saved secrets and connection variables are taken out.
@@ -24,6 +25,7 @@ export async function runExportResponse(
 		tmpDir?: string;
 	},
 	runId: string,
+	spaceId: string,
 ): Promise<Response> {
 	const dir = await mkdtemp(
 		join(deps.tmpDir ?? tmpdir(), "nightshift-export-"),
@@ -33,6 +35,7 @@ export async function runExportResponse(
 		const summary = await exportRun({
 			db: deps.db,
 			runId,
+			spaceId,
 			path: join(dir, "run.nightshift.sqlite"),
 			redact: await deps.connections.secretValues(),
 		});

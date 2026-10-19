@@ -86,7 +86,7 @@ describe("normaliseRemote", () => {
 describe("projects by remote", () => {
 	test("a folder becomes a project with its remote and a Clone here", async () => {
 		const path = await repo("app", "git@github.com:acme/app.git");
-		const added = await projectsOf().add({ repoPath: path });
+		const added = await projectsOf().add({ repoPath: path }, sandbox.spaceId);
 		expect(added).toMatchObject({
 			name: "app",
 			remote: "github.com/acme/app",
@@ -102,18 +102,22 @@ describe("projects by remote", () => {
 		await sandbox.db
 			.insert(device)
 			.values({ id: "studio", name: "studio", platform: "linux" });
-		await sandbox.db
-			.insert(project)
-			.values({ id: "p1", name: "app", remote: "github.com/acme/app" });
+		await sandbox.db.insert(project).values({
+			id: "p1",
+			spaceId: sandbox.spaceId,
+			name: "app",
+			remote: "github.com/acme/app",
+		});
 		await sandbox.db.insert(clone).values({
 			id: "c1",
+			spaceId: sandbox.spaceId,
 			projectId: "p1",
 			deviceId: "studio",
 			path: "/home/ada/app",
 		});
 
 		const path = await repo("mine", "https://github.com/acme/app.git");
-		const added = await projectsOf().add({ repoPath: path });
+		const added = await projectsOf().add({ repoPath: path }, sandbox.spaceId);
 
 		expect(added.id).toBe("p1");
 		expect(added.repoPath).toBe(path);
@@ -136,21 +140,21 @@ describe("projects by remote", () => {
 	test("a second folder of a project here is refused while the first exists", async () => {
 		const projects = projectsOf();
 		const first = await repo("one", "git@github.com:acme/app.git");
-		await projects.add({ repoPath: first });
+		await projects.add({ repoPath: first }, sandbox.spaceId);
 		const second = await repo("two", "https://github.com/acme/app");
-		await expect(projects.add({ repoPath: second })).rejects.toThrow(
-			`This computer already has this project, in ${first}.`,
-		);
+		await expect(
+			projects.add({ repoPath: second }, sandbox.spaceId),
+		).rejects.toThrow(`This computer already has this project, in ${first}.`);
 	});
 
 	test("a project whose folder moved follows it to the new folder", async () => {
 		const projects = projectsOf();
 		const old = await repo("old", "git@github.com:acme/app.git");
-		const added = await projects.add({ repoPath: old });
+		const added = await projects.add({ repoPath: old }, sandbox.spaceId);
 		const moved = join(sandbox.root, "moved");
 		await rename(old, moved);
 
-		const again = await projects.add({ repoPath: moved });
+		const again = await projects.add({ repoPath: moved }, sandbox.spaceId);
 		expect(again.id).toBe(added.id);
 		expect((await projects.get(added.id)).repoPath).toBe(moved);
 		expect(await clones()).toHaveLength(1);
@@ -158,29 +162,43 @@ describe("projects by remote", () => {
 
 	test("folders without a remote stay projects of their own", async () => {
 		const projects = projectsOf();
-		const a = await projects.add({ repoPath: await repo("a") });
-		const b = await projects.add({ repoPath: await repo("b") });
+		const a = await projects.add(
+			{ repoPath: await repo("a") },
+			sandbox.spaceId,
+		);
+		const b = await projects.add(
+			{ repoPath: await repo("b") },
+			sandbox.spaceId,
+		);
 		expect(a.id).not.toBe(b.id);
 		expect([a.remote, b.remote]).toEqual([null, null]);
-		expect(await projects.add({ repoPath: a.repoPath })).toMatchObject({
+		expect(
+			await projects.add({ repoPath: a.repoPath }, sandbox.spaceId),
+		).toMatchObject({
 			id: a.id,
 		});
 	});
 
 	test("readRemotes fills in the remote of a project from before Clones", async () => {
 		// What the migration leaves: a project without its remote, its Clone here.
-		await sandbox.db.insert(project).values({ id: "p1", name: "app" });
+		await sandbox.db
+			.insert(project)
+			.values({ id: "p1", spaceId: sandbox.spaceId, name: "app" });
 		const path = await repo("app", "git@github.com:acme/app.git");
 		await sandbox.db.insert(clone).values({
 			id: "c1",
+			spaceId: sandbox.spaceId,
 			projectId: "p1",
 			deviceId: sandbox.deviceId,
 			path,
 		});
 		// A second clone of the same repository was a project of its own: it stays so.
-		await sandbox.db.insert(project).values({ id: "p2", name: "app-2" });
+		await sandbox.db
+			.insert(project)
+			.values({ id: "p2", spaceId: sandbox.spaceId, name: "app-2" });
 		await sandbox.db.insert(clone).values({
 			id: "c2",
+			spaceId: sandbox.spaceId,
 			projectId: "p2",
 			deviceId: sandbox.deviceId,
 			path: await repo("app-2", "https://github.com/acme/app.git"),

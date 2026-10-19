@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/fake";
-import { event } from "@nightshift/db/schema/nightshift";
+import { event, run } from "@nightshift/db/schema/nightshift";
 import type { Flow, Schedule } from "@nightshift/flows";
 import { writeFlowFile, writeSchedulesFile } from "@nightshift/flows/files";
 import { asc, inArray } from "drizzle-orm";
@@ -16,7 +16,7 @@ import {
 	waitFor,
 	withDevice,
 } from "./test-support";
-import type { Engine, RunSummary } from "./types";
+import type { RunSummary, SpaceEngine } from "./types";
 
 /** The scheduler with an injected clock: each test moves `clock` and waits for a tick. */
 
@@ -49,7 +49,7 @@ function startDaemon(
 		"maxConcurrentRuns" | "scheduler" | "settings"
 	> = {},
 	internals: EngineInternals = {},
-): { engine: Engine; die: () => void } {
+): { engine: SpaceEngine; die: () => void } {
 	const controller = new AbortController();
 	engines.push(controller);
 	const engine = createEngine(
@@ -65,7 +65,7 @@ function startDaemon(
 			signal: controller.signal,
 			...internals,
 		},
-	);
+	).space(sandbox.spaceId);
 	return { engine, die: () => controller.abort() };
 }
 
@@ -156,14 +156,17 @@ function firedRunId(fact: ScheduleFact | undefined): string {
 /** Enough ticks for anything that would happen to have happened. */
 const settle = () => Bun.sleep(TICK_MS * 12);
 
-async function setup(engine: Engine, schedules: Schedule[], flow?: Flow) {
+async function setup(engine: SpaceEngine, schedules: Schedule[], flow?: Flow) {
 	const project = await engine.addProject({ repoPath: sandbox.repoPath });
 	await writeFlowFile(sandbox.repoPath, "night", flow ?? commandFlow());
 	await writeSchedulesFile(sandbox.repoPath, schedules);
 	return project;
 }
 
-async function waitForEnd(engine: Engine, runId: string): Promise<RunSummary> {
+async function waitForEnd(
+	engine: SpaceEngine,
+	runId: string,
+): Promise<RunSummary> {
 	return waitFor(
 		async () => {
 			const runs = await engine.listRuns();
@@ -264,6 +267,17 @@ describe("the scheduler", () => {
 		const project = await setup(first.engine, [nightly()]);
 		first.die();
 		// What the scheduler leaves when it dies between the start and its record.
+		await sandbox.db.insert(run).values({
+			id: "cut-short",
+			spaceId: sandbox.spaceId,
+			projectId: project.id,
+			flow: "{}",
+			title: "night",
+			worktreePath: sandbox.repoPath,
+			branch: "nightshift/cut-short",
+			baseRef: "main",
+			walkerId: sandbox.deviceId,
+		});
 		await appendEvent(
 			sandbox.db,
 			{

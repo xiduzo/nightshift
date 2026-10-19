@@ -152,10 +152,11 @@ export async function startRun(
 	const flows = options.flows ?? {};
 	await db
 		.insert(project)
-		.values({ id: projectId, name: "repo" })
+		.values({ id: projectId, spaceId: sandbox.spaceId, name: "repo" })
 		.onConflictDoNothing();
 	await db.insert(run).values({
 		id: runId,
+		spaceId: sandbox.spaceId,
 		projectId,
 		flowName: null,
 		flow: JSON.stringify(flow),

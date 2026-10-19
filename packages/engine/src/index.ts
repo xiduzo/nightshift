@@ -61,6 +61,7 @@ export {
 	type RunBundleMeta,
 	type RunBundleSummary,
 	UNKNOWN_DEVICE,
+	UNKNOWN_SPACE,
 } from "./run-bundle";
 export {
 	hostDeviceName,

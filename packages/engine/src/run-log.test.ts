@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
-import { event } from "@nightshift/db/schema/nightshift";
+import { event, project, run } from "@nightshift/db/schema/nightshift";
 import { asc, eq } from "drizzle-orm";
 
 import {
@@ -15,6 +15,23 @@ import { createSandbox, type Sandbox } from "./test-support";
 let sandbox: Sandbox;
 beforeEach(async () => {
 	sandbox = await createSandbox();
+	// The runs the tests append to: an event takes its run's Space.
+	await sandbox.db
+		.insert(project)
+		.values({ id: "p", spaceId: sandbox.spaceId, name: "p" });
+	await sandbox.db.insert(run).values(
+		["r0", "r1", "r2", "open", "a", "b", "c"].map((id) => ({
+			id,
+			spaceId: sandbox.spaceId,
+			projectId: "p",
+			flow: "{}",
+			title: id,
+			worktreePath: "/w",
+			branch: "b",
+			baseRef: "main",
+			walkerId: sandbox.deviceId,
+		})),
+	);
 });
 afterEach(async () => {
 	await sandbox.cleanup();

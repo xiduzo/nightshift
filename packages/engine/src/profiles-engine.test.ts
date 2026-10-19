@@ -17,7 +17,7 @@ import {
 	waitFor,
 	withDevice,
 } from "./test-support";
-import type { Engine, RunDetail } from "./types";
+import type { RunDetail, SpaceEngine } from "./types";
 
 /** Agent Profiles: resolved into the run's copy when a run starts. */
 
@@ -44,7 +44,7 @@ function makeEngine(
 		TestEngineOptions,
 		"profileFor" | "harnessNames" | "cliNames" | "findCli"
 	> = {},
-): Engine {
+): SpaceEngine {
 	return createEngine(
 		withDevice({
 			db: sandbox.db,
@@ -55,7 +55,7 @@ function makeEngine(
 			findCli: (name) => `/usr/local/bin/${name}`,
 			...options,
 		}),
-	);
+	).space(sandbox.spaceId);
 }
 
 function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
@@ -81,11 +81,14 @@ function flowOf(nodes: AgentNode[], edges: FlowEdge[] = []): Flow {
 	};
 }
 
-async function projectId(engine: Engine): Promise<string> {
+async function projectId(engine: SpaceEngine): Promise<string> {
 	return (await engine.addProject({ repoPath: sandbox.repoPath })).id;
 }
 
-async function waitForEnd(engine: Engine, runId: string): Promise<RunDetail> {
+async function waitForEnd(
+	engine: SpaceEngine,
+	runId: string,
+): Promise<RunDetail> {
 	return waitFor(
 		async () => {
 			const detail = await engine.getRun(runId);

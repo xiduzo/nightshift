@@ -32,7 +32,7 @@ import {
 	waitFor,
 	withDevice,
 } from "./test-support";
-import type { Engine, RunDetail, StepSummary } from "./types";
+import type { RunDetail, SpaceEngine, StepSummary } from "./types";
 
 /**
  * Flow format 2: inputs and outputs, templates with paths, the Call
@@ -58,7 +58,7 @@ afterEach(async () => {
 function makeEngine(
 	harness: AgentHarness,
 	options: Partial<Pick<TestEngineOptions, "decider">> = {},
-): Engine {
+): SpaceEngine {
 	const runLog = createRunLog(sandbox.db);
 	runLogs.push(runLog);
 	return createEngine(
@@ -72,7 +72,7 @@ function makeEngine(
 			...options,
 		}),
 		{ runLog },
-	);
+	).space(sandbox.spaceId);
 }
 
 function agent(
@@ -157,11 +157,14 @@ async function saveFlow(name: string, flow: FlowInput | unknown) {
 	await writeFile(join(dir, `${name}.json`), JSON.stringify(flow));
 }
 
-async function projectId(engine: Engine): Promise<string> {
+async function projectId(engine: SpaceEngine): Promise<string> {
 	return (await engine.addProject({ repoPath: sandbox.repoPath })).id;
 }
 
-async function waitForEnd(engine: Engine, runId: string): Promise<RunDetail> {
+async function waitForEnd(
+	engine: SpaceEngine,
+	runId: string,
+): Promise<RunDetail> {
 	return waitFor(
 		async () => {
 			const detail = await engine.getRun(runId);
@@ -1118,6 +1121,7 @@ describe("flow format 1", () => {
 		const { run, step } = await import("@nightshift/db/schema/nightshift");
 		await sandbox.db.insert(run).values({
 			id: runId,
+			spaceId: sandbox.spaceId,
 			projectId: projectIdV1,
 			flowName: "night",
 			flow: JSON.stringify(top),
@@ -1146,6 +1150,7 @@ describe("flow format 1", () => {
 		const stepRow = (id: string, nodeId: string, nodeType: string) =>
 			sandbox.db.insert(step).values({
 				id,
+				spaceId: sandbox.spaceId,
 				runId,
 				nodeId,
 				nodeType,
