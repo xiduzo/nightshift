@@ -2,6 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 
 import type { Permissions, Role } from "./access";
+import {
+	type HostAccess,
+	type HostPolicy,
+	hostAccess,
+	OPEN_HOST,
+} from "./host-access";
 import { type Auth, hasPermission, type Session } from "./index";
 import type { LocalSession } from "./local-session";
 import { activeSpaceId } from "./spaces";
@@ -13,6 +19,12 @@ export type RequestAccess = {
 	spaceId: string | null;
 	/** The request's headers, with the local session when it got one: pass these to Better Auth. */
 	headers: Headers;
+	/**
+	 * Whether the session may use the Host (`host-access.ts`). Refused: a
+	 * session from another computer on a Host that requires two-factor,
+	 * whose Person has not turned it on.
+	 */
+	hostAccess: HostAccess;
 	/**
 	 * The organization plugin's `hasPermission` for the session in
 	 * `spaceId`, or in another Space of the Person's.
@@ -46,13 +58,15 @@ export type RequestAccess = {
 /**
  * Resolves a request's session and Space. `local` gives a request from
  * this computer without a session of its own the local Person's session;
- * pass null for any other request.
+ * pass null for any other request. `policy` is the Host's rules for
+ * sessions from other computers.
  */
 export async function requestAccess(
 	auth: Auth,
 	db: Database,
 	headers: Headers,
 	local: LocalSession | null,
+	policy: HostPolicy = OPEN_HOST,
 ): Promise<RequestAccess> {
 	const resolved = local
 		? await local.resolve(headers)
@@ -67,6 +81,10 @@ export async function requestAccess(
 		session,
 		spaceId,
 		headers: resolved.headers,
+		hostAccess: hostAccess(policy, {
+			session,
+			fromThisComputer: local !== null,
+		}),
 		can: (permissions, inSpace) => {
 			const space = inSpace ?? spaceId;
 			return space && session

@@ -30,6 +30,10 @@ export const user = sqliteTable("user", {
 	banned: integer("banned", { mode: "boolean" }).default(false),
 	banReason: text("ban_reason"),
 	banExpires: integer("ban_expires", { mode: "timestamp_ms" }),
+	/** The Person signs in with a second factor: a code from an app, or a backup code (two-factor plugin). */
+	twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" }).default(
+		false,
+	),
 });
 
 export const session = sqliteTable(
@@ -234,8 +238,42 @@ export const apikey = sqliteTable(
 	],
 );
 
+/**
+ * A Person's second factor (two-factor plugin): the secret of their
+ * authenticator app and their unused backup codes, both encrypted with the
+ * auth secret. `verified` is false until the first code from the app is
+ * right. Failed codes count toward a lock of the account for a while.
+ */
+export const twoFactor = sqliteTable(
+	"two_factor",
+	{
+		id: text("id").primaryKey(),
+		secret: text("secret").notNull(),
+		backupCodes: text("backup_codes").notNull(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		verified: integer("verified", { mode: "boolean" }).default(true),
+		failedVerificationCount: integer("failed_verification_count").default(0),
+		lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
+	},
+	(table) => [
+		index("two_factor_secret_idx").on(table.secret),
+		index("two_factor_userId_idx").on(table.userId),
+	],
+);
+
 export const authRelations = defineRelationsPart(
-	{ user, session, account, verification, organization, member, invitation },
+	{
+		user,
+		session,
+		account,
+		verification,
+		organization,
+		member,
+		invitation,
+		twoFactor,
+	},
 	(r) => ({
 		user: {
 			sessions: r.many.session({
@@ -253,6 +291,10 @@ export const authRelations = defineRelationsPart(
 			invitations: r.many.invitation({
 				from: r.user.id,
 				to: r.invitation.inviterId,
+			}),
+			twoFactors: r.many.twoFactor({
+				from: r.user.id,
+				to: r.twoFactor.userId,
 			}),
 		},
 		organization: {
@@ -294,6 +336,12 @@ export const authRelations = defineRelationsPart(
 		account: {
 			user: r.one.user({
 				from: r.account.userId,
+				to: r.user.id,
+			}),
+		},
+		twoFactor: {
+			user: r.one.user({
+				from: r.twoFactor.userId,
 				to: r.user.id,
 			}),
 		},

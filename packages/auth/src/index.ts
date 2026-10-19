@@ -8,6 +8,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin } from "better-auth/plugins/admin";
 import { deviceAuthorization } from "better-auth/plugins/device-authorization";
 import { organization } from "better-auth/plugins/organization";
+import { twoFactor } from "better-auth/plugins/two-factor";
 
 import { ac, type Permissions, roles } from "./access";
 import { DEVICE_KEY_PREFIX } from "./device-keys";
@@ -35,6 +36,26 @@ const PERSONAL = "Nobody can join a personal Space. Create a Space to share.";
 
 /** How long an invitation link works. */
 export const INVITATION_DAYS = 7;
+
+/** How long a browser that a person trusts skips the second factor at sign-in. */
+export const TRUSTED_BROWSER_DAYS = 30;
+
+/**
+ * The address of the computer at the other end of the connection. The
+ * daemon sets it on every request to Better Auth (and drops one a client
+ * sends), so sign-in limits count per computer without a proxy in front.
+ */
+export const PEER_ADDRESS_HEADER = "x-nightshift-peer";
+
+/**
+ * Where the rate limits read the client's address, in order: Cloudflare's
+ * own header (Cloudflare Tunnel), a proxy's, then the connection itself.
+ */
+export const CLIENT_IP_HEADERS = [
+	"cf-connecting-ip",
+	"x-forwarded-for",
+	PEER_ADDRESS_HEADER,
+];
 
 export type AuthOptions = {
 	/**
@@ -68,6 +89,12 @@ export type AuthOptions = {
  * Devices pair with a Host by device authorization (RFC 8628, the device
  * authorization plugin) and sign in with a Device key (the API key
  * plugin): see `pairing.ts` and `device-keys.ts`.
+ *
+ * A Person may add a second factor to their password (the two-factor
+ * plugin): a code from an authenticator app, or a backup code. A Host can
+ * require it for sessions from other computers (`host-access.ts`).
+ * Signing in and the second factor are rate limited per client address,
+ * always: a Host may face the internet.
  */
 export function createAuth(
 	env: AuthConfig,
@@ -90,15 +117,26 @@ export function createAuth(
 			...desktopOrigins,
 			...(options.trustedOrigins?.() ?? []),
 		],
+		appName: "Night Shift",
 		emailAndPassword: { enabled: true },
 		secret: env.BETTER_AUTH_SECRET,
 		baseURL: env.BETTER_AUTH_URL,
+		// On whatever NODE_ENV says: Better Auth turns it on in production only.
+		rateLimit: {
+			enabled: true,
+			storage: "memory",
+			customRules: {
+				"/sign-in/*": { window: 60, max: 5 },
+				"/two-factor/verify-*": { window: 60, max: 5 },
+			},
+		},
 		advanced: {
 			defaultCookieAttributes: {
 				sameSite: "none",
 				secure: true,
 				httpOnly: true,
 			},
+			ipAddress: { ipAddressHeaders: CLIENT_IP_HEADERS },
 		},
 		hooks: {
 			before: createAuthMiddleware(async (ctx) => {
@@ -135,6 +173,10 @@ export function createAuth(
 		},
 		plugins: [
 			admin({ defaultRole: "user", adminRoles: [HOST_ADMIN] }),
+			twoFactor({
+				issuer: "Night Shift",
+				trustDeviceMaxAge: TRUSTED_BROWSER_DAYS * 24 * 3600,
+			}),
 			pairingPlugin(),
 			apiKey({
 				defaultPrefix: DEVICE_KEY_PREFIX,

@@ -15,6 +15,7 @@ import {
 	engine,
 	host,
 	hostExchange,
+	hostPolicy,
 	localSession,
 	offers,
 	profiles,
@@ -30,7 +31,8 @@ export type CreateContextOptions = {
 /**
  * The request's session and Space: the local session for this computer. A
  * request with a Device key (`Authorization: Bearer`) is a Device, never
- * this computer's Person, even from a loopback address.
+ * this computer's Person, even from a loopback address. `hostAccess` says
+ * whether the session may use the Host (`@nightshift/auth/host-access`).
  */
 export function access(context: HonoContext) {
 	const headers = context.req.raw.headers;
@@ -39,6 +41,7 @@ export function access(context: HonoContext) {
 		db,
 		headers,
 		isLocal(context) ? localSession : null,
+		hostPolicy,
 	);
 }
 
@@ -62,6 +65,7 @@ export async function createContext({
 		createSpace,
 		members,
 		headers,
+		hostAccess,
 	} = deviceKey
 		? await requestAccess(auth, db, new Headers(), null)
 		: await access(context);
@@ -71,6 +75,8 @@ export async function createContext({
 		can,
 		setActiveSpace,
 		headers,
+		hostAccess,
+		requireTwoFactor: hostPolicy.requireTwoFactor,
 		fromThisComputer: !deviceKey && isLocal(context),
 		setLogin: (personId, input) => setLogin(auth, personId, input),
 		deviceKey,

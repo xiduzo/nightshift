@@ -1,5 +1,6 @@
 import { DECIDER_ADAPTERS, HARNESS_ADAPTERS } from "@nightshift/agents";
 import { roleAllows } from "@nightshift/auth/access";
+import { hasLogin } from "@nightshift/auth/login";
 import { invitationView, membersOf } from "@nightshift/auth/members";
 import { spacesOf } from "@nightshift/auth/spaces";
 import {
@@ -957,6 +958,33 @@ const devices = {
  * password to sign in from a browser elsewhere (`nightshift admin`).
  */
 const account = {
+	/**
+	 * How the session's Person signs in, for the account page and the
+	 * two-factor setup page. Public: a session the Host refuses until it
+	 * turns two-factor on reads it to know where to go.
+	 */
+	status: publicProcedure.handler(async ({ context }) => {
+		const session = context.session;
+		const required = context.requireTwoFactor && !context.fromThisComputer;
+		if (!session) {
+			return {
+				signedIn: false,
+				thisComputer: context.fromThisComputer,
+				hasPassword: false,
+				twoFactor: { enabled: false, required, setUpNeeded: false },
+			};
+		}
+		return {
+			signedIn: true,
+			thisComputer: context.fromThisComputer,
+			hasPassword: await hasLogin(context.db, session.user.id),
+			twoFactor: {
+				enabled: session.user.twoFactorEnabled === true,
+				required,
+				setUpNeeded: !context.hostAccess.allowed,
+			},
+		};
+	}),
 	setLogin: ownerProcedure
 		.input(
 			z.object({

@@ -1,5 +1,6 @@
 import type { Permissions } from "@nightshift/auth";
 import type { DeviceKeyPermission } from "@nightshift/auth/device-keys";
+import type { HostAccess } from "@nightshift/auth/host-access";
 import { ORPCError, os } from "@orpc/server";
 
 import type { Context } from "./context";
@@ -33,8 +34,19 @@ export function readable(error: unknown): unknown {
 export const publicProcedure = o.use(readableErrors);
 
 /**
- * A session in a Space. The handler gets `space`: the engine as that Space
- * sees it, so nothing it reads or changes is of another Space.
+ * The refusal of a session the Host does not let in (two-factor required,
+ * not on), with the code the web UI looks for.
+ */
+export function hostRefusal(
+	access: Extract<HostAccess, { allowed: false }>,
+): ORPCError<string, unknown> {
+	return new ORPCError(access.code, { status: 403, message: access.message });
+}
+
+/**
+ * A session in a Space, that the Host lets in. The handler gets `space`:
+ * the engine as that Space sees it, so nothing it reads or changes is of
+ * another Space.
  */
 const requireSpace = o.middleware(async ({ context, next }) => {
 	if (!context.session?.user || !context.spaceId) {
@@ -42,6 +54,7 @@ const requireSpace = o.middleware(async ({ context, next }) => {
 			message: "Sign in to use Night Shift.",
 		});
 	}
+	if (!context.hostAccess.allowed) throw hostRefusal(context.hostAccess);
 	return next({
 		context: {
 			session: context.session,

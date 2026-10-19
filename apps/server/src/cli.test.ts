@@ -10,6 +10,7 @@ describe("nightshift serve", () => {
 			env: {},
 			url: "http://localhost:3000",
 			web: null,
+			requireTwoFactor: false,
 		});
 	});
 
@@ -54,6 +55,22 @@ describe("nightshift serve", () => {
 		expect(options.url).toBe("https://ns.example.com");
 		expect(options.web).toBe("/opt/web");
 		expect(options.env).toEqual({});
+	});
+
+	test("--require-two-factor, or NIGHTSHIFT_REQUIRE_TWO_FACTOR", () => {
+		const flag = serveOptions(["--require-two-factor"], {});
+		expect(flag.requireTwoFactor).toBe(true);
+		expect(flag.env).toEqual({ NIGHTSHIFT_REQUIRE_TWO_FACTOR: "on" });
+		const fromEnv = serveOptions([], { NIGHTSHIFT_REQUIRE_TWO_FACTOR: "on" });
+		expect(fromEnv.requireTwoFactor).toBe(true);
+		expect(fromEnv.env).toEqual({});
+		expect(
+			serveOptions([], { NIGHTSHIFT_REQUIRE_TWO_FACTOR: "off" })
+				.requireTwoFactor,
+		).toBe(false);
+		expect(() =>
+			serveOptions([], { NIGHTSHIFT_REQUIRE_TWO_FACTOR: "maybe" }),
+		).toThrow("Use on or off.");
 	});
 
 	test("refuses what it does not know", () => {

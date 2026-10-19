@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	type HostPolicy,
+	OPEN_HOST,
+	TWO_FACTOR_REQUIRED,
+} from "@nightshift/auth/host-access";
 import { requestAccess } from "@nightshift/auth/request";
 import { personalSpaceId } from "@nightshift/auth/spaces";
 import {
 	type AuthSandbox,
 	createAuthSandbox,
 } from "@nightshift/auth/test-support";
+import { turnOnTwoFactor } from "@nightshift/auth/two-factor-support";
 import type { SpaceEngine } from "@nightshift/engine/types";
 import { call, ORPCError } from "@orpc/server";
 
@@ -45,9 +51,13 @@ const engine: Context["engine"] = {
 	deviceBack: async () => {},
 };
 
-async function contextFor(headers: Headers | null): Promise<Context> {
+/** A request from another computer, with these headers, on a Host with this policy. */
+async function contextFor(
+	headers: Headers | null,
+	policy: HostPolicy = OPEN_HOST,
+): Promise<Context> {
 	const access = headers
-		? await requestAccess(sandbox.auth, sandbox.db, headers, null)
+		? await requestAccess(sandbox.auth, sandbox.db, headers, null, policy)
 		: {
 				session: null,
 				spaceId: null,
@@ -55,10 +65,14 @@ async function contextFor(headers: Headers | null): Promise<Context> {
 				setActiveSpace: async () => {},
 				createSpace: async () => ({ id: "none" }),
 				members: {} as Context["members"],
+				hostAccess: { allowed: true } as const,
 			};
 	return {
 		session: access.session,
 		spaceId: access.spaceId,
+		hostAccess: access.hostAccess,
+		requireTwoFactor: policy.requireTwoFactor,
+		fromThisComputer: false,
 		can: access.can,
 		setActiveSpace: access.setActiveSpace,
 		createSpace: access.createSpace,
@@ -514,6 +528,78 @@ describe("Device keys on the procedures", () => {
 			await errorOf(call(appRouter.devices.list, undefined, { context })),
 		).toBe("UNAUTHORIZED");
 		expect(calls).toEqual([]);
+	});
+});
+
+describe("a Host that requires two-factor sign-in", () => {
+	const REQUIRED = { requireTwoFactor: true };
+
+	test("a session without it may only read how it signs in, until it turns two-factor on", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const refused = await contextFor(ada.headers, REQUIRED);
+		for (const procedure of [
+			call(appRouter.runs.list, undefined, { context: refused }),
+			call(appRouter.spaces.list, undefined, { context: refused }),
+			call(
+				appRouter.invitations.accept,
+				{ invitationId: "x" },
+				{
+					context: refused,
+				},
+			),
+			call(appRouter.settings.get, undefined, { context: refused }),
+		]) {
+			expect(await errorOf(procedure)).toBe(TWO_FACTOR_REQUIRED);
+		}
+		expect(calls).toEqual([]);
+		expect(
+			await call(appRouter.account.status, undefined, { context: refused }),
+		).toEqual({
+			signedIn: true,
+			thisComputer: false,
+			hasPassword: true,
+			twoFactor: { enabled: false, required: true, setUpNeeded: true },
+		});
+		expect(
+			await call(appRouter.healthCheck, undefined, { context: refused }),
+		).toBe("OK");
+
+		const { headers } = await turnOnTwoFactor(sandbox.auth, ada.headers);
+		const allowed = await contextFor(headers, REQUIRED);
+		expect(
+			await call(appRouter.runs.list, undefined, { context: allowed }),
+		).toEqual([]);
+		expect(
+			await call(appRouter.account.status, undefined, { context: allowed }),
+		).toMatchObject({
+			twoFactor: { enabled: true, required: true, setUpNeeded: false },
+		});
+	});
+
+	test("a Device key is not affected", async () => {
+		const context: Context = {
+			...(await contextFor(null, REQUIRED)),
+			devices: {
+				hello: async () => ({ deviceId: "device-b" }),
+			} as unknown as Context["devices"],
+			deviceKey: {
+				keyId: "k",
+				deviceId: "device-b",
+				personId: "ada",
+				permissions: { sync: ["pull"] },
+			},
+		};
+		expect(
+			await call(appRouter.link.hello, undefined, { context }),
+		).toMatchObject({ deviceId: "device-b" });
+	});
+
+	test("without a session, status says so", async () => {
+		expect(
+			await call(appRouter.account.status, undefined, {
+				context: await contextFor(null, REQUIRED),
+			}),
+		).toMatchObject({ signedIn: false, twoFactor: { required: true } });
 	});
 });
 
