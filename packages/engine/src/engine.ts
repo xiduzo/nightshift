@@ -375,6 +375,10 @@ export function createEngine(
 				});
 			}
 		},
+		// A Space a Host keeps: that Host's feed of the step, over its link.
+		...(options.relay?.follow
+			? { upstream: options.relay.follow.bind(options.relay) }
+			: {}),
 	});
 
 	/**
@@ -516,6 +520,8 @@ export function createEngine(
 				createdAt: c.createdAt,
 			})),
 		stepTranscript,
+		followStep: (step, afterSeq, signal) =>
+			exchange.feeds.follow(step, afterSeq, signal),
 	});
 
 	const runStart = createRunStart({

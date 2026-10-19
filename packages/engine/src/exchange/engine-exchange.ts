@@ -3,13 +3,14 @@ import { run, step } from "@nightshift/db/schema/nightshift";
 import { eq } from "drizzle-orm";
 
 import type { RunBus } from "../bus";
-import type { LoggedEvent } from "../events";
+import { deriveSteps, type LoggedEvent } from "../events";
 import type { RunLog } from "../run-log";
 import {
 	memberRole,
 	recordClone,
 	type SpaceDocuments,
 } from "../space/document";
+import { parseTranscript, readTranscriptFile } from "../transcripts";
 import {
 	type ArchiveRef,
 	checkpointSnapshot,
@@ -18,6 +19,11 @@ import {
 	writeArchive,
 } from "./archive";
 import { createRunCommands, type RunCommands } from "./commands";
+import {
+	createTranscriptFeeds,
+	type FeedPorts,
+	type TranscriptFeeds,
+} from "./feeds";
 import { createHostSpaces, type HostSpaces } from "./host-spaces";
 import { createExchange, type Exchange } from "./rows";
 
@@ -31,6 +37,8 @@ export type EngineExchange = {
 	rows: Exchange;
 	commands: RunCommands;
 	hostSpaces: HostSpaces;
+	/** Live transcripts: one feed per step, wherever its run is walked. */
+	feeds: TranscriptFeeds;
 	/** A run's Walker and Space, or null for a run this Replica lacks. */
 	runOwner(
 		runId: string,
@@ -73,6 +81,8 @@ export function createEngineExchange(deps: {
 	documents: SpaceDocuments;
 	/** The events a batch added: a run moved here is taken over. */
 	onIngested?(added: readonly LoggedEvent[]): Promise<void>;
+	/** The feed of the Host that keeps a Space (over its link). */
+	upstream?: FeedPorts["upstream"];
 }): EngineExchange {
 	const { db, log, dataDir, documents } = deps;
 
@@ -84,10 +94,39 @@ export function createEngineExchange(deps: {
 		return row ?? null;
 	}
 
+	const hostSpaces = createHostSpaces(db);
+
+	const feeds = createTranscriptFeeds({
+		bus: deps.bus,
+		selfId: () => log.walkerId(),
+		runOwner,
+		hostOf: (spaceId) => hostSpaces.hostOf(spaceId),
+		async stepEnded({ runId, stepId }) {
+			const found = deriveSteps(await log.events(runId)).find(
+				(s) => s.id === stepId,
+			);
+			return found !== undefined && found.endedAt !== null;
+		},
+		async ownEntries({ runId, stepId }) {
+			const [row] = await db
+				.select({ runId: step.runId, transcriptPath: step.transcriptPath })
+				.from(step)
+				.where(eq(step.id, stepId));
+			if (!row || row.runId !== runId || !row.transcriptPath) return [];
+			return readTranscriptFile(row.transcriptPath);
+		},
+		async archived(at) {
+			const text = await readArchive(dataDir, { kind: "transcript", ...at });
+			return text === null ? null : parseTranscript(text);
+		},
+		...(deps.upstream ? { upstream: deps.upstream } : {}),
+	});
+
 	return {
 		rows: withIngested(createExchange(deps), deps.onIngested),
 		commands: createRunCommands({ db }),
-		hostSpaces: createHostSpaces(db),
+		hostSpaces,
+		feeds,
 		runOwner,
 		async stepOwner(stepId) {
 			const [row] = await db
