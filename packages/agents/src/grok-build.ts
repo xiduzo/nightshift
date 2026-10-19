@@ -1,7 +1,7 @@
 /**
  * The Grok Build harness: one `grok -p … --output-format streaming-json` per
- * session, driven through `@tanstack/ai-grok-build` and the local-process
- * sandbox in `input.cwd`, with the user's `grok login`.
+ * session, driven through `@tanstack/ai-grok-build` on the shared harness
+ * session (`adapter-session.ts`), with the user's `grok login`.
  *
  * The permission mode becomes a TanStack `SandboxPolicy`, which the adapter
  * maps onto grok's own flags (see `grokPolicy`). The node's MCP servers go
@@ -18,29 +18,16 @@
  */
 import { rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { chat } from "@tanstack/ai";
 import { GROK_BUILD_MODELS, grokBuildText } from "@tanstack/ai-grok-build";
-import { type SandboxPolicy, withSandbox } from "@tanstack/ai-sandbox";
+import type { SandboxPolicy } from "@tanstack/ai-sandbox";
 import {
-	hostSandbox,
-	providerTap,
-	removeProjectionMarkers,
-	runAdapterSession,
+	type AdapterSetup,
+	type HarnessSpec,
+	harnessSession,
 	shellQuote,
 } from "./adapter-session";
-import { stepReportSetup } from "./step-report";
-import {
-	createTranslator,
-	type HarnessProfile,
-	type SdkSignals,
-	type Translator,
-} from "./translate";
-import type {
-	AgentEvent,
-	AgentHarness,
-	AgentSessionInput,
-	PermissionMode,
-} from "./types";
+import type { HarnessProfile, SdkSignals } from "./translate";
+import type { AgentHarness, AgentSessionInput, PermissionMode } from "./types";
 
 export { GROK_BUILD_MODELS };
 
@@ -98,44 +85,17 @@ export const GROK_BUILD_PROFILE: HarnessProfile = {
 	createObserver: () => observeGrokEvent,
 };
 
-function startChat(
-	input: AgentSessionInput,
-	options: GrokBuildHarnessOptions,
-	translator: Translator,
-	abortController: AbortController,
-): AsyncIterable<unknown> {
-	// The text report, as in plan mode: see the module comment.
-	const report = stepReportSetup(
-		{ ...input, permissionMode: "plan" },
-		undefined,
-	);
-	const host = hostSandbox(
-		input.cwd,
-		input.mcpServers,
-		grokPolicy(input.permissionMode),
-	);
-	if (typeof host === "string") throw new Error(host);
-
-	return chat({
-		adapter: grokBuildText(input.model, {
-			// The adapter runs the executable through `sh -c`.
-			grokExecutable: shellQuote(options.grokExecutable ?? "grok"),
-			// `streaming-json` honours the policy; `acp` always approves.
-			protocol: "streaming-json",
-			authMode: "host",
-			emitDiff: false,
-			...(options.env ? { env: options.env } : {}),
-		}),
-		threadId: host.id,
-		messages: [{ role: "user", content: report.prompt }],
-		...(input.resumeSessionId
-			? { modelOptions: { sessionId: input.resumeSessionId } }
-			: {}),
-		middleware: [withSandbox(host.sandbox)],
-		abortController,
-		debug: providerTap(translator),
-	}) as AsyncIterable<unknown>;
-}
+/**
+ * Grok Build's session knobs. The report is always text (see the module
+ * comment). MCP servers reach grok as workspace skills. A resumed session
+ * may not announce itself again. The adapter has no effort level.
+ */
+export const GROK_BUILD_SPEC: HarnessSpec = {
+	profile: GROK_BUILD_PROFILE,
+	report: "text",
+	mcpAsSkills: true,
+	resumeIsSilent: true,
+};
 
 async function exists(path: string): Promise<boolean> {
 	return stat(path).then(
@@ -144,33 +104,34 @@ async function exists(path: string): Promise<boolean> {
 	);
 }
 
-/** Run one Grok Build session and translate it into AgentEvent values. Never throws. */
-export async function* runGrokBuildSession(
+/**
+ * The `grok` adapter of one session, with the sandbox policy of its
+ * permission mode. The adapter writes its MCP config to `.grok/` in the
+ * worktree: keep a project's own, drop ours afterwards.
+ */
+async function grokBuildAdapter(
 	input: AgentSessionInput,
-	options: GrokBuildHarnessOptions = {},
-): AsyncGenerator<AgentEvent> {
+	options: GrokBuildHarnessOptions,
+): Promise<AdapterSetup> {
 	const grokDir = join(input.cwd, ".grok");
 	const hadGrokDir = await exists(grokDir);
-	const translator = createTranslator({
-		fallbackSessionId: input.resumeSessionId ?? crypto.randomUUID(),
-		stepReport: input.stepReport ?? false,
-		profile: GROK_BUILD_PROFILE,
-		...(input.resumeSessionId ? { knownSessionId: input.resumeSessionId } : {}),
+	const policy = grokPolicy(input.permissionMode);
+	const adapter = grokBuildText(input.model, {
+		// The adapter runs the executable through `sh -c`.
+		grokExecutable: shellQuote(options.grokExecutable ?? "grok"),
+		// `streaming-json` honours the policy; `acp` always approves.
+		protocol: "streaming-json",
+		authMode: "host",
+		emitDiff: false,
+		...(options.env ? { env: options.env } : {}),
 	});
-	yield* runAdapterSession({
-		signal: input.signal,
-		translator,
-		start: (abortController) =>
-			startChat(input, options, translator, abortController),
-		...(options.abortGraceMs !== undefined
-			? { abortGraceMs: options.abortGraceMs }
-			: {}),
+	return {
+		adapter,
+		...(policy ? { policy } : {}),
 		cleanup: async () => {
-			await removeProjectionMarkers(input.cwd);
-			// The adapter's MCP config: keep a project's own, drop ours.
 			if (!hadGrokDir) await rm(grokDir, { recursive: true, force: true });
 		},
-	});
+	};
 }
 
 /** Runs Grok Build sessions on this computer, in `input.cwd`, with the user's `grok login`. */
@@ -179,6 +140,14 @@ export function grokBuildHarness(
 ): AgentHarness {
 	return {
 		name: "grok-build",
-		run: (input) => runGrokBuildSession(input, options),
+		run: (input) =>
+			harnessSession({
+				input,
+				spec: GROK_BUILD_SPEC,
+				adapter: () => grokBuildAdapter(input, options),
+				...(options.abortGraceMs !== undefined
+					? { abortGraceMs: options.abortGraceMs }
+					: {}),
+			}),
 	};
 }

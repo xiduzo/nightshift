@@ -1,6 +1,7 @@
 /**
  * The Codex harness: one `codex exec --experimental-json` per session, driven
- * through `@tanstack/ai-codex` and the local-process sandbox in `input.cwd`.
+ * through `@tanstack/ai-codex` on the shared harness session
+ * (`adapter-session.ts`).
  *
  * Codex runs non-interactively: it never asks for approval (`approval_policy
  * = "never"` in every mode), it refuses what its own sandbox forbids. The
@@ -14,32 +15,15 @@
  * Unverified: the `codex` CLI was not installed when this was written. It is
  * tested against a fake `codex` that speaks the JSONL the adapter expects.
  */
-import { randomUUID } from "node:crypto";
-import { chat } from "@tanstack/ai";
 import { CODEX_MODELS, codexText } from "@tanstack/ai-codex";
 import {
-	defineSandbox,
-	defineWorkspace,
-	localSource,
-	withSandbox,
-} from "@tanstack/ai-sandbox";
-import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
-import {
-	providerTap,
-	removeProjectionMarkers,
-	runAdapterSession,
+	type AdapterSetup,
+	type HarnessSpec,
+	harnessSession,
 	shellQuote,
 } from "./adapter-session";
-import { reportStepTool, stepReportSetup } from "./step-report";
-import {
-	createTranslator,
-	failureKind,
-	type HarnessProfile,
-	type SdkSignals,
-	type Translator,
-} from "./translate";
+import { failureKind, type HarnessProfile, type SdkSignals } from "./translate";
 import type {
-	AgentEvent,
 	AgentHarness,
 	AgentSessionInput,
 	Effort,
@@ -215,17 +199,24 @@ export const CODEX_PROFILE: HarnessProfile = {
 	createObserver: () => observeCodexEvent,
 };
 
-/** The prompt, bridged tools and `--config` overrides of one Codex session. */
+/**
+ * Codex's session knobs. It runs MCP tools without approval in every
+ * sandbox mode, so plan mode reports with the tool too. The adapter maps
+ * `reasoning` for the models it knows; `codexSetup` sets the rest itself.
+ * A resumed thread may not announce itself again.
+ */
+export const CODEX_SPEC: HarnessSpec = {
+	profile: CODEX_PROFILE,
+	report: "tool",
+	reasoningFor: (model) => KNOWN_MODELS.has(model),
+	resumeIsSilent: true,
+};
+
+/** The sandbox policy and `--config` overrides of one Codex session. */
 export function codexSetup(
 	input: AgentSessionInput,
 	options: CodexHarnessOptions = {},
 ) {
-	// Codex runs MCP tools without approval in every sandbox mode, so plan
-	// mode reports with the tool too.
-	const report = stepReportSetup(
-		{ ...input, permissionMode: "default" },
-		undefined,
-	);
 	// CLI tools (`input.clis`) change nothing here: Codex never asks, and its
 	// sandbox decides what a shell command may do. The run checks that they
 	// are installed.
@@ -234,8 +225,6 @@ export function codexSetup(
 			? { model_reasoning_effort: tomlString(codexEffort(input.effort)) }
 			: {};
 	return {
-		prompt: report.prompt,
-		tools: [...(report.withTool ? [reportStepTool(input.stepReport)] : [])],
 		policy: codexPolicy(input.permissionMode),
 		config: {
 			...options.config,
@@ -245,23 +234,12 @@ export function codexSetup(
 	};
 }
 
-function startChat(
+/** The `codex` adapter of one session. */
+function codexAdapter(
 	input: AgentSessionInput,
 	options: CodexHarnessOptions,
-	translator: Translator,
-	abortController: AbortController,
-): AsyncIterable<unknown> {
+): AdapterSetup {
 	const setup = codexSetup(input, options);
-	const id = `nightshift-${randomUUID()}`;
-	const sandbox = defineSandbox({
-		id,
-		provider: localProcessSandbox({ dir: input.cwd, removeOnDestroy: false }),
-		fileEvents: false,
-		// The middleware needs a workspace; see `opencode.ts`.
-		workspace: defineWorkspace({ source: localSource(input.cwd), root: "." }),
-		lifecycle: { reuse: "none", destroyOnComplete: true },
-	});
-
 	const adapter = codexText(input.model, {
 		// The adapter runs `<executable> exec …` through `sh -c`.
 		codexExecutable: shellQuote(options.codexExecutable ?? "codex"),
@@ -276,48 +254,7 @@ function startChat(
 		...(options.env ? { env: options.env } : {}),
 		...(Object.keys(setup.config).length > 0 ? { config: setup.config } : {}),
 	});
-
-	return chat({
-		adapter,
-		threadId: id,
-		messages: [{ role: "user", content: setup.prompt }],
-		...(setup.tools.length > 0 ? { tools: setup.tools } : {}),
-		...(input.resumeSessionId
-			? { modelOptions: { sessionId: input.resumeSessionId } }
-			: {}),
-		// Known models: the adapter maps the level. Others: `codexSetup` sets
-		// `model_reasoning_effort` itself.
-		...(input.effort && KNOWN_MODELS.has(input.model)
-			? { reasoning: { level: input.effort } as never }
-			: {}),
-		middleware: [withSandbox(sandbox)],
-		abortController,
-		debug: providerTap(translator),
-	}) as AsyncIterable<unknown>;
-}
-
-/** Run one Codex session and translate it into AgentEvent values. Never throws. */
-export function runCodexSession(
-	input: AgentSessionInput,
-	options: CodexHarnessOptions = {},
-): AsyncGenerator<AgentEvent> {
-	const translator = createTranslator({
-		fallbackSessionId: input.resumeSessionId ?? randomUUID(),
-		stepReport: input.stepReport ?? false,
-		profile: CODEX_PROFILE,
-		// A resumed thread may not announce itself again.
-		...(input.resumeSessionId ? { knownSessionId: input.resumeSessionId } : {}),
-	});
-	return runAdapterSession({
-		signal: input.signal,
-		translator,
-		start: (abortController) =>
-			startChat(input, options, translator, abortController),
-		...(options.abortGraceMs !== undefined
-			? { abortGraceMs: options.abortGraceMs }
-			: {}),
-		cleanup: () => removeProjectionMarkers(input.cwd),
-	});
+	return { adapter };
 }
 
 /**
@@ -328,6 +265,14 @@ export function runCodexSession(
 export function codexHarness(options: CodexHarnessOptions = {}): AgentHarness {
 	return {
 		name: "codex",
-		run: (input) => runCodexSession(input, options),
+		run: (input) =>
+			harnessSession({
+				input,
+				spec: CODEX_SPEC,
+				adapter: () => codexAdapter(input, options),
+				...(options.abortGraceMs !== undefined
+					? { abortGraceMs: options.abortGraceMs }
+					: {}),
+			}),
 	};
 }

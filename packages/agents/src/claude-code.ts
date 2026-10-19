@@ -1,33 +1,29 @@
-import { randomUUID } from "node:crypto";
+/**
+ * The Claude Code harness: one `claude` process per session, driven through
+ * `@tanstack/ai-claude-code` on the shared harness session
+ * (`adapter-session.ts`). This file holds what is Claude Code's own: the
+ * effort env for models the adapter does not know, the `--allowedTools`
+ * rules for CLI tools and MCP servers, and the `--mcp-config` temp file.
+ */
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chat } from "@tanstack/ai";
 import {
 	type ClaudeCodeSettingSource,
 	claudeCodeText,
 } from "@tanstack/ai-claude-code";
 import {
-	defineSandbox,
-	defineWorkspace,
-	localSource,
-	withSandbox,
-} from "@tanstack/ai-sandbox";
-import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
-import {
-	providerTap,
-	removeProjectionMarkers,
-	runAdapterSession,
+	type AdapterSetup,
+	type HarnessSpec,
+	harnessSession,
+	type SessionReport,
 } from "./adapter-session";
-import { reportStepTool, stepReportSetup } from "./step-report";
-import { createTranslator, type Translator } from "./translate";
+import { CLAUDE_CODE_PROFILE } from "./translate";
 import type {
-	AgentEvent,
 	AgentHarness,
 	AgentSessionInput,
 	Effort,
 	McpServerConfig,
-	StepReportSpec,
 } from "./types";
 
 /** How a `claude` process is started. Shared by the harness and the decider. */
@@ -44,41 +40,13 @@ export type ClaudeCodeHarnessOptions = ClaudeCodeProcessOptions & {
 	/**
 	 * Built-in tools the session may use without a prompt (`--allowedTools`).
 	 * With `stepReport`, the report tool is added (see `step-report.ts`); the
-	 * session's CLI tools and MCP servers are added too (see `harnessSetup`).
+	 * session's CLI tools and MCP servers are added too (see `claudeAllowedTools`).
 	 */
 	allowedTools?: string[];
 	/** Built-in tools removed from the session (`--disallowedTools`). */
 	disallowedTools?: string[];
 	/** Settings tiers to load. Defaults to all three, like the `claude` CLI. */
 	settingSources?: ClaudeCodeSettingSource[];
-};
-
-/** The parts of a session input that start the process. */
-export type SessionRunInput = Pick<
-	AgentSessionInput,
-	"cwd" | "model" | "permissionMode" | "effort" | "resumeSessionId" | "signal"
->;
-
-/** A TanStack AI server tool, as `chat({ tools })` takes it. */
-export type SessionTool = NonNullable<
-	Parameters<typeof chat>[0]["tools"]
->[number];
-
-/** What one session sends: the prompt, the bridged tools, and the CLI settings. */
-export type SessionSetup = {
-	prompt: string;
-	/** TanStack AI tools, bridged into the session over MCP. */
-	tools: SessionTool[];
-	/** `--allowedTools`: tools that run without a permission prompt. */
-	allowedTools: string[] | undefined;
-	/** `--disallowedTools`. */
-	disallowedTools?: string[];
-	/** Turn `report_step` calls into `report` events (`true` or a spec). */
-	stepReport: boolean | StepReportSpec;
-	/** Settings tiers to load (`--setting-sources`). */
-	settingSources: ClaudeCodeSettingSource[];
-	/** The session's own MCP servers, next to the bridge (`--mcp-config`). */
-	mcpServers?: Record<string, McpServerConfig>;
 };
 
 /**
@@ -164,113 +132,6 @@ async function writeMcpConfig(
 	return { path, cleanup };
 }
 
-function startChat(
-	input: SessionRunInput,
-	setup: SessionSetup,
-	options: ClaudeCodeProcessOptions,
-	translator: Translator,
-	abortController: AbortController,
-	mcpConfigPath: string | undefined,
-): AsyncIterable<unknown> {
-	// One id per session: the sandbox middleware keys its in-memory instances
-	// by sandbox id and thread id, so concurrent sessions never share one.
-	const id = `nightshift-${randomUUID()}`;
-	const sandbox = defineSandbox({
-		id,
-		provider: localProcessSandbox({
-			dir: input.cwd,
-			// Never delete the run's worktree when the sandbox is destroyed.
-			removeOnDestroy: false,
-			// Claude Code then uses the user's own `claude login`.
-			scrubEnv: ["ANTHROPIC_API_KEY"],
-		}),
-		fileEvents: false,
-		// Required: the adapter reads the workspace projection. With a
-		// local-process `dir`, the virtual `/workspace` is `input.cwd`. The
-		// relative root keeps the projection marker at the top of `input.cwd`:
-		// the default root writes it under `<cwd>/<cwd>/`.
-		workspace: defineWorkspace({ source: localSource(input.cwd), root: "." }),
-		lifecycle: { reuse: "none", destroyOnComplete: true },
-	});
-
-	// Typed as `opus`, the model with every Effort level, so `chat()` accepts
-	// any `reasoning` level. The adapter gets the real id and clamps the level
-	// to that model's own levels at runtime.
-	const adapter = claudeCodeText(input.model as "opus", {
-		authMode: "host",
-		// The adapter's type lists four modes but passes the string to
-		// `claude --permission-mode` as is, so `auto` works.
-		permissionMode: input.permissionMode as "default",
-		settingSources: setup.settingSources,
-		emitDiff: false,
-		...(setup.allowedTools ? { allowedTools: setup.allowedTools } : {}),
-		...(setup.disallowedTools
-			? { disallowedTools: setup.disallowedTools }
-			: {}),
-		claudeExecutable: claudeCommand(options.claudeExecutable, mcpConfigPath),
-		env: {
-			...effortEnv(input.model, input.effort, (model) =>
-				KNOWN_REASONING_MODELS.has(model),
-			),
-			...options.env,
-		},
-	});
-
-	return chat({
-		adapter,
-		threadId: id,
-		messages: [{ role: "user", content: setup.prompt }],
-		...(setup.tools.length > 0 ? { tools: setup.tools } : {}),
-		...(input.resumeSessionId
-			? { modelOptions: { sessionId: input.resumeSessionId } }
-			: {}),
-		...(input.effort ? { reasoning: { level: input.effort } } : {}),
-		middleware: [withSandbox(sandbox)],
-		abortController,
-		debug: providerTap(translator),
-	}) as AsyncIterable<unknown>;
-}
-
-/**
- * Run one `claude` process through `chat()` and the sandbox middleware, and
- * translate its stream into AgentEvent values. Never throws.
- */
-export async function* runClaudeCodeSession(
-	input: SessionRunInput,
-	setup: SessionSetup,
-	options: ClaudeCodeProcessOptions,
-): AsyncGenerator<AgentEvent> {
-	const translator = createTranslator({
-		// Only used when Claude Code fails before it reports its session id.
-		fallbackSessionId: input.resumeSessionId ?? randomUUID(),
-		stepReport: setup.stepReport,
-	});
-	let removeMcpConfig = async () => {};
-	yield* runAdapterSession({
-		signal: input.signal,
-		translator,
-		start: async function* (abortController) {
-			const mcp = await writeMcpConfig(setup.mcpServers);
-			removeMcpConfig = mcp.cleanup;
-			yield* startChat(
-				input,
-				setup,
-				options,
-				translator,
-				abortController,
-				mcp.path,
-			);
-		},
-		...(options.abortGraceMs !== undefined
-			? { abortGraceMs: options.abortGraceMs }
-			: {}),
-		cleanup: async () => {
-			await removeMcpConfig();
-			await removeProjectionMarkers(input.cwd);
-		},
-	});
-}
-
 /**
  * Claude Code permission rules that let the agent run each CLI tool in its
  * shell without a prompt: `Bash(gh:*)` allows `gh` with any arguments. Plan
@@ -283,34 +144,69 @@ export function cliAllowRules(
 	return (input.clis ?? []).map((name) => `Bash(${name}:*)`);
 }
 
-/** The setup of an agent session: its prompt, the report tool, its CLI tools and MCP servers. */
-export function harnessSetup(
-	input: AgentSessionInput,
-	options: ClaudeCodeHarnessOptions,
-): SessionSetup {
-	const report = stepReportSetup(input, options.allowedTools);
-	const mcpServers = input.mcpServers ?? {};
-	// The node lists its CLI tools and MCP servers on purpose: they run
-	// without a prompt (`mcp__<server>` allows every tool of the server).
+/**
+ * `--allowedTools` of one session: the report's rules (the harness's own
+ * list plus the report tool), then the CLI tools and the MCP servers. The
+ * node lists those on purpose: they run without a prompt (`mcp__<server>`
+ * allows every tool of the server).
+ */
+export function claudeAllowedTools(
+	input: Pick<AgentSessionInput, "clis" | "permissionMode" | "mcpServers">,
+	reportAllowed: string[] | undefined,
+): string[] | undefined {
 	const extraAllowed = [
 		...cliAllowRules(input),
-		...Object.keys(mcpServers).map((name) => `mcp__${name}`),
+		...Object.keys(input.mcpServers ?? {}).map((name) => `mcp__${name}`),
 	];
-	const allowedTools =
-		extraAllowed.length > 0
-			? [...new Set([...(report.allowedTools ?? []), ...extraAllowed])]
-			: report.allowedTools;
-	return {
-		prompt: report.prompt,
-		tools: [...(report.withTool ? [reportStepTool(input.stepReport)] : [])],
-		allowedTools,
+	return extraAllowed.length > 0
+		? [...new Set([...(reportAllowed ?? []), ...extraAllowed])]
+		: reportAllowed;
+}
+
+/**
+ * Claude Code's session knobs. The report follows the permission mode: plan
+ * mode runs no tools, so the agent reports in text there. The adapter maps
+ * `reasoning` for the models it knows; `effortEnv` covers the rest.
+ */
+export const CLAUDE_CODE_SPEC: HarnessSpec = {
+	profile: CLAUDE_CODE_PROFILE,
+	report: "by-mode",
+	reasoningFor: () => true,
+	// Claude Code then uses the user's own `claude login`.
+	scrubEnv: ["ANTHROPIC_API_KEY"],
+};
+
+/** The `claude` adapter of one session, with its `--mcp-config` temp file. */
+async function claudeCodeAdapter(
+	input: AgentSessionInput,
+	options: ClaudeCodeHarnessOptions,
+	report: SessionReport,
+): Promise<AdapterSetup> {
+	const mcp = await writeMcpConfig(input.mcpServers);
+	const allowedTools = claudeAllowedTools(input, report.allowedTools);
+	// Typed as `opus`, the model with every Effort level, so `chat()` accepts
+	// any `reasoning` level. The adapter gets the real id and clamps the level
+	// to that model's own levels at runtime.
+	const adapter = claudeCodeText(input.model as "opus", {
+		authMode: "host",
+		// The adapter's type lists four modes but passes the string to
+		// `claude --permission-mode` as is, so `auto` works.
+		permissionMode: input.permissionMode as "default",
+		settingSources: options.settingSources ?? ["user", "project", "local"],
+		emitDiff: false,
+		...(allowedTools ? { allowedTools } : {}),
 		...(options.disallowedTools
 			? { disallowedTools: options.disallowedTools }
 			: {}),
-		stepReport: input.stepReport ?? false,
-		settingSources: options.settingSources ?? ["user", "project", "local"],
-		...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
-	};
+		claudeExecutable: claudeCommand(options.claudeExecutable, mcp.path),
+		env: {
+			...effortEnv(input.model, input.effort, (model) =>
+				KNOWN_REASONING_MODELS.has(model),
+			),
+			...options.env,
+		},
+	});
+	return { adapter, cleanup: mcp.cleanup };
 }
 
 /** Runs Claude Code sessions through TanStack AI, on the host, in `input.cwd`. */
@@ -320,6 +216,14 @@ export function claudeCodeHarness(
 	return {
 		name: "claude-code",
 		run: (input) =>
-			runClaudeCodeSession(input, harnessSetup(input, options), options),
+			harnessSession({
+				input,
+				spec: CLAUDE_CODE_SPEC,
+				adapter: (report) => claudeCodeAdapter(input, options, report),
+				...(options.allowedTools ? { allowedTools: options.allowedTools } : {}),
+				...(options.abortGraceMs !== undefined
+					? { abortGraceMs: options.abortGraceMs }
+					: {}),
+			}),
 	};
 }

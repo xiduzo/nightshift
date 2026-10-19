@@ -1,6 +1,7 @@
 /**
  * The OpenCode harness: one `opencode serve` per session, driven through
- * `@tanstack/ai-opencode` and the local-process sandbox in `input.cwd`.
+ * `@tanstack/ai-opencode` on the shared harness session
+ * (`adapter-session.ts`).
  *
  * The adapter starts `opencode serve` with a fixed command (`opencode` on the
  * PATH, port 4096, all interfaces) and puts its own tool bridge in
@@ -37,34 +38,17 @@
  * - An abort reaches the server as a session abort; the server process is
  *   killed only if it is still alive 10 s later (see `withSpawnRewrite`).
  */
-import { randomUUID } from "node:crypto";
-import { chat } from "@tanstack/ai";
 import { opencodeText } from "@tanstack/ai-opencode";
+import type { SandboxHandle, SandboxProvider } from "@tanstack/ai-sandbox";
 import {
-	defineSandbox,
-	defineWorkspace,
-	localSource,
-	type SandboxHandle,
-	type SandboxProvider,
-	withSandbox,
-} from "@tanstack/ai-sandbox";
-import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
-import {
+	type AdapterSetup,
 	freePort,
-	providerTap,
-	removeProjectionMarkers,
-	runAdapterSession,
+	type HarnessSpec,
+	harnessSession,
 	shellQuote,
 } from "./adapter-session";
-import { reportStepTool, stepReportSetup } from "./step-report";
-import {
-	createTranslator,
-	type HarnessProfile,
-	type SdkSignals,
-	type Translator,
-} from "./translate";
+import type { HarnessProfile, SdkSignals } from "./translate";
 import type {
-	AgentEvent,
 	AgentHarness,
 	AgentSessionInput,
 	AgentUsage,
@@ -576,100 +560,46 @@ export const OPENCODE_PROFILE: HarnessProfile = {
 	toolInputFromSignals: true,
 };
 
-/** The prompt and the bridged tools of one OpenCode session. */
-export function opencodeSetup(
-	input: AgentSessionInput,
-	options: OpencodeHarnessOptions = {},
-) {
-	// The bridged tools are allowed in every mode (see `opencodePermission`),
-	// so plan mode reports with the tool too.
-	const report = stepReportSetup(
-		{ ...input, permissionMode: "default" },
-		undefined,
-	);
-	return {
-		prompt: report.prompt,
-		tools: [...(report.withTool ? [reportStepTool(input.stepReport)] : [])],
-		config: opencodeSessionConfig(input, options.config),
-	};
-}
+/**
+ * OpenCode's session knobs. The bridged tools are allowed in every mode
+ * (see `opencodePermission`), so plan mode reports with the tool too. The
+ * adapter maps `reasoning` for the models it knows; any level type-checks
+ * against an unknown model as `never`.
+ */
+export const OPENCODE_SPEC: HarnessSpec = {
+	profile: OPENCODE_PROFILE,
+	report: "tool",
+	reasoningFor: () => true,
+};
 
-function startChat(
+/**
+ * The `opencode` adapter of one session: a server on a free loopback port,
+ * whose spawn is rewritten to the configured executable and config.
+ */
+async function opencodeAdapter(
 	input: AgentSessionInput,
 	options: OpencodeHarnessOptions,
-	translator: Translator,
-	abortController: AbortController,
-	port: number,
-): AsyncIterable<unknown> {
-	const setup = opencodeSetup(input, options);
+): Promise<AdapterSetup> {
+	const port = await freePort();
 	const executable = options.opencodeExecutable ?? "opencode";
-	const id = `nightshift-${randomUUID()}`;
-	const sandbox = defineSandbox({
-		id,
-		provider: withSpawnRewrite(
-			localProcessSandbox({ dir: input.cwd, removeOnDestroy: false }),
-			(command, env) =>
-				rewriteServe(command, env, {
-					executable,
-					config: setup.config,
-					...(options.env ? { env: options.env } : {}),
-				}),
-		),
-		fileEvents: false,
-		// The middleware needs a workspace. With no MCP skills in it, the
-		// adapter's projection writes only its marker (removed afterwards),
-		// never an `opencode.json`. The relative root keeps the marker at the
-		// top of `input.cwd` (see `claude-code.ts`).
-		workspace: defineWorkspace({ source: localSource(input.cwd), root: "." }),
-		lifecycle: { reuse: "none", destroyOnComplete: true },
-	});
-
+	const config = opencodeSessionConfig(input, options.config);
 	const adapter = opencodeText(input.model, {
 		// One port per session, on the loopback interface only.
 		port,
 		hostname: "127.0.0.1",
 		permissionMode: adapterPermissionMode(input.permissionMode),
 	});
-
-	return chat({
+	return {
 		adapter,
-		threadId: id,
-		messages: [{ role: "user", content: setup.prompt }],
-		...(setup.tools.length > 0 ? { tools: setup.tools } : {}),
-		...(input.resumeSessionId
-			? { modelOptions: { sessionId: input.resumeSessionId } }
-			: {}),
-		// The adapter maps a level only for the models it knows; any level
-		// type-checks against an unknown model as `never`.
-		...(input.effort ? { reasoning: { level: input.effort } as never } : {}),
-		middleware: [withSandbox(sandbox)],
-		abortController,
-		debug: providerTap(translator),
-	}) as AsyncIterable<unknown>;
-}
-
-/** Run one OpenCode session and translate it into AgentEvent values. Never throws. */
-export function runOpencodeSession(
-	input: AgentSessionInput,
-	options: OpencodeHarnessOptions = {},
-): AsyncGenerator<AgentEvent> {
-	const translator = createTranslator({
-		fallbackSessionId: input.resumeSessionId ?? randomUUID(),
-		stepReport: input.stepReport ?? false,
-		profile: OPENCODE_PROFILE,
-	});
-	return runAdapterSession({
-		signal: input.signal,
-		translator,
-		start: async function* (abortController) {
-			const port = await freePort();
-			yield* startChat(input, options, translator, abortController, port);
-		},
-		...(options.abortGraceMs !== undefined
-			? { abortGraceMs: options.abortGraceMs }
-			: {}),
-		cleanup: () => removeProjectionMarkers(input.cwd),
-	});
+		wrapProvider: (provider) =>
+			withSpawnRewrite(provider, (command, env) =>
+				rewriteServe(command, env, {
+					executable,
+					config,
+					...(options.env ? { env: options.env } : {}),
+				}),
+			),
+	};
 }
 
 /**
@@ -682,6 +612,14 @@ export function opencodeHarness(
 ): AgentHarness {
 	return {
 		name: "opencode",
-		run: (input) => runOpencodeSession(input, options),
+		run: (input) =>
+			harnessSession({
+				input,
+				spec: OPENCODE_SPEC,
+				adapter: () => opencodeAdapter(input, options),
+				...(options.abortGraceMs !== undefined
+					? { abortGraceMs: options.abortGraceMs }
+					: {}),
+			}),
 	};
 }
