@@ -9,15 +9,8 @@ import {
 
 import { createSandbox, type Sandbox } from "../test-support";
 import { STOP_TIME_REASON } from "./context";
-import {
-	agent,
-	command,
-	drive,
-	edge,
-	flowOf,
-	startRun,
-} from "./node-test-support";
 import type { PendingWait } from "./state";
+import { agent, command, drive, edge, flowOf, startRun } from "./test-support";
 
 /**
  * The facts the walk reads from its own state rather than the log: the
@@ -58,7 +51,7 @@ describe("the stop time in the state", () => {
 				[agent("worker", "Go"), command("check", "true")],
 				[edge("e1", "worker", "pass", "check")],
 			),
-			harness,
+			{ harness },
 		);
 		h.ctx.now = () => clock;
 
@@ -101,12 +94,10 @@ describe("the stop time in the state", () => {
 			[agent("work", "Go"), command("check", "true")],
 			[edge("b1", "work", "pass", "check")],
 		);
-		const h = await startRun(
-			sandbox,
-			flowOf([callOnce("sub", "body")]),
+		const h = await startRun(sandbox, flowOf([callOnce("sub", "body")]), {
 			harness,
-			{ flows: { body } },
-		);
+			flows: { body },
+		});
 		h.ctx.now = () => clock;
 
 		const first = await drive(h, { inputs: {}, stopAt });
@@ -137,7 +128,9 @@ describe("the stop time in the state", () => {
 		let clock = Date.now();
 		const stopAt = clock + 60_000;
 		const harness = fakeHarness(reportingScript("pass"));
-		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), harness);
+		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), {
+			harness,
+		});
 		h.ctx.now = () => clock;
 
 		// The daemon dies as the step opens: the thread is pending at the
@@ -174,7 +167,9 @@ describe("a waiting step's streak", () => {
 		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
 			call < 3 ? usageLimitScript() : reportingScript("pass"),
 		);
-		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), harness);
+		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), {
+			harness,
+		});
 		const waits: PendingWait[] = [];
 		let driven = await drive(h, { inputs: {} });
 		for (let i = 0; i < 3; i++) {

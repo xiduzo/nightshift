@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Command } from "@langchain/langgraph";
-import type { AgentHarness } from "@nightshift/agents";
 
 import { deriveSteps, type EngineEventType } from "../events";
 import { createSandbox, type Sandbox } from "../test-support";
 import { STOP_AFTER_STEP_REASON, STOP_TIME_REASON } from "./context";
+import { RESUME_RULES, type ResumePoint } from "./resume-point";
+import type { PendingWait, RunStateValues } from "./state";
+import { type BodyResult, runStep, type StepHandle } from "./step-runner";
 import {
 	command,
 	edge,
@@ -12,23 +14,22 @@ import {
 	type Harness,
 	payloads,
 	startRun,
-} from "./node-test-support";
-import { RESUME_RULES, type ResumePoint } from "./resume-point";
-import type { PendingWait, RunStateValues } from "./state";
-import { type BodyResult, runStep, type StepHandle } from "./step-runner";
+} from "./test-support";
 
 /**
  * The step runner's lifecycle as a table: how a step enters (a new visit,
  * or a step continued after a wait) crossed with what the run and the body
- * do (a stop, a stop after the step, the stop time, the step cap, an abort
- * mid-body, a body that throws, a body that asks for a wait, a body that
- * ends). The body is a fake that returns what the row says; the node and
- * the flow are the same for every row. The expectations are the log that
- * `runStep` writes and the `Command` it returns, so the node tests need not
- * re-test this skeleton.
+ * do (a stop, a stop after the step, the stop time, the step cap, the node's
+ * time budget, an abort mid-body, a body that throws, a body that asks for a
+ * wait, a body that ends). The body is a fake that returns what the row
+ * says; the node and the flow are the same for every row. The expectations
+ * are the log that `runStep` writes and the `Command` it returns, so the
+ * node tests need not re-test this skeleton.
  */
 
-const NODE = command("n", "true");
+const NODE = command("n", "true", { timeoutMinutes: 1 });
+/** One minute of the node's time budget, in the rows that run out of it. */
+const SHORT_MINUTE = 20;
 const FLOW = flowOf(
 	[NODE, command("after", "true")],
 	[edge("e1", "n", "pass", "after")],
@@ -52,13 +53,15 @@ type Situation =
 	| "stop-requested"
 	| "stop-after-step"
 	| "past-stop-time"
-	| "step-cap";
+	| "step-cap"
+	| "time-budget";
 type Behaviour =
 	| "ends"
 	| "aborts-mid-body"
 	| "throws"
 	| "requests-wait"
-	| "stop-requested-ends";
+	| "stop-requested-ends"
+	| "runs-until-aborted";
 
 type Row = {
 	entry: "new" | "continued";
@@ -83,7 +86,7 @@ afterEach(async () => {
 /** Runs the body of a row through the runner and says what it did. */
 async function runRow(row: Row) {
 	const controller = new AbortController();
-	const h: Harness = await startRun(sandbox, FLOW, {} as AgentHarness, {
+	const h: Harness = await startRun(sandbox, FLOW, {
 		signal: controller.signal,
 	});
 	let ctx = h.ctx;
@@ -125,6 +128,9 @@ async function runRow(row: Row) {
 		case "step-cap":
 			ctx = { ...h.ctx, policy: () => ({ ...h.ctx.policy(), maxSteps: 0 }) };
 			break;
+		case "time-budget":
+			ctx = { ...h.ctx, minuteMs: SHORT_MINUTE };
+			break;
 		case "none":
 			break;
 	}
@@ -151,6 +157,14 @@ async function runRow(row: Row) {
 			case "stop-requested-ends":
 				// The run was stopped before the body: it sees the aborted signal.
 				expect(step.signal.aborted).toBe(true);
+				return { kind: "aborted", outputs: { visit: step.visit } };
+			case "runs-until-aborted":
+				// A body that works until its signal fires (the time budget).
+				await new Promise<void>((resolve) =>
+					step.signal.addEventListener("abort", () => resolve(), {
+						once: true,
+					}),
+				);
 				return { kind: "aborted", outputs: { visit: step.visit } };
 			case "throws":
 				throw new Error("boom");
@@ -273,6 +287,35 @@ const rows: Row[] = [
 		goto: "wait__n",
 		ran: true,
 		pending: { kind: "wait", nodeId: "n", reason: "usage-limit", visit: 1 },
+	},
+	// The node's time budget: the step timer aborts the body, and the step
+	// ends `error` with why, for a new and a continued step alike.
+	{
+		entry: "new",
+		situation: "time-budget",
+		body: "runs-until-aborted",
+		appends: ["StepStarted", "StepEnded"],
+		goto: "park__n",
+		ran: true,
+		pending: {
+			kind: "parked",
+			status: "failed",
+			reason: 'Node "n" failed: The step ran past its time budget of 1 min.',
+		},
+	},
+	{
+		entry: "continued",
+		situation: "time-budget",
+		body: "runs-until-aborted",
+		appends: ["StepEnded"],
+		goto: "park__n",
+		ran: true,
+		pending: {
+			kind: "parked",
+			status: "failed",
+			reason: 'Node "n" failed: The step ran past its time budget of 1 min.',
+			visit: 1,
+		},
 	},
 	// A continued step: no entry check parks before it, and nothing is
 	// appended before the body; only the stop time ends it at entry.
@@ -429,6 +472,24 @@ describe("the step runner", () => {
 				outcome: "error",
 				outputs: { visit: 1, note: "", outcome: "error" },
 				error: "boom",
+			},
+		]);
+
+		// The time budget: the abort's reason is the node's timer, so the
+		// step ends `error` with the budget, keeping the outputs the body had.
+		const late = await runRow({
+			entry: "new",
+			situation: "time-budget",
+			body: "runs-until-aborted",
+			appends: [],
+			goto: "",
+			ran: true,
+		});
+		expect(payloads(late.events, "StepEnded")).toEqual([
+			{
+				outcome: "error",
+				outputs: { visit: 1, outcome: "error" },
+				error: "The step ran past its time budget of 1 min.",
 			},
 		]);
 	});

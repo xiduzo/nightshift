@@ -12,7 +12,7 @@ import { deriveSteps } from "../events";
 import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { DEFAULT_RESUME_PROMPT } from "./context";
-import { drive, flowOf, payloads, startRun } from "./test-support";
+import { command, drive, flowOf, payloads, startRun } from "./test-support";
 
 /**
  * The Decision node on the compiled graph, driven by scripted deciders with
@@ -34,13 +34,6 @@ const decision = (
 	decider: "typesafe" as const,
 	model: "jev-1.13.0",
 	...extra,
-});
-
-const command = (id: string, cmd: string) => ({
-	id,
-	type: "command" as const,
-	position: { x: 0, y: 0 },
-	command: cmd,
 });
 
 /** A decider the test scripts per call (0-based). */
@@ -300,35 +293,6 @@ describe("the Decision node", () => {
 				costUsd: 0.001,
 			},
 		]);
-	});
-
-	test("a decision past its time budget errors", async () => {
-		const { decider } = scriptedDecider(waitForAbort);
-		const h = await startRun(
-			sandbox,
-			flowOf({
-				start: "decide",
-				nodes: [
-					decision("decide", [{ name: "yes" }, { name: "no" }], {
-						timeoutMinutes: 1,
-					}),
-				],
-				edges: [],
-			}),
-			{ decider },
-		);
-		h.ctx.minuteMs = 50;
-		const { parked } = await drive(h, { inputs: {} });
-		expect(parked[0]).toMatchObject({
-			status: "failed",
-			reason:
-				'Node "decide" failed: The step ran past its time budget of 1 min.',
-		});
-		expect(payloads(await h.events(), "StepEnded")[0]).toMatchObject({
-			outcome: "error",
-			error: "The step ran past its time budget of 1 min.",
-			costUsd: 0.001,
-		});
 	});
 
 	test("a usage limit parks the run at the wait node; a wake asks again in the same step", async () => {

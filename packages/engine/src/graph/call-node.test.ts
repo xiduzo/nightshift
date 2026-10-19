@@ -15,7 +15,7 @@ import {
 	flowOf,
 	payloads,
 	startRun,
-} from "./node-test-support";
+} from "./test-support";
 
 /**
  * The Call node (once) on the compiled graph: the called flow as a subgraph.
@@ -76,8 +76,7 @@ describe("the Call node", () => {
 				[edge("e1", "prep", "pass", "sub"), edge("e2", "sub", "pass", "after")],
 				{ inputs: [{ name: "who", type: "text", default: "bob" }] },
 			),
-			fakeHarness(),
-			{ flows: { greet } },
+			{ harness: fakeHarness(), flows: { greet } },
 		);
 		const { parked, state, next } = await drive(h, {
 			inputs: { who: "bob" },
@@ -185,8 +184,7 @@ describe("the Call node", () => {
 					edge("e3", "ask", "pass", "verdict"),
 				],
 			),
-			harness,
-			{ flows },
+			{ harness, flows },
 		);
 		const { parked, state } = await drive(h, { inputs: {} });
 		expect(parked).toEqual([]);
@@ -240,14 +238,10 @@ describe("the Call node", () => {
 
 		// Without an edge on `fail`, the run parks at the Subflow node with
 		// today's reason; a resume runs the Subflow again as a new visit.
-		const h2 = await startRun(
-			sandbox,
-			flowOf([callOnce("try", "broken")]),
+		const h2 = await startRun(sandbox, flowOf([callOnce("try", "broken")]), {
 			harness,
-			{
-				flows,
-			},
-		);
+			flows,
+		});
 		const first = await drive(h2, { inputs: {} });
 		const [tryStep] = deriveSteps(await h2.events());
 		expect(first.next).toEqual(["park__try"]);
@@ -293,8 +287,7 @@ describe("the Call node", () => {
 				],
 				[edge("e1", "empty", "pass", "call")],
 			),
-			fakeHarness(),
-			{ flows: { needs } },
+			{ harness: fakeHarness(), flows: { needs } },
 		);
 		const { parked } = await drive(h, { inputs: {} });
 		expect(parked).toEqual([
@@ -313,11 +306,9 @@ describe("the Call node", () => {
 		});
 		expect(await h.types()).not.toContain("FlowCalled");
 
-		const h2 = await startRun(
-			sandbox,
-			flowOf([callOnce("call", "gone")]),
-			fakeHarness(),
-		);
+		const h2 = await startRun(sandbox, flowOf([callOnce("call", "gone")]), {
+			harness: fakeHarness(),
+		});
 		const second = await drive(h2, { inputs: {} });
 		expect(second.parked[0]).toMatchObject({
 			status: "failed",
@@ -347,8 +338,7 @@ describe("the Call node", () => {
 				],
 				[edge("e1", "call", "pass", "after")],
 			),
-			harness,
-			{ flows: { work }, signal: controller.signal },
+			{ harness, flows: { work }, signal: controller.signal },
 		);
 		const first = await drive(h, { inputs: {} });
 		const steps = deriveSteps(await h.events());
@@ -448,14 +438,10 @@ describe("the Call node", () => {
 			[agent("first", "First"), agent("second", "Second")],
 			[edge("w1", "first", "pass", "second")],
 		);
-		const h = await startRun(
-			sandbox,
-			flowOf([callOnce("call", "work")]),
+		const h = await startRun(sandbox, flowOf([callOnce("call", "work")]), {
 			harness,
-			{
-				flows: { work },
-			},
-		);
+			flows: { work },
+		});
 		// The daemon dies while the body's second step starts (after its
 		// StepStarted, before its session).
 		const recorder = h.ctx.recorder;

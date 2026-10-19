@@ -3,11 +3,18 @@ import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
 import type { WaitNode } from "@nightshift/flows";
 
-import { deriveRunState, deriveSleep, deriveSteps } from "../events";
+import { deriveSleep, deriveSteps } from "../events";
 import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { parseTime } from "./nodes/wait";
-import { drive, flowOf, MINUTE, payloads, startRun } from "./test-support";
+import {
+	command,
+	drive,
+	flowOf,
+	MINUTE,
+	payloads,
+	startRun,
+} from "./test-support";
 
 /**
  * The Wait node on the compiled graph, with a real shell, run log and
@@ -27,13 +34,6 @@ const wait = (
 	position: { x: 0, y: 0 },
 	until,
 	...extra,
-});
-
-const command = (id: string, cmd: string) => ({
-	id,
-	type: "command" as const,
-	position: { x: 0, y: 0 },
-	command: cmd,
 });
 
 let sandbox: Sandbox;
@@ -56,140 +56,6 @@ function clock(start = Date.now()) {
 }
 
 describe("the Wait node", () => {
-	test("a duration: parks at the wait node with the wake time, and a wake on a new compile ends it done with waited_minutes", async () => {
-		const time = clock();
-		const h = await startRun(
-			sandbox,
-			flowOf({
-				start: "pause",
-				nodes: [
-					wait("pause", { kind: "duration", minutes: 15 }),
-					command("after", "echo waited {{pause.waited_minutes}}"),
-				],
-				edges: [{ id: "e1", from: "pause", outcome: "done", to: "after" }],
-			}),
-		);
-		h.ctx.now = time.now;
-		const first = await drive(h, { inputs: {} });
-		const [stepRow] = deriveSteps(await h.events());
-		const stepId = stepRow?.id as string;
-		expect(first.next).toEqual(["wait__pause"]);
-		expect(first.parked).toEqual([
-			{
-				kind: "wait",
-				stepId,
-				nodeId: "pause",
-				reason: "duration",
-				until: time.now() + 15 * MINUTE,
-				message: "Waits 15 min.",
-			},
-		]);
-		expect(first.state.pending).toEqual({
-			kind: "wait",
-			stepId,
-			nodeId: "pause",
-			visit: 1,
-			reason: "duration",
-			until: time.now() + 15 * MINUTE,
-			message: "Waits 15 min.",
-			streak: { count: 1, since: time.now() },
-			session: null,
-		});
-		expect(await h.types()).toEqual([
-			"RunStarted",
-			"StepStarted",
-			"WaitStarted",
-		]);
-		expect(payloads(await h.events(), "WaitStarted")).toEqual([
-			{
-				reason: "duration",
-				until: time.now() + 15 * MINUTE,
-				message: "Waits 15 min.",
-				since: time.now(),
-			},
-		]);
-		// The step is open, the run sleeps, and the transcript says so.
-		expect(stepRow?.endedAt).toBeNull();
-		expect(deriveRunState(await h.events()).status).toBe("sleeping");
-		expect(deriveSleep(await h.events())).toMatchObject({
-			stepId,
-			reason: "duration",
-			until: time.now() + 15 * MINUTE,
-			signal: null,
-		});
-
-		// The timer fires: the runner's wake, on a new daemon.
-		time.advance(15);
-		await h.log.append({
-			type: "WaitEnded",
-			runId: h.runId,
-			stepId,
-			payload: { early: false },
-		});
-		const second = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
-		expect(second.parked).toEqual([]);
-		expect(second.state.ended?.status).toBe("finished");
-		expect(second.state.nodes.pause).toEqual({
-			outcome: "done",
-			waited_minutes: 15,
-			visit: 1,
-		});
-		expect(second.state.nodes.after).toMatchObject({ log_tail: "waited 15" });
-		expect(await h.types()).toEqual([
-			"RunStarted",
-			"StepStarted",
-			"WaitStarted",
-			"WaitEnded",
-			"StepEnded",
-			"EdgeTaken",
-			"StepStarted",
-			"StepEnded",
-		]);
-		const [pause] = deriveSteps(await h.events());
-		expect(pause?.outcome).toBe("done");
-		const transcript = await readTranscriptFile(
-			pause?.transcriptPath as string,
-		);
-		expect(transcript.map((e) => e.event)).toEqual([
-			{
-				type: "wait",
-				reason: "duration",
-				until: time.now(),
-				message: "Waits 15 min.",
-			},
-		]);
-	});
-
-	test("a wake by a person before the time ends a duration early", async () => {
-		const time = clock();
-		const h = await startRun(
-			sandbox,
-			flowOf({
-				start: "pause",
-				nodes: [wait("pause", { kind: "duration", minutes: 60 })],
-				edges: [],
-			}),
-		);
-		h.ctx.now = time.now;
-		const first = await drive(h, { inputs: {} });
-		expect(first.next).toEqual(["wait__pause"]);
-		time.advance(5);
-		await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: true } }),
-			h.graph(),
-		);
-		expect(deriveSteps(await h.events())[0]?.outputs).toEqual({
-			outcome: "done",
-			waited_minutes: 5,
-			visit: 1,
-		});
-	});
-
 	test("a time: a clock time means the next one, a date and time is taken as is, and a past time wakes at once", async () => {
 		const start = new Date(2026, 9, 17, 22, 0, 0, 0).getTime();
 		const time = clock(start);
@@ -579,119 +445,5 @@ describe("the Wait node", () => {
 		expect(
 			transcript.filter((e) => e.event.type === "command-start"),
 		).toHaveLength(2);
-	});
-
-	test("a wake past the stop time parks the run as stopped with the stop-time reason", async () => {
-		const time = clock();
-		const h = await startRun(
-			sandbox,
-			flowOf({
-				start: "pause",
-				nodes: [wait("pause", { kind: "duration", minutes: 60 })],
-				edges: [],
-			}),
-		);
-		h.ctx.now = time.now;
-		await drive(h, { inputs: {}, stopAt: time.now() + 30 * MINUTE });
-		const stepId = deriveSteps(await h.events())[0]?.id as string;
-		time.advance(60);
-		await h.log.append({
-			type: "WaitEnded",
-			runId: h.runId,
-			stepId,
-			payload: { early: false },
-		});
-		const woken = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
-		expect(woken.parked).toEqual([
-			{
-				kind: "parked",
-				stepId,
-				nodeId: "pause",
-				status: "stopped",
-				reason: "Reached the stop time",
-				atStopTime: true,
-			},
-		]);
-		expect(payloads(await h.events(), "StepEnded")).toEqual([
-			{
-				outcome: "stopped",
-				outputs: { outcome: "stopped", waited_minutes: 60, visit: 1 },
-				error: null,
-			},
-		]);
-		// A resume past the stop time clears it; the node starts a new visit.
-		await h.log.append({
-			type: "RunResumed",
-			runId: h.runId,
-			payload: {
-				nodeId: "pause",
-				stepId: null,
-				prompt: null,
-				by: "person",
-				clearStopAt: true,
-			},
-		});
-		const resumed = await drive(
-			h,
-			new Command({ resume: { kind: "resume" }, update: { stopAt: null } }),
-			h.graph(),
-		);
-		expect(resumed.parked[0]).toMatchObject({
-			kind: "wait",
-			nodeId: "pause",
-			until: time.now() + 60 * MINUTE,
-		});
-		expect(deriveSteps(await h.events()).map((s) => s.visit)).toEqual([1, 2]);
-	});
-
-	test("a stop while it sleeps, then a resume, starts a new visit", async () => {
-		const h = await startRun(
-			sandbox,
-			flowOf({
-				start: "pause",
-				nodes: [wait("pause", { kind: "duration", minutes: 5 })],
-				edges: [],
-			}),
-		);
-		const first = await drive(h, { inputs: {} });
-		const stepId = deriveSteps(await h.events())[0]?.id as string;
-		expect(first.next).toEqual(["wait__pause"]);
-		// The runner's closeParked, then a person's resume.
-		await h.log.append({
-			type: "StepEnded",
-			runId: h.runId,
-			stepId,
-			payload: {
-				outcome: "stopped",
-				outputs: { outcome: "stopped" },
-				error: null,
-			},
-		});
-		await h.log.append({
-			type: "RunEnded",
-			runId: h.runId,
-			payload: { status: "stopped", reason: null },
-		});
-		await h.log.append({
-			type: "RunResumed",
-			runId: h.runId,
-			payload: { nodeId: "pause", stepId, prompt: null, by: "person" },
-		});
-		const resumed = await drive(
-			h,
-			new Command({ resume: { kind: "resume" } }),
-			h.graph(),
-		);
-		expect(resumed.parked[0]).toMatchObject({ kind: "wait", nodeId: "pause" });
-		expect(
-			deriveSteps(await h.events()).map((s) => [s.visit, s.outcome]),
-		).toEqual([
-			[1, "stopped"],
-			[2, null],
-		]);
 	});
 });

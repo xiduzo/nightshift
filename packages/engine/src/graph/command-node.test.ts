@@ -260,29 +260,6 @@ describe("the Command node", () => {
 		});
 	});
 
-	test("a command past its time budget ends with an error", async () => {
-		const h = await startRun(
-			sandbox,
-			flowOf({
-				start: "slow",
-				nodes: [command("slow", "sleep 30", { timeoutMinutes: 1 })],
-				edges: [],
-			}),
-		);
-		h.ctx.minuteMs = 50;
-		const { parked } = await drive(h, { inputs: {} });
-		expect(parked[0]).toMatchObject({
-			kind: "parked",
-			status: "failed",
-			reason: 'Node "slow" failed: The step ran past its time budget of 1 min.',
-		});
-		expect(payloads(await h.events(), "StepEnded")[0]).toMatchObject({
-			outcome: "error",
-			outputs: { outcome: "error", log_tail: "", visit: 1 },
-			error: "The step ran past its time budget of 1 min.",
-		});
-	});
-
 	test("a parked command resumes as a new visit", async () => {
 		const h = await startRun(
 			sandbox,

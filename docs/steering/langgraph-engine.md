@@ -120,12 +120,12 @@ packages/engine/src/
                            interrupts, owns the slots, gives the sleep module
                            its thread seam (runner.sleeps), and prunes a
                            finished run's thread to its latest checkpoint.
-  graph/test-support.ts    Graph-level test helpers: a compiled flow on a
-                           MemorySaver, drive() collecting the root's
-                           interrupts and custom events.
-  graph/node-test-support.ts
-                           The same for one node: agent(), command(),
-                           edge(), flowOf(), startRun().
+  graph/test-support.ts    The one set of graph test helpers: node builders
+                           (agent(), command(), edge(), flowOf()), startRun()
+                           for a run row with its log and a StepContext, and
+                           drive(), which streams a compiled flow on a
+                           MemorySaver as the runner does and collects the
+                           root's interrupts and custom events.
   engine.ts                The composition root: createEngine wires the
                            runner, recovery, run start, the read model and
                            the scheduler, each behind a small seam that
@@ -613,11 +613,28 @@ a table.
 4. `packages/engine/src/types.ts`: the kind's transcript events, when it
    records any.
 5. `packages/engine/src/graph/node-kinds.test.ts`: the kind's row in every
-   table; a node test next to the others (`<kind>-node.test.ts`).
+   table; a node test next to the others (`<kind>-node.test.ts`), shaped
+   as the next section says.
 6. `apps/web`: the `NODE_TYPE` record, the inspector form, the canvas node.
 7. Check that nothing else names the kind. From `packages/engine/src`:
    `grep -rn -E 'node\.type ===|nodeType ===|case "<kind>"' --include='*.ts' . | grep -v '\.test\.ts'`
    must show the kind in its own module only.
+
+## Test shape
+
+The interface is the test surface, and a shared rule is tested once, at
+the module that owns it. `graph/step-runner.test.ts`, `graph/sleep.test.ts`,
+`graph/resume-point.test.ts` and `graph/node-kinds.test.ts` hold the shared
+rules as tables: the entry checks, the stop time, the step cap, the time
+budget, an abort, a wait and its wake, how every kind re-enters. A per-kind
+test (`<kind>-node.test.ts`) covers what only that kind decides, its
+outcomes and payloads (the log, the transcript, the state, the error
+messages), plus one end-to-end path through a wait and one through a crash
+re-entry on the compiled graph, so the integration of body, runner, sleep
+and resume point stays covered for each kind. A scenario that re-tests a
+shared rule belongs in that module's table, as a row, not in a node test.
+The public seam keeps its own tests: `engine.test.ts`, `flows-v2.test.ts`
+and `call-each.test.ts` go through `createEngine`.
 
 ## StepContext (what a node factory gets)
 
