@@ -250,11 +250,7 @@ export function documentAccess(options: {
 			const access = await spaceAccess(options.db, key.personId, documentName);
 			return access ? { access, context } : false;
 		}
-		const local = isThisComputer(
-			peer,
-			request.headers.get("origin"),
-			options.trustedOrigins,
-		);
+		const local = isThisComputer(peer, request, options.trustedOrigins);
 		const { session } = await requestAccess(
 			options.auth,
 			options.db,

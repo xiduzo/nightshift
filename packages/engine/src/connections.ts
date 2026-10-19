@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import {
 	type AgentNode,
 	type McpServer,
@@ -7,6 +8,7 @@ import {
 import { z } from "zod";
 
 import { type DeviceDocument, mapView } from "./device/document";
+import { type KeyStoreKind, keychainValues, valueStore } from "./keychain";
 import { expandMcpServers, type McpExpansion } from "./mcp";
 
 /**
@@ -56,21 +58,33 @@ export type SecretView = {
 	usedBy: string[];
 };
 
-/** Where secret values live. The default is the macOS keychain through `Bun.secrets`. */
+/** Where secret values live: the system keychain through `Bun.secrets`, or files on a headless computer. */
 export type SecretBackend = {
 	get(name: string): Promise<string | null>;
 	set(name: string, value: string): Promise<void>;
 	delete(name: string): Promise<void>;
 };
 
-export function keychainSecrets(service = "nightshift"): SecretBackend {
-	return {
-		get: (name) => Bun.secrets.get({ service, name }),
-		set: (name, value) => Bun.secrets.set({ service, name, value }),
-		delete: async (name) => {
-			await Bun.secrets.delete({ service, name });
-		},
-	};
+const SECRETS_SERVICE = "nightshift";
+
+export function keychainSecrets(service = SECRETS_SERVICE): SecretBackend {
+	return keychainValues(service);
+}
+
+/**
+ * The secrets saved on the Connections page: in the keychain where it
+ * works, else in `<data dir>/secrets`, one file per secret, readable by
+ * this user only. `prefer: "file"` skips the keychain.
+ */
+export function secretStore(options: {
+	dataDir: string;
+	prefer?: KeyStoreKind;
+}): Promise<SecretBackend & { readonly kind: KeyStoreKind }> {
+	return valueStore({
+		service: SECRETS_SERVICE,
+		dir: join(options.dataDir, "secrets"),
+		prefer: options.prefer,
+	});
 }
 
 export type ConnectionStore = {

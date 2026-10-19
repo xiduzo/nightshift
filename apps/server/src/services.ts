@@ -41,7 +41,6 @@ import {
 	deviceKeyStore,
 	documentRows,
 	HARNESS_BIN,
-	keychainSecrets,
 	LEASE_HEARTBEAT_MS,
 	type Lease,
 	LeaseHeldError,
@@ -49,21 +48,28 @@ import {
 	openDeviceDocument,
 	refreshDeviceFacts,
 	type SpaceDocuments,
+	secretStore,
 	selfDevice,
 	setUpGit,
 	systemGitInstaller,
 } from "@nightshift/engine";
-
+import { secretFiles, secretsDir } from "./daemon-env";
 import {
 	createDeviceLinks,
 	createDevices,
 	createHost,
 	type DeviceLinks,
-	LISTEN_HOSTNAME,
+	listenHostname,
 	reachFor,
 } from "./devices";
 import { certificateFingerprint } from "./devices/tls";
-import { desktopOrigins, ENV, trustedOrigins } from "./env.server";
+import {
+	desktopOrigins,
+	ENV,
+	localOrigins,
+	trustedOrigins,
+} from "./env.server";
+import { migrationsFolder } from "./headless/embedded";
 import { createSync, documentAccess, type Sync } from "./sync";
 
 /** The database, the transcripts and the command logs, together. */
@@ -88,7 +94,8 @@ if (legacyPaths.length > 0) {
 }
 
 export const db = createDb({ DATABASE_URL: databaseUrl(ENV, dataDir) });
-await migrateDb(db);
+// The `nightshift` binary carries its migrations: they are extracted first.
+await migrateDb(db, { migrationsFolder: migrationsFolder() });
 
 /**
  * This Device's document and the Space documents, once they are open
@@ -165,7 +172,7 @@ export const lease = held.nightshiftLease;
 opened.nightshiftSpaces ??= createSpaceDocuments({ db });
 export const spaces = opened.nightshiftSpaces;
 
-export const auth = createAuth(ENV, db, desktopOrigins, {
+export const auth = createAuth(ENV, db, [...desktopOrigins, ...localOrigins], {
 	onMembersChanged: (spaceId) => spaces.mirrorMembers(spaceId),
 });
 
@@ -198,14 +205,25 @@ await spaces.openAll();
  */
 export const localSession = createLocalSession(auth, db, person.userId);
 
-/** The environment is the fallback of every setting and every `${NAME}`. */
-const env: Record<string, string | undefined> = { ...process.env, ...ENV };
+/**
+ * The environment is the fallback of every setting and every `${NAME}`.
+ * Under it, the secret files a service manager gives a headless computer
+ * (NIGHTSHIFT_SECRETS_DIR, else systemd's credentials).
+ */
+const env: Record<string, string | undefined> = {
+	...secretFiles(secretsDir()),
+	...process.env,
+	...ENV,
+};
+/** Secrets saved on the Connections page: the keychain, else a file per secret (headless). */
+const keyStorePreference =
+	ENV.NIGHTSHIFT_KEY_STORE === "file" ? { prefer: "file" as const } : {};
 
 export const settings = createSettingsStore({ document, env });
 export const connections = createConnectionStore({
 	document,
 	env,
-	secrets: keychainSecrets(),
+	secrets: await secretStore({ dataDir, ...keyStorePreference }),
 });
 export const cliTools = createCliToolStore({ document });
 export const profiles = createProfileStore({ document });
@@ -368,7 +386,7 @@ const fingerprint = certificate
 	: null;
 /** How Bun serves this daemon: the hostname of its reach, and its own TLS. */
 export const serve = {
-	hostname: LISTEN_HOSTNAME[reach],
+	hostname: listenHostname(reach, ENV.NIGHTSHIFT_LISTEN),
 	...(certificate ? { tls: certificate } : {}),
 };
 
@@ -398,10 +416,7 @@ presence.nightshiftPresence.unref();
 
 /** This computer's links to the Hosts it paired with. Restarted on `bun --hot`. */
 const hostLinks = createHostLinks(db);
-const keyStore = await deviceKeyStore({
-	dataDir,
-	...(ENV.NIGHTSHIFT_KEY_STORE === "file" ? { prefer: "file" as const } : {}),
-});
+const keyStore = await deviceKeyStore({ dataDir, ...keyStorePreference });
 const linked = globalThis as { nightshiftLinks?: DeviceLinks };
 await linked.nightshiftLinks?.close();
 linked.nightshiftLinks = createDeviceLinks({

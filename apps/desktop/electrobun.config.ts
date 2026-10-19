@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import type { ElectrobunConfig } from "electrobun";
 
 const webBuildDir = "../web/dist/client";
-const shims = join(import.meta.dir, "src/bun/shims");
+const shims = join(import.meta.dir, "../server/src/shims");
 // The packaged app has no .env files and no varlock CLI (see the shims).
 const varlockShims = {
 	"varlock/auto-load": join(shims, "varlock-auto-load.ts"),

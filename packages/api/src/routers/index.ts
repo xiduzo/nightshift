@@ -30,6 +30,7 @@ import {
 	permitted,
 	protectedProcedure,
 	publicProcedure,
+	readable,
 } from "../index";
 
 // Every procedure but the health check needs a session in a Space. One
@@ -726,7 +727,11 @@ const devices = {
 			}),
 		)
 		.handler(async function* ({ context, input, signal }) {
-			yield* context.devices.join(input, signal);
+			try {
+				yield* context.devices.join(input, signal);
+			} catch (error) {
+				throw readable(error);
+			}
 		}),
 };
 

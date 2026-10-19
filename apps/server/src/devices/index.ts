@@ -42,6 +42,17 @@ export const LISTEN_HOSTNAME: Record<Reach, string> = {
 	network: "0.0.0.0",
 };
 
+/**
+ * The hostname a daemon binds. Not a Host: the loopback, always. A Host:
+ * the network, or `listen` (NIGHTSHIFT_LISTEN) when it is set, for a Host
+ * whose way out runs on the same computer (Tailscale Serve, a tunnel, a
+ * proxy): `127.0.0.1` keeps it off the LAN.
+ */
+export function listenHostname(reach: Reach, listen?: string | null): string {
+	if (reach === "this-computer") return LISTEN_HOSTNAME[reach];
+	return listen?.trim() || LISTEN_HOSTNAME.network;
+}
+
 /** The API's `Devices`: this computer as a Host, and its own links to Hosts. */
 export function createDevices(deps: {
 	host: Host;

@@ -1,0 +1,171 @@
+import { join } from "node:path";
+
+import { prepareDaemonEnv } from "./daemon-env";
+import { reachFor } from "./devices";
+import { embedded, extractMigrations } from "./headless/embedded";
+import { directoryWeb, embeddedWeb, webHandler } from "./headless/web";
+import { joinCommand, pairCommand } from "./join-cli";
+import { serveDaemon, tlsPortOf } from "./serve";
+
+/**
+ * `nightshift`: Night Shift without a window, for a server or any computer
+ * (`scripts/build-binary.ts` compiles it into one file). From source:
+ * `bun src/cli.ts <command>`.
+ */
+
+const HELP = `Night Shift
+
+Usage:
+  nightshift serve [options]                Run Night Shift on this computer.
+  nightshift join <host-address> [--guest]  Pair this computer with a Host.
+  nightshift pair <code> [--yes]            Allow a computer to pair with this Host.
+
+Options of serve (each has an environment variable too):
+  --port <port>            The port. PORT, default 3000.
+  --data-dir <folder>      Where the database and the run history go. NIGHTSHIFT_DATA_DIR.
+  --host-address <url>     Be a Host at this https:// address. Repeat it for each
+                           address, in the order other computers try them.
+                           NIGHTSHIFT_HOST_ADDRESSES (comma-separated).
+  --listen <ip>            Where a Host listens. NIGHTSHIFT_LISTEN, default 0.0.0.0.
+                           Use 127.0.0.1 behind Tailscale Serve, a tunnel or a proxy.
+  --tls-port <port>        The https:// port with NIGHTSHIFT_TLS_CERT and _KEY.
+                           NIGHTSHIFT_TLS_PORT, default the port + 443.
+  --web <folder>           Serve the web UI from this folder. NIGHTSHIFT_WEB_DIR.
+
+The auth secret is BETTER_AUTH_SECRET, else the file BETTER_AUTH_SECRET_FILE,
+else BETTER_AUTH_SECRET in NIGHTSHIFT_SECRETS_DIR or systemd's credentials,
+else one Night Shift makes once in the data folder.
+`;
+
+export type ServeOptions = {
+	port: number;
+	tlsPort?: number;
+	/** The environment to set before the server loads. */
+	env: Record<string, string>;
+	/** This daemon's own address: the first https:// Host address, else this computer. */
+	url: string;
+	web: string | null;
+};
+
+/** `serve`'s flags over the environment. Throws on a flag it does not know. */
+export function serveOptions(
+	argv: string[],
+	env: Record<string, string | undefined>,
+): ServeOptions {
+	const args = [...argv];
+	const set: Record<string, string> = {};
+	const addresses: string[] = [];
+	const value = (flag: string) => {
+		const next = args.shift();
+		if (!next) throw new Error(`${flag} needs a value.`);
+		return next;
+	};
+	while (args.length > 0) {
+		const flag = args.shift() as string;
+		if (flag === "--port") set.PORT = value(flag);
+		else if (flag === "--data-dir") set.NIGHTSHIFT_DATA_DIR = value(flag);
+		else if (flag === "--host-address") addresses.push(value(flag));
+		else if (flag === "--listen") set.NIGHTSHIFT_LISTEN = value(flag);
+		else if (flag === "--tls-port") set.NIGHTSHIFT_TLS_PORT = value(flag);
+		else if (flag === "--web") set.NIGHTSHIFT_WEB_DIR = value(flag);
+		else throw new Error(`There is no option ${flag}.`);
+	}
+	if (addresses.length > 0) {
+		set.NIGHTSHIFT_HOST = "on";
+		set.NIGHTSHIFT_HOST_ADDRESSES = addresses.join(",");
+	}
+	const merged = { ...env, ...set };
+	const port = Number(merged.PORT || 3000);
+	if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
+		throw new Error(`${merged.PORT} is not a port.`);
+	}
+	const https = (merged.NIGHTSHIFT_HOST_ADDRESSES ?? "")
+		.split(",")
+		.map((a) => a.trim())
+		.find((a) => a.startsWith("https://"));
+	return {
+		port,
+		tlsPort: tlsPortOf(merged.NIGHTSHIFT_TLS_PORT),
+		env: set,
+		url: https ? new URL(https).origin : `http://localhost:${port}`,
+		web: merged.NIGHTSHIFT_WEB_DIR?.trim() || null,
+	};
+}
+
+async function serve(argv: string[]) {
+	let options: ServeOptions;
+	try {
+		options = serveOptions(argv, process.env);
+	} catch (error) {
+		console.error(`${(error as Error).message}\n\n${HELP}`);
+		process.exit(2);
+	}
+	Object.assign(process.env, options.env);
+	// The UI is served here, so its address is this daemon's own.
+	const { dataDir } = prepareDaemonEnv({
+		port: options.port,
+		url: options.url,
+		uiOrigin: options.url,
+	});
+
+	const files = embedded();
+	if (files)
+		await extractMigrations(files.migrations, join(dataDir, "migrations"));
+
+	// Imported only now: the server reads its environment and takes the
+	// database lease when it loads.
+	const [{ default: daemon }, { settings }] = await Promise.all([
+		import("./index"),
+		import("./services"),
+	]);
+	const web = files
+		? embeddedWeb(files.web)
+		: options.web
+			? directoryWeb(options.web)
+			: null;
+	const ui = web ? webHandler(web) : null;
+
+	const servers = serveDaemon(daemon, {
+		port: options.port,
+		tlsPort: options.tlsPort,
+		...(ui
+			? {
+					fetch: async (request, server) =>
+						(await ui(request)) ?? daemon.fetch(request, server),
+				}
+			: {}),
+	});
+	for (const server of servers) {
+		console.log(`Night Shift answers at ${server.url}`);
+	}
+	console.log(`Data folder: ${dataDir}`);
+	if (reachFor(settings.current()) === "this-computer") {
+		console.log(
+			"Only this computer can connect. To let other computers pair with it, be a Host: --host-address https://…",
+		);
+	}
+	if (!ui) console.log("No web UI here: run it with --web <folder>.");
+}
+
+export async function main(argv: string[]) {
+	const [command, ...rest] = argv;
+	switch (command) {
+		case "serve":
+			return serve(rest);
+		case "join":
+			return joinCommand(rest, "nightshift join");
+		case "pair":
+			return pairCommand(rest, "nightshift pair");
+		case undefined:
+		case "help":
+		case "--help":
+		case "-h":
+			console.log(HELP);
+			return;
+		default:
+			console.error(`There is no command ${command}.\n\n${HELP}`);
+			process.exit(2);
+	}
+}
+
+if (import.meta.main) await main(process.argv.slice(2));

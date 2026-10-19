@@ -87,7 +87,7 @@ export function ThisComputerCard({ computer }: { computer: ThisComputer }) {
 							<KeyRoundIcon aria-hidden="true" />
 						</ItemMedia>
 						<ItemContent>
-							<ItemTitle>Access to your Hosts</ItemTitle>
+							<ItemTitle>Secrets and access to your Hosts</ItemTitle>
 							<ItemDescription className="line-clamp-none">
 								{computer.keyStore === "keychain"
 									? "Saved in the keychain of this computer."
