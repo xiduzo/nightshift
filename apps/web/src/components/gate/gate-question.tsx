@@ -15,8 +15,10 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { ChevronDownIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { GateMarkdown } from "@/components/gate/gate-markdown";
+
 /** One labelled piece of what a Gate shows below its question. */
-type ContextItem = {
+export type ContextItem = {
 	label: string | null;
 	kind: "text" | "code";
 	/** The fence's language, for code. */
@@ -155,11 +157,21 @@ export function GateQuestion({
 	);
 }
 
-function ContextList({ items }: { items: ContextItem[] }) {
+/**
+ * The context of a Gate: text as Markdown, code as code blocks. `plain`
+ * drops the rule on the left, for a pane that holds nothing else.
+ */
+export function ContextList({
+	items,
+	plain = false,
+}: {
+	items: ContextItem[];
+	plain?: boolean;
+}) {
 	return (
-		<div className="flex min-w-0 flex-col gap-3">
+		<div className={cn("flex min-w-0 flex-col", plain ? "gap-4" : "gap-3")}>
 			{items.map((item, index) => (
-				<ContextBlock key={index} label={item.label}>
+				<ContextBlock key={index} label={item.label} plain={plain}>
 					{item.kind === "code" ? (
 						<CodeBlock size="sm" className="bg-muted/40">
 							<CodeBlockActions>
@@ -170,9 +182,7 @@ function ContextList({ items }: { items: ContextItem[] }) {
 							</CodeBlockContent>
 						</CodeBlock>
 					) : (
-						<p className="max-w-prose whitespace-pre-wrap break-words text-sm leading-relaxed">
-							{item.value}
-						</p>
+						<GateMarkdown text={item.value} />
 					)}
 				</ContextBlock>
 			))}
@@ -198,13 +208,17 @@ function diffLines(value: string): ReactNode[] {
 
 function ContextBlock({
 	label,
+	plain,
 	children,
 }: {
 	label: string | null;
+	plain: boolean;
 	children: ReactNode;
 }) {
 	return (
-		<div className="flex min-w-0 flex-col gap-1 border-l-2 pl-3">
+		<div
+			className={cn("flex min-w-0 flex-col gap-1", !plain && "border-l-2 pl-3")}
+		>
 			{label ? (
 				<div className="font-mono text-muted-foreground text-xs">{label}</div>
 			) : null}

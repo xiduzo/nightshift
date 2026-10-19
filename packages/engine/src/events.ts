@@ -119,6 +119,26 @@ export type EnginePayloads = {
 	DeviceOnline: { deviceId: string };
 	/** On a Host: the Device's link went silent, or its access was removed. */
 	DeviceOffline: { deviceId: string };
+	/**
+	 * A Person became a Member of the Space with a role: they accepted an
+	 * invitation (`invitedBy` sent it), made the Space, or were added. `by`
+	 * is who did it; null when nobody signed in did.
+	 */
+	MemberJoined: {
+		personId: string;
+		role: string;
+		by: string | null;
+		invitedBy?: string;
+	};
+	/** A Person is no longer a Member of the Space. `by` removed them. */
+	MemberRemoved: { personId: string; by: string | null };
+	/** A Member got another role. `by` changed it. */
+	MemberRoleChanged: {
+		personId: string;
+		role: string;
+		previousRole: string;
+		by: string | null;
+	};
 	/** A person gave the project a new name. */
 	ProjectRenamed: { projectId: string; name: string };
 	/** A person moved the project, with its Clones, runs and events, to another Space. */
@@ -137,6 +157,11 @@ export type EnginePayloads = {
 		params?: Record<string, string>;
 		/** What started the run. Absent before Slice 7: a person. */
 		trigger?: RunTrigger;
+		/**
+		 * The Person who started the run (their id). Null for a schedule.
+		 * Absent before Members.
+		 */
+		startedBy?: string | null;
 	};
 	WorktreeCreated: { worktreePath: string; branch: string; baseRef: string };
 	/**

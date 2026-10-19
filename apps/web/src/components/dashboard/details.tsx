@@ -36,7 +36,8 @@ export function DetailsDialog({
 }) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-2xl">
+			{/* minmax(0,1fr): a wide table scrolls in its own box, never the dialog. */}
+			<DialogContent className="max-h-[calc(100svh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-4xl">
 				{open ? children : null}
 			</DialogContent>
 		</Dialog>

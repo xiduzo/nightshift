@@ -151,7 +151,15 @@ export type RunRef = {
 	repoPath: string;
 	/** Default: the clone's current HEAD. */
 	baseRef?: string;
+	/**
+	 * The git identity of the Person who started the run: the worktree's
+	 * own `user.name` and `user.email`, so commits in it are in their name.
+	 * Absent: the repository's identity stays.
+	 */
+	author?: GitAuthor;
 };
+
+export type GitAuthor = { name: string; email: string };
 
 export type Worktree = {
 	worktreePath: string;

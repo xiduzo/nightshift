@@ -1,0 +1,49 @@
+import type { Database } from "@nightshift/db";
+import { user } from "@nightshift/db/schema/auth";
+import { eq, inArray } from "drizzle-orm";
+
+import type { RunPerson } from "./types";
+
+/**
+ * The Persons runs name, read from the Replica's accounts: who started a
+ * run, and the git identity commits in its worktree get.
+ */
+
+/** The names of these Persons, by id. A Person this Replica does not know is missing. */
+export async function namesOf(
+	db: Database,
+	ids: readonly (string | null)[],
+): Promise<ReadonlyMap<string, string>> {
+	const wanted = [...new Set(ids.filter((id): id is string => id !== null))];
+	if (wanted.length === 0) return new Map();
+	const rows = await db
+		.select({ id: user.id, name: user.name })
+		.from(user)
+		.where(inArray(user.id, wanted));
+	return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+/** The Person of `id` as a run names them, with their name when known. */
+export function runPerson(
+	id: string | null,
+	names: ReadonlyMap<string, string>,
+): RunPerson | null {
+	return id === null ? null : { id, name: names.get(id) ?? null };
+}
+
+/**
+ * The git identity of a Person: their name and email. Null for a Person
+ * with no real email (this computer's own Person, `…@nightshift.invalid`)
+ * or one this Replica does not know: the repository keeps its own.
+ */
+export async function gitAuthorOf(
+	db: Database,
+	personId: string,
+): Promise<{ name: string; email: string } | null> {
+	const [row] = await db
+		.select({ name: user.name, email: user.email })
+		.from(user)
+		.where(eq(user.id, personId));
+	if (!row || row.email.toLowerCase().endsWith(".invalid")) return null;
+	return { name: row.name.trim() || row.email, email: row.email };
+}

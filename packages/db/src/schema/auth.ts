@@ -22,6 +22,14 @@ export const user = sqliteTable("user", {
 		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 		.$onUpdate(() => /* @__PURE__ */ new Date())
 		.notNull(),
+	/**
+	 * The Person's role on this Host (admin plugin): `admin` for the Host
+	 * admin, the first Person, else `user`. Not a role in a Space.
+	 */
+	role: text("role"),
+	banned: integer("banned", { mode: "boolean" }).default(false),
+	banReason: text("ban_reason"),
+	banExpires: integer("ban_expires", { mode: "timestamp_ms" }),
 });
 
 export const session = sqliteTable(
@@ -43,6 +51,8 @@ export const session = sqliteTable(
 			.references(() => user.id, { onDelete: "cascade" }),
 		/** The session's active Space (organization plugin). Defaults to the Person's personal Space. */
 		activeOrganizationId: text("active_organization_id"),
+		/** The Host admin who acts as this Person (admin plugin). */
+		impersonatedBy: text("impersonated_by"),
 	},
 	(table) => [index("session_userId_idx").on(table.userId)],
 );

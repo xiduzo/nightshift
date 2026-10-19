@@ -6,6 +6,7 @@ import { device } from "@nightshift/db/schema/nightshift";
 import { and, asc, desc, eq } from "drizzle-orm";
 
 import type { Role } from "./access";
+import { claimHostAdmin } from "./members";
 
 /**
  * Spaces as the organization plugin stores them, read and written straight
@@ -116,7 +117,8 @@ export async function activeSpaceId(
  * The Person who owns this computer's Device: the one Night Shift signs in
  * for you on this computer. The migration that added Spaces names one; a
  * database without one gets a new Person here. A blank name becomes the
- * name of the computer's account.
+ * name of the computer's account. A new Person is the Host admin when the
+ * Host has none.
  */
 export async function localPerson(
 	db: Database,
@@ -136,7 +138,11 @@ export async function localPerson(
 	let userId = person?.id;
 	if (!userId) {
 		userId = randomUUID();
-		await db.insert(user).values({ id: userId, name, email: LOCAL_EMAIL });
+		await db
+			.insert(user)
+			.values({ id: userId, name, email: LOCAL_EMAIL, role: "user" });
+		// The first Person on a Host is its admin.
+		await claimHostAdmin(db, userId);
 	}
 	if (self.ownerId !== userId) {
 		await db

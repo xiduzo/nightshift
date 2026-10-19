@@ -397,6 +397,12 @@ describe("Call", () => {
 		expect(logOf(detail, "cleanup")).toBe("fail broke");
 		expect(stepOf(detail, "ask").outputs.ended).toBe("approved");
 		expect(logOf(detail, "verdict")).toBe("approved");
+		// Each call is a run of the flow it called.
+		const [listed] = await engine.listRuns();
+		expect(listed?.subflows.map((s) => [s.flowName, s.status])).toEqual([
+			["broken", "failed"],
+			["review", "finished"],
+		]);
 
 		// Without an edge on `fail`, the run fails.
 		const failing = await engine.startRun({
@@ -553,6 +559,10 @@ describe("Call", () => {
 		const stopped = await engine.getRun(run.id);
 		expect(stopped.status).toBe("stopped");
 		expect(stepOf(stopped, "call").outcome).toBe("stopped");
+		const [listed] = await engine.listRuns();
+		expect(listed?.subflows.map((s) => [s.flowName, s.status])).toEqual([
+			["work", "stopped"],
+		]);
 
 		await engine.resumeRun(run.id, "Go on.");
 		await waitFor(() => sessions[1]);
@@ -564,6 +574,9 @@ describe("Call", () => {
 		expect(logOf(detail, "after")).toBe("done with trees");
 		// The same Subflow step and the same worker step continued.
 		expect(detail.steps.filter((s) => s.nodeId === "call")).toHaveLength(1);
+		expect(detail.subflows.map((s) => [s.flowName, s.status])).toEqual([
+			["work", "finished"],
+		]);
 		expect(detail.steps.filter((s) => s.nodeId === "worker")).toHaveLength(1);
 	});
 
