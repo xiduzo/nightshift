@@ -1,8 +1,4 @@
-import {
-	Command,
-	interrupt,
-	type LangGraphRunnableConfig,
-} from "@langchain/langgraph";
+import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import {
 	type DecisionNode,
 	optionProblem,
@@ -11,14 +7,10 @@ import {
 
 import type { GateChoice } from "../../../events";
 import { messageOf, type NodeAction, type StepContext } from "../../context";
+import { interruptNode } from "../../interrupt";
 import { RESUME_RULES, resumePoint } from "../../resume-point";
 import { askNodeId, route, type StepEnd, scopeOf } from "../../route";
-import type {
-	Parked,
-	PendingGate,
-	ResumeValue,
-	RunStateValues,
-} from "../../state";
+import type { PendingGate, ResumeValue, RunStateValues } from "../../state";
 import { beginStep, type OpenStep } from "../../step-runner";
 import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
 
@@ -71,29 +63,29 @@ export function personChooser(node: DecisionNode, ctx: StepContext): Chooser {
 	};
 }
 
-/** The ask node of a Gate: interrupts with the Gate the node opened and ends the step on the answer. */
+/** The ask node of a Gate (`interruptNode`): interrupts with the Gate the node opened and ends the step on the answer. */
 export function gateAskNode(node: DecisionNode, ctx: StepContext): NodeAction {
-	return async (state, config) => {
-		const pending = state.pending;
-		if (pending?.kind !== "gate" || pending.nodeId !== node.id) {
-			throw new Error(`No Gate is open at node "${node.id}".`);
-		}
-		const value: Parked = {
+	return interruptNode({
+		kind: "gate",
+		nodeId: node.id,
+		missing: `No Gate is open at node "${node.id}".`,
+		value: (pending) => ({
 			kind: "gate",
 			stepId: pending.stepId,
 			nodeId: node.id,
 			question: pending.question,
 			choices: pending.choices,
-		};
-		const answer = interrupt<Parked, ResumeValue | undefined>(value);
-		if (answer?.kind !== "gate") {
-			// A reopen, or anything else: the node asks again in a new visit.
-			return new Command({ update: { pending: null }, goto: node.id });
-		}
-		const done = await resolve(ctx, node, state, config, pending, answer);
-		if (done.kind === "parked") return done.command;
-		return route(ctx, state, node, done.end, config);
-	};
+		}),
+		async answer(pending, answer, state, config) {
+			if (answer?.kind !== "gate") {
+				// A reopen, or anything else: the node asks again in a new visit.
+				return new Command({ update: { pending: null }, goto: node.id });
+			}
+			const done = await resolve(ctx, node, state, config, pending, answer);
+			if (done.kind === "parked") return done.command;
+			return route(ctx, state, node, done.end, config);
+		},
+	});
 }
 
 type OpenGate = {

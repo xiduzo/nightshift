@@ -89,13 +89,11 @@ describe("the Wait node", () => {
 			stepId,
 			nodeId: "pause",
 			visit: 1,
-			harnessSessionId: null,
-			prompt: "",
 			reason: "duration",
 			until: time.now() + 15 * MINUTE,
 			message: "Waits 15 min.",
-			resetAt: null,
 			streak: { count: 1, since: time.now() },
+			session: null,
 		});
 		expect(await h.types()).toEqual([
 			"RunStarted",

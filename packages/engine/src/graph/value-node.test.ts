@@ -348,8 +348,7 @@ describe("the Value node made by a model", () => {
 			stepId,
 			nodeId: "small",
 			visit: 1,
-			harnessSessionId: null,
-			prompt: DEFAULT_RESUME_PROMPT,
+			session: { harnessSessionId: null, prompt: DEFAULT_RESUME_PROMPT },
 		});
 		expect(await h.types()).toEqual([
 			"RunStarted",

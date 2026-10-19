@@ -13,6 +13,7 @@ import {
 	scopeKey,
 } from "../events";
 import { DEFAULT_RESUME_PROMPT } from "./context";
+import { pendingWaitOf } from "./sleep";
 import type { Pending, RunStateUpdate, RunStateValues } from "./state";
 import type { StepStart } from "./step-runner";
 
@@ -140,13 +141,15 @@ export function resumePoint(
 	const steps = deriveSteps(events);
 	const pending = ownPending(node, state.pending);
 
-	if (pending?.kind === "wait") {
-		const own = steps.find((s) => s.id === pending.stepId);
+	const sleeping = pendingWaitOf(pending);
+	if (sleeping) {
+		const own = steps.find((s) => s.id === sleeping.stepId);
 		if (!own) return { kind: "new" };
-		const session = pending.harnessSessionId ?? sessionOf(own);
+		const session = sleeping.session?.harnessSessionId ?? sessionOf(own);
+		const prompt = sleeping.session?.prompt ?? DEFAULT_RESUME_PROMPT;
 		return takeUp(own, session, {
-			continued: pending.prompt,
-			reopened: resumePromptOf(events, own) ?? pending.prompt,
+			continued: prompt,
+			reopened: resumePromptOf(events, own) ?? prompt,
 		});
 	}
 

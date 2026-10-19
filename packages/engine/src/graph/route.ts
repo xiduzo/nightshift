@@ -1,7 +1,6 @@
 import {
 	Command,
 	END,
-	interrupt,
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
 import {
@@ -15,14 +14,9 @@ import {
 
 import type { Scope, StepOutputs } from "../events";
 import type { StepOutcome } from "../types";
-import type { StepContext } from "./context";
-import type {
-	Parked,
-	PendingParked,
-	ResumeValue,
-	RunStateUpdate,
-	RunStateValues,
-} from "./state";
+import type { NodeAction, StepContext } from "./context";
+import { interruptNode } from "./interrupt";
+import type { PendingParked, RunStateUpdate, RunStateValues } from "./state";
 
 /**
  * Where a node goes after its step: the edge the outcome picks, a chosen
@@ -272,33 +266,33 @@ export async function route(
 }
 
 /**
- * The park node of every flow node. It interrupts with the parked step
- * (the runner appends `RunEnded`), after nothing else (design rule 4). A
- * resume jumps back to the node with `pending.prompt` set; the node reopens
- * the parked step when it can, else starts a new visit.
+ * The park node of every flow node (`interruptNode`). It interrupts with the
+ * parked step (the runner appends `RunEnded`), after nothing else (design
+ * rule 4). A resume jumps back to the node with `pending.prompt` set; the
+ * node reopens the parked step when it can, else starts a new visit.
  */
-export function parkNode(node: FlowNode) {
-	return async (state: RunStateValues): Promise<Command> => {
-		const pending = state.pending;
-		if (pending?.kind !== "parked" || pending.nodeId !== node.id) {
-			throw new Error(`Nothing is parked at node "${node.id}".`);
-		}
-		const value: Parked = {
+export function parkNode(node: FlowNode): NodeAction {
+	return interruptNode({
+		kind: "parked",
+		nodeId: node.id,
+		missing: `Nothing is parked at node "${node.id}".`,
+		value: (pending) => ({
 			kind: "parked",
 			stepId: pending.stepId,
 			nodeId: node.id,
 			status: pending.status,
 			reason: pending.reason,
 			...(pending.atStopTime ? { atStopTime: true } : {}),
-		};
-		const answer = interrupt<Parked, ResumeValue | undefined>(value);
-		const prompt =
-			answer && "prompt" in answer && answer.prompt !== undefined
-				? answer.prompt
-				: null;
-		return new Command({
-			update: { pending: { ...pending, prompt } },
-			goto: node.id,
-		});
-	};
+		}),
+		answer: (pending, answer) => {
+			const prompt =
+				answer && "prompt" in answer && answer.prompt !== undefined
+					? answer.prompt
+					: null;
+			return new Command({
+				update: { pending: { ...pending, prompt } },
+				goto: node.id,
+			});
+		},
+	});
 }

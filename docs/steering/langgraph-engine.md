@@ -48,8 +48,7 @@ packages/engine/src/
                            finishedReason); or parks (parkCommand). parkNode,
                            the node ids, scopeOf.
   graph/context.ts         StepContext (below), the recorders, the template
-                           context, stopAtOf, beginWait (the run policy's
-                           wait).
+                           context, stopAtOf.
   graph/step-runner.ts     The step runner (below): runStep() owns the step
                            lifecycle every node shares, from the resume
                            point to route(); beginStep/OpenStep is the lower
@@ -62,9 +61,17 @@ packages/engine/src/
                            latestStepOf, sessionOf. The daemon side of the
                            same question: reenteredNode, reentryUpdate,
                            resumeTarget.
-  graph/wait.ts            waitNode(nodeId): the one wait node of Agent
-                           nodes, Decisions decided by a model, and Wait
-                           nodes. Answers: wake, signal, resume.
+  graph/sleep.ts           The sleep module (below): sleep() plans a wait
+                           (the policy's, or a Wait node's own) and persists
+                           it; waitNode(nodeId) is the one wait node;
+                           pendingWaitOf reads the pending wait (old
+                           checkpoints too); createSleeps(deps) is the
+                           daemon side: the timers, wake(runId, how),
+                           restore(runId, events).
+  graph/interrupt.ts       interruptNode(spec): the one interrupting graph
+                           node; the wait, park and ask nodes give it the
+                           copy of pending the interrupt carries and what
+                           the answer does.
   graph/nodes/agent.ts     agent node: the body runSession
   graph/nodes/command.ts   command node: the body runShell
   graph/nodes/decision.ts  decision node: routes on the step; a chooser
@@ -84,9 +91,9 @@ packages/engine/src/
                            decider's text adapter, `chat()` with the
                            schema; waits like a model Decision).
   graph/nodes/wait.ts      Wait node: works out the wake time (a duration,
-                           a time, a command poll, a signal), appends
-                           WaitStarted and parks at its wait node; a wake
-                           ends it done or timeout, or sleeps again.
+                           a time, a command poll, a signal) and asks the
+                           sleep module to sleep; a wake ends it done or
+                           timeout, or sleeps again.
   graph/nodes/tool.ts      tool node: one tools/call on a Connection's MCP
                            server through @nightshift/agents/mcp, the
                            Connection resolved by mcpServersFor as for an
@@ -98,10 +105,11 @@ packages/engine/src/
                            from a source, item facts, the step's outputs
   graph/runner.ts          Per-run driver: start, continueRun, resume,
                            reenter (seeded by reentryUpdate for threads with
-                           no checkpoint), wake, stop, closeParked. Streams the
+                           no checkpoint), stop, closeParked. Streams the
                            graph, publishes to the bus, reacts to
-                           interrupts, owns slots and wake timers, and prunes
-                           a finished run's thread to its latest checkpoint.
+                           interrupts, owns the slots, gives the sleep module
+                           its thread seam (runner.sleeps), and prunes a
+                           finished run's thread to its latest checkpoint.
   graph/test-support.ts    Graph-level test helpers: a compiled flow on a
                            MemorySaver, drive() collecting the root's
                            interrupts and custom events.
@@ -128,7 +136,8 @@ packages/engine/src/
   recovery.ts              createRecovery(deps): recoverInterruptedWork
                            (a dead daemon's open sessions, steps and runs
                            become interrupted; sleeping runs get their
-                           timers back; after a grace period the daemon
+                           timers back through sleeps.restore; after a
+                           grace period the daemon
                            resumes the rest unless daemonResumeBlock says
                            why not), resume (a person's and the daemon's,
                            mapped from the thread's checkpoint through
@@ -198,20 +207,25 @@ packages/engine/src/
    sets `stopAt`, a resume past it writes it null, and a body reads its
    caller's through `configurable.stopAt` (set on every invoke, because a
    resume's update reaches the root namespace only).
-8. **Waits.** The Agent node plans the wait with `planWait` as before,
-   from the streak the pending wait carries (`pending.streak`: how many
-   waits for this reason, and when the first began), appends
-   `WaitStarted`, records the transcript `wait` entry and returns
-   `goto: wait__<nodeId>`; the wait node interrupts
-   `{ kind: "wait", until, reason }`. The runner schedules the wake timer
-   from the interrupt (and rebuilds timers from `deriveSleep` at startup).
-   A wake is `Command({ resume: { kind: "wake", early, prompt } })`; the
-   Agent node re-enters with `pending` and continues the session.
-   A Wait node parks the same way with its own `until` (`graph/nodes/wait.ts`,
-   below): the four kinds are `WaitReason`s next to the policy's two, a
+8. **Waits.** One module owns every wait (`graph/sleep.ts`, below). A body
+   that hits a usage limit or loses the network returns a wait request;
+   the step runner hands it to `sleep()`, which plans the wait with
+   `planWait` as before, from the streak the pending wait carries
+   (`pending.streak`: how many waits for this reason, and when the first
+   began), appends `WaitStarted`, records the transcript `wait` entry and
+   parks at `wait__<nodeId>`; the wait node interrupts
+   `{ kind: "wait", until, reason }`. The runner gives the interrupt to
+   `sleeps.schedule` for the wake timer (and recovery rebuilds the timers
+   from `deriveSleep` through `sleeps.restore` at startup). A wake is
+   `sleeps.wake(runId, how)`: `WaitEnded`, the transcript `wake`, then
+   `Command({ resume: { kind: "wake", early, prompt } })`; the Agent node
+   re-enters with `pending` and continues the session.
+   A Wait node sleeps the same way with its own `until` (`graph/nodes/wait.ts`,
+   below): its body returns `{ kind: "sleep" }` with the time and its
+   deadline, the four kinds are `WaitReason`s next to the policy's two, a
    wait with no time (a signal with no timeout) has `until: null` and no
    timer, and a signal is `Command({ resume: { kind: "signal", name } })`
-   through the same `runner.wake` (`Engine.signalRun`).
+   through the same `sleeps.wake` (`Engine.signalRun`).
 9. **Resume mapping** (`Engine.resumeRun`): stopped or failed → the thread
    is parked → `resume: { kind: "resume", prompt }`. Interrupted (daemon
    died) → the last checkpoint is before the node → `invoke(null)` re-runs
@@ -298,8 +312,8 @@ Decisions taken while implementing, from the code and its comments:
   visit on the same values. The transcript gets one `rule` entry with what
   each rule gave.
 - **A model Decision has a wait node too** (`choosers/model.ts`,
-  `wait__<id>`, the shared `waitNode`). A usage limit or a network failure
-  of the decider plans a wait with `beginWait` and parks at the wait node,
+  `wait__<id>`, the sleep module's `waitNode`). A usage limit or a network
+  failure of the decider is a wait request the sleep module plans and parks at the wait node,
   like the Agent node; a give-up ends the step `error`. A parked or
   interrupted model Decision step starts a new visit: it has no session to
   reopen.
@@ -317,13 +331,14 @@ Decisions taken while implementing, from the code and its comments:
   flows, `DECIDER_ADAPTERS[name].value` in agents): TypeSafe and Ollaya are
   evaluate adapters only.
 - **A Wait node is a step that is all wait** (`graph/nodes/wait.ts`,
-  2026-10-17). It uses the shared `waitNode` and the pending wait's shape
-  as the Agent node does, with no field of its own: the streak's `since`
-  is when the wait began (the deadline `since + timeoutMinutes` and
-  `waited_minutes` count from it) and `count` how often it slept; the wake
-  time is cut to the deadline, so the timeout fires as a wake and the node
-  ends `timeout`. `beginStep` starts no timer for it, and the step's log
-  path is set when it polls a command. On a wake the step continues, so
+  2026-10-17). It sleeps through the sleep module as the Agent node does.
+  Its pending wait has `session: null`: the step continues nothing. The
+  streak's `since` is when the wait began (the deadline `since +
+  timeoutMinutes` and `waited_minutes` count from it) and `count` how
+  often it slept; the sleep module cuts the wake time to the deadline the
+  node gives it, so the timeout fires as a wake and the node ends
+  `timeout`. `beginStep` starts no timer for it, and the step's log path
+  is set when it polls a command. On a wake the step continues, so
   the entry checks do not run: the step runner checks the stop time and
   parks `stopped` with the stop-time reason, as a new step would, with the
   `waited_minutes` the node gives it. A `duration` or `time` wake, early
@@ -438,12 +453,12 @@ rest, in this order:
    - `aborted`: the body saw its signal abort. The runner reads the reason:
      `stopped` for a person's stop, `error` with why for the time budget
      or no activity. The outputs the body had are kept.
-   - `wait`: a usage limit or a network failure. The runner calls
-     `beginWait` (the one call site) and parks at the wait node, or ends
-     the step `stopped` (the wait would pass the stop time) or `error`
-     (the grace is spent).
-   - `sleep`: a Wait node's own wait. The runner leaves the step open and
-     parks at the wait node.
+   - `wait`: a usage limit or a network failure. The runner calls the sleep
+     module's `sleep()` (the one call site) and returns its park at the
+     wait node, or ends the step `stopped` (the wait would pass the stop
+     time) or `error` (the grace is spent).
+   - `sleep`: a Wait node's own wait, with its time and deadline. The same
+     `sleep()` persists it and parks at the wait node, the step open.
 
 The `StepHandle` a body gets is what a body reads and records: `stepId`,
 `visit`, `existing`, `events`, `tctx`, `signal`, `record()`, `touch()` and
@@ -467,6 +482,63 @@ step through the lower seam, `beginStep` and `OpenStep` (`end()`,
 The log is written exactly as before (rule 3). `graph/step-runner.test.ts`
 holds the lifecycle as a table: a new or a continued entry, crossed with
 what the run and the body do.
+
+## The sleep module (`graph/sleep.ts`)
+
+One module owns a sleep from the step that asks for it to the step that
+continues after it. It is a deep module behind two small interfaces: one
+for the graph side, one for the daemon side.
+
+The graph side is `sleep(ctx, node, state, config, step, request)`. The
+request is a policy wait (`{ kind: "policy" }`: the reason, the message,
+`resetAt`, the harness session) or a Wait node's own wait (`{ kind: "own"
+}`: the reason, `until`, the deadline, the message, a signal name). The
+module:
+
+1. Finds the streak: the pending wait's when the step continues after a
+   wait for the same reason, else a new one.
+2. Plans the wait. A policy wait goes through `planWait` (`policy.ts`,
+   pure), and is refused when it would pass the stop time (`stop-time`) or
+   spend the network grace (`give-up`). An own wait is cut to its deadline.
+3. Persists it: `WaitStarted`, the transcript `wait` entry, the bus, the
+   step left open, and the `Command` that parks at the wait node with
+   `pending` and the node's visit.
+
+`waitNode(nodeId)` is the one wait node (`interruptNode`). It interrupts
+with the sleep and answers a `wake` (the step continues, with the wake's
+prompt when a person gave one), a `signal` (`pending.signal` is set; the
+Wait node reads it) and a `resume` (the run was stopped while it slept:
+the step is parked as stopped and the node reopens or restarts it).
+
+The daemon side is `createSleeps(deps)`, one per runner, with the runner's
+thread seam as its dependency (where the thread is, a slot, a drive into
+the wait node under `exclusive`). `schedule(runId, until)` sets the timer;
+`restore(runId, events)` sets it from `deriveSleep` for a run that slept
+when the last daemon died (the log stays the restart source); `wake(runId,
+how)` checks that the run still sleeps in the log and that the wait is the
+interrupt the thread sits at, appends `WaitEnded` and the transcript
+`wake`, and drives the thread with `{ kind: "wake" }` or `{ kind: "signal"
+}`; a full run cap queues a timer's wake (`drain()` on a freed slot) and
+refuses a person's. `forget(runId)` drops the timer and the queued wake of
+a run that was stopped while it slept (`closeParked`).
+
+The pending wait has one shape (`PendingWait`): the step, the visit, the
+reason, `until`, the message, the streak, `session` (what a policy wait
+continues: the harness session and the follow-up prompt; null for a Wait
+node) and `signal`. A checkpoint written before 2026-10-19 holds the
+continuation flat (`harnessSessionId`, `prompt`, and a `resetAt` nobody
+read). `pendingWaitOf` is the one reader of a pending wait and reads both
+shapes; a run that slept across the upgrade continues, and its next wake
+writes today's shape. `graph/sleep.test.ts` runs plan, persist, interrupt
+and wake (the timer, a signal, an early resume, the stop time, a full run
+cap, a new daemon's restore) for both kinds of wait.
+
+The three interrupting graph nodes share one skeleton
+(`graph/interrupt.ts`, `interruptNode`): check `pending` is this node's,
+interrupt with a copy of it, jump back on the answer. The wait node, the
+park node and the Gate's ask node give it only the copy the interrupt
+carries and what the answer does. The interrupt payloads (`Parked`) did
+not change.
 
 ## StepContext (what a node factory gets)
 

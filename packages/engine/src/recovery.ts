@@ -7,7 +7,6 @@ import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import {
 	countDaemonResumes,
 	deriveRunState,
-	deriveSleep,
 	deriveStopAt,
 	type EngineEventType,
 	groupByRun,
@@ -220,10 +219,8 @@ export function createRecovery(deps: RecoveryDeps) {
 				});
 				if (!why) toResume.push(runId);
 			}
-			const sleep = deriveSleep(events);
-			if (sleep && !open.runOpen && sleep.until !== null) {
-				runner.scheduleWake(runId, sleep.until);
-			}
+			// A sleeping run gets its timer back from the log (`deriveSleep`).
+			if (!open.runOpen) runner.sleeps.restore(runId, events);
 		}
 		if (toResume.length > 0 && !disposed) {
 			resumeTimer = setTimeout(() => {
@@ -294,7 +291,7 @@ export function createRecovery(deps: RecoveryDeps) {
 		const row = await getRunRow(db, runId);
 		const before = await log.events(runId);
 		if (deriveRunState(before).status === "sleeping") {
-			await runner.wake(runId, {
+			await runner.sleeps.wake(runId, {
 				early: true,
 				...(prompt !== undefined ? { prompt } : {}),
 			});

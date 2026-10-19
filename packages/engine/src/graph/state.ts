@@ -47,10 +47,12 @@ const waitReasonSchema = z.enum([
  * The step a wait or a park left behind, for the node that re-enters.
  *
  * - `wait`: the step sleeps (a usage limit or the network, or a Wait node's
- *   own wait). It is still open in the log. The Agent node continues it:
- *   same step id, same visit, the harness session the log assigned,
- *   `prompt` as the follow-up message. A Wait node reads `until`, the
- *   streak (how many waits, and when the first began) and `signal`.
+ *   own wait) and is still open in the log. Written by the sleep module
+ *   only (`graph/sleep.ts`), read through its `pendingWaitOf`. The node
+ *   continues the same step: same id, same visit, and for a policy wait
+ *   the `session` it continues with its follow-up `prompt`. A Wait node
+ *   reads `until`, the streak (when its wait began, how often it slept) and
+ *   `signal`.
  * - `parked`: the step ended (`stopped` or `failed`) and the run parked at
  *   the node's park node. A resume sets `prompt` and jumps back to the node,
  *   which reopens the step (`StepReopened`, a new session of the same
@@ -66,23 +68,29 @@ const pendingWaitSchema = z.object({
 	stepId: z.string(),
 	nodeId: z.string(),
 	visit: z.number(),
-	harnessSessionId: z.string().nullable(),
-	/** The follow-up message of the continued session. */
-	prompt: z.string(),
 	reason: waitReasonSchema,
 	/** Epoch ms when the step continues (`WaitStarted.until`); null for a signal with no timeout. */
 	until: z.number().nullable(),
 	message: z.string(),
-	resetAt: z.number().nullable(),
-	/** A Wait node on a signal: the signal that ended the wait, set by the wait node on a signal resume. */
-	signal: z.string().optional(),
 	/**
-	 * The step's streak of waits for this reason, this one included: how
-	 * many, and when the first began (epoch ms). `planWait` grows the next
-	 * wait from it. A new or reopened step, or a wait for the other reason,
-	 * starts a new streak.
+	 * The step's waits for this reason, this one included: how many, and
+	 * when the first began (epoch ms). `planWait` grows the next policy wait
+	 * from it; a Wait node counts its deadline and `waited_minutes` from
+	 * `since`. A new or reopened step, or a wait for another reason, starts
+	 * a new streak.
 	 */
 	streak: z.object({ count: z.number(), since: z.number() }),
+	/**
+	 * What a policy wait continues after the wake: the harness session the
+	 * log assigned (null while the harness named none, or for a decider) and
+	 * the follow-up prompt (a person's on an early wake, else the default).
+	 * Null for a Wait node: its step continues nothing.
+	 */
+	session: z
+		.object({ harnessSessionId: z.string().nullable(), prompt: z.string() })
+		.nullable(),
+	/** A Wait node on a signal: the signal that ended the wait, set by the wait node on a signal resume. */
+	signal: z.string().optional(),
 });
 const pendingParkedSchema = z.object({
 	kind: z.literal("parked"),
