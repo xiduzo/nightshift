@@ -19,9 +19,12 @@ import { appRouter } from "./routers/index";
 let sandbox: AuthSandbox;
 /** Which Space each engine call went to, in order. */
 let calls: { space: string; method: string }[];
+/** What each engine call got, in order. */
+let inputs: unknown[];
 beforeEach(async () => {
 	sandbox = await createAuthSandbox();
 	calls = [];
+	inputs = [];
 });
 afterEach(() => sandbox.cleanup());
 
@@ -29,12 +32,14 @@ afterEach(() => sandbox.cleanup());
 const engine: Context["engine"] = {
 	space: (space) =>
 		new Proxy({} as SpaceEngine, {
-			get: (_, method) => async () => {
+			get: (_, method) => async (input: unknown) => {
 				calls.push({ space, method: String(method) });
+				inputs.push(input);
 				return method === "listRuns" ? [] : { id: "run-1" };
 			},
 		}),
 	devices: {} as Context["engine"]["devices"],
+	logMemberChange: async () => {},
 };
 
 async function contextFor(headers: Headers | null): Promise<Context> {
@@ -46,6 +51,7 @@ async function contextFor(headers: Headers | null): Promise<Context> {
 				can: async () => false,
 				setActiveSpace: async () => {},
 				createSpace: async () => ({ id: "none" }),
+				members: {} as Context["members"],
 			};
 	return {
 		session: access.session,
@@ -53,6 +59,7 @@ async function contextFor(headers: Headers | null): Promise<Context> {
 		can: access.can,
 		setActiveSpace: access.setActiveSpace,
 		createSpace: access.createSpace,
+		members: access.members,
 		db: sandbox.db,
 		engine,
 		daemon: {
@@ -139,6 +146,8 @@ describe("procedures", () => {
 		const member = await contextFor(bob.headers);
 		await call(appRouter.runs.start, start, { context: member });
 		expect(calls.at(-1)).toEqual({ space: spaceId, method: "startRun" });
+		// The run is started by Bob: commits in it are in his name.
+		expect(inputs.at(-1)).toEqual({ ...start, startedBy: bob.userId });
 		// A member may not remove projects.
 		expect(
 			await errorOf(
@@ -282,6 +291,169 @@ describe("procedures", () => {
 				}),
 			),
 		).toBe("FORBIDDEN");
+	});
+});
+
+describe("Members", () => {
+	test("a personal Space takes no invitations", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const context = await contextFor(ada.headers);
+		const listed = await call(appRouter.members.list, undefined, { context });
+		expect(listed.space).toMatchObject({ personal: true, role: "owner" });
+		expect(listed.members.map((m) => m.name)).toEqual(["Ada"]);
+		await expect(
+			call(
+				appRouter.members.invite,
+				{ email: "carol@example.com", role: "member" },
+				{ context },
+			),
+		).rejects.toThrow("Nobody can join a personal Space");
+	});
+
+	test("invite, open the link, sign up, accept: a Member who works in the Space", async () => {
+		const { ada, spaceId } = await platform();
+		const owner = await contextFor(ada.headers);
+		const { id } = await call(
+			appRouter.members.invite,
+			{ email: "Carol@Example.com", role: "member" },
+			{ context: owner },
+		);
+		const listed = await call(appRouter.members.list, undefined, {
+			context: owner,
+		});
+		expect(listed.can).toEqual({
+			invite: true,
+			remove: true,
+			changeRole: true,
+		});
+		expect(listed.invitations.map((i) => [i.email, i.role])).toEqual([
+			["carol@example.com", "member"],
+		]);
+
+		// The link's page, before anyone signs in.
+		const anonymous = await contextFor(null);
+		expect(
+			await call(
+				appRouter.invitations.get,
+				{ invitationId: id },
+				{ context: anonymous },
+			),
+		).toMatchObject({
+			spaceName: "Platform",
+			email: "carol@example.com",
+			status: "pending",
+			hasAccount: false,
+		});
+		expect(
+			await errorOf(
+				call(
+					appRouter.invitations.get,
+					{ invitationId: "nope" },
+					{ context: anonymous },
+				),
+			),
+		).toBe("NOT_FOUND");
+
+		const signedUp = await sandbox.auth.api.signUpEmail({
+			body: {
+				name: "Carol",
+				email: "carol@example.com",
+				password: "a-long-password",
+				invitationId: id,
+			} as { name: string; email: string; password: string },
+			asResponse: true,
+		});
+		const carol = new Headers({
+			cookie: signedUp.headers
+				.getSetCookie()
+				.map((c) => c.split(";")[0])
+				.join("; "),
+		});
+		expect(
+			await call(
+				appRouter.invitations.accept,
+				{ invitationId: id },
+				{ context: await contextFor(carol) },
+			),
+		).toEqual({ spaceId });
+		const joined = await contextFor(carol);
+		expect(joined.spaceId).toBe(spaceId);
+		const after = await call(appRouter.members.list, undefined, {
+			context: joined,
+		});
+		expect(after.members.map((m) => [m.name, m.role])).toEqual([
+			["Ada", "owner"],
+			["Bob", "member"],
+			["Cy", "viewer"],
+			["Carol", "member"],
+		]);
+		expect(after.can).toEqual({
+			invite: false,
+			remove: false,
+			changeRole: false,
+		});
+	});
+
+	test("a viewer cannot invite, change roles or remove", async () => {
+		const { cy } = await platform();
+		const context = await contextFor(cy.headers);
+		const listed = await call(appRouter.members.list, undefined, { context });
+		const bob = listed.members.find((m) => m.name === "Bob");
+		expect(
+			await errorOf(
+				call(
+					appRouter.members.invite,
+					{ email: "dee@example.com", role: "member" },
+					{ context },
+				),
+			),
+		).toBe("FORBIDDEN");
+		expect(
+			await errorOf(
+				call(
+					appRouter.members.setRole,
+					{ memberId: bob?.id ?? "", role: "admin" },
+					{ context },
+				),
+			),
+		).toBe("FORBIDDEN");
+		expect(
+			await errorOf(
+				call(
+					appRouter.members.remove,
+					{ memberId: bob?.id ?? "" },
+					{ context },
+				),
+			),
+		).toBe("FORBIDDEN");
+	});
+
+	test("an owner changes a role and removes a Member, who then loses the Space", async () => {
+		const { ada, bob, spaceId } = await platform();
+		const owner = await contextFor(ada.headers);
+		const listed = await call(appRouter.members.list, undefined, {
+			context: owner,
+		});
+		const membership = listed.members.find((m) => m.name === "Bob");
+		await call(
+			appRouter.members.setRole,
+			{ memberId: membership?.id ?? "", role: "viewer" },
+			{ context: owner },
+		);
+		const bobs = await contextFor(bob.headers);
+		expect(
+			await errorOf(call(appRouter.runs.start, start, { context: bobs })),
+		).toBe("FORBIDDEN");
+
+		await call(
+			appRouter.members.remove,
+			{ memberId: membership?.id ?? "" },
+			{ context: owner },
+		);
+		const removed = await contextFor(bob.headers);
+		expect(removed.spaceId).not.toBe(spaceId);
+		await call(appRouter.runs.list, undefined, { context: removed });
+		expect(calls.at(-1)?.space).toBe(removed.spaceId ?? "");
 	});
 });
 

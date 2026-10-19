@@ -200,6 +200,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				repoPath: run.repoPath,
 				shortId: run.id.slice(0, 8),
 				...(run.baseRef !== undefined ? { baseRef: run.baseRef } : {}),
+				...(run.author ? { author: run.author } : {}),
 			}),
 	};
 }

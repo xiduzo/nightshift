@@ -191,7 +191,7 @@ describe("exportRun", () => {
 
 		const opened = await openRunBundle(path);
 		expect(opened.meta).toMatchObject({
-			formatVersion: 3,
+			formatVersion: 4,
 			runId,
 			missingTranscripts: [],
 			redacted: 0,
@@ -263,6 +263,27 @@ describe("exportRun", () => {
 		expect(opened.events).toEqual(live);
 		expect(deriveRunState(opened.events).status).toBe("finished");
 		expect(sumCostUsd(opened.events)).toBe(0.25);
+		opened.close();
+	});
+
+	test("a format 3 bundle still opens: nobody known started it", async () => {
+		const runId = await finishedRun();
+		const path = join(sandbox.root, "run.nightshift.sqlite");
+		await exportRun({ db: sandbox.db, runId, spaceId: sandbox.spaceId, path });
+		// What a Night Shift before Members wrote.
+		const file = createDb({ DATABASE_URL: `file:${path}` });
+		for (const statement of [
+			"ALTER TABLE run DROP COLUMN started_by",
+			"UPDATE bundle SET value = '3' WHERE key = 'format_version'",
+		]) {
+			await file.run(sql.raw(statement));
+		}
+		file.$client.close();
+
+		const opened = await openRunBundle(path);
+		expect(opened.meta.formatVersion).toBe(3);
+		expect(opened.run.startedBy).toBeNull();
+		expect(opened.run.spaceId).toBe(sandbox.spaceId);
 		opened.close();
 	});
 

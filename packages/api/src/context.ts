@@ -8,6 +8,7 @@ import type {
 import type { HarnessName } from "@nightshift/agents/types";
 import type { Permissions, Session } from "@nightshift/auth";
 import type { DeviceKeyAccess } from "@nightshift/auth/device-keys";
+import type { RequestAccess } from "@nightshift/auth/request";
 import type { Database } from "@nightshift/db";
 import type {
 	CliToolStore,
@@ -46,6 +47,8 @@ export type Context = {
 	devices: Devices;
 	/** A new Space, its creator the owner, and the session's active one. */
 	createSpace(name: string): Promise<{ id: string }>;
+	/** The Members and invitations of the session's Space (the organization plugin). */
+	members: RequestAccess["members"];
 	db: Database;
 	/** The engine of this Device. Procedures use the view of the session's Space. */
 	engine: Engine;

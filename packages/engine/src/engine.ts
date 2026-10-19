@@ -41,6 +41,7 @@ import { createSpaceDocuments } from "./space/document";
 import type {
 	Engine,
 	EngineOptions,
+	MemberChange,
 	RunStreamItem,
 	RunSummary,
 	RunTrigger,
@@ -516,9 +517,43 @@ export function createEngine(
 		yield* reads.watch(runId, signal, afterSeq);
 	}
 
+	async function logMemberChange(change: MemberChange): Promise<void> {
+		const { spaceId, personId, by } = change;
+		if (change.kind === "joined") {
+			await runLog.append({
+				type: "MemberJoined",
+				spaceId,
+				payload: {
+					personId,
+					role: change.role,
+					by,
+					...(change.invitedBy ? { invitedBy: change.invitedBy } : {}),
+				},
+			});
+		} else if (change.kind === "removed") {
+			await runLog.append({
+				type: "MemberRemoved",
+				spaceId,
+				payload: { personId, by },
+			});
+		} else {
+			await runLog.append({
+				type: "MemberRoleChanged",
+				spaceId,
+				payload: {
+					personId,
+					role: change.role,
+					previousRole: change.previousRole,
+					by,
+				},
+			});
+		}
+	}
+
 	return {
 		space,
 		devices: createDeviceRegistry({ db, log: runLog, now }),
+		logMemberChange,
 	};
 }
 

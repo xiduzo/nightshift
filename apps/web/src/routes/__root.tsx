@@ -11,6 +11,7 @@ import {
 	HeadContent,
 	Outlet,
 	Scripts,
+	useRouterState,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
@@ -54,7 +55,15 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 	component: RootDocument,
 });
 
+/**
+ * Pages for someone who is not signed in yet: signing in, and an
+ * invitation's link. They show without the app's sidebar.
+ */
+const OUTSIDE_APP = ["/login", "/invite/"];
+
 function RootDocument() {
+	const pathname = useRouterState({ select: (s) => s.location.pathname });
+	const outsideApp = OUTSIDE_APP.some((prefix) => pathname.startsWith(prefix));
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
@@ -68,15 +77,19 @@ function RootDocument() {
 					disableTransitionOnChange
 				>
 					<TooltipProvider>
-						<SidebarProvider>
-							<AppSidebar />
-							<SidebarInset className="min-w-0">
-								<Outlet />
-							</SidebarInset>
-						</SidebarProvider>
+						{outsideApp ? (
+							<Outlet />
+						) : (
+							<SidebarProvider>
+								<AppSidebar />
+								<SidebarInset className="min-w-0">
+									<Outlet />
+								</SidebarInset>
+							</SidebarProvider>
+						)}
 					</TooltipProvider>
 					<Toaster richColors />
-					<NightNotifications />
+					{outsideApp ? null : <NightNotifications />}
 				</ThemeProvider>
 				<TanStackRouterDevtools position="bottom-left" />
 				<ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />

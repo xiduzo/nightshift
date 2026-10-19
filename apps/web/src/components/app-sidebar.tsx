@@ -44,6 +44,7 @@ import {
 	Settings2Icon,
 	SunIcon,
 	SunMoonIcon,
+	UsersIcon,
 	WorkflowIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -105,6 +106,16 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 									{open}
 								</SidebarMenuBadge>
 							) : null}
+						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								tooltip="Members"
+								isActive={Boolean(matchRoute({ to: "/members" }))}
+								render={<Link to="/members" />}
+							>
+								<UsersIcon aria-hidden="true" />
+								<span>Members</span>
+							</SidebarMenuButton>
 						</SidebarMenuItem>
 					</SidebarMenu>
 				</SidebarGroup>

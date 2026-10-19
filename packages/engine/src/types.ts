@@ -140,10 +140,15 @@ export type RunTrigger =
 	/** `at`: the cron time the run started for (epoch ms). */
 	| { kind: "schedule"; scheduleId: string; at: number };
 
+/** A Person as a run names them. `name` is null for a Person this computer does not know. */
+export type RunPerson = { id: string; name: string | null };
+
 export type RunSummary = {
 	id: string;
 	projectId: string;
 	trigger: RunTrigger;
+	/** The Person who started the run. Null for a schedule, and for runs from before Members. */
+	startedBy: RunPerson | null;
 	/** The flow file the run started from. Null for a quick run. */
 	flowName: string | null;
 	/** The flow name, or the prompt of a quick run. */
@@ -356,6 +361,11 @@ export type StartRunInput = {
 	stopAt?: number;
 	/** Git ref to branch the worktree from. Defaults to the clone's current HEAD. */
 	baseRef?: string;
+	/**
+	 * The Person who starts the run (their id). Commits in the run's
+	 * worktree are in their name. Absent: a schedule, or nobody known.
+	 */
+	startedBy?: string;
 } & (
 	| { flowName: string; flow?: never }
 	/** A flow that is not a file, for example a quick run. */
@@ -415,7 +425,32 @@ export interface Engine {
 	 * audit of it. Each Person sees their own Devices only (the API's rule).
 	 */
 	readonly devices: DeviceRegistry;
+	/**
+	 * Logs a change of a Space's Members in that Space's event log
+	 * (`MemberJoined`, `MemberRemoved`, `MemberRoleChanged`), with who made it.
+	 */
+	logMemberChange(change: MemberChange): Promise<void>;
 }
+
+/** A change of a Space's Members, as the auth hooks report it. */
+export type MemberChange =
+	| {
+			kind: "joined";
+			spaceId: string;
+			personId: string;
+			role: string;
+			by: string | null;
+			invitedBy?: string;
+	  }
+	| { kind: "removed"; spaceId: string; personId: string; by: string | null }
+	| {
+			kind: "role";
+			spaceId: string;
+			personId: string;
+			role: string;
+			previousRole: string;
+			by: string | null;
+	  };
 
 /** The engine as a person in one Space sees it: the API layer only calls this. */
 export interface SpaceEngine {

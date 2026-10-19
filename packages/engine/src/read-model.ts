@@ -24,6 +24,7 @@ import {
 	sumCostUsd,
 } from "./events";
 import { getRunRow, type RunRow } from "./graph/context";
+import { namesOf, runPerson } from "./people";
 import type { RunLog } from "./run-log";
 import { readRunTranscript } from "./transcripts";
 import type {
@@ -126,10 +127,16 @@ export function runFacts(events: readonly LoggedEvent[]) {
 
 export type RunFacts = ReturnType<typeof runFacts>;
 
-export function toSummary(row: RunRow, facts: RunFacts): RunSummary {
+/** A run's summary. `names`: the names of the Persons it names (`namesOf`). */
+export function toSummary(
+	row: RunRow,
+	facts: RunFacts,
+	names: ReadonlyMap<string, string> = new Map(),
+): RunSummary {
 	return {
 		id: row.id,
 		projectId: row.projectId,
+		startedBy: runPerson(row.startedBy, names),
 		flowName: row.flowName,
 		title: row.title,
 		worktreePath: row.worktreePath,
@@ -191,10 +198,11 @@ export function toRunDetail(
 	row: RunRow,
 	events: readonly LoggedEvent[],
 	harnessOf: HarnessOf,
+	names: ReadonlyMap<string, string> = new Map(),
 ): RunDetail {
 	const last = lastHarnessSession(events);
 	return {
-		...toSummary(row, runFacts(events)),
+		...toSummary(row, runFacts(events), names),
 		flow: parseRunFlow(row),
 		calledFlows: parseCalledFlows(row),
 		steps: deriveSteps(events).map(toStepSummary),
@@ -240,13 +248,24 @@ export function createReadModel(deps: ReadModelDeps) {
 			rows.map((r) => r.id),
 			runFacts,
 		);
-		return rows.map((row) => toSummary(row, facts.get(row.id) ?? runFacts([])));
+		const names = await namesOf(
+			db,
+			rows.map((r) => r.startedBy),
+		);
+		return rows.map((row) =>
+			toSummary(row, facts.get(row.id) ?? runFacts([]), names),
+		);
 	}
 
 	async function getRun(runId: string): Promise<RunDetail> {
 		const row = await getRunRow(db, runId);
 		const events = await log.events(runId);
-		return toRunDetail(row, events, harnessOf);
+		return toRunDetail(
+			row,
+			events,
+			harnessOf,
+			await namesOf(db, [row.startedBy]),
+		);
 	}
 
 	/** The run's status, or null for a run the log has nothing on. */
