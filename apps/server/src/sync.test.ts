@@ -240,34 +240,29 @@ describe("documentAccess: a Space document", () => {
 		updatedAt: 1,
 	});
 
-	test("a member opens it and edits; the project rows follow", async () => {
-		const { opened, name, bob } = await platform();
-		expect(opened.members.size).toBe(3);
-		const client = connect(name, { origin: ORIGIN, cookie: bob });
-		await waitFor(() => client.provider.isSynced);
-		expect(client.doc.getMap("members").size).toBe(3);
-
-		client.doc.getMap("projects").set("p-bob", entry("From Bob"));
-		await waitFor(async () => {
-			const rows = await people.db.select().from(project);
-			return rows.some((row) => row.name === "From Bob");
-		});
-	});
-
-	test("a viewer reads it, and their edits go nowhere", async () => {
+	test("a member and a viewer read it; neither writes through the relay", async () => {
 		const { opened, name, bob, cy } = await platform();
-		const viewer = connect(name, { origin: ORIGIN, cookie: cy });
+		expect(opened.members.size).toBe(3);
 		const member = connect(name, { origin: ORIGIN, cookie: bob });
-		await waitFor(() => viewer.provider.isSynced && member.provider.isSynced);
+		const viewer = connect(name, { origin: ORIGIN, cookie: cy });
+		await waitFor(() => member.provider.isSynced && viewer.provider.isSynced);
+		expect(member.doc.getMap("members").size).toBe(3);
 
-		viewer.doc.getMap("projects").set("p-cy", entry("From Cy"));
-		await Bun.sleep(100);
 		member.doc.getMap("projects").set("p-bob", entry("From Bob"));
-		await waitFor(() => opened.projects.has("p-bob"));
-		// The viewer still sees what others write.
-		await waitFor(() => viewer.doc.getMap("projects").has("p-bob"));
+		viewer.doc.getMap("projects").set("p-cy", entry("From Cy"));
+		// The Owner's own write (through a procedure) reaches both.
+		await opened.change(() => {
+			opened.projects.set("p-owner", entry("From the engine"));
+		});
+		await waitFor(
+			() =>
+				member.doc.getMap("projects").has("p-owner") &&
+				viewer.doc.getMap("projects").has("p-owner"),
+		);
+		expect(opened.projects.has("p-bob")).toBe(false);
 		expect(opened.projects.has("p-cy")).toBe(false);
-		expect(member.doc.getMap("projects").has("p-cy")).toBe(false);
+		const rows = await people.db.select().from(project);
+		expect(rows.map((row) => row.name)).toEqual(["From the engine"]);
 	});
 
 	test("a Person outside the Space is refused", async () => {

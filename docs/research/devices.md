@@ -693,7 +693,7 @@ iroh.
      `clone` row and its Device document.
    - **The document is the source, the rows its projection.** The
      Replica's `project` rows follow the document after every write, the
-     engine's or a relay client's, in the same queue as the save
+     in the same queue as the save
      (`projectSpace`): a new entry makes a row, a changed one updates
      name, remote and removed. Engine queries stay in SQL. A projection
      never deletes a row and never takes a row of another Space (only a
@@ -712,22 +712,24 @@ iroh.
      Clone added here is a `clone` row and a `clones` entry. An entry the
      document lacks (a row from before it) starts from the row. New
      events: `ProjectRenamed` and `ProjectMoved`. The engine logs the facts
-     it makes; an edit that arrives through the relay is projected without
-     an event (audit of document edits comes with sharing).
+     it makes, and nothing else writes the document.
    - **Members mirrored from auth.** On open, and from the organization
      plugin's hooks (a Space made, a Member added or removed, a new role,
      an invitation accepted: `createAuth(…, { onMembersChanged })`), the
      Space's `member` and `user` rows are written into `members`.
    - **Who may open it** (`documentAccess`, `apps/server/src/sync.ts`,
      which `ownerOnly` became): `device:<id>` its owner, as before;
-     `space:<id>` a Member of that Space, by the same session rule. A role
-     that may add projects writes; any other role (a viewer) gets a
-     read-only connection (Hocuspocus's `connectionConfig.readOnly`: it
-     drops the client's updates). Anyone else is refused. The authorize
-     function returns `SyncAccess` (`"write"`, `"read"` or `false`).
-     Not yet: finer checks of what a writing Member changes in the
-     document (a member who may not remove a Project can still set
-     `removedAt` through the relay).
+     `space:<id>` a Member of that Space, by the same session rule, always
+     read-only (Hocuspocus's `connectionConfig.readOnly`: it drops the
+     client's updates). Anyone else is refused. The authorize function
+     returns `SyncAccess` (`"write"`, `"read"` or `false`).
+   - **Writes to a Space document go through the procedures.** A Yjs
+     update is a merge of bytes, not an action: the relay cannot tell a
+     rename from a removal, so it cannot check `project.remove` or log
+     `ProjectRemoved`. The procedures can: they check the role with
+     `hasPermission`, the engine writes the document and logs the event,
+     and the relay carries the change to every Member. Slice 6 lets
+     colleagues in, so no Member writes a Space document directly.
    - **Create Space** (`spaces.create`, the Space switcher): the
      organization plugin's `createOrganization`, slug `<name>-<8 hex>`, the
      creator its owner, and the session's active Space. The hook opens its

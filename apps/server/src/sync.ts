@@ -1,6 +1,5 @@
 import { Hocuspocus } from "@hocuspocus/server";
 import type { Auth } from "@nightshift/auth";
-import { roleAllows } from "@nightshift/auth/access";
 import type { LocalSession } from "@nightshift/auth/local-session";
 import { requestAccess } from "@nightshift/auth/request";
 import { roleIn } from "@nightshift/auth/spaces";
@@ -153,8 +152,10 @@ export function createSync(options: {
  * one rule decides both.
  *
  * - `device:<id>`: its owner only (this daemon serves its own only).
- * - `space:<id>`: a Member of that Space. A role that may add projects
- *   writes; any other role (a viewer) reads.
+ * - `space:<id>`: a Member of that Space, read-only. A Yjs update cannot
+ *   be checked per action (a rename, a removal), so every write to a
+ *   Space document goes through the procedures, which check the role
+ *   and log an event.
  *
  * Slice 4 adds the Device key (its owner), and the home-Host rule (a
  * Device document syncs only to Devices of the same owner).
@@ -196,8 +197,7 @@ async function personAccess(
 	const spaceId = spaceIdOf(documentName);
 	if (spaceId) {
 		const role = await roleIn(options.db, personId, spaceId);
-		if (role === null) return false;
-		return roleAllows(role, { project: ["add"] }) ? "write" : "read";
+		return role === null ? false : "read";
 	}
 	return false;
 }

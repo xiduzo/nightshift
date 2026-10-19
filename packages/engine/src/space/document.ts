@@ -9,8 +9,9 @@ import { openPersistedDocument, type PersistedDocument } from "../ydoc";
 
 /**
  * The Space document: one Yjs document per Space, named `space:<id>`, that
- * holds the Space's definitions. Any Member edits it (through the engine,
- * or a client of the relay); the Replica keeps it in `ydoc`.
+ * holds the Space's definitions. Members change it only through the
+ * engine (the procedures check their role and the engine logs an event);
+ * the relay serves it to them read-only. The Replica keeps it in `ydoc`.
  *
  * - `projects`: id → `{ name, remote, createdAt, removedAt, updatedAt }`.
  * - `clones`: `<project id>/<device id>` → `{ projectId, deviceId, addedAt }`.
@@ -22,7 +23,7 @@ import { openPersistedDocument, type PersistedDocument } from "../ydoc";
  *   Only this Replica writes it, from `member` and `user`.
  *
  * The document is the source of the Space's Projects. The Replica's
- * `project` rows are its projection: after every change, saved or synced,
+ * `project` rows are its projection: after every change, ours or synced,
  * the rows follow the document (`projectSpace`), so engine queries stay in
  * SQL. A projection never deletes a row and never takes a row of another
  * Space: a Project changes Space only by a move, which updates the rows
