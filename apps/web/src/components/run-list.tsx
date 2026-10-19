@@ -25,6 +25,7 @@ import {
 } from "@/lib/format";
 
 import { DataTable, dataTableColumns } from "./data-table";
+import { WalkerBadge } from "./run/walker-badge";
 import { RunStatusBadge } from "./run-status-badge";
 
 /**
@@ -194,6 +195,7 @@ function RunTitle({
 				{run.trigger.kind === "schedule" ? (
 					<ScheduledMark trigger={run.trigger} />
 				) : null}
+				<WalkerBadge walker={run.walker} className="relative z-10" />
 				{run.status === "sleeping" && run.wakeAt ? (
 					<span className="shrink-0 text-status-sleeping text-xs">
 						wakes{" "}

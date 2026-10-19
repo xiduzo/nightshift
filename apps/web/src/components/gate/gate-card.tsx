@@ -1,12 +1,23 @@
+import {
+	Alert,
+	AlertDescription,
+	AlertTitle,
+} from "@nightshift/ui/components/alert";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Card, CardContent, CardHeader } from "@nightshift/ui/components/card";
 import { Separator } from "@nightshift/ui/components/separator";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Link } from "@tanstack/react-router";
-import { ChevronRightIcon, HandIcon, HourglassIcon } from "lucide-react";
+import {
+	ChevronRightIcon,
+	HandIcon,
+	HourglassIcon,
+	SendIcon,
+} from "lucide-react";
 
 import { GateAnswer } from "@/components/gate/gate-answer";
 import { GateQuestion } from "@/components/gate/gate-question";
+import { WalkerBadge, walkerName } from "@/components/run/walker-badge";
 import type { OpenGate } from "@/lib/api-types";
 import { formatDateTime, formatWaited } from "@/lib/format";
 
@@ -45,6 +56,7 @@ export function GateCard({ gate, now }: { gate: OpenGate; now: number }) {
 						<HandIcon aria-hidden="true" />
 						{gate.nodeId}
 					</Badge>
+					<WalkerBadge walker={gate.walker} />
 					<Badge
 						variant="outline"
 						className="ml-auto border-status-waiting/40 bg-status-waiting/10 text-status-waiting"
@@ -64,13 +76,27 @@ export function GateCard({ gate, now }: { gate: OpenGate; now: number }) {
 			<CardContent className="flex flex-col gap-5 py-5">
 				<GateQuestion question={gate.question} headingId={headingId} />
 				<Separator />
-				<GateAnswer
-					runId={gate.runId}
-					stepId={gate.stepId}
-					nodeId={gate.nodeId}
-					choices={gate.choices}
-					runTitle={gate.runTitle}
-				/>
+				{gate.answerPending ? (
+					<Alert>
+						<SendIcon />
+						<AlertTitle>Answer sent</AlertTitle>
+						<AlertDescription>
+							Your answer is on its way to {walkerName(gate.walker)}. The run
+							goes on when {walkerName(gate.walker)} is online.
+						</AlertDescription>
+					</Alert>
+				) : (
+					<GateAnswer
+						runId={gate.runId}
+						stepId={gate.stepId}
+						nodeId={gate.nodeId}
+						choices={gate.choices}
+						runTitle={gate.runTitle}
+						{...(gate.walker.thisDevice
+							? {}
+							: { walkerName: walkerName(gate.walker) })}
+					/>
+				)}
 			</CardContent>
 		</Card>
 	);

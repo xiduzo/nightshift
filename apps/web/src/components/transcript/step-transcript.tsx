@@ -61,12 +61,14 @@ import {
 	type LucideIcon,
 	MessagesSquareIcon,
 	MoonIcon,
+	SendIcon,
 	SplitIcon,
 	SunriseIcon,
 } from "lucide-react";
 import { memo, type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { GateAnswer } from "@/components/gate/gate-answer";
+import { GateQuestion as GateQuestionText } from "@/components/gate/gate-question";
 import {
 	ItemStateBadge,
 	outcomeLabel,
@@ -76,7 +78,7 @@ import {
 import { CodeView, JsonBlock } from "@/components/run/json-block";
 import { SectionTitle } from "@/components/run/step-console";
 
-import type { SessionSummary, StepSummary } from "@/lib/api-types";
+import type { RunSummary, SessionSummary, StepSummary } from "@/lib/api-types";
 import {
 	formatCost,
 	formatDateTime,
@@ -125,16 +127,32 @@ export function StepTranscript({
 	step,
 	transcript,
 	connecting,
+	walker,
+	answerPending = false,
 }: {
 	runId: string;
 	step: StepSummary;
 	transcript: TranscriptState;
 	/** The first replay has not arrived yet. */
 	connecting: boolean;
+	/** The device that runs the run. */
+	walker?: RunSummary["walker"];
+	/** An answer to this run's Gate is on its way to that device. */
+	answerPending?: boolean;
 }) {
 	const running = step.outcome === null;
 	// A gate step without an outcome waits for a person: it gets the answer form.
 	const gateOpen = step.gate !== null && running;
+	const elsewhere =
+		walker && !walker.thisDevice ? (walker.name ?? "another device") : null;
+	// A run of another device shows a step's transcript once the step ended:
+	// its open Gate comes from the step itself.
+	const openGate =
+		gateOpen &&
+		step.gate &&
+		!transcript.items.some((i) => i.kind === "gate-open")
+			? step.gate
+			: null;
 	const sessionNumbers = new Map(
 		step.sessions.map((session, position) => [session.id, position + 1]),
 	);
@@ -257,6 +275,29 @@ export function StepTranscript({
 					)}
 				</div>
 			</div>
+			{openGate ? (
+				<div className="flex shrink-0 flex-col gap-4 border-b p-4">
+					<GateQuestionText question={openGate.question} />
+					{answerPending ? (
+						<Alert>
+							<SendIcon />
+							<AlertTitle>Answer sent</AlertTitle>
+							<AlertDescription>
+								Your answer is on its way to {elsewhere ?? "the device"}. The
+								run goes on when it is online.
+							</AlertDescription>
+						</Alert>
+					) : (
+						<GateAnswer
+							runId={runId}
+							stepId={step.id}
+							nodeId={step.nodeId}
+							choices={openGate.choices}
+							{...(elsewhere ? { walkerName: elsewhere } : {})}
+						/>
+					)}
+				</div>
+			) : null}
 			<MessageScrollerProvider autoScroll defaultScrollPosition="end">
 				<MessageScroller className="min-h-0">
 					<MessageScrollerViewport aria-label={`Transcript of ${step.nodeId}`}>

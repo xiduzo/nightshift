@@ -38,95 +38,103 @@ export function createHostSpaces(db: Database) {
 			personId: string,
 		): Promise<void> {
 			const listed = spaces.map((s) => s.id);
-			await db.transaction(async (tx) => {
-				for (const space of spaces) {
-					const [own] = await tx
-						.select({ id: organization.id })
-						.from(organization)
-						.where(eq(organization.id, space.id));
-					const [kept] = await tx
-						.select()
-						.from(hostSpace)
-						.where(eq(hostSpace.spaceId, space.id));
-					// A Space of this Replica's own is never taken for a Host's.
-					if (own && !kept) continue;
-					if (kept && kept.hostId !== host.id) continue;
-					const name = space.personal ? `Personal on ${host.name}` : space.name;
-					await tx
-						.insert(hostSpace)
-						.values({
-							spaceId: space.id,
-							hostId: host.id,
+			// No transaction: every write is an upsert, and it runs with each
+			// answer of the Host, beside the walk's own writes.
+			for (const space of spaces) {
+				const [own] = await db
+					.select({ id: organization.id })
+					.from(organization)
+					.where(eq(organization.id, space.id));
+				const [kept] = await db
+					.select()
+					.from(hostSpace)
+					.where(eq(hostSpace.spaceId, space.id));
+				// A Space of this Replica's own is never taken for a Host's.
+				if (own && !kept) continue;
+				if (kept && kept.hostId !== host.id) continue;
+				const name = space.personal ? `Personal on ${host.name}` : space.name;
+				const [membership] = await db
+					.select()
+					.from(member)
+					.where(
+						and(
+							eq(member.organizationId, space.id),
+							eq(member.userId, personId),
+						),
+					);
+				if (
+					kept?.name === name &&
+					kept.role === space.role &&
+					kept.personal === space.personal &&
+					membership?.role === space.role
+				) {
+					continue;
+				}
+				await db
+					.insert(hostSpace)
+					.values({
+						spaceId: space.id,
+						hostId: host.id,
+						name,
+						role: space.role,
+						personal: space.personal,
+					})
+					.onConflictDoUpdate({
+						target: hostSpace.spaceId,
+						set: {
 							name,
 							role: space.role,
 							personal: space.personal,
-						})
-						.onConflictDoUpdate({
-							target: hostSpace.spaceId,
-							set: {
-								name,
-								role: space.role,
-								personal: space.personal,
-								updatedAt: new Date(),
-							},
-						});
-					await tx
-						.insert(organization)
-						.values({
-							id: space.id,
-							name,
-							slug: `host-${space.id}`,
-							createdAt: new Date(),
-						})
-						.onConflictDoUpdate({ target: organization.id, set: { name } });
-					const [membership] = await tx
-						.select()
-						.from(member)
-						.where(
-							and(
-								eq(member.organizationId, space.id),
-								eq(member.userId, personId),
-							),
-						);
-					if (!membership) {
-						await tx.insert(member).values({
-							id: randomUUID(),
-							organizationId: space.id,
-							userId: personId,
-							role: space.role,
-							createdAt: new Date(),
-						});
-					} else if (membership.role !== space.role) {
-						await tx
-							.update(member)
-							.set({ role: space.role })
-							.where(eq(member.id, membership.id));
-					}
+							updatedAt: new Date(),
+						},
+					});
+				await db
+					.insert(organization)
+					.values({
+						id: space.id,
+						name,
+						slug: `host-${space.id}`,
+						createdAt: new Date(),
+					})
+					.onConflictDoUpdate({ target: organization.id, set: { name } });
+				if (!membership) {
+					await db.insert(member).values({
+						id: randomUUID(),
+						organizationId: space.id,
+						userId: personId,
+						role: space.role,
+						createdAt: new Date(),
+					});
+				} else if (membership.role !== space.role) {
+					await db
+						.update(member)
+						.set({ role: space.role })
+						.where(eq(member.id, membership.id));
 				}
-				const gone = await tx
-					.select({ spaceId: hostSpace.spaceId })
-					.from(hostSpace)
+			}
+			const gone = await db
+				.select({ spaceId: hostSpace.spaceId })
+				.from(hostSpace)
+				.where(
+					and(
+						eq(hostSpace.hostId, host.id),
+						listed.length > 0
+							? notInArray(hostSpace.spaceId, listed)
+							: undefined,
+					),
+				);
+			const goneIds = gone.map((g) => g.spaceId);
+			if (goneIds.length > 0) {
+				await db
+					.delete(member)
 					.where(
 						and(
-							eq(hostSpace.hostId, host.id),
-							listed.length > 0
-								? notInArray(hostSpace.spaceId, listed)
-								: undefined,
+							inArray(member.organizationId, goneIds),
+							eq(member.userId, personId),
 						),
 					);
-				const goneIds = gone.map((g) => g.spaceId);
-				if (goneIds.length > 0) {
-					await tx
-						.delete(member)
-						.where(
-							and(
-								inArray(member.organizationId, goneIds),
-								eq(member.userId, personId),
-							),
-						);
-					await tx.delete(hostSpace).where(inArray(hostSpace.spaceId, goneIds));
-				}
-			});
+				await db.delete(hostSpace).where(inArray(hostSpace.spaceId, goneIds));
+			}
 		},
 
 		/** The Host that keeps the Space, or null for a Space of this Replica's own. */

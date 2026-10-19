@@ -27,6 +27,7 @@ export function GateAnswer({
 	nodeId,
 	choices,
 	runTitle,
+	walkerName,
 	className,
 }: {
 	runId: string;
@@ -35,6 +36,8 @@ export function GateAnswer({
 	choices: GateChoice[];
 	/** Named in the confirmation toast. */
 	runTitle?: string;
+	/** The device that runs the run, when it is not this computer: the answer goes to it. */
+	walkerName?: string;
 	className?: string;
 }) {
 	const id = useId();
@@ -46,7 +49,11 @@ export function GateAnswer({
 			onSuccess: (_, input) => {
 				toast.success(
 					`Answered ${outcomeLabel(input.choice)}${runTitle ? ` · ${runTitle}` : ""}`,
-					{ description: "The run goes on." },
+					{
+						description: walkerName
+							? `Sent to ${walkerName}. The run goes on when ${walkerName} is online.`
+							: "The run goes on.",
+					},
 				);
 				setNote("");
 				// Out of the inbox at once; the refetch confirms it.
