@@ -24,12 +24,15 @@ export type Context = {
 	/** The Space the session works in: its active Space, else the Person's personal Space. Null without a session. */
 	spaceId: string | null;
 	/**
-	 * Whether the session's Person may do `permissions` in that Space: the
-	 * organization plugin's check of their role, on the server.
+	 * Whether the session's Person may do `permissions` in that Space (or
+	 * in `inSpace`): the organization plugin's check of their role, on the
+	 * server.
 	 */
-	can(permissions: Permissions): Promise<boolean>;
+	can(permissions: Permissions, inSpace?: string): Promise<boolean>;
 	/** Makes a Space of the Person the session's active one. */
 	setActiveSpace(spaceId: string): Promise<void>;
+	/** A new Space, its creator the owner, and the session's active one. */
+	createSpace(name: string): Promise<{ id: string }>;
 	db: Database;
 	/** The engine of this Device. Procedures use the view of the session's Space. */
 	engine: Engine;

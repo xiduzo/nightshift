@@ -21,7 +21,7 @@ import {
 	nextCronTimes,
 	scheduleSchema,
 } from "@nightshift/flows";
-import type { RouterClient } from "@orpc/server";
+import { ORPCError, type RouterClient } from "@orpc/server";
 import { z } from "zod";
 
 import {
@@ -50,6 +50,10 @@ const spaces = {
 		.handler(async ({ context, input }) => {
 			await context.setActiveSpace(input.spaceId);
 		}),
+	/** A new Space with the Person as its owner. Later calls work in it. */
+	create: protectedProcedure
+		.input(z.object({ name: z.string().trim().min(1).max(60) }))
+		.handler(({ context, input }) => context.createSpace(input.name)),
 };
 
 const projects = {
@@ -100,6 +104,28 @@ const projects = {
 		.handler(({ context, input }) =>
 			context.space.removeProject(input.projectId),
 		),
+	/** A new name, for every Member of the Space. Whoever may add projects may rename them. */
+	rename: permitted({ project: ["add"] })
+		.input(
+			z.object({
+				projectId: z.string(),
+				name: z.string().trim().min(1).max(100),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.space.renameProject(input.projectId, input.name),
+		),
+	/** Moves the project, its runs and their history to another Space: `project.move` in both. */
+	move: permitted({ project: ["move"] })
+		.input(z.object({ projectId: z.string(), spaceId: z.string().min(1) }))
+		.handler(async ({ context, input }) => {
+			if (!(await context.can({ project: ["move"] }, input.spaceId))) {
+				throw new ORPCError("FORBIDDEN", {
+					message: "Your role in that Space does not allow this.",
+				});
+			}
+			await context.space.moveProject(input.projectId, input.spaceId);
+		}),
 };
 
 const flowRef = z.object({ projectId: z.string(), name: flowNameSchema });

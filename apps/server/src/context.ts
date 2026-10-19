@@ -35,12 +35,14 @@ export function access(context: HonoContext) {
 export async function createContext({
 	context,
 }: CreateContextOptions): Promise<ApiContext> {
-	const { session, spaceId, can, setActiveSpace } = await access(context);
+	const { session, spaceId, can, setActiveSpace, createSpace } =
+		await access(context);
 	return {
 		session,
 		spaceId,
 		can,
 		setActiveSpace,
+		createSpace,
 		db,
 		engine,
 		settings,

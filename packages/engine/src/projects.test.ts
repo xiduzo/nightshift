@@ -11,13 +11,17 @@ import { asc, eq } from "drizzle-orm";
 
 import { createProjects, normaliseRemote } from "./projects";
 import { createRunLog } from "./run-log";
+import { createSpaceDocuments, type SpaceDocuments } from "./space/document";
 import { createSandbox, mustGit, type Sandbox } from "./test-support";
 
 let sandbox: Sandbox;
+let documents: SpaceDocuments;
 beforeEach(async () => {
 	sandbox = await createSandbox();
+	documents = createSpaceDocuments({ db: sandbox.db });
 });
 afterEach(async () => {
+	await documents.close();
 	await sandbox.cleanup();
 });
 
@@ -26,6 +30,7 @@ const projectsOf = () =>
 		db: sandbox.db,
 		log: createRunLog(sandbox.db),
 		deviceId: async () => sandbox.deviceId,
+		documents,
 	});
 
 /** A new git repository under the sandbox, with `origin` set when given. */

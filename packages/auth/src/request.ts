@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 
 import type { Permissions } from "./access";
@@ -12,13 +13,21 @@ export type RequestAccess = {
 	spaceId: string | null;
 	/** The request's headers, with the local session when it got one: pass these to Better Auth. */
 	headers: Headers;
-	/** The organization plugin's `hasPermission` for the session in `spaceId`. */
-	can(permissions: Permissions): Promise<boolean>;
+	/**
+	 * The organization plugin's `hasPermission` for the session in
+	 * `spaceId`, or in another Space of the Person's.
+	 */
+	can(permissions: Permissions, inSpace?: string): Promise<boolean>;
 	/**
 	 * Makes a Space the session's active one (the organization plugin's
 	 * `setActiveOrganization`). Refused when the Person is not a member.
 	 */
 	setActiveSpace(spaceId: string): Promise<void>;
+	/**
+	 * Makes a new Space with the session's Person as its owner, and makes
+	 * it the session's active one.
+	 */
+	createSpace(name: string): Promise<{ id: string }>;
 };
 
 /**
@@ -41,15 +50,37 @@ export async function requestAccess(
 		session,
 		spaceId,
 		headers: resolved.headers,
-		can: (permissions) =>
-			spaceId
-				? hasPermission(auth, resolved.headers, spaceId, permissions)
-				: Promise.resolve(false),
+		can: (permissions, inSpace) => {
+			const space = inSpace ?? spaceId;
+			return space && session
+				? hasPermission(auth, resolved.headers, space, permissions)
+				: Promise.resolve(false);
+		},
 		async setActiveSpace(id) {
 			await auth.api.setActiveOrganization({
 				headers: resolved.headers,
 				body: { organizationId: id },
 			});
 		},
+		async createSpace(name) {
+			const created = await auth.api.createOrganization({
+				headers: resolved.headers,
+				body: { name, slug: `${slugOf(name)}-${randomUUID().slice(0, 8)}` },
+			});
+			if (!created) throw new Error("Could not create the Space.");
+			return { id: created.id };
+		},
 	};
+}
+
+/** A slug from a Space's name: lower case letters, digits and dashes. */
+function slugOf(name: string): string {
+	return (
+		name
+			.normalize("NFKD")
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 40) || "space"
+	);
 }

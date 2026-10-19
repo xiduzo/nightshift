@@ -9,10 +9,14 @@ import {
 	type AuthSandbox,
 	createAuthSandbox,
 } from "@nightshift/auth/test-support";
+import { project } from "@nightshift/db/schema/nightshift";
 import {
 	createCliToolStore,
 	createSettingsStore,
+	createSpaceDocuments,
 	type DeviceDocument,
+	type SpaceDocuments,
+	spaceDocumentName,
 } from "@nightshift/engine";
 import {
 	createSandbox,
@@ -22,7 +26,7 @@ import {
 import type { Server } from "bun";
 import * as Y from "yjs";
 
-import { createSync, ownerOnly, type SocketData, type Sync } from "./sync";
+import { createSync, documentAccess, type SocketData, type Sync } from "./sync";
 
 /**
  * Hocuspocus 4 under Bun 1.3, in-process: Bun.serve accepts the socket and
@@ -35,6 +39,7 @@ let people: AuthSandbox;
 /** A session of a Person who does not own this computer. */
 let stranger: Headers;
 let document: DeviceDocument;
+let spaces: SpaceDocuments;
 let sync: Sync;
 let server: Server<SocketData>;
 const providers: HocuspocusProvider[] = [];
@@ -47,9 +52,13 @@ beforeEach(async () => {
 	people = await createAuthSandbox();
 	const owner = await localPerson(people.db);
 	stranger = (await people.signUp("Dee")).headers;
+	spaces = createSpaceDocuments({ db: people.db });
 	sync = createSync({
-		document: (name) => (name === document.name ? document.doc : null),
-		authorize: ownerOnly({
+		document: (name) =>
+			name === document.name
+				? document.doc
+				: (spaces.byName(name)?.doc ?? null),
+		authorize: documentAccess({
 			auth: people.auth,
 			db: people.db,
 			localSession: createLocalSession(people.auth, people.db, owner.userId),
@@ -73,6 +82,7 @@ afterEach(async () => {
 	await sync.close();
 	server.stop(true);
 	await document.close();
+	await spaces.close();
 	await sandbox.cleanup();
 	people.cleanup();
 });
@@ -182,7 +192,7 @@ describe("Hocuspocus on Bun", () => {
 	});
 });
 
-describe("ownerOnly", () => {
+describe("documentAccess: the Device document", () => {
 	test("another Person is refused, even on this computer", async () => {
 		const client = connect(document.name, {
 			origin: ORIGIN,
@@ -190,5 +200,86 @@ describe("ownerOnly", () => {
 		});
 		await waitFor(() => client.failed.length > 0);
 		expect(client.provider.isSynced).toBe(false);
+	});
+});
+
+describe("documentAccess: a Space document", () => {
+	/** Platform: Ada owns it, Bob is a member, Cy a viewer. Dee is not in it. */
+	async function platform() {
+		const ada = await people.signUp("Ada");
+		const bob = await people.signUp("Bob");
+		const cy = await people.signUp("Cy");
+		const space = await people.auth.api.createOrganization({
+			headers: ada.headers,
+			body: { name: "Platform", slug: "platform" },
+		});
+		if (!space) throw new Error("no space");
+		for (const [person, role] of [
+			[bob, "member"],
+			[cy, "viewer"],
+		] as const) {
+			await people.auth.api.addMember({
+				body: { userId: person.userId, role, organizationId: space.id },
+			});
+		}
+		const opened = await spaces.open(space.id);
+		const cookie = (headers: Headers) => headers.get("cookie") ?? "";
+		return {
+			opened,
+			name: spaceDocumentName(space.id),
+			bob: cookie(bob.headers),
+			cy: cookie(cy.headers),
+		};
+	}
+
+	const entry = (name: string) => ({
+		name,
+		remote: null,
+		createdAt: 1,
+		removedAt: null,
+		updatedAt: 1,
+	});
+
+	test("a member and a viewer read it; neither writes through the relay", async () => {
+		const { opened, name, bob, cy } = await platform();
+		expect(opened.members.size).toBe(3);
+		const member = connect(name, { origin: ORIGIN, cookie: bob });
+		const viewer = connect(name, { origin: ORIGIN, cookie: cy });
+		await waitFor(() => member.provider.isSynced && viewer.provider.isSynced);
+		expect(member.doc.getMap("members").size).toBe(3);
+
+		member.doc.getMap("projects").set("p-bob", entry("From Bob"));
+		viewer.doc.getMap("projects").set("p-cy", entry("From Cy"));
+		// The Owner's own write (through a procedure) reaches both.
+		await opened.change(() => {
+			opened.projects.set("p-owner", entry("From the engine"));
+		});
+		await waitFor(
+			() =>
+				member.doc.getMap("projects").has("p-owner") &&
+				viewer.doc.getMap("projects").has("p-owner"),
+		);
+		expect(opened.projects.has("p-bob")).toBe(false);
+		expect(opened.projects.has("p-cy")).toBe(false);
+		const rows = await people.db.select().from(project);
+		expect(rows.map((row) => row.name)).toEqual(["From the engine"]);
+	});
+
+	test("a Person outside the Space is refused", async () => {
+		const { name } = await platform();
+		const outsider = connect(name, {
+			origin: ORIGIN,
+			cookie: stranger.get("cookie") ?? "",
+		});
+		await waitFor(() => outsider.failed.length > 0);
+		expect(outsider.provider.isSynced).toBe(false);
+		expect(outsider.doc.getMap("members").size).toBe(0);
+	});
+
+	test("this computer's Person is not a member of another Person's Space", async () => {
+		const { name } = await platform();
+		const local = connect(name, { origin: ORIGIN });
+		await waitFor(() => local.failed.length > 0);
+		expect(local.provider.isSynced).toBe(false);
 	});
 });

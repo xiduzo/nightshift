@@ -6,10 +6,13 @@ import {
 	connection,
 	secret,
 	setting,
-	ydoc,
 } from "@nightshift/db/schema/nightshift";
-import { eq, sql } from "drizzle-orm";
-import * as Y from "yjs";
+import { eq } from "drizzle-orm";
+import type * as Y from "yjs";
+
+import { openPersistedDocument, type PersistedDocument } from "../ydoc";
+
+export { type DocumentRows, documentRows } from "../ydoc";
 
 /**
  * The Device document: one Yjs document per Device, named `device:<id>`,
@@ -24,10 +27,7 @@ import * as Y from "yjs";
  * it, so an entry this version cannot read (a newer build's, or a bad
  * edit) is skipped and stays in the document.
  */
-export type DeviceDocument = {
-	/** `device:<id>`: the document's name in the Replica and on the relay. */
-	readonly name: string;
-	readonly doc: Y.Doc;
+export type DeviceDocument = PersistedDocument & {
 	/** Name → `{ description, settings, updatedAt }`. */
 	readonly profiles: Y.Map<unknown>;
 	/** Name → `{ description, updatedAt }`. */
@@ -40,14 +40,6 @@ export type DeviceDocument = {
 	readonly facts: Y.Map<unknown>;
 	/** The profiles this Device offers into Spaces (slice 6). Empty until then. */
 	readonly offers: Y.Map<unknown>;
-	/** A number that changes whenever the map does (for `mapView`). */
-	revision(map: Y.Map<unknown>): number;
-	/** Makes one change in one transaction. Resolves when the Replica has it. */
-	change(fn: () => void): Promise<void>;
-	/** Resolves when every change so far is in the Replica. */
-	flush(): Promise<void>;
-	/** Flushes, then stops writing to the Replica. */
-	close(): Promise<void>;
 };
 
 /**
@@ -73,37 +65,6 @@ export function deviceDocumentName(deviceId: string): string {
 	return `device:${deviceId}`;
 }
 
-/** Yjs documents in the Replica, by name: their full state. */
-export type DocumentRows = {
-	fetch(name: string): Promise<Uint8Array | null>;
-	store(name: string, state: Uint8Array): Promise<void>;
-};
-
-export function documentRows(db: Database): DocumentRows {
-	return {
-		async fetch(name) {
-			const [row] = await db
-				.select({ state: ydoc.state })
-				.from(ydoc)
-				.where(eq(ydoc.name, name));
-			return row ? new Uint8Array(row.state) : null;
-		},
-		async store(name, state) {
-			const buffer = Buffer.from(state);
-			await db
-				.insert(ydoc)
-				.values({ name, state: buffer })
-				.onConflictDoUpdate({
-					target: ydoc.name,
-					set: {
-						state: buffer,
-						updatedAt: sql`(cast(unixepoch('subsecond') * 1000 as integer))`,
-					},
-				});
-		},
-	};
-}
-
 /** The transaction origin of the Owner's own changes. */
 export const OWNER_ORIGIN = Symbol("device-document-owner");
 
@@ -118,64 +79,21 @@ export async function openDeviceDocument(options: {
 	deviceId: string;
 }): Promise<DeviceDocument> {
 	const { db, deviceId } = options;
-	const name = deviceDocumentName(deviceId);
-	const rows = documentRows(db);
-	const doc = new Y.Doc();
-	const state = await rows.fetch(name);
-	if (state) Y.applyUpdate(doc, state);
-
-	// One write at a time, each of the whole state. Changes made while one
-	// is written wait for the next, which takes them all.
-	let tail: Promise<void> = Promise.resolve();
-	let next: Promise<void> | null = null;
-	function persist(): Promise<void> {
-		if (next) return next;
-		const write = tail
-			.catch(() => {})
-			.then(() => {
-				next = null;
-				return rows.store(name, Y.encodeStateAsUpdate(doc));
-			});
-		next = write;
-		tail = write;
-		return write;
-	}
-	const onUpdate = () => {
-		persist().catch((error) => {
-			console.error(`The Device document ${name} was not saved:`, error);
-		});
-	};
-	doc.on("update", onUpdate);
-
-	// Every transaction counts the maps it changed, ours or a client's.
-	const revisions = new WeakMap<object, number>();
-	const onTransaction = (transaction: Y.Transaction) => {
-		for (const type of transaction.changed.keys()) {
-			revisions.set(type, (revisions.get(type) ?? 0) + 1);
-		}
-	};
-	doc.on("beforeObserverCalls", onTransaction);
-
+	const persisted = await openPersistedDocument({
+		db,
+		name: deviceDocumentName(deviceId),
+		origin: OWNER_ORIGIN,
+		label: "The Device document",
+	});
+	const { doc } = persisted;
 	const document: DeviceDocument = {
-		name,
-		doc,
+		...persisted,
 		profiles: doc.getMap("profiles"),
 		cliTools: doc.getMap("cliTools"),
 		connections: doc.getMap("connections"),
 		settings: doc.getMap("settings"),
 		facts: doc.getMap("facts"),
 		offers: doc.getMap("offers"),
-		revision: (map) => revisions.get(map) ?? 0,
-		async change(fn) {
-			doc.transact(fn, OWNER_ORIGIN);
-			await persist();
-		},
-		flush: () => tail.catch(() => {}),
-		async close() {
-			doc.off("update", onUpdate);
-			doc.off("beforeObserverCalls", onTransaction);
-			await tail.catch(() => {});
-		},
 	};
 
 	const meta = doc.getMap("meta");
@@ -312,7 +230,7 @@ function safeJson(text: string): unknown {
  * (a store built again on `bun --hot`) leaves nothing behind.
  */
 export function mapView<T>(
-	document: DeviceDocument,
+	document: Pick<PersistedDocument, "revision">,
 	map: Y.Map<unknown>,
 	read: () => T,
 ): () => T {

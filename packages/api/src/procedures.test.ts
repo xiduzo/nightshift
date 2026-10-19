@@ -44,12 +44,14 @@ async function contextFor(headers: Headers | null): Promise<Context> {
 				spaceId: null,
 				can: async () => false,
 				setActiveSpace: async () => {},
+				createSpace: async () => ({ id: "none" }),
 			};
 	return {
 		session: access.session,
 		spaceId: access.spaceId,
 		can: access.can,
 		setActiveSpace: access.setActiveSpace,
+		createSpace: access.createSpace,
 		db: sandbox.db,
 		engine,
 		daemon: {
@@ -197,6 +199,87 @@ describe("procedures", () => {
 		).toBe("FORBIDDEN");
 		expect(
 			await errorOf(call(appRouter.connections.list, undefined, { context })),
+		).toBe("FORBIDDEN");
+	});
+
+	test("a Person creates a Space, owns it, and works in it", async () => {
+		const ada = await sandbox.signUp("Ada");
+		let context = await contextFor(ada.headers);
+		const { id } = await call(
+			appRouter.spaces.create,
+			{ name: "  Platform  " },
+			{ context },
+		);
+		context = await contextFor(ada.headers);
+		expect(context.spaceId).toBe(id);
+		const listed = await call(appRouter.spaces.list, undefined, { context });
+		expect(listed.spaces.find((s) => s.id === id)).toEqual({
+			id,
+			name: "Platform",
+			personal: false,
+			role: "owner",
+		});
+	});
+
+	test("moving a project needs project.move in both Spaces", async () => {
+		const { ada, bob, spaceId } = await platform();
+		const move = { projectId: "p1", spaceId };
+
+		// Ada owns her personal Space and Platform: she may.
+		const personal = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
+		const owner = await contextFor(ada.headers);
+		await call(
+			appRouter.spaces.switch,
+			{ spaceId: personal },
+			{ context: owner },
+		);
+		await call(appRouter.projects.move, move, {
+			context: await contextFor(ada.headers),
+		});
+		expect(calls.at(-1)).toEqual({ space: personal, method: "moveProject" });
+
+		// Bob is only a member of Platform: moving into it from his own Space is refused.
+		const bobsOwn = (await personalSpaceId(sandbox.db, bob.userId)) ?? "";
+		const member = await contextFor(bob.headers);
+		await call(
+			appRouter.spaces.switch,
+			{ spaceId: bobsOwn },
+			{ context: member },
+		);
+		expect(
+			await errorOf(
+				call(appRouter.projects.move, move, {
+					context: await contextFor(bob.headers),
+				}),
+			),
+		).toBe("FORBIDDEN");
+		// And out of Platform too: a member may not move.
+		await call(appRouter.spaces.switch, { spaceId }, { context: member });
+		expect(
+			await errorOf(
+				call(
+					appRouter.projects.move,
+					{ projectId: "p1", spaceId: bobsOwn },
+					{ context: await contextFor(bob.headers) },
+				),
+			),
+		).toBe("FORBIDDEN");
+		expect(calls.filter((c) => c.method === "moveProject")).toHaveLength(1);
+	});
+
+	test("a member renames a project; a viewer may not", async () => {
+		const { bob, cy, spaceId } = await platform();
+		const rename = { projectId: "p1", name: "App" };
+		await call(appRouter.projects.rename, rename, {
+			context: await contextFor(bob.headers),
+		});
+		expect(calls.at(-1)).toEqual({ space: spaceId, method: "renameProject" });
+		expect(
+			await errorOf(
+				call(appRouter.projects.rename, rename, {
+					context: await contextFor(cy.headers),
+				}),
+			),
 		).toBe("FORBIDDEN");
 	});
 });

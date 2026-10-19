@@ -38,14 +38,20 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+	ArrowRightLeftIcon,
 	FolderGitIcon,
 	FolderOpenIcon,
 	MoreHorizontalIcon,
+	PencilIcon,
 	Trash2Icon,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PageHeading, PageSection } from "@/components/page-heading";
+import {
+	MoveProjectDialog,
+	RenameProjectDialog,
+} from "@/components/project-actions";
 import { RunList } from "@/components/run-list";
 import { SectionCards } from "@/components/section-cards";
 import { SiteHeader } from "@/components/site-header";
@@ -125,6 +131,8 @@ function ProjectList({
 }) {
 	const queryClient = useQueryClient();
 	const [toRemove, setToRemove] = useState<Project | null>(null);
+	const [toRename, setToRename] = useState<Project | null>(null);
+	const [toMove, setToMove] = useState<Project | null>(null);
 	const removeProject = useMutation(
 		orpc.projects.remove.mutationOptions({
 			onSuccess: () => {
@@ -176,9 +184,23 @@ function ProjectList({
 						runs={runs?.filter((run) => run.projectId === project.id)}
 						removing={removeProject.isPending}
 						onRemove={() => setToRemove(project)}
+						onRename={() => setToRename(project)}
+						onMove={() => setToMove(project)}
 					/>
 				))}
 			</div>
+			<RenameProjectDialog
+				project={toRename}
+				onOpenChange={(open) => {
+					if (!open) setToRename(null);
+				}}
+			/>
+			<MoveProjectDialog
+				project={toMove}
+				onOpenChange={(open) => {
+					if (!open) setToMove(null);
+				}}
+			/>
 			<AlertDialog
 				open={toRemove !== null}
 				onOpenChange={(open) => {
@@ -222,12 +244,16 @@ function ProjectCard({
 	runs,
 	removing,
 	onRemove,
+	onRename,
+	onMove,
 }: {
 	project: Project;
 	/** This project's runs, when loaded. */
 	runs: RunSummary[] | undefined;
 	removing: boolean;
 	onRemove: () => void;
+	onRename: () => void;
+	onMove: () => void;
 }) {
 	const last = runs?.reduce<RunSummary | undefined>(
 		(latest, run) =>
@@ -293,6 +319,14 @@ function ProjectCard({
 							>
 								<FolderOpenIcon aria-hidden="true" />
 								Open project
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={onRename}>
+								<PencilIcon aria-hidden="true" />
+								Rename…
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={onMove}>
+								<ArrowRightLeftIcon aria-hidden="true" />
+								Move to Space…
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem
