@@ -20,6 +20,7 @@
 		"@nightshift/flows": "workspace:*",
 		"ajv": "^8.20.0",
 		"drizzle-orm": "catalog:",
+		"yjs": "catalog:",
 		"zod": "catalog:"
 	},
 	"devDependencies": {

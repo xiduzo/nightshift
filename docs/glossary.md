@@ -23,6 +23,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Walker | The Device that walks a Run and writes its Events. Today every Run's Walker is this computer. | Devices |
 | Owner | The one Device that writes a row. Sync never merges two writers of one row: a Run's rows and Events are its Walker's, a Clone is its Device's. | Devices |
 | Replica | A Device's own database: everything it may see, as far as it has synced. Today, the only one. | Devices |
+| Device document | A Device's configuration as one Yjs document, `device:<id>`: its Agent Profiles, CLI Tools, Connections, Settings, and its facts (harnesses, programs, secret names, Clones). Its Device is its Owner: it applies edits and saves the document in its Replica. Syncs at `/sync`, to its owner only. Never holds a secret value. | Devices, slice 3 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
 | Node | One step of a Flow: Agent, Command, Tool, Decision, Value, Wait, or Subflow (`call` in the file). Its id is also its name in templates. | PLAN §3 |
 | Agent Node | A Node that runs one Session on its Harness, with a prompt or a skill (with arguments), a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. The agent picks its Outcome in its Step Report, or a Checker picks it. | PLAN §3 |
@@ -48,7 +49,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Secret | A value a `${NAME}` reads: from the system keychain (saved on the Agents page, under Secrets), else the daemon's environment. Never in a Flow file, the database, or the log. | Connections |
 | Lease | The right of one daemon to write to a database. The daemon takes it at start, keeps it with a heartbeat, and gives it up on a clean stop. A second daemon on the same database refuses to start. Each acquisition has an Epoch one higher than the last. | Lease |
 | Epoch | The number of a Lease acquisition. A daemon whose Epoch is no longer the Lease's lost it, and exits (self-fence). | Lease |
-| Setting | A daemon-wide value changed on the Settings page and saved in the database. Unset, it reads the environment, then its default. A Flow's own policy wins over the Settings' policy. | Settings |
+| Setting | A daemon-wide value changed on the Settings page and saved in the Device document. Unset, it reads the environment, then its default. A Flow's own policy wins over the Settings' policy. | Settings |
 | List | The elements a Call Node with `each` runs over, read from a Source. | Slice 5 |
 | Source | Where a Call Node with `each` reads its List, again before each Item: a JSON value, a command that prints JSON, or a glob of files. A tracker is a command on its CLI (`gh`, `glab`, `acli`); the engine knows none. | Slice 4 |
 | Schedule | A Flow, its Inputs, a time, and a Stop Time: the daemon starts a Run from it. | Slice 7 |

@@ -233,6 +233,27 @@ const updatedAt = () =>
 		.notNull();
 
 /**
+ * A Yjs document, by name, as its full state (`Y.encodeStateAsUpdate`).
+ * The Device document of this computer is `device:<id>`: its Agent
+ * Profiles, CLI Tools, Connections, settings and facts. Its Owner (this
+ * computer for its own document) writes the row after every change.
+ */
+export const ydoc = sqliteTable("ydoc", {
+	name: text("name").primaryKey(),
+	state: blob("state", { mode: "buffer" }).notNull(),
+	updatedAt: updatedAt(),
+});
+
+/*
+ * Read-only since the Device document: `setting`, `connection`, `cli_tool`,
+ * `agent_profile` and `secret` are imported into it once, on the first
+ * start of the version that added `ydoc`, and never written again. SQL
+ * cannot write a Yjs document, so a migration cannot move the rows itself:
+ * a later migration drops these tables, once every install has started
+ * this version.
+ */
+
+/**
  * A daemon setting changed in the UI. A key without a row falls back to the
  * daemon's environment, then to the built-in default.
  */

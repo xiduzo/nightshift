@@ -1,5 +1,3 @@
-import type { Database } from "@nightshift/db";
-import { agentProfile } from "@nightshift/db/schema/nightshift";
 import {
 	type AgentProfile,
 	type AgentProfileSettings,
@@ -7,12 +5,14 @@ import {
 	agentProfileSettingsSchema,
 	migrateToolSets,
 } from "@nightshift/flows";
-import { eq, sql } from "drizzle-orm";
+import { z } from "zod";
+
+import { type DeviceDocument, mapView } from "./device/document";
 
 /**
  * Agent Profiles: a harness, a model and its tools under one name, defined
- * once on this daemon (the Agents page). Agent nodes name a profile; a run
- * resolves it when it starts.
+ * once on this Device (the Agents page) and kept in its Device document.
+ * Agent nodes name a profile; a run resolves it when it starts.
  */
 
 export type ProfileView = AgentProfile & { updatedAt: number };
@@ -29,33 +29,48 @@ export type ProfileStore = {
 	remove(name: string): Promise<void>;
 };
 
-export function createProfileStore(options: { db: Database }): ProfileStore {
-	const { db } = options;
-	const profiles = new Map<string, ProfileView>();
+/** A profile as the Device document holds it. */
+const entrySchema = z.object({
+	description: z.string().nullable(),
+	settings: z.unknown(),
+	updatedAt: z.number(),
+});
+
+export function createProfileStore(options: {
+	document: DeviceDocument;
+}): ProfileStore {
+	const { document } = options;
+	const profiles = mapView(document, document.profiles, () => {
+		const out = new Map<string, ProfileView>();
+		for (const [name, value] of document.profiles.entries()) {
+			const entry = entrySchema.safeParse(value);
+			if (!entry.success) continue;
+			// A profile saved with the GitHub tool set reads as one with `gh`.
+			const parsed = agentProfileSettingsSchema.safeParse(
+				migrateToolSets(entry.data.settings),
+			);
+			// An entry this version cannot read stays in the document, unused.
+			if (!parsed.success) continue;
+			out.set(name, {
+				...parsed.data,
+				name,
+				...(entry.data.description
+					? { description: entry.data.description }
+					: {}),
+				updatedAt: entry.data.updatedAt,
+			});
+		}
+		return out;
+	});
 
 	return {
-		async load() {
-			profiles.clear();
-			for (const row of await db.select().from(agentProfile)) {
-				// A profile saved with the GitHub tool set reads as one with `gh`.
-				const parsed = agentProfileSettingsSchema.safeParse(
-					migrateToolSets(safeJson(row.settings)),
-				);
-				// A row this version cannot read stays in the database, unused.
-				if (!parsed.success) continue;
-				profiles.set(row.name, {
-					...parsed.data,
-					name: row.name,
-					...(row.description ? { description: row.description } : {}),
-					updatedAt: row.updatedAt.getTime(),
-				});
-			}
-		},
+		// The document is read when it opens; a remote edit applies at once.
+		async load() {},
 		list: () =>
-			[...profiles.values()].sort((a, b) => a.name.localeCompare(b.name)),
-		get: (name) => profiles.get(name) ?? null,
+			[...profiles().values()].sort((a, b) => a.name.localeCompare(b.name)),
+		get: (name) => profiles().get(name) ?? null,
 		settingsFor(name) {
-			const found = profiles.get(name);
+			const found = profiles().get(name);
 			if (!found) return null;
 			const {
 				name: _name,
@@ -68,39 +83,25 @@ export function createProfileStore(options: { db: Database }): ProfileStore {
 		async save(input) {
 			const { name, description, ...settings } =
 				agentProfileSchema.parse(input);
-			const json = JSON.stringify(settings);
-			const [row] = await db
-				.insert(agentProfile)
-				.values({ name, description: description || null, settings: json })
-				.onConflictDoUpdate({
-					target: agentProfile.name,
-					set: {
-						description: description || null,
-						settings: json,
-						updatedAt: sql`(cast(unixepoch('subsecond') * 1000 as integer))`,
-					},
-				})
-				.returning();
-			const saved: ProfileView = {
+			const updatedAt = Date.now();
+			await document.change(() => {
+				document.profiles.set(name, {
+					description: description || null,
+					settings,
+					updatedAt,
+				});
+			});
+			return {
 				...settings,
 				name,
 				...(description ? { description } : {}),
-				updatedAt: row?.updatedAt.getTime() ?? Date.now(),
+				updatedAt,
 			};
-			profiles.set(name, saved);
-			return saved;
 		},
 		async remove(name) {
-			await db.delete(agentProfile).where(eq(agentProfile.name, name));
-			profiles.delete(name);
+			await document.change(() => {
+				document.profiles.delete(name);
+			});
 		},
 	};
-}
-
-function safeJson(text: string): unknown {
-	try {
-		return JSON.parse(text);
-	} catch {
-		return null;
-	}
 }

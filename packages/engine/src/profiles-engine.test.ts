@@ -184,22 +184,30 @@ describe("added harnesses", () => {
 
 describe("createProfileStore", () => {
 	test("saves, reloads, resolves and removes a profile", async () => {
-		const store = createProfileStore({ db: sandbox.db });
+		const document = await sandbox.openDocument();
+		const store = createProfileStore({ document });
 		await store.load();
 		await store.save({ ...builder, name: "builder", description: "Builds." });
-		const again = createProfileStore({ db: sandbox.db });
+		// After a restart.
+		const again = createProfileStore({
+			document: await sandbox.openDocument(),
+		});
 		await again.load();
 		expect(again.list().map((p) => p.name)).toEqual(["builder"]);
 		expect(again.get("builder")?.description).toBe("Builds.");
 		expect(again.settingsFor("builder")).toEqual(builder);
 		await again.remove("builder");
 		expect(again.settingsFor("builder")).toBeNull();
-		await store.load();
-		expect(store.list()).toEqual([]);
+		const third = createProfileStore({
+			document: await sandbox.openDocument(),
+		});
+		expect(third.list()).toEqual([]);
 	});
 
 	test("refuses a profile with a name a node cannot use", async () => {
-		const store = createProfileStore({ db: sandbox.db });
+		const store = createProfileStore({
+			document: await sandbox.openDocument(),
+		});
 		await expect(
 			store.save({ ...builder, name: "Not A Name" }),
 		).rejects.toThrow();

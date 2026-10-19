@@ -11,7 +11,7 @@ export const DAEMON_URL = `http://localhost:${DAEMON_PORT}`;
 export type Daemon = {
 	/** "own": this app runs the daemon. "shared": another one (`bun run night`) already did. */
 	kind: "own" | "shared";
-	/** Stops serving and gives the database lease up, so the next daemon starts at once. */
+	/** Stops serving, writes the Device document, and gives the database lease up, so the next daemon starts at once. */
 	stop(): Promise<void>;
 };
 
@@ -50,7 +50,7 @@ export async function startDaemon(): Promise<Daemon> {
 	prepareDaemonEnv(DAEMON_URL, DAEMON_PORT);
 	// Imported only now: the server reads its env and takes the database lease
 	// when it loads.
-	const [{ default: app }, { lease }] = await Promise.all([
+	const [{ default: daemon }, { document, lease }] = await Promise.all([
 		import("server/src/index"),
 		import("server/src/services"),
 	]);
@@ -58,7 +58,8 @@ export async function startDaemon(): Promise<Daemon> {
 	const server = Bun.serve({
 		hostname: "localhost",
 		port: DAEMON_PORT,
-		fetch: app.fetch,
+		fetch: daemon.fetch,
+		websocket: daemon.websocket,
 	});
 	console.log(`Night Shift daemon on ${server.url}`);
 
@@ -68,7 +69,10 @@ export async function startDaemon(): Promise<Daemon> {
 		stop: () => {
 			stopped ??= (async () => {
 				server.stop(true);
-				await Promise.race([lease.release(), Bun.sleep(2_000)]).catch(() => {});
+				await Promise.race([
+					Promise.all([document.flush(), lease.release()]),
+					Bun.sleep(2_000),
+				]).catch(() => {});
 			})();
 			return stopped;
 		},

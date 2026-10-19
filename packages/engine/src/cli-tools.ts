@@ -1,15 +1,14 @@
-import type { Database } from "@nightshift/db";
-import { cliTool } from "@nightshift/db/schema/nightshift";
 import { cliNameSchema } from "@nightshift/flows";
-import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { type DeviceDocument, mapView } from "./device/document";
+
 /**
- * CLI tools: programs on this computer (`gh`, `aws`), defined once on this
- * daemon (the Agents page, under Tools). An Agent node or profile lists the
- * ones its agent may run; the harness then allows them without a prompt.
- * A run whose flow names one the daemon does not have, or one this computer
- * cannot find, refuses to start.
+ * CLI tools: programs on this computer (`gh`, `aws`), defined once in its
+ * Device document (the Agents page, under Tools). An Agent node or profile
+ * lists the ones its agent may run; the harness then allows them without a
+ * prompt. A run whose flow names one the daemon does not have, or one this
+ * computer cannot find, refuses to start.
  */
 
 export const cliToolInputSchema = z.object({
@@ -36,51 +35,52 @@ export type CliToolStore = {
 	remove(name: string): Promise<void>;
 };
 
-export function createCliToolStore(options: { db: Database }): CliToolStore {
-	const { db } = options;
-	const tools = new Map<string, CliTool>();
+/** A CLI tool as the Device document holds it. */
+const entrySchema = z.object({
+	description: z.string().nullable(),
+	updatedAt: z.number(),
+});
+
+export function createCliToolStore(options: {
+	document: DeviceDocument;
+}): CliToolStore {
+	const { document } = options;
+	const tools = mapView(document, document.cliTools, () => {
+		const out = new Map<string, CliTool>();
+		for (const [name, value] of document.cliTools.entries()) {
+			const entry = entrySchema.safeParse(value);
+			if (!entry.success || !cliNameSchema.safeParse(name).success) continue;
+			out.set(name, { name, ...entry.data });
+		}
+		return out;
+	});
 
 	return {
-		async load() {
-			tools.clear();
-			for (const row of await db.select().from(cliTool)) {
-				if (!cliNameSchema.safeParse(row.name).success) continue;
-				tools.set(row.name, {
-					name: row.name,
-					description: row.description,
-					updatedAt: row.updatedAt.getTime(),
-				});
-			}
-		},
-		names: () => new Set(tools.keys()),
+		// The document is read when it opens; a remote edit applies at once.
+		async load() {},
+		names: () => new Set(tools().keys()),
 		list: () =>
-			[...tools.values()].sort((a, b) => a.name.localeCompare(b.name)),
-		get: (name) => tools.get(name) ?? null,
+			[...tools().values()].sort((a, b) => a.name.localeCompare(b.name)),
+		get: (name) => tools().get(name) ?? null,
 		async save(input) {
 			const parsed = cliToolInputSchema.parse(input);
-			const description = parsed.description || null;
-			const [row] = await db
-				.insert(cliTool)
-				.values({ name: parsed.name, description })
-				.onConflictDoUpdate({
-					target: cliTool.name,
-					set: {
-						description,
-						updatedAt: sql`(cast(unixepoch('subsecond') * 1000 as integer))`,
-					},
-				})
-				.returning();
-			const saved = {
+			const saved: CliTool = {
 				name: parsed.name,
-				description,
-				updatedAt: row?.updatedAt.getTime() ?? Date.now(),
+				description: parsed.description || null,
+				updatedAt: Date.now(),
 			};
-			tools.set(parsed.name, saved);
+			await document.change(() => {
+				document.cliTools.set(parsed.name, {
+					description: saved.description,
+					updatedAt: saved.updatedAt,
+				});
+			});
 			return saved;
 		},
 		async remove(name) {
-			await db.delete(cliTool).where(eq(cliTool.name, name));
-			tools.delete(name);
+			await document.change(() => {
+				document.cliTools.delete(name);
+			});
 		},
 	};
 }

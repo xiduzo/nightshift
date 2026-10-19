@@ -20,6 +20,18 @@ export {
 	type SecretView,
 	secretNameSchema,
 } from "./connections";
+export {
+	type DeviceDocument,
+	type DeviceFacts,
+	type DocumentRows,
+	deviceDocumentName,
+	deviceFacts,
+	documentRows,
+	OWNER_ORIGIN,
+	openDeviceDocument,
+	refreshDeviceFacts,
+	setDeviceFacts,
+} from "./device/document";
 export { type LocalDeviceDeps, localDevice } from "./device/local";
 export type * from "./device/types";
 export { createEngine } from "./engine";
@@ -70,6 +82,7 @@ export {
 } from "./self-device";
 export {
 	createSettingsStore,
+	HARNESS_BIN,
 	type RunSettings,
 	type SettingField,
 	type SettingKey,

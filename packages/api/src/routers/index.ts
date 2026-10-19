@@ -4,7 +4,7 @@ import {
 	chooseFolder,
 	cliToolInputSchema,
 	connectionInputSchema,
-	type SettingKey,
+	HARNESS_BIN,
 	secretNameSchema,
 	settingsPatchSchema,
 } from "@nightshift/engine";
@@ -16,7 +16,6 @@ import {
 	describeCron,
 	flowNameSchema,
 	flowSchema,
-	type HarnessName,
 	harnessNameSchema,
 	labelSchema,
 	nextCronTimes,
@@ -262,17 +261,6 @@ const settings = {
 			daemon: context.daemon,
 		})),
 };
-
-/** The setting that holds each harness's executable. */
-const HARNESS_BIN = {
-	"claude-code": "claudeBin",
-	opencode: "opencodeBin",
-	codex: "codexBin",
-	"grok-build": "grokBin",
-	copilot: "copilotBin",
-	gemini: "geminiBin",
-	cursor: "cursorBin",
-} as const satisfies Record<HarnessName, SettingKey>;
 
 const checkTarget = z.enum(harnessNameSchema.options);
 

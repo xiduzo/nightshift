@@ -14,6 +14,7 @@
 		"auth:generate": "varlock run -- bun x auth@latest generate --config src/services.ts --output ../../packages/db/src/schema/auth.ts --yes"
 	},
 	"dependencies": {
+		"@hocuspocus/server": "^4.7.1",
 		"@nightshift/agents": "workspace:*",
 		"@nightshift/api": "workspace:*",
 		"@nightshift/auth": "workspace:*",
@@ -26,9 +27,12 @@
 		"hono": "^4.13.7",
 		"libsql": "catalog:",
 		"varlock": "catalog:",
+		"y-protocols": "catalog:",
+		"yjs": "catalog:",
 		"zod": "catalog:"
 	},
 	"devDependencies": {
+		"@hocuspocus/provider": "^4.7.1",
 		"@nightshift/config": "workspace:*",
 		"@types/bun": "catalog:",
 		"tsdown": "^0.23.0",

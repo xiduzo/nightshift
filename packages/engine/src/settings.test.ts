@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { setting } from "@nightshift/db/schema/nightshift";
 
+import type { DeviceDocument } from "./device/document";
 import { createSettingsStore, defaultRunSettings } from "./settings";
 import { createSandbox, type Sandbox } from "./test-support";
 
@@ -12,10 +13,22 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
-async function store(env: Record<string, string | undefined> = {}) {
-	const s = createSettingsStore({ db: sandbox.db, env });
+/** A store over the Device document as a daemon start opens it. */
+async function store(
+	env: Record<string, string | undefined> = {},
+	document?: DeviceDocument,
+) {
+	const s = createSettingsStore({
+		document: document ?? (await sandbox.openDocument()),
+		env,
+	});
 	await s.load();
 	return s;
+}
+
+/** The keys with a saved value, as the next start reads them. */
+async function savedKeys(): Promise<string[]> {
+	return [...(await sandbox.openDocument()).settings.keys()].sort();
 }
 
 describe("precedence", () => {
@@ -161,7 +174,7 @@ describe("save", () => {
 		await s.save({ networkGraceMinutes: 30 });
 		await s.save({ networkGraceMinutes: 45 });
 		expect((await store()).current().networkGraceMinutes).toBe(45);
-		expect(await sandbox.db.select().from(setting)).toHaveLength(1);
+		expect(await savedKeys()).toEqual(["networkGraceMinutes"]);
 	});
 
 	test.each([
@@ -178,7 +191,7 @@ describe("save", () => {
 		const s = await store();
 		// biome-ignore lint/suspicious/noExplicitAny: the patch is invalid on purpose.
 		await expect(s.save(patch as any)).rejects.toThrow();
-		expect(await sandbox.db.select().from(setting)).toEqual([]);
+		expect(await savedKeys()).toEqual([]);
 		expect(s.view().fields.maxConcurrentRuns.source).toBe("default");
 	});
 
@@ -200,7 +213,10 @@ describe("save", () => {
 			usageLimitMaxWaitMinutes: 120,
 			networkGraceMinutes: 240,
 		});
-		expect(await sandbox.db.select().from(setting)).toHaveLength(2);
+		expect(await savedKeys()).toEqual([
+			"usageLimitFirstWaitMinutes",
+			"usageLimitMaxWaitMinutes",
+		]);
 	});
 
 	test("forgetting the longest wait checks the first wait against the default it falls back to", async () => {
@@ -225,7 +241,7 @@ describe("save", () => {
 });
 
 describe("load", () => {
-	test("ignores unknown keys and saved values that no longer parse", async () => {
+	test("ignores unknown keys and saved values that no longer parse, from the rows of an older version", async () => {
 		await sandbox.db.insert(setting).values([
 			{ key: "retiredSetting", value: "true" },
 			{ key: "constructor", value: "{}" },
@@ -243,13 +259,23 @@ describe("load", () => {
 		expect(Object.keys(s.current())).not.toContain("retiredSetting");
 	});
 
-	test("load again picks up a value another store saved", async () => {
-		const a = await store();
-		const b = await store();
+	test("a store sees a value saved through another store on its document at once", async () => {
+		const document = await sandbox.openDocument();
+		const a = await store({}, document);
+		const b = await store({}, document);
 		await a.save({ maxConcurrentRuns: 5 });
-		expect(b.current().maxConcurrentRuns).toBe(2);
-		await b.load();
 		expect(b.current().maxConcurrentRuns).toBe(5);
+	});
+
+	test("ignores a value in the document that no longer parses", async () => {
+		const document = await sandbox.openDocument();
+		await document.change(() => {
+			document.settings.set("maxConcurrentRuns", "five");
+			document.settings.set("agentModel", "opus");
+		});
+		const s = await store({}, document);
+		expect(s.view().fields.maxConcurrentRuns.source).toBe("default");
+		expect(s.current().agentModel).toBe("opus");
 	});
 });
 

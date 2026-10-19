@@ -620,6 +620,66 @@ iroh.
 3. **The documents.** Device and Space documents in Yjs, persisted in the
    Replica; Hocuspocus in the daemon, verified on Bun. The Agents page
    grouped by Device.
+
+   *Landed (part A, the Device document):*
+   - **One Yjs document per Device**, `device:<id>`, opened by
+     `openDeviceDocument` (`packages/engine/src/device/document.ts`). Its
+     maps: `profiles`, `cliTools`, `connections` (name → plain JSON entry
+     with `updatedAt`), `settings` (key → saved value), `facts`, `offers`
+     (empty until slice 6) and `meta`. An entry is plain JSON, so an edit
+     of one profile replaces that profile: concurrent edits of two fields
+     of one profile keep one of them. A store parses each entry when it
+     reads it; an entry it cannot read is skipped and stays.
+   - **Facts** (`DeviceFacts`): platform, each added harness and where its
+     CLI is, the programs on its PATH, the names of the secrets in its
+     keychain, its Clones, `checkedAt`. The Owner writes them at start and
+     every ten minutes (only what changed); the connection store writes
+     the secret names when a secret is saved or removed. Secret values
+     never enter the document.
+   - **Persisted in the Replica**: `ydoc(name, state, updated_at)`, the
+     full state (`Y.encodeStateAsUpdate`) after every change, one write at
+     a time; a store's `save` resolves when the row is written. A clean
+     stop (signals, the desktop app's stop) flushes the pending write.
+   - **The stores are views of the document**, interfaces unchanged:
+     `createProfileStore`, `createCliToolStore`, `createConnectionStore`,
+     `createSettingsStore` take `{ document }` instead of `{ db }`. `load()`
+     has nothing left to do; a remote edit shows in the next read.
+   - **Import once.** On the first start without the document's
+     `meta.importedAt`, the rows of `agent_profile`, `cli_tool`,
+     `connection`, `setting` and `secret` (its names become
+     `facts.secrets`) are copied in, in one transaction. The tables stay,
+     read-only, with a comment in the schema: SQL cannot write a Yjs
+     document, so the migration cannot move the rows, and dropping the
+     tables in this slice's migration would lose them before the import
+     runs. A later migration drops them, once every install has started
+     this version.
+   - **Hocuspocus in the daemon** at `/sync` (`apps/server/src/sync.ts`).
+     Bun accepts the socket (the daemon's default export is `{ fetch,
+     websocket }`) and hands it to Hocuspocus 4's `handleConnection`. The
+     daemon is the Owner of the documents it serves, so Hocuspocus gets no
+     persistence extension: on load it takes the Owner's state, and every
+     update goes both ways (origin-tagged, so none echoes) until it
+     unloads the document. The database extension (`fetch`/`store` over
+     `documentRows(db)`) is for a Host that keeps documents it does not
+     own: slice 4.
+   - **Who may connect**: the Device's owner only, by the same rule as the
+     procedures (`ownerOnly`, `apps/server/src/sync.ts`). The request's
+     session decides; a request from this computer (`isThisComputer`: a
+     loopback address, no `Origin` or one of the UI's) without a session
+     of its own gets the local Person's session, as slice 2's procedures
+     do. The session's Person must be the Device's owner, and the document
+     one this daemon owns. The seam is `SyncAuthorize({ documentName,
+     token, peer, request })`: slice 4 adds the Device key (its owner) and
+     the home-Host rule.
+   - **`bun --hot`**: the document and the relay are kept across reloads,
+     and a store's view registers nothing on the document (`mapView`
+     compares a per-map revision the document counts), so building the
+     stores again leaves nothing behind.
+   - **The Agents page** shows profiles, harnesses, tools and secrets under
+     this Device's name, with "This computer" beneath it.
+   - Not yet: the Space document (part B), a UI that syncs the document
+     live (the UI still reads and writes through oRPC; the Owner applies
+     those writes to the document).
 4. **A second Device.** Pairing by device authorization; the event log
    exchange; the archive; inbox and runs from both Devices on both.
 5. **Placement.** Run-level, then per node with the Hand-off;
@@ -654,7 +714,18 @@ Nothing is open. The next step is slice 1.
 
 ## Open items
 
-- Verify Hocuspocus 4 and `ws` under Bun 1.3 in the daemon process.
+- ~~Verify Hocuspocus 4 and `ws` under Bun 1.3 in the daemon process.~~
+  Done in slice 3: Hocuspocus 4.7 runs in the daemon on Bun 1.3.10, with
+  no `ws`. Hocuspocus 4 takes any WebSocket-like object and a standard
+  `Request` (`handleConnection(socket, request, context)`), so Bun's own
+  `server.upgrade` and `websocket` handlers feed it (`open`, `message`,
+  `close`, and `pong` → `touch()`). Its bundled `Server` class uses
+  `node:http` with crossws, and is not needed. One trap: Bun empties a
+  request's headers once it upgrades it, so the sync keeps a copy for
+  `onAuthenticate`. `HocuspocusProvider` syncs under Bun with its global
+  `WebSocket` (`apps/server/src/sync.test.ts`). The SQLite extension
+  needs `better-sqlite3`, which Bun does not load: the Replica's own
+  `ydoc` table is used instead.
 - Better Auth version: the device authorization plugin needs 1.6.11+.
 - A headless Device has no keychain: secrets from its environment or a
   file its service manager provides. Say which on the Devices page.

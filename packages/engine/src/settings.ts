@@ -1,5 +1,3 @@
-import type { Database } from "@nightshift/db";
-import { setting } from "@nightshift/db/schema/nightshift";
 import {
 	type DeciderName,
 	deciderNameSchema,
@@ -8,13 +6,14 @@ import {
 	permissionModeSchema,
 	type ResolvedPolicy,
 } from "@nightshift/flows";
-import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { type DeviceDocument, mapView } from "./device/document";
+
 /**
- * The daemon's settings. Each one is changed in the UI and saved in the
- * database; a setting with no saved value falls back to the daemon's
- * environment, then to its default. One exception: `NIGHTSHIFT_SCHEDULER=off`
+ * The daemon's settings. Each one is changed in the UI and saved in this
+ * Device's document; a setting with no saved value falls back to the
+ * daemon's environment, then to its default. One exception: `NIGHTSHIFT_SCHEDULER=off`
  * locks the scheduler off, so a dev daemon on a copy of the database never
  * starts the night's schedules.
  */
@@ -169,6 +168,17 @@ export type Settings = { [K in SettingKey]: z.output<Defs[K]["schema"]> };
 
 export const SETTING_KEYS = Object.keys(DEFS) as SettingKey[];
 
+/** The setting that holds each harness's executable. */
+export const HARNESS_BIN = {
+	"claude-code": "claudeBin",
+	opencode: "opencodeBin",
+	codex: "codexBin",
+	"grok-build": "grokBin",
+	copilot: "copilotBin",
+	gemini: "geminiBin",
+	cursor: "cursorBin",
+} as const satisfies Record<HarnessName, SettingKey>;
+
 /** A change: a value saves it, null forgets the saved value (back to the environment, then the default). */
 export const settingsPatchSchema = z
 	.object(
@@ -217,11 +227,20 @@ const SCHEDULER_LOCK =
 	"Night Shift was started with schedules turned off, so you cannot turn them on here. To use schedules, restart Night Shift without this setting.";
 
 export function createSettingsStore(options: {
-	db: Database;
+	document: DeviceDocument;
 	env: Readonly<Record<string, string | undefined>>;
 }): SettingsStore {
-	const { db, env } = options;
-	const saved = new Map<SettingKey, unknown>();
+	const { document, env } = options;
+	const saved = mapView(document, document.settings, () => {
+		const out = new Map<SettingKey, unknown>();
+		for (const [key, value] of document.settings.entries()) {
+			if (!Object.hasOwn(DEFS, key)) continue;
+			const parsed = DEFS[key as SettingKey].schema.safeParse(value);
+			// A value saved by an older build that no longer parses is ignored.
+			if (parsed.success) out.set(key as SettingKey, parsed.data);
+		}
+		return out;
+	});
 
 	function fromEnv(key: SettingKey): unknown {
 		const def: Def<unknown> = DEFS[key];
@@ -254,8 +273,8 @@ export function createSettingsStore(options: {
 				locked: SCHEDULER_LOCK,
 			};
 		}
-		if (saved.has(key))
-			return { value: saved.get(key), source: "saved", ...base };
+		if (saved().has(key))
+			return { value: saved().get(key), source: "saved", ...base };
 		if (envValue !== undefined)
 			return { value: envValue, source: "env", ...base };
 		return { value: def.default, source: "default", ...base };
@@ -277,18 +296,8 @@ export function createSettingsStore(options: {
 	}
 
 	return {
-		async load() {
-			saved.clear();
-			for (const row of await db.select().from(setting)) {
-				if (!(row.key in DEFS)) continue;
-				const key = row.key as SettingKey;
-				try {
-					const parsed = DEFS[key].schema.safeParse(JSON.parse(row.value));
-					// A value saved by an older build that no longer parses is ignored.
-					if (parsed.success) saved.set(key, parsed.data);
-				} catch {}
-			}
-		},
+		// The document is read when it opens; a remote edit applies at once.
+		async load() {},
 		current,
 		view,
 		async save(patch) {
@@ -309,31 +318,13 @@ export function createSettingsStore(options: {
 					"The first usage-limit wait cannot be longer than the longest one.",
 				);
 			}
-			await db.transaction(async (tx) => {
+			await document.change(() => {
 				for (const key of SETTING_KEYS) {
 					const value = parsed[key];
-					if (value === undefined) continue;
-					if (value === null) {
-						await tx.delete(setting).where(eq(setting.key, key));
-						continue;
-					}
-					await tx
-						.insert(setting)
-						.values({ key, value: JSON.stringify(value) })
-						.onConflictDoUpdate({
-							target: setting.key,
-							set: {
-								value: JSON.stringify(value),
-								updatedAt: sql`(cast(unixepoch('subsecond') * 1000 as integer))`,
-							},
-						});
+					if (value === null) document.settings.delete(key);
+					else if (value !== undefined) document.settings.set(key, value);
 				}
 			});
-			for (const key of SETTING_KEYS) {
-				const value = parsed[key];
-				if (value === null) saved.delete(key);
-				else if (value !== undefined) saved.set(key, value);
-			}
 			return view();
 		},
 		run() {

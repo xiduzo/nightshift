@@ -11,7 +11,8 @@ import { logger } from "hono/logger";
 import { access, createContext } from "./context";
 import { desktopOrigins, ENV } from "./env.server";
 import { runExportResponse } from "./run-export";
-import { auth, connections, db } from "./services";
+import { auth, connections, db, sync } from "./services";
+import type { SocketData } from "./sync";
 
 const app = new Hono();
 
@@ -98,4 +99,19 @@ app.get("/", (c) => {
 	return c.text("OK");
 });
 
-export default app;
+/** The relay's WebSocket: Yjs documents sync here (see `sync.ts`). */
+export const SYNC_PATH = "/sync";
+
+/**
+ * What Bun serves: the Hono app, and the sync WebSocket beside it. Bun
+ * upgrades the socket itself, so the sync path never reaches Hono.
+ */
+export default {
+	fetch(request: Request, server: Bun.Server<SocketData>) {
+		if (new URL(request.url).pathname === SYNC_PATH) {
+			return sync.upgrade(request, server);
+		}
+		return app.fetch(request, server);
+	},
+	websocket: sync.websocket,
+};

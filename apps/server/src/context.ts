@@ -2,7 +2,7 @@ import type { Context as ApiContext } from "@nightshift/api/context";
 import { requestAccess } from "@nightshift/auth/request";
 import type { Context as HonoContext } from "hono";
 
-import { desktopOrigins, ENV } from "./env.server";
+import { trustedOrigins } from "./env.server";
 import {
 	auth,
 	checks,
@@ -21,13 +21,6 @@ import { fromThisComputer } from "./this-computer";
 export type CreateContextOptions = {
 	context: HonoContext;
 };
-
-/** Pages that may call this daemon: the web app, the desktop app, its own. */
-const trustedOrigins: ReadonlySet<string> = new Set([
-	new URL(ENV.CORS_ORIGIN).origin,
-	new URL(ENV.BETTER_AUTH_URL).origin,
-	...desktopOrigins,
-]);
 
 /** The request's session and Space: the local session for this computer. */
 export function access(context: HonoContext) {
