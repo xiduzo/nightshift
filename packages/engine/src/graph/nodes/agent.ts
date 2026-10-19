@@ -20,8 +20,6 @@ import { eq } from "drizzle-orm";
 import { cliToolsInstruction } from "../../cli-tools";
 import { consumeStream } from "../../consume";
 import {
-	type DerivedStep,
-	deriveSteps,
 	type EnginePayloads,
 	type LoggedEvent,
 	lastHarnessSessionOfNode,
@@ -32,7 +30,6 @@ import { checkOutputData, normalizeOutputData } from "../../output-schema";
 import {
 	beginStep,
 	beginWait,
-	DEFAULT_RESUME_PROMPT,
 	HARNESS_LABEL,
 	isWaitKind,
 	messageOf,
@@ -45,6 +42,7 @@ import {
 	type StepStart,
 	type WaitRequest,
 } from "../context";
+import { RESUME_RULES, resumePoint, entryOf as startOf } from "../resume-point";
 import {
 	parkStopped,
 	route,
@@ -60,30 +58,15 @@ import { decideWithin } from "./choosers/model";
  * in engine.ts. The log is written as there: `SessionStarted`,
  * `HarnessSessionAssigned`, `SessionEnded`, then the step's end.
  *
- * How the node enters, in this order:
- *
- * 1. `pending.kind === "wait"` for this node: the step waited and the wait
- *    ended (the runner appended `WaitEnded`). The step continues: same step
- *    id and visit, the harness session the log assigned, `pending.prompt`
- *    as the follow-up (the wake's prompt, or "Continue where you left
- *    off."). Nothing is appended before `SessionStarted`. If recovery ended
- *    the step meanwhile (the daemon died after the wake), it is reopened
- *    instead (`StepReopened`), with the prompt of the latest `RunResumed`
- *    for it when the daemon left one, else the wait's prompt; a step that
- *    never got a harness session reopens with a new session on the node's
- *    own prompt.
- * 2. `pending.kind === "parked"` for this node with a step that has a
- *    harness session: a person resumed the parked step. `StepReopened` with
- *    the resume prompt, then a new session of the same harness session.
- *    A parked step without a harness session starts a new visit.
- * 3. No `pending`, but the log has a step of this node the graph never
- *    committed (the daemon died while it ran, design rule 5): when it has a
- *    harness session, it is reopened with the prompt of the latest
- *    `RunResumed` for it (the engine appends it before `invoke(null)`),
- *    else "Continue where you left off.". Without a harness session, a new
- *    visit.
- * 4. Else a new visit. With `session: "resume"`, it continues the node's
- *    last harness session (`lastHarnessSessionOfNode`).
+ * How the node enters is one resume point (`resumePoint`, graph/resume-point.ts,
+ * `RESUME_RULES.agent`): a step that waited continues with its harness
+ * session and `pending.prompt` as the follow-up (nothing is appended before
+ * `SessionStarted`), or is reopened (`StepReopened`) when recovery ended it
+ * after the wake; a parked step a person resumed, or a step the daemon died
+ * in (design rule 5), is reopened when it has a harness session to
+ * continue, with the resume prompt; else a new visit. With `session:
+ * "resume"` a new visit continues the node's last harness session
+ * (`lastHarnessSessionOfNode`).
  *
  * A usage limit or a network failure plans a wait (`beginWait`) and jumps
  * to the wait node (`wait__<id>`, the shared `waitNode` in graph/wait.ts),
@@ -160,108 +143,34 @@ type Entry = {
 	resumeSessionId: string | null;
 };
 
-/** The harness session a step has, from the log. */
-function sessionOf(step: DerivedStep | undefined): string | null {
-	return (
-		step?.sessions.findLast((s) => s.harnessSessionId)?.harnessSessionId ?? null
-	);
-}
-
-/** The prompt the latest `RunResumed` for this step carries, if any. */
-function resumePromptOf(
-	events: readonly LoggedEvent[],
-	step: DerivedStep,
-): string | null {
-	const resumed = events.findLast(
-		(e) =>
-			e.type === "RunResumed" &&
-			e.seq > step.startSeq &&
-			e.payload.stepId === step.id,
-	);
-	return resumed?.type === "RunResumed" ? resumed.payload.prompt : null;
-}
-
+/** The resume point, with the harness session a new `session: "resume"` visit continues. */
 function entryOf(
 	node: AgentNode,
 	state: RunStateValues,
 	events: readonly LoggedEvent[],
 	config: LangGraphRunnableConfig,
 ): Entry {
-	const steps = deriveSteps(events);
-	const pending = state.pending?.nodeId === node.id ? state.pending : null;
-	const reopen = (
-		step: DerivedStep,
-		harnessSessionId: string,
-		prompt: string,
-	): Entry => ({
-		start: { kind: "reopen", stepId: step.id, prompt },
-		prompt,
-		resumeSessionId: harnessSessionId,
-	});
-
-	if (pending?.kind === "wait") {
-		const own = steps.find((s) => s.id === pending.stepId);
-		const harnessSessionId = pending.harnessSessionId ?? sessionOf(own);
-		if (own && own.endedAt !== null) {
-			// Recovery ended the step after the wake (the daemon died while it
-			// continued): a reopen, as a resume does, with the daemon's resume
-			// prompt when it left one. Without a harness session the node's
-			// own prompt starts a new session of the reopened step.
-			if (harnessSessionId) {
-				return reopen(
-					own,
-					harnessSessionId,
-					resumePromptOf(events, own) ?? pending.prompt,
-				);
-			}
-			return {
-				start: { kind: "reopen", stepId: own.id, prompt: null },
-				prompt: null,
-				resumeSessionId: null,
-			};
-		}
+	const point = resumePoint(
+		node,
+		state,
+		events,
+		scopeOf(config),
+		RESUME_RULES.agent,
+	);
+	if (point.kind === "new") {
 		return {
-			start: { kind: "continue", stepId: pending.stepId },
-			// After a wait: the step's own harness session, if it got one.
-			prompt: harnessSessionId ? pending.prompt : null,
-			resumeSessionId: harnessSessionId,
+			start: { kind: "new" },
+			prompt: null,
+			resumeSessionId:
+				node.session === "resume"
+					? lastSessionOf(node, state, events, config)
+					: null,
 		};
 	}
-	if (pending?.kind === "parked" && pending.stepId) {
-		const own = steps.find((s) => s.id === pending.stepId);
-		const harnessSessionId = pending.harnessSessionId ?? sessionOf(own);
-		if (own && harnessSessionId) {
-			return reopen(
-				own,
-				harnessSessionId,
-				pending.prompt ?? DEFAULT_RESUME_PROMPT,
-			);
-		}
-	}
-	if (!pending) {
-		const scope = scopeOf(config);
-		const key = scopeKey(scope);
-		const logged = steps.filter(
-			(s) => s.nodeId === node.id && scopeKey(s.scope) === key,
-		);
-		const stale =
-			logged.length > (state.visits[node.id] ?? 0) ? logged.at(-1) : undefined;
-		const harnessSessionId = sessionOf(stale);
-		if (stale && harnessSessionId) {
-			return reopen(
-				stale,
-				harnessSessionId,
-				resumePromptOf(events, stale) ?? DEFAULT_RESUME_PROMPT,
-			);
-		}
-	}
 	return {
-		start: { kind: "new" },
-		prompt: null,
-		resumeSessionId:
-			node.session === "resume"
-				? lastSessionOf(node, state, events, config)
-				: null,
+		start: startOf(point),
+		prompt: point.prompt,
+		resumeSessionId: point.harnessSessionId,
 	};
 }
 

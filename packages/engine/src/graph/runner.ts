@@ -18,19 +18,13 @@ import type { RunBus } from "../bus";
 import type { CliToolGuide } from "../cli-tools";
 import { eachOutputs } from "../each";
 import {
-	countVisits,
 	type DerivedStep,
-	deriveInputs,
-	deriveNodeOutputs,
 	deriveRunState,
 	deriveSteps,
-	deriveStopAt,
-	deriveTraversals,
 	type LoggedEvent,
 	parkedSteps,
 	type RunEnding,
 	type StepOutputs,
-	scopeKey,
 } from "../events";
 import type { McpExpansion } from "../mcp";
 import type { RunLog } from "../run-log";
@@ -44,6 +38,7 @@ import {
 	type RunRow,
 	type StepContext,
 } from "./context";
+import { reenteredNode, reentryUpdate } from "./resume-point";
 import type {
 	Ended,
 	Parked,
@@ -64,7 +59,9 @@ import type {
  * - `start` streams `{ inputs }`; `continueRun` streams `null` (the node a
  *   dead daemon left pending re-runs, rule 5); `resume` streams
  *   `Command({ resume })` into the interrupt the thread sits at; `reenter`
- *   jumps to a node of a thread that ended or never started.
+ *   jumps to a node of a thread that ended or never started (which node,
+ *   and the seed state: `reenteredNode` and `reentryUpdate` in
+ *   resume-point.ts, next to the rule the nodes re-enter by).
  * - Only the root namespace's `__interrupt__` counts (one interrupt repeats
  *   once per level). A `wait` schedules the wake timer (`WaitStarted` is in
  *   the log already); a `gate` needs nothing (the Gate node logged
@@ -79,61 +76,6 @@ import type {
 
 /** setTimeout cannot wait longer; a longer wait checks the clock and waits again. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
-
-/**
- * The top-level node a re-entry reopens: the one of the last top-level
- * step, when the walk did not move on from it (no later top-level
- * `EdgeTaken`). It is the step the resume targets (`resumeTarget` in
- * engine.ts picks the same). Its visit is left uncommitted on purpose, so
- * the node reopens the step as the old walk did: an Agent continues its
- * harness session with the resume prompt, a Call goes on
- * inside it. Null when the run moved on, or never started a step.
- */
-export function reenteredNode(events: readonly LoggedEvent[]): string | null {
-	const last = deriveSteps(events).findLast((s) => scopeKey(s.scope) === "");
-	const movedOn =
-		last !== undefined &&
-		events.some(
-			(e) =>
-				e.type === "EdgeTaken" &&
-				scopeKey(e.payload.scope) === "" &&
-				e.seq > last.startSeq,
-		);
-	return last && !movedOn ? last.nodeId : null;
-}
-
-/**
- * The state a thread without a checkpoint (a run from before this engine)
- * is re-entered with, from the log: the inputs and the stop time, the
- * committed visits of every top-level node, the node outputs for templates
- * and the edge counts. Without it every node with a step in the log looks
- * uncommitted (`uncommittedStep`), so a Call later in the
- * flow would reopen a finished step, `{{node.output}}` would render empty
- * and edge `max` counts would start over. Bodies get fresh namespaces and
- * read their scope from the log. The `reenteredNode`'s last visit stays
- * uncommitted.
- */
-export function reentryUpdate(
-	flow: Flow,
-	events: readonly LoggedEvent[],
-): RunStateUpdate {
-	const reentered = reenteredNode(events);
-	const visits: Record<string, number> = {};
-	for (const node of flow.nodes) {
-		const count =
-			countVisits(events, node.id, "") - (node.id === reentered ? 1 : 0);
-		if (count > 0) visits[node.id] = count;
-	}
-	return {
-		inputs: deriveInputs(events),
-		stopAt: deriveStopAt(events),
-		visits,
-		nodes: deriveNodeOutputs(events, ""),
-		traversals: deriveTraversals(events, ""),
-		ended: null,
-		pending: null,
-	};
-}
 
 export type RunnerDeps = {
 	db: Database;

@@ -6,18 +6,15 @@ import {
 import type { Flow, FlowNode, NodeOutputs, Outcome } from "@nightshift/flows";
 
 import {
-	type DerivedStep,
 	deriveNodeOutputs,
-	deriveSteps,
 	type InputValues,
-	type LoggedEvent,
 	type Scope,
 	type StepOutputs,
 	scopeKey,
 } from "../../events";
 import { flowOutputs } from "../../inputs";
 import { compileFlow } from "../compile";
-import type { StepContext, StepStart } from "../context";
+import type { StepContext } from "../context";
 import { isOwnAgentLabel } from "../route";
 import type { Parked, RunStateValues } from "../state";
 
@@ -187,32 +184,4 @@ export function endedLabel(node: FlowNode, outcome: Outcome): string {
 	return node.type === "decision" || isOwnAgentLabel(node, outcome)
 		? outcome
 		: "";
-}
-
-/**
- * How a Call node enters an existing step of its own: it
- * continues an open one (nothing appended) and reopens an ended one
- * (`StepReopened` with no prompt), exactly `openCallStep`'s rule for a
- * `call` start.
- */
-export function continueStep(existing: DerivedStep | null): StepStart {
-	if (!existing) return { kind: "new" };
-	if (existing.endedAt !== null) {
-		return { kind: "reopen", stepId: existing.id, prompt: null };
-	}
-	return { kind: "continue", stepId: existing.id };
-}
-
-/** The latest step of the node in this scope, as the log has it. */
-export function latestStepOf(
-	node: FlowNode,
-	events: readonly LoggedEvent[],
-	scope: Scope | null,
-): DerivedStep | null {
-	const key = scopeKey(scope);
-	return (
-		deriveSteps(events).findLast(
-			(s) => s.nodeId === node.id && scopeKey(s.scope) === key,
-		) ?? null
-	);
 }

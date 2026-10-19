@@ -232,28 +232,6 @@ export function emit(config: LangGraphRunnableConfig, event: RunEvent): void {
 }
 
 /**
- * The step of this node the log has but the graph never committed: the
- * daemon died while it ran (design rule 5). The graph's `visits` count the
- * node's committed visits; the log counts one more while a step runs.
- * Recovery ends it `interrupted`; a node that re-runs may continue it.
- */
-export function uncommittedStep(
-	node: FlowNode,
-	state: RunStateValues,
-	events: readonly LoggedEvent[],
-	scope: Scope | null,
-): DerivedStep | null {
-	const key = scopeKey(scope);
-	const logged = countVisits(events, node.id, key);
-	if (logged <= (state.visits[node.id] ?? 0)) return null;
-	return (
-		deriveSteps(events).findLast(
-			(s) => s.nodeId === node.id && scopeKey(s.scope) === key,
-		) ?? null
-	);
-}
-
-/**
  * The run's stop time as this graph sees it (epoch ms, or null). The root
  * reads its state; a body reads its caller's, which `runBody` puts in
  * `configurable.stopAt` on every invoke, so a stop time a resume cleared

@@ -15,8 +15,9 @@ import {
 	type StepHandle,
 	type WaitRequest,
 } from "../../context";
-import { parkStopped, type StepEnd, waitNodeId } from "../../route";
-import { entryOf, withinGrace } from "../choosers/model";
+import { entryOf, RESUME_RULES, resumePoint } from "../../resume-point";
+import { parkStopped, type StepEnd, scopeOf, waitNodeId } from "../../route";
+import { withinGrace } from "../choosers/model";
 import {
 	endWithoutValue,
 	endWithValue,
@@ -31,7 +32,8 @@ import {
  * `value-start` (the prompt, the model) and `value` (the data, or why there
  * is none); `StepEnded` carries the decider's cost as `costUsd`.
  *
- * It opens its step as a Decision decided by a model does (`entryOf`): a
+ * It opens its step as a Decision decided by a model does (`resumePoint`
+ * with `RESUME_RULES.model`): a
  * step that waited continues, one recovery ended after the wake is
  * reopened, anything else is a new visit. A usage limit or a network
  * failure plans a wait (`beginWait`) and jumps to the node's wait node
@@ -48,7 +50,15 @@ export function modelProducer(node: ValueNode, ctx: StepContext): Producer {
 			node,
 			state,
 			config,
-			entryOf(node, state, await ctx.log.events(ctx.run.id)),
+			entryOf(
+				resumePoint(
+					node,
+					state,
+					await ctx.log.events(ctx.run.id),
+					scopeOf(config),
+					RESUME_RULES.model,
+				),
+			),
 		);
 		if (begun.kind === "parked") return begun.command;
 		const step = begun.step;
