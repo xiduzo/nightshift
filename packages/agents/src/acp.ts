@@ -1,7 +1,7 @@
 /**
  * Coding agents that speak the Agent Client Protocol (ACP), driven through
- * `acpCompatible` from `@tanstack/ai-acp` and the local-process sandbox in
- * `input.cwd`. An agent is one row of `ACP_AGENTS`: how to start it in ACP
+ * `acpCompatible` from `@tanstack/ai-acp` on the shared harness session
+ * (`adapter-session.ts`). An agent is one row of `ACP_AGENTS`: how to start it in ACP
  * mode. Everything else (the session, resume, bridged tools, MCP servers,
  * permission requests, the AG-UI stream) is the adapter's.
  *
@@ -11,26 +11,16 @@
  *
  * Verified live: none yet. The launch commands are from each agent's docs.
  */
-import { chat } from "@tanstack/ai";
 import type { AcpPermissionMode } from "@tanstack/ai-acp";
 import { acpCompatible } from "@tanstack/ai-acp";
-import { withSandbox } from "@tanstack/ai-sandbox";
 import {
-	hostSandbox,
-	providerTap,
-	removeProjectionMarkers,
-	runAdapterSession,
+	type AdapterSetup,
+	type HarnessSpec,
+	harnessSession,
 	shellQuote,
 } from "./adapter-session";
-import { reportStepTool, stepReportSetup } from "./step-report";
-import {
-	createTranslator,
-	type HarnessProfile,
-	type SdkSignals,
-	type Translator,
-} from "./translate";
+import type { SdkSignals } from "./translate";
 import type {
-	AgentEvent,
 	AgentHarness,
 	AgentSessionInput,
 	Effort,
@@ -137,29 +127,31 @@ export function observeAcpEvent(signals: SdkSignals, raw: unknown): SdkSignals {
 	return { ...signals, resultError: text.trim() };
 }
 
-function profile(name: AcpAgentName): HarnessProfile {
+/**
+ * The session knobs of one ACP agent. Bridged tools are always allowed, so
+ * plan mode reports with the tool too. MCP servers reach the agent over ACP
+ * as workspace skills. A resumed session may not announce itself again.
+ */
+export function acpSpec(name: AcpAgentName): HarnessSpec {
 	return {
-		label: ACP_AGENTS[name].label,
-		// `acpCompatible` emits `<name>.session-id`.
-		sessionEvent: `${name}.session-id`,
-		createObserver: () => observeAcpEvent,
+		profile: {
+			label: ACP_AGENTS[name].label,
+			// `acpCompatible` emits `<name>.session-id`.
+			sessionEvent: `${name}.session-id`,
+			createObserver: () => observeAcpEvent,
+		},
+		report: "tool",
+		mcpAsSkills: true,
+		resumeIsSilent: true,
 	};
 }
 
-function startChat(
+/** The adapter of one ACP agent session. */
+function acpAdapter(
 	name: AcpAgentName,
 	input: AgentSessionInput,
 	options: AcpHarnessOptions,
-	translator: Translator,
-	abortController: AbortController,
-): AsyncIterable<unknown> {
-	// Bridged tools are always allowed, so plan mode reports with the tool too.
-	const report = stepReportSetup(
-		{ ...input, permissionMode: "default" },
-		undefined,
-	);
-	const host = hostSandbox(input.cwd, input.mcpServers);
-	if (typeof host === "string") throw new Error(host);
+): AdapterSetup {
 	const agent = ACP_AGENTS[name];
 	const adapter = acpCompatible({
 		name,
@@ -178,43 +170,7 @@ function startChat(
 		refusalMessage: `${agent.label} refused the request.`,
 		...(options.env ? { env: options.env } : {}),
 	})(input.model);
-
-	return chat({
-		adapter,
-		threadId: host.id,
-		messages: [{ role: "user", content: report.prompt }],
-		...(report.withTool ? { tools: [reportStepTool(input.stepReport)] } : {}),
-		...(input.resumeSessionId
-			? { modelOptions: { sessionId: input.resumeSessionId } }
-			: {}),
-		middleware: [withSandbox(host.sandbox)],
-		abortController,
-		debug: providerTap(translator),
-	}) as AsyncIterable<unknown>;
-}
-
-/** Run one session of an ACP agent and translate it into AgentEvent values. Never throws. */
-export function runAcpSession(
-	name: AcpAgentName,
-	input: AgentSessionInput,
-	options: AcpHarnessOptions,
-): AsyncGenerator<AgentEvent> {
-	const translator = createTranslator({
-		fallbackSessionId: input.resumeSessionId ?? crypto.randomUUID(),
-		stepReport: input.stepReport ?? false,
-		profile: profile(name),
-		...(input.resumeSessionId ? { knownSessionId: input.resumeSessionId } : {}),
-	});
-	return runAdapterSession({
-		signal: input.signal,
-		translator,
-		start: (abortController) =>
-			startChat(name, input, options, translator, abortController),
-		...(options.abortGraceMs !== undefined
-			? { abortGraceMs: options.abortGraceMs }
-			: {}),
-		cleanup: () => removeProjectionMarkers(input.cwd),
-	});
+	return { adapter };
 }
 
 /** Runs sessions of one ACP agent on this computer, in `input.cwd`, with the user's own login. */
@@ -222,5 +178,16 @@ export function acpHarness(
 	name: AcpAgentName,
 	options: AcpHarnessOptions,
 ): AgentHarness {
-	return { name, run: (input) => runAcpSession(name, input, options) };
+	return {
+		name,
+		run: (input) =>
+			harnessSession({
+				input,
+				spec: acpSpec(name),
+				adapter: () => acpAdapter(name, input, options),
+				...(options.abortGraceMs !== undefined
+					? { abortGraceMs: options.abortGraceMs }
+					: {}),
+			}),
+	};
 }

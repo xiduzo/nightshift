@@ -3,11 +3,11 @@ import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+	claudeAllowedTools,
 	claudeCodeHarness,
 	claudeCommand,
 	claudeMcpConfig,
 	cliAllowRules,
-	harnessSetup,
 } from "./claude-code";
 import { fakeBin } from "./fixtures/bin";
 import { REPORT_TOOL_ID } from "./step-report";
@@ -109,29 +109,32 @@ describe("claudeCodeHarness with MCP servers", () => {
 	});
 });
 
-describe("harnessSetup", () => {
-	test("no CLI tools: no bridged tools", () => {
-		const setup = harnessSetup(input(), { allowedTools: ["Read"] });
-		expect(setup.tools).toEqual([]);
-		expect(setup.allowedTools).toEqual(["Read"]);
+describe("claudeAllowedTools", () => {
+	test("no CLI tools: the report's rules as they are", () => {
+		expect(claudeAllowedTools(input(), ["Read"])).toEqual(["Read"]);
+		expect(claudeAllowedTools(input(), undefined)).toBeUndefined();
 	});
 
-	test("CLI tools: allowed in the shell, no bridged tools", () => {
-		const setup = harnessSetup(
-			input({ clis: ["gh", "aws"], stepReport: true }),
-			{ allowedTools: ["Read"] },
-		);
-		expect(setup.tools.map((t) => t.name)).toEqual(["report_step"]);
-		expect(setup.allowedTools).toEqual([
+	test("CLI tools and MCP servers: allowed after the report's rules", () => {
+		expect(
+			claudeAllowedTools(
+				input({
+					clis: ["gh", "aws"],
+					mcpServers: { docs: { url: "https://d", headers: {} } },
+				}),
+				["Read", REPORT_TOOL_ID],
+			),
+		).toEqual([
 			"Read",
 			REPORT_TOOL_ID,
 			"Bash(gh:*)",
 			"Bash(aws:*)",
+			"mcp__docs",
 		]);
 	});
 
-	test("CLI tools without allowedTools allow only the CLI tools", () => {
-		expect(harnessSetup(input({ clis: ["gh"] }), {}).allowedTools).toEqual([
+	test("CLI tools without other rules allow only the CLI tools", () => {
+		expect(claudeAllowedTools(input({ clis: ["gh"] }), undefined)).toEqual([
 			"Bash(gh:*)",
 		]);
 	});
