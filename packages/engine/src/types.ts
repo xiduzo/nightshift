@@ -1,12 +1,6 @@
-import type {
-	AgentEvent,
-	AgentHarness,
-	Decider,
-	HarnessName,
-} from "@nightshift/agents/types";
+import type { AgentEvent } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import type {
-	AgentNode,
 	AgentProfileSettings,
 	Flow,
 	FlowIssue,
@@ -20,8 +14,7 @@ import type {
 	ScheduleIssue,
 } from "@nightshift/flows";
 
-import type { CliToolGuide } from "./cli-tools";
-import type { McpExpansion } from "./mcp";
+import type { Device } from "./device/types";
 import type { GitProbe } from "./project-setup";
 import type { RunSettings } from "./settings";
 
@@ -490,9 +483,11 @@ export type EngineOptions = {
 	 * database's own Device.
 	 */
 	walkerId?: string;
-	harnesses: Partial<Record<HarnessName, AgentHarness>>;
-	/** Decides Decision nodes. A flow with a Decision node fails to start without one. */
-	decider?: Decider;
+	/**
+	 * This computer as a Device (`localDevice`): its harnesses, decider,
+	 * connections, CLI tools, commands and worktrees. Every step runs on it.
+	 */
+	device: Device;
 	/** Root for transcripts, command logs and other on-disk state, for example ~/.nightshift. */
 	dataDir: string;
 	/** Finds git on this computer before a run starts. Default: `probeGit`. */
@@ -514,34 +509,6 @@ export type EngineOptions = {
 	 * `maxConcurrentRuns` and `maxStepsPerRun` when set.
 	 */
 	settings?: () => RunSettings;
-	/**
-	 * An Agent node's MCP servers: its connections and its own servers, with
-	 * `${NAME}` expanded. Default: its own servers, from `process.env`.
-	 */
-	mcpServersFor?: (
-		node: Pick<AgentNode, "connections" | "mcpServers">,
-	) => Promise<McpExpansion>;
-	/** The connections this daemon has. A flow that names another refuses to start. */
-	connectionNames?: () => ReadonlySet<string>;
-	/** The CLI tools this daemon has. A flow that names another refuses to start. */
-	cliNames?: () => ReadonlySet<string>;
-	/**
-	 * Where a CLI tool is on this computer, or null. A flow that names one it
-	 * cannot find refuses to start. Default: `Bun.which`.
-	 */
-	findCli?: (name: string) => string | null;
-	/**
-	 * What an agent learns about its CLI tools: each description and help.
-	 * A new agent session gets them at the end of its prompt. Without it the
-	 * agent may run them, but nobody tells it they are there.
-	 */
-	cliToolsFor?: (names: readonly string[]) => Promise<CliToolGuide[]>;
-	/**
-	 * The harnesses added on the Agents page, read when a run starts and
-	 * when a session starts. A harness left out cannot run an Agent node,
-	 * even when `harnesses` has it. Without it: every harness in `harnesses`.
-	 */
-	harnessNames?: () => ReadonlySet<HarnessName>;
 	/**
 	 * An Agent Profile by name. A run resolves the profiles its Agent nodes
 	 * name when it starts; a flow that names a profile this returns null for

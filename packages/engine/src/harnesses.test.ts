@@ -9,8 +9,14 @@ import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
 
 import { createEngine } from "./engine";
 import { expandMcpServers } from "./mcp";
-import { createSandbox, type Sandbox, waitFor } from "./test-support";
-import type { Engine, EngineOptions, RunStatus } from "./types";
+import {
+	createSandbox,
+	type Sandbox,
+	type TestEngineOptions,
+	waitFor,
+	withDevice,
+} from "./test-support";
+import type { Engine, RunStatus } from "./types";
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -28,13 +34,15 @@ function named(name: HarnessName): FakeHarness {
 	return { ...fakeHarness(), name, ...harnessFacts(name) };
 }
 
-function makeEngine(harnesses: EngineOptions["harnesses"]): Engine {
-	return createEngine({
-		db: sandbox.db,
-		harnesses,
-		dataDir: sandbox.dataDir,
-		scheduler: false,
-	});
+function makeEngine(harnesses: TestEngineOptions["harnesses"]): Engine {
+	return createEngine(
+		withDevice({
+			db: sandbox.db,
+			harnesses,
+			dataDir: sandbox.dataDir,
+			scheduler: false,
+		}),
+	);
 }
 
 function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {

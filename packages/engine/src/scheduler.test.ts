@@ -9,8 +9,14 @@ import { createEngine, type EngineInternals } from "./engine";
 import { appendEvent, type EnginePayloads, parseEventRow } from "./events";
 import { SCHEDULE_GRACE_MS } from "./scheduler";
 import { defaultRunSettings, type RunSettings } from "./settings";
-import { createSandbox, type Sandbox, waitFor } from "./test-support";
-import type { Engine, EngineOptions, RunSummary } from "./types";
+import {
+	createSandbox,
+	type Sandbox,
+	type TestEngineOptions,
+	waitFor,
+	withDevice,
+} from "./test-support";
+import type { Engine, RunSummary } from "./types";
 
 /** The scheduler with an injected clock: each test moves `clock` and waits for a tick. */
 
@@ -39,7 +45,7 @@ function at(day: number, hours: number, minutes = 0, seconds = 0): number {
 /** A daemon. Abort its controller to let it die. */
 function startDaemon(
 	options: Pick<
-		EngineOptions,
+		TestEngineOptions,
 		"maxConcurrentRuns" | "scheduler" | "settings"
 	> = {},
 	internals: EngineInternals = {},
@@ -47,12 +53,12 @@ function startDaemon(
 	const controller = new AbortController();
 	engines.push(controller);
 	const engine = createEngine(
-		{
+		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": fakeHarness() },
 			dataDir: sandbox.dataDir,
 			...options,
-		},
+		}),
 		{
 			now: () => clock,
 			scheduleTickMs: TICK_MS,

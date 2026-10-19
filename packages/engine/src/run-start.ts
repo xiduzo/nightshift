@@ -16,8 +16,9 @@ import {
 } from "@nightshift/flows";
 import { flowsDir } from "@nightshift/flows/files";
 
+import type { Capabilities, Device } from "./device/types";
 import type { InputValues } from "./events";
-import type { DaemonHas, NodeKind, Requirement } from "./graph/context";
+import type { NodeKind, Requirement } from "./graph/context";
 import { kindOf, kindOfType, NODE_KINDS } from "./graph/node-kinds";
 import { missingNames } from "./graph/nodes/agent";
 import type { Runner } from "./graph/runner";
@@ -32,7 +33,6 @@ import type {
 	RunTrigger,
 	StartRunInput,
 } from "./types";
-import { createWorktree } from "./worktrees";
 
 /**
  * Run start: from a `StartRunInput` to a run the runner drives. Two layers
@@ -40,11 +40,11 @@ import { createWorktree } from "./worktrees";
  *
  * - `prepareRun` is the deep part. It loads and validates the flow and the
  *   flows it calls, resolves the profiles, and asks every requirement
- *   whether this daemon has what the nodes need (connections, CLI tools,
- *   harnesses, a decider). It writes nothing; a refusal is an `Error` with
+ *   whether the run's Device has what the nodes need (its
+ *   `capabilities`: connections, CLI tools, harnesses, a decider). It writes nothing; a refusal is an `Error` with
  *   the message the person sees, and a pass is a `PreparedRun`.
- * - `createRunStart(deps).start` holds the slot, prepares, creates the
- *   worktree and the run row, appends `RunStarted` and `WorktreeCreated`
+ * - `createRunStart(deps).start` holds the slot, prepares, has the Device
+ *   create the worktree, writes the run row, appends `RunStarted` and `WorktreeCreated`
  *   and hands the thread to the runner.
  *
  * The requirements are one function each (`Requirement`) and listed once,
@@ -61,14 +61,14 @@ const QUICK_RUN_TITLE = "Quick run";
 
 type ProfileFor = NonNullable<EngineOptions["profileFor"]>;
 
-export type { DaemonHas, Requirement } from "./graph/context";
+export type { Requirement } from "./graph/context";
 
-/** Every node names connections the daemon has (Agent and Tool nodes do). */
+/** Every node names connections the Device has (Agent and Tool nodes do). */
 export const connectionsExist: Requirement = (nodes, has) => {
 	const unknown = missingNames(
 		nodes,
 		(node) => kindOf(node).connections(node),
-		has.connectionNames(),
+		new Set(has.connections),
 	);
 	if (unknown.length === 0) return null;
 	return unknown
@@ -105,10 +105,19 @@ export const REQUIREMENTS: readonly Requirement[] = [
 	),
 ];
 
+/** What the Device has for these nodes: its capabilities, with the programs the nodes name looked up. */
+export function capabilitiesFor(
+	nodes: readonly FlowNode[],
+	device: Pick<Device, "capabilities">,
+): Capabilities {
+	const programs = new Set(nodes.flatMap((n) => kindOf(n).programs(n)));
+	return device.capabilities({ programs: [...programs] });
+}
+
 /** The first requirement these nodes fail, as the message that refuses the run; null when all pass. */
 export function refusalOf(
 	nodes: readonly FlowNode[],
-	has: DaemonHas,
+	has: Capabilities,
 ): string | null {
 	for (const requirement of REQUIREMENTS) {
 		const why = requirement(nodes, has);
@@ -229,8 +238,10 @@ export async function flowsForRun(
 	return { flow, flowName, calledFlows };
 }
 
-/** What `prepareRun` needs: the project, the daemon's inventory, the clock. */
-export type PrepareRunDeps = DaemonHas & {
+/** What `prepareRun` needs: the project, the run's Device, the clock. */
+export type PrepareRunDeps = {
+	/** The Device the run's requirements ask, and its worktree's home. */
+	device: Device;
 	/** A project that a person has not removed; throws for another id. */
 	projectRow(projectId: string): Promise<ProjectRow>;
 	/** An Agent Profile by name, or null. */
@@ -290,7 +301,7 @@ export async function prepareRun(
 	}
 	const all = [flow, ...Object.values(calledFlows)];
 	const nodes = all.flatMap((f) => f.nodes);
-	const refusal = refusalOf(nodes, deps);
+	const refusal = refusalOf(nodes, capabilitiesFor(nodes, deps.device));
 	if (refusal !== null) throw new Error(refusal);
 	if (input.stopAt !== undefined && input.stopAt <= deps.now()) {
 		throw new Error("The stop time has passed already.");
@@ -364,10 +375,10 @@ export function createRunStart(deps: RunStartDeps) {
 			const prepared = await prepareRun(input, deps);
 			const { projectRow, flow, flowName, calledFlows, inputs, title } =
 				prepared;
-			const worktree = await createWorktree({
+			const worktree = await deps.device.worktree({
+				id: runId,
 				repoPath: projectRow.repoPath,
-				shortId: runId.slice(0, 8),
-				baseRef: input.baseRef,
+				...(input.baseRef !== undefined ? { baseRef: input.baseRef } : {}),
 			});
 			const [row] = await db
 				.insert(run)

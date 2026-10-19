@@ -1,15 +1,9 @@
 import type { Command, LangGraphRunnableConfig } from "@langchain/langgraph";
 import { HARNESS_LABELS } from "@nightshift/agents/harness-facts";
-import type {
-	AgentErrorKind,
-	AgentHarness,
-	Decider,
-	HarnessName,
-} from "@nightshift/agents/types";
+import type { AgentErrorKind, HarnessName } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import { run, step } from "@nightshift/db/schema/nightshift";
 import type {
-	AgentNode,
 	Flow,
 	FlowNode,
 	Outcome,
@@ -19,9 +13,8 @@ import type {
 import { eq } from "drizzle-orm";
 
 import type { RunBus } from "../bus";
-import type { CliToolGuide } from "../cli-tools";
+import type { Capabilities, Device } from "../device/types";
 import type { DerivedStep, PolicyWaitReason, StepOutputs } from "../events";
-import type { McpExpansion } from "../mcp";
 import type { RunLog } from "../run-log";
 import type { RunSettings } from "../settings";
 import { openTranscriptWriter, readRunTranscript } from "../transcripts";
@@ -108,15 +101,12 @@ export type StepContext = {
 	bus: RunBus;
 	/** Opens a step's transcript for appending; `seq` continues the run's count. */
 	recorder(stepId: string, path: string): Promise<Recorder>;
-	/** The harness of that name, when it is added and built. */
-	harnessFor(name: HarnessName): AgentHarness | undefined;
-	decider?: Decider;
-	/** An Agent node's MCP servers, expanded. The values go to the harness only. */
-	mcpServersFor(
-		node: Pick<AgentNode, "connections" | "mcpServers">,
-	): Promise<McpExpansion>;
-	/** What an agent learns about its CLI tools. Without it: nothing. */
-	cliToolsFor?: (names: readonly string[]) => Promise<CliToolGuide[]>;
+	/**
+	 * The Device a step of `node` runs on (its Placement). The step runner
+	 * asks once per step and hands the Device to the body; no body touches
+	 * a harness, a process, an MCP client or the decider itself.
+	 */
+	deviceFor(node: FlowNode, run: RunRow): Device;
 	/** The run's abort signal: a person stopped the run. */
 	signal(): AbortSignal;
 	now(): number;
@@ -157,25 +147,15 @@ export type TimeBudget = {
 	idleMinutes: number | undefined;
 };
 
-/** What this daemon has: the question every start-time requirement asks. */
-export type DaemonHas = {
-	/** The harness of that name, when it is added and built. */
-	harnessFor(name: HarnessName): AgentHarness | undefined;
-	connectionNames(): ReadonlySet<string>;
-	cliNames(): ReadonlySet<string>;
-	/** Where a CLI tool is on this computer, or null. */
-	findCli(name: string): string | null;
-	decider: Decider | undefined;
-};
-
 /**
- * One requirement of a run's nodes on the daemon: the message that refuses
- * the run, or null when the daemon has what the nodes need. A kind's own
+ * One requirement of a run's nodes on the Device: the message that refuses
+ * the run, or null when the Device has what the nodes need (its
+ * `capabilities`, with the programs the nodes name looked up). A kind's own
  * requirement gets the nodes of its kind only.
  */
 export type Requirement<N extends FlowNode = FlowNode> = (
 	nodes: readonly N[],
-	has: DaemonHas,
+	has: Capabilities,
 ) => string | null;
 
 /**
@@ -210,8 +190,10 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	 * the run's flow snapshot has no node for the step.
 	 */
 	stoppedOutputs(open: DerivedStep, node: N | undefined): StepOutputs;
-	/** The connections the node needs the daemon to have (`run-start.connectionsExist`). */
+	/** The connections the node needs the Device to have (`run-start.connectionsExist`). */
 	connections(node: N): readonly string[];
+	/** The programs the node needs on the Device, looked up before its requirements run. */
+	programs(node: N): readonly string[];
 	/** The start-time requirements about this kind, in the order a person sees them. */
 	requirements: readonly Requirement<N>[];
 };
@@ -225,7 +207,8 @@ export function endedAtReason(node: FlowNode, outcome: Outcome): string {
  * The facts most kinds share, for a kind to spread and override: no
  * auxiliary node, `pass` is the one chosen end and the plain end, no
  * label for a Call, no command log, the node's own `timeoutMinutes`, a
- * stopped step keeps its outputs, no connections, no requirements.
+ * stopped step keeps its outputs, no connections, no programs, no
+ * requirements.
  */
 export const PLAIN_KIND = {
 	aux: () => [],
@@ -240,6 +223,7 @@ export const PLAIN_KIND = {
 	}),
 	stoppedOutputs: (open) => ({ ...open.outputs, outcome: "stopped" }),
 	connections: () => [],
+	programs: () => [],
 	requirements: [],
 } satisfies Omit<NodeKind, "type" | "make" | "resumeRules">;
 

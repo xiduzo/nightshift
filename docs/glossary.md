@@ -77,6 +77,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Starter | A small Flow in `examples/starters/` to copy into a Project. | Slice 6 |
 | Transcript | The structured record of a Step: agent messages, tool calls, and command output, on disk. | Slice 1 |
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |
+| Device | A computer that runs Night Shift. In code, the port a Step body uses to touch a computer (`packages/engine/src/device/`): it reports its Capabilities (harnesses, connections, CLI tools, programs, decider) and runs Sessions, commands, Tool calls, decisions and Worktrees. The step runner asks for the Step's Device once per Step; `StepStarted` names it. Today every Step runs on this computer (`localDevice`). | Devices, slice 1 |
 | Event | One appended record of a fact that changed. Its identity is its Walker and its number among that Walker's Events (`walker_seq`); `seq` is only the order it landed in this Replica. | Slice 1 |
 | Event Log | The append-only list of Events: the read model. Run status is derived from it, never from a Checkpoint. | Slice 1 |
 | Run Bundle | One Run exported as its own SQLite file: its rows, its Events, and its Transcripts, in the daemon's table names. Secret values are masked. | Run export |

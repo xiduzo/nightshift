@@ -1,12 +1,6 @@
 import { Command } from "@langchain/langgraph";
-import type {
-	AgentHarness,
-	Decider,
-	HarnessName,
-} from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import type {
-	AgentNode,
 	Flow,
 	FlowNode,
 	JsonValue,
@@ -14,7 +8,7 @@ import type {
 } from "@nightshift/flows";
 
 import type { RunBus } from "../bus";
-import type { CliToolGuide } from "../cli-tools";
+import type { Device } from "../device/types";
 import {
 	type DerivedStep,
 	deriveRunState,
@@ -22,7 +16,6 @@ import {
 	parkedSteps,
 	type RunEnding,
 } from "../events";
-import type { McpExpansion } from "../mcp";
 import type { RunLog } from "../run-log";
 import type { RunSettings } from "../settings";
 import { saverFor } from "./checkpointer";
@@ -83,12 +76,8 @@ export type RunnerDeps = {
 	now(): number;
 	minuteMs: number;
 	settings(): RunSettings;
-	harnessFor(name: HarnessName): AgentHarness | undefined;
-	decider?: Decider;
-	mcpServersFor(
-		node: Pick<AgentNode, "connections" | "mcpServers">,
-	): Promise<McpExpansion>;
-	cliToolsFor?: (names: readonly string[]) => Promise<CliToolGuide[]>;
+	/** The Device a step of `node` runs on (`StepContext.deviceFor`). */
+	deviceFor(node: FlowNode, run: RunRow): Device;
 	/** The run's flow snapshot and its called flows, parsed. */
 	flowOf(row: RunRow): Flow;
 	calledFlowsOf(row: RunRow): Record<string, Flow>;
@@ -188,10 +177,7 @@ export function createRunner(deps: RunnerDeps) {
 			log,
 			bus,
 			recorder: (stepId, path) => recorders.open(row.id, stepId, path),
-			harnessFor: deps.harnessFor,
-			...(deps.decider ? { decider: deps.decider } : {}),
-			mcpServersFor: deps.mcpServersFor,
-			...(deps.cliToolsFor ? { cliToolsFor: deps.cliToolsFor } : {}),
+			deviceFor: deps.deviceFor,
 			signal: () => thread.controller.signal,
 			now: deps.now,
 			minuteMs: deps.minuteMs,

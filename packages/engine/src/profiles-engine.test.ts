@@ -10,8 +10,14 @@ import type {
 
 import { createEngine } from "./engine";
 import { createProfileStore } from "./profiles";
-import { createSandbox, type Sandbox, waitFor } from "./test-support";
-import type { Engine, EngineOptions, RunDetail } from "./types";
+import {
+	createSandbox,
+	type Sandbox,
+	type TestEngineOptions,
+	waitFor,
+	withDevice,
+} from "./test-support";
+import type { Engine, RunDetail } from "./types";
 
 /** Agent Profiles: resolved into the run's copy when a run starts. */
 
@@ -35,19 +41,21 @@ const builder: AgentProfileSettings = {
 function makeEngine(
 	harnesses: Partial<Record<HarnessName, AgentHarness>>,
 	options: Pick<
-		EngineOptions,
+		TestEngineOptions,
 		"profileFor" | "harnessNames" | "cliNames" | "findCli"
 	> = {},
 ): Engine {
-	return createEngine({
-		db: sandbox.db,
-		harnesses,
-		dataDir: sandbox.dataDir,
-		scheduler: false,
-		cliNames: () => new Set(["gh"]),
-		findCli: (name) => `/usr/local/bin/${name}`,
-		...options,
-	});
+	return createEngine(
+		withDevice({
+			db: sandbox.db,
+			harnesses,
+			dataDir: sandbox.dataDir,
+			scheduler: false,
+			cliNames: () => new Set(["gh"]),
+			findCli: (name) => `/usr/local/bin/${name}`,
+			...options,
+		}),
+	);
 }
 
 function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {

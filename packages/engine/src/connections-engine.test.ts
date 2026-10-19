@@ -17,9 +17,11 @@ import {
 	createSandbox,
 	type Sandbox,
 	scriptedHarness,
+	type TestEngineOptions,
 	waitFor,
+	withDevice,
 } from "./test-support";
-import type { Engine, EngineOptions, RunDetail } from "./types";
+import type { Engine, RunDetail } from "./types";
 
 /** The engine's hooks for the daemon's settings and connections. */
 
@@ -34,19 +36,19 @@ afterEach(async () => {
 function makeEngine(
 	harness: AgentHarness,
 	options: Pick<
-		EngineOptions,
+		TestEngineOptions,
 		"settings" | "mcpServersFor" | "connectionNames" | "cliNames" | "findCli"
 	> = {},
 	internals: EngineInternals = {},
 ): Engine {
 	return createEngine(
-		{
+		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },
 			dataDir: sandbox.dataDir,
 			scheduler: false,
 			...options,
-		},
+		}),
 		internals,
 	);
 }

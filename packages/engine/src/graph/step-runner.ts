@@ -6,7 +6,7 @@ import {
 } from "@nightshift/db/schema/nightshift";
 import type { FlowNode, TemplateContext } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-
+import type { Device } from "../device/types";
 import {
 	countStepsSinceWalkBegan,
 	countVisits,
@@ -108,6 +108,8 @@ export type SessionRecord = {
 export type StepHandle = {
 	stepId: string;
 	visit: number;
+	/** The Device the step runs on: the body's one way to touch a computer. */
+	device: Device;
 	/** The step as the log had it, for a reopened or continued step; null for a new visit. */
 	existing: DerivedStep | null;
 	/** The log as read on entry, before this step's own events. */
@@ -358,7 +360,8 @@ export function abortEnd(
  * walk had no entry check for one). It then writes the `step` row and
  * `StepStarted` (with the transcript path, the command log path and the
  * scope), or `StepReopened` for a reopen, and opens the transcript and the
- * timers. Exactly `runStep`'s scaffolding in the old engine.
+ * timers. Exactly `runStep`'s scaffolding in the old engine. It asks
+ * `ctx.deviceFor` for the step's Device first; `StepStarted` names it.
  *
  * `events` is the log as the caller read it on entry; without it the log
  * is read here.
@@ -374,6 +377,9 @@ export async function beginStep(
 	const runId = ctx.run.id;
 	const scope = scopeOf(config);
 	const key = scopeKey(scope);
+	// Asked once per step: the body works on this Device, and a new step
+	// records it.
+	const device = ctx.deviceFor(node, ctx.run);
 	const logged = events ?? (await ctx.log.events(runId));
 	const parked = (
 		status: "failed" | "stopped",
@@ -420,8 +426,8 @@ export async function beginStep(
 			nodeType: node.type,
 			visit,
 			transcriptPath: path,
-			// Until steps are placed, every step runs on its run's Walker.
-			deviceId: ctx.run.walkerId,
+			// The Device the step runs on (its Placement), not the Walker.
+			deviceId: device.id,
 		});
 		await ctx.log.append({
 			type: "StepStarted",
@@ -434,6 +440,7 @@ export async function beginStep(
 				transcriptPath: path,
 				logPath,
 				scope,
+				deviceId: device.id,
 			},
 		});
 	} else {
@@ -507,6 +514,7 @@ export async function beginStep(
 	const handle: OpenStep = {
 		stepId,
 		visit,
+		device,
 		existing,
 		events: logged,
 		tctx: templateContext(ctx, state, config),

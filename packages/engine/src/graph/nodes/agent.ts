@@ -1,7 +1,5 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import type {
-	AgentEvent,
-	AgentHarness,
 	AgentSessionInput,
 	HarnessName,
 	StepReportOutcome,
@@ -17,8 +15,8 @@ import {
 	resolvedAgent,
 } from "@nightshift/flows";
 
-import { cliToolsInstruction } from "../../cli-tools";
 import { consumeStream } from "../../consume";
+import type { SessionEvent } from "../../device/types";
 import {
 	type EnginePayloads,
 	type LoggedEvent,
@@ -86,12 +84,12 @@ export function isOwnAgentLabel(node: AgentNode, outcome: Outcome): boolean {
 	);
 }
 
-/** Agent nodes name CLI tools the daemon defines. */
+/** Agent nodes name CLI tools the Device defines. */
 export const cliToolsDefined: Requirement<AgentNode> = (nodes, has) => {
 	const unknown = missingNames(
 		nodes,
 		(node) => node.clis ?? [],
-		has.cliNames(),
+		new Set(has.clis),
 	);
 	if (unknown.length === 0) return null;
 	return unknown
@@ -107,9 +105,9 @@ export const cliToolsInstalled: Requirement<AgentNode> = (nodes, has) => {
 	const notFound = [
 		...new Set(
 			// A node's own CLI tools need no definition, but this computer must have them.
-			nodes.flatMap((n) => [...(n.clis ?? []), ...(n.nodeClis ?? [])]),
+			nodes.flatMap(programsOf),
 		),
-	].filter((name) => has.findCli(name) === null);
+	].filter((name) => (has.programs[name] ?? null) === null);
 	if (notFound.length === 0) return null;
 	return notFound
 		.map(
@@ -119,9 +117,14 @@ export const cliToolsInstalled: Requirement<AgentNode> = (nodes, has) => {
 		.join(" ");
 };
 
-/** Agent nodes run on harnesses the daemon has added. */
+/** The programs an Agent node's agent may run: its CLI tools and its own. */
+function programsOf(node: AgentNode): string[] {
+	return [...(node.clis ?? []), ...(node.nodeClis ?? [])];
+}
+
+/** Agent nodes run on harnesses the Device has added. */
 export const harnessesAdded: Requirement<AgentNode> = (nodes, has) => {
-	const missing = missingHarnesses(nodes, has.harnessFor);
+	const missing = missingHarnesses(nodes, new Set(has.harnesses));
 	if (missing.length === 0) return null;
 	return missing
 		.map(
@@ -137,15 +140,15 @@ export const checkersHaveDecider: Requirement<AgentNode> = (nodes, has) =>
 		? "The flow has an Agent node with a checker, but no decider is configured."
 		: null;
 
-/** The harnesses the Agent nodes name that the daemon has not configured, with their nodes. */
+/** The harnesses the Agent nodes name that the Device has not added, with their nodes. */
 function missingHarnesses(
 	nodes: readonly AgentNode[],
-	harnessFor: (name: HarnessName) => AgentHarness | undefined,
+	added: ReadonlySet<HarnessName>,
 ): { harness: HarnessName; nodeIds: string[] }[] {
 	const missing = new Map<HarnessName, string[]>();
 	for (const node of nodes) {
 		if (node.harness === undefined) continue;
-		if (harnessFor(node.harness)) continue;
+		if (added.has(node.harness)) continue;
 		const ids = missing.get(node.harness) ?? [];
 		if (!ids.includes(node.id)) ids.push(node.id);
 		missing.set(node.harness, ids);
@@ -153,7 +156,7 @@ function missingHarnesses(
 	return [...missing].map(([harness, nodeIds]) => ({ harness, nodeIds }));
 }
 
-/** The names the nodes list that the daemon does not have, with their nodes. */
+/** The names the nodes list that the Device does not have, with their nodes. */
 export function missingNames<N extends FlowNode>(
 	nodes: readonly N[],
 	listed: (node: N) => readonly string[],
@@ -174,8 +177,9 @@ export function missingNames<N extends FlowNode>(
 /**
  * The Agent kind. A wait node for the policy's waits; `pass` and the
  * node's own outcomes are chosen ends, and an own outcome is the label a
- * Call reports; the idle timer is this kind's alone; the daemon must have
- * its connections, CLI tools, harness and, for a checker, the decider.
+ * Call reports; the idle timer is this kind's alone; the Device must have
+ * its connections, CLI tools (defined and installed), harness and, for a
+ * checker, the decider.
  */
 export const AGENT: NodeKind<AgentNode> = {
 	...PLAIN_KIND,
@@ -192,6 +196,7 @@ export const AGENT: NodeKind<AgentNode> = {
 		idleMinutes: node.idleMinutes,
 	}),
 	connections: (node) => node.connections ?? [],
+	programs: programsOf,
 	requirements: [
 		cliToolsDefined,
 		cliToolsInstalled,
@@ -335,37 +340,41 @@ async function runSession(
 			null,
 		);
 	}
-	const harness = ctx.harnessFor(agent.harness);
-	if (!harness) {
+	// The node's connections and its own servers go to the Device by name,
+	// with `${NAME}` as written: the Device fills them in, and the values go
+	// to the harness only, never into the log. The log keeps the node's
+	// prompt only, like the report instruction the harness adds; a new
+	// session learns its CLI tools from the Device after the prompt.
+	const clis = [...new Set(programsOf(node))];
+	const stream = step.device
+		.session({
+			harness: agent.harness,
+			cwd: ctx.run.worktreePath,
+			prompt,
+			model: agent.model,
+			permissionMode: agent.permissionMode,
+			effort: agent.effort,
+			resumeSessionId: resumeSessionId ?? undefined,
+			stepReport: stepReportOf(node),
+			...(clis.length > 0 ? { clis } : {}),
+			...(node.connections ? { connections: node.connections } : {}),
+			...(node.mcpServers ? { mcpServers: node.mcpServers } : {}),
+			signal,
+		})
+		[Symbol.asyncIterator]();
+	// The Device says first whether the session can start: no session is
+	// recorded for one that cannot.
+	const first = await stream.next();
+	if (first.done || first.value.type !== "ready") {
 		return end(
 			"error",
 			{ outcome: "error", visit },
-			`No ${HARNESS_LABEL[agent.harness]} harness is added. Add it under Agents.`,
+			!first.done && first.value.type === "refused"
+				? first.value.message
+				: "The session could not start.",
 			null,
 		);
 	}
-
-	// The node's connections and its own servers. `${NAME}` in env values
-	// and headers reads the keychain, then the daemon's environment. The
-	// expanded values go to the harness only, never into the log.
-	const mcp = await ctx.mcpServersFor(node);
-	if (!mcp.ok) {
-		return end("error", { outcome: "error", visit }, mcp.message, null);
-	}
-
-	// A new session learns its CLI tools after the prompt. A resumed session
-	// has them already. Plan mode runs no command. The log keeps the node's
-	// prompt only, like the report instruction the harness adds.
-	// The daemon's CLI tools (with the profile's) and the node's own.
-	const clis = [...new Set([...(node.clis ?? []), ...(node.nodeClis ?? [])])];
-	const cliGuide =
-		!resumeSessionId &&
-		agent.permissionMode !== "plan" &&
-		clis.length > 0 &&
-		ctx.cliToolsFor
-			? cliToolsInstruction(await ctx.cliToolsFor(clis))
-			: "";
-	const harnessPrompt = cliGuide ? `${prompt}\n\n${cliGuide}` : prompt;
 
 	const session = await step.session({
 		prompt,
@@ -383,7 +392,8 @@ async function runSession(
 	let lastMessageId: string | null = null;
 	const stoppedByPerson = () => signal.aborted && signal.reason === "stopped";
 
-	const onEvent = async (agentEvent: AgentEvent): Promise<void> => {
+	const onEvent = async (agentEvent: SessionEvent): Promise<void> => {
+		if (agentEvent.type === "ready" || agentEvent.type === "refused") return;
 		step.touch();
 		step.record(sessionId, agentEvent);
 		switch (agentEvent.type) {
@@ -447,27 +457,19 @@ async function runSession(
 
 	try {
 		// A stop that came in while the session was being recorded.
-		if (signal.aborted) throw new Error("The session was aborted.");
-		const stream = harness.run({
-			cwd: ctx.run.worktreePath,
-			prompt: harnessPrompt,
-			model: agent.model,
-			permissionMode: agent.permissionMode,
-			effort: agent.effort,
-			resumeSessionId: resumeSessionId ?? undefined,
-			stepReport: stepReportOf(node),
-			...(clis.length > 0 ? { clis } : {}),
-			...(Object.keys(mcp.servers).length > 0
-				? { mcpServers: mcp.servers }
-				: {}),
-			signal,
-		});
-		await consumeStream(stream, {
-			signal,
-			graceMs: STOP_GRACE_MS,
-			onItem: onEvent,
-			isLast: (e) => e.type === "finished" || e.type === "error",
-		});
+		if (signal.aborted) {
+			void Promise.resolve(stream.return?.()).catch(() => {});
+			throw new Error("The session was aborted.");
+		}
+		await consumeStream(
+			{ [Symbol.asyncIterator]: () => stream },
+			{
+				signal,
+				graceMs: STOP_GRACE_MS,
+				onItem: onEvent,
+				isLast: (e) => e.type === "finished" || e.type === "error",
+			},
+		);
 	} catch (error) {
 		ending ??= endWithoutResult(messageOf(error));
 	}
@@ -510,7 +512,7 @@ async function runSession(
 			const problem = checkOutputData(node.output, finalReport.data);
 			if (problem) return stepError(problem);
 		}
-		return checkOutcome(ctx, node, step, outputs, harnessSessionId);
+		return checkOutcome(node, step, outputs, harnessSessionId);
 	}
 	if (finalReport) {
 		const outcomes = agentOutcomes(node);
@@ -564,7 +566,6 @@ const DEFAULT_CHECK_BRIEF =
  * failure of the checker fails the step: waiting would run the agent again.
  */
 async function checkOutcome(
-	ctx: StepContext,
 	node: AgentNode,
 	step: StepHandle,
 	outputs: StepOutputs,
@@ -603,7 +604,8 @@ async function checkOutcome(
 		harnessSessionId,
 		costUsd,
 	});
-	if (!ctx.decider) {
+	const decider = step.device.capabilities().decider;
+	if (!decider) {
 		return finish(
 			"error",
 			"",
@@ -611,9 +613,9 @@ async function checkOutcome(
 			null,
 		);
 	}
-	// The decider port says which model a checker without one starts on.
+	// The Device says which model a checker without one starts on.
 	const model =
-		checker.model ?? ctx.decider.defaultModel(checker.decider, "decision");
+		checker.model ?? decider.defaultModels[checker.decider].decision;
 	step.record(null, {
 		type: "decision-start",
 		prompt,
@@ -621,7 +623,7 @@ async function checkOutcome(
 		model,
 	});
 	const result = await decideWithin(
-		ctx.decider,
+		step.device,
 		{ decider: checker.decider, prompt, labels: options, model, signal },
 		signal,
 	);

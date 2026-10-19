@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { defaultDeciderModel } from "@nightshift/agents/decider";
+import { HARNESS_LABELS } from "@nightshift/agents/harness-facts";
 import type { AgentHarness, Decider } from "@nightshift/agents/types";
 import type {
 	AgentNode,
@@ -8,7 +9,7 @@ import type {
 	FlowNode,
 	ValueNode,
 } from "@nightshift/flows";
-
+import type { Capabilities } from "./device/types";
 import {
 	AGENT,
 	checkersHaveDecider,
@@ -20,14 +21,15 @@ import { DECISION, modelDecisionsHaveDecider } from "./graph/nodes/decision";
 import { modelValuesHaveDecider, VALUE } from "./graph/nodes/value";
 import {
 	connectionsExist,
-	type DaemonHas,
 	quickRunTitle,
 	REQUIREMENTS,
 	refusalOf,
 } from "./run-start";
+import { type TestDeviceDeps, testDevice } from "./test-support";
 
 /**
- * The requirement checks of run start, each with fake daemon inventory.
+ * The requirement checks of run start, each over a test Device's
+ * capabilities.
  * The whole start path (worktree, run row, `RunStarted`) is covered by
  * engine.test.ts through the public interface; these pin the message each
  * requirement refuses with. A kind's own requirements live on its
@@ -45,10 +47,13 @@ const decision = (id: string, by: DecisionNode["by"]) =>
 const value = (id: string, by: ValueNode["by"]) =>
 	node({ id, type: "value", by }) as ValueNode;
 
-/** A daemon that has everything, unless a test takes something away. */
-function has(overrides: Partial<DaemonHas> = {}): DaemonHas {
-	return {
-		harnessFor: () => ({}) as AgentHarness,
+/** What a Device has that has everything, unless a test takes something away. */
+function has(overrides: Partial<TestDeviceDeps> = {}): Capabilities {
+	const harness = {} as AgentHarness;
+	return testDevice({
+		harnesses: Object.fromEntries(
+			Object.keys(HARNESS_LABELS).map((name) => [name, harness]),
+		),
 		connectionNames: () => new Set(["github"]),
 		cliNames: () => new Set(["gh"]),
 		findCli: () => "/usr/bin/tool",
@@ -58,7 +63,7 @@ function has(overrides: Partial<DaemonHas> = {}): DaemonHas {
 			value: async () => ({}) as never,
 		},
 		...overrides,
-	};
+	}).capabilities({ programs: ["gh", "acli", "jq"] });
 }
 
 describe("REQUIREMENTS", () => {
@@ -152,12 +157,10 @@ describe("harnessesAdded", () => {
 			agent("b", { harness: "codex" }),
 			agent("c"),
 		];
-		expect(harnessesAdded(nodes, has({ harnessFor: () => undefined }))).toBe(
+		expect(harnessesAdded(nodes, has({ harnesses: {} }))).toBe(
 			"The flow has Agent nodes on Codex (a, b), but no Codex harness is added. Add it under Agents.",
 		);
-		expect(
-			harnessesAdded(nodes.slice(0, 1), has({ harnessFor: () => undefined })),
-		).toBe(
+		expect(harnessesAdded(nodes.slice(0, 1), has({ harnesses: {} }))).toBe(
 			"The flow has an Agent node on Codex (a), but no Codex harness is added. Add it under Agents.",
 		);
 	});

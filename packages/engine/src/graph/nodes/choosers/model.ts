@@ -1,14 +1,11 @@
-import type {
-	Decider,
-	DecisionInput,
-	DecisionResult,
-} from "@nightshift/agents/types";
+import type { DecisionInput, DecisionResult } from "@nightshift/agents/types";
 import {
 	type DecisionNode,
 	optionProblem,
 	renderTemplate,
 } from "@nightshift/flows";
 
+import type { Device } from "../../../device/types";
 import {
 	isWaitKind,
 	messageOf,
@@ -42,20 +39,20 @@ export function modelChooser(node: DecisionNode, ctx: StepContext): Chooser {
 		runStep(ctx, node, state, config, {
 			rules: RESUME_RULES.model,
 			outputs: (step) => decisionOutputs("", "", step.visit),
-			body: (step) => decide(ctx, node, step),
+			body: (step) => decide(node, step),
 		});
 }
 
 /** Asks the decider and ends the step on its answer, or asks for a wait. */
 async function decide(
-	ctx: StepContext,
 	node: DecisionNode,
 	step: StepHandle,
 ): Promise<BodyResult> {
 	const { visit, signal } = step;
 	const prompt = renderTemplate(node.prompt, step.tctx);
 	const options = visibleOptions(node);
-	if (!ctx.decider) {
+	const decider = step.device.capabilities().decider;
+	if (!decider) {
 		return {
 			kind: "end",
 			outcome: "error",
@@ -63,9 +60,8 @@ async function decide(
 			error: "No decider is configured for Decision nodes.",
 		};
 	}
-	// The decider port says which model a node without one starts on.
-	const model =
-		node.model ?? ctx.decider.defaultModel(node.decider, "decision");
+	// The Device says which model a node without one starts on.
+	const model = node.model ?? decider.defaultModels[node.decider].decision;
 	step.record(null, {
 		type: "decision-start",
 		prompt,
@@ -73,7 +69,7 @@ async function decide(
 		model,
 	});
 	const result = await decideWithin(
-		ctx.decider,
+		step.device,
 		{ decider: node.decider, prompt, labels: options, model, signal },
 		signal,
 	);
@@ -119,19 +115,19 @@ async function decide(
 }
 
 /**
- * Asks the decider, but never waits on it longer than `STOP_GRACE_MS` past
- * an abort: a decider that ignores its signal cannot hold the run. A decider
- * that throws (against its contract) counts as an error. Shared with an
- * Agent node's checker.
+ * Asks the Device's decider, but never waits on it longer than
+ * `STOP_GRACE_MS` past an abort: a decider that ignores its signal cannot
+ * hold the run. A decider that throws (against its contract) counts as an
+ * error. Shared with an Agent node's checker.
  */
 export function decideWithin(
-	decider: Decider,
+	device: Pick<Device, "decide">,
 	input: DecisionInput,
 	signal: AbortSignal,
 ): Promise<DecisionResult> {
 	return withinGrace(
 		() =>
-			decider.decide(input).catch(
+			device.decide(input).catch(
 				(error): DecisionResult => ({
 					kind: "error",
 					errorKind: "harness",

@@ -36,6 +36,7 @@ import {
 	LEASE_HEARTBEAT_MS,
 	type Lease,
 	LeaseHeldError,
+	localDevice,
 	selfDevice,
 	setUpGit,
 	systemGitInstaller,
@@ -155,9 +156,10 @@ hot.nightshiftScheduler?.abort();
 const scheduler = new AbortController();
 hot.nightshiftScheduler = scheduler;
 
-export const engine = await createEngine({
-	db,
-	walkerId: device.id,
+/** This computer as a Device: every computer-touching piece of a step. */
+const local = localDevice({
+	id: device.id,
+	name: device.name,
 	harnesses: {
 		// Each harness spawns its CLI only when an Agent node names it.
 		"claude-code": perSession("claude-code", () =>
@@ -188,10 +190,9 @@ export const engine = await createEngine({
 			acpHarness("cursor", { executable: settings.current().cursorBin }),
 		),
 	},
+	harnessNames: () => new Set(settings.current().harnesses),
 	// Decision nodes decided by a model: TanStack AI deciders, with API keys from the secrets.
 	decider: tanstackDecider({ secret: (name) => connections.secret(name) }),
-	dataDir,
-	settings: () => settings.run(),
 	mcpServersFor: (node) => connections.mcpServersFor(node),
 	connectionNames: () => connections.names(),
 	cliNames: () => cliTools.names(),
@@ -204,7 +205,14 @@ export const engine = await createEngine({
 				help: await cliHelp(name),
 			})),
 		),
-	harnessNames: () => new Set(settings.current().harnesses),
+});
+
+export const engine = await createEngine({
+	db,
+	walkerId: device.id,
+	device: local,
+	dataDir,
+	settings: () => settings.run(),
 	profileFor: (name) => profiles.settingsFor(name),
 	// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.
 	// Otherwise the Settings switch is read on every tick.

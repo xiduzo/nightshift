@@ -12,6 +12,7 @@ import {
 import { eq } from "drizzle-orm";
 
 import { createRunBus } from "../bus";
+import { localDevice } from "../device/local";
 import type {
 	EngineEventType,
 	EnginePayloads,
@@ -20,7 +21,11 @@ import type {
 } from "../events";
 import { createRunLog, type RunLog } from "../run-log";
 import { defaultRunSettings } from "../settings";
-import type { Sandbox } from "../test-support";
+import {
+	type Sandbox,
+	TEST_DEVICE_ID,
+	type TestDeviceDeps,
+} from "../test-support";
 import { compileFlow } from "./compile";
 import { createRecorders, type StepContext } from "./context";
 import type { Parked, RunEvent, RunStateValues } from "./state";
@@ -103,6 +108,11 @@ export const MINUTE = 1_000;
 
 export type Harness = {
 	ctx: StepContext;
+	/**
+	 * What the run's Device is made of, read at each step: a test changes
+	 * it between steps (a harness removed, a connection that fails).
+	 */
+	local: TestDeviceDeps;
 	log: RunLog;
 	runId: string;
 	saver: MemorySaver;
@@ -114,9 +124,11 @@ export type Harness = {
 };
 
 export type StartOptions = {
-	/** The `claude-code` harness; without one, `harnessFor` finds none. */
+	/** The `claude-code` harness; without one, the Device has none. */
 	harness?: AgentHarness;
 	decider?: Decider;
+	/** The Device's connections; default: none, and no node servers. */
+	mcpServersFor?: TestDeviceDeps["mcpServersFor"];
 	/** The called flows, by name. */
 	flows?: Record<string, Flow>;
 	/** The run's abort signal; read at each use, so a test can swap it. */
@@ -171,6 +183,12 @@ export async function startRun(
 	const controller = new AbortController();
 	const [row] = await db.select().from(run).where(eq(run.id, runId));
 	if (!row) throw new Error("no run row");
+	const local: TestDeviceDeps = {
+		harnesses: options.harness ? { "claude-code": options.harness } : {},
+		...(options.decider ? { decider: options.decider } : {}),
+		mcpServersFor:
+			options.mcpServersFor ?? (async () => ({ ok: true, servers: {} })),
+	};
 	const ctx: StepContext = {
 		db,
 		run: row,
@@ -185,10 +203,8 @@ export async function startRun(
 		log,
 		bus,
 		recorder: (stepId, path) => recorders.open(runId, stepId, path),
-		harnessFor: (name) =>
-			name === "claude-code" ? options.harness : undefined,
-		...(options.decider ? { decider: options.decider } : {}),
-		mcpServersFor: async () => ({ ok: true, servers: {} }),
+		deviceFor: () =>
+			localDevice({ id: TEST_DEVICE_ID, name: "test", ...local }),
 		signal: () => options.signal ?? controller.signal,
 		now: Date.now,
 		minuteMs: MINUTE,
@@ -198,6 +214,7 @@ export async function startRun(
 	const saver = new MemorySaver();
 	return {
 		ctx,
+		local,
 		log,
 		runId,
 		saver,

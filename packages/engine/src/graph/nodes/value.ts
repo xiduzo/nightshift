@@ -52,7 +52,7 @@ function producerFor(node: ValueNode, ctx: StepContext): Producer {
 
 /** A Value made by a model needs a decider with a text adapter. */
 export const modelValuesHaveDecider: Requirement<ValueNode> = (nodes, has) =>
-	!has.decider?.value && nodes.some((n) => n.by === "model")
+	!has.decider?.values && nodes.some((n) => n.by === "model")
 		? "The flow has a Value node made by a model, but no decider is configured."
 		: null;
 

@@ -17,7 +17,12 @@ import {
 	sumCostUsd,
 } from "./events";
 import { exportRun, openRunBundle, UNKNOWN_DEVICE } from "./run-bundle";
-import { createSandbox, type Sandbox, waitFor } from "./test-support";
+import {
+	createSandbox,
+	type Sandbox,
+	waitFor,
+	withDevice,
+} from "./test-support";
 import { readRunTranscript } from "./transcripts";
 
 const SECRET = "sk-test-0123456789";
@@ -59,23 +64,25 @@ const flow: Flow = {
 /** A finished run of agent → command. The agent read a file that held a secret. */
 async function finishedRun(): Promise<string> {
 	const script = reportingScript("pass", "Fixed.");
-	const engine = createEngine({
-		db: sandbox.db,
-		harnesses: {
-			"claude-code": fakeHarness({
-				...script,
-				steps: [
-					{ type: "tool", name: "Read", result: `TOKEN=${SECRET}` },
-					...(script.steps ?? []),
-				],
-				outcome: {
-					type: "finished",
-					usage: { inputTokens: 10, outputTokens: 5, costUsd: 0.25 },
-				},
-			}),
-		},
-		dataDir: sandbox.dataDir,
-	});
+	const engine = createEngine(
+		withDevice({
+			db: sandbox.db,
+			harnesses: {
+				"claude-code": fakeHarness({
+					...script,
+					steps: [
+						{ type: "tool", name: "Read", result: `TOKEN=${SECRET}` },
+						...(script.steps ?? []),
+					],
+					outcome: {
+						type: "finished",
+						usage: { inputTokens: 10, outputTokens: 5, costUsd: 0.25 },
+					},
+				}),
+			},
+			dataDir: sandbox.dataDir,
+		}),
+	);
 	const { id: projectId } = await engine.addProject({
 		repoPath: sandbox.repoPath,
 	});

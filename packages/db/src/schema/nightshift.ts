@@ -133,7 +133,7 @@ export const step = sqliteTable(
 		visit: integer("visit").notNull(),
 		/** Absolute path of the step's NDJSON transcript on disk. */
 		transcriptPath: text("transcript_path").notNull(),
-		/** The Device the step's body ran on: the run's Walker, until steps are placed. */
+		/** The Device the step's body ran on (its Placement): this computer, until steps are placed. */
 		deviceId: text("device_id"),
 		createdAt: createdAt(),
 	},

@@ -37,11 +37,12 @@ import {
 	mustGit,
 	type Sandbox,
 	scriptedHarness,
+	type TestEngineOptions,
 	waitFor,
+	withDevice,
 } from "./test-support";
 import type {
 	Engine,
-	EngineOptions,
 	RunDetail,
 	RunStatus,
 	RunStreamItem,
@@ -66,7 +67,7 @@ afterEach(async () => {
 function makeEngine(
 	harness: AgentHarness,
 	options: Pick<
-		EngineOptions,
+		TestEngineOptions,
 		| "maxConcurrentRuns"
 		| "maxStepsPerRun"
 		| "decider"
@@ -80,12 +81,14 @@ function makeEngine(
 	const runLog = createRunLog(sandbox.db);
 	runLogs.push(runLog);
 	return createEngine(
-		{
+		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },
+			// This computer: the Walker places every step on itself.
+			deviceId: sandbox.deviceId,
 			dataDir: sandbox.dataDir,
 			...options,
-		},
+		}),
 		{ runLog, ...internals },
 	);
 }
@@ -418,7 +421,7 @@ describe("runs", () => {
 		expect(transcript.at(-1)?.event.type).toBe("finished");
 	});
 
-	test("this computer walks the run: the run, its steps and its events name its Device", async () => {
+	test("this computer walks the run: the run and its events name the Walker, each step the Device it ran on", async () => {
 		const engine = makeEngine(fakeHarness());
 		const { id: runId } = await engine.startRun({
 			projectId: await projectId(engine),

@@ -20,6 +20,8 @@ export {
 	type SecretView,
 	secretNameSchema,
 } from "./connections";
+export { type LocalDeviceDeps, localDevice } from "./device/local";
+export type * from "./device/types";
 export { createEngine } from "./engine";
 export { chooseFolder } from "./folder-picker";
 export {

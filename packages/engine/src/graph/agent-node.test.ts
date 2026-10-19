@@ -497,7 +497,7 @@ describe("the Agent node", () => {
 			{ harness },
 		);
 		const asked: string[][] = [];
-		h.ctx.cliToolsFor = async (names) => {
+		h.local.cliToolsFor = async (names) => {
 			asked.push([...names]);
 			return names.map((name) => ({
 				name,
@@ -534,7 +534,7 @@ describe("the Agent node", () => {
 			}),
 			{ harness },
 		);
-		h.ctx.cliToolsFor = async () => {
+		h.local.cliToolsFor = async () => {
 			throw new Error("not asked in plan mode");
 		};
 		await drive(h, { inputs: {} });
@@ -725,7 +725,7 @@ describe("the Agent node", () => {
 			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
 			{ harness },
 		);
-		h.ctx.harnessFor = () => undefined;
+		h.local.harnesses = {};
 		const first = await drive(h, { inputs: {} });
 		expect(first.parked[0]).toMatchObject({
 			kind: "parked",
@@ -733,7 +733,7 @@ describe("the Agent node", () => {
 			reason:
 				'Node "worker" failed: No Claude Code harness is added. Add it under Agents.',
 		});
-		h.ctx.harnessFor = () => harness;
+		h.local.harnesses = { "claude-code": harness };
 		const second = await drive(h, new Command({ resume: { kind: "resume" } }));
 		expect(second.state.ended?.status).toBe("finished");
 		expect(harness.calls[0]?.resumeSessionId).toBeUndefined();

@@ -13,7 +13,7 @@ import type {
 } from "@nightshift/flows";
 
 import type { DerivedItem, DerivedStep } from "../events";
-import type { DaemonHas } from "./context";
+import { testDevice } from "../test-support";
 import { kindOf, kindOfType, NODE_KINDS } from "./node-kinds";
 import { RESUME_RULES } from "./resume-point";
 
@@ -364,14 +364,11 @@ describe("stoppedOutputs: what closeParked ends a parked step with", () => {
 });
 
 describe("connections and requirements: what run start asks", () => {
-	const has = (overrides: Partial<DaemonHas> = {}): DaemonHas => ({
-		harnessFor: () => undefined,
-		connectionNames: () => new Set(),
-		cliNames: () => new Set(),
-		findCli: () => null,
-		decider: undefined,
-		...overrides,
-	});
+	/** A Device with nothing: no harness, connection, CLI tool, program or decider. */
+	const has = () =>
+		testDevice({ harnesses: {}, findCli: () => null }).capabilities({
+			programs: ["gh"],
+		});
 
 	test("an Agent names its connections, a Tool its one; the other kinds none", () => {
 		expect(
