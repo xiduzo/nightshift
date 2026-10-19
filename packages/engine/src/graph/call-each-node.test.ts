@@ -26,7 +26,7 @@ import {
 	type Harness,
 	payloads,
 	startRun,
-} from "./node-test-support";
+} from "./test-support";
 
 /**
  * The Call node with `each` on the compiled graph: one element per super-step,
@@ -115,8 +115,7 @@ describe("the Call node with each", () => {
 					]),
 				),
 			]),
-			harness,
-			{ flows: { build } },
+			{ harness, flows: { build } },
 		);
 		const { parked, state, next, events } = await drive(h, { inputs: {} });
 		expect(parked).toEqual([]);
@@ -323,8 +322,7 @@ describe("the Call node with each", () => {
 					{ branch: "shared" },
 				),
 			]),
-			fakeHarness(),
-			{ flows: { build } },
+			{ harness: fakeHarness(), flows: { build } },
 		);
 		const { state } = await drive(h, { inputs: {} });
 		expect(state.ended?.outcome).toBe("done");
@@ -361,8 +359,7 @@ describe("the Call node with each", () => {
 				],
 				[edge("e1", "loop", "done", "after")],
 			),
-			fakeHarness(),
-			{ flows: { build } },
+			{ harness: fakeHarness(), flows: { build } },
 		);
 		const { parked, state } = await drive(h, { inputs: {} });
 		// The body's park at "check" never reached the root.
@@ -479,8 +476,7 @@ describe("the Call node with each", () => {
 					{ branch: "shared" },
 				),
 			]),
-			harness,
-			{ flows: { build } },
+			{ harness, flows: { build } },
 		);
 		const { state, parked } = await drive(h, { inputs: {} });
 		expect(parked).toEqual([]);
@@ -524,8 +520,7 @@ describe("the Call node with each", () => {
 					{ branch: "shared", maxItems: 2 },
 				),
 			]),
-			harness,
-			{ flows: { build } },
+			{ harness, flows: { build } },
 		);
 		await drive(h, { inputs: {} });
 		expect(harness.calls).toHaveLength(2);
@@ -592,8 +587,7 @@ describe("the Call node with each", () => {
 					edge("e2", "each", "done", "report"),
 				],
 			),
-			harness,
-			{ flows: { task } },
+			{ harness, flows: { task } },
 		);
 		const { state } = await drive(h, { inputs: {} });
 		expect(state.ended?.nodeId).toBe("report");
@@ -673,8 +667,7 @@ describe("the Call node with each", () => {
 					{ branch: "shared" },
 				),
 			]),
-			harness,
-			{ flows: { build } },
+			{ harness, flows: { build } },
 		);
 		const { state } = await drive(h, { inputs: {} });
 		expect(state.ended?.outcome).toBe("done");
@@ -706,8 +699,7 @@ describe("the Call node with each", () => {
 					},
 				),
 			]),
-			harness,
-			{ flows: { build } },
+			{ harness, flows: { build } },
 		);
 		await drive(files, { inputs: {} });
 		expect(payloads(await files.events(), "ItemStarted")).toEqual([
@@ -735,8 +727,7 @@ describe("the Call node with each", () => {
 					command: "echo not json",
 				}),
 			]),
-			harness,
-			{ flows: { build } },
+			{ harness, flows: { build } },
 		);
 		const noJson = await drive(bad, { inputs: {} });
 		expect((noJson.parked[0] as { reason: string }).reason).toContain(
@@ -755,8 +746,7 @@ describe("the Call node with each", () => {
 					]),
 				),
 			]),
-			harness,
-			{ flows: { build } },
+			{ harness, flows: { build } },
 		);
 		const cycle = await drive(cyclic, { inputs: {} });
 		expect((cycle.parked[0] as { reason: string }).reason).toContain(
@@ -778,8 +768,7 @@ describe("the Call node with each", () => {
 					]),
 				),
 			]),
-			fakeHarness(),
-			{ flows: { build } },
+			{ harness: fakeHarness(), flows: { build } },
 		);
 		const { state } = await drive(h, { inputs: {} });
 		expect(state.ended?.outcome).toBe("done");
@@ -818,8 +807,7 @@ describe("the Call node with each", () => {
 					{ branch: "shared" },
 				),
 			]),
-			harness,
-			{ flows: { build } },
+			{ harness, flows: { build } },
 		);
 		const first = await drive(h, { inputs: {} });
 		const steps = deriveSteps(await h.events());
@@ -929,8 +917,7 @@ describe("the Call node with each", () => {
 					]),
 				),
 			]),
-			harness,
-			{ flows: { build }, signal: controller.signal },
+			{ harness, flows: { build }, signal: controller.signal },
 		);
 		const first = await drive(h, { inputs: {} });
 		const stoppedSteps = deriveSteps(await h.events());
@@ -1058,8 +1045,7 @@ describe("the Call node with each", () => {
 					{ branch: "shared" },
 				),
 			]),
-			harness,
-			{ flows: { build } },
+			{ harness, flows: { build } },
 		);
 		h.ctx.settings = () => ({ ...defaultRunSettings(), maxStepsPerRun: 3 });
 		const first = await drive(h, { inputs: {} });
@@ -1144,8 +1130,7 @@ describe("the Call node with each", () => {
 					{ branch: "shared" },
 				),
 			]),
-			harness,
-			{ flows: { build } },
+			{ harness, flows: { build } },
 		);
 		const first = await drive(h, { inputs: {} });
 		const loop = loopStep(deriveSteps(await h.events()));
@@ -1214,8 +1199,7 @@ describe("the Call node with each", () => {
 					{ branch: "shared" },
 				),
 			]),
-			harness,
-			{ flows: { build } },
+			{ harness, flows: { build } },
 		);
 		// The daemon dies while element 2's second step starts (after its
 		// StepStarted, before its session).

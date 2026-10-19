@@ -7,7 +7,7 @@ import { deriveSteps } from "../events";
 import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { DEFAULT_RESUME_PROMPT } from "./context";
-import { drive, flowOf, payloads, startRun } from "./test-support";
+import { command, drive, flowOf, payloads, startRun } from "./test-support";
 
 /**
  * The Value node on the compiled graph: a rule (JSONata) or a scripted
@@ -46,13 +46,6 @@ const byModel = (id: string, extra: Partial<ValueNode> = {}): ValueNode => ({
 	output: OUTPUT,
 	decider: "openrouter",
 	...extra,
-});
-
-const command = (id: string, cmd: string) => ({
-	id,
-	type: "command" as const,
-	position: { x: 0, y: 0 },
-	command: cmd,
 });
 
 /** A flow: the Value node, then `done` on pass and `again` on fail. */

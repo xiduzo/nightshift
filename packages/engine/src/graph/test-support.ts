@@ -1,11 +1,23 @@
 import { MemorySaver } from "@langchain/langgraph";
 import type { AgentHarness, Decider } from "@nightshift/agents/types";
 import { project, run } from "@nightshift/db/schema/nightshift";
-import { type Flow, type FlowInput, flowSchema } from "@nightshift/flows";
+import {
+	type AgentNode,
+	type CommandNode,
+	type Flow,
+	type FlowEdge,
+	type FlowInput,
+	flowSchema,
+} from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 
 import { createRunBus } from "../bus";
-import type { EngineEventType, EnginePayloads, LoggedEvent } from "../events";
+import type {
+	EngineEventType,
+	EnginePayloads,
+	InputValues,
+	LoggedEvent,
+} from "../events";
 import { createRunLog, type RunLog } from "../run-log";
 import { defaultRunSettings } from "../settings";
 import type { Sandbox } from "../test-support";
@@ -14,19 +26,82 @@ import { createRecorders, type StepContext } from "./context";
 import type { Parked, RunEvent, RunStateValues } from "./state";
 
 /**
- * Test helpers for the graph nodes: a run row with its log, a minimal
- * StepContext, a compiled graph over a MemorySaver, and a driver that
- * streams the graph and collects the root's interrupts and the custom
- * events. The same shape as agent-node.test.ts uses.
+ * The one set of helpers for a test that drives a compiled flow (with its
+ * called flows) on a MemorySaver over the sandbox's database and git
+ * repository: node builders, a run row with its log and a minimal
+ * StepContext, and a driver that streams the graph as the runner does and
+ * collects the root's interrupts and the custom events.
  */
 
-export const flowOf = (input: Omit<FlowInput, "version">): Flow =>
-	flowSchema.parse({ version: 4, ...input });
+export const agent = (
+	id: string,
+	prompt: string,
+	extra: Partial<AgentNode> = {},
+): AgentNode => ({
+	id,
+	type: "agent",
+	position: { x: 0, y: 0 },
+	prompt,
+	harness: "claude-code",
+	model: "sonnet",
+	permissionMode: "acceptEdits",
+	session: "fresh",
+	...extra,
+});
+
+export const command = (
+	id: string,
+	cmd: string,
+	extra: Partial<CommandNode> = {},
+): CommandNode => ({
+	id,
+	type: "command",
+	position: { x: 0, y: 0 },
+	command: cmd,
+	output: "text",
+	...extra,
+});
+
+export const edge = (
+	id: string,
+	from: string,
+	outcome: FlowEdge["outcome"],
+	to: string,
+): FlowEdge => ({ id, from, outcome, to });
+
+type FlowFields = Omit<FlowInput, "version">;
+
+/**
+ * A flow at today's version: either the whole input, or its nodes (the
+ * first one starts the flow), its edges and the rest.
+ */
+export function flowOf(input: FlowFields): Flow;
+export function flowOf(
+	nodes: FlowInput["nodes"],
+	edges?: FlowEdge[],
+	extra?: Partial<FlowFields>,
+): Flow;
+export function flowOf(
+	input: FlowFields | FlowInput["nodes"],
+	edges: FlowEdge[] = [],
+	extra: Partial<FlowFields> = {},
+): Flow {
+	if (Array.isArray(input)) {
+		return flowSchema.parse({
+			version: 4,
+			start: input[0]?.id ?? "",
+			nodes: input,
+			edges,
+			...extra,
+		});
+	}
+	return flowSchema.parse({ version: 4, ...input });
+}
 
 /** How long one minute of a timeout or a policy wait lasts in these tests. */
 export const MINUTE = 1_000;
 
-export type GraphHarness = {
+export type Harness = {
 	ctx: StepContext;
 	log: RunLog;
 	runId: string;
@@ -38,22 +113,31 @@ export type GraphHarness = {
 	types(): Promise<string[]>;
 };
 
+export type StartOptions = {
+	/** The `claude-code` harness; without one, `harnessFor` finds none. */
+	harness?: AgentHarness;
+	decider?: Decider;
+	/** The called flows, by name. */
+	flows?: Record<string, Flow>;
+	/** The run's abort signal; read at each use, so a test can swap it. */
+	signal?: AbortSignal;
+	/** What `RunStarted` records as the run's inputs. */
+	inputs?: InputValues;
+	branch?: string;
+};
+
 let runs = 0;
 
 /** A run row, its log with `RunStarted`, and a minimal StepContext. */
 export async function startRun(
 	sandbox: Sandbox,
 	flow: Flow,
-	options: {
-		harness?: AgentHarness;
-		decider?: Decider;
-		signal?: AbortSignal;
-		inputs?: Record<string, string>;
-	} = {},
-): Promise<GraphHarness> {
+	options: StartOptions = {},
+): Promise<Harness> {
 	const { db } = sandbox;
 	const runId = `run-${++runs}`;
 	const projectId = "project-1";
+	const flows = options.flows ?? {};
 	await db
 		.insert(project)
 		.values({ id: projectId, name: "repo", repoPath: sandbox.repoPath })
@@ -63,10 +147,10 @@ export async function startRun(
 		projectId,
 		flowName: null,
 		flow: JSON.stringify(flow),
-		bodyFlows: "{}",
+		bodyFlows: JSON.stringify(flows),
 		title: "test",
 		worktreePath: sandbox.repoPath,
-		branch: "nightshift/test",
+		branch: options.branch ?? "nightshift/test",
 		baseRef: "main",
 	});
 	const log = createRunLog(db);
@@ -78,7 +162,7 @@ export async function startRun(
 			flowName: null,
 			title: "test",
 			start: flow.start,
-			inputs: options.inputs ?? { task: "the thing" },
+			inputs: options.inputs ?? {},
 		},
 	});
 	const bus = createRunBus();
@@ -91,7 +175,7 @@ export async function startRun(
 		run: row,
 		flow,
 		flowName: "test",
-		flows: {},
+		flows,
 		policy: () => ({
 			usageLimitFirstWaitMinutes: 5,
 			usageLimitMaxWaitMinutes: 60,
@@ -124,16 +208,20 @@ export async function startRun(
 }
 
 export type Driven = {
+	/** The root's interrupts, innermost value first. */
 	parked: Parked[];
 	events: RunEvent[];
 	state: RunStateValues;
 	next: string[];
 };
 
-/** Streams the graph and collects the root's interrupts and the custom events. */
+/**
+ * Streams the graph as the runner does (`durability: "sync"`) and collects
+ * the root's interrupts and the custom events.
+ */
 export async function drive(
-	h: GraphHarness,
-	input: Parameters<ReturnType<GraphHarness["graph"]>["stream"]>[0],
+	h: Harness,
+	input: Parameters<ReturnType<Harness["graph"]>["stream"]>[0],
 	graph = h.graph(),
 ): Promise<Driven> {
 	const parked: Parked[] = [];
@@ -142,6 +230,7 @@ export async function drive(
 		...h.config,
 		streamMode: ["updates", "custom"],
 		subgraphs: true,
+		durability: "sync",
 	});
 	for await (const chunk of stream) {
 		const [namespace, mode, data] = chunk as [string[], string, unknown];

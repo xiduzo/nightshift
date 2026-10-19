@@ -5,9 +5,10 @@ import { deriveOpenGate, deriveSteps } from "../events";
 import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import {
+	command,
 	drive,
 	flowOf,
-	type GraphHarness,
+	type Harness,
 	payloads,
 	startRun,
 } from "./test-support";
@@ -32,13 +33,6 @@ const gate = (
 	prompt: question,
 	options: choices,
 	by: "person" as const,
-});
-
-const command = (id: string, cmd: string) => ({
-	id,
-	type: "command" as const,
-	position: { x: 0, y: 0 },
-	command: cmd,
 });
 
 /** gate (approve → ship; reject → nothing). */
@@ -70,7 +64,7 @@ afterEach(async () => {
 });
 
 /** What the runner and the engine append when a person stops a run at an open Gate and resumes it. */
-async function stopAndResume(h: GraphHarness, stepId: string, visit: number) {
+async function stopAndResume(h: Harness, stepId: string, visit: number) {
 	await h.log.append({ type: "StopRequested", runId: h.runId, payload: {} });
 	await h.log.append({
 		type: "StepEnded",

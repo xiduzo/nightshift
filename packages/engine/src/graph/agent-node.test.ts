@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { Command, MemorySaver } from "@langchain/langgraph";
+import { Command } from "@langchain/langgraph";
 import type { AgentHarness, AgentSessionInput } from "@nightshift/agents";
 import { defaultDeciderModel } from "@nightshift/agents/decider";
 import {
@@ -11,60 +11,37 @@ import {
 	usageLimitScript,
 } from "@nightshift/agents/fake";
 import type { Decider } from "@nightshift/agents/types";
-import {
-	agentSession,
-	project,
-	run,
-	step,
-} from "@nightshift/db/schema/nightshift";
-import { type Flow, type FlowInput, flowSchema } from "@nightshift/flows";
+import { agentSession, step } from "@nightshift/db/schema/nightshift";
+import type { AgentNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 
-import { createRunBus } from "../bus";
-import {
-	deriveSteps,
-	type EngineEventType,
-	type EnginePayloads,
-	type LoggedEvent,
-} from "../events";
-import { createRunLog, type RunLog } from "../run-log";
-import { defaultRunSettings } from "../settings";
+import { deriveSteps } from "../events";
 import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
-import { compileFlow } from "./compile";
+import { DEFAULT_RESUME_PROMPT } from "./context";
 import {
-	createRecorders,
-	DEFAULT_RESUME_PROMPT,
-	STOP_TIME_REASON,
-	type StepContext,
-} from "./context";
-import type { Parked, RunEvent, RunStateValues } from "./state";
+	agent as agentNode,
+	drive,
+	flowOf,
+	MINUTE,
+	payloads,
+	startRun,
+} from "./test-support";
 
 /**
  * The Agent node on the compiled graph, driven by the fake harness with a
- * real run log and a MemorySaver. The event log is compared with what the
- * engine writes today for the same situations (engine.test.ts,
- * foreach.test.ts "run policy").
+ * real run log and a MemorySaver: what the Agent's body makes of a session
+ * (the prompt, the step report, the checker, the CLI tools, the sessions it
+ * continues), plus one wait and one crash re-entry through the whole graph.
+ * The shared rules (the entry checks, the stop time, the sleep, the resume
+ * point) are tested once in step-runner.test.ts, sleep.test.ts and
+ * resume-point.test.ts.
  */
 
-const agent = (id: string, extra: Record<string, unknown> = {}) => ({
-	id,
-	type: "agent" as const,
-	position: { x: 0, y: 0 },
-	prompt: `Work on ${id}: {{task}}`,
-	harness: "claude-code" as const,
-	model: "sonnet",
-	permissionMode: "acceptEdits" as const,
-	...extra,
-});
-
-const flowOf = (input: Omit<FlowInput, "version">): Flow =>
-	flowSchema.parse({ version: 4, ...input });
-
-const MINUTE = 1_000;
+const agent = (id: string, extra: Record<string, unknown> = {}) =>
+	agentNode(id, `Work on ${id}: {{task}}`, extra as Partial<AgentNode>);
 
 let sandbox: Sandbox;
-let runs = 0;
 beforeEach(async () => {
 	sandbox = await createSandbox();
 });
@@ -72,150 +49,18 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
-type Harness = {
-	ctx: StepContext;
-	log: RunLog;
-	runId: string;
-	saver: MemorySaver;
-	config: { configurable: { thread_id: string } };
-	/** Compiles the flow again over the same saver: a new daemon. */
-	graph(): ReturnType<ReturnType<typeof compileFlow>["compile"]>;
-	events(): Promise<LoggedEvent[]>;
-	types(): Promise<string[]>;
-};
-
-/** A run row, its log with `RunStarted`, and a minimal StepContext. */
-async function startRun(
-	flow: Flow,
-	harness: AgentHarness,
-	options: { signal?: AbortSignal; decider?: Decider } = {},
-): Promise<Harness> {
-	const { db } = sandbox;
-	const runId = `run-${++runs}`;
-	const projectId = "project-1";
-	await db
-		.insert(project)
-		.values({ id: projectId, name: "repo", repoPath: sandbox.repoPath })
-		.onConflictDoNothing();
-	await db.insert(run).values({
-		id: runId,
-		projectId,
-		flowName: null,
-		flow: JSON.stringify(flow),
-		bodyFlows: "{}",
-		title: "test",
-		worktreePath: sandbox.repoPath,
-		branch: "nightshift/test",
-		baseRef: "main",
-	});
-	const log = createRunLog(db);
-	await log.append({
-		type: "RunStarted",
-		runId,
-		payload: {
-			projectId,
-			flowName: null,
-			title: "test",
-			start: flow.start,
-			inputs: { task: "the thing" },
-		},
-	});
-	const bus = createRunBus();
-	const recorders = createRecorders({ db, bus });
-	const controller = new AbortController();
-	const [row] = await db.select().from(run).where(eq(run.id, runId));
-	if (!row) throw new Error("no run row");
-	const ctx: StepContext = {
-		db,
-		run: row,
-		flow,
-		flowName: "test",
-		flows: {},
-		policy: () => ({
-			usageLimitFirstWaitMinutes: 5,
-			usageLimitMaxWaitMinutes: 60,
-			networkGraceMinutes: 240,
-		}),
-		log,
-		bus,
-		recorder: (stepId, path) => recorders.open(runId, stepId, path),
-		harnessFor: (name) => (name === "claude-code" ? harness : undefined),
-		mcpServersFor: async () => ({ ok: true, servers: {} }),
-		signal: () => options.signal ?? controller.signal,
-		now: Date.now,
-		minuteMs: MINUTE,
-		dataDir: sandbox.dataDir,
-		settings: defaultRunSettings,
-		...(options.decider ? { decider: options.decider } : {}),
-	};
-	const saver = new MemorySaver();
-	return {
-		ctx,
-		log,
-		runId,
-		saver,
-		config: { configurable: { thread_id: runId } },
-		graph: () => compileFlow(flow, ctx).compile({ checkpointer: saver }),
-		events: () => log.events(runId),
-		types: async () => (await log.events(runId)).map((e) => e.type),
-	};
-}
-
-/** Streams the graph and collects the root's interrupts and the custom events. */
-async function drive(
-	h: Harness,
-	input: Parameters<ReturnType<Harness["graph"]>["stream"]>[0],
-	graph = h.graph(),
-) {
-	const parked: Parked[] = [];
-	const events: RunEvent[] = [];
-	const stream = await graph.stream(input, {
-		...h.config,
-		streamMode: ["updates", "custom"],
-		subgraphs: true,
-	});
-	for await (const chunk of stream) {
-		const [namespace, mode, data] = chunk as [string[], string, unknown];
-		if (mode === "custom") {
-			events.push(data as RunEvent);
-			continue;
-		}
-		for (const [node, update] of Object.entries(
-			data as Record<string, unknown>,
-		)) {
-			if (node !== "__interrupt__" || namespace.length > 0) continue;
-			const [first] = update as { value: Parked }[];
-			if (first) parked.push(first.value);
-		}
-	}
-	const snapshot = await graph.getState(h.config);
-	return {
-		parked,
-		events,
-		state: snapshot.values as RunStateValues,
-		next: [...snapshot.next],
-	};
-}
-
-const payloads = <T extends EngineEventType>(
-	events: LoggedEvent[],
-	type: T,
-): EnginePayloads[T][] =>
-	events
-		.filter((e) => e.type === type)
-		.map((e) => e.payload as EnginePayloads[T]);
-
 describe("the Agent node", () => {
 	test("a passing step: the log, the rows, the transcript and the state are as the engine writes them", async () => {
 		const harness = fakeHarness(reportingScript("pass", "Built it"));
 		const h = await startRun(
+			sandbox,
 			flowOf({
 				inputs: [{ name: "task" }],
 				start: "worker",
 				nodes: [agent("worker", { skill: "tdd", effort: "high" })],
 				edges: [],
 			}),
-			harness,
+			{ harness },
 		);
 		const { parked, events, state, next } = await drive(h, {
 			inputs: { task: "the thing" },
@@ -350,6 +195,7 @@ describe("the Agent node", () => {
 	test("a failing step takes its retry edge until the max, then parks the run as failed", async () => {
 		const harness = fakeHarness(reportingScript("fail", "Nope"));
 		const h = await startRun(
+			sandbox,
 			flowOf({
 				start: "worker",
 				nodes: [agent("worker")],
@@ -363,7 +209,7 @@ describe("the Agent node", () => {
 					},
 				],
 			}),
-			harness,
+			{ harness },
 		);
 		const { parked, state, next } = await drive(h, { inputs: {} });
 		expect(harness.calls).toHaveLength(3);
@@ -419,8 +265,9 @@ describe("the Agent node", () => {
 	test("an outcome without an edge parks the run as failed, with today's reason", async () => {
 		const harness = fakeHarness(reportingScript("needs-input", "Which?"));
 		const h = await startRun(
+			sandbox,
 			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			harness,
+			{ harness },
 		);
 		const { parked } = await drive(h, { inputs: {} });
 		expect(parked[0]).toMatchObject({
@@ -444,8 +291,9 @@ describe("the Agent node", () => {
 
 		const good = fakeHarness(reportingScript("ship", "Shipped", { n: 1 }));
 		const h = await startRun(
+			sandbox,
 			flowOf({ start: "worker", nodes: [node()], edges: [] }),
-			good,
+			{ harness: good },
 		);
 		const { state, parked } = await drive(h, { inputs: {} });
 		expect(good.calls[0]?.stepReport).toEqual(spec);
@@ -465,8 +313,9 @@ describe("the Agent node", () => {
 
 		const bad = fakeHarness(reportingScript("ship", "Shipped", { n: "x" }));
 		const h2 = await startRun(
+			sandbox,
 			flowOf({ start: "worker", nodes: [node()], edges: [] }),
-			bad,
+			{ harness: bad },
 		);
 		const second = await drive(h2, { inputs: {} });
 		expect(second.parked[0]).toMatchObject({
@@ -484,8 +333,9 @@ describe("the Agent node", () => {
 			reportingScript("ship", "Shipped", JSON.stringify({ n: 2 })),
 		);
 		const h4 = await startRun(
+			sandbox,
 			flowOf({ start: "worker", nodes: [node()], edges: [] }),
-			asText,
+			{ harness: asText },
 		);
 		const fourth = await drive(h4, { inputs: {} });
 		expect(fourth.parked).toEqual([]);
@@ -493,8 +343,9 @@ describe("the Agent node", () => {
 
 		const silent = fakeHarness({ steps: [], outcome: { type: "finished" } });
 		const h3 = await startRun(
+			sandbox,
 			flowOf({ start: "worker", nodes: [node()], edges: [] }),
-			silent,
+			{ harness: silent },
 		);
 		const third = await drive(h3, { inputs: {} });
 		expect((third.parked[0] as { reason: string }).reason).toBe(
@@ -510,8 +361,9 @@ describe("the Agent node", () => {
 				: reportingScript("pass", "After the wait"),
 		);
 		const h = await startRun(
+			sandbox,
 			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			harness,
+			{ harness },
 		);
 		const before = Date.now();
 		const first = await drive(h, { inputs: {} });
@@ -631,92 +483,18 @@ describe("the Agent node", () => {
 		]);
 	});
 
-	test("a wake past the stop time does not continue the step: it ends stopped with its session, for a resume", async () => {
-		const resetAt = Date.now() + 60 * MINUTE;
-		const stopAt = resetAt + 10 * MINUTE;
-		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
-			call === 0 ? usageLimitScript(resetAt) : reportingScript("pass"),
-		);
-		const h = await startRun(
-			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			harness,
-		);
-		const first = await drive(h, { inputs: {}, stopAt });
-		expect(first.next).toEqual(["wait__worker"]);
-		const [stepRow] = deriveSteps(await h.events());
-		const stepId = stepRow?.id as string;
-
-		// Night Shift was not running at the wake: it comes after the stop time.
-		h.ctx.now = () => stopAt + MINUTE;
-		await h.log.append({
-			type: "WaitEnded",
-			runId: h.runId,
-			stepId,
-			payload: { early: false },
-		});
-		const second = await drive(
-			h,
-			new Command({ resume: { kind: "wake", early: false } }),
-			h.graph(),
-		);
-		expect(second.parked).toEqual([
-			{
-				kind: "parked",
-				stepId,
-				nodeId: "worker",
-				status: "stopped",
-				reason: STOP_TIME_REASON,
-				atStopTime: true,
-			},
-		]);
-		expect(harness.calls).toHaveLength(1);
-		expect(second.state.pending).toMatchObject({
-			kind: "parked",
-			harnessSessionId: "fake-session-1",
-		});
-		expect(payloads(await h.events(), "StepEnded")).toEqual([
-			{
-				outcome: "stopped",
-				outputs: { outcome: "stopped", visit: 1 },
-				error: null,
-			},
-		]);
-	});
-
-	test("a wake with a prompt passes it to the continued session", async () => {
-		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
-			call === 0 ? usageLimitScript() : reportingScript("pass"),
-		);
-		const h = await startRun(
-			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			harness,
-		);
-		const first = await drive(h, { inputs: {} });
-		// No reset time: the policy's first wait.
-		expect((first.parked[0] as { message: string }).message).toContain(
-			"continues in 5 min",
-		);
-		await drive(
-			h,
-			new Command({
-				resume: { kind: "wake", early: true, prompt: "Carry on, limit reset." },
-			}),
-		);
-		expect(harness.calls[1]?.prompt).toBe("Carry on, limit reset.");
-		expect(harness.calls[1]?.resumeSessionId).toBe("fake-session-1");
-	});
-
 	test("a new session learns its CLI tools after the prompt; the log and a continued session do not", async () => {
 		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
 			call === 0 ? usageLimitScript() : reportingScript("pass"),
 		);
 		const h = await startRun(
+			sandbox,
 			flowOf({
 				start: "worker",
 				nodes: [agent("worker", { clis: ["acli"] })],
 				edges: [],
 			}),
-			harness,
+			{ harness },
 		);
 		const asked: string[][] = [];
 		h.ctx.cliToolsFor = async (names) => {
@@ -748,12 +526,13 @@ describe("the Agent node", () => {
 	test("plan mode runs no command: the session gets no CLI tools", async () => {
 		const harness = fakeHarness(() => reportingScript("pass"));
 		const h = await startRun(
+			sandbox,
 			flowOf({
 				start: "worker",
 				nodes: [agent("worker", { clis: ["acli"], permissionMode: "plan" })],
 				edges: [],
 			}),
-			harness,
+			{ harness },
 		);
 		h.ctx.cliToolsFor = async () => {
 			throw new Error("not asked in plan mode");
@@ -766,10 +545,12 @@ describe("the Agent node", () => {
 		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
 			call === 0 ? usageLimitScript() : reportingScript("pass"),
 		);
-		const options: { signal?: AbortSignal } = {};
-		const h = await startRun(
-			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
+		const options: { harness: AgentHarness; signal?: AbortSignal } = {
 			harness,
+		};
+		const h = await startRun(
+			sandbox,
+			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
 			options,
 		);
 		const first = await drive(h, { inputs: {} });
@@ -850,8 +631,9 @@ describe("the Agent node", () => {
 			call === 0 ? failingScript("boom") : reportingScript("pass", "Fixed"),
 		);
 		const h = await startRun(
+			sandbox,
 			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			harness,
+			{ harness },
 		);
 		const first = await drive(h, { inputs: {} });
 		const [stepRow] = deriveSteps(await h.events());
@@ -939,8 +721,9 @@ describe("the Agent node", () => {
 	test("a parked step without a harness session resumes as a new visit", async () => {
 		const harness = fakeHarness(reportingScript("pass"));
 		const h = await startRun(
+			sandbox,
 			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			harness,
+			{ harness },
 		);
 		h.ctx.harnessFor = () => undefined;
 		const first = await drive(h, { inputs: {} });
@@ -963,6 +746,7 @@ describe("the Agent node", () => {
 			call === 0 ? reportingScript("fail") : reportingScript("pass"),
 		);
 		const h = await startRun(
+			sandbox,
 			flowOf({
 				start: "worker",
 				nodes: [agent("worker", { session: "resume" })],
@@ -976,7 +760,7 @@ describe("the Agent node", () => {
 					},
 				],
 			}),
-			harness,
+			{ harness },
 		);
 		const { state } = await drive(h, { inputs: {} });
 		expect(state.ended?.status).toBe("finished");
@@ -998,9 +782,9 @@ describe("the Agent node", () => {
 			],
 		});
 		const h = await startRun(
+			sandbox,
 			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			harness,
-			{ signal: controller.signal },
+			{ harness, signal: controller.signal },
 		);
 		setTimeout(() => controller.abort(), 100);
 		const { parked, state } = await drive(h, { inputs: {} });
@@ -1024,101 +808,12 @@ describe("the Agent node", () => {
 		});
 	});
 
-	test("a step past its time budget ends with an error", async () => {
-		const harness = fakeHarness({
-			steps: [{ type: "wait", ms: 10_000 }],
-		});
-		const h = await startRun(
-			flowOf({
-				start: "worker",
-				nodes: [agent("worker", { timeoutMinutes: 1 })],
-				edges: [],
-			}),
-			harness,
-		);
-		h.ctx.minuteMs = 50;
-		const { parked } = await drive(h, { inputs: {} });
-		expect(parked[0]).toMatchObject({
-			status: "failed",
-			reason:
-				'Node "worker" failed: The step ran past its time budget of 1 min.',
-		});
-	});
-
-	test("the entry checks park the run before a step: stop after step, stop time, step cap", async () => {
-		const harness = fakeHarness(reportingScript("pass"));
-		const flow = flowOf({
-			start: "worker",
-			nodes: [agent("worker")],
-			edges: [],
-		});
-
-		const stopped = await startRun(flow, harness);
-		await stopped.log.append({
-			type: "StopAfterStepRequested",
-			runId: stopped.runId,
-			payload: {},
-		});
-		const first = await drive(stopped, { inputs: {} });
-		expect(first.parked).toEqual([
-			{
-				kind: "parked",
-				stepId: null,
-				nodeId: "worker",
-				status: "stopped",
-				reason: "Stopped after the running step, as asked.",
-			},
-		]);
-		expect(await stopped.types()).not.toContain("StepStarted");
-		// A resume (the engine appends RunResumed, which begins a new walk) starts the visit.
-		await stopped.log.append({
-			type: "RunResumed",
-			runId: stopped.runId,
-			payload: { nodeId: "worker", stepId: null, prompt: null, by: "person" },
-		});
-		const resumed = await drive(
-			stopped,
-			new Command({ resume: { kind: "resume" } }),
-		);
-		expect(resumed.state.ended?.status).toBe("finished");
-		expect(deriveSteps(await stopped.events())).toHaveLength(1);
-
-		const capped = await startRun(flow, harness);
-		capped.ctx.settings = () => ({
-			...defaultRunSettings(),
-			maxStepsPerRun: 1,
-		});
-		await capped.log.append({
-			type: "StepStarted",
-			runId: capped.runId,
-			stepId: "earlier",
-			payload: {
-				nodeId: "other",
-				nodeType: "command",
-				visit: 1,
-				transcriptPath: "/dev/null",
-				logPath: null,
-				scope: null,
-			},
-		});
-		const second = await drive(capped, { inputs: {} });
-		expect(second.parked).toEqual([
-			{
-				kind: "parked",
-				stepId: null,
-				nodeId: "worker",
-				status: "failed",
-				reason:
-					'The run reached the limit of 1 steps before node "worker". Resume it to continue.',
-			},
-		]);
-	});
-
 	test("after a daemon death, the node re-runs and continues the step the log has, with the resume's prompt", async () => {
 		const harness = fakeHarness(reportingScript("pass", "Recovered"));
 		const h = await startRun(
+			sandbox,
 			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			harness,
+			{ harness },
 		);
 		// The last daemon started the step and its session, then died before
 		// the node committed; recovery closed both as interrupted, and the
@@ -1221,104 +916,6 @@ describe("the Agent node", () => {
 		expect(deriveSteps(logged)).toHaveLength(1);
 		expect(deriveSteps(logged)[0]?.outcome).toBe("pass");
 	});
-
-	test("a daemon death after a wake: the step recovery ended is reopened, not continued, with the daemon's resume prompt", async () => {
-		const harness = fakeHarness((_input: AgentSessionInput, call: number) =>
-			call === 0 ? usageLimitScript() : reportingScript("pass", "Recovered"),
-		);
-		const h = await startRun(
-			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
-			harness,
-		);
-		await drive(h, { inputs: {} });
-		const stepId = deriveSteps(await h.events())[0]?.id as string;
-		await h.log.append({
-			type: "WaitEnded",
-			runId: h.runId,
-			stepId,
-			payload: { early: false },
-		});
-
-		// The wake re-entered the node, and the daemon died before the
-		// session started: the checkpoint is after the wait node, the step
-		// is still open in the log.
-		const recorder = h.ctx.recorder;
-		h.ctx.recorder = async () => {
-			throw new Error("the daemon died");
-		};
-		await expect(
-			drive(h, new Command({ resume: { kind: "wake", early: false } })),
-		).rejects.toThrow("the daemon died");
-		h.ctx.recorder = recorder;
-		const dead = await h.graph().getState(h.config);
-		expect(dead.next).toEqual(["worker"]);
-		expect((dead.values as RunStateValues).pending).toMatchObject({
-			kind: "wait",
-			stepId,
-		});
-		expect(harness.calls).toHaveLength(1);
-
-		// Recovery ended the step; the engine appended RunResumed with the
-		// daemon's prompt and re-runs the node with invoke(null).
-		const daemonPrompt =
-			"Night Shift stopped while you worked on this. Continue.";
-		await h.log.append({
-			type: "StepEnded",
-			runId: h.runId,
-			stepId,
-			payload: {
-				outcome: "interrupted",
-				outputs: { outcome: "interrupted", visit: 1 },
-				error: "Night Shift stopped while this ran.",
-			},
-		});
-		await h.log.append({
-			type: "RunResumed",
-			runId: h.runId,
-			payload: {
-				nodeId: "worker",
-				stepId,
-				prompt: daemonPrompt,
-				scope: null,
-				by: "daemon",
-				reason: "Night Shift restarted.",
-			},
-		});
-		const third = await drive(h, null);
-		expect(third.parked).toEqual([]);
-		expect(third.state.ended?.status).toBe("finished");
-		expect(third.state.visits).toEqual({ worker: 1 });
-		expect(harness.calls).toHaveLength(2);
-		expect(harness.calls[1]).toMatchObject({
-			prompt: daemonPrompt,
-			resumeSessionId: "fake-session-1",
-		});
-		expect(third.events[0]).toMatchObject({
-			type: "step-started",
-			stepId,
-			reopened: true,
-		});
-		const logged = await h.events();
-		expect(logged.slice(-5).map((e) => e.type)).toEqual([
-			"StepReopened",
-			"SessionStarted",
-			"HarnessSessionAssigned",
-			"SessionEnded",
-			"StepEnded",
-		]);
-		expect(payloads(logged, "StepReopened")[0]).toEqual({
-			prompt: daemonPrompt,
-		});
-		// One step, ended once after its reopening: the read model shows pass.
-		const steps = deriveSteps(logged);
-		expect(steps).toHaveLength(1);
-		expect(steps[0]).toMatchObject({
-			id: stepId,
-			visit: 1,
-			outcome: "pass",
-			outputs: { summary: "Recovered" },
-		});
-	});
 });
 
 describe("the checker", () => {
@@ -1346,6 +943,7 @@ describe("the checker", () => {
 			{ label: "approved", notes: "No issues left.", costUsd: 0.01 },
 		]);
 		const h = await startRun(
+			sandbox,
 			flowOf({
 				inputs: [{ name: "task" }],
 				start: "worker",
@@ -1360,8 +958,7 @@ describe("the checker", () => {
 				],
 				edges: [{ id: "e1", from: "worker", outcome: "approved", to: "merge" }],
 			}),
-			harness,
-			{ decider },
+			{ harness, decider },
 		);
 		const { parked, state } = await drive(h, { inputs: { task: "the thing" } });
 		expect(parked).toEqual([]);
@@ -1407,13 +1004,13 @@ describe("the checker", () => {
 		const harness = fakeHarness(reportingScript("", "Done"));
 		const decider = fakeDecider([{ label: "fail", notes: "Tests fail." }]);
 		const h = await startRun(
+			sandbox,
 			flowOf({
 				start: "worker",
 				nodes: [agent("worker", { checker: { decider: "typesafe" } })],
 				edges: [],
 			}),
-			harness,
-			{ decider },
+			{ harness, decider },
 		);
 		const { parked } = await drive(h, { inputs: { task: "x" } });
 		expect(decider.calls[0]?.labels.map((l) => l.name)).toEqual([
@@ -1439,7 +1036,9 @@ describe("the checker", () => {
 			nodes: [agent("worker", { checker: { decider: "typesafe" } })],
 			edges: [],
 		});
-		const none = await startRun(flow, fakeHarness(reportingScript("", "Done")));
+		const none = await startRun(sandbox, flow, {
+			harness: fakeHarness(reportingScript("", "Done")),
+		});
 		const first = await drive(none, { inputs: { task: "x" } });
 		expect(first.parked[0]).toMatchObject({
 			status: "failed",
@@ -1447,22 +1046,18 @@ describe("the checker", () => {
 				'Node "worker" failed: No decider is configured for the checker of this Agent node.',
 		});
 
-		const wrong = await startRun(
-			flow,
-			fakeHarness(reportingScript("", "Done")),
-			{
-				// A decider that answers off the list (against its contract).
-				decider: {
-					defaultModel: defaultDeciderModel,
-					decide: async () => ({
-						kind: "decided",
-						label: "maybe",
-						notes: "",
-						costUsd: null,
-					}),
-				} as unknown as Decider,
-			},
-		);
+		const wrong = await startRun(sandbox, flow, {
+			harness: fakeHarness(reportingScript("", "Done")), // A decider that answers off the list (against its contract).
+			decider: {
+				defaultModel: defaultDeciderModel,
+				decide: async () => ({
+					kind: "decided",
+					label: "maybe",
+					notes: "",
+					costUsd: null,
+				}),
+			} as unknown as Decider,
+		});
 		const second = await drive(wrong, { inputs: { task: "x" } });
 		expect(second.parked[0]).toMatchObject({
 			status: "failed",

@@ -8,10 +8,13 @@ import {
 } from "@nightshift/agents/fake";
 import type { WaitNode } from "@nightshift/flows";
 
-import { deriveRunState, deriveSteps } from "../events";
+import { deriveRunState, deriveSleep, deriveSteps } from "../events";
 import { createSandbox, type Sandbox, waitFor } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { DEFAULT_RESUME_PROMPT, STOP_TIME_REASON } from "./context";
+import type { ThreadState } from "./runner";
+import { createSleeps, pendingWaitOf, type Sleeps } from "./sleep";
+import type { Parked, Pending, ResumeValue } from "./state";
 import {
 	agent,
 	command,
@@ -20,12 +23,10 @@ import {
 	edge,
 	flowOf,
 	type Harness,
+	MINUTE,
 	payloads,
 	startRun,
-} from "./node-test-support";
-import type { ThreadState } from "./runner";
-import { createSleeps, pendingWaitOf, type Sleeps } from "./sleep";
-import type { Parked, Pending, ResumeValue } from "./state";
+} from "./test-support";
 
 /**
  * The sleep module end to end, for both kinds of wait: a usage limit of an
@@ -35,8 +36,6 @@ import type { Parked, Pending, ResumeValue } from "./state";
  * wake past the stop time, and a new daemon that restores the timer from
  * the log. The clock is `ctx.now`, moved by hand.
  */
-
-const MINUTE = 1_000;
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -143,11 +142,9 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 	test("plans the wait from the policy, persists it, parks at the wait node, and the timer's wake continues the step", async () => {
 		const time = clock();
 		const resetAt = time.now() + 30 * MINUTE;
-		const h = await startRun(
-			sandbox,
-			flowOf([agent("worker", "Go")]),
-			limited(resetAt),
-		);
+		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), {
+			harness: limited(resetAt),
+		});
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
 		const stepId = deriveSteps(await h.events())[0]?.id as string;
@@ -238,11 +235,9 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 
 	test("a person's early resume wakes it now with their prompt", async () => {
 		const time = clock();
-		const h = await startRun(
-			sandbox,
-			flowOf([agent("worker", "Go")]),
-			limited(time.now() + 30 * MINUTE),
-		);
+		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), {
+			harness: limited(time.now() + 30 * MINUTE),
+		});
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
 		const d = daemon(h, time);
@@ -262,11 +257,9 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 	test("a wait that would pass the stop time is not started: the step ends stopped with why", async () => {
 		const time = clock();
 		const resetAt = time.now() + 30 * MINUTE;
-		const h = await startRun(
-			sandbox,
-			flowOf([agent("worker", "Go")]),
-			limited(resetAt),
-		);
+		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), {
+			harness: limited(resetAt),
+		});
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {}, stopAt: resetAt - 5 * MINUTE });
 		expect(first.parked).toEqual([
@@ -289,11 +282,10 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 	test("a wake past the stop time (Night Shift was not running) ends the step stopped and parks the run", async () => {
 		const time = clock();
 		const resetAt = time.now() + 30 * MINUTE;
-		const h = await startRun(
-			sandbox,
-			flowOf([agent("worker", "Go")]),
-			limited(resetAt),
-		);
+		const harness = limited(resetAt);
+		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), {
+			harness,
+		});
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {}, stopAt: resetAt + 10 * MINUTE });
 		expect(payloads(await h.events(), "WaitStarted")).toHaveLength(1);
@@ -318,15 +310,21 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 				error: null,
 			},
 		]);
+		// The body did not run again, and the park keeps the harness session
+		// for a resume.
+		expect(harness.calls).toHaveLength(1);
+		expect(woken.state.pending).toMatchObject({
+			kind: "parked",
+			stepId: deriveSteps(await h.events())[0]?.id as string,
+			harnessSessionId: "fake-session-1",
+		});
 	});
 
 	test("a full run cap queues the timer's wake and refuses a person's; a freed slot drains it", async () => {
 		const time = clock();
-		const h = await startRun(
-			sandbox,
-			flowOf([agent("worker", "Go")]),
-			limited(time.now() + 30 * MINUTE),
-		);
+		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), {
+			harness: limited(time.now() + 30 * MINUTE),
+		});
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
 		const full = { full: true };
@@ -347,11 +345,9 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 
 	test("a stop while it sleeps, then a resume: the wait node parks the step and the node reopens it with its session", async () => {
 		const time = clock();
-		const h = await startRun(
-			sandbox,
-			flowOf([agent("worker", "Go")]),
-			limited(time.now() + 30 * MINUTE),
-		);
+		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), {
+			harness: limited(time.now() + 30 * MINUTE),
+		});
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
 		const stepId = deriveSteps(await h.events())[0]?.id as string;
@@ -397,11 +393,9 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 
 	test("a new daemon restores the timer from the log, and the wake fires at once when the time has passed", async () => {
 		const time = clock();
-		const h = await startRun(
-			sandbox,
-			flowOf([agent("worker", "Go")]),
-			limited(time.now() + 30 * MINUTE),
-		);
+		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), {
+			harness: limited(time.now() + 30 * MINUTE),
+		});
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
 		time.advance(45);
@@ -433,7 +427,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 
 	test("plans from the node's until, persists it with no session, and the timer's wake ends it done", async () => {
 		const time = clock();
-		const h = await startRun(sandbox, timedFlow(15), silent);
+		const h = await startRun(sandbox, timedFlow(15), { harness: silent });
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
 		const stepId = deriveSteps(await h.events())[0]?.id as string;
@@ -471,6 +465,15 @@ describe("the sleep module: a Wait node's own wait", () => {
 			type: "wait",
 			reason: "duration",
 		});
+		// The step is open, and the log alone says the run sleeps and until when.
+		expect(deriveSteps(await h.events())[0]?.endedAt).toBeNull();
+		expect(deriveRunState(await h.events()).status).toBe("sleeping");
+		expect(deriveSleep(await h.events())).toMatchObject({
+			stepId,
+			reason: "duration",
+			until: time.now() + 15 * MINUTE,
+			signal: null,
+		});
 
 		const d = daemon(h, time);
 		time.advance(15);
@@ -493,7 +496,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 
 	test("a person's early resume ends a duration wait done with the minutes waited", async () => {
 		const time = clock();
-		const h = await startRun(sandbox, timedFlow(60), silent);
+		const h = await startRun(sandbox, timedFlow(60), { harness: silent });
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
 		const d = daemon(h, time);
@@ -519,7 +522,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 					{ timeoutMinutes: 60 },
 				),
 			]),
-			silent,
+			{ harness: silent },
 		);
 		h.ctx.now = time.now;
 		const first = await drive(h, { inputs: {} });
@@ -573,7 +576,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 
 	test("a wake past the stop time ends the Wait step stopped with the minutes waited", async () => {
 		const time = clock();
-		const h = await startRun(sandbox, timedFlow(120), silent);
+		const h = await startRun(sandbox, timedFlow(120), { harness: silent });
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {}, stopAt: time.now() + 60 * MINUTE });
 		const d = daemon(h, time);
@@ -601,7 +604,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 
 	test("a new daemon restores the Wait node's timer from the log", async () => {
 		const time = clock();
-		const h = await startRun(sandbox, timedFlow(15), silent);
+		const h = await startRun(sandbox, timedFlow(15), { harness: silent });
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
 		time.advance(20);
@@ -618,7 +621,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 
 	test("a stop while it sleeps, then a resume, starts a new visit", async () => {
 		const time = clock();
-		const h = await startRun(sandbox, timedFlow(15), silent);
+		const h = await startRun(sandbox, timedFlow(15), { harness: silent });
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
 		const stepId = deriveSteps(await h.events())[0]?.id as string;

@@ -7,6 +7,7 @@ import type { ToolNode } from "@nightshift/flows";
 import { deriveSteps } from "../events";
 import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
+import { coerceArguments, dataOf } from "./nodes/tool";
 import {
 	command,
 	drive,
@@ -14,8 +15,7 @@ import {
 	flowOf,
 	payloads,
 	startRun,
-} from "./node-test-support";
-import { coerceArguments, dataOf } from "./nodes/tool";
+} from "./test-support";
 
 /**
  * The Tool node on the compiled graph, against the fake stdio MCP server
@@ -66,9 +66,12 @@ afterEach(async () => {
 /** A run whose `tracker` connection is the fake server. */
 async function start(
 	flow: Parameters<typeof startRun>[1],
-	options: Parameters<typeof startRun>[3] = {},
+	options: Parameters<typeof startRun>[2] = {},
 ) {
-	const h = await startRun(sandbox, flow, fakeHarness(), options);
+	const h = await startRun(sandbox, flow, {
+		harness: fakeHarness(),
+		...options,
+	});
 	h.ctx.mcpServersFor = async (node) =>
 		(node.connections ?? []).includes("tracker")
 			? { ok: true, servers: { tracker: fakeMcp } }
@@ -339,22 +342,6 @@ describe("the Tool node", () => {
 		expect(payloads(await h.events(), "StepEnded")[0]).toMatchObject({
 			outcome: "error",
 			outputs: { outcome: "error", data: null, text: "", visit: 1 },
-		});
-	});
-
-	test("a call past the node's time budget ends with an error", async () => {
-		const h = await start(
-			flowOf([tool("slow", "slow", { ms: "30000" }, { timeoutMinutes: 1 })]),
-		);
-		h.ctx.minuteMs = 100;
-		const { parked } = await drive(h, { inputs: {} });
-		expect(parked[0]).toMatchObject({
-			status: "failed",
-			reason: 'Node "slow" failed: The step ran past its time budget of 1 min.',
-		});
-		expect(payloads(await h.events(), "StepEnded")[0]).toMatchObject({
-			outcome: "error",
-			error: "The step ran past its time budget of 1 min.",
 		});
 	});
 
