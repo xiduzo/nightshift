@@ -36,7 +36,10 @@ export type RunStatus =
 export type Project = {
 	id: string;
 	name: string;
+	/** The folder of the project's Clone on this computer. */
 	repoPath: string;
+	/** The normalised `origin` (`github.com/acme/app`), null without one. */
+	remote: string | null;
 	createdAt: number;
 };
 
@@ -474,6 +477,12 @@ export interface Engine {
 
 export type EngineOptions = {
 	db: Database;
+	/**
+	 * This computer's Device id (`selfDevice`): the Walker of the runs this
+	 * engine starts, and the Device whose Clones it works in. Default: the
+	 * database's own Device.
+	 */
+	walkerId?: string;
 	/**
 	 * This computer as a Device (`localDevice`): its harnesses, decider,
 	 * connections, CLI tools, commands and worktrees. Every step runs on it.

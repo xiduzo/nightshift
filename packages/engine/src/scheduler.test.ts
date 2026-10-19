@@ -6,7 +6,7 @@ import { writeFlowFile, writeSchedulesFile } from "@nightshift/flows/files";
 import { asc, inArray } from "drizzle-orm";
 
 import { createEngine, type EngineInternals } from "./engine";
-import { type EnginePayloads, parseEventRow } from "./events";
+import { appendEvent, type EnginePayloads, parseEventRow } from "./events";
 import { SCHEDULE_GRACE_MS } from "./scheduler";
 import { defaultRunSettings, type RunSettings } from "./settings";
 import {
@@ -264,19 +264,23 @@ describe("the scheduler", () => {
 		const project = await setup(first.engine, [nightly()]);
 		first.die();
 		// What the scheduler leaves when it dies between the start and its record.
-		await sandbox.db.insert(event).values({
-			runId: "cut-short",
-			type: "RunStarted",
-			payload: JSON.stringify({
-				projectId: project.id,
-				flowName: "night",
-				title: "night",
-				start: "work",
-				stopAt: null,
-				inputs: {},
-				trigger: { kind: "schedule", scheduleId: "nightly", at: at(16, 22) },
-			} satisfies EnginePayloads["RunStarted"]),
-		});
+		await appendEvent(
+			sandbox.db,
+			{
+				runId: "cut-short",
+				type: "RunStarted",
+				payload: {
+					projectId: project.id,
+					flowName: "night",
+					title: "night",
+					start: "work",
+					stopAt: null,
+					inputs: {},
+					trigger: { kind: "schedule", scheduleId: "nightly", at: at(16, 22) },
+				} satisfies EnginePayloads["RunStarted"],
+			},
+			sandbox.deviceId,
+		);
 
 		clock = at(16, 22, 3);
 		const second = startDaemon();

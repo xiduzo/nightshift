@@ -10,7 +10,13 @@ import type {
 	DecisionInput,
 	DecisionResult,
 } from "@nightshift/agents/types";
-import { event, lgCheckpoint, lgWrite } from "@nightshift/db/schema/nightshift";
+import {
+	event,
+	lgCheckpoint,
+	lgWrite,
+	run,
+	step,
+} from "@nightshift/db/schema/nightshift";
 import {
 	type AgentNode,
 	type CommandNode,
@@ -78,6 +84,8 @@ function makeEngine(
 		withDevice({
 			db: sandbox.db,
 			harnesses: { "claude-code": harness },
+			// This computer: the Walker places every step on itself.
+			deviceId: sandbox.deviceId,
 			dataDir: sandbox.dataDir,
 			...options,
 		}),
@@ -411,6 +419,33 @@ describe("runs", () => {
 			transcript.map((_, i) => i + 1),
 		);
 		expect(transcript.at(-1)?.event.type).toBe("finished");
+	});
+
+	test("this computer walks the run: the run and its events name the Walker, each step the Device it ran on", async () => {
+		const engine = makeEngine(fakeHarness());
+		const { id: runId } = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([command("check", "true")]),
+		});
+		expect(await waitForEnd(engine, runId)).toBe("finished");
+
+		const [runRow] = await sandbox.db
+			.select({ walkerId: run.walkerId })
+			.from(run)
+			.where(eq(run.id, runId));
+		expect(runRow?.walkerId).toBe(sandbox.deviceId);
+		const steps = await sandbox.db
+			.select({ deviceId: step.deviceId })
+			.from(step)
+			.where(eq(step.runId, runId));
+		expect(steps.length).toBeGreaterThan(0);
+		expect(steps.every((s) => s.deviceId === sandbox.deviceId)).toBe(true);
+		const events = await sandbox.db
+			.select({ walkerId: event.walkerId, walkerSeq: event.walkerSeq })
+			.from(event)
+			.orderBy(asc(event.seq));
+		expect(events.every((e) => e.walkerId === sandbox.deviceId)).toBe(true);
+		expect(events.map((e) => e.walkerSeq)).toEqual(events.map((_, i) => i + 1));
 	});
 
 	test("a finished run keeps its latest checkpoint only; a resume re-enters on it and continues the last session", async () => {

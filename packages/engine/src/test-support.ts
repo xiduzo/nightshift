@@ -16,6 +16,7 @@ import { type LocalDeviceDeps, localDevice } from "./device/local";
 import type { Device } from "./device/types";
 import { parseEventRow } from "./events";
 import type { RunLog } from "./run-log";
+import { selfDevice } from "./self-device";
 import type { EngineOptions } from "./types";
 import { git } from "./worktrees";
 
@@ -28,12 +29,19 @@ export const TEST_DEVICE_ID = "test-device";
 export type TestDeviceDeps = Omit<LocalDeviceDeps, "id" | "name">;
 
 /** This computer as a Device, over the test's fakes. */
-export function testDevice(deps: TestDeviceDeps): Device {
-	return localDevice({ id: TEST_DEVICE_ID, name: "test", ...deps });
+export function testDevice(
+	deps: TestDeviceDeps,
+	id: string = TEST_DEVICE_ID,
+): Device {
+	return localDevice({ id, name: "test", ...deps });
 }
 
 /** The engine's options with the Device's deps beside them, as a test writes them. */
-export type TestEngineOptions = Omit<EngineOptions, "device"> & TestDeviceDeps;
+export type TestEngineOptions = Omit<EngineOptions, "device"> &
+	TestDeviceDeps & {
+		/** The test Device's id. Default `TEST_DEVICE_ID`. */
+		deviceId?: string;
+	};
 
 /** Engine options whose Device is `testDevice` over the Device deps among them. */
 export function withDevice(options: TestEngineOptions): EngineOptions {
@@ -46,20 +54,24 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 		cliNames,
 		findCli,
 		cliToolsFor,
+		deviceId,
 		...engine
 	} = options;
 	return {
 		...engine,
-		device: testDevice({
-			harnesses,
-			harnessNames,
-			decider,
-			mcpServersFor,
-			connectionNames,
-			cliNames,
-			findCli,
-			cliToolsFor,
-		}),
+		device: testDevice(
+			{
+				harnesses,
+				harnessNames,
+				decider,
+				mcpServersFor,
+				connectionNames,
+				cliNames,
+				findCli,
+				cliToolsFor,
+			},
+			deviceId,
+		),
 	};
 }
 
@@ -69,6 +81,8 @@ export type Sandbox = {
 	dataDir: string;
 	dbPath: string;
 	db: Database;
+	/** The database's own Device: the Walker of its runs. */
+	deviceId: string;
 	cleanup(): Promise<void>;
 };
 
@@ -100,6 +114,7 @@ export async function createSandbox(): Promise<Sandbox> {
 		dataDir: join(root, "data"),
 		dbPath,
 		db,
+		deviceId: (await selfDevice(db)).id,
 		cleanup: () => rm(root, { recursive: true, force: true }),
 	};
 }

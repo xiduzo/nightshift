@@ -97,6 +97,7 @@ import {
 	DatabaseIcon,
 	FolderGitIcon,
 	FolderIcon,
+	LaptopIcon,
 	LockIcon,
 	MonitorIcon,
 	MoonIcon,
@@ -270,6 +271,7 @@ function SettingsComponent() {
 					)}
 					<AppearanceCard />
 					<DaemonCard
+						deviceName={settings.data?.daemon.device.name}
 						dataDir={settings.data?.daemon.dataDir}
 						lease={settings.data?.daemon.lease}
 					/>
@@ -1296,9 +1298,11 @@ function AppearanceCard() {
  * ------------------------------------------------------------------------- */
 
 function DaemonCard({
+	deviceName,
 	dataDir,
 	lease,
 }: {
+	deviceName: string | undefined;
 	dataDir: string | undefined;
 	lease:
 		| { host: string; pid: number; epoch: number; since: number }
@@ -1314,6 +1318,18 @@ function DaemonCard({
 			</CardHeader>
 			<CardContent>
 				<ItemGroup>
+					<Item size="sm" className="px-0">
+						<ItemMedia variant="icon">
+							<LaptopIcon aria-hidden="true" />
+						</ItemMedia>
+						<ItemContent className="min-w-0">
+							<ItemTitle>Name</ItemTitle>
+							<ItemDescription className="truncate">
+								{deviceName ?? <Skeleton className="h-4 w-32" />}
+							</ItemDescription>
+						</ItemContent>
+					</Item>
+					<ItemSeparator />
 					<Item size="sm" className="px-0">
 						<ItemMedia variant="icon">
 							<FolderIcon aria-hidden="true" />

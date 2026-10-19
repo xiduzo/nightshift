@@ -108,6 +108,12 @@ export async function resolveRepoTopLevel(path: string): Promise<string> {
 	return topLevel;
 }
 
+/** The URL of the repository's `origin` remote as git gives it, or null without one. */
+export async function originUrl(repoPath: string): Promise<string | null> {
+	const result = await git(repoPath, ["remote", "get-url", "origin"]);
+	return result.exitCode === 0 && result.stdout ? result.stdout : null;
+}
+
 /** Resolves a ref (default `HEAD`) to a full commit id. */
 export async function resolveCommit(
 	repoPath: string,

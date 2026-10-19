@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { event, project } from "@nightshift/db/schema/nightshift";
+import { event } from "@nightshift/db/schema/nightshift";
 import {
 	latestCronTime,
 	nextCronTimes,
@@ -7,14 +7,14 @@ import {
 	type Schedule,
 } from "@nightshift/flows";
 import { readSchedulesFile } from "@nightshift/flows/files";
-import { and, asc, gt, inArray, isNull } from "drizzle-orm";
+import { and, asc, gt, inArray } from "drizzle-orm";
 
 import {
-	appendEvent,
 	type EngineEventType,
 	type LoggedEvent,
 	parseEventRow,
 } from "./events";
+import type { RunLog } from "./run-log";
 import type { RunStatus, RunSummary, RunTrigger, StartRunInput } from "./types";
 
 /**
@@ -64,6 +64,10 @@ export type SchedulerDeps = {
 	db: Database;
 	now: () => number;
 	tickMs: number;
+	/** Appends `ScheduleFired` and `ScheduleSkipped`. */
+	log: RunLog;
+	/** The projects a person has not removed, with their folder on this computer. */
+	projects(): Promise<{ id: string; repoPath: string }[]>;
 	/** Starts a run of a flow file, with the trigger stored in `RunStarted`. */
 	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
 	/** The run's status, or null when the log knows no such run. */
@@ -213,7 +217,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		reason: string,
 		runId: string | null = null,
 	): Promise<void> {
-		await appendEvent(db, {
+		await deps.log.append({
 			type: "ScheduleSkipped",
 			payload: { projectId, scheduleId, at, reason, runId },
 		});
@@ -281,7 +285,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		} catch (cause) {
 			error = cause instanceof Error ? cause.message : String(cause);
 		}
-		await appendEvent(db, {
+		await deps.log.append({
 			type: "ScheduleFired",
 			payload: { projectId, scheduleId: schedule.id, at: due, runId, error },
 		});
@@ -307,11 +311,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			off = false;
 			onSince = at;
 		}
-		const projects = await db
-			.select({ id: project.id, repoPath: project.repoPath })
-			.from(project)
-			.where(isNull(project.removedAt));
-		for (const { id: projectId, repoPath } of projects) {
+		for (const { id: projectId, repoPath } of await deps.projects()) {
 			if (stopped) return;
 			let schedules: Schedule[];
 			try {

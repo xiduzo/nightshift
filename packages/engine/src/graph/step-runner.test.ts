@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Command } from "@langchain/langgraph";
+import { step as stepTable } from "@nightshift/db/schema/nightshift";
+import { eq } from "drizzle-orm";
 
 import { deriveSteps, type EngineEventType } from "../events";
 import { createSandbox, type Sandbox, testDevice } from "../test-support";
@@ -545,5 +547,12 @@ describe("the step's Device", () => {
 		expect(
 			payloads(await h.events(), "StepStarted").map((p) => p.deviceId),
 		).toEqual(["studio", "studio"]);
+		// The step row names the placed Device too, not the run's Walker.
+		const rows = await sandbox.db
+			.select({ deviceId: stepTable.deviceId })
+			.from(stepTable)
+			.where(eq(stepTable.runId, h.runId));
+		expect(rows.map((r) => r.deviceId)).toEqual(["studio", "studio"]);
+		expect(h.ctx.run.walkerId).not.toBe("studio");
 	});
 });

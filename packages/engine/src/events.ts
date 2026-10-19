@@ -13,6 +13,7 @@ import type {
 	Outcome,
 	WaitUntil,
 } from "@nightshift/flows";
+import { sql } from "drizzle-orm";
 
 import type {
 	RunResume,
@@ -85,10 +86,21 @@ export type WaitReason = PolicyWaitReason | WaitUntil["kind"];
 export type ResumedBy = RunResume["by"];
 
 export type EnginePayloads = {
-	ProjectAdded: { projectId: string; name: string; repoPath: string };
+	ProjectAdded: {
+		projectId: string;
+		name: string;
+		repoPath: string;
+		/** The normalised `origin`, null without one. Absent before Clones. */
+		remote?: string | null;
+	};
 	ProjectRemoved: { projectId: string };
 	/** `addProject` on the path of a removed project. */
 	ProjectRestored: { projectId: string };
+	/**
+	 * A folder became a Project's Clone on a Device: a folder whose `origin`
+	 * names a Project already known, or a Clone that moved to a new folder.
+	 */
+	CloneAdded: { projectId: string; deviceId: string; path: string };
 	RunStarted: {
 		projectId: string;
 		flowName: string | null;
@@ -293,12 +305,15 @@ export type EventInput<T extends EngineEventType> = {
 };
 
 /**
- * Appends one event and returns it as committed, with its seq and time. The
- * engine appends through its run log (`run-log.ts`), never here directly.
+ * Appends one event as `walkerId`'s next and returns it as committed, with
+ * its seq and time. The Walker's count (`walker_seq`) is taken in the same
+ * statement, so two appends cannot get one number. The engine appends
+ * through its run log (`run-log.ts`), never here directly.
  */
 export async function appendEvent<T extends EngineEventType>(
 	db: Database,
 	input: EventInput<T>,
+	walkerId: string,
 ): Promise<LoggedEvent> {
 	const [row] = await db
 		.insert(event)
@@ -308,6 +323,8 @@ export async function appendEvent<T extends EngineEventType>(
 			sessionId: input.sessionId ?? null,
 			type: input.type,
 			payload: JSON.stringify(input.payload),
+			walkerId,
+			walkerSeq: sql`(select coalesce(max(${event.walkerSeq}), 0) + 1 from ${event} where ${event.walkerId} = ${walkerId})`,
 		})
 		.returning();
 	if (!row) throw new Error(`Could not append ${input.type}.`);

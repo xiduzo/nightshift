@@ -426,6 +426,8 @@ export async function beginStep(
 			nodeType: node.type,
 			visit,
 			transcriptPath: path,
+			// The Device the step runs on (its Placement), not the Walker.
+			deviceId: device.id,
 		});
 		await ctx.log.append({
 			type: "StepStarted",
