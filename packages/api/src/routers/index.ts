@@ -1,4 +1,5 @@
 import { DECIDER_ADAPTERS, HARNESS_ADAPTERS } from "@nightshift/agents";
+import { spacesOf } from "@nightshift/auth/spaces";
 import {
 	chooseFolder,
 	cliToolInputSchema,
@@ -7,7 +8,7 @@ import {
 	secretNameSchema,
 	settingsPatchSchema,
 } from "@nightshift/engine";
-import type { Engine } from "@nightshift/engine/types";
+import type { SpaceEngine } from "@nightshift/engine/types";
 import {
 	agentProfileSchema,
 	cronError,
@@ -23,35 +24,61 @@ import {
 import type { RouterClient } from "@orpc/server";
 import { z } from "zod";
 
-import { publicProcedure } from "../index";
+import {
+	ownerProcedure,
+	permitted,
+	protectedProcedure,
+	publicProcedure,
+} from "../index";
 
-// Local single-user mode: procedures are public until the local auto-session exists.
+// Every procedure but the health check needs a session in a Space. One
+// person on one computer has one without signing in (the local session).
+// Runs, Gates and projects are the session's Space's; what changes them
+// needs a role that allows it. This computer's own configuration is its
+// owner's.
+
+/** The Person's Spaces, and the one the session works in. */
+const spaces = {
+	/** The personal Space first. `active` is the session's Space. */
+	list: protectedProcedure.handler(async ({ context }) => ({
+		active: context.spaceId,
+		spaces: await spacesOf(context.db, context.session.user.id),
+	})),
+	/** Every later call works in this Space. */
+	switch: protectedProcedure
+		.input(z.object({ spaceId: z.string().min(1) }))
+		.handler(async ({ context, input }) => {
+			await context.setActiveSpace(input.spaceId);
+		}),
+};
 
 const projects = {
-	list: publicProcedure.handler(({ context }) => context.engine.listProjects()),
-	add: publicProcedure
+	list: protectedProcedure.handler(({ context }) =>
+		context.space.listProjects(),
+	),
+	add: permitted({ project: ["add"] })
 		.input(
 			z.object({
 				repoPath: z.string().min(1),
 				name: z.string().min(1).optional(),
 			}),
 		)
-		.handler(({ context, input }) => context.engine.addProject(input)),
+		.handler(({ context, input }) => context.space.addProject(input)),
 	/** The local and remote branches of the clone, for "Start from". Read-only, no fetch. */
-	branches: publicProcedure
+	branches: protectedProcedure
 		.input(z.object({ projectId: z.string() }))
 		.handler(({ context, input }) =>
-			context.engine.listBranches(input.projectId),
+			context.space.listBranches(input.projectId),
 		),
 	/** What the folder needs before runs can start in it. Read-only. */
-	check: publicProcedure
+	check: ownerProcedure
 		.input(z.object({ path: z.string().min(1) }))
 		.handler(({ context, input }) => context.projectSetup.check(input.path)),
 	/**
 	 * The `set-up-git` fix: a repository, a starter `.gitignore` and a first
 	 * commit. A name and email go into the repository's own git config.
 	 */
-	setUpGit: publicProcedure
+	setUpGit: ownerProcedure
 		.input(
 			z.object({
 				path: z.string().min(1),
@@ -61,48 +88,48 @@ const projects = {
 		)
 		.handler(({ context, input }) => context.projectSetup.setUpGit(input)),
 	/** The `install-git` fix: starts the system's installer, or says what to run. */
-	installGit: publicProcedure.handler(({ context }) =>
+	installGit: ownerProcedure.handler(({ context }) =>
 		context.projectSetup.installGit(),
 	),
 	/** Opens the native folder picker on this Mac. Null when cancelled. */
-	chooseFolder: publicProcedure.handler(() =>
+	chooseFolder: ownerProcedure.handler(() =>
 		chooseFolder("Choose a project folder to add to Night Shift"),
 	),
-	remove: publicProcedure
+	remove: permitted({ project: ["remove"] })
 		.input(z.object({ projectId: z.string() }))
 		.handler(({ context, input }) =>
-			context.engine.removeProject(input.projectId),
+			context.space.removeProject(input.projectId),
 		),
 };
 
 const flowRef = z.object({ projectId: z.string(), name: flowNameSchema });
 
 const flows = {
-	list: publicProcedure
+	list: protectedProcedure
 		.input(z.object({ projectId: z.string() }))
-		.handler(({ context, input }) => context.engine.listFlows(input.projectId)),
-	get: publicProcedure
+		.handler(({ context, input }) => context.space.listFlows(input.projectId)),
+	get: protectedProcedure
 		.input(flowRef)
 		.handler(({ context, input }) =>
-			context.engine.getFlow(input.projectId, input.name),
+			context.space.getFlow(input.projectId, input.name),
 		),
-	/** Saves drafts with errors too. Returns the issues. */
-	save: publicProcedure
+	/** Saves drafts with errors too. Returns the issues. Writes this computer's Clone: its owner's. */
+	save: ownerProcedure
 		.input(flowRef.extend({ flow: flowSchema }))
 		.handler(({ context, input }) =>
-			context.engine.saveFlow(input.projectId, input.name, input.flow),
+			context.space.saveFlow(input.projectId, input.name, input.flow),
 		),
-	remove: publicProcedure
+	remove: ownerProcedure
 		.input(flowRef)
 		.handler(({ context, input }) =>
-			context.engine.deleteFlow(input.projectId, input.name),
+			context.space.deleteFlow(input.projectId, input.name),
 		),
 };
 
 /** The Needs-you inbox. */
 const gates = {
-	list: publicProcedure.handler(({ context }) => context.engine.listGates()),
-	resolve: publicProcedure
+	list: protectedProcedure.handler(({ context }) => context.space.listGates()),
+	resolve: permitted({ gate: ["resolve"] })
 		.input(
 			z.object({
 				runId: z.string(),
@@ -111,26 +138,29 @@ const gates = {
 				note: z.string().optional(),
 			}),
 		)
-		.handler(({ context, input }) => context.engine.resolveGate(input)),
+		.handler(({ context, input }) => context.space.resolveGate(input)),
 };
 
 /** `.nightshift/schedules.json`: runs the daemon starts on a cron line. */
 const schedules = {
-	list: publicProcedure
+	list: protectedProcedure
 		.input(z.object({ projectId: z.string() }))
 		.handler(({ context, input }) =>
-			context.engine.listSchedules(input.projectId),
+			context.space.listSchedules(input.projectId),
 		),
-	/** Replaces the whole file. Saves schedules with problems too. Returns the issues. */
-	save: publicProcedure
+	/**
+	 * Replaces the whole file. Saves schedules with problems too. Returns the
+	 * issues. Writes this computer's Clone: its owner's.
+	 */
+	save: ownerProcedure
 		.input(
 			z.object({ projectId: z.string(), schedules: z.array(scheduleSchema) }),
 		)
 		.handler(({ context, input }) =>
-			context.engine.saveSchedules(input.projectId, input.schedules),
+			context.space.saveSchedules(input.projectId, input.schedules),
 		),
 	/** The next times of a cron line on the daemon's clock, and how it reads. */
-	preview: publicProcedure
+	preview: protectedProcedure
 		.input(
 			z.object({
 				cron: z.string(),
@@ -150,14 +180,14 @@ const schedules = {
 };
 
 const runs = {
-	list: publicProcedure
+	list: protectedProcedure
 		.input(z.object({ projectId: z.string().optional() }).optional())
-		.handler(({ context, input }) => context.engine.listRuns(input)),
-	get: publicProcedure
+		.handler(({ context, input }) => context.space.listRuns(input)),
+	get: protectedProcedure
 		.input(z.object({ runId: z.string() }))
-		.handler(({ context, input }) => context.engine.getRun(input.runId)),
+		.handler(({ context, input }) => context.space.getRun(input.runId)),
 	/** Starts a flow file by name, or a flow given inline (a quick run). */
-	start: publicProcedure
+	start: permitted({ run: ["start"] })
 		.input(
 			z.union([
 				z.object({
@@ -176,8 +206,8 @@ const runs = {
 				}),
 			]),
 		)
-		.handler(({ context, input }) => context.engine.startRun(input)),
-	stop: publicProcedure
+		.handler(({ context, input }) => context.space.startRun(input)),
+	stop: permitted({ run: ["stop"] })
 		.input(
 			z.object({
 				runId: z.string(),
@@ -185,17 +215,17 @@ const runs = {
 			}),
 		)
 		.handler(({ context, input }) =>
-			context.engine.stopRun(input.runId, { when: input.when }),
+			context.space.stopRun(input.runId, { when: input.when }),
 		),
-	resume: publicProcedure
+	resume: permitted({ run: ["resume"] })
 		.input(
 			z.object({ runId: z.string(), prompt: z.string().min(1).optional() }),
 		)
 		.handler(({ context, input }) =>
-			context.engine.resumeRun(input.runId, input.prompt),
+			context.space.resumeRun(input.runId, input.prompt),
 		),
 	/** Live transcript and status over SSE. Replays from disk first. */
-	watch: publicProcedure
+	watch: protectedProcedure
 		.input(
 			z.object({ runId: z.string(), afterSeq: z.number().int().optional() }),
 		)
@@ -204,27 +234,27 @@ const runs = {
 			signal?.addEventListener("abort", () => controller.abort(), {
 				once: true,
 			});
-			yield* context.engine.watchRun(input.runId, {
+			yield* context.space.watchRun(input.runId, {
 				signal: controller.signal,
 				afterSeq: input.afterSeq,
 			});
 		}),
 	/** Sends a signal to a run whose Wait node waits for it. */
-	signal: publicProcedure
+	signal: permitted({ signal: ["send"] })
 		.input(z.object({ runId: z.string(), name: labelSchema }))
 		.handler(({ context, input }) =>
-			context.engine.signalRun(input.runId, input.name),
+			context.space.signalRun(input.runId, input.name),
 		),
 };
 
 /** Daemon settings: saved in the database, else the environment, else the default. */
 const settings = {
-	get: publicProcedure.handler(({ context }) => ({
+	get: ownerProcedure.handler(({ context }) => ({
 		...context.settings.view(),
 		daemon: context.daemon,
 	})),
 	/** A value saves it; null forgets it (back to the environment, then the default). */
-	save: publicProcedure
+	save: ownerProcedure
 		.input(settingsPatchSchema)
 		.handler(async ({ context, input }) => ({
 			...(await context.settings.save(input)),
@@ -237,11 +267,11 @@ const checkTarget = z.enum(harnessNameSchema.options);
 type FlowRef = { projectId: string; projectName: string; flowName: string };
 
 /**
- * Who uses what, from every flow of every project: the flows whose Agent
+ * Who uses what, from every flow of the Space's projects: the flows whose Agent
  * or Tool nodes name each connection, whose Agent nodes name each CLI
  * tool, and the Agent nodes that name each profile.
  */
-async function flowUse(engine: Engine): Promise<{
+async function flowUse(engine: SpaceEngine): Promise<{
 	connections: Map<string, FlowRef[]>;
 	clis: Map<string, FlowRef[]>;
 	profiles: Map<string, (FlowRef & { nodeIds: string[] })[]>;
@@ -300,7 +330,7 @@ async function flowUse(engine: Engine): Promise<{
  * `<harness>Bin` (Settings API); this adds, removes and lists models.
  */
 const harnesses = {
-	list: publicProcedure.handler(({ context }) => {
+	list: ownerProcedure.handler(({ context }) => {
 		const values = context.settings.current();
 		const view = context.settings.view();
 		return harnessNameSchema.options.map((name) => {
@@ -328,7 +358,7 @@ const harnesses = {
 			};
 		});
 	}),
-	add: publicProcedure
+	add: ownerProcedure
 		.input(z.object({ harness: harnessNameSchema }))
 		.handler(async ({ context, input }) => {
 			const added = context.settings.current().harnesses;
@@ -336,7 +366,7 @@ const harnesses = {
 			await context.settings.save({ harnesses: [...added, input.harness] });
 		}),
 	/** Refused while a profile runs on it. */
-	remove: publicProcedure
+	remove: ownerProcedure
 		.input(z.object({ harness: harnessNameSchema }))
 		.handler(async ({ context, input }) => {
 			const using = context.profiles
@@ -354,7 +384,7 @@ const harnesses = {
 			});
 		}),
 	/** The adapter's models, plus what the CLI lists itself. Never throws. */
-	models: publicProcedure
+	models: ownerProcedure
 		.input(z.object({ harness: harnessNameSchema }))
 		.handler(({ context, input }) =>
 			context.checks.models(
@@ -366,14 +396,14 @@ const harnesses = {
 
 /** Agent Profiles: a harness, a model and its tools under one name. Agent nodes name them. */
 const profiles = {
-	list: publicProcedure.handler(async ({ context }) => {
-		const use = await flowUse(context.engine);
+	list: ownerProcedure.handler(async ({ context }) => {
+		const use = await flowUse(context.space);
 		return context.profiles.list().map((p) => ({
 			...p,
 			usedBy: use.profiles.get(p.name) ?? [],
 		}));
 	}),
-	save: publicProcedure
+	save: ownerProcedure
 		.input(
 			agentProfileSchema.extend({
 				/** The name it had, when the edit renames it. */
@@ -393,7 +423,7 @@ const profiles = {
 				);
 			}
 			if (renamed) {
-				const use = (await flowUse(context.engine)).profiles.get(previousName);
+				const use = (await flowUse(context.space)).profiles.get(previousName);
 				if (use && use.length > 0) {
 					throw new Error(
 						`The flows ${use.map((u) => u.flowName).join(", ")} use "${previousName}". Change it there first, or keep the name.`,
@@ -421,15 +451,15 @@ const profiles = {
 			return saved;
 		}),
 	/** Flows that name it refuse to start until they name another profile. */
-	remove: publicProcedure
+	remove: ownerProcedure
 		.input(z.object({ name: z.string() }))
 		.handler(({ context, input }) => context.profiles.remove(input.name)),
 };
 
 /** The CLIs Night Shift runs (harnesses, gh) and the MCP servers Agent nodes name. */
 const connections = {
-	list: publicProcedure.handler(async ({ context }) => {
-		const use = (await flowUse(context.engine)).connections;
+	list: ownerProcedure.handler(async ({ context }) => {
+		const use = (await flowUse(context.space)).connections;
 		return {
 			connections: context.connections.list().map((c) => ({
 				...c,
@@ -443,7 +473,7 @@ const connections = {
 		};
 	}),
 	/** Runs `--version` and the login check of one CLI. Read-only. */
-	check: publicProcedure
+	check: ownerProcedure
 		.input(z.object({ target: checkTarget }))
 		.handler(({ context, input }) => {
 			const values = context.settings.current();
@@ -452,7 +482,7 @@ const connections = {
 				values[HARNESS_BIN[input.target]],
 			);
 		}),
-	save: publicProcedure
+	save: ownerProcedure
 		.input(
 			connectionInputSchema.extend({
 				/** The name it had, when the edit renames it. */
@@ -486,7 +516,7 @@ const connections = {
 			return saved;
 		}),
 	/** Also takes it off the profiles that name it. */
-	remove: publicProcedure
+	remove: ownerProcedure
 		.input(z.object({ name: z.string() }))
 		.handler(async ({ context, input }) => {
 			await context.connections.remove(input.name);
@@ -500,7 +530,7 @@ const connections = {
 			}
 		}),
 	/** Connects to the server, lists its tools, and disconnects. A saved connection or a draft. */
-	test: publicProcedure
+	test: ownerProcedure
 		.input(
 			z.union([
 				z.object({ name: z.string() }),
@@ -524,12 +554,12 @@ const connections = {
 			return context.checks.mcp(config, values);
 		}),
 	/** Saves a secret in the system keychain. The value never comes back. */
-	setSecret: publicProcedure
+	setSecret: ownerProcedure
 		.input(z.object({ name: secretNameSchema, value: z.string().min(1) }))
 		.handler(({ context, input }) =>
 			context.connections.setSecret(input.name, input.value),
 		),
-	removeSecret: publicProcedure
+	removeSecret: ownerProcedure
 		.input(z.object({ name: secretNameSchema }))
 		.handler(({ context, input }) =>
 			context.connections.removeSecret(input.name),
@@ -539,7 +569,7 @@ const connections = {
 	 * tool's name, description and input schema. Same client as `test`.
 	 * A connection that cannot be reached answers `ok: false` with why.
 	 */
-	tools: publicProcedure
+	tools: ownerProcedure
 		.input(z.object({ name: z.string() }))
 		.handler(async ({ context, input }) => {
 			const { expansion, values } =
@@ -559,8 +589,8 @@ const connections = {
  * and profiles name them in `clis`.
  */
 const cliTools = {
-	list: publicProcedure.handler(async ({ context }) => {
-		const use = (await flowUse(context.engine)).clis;
+	list: ownerProcedure.handler(async ({ context }) => {
+		const use = (await flowUse(context.space)).clis;
 		return context.cliTools.list().map((tool) => ({
 			...tool,
 			usedBy: use.get(tool.name) ?? [],
@@ -571,17 +601,17 @@ const cliTools = {
 		}));
 	}),
 	/** The programs this computer can run by name, to pick one from. */
-	programs: publicProcedure.handler(({ context }) => context.checks.programs()),
+	programs: ownerProcedure.handler(({ context }) => context.checks.programs()),
 	/** Where the program is, its version and the help the agents read. Read-only. */
-	check: publicProcedure
+	check: ownerProcedure
 		.input(z.object({ name: cliToolInputSchema.shape.name }))
 		.handler(({ context, input }) => context.checks.cli(input.name)),
 	/** Adds a CLI tool, or changes its description. */
-	save: publicProcedure
+	save: ownerProcedure
 		.input(cliToolInputSchema)
 		.handler(({ context, input }) => context.cliTools.save(input)),
 	/** Also takes it off the profiles that name it. */
-	remove: publicProcedure
+	remove: ownerProcedure
 		.input(z.object({ name: z.string() }))
 		.handler(async ({ context, input }) => {
 			await context.cliTools.remove(input.name);
@@ -602,7 +632,7 @@ const cliTools = {
  * made by a model), and which chat model it starts on.
  */
 const deciders = {
-	list: publicProcedure.handler(({ context }) =>
+	list: ownerProcedure.handler(({ context }) =>
 		deciderNameSchema.options.map((name) => {
 			const adapter = DECIDER_ADAPTERS[name];
 			return {
@@ -625,6 +655,7 @@ const deciders = {
 
 export const appRouter = {
 	healthCheck: publicProcedure.handler(() => "OK"),
+	spaces,
 	projects,
 	flows,
 	gates,

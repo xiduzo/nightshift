@@ -4,7 +4,7 @@ import type {
 	HarnessName,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
-import { event } from "@nightshift/db/schema/nightshift";
+import { event, project, run } from "@nightshift/db/schema/nightshift";
 import type {
 	FlowNodeType,
 	ItemState,
@@ -307,8 +307,10 @@ export type EventInput<T extends EngineEventType> = {
 /**
  * Appends one event as `walkerId`'s next and returns it as committed, with
  * its seq and time. The Walker's count (`walker_seq`) is taken in the same
- * statement, so two appends cannot get one number. The engine appends
- * through its run log (`run-log.ts`), never here directly.
+ * statement, so two appends cannot get one number. The event's Space is
+ * its run's, or for a fact of no run its project's (`payload.projectId`),
+ * read in the same statement too. The engine appends through its run log
+ * (`run-log.ts`), never here directly.
  */
 export async function appendEvent<T extends EngineEventType>(
 	db: Database,
@@ -323,12 +325,27 @@ export async function appendEvent<T extends EngineEventType>(
 			sessionId: input.sessionId ?? null,
 			type: input.type,
 			payload: JSON.stringify(input.payload),
+			spaceId: spaceOf(input),
 			walkerId,
 			walkerSeq: sql`(select coalesce(max(${event.walkerSeq}), 0) + 1 from ${event} where ${event.walkerId} = ${walkerId})`,
 		})
 		.returning();
 	if (!row) throw new Error(`Could not append ${input.type}.`);
 	return parseEventRow(row);
+}
+
+/** The Space of an event: its run's, else its project's. */
+function spaceOf(input: EventInput<EngineEventType>) {
+	if (input.runId) {
+		return sql`(select ${run.spaceId} from ${run} where ${run.id} = ${input.runId})`;
+	}
+	const projectId = (input.payload as { projectId?: unknown }).projectId;
+	if (typeof projectId !== "string") {
+		throw new Error(
+			`${input.type} names no run and no project: its Space is unknown.`,
+		);
+	}
+	return sql`(select ${project.spaceId} from ${project} where ${project.id} = ${projectId})`;
 }
 
 export function parseEventRow(row: typeof event.$inferSelect): LoggedEvent {

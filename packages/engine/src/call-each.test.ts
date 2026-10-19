@@ -35,10 +35,10 @@ import {
 	withDevice,
 } from "./test-support";
 import type {
-	Engine,
 	RunDetail,
 	RunStatus,
 	RunStreamItem,
+	SpaceEngine,
 	StepSummary,
 	TranscriptEntry,
 } from "./types";
@@ -64,7 +64,7 @@ function makeEngine(
 		Pick<TestEngineOptions, "maxConcurrentRuns" | "maxStepsPerRun" | "decider">
 	> = {},
 	internals: EngineInternals = {},
-): Engine {
+): SpaceEngine {
 	const runLog = createRunLog(sandbox.db);
 	runLogs.push(runLog);
 	return createEngine(
@@ -75,7 +75,7 @@ function makeEngine(
 			...options,
 		}),
 		{ runLog, ...internals },
-	);
+	).space(sandbox.spaceId);
 }
 
 function agent(
@@ -193,11 +193,15 @@ function printItems(items: unknown[]): string {
 /** Commits a file named after the item, so the worktree is clean for the next item. */
 const commitItem = `echo "{{run.branch}}" > "item-{{item.id}}.txt" && git add -A && git -c user.name=t -c user.email=t@nightshift.invalid -c commit.gpgsign=false commit -q -m "item {{item.id}}"`;
 
-async function projectId(engine: Engine): Promise<string> {
+async function projectId(engine: SpaceEngine): Promise<string> {
 	return (await engine.addProject({ repoPath: sandbox.repoPath })).id;
 }
 
-async function waitForStatus(engine: Engine, runId: string, status: RunStatus) {
+async function waitForStatus(
+	engine: SpaceEngine,
+	runId: string,
+	status: RunStatus,
+) {
 	return waitFor(
 		async () => {
 			const detail = await engine.getRun(runId);
@@ -207,7 +211,10 @@ async function waitForStatus(engine: Engine, runId: string, status: RunStatus) {
 	);
 }
 
-async function waitForEnd(engine: Engine, runId: string): Promise<RunDetail> {
+async function waitForEnd(
+	engine: SpaceEngine,
+	runId: string,
+): Promise<RunDetail> {
 	return waitFor(
 		async () => {
 			const detail = await engine.getRun(runId);

@@ -16,9 +16,15 @@ import {
 	parseEventRow,
 	sumCostUsd,
 } from "./events";
-import { exportRun, openRunBundle, UNKNOWN_DEVICE } from "./run-bundle";
+import {
+	exportRun,
+	openRunBundle,
+	UNKNOWN_DEVICE,
+	UNKNOWN_SPACE,
+} from "./run-bundle";
 import {
 	createSandbox,
+	otherSpace,
 	type Sandbox,
 	waitFor,
 	withDevice,
@@ -82,7 +88,7 @@ async function finishedRun(): Promise<string> {
 			},
 			dataDir: sandbox.dataDir,
 		}),
-	);
+	).space(sandbox.spaceId);
 	const { id: projectId } = await engine.addProject({
 		repoPath: sandbox.repoPath,
 	});
@@ -107,11 +113,26 @@ async function liveSteps(runId: string) {
 	return sandbox.db.select().from(step).where(eq(step.runId, runId));
 }
 
+/** What turns a bundle of today into one written before Spaces. */
+const WITHOUT_SPACE = [
+	"project",
+	"clone",
+	"run",
+	"step",
+	"agent_session",
+	"event",
+].map((table) => `ALTER TABLE ${table} DROP COLUMN space_id`);
+
 describe("exportRun", () => {
 	test("writes the run's rows, events and transcript lines to one small file", async () => {
 		const runId = await finishedRun();
 		const path = join(sandbox.root, "run.nightshift.sqlite");
-		const summary = await exportRun({ db: sandbox.db, runId, path });
+		const summary = await exportRun({
+			db: sandbox.db,
+			runId,
+			spaceId: sandbox.spaceId,
+			path,
+		});
 		expect(summary).toMatchObject({ path, runId, missingTranscripts: [] });
 
 		const file = createDb({ DATABASE_URL: `file:${path}` });
@@ -165,18 +186,19 @@ describe("exportRun", () => {
 	test("a round trip derives the same status, steps, outputs and cost", async () => {
 		const runId = await finishedRun();
 		const path = join(sandbox.root, "run.nightshift.sqlite");
-		await exportRun({ db: sandbox.db, runId, path });
+		await exportRun({ db: sandbox.db, runId, spaceId: sandbox.spaceId, path });
 		const live = await liveEvents(runId);
 
 		const opened = await openRunBundle(path);
 		expect(opened.meta).toMatchObject({
-			formatVersion: 2,
+			formatVersion: 3,
 			runId,
 			missingTranscripts: [],
 			redacted: 0,
 		});
 		expect(opened.meta.schema).toEqual(expect.any(String));
 		expect(opened.run.id).toBe(runId);
+		expect(opened.run.spaceId).toBe(sandbox.spaceId);
 		expect(opened.clones[0]?.path).toBe(sandbox.repoPath);
 		expect(opened.events).toEqual(live);
 		expect(deriveRunState(opened.events)).toEqual(deriveRunState(live));
@@ -205,11 +227,12 @@ describe("exportRun", () => {
 	test("a format 1 bundle still opens: its path is its one Clone, its Walker unknown", async () => {
 		const runId = await finishedRun();
 		const path = join(sandbox.root, "run.nightshift.sqlite");
-		await exportRun({ db: sandbox.db, runId, path });
+		await exportRun({ db: sandbox.db, runId, spaceId: sandbox.spaceId, path });
 		const live = await liveEvents(runId);
 		// What a Night Shift before Clones wrote.
 		const file = createDb({ DATABASE_URL: `file:${path}` });
 		for (const statement of [
+			...WITHOUT_SPACE,
 			"ALTER TABLE run DROP COLUMN walker_id",
 			"ALTER TABLE step DROP COLUMN device_id",
 			"ALTER TABLE event DROP COLUMN walker_id",
@@ -235,11 +258,50 @@ describe("exportRun", () => {
 			}),
 		]);
 		expect(opened.run.walkerId).toBe(UNKNOWN_DEVICE);
+		expect(opened.run.spaceId).toBe(UNKNOWN_SPACE);
 		expect(opened.steps.map((s) => s.deviceId)).toEqual([null, null]);
 		expect(opened.events).toEqual(live);
 		expect(deriveRunState(opened.events).status).toBe("finished");
 		expect(sumCostUsd(opened.events)).toBe(0.25);
 		opened.close();
+	});
+
+	test("a format 2 bundle still opens: its Space unknown", async () => {
+		const runId = await finishedRun();
+		const path = join(sandbox.root, "run.nightshift.sqlite");
+		await exportRun({ db: sandbox.db, runId, spaceId: sandbox.spaceId, path });
+		const live = await liveEvents(runId);
+		// What a Night Shift before Spaces wrote.
+		const file = createDb({ DATABASE_URL: `file:${path}` });
+		for (const statement of [
+			...WITHOUT_SPACE,
+			"UPDATE bundle SET value = '2' WHERE key = 'format_version'",
+		]) {
+			await file.run(sql.raw(statement));
+		}
+		file.$client.close();
+
+		const opened = await openRunBundle(path);
+		expect(opened.meta.formatVersion).toBe(2);
+		expect(opened.run.spaceId).toBe(UNKNOWN_SPACE);
+		expect(opened.clones.map((c) => c.spaceId)).toEqual([UNKNOWN_SPACE]);
+		expect(opened.steps.every((s) => s.spaceId === UNKNOWN_SPACE)).toBe(true);
+		expect(opened.events).toEqual(live);
+		opened.close();
+	});
+
+	test("a run of another Space is not exported", async () => {
+		const runId = await finishedRun();
+		const path = join(sandbox.root, "run.nightshift.sqlite");
+		expect(
+			await exportRun({
+				db: sandbox.db,
+				runId,
+				spaceId: await otherSpace(sandbox.db),
+				path,
+			}),
+		).toBeNull();
+		expect(existsSync(path)).toBe(false);
 	});
 
 	test("a missing transcript file is noted, not an error", async () => {
@@ -257,7 +319,12 @@ describe("exportRun", () => {
 		);
 
 		const path = join(sandbox.root, "run.nightshift.sqlite");
-		const summary = await exportRun({ db: sandbox.db, runId, path });
+		const summary = await exportRun({
+			db: sandbox.db,
+			runId,
+			spaceId: sandbox.spaceId,
+			path,
+		});
 		expect(summary?.missingTranscripts).toEqual([gone.id]);
 
 		const opened = await openRunBundle(path);
@@ -274,6 +341,7 @@ describe("exportRun", () => {
 		await exportRun({
 			db: sandbox.db,
 			runId,
+			spaceId: sandbox.spaceId,
 			path,
 			// Too short to take out safely: left alone.
 			redact: [SECRET, "Fix"],
@@ -293,14 +361,21 @@ describe("exportRun", () => {
 
 	test("an unknown run gives null; an existing file or a foreign file is refused", async () => {
 		const path = join(sandbox.root, "run.nightshift.sqlite");
-		expect(await exportRun({ db: sandbox.db, runId: "nope", path })).toBeNull();
+		expect(
+			await exportRun({
+				db: sandbox.db,
+				runId: "nope",
+				spaceId: sandbox.spaceId,
+				path,
+			}),
+		).toBeNull();
 		expect(existsSync(path)).toBe(false);
 
 		const runId = await finishedRun();
 		await writeFile(path, "");
-		await expect(exportRun({ db: sandbox.db, runId, path })).rejects.toThrow(
-			"already exists",
-		);
+		await expect(
+			exportRun({ db: sandbox.db, runId, spaceId: sandbox.spaceId, path }),
+		).rejects.toThrow("already exists");
 		await expect(openRunBundle(sandbox.dbPath)).rejects.toThrow(
 			"not a Night Shift run bundle",
 		);

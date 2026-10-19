@@ -28,9 +28,12 @@ async function seedRun() {
 		transcriptPath,
 		`${JSON.stringify({ seq: 1, stepId: "s1", sessionId: null, at: 1, event: { type: "command-output", stream: "stdout", text: "token hunter2-secret" } })}\n`,
 	);
-	await sandbox.db.insert(project).values({ id: "p1", name: "repo" });
+	await sandbox.db
+		.insert(project)
+		.values({ id: "p1", spaceId: sandbox.spaceId, name: "repo" });
 	await sandbox.db.insert(run).values({
 		id: RUN_ID,
+		spaceId: sandbox.spaceId,
 		projectId: "p1",
 		flowName: "Nightly fix-up",
 		flow: "{}",
@@ -42,6 +45,7 @@ async function seedRun() {
 	});
 	await sandbox.db.insert(step).values({
 		id: "s1",
+		spaceId: sandbox.spaceId,
 		runId: RUN_ID,
 		nodeId: "check",
 		nodeType: "command",
@@ -49,6 +53,7 @@ async function seedRun() {
 		transcriptPath,
 	});
 	await sandbox.db.insert(event).values({
+		spaceId: sandbox.spaceId,
 		runId: RUN_ID,
 		type: "RunEnded",
 		payload: JSON.stringify({ status: "finished", reason: null }),
@@ -71,7 +76,7 @@ const deps = () => ({
 describe("GET /api/runs/:id/export", () => {
 	test("streams the run bundle as an attachment and removes the temp file", async () => {
 		await seedRun();
-		const response = await runExportResponse(deps(), RUN_ID);
+		const response = await runExportResponse(deps(), RUN_ID, sandbox.spaceId);
 		expect(response.status).toBe(200);
 		expect(response.headers.get("Content-Disposition")).toBe(
 			'attachment; filename="nightly-fix-up-0123abcd.nightshift.sqlite"',
@@ -96,7 +101,14 @@ describe("GET /api/runs/:id/export", () => {
 	});
 
 	test("an unknown run is a 404 and leaves nothing behind", async () => {
-		const response = await runExportResponse(deps(), "nope");
+		const response = await runExportResponse(deps(), "nope", sandbox.spaceId);
+		expect(response.status).toBe(404);
+		expect(await leftovers()).toEqual([]);
+	});
+
+	test("a run of another Space is a 404", async () => {
+		await seedRun();
+		const response = await runExportResponse(deps(), RUN_ID, "another-space");
 		expect(response.status).toBe(404);
 		expect(await leftovers()).toEqual([]);
 	});

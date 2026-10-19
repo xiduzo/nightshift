@@ -421,6 +421,7 @@ export async function beginStep(
 			: null;
 		await ctx.db.insert(stepTable).values({
 			id: stepId,
+			spaceId: ctx.run.spaceId,
 			runId,
 			nodeId: node.id,
 			nodeType: node.type,
@@ -527,9 +528,13 @@ export async function beginStep(
 		touch,
 		async session(started) {
 			const sessionId = randomUUID();
-			await ctx.db
-				.insert(agentSession)
-				.values({ id: sessionId, runId, stepId, prompt: started.prompt });
+			await ctx.db.insert(agentSession).values({
+				id: sessionId,
+				spaceId: ctx.run.spaceId,
+				runId,
+				stepId,
+				prompt: started.prompt,
+			});
 			await ctx.log.append({
 				type: "SessionStarted",
 				runId,

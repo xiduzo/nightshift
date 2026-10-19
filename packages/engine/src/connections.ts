@@ -135,7 +135,7 @@ export function createConnectionStore(options: {
 	secrets: SecretBackend;
 }): ConnectionStore {
 	const { document, env, secrets } = options;
-	const connectionView = mapView(document.connections, () => {
+	const connectionView = mapView(document, document.connections, () => {
 		const out = new Map<string, Omit<Connection, "variables">>();
 		for (const [name, value] of document.connections.entries()) {
 			const entry = entrySchema.safeParse(value);
@@ -152,7 +152,7 @@ export function createConnectionStore(options: {
 		return out;
 	});
 	/** The secret names are a Device fact: the keychain cannot list them. */
-	const secretView = mapView(document.facts, () => {
+	const secretView = mapView(document, document.facts, () => {
 		const names = z.array(z.string()).safeParse(document.facts.get("secrets"));
 		return new Set(names.success ? names.data : []);
 	});

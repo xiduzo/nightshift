@@ -6,7 +6,7 @@ import type {
 	McpTestResult,
 } from "@nightshift/agents";
 import type { HarnessName } from "@nightshift/agents/types";
-import type { Session } from "@nightshift/auth";
+import type { Permissions, Session } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type {
 	CliToolStore,
@@ -19,8 +19,19 @@ import type {
 import type { Engine } from "@nightshift/engine/types";
 
 export type Context = {
+	/** The request's session. On this computer, the local Person's when the request has none. */
 	session: Session | null;
+	/** The Space the session works in: its active Space, else the Person's personal Space. Null without a session. */
+	spaceId: string | null;
+	/**
+	 * Whether the session's Person may do `permissions` in that Space: the
+	 * organization plugin's check of their role, on the server.
+	 */
+	can(permissions: Permissions): Promise<boolean>;
+	/** Makes a Space of the Person the session's active one. */
+	setActiveSpace(spaceId: string): Promise<void>;
 	db: Database;
+	/** The engine of this Device. Procedures use the view of the session's Space. */
 	engine: Engine;
 	settings: SettingsStore;
 	connections: ConnectionStore;
@@ -50,8 +61,8 @@ export type Context = {
 	/** Facts about this daemon that change only on a restart. */
 	daemon: {
 		dataDir: string;
-		/** This computer's Device. */
-		device: { id: string; name: string };
+		/** This computer's Device and the Person who owns it. */
+		device: { id: string; name: string; ownerId: string };
 		/** The database lease this daemon holds. `since` is epoch ms. */
 		lease: { host: string; pid: number; epoch: number; since: number };
 	};

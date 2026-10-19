@@ -231,7 +231,7 @@ export function createSettingsStore(options: {
 	env: Readonly<Record<string, string | undefined>>;
 }): SettingsStore {
 	const { document, env } = options;
-	const saved = mapView(document.settings, () => {
+	const saved = mapView(document, document.settings, () => {
 		const out = new Map<SettingKey, unknown>();
 		for (const [key, value] of document.settings.entries()) {
 			if (!Object.hasOwn(DEFS, key)) continue;

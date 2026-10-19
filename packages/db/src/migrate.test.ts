@@ -121,7 +121,7 @@ describe("migration devices_clones_walkers", () => {
 		// The local seq continues where it was.
 		await db.run(
 			sql.raw(
-				`INSERT INTO event (type, walker_id, walker_seq) VALUES ('ProjectRemoved', '${self.id}', 4)`,
+				`INSERT INTO event (space_id, type, walker_id, walker_seq) VALUES ('s', 'ProjectRemoved', '${self.id}', 4)`,
 			),
 		);
 		expect(
@@ -137,5 +137,76 @@ describe("migration devices_clones_walkers", () => {
 		expect(
 			await rows(db, "SELECT count(*) AS n FROM device WHERE self = 1"),
 		).toEqual([{ n: 1 }]);
+	});
+});
+
+describe("migration spaces", () => {
+	const personalOf = (db: Database, userId: string) =>
+		rows<{ id: string; name: string; personal: number; role: string }>(
+			db,
+			`SELECT organization.id, organization.name, organization.personal, member.role FROM organization JOIN member ON member.organization_id = organization.id WHERE member.user_id = '${userId}'`,
+		);
+
+	test("puts every row in the personal Space of this computer's Person", async () => {
+		const db = await databaseBefore("spaces");
+		for (const statement of [
+			"INSERT INTO user (id, name, email) VALUES ('u1', 'Ada', 'ada@example.com')",
+			"INSERT INTO user (id, name, email, created_at) VALUES ('u2', 'Bob', 'bob@example.com', 9999999999999)",
+			"INSERT INTO session (id, expires_at, token, updated_at, user_id) VALUES ('se1', 9999999999999, 't1', 1, 'u2')",
+			"INSERT INTO project (id, name) VALUES ('p1', 'repo')",
+			"INSERT INTO clone (id, project_id, device_id, path) SELECT 'c1', 'p1', id, '/work/repo' FROM device WHERE self = 1",
+			"INSERT INTO run (id, project_id, flow, title, worktree_path, branch, base_ref, walker_id) VALUES ('r1', 'p1', '{}', 'Run', '/w', 'b', 'main', 'd')",
+			"INSERT INTO step (id, run_id, node_id, node_type, visit, transcript_path) VALUES ('s1', 'r1', 'build', 'agent', 1, '/t/s1.ndjson')",
+			"INSERT INTO agent_session (id, run_id, step_id, prompt) VALUES ('a1', 'r1', 's1', 'Go')",
+			"INSERT INTO event (type, payload, walker_id, walker_seq) VALUES ('ProjectAdded', '{}', 'd', 1)",
+			"INSERT INTO event (run_id, type, walker_id, walker_seq) VALUES ('r1', 'RunStarted', 'd', 2)",
+		]) {
+			await db.run(sql.raw(statement));
+		}
+
+		await migrateDb(db);
+
+		// The earliest account owns this computer.
+		expect(
+			await rows(db, "SELECT owner_id FROM device WHERE self = 1"),
+		).toEqual([{ owner_id: "u1" }]);
+		const [ada] = await personalOf(db, "u1");
+		expect(ada).toMatchObject({ name: "Personal", personal: 1, role: "owner" });
+		const [bob] = await personalOf(db, "u2");
+		expect(bob).toMatchObject({ personal: 1, role: "owner" });
+		expect(bob?.id).not.toBe(ada?.id);
+		expect(
+			await rows(db, "SELECT active_organization_id AS space FROM session"),
+		).toEqual([{ space: bob?.id }]);
+
+		for (const table of [
+			"project",
+			"clone",
+			"run",
+			"step",
+			"agent_session",
+			"event",
+		]) {
+			expect(
+				await rows(db, `SELECT DISTINCT space_id AS space FROM ${table}`),
+			).toEqual([{ space: ada?.id }]);
+		}
+		expect(await rows(db, "SELECT count(*) AS n FROM event")).toEqual([
+			{ n: 2 },
+		]);
+		expect(await rows(db, "PRAGMA foreign_key_check")).toEqual([]);
+	});
+
+	test("a database without an account gets the Person of this computer", async () => {
+		const root = mkdtempSync(join(tmpdir(), "nightshift-migrate-"));
+		roots.push(root);
+		const db = createDb({ DATABASE_URL: `file:${join(root, "fresh.db")}` });
+		await migrateDb(db);
+		const [owner] = await rows<{ id: string; email: string }>(
+			db,
+			"SELECT user.id, user.email FROM user JOIN device ON device.owner_id = user.id WHERE device.self = 1",
+		);
+		expect(owner?.email).toBe("local@nightshift.invalid");
+		expect(await personalOf(db, owner?.id ?? "")).toHaveLength(1);
 	});
 });

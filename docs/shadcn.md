@@ -157,7 +157,7 @@ files into the app; then adapt the copy. Browse them at
 | `sidebar-04` | A floating sidebar with submenus. |
 | `sidebar-05` | A sidebar with collapsible submenus. |
 | `sidebar-06` | A sidebar with submenus as dropdowns. |
-| `sidebar-07` | A sidebar that collapses to icons, with a team switcher and a user menu. Night Shift's app shell is based on it. |
+| `sidebar-07` | A sidebar that collapses to icons, with a team switcher and a user menu. Night Shift's app shell is based on it; its team switcher is the Space switcher (`space-switcher.tsx`). |
 | `sidebar-08` | An inset sidebar with secondary navigation. |
 | `sidebar-09` | Collapsible nested sidebars (a mail-client layout). |
 | `sidebar-10` | A sidebar in a popover. |

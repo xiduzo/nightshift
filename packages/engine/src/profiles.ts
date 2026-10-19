@@ -40,7 +40,7 @@ export function createProfileStore(options: {
 	document: DeviceDocument;
 }): ProfileStore {
 	const { document } = options;
-	const profiles = mapView(document.profiles, () => {
+	const profiles = mapView(document, document.profiles, () => {
 		const out = new Map<string, ProfileView>();
 		for (const [name, value] of document.profiles.entries()) {
 			const entry = entrySchema.safeParse(value);

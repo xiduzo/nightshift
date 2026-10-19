@@ -45,7 +45,7 @@ export function createCliToolStore(options: {
 	document: DeviceDocument;
 }): CliToolStore {
 	const { document } = options;
-	const tools = mapView(document.cliTools, () => {
+	const tools = mapView(document, document.cliTools, () => {
 		const out = new Map<string, CliTool>();
 		for (const [name, value] of document.cliTools.entries()) {
 			const entry = entrySchema.safeParse(value);

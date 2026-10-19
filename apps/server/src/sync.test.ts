@@ -3,6 +3,12 @@ import {
 	HocuspocusProvider,
 	HocuspocusProviderWebsocket,
 } from "@hocuspocus/provider";
+import { createLocalSession } from "@nightshift/auth/local-session";
+import { localPerson } from "@nightshift/auth/spaces";
+import {
+	type AuthSandbox,
+	createAuthSandbox,
+} from "@nightshift/auth/test-support";
 import {
 	createCliToolStore,
 	createSettingsStore,
@@ -16,12 +22,7 @@ import {
 import type { Server } from "bun";
 import * as Y from "yjs";
 
-import {
-	createSync,
-	type SocketData,
-	type Sync,
-	thisComputerOnly,
-} from "./sync";
+import { createSync, ownerOnly, type SocketData, type Sync } from "./sync";
 
 /**
  * Hocuspocus 4 under Bun 1.3, in-process: Bun.serve accepts the socket and
@@ -30,6 +31,9 @@ import {
  */
 
 let sandbox: Sandbox;
+let people: AuthSandbox;
+/** A session of a Person who does not own this computer. */
+let stranger: Headers;
 let document: DeviceDocument;
 let sync: Sync;
 let server: Server<SocketData>;
@@ -40,9 +44,18 @@ const ORIGIN = "http://localhost:3001";
 beforeEach(async () => {
 	sandbox = await createSandbox();
 	document = await sandbox.openDocument();
+	people = await createAuthSandbox();
+	const owner = await localPerson(people.db);
+	stranger = (await people.signUp("Dee")).headers;
 	sync = createSync({
 		document: (name) => (name === document.name ? document.doc : null),
-		authorize: thisComputerOnly([ORIGIN]),
+		authorize: ownerOnly({
+			auth: people.auth,
+			db: people.db,
+			localSession: createLocalSession(people.auth, people.db, owner.userId),
+			ownerId: owner.userId,
+			trustedOrigins: new Set([ORIGIN]),
+		}),
 	});
 	server = Bun.serve<SocketData>({
 		hostname: "127.0.0.1",
@@ -61,16 +74,23 @@ afterEach(async () => {
 	server.stop(true);
 	await document.close();
 	await sandbox.cleanup();
+	people.cleanup();
 });
 
 /** A client of the relay, as a UI or another Device opens one. */
-function connect(name = document.name, origin?: string) {
+function connect(
+	name = document.name,
+	options: { origin?: string; cookie?: string } = {},
+) {
 	const doc = new Y.Doc();
 	const failed: string[] = [];
-	// A browser sends its page's origin; Bun's WebSocket takes headers.
+	// A browser sends its page's origin and cookies; Bun's WebSocket takes headers.
+	const headers: Record<string, string> = {};
+	if (options.origin) headers.origin = options.origin;
+	if (options.cookie) headers.cookie = options.cookie;
 	class FromOrigin extends WebSocket {
 		constructor(url: string) {
-			super(url, { headers: origin ? { origin } : {} } as never);
+			super(url, { headers } as never);
 		}
 	}
 	const provider = new HocuspocusProvider({
@@ -154,35 +174,21 @@ describe("Hocuspocus on Bun", () => {
 	});
 
 	test("the UI's origin gets in; a web page of another origin does not", async () => {
-		const ui = connect(document.name, ORIGIN);
-		const page = connect(document.name, "https://evil.example");
+		const ui = connect(document.name, { origin: ORIGIN });
+		const page = connect(document.name, { origin: "https://evil.example" });
 		await waitFor(() => ui.provider.isSynced && page.failed.length > 0);
 		expect(page.provider.isSynced).toBe(false);
 		expect(page.doc.getMap("meta").size).toBe(0);
 	});
 });
 
-describe("thisComputerOnly", () => {
-	const allow = thisComputerOnly([ORIGIN]);
-	const ask = (peer: string | null, origin?: string) =>
-		allow({
-			documentName: "device:x",
-			token: "",
-			peer,
-			request: new Request("http://localhost/sync", {
-				headers: origin ? { origin } : {},
-			}),
+describe("ownerOnly", () => {
+	test("another Person is refused, even on this computer", async () => {
+		const client = connect(document.name, {
+			origin: ORIGIN,
+			cookie: stranger.get("cookie") ?? "",
 		});
-
-	test("lets in this computer, from the UI or a program", () => {
-		expect(ask("127.0.0.1", ORIGIN)).toBe(true);
-		expect(ask("::1")).toBe(true);
-		expect(ask("::ffff:127.0.0.1")).toBe(true);
-	});
-
-	test("refuses another computer, and a web page of another origin", () => {
-		expect(ask("192.168.1.20", ORIGIN)).toBe(false);
-		expect(ask(null)).toBe(false);
-		expect(ask("127.0.0.1", "https://evil.example")).toBe(false);
+		await waitFor(() => client.failed.length > 0);
+		expect(client.provider.isSynced).toBe(false);
 	});
 });

@@ -16,6 +16,8 @@ import {
 } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
 import { createAuth } from "@nightshift/auth";
+import { createLocalSession } from "@nightshift/auth/local-session";
+import { localPerson } from "@nightshift/auth/spaces";
 import { createDb } from "@nightshift/db";
 import {
 	databaseUrl,
@@ -46,8 +48,8 @@ import {
 	systemGitInstaller,
 } from "@nightshift/engine";
 
-import { desktopOrigins, ENV } from "./env.server";
-import { createSync, thisComputerOnly } from "./sync";
+import { desktopOrigins, ENV, trustedOrigins } from "./env.server";
+import { createSync, ownerOnly, type Sync } from "./sync";
 
 /** The database, the transcripts and the command logs, together. */
 const dev = ENV.NIGHTSHIFT_DEV === "true";
@@ -149,6 +151,15 @@ opened.nightshiftDocument ??= await openDeviceDocument({
 });
 export const document = opened.nightshiftDocument;
 
+/** The Person who owns this computer, and their personal Space. */
+const person = await localPerson(db);
+
+/**
+ * One person on one computer signs in to nothing: a request from this
+ * computer without a session gets the session of the Person who owns it.
+ */
+export const localSession = createLocalSession(auth, db, person.userId);
+
 /** The environment is the fallback of every setting and every `${NAME}`. */
 const env: Record<string, string | undefined> = { ...process.env, ...ENV };
 
@@ -194,11 +205,22 @@ refreshFacts();
 facts.nightshiftFacts = setInterval(refreshFacts, 10 * 60_000);
 facts.nightshiftFacts.unref();
 
-/** The relay's document half: this computer's clients sync its document here. */
-export const sync = createSync({
+/**
+ * The relay's document half: the owner's clients sync this Device's
+ * document here. Kept across `bun --hot` reloads, like the document.
+ */
+const relay = globalThis as { nightshiftSync?: Sync };
+relay.nightshiftSync ??= createSync({
 	document: (name) => (name === document.name ? document.doc : null),
-	authorize: thisComputerOnly([ENV.CORS_ORIGIN, ...desktopOrigins]),
+	authorize: ownerOnly({
+		auth,
+		db,
+		localSession,
+		ownerId: person.userId,
+		trustedOrigins,
+	}),
 });
+export const sync = relay.nightshiftSync;
 
 /** A harness built per session, so a changed path in Settings applies to the next session. */
 function perSession(
@@ -296,7 +318,7 @@ export const projectSetup: Context["projectSetup"] = {
 
 export const daemon: Context["daemon"] = {
 	dataDir,
-	device,
+	device: { ...device, ownerId: person.userId },
 	lease: {
 		host: lease.host,
 		pid: lease.pid,

@@ -40,6 +40,8 @@ export type DeviceDocument = {
 	readonly facts: Y.Map<unknown>;
 	/** The profiles this Device offers into Spaces (slice 6). Empty until then. */
 	readonly offers: Y.Map<unknown>;
+	/** A number that changes whenever the map does (for `mapView`). */
+	revision(map: Y.Map<unknown>): number;
 	/** Makes one change in one transaction. Resolves when the Replica has it. */
 	change(fn: () => void): Promise<void>;
 	/** Resolves when every change so far is in the Replica. */
@@ -145,6 +147,15 @@ export async function openDeviceDocument(options: {
 	};
 	doc.on("update", onUpdate);
 
+	// Every transaction counts the maps it changed, ours or a client's.
+	const revisions = new WeakMap<object, number>();
+	const onTransaction = (transaction: Y.Transaction) => {
+		for (const type of transaction.changed.keys()) {
+			revisions.set(type, (revisions.get(type) ?? 0) + 1);
+		}
+	};
+	doc.on("beforeObserverCalls", onTransaction);
+
 	const document: DeviceDocument = {
 		name,
 		doc,
@@ -154,6 +165,7 @@ export async function openDeviceDocument(options: {
 		settings: doc.getMap("settings"),
 		facts: doc.getMap("facts"),
 		offers: doc.getMap("offers"),
+		revision: (map) => revisions.get(map) ?? 0,
 		async change(fn) {
 			doc.transact(fn, OWNER_ORIGIN);
 			await persist();
@@ -161,6 +173,7 @@ export async function openDeviceDocument(options: {
 		flush: () => tail.catch(() => {}),
 		async close() {
 			doc.off("update", onUpdate);
+			doc.off("beforeObserverCalls", onTransaction);
 			await tail.catch(() => {});
 		},
 	};
@@ -293,14 +306,20 @@ function safeJson(text: string): unknown {
 	}
 }
 
-/** A value read from one map, read again only after the map changes. */
-export function mapView<T>(map: Y.Map<unknown>, read: () => T): () => T {
-	let cached: { value: T } | null = null;
-	map.observe(() => {
-		cached = null;
-	});
+/**
+ * A value read from one of the document's maps, read again only after the
+ * map changes. It registers nothing on the document, so a view made again
+ * (a store built again on `bun --hot`) leaves nothing behind.
+ */
+export function mapView<T>(
+	document: DeviceDocument,
+	map: Y.Map<unknown>,
+	read: () => T,
+): () => T {
+	let cached: { revision: number; value: T } | null = null;
 	return () => {
-		cached ??= { value: read() };
+		const revision = document.revision(map);
+		if (cached?.revision !== revision) cached = { revision, value: read() };
 		return cached.value;
 	};
 }

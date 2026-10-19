@@ -200,6 +200,33 @@ describe("the Device document", () => {
 		expect([...s.cliTools.names()].sort()).toEqual(["aws", "jq"]);
 	});
 
+	test("stores built again (a hot reload) register nothing on the document", async () => {
+		const document = await sandbox.openDocument();
+		const handlers = () =>
+			[
+				document.profiles,
+				document.cliTools,
+				document.connections,
+				document.settings,
+				document.facts,
+			].reduce(
+				(n, map) =>
+					n +
+					(map as unknown as { _eH: { l: unknown[] }; _dEH: { l: unknown[] } })
+						._eH.l.length +
+					(map as unknown as { _dEH: { l: unknown[] } })._dEH.l.length,
+				0,
+			);
+		for (let i = 0; i < 20; i++) stores(document);
+		expect(handlers()).toBe(0);
+
+		// A view made earlier still sees a change made through a later one.
+		const first = stores(document);
+		expect(first.cliTools.list()).toEqual([]);
+		await stores(document).cliTools.save({ name: "gh" });
+		expect([...first.cliTools.names()]).toEqual(["gh"]);
+	});
+
 	test("an entry a store cannot read is skipped, and stays in the document", async () => {
 		const document = await sandbox.openDocument();
 		const s = stores(document);
@@ -245,12 +272,15 @@ describe("facts", () => {
 	});
 
 	test("a refresh reports this computer: platform, harnesses, programs, Clones", async () => {
-		await sandbox.db.insert(project).values({ id: "p1", name: "app" });
+		await sandbox.db
+			.insert(project)
+			.values({ id: "p1", name: "app", spaceId: sandbox.spaceId });
 		await sandbox.db.insert(clone).values({
 			id: "c1",
 			projectId: "p1",
 			deviceId: sandbox.deviceId,
 			path: "/code/app",
+			spaceId: sandbox.spaceId,
 		});
 		const document = await sandbox.openDocument();
 		await refreshDeviceFacts({

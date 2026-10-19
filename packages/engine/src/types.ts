@@ -20,8 +20,8 @@ import type { RunSettings } from "./settings";
 import type { Branches } from "./worktrees";
 
 /**
- * The engine's public contract. The API layer only calls this interface.
- * A run walks a flow, and the flows it calls, in one worktree.
+ * The engine's public contract: `Engine`, and the view of one Space,
+ * `SpaceEngine`. A run walks a flow, and the flows it calls, in one worktree.
  */
 
 /** Derived from the event log, never stored. */
@@ -386,7 +386,21 @@ export type ScheduleList = {
 	issues: ScheduleIssue[];
 };
 
+/**
+ * The engine of this Device. Its background work (the walk, recovery, the
+ * scheduler) covers every Space the Device holds, and writes each row with
+ * its own Space. What a person does goes through one Space's view.
+ */
 export interface Engine {
+	/**
+	 * What a person does in one Space. Nothing it reads, returns or changes
+	 * is of another Space: a project or run of another Space is "not found".
+	 */
+	space(spaceId: string): SpaceEngine;
+}
+
+/** The engine as a person in one Space sees it: the API layer only calls this. */
+export interface SpaceEngine {
 	listProjects(): Promise<Project[]>;
 	/**
 	 * Fails when the path is not the top level of a git repository. A
@@ -407,7 +421,7 @@ export interface Engine {
 	saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
 	deleteFlow(projectId: string, name: string): Promise<void>;
 
-	/** Open Gates over all runs, oldest first. The Needs-you inbox. A Gate stays open across daemon restarts. */
+	/** Open Gates over the Space's runs, oldest first. The Needs-you inbox. A Gate stays open across daemon restarts. */
 	listGates(): Promise<OpenGate[]>;
 
 	/**

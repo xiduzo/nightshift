@@ -11,6 +11,13 @@ import {
 
 // Durable facts only. Status is derived from the event log, never stored.
 
+/**
+ * The Space a row belongs to (the tenant id): an organization's id. No
+ * foreign key: a Space's rows may reach a Replica before the Space does.
+ * Every query of a person reads one Space.
+ */
+const spaceId = () => text("space_id").notNull();
+
 const createdAt = () =>
 	integer("created_at", { mode: "timestamp_ms" })
 		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
@@ -34,6 +41,11 @@ export const device = sqliteTable(
 		/** The address of the Host that keeps its private configuration. Null: none yet. */
 		homeHost: text("home_host"),
 		lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }),
+		/**
+		 * The Person who owns the Device (a Better Auth user). This
+		 * computer's owner is the Person Night Shift signs in for you.
+		 */
+		ownerId: text("owner_id"),
 		/** This computer. At most one row has it. */
 		self: integer("self", { mode: "boolean" }).notNull().default(false),
 		createdAt: createdAt(),
@@ -51,6 +63,8 @@ export const project = sqliteTable(
 	"project",
 	{
 		id: text("id").primaryKey(),
+		/** The one Space the project is in. Its Clones, runs and events are in it too. */
+		spaceId: spaceId(),
 		name: text("name").notNull(),
 		/**
 		 * The `origin` URL, normalised (`github.com/owner/repo`), so the ssh
@@ -62,7 +76,10 @@ export const project = sqliteTable(
 		/** Set when a person removed the project. Its runs and events stay. Adding its folder again clears it. */
 		removedAt: integer("removed_at", { mode: "timestamp_ms" }),
 	},
-	(table) => [uniqueIndex("project_remote_idx").on(table.remote)],
+	(table) => [
+		uniqueIndex("project_remote_idx").on(table.remote),
+		index("project_spaceId_idx").on(table.spaceId),
+	],
 );
 
 /** A Project's repository on one Device, at a path. Owned by that Device. */
@@ -70,6 +87,7 @@ export const clone = sqliteTable(
 	"clone",
 	{
 		id: text("id").primaryKey(),
+		spaceId: spaceId(),
 		projectId: text("project_id")
 			.notNull()
 			.references(() => project.id),
@@ -94,6 +112,8 @@ export const run = sqliteTable(
 	"run",
 	{
 		id: text("id").primaryKey(),
+		/** The project's Space. */
+		spaceId: spaceId(),
 		projectId: text("project_id")
 			.notNull()
 			.references(() => project.id),
@@ -116,7 +136,10 @@ export const run = sqliteTable(
 		walkerId: text("walker_id").notNull(),
 		createdAt: createdAt(),
 	},
-	(table) => [index("run_projectId_idx").on(table.projectId)],
+	(table) => [
+		index("run_projectId_idx").on(table.projectId),
+		index("run_spaceId_idx").on(table.spaceId),
+	],
 );
 
 /** One visit of one node. */
@@ -124,6 +147,7 @@ export const step = sqliteTable(
 	"step",
 	{
 		id: text("id").primaryKey(),
+		spaceId: spaceId(),
 		runId: text("run_id")
 			.notNull()
 			.references(() => run.id),
@@ -145,6 +169,7 @@ export const agentSession = sqliteTable(
 	"agent_session",
 	{
 		id: text("id").primaryKey(),
+		spaceId: spaceId(),
 		runId: text("run_id")
 			.notNull()
 			.references(() => run.id),
@@ -178,6 +203,8 @@ export const event = sqliteTable(
 	"event",
 	{
 		seq: integer("seq").primaryKey({ autoIncrement: true }),
+		/** The Space of the event's run, or of its project for a fact of no run. */
+		spaceId: spaceId(),
 		runId: text("run_id"),
 		stepId: text("step_id"),
 		sessionId: text("session_id"),
@@ -192,6 +219,7 @@ export const event = sqliteTable(
 	},
 	(table) => [
 		index("event_runId_idx").on(table.runId),
+		index("event_spaceId_idx").on(table.spaceId),
 		uniqueIndex("event_walkerId_walkerSeq_idx").on(
 			table.walkerId,
 			table.walkerSeq,

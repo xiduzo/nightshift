@@ -8,7 +8,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
-import { createContext } from "./context";
+import { access, createContext } from "./context";
 import { desktopOrigins, ENV } from "./env.server";
 import { runExportResponse } from "./run-export";
 import { auth, connections, db, sync } from "./services";
@@ -27,13 +27,28 @@ app.use(
 	}),
 );
 
-app.on(["POST", "GET"], "/api/auth/*", async (c) => auth.handler(c.req.raw));
+// Better Auth's own endpoints (the session, the Spaces). A request from
+// this computer without a session goes in with the local session.
+app.on(["POST", "GET"], "/api/auth/*", async (c) => {
+	const { headers } = await access(c);
+	return auth.handler(new Request(c.req.raw, { headers }));
+});
 
-// A file download, not an oRPC call. Public like the procedures: local
-// single-user mode has no session yet.
-app.get("/api/runs/:id/export", (c) =>
-	runExportResponse({ db, connections }, c.req.param("id")),
-);
+// A file download, not an oRPC call: the run of the session's Space, for a
+// role that may export runs.
+app.get("/api/runs/:id/export", async (c) => {
+	const { session, spaceId, can } = await access(c);
+	if (!session || !spaceId) {
+		return c.json({ message: "Sign in to use Night Shift." }, 401);
+	}
+	if (!(await can({ run: ["export"] }))) {
+		return c.json(
+			{ message: "Your role in this Space does not allow this." },
+			403,
+		);
+	}
+	return runExportResponse({ db, connections }, c.req.param("id"), spaceId);
+});
 
 export const apiHandler = new OpenAPIHandler(appRouter, {
 	plugins: [

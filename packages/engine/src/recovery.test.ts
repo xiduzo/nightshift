@@ -67,10 +67,11 @@ const personResumed = {
 async function insertRun(worktreePath: string, ownFlow: Flow = flow) {
 	await sandbox.db
 		.insert(project)
-		.values({ id: "p", name: "p" })
+		.values({ id: "p", spaceId: sandbox.spaceId, name: "p" })
 		.onConflictDoNothing();
 	await sandbox.db.insert(run).values({
 		id: RUN_ID,
+		spaceId: sandbox.spaceId,
 		projectId: "p",
 		flowName: "f",
 		flow: JSON.stringify(ownFlow),

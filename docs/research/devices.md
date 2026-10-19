@@ -552,6 +552,71 @@ iroh.
    personal Space holds everything; the Space switcher shows one. Sessions
    on the procedures replace public ones. No behaviour change for one
    person on one computer.
+
+   *Landed (Spaces):*
+   - **Spaces are organizations.** `packages/auth` adds Better Auth's
+     organization plugin. `access.ts` holds the statements and the four
+     roles of "Roles and permissions". The roles also keep the plugin's
+     own statements (`organization`, `invitation`, `member` create,
+     update, delete), because the plugin's endpoints check those. Custom
+     roles (dynamic access control) are not on yet.
+   - **A personal Space per Person.** `organization.personal` is a column
+     (an additional field that a client cannot set). Its slug is
+     `personal-<user id>`. A new Person gets one in the user-create hook.
+     The hooks refuse an invitation to it, a member added to it, and its
+     deletion. A new session starts in it. A session whose active Space
+     the Person is no longer a member of works in the personal Space.
+   - **The Person of this computer.** `device.owner_id` is the Device's
+     Person. The migration names the earliest account, else it makes one
+     (`local@nightshift.invalid`). Night Shift fills a blank name from the
+     computer's account name when it starts, and `localPerson` makes a new
+     Person for a database whose Person is gone.
+   - **Backfill in SQL.** The migration makes the personal Spaces and
+     their members in SQL, and puts every existing row in the personal
+     Space of this computer's Person. So `space_id` is `NOT NULL` from the
+     start. After the migration, the hooks make personal Spaces.
+   - **`space_id`** is on project, clone, run, step, agent_session and
+     event, without a foreign key (like `walker_id`). It is not on the
+     Device's configuration (settings, profiles, CLI tools, connections,
+     secrets): that is the Device's, not a Space's. LangGraph checkpoints
+     have none: only their run reaches them.
+   - **The engine's shape.** `createEngine` returns `Engine`, whose one
+     method is `space(id)`: a `SpaceEngine`, the interface the API calls.
+     Every method of it reads one Space. A project or run of another Space
+     is "not found", the same answer as one that does not exist. The walk,
+     recovery and the scheduler run over every Space. A run takes its
+     project's Space; a step and a session take their run's; an event takes
+     its run's, or for a fact of no run its project's, in the insert
+     statement itself.
+   - **A project is in one Space.** The remote stays unique on a Replica.
+     A folder whose Clone or remote is a project of another Space is
+     refused ("This folder is a project in another Space"). "Move to
+     Space" comes with sharing.
+   - **Sessions on the procedures.** Every procedure but the health check
+     needs a session in a Space. A write needs a permission, checked on
+     the server with the plugin's `hasPermission`: `project.add` and
+     `remove`, `run.start`, `stop` and `resume`, `gate.resolve`,
+     `signal.send`, and `run.export` on `/api/runs/:id/export`. Reads (runs,
+     Gates, projects, the run stream) need membership only. This
+     computer's configuration (settings, harnesses, profiles, connections,
+     CLI tools, deciders, the folder picker, the git fixes, and the flow
+     and schedule files in its Clone) is its owner's.
+   - **The local session.** One person on one computer signs in to
+     nothing. A request without a session, from a loopback address, with
+     no `Origin` or one of Night Shift's own, gets a real Better Auth
+     session of the computer's Person: the daemon adds its signed cookie
+     to the request's headers, also for Better Auth's own endpoints. Every
+     other request needs its own session. A page of another site in the
+     same browser does not get the local session, and neither does a
+     request from another computer (a daemon on `0.0.0.0` answered those
+     before).
+   - **Run bundles** are format 3: `space_id` on every row. Formats 1 and
+     2 open with the Space `unknown`. An export reads the session's Space
+     only.
+   - **The Space switcher** is the sidebar header (the team switcher of
+     `sidebar-07`): the Person's Spaces, personal first, shown as
+     "Personal". `spaces.switch` sets the session's active organization;
+     the app then goes home and reloads every query.
 3. **The documents.** Device and Space documents in Yjs, persisted in the
    Replica; Hocuspocus in the daemon, verified on Bun. The Agents page
    grouped by Device.
@@ -597,12 +662,19 @@ iroh.
      unloads the document. The database extension (`fetch`/`store` over
      `documentRows(db)`) is for a Host that keeps documents it does not
      own: slice 4.
-   - **Who may connect**, in this slice: `thisComputerOnly` lets in a
-     loopback address whose `Origin` is absent or one of the UI's origins
-     (`CORS_ORIGIN`, the desktop app's), and only for a document this
-     daemon owns. The seam is `SyncAuthorize({ documentName, token, peer,
-     request })`: slice 4 resolves the token (a Device key) to its owner
-     and applies the home-Host rule.
+   - **Who may connect**: the Device's owner only, by the same rule as the
+     procedures (`ownerOnly`, `apps/server/src/sync.ts`). The request's
+     session decides; a request from this computer (`isThisComputer`: a
+     loopback address, no `Origin` or one of the UI's) without a session
+     of its own gets the local Person's session, as slice 2's procedures
+     do. The session's Person must be the Device's owner, and the document
+     one this daemon owns. The seam is `SyncAuthorize({ documentName,
+     token, peer, request })`: slice 4 adds the Device key (its owner) and
+     the home-Host rule.
+   - **`bun --hot`**: the document and the relay are kept across reloads,
+     and a store's view registers nothing on the document (`mapView`
+     compares a per-map revision the document counts), so building the
+     stores again leaves nothing behind.
    - **The Agents page** shows profiles, harnesses, tools and secrets under
      this Device's name, with "This computer" beneath it.
    - Not yet: the Space document (part B), a UI that syncs the document

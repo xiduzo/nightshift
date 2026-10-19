@@ -1,6 +1,12 @@
 import { Hocuspocus } from "@hocuspocus/server";
+import type { Auth } from "@nightshift/auth";
+import type { LocalSession } from "@nightshift/auth/local-session";
+import { requestAccess } from "@nightshift/auth/request";
+import type { Database } from "@nightshift/db";
 import type { Server, ServerWebSocket, WebSocketHandler } from "bun";
 import * as Y from "yjs";
+
+import { isThisComputer } from "./this-computer";
 
 /**
  * The relay's document half: Hocuspocus over Bun's own WebSockets, in the
@@ -125,24 +131,33 @@ export function createSync(options: {
 }
 
 /**
- * Slice 3's rule: this computer only. The client is on this computer
- * (a loopback address) and, when it is a browser, on one of the UI's
- * origins, so no website can open a socket to the daemon. Slice 4
- * replaces this with the Device key: the key's owner, and the home-Host
- * rule (a Device document syncs only to Devices of the same owner).
+ * The Device document opens for its owner only: the Person whose session
+ * the request carries. A request from this computer (`isThisComputer`)
+ * without a session of its own gets the local Person's session, exactly
+ * as the procedures do, so one rule decides both. Slice 4 adds the
+ * Device key: its owner, and the home-Host rule (a Device document syncs
+ * only to Devices of the same owner).
  */
-export function thisComputerOnly(origins: readonly string[]): SyncAuthorize {
-	return ({ peer, request }) => {
-		if (!peer || !isLoopback(peer)) return false;
-		const origin = request.headers.get("origin");
-		return origin === null || origins.includes(origin);
+export function ownerOnly(options: {
+	auth: Auth;
+	db: Database;
+	localSession: LocalSession;
+	/** The Person who owns this Device. */
+	ownerId: string;
+	trustedOrigins: ReadonlySet<string>;
+}): SyncAuthorize {
+	return async ({ request, peer }) => {
+		const local = isThisComputer(
+			peer,
+			request.headers.get("origin"),
+			options.trustedOrigins,
+		);
+		const { session } = await requestAccess(
+			options.auth,
+			options.db,
+			request.headers,
+			local ? options.localSession : null,
+		);
+		return session?.user.id === options.ownerId;
 	};
-}
-
-function isLoopback(address: string): boolean {
-	return (
-		address === "::1" ||
-		address.startsWith("127.") ||
-		address.startsWith("::ffff:127.")
-	);
 }

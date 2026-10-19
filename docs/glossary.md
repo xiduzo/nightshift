@@ -9,18 +9,21 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Term | Meaning | Source |
 |------|---------|--------|
 | Developer | Owns a clone of the repo and the coding-agent CLIs. Draws Flows, starts Runs, and answers Gates. In local mode, the only user. | PLAN §1 |
+| Person | A user account (Better Auth's user). The Person who owns this computer's Device is signed in for you: a request from this computer without a session of its own acts as them. | Devices, slice 2 |
+| Member | A Person in a Space, with a role: owner, admin, member or viewer. The role says what they may do there: start Runs, answer Gates, add Projects. A viewer only reads. | Devices, slice 2 |
 
 ## Objects
 
 | Term | Meaning | Source |
 |------|---------|--------|
+| Space | What is shared, and with whom: Projects, their Runs and Gates, and the Members. A Better Auth organization. Every Person has a personal Space ("Personal") that nobody can be invited to, and everything starts there. Every row of a Project, Clone, Run, Step, Session or Event carries its Space; a person always works in one Space at a time (the session's active Space). | Devices, slice 2 |
 | Project | A repository, by its remote: the normalised `origin` (`github.com/acme/app`), so its ssh and https URLs are one Project. Its folders are its Clones. A repository without a remote is a Project on one Device only. | Devices |
 | Clone | A Project's repository on one Device, at a path. A Device has at most one Clone of a Project. Adding a folder whose `origin` names a known Project makes a Clone of it, not a second Project. | Devices |
 | Device | A computer that runs Night Shift, with its own database. One row of the `device` table is this computer: made on the first start, with a random id that never changes and the host name as its name. | Devices |
 | Walker | The Device that walks a Run and writes its Events. Today every Run's Walker is this computer. | Devices |
 | Owner | The one Device that writes a row. Sync never merges two writers of one row: a Run's rows and Events are its Walker's, a Clone is its Device's. | Devices |
 | Replica | A Device's own database: everything it may see, as far as it has synced. Today, the only one. | Devices |
-| Device document | A Device's configuration as one Yjs document, `device:<id>`: its Agent Profiles, CLI Tools, Connections, Settings, and its facts (harnesses, programs, secret names, Clones). Its Device is its Owner: it applies edits and saves the document in its Replica. Syncs at `/sync`, today to this computer only. Never holds a secret value. | Devices, slice 3 |
+| Device document | A Device's configuration as one Yjs document, `device:<id>`: its Agent Profiles, CLI Tools, Connections, Settings, and its facts (harnesses, programs, secret names, Clones). Its Device is its Owner: it applies edits and saves the document in its Replica. Syncs at `/sync`, to its owner only. Never holds a secret value. | Devices, slice 3 |
 | Flow | A directed graph of Nodes and Edges, stored as `.nightshift/flows/<name>.json` in the Project's clone. | PLAN §2 |
 | Node | One step of a Flow: Agent, Command, Tool, Decision, Value, Wait, or Subflow (`call` in the file). Its id is also its name in templates. | PLAN §3 |
 | Agent Node | A Node that runs one Session on its Harness, with a prompt or a skill (with arguments), a model, an effort, and a permission mode. It names an Agent Profile for them, or sets them itself; a field it sets wins over the profile. The agent picks its Outcome in its Step Report, or a Checker picks it. | PLAN §3 |
