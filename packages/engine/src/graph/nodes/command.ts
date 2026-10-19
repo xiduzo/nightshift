@@ -66,6 +66,9 @@ export const COMMAND: NodeKind<CommandNode> = {
 	...PLAIN_KIND,
 	type: "command",
 	make: commandNode,
+	works: () => "worktree",
+	// A wait node: the step sleeps while its Device is offline.
+	aux: () => [{ kind: "wait" }],
 	resumeRules: () => RESUME_RULES.fresh,
 	isChosenEnd: isSuccessExit,
 	endReason: (node, outcome) =>
@@ -93,7 +96,7 @@ async function runShell(
 	let stdout = "";
 	const result = await runCommand(step.device, {
 		command,
-		cwd: ctx.run.worktreePath,
+		cwd: step.worktree,
 		env,
 		logPath: commandLogPath(ctx.dataDir, ctx.run.id, stepId),
 		signal,

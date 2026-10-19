@@ -42,11 +42,14 @@ const SLEEP_REASON: Record<CurrentWait["reason"], string> = {
 	time: "The flow waits for a time.",
 	command: "The flow waits for a command to pass.",
 	signal: "The flow waits for a signal.",
+	"device-offline": "The device of the next step is offline.",
 };
 
 /** A Wait node's own wait, not the run policy's. */
 const isNodeWait = (reason: CurrentWait["reason"]) =>
-	reason !== "usage-limit" && reason !== "network";
+	reason !== "usage-limit" &&
+	reason !== "network" &&
+	reason !== "device-offline";
 
 type Notice = {
 	icon: LucideIcon;
@@ -256,9 +259,11 @@ function noticeOf({
 						{reason}{" "}
 						{wait?.reason === "command"
 							? "It tries the command again"
-							: nodeWait
-								? "It goes on"
-								: "It continues where it left off"}
+							: wait?.reason === "device-offline"
+								? "It starts when the device is back, and looks again"
+								: nodeWait
+									? "It goes on"
+									: "It continues where it left off"}
 						{at ? <> at {at}</> : null}.
 						{wait?.message ? `\n${wait.message}` : null}
 					</>

@@ -7,17 +7,20 @@ import {
 	type ArchiveRef,
 	applyRunCommand,
 	COMMAND_PERMISSION,
+	type Device,
 	type DeviceRegistry,
 	isEmpty,
 	MissingProjectError,
 	mergeCursors,
 	type SyncCursors,
+	serveWork,
 	withoutPrivatePaths,
 } from "@nightshift/engine";
 import type { Engine } from "@nightshift/engine/types";
 import { ORPCError } from "@orpc/server";
 
 import { NOT_A_HOST } from "./host";
+import { checkWork } from "./work";
 import type { WorkHub } from "./work-hub";
 
 /**
@@ -55,6 +58,8 @@ export function createHostExchange(deps: {
 	isHost(): boolean;
 	/** The calls of runs this Host walks, for the Devices they are placed on. */
 	work: WorkHub;
+	/** This Host as a Device: it serves the calls of runs a Device walks with steps here. */
+	local?: Device;
 }): HostExchange {
 	const { db, engine, registry } = deps;
 	const { exchange } = engine;
@@ -250,7 +255,7 @@ export function createHostExchange(deps: {
 
 		async workReply(key, input) {
 			await admit(key);
-			deps.work.reply(key.deviceId, input);
+			return { known: deps.work.reply(key.deviceId, input) };
 		},
 
 		async startRun(key, input) {
@@ -263,14 +268,62 @@ export function createHostExchange(deps: {
 			return { runId: run.id };
 		},
 
-		async placements(key, input) {
+		async devices(key, input) {
 			await admit(key);
 			if (!(await isMember(key, input.spaceId))) {
 				throw new Error(`Project not found: ${input.projectId}`);
 			}
 			return engine
 				.space(input.spaceId, { personId: key.personId })
-				.listPlacements(input.projectId);
+				.listDevices(input.projectId);
+		},
+
+		async *call(key, { deviceId, request }, signal) {
+			await admit(key);
+			// The Walker asks in the name of its run's Person: its own.
+			if (request.personId !== key.personId) {
+				forbidden("A device may ask only for its own Person's runs.");
+			}
+			await mayStart(key, request.spaceId);
+			if (deviceId === deps.selfId) {
+				const local = deps.local;
+				const refusal = local
+					? await checkWork(request, {
+							ownerId: deps.ownerId,
+							db,
+							engine,
+						})
+					: "This Host does not run steps.";
+				if (refusal !== null || !local) {
+					yield { kind: "error", message: refusal ?? "" };
+					return;
+				}
+				yield* serveWork(
+					local,
+					request,
+					signal ?? new AbortController().signal,
+				);
+				return;
+			}
+			const paired = await registry.get(deviceId);
+			if (!paired || paired.revokedAt || paired.ownerId !== key.personId) {
+				yield {
+					kind: "error",
+					message: "That device is not one of yours on this Host.",
+				};
+				return;
+			}
+			yield* deps.work.call(deviceId, request, signal);
+		},
+
+		async reachable(key, deviceId) {
+			await admit(key);
+			if (deviceId === deps.selfId) return true;
+			const paired = await registry.get(deviceId);
+			if (!paired || paired.revokedAt || paired.ownerId !== key.personId) {
+				return false;
+			}
+			return deps.work.online(deviceId, "");
 		},
 	};
 

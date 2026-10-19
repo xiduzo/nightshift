@@ -4,7 +4,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness, reportingScript } from "@nightshift/agents/fake";
 import { organization } from "@nightshift/db/schema/auth";
-import { clone, device as deviceTable } from "@nightshift/db/schema/nightshift";
+import {
+	clone,
+	device as deviceTable,
+	event,
+} from "@nightshift/db/schema/nightshift";
 import type { Flow } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 
@@ -12,6 +16,7 @@ import { createEngine } from "../engine";
 import { createSpaceDocuments, recordClone } from "../space/document";
 import {
 	createSandbox,
+	mustGit,
 	type Sandbox,
 	testDevice,
 	waitFor,
@@ -38,12 +43,23 @@ let personId: string;
 let projectId: string;
 const B = "device-b";
 
+/** An Agent Profile on Claude Code. */
+const PROFILE = {
+	harness: "claude-code" as const,
+	model: "sonnet",
+	permissionMode: "auto" as const,
+	clis: [],
+	connections: [],
+};
+
 const bDevice = (projectOf: () => string) =>
 	testDevice(
 		{
 			harnesses: { "claude-code": fakeHarness(reportingScript("pass")) },
 			clonePath: async (id) => (id === projectOf() ? b.repoPath : null),
 			findCli: (name) => (name === "git" ? "/usr/bin/git" : null),
+			// B has the profile "everywhere"; only A has "here_only".
+			profileFor: (name) => (name === "everywhere" ? PROFILE : null),
 		},
 		B,
 	);
@@ -80,7 +96,9 @@ beforeEach(async () => {
 			db: a.db,
 			dataDir: a.dataDir,
 			scheduler: false,
-			harnesses: {},
+			harnesses: { "claude-code": fakeHarness(reportingScript("pass")) },
+			profileFor: (name) =>
+				name === "everywhere" || name === "here_only" ? PROFILE : null,
 			spaceDocuments: documents,
 			work,
 		}),
@@ -314,5 +332,191 @@ describe("a run placed on another Device", () => {
 			}),
 		).rejects.toThrow("spare does not have this project.");
 		expect(await engine.space(a.spaceId).listRuns()).toEqual([]);
+	});
+});
+
+describe("nodes placed on Devices, with the Hand-off", () => {
+	/** A git line with a test identity. */
+	const git = (line: string) =>
+		line.replace(
+			/^git /,
+			"git -c user.name=Test -c user.email=test@nightshift.invalid -c commit.gpgsign=false ",
+		);
+
+	/** A has its Clone back, and A and B share one remote. */
+	async function shareRemote(): Promise<void> {
+		await a.db.insert(clone).values({
+			id: "clone-a",
+			spaceId: a.spaceId,
+			projectId,
+			deviceId: a.deviceId,
+			path: a.repoPath,
+		});
+		const remote = join(a.root, "remote.git");
+		await mustGit(a.root, ["init", "-q", "--bare", remote]);
+		await mustGit(a.repoPath, ["remote", "add", "origin", remote]);
+		await mustGit(b.repoPath, ["remote", "add", "origin", remote]);
+	}
+
+	const commitOn = (id: string, file: string, device?: string) => ({
+		...command(
+			id,
+			[
+				`test ! -e ${file}`,
+				`echo ${file} > ${file}`,
+				"git add .",
+				git(`git commit -q -m ${file}`),
+				"ls",
+			].join(" && "),
+		),
+		...(device ? { device } : {}),
+	});
+
+	test("a node on B gets the work by a Hand-off and gives it back", async () => {
+		await shareRemote();
+		const started = await space().startRun({
+			projectId,
+			flow: flow(
+				[
+					commitOn("one", "one.txt"),
+					commitOn("two", "two.txt", "studio-b"),
+					{ ...command("three", "ls"), device: undefined },
+				] as Flow["nodes"],
+				[
+					{ id: "e1", from: "one", outcome: "pass", to: "two" },
+					{ id: "e2", from: "two", outcome: "pass", to: "three" },
+				],
+			),
+			startedBy: personId,
+		});
+		const run = await until(started.id, "finished");
+		expect(run.device.thisDevice).toBe(true);
+		expect(run.steps.map((s) => [s.nodeId, s.device?.id])).toEqual([
+			["one", a.deviceId === run.device.id ? a.deviceId : run.device.id],
+			["two", B],
+			["three", run.device.id],
+		]);
+		// B saw A's commit, and A saw B's.
+		expect(String(run.steps[1]?.outputs.log_tail)).toContain("one.txt");
+		expect(String(run.steps[2]?.outputs.log_tail)).toContain("two.txt");
+		const handed = (await a.db.select().from(event)).filter(
+			(e) => e.type === "HandedOff",
+		);
+		expect(
+			handed.map((e) => {
+				const p = JSON.parse(e.payload) as {
+					from: string;
+					to: string;
+					commit: string;
+				};
+				return [
+					p.from === B ? "B" : "A",
+					p.to === B ? "B" : "A",
+					p.commit.length,
+				];
+			}),
+		).toEqual([
+			["A", "B", 40],
+			["B", "A", 40],
+		]);
+	});
+
+	test("a dirty worktree fails the step that needs the work elsewhere", async () => {
+		await shareRemote();
+		const started = await space().startRun({
+			projectId,
+			flow: flow(
+				[
+					command("scribble", "echo draft > draft.txt"),
+					{
+						...command("there", "ls"),
+						device: "studio-b",
+					},
+				] as Flow["nodes"],
+				[{ id: "e1", from: "scribble", outcome: "pass", to: "there" }],
+			),
+			startedBy: personId,
+		});
+		const run = await until(started.id, "failed");
+		expect(run.steps[1]?.outcome).toBe("error");
+		expect(run.steps[1]?.error).toContain("not committed (draft.txt)");
+		expect(run.steps[1]?.error).toContain("cannot move to studio-b");
+	});
+
+	test("a node whose Device is offline sleeps, and continues when it is back", async () => {
+		await shareRemote();
+		const started = await space().startRun({
+			projectId,
+			flow: flow(
+				[
+					command("first", "sleep 0.3"),
+					{ ...command("ask", "echo from B"), device: "studio-b" },
+				] as Flow["nodes"],
+				[{ id: "e1", from: "first", outcome: "pass", to: "ask" }],
+			),
+			startedBy: personId,
+		});
+		// It goes away after the start.
+		online.delete(B);
+		const asleep = await until(started.id, "sleeping");
+		expect(asleep.steps[1]?.nodeId).toBe("ask");
+		const waited = (await a.db.select().from(event)).find(
+			(e) => e.type === "WaitStarted",
+		);
+		expect(JSON.parse(waited?.payload ?? "{}")).toMatchObject({
+			reason: "device-offline",
+			deviceId: B,
+			message: "studio-b is offline. The step starts when it is back.",
+		});
+		online.add(B);
+		await engine.deviceBack(B);
+		const run = await until(started.id, "finished");
+		expect(String(run.steps[1]?.outputs.log_tail).trim()).toBe("from B");
+	}, 20_000);
+
+	test("a node may not name a device its starter does not have", async () => {
+		await shareRemote();
+		await expect(
+			space().startRun({
+				projectId,
+				flow: flow([
+					{ ...command("ask", "true"), device: "nowhere" },
+				] as Flow["nodes"]),
+				startedBy: personId,
+			}),
+		).rejects.toThrow(
+			'The flow names the device "nowhere", but you have no device of that name.',
+		);
+	});
+
+	test("a node's profile picks its Device: the run's when it has it, else this computer", async () => {
+		await shareRemote();
+		const profiled = (id: string, profile: string) =>
+			({
+				id,
+				type: "agent",
+				position: { x: 0, y: 0 },
+				prompt: "Work.",
+				profile,
+			}) as Flow["nodes"][number];
+		const started = await space().startRun({
+			projectId,
+			flow: flow(
+				[profiled("there", "everywhere"), profiled("here", "here_only")],
+				[{ id: "e1", from: "there", outcome: "pass", to: "here" }],
+			),
+			startedBy: personId,
+			deviceId: B,
+		});
+		const run = await until(started.id, "finished");
+		expect(run.device.id).toBe(B);
+		expect(run.steps.map((s) => [s.nodeId, s.device?.id])).toEqual([
+			["there", B],
+			["here", run.walker.id === a.deviceId ? "test-device" : run.walker.id],
+		]);
+		// The snapshot names this computer for the node only it can run.
+		expect(
+			run.flow.nodes.map((n) => ("device" in n ? n.device : null)),
+		).toEqual([null, "test"]);
 	});
 });

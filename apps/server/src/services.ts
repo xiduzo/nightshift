@@ -71,6 +71,7 @@ import { createRelay } from "./devices/relay";
 import { certificateFingerprint } from "./devices/tls";
 import { createWorkServer, type WorkServer } from "./devices/work";
 import { createWorkHub, type WorkHub } from "./devices/work-hub";
+import { createWorkRelay } from "./devices/work-relay";
 import {
 	desktopOrigins,
 	ENV,
@@ -382,6 +383,8 @@ const local = localDevice({
 		),
 	// The project's folder here: where its runs' worktrees branch from.
 	clonePath: clonePathOf(db),
+	// Its profiles, for a run placed here from another Device.
+	profileFor: (name) => profiles.settingsFor(name),
 });
 
 /**
@@ -390,8 +393,21 @@ const local = localDevice({
  * reloads, so a Device's stream outlives a reload.
  */
 const hotWork = globalThis as { nightshiftWork?: WorkHub };
-hotWork.nightshiftWork ??= createWorkHub();
+hotWork.nightshiftWork ??= createWorkHub({
+	// A Device is back: the steps that slept while it was away look again.
+	onBack: (deviceId) => {
+		engine.deviceBack(deviceId).catch((error) => {
+			console.error("Steps that waited for a device were not woken:", error);
+		});
+	},
+});
 const workHub = hotWork.nightshiftWork;
+/** The hub for the Spaces this computer keeps; its Hosts for the others. */
+const work = createWorkRelay({
+	hub: workHub,
+	engine: () => engine,
+	links: () => deviceLinks,
+});
 
 /**
  * The actions on rows another Device owns (a Gate of a run walked
@@ -418,7 +434,7 @@ export const engine = await createEngine({
 	db,
 	walkerId: device.id,
 	device: local,
-	work: workHub,
+	work,
 	relay: relayToHosts,
 	dataDir,
 	settings: () => settings.run(),
@@ -475,6 +491,7 @@ export const hostExchange = createHostExchange({
 	ownerId: person.userId,
 	isHost: host.isHost,
 	work: workHub,
+	local,
 });
 
 /** A Device whose link says nothing for this long is offline. Its heartbeat comes every 15 s. */

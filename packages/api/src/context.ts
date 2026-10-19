@@ -31,7 +31,7 @@ import type {
 } from "@nightshift/engine";
 import type {
 	Engine,
-	Placement,
+	OwnDevice,
 	StartRunInput,
 } from "@nightshift/engine/types";
 
@@ -247,7 +247,7 @@ export type HostExchange = {
 	workReply(
 		key: DeviceKeyAccess,
 		input: { id: string; replies: WorkReply[]; done: boolean },
-	): Promise<void>;
+	): Promise<{ known: boolean }>;
 	/**
 	 * Starts a run placed on another Device, for the key's Person: this
 	 * Host walks it. Needs `run.start` in the Space.
@@ -256,11 +256,23 @@ export type HostExchange = {
 		key: DeviceKeyAccess,
 		input: StartRunInput & { spaceId: string; deviceId: string },
 	): Promise<{ runId: string }>;
-	/** The Devices of the key's Person a run of the project can run on. */
-	placements(
+	/** The key's Person's Devices for a project: online, with a Clone or not. */
+	devices(
 		key: DeviceKeyAccess,
 		input: { spaceId: string; projectId: string },
-	): Promise<Placement[]>;
+	): Promise<OwnDevice[]>;
+	/**
+	 * The Walker → Host → Device leg: a call of a run the key's Device
+	 * walks, for one of its Person's Devices (or this Host), relayed (or
+	 * served here), with its replies, until the signal aborts.
+	 */
+	call(
+		key: DeviceKeyAccess,
+		input: { deviceId: string; request: WorkRequest },
+		signal?: AbortSignal,
+	): AsyncIterable<WorkReply>;
+	/** Whether one of the key's Person's Devices (or this Host) takes work now. */
+	reachable(key: DeviceKeyAccess, deviceId: string): Promise<boolean>;
 };
 
 /** What a placed Device takes from its Host: a call to serve, or one to cancel. */

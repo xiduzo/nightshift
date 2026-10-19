@@ -155,3 +155,44 @@ export async function checkpointSnapshot(
 		writes: writes.map((w) => ({ ...w, value: base64(w.value) })),
 	});
 }
+
+/**
+ * Writes a run's checkpoint snapshot (`checkpointSnapshot`) into this
+ * Replica's checkpoint tables: what a new Walker resumes from. Rows it has
+ * are kept.
+ */
+export async function restoreCheckpoint(
+	db: Database,
+	snapshot: string,
+): Promise<void> {
+	const parsed = JSON.parse(snapshot) as {
+		checkpoints: (Omit<
+			typeof lgCheckpoint.$inferInsert,
+			"checkpoint" | "metadata"
+		> & {
+			checkpoint: string | null;
+			metadata: string | null;
+		})[];
+		writes: (Omit<typeof lgWrite.$inferInsert, "value"> & {
+			value: string | null;
+		})[];
+	};
+	const buffer = (value: string | null) =>
+		value === null ? null : Buffer.from(value, "base64");
+	for (const c of parsed.checkpoints) {
+		await db
+			.insert(lgCheckpoint)
+			.values({
+				...c,
+				checkpoint: buffer(c.checkpoint),
+				metadata: buffer(c.metadata),
+			})
+			.onConflictDoNothing();
+	}
+	for (const w of parsed.writes) {
+		await db
+			.insert(lgWrite)
+			.values({ ...w, value: buffer(w.value) })
+			.onConflictDoNothing();
+	}
+}

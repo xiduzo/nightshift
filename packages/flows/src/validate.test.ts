@@ -12,7 +12,7 @@ import type {
 	ValueNode,
 	WaitNode,
 } from "./schema";
-import { nodeOutcomes, outputFieldsByType } from "./schema";
+import { flowSchema, nodeOutcomes, outputFieldsByType } from "./schema";
 import type { FlowIssue } from "./types";
 import { parseFlow, validateFlow } from "./validate";
 
@@ -2094,5 +2094,37 @@ describe("validateFlow: wait nodes", () => {
 			),
 		);
 		expect(errors(good)).toEqual([]);
+	});
+});
+
+describe("validateFlow: devices", () => {
+	test("an Agent, a Command and a model Decision may name a device; a Gate may not", () => {
+		const placed = flow(
+			[
+				agent("worker", { device: "hetzner-1" }),
+				command("check", { device: "MacBook" }),
+				decision("pick", ["a", "b"], { device: "studio" }),
+			],
+			[
+				edge("e1", "worker", "pass", "check"),
+				edge("e2", "check", "pass", "pick"),
+			],
+		);
+		expect(errors(validateFlow(placed))).toEqual([]);
+
+		const gate = flow(
+			[decision("worker", ["ship"], { by: "person", device: "studio" })],
+			[],
+		);
+		expect(errors(validateFlow(gate)).map((e) => e.message)).toEqual([
+			'Node "worker" names the device "studio", but you decide it. Only a model runs on a device. Remove the device.',
+		]);
+	});
+
+	test("a device name is a non-empty name", () => {
+		expect(
+			flowSchema.safeParse(flow([agent("worker", { device: " " })], []))
+				.success,
+		).toBe(false);
 	});
 });

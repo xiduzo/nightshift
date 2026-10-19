@@ -160,6 +160,7 @@ describe("a Walker's paths", () => {
 					walkerId: "device-colleague",
 					startedBy: "colleague",
 					deviceId: null,
+					placements: null,
 					createdAt: now,
 				},
 			],

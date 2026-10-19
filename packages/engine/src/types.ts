@@ -180,6 +180,14 @@ export type Placement = {
 	thisDevice: boolean;
 };
 
+/** One of a Person's Devices, as placement sees it. */
+export type OwnDevice = Placement & {
+	/** It takes work now. */
+	online: boolean;
+	/** It has a Clone of the project. */
+	hasClone: boolean;
+};
+
 /** A person's action on a run walked elsewhere, waiting for its Walker. */
 export type PendingCommand = {
 	id: string;
@@ -300,6 +308,19 @@ export type RunDetail = RunSummary & {
 	 * oldest first. Known where they wait: on the Host.
 	 */
 	commands: PendingCommand[];
+	/** The run's work moving between Devices (`HandedOff`), oldest first. */
+	handOffs: HandOff[];
+};
+
+/** The run's work moved from one Device to another before a step there. */
+export type HandOff = {
+	at: number;
+	/** The step that needed the work on `to`. */
+	stepId: string | null;
+	from: RunDevice;
+	to: RunDevice;
+	/** The commit that moved. */
+	commit: string;
 };
 
 /** What a Decision step decided by a model writes to its transcript. */
@@ -358,7 +379,8 @@ export type WaitEvent =
 				| "duration"
 				| "time"
 				| "command"
-				| "signal";
+				| "signal"
+				| "device-offline";
 			until: number | null;
 			message: string;
 			signal?: string;
@@ -544,6 +566,12 @@ export interface Engine {
 	 * (`MemberJoined`, `MemberRemoved`, `MemberRoleChanged`), with who made it.
 	 */
 	logMemberChange(change: MemberChange): Promise<void>;
+	/**
+	 * A Device is back (its link to this Host took work again): the steps
+	 * of the runs this computer walks that sleep because a Device was
+	 * offline look again now, instead of at their next try.
+	 */
+	deviceBack(deviceId: string): Promise<void>;
 }
 
 /** A change of a Space's Members, as the auth hooks report it. */
@@ -592,6 +620,11 @@ export interface SpaceEngine {
 	 * online and have one. In a Space a Host keeps, the Host answers.
 	 */
 	listPlacements(projectId: string): Promise<Placement[]>;
+	/**
+	 * The actor's Devices for a project: this computer first, each with
+	 * whether it is online and has a Clone (a node's Device picker).
+	 */
+	listDevices(projectId: string): Promise<OwnDevice[]>;
 
 	/** The local and remote branches of the project's clone, newest first. A run can start from one. */
 	listBranches(projectId: string): Promise<Branches>;
@@ -667,6 +700,14 @@ export interface SpaceEngine {
 	 * again. Edge counts carry over. Fails while the run is running.
 	 */
 	resumeRun(runId: string, prompt?: string): Promise<void>;
+	/**
+	 * Moves the run's Walk to another of the actor's Devices (`WalkerMoved`):
+	 * this computer archives the run's checkpoint and files and stops
+	 * walking it; the new Walker resumes from the archive. Only a run that
+	 * is not in the middle of a step. A run walked elsewhere: its Walker
+	 * moves it.
+	 */
+	moveRun(runId: string, toDeviceId: string): Promise<void>;
 
 	/**
 	 * Emits the current status and every step summary, replays the full
@@ -709,6 +750,8 @@ export type Relay = {
 	}): Promise<void>;
 	/** A file of the archive from the Host that keeps the Space. Null when it has none. */
 	archive(ref: ArchiveRef): Promise<string | null>;
+	/** Keeps a file of a run this computer walks in the archive of the Host that keeps the Space. */
+	archivePut(ref: ArchiveRef, content: string): Promise<void>;
 	/**
 	 * Starts a run placed on another Device through the Host that keeps
 	 * the Space: the Host walks it. Returns the run's id; its rows follow
@@ -717,11 +760,11 @@ export type Relay = {
 	startRun(
 		input: StartRunInput & { spaceId: string; deviceId: string },
 	): Promise<{ runId: string }>;
-	/** The actor's Devices a run of the project can run on, as the Host that keeps the Space knows them. */
-	placements(input: {
-		spaceId: string;
-		projectId: string;
-	}): Promise<Placement[]>;
+	/**
+	 * The actor's Devices, as the Host that keeps the Space knows them:
+	 * whether each is online and has a Clone of the project.
+	 */
+	devices(input: { spaceId: string; projectId: string }): Promise<OwnDevice[]>;
 };
 
 export type EngineOptions = {

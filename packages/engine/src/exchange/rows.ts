@@ -17,9 +17,11 @@ import type { RunLog } from "../run-log";
 /**
  * The event log exchange: run history between Replicas, by cursor. Every
  * row of a run has one Owner, its Walker, so the merge is a union: a row
- * a Replica has already is skipped, and nothing is ever updated across
- * Devices. The cursor is "this Walker's events in this Space after
- * `walker_seq` N" (`sync_cursor`, per Host).
+ * a Replica has already is skipped, and nothing is updated across Devices
+ * but the run's Walker, which follows its `WalkerMoved` on every Replica.
+ * A moved run's rows are each of its Walkers' to send. The cursor is
+ * "this Walker's events in this Space after `walker_seq` N" (`sync_cursor`,
+ * per Host).
  *
  * - What moves: runs, steps, agent sessions and the events of runs. Facts
  *   of no run (a project's, a schedule's, a Device's) stay on the Replica
@@ -54,6 +56,8 @@ const runRowSchema = z.object({
 	startedBy: z.string().nullable().default(null),
 	/** The Device its steps run on (null: the Walker). A Device of a version before it sends none. */
 	deviceId: z.string().nullable().default(null),
+	/** The Devices its nodes name, by name (JSON). A Device of a version before it sends none. */
+	placements: z.string().nullable().default(null),
 	createdAt: z.number(),
 });
 
@@ -246,7 +250,7 @@ export function createExchange(deps: {
 		check: { walker?: string; spaces?: readonly string[] } = {},
 	): Promise<LoggedEvent[]> {
 		const known = await knownRuns(rows);
-		refuseForeign(rows, known, check);
+		refuseForeign(rows, known, check, await movedWalkers(rows));
 		const projectIds = [...new Set(rows.runs.map((r) => r.projectId))];
 		if (projectIds.length > 0) {
 			const found = new Set(
@@ -288,6 +292,8 @@ export function createExchange(deps: {
 				.onConflictDoNothing();
 		}
 		const added = await log.ingest(rows.events);
+		// The run's Walker follows its `WalkerMoved`, on every Replica.
+		await applyWalkerMoves(db, added);
 		for (const e of added) {
 			// The Walker's own copy of this fact, filled here from the fact.
 			if (e.type === "HarnessSessionAssigned" && e.sessionId) {
@@ -331,32 +337,81 @@ export function createExchange(deps: {
 		return runs;
 	}
 
+	/**
+	 * The Devices that walked each run a batch names before its latest
+	 * Walker: a moved run's earlier events, and its rows from the Device it
+	 * moved from, are that Device's to send.
+	 */
+	async function movedWalkers(
+		rows: RunRows,
+	): Promise<Map<string, Set<string>>> {
+		const moved = new Map<string, Set<string>>();
+		const add = (runId: string, walkerId: string) => {
+			const set = moved.get(runId) ?? new Set();
+			set.add(walkerId);
+			moved.set(runId, set);
+		};
+		const ids = [...new Set(rows.events.map((e) => e.runId))];
+		const logged =
+			ids.length === 0
+				? []
+				: await db
+						.select({ runId: event.runId, payload: event.payload })
+						.from(event)
+						.where(
+							and(inArray(event.runId, ids), eq(event.type, "WalkerMoved")),
+						);
+		const all = [
+			...logged.map((e) => ({ runId: e.runId, payload: e.payload })),
+			...rows.events.filter((e) => e.type === "WalkerMoved"),
+		];
+		for (const e of all) {
+			if (!e.runId) continue;
+			const payload = JSON.parse(e.payload) as { from?: string; to?: string };
+			if (payload.from) add(e.runId, payload.from);
+			if (payload.to) add(e.runId, payload.to);
+		}
+		return moved;
+	}
+
 	function refuseForeign(
 		rows: RunRows,
 		runs: Map<string, { walkerId: string; spaceId: string }>,
 		check: { walker?: string; spaces?: readonly string[] },
+		moved: Map<string, Set<string>> = new Map(),
 	): void {
 		const spaces = check.spaces ? new Set(check.spaces) : null;
 		const allowed = (walkerId: string | undefined, spaceId: string) =>
 			(check.walker === undefined || walkerId === check.walker) &&
 			(spaces === null || spaces.has(spaceId));
+		/** The run's Walkers: its latest, and those it moved from or to. */
+		const walkersOf = (runId: string) =>
+			new Set([
+				...(runs.get(runId) ? [runs.get(runId)?.walkerId as string] : []),
+				...(moved.get(runId) ?? []),
+			]);
 		const ofRun = (runId: string, spaceId: string) => {
 			const owner = runs.get(runId);
 			return (
 				owner !== undefined &&
 				owner.spaceId === spaceId &&
-				allowed(owner.walkerId, spaceId)
+				(check.walker === undefined || walkersOf(runId).has(check.walker)) &&
+				allowed(check.walker, spaceId)
 			);
 		};
 		const ok =
-			rows.runs.every((r) => allowed(r.walkerId, r.spaceId)) &&
+			rows.runs.every(
+				(r) =>
+					allowed(check.walker, r.spaceId) &&
+					(check.walker === undefined || walkersOf(r.id).has(check.walker)),
+			) &&
 			rows.steps.every((s) => ofRun(s.runId, s.spaceId)) &&
 			rows.sessions.every((s) => ofRun(s.runId, s.spaceId)) &&
 			rows.events.every(
 				(e) =>
 					allowed(e.walkerId, e.spaceId) &&
 					ofRun(e.runId, e.spaceId) &&
-					runs.get(e.runId)?.walkerId === e.walkerId,
+					walkersOf(e.runId).has(e.walkerId),
 			);
 		if (!ok) {
 			throw new ForeignRowsError(
@@ -447,7 +502,8 @@ export function createExchange(deps: {
  * and command logs are on its disk. They are private to the Walker's
  * owner, so a Replica of another Person never gets them. Rows keep their
  * shape: a path becomes "" (`run.worktree_path`, `step.transcript_path`,
- * `WorktreeCreated.worktreePath`, `StepStarted.transcriptPath`), and a
+ * `WorktreeCreated.worktreePath`, `HandedOff.worktreePath`,
+ * `StepStarted.transcriptPath`), and a
  * `StepStarted.logPath` that was set becomes "" too, so it still says the
  * step has a log. `keep` says per Walker whose paths stay.
  */
@@ -468,10 +524,17 @@ export function withoutPrivatePaths(
 		sessions: rows.sessions,
 		events: rows.events.map((e) => {
 			if (!strip(e.walkerId)) return e;
-			if (e.type !== "WorktreeCreated" && e.type !== "StepStarted") return e;
+			if (
+				e.type !== "WorktreeCreated" &&
+				e.type !== "StepStarted" &&
+				e.type !== "HandedOff"
+			) {
+				return e;
+			}
 			const payload = JSON.parse(e.payload) as Record<string, unknown>;
-			if (e.type === "WorktreeCreated") payload.worktreePath = "";
-			else {
+			if (e.type === "WorktreeCreated" || e.type === "HandedOff") {
+				payload.worktreePath = "";
+			} else {
 				payload.transcriptPath = "";
 				if (typeof payload.logPath === "string") payload.logPath = "";
 			}
@@ -496,4 +559,25 @@ export function mergeCursors(into: SyncCursors, by: SyncCursors): SyncCursors {
 /** Whether a batch has no rows. */
 export function isEmpty(rows: RunRows): boolean {
 	return rows.events.length === 0;
+}
+
+/**
+ * Applies `WalkerMoved` to the run rows: the run's Walker is the latest
+ * `to`. A run from before Placement keeps its steps' Device: the Walker it
+ * had.
+ */
+export async function applyWalkerMoves(
+	db: Database,
+	events: readonly LoggedEvent[],
+): Promise<void> {
+	for (const e of events) {
+		if (e.type !== "WalkerMoved" || !e.runId) continue;
+		await db
+			.update(run)
+			.set({
+				deviceId: sql`coalesce(${run.deviceId}, ${run.walkerId})`,
+				walkerId: e.payload.to,
+			})
+			.where(eq(run.id, e.runId));
+	}
 }

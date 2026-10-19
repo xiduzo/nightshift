@@ -1,14 +1,16 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
-import { device as deviceTable, run } from "@nightshift/db/schema/nightshift";
 import {
-	type FlowNode,
+	device as deviceTable,
+	run,
+	step as stepTable,
+} from "@nightshift/db/schema/nightshift";
+import {
 	optionProblem,
 	type Policy,
 	type ResolvedPolicy,
 } from "@nightshift/flows";
 import {
 	deleteFlowFile,
-	type FlowSources,
 	listFlowFiles,
 	listFlowSources,
 	loadFlowSource,
@@ -20,9 +22,8 @@ import {
 import { eq, inArray } from "drizzle-orm";
 
 import { createRunBus } from "./bus";
+import { createPlacement } from "./device/placement";
 import { createDeviceRegistry } from "./device/registry";
-import { remoteDevice, type WorkRelay } from "./device/remote";
-import type { Device } from "./device/types";
 import {
 	deriveOpenGate,
 	deriveRunState,
@@ -30,17 +31,21 @@ import {
 	deriveSteps,
 	deriveStopAfterStep,
 } from "./events";
-import { type ArchiveRef, readArchive, writeArchive } from "./exchange/archive";
+import {
+	type ArchiveRef,
+	checkpointSnapshot,
+	ownStepFiles,
+	readArchive,
+	restoreCheckpoint,
+	writeArchive,
+} from "./exchange/archive";
 import type { RunCommandInput } from "./exchange/commands";
 import { createEngineExchange } from "./exchange/engine-exchange";
+import { createHostSpaces, personOnHost } from "./exchange/host-spaces";
+import { applyWalkerMoves } from "./exchange/rows";
 import { getRunRow as getRunRowOf, type RunRow } from "./graph/context";
 import { createRunner } from "./graph/runner";
-import {
-	createProjects,
-	type ListedProject,
-	NOT_ON_THIS_COMPUTER,
-	toProject,
-} from "./projects";
+import { createProjects, type ListedProject, toProject } from "./projects";
 import { createReadModel, parseCalledFlows, parseRunFlow } from "./read-model";
 import { createRecovery } from "./recovery";
 import { createRunLog, type RunLog } from "./run-log";
@@ -51,18 +56,13 @@ import {
 	type ScheduleRecord,
 } from "./scheduler";
 import { defaultRunSettings, type RunSettings } from "./settings";
-import {
-	createSpaceDocuments,
-	deviceNameIn,
-	projectClones,
-} from "./space/document";
+import { createSpaceDocuments, deviceNameIn } from "./space/document";
 import { parseTranscript, readTranscriptFile } from "./transcripts";
 import type {
 	Actor,
 	Engine,
 	EngineOptions,
 	MemberChange,
-	Placement,
 	RunStreamItem,
 	RunSummary,
 	RunTrigger,
@@ -109,17 +109,6 @@ import { listBranches } from "./worktrees";
  * daemon carries it over its Links. Each module gets its dependencies (db, log, runner, bus,
  * settings, clock) from this file, so a test can stand one up alone.
  */
-
-/** A work relay that reaches nobody: a run placed elsewhere on a computer without one. */
-const UNREACHABLE: WorkRelay = {
-	async *call() {
-		yield {
-			kind: "error",
-			message: "This computer cannot reach the device this run is placed on.",
-		};
-	},
-	online: () => false,
-};
 
 /** How long a Device waits for a run its Host started to arrive. */
 const RUN_ARRIVES_MS = 30_000;
@@ -175,37 +164,26 @@ export function createEngine(
 	const documents = options.spaceDocuments ?? createSpaceDocuments({ db });
 	const registry = createDeviceRegistry({ db, log: runLog, now });
 
-	/** Other Devices' names, for the runs placed on them (messages only). */
-	const deviceNames = new Map<string, string>();
-
-	/** Whether a run's steps run on this computer: placed here, or before Placement. */
+	/** Whether a run's own worktree is on this computer: placed here, or before Placement. */
 	const placedHere = (row: RunRow) =>
 		row.deviceId === null ||
 		row.deviceId === device.id ||
 		row.deviceId === row.walkerId;
 
-	/**
-	 * The Device a step of a run runs on (its Placement): the run's Device,
-	 * chosen when it started. Another Device is reached through the Host's
-	 * work relay, for the Person who started the run. Per-node placement
-	 * changes this function only.
-	 */
-	function deviceFor(_node: FlowNode, row: RunRow): Device {
-		if (placedHere(row) || row.deviceId === null) return device;
-		return remoteDevice(
-			options.work ?? UNREACHABLE,
-			{
-				id: row.deviceId,
-				name: deviceNames.get(row.deviceId) ?? "The device of this run",
-			},
-			{
-				spaceId: row.spaceId,
-				projectId: row.projectId,
-				personId: row.startedBy ?? "",
-				runId: row.id,
-			},
-		);
-	}
+	/** Where steps run: per node, else the run's Device (`device/placement.ts`). */
+	const placement = createPlacement({
+		db,
+		device,
+		log: runLog,
+		registry,
+		documents,
+		hostSpaces: createHostSpaces(db),
+		project: (projectId, spaceId) => projects.find(projectId, spaceId),
+		...(options.work ? { work: options.work } : {}),
+		...(options.relay ? { relay: options.relay } : {}),
+	});
+	const deviceFor = placement.deviceFor;
+
 	const projects = createProjects({
 		db,
 		log: runLog,
@@ -231,6 +209,7 @@ export function createEngine(
 		minuteMs,
 		settings: runSettings,
 		deviceFor,
+		deviceById: placement.deviceById,
 		flowOf: parseRunFlow,
 		calledFlowsOf: parseCalledFlows,
 		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
@@ -261,14 +240,10 @@ export function createEngine(
 			// leaves it for the next start.
 			projects.readRemotes().catch(() => {}),
 		)
-		.then(async () => {
-			// The names of the Devices runs may be placed on, for their messages.
-			for (const row of await db
-				.select({ id: deviceTable.id, name: deviceTable.name })
-				.from(deviceTable)) {
-				deviceNames.set(row.id, row.name);
-			}
-		});
+		// The names of the Devices runs may be placed on, for their messages.
+		.then(() => placement.loadNames())
+		// The interrupted runs' grace counts from now: the engine is ready.
+		.then(() => recovery.armResumes());
 	// Every method awaits `ready` and sees the error there.
 	ready.catch(() => {});
 
@@ -278,7 +253,75 @@ export function createEngine(
 		bus,
 		dataDir,
 		documents,
+		// A run moved here: this computer walks it from now on.
+		onIngested: async (added) => {
+			const self = await runLog.walkerId();
+			for (const e of added) {
+				if (e.type !== "WalkerMoved" || !e.runId) continue;
+				if (e.payload.to !== self && e.payload.to !== device.id) continue;
+				await takeOver(e.runId).catch((error) => {
+					console.error(`[engine] could not take over run ${e.runId}`, error);
+				});
+			}
+		},
 	});
+
+	/**
+	 * This computer walks a run another Device moved here (`WalkerMoved`):
+	 * its checkpoint comes from the archive (this Replica's, else the Host's)
+	 * into the checkpoint tables, and a sleeping run gets its wake timer. A
+	 * run at a Gate waits for its answer here; a stopped one for a resume.
+	 */
+	async function takeOver(runId: string): Promise<void> {
+		const row = await getRunRowOf(db, runId);
+		const ref: ArchiveRef = {
+			kind: "checkpoint",
+			spaceId: row.spaceId,
+			runId,
+		};
+		const snapshot =
+			(await readArchive(dataDir, ref)) ??
+			(options.relay ? await options.relay.archive(ref) : null);
+		if (snapshot === null) {
+			throw new Error("The archive has no checkpoint of the run.");
+		}
+		await restoreCheckpoint(db, snapshot);
+		runner.forget(runId);
+		runner.sleeps.restore(runId, await runLog.events(runId));
+	}
+
+	/**
+	 * What a new Walker needs of a run this computer walks: its latest
+	 * checkpoint and its steps' transcripts and command logs, in the archive
+	 * of the Replica that keeps the Space (this one, or its Host).
+	 */
+	async function archiveForMove(row: RunRow): Promise<void> {
+		const keptHere = (await exchange.hostSpaces.hostOf(row.spaceId)) === null;
+		const put = async (ref: ArchiveRef, content: string) => {
+			if (keptHere) await writeArchive(dataDir, ref, content);
+			else if (options.relay) await options.relay.archivePut(ref, content);
+			else
+				throw new Error("This computer cannot reach the Host of this Space.");
+		};
+		const self = await runLog.walkerId();
+		const steps = await db
+			.select({ id: stepTable.id })
+			.from(stepTable)
+			.where(eq(stepTable.runId, row.id));
+		for (const s of steps) {
+			const files = await ownStepFiles(db, dataDir, s.id, self);
+			if (!files) continue;
+			const at = { spaceId: row.spaceId, runId: row.id, stepId: s.id };
+			if (files.transcript !== null) {
+				await put({ kind: "transcript", ...at }, files.transcript);
+			}
+			if (files.log !== null) await put({ kind: "log", ...at }, files.log);
+		}
+		await put(
+			{ kind: "checkpoint", spaceId: row.spaceId, runId: row.id },
+			await checkpointSnapshot(db, row.id),
+		);
+	}
 
 	/** The Walkers of runs of a Space: their names from the Device rows, else the Space document. */
 	async function walkers(
@@ -328,7 +371,11 @@ export function createEngine(
 		walker: RunWalker,
 		ended: boolean,
 	): Promise<TranscriptEntry[]> {
-		if (walker.thisDevice) return readTranscriptFile(row.transcriptPath);
+		if (walker.thisDevice) {
+			// A step of a run walked here before it moved here is in the archive.
+			const own = await readTranscriptFile(row.transcriptPath);
+			if (own.length > 0 || !ended) return own;
+		}
 		const ref: ArchiveRef = {
 			kind: "transcript",
 			spaceId: row.spaceId,
@@ -360,138 +407,6 @@ export function createEngine(
 		stepTranscript,
 	});
 
-	/**
-	 * Places a run on one of its starter's Devices, after the Host's own
-	 * checks: the Device is paired here and belongs to the Person who
-	 * starts the run (another Person's Device takes an Offer, later), it
-	 * takes work now, and it has a Clone of the project. The Device checks
-	 * again before it starts anything.
-	 */
-	async function place(input: {
-		deviceId: string | undefined;
-		project: ListedProject;
-		runId: string;
-		personId: string | null;
-	}): Promise<Device> {
-		const { deviceId, project } = input;
-		if (
-			deviceId === undefined ||
-			deviceId === device.id ||
-			deviceId === (await runLog.walkerId())
-		) {
-			return device;
-		}
-		const paired = await registry.get(deviceId);
-		if (!paired || paired.revokedAt !== null || !options.work) {
-			throw new Error(
-				"That device cannot take runs from this computer. Pair it with this computer, or choose another device.",
-			);
-		}
-		if (input.personId === null || paired.ownerId !== input.personId) {
-			throw new Error(
-				`${paired.name} is not your device. A run can use your own devices only.`,
-			);
-		}
-		if (!options.work.online(deviceId)) {
-			throw new Error(
-				`${paired.name} is offline. Start the run when it is online, or choose another device.`,
-			);
-		}
-		const document = await documents.open(project.spaceId);
-		if (
-			document.hostedElsewhere ||
-			!projectClones(document, project.id).some((c) => c.deviceId === deviceId)
-		) {
-			throw new Error(
-				`${paired.name} does not have this project. Add its folder there first.`,
-			);
-		}
-		deviceNames.set(deviceId, paired.name);
-		return remoteDevice(
-			options.work,
-			{ id: deviceId, name: paired.name },
-			{
-				spaceId: project.spaceId,
-				projectId: project.id,
-				personId: input.personId,
-				runId: input.runId,
-			},
-		);
-	}
-
-	/**
-	 * The Devices a run of the project can run on, for a Person: this
-	 * computer when it has a Clone, then their Devices paired here that are
-	 * online with a Clone. A Space a Host keeps: the Host's answer.
-	 */
-	async function placements(
-		spaceId: string,
-		personId: string,
-		projectId: string,
-	): Promise<Placement[]> {
-		const project = await projects.find(projectId, spaceId);
-		const self = await runLog.walkerId();
-		const here: Placement[] =
-			project.repoPath !== null
-				? [{ deviceId: self, name: device.name, thisDevice: true }]
-				: [];
-		if ((await exchange.hostSpaces.hostOf(spaceId)) !== null) {
-			const listed = options.relay
-				? await options.relay
-						.placements({ spaceId, projectId })
-						.catch(() => [] as Placement[])
-				: [];
-			return [
-				...here,
-				...listed
-					.filter((p) => p.deviceId !== self)
-					.map((p) => ({ ...p, thisDevice: false })),
-			];
-		}
-		const work = options.work;
-		if (!work) return here;
-		const withClone = new Set(
-			projectClones(await documents.open(spaceId), projectId).map(
-				(c) => c.deviceId,
-			),
-		);
-		const own = (await registry.list(personId)).filter(
-			(d) =>
-				d.revokedAt === null &&
-				d.id !== self &&
-				withClone.has(d.id) &&
-				work.online(d.id),
-		);
-		return [
-			...here,
-			...own.map((d) => ({ deviceId: d.id, name: d.name, thisDevice: false })),
-		];
-	}
-
-	/**
-	 * The flow files of a project without a Clone here: from the Clone of
-	 * another of the Person's Devices, through the Host's work relay.
-	 */
-	async function flowsElsewhere(
-		spaceId: string,
-		projectId: string,
-		actor: Actor | undefined,
-	): Promise<FlowSources> {
-		const work = options.work;
-		const at =
-			actor && work
-				? (await placements(spaceId, actor.personId, projectId)).find(
-						(p) => !p.thisDevice && work.online(p.deviceId),
-					)
-				: undefined;
-		if (!actor || !work || !at) throw new Error(NOT_ON_THIS_COMPUTER);
-		return remoteDevice(
-			work,
-			{ id: at.deviceId, name: at.name },
-			{ spaceId, projectId, personId: actor.personId, runId: null },
-		).flows(projectId);
-	}
-
 	const runStart = createRunStart({
 		db,
 		log: runLog,
@@ -499,7 +414,7 @@ export function createEngine(
 		now,
 		projectRow: (projectId) => projects.find(projectId),
 		profileFor: options.profileFor ?? (() => null),
-		place,
+		place: placement.place,
 		selfName: device.name,
 	});
 
@@ -548,6 +463,13 @@ export function createEngine(
 		log: runLog,
 		projects: projects.list,
 		enabled: () => runSettings().scheduler,
+		// The Device a schedule names fires it; without one, the Replica that
+		// keeps the Space (its Host, or the one Device of a Space without one).
+		firesHere: async (projectId, schedule) => {
+			if (schedule.device !== undefined) return schedule.device === device.name;
+			const row = await projects.find(projectId);
+			return (await exchange.hostSpaces.hostOf(row.spaceId)) === null;
+		},
 		runStatus: reads.runStatus,
 	});
 	if (options.scheduler !== false) {
@@ -664,10 +586,16 @@ export function createEngine(
 				return listBranches(row.repoPath);
 			},
 
+			async listDevices(projectId) {
+				await ready;
+				if (!actor) throw new Error("Sign in to see your devices.");
+				return placement.ownDevices(spaceId, actor.personId, projectId);
+			},
+
 			async listPlacements(projectId) {
 				await ready;
 				if (!actor) throw new Error("Sign in to start a run.");
-				return placements(spaceId, actor.personId, projectId);
+				return placement.placements(spaceId, actor.personId, projectId);
 			},
 
 			async listFlows(projectId) {
@@ -675,7 +603,7 @@ export function createEngine(
 				const row = await projects.find(projectId, spaceId);
 				if (row.repoPath !== null) return listFlowFiles(row.repoPath);
 				return listFlowSources(
-					await flowsElsewhere(spaceId, projectId, actor),
+					await placement.flowsElsewhere(spaceId, projectId, actor?.personId),
 					"",
 				);
 			},
@@ -685,7 +613,7 @@ export function createEngine(
 				const row = await projects.find(projectId, spaceId);
 				if (row.repoPath !== null) return readFlowFile(row.repoPath, name);
 				return loadFlowSource(
-					await flowsElsewhere(spaceId, projectId, actor),
+					await placement.flowsElsewhere(spaceId, projectId, actor?.personId),
 					name,
 					"",
 				);
@@ -770,6 +698,54 @@ export function createEngine(
 					return;
 				}
 				await runner.stop(runId);
+			},
+
+			async moveRun(runId, to) {
+				await ready;
+				const row = await getRunRow(runId, spaceId);
+				if (!actor) throw new Error("Sign in to move a run.");
+				if (await walkedElsewhere(row)) {
+					await relay(row, actor, { kind: "run.move", payload: { to } });
+					return;
+				}
+				const self = await runLog.walkerId();
+				if (to === self || to === device.id) {
+					throw new Error("This computer walks the run already.");
+				}
+				await runner.exclusive(runId, async () => {
+					const events = await loadRunEvents(runId);
+					const status = deriveRunState(events).status;
+					if (status === "running" || runner.isActive(runId)) {
+						throw new Error(
+							"The run is in the middle of a step. Move it when it waits, sleeps or has stopped.",
+						);
+					}
+					if (status === "finished") {
+						throw new Error("The run has ended. There is nothing to move.");
+					}
+					const personId =
+						(await personOnHost(db, row.spaceId)) ?? actor.personId;
+					const target = (
+						await placement.ownDevices(row.spaceId, personId, row.projectId)
+					).find((d) => d.deviceId === to);
+					if (!target || target.thisDevice) {
+						throw new Error("That device is not one of yours.");
+					}
+					if (!target.online) {
+						throw new Error(
+							`${target.name} is offline. Move the run when it is online.`,
+						);
+					}
+					await archiveForMove(row);
+					runner.forget(runId);
+					const moved = await runLog.append({
+						type: "WalkerMoved",
+						runId,
+						payload: { from: self, to, by: actor.personId },
+					});
+					await applyWalkerMoves(db, [moved]);
+					bus.publish(runId, { kind: "status-changed" });
+				});
 			},
 
 			async resumeRun(runId, prompt) {
@@ -936,6 +912,24 @@ export function createEngine(
 		yield* reads.watch(runId, signal, afterSeq);
 	}
 
+	async function deviceBack(_deviceId: string): Promise<void> {
+		await ready;
+		const self = await runLog.walkerId();
+		const rows = await db
+			.select({ id: run.id })
+			.from(run)
+			.where(eq(run.walkerId, self));
+		const sleeping = await runLog.derive(
+			rows.map((r) => r.id),
+			deriveSleep,
+		);
+		for (const [runId, sleep] of sleeping) {
+			// Each looks again: one whose Device is still away sleeps again.
+			if (sleep?.reason !== "device-offline") continue;
+			runner.sleeps.wake(runId, { early: true }).catch(() => {});
+		}
+	}
+
 	async function logMemberChange(change: MemberChange): Promise<void> {
 		const { spaceId, personId, by } = change;
 		if (change.kind === "joined") {
@@ -974,6 +968,7 @@ export function createEngine(
 		devices: registry,
 		exchange,
 		logMemberChange,
+		deviceBack,
 	};
 }
 

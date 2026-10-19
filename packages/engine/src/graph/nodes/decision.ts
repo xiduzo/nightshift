@@ -83,6 +83,7 @@ export const DECISION: NodeKind<DecisionNode> = {
 	...PLAIN_KIND,
 	type: "decision",
 	make: decisionNode,
+	works: (node) => (node.by === "model" ? "device" : null),
 	resumeRules: decisionRules,
 	aux: (node) =>
 		node.by === "model"

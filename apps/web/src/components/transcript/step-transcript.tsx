@@ -625,11 +625,14 @@ const WAIT_TITLE: Record<WaitItem["reason"], string> = {
 	time: "Waiting for a time",
 	command: "Waiting for a command to pass",
 	signal: "Waiting for a signal",
+	"device-offline": "Waiting for a device",
 };
 
 /** A Wait node's own wait, or the run policy's (a usage limit, the network). */
 const isNodeWait = (reason: WaitItem["reason"]) =>
-	reason !== "usage-limit" && reason !== "network";
+	reason !== "usage-limit" &&
+	reason !== "network" &&
+	reason !== "device-offline";
 
 /**
  * The run sleeps on this step: the run policy continues the same session
@@ -660,6 +663,11 @@ function WaitCard({ item }: { item: WaitItem }) {
 			</>
 		) : item.reason === "command" ? (
 			<>Tries the command again{at ? <> at {at}</> : null}.</>
+		) : item.reason === "device-offline" ? (
+			<>
+				Starts when the device is back, and looks again
+				{at ? <> at {at}</> : null}.
+			</>
 		) : isNodeWait(item.reason) ? (
 			<>Goes on{at ? <> at {at}</> : null}.</>
 		) : (

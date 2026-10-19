@@ -89,10 +89,22 @@ export type OwnWait = {
 	signal?: string;
 };
 
+/** The step's Device (or the one its work must move from) is offline. */
+export type DeviceWait = {
+	reason: "device-offline";
+	deviceId: string;
+	/** The Device's name, for the message. */
+	name: string;
+};
+
+/** How often a step whose Device is offline looks again, in minutes, besides the wake when it is back. */
+export const DEVICE_RETRY_MINUTES = 1;
+
 /** What a step asks the sleep module for. */
 export type SleepRequest =
 	| ({ kind: "policy" } & WaitRequest)
-	| ({ kind: "own" } & OwnWait);
+	| ({ kind: "own" } & OwnWait)
+	| ({ kind: "device" } & DeviceWait);
 
 /** What `sleep` gives back: the park at the wait node, or why the step must end instead. */
 export type SleepOutcome =
@@ -217,6 +229,10 @@ export async function sleep(
 		}
 		until = plan.until;
 		message = plan.message;
+	} else if (request.kind === "device") {
+		// It looks again in a while; the Device coming back wakes it sooner.
+		until = now + DEVICE_RETRY_MINUTES * ctx.minuteMs;
+		message = `${request.name} is offline. The step starts when it is back.`;
 	} else {
 		until = cutToDeadline(request.until, request.deadline);
 		message = request.message;
@@ -225,11 +241,26 @@ export async function sleep(
 		request.kind === "own" && request.signal !== undefined
 			? { signal: request.signal }
 			: {};
+	// The Device a policy wait is about (a usage limit is its harness
+	// login's), or the one that is offline. A Wait node's own wait has none.
+	const deviceId =
+		request.kind === "device"
+			? { deviceId: request.deviceId }
+			: request.kind === "policy"
+				? { deviceId: step.device.id }
+				: {};
 	await ctx.log.append({
 		type: "WaitStarted",
 		runId,
 		stepId: step.stepId,
-		payload: { reason: request.reason, until, message, since, ...signal },
+		payload: {
+			reason: request.reason,
+			until,
+			message,
+			since,
+			...signal,
+			...deviceId,
+		},
 	});
 	step.record(null, {
 		type: "wait",

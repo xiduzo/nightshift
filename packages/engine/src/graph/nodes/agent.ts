@@ -192,6 +192,7 @@ export const AGENT: NodeKind<AgentNode> = {
 	...PLAIN_KIND,
 	type: "agent",
 	make: agentNode,
+	works: () => "worktree",
 	resumeRules: () => RESUME_RULES.agent,
 	aux: () => [{ kind: "wait" }],
 	isChosenEnd: (node, outcome) =>
@@ -316,7 +317,7 @@ type SessionEnding = EnginePayloads["SessionEnded"];
  * output schema and the node's outcomes; or a wait request.
  */
 async function runSession(
-	ctx: StepContext,
+	_ctx: StepContext,
 	node: AgentNode,
 	step: StepHandle,
 	input: { prompt: string | null; resumeSessionId: string | null },
@@ -356,7 +357,7 @@ async function runSession(
 	const stream = step.device
 		.session({
 			harness: agent.harness,
-			cwd: ctx.run.worktreePath,
+			cwd: step.worktree,
 			prompt,
 			model: agent.model,
 			permissionMode: agent.permissionMode,

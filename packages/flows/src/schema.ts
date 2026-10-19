@@ -167,6 +167,16 @@ export const jsonSchemaSchema = z.record(z.string(), z.unknown());
 
 const position = z.object({ x: z.number(), y: z.number() });
 
+/**
+ * A Device by the name its owner gave it ("MacBook", "hetzner-1"). A node
+ * that names one runs there (its Placement); a run refuses to start when
+ * the Person who starts it has no Device of that name.
+ */
+export const deviceNameSchema = z.string().trim().min(1).max(64);
+
+/** Where the node's step runs. Unset: the profile's Device, else the run's. */
+const placed = { device: deviceNameSchema.optional() };
+
 /** A template string per input name of the called flow. */
 const bindings = z.record(nameSchema, z.string());
 
@@ -181,6 +191,7 @@ const nodeBase = {
 
 export const agentNodeSchema = z.object({
 	...nodeBase,
+	...placed,
 	type: z.literal("agent"),
 	/** The message to the agent. Supports templates. */
 	prompt: z.string(),
@@ -340,6 +351,7 @@ export const STANDARD_EXIT_CODES: CommandExit[] = [
 
 export const commandNodeSchema = z.object({
 	...nodeBase,
+	...placed,
 	type: z.literal("command"),
 	/**
 	 * Run with `sh -c` in the worktree. The exit code picks the outcome (`exits`). Template values
@@ -369,6 +381,8 @@ export const commandNodeSchema = z.object({
  */
 export const decisionNodeSchema = z.object({
 	...nodeBase,
+	/** `by: "model"` only: where the model is asked. */
+	...placed,
 	type: z.literal("decision"),
 	/**
 	 * The question for a person, the brief for a model, or a note on what
@@ -484,6 +498,8 @@ export type ValueBy = z.infer<typeof valueBySchema>;
  */
 export const valueNodeSchema = z.object({
 	...nodeBase,
+	/** `by: "model"` only: where the model is asked. */
+	...placed,
 	type: z.literal("value"),
 	by: valueBySchema,
 	/** A JSON Schema for `data`. The step passes only with data that matches it. */
@@ -546,6 +562,7 @@ export const waitNodeSchema = z.object({
  */
 export const toolNodeSchema = z.object({
 	...nodeBase,
+	...placed,
 	type: z.literal("tool"),
 	/** A Connection by name. A flow that names one the daemon does not have refuses to start. */
 	connection: nameSchema,

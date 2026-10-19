@@ -65,6 +65,7 @@ export const VALUE: NodeKind<ValueNode> = {
 	...PLAIN_KIND,
 	type: "value",
 	make: valueNode,
+	works: (node) => (node.by === "model" ? "device" : null),
 	resumeRules: (node) =>
 		node.by === "model" ? RESUME_RULES.model : RESUME_RULES.fresh,
 	aux: (node) => (node.by === "model" ? [{ kind: "wait" }] : []),

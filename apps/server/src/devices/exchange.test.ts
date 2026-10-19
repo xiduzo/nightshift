@@ -166,9 +166,8 @@ describe("the event log exchange", () => {
 			(projects) => projects.some((p) => p.id === projectId),
 		);
 		expect(listedOnB.find((p) => p.id === projectId)?.repoPath).toBeNull();
-		expect(b.client.flows.list({ projectId })).rejects.toThrow(
-			"not on this computer",
-		);
+		// Its flows come from A's Clone, through A.
+		expect(await b.client.flows.list({ projectId })).toEqual([]);
 
 		// B's folder of the same remote is a Clone of A's project, known on A.
 		const folder = await repo("on-b");

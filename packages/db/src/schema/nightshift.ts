@@ -187,6 +187,12 @@ export const run = sqliteTable(
 		 */
 		deviceId: text("device_id"),
 		/**
+		 * JSON: the Devices the run's nodes name (their `device`), by name:
+		 * `{ "hetzner-1": "<device id>" }`, resolved when the run started. A
+		 * node without one runs on `device_id`. Null: no node names one.
+		 */
+		placements: text("placements"),
+		/**
 		 * The Person who started the run. Null for a run a schedule started,
 		 * and for runs from before Members. No foreign key: a run walked
 		 * elsewhere may name a Person this Replica does not know.
@@ -357,7 +363,7 @@ export const runCommand = sqliteTable(
 		/** The Device that walks the run and applies the command. */
 		walkerId: text("walker_id").notNull(),
 		kind: text("kind", {
-			enum: ["gate.resolve", "signal.send", "run.stop"],
+			enum: ["gate.resolve", "signal.send", "run.stop", "run.move"],
 		}).notNull(),
 		/** JSON: the action's input (the Gate's step, choice and note; the signal; when to stop). */
 		payload: text("payload").notNull(),

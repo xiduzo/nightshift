@@ -14,12 +14,14 @@ import {
 	type DerivedStep,
 	deriveSteps,
 	deriveStopAfterStep,
+	deriveWorktrees,
 	type EnginePayloads,
 	type LoggedEvent,
 	type RunWarningKind,
 	type StepOutputs,
 	scopeKey,
 } from "../events";
+import { gitAuthorOf } from "../people";
 import { commandLogPath, transcriptPath } from "../transcripts";
 import type { StepEvent, StepOutcome } from "../types";
 import {
@@ -47,6 +49,7 @@ import {
 	scopeOf,
 } from "./route";
 import {
+	type DeviceWait,
 	type OwnWait,
 	type SleepRequest,
 	sleep,
@@ -112,6 +115,11 @@ export type StepHandle = {
 	visit: number;
 	/** The Device the step runs on: the body's one way to touch a computer. */
 	device: Device;
+	/**
+	 * The run's worktree on the step's Device, where a command or a session
+	 * works. Another Device's path when the step runs there.
+	 */
+	worktree: string;
 	/** The step as the log had it, for a reopened or continued step; null for a new visit. */
 	existing: DerivedStep | null;
 	/** The log as read on entry, before this step's own events. */
@@ -207,7 +215,8 @@ export type BodyResult =
 			costUsd?: number | null;
 			costSource?: CostSource | null;
 	  } & WaitRequest)
-	| ({ kind: "sleep" } & OwnWait);
+	| ({ kind: "sleep" } & OwnWait)
+	| ({ kind: "offline" } & DeviceWait);
 
 /** What a node tells the runner: how it re-enters, what its body does, what an empty end looks like. */
 export type StepSpec = {
@@ -267,7 +276,8 @@ export async function runStep(
 
 	let result: BodyResult;
 	try {
-		result = await spec.body(step, entry);
+		result =
+			(await readyDevice(ctx, node, step)) ?? (await spec.body(step, entry));
 	} catch (error) {
 		result = {
 			kind: "end",
@@ -309,11 +319,14 @@ export async function runStep(
 			return route(ctx, state, node, end, config);
 		}
 		case "wait":
-		case "sleep": {
+		case "sleep":
+		case "offline": {
 			const request: SleepRequest =
 				result.kind === "wait"
 					? { ...result, kind: "policy" }
-					: { ...result, kind: "own" };
+					: result.kind === "sleep"
+						? { ...result, kind: "own" }
+						: { ...result, kind: "device" };
 			const slept = await sleep(ctx, node, state, config, step, request);
 			if (slept.kind === "asleep") return slept.command;
 			// The step ends before its wait: with the session it has, and
@@ -533,6 +546,8 @@ export async function beginStep(
 		stepId,
 		visit,
 		device,
+		// The run's worktree on this Device; a Hand-off sets it again.
+		worktree: worktreeOn(ctx, logged, device) ?? ctx.run.worktreePath,
 		existing,
 		events: logged,
 		tctx: templateContext(ctx, state, config),
@@ -634,4 +649,104 @@ export async function beginStep(
 		leaveOpen,
 	};
 	return { kind: "step", step: handle };
+}
+
+/** Whether a Device id the log names is `device` (this computer has two ids: its own and the Walker's). */
+function isDevice(ctx: StepContext, id: string, device: Device): boolean {
+	return ctx.deviceById(id, ctx.run).id === device.id;
+}
+
+/** The run's worktree on `device`, from the log, or null when the run has none there. */
+function worktreeOn(
+	ctx: StepContext,
+	events: readonly LoggedEvent[],
+	device: Device,
+): string | null {
+	for (const [id, path] of deriveWorktrees(events, ctx.run).paths) {
+		if (isDevice(ctx, id, device)) return path;
+	}
+	return null;
+}
+
+/**
+ * What a step's Device must be before the body runs, or null when it is
+ * ready. A step that needs a computer (`NodeKind.works`) sleeps while its
+ * Device is offline (`device-offline`). A step
+ * that works in the worktree on another Device than the one that has the
+ * run's work gets it by a Hand-off first: the Device that has it pushes
+ * the branch (a worktree with uncommitted changes fails the step: nothing
+ * is committed for you), this one fetches it into its own worktree of the
+ * run, and the Walker logs `HandedOff`.
+ */
+export async function readyDevice(
+	ctx: StepContext,
+	node: FlowNode,
+	step: OpenStep,
+): Promise<BodyResult | null> {
+	const works = kindOf(node).works(node);
+	if (works === null) return null;
+	const { device } = step;
+	const offline = (at: Device): BodyResult => ({
+		kind: "offline",
+		reason: "device-offline",
+		deviceId: at.id,
+		name: at.name,
+	});
+	if (!(await device.state()).online) return offline(device);
+	if (works !== "worktree") return null;
+	const events = await ctx.log.events(ctx.run.id);
+	const { holder, paths } = deriveWorktrees(events, ctx.run);
+	if (isDevice(ctx, holder, device)) return null;
+	const from = ctx.deviceById(holder, ctx.run);
+	if (!(await from.state()).online) return offline(from);
+	const fail = (error: string): BodyResult => ({
+		kind: "end",
+		outcome: "error",
+		outputs: { visit: step.visit },
+		error,
+	});
+	let sent: { commit: string; branch: string };
+	try {
+		sent = await from.handOff({
+			cwd: paths.get(holder) ?? ctx.run.worktreePath,
+			runBranch: ctx.run.branch,
+		});
+	} catch (error) {
+		return fail(
+			`The run's work on ${from.name} cannot move to ${device.name}. ${messageOf(error)}`,
+		);
+	}
+	const author = ctx.run.startedBy
+		? await gitAuthorOf(ctx.db, ctx.run.startedBy)
+		: null;
+	let worktree: { worktreePath: string };
+	try {
+		worktree = await device.receiveHandOff({
+			run: {
+				id: ctx.run.id,
+				projectId: ctx.run.projectId,
+				...(author ? { author } : {}),
+			},
+			branch: sent.branch,
+			commit: sent.commit,
+		});
+	} catch (error) {
+		return fail(
+			`${device.name} could not take the run's work from ${from.name}. ${messageOf(error)}`,
+		);
+	}
+	await ctx.log.append({
+		type: "HandedOff",
+		runId: ctx.run.id,
+		stepId: step.stepId,
+		payload: {
+			from: from.id,
+			to: device.id,
+			commit: sent.commit,
+			branch: sent.branch,
+			worktreePath: worktree.worktreePath,
+		},
+	});
+	step.worktree = worktree.worktreePath;
+	return null;
 }

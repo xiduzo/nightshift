@@ -49,6 +49,9 @@ export const TOOL: NodeKind<ToolNode> = {
 	...PLAIN_KIND,
 	type: "tool",
 	make: toolNode,
+	works: () => "device",
+	// A wait node: the step sleeps while its Device is offline.
+	aux: () => [{ kind: "wait" }],
 	resumeRules: () => RESUME_RULES.fresh,
 	connections: (node) => [node.connection],
 };
