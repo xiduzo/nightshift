@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    font-family: -apple-system, "SF Pro Display", "Inter", system-ui, sans-serif;
+    color: #f5f6f8;
+    background:
+      radial-gradient(900px 500px at 85% 15%, rgba(96, 140, 255, 0.22), transparent 60%),
+      radial-gradient(700px 400px at 10% 110%, rgba(130, 90, 255, 0.18), transparent 60%),
+      #0b0f1a;
+    position: relative;
+  }
+  .stars span { position: absolute; width: 2px; height: 2px; border-radius: 50%; background: #fff; }
+  .wrap { position: absolute; left: 88px; top: 110px; width: 560px; }
+  .brand { display: flex; align-items: center; gap: 22px; }
+  h1 { font-size: 76px; font-weight: 700; letter-spacing: -2px; }
+  p.tag { margin-top: 30px; font-size: 32px; line-height: 1.3; color: #c9cfdc; }
+  p.tag b { color: #fff; font-weight: 600; }
+  .chips { margin-top: 40px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .chip { font-size: 20px; padding: 8px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18); color: #c9cfdc; background: rgba(255,255,255,0.04); }
+  .url { position: absolute; left: 88px; bottom: 56px; font-size: 22px; color: #7f8aa3; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  svg.flow { position: absolute; right: 56px; top: 92px; }
+  .node rect { fill: #151b2b; stroke: rgba(255,255,255,0.16); stroke-width: 1.5; }
+  .node.gate rect { stroke: #8fb4ff; }
+  .node text { fill: #f5f6f8; font-size: 20px; font-weight: 600; }
+  .node text.sub { fill: #8a94ab; font-size: 15px; font-weight: 400; }
+  .edge { fill: none; stroke: #5f7bd6; stroke-width: 2.5; }
+  .edge.fail { stroke: #9c6ad6; stroke-dasharray: 6 6; }
+  .lbl { fill: #8a94ab; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="stars" id="stars"></div>
+
+<div class="wrap">
+  <div class="brand">
+    <svg width="92" height="92" viewBox="0 0 64 64">
+      <mask id="m"><rect width="64" height="64" fill="#fff"/><circle cx="42" cy="24" r="19" fill="#000"/></mask>
+      <circle cx="30" cy="32" r="22" fill="#f5f6f8" mask="url(#m)"/>
+      <circle cx="42" cy="24" r="19" fill="none" stroke="#8fb4ff" stroke-width="2.5"/>
+    </svg>
+    <h1>Night Shift</h1>
+  </div>
+  <p class="tag">Draw your agent pipeline as a flow.<br><b>Wake up to pull requests.</b></p>
+  <div class="chips">
+    <span class="chip">Claude Code</span><span class="chip">Codex</span><span class="chip">OpenCode</span><span class="chip">Local first</span>
+  </div>
+</div>
+<div class="url">github.com/xiduzo/nightshift</div>
+
+<svg class="flow" width="560" height="460" viewBox="0 0 560 460">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5f7bd6"/></marker>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9c6ad6"/></marker>
+  </defs>
+  <!-- edges -->
+  <path class="edge" d="M160,72 L248,72" marker-end="url(#a)"/>
+  <text class="lbl" x="186" y="62">pass</text>
+  <path class="edge fail" d="M330,104 C330,170 90,170 90,108" marker-end="url(#b)"/>
+  <text class="lbl" x="170" y="168">fail · max 2</text>
+  <path class="edge" d="M330,104 L330,236" marker-end="url(#a)"/>
+  <text class="lbl" x="340" y="200">fail</text>
+  <path class="edge" d="M330,302 L330,356" marker-end="url(#a)"/>
+  <text class="lbl" x="340" y="336">pass</text>
+
+  <g class="node" transform="translate(0,40)">
+    <rect width="160" height="64" rx="12"/>
+    <text x="18" y="30">Implement</text><text class="sub" x="18" y="50">Claude · Sonnet</text>
+  </g>
+  <g class="node" transform="translate(250,40)">
+    <rect width="160" height="64" rx="12"/>
+    <text x="18" y="30">Check</text><text class="sub" x="18" y="50">bun test</text>
+  </g>
+  <g class="node" transform="translate(250,238)">
+    <rect width="160" height="64" rx="12"/>
+    <text x="18" y="30">Rescue</text><text class="sub" x="18" y="50">Claude · Opus</text>
+  </g>
+  <g class="node gate" transform="translate(230,358)">
+    <rect width="200" height="64" rx="12"/>
+    <text x="18" y="30">Open PR?</text><text class="sub" x="18" y="50">Gate · waits for you</text>
+  </g>
+</svg>
+
+<script>
+  // Deterministic star field.
+  let s = 7;
+  const r = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+  const box = document.getElementById("stars");
+  for (let i = 0; i < 70; i++) {
+    const el = document.createElement("span");
+    el.style.left = r() * 1280 + "px";
+    el.style.top = r() * 640 + "px";
+    el.style.opacity = 0.15 + r() * 0.5;
+    if (r() > 0.85) { el.style.width = el.style.height = "3px"; }
+    box.appendChild(el);
+  }
+</script>
+</body>
+</html>
