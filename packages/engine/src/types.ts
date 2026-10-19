@@ -169,6 +169,22 @@ export type RunSummary = {
 	endedAt: number | null;
 	/** Sum over all steps. */
 	costUsd: number;
+	/** The runs of the flows its Call nodes called, in the order they started. */
+	subflows: SubflowRun[];
+};
+
+/**
+ * One run of a called flow inside a run: a Call step once, or one item of
+ * a Call step with `each`. It has no row of its own.
+ */
+export type SubflowRun = {
+	flowName: string;
+	/** How the call (or the item) ended. While it is open: the run's status. */
+	status: RunStatus;
+	/** Sum over the steps of the called flow, and of the flows it called. */
+	costUsd: number;
+	startedAt: number;
+	endedAt: number | null;
 };
 
 /** A resume of a run: by a person, or by the daemon after a restart. */
