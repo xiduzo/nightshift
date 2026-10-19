@@ -241,7 +241,9 @@ export function createEngine(
 			projects.readRemotes().catch(() => {}),
 		)
 		// The names of the Devices runs may be placed on, for their messages.
-		.then(() => placement.loadNames());
+		.then(() => placement.loadNames())
+		// The interrupted runs' grace counts from now: the engine is ready.
+		.then(() => recovery.armResumes());
 	// Every method awaits `ready` and sees the error there.
 	ready.catch(() => {});
 
