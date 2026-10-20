@@ -108,6 +108,9 @@ async function runGit(cwd: string, args: string[]): Promise<GitResult> {
 	return { exitCode, stdout: stdout.trim(), stderr: stderr.trim() };
 }
 
+/** The pauses between the tries of `git --version` in the probe. Null: the last try. */
+const PROBE_RETRY_MS = [200, 1_000, null] as const;
+
 /**
  * Finds git without starting Apple's installer by accident: on macOS,
  * `/usr/bin/git` is a stub that opens the install dialog when the command
@@ -123,8 +126,18 @@ async function probeGit(): Promise<string | null> {
 		});
 		if (tools.exitCode !== 0) return null;
 	}
-	const version = await runGit(process.cwd(), ["--version"]).catch(() => null);
-	return version?.exitCode === 0 ? version.stdout : null;
+	// Git is on the PATH. A `git --version` that fails now is most often a
+	// busy computer (the process could not start), not a missing git: ask
+	// again before calling it missing. A git that never answers stays null.
+	for (const pause of PROBE_RETRY_MS) {
+		const version = await runGit(process.cwd(), ["--version"]).catch(
+			() => null,
+		);
+		if (version?.exitCode === 0) return version.stdout;
+		if (pause === null) break;
+		await Bun.sleep(pause);
+	}
+	return null;
 }
 
 export const GIT_DOWNLOAD_URL = "https://git-scm.com/downloads";
