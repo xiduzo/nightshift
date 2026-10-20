@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <style>
@@ -38,7 +38,7 @@
 
 <div class="wrap">
   <div class="brand">
-    <svg width="92" height="92" viewBox="0 0 64 64">
+    <svg width="92" height="92" viewBox="0 0 64 64" aria-hidden="true">
       <mask id="m"><rect width="64" height="64" fill="#fff"/><circle cx="42" cy="24" r="19" fill="#000"/></mask>
       <circle cx="30" cy="32" r="22" fill="#f5f6f8" mask="url(#m)"/>
       <circle cx="42" cy="24" r="19" fill="none" stroke="#8fb4ff" stroke-width="2.5"/>
@@ -52,7 +52,7 @@
 </div>
 <div class="url">github.com/xiduzo/nightshift</div>
 
-<svg class="flow" width="560" height="460" viewBox="0 0 560 460">
+<svg class="flow" width="560" height="460" viewBox="0 0 560 460" aria-hidden="true">
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5f7bd6"/></marker>
     <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9c6ad6"/></marker>
@@ -88,12 +88,15 @@
 <script>
   // Deterministic star field.
   let s = 7;
-  const r = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+  const r = () => {
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  };
   const box = document.getElementById("stars");
   for (let i = 0; i < 70; i++) {
     const el = document.createElement("span");
-    el.style.left = r() * 1280 + "px";
-    el.style.top = r() * 640 + "px";
+    el.style.left = `${r() * 1280}px`;
+    el.style.top = `${r() * 640}px`;
     el.style.opacity = 0.15 + r() * 0.5;
     if (r() > 0.85) { el.style.width = el.style.height = "3px"; }
     box.appendChild(el);

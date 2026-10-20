@@ -12,6 +12,7 @@
 			"!**/.next",
 			"!**/dist",
 			"!**/.turbo",
+			"!**/.hutch",
 			"!**/.nx",
 			"!**/dev-dist",
 			"!**/.zed",
@@ -27,7 +28,8 @@
 			"!**/wrangler.jsonc",
 			"!**/.source",
 			"!**/convex/_generated",
-			"!apps/*/src/env.ts"
+			"!apps/*/src/env.ts",
+			"!packages/*/src/env.ts"
 		]
 	},
 	"formatter": {

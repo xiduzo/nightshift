@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+	<title>Night Shift</title>
 	<style>
 		.fg { fill: oklch(0.145 0 0); }
 		.run { stroke: oklch(0.5 0.16 250); }
