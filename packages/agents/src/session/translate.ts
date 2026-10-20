@@ -44,7 +44,7 @@ import type {
 	AgentEvent,
 	AgentUsage,
 	StepReportSpec,
-} from "../port/types";
+} from "../port";
 import {
 	isRefusedReport,
 	isReportTool,

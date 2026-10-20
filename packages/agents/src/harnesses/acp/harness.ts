@@ -1,7 +1,7 @@
 /**
  * Coding agents that speak the Agent Client Protocol (ACP), driven through
  * `acpCompatible` from `@tanstack/ai-acp` on the shared harness session
- * (`adapter-session.ts`). An agent is one row of `ACP_AGENTS`: how to start it in ACP
+ * (`session/adapter-session.ts`). An agent is one row of `ACP_AGENTS`: how to start it in ACP
  * mode. Everything else (the session, resume, bridged tools, MCP servers,
  * permission requests, the AG-UI stream) is the adapter's.
  *
@@ -15,36 +15,28 @@
  * Verified live: pi 1.3 through pi-acp 0.0.34, with an Ollama model. The
  * other launch commands are from each agent's docs.
  */
-import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { ndJsonStream } from "@agentclientprotocol/sdk";
 import { type CustomAgent, customHarnessName } from "@nightshift/flows";
 import type { AcpPermissionMode } from "@tanstack/ai-acp";
 import { acpCompatible, spawnHandleToAcpTransport } from "@tanstack/ai-acp";
-import { shellQuoteAlways } from "../../port/shell-quote";
-import type {
-	AgentHarness,
-	AgentSessionInput,
-	Effort,
-	HarnessName,
-	PermissionMode,
-} from "../../port/types";
+import {
+	type AgentHarness,
+	type AgentSessionInput,
+	type Effort,
+	type HarnessName,
+	type PermissionMode,
+	shellQuoteAlways,
+} from "../../port";
 import {
 	type AdapterSetup,
 	type HarnessSpec,
 	harnessSession,
-} from "../../session/adapter-session";
-import type { SdkSignals } from "../../session/translate";
+	type SdkSignals,
+} from "../../session";
 import { harnessFacts } from "../facts";
+import { ACP_DEFAULT_MODEL, ACP_FACTS, type AcpAgentName } from "./facts";
+import { piAcpCommand } from "./pi";
 import { type SessionConfig, withSessionConfig } from "./session-config";
-
-export type AcpAgentName = Extract<
-	HarnessName,
-	"copilot" | "gemini" | "cursor" | "pi"
->;
-
-/** The model name that leaves the choice to the agent's own setting. */
-export const ACP_DEFAULT_MODEL = "default";
 
 export type AcpAgent = {
 	label: string;
@@ -84,42 +76,11 @@ export type AcpAgent = {
 const modelFlag = (model: string | undefined) =>
 	model ? ["--model", model] : [];
 
-/**
- * The command that starts pi-acp: its entry point, run with this process's
- * runtime (Bun). Resolved when a pi session starts, not when this module
- * loads: a build without pi-acp on disk (the `nightshift` binary) must
- * still start. Throws when pi-acp is missing.
- */
-export function piAcpCommand(): string[] {
-	let entry: string | undefined;
-	try {
-		entry = fileURLToPath(import.meta.resolve("pi-acp"));
-	} catch {
-		// Not installed next to this module.
-	}
-	if (!entry || !existsSync(entry)) {
-		throw new Error(
-			"Night Shift cannot start pi on this computer: a part it needs is missing. Install Night Shift again, or run the node on another harness.",
-		);
-	}
-	return [process.execPath, entry];
-}
-
-/**
- * Runs pi-acp in this process. It speaks ACP on stdin and stdout until
- * stdin closes. For a build that carries pi-acp inside and starts itself
- * as pi-acp (see `AcpHarnessOptions.piAcp`).
- */
-export async function runPiAcp(): Promise<void> {
-	// @ts-expect-error pi-acp has no types: it is a program, run when it loads.
-	await import("pi-acp");
-}
-
 /** The ACP agents Night Shift offers as harnesses. */
 export const ACP_AGENTS: Record<AcpAgentName, AcpAgent> = {
 	// docs.github.com/copilot/reference/acp-server
 	copilot: {
-		label: "GitHub Copilot",
+		label: ACP_FACTS.copilot.label,
 		args: ({ model, effort }) => [
 			"--acp",
 			"--stdio",
@@ -129,17 +90,17 @@ export const ACP_AGENTS: Record<AcpAgentName, AcpAgent> = {
 	},
 	// github.com/google-gemini/gemini-cli docs/cli/acp-mode.md
 	gemini: {
-		label: "Gemini CLI",
+		label: ACP_FACTS.gemini.label,
 		args: ({ model }) => ["--acp", ...modelFlag(model)],
 	},
 	// cursor.com/docs/cli/acp
 	cursor: {
-		label: "Cursor",
+		label: ACP_FACTS.cursor.label,
 		args: ({ model }) => [...modelFlag(model), "acp"],
 	},
 	// github.com/svkozak/pi-acp: `PI_ACP_PI_COMMAND` is the pi it runs.
 	pi: {
-		label: "pi",
+		label: ACP_FACTS.pi.label,
 		args: () => [],
 		model: "session",
 		mcp: false,

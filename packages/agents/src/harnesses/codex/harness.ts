@@ -16,24 +16,22 @@
  * tested against a fake `codex` that speaks the JSONL the adapter expects.
  */
 import { CODEX_MODELS, codexText } from "@tanstack/ai-codex";
-import { shellQuoteAlways } from "../../port/shell-quote";
 import type {
 	AgentHarness,
 	AgentSessionInput,
 	Effort,
 	McpServerConfig,
 	PermissionMode,
-} from "../../port/types";
+} from "../../port";
+import { shellQuoteAlways } from "../../port";
 import {
 	type AdapterSetup,
-	type HarnessSpec,
-	harnessSession,
-} from "../../session/adapter-session";
-import {
 	failureKind,
 	type HarnessProfile,
+	type HarnessSpec,
+	harnessSession,
 	type SdkSignals,
-} from "../../session/translate";
+} from "../../session";
 import { harnessFacts } from "../facts";
 
 export type CodexHarnessOptions = {

@@ -7,8 +7,7 @@
  * sees it, for `--allowedTools`.
  */
 import { BRIDGED_MCP_SERVER_NAME } from "@tanstack/ai-claude-code";
-import type { AgentUsage } from "../../port/types";
-import { REPORT_TOOL_NAME } from "../../session/step-report";
+import type { AgentUsage } from "../../port";
 import {
 	asNumber,
 	asString,
@@ -16,9 +15,10 @@ import {
 	type HarnessProfile,
 	isRecord,
 	parseLegacyResetAt,
+	REPORT_TOOL_NAME,
 	type SdkSignals,
 	toEpochMs,
-} from "../../session/translate";
+} from "../../session";
 
 export const SESSION_ID_EVENT = "claude-code.session-id";
 

@@ -1,36 +1,52 @@
 /**
  * The port-side facts about each harness: what `AgentHarness` promises the
- * engine beyond `run`, keyed by name. Every harness adapter (`claude-code.ts`,
- * `codex.ts`, `opencode.ts`, `grok-build.ts`, `acp.ts`) and the fake
- * (`fake.ts`) implement `label` and `takeOverCommand` from this table, so a
- * fake and a real harness are interchangeable at the same seam. The adapter
- * registry (`doctor.ts`, `HARNESS_ADAPTERS`) reads the same table: one source.
+ * engine beyond `run`, keyed by name. Every harness adapter and the fake
+ * (`testing/fake.ts`) implement `label` and `takeOverCommand` from this
+ * table, so a fake and a real harness are interchangeable at the same seam.
  *
- * This module imports no adapter code, so an adapter may import it without
- * a cycle, and the engine may use `HARNESS_LABELS` for a harness it has no
- * instance of (one that is not added).
+ * Each harness folder gives its own facts (`<harness>/facts.ts`). This
+ * module only collects them. It is the `./harness-facts` entry: it imports
+ * no adapter code and no `node:` module, so it is browser-safe, an adapter
+ * may import it without a cycle, and the engine may use `HARNESS_LABELS`
+ * for a harness it has no instance of (one that is not added).
  */
 import { customAgentSlug, isCustomHarness } from "@nightshift/flows";
-import { shellQuote } from "../port/shell-quote";
-import type {
-	AgentHarness,
-	AgentHarnessName,
-	HarnessName,
-} from "../port/types";
+import {
+	type AgentHarness,
+	type AgentHarnessName,
+	type HarnessName,
+	shellQuote,
+} from "../port";
+import { ACP_FACTS } from "./acp/facts";
+import { CLAUDE_CODE_FACTS } from "./claude-code/facts";
+import { CODEX_FACTS } from "./codex/facts";
+import { GROK_BUILD_FACTS } from "./grok-build/facts";
+import type { HarnessFacts } from "./harness-record";
+import { OPENCODE_FACTS } from "./opencode/facts";
 
 export { shellQuote };
 
-/** The display name of each harness, for messages about one that is not added. */
-export const HARNESS_LABELS: Record<HarnessName, string> = {
-	"claude-code": "Claude Code",
-	opencode: "OpenCode",
-	codex: "Codex",
-	"grok-build": "Grok Build",
-	copilot: "GitHub Copilot",
-	gemini: "Gemini CLI",
-	cursor: "Cursor",
-	pi: "pi",
+/** Every harness an Agent node can run on, in the order the pickers show them. */
+export const HARNESS_FACTS: Record<HarnessName, HarnessFacts> = {
+	"claude-code": CLAUDE_CODE_FACTS,
+	opencode: OPENCODE_FACTS,
+	codex: CODEX_FACTS,
+	"grok-build": GROK_BUILD_FACTS,
+	...ACP_FACTS,
 };
+
+function byHarness<T>(
+	pick: (facts: HarnessFacts) => T,
+): Record<HarnessName, T> {
+	return Object.fromEntries(
+		Object.entries(HARNESS_FACTS).map(([name, facts]) => [name, pick(facts)]),
+	) as Record<HarnessName, T>;
+}
+
+/** The display name of each harness, for messages about one that is not added. */
+export const HARNESS_LABELS: Record<HarnessName, string> = byHarness(
+	(facts) => facts.label,
+);
 
 /**
  * The CLI's own command that reopens a session, given its id already quoted
@@ -39,18 +55,7 @@ export const HARNESS_LABELS: Record<HarnessName, string> = {
 export const HARNESS_TAKE_OVER: Record<
 	HarnessName,
 	((quotedSessionId: string) => string) | null
-> = {
-	"claude-code": (id) => `claude --resume ${id}`,
-	// From the OpenCode CLI docs (`-s, --session`), not checked against 1.x.
-	opencode: (id) => `opencode --session ${id}`,
-	codex: (id) => `codex resume ${id}`,
-	"grok-build": (id) => `grok --resume ${id}`,
-	copilot: null,
-	gemini: null,
-	cursor: (id) => `agent --resume ${id}`,
-	// pi-acp's session id is pi's own: `--session` takes it.
-	pi: (id) => `pi --session ${id}`,
-};
+> = byHarness((facts) => facts.takeOver);
 
 /**
  * The display name of a harness, for a message about one: its label, or a

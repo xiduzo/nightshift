@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { DECIDER_ADAPTERS, tanstackDecider } from "../decider/decider";
-import { HARNESS_ADAPTERS } from "../doctor/checks";
 import type {
 	AgentHarness,
 	Decider,
@@ -14,6 +13,7 @@ import { codexHarness } from "./codex/harness";
 import { shellQuote } from "./facts";
 import { grokBuildHarness } from "./grok-build/harness";
 import { opencodeHarness } from "./opencode/harness";
+import { HARNESS_ADAPTERS } from "./registry";
 
 /**
  * The engine asks its ports (`AgentHarness`, `Decider`), not the adapter

@@ -3,7 +3,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { isCustomHarness } from "@nightshift/flows";
-import type { AgentHarnessName, HarnessName } from "../port/types";
+import { HARNESS_FACTS } from "../harnesses";
+import type { AgentHarnessName } from "../port";
 
 /** A skill the harness can run: the project's own, or one for every project on this computer. */
 export type InstalledSkill = {
@@ -15,26 +16,6 @@ export type InstalledSkill = {
 
 /** Where a project keeps its own skills, relative to its folder. */
 export const PROJECT_SKILL_DIR = ".agents/skills";
-
-/**
- * Where each harness looks for skills of the user, relative to the home
- * folder. `.agents/skills` is the shared folder that most of them read.
- */
-const SKILL_DIRS: Record<HarnessName, readonly string[]> = {
-	"claude-code": [".claude/skills"],
-	opencode: [
-		".config/opencode/skills",
-		".config/opencode/skill",
-		".claude/skills",
-		".agents/skills",
-	],
-	codex: [".codex/skills", ".agents/skills"],
-	"grok-build": [".grok/skills", ".agents/skills"],
-	copilot: [".copilot/skills", ".agents/skills"],
-	gemini: [".gemini/skills", ".agents/skills"],
-	cursor: [".cursor/skills", ".agents/skills"],
-	pi: [".pi/agent/skills", ".agents/skills"],
-};
 
 /** The name and description in a SKILL.md's frontmatter. */
 function frontmatter(text: string): { name?: string; description?: string } {
@@ -125,7 +106,7 @@ export async function installedSkills(
 ): Promise<InstalledSkill[]> {
 	const dirs = isCustomHarness(harness)
 		? [".agents/skills"]
-		: SKILL_DIRS[harness];
+		: HARNESS_FACTS[harness].skillDirs;
 	const byName = (a: InstalledSkill, b: InstalledSkill) =>
 		a.name.localeCompare(b.name);
 	const [project, ...computer] = await Promise.all([

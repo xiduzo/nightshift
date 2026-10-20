@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { testMcpServer } from "../doctor/checks";
 import type { McpServerConfig } from "../port/types";
 import { fixturePath } from "../testing";
 import { callMcpTool, listMcpTools, withMcpClient } from "./mcp";
+import { testMcpServer } from "./mcp-test";
 
 /** The shared MCP client against the fake stdio server in `testing/fixtures/fake-mcp.ts`. */
 

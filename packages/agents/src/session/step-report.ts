@@ -28,7 +28,7 @@ import type {
 	AgentSessionInput,
 	StepReportOutcome,
 	StepReportSpec,
-} from "../port/types";
+} from "../port";
 
 /** The tool name as the application registers it with `chat({ tools })`. */
 export const REPORT_TOOL_NAME = "report_step";

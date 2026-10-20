@@ -40,21 +40,21 @@
  */
 import { opencodeText } from "@tanstack/ai-opencode";
 import type { SandboxHandle, SandboxProvider } from "@tanstack/ai-sandbox";
-import { shellQuoteAlways } from "../../port/shell-quote";
 import type {
 	AgentHarness,
 	AgentSessionInput,
 	AgentUsage,
 	McpServerConfig,
 	PermissionMode,
-} from "../../port/types";
+} from "../../port";
+import { shellQuoteAlways } from "../../port";
+import type { HarnessProfile, SdkSignals } from "../../session";
 import {
 	type AdapterSetup,
 	freePort,
 	type HarnessSpec,
 	harnessSession,
-} from "../../session/adapter-session";
-import type { HarnessProfile, SdkSignals } from "../../session/translate";
+} from "../../session";
 import { harnessFacts } from "../facts";
 
 export type OpencodeHarnessOptions = {

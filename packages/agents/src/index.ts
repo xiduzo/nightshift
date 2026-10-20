@@ -1,3 +1,8 @@
+/**
+ * `@nightshift/agents`: the package API, composed from the barrels of its
+ * verticals. This root loads every harness. The engine uses the light
+ * entries (`./types`, `./harness-facts`, `./pricing`, `./mcp`) instead.
+ */
 export {
 	cannotMakeValueMessage,
 	DECIDER_ADAPTERS,
@@ -8,25 +13,8 @@ export {
 	type TanstackDeciderOptions,
 	tanstackDecider,
 	type ValueAdapter,
-} from "./decider/decider";
-export {
-	type CliCheck,
-	type CliToolCheck,
-	checkCli,
-	checkCustomAgent,
-	checkHarness,
-	cliHelp,
-	cliHelpAt,
-	HARNESS_ADAPTERS,
-	type HarnessAdapter,
-	type HarnessModels,
-	HELP_MAX_CHARS,
-	harnessModels,
-	type McpTestResult,
-	pathPrograms,
-	resolveBin,
-	testMcpServer,
-} from "./doctor/checks";
+} from "./decider";
+export { type CliCheck, checkCustomAgent, resolveBin } from "./doctor";
 export {
 	ACP_AGENTS,
 	ACP_DEFAULT_MODEL,
@@ -35,41 +23,56 @@ export {
 	acpAgentHarness,
 	acpHarness,
 	acpPermission,
-	customAcpHarness,
-	isAcpAgent,
-	runPiAcp,
-} from "./harnesses/acp/harness";
-export {
 	type ClaudeCodeHarnessOptions,
 	type ClaudeCodeProcessOptions,
-	claudeCodeHarness,
-	cliAllowRules,
-} from "./harnesses/claude-code/harness";
-export {
 	type CodexHarnessOptions,
 	type CodexPolicy,
+	checkHarness,
+	claudeCodeHarness,
+	cliAllowRules,
 	codexHarness,
 	codexPolicy,
-} from "./harnesses/codex/harness";
-export {
-	HARNESS_LABELS,
-	HARNESS_TAKE_OVER,
-	harnessFacts,
-	harnessLabel,
-	harnessNoun,
-	shellQuote,
-} from "./harnesses/facts";
-export {
+	customAcpHarness,
 	type GrokBuildHarnessOptions,
 	grokBuildHarness,
 	grokPolicy,
-} from "./harnesses/grok-build/harness";
-export {
+	HARNESS_ADAPTERS,
+	HARNESS_LABELS,
+	HARNESS_TAKE_OVER,
+	type HarnessAdapter,
+	type HarnessModels,
+	harnessFacts,
+	harnessLabel,
+	harnessModels,
+	harnessNoun,
+	isAcpAgent,
 	type OpencodeHarnessOptions,
 	opencodeHarness,
 	opencodePermission,
-} from "./harnesses/opencode/harness";
-export type * from "./port/types";
+	runPiAcp,
+} from "./harnesses";
+export {
+	type AgentErrorKind,
+	type AgentEvent,
+	type AgentHarness,
+	type AgentHarnessName,
+	type AgentSessionInput,
+	type AgentUsage,
+	type CustomHarnessName,
+	type Decider,
+	type DeciderName,
+	type DecisionInput,
+	type DecisionResult,
+	type Effort,
+	type HarnessName,
+	type McpServerConfig,
+	type PermissionMode,
+	type StepReportOutcome,
+	type StepReportSpec,
+	shellQuote,
+	type ValueInput,
+	type ValueResult,
+} from "./port";
 export {
 	type CostSource,
 	estimateCostUsd,
@@ -77,19 +80,27 @@ export {
 	type SettledCost,
 	settleCost,
 	startPriceUpdates,
-} from "./pricing/pricing";
+} from "./pricing";
 export {
 	type InstalledSkill,
 	installedSkills,
 	PROJECT_SKILL_DIR,
-} from "./skills/skills";
+} from "./skills";
 export {
+	type CliToolCheck,
 	callMcpTool,
+	checkCli,
+	cliHelp,
+	cliHelpAt,
+	HELP_MAX_CHARS,
 	listMcpTools,
 	MCP_TIMEOUT_MS,
+	type McpTestResult,
 	type McpToolCall,
 	type McpToolInfo,
+	pathPrograms,
+	testMcpServer,
 	toolCallOf,
 	toolResultText,
 	withMcpClient,
-} from "./tools/mcp";
+} from "./tools";

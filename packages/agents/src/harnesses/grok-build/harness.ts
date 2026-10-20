@@ -18,23 +18,21 @@
  */
 import { rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { GROK_BUILD_MODELS, grokBuildText } from "@tanstack/ai-grok-build";
+import { grokBuildText } from "@tanstack/ai-grok-build";
 import type { SandboxPolicy } from "@tanstack/ai-sandbox";
-import { shellQuoteAlways } from "../../port/shell-quote";
 import type {
 	AgentHarness,
 	AgentSessionInput,
 	PermissionMode,
-} from "../../port/types";
+} from "../../port";
+import { shellQuoteAlways } from "../../port";
+import type { HarnessProfile, SdkSignals } from "../../session";
 import {
 	type AdapterSetup,
 	type HarnessSpec,
 	harnessSession,
-} from "../../session/adapter-session";
-import type { HarnessProfile, SdkSignals } from "../../session/translate";
+} from "../../session";
 import { harnessFacts } from "../facts";
-
-export { GROK_BUILD_MODELS };
 
 export type GrokBuildHarnessOptions = {
 	/** Path or name of the `grok` executable. Defaults to `grok`. */

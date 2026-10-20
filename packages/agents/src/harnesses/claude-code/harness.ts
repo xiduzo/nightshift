@@ -17,13 +17,13 @@ import type {
 	AgentSessionInput,
 	Effort,
 	McpServerConfig,
-} from "../../port/types";
+} from "../../port";
 import {
 	type AdapterSetup,
 	type HarnessSpec,
 	harnessSession,
 	type SessionReport,
-} from "../../session/adapter-session";
+} from "../../session";
 import { harnessFacts } from "../facts";
 import { CLAUDE_CODE_PROFILE } from "./profile";
 

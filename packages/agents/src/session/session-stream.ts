@@ -1,4 +1,4 @@
-import type { AgentEvent } from "../port/types";
+import type { AgentEvent } from "../port";
 import type { Translator } from "./translate";
 
 const ABORTED = Symbol("aborted");

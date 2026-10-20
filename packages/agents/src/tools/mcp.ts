@@ -12,7 +12,7 @@ import {
 	CallToolResultSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import type { McpServerConfig } from "../port/types";
+import type { McpServerConfig } from "../port";
 
 /**
  * One MCP client for one server: the Connections page's test, the

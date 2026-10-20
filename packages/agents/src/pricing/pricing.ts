@@ -11,7 +11,7 @@
 import { readFile, rename, stat, utimes, writeFile } from "node:fs/promises";
 import { calcPrice, updatePrices } from "@pydantic/genai-prices";
 
-import type { AgentUsage, CostSource } from "../port/types";
+import type { AgentUsage, CostSource } from "../port";
 
 export type { CostSource };
 

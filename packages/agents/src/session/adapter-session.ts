@@ -30,11 +30,7 @@ import {
 	withSandbox,
 } from "@tanstack/ai-sandbox";
 import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
-import type {
-	AgentEvent,
-	AgentSessionInput,
-	McpServerConfig,
-} from "../port/types";
+import type { AgentEvent, AgentSessionInput, McpServerConfig } from "../port";
 import { streamSession } from "./session-stream";
 import { reportStepTool, stepReportSetup } from "./step-report";
 import { withSharedToolBridge } from "./tool-bridge";
