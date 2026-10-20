@@ -1,0 +1,4373 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`published schemas flowSchema as JSON Schema 1`] = `
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "description": {
+        "type": "string",
+      },
+      "edges": {
+        "items": {
+          "properties": {
+            "from": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "max": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer",
+            },
+            "outcome": {
+              "pattern": "^[a-z][a-z0-9-]{0,29}$",
+              "type": "string",
+            },
+            "to": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "from",
+            "outcome",
+            "to",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "inputs": {
+        "default": [],
+        "items": {
+          "properties": {
+            "default": {
+              "type": "string",
+            },
+            "description": {
+              "type": "string",
+            },
+            "label": {
+              "type": "string",
+            },
+            "name": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "required": {
+              "type": "boolean",
+            },
+            "type": {
+              "default": "text",
+              "enum": [
+                "text",
+                "json",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "nodes": {
+        "items": {
+          "oneOf": [
+            {
+              "properties": {
+                "checker": {
+                  "properties": {
+                    "decider": {
+                      "default": "typesafe",
+                      "enum": [
+                        "typesafe",
+                        "openrouter",
+                        "openai",
+                        "ollaya",
+                        "ollama",
+                      ],
+                      "type": "string",
+                    },
+                    "model": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "prompt": {
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "clis": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "connections": {
+                  "items": {
+                    "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "effort": {
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max",
+                  ],
+                  "type": "string",
+                },
+                "harness": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "claude-code",
+                        "opencode",
+                        "codex",
+                        "grok-build",
+                        "copilot",
+                        "gemini",
+                        "cursor",
+                        "pi",
+                      ],
+                      "type": "string",
+                    },
+                    {
+                      "pattern": "^acp:[a-z0-9][a-z0-9-]{0,39}$",
+                      "type": "string",
+                    },
+                  ],
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "idleMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "mcpServers": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "args": {
+                            "default": [],
+                            "items": {
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "command": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "env": {
+                            "additionalProperties": {
+                              "type": "string",
+                            },
+                            "default": {},
+                            "propertyNames": {
+                              "type": "string",
+                            },
+                            "type": "object",
+                          },
+                        },
+                        "required": [
+                          "command",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "properties": {
+                          "headers": {
+                            "additionalProperties": {
+                              "type": "string",
+                            },
+                            "default": {},
+                            "propertyNames": {
+                              "type": "string",
+                            },
+                            "type": "object",
+                          },
+                          "url": {
+                            "format": "uri",
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "url",
+                        ],
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "propertyNames": {
+                    "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "model": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "nodeClis": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "outcomes": {
+                  "items": {
+                    "properties": {
+                      "color": {
+                        "enum": [
+                          "red",
+                          "orange",
+                          "amber",
+                          "yellow",
+                          "lime",
+                          "green",
+                          "teal",
+                          "cyan",
+                          "sky",
+                          "blue",
+                          "indigo",
+                          "violet",
+                          "pink",
+                          "gray",
+                        ],
+                        "type": "string",
+                      },
+                      "description": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                        "type": "string",
+                      },
+                      "when": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                },
+                "output": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "permissionMode": {
+                  "enum": [
+                    "default",
+                    "acceptEdits",
+                    "auto",
+                    "bypassPermissions",
+                    "plan",
+                  ],
+                  "type": "string",
+                },
+                "position": {
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "profile": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "prompt": {
+                  "type": "string",
+                },
+                "session": {
+                  "default": "fresh",
+                  "enum": [
+                    "fresh",
+                    "resume",
+                  ],
+                  "type": "string",
+                },
+                "set": {
+                  "items": {
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "skill": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "agent",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "prompt",
+              ],
+              "type": "object",
+            },
+            {
+              "properties": {
+                "command": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "exits": {
+                  "items": {
+                    "properties": {
+                      "code": {
+                        "maximum": 255,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "color": {
+                        "enum": [
+                          "red",
+                          "orange",
+                          "amber",
+                          "yellow",
+                          "lime",
+                          "green",
+                          "teal",
+                          "cyan",
+                          "sky",
+                          "blue",
+                          "indigo",
+                          "violet",
+                          "pink",
+                          "gray",
+                        ],
+                        "type": "string",
+                      },
+                      "description": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "output": {
+                  "default": "text",
+                  "enum": [
+                    "text",
+                    "json",
+                  ],
+                  "type": "string",
+                },
+                "position": {
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "set": {
+                  "items": {
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "command",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "command",
+              ],
+              "type": "object",
+            },
+            {
+              "properties": {
+                "by": {
+                  "enum": [
+                    "person",
+                    "rule",
+                    "model",
+                  ],
+                  "type": "string",
+                },
+                "decider": {
+                  "default": "typesafe",
+                  "enum": [
+                    "typesafe",
+                    "openrouter",
+                    "openai",
+                    "ollaya",
+                    "ollama",
+                  ],
+                  "type": "string",
+                },
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "model": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "options": {
+                  "items": {
+                    "properties": {
+                      "color": {
+                        "enum": [
+                          "red",
+                          "orange",
+                          "amber",
+                          "yellow",
+                          "lime",
+                          "green",
+                          "teal",
+                          "cyan",
+                          "sky",
+                          "blue",
+                          "indigo",
+                          "violet",
+                          "pink",
+                          "gray",
+                        ],
+                        "type": "string",
+                      },
+                      "description": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                        "type": "string",
+                      },
+                      "when": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                },
+                "position": {
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "prompt": {
+                  "type": "string",
+                },
+                "set": {
+                  "items": {
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "decision",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "prompt",
+                "options",
+                "by",
+              ],
+              "type": "object",
+            },
+            {
+              "properties": {
+                "each": {
+                  "properties": {
+                    "as": {
+                      "default": "item",
+                      "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                      "type": "string",
+                    },
+                    "branch": {
+                      "default": "per-item",
+                      "enum": [
+                        "per-item",
+                        "shared",
+                      ],
+                      "type": "string",
+                    },
+                    "haltOn": {
+                      "default": [
+                        "halt",
+                      ],
+                      "items": {
+                        "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                    "maxItems": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "source": {
+                      "oneOf": [
+                        {
+                          "properties": {
+                            "kind": {
+                              "const": "json",
+                              "type": "string",
+                            },
+                            "value": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "value",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "properties": {
+                            "command": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "kind": {
+                              "const": "command",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "command",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "properties": {
+                            "glob": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "kind": {
+                              "const": "files",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "glob",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                  },
+                  "required": [
+                    "source",
+                  ],
+                  "type": "object",
+                },
+                "flow": {
+                  "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
+                  "type": "string",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "inputs": {
+                  "additionalProperties": {
+                    "type": "string",
+                  },
+                  "default": {},
+                  "propertyNames": {
+                    "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "position": {
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "set": {
+                  "items": {
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "call",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "flow",
+              ],
+              "type": "object",
+            },
+            {
+              "properties": {
+                "by": {
+                  "enum": [
+                    "rule",
+                    "model",
+                  ],
+                  "type": "string",
+                },
+                "decider": {
+                  "default": "openrouter",
+                  "enum": [
+                    "typesafe",
+                    "openrouter",
+                    "openai",
+                    "ollaya",
+                    "ollama",
+                  ],
+                  "type": "string",
+                },
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "expression": {
+                  "type": "string",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "model": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "output": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "position": {
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "prompt": {
+                  "type": "string",
+                },
+                "set": {
+                  "items": {
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "value",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "by",
+                "output",
+              ],
+              "type": "object",
+            },
+            {
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "position": {
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "set": {
+                  "items": {
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "wait",
+                  "type": "string",
+                },
+                "until": {
+                  "oneOf": [
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "duration",
+                          "type": "string",
+                        },
+                        "minutes": {
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "type": "integer",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "minutes",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {
+                        "at": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "kind": {
+                          "const": "time",
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "at",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {
+                        "command": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "everyMinutes": {
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "type": "integer",
+                        },
+                        "kind": {
+                          "const": "command",
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "everyMinutes",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "signal",
+                          "type": "string",
+                        },
+                        "name": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "name",
+                      ],
+                      "type": "object",
+                    },
+                  ],
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "until",
+              ],
+              "type": "object",
+            },
+            {
+              "properties": {
+                "arguments": {
+                  "additionalProperties": {
+                    "type": "string",
+                  },
+                  "default": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "connection": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "position": {
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "set": {
+                  "items": {
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "tool": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "type": {
+                  "const": "tool",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "connection",
+                "tool",
+              ],
+              "type": "object",
+            },
+          ],
+        },
+        "type": "array",
+      },
+      "outputs": {
+        "default": [],
+        "items": {
+          "properties": {
+            "description": {
+              "type": "string",
+            },
+            "name": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "value": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "value",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "policy": {
+        "properties": {
+          "maxSteps": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
+          },
+          "networkGraceMinutes": {
+            "exclusiveMinimum": 0,
+            "type": "number",
+          },
+          "resumeInterruptedRuns": {
+            "type": "boolean",
+          },
+          "usageLimitFirstWaitMinutes": {
+            "exclusiveMinimum": 0,
+            "type": "number",
+          },
+          "usageLimitMaxWaitMinutes": {
+            "exclusiveMinimum": 0,
+            "type": "number",
+          },
+        },
+        "type": "object",
+      },
+      "start": {
+        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+        "type": "string",
+      },
+      "variables": {
+        "items": {
+          "properties": {
+            "description": {
+              "type": "string",
+            },
+            "initial": {
+              "type": "string",
+            },
+            "name": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "schema": {
+              "additionalProperties": {},
+              "propertyNames": {
+                "type": "string",
+              },
+              "type": "object",
+            },
+            "type": {
+              "default": "text",
+              "enum": [
+                "text",
+                "number",
+                "boolean",
+                "json",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "version": {
+        "const": 5,
+        "type": "number",
+      },
+    },
+    "required": [
+      "version",
+      "start",
+      "nodes",
+      "edges",
+    ],
+    "type": "object",
+    "~standard": {
+      "jsonSchema": {
+        "input": [Function],
+        "output": [Function],
+      },
+      "validate": [Function],
+      "vendor": "zod",
+      "version": 1,
+    },
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "description": {
+        "type": "string",
+      },
+      "edges": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "max": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer",
+            },
+            "outcome": {
+              "pattern": "^[a-z][a-z0-9-]{0,29}$",
+              "type": "string",
+            },
+            "to": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "from",
+            "outcome",
+            "to",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "inputs": {
+        "default": [],
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "type": "string",
+            },
+            "description": {
+              "type": "string",
+            },
+            "label": {
+              "type": "string",
+            },
+            "name": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "required": {
+              "type": "boolean",
+            },
+            "type": {
+              "default": "text",
+              "enum": [
+                "text",
+                "json",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "type",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "nodes": {
+        "items": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "checker": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "decider": {
+                      "default": "typesafe",
+                      "enum": [
+                        "typesafe",
+                        "openrouter",
+                        "openai",
+                        "ollaya",
+                        "ollama",
+                      ],
+                      "type": "string",
+                    },
+                    "model": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "prompt": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "decider",
+                  ],
+                  "type": "object",
+                },
+                "clis": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "connections": {
+                  "items": {
+                    "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "effort": {
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max",
+                  ],
+                  "type": "string",
+                },
+                "harness": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "claude-code",
+                        "opencode",
+                        "codex",
+                        "grok-build",
+                        "copilot",
+                        "gemini",
+                        "cursor",
+                        "pi",
+                      ],
+                      "type": "string",
+                    },
+                    {
+                      "pattern": "^acp:[a-z0-9][a-z0-9-]{0,39}$",
+                      "type": "string",
+                    },
+                  ],
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "idleMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "mcpServers": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "args": {
+                            "default": [],
+                            "items": {
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "command": {
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "env": {
+                            "additionalProperties": {
+                              "type": "string",
+                            },
+                            "default": {},
+                            "propertyNames": {
+                              "type": "string",
+                            },
+                            "type": "object",
+                          },
+                        },
+                        "required": [
+                          "command",
+                          "args",
+                          "env",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "headers": {
+                            "additionalProperties": {
+                              "type": "string",
+                            },
+                            "default": {},
+                            "propertyNames": {
+                              "type": "string",
+                            },
+                            "type": "object",
+                          },
+                          "url": {
+                            "format": "uri",
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "url",
+                          "headers",
+                        ],
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  "propertyNames": {
+                    "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "model": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "nodeClis": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "outcomes": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "color": {
+                        "enum": [
+                          "red",
+                          "orange",
+                          "amber",
+                          "yellow",
+                          "lime",
+                          "green",
+                          "teal",
+                          "cyan",
+                          "sky",
+                          "blue",
+                          "indigo",
+                          "violet",
+                          "pink",
+                          "gray",
+                        ],
+                        "type": "string",
+                      },
+                      "description": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                        "type": "string",
+                      },
+                      "when": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                },
+                "output": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "permissionMode": {
+                  "enum": [
+                    "default",
+                    "acceptEdits",
+                    "auto",
+                    "bypassPermissions",
+                    "plan",
+                  ],
+                  "type": "string",
+                },
+                "position": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "profile": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "prompt": {
+                  "type": "string",
+                },
+                "session": {
+                  "default": "fresh",
+                  "enum": [
+                    "fresh",
+                    "resume",
+                  ],
+                  "type": "string",
+                },
+                "set": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "skill": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "agent",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "prompt",
+                "session",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "command": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "exits": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "maximum": 255,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "color": {
+                        "enum": [
+                          "red",
+                          "orange",
+                          "amber",
+                          "yellow",
+                          "lime",
+                          "green",
+                          "teal",
+                          "cyan",
+                          "sky",
+                          "blue",
+                          "indigo",
+                          "violet",
+                          "pink",
+                          "gray",
+                        ],
+                        "type": "string",
+                      },
+                      "description": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "output": {
+                  "default": "text",
+                  "enum": [
+                    "text",
+                    "json",
+                  ],
+                  "type": "string",
+                },
+                "position": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "set": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "command",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "command",
+                "output",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "by": {
+                  "enum": [
+                    "person",
+                    "rule",
+                    "model",
+                  ],
+                  "type": "string",
+                },
+                "decider": {
+                  "default": "typesafe",
+                  "enum": [
+                    "typesafe",
+                    "openrouter",
+                    "openai",
+                    "ollaya",
+                    "ollama",
+                  ],
+                  "type": "string",
+                },
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "model": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "options": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "color": {
+                        "enum": [
+                          "red",
+                          "orange",
+                          "amber",
+                          "yellow",
+                          "lime",
+                          "green",
+                          "teal",
+                          "cyan",
+                          "sky",
+                          "blue",
+                          "indigo",
+                          "violet",
+                          "pink",
+                          "gray",
+                        ],
+                        "type": "string",
+                      },
+                      "description": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                        "type": "string",
+                      },
+                      "when": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "minItems": 1,
+                  "type": "array",
+                },
+                "position": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "prompt": {
+                  "type": "string",
+                },
+                "set": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "decision",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "prompt",
+                "options",
+                "by",
+                "decider",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "each": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "as": {
+                      "default": "item",
+                      "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                      "type": "string",
+                    },
+                    "branch": {
+                      "default": "per-item",
+                      "enum": [
+                        "per-item",
+                        "shared",
+                      ],
+                      "type": "string",
+                    },
+                    "haltOn": {
+                      "default": [
+                        "halt",
+                      ],
+                      "items": {
+                        "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                    "maxItems": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer",
+                    },
+                    "source": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "json",
+                              "type": "string",
+                            },
+                            "value": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "value",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "command": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "kind": {
+                              "const": "command",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "command",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "glob": {
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "kind": {
+                              "const": "files",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "glob",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                  },
+                  "required": [
+                    "source",
+                    "as",
+                    "branch",
+                    "haltOn",
+                  ],
+                  "type": "object",
+                },
+                "flow": {
+                  "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
+                  "type": "string",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "inputs": {
+                  "additionalProperties": {
+                    "type": "string",
+                  },
+                  "default": {},
+                  "propertyNames": {
+                    "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "position": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "set": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "call",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "flow",
+                "inputs",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "by": {
+                  "enum": [
+                    "rule",
+                    "model",
+                  ],
+                  "type": "string",
+                },
+                "decider": {
+                  "default": "openrouter",
+                  "enum": [
+                    "typesafe",
+                    "openrouter",
+                    "openai",
+                    "ollaya",
+                    "ollama",
+                  ],
+                  "type": "string",
+                },
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "expression": {
+                  "type": "string",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "model": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "output": {
+                  "additionalProperties": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "position": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "prompt": {
+                  "type": "string",
+                },
+                "set": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "value",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "by",
+                "output",
+                "decider",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "position": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "set": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "type": {
+                  "const": "wait",
+                  "type": "string",
+                },
+                "until": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "duration",
+                          "type": "string",
+                        },
+                        "minutes": {
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "type": "integer",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "minutes",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "at": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "kind": {
+                          "const": "time",
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "at",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "command": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "everyMinutes": {
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "type": "integer",
+                        },
+                        "kind": {
+                          "const": "command",
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "command",
+                        "everyMinutes",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "signal",
+                          "type": "string",
+                        },
+                        "name": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "name",
+                      ],
+                      "type": "object",
+                    },
+                  ],
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "until",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "arguments": {
+                  "additionalProperties": {
+                    "type": "string",
+                  },
+                  "default": {},
+                  "propertyNames": {
+                    "type": "string",
+                  },
+                  "type": "object",
+                },
+                "connection": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "device": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                  "type": "string",
+                },
+                "label": {
+                  "type": "string",
+                },
+                "position": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "set": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "expression": {
+                        "type": "string",
+                      },
+                      "on": {
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "value": {
+                        "type": "string",
+                      },
+                      "variable": {
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "variable",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "timeoutMinutes": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "tool": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "type": {
+                  "const": "tool",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "id",
+                "position",
+                "type",
+                "connection",
+                "tool",
+                "arguments",
+              ],
+              "type": "object",
+            },
+          ],
+        },
+        "type": "array",
+      },
+      "outputs": {
+        "default": [],
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string",
+            },
+            "name": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "value": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "value",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "policy": {
+        "additionalProperties": false,
+        "properties": {
+          "maxSteps": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
+          },
+          "networkGraceMinutes": {
+            "exclusiveMinimum": 0,
+            "type": "number",
+          },
+          "resumeInterruptedRuns": {
+            "type": "boolean",
+          },
+          "usageLimitFirstWaitMinutes": {
+            "exclusiveMinimum": 0,
+            "type": "number",
+          },
+          "usageLimitMaxWaitMinutes": {
+            "exclusiveMinimum": 0,
+            "type": "number",
+          },
+        },
+        "type": "object",
+      },
+      "start": {
+        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+        "type": "string",
+      },
+      "variables": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string",
+            },
+            "initial": {
+              "type": "string",
+            },
+            "name": {
+              "pattern": "^[a-z][a-z0-9_]{0,39}$",
+              "type": "string",
+            },
+            "schema": {
+              "additionalProperties": {},
+              "propertyNames": {
+                "type": "string",
+              },
+              "type": "object",
+            },
+            "type": {
+              "default": "text",
+              "enum": [
+                "text",
+                "number",
+                "boolean",
+                "json",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "type",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "version": {
+        "const": 5,
+        "type": "number",
+      },
+    },
+    "required": [
+      "version",
+      "inputs",
+      "outputs",
+      "start",
+      "nodes",
+      "edges",
+    ],
+    "type": "object",
+    "~standard": {
+      "jsonSchema": {
+        "input": [Function],
+        "output": [Function],
+      },
+      "validate": [Function],
+      "vendor": "zod",
+      "version": 1,
+    },
+  },
+}
+`;
+
+exports[`published schemas schedulesFileSchema as JSON Schema 1`] = `
+{
+  "input": {
+    "$defs": {
+      "__schema0": {
+        "anyOf": [
+          {
+            "type": "string",
+          },
+          {
+            "type": "number",
+          },
+          {
+            "type": "boolean",
+          },
+          {
+            "type": "null",
+          },
+          {
+            "items": {
+              "$ref": "#/$defs/__schema0",
+            },
+            "type": "array",
+          },
+          {
+            "additionalProperties": {
+              "$ref": "#/$defs/__schema0",
+            },
+            "propertyNames": {
+              "type": "string",
+            },
+            "type": "object",
+          },
+        ],
+      },
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "schedules": {
+        "default": [],
+        "items": {
+          "properties": {
+            "baseRef": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "cron": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "device": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string",
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean",
+            },
+            "flow": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
+              "type": "string",
+            },
+            "id": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
+              "type": "string",
+            },
+            "inputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0",
+              },
+              "default": {},
+              "propertyNames": {
+                "type": "string",
+              },
+              "type": "object",
+            },
+            "person": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string",
+            },
+            "stopAt": {
+              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "flow",
+            "cron",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "version": {
+        "const": 1,
+        "type": "number",
+      },
+    },
+    "required": [
+      "version",
+    ],
+    "type": "object",
+    "~standard": {
+      "jsonSchema": {
+        "input": [Function],
+        "output": [Function],
+      },
+      "validate": [Function],
+      "vendor": "zod",
+      "version": 1,
+    },
+  },
+  "output": {
+    "$defs": {
+      "__schema0": {
+        "anyOf": [
+          {
+            "type": "string",
+          },
+          {
+            "type": "number",
+          },
+          {
+            "type": "boolean",
+          },
+          {
+            "type": "null",
+          },
+          {
+            "items": {
+              "$ref": "#/$defs/__schema0",
+            },
+            "type": "array",
+          },
+          {
+            "additionalProperties": {
+              "$ref": "#/$defs/__schema0",
+            },
+            "propertyNames": {
+              "type": "string",
+            },
+            "type": "object",
+          },
+        ],
+      },
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "schedules": {
+        "default": [],
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "baseRef": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "cron": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "device": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string",
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean",
+            },
+            "flow": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
+              "type": "string",
+            },
+            "id": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,59}$",
+              "type": "string",
+            },
+            "inputs": {
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0",
+              },
+              "default": {},
+              "propertyNames": {
+                "type": "string",
+              },
+              "type": "object",
+            },
+            "person": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string",
+            },
+            "stopAt": {
+              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "flow",
+            "inputs",
+            "cron",
+            "enabled",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "version": {
+        "const": 1,
+        "type": "number",
+      },
+    },
+    "required": [
+      "version",
+      "schedules",
+    ],
+    "type": "object",
+    "~standard": {
+      "jsonSchema": {
+        "input": [Function],
+        "output": [Function],
+      },
+      "validate": [Function],
+      "vendor": "zod",
+      "version": 1,
+    },
+  },
+}
+`;
+
+exports[`published schemas agentProfileSchema as JSON Schema 1`] = `
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "clis": {
+        "default": [],
+        "items": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "connections": {
+        "default": [],
+        "items": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "description": {
+        "maxLength": 500,
+        "type": "string",
+      },
+      "effort": {
+        "enum": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max",
+        ],
+        "type": "string",
+      },
+      "harness": {
+        "anyOf": [
+          {
+            "enum": [
+              "claude-code",
+              "opencode",
+              "codex",
+              "grok-build",
+              "copilot",
+              "gemini",
+              "cursor",
+              "pi",
+            ],
+            "type": "string",
+          },
+          {
+            "pattern": "^acp:[a-z0-9][a-z0-9-]{0,39}$",
+            "type": "string",
+          },
+        ],
+      },
+      "model": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "name": {
+        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+        "type": "string",
+      },
+      "permissionMode": {
+        "enum": [
+          "default",
+          "acceptEdits",
+          "auto",
+          "bypassPermissions",
+          "plan",
+        ],
+        "type": "string",
+      },
+    },
+    "required": [
+      "harness",
+      "model",
+      "permissionMode",
+      "name",
+    ],
+    "type": "object",
+    "~standard": {
+      "jsonSchema": {
+        "input": [Function],
+        "output": [Function],
+      },
+      "validate": [Function],
+      "vendor": "zod",
+      "version": 1,
+    },
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "clis": {
+        "default": [],
+        "items": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "connections": {
+        "default": [],
+        "items": {
+          "pattern": "^[a-z][a-z0-9_]{0,39}$",
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "description": {
+        "maxLength": 500,
+        "type": "string",
+      },
+      "effort": {
+        "enum": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max",
+        ],
+        "type": "string",
+      },
+      "harness": {
+        "anyOf": [
+          {
+            "enum": [
+              "claude-code",
+              "opencode",
+              "codex",
+              "grok-build",
+              "copilot",
+              "gemini",
+              "cursor",
+              "pi",
+            ],
+            "type": "string",
+          },
+          {
+            "pattern": "^acp:[a-z0-9][a-z0-9-]{0,39}$",
+            "type": "string",
+          },
+        ],
+      },
+      "model": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "name": {
+        "pattern": "^[a-z][a-z0-9_]{0,39}$",
+        "type": "string",
+      },
+      "permissionMode": {
+        "enum": [
+          "default",
+          "acceptEdits",
+          "auto",
+          "bypassPermissions",
+          "plan",
+        ],
+        "type": "string",
+      },
+    },
+    "required": [
+      "harness",
+      "model",
+      "permissionMode",
+      "clis",
+      "connections",
+      "name",
+    ],
+    "type": "object",
+    "~standard": {
+      "jsonSchema": {
+        "input": [Function],
+        "output": [Function],
+      },
+      "validate": [Function],
+      "vendor": "zod",
+      "version": 1,
+    },
+  },
+}
+`;
+
+exports[`published schemas customAgentSchema as JSON Schema 1`] = `
+{
+  "input": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "args": {
+        "default": [],
+        "items": {
+          "type": "string",
+        },
+        "maxItems": 64,
+        "type": "array",
+      },
+      "command": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "env": {
+        "additionalProperties": {
+          "type": "string",
+        },
+        "default": {},
+        "propertyNames": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "label": {
+        "maxLength": 64,
+        "minLength": 1,
+        "type": "string",
+      },
+      "slug": {
+        "pattern": "^[a-z0-9][a-z0-9-]{0,39}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "slug",
+      "label",
+      "command",
+    ],
+    "type": "object",
+    "~standard": {
+      "jsonSchema": {
+        "input": [Function],
+        "output": [Function],
+      },
+      "validate": [Function],
+      "vendor": "zod",
+      "version": 1,
+    },
+  },
+  "output": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "args": {
+        "default": [],
+        "items": {
+          "type": "string",
+        },
+        "maxItems": 64,
+        "type": "array",
+      },
+      "command": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "env": {
+        "additionalProperties": {
+          "type": "string",
+        },
+        "default": {},
+        "propertyNames": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+          "type": "string",
+        },
+        "type": "object",
+      },
+      "label": {
+        "maxLength": 64,
+        "minLength": 1,
+        "type": "string",
+      },
+      "slug": {
+        "pattern": "^[a-z0-9][a-z0-9-]{0,39}$",
+        "type": "string",
+      },
+    },
+    "required": [
+      "slug",
+      "label",
+      "command",
+      "args",
+      "env",
+    ],
+    "type": "object",
+    "~standard": {
+      "jsonSchema": {
+        "input": [Function],
+        "output": [Function],
+      },
+      "validate": [Function],
+      "vendor": "zod",
+      "version": 1,
+    },
+  },
+}
+`;
+
+exports[`published schemas every published schema as a JSON Schema hash 1`] = `
+{
+  "agentHarnessSchema": "d12cc5d7f05c6d4a3a3619d72791c31de7a482d1090430b563bf01d4149f9471",
+  "agentNodeSchema": "13e378286abcfddbbdf95ec737fc349e9ebf2f2223360efbaf69c10ab4d2b13e",
+  "agentProfileSchema": "bed949397866c087d61cfac1a7ada6bb6b9f11d13b232be0c56b0d150bf20ee8",
+  "agentProfileSettingsSchema": "2f3c17fcdbfcbd3f4b0eadb835d385be7b3bc847d4239148743aa6777b42077a",
+  "callEachSchema": "43a87772abe5fd60377345c38008fcd13febc0b71a965170ffcf8eb575be3c39",
+  "callNodeSchema": "121ccd0985ab06eb0ec5f6569f06bf2a323eb6c874e14cab91de4bea1db38da8",
+  "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
+  "commandExitSchema": "8aeb73dfd94f45d4271829acd38fd43aaf56fd36e3db9b446b0017b2f6444efa",
+  "commandNodeSchema": "4715a0f36e1b8798b2d2a81462a7f8423ac2229cf8719703d79816564ef15370",
+  "commandSourceSchema": "29be5c28ca62374751ca03afaf9cd232962ffa7e0220220d34e0f64a0f2f3ecb",
+  "customAgentSchema": "695fcb6e79464055898109624fe9bfb29190a3dccb2c722e26f4d9bdb622d425",
+  "customAgentSlugSchema": "85b706ff2ef51fed369fb25c81f938328d9771d8a396bc7f1ed876637543e94a",
+  "customHarnessSchema": "340fd5e4d3041404dcebc63ea2a312d8dba0e6b3c15d5b50b154df7a8f58ddb7",
+  "decidedBySchema": "ba1eaed1ee91e185e0fe25e4b3ab48ebc800aac50bbe3b6f3762a1ddd7c5e6fe",
+  "deciderNameSchema": "844c61e968f871120362b07648dd4375a0c6183fe79a59bfd0d521792c578247",
+  "decisionNodeSchema": "4a359125cf5957796ecd7560090d0547831954f83065736abe5d964efb4c75e6",
+  "deviceNameSchema": "c385fef4336b7131063a6ba2bc416a02725ab5eedb75af59ca29bafd252dc91b",
+  "effortSchema": "493230d82c85cabb606d65dd36a75b762c05cb4a2b5fda14a43a1d6b1d2d1902",
+  "filesSourceSchema": "4c1c5591c21b0adb94e9d96d93d697b93de410a801ccf6b4b7a258d8c76b3219",
+  "flowEdgeSchema": "fa102c4d0dbb7e0dc39d6b2ff6a8dda61e677b0a5b06f37519200f3145d3e80d",
+  "flowInputSchema": "614c08d07a4c7b5980a98cf8447cd5bd3491dd84a298256e50dee562624f2c57",
+  "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
+  "flowNodeSchema": "ff46f30b703587789c07becbab6b25445e4bd882952b3f4263e7cc2e79b388b5",
+  "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
+  "flowSchema": "5196f32bd5afd85272cee4a9efe10f13b55e84713e4ef7b6d720ba23a048a9c9",
+  "flowVariableSchema": "bc241c9d8a19a055e9866d040bc4720e0dbd3eacb515865d1036ca65e8be7679",
+  "harnessNameSchema": "5680ae13dedd38277934574bb77ad18e9ec2d67a68bd7c7266e1c5ebd57d3318",
+  "jsonSchemaSchema": "5f8d604991fdf1ed7da4739406b681e55cba181bf749047debf0eae2673efece",
+  "jsonSourceSchema": "a3a5fddca4b7a01134d1e5ae0b6af454545831c5d63dd9272c4506e020eb8b1a",
+  "labelSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
+  "listSourceSchema": "08e4d5396923d469929e91f604743e2b4ba8976aa0e96f901f10a2a47d3015f1",
+  "mcpServerSchema": "a26196da9adb9b7777c1554b9c04c2be3e49961c1dc5b9a2b94ed1d9b1253727",
+  "nameSchema": "82cd45042469c87788418eea427bbaeb9f7aef07c90da2027149303eeab2f03c",
+  "nodeIdSchema": "82cd45042469c87788418eea427bbaeb9f7aef07c90da2027149303eeab2f03c",
+  "outcomeColorSchema": "a08d55161170d015984cde21947f73357d874c2c1469cf21d5df857936510817",
+  "outcomeSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
+  "permissionModeSchema": "759773decf0c9f4a4772f09d6bb1732999436b3b8f7b763134ae9a4b7478b3bd",
+  "policySchema": "c71ca6d9449c26281734e9b83bd509468adc49682849863fca0aea5ad00f48a0",
+  "scheduleIdSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
+  "scheduleSchema": "8d24fd7c9303f41084ec74e1ef4da372577d1bea6c7205e82c193126037d91bc",
+  "schedulesFileSchema": "a58f53e65cddb3ebb52d62f05fe5c0cd33da5c86fe05a7aa61e6984780f22eab",
+  "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
+  "toolNodeSchema": "77f7d1564de94766384a1c28a5219e9d6c8fa3c63feb9e0ffac8cef75b33c724",
+  "valueBySchema": "bd03d7f4d6a9ce81bfdb8638ac71508d4761cd359a8b94bdc2fc070915a01cfd",
+  "valueDeciderNameSchema": "7c7f28413777a1a59ae0c47ed82503caa6029be37a82ed9c774e89e468b946a0",
+  "valueNodeSchema": "054e8cb82599dd45bc1a7727b5a4888b3cbd1e6d2776d908e1e08d6bfa4abebe",
+  "variableTypeSchema": "1117a60eccb8c2baefec4e9cebcf2c4a387a033ded5c8a7071a9474221fa733c",
+  "variableWriteSchema": "2c39a4e86bcbb12e591793c1361222cd3dd9380833ce702eef65f3ca45cee0a2",
+  "waitNodeSchema": "8b161da59bbae64dabd06ff81740ca7695dae7906ae794625d1a101259adcb7c",
+  "waitUntilSchema": "ddb80380cd2540a3365e440a5cfb7d24e3628444436dda8735eaeafb88b5a245",
+}
+`;
+
+exports[`published schemas the version 1 fixtures parse to the same flows 1`] = `
+[
+  {
+    "flow": {
+      "description": "The rpgdotexe night: builds each Feature of one Epic, blockers first, like \`night-shift.py <epic>\`.",
+      "edges": [
+        {
+          "from": "features",
+          "id": "features-done-summary",
+          "outcome": "done",
+          "to": "summary",
+        },
+        {
+          "from": "features",
+          "id": "features-halted-summary",
+          "outcome": "halted",
+          "to": "summary",
+        },
+      ],
+      "inputs": [
+        {
+          "description": "The issue number of the Epic to build, as in night-shift.py <epic>.",
+          "label": "Epic",
+          "name": "epic",
+          "required": true,
+          "type": "text",
+        },
+      ],
+      "nodes": [
+        {
+          "each": {
+            "as": "item",
+            "branch": "shared",
+            "haltOn": [
+              "halt",
+            ],
+            "source": {
+              "command": 
+"gh api graphql -F owner='{owner}' -F name='{repo}' -F number="{{epic}}" -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      number title
+      subIssues(first: 100) {
+        nodes {
+          number title body state url
+          labels(first: 30) { nodes { name } }
+          blockedBy(first: 50) { nodes { number state } }
+        }
+      }
+    }
+  }
+}' --jq '
+"feature" as $require | [] as $skip | [] as $done
+| .data.repository.issue as $parent
+| [ $parent.subIssues.nodes[]
+    | (.labels.nodes | map(.name | ascii_downcase)) as $labels
+    | select($require == null or any($labels[]; . == $require))
+    | select(any($labels[]; IN($skip[])) | not)
+    | { id: (.number | tostring), number, title, body: (.body // ""), url, state,
+        labels: [.labels.nodes[].name],
+        parent: { number: $parent.number, title: $parent.title },
+        dependsOn: [ .blockedBy.nodes[] | { id: (.number | tostring), done: (.state == "CLOSED") } ],
+        done: (.state == "CLOSED" or any($labels[]; IN($done[]))) } ]'"
+,
+              "kind": "command",
+            },
+          },
+          "flow": "feature",
+          "id": "features",
+          "inputs": {},
+          "label": "Each Feature of the Epic",
+          "position": {
+            "x": 0,
+            "y": 0,
+          },
+          "type": "call",
+        },
+        {
+          "command": 
+"# The report of the night, as STATUS.md in the worktree and in the log.
+mkdir -p .build/night
+{
+	printf '# The night: %s\\n\\n' "{{features.outcome}}"
+	printf 'Features: %s done, %s failed, %s blocked, %s waiting.\\n\\n' "{{features.done_count}}" "{{features.failed_count}}" "{{features.blocked_count}}" "{{features.waiting_count}}"
+	printf '%s\\n\\n' "{{features.summary}}"
+	printf 'Your open pull requests, to read in the morning:\\n\\n'
+	gh pr list --state open --author @me --json number,title,url --jq '.[] | "- #\\(.number) \\(.title) \\(.url)"' || true
+} | tee .build/night/STATUS.md"
+,
+          "id": "summary",
+          "label": "Night report",
+          "output": "text",
+          "position": {
+            "x": 320,
+            "y": 0,
+          },
+          "timeoutMinutes": 10,
+          "type": "command",
+        },
+      ],
+      "outputs": [],
+      "policy": {
+        "maxSteps": 2000,
+        "networkGraceMinutes": 240,
+        "usageLimitFirstWaitMinutes": 5,
+        "usageLimitMaxWaitMinutes": 60,
+      },
+      "start": "features",
+      "version": 5,
+    },
+    "issues": [],
+  },
+  {
+    "flow": {
+      "description": "One Feature: its Traces, blockers first, each on its own branch of the stack. Then the checkpoint: the validator verifies and tunes, the orchestrator steers, and a decision continues or halts the night.",
+      "edges": [
+        {
+          "from": "begin",
+          "id": "begin-pass-traces",
+          "outcome": "pass",
+          "to": "traces",
+        },
+        {
+          "from": "traces",
+          "id": "traces-done-built",
+          "outcome": "done",
+          "to": "built",
+        },
+        {
+          "from": "built",
+          "id": "built-pass-tune_start",
+          "outcome": "pass",
+          "to": "tune_start",
+        },
+        {
+          "from": "tune_start",
+          "id": "tune_start-pass-validate",
+          "outcome": "pass",
+          "to": "validate",
+        },
+        {
+          "from": "validate",
+          "id": "validate-pass-check_tune",
+          "outcome": "pass",
+          "to": "check_tune",
+        },
+        {
+          "from": "validate",
+          "id": "validate-fail-check_tune",
+          "outcome": "fail",
+          "to": "check_tune",
+        },
+        {
+          "from": "validate",
+          "id": "validate-needs-input-check_tune",
+          "outcome": "needs-input",
+          "to": "check_tune",
+        },
+        {
+          "from": "check_tune",
+          "id": "check_tune-pass-deliver_tune",
+          "outcome": "pass",
+          "to": "deliver_tune",
+        },
+        {
+          "from": "check_tune",
+          "id": "check_tune-fail-validate",
+          "max": 1,
+          "outcome": "fail",
+          "to": "validate",
+        },
+        {
+          "from": "check_tune",
+          "id": "check_tune-fail-drop_tune",
+          "outcome": "fail",
+          "to": "drop_tune",
+        },
+        {
+          "from": "drop_tune",
+          "id": "drop_tune-pass-deliver_tune",
+          "outcome": "pass",
+          "to": "deliver_tune",
+        },
+        {
+          "from": "deliver_tune",
+          "id": "deliver_tune-pass-steer",
+          "outcome": "pass",
+          "to": "steer",
+        },
+        {
+          "from": "steer",
+          "id": "steer-pass-undo_steer",
+          "outcome": "pass",
+          "to": "undo_steer",
+        },
+        {
+          "from": "steer",
+          "id": "steer-fail-undo_steer",
+          "outcome": "fail",
+          "to": "undo_steer",
+        },
+        {
+          "from": "steer",
+          "id": "steer-needs-input-undo_steer",
+          "outcome": "needs-input",
+          "to": "undo_steer",
+        },
+        {
+          "from": "undo_steer",
+          "id": "undo_steer-pass-orchestrate",
+          "outcome": "pass",
+          "to": "orchestrate",
+        },
+      ],
+      "inputs": [
+        {
+          "name": "item",
+          "required": true,
+          "type": "json",
+        },
+      ],
+      "nodes": [
+        {
+          "command": 
+"# Where this Feature starts, for the checkpoint after its Traces.
+set -e
+mkdir -p .build/night
+git rev-parse HEAD > .build/night/feature-base
+: > .build/night/feature-scenarios.txt
+gh issue view "{{item.number}}" --json body --jq .body > .build/night/FEATURE.md"
+,
+          "id": "begin",
+          "label": "Start of the Feature",
+          "output": "text",
+          "position": {
+            "x": 0,
+            "y": 0,
+          },
+          "timeoutMinutes": 10,
+          "type": "command",
+        },
+        {
+          "each": {
+            "as": "item",
+            "branch": "per-item",
+            "haltOn": [
+              "halt",
+            ],
+            "source": {
+              "command": 
+"gh api graphql -F owner='{owner}' -F name='{repo}' -F number="{{item.number}}" -f query='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      number title
+      subIssues(first: 100) {
+        nodes {
+          number title body state url
+          labels(first: 30) { nodes { name } }
+          blockedBy(first: 50) { nodes { number state } }
+        }
+      }
+    }
+  }
+}' --jq '
+"trace" as $require | ["draft"] as $skip | ["implemented"] as $done
+| .data.repository.issue as $parent
+| [ $parent.subIssues.nodes[]
+    | (.labels.nodes | map(.name | ascii_downcase)) as $labels
+    | select($require == null or any($labels[]; . == $require))
+    | select(any($labels[]; IN($skip[])) | not)
+    | { id: (.number | tostring), number, title, body: (.body // ""), url, state,
+        labels: [.labels.nodes[].name],
+        parent: { number: $parent.number, title: $parent.title },
+        dependsOn: [ .blockedBy.nodes[] | { id: (.number | tostring), done: (.state == "CLOSED") } ],
+        done: (.state == "CLOSED" or any($labels[]; IN($done[]))) } ]'"
+,
+              "kind": "command",
+            },
+          },
+          "flow": "trace",
+          "id": "traces",
+          "inputs": {},
+          "label": "Each Trace of the Feature",
+          "position": {
+            "x": 320,
+            "y": 0,
+          },
+          "type": "call",
+        },
+        {
+          "command": 
+"# The checkpoint runs only when every Trace of the Feature is built. Else the Feature fails, and the Features that wait on it are blocked.
+if [ "{{traces.failed_count}}" != 0 ] || [ "{{traces.blocked_count}}" != 0 ] || [ "{{traces.waiting_count}}" != 0 ]; then
+	echo "Not every Trace of Feature #{{item.number}} is built: no checkpoint."
+	printf '%s\\n' "{{traces.summary}}"
+	exit 1
+fi
+printf '%s\\n' "{{traces.summary}}""
+,
+          "id": "built",
+          "label": "Every Trace built?",
+          "output": "text",
+          "position": {
+            "x": 640,
+            "y": 0,
+          },
+          "timeoutMinutes": 5,
+          "type": "command",
+        },
+        {
+          "command": 
+"# A tune/ branch on top of the stack, and the context of the check for the whole Feature.
+set -e
+git branch --show-current > .build/night/tune-base-branch
+git rev-parse HEAD > .build/night/tune-base
+git checkout --no-track -B "tune/{{item.number}}"
+rm -f .build/night/validation.json .build/night/REPORT.md
+python3 -c '
+import json
+names = [line for line in open(".build/night/feature-scenarios.txt").read().splitlines() if line]
+base = open(".build/night/feature-base").read().strip()
+json.dump({"base": base, "sim": "rpg-pool-1", "scenarios": names}, open(".build/night/context.json", "w"))
+'"
+,
+          "id": "tune_start",
+          "label": "tune/ branch",
+          "output": "text",
+          "position": {
+            "x": 960,
+            "y": 0,
+          },
+          "timeoutMinutes": 10,
+          "type": "command",
+        },
+        {
+          "clis": [
+            "gh",
+          ],
+          "harness": "claude-code",
+          "id": "validate",
+          "label": "Validator",
+          "model": "sonnet",
+          "permissionMode": "auto",
+          "position": {
+            "x": 1280,
+            "y": 0,
+          },
+          "prompt": 
+"You are the validator at the checkpoint of an unattended night build ("night-shift"). The worker built all Traces of Feature #{{item.number}} ({{item.title}}). Each Trace has its pull request on the stack. After you, the orchestrator reads your findings, steers the next work, and decides whether the night continues. Nobody is awake. Do not ask a question: decide, act, and write down what you decided.
+
+You are in the worktree, on a \`tune/\` branch on top of the stack. It gets a pull request of its own when it has a commit. The work to validate is \`git diff "$(cat .build/night/feature-base)..HEAD"\`. The Traces of this Feature, as the build left them:
+{{traces.summary}}
+The issues: \`gh issue view <number>\`. \`.build/night/FEATURE.md\` holds the Feature.
+
+Do these two tasks, in this order.
+
+1. VERIFY. A claimed scenario is verified when a test with its exact name exists, passes, and asserts each Then step for real. Look at each Trace. Look at the tests that existed before (\`git diff "$(cat .build/night/feature-base)..HEAD" -- Packages/Tests\`): a worker that weakened or removed an assert to get a green check is the worst case. Check the rules below, the contracts of each Trace, and the Golden fixtures that changed.
+
+2. TUNE. Correct what is wrong or weak, here, on this branch: a deviation from the spec, an assert that is missing, a broken rule, dead code, a wrong domain term, a seam that the next Features cannot build on. A bug gets a failing test first, then the fix, in its own \`fix(...)\` commit. Small Conventional Commits. Do not rewrite what is good: the goal is a correct and clean base for the next work, not your taste. No change is a good result when the work is good.
+   Do not change the scenario set. Do not edit an issue. Do not push, open a pull request, or merge: a later step does the delivery and the labels.
+   After a change, run \`python3 tools/night-shift/night-shift.py gate\` until it prints \`GATE PASSED\`. It can take 20 minutes: give your shell tool the timeout 2700000 (milliseconds) for it.
+
+Then write \`.build/night/validation.json\`, as the last thing you do:
+
+{"summary": "3 to 6 sentences: how good the build was, and what you changed", "traces": {"<number>": {"verified": true, "note": ""}}, "needs_input": ["a step or a decision for the owner"]}
+
+When the code misses its spec in a way that you could not correct here, or the spec contradicts itself or the code, say so in the summary and in the note of the Trace: the orchestrator decides what happens next. End with the same summary as your step report.
+
+When this message comes again in the same session, your tuning did not pass the check after you. Its result (empty the first time):
+
+\`\`\`
+{{check_tune.log_tail}}
+\`\`\`
+
+Then correct the cause, commit, run the check until it prints \`GATE PASSED\`, and update \`.build/night/validation.json\`. When the check still fails after this, a later step removes your changes; your findings still count.
+
+Rules of this repository:
+
+- Tests: Swift Testing. Each claimed scenario gets one test with the scenario name as the exact \`@Test("...")\` display name. Test logic, not pixels: tests of pure package code, and \`Edge/\` tests that drive the store, the scene, or the view model. No new XCUITest. The UI smoke set (\`App/UITests/SmokeUITests.swift\`) must keep passing.
+- The model is a fake in each test (see the test doubles of ModelRuntime). No test asks a real model.
+- Determinism: each random number comes from a Seed Stream (\`SeedStream\`). No \`random()\`, no \`Date()\`, and no frame time in the simulation. The simulation has 30 Ticks each second. A test steps Ticks with recorded inputs; it does not sleep and does not use real time.
+- Game State is \`Codable\`. Each new Game State field goes into the save round-trip test of the Run File.
+- Golden fixtures (\`Packages/Tests/Fixtures/\`): change one only when the Trace changes the rules on purpose. Record it again with \`TEST_RUNNER_RECORD_GOLDEN_SEEDS=1\`, read the diff, and commit the fixture in its own commit with the reason.
+- Verticals: pure code imports no SwiftUI, SpriteKit, UIKit, or DesignSystem outside an \`Edge/\` folder. A new target needs its target and its test target in \`Packages/Package.swift\`, and its entry in \`tools/ci/verticals.json\`, in the same commit.
+- Wide Events: one event for each unit of work, emitted one time in a \`defer\`. No \`print\`. No text of the Player and no text of the model in an event.
+- The build has no warnings (a warning is an error). \`swift format lint --strict --recursive App Packages\` passes.
+- Code and comments describe the code as it is now: no history, no old names, no issue numbers, no milestone names.
+- Names use the domain terms of \`docs/glossary.md\`. A generic mechanism gets a generic name.
+- A bug in existing code: first a test that fails, then the fix, in its own \`fix(...)\` commit.
+- Commits: small Conventional Commits (\`feat(run): ...\`, \`test(direction): ...\`) in simple English, with the trailer lines \`Scenario: <scenario name>\` and \`Trace: #<number>\`.
+- Do not change \`.github/\`, the scripts and the allow lists of \`tools/ci/\`, signing, entitlements, or the settings of the Apple developer account. Do not delete or weaken a test to make it pass.
+- \`xcodebuild test\` gets \`-collect-test-diagnostics never -parallel-testing-enabled NO\`. A Swift Testing \`-only-testing\` ID of one test needs \`()\` at its end. Use only the Simulator \`rpg-pool-1\`; do not make or delete a Simulator. Logs go into \`.build/logs/\`.
+- These rules are the short form of \`docs/steering/\` (TECH.md, QA.md). Read a section there only when a rule above does not answer your question."
+,
+          "session": "resume",
+          "timeoutMinutes": 75,
+          "type": "agent",
+        },
+        {
+          "command": 
+"# The check after the validator: no loose changes, then the script's own gate over the whole Feature.
+if [ -n "$(git status --porcelain)" ]; then
+	echo '\`git status\` shows changes that are not committed:'
+	git status --porcelain | head -25
+	exit 1
+fi
+python3 tools/night-shift/night-shift.py gate"
+,
+          "id": "check_tune",
+          "label": "Check the tuning",
+          "output": "text",
+          "position": {
+            "x": 1600,
+            "y": 0,
+          },
+          "timeoutMinutes": 90,
+          "type": "command",
+        },
+        {
+          "command": 
+"# The tuning did not pass the check: remove it. The findings of the validator still count.
+git reset -q --hard "$(cat .build/night/tune-base)"
+git clean -qfd
+echo "The changes of the validator did not pass the check. They are removed.""
+,
+          "id": "drop_tune",
+          "label": "Remove the tuning",
+          "output": "text",
+          "position": {
+            "x": 1600,
+            "y": 240,
+          },
+          "timeoutMinutes": 5,
+          "type": "command",
+        },
+        {
+          "command": 
+"# The tune/ branch gets a pull request on the stack when it has a commit. Then the labels \`verified\` and a comment on the Feature.
+set -e
+branch="tune/{{item.number}}"
+base_branch=$(cat .build/night/tune-base-branch)
+summary=$(python3 -c 'import json; print(json.load(open(".build/night/validation.json")).get("summary", ""))' 2>/dev/null || true)
+url=""
+if [ "$(git rev-list --count "$(cat .build/night/tune-base)..HEAD")" != 0 ]; then
+	git push --force-with-lease -u origin "$branch"
+	# A base branch that is not on GitHub (the run's own branch): the pull request goes on the trunk.
+	git ls-remote --exit-code --heads origin "$base_branch" >/dev/null || base_branch=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)
+	{
+		printf '## Summary\\n\\nThe tuning of Feature #%s (%s) after its build: the validator at the checkpoint of the night build.\\n\\n%s\\n' "{{item.number}}" "{{item.title}}" "$summary"
+		printf '\\n## Changes\\n\\n'
+		git log --reverse --format='- %s' "$(cat .build/night/tune-base)..HEAD"
+		printf '\\n## Test plan\\n\\n- [x] The local check against the start of the Feature: the guards, the format lint, the tests of the affected Verticals, and, for a change in \`App/\` or \`Edge/\`, the app builds and the UI smoke set\\n\\n## Related\\n\\nFeature #%s\\n' "{{item.number}}"
+	} > .build/night/pr-body.md
+	url=$(gh pr list --head "$branch" --state open --json url --jq '.[0].url // empty')
+	[ -n "$url" ] || url=$(gh pr create --base "$base_branch" --head "$branch" --title "refactor: tune {{item.title}}" --body-file .build/night/pr-body.md | tail -1)
+else
+	git checkout -q "$base_branch"
+	git branch -q -D "$branch"
+fi
+# The labels and the comment, from validation.json.
+TUNE_URL="$url" python3 -c '
+import json, os, subprocess, sys
+try:
+    check = json.load(open(".build/night/validation.json"))
+except (OSError, ValueError):
+    check = {}
+lines = ["### night-shift: checkpoint after the build", "", str(check.get("summary", "The validator wrote no validation.json."))]
+traces = check.get("traces") if isinstance(check.get("traces"), dict) else {}
+for number, result in traces.items():
+    result = result if isinstance(result, dict) else {}
+    verified = bool(result.get("verified"))
+    if verified and str(number).isdigit():
+        subprocess.run(["gh", "issue", "edit", str(number), "--add-label", "verified"], check=False)
+    note = (". " + result["note"]) if result.get("note") else ""
+    lines.append("- Trace #" + str(number) + ": " + ("verified" if verified else "NOT verified") + note)
+needs = check.get("needs_input") or []
+if needs:
+    lines += ["", "Needs the owner:"] + ["- " + str(item) for item in needs]
+if os.environ.get("TUNE_URL"):
+    lines += ["", "Tuning: " + os.environ["TUNE_URL"]]
+subprocess.run(["gh", "issue", "comment", sys.argv[1], "--body-file", "-"], input="\\n".join(lines) + "\\n", text=True, check=True)
+' "{{item.number}}"
+
+# The commit that the orchestrator must leave as it is.
+git rev-parse HEAD > .build/night/tuned"
+,
+          "id": "deliver_tune",
+          "label": "Tuning PR, labels, comment",
+          "output": "text",
+          "position": {
+            "x": 1920,
+            "y": 0,
+          },
+          "timeoutMinutes": 15,
+          "type": "command",
+        },
+        {
+          "clis": [
+            "gh",
+          ],
+          "harness": "claude-code",
+          "id": "steer",
+          "label": "Orchestrator: steer",
+          "model": "opus",
+          "permissionMode": "auto",
+          "position": {
+            "x": 2240,
+            "y": 0,
+          },
+          "prompt": 
+"You are the orchestrator of an unattended night build ("night-shift"). The worker built all Traces of Feature #{{item.number}} ({{item.title}}), and each has its pull request on the stack. The check passed, and the validator verified and tuned the work. Its findings are in \`.build/night/validation.json\`, and its summary is:
+
+{{validate.summary}}
+
+The tuning of the validator, when it did not pass the check, was removed ("pass" here means removed, empty means kept): {{drop_tune.outcome}}
+
+You are in the worktree. The work is \`git diff "$(cat .build/night/feature-base)..HEAD"\`. The Traces of this Feature:
+{{traces.summary}}
+The issues: \`gh issue view <number>\`. \`.build/night/FEATURE.md\` holds the Feature.
+Do not change the code and do not commit: you steer the next work. A decision after you reads your notes and decides whether the night continues.
+
+STEER. The worker builds next the open Traces (label \`trace\`, without the label \`implemented\`) of the next open Features (label \`feature\`) of Epic #{{item.parent.number}}. Find them with the GitHub tools or \`gh issue view {{item.parent.number}}\`. Write what the worker must know. Give it facts, file names, and orders, not advice: the worker is a smaller model that starts fresh for each try.
+- \`.build/night/STEERING.md\`: the notes that each later worker gets. Keep the file below 60 lines: merge and rewrite it, do not only add to it. Put there the patterns to copy (with the file names) and the errors of this worker that the next must not make.
+- \`.build/night/steering/trace-<number>.md\`: a note for one of those Traces, only when you have a concrete fact for it (for example "the type that the Trace calls X is \`Y\` in \`File.swift\`").
+
+End with a step report of 3 to 6 sentences: how good the work of this Feature is, whether the code misses its spec in a way that the validator could not correct, whether the spec contradicts itself or the code, and each step or decision for the owner.
+
+Rules of this repository:
+
+- Tests: Swift Testing. Each claimed scenario gets one test with the scenario name as the exact \`@Test("...")\` display name. Test logic, not pixels: tests of pure package code, and \`Edge/\` tests that drive the store, the scene, or the view model. No new XCUITest. The UI smoke set (\`App/UITests/SmokeUITests.swift\`) must keep passing.
+- The model is a fake in each test (see the test doubles of ModelRuntime). No test asks a real model.
+- Determinism: each random number comes from a Seed Stream (\`SeedStream\`). No \`random()\`, no \`Date()\`, and no frame time in the simulation. The simulation has 30 Ticks each second. A test steps Ticks with recorded inputs; it does not sleep and does not use real time.
+- Game State is \`Codable\`. Each new Game State field goes into the save round-trip test of the Run File.
+- Golden fixtures (\`Packages/Tests/Fixtures/\`): change one only when the Trace changes the rules on purpose. Record it again with \`TEST_RUNNER_RECORD_GOLDEN_SEEDS=1\`, read the diff, and commit the fixture in its own commit with the reason.
+- Verticals: pure code imports no SwiftUI, SpriteKit, UIKit, or DesignSystem outside an \`Edge/\` folder. A new target needs its target and its test target in \`Packages/Package.swift\`, and its entry in \`tools/ci/verticals.json\`, in the same commit.
+- Wide Events: one event for each unit of work, emitted one time in a \`defer\`. No \`print\`. No text of the Player and no text of the model in an event.
+- The build has no warnings (a warning is an error). \`swift format lint --strict --recursive App Packages\` passes.
+- Code and comments describe the code as it is now: no history, no old names, no issue numbers, no milestone names.
+- Names use the domain terms of \`docs/glossary.md\`. A generic mechanism gets a generic name.
+- A bug in existing code: first a test that fails, then the fix, in its own \`fix(...)\` commit.
+- Commits: small Conventional Commits (\`feat(run): ...\`, \`test(direction): ...\`) in simple English, with the trailer lines \`Scenario: <scenario name>\` and \`Trace: #<number>\`.
+- Do not change \`.github/\`, the scripts and the allow lists of \`tools/ci/\`, signing, entitlements, or the settings of the Apple developer account. Do not delete or weaken a test to make it pass.
+- \`xcodebuild test\` gets \`-collect-test-diagnostics never -parallel-testing-enabled NO\`. A Swift Testing \`-only-testing\` ID of one test needs \`()\` at its end. Use only the Simulator \`rpg-pool-1\`; do not make or delete a Simulator. Logs go into \`.build/logs/\`.
+- These rules are the short form of \`docs/steering/\` (TECH.md, QA.md). Read a section there only when a rule above does not answer your question."
+,
+          "session": "fresh",
+          "timeoutMinutes": 75,
+          "type": "agent",
+        },
+        {
+          "command": 
+"# The orchestrator must not change the code: remove a change of it. Its notes in .build/night/ stay (git ignores that folder).
+tuned=$(cat .build/night/tuned)
+if [ "$(git rev-parse HEAD)" != "$tuned" ] || [ -n "$(git status --porcelain)" ]; then
+	git reset -q --hard "$tuned"
+	git clean -qfd
+	echo "The orchestrator changed the code, and it must not. Its changes are removed."
+fi
+exit 0"
+,
+          "id": "undo_steer",
+          "label": "Keep the code as tuned",
+          "output": "text",
+          "position": {
+            "x": 2560,
+            "y": 0,
+          },
+          "timeoutMinutes": 5,
+          "type": "command",
+        },
+        {
+          "by": "model",
+          "decider": "typesafe",
+          "id": "orchestrate",
+          "label": "Orchestrator: continue or halt",
+          "options": [
+            {
+              "description": "The work is a sound base: the night goes on with the next Feature.",
+              "name": "continue",
+            },
+            {
+              "description": "Work on top of this code would be wrong: it misses its spec in a way the validator could not correct, or the spec contradicts itself or the code. The night stops for the owner.",
+              "name": "halt",
+            },
+          ],
+          "position": {
+            "x": 2880,
+            "y": 0,
+          },
+          "prompt": 
+"You decide whether an unattended night build ("night-shift") continues after Feature #{{item.number}} ({{item.title}}) of Epic #{{item.parent.number}}. Nobody is awake: decide from the reports below.
+
+The Traces of this Feature:
+{{traces.summary}}
+
+The validator verified and tuned the work. Its summary:
+
+{{validate.summary}}
+
+The tuning of the validator, when it did not pass the check, was removed ("pass" here means removed, empty means kept): {{drop_tune.outcome}}
+
+The orchestrator read the work and steered the next workers. Its report:
+
+{{steer.summary}}
+
+Pick "halt" only when work on top of this code would be wrong: the code misses its spec in a way that the validator could not correct, or the spec contradicts itself or the code so that the owner must decide. In each other case pick "continue". In the notes: 1 to 3 sentences on why, then each step or decision for the owner."
+,
+          "timeoutMinutes": 30,
+          "type": "decision",
+        },
+      ],
+      "outputs": [],
+      "start": "begin",
+      "version": 5,
+    },
+    "issues": [
+      {
+        "message": "Decision node "orchestrate" has no edge for "continue": the run ends there when the model picks "continue".",
+        "nodeId": "orchestrate",
+        "severity": "warning",
+      },
+      {
+        "message": "Decision node "orchestrate" has no edge for "halt": the run ends there when the model picks "halt".",
+        "nodeId": "orchestrate",
+        "severity": "warning",
+      },
+    ],
+  },
+  {
+    "flow": {
+      "description": "One Trace: the worker builds it, the check runs, a failed check goes back to a fresh worker (3 tries), then a rescue on a stronger model. A Trace that passes gets a pull request on the stack and the label \`implemented\`.",
+      "edges": [
+        {
+          "from": "prepare",
+          "id": "prepare-pass-worker",
+          "outcome": "pass",
+          "to": "worker",
+        },
+        {
+          "from": "worker",
+          "id": "worker-pass-format",
+          "outcome": "pass",
+          "to": "format",
+        },
+        {
+          "from": "worker",
+          "id": "worker-fail-format",
+          "outcome": "fail",
+          "to": "format",
+        },
+        {
+          "from": "worker",
+          "id": "worker-needs-input-format",
+          "outcome": "needs-input",
+          "to": "format",
+        },
+        {
+          "from": "format",
+          "id": "format-pass-check",
+          "outcome": "pass",
+          "to": "check",
+        },
+        {
+          "from": "format",
+          "id": "format-fail-check",
+          "outcome": "fail",
+          "to": "check",
+        },
+        {
+          "from": "check",
+          "id": "check-pass-deliver",
+          "outcome": "pass",
+          "to": "deliver",
+        },
+        {
+          "from": "check",
+          "id": "check-fail-worker",
+          "max": 2,
+          "outcome": "fail",
+          "to": "worker",
+        },
+        {
+          "from": "check",
+          "id": "check-fail-rescue",
+          "outcome": "fail",
+          "to": "rescue",
+        },
+        {
+          "from": "rescue",
+          "id": "rescue-pass-check2",
+          "outcome": "pass",
+          "to": "check2",
+        },
+        {
+          "from": "rescue",
+          "id": "rescue-fail-check2",
+          "outcome": "fail",
+          "to": "check2",
+        },
+        {
+          "from": "rescue",
+          "id": "rescue-needs-input-check2",
+          "outcome": "needs-input",
+          "to": "check2",
+        },
+        {
+          "from": "check2",
+          "id": "check2-pass-deliver",
+          "outcome": "pass",
+          "to": "deliver",
+        },
+        {
+          "from": "check2",
+          "id": "check2-fail-rescue",
+          "max": 1,
+          "outcome": "fail",
+          "to": "rescue",
+        },
+        {
+          "from": "check2",
+          "id": "check2-fail-park",
+          "outcome": "fail",
+          "to": "park",
+        },
+      ],
+      "inputs": [
+        {
+          "name": "item",
+          "required": true,
+          "type": "json",
+        },
+      ],
+      "nodes": [
+        {
+          "command": 
+"# The files of the night for this Trace, as the script's write_context does.
+set -e
+mkdir -p .build/night
+rm -f .build/night/REPORT.md
+git rev-parse HEAD > .build/night/base
+printf '%s\\n' "{{item.body}}" > .build/night/TRACE.md
+gh issue view "{{item.parent.number}}" --json body --jq .body > .build/night/FEATURE.md
+# context.json: the base and the claimed scenarios, for \`night-shift.py gate\` and \`night-shift.py test\`.
+python3 -c '
+import importlib.util, json
+spec = importlib.util.spec_from_file_location("night_shift", "tools/night-shift/night-shift.py")
+ns = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ns)
+names = ns.claimed_scenarios(open(".build/night/TRACE.md").read())
+base = open(".build/night/base").read().strip()
+json.dump({"base": base, "sim": "rpg-pool-1", "scenarios": names}, open(".build/night/context.json", "w"))
+lines = "".join(name + "\\n" for name in names)
+open(".build/night/scenarios.txt", "w").write(lines)
+open(".build/night/feature-scenarios.txt", "a").write(lines)
+print("Base", base[:12], "and", len(names), "claimed scenario(s).")
+'"
+,
+          "id": "prepare",
+          "label": "Context of the Trace",
+          "output": "text",
+          "position": {
+            "x": 0,
+            "y": 0,
+          },
+          "timeoutMinutes": 10,
+          "type": "command",
+        },
+        {
+          "clis": [
+            "gh",
+          ],
+          "effort": "high",
+          "harness": "claude-code",
+          "id": "worker",
+          "idleMinutes": 30,
+          "label": "Worker",
+          "model": "sonnet",
+          "permissionMode": "auto",
+          "position": {
+            "x": 320,
+            "y": 0,
+          },
+          "prompt": 
+"You are a worker on ONE Trace in the repository of your working directory: an iOS game in Swift 6 (the Swift package is in \`Packages/\`, the app is in \`App/\`). You work alone, at night. Nobody answers a question, so do not ask one: decide, continue, and write each decision in your report.
+
+Trace #{{item.number}}: {{item.title}}
+Feature #{{item.parent.number}}: {{item.parent.title}}
+Branch: \`{{run.branch}}\`. It is checked out. Commit on it. Do not change the branch, do not push, and do not open a pull request: a later step does that after you.
+You start fresh. Earlier sessions can have worked on this branch already: \`git log --reverse --format='- %s' "$(cat .build/night/base)..HEAD"\` shows their commits, and \`git status\` shows what is not committed. Do not do their work again.
+
+## Your task
+
+The result of the last check of this branch (empty on the first try):
+
+\`\`\`
+{{check.log_tail}}
+\`\`\`
+
+When that block is empty, build the Trace, test first. For each claimed scenario: write a Swift Testing test with exactly the scenario name as its display name (\`@Test("<scenario name>")\`), run it and see it fail, write the code, run the test again until it prints \`TESTS PASSED\`, and commit. Then run the tests of the Verticals that you changed (no argument).
+
+When that block holds a result, the full check failed: fix it. Correct the cause of each problem in the code. Do not delete or weaken a test, and do not change the scripts or the allow lists of \`tools/ci/\`. Run the tests that failed until they pass.
+
+You are done when the tests pass and \`git status\` shows no change that is not committed.
+
+## How you work
+
+- Keep your context small. Find code with \`grep -rn\` and read only the lines that you need (\`sed -n '120,180p' <file>\`), not whole folders. Do not print a full log: the logs are in \`.build/night/\`.
+- Run tests with \`python3 tools/night-shift/night-shift.py test <TestTarget>/<Suite>/<test>()\`, or with no argument for the tests of the Verticals that you changed. It prints only the lines of the problems, then \`TESTS PASSED\` or \`TESTS FAILED\`. A run can take 10 minutes: give your shell tool the timeout 2700000 (milliseconds). Do not run \`xcodebuild\` yourself.
+- Do not run the full check: a later step runs it after you, and gives its result to the next session. A later step also formats the Swift files.
+- Commit your work before you stop: small Conventional Commits with the trailer lines \`Scenario: <scenario name>\` and \`Trace: #{{item.number}}\`.
+- Add to \`.build/night/REPORT.md\` (git ignores that folder; add, do not replace): what you did in 3 lines or fewer, each decision that the Trace did not make for you, and, under the heading \`NEEDS_INPUT\`, each step that only a person can do (for example a step on the Reference Device).
+
+## Scope
+
+Build exactly the claimed scenarios of this Trace, not more. The code of a later Trace stays out. When the Trace and the Feature differ, the Feature is correct. When the Trace names code that is not there, look for it under a different name first (\`grep\`), and build on the code that is there. The code is the source of truth, and it starts at the commit in \`.build/night/base\`.
+\`.build/night/TRACE.md\` holds the Trace and \`.build/night/FEATURE.md\` the Feature: its Bounded Context and its Rules come before \`## User Stories\`, and its Gherkin holds the full text of each scenario.
+
+## Steering notes
+
+When \`.build/night/STEERING.md\` or \`.build/night/steering/trace-{{item.number}}.md\` exists, read it first. These notes come from a senior reviewer who read the work before yours. Follow them.
+
+## Rules of this repository
+
+- Tests: Swift Testing. Each claimed scenario gets one test with the scenario name as the exact \`@Test("...")\` display name. Test logic, not pixels: tests of pure package code, and \`Edge/\` tests that drive the store, the scene, or the view model. No new XCUITest. The UI smoke set (\`App/UITests/SmokeUITests.swift\`) must keep passing.
+- The model is a fake in each test (see the test doubles of ModelRuntime). No test asks a real model.
+- Determinism: each random number comes from a Seed Stream (\`SeedStream\`). No \`random()\`, no \`Date()\`, and no frame time in the simulation. The simulation has 30 Ticks each second. A test steps Ticks with recorded inputs; it does not sleep and does not use real time.
+- Game State is \`Codable\`. Each new Game State field goes into the save round-trip test of the Run File.
+- Golden fixtures (\`Packages/Tests/Fixtures/\`): change one only when the Trace changes the rules on purpose. Record it again with \`TEST_RUNNER_RECORD_GOLDEN_SEEDS=1\`, read the diff, and commit the fixture in its own commit with the reason.
+- Verticals: pure code imports no SwiftUI, SpriteKit, UIKit, or DesignSystem outside an \`Edge/\` folder. A new target needs its target and its test target in \`Packages/Package.swift\`, and its entry in \`tools/ci/verticals.json\`, in the same commit.
+- Wide Events: one event for each unit of work, emitted one time in a \`defer\`. No \`print\`. No text of the Player and no text of the model in an event.
+- The build has no warnings (a warning is an error). \`swift format lint --strict --recursive App Packages\` passes.
+- Code and comments describe the code as it is now: no history, no old names, no issue numbers, no milestone names.
+- Names use the domain terms of \`docs/glossary.md\`. A generic mechanism gets a generic name.
+- A bug in existing code: first a test that fails, then the fix, in its own \`fix(...)\` commit.
+- Commits: small Conventional Commits (\`feat(run): ...\`, \`test(direction): ...\`) in simple English, with the trailer lines \`Scenario: <scenario name>\` and \`Trace: #<number>\`.
+- Do not change \`.github/\`, the scripts and the allow lists of \`tools/ci/\`, signing, entitlements, or the settings of the Apple developer account. Do not delete or weaken a test to make it pass.
+- \`xcodebuild test\` gets \`-collect-test-diagnostics never -parallel-testing-enabled NO\`. A Swift Testing \`-only-testing\` ID of one test needs \`()\` at its end. Use only the Simulator \`rpg-pool-1\`; do not make or delete a Simulator. Logs go into \`.build/logs/\`.
+- These rules are the short form of \`docs/steering/\` (TECH.md, QA.md). Read a section there only when a rule above does not answer your question.
+
+## The Trace (issue #{{item.number}})
+
+{{item.body}}"
+,
+          "session": "fresh",
+          "timeoutMinutes": 90,
+          "type": "agent",
+        },
+        {
+          "command": 
+"# Formats the Swift files that changed since the base and commits them, so no try goes to the format lint.
+command -v swift >/dev/null || exit 0
+files=$(git diff --name-only --diff-filter=d "$(cat .build/night/base)" -- '*.swift')
+[ -n "$files" ] || exit 0
+loose=$(git status --porcelain)
+printf '%s\\n' "$files" | xargs swift format format --in-place --parallel || exit 0
+if [ -z "$loose" ] && [ -n "$(git status --porcelain)" ]; then
+	git commit --no-verify -qam "style: format the Swift files of the Trace" -m "Trace: #{{item.number}}"
+	echo "Formatted and committed the Swift files."
+fi
+exit 0"
+,
+          "id": "format",
+          "label": "Format Swift",
+          "output": "text",
+          "position": {
+            "x": 640,
+            "y": 0,
+          },
+          "timeoutMinutes": 15,
+          "type": "command",
+        },
+        {
+          "command": 
+"# The check after the worker: what loop_gate does for a builder, then the script's own gate.
+base=$(cat .build/night/base)
+if [ -n "$(git status --porcelain)" ]; then
+	echo '\`git status\` shows changes that are not committed:'
+	git status --porcelain | head -25
+	echo "Commit what is part of the Trace in a Conventional Commit. Delete what is not."
+	exit 1
+fi
+if [ "$(git rev-list --count "$base..HEAD")" = 0 ]; then
+	echo "No commit is on this branch: nothing of the Trace is built."
+	exit 1
+fi
+python3 -c '
+import importlib.util, os, subprocess, sys
+spec = importlib.util.spec_from_file_location("night_shift", "tools/night-shift/night-shift.py")
+ns = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ns)
+base, body, bad = sys.argv[1], open(".build/night/TRACE.md").read(), []
+diff = subprocess.run(["git", "diff", "--name-status", base + "..HEAD"], capture_output=True, text=True, check=True).stdout
+for line in diff.splitlines():
+    fields = line.split("\\t")
+    path = fields[1] if fields[0].startswith("D") else fields[-1]
+    named = os.path.basename(path) in body
+    if ns.PROTECTED.match(path) and not named:
+        bad.append("  changed a protected file: " + path)
+    elif fields[0].startswith("D") and ns.TEST_FILES.match(path) and not named:
+        bad.append("  deleted a test file: " + path)
+if bad:
+    print("A builder must not make these changes:")
+    print("\\n".join(bad))
+    print("Put each file back (\`git checkout " + base[:12] + " -- <path>\`, then commit) and correct the real cause in the code.")
+    sys.exit(1)
+' "$base" || exit 1
+python3 tools/night-shift/night-shift.py gate"
+,
+          "id": "check",
+          "label": "Check",
+          "output": "text",
+          "position": {
+            "x": 960,
+            "y": 0,
+          },
+          "timeoutMinutes": 90,
+          "type": "command",
+        },
+        {
+          "clis": [
+            "gh",
+          ],
+          "harness": "claude-code",
+          "id": "rescue",
+          "label": "Rescue (orchestrator)",
+          "model": "opus",
+          "permissionMode": "auto",
+          "position": {
+            "x": 1280,
+            "y": 240,
+          },
+          "prompt": 
+"You take over ONE Trace of an unattended night build ("night-shift"). The worker tried 3 times, and its work does not pass the check. Nobody is awake. Do not ask a question: decide, act, and write down what you decided.
+
+Trace #{{item.number}}: {{item.title}} (Feature #{{item.parent.number}}: {{item.parent.title}})
+You are in the worktree, on the branch \`{{run.branch}}\`. The Trace starts at the commit in \`.build/night/base\`: \`git log --oneline "$(cat .build/night/base)..HEAD"\` shows the work of the worker.
+The issues are in \`.build/night/TRACE.md\` and \`.build/night/FEATURE.md\`.
+
+The check of the worker's last try fails with:
+
+\`\`\`
+{{check.log_tail}}
+\`\`\`
+
+Your task: finish this Trace, so that it does what its claimed scenarios say and the check passes.
+- Keep what is good in the work of the worker, and replace what is wrong. Start again from the base commit when that is faster.
+- Build exactly the claimed scenarios. Do not change the scenario set, and do not edit an issue.
+- Commit on this branch in small Conventional Commits with the trailers \`Scenario:\` and \`Trace: #{{item.number}}\`. Do not push, do not open a pull request, and do not merge: a later step does the delivery.
+- The check is \`python3 tools/night-shift/night-shift.py gate\`. It can take 20 minutes: give your shell tool the timeout 2700000 (milliseconds) for it. Run it until it prints \`GATE PASSED\`.
+- When the Trace cannot be built as written (the spec contradicts the code or itself, or code that it needs is not there), stop, and say why under the heading \`NEEDS_INPUT\` in \`.build/night/REPORT.md\`.
+- At the end, write \`.build/night/REPORT.md\`: what was wrong, what you did, and what the next workers must know.
+
+When this message comes again in the same session, your work did not pass the check after you. Its result (empty the first time):
+
+\`\`\`
+{{check2.log_tail}}
+\`\`\`
+
+Then correct the cause in the code. Do not delete or weaken a test, and do not change the scripts or the allow lists of \`tools/ci/\`. Commit. Run the check again until it prints \`GATE PASSED\`, then update \`.build/night/REPORT.md\`.
+
+Rules of this repository:
+
+- Tests: Swift Testing. Each claimed scenario gets one test with the scenario name as the exact \`@Test("...")\` display name. Test logic, not pixels: tests of pure package code, and \`Edge/\` tests that drive the store, the scene, or the view model. No new XCUITest. The UI smoke set (\`App/UITests/SmokeUITests.swift\`) must keep passing.
+- The model is a fake in each test (see the test doubles of ModelRuntime). No test asks a real model.
+- Determinism: each random number comes from a Seed Stream (\`SeedStream\`). No \`random()\`, no \`Date()\`, and no frame time in the simulation. The simulation has 30 Ticks each second. A test steps Ticks with recorded inputs; it does not sleep and does not use real time.
+- Game State is \`Codable\`. Each new Game State field goes into the save round-trip test of the Run File.
+- Golden fixtures (\`Packages/Tests/Fixtures/\`): change one only when the Trace changes the rules on purpose. Record it again with \`TEST_RUNNER_RECORD_GOLDEN_SEEDS=1\`, read the diff, and commit the fixture in its own commit with the reason.
+- Verticals: pure code imports no SwiftUI, SpriteKit, UIKit, or DesignSystem outside an \`Edge/\` folder. A new target needs its target and its test target in \`Packages/Package.swift\`, and its entry in \`tools/ci/verticals.json\`, in the same commit.
+- Wide Events: one event for each unit of work, emitted one time in a \`defer\`. No \`print\`. No text of the Player and no text of the model in an event.
+- The build has no warnings (a warning is an error). \`swift format lint --strict --recursive App Packages\` passes.
+- Code and comments describe the code as it is now: no history, no old names, no issue numbers, no milestone names.
+- Names use the domain terms of \`docs/glossary.md\`. A generic mechanism gets a generic name.
+- A bug in existing code: first a test that fails, then the fix, in its own \`fix(...)\` commit.
+- Commits: small Conventional Commits (\`feat(run): ...\`, \`test(direction): ...\`) in simple English, with the trailer lines \`Scenario: <scenario name>\` and \`Trace: #<number>\`.
+- Do not change \`.github/\`, the scripts and the allow lists of \`tools/ci/\`, signing, entitlements, or the settings of the Apple developer account. Do not delete or weaken a test to make it pass.
+- \`xcodebuild test\` gets \`-collect-test-diagnostics never -parallel-testing-enabled NO\`. A Swift Testing \`-only-testing\` ID of one test needs \`()\` at its end. Use only the Simulator \`rpg-pool-1\`; do not make or delete a Simulator. Logs go into \`.build/logs/\`.
+- These rules are the short form of \`docs/steering/\` (TECH.md, QA.md). Read a section there only when a rule above does not answer your question."
+,
+          "session": "resume",
+          "timeoutMinutes": 75,
+          "type": "agent",
+        },
+        {
+          "command": 
+"# The check after the rescue: no loose changes, at least one commit, then the script's own gate.
+if [ -n "$(git status --porcelain)" ]; then
+	echo '\`git status\` shows changes that are not committed:'
+	git status --porcelain | head -25
+	exit 1
+fi
+if [ "$(git rev-list --count "$(cat .build/night/base)..HEAD")" = 0 ]; then
+	echo "No commit is on this branch: nothing of the Trace is built."
+	exit 1
+fi
+python3 tools/night-shift/night-shift.py gate"
+,
+          "id": "check2",
+          "label": "Check the rescue",
+          "output": "text",
+          "position": {
+            "x": 1600,
+            "y": 240,
+          },
+          "timeoutMinutes": 90,
+          "type": "command",
+        },
+        {
+          "command": 
+"# Pushes the Trace branch, opens its pull request on the stack, and labels the Trace \`implemented\`.
+set -e
+branch="{{run.branch}}"
+base_branch="{{run.base_branch}}"
+git push --force-with-lease -u origin "$branch"
+# A base branch that is not on GitHub (the run's own branch): the pull request goes on the trunk.
+git ls-remote --exit-code --heads origin "$base_branch" >/dev/null || base_branch=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)
+body=.build/night/pr-body.md
+{
+	printf '## Summary\\n\\n%s. Trace #%s of Feature #%s (%s).\\n' "{{item.title}}" "{{item.number}}" "{{item.parent.number}}" "{{item.parent.title}}"
+	if [ -s .build/night/REPORT.md ]; then
+		printf '\\n### Report of the builder\\n\\n'
+		head -c 2500 .build/night/REPORT.md | sed 's/^/> /'
+		printf '\\n'
+	fi
+	printf '\\n## Changes\\n\\n'
+	git log --reverse --format='- %s' "$(cat .build/night/base)..HEAD"
+	printf '\\n## Test plan\\n\\n'
+	if [ -s .build/night/scenarios.txt ]; then
+		sed 's/^/- [x] /' .build/night/scenarios.txt
+	else
+		echo "- [x] The claimed scenarios of the Trace"
+	fi
+	echo "- [x] The local check against the parent branch: the guards, the format lint, the tests of the affected Verticals, and, for a change in \\\`App/\\\` or \\\`Edge/\\\`, the app builds and the UI smoke set"
+	how="the worker, {{worker.visit}} try(s)"
+	[ -z "{{rescue.visit}}" ] || how="$how, finished by the rescue"
+	printf '\\n## Related\\n\\nCloses #%s\\n\\nBuilt with no person present by the Night Shift flow \`trace\`: %s.\\n' "{{item.number}}" "$how"
+} > "$body"
+# A pull request whose answer got lost is not made twice: look first.
+url=$(gh pr list --head "$branch" --state open --json url --jq '.[0].url // empty')
+if [ -z "$url" ]; then
+	gh pr create --base "$base_branch" --head "$branch" --title "feat: {{item.title}}" --body-file "$body"
+else
+	echo "The pull request is open already: $url"
+fi
+gh issue edit "{{item.number}}" --add-label implemented"
+,
+          "id": "deliver",
+          "label": "Pull request + implemented",
+          "output": "text",
+          "position": {
+            "x": 1920,
+            "y": 0,
+          },
+          "timeoutMinutes": 15,
+          "type": "command",
+        },
+        {
+          "command": 
+"# The rescue did not get the Trace through the check either: the Trace fails, and each Trace that waits on it is blocked.
+# Its work stays on its branch, committed, so the next Trace can check out its own branch.
+if [ -n "$(git status --porcelain)" ]; then
+	git add -A
+	git commit --no-verify -qm "wip: the build of Trace #{{item.number}} that failed" || true
+fi
+echo "Trace #{{item.number}} is blocked: the check failed after the worker and the rescue. Its work stays on the branch {{run.branch}}."
+exit 1"
+,
+          "id": "park",
+          "label": "Blocked: keep the work",
+          "output": "text",
+          "position": {
+            "x": 1920,
+            "y": 240,
+          },
+          "timeoutMinutes": 5,
+          "type": "command",
+        },
+      ],
+      "outputs": [],
+      "start": "prepare",
+      "version": 5,
+    },
+    "issues": [],
+  },
+]
+`;
+
+exports[`published schemas a flow that is not valid gives the same schema issues 1`] = `
+{
+  "flow": null,
+  "issues": [
+    {
+      "message": "start: Use lowercase letters, digits and _, starting with a letter.",
+      "severity": "error",
+    },
+    {
+      "message": "nodes.0.prompt: Invalid input: expected string, received number",
+      "severity": "error",
+    },
+    {
+      "message": "nodes.1.until.kind: Invalid discriminator value. Expected 'duration' | 'time' | 'command' | 'signal'",
+      "severity": "error",
+    },
+    {
+      "message": "nodes.2.flow: Use lowercase letters, digits and -, starting with a letter or digit.",
+      "severity": "error",
+    },
+    {
+      "message": "edges.0.outcome: Use lowercase letters, digits and -, starting with a letter.",
+      "severity": "error",
+    },
+    {
+      "message": "edges.0.max: Too small: expected number to be >0",
+      "severity": "error",
+    },
+  ],
+}
+`;
