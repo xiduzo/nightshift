@@ -13,7 +13,7 @@ import { formatDateTime, formatKnownCost, formatTime } from "@/lib/format";
 import { formatJson, jsonOutput } from "@/lib/run-steps";
 
 import { CodeView, JsonBlock } from "./json-block";
-import { stepDuration } from "./step-timeline";
+import { StepDuration } from "./step-timeline";
 
 /** The selected step on one line: its node, outcome, when, how long, and what it cost. */
 export function StepLine({
@@ -49,7 +49,7 @@ export function StepLine({
 					{formatTime(step.startedAt)}
 				</time>
 				{" · "}
-				{stepDuration(step)}
+				<StepDuration step={step} />
 				{hasCost(step) ? ` · ${formatKnownCost(step)}` : ""}
 			</span>
 		</div>
@@ -96,7 +96,7 @@ export function StepFacts({ step }: { step: StepSummary }) {
 				</time>
 			),
 		},
-		{ label: "Took", value: stepDuration(step) },
+		{ label: "Took", value: <StepDuration step={step} /> },
 	];
 	if (hasCost(step)) {
 		facts.push({ label: "Cost", value: <CostText cost={step} /> });

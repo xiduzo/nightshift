@@ -34,12 +34,7 @@ import {
 	stepState,
 } from "@/components/outcome-badge";
 import type { RunStatus, StepSummary } from "@/lib/api-types";
-import {
-	formatDuration,
-	formatKnownCost,
-	formatTime,
-	sumKnownCost,
-} from "@/lib/format";
+import { formatKnownCost, formatTime, sumKnownCost } from "@/lib/format";
 import {
 	callsFlow,
 	type ItemScope,
@@ -49,16 +44,21 @@ import {
 	stepsUnder,
 } from "@/lib/run-steps";
 
-export function stepDuration(step: StepSummary, now = Date.now()): string {
-	return formatDuration((step.endedAt ?? now) - step.startedAt);
+import { Elapsed } from "./elapsed";
+
+/** How long the step took, counting up while it runs. */
+export function StepDuration({ step }: { step: StepSummary }) {
+	return <Elapsed start={step.startedAt} end={step.endedAt} />;
 }
 
-/** From the first step's start to the last one's end, or now while one runs. */
-function spanOf(list: StepSummary[], now = Date.now()): string | undefined {
+/** From the first step's start to the last one's end, counting up while one runs. */
+function spanOf(list: StepSummary[]): ReactNode {
 	if (list.length === 0) return undefined;
 	const start = Math.min(...list.map((step) => step.startedAt));
-	const end = Math.max(...list.map((step) => step.endedAt ?? now));
-	return formatDuration(end - start);
+	const end = list.some((step) => step.endedAt === null)
+		? null
+		: Math.max(...list.map((step) => step.endedAt ?? 0));
+	return <Elapsed start={start} end={end} />;
 }
 
 /** What the steps that can cost cost together; undefined when none did. */
@@ -290,7 +290,7 @@ function RowStats({
 	cost,
 }: {
 	badge: ReactNode;
-	duration: string | undefined;
+	duration: ReactNode;
 	durationTitle?: string;
 	cost: string | undefined;
 }) {
@@ -381,7 +381,7 @@ function StepRow({
 			) : null}
 			<RowStats
 				badge={<OutcomeBadge state={stepState(step, runStatus)} />}
-				duration={stepDuration(step)}
+				duration={<StepDuration step={step} />}
 				durationTitle={`Started ${formatTime(step.startedAt)}`}
 				cost={cost}
 			/>
@@ -405,7 +405,7 @@ function GroupRow({
 }: {
 	label: ReactNode;
 	badge: ReactNode;
-	duration: string | undefined;
+	duration: ReactNode;
 	cost: string | undefined;
 	depth: number;
 	stepCount: number;

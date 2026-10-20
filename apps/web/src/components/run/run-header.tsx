@@ -60,12 +60,12 @@ import {
 	dayWord,
 	formatDateTime,
 	formatDayTime,
-	formatDuration,
 	formatTime,
 } from "@/lib/format";
 import { SERVER_URL } from "@/lib/server-url";
 import { orpc } from "@/utils/orpc";
 
+import { Elapsed } from "./elapsed";
 import { MoveMenu } from "./move-menu";
 import { WalkerBadge, walkerName } from "./walker-badge";
 
@@ -90,10 +90,10 @@ export function RunTitle({
 	reconnecting: boolean;
 }) {
 	const stoppable = STOPPABLE.includes(status);
-	const lastEnd = Math.max(
-		run.createdAt,
-		...steps.map((step) => step.endedAt ?? Date.now()),
-	);
+	// Counts up while a step runs; otherwise ends at the last step's end.
+	const lastEnd = steps.some((step) => step.endedAt === null)
+		? null
+		: Math.max(run.createdAt, ...steps.map((step) => step.endedAt ?? 0));
 
 	return (
 		<div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-3 lg:px-5 lg:pt-4">
@@ -140,7 +140,7 @@ export function RunTitle({
 			</div>
 			<p className="ml-auto shrink-0 text-muted-foreground text-sm tabular-nums">
 				<span className="sr-only">Ran for </span>
-				{formatDuration(lastEnd - run.createdAt)}
+				<Elapsed start={run.createdAt} end={lastEnd} />
 				<span aria-hidden="true"> · </span>
 				<span className="sr-only">, cost </span>
 				<CostText cost={run} />
