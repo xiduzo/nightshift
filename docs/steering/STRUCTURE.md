@@ -139,20 +139,22 @@ These are signals, not hard limits. A file past the limit needs a reason in its 
 ```
 apps/web/src/
   router.tsx               the router and its query client (TanStack Start reads it here)
-  routes/                  thin TanStack Router files: createFileRoute + one page from a vertical
+  routes/                  thin TanStack Router files: createFileRoute, search and params, one page from a vertical
   shared/
     api/                   the oRPC client, query client, server URL, auth client, refusal codes, contract.ts (every derived API type)
     page/                  the parts of a page: site header, page heading, loader, logo
-    shell/                 the app frame: sidebar, night notifications
+    shell/                 the app frame (AppShell): theme, sidebar, toasts, night notifications
     format/  code/  data-table/  media-query/   other named cross-cutting pieces, each with a barrel
   features/
     <vertical>/            projects, flows, runs, gates, schedules, agents, devices, settings, spaces, access, dashboard
       index.ts             the barrel: the only public surface
       queries.ts           query and mutation option factories, polling rules (or queries/ + mutations/)
+      <name>-page.tsx      the page a route renders
       types.ts             this vertical's slice of the API types, when contract.ts is not enough
       components/ hooks/ lib/   when the vertical is big enough
     flows/                 canvas/, editor/ (+ editor/lib/), start/ (Start run, the flow's inputs)
-    runs/                  components/, hooks/, lib/, transcript/
+    runs/                  components/ (+ run-page.tsx), hooks/, lib/, transcript/
+    settings/              settings-page.tsx, components/ (one file per card), hooks/use-settings-form.ts
 ```
 
 Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fails a cycle through barrels too.
@@ -160,12 +162,15 @@ Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fai
 - Routes and `router.tsx` may import any vertical, through its barrel.
 - `shared/shell` composes the features. It is the only shared piece that imports a feature. No feature imports it.
 - The other shared pieces import no feature. Every feature may use them.
-- The features, from the bottom: `access`, `spaces`, `projects`, `agents`, `settings` (shared only), then `flows`, `devices`, `gates`, `runs`, then `schedules` and `dashboard`. A feature imports only features below it.
-- `devices` and `runs` show each other (the Walker of a run, the runs of an Offer). That is the one exception to the order: `devices` reaches the run status badge through a peer port (`scripts/check-verticals.ts`).
+- The features, from the bottom: `access`, `spaces`, `projects`, `agents`, then `flows`, `devices`, `gates`, `runs`, then `settings`, `schedules` and `dashboard`. A feature imports only features below it. The Settings page shows projects, flows, runs and agent defaults, so `settings` sits above them.
+- Data can go the other way. Examples: the flow editor reads the settings, and the inbox lists runs. A vertical below the owner of the data imports the owner's `queries.ts` through a peer port (`scripts/check-verticals.ts`), not its barrel. A `queries.ts` imports only `shared/api`, so the port closes no cycle. Today `agents`, `flows` and `devices` read `settings/queries`. `flows` and `gates` read `runs/queries`. `agents` reads `devices/queries` (the Offers of a profile).
+- `devices` and `runs` show each other (the Walker of a run, the runs of an Offer). `devices` reaches the run status badge through a peer port.
 - A concept goes to the vertical that owns it in `docs/glossary.md`, not to its biggest user. Outcomes are declared by flow nodes, so `outcome-badge` is in `flows/canvas`. The Walker is a Device, so `walker-badge` is in `devices`.
 
-- A route file loads data (`loader`, `ensureQueryData`) and renders one page from a vertical's barrel. It holds no other markup.
-- Query options live in the vertical's queries. A component does not build `orpc.x.y.queryOptions(...)` for another vertical's data. It imports that vertical's factory from its barrel.
+- A route file declares the route (path, `ssr`, search and params validation) and renders one page from a vertical's barrel. It gives the params and the search to the page as props. It holds no other markup.
+- A route loads data in a `loader` (`ensureQueryData`) only when that does not change what the person sees. No route has a loader today. The build prerenders the pages, so a loader also runs at build time. A loader that waits for data also blocks the navigation. Each page shows its own skeleton and its own error instead.
+- Query options live in the vertical's queries. A component does not build `orpc.x.y.queryOptions(...)` for another vertical's data. It imports that vertical's factory from its barrel, or from its `queries.ts` through a peer port (see above).
+- A query factory keeps the query key of the oRPC procedure (`orpc.x.y.queryOptions({ input })`). A polling rule (`refetchInterval` and its `meta`) is part of the factory, in the vertical that owns the data. A call site adds only its own options (`enabled`, `select`, `staleTime`).
 - API types come from `shared/api` (`InferClientOutputs`). Never derive them again in a component.
 - Rules that `@nightshift/flows` or the engine already has are imported, not copied. Example: template references, the harness catalog.
 - UI follows `AGENTS.md`: shadcn components only.
@@ -198,7 +203,7 @@ When a check exists, change its status to "Active". When a workspace follows sec
 
 The code does not yet follow every rule. These are debts. Do not copy them into new code.
 
-- `apps/web` has fat routes: `settings.tsx`, `runs/$runId.tsx`, `members.tsx`, `devices.tsx`, `index.tsx`. Components build `orpc.x.y.queryOptions(...)` inline, and no vertical has a `queries.ts` yet. God files: `flows/editor/node-inspector.tsx`, `flows/flow-draft.ts`, `runs/transcript/step-transcript.tsx`.
+- `apps/web` god files: `flows/editor/node-inspector.tsx`, `flows/flow-draft.ts`, `runs/transcript/step-transcript.tsx`. `routes/_auth/dashboard.tsx` holds its own markup: it is the old sign-in placeholder. `shared/api/orpc.ts` builds the account status key itself: the query client sends a refused session to sign in, and `shared/api` imports no feature.
 - `packages/engine/src/run/engine.ts` is a god file: flow-file CRUD, the exchange glue, Offers, and raw queries of the `device`, `run` and `step` tables. `graph/` has a value import cycle through `node-kinds.ts`.
 - The devices domain is split over four places (see section 2).
 - `apps/server/src/services.ts` starts the daemon at import time. `apps/desktop` imports the server app through a temporary `exports` map in `apps/server/package.json`. The layer check allows `desktop` → `server` with a temporary exception.
