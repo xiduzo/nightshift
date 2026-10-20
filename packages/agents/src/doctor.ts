@@ -208,7 +208,10 @@ function olderThan(a: string, b: string): boolean {
 async function piCheck(bin: string): Promise<CliCheck> {
 	const { resolved, ...check } = await baseCheck(bin, "pi");
 	if (!resolved || check.problem) return check;
-	const version = check.version?.match(/\d+\.\d+\.\d+/)?.[0];
+	// pi 0.73 prints its version to stderr.
+	const printed =
+		check.version ?? firstLine((await run([resolved, "--version"])).stderr);
+	const version = printed?.match(/\d+\.\d+\.\d+/)?.[0];
 	if (!version) return check;
 	if (olderThan(version, PI_MIN_VERSION)) {
 		return {

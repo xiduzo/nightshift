@@ -300,7 +300,8 @@ describe("checkHarness: pi", () => {
 	});
 
 	test("an older pi is a problem: pi-acp would wait for it forever", async () => {
-		const bin = await fakeCli("pi", { "--version": { stdout: "0.73.0\n" } });
+		// pi 0.73 prints its version to stderr.
+		const bin = await fakeCli("pi", { "--version": { stderr: "0.73.0\n" } });
 		expect((await checkHarness("pi", bin)).problem).toBe(
 			"pi 0.73.0 is too old. Night Shift needs pi 0.81 or later. Update pi, or enter the path of a newer one.",
 		);
