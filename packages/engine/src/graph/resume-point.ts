@@ -389,23 +389,76 @@ export function reenteredNode(events: readonly LoggedEvent[]): string | null {
 export function reentryUpdate(
 	flow: Flow,
 	events: readonly LoggedEvent[],
+	reentered: string | null = reenteredNode(events),
 ): RunStateUpdate {
-	const reentered = reenteredNode(events);
+	return {
+		inputs: deriveInputs(events),
+		stopAt: deriveStopAt(events),
+		visits: loggedVisits(flow, events, reentered),
+		nodes: deriveNodeOutputs(events, ""),
+		traversals: deriveTraversals(events, ""),
+		ended: null,
+		pending: null,
+	};
+}
+
+/**
+ * The committed visits of every top-level node, as the log counts them:
+ * every step of the node ended or was taken over by the walk, so none is
+ * left for `uncommittedStep` to take up. `reentered`'s last visit stays
+ * uncommitted (its count is one less).
+ */
+export function loggedVisits(
+	flow: Flow,
+	events: readonly LoggedEvent[],
+	reentered: string | null,
+): Record<string, number> {
 	const visits: Record<string, number> = {};
 	for (const node of flow.nodes) {
 		const count =
 			countVisits(events, node.id, "") - (node.id === reentered ? 1 : 0);
 		if (count > 0) visits[node.id] = count;
 	}
-	return {
-		inputs: deriveInputs(events),
-		stopAt: deriveStopAt(events),
-		visits,
-		nodes: deriveNodeOutputs(events, ""),
-		traversals: deriveTraversals(events, ""),
-		ended: null,
-		pending: null,
-	};
+	return visits;
+}
+
+/**
+ * How a new visit of an Agent node runs because a person ran the flow again
+ * from it (`RunResumed` with `action: "rerun"`): it continues the harness
+ * session of the step `stepId` names with the follow-up `prompt`, or, with
+ * `stepId` null, starts a fresh session with the node's own prompt (also on
+ * a node with `session: "resume"`). Only for the first step the rerun walk
+ * opens, when it is this node's at the top level: later visits run as the
+ * node says. `events` is the log before the visit's own `StepStarted`.
+ * Undefined for any other visit.
+ */
+export function rerunEntryOf(
+	node: Pick<FlowNode, "id">,
+	events: readonly LoggedEvent[],
+	scope: Scope | null,
+): { harnessSessionId: string; prompt: string } | null | undefined {
+	if (scope) return undefined;
+	let resumed: Extract<LoggedEvent, { type: "RunResumed" }> | undefined;
+	for (const e of events) {
+		if (e.type === "RunResumed" && (!resumed || e.seq > resumed.seq)) {
+			resumed = e;
+		}
+	}
+	if (resumed?.payload.action !== "rerun") return undefined;
+	if (resumed.payload.nodeId !== node.id) return undefined;
+	const after = resumed.seq;
+	// A step the rerun walk opened already: this visit is a later one.
+	const opened = events.some(
+		(e) =>
+			e.seq > after && (e.type === "StepStarted" || e.type === "StepReopened"),
+	);
+	if (opened) return undefined;
+	const { stepId: from, prompt } = resumed.payload;
+	if (from === null) return null;
+	const session = sessionOf(deriveSteps(events).find((s) => s.id === from));
+	return session
+		? { harnessSessionId: session, prompt: prompt ?? DEFAULT_RESUME_PROMPT }
+		: null;
 }
 
 /** What `RunResumed` records (`resumeTarget`). */

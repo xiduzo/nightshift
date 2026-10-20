@@ -42,7 +42,7 @@ import {
 	sessionCostUnknown,
 	warnDeciderCost,
 } from "../cost";
-import { RESUME_RULES, type ResumePoint } from "../resume-point";
+import { RESUME_RULES, type ResumePoint, rerunEntryOf } from "../resume-point";
 import { scopeOf } from "../route";
 import type { RunStateValues } from "../state";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
@@ -73,11 +73,26 @@ export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 	return (state, config) =>
 		runStep(ctx, node, state, config, {
 			rules: AGENT.resumeRules(node),
-			body: (step, entry) =>
-				runSession(ctx, node, step, {
-					prompt: entry.kind === "new" ? null : entry.prompt,
-					resumeSessionId: resumeSessionOf(node, entry, state, step, config),
-				}),
+			body: (step, entry) => {
+				// The first visit of a rerun from this node: the person chose
+				// to continue a session, or to start fresh.
+				const rerun =
+					entry.kind === "new"
+						? rerunEntryOf(node, step.events, scopeOf(config))
+						: undefined;
+				return runSession(ctx, node, step, {
+					prompt:
+						rerun !== undefined
+							? (rerun?.prompt ?? null)
+							: entry.kind === "new"
+								? null
+								: entry.prompt,
+					resumeSessionId:
+						rerun !== undefined
+							? (rerun?.harnessSessionId ?? null)
+							: resumeSessionOf(node, entry, state, step, config),
+				});
+			},
 		});
 }
 

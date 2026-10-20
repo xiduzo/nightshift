@@ -7,6 +7,7 @@ import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import {
 	countDaemonResumes,
 	deriveRunState,
+	deriveSteps,
 	deriveStopAt,
 	type EngineEventType,
 	groupByRun,
@@ -21,10 +22,11 @@ import {
 	messageOf,
 	type RunRow,
 } from "./graph/context";
-import { resumeTarget } from "./graph/resume-point";
+import { latestStepOf, resumeTarget, sessionOf } from "./graph/resume-point";
 import type { Runner, ThreadState } from "./graph/runner";
 import type { RunLog } from "./run-log";
 import type { RunSettings } from "./settings";
+import type { RunStatus } from "./types";
 
 /**
  * Recovery: what a daemon does about runs that did not end on their own.
@@ -51,6 +53,22 @@ const INTERRUPTED_REASON = "Night Shift stopped while this run ran.";
 /** A person asked to resume a run another Device walks. */
 export const WALKED_ELSEWHERE =
 	"Another device runs this run. Resume it on that device.";
+/** A person asked to restart a step of a run another Device walks. */
+export const RESTART_ELSEWHERE =
+	"Another device runs this run. Restart the step on that device.";
+/** A person asked to run a run another Device walks again. */
+export const RERUN_ELSEWHERE =
+	"Another device runs this run. Run it again on that device.";
+/** Why a run that runs no step has no step to restart. */
+const NOT_RUNNING: Record<Exclude<RunStatus, "running">, string> = {
+	waiting:
+		"This run waits at a Gate. Answer the Gate, or stop the run and resume it.",
+	sleeping: "This run sleeps. Wake it to continue now.",
+	finished: "This run has ended. Run it again from a step instead.",
+	failed: "This run has ended. Resume it, or run it again from a step.",
+	stopped: "This run has ended. Resume it, or run it again from a step.",
+	interrupted: "This run has ended. Resume it, or run it again from a step.",
+};
 /** Daemon resumes in a row (no person in between) before a run waits for a person. */
 const MAX_DAEMON_RESUMES = 3;
 const DAEMON_RESUME_REASON = "Night Shift restarted.";
@@ -347,74 +365,250 @@ export function createRecovery(deps: RecoveryDeps) {
 		}
 		runner.reserveSlot(runId);
 		try {
+			await continueThread(row, input);
+		} finally {
+			runner.releaseStartingSlot(runId);
+		}
+	}
+
+	/**
+	 * The resume itself, on a run whose slot the caller holds: refuses a run
+	 * that runs, waits or sleeps, appends `RunResumed`, and moves the thread
+	 * by its checkpoint (see `resume`).
+	 */
+	async function continueThread(
+		row: RunRow,
+		input: { by: ResumedBy; prompt?: string; action?: "restart" },
+	): Promise<void> {
+		const { prompt } = input;
+		const runId = row.id;
+		const events = await log.events(runId);
+		refuseLive(deriveRunState(events).status);
+		const flow = deps.flowOf(row);
+		const target = resumeTarget(events) ?? {
+			nodeId: flow.start,
+			stepId: null,
+			scope: null,
+			topNodeId: flow.start,
+		};
+		const thread: ThreadState = await runner.threadState(row);
+		const resumedPrompt =
+			prompt ??
+			(input.by === "daemon" ? DAEMON_RESUME_PROMPT : DEFAULT_RESUME_PROMPT);
+		const clearStopAt = stopTimePassed(events);
+		await log.append({
+			type: "RunResumed",
+			runId,
+			payload: {
+				nodeId: target.nodeId,
+				stepId: target.stepId,
+				prompt: target.stepId ? resumedPrompt : null,
+				scope: target.scope,
+				...(clearStopAt ? { clearStopAt: true } : {}),
+				by: input.by,
+				...(input.by === "daemon" ? { reason: DAEMON_RESUME_REASON } : {}),
+				...(input.action ? { action: input.action } : {}),
+			},
+		});
+		const update = clearStopAt ? { stopAt: null } : undefined;
+		switch (thread.kind) {
+			case "interrupted":
+				runner.resume(
+					row,
+					thread.value.kind === "gate"
+						? { kind: "reopen" }
+						: { kind: "resume", prompt: resumedPrompt },
+					update,
+				);
+				break;
+			case "pending":
+				runner.continueRun(row, update);
+				break;
+			case "ended":
+			case "fresh":
+				await runner.reenter(row, target.topNodeId, events, update);
+				break;
+		}
+	}
+
+	/** Throws for a run that is still going: it must stop first. */
+	function refuseLive(status: RunStatus): void {
+		if (status === "running") {
+			throw new Error(
+				"This run is still running. Stop it or wait for it to end.",
+			);
+		}
+		if (status === "waiting") {
+			throw new Error(
+				"This run waits at a Gate. Answer the Gate, or stop the run first.",
+			);
+		}
+		if (status === "sleeping") {
+			throw new Error(
+				"This run sleeps until a wait ends. Resume it again to wake it now.",
+			);
+		}
+	}
+
+	/**
+	 * A resume past the stop time clears it: in the log, and in the
+	 * thread's state before the node continues.
+	 */
+	function stopTimePassed(events: readonly LoggedEvent[]): boolean {
+		const stopAt = deriveStopAt(events);
+		return stopAt !== null && now() >= stopAt;
+	}
+
+	/**
+	 * Stops the running step and continues it at once, as a stop now and a
+	 * resume would, in one action (`runner.restart`): nothing comes in
+	 * between, the old drive is fenced off and its harness aborted before
+	 * the resume reads the log, and the run keeps its slot. The resume is
+	 * `continueThread`'s, so the step continues as Resume continues it: an
+	 * Agent step with a harness session reopens it with `prompt` (default
+	 * "Continue where you left off."), any other step runs again.
+	 *
+	 * Refused unless a step runs: for a run another Device walks, a run that
+	 * waits, sleeps or ended, and between steps. With `stepId`, also when
+	 * that step is no longer open (it ended, and the run went on).
+	 */
+	async function restartStep(
+		runId: string,
+		input: { by: ResumedBy; prompt?: string; stepId?: string },
+	): Promise<void> {
+		const row = await getRunRow(db, runId);
+		if (row.walkerId !== (await log.walkerId())) {
+			throw new Error(RESTART_ELSEWHERE);
+		}
+		await runner.restart(
+			runId,
+			(events) => {
+				const status = deriveRunState(events).status;
+				if (status !== "running") throw new Error(NOT_RUNNING[status]);
+				const open = deriveSteps(events).filter((s) => s.endedAt === null);
+				if (open.length === 0) {
+					throw new Error(
+						"No step runs right now. Try again when the next step starts.",
+					);
+				}
+				if (
+					input.stepId !== undefined &&
+					!open.some((s) => s.id === input.stepId)
+				) {
+					throw new Error(
+						"That step has ended. Restart the step that runs now.",
+					);
+				}
+			},
+			() =>
+				continueThread(row, {
+					by: input.by,
+					action: "restart",
+					...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
+				}),
+		);
+	}
+
+	/**
+	 * Walks a run that ended again from `nodeId`, a node of its own flow
+	 * (not of a flow a Call node calls), with a new visit of it
+	 * (`runner.rerun`). The steps after it run again as the flow routes;
+	 * inputs, node outputs and edge counts carry over.
+	 *
+	 * An Agent node continues the harness session of its step `stepId`
+	 * (default: its latest top-level step) with `prompt` (default "Continue
+	 * where you left off."), unless `fresh`: then it starts a new session
+	 * with the node's own prompt. The new visit finds which in `RunResumed`
+	 * (`rerunEntryOf`). Any other node runs as
+	 * the flow says.
+	 *
+	 * Refused for a run another Device walks, a run that runs, waits or
+	 * sleeps, and a node the run's flow does not have at the top level.
+	 */
+	async function rerunFrom(
+		runId: string,
+		input: {
+			by: ResumedBy;
+			nodeId: string;
+			stepId?: string;
+			prompt?: string;
+			fresh?: boolean;
+		},
+	): Promise<void> {
+		const row = await getRunRow(db, runId);
+		if (row.walkerId !== (await log.walkerId())) {
+			throw new Error(RERUN_ELSEWHERE);
+		}
+		const flow = deps.flowOf(row);
+		if (!flow.nodes.some((n) => n.id === input.nodeId)) {
+			throw new Error(
+				`This run's flow has no node "${input.nodeId}". Pick a step of the run's own flow, not one inside a called flow.`,
+			);
+		}
+		runner.reserveSlot(runId);
+		try {
 			const events = await log.events(runId);
-			const status = deriveRunState(events).status;
-			if (status === "running") {
+			refuseLive(deriveRunState(events).status);
+			const last =
+				input.stepId === undefined
+					? latestStepOf({ id: input.nodeId }, events, null)
+					: deriveSteps(events).find((s) => s.id === input.stepId);
+			if (
+				input.stepId !== undefined &&
+				(last?.nodeId !== input.nodeId || last.scope !== null)
+			) {
 				throw new Error(
-					"This run is still running. Stop it or wait for it to end.",
+					`That step is not a step of "${input.nodeId}" in the run's own flow.`,
 				);
 			}
-			if (status === "waiting") {
-				throw new Error(
-					"This run waits at a Gate. Answer the Gate, or stop the run first.",
-				);
-			}
-			if (status === "sleeping") {
-				throw new Error(
-					"This run sleeps until a wait ends. Resume it again to wake it now.",
-				);
-			}
-			const flow = deps.flowOf(row);
-			const target = resumeTarget(events) ?? {
-				nodeId: flow.start,
-				stepId: null,
-				scope: null,
-				topNodeId: flow.start,
-			};
-			const thread: ThreadState = await runner.threadState(row);
-			const resumedPrompt =
-				prompt ??
-				(input.by === "daemon" ? DAEMON_RESUME_PROMPT : DEFAULT_RESUME_PROMPT);
-			const stopAt = deriveStopAt(events);
-			// A resume past the stop time clears it: in the log, and in the
-			// thread's state before the node continues.
-			const clearStopAt = stopAt !== null && now() >= stopAt;
+			const continued =
+				!input.fresh && last?.nodeType === "agent" && sessionOf(last) !== null
+					? last
+					: null;
+			const clearStopAt = stopTimePassed(events);
 			await log.append({
 				type: "RunResumed",
 				runId,
 				payload: {
-					nodeId: target.nodeId,
-					stepId: target.stepId,
-					prompt: target.stepId ? resumedPrompt : null,
-					scope: target.scope,
+					nodeId: input.nodeId,
+					stepId: continued?.id ?? null,
+					prompt: continued ? (input.prompt ?? DEFAULT_RESUME_PROMPT) : null,
+					scope: null,
 					...(clearStopAt ? { clearStopAt: true } : {}),
 					by: input.by,
-					...(input.by === "daemon" ? { reason: DAEMON_RESUME_REASON } : {}),
+					action: "rerun",
 				},
 			});
-			const update = clearStopAt ? { stopAt: null } : undefined;
-			switch (thread.kind) {
-				case "interrupted":
-					runner.resume(
-						row,
-						thread.value.kind === "gate"
-							? { kind: "reopen" }
-							: { kind: "resume", prompt: resumedPrompt },
-						update,
-					);
-					break;
-				case "pending":
-					runner.continueRun(row, update);
-					break;
-				case "ended":
-				case "fresh":
-					await runner.reenter(row, target.topNodeId, events, update);
-					break;
+			try {
+				await runner.rerun(
+					row,
+					input.nodeId,
+					events,
+					clearStopAt ? { stopAt: null } : undefined,
+				);
+			} catch (error) {
+				// No drive took the run: end the walk `RunResumed` began.
+				await log.append({
+					type: "RunEnded",
+					runId,
+					payload: {
+						status: "failed",
+						reason: `The run could not start again: ${messageOf(error)}`,
+					},
+				});
+				throw error;
 			}
 		} finally {
 			runner.releaseStartingSlot(runId);
 		}
 	}
 
-	return { recoverInterruptedWork, armResumes, resume, onSlotFreed };
+	return {
+		recoverInterruptedWork,
+		armResumes,
+		resume,
+		restartStep,
+		rerunFrom,
+		onSlotFreed,
+	};
 }

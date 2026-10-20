@@ -372,6 +372,48 @@ const runs = {
 		.handler(({ context, input }) =>
 			context.space.resumeRun(input.runId, input.prompt),
 		),
+	/**
+	 * Stops the running step and continues it at once, with an optional
+	 * follow-up prompt. With `stepId`, only while that step runs.
+	 */
+	restartStep: permitted({ run: ["stop", "resume"] })
+		.input(
+			z.object({
+				runId: z.string(),
+				stepId: z.string().min(1).optional(),
+				prompt: z.string().min(1).optional(),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.space.restartStep(input.runId, {
+				...(input.stepId !== undefined ? { stepId: input.stepId } : {}),
+				...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
+			}),
+		),
+	/**
+	 * Runs a run that is not going again from a node of its own flow. An
+	 * Agent node continues its last session with the prompt, or with
+	 * `fresh` starts a new one.
+	 */
+	rerun: permitted({ run: ["resume"] })
+		.input(
+			z.object({
+				runId: z.string(),
+				nodeId: z.string().min(1),
+				/** The step of that node whose session an Agent continues. Default: its latest. */
+				stepId: z.string().min(1).optional(),
+				prompt: z.string().min(1).optional(),
+				fresh: z.boolean().optional(),
+			}),
+		)
+		.handler(({ context, input }) =>
+			context.space.rerunFrom(input.runId, {
+				nodeId: input.nodeId,
+				...(input.stepId !== undefined ? { stepId: input.stepId } : {}),
+				...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
+				...(input.fresh ? { fresh: true } : {}),
+			}),
+		),
 	/** Live transcript and status over SSE. Replays from disk first. */
 	watch: protectedProcedure
 		.input(

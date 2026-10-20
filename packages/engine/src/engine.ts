@@ -97,8 +97,9 @@ import { listBranches } from "./worktrees";
  *
  * - `run-start.ts`: `startRun` validates, checks what this daemon has,
  *   writes `RunStarted` and hands the thread to the runner.
- * - `recovery.ts`: startup recovery, the daemon's automatic resume and
- *   `resumeRun` (both append `RunResumed` before the thread moves).
+ * - `recovery.ts`: startup recovery, the daemon's automatic resume,
+ *   `resumeRun`, `restartStep` and `rerunFrom` (each appends `RunResumed`
+ *   before the thread moves).
  * - `read-model.ts`: the summaries, `getRun`, `listGates`, `watchRun`.
  * - `scheduler.ts`: starts the runs of `.nightshift/schedules.json`.
  * - `projects.ts`: projects by remote and their Clones on this computer.
@@ -875,6 +876,28 @@ export function createEngine(
 				await recovery.resume(runId, {
 					by: "person",
 					...(prompt !== undefined ? { prompt } : {}),
+				});
+			},
+
+			async restartStep(runId, options) {
+				await ready;
+				await getRunRow(runId, spaceId);
+				await recovery.restartStep(runId, {
+					by: "person",
+					...(options?.prompt !== undefined ? { prompt: options.prompt } : {}),
+					...(options?.stepId !== undefined ? { stepId: options.stepId } : {}),
+				});
+			},
+
+			async rerunFrom(runId, options) {
+				await ready;
+				await getRunRow(runId, spaceId);
+				await recovery.rerunFrom(runId, {
+					by: "person",
+					nodeId: options.nodeId,
+					...(options.stepId !== undefined ? { stepId: options.stepId } : {}),
+					...(options.prompt !== undefined ? { prompt: options.prompt } : {}),
+					...(options.fresh ? { fresh: true } : {}),
 				});
 			},
 

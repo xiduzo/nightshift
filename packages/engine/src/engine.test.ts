@@ -1102,6 +1102,467 @@ describe("stop and resume", () => {
 	});
 });
 
+describe("restart a step", () => {
+	test("a session that hangs after its work restarts in one action: the old one is aborted and fenced, the same session continues", async () => {
+		// The incident: the agent is done, but its session never ends and
+		// ignores the abort.
+		const { harness, sessions } = scriptedHarness({ hang: true });
+		const engine = makeEngine(harness, { maxConcurrentRuns: 1 });
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[agent("worker", "Build it"), command("check", "echo ok")],
+				[edge("e1", "worker", "pass", "check")],
+			),
+		});
+		const hung = await waitFor(() => sessions[0]);
+		hung.text("All done.");
+		await waitFor(async () =>
+			(await engine.getRun(run.id)).steps[0]?.sessions[0]?.harnessSessionId
+				? true
+				: null,
+		);
+
+		// The run cap of one: the restart keeps the run's slot.
+		await engine.restartStep(run.id, { prompt: "Report your result now." });
+		expect(hung.input.signal.aborted).toBe(true);
+		const second = await waitFor(() => sessions[1], { label: "restart" });
+		expect(second.input.resumeSessionId).toBe("harness-0");
+		expect(second.input.prompt).toBe("Report your result now.");
+		expect(second.input.signal.aborted).toBe(false);
+		expect(await statusOf(engine, run.id)).toBe("running");
+		const types = await loggedTypes();
+		const at = types.lastIndexOf("StopRequested");
+		expect(types.slice(at, at + 6)).toEqual([
+			"StopRequested",
+			"SessionEnded",
+			"StepEnded",
+			"RunEnded",
+			"RunResumed",
+			"StepReopened",
+		]);
+
+		// The old session ends much later: it writes nothing.
+		const before = await loggedTypes();
+		hung.finish(1);
+		await Bun.sleep(100);
+		expect(await loggedTypes()).toEqual(before);
+
+		second.finish(0.25);
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps.map((s) => [s.nodeId, s.visit, s.outcome])).toEqual([
+			["worker", 1, "pass"],
+			["check", 1, "pass"],
+		]);
+		expect(detail.steps[0]?.sessions.map((s) => s.outcome)).toEqual([
+			"stopped",
+			"finished",
+		]);
+		expect(detail.resumes).toEqual([
+			{
+				at: expect.any(Number),
+				by: "person",
+				nodeId: "worker",
+				reason: null,
+				action: "restart",
+			},
+		]);
+		expect(detail.costUsd).toBeCloseTo(0.25);
+	});
+
+	test("without a prompt, the restart uses Resume's follow-up; a step with no session runs again", async () => {
+		const { harness, sessions } = scriptedHarness({ hang: true, silent: true });
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([agent("worker", "Build it")]),
+		});
+		const hung = await waitFor(() => sessions[0]);
+		await engine.restartStep(run.id);
+		expect(hung.input.signal.aborted).toBe(true);
+		const second = await waitFor(() => sessions[1], { label: "restart" });
+		// The harness never named its session: nothing to continue.
+		expect(second.input.resumeSessionId).toBeUndefined();
+		expect(second.input.prompt).toBe("Build it");
+		second.emit({ type: "session", sessionId: "s2", model: "sonnet" });
+		second.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect(
+			(await engine.getRun(run.id)).steps.map((s) => [s.visit, s.outcome]),
+		).toEqual([
+			[1, "stopped"],
+			[2, "pass"],
+		]);
+
+		const { harness: h2, sessions: s2 } = scriptedHarness({ hang: true });
+		const other = makeEngine(h2);
+		const run2 = await other.startRun({
+			projectId: await projectId(other),
+			flow: flowOf([agent("worker", "Build it")]),
+		});
+		await waitFor(() => s2[0]);
+		await waitFor(async () =>
+			(await other.getRun(run2.id)).steps[0]?.sessions[0]?.harnessSessionId
+				? true
+				: null,
+		);
+		await other.restartStep(run2.id);
+		const again = await waitFor(() => s2[1], { label: "restart" });
+		expect(again.input.prompt).toBe("Continue where you left off.");
+		expect(again.input.resumeSessionId).toBe("harness-0");
+		again.finish();
+		expect(await waitForEnd(other, run2.id)).toBe("finished");
+	});
+
+	test("a restart racing a session that ends: one of them wins, and the log stays whole", async () => {
+		for (const delay of [-1, 0, 1, 5, 20]) {
+			const { harness, sessions } = scriptedHarness();
+			const engine = makeEngine(harness);
+			const run = await engine.startRun({
+				projectId: await projectId(engine),
+				flow: flowOf([agent("worker", "Build it")]),
+			});
+			const first = await waitFor(() => sessions[0]);
+			await waitFor(async () =>
+				(await engine.getRun(run.id)).steps[0]?.sessions[0]?.harnessSessionId
+					? true
+					: null,
+			);
+			first.finish(0.5);
+			if (delay >= 0) await Bun.sleep(delay);
+			const restarted = await engine.restartStep(run.id).then(
+				() => true,
+				(error: Error) => error.message,
+			);
+			if (restarted === true) {
+				const second = await waitFor(() => sessions[1], {
+					label: `the restart after ${delay} ms`,
+				});
+				second.finish(0.25);
+			} else {
+				// The session ended first and the run finished: nothing to restart.
+				expect(restarted).toMatch(/has ended|ended before it could restart/);
+				expect(sessions).toHaveLength(1);
+			}
+			expect(await waitForEnd(engine, run.id)).toBe("finished");
+			const detail = await engine.getRun(run.id);
+			expect(detail.steps).toHaveLength(1);
+			expect(detail.steps[0]?.outcome).toBe("pass");
+			const types = (
+				await sandbox.db
+					.select()
+					.from(event)
+					.where(eq(event.runId, run.id))
+					.orderBy(asc(event.seq))
+			).map((e) => e.type);
+			// Every opening of the step ends once, every session ends once,
+			// and the run ends once per walk.
+			const count = (type: string) => types.filter((t) => t === type).length;
+			expect(count("StepEnded")).toBe(
+				count("StepStarted") + count("StepReopened"),
+			);
+			expect(count("SessionEnded")).toBe(count("SessionStarted"));
+			expect(count("RunEnded")).toBe(1 + count("RunResumed"));
+			expect(count("RunResumed")).toBe(restarted === true ? 1 : 0);
+		}
+	});
+
+	test("a restart for a step that ended meanwhile is refused, and the run goes on", async () => {
+		const { harness, sessions } = scriptedHarness();
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[agent("worker", "Build it"), agent("reviewer", "Review it")],
+				[edge("e1", "worker", "pass", "reviewer")],
+			),
+		});
+		(await waitFor(() => sessions[0])).finish();
+		const second = await waitFor(() => sessions[1]);
+		const workerStep = (await engine.getRun(run.id)).steps[0];
+		await expect(
+			engine.restartStep(run.id, { stepId: workerStep?.id ?? "" }),
+		).rejects.toThrow("That step has ended");
+		expect(second.input.signal.aborted).toBe(false);
+		expect(await statusOf(engine, run.id)).toBe("running");
+		second.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+	});
+
+	test("refusals: a run that ended, a run that waits at a Gate, a run another device walks", async () => {
+		const harness = fakeHarness((_input, call) =>
+			reportingScript("pass", `summary ${call + 1}`),
+		);
+		const engine = makeEngine(harness);
+		const walked = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: gateFlow(),
+		});
+		await openGateOf(engine, walked.id);
+		await expect(engine.restartStep(walked.id)).rejects.toThrow(
+			"This run waits at a Gate",
+		);
+		await engine.stopRun(walked.id);
+		await expect(engine.restartStep(walked.id)).rejects.toThrow(
+			"This run has ended",
+		);
+		const before = await loggedTypes();
+
+		await sandbox.db
+			.update(run)
+			.set({ walkerId: "another-device" })
+			.where(eq(run.id, walked.id));
+		await expect(engine.restartStep(walked.id)).rejects.toThrow(
+			"Another device runs this run. Restart the step on that device.",
+		);
+		await expect(
+			engine.rerunFrom(walked.id, { nodeId: "worker" }),
+		).rejects.toThrow(
+			"Another device runs this run. Run it again on that device.",
+		);
+		expect(await loggedTypes()).toEqual(before);
+	});
+});
+
+describe("run again from a step", () => {
+	test("after a failed run, from an earlier agent step: a new visit continues its session with the prompt, and the steps after it run again", async () => {
+		const harness = fakeHarness();
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[agent("worker", "Build it"), command("check", passOnAttempt(2))],
+				[edge("e1", "worker", "pass", "check")],
+			),
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("failed");
+
+		await engine.rerunFrom(run.id, {
+			nodeId: "worker",
+			prompt: "The check failed. Fix it.",
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect(
+			harness.calls.map((c) => [c.prompt, c.resumeSessionId ?? null]),
+		).toEqual([
+			["Build it", null],
+			["The check failed. Fix it.", "fake-session-1"],
+		]);
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps.map((s) => [s.nodeId, s.visit, s.outcome])).toEqual([
+			["worker", 1, "pass"],
+			["check", 1, "fail"],
+			["worker", 2, "pass"],
+			["check", 2, "pass"],
+		]);
+		expect(detail.reason).toBeNull();
+		expect(detail.traversals).toEqual({ e1: 2 });
+		expect(detail.resumes).toEqual([
+			{
+				at: expect.any(Number),
+				by: "person",
+				nodeId: "worker",
+				reason: null,
+				action: "rerun",
+			},
+		]);
+	});
+
+	test("start fresh: the agent starts a new session with the flow's prompt, also on a node that resumes its session", async () => {
+		const harness = fakeHarness();
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[
+					agent("worker", "Build it", { session: "resume" }),
+					command("check", passOnAttempt(2)),
+				],
+				[edge("e1", "worker", "pass", "check")],
+			),
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("failed");
+		await engine.rerunFrom(run.id, {
+			nodeId: "worker",
+			prompt: "ignored",
+			fresh: true,
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect(
+			harness.calls.map((c) => [c.prompt, c.resumeSessionId ?? null]),
+		).toEqual([
+			["Build it", null],
+			["Build it", null],
+		]);
+	});
+
+	test("after a finished run, from its first step: every step runs again and the run finishes", async () => {
+		const harness = fakeHarness();
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[command("prepare", "echo ready"), agent("worker", "Build it")],
+				[edge("e1", "prepare", "pass", "worker")],
+			),
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+
+		await engine.rerunFrom(run.id, { nodeId: "prepare" });
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		// The agent after it runs as its node says: a fresh session.
+		expect(
+			harness.calls.map((c) => [c.prompt, c.resumeSessionId ?? null]),
+		).toEqual([
+			["Build it", null],
+			["Build it", null],
+		]);
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps.map((s) => [s.nodeId, s.visit, s.outcome])).toEqual([
+			["prepare", 1, "pass"],
+			["worker", 1, "pass"],
+			["prepare", 2, "pass"],
+			["worker", 2, "pass"],
+		]);
+		expect(detail.traversals).toEqual({ e1: 2 });
+		await waitFor(
+			async () =>
+				(
+					await sandbox.db
+						.select()
+						.from(lgCheckpoint)
+						.where(eq(lgCheckpoint.threadId, run.id))
+				).length === 1,
+			{ label: "the checkpoints to be pruned again" },
+		);
+	});
+
+	test("after a stop in the middle of a step, only the chosen step runs: the cut-short one is not taken up", async () => {
+		const { harness, sessions } = scriptedHarness();
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[command("prepare", "echo ready"), agent("worker", "Build it")],
+				[edge("e1", "prepare", "pass", "worker")],
+			),
+		});
+		await waitFor(() => sessions[0]);
+		await engine.stopRun(run.id);
+
+		await engine.rerunFrom(run.id, { nodeId: "prepare" });
+		const second = await waitFor(() => sessions[1], { label: "the rerun" });
+		// A new visit with a fresh session: the stopped one stays stopped.
+		expect(second.input.resumeSessionId).toBeUndefined();
+		second.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect(sessions).toHaveLength(2);
+		expect(
+			(await engine.getRun(run.id)).steps.map((s) => [
+				s.nodeId,
+				s.visit,
+				s.outcome,
+			]),
+		).toEqual([
+			["prepare", 1, "pass"],
+			["worker", 1, "stopped"],
+			["prepare", 2, "pass"],
+			["worker", 2, "pass"],
+		]);
+	});
+
+	test("after a stop at a Gate, from the agent before it: the Gate asks once more, not twice", async () => {
+		const harness = fakeHarness((_input, call) =>
+			reportingScript("pass", `summary ${call + 1}`),
+		);
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: gateFlow(),
+		});
+		await openGateOf(engine, run.id);
+		await engine.stopRun(run.id);
+
+		await engine.rerunFrom(run.id, { nodeId: "worker", prompt: "Again." });
+		await waitForStatus(engine, run.id, "waiting");
+		expect(harness.calls[1]).toMatchObject({
+			prompt: "Again.",
+			resumeSessionId: "fake-session-1",
+		});
+		const gates = await engine.listGates();
+		expect(gates).toHaveLength(1);
+		expect(gates[0]?.question).toContain("summary 2");
+		expect(
+			(await engine.getRun(run.id)).steps.map((s) => [
+				s.nodeId,
+				s.visit,
+				s.outcome,
+			]),
+		).toEqual([
+			["worker", 1, "pass"],
+			["gate", 1, "stopped"],
+			["worker", 2, "pass"],
+			["gate", 2, null],
+		]);
+	});
+
+	test("refusals: a run that is still going, a node the flow does not have", async () => {
+		const { harness, sessions } = scriptedHarness();
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([agent("worker", "Build it")]),
+		});
+		const first = await waitFor(() => sessions[0]);
+		await expect(
+			engine.rerunFrom(run.id, { nodeId: "worker" }),
+		).rejects.toThrow("still running");
+		first.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		await expect(engine.rerunFrom(run.id, { nodeId: "inner" })).rejects.toThrow(
+			`This run's flow has no node "inner"`,
+		);
+		expect(sessions).toHaveLength(1);
+		expect(await statusOf(engine, run.id)).toBe("finished");
+	});
+
+	test("from an earlier visit: the agent continues that visit's session; a step of another node is refused", async () => {
+		const harness = fakeHarness();
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: retryFlow(passOnAttempt(3), 1),
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("failed");
+		const steps = (await engine.getRun(run.id)).steps;
+		expect(steps.map((s) => [s.nodeId, s.visit])).toEqual([
+			["worker", 1],
+			["check", 1],
+			["worker", 2],
+			["check", 2],
+		]);
+		const [firstWorker, firstCheck] = steps;
+		await expect(
+			engine.rerunFrom(run.id, {
+				nodeId: "worker",
+				stepId: firstCheck?.id ?? "",
+			}),
+		).rejects.toThrow(`That step is not a step of "worker"`);
+
+		await engine.rerunFrom(run.id, {
+			nodeId: "worker",
+			stepId: firstWorker?.id ?? "",
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect(harness.calls.map((c) => c.resumeSessionId ?? null)).toEqual([
+			null,
+			null,
+			"fake-session-1",
+		]);
+	});
+});
+
 describe("watchRun", () => {
 	test("emits status and steps, replays from disk, then streams live", async () => {
 		const { harness, sessions } = scriptedHarness();
@@ -1319,6 +1780,7 @@ describe("automatic resume after a restart", () => {
 				by: "daemon",
 				nodeId: "worker",
 				reason: "Night Shift restarted.",
+				action: "resume",
 			},
 		]);
 		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([

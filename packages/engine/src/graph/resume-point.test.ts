@@ -9,11 +9,13 @@ import type {
 import { DEFAULT_RESUME_PROMPT } from "./context";
 import {
 	entryOf,
+	loggedVisits,
 	RESUME_RULES,
 	type ResumePoint,
 	type ResumeRules,
 	reenteredNode,
 	reentryUpdate,
+	rerunEntryOf,
 	resumePoint,
 	resumeTarget,
 	uncommittedStep,
@@ -790,5 +792,77 @@ describe("the daemon side agrees with the node side", () => {
 	test("no step yet: no target, no re-entered node", () => {
 		expect(resumeTarget(logOf())).toBeNull();
 		expect(reenteredNode(logOf())).toBeNull();
+	});
+});
+
+describe("run again from a node", () => {
+	const rerun = (
+		nodeId: string,
+		stepId: string | null,
+		prompt: string | null,
+	): Ev => ({
+		type: "RunResumed",
+		payload: {
+			nodeId,
+			stepId,
+			prompt,
+			scope: null,
+			by: "person",
+			action: "rerun",
+		},
+	});
+	const base = [
+		started("s1", "a", 1),
+		...session("s1", "h-1"),
+		ended("s1", "pass"),
+		started("s2", "b", 1, null, "decision"),
+		ended("s2", "error"),
+	];
+
+	test("the first visit of the node continues the session the rerun names, with its prompt", () => {
+		const events = logOf(...base, rerun("a", "s1", "Fix it."));
+		expect(rerunEntryOf({ id: "a" }, events, null)).toEqual({
+			harnessSessionId: "h-1",
+			prompt: "Fix it.",
+		});
+		// Without a prompt: Resume's follow-up.
+		expect(
+			rerunEntryOf({ id: "a" }, logOf(...base, rerun("a", "s1", null)), null),
+		).toEqual({ harnessSessionId: "h-1", prompt: DEFAULT_RESUME_PROMPT });
+	});
+
+	test("start fresh: no session, whatever the node says", () => {
+		const events = logOf(...base, rerun("a", null, null));
+		expect(rerunEntryOf({ id: "a" }, events, null)).toBeNull();
+	});
+
+	test("any other visit runs as the node says", () => {
+		const events = logOf(...base, rerun("a", "s1", "Fix it."));
+		// Another node, a node inside a called flow.
+		expect(rerunEntryOf({ id: "b" }, events, null)).toBeUndefined();
+		expect(
+			rerunEntryOf({ id: "a" }, events, { parentStepId: "s9", itemId: null }),
+		).toBeUndefined();
+		// A later visit: the rerun walk opened a step already.
+		const later = logOf(
+			...base,
+			rerun("a", "s1", "Fix it."),
+			started("s3", "a", 2),
+			ended("s3", "pass"),
+		);
+		expect(rerunEntryOf({ id: "a" }, later, null)).toBeUndefined();
+		// A plain resume.
+		expect(
+			rerunEntryOf({ id: "a" }, logOf(...base, resumed("s1", "Go")), null),
+		).toBeUndefined();
+	});
+
+	test("the visits are the log's counts: no step is left uncommitted", () => {
+		const flow = {
+			nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
+		} as unknown as Parameters<typeof loggedVisits>[0];
+		const events = logOf(...base, started("s3", "a", 2));
+		expect(loggedVisits(flow, events, null)).toEqual({ a: 2, b: 1 });
+		expect(loggedVisits(flow, events, "a")).toEqual({ a: 1, b: 1 });
 	});
 });

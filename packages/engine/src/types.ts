@@ -296,6 +296,12 @@ export type RunResume = {
 	nodeId: string;
 	/** Why the daemon resumed the run. Null for a person. */
 	reason: string | null;
+	/**
+	 * `resume`: the run continued where it stopped. `restart`: a person
+	 * stopped the running step and continued it at once. `rerun`: a person
+	 * ran the flow again from `nodeId`.
+	 */
+	action: "resume" | "restart" | "rerun";
 };
 
 export type RunDetail = RunSummary & {
@@ -754,6 +760,37 @@ export interface SpaceEngine {
 	 * again. Edge counts carry over. Fails while the run is running.
 	 */
 	resumeRun(runId: string, prompt?: string): Promise<void>;
+	/**
+	 * Stops the running step and continues it at once, in one action: as a
+	 * stop now and a resume would, with nothing in between. An Agent step
+	 * with a harness session continues it with the prompt (default
+	 * "Continue where you left off."); any other step runs again. Only
+	 * while a step runs; with `stepId`, only while that step runs. A run
+	 * another Device walks is refused.
+	 */
+	restartStep(
+		runId: string,
+		options?: { prompt?: string; stepId?: string },
+	): Promise<void>;
+	/**
+	 * Walks a run that is not going (failed, stopped, interrupted or
+	 * finished) again from `nodeId`, a node of the run's own flow, with a
+	 * new visit of it; the steps after it follow as the flow routes. Inputs,
+	 * outputs and edge counts carry over. An Agent node continues the
+	 * session of its step `stepId` (default: its latest) with the prompt
+	 * (default "Continue where you left off."), or with `fresh` starts a
+	 * new session with its own prompt. A run another Device walks is
+	 * refused.
+	 */
+	rerunFrom(
+		runId: string,
+		options: {
+			nodeId: string;
+			stepId?: string;
+			prompt?: string;
+			fresh?: boolean;
+		},
+	): Promise<void>;
 	/**
 	 * Moves the run's Walk to another of the actor's Devices (`WalkerMoved`):
 	 * this computer archives the run's checkpoint and files and stops

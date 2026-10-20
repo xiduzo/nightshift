@@ -1,4 +1,4 @@
-import { Command } from "@langchain/langgraph";
+import { Command, END } from "@langchain/langgraph";
 import type { Database } from "@nightshift/db";
 import type {
 	Flow,
@@ -21,6 +21,7 @@ import {
 } from "../events";
 import type { RunLog } from "../run-log";
 import type { RunSettings } from "../settings";
+import type { RunStatus } from "../types";
 import { compileFlow } from "./compile";
 import {
 	createRecorders,
@@ -38,7 +39,7 @@ import {
 	fencedLog,
 } from "./fence";
 import { kindOfType } from "./node-kinds";
-import { reenteredNode, reentryUpdate } from "./resume-point";
+import { loggedVisits, reenteredNode, reentryUpdate } from "./resume-point";
 import { createSleeps } from "./sleep";
 import type {
 	Ended,
@@ -140,6 +141,14 @@ type Thread = {
 };
 
 type StreamInput = Parameters<Thread["graph"]["stream"]>[0];
+
+/** A restart that came after the drive ended the run itself: there is no step left to restart. */
+export class RestartTooLate extends Error {
+	constructor(readonly status: RunStatus) {
+		super(`The step ended before it could restart. The run is ${status} now.`);
+		this.name = "RestartTooLate";
+	}
+}
 
 export type Runner = ReturnType<typeof createRunner>;
 
@@ -427,9 +436,18 @@ export function createRunner(deps: RunnerDeps) {
 	 * signalled and killed). Resolves once the drive's writes in flight
 	 * settled; it waits on no timer.
 	 */
-	async function takeFromDrive(runId: string, walk: Walk): Promise<void> {
+	async function takeFromDrive(
+		runId: string,
+		walk: Walk,
+		options: { keepSlot?: boolean } = {},
+	): Promise<void> {
 		const settled = walk.thread?.fence.close() ?? Promise.resolve();
-		if (slots.get(runId) === walk) slots.delete(runId);
+		if (slots.get(runId) === walk) {
+			// A restart keeps the slot for the drive that continues the run,
+			// so no other run takes it in between.
+			if (options.keepSlot) slots.set(runId, "starting");
+			else slots.delete(runId);
+		}
 		if (walk.thread) dropThread(runId, walk.thread);
 		walk.controller.abort();
 		await settled;
@@ -553,6 +571,62 @@ export function createRunner(deps: RunnerDeps) {
 			}
 		});
 		if (freed) slotFreed(runId);
+	}
+
+	/**
+	 * Stops the running step and hands the run to `next` in one turn of the
+	 * run's queue (`exclusive`), so no answer, stop, wake or other restart
+	 * comes in between. `check` sees the log first and throws to refuse.
+	 *
+	 * The running drive is taken as a stop takes it (`takeFromDrive`): its
+	 * fence closes (it writes nothing more, its harness is aborted), and its
+	 * writes in flight settle before the log is read again. Its slot stays
+	 * reserved for `next`, which drives the run on (`drive` takes the slot
+	 * over); a slot `next` did not take is freed. A run the log says runs
+	 * but no drive in this process holds (its drive died) is closed the
+	 * same way: nothing can write to it. The open work ends `stopped`
+	 * (`StopRequested`, then `closeOpenWork`).
+	 *
+	 * When the drive ended the run itself just before its fence closed,
+	 * there is nothing left to restart: throws `RestartTooLate` with the
+	 * run as it ended.
+	 */
+	async function restart(
+		runId: string,
+		check: (events: readonly LoggedEvent[]) => void,
+		next: () => Promise<void>,
+	): Promise<void> {
+		let took = false;
+		try {
+			await exclusive(runId, async () => {
+				const slot = slots.get(runId);
+				if (slot === "starting") {
+					throw new Error("The run is starting. Try again in a moment.");
+				}
+				check(await log.events(runId));
+				if (slot) await takeFromDrive(runId, slot, { keepSlot: true });
+				else reserveSlot(runId);
+				took = true;
+				try {
+					const status = deriveRunState(await log.events(runId)).status;
+					if (
+						status !== "running" &&
+						status !== "waiting" &&
+						status !== "sleeping"
+					) {
+						throw new RestartTooLate(status);
+					}
+					await log.append({ type: "StopRequested", runId, payload: {} });
+					await closeOpenWork(runId, { kind: "stopped" });
+					await next();
+				} finally {
+					releaseStartingSlot(runId);
+				}
+			});
+		} finally {
+			// The old drive may never unwind to free its slot itself.
+			if (took) slotFreed(runId);
+		}
 	}
 
 	/**
@@ -694,6 +768,50 @@ export function createRunner(deps: RunnerDeps) {
 			}) as unknown as StreamInput;
 			drive(row, jump);
 		},
+		/**
+		 * Walks the run again from `nodeId`, a top-level node, with a new
+		 * visit of it. The thread may be anywhere: parked at an interrupt,
+		 * pending at a node, at END, or without a checkpoint. A thread that
+		 * still has a task (an interrupt, or a node a stop or a death cut
+		 * short) has it cleared first (`updateState(…, END)`), so only the
+		 * jump runs. The visits are set to the log's counts (`loggedVisits`):
+		 * no step of an earlier walk is taken up again. The cursors of Calls
+		 * with `each` are cleared, so a Call starts its list over. Inputs,
+		 * node outputs and edge counts stay. `update` writes on top (a
+		 * cleared stop time). Takes over a reserved slot.
+		 */
+		async rerun(
+			row: RunRow,
+			nodeId: string,
+			events: readonly LoggedEvent[],
+			update?: RunStateUpdate,
+		): Promise<void> {
+			const thread = threadOf(row);
+			const config = configOf(row.id);
+			const snapshot = await thread.graph.getState(config);
+			let seed: RunStateUpdate;
+			if (snapshot.config?.configurable?.checkpoint_id === undefined) {
+				seed = reentryUpdate(thread.ctx.flow, events, null);
+			} else {
+				if (snapshot.tasks.length > 0) {
+					await thread.graph.updateState(config, null, END);
+				}
+				const { loops } = snapshot.values as RunStateValues;
+				seed = {
+					ended: null,
+					pending: null,
+					visits: loggedVisits(thread.ctx.flow, events, null),
+					loops: Object.fromEntries(
+						Object.keys(loops ?? {}).map((id) => [id, null]),
+					),
+				};
+			}
+			const jump = new Command({
+				goto: nodeId,
+				update: { ...seed, ...update },
+			}) as unknown as StreamInput;
+			drive(row, jump);
+		},
 		threadState,
 		/**
 		 * Drops what this runner keeps of a run that another Device walks
@@ -706,6 +824,7 @@ export function createRunner(deps: RunnerDeps) {
 		/** The sleeping runs: `wake(runId, how)`, `restore(runId, events)` (`graph/sleep.ts`). */
 		sleeps,
 		stop,
+		restart,
 		endIfOverdue,
 		endOverdueSteps,
 		dispose,

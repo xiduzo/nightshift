@@ -89,6 +89,8 @@ export type WaitReason =
 
 /** Who resumed a run: a person, or the daemon after a restart. */
 export type ResumedBy = RunResume["by"];
+/** What a `RunResumed` did beyond a resume (`RunResumed.action`). */
+export type ResumeAction = Exclude<RunResume["action"], "resume">;
 
 export type EnginePayloads = {
 	ProjectAdded: {
@@ -219,6 +221,15 @@ export type EnginePayloads = {
 		by?: ResumedBy;
 		/** Why the daemon resumed the run. */
 		reason?: string;
+		/**
+		 * What the person asked for, when it was more than a resume.
+		 * `restart`: the running step was stopped and continued at once
+		 * (`restartStep`). `rerun`: the run walks again from `nodeId`, a
+		 * top-level node, with a new visit of it (`rerunFrom`); `stepId` is
+		 * then the Agent step whose harness session that visit continues
+		 * with `prompt`, or null for a fresh session. Absent: a resume.
+		 */
+		action?: ResumeAction;
 	};
 	/** A new visit of a node. */
 	StepStarted: {
@@ -773,6 +784,7 @@ export function deriveResumes(events: readonly LoggedEvent[]): RunResume[] {
 		by: e.payload.by ?? "person",
 		nodeId: e.payload.nodeId,
 		reason: e.payload.reason ?? null,
+		action: e.payload.action ?? "resume",
 	}));
 }
 

@@ -27,10 +27,13 @@ let sandbox: AuthSandbox;
 let calls: { space: string; method: string }[];
 /** What each engine call got, in order. */
 let inputs: unknown[];
+/** Every argument of each engine call, in order. */
+let args: unknown[][];
 beforeEach(async () => {
 	sandbox = await createAuthSandbox();
 	calls = [];
 	inputs = [];
+	args = [];
 });
 afterEach(() => sandbox.cleanup());
 
@@ -38,11 +41,14 @@ afterEach(() => sandbox.cleanup());
 const engine: Context["engine"] = {
 	space: (space) =>
 		new Proxy({} as SpaceEngine, {
-			get: (_, method) => async (input: unknown) => {
-				calls.push({ space, method: String(method) });
-				inputs.push(input);
-				return method === "listRuns" ? [] : { id: "run-1" };
-			},
+			get:
+				(_, method) =>
+				async (input: unknown, ...rest: unknown[]) => {
+					calls.push({ space, method: String(method) });
+					inputs.push(input);
+					args.push([input, ...rest]);
+					return method === "listRuns" ? [] : { id: "run-1" };
+				},
 		}),
 	devices: {} as Context["engine"]["devices"],
 	exchange: {} as Context["engine"]["exchange"],
@@ -293,6 +299,48 @@ describe("procedures", () => {
 			),
 		).toBe("FORBIDDEN");
 		expect(calls.filter((c) => c.method === "moveProject")).toHaveLength(1);
+	});
+
+	test("a member restarts a step and runs a run again from a step; a viewer may not", async () => {
+		const { bob, cy, spaceId } = await platform();
+		const member = await contextFor(bob.headers);
+		await call(
+			appRouter.runs.restartStep,
+			{ runId: "r", stepId: "s", prompt: "Report now." },
+			{ context: member },
+		);
+		expect(calls.at(-1)).toEqual({ space: spaceId, method: "restartStep" });
+		expect(args.at(-1)).toEqual(["r", { stepId: "s", prompt: "Report now." }]);
+		await call(appRouter.runs.restartStep, { runId: "r" }, { context: member });
+		expect(args.at(-1)).toEqual(["r", {}]);
+
+		await call(
+			appRouter.runs.rerun,
+			{ runId: "r", nodeId: "worker", prompt: "Again.", fresh: true },
+			{ context: member },
+		);
+		expect(calls.at(-1)).toEqual({ space: spaceId, method: "rerunFrom" });
+		expect(args.at(-1)).toEqual([
+			"r",
+			{ nodeId: "worker", prompt: "Again.", fresh: true },
+		]);
+
+		const viewer = await contextFor(cy.headers);
+		expect(
+			await errorOf(
+				call(appRouter.runs.restartStep, { runId: "r" }, { context: viewer }),
+			),
+		).toBe("FORBIDDEN");
+		expect(
+			await errorOf(
+				call(
+					appRouter.runs.rerun,
+					{ runId: "r", nodeId: "worker" },
+					{ context: viewer },
+				),
+			),
+		).toBe("FORBIDDEN");
+		expect(calls).toHaveLength(3);
 	});
 
 	test("a member renames a project; a viewer may not", async () => {
