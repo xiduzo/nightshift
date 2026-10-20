@@ -2,6 +2,7 @@ import type { HostExchange, SyncBatch } from "@nightshift/api/context";
 import type { DeviceKeyAccess } from "@nightshift/auth";
 import { roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
+import type { Engine } from "@nightshift/engine";
 import {
 	type ArchiveRef,
 	applyRunCommand,
@@ -14,7 +15,6 @@ import {
 	type SyncCursors,
 	withoutPrivatePaths,
 } from "@nightshift/engine";
-import type { Engine } from "@nightshift/engine/types";
 import { ORPCError } from "@orpc/server";
 
 import { NOT_A_HOST } from "./host";

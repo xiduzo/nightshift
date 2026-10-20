@@ -22,7 +22,7 @@ import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
-} from "@nightshift/engine/test-support";
+} from "@nightshift/engine/testing";
 import type { Server } from "bun";
 import * as Y from "yjs";
 

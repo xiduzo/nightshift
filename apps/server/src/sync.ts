@@ -2,7 +2,7 @@ import { Hocuspocus } from "@hocuspocus/server";
 import type { Auth, HostPolicy, LocalSession } from "@nightshift/auth";
 import { isDeviceKey, requestAccess, roleIn } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { spaceIdOf } from "@nightshift/engine/space/document";
+import { spaceIdOf } from "@nightshift/engine";
 import type { Server, ServerWebSocket, WebSocketHandler } from "bun";
 import * as Y from "yjs";
 

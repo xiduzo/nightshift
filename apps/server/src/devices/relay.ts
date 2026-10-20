@@ -1,6 +1,5 @@
 import type { AppRouterClient } from "@nightshift/api";
-import type { DeviceRegistry } from "@nightshift/engine";
-import type { Engine, Relay } from "@nightshift/engine/types";
+import type { DeviceRegistry, Engine, Relay } from "@nightshift/engine";
 
 import type { DeviceLinks } from "./links";
 

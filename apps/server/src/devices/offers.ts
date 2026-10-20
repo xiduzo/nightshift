@@ -1,6 +1,7 @@
 import type { Offers, SpaceDeviceView } from "@nightshift/api/context";
 import { spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
+import type { Engine } from "@nightshift/engine";
 import {
 	type DeviceDocument,
 	deviceOffers,
@@ -9,7 +10,6 @@ import {
 	removeDeviceOffer,
 	setDeviceOffer,
 } from "@nightshift/engine";
-import type { Engine } from "@nightshift/engine/types";
 
 /**
  * This computer's Offers, as its owner makes and withdraws them (the

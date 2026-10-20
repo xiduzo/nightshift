@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AppRouterClient } from "@nightshift/api";
-import type { RunSummary } from "@nightshift/engine/types";
+import type { RunSummary } from "@nightshift/engine";
 import { type InferClientInputs, ORPCError } from "@orpc/client";
 
 import { hostClient } from "./host-client";

@@ -18,6 +18,7 @@ import type {
 	ArchiveRef,
 	CliToolStore,
 	ConnectionStore,
+	Engine,
 	FeedStep,
 	FollowWant,
 	GitInstall,
@@ -25,24 +26,21 @@ import type {
 	KeyStoreKind,
 	ListedSpace,
 	OfferCaps,
+	OwnDevice,
 	PairedDevice,
 	ProfileStore,
 	ProjectReadiness,
 	RunCommand,
 	RunCommandInput,
 	RunRows,
+	RunSummary,
 	SettingsStore,
+	StartRunInput,
 	SyncCursors,
+	TranscriptEntry,
 	WorkReply,
 	WorkRequest,
 } from "@nightshift/engine";
-import type {
-	Engine,
-	OwnDevice,
-	RunSummary,
-	StartRunInput,
-	TranscriptEntry,
-} from "@nightshift/engine/types";
 
 export type Context = {
 	/** The request's session. On this computer, the local Person's when the request has none. */

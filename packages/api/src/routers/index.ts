@@ -12,6 +12,7 @@ import {
 	roleAllows,
 	spacesOf,
 } from "@nightshift/auth";
+import type { SpaceEngine, TranscriptEntry } from "@nightshift/engine";
 import {
 	archiveRefSchema,
 	chooseFolder,
@@ -32,7 +33,6 @@ import {
 	workReplySchema,
 	workRequestSchema,
 } from "@nightshift/engine";
-import type { SpaceEngine, TranscriptEntry } from "@nightshift/engine/types";
 import {
 	type AgentHarnessName,
 	agentHarnessSchema,

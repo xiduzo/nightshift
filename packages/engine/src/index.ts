@@ -1,21 +1,20 @@
+/**
+ * The public surface of the engine: what the API, the server and their
+ * tests import. A type is also here when the API's router type names it,
+ * because the router declaration must be able to name it. Remove a name
+ * that nothing outside the engine imports.
+ */
 export {
 	type CliTool,
-	type CliToolGuide,
-	type CliToolInput,
 	type CliToolStore,
 	cliToolInputSchema,
-	cliToolsInstruction,
 	createCliToolStore,
 } from "./cli-tools";
 export {
 	type Connection,
-	type ConnectionInput,
 	type ConnectionStore,
 	connectionInputSchema,
 	createConnectionStore,
-	keychainSecrets,
-	referencedVariables,
-	type SecretBackend,
 	type SecretSource,
 	type SecretView,
 	secretNameSchema,
@@ -23,15 +22,9 @@ export {
 } from "./connections";
 export {
 	type DeviceDocument,
-	type DeviceFacts,
-	type DocumentRows,
-	deviceDocumentName,
-	deviceFacts,
 	documentRows,
-	OWNER_ORIGIN,
 	openDeviceDocument,
 	refreshDeviceFacts,
-	setDeviceFacts,
 } from "./device/document";
 export {
 	createHostLinks,
@@ -43,60 +36,38 @@ export {
 	type KeyStoreKind,
 	SECOND_HOME,
 } from "./device/host-links";
-export { type LocalDeviceDeps, localDevice } from "./device/local";
+export { localDevice } from "./device/local";
+export type { DeviceRegistry, PairedDevice } from "./device/registry";
 export {
-	createDeviceRegistry,
-	type DeviceRegistry,
-	type PairedDevice,
-} from "./device/registry";
-export {
-	remoteDevice,
 	serveWork,
 	type WorkCall,
-	type WorkFor,
 	type WorkRelay,
 	type WorkReply,
 	type WorkRequest,
 	workReplySchema,
 	workRequestSchema,
 } from "./device/remote";
-export type * from "./device/types";
+export type { Device, SessionInput } from "./device/types";
 export { createEngine } from "./engine";
-export {
-	type ArchiveRef,
-	archiveRefSchema,
-} from "./exchange/archive";
+export { type ArchiveRef, archiveRefSchema } from "./exchange/archive";
 export {
 	applyRunCommand,
 	COMMAND_PERMISSION,
 	type RunCommand,
 	type RunCommandInput,
-	type RunCommandKind,
-	runCommandKindSchema,
-	runCommandPayloadSchema,
 } from "./exchange/commands";
-export type { EngineExchange } from "./exchange/engine-exchange";
 export {
-	type FeedSend,
 	type FeedStep,
-	type FollowPumps,
 	type FollowWant,
 	feedStepSchema,
-	followWantSchema,
-	type TranscriptFeeds,
 	transcriptEntrySchema,
 } from "./exchange/feeds";
-export {
-	type HostSpaces,
-	type ListedSpace,
-	personOnHost,
-} from "./exchange/host-spaces";
+export { type ListedSpace, personOnHost } from "./exchange/host-spaces";
 export {
 	ForeignRowsError,
 	isEmpty,
 	MissingProjectError,
 	mergeCursors,
-	NO_ROWS,
 	type RunRows,
 	runRowsSchema,
 	type SyncCursors,
@@ -107,32 +78,23 @@ export { chooseFolder } from "./folder-picker";
 export {
 	acquireLease,
 	LEASE_HEARTBEAT_MS,
-	LEASE_STALE_AFTER_MS,
 	type Lease,
 	LeaseHeldError,
-	type LeaseHolder,
 	pidAlive,
 } from "./lease";
 export {
-	clampToCap,
 	createOfferSlots,
 	type DeviceOffer,
 	deviceOffers,
 	inForce,
-	MAX_SESSION_CAP,
 	type OfferCaps,
 	type OfferSlots,
 	offerCapsSchema,
 	offeredCallRefusal,
 	offeredSession,
-	PERMISSION_ORDER,
-	type PermissionMode,
 	removeDeviceOffer,
-	type SpaceOffer,
 	setDeviceOffer,
 	slotKey,
-	spaceOffers,
-	withinCap,
 } from "./offers";
 export {
 	createProfileStore,
@@ -141,63 +103,45 @@ export {
 } from "./profiles";
 export {
 	checkProjectFolder,
-	GIT_DOWNLOAD_URL,
 	type GitInstall,
-	type GitInstaller,
-	type GitProbe,
 	type ProjectReadiness,
-	probeGit,
-	type ReadinessFix,
-	type ReadinessStatus,
-	type ReadinessStep,
-	type ReadinessStepId,
 	setUpGit,
 	systemGitInstaller,
 } from "./project-setup";
-export { clonePathOf, NOT_ON_THIS_COMPUTER } from "./projects";
-export {
-	exportRun,
-	openRunBundle,
-	RUN_BUNDLE_FORMAT_VERSION,
-	type RunBundle,
-	type RunBundleMeta,
-	type RunBundleSummary,
-	UNKNOWN_DEVICE,
-	UNKNOWN_SPACE,
-} from "./run-bundle";
-export {
-	hostDeviceName,
-	type SelfDevice,
-	selfDevice,
-} from "./self-device";
+export { clonePathOf } from "./projects";
+export { exportRun, openRunBundle, type RunBundleSummary } from "./run-bundle";
+export { selfDevice } from "./self-device";
 export {
 	createSettingsStore,
 	HARNESS_BIN,
-	hostAddressSchema,
 	isHostAddress,
 	isLoopbackHost,
-	type RunSettings,
 	type SettingField,
 	type SettingKey,
-	type SettingSource,
 	type Settings,
-	type SettingsPatch,
 	type SettingsStore,
-	type SettingsView,
 	settingsPatchSchema,
 } from "./settings";
 export {
 	createSpaceDocuments,
 	memberRole,
-	projectClones,
-	type SpaceClone,
-	type SpaceDocument,
 	type SpaceDocuments,
-	type SpaceMember,
-	type SpaceProject,
 	spaceDocumentName,
 	spaceIdOf,
-	spaceProjects,
 } from "./space/document";
-export type * from "./types";
-export { worktreeLocation } from "./worktrees";
+export type {
+	Engine,
+	OpenGate,
+	OwnDevice,
+	Placement,
+	Project,
+	Relay,
+	RunDetail,
+	RunStreamItem,
+	RunSummary,
+	ScheduleList,
+	SpaceEngine,
+	StartRunInput,
+	TranscriptEntry,
+} from "./types";
+export { type Branches, worktreeLocation } from "./worktrees";

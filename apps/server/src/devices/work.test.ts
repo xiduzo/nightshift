@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { AppRouterClient } from "@nightshift/api";
 import type { WorkDelivery } from "@nightshift/api/context";
 import { clone, hostLink, project, user } from "@nightshift/db/schema";
+import type { Engine } from "@nightshift/engine";
 import {
 	createEngine,
 	createOfferSlots,
@@ -19,8 +20,7 @@ import {
 	createSandbox,
 	type Sandbox,
 	withDevice,
-} from "@nightshift/engine/test-support";
-import type { Engine } from "@nightshift/engine/types";
+} from "@nightshift/engine/testing";
 import { checkWork, createOfferCalls, createWorkServer } from "./work";
 import { createWorkHub } from "./work-hub";
 

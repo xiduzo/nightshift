@@ -1,6 +1,7 @@
 import type { AppRouterClient } from "@nightshift/api";
 import { roleAllows } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
+import type { Engine } from "@nightshift/engine";
 import {
 	clonePathOf,
 	type Device,
@@ -19,7 +20,6 @@ import {
 	workRequestSchema,
 	worktreeLocation,
 } from "@nightshift/engine";
-import type { Engine } from "@nightshift/engine/types";
 
 /**
  * This computer as a placed Device: the work of runs its Host walks with

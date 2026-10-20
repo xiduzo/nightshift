@@ -1,5 +1,4 @@
-import type { WorkRelay } from "@nightshift/engine";
-import type { Engine } from "@nightshift/engine/types";
+import type { Engine, WorkRelay } from "@nightshift/engine";
 
 import type { DeviceLinks } from "./links";
 import { HOST_OFFLINE } from "./relay";

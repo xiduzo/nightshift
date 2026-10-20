@@ -7,7 +7,7 @@ import {
 	createSandbox,
 	type Sandbox,
 	waitFor,
-} from "@nightshift/engine/test-support";
+} from "@nightshift/engine/testing";
 
 import { bundleFileName, runExportResponse } from "./run-export";
 

@@ -11,7 +11,7 @@ import {
 	createAuthSandbox,
 	turnOnTwoFactor,
 } from "@nightshift/auth/testing";
-import type { SpaceEngine } from "@nightshift/engine/types";
+import type { SpaceEngine } from "@nightshift/engine";
 import { call, ORPCError } from "@orpc/server";
 
 import type { Context } from "./context";
