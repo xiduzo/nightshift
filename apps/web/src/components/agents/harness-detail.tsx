@@ -38,13 +38,16 @@ import {
 	toolFor,
 } from "@/components/connections/cli-panel";
 import { MonoTile } from "@/components/connections/parts";
-import type { CheckTarget, SettingsView } from "@/components/connections/types";
+import type {
+	CheckTarget,
+	HarnessRow,
+	HarnessRowName,
+	SettingsView,
+} from "@/lib/api-types";
 import type { BuiltInHarnessName } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
-
 import { DetailSection, DetailShell } from "./detail-shell";
 import { ModelSourceHint, useHarnessModels } from "./model-combobox";
-import type { HarnessName, HarnessRow } from "./types";
 
 export function HarnessDetail({
 	harness,
@@ -204,7 +207,7 @@ export function HarnessPicker({
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	harnesses: HarnessRow[] | undefined;
-	onAdded: (name: HarnessName) => void;
+	onAdded: (name: HarnessRowName) => void;
 	/** Opens the custom agent form. */
 	onAddCustom: () => void;
 }) {
@@ -216,7 +219,7 @@ export function HarnessPicker({
 					queryKey: orpc.harnesses.key(),
 				});
 				onOpenChange(false);
-				onAdded(input.harness as HarnessName);
+				onAdded(input.harness as HarnessRowName);
 			},
 			onError: (error) => toast.error(`Not added: ${error.message}`),
 		}),

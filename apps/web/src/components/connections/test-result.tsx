@@ -12,7 +12,7 @@ import {
 } from "@nightshift/ui/components/tooltip";
 import { CircleCheckIcon, CircleXIcon } from "lucide-react";
 
-import type { McpTestResult } from "./types";
+import type { McpTestResult } from "@/lib/api-types";
 
 /** The inline result of an MCP test: the server, its tools, or why it failed. */
 export function McpTestOutcome({

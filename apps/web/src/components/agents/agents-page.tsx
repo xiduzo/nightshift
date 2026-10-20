@@ -56,24 +56,25 @@ import type {
 	CliTool,
 	Connection,
 	ConnectionList,
+	HarnessRow,
+	HarnessRowName,
+	ProfileRow,
 	SecretView,
 	SettingsView,
-} from "@/components/connections/types";
+} from "@/lib/api-types";
 import { harnessInfo, isHarnessName } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
-
 import { CliToolCheckBadge, CliToolDetail, CliToolDialog } from "./cli-tool";
 import { CustomAgentDetail, CustomAgentDialog } from "./custom-agent";
 import { HarnessDetail, HarnessPicker } from "./harness-detail";
 import { newProfileDraft, ProfileDetail } from "./profile-detail";
 import { ToolDetail, ToolPicker } from "./tool-detail";
-import type { HarnessName, HarnessRow, ProfileRow } from "./types";
 
 /** What the detail pane shows, as it sits in the URL (`?item=profile:builder`). */
 export type Selection =
 	| { kind: "profile"; name: string }
 	| { kind: "new-profile" }
-	| { kind: "harness"; name: HarnessName }
+	| { kind: "harness"; name: HarnessRowName }
 	| { kind: "tool"; name: string }
 	| { kind: "cli"; name: string }
 	| { kind: "secrets" };

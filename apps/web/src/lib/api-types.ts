@@ -103,3 +103,28 @@ export type PendingInvitation = MembersOverview["invitations"][number];
 export type SpaceRole = SpaceMember["role"];
 /** An invitation as its link's page shows it. */
 export type InvitationView = Outputs["invitations"]["get"];
+
+/** The Agents page: profiles and harnesses. */
+export type ProfileRow = Outputs["profiles"]["list"][number];
+export type ProfileInput = Inputs["profiles"]["save"];
+export type HarnessRow = Outputs["harnesses"]["list"][number];
+/** A harness by its name, as the Agents page lists it. */
+export type HarnessRowName = HarnessRow["name"];
+
+/** Connections, CLI tools and secrets: the Agents page and the flow editor. */
+export type ConnectionList = Outputs["connections"]["list"];
+export type Connection = ConnectionList["connections"][number];
+export type SecretView = ConnectionList["secrets"][number];
+export type SecretSource = Connection["variables"][number]["source"];
+export type McpServer = Connection["server"];
+export type CliCheck = Outputs["connections"]["check"];
+export type CliTool = Outputs["cliTools"]["list"][number];
+export type CheckTarget = Inputs["connections"]["check"]["target"];
+export type McpTestResult = Outputs["connections"]["test"];
+
+/** The settings of this computer, their fields and their defaults. */
+export type SettingsView = Outputs["settings"]["get"];
+
+/** Whether a project's folder is ready to run flows, and the git install. */
+export type ProjectCheck = Outputs["projects"]["check"];
+export type GitInstall = Outputs["projects"]["installGit"];

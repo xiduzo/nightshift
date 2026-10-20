@@ -58,25 +58,27 @@ import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { CliCheckBadge } from "@/components/connections/cli-panel";
 import { KindBadge } from "@/components/connections/parts";
-import type { CliTool, Connection } from "@/components/connections/types";
 import {
 	EFFORTS,
 	PERMISSION_MODES,
 	permissionLabel,
 } from "@/lib/agent-options";
-import type { Effort, OfferView, PermissionMode } from "@/lib/api-types";
+import type {
+	CliTool,
+	Connection,
+	Effort,
+	HarnessRow,
+	HarnessRowName,
+	OfferView,
+	PermissionMode,
+	ProfileInput,
+	ProfileRow,
+} from "@/lib/api-types";
 import { harnessInfo } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
-
 import { DetailSection, DetailShell } from "./detail-shell";
 import { ModelCombobox, ModelSourceHint } from "./model-combobox";
 import { OfferDialog, WithdrawOfferDialog } from "./offer-dialog";
-import type {
-	HarnessName,
-	HarnessRow,
-	ProfileInput,
-	ProfileRow,
-} from "./types";
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
 
@@ -205,7 +207,7 @@ export function ProfileDetail({
 		NAME.test(name) && !nameTaken && draft.model.trim() !== "" && dirty;
 	const harness = harnesses.find((h) => h.name === draft.harness);
 	const customAgents = customAgentsOf(harnesses);
-	const info = (name: HarnessName) => harnessInfo(name, customAgents);
+	const info = (name: HarnessRowName) => harnessInfo(name, customAgents);
 
 	return (
 		<DetailShell
@@ -322,7 +324,7 @@ export function ProfileDetail({
 					<RadioGroup
 						value={draft.harness}
 						onValueChange={(next) => {
-							const to = next as HarnessName;
+							const to = next as HarnessRowName;
 							if (to === draft.harness) return;
 							const known = info(draft.harness).models.includes(draft.model);
 							set({

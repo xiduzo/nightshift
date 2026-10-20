@@ -43,7 +43,7 @@ import {
 	VariableBadge,
 } from "@/components/connections/parts";
 import { McpTestOutcome } from "@/components/connections/test-result";
-import type { Connection } from "@/components/connections/types";
+import type { Connection } from "@/lib/api-types";
 import { orpc } from "@/utils/orpc";
 
 import { DetailSection, DetailShell } from "./detail-shell";

@@ -1,4 +1,3 @@
-import type { AppRouterClient } from "@nightshift/api/client";
 import {
 	Alert,
 	AlertAction,
@@ -65,7 +64,6 @@ import {
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
-import type { InferClientOutputs } from "@orpc/client";
 import {
 	useMutation,
 	useQueries,
@@ -94,7 +92,7 @@ import { DataTable, dataTableColumns } from "@/components/data-table";
 import { PageHeading, PageSection } from "@/components/page-heading";
 import { SiteHeader } from "@/components/site-header";
 import { notificationsSupported } from "@/hooks/use-night-notifications";
-import type { PermissionMode, Project } from "@/lib/api-types";
+import type { PermissionMode, Project, SettingsView } from "@/lib/api-types";
 import { HARNESSES, type HarnessName, harnessInfo } from "@/lib/harnesses";
 import { projectFolder } from "@/lib/projects";
 import { orpc } from "@/utils/orpc";
@@ -105,7 +103,6 @@ export const Route = createFileRoute("/settings")({
 	component: SettingsComponent,
 });
 
-type SettingsView = InferClientOutputs<AppRouterClient>["settings"]["get"];
 type Settings = SettingsView["values"];
 type SettingKey = keyof Settings;
 type SettingField = SettingsView["fields"][SettingKey];

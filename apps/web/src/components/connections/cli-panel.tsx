@@ -31,13 +31,11 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-
+import type { CheckTarget, CliCheck, SettingsView } from "@/lib/api-types";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { HARNESSES, type HarnessInfo } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
-
 import { CheckBadge, type CheckState, FactList, OffMachineNote } from "./parts";
-import type { CheckTarget, CliCheck, SettingsView } from "./types";
 
 type BinKey = HarnessInfo["setting"] & keyof SettingsView["fields"];
 

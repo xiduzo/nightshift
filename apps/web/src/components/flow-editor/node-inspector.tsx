@@ -45,7 +45,6 @@ import {
 import { type ReactNode, useId, useState } from "react";
 
 import { ModelCombobox } from "@/components/agents/model-combobox";
-import type { ProfileRow } from "@/components/agents/types";
 import {
 	DECIDED_BY_ICON,
 	NODE_TYPE,
@@ -56,7 +55,7 @@ import {
 	PERMISSION_MODES,
 	permissionLabel,
 } from "@/lib/agent-options";
-import type { Effort, PermissionMode } from "@/lib/api-types";
+import type { Effort, PermissionMode, ProfileRow } from "@/lib/api-types";
 import {
 	type NodeOption,
 	nodeOptions,

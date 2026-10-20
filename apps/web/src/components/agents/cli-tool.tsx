@@ -52,8 +52,8 @@ import { toast } from "sonner";
 
 import { checkState } from "@/components/connections/cli-panel";
 import { CheckBadge, FactList } from "@/components/connections/parts";
-import type { CliTool } from "@/components/connections/types";
 import { CodeView } from "@/components/run/json-block";
+import type { CliTool } from "@/lib/api-types";
 import { orpc } from "@/utils/orpc";
 
 import { DetailSection, DetailShell } from "./detail-shell";

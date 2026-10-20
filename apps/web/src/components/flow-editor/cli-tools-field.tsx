@@ -1,4 +1,3 @@
-import type { AppRouterClient } from "@nightshift/api/client";
 import {
 	Combobox,
 	ComboboxChip,
@@ -18,15 +17,15 @@ import {
 	FieldSet,
 } from "@nightshift/ui/components/field";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import type { InferClientOutputs } from "@orpc/client";
 import { Link } from "@tanstack/react-router";
 import { Fragment } from "react";
+
+import type { CliTool } from "@/lib/api-types";
 
 import { Note } from "./fields";
 
 /** A CLI tool on this computer, as `cliTools.list` returns it. */
-export type DaemonCliTool =
-	InferClientOutputs<AppRouterClient>["cliTools"]["list"][number];
+export type DaemonCliTool = CliTool;
 
 /** What the editor says about a CLI tool Night Shift does not have. */
 export function missingCliToolMessage(name: string): string {

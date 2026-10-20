@@ -1,4 +1,3 @@
-import type { AppRouterClient } from "@nightshift/api/client";
 import {
 	Alert,
 	AlertDescription,
@@ -32,18 +31,16 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import type { InferClientOutputs } from "@orpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon, CircleCheckIcon, RotateCwIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
+import type { GitInstall, ProjectCheck } from "@/lib/api-types";
 import { orpc } from "@/utils/orpc";
 
-type Outputs = InferClientOutputs<AppRouterClient>;
-type Readiness = Outputs["projects"]["check"];
+type Readiness = ProjectCheck;
 type Step = Readiness["steps"][number];
-type GitInstall = Outputs["projects"]["installGit"];
 
 const STEP_TITLE: Record<Step["id"], string> = {
 	git: "Git on this computer",

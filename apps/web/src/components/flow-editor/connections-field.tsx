@@ -1,4 +1,3 @@
-import type { AppRouterClient } from "@nightshift/api/client";
 import {
 	Combobox,
 	ComboboxChip,
@@ -18,17 +17,16 @@ import {
 	FieldSet,
 } from "@nightshift/ui/components/field";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import type { InferClientOutputs } from "@orpc/client";
 import { Link } from "@tanstack/react-router";
 import { Fragment } from "react";
 
+import type { Connection } from "@/lib/api-types";
 import { missingConnectionMessage } from "@/lib/flow-draft";
 
 import { Note } from "./fields";
 
 /** A connection on this daemon, as `connections.list` returns it. */
-export type DaemonConnection =
-	InferClientOutputs<AppRouterClient>["connections"]["list"]["connections"][number];
+export type DaemonConnection = Connection;
 
 /** How a connection's server runs, in the words of the Connections page. */
 export function connectionKind(connection: DaemonConnection): string {

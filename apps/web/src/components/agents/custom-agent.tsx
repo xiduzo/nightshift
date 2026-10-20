@@ -55,11 +55,10 @@ import {
 	rowsFrom,
 } from "@/components/connections/key-value-rows";
 import { FactList, OffMachineNote } from "@/components/connections/parts";
+import type { HarnessRow } from "@/lib/api-types";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
-
 import { DetailSection, DetailShell } from "./detail-shell";
-import type { HarnessRow } from "./types";
 
 /** `${NAME}`: a reference to a secret. */
 const ref = (name: string) => `$\{${name}}`;

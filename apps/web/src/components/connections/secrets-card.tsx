@@ -58,9 +58,8 @@ import { toast } from "sonner";
 
 import { DataTable, dataTableColumns } from "@/components/data-table";
 import { PageSection } from "@/components/page-heading";
+import type { SecretView } from "@/lib/api-types";
 import { orpc } from "@/utils/orpc";
-
-import type { SecretView } from "./types";
 
 const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 

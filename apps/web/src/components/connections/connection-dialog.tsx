@@ -38,9 +38,8 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
-
+import type { Connection, McpServer } from "@/lib/api-types";
 import { orpc } from "@/utils/orpc";
-
 import {
 	type KeyValueRow,
 	KeyValueRows,
@@ -49,7 +48,6 @@ import {
 	rowsFrom,
 } from "./key-value-rows";
 import { McpTestOutcome } from "./test-result";
-import type { Connection, McpServer } from "./types";
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
 

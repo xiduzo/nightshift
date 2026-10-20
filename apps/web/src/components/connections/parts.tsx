@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { SecretSource } from "./types";
+import type { SecretSource } from "@/lib/api-types";
 
 /** The 40px tile with initials that heads each connection card. */
 export function MonoTile({ children }: { children: string }) {

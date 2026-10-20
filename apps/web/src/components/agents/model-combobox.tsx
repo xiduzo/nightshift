@@ -10,17 +10,15 @@ import {
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-
+import type { HarnessRowName } from "@/lib/api-types";
 import { harnessInfo, useCustomAgents } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
-
-import type { HarnessName } from "./types";
 
 /**
  * The models a harness offers: its adapter's list, plus what the CLI lists
  * itself (`opencode models`). Asked once per harness and kept a while.
  */
-export function useHarnessModels(harness: HarnessName) {
+export function useHarnessModels(harness: HarnessRowName) {
 	const query = useQuery({
 		...orpc.harnesses.models.queryOptions({ input: { harness } }),
 		staleTime: 5 * 60_000,
@@ -48,7 +46,7 @@ export function ModelCombobox({
 	describedBy,
 }: {
 	id: string;
-	harness: HarnessName;
+	harness: HarnessRowName;
 	value: string;
 	onChange: (model: string) => void;
 	placeholder?: string;
@@ -113,7 +111,7 @@ export function ModelSourceHint({
 	harness,
 	listing,
 }: {
-	harness: HarnessName;
+	harness: HarnessRowName;
 	/** The CLI's listing command, if it has one. */
 	listing: string | null;
 }) {
