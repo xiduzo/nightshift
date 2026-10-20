@@ -24,9 +24,9 @@ import {
 	type AdapterSetup,
 	type HarnessSpec,
 	harnessSession,
-	shellQuote,
 } from "./adapter-session";
 import { harnessFacts } from "./harness-facts";
+import { shellQuoteAlways } from "./shell-quote";
 import type { HarnessProfile, SdkSignals } from "./translate";
 import type { AgentHarness, AgentSessionInput, PermissionMode } from "./types";
 
@@ -119,7 +119,7 @@ async function grokBuildAdapter(
 	const policy = grokPolicy(input.permissionMode);
 	const adapter = grokBuildText(input.model, {
 		// The adapter runs the executable through `sh -c`.
-		grokExecutable: shellQuote(options.grokExecutable ?? "grok"),
+		grokExecutable: shellQuoteAlways(options.grokExecutable ?? "grok"),
 		// `streaming-json` honours the policy; `acp` always approves.
 		protocol: "streaming-json",
 		authMode: "host",

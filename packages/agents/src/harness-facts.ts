@@ -11,7 +11,10 @@
  * instance of (one that is not added).
  */
 import { customAgentSlug, isCustomHarness } from "@nightshift/flows";
+import { shellQuote } from "./shell-quote";
 import type { AgentHarness, AgentHarnessName, HarnessName } from "./types";
+
+export { shellQuote };
 
 /** The display name of each harness, for messages about one that is not added. */
 export const HARNESS_LABELS: Record<HarnessName, string> = {
@@ -58,12 +61,6 @@ export function harnessNoun(name: AgentHarnessName): string {
 	return isCustomHarness(name)
 		? `custom agent ${customAgentSlug(name)}`
 		: `${HARNESS_LABELS[name]} harness`;
-}
-
-/** Quote one value for a shell, only when it needs it. */
-export function shellQuote(value: string): string {
-	if (/^[\w@%+=:,./-]+$/.test(value)) return value;
-	return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
 /** The port members a harness of this name gets from the table: spread into the adapter. */

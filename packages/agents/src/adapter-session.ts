@@ -331,11 +331,6 @@ export function freePort(): Promise<number> {
 	});
 }
 
-/** Quote one value for `sh -c`. */
-export function shellQuote(value: string): string {
-	return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
 /** The marker file the sandbox middleware writes into the workspace root. */
 const PROJECTION_MARKER_PREFIX = ".tanstack-projected-";
 

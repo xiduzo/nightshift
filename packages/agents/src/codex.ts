@@ -20,9 +20,9 @@ import {
 	type AdapterSetup,
 	type HarnessSpec,
 	harnessSession,
-	shellQuote,
 } from "./adapter-session";
 import { harnessFacts } from "./harness-facts";
+import { shellQuoteAlways } from "./shell-quote";
 import { failureKind, type HarnessProfile, type SdkSignals } from "./translate";
 import type {
 	AgentHarness,
@@ -245,7 +245,7 @@ function codexAdapter(
 	const setup = codexSetup(input, options);
 	const adapter = codexText(input.model, {
 		// The adapter runs `<executable> exec …` through `sh -c`.
-		codexExecutable: shellQuote(options.codexExecutable ?? "codex"),
+		codexExecutable: shellQuoteAlways(options.codexExecutable ?? "codex"),
 		sandboxMode: setup.policy.sandboxMode,
 		approvalPolicy: setup.policy.approvalPolicy,
 		...(setup.policy.networkAccessEnabled !== undefined

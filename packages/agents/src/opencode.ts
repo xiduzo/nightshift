@@ -45,9 +45,9 @@ import {
 	freePort,
 	type HarnessSpec,
 	harnessSession,
-	shellQuote,
 } from "./adapter-session";
 import { harnessFacts } from "./harness-facts";
+import { shellQuoteAlways } from "./shell-quote";
 import type { HarnessProfile, SdkSignals } from "./translate";
 import type {
 	AgentHarness,
@@ -290,7 +290,7 @@ export function rewriteServe(
 	return {
 		command: command.replace(
 			SERVE_COMMAND,
-			`${shellQuote(options.executable)} serve`,
+			`${shellQuoteAlways(options.executable)} serve`,
 		),
 		env: {
 			...options.env,

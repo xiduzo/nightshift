@@ -26,9 +26,9 @@ import {
 	type AdapterSetup,
 	type HarnessSpec,
 	harnessSession,
-	shellQuote,
 } from "./adapter-session";
 import { harnessFacts } from "./harness-facts";
+import { shellQuoteAlways } from "./shell-quote";
 import type { SdkSignals } from "./translate";
 import type {
 	AgentHarness,
@@ -317,7 +317,7 @@ async function acpAdapter(
 					},
 		),
 	]
-		.map(shellQuote)
+		.map(shellQuoteAlways)
 		.join(" ");
 	const config: SessionConfig = bySession
 		? {
