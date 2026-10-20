@@ -39,6 +39,9 @@ export function estimateCostUsd(
 			...(usage.cacheWriteTokens !== undefined
 				? { cache_write_tokens: usage.cacheWriteTokens }
 				: {}),
+			...(usage.cacheWrite1hTokens !== undefined
+				? { cache_write_1h_tokens: usage.cacheWrite1hTokens }
+				: {}),
 		},
 		model,
 		{

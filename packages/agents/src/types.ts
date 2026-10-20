@@ -70,6 +70,8 @@ export type AgentUsage = {
 	cacheReadTokens?: number;
 	/** The part of `inputTokens` written to the prompt cache, when the harness says. */
 	cacheWriteTokens?: number;
+	/** The part of `cacheWriteTokens` kept for an hour, which costs more. */
+	cacheWrite1hTokens?: number;
 	/** What the harness itself says the session cost. */
 	costUsd?: number;
 };

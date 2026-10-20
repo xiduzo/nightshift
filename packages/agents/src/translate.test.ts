@@ -167,51 +167,69 @@ describe("createTranslator", () => {
 
 	test("sends the usage so far after each Claude Code model call", () => {
 		const t = newTranslator();
-		const assistant = (id: string, output: number) => ({
+		// What a call says at its start: the input, and the output so far.
+		const startUsage = {
+			input_tokens: 10,
+			cache_read_input_tokens: 100,
+			cache_creation_input_tokens: 5,
+			cache_creation: {
+				ephemeral_5m_input_tokens: 0,
+				ephemeral_1h_input_tokens: 5,
+			},
+			output_tokens: 1,
+		};
+		const started = (id: string, parent: string | null = null) => ({
+			type: "stream_event",
+			parent_tool_use_id: parent,
+			event: { type: "message_start", message: { id, usage: startUsage } },
+		});
+		const assistant = (id: string) => ({
 			type: "assistant",
-			message: {
-				id,
+			message: { id, usage: startUsage },
+		});
+		// The final output count; no id, and no cache split.
+		const delta = (output: number, parent: string | null = null) => ({
+			type: "stream_event",
+			parent_tool_use_id: parent,
+			event: {
+				type: "message_delta",
 				usage: {
-					input_tokens: 10,
-					cache_read_input_tokens: 100,
-					cache_creation_input_tokens: 5,
+					...startUsage,
+					cache_creation: undefined,
 					output_tokens: output,
 				},
 			},
 		});
-		const text = { type: "TEXT_MESSAGE_CONTENT", messageId: "m", delta: "a" };
-		// Before the session id: held, like every other event.
-		t.observeSdk(assistant("call-1", 1));
-		expect(t.push(text)).toEqual([]);
-		expect(t.push(session).at(-1)).toEqual({
+		const call = (output: number, calls = 1): AgentEvent => ({
 			type: "usage",
 			usage: {
-				inputTokens: 115,
-				outputTokens: 1,
-				cacheReadTokens: 100,
-				cacheWriteTokens: 5,
+				inputTokens: 115 * calls,
+				outputTokens: output,
+				cacheReadTokens: 100 * calls,
+				cacheWriteTokens: 5 * calls,
+				cacheWrite1hTokens: 5 * calls,
 			},
 		});
-		// A second message of the same call replaces its usage; it does not add.
-		t.observeSdk(assistant("call-1", 4));
-		t.observeSdk(assistant("call-2", 6));
-		expect(t.push(text)).toEqual([
-			{ type: "text", messageId: "m", delta: "a" },
-			{
-				type: "usage",
-				usage: {
-					inputTokens: 230,
-					outputTokens: 10,
-					cacheReadTokens: 200,
-					cacheWriteTokens: 10,
-				},
-			},
-		]);
-		// Nothing new: no usage event.
-		t.observeSdk(assistant("call-2", 6));
-		expect(t.push(text)).toEqual([
-			{ type: "text", messageId: "m", delta: "a" },
-		]);
+		const text = { type: "TEXT_MESSAGE_CONTENT", messageId: "m", delta: "a" };
+		const said: AgentEvent = { type: "text", messageId: "m", delta: "a" };
+
+		// Before the session id: held, like every other event.
+		t.observeSdk(started("call-1"));
+		expect(t.push(text)).toEqual([]);
+		expect(t.push(session).at(-1)).toEqual(call(1));
+		// The assistant messages of a call repeat its usage: no new event.
+		t.observeSdk(assistant("call-1"));
+		t.observeSdk(assistant("call-1"));
+		expect(t.push(text)).toEqual([said]);
+		// The delta has the final output count, and keeps the cache split.
+		t.observeSdk(delta(40));
+		expect(t.push(text)).toEqual([said, call(40)]);
+		// A subagent's call streams apart from the main agent's.
+		t.observeSdk(started("call-2"));
+		t.observeSdk(started("sub-1", "task-1"));
+		t.observeSdk(delta(7, "task-1"));
+		t.observeSdk(delta(3));
+		expect(t.push(text)).toEqual([said, call(50, 3)]);
 	});
 
 	test("holds events that arrive before the session id", () => {

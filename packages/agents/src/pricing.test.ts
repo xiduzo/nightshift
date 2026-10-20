@@ -29,6 +29,23 @@ describe("settleCost", () => {
 		expect(cached).toBeLessThan(fresh);
 	});
 
+	test("cache writes kept for an hour cost more, as Claude Code reports them", () => {
+		// A real Claude Code session: it reported $0.0526781 for these tokens.
+		const session = {
+			inputTokens: 18 + 41_821 + 23_844,
+			outputTokens: 158,
+			cacheReadTokens: 41_821,
+			cacheWriteTokens: 23_844,
+		};
+		expect(
+			estimateCostUsd(
+				{ ...session, cacheWrite1hTokens: 23_844 },
+				"claude-haiku-4-5",
+			),
+		).toBeCloseTo(0.0526781, 7);
+		expect(estimateCostUsd(session, "claude-haiku-4-5")).toBeLessThan(0.04);
+	});
+
 	test("unknown without usage, without tokens, or without a price", () => {
 		const unknown = { costUsd: null, costSource: null };
 		expect(settleCost(null, "claude-sonnet-4-6")).toEqual(unknown);
