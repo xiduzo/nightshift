@@ -90,7 +90,12 @@ import {
 	trustedOrigins,
 } from "./env.server";
 import { migrationsFolder } from "./headless/embedded";
+import { guardProcess } from "./process-guard";
 import { createSync, documentAccess, type Sync } from "./sync";
+
+// First: an error nothing caught must never stop the timers (the lease
+// heartbeat, the scheduler). `nightshift serve` also exits on one.
+guardProcess();
 
 /** The database, the transcripts and the command logs, together. */
 const dev = ENV.NIGHTSHIFT_DEV === "true";
@@ -157,7 +162,11 @@ async function holdLease(): Promise<Lease> {
 		});
 	}, LEASE_HEARTBEAT_MS).unref();
 	// A clean stop writes what the Device document still has pending, and
-	// gives the lease up, so the next daemon starts at once.
+	// gives the lease up, so the next daemon starts at once. The 2 s bound
+	// is a timer, and dead timers never fire it. The writes need no timer,
+	// so a stop still ends when they do. If one hangs too: a second signal
+	// stops the process at once (`once`: the default action is back), and
+	// every watchdog sends SIGKILL a few seconds after SIGTERM.
 	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
 		process.once(signal, () => {
 			const pending = [

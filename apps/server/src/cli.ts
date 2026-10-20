@@ -8,6 +8,7 @@ import { reachFor } from "./devices";
 import { embedded, extractMigrations } from "./headless/embedded";
 import { directoryWeb, embeddedWeb, webHandler } from "./headless/web";
 import { adminCommand, joinCommand, pairCommand } from "./join-cli";
+import { guardProcess } from "./process-guard";
 import { serveDaemon, tlsPortOf } from "./serve";
 
 /**
@@ -107,6 +108,8 @@ export function serveOptions(
 }
 
 async function serve(argv: string[]) {
+	// A service manager (systemd, Docker, launchd) starts it again.
+	guardProcess({ exitOnUncaughtException: true });
 	let options: ServeOptions;
 	try {
 		options = serveOptions(argv, process.env);
