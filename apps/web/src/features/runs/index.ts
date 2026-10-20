@@ -2,6 +2,7 @@
 
 export { CostText } from "./components/cost-text";
 export { QuickRunDialog } from "./components/new-run-form";
+export { ProjectRunsPage } from "./components/project-runs-page";
 export { RunDetails } from "./components/run-details";
 export { RunGraph } from "./components/run-graph";
 export { RunActions, RunTitle } from "./components/run-header";
