@@ -8,7 +8,8 @@ import {
 import type { AgentSessionInput } from "@nightshift/agents/types";
 import type { WaitNode } from "@nightshift/flows";
 
-import { deriveRunState, deriveSleep, deriveSteps } from "../events";
+import { deriveRunState, deriveSleep } from "../derive-run";
+import { deriveSteps } from "../derive-steps";
 import { createSandbox, type Sandbox, waitFor } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { DEFAULT_RESUME_PROMPT, STOP_TIME_REASON } from "./context";

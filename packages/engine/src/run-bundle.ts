@@ -18,7 +18,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 import { type LoggedEvent, parseEventRow } from "./events";
-import type { TranscriptEntry } from "./types";
+import type { TranscriptEntry } from "./step-events";
 
 /**
  * A run bundle is one run in its own small SQLite file: the run, its

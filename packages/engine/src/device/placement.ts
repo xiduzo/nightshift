@@ -6,7 +6,6 @@ import { eq } from "drizzle-orm";
 
 import type { HostSpaces } from "../exchange/host-spaces";
 import { personOnHost } from "../exchange/host-spaces";
-import type { RunRow } from "../graph/context";
 import {
 	type DeviceOffer,
 	type OfferedPlacement,
@@ -14,10 +13,11 @@ import {
 	spaceOffers,
 } from "../offers";
 import { type ListedProject, NOT_ON_THIS_COMPUTER } from "../projects";
+import type { Relay } from "../relay";
 import type { RunLog } from "../run-log";
+import type { RunRow } from "../run-row";
 import type { PlacedDevice } from "../run-start";
 import { projectClones, type SpaceDocuments } from "../space/document";
-import type { OwnDevice, Placement, Relay } from "../types";
 import type { DeviceRegistry } from "./registry";
 import { remoteDevice, type WorkRelay } from "./remote";
 import type { Device } from "./types";
@@ -507,3 +507,28 @@ export function createPlacement(deps: PlacementDeps) {
 		nameOf: (id: string) => names.get(id) ?? null,
 	};
 }
+
+/**
+ * A Device a run of a project can be placed on, online, with a Clone of
+ * the project: one of the Person's own, or another Person's that offers
+ * profiles to the Space.
+ */
+export type Placement = {
+	deviceId: string;
+	name: string;
+	/** This computer. */
+	thisDevice: boolean;
+	/**
+	 * Another Person's Device: the profiles it offers to the Space, the
+	 * only ones a run there may use. Absent for the Person's own Devices.
+	 */
+	offers?: string[];
+};
+
+/** One of a Person's Devices, as placement sees it. */
+export type OwnDevice = Placement & {
+	/** It takes work now. */
+	online: boolean;
+	/** It has a Clone of the project. */
+	hasClone: boolean;
+};

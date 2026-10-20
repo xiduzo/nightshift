@@ -1,34 +1,36 @@
 import { describe, expect, test } from "bun:test";
 import type { FlowNodeType } from "@nightshift/flows";
-
+import { NO_COST, sessionCost } from "./cost";
 import {
 	countDaemonResumes,
 	countStepsSinceWalkBegan,
-	countVisits,
 	deriveGateWaits,
-	deriveNodeOutputs,
 	deriveOpenGate,
 	deriveRunState,
-	deriveSessions,
 	deriveSleep,
-	deriveSteps,
 	deriveStopAfterStep,
 	deriveStopAt,
 	deriveTraversals,
 	deriveWarnings,
-	type EngineEventType,
-	type EnginePayloads,
-	type LoggedEvent,
+	openWork,
+} from "./derive-run";
+import {
+	countVisits,
+	deriveNodeOutputs,
+	deriveSessions,
+	deriveSteps,
 	lastHarnessSession,
 	lastHarnessSessionOfNode,
-	NO_COST,
-	openWork,
-	type Scope,
-	type SessionOutcome,
-	sessionCost,
 	sumCost,
+} from "./derive-steps";
+import type {
+	EngineEventType,
+	EnginePayloads,
+	LoggedEvent,
+	Scope,
+	SessionOutcome,
+	StepOutcome,
 } from "./events";
-import type { StepOutcome } from "./types";
 
 /** Builds a log for one run. Each helper appends one event with the next seq. */
 function log() {

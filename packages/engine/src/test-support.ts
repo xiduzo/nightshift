@@ -16,10 +16,10 @@ import { type DeviceDocument, openDeviceDocument } from "./device/document";
 import { type LocalDeviceDeps, localDevice } from "./device/local";
 import type { Device } from "./device/types";
 import { parseEventRow } from "./events";
+import type { EngineOptions } from "./options";
 import { clonePathOf } from "./projects";
 import type { RunLog } from "./run-log";
 import { selfDevice } from "./self-device";
-import type { EngineOptions } from "./types";
 import { git } from "./worktrees";
 
 /** Test helpers: a temp git repo, a migrated temp database, scripted harnesses. */

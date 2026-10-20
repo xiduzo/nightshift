@@ -13,6 +13,7 @@ import type { Flow } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 
 import { createEngine } from "../engine";
+import type { RunStatus } from "../events";
 import { createSpaceDocuments, recordClone } from "../space/document";
 import {
 	createSandbox,
@@ -22,7 +23,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../test-support";
-import type { Engine, RunStatus } from "../types";
+import type { Engine } from "../types";
 import { serveWork, type WorkRelay, type WorkRequest } from "./remote";
 
 /**

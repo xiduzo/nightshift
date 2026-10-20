@@ -7,26 +7,24 @@ import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import {
 	countDaemonResumes,
 	deriveRunState,
-	deriveSteps,
 	deriveStopAt,
+	openWork,
+} from "./derive-run";
+import { deriveSteps } from "./derive-steps";
+import type { RunStatus } from "./events";
+import {
 	type EngineEventType,
 	groupByRun,
 	type LoggedEvent,
-	openWork,
 	parseEventRow,
 	type ResumedBy,
 } from "./events";
-import {
-	DEFAULT_RESUME_PROMPT,
-	getRunRow,
-	messageOf,
-	type RunRow,
-} from "./graph/context";
+import { DEFAULT_RESUME_PROMPT, messageOf } from "./graph/context";
 import { latestStepOf, resumeTarget, sessionOf } from "./graph/resume-point";
 import type { Runner, ThreadState } from "./graph/runner";
 import type { RunLog } from "./run-log";
+import { getRunRow, type RunRow } from "./run-row";
 import type { RunSettings } from "./settings";
-import type { RunStatus } from "./types";
 
 /**
  * Recovery: what a daemon does about runs that did not end on their own.

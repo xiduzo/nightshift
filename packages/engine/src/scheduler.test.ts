@@ -16,7 +16,8 @@ import {
 	waitFor,
 	withDevice,
 } from "./test-support";
-import type { RunSummary, SpaceEngine } from "./types";
+import type { SpaceEngine } from "./types";
+import type { RunSummary } from "./views";
 
 /** The scheduler with an injected clock: each test moves `clock` and waits for a tick. */
 

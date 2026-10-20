@@ -18,11 +18,11 @@ import {
 	resolvedAgent,
 } from "@nightshift/flows";
 import { consumeStream } from "../../consume";
+import { lastHarnessSessionOfNode } from "../../derive-steps";
 import type { SessionEvent } from "../../device/types";
 import {
 	type EnginePayloads,
 	type LoggedEvent,
-	lastHarnessSessionOfNode,
 	type StepOutputs,
 	scopeKey,
 } from "../../events";

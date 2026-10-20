@@ -11,7 +11,7 @@ import {
 import type { AgentSessionInput } from "@nightshift/agents/types";
 import type { CallEach, CallEachNode, CallNode, Flow } from "@nightshift/flows";
 
-import { type DerivedStep, deriveSteps } from "../events";
+import { type DerivedStep, deriveSteps } from "../derive-steps";
 import { defaultRunSettings } from "../settings";
 import { createSandbox, mustGit, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";

@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { FlowEdge } from "@nightshift/flows";
 
-import { deriveSteps, deriveVariableChanges, deriveVariables } from "../events";
+import {
+	deriveSteps,
+	deriveVariableChanges,
+	deriveVariables,
+} from "../derive-steps";
 import { createSandbox, type Sandbox } from "../test-support";
 import { reentryUpdate } from "./resume-point";
 import {

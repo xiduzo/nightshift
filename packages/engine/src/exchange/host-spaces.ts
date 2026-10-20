@@ -161,18 +161,6 @@ export function createHostSpaces(db: Database) {
 	};
 }
 
-/** Whether a Space is kept by a Host, not by this Replica. */
-export async function isHostedElsewhere(
-	db: Database,
-	spaceId: string,
-): Promise<boolean> {
-	const [row] = await db
-		.select({ spaceId: hostSpace.spaceId })
-		.from(hostSpace)
-		.where(eq(hostSpace.spaceId, spaceId));
-	return row !== undefined;
-}
-
 /**
  * This computer's Person as the Host of a Space knows them (the Person of
  * its link), or null for a Space this Replica keeps itself. A run this

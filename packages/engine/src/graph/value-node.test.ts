@@ -3,7 +3,7 @@ import { Command } from "@langchain/langgraph";
 import { fakeDecider } from "@nightshift/agents/testing";
 import type { ValueNode } from "@nightshift/flows";
 
-import { deriveSteps } from "../events";
+import { deriveSteps } from "../derive-steps";
 import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { DEFAULT_RESUME_PROMPT } from "./context";

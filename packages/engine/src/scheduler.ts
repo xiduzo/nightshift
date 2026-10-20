@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema";
+import type { ScheduleIssue } from "@nightshift/flows";
 import {
 	latestCronTime,
 	nextCronTimes,
@@ -8,14 +9,15 @@ import {
 } from "@nightshift/flows";
 import { readSchedulesFile } from "@nightshift/flows/files";
 import { and, asc, gt, inArray } from "drizzle-orm";
-
+import type { RunStatus, RunTrigger } from "./events";
 import {
 	type EngineEventType,
 	type LoggedEvent,
 	parseEventRow,
 } from "./events";
 import type { RunLog } from "./run-log";
-import type { RunStatus, RunSummary, RunTrigger, StartRunInput } from "./types";
+import type { StartRunInput } from "./run-start";
+import type { RunSummary } from "./views";
 
 /**
  * The scheduler: starts the runs of `.nightshift/schedules.json` when their
@@ -402,3 +404,40 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 		},
 	};
 }
+
+/** How the last cron time of a schedule went. */
+export type ScheduleResult =
+	| {
+			kind: "fired";
+			/** The cron time (epoch ms). */
+			at: number;
+			runId: string;
+			/** The run's status now. Null when the run is gone. */
+			runStatus: RunStatus | null;
+	  }
+	/** The run did not start, for example the flow has errors or the run cap was reached. */
+	| { kind: "failed"; at: number; error: string }
+	/** The time was not started: missed while the daemon was down, or an earlier run still runs. */
+	| {
+			kind: "skipped";
+			at: number;
+			reason: string;
+			/** The earlier run that still ran, when that is the reason. */
+			runId: string | null;
+	  };
+
+export type ScheduleSummary = Schedule & {
+	/** The next start (epoch ms). Null when paused or the cron line does not parse. */
+	nextAt: number | null;
+	last: ScheduleResult | null;
+	/** Problems of this schedule. One with an error fails to start. */
+	issues: ScheduleIssue[];
+};
+
+export type ScheduleList = {
+	/** Absolute path of `.nightshift/schedules.json`. */
+	path: string;
+	schedules: ScheduleSummary[];
+	/** Problems of the whole file, for example JSON that does not parse. */
+	issues: ScheduleIssue[];
+};

@@ -11,9 +11,8 @@ import type {
 	Outcome,
 } from "@nightshift/flows";
 
+import { deriveNodeOutputs, deriveVariables } from "../../derive-steps";
 import {
-	deriveNodeOutputs,
-	deriveVariables,
 	type InputValues,
 	type Scope,
 	type StepOutputs,

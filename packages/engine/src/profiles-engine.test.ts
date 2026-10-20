@@ -17,7 +17,8 @@ import {
 	waitFor,
 	withDevice,
 } from "./test-support";
-import type { RunDetail, SpaceEngine } from "./types";
+import type { SpaceEngine } from "./types";
+import type { RunDetail } from "./views";
 
 /** Agent Profiles: resolved into the run's copy when a run starts. */
 

@@ -21,11 +21,11 @@ import {
 	or,
 	sql,
 } from "drizzle-orm";
-
-import { isHostedElsewhere } from "./exchange/host-spaces";
+import type { Relay } from "./relay";
 import type { RunLog } from "./run-log";
 import {
 	cloneKey,
+	isHostedElsewhere,
 	projectClones,
 	projectEntry,
 	recordClone,
@@ -34,7 +34,6 @@ import {
 	type SpaceProject,
 	spaceProjectSchema,
 } from "./space/document";
-import type { Project, Relay } from "./types";
 import { originUrl, resolveRepoTopLevel } from "./worktrees";
 
 /**
@@ -572,3 +571,29 @@ export function normaliseRemote(url: string): string | null {
 	if (host === "" || path === "") return null;
 	return `${host.toLowerCase()}/${path}`;
 }
+
+export type Project = {
+	id: string;
+	name: string;
+	/**
+	 * The folder of the project's Clone on this computer. Null: the project
+	 * is not on this computer (another Device of the Space has it); a call
+	 * that needs its folder (flows, branches, schedules, a run walked here)
+	 * fails until a folder of it is added.
+	 */
+	repoPath: string | null;
+	/** The normalised `origin` (`github.com/acme/app`), null without one. */
+	remote: string | null;
+	createdAt: number;
+	/** The Devices with a Clone of it, from the Space document: this one first. */
+	clones: ProjectClone[];
+};
+
+/** That a Device has a Clone of a Project. Its path is that Device's own. */
+export type ProjectClone = {
+	deviceId: string;
+	/** The Device's name, as the Space document has it. */
+	deviceName: string | null;
+	/** This computer. */
+	thisDevice: boolean;
+};

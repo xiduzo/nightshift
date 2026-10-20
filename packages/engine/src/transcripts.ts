@@ -2,7 +2,7 @@ import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { type FileHandle, open, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type { TranscriptEntry } from "./types";
+import type { TranscriptEntry } from "./step-events";
 
 /**
  * Transcripts are NDJSON files on disk, one per step:

@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
 import type { WaitNode } from "@nightshift/flows";
 
-import { deriveSleep, deriveSteps } from "../events";
+import { deriveSleep } from "../derive-run";
+import { deriveSteps } from "../derive-steps";
 import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { parseTime } from "./nodes/wait";

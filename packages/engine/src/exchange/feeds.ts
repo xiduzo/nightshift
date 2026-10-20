@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { RunBus } from "../bus";
-import type { TranscriptEntry } from "../types";
+import type { TranscriptEntry } from "../step-events";
 
 /**
  * Live transcripts: one feed per step, the same on every Replica.

@@ -3,7 +3,8 @@ import { run, step } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
 import type { RunBus } from "../bus";
-import { deriveSteps, type LoggedEvent } from "../events";
+import { deriveSteps } from "../derive-steps";
+import type { LoggedEvent } from "../events";
 import type { RunLog } from "../run-log";
 import {
 	memberRole,

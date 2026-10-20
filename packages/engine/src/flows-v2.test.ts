@@ -32,7 +32,8 @@ import {
 	waitFor,
 	withDevice,
 } from "./test-support";
-import type { RunDetail, SpaceEngine, StepSummary } from "./types";
+import type { SpaceEngine } from "./types";
+import type { RunDetail, StepSummary } from "./views";
 
 /**
  * Flow format 2: inputs and outputs, templates with paths, the Call

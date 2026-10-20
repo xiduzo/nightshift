@@ -4,9 +4,7 @@ import {
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
 import { type FlowNode, type JsonValue, nextEdge } from "@nightshift/flows";
-
-import type { Scope, StepOutputs } from "../events";
-import type { StepOutcome } from "../types";
+import type { Scope, StepOutcome, StepOutputs } from "../events";
 import type { NodeAction, StepContext } from "./context";
 import { interruptNode } from "./interrupt";
 import { kindOf } from "./node-kinds";

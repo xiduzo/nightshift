@@ -26,16 +26,17 @@ import {
 import { eq, inArray } from "drizzle-orm";
 
 import { createRunBus } from "./bus";
-import { createPlacement } from "./device/placement";
-import { createDeviceRegistry } from "./device/registry";
-import type { WorkRelay } from "./device/remote";
 import {
 	deriveOpenGate,
 	deriveRunState,
 	deriveSleep,
-	deriveSteps,
 	deriveStopAfterStep,
-} from "./events";
+} from "./derive-run";
+import { deriveSteps } from "./derive-steps";
+import { createPlacement } from "./device/placement";
+import { createDeviceRegistry } from "./device/registry";
+import type { WorkRelay } from "./device/remote";
+import type { RunTrigger } from "./events";
 import {
 	type ArchiveRef,
 	checkpointSnapshot,
@@ -48,7 +49,6 @@ import type { RunCommandInput } from "./exchange/commands";
 import { createEngineExchange } from "./exchange/engine-exchange";
 import { createHostSpaces, personOnHost } from "./exchange/host-spaces";
 import { applyWalkerMoves } from "./exchange/rows";
-import { getRunRow as getRunRowOf, type RunRow } from "./graph/context";
 import { createRunner } from "./graph/runner";
 import {
 	createOfferSlots,
@@ -59,11 +59,15 @@ import {
 	spaceOffers,
 	unpublishOffer,
 } from "./offers";
+import type { EngineOptions } from "./options";
 import { createProjects, type ListedProject, toProject } from "./projects";
 import { createReadModel, parseCalledFlows, parseRunFlow } from "./read-model";
 import { createRecovery } from "./recovery";
 import { createRunLog, type RunLog } from "./run-log";
+import { getRunRow as getRunRowOf, type RunRow } from "./run-row";
+import type { StartRunInput } from "./run-start";
 import { createRunStart, flowsForRun } from "./run-start";
+import type { ScheduleResult } from "./scheduler";
 import {
 	createScheduler,
 	DEFAULT_SCHEDULE_TICK_MS,
@@ -71,22 +75,16 @@ import {
 } from "./scheduler";
 import { defaultRunSettings, type RunSettings } from "./settings";
 import { createSpaceDocuments, deviceNameIn } from "./space/document";
+import type { TranscriptEntry } from "./step-events";
 import { parseTranscript, readTranscriptFile } from "./transcripts";
 import type {
 	Actor,
 	Engine,
 	EngineOffers,
-	EngineOptions,
 	MemberChange,
-	RunStreamItem,
-	RunSummary,
-	RunTrigger,
-	RunWalker,
-	ScheduleResult,
 	SpaceEngine,
-	StartRunInput,
-	TranscriptEntry,
 } from "./types";
+import type { RunStreamItem, RunSummary, RunWalker } from "./views";
 import { listBranches } from "./worktrees";
 
 /**

@@ -9,14 +9,15 @@ import {
 	type VariableResult,
 } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-import type { Device } from "../device/types";
 import {
 	countStepsSinceWalkBegan,
-	countVisits,
-	type DerivedStep,
-	deriveSteps,
 	deriveStopAfterStep,
 	deriveWorktrees,
+} from "../derive-run";
+import { countVisits, type DerivedStep, deriveSteps } from "../derive-steps";
+import type { Device } from "../device/types";
+import type { StepOutcome } from "../events";
+import {
 	type EnginePayloads,
 	type LoggedEvent,
 	type RunWarningKind,
@@ -26,8 +27,8 @@ import {
 } from "../events";
 import { dataProblem } from "../output-schema";
 import { gitAuthorOf } from "../people";
+import type { StepEvent } from "../step-events";
 import { commandLogPath, transcriptPath } from "../transcripts";
-import type { StepEvent, StepOutcome } from "../types";
 import {
 	emit,
 	messageOf,

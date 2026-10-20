@@ -2,7 +2,7 @@ import type { Command, LangGraphRunnableConfig } from "@langchain/langgraph";
 import { harnessLabel } from "@nightshift/agents/harness-facts";
 import type { AgentErrorKind } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
-import { run, step } from "@nightshift/db/schema";
+import { step } from "@nightshift/db/schema";
 import type {
 	Flow,
 	FlowNode,
@@ -13,12 +13,14 @@ import type {
 import { eq } from "drizzle-orm";
 
 import type { RunBus } from "../bus";
+import type { DerivedStep } from "../derive-steps";
 import type { Capabilities, Device } from "../device/types";
-import type { DerivedStep, PolicyWaitReason, StepOutputs } from "../events";
+import type { PolicyWaitReason, StepOutputs } from "../events";
 import type { RunLog } from "../run-log";
+import type { RunRow } from "../run-row";
 import type { RunSettings } from "../settings";
+import type { StepEvent, TranscriptEntry } from "../step-events";
 import { openTranscriptWriter, readRunTranscript } from "../transcripts";
-import type { StepEvent, TranscriptEntry } from "../types";
 import type { ResumeRules } from "./resume-point";
 import type { RunEvent, RunStateValues } from "./state";
 
@@ -33,15 +35,6 @@ import type { RunEvent, RunStateValues } from "./state";
  * a step's sleep and wake are the sleep module's (`graph/sleep.ts`). The
  * log is written exactly as the old engine wrote it.
  */
-
-export type RunRow = typeof run.$inferSelect;
-
-/** The run's row, or an error naming the run. */
-export async function getRunRow(db: Database, runId: string): Promise<RunRow> {
-	const [row] = await db.select().from(run).where(eq(run.id, runId));
-	if (!row) throw new Error(`Run not found: ${runId}`);
-	return row;
-}
 
 /**
  * A harness's display name, for a message about one that is not added (no

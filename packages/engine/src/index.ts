@@ -37,6 +37,7 @@ export {
 	SECOND_HOME,
 } from "./device/host-links";
 export { localDevice } from "./device/local";
+export type { OwnDevice, Placement } from "./device/placement";
 export type { DeviceRegistry, PairedDevice } from "./device/registry";
 export {
 	serveWork,
@@ -108,8 +109,12 @@ export {
 	setUpGit,
 	systemGitInstaller,
 } from "./project-setup";
+export type { Project } from "./projects";
 export { clonePathOf } from "./projects";
+export type { Relay } from "./relay";
 export { exportRun, openRunBundle, type RunBundleSummary } from "./run-bundle";
+export type { StartRunInput } from "./run-start";
+export type { ScheduleList } from "./scheduler";
 export { selfDevice } from "./self-device";
 export {
 	createSettingsStore,
@@ -129,19 +134,7 @@ export {
 	spaceDocumentName,
 	spaceIdOf,
 } from "./space/document";
-export type {
-	Engine,
-	OpenGate,
-	OwnDevice,
-	Placement,
-	Project,
-	Relay,
-	RunDetail,
-	RunStreamItem,
-	RunSummary,
-	ScheduleList,
-	SpaceEngine,
-	StartRunInput,
-	TranscriptEntry,
-} from "./types";
+export type { TranscriptEntry } from "./step-events";
+export type { Engine, SpaceEngine } from "./types";
+export type { OpenGate, RunDetail, RunStreamItem, RunSummary } from "./views";
 export { type Branches, worktreeLocation } from "./worktrees";

@@ -21,7 +21,8 @@ import {
 	waitFor,
 	withDevice,
 } from "./test-support";
-import type { RunDetail, SpaceEngine } from "./types";
+import type { SpaceEngine } from "./types";
+import type { RunDetail } from "./views";
 
 /** The engine's hooks for the daemon's settings and connections. */
 

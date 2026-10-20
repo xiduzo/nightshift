@@ -12,7 +12,8 @@ import {
 	waitFor,
 	withDevice,
 } from "../test-support";
-import type { Engine, RunStreamItem } from "../types";
+import type { Engine } from "../types";
+import type { RunStreamItem } from "../views";
 
 /**
  * The run page of a run walked elsewhere, in one process: A walks a run

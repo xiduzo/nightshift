@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import { createRunBus, type RunBus } from "../bus";
-import type { TranscriptEntry } from "../types";
+import type { TranscriptEntry } from "../step-events";
 import {
 	createTranscriptFeeds,
 	type FeedStep,

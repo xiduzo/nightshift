@@ -3,7 +3,8 @@ import type { Command } from "@langchain/langgraph";
 import { step as stepTable } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
-import { deriveSteps, type EngineEventType } from "../events";
+import { deriveSteps } from "../derive-steps";
+import type { EngineEventType } from "../events";
 import { createSandbox, type Sandbox, testDevice } from "../test-support";
 import { STOP_AFTER_STEP_REASON, STOP_TIME_REASON } from "./context";
 import { RESUME_RULES, type ResumePoint } from "./resume-point";

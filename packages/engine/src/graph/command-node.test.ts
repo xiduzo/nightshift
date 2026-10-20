@@ -6,7 +6,7 @@ import { step } from "@nightshift/db/schema";
 import { templateEnvName } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 
-import { deriveSteps } from "../events";
+import { deriveSteps } from "../derive-steps";
 import { createSandbox, type Sandbox, TEST_DEVICE_ID } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { drive, flowOf, payloads, startRun } from "./test-support";

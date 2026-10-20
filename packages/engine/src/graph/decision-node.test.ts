@@ -8,7 +8,7 @@ import type {
 	DecisionResult,
 } from "@nightshift/agents/types";
 
-import { deriveSteps } from "../events";
+import { deriveSteps } from "../derive-steps";
 import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { DEFAULT_RESUME_PROMPT } from "./context";

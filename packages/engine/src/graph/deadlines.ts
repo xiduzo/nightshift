@@ -1,4 +1,5 @@
-import { deriveStepClocks, type LoggedEvent } from "../events";
+import { deriveStepClocks } from "../derive-run";
+import type { LoggedEvent } from "../events";
 import { lastEntryAt } from "../transcripts";
 import { type AbortReason, budgetError } from "./step-runner";
 

@@ -3,12 +3,8 @@ import type { Database } from "@nightshift/db";
 import { event, project, run } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 
-import {
-	deriveRunStatus,
-	type EventInput,
-	type LoggedEvent,
-	parseEventRow,
-} from "./events";
+import { deriveRunStatus } from "./derive-run";
+import { type EventInput, type LoggedEvent, parseEventRow } from "./events";
 import { createRunLog } from "./run-log";
 import { createSandbox, type Sandbox } from "./test-support";
 

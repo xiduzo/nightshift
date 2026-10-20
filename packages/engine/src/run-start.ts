@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { run } from "@nightshift/db/schema";
+import type { JsonValue } from "@nightshift/flows";
 import {
 	type AgentProfileSettings,
 	type Flow,
@@ -13,9 +14,8 @@ import {
 	validateFlow,
 } from "@nightshift/flows";
 import { type FlowSources, parsedFlows } from "@nightshift/flows/files";
-
 import type { Capabilities, Device } from "./device/types";
-import type { InputValues } from "./events";
+import type { InputValues, RunTrigger } from "./events";
 import { personOnHost } from "./exchange/host-spaces";
 import { type NodeKind, onDevice, type Requirement } from "./graph/context";
 import { kindOf, kindOfType, NODE_KINDS } from "./graph/node-kinds";
@@ -23,16 +23,12 @@ import { missingNames } from "./graph/nodes/agent";
 import type { Runner } from "./graph/runner";
 import { resolveInputs } from "./inputs";
 import { type OfferedPlacement, offerRefusal } from "./offers";
+import type { EngineOptions } from "./options";
 import { gitAuthorOf, namesOf } from "./people";
 import type { ListedProject } from "./projects";
 import { runFacts, toSummary } from "./read-model";
 import type { RunLog } from "./run-log";
-import type {
-	EngineOptions,
-	RunSummary,
-	RunTrigger,
-	StartRunInput,
-} from "./types";
+import type { RunSummary } from "./views";
 
 /**
  * Run start: from a `StartRunInput` to a run the runner drives. Two layers
@@ -608,3 +604,33 @@ export function createRunStart(deps: RunStartDeps) {
 
 	return { start };
 }
+
+export type StartRunInput = {
+	projectId: string;
+	/**
+	 * Values for the flow's `inputs`, by name: a string for a `text` input,
+	 * any JSON value (or JSON text) for a `json` input. A missing or empty
+	 * value takes the input's default; a required input without either
+	 * refuses the start. Names the flow does not declare are refused.
+	 */
+	inputs?: Record<string, JsonValue>;
+	/** Epoch ms. No new step starts after it; the run then ends as stopped. */
+	stopAt?: number;
+	/** Git ref to branch the worktree from. Defaults to the clone's current HEAD. */
+	baseRef?: string;
+	/**
+	 * The Person who starts the run (their id). Commits in the run's
+	 * worktree are in their name. Absent: a schedule, or nobody known.
+	 */
+	startedBy?: string;
+	/**
+	 * The Device the run's steps run on, and its worktree's home (its
+	 * Placement): one of the starter's Devices with a Clone of the project
+	 * (`listPlacements`). Default: this computer.
+	 */
+	deviceId?: string;
+} & (
+	| { flowName: string; flow?: never }
+	/** A flow that is not a file, for example a quick run. */
+	| { flow: Flow; flowName?: never }
+);

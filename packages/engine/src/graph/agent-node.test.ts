@@ -18,7 +18,7 @@ import { agentSession, step } from "@nightshift/db/schema";
 import type { AgentNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 
-import { deriveSteps } from "../events";
+import { deriveSteps } from "../derive-steps";
 import { createSandbox, type Sandbox } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import { DEFAULT_RESUME_PROMPT } from "./context";

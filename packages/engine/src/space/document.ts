@@ -2,6 +2,7 @@ import type { Database } from "@nightshift/db";
 import {
 	clone,
 	device,
+	hostSpace,
 	member,
 	organization,
 	project,
@@ -10,8 +11,6 @@ import {
 import { eq, inArray } from "drizzle-orm";
 import type * as Y from "yjs";
 import { z } from "zod";
-
-import { isHostedElsewhere } from "../exchange/host-spaces";
 import { openPersistedDocument, type PersistedDocument } from "../ydoc";
 
 /**
@@ -415,4 +414,16 @@ async function mirror(db: Database, document: SpaceDocument): Promise<void> {
 			}
 		}
 	});
+}
+
+/** Whether a Space is kept by a Host, not by this Replica. */
+export async function isHostedElsewhere(
+	db: Database,
+	spaceId: string,
+): Promise<boolean> {
+	const [row] = await db
+		.select({ spaceId: hostSpace.spaceId })
+		.from(hostSpace)
+		.where(eq(hostSpace.spaceId, spaceId));
+	return row !== undefined;
 }

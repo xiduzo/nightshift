@@ -1,9 +1,13 @@
 import { withLangGraph } from "@langchain/langgraph/zod";
 import { type JsonValue, outcomeColorSchema } from "@nightshift/flows";
 import { z } from "zod";
-
-import type { GateChoice, StepOutputs, WaitReason } from "../events";
-import type { StepOutcome, TranscriptEntry } from "../types";
+import type {
+	GateChoice,
+	StepOutcome,
+	StepOutputs,
+	WaitReason,
+} from "../events";
+import type { TranscriptEntry } from "../step-events";
 
 /**
  * The run state LangGraph checkpoints after every node, and the typed

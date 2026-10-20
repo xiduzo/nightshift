@@ -12,6 +12,8 @@ import type { Flow } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 
 import { createEngine } from "../engine";
+import type { RunStatus } from "../events";
+import type { Relay } from "../relay";
 import { createRunLog } from "../run-log";
 import {
 	createSandbox,
@@ -20,7 +22,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../test-support";
-import type { Engine, Relay, RunStatus } from "../types";
+import type { Engine } from "../types";
 import {
 	ForeignRowsError,
 	MissingProjectError,

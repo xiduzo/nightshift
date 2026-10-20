@@ -12,7 +12,7 @@ import type {
 	WaitNode,
 } from "@nightshift/flows";
 
-import type { DerivedItem, DerivedStep } from "../events";
+import type { DerivedItem, DerivedStep } from "../derive-steps";
 import { testDevice } from "../test-support";
 import { kindOf, kindOfType, NODE_KINDS } from "./node-kinds";
 import { RESUME_RULES } from "./resume-point";

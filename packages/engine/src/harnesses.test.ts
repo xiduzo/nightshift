@@ -8,6 +8,7 @@ import { event } from "@nightshift/db/schema";
 import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
 
 import { createEngine } from "./engine";
+import type { RunStatus } from "./events";
 import { expandMcpServers } from "./mcp";
 import {
 	createSandbox,
@@ -16,7 +17,7 @@ import {
 	waitFor,
 	withDevice,
 } from "./test-support";
-import type { RunStatus, SpaceEngine } from "./types";
+import type { SpaceEngine } from "./types";
 
 let sandbox: Sandbox;
 beforeEach(async () => {

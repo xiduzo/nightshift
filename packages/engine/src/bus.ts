@@ -1,4 +1,4 @@
-import type { TranscriptEntry } from "./types";
+import type { TranscriptEntry } from "./step-events";
 
 /** What the engine publishes in-process for one run. */
 export type BusItem =

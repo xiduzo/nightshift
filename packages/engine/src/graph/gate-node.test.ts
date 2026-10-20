@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
 
-import { deriveOpenGate, deriveSteps, type GateChoice } from "../events";
+import { deriveOpenGate } from "../derive-run";
+import { deriveSteps } from "../derive-steps";
+import type { GateChoice } from "../events";
 import { createSandbox, type Sandbox, TEST_DEVICE_ID } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import {

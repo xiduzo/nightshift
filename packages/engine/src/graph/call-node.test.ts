@@ -5,7 +5,7 @@ import type { AgentSessionInput } from "@nightshift/agents/types";
 import { step as stepTable } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
-import { deriveSteps } from "../events";
+import { deriveSteps } from "../derive-steps";
 import { createSandbox, type Sandbox } from "../test-support";
 import {
 	agent,

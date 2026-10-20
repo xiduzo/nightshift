@@ -23,8 +23,10 @@ import {
 import { asc, eq } from "drizzle-orm";
 
 import { createEngine, type EngineInternals } from "./engine";
+import type { RunStatus } from "./events";
 import { createRunLog, type RunLog } from "./run-log";
 import { defaultRunSettings, type RunSettings } from "./settings";
+import type { TranscriptEntry } from "./step-events";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -35,14 +37,8 @@ import {
 	waitFor,
 	withDevice,
 } from "./test-support";
-import type {
-	Engine,
-	RunDetail,
-	RunStatus,
-	RunStreamItem,
-	SpaceEngine,
-	TranscriptEntry,
-} from "./types";
+import type { Engine, SpaceEngine } from "./types";
+import type { RunDetail, RunStreamItem } from "./views";
 
 let sandbox: Sandbox;
 /** The run log of each engine the test made, oldest first: checked against the database after it. */

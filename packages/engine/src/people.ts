@@ -2,7 +2,7 @@ import type { Database } from "@nightshift/db";
 import { user } from "@nightshift/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
-import type { RunPerson } from "./types";
+import type { RunPerson } from "./views";
 
 /**
  * The Persons runs name, read from the Replica's accounts: who started a
