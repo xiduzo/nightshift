@@ -9,6 +9,7 @@ import {
 	deriveNodeOutputs,
 	deriveOpenGate,
 	deriveRunState,
+	deriveSessions,
 	deriveSleep,
 	deriveSteps,
 	deriveStopAfterStep,
@@ -20,6 +21,7 @@ import {
 	type LoggedEvent,
 	lastHarnessSession,
 	lastHarnessSessionOfNode,
+	NO_COST,
 	openWork,
 	type Scope,
 	type SessionOutcome,
@@ -423,17 +425,88 @@ test("a cost tally knows what it does not know", () => {
 	]);
 });
 
-test("a failed session without usage is not a missing cost", () => {
-	expect(
-		sessionCost({
-			outcome: "failed",
-			error: "boom",
-			errorKind: "harness",
-			usage: null,
-			costUsd: null,
-			resetAt: null,
-		}),
-	).toEqual({ usd: 0, estimated: false, missing: 0, calls: 1 });
+describe("sessionCost", () => {
+	const failed = {
+		outcome: "failed" as const,
+		error: "boom",
+		errorKind: "harness" as const,
+		usage: null,
+		costUsd: null,
+		resetAt: null,
+	};
+	const spent = {
+		usage: { inputTokens: 1000, outputTokens: 100 },
+		costUsd: 0.2,
+		costSource: "estimated" as const,
+	};
+
+	test("a failed session without usage is not a missing cost", () => {
+		expect(sessionCost({ ending: failed, spent: null })).toEqual({
+			usd: 0,
+			estimated: false,
+			missing: 0,
+			calls: 1,
+		});
+	});
+
+	test("a running session costs what it spent so far", () => {
+		expect(sessionCost({ ending: null, spent })).toEqual({
+			usd: 0.2,
+			estimated: true,
+			missing: 0,
+			calls: 1,
+		});
+		expect(sessionCost({ ending: null, spent: null })).toEqual(NO_COST);
+	});
+
+	test("a session that ended without a cost keeps what it spent so far", () => {
+		expect(sessionCost({ ending: failed, spent }).usd).toBe(0.2);
+		expect(
+			sessionCost({
+				ending: { ...failed, outcome: "interrupted" },
+				spent,
+			}).usd,
+		).toBe(0.2);
+	});
+
+	test("the final cost replaces what it spent so far", () => {
+		expect(
+			sessionCost({
+				ending: {
+					...failed,
+					outcome: "finished",
+					error: null,
+					errorKind: null,
+					costUsd: 0.25,
+					costSource: "reported",
+				},
+				spent,
+			}),
+		).toEqual({ usd: 0.25, estimated: false, missing: 0, calls: 1 });
+	});
+
+	test("the log keeps the last running total of each session", () => {
+		const events: LoggedEvent[] = [];
+		let seq = 0;
+		const push = <T extends EngineEventType>(
+			type: T,
+			payload: EnginePayloads[T],
+		) =>
+			events.push({
+				seq: ++seq,
+				runId: "r",
+				stepId: "s1",
+				sessionId: "a",
+				type,
+				payload,
+				at: seq,
+			} as LoggedEvent);
+		push("SessionStarted", { prompt: "go", resumeSessionId: null });
+		push("SessionUsage", { ...spent, costUsd: 0.1 });
+		push("SessionUsage", spent);
+		expect(deriveSessions(events)[0]?.spent).toEqual(spent);
+		expect(sumCost(events).usd).toBe(0.2);
+	});
 });
 
 describe("gates", () => {

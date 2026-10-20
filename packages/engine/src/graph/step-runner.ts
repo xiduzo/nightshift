@@ -106,6 +106,8 @@ export type SessionRecord = {
 	id: string;
 	/** The harness named its session: the row and `HarnessSessionAssigned`. */
 	assigned(harnessSessionId: string, model: string | null): Promise<void>;
+	/** `SessionUsage`: what the session has spent so far. */
+	spent(payload: EnginePayloads["SessionUsage"]): Promise<void>;
 	/** `SessionEnded` with how the session ended. */
 	ended(payload: EnginePayloads["SessionEnded"]): Promise<void>;
 };
@@ -618,6 +620,16 @@ export async function beginStep(
 						stepId,
 						sessionId,
 						payload: { harnessSessionId, model },
+					});
+					changed();
+				},
+				async spent(payload) {
+					await ctx.log.append({
+						type: "SessionUsage",
+						runId,
+						stepId,
+						sessionId,
+						payload,
 					});
 					changed();
 				},

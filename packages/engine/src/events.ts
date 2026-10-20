@@ -290,6 +290,17 @@ export type EnginePayloads = {
 		harness?: HarnessName;
 	};
 	HarnessSessionAssigned: { harnessSessionId: string; model: string | null };
+	/**
+	 * What a session has spent so far: a running total, logged while it
+	 * runs, at most every few seconds. Only harnesses that report usage
+	 * while they work have it. `SessionEnded` has the final cost; without
+	 * one (the session failed, or Night Shift stopped), the last total counts.
+	 */
+	SessionUsage: {
+		usage: AgentUsage;
+		costUsd: number | null;
+		costSource?: CostSource | null;
+	};
 	SessionEnded: {
 		outcome: SessionOutcome;
 		error: string | null;
@@ -418,7 +429,7 @@ export type RunWarningKind = "cost-unknown";
  * What something cost, as far as it is known: the reported and estimated
  * dollars, whether part of them is an estimate, how many sessions or model
  * calls ended without a cost (their spend is not in `usd`), and how many
- * ended at all. With no calls, nothing could cost.
+ * ended or spent so far. With no calls, nothing could cost.
  */
 export type CostTally = {
 	usd: number;
@@ -444,25 +455,29 @@ export function addCost(a: CostTally, b: CostTally): CostTally {
 }
 
 /**
- * A session's cost. A finished session without one is missing: it did work.
- * A session that failed without usage spent what nobody knows, usually
- * nothing, so it does not count.
+ * A session's cost: its final cost, else what it spent so far (it still
+ * runs, failed, or Night Shift stopped during it). A finished session
+ * without either is missing: it did work. A session that failed without
+ * usage spent what nobody knows, usually nothing, so it does not count.
  */
 export function sessionCost(
-	ending: EnginePayloads["SessionEnded"] | null,
+	session: Pick<DerivedSession, "ending" | "spent">,
 ): CostTally {
-	if (!ending) return NO_COST;
-	if (ending.costUsd === null) {
+	const { ending, spent } = session;
+	const known =
+		ending?.costUsd != null ? ending : spent?.costUsd != null ? spent : null;
+	if (known?.costUsd != null) {
 		return {
-			...NO_COST,
-			missing: ending.outcome === "finished" ? 1 : 0,
+			usd: known.costUsd,
+			estimated: known.costSource === "estimated",
+			missing: 0,
 			calls: 1,
 		};
 	}
+	if (!ending) return NO_COST;
 	return {
-		usd: ending.costUsd,
-		estimated: ending.costSource === "estimated",
-		missing: 0,
+		...NO_COST,
+		missing: ending.outcome === "finished" ? 1 : 0,
 		calls: 1,
 	};
 }
@@ -853,6 +868,8 @@ export type DerivedSession = {
 	startSeq: number;
 	/** The first end wins: a late duplicate never rewrites history. */
 	ending: EnginePayloads["SessionEnded"] | null;
+	/** The last running total (`SessionUsage`), or null. */
+	spent: EnginePayloads["SessionUsage"] | null;
 };
 
 /** Sessions in the order they started. */
@@ -873,6 +890,7 @@ export function deriveSessions(
 				startedAt: e.at,
 				startSeq: e.seq,
 				ending: null,
+				spent: null,
 			});
 			continue;
 		}
@@ -880,6 +898,8 @@ export function deriveSessions(
 		if (!session) continue;
 		if (e.type === "HarnessSessionAssigned") {
 			session.harnessSessionId ??= e.payload.harnessSessionId;
+		} else if (e.type === "SessionUsage") {
+			session.spent = e.payload;
 		} else if (e.type === "SessionEnded") {
 			session.ending ??= e.payload;
 		}
@@ -1062,7 +1082,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 		const step = session.stepId ? steps.get(session.stepId) : undefined;
 		if (!step) continue;
 		step.sessions.push(session);
-		step.cost = addCost(step.cost, sessionCost(session.ending));
+		step.cost = addCost(step.cost, sessionCost(session));
 	}
 	for (const step of steps.values()) {
 		if (step.endedAt === null) continue;
@@ -1169,7 +1189,7 @@ export function sumCost(events: readonly LoggedEvent[]): CostTally {
 	// A session whose step is missing from the log still cost money.
 	for (const session of deriveSessions(events)) {
 		if (session.stepId && stepIds.has(session.stepId)) continue;
-		total = addCost(total, sessionCost(session.ending));
+		total = addCost(total, sessionCost(session));
 	}
 	return total;
 }

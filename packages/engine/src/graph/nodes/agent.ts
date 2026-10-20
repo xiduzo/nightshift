@@ -2,6 +2,7 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { settleCost } from "@nightshift/agents/pricing";
 import type {
 	AgentSessionInput,
+	AgentUsage,
 	HarnessName,
 	StepReportOutcome,
 	StepReportSpec,
@@ -325,11 +326,15 @@ type AgentReport = {
 
 type SessionEnding = EnginePayloads["SessionEnded"];
 
+/** How often a session's spend so far goes to the log, at most. */
+const SPENT_EVERY_MS = 5_000;
+
 /**
  * One harness session of the step: `SessionStarted`, the stream (every
- * event to the transcript; `HarnessSessionAssigned` when the harness names
- * its session), `SessionEnded`, then the step's end from the report, the
- * output schema and the node's outcomes; or a wait request.
+ * event but `usage` to the transcript; `HarnessSessionAssigned` when the
+ * harness names its session; `SessionUsage` with the spend so far, at most
+ * every `SPENT_EVERY_MS`), `SessionEnded`, then the step's end from the
+ * report, the output schema and the node's outcomes; or a wait request.
  */
 async function runSession(
 	_ctx: StepContext,
@@ -437,9 +442,36 @@ async function runSession(
 	let lastMessageId: string | null = null;
 	const stoppedByPerson = () => signal.aborted && signal.reason === "stopped";
 
+	/** The usage so far, from the last `usage` event. */
+	let used: AgentUsage | null = null;
+	let spentAt = 0;
+	let spentTimer: ReturnType<typeof setTimeout> | undefined;
+	let sessionOver = false;
+	const logSpent = () => {
+		spentTimer = undefined;
+		if (sessionOver || !used) return;
+		spentAt = Date.now();
+		void session
+			.spent({ usage: used, ...settleCost(used, sessionModel) })
+			.catch(() => {});
+	};
+	/** Logs the spend so far now, or once `SPENT_EVERY_MS` passed since the last time. */
+	const spendSoFar = (usage: AgentUsage) => {
+		used = usage;
+		if (spentTimer) return;
+		const wait = spentAt + SPENT_EVERY_MS - Date.now();
+		if (wait <= 0) logSpent();
+		else spentTimer = setTimeout(logSpent, wait);
+	};
+
 	const onEvent = async (agentEvent: SessionEvent): Promise<void> => {
 		if (agentEvent.type === "ready" || agentEvent.type === "refused") return;
 		step.touch();
+		// The spend so far is not part of the transcript.
+		if (agentEvent.type === "usage") {
+			spendSoFar(agentEvent.usage);
+			return;
+		}
 		step.record(sessionId, agentEvent);
 		switch (agentEvent.type) {
 			case "session":
@@ -485,20 +517,24 @@ async function runSession(
 					outcome: stoppedByPerson() ? "stopped" : "failed",
 					error: agentEvent.message,
 					errorKind: agentEvent.kind,
-					usage: null,
-					costUsd: null,
+					...spentBeforeTheEnd(),
 					resetAt: agentEvent.resetAt ?? null,
 				};
 				break;
 		}
 	};
 
+	/** A session that ends without a result keeps what it spent so far. */
+	const spentBeforeTheEnd = () =>
+		used
+			? { usage: used, ...settleCost(used, sessionModel) }
+			: { usage: null, costUsd: null };
+
 	const endWithoutResult = (message: string): SessionEnding => ({
 		outcome: stoppedByPerson() ? "stopped" : "failed",
 		error: signal.aborted ? "The session was aborted." : message,
 		errorKind: signal.aborted ? "aborted" : "harness",
-		usage: null,
-		costUsd: null,
+		...spentBeforeTheEnd(),
 		resetAt: null,
 	});
 
@@ -522,6 +558,9 @@ async function runSession(
 	}
 	const final: SessionEnding =
 		ending ?? endWithoutResult("The harness stream ended without a result.");
+	// The end has the final cost: no running total after it.
+	sessionOver = true;
+	clearTimeout(spentTimer);
 	await session.ended(final);
 	if (final.outcome === "finished" && final.costUsd === null) {
 		await step.warn(

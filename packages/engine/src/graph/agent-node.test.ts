@@ -75,6 +75,70 @@ describe("the Agent node", () => {
 		expect(cost).toMatchObject({ estimated: true, missing: 0 });
 	});
 
+	test("the spend so far goes to the log, not to the transcript", async () => {
+		const usage = (outputTokens: number) => ({
+			type: "usage" as const,
+			usage: { inputTokens: 1_000_000, outputTokens },
+		});
+		const harness = fakeHarness({
+			...reportingScript("pass"),
+			model: "claude-sonnet-4-6",
+			// The first usage goes out at once, the next two within 5 s: only the last of them.
+			steps: [
+				usage(0),
+				{ type: "text", text: "Working." },
+				usage(50_000),
+				usage(100_000),
+				...(reportingScript("pass").steps ?? []),
+			],
+			outcome: { type: "finished", usage: { inputTokens: 1, outputTokens: 1 } },
+		});
+		const h = await startRun(
+			sandbox,
+			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
+			{ harness },
+		);
+		await drive(h, { inputs: {} });
+		const logged = await h.events();
+		const spent = payloads(logged, "SessionUsage");
+		expect(spent).toHaveLength(1);
+		expect(spent[0]?.costSource).toBe("estimated");
+		expect(spent[0]?.costUsd).toBeCloseTo(3, 6);
+		// The end has the final cost, and it wins.
+		const [ended] = payloads(logged, "SessionEnded");
+		expect(deriveSteps(logged)[0]?.cost.usd).toBe(ended?.costUsd as number);
+		const [started] = payloads(logged, "StepStarted");
+		const transcript = await readTranscriptFile(
+			started?.transcriptPath as string,
+		);
+		expect(transcript.some((e) => e.event.type === "usage")).toBe(false);
+	});
+
+	test("a session that fails keeps what it spent so far", async () => {
+		const harness = fakeHarness({
+			...failingScript(),
+			model: "claude-sonnet-4-6",
+			steps: [
+				{
+					type: "usage",
+					usage: { inputTokens: 1_000_000, outputTokens: 100_000 },
+				},
+			],
+		});
+		const h = await startRun(
+			sandbox,
+			flowOf({ start: "worker", nodes: [agent("worker")], edges: [] }),
+			{ harness },
+		);
+		await drive(h, { inputs: {} });
+		const logged = await h.events();
+		const [ended] = payloads(logged, "SessionEnded");
+		expect(ended?.outcome).toBe("failed");
+		expect(ended?.costSource).toBe("estimated");
+		expect(ended?.costUsd).toBeCloseTo(4.5, 6);
+		expect(deriveSteps(logged)[0]?.cost.usd).toBeCloseTo(4.5, 6);
+	});
+
 	test("no cost and no price: the cost is missing, and the run warns about it", async () => {
 		const harness = fakeHarness({
 			...reportingScript("pass"),

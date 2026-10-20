@@ -86,6 +86,7 @@ export type SessionSummary = {
 	/** Set when the session ended. */
 	outcome: "finished" | "stopped" | "failed" | "interrupted" | null;
 	error: string | null;
+	/** What the session cost, or has spent so far while it runs. */
 	costUsd: number | null;
 	/** `costUsd` is estimated from tokens: the harness reported no cost. */
 	costEstimated: boolean;

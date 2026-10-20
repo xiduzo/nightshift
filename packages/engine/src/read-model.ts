@@ -390,8 +390,8 @@ export function toStepSummary(
 			createdAt: s.startedAt,
 			outcome: s.ending?.outcome ?? null,
 			error: s.ending?.error ?? null,
-			costUsd: s.ending?.costUsd ?? null,
-			costEstimated: sessionCost(s.ending).estimated,
+			costUsd: s.ending?.costUsd ?? s.spent?.costUsd ?? null,
+			costEstimated: sessionCost(s).estimated,
 		})),
 		...costFields(derived.cost),
 		device:
