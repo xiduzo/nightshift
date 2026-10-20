@@ -7,6 +7,7 @@ import { prepareDaemonEnv } from "./daemon-env";
 import { reachFor } from "./devices";
 import { embedded, extractMigrations } from "./headless/embedded";
 import { directoryWeb, embeddedWeb, webHandler } from "./headless/web";
+import { healthCommand } from "./health-cli";
 import { adminCommand, joinCommand, pairCommand } from "./join-cli";
 import { guardProcess } from "./process-guard";
 import { serveDaemon, tlsPortOf } from "./serve";
@@ -26,6 +27,10 @@ Usage:
   nightshift admin --email <email>          Set how the Host admin signs in from
                                             another computer. --reset-two-factor
                                             also turns two-factor sign-in off.
+  nightshift health [--restart]             Exit code 0 when Night Shift runs here, else 1.
+                                            --restart stops a Night Shift that does not
+                                            respond, so that its service manager starts it
+                                            again. --data-dir as for serve.
 
 Options of serve (each has an environment variable too):
   --port <port>            The port. PORT, default 3000.
@@ -187,6 +192,8 @@ export async function main(argv: string[]) {
 			return pairCommand(rest, "nightshift pair");
 		case "admin":
 			return adminCommand(rest, "nightshift admin");
+		case "health":
+			return healthCommand(rest, "nightshift health");
 		case undefined:
 		case "help":
 		case "--help":

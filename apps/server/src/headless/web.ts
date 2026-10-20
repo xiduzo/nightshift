@@ -42,7 +42,7 @@ export const DAEMON_META =
 	'<meta name="nightshift-daemon" content="same-origin"/>';
 
 /** Paths the daemon answers itself, never the UI. */
-const DAEMON_PATHS = ["/rpc", "/api", "/sync"];
+const DAEMON_PATHS = ["/rpc", "/api", "/sync", "/health"];
 
 /**
  * The UI's answer to a request, or null when the daemon answers it. A

@@ -12,12 +12,31 @@ import { logger } from "hono/logger";
 
 import { access, createContext } from "./context";
 import { desktopOrigins, ENV } from "./env.server";
+import { leaseHealth, readHeartbeat } from "./health";
 import { runExportResponse } from "./run-export";
-import { auth, connections, db, serve, sync } from "./services";
+import { auth, connections, db, lease, serve, sync } from "./services";
 import type { SocketData } from "./sync";
 import { peerAddress } from "./this-computer";
 
 const app = new Hono();
+
+// For watchdogs and health checks, before the logger: they ask often. 200
+// while the lease heartbeat is fresh, else 503. It reads the clock and the
+// database only, so it answers truthfully when the timers stopped. It says
+// nothing about this computer: anyone may ask.
+app.get("/health", async (c) => {
+	try {
+		const health = leaseHealth(await readHeartbeat(db), {
+			owner: lease.owner,
+		});
+		return c.json(
+			{ status: health.status, heartbeatAgeMs: health.heartbeatAgeMs },
+			health.healthy ? 200 : 503,
+		);
+	} catch {
+		return c.json({ status: "unknown", heartbeatAgeMs: null }, 503);
+	}
+});
 
 app.use(logger());
 app.use(
