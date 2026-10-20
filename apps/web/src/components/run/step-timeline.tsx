@@ -298,7 +298,7 @@ function RowStats({
 		<>
 			<span className="ml-auto flex w-28 shrink-0 justify-start">{badge}</span>
 			<span
-				className="w-20 shrink-0 whitespace-nowrap text-right text-muted-foreground tabular-nums"
+				className="w-14 shrink-0 whitespace-nowrap text-right text-muted-foreground tabular-nums"
 				title={durationTitle}
 			>
 				{duration}
