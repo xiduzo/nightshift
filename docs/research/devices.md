@@ -1532,7 +1532,7 @@ iroh.
      the browser (React reports a recoverable hydration mismatch there).
      Each page gets `<meta name="nightshift-daemon">`, and the UI then
      calls the origin it came from instead of `VITE_SERVER_URL`
-     (`apps/web/src/lib/server-url.ts`): a Host has several addresses, and
+     (`apps/web/src/shared/api/server-url.ts`): a Host has several addresses, and
      the one the browser used is the one that answers.
    - **Secrets without a keychain.** The auth secret: `BETTER_AUTH_SECRET`,
      else the file `BETTER_AUTH_SECRET_FILE`, else `BETTER_AUTH_SECRET` in

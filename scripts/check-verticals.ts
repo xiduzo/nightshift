@@ -36,7 +36,7 @@ import ts from "typescript";
  * workspaces it converts. Phase 8 removes the list: then every workspace
  * except `packages/ui` and `packages/config` is checked.
  */
-export const ENFORCED: string[] = [];
+export const ENFORCED: string[] = ["apps/web"];
 
 /**
  * Leaf contracts: a pure-data file (no imports of its own) that a vertical
@@ -59,7 +59,18 @@ export const LEAF_CONTRACTS: Record<string, Record<string, string[]>> = {};
 export const PEER_PORTS: Record<
 	string,
 	Record<string, Record<string, string>>
-> = {};
+> = {
+	"apps/web": {
+		"features/devices": {
+			// Runs and devices show each other: a run shows its Walker (a
+			// Device), and the Offers of a Device list the runs they started,
+			// with their status. Through the runs barrel the devices page would
+			// close a devices -> runs -> devices cycle (run-details shows the
+			// Walker). The status badge imports only the API types.
+			"features/runs": "components/run-status-badge",
+		},
+	},
+};
 
 /** Kind buckets: never a folder at the top of `src/`. */
 const KIND_BUCKETS = new Set([

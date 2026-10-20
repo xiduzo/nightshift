@@ -67,14 +67,14 @@ Pipeline board and spec tree components do not exist yet. Build them in `package
 
 An overview shows **at most 5 rows** in a list or table. This covers the sections on Home and on a project page (Recent runs, What the night produced, Up next, Flow health), and every tab of a details dialog.
 
-- One number for all of them: `OVERVIEW_ROWS` in `apps/web/src/lib/overview.ts`. Do not add a limit per list.
+- One number for all of them: `OVERVIEW_ROWS` in `apps/web/src/features/dashboard/overview.ts`. Do not add a limit per list.
 - Show the top 5 for the list's question: newest first, the most runs, the highest cost. Say which in the hint ("The last 5, newest first", "The top 5, the most runs first").
 - The full list is one link away: a section action ("Flows", "All runs") or the dialog footer. Under a cut list in a dialog, `MoreRows` says how many rows it leaves out.
 - Pages whose job is the full list (the runs page, the inbox, the flows page) do not use this limit.
 
 ### Details dialogs
 
-A stat card or a table row can open a details dialog (`apps/web/src/components/dashboard/details.tsx`). Flow health set the shape. Every details dialog follows it:
+A stat card or a table row can open a details dialog (`apps/web/src/features/dashboard/details.tsx`). Flow health set the shape. Every details dialog follows it:
 
 - A header with the trail ("project › Runs") and a title.
 - `DetailsTabs`: Overview first, then one tab per view (a breakdown per flow or project, the latest or top rows). A tab can carry a count badge for what needs attention (problems, open runs, waiting Gates).

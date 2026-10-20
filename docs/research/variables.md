@@ -219,7 +219,7 @@ Built from shadcn components only (`AGENTS.md`, `docs/shadcn.md`).
   per write: the variable (`Select`), Template or Expression (`ToggleGroup`),
   the value (`TemplateField`), and the outcomes (`ToggleGroup` with multiple
   selection, unset means all).
-- **Variable picker.** `templateVariables()` in `lib/flow-draft.ts` adds a
+- **Variable picker.** `templateVariables()` in `features/flows/flow-draft.ts` adds a
   `vars` group after the inputs, with the type as the description. A `json`
   variable leaves the cursor before `}}` for a path, as `data` does now.
 - **Canvas.** A small `Badge` on a node that writes: `sets 2`. The tooltip

@@ -28,6 +28,9 @@ Shift uses it. The rule itself is in `AGENTS.md`.
 
   If the CLI drops a hook into `apps/web/src/hooks` while a component imports
   it from `@nightshift/ui/hooks/...`, move the hook to `packages/ui/src/hooks`.
+  A block lands in `apps/web/src/components`. Move it into the vertical that
+  uses it (`src/features/<vertical>/` or `src/shared/<name>/`, see
+  `docs/steering/STRUCTURE.md`): `src/components/` must not exist.
 - **Do not hand-edit** generated files in `packages/ui/src/components`.
   Change the look through tokens, a variant on the call site (`className`), or
   by composing components. When a component really must change, re-add it
@@ -47,7 +50,7 @@ CLI when you need them.
 | ✓ [Button Group](https://ui.shadcn.com/docs/components/button-group) | Joins related buttons (split buttons, prev/next, a button with a dropdown). |
 | ✓ [Input](https://ui.shadcn.com/docs/components/input) | One-line text. |
 | ✓ [Input Group](https://ui.shadcn.com/docs/components/input-group) | An input or textarea with addons inside the border: an icon, a prefix, a button, a counter. |
-| ✓ [Input OTP](https://ui.shadcn.com/docs/components/input-otp) | One-time codes, one box per digit: the two-factor code at sign-in and in its setup (`components/account/code-input.tsx`). |
+| ✓ [Input OTP](https://ui.shadcn.com/docs/components/input-otp) | One-time codes, one box per digit: the two-factor code at sign-in and in its setup (`features/access/code-input.tsx`). |
 | ✓ [Textarea](https://ui.shadcn.com/docs/components/textarea) | Multi-line text: prompts, notes, JSON. |
 | ✓ [Checkbox](https://ui.shadcn.com/docs/components/checkbox) | One on/off choice inside a form, or several from a list. |
 | ✓ [Radio Group](https://ui.shadcn.com/docs/components/radio-group) | One choice from a few visible options. As cards (`FieldLabel` around a horizontal `Field`): a profile's harness, a Gate's choices in the inbox. |
@@ -139,7 +142,7 @@ yet; read the source with `shadcn view <name>`.
 | ✓ `attachment` | A file or link attached to a message: media, title, description, actions. |
 | ✓ `marker` | An inline marker in a conversation: a system note, a divider, a status line. |
 | ✓ `trace` | A collapsible line of agent activity (a tool call, a thinking step) with icon, title and description. Use for transcript tool calls. |
-| ✓ `code-block` | Code with a header, title, copy button and Shiki highlighting (`useHighlightedCode` in `apps/web/src/hooks`). Use for commands, logs, JSON. |
+| ✓ `code-block` | Code with a header, title, copy button and Shiki highlighting (`useHighlightedCode` in `apps/web/src/shared/code`). Use for commands, logs, JSON. |
 | `questionnaire` | A step-by-step set of questions with choices (a Gate's question form). |
 
 ## Blocks
@@ -157,7 +160,7 @@ files into the app; then adapt the copy. Browse them at
 | `sidebar-04` | A floating sidebar with submenus. |
 | `sidebar-05` | A sidebar with collapsible submenus. |
 | `sidebar-06` | A sidebar with submenus as dropdowns. |
-| `sidebar-07` | A sidebar that collapses to icons, with a team switcher and a user menu. Night Shift's app shell is based on it; its team switcher is the Space switcher (`space-switcher.tsx`). |
+| `sidebar-07` | A sidebar that collapses to icons, with a team switcher and a user menu. Night Shift's app shell is based on it; its team switcher is the Space switcher (`features/spaces/space-switcher.tsx`). |
 | `sidebar-08` | An inset sidebar with secondary navigation. |
 | `sidebar-09` | Collapsible nested sidebars (a mail-client layout). |
 | `sidebar-10` | A sidebar in a popover. |

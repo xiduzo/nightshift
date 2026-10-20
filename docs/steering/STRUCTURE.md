@@ -119,7 +119,7 @@ Every app and every package (except `ui` and `config`) is cut into verticals. Th
 Two exceptions exist, as in yapyap. Each one is listed by name in `scripts/check-verticals.ts` with a comment that says why.
 
 - **Leaf contract:** a pure-data file (no imports of its own) that a vertical exposes past its barrel, because importing the barrel would close a module-init cycle. Its symbols are also on the barrel.
-- **Peer port:** two verticals that depend on each other cross only through one named port file per direction. Every other deep import between them stays banned.
+- **Peer port:** two verticals that depend on each other cross only through one named port file per direction. Every other deep import between them stays banned. Often only one direction closes the cycle. Then only that direction has a port, and the other direction imports the barrel.
 
 ### Growth
 
@@ -138,18 +138,31 @@ These are signals, not hard limits. A file past the limit needs a reason in its 
 
 ```
 apps/web/src/
+  router.tsx               the router and its query client (TanStack Start reads it here)
   routes/                  thin TanStack Router files: createFileRoute + one page from a vertical
   shared/
-    api/                   the oRPC client, query client, server URL, contract.ts (derived API types)
-    shell/                 router wiring, sidebar, site header, page heading
-    time/  data-table/     other named cross-cutting pieces, each with a barrel
+    api/                   the oRPC client, query client, server URL, auth client, refusal codes, contract.ts (every derived API type)
+    page/                  the parts of a page: site header, page heading, loader, logo
+    shell/                 the app frame: sidebar, night notifications
+    format/  code/  data-table/  media-query/   other named cross-cutting pieces, each with a barrel
   features/
     <vertical>/            projects, flows, runs, gates, schedules, agents, devices, settings, spaces, access, dashboard
       index.ts             the barrel: the only public surface
       queries.ts           query and mutation option factories, polling rules (or queries/ + mutations/)
-      types.ts             this vertical's slice of the API types
+      types.ts             this vertical's slice of the API types, when contract.ts is not enough
       components/ hooks/ lib/   when the vertical is big enough
+    flows/                 canvas/, editor/ (+ editor/lib/), start/ (Start run, the flow's inputs)
+    runs/                  components/, hooks/, lib/, transcript/
 ```
+
+Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fails a cycle through barrels too.
+
+- Routes and `router.tsx` may import any vertical, through its barrel.
+- `shared/shell` composes the features. It is the only shared piece that imports a feature. No feature imports it.
+- The other shared pieces import no feature. Every feature may use them.
+- The features, from the bottom: `access`, `spaces`, `projects`, `agents`, `settings` (shared only), then `flows`, `devices`, `gates`, `runs`, then `schedules` and `dashboard`. A feature imports only features below it.
+- `devices` and `runs` show each other (the Walker of a run, the runs of an Offer). That is the one exception to the order: `devices` reaches the run status badge through a peer port (`scripts/check-verticals.ts`).
+- A concept goes to the vertical that owns it in `docs/glossary.md`, not to its biggest user. Outcomes are declared by flow nodes, so `outcome-badge` is in `flows/canvas`. The Walker is a Device, so `walker-badge` is in `devices`.
 
 - A route file loads data (`loader`, `ensureQueryData`) and renders one page from a vertical's barrel. It holds no other markup.
 - Query options live in the vertical's queries. A component does not build `orpc.x.y.queryOptions(...)` for another vertical's data. It imports that vertical's factory from its barrel.
@@ -175,9 +188,9 @@ An app wires packages together and talks to the outside world. It does not hold 
 | Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, the `api` root and `flows/files` in `apps/web`. Biome replaces the options of a rule per override, so each override lists the whole set. | `biome.json` and its overrides | Active |
 | Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json` | Active. `noImportCycles` only warns in `packages/engine/src/graph/` until phase 3. |
 | CI on every pull request and push to `main`: `biome ci`, the layer check, the vertical check and its tests, `bun run check-types`, and `bun test` per workspace (without `*.live.test.ts`). | `.github/workflows/ci.yml` | Active |
-| Vertical boundaries: `scripts/check-verticals.ts` finds the verticals from the file system (so no list can drift), then fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks a workspace that is not enforced yet. | lefthook pre-commit, CI | Active (enforced for: none yet) |
-| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. | lefthook pre-commit, CI | Active (enforced for: none yet) |
-| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (enforced for: none yet) |
+| Vertical boundaries: `scripts/check-verticals.ts` finds the verticals from the file system (so no list can drift), then fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks a workspace that is not enforced yet. | lefthook pre-commit, CI | Active (enforced for: apps/web) |
+| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. | lefthook pre-commit, CI | Active (enforced for: apps/web) |
+| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (enforced for: apps/web) |
 
 When a check exists, change its status to "Active". When a workspace follows section 4, add it to `ENFORCED` in `scripts/check-verticals.ts` and to the list above. Fix a violation, do not add an exception. If a rule is wrong, change this document first.
 
@@ -185,7 +198,7 @@ When a check exists, change its status to "Active". When a workspace follows sec
 
 The code does not yet follow every rule. These are debts. Do not copy them into new code.
 
-- `apps/web` groups by kind: `lib/` (35 files), `hooks/`, `utils/`, loose `components/*.tsx`. Fat routes: `settings.tsx`, `runs/$runId.tsx`, `members.tsx`, `devices.tsx`, `index.tsx`.
+- `apps/web` has fat routes: `settings.tsx`, `runs/$runId.tsx`, `members.tsx`, `devices.tsx`, `index.tsx`. Components build `orpc.x.y.queryOptions(...)` inline, and no vertical has a `queries.ts` yet. God files: `flows/editor/node-inspector.tsx`, `flows/flow-draft.ts`, `runs/transcript/step-transcript.tsx`.
 - `packages/engine` has 58 flat files and five jobs. `engine.ts`, `events.ts` and `types.ts` are god files. `types.ts` is the hub of an import cycle. `graph/` has a value import cycle through `node-kinds.ts`.
 - The devices domain is split over four places (see section 2).
 - `apps/server/src/services.ts` starts the daemon at import time. `apps/desktop` imports the server app through a temporary `exports` map in `apps/server/package.json`. The layer check allows `desktop` → `server` with a temporary exception.
@@ -193,6 +206,6 @@ The code does not yet follow every rule. These are debts. Do not copy them into 
 - `packages/api/src/routers/index.ts` holds every procedure in one file. Most procedures declare no output schema. The engine owns wire schemas that the API uses.
 - The engine reads auth tables directly. `worktrees.ts` calls `git` with no port.
 - Each harness touches five files.
-- No workspace is cut into barrel verticals yet (`features/<vertical>/index.ts` in apps, `src/<vertical>/index.ts` in packages).
+- Only `apps/web` is cut into barrel verticals (`features/<vertical>/index.ts` in apps, `src/<vertical>/index.ts` in packages).
 
 The migration plan that removes these debts is in the structure audit of 2026-10-20.
