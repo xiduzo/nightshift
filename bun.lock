@@ -163,6 +163,7 @@
         "@nightshift/db": "workspace:*",
         "better-auth": "catalog:",
         "drizzle-orm": "catalog:",
+        "zod": "catalog:",
       },
       "devDependencies": {
         "@nightshift/config": "workspace:*",
