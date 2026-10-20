@@ -45,7 +45,7 @@ import {
 
 import { JsonBlock } from "./json-block";
 
-const TYPE_LABEL = {
+export const TYPE_LABEL = {
 	text: "text",
 	number: "number",
 	boolean: "yes or no",
@@ -197,7 +197,7 @@ function VariableTable({
 }
 
 /** A called flow's name: its Call step's node, the item, and the flow. */
-function ScopeTitle({
+export function ScopeTitle({
 	run,
 	steps,
 	scope,
@@ -216,7 +216,7 @@ function ScopeTitle({
 	);
 }
 
-function ValuePreview({ value }: { value: unknown }) {
+export function ValuePreview({ value }: { value: unknown }) {
 	if (value === null || value === undefined) {
 		return <span className="text-muted-foreground">No value</span>;
 	}
@@ -224,7 +224,7 @@ function ValuePreview({ value }: { value: unknown }) {
 }
 
 /** The step a change came from, with a way to show it; "Start value" for the first value. */
-function SetBy({
+export function SetBy({
 	change,
 	steps,
 	onShowStep,

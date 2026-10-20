@@ -19,16 +19,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
-import { ScrollArea } from "@nightshift/ui/components/scroll-area";
-import { Separator } from "@nightshift/ui/components/separator";
-import {
-	Sheet,
-	SheetContent,
-	SheetDescription,
-	SheetHeader,
-	SheetTitle,
-	SheetTrigger,
-} from "@nightshift/ui/components/sheet";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import {
 	Tooltip,
@@ -37,34 +27,23 @@ import {
 } from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import {
 	AlarmClockIcon,
 	ChevronDownIcon,
 	CircleStopIcon,
 	ClipboardCopyIcon,
-	CopyIcon,
 	DownloadIcon,
-	InfoIcon,
-	MonitorIcon,
 	PlayIcon,
 	RotateCcwIcon,
 	SendIcon,
 	SkipForwardIcon,
-	WorkflowIcon,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { CostText } from "@/components/cost-text";
 import { RunStatusBadge } from "@/components/run-status-badge";
 import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
-import { authClient } from "@/lib/auth-client";
-import {
-	dayWord,
-	formatDateTime,
-	formatDayTime,
-	formatTime,
-} from "@/lib/format";
+import { dayWord, formatDateTime, formatTime } from "@/lib/format";
 import { SERVER_URL } from "@/lib/server-url";
 import { orpc } from "@/utils/orpc";
 
@@ -75,12 +54,10 @@ import { WalkerBadge, walkerName } from "./walker-badge";
 
 const STOPPABLE: RunStatus[] = ["running", "waiting", "sleeping"];
 
-/** A git object id: shown short, with the full id in a tooltip. */
-const SHA = /^[0-9a-f]{40}$/i;
-
 /**
  * The run on one line: its title, status and stop plans, and how long it ran
- * and what it cost. The rest of its facts sit in `RunDetails`.
+ * and what it cost. The rest of its facts sit in `RunDetails`
+ * (`run-details.tsx`).
  */
 export function RunTitle({
 	run,
@@ -150,262 +127,6 @@ export function RunTitle({
 				<CostText cost={run} />
 			</p>
 		</div>
-	);
-}
-
-/** A button in the page header that opens every fact of the run in a Sheet. */
-export function RunDetails({ run }: { run: RunDetail }) {
-	return (
-		<Sheet>
-			<SheetTrigger
-				render={<Button variant="outline" size="sm" aria-label="Details" />}
-			>
-				<InfoIcon data-icon="inline-start" />
-				<span className="hidden sm:inline">Details</span>
-			</SheetTrigger>
-			<SheetContent>
-				<SheetHeader>
-					<SheetTitle>Run details</SheetTitle>
-					<SheetDescription>
-						What started it, where it ran, and what it cost.
-					</SheetDescription>
-				</SheetHeader>
-				<ScrollArea className="min-h-0 flex-1">
-					<div className="px-4 pb-6">
-						<RunFacts run={run} />
-					</div>
-				</ScrollArea>
-			</SheetContent>
-		</Sheet>
-	);
-}
-
-/** Every fact of the run, one per row, in three groups: what, where, when. */
-function RunFacts({ run }: { run: RunDetail }) {
-	const inputs = Object.entries(run.inputs ?? {}).map(
-		([name, value]) =>
-			[
-				name,
-				typeof value === "string" ? value : JSON.stringify(value),
-			] as const,
-	);
-	const daemonResumes = run.resumes.filter((resume) => resume.by === "daemon");
-
-	return (
-		<div className="flex flex-col gap-5">
-			<dl className="flex flex-col gap-3">
-				<Fact label="Flow">
-					<WorkflowIcon
-						className="size-3.5 shrink-0 text-muted-foreground"
-						aria-hidden="true"
-					/>
-					{run.flowName ? (
-						<Link
-							to="/projects/$projectId/flows/$name"
-							params={{ projectId: run.projectId, name: run.flowName }}
-							className="truncate rounded-sm font-mono underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-						>
-							{run.flowName}
-						</Link>
-					) : (
-						"Quick run"
-					)}
-				</Fact>
-				{inputs.map(([name, value]) => (
-					<Fact key={name} label={`Input · ${name}`}>
-						<span className="truncate font-mono text-xs" title={value}>
-							{value}
-						</span>
-					</Fact>
-				))}
-				<Fact label="Started by">
-					<StartedBy run={run} />
-				</Fact>
-			</dl>
-			<Separator />
-			<dl className="flex flex-col gap-3">
-				<Fact label="Branch">
-					<CopyValue label="branch" value={run.branch} />
-				</Fact>
-				<Fact label="Base">
-					<CopyValue
-						label="base"
-						value={run.baseRef}
-						short={SHA.test(run.baseRef) ? run.baseRef.slice(0, 12) : undefined}
-					/>
-				</Fact>
-				<Fact label="Runs on">
-					<MonitorIcon
-						className="size-3.5 shrink-0 text-muted-foreground"
-						aria-hidden="true"
-					/>
-					{run.device.thisDevice ? "This computer" : walkerName(run.device)}
-				</Fact>
-				{run.walker.id !== run.device.id ? (
-					<Fact label="Walked by">
-						<MonitorIcon
-							className="size-3.5 shrink-0 text-muted-foreground"
-							aria-hidden="true"
-						/>
-						{run.walker.thisDevice ? "This computer" : walkerName(run.walker)}
-					</Fact>
-				) : null}
-				{run.handOffs.length > 0 ? (
-					<Fact label="Work moved">
-						<ul className="flex min-w-0 flex-col gap-1 text-xs">
-							{run.handOffs.map((handOff) => (
-								<li key={`${handOff.at}-${handOff.commit}`}>
-									{deviceLabel(handOff.from)} → {deviceLabel(handOff.to)}{" "}
-									<span className="font-mono text-muted-foreground">
-										{handOff.commit.slice(0, 7)}
-									</span>
-								</li>
-							))}
-						</ul>
-					</Fact>
-				) : null}
-				{run.walker.thisDevice && run.device.thisDevice ? (
-					<Fact label="Folder">
-						<CopyValue label="folder path" value={run.worktreePath} />
-					</Fact>
-				) : null}
-			</dl>
-			<Separator />
-			<dl className="flex flex-col gap-3">
-				<Fact label="Cost">
-					<CostText cost={run} className="font-medium tabular-nums" />
-				</Fact>
-				<Fact label="Started">
-					<time
-						dateTime={new Date(run.createdAt).toISOString()}
-						className="truncate tabular-nums"
-					>
-						{formatDateTime(run.createdAt)}
-					</time>
-				</Fact>
-				<Fact label="Stop time">
-					{run.stopAt ? (
-						<time
-							dateTime={new Date(run.stopAt).toISOString()}
-							className="truncate tabular-nums"
-						>
-							{formatDayTime(run.stopAt)}
-						</time>
-					) : (
-						<span className="text-muted-foreground">None</span>
-					)}
-				</Fact>
-				{daemonResumes.length > 0 ? (
-					<Fact label="Resumed automatically">
-						<ul className="flex min-w-0 flex-col gap-1 text-xs">
-							{daemonResumes.map((resume) => (
-								<li key={resume.at}>
-									<span className="tabular-nums">
-										{formatDayTime(resume.at)}
-									</span>
-									, at <span className="font-mono">{resume.nodeId}</span>:{" "}
-									{resume.reason ?? "Night Shift restarted."}
-								</li>
-							))}
-						</ul>
-					</Fact>
-				) : null}
-			</dl>
-		</div>
-	);
-}
-
-/** A device of the run, as people read it: this computer, or its name. */
-function deviceLabel(device: RunDetail["walker"]): string {
-	return device.thisDevice ? "This computer" : walkerName(device);
-}
-
-/** One fact of the run: a small muted label above its value. */
-/**
- * Who started the run: a schedule, you, or another Member of the Space.
- * Commits in the run are in the name of the person who started it.
- */
-function StartedBy({ run }: { run: RunDetail }) {
-	const session = authClient.useSession();
-	if (run.trigger.kind === "schedule") {
-		return <>Schedule · {run.trigger.scheduleId}</>;
-	}
-	if (!run.startedBy) {
-		return <span className="text-muted-foreground">Not known</span>;
-	}
-	if (run.startedBy.id === session.data?.user.id) return <>You</>;
-	return (
-		<span className="truncate">{run.startedBy.name ?? "A former member"}</span>
-	);
-}
-
-function Fact({
-	label,
-	className,
-	children,
-}: {
-	label: string;
-	className?: string;
-	children: ReactNode;
-}) {
-	return (
-		<div className={cn("flex min-w-0 flex-col gap-1", className)}>
-			<dt className="text-muted-foreground text-xs">{label}</dt>
-			<dd className="flex min-h-6 min-w-0 items-center gap-1 text-sm">
-				{children}
-			</dd>
-		</div>
-	);
-}
-
-/** A mono value that may be cut short, with its full text in a tooltip and a copy button. */
-function CopyValue({
-	label,
-	value,
-	short,
-}: {
-	label: string;
-	value: string;
-	/** A shorter form to show, such as the start of a hash. */
-	short?: string;
-}) {
-	const copy = async () => {
-		try {
-			await navigator.clipboard.writeText(value);
-			toast.success(`Copied the ${label}.`);
-		} catch {
-			toast.error("Could not copy.");
-		}
-	};
-	return (
-		<>
-			<Tooltip>
-				<TooltipTrigger
-					render={<span className="min-w-0 truncate font-mono text-xs" />}
-				>
-					{short ?? value}
-				</TooltipTrigger>
-				<TooltipContent className="max-w-md break-all font-mono">
-					{value}
-				</TooltipContent>
-			</Tooltip>
-			<Tooltip>
-				<TooltipTrigger
-					render={
-						<Button
-							variant="ghost"
-							size="icon-xs"
-							className="text-muted-foreground"
-							aria-label={`Copy the ${label}`}
-							onClick={copy}
-						/>
-					}
-				>
-					<CopyIcon aria-hidden="true" />
-				</TooltipTrigger>
-				<TooltipContent>Copy</TooltipContent>
-			</Tooltip>
-		</>
 	);
 }
 

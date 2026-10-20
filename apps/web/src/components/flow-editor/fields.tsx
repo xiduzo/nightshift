@@ -109,15 +109,20 @@ export function InspectorHeader({
 	title,
 	badges,
 	actions,
+	className,
 }: {
 	icon: LucideIcon;
 	kicker: ReactNode;
 	title: ReactNode;
 	badges?: ReactNode;
 	actions?: ReactNode;
+	className?: string;
 }) {
 	return (
-		<Item size="sm" className="flex-nowrap rounded-none border-0 p-4">
+		<Item
+			size="sm"
+			className={cn("flex-nowrap rounded-none border-0 p-4", className)}
+		>
 			<ItemMedia
 				variant="icon"
 				className="size-9 rounded-lg border bg-muted text-muted-foreground"

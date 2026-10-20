@@ -43,9 +43,9 @@ import {
 	useState,
 	useSyncExternalStore,
 } from "react";
-
+import { RunDetails } from "@/components/run/run-details";
 import { RunGraph } from "@/components/run/run-graph";
-import { RunActions, RunDetails, RunTitle } from "@/components/run/run-header";
+import { RunActions, RunTitle } from "@/components/run/run-header";
 import { RunStatusPanel } from "@/components/run/run-status-panel";
 import { RunVariables } from "@/components/run/run-variables";
 import { RunWarnings } from "@/components/run/run-warnings";
@@ -465,7 +465,12 @@ function RunComponent() {
 		<>
 			<SiteHeader crumbs={crumbs}>
 				<RunActions run={runData} status={status} steps={steps} />
-				<RunDetails run={runData} />
+				<RunDetails
+					run={runData}
+					steps={steps}
+					status={status}
+					onShowStep={setPickedStepId}
+				/>
 			</SiteHeader>
 			<div className="flex flex-1 flex-col lg:h-[calc(100svh-3.5rem)] lg:min-h-0 lg:flex-none">
 				<RunTitle
