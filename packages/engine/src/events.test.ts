@@ -772,6 +772,10 @@ describe("Call scopes", () => {
 		expect(deriveStopAfterStep(b.events)).toBe(false);
 		b.push("StopAfterStepRequested", {});
 		expect(deriveStopAfterStep(b.events)).toBe(true);
+		b.push("StopAfterStepCancelled", {});
+		expect(deriveStopAfterStep(b.events)).toBe(false);
+		b.push("StopAfterStepRequested", {});
+		expect(deriveStopAfterStep(b.events)).toBe(true);
 		b.ended("stopped");
 		b.push("RunResumed", {
 			nodeId: "worker",

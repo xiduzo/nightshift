@@ -808,7 +808,11 @@ export function createEngine(
 					});
 					return;
 				}
-				if (stopOptions?.when === "after-step") {
+				if (
+					stopOptions?.when === "after-step" ||
+					stopOptions?.when === "cancel-after-step"
+				) {
+					const request = stopOptions.when === "after-step";
 					await runner.exclusive(runId, async () => {
 						const events = await loadRunEvents(runId);
 						const status = deriveRunState(events).status;
@@ -819,9 +823,11 @@ export function createEngine(
 						) {
 							return;
 						}
-						if (deriveStopAfterStep(events)) return;
+						if (deriveStopAfterStep(events) === request) return;
 						await runLog.append({
-							type: "StopAfterStepRequested",
+							type: request
+								? "StopAfterStepRequested"
+								: "StopAfterStepCancelled",
 							runId,
 							payload: {},
 						});

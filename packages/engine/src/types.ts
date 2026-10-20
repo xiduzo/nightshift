@@ -765,11 +765,12 @@ export interface SpaceEngine {
 	 * `now` (default): aborts the running step, closes an open Gate or ends a
 	 * sleep, and ends the run as `stopped`. `after-step`: lets the running
 	 * step finish, then ends the run as `stopped` before the next step.
+	 * `cancel-after-step`: withdraws an `after-step` stop.
 	 * No-op when nothing runs, waits or sleeps.
 	 */
 	stopRun(
 		runId: string,
-		options?: { when?: "now" | "after-step" },
+		options?: { when?: "now" | "after-step" | "cancel-after-step" },
 	): Promise<void>;
 	/**
 	 * Continues a stopped, failed or interrupted run at its last step's node

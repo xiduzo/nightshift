@@ -47,6 +47,7 @@ import {
 	DownloadIcon,
 	InfoIcon,
 	MonitorIcon,
+	PlayIcon,
 	RotateCcwIcon,
 	SendIcon,
 	SkipForwardIcon,
@@ -430,9 +431,17 @@ export function RunActions({
 		orpc.runs.stop.mutationOptions({
 			onSuccess: () =>
 				queryClient.invalidateQueries({ queryKey: orpc.runs.key() }),
-			onError: (error) => toast.error(`Could not stop: ${error.message}`),
+			onError: (error, { when }) =>
+				toast.error(
+					when === "cancel-after-step"
+						? `Could not keep the run going: ${error.message}`
+						: `Could not stop: ${error.message}`,
+				),
 		}),
 	);
+	const stopPending = stopRun.isPending
+		? (stopRun.variables?.when ?? "now")
+		: null;
 
 	const takeOver = async () => {
 		if (!run.takeOverCommand) return;
@@ -454,7 +463,7 @@ export function RunActions({
 						key={run.id}
 						status={status}
 						stopAfterStep={run.stopAfterStep}
-						pending={stopRun.isPending}
+						pending={stopPending}
 						onStop={(when) => stopRun.mutate({ runId: run.id, when })}
 					/>
 				) : null}
@@ -517,7 +526,7 @@ export function RunActions({
 					key={run.id}
 					status={status}
 					stopAfterStep={run.stopAfterStep}
-					pending={stopRun.isPending}
+					pending={stopPending}
 					onStop={(when) => stopRun.mutate({ runId: run.id, when })}
 					onRestart={running ? () => setRestarting(true) : undefined}
 				/>
@@ -541,9 +550,12 @@ const STOP_NOW_TEXT: Partial<Record<RunStatus, string>> = {
 	running: "This cancels the running step and stops the run.",
 };
 
+type StopWhen = "now" | "after-step" | "cancel-after-step";
+
 /**
  * Stop now (after a confirmation), let the running step finish first, or
- * restart the running step (`onRestart`, while a step runs here).
+ * restart the running step (`onRestart`, while a step runs here). Once a
+ * stop after the step is planned, the main action takes it back.
  */
 function StopMenu({
 	status,
@@ -554,36 +566,54 @@ function StopMenu({
 }: {
 	status: RunStatus;
 	stopAfterStep: boolean;
-	pending: boolean;
-	onStop: (when: "now" | "after-step") => void;
+	/** The stop on its way, if any. */
+	pending: StopWhen | null;
+	onStop: (when: StopWhen) => void;
 	onRestart?: () => void;
 }) {
 	const [confirming, setConfirming] = useState(false);
+	const variant = stopAfterStep ? "outline" : "destructive";
 	return (
 		<>
 			<ButtonGroup>
-				<Button
-					variant="destructive"
-					size="sm"
-					onClick={() => setConfirming(true)}
-					disabled={pending}
-				>
-					{pending ? (
-						<Spinner data-icon="inline-start" />
-					) : (
-						<CircleStopIcon data-icon="inline-start" />
-					)}
-					{pending ? "Stopping…" : "Stop"}
-				</Button>
+				{stopAfterStep ? (
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => onStop("cancel-after-step")}
+						disabled={pending !== null}
+					>
+						{pending === "cancel-after-step" ? (
+							<Spinner data-icon="inline-start" />
+						) : (
+							<PlayIcon data-icon="inline-start" />
+						)}
+						Keep running
+					</Button>
+				) : (
+					<Button
+						variant="destructive"
+						size="sm"
+						onClick={() => setConfirming(true)}
+						disabled={pending !== null}
+					>
+						{pending ? (
+							<Spinner data-icon="inline-start" />
+						) : (
+							<CircleStopIcon data-icon="inline-start" />
+						)}
+						{pending ? "Stopping…" : "Stop"}
+					</Button>
+				)}
 				<DropdownMenu>
 					<DropdownMenuTrigger
 						render={
 							<Button
-								variant="destructive"
+								variant={variant}
 								size="icon-sm"
-								className="border-l-destructive/30"
+								className={cn(!stopAfterStep && "border-l-destructive/30")}
 								aria-label="More ways to stop"
-								disabled={pending}
+								disabled={pending !== null}
 							/>
 						}
 					>
@@ -602,20 +632,17 @@ function StopMenu({
 								</span>
 							</span>
 						</DropdownMenuItem>
-						<DropdownMenuItem
-							disabled={stopAfterStep}
-							onClick={() => onStop("after-step")}
-						>
-							<SkipForwardIcon />
-							<span className="flex flex-col">
-								Stop after this step
-								<span className="text-muted-foreground text-xs">
-									{stopAfterStep
-										? "Already asked."
-										: "The running step finishes, then the run stops."}
+						{stopAfterStep ? null : (
+							<DropdownMenuItem onClick={() => onStop("after-step")}>
+								<SkipForwardIcon />
+								<span className="flex flex-col">
+									Stop after this step
+									<span className="text-muted-foreground text-xs">
+										The running step finishes, then the run stops.
+									</span>
 								</span>
-							</span>
-						</DropdownMenuItem>
+							</DropdownMenuItem>
+						)}
 						{onRestart ? (
 							<>
 								<DropdownMenuSeparator />

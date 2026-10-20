@@ -386,6 +386,8 @@ export type EnginePayloads = {
 	StopRequested: Record<string, never>;
 	/** A person asked to stop the run before its next step or item. */
 	StopAfterStepRequested: Record<string, never>;
+	/** A person withdrew the stop after the step: the run goes on. */
+	StopAfterStepCancelled: Record<string, never>;
 	RunEnded: { status: RunEnding; reason: string | null };
 	/**
 	 * Something went wrong that did not fail the step, and that a person
@@ -800,9 +802,13 @@ export function deriveWorktrees(
 /** A person asked to stop after the running step, since the current walk began. */
 export function deriveStopAfterStep(events: readonly LoggedEvent[]): boolean {
 	const began = walkBeganSeq(events);
-	return events.some(
-		(e) => e.type === "StopAfterStepRequested" && e.seq > began,
-	);
+	let requested = false;
+	for (const e of bySeq(events)) {
+		if (e.seq <= began) continue;
+		if (e.type === "StopAfterStepRequested") requested = true;
+		else if (e.type === "StopAfterStepCancelled") requested = false;
+	}
+	return requested;
 }
 
 /**

@@ -31,7 +31,9 @@ export const runCommandPayloadSchema = z.union([
 		note: z.string().optional(),
 	}),
 	z.object({ name: z.string().min(1) }),
-	z.object({ when: z.enum(["now", "after-step"]).optional() }),
+	z.object({
+		when: z.enum(["now", "after-step", "cancel-after-step"]).optional(),
+	}),
 	z.object({ to: z.string().min(1) }),
 ]);
 
@@ -42,7 +44,10 @@ export type RunCommandInput =
 			payload: { stepId: string; choice: string; note?: string };
 	  }
 	| { kind: "signal.send"; payload: { name: string } }
-	| { kind: "run.stop"; payload: { when?: "now" | "after-step" } }
+	| {
+			kind: "run.stop";
+			payload: { when?: "now" | "after-step" | "cancel-after-step" };
+	  }
 	/** Another Device walks the run from here on. */
 	| { kind: "run.move"; payload: { to: string } };
 

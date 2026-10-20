@@ -359,7 +359,7 @@ const runs = {
 		.input(
 			z.object({
 				runId: z.string(),
-				when: z.enum(["now", "after-step"]).optional(),
+				when: z.enum(["now", "after-step", "cancel-after-step"]).optional(),
 			}),
 		)
 		.handler(({ context, input }) =>
@@ -1262,7 +1262,7 @@ const sync = {
 					runId: z.string().min(1),
 					kind: z.literal("run.stop"),
 					payload: z.object({
-						when: z.enum(["now", "after-step"]).optional(),
+						when: z.enum(["now", "after-step", "cancel-after-step"]).optional(),
 					}),
 				}),
 				z.object({
