@@ -81,7 +81,7 @@ function calledSteps(steps: StepSummary[], step: StepSummary): StepSummary[] {
 }
 
 /** Indent per level of nesting. */
-const INDENT_REM = 1.25;
+const INDENT_REM = 0.75;
 
 /**
  * Every visit of every node, in the order they started. The steps of a
@@ -343,12 +343,12 @@ function StepRow({
 			onClick={onSelect}
 			className={cn(
 				ROW,
-				"flex-nowrap gap-2 py-0 pr-1 text-left text-xs hover:bg-muted/60",
+				"flex-nowrap gap-2 py-0 pr-1 pl-1 text-left text-xs hover:bg-muted/60",
 				selected && "bg-muted hover:bg-muted",
 			)}
 			style={
 				depth > 0
-					? { paddingLeft: `${0.625 + depth * INDENT_REM}rem` }
+					? { paddingLeft: `${0.25 + depth * INDENT_REM}rem` }
 					: undefined
 			}
 		>
@@ -424,7 +424,7 @@ function GroupRow({
 		>
 			<CollapsibleTrigger
 				disabled={stepCount === 0}
-				className="group/row flex h-full min-w-0 flex-1 items-center gap-2 rounded-md pr-1 pl-2.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-default"
+				className="group/row flex h-full min-w-0 flex-1 items-center gap-2 rounded-md pr-1 pl-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-default"
 				title={
 					stepCount === 0
 						? "No steps yet"
