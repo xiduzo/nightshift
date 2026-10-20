@@ -156,11 +156,11 @@ An app wires packages together and talks to the outside world. It does not hold 
 
 | Check | Where | Status |
 | --- | --- | --- |
-| Layer map: `scripts/check-layers.ts` compares each `package.json` dependency on `@nightshift/*` with the table in section 1. Bun links only declared dependencies, so this is the real import graph. | lefthook pre-commit, CI | Planned |
+| Layer map: `scripts/check-layers.ts` compares each workspace dependency in a `package.json` with the table in section 1. Bun links only declared dependencies, so this is the real import graph. | lefthook pre-commit, CI | Active |
 | Explicit `exports` in every `package.json`. A deep import fails `tsc` and fails at runtime. | TypeScript, Bun | Planned |
 | Biome `style/noRestrictedImports` per package: forbid entries outside `exports`, `./testing` in production files, and engine/agents/auth/db in `apps/web`. | `biome.json` overrides | Planned |
 | Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json` | Planned |
-| CI on every pull request: `biome ci`, `bun run check-types`, `bun test`, the layer check. | `.github/workflows/ci.yml` | Planned |
+| CI on every pull request and push to `main`: `biome ci`, the layer check, `bun run check-types`, and `bun test` per workspace (without `*.live.test.ts`). | `.github/workflows/ci.yml` | Active |
 | Vertical boundaries: `scripts/check-verticals.ts` finds the verticals from the file system (so no list can drift), then fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports. Tests may deep-import. | lefthook pre-commit, CI | Planned |
 | Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. | lefthook pre-commit, CI | Planned |
 | Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Planned |
@@ -175,7 +175,7 @@ The code does not yet follow every rule. These are debts. Do not copy them into 
 - `apps/web` groups by kind: `lib/` (35 files), `hooks/`, `utils/`, loose `components/*.tsx`. Fat routes: `settings.tsx`, `runs/$runId.tsx`, `members.tsx`, `devices.tsx`, `index.tsx`.
 - `packages/engine` has 58 flat files and five jobs. `engine.ts`, `events.ts` and `types.ts` are god files. `types.ts` is the hub of an import cycle.
 - The devices domain is split over four places (see section 2).
-- `apps/server/src/services.ts` starts the daemon at import time. `apps/desktop` imports `server/src/*`.
+- `apps/server/src/services.ts` starts the daemon at import time. `apps/desktop` imports `server/src/*`. The layer check allows `desktop` → `server` with a temporary exception.
 - `packages/api/src/routers/index.ts` holds every procedure in one file. Most procedures declare no output schema. The engine owns wire schemas that the API uses.
 - The engine reads auth tables directly. `worktrees.ts` calls `git` with no port.
 - `packages/agents` exports its fakes from the root. Each harness touches five files.
