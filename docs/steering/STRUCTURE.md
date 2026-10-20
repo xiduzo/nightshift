@@ -44,7 +44,7 @@ One package is one bounded context. One domain has one home.
 | Package | Owns | Does not own |
 | --- | --- | --- |
 | `db` | The libsql client, the drizzle schema, migrations, the data directory. | Queries of a domain. Those live with the domain. |
-| `flows` | The flow document: schema, validation, migration, templates, rules. The `.nightshift/` file loader (`./files`, the only I/O). Schedules and agent profiles, because a flow document references them. | Running a flow. UI copy. |
+| `flows` | The flow document: schema, validation, migration, templates, rules, and the pure edits of a draft (`draft/`: new nodes, graph and outcome edits, renames, the draft check). The `.nightshift/` file loader (`./files`, the only I/O). Schedules and agent profiles, because a flow document references them. | Running a flow. UI copy: the editor passes its own words to `checkDraft`. |
 | `ui` | shadcn/ui components and tokens. See `AGENTS.md`. | Anything domain-specific. |
 | `auth` | Identity and access on Better Auth: login, two-factor, pairing, device keys, Spaces, members, roles. The auth tables. | Device rows. |
 | `agents` | Harness sessions, one harness adapter per harness, decider providers, MCP and CLI tools, pricing, skills. | Run order, retries, gates. |
@@ -152,8 +152,8 @@ apps/web/src/
       <name>-page.tsx      the page a route renders
       types.ts             this vertical's slice of the API types, when contract.ts is not enough
       components/ hooks/ lib/   when the vertical is big enough
-    flows/                 canvas/, editor/ (+ editor/lib/), start/ (Start run, the flow's inputs)
-    runs/                  components/ (+ run-page.tsx), hooks/, lib/, transcript/
+    flows/                 canvas/, editor/ (+ inspector/ one file per node type, io/, lib/), start/ (Start run, the flow's inputs)
+    runs/                  components/ (+ run-page.tsx, details/), hooks/, lib/, transcript/ (+ items/ per group of item kinds)
     settings/              settings-page.tsx, components/ (one file per card), hooks/use-settings-form.ts
 ```
 
@@ -203,7 +203,8 @@ When a check exists, change its status to "Active". When a workspace follows sec
 
 The code does not yet follow every rule. These are debts. Do not copy them into new code.
 
-- `apps/web` god files: `flows/editor/node-inspector.tsx`, `flows/flow-draft.ts`, `runs/transcript/step-transcript.tsx`. `routes/_auth/dashboard.tsx` holds its own markup: it is the old sign-in placeholder. `shared/api/orpc.ts` builds the account status key itself: the query client sends a refused session to sign in, and `shared/api` imports no feature.
+- `apps/web`: `routes/_auth/dashboard.tsx` holds its own markup: it is the old sign-in placeholder. `shared/api/orpc.ts` builds the account status key itself: the query client sends a refused session to sign in, and `shared/api` imports no feature.
+- `apps/web/src/features/agents/harnesses.ts` keeps its own copy of the harness catalog (label, initials, note, default model, models, where the code goes). The web app may not import `@nightshift/agents`. `harnesses.list` returns these facts, but only to an owner. The pickers, the canvas and the new-node defaults need them before the API answers. The model lists also differ: the API sends every model of the adapter, the editor shows a short list of suggestions. The agents package now keeps one record per harness (`packages/agents/src/harnesses/`). The fix is to put the browser-safe facts of those records where the web app may read them, with the suggestions as their own field.
 - `packages/engine/src/run/engine.ts` is a god file: flow-file CRUD, the exchange glue, Offers, and raw queries of the `device`, `run` and `step` tables. `graph/` has a value import cycle through `node-kinds.ts`.
 - The devices domain is split over four places (see section 2).
 - `apps/server/src/services.ts` starts the daemon at import time. `apps/desktop` imports the server app through a temporary `exports` map in `apps/server/package.json`. The layer check allows `desktop` → `server` with a temporary exception.
