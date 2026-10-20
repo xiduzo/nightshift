@@ -8,3 +8,9 @@ pre-commit:
       glob: "*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc}"
       run: bun biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
       stage_fixed: true
+    - name: layers
+      glob:
+        - "package.json"
+        - "**/package.json"
+        - "scripts/check-layers.ts"
+      run: bun scripts/check-layers.ts
