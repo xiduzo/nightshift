@@ -1,4 +1,4 @@
-import type { McpServerConfig } from "@nightshift/agents";
+import type { McpServerConfig } from "@nightshift/agents/types";
 import type { AgentNode } from "@nightshift/flows";
 
 /** `${NAME}`: an environment variable name, as a shell would read it. */

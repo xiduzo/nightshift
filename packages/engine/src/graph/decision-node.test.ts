@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
+import { defaultDeciderModel } from "@nightshift/agents";
+import { fakeDecider } from "@nightshift/agents/testing";
 import type {
 	Decider,
 	DecisionInput,
 	DecisionResult,
-} from "@nightshift/agents";
-import { defaultDeciderModel } from "@nightshift/agents";
-import { fakeDecider } from "@nightshift/agents/testing";
+} from "@nightshift/agents/types";
 
 import { deriveSteps } from "../events";
 import { createSandbox, type Sandbox } from "../test-support";

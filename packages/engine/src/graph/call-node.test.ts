@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
-import type { AgentSessionInput } from "@nightshift/agents";
 import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
+import type { AgentSessionInput } from "@nightshift/agents/types";
 import { step as stepTable } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 

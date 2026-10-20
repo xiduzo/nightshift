@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { HarnessName } from "@nightshift/agents";
-import { harnessFacts } from "@nightshift/agents";
+import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { type FakeHarness, fakeHarness } from "@nightshift/agents/testing";
+import type { HarnessName } from "@nightshift/agents/types";
 import { event } from "@nightshift/db/schema";
 import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
 

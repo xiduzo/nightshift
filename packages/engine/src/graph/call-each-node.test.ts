@@ -3,12 +3,12 @@ import { existsSync, writeFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
-import type { AgentSessionInput } from "@nightshift/agents";
 import {
 	fakeHarness,
 	reportingScript,
 	usageLimitScript,
 } from "@nightshift/agents/testing";
+import type { AgentSessionInput } from "@nightshift/agents/types";
 import type { CallEach, CallEachNode, CallNode, Flow } from "@nightshift/flows";
 
 import { type DerivedStep, deriveSteps } from "../events";

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
-import type { AgentSessionInput } from "@nightshift/agents";
 import {
 	fakeHarness,
 	reportingScript,
 	usageLimitScript,
 } from "@nightshift/agents/testing";
+import type { AgentSessionInput } from "@nightshift/agents/types";
 
 import { createSandbox, type Sandbox } from "../test-support";
 import { STOP_TIME_REASON } from "./context";

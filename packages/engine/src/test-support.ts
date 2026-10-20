@@ -1,12 +1,12 @@
 import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { harnessFacts } from "@nightshift/agents/harness-facts";
 import type {
 	AgentEvent,
 	AgentHarness,
 	AgentSessionInput,
-} from "@nightshift/agents";
-import { harnessFacts } from "@nightshift/agents";
+} from "@nightshift/agents/types";
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { device, event, organization } from "@nightshift/db/schema";

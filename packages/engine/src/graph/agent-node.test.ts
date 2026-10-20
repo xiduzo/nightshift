@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { Command } from "@langchain/langgraph";
-import type {
-	AgentHarness,
-	AgentSessionInput,
-	Decider,
-} from "@nightshift/agents";
 import { defaultDeciderModel } from "@nightshift/agents";
 import {
 	failingScript,
@@ -14,6 +9,11 @@ import {
 	reportingScript,
 	usageLimitScript,
 } from "@nightshift/agents/testing";
+import type {
+	AgentHarness,
+	AgentSessionInput,
+	Decider,
+} from "@nightshift/agents/types";
 import { agentSession, step } from "@nightshift/db/schema";
 import type { AgentNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";

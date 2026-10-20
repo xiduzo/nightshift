@@ -3,7 +3,7 @@ import type {
 	DecisionResult,
 	ValueInput,
 	ValueResult,
-} from "@nightshift/agents";
+} from "@nightshift/agents/types";
 import type { FlowSources } from "@nightshift/flows/files";
 import { z } from "zod";
 

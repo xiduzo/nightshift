@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { Decider, McpServerConfig } from "@nightshift/agents";
 import { defaultDeciderModel } from "@nightshift/agents";
 import {
 	fakeDecider,
 	fakeHarness,
 	fixturePath,
 } from "@nightshift/agents/testing";
+import type { Decider, McpServerConfig } from "@nightshift/agents/types";
 
 import { createSandbox, mustGit, type Sandbox } from "../test-support";
 import { type LocalDeviceDeps, localDevice } from "./local";

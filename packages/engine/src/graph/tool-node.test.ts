@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { McpServerConfig } from "@nightshift/agents";
-import { harnessFacts } from "@nightshift/agents";
+import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { fixturePath } from "@nightshift/agents/testing";
+import type { McpServerConfig } from "@nightshift/agents/types";
 import type { ToolNode } from "@nightshift/flows";
 import { coerceArguments } from "../device/tool-call";
 import { deriveSteps } from "../events";

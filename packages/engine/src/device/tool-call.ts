@@ -1,11 +1,11 @@
-import type { McpServerConfig } from "@nightshift/agents";
 import {
 	callMcpTool,
 	MCP_TIMEOUT_MS,
 	type McpToolCall,
 	toolInfo,
 	withMcpClient,
-} from "@nightshift/agents";
+} from "@nightshift/agents/mcp";
+import type { McpServerConfig } from "@nightshift/agents/types";
 import type { JsonValue } from "@nightshift/flows";
 
 import type { ToolCallInput, ToolResult } from "./types";

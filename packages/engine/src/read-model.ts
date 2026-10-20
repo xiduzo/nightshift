@@ -1,5 +1,5 @@
-import type { AgentHarness, AgentHarnessName } from "@nightshift/agents";
-import { shellQuote } from "@nightshift/agents";
+import { shellQuote } from "@nightshift/agents/harness-facts";
+import type { AgentHarness, AgentHarnessName } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import { project, run, step } from "@nightshift/db/schema";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
