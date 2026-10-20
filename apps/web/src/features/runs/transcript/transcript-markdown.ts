@@ -1,5 +1,5 @@
 import type { StepSummary } from "@/shared/api";
-import type { TranscriptItem } from "./transcript";
+import type { TranscriptItem } from "./transcript-items";
 
 /**
  * A step's transcript as Markdown, to paste in a chat, an issue or a pull

@@ -31,7 +31,7 @@ import type {
 	FinishedItem,
 	MessageItem,
 	ReportItem,
-} from "../transcript";
+} from "../transcript-items";
 import { Divider, PromptBubble, ResultCard } from "./parts";
 
 export function SessionBoundary({

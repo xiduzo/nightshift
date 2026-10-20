@@ -13,7 +13,7 @@ import {
 } from "@nightshift/ui/components/marker";
 import { CircleCheckIcon, CircleXIcon } from "lucide-react";
 import { formatTime } from "@/shared/format";
-import type { ExitItem, LogItem } from "../transcript";
+import type { ExitItem, LogItem } from "../transcript-items";
 
 /** A command's output as it streamed; stderr in the destructive colour. */
 export function CommandLog({ item }: { item: LogItem }) {

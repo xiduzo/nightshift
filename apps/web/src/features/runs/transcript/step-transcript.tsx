@@ -57,7 +57,8 @@ import {
 } from "./items/session-items";
 import { ToolCallRow } from "./items/tool-call-row";
 import { WaitCard, WakeMarker } from "./items/wait-items";
-import type { TranscriptItem, TranscriptState } from "./transcript";
+import type { TranscriptState } from "./transcript";
+import type { TranscriptItem } from "./transcript-items";
 import { markdownContext, transcriptToMarkdown } from "./transcript-markdown";
 
 /**

@@ -15,7 +15,7 @@ import type {
 	RuleItem,
 	ValueAskItem,
 	ValueItem,
-} from "../transcript";
+} from "../transcript-items";
 import { Divider, PromptBubble, ResultCard } from "./parts";
 
 /** What the model was asked, with the options it could pick. */

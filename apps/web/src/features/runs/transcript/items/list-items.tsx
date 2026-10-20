@@ -14,7 +14,11 @@ import {
 import { GitBranchIcon, ListChecksIcon } from "lucide-react";
 import { ItemStateBadge } from "@/features/flows";
 import { formatTime } from "@/shared/format";
-import type { ItemEndItem, ItemStartItem, ItemsReadItem } from "../transcript";
+import type {
+	ItemEndItem,
+	ItemStartItem,
+	ItemsReadItem,
+} from "../transcript-items";
 import { Divider } from "./parts";
 
 export function ItemsRead({ item }: { item: ItemsReadItem }) {

@@ -26,11 +26,8 @@ import { memo, useState } from "react";
 
 import { CodeView } from "@/shared/code";
 import { truncate } from "@/shared/format";
-import {
-	formatToolInput,
-	summarizeToolInput,
-	type ToolItem,
-} from "../transcript";
+import { formatToolInput, summarizeToolInput } from "../transcript";
+import type { ToolItem } from "../transcript-items";
 
 const RESULT_PREVIEW_CHARS = 1500;
 const RESULT_PREVIEW_LINES = 20;

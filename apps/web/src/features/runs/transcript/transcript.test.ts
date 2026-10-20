@@ -1,13 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import type { StepEvent, TranscriptEntry } from "@/shared/api/contract";
-import {
-	applyEntries,
-	emptyRunTranscript,
-	type GateResolvedItem,
-	type ToolItem,
-	type TranscriptItem,
-} from "./transcript";
+import { applyEntries, emptyRunTranscript } from "./transcript";
+import type {
+	GateResolvedItem,
+	ToolItem,
+	TranscriptItem,
+} from "./transcript-items";
 
 function entriesOf(events: StepEvent[], from = 0): TranscriptEntry[] {
 	return events.map((event, at) => ({

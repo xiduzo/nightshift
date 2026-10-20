@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { StepSummary } from "@/shared/api/contract";
-import type { TranscriptItem } from "./transcript";
+import type { TranscriptItem } from "./transcript-items";
 import {
 	fence,
 	itemToMarkdown,

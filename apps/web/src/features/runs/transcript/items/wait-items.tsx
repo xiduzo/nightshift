@@ -11,7 +11,7 @@ import {
 } from "@nightshift/ui/components/marker";
 import { MoonIcon, SunriseIcon } from "lucide-react";
 import { formatDateTime, formatRelative, formatTime } from "@/shared/format";
-import type { WaitItem, WakeItem } from "../transcript";
+import type { WaitItem, WakeItem } from "../transcript-items";
 
 const WAIT_TITLE: Record<WaitItem["reason"], string> = {
 	"usage-limit": "Usage limit reached",
