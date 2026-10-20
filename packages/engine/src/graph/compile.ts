@@ -7,7 +7,6 @@ import {
 } from "@langchain/langgraph";
 import { type Flow, initialVariables } from "@nightshift/flows";
 import { type StepContext, templateContext } from "./context";
-import { kindOf } from "./node-kinds";
 import { dataProblem } from "./output-schema";
 import {
 	askNodeId,
@@ -23,10 +22,10 @@ import { RunState } from "./state";
 /**
  * Compiles a Night Shift flow (the run's snapshot) into a LangGraph
  * StateGraph. Every flow node is one graph node named by its id, made by
- * its kind's factory (`kindOf(node).make`), with a park node `park__<id>`
+ * its kind's factory (`ctx.kindOf(node).make`), with a park node `park__<id>`
  * (design rule 2: a failed or stopped step parks the run there, and only a
  * chosen end reaches END) and the auxiliary graph nodes its kind asks for
- * (`kindOf(node).aux`): a wait node `wait__<id>` (rule 8), the sleep
+ * (`ctx.kindOf(node).aux`): a wait node `wait__<id>` (rule 8), the sleep
  * module's `waitNode`, or an ask node `ask__<id>` that interrupts and
  * routes on the answer (the Gate). This module knows no node type: adding a
  * kind is adding its descriptor to the registry (`node-kinds.ts`). No
@@ -47,7 +46,7 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 	const graph = new StateGraph(RunState);
 
 	for (const node of flow.nodes) {
-		const kind = kindOf(node);
+		const kind = ctx.kindOf(node);
 		const park = parkNodeId(node.id);
 		const own = [park];
 		for (const aux of kind.aux(node)) {

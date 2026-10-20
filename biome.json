@@ -151,16 +151,6 @@
 			}
 		},
 		{
-			"includes": ["packages/engine/src/graph/**"],
-			"linter": {
-				"rules": {
-					"suspicious": {
-						"noImportCycles": "warn"
-					}
-				}
-			}
-		},
-		{
 			"includes": [
 				"**/*.test.ts",
 				"**/*.test.tsx",

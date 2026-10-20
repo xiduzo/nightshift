@@ -15,7 +15,7 @@ import {
 import { deciderCostSource, warnDeciderCost } from "../../cost";
 import { RESUME_RULES } from "../../resume-point";
 import { type BodyResult, runStep, type StepHandle } from "../../step-runner";
-import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
+import { type Chooser, decisionOutputs, visibleOptions } from "./chooser";
 
 /**
  * A Decision decided by a model: the node's decider (a TanStack AI

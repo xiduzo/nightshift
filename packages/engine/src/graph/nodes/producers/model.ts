@@ -11,7 +11,7 @@ import {
 	endWithValue,
 	type Producer,
 	valueOutputs,
-} from "../value";
+} from "./producer";
 
 /**
  * A Value made by a model: the node's decider (`Decider.value`, TanStack

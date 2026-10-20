@@ -3,7 +3,7 @@ import { chooseByRule, type DecisionNode } from "@nightshift/flows";
 import type { StepContext } from "../../context";
 import { RESUME_RULES } from "../../resume-point";
 import { runStep } from "../../step-runner";
-import { type Chooser, decisionOutputs } from "../decision";
+import { type Chooser, decisionOutputs } from "./chooser";
 
 /**
  * A Decision decided by a rule: each option's `when` (a JSONata

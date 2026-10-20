@@ -113,6 +113,12 @@ export type StepContext = {
 	minuteMs: number;
 	dataDir: string;
 	settings(): RunSettings;
+	/**
+	 * The descriptor of a node's kind (`node-kinds.ts`). The registry comes
+	 * in by the context, so the engine around the nodes never imports the
+	 * node modules: they import it.
+	 */
+	kindOf(node: FlowNode): NodeKind;
 };
 
 /** A node of the compiled graph: runs one visit and returns where to go next. */

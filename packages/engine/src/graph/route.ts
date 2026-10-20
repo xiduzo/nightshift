@@ -7,14 +7,13 @@ import { type FlowNode, type JsonValue, nextEdge } from "@nightshift/flows";
 import type { Scope, StepOutcome, StepOutputs } from "../log";
 import type { NodeAction, StepContext } from "./context";
 import { interruptNode } from "./interrupt";
-import { kindOf } from "./node-kinds";
 import type { PendingParked, RunStateUpdate, RunStateValues } from "./state";
 
 /**
  * Where a node goes after its step: the edge the outcome picks, a chosen
  * end, or the node's park node. Ported from `walkScope` in engine.ts. Which
  * ends are chosen and what `RunEnded` says are the node kind's facts
- * (`kindOf(node).isChosenEnd`, `endReason`): this module switches on no
+ * (`ctx.kindOf(node).isChosenEnd`, `endReason`): this module switches on no
  * node type.
  *
  * Node naming in the compiled graph: the step node is the flow node's id;
@@ -154,7 +153,7 @@ export async function route(
 		traversals: state.traversals,
 	});
 	if (choice.kind === "end") {
-		const kind = kindOf(node);
+		const kind = ctx.kindOf(node);
 		if (kind.isChosenEnd(node, outcome)) {
 			return new Command({
 				update: {

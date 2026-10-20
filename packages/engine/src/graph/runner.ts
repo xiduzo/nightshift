@@ -35,7 +35,7 @@ import {
 	FencedSaver,
 	fencedLog,
 } from "./fence";
-import { kindOfType } from "./node-kinds";
+import { kindOf, kindOfType } from "./node-kinds";
 import { loggedVisits, reenteredNode, reentryUpdate } from "./resume-point";
 import { createSleeps } from "./sleep";
 import type {
@@ -237,6 +237,7 @@ export function createRunner(deps: RunnerDeps) {
 			minuteMs: deps.minuteMs,
 			dataDir: deps.dataDir,
 			settings: deps.settings,
+			kindOf,
 		};
 		const saver = new FencedSaver(db, fence);
 		const thread: Thread = {

@@ -1,5 +1,4 @@
 import type { DecisionNode } from "@nightshift/flows";
-import type { GateChoice, StepOutputs } from "../../log";
 import {
 	endedAtReason,
 	type NodeAction,
@@ -10,6 +9,7 @@ import {
 	type StepContext,
 } from "../context";
 import { RESUME_RULES, type ResumeRules } from "../resume-point";
+import { type Chooser, decisionOutputs } from "./choosers/chooser";
 import { modelChooser } from "./choosers/model";
 import { gateAskNode, personChooser } from "./choosers/person";
 import { ruleChooser } from "./choosers/rule";
@@ -33,13 +33,6 @@ import { ruleChooser } from "./choosers/rule";
 export function decisionNode(node: DecisionNode, ctx: StepContext): NodeAction {
 	return chooserFor(node, ctx);
 }
-
-/**
- * A chooser runs one visit of the node: it opens the step (how depends on
- * who decides), gets the option, ends the step and routes on it, or parks
- * or waits instead. It returns what the graph node returns.
- */
-export type Chooser = NodeAction;
 
 function chooserFor(node: DecisionNode, ctx: StepContext): Chooser {
 	switch (node.by) {
@@ -103,32 +96,3 @@ export const DECISION: NodeKind<DecisionNode> = {
 	stoppedOutputs: (open) => decisionOutputs("stopped", "", open.visit),
 	requirements: [modelDecisionsHaveDecider],
 };
-
-/** The outputs every Decision step ends with. */
-export function decisionOutputs(
-	outcome: string,
-	note: string,
-	visit: number,
-): StepOutputs {
-	return { outcome, note, visit };
-}
-
-/** The options as a person, a model or the log sees them: name and description only. */
-export function visibleOptions(
-	node: DecisionNode,
-): { name: string; description?: string }[] {
-	return node.options.map((option) =>
-		option.description === undefined
-			? { name: option.name }
-			: { name: option.name, description: option.description },
-	);
-}
-
-/** The options as a Gate shows them to a person: the visible ones, with their colour. */
-export function gateChoices(node: DecisionNode): GateChoice[] {
-	return node.options.map(({ name, description, color }) => ({
-		name,
-		...(description === undefined ? {} : { description }),
-		...(color === undefined ? {} : { color }),
-	}));
-}

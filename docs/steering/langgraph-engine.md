@@ -30,18 +30,21 @@ below it, from the bottom up:
 | Vertical | Holds |
 | --- | --- |
 | `device-config/` | This computer's Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. This computer's own `device` row (`self-device.ts`). |
-| `log/` | The event payloads and append and parse (`events.ts`), the run log in memory (`run-log.ts`), the bus, the run row, the transcript files and the transcript event types (`step-events.ts`). |
+| `log/` | The event payloads and append and parse (`events.ts`), the run log in memory (`run-log.ts`), the bus, the run and step rows (`run-row.ts`), the member events, the transcript files and the transcript event types (`step-events.ts`). |
 | `read/` | The pure projections of the log (`derive-run.ts`, `derive-steps.ts`), cost (`cost.ts`), the run views (`views.ts`), the read model, the Persons a run names (`people.ts`) and the run bundle. |
-| `projects/` | Projects, the Space document that defines them, the git setup of a project folder, and run worktrees. |
+| `projects/` | Projects, the Space document that defines them, the git port (`git.ts`: every `git` and `xcode-select` process, with its adapter `systemGit`), the git setup of a project folder, and run worktrees (`createWorktrees(git)`). |
+| `flows/` | The flow files of a project (`flow-files.ts`) and the flows a run starts from (`run-flows.ts`). |
 | `device/` | The execution port (`Device`), this computer (`local.ts`), a Device through a Host (`remote.ts`), commands and tool calls. |
-| `peers/` | The device registry, host links, placement, Offers and the exchange of run history (`exchange/`). |
+| `peers/` | The device registry, host links, placement, Offers (`offers.ts`, and `engine-offers.ts`: publish, withdraw, this computer through its Offers), the Walker names, the worktree paths a Person may see, and the exchange of run history (`exchange/`, with the archive of a moved run in `run-archive.ts`). |
 | `graph/` | The flow as a graph, below. |
-| `schedules/` | The scheduler. |
-| `run/` | The composition root (`engine.ts`), run start and recovery. |
+| `schedules/` | The scheduler and the schedules file of a project (`schedule-files.ts`). |
+| `run/` | The composition root (`engine.ts`), what a person does in one Space (`space.ts`), run start, recovery, and the run actions (`control.ts` over `stop.ts`, `move.ts`, `gate.ts`, `wake.ts` and the relay to a Walker in `relay.ts`). |
 
 `contract/` holds only types: `Engine`, `SpaceEngine`, `StartRunInput`,
 `EngineOptions` and `Relay`. A type-only import may point up (a port that a
-lower vertical implements, or the contract). `testing/` holds the test
+lower vertical implements, or the contract). The engine reads the auth
+tables (`user`, `member`, `organization`) only through functions of
+`@nightshift/auth`. `testing/` holds the test
 helpers and fixtures. `lease.ts` and `folder-picker.ts` stay at the top of
 `src/` until the daemon package takes them.
 
@@ -69,12 +72,15 @@ packages/engine/src/
                            descriptor per node type, exported by the
                            kind's module; kindOf(node), kindOfType(type).
                            The NodeKind interface itself is in context.ts.
+                           Only the runner and run start import it. A
+                           graph node asks ctx.kindOf(node).
   graph/route.ts           route(): picks the edge with `nextEdge`, logs
                            EdgeTaken and returns `new Command({ update,
                            goto })`; or ends the flow (the kind's
                            isChosenEnd and endReason); or parks
                            (parkCommand). parkNode, the node ids, scopeOf.
-  graph/context.ts         StepContext (below), NodeKind (the descriptor a
+  graph/context.ts         StepContext (below, with kindOf: the registry,
+                           given by the runner), NodeKind (the descriptor a
                            node module gives back, with PLAIN_KIND, the
                            facts most kinds share), the recorders, the
                            template context, stopAtOf.
@@ -108,8 +114,10 @@ packages/engine/src/
   graph/nodes/decision.ts  decision node: routes on the step; a chooser
                            per `by` gets the option. DECISION, whose
                            facts follow `by`.
-  graph/nodes/choosers/    person.ts (the Gate: the node opens it, its ask
-                           node interrupts), rule.ts (JSONata rules),
+  graph/nodes/choosers/    chooser.ts (the Chooser seam and the outputs
+                           every chooser shares), person.ts (the Gate: the
+                           node opens it, its ask node interrupts),
+                           rule.ts (JSONata rules),
                            model.ts (the decider).
   graph/nodes/call.ts      the Call node: runs its flow once, or hands
                            over to call-each.ts; CALL, whose facts follow
@@ -122,9 +130,11 @@ packages/engine/src/
   graph/nodes/value.ts     value node, the Decision's twin: routes on the
                            step; a producer per `by` makes the data, which
                            is checked against the output schema. VALUE.
-  graph/nodes/producers/   rule.ts (one JSONata expression), model.ts (the
-                           decider's text adapter, `chat()` with the
-                           schema; waits like a model Decision).
+  graph/nodes/producers/   producer.ts (the Producer seam and the ends of a
+                           step every producer shares), rule.ts (one
+                           JSONata expression), model.ts (the decider's
+                           text adapter, `chat()` with the schema; waits
+                           like a model Decision).
   graph/nodes/wait.ts      Wait node: works out the wake time (a duration,
                            a time, a command poll, a signal) and asks the
                            sleep module to sleep; a wake ends it done or
@@ -153,13 +163,22 @@ packages/engine/src/
                            drive(), which streams a compiled flow on a
                            MemorySaver as the runner does and collects the
                            root's interrupts and custom events.
-  run/engine.ts            The composition root: createEngine wires the
-                           runner, recovery, run start, the read model and
-                           the scheduler, each behind a small seam that
-                           takes its dependencies (db, log, runner, bus,
-                           settings, clock). Keeps the projects, flows and
-                           schedules CRUD, and stopRun, resolveGate and
-                           signalRun, which write one run-level fact each.
+  run/engine.ts            The composition root: createEngine makes the
+                           runner, recovery, run start, the read model, the
+                           scheduler, placement, the exchange and the run
+                           actions, each behind a small seam that takes its
+                           dependencies (db, log, runner, bus, settings,
+                           clock), and wires them. It holds no logic.
+  run/space.ts             createSpaces(deps): the SpaceEngine of one
+                           Space. Each method waits for the engine, checks
+                           the Space and hands over to the module that
+                           owns the action.
+  run/control.ts           createRunControl(deps): stopRun (stop.ts),
+                           moveRun and takeOver (move.ts), resolveGate
+                           (gate.ts), signalRun and the wake when a Device
+                           is back (wake.ts). Each writes one run-level
+                           fact. On a run another Device walks, it travels
+                           to the Walker (relay.ts).
   run/run-start.ts         Run start. prepareRun loads and validates the
                            flow and its called flows, resolves profiles and
                            asks every requirement in REQUIREMENTS (the
@@ -410,7 +429,7 @@ Decisions taken while implementing, from the code and its comments:
   (`runner.onCustom`). The `step-started` and `step-ended` custom stream
   chunks (`RunEvent`) make the runner publish `{ kind: "status-changed" }`
   on the bus; transcript entries reach the bus from the recorder already.
-- **`resolveGate` waits for the step to end** (`run/engine.ts`). It reserves a
+- **`resolveGate` waits for the step to end** (`run/gate.ts`). It reserves a
   slot, resumes the thread with `{ kind: "gate", choice, note }` and
   returns once the log has the step's `StepEnded`, so the run no longer
   waits when the caller looks again. A full run cap leaves the Gate open.
@@ -615,15 +634,18 @@ purpose: the zod union in `packages/flows` and the web's `NODE_TYPE` record
 (inherent, outside this package); the transcript-event unions in `log/step-events.ts`
 (typed data, no switch asks them); the `WaitReason` enum in `state.ts` (a
 Wait node's `until` kinds and the policy's reasons, not node kinds); which
-flow a Call calls (`calledFlowNames`, `runner.nodesOf`: only a Call does,
+flow a Call calls (`flows/run-flows.ts`, `runner.nodesOf`: only a Call does,
 both read `node.flow`); the first Agent prompt a quick run is titled by;
 and the resume target's "an Agent step with a harness session".
 
-The registry's entries are getters. A node module imports `route.ts` and
-the step runner, which import the registry, so the modules form a cycle;
-a getter reads the descriptor when a caller asks, after every module
-evaluated. `graph/node-kinds.test.ts` holds every fact for every kind as
-a table.
+The registry imports the node modules, and no module a node imports
+imports the registry. The runner puts `kindOf` on the `StepContext`, so
+`compile.ts`, `route.ts`, the step runner and the Call node ask
+`ctx.kindOf(node)`. The chooser and producer seams have a leaf of their own
+(`choosers/chooser.ts`, `producers/producer.ts`), so a chooser does not
+import the Decision node that picks it. `graph/` has no import cycle, and
+Biome's `noImportCycles` holds it there too. `graph/node-kinds.test.ts`
+holds every fact for every kind as a table.
 
 ### How to add a node kind
 
@@ -635,7 +657,7 @@ a table.
    descriptor: `{ ...PLAIN_KIND, type, make, resumeRules, ... }`, overriding
    only the facts that differ. A new way to re-enter is a new `RESUME_RULES`
    entry in `resume-point.ts`.
-3. `packages/engine/src/graph/node-kinds.ts`: one getter in `NODE_KINDS`.
+3. `packages/engine/src/graph/node-kinds.ts`: one entry in `NODE_KINDS`.
    The type of the registry refuses a missing kind.
 4. `packages/engine/src/log/step-events.ts`: the kind's transcript events, when it
    records any.

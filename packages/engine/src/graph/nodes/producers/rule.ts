@@ -12,7 +12,7 @@ import {
 	endWithValue,
 	type Producer,
 	valueOutputs,
-} from "../value";
+} from "./producer";
 
 /**
  * A Value made by a rule: the node's JSONata expression is evaluated over

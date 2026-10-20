@@ -12,7 +12,7 @@ import { RESUME_RULES, resumePoint } from "../../resume-point";
 import { askNodeId, route, type StepEnd, scopeOf } from "../../route";
 import type { PendingGate, ResumeValue, RunStateValues } from "../../state";
 import { beginStep, type OpenStep } from "../../step-runner";
-import { type Chooser, decisionOutputs, gateChoices } from "../decision";
+import { type Chooser, decisionOutputs, gateChoices } from "./chooser";
 
 /**
  * A Decision decided by a person: a Gate. It asks the rendered prompt in

@@ -11,7 +11,6 @@ import {
 } from "../context";
 import { eachOutputs } from "../each";
 import { renderBindings, resolveInputs } from "../inputs";
-import { kindOf } from "../node-kinds";
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
 import { route, scopeOf } from "../route";
 import { beginStep } from "../step-runner";
@@ -160,7 +159,7 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 					"pass",
 					{
 						...outputs,
-						ended: kindOf(ended.node).endedLabel(ended.node, ended.outcome),
+						ended: ctx.kindOf(ended.node).endedLabel(ended.node, ended.outcome),
 					},
 					null,
 				);

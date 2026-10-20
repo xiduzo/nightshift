@@ -41,7 +41,6 @@ import {
 	stopAtOf,
 	templateContext,
 } from "./context";
-import { kindOf } from "./node-kinds";
 import { dataProblem } from "./output-schema";
 import {
 	entryOf,
@@ -319,7 +318,7 @@ export async function runStep(
 			return route(ctx, state, node, end, config);
 		}
 		case "aborted": {
-			const aborted = abortEnd(node, step.signal, result.outputs);
+			const aborted = abortEnd(ctx, node, step.signal, result.outputs);
 			const end = await step.end(
 				aborted.outcome,
 				aborted.outputs,
@@ -378,13 +377,14 @@ export function budgetError(
  * stopped the run). The outputs the body had so far are kept.
  */
 export function abortEnd(
+	ctx: StepContext,
 	node: FlowNode,
 	signal: AbortSignal,
 	outputs: StepOutputs,
 ): Pick<StepEnd, "outcome" | "outputs" | "error"> {
 	const reason = signal.reason as AbortReason | undefined;
 	if (reason === "timeout" || reason === "idle") {
-		const budget = kindOf(node).timeBudget(node);
+		const budget = ctx.kindOf(node).timeBudget(node);
 		return {
 			outcome: "error",
 			outputs: { ...outputs, outcome: "error" },
@@ -437,7 +437,7 @@ export async function beginStep(
 	// must, a Wait node keeps its own deadline across its sleeps, and only an
 	// Agent step has an idle clock. The log keeps the same limits, so they
 	// hold when the timers do not (`deriveStepClocks`).
-	const { timeoutMinutes, idleMinutes } = kindOf(node).timeBudget(node);
+	const { timeoutMinutes, idleMinutes } = ctx.kindOf(node).timeBudget(node);
 	const budget: StepBudget = {
 		...(timeoutMinutes ? { timeoutMs: timeoutMinutes * ctx.minuteMs } : {}),
 		...(idleMinutes !== undefined
@@ -479,7 +479,7 @@ export async function beginStep(
 		stepId = randomUUID();
 		path = transcriptPath(ctx.dataDir, runId, stepId);
 		visit = countVisits(logged, node.id, key) + 1;
-		const logPath = kindOf(node).logsCommandOutput(node)
+		const logPath = ctx.kindOf(node).logsCommandOutput(node)
 			? commandLogPath(ctx.dataDir, runId, stepId)
 			: null;
 		await ctx.db.insert(stepTable).values({
@@ -770,7 +770,7 @@ export async function readyDevice(
 	node: FlowNode,
 	step: OpenStep,
 ): Promise<BodyResult | null> {
-	const works = kindOf(node).works(node);
+	const works = ctx.kindOf(node).works(node);
 	if (works === null) return null;
 	const { device } = step;
 	const offline = (at: Device): BodyResult => ({

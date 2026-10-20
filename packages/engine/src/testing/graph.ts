@@ -14,6 +14,7 @@ import { localDevice } from "../device/local";
 import { defaultRunSettings } from "../device-config/settings";
 import { compileFlow } from "../graph/compile";
 import { createRecorders, type StepContext } from "../graph/context";
+import { kindOf } from "../graph/node-kinds";
 import type { Parked, RunEvent, RunStateValues } from "../graph/state";
 import { createRunBus } from "../log/bus";
 import type {
@@ -212,6 +213,7 @@ export async function startRun(
 		minuteMs: MINUTE,
 		dataDir: sandbox.dataDir,
 		settings: defaultRunSettings,
+		kindOf,
 	};
 	const saver = new MemorySaver();
 	return {

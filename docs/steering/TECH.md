@@ -24,7 +24,7 @@ Last updated: 2026-10-21
 
 ## Architecture
 
-- **Pattern:** Ports and adapters. The engine depends on interfaces. Harnesses and decider providers are adapters behind them.
+- **Pattern:** Ports and adapters. The engine depends on interfaces. Harnesses, decider providers and git (`packages/engine/src/projects/git.ts`) are adapters behind them.
 - **Module structure:** A layered vertical codebase in a Bun workspace. Packages sit in layers and import only downward. Inside a package, code is grouped by domain. `docs/steering/STRUCTURE.md` holds the layer map, what each package owns, and the rules.
 - **State management:** The server stores durable facts in libsql and appends every change to an event log. The UI derives status from facts and subscribes to the event log over SSE through TanStack Query.
 - **Data flow:** UI → oRPC → engine → agents (harness or tool) → facts + event → SSE → UI. Everything runs in-process.
