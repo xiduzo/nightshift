@@ -73,9 +73,7 @@ function plain(summary: ScheduleSummary): Schedule {
 export function ScheduleList({ projectId }: { projectId: string }) {
 	const queryClient = useQueryClient();
 	const now = useNow(30_000);
-	const list = useQuery({
-		...scheduleQueries.listLive(projectId),
-	});
+	const list = useQuery(scheduleQueries.listLive(projectId));
 	const [editing, setEditing] = useState<{ schedule: Schedule | null } | null>(
 		null,
 	);
