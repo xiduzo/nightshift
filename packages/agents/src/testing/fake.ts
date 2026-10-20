@@ -1,5 +1,5 @@
-import { defaultDeciderModel } from "../decider";
-import { harnessFacts } from "../harness-facts";
+import { defaultDeciderModel } from "../decider/decider";
+import { harnessFacts } from "../harnesses/facts";
 import type {
 	AgentErrorKind,
 	AgentEvent,
@@ -12,7 +12,7 @@ import type {
 	StepReportOutcome,
 	ValueInput,
 	ValueResult,
-} from "../types";
+} from "../port/types";
 
 /** One step of a scripted fake session. */
 export type FakeStep =

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentEvent, AgentSessionInput, DecisionInput } from "../types";
+import type {
+	AgentEvent,
+	AgentSessionInput,
+	DecisionInput,
+} from "../port/types";
 import {
 	defaultFakeScript,
 	failingScript,

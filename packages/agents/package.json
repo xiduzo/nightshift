@@ -3,10 +3,10 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
-		"./harness-facts": "./src/harness-facts.ts",
-		"./mcp": "./src/mcp.ts",
-		"./pricing": "./src/pricing.ts",
-		"./types": "./src/types.ts",
+		"./harness-facts": "./src/harnesses/facts.ts",
+		"./mcp": "./src/tools/mcp.ts",
+		"./pricing": "./src/pricing/pricing.ts",
+		"./types": "./src/port/types.ts",
 		"./testing": "./src/testing/index.ts"
 	},
 	"scripts": {
