@@ -56,9 +56,49 @@ nightshift serve --data-dir /var/lib/nightshift \
 Two ready-made setups are in [`deploy/`](../../deploy/):
 
 - [`nightshift.service`](../../deploy/nightshift.service): a systemd unit.
+- [`launchd/`](../../deploy/launchd/): the same for a Mac, as launchd agents.
 - [`Dockerfile`](../../deploy/Dockerfile) and
   [`docker-compose.yml`](../../deploy/docker-compose.yml): a container,
   with Caddy in front for TLS.
+
+### Keep it running
+
+Night Shift can stop responding while it still answers web requests. Each
+setup above notices this, and starts Night Shift again. A run that was in
+progress goes on after the restart.
+
+Check it yourself:
+
+```bash
+nightshift health            # Exit code 0 when Night Shift runs, else 1.
+curl http://127.0.0.1:3000/health   # 200 when it runs, else 503.
+```
+
+- **systemd**: the unit has a watchdog (`WatchdogSec=30`). Night Shift
+  sends a sign of life every 15 s. Without one for 30 s, systemd restarts
+  it. `systemctl status nightshift` shows a restart by the watchdog.
+- **Docker**: the image has a health check (`nightshift health`). Docker
+  Swarm, and so Dokploy, replaces a container that is unhealthy. Plain
+  Docker and Docker Compose only mark it unhealthy (`docker ps`).
+- **macOS**: two launchd agents. `nightshift.serve.plist` runs
+  `nightshift serve` and starts it again when it stops.
+  `nightshift.health.plist` runs `nightshift health --restart` every 60 s.
+  When Night Shift does not respond twice, 15 s apart, it stops Night
+  Shift, and launchd starts it again. Install both:
+
+  ```bash
+  cd deploy/launchd
+  for job in serve health; do
+    sed "s|/Users/YOU|$HOME|g" nightshift.$job.plist \
+      > ~/Library/LaunchAgents/nightshift.$job.plist
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/nightshift.$job.plist
+  done
+  ```
+
+  Put the folders of your agent CLIs (`claude`, `codex`) in the `PATH` of
+  `nightshift.serve.plist` first. The log is in
+  `~/Library/Logs/nightshift.log`. To stop it:
+  `launchctl bootout gui/$(id -u)/nightshift.serve` (and `nightshift.health`).
 
 ### Secrets on a computer without a keychain
 

@@ -29,6 +29,10 @@ Caddy gets the certificate and renews it. Night Shift listens only on the
 compose network: Caddy is the only way in. The data is in the volume
 `nightshift`. Back it up.
 
+Docker Compose shows a Night Shift that stops responding as `unhealthy` in
+`docker compose ps`, but does not restart it. Restart it with
+`docker compose -f deploy/docker-compose.yml restart nightshift`.
+
 ## With Dokploy
 
 1. Create an Application. Source: this repository. Build type: Dockerfile,
@@ -39,6 +43,25 @@ compose network: Caddy is the only way in. The data is in the volume
    certificate provider Let's Encrypt. Dokploy's Traefik then gets the
    certificate.
 5. Deploy.
+
+Dokploy runs the Application as a Docker Swarm service. The image has a
+health check: when Night Shift stops responding, Swarm replaces the
+container. You do not have to set anything. If you set your own health
+check (Advanced, Swarm Settings, Health Check), keep `nightshift health` as
+the test, and a start period of at least 2 minutes:
+
+```json
+{
+  "Test": ["CMD", "nightshift", "health"],
+  "Interval": 30000000000,
+  "Timeout": 10000000000,
+  "StartPeriod": 120000000000,
+  "Retries": 3
+}
+```
+
+The times are in nanoseconds, as Docker takes them. The image has no
+`curl`: test with `nightshift health`, not with a web request.
 
 ## Without Docker
 
