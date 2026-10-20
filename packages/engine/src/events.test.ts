@@ -395,9 +395,24 @@ test("a cost tally knows what it does not know", () => {
 	);
 
 	const [worker, decide] = deriveSteps(events);
-	expect(worker?.cost).toEqual({ usd: 0.5, estimated: true, missing: 2 });
-	expect(decide?.cost).toEqual({ usd: 0, estimated: false, missing: 0 });
-	expect(sumCost(events)).toEqual({ usd: 0.5, estimated: true, missing: 2 });
+	expect(worker?.cost).toEqual({
+		usd: 0.5,
+		estimated: true,
+		missing: 2,
+		calls: 3,
+	});
+	expect(decide?.cost).toEqual({
+		usd: 0,
+		estimated: false,
+		missing: 0,
+		calls: 0,
+	});
+	expect(sumCost(events)).toEqual({
+		usd: 0.5,
+		estimated: true,
+		missing: 2,
+		calls: 3,
+	});
 	expect(deriveWarnings(events)).toEqual([
 		{
 			stepId: "s1",
@@ -418,7 +433,7 @@ test("a failed session without usage is not a missing cost", () => {
 			costUsd: null,
 			resetAt: null,
 		}),
-	).toEqual({ usd: 0, estimated: false, missing: 0 });
+	).toEqual({ usd: 0, estimated: false, missing: 0, calls: 1 });
 });
 
 describe("gates", () => {

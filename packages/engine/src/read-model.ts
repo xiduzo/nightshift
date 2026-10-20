@@ -150,6 +150,7 @@ function costFields(cost: CostTally) {
 		costUsd: cost.usd,
 		costEstimated: cost.estimated,
 		costMissing: cost.missing,
+		costCalls: cost.calls,
 	};
 }
 
@@ -220,6 +221,7 @@ type CallFact = {
 		costUsd: number;
 		costEstimated: boolean;
 		costMissing: number;
+		costCalls: number;
 		startedAt: number;
 		endedAt: number | null;
 	}[];

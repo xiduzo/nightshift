@@ -108,6 +108,7 @@ describe("the Agent node", () => {
 			usd: 0,
 			estimated: false,
 			missing: 1,
+			calls: 1,
 		});
 	});
 

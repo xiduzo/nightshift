@@ -416,18 +416,30 @@ export type RunWarningKind = "cost-unknown";
 
 /**
  * What something cost, as far as it is known: the reported and estimated
- * dollars, whether part of them is an estimate, and how many sessions or
- * model calls ended without a cost (their spend is not in `usd`).
+ * dollars, whether part of them is an estimate, how many sessions or model
+ * calls ended without a cost (their spend is not in `usd`), and how many
+ * ended at all. With no calls, nothing could cost.
  */
-export type CostTally = { usd: number; estimated: boolean; missing: number };
+export type CostTally = {
+	usd: number;
+	estimated: boolean;
+	missing: number;
+	calls: number;
+};
 
-export const NO_COST: CostTally = { usd: 0, estimated: false, missing: 0 };
+export const NO_COST: CostTally = {
+	usd: 0,
+	estimated: false,
+	missing: 0,
+	calls: 0,
+};
 
 export function addCost(a: CostTally, b: CostTally): CostTally {
 	return {
 		usd: a.usd + b.usd,
 		estimated: a.estimated || b.estimated,
 		missing: a.missing + b.missing,
+		calls: a.calls + b.calls,
 	};
 }
 
@@ -441,24 +453,33 @@ export function sessionCost(
 ): CostTally {
 	if (!ending) return NO_COST;
 	if (ending.costUsd === null) {
-		return ending.outcome === "finished" ? { ...NO_COST, missing: 1 } : NO_COST;
+		return {
+			...NO_COST,
+			missing: ending.outcome === "finished" ? 1 : 0,
+			calls: 1,
+		};
 	}
 	return {
 		usd: ending.costUsd,
 		estimated: ending.costSource === "estimated",
 		missing: 0,
+		calls: 1,
 	};
 }
 
 /** What a step spent outside sessions (a decider), from its `StepEnded`. */
 export function stepEndCost(payload: EnginePayloads["StepEnded"]): CostTally {
 	if (payload.costUsd == null) {
-		return payload.costSource === null ? { ...NO_COST, missing: 1 } : NO_COST;
+		// Absent: nothing was asked. Null: the decider answered without a cost.
+		return payload.costSource === null
+			? { ...NO_COST, missing: 1, calls: 1 }
+			: NO_COST;
 	}
 	return {
 		usd: payload.costUsd,
 		estimated: payload.costSource === "estimated",
 		missing: 0,
+		calls: 1,
 	};
 }
 

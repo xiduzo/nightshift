@@ -122,6 +122,8 @@ export type StepSummary = {
 	costEstimated: boolean;
 	/** Sessions or model calls that ended without a cost: their spend is not in `costUsd`. */
 	costMissing: number;
+	/** Sessions and model calls that ended. With none, nothing could cost. */
+	costCalls: number;
 	/** The Device the step ran on (its Placement). Null for steps from before Devices named it. */
 	device: RunDevice | null;
 	/**
@@ -248,6 +250,8 @@ export type RunSummary = {
 	costEstimated: boolean;
 	/** Sessions or model calls that ended without a cost: their spend is not in `costUsd`. */
 	costMissing: number;
+	/** Sessions and model calls that ended. With none, nothing could cost. */
+	costCalls: number;
 	/** What went wrong without failing a step, oldest first. */
 	warnings: RunWarning[];
 	/** The runs of the flows its Call nodes called, in the order they started. */
@@ -273,6 +277,8 @@ export type SubflowRun = {
 	costEstimated: boolean;
 	/** Sessions or model calls that ended without a cost: their spend is not in `costUsd`. */
 	costMissing: number;
+	/** Sessions and model calls that ended. With none, nothing could cost. */
+	costCalls: number;
 	startedAt: number;
 	endedAt: number | null;
 };
