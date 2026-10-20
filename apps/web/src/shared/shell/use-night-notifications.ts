@@ -4,13 +4,8 @@ import { useEffect, useRef } from "react";
 
 import { useOpenGates } from "@/features/gates";
 import { runQueries } from "@/features/runs";
-import { settingsQueries } from "@/features/settings";
+import { notificationsSupported, settingsQueries } from "@/features/settings";
 import type { OpenGate, RunStatus, RunSummary } from "@/shared/api";
-
-/** True when this browser can show desktop notifications. */
-export function notificationsSupported(): boolean {
-	return typeof window !== "undefined" && "Notification" in window;
-}
 
 const gateKey = (gate: OpenGate) => `${gate.runId}:${gate.stepId}`;
 

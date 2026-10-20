@@ -1,4 +1,5 @@
-/** The settings of this computer. The settings page moves here from its route next. */
+/** The settings of this computer: the Settings page, its cards and form, and the settings queries. */
 
-export { PERMISSION_MODES } from "./permission-modes";
-export { settingsMutations, settingsQueries } from "./queries";
+export { notificationsSupported } from "./notifications";
+export { settingsQueries } from "./queries";
+export { SettingsPage } from "./settings-page";
