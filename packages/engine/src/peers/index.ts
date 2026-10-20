@@ -3,6 +3,7 @@
 export {
 	createEngineOffers,
 	createOfferedSessions,
+	createOffersHere,
 } from "./engine-offers";
 export type { ArchiveRef } from "./exchange/archive";
 export { archiveRefSchema } from "./exchange/archive";
@@ -52,7 +53,6 @@ export {
 	inForce,
 	offerCapsSchema,
 	offeredCallRefusal,
-	offeredDevice,
 	offeredSession,
 	offerRefusal,
 	removeDeviceOffer,

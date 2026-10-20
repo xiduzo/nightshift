@@ -1,8 +1,19 @@
+import type { Database } from "@nightshift/db";
+import type { AgentProfileSettings } from "@nightshift/flows";
 import type { EngineOffers, Relay } from "../contract";
-import type { WorkRelay } from "../device";
-import type { RunLog } from "../log";
+import type { Device, WorkRelay } from "../device";
+import type { RunLog, RunRow } from "../log";
 import type { SpaceDocuments } from "../projects";
-import { publishOffer, spaceOffers, unpublishOffer } from "./offers";
+import { personOnHost } from "./exchange/host-spaces";
+import {
+	createOfferSlots,
+	type DeviceOffer,
+	inForce,
+	offeredDevice,
+	publishOffer,
+	spaceOffers,
+	unpublishOffer,
+} from "./offers";
 
 /** A session under an Offer, on a run this computer walks. */
 type OfferedSession = {
@@ -79,6 +90,66 @@ export function createOfferedSessions() {
 }
 
 export type OfferedSessions = ReturnType<typeof createOfferedSessions>;
+
+/**
+ * This computer as the Device of the runs it walks: as it is for its
+ * owner's runs and a schedule's, else through its Offers only
+ * (`offeredDevice`), at most each Offer's session cap at once.
+ */
+export function createOffersHere(deps: {
+	db: Database;
+	device: Device;
+	documents: SpaceDocuments;
+	/** This computer's own Offers (its Device document). Without it, none. */
+	ownOffers?: () => readonly DeviceOffer[];
+	profileFor?: (name: string) => AgentProfileSettings | null;
+	/** The Person who owns this computer, or null before the engine knows. */
+	ownerId(): string | null;
+	sessions: OfferedSessions;
+}) {
+	const { db, device, documents } = deps;
+	const slots = createOfferSlots();
+
+	/** This computer's Offers into a Space that are in force: its own, and the Space lists them. */
+	async function offersHere(spaceId: string): Promise<DeviceOffer[]> {
+		return inForce(
+			deps.ownOffers?.() ?? [],
+			spaceOffers(await documents.open(spaceId), device.id),
+			spaceId,
+		);
+	}
+
+	/**
+	 * Whether a run is this computer's owner's own (as the Space's Host
+	 * knows them), or a schedule's without a Person. Another Person's run
+	 * uses this computer through its Offers only.
+	 */
+	const ownRun = async (row: Pick<RunRow, "startedBy" | "spaceId">) =>
+		row.startedBy === null ||
+		row.startedBy === ((await personOnHost(db, row.spaceId)) ?? deps.ownerId());
+
+	return {
+		offersHere,
+		/** This computer as the Device of the run (`PlacementDeps.localFor`). */
+		localFor(row: RunRow): Device {
+			if (row.startedBy === null) return device;
+			return offeredDevice(device, {
+				own: () => ownRun(row),
+				inForce: () => offersHere(row.spaceId),
+				profileFor: deps.profileFor ?? (() => null),
+				slots,
+				spaceId: row.spaceId,
+				track: (profile) =>
+					deps.sessions.track({
+						runId: row.id,
+						deviceId: device.id,
+						spaceId: row.spaceId,
+						profile,
+					}),
+			});
+		},
+	};
+}
 
 const HOST_UNREACHABLE =
 	"The computer that keeps this Space cannot be reached. Try again when it is online.";

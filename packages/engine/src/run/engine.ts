@@ -24,16 +24,12 @@ import {
 	createEngineOffers,
 	createHostSpaces,
 	createOfferedSessions,
-	createOfferSlots,
+	createOffersHere,
 	createPlacement,
 	createPrivatePaths,
 	createRunArchive,
 	createWalkers,
-	inForce,
-	offeredDevice,
-	personOnHost,
 	runsMovedHere,
-	spaceOffers,
 } from "../peers";
 import {
 	createProjects,
@@ -52,14 +48,11 @@ import {
 	createScheduler,
 	DEFAULT_SCHEDULE_TICK_MS,
 } from "../schedules";
-import { resolveGate } from "./gate";
-import { moveRun, takeOver } from "./move";
+import { createRunControl } from "./control";
 import { createRecovery } from "./recovery";
 import { createRunRelay } from "./relay";
 import { createRunStart } from "./run-start";
 import { createSpaces } from "./space";
-import { stopRun } from "./stop";
-import { signalRun, wakeOfflineSleeps } from "./wake";
 
 /**
  * The engine: projects, flows, schedules, Gates and runs, over the event
@@ -158,26 +151,15 @@ export function createEngine(
 	/** The offered sessions running now: what withdrawing an Offer stops. */
 	const offeredSessions = createOfferedSessions();
 	const work = options.work && offeredSessions.relay(options.work);
-	/** At most each Offer's session cap of offered sessions at once, on this computer. */
-	const slots = createOfferSlots();
-
-	/** This computer's Offers into a Space that are in force: its own, and the Space lists them. */
-	async function offersHere(spaceId: string) {
-		return inForce(
-			options.ownOffers?.() ?? [],
-			spaceOffers(await documents.open(spaceId), device.id),
-			spaceId,
-		);
-	}
-
-	/**
-	 * Whether a run is this computer's owner's own (as the Space's Host
-	 * knows them), or a schedule's without a Person. Another Person's run
-	 * uses this computer through its Offers only.
-	 */
-	const ownRun = async (row: Pick<RunRow, "startedBy" | "spaceId">) =>
-		row.startedBy === null ||
-		row.startedBy === ((await personOnHost(db, row.spaceId)) ?? ownerId);
+	const { offersHere, localFor } = createOffersHere({
+		db,
+		device,
+		documents,
+		...(options.ownOffers ? { ownOffers: options.ownOffers } : {}),
+		...(options.profileFor ? { profileFor: options.profileFor } : {}),
+		ownerId: () => ownerId,
+		sessions: offeredSessions,
+	});
 
 	/** Where steps run: per node, else the run's Device (`peers/placement.ts`). */
 	const placement = createPlacement({
@@ -191,23 +173,7 @@ export function createEngine(
 		...(work ? { work } : {}),
 		...(options.relay ? { relay: options.relay } : {}),
 		// Another Person's run here uses this computer through its Offers.
-		localFor: (row) =>
-			row.startedBy === null
-				? device
-				: offeredDevice(device, {
-						own: () => ownRun(row),
-						inForce: () => offersHere(row.spaceId),
-						profileFor: options.profileFor ?? (() => null),
-						slots,
-						spaceId: row.spaceId,
-						track: (profile) =>
-							offeredSessions.track({
-								runId: row.id,
-								deviceId: device.id,
-								spaceId: row.spaceId,
-								profile,
-							}),
-					}),
+		localFor,
 		offersHere,
 		mayUseOffers: (spaceId, personId) =>
 			options.mayUseOffers?.(spaceId, personId) ?? Promise.resolve(false),
@@ -309,11 +275,9 @@ export function createEngine(
 		onIngested: async (added) => {
 			const here = [await runLog.walkerId(), device.id];
 			for (const runId of runsMovedHere(added, here)) {
-				await takeOver({ db, log: runLog, runner, archive }, runId).catch(
-					(error) => {
-						console.error(`[engine] could not take over run ${runId}`, error);
-					},
-				);
+				await control.takeOver(runId).catch((error) => {
+					console.error(`[engine] could not take over run ${runId}`, error);
+				});
 			}
 		},
 		// A Space a Host keeps: that Host's feed of the step, over its link.
@@ -400,6 +364,19 @@ export function createEngine(
 		listRuns: reads.listRuns,
 	});
 
+	const control = createRunControl({
+		db,
+		log: runLog,
+		bus,
+		runner,
+		reads,
+		relay,
+		archive,
+		commands: exchange.commands,
+		device,
+		ownDevices: placement.ownDevices,
+	});
+
 	const space = createSpaces({
 		ready,
 		signal,
@@ -433,35 +410,7 @@ export function createEngine(
 		hostOf,
 		startRun: startRunWith,
 		pathsFor: createPrivatePaths({ db, registry, ownerId: () => ownerId }),
-		control: {
-			stop: (row, actor, stopOptions) =>
-				stopRun({ log: runLog, bus, runner, relay }, row, actor, stopOptions),
-			move: (row, actor, to) =>
-				moveRun(
-					{
-						db,
-						log: runLog,
-						bus,
-						runner,
-						relay,
-						archive,
-						device,
-						ownDevices: placement.ownDevices,
-					},
-					row,
-					actor,
-					to,
-				),
-			resolveGate: (row, actor, input) =>
-				resolveGate(
-					{ log: runLog, runner, reads, relay, commands: exchange.commands },
-					row,
-					actor,
-					input,
-				),
-			signal: (row, actor, name) =>
-				signalRun({ log: runLog, runner, relay }, row, actor, name),
-		},
+		control,
 	});
 
 	const offers = createEngineOffers({
@@ -490,7 +439,7 @@ export function createEngine(
 		logMemberChange: (change) => logMemberChange(runLog, change),
 		async deviceBack(_deviceId) {
 			await ready;
-			await wakeOfflineSleeps({ db, log: runLog, runner });
+			await control.wakeOfflineSleeps();
 		},
 		offers,
 		async endOverdueSteps() {
