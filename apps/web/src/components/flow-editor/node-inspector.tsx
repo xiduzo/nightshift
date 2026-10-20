@@ -95,6 +95,7 @@ import {
 import { McpServersField } from "./mcp-servers-field";
 import { OptionsEditor } from "./options-editor";
 import { OutputSchemaField } from "./output-schema-field";
+import { SkillCombobox } from "./skill-combobox";
 import { TemplateField } from "./template-field";
 import { ToolFields } from "./tool-fields";
 import { NodeProgramsField, ToolsField } from "./tools-field";
@@ -144,6 +145,7 @@ function pickProfile(
 }
 
 export function NodeInspector({
+	projectId,
 	flow,
 	node,
 	onChange,
@@ -158,6 +160,7 @@ export function NodeInspector({
 	connections,
 	devices,
 }: {
+	projectId: string;
 	flow: Flow;
 	node: FlowNode;
 	/** Your devices, for where a step runs; undefined while they load. */
@@ -257,6 +260,7 @@ export function NodeInspector({
 
 			{node.type === "agent" ? (
 				<AgentFields
+					projectId={projectId}
 					flow={flow}
 					node={node}
 					onChange={(change) =>
@@ -521,6 +525,7 @@ const TASK_KINDS = [
 ] as const;
 
 function AgentFields({
+	projectId,
 	flow,
 	node,
 	onChange,
@@ -528,6 +533,7 @@ function AgentFields({
 	onRemoveOutcome,
 	onSetOutcomes,
 }: {
+	projectId: string;
 	flow: Flow;
 	node: AgentNode;
 	onChange: (change: (node: AgentNode) => AgentNode) => void;
@@ -852,20 +858,20 @@ function AgentFields({
 						<Field
 							id={`${id}-skill`}
 							label="Skill"
-							hint="Leave out the slash."
+							hint="Pick a skill of this project or this computer, or type its name. Leave out the slash."
 							error={node.skill === undefined ? "Write the skill name." : null}
 						>
-							<Input
+							<SkillCombobox
 								id={`${id}-skill`}
+								projectId={projectId}
+								harness={harnessName}
+								harnessLabel={harness.label}
 								value={node.skill ?? ""}
 								placeholder="wtf.implement-trace"
-								className="font-mono"
-								autoComplete="off"
-								spellCheck={false}
-								aria-invalid={node.skill === undefined}
-								aria-describedby={`${id}-skill-hint`}
-								onChange={(event) => {
-									const skill = event.target.value.replace(/^\//, "").trim();
+								invalid={node.skill === undefined}
+								describedBy={`${id}-skill-hint`}
+								onChange={(value) => {
+									const skill = value.replace(/^\//, "").trim();
 									onChange(({ skill: _, ...rest }) =>
 										skill ? { ...rest, skill } : rest,
 									);

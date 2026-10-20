@@ -428,6 +428,7 @@ function Editor({
 	const inspector = selectedNode ? (
 		<NodeInspector
 			key={selectedNode.id}
+			projectId={projectId}
 			flow={draft}
 			node={selectedNode}
 			devices={myDevices.data}

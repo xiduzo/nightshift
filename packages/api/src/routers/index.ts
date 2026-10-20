@@ -3,6 +3,7 @@ import {
 	DECIDER_ADAPTERS,
 	deciderModels,
 	HARNESS_ADAPTERS,
+	installedSkills,
 } from "@nightshift/agents";
 import { roleAllows } from "@nightshift/auth/access";
 import { hasLogin } from "@nightshift/auth/login";
@@ -683,6 +684,26 @@ const harnesses = {
 						context.settings.current()[HARNESS_BIN[input.harness]],
 					),
 		),
+	/**
+	 * The skills the harness can run: the project's own (when its folder is
+	 * on this computer), then those for every project here. Never throws.
+	 */
+	skills: ownerProcedure
+		.input(
+			z.object({
+				harness: agentHarnessSchema,
+				projectId: z.string().optional(),
+			}),
+		)
+		.handler(async ({ context, input }) => {
+			const projects = input.projectId
+				? await context.space.listProjects().catch(() => [])
+				: [];
+			const project = projects.find((p) => p.id === input.projectId);
+			return installedSkills(input.harness, {
+				projectPath: project?.repoPath ?? null,
+			});
+		}),
 };
 
 /** Agent Profiles: a harness, a model and its tools under one name. Agent nodes name them. */

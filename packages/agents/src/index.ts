@@ -93,4 +93,9 @@ export {
 	settleCost,
 	startPriceUpdates,
 } from "./pricing";
+export {
+	type InstalledSkill,
+	installedSkills,
+	PROJECT_SKILL_DIR,
+} from "./skills";
 export type * from "./types";
