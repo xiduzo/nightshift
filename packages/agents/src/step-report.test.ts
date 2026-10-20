@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	DEFAULT_RULES,
+	isRefusedReport,
 	parseStepReport,
 	parseTextReport,
 	REPORT_ACK,
@@ -127,6 +128,40 @@ describe("reportStepTool", () => {
 		if (!execute) throw new Error("expected a server tool");
 		expect(await execute({ outcome: "fail", summary: "x" })).toBe(REPORT_ACK);
 		expect(() => execute({ outcome: "maybe" })).toThrow(/Invalid report/);
+	});
+
+	test("its rejection reads as a refused report", () => {
+		const { execute } = tool;
+		if (!execute) throw new Error("expected a server tool");
+		let message = "";
+		try {
+			execute({ outcome: "maybe" });
+		} catch (error) {
+			message = (error as Error).message;
+		}
+		// The bridge wraps the error before the agent sees it.
+		expect(isRefusedReport(`Tool execution failed: ${message}`)).toBe(true);
+	});
+});
+
+describe("isRefusedReport", () => {
+	test.each([
+		"Permission to use mcp__tanstack__report_step has been denied.",
+		"The user doesn't want to proceed with this tool use.",
+		"InputValidationError: summary is missing",
+		"MCP error -32602: Invalid params",
+	])("refused: %s", (text) => {
+		expect(isRefusedReport(text)).toBe(true);
+	});
+
+	test.each([
+		'MCP server "tanstack" rejected the Authorization header in its config (update it, then run /mcp to reconnect)',
+		"MCP error -32000: Connection closed",
+		"Tool execution failed: fetch failed",
+		"No such tool available: mcp__tanstack__report_step",
+		"",
+	])("lost on the way: %s", (text) => {
+		expect(isRefusedReport(text)).toBe(false);
 	});
 });
 

@@ -13,18 +13,32 @@
  * The translator enforces the stream contract: one `session` event first and
  * one terminal `finished` / `error` event last (from `finish`).
  *
+ * A `tool-result` carries `isError: true` when the harness marks the result
+ * as an error. Every adapter maps its own flag (Claude Code's `is_error`,
+ * Codex and Grok Build's failed item, OpenCode's error state, ACP's failed
+ * status) to the chunk's `output-error` state.
+ *
  * Step reports (`stepReport` on: `true` or a spec), see `step-report.ts`:
- * - A `report_step` tool call becomes one `report` event, emitted when its
- *   successful result arrives. The call itself is harness plumbing: its
- *   `tool-start` / `tool-end` / `tool-result` events are not emitted. A call
- *   with invalid input, or one that fails or is denied, emits its tool
- *   events instead, so the transcript shows the report that did not count.
+ * - A `report_step` call with a valid input (`parseStepReport`) becomes one
+ *   `report` event, emitted when its result arrives. After a successful
+ *   result the call itself is harness plumbing: its `tool-start` /
+ *   `tool-end` / `tool-result` events are not emitted.
+ * - A valid report whose result is an error still counts, unless the
+ *   result says the report was refused (`isRefusedReport`: Night Shift's
+ *   own check, the harness's input check, or a permission denial). The
+ *   agent sent the report; only its delivery failed (the bridge was gone,
+ *   for example). The tool events are emitted, with `isError` on the
+ *   result, and the `report` event follows them: the transcript shows the
+ *   failed delivery and the report that counted.
+ * - A call with an invalid input, or a refused one, emits its tool events
+ *   and no report, so the transcript shows the report that did not count.
  * - A `NIGHTSHIFT-REPORT: {...}` line in the final result text becomes one
  *   `report` event just before the terminal event. The line stays in the
  *   streamed text.
  * Both channels are read in every mode; the last report counts.
  */
 import {
+	isRefusedReport,
 	isReportTool,
 	parseStepReport,
 	parseTextReport,
@@ -528,6 +542,7 @@ export function createTranslator(options: {
 				const toolCallId = asString(chunk.toolCallId);
 				if (!toolCallId) return [];
 				const content = chunk.content;
+				const failed = isErrorResult(chunk);
 				const call = reportCalls.get(toolCallId);
 				if (call) {
 					reportCalls.delete(toolCallId);
@@ -535,11 +550,18 @@ export function createTranslator(options: {
 						call.input = rawInput(toolCallId, call.input);
 						call.report = parseStepReport(call.input, rules);
 					}
-					if (call.report && !isErrorResult(chunk)) {
+					if (call.report && !failed) {
 						if (content === INTERRUPTED_RESULT) return [];
 						return emit([{ type: "report", ...call.report }]);
 					}
-					// A report that did not count stays visible, so a person can see why the step passed without one.
+					const text =
+						typeof content === "string"
+							? content
+							: JSON.stringify(content ?? "");
+					// Here a valid report means its delivery failed: it counts unless it was refused.
+					const counted =
+						call.report && !isRefusedReport(text) ? call.report : undefined;
+					// The call stays visible, so a person can see why the report failed or did not count.
 					return emit([
 						{ type: "tool-start", toolCallId, name: call.name },
 						{
@@ -551,9 +573,10 @@ export function createTranslator(options: {
 						{
 							type: "tool-result",
 							toolCallId,
-							content:
-								typeof content === "string" ? content : JSON.stringify(content),
+							content: text,
+							...(failed ? { isError: true as const } : {}),
 						},
+						...(counted ? [{ type: "report" as const, ...counted }] : []),
 					]);
 				}
 				const held = heldEnds.get(toolCallId);
@@ -569,6 +592,7 @@ export function createTranslator(options: {
 							typeof content === "string"
 								? content
 								: JSON.stringify(content ?? ""),
+						...(failed ? { isError: true as const } : {}),
 					},
 				]);
 			}

@@ -19,6 +19,8 @@
  * the outcome and that `data` is there; validating `data` is the engine's job.
  *
  * The translator turns either channel into a `report` event (see `translate.ts`).
+ * A valid tool report counts even when its delivery fails, unless the
+ * result says it was refused (`isRefusedReport`).
  */
 import { toolDefinition } from "@tanstack/ai";
 import { BRIDGED_MCP_SERVER_NAME } from "@tanstack/ai-claude-code";
@@ -205,6 +207,49 @@ export function isReportTool(name: string | undefined): boolean {
 	return name === REPORT_TOOL_NAME || name === REPORT_TOOL_ID;
 }
 
+/** The start of the error `reportStepTool` gives an invalid report. */
+export const INVALID_REPORT_TEXT = "Invalid report. Expected";
+
+/**
+ * What a failed `report_step` result says when the report itself was
+ * refused, not lost on the way:
+ * - Night Shift's own check (`reportStepTool`). It runs `parseStepReport`
+ *   with the same rules as the translator, so a valid input never gets it;
+ *   matching it is a guard.
+ * - The harness rejected the input before the call: Claude Code's
+ *   `InputValidationError`, or the MCP "invalid params" error (-32602).
+ * - A permission denial: a deny rule, a hook, or a person said no. Night
+ *   Shift allows the tool in every harness, so this is rare.
+ * Each harness words a denial its own way and none marks it apart from
+ * other failures, so this reads the words. A failure that says none of
+ * this (the bridge cannot be reached, it rejects the session's credentials,
+ * a timeout) is a lost delivery.
+ */
+const REFUSED_REPORT = new RegExp(
+	[
+		INVALID_REPORT_TEXT.replaceAll(".", "\\."),
+		"InputValidationError",
+		"MCP error -32602",
+		"\\bpermission",
+		"\\bdenied\\b",
+		"\\bnot allowed\\b",
+		"\\b(?:user|you) (?:rejected|declined|denied|refused|cancell?ed)\\b",
+		"\\brejected by the user\\b",
+		"(?:doesn't|does not) want to proceed",
+		"prevents you from using",
+	].join("|"),
+	"i",
+);
+
+/**
+ * True when the text of a failed `report_step` result says the report was
+ * refused: by Night Shift's own check, by the harness's input check, or by
+ * a permission denial. False for a report that was lost on the way.
+ */
+export function isRefusedReport(text: string): boolean {
+	return REFUSED_REPORT.test(text);
+}
+
 /**
  * Check a report: an outcome of the rules, a string summary, and `data`
  * when the rules have an output schema. Returns undefined when it is not a
@@ -353,7 +398,7 @@ export function reportStepTool(
 		inputSchema: reportInputSchema(rules),
 	}).server((args: unknown) => {
 		if (!parseStepReport(args, rules)) {
-			throw new Error(`Invalid report. Expected { ${expected} }.`);
+			throw new Error(`${INVALID_REPORT_TEXT} { ${expected} }.`);
 		}
 		return REPORT_ACK;
 	});

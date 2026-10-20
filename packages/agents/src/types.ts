@@ -111,7 +111,13 @@ export type AgentEvent =
 	| { type: "text"; messageId: string; delta: string }
 	| { type: "tool-start"; toolCallId: string; name: string }
 	| { type: "tool-end"; toolCallId: string; name: string; input: unknown }
-	| { type: "tool-result"; toolCallId: string; content: string }
+	| {
+			type: "tool-result";
+			toolCallId: string;
+			content: string;
+			/** The harness marked the result as an error. Absent otherwise. */
+			isError?: true;
+	  }
 	/** The agent's step report. When the agent reports twice, the last one counts. */
 	| {
 			type: "report";

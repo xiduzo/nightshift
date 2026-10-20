@@ -381,6 +381,52 @@ describe("createTranslator", () => {
 	});
 });
 
+describe("tool results", () => {
+	const call = (result: Record<string, unknown>) => [
+		{ type: "TOOL_CALL_START", toolCallId: "c1", toolCallName: "Bash" },
+		{ type: "TOOL_CALL_END", toolCallId: "c1", input: { command: "ls" } },
+		{ type: "TOOL_CALL_RESULT", toolCallId: "c1", ...result },
+	];
+	const result = (events: AgentEvent[]) =>
+		events.find((e) => e.type === "tool-result");
+
+	test.each([
+		["the chunk", { content: "No such file", state: "output-error" }],
+		[
+			"its metadata",
+			{
+				content: "No such file",
+				metadata: { tanstack: { state: "output-error" } },
+			},
+		],
+	])("an error result in %s is marked as an error", (_name, chunk) => {
+		const events = feed(newTranslator(), [
+			session,
+			...call(chunk),
+			runFinished,
+		]);
+		expect(result(events)).toEqual({
+			type: "tool-result",
+			toolCallId: "c1",
+			content: "No such file",
+			isError: true,
+		});
+	});
+
+	test("a successful result has no error mark", () => {
+		const events = feed(newTranslator(), [
+			session,
+			...call({ content: "a.txt" }),
+			runFinished,
+		]);
+		expect(result(events)).toEqual({
+			type: "tool-result",
+			toolCallId: "c1",
+			content: "a.txt",
+		});
+	});
+});
+
 describe("step reports", () => {
 	const reporting = () =>
 		createTranslator({ fallbackSessionId: "fallback", stepReport: true });
@@ -450,17 +496,9 @@ describe("step reports", () => {
 		["invalid input", { outcome: "maybe", summary: "x" }, { content: "ok" }],
 		["missing summary", { outcome: "pass" }, { content: "ok" }],
 		[
-			"an error result",
+			"a denied call",
 			{ outcome: "pass", summary: "x" },
 			{ content: "denied", state: "output-error" },
-		],
-		[
-			"an error result in metadata",
-			{ outcome: "pass", summary: "x" },
-			{
-				content: "Tool execution failed",
-				metadata: { tanstack: { state: "output-error" } },
-			},
 		],
 	])("shows the call instead of a report for %s", (_name, input, result) => {
 		const events = feed(reporting(), [
@@ -502,6 +540,200 @@ describe("step reports", () => {
 		expect(events.filter((e) => e.type === "report")).toEqual([
 			{ type: "report", outcome: "fail", summary: "Tests fail." },
 		]);
+	});
+
+	describe("a valid report whose delivery failed", () => {
+		/** What Claude Code said when the bridge on its port was another session's. */
+		const LOST =
+			'MCP server "tanstack" rejected the Authorization header in its config (update it, then run /mcp to reconnect)';
+		const valid = { outcome: "pass", summary: "Fixed it." };
+
+		test.each([
+			["a lost bridge", { content: LOST, state: "output-error" }],
+			[
+				"a failed call in metadata",
+				{
+					content: "Tool execution failed: fetch failed",
+					metadata: { tanstack: { state: "output-error" } },
+				},
+			],
+			[
+				"a closed connection",
+				{
+					content: "MCP error -32000: Connection closed",
+					state: "output-error",
+				},
+			],
+			["an empty error", { content: "", state: "output-error" }],
+		])("counts after %s, and shows the failed call", (_name, result) => {
+			const events = feed(reporting(), [
+				session,
+				...reportCall(valid, result),
+				runFinished,
+			]);
+			expect(events.slice(1)).toEqual([
+				{ type: "tool-start", toolCallId: "r1", name: "report_step" },
+				{
+					type: "tool-end",
+					toolCallId: "r1",
+					name: "report_step",
+					input: valid,
+				},
+				{
+					type: "tool-result",
+					toolCallId: "r1",
+					content: result.content,
+					isError: true,
+				},
+				{ type: "report", outcome: "pass", summary: "Fixed it." },
+				expect.objectContaining({ type: "finished" }),
+			]);
+		});
+
+		test("counts with the input from the raw messages (OpenCode)", () => {
+			const t = createTranslator({
+				fallbackSessionId: "f",
+				stepReport: true,
+				profile: {
+					label: "Other",
+					sessionEvent: "other.session-id",
+					createObserver: () => (signals, raw) => ({
+						...signals,
+						...(raw as SdkSignals),
+					}),
+					toolInputFromSignals: true,
+				},
+			});
+			t.push({
+				type: "CUSTOM",
+				name: "other.session-id",
+				value: { sessionId: "s" },
+			});
+			t.push({
+				type: "TOOL_CALL_START",
+				toolCallId: "r1",
+				toolCallName: "report_step",
+			});
+			t.push({ type: "TOOL_CALL_END", toolCallId: "r1", input: {} });
+			t.observeSdk({ toolInputs: { r1: valid } });
+			expect(
+				t
+					.push({
+						type: "TOOL_CALL_RESULT",
+						toolCallId: "r1",
+						content: "Unable to connect",
+						state: "output-error",
+					})
+					.filter((e) => e.type === "report"),
+			).toEqual([{ type: "report", outcome: "pass", summary: "Fixed it." }]);
+		});
+
+		test.each([
+			[
+				"Night Shift's own check",
+				'Tool execution failed: Invalid report. Expected { outcome: "pass" | "fail" | "needs-input", summary: string }.',
+			],
+			[
+				"the harness's input check",
+				"InputValidationError: report_step failed due to the following issue",
+			],
+			["invalid params", "MCP error -32602: Invalid params"],
+			[
+				"a deny rule",
+				"Permission to use mcp__tanstack__report_step has been denied.",
+			],
+			[
+				"a person who said no",
+				"The user doesn't want to proceed with this tool use. The tool use was rejected.",
+			],
+			[
+				"an OpenCode rule",
+				"The user has specified a rule which prevents you from using this specific tool call.",
+			],
+			[
+				"an OpenCode rejection",
+				"The user rejected permission to use this specific tool call.",
+			],
+		])("does not count when refused by %s", (_name, content) => {
+			const events = feed(reporting(), [
+				session,
+				...reportCall(valid, { content, state: "output-error" }),
+				runFinished,
+			]);
+			expect(events.map((e) => e.type)).toEqual([
+				"session",
+				"tool-start",
+				"tool-end",
+				"tool-result",
+				"finished",
+			]);
+			expect(events[3]).toMatchObject({ isError: true });
+		});
+
+		test("an invalid report with an error result does not count", () => {
+			const events = feed(reporting(), [
+				session,
+				...reportCall(
+					{ outcome: "maybe", summary: "x" },
+					{ content: LOST, state: "output-error" },
+				),
+				runFinished,
+			]);
+			expect(events.map((e) => e.type)).toEqual([
+				"session",
+				"tool-start",
+				"tool-end",
+				"tool-result",
+				"finished",
+			]);
+		});
+
+		test("a later valid report wins over a failed one, and the other way round", () => {
+			const call = (
+				id: string,
+				input: unknown,
+				result: Record<string, unknown>,
+			) =>
+				reportCall(input, result).map((chunk) => ({
+					...chunk,
+					toolCallId: id,
+				}));
+			const failedFirst = feed(reporting(), [
+				session,
+				...call(
+					"r1",
+					{ outcome: "fail", summary: "a" },
+					{
+						content: LOST,
+						state: "output-error",
+					},
+				),
+				...call("r2", { outcome: "pass", summary: "b" }, { content: "ok" }),
+				runFinished,
+			]);
+			expect(failedFirst.filter((e) => e.type === "report")).toEqual([
+				{ type: "report", outcome: "fail", summary: "a" },
+				{ type: "report", outcome: "pass", summary: "b" },
+			]);
+			const failedLast = feed(reporting(), [
+				session,
+				...call("r1", { outcome: "pass", summary: "a" }, { content: "ok" }),
+				...call(
+					"r2",
+					{ outcome: "fail", summary: "b" },
+					{
+						content: LOST,
+						state: "output-error",
+					},
+				),
+				runFinished,
+			]);
+			expect(failedLast.filter((e) => e.type === "report").at(-1)).toEqual({
+				type: "report",
+				outcome: "fail",
+				summary: "b",
+			});
+		});
 	});
 
 	test("without stepReport the tool call is an ordinary tool", () => {
