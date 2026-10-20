@@ -47,6 +47,7 @@ import {
 import { RunGraph } from "@/components/run/run-graph";
 import { RunActions, RunDetails, RunTitle } from "@/components/run/run-header";
 import { RunStatusPanel } from "@/components/run/run-status-panel";
+import { RunVariables } from "@/components/run/run-variables";
 import { RunWarnings } from "@/components/run/run-warnings";
 import { StepRowMenu } from "@/components/run/step-actions";
 import { CONSOLE_BAR_PX, StepConsole } from "@/components/run/step-console";
@@ -401,6 +402,7 @@ function RunComponent() {
 				lastStep={lastStep}
 			/>
 			<RunWarnings warnings={runData.warnings} onShowStep={setPickedStepId} />
+			<RunVariables run={runData} steps={steps} onShowStep={setPickedStepId} />
 		</section>
 	);
 
