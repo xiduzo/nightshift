@@ -36,6 +36,7 @@ export function TemplateField({
 	className,
 	multiline = true,
 	variablesOpen = true,
+	scopes,
 	required,
 }: {
 	id: string;
@@ -53,6 +54,8 @@ export function TemplateField({
 	multiline?: boolean;
 	/** Whether the variable list starts open. */
 	variablesOpen?: boolean;
+	/** Only these groups of variables (`inputs`, `run`, …). Default: all. */
+	scopes?: readonly string[];
 	required?: boolean;
 }) {
 	const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
@@ -123,6 +126,7 @@ export function TemplateField({
 			<TemplateVariables
 				flow={flow}
 				nodeId={nodeId}
+				scopes={scopes}
 				open={variablesOpen}
 				onInsert={insert}
 			/>
@@ -134,17 +138,22 @@ export function TemplateField({
 export function TemplateVariables({
 	flow,
 	nodeId,
+	scopes,
 	open,
 	onInsert,
 }: {
 	flow: Flow;
 	nodeId: string | null;
+	/** Only these groups. Default: all. */
+	scopes?: readonly string[];
 	/** Whether the list starts open. */
 	open: boolean;
 	onInsert: (variable: TemplateVariable) => void;
 }) {
 	const flows = useProjectFlowMap();
-	const groups = templateVariables(flow, nodeId, flows);
+	const groups = templateVariables(flow, nodeId, flows).filter(
+		(group) => scopes === undefined || scopes.includes(group.scope),
+	);
 
 	return (
 		<Collapsible defaultOpen={open} className="rounded-lg border border-dashed">

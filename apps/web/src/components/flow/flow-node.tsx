@@ -40,6 +40,7 @@ import {
 	RadioIcon,
 	SquareTerminalIcon,
 	TriangleAlertIcon,
+	VariableIcon,
 	WorkflowIcon,
 } from "lucide-react";
 import { memo, useContext, useEffect, useRef } from "react";
@@ -194,6 +195,8 @@ const FlowNodeCard = memo(function FlowNodeCard({
 		: undefined;
 	const active = run?.state === "running";
 	const waiting = run?.state === "waiting";
+	// The variables the node sets when its step ends, each once.
+	const writes = [...new Set((node.set ?? []).map((write) => write.variable))];
 
 	// One handle per outcome, unique by name (a draft can repeat a label).
 	const outcomes = [...new Set(nodeOutcomes(node))];
@@ -257,6 +260,16 @@ const FlowNodeCard = memo(function FlowNodeCard({
 							</Badge>
 						) : null}
 						<span className="ml-auto flex shrink-0 items-center gap-1.5 normal-case tracking-normal">
+							{writes.length > 0 ? (
+								<Badge
+									variant="outline"
+									className="h-4 gap-0.5 px-1.5 font-mono text-[10px] text-foreground"
+									title={`Sets ${writes.join(", ")} when the step ends`}
+								>
+									<VariableIcon aria-hidden="true" />
+									sets {writes.length}
+								</Badge>
+							) : null}
 							{errorCount > 0 ? (
 								<Badge
 									variant="destructive"

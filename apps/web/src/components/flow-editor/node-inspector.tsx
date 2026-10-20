@@ -97,6 +97,7 @@ import { OutputSchemaField } from "./output-schema-field";
 import { TemplateField } from "./template-field";
 import { ToolFields } from "./tool-fields";
 import { NodeProgramsField, ToolsField } from "./tools-field";
+import { VariableWritesSection } from "./variable-writes-field";
 import { WaitFields } from "./wait-fields";
 
 /**
@@ -355,6 +356,8 @@ export function NodeInspector({
 					}
 				/>
 			) : null}
+
+			<VariableWritesSection flow={flow} node={node} onChange={onChange} />
 
 			{runsOnDevice(node) ? (
 				<InspectorSection

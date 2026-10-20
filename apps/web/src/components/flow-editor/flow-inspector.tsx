@@ -20,7 +20,7 @@ import {
 	Note,
 	PositiveIntInput,
 } from "./fields";
-import { InputsEditor, OutputsEditor } from "./io-editor";
+import { InputsEditor, OutputsEditor, VariablesEditor } from "./io-editor";
 
 const POLICY_FIELDS: {
 	key: Exclude<keyof Policy, "resumeInterruptedRuns">;
@@ -138,6 +138,27 @@ export function FlowInspector({
 				<InputsEditor
 					flow={flow}
 					describedBy={`${id}-inputs-hint`}
+					onChange={onChange}
+				/>
+			</InspectorSection>
+
+			<InspectorSection
+				title="Variables"
+				defaultOpen={(flow.variables ?? []).length > 0}
+				aside={
+					<Badge variant="secondary" className="tabular-nums">
+						{(flow.variables ?? []).length}
+					</Badge>
+				}
+				className="gap-3"
+			>
+				<Note id={`${id}-variables-hint`}>
+					Values the flow keeps while it runs. Each step can read them as{" "}
+					<code>{"{{vars.name}}"}</code> and change them under Set variables.
+				</Note>
+				<VariablesEditor
+					flow={flow}
+					describedBy={`${id}-variables-hint`}
 					onChange={onChange}
 				/>
 			</InspectorSection>

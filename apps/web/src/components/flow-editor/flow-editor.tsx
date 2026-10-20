@@ -561,6 +561,7 @@ function Editor({
 								<FlowSignature
 									projectId={projectId}
 									inputs={draft.inputs}
+									variables={draft.variables ?? []}
 									callers={callers}
 								/>
 							</div>
@@ -658,17 +659,23 @@ function useMediaQuery(query: string): boolean {
 	);
 }
 
-/** The flow's inputs, like a function signature, and the flows that call it. */
+/**
+ * The flow's inputs, like a function signature, its variables, and the
+ * flows that call it.
+ */
 function FlowSignature({
 	projectId,
 	inputs,
+	variables,
 	callers,
 }: {
 	projectId: string;
 	inputs: Flow["inputs"];
+	variables: NonNullable<Flow["variables"]>;
 	callers: string[];
 }) {
-	if (inputs.length === 0 && callers.length === 0) return null;
+	if (inputs.length === 0 && variables.length === 0 && callers.length === 0)
+		return null;
 	return (
 		<div className="ml-auto @xl:flex hidden min-w-0 items-center gap-3 text-muted-foreground text-xs">
 			{inputs.length > 0 ? (
@@ -688,6 +695,26 @@ function FlowSignature({
 								{input.type === "json" ? (
 									<span className="text-muted-foreground">: json</span>
 								) : null}
+							</Badge>
+						))}
+					</span>
+				</span>
+			) : null}
+			{variables.length > 0 ? (
+				<span
+					className="flex min-w-0 items-center gap-1.5"
+					title="The variables of this flow"
+				>
+					<span className="shrink-0">Variables</span>
+					<span className="flex min-w-0 flex-wrap gap-1">
+						{variables.map((variable) => (
+							<Badge
+								key={variable.name}
+								variant="outline"
+								className="font-mono font-normal"
+							>
+								{variable.name}
+								<span className="text-muted-foreground">: {variable.type}</span>
 							</Badge>
 						))}
 					</span>

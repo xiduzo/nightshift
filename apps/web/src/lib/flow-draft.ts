@@ -16,6 +16,7 @@ import {
 	type FlowNode,
 	type FlowNodeType,
 	type FlowOutputDef,
+	type FlowVariableDef,
 	flowSchema,
 	type ListSource,
 	nameSchema,
@@ -27,6 +28,7 @@ import {
 	type ToolNode,
 	type ValueBy,
 	type ValueNode,
+	type VariableWrite,
 	validateFlow,
 	valueDeciderNameSchema,
 	type WaitNode,
@@ -304,15 +306,32 @@ export function setOutputs(flow: Flow, outputs: FlowOutputDef[]): Flow {
 	return { ...flow, outputs };
 }
 
+/** Replaces the flow's variables. None: the file has no `variables` at all. */
+export function setVariables(flow: Flow, variables: FlowVariableDef[]): Flow {
+	const { variables: _, ...rest } = flow;
+	return variables.length > 0 ? { ...rest, variables } : rest;
+}
+
+/** Replaces a node's variable writes. None: the node has no `set` at all. */
+export function withWrites<T extends FlowNode>(
+	node: T,
+	set: VariableWrite[],
+): T {
+	const { set: _, ...rest } = node;
+	return (set.length > 0 ? { ...rest, set } : rest) as T;
+}
+
 /**
- * The names a template can read in this flow: node ids and inputs share one
- * namespace, and `run` is reserved.
+ * The names a template can read in this flow: node ids, inputs and
+ * variables share one namespace, and `run` and `vars` are reserved.
  */
 export function takenNames(flow: Flow): Set<string> {
 	return new Set([
 		"run",
+		"vars",
 		...flow.nodes.map((node) => node.id),
 		...flow.inputs.map((input) => input.name),
+		...(flow.variables ?? []).map((variable) => variable.name),
 	]);
 }
 
@@ -346,6 +365,83 @@ export function renameRefs(text: string, from: string, to: string): string {
 		"g",
 	);
 	return text.replace(reference, `$1${to}`);
+}
+
+/**
+ * Rewrites the references to the variable `from` in a template:
+ * `{{vars.from}}`, `{{ vars.from.path }}`.
+ */
+export function renameVarRefs(text: string, from: string, to: string): string {
+	const reference = new RegExp(
+		`(\\{\\{\\s*vars\\.)${from}(?=(?:\\.[A-Za-z0-9_-]+)*\\s*\\}\\})`,
+		"g",
+	);
+	return text.replace(reference, `$1${to}`);
+}
+
+/**
+ * Rewrites `vars.from` in a rule or an expression, best effort: a name
+ * that only starts the same (`vars.from_2`) stays.
+ */
+export function renameVarInRule(
+	text: string,
+	from: string,
+	to: string,
+): string {
+	const reference = new RegExp(
+		`(^|[^A-Za-z0-9_$.])(vars\\.)${from}(?![A-Za-z0-9_])`,
+		"g",
+	);
+	return text.replace(reference, `$1$2${to}`);
+}
+
+/**
+ * Renames a variable, its `{{vars.old…}}` references in this flow's
+ * templates, `vars.old` in its rules and expressions, and the writes to it.
+ */
+export function renameVariable(flow: Flow, index: number, to: string): Flow {
+	const from = flow.variables?.[index]?.name;
+	if (from === undefined || from === to) return flow;
+	const templated = rewriteFlowTemplates(flow, (text) =>
+		renameVarRefs(text, from, to),
+	);
+	const rule = (text: string) => renameVarInRule(text, from, to);
+	const nodes = templated.nodes.map((node): FlowNode => {
+		let next: FlowNode = node;
+		if (next.type === "decision") {
+			next = {
+				...next,
+				options: next.options.map((option) =>
+					option.when === undefined
+						? option
+						: { ...option, when: rule(option.when) },
+				),
+			};
+		}
+		if (next.type === "value" && next.expression !== undefined) {
+			next = { ...next, expression: rule(next.expression) };
+		}
+		if (next.set) {
+			next = {
+				...next,
+				set: next.set.map((write) => ({
+					...write,
+					variable: write.variable === from ? to : write.variable,
+					...(write.expression !== undefined
+						? { expression: rule(write.expression) }
+						: {}),
+				})),
+			};
+		}
+		return next;
+	});
+	return {
+		...templated,
+		nodes,
+		variables: (templated.variables ?? []).map((variable, at) =>
+			at === index ? { ...variable, name: to } : variable,
+		),
+	};
 }
 
 /** Whether the template is exactly one reference, so it keeps a JSON value as it is. */
@@ -509,9 +605,27 @@ function rewriteSource(
 
 /**
  * Applies `rewrite` to every template of the node: a prompt, a command, a
- * question, a list source, and the bindings of a called flow's inputs.
+ * question, a list source, the bindings of a called flow's inputs, and the
+ * values of its variable writes.
  */
 function rewriteTemplates(
+	node: FlowNode,
+	rewrite: (text: string) => string,
+): FlowNode {
+	const own = rewriteOwnTemplates(node, rewrite);
+	if (!own.set) return own;
+	return {
+		...own,
+		set: own.set.map((write) =>
+			write.value === undefined
+				? write
+				: { ...write, value: rewrite(write.value) },
+		),
+	};
+}
+
+/** The templates of the node's own kind. */
+function rewriteOwnTemplates(
 	node: FlowNode,
 	rewrite: (text: string) => string,
 ): FlowNode {
@@ -559,18 +673,30 @@ function rewriteTemplates(
 	}
 }
 
-/** Applies `rewrite` to every template of the flow: its nodes and its outputs. */
+/**
+ * Applies `rewrite` to every template of the flow: its nodes, its outputs,
+ * and the initial values of its variables.
+ */
 function rewriteFlowTemplates(
 	flow: Flow,
 	rewrite: (text: string) => string,
 ): Flow {
-	return {
+	const rewritten: Flow = {
 		...flow,
 		nodes: flow.nodes.map((node) => rewriteTemplates(node, rewrite)),
 		outputs: flow.outputs.map((output) => ({
 			...output,
 			value: rewrite(output.value),
 		})),
+	};
+	if (!flow.variables) return rewritten;
+	return {
+		...rewritten,
+		variables: flow.variables.map((variable) =>
+			variable.initial === undefined
+				? variable
+				: { ...variable, initial: rewrite(variable.initial) },
+		),
 	};
 }
 
@@ -942,7 +1068,7 @@ export type TemplateVariable = {
 };
 
 export type VariableGroup = {
-	/** A node id, `inputs`, or `run`. */
+	/** A node id, `inputs`, `vars`, or `run`. */
 	scope: string;
 	variables: TemplateVariable[];
 };
@@ -1024,8 +1150,8 @@ function nodeVariables(
 }
 
 /**
- * The `{{…}}` variables a node can use: the flow's inputs, other nodes'
- * outputs, and the run's fields. With `nodeId` null (the flow's outputs),
+ * The `{{…}}` variables a node can use: the flow's inputs, its variables,
+ * other nodes' outputs, and the run's fields. With `nodeId` null (the flow's outputs),
  * every node counts. `flows` adds the outputs of the flows that Call
  * nodes call.
  */
@@ -1048,6 +1174,23 @@ export function templateVariables(
 					},
 				]
 			: [];
+	const variables = flow.variables ?? [];
+	const vars: VariableGroup[] =
+		variables.length > 0
+			? [
+					{
+						scope: "vars",
+						variables: variables.map((variable) => ({
+							text: `{{vars.${variable.name}}}`,
+							label: variable.name,
+							json: variable.type === "json",
+							description: variable.description
+								? `${variable.type}: ${variable.description}`
+								: variable.type,
+						})),
+					},
+				]
+			: [];
 	const nodes = flow.nodes
 		.filter((node) => node.id !== nodeId)
 		.map((node) => ({
@@ -1056,6 +1199,7 @@ export function templateVariables(
 		}));
 	return [
 		...inputs,
+		...vars,
 		...nodes,
 		{
 			scope: "run",
@@ -1152,6 +1296,7 @@ export function checkFlow(
 			const field = rest.map(String).join(".");
 			const message =
 				ioMessage(flow, scope, index, rest) ??
+				writeMessage(flow, scope, index, rest) ??
 				FIELD_MESSAGES[field] ??
 				optionMessage(flow, index, rest) ??
 				bindingMessage(scope, index, rest) ??
@@ -1241,17 +1386,48 @@ function ioMessage(
 	index: PropertyKey | undefined,
 	rest: PropertyKey[],
 ): string | undefined {
-	if ((scope !== "inputs" && scope !== "outputs") || typeof index !== "number")
+	if (
+		(scope !== "inputs" && scope !== "outputs" && scope !== "variables") ||
+		typeof index !== "number"
+	)
 		return;
-	const kind = scope === "inputs" ? "Input" : "Output";
-	const name =
-		(scope === "inputs" ? flow.inputs : flow.outputs)[index]?.name ?? "";
+	const kind =
+		scope === "inputs" ? "Input" : scope === "outputs" ? "Output" : "Variable";
+	const list =
+		scope === "inputs"
+			? flow.inputs
+			: scope === "outputs"
+				? flow.outputs
+				: (flow.variables ?? []);
+	const name = list[index]?.name ?? "";
 	if (rest[0] !== "name") {
 		return `${kind} "${name}": ${rest.map(String).join(".")} is not valid.`;
 	}
 	return name === ""
 		? `An ${kind.toLowerCase()} has no name.`
 		: `${kind} "${name}": use lowercase letters, digits and _, starting with a letter.`;
+}
+
+/** A bad variable write of a node: `set.0.variable` reads as `Set variables: …`. */
+function writeMessage(
+	flow: Flow,
+	scope: PropertyKey | undefined,
+	index: PropertyKey | undefined,
+	rest: PropertyKey[],
+): string | undefined {
+	const [list, at, field, outcome] = rest;
+	if (scope !== "nodes" || list !== "set" || typeof index !== "number") return;
+	const write = flow.nodes[index]?.set?.[Number(at)];
+	if (field === "variable") {
+		return write?.variable
+			? `Set variables: "${write.variable}" is not a valid variable name.`
+			: "Set variables: pick a variable.";
+	}
+	if (field === "on") {
+		const name = write?.on?.[Number(outcome)] ?? "";
+		return `Set variables: "${name}" is not a valid outcome.`;
+	}
+	return `Set variables: ${rest.slice(2).map(String).join(".")} is not valid.`;
 }
 
 /** A binding to a name that cannot be an input of the called flow. */

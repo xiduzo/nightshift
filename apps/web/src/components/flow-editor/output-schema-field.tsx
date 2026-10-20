@@ -99,10 +99,16 @@ export function OutputSchemaField({
 	required = false,
 	rootObject = false,
 	description = "The shape of the data the agent must report. The step fails when the data does not fit.",
+	label = "Output data",
+	reference,
 	children,
 }: {
 	id: string;
 	nodeId: string;
+	/** The field's label. */
+	label?: string;
+	/** What later nodes read, without braces. Default: `<nodeId>.data`. */
+	reference?: string;
 	output: Schema | undefined;
 	onChange: (output: Schema | undefined) => void;
 	/** The node cannot do without a schema: no "(optional)" on the label. */
@@ -155,11 +161,12 @@ export function OutputSchemaField({
 	};
 
 	const fields = schemaFields(output);
+	const base = reference ?? `${nodeId}.data`;
 
 	return (
 		<Field className="gap-2" data-invalid={error !== null ? true : undefined}>
 			<FieldLabel id={`${id}-label`} htmlFor={mode === "json" ? id : undefined}>
-				Output data
+				{label}
 				{required ? null : (
 					<span className="font-normal text-muted-foreground">(optional)</span>
 				)}
@@ -289,12 +296,11 @@ export function OutputSchemaField({
 					) : (
 						<>
 							Later nodes read{" "}
-							<code className="font-mono">{`{{${nodeId}.data}}`}</code> or a
-							field:{" "}
+							<code className="font-mono">{`{{${base}}}`}</code> or a field:{" "}
 							{fields.map((field, index) => (
 								<span key={field.name}>
 									{index > 0 ? ", " : null}
-									<code className="font-mono">{`{{${nodeId}.data.${field.name}}}`}</code>
+									<code className="font-mono">{`{{${base}.${field.name}}}`}</code>
 								</span>
 							))}
 							. A list feeds a Subflow that runs once per item.
