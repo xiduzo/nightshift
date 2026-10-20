@@ -48,13 +48,14 @@ import { RunGraph } from "@/components/run/run-graph";
 import { RunActions, RunDetails, RunTitle } from "@/components/run/run-header";
 import { RunStatusPanel } from "@/components/run/run-status-panel";
 import { RunWarnings } from "@/components/run/run-warnings";
+import { StepRowMenu } from "@/components/run/step-actions";
 import { CONSOLE_BAR_PX, StepConsole } from "@/components/run/step-console";
 import { StepSummary as StepSummaryView } from "@/components/run/step-summary";
 import { StepTimeline } from "@/components/run/step-timeline";
 import { type Crumb, SiteHeader } from "@/components/site-header";
 import { StepTranscript } from "@/components/transcript/step-transcript";
 import { mergeSteps, useRunStream } from "@/hooks/use-run-stream";
-import type { RunDetail, StepSummary } from "@/lib/api-types";
+import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
 import {
 	calledFlowName,
 	calledFlowOf,
@@ -77,6 +78,13 @@ export const Route = createFileRoute("/runs/$runId")({
 });
 
 const DESKTOP = "(min-width: 1024px)";
+/** A run in one of these runs again from a step. */
+const RERUNNABLE: RunStatus[] = [
+	"failed",
+	"stopped",
+	"interrupted",
+	"finished",
+];
 
 /** The closed console's panel: its bar, and the gaps above and below its card. */
 const CONSOLE_CLOSED_PX = CONSOLE_BAR_PX + 8 + 16;
@@ -190,6 +198,8 @@ function RunComponent() {
 		steps.find((step) => step.id === pickedStepId) ??
 		visible[visible.length - 1];
 	const lastStep = steps[steps.length - 1];
+	// A run that is not going runs again from a step, on the device that runs it.
+	const rerunnable = runData.walker.thisDevice && RERUNNABLE.includes(status);
 	const warnedStepIds = new Set(
 		runData.warnings.flatMap((warning) =>
 			warning.stepId ? [warning.stepId] : [],
@@ -323,6 +333,11 @@ function RunComponent() {
 					calledName={(step) => calledFlowName(runData, steps, step)}
 					runsEach={(step) => stepRunsEach(runData, steps, step)}
 					warnedStepIds={warnedStepIds}
+					stepAction={
+						rerunnable
+							? (step) => <StepRowMenu runId={runData.id} step={step} />
+							: undefined
+					}
 				/>
 			</ScrollArea>
 		</section>
@@ -438,7 +453,7 @@ function RunComponent() {
 	return (
 		<>
 			<SiteHeader crumbs={crumbs}>
-				<RunActions run={runData} status={status} />
+				<RunActions run={runData} status={status} steps={steps} />
 				<RunDetails run={runData} />
 			</SiteHeader>
 			<div className="flex flex-1 flex-col lg:h-[calc(100svh-3.5rem)] lg:min-h-0 lg:flex-none">

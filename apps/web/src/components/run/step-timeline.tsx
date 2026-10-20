@@ -100,6 +100,7 @@ export function StepTimeline({
 	calledName,
 	runsEach,
 	warnedStepIds,
+	stepAction,
 }: {
 	/** All steps of the run, in the order they started. */
 	steps: StepSummary[];
@@ -116,6 +117,8 @@ export function StepTimeline({
 	runsEach?: (step: StepSummary) => boolean;
 	/** The steps the run warned about: their rows show a warning sign. */
 	warnedStepIds?: ReadonlySet<string>;
+	/** A button for a step's actions, at the end of its row. */
+	stepAction?: (step: StepSummary) => ReactNode;
 }) {
 	/** Groups the person opened or closed; the rest follow `defaultOpen`. */
 	const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(
@@ -220,6 +223,7 @@ export function StepTimeline({
 					selected={step.id === selectedStepId}
 					warned={warnedStepIds?.has(step.id) ?? false}
 					onSelect={() => onSelect(step.id)}
+					action={stepAction?.(step)}
 				/>
 				{step.nodeType === "call" && !eachOf(step) ? (
 					<ol
@@ -322,6 +326,7 @@ function StepRow({
 	selected,
 	warned,
 	onSelect,
+	action,
 }: {
 	step: StepSummary;
 	/** Its own cost, or what the steps it called cost together. */
@@ -333,61 +338,67 @@ function StepRow({
 	/** The run warned about this step. */
 	warned: boolean;
 	onSelect: () => void;
+	/** A button for the step's actions, at the end of the row. */
+	action?: ReactNode;
 }) {
 	const Icon = NODE_TYPE[step.nodeType].icon;
 	return (
-		<Item
-			size="xs"
-			render={<button type="button" />}
-			aria-current={selected ? "step" : undefined}
-			onClick={onSelect}
+		<div
 			className={cn(
 				ROW,
-				"flex-nowrap gap-2 py-0 pr-1 pl-1 text-left text-xs hover:bg-muted/60",
-				selected && "bg-muted hover:bg-muted",
+				"flex items-center gap-1 rounded-md pr-1",
+				selected ? "bg-muted" : "hover:bg-muted/60",
 			)}
-			style={
-				depth > 0
-					? { paddingLeft: `${0.25 + depth * INDENT_REM}rem` }
-					: undefined
-			}
 		>
-			<span className="w-5 shrink-0 text-right text-muted-foreground tabular-nums">
-				{number}
-			</span>
-			<Icon
-				className="size-3.5 shrink-0 text-muted-foreground"
-				aria-label={NODE_TYPE[step.nodeType].label}
-			/>
-			<span className="min-w-0 truncate font-medium font-mono">
-				{step.nodeId}
-			</span>
-			{warned ? (
-				<TriangleAlertIcon
-					className="size-3.5 shrink-0 text-status-waiting"
-					aria-label="This step has a warning"
+			<Item
+				size="xs"
+				render={<button type="button" />}
+				aria-current={selected ? "step" : undefined}
+				onClick={onSelect}
+				className="h-full min-w-0 flex-1 flex-nowrap gap-2 py-0 pr-1 pl-1 text-left text-xs"
+				style={
+					depth > 0
+						? { paddingLeft: `${0.25 + depth * INDENT_REM}rem` }
+						: undefined
+				}
+			>
+				<span className="w-5 shrink-0 text-right text-muted-foreground tabular-nums">
+					{number}
+				</span>
+				<Icon
+					className="size-3.5 shrink-0 text-muted-foreground"
+					aria-label={NODE_TYPE[step.nodeType].label}
 				/>
-			) : null}
-			{step.visit > 1 ? (
-				<span className="shrink-0 text-muted-foreground">
-					visit {step.visit}
+				<span className="min-w-0 truncate font-medium font-mono">
+					{step.nodeId}
 				</span>
-			) : null}
-			{step.nodeType === "call" && step.items.length > 0 ? (
-				<span className="hidden shrink-0 text-muted-foreground tabular-nums sm:inline">
-					{step.items.filter((item) => item.state === "done").length}/
-					{step.items.length} done
-				</span>
-			) : null}
-			<RowStats
-				badge={<OutcomeBadge state={stepState(step, runStatus)} />}
-				duration={<StepDuration step={step} />}
-				durationTitle={`Started ${formatTime(step.startedAt)}`}
-				cost={cost}
-			/>
-			{/* The focus button's slot on a call's row. */}
-			<span className="size-6 shrink-0" aria-hidden="true" />
-		</Item>
+				{warned ? (
+					<TriangleAlertIcon
+						className="size-3.5 shrink-0 text-status-waiting"
+						aria-label="This step has a warning"
+					/>
+				) : null}
+				{step.visit > 1 ? (
+					<span className="shrink-0 text-muted-foreground">
+						visit {step.visit}
+					</span>
+				) : null}
+				{step.nodeType === "call" && step.items.length > 0 ? (
+					<span className="hidden shrink-0 text-muted-foreground tabular-nums sm:inline">
+						{step.items.filter((item) => item.state === "done").length}/
+						{step.items.length} done
+					</span>
+				) : null}
+				<RowStats
+					badge={<OutcomeBadge state={stepState(step, runStatus)} />}
+					duration={<StepDuration step={step} />}
+					durationTitle={`Started ${formatTime(step.startedAt)}`}
+					cost={cost}
+				/>
+			</Item>
+			{/* The step's actions, in the slot of the focus button on a call's row. */}
+			{action ?? <span className="size-6 shrink-0" aria-hidden="true" />}
+		</div>
 	);
 }
 

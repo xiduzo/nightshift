@@ -16,6 +16,7 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
@@ -46,6 +47,7 @@ import {
 	DownloadIcon,
 	InfoIcon,
 	MonitorIcon,
+	RotateCcwIcon,
 	SendIcon,
 	SkipForwardIcon,
 	WorkflowIcon,
@@ -67,6 +69,7 @@ import { orpc } from "@/utils/orpc";
 
 import { Elapsed } from "./elapsed";
 import { MoveMenu } from "./move-menu";
+import { RestartStepDialog } from "./step-actions";
 import { WalkerBadge, walkerName } from "./walker-badge";
 
 const STOPPABLE: RunStatus[] = ["running", "waiting", "sleeping"];
@@ -405,14 +408,23 @@ function CopyValue({
 	);
 }
 
-/** The run's actions for the page header: take over the session, and stop. */
+/** The run's actions for the page header: take over the session, and stop or restart the step. */
 export function RunActions({
 	run,
 	status,
+	steps,
 }: {
 	run: RunDetail;
 	status: RunStatus;
+	/** The run's steps as they stand, live. */
+	steps: StepSummary[];
 }) {
+	const [restarting, setRestarting] = useState(false);
+	// The innermost step that runs: a step inside a called flow starts after its caller.
+	const running =
+		status === "running"
+			? [...steps].reverse().find((step) => step.endedAt === null)
+			: undefined;
 	const queryClient = useQueryClient();
 	const stopRun = useMutation(
 		orpc.runs.stop.mutationOptions({
@@ -507,6 +519,16 @@ export function RunActions({
 					stopAfterStep={run.stopAfterStep}
 					pending={stopRun.isPending}
 					onStop={(when) => stopRun.mutate({ runId: run.id, when })}
+					onRestart={running ? () => setRestarting(true) : undefined}
+				/>
+			) : null}
+			{running ? (
+				<RestartStepDialog
+					key={running.id}
+					runId={run.id}
+					step={running}
+					open={restarting}
+					onOpenChange={setRestarting}
 				/>
 			) : null}
 		</>
@@ -519,17 +541,22 @@ const STOP_NOW_TEXT: Partial<Record<RunStatus, string>> = {
 	running: "This cancels the running step and stops the run.",
 };
 
-/** Stop now (after a confirmation), or let the running step finish first. */
+/**
+ * Stop now (after a confirmation), let the running step finish first, or
+ * restart the running step (`onRestart`, while a step runs here).
+ */
 function StopMenu({
 	status,
 	stopAfterStep,
 	pending,
 	onStop,
+	onRestart,
 }: {
 	status: RunStatus;
 	stopAfterStep: boolean;
 	pending: boolean;
 	onStop: (when: "now" | "after-step") => void;
+	onRestart?: () => void;
 }) {
 	const [confirming, setConfirming] = useState(false);
 	return (
@@ -589,6 +616,20 @@ function StopMenu({
 								</span>
 							</span>
 						</DropdownMenuItem>
+						{onRestart ? (
+							<>
+								<DropdownMenuSeparator />
+								<DropdownMenuItem onClick={onRestart}>
+									<RotateCcwIcon />
+									<span className="flex flex-col">
+										Restart step
+										<span className="text-muted-foreground text-xs">
+											Stops the running step and starts it again.
+										</span>
+									</span>
+								</DropdownMenuItem>
+							</>
+						) : null}
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</ButtonGroup>
