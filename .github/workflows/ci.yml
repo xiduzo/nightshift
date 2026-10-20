@@ -51,6 +51,12 @@ jobs:
       - name: Layer map
         run: bun scripts/check-layers.ts
 
+      - name: Verticals
+        run: bun scripts/check-verticals.ts
+
+      - name: Tests of the checks
+        run: bun test ./scripts/
+
       - name: Types
         run: bun run check-types
 

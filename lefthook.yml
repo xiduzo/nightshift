@@ -14,3 +14,9 @@ pre-commit:
         - "**/package.json"
         - "scripts/check-layers.ts"
       run: bun scripts/check-layers.ts
+    - name: verticals
+      glob: "*.{ts,tsx}"
+      run: bun scripts/check-verticals.ts
+    - name: check tests
+      glob: "scripts/check-*.ts"
+      run: bun test ./scripts/
