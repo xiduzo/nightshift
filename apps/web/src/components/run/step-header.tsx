@@ -10,7 +10,12 @@ import { CostText } from "@/components/cost-text";
 import { hasCost, NODE_TYPE } from "@/components/flow/node-type";
 import { OutcomeBadge, stepState } from "@/components/outcome-badge";
 import type { RunStatus, StepSummary } from "@/lib/api-types";
-import { formatDateTime, formatKnownCost, formatTime } from "@/lib/format";
+import {
+	formatDateTime,
+	formatStepCost,
+	formatTime,
+	noCostYet,
+} from "@/lib/format";
 import { formatJson, jsonOutput } from "@/lib/run-steps";
 
 import { CodeView, JsonBlock } from "./json-block";
@@ -58,7 +63,7 @@ export function StepLine({
 				</time>
 				{" · "}
 				<StepDuration step={step} />
-				{hasCost(step) ? ` · ${formatKnownCost(step)}` : ""}
+				{hasCost(step) ? ` · ${formatStepCost(step)}` : ""}
 			</span>
 		</div>
 	);
@@ -107,7 +112,10 @@ export function StepFacts({ step }: { step: StepSummary }) {
 		{ label: "Took", value: <StepDuration step={step} /> },
 	];
 	if (hasCost(step)) {
-		facts.push({ label: "Cost", value: <CostText cost={step} /> });
+		facts.push({
+			label: "Cost",
+			value: noCostYet(step) ? "—" : <CostText cost={step} />,
+		});
 	}
 	if (step.visit > 1) facts.push({ label: "Visit", value: step.visit });
 	if (exit !== undefined && exit !== "") {

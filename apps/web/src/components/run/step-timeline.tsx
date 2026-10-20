@@ -35,7 +35,12 @@ import {
 	stepState,
 } from "@/components/outcome-badge";
 import type { RunStatus, StepSummary } from "@/lib/api-types";
-import { formatKnownCost, formatTime, sumKnownCost } from "@/lib/format";
+import {
+	formatKnownCost,
+	formatStepCost,
+	formatTime,
+	sumKnownCost,
+} from "@/lib/format";
 import {
 	callsFlow,
 	type ItemScope,
@@ -218,7 +223,7 @@ export function StepTimeline({
 						callsFlow(step)
 							? costOf(calledSteps(steps, step))
 							: hasCost(step)
-								? formatKnownCost(step)
+								? formatStepCost(step)
 								: undefined
 					}
 					number={numbers.get(step.id) ?? 0}

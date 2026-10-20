@@ -100,7 +100,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Transcript | The structured record of a Step: agent messages, tool calls, and command output, on disk. | Slice 1 |
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |
 | Device | A computer that runs Night Shift. In code, the port a Step body uses to touch a computer (`packages/engine/src/device/`): it reports its Capabilities (harnesses, connections, CLI tools, programs, decider) and runs Sessions, commands, Tool calls, decisions and Worktrees. The step runner asks for the Step's Device once per Step; `StepStarted` names it. Today every Step runs on this computer (`localDevice`). | Devices, slice 1 |
-| Cost | What a Session or a model call cost, in US dollars at API prices, also on a subscription: the person sees what the work would cost. The harness reports it, or Night Shift estimates it from the tokens and a price list it updates daily. A cost that neither can tell is not known: totals leave it out and show "+", and the Run warns. | Costs |
+| Cost | What a Session or a model call cost, in US dollars at API prices, also on a subscription: the person sees what the work would cost. The harness reports it, or Night Shift estimates it from the tokens and a price list it updates daily. A cost that neither can tell is not known: totals leave it out and show "+", and the Run warns. While a Session runs, its Cost so far counts. | Costs |
 | Warning | Something that went wrong in a Run without failing a Step, such as a Step whose Cost is not known. Shown on the Run and grouped per Flow in Flow health. | Costs |
 | Event | One appended record of a fact that changed. Its identity is its Walker and its number among that Walker's Events (`walker_seq`); `seq` is only the order it landed in this Replica. | Slice 1 |
 | Event Log | The append-only list of Events: the read model. Run status is derived from it, never from a Checkpoint. | Slice 1 |
@@ -169,6 +169,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | StepEnded | A Step ended with an Outcome and its Outputs. |
 | SessionStarted | A harness Session began for an Agent Step. |
 | HarnessSessionAssigned | The Harness reported its own session id. |
+| SessionUsage | What a running Session has spent so far, at most every 5 seconds. Only some Harnesses report it while they work. A Session that ends without a Cost keeps the last total. |
 | SessionEnded | A Session ended, with its Cost and where it came from (reported or estimated). |
 | EdgeTaken | The Run followed an Edge to the next Node. |
 | StopRequested | A person asked to stop the Run. |

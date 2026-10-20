@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { costNote, formatKnownCost, sumKnownCost } from "./format";
+import {
+	costNote,
+	formatKnownCost,
+	formatStepCost,
+	sumKnownCost,
+} from "./format";
 
 describe("a cost that may be partly unknown", () => {
 	test("known, partly known, not known", () => {
@@ -25,5 +30,15 @@ describe("a cost that may be partly unknown", () => {
 				{ costUsd: 0.5, costMissing: 1, costEstimated: true },
 			]),
 		).toEqual({ costUsd: 1.5, costMissing: 1, costEstimated: true });
+	});
+
+	test("a running step shows its spend so far, or a dash before it has any", () => {
+		const running = { costUsd: 0, endedAt: null, costCalls: 0 };
+		expect(formatStepCost(running)).toBe("—");
+		expect(formatStepCost({ ...running, costUsd: 0.12, costCalls: 1 })).toBe(
+			"$0.12",
+		);
+		// An ended step that never asked a model cost nothing.
+		expect(formatStepCost({ ...running, endedAt: 1 })).toBe("$0.00");
 	});
 });

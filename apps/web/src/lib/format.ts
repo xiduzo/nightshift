@@ -58,6 +58,21 @@ export function formatKnownCost(cost: KnownCost): string {
 	return cost.costUsd > 0 ? `${formatCost(cost.costUsd)}+` : "—";
 }
 
+/** A step that runs and has not reported any spend yet: its cost is not known. */
+export function noCostYet(step: {
+	endedAt: number | null;
+	costCalls: number;
+}): boolean {
+	return step.endedAt === null && step.costCalls === 0;
+}
+
+/** A step's cost: "—" while it runs and has not reported any spend yet. */
+export function formatStepCost(
+	step: KnownCost & { endedAt: number | null; costCalls: number },
+): string {
+	return noCostYet(step) ? "—" : formatKnownCost(step);
+}
+
 /** The costs of several runs or steps together. */
 export function sumKnownCost(costs: readonly KnownCost[]): KnownCost {
 	return {
