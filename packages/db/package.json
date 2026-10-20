@@ -19,8 +19,7 @@
 	"dependencies": {
 		"@libsql/client": "0.18.0",
 		"drizzle-orm": "catalog:",
-		"libsql": "catalog:",
-		"zod": "catalog:"
+		"libsql": "catalog:"
 	},
 	"devDependencies": {
 		"@nightshift/config": "workspace:*",

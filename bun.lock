@@ -68,7 +68,6 @@
         "@nightshift/flows": "workspace:*",
         "@nightshift/ui": "workspace:*",
         "@orpc/client": "catalog:",
-        "@orpc/server": "catalog:",
         "@orpc/tanstack-query": "^1.15.0",
         "@tailwindcss/vite": "^4.3.3",
         "@tanstack/react-form": "^1.33.5",
@@ -147,10 +146,7 @@
         "@nightshift/db": "workspace:*",
         "@nightshift/engine": "workspace:*",
         "@nightshift/flows": "workspace:*",
-        "@orpc/client": "catalog:",
-        "@orpc/openapi": "catalog:",
         "@orpc/server": "catalog:",
-        "@orpc/zod": "catalog:",
         "zod": "catalog:",
       },
       "devDependencies": {
@@ -167,7 +163,6 @@
         "@nightshift/db": "workspace:*",
         "better-auth": "catalog:",
         "drizzle-orm": "catalog:",
-        "zod": "catalog:",
       },
       "devDependencies": {
         "@nightshift/config": "workspace:*",
@@ -184,7 +179,6 @@
         "@libsql/client": "0.18.0",
         "drizzle-orm": "catalog:",
         "libsql": "catalog:",
-        "zod": "catalog:",
       },
       "devDependencies": {
         "@nightshift/config": "workspace:*",
