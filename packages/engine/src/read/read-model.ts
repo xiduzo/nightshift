@@ -60,7 +60,7 @@ import type {
  * (design rule: the log is the read model). This module only reads. The
  * pure half (`runFacts`, `toSummary`, `toStepSummary`, `toRunDetail`,
  * `takeOverCommand`, the flow snapshot parsers) turns rows and events into
- * the `types.ts` shapes; `createReadModel` adds the queries that need the
+ * the `views.ts` shapes; `createReadModel` adds the queries that need the
  * database, the run log and the bus (`listRuns`, `getRun`, `listGates`,
  * `runStatus`, `watch`, `untilLogged`).
  *

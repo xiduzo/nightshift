@@ -69,7 +69,7 @@ A new top-level list next to `inputs` and `outputs`, and a `set` list on
 | --- | --- |
 | `name` | `nameSchema`. Unique among variables. Not reserved. |
 | `type` | `text`, `number`, `boolean`, or `json`. The four field types of the Output Schema editor (it also has choice and list, which are `json` with a `schema` here). |
-| `schema` | `json` only, optional. A JSON Schema, built with the Output Schema field editor. The engine checks every write against it (`output-schema.ts`, `dataProblem`). |
+| `schema` | `json` only, optional. A JSON Schema, built with the Output Schema field editor. The engine checks every write against it (`graph/output-schema.ts`, `dataProblem`). |
 | `initial` | Optional template. Rendered once when the flow starts, after its inputs are bound, with `renderValue` (one reference keeps its JSON value). It can read inputs and `run`, never a node (no node ran yet). Unset: `null`. |
 | `description` | Optional. Shown in the variable picker and on the run page. |
 
@@ -241,7 +241,7 @@ Copy, following the UI copy rules:
 A **Variables** `Card` on the run page, per flow scope. A `Table` lists each
 variable, its value now, and the step that set it last (a link to that
 step). A row opens a `Sheet` with each value the variable had, the step that
-wrote it, and when. All of it is derived from the Event Log (`read-model.ts`),
+wrote it, and when. All of it is derived from the Event Log (`read/read-model.ts`),
 never from a Checkpoint.
 
 ## 8. Glossary

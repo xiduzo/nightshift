@@ -111,10 +111,10 @@ import { createRunStart, flowsForRun } from "./run-start";
  * - `recovery.ts`: startup recovery, the daemon's automatic resume,
  *   `resumeRun`, `restartStep` and `rerunFrom` (each appends `RunResumed`
  *   before the thread moves).
- * - `read-model.ts`: the summaries, `getRun`, `listGates`, `watchRun`.
- * - `scheduler.ts`: starts the runs of `.nightshift/schedules.json`.
- * - `projects.ts`: projects by remote and their Clones on this computer.
- *   A project is defined in its Space document (`space/document.ts`);
+ * - `read/read-model.ts`: the summaries, `getRun`, `listGates`, `watchRun`.
+ * - `schedules/scheduler.ts`: starts the runs of `.nightshift/schedules.json`.
+ * - `projects/projects.ts`: projects by remote and their Clones on this computer.
+ *   A project is defined in its Space document (`projects/space-document.ts`);
  *   its `project` row is the document's projection.
  *
  * Spaces: `createEngine` returns the Device's engine; `space(id)` is what a
@@ -264,7 +264,7 @@ export function createEngine(
 		row.startedBy === null ||
 		row.startedBy === ((await personOnHost(db, row.spaceId)) ?? ownerId);
 
-	/** Where steps run: per node, else the run's Device (`device/placement.ts`). */
+	/** Where steps run: per node, else the run's Device (`peers/placement.ts`). */
 	const placement = createPlacement({
 		db,
 		device,

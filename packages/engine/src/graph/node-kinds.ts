@@ -33,7 +33,7 @@ import { WAIT } from "./nodes/wait";
  * when deleting the switch in a caller would make the fact reappear there.
  * What is not here, on purpose: the zod union in `packages/flows` and the
  * web's `NODE_TYPE` record (inherent to a kind, out of this package); the
- * transcript-event unions in `types.ts` (one per kind, typed data, no
+ * transcript-event unions in `log/step-events.ts` (one per kind, typed data, no
  * switch asks them); the `WaitReason` enum in `state.ts` (it enumerates a
  * Wait node's `until` kinds and the policy's reasons, not node kinds); and
  * which flow a Call calls (`run-start.calledFlowNames`, `runner.nodesOf`):

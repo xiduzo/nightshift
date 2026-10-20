@@ -19,7 +19,7 @@ import { sql } from "drizzle-orm";
 /**
  * Every fact the engine appends to the event log, and how to append and read
  * one. The pure functions that derive state from the log are in
- * `derive-run.ts` and `derive-steps.ts`. Status, reasons, step summaries,
+ * `read/derive-run.ts` and `read/derive-steps.ts`. Status, reasons, step summaries,
  * edge counts and node outputs are never stored anywhere else.
  *
  * Checkpoint rule: a fact goes into the log as soon as it happens, and a step

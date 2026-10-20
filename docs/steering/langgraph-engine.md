@@ -14,13 +14,36 @@ and the three ways a run ends early (failed, stopped, needs a person) are
 LangGraph `interrupt`s, so a resume always lands back at the exact node, at
 any depth.
 
-What did **not** change: the `Engine` interface (`types.ts`), the API, the
+What did **not** change: the `Engine` interface (`contract/`), the API, the
 web app, the event log as the read model, transcripts on disk, the bus,
 the scheduler, worktrees, leases, run bundles, settings, profiles,
 connections and the harnesses. The existing engine test
 suites were the acceptance criteria.
 
 ## Layering
+
+The engine is cut into verticals (`docs/steering/STRUCTURE.md`, section 4).
+Each folder of `packages/engine/src/` has an `index.ts` barrel. Code outside
+a folder imports only its barrel. A vertical imports only the verticals
+below it, from the bottom up:
+
+| Vertical | Holds |
+| --- | --- |
+| `device-config/` | This computer's Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. This computer's own `device` row (`self-device.ts`). |
+| `log/` | The event payloads and append and parse (`events.ts`), the run log in memory (`run-log.ts`), the bus, the run row, the transcript files and the transcript event types (`step-events.ts`). |
+| `read/` | The pure projections of the log (`derive-run.ts`, `derive-steps.ts`), cost (`cost.ts`), the run views (`views.ts`), the read model, the Persons a run names (`people.ts`) and the run bundle. |
+| `projects/` | Projects, the Space document that defines them, the git setup of a project folder, and run worktrees. |
+| `device/` | The execution port (`Device`), this computer (`local.ts`), a Device through a Host (`remote.ts`), commands and tool calls. |
+| `peers/` | The device registry, host links, placement, Offers and the exchange of run history (`exchange/`). |
+| `graph/` | The flow as a graph, below. |
+| `schedules/` | The scheduler. |
+| `run/` | The composition root (`engine.ts`), run start and recovery. |
+
+`contract/` holds only types: `Engine`, `SpaceEngine`, `StartRunInput`,
+`EngineOptions` and `Relay`. A type-only import may point up (a port that a
+lower vertical implements, or the contract). `testing/` holds the test
+helpers and fixtures. `lease.ts` and `folder-picker.ts` stay at the top of
+`src/` until the daemon package takes them.
 
 ```
 packages/engine/src/
@@ -111,8 +134,12 @@ packages/engine/src/
                            (Device.callTool), the Connection resolved as
                            for an Agent node. No wait node: a transport
                            failure is `fail`. TOOL.
-  ../each.ts               the pure parts of a Call with `each`: list items
+  graph/each.ts            the pure parts of a Call with `each`: list items
                            from a source, item facts, the step's outputs
+  graph/inputs.ts          a flow's input values, a Call's bindings, outputs
+  graph/output-schema.ts   the output schema check (ajv)
+  graph/policy.ts          the run policy's wait plan (planWait), pure
+  graph/consume.ts         reads a harness stream, gives up after a grace
   graph/runner.ts          Per-run driver: start, continueRun, resume,
                            reenter (seeded by reentryUpdate for threads with
                            no checkpoint), stop, closeParked. Streams the
@@ -120,20 +147,20 @@ packages/engine/src/
                            interrupts, owns the slots, gives the sleep module
                            its thread seam (runner.sleeps), and prunes a
                            finished run's thread to its latest checkpoint.
-  graph/test-support.ts    The one set of graph test helpers: node builders
+  testing/graph.ts         The one set of graph test helpers: node builders
                            (agent(), command(), edge(), flowOf()), startRun()
                            for a run row with its log and a StepContext, and
                            drive(), which streams a compiled flow on a
                            MemorySaver as the runner does and collects the
                            root's interrupts and custom events.
-  engine.ts                The composition root: createEngine wires the
+  run/engine.ts            The composition root: createEngine wires the
                            runner, recovery, run start, the read model and
                            the scheduler, each behind a small seam that
                            takes its dependencies (db, log, runner, bus,
                            settings, clock). Keeps the projects, flows and
                            schedules CRUD, and stopRun, resolveGate and
                            signalRun, which write one run-level fact each.
-  run-start.ts             Run start. prepareRun loads and validates the
+  run/run-start.ts         Run start. prepareRun loads and validates the
                            flow and its called flows, resolves profiles and
                            asks every requirement in REQUIREMENTS (the
                            shared connections check, then each kind's own
@@ -144,7 +171,7 @@ packages/engine/src/
                            the slot, creates the worktree and the run row,
                            appends RunStarted and WorktreeCreated and hands
                            the thread to the runner.
-  recovery.ts              createRecovery(deps): recoverInterruptedWork
+  run/recovery.ts          createRecovery(deps): recoverInterruptedWork
                            (a dead daemon's open sessions, steps and runs
                            become interrupted; sleeping runs get their
                            timers back through sleeps.restore; after a
@@ -155,15 +182,15 @@ packages/engine/src/
                            resumeTarget; appends RunResumed before the
                            thread moves) and onSlotFreed (the queue on a
                            full run cap).
-  read-model.ts            What people see of a run, from the log: runFacts,
+  read/read-model.ts       What people see of a run, from the log: runFacts,
                            toSummary, toStepSummary, toRunDetail,
                            takeOverCommand, the flow snapshot parsers;
                            createReadModel(deps) adds listRuns, getRun,
                            listGates, runStatus, watch and untilLogged.
                            Reads only.
-  events.ts                Unchanged payloads and derivations for the read
-                           model. Derivations only the old walk used are
-                           deleted.
+  log/events.ts            Unchanged payloads, append and parse.
+  read/derive-*.ts         The derivations for the read model and the walk.
+                           Derivations only the old walk used are deleted.
 ```
 
 ## Rules
@@ -184,7 +211,7 @@ packages/engine/src/
    `WaitEnded`, `FlowCalled`, `ItemsRead`, `ItemStarted`, `ItemBlocked`,
    `ItemEnded`, `RunResumed`, `RunEnded`. The
    `step` and `agent_session` rows and the transcript files too. The API,
-   the derivations in `events.ts` and the web app keep working unchanged.
+   the derivations in `read/` and the web app keep working unchanged.
 4. **Code before `interrupt()` re-runs on resume.** Only the wait, park
    and ask nodes interrupt, and nothing before their `interrupt()` call
    has side effects. Everything else happens in the step node, which runs
@@ -336,7 +363,7 @@ Decisions taken while implementing, from the code and its comments:
   schema) and shares the model chooser's entry and wait rules
   (`RESUME_RULES.model`, `withinGrace`, `wait__<id>`). Both end the step through one place
   (`endWithValue`): the data is checked against the output schema with ajv
-  (`output-schema.ts`), `pass` with the data, or `fail` with why in `note`.
+  (`graph/output-schema.ts`), `pass` with the data, or `fail` with why in `note`.
   A schema that does not compile, or no decider, ends `error`. Only a
   decider with a text adapter can make a value (`valueDeciderNameSchema` in
   flows, `DECIDER_ADAPTERS[name].value` in agents): TypeSafe and Ollaya are
@@ -383,7 +410,7 @@ Decisions taken while implementing, from the code and its comments:
   (`runner.onCustom`). The `step-started` and `step-ended` custom stream
   chunks (`RunEvent`) make the runner publish `{ kind: "status-changed" }`
   on the bus; transcript entries reach the bus from the recorder already.
-- **`resolveGate` waits for the step to end** (`engine.ts`). It reserves a
+- **`resolveGate` waits for the step to end** (`run/engine.ts`). It reserves a
   slot, resumes the thread with `{ kind: "gate", choice, note }` and
   returns once the log has the step's `StepEnded`, so the run no longer
   waits when the caller looks again. A full run cap leaves the Gate open.
@@ -508,7 +535,7 @@ module:
 
 1. Finds the streak: the pending wait's when the step continues after a
    wait for the same reason, else a new one.
-2. Plans the wait. A policy wait goes through `planWait` (`policy.ts`,
+2. Plans the wait. A policy wait goes through `planWait` (`graph/policy.ts`,
    pure), and is refused when it would pass the stop time (`stop-time`) or
    spend the network grace (`give-up`). An own wait is cut to its deadline.
 3. Persists it: `WaitStarted`, the transcript `wait` entry, the bus, the
@@ -585,7 +612,7 @@ when deleting the switch in a caller would make the fact reappear there.
 A fact may depend on `node.by` (Decision, Value) or `node.each` (Call);
 the chooser and producer seams stay as they are. Not on the descriptor, on
 purpose: the zod union in `packages/flows` and the web's `NODE_TYPE` record
-(inherent, outside this package); the transcript-event unions in `types.ts`
+(inherent, outside this package); the transcript-event unions in `log/step-events.ts`
 (typed data, no switch asks them); the `WaitReason` enum in `state.ts` (a
 Wait node's `until` kinds and the policy's reasons, not node kinds); which
 flow a Call calls (`calledFlowNames`, `runner.nodesOf`: only a Call does,
@@ -610,7 +637,7 @@ a table.
    entry in `resume-point.ts`.
 3. `packages/engine/src/graph/node-kinds.ts`: one getter in `NODE_KINDS`.
    The type of the registry refuses a missing kind.
-4. `packages/engine/src/types.ts`: the kind's transcript events, when it
+4. `packages/engine/src/log/step-events.ts`: the kind's transcript events, when it
    records any.
 5. `packages/engine/src/graph/node-kinds.test.ts`: the kind's row in every
    table; a node test next to the others (`<kind>-node.test.ts`), shaped

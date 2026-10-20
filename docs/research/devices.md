@@ -27,10 +27,10 @@ and set aside; the first revision of this file has them.
 | --- | --- |
 | One daemon writes one database. A second daemon on it refuses to start (the Lease). | `packages/engine/src/lease.ts` |
 | A Project is an absolute path of a clone, unique in the database. | `project.repo_path` |
-| A Run has one worktree, a sibling folder of that clone, on this computer. | `run.worktree_path`, `worktrees.ts` |
+| A Run has one worktree, a sibling folder of that clone, on this computer. | `run.worktree_path`, `projects/worktrees.ts` |
 | Harnesses, CLI Tools, Connections, Secrets and Agent Profiles are daemon-wide and say "this computer". | the Agents and Settings pages |
-| Transcripts and command logs are files in the daemon's data directory. | `transcripts.ts` |
-| Every daemon's scheduler reads every project's `.nightshift/schedules.json`. | `scheduler.ts` |
+| Transcripts and command logs are files in the daemon's data directory. | `log/transcripts.ts` |
+| Every daemon's scheduler reads every project's `.nightshift/schedules.json`. | `schedules/scheduler.ts` |
 | The UI talks to one server URL. Procedures are public: local single-user mode. | `VITE_SERVER_URL`, `routers/index.ts` |
 | Better Auth is wired; one local user is auto-created. | `packages/auth` |
 | TECH constraint already written: "Put a tenant id on every row. No query crosses a workspace." | `docs/steering/TECH.md` |
@@ -404,7 +404,7 @@ travel as before.
 - **One feed per step.** Every Replica answers the same call,
   `follow(step, afterSeq)`: the step's transcript entries after
   `afterSeq`, first what was written, then each entry as it is written,
-  ending when the step ends (`packages/engine/src/exchange/feeds.ts`).
+  ending when the step ends (`packages/engine/src/peers/exchange/feeds.ts`).
   Where the entries come from depends on who walks the run:
   - this Replica walks it: its own file, then its bus;
   - this Replica keeps the Space (it is the Host) and a Device walks it:
@@ -458,12 +458,12 @@ travel as before.
 - **No new channel, no new library.** The demand rides on `sync.stream`,
   the entries on two oRPC procedures under the `archive` permission. Yjs
   stays with the documents: a transcript is a log, which it does not fit.
-- Tests: `packages/engine/src/exchange/feeds.test.ts` (three Replicas and
+- Tests: `packages/engine/src/peers/exchange/feeds.test.ts` (three Replicas and
   a fake link, through the feed's interface: catch-up then live, two
   followers on one pump, the last follower leaving stops the Walker's
   pushes, a reconnect from its cursor without duplicates or gaps, the
   step's end closes the feed, a push of another Device is dropped);
-  `packages/engine/src/exchange/live-watch.test.ts` (the run page of a run
+  `packages/engine/src/peers/exchange/live-watch.test.ts` (the run page of a run
   walked elsewhere shows a running command's output);
   `apps/server/src/devices/host-exchange.test.ts` (the Walker's stream
   names a followed step, only the Walker pushes, a non-Member is
@@ -703,7 +703,7 @@ iroh.
 
    *Landed (part A, the Device document):*
    - **One Yjs document per Device**, `device:<id>`, opened by
-     `openDeviceDocument` (`packages/engine/src/device/document.ts`). Its
+     `openDeviceDocument` (`packages/engine/src/device-config/device-document.ts`). Its
      maps: `profiles`, `cliTools`, `connections` (name → plain JSON entry
      with `updatedAt`), `settings` (key → saved value), `facts`, `offers`
      (empty until slice 6) and `meta`. An entry is plain JSON, so an edit
@@ -763,8 +763,8 @@ iroh.
 
    *Landed (part B, the Space document):*
    - **One Yjs document per Space**, `space:<id>`, in `ydoc` like the
-     Device document (`packages/engine/src/space/document.ts`; both open
-     through `openPersistedDocument`, `packages/engine/src/ydoc.ts`). Its
+     Device document (`packages/engine/src/projects/space-document.ts`; both open
+     through `openPersistedDocument`, `packages/engine/src/device-config/ydoc.ts`). Its
      maps: `projects` (id → name, remote, created, removed, updated),
      `clones` (`<project>/<device>` → that the Device has a Clone, and
      since when), `devices` (id → name, for the Devices with a Clone),
@@ -873,7 +873,7 @@ iroh.
      rest, rate limit off. Idle expiry: a use moves `expiresAt` on, at
      most once a day. Pairing again replaces the Device's key.
    - **On the Host** (`apps/server/src/devices/host.ts`, the registry
-     `packages/engine/src/device/registry.ts`): the paired Device's
+     `packages/engine/src/peers/registry.ts`): the paired Device's
      `device` row (name, platform, owner, `home_host` = the address it
      joined by when this is its home Host, else null, `last_seen_at`,
      new `revoked_at`), and `DeviceJoined`, `DeviceRevoked`,
@@ -944,7 +944,7 @@ iroh.
      of its `HarnessSessionAssigned` event: a receiver fills it from that
      event. A batch carries its events in each Walker's order with the
      run, step and session rows they name, so parents go in first and the
-     foreign keys hold (`packages/engine/src/exchange/rows.ts`).
+     foreign keys hold (`packages/engine/src/peers/exchange/rows.ts`).
    - **Cursors** (`sync_cursor`): per Host, Space and Walker, the last
      `walker_seq` this Replica has. Finer than "per Host and Walker", so a
      Space the owner joins later is exchanged from its start. For this
@@ -979,7 +979,7 @@ iroh.
      (`sync.addClone`, which needs `project.add`), then the `clone` row
      here. A new project, a rename, a removal or a move there is refused
      on the Device: "change its projects there".
-   - **Commands** (`run_command`, `exchange/commands.ts`). The Walker is
+   - **Commands** (`run_command`, `peers/exchange/commands.ts`). The Walker is
      the only writer of its run's events, so answering a Gate, sending a
      signal and stopping a run walked elsewhere is a command. The Replica
      that asks checks what it can first (the Gate is open, the choice is
@@ -1004,7 +1004,7 @@ iroh.
      the run page and the inbox; a run of another device has no take
      over, wake, resume or export, and its folder is not shown.
    - **The archive** (`archive.put`, `archive.get`, the `archive`
-     permission; `exchange/archive.ts`). After a pushed batch with a node
+     permission; `peers/exchange/archive.ts`). After a pushed batch with a node
      that ended, the Walker puts that step's transcript and command log,
      and its run's latest checkpoint per namespace with its pending
      writes (JSON, blobs in base64). Rows first, then files, then the
@@ -1021,7 +1021,7 @@ iroh.
      Retention is undecided, as for run history: everything is kept.
    - **Host offline**: every Device keeps walking its own runs; both loops
      start again at their cursors when the link is back.
-   - Tests: `packages/engine/src/exchange/exchange.test.ts` (two
+   - Tests: `packages/engine/src/peers/exchange/exchange.test.ts` (two
      Replicas in one process) and `apps/server/src/devices/exchange.test.ts`
      (two daemons, the harness of part A in `test-daemons.ts`): B walks a
      run in A's Space, A gets it live with the same status and B's name,
@@ -1110,7 +1110,7 @@ iroh.
      Replies that cannot reach the Host for a minute abort the call on the
      Device: nothing runs for a Walker that is gone.
    - **Two checks, two code paths.** The Host, before it places a run
-     (`place` in `engine.ts`): the Device is paired here and not revoked,
+     (`place` in `peers/placement.ts`): the Device is paired here and not revoked,
      its owner is the Person who starts the run (another Person's Device
      is Offers, part B: "colleague-laptop is not your device."), it takes
      work now, and the Space document has its Clone of the project. The
@@ -1146,7 +1146,7 @@ iroh.
      (the run's Device), "Walked by" when that is another computer, "Ran
      on" per step. Take over shows only for a run whose steps run here.
      The runs list badges the run's Device.
-   - Tests: `packages/engine/src/device/placement.test.ts` (in-memory
+   - Tests: `packages/engine/src/peers/placement.test.ts` (in-memory
      relay: the steps and worktree on B, a stop ends B's command, flows from
      B's Clone, rename and remove without a Clone, the refusals);
      `apps/server/src/devices/work.test.ts` (`checkWork`, the hub);
@@ -1172,7 +1172,7 @@ iroh.
      device"). `deviceNameSchema`: 1 to 64 characters. The flow editor's
      Device section lists your Devices (`runs.devices`); a name that is not
      one of yours stays, marked.
-   - **Where a step runs** (`packages/engine/src/device/placement.ts`, one
+   - **Where a step runs** (`packages/engine/src/peers/placement.ts`, one
      module for both halves): the node's `device`, else the profile's
      Device, else the run's Device, else the Walker. "The profile's Device"
      is the run's Device when it defines the profile, else this computer
@@ -1270,7 +1270,7 @@ iroh.
    - **The resume grace** now counts from when the engine is ready (it
      started at recovery, before the engine's start ended: the flaky
      "an open run continues on its own" test).
-   - Tests: `packages/engine/src/device/placement.test.ts` (per-node with
+   - Tests: `packages/engine/src/peers/placement.test.ts` (per-node with
      the Hand-off there and back, a dirty worktree fails the step, offline
      then back, an unknown name, the profile's Device); `apps/server/src/
      devices/handoff.test.ts` (two daemons with one bare remote: A walks a
@@ -1362,7 +1362,7 @@ iroh.
      step comes with them.
 
    *Landed (part B, Offers):*
-   - **An Offer is two entries** (`packages/engine/src/offers.ts`): the
+   - **An Offer is two entries** (`packages/engine/src/peers/offers.ts`): the
      Device's own, in its Device document's `offers` (`DeviceOffer`: Space,
      profile, `permissionCap`, `sessionCap`, when), the caps the Device
      enforces; and the publication in the Space document's `offers`
@@ -1439,7 +1439,7 @@ iroh.
      Withdraw. The Devices page: "Offered to Spaces" (each Offer with
      "Runs for <Space>": the runs of other people here, and Withdraw) and
      "Devices in this Space".
-   - Tests: `packages/engine/src/offers.test.ts` (the run-start rule, the
+   - Tests: `packages/engine/src/peers/offers.test.ts` (the run-start rule, the
      clamp, the queue, another Person's run on the computer that walks it,
      withdrawing stops it, the Space document's entry has only the public
      fields); `apps/server/src/devices/work.test.ts` (`checkWork` called
@@ -1542,7 +1542,7 @@ iroh.
      read at start, under the environment. Secrets saved on the
      Connections page go to the keychain where it works, else
      `<data dir>/secrets/<NAME>` (0600), the same choice as Device keys
-     (`packages/engine/src/keychain.ts`, `NIGHTSHIFT_KEY_STORE=file`). The
+     (`packages/engine/src/device-config/keychain.ts`, `NIGHTSHIFT_KEY_STORE=file`). The
      Devices page says where: "Secrets and access to your Hosts".
    - **Listening.** `NIGHTSHIFT_LISTEN` narrows where a Host binds (default
      `0.0.0.0`): `127.0.0.1` when its way out runs on the same computer. A

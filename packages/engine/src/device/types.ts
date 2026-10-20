@@ -47,7 +47,7 @@ export type Device = {
 	 *
 	 * An `OfferedSessionInput` names a profile the Device offers instead
 	 * of the harness and its settings: only a Device that serves another
-	 * Person's run under its Offers takes one (`offers.ts`).
+	 * Person's run under its Offers takes one (`peers/offers.ts`).
 	 */
 	session(
 		input: SessionInput | OfferedSessionInput,
