@@ -1,0 +1,98 @@
+# Checks every pull request and every push to main: lint and format, the
+# layer map, types, and the tests of each workspace. The same commands run
+# on your computer (see CONTRIBUTING.md, "Check your change").
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Lint, layers and types
+    runs-on: ubuntu-24.04
+    env:
+      # The web build (part of check-types) requires it. Same value as the
+      # desktop build.
+      VITE_SERVER_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      # Vite's prerender in the web build runs on Node.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # Electrobun keeps its toolchain here. `electrobun prepare` (the desktop
+      # type check) fills it.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.hutch
+          key: hutch-check-linux-x64-${{ hashFiles('bun.lock') }}
+
+      # postinstall generates the typed env files (varlock codegen).
+      - run: bun install --frozen-lockfile
+
+      - name: Biome
+        run: bunx biome ci .
+
+      - name: Layer map
+        run: bun scripts/check-layers.ts
+
+      - name: Types
+        run: bun run check-types
+
+  test:
+    name: Test (${{ matrix.workspace }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace:
+          - apps/desktop
+          - apps/server
+          - apps/web
+          - packages/agents
+          - packages/api
+          - packages/auth
+          - packages/db
+          - packages/engine
+          - packages/flows
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - run: bun install --frozen-lockfile
+
+      # Tests make git repositories and commit in them, as on a developer's
+      # computer.
+      - name: Git identity
+        run: |
+          git config --global user.name "Night Shift CI"
+          git config --global user.email "ci@nightshift.invalid"
+
+      # Every test file of the workspace except *.live.test.ts: those need
+      # real services (for example a local Ollama).
+      - name: Test
+        working-directory: ${{ matrix.workspace }}
+        timeout-minutes: 15
+        run: |
+          find . \( -name node_modules -o -name dist -o -name .hutch \) -prune -o \
+            -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) \
+            ! -name '*.live.test.ts' -print0 \
+            | xargs -0 --no-run-if-empty bun test
