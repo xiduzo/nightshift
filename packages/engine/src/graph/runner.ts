@@ -12,13 +12,15 @@ import type { Device } from "../device/types";
 import {
 	type DerivedStep,
 	deriveRunState,
+	deriveSessions,
+	deriveSteps,
+	type EnginePayloads,
 	type LoggedEvent,
-	parkedSteps,
 	type RunEnding,
+	withEnclosing,
 } from "../events";
 import type { RunLog } from "../run-log";
 import type { RunSettings } from "../settings";
-import { saverFor } from "./checkpointer";
 import { compileFlow } from "./compile";
 import {
 	createRecorders,
@@ -27,6 +29,13 @@ import {
 	type RunRow,
 	type StepContext,
 } from "./context";
+import {
+	createFence,
+	type Fence,
+	FencedError,
+	FencedSaver,
+	fencedLog,
+} from "./fence";
 import { kindOfType } from "./node-kinds";
 import { reenteredNode, reentryUpdate } from "./resume-point";
 import { createSleeps } from "./sleep";
@@ -44,8 +53,9 @@ import type {
  * id) on a graph compiled from the run's flow snapshot (design rule 1).
  * The runner streams the graph, reacts to its interrupts, appends
  * `RunEnded`, and owns what the walk owned around the steps: the slots and
- * the run cap, the per-run `exclusive` queue, a stop with its grace, and
- * `closeParked`. The wake timers and the wake of a sleeping run are the
+ * the run cap, the per-run `exclusive` queue, and a stop. A stop waits for
+ * nothing: it fences the drive off (`fence.ts`) and ends the run's open
+ * work itself (`closeOpenWork`). The wake timers and the wake of a sleeping run are the
  * sleep module's (`sleeps`, `graph/sleep.ts`), given the runner's thread
  * seam.
  *
@@ -106,6 +116,8 @@ type Walk = {
 	/** Aborts when a person stops the run. */
 	controller: AbortController;
 	done: Promise<void>;
+	/** The thread the drive streams; null until the drive compiled it. */
+	thread: Thread | null;
 };
 
 /** A slot is reserved before any await, so two calls cannot both pass the cap. */
@@ -116,6 +128,13 @@ type Thread = {
 	graph: ReturnType<ReturnType<typeof compileFlow>["compile"]>;
 	/** The controller of the current drive; a new one per drive. */
 	controller: AbortController;
+	/**
+	 * Every write of the thread's drives goes through it: the log in `ctx`
+	 * and `saver`. A stop closes it and drops the thread from the cache, so
+	 * the next drive of the run compiles a new thread with a new fence.
+	 */
+	fence: Fence;
+	saver: FencedSaver;
 };
 
 type StreamInput = Parameters<Thread["graph"]["stream"]>[0];
@@ -124,7 +143,6 @@ export type Runner = ReturnType<typeof createRunner>;
 
 export function createRunner(deps: RunnerDeps) {
 	const { db, log, bus } = deps;
-	const saver = saverFor(db);
 	const recorders = createRecorders({ db, bus });
 	/** Compiled graphs by run id, kept while the run is likely to continue soon. */
 	const threads = new Map<string, Thread>();
@@ -168,6 +186,7 @@ export function createRunner(deps: RunnerDeps) {
 		const cached = threads.get(row.id);
 		if (cached) return cached;
 		const flow = deps.flowOf(row);
+		const fence = createFence(row.id);
 		const ctx: StepContext = {
 			db,
 			run: row,
@@ -176,7 +195,7 @@ export function createRunner(deps: RunnerDeps) {
 			flows: deps.calledFlowsOf(row),
 			// Resolved at each use: the settings may change while the thread is cached.
 			policy: () => deps.policyFor(flow),
-			log,
+			log: fencedLog(log, fence),
 			bus,
 			recorder: (stepId, path) => recorders.open(row.id, stepId, path),
 			deviceFor: deps.deviceFor,
@@ -187,10 +206,13 @@ export function createRunner(deps: RunnerDeps) {
 			dataDir: deps.dataDir,
 			settings: deps.settings,
 		};
+		const saver = new FencedSaver(db, fence);
 		const thread: Thread = {
 			ctx,
 			graph: compileFlow(flow, ctx).compile({ checkpointer: saver }),
 			controller: new AbortController(),
+			fence,
+			saver,
 		};
 		threads.set(row.id, thread);
 		return thread;
@@ -230,18 +252,22 @@ export function createRunner(deps: RunnerDeps) {
 		if (slots.get(runId) === "starting") slots.delete(runId);
 	}
 
+	/** Appends `RunEnded` through `writer`: a drive's own fenced log, or the runner's. */
 	async function endRun(
+		writer: RunLog,
 		runId: string,
 		status: RunEnding,
 		reason: string | null,
 	): Promise<void> {
 		try {
-			await log.append({
+			await writer.append({
 				type: "RunEnded",
 				runId,
 				payload: { status, reason },
 			});
 		} catch (error) {
+			// A stop took the run from the drive and wrote its end.
+			if (error instanceof FencedError) return;
 			// The next start marks the run interrupted.
 			console.error(`[engine] could not record the end of run ${runId}`, error);
 		}
@@ -256,10 +282,11 @@ export function createRunner(deps: RunnerDeps) {
 		const walk: Walk = {
 			controller: new AbortController(),
 			done: Promise.resolve(),
+			thread: null,
 		};
 		slots.set(runId, walk);
 		bus.publish(runId, { kind: "status-changed" });
-		walk.done = driveThread(row, walk.controller, input).finally(() => {
+		walk.done = driveThread(row, walk, input).finally(() => {
 			if (slots.get(runId) === walk) slots.delete(runId);
 			bus.publish(runId, { kind: "status-changed" });
 			sleeps.drain();
@@ -267,15 +294,22 @@ export function createRunner(deps: RunnerDeps) {
 		});
 	}
 
+	/**
+	 * Streams the thread and records how the drive ended. A drive whose
+	 * fence a stop closed records nothing: the stop wrote the run's end.
+	 */
 	async function driveThread(
 		row: RunRow,
-		controller: AbortController,
+		walk: Walk,
 		input: StreamInput,
 	): Promise<void> {
 		const runId = row.id;
+		let thread: Thread | undefined;
 		try {
-			const thread = threadOf(row);
-			thread.controller = controller;
+			// Before the first await: a stop that comes in later finds the thread.
+			thread = threadOf(row);
+			walk.thread = thread;
+			thread.controller = walk.controller;
 			const stream = await thread.graph.stream(input, {
 				...configOf(runId),
 				streamMode: ["updates", "custom"],
@@ -302,8 +336,9 @@ export function createRunner(deps: RunnerDeps) {
 				const first = interrupts?.[0];
 				if (first) parked = first.value;
 			}
+			if (thread.fence.closed) return;
 			if (parked) {
-				await onInterrupt(runId, parked, controller.signal);
+				await onInterrupt(thread, runId, parked);
 				return;
 			}
 			const snapshot = await thread.graph.getState(configOf(runId));
@@ -311,13 +346,26 @@ export function createRunner(deps: RunnerDeps) {
 			if (!ended) {
 				throw new Error("The graph stopped without an end or an interrupt.");
 			}
-			threads.delete(runId);
-			await endRun(runId, "finished", ended.reason);
-			await pruneThread(runId);
+			if (thread.fence.closed) return;
+			dropThread(runId, thread);
+			await endRun(thread.ctx.log, runId, "finished", ended.reason);
+			await pruneThread(thread, runId);
 		} catch (error) {
+			// A stop took the run from this drive: it writes nothing more.
+			if (thread?.fence.closed) return;
 			console.error(`[engine] the walk of run ${runId} failed`, error);
-			await endRun(runId, "failed", `The engine failed: ${messageOf(error)}`);
+			await endRun(
+				thread?.ctx.log ?? log,
+				runId,
+				"failed",
+				`The engine failed: ${messageOf(error)}`,
+			);
 		}
+	}
+
+	/** Drops the run's compiled thread from the cache, when it is still `thread`. */
+	function dropThread(runId: string, thread: Thread): void {
+		if (threads.get(runId) === thread) threads.delete(runId);
 	}
 
 	/**
@@ -326,10 +374,11 @@ export function createRunner(deps: RunnerDeps) {
 	 * the event log is the record; the final state is what `resumeRun` of a
 	 * finished run re-enters on (`reenter`).
 	 */
-	async function pruneThread(runId: string): Promise<void> {
+	async function pruneThread(thread: Thread, runId: string): Promise<void> {
 		try {
-			await saver.pruneThread(runId);
+			await thread.saver.pruneThread(runId);
 		} catch (error) {
+			if (error instanceof FencedError) return;
 			console.error(
 				`[engine] could not prune the checkpoints of run ${runId}`,
 				error,
@@ -346,89 +395,131 @@ export function createRunner(deps: RunnerDeps) {
 
 	/**
 	 * The root's interrupt ended the drive. A stop that came in while the
-	 * wait began or the Gate opened closes the parked step at once, as the
-	 * walk did on `paused`.
+	 * wait began or the Gate opened closed the drive's fence, so the drive
+	 * never gets here: the stop closed the parked step itself.
 	 */
 	async function onInterrupt(
+		thread: Thread,
 		runId: string,
 		parked: Parked,
-		signal: AbortSignal,
 	): Promise<void> {
 		switch (parked.kind) {
 			case "wait":
 				// A wait with no time (a signal with no timeout) has no timer.
 				if (parked.until !== null) sleeps.schedule(runId, parked.until);
-				if (signal.aborted) await closeParked(runId);
 				return;
 			case "gate":
-				if (signal.aborted) await closeParked(runId);
 				return;
 			case "parked":
-				threads.delete(runId);
-				await endRun(runId, parked.status, parked.reason);
+				dropThread(runId, thread);
+				await endRun(thread.ctx.log, runId, parked.status, parked.reason);
 				return;
 		}
 	}
 
 	/**
-	 * Closes the step the run is parked at (an open Gate or a sleeping step)
-	 * and the Call steps around it without an answer, and
-	 * ends the run as `stopped`. The thread stays at its interrupt: a resume
-	 * re-enters it (design rule 7). False when the run is not parked.
+	 * Takes the run from its drive at once, without waiting for it: closes
+	 * the drive's fence (it writes nothing more, `fence.ts`), frees its slot
+	 * and its compiled thread (a resume drives a new thread while the old
+	 * drive unwinds, or hangs), and aborts it (the harness process is
+	 * signalled and killed). Resolves once the drive's writes in flight
+	 * settled; it waits on no timer.
 	 */
-	async function closeParked(runId: string): Promise<boolean> {
-		const status = "stopped";
-		const parked = parkedSteps(await log.events(runId));
-		if (parked.length === 0) return false;
-		sleeps.forget(runId);
-		const row = await getRunRow(db, runId);
-		const nodes = nodesOf(deps.flowOf(row), deps.calledFlowsOf(row), parked);
-		for (const open of parked) {
-			// The kind says what a stopped step ends with; the node is the
-			// logged kind's, or missing when the snapshot has no node for it.
-			const outputs = kindOfType(open.nodeType).stoppedOutputs(
-				open,
-				nodes.get(open.id),
-			);
-			await log.append({
-				type: "StepEnded",
-				runId,
-				stepId: open.id,
-				payload: { outcome: status, outputs, error: null },
-			});
-			bus.publish(runId, { kind: "step-changed", stepId: open.id });
-		}
-		await endRun(runId, status, null);
-		bus.publish(runId, { kind: "status-changed" });
-		return true;
+	async function takeFromDrive(runId: string, walk: Walk): Promise<void> {
+		const settled = walk.thread?.fence.close() ?? Promise.resolve();
+		if (slots.get(runId) === walk) slots.delete(runId);
+		if (walk.thread) dropThread(runId, walk.thread);
+		walk.controller.abort();
+		await settled;
 	}
 
 	/**
-	 * Stops the run now: aborts the running drive (the step ends `stopped`
-	 * and parks), or closes a run that waits at a Gate or sleeps. No-op
-	 * when nothing runs, waits or sleeps.
+	 * Ends the run's open work as stopped: its open sessions, then its open
+	 * steps from the inside out (a running step, an open Gate or a sleeping
+	 * step, and the Call steps around them), then the run. A stopped step
+	 * ends with its kind's outputs (`stoppedOutputs`). The thread stays
+	 * where it is: a resume re-enters it (design rule 7), at its interrupt
+	 * or at the node the stopped drive was in.
+	 */
+	async function closeOpenWork(runId: string): Promise<void> {
+		const status = "stopped";
+		const events = await log.events(runId);
+		const steps = deriveSteps(events);
+		sleeps.forget(runId);
+		for (const session of deriveSessions(events)) {
+			if (session.ending !== null) continue;
+			const ending: EnginePayloads["SessionEnded"] = {
+				outcome: status,
+				error: "The session was aborted.",
+				errorKind: "aborted",
+				usage: null,
+				costUsd: null,
+				resetAt: null,
+			};
+			await log.append({
+				type: "SessionEnded",
+				runId,
+				stepId: session.stepId,
+				sessionId: session.id,
+				payload: ending,
+			});
+		}
+		const open = steps
+			.filter((s) => s.endedAt === null)
+			.sort((a, b) => b.startSeq - a.startSeq);
+		if (open.length > 0) {
+			const row = await getRunRow(db, runId);
+			const flow = deps.flowOf(row);
+			const flows = deps.calledFlowsOf(row);
+			for (const step of open) {
+				// The kind says what a stopped step ends with; the node is the
+				// logged kind's, or missing when the snapshot has no node for it.
+				const node = nodesOf(flow, flows, withEnclosing(steps, step.id)).get(
+					step.id,
+				);
+				const outputs = kindOfType(step.nodeType).stoppedOutputs(step, node);
+				await log.append({
+					type: "StepEnded",
+					runId,
+					stepId: step.id,
+					payload: { outcome: status, outputs, error: null },
+				});
+				bus.publish(runId, { kind: "step-changed", stepId: step.id });
+			}
+		}
+		await endRun(log, runId, status, null);
+		bus.publish(runId, { kind: "status-changed" });
+	}
+
+	/**
+	 * Stops the run now, whatever its drive does: takes the run from the
+	 * running drive (`takeFromDrive`) and ends its open work as stopped
+	 * (`closeOpenWork`), or closes a run that waits at a Gate or sleeps.
+	 * Waits on no drive and no timer: a harness that hangs cannot hold a
+	 * stop. No-op when nothing runs, waits or sleeps.
 	 */
 	async function stop(runId: string): Promise<void> {
+		let freed = false;
 		await exclusive(runId, async () => {
 			const slot = slots.get(runId);
 			if (slot === "starting") return;
-			let requested = false;
 			if (slot) {
-				if (!slot.controller.signal.aborted) {
-					await log.append({ type: "StopRequested", runId, payload: {} });
-					requested = true;
-					slot.controller.abort();
-				}
-				await slot.done;
+				await takeFromDrive(runId, slot);
+				freed = true;
 			}
-			// A run that waits at a Gate or sleeps, or reached one while it stopped.
 			const status = deriveRunState(await log.events(runId)).status;
-			if (status !== "waiting" && status !== "sleeping") return;
-			if (!requested) {
-				await log.append({ type: "StopRequested", runId, payload: {} });
-			}
-			await closeParked(runId);
+			const parked = status === "waiting" || status === "sleeping";
+			if (!slot && !parked) return;
+			await log.append({ type: "StopRequested", runId, payload: {} });
+			// A drive may have ended the run before the stop took it.
+			if (status === "running" || parked) await closeOpenWork(runId);
 		});
+		if (freed) {
+			// The old drive may never unwind to free its slot itself.
+			bus.publish(runId, { kind: "status-changed" });
+			sleeps.drain();
+			deps.onSlotFreed?.();
+		}
 	}
 
 	/** Where the run's thread is, from its latest checkpoint. */
@@ -529,14 +620,13 @@ export function createRunner(deps: RunnerDeps) {
 		/** The sleeping runs: `wake(runId, how)`, `restore(runId, events)` (`graph/sleep.ts`). */
 		sleeps,
 		stop,
-		closeParked,
 		dispose,
 	};
 }
 
 /**
  * The node of each step in a chain of calling steps (inside out, as
- * `parkedSteps` gives it): the outermost is in the run's flow, each inner
+ * `withEnclosing` gives it): the outermost is in the run's flow, each inner
  * one in the flow its caller's Call node names. Stops at a node the
  * snapshot does not have.
  */

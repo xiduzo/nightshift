@@ -193,6 +193,28 @@ async function waitForEnd(
 	);
 }
 
+/**
+ * Runs `fn` while no timer can fire: `setTimeout` and `setInterval` take
+ * the callback and drop it, as in a daemon whose timers stopped.
+ */
+async function withFrozenTimers<T>(fn: () => Promise<T>): Promise<T> {
+	const { setTimeout: timeout, setInterval: interval } = globalThis;
+	const never = (() => ({
+		ref() {},
+		unref() {},
+		hasRef: () => false,
+		refresh() {},
+	})) as unknown;
+	globalThis.setTimeout = never as typeof setTimeout;
+	globalThis.setInterval = never as typeof setInterval;
+	try {
+		return await fn();
+	} finally {
+		globalThis.setTimeout = timeout;
+		globalThis.setInterval = interval;
+	}
+}
+
 async function loggedTypes(): Promise<string[]> {
 	const rows = await sandbox.db.select().from(event).orderBy(asc(event.seq));
 	return rows.map((r) => r.type);
@@ -912,6 +934,91 @@ describe("stop and resume", () => {
 			"command-output",
 			"command-exit",
 		]);
+	});
+
+	test("stop ends a step whose harness hangs at once, with no timer, and the late drive writes nothing", async () => {
+		// The session never says a word after it is ready and ignores the abort.
+		const { harness, sessions } = scriptedHarness({ hang: true, silent: true });
+		const engine = makeEngine(harness);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[
+					agent("worker", "Build it", { timeoutMinutes: 60, idleMinutes: 30 }),
+					command("check", "echo ok"),
+				],
+				[edge("e1", "worker", "pass", "check")],
+			),
+		});
+		const hung = await waitFor(() => sessions[0]);
+
+		await withFrozenTimers(() => engine.stopRun(run.id));
+		expect(hung.input.signal.aborted).toBe(true);
+		const detail = await engine.getRun(run.id);
+		expect(detail.status).toBe("stopped");
+		expect(detail.reason).toBeNull();
+		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["worker", "stopped"],
+		]);
+		expect(detail.steps[0]?.sessions[0]?.outcome).toBe("stopped");
+		const stopped = await loggedTypes();
+		expect(stopped.slice(-4)).toEqual([
+			"StopRequested",
+			"SessionEnded",
+			"StepEnded",
+			"RunEnded",
+		]);
+
+		// The hung drive wakes up much later: the stop took the run from it.
+		hung.emit({ type: "session", sessionId: "late", model: "sonnet" });
+		hung.text("too late");
+		hung.finish(1);
+		await Bun.sleep(100);
+		expect(await loggedTypes()).toEqual(stopped);
+		expect(await statusOf(engine, run.id)).toBe("stopped");
+	});
+
+	test("a resume after a stop drives anew while the stopped drive still hangs", async () => {
+		const { harness, sessions } = scriptedHarness({ hang: true, silent: true });
+		const engine = makeEngine(harness, { maxConcurrentRuns: 1 });
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf(
+				[agent("worker", "Build it"), command("check", "echo ok")],
+				[edge("e1", "worker", "pass", "check")],
+			),
+		});
+		const hung = await waitFor(() => sessions[0]);
+		await withFrozenTimers(() => engine.stopRun(run.id));
+
+		// The stopped drive holds no slot: the cap of one lets the resume in.
+		await engine.resumeRun(run.id);
+		const second = await waitFor(() => sessions[1], { label: "resume" });
+		expect(second.input.signal.aborted).toBe(false);
+		await expect(engine.resumeRun(run.id)).rejects.toThrow("still running");
+
+		// The old drive wakes while the new one runs: it writes nothing, and
+		// it does not touch the new drive's thread.
+		const before = await loggedTypes();
+		hung.emit({ type: "session", sessionId: "late", model: "sonnet" });
+		hung.finish(1);
+		await Bun.sleep(100);
+		expect(await loggedTypes()).toEqual(before);
+		expect(await statusOf(engine, run.id)).toBe("running");
+
+		second.emit({ type: "session", sessionId: "fresh", model: "sonnet" });
+		second.finish(0.25);
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps.map((s) => [s.nodeId, s.visit, s.outcome])).toEqual([
+			["worker", 1, "stopped"],
+			["worker", 2, "pass"],
+			["check", 1, "pass"],
+		]);
+		expect(detail.costUsd).toBeCloseTo(0.25);
+		const types = await loggedTypes();
+		expect(types.filter((t) => t === "RunEnded")).toHaveLength(2);
+		expect(types.filter((t) => t === "EdgeTaken")).toHaveLength(1);
 	});
 
 	test("resumeRun passes a prompt on", async () => {

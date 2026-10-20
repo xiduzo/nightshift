@@ -353,7 +353,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
 		const stepId = deriveSteps(await h.events())[0]?.id as string;
-		// The runner's closeParked, then the engine's RunResumed.
+		// The runner's closeOpenWork, then the engine's RunResumed.
 		await h.log.append({
 			type: "StepEnded",
 			runId: h.runId,

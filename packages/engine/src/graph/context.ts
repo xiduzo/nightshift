@@ -195,8 +195,8 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	/** The step's timers (`beginStep`), and the idle minutes an abort names. */
 	timeBudget(node: N): TimeBudget;
 	/**
-	 * The outputs a step of this node ends with when the run is stopped
-	 * while it is parked (`runner.closeParked`). `node` is undefined when
+	 * The outputs an open step of this node ends with when the run is
+	 * stopped (`runner.closeOpenWork`). `node` is undefined when
 	 * the run's flow snapshot has no node for the step.
 	 */
 	stoppedOutputs(open: DerivedStep, node: N | undefined): StepOutputs;

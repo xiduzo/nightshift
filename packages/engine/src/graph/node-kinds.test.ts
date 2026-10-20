@@ -20,7 +20,7 @@ import { RESUME_RULES } from "./resume-point";
 /**
  * The node-kind descriptors as a table: one fact, every kind. Each table
  * pins what the switches said before the descriptor took them over
- * (`compile.ts`, `route.ts`, the step runner, `runner.closeParked`,
+ * (`compile.ts`, `route.ts`, the step runner, `runner.closeOpenWork`,
  * `body.endedLabel`, `run-start.REQUIREMENTS`), so a new kind shows up
  * here first and an old one cannot drift.
  */
@@ -296,7 +296,7 @@ describe("timeBudget: the step's timers", () => {
 	});
 });
 
-describe("stoppedOutputs: what closeParked ends a parked step with", () => {
+describe("stoppedOutputs: what a stop ends an open step with", () => {
 	const open = (fields: Partial<DerivedStep>): DerivedStep =>
 		({
 			id: "s1",

@@ -217,7 +217,7 @@ async function resolve(
 	});
 	// A continued step never parks at entry (`beginStep` checks only a new
 	// visit); the branch is here for the type. A stop that lands while the
-	// Gate is open goes through the runner's `closeParked` instead.
+	// Gate is open goes through the runner's `closeOpenWork` instead.
 	if (begun.kind === "parked") return begun;
 	const step = begun.step;
 	const { choice } = answer;

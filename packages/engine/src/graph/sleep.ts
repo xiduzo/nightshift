@@ -310,7 +310,7 @@ export async function sleep(
  * - a `resume` (the run was stopped while it slept, and a person resumed
  *   it) parks the step as stopped and jumps back, so the node reopens the
  *   step when it has a session, else starts its next visit, as the engine
- *   does after `closeParked`.
+ *   does after `closeOpenWork`.
  */
 export function waitNode(nodeId: string): NodeAction {
 	return interruptNode({

@@ -231,6 +231,8 @@ export function scriptedHarness(
 		harnessSessionId?: (index: number) => string;
 		/** Ignore the abort signal and never end (a daemon that died). */
 		hang?: boolean;
+		/** Emit nothing when a session starts: it hangs in its setup until the test speaks. */
+		silent?: boolean;
 	} = {},
 ) {
 	const sessions: ScriptedSession[] = [];
@@ -258,7 +260,9 @@ export function scriptedHarness(
 			};
 			sessions.push(session);
 			const id = options.harnessSessionId?.(index) ?? `harness-${index}`;
-			channel.push({ type: "session", sessionId: id, model: input.model });
+			if (!options.silent) {
+				channel.push({ type: "session", sessionId: id, model: input.model });
+			}
 			if (!options.hang) {
 				input.signal.addEventListener(
 					"abort",
