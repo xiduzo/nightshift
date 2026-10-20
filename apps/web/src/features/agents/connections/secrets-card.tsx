@@ -56,9 +56,9 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { SecretView } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { PageSection } from "@/shared/page";
+import { connectionMutations, connectionQueries } from "../queries";
 
 const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 
@@ -280,11 +280,11 @@ function SecretForm({
 	const [name, setName] = useState(fixedName ?? "");
 	const [value, setValue] = useState("");
 	const setSecret = useMutation(
-		orpc.connections.setSecret.mutationOptions({
+		connectionMutations.setSecret({
 			onSuccess: () => {
 				toast.success(`Saved ${name} in the keychain`);
 				void queryClient.invalidateQueries({
-					queryKey: orpc.connections.list.key(),
+					queryKey: connectionQueries.lists(),
 				});
 				onDone();
 			},
@@ -402,11 +402,11 @@ function RemoveSecretDialog({
 }) {
 	const queryClient = useQueryClient();
 	const removeSecret = useMutation(
-		orpc.connections.removeSecret.mutationOptions({
+		connectionMutations.removeSecret({
 			onSuccess: () => {
 				toast.success(`Removed ${name} from the keychain`);
 				void queryClient.invalidateQueries({
-					queryKey: orpc.connections.list.key(),
+					queryKey: connectionQueries.lists(),
 				});
 				onOpenChange(false);
 			},

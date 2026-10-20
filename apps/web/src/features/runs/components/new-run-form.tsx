@@ -31,7 +31,7 @@ import { PlayIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useState } from "react";
 
 import type { Effort, PermissionMode } from "@/shared/api";
-import { orpc } from "@/shared/api";
+import { runMutations, runQueries } from "../queries";
 
 const MODELS = ["sonnet", "opus", "haiku"];
 
@@ -71,9 +71,9 @@ export function QuickRunDialog({
 	const [flowError, setFlowError] = useState<string | null>(null);
 
 	const startRun = useMutation(
-		orpc.runs.start.mutationOptions({
+		runMutations.start({
 			onSuccess: (run) => {
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 				void navigate({ to: "/runs/$runId", params: { runId: run.id } });
 			},
 		}),

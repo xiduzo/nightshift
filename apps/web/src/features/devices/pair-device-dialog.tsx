@@ -40,9 +40,9 @@ import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import type { PairingReview } from "@/shared/api";
-import { orpc } from "@/shared/api";
 
 import { formatUserCode, platformName } from "./platform";
+import { deviceMutations, deviceQueries } from "./queries";
 
 /**
  * "Pair a device": the Person enters the code their other computer shows,
@@ -85,13 +85,11 @@ function PairDeviceSteps({
 	const [code, setCode] = useState(cleanCode(initialCode));
 	const [review, setReview] = useState<PairingReview | null>(null);
 
-	const find = useMutation(
-		orpc.devices.review.mutationOptions({ onSuccess: setReview }),
-	);
+	const find = useMutation(deviceMutations.review({ onSuccess: setReview }));
 	const refresh = () =>
-		queryClient.invalidateQueries({ queryKey: orpc.devices.list.key() });
+		queryClient.invalidateQueries({ queryKey: deviceQueries.overviewKey() });
 	const allow = useMutation(
-		orpc.devices.approve.mutationOptions({
+		deviceMutations.approve({
 			onSuccess: () => {
 				toast.success(`${review?.device.name ?? "The device"} is paired`);
 				void refresh();
@@ -100,7 +98,7 @@ function PairDeviceSteps({
 		}),
 	);
 	const decline = useMutation(
-		orpc.devices.deny.mutationOptions({
+		deviceMutations.deny({
 			onSuccess: () => {
 				toast("The device was declined");
 				onDone();

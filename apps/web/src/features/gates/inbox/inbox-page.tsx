@@ -43,8 +43,9 @@ import {
 } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { toast } from "sonner";
+import { projectQueries } from "@/features/projects";
+import { runMutations, runQueries } from "@/features/runs/queries";
 import type { OpenGate, RunSummary } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import {
 	formatCountdown,
 	formatTime,
@@ -52,7 +53,6 @@ import {
 	useNow,
 } from "@/shared/format";
 import { useOpenGates } from "../use-open-gates";
-
 import { GateDetail, gateParts } from "./gate-detail";
 
 /**
@@ -70,12 +70,8 @@ export function InboxPage({
 }) {
 	const gates = useOpenGates();
 	const now = useNow(30_000);
-	const runs = useQuery({
-		...orpc.runs.list.queryOptions({ input: {} }),
-		refetchInterval: 15_000,
-		meta: { quietErrors: true },
-	});
-	const projects = useQuery(orpc.projects.list.queryOptions());
+	const runs = useQuery(runQueries.everyRunForInbox());
+	const projects = useQuery(projectQueries.list());
 	const projectNames = new Map(projects.data?.map((p) => [p.id, p.name]));
 	const sleeping = (runs.data ?? [])
 		.filter((run) => run.status === "sleeping")
@@ -288,9 +284,9 @@ function SleepingGroup({
 	const now = useNow(1000);
 	const queryClient = useQueryClient();
 	const wake = useMutation(
-		orpc.runs.resume.mutationOptions({
+		runMutations.resume({
 			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.runs.key() }),
+				queryClient.invalidateQueries({ queryKey: runQueries.all() }),
 			onError: (error) => toast.error(`Could not wake: ${error.message}`),
 		}),
 	);

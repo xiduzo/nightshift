@@ -42,6 +42,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { projectQueries } from "@/features/projects";
 import {
 	CONSOLE_BAR_PX,
 	calledFlowName,
@@ -59,6 +60,7 @@ import {
 	RunTitle,
 	RunVariables,
 	RunWarnings,
+	runQueries,
 	StepConsole,
 	StepRowMenu,
 	StepSummary as StepSummaryView,
@@ -73,7 +75,6 @@ import {
 	useRunStream,
 } from "@/features/runs";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { useMediaQuery } from "@/shared/media-query";
 import { type Crumb, SiteHeader } from "@/shared/page";
 
@@ -111,8 +112,8 @@ type PanelHandle = NonNullable<
  */
 function RunComponent() {
 	const { runId } = Route.useParams();
-	const run = useQuery(orpc.runs.get.queryOptions({ input: { runId } }));
-	const projects = useQuery(orpc.projects.list.queryOptions());
+	const run = useQuery(runQueries.get(runId));
+	const projects = useQuery(projectQueries.list());
 	const stream = useRunStream(runId);
 	const desktop = useMediaQuery(DESKTOP);
 	/** Null follows the latest step as the run walks. */

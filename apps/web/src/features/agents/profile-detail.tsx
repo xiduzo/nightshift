@@ -67,7 +67,6 @@ import type {
 	ProfileInput,
 	ProfileRow,
 } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { EFFORTS, PERMISSION_MODES, permissionLabel } from "./agent-options";
 import { CliCheckBadge } from "./connections/cli-panel";
 import { KindBadge } from "./connections/parts";
@@ -75,6 +74,12 @@ import { DetailSection, DetailShell } from "./detail-shell";
 import { harnessInfo } from "./harnesses";
 import { ModelCombobox, ModelSourceHint } from "./model-combobox";
 import { OfferDialog, WithdrawOfferDialog } from "./offer-dialog";
+import {
+	harnessQueries,
+	offerQueries,
+	profileMutations,
+	profileQueries,
+} from "./queries";
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
 
@@ -154,7 +159,7 @@ export function ProfileDetail({
 	const [offering, setOffering] = useState(false);
 	const [withdrawing, setWithdrawing] = useState<OfferView | null>(null);
 	const offers = useQuery({
-		...orpc.offers.list.queryOptions(),
+		...offerQueries.list(),
 		enabled: profile !== null,
 	});
 	const offered = (offers.data?.offers ?? []).filter(
@@ -164,21 +169,21 @@ export function ProfileDetail({
 		setDraft((current) => ({ ...current, ...patch }));
 
 	const invalidate = () =>
-		queryClient.invalidateQueries({ queryKey: orpc.profiles.key() });
+		queryClient.invalidateQueries({ queryKey: profileQueries.all() });
 	const save = useMutation(
-		orpc.profiles.save.mutationOptions({
+		profileMutations.save({
 			onSuccess: (next) => {
 				toast.success(profile ? `Saved ${next.name}` : `Added ${next.name}`);
 				void invalidate();
 				void queryClient.invalidateQueries({
-					queryKey: orpc.harnesses.list.key(),
+					queryKey: harnessQueries.lists(),
 				});
 				onSaved(next.name);
 			},
 		}),
 	);
 	const remove = useMutation(
-		orpc.profiles.remove.mutationOptions({
+		profileMutations.remove({
 			onSuccess: () => {
 				toast.success(`Deleted ${profile?.name}`);
 				void invalidate();

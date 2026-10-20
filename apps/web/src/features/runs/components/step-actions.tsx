@@ -39,7 +39,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import type { StepSummary } from "@/shared/api";
-import { orpc } from "@/shared/api";
+import { runMutations, runQueries } from "../queries";
 
 /** An Agent step whose conversation can go on: its harness named a session. */
 function continuesSession(step: StepSummary): boolean {
@@ -111,12 +111,12 @@ export function RestartStepDialog({
 	const [prompt, setPrompt] = useState("");
 	const agent = continuesSession(step);
 	const restart = useMutation(
-		orpc.runs.restartStep.mutationOptions({
+		runMutations.restartStep({
 			onSuccess: () => {
 				setPrompt("");
 				onOpenChange(false);
 				toast.success(`Restarted ${step.nodeId}.`);
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 			},
 		}),
 	);
@@ -255,13 +255,13 @@ function RerunDialog({
 	const [fresh, setFresh] = useState(false);
 	const agent = continuesSession(step);
 	const rerun = useMutation(
-		orpc.runs.rerun.mutationOptions({
+		runMutations.rerun({
 			onSuccess: () => {
 				setPrompt("");
 				setFresh(false);
 				onOpenChange(false);
 				toast.success(`Running again from ${step.nodeId}.`);
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 			},
 		}),
 	);

@@ -23,9 +23,9 @@ import { MailXIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { AccountForm } from "@/features/access";
-import { roleLabel } from "@/features/spaces";
+import { roleLabel, spaceMutations, spaceQueries } from "@/features/spaces";
 import type { InvitationView } from "@/shared/api";
-import { authClient, orpc } from "@/shared/api";
+import { authClient } from "@/shared/api";
 
 export const Route = createFileRoute("/invite/$invitationId")({
 	// The session lives in the browser; nothing to render on the server.
@@ -41,7 +41,7 @@ export const Route = createFileRoute("/invite/$invitationId")({
 function InviteRoute() {
 	const { invitationId } = Route.useParams();
 	const invitation = useQuery({
-		...orpc.invitations.get.queryOptions({ input: { invitationId } }),
+		...spaceQueries.invitation(invitationId),
 		retry: false,
 	});
 
@@ -73,7 +73,7 @@ function PendingInvitation({ invitation }: { invitation: InvitationView }) {
 		signedInAs.toLowerCase() === invitation.email.toLowerCase();
 
 	const accept = useMutation(
-		orpc.invitations.accept.mutationOptions({
+		spaceMutations.acceptInvitation({
 			onSuccess: async () => {
 				toast.success(`You joined ${invitation.spaceName}`);
 				// You work in the Space now: every page shows it.

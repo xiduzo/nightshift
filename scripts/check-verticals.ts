@@ -61,6 +61,15 @@ export const PEER_PORTS: Record<
 	Record<string, Record<string, string>>
 > = {
 	"apps/web": {
+		// A vertical's queries.ts imports only shared/api. A vertical below the
+		// owner in the order of STRUCTURE.md section 5 that needs the owner's
+		// data reads it through that file: the owner's barrel would close a
+		// cycle, because the owner's pages import the lower vertical.
+		"features/agents": {
+			// The Agents page reads the settings and saves a program's path.
+			// The settings page shows the agent defaults with the harnesses.
+			"features/settings": "queries",
+		},
 		"features/devices": {
 			// Runs and devices show each other: a run shows its Walker (a
 			// Device), and the Offers of a Device list the runs they started,
@@ -68,6 +77,22 @@ export const PEER_PORTS: Record<
 			// close a devices -> runs -> devices cycle (run-details shows the
 			// Walker). The status badge imports only the API types.
 			"features/runs": "components/run-status-badge",
+			// This computer's card reads and saves its Host addresses in the
+			// settings. The settings page imports runs, and runs imports devices.
+			"features/settings": "queries",
+		},
+		"features/flows": {
+			// The editor reads the new-node defaults, the flow list creates a
+			// flow with them. The settings page counts the flows of a project.
+			"features/settings": "queries",
+			// Start run starts a run and reads a project's runs and Devices.
+			// The run page imports the flow canvas.
+			"features/runs": "queries",
+		},
+		"features/gates": {
+			// The inbox lists sleeping runs and refreshes the runs after an
+			// answer. The run page imports the gate question and answer.
+			"features/runs": "queries",
 		},
 	},
 };

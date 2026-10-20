@@ -57,19 +57,20 @@ import {
 	useState,
 } from "react";
 import { describeRunStatuses, RunsDonut } from "@/features/dashboard";
+import { flowQueries } from "@/features/flows";
 import { useOpenGates } from "@/features/gates";
-import { AddProjectDialog } from "@/features/projects";
+import { AddProjectDialog, projectQueries } from "@/features/projects";
 import { useProjectRuns } from "@/features/runs";
+import { scheduleQueries } from "@/features/schedules";
 import { SpaceSwitcher } from "@/features/spaces";
 import type { Project } from "@/shared/api";
-import { orpc } from "@/shared/api";
 
 /** The app shell's sidebar, after the shadcn `sidebar-07` block. */
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 	const matchRoute = useMatchRoute();
 	const gates = useOpenGates();
 	const open = gates.data?.length ?? 0;
-	const projects = useQuery(orpc.projects.list.queryOptions());
+	const projects = useQuery(projectQueries.list());
 
 	return (
 		<Sidebar collapsible="icon" {...props}>
@@ -234,12 +235,12 @@ function ProjectFolder({ project }: { project: Project }) {
 	const Icon = open ? FolderOpenIcon : FolderIcon;
 
 	const flows = useQuery({
-		...orpc.flows.list.queryOptions({ input: params }),
+		...flowQueries.list(params.projectId),
 		staleTime: 30_000,
 		meta: { quietErrors: true },
 	});
 	const schedules = useQuery({
-		...orpc.schedules.list.queryOptions({ input: params }),
+		...scheduleQueries.list(params.projectId),
 		staleTime: 30_000,
 		meta: { quietErrors: true },
 	});

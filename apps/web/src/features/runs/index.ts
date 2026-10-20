@@ -30,5 +30,6 @@ export {
 	stepsIn,
 	stepsUnder,
 } from "./lib/run-steps";
+export { runQueries } from "./queries";
 export { StepTranscript } from "./transcript/step-transcript";
 export { emptyTranscript } from "./transcript/transcript";

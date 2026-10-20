@@ -47,7 +47,6 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { HarnessRow } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { formatDateTime, formatTime } from "@/shared/format";
 import { useCliCheck } from "./connections/cli-panel";
 import {
@@ -58,6 +57,7 @@ import {
 } from "./connections/key-value-rows";
 import { FactList, OffMachineNote } from "./connections/parts";
 import { DetailSection, DetailShell } from "./detail-shell";
+import { connectionQueries, harnessMutations, harnessQueries } from "./queries";
 
 /** `${NAME}`: a reference to a secret. */
 const ref = (name: string) => `$\{${name}}`;
@@ -136,12 +136,12 @@ function CustomAgentForm({
 	);
 	const [env, setEnv] = useState<KeyValueRow[]>(() => rowsFrom(agent?.env));
 	const save = useMutation(
-		orpc.harnesses.saveCustom.mutationOptions({
+		harnessMutations.saveCustom({
 			onSuccess: (saved) => {
 				toast.success(agent ? `Saved ${saved.label}` : `Added ${saved.label}`);
-				void queryClient.invalidateQueries({ queryKey: orpc.harnesses.key() });
+				void queryClient.invalidateQueries({ queryKey: harnessQueries.all() });
 				void queryClient.invalidateQueries({
-					queryKey: orpc.connections.check.key(),
+					queryKey: connectionQueries.checks(),
 				});
 				onDone(saved.slug);
 			},
@@ -291,10 +291,10 @@ export function CustomAgentDetail({
 	const check = useCliCheck(harness.name);
 	const data = check.data;
 	const remove = useMutation(
-		orpc.harnesses.remove.mutationOptions({
+		harnessMutations.remove({
 			onSuccess: () => {
 				toast.success(`Removed ${agent.label}`);
-				void queryClient.invalidateQueries({ queryKey: orpc.harnesses.key() });
+				void queryClient.invalidateQueries({ queryKey: harnessQueries.all() });
 				onRemoved();
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),

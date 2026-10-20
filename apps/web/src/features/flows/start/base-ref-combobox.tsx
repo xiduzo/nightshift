@@ -12,7 +12,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { orpc } from "@/shared/api";
+import { projectQueries } from "@/features/projects";
 
 /** A clone can have hundreds of remote branches: show the newest per group. */
 const PER_GROUP = 50;
@@ -43,7 +43,7 @@ export function BaseRefCombobox({
 	describedBy?: string;
 }) {
 	const branches = useQuery({
-		...orpc.projects.branches.queryOptions({ input: { projectId } }),
+		...projectQueries.branches(projectId),
 		staleTime: 60_000,
 		meta: { quietErrors: true },
 	});

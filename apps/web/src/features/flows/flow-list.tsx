@@ -64,10 +64,11 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { settingsQueries } from "@/features/settings/queries";
 import type { FlowListItem } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
 import { callersOf, newFlow } from "./flow-draft";
+import { flowMutations, flowQueries } from "./queries";
 import { StartRunDialog } from "./start/start-run-dialog";
 import { useProjectFlows } from "./use-project-flows";
 
@@ -77,9 +78,7 @@ import { useProjectFlows } from "./use-project-flows";
  */
 export function FlowList({ projectId }: { projectId: string }) {
 	const queryClient = useQueryClient();
-	const flows = useQuery(
-		orpc.flows.list.queryOptions({ input: { projectId } }),
-	);
+	const flows = useQuery(flowQueries.list(projectId));
 	// Each flow's inputs, and which flows call it.
 	const loaded = useProjectFlows(projectId);
 	const [creating, setCreating] = useState(false);
@@ -91,11 +90,11 @@ export function FlowList({ projectId }: { projectId: string }) {
 	} | null>(null);
 
 	const removeFlow = useMutation(
-		orpc.flows.remove.mutationOptions({
+		flowMutations.remove({
 			onSuccess: (_, input) => {
 				toast.success(`Deleted ${input.name}`);
 				setToDelete(null);
-				void queryClient.invalidateQueries({ queryKey: orpc.flows.key() });
+				void queryClient.invalidateQueries({ queryKey: flowQueries.all() });
 			},
 			onError: (error) => toast.error(`Could not delete: ${error.message}`),
 		}),
@@ -440,9 +439,9 @@ function NewFlowForm({
 
 	// Writes the starter flow to disk first, so the editor always opens a real file.
 	const createFlow = useMutation(
-		orpc.flows.save.mutationOptions({
+		flowMutations.save({
 			onSuccess: (_, input) => {
-				void queryClient.invalidateQueries({ queryKey: orpc.flows.key() });
+				void queryClient.invalidateQueries({ queryKey: flowQueries.all() });
 				void navigate({
 					to: "/projects/$projectId/flows/$name",
 					params: { projectId, name: input.name },
@@ -452,7 +451,7 @@ function NewFlowForm({
 	);
 
 	// The first Agent node starts with the daemon's defaults (Settings → New Agent nodes).
-	const settings = useQuery(orpc.settings.get.queryOptions());
+	const settings = useQuery(settingsQueries.get());
 	const canCreate = trimmed !== "" && error === null && !createFlow.isPending;
 	const problem = error ?? createFlow.error?.message ?? null;
 

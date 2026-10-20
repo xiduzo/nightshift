@@ -30,9 +30,9 @@ import { useNavigate } from "@tanstack/react-router";
 import { ArrowRightLeftIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-
+import { spaceQueries } from "@/features/spaces";
 import type { Project } from "@/shared/api";
-import { orpc } from "@/shared/api";
+import { projectMutations, projectQueries } from "./queries";
 
 /** Renames a project for everyone in its Space. */
 export function RenameProjectDialog({
@@ -68,9 +68,9 @@ function RenameProjectForm({
 	const queryClient = useQueryClient();
 	const [name, setName] = useState(project.name);
 	const rename = useMutation(
-		orpc.projects.rename.mutationOptions({
+		projectMutations.rename({
 			onSuccess: () => {
-				void queryClient.invalidateQueries({ queryKey: orpc.projects.key() });
+				void queryClient.invalidateQueries({ queryKey: projectQueries.all() });
 				onDone();
 			},
 		}),
@@ -164,7 +164,7 @@ function MoveProjectForm({
 	const id = useId();
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const spaces = useQuery(orpc.spaces.list.queryOptions());
+	const spaces = useQuery(spaceQueries.list());
 	// Only an owner or an admin of a Space may move projects into it.
 	const targets = (spaces.data?.spaces ?? [])
 		.filter(
@@ -177,7 +177,7 @@ function MoveProjectForm({
 	const target = targets.find((t) => t.value === spaceId);
 
 	const move = useMutation(
-		orpc.projects.move.mutationOptions({
+		projectMutations.move({
 			onSuccess: async () => {
 				toast.success(
 					`Moved ${project.name} to ${target?.label ?? "the Space"}`,

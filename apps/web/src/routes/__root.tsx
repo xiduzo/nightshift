@@ -17,8 +17,12 @@ import {
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
 import { useEffect } from "react";
-import { accessRedirect, isOutsideApp } from "@/features/access";
-import { orpc } from "@/shared/api";
+import {
+	accessRedirect,
+	accountQueries,
+	isOutsideApp,
+} from "@/features/access";
+import type { orpc } from "@/shared/api";
 import { AppSidebar, NightNotifications } from "@/shared/shell";
 
 import appCss from "../index.css?url";
@@ -68,7 +72,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 function useAccessGuard(pathname: string, href: string): boolean {
 	const navigate = useNavigate();
 	const status = useQuery({
-		...orpc.account.status.queryOptions(),
+		...accountQueries.status(),
 		meta: { quietErrors: true },
 	});
 	const target = status.data

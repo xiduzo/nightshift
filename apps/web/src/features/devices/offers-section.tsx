@@ -24,12 +24,16 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { LaptopIcon, ShareIcon } from "lucide-react";
 import { Fragment, useState } from "react";
-import { permissionLabel, WithdrawOfferDialog } from "@/features/agents";
+import {
+	offerQueries,
+	permissionLabel,
+	WithdrawOfferDialog,
+} from "@/features/agents";
 import { RunStatusBadge } from "@/features/runs/components/run-status-badge";
 import type { OfferView, SpaceDevice } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { formatRelative, useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
+import { deviceQueries } from "./queries";
 
 function caps(offer: Pick<OfferView, "permissionCap" | "sessionCap">): string {
 	return `${permissionLabel(offer.permissionCap)} at most. ${
@@ -45,11 +49,7 @@ function caps(offer: Pick<OfferView, "permissionCap" | "sessionCap">): string {
  */
 export function ThisComputerOffers() {
 	const now = useNow(30_000);
-	const listed = useQuery({
-		...orpc.offers.list.queryOptions(),
-		refetchInterval: 10_000,
-		meta: { quietRefetchErrors: true },
-	});
+	const listed = useQuery(offerQueries.listLive());
 	const [withdrawing, setWithdrawing] = useState<OfferView | null>(null);
 	const offers = listed.data?.offers ?? [];
 
@@ -165,11 +165,7 @@ export function ThisComputerOffers() {
  * profiles it offers to the Space. Nothing else of them.
  */
 export function SpaceDevices() {
-	const listed = useQuery({
-		...orpc.devices.space.queryOptions(),
-		refetchInterval: 10_000,
-		meta: { quietRefetchErrors: true },
-	});
+	const listed = useQuery(deviceQueries.spaceLive());
 	const devices = (listed.data ?? []).filter((d) => !d.thisDevice);
 	if (devices.length === 0) return null;
 	return (

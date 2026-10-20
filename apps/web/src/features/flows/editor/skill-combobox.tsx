@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { HarnessName } from "@/features/agents";
-import { orpc } from "@/shared/api";
+import { harnessQueries } from "@/features/agents";
 
 /**
  * A skill name with autocomplete. Opening it shows the project's own skills,
@@ -40,7 +40,7 @@ export function SkillCombobox({
 	describedBy?: string;
 }) {
 	const query = useQuery({
-		...orpc.harnesses.skills.queryOptions({ input: { harness, projectId } }),
+		...harnessQueries.skills(harness, projectId),
 		staleTime: 5 * 60_000,
 		meta: { quietErrors: true },
 	});

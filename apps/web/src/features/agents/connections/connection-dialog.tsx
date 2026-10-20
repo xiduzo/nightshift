@@ -39,7 +39,11 @@ import {
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Connection, McpServer } from "@/shared/api";
-import { orpc } from "@/shared/api";
+import {
+	connectionMutations,
+	connectionQueries,
+	profileQueries,
+} from "../queries";
 import {
 	type KeyValueRow,
 	KeyValueRows,
@@ -164,7 +168,7 @@ function ConnectionForm({
 	const set = (patch: Partial<Draft>) =>
 		setDraft((current) => ({ ...current, ...patch }));
 
-	const test = useMutation(orpc.connections.test.mutationOptions());
+	const test = useMutation(connectionMutations.test());
 	// The result sits under the form; bring it into view in a scrolled dialog.
 	const resultRef = useRef<HTMLDivElement>(null);
 	const tested = test.data ?? test.error;
@@ -172,17 +176,17 @@ function ConnectionForm({
 		if (tested) resultRef.current?.scrollIntoView({ block: "nearest" });
 	}, [tested]);
 	const save = useMutation(
-		orpc.connections.save.mutationOptions({
+		connectionMutations.save({
 			onSuccess: (saved) => {
 				toast.success(
 					connection ? `Saved ${saved.name}` : `Added ${saved.name}`,
 				);
 				void queryClient.invalidateQueries({
-					queryKey: orpc.connections.list.key(),
+					queryKey: connectionQueries.lists(),
 				});
 				// A rename reaches the profiles that name it.
 				void queryClient.invalidateQueries({
-					queryKey: orpc.profiles.list.key(),
+					queryKey: profileQueries.lists(),
 				});
 				onDone(saved.name);
 			},

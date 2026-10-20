@@ -27,13 +27,13 @@ import { type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 import { walkerName } from "@/features/devices";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import {
 	formatCountdown,
 	formatDateTime,
 	formatTime,
 	useNow,
 } from "@/shared/format";
+import { runMutations, runQueries } from "../queries";
 import type { CurrentWait } from "../transcript/transcript";
 import { ResumeComposer } from "./resume-composer";
 
@@ -340,10 +340,10 @@ function Countdown({
 function SignalButton({ runId, name }: { runId: string; name: string }) {
 	const queryClient = useQueryClient();
 	const send = useMutation(
-		orpc.runs.signal.mutationOptions({
+		runMutations.signal({
 			onSuccess: () => {
 				toast.success(`Sent ${name}. The flow goes on.`);
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 			},
 			onError: (error) => toast.error(`Could not send: ${error.message}`),
 		}),
@@ -368,9 +368,9 @@ function SignalButton({ runId, name }: { runId: string; name: string }) {
 function WakeButton({ runId }: { runId: string }) {
 	const queryClient = useQueryClient();
 	const wake = useMutation(
-		orpc.runs.resume.mutationOptions({
+		runMutations.resume({
 			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.runs.key() }),
+				queryClient.invalidateQueries({ queryKey: runQueries.all() }),
 			onError: (error) => toast.error(`Could not wake: ${error.message}`),
 		}),
 	);

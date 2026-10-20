@@ -1,9 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { orpc } from "@/shared/api";
-
-/** How often the inbox and its badge look for new open Gates. */
-const POLL_MS = 5000;
+import { gateQueries } from "./queries";
 
 /**
  * The open Gates over all runs, oldest first: the Needs-you inbox. Polls, and
@@ -11,10 +8,5 @@ const POLL_MS = 5000;
  * inbox shows the error itself.
  */
 export function useOpenGates() {
-	return useQuery({
-		...orpc.gates.list.queryOptions(),
-		refetchInterval: POLL_MS,
-		refetchOnWindowFocus: "always",
-		meta: { quietErrors: true },
-	});
+	return useQuery(gateQueries.open());
 }

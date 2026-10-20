@@ -35,9 +35,10 @@ import { CopyIcon, ExternalLinkIcon, ShieldCheckIcon } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { client, orpc } from "@/shared/api";
+import { client } from "@/shared/api";
 
 import { formatUserCode } from "./platform";
+import { deviceQueries } from "./queries";
 
 type Role = "home" | "guest";
 
@@ -119,7 +120,7 @@ function JoinHostSteps({
 				} else {
 					toast.success(`Paired with ${next.hostName}`);
 					void queryClient.invalidateQueries({
-						queryKey: orpc.devices.list.key(),
+						queryKey: deviceQueries.overviewKey(),
 					});
 					onDone();
 					return;

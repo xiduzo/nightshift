@@ -25,9 +25,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { orpc } from "@/shared/api";
 import { Logo } from "@/shared/page";
 import { CreateSpaceDialog } from "./create-space-dialog";
+import { spaceMutations, spaceQueries } from "./queries";
 
 /** The personal Space always reads "Personal", whatever it is called. */
 const spaceName = (space: { name: string; personal: boolean }) =>
@@ -44,12 +44,12 @@ export function SpaceSwitcher() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const [creating, setCreating] = useState(false);
-	const spaces = useQuery(orpc.spaces.list.queryOptions());
+	const spaces = useQuery(spaceQueries.list());
 	const active = spaces.data?.spaces.find(
 		(space) => space.id === spaces.data?.active,
 	);
 	const switchSpace = useMutation(
-		orpc.spaces.switch.mutationOptions({
+		spaceMutations.switch({
 			onSuccess: async () => {
 				// Every page shows the new Space: its projects, runs and Gates.
 				await navigate({ to: "/" });

@@ -51,11 +51,12 @@ import { OVERVIEW_ROWS, SectionCards } from "@/features/dashboard";
 import {
 	MoveProjectDialog,
 	projectFolder,
+	projectMutations,
+	projectQueries,
 	RenameProjectDialog,
 } from "@/features/projects";
-import { RunList } from "@/features/runs";
+import { RunList, runQueries } from "@/features/runs";
 import type { Project, RunSummary } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { formatDateTime, formatRelative } from "@/shared/format";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 
@@ -64,8 +65,8 @@ export const Route = createFileRoute("/")({
 });
 
 function HomeComponent() {
-	const projects = useQuery(orpc.projects.list.queryOptions());
-	const runs = useQuery(orpc.runs.list.queryOptions({ input: {} }));
+	const projects = useQuery(projectQueries.list());
+	const runs = useQuery(runQueries.everyRun());
 
 	const recentRuns = runs.data
 		?.slice()
@@ -132,11 +133,11 @@ function ProjectList({
 	const [toRename, setToRename] = useState<Project | null>(null);
 	const [toMove, setToMove] = useState<Project | null>(null);
 	const removeProject = useMutation(
-		orpc.projects.remove.mutationOptions({
+		projectMutations.remove({
 			onSuccess: () => {
 				setToRemove(null);
-				void queryClient.invalidateQueries({ queryKey: orpc.projects.key() });
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+				void queryClient.invalidateQueries({ queryKey: projectQueries.all() });
+				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 			},
 			onError: (error) => toast.error(error.message),
 		}),

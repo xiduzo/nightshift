@@ -15,8 +15,12 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef } from "react";
-import { safeRedirect, TwoFactorSetup } from "@/features/access";
-import { authClient, orpc } from "@/shared/api";
+import {
+	accountQueries,
+	safeRedirect,
+	TwoFactorSetup,
+} from "@/features/access";
+import { authClient } from "@/shared/api";
 
 export const Route = createFileRoute("/two-factor")({
 	ssr: false,
@@ -35,7 +39,7 @@ function TwoFactorRoute() {
 	const navigate = useNavigate();
 	const router = useRouter();
 	const queryClient = useQueryClient();
-	const status = useQuery(orpc.account.status.queryOptions());
+	const status = useQuery(accountQueries.status());
 	/**
 	 * The setup started. It turns two-factor on before the backup codes
 	 * show, so from now on only Done leaves the page.

@@ -64,6 +64,8 @@ import {
 	copyInvitationLink,
 	InviteDialog,
 	roleLabel,
+	spaceMutations,
+	spaceQueries,
 } from "@/features/spaces";
 import type {
 	MembersOverview,
@@ -71,7 +73,6 @@ import type {
 	SpaceMember,
 	SpaceRole,
 } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 
@@ -81,7 +82,7 @@ export const Route = createFileRoute("/members")({
 });
 
 function MembersRoute() {
-	const overview = useQuery(orpc.members.list.queryOptions());
+	const overview = useQuery(spaceQueries.members());
 	const [inviting, setInviting] = useState(false);
 	const [creating, setCreating] = useState(false);
 	const data = overview.data;
@@ -175,7 +176,7 @@ function MembersRoute() {
 function useRefreshMembers() {
 	const queryClient = useQueryClient();
 	return () =>
-		void queryClient.invalidateQueries({ queryKey: orpc.members.list.key() });
+		void queryClient.invalidateQueries({ queryKey: spaceQueries.membersKey() });
 }
 
 /** The Members with their roles: change a role, or remove a Member. */
@@ -183,7 +184,7 @@ function MemberList({ overview }: { overview: MembersOverview }) {
 	const refresh = useRefreshMembers();
 	const [toRemove, setToRemove] = useState<SpaceMember | null>(null);
 	const setRole = useMutation(
-		orpc.members.setRole.mutationOptions({
+		spaceMutations.setRole({
 			onSuccess: () => {
 				toast.success("Role changed");
 				refresh();
@@ -192,7 +193,7 @@ function MemberList({ overview }: { overview: MembersOverview }) {
 		}),
 	);
 	const remove = useMutation(
-		orpc.members.remove.mutationOptions({
+		spaceMutations.removeMember({
 			onSuccess: () => {
 				toast.success(`${toRemove?.name ?? "The member"} left the Space`);
 				setToRemove(null);
@@ -342,7 +343,7 @@ function Invitations({
 }) {
 	const refresh = useRefreshMembers();
 	const cancel = useMutation(
-		orpc.members.cancelInvitation.mutationOptions({
+		spaceMutations.cancelInvitation({
 			onSuccess: () => {
 				toast.success("Invitation canceled");
 				refresh();

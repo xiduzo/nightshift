@@ -48,13 +48,14 @@ import {
 	BaseRefCombobox,
 	FlowInputFields,
 	filledInputs,
+	flowQueries,
 	type InputTexts,
 	jsonProblem,
 	missingInputs,
 	useProjectFlows,
 } from "@/features/flows";
-import { orpc } from "@/shared/api";
 import { formatDayTime } from "@/shared/format";
+import { scheduleQueries } from "./queries";
 
 /** Monday first, the way a week reads. Day numbers as cron counts them: 0 is Sunday. */
 const WEEK = [
@@ -163,7 +164,7 @@ function ScheduleForm({
 	onSave: (schedule: Schedule) => void;
 }) {
 	const id = useId();
-	const list = useQuery(orpc.flows.list.queryOptions({ input: { projectId } }));
+	const list = useQuery(flowQueries.list(projectId));
 	const project = useProjectFlows(projectId);
 	const flowNames = (list.data ?? []).map((flow) => flow.name);
 	const [flow, setFlow] = useState(schedule?.flow ?? "");
@@ -188,7 +189,7 @@ function ScheduleForm({
 	const cron = cronOf(when);
 	const cronProblem = cron === null ? null : cronError(cron);
 	const preview = useQuery({
-		...orpc.schedules.preview.queryOptions({ input: { cron: cron ?? "" } }),
+		...scheduleQueries.preview(cron ?? ""),
 		enabled: cron !== null && cronProblem === null,
 	});
 	const missing = missingInputs(inputs, values);

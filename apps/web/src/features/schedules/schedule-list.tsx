@@ -40,13 +40,13 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { RunStatusBadge } from "@/features/runs";
+import { RunStatusBadge, runQueries } from "@/features/runs";
+import { settingsQueries } from "@/features/settings";
 import type {
 	ScheduleIssue,
 	ScheduleResult,
 	ScheduleSummary,
 } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	dayWord,
@@ -57,7 +57,7 @@ import {
 	useNow,
 } from "@/shared/format";
 import { PageHeading } from "@/shared/page";
-
+import { scheduleMutations, scheduleQueries } from "./queries";
 import { ScheduleDialog } from "./schedule-dialog";
 
 /** The schedule as the file holds it, without what the engine derived. */
@@ -74,10 +74,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 	const queryClient = useQueryClient();
 	const now = useNow(30_000);
 	const list = useQuery({
-		...orpc.schedules.list.queryOptions({ input: { projectId } }),
-		// The next start moves on and a schedule may have fired.
-		refetchInterval: 30_000,
-		meta: { quietRefetchErrors: true },
+		...scheduleQueries.listLive(projectId),
 	});
 	const [editing, setEditing] = useState<{ schedule: Schedule | null } | null>(
 		null,
@@ -85,7 +82,7 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 	const [toDelete, setToDelete] = useState<ScheduleSummary | null>(null);
 	const schedules = list.data?.schedules ?? [];
 	// Settings → Runs can turn the scheduler off; then no schedule starts.
-	const settings = useQuery(orpc.settings.get.queryOptions());
+	const settings = useQuery(settingsQueries.get());
 	const schedulerOff = settings.data ? !settings.data.values.scheduler : false;
 	const schedulerLock = settings.data?.fields.scheduler.locked;
 
@@ -97,16 +94,16 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 	useEffect(() => {
 		if (!list.data) return;
 		if (seenFired.current !== null && seenFired.current !== fired) {
-			void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+			void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 		}
 		seenFired.current = fired;
 	}, [fired, list.data, queryClient]);
 
 	const save = useMutation(
-		orpc.schedules.save.mutationOptions({
+		scheduleMutations.save({
 			onSuccess: (issues) => {
 				void queryClient.invalidateQueries({
-					queryKey: orpc.schedules.key(),
+					queryKey: scheduleQueries.all(),
 				});
 				const errors = issues.filter((issue) => issue.severity === "error");
 				if (errors.length > 0) {

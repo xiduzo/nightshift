@@ -18,6 +18,7 @@ export { InspectorHeader, InspectorSection } from "./editor/fields";
 export { FlowEditor } from "./editor/flow-editor";
 export { newFlow } from "./flow-draft";
 export { FlowList } from "./flow-list";
+export { flowQueries } from "./queries";
 export { BaseRefCombobox } from "./start/base-ref-combobox";
 export type { InputTexts } from "./start/flow-input-fields";
 export {

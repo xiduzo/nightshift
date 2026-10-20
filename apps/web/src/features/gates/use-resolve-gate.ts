@@ -2,7 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { outcomeLabel } from "@/features/flows";
-import { orpc } from "@/shared/api";
+import { runQueries } from "@/features/runs/queries";
+import { gateMutations, gateQueries } from "./queries";
 
 /**
  * Answers an open Gate. On success it toasts, takes the Gate out of the
@@ -18,7 +19,7 @@ export function useResolveGate({
 } = {}) {
 	const queryClient = useQueryClient();
 	return useMutation(
-		orpc.gates.resolve.mutationOptions({
+		gateMutations.resolve({
 			onSuccess: (_, input) => {
 				toast.success(
 					`Answered ${outcomeLabel(input.choice)}${runTitle ? ` · ${runTitle}` : ""}`,
@@ -29,11 +30,11 @@ export function useResolveGate({
 					},
 				);
 				// Out of the inbox at once; the refetch confirms it.
-				queryClient.setQueryData(orpc.gates.list.queryKey(), (gates) =>
+				queryClient.setQueryData(gateQueries.open().queryKey, (gates) =>
 					gates?.filter((gate) => gate.stepId !== input.stepId),
 				);
-				void queryClient.invalidateQueries({ queryKey: orpc.gates.key() });
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+				void queryClient.invalidateQueries({ queryKey: gateQueries.all() });
+				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 			},
 			onError: (error) => toast.error(`Could not answer: ${error.message}`),
 		}),

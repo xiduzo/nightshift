@@ -51,6 +51,8 @@ import {
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
 import {
+	deviceMutations,
+	deviceQueries,
 	JoinHostDialog,
 	PairDeviceDialog,
 	platformName,
@@ -59,7 +61,6 @@ import {
 	ThisComputerOffers,
 } from "@/features/devices";
 import type { LinkedHost, PairedDevice } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { formatRelative, useNow } from "@/shared/format";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 
@@ -75,11 +76,7 @@ export const Route = createFileRoute("/devices")({
 function DevicesRoute() {
 	const { pair } = Route.useSearch();
 	const navigate = Route.useNavigate();
-	const overview = useQuery({
-		...orpc.devices.list.queryOptions(),
-		refetchInterval: 5_000,
-		meta: { quietRefetchErrors: true },
-	});
+	const overview = useQuery(deviceQueries.overviewLive());
 	const computer = overview.data?.thisComputer ?? null;
 	const isHost = computer ? computer.host.enabled : true;
 	const [pairing, setPairing] = useState(false);
@@ -176,12 +173,12 @@ function PairedDevices({
 	const queryClient = useQueryClient();
 	const [toRemove, setToRemove] = useState<PairedDevice | null>(null);
 	const revoke = useMutation(
-		orpc.devices.revoke.mutationOptions({
+		deviceMutations.revoke({
 			onSuccess: () => {
 				toast.success(`${toRemove?.name ?? "The device"} has no access now`);
 				setToRemove(null);
 				void queryClient.invalidateQueries({
-					queryKey: orpc.devices.list.key(),
+					queryKey: deviceQueries.overviewKey(),
 				});
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),

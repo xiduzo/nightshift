@@ -28,8 +28,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderGitIcon, FolderOpenIcon, PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { orpc } from "@/shared/api";
 import { ProjectReadiness } from "./project-readiness";
+import { projectMutations, projectQueries } from "./queries";
 
 /** Adds a folder as a project, in a dialog, after its readiness check. */
 export function AddProjectDialog({
@@ -56,7 +56,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 
 	// The server opens the native folder picker on this Mac.
 	const chooseFolder = useMutation(
-		orpc.projects.chooseFolder.mutationOptions({
+		projectMutations.chooseFolder({
 			onSuccess: (path) => {
 				if (path) setRepoPath(path);
 			},
@@ -64,25 +64,23 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 	);
 
 	const addProject = useMutation(
-		orpc.projects.add.mutationOptions({
+		projectMutations.add({
 			onSuccess: (project) => {
 				toast.success(`Added ${project.name}`);
 				setRepoPath("");
 				setName("");
 				void queryClient.invalidateQueries({
-					queryKey: orpc.projects.key(),
+					queryKey: projectQueries.all(),
 				});
 				onAdded?.();
 			},
 		}),
 	);
 
-	const readiness = useQuery(
-		orpc.projects.check.queryOptions({
-			input: { path: repoPath },
-			enabled: repoPath !== "",
-		}),
-	);
+	const readiness = useQuery({
+		...projectQueries.check(repoPath),
+		enabled: repoPath !== "",
+	});
 	const ready = readiness.data?.ready === true;
 
 	const folderName = repoPath.split("/").at(-1) || repoPath;

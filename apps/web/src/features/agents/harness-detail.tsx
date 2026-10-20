@@ -37,12 +37,12 @@ import type {
 	HarnessRowName,
 	SettingsView,
 } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { CliCheckBadge, CliPanel, toolFor } from "./connections/cli-panel";
 import { MonoTile } from "./connections/parts";
 import { DetailSection, DetailShell } from "./detail-shell";
 import type { BuiltInHarnessName } from "./harnesses";
 import { ModelSourceHint, useHarnessModels } from "./model-combobox";
+import { harnessMutations, harnessQueries } from "./queries";
 
 export function HarnessDetail({
 	harness,
@@ -59,11 +59,11 @@ export function HarnessDetail({
 	const [removing, setRemoving] = useState(false);
 	const models = useHarnessModels(harness.name);
 	const remove = useMutation(
-		orpc.harnesses.remove.mutationOptions({
+		harnessMutations.remove({
 			onSuccess: () => {
 				toast.success(`Removed ${harness.label}`);
 				void queryClient.invalidateQueries({
-					queryKey: orpc.harnesses.key(),
+					queryKey: harnessQueries.all(),
 				});
 				onRemoved();
 			},
@@ -208,10 +208,10 @@ export function HarnessPicker({
 }) {
 	const queryClient = useQueryClient();
 	const add = useMutation(
-		orpc.harnesses.add.mutationOptions({
+		harnessMutations.add({
 			onSuccess: (_, input) => {
 				void queryClient.invalidateQueries({
-					queryKey: orpc.harnesses.key(),
+					queryKey: harnessQueries.all(),
 				});
 				onOpenChange(false);
 				onAdded(input.harness as HarnessRowName);

@@ -18,8 +18,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { CircleAlertIcon, CircleUserRoundIcon } from "lucide-react";
 
-import { TwoFactorSection } from "@/features/access";
-import { authClient, orpc } from "@/shared/api";
+import { accountQueries, TwoFactorSection } from "@/features/access";
+import { authClient } from "@/shared/api";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 
 export const Route = createFileRoute("/account")({
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/account")({
 function AccountRoute() {
 	// Not the session hook: it empties while it reloads, which would close
 	// a dialog in the middle of the two-factor setup.
-	const status = useQuery(orpc.account.status.queryOptions());
+	const status = useQuery(accountQueries.status());
 	const user = status.data?.person;
 
 	return (

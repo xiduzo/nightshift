@@ -35,7 +35,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CopyIcon, SendIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { orpc } from "@/shared/api";
+import { spaceMutations, spaceQueries } from "./queries";
 import { INVITE_ROLES, roleLabel } from "./roles";
 
 /** The link that opens an invitation: its id is the secret. */
@@ -83,10 +83,10 @@ function InviteForm({ spaceName }: { spaceName: string }) {
 	const [email, setEmail] = useState("");
 	const [role, setRole] = useState<InviteRole>("member");
 	const invite = useMutation(
-		orpc.members.invite.mutationOptions({
+		spaceMutations.invite({
 			onSuccess: () => {
 				void queryClient.invalidateQueries({
-					queryKey: orpc.members.list.key(),
+					queryKey: spaceQueries.membersKey(),
 				});
 			},
 		}),

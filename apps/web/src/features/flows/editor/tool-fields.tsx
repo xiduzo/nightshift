@@ -15,9 +15,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { PlusIcon, XIcon } from "lucide-react";
 import { useId, useState } from "react";
-import { orpc } from "@/shared/api";
+import { connectionQueries } from "@/features/agents";
 import { missingConnectionMessage } from "../flow-draft";
-
 import { connectionKind, type DaemonConnection } from "./connections-field";
 import { Field, InspectorSection, Note } from "./fields";
 import { TemplateField } from "./template-field";
@@ -48,9 +47,7 @@ export function ToolFields({
 	const noServers = connections?.length === 0 && !picked;
 
 	const tools = useQuery({
-		...orpc.connections.tools.queryOptions({
-			input: { name: node.connection },
-		}),
+		...connectionQueries.tools(node.connection),
 		enabled: picked && !missing && connections !== undefined,
 		staleTime: 60_000,
 		retry: false,

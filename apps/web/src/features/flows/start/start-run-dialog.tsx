@@ -34,7 +34,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { PlayIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { orpc } from "@/shared/api";
+import { runMutations, runQueries } from "@/features/runs/queries";
 import {
 	dayWord,
 	formatDayTime,
@@ -42,9 +42,7 @@ import {
 	nextOccurrence,
 	useNow,
 } from "@/shared/format";
-
 import { BaseRefCombobox } from "./base-ref-combobox";
-
 import {
 	FlowInputFields,
 	filledInputs,
@@ -196,9 +194,7 @@ function StartRunForm({
 	);
 	const [baseRef, setBaseRef] = useState("");
 	// Where the steps run: this computer when it has the project, else the first.
-	const placements = useQuery(
-		orpc.runs.placements.queryOptions({ input: { projectId } }),
-	);
+	const placements = useQuery(runQueries.placements(projectId));
 	const [chosenDevice, setChosenDevice] = useState<string | null>(null);
 	const devices = placements.data ?? [];
 	const device =
@@ -210,7 +206,7 @@ function StartRunForm({
 	const noDevice = placements.isSuccess && devices.length === 0;
 	const now = useNow(15_000);
 	// Recent branches of this project's runs: a night can go on from an open stack.
-	const runs = useQuery(orpc.runs.list.queryOptions({ input: { projectId } }));
+	const runs = useQuery(runQueries.ofProject(projectId));
 	const recentRefs = [
 		...new Set((runs.data ?? []).flatMap((run) => [run.branch, run.baseRef])),
 	].slice(0, 12);
@@ -226,10 +222,10 @@ function StartRunForm({
 		stopInvalid || missing.length > 0 || badJson.length > 0 || noDevice;
 
 	const startRun = useMutation(
-		orpc.runs.start.mutationOptions({
+		runMutations.start({
 			onSuccess: (run) => {
 				onStarted();
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 				void navigate({ to: "/runs/$runId", params: { runId: run.id } });
 			},
 			onError: (error) => toast.error(`Could not start: ${error.message}`),

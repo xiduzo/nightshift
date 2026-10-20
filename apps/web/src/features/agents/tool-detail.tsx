@@ -37,11 +37,15 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Connection } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { FactList, OffMachineNote, VariableBadge } from "./connections/parts";
 import { McpTestOutcome } from "./connections/test-result";
 
 import { DetailSection, DetailShell } from "./detail-shell";
+import {
+	connectionMutations,
+	connectionQueries,
+	profileQueries,
+} from "./queries";
 
 function host(url: string): string {
 	try {
@@ -74,15 +78,15 @@ export function ToolDetail({
 }) {
 	const queryClient = useQueryClient();
 	const [removing, setRemoving] = useState(false);
-	const test = useMutation(orpc.connections.test.mutationOptions());
+	const test = useMutation(connectionMutations.test());
 	const remove = useMutation(
-		orpc.connections.remove.mutationOptions({
+		connectionMutations.remove({
 			onSuccess: () => {
 				toast.success(`Removed ${connection.name}`);
 				void queryClient.invalidateQueries({
-					queryKey: orpc.connections.list.key(),
+					queryKey: connectionQueries.lists(),
 				});
-				void queryClient.invalidateQueries({ queryKey: orpc.profiles.key() });
+				void queryClient.invalidateQueries({ queryKey: profileQueries.all() });
 				onRemoved();
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),

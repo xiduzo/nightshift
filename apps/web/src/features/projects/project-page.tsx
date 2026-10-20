@@ -14,8 +14,8 @@ import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, FolderXIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Project } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { type Crumb, SiteHeader } from "@/shared/page";
+import { projectQueries } from "./queries";
 
 /**
  * The frame of every page inside a project folder: the header with
@@ -35,7 +35,7 @@ export function ProjectPage({
 	actions?: (project: Project) => ReactNode;
 	children: (project: Project) => ReactNode;
 }) {
-	const projects = useQuery(orpc.projects.list.queryOptions());
+	const projects = useQuery(projectQueries.list());
 	const project = projects.data?.find((p) => p.id === projectId);
 
 	const crumbs = (projectLabel: ReactNode): Crumb[] => [

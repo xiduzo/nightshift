@@ -42,19 +42,21 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
-
+import {
+	settingsMutations,
+	settingsQueries,
+} from "@/features/settings/queries";
 import type { ThisComputer } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
-
 import { platformName } from "./platform";
+import { deviceQueries } from "./queries";
 
 /**
  * This computer: its name, where its data is, whether Night Shift runs, and
  * "Be a Host" with the addresses other computers use. Its owner's only.
  */
 export function ThisComputerCard({ computer }: { computer: ThisComputer }) {
-	const settings = useQuery(orpc.settings.get.queryOptions());
+	const settings = useQuery(settingsQueries.get());
 	const daemon = settings.data?.daemon;
 	const dataDir = daemon?.dataDir;
 	const lease = daemon?.lease;
@@ -184,11 +186,11 @@ function HostSettings({ computer }: { computer: ThisComputer }) {
 	useEffect(() => setDraft(saved), [saved]);
 
 	const save = useMutation(
-		orpc.settings.save.mutationOptions({
+		settingsMutations.save({
 			onSuccess: (data) => {
-				queryClient.setQueryData(orpc.settings.get.queryKey(), data);
+				queryClient.setQueryData(settingsQueries.get().queryKey, data);
 				void queryClient.invalidateQueries({
-					queryKey: orpc.devices.list.key(),
+					queryKey: deviceQueries.overviewKey(),
 				});
 			},
 			onError: (error) => toast.error(`Not saved: ${error.message}`),

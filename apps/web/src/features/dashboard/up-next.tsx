@@ -18,8 +18,8 @@ import {
 	MoonIcon,
 	OctagonPauseIcon,
 } from "lucide-react";
+import { scheduleQueries } from "@/features/schedules";
 import type { RunSummary } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import {
 	dayWord,
 	formatDateTime,
@@ -49,11 +49,7 @@ export function UpNext({
 	runs: RunSummary[] | undefined;
 }) {
 	const now = useNow(60_000);
-	const schedules = useQuery({
-		...orpc.schedules.list.queryOptions({ input: { projectId } }),
-		refetchInterval: 30_000,
-		meta: { quietRefetchErrors: true },
-	});
+	const schedules = useQuery(scheduleQueries.listLive(projectId));
 
 	const upcoming: Upcoming[] = [
 		...(schedules.data?.schedules ?? []).flatMap((schedule) =>

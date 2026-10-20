@@ -2,7 +2,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import type { RunStatus, StepSummary, TranscriptEntry } from "@/shared/api";
-import { client, orpc } from "@/shared/api";
+import { client } from "@/shared/api";
+import { runQueries } from "../queries";
 import {
 	applyEntries,
 	emptyRunTranscript,
@@ -74,7 +75,7 @@ export function useRunStream(runId: string) {
 		const scheduleRefetch = () => {
 			refetchTimer ??= setTimeout(() => {
 				refetchTimer = null;
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 			}, REFETCH_MS);
 		};
 

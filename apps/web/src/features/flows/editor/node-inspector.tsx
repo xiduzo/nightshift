@@ -44,6 +44,8 @@ import {
 } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import {
+	cliToolQueries,
+	deciderQueries,
 	EFFORTS,
 	HARNESSES,
 	type HarnessName,
@@ -51,11 +53,11 @@ import {
 	ModelCombobox,
 	PERMISSION_MODES,
 	permissionLabel,
+	profileQueries,
 	switchHarness,
 	useCustomAgents,
 } from "@/features/agents";
 import type { Effort, PermissionMode, ProfileRow } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { DECIDED_BY_ICON, NODE_TYPE, VALUE_BY_ICON } from "../canvas/node-type";
 import {
 	type NodeOption,
@@ -497,7 +499,7 @@ function IdField({
 
 function useProfile(node: AgentNode) {
 	const profiles = useQuery({
-		...orpc.profiles.list.queryOptions(),
+		...profileQueries.list(),
 		staleTime: 30_000,
 		meta: { quietErrors: true },
 	});
@@ -922,7 +924,7 @@ function AgentAdvanced({
 	const { profile } = useProfile(node);
 	const id = useId();
 	const cliTools = useQuery({
-		...orpc.cliTools.list.queryOptions(),
+		...cliToolQueries.list(),
 		staleTime: 30_000,
 		meta: { quietErrors: true },
 	});
@@ -1411,7 +1413,7 @@ function DecisionFields({
 				? "The model picks exactly one. Each option gets its own edge. A description tells the model when to pick it."
 				: "Night Shift tries the rules from top to bottom and picks the first option whose rule holds. Leave the last option without a rule: it is picked when none holds.";
 
-	const deciders = useQuery(orpc.deciders.list.queryOptions());
+	const deciders = useQuery(deciderQueries.list());
 	const decider = deciders.data?.find((d) => d.name === node.decider);
 	const keyMissing = decider?.apiKeySource === "missing";
 	return (
@@ -1607,7 +1609,7 @@ function ValueFields({
 }) {
 	const id = useId();
 	const { by } = node;
-	const deciders = useQuery(orpc.deciders.list.queryOptions());
+	const deciders = useQuery(deciderQueries.list());
 	const makers = (deciders.data ?? []).filter((d) => d.value !== null);
 	const decider = deciders.data?.find((d) => d.name === node.decider);
 	const keyMissing = decider?.apiKeySource === "missing";
@@ -1965,7 +1967,7 @@ function CheckerFields({
 	checker: Checker;
 	onChange: (checker: Checker) => void;
 }) {
-	const deciders = useQuery(orpc.deciders.list.queryOptions());
+	const deciders = useQuery(deciderQueries.list());
 	const decider = deciders.data?.find((d) => d.name === checker.decider);
 	const keyMissing = decider?.apiKeySource === "missing";
 	return (

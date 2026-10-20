@@ -19,8 +19,8 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, CircleAlertIcon, FileWarningIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { FlowEditor, newFlow } from "@/features/flows";
-import { orpc } from "@/shared/api";
+import { FlowEditor, flowQueries, newFlow } from "@/features/flows";
+import { projectQueries } from "@/features/projects";
 import { type Crumb, SiteHeader } from "@/shared/page";
 
 export const Route = createFileRoute("/projects/$projectId/flows/$name")({
@@ -32,9 +32,9 @@ export const Route = createFileRoute("/projects/$projectId/flows/$name")({
 function FlowEditorRoute() {
 	const { projectId, name } = Route.useParams();
 	const validName = flowNameSchema.safeParse(name).success;
-	const projects = useQuery(orpc.projects.list.queryOptions());
+	const projects = useQuery(projectQueries.list());
 	const loaded = useQuery({
-		...orpc.flows.get.queryOptions({ input: { projectId, name } }),
+		...flowQueries.get(projectId, name),
 		enabled: validName,
 		// The editor owns the draft once it opens; a refetch must not reset it.
 		staleTime: Number.POSITIVE_INFINITY,

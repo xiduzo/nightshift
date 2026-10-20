@@ -3,11 +3,9 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
 import { useOpenGates } from "@/features/gates";
+import { runQueries } from "@/features/runs";
+import { settingsQueries } from "@/features/settings";
 import type { OpenGate, RunStatus, RunSummary } from "@/shared/api";
-import { orpc } from "@/shared/api";
-
-/** How often the runs are read for a change of status. */
-const RUNS_POLL_MS = 10_000;
 
 /** True when this browser can show desktop notifications. */
 export function notificationsSupported(): boolean {
@@ -27,15 +25,11 @@ const gateKey = (gate: OpenGate) => `${gate.runId}:${gate.stepId}`;
 export function useNightNotifications() {
 	const navigate = useNavigate();
 	const settings = useQuery({
-		...orpc.settings.get.queryOptions(),
+		...settingsQueries.get(),
 		meta: { quietErrors: true },
 	});
 	const gates = useOpenGates();
-	const runs = useQuery({
-		...orpc.runs.list.queryOptions({ input: {} }),
-		refetchInterval: RUNS_POLL_MS,
-		meta: { quietErrors: true },
-	});
+	const runs = useQuery(runQueries.everyRunForNotifications());
 
 	const seenGates = useRef<Set<string> | null>(null);
 	const runStatus = useRef<Map<string, RunStatus> | null>(null);

@@ -7,7 +7,7 @@ import {
 } from "@nightshift/flows";
 import { useQuery } from "@tanstack/react-query";
 
-import { orpc } from "@/shared/api";
+import { harnessQueries } from "./queries";
 
 /** A built-in harness, or a custom agent (`acp:<slug>`). */
 export type HarnessName = NonNullable<AgentNode["harness"]>;
@@ -191,7 +191,7 @@ export const isHarnessName = (name: string): name is HarnessName =>
  */
 export function useCustomAgents(): CustomAgent[] {
 	const query = useQuery({
-		...orpc.harnesses.list.queryOptions(),
+		...harnessQueries.list(),
 		staleTime: 60_000,
 		meta: { quietErrors: true },
 	});

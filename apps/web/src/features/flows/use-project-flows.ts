@@ -2,7 +2,7 @@ import type { Flow } from "@nightshift/flows";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { orpc } from "@/shared/api";
+import { flowQueries } from "./queries";
 
 /** Other flow files change rarely while one is open in the editor. */
 const STALE_MS = 30_000;
@@ -24,7 +24,7 @@ export function useProjectFlows(
 	except?: string,
 ): ProjectFlows {
 	const list = useQuery({
-		...orpc.flows.list.queryOptions({ input: { projectId } }),
+		...flowQueries.list(projectId),
 		staleTime: STALE_MS,
 	});
 	const names = (list.data ?? [])
@@ -33,7 +33,7 @@ export function useProjectFlows(
 
 	const results = useQueries({
 		queries: names.map((name) => ({
-			...orpc.flows.get.queryOptions({ input: { projectId, name } }),
+			...flowQueries.get(projectId, name),
 			staleTime: STALE_MS,
 			refetchOnWindowFocus: false,
 			meta: { quietErrors: true },

@@ -11,9 +11,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
+import { flowQueries } from "@/features/flows";
 import { RunStatusBadge } from "@/features/runs";
 import type { Project, RunSummary } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	formatCost,
@@ -49,9 +49,7 @@ export function FlowHealth({
 	runs: RunSummary[] | undefined;
 }) {
 	const now = useNow(60_000);
-	const flows = useQuery(
-		orpc.flows.list.queryOptions({ input: { projectId: project.id } }),
-	);
+	const flows = useQuery(flowQueries.list(project.id));
 	// The name stays while the dialog closes, so its body does not go blank.
 	const [details, setDetails] = useState<{ name: string; open: boolean }>();
 

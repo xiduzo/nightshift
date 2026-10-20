@@ -37,7 +37,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import type { GitInstall, ProjectCheck } from "@/shared/api";
-import { orpc } from "@/shared/api";
+import { projectMutations, projectQueries } from "./queries";
 
 type Readiness = ProjectCheck;
 type Step = Readiness["steps"][number];
@@ -79,11 +79,11 @@ export function ProjectReadiness({
 
 	const refresh = () =>
 		queryClient.invalidateQueries({
-			queryKey: orpc.projects.check.key({ input: { path: readiness.path } }),
+			queryKey: projectQueries.checkKey(readiness.path),
 		});
 
 	const installGit = useMutation(
-		orpc.projects.installGit.mutationOptions({
+		projectMutations.installGit({
 			onSuccess: (result) => {
 				setConfirm(null);
 				setInstall(result);
@@ -270,7 +270,7 @@ function SetUpGitDialog({
 	const [name, setName] = useState("");
 	const [email, setEmail] = useState("");
 	const setUpGit = useMutation(
-		orpc.projects.setUpGit.mutationOptions({
+		projectMutations.setUpGit({
 			onSuccess: () => {
 				toast.success("Git is set up in this folder");
 				onDone();

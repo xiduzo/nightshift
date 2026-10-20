@@ -31,10 +31,14 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import {
+	settingsMutations,
+	settingsQueries,
+} from "@/features/settings/queries";
 import type { CheckTarget, CliCheck, SettingsView } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { formatDateTime, formatTime } from "@/shared/format";
 import { HARNESSES, type HarnessInfo } from "../harnesses";
+import { connectionQueries } from "../queries";
 import { CheckBadge, type CheckState, FactList, OffMachineNote } from "./parts";
 
 type BinKey = HarnessInfo["setting"] & keyof SettingsView["fields"];
@@ -218,7 +222,7 @@ export function CliPanel({
 /** The read-only check of one CLI, shared by the list badges and the detail. */
 export function useCliCheck(target: CheckTarget) {
 	return useQuery({
-		...orpc.connections.check.queryOptions({ input: { target } }),
+		...connectionQueries.check(target),
 		staleTime: 60_000,
 		meta: { quietErrors: true },
 	});
@@ -281,16 +285,14 @@ function ChangePathForm({
 	const saved = settings.fields[key].source === "saved";
 
 	const save = useMutation(
-		orpc.settings.save.mutationOptions({
+		settingsMutations.save({
 			onSuccess: (next, patch) => {
-				queryClient.setQueryData(orpc.settings.get.queryKey(), next);
+				queryClient.setQueryData(settingsQueries.get().queryKey, next);
 				void queryClient.invalidateQueries({
-					queryKey: orpc.settings.key(),
+					queryKey: settingsQueries.all(),
 				});
 				void queryClient.invalidateQueries({
-					queryKey: orpc.connections.check.queryKey({
-						input: { target: tool.target },
-					}),
+					queryKey: connectionQueries.check(tool.target).queryKey,
 				});
 				toast.success(
 					patch[key] === null

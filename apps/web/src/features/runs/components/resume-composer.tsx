@@ -13,7 +13,7 @@ import { PlayIcon } from "lucide-react";
 import { useId, useState } from "react";
 
 import type { StepSummary } from "@/shared/api";
-import { orpc } from "@/shared/api";
+import { runMutations, runQueries } from "../queries";
 
 /** Continues a stopped, failed or interrupted run at its last step's node. */
 export function ResumeComposer({
@@ -30,10 +30,10 @@ export function ResumeComposer({
 	const [prompt, setPrompt] = useState("");
 
 	const resumeRun = useMutation(
-		orpc.runs.resume.mutationOptions({
+		runMutations.resume({
 			onSuccess: () => {
 				setPrompt("");
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 			},
 		}),
 	);

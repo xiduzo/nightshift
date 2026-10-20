@@ -11,8 +11,8 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { HarnessRowName } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { harnessInfo, useCustomAgents } from "./harnesses";
+import { harnessQueries } from "./queries";
 
 /**
  * The models a harness offers: its adapter's list, plus what the CLI lists
@@ -20,7 +20,7 @@ import { harnessInfo, useCustomAgents } from "./harnesses";
  */
 export function useHarnessModels(harness: HarnessRowName) {
 	const query = useQuery({
-		...orpc.harnesses.models.queryOptions({ input: { harness } }),
+		...harnessQueries.models(harness),
 		staleTime: 5 * 60_000,
 		meta: { quietErrors: true },
 	});

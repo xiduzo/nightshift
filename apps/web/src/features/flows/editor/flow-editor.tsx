@@ -31,7 +31,9 @@ import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { CheckIcon, CircleDotIcon, PlayIcon, SaveIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { orpc } from "@/shared/api";
+import { connectionQueries, profileQueries } from "@/features/agents";
+import { runQueries } from "@/features/runs/queries";
+import { settingsQueries } from "@/features/settings/queries";
 import { useMediaQuery } from "@/shared/media-query";
 import { SiteHeader } from "@/shared/page";
 import { OpenFlowContext } from "../canvas/open-flow-context";
@@ -57,9 +59,9 @@ import {
 	updateEdge,
 	updateNode,
 } from "../flow-draft";
+import { flowMutations, flowQueries } from "../queries";
 import { StartRunDialog } from "../start/start-run-dialog";
 import { useProjectFlows } from "../use-project-flows";
-
 import { EdgeInspector } from "./edge-inspector";
 import { EditorCanvas, NodePalette, type Selection } from "./editor-canvas";
 import { FlowInspector } from "./flow-inspector";
@@ -109,12 +111,12 @@ function Editor({
 	const projectFlows = useProjectFlows(projectId, name);
 	// Your devices, for where a node runs.
 	const myDevices = useQuery({
-		...orpc.runs.devices.queryOptions({ input: { projectId } }),
+		...runQueries.devices(projectId),
 		meta: { quietErrors: true },
 	});
 	// The daemon's settings (new-node defaults, run policy) and connections.
-	const settings = useQuery(orpc.settings.get.queryOptions());
-	const daemonConnections = useQuery(orpc.connections.list.queryOptions());
+	const settings = useQuery(settingsQueries.get());
+	const daemonConnections = useQuery(connectionQueries.list());
 	const nodeDefaults = settings.data?.values;
 	const policyDefaults = useMemo((): Required<Policy> | undefined => {
 		const values = settings.data?.values;
@@ -132,7 +134,7 @@ function Editor({
 		() => connections?.map((connection) => connection.name),
 		[connections],
 	);
-	const daemonProfiles = useQuery(orpc.profiles.list.queryOptions());
+	const daemonProfiles = useQuery(profileQueries.list());
 	const profileNames = useMemo(
 		() => daemonProfiles.data?.map((profile) => profile.name),
 		[daemonProfiles.data],
@@ -155,7 +157,7 @@ function Editor({
 	);
 
 	const saveFlow = useMutation(
-		orpc.flows.save.mutationOptions({
+		flowMutations.save({
 			onError: (error) => toast.error(`Could not save: ${error.message}`),
 		}),
 	);
@@ -167,11 +169,11 @@ function Editor({
 		(snapshot: Flow, issues: FlowIssue[]) => {
 			setSavedJson(JSON.stringify(snapshot));
 			queryClient.setQueryData(
-				orpc.flows.get.queryKey({ input: { projectId, name } }),
+				flowQueries.get(projectId, name).queryKey,
 				(loaded) => (loaded ? { ...loaded, flow: snapshot, issues } : loaded),
 			);
 			void queryClient.invalidateQueries({
-				queryKey: orpc.flows.list.key(),
+				queryKey: flowQueries.lists(),
 			});
 		},
 		[queryClient, projectId, name],
@@ -210,7 +212,7 @@ function Editor({
 	);
 
 	// A new called flow: write it, point the node at it, save this flow, open it.
-	const createCalled = useMutation(orpc.flows.save.mutationOptions());
+	const createCalled = useMutation(flowMutations.save());
 	const createCalledFlow = async (nodeId: string, calledName: string) => {
 		const node = draft.nodes.find((candidate) => candidate.id === nodeId);
 		if (node?.type !== "call") return;
@@ -228,7 +230,7 @@ function Editor({
 			);
 			return;
 		}
-		void queryClient.invalidateQueries({ queryKey: orpc.flows.list.key() });
+		void queryClient.invalidateQueries({ queryKey: flowQueries.lists() });
 		const next = updateNode(draft, nodeId, (current) =>
 			current.type === "call" ? { ...current, flow: calledName } : current,
 		);

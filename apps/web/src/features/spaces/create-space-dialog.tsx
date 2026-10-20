@@ -22,7 +22,7 @@ import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
-import { orpc } from "@/shared/api";
+import { spaceMutations } from "./queries";
 
 /**
  * Creates a Space with you as its owner, then switches to it. Your
@@ -52,7 +52,7 @@ function CreateSpaceForm({ onCreated }: { onCreated: () => void }) {
 	const queryClient = useQueryClient();
 	const [name, setName] = useState("");
 	const create = useMutation(
-		orpc.spaces.create.mutationOptions({
+		spaceMutations.create({
 			onSuccess: async () => {
 				toast.success(`Created ${name.trim()}`);
 				onCreated();

@@ -2,5 +2,6 @@
 
 export { CreateSpaceDialog } from "./create-space-dialog";
 export { copyInvitationLink, InviteDialog } from "./invite-dialog";
+export { spaceMutations, spaceQueries } from "./queries";
 export { ALL_ROLES, roleLabel } from "./roles";
 export { SpaceSwitcher } from "./space-switcher";

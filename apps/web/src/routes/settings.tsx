@@ -87,11 +87,25 @@ import {
 import { useTheme } from "next-themes";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
-import { HARNESSES, type HarnessName, harnessInfo } from "@/features/agents";
-import { projectFolder } from "@/features/projects";
-import { PERMISSION_MODES } from "@/features/settings";
+import {
+	deciderQueries,
+	HARNESSES,
+	type HarnessName,
+	harnessInfo,
+} from "@/features/agents";
+import { flowQueries } from "@/features/flows";
+import {
+	projectFolder,
+	projectMutations,
+	projectQueries,
+} from "@/features/projects";
+import { runQueries } from "@/features/runs";
+import {
+	PERMISSION_MODES,
+	settingsMutations,
+	settingsQueries,
+} from "@/features/settings";
 import type { Project, SettingsView } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 import { notificationsSupported } from "@/shared/shell";
@@ -158,7 +172,7 @@ function parseDraft(
 }
 
 function SettingsComponent() {
-	const settings = useQuery(orpc.settings.get.queryOptions());
+	const settings = useQuery(settingsQueries.get());
 
 	return (
 		<>
@@ -222,9 +236,9 @@ function SettingsComponent() {
 function useSaveSettings() {
 	const queryClient = useQueryClient();
 	return useMutation(
-		orpc.settings.save.mutationOptions({
+		settingsMutations.save({
 			onSuccess: (data) => {
-				queryClient.setQueryData(orpc.settings.get.queryKey(), data);
+				queryClient.setQueryData(settingsQueries.get().queryKey, data);
 			},
 		}),
 	);
@@ -236,9 +250,9 @@ function useSaveSettings() {
  */
 function useToggleSetting() {
 	const queryClient = useQueryClient();
-	const queryKey = orpc.settings.get.queryKey();
+	const queryKey = settingsQueries.get().queryKey;
 	return useMutation(
-		orpc.settings.save.mutationOptions({
+		settingsMutations.save({
 			onMutate: async (patch) => {
 				await queryClient.cancelQueries({ queryKey });
 				const before = queryClient.getQueryData<SettingsView>(queryKey);
@@ -600,21 +614,21 @@ function CardForm({
 
 function ProjectsCard() {
 	const queryClient = useQueryClient();
-	const projects = useQuery(orpc.projects.list.queryOptions());
+	const projects = useQuery(projectQueries.list());
 	const flows = useQueries({
 		queries: (projects.data ?? []).map((project) => ({
-			...orpc.flows.list.queryOptions({ input: { projectId: project.id } }),
+			...flowQueries.list(project.id),
 			staleTime: 30_000,
 			meta: { quietErrors: true },
 		})),
 	});
 	const [toRemove, setToRemove] = useState<Project | null>(null);
 	const removeProject = useMutation(
-		orpc.projects.remove.mutationOptions({
+		projectMutations.remove({
 			onSuccess: () => {
 				setToRemove(null);
-				void queryClient.invalidateQueries({ queryKey: orpc.projects.key() });
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+				void queryClient.invalidateQueries({ queryKey: projectQueries.all() });
+				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 			},
 			onError: (error) => toast.error(error.message),
 		}),
@@ -982,7 +996,7 @@ function AgentDefaultsCard({ data }: { data: SettingsView }) {
 	const mode = PERMISSION_MODES.find(
 		(option) => option.value === form.value("agentPermissionMode"),
 	);
-	const deciders = useQuery(orpc.deciders.list.queryOptions());
+	const deciders = useQuery(deciderQueries.list());
 	const deciderOptions = (deciders.data ?? []).map((d) => ({
 		value: d.name,
 		label: d.label,

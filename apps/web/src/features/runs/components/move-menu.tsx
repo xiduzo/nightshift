@@ -13,7 +13,7 @@ import { ArrowRightLeftIcon, MonitorIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import type { RunDetail, RunStatus } from "@/shared/api";
-import { orpc } from "@/shared/api";
+import { runMutations, runQueries } from "../queries";
 
 /** A run in the middle of a step does not move; one that ended has nothing to move. */
 const MOVABLE: readonly RunStatus[] = [
@@ -38,7 +38,7 @@ export function MoveMenu({
 }) {
 	const queryClient = useQueryClient();
 	const devices = useQuery({
-		...orpc.runs.devices.queryOptions({ input: { projectId: run.projectId } }),
+		...runQueries.devices(run.projectId),
 		meta: { quietErrors: true },
 	});
 	// Your own devices only: another person's device offers steps, not walks.
@@ -46,11 +46,11 @@ export function MoveMenu({
 		(d) => d.online && d.deviceId !== run.walker.id && d.offers === undefined,
 	);
 	const move = useMutation(
-		orpc.runs.move.mutationOptions({
+		runMutations.move({
 			onSuccess: (_, input) => {
 				const to = targets.find((d) => d.deviceId === input.deviceId);
 				toast.success(`${to?.name ?? "The device"} goes on with the run.`);
-				void queryClient.invalidateQueries({ queryKey: orpc.runs.key() });
+				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 			},
 			onError: (error) => toast.error(`Could not move: ${error.message}`),
 		}),

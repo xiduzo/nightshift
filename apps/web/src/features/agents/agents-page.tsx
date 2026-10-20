@@ -49,6 +49,7 @@ import {
 	SquareTerminalIcon,
 } from "lucide-react";
 import { type ReactNode, useCallback, useRef, useState } from "react";
+import { settingsQueries } from "@/features/settings/queries";
 import type {
 	CliTool,
 	Connection,
@@ -59,7 +60,6 @@ import type {
 	SecretView,
 	SettingsView,
 } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { CliToolCheckBadge, CliToolDetail, CliToolDialog } from "./cli-tool";
 import { CliCheckBadge } from "./connections/cli-panel";
 import { ConnectionDialog } from "./connections/connection-dialog";
@@ -68,6 +68,12 @@ import { CustomAgentDetail, CustomAgentDialog } from "./custom-agent";
 import { HarnessDetail, HarnessPicker } from "./harness-detail";
 import { harnessInfo, isHarnessName } from "./harnesses";
 import { newProfileDraft, ProfileDetail } from "./profile-detail";
+import {
+	cliToolQueries,
+	connectionQueries,
+	harnessQueries,
+	profileQueries,
+} from "./queries";
 import { ToolDetail, ToolPicker } from "./tool-detail";
 
 /** What the detail pane shows, as it sits in the URL (`?item=profile:builder`). */
@@ -120,11 +126,11 @@ export function AgentsPage({
 	item: string | undefined;
 	onSelect: (item: string | undefined) => void;
 }) {
-	const profiles = useQuery(orpc.profiles.list.queryOptions());
-	const harnesses = useQuery(orpc.harnesses.list.queryOptions());
-	const tools = useQuery(orpc.connections.list.queryOptions());
-	const cliTools = useQuery(orpc.cliTools.list.queryOptions());
-	const settings = useQuery(orpc.settings.get.queryOptions());
+	const profiles = useQuery(profileQueries.list());
+	const harnesses = useQuery(harnessQueries.list());
+	const tools = useQuery(connectionQueries.list());
+	const cliTools = useQuery(cliToolQueries.list());
+	const settings = useQuery(settingsQueries.get());
 	const [picking, setPicking] = useState<"harness" | "tool" | null>(null);
 	const [editing, setEditing] = useState<{
 		open: boolean;

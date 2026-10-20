@@ -41,8 +41,8 @@ import { ShareIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { PermissionMode } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { PERMISSION_MODES } from "./agent-options";
+import { offerMutations, offerQueries } from "./queries";
 
 /** The permission modes from the narrowest to the widest, as an Offer caps them. */
 const CAPS: PermissionMode[] = [
@@ -87,7 +87,7 @@ function OfferForm({
 }) {
 	const id = useId();
 	const queryClient = useQueryClient();
-	const listed = useQuery(orpc.offers.list.queryOptions());
+	const listed = useQuery(offerQueries.list());
 	const spaces = listed.data?.spaces ?? [];
 	const [spaceId, setSpaceId] = useState<string | null>(null);
 	const space = spaceId ?? spaces[0]?.id ?? "";
@@ -97,12 +97,12 @@ function OfferForm({
 	const sessionsValid =
 		Number.isInteger(sessionCap) && sessionCap >= 1 && sessionCap <= 16;
 	const make = useMutation(
-		orpc.offers.make.mutationOptions({
+		offerMutations.make({
 			onSuccess: () => {
 				toast.success(
 					`Offered ${profile} to ${spaces.find((s) => s.id === space)?.name ?? "the Space"}`,
 				);
-				void queryClient.invalidateQueries({ queryKey: orpc.offers.key() });
+				void queryClient.invalidateQueries({ queryKey: offerQueries.all() });
 				onDone();
 			},
 		}),
@@ -233,14 +233,14 @@ export function WithdrawOfferDialog({
 }) {
 	const queryClient = useQueryClient();
 	const withdraw = useMutation(
-		orpc.offers.withdraw.mutationOptions({
+		offerMutations.withdraw({
 			onSuccess: () => {
 				toast.success(`Withdrew ${offer?.profile} from ${offer?.spaceName}`);
 				onOpenChange(false);
 			},
 			onError: (error) => toast.error(`Not withdrawn: ${error.message}`),
 			onSettled: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.offers.key() }),
+				queryClient.invalidateQueries({ queryKey: offerQueries.all() }),
 		}),
 	);
 	return (

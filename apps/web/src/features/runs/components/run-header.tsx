@@ -42,10 +42,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { WalkerBadge, walkerName } from "@/features/devices";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
-import { orpc, SERVER_URL } from "@/shared/api";
+import { SERVER_URL } from "@/shared/api";
 import { dayWord, formatDateTime, formatTime } from "@/shared/format";
+import { runMutations, runQueries } from "../queries";
 import { CostText } from "./cost-text";
-
 import { Elapsed } from "./elapsed";
 import { MoveMenu } from "./move-menu";
 import { RunStatusBadge } from "./run-status-badge";
@@ -148,9 +148,9 @@ export function RunActions({
 			: undefined;
 	const queryClient = useQueryClient();
 	const stopRun = useMutation(
-		orpc.runs.stop.mutationOptions({
+		runMutations.stop({
 			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.runs.key() }),
+				queryClient.invalidateQueries({ queryKey: runQueries.all() }),
 			onError: (error, { when }) =>
 				toast.error(
 					when === "cancel-after-step"

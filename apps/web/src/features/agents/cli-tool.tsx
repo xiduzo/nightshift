@@ -50,12 +50,12 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { CliTool } from "@/shared/api";
-import { orpc } from "@/shared/api";
 import { CodeView } from "@/shared/code";
 import { checkState } from "./connections/cli-panel";
 import { CheckBadge, FactList } from "./connections/parts";
 
 import { DetailSection, DetailShell } from "./detail-shell";
+import { cliToolMutations, cliToolQueries, profileQueries } from "./queries";
 import { UsedBySection } from "./tool-detail";
 
 /** The program name only: what a shell types to run it. */
@@ -67,7 +67,7 @@ const SHOWN = 50;
 /** Where the program is and its version, asked once and kept a while. */
 export function useCliToolCheck(name: string) {
 	return useQuery({
-		...orpc.cliTools.check.queryOptions({ input: { name } }),
+		...cliToolQueries.check(name),
 		staleTime: 60_000,
 		meta: { quietErrors: true },
 	});
@@ -99,13 +99,13 @@ export function CliToolDetail({
 	const check = useCliToolCheck(tool.name);
 	const data = check.data;
 	const remove = useMutation(
-		orpc.cliTools.remove.mutationOptions({
+		cliToolMutations.remove({
 			onSuccess: () => {
 				toast.success(`Removed ${tool.name}`);
 				void queryClient.invalidateQueries({
-					queryKey: orpc.cliTools.list.key(),
+					queryKey: cliToolQueries.lists(),
 				});
-				void queryClient.invalidateQueries({ queryKey: orpc.profiles.key() });
+				void queryClient.invalidateQueries({ queryKey: profileQueries.all() });
 				onRemoved();
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),
@@ -310,17 +310,17 @@ function CliToolForm({
 	const [name, setName] = useState(tool?.name ?? "");
 	const [description, setDescription] = useState(tool?.description ?? "");
 	const programs = useQuery({
-		...orpc.cliTools.programs.queryOptions(),
+		...cliToolQueries.programs(),
 		enabled: tool === null,
 		staleTime: 5 * 60_000,
 		meta: { quietErrors: true },
 	});
 	const save = useMutation(
-		orpc.cliTools.save.mutationOptions({
+		cliToolMutations.save({
 			onSuccess: (saved) => {
 				toast.success(tool ? `Saved ${saved.name}` : `Added ${saved.name}`);
 				void queryClient.invalidateQueries({
-					queryKey: orpc.cliTools.list.key(),
+					queryKey: cliToolQueries.lists(),
 				});
 				onDone(saved.name);
 			},
