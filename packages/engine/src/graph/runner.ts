@@ -188,6 +188,30 @@ export function createRunner(deps: RunnerDeps) {
 	}
 	deps.signal?.addEventListener("abort", dispose, { once: true });
 
+	/**
+	 * Lets go of every run this runner drives, writing nothing: each drive's
+	 * fence closes (its late writes are dropped), its harness is aborted, and
+	 * its writes in flight settle. For a handover to a new engine in the
+	 * same process (`bun --hot`): without it the old drives run on beside
+	 * the runs the new engine resumes, and their timers and late writes end
+	 * steps that are no longer theirs. The new engine's recovery ends the
+	 * open work `interrupted`, as after a restart.
+	 */
+	async function release(): Promise<void> {
+		const walks = [...slots.values()].filter(
+			(slot): slot is Walk => slot !== "starting",
+		);
+		slots.clear();
+		await Promise.all(
+			walks.map(async (walk) => {
+				const settled = walk.thread?.fence.close() ?? Promise.resolve();
+				walk.controller.abort();
+				await settled;
+			}),
+		);
+		dispose();
+	}
+
 	const configOf = (runId: string) => ({
 		configurable: { thread_id: runId },
 	});
@@ -825,6 +849,7 @@ export function createRunner(deps: RunnerDeps) {
 		sleeps,
 		stop,
 		restart,
+		release,
 		endIfOverdue,
 		endOverdueSteps,
 		dispose,

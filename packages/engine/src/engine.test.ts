@@ -1790,6 +1790,49 @@ describe("automatic resume after a restart", () => {
 		expect(detail.steps[0]?.sessions).toHaveLength(2);
 	});
 
+	test("a reload in the same process: the old engine lets go of its run, and its late session writes nothing", async () => {
+		// `bun --hot`: a new engine in the same process, while the old
+		// engine's harness still runs and ignores the abort.
+		const old = scriptedHarness({
+			hang: true,
+			harnessSessionId: () => "harness-0",
+		});
+		const daemon = makeDaemon(old.harness);
+		const first = daemon.space(sandbox.spaceId);
+		const run = await first.startRun({
+			projectId: await projectId(first),
+			flow: flowOf(
+				[agent("worker", "Go"), command("check", "true")],
+				[edge("e1", "worker", "pass", "check")],
+			),
+		});
+		const lost = await waitFor(() => old.sessions[0]);
+		await waitFor(async () =>
+			(await first.getRun(run.id)).steps[0]?.sessions.length ? true : null,
+		);
+
+		await daemon.dispose();
+		expect(lost.input.signal.aborted).toBe(true);
+
+		const { engine, sessions } = restart();
+		const resumed = await waitFor(() => sessions[0]);
+		expect(resumed.input.resumeSessionId).toBe("harness-0");
+
+		// The old session ends late with its own report: none of it counts.
+		lost.emit({ type: "report", outcome: "fail", summary: "Too late." });
+		lost.finish();
+		await Bun.sleep(50);
+		expect((await engine.getRun(run.id)).status).toBe("running");
+
+		resumed.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		const detail = await engine.getRun(run.id);
+		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
+			["worker", "pass"],
+			["check", "pass"],
+		]);
+	});
+
 	test.each([
 		["the Settings switch", { settings: settingsWith({ scheduler: false }) }],
 		["NIGHTSHIFT_SCHEDULER=off", { scheduler: false as const }],

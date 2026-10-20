@@ -47,6 +47,7 @@ import {
 	deviceKeyStore,
 	deviceOffers,
 	documentRows,
+	type Engine,
 	HARNESS_BIN,
 	LEASE_HEARTBEAT_MS,
 	type Lease,
@@ -457,6 +458,18 @@ const relayToHosts = createRelay({
 	links: () => deviceLinks,
 });
 
+// `bun --hot` evaluates this module again on each reload, in the same
+// process. The engine before lets go of its runs first: else its drives,
+// harnesses and step timers run on beside the runs this engine's recovery
+// continues, and end steps that are no longer theirs.
+const engines = globalThis as { nightshiftEngine?: Engine };
+await engines.nightshiftEngine?.dispose().catch((error) => {
+	console.error(
+		"The engine before the reload did not let go of its runs:",
+		error,
+	);
+});
+
 export const engine = await createEngine({
 	db,
 	walkerId: device.id,
@@ -478,6 +491,7 @@ export const engine = await createEngine({
 	scheduler:
 		ENV.NIGHTSHIFT_SCHEDULER === "off" ? false : { signal: scheduler.signal },
 });
+engines.nightshiftEngine = engine;
 
 /*
  * Devices. Secure by default: this daemon answers this computer only,

@@ -56,6 +56,7 @@ const engine: Context["engine"] = {
 	offers: {} as Context["engine"]["offers"],
 	deviceBack: async () => {},
 	endOverdueSteps: async () => {},
+	dispose: async () => {},
 };
 
 /** A request from another computer, with these headers, on a Host with this policy. */

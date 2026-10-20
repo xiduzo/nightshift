@@ -295,8 +295,15 @@ export function createEngine(
 		documents,
 		...(options.relay ? { relay: options.relay } : {}),
 	});
+	// The engine's lifetime: a test's signal, or `dispose` (a `bun --hot`
+	// handover) ends it.
+	const lifetime = new AbortController();
+	internals.signal?.addEventListener("abort", () => lifetime.abort(), {
+		once: true,
+	});
+	const signal = lifetime.signal;
 	let disposed = false;
-	internals.signal?.addEventListener(
+	signal.addEventListener(
 		"abort",
 		() => {
 			disposed = true;
@@ -317,7 +324,7 @@ export function createEngine(
 		flowOf: parseRunFlow,
 		calledFlowsOf: parseCalledFlows,
 		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
-		...(internals.signal ? { signal: internals.signal } : {}),
+		signal,
 		// `recovery` is assigned below; the runner frees its first slot later.
 		onSlotFreed: () => recovery.onSlotFreed(),
 	});
@@ -332,7 +339,7 @@ export function createEngine(
 		flowOf: parseRunFlow,
 		placedElsewhere: (row) => !placedHere(row),
 		resumeGraceMs: internals.resumeGraceMs ?? DAEMON_RESUME_GRACE_MS,
-		...(internals.signal ? { signal: internals.signal } : {}),
+		signal,
 	});
 
 	const ready = recovery
@@ -592,7 +599,7 @@ export function createEngine(
 	});
 	if (options.scheduler !== false) {
 		const schedulerSignal = options.scheduler?.signal;
-		internals.signal?.addEventListener("abort", () => scheduler.stop(), {
+		signal.addEventListener("abort", () => scheduler.stop(), {
 			once: true,
 		});
 		ready.then(
@@ -1318,6 +1325,10 @@ export function createEngine(
 		async endOverdueSteps() {
 			await ready;
 			await runner.endOverdueSteps();
+		},
+		async dispose() {
+			lifetime.abort();
+			await runner.release();
 		},
 	};
 }

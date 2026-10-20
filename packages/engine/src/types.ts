@@ -595,6 +595,16 @@ export interface Engine {
 	 * minute past its limit.
 	 */
 	endOverdueSteps(): Promise<void>;
+	/**
+	 * Hands this computer's runs over to a new engine in the same process
+	 * (`bun --hot` evaluates the daemon again). Stops the scheduler, the
+	 * resumes and the wake timers, and lets go of every run this engine
+	 * drives: each drive writes nothing more and its harness is aborted.
+	 * The log is left as it is, so the next engine's recovery finds the
+	 * open work, ends it `interrupted` and continues it, as after a
+	 * restart. Resolves once the drives' writes in flight settled.
+	 */
+	dispose(): Promise<void>;
 }
 
 /**
