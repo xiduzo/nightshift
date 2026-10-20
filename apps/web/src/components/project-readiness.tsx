@@ -1,4 +1,4 @@
-import type { AppRouterClient } from "@nightshift/api/routers/index";
+import type { AppRouterClient } from "@nightshift/api/client";
 import {
 	Alert,
 	AlertDescription,

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { AppRouterClient } from "@nightshift/api/routers/index";
+import type { AppRouterClient } from "@nightshift/api";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { Subprocess } from "bun";

@@ -63,7 +63,7 @@ import {
 	protectedProcedure,
 	publicProcedure,
 	readable,
-} from "../index";
+} from "../procedures";
 
 // Every procedure but the health check needs a session in a Space. One
 // person on one computer has one without signing in (the local session).

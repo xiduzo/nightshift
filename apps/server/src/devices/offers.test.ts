@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fixturePath } from "@nightshift/agents/testing";
-import type { AppRouterClient } from "@nightshift/api/routers/index";
+import type { AppRouterClient } from "@nightshift/api";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 

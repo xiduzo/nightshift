@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AppRouterClient } from "@nightshift/api/routers/index";
+import type { AppRouterClient } from "@nightshift/api";
 import type { InferClientInputs } from "@orpc/client";
 
 import {

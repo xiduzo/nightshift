@@ -1,5 +1,5 @@
+import type { AppRouterClient } from "@nightshift/api";
 import type { HostHello, LinkedHost } from "@nightshift/api/context";
-import type { AppRouterClient } from "@nightshift/api/routers/index";
 import type { DeviceKeyStore, HostLink, HostLinks } from "@nightshift/engine";
 import type * as Y from "yjs";
 

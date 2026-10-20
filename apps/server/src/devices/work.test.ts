@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
+import type { AppRouterClient } from "@nightshift/api";
 import type { WorkDelivery } from "@nightshift/api/context";
-import type { AppRouterClient } from "@nightshift/api/routers/index";
 import { clone, hostLink, project, user } from "@nightshift/db/schema";
 import {
 	createEngine,

@@ -1,4 +1,4 @@
-import type { AppRouterClient } from "@nightshift/api/routers/index";
+import type { AppRouterClient } from "@nightshift/api";
 import { roleAllows } from "@nightshift/auth";
 import {
 	type ArchiveRef,

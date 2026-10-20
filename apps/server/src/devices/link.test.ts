@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import type { AppRouterClient } from "@nightshift/api";
 import type { HostHello } from "@nightshift/api/context";
-import type { AppRouterClient } from "@nightshift/api/routers/index";
 import type { HostLink } from "@nightshift/engine";
 import { ORPCError } from "@orpc/client";
 

@@ -1,4 +1,4 @@
-import { appRouter } from "@nightshift/api/routers/index";
+import { appRouter } from "@nightshift/api";
 import { authEndpointAllowed, PEER_ADDRESS_HEADER } from "@nightshift/auth";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";

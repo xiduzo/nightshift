@@ -3,7 +3,8 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
-		"./*": "./src/*.ts"
+		"./client": "./src/client.ts",
+		"./context": "./src/context.ts"
 	},
 	"scripts": {
 		"build": "tsc -b",

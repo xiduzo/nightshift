@@ -1,4 +1,4 @@
-import type { AppRouterClient } from "@nightshift/api/routers/index";
+import type { AppRouterClient } from "@nightshift/api/client";
 import type { InferClientInputs, InferClientOutputs } from "@orpc/client";
 
 /** Contract types for the Agents page, derived from the API client. */

@@ -1,4 +1,4 @@
-import type { AppRouterClient } from "@nightshift/api/routers/index";
+import type { AppRouterClient } from "@nightshift/api/client";
 import type { AgentNode, Outcome } from "@nightshift/flows";
 import type { InferClientInputs, InferClientOutputs } from "@orpc/client";
 

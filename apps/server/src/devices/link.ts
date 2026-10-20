@@ -2,8 +2,8 @@ import {
 	HocuspocusProvider,
 	HocuspocusProviderWebsocket,
 } from "@hocuspocus/provider";
+import type { AppRouterClient } from "@nightshift/api";
 import type { HostHello, LinkStatus } from "@nightshift/api/context";
-import type { AppRouterClient } from "@nightshift/api/routers/index";
 import type { HostLink } from "@nightshift/engine";
 import { ORPCError } from "@orpc/client";
 import type * as Y from "yjs";
