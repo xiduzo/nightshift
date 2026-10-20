@@ -32,6 +32,7 @@ import {
 import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
 import { streamSession } from "./session-stream";
 import { reportStepTool, stepReportSetup } from "./step-report";
+import { withSharedToolBridge } from "./tool-bridge";
 import {
 	createTranslator,
 	type HarnessProfile,
@@ -226,7 +227,7 @@ export function harnessSession(options: {
 				...(input.effort && spec.reasoningFor?.(input.model)
 					? { reasoning: { level: input.effort } as never }
 					: {}),
-				middleware: [withSandbox(sandbox)],
+				middleware: [withSandbox(sandbox), withSharedToolBridge],
 				abortController,
 				debug: providerTap(translator),
 			}) as AsyncIterable<unknown>;

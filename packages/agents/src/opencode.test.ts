@@ -437,11 +437,13 @@ describe("opencodeHarness", () => {
 		expect(await serversStop(log)).toEqual([]);
 		const [line] = await readLog(log);
 		const deadline = Date.now() + 5_000;
-		// The adapter's teardown ran to the end: its tool bridge is closed.
+		// The adapter's teardown ran to the end: its tool bridge is closed. The
+		// shared bridge answers a closed session with 404 (an unshared one
+		// refuses the connection).
 		const bridge = line?.config.mcp?.tanstack as { url: string };
 		const open = () =>
 			fetch(bridge.url, { method: "POST" }).then(
-				() => true,
+				(response) => response.status !== 404,
 				() => false,
 			);
 		while ((await open()) && Date.now() < deadline) await Bun.sleep(100);

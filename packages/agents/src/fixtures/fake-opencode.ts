@@ -65,7 +65,11 @@ async function rpc(method: string, params: unknown): Promise<unknown> {
 		body: JSON.stringify({ jsonrpc: "2.0", id: ++seq, method, params }),
 	});
 	const body = await response.text();
-	const data = body.includes("data:")
+	// A bridge answers with JSON or with an SSE stream: the content type says.
+	const sse = response.headers
+		.get("content-type")
+		?.includes("text/event-stream");
+	const data = sse
 		? body
 				.split("\n")
 				.filter((line) => line.startsWith("data:"))

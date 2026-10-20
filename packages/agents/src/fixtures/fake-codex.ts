@@ -63,7 +63,11 @@ async function callTool(call: Call): Promise<{ text: string; ok: boolean }> {
 		}),
 	});
 	const body = await response.text();
-	const data = body.includes("data:")
+	// A bridge answers with JSON or with an SSE stream: the content type says.
+	const sse = response.headers
+		.get("content-type")
+		?.includes("text/event-stream");
+	const data = sse
 		? body
 				.split("\n")
 				.filter((line) => line.startsWith("data:"))
