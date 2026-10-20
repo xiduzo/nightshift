@@ -21,8 +21,8 @@ import {
 import { selfDevice } from "../device-config/self-device";
 import { parseEventRow } from "../log/events";
 import type { RunLog } from "../log/run-log";
+import { systemGit } from "../projects/git";
 import { clonePathOf } from "../projects/projects";
-import { git } from "../projects/worktrees";
 
 /** Test helpers: a temp git repo, a migrated temp database, scripted harnesses. */
 
@@ -61,12 +61,13 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 		findCli,
 		cliToolsFor,
 		clonePath,
-		probeGit,
+		git,
 		deviceId,
 		...engine
 	} = options;
 	return {
 		...engine,
+		...(git ? { git } : {}),
 		device: testDevice(
 			{
 				harnesses,
@@ -81,7 +82,7 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 				cliToolsFor,
 				// The Clones of the database's own Device, as the daemon wires it.
 				clonePath: clonePath ?? clonePathOf(engine.db),
-				probeGit,
+				git,
 			},
 			deviceId,
 		),
@@ -172,7 +173,7 @@ export async function commitFile(repoPath: string, name: string) {
 }
 
 export async function mustGit(cwd: string, args: string[]): Promise<string> {
-	const result = await git(cwd, args);
+	const result = await systemGit().run(cwd, args);
 	if (result.exitCode !== 0) {
 		throw new Error(`git ${args.join(" ")}: ${result.stderr}`);
 	}

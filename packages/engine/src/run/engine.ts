@@ -72,9 +72,10 @@ import {
 import {
 	createProjects,
 	createSpaceDocuments,
+	createWorktrees,
 	deviceNameIn,
 	type ListedProject,
-	listBranches,
+	systemGit,
 	toProject,
 } from "../projects";
 import {
@@ -299,11 +300,14 @@ export function createEngine(
 	});
 	const deviceFor = placement.deviceFor;
 
+	const git = options.git ?? systemGit();
+	const { listBranches } = createWorktrees(git);
 	const projects = createProjects({
 		db,
 		log: runLog,
 		deviceId: runLog.walkerId,
 		documents,
+		git,
 		...(options.relay ? { relay: options.relay } : {}),
 	});
 	// The engine's lifetime: a test's signal, or `dispose` (a `bun --hot`

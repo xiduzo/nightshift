@@ -27,14 +27,10 @@ import {
 } from "../device-config";
 import {
 	checkProjectFolder,
-	createAndCheckoutBranch,
-	createWorktree,
-	currentBranch,
-	freeBranchName,
-	type GitProbe,
+	createWorktrees,
+	type Git,
 	NOT_ON_THIS_COMPUTER,
-	pullRunBranch,
-	pushRunBranch,
+	systemGit,
 } from "../projects";
 import { spawnCommand } from "./command";
 import { callServerTool } from "./tool-call";
@@ -97,8 +93,11 @@ export type LocalDeviceDeps = {
 	 * none. Without it, this computer has no Clones: a run cannot start here.
 	 */
 	clonePath?: (projectId: string) => Promise<string | null>;
-	/** Finds git on this computer before a worktree is added. Default: `probeGit`. */
-	probeGit?: GitProbe;
+	/**
+	 * The git port: worktrees, Hand-offs and item branches, and finding git
+	 * before a worktree is added. Default: the git programs on this computer.
+	 */
+	git?: Git;
 	/** An Agent Profile defined on this computer, by name, or null. */
 	profileFor?: (name: string) => AgentProfileSettings | null;
 };
@@ -118,6 +117,15 @@ function noDecider(
 /** This computer as a Device. */
 export function localDevice(deps: LocalDeviceDeps): Device {
 	const { harnesses, decider } = deps;
+	const git = deps.git ?? systemGit();
+	const {
+		createAndCheckoutBranch,
+		createWorktree,
+		currentBranch,
+		freeBranchName,
+		pullRunBranch,
+		pushRunBranch,
+	} = createWorktrees(git);
 	const findCli = deps.findCli ?? ((name: string) => Bun.which(name));
 	const mcpServersFor =
 		deps.mcpServersFor ??
@@ -266,9 +274,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		flows: async (projectId) => readFlowSources(await cloneOf(projectId)),
 		async worktree(run) {
 			const repoPath = await cloneOf(run.projectId);
-			const readiness = await checkProjectFolder(repoPath, {
-				...(deps.probeGit ? { probeGit: deps.probeGit } : {}),
-			});
+			const readiness = await checkProjectFolder(repoPath, { git });
 			const notReady = readiness.steps.find(
 				(step) => step.status === "failed" && step.id !== "identity",
 			);

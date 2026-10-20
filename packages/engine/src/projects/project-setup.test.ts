@@ -10,13 +10,12 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mustGit } from "../testing/test-support";
+import { GIT_DOWNLOAD_URL, systemGit, systemGitInstaller } from "./git";
 import {
 	checkProjectFolder,
-	GIT_DOWNLOAD_URL,
 	type ProjectReadiness,
 	STARTER_GITIGNORE,
 	setUpGit,
-	systemGitInstaller,
 } from "./project-setup";
 
 const statuses = (readiness: ProjectReadiness) =>
@@ -59,7 +58,7 @@ async function withGlobalIdentity() {
 describe("checkProjectFolder", () => {
 	test("git missing stops at the first step and offers the installer", async () => {
 		const readiness = await checkProjectFolder(folder, {
-			probeGit: async () => null,
+			git: { ...systemGit(), probe: async () => null },
 		});
 		expect(readiness.ready).toBe(false);
 		expect(statuses(readiness)).toEqual([

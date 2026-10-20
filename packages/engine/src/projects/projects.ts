@@ -23,6 +23,7 @@ import {
 } from "drizzle-orm";
 import type { Relay } from "../contract";
 import type { RunLog } from "../log";
+import { type Git, systemGit } from "./git";
 import {
 	cloneKey,
 	isHostedElsewhere,
@@ -34,7 +35,7 @@ import {
 	type SpaceProject,
 	spaceProjectSchema,
 } from "./space-document";
-import { originUrl, resolveRepoTopLevel } from "./worktrees";
+import { createWorktrees } from "./worktrees";
 
 /**
  * Projects by remote, and their Clones on this computer. A Project is a
@@ -111,6 +112,8 @@ export type ProjectsDeps = {
 	documents: SpaceDocuments;
 	/** The Hosts: a Clone in a Space a Host keeps is recorded through it. */
 	relay?: Pick<Relay, "addClone">;
+	/** The git port, for a clone's top folder and remote. Default: the git programs on this computer. */
+	git?: Git;
 };
 
 export type Projects = ReturnType<typeof createProjects>;
@@ -145,6 +148,9 @@ export function toProject(
 
 export function createProjects(deps: ProjectsDeps) {
 	const { db, log, documents } = deps;
+	const { originUrl, resolveRepoTopLevel } = createWorktrees(
+		deps.git ?? systemGit(),
+	);
 
 	/**
 	 * Changes the Project's entry in its Space document. An entry the

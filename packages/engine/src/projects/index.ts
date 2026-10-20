@@ -1,11 +1,9 @@
-/** Projects, their Clones and the Space document that defines them, the git setup of a project folder, and run worktrees. */
+/** Projects, their Clones and the Space document that defines them, the git port, the git setup of a project folder, and run worktrees. */
 
-export type { GitInstall, GitProbe, ProjectReadiness } from "./project-setup";
-export {
-	checkProjectFolder,
-	setUpGit,
-	systemGitInstaller,
-} from "./project-setup";
+export type { Git, GitInstall } from "./git";
+export { systemGit, systemGitInstaller } from "./git";
+export type { ProjectReadiness } from "./project-setup";
+export { checkProjectFolder, setUpGit } from "./project-setup";
 export type { ListedProject, Project } from "./projects";
 export {
 	clonePathOf,
@@ -25,13 +23,7 @@ export {
 } from "./space-document";
 export type { Branches } from "./worktrees";
 export {
-	createAndCheckoutBranch,
-	createWorktree,
-	currentBranch,
-	freeBranchName,
+	createWorktrees,
 	itemBranchName,
-	listBranches,
-	pullRunBranch,
-	pushRunBranch,
 	worktreeLocation,
 } from "./worktrees";

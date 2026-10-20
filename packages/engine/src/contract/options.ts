@@ -3,7 +3,7 @@ import type { AgentProfileSettings } from "@nightshift/flows";
 import type { Device, WorkRelay } from "../device";
 import type { RunSettings } from "../device-config";
 import type { DeviceOffer } from "../peers";
-import type { SpaceDocuments } from "../projects";
+import type { Git, SpaceDocuments } from "../projects";
 import type { Relay } from "./relay";
 
 /** What `createEngine` takes: the database, this computer as a Device, and the hooks of the daemon. */
@@ -71,4 +71,9 @@ export type EngineOptions = {
 	 * the ones the relay serves. Default: new ones over `db`.
 	 */
 	spaceDocuments?: SpaceDocuments;
+	/**
+	 * The git port, for a new project's clone and remote and the branches
+	 * of a clone. Default: the git programs on this computer.
+	 */
+	git?: Git;
 };
