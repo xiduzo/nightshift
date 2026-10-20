@@ -43,7 +43,7 @@ import type { RunEvent, RunStateValues } from "./state";
 /**
  * A harness's display name, for a message about one that is not added (no
  * `AgentHarness` instance to ask). Sourced from the port side
- * (`harness-facts.ts`), not the adapter registry.
+ * (`@nightshift/agents/harness-facts`), not the adapter registry.
  */
 export { harnessLabel };
 

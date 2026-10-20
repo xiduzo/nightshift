@@ -3,7 +3,7 @@
 > The rules for where code lives. Read this before you add a file, a folder or a package.
 > Refine it when a rule changes. Record the change in the ADR table of `TECH.md`.
 
-Last updated: 2026-10-20
+Last updated: 2026-10-21
 
 Night Shift is a **layered vertical codebase**.
 
@@ -79,7 +79,7 @@ The entries today:
 
 | Package | Entries |
 | --- | --- |
-| `agents` | `.`, `./harness-facts`, `./mcp`, `./pricing`, `./types`, `./testing` (fakes, `fixturePath(name)`). The engine uses the four light entries: the root loads every harness. |
+| `agents` | `.`, `./harness-facts`, `./mcp`, `./pricing`, `./types`, `./testing` (fakes, `fixturePath(name)`). The engine uses the four light entries: the root loads every harness. `./harness-facts` is browser-safe. |
 | `api` | `.` (`appRouter` and its types), `./client` (types only, for `apps/web`), `./context` |
 | `auth` | `.`, `./testing` |
 | `db` | `.`, `./schema`, `./data-dir`, `./migrate` |
@@ -193,9 +193,9 @@ An app wires packages together and talks to the outside world. It does not hold 
 | Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, the `api` root and `flows/files` in `apps/web`. Biome replaces the options of a rule per override, so each override lists the whole set. | `biome.json` and its overrides | Active |
 | Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json` | Active. `noImportCycles` only warns in `packages/engine/src/graph/` until phase 3b. Outside `graph/`, the engine verticals import each other without a cycle. |
 | CI on every pull request and push to `main`: `biome ci`, the layer check, the vertical check and its tests, `bun run check-types`, and `bun test` per workspace (without `*.live.test.ts`). | `.github/workflows/ci.yml` | Active |
-| Vertical boundaries: `scripts/check-verticals.ts` finds the verticals from the file system (so no list can drift), then fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks a workspace that is not enforced yet. | lefthook pre-commit, CI | Active (enforced for: `apps/web`, `packages/engine`) |
-| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. | lefthook pre-commit, CI | Active (enforced for: `apps/web`, `packages/engine`) |
-| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (enforced for: `apps/web`, `packages/engine`) |
+| Vertical boundaries: `scripts/check-verticals.ts` finds the verticals from the file system (so no list can drift), then fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks a workspace that is not enforced yet. | lefthook pre-commit, CI | Active (enforced for: `apps/web`, `packages/agents`, `packages/engine`) |
+| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. | lefthook pre-commit, CI | Active (enforced for: `apps/web`, `packages/agents`, `packages/engine`) |
+| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (enforced for: `apps/web`, `packages/agents`, `packages/engine`) |
 
 When a check exists, change its status to "Active". When a workspace follows section 4, add it to `ENFORCED` in `scripts/check-verticals.ts` and to the list above. Fix a violation, do not add an exception. If a rule is wrong, change this document first.
 
@@ -210,7 +210,6 @@ The code does not yet follow every rule. These are debts. Do not copy them into 
 - `@nightshift/engine/lease` is an extra entry. The desktop watchdog reads the health check before the daemon starts, and must not load the whole engine. Phase 4 moves the lease to the daemon.
 - `packages/api/src/routers/index.ts` holds every procedure in one file. Most procedures declare no output schema. The engine owns wire schemas that the API uses.
 - The engine reads auth tables directly. `projects/worktrees.ts`, `projects/project-setup.ts`, `projects/projects.ts`, `device/local.ts` and `run/engine.ts` call `git` with no port.
-- Each harness touches five files.
-- Only `apps/web` and `packages/engine` are cut into barrel verticals (`features/<vertical>/index.ts` in apps, `src/<vertical>/index.ts` in packages).
+- Only `apps/web`, `packages/agents` and `packages/engine` are cut into barrel verticals (`features/<vertical>/index.ts` in apps, `src/<vertical>/index.ts` in packages).
 
 The migration plan that removes these debts is in the structure audit of 2026-10-20.

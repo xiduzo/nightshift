@@ -1,7 +1,7 @@
 /**
  * The Grok Build harness: one `grok -p … --output-format streaming-json` per
  * session, driven through `@tanstack/ai-grok-build` on the shared harness
- * session (`adapter-session.ts`), with the user's `grok login`.
+ * session (`session/adapter-session.ts`), with the user's `grok login`.
  *
  * The permission mode becomes a TanStack `SandboxPolicy`, which the adapter
  * maps onto grok's own flags (see `grokPolicy`). The node's MCP servers go

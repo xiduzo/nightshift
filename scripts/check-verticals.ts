@@ -36,7 +36,11 @@ import ts from "typescript";
  * workspaces it converts. Phase 8 removes the list: then every workspace
  * except `packages/ui` and `packages/config` is checked.
  */
-export const ENFORCED: string[] = ["apps/web", "packages/engine"];
+export const ENFORCED: string[] = [
+	"apps/web",
+	"packages/agents",
+	"packages/engine",
+];
 
 /**
  * Leaf contracts: a pure-data file (no imports of its own) that a vertical

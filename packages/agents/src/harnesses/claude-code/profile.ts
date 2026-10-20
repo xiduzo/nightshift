@@ -1,5 +1,5 @@
 /**
- * How the translator (`translate.ts`) reads Claude Code. The AG-UI
+ * How the translator (`session/translate.ts`) reads Claude Code. The AG-UI
  * translation drops what usage-limit detection needs: `rate_limit_event`,
  * the assistant `error` field and the result's `is_error`. This profile
  * reads them from the raw stream-json messages, and adds up the usage so

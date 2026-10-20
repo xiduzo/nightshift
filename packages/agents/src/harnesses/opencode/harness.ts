@@ -1,7 +1,7 @@
 /**
  * The OpenCode harness: one `opencode serve` per session, driven through
  * `@tanstack/ai-opencode` on the shared harness session
- * (`adapter-session.ts`).
+ * (`session/adapter-session.ts`).
  *
  * The adapter starts `opencode serve` with a fixed command (`opencode` on the
  * PATH, port 4096, all interfaces) and puts its own tool bridge in

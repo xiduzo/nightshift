@@ -1,7 +1,7 @@
 /**
  * The Claude Code harness: one `claude` process per session, driven through
  * `@tanstack/ai-claude-code` on the shared harness session
- * (`adapter-session.ts`). This file holds what is Claude Code's own: the
+ * (`session/adapter-session.ts`). This file holds what is Claude Code's own: the
  * effort env for models the adapter does not know, the `--allowedTools`
  * rules for CLI tools and MCP servers, and the `--mcp-config` temp file.
  */
@@ -40,7 +40,7 @@ export type ClaudeCodeProcessOptions = {
 export type ClaudeCodeHarnessOptions = ClaudeCodeProcessOptions & {
 	/**
 	 * Built-in tools the session may use without a prompt (`--allowedTools`).
-	 * With `stepReport`, the report tool is added (see `step-report.ts`); the
+	 * With `stepReport`, the report tool is added (see `session/step-report.ts`); the
 	 * session's CLI tools and MCP servers are added too (see `claudeAllowedTools`).
 	 */
 	allowedTools?: string[];

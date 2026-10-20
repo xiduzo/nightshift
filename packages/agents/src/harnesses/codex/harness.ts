@@ -1,7 +1,7 @@
 /**
  * The Codex harness: one `codex exec --experimental-json` per session, driven
  * through `@tanstack/ai-codex` on the shared harness session
- * (`adapter-session.ts`).
+ * (`session/adapter-session.ts`).
  *
  * Codex runs non-interactively: it never asks for approval (`approval_policy
  * = "never"` in every mode), it refuses what its own sandbox forbids. The

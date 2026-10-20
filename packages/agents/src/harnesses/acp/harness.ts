@@ -10,7 +10,7 @@
  * MCP servers reach the agent over ACP, URL servers only.
  *
  * An agent takes its model as a flag, or over ACP once the session is open
- * (`model: "session"`, see `acp-session-config.ts`).
+ * (`model: "session"`, see `session-config.ts`).
  *
  * Verified live: pi 1.3 through pi-acp 0.0.34, with an Ollama model. The
  * other launch commands are from each agent's docs.
