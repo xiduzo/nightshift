@@ -11,10 +11,9 @@
 import { readFile, rename, stat, utimes, writeFile } from "node:fs/promises";
 import { calcPrice, updatePrices } from "@pydantic/genai-prices";
 
-import type { AgentUsage } from "./types";
+import type { AgentUsage, CostSource } from "./types";
 
-/** Where a cost came from: the harness said it, or Night Shift priced the tokens. */
-export type CostSource = "reported" | "estimated";
+export type { CostSource };
 
 export type SettledCost =
 	| { costUsd: number; costSource: CostSource }

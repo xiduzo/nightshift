@@ -10,7 +10,6 @@ import type {
 	DeciderName,
 	HarnessName,
 } from "@nightshift/flows";
-import type { CostSource } from "./pricing";
 
 export type { AgentHarnessName, CustomHarnessName, DeciderName, HarnessName };
 
@@ -66,6 +65,9 @@ export type AgentSessionInput = {
 	/** Aborting stops the harness process. The stream then ends with an `error` event of kind `aborted`. */
 	signal: AbortSignal;
 };
+
+/** Where a cost came from: the harness said it, or Night Shift priced the tokens. */
+export type CostSource = "reported" | "estimated";
 
 export type AgentUsage = {
 	/** Every input token, the cached ones included. */
