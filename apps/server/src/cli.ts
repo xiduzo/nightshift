@@ -11,6 +11,7 @@ import { healthCommand } from "./health-cli";
 import { adminCommand, joinCommand, pairCommand } from "./join-cli";
 import { guardProcess } from "./process-guard";
 import { serveDaemon, tlsPortOf } from "./serve";
+import { notifySystemd } from "./systemd";
 
 /**
  * `nightshift`: Night Shift without a window, for a server or any computer
@@ -161,6 +162,8 @@ async function serve(argv: string[]) {
 	for (const server of servers) {
 		console.log(`Night Shift answers at ${server.url}`);
 	}
+	// Under systemd: started, and the watchdog's pings.
+	notifySystemd();
 	console.log(`Data folder: ${dataDir}`);
 	if (reachFor(settings.current()) === "this-computer") {
 		console.log(
