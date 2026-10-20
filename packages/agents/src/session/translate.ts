@@ -37,6 +37,10 @@
  *   `report` event just before the terminal event. The line stays in the
  *   streamed text.
  * Both channels are read in every mode; the last report counts.
+ *
+ * Over 600 lines on purpose: the translator is one state machine over one
+ * stream, and the failure texts it sorts belong with it. What one harness
+ * reads in its raw messages is in that harness's profile.
  */
 
 import type {
