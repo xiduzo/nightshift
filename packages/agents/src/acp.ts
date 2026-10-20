@@ -15,6 +15,7 @@
  * Verified live: pi 1.3 through pi-acp 0.0.34, with an Ollama model. The
  * other launch commands are from each agent's docs.
  */
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ndJsonStream } from "@agentclientprotocol/sdk";
 import { type CustomAgent, customHarnessName } from "@nightshift/flows";
@@ -68,9 +69,13 @@ export type AcpAgent = {
 	/**
 	 * Start it through another program, given the configured executable.
 	 * pi has no ACP mode of its own: pi-acp (a dependency of this package)
-	 * runs `pi --mode rpc` and speaks ACP for it.
+	 * runs `pi --mode rpc` and speaks ACP for it. Called when a session
+	 * starts. A throw ends the session with its message.
 	 */
-	launch?: (executable: string) => {
+	launch?: (
+		executable: string,
+		options?: Pick<AcpHarnessOptions, "piAcp">,
+	) => {
 		argv: string[];
 		env: Record<string, string>;
 	};
@@ -79,8 +84,36 @@ export type AcpAgent = {
 const modelFlag = (model: string | undefined) =>
 	model ? ["--model", model] : [];
 
-/** pi-acp's entry point, run with this process's runtime (Bun). */
-const PI_ACP = fileURLToPath(import.meta.resolve("pi-acp"));
+/**
+ * The command that starts pi-acp: its entry point, run with this process's
+ * runtime (Bun). Resolved when a pi session starts, not when this module
+ * loads: a build without pi-acp on disk (the `nightshift` binary) must
+ * still start. Throws when pi-acp is missing.
+ */
+export function piAcpCommand(): string[] {
+	let entry: string | undefined;
+	try {
+		entry = fileURLToPath(import.meta.resolve("pi-acp"));
+	} catch {
+		// Not installed next to this module.
+	}
+	if (!entry || !existsSync(entry)) {
+		throw new Error(
+			"Night Shift cannot start pi on this computer: a part it needs is missing. Install Night Shift again, or run the node on another harness.",
+		);
+	}
+	return [process.execPath, entry];
+}
+
+/**
+ * Runs pi-acp in this process. It speaks ACP on stdin and stdout until
+ * stdin closes. For a build that carries pi-acp inside and starts itself
+ * as pi-acp (see `AcpHarnessOptions.piAcp`).
+ */
+export async function runPiAcp(): Promise<void> {
+	// @ts-expect-error pi-acp has no types: it is a program, run when it loads.
+	await import("pi-acp");
+}
 
 /** The ACP agents Night Shift offers as harnesses. */
 export const ACP_AGENTS: Record<AcpAgentName, AcpAgent> = {
@@ -110,8 +143,8 @@ export const ACP_AGENTS: Record<AcpAgentName, AcpAgent> = {
 		args: () => [],
 		model: "session",
 		mcp: false,
-		launch: (pi) => ({
-			argv: [process.execPath, PI_ACP],
+		launch: (pi, options) => ({
+			argv: options?.piAcp ?? piAcpCommand(),
 			env: { PI_ACP_PI_COMMAND: pi },
 		}),
 	},
@@ -151,6 +184,12 @@ export type AcpHarnessOptions = {
 	env?: Record<string, string> | (() => Promise<Record<string, string>>);
 	/** How long to wait for the process to stop after an abort. Default 5 s. */
 	abortGraceMs?: number;
+	/**
+	 * pi only: the command that starts pi-acp. Default `piAcpCommand()`. A
+	 * build that carries pi-acp inside gives the command that starts it
+	 * there (`runPiAcp`).
+	 */
+	piAcp?: string[];
 };
 
 /**
@@ -259,7 +298,7 @@ async function acpAdapter(
 	}
 	const model = input.model !== ACP_DEFAULT_MODEL ? input.model : undefined;
 	const bySession = agent.model === "session";
-	const launch = agent.launch?.(options.executable) ?? {
+	const launch = agent.launch?.(options.executable, options) ?? {
 		argv: [options.executable],
 		env: {},
 	};

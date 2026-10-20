@@ -8,6 +8,7 @@ export {
 	acpPermission,
 	customAcpHarness,
 	isAcpAgent,
+	runPiAcp,
 } from "./acp";
 export {
 	type ClaudeCodeHarnessOptions,

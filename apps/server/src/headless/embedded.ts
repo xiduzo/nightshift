@@ -46,6 +46,18 @@ export async function extractMigrations(
 	return dir;
 }
 
+/** The hidden command that runs pi-acp, which the binary carries inside. */
+export const PI_ACP_COMMAND = "pi-acp";
+
+/**
+ * How the binary starts pi-acp for the pi harness: it runs itself as
+ * `nightshift pi-acp`. pi-acp is not on disk next to it. Undefined: the
+ * default, pi-acp's own script, from source.
+ */
+export function embeddedPiAcp(): string[] | undefined {
+	return embedded() ? [process.execPath, PI_ACP_COMMAND] : undefined;
+}
+
 /** The migrations folder of the binary, once extracted. Undefined: the default, from source. */
 export function migrationsFolder(): string | undefined {
 	return state.nightshiftMigrations;

@@ -79,7 +79,7 @@ The entries today:
 
 | Package | Entries |
 | --- | --- |
-| `agents` | `.`, `./harness-facts`, `./mcp`, `./pricing`, `./types`, `./testing` (fakes, `fixturePath(name)`). The engine uses the four light entries: the root loads every harness, and `acp.ts` resolves `pi-acp` when it loads. |
+| `agents` | `.`, `./harness-facts`, `./mcp`, `./pricing`, `./types`, `./testing` (fakes, `fixturePath(name)`). The engine uses the four light entries: the root loads every harness. |
 | `api` | `.` (`appRouter` and its types), `./client` (types only, for `apps/web`), `./context` |
 | `auth` | `.`, `./testing` |
 | `db` | `.`, `./schema`, `./data-dir`, `./migrate` |

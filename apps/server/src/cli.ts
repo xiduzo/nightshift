@@ -3,7 +3,11 @@ import { hasLogin, hostPolicyFromEnv } from "@nightshift/auth";
 
 import { prepareDaemonEnv } from "./daemon-env";
 import { reachFor } from "./devices";
-import { embedded, extractMigrations } from "./headless/embedded";
+import {
+	embedded,
+	extractMigrations,
+	PI_ACP_COMMAND,
+} from "./headless/embedded";
 import { directoryWeb, embeddedWeb, webHandler } from "./headless/web";
 import { healthCommand } from "./health-cli";
 import { adminCommand, joinCommand, pairCommand } from "./join-cli";
@@ -195,6 +199,11 @@ export async function main(argv: string[]) {
 			return adminCommand(rest, "nightshift admin");
 		case "health":
 			return healthCommand(rest, "nightshift health");
+		// Not in the help: the pi harness of the binary starts it (embeddedPiAcp).
+		case PI_ACP_COMMAND: {
+			const { runPiAcp } = await import("@nightshift/agents");
+			return runPiAcp();
+		}
 		case undefined:
 		case "help":
 		case "--help":

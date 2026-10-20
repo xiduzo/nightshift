@@ -95,7 +95,7 @@ import {
 	localOrigins,
 	trustedOrigins,
 } from "./env.server";
-import { migrationsFolder } from "./headless/embedded";
+import { embeddedPiAcp, migrationsFolder } from "./headless/embedded";
 import { guardProcess } from "./process-guard";
 import { createSync, documentAccess, type Sync } from "./sync";
 
@@ -402,9 +402,13 @@ const local = localDevice({
 		cursor: perSession("cursor", () =>
 			acpHarness("cursor", { executable: settings.current().cursorBin }),
 		),
-		pi: perSession("pi", () =>
-			acpHarness("pi", { executable: settings.current().piBin }),
-		),
+		pi: perSession("pi", () => {
+			const piAcp = embeddedPiAcp();
+			return acpHarness("pi", {
+				executable: settings.current().piBin,
+				...(piAcp ? { piAcp } : {}),
+			});
+		}),
 	},
 	// Custom agents: read from the settings at each session, so an edit
 	// applies to the next one. `${NAME}` in their env reads the secrets.

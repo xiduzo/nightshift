@@ -167,6 +167,14 @@ describe("acpHarness", () => {
 		expect(ACP_AGENTS.pi.args({ model: "m" })).toEqual([]);
 	});
 
+	test("a build that carries pi-acp inside starts it its own way", () => {
+		const launch = ACP_AGENTS.pi.launch?.("pi", {
+			piAcp: ["/usr/local/bin/nightshift", "pi-acp"],
+		});
+		expect(launch?.argv).toEqual(["/usr/local/bin/nightshift", "pi-acp"]);
+		expect(launch?.env).toEqual({ PI_ACP_PI_COMMAND: "pi" });
+	});
+
 	test("each agent starts its ACP server", () => {
 		expect(ACP_AGENTS.gemini.args({ model: "m" })).toEqual([
 			"--acp",
