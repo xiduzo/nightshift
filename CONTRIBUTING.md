@@ -30,6 +30,7 @@ bun run check          # Biome: lint and format
 Every change follows the steering documents:
 
 - [TECH.md](docs/steering/TECH.md): the stack, the architecture, and the constraints. For example: store facts, never status, and every loop has a maximum count.
+- [STRUCTURE.md](docs/steering/STRUCTURE.md): where code lives. Packages import only downward, and code inside a package is grouped by domain, not by kind.
 - [QA.md](docs/steering/QA.md): the test strategy and the definition of done.
 - [DESIGN.md](docs/steering/DESIGN.md) and [AGENTS.md](AGENTS.md): the UI is built from shadcn/ui components only, and UI copy tells the person what happens, not how Night Shift works inside.
 

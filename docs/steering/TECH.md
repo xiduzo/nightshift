@@ -25,7 +25,7 @@ Last updated: 2026-10-19
 ## Architecture
 
 - **Pattern:** Ports and adapters. The engine depends on interfaces. Harnesses and decider providers are adapters behind them.
-- **Module structure:** A Bun workspace. `apps/server` is the daemon (Hono, oRPC, Better Auth, SSE). `apps/web` is the UI. `apps/desktop` is the Electrobun shell and holds no logic. `packages/db` owns the schema. `packages/api` owns the oRPC contracts. Planned: `packages/flows`, `packages/engine`, `packages/agents`. See `docs/PLAN.md`.
+- **Module structure:** A layered vertical codebase in a Bun workspace. Packages sit in layers and import only downward. Inside a package, code is grouped by domain. `docs/steering/STRUCTURE.md` holds the layer map, what each package owns, and the rules.
 - **State management:** The server stores durable facts in libsql and appends every change to an event log. The UI derives status from facts and subscribes to the event log over SSE through TanStack Query.
 - **Data flow:** UI → oRPC → engine → agents (harness or tool) → facts + event → SSE → UI. Everything runs in-process.
 - **Harness adapters:** `packages/agents/src/adapter-session.ts` runs every Agent step as one TanStack AI session: it owns the sandbox in the worktree, the `chat()` call, the translator, the step report and the abort. One file per harness (`claude-code.ts`, `codex.ts`, `opencode.ts`, `acp.ts`, `grok-build.ts`) holds only a `HarnessSpec`, a TanStack adapter factory and a raw-message observer. `acp.ts` runs every agent that speaks the Agent Client Protocol through `acpCompatible`: GitHub Copilot, Gemini CLI, Cursor, and pi (through the `pi-acp` package, which `packages/agents` ships). An agent without a model flag gets its model over ACP (`acp-session-config.ts`). A custom agent (`acp:<slug>` in a flow, `customAgents` in the settings) runs through the same path, with the command the person gave.
@@ -80,7 +80,7 @@ bun lefthook install
 ## Code Conventions
 
 - **Naming:** PascalCase components and types, camelCase functions and variables, kebab-case file names.
-- **File structure:** One workspace package per bounded context. Inside a package, group by feature, not by kind.
+- **File structure:** One workspace package per bounded context. Inside a package, group by feature, not by kind. No `lib/`, `utils/` or `hooks/` buckets. See `docs/steering/STRUCTURE.md`.
 - **Test files:** Colocated `*.test.ts` next to the module. Bun's test runner.
 - **Imports:** Workspace packages by name (`@nightshift/db`). No relative imports across packages.
 - **Formatting:** Biome. The pre-commit hook formats staged files.
@@ -107,6 +107,7 @@ bun lefthook install
 | The walk reads the checkpoint; the event log is the read model for people, and the crash-recovery source | Writes before `interrupt()` are not committed, and a daemon death mid-node leaves only the log. What the checkpoint holds for sure (outputs, stop time, streak, open Gate) is read there. | 2026-10-17 |
 | Project readiness check with guided fixes, never a silent install | Worktrees need git, a top-level repository and a first commit. Night Shift checks them in order and offers a fix per problem after one confirm: the OS installer for git (a command to run where it needs `sudo`), and `git init` plus a first commit with a repo-local name and email. | 2026-10-18 |
 | Run history in one global app data directory per daemon, not per project | The dashboard, inbox and run list read across projects, and the per-database lease keeps the dev and night daemons apart. Transcripts can hold unredacted secrets and grow large, so they stay out of repos. Run export bundles cover sharing one run. | 2026-10-18 |
+| A layered vertical codebase with enforced public surfaces | Packages import only downward and expose named entry points. Inside a package, code is grouped by domain. Kind buckets (`lib/`, `utils/`) and `"./*"` exports let any file reach any other, so a small change breaks far-away code. See `docs/steering/STRUCTURE.md`. | 2026-10-20 |
 
 Full ADRs go in `docs/adr/` when a decision needs more than one line of rationale.
 
