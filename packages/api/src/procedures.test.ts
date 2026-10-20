@@ -15,7 +15,7 @@ import type { SpaceEngine } from "@nightshift/engine";
 import { call, ORPCError } from "@orpc/server";
 
 import type { Context } from "./context";
-import { appRouter } from "./routers/index";
+import { appRouter } from "./router";
 
 /**
  * Sessions and roles on the procedures: a call needs a session, works in

@@ -39,6 +39,7 @@ import ts from "typescript";
 export const ENFORCED: string[] = [
 	"apps/web",
 	"packages/agents",
+	"packages/api",
 	"packages/engine",
 ];
 
