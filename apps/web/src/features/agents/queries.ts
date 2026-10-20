@@ -1,16 +1,10 @@
 /**
  * The query and mutation options of the agents: Agent Profiles, harnesses,
- * Connections and their Secrets, CLI Tools, deciders and Offers.
- *
- * Offers are here, not in devices: the Agents page makes and withdraws
- * them, and devices sits above agents.
+ * Connections and their Secrets, CLI Tools and deciders.
  */
 
 import type { CheckTarget, HarnessRowName } from "@/shared/api";
 import { orpc } from "@/shared/api";
-
-/** How often a list of Offers is read again. */
-const OFFERS_POLL_MS = 10_000;
 
 export const profileQueries = {
 	/** Every profiles query. Invalidate it after a profile, a Connection or a CLI Tool changes. */
@@ -90,22 +84,4 @@ export const cliToolMutations = {
 export const deciderQueries = {
 	/** The deciders of this computer: who decides a Decision node, and whether its key is set. */
 	list: () => orpc.deciders.list.queryOptions(),
-};
-
-export const offerQueries = {
-	/** Every offers query. Invalidate it after an Offer is made or withdrawn. */
-	all: () => orpc.offers.key(),
-	/** The Offers of this computer, and the Spaces it can offer to. */
-	list: () => orpc.offers.list.queryOptions(),
-	/** The Offers of this computer. Polls; a failed background poll keeps the list. */
-	listLive: () => ({
-		...orpc.offers.list.queryOptions(),
-		refetchInterval: OFFERS_POLL_MS,
-		meta: { quietRefetchErrors: true },
-	}),
-};
-
-export const offerMutations = {
-	make: orpc.offers.make.mutationOptions,
-	withdraw: orpc.offers.withdraw.mutationOptions,
 };

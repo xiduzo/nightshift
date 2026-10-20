@@ -40,9 +40,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShareIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { offerMutations, offerQueries } from "@/features/devices/queries";
 import type { PermissionMode } from "@/shared/api";
 import { PERMISSION_MODES } from "./agent-options";
-import { offerMutations, offerQueries } from "./queries";
 
 /** The permission modes from the narrowest to the widest, as an Offer caps them. */
 const CAPS: PermissionMode[] = [

@@ -24,16 +24,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { LaptopIcon, ShareIcon } from "lucide-react";
 import { Fragment, useState } from "react";
-import {
-	offerQueries,
-	permissionLabel,
-	WithdrawOfferDialog,
-} from "@/features/agents";
+import { permissionLabel, WithdrawOfferDialog } from "@/features/agents";
 import { RunStatusBadge } from "@/features/runs/components/run-status-badge";
 import type { OfferView, SpaceDevice } from "@/shared/api";
 import { formatRelative, useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
-import { deviceQueries } from "./queries";
+import { deviceQueries, offerQueries } from "./queries";
 
 function caps(offer: Pick<OfferView, "permissionCap" | "sessionCap">): string {
 	return `${permissionLabel(offer.permissionCap)} at most. ${

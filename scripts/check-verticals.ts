@@ -69,6 +69,9 @@ export const PEER_PORTS: Record<
 			// The Agents page reads the settings and saves a program's path.
 			// The settings page shows the agent defaults with the harnesses.
 			"features/settings": "queries",
+			// The Agents page makes and withdraws the Offers of a profile. The
+			// Devices page shows the Offers with the withdraw dialog of agents.
+			"features/devices": "queries",
 		},
 		"features/devices": {
 			// Runs and devices show each other: a run shows its Walker (a

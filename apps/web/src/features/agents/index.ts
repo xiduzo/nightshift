@@ -16,6 +16,5 @@ export {
 	connectionQueries,
 	deciderQueries,
 	harnessQueries,
-	offerQueries,
 	profileQueries,
 } from "./queries";

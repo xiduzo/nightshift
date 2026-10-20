@@ -56,6 +56,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
+import { offerQueries } from "@/features/devices/queries";
 import type {
 	CliTool,
 	Connection,
@@ -74,12 +75,7 @@ import { DetailSection, DetailShell } from "./detail-shell";
 import { harnessInfo } from "./harnesses";
 import { ModelCombobox, ModelSourceHint } from "./model-combobox";
 import { OfferDialog, WithdrawOfferDialog } from "./offer-dialog";
-import {
-	harnessQueries,
-	offerQueries,
-	profileMutations,
-	profileQueries,
-} from "./queries";
+import { harnessQueries, profileMutations, profileQueries } from "./queries";
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
 
