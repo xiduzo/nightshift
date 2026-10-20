@@ -1,0 +1,56 @@
+import type { Policy } from "@nightshift/flows";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { connectionQueries, profileQueries } from "@/features/agents";
+import { runQueries } from "@/features/runs/queries";
+import { settingsQueries } from "@/features/settings/queries";
+import { useProjectFlows } from "../use-project-flows";
+
+/**
+ * What the editor reads besides the draft: the project's other flows, your
+ * devices, the settings (new-node defaults, run policy), the connections and
+ * the Agent Profiles. Each part is undefined while it loads.
+ */
+export function useEditorData(projectId: string, name: string) {
+	// The other flow files, for Call nodes. The draft stands in for this one.
+	const projectFlows = useProjectFlows(projectId, name);
+	// Your devices, for where a node runs.
+	const myDevices = useQuery({
+		...runQueries.devices(projectId),
+		meta: { quietErrors: true },
+	});
+	// The daemon's settings (new-node defaults, run policy) and connections.
+	const settings = useQuery(settingsQueries.get());
+	const daemonConnections = useQuery(connectionQueries.list());
+	const nodeDefaults = settings.data?.values;
+	const policyDefaults = useMemo((): Required<Policy> | undefined => {
+		const values = settings.data?.values;
+		if (!values) return undefined;
+		return {
+			usageLimitFirstWaitMinutes: values.usageLimitFirstWaitMinutes,
+			usageLimitMaxWaitMinutes: values.usageLimitMaxWaitMinutes,
+			networkGraceMinutes: values.networkGraceMinutes,
+			maxSteps: values.maxStepsPerRun,
+			resumeInterruptedRuns: values.resumeInterruptedRuns,
+		};
+	}, [settings.data]);
+	const connections = daemonConnections.data?.connections;
+	const connectionNames = useMemo(
+		() => connections?.map((connection) => connection.name),
+		[connections],
+	);
+	const daemonProfiles = useQuery(profileQueries.list());
+	const profileNames = useMemo(
+		() => daemonProfiles.data?.map((profile) => profile.name),
+		[daemonProfiles.data],
+	);
+	return {
+		projectFlows,
+		devices: myDevices.data,
+		nodeDefaults,
+		policyDefaults,
+		connections,
+		connectionNames,
+		profileNames,
+	};
+}

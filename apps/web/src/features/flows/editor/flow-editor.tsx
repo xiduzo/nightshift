@@ -1,39 +1,14 @@
-import type {
-	CallEach,
-	Flow,
-	FlowIssue,
-	FlowNode,
-	Policy,
-} from "@nightshift/flows";
+import type { Flow, FlowIssue } from "@nightshift/flows";
 import {
 	callersOf,
 	isSavable,
-	type NodeOption,
 	newElementFlow,
 	newFlow,
 	removeEdge,
 	removeNode,
-	removeOutcome,
-	renameNode,
-	renameOutcome,
-	restoreAgentOutcomes,
-	restoreCallEach,
-	restoreOutcome,
-	setAgentOutcomes,
-	setCallEach,
 	updateEdge,
 	updateNode,
 } from "@nightshift/flows";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@nightshift/ui/components/alert-dialog";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Card } from "@nightshift/ui/components/card";
@@ -44,29 +19,28 @@ import {
 } from "@nightshift/ui/components/resizable";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { CheckIcon, CircleDotIcon, PlayIcon, SaveIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { connectionQueries, profileQueries } from "@/features/agents";
-import { runQueries } from "@/features/runs/queries";
-import { settingsQueries } from "@/features/settings/queries";
 import { useMediaQuery } from "@/shared/media-query";
 import { SiteHeader } from "@/shared/page";
 import { OpenFlowContext } from "../canvas/open-flow-context";
-import { outcomeLabel } from "../canvas/outcome-badge";
-import { checkFlow, optionNoun } from "../flow-draft";
+import { checkFlow } from "../flow-draft";
 import { flowMutations, flowQueries } from "../queries";
 import { StartRunDialog } from "../start/start-run-dialog";
-import { useProjectFlows } from "../use-project-flows";
 import { EdgeInspector } from "./edge-inspector";
 import { EditorCanvas, NodePalette, type Selection } from "./editor-canvas";
 import { FlowInspector } from "./flow-inspector";
+import { FlowSignature } from "./flow-signature";
 import { NodeInspector } from "./inspector/node-inspector";
 import { IssuesPanel } from "./issues-panel";
+import { LeaveDialog } from "./leave-dialog";
+import { nodeEdits } from "./node-edits";
 import { ProjectFlowsContext } from "./project-flows-context";
+import { useEditorData } from "./use-editor-data";
 
 type Props = {
 	projectId: string;
@@ -106,38 +80,15 @@ function Editor({
 		() => JSON.stringify(draft) !== savedJson,
 		[draft, savedJson],
 	);
-	// The other flow files, for Call nodes. The draft stands in for this one.
-	const projectFlows = useProjectFlows(projectId, name);
-	// Your devices, for where a node runs.
-	const myDevices = useQuery({
-		...runQueries.devices(projectId),
-		meta: { quietErrors: true },
-	});
-	// The daemon's settings (new-node defaults, run policy) and connections.
-	const settings = useQuery(settingsQueries.get());
-	const daemonConnections = useQuery(connectionQueries.list());
-	const nodeDefaults = settings.data?.values;
-	const policyDefaults = useMemo((): Required<Policy> | undefined => {
-		const values = settings.data?.values;
-		if (!values) return undefined;
-		return {
-			usageLimitFirstWaitMinutes: values.usageLimitFirstWaitMinutes,
-			usageLimitMaxWaitMinutes: values.usageLimitMaxWaitMinutes,
-			networkGraceMinutes: values.networkGraceMinutes,
-			maxSteps: values.maxStepsPerRun,
-			resumeInterruptedRuns: values.resumeInterruptedRuns,
-		};
-	}, [settings.data]);
-	const connections = daemonConnections.data?.connections;
-	const connectionNames = useMemo(
-		() => connections?.map((connection) => connection.name),
-		[connections],
-	);
-	const daemonProfiles = useQuery(profileQueries.list());
-	const profileNames = useMemo(
-		() => daemonProfiles.data?.map((profile) => profile.name),
-		[daemonProfiles.data],
-	);
+	const {
+		projectFlows,
+		devices,
+		nodeDefaults,
+		policyDefaults,
+		connections,
+		connectionNames,
+		profileNames,
+	} = useEditorData(projectId, name);
 	const check = useMemo(
 		() =>
 			checkFlow(draft, projectFlows.flows, name, connectionNames, profileNames),
@@ -313,102 +264,13 @@ function Editor({
 			? draft.edges.find((edge) => edge.id === selection.id)
 			: undefined;
 
-	const renameSelected = (node: FlowNode) => (next: string) => {
-		if (draft.nodes.some((other) => other.id === next)) {
-			return `${next} is taken by another node.`;
-		}
-		if (draft.inputs.some((input) => input.name === next)) {
-			return `An input of this flow is already named ${next}. Pick another name.`;
-		}
-		if (next === "run") return "The name run is taken. Pick another name.";
-		setDraft((current) => renameNode(current, node.id, next));
-		setSelection({ kind: "node", id: next });
-		return null;
-	};
-
-	const renameSelectedOutcome =
-		(node: FlowNode) => (index: number, name: string) => {
-			setDraft((current) => renameOutcome(current, node.id, index, name));
-			return null;
-		};
-
-	// Dropping a label drops its edges too: say so, and offer to put them back.
-	const removeSelectedOutcome = (node: FlowNode) => (index: number) => {
-		const result = removeOutcome(draft, node.id, index);
-		const { option, dropped } = result;
-		if (!option) return;
-		setDraft((current) => removeOutcome(current, node.id, index).flow);
-		if (dropped.length === 0) return;
-		const noun = optionNoun(node);
-		toast.info(
-			`Removed the ${noun} ${outcomeLabel(option.name)} and ${dropped.length} ${dropped.length === 1 ? "edge" : "edges"} on it.`,
-			{
-				description: dropped
-					.map((edge) => `${edge.from} → ${edge.to}`)
-					.join(", "),
-				action: {
-					label: "Undo",
-					onClick: () =>
-						setDraft((current) =>
-							restoreOutcome(current, node.id, index, option, dropped),
-						),
-				},
-			},
-		);
-	};
-
-	// Own outcomes on or off: edges on outcomes the node drops go too, with an undo.
-	const setSelectedCallEach =
-		(node: FlowNode) => (each: CallEach | undefined) => {
-			const result = setCallEach(draft, node.id, each);
-			setDraft((current) => setCallEach(current, node.id, each).flow);
-			const { dropped, previous } = result;
-			if (dropped.length === 0) return;
-			toast.info(
-				`Removed ${dropped.length} ${dropped.length === 1 ? "edge" : "edges"} on outcomes ${node.id} no longer has.`,
-				{
-					description: dropped
-						.map(
-							(edge) =>
-								`${edge.from} ${outcomeLabel(edge.outcome)} → ${edge.to}`,
-						)
-						.join(", "),
-					action: {
-						label: "Undo",
-						onClick: () =>
-							setDraft((current) =>
-								restoreCallEach(current, node.id, previous, dropped),
-							),
-					},
-				},
-			);
-		};
-
-	const setSelectedAgentOutcomes =
-		(node: FlowNode) => (outcomes: NodeOption[] | undefined) => {
-			const result = setAgentOutcomes(draft, node.id, outcomes);
-			setDraft((current) => setAgentOutcomes(current, node.id, outcomes).flow);
-			const { dropped, previous } = result;
-			if (dropped.length === 0) return;
-			toast.info(
-				`Removed ${dropped.length} ${dropped.length === 1 ? "edge" : "edges"} on outcomes ${node.id} no longer has.`,
-				{
-					description: dropped
-						.map(
-							(edge) =>
-								`${edge.from} ${outcomeLabel(edge.outcome)} → ${edge.to}`,
-						)
-						.join(", "),
-					action: {
-						label: "Undo",
-						onClick: () =>
-							setDraft((current) =>
-								restoreAgentOutcomes(current, node.id, previous, dropped),
-							),
-					},
-				},
-			);
-		};
+	const {
+		renameSelected,
+		renameSelectedOutcome,
+		removeSelectedOutcome,
+		setSelectedCallEach,
+		setSelectedAgentOutcomes,
+	} = nodeEdits(draft, setDraft, setSelection);
 
 	const flowsSupport = {
 		flowName: name,
@@ -425,7 +287,7 @@ function Editor({
 			projectId={projectId}
 			flow={draft}
 			node={selectedNode}
-			devices={myDevices.data}
+			devices={devices}
 			onChange={(change) =>
 				setDraft((current) => updateNode(current, selectedNode.id, change))
 			}
@@ -608,123 +470,20 @@ function Editor({
 				inputs={draft.inputs}
 			/>
 
-			<AlertDialog
-				open={blocker.status === "blocked"}
-				onOpenChange={(open) => {
-					if (!open && blocker.status === "blocked") blocker.reset();
+			<LeaveDialog
+				blocked={blocker.status === "blocked"}
+				name={name}
+				onStay={() => {
+					if (blocker.status === "blocked") blocker.reset();
 				}}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Leave without saving?</AlertDialogTitle>
-						<AlertDialogDescription>
-							The changes to <span className="font-mono">{name}</span> are not
-							saved. They are lost when you leave.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Stay</AlertDialogCancel>
-						<AlertDialogAction
-							variant="destructive"
-							onClick={() => blocker.status === "blocked" && blocker.proceed()}
-						>
-							Leave
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
+				onLeave={() => {
+					if (blocker.status === "blocked") blocker.proceed();
+				}}
+			/>
 		</>
 	);
 }
 
 function selectionKey(selection: Selection): string {
 	return selection ? `${selection.kind}:${selection.id}` : "flow";
-}
-
-/** True while the viewport is at least `query` wide; follows resizes. */
-/**
- * The flow's inputs, like a function signature, its variables, and the
- * flows that call it.
- */
-function FlowSignature({
-	projectId,
-	inputs,
-	variables,
-	callers,
-}: {
-	projectId: string;
-	inputs: Flow["inputs"];
-	variables: NonNullable<Flow["variables"]>;
-	callers: string[];
-}) {
-	if (inputs.length === 0 && variables.length === 0 && callers.length === 0)
-		return null;
-	return (
-		<div className="ml-auto @xl:flex hidden min-w-0 items-center gap-3 text-muted-foreground text-xs">
-			{inputs.length > 0 ? (
-				<span
-					className="flex min-w-0 items-center gap-1.5"
-					title="The inputs of this flow"
-				>
-					<span className="shrink-0">Inputs</span>
-					<span className="flex min-w-0 flex-wrap gap-1">
-						{inputs.map((input) => (
-							<Badge
-								key={input.name}
-								variant="outline"
-								className="font-mono font-normal"
-							>
-								{input.name}
-								{input.type === "json" ? (
-									<span className="text-muted-foreground">: json</span>
-								) : null}
-							</Badge>
-						))}
-					</span>
-				</span>
-			) : null}
-			{variables.length > 0 ? (
-				<span
-					className="flex min-w-0 items-center gap-1.5"
-					title="The variables of this flow"
-				>
-					<span className="shrink-0">Variables</span>
-					<span className="flex min-w-0 flex-wrap gap-1">
-						{variables.map((variable) => (
-							<Badge
-								key={variable.name}
-								variant="outline"
-								className="font-mono font-normal"
-							>
-								{variable.name}
-								<span className="text-muted-foreground">: {variable.type}</span>
-							</Badge>
-						))}
-					</span>
-				</span>
-			) : null}
-			{callers.length > 0 ? (
-				<span className="flex min-w-0 items-center gap-1">
-					<span className="shrink-0">Called by</span>
-					{callers.map((caller) => (
-						<Button
-							key={caller}
-							variant="link"
-							size="xs"
-							className="h-auto px-0.5 font-mono text-muted-foreground hover:text-foreground"
-							nativeButton={false}
-							render={
-								<Link
-									to="/projects/$projectId/flows/$name"
-									params={{ projectId, name: caller }}
-								/>
-							}
-						>
-							{caller}
-						</Button>
-					))}
-				</span>
-			) : null}
-		</div>
-	);
 }
