@@ -135,6 +135,8 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | stop | Abort the running Step and end the Run as stopped. | Slice 1 |
 | park | Hold a Thread at an Interrupt: a Wait, a Gate, or a Step that failed or was stopped. | LangGraph |
 | resume | Continue a stopped, failed, or interrupted Run at its last Node. A person resumes, or the daemon after a restart. The Thread answers its Interrupt, or runs the Node the daemon left pending again. | Slice 1 |
+| restart | Stop the running Step and resume it at once, in one action ("Restart step" in the Stop menu). For a Step that looks stuck. An Agent Step continues its Session with a follow-up prompt. Only on the Walker. | Restart |
+| run again | Walk a Run that is not going (failed, stopped, interrupted or finished) again from a Node of its own Flow, with a new Visit of it ("Run again from here" on a Step). The Steps after it follow as the Flow routes; Inputs, Outputs and Edge counts carry over. An Agent Node continues that Step's Session with a follow-up prompt, or starts fresh with its own prompt. Only on the Walker. | Restart |
 | take over | Hand a Session to a person with its Harness's resume command, for example `claude --resume <id>`. | Slice 1 |
 | retry | Take a Retry Loop back to an earlier Node. | Slice 2 |
 | rescue | Retry a Node with a stronger model. | PLAN §2 |
@@ -161,7 +163,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | MemberRemoved | A Person is no longer a Member of a Space, and who removed them. |
 | RunStarted | A Run began, with its copy of the Flow, and the Person who started it (none for a Schedule). |
 | WorktreeCreated | A Worktree was created for a Run. |
-| RunResumed | A person resumed a Run, or the daemon did after a restart (`by: "daemon"`). |
+| RunResumed | A person resumed a Run, or the daemon did after a restart (`by: "daemon"`). `action` says when it was more: `restart` (a person restarted the running Step) or `rerun` (a person ran the Run again from a Node). |
 | StepStarted | A Step began a Visit of a Node. |
 | StepReopened | A resume continued an Agent Step's Session in place. |
 | StepEnded | A Step ended with an Outcome and its Outputs. |
