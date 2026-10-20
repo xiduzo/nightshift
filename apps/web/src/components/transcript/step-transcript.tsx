@@ -1,4 +1,4 @@
-import type { JsonValue } from "@nightshift/flows";
+import { type FlowNode, type JsonValue, outcomeColor } from "@nightshift/flows";
 import {
 	Alert,
 	AlertDescription,
@@ -129,6 +129,7 @@ export function StepTranscript({
 	connecting,
 	walker,
 	answerPending = false,
+	node,
 }: {
 	runId: string;
 	step: StepSummary;
@@ -139,6 +140,8 @@ export function StepTranscript({
 	walker?: RunSummary["walker"];
 	/** An answer to this run's Gate is on its way to that device. */
 	answerPending?: boolean;
+	/** The step's node: its outcomes keep their colours. */
+	node?: FlowNode;
 }) {
 	const running = step.outcome === null;
 	// A gate step without an outcome waits for a person: it gets the answer form.
@@ -331,6 +334,7 @@ export function StepTranscript({
 										) : (
 											<TranscriptItemView
 												item={item}
+												node={node}
 												itemTitle={
 													item.kind === "item-end"
 														? itemTitles.get(item.itemId)
@@ -452,6 +456,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 	running,
 	session,
 	sessionNumber,
+	node,
 }: {
 	item: TranscriptItem;
 	/** For an item's end: the title from its start. */
@@ -459,6 +464,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 	running: boolean;
 	session: SessionSummary | undefined;
 	sessionNumber: number | undefined;
+	node?: FlowNode;
 }) {
 	switch (item.kind) {
 		case "session":
@@ -475,7 +481,7 @@ const TranscriptItemView = memo(function TranscriptItemView({
 		case "tool":
 			return <ToolCallRow item={item} running={running} />;
 		case "report":
-			return <ReportCard item={item} />;
+			return <ReportCard item={item} node={node} />;
 		case "finished":
 			return <SessionFinished item={item} />;
 		case "error":
@@ -847,8 +853,11 @@ function ResultCard({
 }
 
 /** The agent's step report: the outcome the flow follows, and its summary. */
-function ReportCard({ item }: { item: ReportItem }) {
-	const { label, icon, text } = stepStateStyle(item.outcome);
+function ReportCard({ item, node }: { item: ReportItem; node?: FlowNode }) {
+	const { label, icon, text } = stepStateStyle(
+		item.outcome,
+		node && outcomeColor(node, item.outcome),
+	);
 	const hasSummary = item.summary.trim() !== "";
 	return (
 		<ResultCard icon={icon} kicker="Step report ·" value={label} tone={text}>

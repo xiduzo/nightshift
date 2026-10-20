@@ -273,10 +273,17 @@ function isKnown(state: string): state is keyof typeof KNOWN_STATES {
 	return Object.hasOwn(KNOWN_STATES, state);
 }
 
-/** The look of a step state or an outcome. A Decision label or Gate choice shows its own name. */
-export function stepStateStyle(state: StepState): Style {
-	if (isKnown(state)) return KNOWN_STATES[state];
-	return { ...outcomeStyle(state), label: state };
+/**
+ * The look of a step state or an outcome. A Decision label or Gate choice
+ * shows its own name. An outcome takes the colour its node gives it, so the
+ * badge matches the output it left by.
+ */
+export function stepStateStyle(state: StepState, color?: OutcomeColor): Style {
+	if (isKnown(state)) {
+		const known = KNOWN_STATES[state];
+		return color ? { ...known, ...OUTCOME_COLOR_STYLE[color] } : known;
+	}
+	return { ...outcomeStyle(state, color), label: state };
 }
 
 /**
@@ -317,12 +324,15 @@ export function outcomeLabel(outcome: Outcome): string {
 
 export function OutcomeBadge({
 	state,
+	color,
 	className,
 }: {
 	state: StepState;
+	/** The colour the node gives this outcome. */
+	color?: OutcomeColor;
 	className?: string;
 }) {
-	const { label, icon: Icon, badge } = stepStateStyle(state);
+	const { label, icon: Icon, badge } = stepStateStyle(state, color);
 	return (
 		<Badge variant="outline" className={cn(badge, className)}>
 			<Icon aria-hidden="true" />

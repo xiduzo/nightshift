@@ -62,8 +62,10 @@ import {
 	derivedTraversals,
 	type ItemScope,
 	itemsOf,
+	nodeOfStep,
 	scopeChain,
 	stepAtScope,
+	stepOutcomeColor,
 	stepRunsEach,
 	stepsIn,
 	stepsUnder,
@@ -332,6 +334,7 @@ function RunComponent() {
 					onSelectItem={selectItem}
 					calledName={(step) => calledFlowName(runData, steps, step)}
 					runsEach={(step) => stepRunsEach(runData, steps, step)}
+					outcomeColor={(step) => stepOutcomeColor(runData, steps, step)}
 					warnedStepIds={warnedStepIds}
 					stepAction={
 						rerunnable
@@ -408,6 +411,11 @@ function RunComponent() {
 			open={consoleOpen}
 			onOpenChange={showConsole}
 			empty={status === "running" ? "Waiting for the first step…" : "No steps."}
+			outcomeColor={
+				selectedStep
+					? stepOutcomeColor(runData, steps, selectedStep)
+					: undefined
+			}
 			className="h-full"
 			summary={
 				selectedStep ? (
@@ -441,6 +449,7 @@ function RunComponent() {
 						}
 						connecting={stream.connection === "connecting"}
 						walker={runData.walker}
+						node={nodeOfStep(runData, steps, selectedStep)}
 						answerPending={runData.commands.some(
 							(c) => c.kind === "gate.resolve",
 						)}

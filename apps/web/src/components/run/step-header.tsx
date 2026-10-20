@@ -1,3 +1,4 @@
+import type { OutcomeColor } from "@nightshift/flows";
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -19,9 +20,12 @@ import { StepDuration } from "./step-timeline";
 export function StepLine({
 	step,
 	runStatus,
+	outcomeColor,
 }: {
 	step: StepSummary;
 	runStatus: RunStatus;
+	/** The colour the step's node gives its outcome. */
+	outcomeColor?: OutcomeColor;
 }) {
 	const { icon: typeIcon, label } = NODE_TYPE[step.nodeType];
 	const Icon = step.gate !== null ? HandIcon : typeIcon;
@@ -40,7 +44,11 @@ export function StepLine({
 					visit {step.visit}
 				</span>
 			) : null}
-			<OutcomeBadge state={stepState(step, runStatus)} className="shrink-0" />
+			<OutcomeBadge
+				state={stepState(step, runStatus)}
+				color={outcomeColor}
+				className="shrink-0"
+			/>
 			<span className="shrink-0 text-muted-foreground text-xs tabular-nums">
 				<time
 					dateTime={new Date(step.startedAt).toISOString()}

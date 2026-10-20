@@ -1,3 +1,4 @@
+import type { OutcomeColor } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Collapsible,
@@ -101,6 +102,7 @@ export function StepTimeline({
 	runsEach,
 	warnedStepIds,
 	stepAction,
+	outcomeColor,
 }: {
 	/** All steps of the run, in the order they started. */
 	steps: StepSummary[];
@@ -119,6 +121,8 @@ export function StepTimeline({
 	warnedStepIds?: ReadonlySet<string>;
 	/** A button for a step's actions, at the end of its row. */
 	stepAction?: (step: StepSummary) => ReactNode;
+	/** The colour a step's node gives its outcome. */
+	outcomeColor?: (step: StepSummary) => OutcomeColor | undefined;
 }) {
 	/** Groups the person opened or closed; the rest follow `defaultOpen`. */
 	const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(
@@ -223,6 +227,7 @@ export function StepTimeline({
 					selected={step.id === selectedStepId}
 					warned={warnedStepIds?.has(step.id) ?? false}
 					onSelect={() => onSelect(step.id)}
+					outcomeColor={outcomeColor?.(step)}
 					action={stepAction?.(step)}
 				/>
 				{step.nodeType === "call" && !eachOf(step) ? (
@@ -327,6 +332,7 @@ function StepRow({
 	warned,
 	onSelect,
 	action,
+	outcomeColor,
 }: {
 	step: StepSummary;
 	/** Its own cost, or what the steps it called cost together. */
@@ -340,6 +346,8 @@ function StepRow({
 	onSelect: () => void;
 	/** A button for the step's actions, at the end of the row. */
 	action?: ReactNode;
+	/** The colour the step's node gives its outcome. */
+	outcomeColor?: OutcomeColor;
 }) {
 	const Icon = NODE_TYPE[step.nodeType].icon;
 	return (
@@ -390,7 +398,12 @@ function StepRow({
 					</span>
 				) : null}
 				<RowStats
-					badge={<OutcomeBadge state={stepState(step, runStatus)} />}
+					badge={
+						<OutcomeBadge
+							state={stepState(step, runStatus)}
+							color={outcomeColor}
+						/>
+					}
 					duration={<StepDuration step={step} />}
 					durationTitle={`Started ${formatTime(step.startedAt)}`}
 					cost={cost}

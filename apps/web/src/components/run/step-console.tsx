@@ -1,3 +1,4 @@
+import type { OutcomeColor } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
@@ -26,6 +27,7 @@ export function StepConsole({
 	summary,
 	transcript,
 	empty,
+	outcomeColor,
 	className,
 }: {
 	step: StepSummary | undefined;
@@ -38,6 +40,8 @@ export function StepConsole({
 	transcript: ReactNode;
 	/** Shown in the bar while there is no step. */
 	empty: string;
+	/** The colour the step's node gives its outcome. */
+	outcomeColor?: OutcomeColor;
 	className?: string;
 }) {
 	const gist = step ? stepGist(step) : undefined;
@@ -57,7 +61,11 @@ export function StepConsole({
 				{step ? (
 					<>
 						<div className="min-w-0 max-w-[60%] shrink-0">
-							<StepLine step={step} runStatus={runStatus} />
+							<StepLine
+								step={step}
+								runStatus={runStatus}
+								outcomeColor={outcomeColor}
+							/>
 						</div>
 						{open ? null : (
 							<p

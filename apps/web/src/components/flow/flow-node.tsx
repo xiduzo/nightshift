@@ -188,7 +188,10 @@ const FlowNodeCard = memo(function FlowNodeCard({
 				: runsEach(node)
 					? CALL_EACH_ICON
 					: meta.icon;
-	const runColor = run ? stepStateStyle(run.state).color : undefined;
+	const stateColor = run ? outcomeColor(node, run.state) : undefined;
+	const runColor = run
+		? stepStateStyle(run.state, stateColor).color
+		: undefined;
 	const active = run?.state === "running";
 	const waiting = run?.state === "waiting";
 
@@ -278,6 +281,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 							{run ? (
 								<OutcomeBadge
 									state={run.state}
+									color={stateColor}
 									className="h-4 px-1.5 text-[10px]"
 								/>
 							) : null}

@@ -1,4 +1,10 @@
-import { type Flow, type FlowNode, runsEach } from "@nightshift/flows";
+import {
+	type Flow,
+	type FlowNode,
+	type OutcomeColor,
+	outcomeColor,
+	runsEach,
+} from "@nightshift/flows";
 
 import type { ItemSummary, StepSummary } from "@/lib/api-types";
 
@@ -94,6 +100,17 @@ export function nodeOfStep(
 	return flowOfStep(run, steps, step)?.nodes.find(
 		(candidate) => candidate.id === step.nodeId,
 	);
+}
+
+/** The colour a step's node gives the outcome the step ended with. */
+export function stepOutcomeColor(
+	run: RunFlows,
+	steps: readonly StepSummary[],
+	step: StepSummary,
+): OutcomeColor | undefined {
+	if (step.outcome === null) return undefined;
+	const node = nodeOfStep(run, steps, step);
+	return node ? outcomeColor(node, step.outcome) : undefined;
 }
 
 /** The name of the flow a Call step calls. */
