@@ -21,6 +21,7 @@ export const HARNESS_LABELS: Record<HarnessName, string> = {
 	copilot: "GitHub Copilot",
 	gemini: "Gemini CLI",
 	cursor: "Cursor",
+	pi: "pi",
 };
 
 /**
@@ -39,6 +40,8 @@ export const HARNESS_TAKE_OVER: Record<
 	copilot: null,
 	gemini: null,
 	cursor: (id) => `agent --resume ${id}`,
+	// pi-acp's session id is pi's own: `--session` takes it.
+	pi: (id) => `pi --session ${id}`,
 };
 
 /** Quote one value for a shell, only when it needs it. */

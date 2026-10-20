@@ -5,7 +5,12 @@
  * MCP server, calls its `report_step` tool the way a real agent would.
  *
  * `FAKE_ACP_LOG`: a file that gets one JSON line per event (argv, session,
- * permission, report), for the test to read.
+ * permission, report, config), for the test to read.
+ *
+ * `FAKE_ACP_CONFIG`: `options` offers the model and a thought level as
+ * session config options (as pi-acp and OpenCode 2.x do). A model it does
+ * not list is refused.
+ * Without an MCP server, the agent reports with a text line instead.
  */
 import { appendFileSync } from "node:fs";
 import { Readable, Writable } from "node:stream";
@@ -22,6 +27,39 @@ log({ type: "argv", argv: process.argv.slice(2) });
 type HttpServer = { name: string; url: string; headers: acp.HttpHeader[] };
 
 const servers = new Map<string, HttpServer[]>();
+
+const MODELS = ["fake/default", "ollama/qwen3-coder:latest"];
+const offer = process.env.FAKE_ACP_CONFIG;
+
+/** What a new or loaded session offers, per `FAKE_ACP_CONFIG`. */
+function offered(): Partial<acp.NewSessionResponse> {
+	if (offer === "options") {
+		return {
+			configOptions: [
+				{
+					id: "model",
+					name: "Model",
+					category: "model",
+					type: "select",
+					currentValue: "fake/default",
+					options: MODELS.map((value) => ({ value, name: value })),
+				},
+				{
+					id: "thinking",
+					name: "Thinking",
+					category: "thought_level",
+					type: "select",
+					currentValue: "off",
+					options: ["off", "low", "high"].map((value) => ({
+						value,
+						name: value,
+					})),
+				},
+			],
+		};
+	}
+	return {};
+}
 
 /** Announces the MCP call as a tool call, as real agents do, then makes it. */
 async function callReport(
@@ -93,7 +131,7 @@ class FakeAgent implements acp.Agent {
 			cwd: params.cwd,
 			mcp: params.mcpServers.map((s) => s.name),
 		});
-		return { sessionId };
+		return { sessionId, ...offered() };
 	}
 
 	async loadSession(
@@ -101,7 +139,21 @@ class FakeAgent implements acp.Agent {
 	): Promise<acp.LoadSessionResponse> {
 		this.remember(params.sessionId, params.mcpServers);
 		log({ type: "load", sessionId: params.sessionId });
-		return {};
+		return offered();
+	}
+
+	async setSessionConfigOption(
+		params: acp.SetSessionConfigOptionRequest,
+	): Promise<acp.SetSessionConfigOptionResponse> {
+		const value = String(params.value);
+		log({ type: "config", configId: params.configId, value });
+		if (params.configId === "model" && !MODELS.includes(value)) {
+			throw acp.RequestError.invalidParams(
+				undefined,
+				`model not found: ${value}`,
+			);
+		}
+		return { configOptions: offered().configOptions ?? [] };
 	}
 
 	private remember(sessionId: string, mcp: acp.McpServer[]) {
@@ -135,8 +187,21 @@ class FakeAgent implements acp.Agent {
 					? permission.outcome.optionId
 					: "cancelled",
 		});
-		for (const server of servers.get(sessionId) ?? []) {
+		const bridged = servers.get(sessionId) ?? [];
+		for (const server of bridged) {
 			await callReport(this.connection, sessionId, server);
+		}
+		if (bridged.length === 0) {
+			await this.connection.sessionUpdate({
+				sessionId,
+				update: {
+					sessionUpdate: "agent_message_chunk",
+					content: {
+						type: "text",
+						text: `\nNIGHTSHIFT-REPORT: {"outcome": "pass", "summary": "The tests pass."}`,
+					},
+				},
+			});
 		}
 		return { stopReason: "end_turn" };
 	}

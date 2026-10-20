@@ -80,6 +80,7 @@ export const harnessNameSchema = z.enum([
 	"copilot",
 	"gemini",
 	"cursor",
+	"pi",
 ]);
 export type HarnessName = z.infer<typeof harnessNameSchema>;
 

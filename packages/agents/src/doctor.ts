@@ -190,6 +190,36 @@ async function codexCheck(bin: string): Promise<CliCheck> {
 	}
 }
 
+/** The oldest pi that pi-acp works with: it asks pi for its thinking levels. */
+export const PI_MIN_VERSION = "0.81.0";
+
+/** True when version `a` (`x.y.z`) is older than `b`. */
+function olderThan(a: string, b: string): boolean {
+	const pa = a.split(".").map(Number);
+	const pb = b.split(".").map(Number);
+	for (let i = 0; i < 3; i++) {
+		const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+		if (d !== 0) return d < 0;
+	}
+	return false;
+}
+
+/** pi-acp waits forever on a pi that is too old: say so here instead. */
+async function piCheck(bin: string): Promise<CliCheck> {
+	const { resolved, ...check } = await baseCheck(bin, "pi");
+	if (!resolved || check.problem) return check;
+	const version = check.version?.match(/\d+\.\d+\.\d+/)?.[0];
+	if (!version) return check;
+	if (olderThan(version, PI_MIN_VERSION)) {
+		return {
+			...check,
+			version,
+			problem: `pi ${version} is too old. Night Shift needs pi 0.81 or later. Update pi, or enter the path of a newer one.`,
+		};
+	}
+	return { ...check, version };
+}
+
 /** The version, and the login where the CLI can tell. Others: version only. */
 export async function checkHarness(
 	harness: HarnessName,
@@ -202,6 +232,8 @@ export async function checkHarness(
 			return opencodeCheck(bin);
 		case "codex":
 			return codexCheck(bin);
+		case "pi":
+			return piCheck(bin);
 		default: {
 			const { resolved: _resolved, ...check } = await baseCheck(
 				bin,
@@ -228,6 +260,11 @@ export type HarnessAdapter = {
 	defaultModel: string;
 	/** The CLI's own command that lists the models it can reach, if it has one. */
 	listing: readonly string[] | null;
+	/**
+	 * Reads the listing's output. Default: each stdout line that is one
+	 * `provider/model`.
+	 */
+	parseListing?: (out: { stdout: string; stderr: string }) => string[];
 	/** One line under the picker: what this harness needs. */
 	note: string;
 	/** Where prompts and code go. */
@@ -339,7 +376,38 @@ export const HARNESS_ADAPTERS: Record<HarnessName, HarnessAdapter> = {
 		offMachine: "Prompts and code go to Cursor under your Cursor login.",
 		takeOver: HARNESS_TAKE_OVER.cursor,
 	},
+	pi: {
+		name: "pi",
+		label: HARNESS_LABELS.pi,
+		initials: "PI",
+		pkg: "@tanstack/ai-acp",
+		bin: "pi",
+		models: [ACP_DEFAULT_MODEL],
+		defaultModel: ACP_DEFAULT_MODEL,
+		listing: ["--list-models"],
+		parseListing: piModels,
+		note: "Needs pi 0.81 or later. Model as provider/model, for example ollama/qwen3-coder:latest. Model default uses the model pi is set to.",
+		offMachine:
+			"Prompts and code go to the model provider pi is set up with. With a local model, such as one in Ollama, they stay on this computer.",
+		takeOver: HARNESS_TAKE_OVER.pi,
+	},
 };
+
+/**
+ * `pi --list-models` prints a table, to stderr in pi 0.73: a header, then
+ * `provider  model  context …` per row. Each row becomes `provider/model`.
+ */
+export function piModels(out: { stdout: string; stderr: string }): string[] {
+	const text = out.stdout.trim() ? out.stdout : out.stderr;
+	return text
+		.split("\n")
+		.map((line) => line.trim().split(/\s+/))
+		.flatMap(([provider, model]) =>
+			provider && model && provider !== "provider"
+				? [`${provider}/${model}`]
+				: [],
+		);
+}
 
 export type HarnessModels = {
 	/** The adapter's models, then the ones only the CLI listed. */
@@ -383,10 +451,12 @@ export async function harnessModels(
 				firstLine(out.stderr) ?? "Night Shift could not list the models.",
 			);
 		}
-		const listed = out.stdout
-			.split("\n")
-			.map((line) => line.trim())
-			.filter((line) => line.includes("/") && !/\s/.test(line));
+		const listed = adapter.parseListing
+			? adapter.parseListing(out)
+			: out.stdout
+					.split("\n")
+					.map((line) => line.trim())
+					.filter((line) => line.includes("/") && !/\s/.test(line));
 		return result([...new Set(listed)], null);
 	} catch (error) {
 		return result([], String(error));

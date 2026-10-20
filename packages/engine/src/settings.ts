@@ -163,6 +163,12 @@ const DEFS = {
 		env: "NIGHTSHIFT_CURSOR_BIN",
 		fromEnv: text,
 	} satisfies Def<string>,
+	piBin: {
+		schema: z.string().trim().min(1),
+		default: "pi",
+		env: "NIGHTSHIFT_PI_BIN",
+		fromEnv: text,
+	} satisfies Def<string>,
 	/**
 	 * The harnesses added on the Agents page. Agent nodes may run only on
 	 * these. The default is the harnesses Night Shift had before Grok Build
@@ -245,6 +251,7 @@ export const HARNESS_BIN = {
 	copilot: "copilotBin",
 	gemini: "geminiBin",
 	cursor: "cursorBin",
+	pi: "piBin",
 } as const satisfies Record<HarnessName, SettingKey>;
 
 /** A change: a value saves it, null forgets the saved value (back to the environment, then the default). */

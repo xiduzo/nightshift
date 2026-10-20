@@ -11,6 +11,7 @@
 		"test": "bun test"
 	},
 	"dependencies": {
+		"@agentclientprotocol/sdk": "0.25.1",
 		"@modelcontextprotocol/sdk": "1.32.1",
 		"@nightshift/flows": "workspace:*",
 		"@pydantic/genai-prices": "0.1.13",
@@ -28,10 +29,10 @@
 		"@tanstack/ai-sandbox-local-process": "0.2.6",
 		"@tanstack/ai-typesafe": "0.1.12",
 		"ollama": "0.6.4",
+		"pi-acp": "0.0.34",
 		"zod": "catalog:"
 	},
 	"devDependencies": {
-		"@agentclientprotocol/sdk": "0.25.1",
 		"@nightshift/config": "workspace:*",
 		"@types/bun": "catalog:",
 		"typescript": "catalog:"

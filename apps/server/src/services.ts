@@ -393,6 +393,9 @@ const local = localDevice({
 		cursor: perSession("cursor", () =>
 			acpHarness("cursor", { executable: settings.current().cursorBin }),
 		),
+		pi: perSession("pi", () =>
+			acpHarness("pi", { executable: settings.current().piBin }),
+		),
 	},
 	harnessNames: () => new Set(settings.current().harnesses),
 	// Decision nodes decided by a model: TanStack AI deciders, with API keys from the secrets.

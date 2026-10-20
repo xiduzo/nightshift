@@ -110,6 +110,17 @@ export const HARNESSES: readonly HarnessInfo[] = [
 		setting: "cursorBin",
 		offMachine: "Prompts and code go to Cursor under your Cursor login.",
 	},
+	{
+		value: "pi",
+		label: "pi",
+		initials: "PI",
+		note: "Needs pi 0.81 or later. Model as provider/model, for example ollama/qwen3-coder:latest. Model default uses the model pi is set to.",
+		defaultModel: "default",
+		models: ["default"],
+		setting: "piBin",
+		offMachine:
+			"Prompts and code go to the model provider pi is set up with. With a local model, such as one in Ollama, they stay on this computer.",
+	},
 ];
 
 export function harnessInfo(name: HarnessName): HarnessInfo {
