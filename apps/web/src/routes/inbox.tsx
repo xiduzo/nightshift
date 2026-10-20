@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { InboxPage } from "@/features/gates";
-import { SiteHeader } from "@/shared/page";
 
 export const Route = createFileRoute("/inbox")({
 	// Polls from the browser; nothing to render on the server.
@@ -16,14 +15,11 @@ function InboxRoute() {
 	const { gate } = Route.useSearch();
 	const navigate = Route.useNavigate();
 	return (
-		<>
-			<SiteHeader crumbs={[{ label: "Inbox" }]} />
-			<InboxPage
-				gateId={gate}
-				onSelect={(next) =>
-					void navigate({ search: { gate: next }, replace: true })
-				}
-			/>
-		</>
+		<InboxPage
+			gateId={gate}
+			onSelect={(next) =>
+				void navigate({ search: { gate: next }, replace: true })
+			}
+		/>
 	);
 }

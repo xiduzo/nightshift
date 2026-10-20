@@ -52,6 +52,7 @@ import {
 	formatWaited,
 	useNow,
 } from "@/shared/format";
+import { SiteHeader } from "@/shared/page";
 import { useOpenGates } from "../use-open-gates";
 import { GateDetail, gateParts } from "./gate-detail";
 
@@ -82,114 +83,117 @@ export function InboxPage({
 	const byProject = groupByProject(open);
 
 	return (
-		<div className="flex h-[calc(100svh-3.5rem)] min-h-0">
-			<nav
-				aria-label="Inbox"
-				className="flex w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r p-4"
-			>
-				<div className="flex items-center justify-between gap-2 px-2">
-					<div className="min-w-0">
-						<h2 className="font-medium text-sm">Waiting for you</h2>
-						<p className="text-muted-foreground text-xs">
-							Each run goes on when you answer.
-						</p>
-					</div>
-					{open.length > 0 ? (
-						<Badge
-							variant="outline"
-							className="border-status-waiting/40 bg-status-waiting/10 text-status-waiting tabular-nums"
-						>
-							{open.length}
-						</Badge>
-					) : null}
-				</div>
-				{gates.isLoading ? (
-					<ListSkeleton />
-				) : open.length === 0 ? (
-					<p className="px-2 text-muted-foreground text-xs">
-						No open Gates right now.
-					</p>
-				) : (
-					byProject.map(([project, list], index) => (
-						<Fragment key={project}>
-							{index > 0 ? <Separator /> : null}
-							<NavGroup
-								title={project}
-								hint={`${list.length} ${list.length === 1 ? "Gate waits" : "Gates wait"}`}
+		<>
+			<SiteHeader crumbs={[{ label: "Inbox" }]} />
+			<div className="flex h-[calc(100svh-3.5rem)] min-h-0">
+				<nav
+					aria-label="Inbox"
+					className="flex w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r p-4"
+				>
+					<div className="flex items-center justify-between gap-2 px-2">
+						<div className="min-w-0">
+							<h2 className="font-medium text-sm">Waiting for you</h2>
+							<p className="text-muted-foreground text-xs">
+								Each run goes on when you answer.
+							</p>
+						</div>
+						{open.length > 0 ? (
+							<Badge
+								variant="outline"
+								className="border-status-waiting/40 bg-status-waiting/10 text-status-waiting tabular-nums"
 							>
-								{list.map((gate) => (
-									<GateNavItem
-										key={gate.stepId}
-										gate={gate}
-										now={now}
-										selected={gate.stepId === selected?.stepId}
-										onClick={() => onSelect(gate.stepId)}
-									/>
-								))}
-							</NavGroup>
-						</Fragment>
-					))
-				)}
-				{sleeping.length > 0 ? (
-					<>
-						<Separator />
-						<SleepingGroup runs={sleeping} projectNames={projectNames} />
-					</>
-				) : null}
-			</nav>
-			<div className="min-w-0 flex-1 overflow-y-auto">
-				{gates.isLoading ? (
-					<DetailSkeleton />
-				) : gates.error && !gates.data ? (
-					<div className="p-8">
-						<Alert variant="destructive">
-							<CircleAlertIcon />
-							<AlertTitle>The inbox did not load</AlertTitle>
-							<AlertDescription>{gates.error.message}</AlertDescription>
-							<AlertAction>
+								{open.length}
+							</Badge>
+						) : null}
+					</div>
+					{gates.isLoading ? (
+						<ListSkeleton />
+					) : open.length === 0 ? (
+						<p className="px-2 text-muted-foreground text-xs">
+							No open Gates right now.
+						</p>
+					) : (
+						byProject.map(([project, list], index) => (
+							<Fragment key={project}>
+								{index > 0 ? <Separator /> : null}
+								<NavGroup
+									title={project}
+									hint={`${list.length} ${list.length === 1 ? "Gate waits" : "Gates wait"}`}
+								>
+									{list.map((gate) => (
+										<GateNavItem
+											key={gate.stepId}
+											gate={gate}
+											now={now}
+											selected={gate.stepId === selected?.stepId}
+											onClick={() => onSelect(gate.stepId)}
+										/>
+									))}
+								</NavGroup>
+							</Fragment>
+						))
+					)}
+					{sleeping.length > 0 ? (
+						<>
+							<Separator />
+							<SleepingGroup runs={sleeping} projectNames={projectNames} />
+						</>
+					) : null}
+				</nav>
+				<div className="min-w-0 flex-1 overflow-y-auto">
+					{gates.isLoading ? (
+						<DetailSkeleton />
+					) : gates.error && !gates.data ? (
+						<div className="p-8">
+							<Alert variant="destructive">
+								<CircleAlertIcon />
+								<AlertTitle>The inbox did not load</AlertTitle>
+								<AlertDescription>{gates.error.message}</AlertDescription>
+								<AlertAction>
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={gates.isFetching}
+										onClick={() => void gates.refetch()}
+									>
+										{gates.isFetching ? (
+											<Spinner data-icon="inline-start" />
+										) : null}
+										Try again
+									</Button>
+								</AlertAction>
+							</Alert>
+						</div>
+					) : selected ? (
+						<GateDetail key={selected.stepId} gate={selected} now={now} />
+					) : (
+						<Empty className="h-full">
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<InboxIcon />
+								</EmptyMedia>
+								<EmptyTitle>Nothing waits for you</EmptyTitle>
+								<EmptyDescription>
+									When a run reaches a Gate node, its question shows up here.
+									Add one to a flow to ask before a step that matters.
+								</EmptyDescription>
+							</EmptyHeader>
+							<EmptyContent>
 								<Button
 									variant="outline"
 									size="sm"
-									disabled={gates.isFetching}
-									onClick={() => void gates.refetch()}
+									nativeButton={false}
+									render={<Link to="/" />}
 								>
-									{gates.isFetching ? (
-										<Spinner data-icon="inline-start" />
-									) : null}
-									Try again
+									<FolderIcon data-icon="inline-start" />
+									Go to projects
 								</Button>
-							</AlertAction>
-						</Alert>
-					</div>
-				) : selected ? (
-					<GateDetail key={selected.stepId} gate={selected} now={now} />
-				) : (
-					<Empty className="h-full">
-						<EmptyHeader>
-							<EmptyMedia variant="icon">
-								<InboxIcon />
-							</EmptyMedia>
-							<EmptyTitle>Nothing waits for you</EmptyTitle>
-							<EmptyDescription>
-								When a run reaches a Gate node, its question shows up here. Add
-								one to a flow to ask before a step that matters.
-							</EmptyDescription>
-						</EmptyHeader>
-						<EmptyContent>
-							<Button
-								variant="outline"
-								size="sm"
-								nativeButton={false}
-								render={<Link to="/" />}
-							>
-								<FolderIcon data-icon="inline-start" />
-								Go to projects
-							</Button>
-						</EmptyContent>
-					</Empty>
-				)}
+							</EmptyContent>
+						</Empty>
+					)}
+				</div>
 			</div>
-		</div>
+		</>
 	);
 }
 

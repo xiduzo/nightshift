@@ -60,6 +60,7 @@ import type {
 	SecretView,
 	SettingsView,
 } from "@/shared/api";
+import { SiteHeader } from "@/shared/page";
 import { CliToolCheckBadge, CliToolDetail, CliToolDialog } from "./cli-tool";
 import { CliCheckBadge } from "./connections/cli-panel";
 import { ConnectionDialog } from "./connections/connection-dialog";
@@ -188,275 +189,280 @@ export function AgentsPage({
 		cliTools.isPending;
 
 	return (
-		<div className="flex h-[calc(100svh-3.5rem)] min-h-0">
-			<nav
-				aria-label="Agents"
-				className="flex w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r p-4"
-			>
-				<DeviceSection
-					name={settings.data?.daemon.device.name}
-					description="This computer"
+		<>
+			<SiteHeader crumbs={[{ label: "Agents" }]} />
+			<div className="flex h-[calc(100svh-3.5rem)] min-h-0">
+				<nav
+					aria-label="Agents"
+					className="flex w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r p-4"
 				>
-					<Group
-						title="Profiles"
-						hint="What Agent nodes pick"
-						addLabel="Add a profile"
-						onAdd={() => select({ kind: "new-profile" })}
+					<DeviceSection
+						name={settings.data?.daemon.device.name}
+						description="This computer"
 					>
-						{profiles.isPending ? (
-							<ListSkeleton />
-						) : (
-							(profiles.data ?? []).map((p) => {
-								const nodes = p.usedBy.reduce(
-									(n, u) => n + u.nodeIds.length,
-									0,
-								);
-								return (
-									<ListItem
-										key={p.name}
-										selected={isSel({ kind: "profile", name: p.name })}
-										onClick={() => select({ kind: "profile", name: p.name })}
-										icon={<BotIcon />}
-										title={<span className="font-mono">{p.name}</span>}
-										description={`${harnessInfo(p.harness).label} · ${p.model}`}
-										aside={
-											<Badge
-												variant="secondary"
-												title={`${nodes} Agent ${nodes === 1 ? "node" : "nodes"}`}
-											>
-												{nodes}
-											</Badge>
-										}
-									/>
-								);
-							})
-						)}
-						{isSel({ kind: "new-profile" }) ? (
-							<ListItem
-								selected
-								onClick={() => {}}
-								icon={<BotIcon />}
-								title={
-									<span className="text-muted-foreground">New profile</span>
-								}
-							/>
-						) : null}
-					</Group>
-					<Separator />
-					<Group
-						title="Harnesses"
-						hint="Coding agents your profiles use"
-						addLabel="Add a harness"
-						onAdd={() => setPicking("harness")}
-					>
-						{harnesses.isPending ? (
-							<ListSkeleton />
-						) : (
-							added.map((h) => (
-								<ListItem
-									key={h.name}
-									selected={isSel({ kind: "harness", name: h.name })}
-									onClick={() => select({ kind: "harness", name: h.name })}
-									icon={<SquareTerminalIcon />}
-									title={h.label}
-									description={h.custom ? "Custom agent" : undefined}
-									aside={<CliCheckBadge target={h.name} />}
-								/>
-							))
-						)}
-					</Group>
-					<Separator />
-					<Group
-						title="Tools"
-						hint="Extra tools for your agents"
-						addLabel="Add a tool"
-						onAdd={() => setPicking("tool")}
-					>
-						{cliTools.isPending ? (
-							<ListSkeleton />
-						) : (
-							(cliTools.data ?? []).map((t) => (
-								<ListItem
-									key={`cli:${t.name}`}
-									selected={isSel({ kind: "cli", name: t.name })}
-									onClick={() => select({ kind: "cli", name: t.name })}
-									icon={<SquareTerminalIcon />}
-									title={<span className="font-mono">{t.name}</span>}
-									description="CLI"
-									aside={<CliToolCheckBadge name={t.name} />}
-								/>
-							))
-						)}
-						{tools.isPending ? (
-							<ListSkeleton />
-						) : (
-							connections.map((c) => {
-								const missing = c.variables.filter(
-									(v) => v.source === "missing",
-								).length;
-								return (
-									<ListItem
-										key={c.name}
-										selected={isSel({ kind: "tool", name: c.name })}
-										onClick={() => select({ kind: "tool", name: c.name })}
-										icon={"url" in c.server ? <GlobeIcon /> : <PlugIcon />}
-										title={<span className="font-mono">{c.name}</span>}
-										description="MCP server"
-										aside={
-											missing > 0 ? (
-												<Badge
-													variant="outline"
-													className="text-status-waiting"
-												>
-													Secret missing
-												</Badge>
-											) : null
-										}
-									/>
-								);
-							})
-						)}
-					</Group>
-					<Separator />
-					<ListItem
-						selected={isSel({ kind: "secrets" })}
-						onClick={() => select({ kind: "secrets" })}
-						icon={<KeyRoundIcon />}
-						title="Secrets"
-						aside={
-							missingSecrets > 0 ? (
-								<Badge variant="outline" className="text-status-waiting">
-									{missingSecrets} missing
-								</Badge>
-							) : (
-								<Badge variant="secondary">{secrets.length}</Badge>
-							)
-						}
-					/>
-				</DeviceSection>
-			</nav>
-
-			<div className="min-w-0 flex-1 overflow-y-auto">
-				{error ? (
-					<div className="p-8">
-						<Alert variant="destructive">
-							<CircleAlertIcon />
-							<AlertTitle>The agents did not load</AlertTitle>
-							<AlertDescription>{error.message}</AlertDescription>
-							<AlertAction>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => {
-										void profiles.refetch();
-										void harnesses.refetch();
-										void tools.refetch();
-										void cliTools.refetch();
-									}}
-								>
-									Try again
-								</Button>
-							</AlertAction>
-						</Alert>
-					</div>
-				) : loading ? (
-					<div
-						className="mx-auto flex max-w-6xl flex-col gap-6 p-8"
-						aria-hidden
-					>
-						<Skeleton className="h-12 w-72" />
-						<Skeleton className="h-40 w-full" />
-						<Skeleton className="h-40 w-full" />
-					</div>
-				) : (
-					<Detail
-						selection={selection}
-						onSelect={select}
-						onGo={go}
-						onDirtyChange={setDirty}
-						onEditTool={(connection) => setEditing({ open: true, connection })}
-						onEditCliTool={(tool) => setEditingCli({ open: true, tool })}
-						onEditAgent={(agent) => setEditingAgent({ open: true, agent })}
-						data={{
-							profiles: profiles.data ?? [],
-							harnesses: harnesses.data ?? [],
-							connections,
-							cliTools: cliTools.data ?? [],
-							secrets,
-							settings: settings.data,
-						}}
-					/>
-				)}
-			</div>
-
-			<HarnessPicker
-				open={picking === "harness"}
-				onOpenChange={(open) => setPicking(open ? "harness" : null)}
-				harnesses={harnesses.data}
-				onAdded={(name) => select({ kind: "harness", name })}
-				onAddCustom={() => setEditingAgent({ open: true, agent: null })}
-			/>
-			<CustomAgentDialog
-				open={editingAgent.open}
-				onOpenChange={(open) => setEditingAgent((e) => ({ ...e, open }))}
-				agent={editingAgent.agent}
-				taken={(harnesses.data ?? []).flatMap((h) =>
-					h.custom ? [h.custom.slug] : [],
-				)}
-				onSaved={(slug) => select({ kind: "harness", name: `acp:${slug}` })}
-			/>
-			<ToolPicker
-				open={picking === "tool"}
-				onOpenChange={(open) => setPicking(open ? "tool" : null)}
-				onPick={(kind) => {
-					setPicking(null);
-					if (kind === "cli") setEditingCli({ open: true, tool: null });
-					else setEditing({ open: true, connection: null, kind: "command" });
-				}}
-			/>
-			<CliToolDialog
-				open={editingCli.open}
-				onOpenChange={(open) => setEditingCli((e) => ({ ...e, open }))}
-				tool={editingCli.tool}
-				taken={(cliTools.data ?? []).map((t) => t.name)}
-				onSaved={(name) => select({ kind: "cli", name })}
-			/>
-			<ConnectionDialog
-				open={editing.open}
-				onOpenChange={(open) => setEditing((e) => ({ ...e, open }))}
-				connection={editing.connection}
-				kind={editing.kind}
-				taken={connections.map((c) => c.name)}
-				onSaved={(name) => select({ kind: "tool", name })}
-			/>
-			<AlertDialog
-				open={leaving !== null}
-				onOpenChange={(open) => (open ? null : setLeaving(null))}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Discard your changes?</AlertDialogTitle>
-						<AlertDialogDescription>
-							The profile has changes that are not saved.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Keep editing</AlertDialogCancel>
-						<AlertDialogAction
-							variant="destructive"
-							onClick={() => {
-								const to = leaving?.to ?? null;
-								dirty.current = false;
-								setLeaving(null);
-								go(to);
-							}}
+						<Group
+							title="Profiles"
+							hint="What Agent nodes pick"
+							addLabel="Add a profile"
+							onAdd={() => select({ kind: "new-profile" })}
 						>
-							Discard
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
-		</div>
+							{profiles.isPending ? (
+								<ListSkeleton />
+							) : (
+								(profiles.data ?? []).map((p) => {
+									const nodes = p.usedBy.reduce(
+										(n, u) => n + u.nodeIds.length,
+										0,
+									);
+									return (
+										<ListItem
+											key={p.name}
+											selected={isSel({ kind: "profile", name: p.name })}
+											onClick={() => select({ kind: "profile", name: p.name })}
+											icon={<BotIcon />}
+											title={<span className="font-mono">{p.name}</span>}
+											description={`${harnessInfo(p.harness).label} · ${p.model}`}
+											aside={
+												<Badge
+													variant="secondary"
+													title={`${nodes} Agent ${nodes === 1 ? "node" : "nodes"}`}
+												>
+													{nodes}
+												</Badge>
+											}
+										/>
+									);
+								})
+							)}
+							{isSel({ kind: "new-profile" }) ? (
+								<ListItem
+									selected
+									onClick={() => {}}
+									icon={<BotIcon />}
+									title={
+										<span className="text-muted-foreground">New profile</span>
+									}
+								/>
+							) : null}
+						</Group>
+						<Separator />
+						<Group
+							title="Harnesses"
+							hint="Coding agents your profiles use"
+							addLabel="Add a harness"
+							onAdd={() => setPicking("harness")}
+						>
+							{harnesses.isPending ? (
+								<ListSkeleton />
+							) : (
+								added.map((h) => (
+									<ListItem
+										key={h.name}
+										selected={isSel({ kind: "harness", name: h.name })}
+										onClick={() => select({ kind: "harness", name: h.name })}
+										icon={<SquareTerminalIcon />}
+										title={h.label}
+										description={h.custom ? "Custom agent" : undefined}
+										aside={<CliCheckBadge target={h.name} />}
+									/>
+								))
+							)}
+						</Group>
+						<Separator />
+						<Group
+							title="Tools"
+							hint="Extra tools for your agents"
+							addLabel="Add a tool"
+							onAdd={() => setPicking("tool")}
+						>
+							{cliTools.isPending ? (
+								<ListSkeleton />
+							) : (
+								(cliTools.data ?? []).map((t) => (
+									<ListItem
+										key={`cli:${t.name}`}
+										selected={isSel({ kind: "cli", name: t.name })}
+										onClick={() => select({ kind: "cli", name: t.name })}
+										icon={<SquareTerminalIcon />}
+										title={<span className="font-mono">{t.name}</span>}
+										description="CLI"
+										aside={<CliToolCheckBadge name={t.name} />}
+									/>
+								))
+							)}
+							{tools.isPending ? (
+								<ListSkeleton />
+							) : (
+								connections.map((c) => {
+									const missing = c.variables.filter(
+										(v) => v.source === "missing",
+									).length;
+									return (
+										<ListItem
+											key={c.name}
+											selected={isSel({ kind: "tool", name: c.name })}
+											onClick={() => select({ kind: "tool", name: c.name })}
+											icon={"url" in c.server ? <GlobeIcon /> : <PlugIcon />}
+											title={<span className="font-mono">{c.name}</span>}
+											description="MCP server"
+											aside={
+												missing > 0 ? (
+													<Badge
+														variant="outline"
+														className="text-status-waiting"
+													>
+														Secret missing
+													</Badge>
+												) : null
+											}
+										/>
+									);
+								})
+							)}
+						</Group>
+						<Separator />
+						<ListItem
+							selected={isSel({ kind: "secrets" })}
+							onClick={() => select({ kind: "secrets" })}
+							icon={<KeyRoundIcon />}
+							title="Secrets"
+							aside={
+								missingSecrets > 0 ? (
+									<Badge variant="outline" className="text-status-waiting">
+										{missingSecrets} missing
+									</Badge>
+								) : (
+									<Badge variant="secondary">{secrets.length}</Badge>
+								)
+							}
+						/>
+					</DeviceSection>
+				</nav>
+
+				<div className="min-w-0 flex-1 overflow-y-auto">
+					{error ? (
+						<div className="p-8">
+							<Alert variant="destructive">
+								<CircleAlertIcon />
+								<AlertTitle>The agents did not load</AlertTitle>
+								<AlertDescription>{error.message}</AlertDescription>
+								<AlertAction>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => {
+											void profiles.refetch();
+											void harnesses.refetch();
+											void tools.refetch();
+											void cliTools.refetch();
+										}}
+									>
+										Try again
+									</Button>
+								</AlertAction>
+							</Alert>
+						</div>
+					) : loading ? (
+						<div
+							className="mx-auto flex max-w-6xl flex-col gap-6 p-8"
+							aria-hidden
+						>
+							<Skeleton className="h-12 w-72" />
+							<Skeleton className="h-40 w-full" />
+							<Skeleton className="h-40 w-full" />
+						</div>
+					) : (
+						<Detail
+							selection={selection}
+							onSelect={select}
+							onGo={go}
+							onDirtyChange={setDirty}
+							onEditTool={(connection) =>
+								setEditing({ open: true, connection })
+							}
+							onEditCliTool={(tool) => setEditingCli({ open: true, tool })}
+							onEditAgent={(agent) => setEditingAgent({ open: true, agent })}
+							data={{
+								profiles: profiles.data ?? [],
+								harnesses: harnesses.data ?? [],
+								connections,
+								cliTools: cliTools.data ?? [],
+								secrets,
+								settings: settings.data,
+							}}
+						/>
+					)}
+				</div>
+
+				<HarnessPicker
+					open={picking === "harness"}
+					onOpenChange={(open) => setPicking(open ? "harness" : null)}
+					harnesses={harnesses.data}
+					onAdded={(name) => select({ kind: "harness", name })}
+					onAddCustom={() => setEditingAgent({ open: true, agent: null })}
+				/>
+				<CustomAgentDialog
+					open={editingAgent.open}
+					onOpenChange={(open) => setEditingAgent((e) => ({ ...e, open }))}
+					agent={editingAgent.agent}
+					taken={(harnesses.data ?? []).flatMap((h) =>
+						h.custom ? [h.custom.slug] : [],
+					)}
+					onSaved={(slug) => select({ kind: "harness", name: `acp:${slug}` })}
+				/>
+				<ToolPicker
+					open={picking === "tool"}
+					onOpenChange={(open) => setPicking(open ? "tool" : null)}
+					onPick={(kind) => {
+						setPicking(null);
+						if (kind === "cli") setEditingCli({ open: true, tool: null });
+						else setEditing({ open: true, connection: null, kind: "command" });
+					}}
+				/>
+				<CliToolDialog
+					open={editingCli.open}
+					onOpenChange={(open) => setEditingCli((e) => ({ ...e, open }))}
+					tool={editingCli.tool}
+					taken={(cliTools.data ?? []).map((t) => t.name)}
+					onSaved={(name) => select({ kind: "cli", name })}
+				/>
+				<ConnectionDialog
+					open={editing.open}
+					onOpenChange={(open) => setEditing((e) => ({ ...e, open }))}
+					connection={editing.connection}
+					kind={editing.kind}
+					taken={connections.map((c) => c.name)}
+					onSaved={(name) => select({ kind: "tool", name })}
+				/>
+				<AlertDialog
+					open={leaving !== null}
+					onOpenChange={(open) => (open ? null : setLeaving(null))}
+				>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>Discard your changes?</AlertDialogTitle>
+							<AlertDialogDescription>
+								The profile has changes that are not saved.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Keep editing</AlertDialogCancel>
+							<AlertDialogAction
+								variant="destructive"
+								onClick={() => {
+									const to = leaving?.to ?? null;
+									dirty.current = false;
+									setLeaving(null);
+									go(to);
+								}}
+							>
+								Discard
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
+			</div>
+		</>
 	);
 }
 

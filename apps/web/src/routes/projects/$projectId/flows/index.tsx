@@ -1,17 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { FlowList } from "@/features/flows";
-import { ProjectPage } from "@/features/projects";
+import { ProjectFlowsPage } from "@/features/flows";
 
 export const Route = createFileRoute("/projects/$projectId/flows/")({
-	component: ProjectFlowsComponent,
+	component: ProjectFlowsRoute,
 });
 
-function ProjectFlowsComponent() {
+function ProjectFlowsRoute() {
 	const { projectId } = Route.useParams();
-	return (
-		<ProjectPage projectId={projectId} section="Flows">
-			{(project) => <FlowList projectId={project.id} />}
-		</ProjectPage>
-	);
+	return <ProjectFlowsPage projectId={projectId} />;
 }

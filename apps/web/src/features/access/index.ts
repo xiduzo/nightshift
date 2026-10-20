@@ -3,5 +3,6 @@
 export { isOutsideApp, safeRedirect } from "./access";
 export { AccountForm } from "./account-form";
 export { AccountPage } from "./account-page";
+export { LoginPage } from "./login-page";
 export { TwoFactorPage } from "./two-factor-page";
 export { useAccessGuard } from "./use-access-guard";
