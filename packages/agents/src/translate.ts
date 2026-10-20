@@ -71,6 +71,8 @@ export type SdkSignals = {
 	resultError?: string;
 	/** Usage from the result message, a fallback for RUN_FINISHED usage. */
 	resultUsage?: AgentUsage;
+	/** What the session has used so far, while it runs: a running total. */
+	liveUsage?: AgentUsage;
 	/** The `result` text of the result message: the final assistant text. */
 	resultText?: string;
 	/**
@@ -213,23 +215,57 @@ function assistantText(message: Record<string, unknown>): string {
 		.trim();
 }
 
-function usageFromSdkResult(
-	message: Record<string, unknown>,
-): AgentUsage | undefined {
-	const usage = message.usage;
-	if (!isRecord(usage)) return undefined;
+/** The tokens of a Claude API `usage` object: a model call's, or the session's. */
+function tokensOf(usage: Record<string, unknown>): AgentUsage {
 	const cacheReadTokens = asNumber(usage.cache_read_input_tokens) ?? 0;
 	const cacheWriteTokens = asNumber(usage.cache_creation_input_tokens) ?? 0;
-	const inputTokens =
-		(asNumber(usage.input_tokens) ?? 0) + cacheReadTokens + cacheWriteTokens;
-	const costUsd = asNumber(message.total_cost_usd);
 	return {
-		inputTokens,
+		inputTokens:
+			(asNumber(usage.input_tokens) ?? 0) + cacheReadTokens + cacheWriteTokens,
 		outputTokens: asNumber(usage.output_tokens) ?? 0,
 		cacheReadTokens,
 		cacheWriteTokens,
+	};
+}
+
+function usageFromSdkResult(
+	message: Record<string, unknown>,
+): AgentUsage | undefined {
+	if (!isRecord(message.usage)) return undefined;
+	const costUsd = asNumber(message.total_cost_usd);
+	return {
+		...tokensOf(message.usage),
 		...(costUsd !== undefined ? { costUsd } : {}),
 	};
+}
+
+/** The tokens of model calls added up. */
+function sumTokens(usages: Iterable<AgentUsage>): AgentUsage {
+	const total = {
+		inputTokens: 0,
+		outputTokens: 0,
+		cacheReadTokens: 0,
+		cacheWriteTokens: 0,
+	};
+	for (const usage of usages) {
+		total.inputTokens += usage.inputTokens;
+		total.outputTokens += usage.outputTokens;
+		total.cacheReadTokens += usage.cacheReadTokens ?? 0;
+		total.cacheWriteTokens += usage.cacheWriteTokens ?? 0;
+	}
+	return total;
+}
+
+/** Same tokens and cost: a `usage` event would tell nothing new. */
+function sameUsage(a: AgentUsage | undefined, b: AgentUsage): boolean {
+	return (
+		a !== undefined &&
+		a.inputTokens === b.inputTokens &&
+		a.outputTokens === b.outputTokens &&
+		a.cacheReadTokens === b.cacheReadTokens &&
+		a.cacheWriteTokens === b.cacheWriteTokens &&
+		a.costUsd === b.costUsd
+	);
 }
 
 /** Fold one raw Claude Code stream-json message into the signals. Pure. */
@@ -418,10 +454,33 @@ export type HarnessProfile = {
 	toolInputFromSignals?: boolean;
 };
 
+/**
+ * Claude Code's observer: `observeSdkMessage`, plus the usage so far. Each
+ * assistant message carries the usage of its model call. Claude Code sends
+ * one message per content block, all with the id of their call, so the last
+ * one of each id counts. Subagents' calls count too: they cost the same.
+ */
+export function createClaudeCodeObserver(): (
+	signals: SdkSignals,
+	message: unknown,
+) => SdkSignals {
+	const calls = new Map<string, AgentUsage>();
+	return (signals, message) => {
+		const next = observeSdkMessage(signals, message);
+		if (!isRecord(message) || message.type !== "assistant") return next;
+		const inner = message.message;
+		if (!isRecord(inner) || !isRecord(inner.usage)) return next;
+		const id = asString(inner.id);
+		if (!id) return next;
+		calls.set(id, tokensOf(inner.usage));
+		return { ...next, liveUsage: sumTokens(calls.values()) };
+	};
+}
+
 export const CLAUDE_CODE_PROFILE: HarnessProfile = {
 	label: "Claude Code",
 	sessionEvent: SESSION_ID_EVENT,
-	createObserver: () => observeSdkMessage,
+	createObserver: createClaudeCodeObserver,
 };
 
 export type Translator = {
@@ -461,6 +520,8 @@ export function createTranslator(options: {
 	let signals: SdkSignals = {};
 	let runFinished: { usage?: AgentUsage } | undefined;
 	let runError: string | undefined;
+	/** The last `usage` event sent. */
+	let liveSent: AgentUsage | undefined;
 	/** Tool names by call id: `chat()` can drop the name from TOOL_CALL_END. */
 	const toolNames = new Map<string, string>();
 	/** `tool-end` events held for their input (`toolInputFromSignals`). */
@@ -666,6 +727,14 @@ export function createTranslator(options: {
 		return { ...usage, costUsd: raw.costUsd };
 	}
 
+	/** A `usage` event when the usage so far changed since the last one. */
+	function liveUsage(): AgentEvent[] {
+		const usage = signals.liveUsage;
+		if (!sessionEmitted || !usage || sameUsage(liveSent, usage)) return [];
+		liveSent = usage;
+		return [{ type: "usage", usage }];
+	}
+
 	function startKnownSession(): AgentEvent[] {
 		if (sessionEmitted || options.knownSessionId === undefined) return [];
 		sessionEmitted = true;
@@ -677,7 +746,11 @@ export function createTranslator(options: {
 			if (finished || !isRecord(chunk) || typeof chunk.type !== "string") {
 				return [];
 			}
-			return [...startKnownSession(), ...translate(chunk as AgUiChunk)];
+			return [
+				...startKnownSession(),
+				...translate(chunk as AgUiChunk),
+				...liveUsage(),
+			];
 		},
 		observeSdk(message) {
 			signals = observe(signals, message);

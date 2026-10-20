@@ -165,6 +165,55 @@ describe("createTranslator", () => {
 		});
 	});
 
+	test("sends the usage so far after each Claude Code model call", () => {
+		const t = newTranslator();
+		const assistant = (id: string, output: number) => ({
+			type: "assistant",
+			message: {
+				id,
+				usage: {
+					input_tokens: 10,
+					cache_read_input_tokens: 100,
+					cache_creation_input_tokens: 5,
+					output_tokens: output,
+				},
+			},
+		});
+		const text = { type: "TEXT_MESSAGE_CONTENT", messageId: "m", delta: "a" };
+		// Before the session id: held, like every other event.
+		t.observeSdk(assistant("call-1", 1));
+		expect(t.push(text)).toEqual([]);
+		expect(t.push(session).at(-1)).toEqual({
+			type: "usage",
+			usage: {
+				inputTokens: 115,
+				outputTokens: 1,
+				cacheReadTokens: 100,
+				cacheWriteTokens: 5,
+			},
+		});
+		// A second message of the same call replaces its usage; it does not add.
+		t.observeSdk(assistant("call-1", 4));
+		t.observeSdk(assistant("call-2", 6));
+		expect(t.push(text)).toEqual([
+			{ type: "text", messageId: "m", delta: "a" },
+			{
+				type: "usage",
+				usage: {
+					inputTokens: 230,
+					outputTokens: 10,
+					cacheReadTokens: 200,
+					cacheWriteTokens: 10,
+				},
+			},
+		]);
+		// Nothing new: no usage event.
+		t.observeSdk(assistant("call-2", 6));
+		expect(t.push(text)).toEqual([
+			{ type: "text", messageId: "m", delta: "a" },
+		]);
+	});
+
 	test("holds events that arrive before the session id", () => {
 		const translator = newTranslator();
 		expect(

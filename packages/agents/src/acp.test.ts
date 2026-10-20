@@ -160,3 +160,28 @@ describe("acpHarness", () => {
 		expect(ACP_AGENTS.cursor.args({})).toEqual(["acp"]);
 	});
 });
+
+describe("observeAcpEvent", () => {
+	const usageUpdate = (cost: unknown) => ({
+		kind: "update",
+		update: { sessionUpdate: "usage_update", used: 1000, size: 200000, cost },
+	});
+
+	test("a usage update in dollars is the cost so far and at the end", () => {
+		const signals = observeAcpEvent(
+			{},
+			usageUpdate({ amount: 0.42, currency: "USD" }),
+		);
+		const usage = { inputTokens: 0, outputTokens: 0, costUsd: 0.42 };
+		expect(signals.liveUsage).toEqual(usage);
+		expect(signals.resultUsage).toEqual(usage);
+	});
+
+	test("a usage update without a cost in dollars changes nothing", () => {
+		const signals = {};
+		expect(observeAcpEvent(signals, usageUpdate(null))).toBe(signals);
+		expect(
+			observeAcpEvent(signals, usageUpdate({ amount: 1, currency: "EUR" })),
+		).toBe(signals);
+	});
+});

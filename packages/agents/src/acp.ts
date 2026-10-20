@@ -106,20 +106,42 @@ export type AcpHarnessOptions = {
 };
 
 /**
- * Read the raw ACP events (the adapter's provider log). Some agents report
- * a failure as message text and then end the turn normally (Copilot:
- * "Error: You have exceeded your monthly quota"). That text fails the
- * session, so the engine waits out a usage limit instead of a pass.
+ * Read the raw ACP events (the adapter's provider log).
+ *
+ * - Some agents report a failure as message text and then end the turn
+ *   normally (Copilot: "Error: You have exceeded your monthly quota"). That
+ *   text fails the session, so the engine waits out a usage limit instead
+ *   of a pass.
+ * - A `usage_update` with a cost in US dollars is what the session has
+ *   spent so far. The last one is also its cost at the end: the prompt
+ *   response has tokens but no cost.
  */
 export function observeAcpEvent(signals: SdkSignals, raw: unknown): SdkSignals {
 	const event = raw as {
 		kind?: string;
-		update?: { sessionUpdate?: string; content?: { text?: unknown } };
+		update?: {
+			sessionUpdate?: string;
+			content?: { text?: unknown };
+			cost?: { amount?: unknown; currency?: unknown } | null;
+		};
 	} | null;
-	const text = event?.update?.content?.text;
+	if (event?.kind !== "update") return signals;
+	const update = event.update;
+	if (update?.sessionUpdate === "usage_update") {
+		const amount = update.cost?.amount;
+		if (
+			update.cost?.currency !== "USD" ||
+			typeof amount !== "number" ||
+			!Number.isFinite(amount)
+		) {
+			return signals;
+		}
+		const usage = { inputTokens: 0, outputTokens: 0, costUsd: amount };
+		return { ...signals, liveUsage: usage, resultUsage: usage };
+	}
+	const text = update?.content?.text;
 	if (
-		event?.kind !== "update" ||
-		event.update?.sessionUpdate !== "agent_message_chunk" ||
+		update?.sessionUpdate !== "agent_message_chunk" ||
 		typeof text !== "string" ||
 		!text.trimStart().startsWith("Error:")
 	) {

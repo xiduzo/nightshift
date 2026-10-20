@@ -32,7 +32,9 @@ export type FakeStep =
 			summary: string;
 			data?: unknown;
 	  }
-	| { type: "wait"; ms: number };
+	| { type: "wait"; ms: number }
+	/** What the session has used so far: one `usage` event. */
+	| { type: "usage"; usage: AgentUsage };
 
 export type FakeOutcome =
 	| { type: "finished"; usage?: AgentUsage }
@@ -174,6 +176,8 @@ export function fakeHarness(script: FakeScriptSource = {}): FakeHarness {
 			for (const step of steps) {
 				if (step.type === "wait") {
 					yield { wait: step.ms };
+				} else if (step.type === "usage") {
+					yield { type: "usage", usage: step.usage };
 				} else if (step.type === "report") {
 					yield {
 						type: "report",

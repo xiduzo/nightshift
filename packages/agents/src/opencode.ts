@@ -460,14 +460,13 @@ export function createOpencodeObserver(): (
 			outputTokens += step.usage.outputTokens;
 			if (step.cost !== undefined) cost = (cost ?? 0) + step.cost;
 		}
-		return {
-			...signals,
-			resultUsage: {
-				inputTokens,
-				outputTokens,
-				...(cost !== undefined ? { costUsd: cost } : {}),
-			},
+		const usage: AgentUsage = {
+			inputTokens,
+			outputTokens,
+			...(cost !== undefined ? { costUsd: cost } : {}),
 		};
+		// The total of the steps so far is also the usage so far.
+		return { ...signals, resultUsage: usage, liveUsage: usage };
 	};
 
 	const message = (signals: SdkSignals, info: unknown): SdkSignals => {

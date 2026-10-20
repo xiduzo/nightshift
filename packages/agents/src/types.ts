@@ -126,6 +126,12 @@ export type AgentEvent =
 			/** Present when the spec has an output schema (not yet validated). */
 			data?: unknown;
 	  }
+	/**
+	 * What the session has used so far: a running total, not a step. Only
+	 * harnesses that report usage while they work send it (Claude Code,
+	 * OpenCode, ACP agents that send `usage_update`). `finished` has the total.
+	 */
+	| { type: "usage"; usage: AgentUsage }
 	| { type: "finished"; usage?: AgentUsage }
 	| {
 			type: "error";

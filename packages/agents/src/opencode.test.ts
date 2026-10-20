@@ -260,6 +260,8 @@ describe("createOpencodeObserver", () => {
 		expect(done.resultUsage?.inputTokens).toBe(30);
 		expect(done.resultUsage?.outputTokens).toBe(6);
 		expect(done.resultUsage?.costUsd).toBeCloseTo(0.03);
+		// The total of the steps so far is also the usage so far.
+		expect(signals.liveUsage).toEqual(done.resultUsage);
 	});
 
 	test("an API 429 is a usage limit with its retry-after", () => {
@@ -305,6 +307,11 @@ describe("opencodeHarness", () => {
 			{ type: "report", outcome: "pass", summary: "Done it." },
 			// The adapter streams a text part whole, when it ends.
 			{ type: "text", messageId: expect.any(String), delta: "All good." },
+			// The usage so far, sent while the session runs.
+			{
+				type: "usage",
+				usage: { inputTokens: 110, outputTokens: 6, costUsd: 0.002 },
+			},
 			{
 				type: "finished",
 				usage: { inputTokens: 110, outputTokens: 6, costUsd: 0.002 },
