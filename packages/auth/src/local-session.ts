@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { session as sessionTable } from "@nightshift/db/schema/auth";
+import { session as sessionTable } from "@nightshift/db/schema";
 import { setRequestCookie } from "better-auth/cookies";
 import { makeSignature } from "better-auth/crypto";
 import { and, desc, eq, gt } from "drizzle-orm";

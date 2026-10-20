@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { Database } from "@nightshift/db";
-import { device, hostLink } from "@nightshift/db/schema/nightshift";
+import { device, hostLink } from "@nightshift/db/schema";
 import { and, asc, eq, isNull, ne } from "drizzle-orm";
 
 import { type KeyStoreKind, valueStore } from "../keychain";

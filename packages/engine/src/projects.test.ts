@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
-import {
-	clone,
-	device,
-	event,
-	project,
-} from "@nightshift/db/schema/nightshift";
+import { clone, device, event, project } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 
 import { createProjects, normaliseRemote } from "./projects";

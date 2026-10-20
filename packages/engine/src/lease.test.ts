@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createDb } from "@nightshift/db";
-import { daemonLease } from "@nightshift/db/schema/nightshift";
+import { daemonLease } from "@nightshift/db/schema";
 
 import { acquireLease, LeaseHeldError } from "./lease";
 import { createSandbox, type Sandbox } from "./test-support";

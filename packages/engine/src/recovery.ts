@@ -1,6 +1,6 @@
 import { stat } from "node:fs/promises";
 import type { Database } from "@nightshift/db";
-import { event, run } from "@nightshift/db/schema/nightshift";
+import { event, run } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 

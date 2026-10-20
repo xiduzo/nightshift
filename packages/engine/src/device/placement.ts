@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { device as deviceTable } from "@nightshift/db/schema/nightshift";
+import { device as deviceTable } from "@nightshift/db/schema";
 import type { FlowNode } from "@nightshift/flows";
 import type { FlowSources } from "@nightshift/flows/files";
 import { eq } from "drizzle-orm";

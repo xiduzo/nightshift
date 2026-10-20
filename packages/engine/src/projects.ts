@@ -1,16 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import type { Database } from "@nightshift/db";
-import { organization } from "@nightshift/db/schema/auth";
 import {
 	agentSession,
 	clone,
 	device,
 	event,
+	organization,
 	project,
 	run,
 	step,
-} from "@nightshift/db/schema/nightshift";
+} from "@nightshift/db/schema";
 import {
 	and,
 	asc,

@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { event } from "@nightshift/db/schema/nightshift";
+import { event } from "@nightshift/db/schema";
 import { asc, eq, inArray } from "drizzle-orm";
 
 import {

@@ -1,6 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { organization } from "@nightshift/db/schema/auth";
-import { device, event } from "@nightshift/db/schema/nightshift";
+import { device, event, organization } from "@nightshift/db/schema";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import type { RunLog } from "../run-log";

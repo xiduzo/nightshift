@@ -1,10 +1,5 @@
 import type { Database } from "@nightshift/db";
-import {
-	invitation,
-	member,
-	organization,
-	user,
-} from "@nightshift/db/schema/auth";
+import { invitation, member, organization, user } from "@nightshift/db/schema";
 import { and, eq, gt, sql } from "drizzle-orm";
 
 import type { Role } from "./access";

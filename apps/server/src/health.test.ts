@@ -4,7 +4,7 @@ import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
-import { daemonLease } from "@nightshift/db/schema/nightshift";
+import { daemonLease } from "@nightshift/db/schema";
 import { acquireLease, pidAlive } from "@nightshift/engine/lease";
 
 import {

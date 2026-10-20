@@ -2,12 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { Database } from "@nightshift/db";
-import {
-	lgCheckpoint,
-	lgWrite,
-	run,
-	step,
-} from "@nightshift/db/schema/nightshift";
+import { lgCheckpoint, lgWrite, run, step } from "@nightshift/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 

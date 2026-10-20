@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
-import { runCommand } from "@nightshift/db/schema/nightshift";
+import { runCommand } from "@nightshift/db/schema";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 

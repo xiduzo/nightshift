@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { connection } from "@nightshift/db/schema/nightshift";
+import { connection } from "@nightshift/db/schema";
 
 import {
 	type ConnectionInput,

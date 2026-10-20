@@ -7,7 +7,7 @@ import {
 	project,
 	run,
 	step,
-} from "@nightshift/db/schema/nightshift";
+} from "@nightshift/db/schema";
 import type { DecisionNode, Flow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { agentProfile } from "@nightshift/db/schema/nightshift";
+import { agentProfile } from "@nightshift/db/schema";
 
 import { cliToolsInstruction, createCliToolStore } from "./cli-tools";
 import { createProfileStore } from "./profiles";

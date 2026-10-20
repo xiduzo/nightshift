@@ -6,7 +6,7 @@ import {
 	connection,
 	secret,
 	setting,
-} from "@nightshift/db/schema/nightshift";
+} from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 import type * as Y from "yjs";
 

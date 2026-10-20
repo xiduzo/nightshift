@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "@langchain/langgraph";
-import { step } from "@nightshift/db/schema/nightshift";
+import { step } from "@nightshift/db/schema";
 import { templateEnvName } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 

@@ -8,7 +8,7 @@ import {
 	project,
 	run,
 	step,
-} from "@nightshift/db/schema/nightshift";
+} from "@nightshift/db/schema";
 import { and, asc, eq, getColumns, sql } from "drizzle-orm";
 import {
 	integer,

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { setting } from "@nightshift/db/schema/nightshift";
+import { setting } from "@nightshift/db/schema";
 
 import type { DeviceDocument } from "./device/document";
 import { createSettingsStore, defaultRunSettings } from "./settings";

@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { DeviceKeyAccess } from "@nightshift/auth/device-keys";
-import { member, user } from "@nightshift/db/schema/auth";
 import {
 	event,
+	member,
 	run as runTable,
 	step as stepTable,
-} from "@nightshift/db/schema/nightshift";
+	user,
+} from "@nightshift/db/schema";
 import { createEngine, type DeviceRegistry } from "@nightshift/engine";
 import { createRunLog } from "@nightshift/engine/run-log";
 import {

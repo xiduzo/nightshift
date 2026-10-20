@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
-import { event, project, run } from "@nightshift/db/schema/nightshift";
+import { event, project, run } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 
 import {

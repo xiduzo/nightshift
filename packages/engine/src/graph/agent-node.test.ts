@@ -11,7 +11,7 @@ import {
 	usageLimitScript,
 } from "@nightshift/agents/fake";
 import type { Decider } from "@nightshift/agents/types";
-import { agentSession, step } from "@nightshift/db/schema/nightshift";
+import { agentSession, step } from "@nightshift/db/schema";
 import type { AgentNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 

@@ -9,8 +9,7 @@ import type {
 } from "@nightshift/agents/types";
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
-import { organization } from "@nightshift/db/schema/auth";
-import { device, event } from "@nightshift/db/schema/nightshift";
+import { device, event, organization } from "@nightshift/db/schema";
 import { asc, eq, sql } from "drizzle-orm";
 
 import { type DeviceDocument, openDeviceDocument } from "./device/document";

@@ -3,7 +3,9 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
-		"./*": "./src/*.ts"
+		"./schema": "./src/schema/index.ts",
+		"./data-dir": "./src/data-dir.ts",
+		"./migrate": "./src/migrate.ts"
 	},
 	"scripts": {
 		"build": "tsc -b",

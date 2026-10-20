@@ -3,7 +3,7 @@ import {
 	device as deviceTable,
 	run,
 	step as stepTable,
-} from "@nightshift/db/schema/nightshift";
+} from "@nightshift/db/schema";
 import {
 	type FlowNode,
 	isCustomHarness,

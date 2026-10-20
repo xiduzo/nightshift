@@ -4,7 +4,7 @@ import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness, reportingScript } from "@nightshift/agents/fake";
 import { createDb } from "@nightshift/db";
-import { event, run, step } from "@nightshift/db/schema/nightshift";
+import { event, run, step } from "@nightshift/db/schema";
 import type { AgentNode, CommandNode, Flow } from "@nightshift/flows";
 import { asc, eq, sql } from "drizzle-orm";
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { project } from "@nightshift/db/schema/nightshift";
+import { project } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 

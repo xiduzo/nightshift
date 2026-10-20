@@ -10,7 +10,7 @@ import {
 	createAuthSandbox,
 } from "@nightshift/auth/test-support";
 import { turnOnTwoFactor } from "@nightshift/auth/two-factor-support";
-import { project } from "@nightshift/db/schema/nightshift";
+import { project } from "@nightshift/db/schema";
 import {
 	createCliToolStore,
 	createSettingsStore,

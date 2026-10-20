@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { user } from "@nightshift/db/schema/auth";
+import { user } from "@nightshift/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
 import type { RunPerson } from "./types";

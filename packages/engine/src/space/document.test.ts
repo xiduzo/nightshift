@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/fake";
-import { member, organization, user } from "@nightshift/db/schema/auth";
-import { clone, event, project } from "@nightshift/db/schema/nightshift";
+import {
+	clone,
+	event,
+	member,
+	organization,
+	project,
+	user,
+} from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 import type * as Y from "yjs";
 

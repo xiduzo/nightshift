@@ -1131,7 +1131,7 @@ describe("flow format 1", () => {
 			edges: [],
 		};
 		const runId = "00000000-v1-run";
-		const { run, step } = await import("@nightshift/db/schema/nightshift");
+		const { run, step } = await import("@nightshift/db/schema");
 		await sandbox.db.insert(run).values({
 			id: runId,
 			spaceId: sandbox.spaceId,

@@ -1,6 +1,12 @@
 import type { Database } from "@nightshift/db";
-import { member, organization, user } from "@nightshift/db/schema/auth";
-import { clone, device, project } from "@nightshift/db/schema/nightshift";
+import {
+	clone,
+	device,
+	member,
+	organization,
+	project,
+	user,
+} from "@nightshift/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import type * as Y from "yjs";
 import { z } from "zod";

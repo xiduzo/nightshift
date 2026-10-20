@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import type { Database } from "@nightshift/db";
-import { device } from "@nightshift/db/schema/nightshift";
+import { device } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
 /**

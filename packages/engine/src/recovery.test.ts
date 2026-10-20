@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { project, run } from "@nightshift/db/schema/nightshift";
+import { project, run } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 
 import type { EnginePayloads, LoggedEvent } from "./events";

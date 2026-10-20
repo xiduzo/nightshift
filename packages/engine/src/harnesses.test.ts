@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { type FakeHarness, fakeHarness } from "@nightshift/agents/fake";
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import type { HarnessName } from "@nightshift/agents/types";
-import { event } from "@nightshift/db/schema/nightshift";
+import { event } from "@nightshift/db/schema";
 import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
 
 import { createEngine } from "./engine";

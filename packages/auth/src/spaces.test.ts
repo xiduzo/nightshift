@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { user } from "@nightshift/db/schema/auth";
-import { device } from "@nightshift/db/schema/nightshift";
+import { device, user } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
 import { hasPermission, roleAllows } from "./index";

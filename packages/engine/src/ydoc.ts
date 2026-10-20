@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { ydoc } from "@nightshift/db/schema/nightshift";
+import { ydoc } from "@nightshift/db/schema";
 import { eq, sql } from "drizzle-orm";
 import * as Y from "yjs";
 

@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { userInfo } from "node:os";
 import type { Database } from "@nightshift/db";
-import { member, organization, user } from "@nightshift/db/schema/auth";
-import { device } from "@nightshift/db/schema/nightshift";
+import { device, member, organization, user } from "@nightshift/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
 
 import type { Role } from "./access";

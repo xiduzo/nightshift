@@ -2,7 +2,7 @@ import { apiKey } from "@better-auth/api-key";
 import { tryGetCurrentAuthEndpointContext } from "@better-auth/core/context";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import type { Database } from "@nightshift/db";
-import * as schema from "@nightshift/db/schema/auth";
+import { authSchema as schema } from "@nightshift/db";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin } from "better-auth/plugins/admin";

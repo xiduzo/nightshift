@@ -8,7 +8,7 @@ import {
 	usageLimitScript,
 } from "@nightshift/agents/fake";
 import type { AgentHarness } from "@nightshift/agents/types";
-import { event } from "@nightshift/db/schema/nightshift";
+import { event } from "@nightshift/db/schema";
 import type {
 	AgentNode,
 	CallEach,

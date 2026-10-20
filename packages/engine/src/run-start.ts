@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
-import { run } from "@nightshift/db/schema/nightshift";
+import { run } from "@nightshift/db/schema";
 import {
 	type AgentProfileSettings,
 	type Flow,

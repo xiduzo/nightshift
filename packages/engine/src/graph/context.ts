@@ -2,7 +2,7 @@ import type { Command, LangGraphRunnableConfig } from "@langchain/langgraph";
 import { harnessLabel } from "@nightshift/agents/harness-facts";
 import type { AgentErrorKind } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
-import { run, step } from "@nightshift/db/schema/nightshift";
+import { run, step } from "@nightshift/db/schema";
 import type {
 	Flow,
 	FlowNode,

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { device, event } from "@nightshift/db/schema/nightshift";
+import { device, event } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 
 import { parseEventRow } from "../events";

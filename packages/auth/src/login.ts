@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { account } from "@nightshift/db/schema/auth";
+import { account } from "@nightshift/db/schema";
 import { and, eq } from "drizzle-orm";
 
 import type { Auth } from "./index";

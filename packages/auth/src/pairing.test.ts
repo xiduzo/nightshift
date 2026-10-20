@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { apikey } from "@nightshift/db/schema/auth";
+import { apikey } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
 import { createDeviceKeys, type DeviceKeys } from "./device-keys";

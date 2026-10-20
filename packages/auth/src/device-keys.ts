@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { apikey } from "@nightshift/db/schema/auth";
+import { apikey } from "@nightshift/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
 import type { Auth } from "./index";

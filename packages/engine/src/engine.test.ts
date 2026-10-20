@@ -10,13 +10,7 @@ import type {
 	DecisionInput,
 	DecisionResult,
 } from "@nightshift/agents/types";
-import {
-	event,
-	lgCheckpoint,
-	lgWrite,
-	run,
-	step,
-} from "@nightshift/db/schema/nightshift";
+import { event, lgCheckpoint, lgWrite, run, step } from "@nightshift/db/schema";
 import {
 	type AgentNode,
 	type CommandNode,

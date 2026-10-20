@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Command } from "@langchain/langgraph";
-import { step as stepTable } from "@nightshift/db/schema/nightshift";
+import { step as stepTable } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
 import { deriveSteps, type EngineEventType } from "../events";

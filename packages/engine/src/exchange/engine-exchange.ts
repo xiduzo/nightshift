@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { run, step } from "@nightshift/db/schema/nightshift";
+import { run, step } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
 import type { RunBus } from "../bus";

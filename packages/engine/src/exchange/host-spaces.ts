@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
-import { member, organization } from "@nightshift/db/schema/auth";
-import { hostLink, hostSpace } from "@nightshift/db/schema/nightshift";
+import {
+	hostLink,
+	hostSpace,
+	member,
+	organization,
+} from "@nightshift/db/schema";
 import { and, eq, inArray, notInArray } from "drizzle-orm";
 
 /**

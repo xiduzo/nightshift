@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { device } from "@nightshift/db/schema/nightshift";
+import { device } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
 import { hostDeviceName, selfDevice } from "./self-device";

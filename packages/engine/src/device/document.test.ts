@@ -8,7 +8,7 @@ import {
 	secret,
 	setting,
 	ydoc,
-} from "@nightshift/db/schema/nightshift";
+} from "@nightshift/db/schema";
 import * as Y from "yjs";
 
 import { createCliToolStore } from "../cli-tools";

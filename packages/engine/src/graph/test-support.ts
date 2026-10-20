@@ -1,6 +1,6 @@
 import { MemorySaver } from "@langchain/langgraph";
 import type { AgentHarness, Decider } from "@nightshift/agents/types";
-import { project, run } from "@nightshift/db/schema/nightshift";
+import { project, run } from "@nightshift/db/schema";
 import {
 	type AgentNode,
 	type CommandNode,

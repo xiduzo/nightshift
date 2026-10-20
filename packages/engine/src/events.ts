@@ -5,7 +5,7 @@ import type {
 	AgentUsage,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
-import { event, project, run } from "@nightshift/db/schema/nightshift";
+import { event, project, run } from "@nightshift/db/schema";
 import type {
 	FlowNodeType,
 	ItemState,

@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { hostname } from "node:os";
 
 import type { Database } from "@nightshift/db";
-import { daemonLease } from "@nightshift/db/schema/nightshift";
+import { daemonLease } from "@nightshift/db/schema";
 import { pidAlive } from "@nightshift/engine/lease";
 
 /**

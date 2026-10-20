@@ -6,7 +6,7 @@ import {
 	run,
 	step,
 	syncCursor,
-} from "@nightshift/db/schema/nightshift";
+} from "@nightshift/db/schema";
 import { and, asc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 

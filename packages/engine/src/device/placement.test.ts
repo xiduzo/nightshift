@@ -3,12 +3,12 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness, reportingScript } from "@nightshift/agents/fake";
-import { organization } from "@nightshift/db/schema/auth";
 import {
 	clone,
 	device as deviceTable,
 	event,
-} from "@nightshift/db/schema/nightshift";
+	organization,
+} from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 

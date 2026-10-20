@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { user } from "@nightshift/db/schema/auth";
+import { user } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
 import { hasPermission, type MemberChange } from "./index";
