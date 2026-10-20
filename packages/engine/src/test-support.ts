@@ -51,6 +51,8 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 	const {
 		harnesses,
 		harnessNames,
+		customHarness,
+		customHarnessNames,
 		decider,
 		mcpServersFor,
 		connectionNames,
@@ -68,6 +70,8 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 			{
 				harnesses,
 				harnessNames,
+				customHarness,
+				customHarnessNames,
 				decider,
 				mcpServersFor,
 				connectionNames,

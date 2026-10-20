@@ -1,9 +1,20 @@
-import type { AgentNode } from "@nightshift/flows";
+import {
+	type AgentNode,
+	type HarnessName as BuiltInHarnessName,
+	type CustomAgent,
+	customAgentSlug,
+	isCustomHarness,
+} from "@nightshift/flows";
+import { useQuery } from "@tanstack/react-query";
 
+import { orpc } from "@/utils/orpc";
+
+/** A built-in harness, or a custom agent (`acp:<slug>`). */
 export type HarnessName = NonNullable<AgentNode["harness"]>;
+export type { BuiltInHarnessName };
 
 export type HarnessInfo = {
-	value: HarnessName;
+	value: BuiltInHarnessName;
 	label: string;
 	/** Two letters for its tile. */
 	initials: string;
@@ -110,16 +121,82 @@ export const HARNESSES: readonly HarnessInfo[] = [
 		setting: "cursorBin",
 		offMachine: "Prompts and code go to Cursor under your Cursor login.",
 	},
+	{
+		value: "pi",
+		label: "pi",
+		initials: "PI",
+		note: "Needs pi 0.81 or later. Model as provider/model, for example ollama/qwen3-coder:latest. Model default uses the model pi is set to.",
+		defaultModel: "default",
+		models: ["default"],
+		setting: "piBin",
+		offMachine:
+			"Prompts and code go to the model provider pi is set up with. With a local model, such as one in Ollama, they stay on this computer.",
+	},
 ];
 
-export function harnessInfo(name: HarnessName): HarnessInfo {
+/** What the pickers show for a harness: a built-in one, or a custom agent. */
+export type HarnessView = Omit<HarnessInfo, "value" | "setting"> & {
+	value: HarnessName;
+	/** Null for a custom agent: its command is its own. */
+	setting: HarnessInfo["setting"] | null;
+};
+
+/**
+ * A custom agent as the pickers show it. `agent` is undefined on a computer
+ * that has not added it: its slug is the label then.
+ */
+export function customAgentInfo(
+	name: `acp:${string}`,
+	agent: Pick<CustomAgent, "label"> | undefined,
+): HarnessView {
+	const label = agent?.label ?? customAgentSlug(name);
+	return {
+		value: name,
+		label: agent ? label : `${label} (not added)`,
+		initials: label.slice(0, 2).toUpperCase(),
+		note: agent
+			? `Model default uses the model ${label} is set to. You can type another model it offers.`
+			: "This custom agent is not added on this computer. Add it under Agents, or pick another harness.",
+		defaultModel: "default",
+		models: ["default"],
+		setting: null,
+		offMachine: `Prompts and code go wherever ${label} sends them.`,
+	};
+}
+
+/** A harness's view. Pass the custom agents to show a custom agent's own label. */
+export function harnessInfo(
+	name: HarnessName,
+	customAgents: readonly CustomAgent[] = [],
+): HarnessView {
+	if (isCustomHarness(name)) {
+		const slug = customAgentSlug(name);
+		return customAgentInfo(
+			name,
+			customAgents.find((a) => a.slug === slug),
+		);
+	}
 	return (
 		HARNESSES.find((h) => h.value === name) ?? (HARNESSES[0] as HarnessInfo)
 	);
 }
 
 export const isHarnessName = (name: string): name is HarnessName =>
-	HARNESSES.some((h) => h.value === name);
+	HARNESSES.some((h) => h.value === name) ||
+	/^acp:[a-z0-9][a-z0-9-]{0,39}$/.test(name);
+
+/**
+ * The custom agents added on this computer: any coding agent that speaks
+ * the Agent Client Protocol. Empty until the daemon answers.
+ */
+export function useCustomAgents(): CustomAgent[] {
+	const query = useQuery({
+		...orpc.harnesses.list.queryOptions(),
+		staleTime: 60_000,
+		meta: { quietErrors: true },
+	});
+	return (query.data ?? []).flatMap((h) => (h.custom ? [h.custom] : []));
+}
 
 /**
  * The node on another harness. A model from the old harness's suggestions
@@ -129,15 +206,16 @@ export const isHarnessName = (name: string): name is HarnessName =>
 export function switchHarness(
 	node: AgentNode,
 	harness: HarnessName,
+	customAgents: readonly CustomAgent[] = [],
 ): AgentNode {
 	if (node.harness === harness) return node;
-	const before = node.harness ? harnessInfo(node.harness) : null;
+	const before = node.harness ? harnessInfo(node.harness, customAgents) : null;
 	const model = node.model ?? "";
 	const keepModel =
 		model.trim() !== "" && before !== null && !before.models.includes(model);
 	return {
 		...node,
 		harness,
-		model: keepModel ? model : harnessInfo(harness).defaultModel,
+		model: keepModel ? model : harnessInfo(harness, customAgents).defaultModel,
 	};
 }

@@ -198,6 +198,50 @@ describe("harnesses", () => {
 	});
 });
 
+describe("custom agents", () => {
+	test("an Agent node on a custom agent runs on it, with its label", async () => {
+		const goose: FakeHarness = {
+			...fakeHarness(),
+			name: "acp:goose",
+			label: "Goose",
+		};
+		const engine = createEngine(
+			withDevice({
+				db: sandbox.db,
+				harnesses: { "claude-code": named("claude-code") },
+				customHarness: (name) => (name === "acp:goose" ? goose : undefined),
+				customHarnessNames: () => ["acp:goose"],
+				dataDir: sandbox.dataDir,
+				scheduler: false,
+			}),
+		).space(sandbox.spaceId);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([
+				agent("worker", { harness: "acp:goose", model: "default" }),
+			]),
+		});
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect(goose.calls.map((c) => [c.prompt, c.model])).toEqual([
+			["Work as worker.", "default"],
+		]);
+		// A custom agent has no take-over command.
+		expect((await engine.getRun(run.id)).takeOverCommand).toBeNull();
+	});
+
+	test("a flow on a custom agent this computer has not added does not start", async () => {
+		const engine = makeEngine({ "claude-code": named("claude-code") });
+		await expect(
+			engine.startRun({
+				projectId: await projectId(engine),
+				flow: flowOf([agent("worker", { harness: "acp:goose" })]),
+			}),
+		).rejects.toThrow(
+			"The flow has an Agent node on goose (worker), but no custom agent goose is added. Add it under Agents.",
+		);
+	});
+});
+
 describe("MCP servers", () => {
 	const TOKEN = "NIGHTSHIFT_TEST_MCP_TOKEN";
 	const SECRET = "s3cret-value-for-the-test";

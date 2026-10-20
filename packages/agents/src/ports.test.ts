@@ -25,6 +25,7 @@ const harnesses: Record<HarnessName, AgentHarness> = {
 	copilot: acpHarness("copilot", { executable: "copilot" }),
 	gemini: acpHarness("gemini", { executable: "gemini" }),
 	cursor: acpHarness("cursor", { executable: "agent" }),
+	pi: acpHarness("pi", { executable: "pi" }),
 };
 
 describe("the AgentHarness port", () => {

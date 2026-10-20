@@ -1,9 +1,10 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import { harnessNoun } from "@nightshift/agents/harness-facts";
 import { settleCost } from "@nightshift/agents/pricing";
 import type {
+	AgentHarnessName,
 	AgentSessionInput,
 	AgentUsage,
-	HarnessName,
 	StepReportOutcome,
 	StepReportSpec,
 } from "@nightshift/agents/types";
@@ -27,7 +28,7 @@ import {
 } from "../../events";
 import { checkOutputData, normalizeOutputData } from "../../output-schema";
 import {
-	HARNESS_LABEL,
+	harnessLabel,
 	isWaitKind,
 	messageOf,
 	type NodeAction,
@@ -152,7 +153,7 @@ export const harnessesAdded: Requirement<AgentNode> = (nodes, has) => {
 	return missing
 		.map(
 			({ harness, nodeIds }) =>
-				`The flow has ${nodeIds.length === 1 ? "an Agent node" : "Agent nodes"} on ${HARNESS_LABEL[harness]} (${nodeIds.join(", ")}), but no ${HARNESS_LABEL[harness]} harness is added${onDevice(has)}. Add it under Agents.`,
+				`The flow has ${nodeIds.length === 1 ? "an Agent node" : "Agent nodes"} on ${harnessLabel(harness)} (${nodeIds.join(", ")}), but no ${harnessNoun(harness)} is added${onDevice(has)}. Add it under Agents.`,
 		)
 		.join(" ");
 };
@@ -166,9 +167,9 @@ export const checkersHaveDecider: Requirement<AgentNode> = (nodes, has) =>
 /** The harnesses the Agent nodes name that the Device has not added, with their nodes. */
 function missingHarnesses(
 	nodes: readonly AgentNode[],
-	added: ReadonlySet<HarnessName>,
-): { harness: HarnessName; nodeIds: string[] }[] {
-	const missing = new Map<HarnessName, string[]>();
+	added: ReadonlySet<AgentHarnessName>,
+): { harness: AgentHarnessName; nodeIds: string[] }[] {
+	const missing = new Map<AgentHarnessName, string[]>();
 	for (const node of nodes) {
 		if (node.harness === undefined) continue;
 		if (added.has(node.harness)) continue;
@@ -566,7 +567,7 @@ async function runSession(
 		await step.warn(
 			"cost-unknown",
 			sessionCostUnknown(
-				HARNESS_LABEL[harness],
+				harnessLabel(harness),
 				sessionModel,
 				(final.usage?.inputTokens ?? 0) + (final.usage?.outputTokens ?? 0) > 0,
 			),

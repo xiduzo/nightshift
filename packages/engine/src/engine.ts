@@ -6,6 +6,7 @@ import {
 } from "@nightshift/db/schema/nightshift";
 import {
 	type FlowNode,
+	isCustomHarness,
 	optionProblem,
 	type Policy,
 	type ResolvedPolicy,
@@ -519,7 +520,9 @@ export function createEngine(
 		bus,
 		isActive: runner.isActive,
 		// Any harness, added or not: an old run's session stays takeable.
-		harnessOf: harnessFacts,
+		// A custom agent has no take-over command.
+		harnessOf: (name) =>
+			isCustomHarness(name) ? undefined : harnessFacts(name),
 		walkers,
 		pendingCommands: async (runId) =>
 			(await exchange.commands.pendingOf(runId)).map((c) => ({

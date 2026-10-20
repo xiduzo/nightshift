@@ -3,8 +3,10 @@ export {
 	ACP_DEFAULT_MODEL,
 	type AcpAgentName,
 	type AcpHarnessOptions,
+	acpAgentHarness,
 	acpHarness,
 	acpPermission,
+	customAcpHarness,
 	isAcpAgent,
 } from "./acp";
 export {
@@ -34,6 +36,7 @@ export {
 	type CliCheck,
 	type CliToolCheck,
 	checkCli,
+	checkCustomAgent,
 	checkHarness,
 	cliHelp,
 	cliHelpAt,
@@ -63,6 +66,8 @@ export {
 	HARNESS_LABELS,
 	HARNESS_TAKE_OVER,
 	harnessFacts,
+	harnessLabel,
+	harnessNoun,
 	shellQuote,
 } from "./harness-facts";
 export {

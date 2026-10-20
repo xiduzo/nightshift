@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import {
 	checkCli,
+	checkCustomAgent,
 	checkHarness,
 	cliHelp,
 	cliHelpAt,
@@ -290,6 +291,43 @@ describe("checkHarness: opencode", () => {
 	});
 });
 
+describe("checkCustomAgent", () => {
+	test("a command that is there is ready, with or without a version", async () => {
+		const bin = await fakeCli("goose", {});
+		expect(await checkCustomAgent(bin, "Goose")).toMatchObject({
+			path: bin,
+			version: null,
+			problem: null,
+		});
+	});
+
+	test("a command that is not there says how to fix it", async () => {
+		expect(
+			(await checkCustomAgent("no-such-agent-here", "Goose")).problem,
+		).toBe(
+			"Night Shift cannot find no-such-agent-here on this computer. Install Goose, or enter the full path of its command.",
+		);
+	});
+});
+
+describe("checkHarness: pi", () => {
+	test("pi 0.81 or later is ready", async () => {
+		const bin = await fakeCli("pi", { "--version": { stdout: "1.3.0\n" } });
+		expect(await checkHarness("pi", bin)).toMatchObject({
+			version: "1.3.0",
+			problem: null,
+		});
+	});
+
+	test("an older pi is a problem: pi-acp would wait for it forever", async () => {
+		// pi 0.73 prints its version to stderr.
+		const bin = await fakeCli("pi", { "--version": { stderr: "0.73.0\n" } });
+		expect((await checkHarness("pi", bin)).problem).toBe(
+			"pi 0.73.0 is too old. Night Shift needs pi 0.81 or later. Update pi, or enter the path of a newer one.",
+		);
+	});
+});
+
 describe("checkHarness: codex", () => {
 	test("a logged-in Codex: the login line is the account", async () => {
 		const bin = await fakeCli("codex", {
@@ -446,6 +484,23 @@ describe("harnessModels", () => {
 		expect(result.models.slice(-2)).toEqual([
 			"ollama/qwen3-coder:30b",
 			"openrouter/z-ai/glm-4.6",
+		]);
+	});
+
+	test("pi's model table becomes provider/model ids", async () => {
+		// pi 0.73 prints the table to stderr.
+		const bin = await fakeCli("pi", {
+			"--list-models": {
+				stderr:
+					"provider  model               context  max-out\nollama    qwen3-coder:latest  128K     16.4K\nanthropic claude-opus-4-7     1M       128K\n",
+			},
+		});
+		const result = await harnessModels("pi", bin);
+		expect(result.problem).toBeNull();
+		expect(result.models).toEqual([
+			"default",
+			"ollama/qwen3-coder:latest",
+			"anthropic/claude-opus-4-7",
 		]);
 	});
 

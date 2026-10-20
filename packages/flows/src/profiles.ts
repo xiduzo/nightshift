@@ -1,8 +1,8 @@
 import type {
+	AgentHarnessName,
 	AgentNode,
 	AgentProfileSettings,
 	Flow,
-	HarnessName,
 } from "./schema";
 
 /**
@@ -16,7 +16,7 @@ import type {
 
 /** An Agent node with everything it runs with, after its profile is resolved. */
 export type ResolvedAgentNode = AgentNode & {
-	harness: HarnessName;
+	harness: AgentHarnessName;
 	model: string;
 	permissionMode: NonNullable<AgentNode["permissionMode"]>;
 };

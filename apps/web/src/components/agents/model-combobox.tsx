@@ -11,7 +11,7 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { harnessInfo } from "@/lib/harnesses";
+import { harnessInfo, useCustomAgents } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
 
 import type { HarnessName } from "./types";
@@ -56,6 +56,7 @@ export function ModelCombobox({
 	describedBy?: string;
 }) {
 	const { models } = useHarnessModels(harness);
+	const customAgents = useCustomAgents();
 	// The whole list on open; filter only once the person types.
 	const [typed, setTyped] = useState(false);
 	const query = value.trim().toLowerCase();
@@ -92,8 +93,8 @@ export function ModelCombobox({
 			/>
 			<ComboboxContent>
 				<ComboboxEmpty>
-					Not in the list. {harnessInfo(harness).label} still takes any model it
-					supports.
+					Not in the list. {harnessInfo(harness, customAgents).label} still
+					takes any model it supports.
 				</ComboboxEmpty>
 				<ComboboxList>
 					{(model: string) => (

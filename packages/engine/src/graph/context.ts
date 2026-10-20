@@ -1,6 +1,6 @@
 import type { Command, LangGraphRunnableConfig } from "@langchain/langgraph";
-import { HARNESS_LABELS } from "@nightshift/agents/harness-facts";
-import type { AgentErrorKind, HarnessName } from "@nightshift/agents/types";
+import { harnessLabel } from "@nightshift/agents/harness-facts";
+import type { AgentErrorKind } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import { run, step } from "@nightshift/db/schema/nightshift";
 import type {
@@ -44,11 +44,11 @@ export async function getRunRow(db: Database, runId: string): Promise<RunRow> {
 }
 
 /**
- * Harness display names by name, for a message about a harness that is not
- * added (no `AgentHarness` instance to ask). Sourced from the port side
+ * A harness's display name, for a message about one that is not added (no
+ * `AgentHarness` instance to ask). Sourced from the port side
  * (`harness-facts.ts`), not the adapter registry.
  */
-export const HARNESS_LABEL: Record<HarnessName, string> = HARNESS_LABELS;
+export { harnessLabel };
 
 /** A harness or decider error the run policy waits out, rather than a failure. */
 export const isWaitKind = (

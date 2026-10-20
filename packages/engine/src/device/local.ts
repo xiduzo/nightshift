@@ -1,4 +1,4 @@
-import { HARNESS_LABELS } from "@nightshift/agents/harness-facts";
+import { harnessNoun } from "@nightshift/agents/harness-facts";
 import type {
 	AgentHarness,
 	Decider,
@@ -10,9 +10,12 @@ import type {
 	ValueResult,
 } from "@nightshift/agents/types";
 import {
+	type AgentHarnessName,
 	type AgentNode,
 	type AgentProfileSettings,
+	type CustomHarnessName,
 	deciderNameSchema,
+	isCustomHarness,
 } from "@nightshift/flows";
 import { readFlowSources } from "@nightshift/flows/files";
 
@@ -52,11 +55,18 @@ export type LocalDeviceDeps = {
 	/** The harnesses built on this computer, by name. */
 	harnesses: Partial<Record<HarnessName, AgentHarness>>;
 	/**
+	 * The custom agents added on this computer (`acp:<slug>`), read at each
+	 * question. Undefined: none of that name.
+	 */
+	customHarness?: (name: CustomHarnessName) => AgentHarness | undefined;
+	/**
 	 * The harnesses added on the Agents page, read at each question. A
 	 * harness left out cannot run a session, even when `harnesses` has it.
-	 * Without it: every harness in `harnesses`.
+	 * Without it: every harness in `harnesses`. Custom agents need no entry.
 	 */
 	harnessNames?: () => ReadonlySet<HarnessName>;
+	/** The custom agents added on this computer, by flow name. Without it: none. */
+	customHarnessNames?: () => readonly CustomHarnessName[];
 	/** Decides Decision nodes and makes values for Value nodes. */
 	decider?: Decider;
 	/**
@@ -117,8 +127,12 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				: expandMcpServers(node.mcpServers, process.env));
 
 	/** The harness of that name, when it is added and built. */
-	const harnessFor = (name: HarnessName): AgentHarness | undefined =>
-		(deps.harnessNames?.().has(name) ?? true) ? harnesses[name] : undefined;
+	const harnessFor = (name: AgentHarnessName): AgentHarness | undefined => {
+		if (isCustomHarness(name)) return deps.customHarness?.(name);
+		return (deps.harnessNames?.().has(name) ?? true)
+			? harnesses[name]
+			: undefined;
+	};
 
 	const deciderFacts: DeciderFacts | null = decider
 		? {
@@ -151,7 +165,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		if (!harness) {
 			yield {
 				type: "refused",
-				message: `No ${HARNESS_LABELS[name]} harness is added. Add it under Agents.`,
+				message: `No ${harnessNoun(name)} is added. Add it under Agents.`,
 			};
 			return;
 		}
@@ -211,9 +225,10 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		async capabilities(query = {}): Promise<Capabilities> {
 			return {
 				elsewhere: null,
-				harnesses: (Object.keys(harnesses) as HarnessName[]).filter(
-					(name) => harnessFor(name) !== undefined,
-				),
+				harnesses: [
+					...(Object.keys(harnesses) as HarnessName[]),
+					...(deps.customHarnessNames?.() ?? []),
+				].filter((name) => harnessFor(name) !== undefined),
 				connections: [...(deps.connectionNames?.() ?? [])],
 				clis: [...(deps.cliNames?.() ?? [])],
 				programs: Object.fromEntries(

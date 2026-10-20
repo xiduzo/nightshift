@@ -1,3 +1,4 @@
+import type { CustomAgent } from "@nightshift/flows";
 import {
 	Alert,
 	AlertAction,
@@ -62,6 +63,7 @@ import { harnessInfo, isHarnessName } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
 
 import { CliToolCheckBadge, CliToolDetail, CliToolDialog } from "./cli-tool";
+import { CustomAgentDetail, CustomAgentDialog } from "./custom-agent";
 import { HarnessDetail, HarnessPicker } from "./harness-detail";
 import { newProfileDraft, ProfileDetail } from "./profile-detail";
 import { ToolDetail, ToolPicker } from "./tool-detail";
@@ -78,7 +80,10 @@ export type Selection =
 
 export function parseItem(item: string | undefined): Selection | null {
 	if (!item) return null;
-	const [kind, name = ""] = item.split(":", 2) as [string, string?];
+	// A custom agent's name has a colon of its own: `harness:acp:goose`.
+	const colon = item.indexOf(":");
+	const kind = colon === -1 ? item : item.slice(0, colon);
+	const name = colon === -1 ? "" : item.slice(colon + 1);
 	switch (kind) {
 		case "profile":
 			return name ? { kind, name } : null;
@@ -129,6 +134,10 @@ export function AgentsPage({
 		open: boolean;
 		tool: CliTool | null;
 	}>({ open: false, tool: null });
+	const [editingAgent, setEditingAgent] = useState<{
+		open: boolean;
+		agent: CustomAgent | null;
+	}>({ open: false, agent: null });
 
 	/** Shows it, unsaved changes or not: after a save, a delete, a cancel. */
 	const go = useCallback(
@@ -243,6 +252,7 @@ export function AgentsPage({
 									onClick={() => select({ kind: "harness", name: h.name })}
 									icon={<SquareTerminalIcon />}
 									title={h.label}
+									description={h.custom ? "Custom agent" : undefined}
 									aside={<CliCheckBadge target={h.name} />}
 								/>
 							))
@@ -359,6 +369,7 @@ export function AgentsPage({
 						onDirtyChange={setDirty}
 						onEditTool={(connection) => setEditing({ open: true, connection })}
 						onEditCliTool={(tool) => setEditingCli({ open: true, tool })}
+						onEditAgent={(agent) => setEditingAgent({ open: true, agent })}
 						data={{
 							profiles: profiles.data ?? [],
 							harnesses: harnesses.data ?? [],
@@ -376,6 +387,16 @@ export function AgentsPage({
 				onOpenChange={(open) => setPicking(open ? "harness" : null)}
 				harnesses={harnesses.data}
 				onAdded={(name) => select({ kind: "harness", name })}
+				onAddCustom={() => setEditingAgent({ open: true, agent: null })}
+			/>
+			<CustomAgentDialog
+				open={editingAgent.open}
+				onOpenChange={(open) => setEditingAgent((e) => ({ ...e, open }))}
+				agent={editingAgent.agent}
+				taken={(harnesses.data ?? []).flatMap((h) =>
+					h.custom ? [h.custom.slug] : [],
+				)}
+				onSaved={(slug) => select({ kind: "harness", name: `acp:${slug}` })}
 			/>
 			<ToolPicker
 				open={picking === "tool"}
@@ -448,6 +469,7 @@ function Detail({
 	onDirtyChange,
 	onEditTool,
 	onEditCliTool,
+	onEditAgent,
 	data,
 }: {
 	selection: Selection | null;
@@ -458,6 +480,7 @@ function Detail({
 	onDirtyChange: (dirty: boolean) => void;
 	onEditTool: (connection: Connection) => void;
 	onEditCliTool: (tool: CliTool) => void;
+	onEditAgent: (agent: CustomAgent) => void;
 	data: PageData;
 }) {
 	const added = data.harnesses.filter((h) => h.added);
@@ -532,6 +555,19 @@ function Detail({
 		case "harness": {
 			const harness = added.find((h) => h.name === selection.name);
 			if (!harness) return <Gone what="harness" />;
+			if (harness.custom) {
+				const agent = harness.custom;
+				return (
+					<CustomAgentDetail
+						key={harness.name}
+						harness={harness}
+						agent={agent}
+						onEdit={() => onEditAgent(agent)}
+						onOpenProfile={openProfile}
+						onRemoved={() => onGo(null)}
+					/>
+				);
+			}
 			return (
 				<HarnessDetail
 					key={harness.name}

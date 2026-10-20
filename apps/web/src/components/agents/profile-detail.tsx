@@ -1,3 +1,4 @@
+import type { CustomAgent } from "@nightshift/flows";
 import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
 	AlertDialog,
@@ -55,7 +56,6 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
-
 import { CliCheckBadge } from "@/components/connections/cli-panel";
 import { KindBadge } from "@/components/connections/parts";
 import type { CliTool, Connection } from "@/components/connections/types";
@@ -98,11 +98,16 @@ export function newProfileDraft(
 		name: "",
 		description: "",
 		harness,
-		model: harnessInfo(harness).defaultModel,
+		model: harnessInfo(harness, customAgentsOf(harnesses)).defaultModel,
 		permissionMode,
 		clis: [],
 		connections: [],
 	};
+}
+
+/** The custom agents among the harness rows. */
+function customAgentsOf(harnesses: HarnessRow[]): CustomAgent[] {
+	return harnesses.flatMap((h) => (h.custom ? [h.custom] : []));
 }
 
 /** Same values, whatever the key order or `undefined` fields. */
@@ -199,6 +204,8 @@ export function ProfileDetail({
 	const canSave =
 		NAME.test(name) && !nameTaken && draft.model.trim() !== "" && dirty;
 	const harness = harnesses.find((h) => h.name === draft.harness);
+	const customAgents = customAgentsOf(harnesses);
+	const info = (name: HarnessName) => harnessInfo(name, customAgents);
 
 	return (
 		<DetailShell
@@ -208,7 +215,7 @@ export function ProfileDetail({
 			mono
 			subtitle={
 				<span className="flex flex-wrap items-center gap-x-1.5">
-					{harnessInfo(draft.harness).label}
+					{info(draft.harness).label}
 					<span aria-hidden>·</span>
 					<span className="font-mono">{draft.model || "no model"}</span>
 					{draft.effort ? (
@@ -317,13 +324,11 @@ export function ProfileDetail({
 						onValueChange={(next) => {
 							const to = next as HarnessName;
 							if (to === draft.harness) return;
-							const known = harnessInfo(draft.harness).models.includes(
-								draft.model,
-							);
+							const known = info(draft.harness).models.includes(draft.model);
 							set({
 								harness: to,
 								// A model from the old harness's list means nothing to the new one.
-								model: known ? harnessInfo(to).defaultModel : draft.model,
+								model: known ? info(to).defaultModel : draft.model,
 							});
 						}}
 						className="grid gap-2 sm:grid-cols-3"
@@ -349,7 +354,7 @@ export function ProfileDetail({
 							harness={draft.harness}
 							value={draft.model}
 							onChange={(model) => set({ model })}
-							placeholder={harnessInfo(draft.harness).defaultModel}
+							placeholder={info(draft.harness).defaultModel}
 							invalid={draft.model.trim() === ""}
 							describedBy={`${id}-model-hint`}
 						/>

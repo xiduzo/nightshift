@@ -4,10 +4,15 @@
  * stream into AgentEvent values.
  */
 
-import type { DeciderName, HarnessName } from "@nightshift/flows";
+import type {
+	AgentHarnessName,
+	CustomHarnessName,
+	DeciderName,
+	HarnessName,
+} from "@nightshift/flows";
 import type { CostSource } from "./pricing";
 
-export type { DeciderName, HarnessName };
+export type { AgentHarnessName, CustomHarnessName, DeciderName, HarnessName };
 
 /** An MCP server for one session, with `${NAME}` already expanded by the engine. */
 export type McpServerConfig =
@@ -144,7 +149,8 @@ export type AgentEvent =
 	  };
 
 export interface AgentHarness {
-	readonly name: HarnessName;
+	/** A built-in harness, or a custom agent (`acp:<slug>`). */
+	readonly name: AgentHarnessName;
 	/** The display name, for example "Claude Code". */
 	readonly label: string;
 	/** Start or resume one session. Never throws: failures end the stream with an `error` event. */

@@ -1,8 +1,8 @@
 import type { CostSource } from "@nightshift/agents/pricing";
 import type {
 	AgentErrorKind,
+	AgentHarnessName,
 	AgentUsage,
-	HarnessName,
 } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import { event, project, run } from "@nightshift/db/schema/nightshift";
@@ -301,7 +301,7 @@ export type EnginePayloads = {
 		/** The harness session this session continues, on a resume. */
 		resumeSessionId: string | null;
 		/** Absent in logs from before Slice 8: those sessions ran on Claude Code. */
-		harness?: HarnessName;
+		harness?: AgentHarnessName;
 	};
 	HarnessSessionAssigned: { harnessSessionId: string; model: string | null };
 	/**
@@ -876,7 +876,7 @@ export type DerivedSession = {
 	stepId: string | null;
 	prompt: string;
 	resumeSessionId: string | null;
-	harness: HarnessName;
+	harness: AgentHarnessName;
 	harnessSessionId: string | null;
 	startedAt: number;
 	startSeq: number;
@@ -1261,7 +1261,7 @@ export function lastHarnessSessionOfNode(
 /** The run's latest session that has a harness session id. */
 export function lastHarnessSession(
 	events: readonly LoggedEvent[],
-): { harness: HarnessName; harnessSessionId: string } | null {
+): { harness: AgentHarnessName; harnessSessionId: string } | null {
 	const session = deriveSessions(events).findLast((s) => s.harnessSessionId);
 	return session?.harnessSessionId
 		? { harness: session.harness, harnessSessionId: session.harnessSessionId }

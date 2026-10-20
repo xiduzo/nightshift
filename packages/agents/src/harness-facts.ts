@@ -10,7 +10,8 @@
  * a cycle, and the engine may use `HARNESS_LABELS` for a harness it has no
  * instance of (one that is not added).
  */
-import type { AgentHarness, HarnessName } from "./types";
+import { customAgentSlug, isCustomHarness } from "@nightshift/flows";
+import type { AgentHarness, AgentHarnessName, HarnessName } from "./types";
 
 /** The display name of each harness, for messages about one that is not added. */
 export const HARNESS_LABELS: Record<HarnessName, string> = {
@@ -21,6 +22,7 @@ export const HARNESS_LABELS: Record<HarnessName, string> = {
 	copilot: "GitHub Copilot",
 	gemini: "Gemini CLI",
 	cursor: "Cursor",
+	pi: "pi",
 };
 
 /**
@@ -39,7 +41,24 @@ export const HARNESS_TAKE_OVER: Record<
 	copilot: null,
 	gemini: null,
 	cursor: (id) => `agent --resume ${id}`,
+	// pi-acp's session id is pi's own: `--session` takes it.
+	pi: (id) => `pi --session ${id}`,
 };
+
+/**
+ * The display name of a harness, for a message about one: its label, or a
+ * custom agent's slug (its label lives on the computer that added it).
+ */
+export function harnessLabel(name: AgentHarnessName): string {
+	return isCustomHarness(name) ? customAgentSlug(name) : HARNESS_LABELS[name];
+}
+
+/** What a "not added" message calls it: "Cursor harness", "custom agent goose". */
+export function harnessNoun(name: AgentHarnessName): string {
+	return isCustomHarness(name)
+		? `custom agent ${customAgentSlug(name)}`
+		: `${HARNESS_LABELS[name]} harness`;
+}
 
 /** Quote one value for a shell, only when it needs it. */
 export function shellQuote(value: string): string {

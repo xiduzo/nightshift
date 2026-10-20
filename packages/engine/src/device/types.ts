@@ -1,10 +1,10 @@
 import type {
 	AgentEvent,
+	AgentHarnessName,
 	AgentSessionInput,
 	DeciderName,
 	DecisionInput,
 	DecisionResult,
-	HarnessName,
 	ValueInput,
 	ValueResult,
 } from "@nightshift/agents/types";
@@ -124,7 +124,7 @@ export type Capabilities = {
 	 */
 	elsewhere: string | null;
 	/** The harnesses added (the Agents page) and built. */
-	harnesses: HarnessName[];
+	harnesses: AgentHarnessName[];
 	/** The connections defined (Agents → Tools). */
 	connections: string[];
 	/** The CLI tools defined (Agents → Tools). */
@@ -148,7 +148,7 @@ export type SessionInput = Omit<
 	AgentSessionInput,
 	"mcpServers" | "clis" | "prompt"
 > & {
-	harness: HarnessName;
+	harness: AgentHarnessName;
 	/** The node's prompt. The Device adds what a new session learns about its CLI tools. */
 	prompt: string;
 	clis?: string[];
@@ -183,7 +183,7 @@ export type OfferedSessionInput = Omit<
 export type SessionEvent =
 	| AgentEvent
 	/** `harness`: what runs the session, for an offered profile the Walker cannot resolve. */
-	| { type: "ready"; harness?: HarnessName }
+	| { type: "ready"; harness?: AgentHarnessName }
 	/** The session cannot start; the message says why, for the person. */
 	| { type: "refused"; message: string };
 

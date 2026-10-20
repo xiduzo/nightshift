@@ -4,11 +4,14 @@ import {
 	type AgentHarness,
 	acpHarness,
 	checkCli,
+	checkCustomAgent,
 	checkHarness,
 	claudeCodeHarness,
 	cliHelp,
 	codexHarness,
+	customAcpHarness,
 	grokBuildHarness,
+	type HarnessName,
 	harnessFacts,
 	harnessModels,
 	opencodeHarness,
@@ -303,9 +306,13 @@ function refreshFacts(): void {
 		deviceId: device.id,
 		harnesses: () => {
 			const s = settings.current();
-			return Object.fromEntries(
-				s.harnesses.map((name) => [name, Bun.which(s[HARNESS_BIN[name]])]),
-			);
+			return Object.fromEntries([
+				...s.harnesses.map((name) => [name, Bun.which(s[HARNESS_BIN[name]])]),
+				...s.customAgents.map((a) => [
+					`acp:${a.slug}` as const,
+					Bun.which(a.command),
+				]),
+			]);
 		},
 		programs: () => pathPrograms(),
 	}).catch((error) => {
@@ -347,7 +354,7 @@ export const sync = relay.nightshiftSync;
 
 /** A harness built per session, so a changed path in Settings applies to the next session. */
 function perSession(
-	name: AgentHarness["name"],
+	name: HarnessName,
 	build: () => AgentHarness,
 ): AgentHarness {
 	return { name, ...harnessFacts(name), run: (input) => build().run(input) };
@@ -393,7 +400,33 @@ const local = localDevice({
 		cursor: perSession("cursor", () =>
 			acpHarness("cursor", { executable: settings.current().cursorBin }),
 		),
+		pi: perSession("pi", () =>
+			acpHarness("pi", { executable: settings.current().piBin }),
+		),
 	},
+	// Custom agents: read from the settings at each session, so an edit
+	// applies to the next one. `${NAME}` in their env reads the secrets.
+	customHarness: (name) => {
+		const agent = settings
+			.current()
+			.customAgents.find((a) => `acp:${a.slug}` === name);
+		if (!agent) return undefined;
+		return customAcpHarness(agent, {
+			env: async () => {
+				const expanded = await connections.expandEnv(agent.env);
+				if (expanded.ok) return expanded.env;
+				const [noun, isNot, it] =
+					expanded.missing.length === 1
+						? ["secret", "it is", "it"]
+						: ["secrets", "they are", "them"];
+				throw new Error(
+					`${agent.label} needs the ${noun} ${expanded.missing.join(", ")}, but ${isNot} not saved. Save ${it} under Agents → Secrets, or remove the reference.`,
+				);
+			},
+		});
+	},
+	customHarnessNames: () =>
+		settings.current().customAgents.map((a) => `acp:${a.slug}` as const),
 	harnessNames: () => new Set(settings.current().harnesses),
 	// Decision nodes decided by a model: TanStack AI deciders, with API keys from the secrets.
 	decider: tanstackDecider({ secret: (name) => connections.secret(name) }),
@@ -654,6 +687,7 @@ export const devices = createDevices({
 
 export const checks: Context["checks"] = {
 	harness: checkHarness,
+	customAgent: checkCustomAgent,
 	cli: (name) => checkCli(name),
 	programs: () => pathPrograms(),
 	mcp: (config, redact) => testMcpServer(config, { redact }),

@@ -28,7 +28,7 @@ import {
 } from "@nightshift/ui/components/item";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { BotIcon, SquareTerminalIcon } from "lucide-react";
+import { BotIcon, PlusIcon, SquareTerminalIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -38,7 +38,8 @@ import {
 	toolFor,
 } from "@/components/connections/cli-panel";
 import { MonoTile } from "@/components/connections/parts";
-import type { SettingsView } from "@/components/connections/types";
+import type { CheckTarget, SettingsView } from "@/components/connections/types";
+import type { BuiltInHarnessName } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
 
 import { DetailSection, DetailShell } from "./detail-shell";
@@ -71,7 +72,7 @@ export function HarnessDetail({
 			onError: (error) => toast.error(`Not removed: ${error.message}`),
 		}),
 	);
-	const tool = toolFor(harness.name);
+	const tool = toolFor(harness.name as CheckTarget);
 
 	return (
 		<DetailShell
@@ -189,17 +190,23 @@ export function HarnessDetail({
 	);
 }
 
-/** "Add a harness": every TanStack AI harness adapter, with what this machine has. */
+/**
+ * "Add a harness": every TanStack AI harness adapter, with what this machine
+ * has, then a custom agent: any agent that speaks ACP.
+ */
 export function HarnessPicker({
 	open,
 	onOpenChange,
 	harnesses,
 	onAdded,
+	onAddCustom,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	harnesses: HarnessRow[] | undefined;
 	onAdded: (name: HarnessName) => void;
+	/** Opens the custom agent form. */
+	onAddCustom: () => void;
 }) {
 	const queryClient = useQueryClient();
 	const add = useMutation(
@@ -209,7 +216,7 @@ export function HarnessPicker({
 					queryKey: orpc.harnesses.key(),
 				});
 				onOpenChange(false);
-				onAdded(input.harness);
+				onAdded(input.harness as HarnessName);
 			},
 			onError: (error) => toast.error(`Not added: ${error.message}`),
 		}),
@@ -225,37 +232,60 @@ export function HarnessPicker({
 					</DialogDescription>
 				</DialogHeader>
 				<ItemGroup className="gap-2">
-					{(harnesses ?? []).map((h) => (
-						<Item
-							key={h.name}
-							variant="outline"
-							render={
-								<button
-									type="button"
-									disabled={h.added || add.isPending}
-									className="text-left disabled:opacity-60"
-								/>
-							}
-							onClick={() => add.mutate({ harness: h.name })}
-						>
-							<ItemMedia>
-								<MonoTile>{toolFor(h.name).initials}</MonoTile>
-							</ItemMedia>
-							<ItemContent>
-								<ItemTitle>{h.label}</ItemTitle>
-								<ItemDescription className="text-xs">
-									{h.models.length} known models
-								</ItemDescription>
-							</ItemContent>
-							<ItemActions>
-								{h.added ? (
-									<Badge variant="secondary">Added</Badge>
-								) : (
-									<CliCheckBadge target={h.name} />
-								)}
-							</ItemActions>
-						</Item>
-					))}
+					{(harnesses ?? [])
+						.flatMap((h) =>
+							h.custom ? [] : [{ ...h, name: h.name as BuiltInHarnessName }],
+						)
+						.map((h) => (
+							<Item
+								key={h.name}
+								variant="outline"
+								render={
+									<button
+										type="button"
+										disabled={h.added || add.isPending}
+										className="text-left disabled:opacity-60"
+									/>
+								}
+								onClick={() => add.mutate({ harness: h.name })}
+							>
+								<ItemMedia>
+									<MonoTile>{toolFor(h.name).initials}</MonoTile>
+								</ItemMedia>
+								<ItemContent>
+									<ItemTitle>{h.label}</ItemTitle>
+									<ItemDescription className="text-xs">
+										{h.models.length} known models
+									</ItemDescription>
+								</ItemContent>
+								<ItemActions>
+									{h.added ? (
+										<Badge variant="secondary">Added</Badge>
+									) : (
+										<CliCheckBadge target={h.name} />
+									)}
+								</ItemActions>
+							</Item>
+						))}
+					<Item
+						variant="outline"
+						render={<button type="button" className="text-left" />}
+						onClick={() => {
+							onOpenChange(false);
+							onAddCustom();
+						}}
+					>
+						<ItemMedia variant="icon">
+							<PlusIcon />
+						</ItemMedia>
+						<ItemContent>
+							<ItemTitle>Custom agent</ItemTitle>
+							<ItemDescription className="text-xs">
+								Any coding agent that supports the Agent Client Protocol, such
+								as Goose or Qwen Code.
+							</ItemDescription>
+						</ItemContent>
+					</Item>
 				</ItemGroup>
 			</DialogContent>
 		</Dialog>

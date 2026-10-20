@@ -82,8 +82,71 @@ export const harnessNameSchema = z.enum([
 	"copilot",
 	"gemini",
 	"cursor",
+	"pi",
 ]);
 export type HarnessName = z.infer<typeof harnessNameSchema>;
+
+/** A custom agent's slug: its name in a flow, after `acp:`. */
+export const customAgentSlugSchema = z
+	.string()
+	.regex(
+		/^[a-z0-9][a-z0-9-]{0,39}$/,
+		"Use lowercase letters, digits and -, for example goose.",
+	);
+
+/**
+ * A custom agent in a flow: `acp:` and its slug, for example `acp:goose`.
+ * Any coding agent that speaks the Agent Client Protocol, added by the
+ * person with its command (`customAgentSchema`). A flow that names one
+ * still validates on a computer without it: a run there refuses the node,
+ * as for a built-in harness that is not added.
+ */
+export const customHarnessSchema = z.templateLiteral([
+	"acp:",
+	customAgentSlugSchema,
+]);
+export type CustomHarnessName = z.infer<typeof customHarnessSchema>;
+
+/** What an Agent node or an Agent Profile runs on: a built-in harness or a custom agent. */
+export const agentHarnessSchema = z.union([
+	harnessNameSchema,
+	customHarnessSchema,
+]);
+export type AgentHarnessName = z.infer<typeof agentHarnessSchema>;
+
+export const isCustomHarness = (name: string): name is CustomHarnessName =>
+	name.startsWith("acp:");
+
+/** The flow name of the custom agent with this slug. */
+export const customHarnessName = (slug: string): CustomHarnessName =>
+	`acp:${slug}`;
+
+/** The slug of a custom agent's flow name. */
+export const customAgentSlug = (name: CustomHarnessName): string =>
+	name.slice("acp:".length);
+
+/** An environment variable name, as a shell reads it. */
+const envNameSchema = z
+	.string()
+	.regex(
+		/^[A-Za-z_][A-Za-z0-9_]{0,127}$/,
+		"Use letters, digits and _, starting with a letter or _.",
+	);
+
+/**
+ * A custom agent: a coding agent that speaks the Agent Client Protocol on
+ * stdio, started with `command` and `args` (for example `goose acp`).
+ * Saved in the daemon's settings, never in a flow file. `${NAME}` in an
+ * `env` value reads a secret when a session starts.
+ */
+export const customAgentSchema = z.object({
+	slug: customAgentSlugSchema,
+	label: z.string().trim().min(1).max(64),
+	command: z.string().trim().min(1),
+	args: z.array(z.string()).max(64).default([]),
+	env: z.record(envNameSchema, z.string()).default({}),
+});
+export type CustomAgent = z.infer<typeof customAgentSchema>;
 
 /**
  * Who decides a Decision node: a TanStack AI decision model, through
@@ -260,9 +323,9 @@ export const agentNodeSchema = z.object({
 	profile: nameSchema.optional(),
 	/**
 	 * The coding-agent CLI that runs the session. Each uses its own login.
-	 * Required without a profile.
+	 * Required without a profile. A custom agent is `acp:<slug>`.
 	 */
-	harness: harnessNameSchema.optional(),
+	harness: agentHarnessSchema.optional(),
 	/** Required without a profile. */
 	model: z.string().min(1).optional(),
 	effort: effortSchema.optional(),
@@ -329,7 +392,7 @@ export const agentNodeSchema = z.object({
  * daemon (the Agents page), never in a flow file.
  */
 export const agentProfileSettingsSchema = z.object({
-	harness: harnessNameSchema,
+	harness: agentHarnessSchema,
 	model: z.string().trim().min(1),
 	effort: effortSchema.optional(),
 	permissionMode: permissionModeSchema,

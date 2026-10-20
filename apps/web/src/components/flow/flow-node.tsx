@@ -6,6 +6,7 @@ import {
 	type DecisionNode,
 	type FlowNode,
 	type FlowNodeType,
+	isCustomHarness,
 	type ListSource,
 	nodeOutcomes,
 	outcomeColor,
@@ -437,7 +438,11 @@ function agentParts(node: AgentNode): string[] {
 		node.harness !== undefined &&
 		(node.harness !== "claude-code" || node.profile !== undefined)
 	) {
-		parts.push(harnessInfo(node.harness).label);
+		parts.push(
+			isCustomHarness(node.harness)
+				? node.harness
+				: harnessInfo(node.harness).label,
+		);
 	}
 	if (node.model !== undefined) parts.push(node.model);
 	if (node.effort !== undefined) parts.push(node.effort);
