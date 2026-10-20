@@ -1,6 +1,8 @@
+import { databaseUrl } from "@nightshift/db/data-dir";
 import { serveDaemon, tlsPortOf } from "server/src/serve";
 
 import { prepareDaemonEnv } from "./daemon-env";
+import { startWatchdog } from "./watchdog";
 
 /**
  * The web build calls the daemon at VITE_SERVER_URL, which `apps/web/.env`
@@ -52,10 +54,11 @@ export async function startDaemon(): Promise<Daemon> {
 	prepareDaemonEnv(DAEMON_URL, DAEMON_PORT);
 	// Imported only now: the server reads its env and takes the database lease
 	// when it loads.
-	const [{ default: daemon }, { document, spaces, lease }] = await Promise.all([
-		import("server/src/index"),
-		import("server/src/services"),
-	]);
+	const [{ default: daemon }, { document, spaces, lease, daemon: info }] =
+		await Promise.all([
+			import("server/src/index"),
+			import("server/src/services"),
+		]);
 
 	// This computer only, until it is a Host with an https:// address. With
 	// its own certificate it also serves https:// for other computers, on
@@ -68,11 +71,21 @@ export async function startDaemon(): Promise<Daemon> {
 		console.log(`Night Shift daemon on ${server.url}`);
 	}
 
+	// Only for the daemon this app runs: a shared one has its own watchers.
+	const url = databaseUrl(
+		{ DATABASE_URL: process.env.DATABASE_URL },
+		info.dataDir,
+	);
+	const watchdog = url.startsWith("file:")
+		? startWatchdog({ database: url.slice(5), owner: lease.owner })
+		: null;
+
 	let stopped: Promise<void> | undefined;
 	return {
 		kind: "own",
 		stop: () => {
 			stopped ??= (async () => {
+				watchdog?.terminate();
 				for (const server of servers) server.stop(true);
 				await Promise.race([
 					Promise.all([document.flush(), spaces.flush(), lease.release()]),

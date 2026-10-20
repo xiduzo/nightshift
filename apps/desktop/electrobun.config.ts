@@ -67,6 +67,8 @@ export default {
 			[webBuildDir]: "views/mainview",
 			// `@nightshift/db` finds its migrations next to the module that runs.
 			"../../packages/db/src/migrations": "bun/migrations",
+			// A Worker's own file, next to the bundle that starts it (Bun runs it as is).
+			"src/bun/watchdog-worker.ts": "bun/watchdog-worker.ts",
 			[libsqlNative]: `bun/node_modules/@libsql/${libsqlNative.split("/").pop()}`,
 		},
 		watchIgnore: [`${webBuildDir}/**`],
