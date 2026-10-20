@@ -12,14 +12,14 @@ import {
 	ItemContent,
 	ItemDescription,
 	ItemGroup,
-	ItemMedia,
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Link } from "@tanstack/react-router";
-import { ArrowRightIcon, LoaderCircleIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { ArrowRightIcon } from "lucide-react";
+import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
+import { DataTable, dataTableColumns } from "@/components/data-table";
 import { RunStatusBadge } from "@/components/run-status-badge";
 import { useNow } from "@/hooks/use-now";
 import type { Project, RunSummary } from "@/lib/api-types";
@@ -29,6 +29,7 @@ import {
 	formatRelative,
 	formatTime,
 } from "@/lib/format";
+import { OVERVIEW_ROWS } from "@/lib/overview";
 
 import { activePerHour, isOpen } from "./activity";
 import {
@@ -36,6 +37,9 @@ import {
 	DetailsDialog,
 	DetailsEmpty,
 	DetailsHeader,
+	DetailsTabContent,
+	DetailsTabs,
+	MoreRows,
 	RangeToggle,
 	Stat,
 	Swatch,
@@ -45,13 +49,15 @@ import { spendGroupOf } from "./spend";
 /** In hours: a day, two, a week. */
 const RANGES = [24, 48, 168] as const;
 type Range = (typeof RANGES)[number];
+type Tab = "overview" | "open" | "groups";
 const CHART_CONFIG = {
 	active: { label: "Runs at work", color: "var(--status-running)" },
 } satisfies ChartConfig;
 
 /**
- * What is at work, in detail: the open runs, how many ran at once per hour,
- * and the peak. Behind the "Running now" card.
+ * What is at work, in detail, in tabs like Flow health: how many ran at once
+ * per hour and the peak, the open runs, and which flows (or projects, over
+ * all of them) kept Night Shift busy. Behind the "Running now" card.
  */
 export function ActivityDialog({
 	open,
@@ -91,9 +97,9 @@ function ActivityDetails({
 	projects?: Project[];
 	onNavigate: () => void;
 }) {
-	const id = useId();
 	const now = useNow(60_000);
 	const [range, setRange] = useState<Range>(24);
+	const [tab, setTab] = useState<Tab>("overview");
 	const groupOf = spendGroupOf(project, projects);
 	const hours = activePerHour(runs, range, now);
 	const since = hours[0]?.hour ?? now;
@@ -114,56 +120,20 @@ function ActivityDetails({
 		title: formatDayTime(hour),
 	}));
 	const rangeWord = range > 48 ? "7 days" : `${range} h`;
+	const groups = atWorkPerGroup(runs, groupOf, since, now);
 
 	return (
 		<>
 			<DetailsHeader project={project} trail="Runs" title="Activity" />
 
-			<Item variant="muted" size="sm">
-				<ItemMedia variant="icon">
-					<LoaderCircleIcon />
-				</ItemMedia>
-				<ItemContent>
-					<ItemTitle>Running now</ItemTitle>
-					<ItemDescription>
-						{nextWake
-							? `${open.length} open, the next wakes at ${formatTime(nextWake)}`
-							: open.length > 0
-								? `${open.length} open`
-								: "Nothing open"}
-					</ItemDescription>
-				</ItemContent>
-				<ItemActions className="font-semibold text-lg tabular-nums">
-					{running}
-				</ItemActions>
-			</Item>
-
-			<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-				<Stat
-					label="Open"
-					value={String(open.length)}
-					hint="Running, waiting, asleep"
-				/>
-				<Stat
-					label="Peak"
-					value={String(peak)}
-					hint={`At once, last ${rangeWord}`}
-				/>
-				<Stat
-					label="Busy hours"
-					value={String(busy)}
-					hint={`Of the last ${rangeWord}`}
-				/>
-				<Stat
-					label="Started"
-					value={String(started)}
-					hint={`Last ${rangeWord}`}
-				/>
-			</div>
-
-			<ChartSection
-				title="At work"
-				hint="Runs at work in each hour, from start to end"
+			<DetailsTabs
+				tabs={[
+					{ value: "overview", label: "Overview" },
+					{ value: "open", label: "Open runs", count: open.length },
+					{ value: "groups", label: project ? "By flow" : "By project" },
+				]}
+				value={tab}
+				onValueChange={setTab}
 				toggle={
 					<RangeToggle
 						ranges={RANGES}
@@ -176,98 +146,171 @@ function ActivityDetails({
 					/>
 				}
 			>
-				{peak === 0 ? (
-					<DetailsEmpty>Nothing ran in the last {rangeWord}.</DetailsEmpty>
-				) : (
-					<ChartContainer
-						config={CHART_CONFIG}
-						className="aspect-auto h-56 w-full"
-					>
-						<BarChart data={rows} margin={{ left: 0, right: 0 }}>
-							<CartesianGrid vertical={false} />
-							<XAxis
-								dataKey="label"
-								tickLine={false}
-								axisLine={false}
-								tickMargin={8}
-								minTickGap={24}
-							/>
-							<YAxis
-								tickLine={false}
-								axisLine={false}
-								width={32}
-								allowDecimals={false}
-							/>
-							<ChartTooltip
-								cursor={false}
-								content={
-									<ChartTooltipContent
-										labelFormatter={(_, payload) =>
-											String(payload[0]?.payload?.title ?? "")
-										}
-										formatter={(value) => (
-											<div className="flex w-full items-center gap-2">
-												<Swatch color="var(--color-active)" />
-												<span className="text-muted-foreground">
-													Runs at work
-												</span>
-												<span className="ml-auto font-medium font-mono tabular-nums">
-													{Number(value)}
-												</span>
-											</div>
-										)}
-									/>
-								}
-							/>
-							<Bar
-								dataKey="active"
-								fill="var(--color-active)"
-								radius={[4, 4, 0, 0]}
-							/>
-						</BarChart>
-					</ChartContainer>
-				)}
-			</ChartSection>
+				<DetailsTabContent value="overview">
+					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+						<Stat
+							label="Running now"
+							value={String(running)}
+							hint={
+								nextWake
+									? `${open.length} open, the next wakes at ${formatTime(nextWake)}`
+									: open.length > 0
+										? `${open.length} open`
+										: "Nothing open"
+							}
+						/>
+						<Stat
+							label="Peak"
+							value={String(peak)}
+							hint={`At once, last ${rangeWord}`}
+						/>
+						<Stat
+							label="Busy hours"
+							value={String(busy)}
+							hint={`Of the last ${rangeWord}`}
+						/>
+						<Stat
+							label="Started"
+							value={String(started)}
+							hint={`Last ${rangeWord}`}
+						/>
+					</div>
 
-			<section aria-labelledby={`${id}-open`} className="flex flex-col gap-2">
-				<h3 id={`${id}-open`} className="font-medium text-base">
-					Open runs
-				</h3>
-				{open.length === 0 ? (
-					<DetailsEmpty>No run is at work, waiting or asleep.</DetailsEmpty>
-				) : (
-					<ItemGroup className="gap-1">
-						{open.map((run) => (
-							<Item
-								key={run.id}
-								size="xs"
-								render={
-									<Link
-										to="/runs/$runId"
-										params={{ runId: run.id }}
-										onClick={onNavigate}
-									/>
-								}
+					<ChartSection
+						title="At work"
+						hint="Runs at work in each hour, from start to end"
+					>
+						{peak === 0 ? (
+							<DetailsEmpty>Nothing ran in the last {rangeWord}.</DetailsEmpty>
+						) : (
+							<ChartContainer
+								config={CHART_CONFIG}
+								className="aspect-auto h-56 w-full"
 							>
-								<ItemContent className="min-w-0">
-									<ItemTitle className="w-full truncate">{run.title}</ItemTitle>
-									<ItemDescription>
-										{project ? null : `${groupOf(run)}, `}
-										started {formatRelative(run.createdAt, now)}
-										{run.wakeAt ? `, wakes at ${formatTime(run.wakeAt)}` : null}
-									</ItemDescription>
-								</ItemContent>
-								<ItemActions>
-									<RunStatusBadge status={run.status} />
-									<span className="w-20 text-right text-muted-foreground tabular-nums">
-										{formatDuration(Math.max(now - run.createdAt, 0))}
-									</span>
-								</ItemActions>
-							</Item>
-						))}
-					</ItemGroup>
-				)}
-			</section>
+								<BarChart data={rows} margin={{ left: 0, right: 0 }}>
+									<CartesianGrid vertical={false} />
+									<XAxis
+										dataKey="label"
+										tickLine={false}
+										axisLine={false}
+										tickMargin={8}
+										minTickGap={24}
+									/>
+									<YAxis
+										tickLine={false}
+										axisLine={false}
+										width={32}
+										allowDecimals={false}
+									/>
+									<ChartTooltip
+										cursor={false}
+										content={
+											<ChartTooltipContent
+												labelFormatter={(_, payload) =>
+													String(payload[0]?.payload?.title ?? "")
+												}
+												formatter={(value) => (
+													<div className="flex w-full items-center gap-2">
+														<Swatch color="var(--color-active)" />
+														<span className="text-muted-foreground">
+															Runs at work
+														</span>
+														<span className="ml-auto font-medium font-mono tabular-nums">
+															{Number(value)}
+														</span>
+													</div>
+												)}
+											/>
+										}
+									/>
+									<Bar
+										dataKey="active"
+										fill="var(--color-active)"
+										radius={[4, 4, 0, 0]}
+									/>
+								</BarChart>
+							</ChartContainer>
+						)}
+					</ChartSection>
+				</DetailsTabContent>
+
+				<DetailsTabContent value="open">
+					<ChartSection
+						title="Open runs"
+						hint={`The oldest ${Math.min(open.length, OVERVIEW_ROWS)}: at work, waiting for you or asleep`}
+					>
+						{open.length === 0 ? (
+							<DetailsEmpty>No run is at work, waiting or asleep.</DetailsEmpty>
+						) : (
+							<>
+								<ItemGroup className="gap-1">
+									{open.slice(0, OVERVIEW_ROWS).map((run) => (
+										<Item
+											key={run.id}
+											size="xs"
+											render={
+												<Link
+													to="/runs/$runId"
+													params={{ runId: run.id }}
+													onClick={onNavigate}
+												/>
+											}
+										>
+											<ItemContent className="min-w-0">
+												<ItemTitle className="w-full truncate">
+													{run.title}
+												</ItemTitle>
+												<ItemDescription>
+													{project ? null : `${groupOf(run)}, `}
+													started {formatRelative(run.createdAt, now)}
+													{run.wakeAt
+														? `, wakes at ${formatTime(run.wakeAt)}`
+														: null}
+												</ItemDescription>
+											</ItemContent>
+											<ItemActions>
+												<RunStatusBadge status={run.status} />
+												<span className="w-20 text-right text-muted-foreground tabular-nums">
+													{formatDuration(Math.max(now - run.createdAt, 0))}
+												</span>
+											</ItemActions>
+										</Item>
+									))}
+								</ItemGroup>
+								<MoreRows
+									hidden={open.length - OVERVIEW_ROWS}
+									where="open runs"
+								/>
+							</>
+						)}
+					</ChartSection>
+				</DetailsTabContent>
+
+				<DetailsTabContent value="groups">
+					<ChartSection
+						title={
+							project ? "Time at work per flow" : "Time at work per project"
+						}
+						hint={`The top ${Math.min(groups.length, OVERVIEW_ROWS)} of the last ${rangeWord}, the most time first`}
+					>
+						{groups.length === 0 ? (
+							<DetailsEmpty>Nothing ran in the last {rangeWord}.</DetailsEmpty>
+						) : (
+							<>
+								<DataTable
+									columns={groupColumns(project ? "Flow" : "Project")}
+									data={groups.slice(0, OVERVIEW_ROWS)}
+									getRowId={(group) => group.label}
+								/>
+								<MoreRows
+									hidden={groups.length - OVERVIEW_ROWS}
+									where={project ? "flows" : "projects"}
+								/>
+							</>
+						)}
+					</ChartSection>
+				</DetailsTabContent>
+			</DetailsTabs>
 
 			{project ? (
 				<DialogFooter>
@@ -289,4 +332,87 @@ function ActivityDetails({
 			) : null}
 		</>
 	);
+}
+
+type GroupRow = {
+	label: string;
+	/** Runs at work at some point since `since`. */
+	runs: number;
+	started: number;
+	/** The time its runs were at work since `since`, added up. */
+	atWork: number;
+	longest: number;
+};
+
+/**
+ * How long the runs of each flow or project were at work since `since`,
+ * the most first. Only the part since `since` counts. An open run works
+ * until now.
+ */
+function atWorkPerGroup(
+	runs: RunSummary[],
+	groupOf: (run: RunSummary) => string,
+	since: number,
+	now: number,
+): GroupRow[] {
+	const byLabel = new Map<string, GroupRow>();
+	for (const run of runs) {
+		const to = run.endedAt ?? (isOpen(run) ? now : run.createdAt);
+		if (to < since) continue;
+		const label = groupOf(run);
+		const group = byLabel.get(label) ?? {
+			label,
+			runs: 0,
+			started: 0,
+			atWork: 0,
+			longest: 0,
+		};
+		const atWork = Math.max(to - Math.max(run.createdAt, since), 0);
+		group.runs += 1;
+		if (run.createdAt >= since) group.started += 1;
+		group.atWork += atWork;
+		group.longest = Math.max(group.longest, atWork);
+		byLabel.set(label, group);
+	}
+	return [...byLabel.values()].sort((a, b) => b.atWork - a.atWork);
+}
+
+const groupColumn = dataTableColumns<GroupRow>();
+
+function groupColumns(groupLabel: string) {
+	const count = {
+		headClassName: "text-right",
+		cellClassName: "text-right tabular-nums",
+	};
+	return groupColumn.columns([
+		groupColumn.accessor("label", {
+			header: groupLabel,
+			meta: { cellClassName: "max-w-48 truncate font-mono text-xs" },
+		}),
+		groupColumn.accessor("runs", {
+			header: "Runs",
+			enableSorting: true,
+			meta: count,
+		}),
+		groupColumn.accessor("started", {
+			header: "Started",
+			enableSorting: true,
+			meta: count,
+		}),
+		groupColumn.accessor("longest", {
+			header: "Longest",
+			enableSorting: true,
+			cell: ({ getValue }) => formatDuration(getValue()),
+			meta: count,
+		}),
+		groupColumn.accessor("atWork", {
+			header: "At work",
+			enableSorting: true,
+			cell: ({ getValue }) => formatDuration(getValue()),
+			meta: {
+				headClassName: "text-right",
+				cellClassName: "text-right font-medium tabular-nums",
+			},
+		}),
+	]);
 }

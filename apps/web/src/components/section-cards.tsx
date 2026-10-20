@@ -261,7 +261,9 @@ export function SectionCards({
 			<GatesDialog
 				{...detailsProps("gates")}
 				gates={openGates}
+				runs={all}
 				project={project}
+				projects={projects}
 			/>
 			<SpendDialog
 				{...detailsProps("spend")}

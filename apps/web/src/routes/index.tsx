@@ -57,14 +57,13 @@ import { SectionCards } from "@/components/section-cards";
 import { SiteHeader } from "@/components/site-header";
 import type { Project, RunSummary } from "@/lib/api-types";
 import { formatDateTime, formatRelative } from "@/lib/format";
+import { OVERVIEW_ROWS } from "@/lib/overview";
 import { projectFolder } from "@/lib/projects";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/")({
 	component: HomeComponent,
 });
-
-const RECENT_RUNS = 20;
 
 function HomeComponent() {
 	const projects = useQuery(orpc.projects.list.queryOptions());
@@ -73,7 +72,7 @@ function HomeComponent() {
 	const recentRuns = runs.data
 		?.slice()
 		.sort((a, b) => b.createdAt - a.createdAt)
-		.slice(0, RECENT_RUNS);
+		.slice(0, OVERVIEW_ROWS);
 
 	return (
 		<>
@@ -92,7 +91,7 @@ function HomeComponent() {
 
 				<PageSection
 					title="Recent runs"
-					description={`The last ${RECENT_RUNS} runs over all projects, newest first.`}
+					description={`The last ${OVERVIEW_ROWS} runs over all projects, newest first.`}
 				>
 					<Card className="py-0">
 						<CardContent className="px-0">

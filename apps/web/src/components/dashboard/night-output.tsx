@@ -35,11 +35,10 @@ import {
 	sumKnownCost,
 } from "@/lib/format";
 import { formatNight, nightOf } from "@/lib/nights";
-
-const SHOWN = 4;
+import { OVERVIEW_ROWS } from "@/lib/overview";
 
 /**
- * The latest night with runs, newest first and at most {@link SHOWN}: each
+ * The latest night with runs, newest first and at most {@link OVERVIEW_ROWS}: each
  * run's branch, how it ended and what it cost. What there is to review in the
  * morning. The heading still counts the whole night.
  */
@@ -65,7 +64,7 @@ export function NightOutput({
 	const ofNight = (runs ?? [])
 		.filter((run) => night !== null && nightOf(run.createdAt) === night)
 		.sort((a, b) => b.createdAt - a.createdAt);
-	const shown = ofNight.slice(0, SHOWN);
+	const shown = ofNight.slice(0, OVERVIEW_ROWS);
 	const cost = sumKnownCost(ofNight);
 
 	return (

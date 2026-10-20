@@ -22,7 +22,12 @@ import {
 import { PageSection } from "@/components/page-heading";
 import { useNow } from "@/hooks/use-now";
 import type { RunSummary } from "@/lib/api-types";
-import { dayWord, formatDateTime, formatTime } from "@/lib/format";
+import {
+	dayWord,
+	formatDateTime,
+	formatTime,
+	formatWaited,
+} from "@/lib/format";
 import { orpc } from "@/utils/orpc";
 
 const MAX_ITEMS = 5;
@@ -150,9 +155,14 @@ export function UpNext({
 												title={formatDateTime(at)}
 												className="flex flex-col tabular-nums"
 											>
-												<span className="font-medium">{formatTime(at)}</span>
+												<span>
+													<span className="font-medium">{formatTime(at)}</span>{" "}
+													<span className="text-muted-foreground">
+														{dayWord(at, now)}
+													</span>
+												</span>
 												<span className="text-muted-foreground">
-													{dayWord(at, now)}
+													in {formatWaited(at - now)}
 												</span>
 											</time>
 										</ItemActions>

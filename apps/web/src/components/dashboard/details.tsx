@@ -1,3 +1,4 @@
+import { Badge } from "@nightshift/ui/components/badge";
 import {
 	Card,
 	CardDescription,
@@ -11,6 +12,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@nightshift/ui/components/dialog";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@nightshift/ui/components/tabs";
 import {
 	ToggleGroup,
 	ToggleGroupItem,
@@ -117,12 +124,105 @@ export function ChartSection({
 	);
 }
 
+/** Under an overview list cut at its top rows: how many it leaves out. */
+export function MoreRows({ hidden, where }: { hidden: number; where: string }) {
+	return hidden > 0 ? (
+		<p className="text-muted-foreground text-xs">
+			{hidden} more {where}.
+		</p>
+	) : null;
+}
+
 /** Where a chart or a list would be, when it has nothing to show. */
 export function DetailsEmpty({ children }: { children: ReactNode }) {
 	return (
 		<p className="rounded-md border border-dashed px-4 py-10 text-center text-muted-foreground text-sm">
 			{children}
 		</p>
+	);
+}
+
+export type DetailsTab<Tab extends string> = {
+	value: Tab;
+	label: string;
+	/** A count on the tab, shown when above 0: problems, open runs. */
+	count?: number;
+};
+
+/**
+ * The views of a details dialog as tabs, with the range toggle on the right
+ * of the tab list. One range drives every tab. The children are its
+ * `DetailsTabContent`s.
+ */
+export function DetailsTabs<Tab extends string>({
+	tabs,
+	value,
+	onValueChange,
+	toggle,
+	children,
+}: {
+	tabs: DetailsTab<Tab>[];
+	value: Tab;
+	onValueChange: (tab: Tab) => void;
+	toggle?: ReactNode;
+	children: ReactNode;
+}) {
+	return (
+		<Tabs value={value} onValueChange={(next) => onValueChange(next as Tab)}>
+			<div className="flex flex-wrap items-center justify-between gap-2">
+				<TabsList>
+					{tabs.map((tab) => (
+						<TabsTrigger key={tab.value} value={tab.value}>
+							{tab.label}
+							{tab.count ? (
+								<Badge variant="secondary" className="tabular-nums">
+									{tab.count}
+								</Badge>
+							) : null}
+						</TabsTrigger>
+					))}
+				</TabsList>
+				{toggle}
+			</div>
+			{children}
+		</Tabs>
+	);
+}
+
+export function DetailsTabContent({
+	value,
+	children,
+}: {
+	value: string;
+	children: ReactNode;
+}) {
+	return (
+		<TabsContent value={value} className="flex flex-col gap-6 pt-2">
+			{children}
+		</TabsContent>
+	);
+}
+
+/** The ranges of a dialog over nights. */
+export const NIGHT_RANGES = [7, 30, 90] as const;
+export type NightRange = (typeof NIGHT_RANGES)[number];
+
+/** "7n 30n 90n". */
+export function NightRangeToggle({
+	value,
+	onValueChange,
+}: {
+	value: NightRange;
+	onValueChange: (range: NightRange) => void;
+}) {
+	return (
+		<RangeToggle
+			ranges={NIGHT_RANGES}
+			value={value}
+			onValueChange={onValueChange}
+			short={(nights) => `${nights}n`}
+			long={(nights) => `Last ${nights} nights`}
+		/>
 	);
 }
 

@@ -18,6 +18,7 @@ import { useNow } from "@/hooks/use-now";
 import type { Project, RunSummary } from "@/lib/api-types";
 import { formatCost, formatDateTime, formatRelative } from "@/lib/format";
 import { inLastNights } from "@/lib/nights";
+import { OVERVIEW_ROWS } from "@/lib/overview";
 import { orpc } from "@/utils/orpc";
 
 import { FlowHealthDialog } from "./flow-health-dialog";
@@ -56,7 +57,7 @@ export function FlowHealth({
 	return (
 		<PageSection
 			title="Flow health"
-			description={`Each flow over the last ${NIGHTS} nights, on its own or as a subflow.`}
+			description={`The ${OVERVIEW_ROWS} busiest flows over the last ${NIGHTS} nights, on their own or as a subflow.`}
 			actions={
 				<Button
 					variant="outline"
@@ -83,9 +84,15 @@ export function FlowHealth({
 						</div>
 					) : (
 						<FlowHealthTable
-							rows={(flows.data ?? []).map((flow) =>
-								flowHealthOf(flow.name, runs, now),
-							)}
+							rows={(flows.data ?? [])
+								.map((flow) => flowHealthOf(flow.name, runs, now))
+								// The busiest flows, then the one that ran last.
+								.sort(
+									(a, b) =>
+										b.runs - a.runs ||
+										(b.last?.startedAt ?? 0) - (a.last?.startedAt ?? 0),
+								)
+								.slice(0, OVERVIEW_ROWS)}
 							now={now}
 							onOpen={(name) => setDetails({ name, open: true })}
 						/>

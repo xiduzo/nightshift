@@ -1,4 +1,3 @@
-import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	ChartContainer,
@@ -6,12 +5,6 @@ import {
 	ChartTooltipContent,
 } from "@nightshift/ui/components/chart";
 import { DialogFooter } from "@nightshift/ui/components/dialog";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@nightshift/ui/components/tabs";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRightIcon, TriangleAlertIcon } from "lucide-react";
 import { useState } from "react";
@@ -45,13 +38,18 @@ import {
 	lastNights,
 	nightOf,
 } from "@/lib/nights";
+import { OVERVIEW_ROWS } from "@/lib/overview";
 
 import {
 	ChartSection,
 	DetailsDialog,
 	DetailsEmpty,
 	DetailsHeader,
-	RangeToggle,
+	DetailsTabContent,
+	DetailsTabs,
+	MoreRows,
+	type NightRange,
+	NightRangeToggle,
 	Stat,
 	Swatch,
 } from "./details";
@@ -63,10 +61,6 @@ import {
 	spreadOf,
 } from "./flow-runs";
 
-const RANGES = [7, 30, 90] as const;
-type Range = (typeof RANGES)[number];
-/** Runs listed on the Runs tab. */
-const RUNS_MAX = 10;
 type Tab = "overview" | "cost" | "problems" | "runs";
 
 /**
@@ -112,7 +106,7 @@ function FlowHealthDetails({
 	onNavigate: () => void;
 }) {
 	const now = useNow(60_000);
-	const [range, setRange] = useState<Range>(30);
+	const [range, setRange] = useState<NightRange>(30);
 	const [tab, setTab] = useState<Tab>("overview");
 	const inRange = runsOf(flowName, runs)
 		.filter((run) => inLastNights(run.startedAt, range, now))
@@ -143,37 +137,28 @@ function FlowHealthDetails({
 		<>
 			<DetailsHeader project={project} trail="Flow health" title={flowName} />
 
-			<Tabs value={tab} onValueChange={(next) => setTab(next as Tab)}>
-				<div className="flex flex-wrap items-center justify-between gap-2">
-					<TabsList>
-						<TabsTrigger value="overview">Overview</TabsTrigger>
-						<TabsTrigger value="cost">Cost</TabsTrigger>
-						<TabsTrigger value="problems">
-							Problems
-							{unfinished.length + warnings > 0 ? (
-								<Badge variant="secondary" className="tabular-nums">
-									{unfinished.length + warnings}
-								</Badge>
-							) : null}
-						</TabsTrigger>
-						<TabsTrigger value="runs">Runs</TabsTrigger>
-					</TabsList>
-					<RangeToggle
-						ranges={RANGES}
-						value={range}
-						onValueChange={setRange}
-						short={(nights) => `${nights}n`}
-						long={(nights) => `Last ${nights} nights`}
-					/>
-				</div>
-
+			<DetailsTabs
+				tabs={[
+					{ value: "overview", label: "Overview" },
+					{ value: "cost", label: "Cost" },
+					{
+						value: "problems",
+						label: "Problems",
+						count: unfinished.length + warnings,
+					},
+					{ value: "runs", label: "Runs" },
+				]}
+				value={tab}
+				onValueChange={setTab}
+				toggle={<NightRangeToggle value={range} onValueChange={setRange} />}
+			>
 				{inRange.length === 0 ? (
 					<DetailsEmpty>
 						This flow did not run in the last {range} nights.
 					</DetailsEmpty>
 				) : (
 					<>
-						<TabsContent value="overview" className="flex flex-col gap-6 pt-2">
+						<DetailsTabContent value="overview">
 							<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 								<Stat
 									label="Runs"
@@ -213,9 +198,9 @@ function FlowHealthDetails({
 								/>
 							</div>
 							<RunsPerNight runs={inRange} range={range} now={now} />
-						</TabsContent>
+						</DetailsTabContent>
 
-						<TabsContent value="cost" className="flex flex-col gap-6 pt-2">
+						<DetailsTabContent value="cost">
 							<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
 								<Stat label="Spent in all" value={formatKnownCost(spent)} />
 								<Stat
@@ -234,9 +219,9 @@ function FlowHealthDetails({
 								/>
 							</div>
 							<CostPerRun runs={ended} median={cost?.median} />
-						</TabsContent>
+						</DetailsTabContent>
 
-						<TabsContent value="problems" className="flex flex-col gap-6 pt-2">
+						<DetailsTabContent value="problems">
 							{unfinished.length + warnings === 0 ? (
 								<DetailsEmpty>
 									Every run in the last {range} nights finished, without
@@ -249,18 +234,18 @@ function FlowHealthDetails({
 							{warnings > 0 ? (
 								<Warnings runs={inRange} now={now} onNavigate={onNavigate} />
 							) : null}
-						</TabsContent>
+						</DetailsTabContent>
 
-						<TabsContent value="runs" className="pt-2">
+						<DetailsTabContent value="runs">
 							<LatestRuns
-								runs={inRange.slice(-RUNS_MAX).reverse()}
+								runs={inRange.slice(-OVERVIEW_ROWS).reverse()}
 								now={now}
 								onNavigate={onNavigate}
 							/>
-						</TabsContent>
+						</DetailsTabContent>
 					</>
 				)}
-			</Tabs>
+			</DetailsTabs>
 
 			<DialogFooter>
 				<Button
@@ -302,7 +287,7 @@ function RunsPerNight({
 	now,
 }: {
 	runs: FlowRun[];
-	range: Range;
+	range: NightRange;
 	now: number;
 }) {
 	const statuses = (Object.keys(RUN_STATUS_CHART) as RunStatus[]).filter(
@@ -522,12 +507,16 @@ function Warnings({
 	}
 	const rows = [...byKey.values()].sort((a, b) => b.runs - a.runs);
 	return (
-		<ChartSection title="Warnings" hint="The most common warning first">
+		<ChartSection
+			title="Warnings"
+			hint={`The top ${Math.min(rows.length, OVERVIEW_ROWS)}, the most common first`}
+		>
 			<DataTable
 				columns={warningColumns(now, onNavigate)}
-				data={rows}
+				data={rows.slice(0, OVERVIEW_ROWS)}
 				getRowId={(row) => row.key}
 			/>
+			<MoreRows hidden={rows.length - OVERVIEW_ROWS} where="warnings" />
 		</ChartSection>
 	);
 }
@@ -626,13 +615,14 @@ function WhyUnfinished({ runs, now }: { runs: FlowRun[]; now: number }) {
 	return (
 		<ChartSection
 			title="Why runs did not finish"
-			hint="The most common reason first"
+			hint={`The top ${Math.min(rows.length, OVERVIEW_ROWS)}, the most common first`}
 		>
 			<DataTable
 				columns={reasonColumns(now)}
-				data={rows}
+				data={rows.slice(0, OVERVIEW_ROWS)}
 				getRowId={(row) => row.reason}
 			/>
+			<MoreRows hidden={rows.length - OVERVIEW_ROWS} where="reasons" />
 		</ChartSection>
 	);
 }
@@ -692,7 +682,7 @@ function LatestRuns({
 	return (
 		<ChartSection
 			title="Latest runs"
-			hint={`The last ${Math.min(runs.length, RUNS_MAX)}, newest first`}
+			hint={`The last ${Math.min(runs.length, OVERVIEW_ROWS)}, newest first`}
 		>
 			<DataTable
 				columns={latestColumns(now, onNavigate)}
