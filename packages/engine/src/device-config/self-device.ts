@@ -25,6 +25,15 @@ const thisHost = (): SelfDeviceHost => ({
 	platform: process.platform,
 });
 
+/** The Person who owns this computer's Device, or null before one does. */
+export async function selfOwnerId(db: Database): Promise<string | null> {
+	const [row] = await db
+		.select({ ownerId: device.ownerId })
+		.from(device)
+		.where(eq(device.self, true));
+	return row?.ownerId ?? null;
+}
+
 /**
  * This computer's Device, made when there is none. A name or platform the
  * migration left blank is filled in from `host`.

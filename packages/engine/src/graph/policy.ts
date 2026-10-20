@@ -1,6 +1,22 @@
-import type { ResolvedPolicy } from "@nightshift/flows";
-
+import type { Policy, ResolvedPolicy } from "@nightshift/flows";
+import type { RunSettings } from "../device-config";
 import type { PolicyWaitReason } from "../log";
+
+/** The flow's own policy numbers, else the daemon's settings. */
+export function resolvePolicy(
+	own: Policy | undefined,
+	defaults: RunSettings["policy"],
+): ResolvedPolicy {
+	return {
+		usageLimitFirstWaitMinutes:
+			own?.usageLimitFirstWaitMinutes ?? defaults.usageLimitFirstWaitMinutes,
+		usageLimitMaxWaitMinutes:
+			own?.usageLimitMaxWaitMinutes ?? defaults.usageLimitMaxWaitMinutes,
+		networkGraceMinutes:
+			own?.networkGraceMinutes ?? defaults.networkGraceMinutes,
+		...(own?.maxSteps !== undefined ? { maxSteps: own.maxSteps } : {}),
+	};
+}
 
 /**
  * The run policy's waits, ported from night-shift.py. A usage limit waits

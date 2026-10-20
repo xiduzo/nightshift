@@ -66,6 +66,19 @@ export type DeviceRegistry = {
 	keptDocumentOwner(documentName: string): Promise<string | null>;
 };
 
+/** The names of these Devices (this computer's own too), by id. A Device this Replica has no row of is missing. */
+export async function deviceNamesOf(
+	db: Database,
+	ids: readonly string[],
+): Promise<Map<string, string>> {
+	if (ids.length === 0) return new Map();
+	const rows = await db
+		.select({ id: device.id, name: device.name })
+		.from(device)
+		.where(inArray(device.id, [...ids]));
+	return new Map(rows.map((d) => [d.id, d.name]));
+}
+
 export function createDeviceRegistry(deps: {
 	db: Database;
 	log: RunLog;

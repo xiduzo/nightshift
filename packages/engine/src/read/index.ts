@@ -26,6 +26,7 @@ export {
 	withEnclosing,
 } from "./derive-steps";
 export { gitAuthorOf, namesOf } from "./people";
+export type { ReadModel } from "./read-model";
 export {
 	createReadModel,
 	parseCalledFlows,

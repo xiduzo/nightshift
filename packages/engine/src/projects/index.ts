@@ -4,7 +4,7 @@ export type { Git, GitInstall } from "./git";
 export { systemGit, systemGitInstaller } from "./git";
 export type { ProjectReadiness } from "./project-setup";
 export { checkProjectFolder, setUpGit } from "./project-setup";
-export type { ListedProject, Project } from "./projects";
+export type { ListedProject, Project, Projects } from "./projects";
 export {
 	clonePathOf,
 	createProjects,

@@ -1,14 +1,11 @@
 /** Other Devices and Hosts: the device registry, host links, placement, Offers and the exchange of run history. */
 
-export type { ArchiveRef } from "./exchange/archive";
 export {
-	archiveRefSchema,
-	checkpointSnapshot,
-	ownStepFiles,
-	readArchive,
-	restoreCheckpoint,
-	writeArchive,
-} from "./exchange/archive";
+	createEngineOffers,
+	createOfferedSessions,
+} from "./engine-offers";
+export type { ArchiveRef } from "./exchange/archive";
+export { archiveRefSchema } from "./exchange/archive";
 export type {
 	RunCommand,
 	RunCommandInput,
@@ -32,6 +29,8 @@ export {
 	syncCursorsSchema,
 	withoutPrivatePaths,
 } from "./exchange/rows";
+export type { RunArchive } from "./exchange/run-archive";
+export { createRunArchive, runsMovedHere } from "./exchange/run-archive";
 export type {
 	DeviceKeyStore,
 	HostLink,
@@ -56,14 +55,14 @@ export {
 	offeredDevice,
 	offeredSession,
 	offerRefusal,
-	publishOffer,
 	removeDeviceOffer,
 	setDeviceOffer,
 	slotKey,
 	spaceOffers,
-	unpublishOffer,
 } from "./offers";
-export type { OwnDevice, Placement } from "./placement";
+export type { OwnDevice, Placement, PlacementModule } from "./placement";
 export { createPlacement } from "./placement";
+export { createPrivatePaths } from "./private-paths";
 export type { DeviceRegistry, PairedDevice } from "./registry";
 export { createDeviceRegistry } from "./registry";
+export { createWalkers } from "./walkers";

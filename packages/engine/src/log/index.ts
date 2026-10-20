@@ -24,10 +24,17 @@ export type {
 	WaitReason,
 } from "./events";
 export { groupByRun, parseEventRow, scopeKey } from "./events";
+export { logMemberChange } from "./member-events";
 export type { RunLog } from "./run-log";
 export { createRunLog } from "./run-log";
 export type { RunRow } from "./run-row";
-export { getRunRow } from "./run-row";
+export {
+	getRunRow,
+	hasRunRow,
+	runIdsOfProject,
+	runIdsWalkedBy,
+	stepIdsOfRun,
+} from "./run-row";
 export type { StepEvent, TranscriptEntry } from "./step-events";
 export {
 	commandLogPath,
