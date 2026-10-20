@@ -6,10 +6,11 @@ Two workflows publish there:
 | Workflow | Publishes | Feed |
 | --- | --- | --- |
 | [Release](../.github/workflows/release.yml) | One version, such as `v0.2.0`, as a full release | Stable: the latest full release |
-| [Nightly](../.github/workflows/nightly.yml) | `main` every night at 03:00 UTC, as the rolling `nightly` prerelease | Nightly |
+| [Nightly](../.github/workflows/nightly.yml) | `main` every night at 03:17 UTC, as the rolling `nightly` prerelease | Nightly |
 
 Both call [Desktop build](../.github/workflows/desktop-build.yml), which
-builds macOS (arm64, x64) and Linux (x64). A pull request that changes
+builds macOS (arm64) and Linux (x64). Electrobun cannot build on
+Intel Macs, so there is no Intel Mac build. A pull request that changes
 `apps/desktop` runs the same build as a check, without a release.
 
 ## Release a version
