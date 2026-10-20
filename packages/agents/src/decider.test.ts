@@ -1,7 +1,15 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import {
 	cannotMakeValueMessage,
 	DECIDER_ADAPTERS,
+	deciderModels,
 	tanstackDecider,
 } from "./decider";
 import type { DecisionInput, ValueInput } from "./types";
@@ -134,6 +142,7 @@ describe("tanstackDecider", () => {
 			expect(spec.models).toContain(spec.defaultModel);
 		}
 		expect(DECIDER_ADAPTERS.ollaya.apiKey).toBeNull();
+		expect(DECIDER_ADAPTERS.ollama.apiKey).toBeNull();
 	});
 });
 
@@ -175,8 +184,9 @@ describe("tanstackDecider: values", () => {
 		expect(DECIDER_ADAPTERS.openai.value).toBeDefined();
 		expect(DECIDER_ADAPTERS.typesafe.value).toBeUndefined();
 		expect(DECIDER_ADAPTERS.ollaya.value).toBeUndefined();
+		expect(DECIDER_ADAPTERS.ollama.value).toBeDefined();
 		expect(cannotMakeValueMessage("typesafe")).toBe(
-			"TypeSafe Jev cannot make a value. Choose Jev on OpenRouter or OpenAI Decisions.",
+			"TypeSafe Jev cannot make a value. Choose Jev on OpenRouter, OpenAI Decisions or Ollama on this computer.",
 		);
 	});
 
@@ -261,6 +271,185 @@ describe("tanstackDecider: values", () => {
 		expect(
 			await withKey.value?.(valueInput({ signal: controller.signal })),
 		).toMatchObject({ kind: "error", errorKind: "aborted" });
+		expect(sent).toHaveLength(0);
+	});
+});
+
+type OllamaSent = { url: string; body: Record<string, unknown> | null };
+
+/** Answers Ollama's HTTP API with `respond`, and records each request. */
+function stubOllama(respond: (url: string) => Response): OllamaSent[] {
+	const sent: OllamaSent[] = [];
+	globalThis.fetch = (async (
+		url: string | URL | Request,
+		init?: RequestInit,
+	) => {
+		const href = url instanceof Request ? url.url : String(url);
+		sent.push({
+			url: href,
+			body: init?.body ? JSON.parse(String(init.body)) : null,
+		});
+		return respond(href);
+	}) as typeof fetch;
+	return sent;
+}
+
+/** One non-streamed `/api/chat` answer whose message is `content`. */
+const ollamaChat = (content: string) =>
+	Response.json({
+		model: "llama3.2:latest",
+		created_at: "2026-10-20T00:00:00Z",
+		message: { role: "assistant", content },
+		done: true,
+		done_reason: "stop",
+		prompt_eval_count: 30,
+		eval_count: 5,
+	});
+
+const free = tanstackDecider({ secret: async () => undefined });
+
+describe("tanstackDecider: Ollama", () => {
+	const host = process.env.OLLAMA_HOST;
+	beforeEach(() => {
+		delete process.env.OLLAMA_HOST;
+	});
+	afterAll(() => {
+		if (host !== undefined) process.env.OLLAMA_HOST = host;
+	});
+
+	test("asks a chat model held to the option keys, and reports no made-up probability", async () => {
+		const sent = stubOllama(() => ollamaChat('{"choice":"hold"}'));
+		const result = await free.decide(input({ decider: "ollama" }));
+		expect(result).toEqual({
+			kind: "decided",
+			label: "hold",
+			notes: "Ollama on this computer picked it.",
+			costUsd: 0,
+			costSource: "estimated",
+		});
+		expect(sent).toHaveLength(1);
+		// Ollama's own default host.
+		expect(sent[0]?.url).toBe("http://localhost:11434/api/chat");
+		expect(sent[0]?.body).toMatchObject({
+			model: "llama3.2:latest",
+			stream: false,
+			format: {
+				type: "object",
+				properties: { choice: { type: "string", enum: ["ship", "hold"] } },
+				required: ["choice"],
+			},
+		});
+		const messages = sent[0]?.body?.messages as { content: string }[];
+		expect(messages.at(-1)?.content).toContain("ship: Everything is green");
+	});
+
+	test("honors OLLAMA_HOST", async () => {
+		process.env.OLLAMA_HOST = "http://studio.local:11500";
+		const sent = stubOllama(() => ollamaChat('{"choice":"ship"}'));
+		await free.decide(input({ decider: "ollama" }));
+		expect(sent[0]?.url).toBe("http://studio.local:11500/api/chat");
+	});
+
+	test("an answer outside the options fails the decision", async () => {
+		stubOllama(() => ollamaChat('{"choice":"maybe"}'));
+		const result = await free.decide(input({ decider: "ollama" }));
+		expect(result).toMatchObject({ kind: "error", errorKind: "harness" });
+		expect(result.kind === "error" && result.message).toContain(
+			"not one of the options",
+		);
+	});
+
+	test("a model that is not pulled says how to get it", async () => {
+		stubOllama(() =>
+			Response.json({ error: "model 'qwen3:8b' not found" }, { status: 404 }),
+		);
+		const result = await free.decide(
+			input({ decider: "ollama", model: "qwen3:8b" }),
+		);
+		expect(result).toEqual({
+			kind: "error",
+			errorKind: "harness",
+			message:
+				"The model qwen3:8b is not on this computer. Run ollama pull qwen3:8b in a terminal, then run the step again.",
+			costUsd: null,
+		});
+	});
+
+	test("Ollama not running fails the step with how to fix it, not a network wait", async () => {
+		stubOllama(() => {
+			throw new Error(
+				"Unable to connect. Is the computer able to access the url?",
+			);
+		});
+		const message =
+			"Ollama is not running on this computer. Start Ollama and run the step again.";
+		expect(await free.decide(input({ decider: "ollama" }))).toMatchObject({
+			errorKind: "harness",
+			message,
+		});
+		expect(await free.value?.(valueInput({ decider: "ollama" }))).toMatchObject(
+			{ errorKind: "harness", message },
+		);
+	});
+
+	test("makes a value on its chat model, free", async () => {
+		const sent = stubOllama(() =>
+			ollamaChat('{"tests":["a.test.ts","b.test.ts"]}'),
+		);
+		const result = await free.value?.(
+			valueInput({ decider: "ollama", model: "qwen2.5:3b" }),
+		);
+		expect(result).toEqual({
+			kind: "made",
+			data: { tests: ["a.test.ts", "b.test.ts"] },
+			costUsd: 0,
+			costSource: "estimated",
+		});
+		expect(sent[0]?.body).toMatchObject({
+			model: "qwen2.5:3b",
+			format: expect.objectContaining({ type: "object" }),
+		});
+	});
+
+	test("lists the pulled models first, then the adapter's", async () => {
+		stubOllama(() =>
+			Response.json({
+				models: [{ name: "qwen2.5:3b" }, { name: "my-own:latest" }],
+			}),
+		);
+		const offered = await deciderModels("ollama");
+		expect(offered.listed).toBe(2);
+		expect(offered.problem).toBeNull();
+		expect(offered.models.slice(0, 2)).toEqual(["qwen2.5:3b", "my-own:latest"]);
+		expect(offered.models.filter((m) => m === "qwen2.5:3b")).toHaveLength(1);
+		expect(offered.models).toContain(DECIDER_ADAPTERS.ollama.defaultModel);
+		expect(offered.valueModels.slice(0, 2)).toEqual([
+			"qwen2.5:3b",
+			"my-own:latest",
+		]);
+	});
+
+	test("a listing Ollama does not answer leaves the adapter's models, and says why", async () => {
+		stubOllama(() => {
+			throw new Error("Unable to connect.");
+		});
+		const offered = await deciderModels("ollama");
+		expect(offered.listed).toBe(0);
+		expect(offered.models).toEqual([...DECIDER_ADAPTERS.ollama.models]);
+		expect(offered.problem).toBe(
+			"Ollama is not running on this computer. Start Ollama to see the models you pulled.",
+		);
+	});
+
+	test("a decider without a listing offers the adapter's models only", async () => {
+		const sent = stubOllama(() => Response.json({}));
+		const offered = await deciderModels("typesafe");
+		expect(offered).toEqual({
+			models: [...DECIDER_ADAPTERS.typesafe.models],
+			valueModels: [],
+			listed: 0,
+			problem: null,
+		});
 		expect(sent).toHaveLength(0);
 	});
 });

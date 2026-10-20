@@ -1524,7 +1524,7 @@ function DecisionFields({
 						id={`${id}-model`}
 						label="Model"
 						optional
-						hint="Leave it empty to use the decider's default model."
+						hint={deciderModelHint(decider)}
 					>
 						<Input
 							id={`${id}-model`}
@@ -1554,6 +1554,21 @@ function DecisionFields({
 			) : null}
 		</>
 	);
+}
+
+/**
+ * The hint under a decider's model field. A decider that lists the models
+ * on this computer (Ollama) says how many lead the list, or why it could not.
+ */
+function deciderModelHint(
+	decider: { listed: number; listProblem: string | null } | undefined,
+): string {
+	const base = "Leave it empty to use the decider's default model.";
+	if (decider?.listProblem) return `${base} ${decider.listProblem}`;
+	if (decider && decider.listed > 0) {
+		return `${base} The first ${decider.listed} in the list are on this computer.`;
+	}
+	return base;
 }
 
 const VALUE_BY: { by: ValueNode["by"]; label: string }[] = [
@@ -1736,10 +1751,11 @@ function ValueFields({
 						id={`${id}-model`}
 						label="Model"
 						optional
-						hint="Leave it empty to use the decider's default model."
+						hint={deciderModelHint(decider)}
 					>
 						<Input
 							id={`${id}-model`}
+							list={`${id}-models`}
 							value={node.model ?? ""}
 							placeholder={decider?.value?.defaultModel}
 							className="font-mono"
@@ -1755,6 +1771,11 @@ function ValueFields({
 								);
 							}}
 						/>
+						<datalist id={`${id}-models`}>
+							{(decider?.value?.models ?? []).map((value) => (
+								<option key={value} value={value} />
+							))}
+						</datalist>
 					</Field>
 				</InspectorSection>
 			) : null}

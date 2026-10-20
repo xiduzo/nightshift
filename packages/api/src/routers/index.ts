@@ -1,4 +1,8 @@
-import { DECIDER_ADAPTERS, HARNESS_ADAPTERS } from "@nightshift/agents";
+import {
+	DECIDER_ADAPTERS,
+	deciderModels,
+	HARNESS_ADAPTERS,
+} from "@nightshift/agents";
 import { roleAllows } from "@nightshift/auth/access";
 import { hasLogin } from "@nightshift/auth/login";
 import { invitationView, membersOf } from "@nightshift/auth/members";
@@ -854,27 +858,36 @@ const cliTools = {
 /**
  * The decision models Decision nodes pick from, and whether each has its API
  * key. `value` says whether the decider can also make a value (a Value node
- * made by a model), and which chat model it starts on.
+ * made by a model), and which chat model it starts on. A decider that lists
+ * its models (Ollama: the models pulled on this computer) puts those first.
  */
 const deciders = {
 	list: ownerProcedure.handler(({ context }) =>
-		deciderNameSchema.options.map((name) => {
-			const adapter = DECIDER_ADAPTERS[name];
-			return {
-				name,
-				label: adapter.label,
-				pkg: adapter.pkg,
-				models: [...adapter.models],
-				defaultModel: adapter.defaultModel,
-				apiKey: adapter.apiKey,
-				apiKeySource: adapter.apiKey
-					? context.connections.secretSource(adapter.apiKey)
-					: null,
-				value: adapter.value
-					? { defaultModel: adapter.value.defaultModel }
-					: null,
-			};
-		}),
+		Promise.all(
+			deciderNameSchema.options.map(async (name) => {
+				const adapter = DECIDER_ADAPTERS[name];
+				const offered = await deciderModels(name);
+				return {
+					name,
+					label: adapter.label,
+					pkg: adapter.pkg,
+					models: offered.models,
+					listed: offered.listed,
+					listProblem: offered.problem,
+					defaultModel: adapter.defaultModel,
+					apiKey: adapter.apiKey,
+					apiKeySource: adapter.apiKey
+						? context.connections.secretSource(adapter.apiKey)
+						: null,
+					value: adapter.value
+						? {
+								defaultModel: adapter.value.defaultModel,
+								models: offered.valueModels,
+							}
+						: null,
+				};
+			}),
+		),
 	),
 };
 

@@ -19,6 +19,7 @@
 		"@tanstack/ai-claude-code": "0.9.0",
 		"@tanstack/ai-codex": "0.6.0",
 		"@tanstack/ai-grok-build": "0.5.20",
+		"@tanstack/ai-ollama": "0.12.0",
 		"@tanstack/ai-ollaya": "0.2.5",
 		"@tanstack/ai-openai": "0.30.0",
 		"@tanstack/ai-opencode": "0.5.0",
@@ -26,6 +27,7 @@
 		"@tanstack/ai-sandbox": "0.5.23",
 		"@tanstack/ai-sandbox-local-process": "0.2.6",
 		"@tanstack/ai-typesafe": "0.1.12",
+		"ollama": "0.6.4",
 		"zod": "catalog:"
 	},
 	"devDependencies": {

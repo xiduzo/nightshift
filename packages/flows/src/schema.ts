@@ -86,23 +86,30 @@ export type HarnessName = z.infer<typeof harnessNameSchema>;
 /**
  * Who decides a Decision node: a TanStack AI decision model, through
  * `decide()`. TypeSafe and OpenRouter serve Jev, OpenAI its Decisions API,
- * Ollaya a `laya` model on this computer.
+ * Ollaya a `laya` model on this computer, Ollama any chat model pulled on
+ * this computer.
  */
 export const deciderNameSchema = z.enum([
 	"typesafe",
 	"openrouter",
 	"openai",
 	"ollaya",
+	"ollama",
 ]);
 export type DeciderName = z.infer<typeof deciderNameSchema>;
 
 /**
  * The deciders that can also make a value (a Value node made by a model):
  * those with a TanStack AI text adapter, so `chat()` can hold their answer
- * to a JSON Schema. TypeSafe and Ollaya are decision models only: they
- * answer choice, score and yes/no questions, never with data.
+ * to a JSON Schema: OpenRouter, OpenAI and Ollama. TypeSafe and Ollaya are
+ * decision models only: they answer choice, score and yes/no questions,
+ * never with data. The first is the default for a new Value node.
  */
-export const valueDeciderNameSchema = z.enum(["openrouter", "openai"]);
+export const valueDeciderNameSchema = z.enum([
+	"openrouter",
+	"openai",
+	"ollama",
+]);
 export type ValueDeciderName = z.infer<typeof valueDeciderNameSchema>;
 
 /** Whether the decider can make a value. */

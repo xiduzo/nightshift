@@ -23,6 +23,8 @@ export {
 	cannotMakeValueMessage,
 	DECIDER_ADAPTERS,
 	type DeciderAdapter,
+	type DeciderModels,
+	deciderModels,
 	defaultDeciderModel,
 	type TanstackDeciderOptions,
 	tanstackDecider,

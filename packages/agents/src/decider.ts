@@ -2,7 +2,8 @@
  * Decision nodes on TanStack AI's `decide()`: one `choice` question whose
  * options are the node's labels, answered by a decision model. Value nodes
  * made by a model on `chat()` with an output schema, on the same decider's
- * text adapter. The deciders are TanStack's own adapters; this module only
+ * text adapter. The deciders are TanStack's own adapters, and Ollama's text
+ * adapter behind a small evaluate adapter (`./ollama`); this module only
  * picks one and fills in its API key.
  */
 
@@ -15,6 +16,7 @@ import {
 	decide,
 	type TokenUsage,
 } from "@tanstack/ai";
+import { ollamaText } from "@tanstack/ai-ollama";
 import { OLLAYA_EVALUATE_MODELS, ollayaDecider } from "@tanstack/ai-ollaya";
 import {
 	createOpenaiChat,
@@ -30,6 +32,13 @@ import {
 	createTypesafeDecider,
 	TYPESAFE_EVALUATE_MODELS,
 } from "@tanstack/ai-typesafe";
+import {
+	OLLAMA_DEFAULT_MODEL,
+	OLLAMA_MODELS,
+	ollamaDecider,
+	ollamaModels,
+	ollamaProblem,
+} from "./ollama";
 import { type SettledCost, settleCost } from "./pricing";
 import { failureKind } from "./translate";
 import type {
@@ -46,10 +55,12 @@ import type {
  * How a decider makes a value: its TanStack AI text adapter and the chat
  * model it starts on. Only deciders in `valueDeciderNameSchema` have one.
  * TypeSafe and Ollaya ship an evaluate adapter only (choice, score, yes/no
- * questions): they cannot answer with data.
+ * questions): they cannot answer with data. Ollama's chat model can.
  */
 export type ValueAdapter = {
 	defaultModel: string;
+	/** The chat models the adapter knows, when it lists them. Any other id works too. */
+	models?: readonly string[];
 	create: (model: string, apiKey: string | undefined) => AnyTextAdapter;
 };
 
@@ -70,6 +81,21 @@ export type DeciderAdapter = {
 	 * a model on this computer. Absent: the price list guesses from the model.
 	 */
 	pricing?: { providerId: string } | "free";
+	/**
+	 * False when the adapter reports a pick without a measured probability
+	 * (a chat model): the decision notes then leave the percentage out.
+	 */
+	probability?: false;
+	/**
+	 * The models the provider has on hand right now (Ollama: the models
+	 * pulled on this computer). Throws when the provider does not answer.
+	 */
+	listModels?: () => Promise<string[]>;
+	/**
+	 * What a failure means for the person, and how to fix it. Undefined:
+	 * the failure keeps its own message.
+	 */
+	explain?: (message: string, model: string) => string | undefined;
 };
 
 /** Every TanStack AI decider adapter (the `evaluate` activity). */
@@ -125,6 +151,23 @@ export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 		create: (model) => ollayaDecider(model),
 		pricing: "free",
 	},
+	ollama: {
+		label: "Ollama on this computer",
+		pkg: "@tanstack/ai-ollama",
+		models: OLLAMA_MODELS,
+		defaultModel: OLLAMA_DEFAULT_MODEL,
+		apiKey: null,
+		create: (model) => ollamaDecider(model),
+		pricing: "free",
+		probability: false,
+		listModels: ollamaModels,
+		explain: ollamaProblem,
+		value: {
+			defaultModel: OLLAMA_DEFAULT_MODEL,
+			models: OLLAMA_MODELS,
+			create: (model) => ollamaText(model),
+		},
+	},
 };
 
 /** The flows package and this table must agree on who can make a value. */
@@ -138,9 +181,13 @@ for (const name of valueDeciderNameSchema.options) {
 
 /** What a decider without a text adapter answers a Value node. */
 export function cannotMakeValueMessage(name: DeciderName): string {
-	const able = valueDeciderNameSchema.options
-		.map((other) => DECIDER_ADAPTERS[other].label)
-		.join(" or ");
+	const labels = valueDeciderNameSchema.options.map(
+		(other) => DECIDER_ADAPTERS[other].label,
+	);
+	const able =
+		labels.length > 1
+			? `${labels.slice(0, -1).join(", ")} or ${labels.at(-1)}`
+			: (labels[0] ?? "");
 	return `${DECIDER_ADAPTERS[name].label} cannot make a value. Choose ${able}.`;
 }
 
@@ -228,7 +275,10 @@ async function decideOnce(
 	return {
 		kind: "decided",
 		label: result.label.value,
-		notes: `${spec.label} picked it with ${percent}% probability.`,
+		notes:
+			spec.probability === false
+				? `${spec.label} picked it.`
+				: `${spec.label} picked it with ${percent}% probability.`,
 		...costOf(spec, result.meta.model, result.meta.usage),
 	};
 }
@@ -268,6 +318,7 @@ async function valueOnce(
 			messages: [{ role: "user", content: input.prompt }],
 			outputSchema: input.output as Parameters<typeof chat>[0]["outputSchema"],
 			stream: false,
+			debug: false,
 			abortController,
 			middleware: [
 				{
@@ -283,6 +334,59 @@ async function valueOnce(
 	}
 }
 
+/**
+ * Why a call failed, for the node: the decider's own explanation when it
+ * has one (Ollama not running, a model not pulled), else the raw message.
+ * `usage-limit` and `network` make the engine wait and ask again. An
+ * explained failure is for the person to fix, so it fails the step.
+ */
+function failure(
+	spec: DeciderAdapter,
+	model: string,
+	error: unknown,
+): { errorKind: AgentErrorKind; message: string } {
+	const message = error instanceof Error ? error.message : String(error);
+	const explained = spec.explain?.(message, model);
+	if (explained) return { errorKind: "harness", message: explained };
+	return { errorKind: failureKind(message) ?? "harness", message };
+}
+
+export type DeciderModels = {
+	/** The models that decide: the provider's listing first, then the adapter's. */
+	models: string[];
+	/** The models that make a value, in the same order. Empty when it lists none. */
+	valueModels: string[];
+	/** How many models came from the provider's listing. */
+	listed: number;
+	/** Why the provider's listing did not answer. Null when it did, or has none. */
+	problem: string | null;
+};
+
+/**
+ * The models a decider offers: what the provider has on hand first (Ollama:
+ * the models pulled on this computer), then the adapter's lists. Never
+ * throws: a provider that does not answer leaves the adapter's lists.
+ */
+export async function deciderModels(name: DeciderName): Promise<DeciderModels> {
+	const spec = DECIDER_ADAPTERS[name];
+	const merged = (listed: string[], known: readonly string[]) => [
+		...listed,
+		...known.filter((m) => !listed.includes(m)),
+	];
+	const result = (listed: string[], problem: string | null) => ({
+		models: merged(listed, spec.models),
+		valueModels: spec.value?.models ? merged(listed, spec.value.models) : [],
+		listed: listed.length,
+		problem,
+	});
+	if (!spec.listModels) return result([], null);
+	try {
+		return result([...new Set(await spec.listModels())], null);
+	} catch (error) {
+		return result([], error instanceof Error ? error.message : String(error));
+	}
+}
+
 /** Decision nodes on `decide()`, Value nodes on `chat()`. Never throws. */
 export function tanstackDecider(options: TanstackDeciderOptions): Decider {
 	return {
@@ -294,12 +398,12 @@ export function tanstackDecider(options: TanstackDeciderOptions): Decider {
 			try {
 				return await decideOnce(input, options);
 			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
 				if (input.signal.aborted) {
 					return failed("aborted", "The decision was aborted");
 				}
-				// `usage-limit` and `network` make the engine wait and ask again.
-				return failed(failureKind(message) ?? "harness", message);
+				const spec = DECIDER_ADAPTERS[input.decider];
+				const why = failure(spec, input.model ?? spec.defaultModel, error);
+				return failed(why.errorKind, why.message);
 			}
 		},
 		value: async (input) => {
@@ -309,11 +413,15 @@ export function tanstackDecider(options: TanstackDeciderOptions): Decider {
 			try {
 				return await valueOnce(input, options);
 			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
 				if (input.signal.aborted) {
 					return valueFailed("aborted", "The value was aborted");
 				}
-				return valueFailed(failureKind(message) ?? "harness", message);
+				const why = failure(
+					DECIDER_ADAPTERS[input.decider],
+					input.model ?? defaultDeciderModel(input.decider, "value"),
+					error,
+				);
+				return valueFailed(why.errorKind, why.message);
 			}
 		},
 	};
