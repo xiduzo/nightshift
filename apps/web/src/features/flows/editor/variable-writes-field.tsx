@@ -3,6 +3,7 @@ import {
 	type FlowNode,
 	nodeOutcomes,
 	type VariableWrite,
+	withWrites,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -18,8 +19,6 @@ import {
 } from "@nightshift/ui/components/toggle-group";
 import { PlusIcon, XIcon } from "lucide-react";
 import { useId } from "react";
-
-import { withWrites } from "../flow-draft";
 
 import { Field, InspectorSection, Note } from "./fields";
 import { TemplateField } from "./template-field";

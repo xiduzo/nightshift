@@ -1,8 +1,10 @@
 import {
 	labelSchema,
+	type NodeOption,
 	type OutcomeColor,
 	outcomeColors,
 	reservedOutcomes,
+	uniqueOptionName,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { FieldError } from "@nightshift/ui/components/field";
@@ -35,7 +37,6 @@ import {
 	OUTCOME_COLOR_STYLE,
 	outcomeStyle,
 } from "../canvas/outcome-badge";
-import { type NodeOption, uniqueOptionName } from "../flow-draft";
 
 type Kind = "option" | "outcome" | "exit";
 

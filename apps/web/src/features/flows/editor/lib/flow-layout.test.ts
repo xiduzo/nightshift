@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow, type FlowEdge } from "@nightshift/flows";
+import {
+	commandNode,
+	FLOW_VERSION,
+	type Flow,
+	type FlowEdge,
+} from "@nightshift/flows";
 
-import { commandNode } from "../../flow-draft";
 import { layoutFlow } from "./flow-layout";
 
 const origin = { x: 0, y: 0 };

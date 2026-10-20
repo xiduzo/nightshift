@@ -1,207 +1,31 @@
+/**
+ * The flow draft in the editor's words: summaries, picker labels, template
+ * chips and the messages of a check. The edits themselves live in
+ * `@nightshift/flows` (the draft vertical).
+ */
 import {
 	type AgentNode,
-	type CallEach,
-	type CallNode,
-	type CommandNode,
-	canMakeValue,
-	commandExits,
-	DEFAULT_COMMAND_EXITS,
-	type DecidedBy,
-	type DecisionNode,
-	FLOW_VERSION,
+	calledFlow,
+	checkDraft,
+	type DraftMessages,
 	type Flow,
-	type FlowEdge,
-	type FlowInputDef,
-	type FlowIssue,
+	type FlowCheck,
 	type FlowNode,
-	type FlowNodeType,
-	type FlowOutputDef,
-	type FlowVariableDef,
-	flowSchema,
+	isOptionNode,
 	type ListSource,
 	nameSchema,
-	nodeOutcomes,
+	nodeOptions,
 	nodeOutputFields,
-	type Outcome,
 	type Policy,
+	type ProjectFlowMap,
 	runFields,
-	type ToolNode,
-	type ValueBy,
 	type ValueNode,
-	type VariableWrite,
-	validateFlow,
-	valueDeciderNameSchema,
-	type WaitNode,
 	type WaitUntil,
 } from "@nightshift/flows";
-
-/**
- * Pure edits on a flow draft. The editor keeps the draft as a `Flow` and every
- * change goes through one of these, so the JSON on disk is exactly the draft.
- */
-
-export type Position = { x: number; y: number };
-
-export const DEFAULT_MODEL = "sonnet";
-
-/** The flow files of a project, by name. Null when a file does not load. */
-export type ProjectFlowMap = Readonly<Record<string, Flow | null>>;
-
-/** A Decision option or an Agent's own outcome. Each one is an outcome of its node. */
-/** A Decision option, an Agent outcome, or a Command exit (with its `code`). */
-export type NodeOption = DecisionNode["options"][number] & { code?: number };
-/** A node whose outcomes are its own options. */
-export type OptionNode = DecisionNode | AgentNode | CommandNode;
-
-/**
- * What a new Agent or Decision node starts with: the daemon's settings
- * (Settings → New nodes). Each one left out keeps the built-in default.
- */
-export type NodeDefaults = {
-	agentHarness?: AgentNode["harness"];
-	agentModel?: string;
-	agentPermissionMode?: AgentNode["permissionMode"];
-	decisionDecider?: DecisionNode["decider"];
-};
-
-export function agentNode(
-	id: string,
-	position: Position,
-	defaults: NodeDefaults = {},
-): AgentNode {
-	return {
-		id,
-		type: "agent",
-		position,
-		prompt: "",
-		harness: defaults.agentHarness ?? "claude-code",
-		model: defaults.agentModel ?? DEFAULT_MODEL,
-		permissionMode: defaults.agentPermissionMode ?? "acceptEdits",
-		session: "fresh",
-	};
-}
-
-/** The command starts empty; the issues panel asks for one. */
-export function commandNode(id: string, position: Position): CommandNode {
-	return {
-		id,
-		type: "command",
-		position,
-		command: "",
-		output: "text",
-		exits: DEFAULT_COMMAND_EXITS.map((exit) => ({ ...exit })),
-	};
-}
-
-/**
- * A rule decides, with the options yes and no and no rule yet; the issues
- * panel asks for one. The inspector switches who decides: you (a Gate) or
- * a model. Switched to a model, the node starts on the decider from
- * Settings and that decider's default model.
- */
-export function decisionNode(
-	id: string,
-	position: Position,
-	defaults: NodeDefaults = {},
-): DecisionNode {
-	return {
-		id,
-		type: "decision",
-		position,
-		prompt: "",
-		options: [{ name: "yes" }, { name: "no" }],
-		by: "rule",
-		decider: defaults.decisionDecider ?? "typesafe",
-	};
-}
-
-/** Changes who decides. A rule's `when` fields go; a model's name stays for when it comes back. */
-export function withDecidedBy(node: DecisionNode, by: DecidedBy): DecisionNode {
-	if (by === node.by) return node;
-	const options =
-		by === "rule"
-			? node.options
-			: node.options.map(({ when: _, ...option }) => option);
-	return { ...node, by, options };
-}
-
-/** Runs a flow once. The called flow starts empty; the issues panel asks for one. */
-export function callNode(id: string, position: Position): CallNode {
-	return { id, type: "call", position, flow: "", inputs: {} };
-}
-
-/**
- * What a Call node loops over when "once per item" is switched on: a JSON
- * list by default, often another node's output. The list starts empty; the
- * issues panel asks for it.
- */
-export function defaultEach(): CallEach {
-	return {
-		source: emptySource("json"),
-		as: "item",
-		branch: "per-item",
-		haltOn: ["halt"],
-	};
-}
-
-/**
- * A rule makes the value, with an object schema and no expression yet; the
- * issues panel asks for one. Switched to a model, the node starts on the
- * first decider that can make a value.
- */
-export function valueNode(id: string, position: Position): ValueNode {
-	return {
-		id,
-		type: "value",
-		position,
-		by: "rule",
-		expression: "",
-		output: { type: "object" },
-		decider: valueDeciderNameSchema.options[0],
-	};
-}
-
-/**
- * Changes who makes the value. The expression and the prompt both stay, for
- * when their mode comes back. A model needs a decider that can make a value:
- * one that cannot is swapped for the first that can.
- */
-export function withValueBy(node: ValueNode, by: ValueBy): ValueNode {
-	if (by === node.by) return node;
-	const decider =
-		by === "model" && !canMakeValue(node.decider)
-			? valueDeciderNameSchema.options[0]
-			: node.decider;
-	return { ...node, by, decider };
-}
 
 /** The first line of what makes the value: the expression, or the prompt. */
 export function valueSummary(node: ValueNode): string {
 	return firstLine((node.by === "rule" ? node.expression : node.prompt) ?? "");
-}
-
-/** Waits 15 minutes until the inspector says otherwise. */
-export function waitNode(id: string, position: Position): WaitNode {
-	return {
-		id,
-		type: "wait",
-		position,
-		until: { kind: "duration", minutes: 15 },
-	};
-}
-
-/** What a Wait node of each kind starts with when the person switches to it. */
-export function emptyUntil(kind: WaitUntil["kind"]): WaitUntil {
-	switch (kind) {
-		case "duration":
-			return { kind: "duration", minutes: 15 };
-		case "time":
-			return { kind: "time", at: "" };
-		case "command":
-			return { kind: "command", command: "", everyMinutes: 5 };
-		case "signal":
-			return { kind: "signal", name: "" };
-	}
 }
 
 /** How each kind of wait reads in a picker. */
@@ -223,29 +47,6 @@ export function waitSummary(until: WaitUntil): string {
 			return until.command.trim().split("\n")[0] ?? "";
 		case "signal":
 			return until.name.trim();
-	}
-}
-
-/** The connection and the tool start empty; the issues panel asks for them. */
-export function toolNode(id: string, position: Position): ToolNode {
-	return {
-		id,
-		type: "tool",
-		position,
-		connection: "",
-		tool: "",
-		arguments: {},
-	};
-}
-
-export function emptySource(kind: ListSource["kind"]): ListSource {
-	switch (kind) {
-		case "json":
-			return { kind: "json", value: "" };
-		case "command":
-			return { kind: "command", command: "" };
-		case "files":
-			return { kind: "files", glob: "" };
 	}
 }
 
@@ -280,727 +81,10 @@ export const POLICY_DEFAULTS: Required<Policy> = {
 	resumeInterruptedRuns: true,
 };
 
-/**
- * Sets one value of the run policy, or clears it (back to the daemon's
- * setting). A policy with no values left is dropped, so the file stays
- * minimal.
- */
-export function setPolicyValue<K extends keyof Policy>(
-	flow: Flow,
-	key: K,
-	value: Policy[K] | undefined,
-): Flow {
-	const next: Partial<Policy> = { ...flow.policy, [key]: value };
-	if (value === undefined) delete next[key];
-	const empty = Object.keys(next).length === 0;
-	return { ...flow, policy: empty ? undefined : next };
-}
-
-/** Replaces the flow's inputs. */
-export function setInputs(flow: Flow, inputs: FlowInputDef[]): Flow {
-	return { ...flow, inputs };
-}
-
-/** Replaces the flow's outputs. */
-export function setOutputs(flow: Flow, outputs: FlowOutputDef[]): Flow {
-	return { ...flow, outputs };
-}
-
-/** Replaces the flow's variables. None: the file has no `variables` at all. */
-export function setVariables(flow: Flow, variables: FlowVariableDef[]): Flow {
-	const { variables: _, ...rest } = flow;
-	return variables.length > 0 ? { ...rest, variables } : rest;
-}
-
-/** Replaces a node's variable writes. None: the node has no `set` at all. */
-export function withWrites<T extends FlowNode>(
-	node: T,
-	set: VariableWrite[],
-): T {
-	const { set: _, ...rest } = node;
-	return (set.length > 0 ? { ...rest, set } : rest) as T;
-}
-
-/**
- * The names a template can read in this flow: node ids, inputs and
- * variables share one namespace, and `run` and `vars` are reserved.
- */
-export function takenNames(flow: Flow): Set<string> {
-	return new Set([
-		"run",
-		"vars",
-		...flow.nodes.map((node) => node.id),
-		...flow.inputs.map((input) => input.name),
-		...(flow.variables ?? []).map((variable) => variable.name),
-	]);
-}
-
-/** `base`, else `base_2`, `base_3`, … whichever no node or input uses yet. */
-export function uniqueName(flow: Flow, base: string): string {
-	const taken = takenNames(flow);
-	if (!taken.has(base)) return base;
-	for (let n = 2; ; n++) {
-		const name = `${base}_${n}`;
-		if (!taken.has(name)) return name;
-	}
-}
-
-/** `base`, else `base_2`, … among the flow's outputs. */
-export function uniqueOutputName(flow: Flow, base: string): string {
-	const taken = new Set(flow.outputs.map((output) => output.name));
-	if (!taken.has(base)) return base;
-	for (let n = 2; ; n++) {
-		const name = `${base}_${n}`;
-		if (!taken.has(name)) return name;
-	}
-}
-
-/**
- * Rewrites the references to `from` in a template: `{{from}}`,
- * `{{ from.path.to }}`. Other names that start the same stay.
- */
-export function renameRefs(text: string, from: string, to: string): string {
-	const reference = new RegExp(
-		`(\\{\\{\\s*)${from}(?=(?:\\.[A-Za-z0-9_-]+)*\\s*\\}\\})`,
-		"g",
-	);
-	return text.replace(reference, `$1${to}`);
-}
-
-/**
- * Rewrites the references to the variable `from` in a template:
- * `{{vars.from}}`, `{{ vars.from.path }}`.
- */
-export function renameVarRefs(text: string, from: string, to: string): string {
-	const reference = new RegExp(
-		`(\\{\\{\\s*vars\\.)${from}(?=(?:\\.[A-Za-z0-9_-]+)*\\s*\\}\\})`,
-		"g",
-	);
-	return text.replace(reference, `$1${to}`);
-}
-
-/**
- * Rewrites `vars.from` in a rule or an expression, best effort: a name
- * that only starts the same (`vars.from_2`) stays.
- */
-export function renameVarInRule(
-	text: string,
-	from: string,
-	to: string,
-): string {
-	const reference = new RegExp(
-		`(^|[^A-Za-z0-9_$.])(vars\\.)${from}(?![A-Za-z0-9_])`,
-		"g",
-	);
-	return text.replace(reference, `$1$2${to}`);
-}
-
-/**
- * Renames a variable, its `{{vars.old…}}` references in this flow's
- * templates, `vars.old` in its rules and expressions, and the writes to it.
- */
-export function renameVariable(flow: Flow, index: number, to: string): Flow {
-	const from = flow.variables?.[index]?.name;
-	if (from === undefined || from === to) return flow;
-	const templated = rewriteFlowTemplates(flow, (text) =>
-		renameVarRefs(text, from, to),
-	);
-	const rule = (text: string) => renameVarInRule(text, from, to);
-	const nodes = templated.nodes.map((node): FlowNode => {
-		let next: FlowNode = node;
-		if (next.type === "decision") {
-			next = {
-				...next,
-				options: next.options.map((option) =>
-					option.when === undefined
-						? option
-						: { ...option, when: rule(option.when) },
-				),
-			};
-		}
-		if (next.type === "value" && next.expression !== undefined) {
-			next = { ...next, expression: rule(next.expression) };
-		}
-		if (next.set) {
-			next = {
-				...next,
-				set: next.set.map((write) => ({
-					...write,
-					variable: write.variable === from ? to : write.variable,
-					...(write.expression !== undefined
-						? { expression: rule(write.expression) }
-						: {}),
-				})),
-			};
-		}
-		return next;
-	});
-	return {
-		...templated,
-		nodes,
-		variables: (templated.variables ?? []).map((variable, at) =>
-			at === index ? { ...variable, name: to } : variable,
-		),
-	};
-}
-
-/** Whether the template is exactly one reference, so it keeps a JSON value as it is. */
-export function isSingleRef(text: string): boolean {
-	return /^\s*\{\{\s*[a-z][a-z0-9_]*(?:\.[A-Za-z0-9_-]+)*\s*\}\}\s*$/.test(
-		text,
-	);
-}
-
-/**
- * Renames an input and the `{{old…}}` references in this flow's nodes and
- * outputs. Flows that call this one keep binding the old name.
- */
-export function renameInput(flow: Flow, index: number, to: string): Flow {
-	const from = flow.inputs[index]?.name;
-	if (from === undefined || from === to) return flow;
-	const next = rewriteFlowTemplates(flow, (text) => renameRefs(text, from, to));
-	return {
-		...next,
-		inputs: next.inputs.map((input, at) =>
-			at === index ? { ...input, name: to } : input,
-		),
-	};
-}
-
-/** A new flow: one Agent node named `worker`. */
-export function newFlow(defaults?: NodeDefaults): Flow {
-	return {
-		version: FLOW_VERSION,
-		inputs: [],
-		outputs: [],
-		start: "worker",
-		nodes: [agentNode("worker", { x: 0, y: 0 }, defaults)],
-		edges: [],
-	};
-}
-
-/**
- * A new flow for a Call that runs once per item: one JSON input (named
- * `as`) that takes the element, and one Agent node that works on it.
- */
-export function newElementFlow(as: string, defaults?: NodeDefaults): Flow {
-	return {
-		version: FLOW_VERSION,
-		inputs: [{ name: as, type: "json", required: true }],
-		outputs: [],
-		start: "worker",
-		nodes: [
-			{
-				...agentNode("worker", { x: 0, y: 0 }, defaults),
-				prompt: `Work on {{${as}.title}}.\n\nThe item:\n{{${as}}}`,
-			},
-		],
-		edges: [],
-	};
-}
-
-/** `base`, else `base_2`, `base_3`, … whichever is free. */
-export function uniqueNodeId(flow: Flow, base: string): string {
-	return uniqueName(flow, base);
-}
-
-function uniqueEdgeId(flow: Flow, base: string): string {
-	const taken = new Set(flow.edges.map((edge) => edge.id));
-	if (!taken.has(base)) return base;
-	for (let n = 2; ; n++) {
-		const id = `${base}-${n}`;
-		if (!taken.has(id)) return id;
-	}
-}
-
-const NEW_NODE: Record<
-	FlowNodeType,
-	{
-		id: string;
-		create: (
-			id: string,
-			position: Position,
-			defaults: NodeDefaults,
-		) => FlowNode;
-	}
-> = {
-	agent: { id: "agent", create: agentNode },
-	command: { id: "check", create: commandNode },
-	decision: { id: "decide", create: decisionNode },
-	call: { id: "call", create: callNode },
-	value: { id: "value", create: valueNode },
-	wait: { id: "wait", create: waitNode },
-	tool: { id: "tool", create: toolNode },
-};
-
-/** Adds a node of `type`; a new Agent node starts with `defaults`. */
-export function addNode(
-	flow: Flow,
-	type: FlowNodeType,
-	position: Position,
-	defaults: NodeDefaults = {},
-) {
-	const id = uniqueNodeId(flow, NEW_NODE[type].id);
-	const node = NEW_NODE[type].create(id, position, defaults);
-	const next: Flow = {
-		...flow,
-		nodes: [...flow.nodes, node],
-		// A flow without nodes has no valid start; the first node becomes it.
-		start: flow.nodes.length === 0 ? id : flow.start,
-	};
-	return { flow: next, id };
-}
-
-export function updateNode(
-	flow: Flow,
-	id: string,
-	change: (node: FlowNode) => FlowNode,
-): Flow {
-	return {
-		...flow,
-		nodes: flow.nodes.map((node) => (node.id === id ? change(node) : node)),
-	};
-}
-
-export function moveNode(flow: Flow, id: string, position: Position): Flow {
-	return updateNode(flow, id, (node) => ({
-		...node,
-		position: { x: Math.round(position.x), y: Math.round(position.y) },
-	}));
-}
-
-/** Removes the node and its edges. A removed start node hands start to the first node left. */
-export function removeNode(flow: Flow, id: string): Flow {
-	const nodes = flow.nodes.filter((node) => node.id !== id);
-	return {
-		...flow,
-		nodes,
-		edges: flow.edges.filter((edge) => edge.from !== id && edge.to !== id),
-		start: flow.start === id ? (nodes[0]?.id ?? "") : flow.start,
-	};
-}
-
-function rewriteBindings(
-	bindings: Record<string, string>,
-	rewrite: (text: string) => string,
-): Record<string, string> {
-	return Object.fromEntries(
-		Object.entries(bindings).map(([name, value]) => [name, rewrite(value)]),
-	);
-}
-
-function rewriteSource(
-	source: ListSource,
-	rewrite: (text: string) => string,
-): ListSource {
-	switch (source.kind) {
-		case "json":
-			return { ...source, value: rewrite(source.value) };
-		case "command":
-			return { ...source, command: rewrite(source.command) };
-		case "files":
-			return { ...source, glob: rewrite(source.glob) };
-	}
-}
-
-/**
- * Applies `rewrite` to every template of the node: a prompt, a command, a
- * question, a list source, the bindings of a called flow's inputs, and the
- * values of its variable writes.
- */
-function rewriteTemplates(
-	node: FlowNode,
-	rewrite: (text: string) => string,
-): FlowNode {
-	const own = rewriteOwnTemplates(node, rewrite);
-	if (!own.set) return own;
-	return {
-		...own,
-		set: own.set.map((write) =>
-			write.value === undefined
-				? write
-				: { ...write, value: rewrite(write.value) },
-		),
-	};
-}
-
-/** The templates of the node's own kind. */
-function rewriteOwnTemplates(
-	node: FlowNode,
-	rewrite: (text: string) => string,
-): FlowNode {
-	switch (node.type) {
-		case "agent":
-		case "decision":
-			return { ...node, prompt: rewrite(node.prompt) };
-		case "command":
-			return { ...node, command: rewrite(node.command) };
-		case "call":
-			return {
-				...node,
-				inputs: rewriteBindings(node.inputs, rewrite),
-				...(node.each
-					? {
-							each: {
-								...node.each,
-								source: rewriteSource(node.each.source, rewrite),
-							},
-						}
-					: {}),
-			};
-		case "value":
-			// The expression reads names bare, as a Decision's rules do: not a template.
-			return node.prompt === undefined
-				? node
-				: { ...node, prompt: rewrite(node.prompt) };
-		case "wait":
-			switch (node.until.kind) {
-				case "time":
-					return {
-						...node,
-						until: { ...node.until, at: rewrite(node.until.at) },
-					};
-				case "command":
-					return {
-						...node,
-						until: { ...node.until, command: rewrite(node.until.command) },
-					};
-				default:
-					return node;
-			}
-		case "tool":
-			return { ...node, arguments: rewriteBindings(node.arguments, rewrite) };
-	}
-}
-
-/**
- * Applies `rewrite` to every template of the flow: its nodes, its outputs,
- * and the initial values of its variables.
- */
-function rewriteFlowTemplates(
-	flow: Flow,
-	rewrite: (text: string) => string,
-): Flow {
-	const rewritten: Flow = {
-		...flow,
-		nodes: flow.nodes.map((node) => rewriteTemplates(node, rewrite)),
-		outputs: flow.outputs.map((output) => ({
-			...output,
-			value: rewrite(output.value),
-		})),
-	};
-	if (!flow.variables) return rewritten;
-	return {
-		...rewritten,
-		variables: flow.variables.map((variable) =>
-			variable.initial === undefined
-				? variable
-				: { ...variable, initial: rewrite(variable.initial) },
-		),
-	};
-}
-
-/**
- * Renames a node everywhere: its edges, the start, and `{{old…}}`
- * references in the flow's templates and outputs.
- */
-export function renameNode(flow: Flow, from: string, to: string): Flow {
-	if (from === to) return flow;
-	const renamed = rewriteFlowTemplates(
-		{
-			...flow,
-			nodes: flow.nodes.map((node) =>
-				node.id === from ? { ...node, id: to } : node,
-			),
-		},
-		(text) => renameRefs(text, from, to),
-	);
-	return {
-		...renamed,
-		start: flow.start === from ? to : flow.start,
-		edges: flow.edges.map((edge) => ({
-			...edge,
-			from: edge.from === from ? to : edge.from,
-			to: edge.to === from ? to : edge.to,
-		})),
-	};
-}
-
-export function isOptionNode(node: FlowNode): node is OptionNode {
-	return (
-		node.type === "decision" || node.type === "agent" || node.type === "command"
-	);
-}
-
-/** The options of a Decision node, an Agent's own outcomes, or a Command's exits. */
-export function nodeOptions(node: OptionNode): NodeOption[] {
-	if (node.type === "decision") return node.options;
-	if (node.type === "command") return commandExits(node);
-	return node.outcomes ?? [];
-}
-
-export function withOptions<T extends OptionNode>(
-	node: T,
-	options: NodeOption[],
-): T {
-	if (node.type === "decision") return { ...node, options };
-	if (node.type === "command") {
-		const exits = options.map(({ name, code, description, color }) => ({
-			name,
-			...(code === undefined ? {} : { code }),
-			...(description === undefined ? {} : { description }),
-			...(color === undefined ? {} : { color }),
-		}));
-		return { ...node, exits };
-	}
-	return { ...node, outcomes: options };
-}
-
 /** What an option is called on its node: an option, an outcome, or an exit. */
 export function optionNoun(node: FlowNode): "option" | "outcome" | "exit" {
 	if (node.type === "decision") return "option";
 	return node.type === "command" ? "exit" : "outcome";
-}
-
-function changeOptions(
-	flow: Flow,
-	nodeId: string,
-	change: (options: NodeOption[]) => NodeOption[],
-): Flow {
-	return updateNode(flow, nodeId, (node) =>
-		isOptionNode(node) ? withOptions(node, change(nodeOptions(node))) : node,
-	);
-}
-
-/**
- * Renames a Decision label, a Gate choice or an Agent's own outcome, and
- * moves the node's edges on that outcome along with it.
- */
-export function renameOutcome(
-	flow: Flow,
-	nodeId: string,
-	index: number,
-	to: Outcome,
-): Flow {
-	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
-	if (!node || !isOptionNode(node)) return flow;
-	const from = nodeOptions(node)[index]?.name;
-	if (from === undefined || from === to) return flow;
-	const next = changeOptions(flow, nodeId, (options) =>
-		options.map((option, at) =>
-			at === index ? { ...option, name: to } : option,
-		),
-	);
-	return {
-		...next,
-		edges: next.edges.map((edge) =>
-			edge.from === nodeId && edge.outcome === from
-				? { ...edge, outcome: to }
-				: edge,
-		),
-	};
-}
-
-/**
- * Removes a Decision label, a Gate choice or an Agent's own outcome, and the
- * node's edges on it (unless another option keeps the same name). Returns
- * what it removed, for an undo.
- */
-export function removeOutcome(
-	flow: Flow,
-	nodeId: string,
-	index: number,
-): { flow: Flow; option: NodeOption | null; dropped: FlowEdge[] } {
-	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
-	if (!node || !isOptionNode(node)) {
-		return { flow, option: null, dropped: [] };
-	}
-	const options = nodeOptions(node);
-	const option = options[index];
-	if (!option) return { flow, option: null, dropped: [] };
-	const stillThere = options.some(
-		(other, at) => at !== index && other.name === option.name,
-	);
-	const dropped = stillThere
-		? []
-		: flow.edges.filter(
-				(edge) => edge.from === nodeId && edge.outcome === option.name,
-			);
-	const next = changeOptions(flow, nodeId, (list) =>
-		list.filter((_, at) => at !== index),
-	);
-	return {
-		flow: {
-			...next,
-			edges: next.edges.filter((edge) => !dropped.includes(edge)),
-		},
-		option,
-		dropped,
-	};
-}
-
-/** Puts dropped edges back whose nodes still exist and whose ids are free. */
-function restoreEdges(flow: Flow, dropped: FlowEdge[]): Flow {
-	const ids = new Set(flow.nodes.map((candidate) => candidate.id));
-	const edgeIds = new Set(flow.edges.map((edge) => edge.id));
-	const back = dropped.filter(
-		(edge) => ids.has(edge.from) && ids.has(edge.to) && !edgeIds.has(edge.id),
-	);
-	return { ...flow, edges: [...flow.edges, ...back] };
-}
-
-/**
- * Undoes `removeOutcome`: puts the option back at its place and the dropped
- * edges whose nodes still exist. Does nothing when the node is gone or the
- * name is taken again.
- */
-export function restoreOutcome(
-	flow: Flow,
-	nodeId: string,
-	index: number,
-	option: NodeOption,
-	dropped: FlowEdge[],
-): Flow {
-	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
-	if (!node || !isOptionNode(node)) return flow;
-	if (nodeOptions(node).some((other) => other.name === option.name)) {
-		return flow;
-	}
-	const next = changeOptions(flow, nodeId, (options) => [
-		...options.slice(0, index),
-		option,
-		...options.slice(index),
-	]);
-	return restoreEdges(next, dropped);
-}
-
-/**
- * Gives an Agent node its own outcomes, or (undefined) back the standard
- * pass, fail and needs-input. Edges on an outcome the node no longer has are
- * dropped and returned, for an undo.
- */
-export function setAgentOutcomes(
-	flow: Flow,
-	nodeId: string,
-	outcomes: NodeOption[] | undefined,
-): { flow: Flow; dropped: FlowEdge[]; previous: NodeOption[] | undefined } {
-	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
-	if (node?.type !== "agent") return { flow, dropped: [], previous: undefined };
-	const { outcomes: previous, ...rest } = node;
-	const changed: AgentNode = outcomes ? { ...rest, outcomes } : rest;
-	const kept = new Set(nodeOutcomes(changed));
-	const dropped = flow.edges.filter(
-		(edge) => edge.from === nodeId && !kept.has(edge.outcome),
-	);
-	const next = updateNode(flow, nodeId, () => changed);
-	return {
-		flow: {
-			...next,
-			edges: next.edges.filter((edge) => !dropped.includes(edge)),
-		},
-		dropped,
-		previous,
-	};
-}
-
-/** Undoes `setAgentOutcomes`. */
-export function restoreAgentOutcomes(
-	flow: Flow,
-	nodeId: string,
-	previous: NodeOption[] | undefined,
-	dropped: FlowEdge[],
-): Flow {
-	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
-	if (node?.type !== "agent") return flow;
-	const { outcomes: _, ...rest } = node;
-	const next = updateNode(flow, nodeId, () =>
-		previous ? { ...rest, outcomes: previous } : rest,
-	);
-	return restoreEdges(next, dropped);
-}
-
-/**
- * Makes a Call node run once per item (`each`, the defaults or what it had
- * before) or once (no `each`). Its outcomes change with it (pass and fail,
- * or done and halted; stopped stays), so edges on an outcome the node no longer has are
- * dropped and returned, for an undo.
- */
-export function setCallEach(
-	flow: Flow,
-	nodeId: string,
-	each: CallEach | undefined,
-): { flow: Flow; dropped: FlowEdge[]; previous: CallEach | undefined } {
-	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
-	if (node?.type !== "call") return { flow, dropped: [], previous: undefined };
-	const { each: previous, ...rest } = node;
-	const changed: CallNode = each ? { ...rest, each } : rest;
-	const kept = new Set(nodeOutcomes(changed));
-	const dropped = flow.edges.filter(
-		(edge) => edge.from === nodeId && !kept.has(edge.outcome),
-	);
-	const next = updateNode(flow, nodeId, () => changed);
-	return {
-		flow: {
-			...next,
-			edges: next.edges.filter((edge) => !dropped.includes(edge)),
-		},
-		dropped,
-		previous,
-	};
-}
-
-/** Undoes `setCallEach`. */
-export function restoreCallEach(
-	flow: Flow,
-	nodeId: string,
-	previous: CallEach | undefined,
-	dropped: FlowEdge[],
-): Flow {
-	const node = flow.nodes.find((candidate) => candidate.id === nodeId);
-	if (node?.type !== "call") return flow;
-	const { each: _, ...rest } = node;
-	const next = updateNode(flow, nodeId, () =>
-		previous ? { ...rest, each: previous } : rest,
-	);
-	return restoreEdges(next, dropped);
-}
-
-/**
- * The Agent node naming these connections, in the order given and without
- * repeats. None left drops the field, so the file stays minimal.
- */
-export function withConnections(
-	node: AgentNode,
-	names: readonly string[],
-): AgentNode {
-	const unique = [...new Set(names)];
-	const { connections: _, ...rest } = node;
-	return unique.length > 0 ? { ...rest, connections: unique } : rest;
-}
-
-/** Sets the connections an Agent node names; see `withConnections`. */
-export function setAgentConnections(
-	flow: Flow,
-	nodeId: string,
-	names: readonly string[],
-): Flow {
-	return updateNode(flow, nodeId, (node) =>
-		node.type === "agent" ? withConnections(node, names) : node,
-	);
-}
-
-/** The connections an Agent or Tool node names that the daemon does not have. */
-export function missingConnections(
-	node: FlowNode,
-	known: readonly string[],
-): string[] {
-	const named =
-		node.type === "agent"
-			? (node.connections ?? [])
-			: node.type === "tool" && node.connection !== ""
-				? [node.connection]
-				: [];
-	return named.filter((name) => !known.includes(name));
 }
 
 /** What the editor says about a connection the daemon does not have. */
@@ -1011,48 +95,6 @@ export function missingConnectionMessage(name: string): string {
 /** What the editor says about a profile the daemon does not have. */
 export function missingProfileMessage(name: string): string {
 	return `No profile named ${name}. The flow cannot run until you add it on the Agents page.`;
-}
-
-/** `base`, else `base-2`, `base-3`, … whichever the node does not use yet. */
-export function uniqueOptionName(options: NodeOption[], base: string): string {
-	const taken = new Set(options.map((option) => option.name));
-	if (!taken.has(base)) return base;
-	for (let n = 2; ; n++) {
-		const name = `${base}-${n}`;
-		if (!taken.has(name)) return name;
-	}
-}
-
-export function addEdge(
-	flow: Flow,
-	from: string,
-	outcome: Outcome,
-	to: string,
-): { flow: Flow; id: string } | null {
-	const exists = flow.edges.some(
-		(edge) => edge.from === from && edge.outcome === outcome && edge.to === to,
-	);
-	if (exists) return null;
-	const id = uniqueEdgeId(flow, `${from}-${outcome}-${to}`);
-	return {
-		flow: { ...flow, edges: [...flow.edges, { id, from, outcome, to }] },
-		id,
-	};
-}
-
-export function updateEdge(
-	flow: Flow,
-	id: string,
-	change: (edge: FlowEdge) => FlowEdge,
-): Flow {
-	return {
-		...flow,
-		edges: flow.edges.map((edge) => (edge.id === id ? change(edge) : edge)),
-	};
-}
-
-export function removeEdge(flow: Flow, id: string): Flow {
-	return { ...flow, edges: flow.edges.filter((edge) => edge.id !== id) };
 }
 
 /** One `{{…}}` a template can use. */
@@ -1072,16 +114,6 @@ export type VariableGroup = {
 	scope: string;
 	variables: TemplateVariable[];
 };
-
-/** The flow a Call node calls, when it loads. */
-export function calledFlow(
-	node: FlowNode,
-	flows: ProjectFlowMap | undefined,
-): Flow | null {
-	if (node.type !== "call") return null;
-	if (node.flow === "" || !flows) return null;
-	return flows[node.flow] ?? null;
-}
 
 /** The top-level keys of a JSON Schema object, with whether each holds JSON. */
 export function schemaFields(
@@ -1212,26 +244,6 @@ export function templateVariables(
 	];
 }
 
-/** The flows of the project that call `name` through a Call node. */
-export function callersOf(name: string, flows: ProjectFlowMap): string[] {
-	return Object.entries(flows)
-		.filter(
-			([caller, flow]) =>
-				caller !== name &&
-				(flow?.nodes ?? []).some(
-					(node) => node.type === "call" && node.flow === name,
-				),
-		)
-		.map(([caller]) => caller)
-		.sort();
-}
-
-export type FlowCheck = {
-	issues: FlowIssue[];
-	/** Set when the validator itself failed, so the issues are only the schema's. */
-	validatorError: string | null;
-};
-
 const FIELD_MESSAGES: Record<string, string> = {
 	command: "The command is empty.",
 	prompt: "Write the prompt.",
@@ -1271,15 +283,34 @@ const POLICY_MESSAGES: Record<string, string> = {
 	maxSteps: "Run policy: max steps must be a whole number above 0.",
 };
 
+/** The words of a draft check: what the editor says about each issue. */
+const MESSAGES: DraftMessages = {
+	schemaIssue: (flow, issue) => {
+		const [scope, index, ...rest] = issue.path;
+		if (scope === "start") return "Pick a start node.";
+		const field = rest.map(String).join(".");
+		return (
+			ioMessage(flow, scope, index, rest) ??
+			writeMessage(flow, scope, index, rest) ??
+			FIELD_MESSAGES[field] ??
+			optionMessage(flow, index, rest) ??
+			bindingMessage(scope, index, rest) ??
+			haltOnMessage(flow, index, rest) ??
+			mcpMessage(flow, index, rest) ??
+			(scope === "policy" ? POLICY_MESSAGES[String(index)] : undefined) ??
+			`${field || String(scope)}: ${issue.message}`
+		);
+	},
+	missingConnection: missingConnectionMessage,
+	missingProfile: missingProfileMessage,
+};
+
 /**
- * Checks the draft: the schema first (what the API would refuse to save), then
- * `validateFlow` for meaning. Schema issues point at their node or edge.
- * `flows` holds the project's flow files by name, so Call nodes can check
- * the flows they call; leave it out while they load. `name`
- * is the draft's own file name: the draft stands in for that file, and a
- * flow that reaches itself is reported with the chain. `connections` and
- * `profiles` hold the names of the daemon's connections and Agent Profiles;
- * leave them out while they load.
+ * Checks the draft with `checkDraft`, in the editor's words. `flows` holds
+ * the project's flow files by name, so Call nodes can check the flows they
+ * call; leave it out while they load. `name` is the draft's own file name.
+ * `connections` and `profiles` hold the names of the daemon's connections
+ * and Agent Profiles; leave them out while they load.
  */
 export function checkFlow(
 	flow: Flow,
@@ -1288,73 +319,7 @@ export function checkFlow(
 	connections?: readonly string[],
 	profiles?: readonly string[],
 ): FlowCheck {
-	const issues: FlowIssue[] = [];
-	const parsed = flowSchema.safeParse(flow);
-	if (!parsed.success) {
-		for (const issue of parsed.error.issues) {
-			const [scope, index, ...rest] = issue.path;
-			const field = rest.map(String).join(".");
-			const message =
-				ioMessage(flow, scope, index, rest) ??
-				writeMessage(flow, scope, index, rest) ??
-				FIELD_MESSAGES[field] ??
-				optionMessage(flow, index, rest) ??
-				bindingMessage(scope, index, rest) ??
-				haltOnMessage(flow, index, rest) ??
-				mcpMessage(flow, index, rest) ??
-				(scope === "policy" ? POLICY_MESSAGES[String(index)] : undefined) ??
-				`${field || String(scope)}: ${issue.message}`;
-			if (scope === "nodes" && typeof index === "number") {
-				issues.push({
-					severity: "error",
-					message,
-					nodeId: flow.nodes[index]?.id,
-				});
-			} else if (scope === "edges" && typeof index === "number") {
-				issues.push({
-					severity: "error",
-					message,
-					edgeId: flow.edges[index]?.id,
-				});
-			} else if (scope === "start") {
-				issues.push({ severity: "error", message: "Pick a start node." });
-			} else {
-				issues.push({ severity: "error", message });
-			}
-		}
-	}
-
-	if (connections) {
-		for (const node of flow.nodes) {
-			for (const missing of missingConnections(node, connections)) {
-				issues.push({
-					severity: "error",
-					message: missingConnectionMessage(missing),
-					nodeId: node.id,
-				});
-			}
-		}
-	}
-
-	if (profiles) {
-		for (const node of flow.nodes) {
-			if (node.type !== "agent" || node.profile === undefined) continue;
-			if (profiles.includes(node.profile)) continue;
-			issues.push({
-				severity: "error",
-				message: missingProfileMessage(node.profile),
-				nodeId: node.id,
-			});
-		}
-	}
-
-	let validatorError: string | null = null;
-	try {
-		issues.push(...validateFlow(flow, flows ? { flows, name } : undefined));
-	} catch (error) {
-		validatorError = error instanceof Error ? error.message : String(error);
-	}
-	return { issues, validatorError };
+	return checkDraft(flow, MESSAGES, { flows, name, connections, profiles });
 }
 
 /** A bad label, choice or outcome name: `labels.1.name` reads as `Label "Yes": …`. */
@@ -1479,11 +444,6 @@ function mcpMessage(
 		: undefined;
 }
 
-/** Whether the draft passes the schema, so `flows.save` accepts it. */
-export function isSavable(flow: Flow): boolean {
-	return flowSchema.safeParse(flow).success;
-}
-
 /** The first line of a prompt, or the skill call when the prompt is empty. */
 export function agentSummary(node: AgentNode): string {
 	const firstLine = node.prompt.trim().split("\n")[0] ?? "";
@@ -1494,18 +454,4 @@ export function agentSummary(node: AgentNode): string {
 /** The first line of a decision's prompt. */
 export function firstLine(text: string): string {
 	return text.trim().split("\n")[0] ?? "";
-}
-
-/** Whether the edge closes a loop: its source is reachable again from its target. */
-export function edgeInLoop(flow: Flow, edge: FlowEdge): boolean {
-	const seen = new Set<string>();
-	const queue = [edge.to];
-	while (queue.length > 0) {
-		const id = queue.shift() as string;
-		if (id === edge.from) return true;
-		if (seen.has(id)) continue;
-		seen.add(id);
-		for (const next of flow.edges) if (next.from === id) queue.push(next.to);
-	}
-	return false;
 }

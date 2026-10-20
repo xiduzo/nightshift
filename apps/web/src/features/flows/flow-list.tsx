@@ -1,4 +1,9 @@
-import { type FlowInputDef, flowNameSchema } from "@nightshift/flows";
+import {
+	callersOf,
+	type FlowInputDef,
+	flowNameSchema,
+	newFlow,
+} from "@nightshift/flows";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -67,7 +72,7 @@ import { toast } from "sonner";
 import { settingsQueries } from "@/features/settings/queries";
 import type { FlowListItem } from "@/shared/api";
 import { PageHeading } from "@/shared/page";
-import { callersOf, newFlow } from "./flow-draft";
+
 import { flowMutations, flowQueries } from "./queries";
 import { StartRunDialog } from "./start/start-run-dialog";
 import { useProjectFlows } from "./use-project-flows";

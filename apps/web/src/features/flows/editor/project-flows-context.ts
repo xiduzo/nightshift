@@ -1,6 +1,5 @@
+import type { ProjectFlowMap } from "@nightshift/flows";
 import { createContext, useContext } from "react";
-
-import type { ProjectFlowMap } from "../flow-draft";
 
 /**
  * The project's flow files, by name, for the editor's fields: the flows a

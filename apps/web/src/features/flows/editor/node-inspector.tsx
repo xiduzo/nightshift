@@ -6,9 +6,17 @@ import {
 	type DecisionNode,
 	type Flow,
 	type FlowNode,
+	type NodeOption,
 	nodeIdSchema,
+	nodeOptions,
+	type OptionNode,
 	STANDARD_EXIT_CODES,
+	uniqueOptionName,
 	type ValueNode,
+	withConnections,
+	withDecidedBy,
+	withOptions,
+	withValueBy,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -59,16 +67,7 @@ import {
 } from "@/features/agents";
 import type { Effort, PermissionMode, ProfileRow } from "@/shared/api";
 import { DECIDED_BY_ICON, NODE_TYPE, VALUE_BY_ICON } from "../canvas/node-type";
-import {
-	type NodeOption,
-	nodeOptions,
-	type OptionNode,
-	uniqueOptionName,
-	withConnections,
-	withDecidedBy,
-	withOptions,
-	withValueBy,
-} from "../flow-draft";
+
 import { CallFields } from "./call-fields";
 import type { CalledFlowSupport } from "./called-flow-fields";
 import type { DaemonConnection } from "./connections-field";

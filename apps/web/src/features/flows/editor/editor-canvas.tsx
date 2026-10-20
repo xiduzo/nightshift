@@ -1,4 +1,13 @@
 import type { Flow, FlowNodeType, Outcome } from "@nightshift/flows";
+import {
+	addEdge,
+	addNode,
+	type FlowCheck,
+	moveNode,
+	type NodeDefaults,
+	removeEdge,
+	removeNode,
+} from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { ButtonGroup } from "@nightshift/ui/components/button-group";
 import {
@@ -37,7 +46,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
-
 import { type FlowCanvasNode, nodeTypes } from "../canvas/flow-node";
 import { NODE_TYPE } from "../canvas/node-type";
 import {
@@ -48,15 +56,6 @@ import {
 	SelectEdgeContext,
 } from "../canvas/outcome-edge";
 import { useMeasured } from "../canvas/use-measured";
-import {
-	addEdge,
-	addNode,
-	type FlowCheck,
-	moveNode,
-	type NodeDefaults,
-	removeEdge,
-	removeNode,
-} from "../flow-draft";
 import { layoutFlow } from "./lib/flow-layout";
 
 export type Selection =

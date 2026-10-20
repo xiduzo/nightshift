@@ -1,13 +1,12 @@
 import type { Flow, WaitNode, WaitUntil } from "@nightshift/flows";
+import { emptyUntil } from "@nightshift/flows";
 import { Input } from "@nightshift/ui/components/input";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { useId, useRef } from "react";
-
-import { emptyUntil, WAIT_KINDS } from "../flow-draft";
-
+import { WAIT_KINDS } from "../flow-draft";
 import { Field, InspectorSection, Note, PositiveIntInput } from "./fields";
 import { TemplateField } from "./template-field";
 

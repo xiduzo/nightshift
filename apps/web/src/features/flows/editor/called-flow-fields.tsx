@@ -1,3 +1,4 @@
+import type { ProjectFlowMap } from "@nightshift/flows";
 import { type CallNode, type Flow, flowNameSchema } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -27,9 +28,6 @@ import {
 	XIcon,
 } from "lucide-react";
 import { useId, useState } from "react";
-
-import type { ProjectFlowMap } from "../flow-draft";
-
 import { TemplateField } from "./template-field";
 
 /** What a Call node's inspector needs from the editor around it. */

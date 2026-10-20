@@ -1,4 +1,5 @@
 import {
+	edgeInLoop,
 	type Flow,
 	type FlowEdge,
 	nodeOutcomes,
@@ -17,7 +18,6 @@ import { ArrowRightIcon, SplineIcon, Trash2Icon } from "lucide-react";
 import { useId } from "react";
 
 import { outcomeLabel, outcomeStyle } from "../canvas/outcome-badge";
-import { edgeInLoop } from "../flow-draft";
 
 import {
 	Field,

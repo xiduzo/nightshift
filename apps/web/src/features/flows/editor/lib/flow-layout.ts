@@ -5,9 +5,7 @@
 // React Flow measured, returns the flow with new positions.
 
 import dagre from "@dagrejs/dagre";
-import { type Flow, nodeOutcomes } from "@nightshift/flows";
-
-import { moveNode } from "../../flow-draft";
+import { type Flow, moveNode, nodeOutcomes } from "@nightshift/flows";
 
 type Size = { width: number; height: number };
 type Box = Size & { x: number; y: number };

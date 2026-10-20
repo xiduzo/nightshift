@@ -1,0 +1,69 @@
+/**
+ * Pure edits on a flow draft. The editor keeps the draft as a `Flow` and every
+ * change goes through one of these, so the JSON on disk is exactly the draft.
+ * The words the editor shows stay in the app.
+ */
+
+export {
+	checkDraft,
+	type DraftCheckOptions,
+	type DraftMessages,
+	type DraftSchemaIssue,
+	type FlowCheck,
+	isSavable,
+} from "./check";
+export {
+	addEdge,
+	addNode,
+	calledFlow,
+	callersOf,
+	edgeInLoop,
+	moveNode,
+	type ProjectFlowMap,
+	removeEdge,
+	removeNode,
+	renameNode,
+	setInputs,
+	setOutputs,
+	setPolicyValue,
+	setVariables,
+	updateEdge,
+	updateNode,
+} from "./graph";
+export {
+	uniqueName,
+	uniqueOutputName,
+} from "./names";
+export {
+	commandNode,
+	defaultEach,
+	emptySource,
+	emptyUntil,
+	type NodeDefaults,
+	newElementFlow,
+	newFlow,
+	type Position,
+	withConnections,
+	withDecidedBy,
+	withValueBy,
+	withWrites,
+} from "./nodes";
+export {
+	isOptionNode,
+	type NodeOption,
+	nodeOptions,
+	type OptionNode,
+	removeOutcome,
+	renameOutcome,
+	restoreAgentOutcomes,
+	restoreCallEach,
+	restoreOutcome,
+	setAgentOutcomes,
+	setCallEach,
+	uniqueOptionName,
+	withOptions,
+} from "./outcomes";
+export {
+	renameInput,
+	renameVariable,
+} from "./refs";

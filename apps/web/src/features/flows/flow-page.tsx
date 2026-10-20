@@ -1,4 +1,4 @@
-import { flowNameSchema } from "@nightshift/flows";
+import { flowNameSchema, newFlow } from "@nightshift/flows";
 import {
 	Alert,
 	AlertDescription,
@@ -22,7 +22,7 @@ import { type ReactNode, useState } from "react";
 import { projectQueries } from "@/features/projects";
 import { type Crumb, SiteHeader } from "@/shared/page";
 import { FlowEditor } from "./editor/flow-editor";
-import { newFlow } from "./flow-draft";
+
 import { flowQueries } from "./queries";
 
 export function FlowPage({

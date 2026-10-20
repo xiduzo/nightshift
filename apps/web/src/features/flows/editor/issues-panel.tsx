@@ -1,4 +1,4 @@
-import type { FlowIssue } from "@nightshift/flows";
+import type { FlowCheck, FlowIssue } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Card } from "@nightshift/ui/components/card";
@@ -23,8 +23,6 @@ import {
 	TriangleAlertIcon,
 } from "lucide-react";
 import { useState } from "react";
-
-import type { FlowCheck } from "../flow-draft";
 
 /**
  * The validator's findings under the canvas, errors first. A Collapsible

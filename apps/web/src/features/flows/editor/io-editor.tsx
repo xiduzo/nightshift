@@ -4,6 +4,13 @@ import {
 	type FlowOutputDef,
 	type FlowVariableDef,
 	nameSchema,
+	renameInput,
+	renameVariable,
+	setInputs,
+	setOutputs,
+	setVariables,
+	uniqueName,
+	uniqueOutputName,
 	type VariableType,
 	variableTypeSchema,
 } from "@nightshift/flows";
@@ -24,16 +31,6 @@ import {
 import { Textarea } from "@nightshift/ui/components/textarea";
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, XIcon } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
-
-import {
-	renameInput,
-	renameVariable,
-	setInputs,
-	setOutputs,
-	setVariables,
-	uniqueName,
-	uniqueOutputName,
-} from "../flow-draft";
 
 import { OutputSchemaField } from "./output-schema-field";
 import { TemplateField } from "./template-field";

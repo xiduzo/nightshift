@@ -1,4 +1,5 @@
 import type { Flow, Policy } from "@nightshift/flows";
+import { setPolicyValue } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
@@ -10,9 +11,7 @@ import { Textarea } from "@nightshift/ui/components/textarea";
 import { Link } from "@tanstack/react-router";
 import { SettingsIcon, WorkflowIcon } from "lucide-react";
 import { useId } from "react";
-
-import { POLICY_DEFAULTS, setPolicyValue } from "../flow-draft";
-
+import { POLICY_DEFAULTS } from "../flow-draft";
 import {
 	Field,
 	InspectorHeader,
