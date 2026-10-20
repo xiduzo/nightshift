@@ -1,4 +1,4 @@
-import type { JsonValue } from "@nightshift/flows";
+import type { JsonValue, OutcomeColor } from "@nightshift/flows";
 
 import type {
 	AgentErrorKind,
@@ -115,6 +115,8 @@ export type GateOpenItem = ItemBase & {
 export type GateResolvedItem = ItemBase & {
 	kind: "gate-resolved";
 	choice: string;
+	/** The colour the Gate gave this choice, if any. */
+	color?: OutcomeColor;
 	note: string;
 };
 
@@ -279,6 +281,15 @@ export function applyEntries(
 		lastSeq: fresh[fresh.length - 1]?.seq ?? state.lastSeq,
 		lastWait,
 	};
+}
+
+/** The Gate that opened last: the one a gate-resolved entry answers. */
+function lastGateOpen(items: TranscriptItem[]): GateOpenItem | undefined {
+	for (let at = items.length - 1; at >= 0; at--) {
+		const item = items[at];
+		if (item?.kind === "gate-open") return item;
+	}
+	return undefined;
 }
 
 function applyStepEntries(
@@ -502,15 +513,21 @@ function applyStepEntries(
 					choices: event.choices,
 				});
 				break;
-			case "gate-resolved":
+			case "gate-resolved": {
+				const opened = lastGateOpen(items);
+				const color = opened?.choices.find(
+					(choice) => choice.name === event.choice,
+				)?.color;
 				push({
 					...base,
 					kind: "gate-resolved",
 					key: `gate-resolved:${entry.seq}`,
 					choice: event.choice,
+					...(color === undefined ? {} : { color }),
 					note: event.note,
 				});
 				break;
+			}
 			case "items-read":
 				push({
 					...base,

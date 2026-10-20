@@ -12,7 +12,7 @@ import {
 	TabsList,
 	TabsTrigger,
 } from "@nightshift/ui/components/tabs";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRightIcon, TriangleAlertIcon } from "lucide-react";
 import { useState } from "react";
 import {
@@ -675,7 +675,7 @@ function reasonColumns(now: number) {
 
 type LatestRow = FlowRun & { key: string };
 
-/** The latest runs, newest first, each with a button to open it. */
+/** The latest runs, newest first. A click on a row opens its run. */
 function LatestRuns({
 	runs,
 	now,
@@ -685,6 +685,7 @@ function LatestRuns({
 	now: number;
 	onNavigate: () => void;
 }) {
+	const navigate = useNavigate();
 	return (
 		<ChartSection
 			title="Latest runs"
@@ -697,6 +698,10 @@ function LatestRuns({
 					key: `${run.runId}-${run.startedAt}-${index}`,
 				}))}
 				getRowId={(row: LatestRow) => row.key}
+				onRowClick={(row) => {
+					onNavigate();
+					navigate({ to: "/runs/$runId", params: { runId: row.runId } });
+				}}
 			/>
 		</ChartSection>
 	);
@@ -711,13 +716,31 @@ function latestColumns(now: number, onNavigate: () => void) {
 			cell: ({ row: { original } }) => (
 				<span className="flex items-center gap-2">
 					<RunStatusBadge status={original.status} />
-					<time
-						dateTime={new Date(original.startedAt).toISOString()}
-						title={formatDateTime(original.startedAt)}
-						className="text-muted-foreground text-xs"
+					{/* The row opens the run on a click. This link does it for the keyboard. */}
+					<Button
+						variant="link"
+						size="xs"
+						className="h-auto px-0 font-normal text-muted-foreground"
+						nativeButton={false}
+						aria-label={`Open run, started ${formatDateTime(original.startedAt)}`}
+						render={
+							<Link
+								to="/runs/$runId"
+								params={{ runId: original.runId }}
+								onClick={(event) => {
+									event.stopPropagation();
+									onNavigate();
+								}}
+							/>
+						}
 					>
-						{formatRelative(original.startedAt, now)}
-					</time>
+						<time
+							dateTime={new Date(original.startedAt).toISOString()}
+							title={formatDateTime(original.startedAt)}
+						>
+							{formatRelative(original.startedAt, now)}
+						</time>
+					</Button>
 				</span>
 			),
 		}),
@@ -753,30 +776,6 @@ function latestColumns(now: number, onNavigate: () => void) {
 				headClassName: "text-right",
 				cellClassName: "text-right tabular-nums text-xs",
 			},
-		}),
-		latestColumn.display({
-			id: "open",
-			header: () => <span className="sr-only">Actions</span>,
-			cell: ({ row: { original } }) => (
-				<Button
-					variant="link"
-					size="xs"
-					className="h-auto px-0"
-					nativeButton={false}
-					aria-label={`Open run, started ${formatDateTime(original.startedAt)}`}
-					render={
-						<Link
-							to="/runs/$runId"
-							params={{ runId: original.runId }}
-							onClick={onNavigate}
-						/>
-					}
-				>
-					Open run
-					<ArrowRightIcon data-icon="inline-end" />
-				</Button>
-			),
-			meta: { headClassName: "w-28", cellClassName: "text-right" },
 		}),
 	]);
 }

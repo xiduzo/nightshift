@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
 
-import { deriveOpenGate, deriveSteps } from "../events";
+import { deriveOpenGate, deriveSteps, type GateChoice } from "../events";
 import { createSandbox, type Sandbox, TEST_DEVICE_ID } from "../test-support";
 import { readTranscriptFile } from "../transcripts";
 import {
@@ -22,11 +22,7 @@ import {
  * `RunResumed`) is appended by hand where a test needs it.
  */
 
-const gate = (
-	id: string,
-	question: string,
-	choices: { name: string; description?: string }[],
-) => ({
+const gate = (id: string, question: string, choices: GateChoice[]) => ({
 	id,
 	type: "decision" as const,
 	position: { x: 0, y: 0 },
@@ -244,6 +240,32 @@ describe("the Gate node", () => {
 			visit: 1,
 			outcome: "approve",
 		});
+	});
+
+	test("an option's colour goes with its choice: the log, the checkpoint and the transcript", async () => {
+		const choices: GateChoice[] = [
+			{ name: "ready", description: "Ship it", color: "green" },
+			{ name: "revise" },
+		];
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "gate",
+				nodes: [gate("gate", "Ready?", choices)],
+				edges: [],
+			}),
+		);
+		const first = await drive(h, {});
+		const [gateStep] = deriveSteps(await h.events());
+		expect(payloads(await h.events(), "GateOpened")).toEqual([
+			{ question: "Ready?", choices },
+		]);
+		expect(first.state.pending).toMatchObject({ choices });
+		expect(
+			(await readTranscriptFile(gateStep?.transcriptPath as string)).map(
+				(e) => e.event,
+			),
+		).toEqual([{ type: "gate-open", question: "Ready?", choices }]);
 	});
 
 	test("an answer without a note, and a choice without an edge, is a chosen end", async () => {

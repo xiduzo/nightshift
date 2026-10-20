@@ -1,20 +1,33 @@
 import { describe, expect, test } from "bun:test";
 
 import type { StepEvent, TranscriptEntry } from "./api-types";
-import { applyEntries, emptyRunTranscript, type ToolItem } from "./transcript";
+import {
+	applyEntries,
+	emptyRunTranscript,
+	type GateResolvedItem,
+	type ToolItem,
+	type TranscriptItem,
+} from "./transcript";
 
-function toolItem(events: StepEvent[]): ToolItem | undefined {
-	const entries: TranscriptEntry[] = events.map((event, seq) => ({
-		seq,
+function entriesOf(events: StepEvent[], from = 0): TranscriptEntry[] {
+	return events.map((event, at) => ({
+		seq: from + at,
 		stepId: "step",
 		sessionId: "s1",
-		at: seq,
+		at: from + at,
 		event,
 	}));
-	const state = applyEntries(emptyRunTranscript, entries);
-	return state.steps
-		.get("step")
-		?.items.find((item): item is ToolItem => item.kind === "tool");
+}
+
+function itemsOf(entries: TranscriptEntry[][]): TranscriptItem[] {
+	const state = entries.reduce(applyEntries, emptyRunTranscript);
+	return state.steps.get("step")?.items ?? [];
+}
+
+function toolItem(events: StepEvent[]): ToolItem | undefined {
+	return itemsOf([entriesOf(events)]).find(
+		(item): item is ToolItem => item.kind === "tool",
+	);
 }
 
 describe("an agent's tool call", () => {
@@ -48,5 +61,26 @@ describe("an agent's tool call", () => {
 		]);
 		expect(item?.result).toBe("a.txt");
 		expect(item?.failed).toBeUndefined();
+	});
+});
+
+describe("an answered Gate", () => {
+	const opened: StepEvent = {
+		type: "gate-open",
+		question: "Ready?",
+		choices: [{ name: "ready", color: "green" }, { name: "revise" }],
+	};
+	const answered = (choice: string) =>
+		itemsOf([
+			entriesOf([opened]),
+			entriesOf([{ type: "gate-resolved", choice, note: "" }], 1),
+		]).find((item): item is GateResolvedItem => item.kind === "gate-resolved");
+
+	test("shows the colour the Gate gave the choice, from an earlier batch", () => {
+		expect(answered("ready")?.color).toBe("green");
+	});
+
+	test("without a colour on the choice has none", () => {
+		expect(answered("revise")?.color).toBeUndefined();
 	});
 });

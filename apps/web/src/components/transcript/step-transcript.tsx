@@ -1155,7 +1155,7 @@ function GateQuestion({
 
 /** The answer a person gave, and their note. */
 function GateResolved({ item }: { item: GateResolvedItem }) {
-	const { text } = outcomeStyle(item.choice);
+	const { text } = outcomeStyle(item.choice, item.color);
 	return (
 		<ResultCard
 			icon={HandIcon}

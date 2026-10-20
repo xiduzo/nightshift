@@ -17,7 +17,7 @@ import type {
 import type { DeviceRegistry } from "./device/registry";
 import type { WorkRelay } from "./device/remote";
 import type { Device } from "./device/types";
-import type { RunWarningKind } from "./events";
+import type { GateChoice, RunWarningKind } from "./events";
 import type { ArchiveRef } from "./exchange/archive";
 import type { RunCommandInput, RunCommandKind } from "./exchange/commands";
 import type { EngineExchange } from "./exchange/engine-exchange";
@@ -131,7 +131,7 @@ export type StepSummary = {
 	 */
 	gate: {
 		question: string;
-		choices: { name: string; description?: string }[];
+		choices: GateChoice[];
 		openedAt: number;
 	} | null;
 };
@@ -358,7 +358,7 @@ export type GateEvent =
 	| {
 			type: "gate-open";
 			question: string;
-			choices: { name: string; description?: string }[];
+			choices: GateChoice[];
 	  }
 	| { type: "gate-resolved"; choice: string; note: string };
 
@@ -462,7 +462,7 @@ export type OpenGate = {
 	nodeId: string;
 	/** The rendered question. */
 	question: string;
-	choices: { name: string; description?: string }[];
+	choices: GateChoice[];
 	openedAt: number;
 	walker: RunWalker;
 	/** An answer is on its way to the Walker. */

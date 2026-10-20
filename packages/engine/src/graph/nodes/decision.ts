@@ -1,5 +1,5 @@
 import type { DecisionNode } from "@nightshift/flows";
-import type { StepOutputs } from "../../events";
+import type { GateChoice, StepOutputs } from "../../events";
 import {
 	endedAtReason,
 	type NodeAction,
@@ -122,4 +122,13 @@ export function visibleOptions(
 			? { name: option.name }
 			: { name: option.name, description: option.description },
 	);
+}
+
+/** The options as a Gate shows them to a person: the visible ones, with their colour. */
+export function gateChoices(node: DecisionNode): GateChoice[] {
+	return node.options.map(({ name, description, color }) => ({
+		name,
+		...(description === undefined ? {} : { description }),
+		...(color === undefined ? {} : { color }),
+	}));
 }

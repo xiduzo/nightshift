@@ -82,7 +82,7 @@ export function GateAnswer({
 				</FieldLegend>
 				<div className="grid gap-2 sm:grid-cols-[repeat(auto-fill,minmax(13rem,1fr))]">
 					{choices.map((choice) => {
-						const style = outcomeStyle(choice.name);
+						const style = outcomeStyle(choice.name, choice.color);
 						const Icon = style.icon;
 						const sending =
 							resolve.isPending && resolve.variables?.choice === choice.name;

@@ -12,7 +12,7 @@ import { RESUME_RULES, resumePoint } from "../../resume-point";
 import { askNodeId, route, type StepEnd, scopeOf } from "../../route";
 import type { PendingGate, ResumeValue, RunStateValues } from "../../state";
 import { beginStep, type OpenStep } from "../../step-runner";
-import { type Chooser, decisionOutputs, visibleOptions } from "../decision";
+import { type Chooser, decisionOutputs, gateChoices } from "../decision";
 
 /**
  * A Decision decided by a person: a Gate. It asks the rendered prompt in
@@ -178,7 +178,7 @@ async function open(
 	const { stepId, visit } = step;
 	try {
 		const question = renderTemplate(node.prompt, step.tctx);
-		const choices = visibleOptions(node);
+		const choices = gateChoices(node);
 		await ctx.log.append({
 			type: "GateOpened",
 			runId: ctx.run.id,

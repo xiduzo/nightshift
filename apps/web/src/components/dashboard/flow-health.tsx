@@ -269,32 +269,9 @@ function flowHealthColumns(
 				/>
 			),
 			meta: {
-				headClassName: "text-right w-56",
-				cellClassName: "text-right tabular-nums",
+				headClassName: "pr-6 text-right w-56",
+				cellClassName: "pr-6 text-right tabular-nums",
 			},
-		}),
-		column.display({
-			id: "open",
-			header: () => <span className="sr-only">Actions</span>,
-			cell: ({ row: { original } }) =>
-				original.last ? (
-					<Button
-						variant="link"
-						size="xs"
-						className="h-auto px-0"
-						nativeButton={false}
-						aria-label={`Open run, the last run of ${original.name}`}
-						// The row opens the details. This button opens the run.
-						onClick={(event) => event.stopPropagation()}
-						render={
-							<Link to="/runs/$runId" params={{ runId: original.last.runId }} />
-						}
-					>
-						Open run
-						<ArrowRightIcon data-icon="inline-end" />
-					</Button>
-				) : null,
-			meta: { headClassName: "pr-6 w-28", cellClassName: "pr-6 text-right" },
 		}),
 	]);
 }

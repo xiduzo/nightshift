@@ -12,6 +12,7 @@ import type {
 	JsonValue,
 	NodeOutputs,
 	Outcome,
+	OutcomeColor,
 	WaitUntil,
 } from "@nightshift/flows";
 import { sql } from "drizzle-orm";
@@ -48,7 +49,12 @@ export type StepOutputs = Record<string, JsonValue>;
 /** Input values of a flow, by input name. */
 export type InputValues = Record<string, JsonValue>;
 
-export type GateChoice = { name: string; description?: string };
+/** One choice of a Gate: an option of its Decision node, with the colour the node gives it. */
+export type GateChoice = {
+	name: string;
+	description?: string;
+	color?: OutcomeColor;
+};
 
 /**
  * Where a step runs: null at the top level of the run's flow, or inside a

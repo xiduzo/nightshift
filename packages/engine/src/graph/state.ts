@@ -1,8 +1,8 @@
 import { withLangGraph } from "@langchain/langgraph/zod";
-import type { JsonValue } from "@nightshift/flows";
+import { type JsonValue, outcomeColorSchema } from "@nightshift/flows";
 import { z } from "zod";
 
-import type { StepOutputs, WaitReason } from "../events";
+import type { GateChoice, StepOutputs, WaitReason } from "../events";
 import type { StepOutcome, TranscriptEntry } from "../types";
 
 /**
@@ -119,7 +119,11 @@ const pendingGateSchema = z.object({
 	visit: z.number(),
 	question: z.string(),
 	choices: z.array(
-		z.object({ name: z.string(), description: z.string().optional() }),
+		z.object({
+			name: z.string(),
+			description: z.string().optional(),
+			color: outcomeColorSchema.optional(),
+		}),
 	),
 });
 const pendingSchema = z.discriminatedUnion("kind", [
@@ -223,7 +227,7 @@ export type Parked =
 			stepId: string;
 			nodeId: string;
 			question: string;
-			choices: { name: string; description?: string }[];
+			choices: GateChoice[];
 	  }
 	| {
 			kind: "parked";

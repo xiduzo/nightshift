@@ -57,7 +57,7 @@ export function GateChoiceForm({
 				className="grid gap-2"
 			>
 				{gate.choices.map((option) => {
-					const style = outcomeStyle(option.name);
+					const style = outcomeStyle(option.name, option.color);
 					const Icon = style.icon;
 					return (
 						<FieldLabel key={option.name} htmlFor={`${id}-${option.name}`}>
