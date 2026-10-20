@@ -30,7 +30,7 @@ import {
 	formatToolInput,
 	summarizeToolInput,
 	type ToolItem,
-} from "./transcript";
+} from "../transcript";
 
 const RESULT_PREVIEW_CHARS = 1500;
 const RESULT_PREVIEW_LINES = 20;
