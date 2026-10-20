@@ -1635,6 +1635,31 @@ describe("watchRun", () => {
 		expect(entriesOf(items).map((e) => e.seq)).toEqual([3, 4]);
 	});
 
+	test("ends when the engine is disposed, so the watcher reconnects to the next one", async () => {
+		const { harness, sessions } = scriptedHarness({ hang: true });
+		const daemon = makeDaemon(harness);
+		const engine = daemon.space(sandbox.spaceId);
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([agent("worker", "Go")]),
+		});
+		await waitFor(() => sessions[0]);
+
+		const items: RunStreamItem[] = [];
+		const watching = (async () => {
+			for await (const item of engine.watchRun(run.id, {
+				signal: new AbortController().signal,
+			})) {
+				items.push(item);
+			}
+		})();
+		await waitFor(() => items.length > 0);
+
+		await daemon.dispose();
+		await watching;
+		expect(items[0]).toEqual({ kind: "status", status: "running" });
+	});
+
 	test("rejects an unknown run", async () => {
 		const engine = makeEngine(scriptedHarness().harness);
 		const iterator = engine

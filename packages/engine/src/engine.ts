@@ -1025,8 +1025,15 @@ export function createEngine(
 				await runner.sleeps.wake(runId, { early: true, signal: name });
 			},
 
-			watchRun(runId, { signal, afterSeq }) {
-				return watch(runId, spaceId, signal, afterSeq ?? 0);
+			watchRun(runId, { signal: watching, afterSeq }) {
+				// A disposed engine publishes nothing more on its bus: the watch
+				// ends with it, so the watcher reconnects to the next engine.
+				return watch(
+					runId,
+					spaceId,
+					AbortSignal.any([watching, signal]),
+					afterSeq ?? 0,
+				);
 			},
 		};
 	}
