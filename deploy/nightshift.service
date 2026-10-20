@@ -16,7 +16,17 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-Type=simple
+# Night Shift tells systemd when it serves (READY=1), and pings the watchdog
+# every 15 s (WATCHDOG=1) from the same timers as its own work. A Night Shift
+# whose timers stopped, or that hangs, misses the pings: after WatchdogSec,
+# systemd kills it and Restart= starts it again. Bun cannot send to the
+# notify socket itself: it runs systemd-notify, which waits until systemd
+# has the message. NotifyAccess=all lets that child process speak for it.
+Type=notify
+NotifyAccess=all
+WatchdogSec=30
+# Setting up the database and picking up interrupted runs can take a while.
+TimeoutStartSec=5min
 User=nightshift
 Group=nightshift
 WorkingDirectory=~
@@ -41,7 +51,9 @@ LoadCredential=BETTER_AUTH_SECRET:/etc/nightshift/auth-secret
 #LoadCredential=GITHUB_TOKEN:/etc/nightshift/github-token
 
 # A stop gives the database up at once. Exit code 3: another Night Shift took
-# the database. Start again, and it waits until that one stops.
+# the database. Start again, and it waits until that one stops. on-failure
+# also covers the watchdog and an error nothing caught (exit code 1). A stop
+# that hangs gets SIGKILL after TimeoutStopSec.
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=10

@@ -35,5 +35,13 @@ ENV NIGHTSHIFT_DATA_DIR=/data \
 	NIGHTSHIFT_HOST=on
 VOLUME /data
 EXPOSE 3000
+# Healthy while Night Shift's heartbeat in the database is fresh. It reads
+# the database in NIGHTSHIFT_DATA_DIR, not HTTP: a Night Shift whose timers
+# stopped still answers HTTP. Docker Swarm (and Dokploy) replaces an
+# unhealthy container. Plain Docker and Docker Compose only mark it
+# unhealthy. The start period covers the database setup and the runs it
+# picks up again.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=2m --retries=3 \
+	CMD ["nightshift", "health"]
 ENTRYPOINT ["nightshift"]
 CMD ["serve"]

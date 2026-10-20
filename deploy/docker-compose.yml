@@ -11,6 +11,9 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
     restart: unless-stopped
+    # The image's health check marks a Night Shift that stops responding as
+    # unhealthy (`docker compose ps`). Compose does not restart it for that:
+    # Docker Swarm does (Dokploy).
     # The name other computers show for this Host.
     hostname: nightshift
     environment:

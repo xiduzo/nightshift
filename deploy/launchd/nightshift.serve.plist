@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Night Shift on a Mac without a window: `nightshift serve` as a launchd
+  agent. It starts when you log in, and launchd starts it again whenever it
+  stops. Use it with nightshift.health.plist, which restarts a Night Shift
+  that does not respond.
+
+    sed "s|/Users/YOU|$HOME|g" nightshift.serve.plist > ~/Library/LaunchAgents/nightshift.serve.plist
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/nightshift.serve.plist
+
+  The data folder is ~/Library/Application Support/Night Shift, as for the
+  desktop app. The desktop app then opens its window on this Night Shift.
+  Put the folders of the agent CLIs (claude, codex) in PATH below.
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>nightshift.serve</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/local/bin/nightshift</string>
+		<string>serve</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/Users/YOU/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>/Users/YOU/Library/Logs/nightshift.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/YOU/Library/Logs/nightshift.log</string>
+</dict>
+</plist>

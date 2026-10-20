@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The watchdog of nightshift.serve.plist: every 60 s, `nightshift health`
+  with its restart option checks that Night Shift responds. When it does
+  not (twice, 15 s apart), it stops it, and launchd starts it again. (An
+  XML comment cannot show the option's two dashes.)
+
+    sed "s|/Users/YOU|$HOME|g" nightshift.health.plist > ~/Library/LaunchAgents/nightshift.health.plist
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/nightshift.health.plist
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>nightshift.health</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/local/bin/nightshift</string>
+		<string>health</string>
+		<string>--restart</string>
+	</array>
+	<key>StartInterval</key>
+	<integer>60</integer>
+	<key>StandardOutPath</key>
+	<string>/Users/YOU/Library/Logs/nightshift-health.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/YOU/Library/Logs/nightshift-health.log</string>
+</dict>
+</plist>
