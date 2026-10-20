@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { join } from "node:path";
-import { harnessFacts } from "@nightshift/agents/harness-facts";
-import type { McpServerConfig } from "@nightshift/agents/types";
+import type { McpServerConfig } from "@nightshift/agents";
+import { harnessFacts } from "@nightshift/agents";
+import { fixturePath } from "@nightshift/agents/testing";
 import type { ToolNode } from "@nightshift/flows";
 import { coerceArguments } from "../device/tool-call";
 import { deriveSteps } from "../events";
@@ -19,24 +19,13 @@ import {
 
 /**
  * The Tool node on the compiled graph, against the fake stdio MCP server
- * of `@nightshift/agents` (`fixtures/fake-mcp.ts`), with a real run log
+ * of `@nightshift/agents/testing` (`fake-mcp.ts`), with a real run log
  * and MemorySaver.
  */
 
 const fakeMcp: McpServerConfig = {
 	command: process.execPath,
-	args: [
-		join(
-			import.meta.dir,
-			"..",
-			"..",
-			"..",
-			"agents",
-			"src",
-			"fixtures",
-			"fake-mcp.ts",
-		),
-	],
+	args: [fixturePath("fake-mcp.ts")],
 	env: {},
 };
 

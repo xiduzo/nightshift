@@ -7,7 +7,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { settleCost, startPriceUpdates } from "../pricing";
+import { settleCost, startPriceUpdates } from "../../pricing";
 
 const usage = { inputTokens: 1_000_000, outputTokens: 100_000 };
 const list = [

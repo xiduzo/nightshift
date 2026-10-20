@@ -2,10 +2,10 @@ import type {
 	CliCheck,
 	CliToolCheck,
 	HarnessModels,
+	HarnessName,
 	McpServerConfig,
 	McpTestResult,
 } from "@nightshift/agents";
-import type { HarnessName } from "@nightshift/agents/types";
 import type { Permissions, Session } from "@nightshift/auth";
 import type { DeviceKeyAccess } from "@nightshift/auth/device-keys";
 import type { HostAccess } from "@nightshift/auth/host-access";

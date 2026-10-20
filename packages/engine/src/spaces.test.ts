@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { fakeHarness } from "@nightshift/agents/fake";
+import { fakeHarness } from "@nightshift/agents/testing";
 import {
 	agentSession,
 	clone,

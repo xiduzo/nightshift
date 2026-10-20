@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { fakeHarness, reportingScript } from "@nightshift/agents/fake";
+import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import {
 	clone,
 	device as deviceTable,

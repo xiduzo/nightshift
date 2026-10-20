@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { chmod, copyFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import type { AgentHarness, AgentSessionInput } from "@nightshift/agents";
 import {
 	fakeDecider,
 	fakeHarness,
 	reportingScript,
-} from "@nightshift/agents/fake";
-import type { AgentHarness, AgentSessionInput } from "@nightshift/agents/types";
+} from "@nightshift/agents/testing";
 import type {
 	AgentNode,
 	CallEach,

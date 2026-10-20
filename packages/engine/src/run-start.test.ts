@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { defaultDeciderModel } from "@nightshift/agents/decider";
-import { HARNESS_LABELS } from "@nightshift/agents/harness-facts";
-import type { AgentHarness, Decider } from "@nightshift/agents/types";
+import type { AgentHarness, Decider } from "@nightshift/agents";
+import { defaultDeciderModel, HARNESS_LABELS } from "@nightshift/agents";
 import type {
 	AgentNode,
 	DecisionNode,

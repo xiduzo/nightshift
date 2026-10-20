@@ -1,4 +1,3 @@
-import { harnessNoun } from "@nightshift/agents/harness-facts";
 import type {
 	AgentHarness,
 	Decider,
@@ -8,7 +7,8 @@ import type {
 	HarnessName,
 	ValueInput,
 	ValueResult,
-} from "@nightshift/agents/types";
+} from "@nightshift/agents";
+import { harnessNoun } from "@nightshift/agents";
 import {
 	type AgentHarnessName,
 	type AgentNode,

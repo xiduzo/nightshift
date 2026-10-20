@@ -1,4 +1,4 @@
-import type { AgentEvent } from "@nightshift/agents/types";
+import type { AgentEvent } from "@nightshift/agents";
 import type { Database } from "@nightshift/db";
 import type {
 	AgentProfileSettings,

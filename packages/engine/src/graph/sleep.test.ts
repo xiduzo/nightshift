@@ -5,7 +5,7 @@ import {
 	fakeHarness,
 	reportingScript,
 	usageLimitScript,
-} from "@nightshift/agents/fake";
+} from "@nightshift/agents/testing";
 import type { WaitNode } from "@nightshift/flows";
 
 import { deriveRunState, deriveSleep, deriveSteps } from "../events";

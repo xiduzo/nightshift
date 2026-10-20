@@ -51,13 +51,6 @@ export {
 	testMcpServer,
 } from "./doctor";
 export {
-	type FakeDecider,
-	type FakeDecision,
-	type FakeValue,
-	fakeDecider,
-	fakeHarness,
-} from "./fake";
-export {
 	type GrokBuildHarnessOptions,
 	grokBuildHarness,
 	grokPolicy,
@@ -77,6 +70,7 @@ export {
 	type McpToolCall,
 	type McpToolInfo,
 	toolCallOf,
+	toolInfo,
 	toolResultText,
 	withMcpClient,
 } from "./mcp";

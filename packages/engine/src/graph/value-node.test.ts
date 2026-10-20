@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
-import { fakeDecider } from "@nightshift/agents/fake";
+import { fakeDecider } from "@nightshift/agents/testing";
 import type { ValueNode } from "@nightshift/flows";
 
 import { deriveSteps } from "../events";

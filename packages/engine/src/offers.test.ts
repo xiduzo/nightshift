@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { fakeHarness } from "@nightshift/agents/fake";
+import { fakeHarness } from "@nightshift/agents/testing";
 import { event, user } from "@nightshift/db/schema";
 import type { AgentProfileSettings, Flow, FlowNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";

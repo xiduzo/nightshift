@@ -8,7 +8,7 @@ import {
 	fakeHarness,
 	reportingScript,
 	usageLimitScript,
-} from "@nightshift/agents/fake";
+} from "@nightshift/agents/testing";
 import type { CallEach, CallEachNode, CallNode, Flow } from "@nightshift/flows";
 
 import { type DerivedStep, deriveSteps } from "../events";

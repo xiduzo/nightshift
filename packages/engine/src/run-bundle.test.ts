@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, statSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { fakeHarness, reportingScript } from "@nightshift/agents/fake";
+import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import { createDb } from "@nightshift/db";
 import { event, run, step } from "@nightshift/db/schema";
 import type { AgentNode, CommandNode, Flow } from "@nightshift/flows";

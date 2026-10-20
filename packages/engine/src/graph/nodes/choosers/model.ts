@@ -1,4 +1,4 @@
-import type { DecisionInput, DecisionResult } from "@nightshift/agents/types";
+import type { DecisionInput, DecisionResult } from "@nightshift/agents";
 import {
 	type DecisionNode,
 	optionProblem,

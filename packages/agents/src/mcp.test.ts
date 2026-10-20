@@ -5,13 +5,13 @@ import { testMcpServer } from "./doctor";
 import { callMcpTool, listMcpTools, withMcpClient } from "./mcp";
 import type { McpServerConfig } from "./types";
 
-/** The shared MCP client against the fake stdio server in `fixtures/fake-mcp.ts`. */
+/** The shared MCP client against the fake stdio server in `testing/fixtures/fake-mcp.ts`. */
 
 export const fakeMcpConfig = (
 	env: Record<string, string> = {},
 ): McpServerConfig => ({
 	command: process.execPath,
-	args: [join(import.meta.dir, "fixtures", "fake-mcp.ts")],
+	args: [join(import.meta.dir, "testing", "fixtures", "fake-mcp.ts")],
 	env,
 });
 

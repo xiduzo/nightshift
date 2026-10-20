@@ -1,4 +1,4 @@
-import { harnessFacts } from "@nightshift/agents/harness-facts";
+import { harnessFacts } from "@nightshift/agents";
 import {
 	device as deviceTable,
 	run,

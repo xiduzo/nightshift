@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { type FakeHarness, fakeHarness } from "@nightshift/agents/fake";
-import type { AgentHarness } from "@nightshift/agents/types";
+import type { AgentHarness } from "@nightshift/agents";
+import { type FakeHarness, fakeHarness } from "@nightshift/agents/testing";
 import type {
 	AgentNode,
 	CommandNode,

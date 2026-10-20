@@ -9,8 +9,8 @@ import {
 	claudeMcpConfig,
 	cliAllowRules,
 } from "./claude-code";
-import { fakeBin } from "./fixtures/bin";
 import { REPORT_TOOL_ID } from "./step-report";
+import { fakeBin } from "./testing/fixtures/bin";
 import type { AgentEvent, AgentSessionInput, StepReportSpec } from "./types";
 
 let dir: string;

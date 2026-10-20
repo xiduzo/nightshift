@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fakeBin } from "./fixtures/bin";
 import {
 	createOpencodeObserver,
 	opencodeHarness,
@@ -11,6 +10,7 @@ import {
 	opencodeSessionConfig,
 	rewriteServe,
 } from "./opencode";
+import { fakeBin } from "./testing/fixtures/bin";
 import type { SdkSignals } from "./translate";
 import type { AgentEvent, AgentSessionInput } from "./types";
 

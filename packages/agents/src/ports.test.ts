@@ -5,10 +5,10 @@ import { claudeCodeHarness } from "./claude-code";
 import { codexHarness } from "./codex";
 import { DECIDER_ADAPTERS, tanstackDecider } from "./decider";
 import { HARNESS_ADAPTERS } from "./doctor";
-import { fakeDecider, fakeHarness } from "./fake";
 import { grokBuildHarness } from "./grok-build";
 import { shellQuote } from "./harness-facts";
 import { opencodeHarness } from "./opencode";
+import { fakeDecider, fakeHarness } from "./testing/fake";
 import type { AgentHarness, Decider, DeciderName, HarnessName } from "./types";
 
 /**

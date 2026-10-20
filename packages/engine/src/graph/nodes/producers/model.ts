@@ -1,4 +1,4 @@
-import type { ValueResult } from "@nightshift/agents/types";
+import type { ValueResult } from "@nightshift/agents";
 import { renderTemplate, type ValueNode } from "@nightshift/flows";
 
 import { schemaProblem } from "../../../output-schema";

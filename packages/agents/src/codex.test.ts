@@ -9,7 +9,7 @@ import {
 	codexPolicy,
 	codexSetup,
 } from "./codex";
-import { fakeBin } from "./fixtures/bin";
+import { fakeBin } from "./testing/fixtures/bin";
 import type { AgentEvent, AgentSessionInput } from "./types";
 
 let dir: string;

@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { defaultDeciderModel } from "@nightshift/agents/decider";
-import { fakeHarness, reportingScript } from "@nightshift/agents/fake";
 import type {
 	AgentHarness,
 	Decider,
 	DecisionInput,
 	DecisionResult,
-} from "@nightshift/agents/types";
+} from "@nightshift/agents";
+import { defaultDeciderModel } from "@nightshift/agents";
+import { fakeHarness, reportingScript } from "@nightshift/agents/testing";
 import { event, lgCheckpoint, lgWrite, run, step } from "@nightshift/db/schema";
 import {
 	type AgentNode,

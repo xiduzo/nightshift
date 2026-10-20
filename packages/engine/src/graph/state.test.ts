@@ -5,7 +5,7 @@ import {
 	fakeHarness,
 	reportingScript,
 	usageLimitScript,
-} from "@nightshift/agents/fake";
+} from "@nightshift/agents/testing";
 
 import { createSandbox, type Sandbox } from "../test-support";
 import { STOP_TIME_REASON } from "./context";

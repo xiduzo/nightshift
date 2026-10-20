@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { AgentEvent, AgentSessionInput, DecisionInput } from "../types";
 import {
 	defaultFakeScript,
 	failingScript,
@@ -7,7 +8,6 @@ import {
 	reportingScript,
 	usageLimitScript,
 } from "./fake";
-import type { AgentEvent, AgentSessionInput, DecisionInput } from "./types";
 
 function input(overrides: Partial<AgentSessionInput> = {}): AgentSessionInput {
 	return {

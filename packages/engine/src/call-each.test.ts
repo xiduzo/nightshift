@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import type { AgentHarness } from "@nightshift/agents";
 import {
 	fakeDecider,
 	fakeHarness,
 	usageLimitScript,
-} from "@nightshift/agents/fake";
-import type { AgentHarness } from "@nightshift/agents/types";
+} from "@nightshift/agents/testing";
 import { event } from "@nightshift/db/schema";
 import type {
 	AgentNode,

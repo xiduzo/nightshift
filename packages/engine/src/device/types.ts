@@ -7,7 +7,7 @@ import type {
 	DecisionResult,
 	ValueInput,
 	ValueResult,
-} from "@nightshift/agents/types";
+} from "@nightshift/agents";
 import type {
 	AgentNode,
 	AgentProfileSettings,

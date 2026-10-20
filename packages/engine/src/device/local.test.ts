@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { defaultDeciderModel } from "@nightshift/agents/decider";
-import { fakeDecider, fakeHarness } from "@nightshift/agents/fake";
-import type { Decider, McpServerConfig } from "@nightshift/agents/types";
+import type { Decider, McpServerConfig } from "@nightshift/agents";
+import { defaultDeciderModel } from "@nightshift/agents";
+import {
+	fakeDecider,
+	fakeHarness,
+	fixturePath,
+} from "@nightshift/agents/testing";
 
 import { createSandbox, mustGit, type Sandbox } from "../test-support";
 import { type LocalDeviceDeps, localDevice } from "./local";
@@ -17,18 +21,7 @@ import type { Device, ExecEvent, SessionEvent, SessionInput } from "./types";
 
 const fakeMcp: McpServerConfig = {
 	command: process.execPath,
-	args: [
-		join(
-			import.meta.dir,
-			"..",
-			"..",
-			"..",
-			"agents",
-			"src",
-			"fixtures",
-			"fake-mcp.ts",
-		),
-	],
+	args: [fixturePath("fake-mcp.ts")],
 	env: {},
 };
 

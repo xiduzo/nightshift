@@ -61,7 +61,10 @@ describe("startPriceUpdates", () => {
 	test("fetches once, keeps the list in a file, and survives a broken download", async () => {
 		// A new list replaces the bundled one for the whole process: run it apart.
 		const child = Bun.spawn(
-			[process.execPath, join(import.meta.dir, "fixtures/price-updates.ts")],
+			[
+				process.execPath,
+				join(import.meta.dir, "testing/fixtures/price-updates.ts"),
+			],
 			{ stdout: "pipe", stderr: "inherit" },
 		);
 		const result = JSON.parse(await new Response(child.stdout).text());

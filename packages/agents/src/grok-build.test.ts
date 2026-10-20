@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fakeBin } from "./fixtures/bin";
 import { grokBuildHarness, grokPolicy } from "./grok-build";
+import { fakeBin } from "./testing/fixtures/bin";
 import type { AgentEvent, AgentSessionInput } from "./types";
 
 let dir: string;

@@ -1,9 +1,9 @@
-import type { CostSource } from "@nightshift/agents/pricing";
 import type {
 	AgentErrorKind,
 	AgentHarnessName,
 	AgentUsage,
-} from "@nightshift/agents/types";
+	CostSource,
+} from "@nightshift/agents";
 import type { Database } from "@nightshift/db";
 import { event, project, run } from "@nightshift/db/schema";
 import type {

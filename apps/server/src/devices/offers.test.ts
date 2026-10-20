@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fixturePath } from "@nightshift/agents/testing";
 import type { AppRouterClient } from "@nightshift/api/routers/index";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -18,7 +19,6 @@ import { RPCLink } from "@orpc/client/fetch";
 import {
 	type Daemon,
 	pair,
-	SERVER_DIR,
 	startDaemon,
 	stopDaemon,
 	waitFor,
@@ -37,10 +37,7 @@ import {
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), "nightshift-offers-")));
 const REMOTE = "https://example.com/acme/shared.git";
-const FAKE_CLAUDE = join(
-	SERVER_DIR,
-	"../../packages/agents/src/fixtures/fake-claude.ts",
-);
+const FAKE_CLAUDE = fixturePath("fake-claude.ts");
 /** Each fake Claude Code session on B writes its pid here, and its arguments. */
 const PIDS = join(root, "claude-pids");
 const ARGS = join(root, "claude-args");
