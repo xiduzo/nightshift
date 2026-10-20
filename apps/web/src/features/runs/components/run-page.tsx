@@ -41,7 +41,7 @@ import {
 import { runQueries } from "../queries";
 import { StepTranscript } from "../transcript/step-transcript";
 import { emptyTranscript } from "../transcript/transcript";
-import { RunDetails } from "./run-details";
+import { RunDetails } from "./details/run-details";
 import { FocusBreadcrumb, FocusChip, StepContext } from "./run-focus";
 import { RunGraph } from "./run-graph";
 import { RunActions, RunTitle } from "./run-header";
