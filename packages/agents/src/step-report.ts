@@ -6,6 +6,7 @@
  *   AI tool, `report_step`. The Claude Code adapter bridges it into the
  *   session over MCP, so the agent sees it as `mcp__tanstack__report_step`,
  *   and the harness adds that name to `--allowedTools` so it never prompts.
+ *   The harness's profile gives that name (`HarnessProfile.reportToolId`).
  * - Text (`plan`): plan mode denies every MCP tool, even an allowed one (the
  *   bridge cannot mark a tool read-only). The agent ends its final message
  *   with a `NIGHTSHIFT-REPORT: {...}` line instead.
@@ -23,7 +24,6 @@
  * result says it was refused (`isRefusedReport`).
  */
 import { toolDefinition } from "@tanstack/ai";
-import { BRIDGED_MCP_SERVER_NAME } from "@tanstack/ai-claude-code";
 import type {
 	AgentSessionInput,
 	StepReportOutcome,
@@ -32,9 +32,6 @@ import type {
 
 /** The tool name as the application registers it with `chat({ tools })`. */
 export const REPORT_TOOL_NAME = "report_step";
-
-/** The tool name as Claude Code sees it, for `--allowedTools`. */
-export const REPORT_TOOL_ID = `mcp__${BRIDGED_MCP_SERVER_NAME}__${REPORT_TOOL_NAME}`;
 
 /** What the tool returns to the agent after a valid report. */
 export const REPORT_ACK = "Step report recorded.";
@@ -173,16 +170,21 @@ export function textReportInstruction(rules: ReportRules): string {
 export type StepReportSetup = {
 	/** The prompt to send, with the report instruction appended. */
 	prompt: string;
-	/** `--allowedTools`, with the report tool added when it is used. */
+	/** `--allowedTools`, with the report tool added when it is used and has an id. */
 	allowedTools: string[] | undefined;
 	/** Pass the `report_step` tool to `chat()`. */
 	withTool: boolean;
 };
 
-/** What a step report adds to a session. Unchanged input without `stepReport`. */
+/**
+ * What a step report adds to a session. Unchanged input without
+ * `stepReport`. `reportToolId`: the report tool's name in the harness's
+ * allow rules (`HarnessProfile.reportToolId`).
+ */
 export function stepReportSetup(
 	input: Pick<AgentSessionInput, "prompt" | "stepReport" | "permissionMode">,
 	allowedTools: string[] | undefined,
+	reportToolId?: string,
 ): StepReportSetup {
 	const rules = reportRules(input.stepReport);
 	if (!rules) {
@@ -197,14 +199,22 @@ export function stepReportSetup(
 	}
 	return {
 		prompt: `${input.prompt}\n\n${toolReportInstruction(rules)}`,
-		allowedTools: [...new Set([...(allowedTools ?? []), REPORT_TOOL_ID])],
+		allowedTools: reportToolId
+			? [...new Set([...(allowedTools ?? []), reportToolId])]
+			: allowedTools,
 		withTool: true,
 	};
 }
 
-/** True for the report tool, with or without the bridge's MCP prefix. */
-export function isReportTool(name: string | undefined): boolean {
-	return name === REPORT_TOOL_NAME || name === REPORT_TOOL_ID;
+/** True for the report tool: by its own name, or by the harness's name for it. */
+export function isReportTool(
+	name: string | undefined,
+	reportToolId?: string,
+): boolean {
+	return (
+		name === REPORT_TOOL_NAME ||
+		(reportToolId !== undefined && name === reportToolId)
+	);
 }
 
 /** The start of the error `reportStepTool` gives an invalid report. */

@@ -18,8 +18,8 @@ import {
 	harnessSession,
 	type SessionReport,
 } from "./adapter-session";
+import { CLAUDE_CODE_PROFILE } from "./claude-code-profile";
 import { harnessFacts } from "./harness-facts";
-import { CLAUDE_CODE_PROFILE } from "./translate";
 import type {
 	AgentHarness,
 	AgentSessionInput,

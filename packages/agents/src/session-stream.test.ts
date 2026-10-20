@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { effortEnv } from "./claude-code";
+import { CLAUDE_CODE_PROFILE } from "./claude-code-profile";
 import { streamSession } from "./session-stream";
 import { createTranslator } from "./translate";
 import type { AgentEvent } from "./types";
@@ -41,7 +42,11 @@ async function collect(
 	return events;
 }
 
-const translator = () => createTranslator({ fallbackSessionId: "fallback" });
+const translator = () =>
+	createTranslator({
+		fallbackSessionId: "fallback",
+		profile: CLAUDE_CODE_PROFILE,
+	});
 
 describe("streamSession", () => {
 	test("passes a finished stream through", async () => {

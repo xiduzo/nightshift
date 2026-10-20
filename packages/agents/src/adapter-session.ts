@@ -114,7 +114,7 @@ export type AdapterSetup = {
  */
 export function sessionReport(
 	input: Pick<AgentSessionInput, "prompt" | "stepReport" | "permissionMode">,
-	spec: Pick<HarnessSpec, "report">,
+	spec: Pick<HarnessSpec, "report" | "profile">,
 	allowedTools?: string[],
 ): SessionReport {
 	const permissionMode =
@@ -123,7 +123,11 @@ export function sessionReport(
 			: spec.report === "tool"
 				? "default"
 				: "plan";
-	const report = stepReportSetup({ ...input, permissionMode }, allowedTools);
+	const report = stepReportSetup(
+		{ ...input, permissionMode },
+		allowedTools,
+		spec.profile.reportToolId,
+	);
 	return {
 		prompt: report.prompt,
 		tools: report.withTool ? [reportStepTool(input.stepReport)] : [],

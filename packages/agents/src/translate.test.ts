@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { CLAUDE_CODE_PROFILE, observeSdkMessage } from "./claude-code-profile";
 import {
 	createTranslator,
 	failureKind,
 	type HarnessProfile,
 	isNetworkText,
 	isUsageLimitText,
-	observeSdkMessage,
 	parseLegacyResetAt,
 	type SdkSignals,
 	type Translator,
@@ -42,7 +42,11 @@ function feed(
 	];
 }
 
-const newTranslator = () => createTranslator({ fallbackSessionId: "fallback" });
+const newTranslator = () =>
+	createTranslator({
+		fallbackSessionId: "fallback",
+		profile: CLAUDE_CODE_PROFILE,
+	});
 
 describe("createTranslator", () => {
 	test("maps a full session", () => {
@@ -496,7 +500,11 @@ describe("tool results", () => {
 
 describe("step reports", () => {
 	const reporting = () =>
-		createTranslator({ fallbackSessionId: "fallback", stepReport: true });
+		createTranslator({
+			fallbackSessionId: "fallback",
+			stepReport: true,
+			profile: CLAUDE_CODE_PROFILE,
+		});
 
 	const reportCall = (
 		input: unknown,
@@ -883,6 +891,7 @@ describe("step reports", () => {
 		const reviewing = () =>
 			createTranslator({
 				fallbackSessionId: "fallback",
+				profile: CLAUDE_CODE_PROFILE,
 				stepReport: {
 					outcomes: [{ name: "approved" }, { name: "changes-requested" }],
 					output: { type: "object" },
@@ -1066,7 +1075,10 @@ describe("network text", () => {
 
 describe("network errors", () => {
 	const newTranslator = () =>
-		createTranslator({ fallbackSessionId: "fallback" });
+		createTranslator({
+			fallbackSessionId: "fallback",
+			profile: CLAUDE_CODE_PROFILE,
+		});
 
 	test("a failed result with an API connection error", () => {
 		const translator = newTranslator();
@@ -1326,7 +1338,10 @@ describe("harness profiles", () => {
 	});
 
 	test("the raw cost fills in a chunk usage without one", () => {
-		const t = createTranslator({ fallbackSessionId: "f" });
+		const t = createTranslator({
+			fallbackSessionId: "f",
+			profile: CLAUDE_CODE_PROFILE,
+		});
 		t.observeSdk({
 			type: "result",
 			subtype: "success",

@@ -10,7 +10,6 @@ import {
 	harnessSession,
 	sessionReport,
 } from "./adapter-session";
-import { REPORT_TOOL_ID } from "./step-report";
 import type { SdkSignals } from "./translate";
 import type { AgentEvent, AgentSessionInput } from "./types";
 
@@ -36,6 +35,9 @@ function input(overrides: Partial<AgentSessionInput> = {}): AgentSessionInput {
 }
 
 const SESSION_EVENT = "fake.session-id";
+
+/** The harness's own name for the report tool. */
+const REPORT_TOOL_ID = "mcp__fake__report_step";
 
 const spec = (overrides: Partial<HarnessSpec> = {}): HarnessSpec => ({
 	profile: {
@@ -103,7 +105,14 @@ async function collect(stream: AsyncIterable<AgentEvent>) {
 
 describe("sessionReport", () => {
 	test("by-mode: the tool, except in plan mode", () => {
-		const byMode = spec();
+		const byMode = spec({
+			profile: {
+				label: "Fake",
+				sessionEvent: SESSION_EVENT,
+				createObserver: () => (signals: SdkSignals) => signals,
+				reportToolId: REPORT_TOOL_ID,
+			},
+		});
 		const tool = sessionReport(input({ stepReport: true }), byMode, ["Read"]);
 		expect(tool.tools.map((t) => t.name)).toEqual(["report_step"]);
 		expect(tool.allowedTools).toEqual(["Read", REPORT_TOOL_ID]);

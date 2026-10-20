@@ -5,7 +5,6 @@ import {
 	parseStepReport,
 	parseTextReport,
 	REPORT_ACK,
-	REPORT_TOOL_ID,
 	REPORT_TOOL_NAME,
 	type ReportRules,
 	reportInputSchema,
@@ -20,6 +19,9 @@ import {
 } from "./step-report";
 import type { StepReportSpec } from "./types";
 
+/** A harness's own name for the report tool, as Claude Code has one. */
+const REPORT_TOOL_ID = "mcp__tanstack__report_step";
+
 describe("stepReportSetup", () => {
 	test("changes nothing without stepReport", () => {
 		expect(
@@ -33,6 +35,7 @@ describe("stepReportSetup", () => {
 			const setup = stepReportSetup(
 				{ prompt: "Do it", permissionMode, stepReport: true },
 				["Read", REPORT_TOOL_ID],
+				REPORT_TOOL_ID,
 			);
 			expect(setup).toEqual({
 				prompt: `Do it\n\n${TOOL_REPORT_INSTRUCTION}`,
@@ -47,8 +50,18 @@ describe("stepReportSetup", () => {
 			stepReportSetup(
 				{ prompt: "p", permissionMode: "default", stepReport: true },
 				undefined,
+				REPORT_TOOL_ID,
 			).allowedTools,
 		).toEqual([REPORT_TOOL_ID]);
+	});
+
+	test("adds nothing to allowedTools when the harness has no id for the tool", () => {
+		expect(
+			stepReportSetup(
+				{ prompt: "p", permissionMode: "default", stepReport: true },
+				["Read"],
+			).allowedTools,
+		).toEqual(["Read"]);
 	});
 
 	test("plan mode reports with text, without the tool", () => {
@@ -62,10 +75,6 @@ describe("stepReportSetup", () => {
 			allowedTools: ["Read"],
 			withTool: false,
 		});
-	});
-
-	test("the tool id is the bridged MCP name", () => {
-		expect(REPORT_TOOL_ID).toBe("mcp__tanstack__report_step");
 	});
 });
 
