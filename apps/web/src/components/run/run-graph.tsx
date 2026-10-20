@@ -14,6 +14,7 @@ import {
 	nodeTypes,
 } from "@/components/flow/flow-node";
 import {
+	edgeColor,
 	edgeTypes,
 	type FlowCanvasEdge,
 	OutcomeMarkers,
@@ -92,12 +93,13 @@ export function RunGraph({
 				focusable: false,
 				data: {
 					outcome: edge.outcome,
+					color: edgeColor(flow.nodes, edge),
 					max: edge.max,
 					hasError: false,
 					traversals: traversals[edge.id] ?? 0,
 				},
 			})),
-		[flow.edges, traversals],
+		[flow.edges, flow.nodes, traversals],
 	);
 
 	return (

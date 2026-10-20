@@ -619,10 +619,11 @@ export function withOptions<T extends OptionNode>(
 ): T {
 	if (node.type === "decision") return { ...node, options };
 	if (node.type === "command") {
-		const exits = options.map(({ name, code, description }) => ({
+		const exits = options.map(({ name, code, description, color }) => ({
 			name,
 			...(code === undefined ? {} : { code }),
 			...(description === undefined ? {} : { description }),
+			...(color === undefined ? {} : { color }),
 		}));
 		return { ...node, exits };
 	}

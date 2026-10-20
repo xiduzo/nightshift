@@ -1,3 +1,4 @@
+import type { OutcomeColor } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
@@ -112,32 +113,161 @@ const KNOWN_STATES = {
 	},
 } satisfies Record<string, Style>;
 
-/** The colour family of an outcome. Edges and arrowheads come in these. */
-export type OutcomeTone = "pass" | "fail" | "needs-input" | "label";
-export const OUTCOME_TONES: OutcomeTone[] = [
-	"pass",
-	"fail",
-	"needs-input",
-	"label",
-];
+type ColorStyle = Pick<Style, "badge" | "text" | "color">;
 
-export function outcomeTone(outcome: Outcome): OutcomeTone {
-	return outcome === "pass" || outcome === "fail" || outcome === "needs-input"
-		? outcome
-		: "label";
-}
-
-const TONE_STYLE: Record<OutcomeTone, Omit<Style, "label">> = {
-	pass: KNOWN_STATES.pass,
-	fail: KNOWN_STATES.fail,
-	"needs-input": KNOWN_STATES["needs-input"],
-	label: {
-		icon: CircleDotIcon,
-		badge: "border-outcome-label/40 bg-outcome-label/10 text-outcome-label",
-		text: "text-outcome-label",
-		color: "var(--outcome-label)",
+/** The look of each outcome colour. Literal classes, so Tailwind finds them. */
+export const OUTCOME_COLOR_STYLE: Record<OutcomeColor, ColorStyle> = {
+	red: {
+		badge: "border-outcome-red/40 bg-outcome-red/10 text-outcome-red",
+		text: "text-outcome-red",
+		color: "var(--outcome-red)",
+	},
+	orange: {
+		badge: "border-outcome-orange/40 bg-outcome-orange/10 text-outcome-orange",
+		text: "text-outcome-orange",
+		color: "var(--outcome-orange)",
+	},
+	amber: {
+		badge: "border-outcome-amber/40 bg-outcome-amber/10 text-outcome-amber",
+		text: "text-outcome-amber",
+		color: "var(--outcome-amber)",
+	},
+	yellow: {
+		badge: "border-outcome-yellow/40 bg-outcome-yellow/10 text-outcome-yellow",
+		text: "text-outcome-yellow",
+		color: "var(--outcome-yellow)",
+	},
+	lime: {
+		badge: "border-outcome-lime/40 bg-outcome-lime/10 text-outcome-lime",
+		text: "text-outcome-lime",
+		color: "var(--outcome-lime)",
+	},
+	green: {
+		badge: "border-outcome-green/40 bg-outcome-green/10 text-outcome-green",
+		text: "text-outcome-green",
+		color: "var(--outcome-green)",
+	},
+	teal: {
+		badge: "border-outcome-teal/40 bg-outcome-teal/10 text-outcome-teal",
+		text: "text-outcome-teal",
+		color: "var(--outcome-teal)",
+	},
+	cyan: {
+		badge: "border-outcome-cyan/40 bg-outcome-cyan/10 text-outcome-cyan",
+		text: "text-outcome-cyan",
+		color: "var(--outcome-cyan)",
+	},
+	sky: {
+		badge: "border-outcome-sky/40 bg-outcome-sky/10 text-outcome-sky",
+		text: "text-outcome-sky",
+		color: "var(--outcome-sky)",
+	},
+	blue: {
+		badge: "border-outcome-blue/40 bg-outcome-blue/10 text-outcome-blue",
+		text: "text-outcome-blue",
+		color: "var(--outcome-blue)",
+	},
+	indigo: {
+		badge: "border-outcome-indigo/40 bg-outcome-indigo/10 text-outcome-indigo",
+		text: "text-outcome-indigo",
+		color: "var(--outcome-indigo)",
+	},
+	violet: {
+		badge: "border-outcome-violet/40 bg-outcome-violet/10 text-outcome-violet",
+		text: "text-outcome-violet",
+		color: "var(--outcome-violet)",
+	},
+	pink: {
+		badge: "border-outcome-pink/40 bg-outcome-pink/10 text-outcome-pink",
+		text: "text-outcome-pink",
+		color: "var(--outcome-pink)",
+	},
+	gray: {
+		badge: "border-outcome-gray/40 bg-outcome-gray/10 text-outcome-gray",
+		text: "text-outcome-gray",
+		color: "var(--outcome-gray)",
 	},
 };
+
+/**
+ * The colour an outcome takes when its node sets none, from words in its
+ * name: `failed` and `tests-failed` are red, `busy` amber, `none` gray.
+ * The first list with a match wins.
+ */
+const NAMED_COLORS: [OutcomeColor, readonly string[]][] = [
+	[
+		"red",
+		[
+			"fail",
+			"failed",
+			"failure",
+			"error",
+			"errors",
+			"broken",
+			"crashed",
+			"killed",
+			"rejected",
+			"denied",
+			"invalid",
+		],
+	],
+	[
+		"amber",
+		[
+			"needs-input",
+			"busy",
+			"waiting",
+			"blocked",
+			"retry",
+			"timeout",
+			"halted",
+			"interrupted",
+			"terminated",
+		],
+	],
+	[
+		"gray",
+		["none", "other", "empty", "skip", "skipped", "stopped", "cancelled"],
+	],
+	[
+		"green",
+		[
+			"pass",
+			"passed",
+			"success",
+			"succeeded",
+			"ok",
+			"done",
+			"approved",
+			"accepted",
+			"merged",
+			"valid",
+			"yes",
+		],
+	],
+];
+
+export function defaultOutcomeColor(outcome: Outcome): OutcomeColor {
+	const words = [outcome, ...outcome.split("-")];
+	for (const [color, names] of NAMED_COLORS) {
+		if (words.some((word) => names.includes(word))) return color;
+	}
+	return "cyan";
+}
+
+/** The colour an outcome shows: its own, else one from its name. */
+export function resolveOutcomeColor(
+	outcome: Outcome,
+	color?: OutcomeColor,
+): OutcomeColor {
+	return color ?? defaultOutcomeColor(outcome);
+}
+
+function outcomeIcon(outcome: Outcome): LucideIcon {
+	return outcome === "pass" || outcome === "fail" || outcome === "needs-input"
+		? KNOWN_STATES[outcome].icon
+		: CircleDotIcon;
+}
 
 function isKnown(state: string): state is keyof typeof KNOWN_STATES {
 	return Object.hasOwn(KNOWN_STATES, state);
@@ -146,12 +276,21 @@ function isKnown(state: string): state is keyof typeof KNOWN_STATES {
 /** The look of a step state or an outcome. A Decision label or Gate choice shows its own name. */
 export function stepStateStyle(state: StepState): Style {
 	if (isKnown(state)) return KNOWN_STATES[state];
-	return { ...TONE_STYLE.label, label: state };
+	return { ...outcomeStyle(state), label: state };
 }
 
-/** The colour of an outcome, for handles, edges and arrowheads. */
-export function outcomeStyle(outcome: Outcome): Omit<Style, "label"> {
-	return TONE_STYLE[outcomeTone(outcome)];
+/**
+ * The look of an outcome, for handles, edges and arrowheads: the colour its
+ * node gives it, else one from its name.
+ */
+export function outcomeStyle(
+	outcome: Outcome,
+	color?: OutcomeColor,
+): Omit<Style, "label"> {
+	return {
+		icon: outcomeIcon(outcome),
+		...OUTCOME_COLOR_STYLE[resolveOutcomeColor(outcome, color)],
+	};
 }
 
 /**

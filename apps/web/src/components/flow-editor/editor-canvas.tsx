@@ -41,6 +41,7 @@ import { toast } from "sonner";
 import { type FlowCanvasNode, nodeTypes } from "@/components/flow/flow-node";
 import { NODE_TYPE } from "@/components/flow/node-type";
 import {
+	edgeColor,
 	edgeTypes,
 	type FlowCanvasEdge,
 	OutcomeMarkers,
@@ -326,11 +327,12 @@ export function EditorCanvas({
 				selected: selection?.kind === "edge" && selection.id === edge.id,
 				data: {
 					outcome: edge.outcome,
+					color: edgeColor(flow.nodes, edge),
 					max: edge.max,
 					hasError: counts.edgeErrors.has(edge.id),
 				},
 			})),
-		[flow.edges, counts, selection],
+		[flow.edges, flow.nodes, counts, selection],
 	);
 
 	const onNodesChange = useCallback(

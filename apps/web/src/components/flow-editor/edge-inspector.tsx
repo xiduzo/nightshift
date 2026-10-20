@@ -3,6 +3,8 @@ import {
 	type FlowEdge,
 	nodeOutcomes,
 	type Outcome,
+	type OutcomeColor,
+	outcomeColor,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -27,15 +29,17 @@ import {
 /** An outcome as a small outline Badge in its own colour. */
 export function OutcomePill({
 	outcome,
+	color,
 	className,
 }: {
 	outcome: Outcome;
+	color?: OutcomeColor;
 	className?: string;
 }) {
 	return (
 		<Badge
 			variant="outline"
-			className={cn(outcomeStyle(outcome).badge, "font-mono", className)}
+			className={cn(outcomeStyle(outcome, color).badge, "font-mono", className)}
 		>
 			{outcomeLabel(outcome)}
 		</Badge>
@@ -76,7 +80,13 @@ export function EdgeInspector({
 						<span className="truncate">{edge.to}</span>
 					</span>
 				}
-				badges={<OutcomePill outcome={edge.outcome} className="normal-case" />}
+				badges={
+					<OutcomePill
+						outcome={edge.outcome}
+						color={source && outcomeColor(source, edge.outcome)}
+						className="normal-case"
+					/>
+				}
 				actions={
 					<Button
 						variant="ghost"

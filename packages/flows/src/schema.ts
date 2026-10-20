@@ -125,10 +125,34 @@ export const permissionModeSchema = z.enum([
 	"plan",
 ]);
 
+/**
+ * The colours an outcome can take: Tailwind colour names. The web app picks
+ * the shade for light and dark. Unset: a colour from the outcome's name.
+ */
+export const outcomeColors = [
+	"red",
+	"orange",
+	"amber",
+	"yellow",
+	"lime",
+	"green",
+	"teal",
+	"cyan",
+	"sky",
+	"blue",
+	"indigo",
+	"violet",
+	"pink",
+	"gray",
+] as const;
+export const outcomeColorSchema = z.enum(outcomeColors);
+export type OutcomeColor = z.infer<typeof outcomeColorSchema>;
+
 const option = z.object({
 	name: labelSchema,
 	/** Tells the agent, the model or the person what this option means. */
 	description: z.string().optional(),
+	color: outcomeColorSchema.optional(),
 	/**
 	 * Decision nodes decided by a rule only: a JSONata expression over the
 	 * run's values (`build.data.tests_passed = true and check.exit_code = 0`).
@@ -302,6 +326,7 @@ export const commandExitSchema = z.object({
 	name: labelSchema,
 	code: z.number().int().min(0).max(255).optional(),
 	description: z.string().optional(),
+	color: outcomeColorSchema.optional(),
 });
 export type CommandExit = z.infer<typeof commandExitSchema>;
 
@@ -313,9 +338,14 @@ export const LEGACY_COMMAND_EXITS: CommandExit[] = [
 
 /** The exits a new Command node starts with. */
 export const DEFAULT_COMMAND_EXITS: CommandExit[] = [
-	{ name: "success", code: 0, description: "The command succeeded." },
-	{ name: "error", code: 1, description: "General error." },
-	{ name: "other", description: "Any other exit code." },
+	{
+		name: "success",
+		code: 0,
+		description: "The command succeeded.",
+		color: "green",
+	},
+	{ name: "error", code: 1, description: "General error.", color: "red" },
+	{ name: "other", description: "Any other exit code.", color: "gray" },
 ];
 
 /**
@@ -323,30 +353,49 @@ export const DEFAULT_COMMAND_EXITS: CommandExit[] = [
  * 128 + n is "killed by signal n".
  */
 export const STANDARD_EXIT_CODES: CommandExit[] = [
-	{ name: "success", code: 0, description: "The command succeeded." },
-	{ name: "error", code: 1, description: "General error." },
+	{
+		name: "success",
+		code: 0,
+		description: "The command succeeded.",
+		color: "green",
+	},
+	{ name: "error", code: 1, description: "General error.", color: "red" },
 	{
 		name: "misuse",
 		code: 2,
 		description: "Wrong use of a shell builtin or wrong arguments.",
+		color: "orange",
 	},
 	{
 		name: "cannot-execute",
 		code: 126,
 		description: "The command was found but cannot run.",
+		color: "red",
 	},
-	{ name: "not-found", code: 127, description: "The command was not found." },
+	{
+		name: "not-found",
+		code: 127,
+		description: "The command was not found.",
+		color: "red",
+	},
 	{
 		name: "interrupted",
 		code: 130,
 		description: "Stopped with Ctrl+C (SIGINT).",
+		color: "amber",
 	},
 	{
 		name: "killed",
 		code: 137,
 		description: "Killed (SIGKILL), often out of memory.",
+		color: "red",
 	},
-	{ name: "terminated", code: 143, description: "Terminated (SIGTERM)." },
+	{
+		name: "terminated",
+		code: 143,
+		description: "Terminated (SIGTERM).",
+		color: "amber",
+	},
 ];
 
 export const commandNodeSchema = z.object({
@@ -751,6 +800,23 @@ export function nodeOutcomes(node: FlowNode): readonly Outcome[] {
 			return ["done", "timeout"];
 		case "tool":
 			return ["pass", "fail"];
+	}
+}
+
+/** The colour a node gives one of its outcomes, or undefined when it sets none. */
+export function outcomeColor(
+	node: FlowNode,
+	outcome: Outcome,
+): OutcomeColor | undefined {
+	switch (node.type) {
+		case "agent":
+			return node.outcomes?.find((o) => o.name === outcome)?.color;
+		case "command":
+			return commandExits(node).find((exit) => exit.name === outcome)?.color;
+		case "decision":
+			return node.options.find((option) => option.name === outcome)?.color;
+		default:
+			return undefined;
 	}
 }
 

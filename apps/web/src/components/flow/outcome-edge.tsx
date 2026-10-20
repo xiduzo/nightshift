@@ -1,4 +1,11 @@
-import type { Outcome } from "@nightshift/flows";
+import {
+	type FlowEdge,
+	type FlowNode,
+	type Outcome,
+	type OutcomeColor,
+	outcomeColor,
+	outcomeColors,
+} from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
@@ -14,15 +21,16 @@ import {
 import { createContext, memo, useCallback, useContext } from "react";
 
 import {
-	OUTCOME_TONES,
-	type OutcomeTone,
+	OUTCOME_COLOR_STYLE,
 	outcomeLabel,
 	outcomeStyle,
-	outcomeTone,
+	resolveOutcomeColor,
 } from "@/components/outcome-badge";
 
 export type OutcomeEdgeData = {
 	outcome: Outcome;
+	/** The colour the source node gives the outcome, if any. */
+	color?: OutcomeColor;
 	max?: number;
 	hasError: boolean;
 	/** Run view only: how often the run took this edge. */
@@ -31,22 +39,31 @@ export type OutcomeEdgeData = {
 
 export type FlowCanvasEdge = Edge<OutcomeEdgeData, "outcome">;
 
+/** The colour the edge's source node gives its outcome, if any. */
+export function edgeColor(
+	nodes: readonly FlowNode[],
+	edge: Pick<FlowEdge, "from" | "outcome">,
+): OutcomeColor | undefined {
+	const source = nodes.find((node) => node.id === edge.from);
+	return source ? outcomeColor(source, edge.outcome) : undefined;
+}
+
 /** Lets an edge label select its edge. Absent in read-only canvases. */
 export const SelectEdgeContext = createContext<((id: string) => void) | null>(
 	null,
 );
 
-const markerId = (tone: OutcomeTone) => `ns-arrow-${tone}`;
+const markerId = (color: OutcomeColor) => `ns-arrow-${color}`;
 
 /** Arrowheads, one per outcome colour. Render once inside each canvas. */
 export function OutcomeMarkers() {
 	return (
 		<svg className="absolute size-0" aria-hidden="true">
 			<defs>
-				{OUTCOME_TONES.map((tone) => (
+				{outcomeColors.map((color) => (
 					<marker
-						key={tone}
-						id={markerId(tone)}
+						key={color}
+						id={markerId(color)}
 						viewBox="0 0 10 10"
 						refX="9"
 						refY="5"
@@ -57,7 +74,7 @@ export function OutcomeMarkers() {
 					>
 						<path
 							d="M0,0 L10,5 L0,10 z"
-							style={{ fill: outcomeStyle(tone).color }}
+							style={{ fill: OUTCOME_COLOR_STYLE[color].color }}
 						/>
 					</marker>
 				))}
@@ -190,7 +207,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 	});
 	if (!data) return null;
 
-	const style = outcomeStyle(data.outcome);
+	const style = outcomeStyle(data.outcome, data.color);
 	const color = style.color;
 	const untaken = data.traversals === 0;
 
@@ -199,7 +216,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 			<BaseEdge
 				id={id}
 				path={path}
-				markerEnd={`url(#${markerId(outcomeTone(data.outcome))})`}
+				markerEnd={`url(#${markerId(resolveOutcomeColor(data.outcome, data.color))})`}
 				style={{
 					stroke: color,
 					strokeWidth: selected ? 2.5 : 1.5,

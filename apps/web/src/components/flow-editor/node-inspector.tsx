@@ -1314,6 +1314,15 @@ function NodeOptionsField<T extends OptionNode>({
 						: undefined
 				}
 				onCode={onCode}
+				onColor={(index, color) =>
+					change((list) =>
+						list.map((option, at) => {
+							if (at !== index) return option;
+							const { color: _, ...rest } = option;
+							return color === undefined ? rest : { ...rest, color };
+						}),
+					)
+				}
 				onAdd={(option) => change((list) => [...list, option])}
 				addControl={addControl}
 				onMove={(from, to) =>

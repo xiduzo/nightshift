@@ -1,13 +1,40 @@
-import { labelSchema, reservedOutcomes } from "@nightshift/flows";
+import {
+	labelSchema,
+	type OutcomeColor,
+	outcomeColors,
+	reservedOutcomes,
+} from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { FieldError } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import { Item } from "@nightshift/ui/components/item";
+import {
+	Popover,
+	PopoverContent,
+	PopoverDescription,
+	PopoverHeader,
+	PopoverTitle,
+	PopoverTrigger,
+} from "@nightshift/ui/components/popover";
+import {
+	ToggleGroup,
+	ToggleGroupItem,
+} from "@nightshift/ui/components/toggle-group";
 import { cn } from "@nightshift/ui/lib/utils";
-import { ArrowDownIcon, ArrowUpIcon, PlusIcon, XIcon } from "lucide-react";
+import {
+	ArrowDownIcon,
+	ArrowUpIcon,
+	CheckIcon,
+	PlusIcon,
+	XIcon,
+} from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
-import { outcomeStyle } from "@/components/outcome-badge";
+import {
+	defaultOutcomeColor,
+	OUTCOME_COLOR_STYLE,
+	outcomeStyle,
+} from "@/components/outcome-badge";
 import { type NodeOption, uniqueOptionName } from "@/lib/flow-draft";
 
 type Kind = "option" | "outcome" | "exit";
@@ -21,6 +48,7 @@ const RESERVED: readonly string[] = reservedOutcomes;
  * row also takes the rule (`when`) that picks it. Without `onDescribe` and
  * `onMove` it edits a plain list of names, for example a Subflow's halt-on
  * labels. With `onCode`, each row also takes an exit code (a Command node).
+ * With `onColor`, each row also takes a colour for its handle and edges.
  */
 export function OptionsEditor({
 	kind,
@@ -32,6 +60,7 @@ export function OptionsEditor({
 	onDescribe,
 	onRule,
 	onCode,
+	onColor,
 	onAdd,
 	addControl,
 	onRemove,
@@ -51,6 +80,8 @@ export function OptionsEditor({
 	onRule?: (index: number, when: string | undefined) => void;
 	/** Command nodes: the exit code of each row. Empty makes it the catch-all. */
 	onCode?: (index: number, code: number | undefined) => void;
+	/** The colour of each row. Undefined goes back to the one from its name. */
+	onColor?: (index: number, color: OutcomeColor | undefined) => void;
 	onAdd: (option: NodeOption) => void;
 	/** Replaces the add button, for example with a menu of common entries. */
 	addControl?: ReactNode;
@@ -90,6 +121,7 @@ export function OptionsEditor({
 						}
 						onRule={onRule ? (when) => onRule(index, when) : undefined}
 						onCode={onCode ? (code) => onCode(index, code) : undefined}
+						onColor={onColor ? (color) => onColor(index, color) : undefined}
 						onRemove={() => onRemove(index)}
 						onMove={onMove ? (to) => onMove(index, to) : undefined}
 					/>
@@ -126,6 +158,7 @@ function OptionRow({
 	onDescribe,
 	onRule,
 	onCode,
+	onColor,
 	onRemove,
 	onMove,
 }: {
@@ -141,6 +174,7 @@ function OptionRow({
 	onDescribe?: (description: string | undefined) => void;
 	onRule?: (when: string | undefined) => void;
 	onCode?: (code: number | undefined) => void;
+	onColor?: (color: OutcomeColor | undefined) => void;
 	onRemove: () => void;
 	onMove?: (to: number) => void;
 }) {
@@ -177,7 +211,7 @@ function OptionRow({
 		setError(onRename(next));
 	};
 
-	const style = outcomeStyle(option.name);
+	const style = outcomeStyle(option.name, option.color);
 	const position = `${noun} ${index + 1}`;
 
 	return (
@@ -195,6 +229,14 @@ function OptionRow({
 						code={option.code}
 						label={`Exit code of ${position}`}
 						onChange={onCode}
+					/>
+				) : null}
+				{onColor ? (
+					<OutcomeColorPicker
+						name={option.name}
+						color={option.color}
+						label={`Color of ${position}`}
+						onChange={onColor}
 					/>
 				) : null}
 				<Input
@@ -302,6 +344,89 @@ function OptionRow({
 				/>
 			) : null}
 		</Item>
+	);
+}
+
+/**
+ * A colour for an outcome, from the Tailwind colours. Without a pick, the
+ * outcome takes a colour from its name, such as red for `failed`.
+ */
+function OutcomeColorPicker({
+	name,
+	color,
+	label,
+	onChange,
+}: {
+	name: string;
+	color: OutcomeColor | undefined;
+	label: string;
+	onChange: (color: OutcomeColor | undefined) => void;
+}) {
+	const fallback = defaultOutcomeColor(name);
+	const shown = color ?? fallback;
+
+	return (
+		<Popover>
+			<PopoverTrigger
+				render={
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label={label}
+						title="Change color"
+					/>
+				}
+			>
+				<span
+					aria-hidden="true"
+					className="size-3.5 rounded-full"
+					style={{ background: OUTCOME_COLOR_STYLE[shown].color }}
+				/>
+			</PopoverTrigger>
+			<PopoverContent align="start" className="w-auto gap-3 p-3">
+				<PopoverHeader>
+					<PopoverTitle className="text-xs">Color</PopoverTitle>
+					<PopoverDescription className="text-xs">
+						The handle and edges of {name} use it.
+					</PopoverDescription>
+				</PopoverHeader>
+				<ToggleGroup
+					aria-label={label}
+					spacing={1}
+					className="grid grid-cols-7"
+					value={color ? [color] : []}
+					onValueChange={(value) =>
+						onChange(value[0] as OutcomeColor | undefined)
+					}
+				>
+					{outcomeColors.map((option) => (
+						<ToggleGroupItem
+							key={option}
+							value={option}
+							size="sm"
+							aria-label={option}
+							title={option}
+						>
+							<span
+								aria-hidden="true"
+								className="flex size-5 items-center justify-center rounded-full text-background"
+								style={{ background: OUTCOME_COLOR_STYLE[option].color }}
+							>
+								{option === shown ? <CheckIcon className="size-3.5" /> : null}
+							</span>
+						</ToggleGroupItem>
+					))}
+				</ToggleGroup>
+				<Button
+					variant="outline"
+					size="sm"
+					disabled={color === undefined}
+					onClick={() => onChange(undefined)}
+				>
+					Use the default color ({fallback})
+				</Button>
+			</PopoverContent>
+		</Popover>
 	);
 }
 

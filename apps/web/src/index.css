@@ -28,19 +28,47 @@
 }
 
 /*
- * Step outcomes reuse the status hues: pass reads as finished, fail as failed,
- * needs-input as the amber that asks for a person. Every other outcome (a
- * Decision label, a Gate choice) shares one teal accent; its name is the signal.
+ * Outcome colors: the Tailwind colors a person can pick for an outcome, one
+ * shade per theme. An outcome without a color takes one from its name: pass
+ * green, fail red, needs-input amber. Every other outcome (a Decision label, a
+ * Gate choice) shares the cyan accent; its name is the signal.
  */
 :root {
-	--outcome-pass: var(--status-finished);
-	--outcome-fail: var(--status-failed);
-	--outcome-needs-input: var(--status-waiting);
-	--outcome-label: oklch(0.52 0.1 200);
+	--outcome-red: var(--color-red-600);
+	--outcome-orange: var(--color-orange-600);
+	--outcome-amber: var(--color-amber-600);
+	--outcome-yellow: var(--color-yellow-600);
+	--outcome-lime: var(--color-lime-600);
+	--outcome-green: var(--color-green-600);
+	--outcome-teal: var(--color-teal-600);
+	--outcome-cyan: var(--color-cyan-600);
+	--outcome-sky: var(--color-sky-600);
+	--outcome-blue: var(--color-blue-600);
+	--outcome-indigo: var(--color-indigo-600);
+	--outcome-violet: var(--color-violet-600);
+	--outcome-pink: var(--color-pink-600);
+	--outcome-gray: var(--color-gray-600);
+	--outcome-pass: var(--outcome-green);
+	--outcome-fail: var(--outcome-red);
+	--outcome-needs-input: var(--outcome-amber);
+	--outcome-label: var(--outcome-cyan);
 }
 
 .dark {
-	--outcome-label: oklch(0.8 0.1 200);
+	--outcome-red: var(--color-red-400);
+	--outcome-orange: var(--color-orange-400);
+	--outcome-amber: var(--color-amber-400);
+	--outcome-yellow: var(--color-yellow-400);
+	--outcome-lime: var(--color-lime-400);
+	--outcome-green: var(--color-green-400);
+	--outcome-teal: var(--color-teal-400);
+	--outcome-cyan: var(--color-cyan-400);
+	--outcome-sky: var(--color-sky-400);
+	--outcome-blue: var(--color-blue-400);
+	--outcome-indigo: var(--color-indigo-400);
+	--outcome-violet: var(--color-violet-400);
+	--outcome-pink: var(--color-pink-400);
+	--outcome-gray: var(--color-gray-400);
 }
 
 @theme inline {
@@ -55,6 +83,20 @@
 	--color-outcome-fail: var(--outcome-fail);
 	--color-outcome-needs-input: var(--outcome-needs-input);
 	--color-outcome-label: var(--outcome-label);
+	--color-outcome-red: var(--outcome-red);
+	--color-outcome-orange: var(--outcome-orange);
+	--color-outcome-amber: var(--outcome-amber);
+	--color-outcome-yellow: var(--outcome-yellow);
+	--color-outcome-lime: var(--outcome-lime);
+	--color-outcome-green: var(--outcome-green);
+	--color-outcome-teal: var(--outcome-teal);
+	--color-outcome-cyan: var(--outcome-cyan);
+	--color-outcome-sky: var(--outcome-sky);
+	--color-outcome-blue: var(--outcome-blue);
+	--color-outcome-indigo: var(--outcome-indigo);
+	--color-outcome-violet: var(--outcome-violet);
+	--color-outcome-pink: var(--outcome-pink);
+	--color-outcome-gray: var(--outcome-gray);
 }
 
 /* React Flow, themed with the app tokens. Follows `.dark` on <html>. */

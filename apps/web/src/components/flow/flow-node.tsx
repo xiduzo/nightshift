@@ -8,6 +8,7 @@ import {
 	type FlowNodeType,
 	type ListSource,
 	nodeOutcomes,
+	outcomeColor,
 	runsEach,
 	type ToolNode,
 	type ValueNode,
@@ -341,7 +342,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 						</li>
 					) : null}
 					{outcomes.map((outcome) => {
-						const style = outcomeStyle(outcome);
+						const style = outcomeStyle(outcome, outcomeColor(node, outcome));
 						const description = descriptions.get(outcome);
 						return (
 							<li
