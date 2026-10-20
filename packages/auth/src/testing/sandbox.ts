@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 
-import { type Auth, type AuthOptions, createAuth } from "./index";
+import { type Auth, type AuthOptions, createAuth } from "../auth";
 
 /** Test helpers: a migrated temp database with Better Auth on it. */
 

@@ -4,7 +4,7 @@ import { setRequestCookie } from "better-auth/cookies";
 import { makeSignature } from "better-auth/crypto";
 import { and, desc, eq, gt } from "drizzle-orm";
 
-import type { Auth, Session } from "./index";
+import type { Auth, Session } from "./auth";
 
 /**
  * One person on one computer signs in to nothing: a request from this

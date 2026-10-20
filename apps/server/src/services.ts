@@ -21,11 +21,13 @@ import {
 	testMcpServer,
 } from "@nightshift/agents";
 import type { Context } from "@nightshift/api/context";
-import { createAuth } from "@nightshift/auth";
-import { roleAllows } from "@nightshift/auth/access";
-import { hostPolicyFromEnv } from "@nightshift/auth/host-access";
-import { createLocalSession } from "@nightshift/auth/local-session";
-import { localPerson } from "@nightshift/auth/spaces";
+import {
+	createAuth,
+	createLocalSession,
+	hostPolicyFromEnv,
+	localPerson,
+	roleAllows,
+} from "@nightshift/auth";
 import { createDb } from "@nightshift/db";
 import {
 	databaseUrl,

@@ -1,7 +1,6 @@
 import type { HostExchange, SyncBatch } from "@nightshift/api/context";
-import { roleAllows } from "@nightshift/auth/access";
-import type { DeviceKeyAccess } from "@nightshift/auth/device-keys";
-import { roleIn, spacesOf } from "@nightshift/auth/spaces";
+import type { DeviceKeyAccess } from "@nightshift/auth";
+import { roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type ArchiveRef,

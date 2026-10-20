@@ -2,7 +2,7 @@ import type { Database } from "@nightshift/db";
 import { apikey } from "@nightshift/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
-import type { Auth } from "./index";
+import type { Auth } from "./auth";
 
 /**
  * Device keys: what a paired Device signs in with on a Host. A key is an

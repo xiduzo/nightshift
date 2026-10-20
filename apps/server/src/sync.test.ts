@@ -3,13 +3,12 @@ import {
 	HocuspocusProvider,
 	HocuspocusProviderWebsocket,
 } from "@hocuspocus/provider";
-import { createLocalSession } from "@nightshift/auth/local-session";
-import { localPerson } from "@nightshift/auth/spaces";
+import { createLocalSession, localPerson } from "@nightshift/auth";
 import {
 	type AuthSandbox,
 	createAuthSandbox,
-} from "@nightshift/auth/test-support";
-import { turnOnTwoFactor } from "@nightshift/auth/two-factor-support";
+	turnOnTwoFactor,
+} from "@nightshift/auth/testing";
 import { project } from "@nightshift/db/schema";
 import {
 	createCliToolStore,

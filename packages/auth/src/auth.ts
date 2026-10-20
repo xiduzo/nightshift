@@ -1,0 +1,313 @@
+import { apiKey } from "@better-auth/api-key";
+import { tryGetCurrentAuthEndpointContext } from "@better-auth/core/context";
+import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
+import type { Database } from "@nightshift/db";
+import { authSchema as schema } from "@nightshift/db";
+import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import { admin } from "better-auth/plugins/admin";
+import { deviceAuthorization } from "better-auth/plugins/device-authorization";
+import { organization } from "better-auth/plugins/organization";
+import { twoFactor } from "better-auth/plugins/two-factor";
+
+import { ac, type Permissions, roles } from "./access";
+import { DEVICE_KEY_PREFIX } from "./device-keys";
+import {
+	HOST_ADMIN,
+	hasHostAdmin,
+	type MemberChange,
+	signUpRefusal,
+} from "./members";
+import { PAIRING_CODE_TTL, PAIRING_POLL_INTERVAL } from "./pairing";
+import { activeSpaceId, ensurePersonalSpace } from "./spaces";
+
+export type AuthConfig = {
+	BETTER_AUTH_URL: string;
+	BETTER_AUTH_SECRET: string;
+	CORS_ORIGIN: string;
+};
+
+const PERSONAL = "Nobody can join a personal Space. Create a Space to share.";
+
+/** How long an invitation link works. */
+export const INVITATION_DAYS = 7;
+
+/** How long a browser that a person trusts skips the second factor at sign-in. */
+export const TRUSTED_BROWSER_DAYS = 30;
+
+/**
+ * The address of the computer at the other end of the connection. The
+ * daemon sets it on every request to Better Auth (and drops one a client
+ * sends), so sign-in limits count per computer without a proxy in front.
+ */
+export const PEER_ADDRESS_HEADER = "x-nightshift-peer";
+
+/**
+ * Where the rate limits read the client's address, in order: Cloudflare's
+ * own header (Cloudflare Tunnel), a proxy's, then the connection itself.
+ */
+export const CLIENT_IP_HEADERS = [
+	"cf-connecting-ip",
+	"x-forwarded-for",
+	PEER_ADDRESS_HEADER,
+];
+
+export type AuthOptions = {
+	/**
+	 * A Space was made, or its Members changed (added, removed, a new role,
+	 * an accepted invitation). The daemon mirrors the Members into the
+	 * Space's document.
+	 */
+	onMembersChanged?: (spaceId: string) => Promise<void>;
+	/**
+	 * A Person joined a Space, left it, or got a new role, and who did it.
+	 * The daemon logs it in the Space's event log.
+	 */
+	onMemberChange?: (change: MemberChange) => Promise<void>;
+	/**
+	 * More pages that may sign in, read per request: a Host's own
+	 * `https://` addresses, so a browser can use any of them.
+	 */
+	trustedOrigins?: () => readonly string[];
+};
+
+/**
+ * Better Auth with the organization plugin: a Space is an organization.
+ * Every Person gets a personal Space with their account, and every new
+ * session starts in it. Nobody can be invited to, added to, or delete a
+ * personal Space.
+ *
+ * A Host is invitation-only (`members.ts`): the first Person is the Host
+ * admin (the admin plugin), and every other sign-up names a pending
+ * invitation of its email.
+ *
+ * Devices pair with a Host by device authorization (RFC 8628, the device
+ * authorization plugin) and sign in with a Device key (the API key
+ * plugin): see `pairing.ts` and `device-keys.ts`.
+ *
+ * A Person may add a second factor to their password (the two-factor
+ * plugin): a code from an authenticator app, or a backup code. A Host can
+ * require it for sessions from other computers (`host-access.ts`).
+ * Signing in and the second factor are rate limited per client address,
+ * always: a Host may face the internet.
+ */
+export function createAuth(
+	env: AuthConfig,
+	database: Database,
+	desktopOrigins: readonly string[] = [],
+	options: AuthOptions = {},
+) {
+	/** The Members changed: mirror them, and log who did what. */
+	const changed = async (change: MemberChange) => {
+		await options.onMembersChanged?.(change.spaceId);
+		await options.onMemberChange?.(change);
+	};
+	return betterAuth({
+		database: drizzleAdapter(database, {
+			provider: "sqlite",
+			schema,
+		}),
+		trustedOrigins: () => [
+			env.CORS_ORIGIN,
+			...desktopOrigins,
+			...(options.trustedOrigins?.() ?? []),
+		],
+		appName: "Night Shift",
+		emailAndPassword: { enabled: true },
+		secret: env.BETTER_AUTH_SECRET,
+		baseURL: env.BETTER_AUTH_URL,
+		// On whatever NODE_ENV says: Better Auth turns it on in production only.
+		rateLimit: {
+			enabled: true,
+			storage: "memory",
+			customRules: {
+				"/sign-in/*": { window: 60, max: 5 },
+				"/two-factor/verify-*": { window: 60, max: 5 },
+			},
+		},
+		advanced: {
+			defaultCookieAttributes: {
+				sameSite: "none",
+				secure: true,
+				httpOnly: true,
+			},
+			ipAddress: { ipAddressHeaders: CLIENT_IP_HEADERS },
+		},
+		hooks: {
+			before: createAuthMiddleware(async (ctx) => {
+				if (ctx.path !== "/sign-up/email") return;
+				const refusal = await signUpRefusal(database, ctx.body ?? {});
+				if (refusal) refuse(refusal);
+			}),
+		},
+		databaseHooks: {
+			user: {
+				create: {
+					// The first Person on a Host is its admin.
+					before: async (data) => ({
+						data: {
+							...data,
+							role: (await hasHostAdmin(database)) ? "user" : HOST_ADMIN,
+						},
+					}),
+					after: async (created) => {
+						await ensurePersonalSpace(database, created.id);
+					},
+				},
+			},
+			session: {
+				create: {
+					before: async (session) => ({
+						data: {
+							...session,
+							activeOrganizationId: await activeSpaceId(database, session),
+						},
+					}),
+				},
+			},
+		},
+		plugins: [
+			admin({ defaultRole: "user", adminRoles: [HOST_ADMIN] }),
+			twoFactor({
+				issuer: "Night Shift",
+				trustDeviceMaxAge: TRUSTED_BROWSER_DAYS * 24 * 3600,
+			}),
+			pairingPlugin(),
+			apiKey({
+				defaultPrefix: DEVICE_KEY_PREFIX,
+				enableMetadata: true,
+				// A Device calls its Host every few seconds; idle expiry, not a
+				// request count, ends a key nobody uses (`device-keys.ts`).
+				rateLimit: { enabled: false },
+				keyExpiration: { minExpiresIn: 1, maxExpiresIn: 365 },
+			}),
+			organization({
+				ac,
+				roles,
+				// No email server: a person shares the link by hand, which takes longer.
+				invitationExpiresIn: INVITATION_DAYS * 24 * 3600,
+				schema: {
+					organization: {
+						additionalFields: {
+							personal: {
+								type: "boolean",
+								required: false,
+								defaultValue: false,
+								input: false,
+							},
+						},
+					},
+				},
+				organizationHooks: {
+					beforeCreateInvitation: async ({ organization }) => {
+						if (organization.personal) refuse(PERSONAL);
+					},
+					beforeAddMember: async ({ organization }) => {
+						if (organization.personal) refuse(PERSONAL);
+					},
+					beforeDeleteOrganization: async ({ organization }) => {
+						if (organization.personal) {
+							refuse("A personal Space stays as long as its Person.");
+						}
+					},
+					afterCreateOrganization: ({ organization, member, user }) =>
+						changed({
+							kind: "joined",
+							spaceId: organization.id,
+							personId: user.id,
+							role: member.role,
+							by: user.id,
+						}),
+					afterAddMember: ({ organization, member, user }) =>
+						changed({
+							kind: "joined",
+							spaceId: organization.id,
+							personId: user.id,
+							role: member.role,
+							by: actor(),
+						}),
+					afterRemoveMember: ({ organization, user }) =>
+						changed({
+							kind: "removed",
+							spaceId: organization.id,
+							personId: user.id,
+							by: actor(),
+						}),
+					afterUpdateMemberRole: ({
+						organization,
+						member,
+						user,
+						previousRole,
+					}) =>
+						changed({
+							kind: "role",
+							spaceId: organization.id,
+							personId: user.id,
+							role: member.role,
+							previousRole,
+							by: actor(),
+						}),
+					afterAcceptInvitation: ({ organization, member, user, invitation }) =>
+						changed({
+							kind: "joined",
+							spaceId: organization.id,
+							personId: user.id,
+							role: member.role,
+							by: user.id,
+							invitedBy: invitation.inviterId,
+						}),
+				},
+			}),
+		],
+	});
+}
+
+/**
+ * The device authorization plugin, typed by name: its inferred type names a
+ * type `better-call` does not export, which a declaration cannot name.
+ */
+export interface PairingPlugin
+	extends ReturnType<typeof deviceAuthorization<undefined>> {}
+
+function pairingPlugin(): PairingPlugin {
+	return deviceAuthorization({
+		expiresIn: PAIRING_CODE_TTL,
+		interval: PAIRING_POLL_INTERVAL,
+		// The client is the joining Device: its id.
+		validateClient: (clientId) => /^[\w-]{1,64}$/.test(clientId),
+	});
+}
+
+/** The Person whose session called the endpoint that runs now, if any. */
+function actor(): string | null {
+	const context = tryGetCurrentAuthEndpointContext()?.context as
+		| { session?: { user?: { id?: string } } | null }
+		| undefined;
+	return context?.session?.user?.id ?? null;
+}
+
+function refuse(message: string): never {
+	throw new APIError("FORBIDDEN", { message });
+}
+
+export type Auth = ReturnType<typeof createAuth>;
+export type Session = Auth["$Infer"]["Session"];
+
+/**
+ * Whether the session's Person may do `permissions` in the Space: the
+ * organization plugin's `hasPermission`, with the request's headers.
+ */
+export async function hasPermission(
+	auth: Auth,
+	headers: Headers,
+	spaceId: string,
+	permissions: Permissions,
+): Promise<boolean> {
+	const result = await auth.api
+		.hasPermission({
+			headers,
+			body: { organizationId: spaceId, permissions },
+		})
+		.catch(() => null);
+	return result?.success === true;
+}

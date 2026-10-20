@@ -11,8 +11,8 @@ import {
 import { createLocalSession } from "./local-session";
 import { requestAccess } from "./request";
 import { localPerson } from "./spaces";
-import { type AuthSandbox, createAuthSandbox } from "./test-support";
-import { turnOnTwoFactor } from "./two-factor-support";
+import { type AuthSandbox, createAuthSandbox } from "./testing/sandbox";
+import { turnOnTwoFactor } from "./testing/two-factor";
 
 const REQUIRED = { requireTwoFactor: true };
 

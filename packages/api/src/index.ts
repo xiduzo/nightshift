@@ -1,6 +1,8 @@
-import type { Permissions } from "@nightshift/auth";
-import type { DeviceKeyPermission } from "@nightshift/auth/device-keys";
-import type { HostAccess } from "@nightshift/auth/host-access";
+import type {
+	DeviceKeyPermission,
+	HostAccess,
+	Permissions,
+} from "@nightshift/auth";
 import { ORPCError, os } from "@orpc/server";
 
 import type { Context } from "./context";

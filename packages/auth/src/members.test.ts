@@ -6,7 +6,11 @@ import { hasPermission, type MemberChange } from "./index";
 import { invitationView, membersOf } from "./members";
 import { requestAccess } from "./request";
 import { LOCAL_EMAIL, localPerson, personalSpaceId } from "./spaces";
-import { type AuthSandbox, cookiesOf, createAuthSandbox } from "./test-support";
+import {
+	type AuthSandbox,
+	cookiesOf,
+	createAuthSandbox,
+} from "./testing/sandbox";
 
 let sandbox: AuthSandbox;
 let changes: MemberChange[];

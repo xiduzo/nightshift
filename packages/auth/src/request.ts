@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 
 import type { Permissions, Role } from "./access";
+import { type Auth, hasPermission, type Session } from "./auth";
 import {
 	type HostAccess,
 	type HostPolicy,
 	hostAccess,
 	OPEN_HOST,
 } from "./host-access";
-import { type Auth, hasPermission, type Session } from "./index";
 import type { LocalSession } from "./local-session";
 import { activeSpaceId } from "./spaces";
 

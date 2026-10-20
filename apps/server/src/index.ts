@@ -1,6 +1,5 @@
 import { appRouter } from "@nightshift/api/routers/index";
-import { PEER_ADDRESS_HEADER } from "@nightshift/auth";
-import { authEndpointAllowed } from "@nightshift/auth/host-access";
+import { authEndpointAllowed, PEER_ADDRESS_HEADER } from "@nightshift/auth";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { onError } from "@orpc/server";

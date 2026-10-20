@@ -1,4 +1,4 @@
-import type { Auth } from "./index";
+import type { Auth } from "./auth";
 
 /**
  * Pairing a Device with a Host, by device authorization (RFC 8628, Better

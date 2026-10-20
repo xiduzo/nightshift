@@ -6,7 +6,7 @@ import { hasPermission, roleAllows } from "./index";
 import { createLocalSession } from "./local-session";
 import { requestAccess } from "./request";
 import { LOCAL_EMAIL, localPerson, personalSpaceId, spacesOf } from "./spaces";
-import { type AuthSandbox, createAuthSandbox } from "./test-support";
+import { type AuthSandbox, createAuthSandbox } from "./testing/sandbox";
 
 let sandbox: AuthSandbox;
 beforeEach(async () => {

@@ -1,5 +1,5 @@
 import type { Offers, SpaceDeviceView } from "@nightshift/api/context";
-import { spacesOf } from "@nightshift/auth/spaces";
+import { spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type DeviceDocument,

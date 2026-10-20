@@ -2,15 +2,15 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
 	type HostPolicy,
 	OPEN_HOST,
+	personalSpaceId,
+	requestAccess,
 	TWO_FACTOR_REQUIRED,
-} from "@nightshift/auth/host-access";
-import { requestAccess } from "@nightshift/auth/request";
-import { personalSpaceId } from "@nightshift/auth/spaces";
+} from "@nightshift/auth";
 import {
 	type AuthSandbox,
 	createAuthSandbox,
-} from "@nightshift/auth/test-support";
-import { turnOnTwoFactor } from "@nightshift/auth/two-factor-support";
+	turnOnTwoFactor,
+} from "@nightshift/auth/testing";
 import type { SpaceEngine } from "@nightshift/engine/types";
 import { call, ORPCError } from "@orpc/server";
 

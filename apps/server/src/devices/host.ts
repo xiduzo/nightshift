@@ -6,19 +6,17 @@ import type {
 } from "@nightshift/api/context";
 import type { Auth } from "@nightshift/auth";
 import {
+	approvePairing,
 	bearerDeviceKey,
 	createDeviceKeys,
 	type DeviceKeyAccess,
-} from "@nightshift/auth/device-keys";
-import {
-	approvePairing,
 	denyPairing,
 	normalizeUserCode,
 	redeemPairing,
 	reviewPairing,
+	spacesOf,
 	startPairing,
-} from "@nightshift/auth/pairing";
-import { spacesOf } from "@nightshift/auth/spaces";
+} from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { DeviceRegistry, SettingsStore } from "@nightshift/engine";
 

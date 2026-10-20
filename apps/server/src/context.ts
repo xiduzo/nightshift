@@ -1,6 +1,5 @@
 import type { Context as ApiContext } from "@nightshift/api/context";
-import { setLogin } from "@nightshift/auth/login";
-import { requestAccess } from "@nightshift/auth/request";
+import { requestAccess, setLogin } from "@nightshift/auth";
 import type { Context as HonoContext } from "hono";
 
 import { trustedOrigins } from "./env.server";

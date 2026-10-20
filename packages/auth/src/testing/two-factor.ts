@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 
-import type { Auth } from "./index";
-import { cookiesOf } from "./test-support";
+import type { Auth } from "../auth";
+import { cookiesOf } from "./sandbox";
 
 /** Test helpers for two-factor sign-in: the authenticator app's side. */
 

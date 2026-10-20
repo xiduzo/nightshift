@@ -10,7 +10,7 @@ import {
 	reviewPairing,
 	startPairing,
 } from "./pairing";
-import { type AuthSandbox, createAuthSandbox } from "./test-support";
+import { type AuthSandbox, createAuthSandbox } from "./testing/sandbox";
 
 /**
  * Pairing by device authorization, and the Device keys it ends in: through

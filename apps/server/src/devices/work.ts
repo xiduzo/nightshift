@@ -1,5 +1,5 @@
 import type { AppRouterClient } from "@nightshift/api/routers/index";
-import { roleAllows } from "@nightshift/auth/access";
+import { roleAllows } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	clonePathOf,

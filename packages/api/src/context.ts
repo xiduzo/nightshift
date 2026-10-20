@@ -6,10 +6,13 @@ import type {
 	McpServerConfig,
 	McpTestResult,
 } from "@nightshift/agents";
-import type { Permissions, Session } from "@nightshift/auth";
-import type { DeviceKeyAccess } from "@nightshift/auth/device-keys";
-import type { HostAccess } from "@nightshift/auth/host-access";
-import type { RequestAccess } from "@nightshift/auth/request";
+import type {
+	DeviceKeyAccess,
+	HostAccess,
+	Permissions,
+	RequestAccess,
+	Session,
+} from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type {
 	ArchiveRef,

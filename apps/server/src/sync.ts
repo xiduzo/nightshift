@@ -1,10 +1,6 @@
 import { Hocuspocus } from "@hocuspocus/server";
-import type { Auth } from "@nightshift/auth";
-import { isDeviceKey } from "@nightshift/auth/device-keys";
-import type { HostPolicy } from "@nightshift/auth/host-access";
-import type { LocalSession } from "@nightshift/auth/local-session";
-import { requestAccess } from "@nightshift/auth/request";
-import { roleIn } from "@nightshift/auth/spaces";
+import type { Auth, HostPolicy, LocalSession } from "@nightshift/auth";
+import { isDeviceKey, requestAccess, roleIn } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { spaceIdOf } from "@nightshift/engine/space/document";
 import type { Server, ServerWebSocket, WebSocketHandler } from "bun";

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { DeviceKeyAccess } from "@nightshift/auth/device-keys";
+import type { DeviceKeyAccess } from "@nightshift/auth";
 import {
 	event,
 	member,

@@ -2,7 +2,7 @@ import type { Database } from "@nightshift/db";
 import { account } from "@nightshift/db/schema";
 import { and, eq } from "drizzle-orm";
 
-import type { Auth } from "./index";
+import type { Auth } from "./auth";
 
 /**
  * A sign-in for a Person: an email and a password. This computer's Person

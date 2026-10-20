@@ -5,10 +5,13 @@ import {
 	HARNESS_ADAPTERS,
 	installedSkills,
 } from "@nightshift/agents";
-import { roleAllows } from "@nightshift/auth/access";
-import { hasLogin } from "@nightshift/auth/login";
-import { invitationView, membersOf } from "@nightshift/auth/members";
-import { spacesOf } from "@nightshift/auth/spaces";
+import {
+	hasLogin,
+	invitationView,
+	membersOf,
+	roleAllows,
+	spacesOf,
+} from "@nightshift/auth";
 import {
 	archiveRefSchema,
 	chooseFolder,

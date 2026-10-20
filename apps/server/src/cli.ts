@@ -1,7 +1,5 @@
 import { join } from "node:path";
-
-import { hostPolicyFromEnv } from "@nightshift/auth/host-access";
-import { hasLogin } from "@nightshift/auth/login";
+import { hasLogin, hostPolicyFromEnv } from "@nightshift/auth";
 
 import { prepareDaemonEnv } from "./daemon-env";
 import { reachFor } from "./devices";
