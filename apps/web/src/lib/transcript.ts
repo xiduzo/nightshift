@@ -47,7 +47,11 @@ export type ToolItem = ItemBase & {
 	result?: string;
 	/** A Tool node's call: the connection it called. Absent for an agent's tool call. */
 	connection?: string;
-	/** A Tool node's call that the tool answered with an error, or that could not be made. */
+	/**
+	 * The call failed: an agent's tool call whose result the harness marked
+	 * as an error, or a Tool node's call that the tool answered with an
+	 * error or that could not be made.
+	 */
 	failed?: boolean;
 };
 
@@ -366,7 +370,12 @@ function applyStepEntries(
 			}
 			case "tool-result": {
 				const key = ensureTool(entry, event.toolCallId, "tool");
-				update<ToolItem>(key, (item) => ({ ...item, result: event.content }));
+				update<ToolItem>(key, (item) => ({
+					...item,
+					result: event.content,
+					// Older transcripts have no flag: their calls show as done.
+					...(event.isError ? { failed: true } : {}),
+				}));
 				break;
 			}
 			case "report":
