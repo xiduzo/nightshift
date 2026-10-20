@@ -79,7 +79,7 @@ const EXCEPTIONS: { from: string; to: string; why: string }[] = [
 		// app then imports only @nightshift/daemon (STRUCTURE.md section 8).
 		from: "desktop",
 		to: "server",
-		why: "apps/desktop boots the daemon from server/src/* until phase 4",
+		why: "apps/desktop boots the daemon through the server entries until phase 4",
 	},
 ];
 

@@ -36,13 +36,23 @@
 		"enabled": true,
 		"indentStyle": "tab"
 	},
-	"assist": { "actions": { "source": { "organizeImports": "on" } } },
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
 	"linter": {
 		"enabled": true,
 		"rules": {
 			"preset": "recommended",
 			"correctness": {
-				"useExhaustiveDependencies": "info"
+				"useExhaustiveDependencies": "info",
+				"noUndeclaredDependencies": "error"
+			},
+			"suspicious": {
+				"noImportCycles": "error"
 			},
 			"nursery": {
 				"useSortedClasses": {
@@ -63,7 +73,58 @@
 				"noUnusedTemplateLiteral": "error",
 				"useNumberNamespace": "error",
 				"noInferrableTypes": "error",
-				"noUselessElse": "error"
+				"noUselessElse": "error",
+				"noRestrictedImports": {
+					"level": "error",
+					"options": {
+						"patterns": [
+							{
+								"group": [
+									"@nightshift/**",
+									"!@nightshift/agents",
+									"!@nightshift/agents/testing",
+									"!@nightshift/api",
+									"!@nightshift/api/client",
+									"!@nightshift/api/context",
+									"!@nightshift/auth",
+									"!@nightshift/auth/testing",
+									"!@nightshift/db",
+									"!@nightshift/db/schema",
+									"!@nightshift/db/data-dir",
+									"!@nightshift/db/migrate",
+									"!@nightshift/engine",
+									"!@nightshift/engine/lease",
+									"!@nightshift/engine/testing",
+									"!@nightshift/flows",
+									"!@nightshift/flows/files",
+									"!@nightshift/ui/components/*",
+									"!@nightshift/ui/hooks/*",
+									"!@nightshift/ui/lib/*",
+									"!@nightshift/ui/globals.css"
+								],
+								"message": "Import a package by an entry in its package.json exports, never a path inside it (see docs/steering/STRUCTURE.md, section 3)."
+							},
+							{
+								"group": [
+									"server/**",
+									"!server/daemon-env",
+									"!server/health",
+									"!server/serve",
+									"!server/services"
+								],
+								"message": "Import the server app only by an entry in its package.json exports. Phase 4 replaces them with @nightshift/daemon."
+							},
+							{
+								"group": ["**/packages/**", "**/apps/*/src/**"],
+								"message": "Never reach into another workspace by a relative path. Import the package by its name and a listed entry."
+							},
+							{
+								"group": ["@nightshift/*/testing"],
+								"message": "./testing holds fakes and test helpers. Only tests import it."
+							}
+						]
+					}
+				}
 			}
 		}
 	},
@@ -80,7 +141,158 @@
 	"overrides": [
 		{
 			"includes": ["packages/ui/src/components/**"],
-			"linter": { "enabled": false }
+			"linter": {
+				"enabled": false
+			}
+		},
+		{
+			"includes": ["packages/engine/src/graph/**"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noImportCycles": "warn"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"**/*.test.ts",
+				"**/*.test.tsx",
+				"**/test-support.ts",
+				"**/test-daemons.ts",
+				"**/testing/**",
+				"**/fixtures/**"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": [
+											"@nightshift/**",
+											"!@nightshift/agents",
+											"!@nightshift/agents/testing",
+											"!@nightshift/api",
+											"!@nightshift/api/client",
+											"!@nightshift/api/context",
+											"!@nightshift/auth",
+											"!@nightshift/auth/testing",
+											"!@nightshift/db",
+											"!@nightshift/db/schema",
+											"!@nightshift/db/data-dir",
+											"!@nightshift/db/migrate",
+											"!@nightshift/engine",
+											"!@nightshift/engine/lease",
+											"!@nightshift/engine/testing",
+											"!@nightshift/flows",
+											"!@nightshift/flows/files",
+											"!@nightshift/ui/components/*",
+											"!@nightshift/ui/hooks/*",
+											"!@nightshift/ui/lib/*",
+											"!@nightshift/ui/globals.css"
+										],
+										"message": "Import a package by an entry in its package.json exports, never a path inside it (see docs/steering/STRUCTURE.md, section 3)."
+									},
+									{
+										"group": [
+											"server/**",
+											"!server/daemon-env",
+											"!server/health",
+											"!server/serve",
+											"!server/services"
+										],
+										"message": "Import the server app only by an entry in its package.json exports. Phase 4 replaces them with @nightshift/daemon."
+									},
+									{
+										"group": ["**/packages/**", "**/apps/*/src/**"],
+										"message": "Never reach into another workspace by a relative path. Import the package by its name and a listed entry."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["apps/web/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": [
+											"@nightshift/**",
+											"!@nightshift/agents",
+											"!@nightshift/agents/testing",
+											"!@nightshift/api",
+											"!@nightshift/api/client",
+											"!@nightshift/api/context",
+											"!@nightshift/auth",
+											"!@nightshift/auth/testing",
+											"!@nightshift/db",
+											"!@nightshift/db/schema",
+											"!@nightshift/db/data-dir",
+											"!@nightshift/db/migrate",
+											"!@nightshift/engine",
+											"!@nightshift/engine/lease",
+											"!@nightshift/engine/testing",
+											"!@nightshift/flows",
+											"!@nightshift/flows/files",
+											"!@nightshift/ui/components/*",
+											"!@nightshift/ui/hooks/*",
+											"!@nightshift/ui/lib/*",
+											"!@nightshift/ui/globals.css"
+										],
+										"message": "Import a package by an entry in its package.json exports, never a path inside it (see docs/steering/STRUCTURE.md, section 3)."
+									},
+									{
+										"group": [
+											"server/**",
+											"!server/daemon-env",
+											"!server/health",
+											"!server/serve",
+											"!server/services"
+										],
+										"message": "Import the server app only by an entry in its package.json exports. Phase 4 replaces them with @nightshift/daemon."
+									},
+									{
+										"group": ["**/packages/**", "**/apps/*/src/**"],
+										"message": "Never reach into another workspace by a relative path. Import the package by its name and a listed entry."
+									},
+									{
+										"group": ["@nightshift/*/testing"],
+										"message": "./testing holds fakes and test helpers. Only tests import it."
+									},
+									{
+										"group": [
+											"@nightshift/agents",
+											"@nightshift/agents/**",
+											"@nightshift/auth",
+											"@nightshift/auth/**",
+											"@nightshift/db",
+											"@nightshift/db/**",
+											"@nightshift/engine",
+											"@nightshift/engine/**",
+											"@nightshift/api",
+											"@nightshift/api/context",
+											"@nightshift/flows/files"
+										],
+										"message": "The web app imports only @nightshift/api/client (types), the @nightshift/flows root and @nightshift/ui."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
 		}
 	]
 }
