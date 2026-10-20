@@ -1,13 +1,6 @@
+import { spaceIds, spaceRoster } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import {
-	clone,
-	device,
-	hostSpace,
-	member,
-	organization,
-	project,
-	user,
-} from "@nightshift/db/schema";
+import { clone, device, hostSpace, project } from "@nightshift/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import type * as Y from "yjs";
 import { z } from "zod";
@@ -247,11 +240,7 @@ export function createSpaceDocuments(options: {
 		open,
 		async openAll() {
 			const spaces = new Set<string>();
-			for (const row of await db
-				.select({ id: organization.id })
-				.from(organization)) {
-				spaces.add(row.id);
-			}
+			for (const id of await spaceIds(db)) spaces.add(id);
 			for (const row of await db
 				.selectDistinct({ id: project.spaceId })
 				.from(project)) {
@@ -392,11 +381,7 @@ export async function projectSpace(
 
 /** Writes the Space's Members (id, name, role) when they differ from the mirror. */
 async function mirror(db: Database, document: SpaceDocument): Promise<void> {
-	const rows = await db
-		.select({ id: user.id, name: user.name, role: member.role })
-		.from(member)
-		.innerJoin(user, eq(user.id, member.userId))
-		.where(eq(member.organizationId, document.spaceId));
+	const rows = await spaceRoster(db, document.spaceId);
 	const members = new Map<string, SpaceMember>(
 		rows.map((row) => [row.id, { name: row.name, role: row.role }]),
 	);

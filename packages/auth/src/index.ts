@@ -33,12 +33,17 @@ export { hasLogin, setLogin } from "./login";
 // InvitationView, PendingInvitation and SpaceMember are in the API's
 // router type: its declaration must be able to name them.
 export {
+	addMembership,
 	type InvitationView,
 	invitationView,
 	type MemberChange,
+	membershipOf,
 	membersOf,
 	type PendingInvitation,
+	removeMemberships,
 	type SpaceMember,
+	setMembershipRole,
+	spaceRoster,
 } from "./members";
 export {
 	approvePairing,
@@ -48,11 +53,16 @@ export {
 	reviewPairing,
 	startPairing,
 } from "./pairing";
+export { personContact, personNames } from "./people";
 export { type RequestAccess, requestAccess } from "./request";
 export {
 	localPerson,
+	mirrorHostSpace,
 	personalSpaceId,
+	personalSpaceIdBySlug,
 	roleIn,
 	type Space,
+	spaceExists,
+	spaceIds,
 	spacesOf,
 } from "./spaces";

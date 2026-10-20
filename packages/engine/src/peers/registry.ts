@@ -1,5 +1,6 @@
+import { personalSpaceIdBySlug } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { device, event, organization } from "@nightshift/db/schema";
+import { device, event } from "@nightshift/db/schema";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { deviceDocumentName } from "../device-config";
 import type { RunLog } from "../log";
@@ -103,12 +104,11 @@ export function createDeviceRegistry(deps: {
 
 	/** The personal Space of the Person: where their Devices' facts are logged. */
 	async function spaceOf(ownerId: string): Promise<string> {
-		const [found] = await db
-			.select({ id: organization.id })
-			.from(organization)
-			.where(eq(organization.slug, `personal-${ownerId}`));
-		if (!found) throw new Error("The Device's owner has no personal Space.");
-		return found.id;
+		const found = await personalSpaceIdBySlug(db, ownerId);
+		if (found === null) {
+			throw new Error("The Device's owner has no personal Space.");
+		}
+		return found;
 	}
 
 	async function logPresence(

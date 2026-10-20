@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { invitation, member, organization, user } from "@nightshift/db/schema";
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, sql } from "drizzle-orm";
 
 import type { Role } from "./access";
 
@@ -220,4 +221,70 @@ export async function claimHostAdmin(
 ): Promise<void> {
 	if (await hasHostAdmin(db)) return;
 	await db.update(user).set({ role: HOST_ADMIN }).where(eq(user.id, personId));
+}
+
+/** The Members of a Space by Person: their name and role, in no set order. */
+export async function spaceRoster(
+	db: Database,
+	spaceId: string,
+): Promise<{ id: string; name: string; role: string }[]> {
+	return db
+		.select({ id: user.id, name: user.name, role: member.role })
+		.from(member)
+		.innerJoin(user, eq(user.id, member.userId))
+		.where(eq(member.organizationId, spaceId));
+}
+
+/** The Person's membership of the Space (its id and role), or null. */
+export async function membershipOf(
+	db: Database,
+	spaceId: string,
+	personId: string,
+): Promise<{ id: string; role: string } | null> {
+	const [row] = await db
+		.select({ id: member.id, role: member.role })
+		.from(member)
+		.where(
+			and(eq(member.organizationId, spaceId), eq(member.userId, personId)),
+		);
+	return row ?? null;
+}
+
+/** Makes the Person a Member of the Space in that role. */
+export async function addMembership(
+	db: Database,
+	input: { spaceId: string; personId: string; role: string },
+): Promise<void> {
+	await db.insert(member).values({
+		id: randomUUID(),
+		organizationId: input.spaceId,
+		userId: input.personId,
+		role: input.role,
+		createdAt: new Date(),
+	});
+}
+
+/** Gives a membership another role. */
+export async function setMembershipRole(
+	db: Database,
+	membershipId: string,
+	role: string,
+): Promise<void> {
+	await db.update(member).set({ role }).where(eq(member.id, membershipId));
+}
+
+/** Ends the Person's memberships of these Spaces. */
+export async function removeMemberships(
+	db: Database,
+	spaceIds: readonly string[],
+	personId: string,
+): Promise<void> {
+	await db
+		.delete(member)
+		.where(
+			and(
+				inArray(member.organizationId, [...spaceIds]),
+				eq(member.userId, personId),
+			),
+		);
 }

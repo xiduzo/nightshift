@@ -162,3 +162,59 @@ function localName(): string {
 		return "You";
 	}
 }
+
+/** Whether a Space of that id exists on this Replica. */
+export async function spaceExists(
+	db: Database,
+	spaceId: string,
+): Promise<boolean> {
+	const [row] = await db
+		.select({ id: organization.id })
+		.from(organization)
+		.where(eq(organization.id, spaceId));
+	return row !== undefined;
+}
+
+/** The id of every Space on this Replica. */
+export async function spaceIds(db: Database): Promise<string[]> {
+	const rows = await db.select({ id: organization.id }).from(organization);
+	return rows.map((row) => row.id);
+}
+
+/**
+ * The id of the Person's personal Space by its slug (`personal-<user id>`),
+ * or null. Unlike `personalSpaceId`, it needs no membership row: a Host
+ * finds the personal Space of a Device's owner this way.
+ */
+export async function personalSpaceIdBySlug(
+	db: Database,
+	userId: string,
+): Promise<string | null> {
+	const [row] = await db
+		.select({ id: organization.id })
+		.from(organization)
+		.where(eq(organization.slug, `personal-${userId}`));
+	return row?.id ?? null;
+}
+
+/**
+ * Keeps a Space that a Host lists as this Replica's copy: makes its row
+ * (slug `host-<id>`), or gives the row the Host's name.
+ */
+export async function mirrorHostSpace(
+	db: Database,
+	space: { id: string; name: string },
+): Promise<void> {
+	await db
+		.insert(organization)
+		.values({
+			id: space.id,
+			name: space.name,
+			slug: `host-${space.id}`,
+			createdAt: new Date(),
+		})
+		.onConflictDoUpdate({
+			target: organization.id,
+			set: { name: space.name },
+		});
+}

@@ -17,6 +17,7 @@
 		"@langchain/langgraph-checkpoint": "^1.2.0",
 		"@libsql/client": "0.18.0",
 		"@nightshift/agents": "workspace:*",
+		"@nightshift/auth": "workspace:*",
 		"@nightshift/db": "workspace:*",
 		"@nightshift/flows": "workspace:*",
 		"ajv": "^8.20.0",

@@ -1,11 +1,13 @@
-import { randomUUID } from "node:crypto";
-import type { Database } from "@nightshift/db";
 import {
-	hostLink,
-	hostSpace,
-	member,
-	organization,
-} from "@nightshift/db/schema";
+	addMembership,
+	membershipOf,
+	mirrorHostSpace,
+	removeMemberships,
+	setMembershipRole,
+	spaceExists,
+} from "@nightshift/auth";
+import type { Database } from "@nightshift/db";
+import { hostLink, hostSpace } from "@nightshift/db/schema";
 import { and, eq, inArray, notInArray } from "drizzle-orm";
 
 /**
@@ -45,10 +47,7 @@ export function createHostSpaces(db: Database) {
 			// No transaction: every write is an upsert, and it runs with each
 			// answer of the Host, beside the walk's own writes.
 			for (const space of spaces) {
-				const [own] = await db
-					.select({ id: organization.id })
-					.from(organization)
-					.where(eq(organization.id, space.id));
+				const own = await spaceExists(db, space.id);
 				const [kept] = await db
 					.select()
 					.from(hostSpace)
@@ -57,15 +56,7 @@ export function createHostSpaces(db: Database) {
 				if (own && !kept) continue;
 				if (kept && kept.hostId !== host.id) continue;
 				const name = space.personal ? `Personal on ${host.name}` : space.name;
-				const [membership] = await db
-					.select()
-					.from(member)
-					.where(
-						and(
-							eq(member.organizationId, space.id),
-							eq(member.userId, personId),
-						),
-					);
+				const membership = await membershipOf(db, space.id, personId);
 				if (
 					kept?.name === name &&
 					kept.role === space.role &&
@@ -92,28 +83,15 @@ export function createHostSpaces(db: Database) {
 							updatedAt: new Date(),
 						},
 					});
-				await db
-					.insert(organization)
-					.values({
-						id: space.id,
-						name,
-						slug: `host-${space.id}`,
-						createdAt: new Date(),
-					})
-					.onConflictDoUpdate({ target: organization.id, set: { name } });
+				await mirrorHostSpace(db, { id: space.id, name });
 				if (!membership) {
-					await db.insert(member).values({
-						id: randomUUID(),
-						organizationId: space.id,
-						userId: personId,
+					await addMembership(db, {
+						spaceId: space.id,
+						personId,
 						role: space.role,
-						createdAt: new Date(),
 					});
 				} else if (membership.role !== space.role) {
-					await db
-						.update(member)
-						.set({ role: space.role })
-						.where(eq(member.id, membership.id));
+					await setMembershipRole(db, membership.id, space.role);
 				}
 			}
 			const gone = await db
@@ -129,14 +107,7 @@ export function createHostSpaces(db: Database) {
 				);
 			const goneIds = gone.map((g) => g.spaceId);
 			if (goneIds.length > 0) {
-				await db
-					.delete(member)
-					.where(
-						and(
-							inArray(member.organizationId, goneIds),
-							eq(member.userId, personId),
-						),
-					);
+				await removeMemberships(db, goneIds, personId);
 				await db.delete(hostSpace).where(inArray(hostSpace.spaceId, goneIds));
 			}
 		},

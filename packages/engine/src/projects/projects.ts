@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
+import { spaceExists } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	agentSession,
 	clone,
 	device,
 	event,
-	organization,
 	project,
 	run,
 	step,
@@ -429,11 +429,9 @@ export function createProjects(deps: ProjectsDeps) {
 			) {
 				throw new Error(HOSTED_ELSEWHERE);
 			}
-			const [target] = await db
-				.select({ id: organization.id })
-				.from(organization)
-				.where(eq(organization.id, to));
-			if (!target) throw new Error("That Space does not exist.");
+			if (!(await spaceExists(db, to))) {
+				throw new Error("That Space does not exist.");
+			}
 			const row = await rowOf(projectId);
 			if (row.spaceId !== from) {
 				throw new Error(`Project not found: ${projectId}`);
