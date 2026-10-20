@@ -55,7 +55,13 @@ import {
 	Stat,
 	Swatch,
 } from "./details";
-import { type FlowRun, hasEnded, runsOf, spreadOf } from "./flow-runs";
+import {
+	type FlowRun,
+	finishedCostOf,
+	hasEnded,
+	runsOf,
+	spreadOf,
+} from "./flow-runs";
 
 const RANGES = [7, 30, 90] as const;
 type Range = (typeof RANGES)[number];
@@ -115,10 +121,7 @@ function FlowHealthDetails({
 	const ended = inRange.filter(hasEnded);
 	const finished = ended.filter((run) => run.status === "finished");
 	const unfinished = ended.filter((run) => run.status !== "finished");
-	// A run with a step of unknown cost would look cheaper than it was.
-	const cost = spreadOf(
-		finished.filter((run) => run.costMissing === 0).map((run) => run.costUsd),
-	);
+	const { cost } = finishedCostOf(finished);
 	const warnings = inRange.reduce(
 		(total, run) => total + run.warnings.length,
 		0,
@@ -410,7 +413,7 @@ function CostPerRun({
 			hint={
 				median === undefined
 					? "Each ended run, oldest first"
-					: `Each ended run, oldest first. The dashed line is the median of the finished runs, ${formatCost(median)}.`
+					: `Each ended run, oldest first. The dashed line is the median of the finished runs that used an agent, ${formatCost(median)}.`
 			}
 		>
 			{runs.length === 0 ? (

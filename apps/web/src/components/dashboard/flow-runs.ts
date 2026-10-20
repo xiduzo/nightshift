@@ -17,6 +17,8 @@ export type FlowRun = {
 	costEstimated: boolean;
 	/** Steps that ended without a cost: their spend is not in `costUsd`. */
 	costMissing: number;
+	/** Agent sessions and model calls that ended. With none, it could not cost. */
+	costCalls: number;
 	/** The warnings of a run of its own. A subflow run shows its warnings in the run that called it. */
 	warnings: RunSummary["warnings"];
 };
@@ -34,6 +36,7 @@ export function runsOf(name: string, runs: RunSummary[]): FlowRun[] {
 						costUsd: run.costUsd,
 						costEstimated: run.costEstimated,
 						costMissing: run.costMissing,
+						costCalls: run.costCalls,
 						calledBy: null,
 						reason: run.reason,
 						warnings: run.warnings,
@@ -50,6 +53,7 @@ export function runsOf(name: string, runs: RunSummary[]): FlowRun[] {
 				costUsd: subflow.costUsd,
 				costEstimated: subflow.costEstimated,
 				costMissing: subflow.costMissing,
+				costCalls: subflow.costCalls,
 				calledBy: run.title,
 				reason: null,
 				warnings: [],
@@ -99,5 +103,27 @@ export function spreadOf(values: number[]): Spread | undefined {
 		q3: quantile(sorted, 0.75),
 		max: sorted.at(-1) ?? 0,
 		count: sorted.length,
+	};
+}
+
+/**
+ * What a finished run costs. A run with a step of unknown cost would look
+ * cheaper than it was, so it is left out and counted in `unknown`. A run
+ * that asked no agent or model, such as one that found nothing to do, cost
+ * nothing for sure. It is left out too, counted in `free`, so it does not
+ * drag the cost down.
+ */
+export function finishedCostOf(finished: FlowRun[]): {
+	cost: Spread | undefined;
+	unknown: number;
+	free: number;
+} {
+	const costly = finished.filter((run) => run.costCalls > 0);
+	return {
+		cost: spreadOf(
+			costly.filter((run) => run.costMissing === 0).map((run) => run.costUsd),
+		),
+		unknown: costly.filter((run) => run.costMissing > 0).length,
+		free: finished.length - costly.length,
 	};
 }

@@ -23,10 +23,10 @@ import { orpc } from "@/utils/orpc";
 import { FlowHealthDialog } from "./flow-health-dialog";
 import {
 	type FlowRun,
+	finishedCostOf,
 	hasEnded,
 	runsOf,
 	type Spread,
-	spreadOf,
 } from "./flow-runs";
 
 const NIGHTS = 30;
@@ -135,12 +135,14 @@ type FlowHealthRow = {
 	ended: number;
 	/** Percent of ended runs that finished; undefined when none ended. */
 	rate: number | undefined;
-	/** What a finished run cost; undefined when none finished. */
+	/** What a finished run that asked an agent or model cost; undefined when none did. */
 	cost: Spread | undefined;
 	/** The runs that ended without finishing, and what they spent together. */
 	unfinished: { count: number; costUsd: number };
 	/** Finished runs with a step whose cost is not known: not in `cost`. */
 	unknownCost: number;
+	/** Finished runs that asked no agent or model: not in `cost`. */
+	freeRuns: number;
 };
 
 function flowHealthOf(
@@ -160,6 +162,7 @@ function flowHealthOf(
 	// A run that failed early spent next to nothing, which would drag down
 	// what a run costs. Its spend shows on its own instead.
 	const unfinished = ended.filter((run) => run.status !== "finished");
+	const { cost, unknown, free } = finishedCostOf(finished);
 	return {
 		name,
 		last,
@@ -170,11 +173,9 @@ function flowHealthOf(
 			ended.length > 0
 				? Math.round((finished.length / ended.length) * 100)
 				: undefined,
-		// A run with a step of unknown cost would look cheaper than it was.
-		cost: spreadOf(
-			finished.filter((run) => run.costMissing === 0).map((run) => run.costUsd),
-		),
-		unknownCost: finished.filter((run) => run.costMissing > 0).length,
+		cost,
+		unknownCost: unknown,
+		freeRuns: free,
 		unfinished: {
 			count: unfinished.length,
 			costUsd: unfinished.reduce((total, run) => total + run.costUsd, 0),
@@ -265,6 +266,7 @@ function flowHealthColumns(
 					cost={original.cost}
 					unfinished={original.unfinished}
 					unknownCost={original.unknownCost}
+					freeRuns={original.freeRuns}
 					scaleMax={scaleMax}
 				/>
 			),
@@ -288,13 +290,23 @@ function CostCell({
 	cost,
 	unfinished,
 	unknownCost,
+	freeRuns,
 	scaleMax,
 }: {
 	cost: Spread | undefined;
 	unfinished: FlowHealthRow["unfinished"];
 	unknownCost: number;
+	freeRuns: number;
 	scaleMax: number;
 }) {
+	const freeLine =
+		freeRuns > 0 ? (
+			<span>
+				{freeRuns === 1
+					? "1 finished run is left out: it used no agent, so it cost nothing."
+					: `${freeRuns} finished runs are left out: they used no agent, so they cost nothing.`}
+			</span>
+		) : null;
 	const unknownLine =
 		unknownCost > 0 ? (
 			<span>
@@ -313,13 +325,14 @@ function CostCell({
 			</span>
 		) : null;
 	if (cost === undefined) {
-		return unfinishedLine || unknownLine ? (
+		return unfinishedLine || unknownLine || freeLine ? (
 			<Tooltip>
 				<TooltipTrigger render={<span className="text-muted-foreground" />}>
 					—
 				</TooltipTrigger>
 				<TooltipContent className="flex flex-col items-start gap-0.5 tabular-nums">
 					<span>No finished run with a known cost.</span>
+					{freeLine}
 					{unknownLine}
 					{unfinishedLine}
 				</TooltipContent>
@@ -395,6 +408,7 @@ function CostCell({
 						</span>
 					</>
 				) : null}
+				{freeLine}
 				{unknownLine}
 				{unfinishedLine}
 				<span className="text-muted-foreground">
