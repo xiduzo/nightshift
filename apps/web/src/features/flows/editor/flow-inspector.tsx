@@ -19,7 +19,9 @@ import {
 	Note,
 	PositiveIntInput,
 } from "./fields";
-import { InputsEditor, OutputsEditor, VariablesEditor } from "./io-editor";
+import { InputsEditor } from "./io/inputs-editor";
+import { OutputsEditor } from "./io/outputs-editor";
+import { VariablesEditor } from "./io/variables-editor";
 
 const POLICY_FIELDS: {
 	key: Exclude<keyof Policy, "resumeInterruptedRuns">;

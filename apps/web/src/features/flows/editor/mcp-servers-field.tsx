@@ -15,8 +15,7 @@ import {
 import { Textarea } from "@nightshift/ui/components/textarea";
 import { PlusIcon, XIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
-
-import { NameInput } from "./io-editor";
+import { NameInput } from "./io/io-rows";
 
 type Servers = Record<string, McpServer>;
 type StdioServer = Extract<McpServer, { command: string }>;
