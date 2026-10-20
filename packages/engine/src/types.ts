@@ -582,6 +582,13 @@ export interface Engine {
 	 * offline look again now, instead of at their next try.
 	 */
 	deviceBack(deviceId: string): Promise<void>;
+	/**
+	 * Ends the running steps of the runs this computer walks that ran past
+	 * their time budget or idle limit, as the run's log records them, when
+	 * their own timers did not. For a periodic sweep: a step must be one
+	 * minute past its limit.
+	 */
+	endOverdueSteps(): Promise<void>;
 }
 
 /**

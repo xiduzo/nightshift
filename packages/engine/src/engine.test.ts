@@ -42,6 +42,7 @@ import {
 	withDevice,
 } from "./test-support";
 import type {
+	Engine,
 	RunDetail,
 	RunStatus,
 	RunStreamItem,
@@ -78,6 +79,15 @@ function makeEngine(
 	> = {},
 	internals: EngineInternals = {},
 ): SpaceEngine {
+	return makeDaemon(harness, options, internals).space(sandbox.spaceId);
+}
+
+/** The whole engine of a daemon, for what it does outside a Space. */
+function makeDaemon(
+	harness: AgentHarness,
+	options: Parameters<typeof makeEngine>[1] = {},
+	internals: EngineInternals = {},
+): Engine {
 	const runLog = createRunLog(sandbox.db);
 	runLogs.push(runLog);
 	return createEngine(
@@ -90,7 +100,7 @@ function makeEngine(
 			...options,
 		}),
 		{ runLog, ...internals },
-	).space(sandbox.spaceId);
+	);
 }
 
 function agent(
@@ -1468,6 +1478,139 @@ describe("automatic resume after a restart", () => {
 		await waitFor(async () =>
 			(await statuses()).every((status) => status === "finished"),
 		);
+	});
+
+	const HOUR = 60 * 60_000;
+	/** One Agent step with an hour's budget, and a check after it. */
+	const budgeted = (limits: Partial<AgentNode>) =>
+		flowOf(
+			[agent("worker", "Go", limits), command("check", "true")],
+			[edge("e1", "worker", "pass", "check")],
+		);
+
+	test("a step past its time budget ends as its timer would, and the run does not continue", async () => {
+		const { run } = await dieMidStep(budgeted({ timeoutMinutes: 60 }));
+		// The new daemon starts two hours later: the budget ran out meanwhile.
+		const { engine, sessions } = restart(
+			{},
+			{ now: () => Date.now() + 2 * HOUR },
+		);
+		const detail = await engine.getRun(run.id);
+		expect(detail.status).toBe("failed");
+		expect(detail.reason).toBe(
+			'Node "worker" failed: The step ran past its time budget of 60 min.',
+		);
+		expect(detail.steps[0]).toMatchObject({
+			outcome: "error",
+			error: "The step ran past its time budget of 60 min.",
+		});
+		expect(detail.steps[0]?.sessions[0]?.outcome).toBe("failed");
+		await Bun.sleep(60);
+		expect(sessions).toHaveLength(0);
+		expect(await loggedTypes()).not.toContain("RunResumed");
+	});
+
+	test("a step idle past its limit ends as its idle timer would", async () => {
+		const { run } = await dieMidStep(budgeted({ idleMinutes: 30 }));
+		const { engine, sessions } = restart({}, { now: () => Date.now() + HOUR });
+		const detail = await engine.getRun(run.id);
+		expect(detail.status).toBe("failed");
+		expect(detail.steps[0]).toMatchObject({
+			outcome: "error",
+			error: "No activity for 30 min.",
+		});
+		await Bun.sleep(60);
+		expect(sessions).toHaveLength(0);
+	});
+
+	test("a step within its budget is interrupted and continues as before", async () => {
+		const { run } = await dieMidStep(
+			budgeted({ timeoutMinutes: 60, idleMinutes: 30 }),
+		);
+		const { engine, sessions } = restart();
+		const resumed = await waitFor(() => sessions[0]);
+		expect(resumed.input.resumeSessionId).toBe("harness-0");
+		resumed.finish();
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+		expect(
+			(await engine.getRun(run.id)).steps.map((s) => [s.nodeId, s.outcome]),
+		).toEqual([
+			["worker", "pass"],
+			["check", "pass"],
+		]);
+	});
+
+	test("a log from before step budgets recovers as before, past any deadline", async () => {
+		const { run } = await dieMidStep(budgeted({ timeoutMinutes: 60 }));
+		// The log of an older Night Shift: StepStarted without the budget.
+		const [started] = await sandbox.db
+			.select()
+			.from(event)
+			.where(eq(event.type, "StepStarted"));
+		if (!started) throw new Error("No StepStarted");
+		const { timeoutMs, ...payload } = JSON.parse(started.payload);
+		expect(timeoutMs).toBe(HOUR);
+		await sandbox.db
+			.update(event)
+			.set({ payload: JSON.stringify(payload) })
+			.where(eq(event.seq, started.seq));
+
+		const { engine, sessions } = restart(
+			{},
+			{ now: () => Date.now() + 2 * HOUR },
+		);
+		const resumed = await waitFor(() => sessions[0]);
+		expect(resumed.input.resumeSessionId).toBe("harness-0");
+		expect((await engine.getRun(run.id)).steps[0]?.outcome).toBeNull();
+	});
+});
+
+describe("deadlines without timers", () => {
+	test("the sweep ends a running step past its budget whose harness ignores everything", async () => {
+		const { harness, sessions } = scriptedHarness({ hang: true, silent: true });
+		const daemon = makeDaemon(harness, {}, { minuteMs: 50 });
+		const engine = daemon.space(sandbox.spaceId);
+		const id = await projectId(engine);
+		// The step's own timers never fire: they are set while timers are frozen.
+		const run = await withFrozenTimers(async () => {
+			const started = await engine.startRun({
+				projectId: id,
+				flow: flowOf(
+					[
+						agent("worker", "Go", { timeoutMinutes: 1 }),
+						command("check", "true"),
+					],
+					[edge("e1", "worker", "pass", "check")],
+				),
+			});
+			await waitFor(() => sessions[0]);
+			return started;
+		});
+		const hung = sessions[0] as (typeof sessions)[number];
+
+		// Within its budget, and its grace: the sweep leaves it alone.
+		await daemon.endOverdueSteps();
+		expect(await statusOf(engine, run.id)).toBe("running");
+
+		// One minute (50 ms) of budget, one minute of grace.
+		await Bun.sleep(150);
+		await daemon.endOverdueSteps();
+		expect(hung.input.signal.aborted).toBe(true);
+		const detail = await engine.getRun(run.id);
+		expect(detail.status).toBe("failed");
+		expect(detail.reason).toBe(
+			'Node "worker" failed: The step ran past its time budget of 1 min.',
+		);
+		expect(detail.steps.map((s) => [s.nodeId, s.outcome, s.error])).toEqual([
+			["worker", "error", "The step ran past its time budget of 1 min."],
+		]);
+		expect(detail.steps[0]?.sessions[0]?.outcome).toBe("failed");
+
+		// The hung harness wakes later: its drive writes nothing more.
+		const ended = await loggedTypes();
+		hung.finish(1);
+		await Bun.sleep(100);
+		expect(await loggedTypes()).toEqual(ended);
 	});
 });
 

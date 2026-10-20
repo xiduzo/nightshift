@@ -35,7 +35,9 @@ import type { RunSettings } from "./settings";
  * - Startup recovery (`recoverInterruptedWork`): a daemon that died left
  *   sessions, steps and runs open. They become `interrupted`, sleeping runs
  *   get their timers back, and after a grace period the daemon resumes the
- *   interrupted runs itself unless `daemonResumeBlock` says why not.
+ *   interrupted runs itself unless `daemonResumeBlock` says why not. A
+ *   step past its recorded time budget or idle limit ends as its timer
+ *   would have ended it instead (`runner.endIfOverdue`).
  * - Resume (`resume`): a person's resume and the daemon's both come here,
  *   and the thread's checkpoint decides how the run continues.
  *
@@ -193,6 +195,16 @@ export function createRecovery(deps: RecoveryDeps) {
 		toResume = [];
 		for (const [runId, events] of byRun) {
 			const open = openWork(events);
+			// A step that ran past its time budget or idle limit meanwhile
+			// ends as its timer would have ended it, and the run fails: it
+			// does not continue.
+			if (
+				open.runOpen &&
+				open.steps.length > 0 &&
+				(await runner.endIfOverdue(runId, 0))
+			) {
+				continue;
+			}
 			for (const session of open.sessions) {
 				await log.append({
 					type: "SessionEnded",

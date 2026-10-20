@@ -547,6 +547,10 @@ presence.nightshiftPresence = setInterval(() => {
 	engine.devices.sweep(OFFLINE_AFTER_MS).catch((error) => {
 		console.error("Device presence was not updated:", error);
 	});
+	// The steps' own timers are the fast path; this ends a step they missed.
+	engine.endOverdueSteps().catch((error) => {
+		console.error("Steps past their time limits were not ended:", error);
+	});
 }, 5_000);
 presence.nightshiftPresence.unref();
 

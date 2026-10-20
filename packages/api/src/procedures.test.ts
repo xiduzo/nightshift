@@ -49,6 +49,7 @@ const engine: Context["engine"] = {
 	logMemberChange: async () => {},
 	offers: {} as Context["engine"]["offers"],
 	deviceBack: async () => {},
+	endOverdueSteps: async () => {},
 };
 
 /** A request from another computer, with these headers, on a Host with this policy. */

@@ -1,5 +1,5 @@
 import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { type FileHandle, open, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type { TranscriptEntry } from "./types";
@@ -42,6 +42,37 @@ export async function readTranscriptFile(
 		throw error;
 	}
 	return parseTranscript(text);
+}
+
+/** How much of a transcript's end `lastEntryAt` reads first. */
+const TAIL_BYTES = 64 * 1024;
+
+/**
+ * The time of a transcript's last entry, or null when it has none. Reads
+ * the end of the file only, unless one entry is longer than that.
+ */
+export async function lastEntryAt(path: string): Promise<number | null> {
+	let file: FileHandle;
+	try {
+		file = await open(path, "r");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+		throw error;
+	}
+	try {
+		const { size } = await file.stat();
+		const start = Math.max(0, size - TAIL_BYTES);
+		const tail = Buffer.alloc(size - start);
+		await file.read(tail, 0, tail.length, start);
+		let text = tail.toString("utf8");
+		// The tail starts inside an entry: its first line is cut.
+		if (start > 0) text = text.slice(text.indexOf("\n") + 1);
+		const last = parseTranscript(text).at(-1);
+		if (last || start === 0) return last?.at ?? null;
+	} finally {
+		await file.close();
+	}
+	return (await readTranscriptFile(path)).at(-1)?.at ?? null;
 }
 
 /** The entries of a transcript's text. A line that does not parse is skipped. */

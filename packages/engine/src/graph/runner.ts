@@ -29,6 +29,7 @@ import {
 	type RunRow,
 	type StepContext,
 } from "./context";
+import { findOverdue, type Overdue } from "./deadlines";
 import {
 	createFence,
 	type Fence,
@@ -55,9 +56,10 @@ import type {
  * `RunEnded`, and owns what the walk owned around the steps: the slots and
  * the run cap, the per-run `exclusive` queue, and a stop. A stop waits for
  * nothing: it fences the drive off (`fence.ts`) and ends the run's open
- * work itself (`closeOpenWork`). The wake timers and the wake of a sleeping run are the
- * sleep module's (`sleeps`, `graph/sleep.ts`), given the runner's thread
- * seam.
+ * work itself (`closeOpenWork`). A step past the time limits its log
+ * records ends the same way (`endIfOverdue`, `deadlines.ts`). The wake
+ * timers and the wake of a sleeping run are the sleep module's (`sleeps`,
+ * `graph/sleep.ts`), given the runner's thread seam.
  *
  * - `start` streams `{ inputs }`; `continueRun` streams `null` (the node a
  *   dead daemon left pending re-runs, rule 5); `resume` streams
@@ -434,22 +436,35 @@ export function createRunner(deps: RunnerDeps) {
 	}
 
 	/**
-	 * Ends the run's open work as stopped: its open sessions, then its open
-	 * steps from the inside out (a running step, an open Gate or a sleeping
-	 * step, and the Call steps around them), then the run. A stopped step
-	 * ends with its kind's outputs (`stoppedOutputs`). The thread stays
-	 * where it is: a resume re-enters it (design rule 7), at its interrupt
-	 * or at the node the stopped drive was in.
+	 * Ends the run's open work: its open sessions, then its open steps from
+	 * the inside out (a running step, an open Gate or a sleeping step, and
+	 * the Call steps around them), then the run. The thread stays where it
+	 * is: a resume re-enters it (design rule 7), at its interrupt or at the
+	 * node the drive was in.
+	 *
+	 * - `stopped` (a person stopped the run): every step ends `stopped` with
+	 *   its kind's outputs (`stoppedOutputs`), the run `stopped`.
+	 * - `overdue` (a step ran past its time budget or idle limit and its
+	 *   timer did not end it): that step ends `error` with the timer's
+	 *   message, the steps around it and the run fail with the reason a
+	 *   failed step gives (`route`). The sessions end as the timer's abort
+	 *   ends them: `failed`, aborted.
 	 */
-	async function closeOpenWork(runId: string): Promise<void> {
-		const status = "stopped";
+	async function closeOpenWork(
+		runId: string,
+		halt: { kind: "stopped" } | ({ kind: "overdue" } & Overdue),
+	): Promise<void> {
+		const reason =
+			halt.kind === "overdue"
+				? `Node "${halt.nodeId}" failed: ${halt.error}`
+				: null;
 		const events = await log.events(runId);
 		const steps = deriveSteps(events);
 		sleeps.forget(runId);
 		for (const session of deriveSessions(events)) {
 			if (session.ending !== null) continue;
 			const ending: EnginePayloads["SessionEnded"] = {
-				outcome: status,
+				outcome: halt.kind === "stopped" ? "stopped" : "failed",
 				error: "The session was aborted.",
 				errorKind: "aborted",
 				usage: null,
@@ -478,17 +493,38 @@ export function createRunner(deps: RunnerDeps) {
 					step.id,
 				);
 				const outputs = kindOfType(step.nodeType).stoppedOutputs(step, node);
+				const payload: EnginePayloads["StepEnded"] =
+					halt.kind === "stopped"
+						? { outcome: "stopped", outputs, error: null }
+						: {
+								outcome: "error",
+								outputs: { ...outputs, outcome: "error" },
+								error: step.id === halt.stepId ? halt.error : reason,
+							};
 				await log.append({
 					type: "StepEnded",
 					runId,
 					stepId: step.id,
-					payload: { outcome: status, outputs, error: null },
+					payload,
 				});
 				bus.publish(runId, { kind: "step-changed", stepId: step.id });
 			}
 		}
-		await endRun(log, runId, status, null);
+		await endRun(
+			log,
+			runId,
+			halt.kind === "stopped" ? "stopped" : "failed",
+			reason,
+		);
 		bus.publish(runId, { kind: "status-changed" });
+	}
+
+	/** A drive's slot is free: what waited for one may go now. */
+	function slotFreed(runId: string): void {
+		// The old drive may never unwind to free its slot itself.
+		bus.publish(runId, { kind: "status-changed" });
+		sleeps.drain();
+		deps.onSlotFreed?.();
 	}
 
 	/**
@@ -512,13 +548,63 @@ export function createRunner(deps: RunnerDeps) {
 			if (!slot && !parked) return;
 			await log.append({ type: "StopRequested", runId, payload: {} });
 			// A drive may have ended the run before the stop took it.
-			if (status === "running" || parked) await closeOpenWork(runId);
+			if (status === "running" || parked) {
+				await closeOpenWork(runId, { kind: "stopped" });
+			}
 		});
-		if (freed) {
-			// The old drive may never unwind to free its slot itself.
-			bus.publish(runId, { kind: "status-changed" });
-			sleeps.drain();
-			deps.onSlotFreed?.();
+		if (freed) slotFreed(runId);
+	}
+
+	/**
+	 * Ends the run's running step when it ran past its time budget or its
+	 * idle limit by `graceMs` or more, as the recorded limits say
+	 * (`findOverdue`): the step and the run end as the step's timer ends
+	 * them, through the stop's path (`takeFromDrive`, `closeOpenWork`), so
+	 * a drive that hangs writes nothing more. True when it ended one.
+	 */
+	async function endIfOverdue(
+		runId: string,
+		graceMs: number,
+	): Promise<boolean> {
+		let freed = false;
+		const ended = await exclusive(runId, async () => {
+			const slot = slots.get(runId);
+			if (slot === "starting") return false;
+			const events = await log.events(runId);
+			if (deriveRunState(events).status !== "running") return false;
+			const overdue = await findOverdue(events, {
+				now: deps.now(),
+				graceMs,
+				minuteMs: deps.minuteMs,
+			});
+			if (!overdue) return false;
+			if (slot) {
+				await takeFromDrive(runId, slot);
+				freed = true;
+			}
+			await closeOpenWork(runId, { kind: "overdue", ...overdue });
+			return true;
+		});
+		if (freed) slotFreed(runId);
+		return ended;
+	}
+
+	/**
+	 * Checks the running step of every run this process drives against its
+	 * recorded limits (`endIfOverdue`). The timers stay the fast path, so a
+	 * step must be a minute past its limit (one `minuteMs`) before this
+	 * ends it.
+	 */
+	async function endOverdueSteps(): Promise<void> {
+		for (const runId of [...slots.keys()]) {
+			try {
+				await endIfOverdue(runId, deps.minuteMs);
+			} catch (error) {
+				console.error(
+					`[engine] could not check the time of run ${runId}`,
+					error,
+				);
+			}
 		}
 	}
 
@@ -620,6 +706,8 @@ export function createRunner(deps: RunnerDeps) {
 		/** The sleeping runs: `wake(runId, how)`, `restore(runId, events)` (`graph/sleep.ts`). */
 		sleeps,
 		stop,
+		endIfOverdue,
+		endOverdueSteps,
 		dispose,
 	};
 }

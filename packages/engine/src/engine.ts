@@ -1292,6 +1292,10 @@ export function createEngine(
 		logMemberChange,
 		deviceBack,
 		offers,
+		async endOverdueSteps() {
+			await ready;
+			await runner.endOverdueSteps();
+		},
 	};
 }
 

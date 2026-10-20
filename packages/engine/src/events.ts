@@ -232,12 +232,12 @@ export type EnginePayloads = {
 		scope?: Scope | null;
 		/** The Device the step runs on. Absent before Devices: this computer. */
 		deviceId?: string;
-	};
+	} & StepBudget;
 	/**
 	 * An ended step runs again: an Agent step in a new session of the same
 	 * harness session, a Call step to continue its called flow.
 	 */
-	StepReopened: { prompt: string | null };
+	StepReopened: { prompt: string | null } & StepBudget;
 	StepEnded: {
 		outcome: StepOutcome;
 		outputs: StepOutputs;
@@ -377,6 +377,19 @@ export type EnginePayloads = {
 		/** The earlier run that still runs, when that is the reason. */
 		runId: string | null;
 	};
+};
+
+/**
+ * A step's time budget, on `StepStarted` and `StepReopened`, so it outlives
+ * the timers of the process that runs the step (`deriveStepClocks`). Each
+ * field is set only when the step has that limit, and absent in logs from
+ * before it: such a step has only its timers.
+ */
+export type StepBudget = {
+	/** How long the step may run (its node's `timeoutMinutes`), in ms. */
+	timeoutMs?: number;
+	/** How long the step may go without activity (`idleMinutes`), in ms. */
+	idleMs?: number;
 };
 
 export type EngineEventType = keyof EnginePayloads;
@@ -1246,6 +1259,70 @@ export function openWork(events: readonly LoggedEvent[]): {
 		),
 		runOpen: deriveRunStatus(events) === "running",
 	};
+}
+
+/** A running step's time budget, as the log has it, and when it counts from. */
+export type StepClock = {
+	step: DerivedStep;
+	/** The step's time budget in ms, or null without one. */
+	timeoutMs: number | null;
+	/** The step's idle limit in ms, or null without one. */
+	idleMs: number | null;
+	/**
+	 * When the step's node last entered: the budget counts from here, and
+	 * so does the idle clock until the step's transcript has a later entry.
+	 */
+	since: number;
+};
+
+/**
+ * The clocks of the steps that run now (open, and not parked at a Gate or
+ * in a sleep) and have a budget in the log (`StepBudget`). A step's timers
+ * start again each time its node enters, so `since` is the latest of: its
+ * `StepStarted` or `StepReopened`, a `WaitEnded` or `ItemStarted` of its
+ * own, and every event inside it (a step of the flow it calls, an edge
+ * there). A Call node enters again after each wait, Gate and element in
+ * its called flow, and the log has no mark of that entry: the events
+ * inside stand in for it. So `since` can be late, never early.
+ */
+export function deriveStepClocks(events: readonly LoggedEvent[]): StepClock[] {
+	const latest = latestRunEvent(events);
+	if (!latest || latest.type === "RunEnded") return [];
+	const steps = deriveSteps(events);
+	const callerOf = new Map(steps.map((s) => [s.id, s.scope?.parentStepId]));
+	const parked = new Set(parkedSteps(events).map((s) => s.id));
+	const budgets = new Map<string, StepBudget>();
+	const since = new Map<string, number>();
+	const entered = (stepId: string, at: number) =>
+		since.set(stepId, Math.max(since.get(stepId) ?? at, at));
+	for (const e of bySeq(events)) {
+		const own = e.stepId;
+		if (own && (e.type === "StepStarted" || e.type === "StepReopened")) {
+			budgets.set(own, e.payload);
+			entered(own, e.at);
+		} else if (own && (e.type === "WaitEnded" || e.type === "ItemStarted")) {
+			entered(own, e.at);
+		}
+		const inside =
+			e.type === "EdgeTaken"
+				? e.payload.scope?.parentStepId
+				: own
+					? callerOf.get(own)
+					: undefined;
+		for (let caller = inside; caller; caller = callerOf.get(caller)) {
+			entered(caller, e.at);
+		}
+	}
+	return steps.flatMap((step) => {
+		if (step.endedAt !== null || parked.has(step.id)) return [];
+		const budget = budgets.get(step.id);
+		const timeoutMs = budget?.timeoutMs ?? null;
+		const idleMs = budget?.idleMs ?? null;
+		if (timeoutMs === null && idleMs === null) return [];
+		return [
+			{ step, timeoutMs, idleMs, since: since.get(step.id) ?? step.startedAt },
+		];
+	});
 }
 
 /** Groups events by run id. Events without a run are dropped. */

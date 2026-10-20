@@ -18,6 +18,7 @@ import {
 	type EnginePayloads,
 	type LoggedEvent,
 	type RunWarningKind,
+	type StepBudget,
 	type StepOutputs,
 	scopeKey,
 } from "../events";
@@ -352,6 +353,16 @@ export async function runStep(
 	}
 }
 
+/** Why a step ran out of time: its end's error. `minutes` is the limit it ran past. */
+export function budgetError(
+	reason: Exclude<AbortReason, "stopped">,
+	minutes: number | undefined,
+): string {
+	return reason === "timeout"
+		? `The step ran past its time budget of ${minutes} min.`
+		: `No activity for ${minutes} min.`;
+}
+
 /**
  * The end an aborted step has, from its signal's reason: `error` with why
  * for the node's time budget or no activity, else `stopped` (a person
@@ -364,13 +375,14 @@ export function abortEnd(
 ): Pick<StepEnd, "outcome" | "outputs" | "error"> {
 	const reason = signal.reason as AbortReason | undefined;
 	if (reason === "timeout" || reason === "idle") {
+		const budget = kindOf(node).timeBudget(node);
 		return {
 			outcome: "error",
 			outputs: { ...outputs, outcome: "error" },
-			error:
-				reason === "timeout"
-					? `The step ran past its time budget of ${node.timeoutMinutes} min.`
-					: `No activity for ${kindOf(node).timeBudget(node).idleMinutes} min.`,
+			error: budgetError(
+				reason,
+				reason === "timeout" ? budget.timeoutMinutes : budget.idleMinutes,
+			),
 		};
 	}
 	return {
@@ -388,10 +400,11 @@ export function abortEnd(
  * step cap (failed, with today's reason). A continued or reopened step skips
  * them all: it is already in the log, and a stop must end it there (the old
  * walk had no entry check for one). It then writes the `step` row and
- * `StepStarted` (with the transcript path, the command log path and the
- * scope), or `StepReopened` for a reopen, and opens the transcript and the
- * timers. Exactly `runStep`'s scaffolding in the old engine. It asks
- * `ctx.deviceFor` for the step's Device first; `StepStarted` names it.
+ * `StepStarted` (with the transcript path, the command log path, the
+ * scope and the time budget), or `StepReopened` for a reopen (with the
+ * time budget), and opens the transcript and the timers. Exactly
+ * `runStep`'s scaffolding in the old engine. It asks `ctx.deviceFor` for
+ * the step's Device first; `StepStarted` names it.
  *
  * `events` is the log as the caller read it on entry; without it the log
  * is read here.
@@ -411,6 +424,17 @@ export async function beginStep(
 	// records it.
 	const device = ctx.deviceFor(node, ctx.run);
 	const logged = events ?? (await ctx.log.events(runId));
+	// The kind says which timers a step has: a Gate waits as long as it
+	// must, a Wait node keeps its own deadline across its sleeps, and only an
+	// Agent step has an idle clock. The log keeps the same limits, so they
+	// hold when the timers do not (`deriveStepClocks`).
+	const { timeoutMinutes, idleMinutes } = kindOf(node).timeBudget(node);
+	const budget: StepBudget = {
+		...(timeoutMinutes ? { timeoutMs: timeoutMinutes * ctx.minuteMs } : {}),
+		...(idleMinutes !== undefined
+			? { idleMs: idleMinutes * ctx.minuteMs }
+			: {}),
+	};
 	const parked = (
 		status: "failed" | "stopped",
 		reason: string | null,
@@ -472,6 +496,7 @@ export async function beginStep(
 				logPath,
 				scope,
 				deviceId: device.id,
+				...budget,
 			},
 		});
 	} else {
@@ -485,7 +510,7 @@ export async function beginStep(
 				type: "StepReopened",
 				runId,
 				stepId,
-				payload: { prompt: start.prompt },
+				payload: { prompt: start.prompt, ...budget },
 			});
 		}
 	}
@@ -511,10 +536,6 @@ export async function beginStep(
 	const onStop = () => stepController.abort("stopped" satisfies AbortReason);
 	if (runSignal.aborted) onStop();
 	else runSignal.addEventListener("abort", onStop, { once: true });
-	// The kind says which timers a step has: a Gate waits as long as it
-	// must, a Wait node keeps its own deadline across its sleeps, and only an
-	// Agent step has an idle clock.
-	const { timeoutMinutes, idleMinutes } = kindOf(node).timeBudget(node);
 	const timer = timeoutMinutes
 		? setTimeout(
 				() => stepController.abort("timeout" satisfies AbortReason),
