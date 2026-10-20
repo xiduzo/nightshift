@@ -4,7 +4,6 @@ import { ZapIcon } from "lucide-react";
 import { useState } from "react";
 
 import { FlowHealth } from "@/components/dashboard/flow-health";
-import { NeedsYou } from "@/components/dashboard/needs-you";
 import { NightOutput } from "@/components/dashboard/night-output";
 import { ProjectClones } from "@/components/dashboard/project-clones";
 import { RunOutcomes } from "@/components/dashboard/run-outcomes";
@@ -21,9 +20,9 @@ export const Route = createFileRoute("/projects/$projectId/")({
 });
 
 /**
- * The project's root: a morning review. What needs you, what the night made,
- * what comes next, and how the flows do. Flows, runs and schedules have their
- * own pages.
+ * The project's root: a morning review. What the night made, what comes next,
+ * and how the flows do. Open Gates wait in the Inbox. Flows, runs and
+ * schedules have their own pages.
  */
 function ProjectDashboardComponent() {
 	const { projectId } = Route.useParams();
@@ -55,8 +54,6 @@ function ProjectDashboardComponent() {
 							</Button>
 						}
 					/>
-
-					<NeedsYou projectId={project.id} />
 
 					<SectionCards
 						runs={runs.data}
