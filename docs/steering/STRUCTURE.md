@@ -73,6 +73,20 @@ Each package lists its public entry points in `package.json` `exports`.
 - `index.ts` exports what consumers use. It is not a barrel of every file.
 - Test helpers, fakes and fixtures are public only through `./testing`. Production code never imports `./testing`.
 - An entry for the web app is type-only and browser-safe (`@nightshift/api/client`).
+- A type that the emitted declaration of another package names must be on an entry. Example: the API router type names engine and auth view types, so their roots export them. Without this, `tsc` fails with TS2883.
+
+The entries today:
+
+| Package | Entries |
+| --- | --- |
+| `agents` | `.`, `./testing` (fakes, `fixturePath(name)`) |
+| `api` | `.` (`appRouter` and its types), `./client` (types only, for `apps/web`), `./context` |
+| `auth` | `.`, `./testing` |
+| `db` | `.`, `./schema`, `./data-dir`, `./migrate` |
+| `engine` | `.`, `./lease` (light, for the health check, until phase 4 moves the lease to the daemon), `./testing` |
+| `flows` | `.`, `./files` |
+| `ui` | `./components/*`, `./hooks/*`, `./lib/*`, `./globals.css`, `./postcss.config` |
+| `apps/server` | `.`, `./daemon-env`, `./health`, `./serve`, `./services`, `./shims/*` by name. A stopgap for `apps/desktop` until phase 4. |
 - A consumer imports a package by its name and a listed entry. Never by a relative path into another package (`../../packages/agents/src/...`).
 
 ## 4. Verticals
@@ -157,28 +171,28 @@ An app wires packages together and talks to the outside world. It does not hold 
 | Check | Where | Status |
 | --- | --- | --- |
 | Layer map: `scripts/check-layers.ts` compares each workspace dependency in a `package.json` with the table in section 1. Bun links only declared dependencies, so this is the real import graph. | lefthook pre-commit, CI | Active |
-| Explicit `exports` in every `package.json`. A deep import fails `tsc` and fails at runtime. | TypeScript, Bun | Planned |
-| Biome `style/noRestrictedImports` per package: forbid entries outside `exports`, `./testing` in production files, and engine/agents/auth/db in `apps/web`. | `biome.json` overrides | Planned |
-| Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json` | Planned |
-| CI on every pull request and push to `main`: `biome ci`, the layer check, `bun run check-types`, and `bun test` per workspace (without `*.live.test.ts`). | `.github/workflows/ci.yml` | Active |
-| Vertical boundaries: `scripts/check-verticals.ts` finds the verticals from the file system (so no list can drift), then fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports. Tests may deep-import. | lefthook pre-commit, CI | Planned |
-| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. | lefthook pre-commit, CI | Planned |
-| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Planned |
+| Explicit `exports` in every `package.json` (section 3). A deep import fails `tsc` and fails at runtime. | TypeScript, Bun | Active |
+| Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, the `api` root and `flows/files` in `apps/web`. Biome replaces the options of a rule per override, so each override lists the whole set. | `biome.json` and its overrides | Active |
+| Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json` | Active. `noImportCycles` only warns in `packages/engine/src/graph/` until phase 3. |
+| CI on every pull request and push to `main`: `biome ci`, the layer check, the vertical check and its tests, `bun run check-types`, and `bun test` per workspace (without `*.live.test.ts`). | `.github/workflows/ci.yml` | Active |
+| Vertical boundaries: `scripts/check-verticals.ts` finds the verticals from the file system (so no list can drift), then fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks a workspace that is not enforced yet. | lefthook pre-commit, CI | Active (enforced for: none yet) |
+| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. | lefthook pre-commit, CI | Active (enforced for: none yet) |
+| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (enforced for: none yet) |
 
-When a check exists, change its status to "Active". Fix a violation, do not add an exception. If a rule is wrong, change this document first.
+When a check exists, change its status to "Active". When a workspace follows section 4, add it to `ENFORCED` in `scripts/check-verticals.ts` and to the list above. Fix a violation, do not add an exception. If a rule is wrong, change this document first.
 
 ## 8. Known deviations
 
 The code does not yet follow every rule. These are debts. Do not copy them into new code.
 
-- Every package except `ui` exports `"./*"`.
 - `apps/web` groups by kind: `lib/` (35 files), `hooks/`, `utils/`, loose `components/*.tsx`. Fat routes: `settings.tsx`, `runs/$runId.tsx`, `members.tsx`, `devices.tsx`, `index.tsx`.
-- `packages/engine` has 58 flat files and five jobs. `engine.ts`, `events.ts` and `types.ts` are god files. `types.ts` is the hub of an import cycle.
+- `packages/engine` has 58 flat files and five jobs. `engine.ts`, `events.ts` and `types.ts` are god files. `types.ts` is the hub of an import cycle. `graph/` has a value import cycle through `node-kinds.ts`.
 - The devices domain is split over four places (see section 2).
-- `apps/server/src/services.ts` starts the daemon at import time. `apps/desktop` imports `server/src/*`. The layer check allows `desktop` → `server` with a temporary exception.
+- `apps/server/src/services.ts` starts the daemon at import time. `apps/desktop` imports the server app through a temporary `exports` map in `apps/server/package.json`. The layer check allows `desktop` → `server` with a temporary exception.
+- `@nightshift/engine/lease` is an extra entry. The desktop watchdog reads the health check before the daemon starts, and must not load the whole engine. Phase 4 moves the lease to the daemon.
 - `packages/api/src/routers/index.ts` holds every procedure in one file. Most procedures declare no output schema. The engine owns wire schemas that the API uses.
 - The engine reads auth tables directly. `worktrees.ts` calls `git` with no port.
-- `packages/agents` exports its fakes from the root. Each harness touches five files.
+- Each harness touches five files.
 - No workspace is cut into barrel verticals yet (`features/<vertical>/index.ts` in apps, `src/<vertical>/index.ts` in packages).
 
 The migration plan that removes these debts is in the structure audit of 2026-10-20.

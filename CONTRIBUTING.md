@@ -12,7 +12,7 @@ Thank you for your interest. Night Shift is pre-alpha and built for its author f
 
 ```bash
 bun install
-bun lefthook install   # git hooks: format, lint and the layer check on commit
+bun lefthook install   # git hooks: format, lint, the layer and vertical checks on commit
 bun run db:push        # the dev database in .nightshift-dev/
 bun run dev            # web UI and API with hot reload
 ```
@@ -23,7 +23,8 @@ bun run dev            # web UI and API with hot reload
 bun test               # tests, next to the code as *.test.ts
 bun run check-types    # TypeScript
 bun run check          # Biome: lint and format
-bun scripts/check-layers.ts   # packages depend only on lower layers
+bun scripts/check-layers.ts      # packages depend only on lower layers
+bun scripts/check-verticals.ts   # imports go through a vertical's barrel
 ```
 
 ## The rules
