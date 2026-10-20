@@ -17,7 +17,7 @@ import { ChevronRightIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useHighlightedCode } from "@/hooks/use-highlighted-code";
-import { formatJson } from "@/lib/run-steps";
+import { formatJson } from "@/lib/format-json";
 
 /**
  * Code in a shadcn code block, highlighted by Shiki once its language loads.

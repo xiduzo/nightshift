@@ -29,20 +29,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { CheckIcon, CircleDotIcon, PlayIcon, SaveIcon } from "lucide-react";
-import {
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-	useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-
 import { OpenFlowContext } from "@/components/flow/open-flow-context";
 import { outcomeLabel } from "@/components/outcome-badge";
 import { StartRunDialog } from "@/components/run/start-run-dialog";
 import { SiteHeader } from "@/components/site-header";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useProjectFlows } from "@/hooks/use-project-flows";
 import {
 	callersOf,
@@ -151,7 +144,7 @@ function Editor({
 	);
 	const [starting, setStarting] = useState(false);
 	const savable = useMemo(() => isSavable(draft), [draft]);
-	const wide = useMediaQuery("(min-width: 1024px)");
+	const wide = useMediaQuery("(min-width: 1024px)", true);
 	const errorCount = check.issues.filter(
 		(issue) => issue.severity === "error",
 	).length;
@@ -648,18 +641,6 @@ function selectionKey(selection: Selection): string {
 }
 
 /** True while the viewport is at least `query` wide; follows resizes. */
-function useMediaQuery(query: string): boolean {
-	return useSyncExternalStore(
-		(onChange) => {
-			const list = window.matchMedia(query);
-			list.addEventListener("change", onChange);
-			return () => list.removeEventListener("change", onChange);
-		},
-		() => window.matchMedia(query).matches,
-		() => true,
-	);
-}
-
 /**
  * The flow's inputs, like a function signature, its variables, and the
  * flows that call it.

@@ -225,13 +225,6 @@ export function scopeChain(
 	return chain;
 }
 
-/** A JSON value as text to read: strings as they are, the rest pretty-printed. */
-export function formatJson(value: unknown): string {
-	if (typeof value === "string") return value;
-	if (value === undefined) return "";
-	return JSON.stringify(value, null, 2);
-}
-
 /**
  * An output value that may hold JSON as text (an Agent's `data`, a Call's
  * `results`, a called flow's output): the parsed value when it is a JSON

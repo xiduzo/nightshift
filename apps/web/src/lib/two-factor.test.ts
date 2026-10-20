@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-	authErrorMessage,
-	backupCodesFile,
-	isTwoFactorRequired,
-	setupKeyOf,
-} from "./two-factor";
+import { authErrorMessage, backupCodesFile, setupKeyOf } from "./two-factor";
 
 describe("two-factor in the browser", () => {
 	test("the setup key comes from the link, in groups of four", () => {
@@ -28,12 +23,6 @@ describe("two-factor in the browser", () => {
 			"Not saved.",
 		);
 		expect(authErrorMessage(null)).toBe("Something went wrong. Try again.");
-	});
-
-	test("the daemon's refusal of a session without two-factor", () => {
-		expect(isTwoFactorRequired({ code: "TWO_FACTOR_REQUIRED" })).toBe(true);
-		expect(isTwoFactorRequired({ code: "UNAUTHORIZED" })).toBe(false);
-		expect(isTwoFactorRequired(null)).toBe(false);
 	});
 
 	test("the backup codes file has one code per line", () => {

@@ -41,7 +41,6 @@ import {
 	useMemo,
 	useRef,
 	useState,
-	useSyncExternalStore,
 } from "react";
 import { RunDetails } from "@/components/run/run-details";
 import { RunGraph } from "@/components/run/run-graph";
@@ -55,6 +54,7 @@ import { StepSummary as StepSummaryView } from "@/components/run/step-summary";
 import { StepTimeline } from "@/components/run/step-timeline";
 import { type Crumb, SiteHeader } from "@/components/site-header";
 import { StepTranscript } from "@/components/transcript/step-transcript";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { mergeSteps, useRunStream } from "@/hooks/use-run-stream";
 import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
 import {
@@ -101,18 +101,6 @@ type PanelHandle = NonNullable<
 >;
 
 /** Whether a media query matches, following changes. The route renders in the browser only. */
-function useMediaQuery(query: string): boolean {
-	return useSyncExternalStore(
-		(onChange) => {
-			const list = window.matchMedia(query);
-			list.addEventListener("change", onChange);
-			return () => list.removeEventListener("change", onChange);
-		},
-		() => window.matchMedia(query).matches,
-		() => false,
-	);
-}
-
 /**
  * A run: its steps and the flow behind them fill the page. The selected step
  * sits in a console along the bottom: one line, or open on its summary,

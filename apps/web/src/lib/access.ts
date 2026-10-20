@@ -67,15 +67,3 @@ export function accessRedirect(
 	}
 	return null;
 }
-
-/** The oRPC code the daemon refuses a call with when nobody is signed in. */
-export const SIGN_IN_REQUIRED = "UNAUTHORIZED";
-
-/** Whether an error is the daemon's refusal of a call without a session. */
-export function isSignInRequired(error: unknown): boolean {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		(error as { code?: unknown }).code === SIGN_IN_REQUIRED
-	);
-}

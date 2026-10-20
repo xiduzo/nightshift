@@ -16,7 +16,8 @@ import {
 	formatTime,
 	noCostYet,
 } from "@/lib/format";
-import { formatJson, jsonOutput } from "@/lib/run-steps";
+import { formatJson } from "@/lib/format-json";
+import { jsonOutput } from "@/lib/run-steps";
 
 import { CodeView, JsonBlock } from "./json-block";
 import { StepDuration } from "./step-timeline";

@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { ORPCError } from "@orpc/client";
 
-import {
-	accessRedirect,
-	isOutsideApp,
-	isSignInRequired,
-	safeRedirect,
-} from "./access";
+import { accessRedirect, isOutsideApp, safeRedirect } from "./access";
 
 const remote = {
 	signedIn: false,
@@ -93,24 +87,5 @@ describe("the page to come back to", () => {
 		expect(safeRedirect("/login")).toBeUndefined();
 		expect(safeRedirect("/login?redirect=/")).toBeUndefined();
 		expect(safeRedirect("/two-factor")).toBeUndefined();
-	});
-});
-
-describe("the refusal of a call without a session", () => {
-	test("is told apart from other errors", () => {
-		expect(
-			isSignInRequired(
-				new ORPCError("UNAUTHORIZED", {
-					message: "Sign in to use Night Shift.",
-				}),
-			),
-		).toBe(true);
-		expect(isSignInRequired({ code: "UNAUTHORIZED", status: 401 })).toBe(true);
-		expect(isSignInRequired({ code: "TWO_FACTOR_REQUIRED" })).toBe(false);
-		expect(isSignInRequired({ code: "FORBIDDEN" })).toBe(false);
-		expect(isSignInRequired(new Error("Sign in to use Night Shift."))).toBe(
-			false,
-		);
-		expect(isSignInRequired(null)).toBe(false);
 	});
 });

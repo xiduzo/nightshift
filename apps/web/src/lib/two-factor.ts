@@ -3,20 +3,10 @@
  * and the setup key a person types into an authenticator app.
  */
 
-/** The code the daemon refuses with until two-factor is on (`@nightshift/auth/host-access`). */
-export const TWO_FACTOR_REQUIRED = "TWO_FACTOR_REQUIRED";
+import { TWO_FACTOR_REQUIRED } from "./refusals";
 
 /** How long a trusted browser skips the code. The daemon's `TRUSTED_BROWSER_DAYS`. */
 export const TRUSTED_BROWSER_DAYS = 30;
-
-/** Whether an error is the daemon's refusal of a session without two-factor. */
-export function isTwoFactorRequired(error: unknown): boolean {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		(error as { code?: unknown }).code === TWO_FACTOR_REQUIRED
-	);
-}
 
 /** A Better Auth client error: its code, status and message. */
 export type AuthError = {

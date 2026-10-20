@@ -5,9 +5,8 @@ import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { isSignInRequired } from "@/lib/access";
+import { isSignInRequired, isTwoFactorRequired } from "@/lib/refusals";
 import { SERVER_URL } from "@/lib/server-url";
-import { isTwoFactorRequired } from "@/lib/two-factor";
 
 export function createQueryClient() {
 	/**
