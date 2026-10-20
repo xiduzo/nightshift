@@ -1,6 +1,5 @@
 import type { JsonValue, ValueNode } from "@nightshift/flows";
-import type { StepOutputs } from "../../events";
-import { dataProblem } from "../../output-schema";
+import type { StepOutputs } from "../../log";
 import {
 	type NodeAction,
 	type NodeKind,
@@ -9,6 +8,7 @@ import {
 	type Requirement,
 	type StepContext,
 } from "../context";
+import { dataProblem } from "../output-schema";
 import { RESUME_RULES } from "../resume-point";
 import type { BodyEnd, StepHandle } from "../step-runner";
 import { modelProducer } from "./producers/model";

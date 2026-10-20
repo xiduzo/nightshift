@@ -17,11 +17,8 @@ import type {
 import { agentSession, step } from "@nightshift/db/schema";
 import type { AgentNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-
-import { deriveSteps } from "../derive-steps";
-import { createSandbox, type Sandbox } from "../test-support";
-import { readTranscriptFile } from "../transcripts";
-import { DEFAULT_RESUME_PROMPT } from "./context";
+import { readTranscriptFile } from "../log/transcripts";
+import { deriveSteps } from "../read/derive-steps";
 import {
 	agent as agentNode,
 	drive,
@@ -29,7 +26,9 @@ import {
 	MINUTE,
 	payloads,
 	startRun,
-} from "./test-support";
+} from "../testing/graph";
+import { createSandbox, type Sandbox } from "../testing/test-support";
+import { DEFAULT_RESUME_PROMPT } from "./context";
 
 /**
  * The Agent node on the compiled graph, driven by the fake harness with a

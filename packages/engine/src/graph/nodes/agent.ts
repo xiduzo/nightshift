@@ -17,16 +17,15 @@ import {
 	renderTemplate,
 	resolvedAgent,
 } from "@nightshift/flows";
-import { consumeStream } from "../../consume";
-import { lastHarnessSessionOfNode } from "../../derive-steps";
-import type { SessionEvent } from "../../device/types";
+import type { SessionEvent } from "../../device";
 import {
 	type EnginePayloads,
 	type LoggedEvent,
 	type StepOutputs,
 	scopeKey,
-} from "../../events";
-import { checkOutputData, normalizeOutputData } from "../../output-schema";
+} from "../../log";
+import { lastHarnessSessionOfNode } from "../../read";
+import { consumeStream } from "../consume";
 import {
 	harnessLabel,
 	isWaitKind,
@@ -44,6 +43,7 @@ import {
 	sessionCostUnknown,
 	warnDeciderCost,
 } from "../cost";
+import { checkOutputData, normalizeOutputData } from "../output-schema";
 import { RESUME_RULES, type ResumePoint, rerunEntryOf } from "../resume-point";
 import { scopeOf } from "../route";
 import type { RunStateValues } from "../state";

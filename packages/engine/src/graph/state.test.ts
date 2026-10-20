@@ -6,11 +6,17 @@ import {
 	usageLimitScript,
 } from "@nightshift/agents/testing";
 import type { AgentSessionInput } from "@nightshift/agents/types";
-
-import { createSandbox, type Sandbox } from "../test-support";
+import {
+	agent,
+	command,
+	drive,
+	edge,
+	flowOf,
+	startRun,
+} from "../testing/graph";
+import { createSandbox, type Sandbox } from "../testing/test-support";
 import { STOP_TIME_REASON } from "./context";
 import type { PendingWait } from "./state";
-import { agent, command, drive, edge, flowOf, startRun } from "./test-support";
 
 /**
  * The facts the walk reads from its own state rather than the log: the

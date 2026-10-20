@@ -5,7 +5,7 @@ import {
 	renderTemplate,
 } from "@nightshift/flows";
 
-import type { Device } from "../../../device/types";
+import type { Device } from "../../../device";
 import {
 	isWaitKind,
 	messageOf,

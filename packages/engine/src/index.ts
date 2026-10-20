@@ -4,42 +4,11 @@
  * because the router declaration must be able to name it. Remove a name
  * that nothing outside the engine imports.
  */
+
+export type { Engine, Relay, SpaceEngine, StartRunInput } from "./contract";
+export type { Device, SessionInput } from "./device";
 export {
-	type CliTool,
-	type CliToolStore,
-	cliToolInputSchema,
-	createCliToolStore,
-} from "./cli-tools";
-export {
-	type Connection,
-	type ConnectionStore,
-	connectionInputSchema,
-	createConnectionStore,
-	type SecretSource,
-	type SecretView,
-	secretNameSchema,
-	secretStore,
-} from "./connections";
-export {
-	type DeviceDocument,
-	documentRows,
-	openDeviceDocument,
-	refreshDeviceFacts,
-} from "./device/document";
-export {
-	createHostLinks,
-	type DeviceKeyStore,
-	deviceKeyStore,
-	type HostLink,
-	type HostLinks,
-	type HostRole,
-	type KeyStoreKind,
-	SECOND_HOME,
-} from "./device/host-links";
-export { localDevice } from "./device/local";
-export type { OwnDevice, Placement } from "./device/placement";
-export type { DeviceRegistry, PairedDevice } from "./device/registry";
-export {
+	localDevice,
 	serveWork,
 	type WorkCall,
 	type WorkRelay,
@@ -47,34 +16,38 @@ export {
 	type WorkRequest,
 	workReplySchema,
 	workRequestSchema,
-} from "./device/remote";
-export type { Device, SessionInput } from "./device/types";
-export { createEngine } from "./engine";
-export { type ArchiveRef, archiveRefSchema } from "./exchange/archive";
+} from "./device";
 export {
-	applyRunCommand,
-	COMMAND_PERMISSION,
-	type RunCommand,
-	type RunCommandInput,
-} from "./exchange/commands";
-export {
-	type FeedStep,
-	type FollowWant,
-	feedStepSchema,
-	transcriptEntrySchema,
-} from "./exchange/feeds";
-export { type ListedSpace, personOnHost } from "./exchange/host-spaces";
-export {
-	ForeignRowsError,
-	isEmpty,
-	MissingProjectError,
-	mergeCursors,
-	type RunRows,
-	runRowsSchema,
-	type SyncCursors,
-	syncCursorsSchema,
-	withoutPrivatePaths,
-} from "./exchange/rows";
+	type CliTool,
+	type CliToolStore,
+	type Connection,
+	type ConnectionStore,
+	cliToolInputSchema,
+	connectionInputSchema,
+	createCliToolStore,
+	createConnectionStore,
+	createProfileStore,
+	createSettingsStore,
+	type DeviceDocument,
+	documentRows,
+	HARNESS_BIN,
+	isHostAddress,
+	isLoopbackHost,
+	openDeviceDocument,
+	type ProfileStore,
+	type ProfileView,
+	refreshDeviceFacts,
+	type SecretSource,
+	type SecretView,
+	type SettingField,
+	type SettingKey,
+	type Settings,
+	type SettingsStore,
+	secretNameSchema,
+	secretStore,
+	selfDevice,
+	settingsPatchSchema,
+} from "./device-config";
 export { chooseFolder } from "./folder-picker";
 export {
 	acquireLease,
@@ -83,58 +56,73 @@ export {
 	LeaseHeldError,
 	pidAlive,
 } from "./lease";
+export type { TranscriptEntry } from "./log";
+export type {
+	DeviceRegistry,
+	OwnDevice,
+	PairedDevice,
+	Placement,
+} from "./peers";
 export {
+	type ArchiveRef,
+	applyRunCommand,
+	archiveRefSchema,
+	COMMAND_PERMISSION,
+	createHostLinks,
 	createOfferSlots,
+	type DeviceKeyStore,
 	type DeviceOffer,
+	deviceKeyStore,
 	deviceOffers,
+	type FeedStep,
+	type FollowWant,
+	ForeignRowsError,
+	feedStepSchema,
+	type HostLink,
+	type HostLinks,
+	type HostRole,
 	inForce,
+	isEmpty,
+	type KeyStoreKind,
+	type ListedSpace,
+	MissingProjectError,
+	mergeCursors,
 	type OfferCaps,
 	type OfferSlots,
 	offerCapsSchema,
 	offeredCallRefusal,
 	offeredSession,
+	personOnHost,
+	type RunCommand,
+	type RunCommandInput,
+	type RunRows,
 	removeDeviceOffer,
+	runRowsSchema,
+	SECOND_HOME,
+	type SyncCursors,
 	setDeviceOffer,
 	slotKey,
-} from "./offers";
-export {
-	createProfileStore,
-	type ProfileStore,
-	type ProfileView,
-} from "./profiles";
-export {
-	checkProjectFolder,
-	type GitInstall,
-	type ProjectReadiness,
-	setUpGit,
-	systemGitInstaller,
-} from "./project-setup";
+	syncCursorsSchema,
+	transcriptEntrySchema,
+	withoutPrivatePaths,
+} from "./peers";
 export type { Project } from "./projects";
-export { clonePathOf } from "./projects";
-export type { Relay } from "./relay";
-export { exportRun, openRunBundle, type RunBundleSummary } from "./run-bundle";
-export type { StartRunInput } from "./run-start";
-export type { ScheduleList } from "./scheduler";
-export { selfDevice } from "./self-device";
 export {
-	createSettingsStore,
-	HARNESS_BIN,
-	isHostAddress,
-	isLoopbackHost,
-	type SettingField,
-	type SettingKey,
-	type Settings,
-	type SettingsStore,
-	settingsPatchSchema,
-} from "./settings";
-export {
+	type Branches,
+	checkProjectFolder,
+	clonePathOf,
 	createSpaceDocuments,
+	type GitInstall,
 	memberRole,
+	type ProjectReadiness,
 	type SpaceDocuments,
+	setUpGit,
 	spaceDocumentName,
 	spaceIdOf,
-} from "./space/document";
-export type { TranscriptEntry } from "./step-events";
-export type { Engine, SpaceEngine } from "./types";
-export type { OpenGate, RunDetail, RunStreamItem, RunSummary } from "./views";
-export { type Branches, worktreeLocation } from "./worktrees";
+	systemGitInstaller,
+	worktreeLocation,
+} from "./projects";
+export type { OpenGate, RunDetail, RunStreamItem, RunSummary } from "./read";
+export { exportRun, openRunBundle, type RunBundleSummary } from "./read";
+export { createEngine } from "./run";
+export type { ScheduleList } from "./schedules";

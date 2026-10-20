@@ -9,7 +9,7 @@ import type {
 	LoggedEvent,
 	Scope,
 	StepBudget,
-} from "../events";
+} from "../log/events";
 import { findOverdue } from "./deadlines";
 
 const MINUTE = 1_000;

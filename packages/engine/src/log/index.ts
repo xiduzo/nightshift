@@ -1,0 +1,40 @@
+/** The event log of each run: the event payloads, append and parse, the run log in memory, the run bus, the run row and the transcript files. */
+
+export type { RunBus } from "./bus";
+export { createRunBus } from "./bus";
+export type {
+	EngineEventType,
+	EnginePayloads,
+	GateChoice,
+	InputValues,
+	ItemFacts,
+	LoggedEvent,
+	PolicyWaitReason,
+	ResumeAction,
+	ResumedBy,
+	RunEnding,
+	RunStatus,
+	RunTrigger,
+	RunWarningKind,
+	Scope,
+	SessionOutcome,
+	StepBudget,
+	StepOutcome,
+	StepOutputs,
+	WaitReason,
+} from "./events";
+export { groupByRun, parseEventRow, scopeKey } from "./events";
+export type { RunLog } from "./run-log";
+export { createRunLog } from "./run-log";
+export type { RunRow } from "./run-row";
+export { getRunRow } from "./run-row";
+export type { StepEvent, TranscriptEntry } from "./step-events";
+export {
+	commandLogPath,
+	lastEntryAt,
+	openTranscriptWriter,
+	parseTranscript,
+	readRunTranscript,
+	readTranscriptFile,
+	transcriptPath,
+} from "./transcripts";

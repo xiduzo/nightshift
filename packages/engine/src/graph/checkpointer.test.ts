@@ -15,7 +15,7 @@ import {
 } from "@langchain/langgraph-checkpoint";
 import { createDb } from "@nightshift/db";
 
-import { createSandbox, type Sandbox } from "../test-support";
+import { createSandbox, type Sandbox } from "../testing/test-support";
 import { type LibsqlSaver, saverFor } from "./checkpointer";
 
 let sandbox: Sandbox;

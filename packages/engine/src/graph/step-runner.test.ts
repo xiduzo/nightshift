@@ -2,14 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Command } from "@langchain/langgraph";
 import { step as stepTable } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
-
-import { deriveSteps } from "../derive-steps";
-import type { EngineEventType } from "../events";
-import { createSandbox, type Sandbox, testDevice } from "../test-support";
-import { STOP_AFTER_STEP_REASON, STOP_TIME_REASON } from "./context";
-import { RESUME_RULES, type ResumePoint } from "./resume-point";
-import type { PendingWait, RunStateValues } from "./state";
-import { type BodyResult, runStep, type StepHandle } from "./step-runner";
+import type { EngineEventType } from "../log/events";
+import { deriveSteps } from "../read/derive-steps";
 import {
 	command,
 	drive,
@@ -18,7 +12,16 @@ import {
 	type Harness,
 	payloads,
 	startRun,
-} from "./test-support";
+} from "../testing/graph";
+import {
+	createSandbox,
+	type Sandbox,
+	testDevice,
+} from "../testing/test-support";
+import { STOP_AFTER_STEP_REASON, STOP_TIME_REASON } from "./context";
+import { RESUME_RULES, type ResumePoint } from "./resume-point";
+import type { PendingWait, RunStateValues } from "./state";
+import { type BodyResult, runStep, type StepHandle } from "./step-runner";
 
 /**
  * The step runner's lifecycle as a table: how a step enters (a new visit,

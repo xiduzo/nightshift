@@ -1,7 +1,5 @@
 import { type CallNode, type Outcome, runsEach } from "@nightshift/flows";
-import { eachOutputs } from "../../each";
-import type { InputValues, StepOutputs } from "../../events";
-import { renderBindings, resolveInputs } from "../../inputs";
+import type { InputValues, StepOutputs } from "../../log";
 import {
 	endedAtReason,
 	messageOf,
@@ -11,6 +9,8 @@ import {
 	type StepContext,
 	stopAtOf,
 } from "../context";
+import { eachOutputs } from "../each";
+import { renderBindings, resolveInputs } from "../inputs";
 import { kindOf } from "../node-kinds";
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
 import { route, scopeOf } from "../route";

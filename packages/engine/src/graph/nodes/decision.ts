@@ -1,5 +1,5 @@
 import type { DecisionNode } from "@nightshift/flows";
-import type { GateChoice, StepOutputs } from "../../events";
+import type { GateChoice, StepOutputs } from "../../log";
 import {
 	endedAtReason,
 	type NodeAction,

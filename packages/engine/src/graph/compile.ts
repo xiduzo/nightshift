@@ -6,10 +6,9 @@ import {
 	StateGraph,
 } from "@langchain/langgraph";
 import { type Flow, initialVariables } from "@nightshift/flows";
-
-import { dataProblem } from "../output-schema";
 import { type StepContext, templateContext } from "./context";
 import { kindOf } from "./node-kinds";
+import { dataProblem } from "./output-schema";
 import {
 	askNodeId,
 	parkCommand,

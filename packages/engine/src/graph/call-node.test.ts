@@ -5,8 +5,7 @@ import type { AgentSessionInput } from "@nightshift/agents/types";
 import { step as stepTable } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
-import { deriveSteps } from "../derive-steps";
-import { createSandbox, type Sandbox } from "../test-support";
+import { deriveSteps } from "../read/derive-steps";
 import {
 	agent,
 	command,
@@ -15,7 +14,8 @@ import {
 	flowOf,
 	payloads,
 	startRun,
-} from "./test-support";
+} from "../testing/graph";
+import { createSandbox, type Sandbox } from "../testing/test-support";
 
 /**
  * The Call node (once) on the compiled graph: the called flow as a subgraph.

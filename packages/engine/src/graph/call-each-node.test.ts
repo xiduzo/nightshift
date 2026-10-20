@@ -10,13 +10,10 @@ import {
 } from "@nightshift/agents/testing";
 import type { AgentSessionInput } from "@nightshift/agents/types";
 import type { CallEach, CallEachNode, CallNode, Flow } from "@nightshift/flows";
-
-import { type DerivedStep, deriveSteps } from "../derive-steps";
-import { defaultRunSettings } from "../settings";
-import { createSandbox, mustGit, type Sandbox } from "../test-support";
-import { readTranscriptFile } from "../transcripts";
-import { itemBranchName } from "../worktrees";
-import { DEFAULT_RESUME_PROMPT } from "./context";
+import { defaultRunSettings } from "../device-config/settings";
+import { readTranscriptFile } from "../log/transcripts";
+import { itemBranchName } from "../projects/worktrees";
+import { type DerivedStep, deriveSteps } from "../read/derive-steps";
 import {
 	agent,
 	command,
@@ -26,7 +23,9 @@ import {
 	type Harness,
 	payloads,
 	startRun,
-} from "./test-support";
+} from "../testing/graph";
+import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
+import { DEFAULT_RESUME_PROMPT } from "./context";
 
 /**
  * The Call node with `each` on the compiled graph: one element per super-step,

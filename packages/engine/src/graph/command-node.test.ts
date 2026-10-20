@@ -5,11 +5,14 @@ import { Command } from "@langchain/langgraph";
 import { step } from "@nightshift/db/schema";
 import { templateEnvName } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-
-import { deriveSteps } from "../derive-steps";
-import { createSandbox, type Sandbox, TEST_DEVICE_ID } from "../test-support";
-import { readTranscriptFile } from "../transcripts";
-import { drive, flowOf, payloads, startRun } from "./test-support";
+import { readTranscriptFile } from "../log/transcripts";
+import { deriveSteps } from "../read/derive-steps";
+import { drive, flowOf, payloads, startRun } from "../testing/graph";
+import {
+	createSandbox,
+	type Sandbox,
+	TEST_DEVICE_ID,
+} from "../testing/test-support";
 
 /**
  * The Command node on the compiled graph, with a real shell, run log and

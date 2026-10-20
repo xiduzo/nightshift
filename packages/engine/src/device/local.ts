@@ -19,19 +19,24 @@ import {
 } from "@nightshift/flows";
 import { readFlowSources } from "@nightshift/flows/files";
 
-import { type CliToolGuide, cliToolsInstruction } from "../cli-tools";
-import { spawnCommand } from "../command";
-import { expandMcpServers, type McpExpansion } from "../mcp";
-import { checkProjectFolder, type GitProbe } from "../project-setup";
-import { NOT_ON_THIS_COMPUTER } from "../projects";
 import {
+	type CliToolGuide,
+	cliToolsInstruction,
+	expandMcpServers,
+	type McpExpansion,
+} from "../device-config";
+import {
+	checkProjectFolder,
 	createAndCheckoutBranch,
 	createWorktree,
 	currentBranch,
 	freeBranchName,
+	type GitProbe,
+	NOT_ON_THIS_COMPUTER,
 	pullRunBranch,
 	pushRunBranch,
-} from "../worktrees";
+} from "../projects";
+import { spawnCommand } from "./command";
 import { callServerTool } from "./tool-call";
 import type {
 	Capabilities,

@@ -3,9 +3,8 @@ import {
 	type JsonValue,
 	type ValueNode,
 } from "@nightshift/flows";
-
-import { schemaProblem } from "../../../output-schema";
 import { messageOf, type StepContext } from "../../context";
+import { schemaProblem } from "../../output-schema";
 import { RESUME_RULES } from "../../resume-point";
 import { runStep } from "../../step-runner";
 import {

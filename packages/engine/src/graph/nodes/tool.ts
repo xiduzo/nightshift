@@ -6,7 +6,7 @@ import {
 	type ToolNode,
 } from "@nightshift/flows";
 
-import type { StepOutputs } from "../../events";
+import type { StepOutputs } from "../../log";
 import {
 	type NodeAction,
 	type NodeKind,

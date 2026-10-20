@@ -9,26 +9,28 @@ import {
 	type VariableResult,
 } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
+import type { Device } from "../device";
 import {
-	countStepsSinceWalkBegan,
-	deriveStopAfterStep,
-	deriveWorktrees,
-} from "../derive-run";
-import { countVisits, type DerivedStep, deriveSteps } from "../derive-steps";
-import type { Device } from "../device/types";
-import type { StepOutcome } from "../events";
-import {
+	commandLogPath,
 	type EnginePayloads,
 	type LoggedEvent,
 	type RunWarningKind,
 	type StepBudget,
+	type StepEvent,
+	type StepOutcome,
 	type StepOutputs,
 	scopeKey,
-} from "../events";
-import { dataProblem } from "../output-schema";
-import { gitAuthorOf } from "../people";
-import type { StepEvent } from "../step-events";
-import { commandLogPath, transcriptPath } from "../transcripts";
+	transcriptPath,
+} from "../log";
+import {
+	countStepsSinceWalkBegan,
+	countVisits,
+	type DerivedStep,
+	deriveSteps,
+	deriveStopAfterStep,
+	deriveWorktrees,
+	gitAuthorOf,
+} from "../read";
 import {
 	emit,
 	messageOf,
@@ -40,6 +42,7 @@ import {
 	templateContext,
 } from "./context";
 import { kindOf } from "./node-kinds";
+import { dataProblem } from "./output-schema";
 import {
 	entryOf,
 	type ResumePoint,

@@ -5,9 +5,7 @@ import {
 	deriveSteps,
 	deriveVariableChanges,
 	deriveVariables,
-} from "../derive-steps";
-import { createSandbox, type Sandbox } from "../test-support";
-import { reentryUpdate } from "./resume-point";
+} from "../read/derive-steps";
 import {
 	command,
 	drive,
@@ -15,7 +13,9 @@ import {
 	flowOf,
 	payloads,
 	startRun,
-} from "./test-support";
+} from "../testing/graph";
+import { createSandbox, type Sandbox } from "../testing/test-support";
+import { reentryUpdate } from "./resume-point";
 
 /**
  * Variables on the compiled graph: the values a flow starts with

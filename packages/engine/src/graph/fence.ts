@@ -7,7 +7,7 @@ import type {
 } from "@langchain/langgraph-checkpoint";
 import type { Database } from "@nightshift/db";
 
-import type { RunLog } from "../run-log";
+import type { RunLog } from "../log";
 import { LibsqlSaver } from "./checkpointer";
 
 /**

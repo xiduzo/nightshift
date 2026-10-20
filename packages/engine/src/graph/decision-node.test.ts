@@ -7,12 +7,11 @@ import type {
 	DecisionInput,
 	DecisionResult,
 } from "@nightshift/agents/types";
-
-import { deriveSteps } from "../derive-steps";
-import { createSandbox, type Sandbox } from "../test-support";
-import { readTranscriptFile } from "../transcripts";
+import { readTranscriptFile } from "../log/transcripts";
+import { deriveSteps } from "../read/derive-steps";
+import { command, drive, flowOf, payloads, startRun } from "../testing/graph";
+import { createSandbox, type Sandbox } from "../testing/test-support";
 import { DEFAULT_RESUME_PROMPT } from "./context";
-import { command, drive, flowOf, payloads, startRun } from "./test-support";
 
 /**
  * The Decision node on the compiled graph, driven by scripted deciders with

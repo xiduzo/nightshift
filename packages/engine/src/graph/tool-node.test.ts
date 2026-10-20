@@ -3,11 +3,9 @@ import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { fixturePath } from "@nightshift/agents/testing";
 import type { McpServerConfig } from "@nightshift/agents/types";
 import type { ToolNode } from "@nightshift/flows";
-import { deriveSteps } from "../derive-steps";
 import { coerceArguments } from "../device/tool-call";
-import { createSandbox, type Sandbox } from "../test-support";
-import { readTranscriptFile } from "../transcripts";
-import { dataOf } from "./nodes/tool";
+import { readTranscriptFile } from "../log/transcripts";
+import { deriveSteps } from "../read/derive-steps";
 import {
 	command,
 	drive,
@@ -15,7 +13,9 @@ import {
 	flowOf,
 	payloads,
 	startRun,
-} from "./test-support";
+} from "../testing/graph";
+import { createSandbox, type Sandbox } from "../testing/test-support";
+import { dataOf } from "./nodes/tool";
 
 /**
  * The Tool node on the compiled graph, against the fake stdio MCP server

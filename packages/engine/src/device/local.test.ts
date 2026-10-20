@@ -9,7 +9,7 @@ import {
 } from "@nightshift/agents/testing";
 import type { Decider, McpServerConfig } from "@nightshift/agents/types";
 
-import { createSandbox, mustGit, type Sandbox } from "../test-support";
+import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
 import { type LocalDeviceDeps, localDevice } from "./local";
 import type { Device, ExecEvent, SessionEvent, SessionInput } from "./types";
 

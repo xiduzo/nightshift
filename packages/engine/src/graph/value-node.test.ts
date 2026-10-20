@@ -2,12 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
 import { fakeDecider } from "@nightshift/agents/testing";
 import type { ValueNode } from "@nightshift/flows";
-
-import { deriveSteps } from "../derive-steps";
-import { createSandbox, type Sandbox } from "../test-support";
-import { readTranscriptFile } from "../transcripts";
+import { readTranscriptFile } from "../log/transcripts";
+import { deriveSteps } from "../read/derive-steps";
+import { command, drive, flowOf, payloads, startRun } from "../testing/graph";
+import { createSandbox, type Sandbox } from "../testing/test-support";
 import { DEFAULT_RESUME_PROMPT } from "./context";
-import { command, drive, flowOf, payloads, startRun } from "./test-support";
 
 /**
  * The Value node on the compiled graph: a rule (JSONata) or a scripted

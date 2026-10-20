@@ -6,10 +6,8 @@ import {
 	renderCommand,
 } from "@nightshift/flows";
 
-import { runCommand } from "../../command";
-import { parseCommandJson } from "../../each";
-import type { StepOutputs } from "../../events";
-import { commandLogPath } from "../../transcripts";
+import { runCommand } from "../../device";
+import { commandLogPath, type StepOutputs } from "../../log";
 import {
 	endedAtReason,
 	type NodeAction,
@@ -17,6 +15,7 @@ import {
 	PLAIN_KIND,
 	type StepContext,
 } from "../context";
+import { parseCommandJson } from "../each";
 import { RESUME_RULES } from "../resume-point";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
 

@@ -5,7 +5,7 @@ import type {
 	EnginePayloads,
 	LoggedEvent,
 	Scope,
-} from "../events";
+} from "../log/events";
 import { DEFAULT_RESUME_PROMPT } from "./context";
 import {
 	entryOf,

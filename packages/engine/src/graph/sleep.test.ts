@@ -7,15 +7,9 @@ import {
 } from "@nightshift/agents/testing";
 import type { AgentSessionInput } from "@nightshift/agents/types";
 import type { WaitNode } from "@nightshift/flows";
-
-import { deriveRunState, deriveSleep } from "../derive-run";
-import { deriveSteps } from "../derive-steps";
-import { createSandbox, type Sandbox, waitFor } from "../test-support";
-import { readTranscriptFile } from "../transcripts";
-import { DEFAULT_RESUME_PROMPT, STOP_TIME_REASON } from "./context";
-import type { ThreadState } from "./runner";
-import { createSleeps, pendingWaitOf, type Sleeps } from "./sleep";
-import type { Parked, Pending, ResumeValue } from "./state";
+import { readTranscriptFile } from "../log/transcripts";
+import { deriveRunState, deriveSleep } from "../read/derive-run";
+import { deriveSteps } from "../read/derive-steps";
 import {
 	agent,
 	command,
@@ -27,7 +21,12 @@ import {
 	MINUTE,
 	payloads,
 	startRun,
-} from "./test-support";
+} from "../testing/graph";
+import { createSandbox, type Sandbox, waitFor } from "../testing/test-support";
+import { DEFAULT_RESUME_PROMPT, STOP_TIME_REASON } from "./context";
+import type { ThreadState } from "./runner";
+import { createSleeps, pendingWaitOf, type Sleeps } from "./sleep";
+import type { Parked, Pending, ResumeValue } from "./state";
 
 /**
  * The sleep module end to end, for both kinds of wait: a usage limit of an

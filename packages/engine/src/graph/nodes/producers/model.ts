@@ -1,9 +1,8 @@
 import type { ValueResult } from "@nightshift/agents/types";
 import { renderTemplate, type ValueNode } from "@nightshift/flows";
-
-import { schemaProblem } from "../../../output-schema";
 import { isWaitKind, messageOf, type StepContext } from "../../context";
 import { deciderCostSource, warnDeciderCost } from "../../cost";
+import { schemaProblem } from "../../output-schema";
 import { RESUME_RULES } from "../../resume-point";
 import { type BodyResult, runStep, type StepHandle } from "../../step-runner";
 import { withinGrace } from "../choosers/model";

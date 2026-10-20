@@ -3,7 +3,7 @@ import { createDb } from "@nightshift/db";
 import { daemonLease } from "@nightshift/db/schema";
 
 import { acquireLease, LeaseHeldError } from "./lease";
-import { createSandbox, type Sandbox } from "./test-support";
+import { createSandbox, type Sandbox } from "./testing/test-support";
 
 let sandbox: Sandbox;
 let clock: number;

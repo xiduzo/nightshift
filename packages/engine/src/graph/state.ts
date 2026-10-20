@@ -5,9 +5,9 @@ import type {
 	GateChoice,
 	StepOutcome,
 	StepOutputs,
+	TranscriptEntry,
 	WaitReason,
-} from "../events";
-import type { TranscriptEntry } from "../step-events";
+} from "../log";
 
 /**
  * The run state LangGraph checkpoints after every node, and the typed

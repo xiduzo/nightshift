@@ -5,9 +5,8 @@ import {
 	type WaitUntil,
 } from "@nightshift/flows";
 
-import { runCommand, tailOf } from "../../command";
-import type { StepOutputs } from "../../events";
-import { commandLogPath } from "../../transcripts";
+import { runCommand, tailOf } from "../../device";
+import { commandLogPath, type StepOutputs } from "../../log";
 import {
 	endedAtReason,
 	type NodeAction,

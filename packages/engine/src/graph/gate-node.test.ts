@@ -1,11 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Command } from "@langchain/langgraph";
-
-import { deriveOpenGate } from "../derive-run";
-import { deriveSteps } from "../derive-steps";
-import type { GateChoice } from "../events";
-import { createSandbox, type Sandbox, TEST_DEVICE_ID } from "../test-support";
-import { readTranscriptFile } from "../transcripts";
+import type { GateChoice } from "../log/events";
+import { readTranscriptFile } from "../log/transcripts";
+import { deriveOpenGate } from "../read/derive-run";
+import { deriveSteps } from "../read/derive-steps";
 import {
 	command,
 	drive,
@@ -13,7 +11,12 @@ import {
 	type Harness,
 	payloads,
 	startRun,
-} from "./test-support";
+} from "../testing/graph";
+import {
+	createSandbox,
+	type Sandbox,
+	TEST_DEVICE_ID,
+} from "../testing/test-support";
 
 /**
  * The Gate node on the compiled graph with a real run log and a

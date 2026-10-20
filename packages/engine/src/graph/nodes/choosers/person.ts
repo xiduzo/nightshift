@@ -5,7 +5,7 @@ import {
 	renderTemplate,
 } from "@nightshift/flows";
 
-import type { GateChoice } from "../../../events";
+import type { GateChoice } from "../../../log";
 import { messageOf, type NodeAction, type StepContext } from "../../context";
 import { interruptNode } from "../../interrupt";
 import { RESUME_RULES, resumePoint } from "../../resume-point";
