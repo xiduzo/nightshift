@@ -13,6 +13,9 @@ afterEach(async () => {
 	await sandbox.cleanup();
 });
 
+/** `${NAME}`: a reference to a secret. */
+const ref = (name: string) => `\${${name}}`;
+
 /** A store over the Device document as a daemon start opens it. */
 async function store(
 	env: Record<string, string | undefined> = {},
@@ -169,6 +172,31 @@ describe("save", () => {
 		expect(third.current().agentModel).toBe("opus");
 	});
 
+	test("custom agents are saved with their command, arguments and env", async () => {
+		const s = await store();
+		expect(s.current().customAgents).toEqual([]);
+		await s.save({
+			customAgents: [
+				{
+					slug: "goose",
+					label: "Goose",
+					command: "goose",
+					args: ["acp"],
+					env: { GOOSE_API_KEY: ref("GOOSE_API_KEY") },
+				},
+			],
+		});
+		expect((await store()).current().customAgents).toEqual([
+			{
+				slug: "goose",
+				label: "Goose",
+				command: "goose",
+				args: ["acp"],
+				env: { GOOSE_API_KEY: ref("GOOSE_API_KEY") },
+			},
+		]);
+	});
+
 	test("saving again replaces the value", async () => {
 		const s = await store();
 		await s.save({ networkGraceMinutes: 30 });
@@ -186,6 +214,19 @@ describe("save", () => {
 		["a wait over a week", { networkGraceMinutes: 10_081 }],
 		["a blank binary", { codexBin: "  " }],
 		["an unknown harness", { agentHarness: "aider" }],
+		[
+			"two custom agents with one slug",
+			{
+				customAgents: [
+					{ slug: "goose", label: "Goose", command: "goose", args: ["acp"] },
+					{ slug: "goose", label: "Goose 2", command: "goose2", args: [] },
+				],
+			},
+		],
+		[
+			"a custom agent slug with capitals",
+			{ customAgents: [{ slug: "Goose", label: "Goose", command: "goose" }] },
+		],
 		["a wrong type", { scheduler: "yes" }],
 	])("refuses %s and saves nothing", async (_label, patch) => {
 		const s = await store();

@@ -17,6 +17,7 @@
  */
 import { fileURLToPath } from "node:url";
 import { ndJsonStream } from "@agentclientprotocol/sdk";
+import { type CustomAgent, customHarnessName } from "@nightshift/flows";
 import type { AcpPermissionMode } from "@tanstack/ai-acp";
 import { acpCompatible, spawnHandleToAcpTransport } from "@tanstack/ai-acp";
 import { type SessionConfig, withSessionConfig } from "./acp-session-config";
@@ -142,8 +143,12 @@ export function acpPermission(mode: PermissionMode): AcpPermissionMode {
 export type AcpHarnessOptions = {
 	/** Path or name of the agent's executable. */
 	executable: string;
-	/** Extra environment variables for the agent process. */
-	env?: Record<string, string>;
+	/**
+	 * Extra environment variables for the agent process. A function is
+	 * called for each session (a custom agent reads its secrets then); a
+	 * throw ends the session with its message.
+	 */
+	env?: Record<string, string> | (() => Promise<Record<string, string>>);
 	/** How long to wait for the process to stop after an abort. Default 5 s. */
 	abortGraceMs?: number;
 };
@@ -240,12 +245,12 @@ export function acpSpec(name: string, agent: AcpAgent): HarnessSpec {
 }
 
 /** The adapter of one ACP agent session. */
-function acpAdapter(
+async function acpAdapter(
 	name: string,
 	agent: AcpAgent,
 	input: AgentSessionInput,
 	options: AcpHarnessOptions,
-): AdapterSetup {
+): Promise<AdapterSetup> {
 	const servers = Object.keys(input.mcpServers ?? {});
 	if (agent.mcp === false && servers.length > 0) {
 		throw new Error(
@@ -258,7 +263,10 @@ function acpAdapter(
 		argv: [options.executable],
 		env: {},
 	};
-	const env = { ...launch.env, ...options.env };
+	const env = {
+		...launch.env,
+		...(typeof options.env === "function" ? await options.env() : options.env),
+	};
 	const command = [
 		...launch.argv,
 		...agent.args(
@@ -347,4 +355,20 @@ export function acpAgentHarness(
 					: {}),
 			}),
 	};
+}
+
+/**
+ * Runs sessions of a custom agent: one the person added with its command.
+ * It takes the model over ACP, never as a flag: `default` leaves the
+ * agent's own setting.
+ */
+export function customAcpHarness(
+	agent: Pick<CustomAgent, "slug" | "label" | "command" | "args">,
+	options: Omit<AcpHarnessOptions, "executable"> = {},
+): AgentHarness {
+	return acpAgentHarness(
+		customHarnessName(agent.slug),
+		{ label: agent.label, args: () => [...agent.args], model: "session" },
+		{ ...options, executable: agent.command },
+	);
 }

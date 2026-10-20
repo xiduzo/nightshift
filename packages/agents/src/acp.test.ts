@@ -8,6 +8,7 @@ import {
 	acpAgentHarness,
 	acpHarness,
 	acpPermission,
+	customAcpHarness,
 	observeAcpEvent,
 } from "./acp";
 import { fakeBin } from "./fixtures/bin";
@@ -296,6 +297,54 @@ describe("an agent that takes its model over ACP", () => {
 			type: "error",
 			message:
 				"Fake agent cannot use connections yet. Remove linear from the node, or run it on another harness.",
+		});
+	});
+});
+
+describe("customAcpHarness", () => {
+	async function custom(env?: () => Promise<Record<string, string>>) {
+		const command = await fakeBin(dir, "goose", "fake-acp", {
+			FAKE_ACP_LOG: log,
+			FAKE_ACP_CONFIG: "options",
+		});
+		return customAcpHarness(
+			{ slug: "goose", label: "Goose", command, args: ["acp"] },
+			env ? { env } : {},
+		);
+	}
+
+	test("runs the command with its arguments and takes the model over ACP", async () => {
+		const harness = await custom(async () => ({ GOOSE_MODE: "auto" }));
+		expect(harness.name).toBe("acp:goose");
+		expect(harness.label).toBe("Goose");
+		expect(harness.takeOverCommand("x")).toBeNull();
+		const events: AgentEvent[] = [];
+		for await (const event of harness.run(
+			input({ model: "ollama/qwen3-coder:latest" }),
+		)) {
+			events.push(event);
+		}
+		expect(events.at(-1)?.type).toBe("finished");
+		const lines = await logged();
+		expect(entry(lines, "argv")?.argv).toEqual(["acp"]);
+		expect(entry(lines, "config")).toEqual({
+			type: "config",
+			configId: "model",
+			value: "ollama/qwen3-coder:latest",
+		});
+	});
+
+	test("an env that cannot be read ends the session with its reason", async () => {
+		const harness = await custom(async () => {
+			throw new Error("Goose needs the secret GOOSE_API_KEY.");
+		});
+		const events: AgentEvent[] = [];
+		for await (const event of harness.run(input({ model: "default" }))) {
+			events.push(event);
+		}
+		expect(events.at(-1)).toMatchObject({
+			type: "error",
+			message: "Goose needs the secret GOOSE_API_KEY.",
 		});
 	});
 });

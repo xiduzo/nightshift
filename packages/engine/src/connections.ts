@@ -120,6 +120,16 @@ export type ConnectionStore = {
 	 * reference, to take out of an exported run.
 	 */
 	secretValues(): Promise<string[]>;
+	/**
+	 * Environment values with `${NAME}` expanded from the secrets, then the
+	 * daemon's environment: a custom agent's env. `missing` names the
+	 * references with no value; then nothing is expanded.
+	 */
+	expandEnv(
+		values: Record<string, string>,
+	): Promise<
+		{ ok: true; env: Record<string, string> } | { ok: false; missing: string[] }
+	>;
 };
 
 /** The `${NAME}` references of a server's env values and headers. */
@@ -311,6 +321,26 @@ export function createConnectionStore(options: {
 			return {
 				expansion: expandMcpServers({ [name]: server }, vars),
 				values: variables.flatMap((v) => (vars[v] ? [vars[v]] : [])),
+			};
+		},
+		async expandEnv(values) {
+			const names = new Set<string>();
+			for (const value of Object.values(values)) {
+				for (const match of value.matchAll(REFERENCE)) {
+					if (match[1]) names.add(match[1]);
+				}
+			}
+			const vars = await envFor(names);
+			const missing = [...names].filter((name) => vars[name] === undefined);
+			if (missing.length > 0) return { ok: false, missing };
+			return {
+				ok: true,
+				env: Object.fromEntries(
+					Object.entries(values).map(([key, value]) => [
+						key,
+						value.replace(REFERENCE, (_, name: string) => vars[name] ?? ""),
+					]),
+				),
 			};
 		},
 		async secretValues() {

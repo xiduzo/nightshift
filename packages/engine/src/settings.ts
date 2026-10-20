@@ -1,4 +1,6 @@
 import {
+	type CustomAgent,
+	customAgentSchema,
 	type DeciderName,
 	deciderNameSchema,
 	type HarnessName,
@@ -178,6 +180,21 @@ const DEFS = {
 		schema: z.array(harnessNameSchema).max(harnessNameSchema.options.length),
 		default: ["claude-code", "opencode", "codex"],
 	} satisfies Def<HarnessName[]>,
+	/**
+	 * The custom agents added on the Agents page: any coding agent that
+	 * speaks the Agent Client Protocol, with the command that starts it.
+	 * Agent nodes name one as `acp:<slug>`.
+	 */
+	customAgents: {
+		schema: z
+			.array(customAgentSchema)
+			.max(32)
+			.refine(
+				(agents) => new Set(agents.map((a) => a.slug)).size === agents.length,
+				{ message: "Each custom agent needs its own name in flows." },
+			),
+		default: [],
+	} satisfies Def<CustomAgent[]>,
 	agentHarness: {
 		schema: harnessNameSchema,
 		default: "claude-code",

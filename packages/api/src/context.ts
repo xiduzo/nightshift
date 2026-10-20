@@ -101,6 +101,8 @@ export type Context = {
 	/** Read-only checks of the CLIs and MCP servers on this machine. */
 	checks: {
 		harness(harness: HarnessName, bin: string): Promise<CliCheck>;
+		/** A custom agent's command: where it is, and its version when it says. */
+		customAgent(command: string, label: string): Promise<CliCheck>;
 		/** A CLI tool by name: where it is, its version and its help. */
 		cli(name: string): Promise<CliToolCheck>;
 		/** The programs this computer can run by name, for the CLI tool picker. */

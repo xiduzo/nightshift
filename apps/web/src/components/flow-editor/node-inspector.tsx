@@ -72,6 +72,7 @@ import {
 	type HarnessName,
 	harnessInfo,
 	switchHarness,
+	useCustomAgents,
 } from "@/lib/harnesses";
 import { orpc } from "@/utils/orpc";
 import { CallFields } from "./call-fields";
@@ -533,10 +534,22 @@ function AgentFields({
 }) {
 	const id = useId();
 	const { profiles, profile, unknownProfile } = useProfile(node);
+	const customAgents = useCustomAgents();
+	const info = (name: HarnessName) => harnessInfo(name, customAgents);
 	// With a profile, a field the node leaves out comes from the profile.
 	const harnessName: HarnessName =
 		node.harness ?? profile?.harness ?? "claude-code";
-	const harness = harnessInfo(harnessName);
+	const harness = info(harnessName);
+	// The built-in harnesses, the custom agents added here, and the node's
+	// own custom agent when this computer has not added it.
+	const harnessOptions = [
+		...HARNESSES.map(({ value, label }) => ({ value, label })),
+		...customAgents.map((agent) => info(`acp:${agent.slug}`)),
+		...(node.harness?.startsWith("acp:") &&
+		!customAgents.some((a) => `acp:${a.slug}` === node.harness)
+			? [info(node.harness)]
+			: []),
+	];
 	const fromProfile = (value: string) => `From the profile (${value})`;
 	// A skill with no name yet is not in the node: keep the toggle on Skill.
 	const [taskKind, setTaskKind] = useState<"prompt" | "skill">(
@@ -573,7 +586,7 @@ function AgentFields({
 						</NativeSelectOption>
 						{(profiles ?? []).map((p) => (
 							<NativeSelectOption key={p.name} value={p.name}>
-								{p.name} · {harnessInfo(p.harness).label} · {p.model}
+								{p.name} · {info(p.harness).label} · {p.model}
 							</NativeSelectOption>
 						))}
 						{unknownProfile ? (
@@ -605,18 +618,16 @@ function AgentFields({
 							onChange((current) =>
 								next === ""
 									? withoutField(current, "harness")
-									: switchHarness(current, next),
+									: switchHarness(current, next, customAgents),
 							);
 						}}
 					>
 						{node.profile !== undefined ? (
 							<NativeSelectOption value="">
-								{fromProfile(
-									profile ? harnessInfo(profile.harness).label : "unknown",
-								)}
+								{fromProfile(profile ? info(profile.harness).label : "unknown")}
 							</NativeSelectOption>
 						) : null}
-						{HARNESSES.map(({ value, label }) => (
+						{harnessOptions.map(({ value, label }) => (
 							<NativeSelectOption key={value} value={value}>
 								{label}
 							</NativeSelectOption>

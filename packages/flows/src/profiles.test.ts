@@ -8,8 +8,11 @@ import {
 import {
 	type AgentNode,
 	type AgentProfileSettings,
+	agentHarnessSchema,
+	agentProfileSettingsSchema,
 	FLOW_VERSION,
 	type Flow,
+	flowSchema,
 } from "./schema";
 import { validateFlow } from "./validate";
 
@@ -125,4 +128,32 @@ describe("validateFlow and profiles", () => {
 			'Agent node "work" needs a profile, or its own harness, model and permission mode.',
 		);
 	});
+});
+
+describe("custom agents in a flow", () => {
+	test("a node or a profile may name a custom agent as acp:<slug>", () => {
+		const flow = flowOf(
+			node({
+				profile: undefined,
+				harness: "acp:goose",
+				model: "default",
+				permissionMode: "auto",
+			}),
+		);
+		expect(flowSchema.safeParse(flow).success).toBe(true);
+		expect(validateFlow(flow).filter((i) => i.severity === "error")).toEqual(
+			[],
+		);
+		expect(
+			agentProfileSettingsSchema.safeParse({ ...builder, harness: "acp:kimi" })
+				.success,
+		).toBe(true);
+	});
+
+	test.each(["acp:", "acp:Goose", "acp:goose agent", "goose"])(
+		"%s is not a harness",
+		(harness) => {
+			expect(agentHarnessSchema.safeParse(harness).success).toBe(false);
+		},
+	);
 });

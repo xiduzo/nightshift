@@ -223,6 +223,42 @@ async function piCheck(bin: string): Promise<CliCheck> {
 	return { ...check, version };
 }
 
+/**
+ * A custom agent's command: is it on this computer, and its version when it
+ * answers `--version`. Many agents do not, so no version is no problem.
+ */
+export async function checkCustomAgent(
+	command: string,
+	label: string,
+): Promise<CliCheck> {
+	const path = await resolveBin(command);
+	const check: CliCheck = {
+		bin: command,
+		path,
+		version: null,
+		account: null,
+		facts: [],
+		problem: null,
+		checkedAt: Date.now(),
+	};
+	if (!path) {
+		return {
+			...check,
+			problem: command.includes("/")
+				? `Nothing is installed at ${command}. Check the path.`
+				: `Night Shift cannot find ${command} on this computer. Install ${label}, or enter the full path of its command.`,
+		};
+	}
+	try {
+		const out = await run([path, "--version"]);
+		return out.code === 0
+			? { ...check, version: firstLine(out.stdout) }
+			: check;
+	} catch {
+		return check;
+	}
+}
+
 /** The version, and the login where the CLI can tell. Others: version only. */
 export async function checkHarness(
 	harness: HarnessName,

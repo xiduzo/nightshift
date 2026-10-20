@@ -76,6 +76,7 @@ An Agent node names the coding agent it runs on. One flow can mix them.
 | Codex | Not yet verified |
 | Grok Build | Not yet verified |
 | pi | Through the Agent Client Protocol. Needs pi 0.81 or later. Runs local models through Ollama |
+| Any other agent that speaks the Agent Client Protocol | Add it as a custom agent with its command, for example `goose acp` |
 | GitHub Copilot, Gemini CLI, Cursor | Through the Agent Client Protocol, not yet verified |
 
 A node can add MCP servers and CLI tools such as `gh`. Night Shift knows no issue tracker: GitHub, Linear, or Jira is a command or an MCP server in your flow.

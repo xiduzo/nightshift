@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import {
 	checkCli,
+	checkCustomAgent,
 	checkHarness,
 	cliHelp,
 	cliHelpAt,
@@ -286,6 +287,25 @@ describe("checkHarness: opencode", () => {
 			(await checkHarness("opencode", "nightshift-no-such-opencode")).problem,
 		).toBe(
 			"OpenCode is not installed, or Night Shift cannot find it. Install it, or enter its path.",
+		);
+	});
+});
+
+describe("checkCustomAgent", () => {
+	test("a command that is there is ready, with or without a version", async () => {
+		const bin = await fakeCli("goose", {});
+		expect(await checkCustomAgent(bin, "Goose")).toMatchObject({
+			path: bin,
+			version: null,
+			problem: null,
+		});
+	});
+
+	test("a command that is not there says how to fix it", async () => {
+		expect(
+			(await checkCustomAgent("no-such-agent-here", "Goose")).problem,
+		).toBe(
+			"Night Shift cannot find no-such-agent-here on this computer. Install Goose, or enter the full path of its command.",
 		);
 	});
 });

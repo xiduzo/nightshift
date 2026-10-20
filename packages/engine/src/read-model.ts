@@ -1,5 +1,5 @@
 import { shellQuote } from "@nightshift/agents/harness-facts";
-import type { AgentHarness, HarnessName } from "@nightshift/agents/types";
+import type { AgentHarness, AgentHarnessName } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
 import { project, run, step } from "@nightshift/db/schema/nightshift";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
@@ -68,7 +68,7 @@ import type {
 
 /** The take-over facts of the harness of that name, or none. */
 export type HarnessOf = (
-	name: HarnessName,
+	name: AgentHarnessName,
 ) => Pick<AgentHarness, "takeOverCommand"> | undefined;
 
 /**
@@ -78,7 +78,10 @@ export type HarnessOf = (
  */
 export function takeOverCommand(
 	worktreePath: string,
-	last: { harness: HarnessName; harnessSessionId: string } | null | undefined,
+	last:
+		| { harness: AgentHarnessName; harnessSessionId: string }
+		| null
+		| undefined,
 	harnessOf: HarnessOf,
 ): string | null {
 	const command = last
