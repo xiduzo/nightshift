@@ -130,9 +130,12 @@ async function serve(argv: string[]) {
 		await extractMigrations(files.migrations, join(dataDir, "migrations"));
 
 	// Imported only now: the server reads its environment and takes the
-	// database lease when it loads.
-	const [{ default: daemon }, { settings, db, daemon: self }] =
-		await Promise.all([import("./index"), import("./services")]);
+	// database lease when it loads. One after the other: Bun 1.3 can run
+	// `./index` before `./services` it imports has finished loading, when
+	// both are imported at once ("Cannot access 'serve' before
+	// initialization").
+	const { settings, db, daemon: self } = await import("./services");
+	const { default: daemon } = await import("./index");
 	const web = files
 		? embeddedWeb(files.web)
 		: options.web
