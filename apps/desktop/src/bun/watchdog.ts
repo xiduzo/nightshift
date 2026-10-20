@@ -1,4 +1,4 @@
-import { HEALTH_STALE_AFTER_MS } from "server/src/health";
+import { HEALTH_STALE_AFTER_MS } from "server/health";
 
 import type { WatchdogStart } from "./watchdog-worker";
 

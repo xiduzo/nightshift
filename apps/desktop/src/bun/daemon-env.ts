@@ -1,5 +1,5 @@
 import fixPath from "fix-path";
-import { prepareDaemonEnv as prepare } from "server/src/daemon-env";
+import { prepareDaemonEnv as prepare } from "server/daemon-env";
 
 /**
  * Fills `process.env` for the daemon before the server loads. The packaged

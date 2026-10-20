@@ -5,11 +5,13 @@ import type { ElectrobunConfig } from "electrobun";
 import { UPDATE_FEEDS } from "./src/bun/update-feeds";
 
 const webBuildDir = "../web/dist/client";
-const shims = join(import.meta.dir, "../server/src/shims");
 // The packaged app has no .env files and no varlock CLI (see the shims).
 const varlockShims = {
-	"varlock/auto-load": join(shims, "varlock-auto-load.ts"),
-	"varlock/env": join(shims, "varlock-env.ts"),
+	"varlock/auto-load": Bun.resolveSync(
+		"server/shims/varlock-auto-load",
+		import.meta.dir,
+	),
+	"varlock/env": Bun.resolveSync("server/shims/varlock-env", import.meta.dir),
 };
 
 /**

@@ -1,5 +1,5 @@
 import { databaseUrl } from "@nightshift/db/data-dir";
-import { serveDaemon, tlsPortOf } from "server/src/serve";
+import { serveDaemon, tlsPortOf } from "server/serve";
 
 import { prepareDaemonEnv } from "./daemon-env";
 import { startWatchdog } from "./watchdog";
@@ -55,10 +55,7 @@ export async function startDaemon(): Promise<Daemon> {
 	// Imported only now: the server reads its env and takes the database lease
 	// when it loads.
 	const [{ default: daemon }, { document, spaces, lease, daemon: info }] =
-		await Promise.all([
-			import("server/src/index"),
-			import("server/src/services"),
-		]);
+		await Promise.all([import("server"), import("server/services")]);
 
 	// This computer only, until it is a Host with an https:// address. With
 	// its own certificate it also serves https:// for other computers, on
