@@ -1,3 +1,4 @@
+import { Badge } from "@nightshift/ui/components/badge";
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -96,7 +97,18 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 								isActive={Boolean(matchRoute({ to: "/inbox" }))}
 								render={<Link to="/inbox" />}
 							>
-								<InboxIcon aria-hidden="true" />
+								{/* The menu badge hides in the icon rail. There the count sits on the icon. */}
+								<span className="relative flex shrink-0">
+									<InboxIcon aria-hidden="true" />
+									{open > 0 ? (
+										<Badge
+											aria-label={`${open} ${open === 1 ? "gate waits" : "gates wait"} for you`}
+											className="absolute -top-2 -right-2 hidden h-4 min-w-4 bg-status-waiting px-1 text-[10px] text-background tabular-nums group-data-[collapsible=icon]:inline-flex"
+										>
+											{open > 9 ? "9+" : open}
+										</Badge>
+									) : null}
+								</span>
 								<span>Inbox</span>
 							</SidebarMenuButton>
 							{open > 0 ? (
