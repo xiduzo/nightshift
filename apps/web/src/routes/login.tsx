@@ -12,9 +12,7 @@ import {
 	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
-
-import { AccountForm } from "@/components/members/account-form";
-import { safeRedirect } from "@/lib/access";
+import { AccountForm, safeRedirect } from "@/features/access";
 
 export const Route = createFileRoute("/login")({
 	ssr: false,

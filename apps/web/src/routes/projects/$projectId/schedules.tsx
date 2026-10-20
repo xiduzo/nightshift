@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { ProjectPage } from "@/components/project-page";
-import { ScheduleList } from "@/components/schedule/schedule-list";
+import { ProjectPage } from "@/features/projects";
+import { ScheduleList } from "@/features/schedules";
 
 export const Route = createFileRoute("/projects/$projectId/schedules")({
 	component: ProjectSchedulesComponent,

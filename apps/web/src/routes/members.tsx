@@ -58,23 +58,22 @@ import {
 } from "lucide-react";
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
-
-import { CreateSpaceDialog } from "@/components/create-space-dialog";
 import {
+	ALL_ROLES,
+	CreateSpaceDialog,
 	copyInvitationLink,
 	InviteDialog,
-} from "@/components/members/invite-dialog";
-import { ALL_ROLES, roleLabel } from "@/components/members/roles";
-import { PageHeading, PageSection } from "@/components/page-heading";
-import { SiteHeader } from "@/components/site-header";
+	roleLabel,
+} from "@/features/spaces";
 import type {
 	MembersOverview,
 	PendingInvitation,
 	SpaceMember,
 	SpaceRole,
-} from "@/lib/api-types";
-import { formatDateTime } from "@/lib/format";
-import { orpc } from "@/utils/orpc";
+} from "@/shared/api";
+import { orpc } from "@/shared/api";
+import { formatDateTime } from "@/shared/format";
+import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 
 export const Route = createFileRoute("/members")({
 	ssr: false,

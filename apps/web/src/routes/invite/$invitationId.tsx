@@ -22,11 +22,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { MailXIcon } from "lucide-react";
 import { toast } from "sonner";
 
-import { AccountForm } from "@/components/members/account-form";
-import { roleLabel } from "@/components/members/roles";
-import type { InvitationView } from "@/lib/api-types";
-import { authClient } from "@/lib/auth-client";
-import { orpc } from "@/utils/orpc";
+import { AccountForm } from "@/features/access";
+import { roleLabel } from "@/features/spaces";
+import type { InvitationView } from "@/shared/api";
+import { authClient, orpc } from "@/shared/api";
 
 export const Route = createFileRoute("/invite/$invitationId")({
 	// The session lives in the browser; nothing to render on the server.

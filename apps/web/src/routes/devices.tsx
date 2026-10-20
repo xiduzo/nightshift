@@ -50,21 +50,18 @@ import {
 } from "lucide-react";
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
-
-import { JoinHostDialog } from "@/components/devices/join-host-dialog";
 import {
+	JoinHostDialog,
+	PairDeviceDialog,
+	platformName,
 	SpaceDevices,
+	ThisComputerCard,
 	ThisComputerOffers,
-} from "@/components/devices/offers-section";
-import { PairDeviceDialog } from "@/components/devices/pair-device-dialog";
-import { platformName } from "@/components/devices/platform";
-import { ThisComputerCard } from "@/components/devices/this-computer-card";
-import { PageHeading, PageSection } from "@/components/page-heading";
-import { SiteHeader } from "@/components/site-header";
-import { useNow } from "@/hooks/use-now";
-import type { LinkedHost, PairedDevice } from "@/lib/api-types";
-import { formatRelative } from "@/lib/format";
-import { orpc } from "@/utils/orpc";
+} from "@/features/devices";
+import type { LinkedHost, PairedDevice } from "@/shared/api";
+import { orpc } from "@/shared/api";
+import { formatRelative, useNow } from "@/shared/format";
+import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 
 export const Route = createFileRoute("/devices")({
 	// Polls from the browser; nothing to render on the server.

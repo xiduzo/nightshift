@@ -87,15 +87,14 @@ import {
 import { useTheme } from "next-themes";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
-
-import { DataTable, dataTableColumns } from "@/components/data-table";
-import { PageHeading, PageSection } from "@/components/page-heading";
-import { SiteHeader } from "@/components/site-header";
-import { notificationsSupported } from "@/hooks/use-night-notifications";
-import type { PermissionMode, Project, SettingsView } from "@/lib/api-types";
-import { HARNESSES, type HarnessName, harnessInfo } from "@/lib/harnesses";
-import { projectFolder } from "@/lib/projects";
-import { orpc } from "@/utils/orpc";
+import { HARNESSES, type HarnessName, harnessInfo } from "@/features/agents";
+import { projectFolder } from "@/features/projects";
+import { PERMISSION_MODES } from "@/features/settings";
+import type { Project, SettingsView } from "@/shared/api";
+import { orpc } from "@/shared/api";
+import { DataTable, dataTableColumns } from "@/shared/data-table";
+import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
+import { notificationsSupported } from "@/shared/shell";
 
 export const Route = createFileRoute("/settings")({
 	// The theme and the notification permission exist only in the browser.
@@ -157,42 +156,6 @@ function parseDraft(
 			return { value: text };
 	}
 }
-
-const PERMISSION_MODES: {
-	value: PermissionMode;
-	label: string;
-	description: string;
-}[] = [
-	{
-		value: "auto",
-		label: "Auto",
-		description:
-			"Claude Code approves safe actions on its own, so nobody needs to be awake. Made for nights.",
-	},
-	{
-		value: "acceptEdits",
-		label: "Accept edits",
-		description:
-			"The agent can edit files. It cannot run commands while nobody is there to approve them.",
-	},
-	{
-		value: "default",
-		label: "Ask for each tool",
-		description:
-			"Asks before each tool. At night nobody answers, so the agent cannot use its tools.",
-	},
-	{
-		value: "plan",
-		label: "Plan only",
-		description: "Reads the code and writes a plan. Changes nothing.",
-	},
-	{
-		value: "bypassPermissions",
-		label: "Bypass permissions",
-		description:
-			"Runs every tool, shell commands included, without asking. Use it only on a repository you trust.",
-	},
-];
 
 function SettingsComponent() {
 	const settings = useQuery(orpc.settings.get.queryOptions());

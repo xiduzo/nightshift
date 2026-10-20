@@ -42,37 +42,40 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { RunDetails } from "@/components/run/run-details";
-import { RunGraph } from "@/components/run/run-graph";
-import { RunActions, RunTitle } from "@/components/run/run-header";
-import { RunStatusPanel } from "@/components/run/run-status-panel";
-import { RunVariables } from "@/components/run/run-variables";
-import { RunWarnings } from "@/components/run/run-warnings";
-import { StepRowMenu } from "@/components/run/step-actions";
-import { CONSOLE_BAR_PX, StepConsole } from "@/components/run/step-console";
-import { StepSummary as StepSummaryView } from "@/components/run/step-summary";
-import { StepTimeline } from "@/components/run/step-timeline";
-import { type Crumb, SiteHeader } from "@/components/site-header";
-import { StepTranscript } from "@/components/transcript/step-transcript";
-import { useMediaQuery } from "@/hooks/use-media-query";
-import { mergeSteps, useRunStream } from "@/hooks/use-run-stream";
-import type { RunDetail, RunStatus, StepSummary } from "@/lib/api-types";
 import {
+	CONSOLE_BAR_PX,
 	calledFlowName,
 	calledFlowOf,
 	derivedTraversals,
+	emptyTranscript,
 	type ItemScope,
 	itemsOf,
+	mergeSteps,
 	nodeOfStep,
+	RunActions,
+	RunDetails,
+	RunGraph,
+	RunStatusPanel,
+	RunTitle,
+	RunVariables,
+	RunWarnings,
+	StepConsole,
+	StepRowMenu,
+	StepSummary as StepSummaryView,
+	StepTimeline,
+	StepTranscript,
 	scopeChain,
 	stepAtScope,
 	stepOutcomeColor,
 	stepRunsEach,
 	stepsIn,
 	stepsUnder,
-} from "@/lib/run-steps";
-import { emptyTranscript } from "@/lib/transcript";
-import { orpc } from "@/utils/orpc";
+	useRunStream,
+} from "@/features/runs";
+import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
+import { orpc } from "@/shared/api";
+import { useMediaQuery } from "@/shared/media-query";
+import { type Crumb, SiteHeader } from "@/shared/page";
 
 export const Route = createFileRoute("/runs/$runId")({
 	// The transcript streams from the browser; nothing to render on the server.

@@ -4,13 +4,11 @@ import { Card, CardContent } from "@nightshift/ui/components/card";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { HourglassIcon, MoonIcon, ZapIcon } from "lucide-react";
 import { useState } from "react";
-import { QuickRunDialog } from "@/components/new-run-form";
-import { PageHeading } from "@/components/page-heading";
-import { ProjectPage } from "@/components/project-page";
-import { RunList } from "@/components/run-list";
-import { useOpenGates } from "@/hooks/use-open-gates";
-import { useProjectRuns } from "@/hooks/use-project-runs";
-import { formatDateTime, formatTime } from "@/lib/format";
+import { useOpenGates } from "@/features/gates";
+import { ProjectPage } from "@/features/projects";
+import { QuickRunDialog, RunList, useProjectRuns } from "@/features/runs";
+import { formatDateTime, formatTime } from "@/shared/format";
+import { PageHeading } from "@/shared/page";
 
 export const Route = createFileRoute("/projects/$projectId/runs")({
 	component: ProjectRunsComponent,

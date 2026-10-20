@@ -2,18 +2,17 @@ import { Button } from "@nightshift/ui/components/button";
 import { createFileRoute } from "@tanstack/react-router";
 import { ZapIcon } from "lucide-react";
 import { useState } from "react";
-
-import { FlowHealth } from "@/components/dashboard/flow-health";
-import { NightOutput } from "@/components/dashboard/night-output";
-import { ProjectClones } from "@/components/dashboard/project-clones";
-import { RunOutcomes } from "@/components/dashboard/run-outcomes";
-import { UpNext } from "@/components/dashboard/up-next";
-import { QuickRunDialog } from "@/components/new-run-form";
-import { PageHeading } from "@/components/page-heading";
-import { ProjectPage } from "@/components/project-page";
-import { SectionCards } from "@/components/section-cards";
-import { useProjectRuns } from "@/hooks/use-project-runs";
-import { projectFolder } from "@/lib/projects";
+import {
+	FlowHealth,
+	NightOutput,
+	ProjectClones,
+	RunOutcomes,
+	SectionCards,
+	UpNext,
+} from "@/features/dashboard";
+import { ProjectPage, projectFolder } from "@/features/projects";
+import { QuickRunDialog, useProjectRuns } from "@/features/runs";
+import { PageHeading } from "@/shared/page";
 
 export const Route = createFileRoute("/projects/$projectId/")({
 	component: ProjectDashboardComponent,

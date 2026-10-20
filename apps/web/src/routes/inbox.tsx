@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { InboxPage } from "@/components/inbox/inbox-page";
-import { SiteHeader } from "@/components/site-header";
+import { InboxPage } from "@/features/gates";
+import { SiteHeader } from "@/shared/page";
 
 export const Route = createFileRoute("/inbox")({
 	// Polls from the browser; nothing to render on the server.

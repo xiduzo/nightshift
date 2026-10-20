@@ -47,19 +47,17 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { PageHeading, PageSection } from "@/components/page-heading";
+import { OVERVIEW_ROWS, SectionCards } from "@/features/dashboard";
 import {
 	MoveProjectDialog,
+	projectFolder,
 	RenameProjectDialog,
-} from "@/components/project-actions";
-import { RunList } from "@/components/run-list";
-import { SectionCards } from "@/components/section-cards";
-import { SiteHeader } from "@/components/site-header";
-import type { Project, RunSummary } from "@/lib/api-types";
-import { formatDateTime, formatRelative } from "@/lib/format";
-import { OVERVIEW_ROWS } from "@/lib/overview";
-import { projectFolder } from "@/lib/projects";
-import { orpc } from "@/utils/orpc";
+} from "@/features/projects";
+import { RunList } from "@/features/runs";
+import type { Project, RunSummary } from "@/shared/api";
+import { orpc } from "@/shared/api";
+import { formatDateTime, formatRelative } from "@/shared/format";
+import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 
 export const Route = createFileRoute("/")({
 	component: HomeComponent,

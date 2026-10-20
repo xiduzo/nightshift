@@ -15,11 +15,8 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef } from "react";
-
-import { TwoFactorSetup } from "@/components/account/two-factor-setup";
-import { safeRedirect } from "@/lib/access";
-import { authClient } from "@/lib/auth-client";
-import { orpc } from "@/utils/orpc";
+import { safeRedirect, TwoFactorSetup } from "@/features/access";
+import { authClient, orpc } from "@/shared/api";
 
 export const Route = createFileRoute("/two-factor")({
 	ssr: false,

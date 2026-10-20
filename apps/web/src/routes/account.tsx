@@ -18,11 +18,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { CircleAlertIcon, CircleUserRoundIcon } from "lucide-react";
 
-import { TwoFactorSection } from "@/components/account/two-factor-section";
-import { PageHeading, PageSection } from "@/components/page-heading";
-import { SiteHeader } from "@/components/site-header";
-import { authClient } from "@/lib/auth-client";
-import { orpc } from "@/utils/orpc";
+import { TwoFactorSection } from "@/features/access";
+import { authClient, orpc } from "@/shared/api";
+import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 
 export const Route = createFileRoute("/account")({
 	ssr: false,

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { AgentsPage } from "@/components/agents/agents-page";
-import { SiteHeader } from "@/components/site-header";
+import { AgentsPage } from "@/features/agents";
+import { SiteHeader } from "@/shared/page";
 
 export const Route = createFileRoute("/agents")({
 	// The checks run CLIs on the daemon; nothing to render on the server.

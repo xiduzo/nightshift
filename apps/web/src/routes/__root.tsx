@@ -17,10 +17,9 @@ import {
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "next-themes";
 import { useEffect } from "react";
-import { AppSidebar } from "@/components/app-sidebar";
-import { NightNotifications } from "@/hooks/use-night-notifications";
-import { accessRedirect, isOutsideApp } from "@/lib/access";
-import { orpc } from "@/utils/orpc";
+import { accessRedirect, isOutsideApp } from "@/features/access";
+import { orpc } from "@/shared/api";
+import { AppSidebar, NightNotifications } from "@/shared/shell";
 
 import appCss from "../index.css?url";
 export interface RouterAppContext {

@@ -1,0 +1,6 @@
+/** Spaces: switching and creating a Space, its Members, roles and invitations. */
+
+export { CreateSpaceDialog } from "./create-space-dialog";
+export { copyInvitationLink, InviteDialog } from "./invite-dialog";
+export { ALL_ROLES, roleLabel } from "./roles";
+export { SpaceSwitcher } from "./space-switcher";

@@ -19,11 +19,9 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, CircleAlertIcon, FileWarningIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
-
-import { FlowEditor } from "@/components/flow-editor/flow-editor";
-import { type Crumb, SiteHeader } from "@/components/site-header";
-import { newFlow } from "@/lib/flow-draft";
-import { orpc } from "@/utils/orpc";
+import { FlowEditor, newFlow } from "@/features/flows";
+import { orpc } from "@/shared/api";
+import { type Crumb, SiteHeader } from "@/shared/page";
 
 export const Route = createFileRoute("/projects/$projectId/flows/$name")({
 	// The canvas measures nodes in the browser; nothing to render on the server.

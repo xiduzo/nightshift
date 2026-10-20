@@ -1,9 +1,8 @@
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
-
-import Loader from "./components/loader";
+import { createQueryClient, orpc } from "@/shared/api";
+import { Loader } from "@/shared/page";
 import { routeTree } from "./routeTree.gen";
-import { createQueryClient, orpc } from "./utils/orpc";
 
 export const getRouter = () => {
 	const queryClient = createQueryClient();
