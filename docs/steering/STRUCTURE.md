@@ -75,14 +75,40 @@ Each package lists its public entry points in `package.json` `exports`.
 - An entry for the web app is type-only and browser-safe (`@nightshift/api/client`).
 - A consumer imports a package by its name and a listed entry. Never by a relative path into another package (`../../packages/agents/src/...`).
 
-## 4. Verticals inside a package
+## 4. Verticals
 
-- `src/` holds one folder per vertical. Name it with a domain word from `docs/glossary.md`: `runs/`, `gates/`, `schedules/`, `projects/`.
-- The top of `src/` holds only `index.ts` and, for a runtime or app, its composition root.
-- **No kind buckets.** Do not create `lib/`, `utils/`, `helpers/`, `hooks/`, `types/`, `types.ts` (as a catch-all), `common/`, `shared/` or `misc/`. Exception: `packages/ui` (the shadcn layout).
-- Shared code gets its own named vertical, for example `time/` or `api/` in the web app. Its name says what it does.
+Every app and every package (except `ui` and `config`) is cut into verticals. The model is the one yapyap uses.
+
+### What a vertical is
+
+- A vertical is a folder named with a domain word from `docs/glossary.md`: `runs/`, `gates/`, `schedules/`, `projects/`.
+- Its `index.ts` is a barrel. The barrel is the **only** public surface of the vertical.
+- Code outside the vertical imports from the barrel only. A deep import into another vertical (`features/runs/components/run-list`) is an error.
+- Inside the vertical, code uses relative imports and may reach any file.
 - A vertical holds everything about its domain: components, hooks, query options, types, utilities, constants and tests.
-- Another vertical imports only the files at the root of a vertical. Subfolders of a vertical are private to it.
+- Inside a vertical, kind folders are allowed when the vertical is big enough: `components/`, `hooks/`, `lib/`, `queries/`, `mutations/`. A small vertical stays flat.
+- Every name on a barrel has an importer outside the vertical. A name nobody imports comes off the barrel.
+
+### Where verticals live
+
+| Workspace | Verticals in | Also at the top of `src/` |
+| --- | --- | --- |
+| An app (`apps/web`, `apps/server`, `apps/desktop`) | `src/features/<vertical>/` | `routes/` (web), `shared/`, the entry and composition root files |
+| A package (`engine`, `agents`, `flows`, `api`, `auth`, `db`, `daemon`, `devices`) | `src/<vertical>/` | `index.ts` (composes the vertical barrels into the package API), `testing/` |
+
+- **`shared/` (apps only)** holds cross-cutting code that is not a product area: the API client, logging, the page shell, time formatting. Each piece in `shared/` is a named folder with its own barrel (`shared/api/`, `shared/time/`). No loose files in `shared/`.
+- **No kind buckets at the top of `src/`.** Do not create `src/lib/`, `src/utils/`, `src/helpers/`, `src/hooks/`, `src/components/`, `src/types/`, `src/common/` or `src/misc/`. Exception: `packages/ui` (the shadcn layout).
+- No catch-all `types.ts` for a whole package. Types live in the vertical that owns them.
+
+### Exceptions are listed, not implied
+
+Two exceptions exist, as in yapyap. Each one is listed by name in `scripts/check-verticals.ts` with a comment that says why.
+
+- **Leaf contract:** a pure-data file (no imports of its own) that a vertical exposes past its barrel, because importing the barrel would close a module-init cycle. Its symbols are also on the barrel.
+- **Peer port:** two verticals that depend on each other cross only through one named port file per direction. Every other deep import between them stays banned.
+
+### Growth
+
 - Start a new concept inside the vertical that uses it. Promote it to its own vertical when a second vertical needs it.
 - A new package is right only when a vertical must sit in a different layer than its host, or when two apps need it.
 
@@ -98,18 +124,22 @@ These are signals, not hard limits. A file past the limit needs a reason in its 
 
 ```
 apps/web/src/
-  routes/            thin TanStack Router files: createFileRoute + one page from a vertical
-  app/               the shell: router, sidebar, site header, page heading
-  api/               the oRPC client, query client, server URL, contract.ts (shared derived types)
-  <vertical>/        projects/, flows/, runs/, gates/, schedules/, agents/, devices/, settings/, spaces/, access/, dashboard/
-    queries.ts       query and mutation option factories, polling rules
-    types.ts         this vertical's slice of the API types
-    *.tsx, *.ts      components, hooks and logic of this vertical, tests next to them
+  routes/                  thin TanStack Router files: createFileRoute + one page from a vertical
+  shared/
+    api/                   the oRPC client, query client, server URL, contract.ts (derived API types)
+    shell/                 router wiring, sidebar, site header, page heading
+    time/  data-table/     other named cross-cutting pieces, each with a barrel
+  features/
+    <vertical>/            projects, flows, runs, gates, schedules, agents, devices, settings, spaces, access, dashboard
+      index.ts             the barrel: the only public surface
+      queries.ts           query and mutation option factories, polling rules (or queries/ + mutations/)
+      types.ts             this vertical's slice of the API types
+      components/ hooks/ lib/   when the vertical is big enough
 ```
 
-- A route file loads data (`loader`, `ensureQueryData`) and renders one page component. It holds no other markup.
-- Query options live in the vertical's `queries.ts`. A component does not build `orpc.x.y.queryOptions(...)` for another vertical's data. It imports that vertical's factory.
-- API types come from `api/contract.ts` (`InferClientOutputs`). Never derive them again in a component.
+- A route file loads data (`loader`, `ensureQueryData`) and renders one page from a vertical's barrel. It holds no other markup.
+- Query options live in the vertical's queries. A component does not build `orpc.x.y.queryOptions(...)` for another vertical's data. It imports that vertical's factory from its barrel.
+- API types come from `shared/api` (`InferClientOutputs`). Never derive them again in a component.
 - Rules that `@nightshift/flows` or the engine already has are imported, not copied. Example: template references, the harness catalog.
 - UI follows `AGENTS.md`: shadcn components only.
 
@@ -131,6 +161,9 @@ An app wires packages together and talks to the outside world. It does not hold 
 | Biome `style/noRestrictedImports` per package: forbid entries outside `exports`, `./testing` in production files, and engine/agents/auth/db in `apps/web`. | `biome.json` overrides | Planned |
 | Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json` | Planned |
 | CI on every pull request: `biome ci`, `bun run check-types`, `bun test`, the layer check. | `.github/workflows/ci.yml` | Planned |
+| Vertical boundaries: `scripts/check-verticals.ts` finds the verticals from the file system (so no list can drift), then fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports. Tests may deep-import. | lefthook pre-commit, CI | Planned |
+| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. | lefthook pre-commit, CI | Planned |
+| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Planned |
 
 When a check exists, change its status to "Active". Fix a violation, do not add an exception. If a rule is wrong, change this document first.
 
@@ -146,5 +179,6 @@ The code does not yet follow every rule. These are debts. Do not copy them into 
 - `packages/api/src/routers/index.ts` holds every procedure in one file. Most procedures declare no output schema. The engine owns wire schemas that the API uses.
 - The engine reads auth tables directly. `worktrees.ts` calls `git` with no port.
 - `packages/agents` exports its fakes from the root. Each harness touches five files.
+- No workspace is cut into barrel verticals yet (`features/<vertical>/index.ts` in apps, `src/<vertical>/index.ts` in packages).
 
 The migration plan that removes these debts is in the structure audit of 2026-10-20.

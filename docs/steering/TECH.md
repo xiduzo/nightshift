@@ -80,7 +80,7 @@ bun lefthook install
 ## Code Conventions
 
 - **Naming:** PascalCase components and types, camelCase functions and variables, kebab-case file names.
-- **File structure:** One workspace package per bounded context. Inside a package, group by feature, not by kind. No `lib/`, `utils/` or `hooks/` buckets. See `docs/steering/STRUCTURE.md`.
+- **File structure:** One workspace package per bounded context. Inside a package, group by feature, not by kind. Each vertical is a folder with an `index.ts` barrel as its only public surface (`src/features/<vertical>/` in apps, `src/<vertical>/` in packages). No `lib/`, `utils/` or `hooks/` buckets at the top of `src/`. See `docs/steering/STRUCTURE.md`.
 - **Test files:** Colocated `*.test.ts` next to the module. Bun's test runner.
 - **Imports:** Workspace packages by name (`@nightshift/db`). No relative imports across packages.
 - **Formatting:** Biome. The pre-commit hook formats staged files.

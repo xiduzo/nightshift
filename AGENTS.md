@@ -4,10 +4,12 @@ Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
 
 - **Layers point down.** A package imports only from lower layers (`db`, `flows`, `ui`
   → `auth`, `agents` → `engine` → `api` → apps). No package imports an app.
-- **Group by domain, not by kind.** Put new code in the vertical it serves
-  (`runs/`, `gates/`, `schedules/`). Never create `lib/`, `utils/`, `helpers/`,
-  `hooks/`, `common/`, `shared/` or a catch-all `types.ts`. Shared code gets a
-  named vertical.
+- **Group by domain, not by kind.** Put new code in the vertical it serves:
+  `src/features/<vertical>/` in an app, `src/<vertical>/` in a package. Never
+  create `lib/`, `utils/`, `hooks/` or `components/` at the top of `src/`, or a
+  catch-all `types.ts`. Cross-cutting app code goes in a named `shared/<name>/`.
+- **A vertical's barrel is its only door.** Import another vertical through its
+  `index.ts`, never a file inside it. Every barrel export needs an outside importer.
 - **Import only public entries.** Use a package's name and an entry listed in its
   `exports`. Never a deep path into its `src/`. Fakes and fixtures come from `./testing`.
 - **Apps wire, packages decide.** Domain logic goes in a package, not in `apps/*`.
