@@ -28,16 +28,16 @@ import {
 import { Switch } from "@nightshift/ui/components/switch";
 import { ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useRef } from "react";
-import { SOURCE_KINDS } from "../flow-draft";
+import { SOURCE_KINDS } from "../../flow-draft";
+import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
+import { LIST_RECIPES } from "../lib/list-recipes";
+import { OptionsEditor } from "../options-editor";
+import { TemplateField } from "../template-field";
 import {
 	CalledFlowField,
 	type CalledFlowSupport,
 	InputBindings,
 } from "./called-flow-fields";
-import { Field, InspectorSection, Note, PositiveIntInput } from "./fields";
-import { LIST_RECIPES } from "./lib/list-recipes";
-import { OptionsEditor } from "./options-editor";
-import { TemplateField } from "./template-field";
 
 const SOURCE_ORDER: ListSource["kind"][] = ["json", "command", "files"];
 

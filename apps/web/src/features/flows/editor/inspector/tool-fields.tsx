@@ -16,10 +16,10 @@ import { Link } from "@tanstack/react-router";
 import { PlusIcon, XIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { connectionQueries } from "@/features/agents";
-import { missingConnectionMessage } from "../flow-draft";
-import { connectionKind, type DaemonConnection } from "./connections-field";
-import { Field, InspectorSection, Note } from "./fields";
-import { TemplateField } from "./template-field";
+import { missingConnectionMessage } from "../../flow-draft";
+import { connectionKind, type DaemonConnection } from "../connections-field";
+import { Field, InspectorSection, Note } from "../fields";
+import { TemplateField } from "../template-field";
 
 /**
  * The Tool node's inspector: the connection, the tool (listed from the

@@ -6,9 +6,9 @@ import {
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
 import { useId, useRef } from "react";
-import { WAIT_KINDS } from "../flow-draft";
-import { Field, InspectorSection, Note, PositiveIntInput } from "./fields";
-import { TemplateField } from "./template-field";
+import { WAIT_KINDS } from "../../flow-draft";
+import { Field, InspectorSection, Note, PositiveIntInput } from "../fields";
+import { TemplateField } from "../template-field";
 
 const KIND_ORDER: WaitUntil["kind"][] = [
 	"duration",

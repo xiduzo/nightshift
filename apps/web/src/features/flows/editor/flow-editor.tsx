@@ -64,8 +64,8 @@ import { useProjectFlows } from "../use-project-flows";
 import { EdgeInspector } from "./edge-inspector";
 import { EditorCanvas, NodePalette, type Selection } from "./editor-canvas";
 import { FlowInspector } from "./flow-inspector";
+import { NodeInspector } from "./inspector/node-inspector";
 import { IssuesPanel } from "./issues-panel";
-import { NodeInspector } from "./node-inspector";
 import { ProjectFlowsContext } from "./project-flows-context";
 
 type Props = {

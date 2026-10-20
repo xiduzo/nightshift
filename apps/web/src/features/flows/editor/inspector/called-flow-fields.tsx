@@ -28,7 +28,7 @@ import {
 	XIcon,
 } from "lucide-react";
 import { useId, useState } from "react";
-import { TemplateField } from "./template-field";
+import { TemplateField } from "../template-field";
 
 /** What a Call node's inspector needs from the editor around it. */
 export type CalledFlowSupport = {
