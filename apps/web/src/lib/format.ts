@@ -91,8 +91,8 @@ export function truncate(text: string, max: number): string {
 	return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-/** "42s", "3m 05s", "1h 02m". */
-export function formatDuration(ms: number): string {
+/** "42s", "3m 05s", "1h 02m". With `exact`, an hour or more keeps its seconds: "1h 02m 07s". */
+export function formatDuration(ms: number, exact = false): string {
 	const seconds = Math.max(0, Math.round(ms / 1000));
 	if (seconds < 60) return `${seconds}s`;
 	const minutes = Math.floor(seconds / 60);
@@ -100,7 +100,8 @@ export function formatDuration(ms: number): string {
 		return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
 	}
 	const hours = Math.floor(minutes / 60);
-	return `${hours}h ${String(minutes % 60).padStart(2, "0")}m`;
+	const rest = `${hours}h ${String(minutes % 60).padStart(2, "0")}m`;
+	return exact ? `${rest} ${String(seconds % 60).padStart(2, "0")}s` : rest;
 }
 
 /** How long something has waited: "under a minute", "12 min", "3 h 5 min", "2 days". */
