@@ -1,5 +1,6 @@
 # Checks every pull request and every push to main: lint and format, the
-# layer map, types, and the tests of each workspace. The same commands run
+# layer map, types, the tests of each workspace, and that the compiled
+# binary starts. The same commands run
 # on your computer (see CONTRIBUTING.md, "Check your change").
 name: CI
 
@@ -59,6 +60,36 @@ jobs:
 
       - name: Types
         run: bun run check-types
+
+  # The Docker image (deploy/Dockerfile) runs the compiled binary. A binary
+  # that stops at start leaves production on its old container, without an
+  # error anywhere. This builds it and starts it as the image does.
+  binary:
+    name: Binary starts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      # Vite's prerender in the web build runs on Node.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build the binary
+        run: bun run --cwd apps/server build:binary
+
+      # serve answers GET / with 200, health exits with 0, and pi-acp
+      # answers over ACP. In a temporary folder, away from node_modules.
+      - name: Start the binary
+        timeout-minutes: 3
+        run: bun apps/server/scripts/smoke-binary.ts
 
   test:
     name: Test (${{ matrix.workspace }})

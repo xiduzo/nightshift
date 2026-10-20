@@ -39,6 +39,13 @@ bun run --cwd apps/server build:binary --target all
 ls apps/server/dist/bin/   # nightshift-linux-x64, nightshift-linux-arm64, nightshift-darwin-arm64
 ```
 
+Check that the binary of this computer starts. CI does this on every
+pull request:
+
+```bash
+bun apps/server/scripts/smoke-binary.ts
+```
+
 Run it:
 
 ```bash
