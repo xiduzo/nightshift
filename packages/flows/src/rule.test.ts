@@ -31,7 +31,7 @@ const context: TemplateContext = {
 };
 
 describe("ruleContext", () => {
-	test("one object: run, then the inputs, then the nodes, with the template lookup's precedence", () => {
+	test("one object: run, vars, then the inputs, then the nodes, with the template lookup's precedence", () => {
 		const ctx = ruleContext(context);
 		expect(Object.keys(ctx).sort()).toEqual([
 			"build",
@@ -40,6 +40,7 @@ describe("ruleContext", () => {
 			"mode",
 			"my-node",
 			"run",
+			"vars",
 		]);
 		expect(ctx.check).toBe("an input wins");
 		expect(ctx.run).toEqual(context.run);

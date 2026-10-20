@@ -3,10 +3,17 @@ import {
 	isGraphInterrupt,
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
-import type { Flow, FlowNode, NodeOutputs, Outcome } from "@nightshift/flows";
+import type {
+	Flow,
+	FlowNode,
+	JsonValue,
+	NodeOutputs,
+	Outcome,
+} from "@nightshift/flows";
 
 import {
 	deriveNodeOutputs,
+	deriveVariables,
 	type InputValues,
 	type Scope,
 	type StepOutputs,
@@ -53,6 +60,8 @@ export type BodyEnd =
 			outcome: Outcome;
 			/** The body's node outputs, from its final state. */
 			nodes: NodeOutputs;
+			/** The body's variables, from its final state. */
+			vars: Record<string, JsonValue>;
 	  }
 	| { kind: "failed"; reason: string }
 	| {
@@ -142,13 +151,14 @@ export async function runBody(input: {
 		node,
 		outcome: ended.outcome as Outcome,
 		nodes: result.nodes,
+		vars: result.vars ?? {},
 	};
 }
 
 /**
  * The called flow's declared outputs, rendered in the body's own context:
- * from the node outputs of a finished body's state, or from the log for a
- * body that failed (its state was never returned).
+ * from the node outputs and variables of a finished body's state, or from
+ * the log for a body that failed (its state was never returned).
  */
 export async function bodyOutputs(
 	ctx: StepContext,
@@ -159,15 +169,13 @@ export async function bodyOutputs(
 		scope: Scope;
 		run: BodyRun;
 	},
-	nodes?: NodeOutputs,
+	finished?: { nodes: NodeOutputs; vars: Record<string, JsonValue> },
 ): Promise<StepOutputs> {
+	const events = finished ? [] : await ctx.log.events(ctx.run.id);
+	const key = scopeKey(input.scope);
 	return flowOutputs(input.called, {
-		nodes:
-			nodes ??
-			deriveNodeOutputs(
-				await ctx.log.events(ctx.run.id),
-				scopeKey(input.scope),
-			),
+		nodes: finished?.nodes ?? deriveNodeOutputs(events, key),
+		vars: finished?.vars ?? deriveVariables(events, key),
 		inputs: input.inputs,
 		run: {
 			...input.run,

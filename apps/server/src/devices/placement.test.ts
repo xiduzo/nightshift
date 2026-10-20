@@ -81,7 +81,7 @@ function flowOnB(name: string, nodes: unknown[], edges: unknown[] = []) {
 	writeFileSync(
 		join(dir, `${name}.json`),
 		JSON.stringify({
-			version: 4,
+			version: 5,
 			inputs: [],
 			outputs: [],
 			start: (nodes[0] as { id: string }).id,

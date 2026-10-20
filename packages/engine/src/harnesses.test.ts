@@ -61,7 +61,7 @@ function agent(id: string, extra: Partial<AgentNode> = {}): AgentNode {
 
 function flowOf(nodes: AgentNode[], edges: FlowEdge[] = []): Flow {
 	return {
-		version: 4,
+		version: 5,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

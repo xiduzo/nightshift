@@ -1,5 +1,5 @@
 import { migrateFlow } from "./migrate";
-import { ruleNames, ruleProblem } from "./rule";
+import { ruleNames, ruleProblem, ruleVariableNames } from "./rule";
 import {
 	type CallEachNode,
 	type CallNode,
@@ -26,6 +26,7 @@ import {
 } from "./schema";
 import { templateRefs } from "./template";
 import type { FlowIssue, ValidateOptions } from "./types";
+import { coerceVariable } from "./variables";
 
 type At = Pick<FlowIssue, "nodeId" | "edgeId">;
 type Report = (message: string, at: At) => void;
@@ -109,6 +110,7 @@ function validateIn(
 	}
 
 	checkInputs(flow, nodes, error);
+	checkVariables(flow, nodes, error);
 
 	if (!nodes.has(flow.start)) {
 		error(`Start node "${flow.start}" does not exist.`, {
@@ -161,7 +163,7 @@ function validateIn(
 	}
 
 	// Node content.
-	const scope: Scope = { flow, nodes, flows };
+	const scope: Scope = { flow, nodes, flows, readVars: new Set() };
 	for (const node of nodes.values()) {
 		const at = { nodeId: node.id };
 		const template = (text: string, where: string) =>
@@ -248,9 +250,11 @@ function validateIn(
 				}
 				break;
 		}
+		checkWrites(node, scope, error);
 	}
 
 	checkOutputs(scope, error);
+	checkUnusedVariables(scope, warning);
 
 	// Called flows, when the project's flows are known.
 	if (flows !== undefined) {
@@ -305,7 +309,208 @@ type Scope = {
 	nodes: ReadonlyMap<string, FlowNode>;
 	/** Undefined when the project's flows are not known. */
 	flows: Flows | undefined;
+	/** The variables a template or a rule read so far, for the unused-variable warning. */
+	readVars: Set<string>;
 };
+
+/** `${NAME}` reads a secret: its value must never land in a variable. */
+const SECRET_REF = /\$\{[A-Za-z_][A-Za-z0-9_]*\}/;
+
+/**
+ * Variables: unique names, valid and not reserved, not an input or a node
+ * id, a schema on `json` only, and an initial value that reads only inputs
+ * and `run`, holds no secret, and (as plain text) fits the type.
+ */
+function checkVariables(
+	flow: Flow,
+	nodes: ReadonlyMap<string, FlowNode>,
+	error: Report,
+): void {
+	const reserved: readonly string[] = reservedNames;
+	const inputs = new Set(flow.inputs.map((input) => input.name));
+	const seen = new Set<string>();
+	for (const variable of flow.variables ?? []) {
+		const name = variable.name;
+		if (seen.has(name)) {
+			error(`The variable "${name}" is declared more than once.`, {});
+			continue;
+		}
+		seen.add(name);
+		const valid = nameSchema.safeParse(name);
+		if (!valid.success) {
+			error(
+				`The variable "${name}" is not a valid name: ${valid.error.issues[0]?.message ?? "not allowed"}`,
+				{},
+			);
+		} else if (reserved.includes(name)) {
+			error(`The variable name "${name}" is reserved. Pick another name.`, {});
+		}
+		if (inputs.has(name)) {
+			error(
+				`The variable "${name}" has the same name as an input. Rename one of them.`,
+				{},
+			);
+		}
+		if (nodes.has(name)) {
+			error(
+				`The variable "${name}" has the same name as the node "${name}". Rename one of them.`,
+				{ nodeId: name },
+			);
+		}
+		if (variable.schema !== undefined && variable.type !== "json") {
+			error(
+				`The variable "${name}" has a schema, but only a json variable takes one. Make it json, or remove the schema.`,
+				{},
+			);
+		}
+		const initial = variable.initial;
+		if (initial === undefined || initial.trim() === "") continue;
+		const subject = `The initial value of variable "${name}"`;
+		if (SECRET_REF.test(initial)) {
+			error(
+				`${subject} reads a secret. A variable is kept with the run, so it cannot hold a secret.`,
+				{},
+			);
+		}
+		const refs = templateRefs(initial);
+		for (const ref of refs) {
+			if (ref.name === "run" || inputs.has(ref.name)) continue;
+			error(
+				`${subject} uses ${ref.raw}. It can read the inputs and run only: no step ran yet.`,
+				{},
+			);
+		}
+		if (refs.length === 0) {
+			const fits = coerceVariable(variable.type, initial, true);
+			if (!fits.ok) error(`${subject} does not fit: ${fits.problem}`, {});
+		}
+	}
+}
+
+/**
+ * A node's writes (`set`): a known variable, exactly one of a value and an
+ * expression, a template or a rule that reads known names, outcomes the
+ * node can end with, no secret, and (as plain text) a value that fits.
+ */
+function checkWrites(node: FlowNode, scope: Scope, error: Report): void {
+	const at = { nodeId: node.id };
+	const variables = new Map(
+		(scope.flow.variables ?? []).map((variable) => [variable.name, variable]),
+	);
+	const outcomes = nodeOutcomes(node);
+	for (const write of node.set ?? []) {
+		const subject = `"${node.id}" sets "${write.variable}"`;
+		const writeTo = `the write to "${write.variable}" on "${node.id}"`;
+		const variable = variables.get(write.variable);
+		if (variable === undefined) {
+			error(
+				`${subject}, but the flow has no variable "${write.variable}". Add it under Variables.`,
+				at,
+			);
+		}
+		const hasValue = write.value !== undefined && write.value.trim() !== "";
+		const hasExpression =
+			write.expression !== undefined && write.expression.trim() !== "";
+		if (hasValue && hasExpression) {
+			error(`${subject} with a value and an expression. Keep one.`, at);
+		} else if (!hasValue && !hasExpression) {
+			error(`${subject}, but has no value or expression.`, at);
+		}
+		const source = hasExpression
+			? (write.expression ?? "")
+			: (write.value ?? "");
+		if (SECRET_REF.test(source)) {
+			error(
+				`${subject} from a secret. A variable is kept with the run, so it cannot hold a secret.`,
+				at,
+			);
+		}
+		if (hasExpression) {
+			const problem = ruleProblem(source);
+			if (problem !== null) {
+				error(`The expression of ${writeTo} is not valid: ${problem}`, at);
+			} else {
+				checkRuleReads(
+					source,
+					`The expression of ${writeTo}`,
+					at,
+					scope,
+					error,
+				);
+			}
+		} else if (hasValue) {
+			checkTemplate(source, `The value of ${writeTo}`, at, scope, error);
+			if (variable !== undefined && templateRefs(source).length === 0) {
+				const fits = coerceVariable(variable.type, source, true);
+				if (!fits.ok) {
+					error(`The value of ${writeTo} does not fit: ${fits.problem}`, at);
+				}
+			}
+		}
+		for (const outcome of write.on ?? []) {
+			if (!outcomes.includes(outcome)) {
+				error(
+					`${subject} on "${outcome}", but ${describeNode(node)} ends with ${outcomes.join(", ")}.`,
+					at,
+				);
+			}
+		}
+	}
+}
+
+/** A variable that no node writes and nothing reads does nothing. */
+function checkUnusedVariables(scope: Scope, warning: Report): void {
+	const written = new Set<string>();
+	for (const node of scope.nodes.values()) {
+		for (const write of node.set ?? []) written.add(write.variable);
+	}
+	for (const variable of scope.flow.variables ?? []) {
+		if (written.has(variable.name) || scope.readVars.has(variable.name)) {
+			continue;
+		}
+		warning(
+			`The variable "${variable.name}" is never set or read. Set it on a node, or remove it.`,
+			{},
+		);
+	}
+}
+
+/**
+ * The names a rule reads: `run`, `vars`, an input or a node at the top,
+ * and a variable the flow has below `vars`.
+ */
+function checkRuleReads(
+	expr: string,
+	subject: string,
+	at: At,
+	scope: Scope,
+	error: Report,
+): void {
+	const known = new Set<string>([
+		"run",
+		"vars",
+		...scope.flow.inputs.map((input) => input.name),
+		...scope.nodes.keys(),
+	]);
+	for (const name of ruleNames(expr)) {
+		if (!known.has(name)) {
+			error(
+				`${subject} reads "${name}", but there is no node or input "${name}".`,
+				at,
+			);
+		}
+	}
+	const variables = new Set((scope.flow.variables ?? []).map((v) => v.name));
+	for (const name of ruleVariableNames(expr)) {
+		scope.readVars.add(name);
+		if (!variables.has(name)) {
+			error(
+				`${subject} reads vars.${name}, but the flow has no variable "${name}".`,
+				at,
+			);
+		}
+	}
+}
 
 /**
  * Inputs: unique names, valid and not reserved, not the id of a node, and a
@@ -410,6 +615,24 @@ function checkTemplate(
 				);
 			} else if (deeper.length > 0) {
 				error(`${uses}, but run.${field} is text: it takes no path.`, at);
+			}
+			continue;
+		}
+
+		if (ref.name === "vars") {
+			const variable = scope.flow.variables?.find((v) => v.name === field);
+			if (field === undefined) {
+				error(`${uses}, but vars needs a variable: {{vars.<name>}}.`, at);
+			} else if (variable === undefined) {
+				error(`${uses}, but the flow has no variable "${field}".`, at);
+			} else {
+				scope.readVars.add(field);
+				if (deeper.length > 0 && variable.type !== "json") {
+					error(
+						`${uses}, but the variable "${field}" is ${variable.type}: it takes no path. Write {{vars.${field}}}, or make it json.`,
+						at,
+					);
+				}
 			}
 			continue;
 		}
@@ -720,11 +943,6 @@ function checkDecision(
 			at,
 		);
 	}
-	const known = new Set<string>([
-		"run",
-		...scope.flow.inputs.map((input) => input.name),
-		...scope.nodes.keys(),
-	]);
 	for (const option of ruled) {
 		const when = option.when ?? "";
 		const problem = ruleProblem(when);
@@ -733,14 +951,7 @@ function checkDecision(
 			error(`${rule} is not valid: ${problem}`, at);
 			continue;
 		}
-		for (const name of ruleNames(when)) {
-			if (!known.has(name)) {
-				error(
-					`${rule} reads "${name}", but there is no node or input "${name}".`,
-					at,
-				);
-			}
-		}
+		checkRuleReads(when, rule, at, scope, error);
 	}
 }
 
@@ -780,19 +991,13 @@ function checkValue(node: ValueNode, scope: Scope, error: Report): void {
 		error(`The expression of "${node.id}" is not valid: ${problem}`, at);
 		return;
 	}
-	const known = new Set<string>([
-		"run",
-		...scope.flow.inputs.map((input) => input.name),
-		...scope.nodes.keys(),
-	]);
-	for (const name of ruleNames(expression)) {
-		if (!known.has(name)) {
-			error(
-				`The expression of "${node.id}" reads "${name}", but there is no node or input "${name}".`,
-				at,
-			);
-		}
-	}
+	checkRuleReads(
+		expression,
+		`The expression of "${node.id}"`,
+		at,
+		scope,
+		error,
+	);
 }
 
 /**

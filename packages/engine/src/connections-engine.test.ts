@@ -83,7 +83,7 @@ function flowOf(
 	policy?: Policy,
 ): Flow {
 	return {
-		version: 4,
+		version: 5,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",

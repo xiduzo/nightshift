@@ -1,5 +1,5 @@
 {
-	"version": 4,
+	"version": 5,
 	"description": "One Feature: its Traces, blockers first, each on its own branch of the stack. Then the checkpoint: the validator verifies and tunes, the night waits for CI, the orchestrator steers, and a rule continues or halts the night.",
 	"inputs": [
 		{

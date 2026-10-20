@@ -148,7 +148,7 @@ function edge(
 }
 
 function flow(nodes: FlowNode[], edges: FlowEdge[], start = "worker"): Flow {
-	return { version: 4, inputs: [], outputs: [], start, nodes, edges };
+	return { version: 5, inputs: [], outputs: [], start, nodes, edges };
 }
 
 const errors = (issues: FlowIssue[]) =>
@@ -868,7 +868,7 @@ describe("parseFlow", () => {
 
 	test("turns schema errors into one issue per zod issue, with the path", () => {
 		const result = parseFlow({
-			version: 4,
+			version: 5,
 			start: "Worker",
 			nodes: [{ ...agent("worker"), model: "" }],
 			edges: [{ id: "a", from: "worker", outcome: "Maybe", to: "check" }],
@@ -1772,7 +1772,7 @@ describe("validateFlow: Call", () => {
 describe("parseFlow with options", () => {
 	test("passes the options to validateFlow", () => {
 		const json = {
-			version: 4,
+			version: 5,
 			start: "each",
 			nodes: [
 				{
@@ -1809,7 +1809,7 @@ describe("parseFlow with options", () => {
 		});
 		expect(parsed.issues).toEqual([]);
 		expect(parsed.flow).toMatchObject({
-			version: 4,
+			version: 5,
 			inputs: [{ name: "epic", type: "text", required: true }],
 			nodes: [{ prompt: "Epic {{epic}}" }],
 		});
@@ -2126,5 +2126,248 @@ describe("validateFlow: devices", () => {
 			flowSchema.safeParse(flow([agent("worker", { device: " " })], []))
 				.success,
 		).toBe(false);
+	});
+});
+
+describe("validateFlow: variables", () => {
+	/** worker → check → worker on fail, keeping each failure in a variable. */
+	function withVariables(
+		extra: { check?: Partial<CommandNode>; worker?: Partial<AgentNode> } = {},
+		variables: Flow["variables"] = [
+			{ name: "failures", type: "json", initial: "[]" },
+		],
+	): Flow {
+		return {
+			...flow(
+				[
+					agent("worker", {
+						prompt: "Earlier failures: {{vars.failures}}",
+						...extra.worker,
+					}),
+					command("check", {
+						set: [
+							{
+								variable: "failures",
+								on: ["fail"],
+								expression: "$append(vars.failures, check.log_tail)",
+							},
+						],
+						...extra.check,
+					}),
+				],
+				[
+					edge("work-done", "worker", "pass", "check"),
+					edge("retry", "check", "fail", "worker", 3),
+				],
+			),
+			variables,
+		};
+	}
+
+	const messages = (f: Flow) =>
+		validateFlow(f).map((issue) => `${issue.severity}: ${issue.message}`);
+
+	test("a loop that keeps its failures in a variable is valid", () => {
+		expect(validateFlow(withVariables())).toEqual([]);
+	});
+
+	test("a reference to a variable the flow does not have is an error", () => {
+		expect(
+			messages(withVariables({ worker: { prompt: "{{vars.nope}}" } })),
+		).toContain(
+			'error: The prompt of "worker" uses {{vars.nope}}, but the flow has no variable "nope".',
+		);
+	});
+
+	test("{{vars}} without a name and a path into a text variable are errors", () => {
+		const f = withVariables(
+			{ worker: { prompt: "{{vars}} {{vars.summary.x}} {{vars.failures.0}}" } },
+			[
+				{ name: "failures", type: "json", initial: "[]" },
+				{ name: "summary", type: "text" },
+			],
+		);
+		const found = messages(f);
+		expect(found).toContain(
+			'error: The prompt of "worker" uses {{vars}}, but vars needs a variable: {{vars.<name>}}.',
+		);
+		expect(found).toContain(
+			'error: The prompt of "worker" uses {{vars.summary.x}}, but the variable "summary" is text: it takes no path. Write {{vars.summary}}, or make it json.',
+		);
+		expect(found.some((m) => m.includes("vars.failures.0"))).toBe(false);
+	});
+
+	test("names: reserved, used twice, the same as an input or a node", () => {
+		const f: Flow = {
+			...withVariables({}, [
+				{ name: "failures", type: "json" },
+				{ name: "failures", type: "text" },
+				{ name: "vars", type: "text" },
+				{ name: "topic", type: "text" },
+				{ name: "check", type: "text" },
+			]),
+			inputs: [{ name: "topic", type: "text" }],
+		};
+		const found = messages(f);
+		expect(found).toContain(
+			'error: The variable "failures" is declared more than once.',
+		);
+		expect(found).toContain(
+			'error: The variable name "vars" is reserved. Pick another name.',
+		);
+		expect(found).toContain(
+			'error: The variable "topic" has the same name as an input. Rename one of them.',
+		);
+		expect(found).toContain(
+			'error: The variable "check" has the same name as the node "check". Rename one of them.',
+		);
+	});
+
+	test("a node named vars is reserved", () => {
+		expect(
+			messages(flow([agent("vars")], [], "vars")).filter((m) =>
+				m.startsWith("error"),
+			),
+		).toEqual([
+			'error: The node id "vars" is reserved. Give the node another id.',
+		]);
+	});
+
+	test("an initial value reads inputs and run only, fits its type, holds no secret", () => {
+		const f: Flow = {
+			...withVariables({}, [
+				{ name: "failures", type: "json", initial: "{{check.log_tail}}" },
+				{ name: "tries", type: "number", initial: "three" },
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, not a template literal
+				{ name: "token", type: "text", initial: "${GH_TOKEN}" },
+				{ name: "issue", type: "number", initial: "{{topic}}" },
+				{ name: "list", type: "text", schema: { type: "array" } },
+			]),
+			inputs: [{ name: "topic", type: "text" }],
+		};
+		const found = messages(f);
+		expect(found).toContain(
+			'error: The initial value of variable "failures" uses {{check.log_tail}}. It can read the inputs and run only: no step ran yet.',
+		);
+		expect(found).toContain(
+			'error: The initial value of variable "tries" does not fit: a number is needed, and the value is "three".',
+		);
+		expect(found).toContain(
+			'error: The initial value of variable "token" reads a secret. A variable is kept with the run, so it cannot hold a secret.',
+		);
+		expect(found).toContain(
+			'error: The variable "list" has a schema, but only a json variable takes one. Make it json, or remove the schema.',
+		);
+		expect(
+			found.some((m) => m.includes('"issue"') && m.startsWith("error")),
+		).toBe(false);
+	});
+
+	test("writes: a known variable, one of value and expression, known outcomes", () => {
+		const found = messages(
+			withVariables({
+				check: {
+					set: [
+						{ variable: "nope", value: "x" },
+						{ variable: "failures", value: "[]", expression: "[]" },
+						{ variable: "failures" },
+						{ variable: "failures", on: ["maybe"], value: "[]" },
+						{ variable: "failures", expression: "vars.other + (" },
+					],
+				},
+			}),
+		);
+		expect(found).toContain(
+			'error: "check" sets "nope", but the flow has no variable "nope". Add it under Variables.',
+		);
+		expect(found).toContain(
+			'error: "check" sets "failures" with a value and an expression. Keep one.',
+		);
+		expect(found).toContain(
+			'error: "check" sets "failures", but has no value or expression.',
+		);
+		expect(found).toContain(
+			'error: "check" sets "failures" on "maybe", but "check" ends with pass, fail.',
+		);
+		expect(
+			found.some((m) =>
+				m.startsWith(
+					'error: The expression of the write to "failures" on "check" is not valid:',
+				),
+			),
+		).toBe(true);
+	});
+
+	test("a write reads known names, fits its type and holds no secret", () => {
+		const found = messages(
+			withVariables(
+				{
+					check: {
+						set: [
+							{ variable: "tries", value: "many" },
+							{ variable: "tries", expression: "vars.nope + 1" },
+							// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, not a template literal
+							{ variable: "note", value: "${API_KEY}" },
+							{ variable: "note", value: "{{ghost.summary}}" },
+						],
+					},
+				},
+				[
+					{ name: "failures", type: "json" },
+					{ name: "tries", type: "number" },
+					{ name: "note", type: "text" },
+				],
+			),
+		);
+		expect(found).toContain(
+			'error: The value of the write to "tries" on "check" does not fit: a number is needed, and the value is "many".',
+		);
+		expect(found).toContain(
+			'error: The expression of the write to "tries" on "check" reads vars.nope, but the flow has no variable "nope".',
+		);
+		expect(found).toContain(
+			'error: "check" sets "note" from a secret. A variable is kept with the run, so it cannot hold a secret.',
+		);
+		expect(found).toContain(
+			'error: The value of the write to "note" on "check" uses {{ghost.summary}}, but there is no node or input "ghost".',
+		);
+	});
+
+	test("a rule may read vars, and an unknown variable in a rule is an error", () => {
+		const f = withVariables({
+			check: {
+				set: [
+					{ variable: "failures", expression: "$append(vars.failures, 1)" },
+				],
+			},
+		});
+		f.nodes.push(
+			decision("enough", ["stop", "again"], {
+				by: "rule",
+				options: [
+					{ name: "stop", when: "$count(vars.failures) >= 3 and vars.ghost" },
+					{ name: "again" },
+				],
+			}),
+		);
+		f.edges.push(edge("judge", "check", "pass", "enough"));
+		expect(messages(f).filter((m) => m.startsWith("error"))).toEqual([
+			'error: The rule of option "stop" of "enough" reads vars.ghost, but the flow has no variable "ghost".',
+		]);
+	});
+
+	test("a variable nothing sets or reads is a warning", () => {
+		expect(
+			warnings(
+				validateFlow(
+					withVariables({}, [
+						{ name: "failures", type: "json", initial: "[]" },
+						{ name: "idle", type: "text" },
+					]),
+				),
+			).map((issue) => issue.message),
+		).toEqual([
+			'The variable "idle" is never set or read. Set it on a node, or remove it.',
+		]);
 	});
 });

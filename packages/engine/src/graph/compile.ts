@@ -1,9 +1,23 @@
-import { END, START, StateGraph } from "@langchain/langgraph";
-import type { Flow } from "@nightshift/flows";
+import {
+	Command,
+	END,
+	type LangGraphRunnableConfig,
+	START,
+	StateGraph,
+} from "@langchain/langgraph";
+import { type Flow, initialVariables } from "@nightshift/flows";
 
-import type { StepContext } from "./context";
+import { dataProblem } from "../output-schema";
+import { type StepContext, templateContext } from "./context";
 import { kindOf } from "./node-kinds";
-import { askNodeId, parkNode, parkNodeId, waitNodeId } from "./route";
+import {
+	askNodeId,
+	parkCommand,
+	parkNode,
+	parkNodeId,
+	scopeOf,
+	waitNodeId,
+} from "./route";
 import { waitNode } from "./sleep";
 import { RunState } from "./state";
 
@@ -18,7 +32,9 @@ import { RunState } from "./state";
  * routes on the answer (the Gate). This module knows no node type: adding a
  * kind is adding its descriptor to the registry (`node-kinds.ts`). No
  * static edges besides START → `flow.start`: every node returns `new
- * Command({ update, goto })`, built by `route()`.
+ * Command({ update, goto })`, built by `route()`. A flow with variables
+ * starts at `vars__init` instead (`variablesNode`), which sets them and
+ * goes on to `flow.start`.
  *
  * The runner compiles once per run (`compileFlow(flow, ctx).compile({
  * checkpointer })`) with the thread id set to the run id. A Call node
@@ -58,8 +74,56 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 		graph.addNode(node.id, kind.make(node, ctx), { ends: [...ends, ...own] });
 		graph.addNode(park, parkNode(node), { ends: [node.id] });
 	}
-	graph.addEdge(START, flow.start as typeof START);
+	if ((flow.variables ?? []).length > 0) {
+		graph.addNode(VARIABLES_NODE, variablesNode(flow, ctx), {
+			ends: [flow.start, parkNodeId(flow.start)],
+		});
+		graph.addEdge(START, VARIABLES_NODE as typeof START);
+	} else {
+		graph.addEdge(START, flow.start as typeof START);
+	}
 	return graph;
+}
+
+/** The graph node that sets a flow's variables before its first step. */
+export const VARIABLES_NODE = "vars__init";
+
+/**
+ * Sets the flow's variables to their initial values (each `initial`
+ * rendered over the inputs and `run`), logs them (`VariablesSet`, in the
+ * flow's scope) and goes on to the start node. An initial value that does
+ * not fit parks the run as failed at the start node, before its step.
+ */
+function variablesNode(flow: Flow, ctx: StepContext) {
+	return async (
+		state: Parameters<typeof templateContext>[1],
+		config: LangGraphRunnableConfig,
+	): Promise<Command> => {
+		const result = initialVariables(
+			flow,
+			templateContext(ctx, state, config),
+			dataProblem,
+		);
+		const start = flow.nodes.find((node) => node.id === flow.start);
+		if (!result.ok) {
+			if (!start) throw new Error(result.error);
+			return parkCommand({
+				node: start,
+				status: "failed",
+				reason: result.error,
+				step: null,
+			});
+		}
+		await ctx.log.append({
+			type: "VariablesSet",
+			runId: ctx.run.id,
+			payload: { values: result.values, scope: scopeOf(config) },
+		});
+		return new Command({
+			update: { vars: result.values },
+			goto: flow.start,
+		});
+	};
 }
 
 export type FlowGraph = ReturnType<typeof compileFlow>;

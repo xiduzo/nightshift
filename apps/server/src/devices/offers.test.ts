@@ -95,7 +95,7 @@ function flowOnB(name: string, agent: Record<string, unknown>) {
 	writeFileSync(
 		join(dir, `${name}.json`),
 		JSON.stringify({
-			version: 4,
+			version: 5,
 			inputs: [],
 			outputs: [],
 			start: "work",

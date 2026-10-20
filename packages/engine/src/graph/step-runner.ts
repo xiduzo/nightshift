@@ -5,7 +5,12 @@ import {
 	agentSession,
 	step as stepTable,
 } from "@nightshift/db/schema/nightshift";
-import type { FlowNode, TemplateContext } from "@nightshift/flows";
+import {
+	applyVariableWrites,
+	type FlowNode,
+	type TemplateContext,
+	type VariableResult,
+} from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import type { Device } from "../device/types";
 import {
@@ -22,6 +27,7 @@ import {
 	type StepOutputs,
 	scopeKey,
 } from "../events";
+import { dataProblem } from "../output-schema";
 import { gitAuthorOf } from "../people";
 import { commandLogPath, transcriptPath } from "../transcripts";
 import type { StepEvent, StepOutcome } from "../types";
@@ -644,8 +650,30 @@ export async function beginStep(
 				},
 			};
 		},
-		async end(outcome, outputs, error, extra) {
+		async end(ended, endOutputs, endError, extra) {
 			leaveOpen();
+			// The node's writes, before `StepEnded`: a write that does not fit
+			// ends the step `error` instead, so the run parks and a person
+			// can fix the flow and resume.
+			let outcome = ended;
+			let outputs = endOutputs;
+			let error = endError;
+			const written = await writeVariables(
+				ctx,
+				node,
+				handle.tctx,
+				outcome,
+				outputs,
+			);
+			if (!written.ok) {
+				outcome = "error";
+				outputs = { ...outputs, outcome };
+				error = written.error;
+			}
+			const variables =
+				written.ok && Object.keys(written.values).length > 0
+					? written.values
+					: undefined;
 			await ctx.log.append({
 				type: "StepEnded",
 				runId,
@@ -654,6 +682,7 @@ export async function beginStep(
 					outcome,
 					outputs,
 					error,
+					...(variables ? { variables } : {}),
 					...(extra?.costUsd !== undefined ? { costUsd: extra.costUsd } : {}),
 					...(extra?.costSource !== undefined
 						? { costSource: extra.costSource }
@@ -677,11 +706,35 @@ export async function beginStep(
 				...(extra?.harnessSessionId !== undefined
 					? { harnessSessionId: extra.harnessSessionId }
 					: {}),
+				...(variables ? { variables } : {}),
 			};
 		},
 		leaveOpen,
 	};
 	return { kind: "step", step: handle };
+}
+
+/**
+ * The node's writes to its flow's variables for a step that ends with
+ * `outcome` (`applyVariableWrites`): over the step's template context, with
+ * the node's own outputs this step's, and a `json` variable held to its
+ * schema.
+ */
+function writeVariables(
+	ctx: StepContext,
+	node: FlowNode,
+	tctx: TemplateContext,
+	outcome: StepOutcome,
+	outputs: StepOutputs,
+): Promise<VariableResult> | VariableResult {
+	if (!node.set || node.set.length === 0) return { ok: true, values: {} };
+	return applyVariableWrites({
+		node,
+		variables: ctx.flow.variables ?? [],
+		outcome,
+		context: { ...tctx, nodes: { ...tctx.nodes, [node.id]: outputs } },
+		checkSchema: dataProblem,
+	});
 }
 
 /** Whether a Device id the log names is `device` (this computer has two ids: its own and the Walker's). */

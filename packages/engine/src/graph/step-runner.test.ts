@@ -43,6 +43,7 @@ const stateOf = (extra: Partial<RunStateValues> = {}): RunStateValues => ({
 	stopAt: null,
 	wrappingUp: false,
 	nodes: {},
+	vars: {},
 	visits: {},
 	traversals: {},
 	loops: {},

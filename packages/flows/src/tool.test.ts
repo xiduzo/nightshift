@@ -35,7 +35,7 @@ function command(id: string): CommandNode {
 
 function flowOf(nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow {
 	return {
-		version: 4,
+		version: 5,
 		inputs: [],
 		outputs: [],
 		start: nodes[0]?.id ?? "",
@@ -47,7 +47,7 @@ function flowOf(nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow {
 describe("the Tool node schema", () => {
 	test("parses with its connection, tool and arguments; arguments default to none", () => {
 		const parsed = flowSchema.parse({
-			version: 4,
+			version: 5,
 			start: "file",
 			nodes: [
 				{
@@ -66,7 +66,7 @@ describe("the Tool node schema", () => {
 	test("refuses an empty tool name and a connection that is not a name", () => {
 		const bad = (node: Record<string, unknown>) =>
 			flowSchema.safeParse({
-				version: 4,
+				version: 5,
 				start: "file",
 				nodes: [
 					{ id: "file", type: "tool", position: { x: 0, y: 0 }, ...node },
@@ -175,7 +175,7 @@ describe("validateFlow: Tool", () => {
 
 	test("a Tool node whose tool name is blank is an error", () => {
 		const { flow, issues } = parseFlow({
-			version: 4,
+			version: 5,
 			start: "file",
 			nodes: [
 				{

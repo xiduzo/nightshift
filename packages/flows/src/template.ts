@@ -7,8 +7,8 @@ import type { TemplateContext, TemplateRef } from "./types";
  * `run`); each path key matches `[A-Za-z0-9_-]+` (an object key, or an array
  * index). Anything else between braces is left as it is.
  *
- * Lookup: `run` → `context.run`; an input name → `context.inputs`; a node id
- * → `context.nodes`. A missing value renders as "". A string renders as is,
+ * Lookup: `run` → `context.run`; `vars` → `context.vars` (the flow's
+ * variables); an input name → `context.inputs`; a node id → `context.nodes`. A missing value renders as "". A string renders as is,
  * a number or boolean with String(), an object or array as JSON.
  */
 
@@ -39,6 +39,7 @@ export function lookupRef(
 ): JsonValue | undefined {
 	let value: JsonValue | undefined;
 	if (ref.name === "run") value = context.run;
+	else if (ref.name === "vars") value = context.vars ?? {};
 	else if (Object.hasOwn(context.inputs, ref.name))
 		value = context.inputs[ref.name];
 	else if (Object.hasOwn(context.nodes, ref.name))
@@ -73,6 +74,11 @@ export function renderTemplate(text: string, context: TemplateContext): string {
 	return text.replace(REF, (raw: string, name: string, keys: string) =>
 		asText(lookupRef(context, toRef(raw, name, keys))),
 	);
+}
+
+/** Whether the template is exactly one reference, whitespace around it allowed. */
+export function isOnlyRef(text: string): boolean {
+	return ONLY_REF.test(text);
 }
 
 /**

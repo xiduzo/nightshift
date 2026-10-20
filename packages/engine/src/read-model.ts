@@ -22,6 +22,7 @@ import {
 	deriveStopAt,
 	deriveTraversals,
 	deriveTrigger,
+	deriveVariableChanges,
 	deriveWarnings,
 	type LoggedEvent,
 	lastHarnessSession,
@@ -436,6 +437,7 @@ export function toRunDetail(
 		takeOverCommand: takeOverCommand(row.worktreePath, last, harnessOf),
 		resumes: deriveResumes(events),
 		commands,
+		variables: deriveVariableChanges(events),
 		handOffs: events.flatMap((e) =>
 			e.type === "HandedOff"
 				? [

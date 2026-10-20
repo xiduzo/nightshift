@@ -1,5 +1,5 @@
 {
-	"version": 4,
+	"version": 5,
 	"description": "An agent splits your goal into small tasks. Night Shift builds and checks each task on top of the one before. An agent then reviews the result.",
 	"inputs": [
 		{

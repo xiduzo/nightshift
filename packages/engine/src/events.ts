@@ -270,6 +270,20 @@ export type EnginePayloads = {
 		 * is not known. Absent in older logs, and when nothing was asked.
 		 */
 		costSource?: CostSource | null;
+		/**
+		 * The variables the step's writes (`set`) changed, by name. Absent
+		 * when it wrote none. In `StepEnded`, so a step never ends without
+		 * its writes, or the reverse.
+		 */
+		variables?: Record<string, JsonValue>;
+	};
+	/**
+	 * The variables of a flow when it starts (each `initial`), in the scope
+	 * the flow runs in: null at the top level of the run.
+	 */
+	VariablesSet: {
+		values: Record<string, JsonValue>;
+		scope: Scope | null;
 	};
 	/**
 	 * A Gate step asks a person and waits. The step stays open until a person
@@ -1128,6 +1142,83 @@ export function deriveNodeOutputs(
 		}
 	}
 	return nodes;
+}
+
+/**
+ * The variables of one scope (default: the top level) as the log has them:
+ * the values the flow started with, then each step's writes in order.
+ */
+export function deriveVariables(
+	events: readonly LoggedEvent[],
+	key = "",
+): Record<string, JsonValue> {
+	let values: Record<string, JsonValue> = {};
+	const inScope = new Set<string>();
+	for (const e of bySeq(events)) {
+		if (e.type === "VariablesSet") {
+			if (scopeKey(e.payload.scope) === key) {
+				values = { ...values, ...e.payload.values };
+			}
+		} else if (e.type === "StepStarted" && e.stepId) {
+			if (scopeKey(e.payload.scope) === key) inScope.add(e.stepId);
+		} else if (
+			e.type === "StepEnded" &&
+			e.stepId &&
+			inScope.has(e.stepId) &&
+			e.payload.variables
+		) {
+			values = { ...values, ...e.payload.variables };
+		}
+	}
+	return values;
+}
+
+/** One value a variable took in a run, from the log. */
+export type VariableChange = {
+	/** The flow invocation the variable belongs to: null for the run's top-level flow. */
+	scope: Scope | null;
+	name: string;
+	value: JsonValue;
+	/** The step whose write set it; null for the value the flow started with. */
+	stepId: string | null;
+	at: number;
+};
+
+/**
+ * Every value each variable took, in every scope, oldest first: the values
+ * each flow started with (`VariablesSet`), then each step's writes.
+ */
+export function deriveVariableChanges(
+	events: readonly LoggedEvent[],
+): VariableChange[] {
+	const changes: VariableChange[] = [];
+	const scopeOfStep = new Map<string, Scope | null>();
+	for (const e of bySeq(events)) {
+		if (e.type === "VariablesSet") {
+			for (const [name, value] of Object.entries(e.payload.values)) {
+				changes.push({
+					scope: e.payload.scope ?? null,
+					name,
+					value,
+					stepId: null,
+					at: e.at,
+				});
+			}
+		} else if (e.type === "StepStarted" && e.stepId) {
+			scopeOfStep.set(e.stepId, e.payload.scope ?? null);
+		} else if (e.type === "StepEnded" && e.stepId && e.payload.variables) {
+			for (const [name, value] of Object.entries(e.payload.variables)) {
+				changes.push({
+					scope: scopeOfStep.get(e.stepId) ?? null,
+					name,
+					value,
+					stepId: e.stepId,
+					at: e.at,
+				});
+			}
+		}
+	}
+	return changes;
 }
 
 /** How many visits of the node (in one scope, default the top level) the run started so far. */

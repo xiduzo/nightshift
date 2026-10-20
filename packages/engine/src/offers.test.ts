@@ -188,7 +188,7 @@ describe("another Person's run on the computer that walks it", () => {
 	const carol = "person-carol";
 
 	const flow = (prompt: string, extra: Record<string, unknown> = {}): Flow => ({
-		version: 4,
+		version: 5,
 		inputs: [],
 		outputs: [],
 		start: "work",
@@ -395,7 +395,7 @@ describe("a schedule that fires on another Person's Device", () => {
 			repoPath: sandbox.repoPath,
 		});
 		await owner.saveFlow(projectId, "night", {
-			version: 4,
+			version: 5,
 			inputs: [],
 			outputs: [],
 			start: "work",

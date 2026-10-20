@@ -9,4 +9,5 @@ export * from "./schema";
 export * from "./template";
 export type * from "./types";
 export * from "./validate";
+export * from "./variables";
 export * from "./walk";

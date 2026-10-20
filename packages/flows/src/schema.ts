@@ -10,11 +10,13 @@ import { z } from "zod";
  * migrate on load (`migrateFlow`).
  */
 
-export const FLOW_VERSION = 4;
+export const FLOW_VERSION = 5;
 
 /**
- * A node id or an input name. Both are names in templates (`{{check.log_tail}}`,
- * `{{epic}}`) and share one namespace per flow. `run` is reserved.
+ * A node id, an input name or a variable name. Node ids and inputs are names
+ * in templates (`{{check.log_tail}}`, `{{epic}}`) and share one namespace per
+ * flow. Variables are read under `vars` (`{{vars.tries}}`). `run` and `vars`
+ * are reserved.
  */
 export const nameSchema = z
 	.string()
@@ -51,8 +53,8 @@ export const reservedOutcomes = [
 	"waiting",
 ] as const;
 
-/** Names a flow may not use for a node or an input. */
-export const reservedNames = ["run"] as const;
+/** Names a flow may not use for a node, an input or a variable. */
+export const reservedNames = ["run", "vars"] as const;
 
 /**
  * A CLI tool: the name of a program on this computer, as a shell finds it
@@ -211,6 +213,24 @@ const placed = { device: deviceNameSchema.optional() };
 /** A template string per input name of the called flow. */
 const bindings = z.record(nameSchema, z.string());
 
+/**
+ * One write of a node to a variable of its flow, applied once when the
+ * node's step ends (`set` on every node). Exactly one of `value` and
+ * `expression` (the validator checks it). The node's own id reads the step
+ * that just ended. A step that ends `stopped`, `error` or `interrupted`
+ * writes nothing.
+ */
+export const variableWriteSchema = z.object({
+	/** The variable, by name. */
+	variable: nameSchema,
+	/** A template: `{{deliver.data.url}}`. One reference keeps its JSON value. */
+	value: z.string().optional(),
+	/** A JSONata expression over the run's values, `vars` included: `vars.tries + 1`. */
+	expression: z.string().optional(),
+	/** The outcomes that write. Unset: every outcome the step routes on. */
+	on: z.array(labelSchema).optional(),
+});
+
 const nodeBase = {
 	id: nodeIdSchema,
 	/** Display name in the editor. Defaults to the id. */
@@ -218,6 +238,8 @@ const nodeBase = {
 	position,
 	/** Wall-clock budget for one visit. The step fails when it runs out. */
 	timeoutMinutes: z.number().int().positive().optional(),
+	/** Writes to the flow's variables when the step ends, in order. */
+	set: z.array(variableWriteSchema).optional(),
 };
 
 export const agentNodeSchema = z.object({
@@ -707,11 +729,38 @@ export const flowOutputSchema = z.object({
 	description: z.string().optional(),
 });
 
+/**
+ * The type of a variable. `json` is any JSON value, held to `schema` when
+ * the variable has one.
+ */
+export const variableTypeSchema = z.enum(["text", "number", "boolean", "json"]);
+
+/**
+ * A named, typed value the flow keeps while it runs, like a local variable
+ * of a function. Each invocation of the flow (a run's top-level flow, a
+ * Call, each element of a Call with `each`) has its own. Nodes read it as
+ * `{{vars.<name>}}` and change it with `set`.
+ */
+export const flowVariableSchema = z.object({
+	name: nameSchema,
+	type: variableTypeSchema.default("text"),
+	/** `json` only: a JSON Schema every value must match. */
+	schema: jsonSchemaSchema.optional(),
+	/**
+	 * A template, rendered when the flow starts: it reads the inputs and
+	 * `run`, never a node. Text is read as the type. Unset: null.
+	 */
+	initial: z.string().optional(),
+	description: z.string().optional(),
+});
+
 export const flowSchema = z.object({
 	version: z.literal(FLOW_VERSION),
 	description: z.string().optional(),
 	inputs: z.array(flowInputSchema).default([]),
 	outputs: z.array(flowOutputSchema).default([]),
+	/** Optional, so a flow without variables keeps its file as it is. */
+	variables: z.array(flowVariableSchema).optional(),
 	/** Used when this flow is the top-level flow of a run. */
 	policy: policySchema.optional(),
 	/** The node the flow starts at. */
@@ -747,6 +796,9 @@ export type ResolvedPolicy = Required<
 	Pick<Policy, "maxSteps" | "resumeInterruptedRuns">;
 export type FlowInputDef = z.infer<typeof flowInputSchema>;
 export type FlowOutputDef = z.infer<typeof flowOutputSchema>;
+export type FlowVariableDef = z.infer<typeof flowVariableSchema>;
+export type VariableType = z.infer<typeof variableTypeSchema>;
+export type VariableWrite = z.infer<typeof variableWriteSchema>;
 export type FlowEdge = z.infer<typeof flowEdgeSchema>;
 export type Outcome = z.infer<typeof outcomeSchema>;
 export type FlowNodeType = FlowNode["type"];

@@ -3,7 +3,7 @@ import {
 	END,
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
-import { type FlowNode, nextEdge } from "@nightshift/flows";
+import { type FlowNode, type JsonValue, nextEdge } from "@nightshift/flows";
 
 import type { Scope, StepOutputs } from "../events";
 import type { StepOutcome } from "../types";
@@ -43,6 +43,8 @@ export type StepEnd = {
 	error: string | null;
 	/** Agent steps: the harness session the step has, for a reopen. */
 	harnessSessionId?: string | null;
+	/** The variables the step's writes changed (`StepEnded.variables`). */
+	variables?: Record<string, JsonValue>;
 };
 
 /**
@@ -129,6 +131,7 @@ export async function route(
 	const update: RunStateUpdate = {
 		...extra,
 		nodes: { [node.id]: end.outputs },
+		...(end.variables ? { vars: end.variables } : {}),
 		visits: { [node.id]: visit },
 		pending: null,
 	};

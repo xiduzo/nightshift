@@ -155,7 +155,7 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 				return route(ctx, state, node, result, config);
 			}
 			case "finished": {
-				const outputs = await bodyOutputs(ctx, body, ended.nodes);
+				const outputs = await bodyOutputs(ctx, body, ended);
 				const result = await end(
 					"pass",
 					{

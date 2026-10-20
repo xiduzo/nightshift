@@ -17,7 +17,7 @@ import type {
 import type { DeviceRegistry } from "./device/registry";
 import type { WorkRelay } from "./device/remote";
 import type { Device } from "./device/types";
-import type { GateChoice, RunWarningKind } from "./events";
+import type { GateChoice, RunWarningKind, VariableChange } from "./events";
 import type { ArchiveRef } from "./exchange/archive";
 import type { RunCommandInput, RunCommandKind } from "./exchange/commands";
 import type { EngineExchange } from "./exchange/engine-exchange";
@@ -331,6 +331,8 @@ export type RunDetail = RunSummary & {
 	commands: PendingCommand[];
 	/** The run's work moving between Devices (`HandedOff`), oldest first. */
 	handOffs: HandOff[];
+	/** Every value each variable took, in every flow the run ran, oldest first. */
+	variables: VariableChange[];
 };
 
 /** The run's work moved from one Device to another before a step there. */

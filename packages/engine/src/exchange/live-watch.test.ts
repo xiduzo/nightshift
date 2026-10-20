@@ -46,7 +46,7 @@ function engineOf(sandbox: Sandbox): Engine {
 /** One command that prints, waits for a file, and prints again. */
 function slowFlow(marker: string): Flow {
 	return {
-		version: 4,
+		version: 5,
 		inputs: [],
 		outputs: [],
 		start: "build",

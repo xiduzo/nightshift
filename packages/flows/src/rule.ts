@@ -5,7 +5,7 @@ import type { TemplateContext } from "./types";
 /**
  * Rules: the `when` of a Decision option, a JSONata expression over the
  * same values templates see. The context is one object whose top-level
- * keys are `run`, every input name and every node id, so
+ * keys are `run`, `vars`, every input name and every node id, so
  * `build.data.tests_passed = true and check.exit_code = 0` reads the
  * outputs of the nodes `build` and `check`. A name JSONata cannot take
  * bare (one with `-`) goes in backticks: `` `my-input` = "x" ``.
@@ -17,7 +17,12 @@ import type { TemplateContext } from "./types";
 export function ruleContext(
 	context: TemplateContext,
 ): Record<string, JsonValue> {
-	return { ...context.nodes, ...context.inputs, run: context.run };
+	return {
+		...context.nodes,
+		...context.inputs,
+		run: context.run,
+		vars: context.vars ?? {},
+	};
 }
 
 /** JSONata's own idea of true: `$boolean(value)`. */
@@ -97,7 +102,7 @@ export function ruleProblem(expr: string): string | null {
 }
 
 /** JSONata throws plain objects with a `message`, not Errors. */
-function ruleMessage(error: unknown): string {
+export function ruleMessage(error: unknown): string {
 	if (
 		typeof error === "object" &&
 		error !== null &&
@@ -123,6 +128,45 @@ export function ruleNames(expr: string): string[] {
 	}
 	const names = new Set<string>();
 	walk(ast, names, true);
+	return [...names];
+}
+
+/**
+ * The variables a rule reads (`tries` in `vars.tries + 1`), best effort
+ * from JSONata's AST: the name right after a top-level `vars`.
+ */
+export function ruleVariableNames(expr: string): string[] {
+	let ast: unknown;
+	try {
+		ast = jsonata(expr).ast();
+	} catch {
+		return [];
+	}
+	const names = new Set<string>();
+	const visit = (node: unknown): void => {
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (typeof node !== "object" || node === null) return;
+		const ast = node as AstNode;
+		if (ast.type === "path" && Array.isArray(ast.steps)) {
+			const [first, second] = ast.steps;
+			if (
+				first?.type === "name" &&
+				first.value === "vars" &&
+				second?.type === "name" &&
+				typeof second.value === "string"
+			) {
+				names.add(second.value);
+			}
+		}
+		for (const [key, value] of Object.entries(ast)) {
+			if (key === "type" || key === "value" || key === "position") continue;
+			visit(value);
+		}
+	};
+	visit(ast);
 	return [...names];
 }
 

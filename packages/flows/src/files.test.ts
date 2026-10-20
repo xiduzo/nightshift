@@ -212,19 +212,19 @@ describe("version 1 files", () => {
 		const loaded = await readFlowFile(repo, "old");
 		expect(loaded.issues).toEqual([]);
 		expect(loaded.flow).toMatchObject({
-			version: 4,
+			version: 5,
 			inputs: [{ name: "epic", type: "text", required: true }],
 			outputs: [],
 			nodes: [{ prompt: "Build Epic {{epic}}" }],
 		});
-		expect((await loadAllFlows(repo)).old?.version).toBe(4);
+		expect((await loadAllFlows(repo)).old?.version).toBe(5);
 		expect(await listFlowFiles(repo)).toEqual([
 			expect.objectContaining({ name: "old", errorCount: 0, nodeCount: 1 }),
 		]);
 		expect(await readFile(path, "utf8")).toBe(text);
 	});
 
-	test("writing a read flow saves version 4", async () => {
+	test("writing a read flow saves the current version", async () => {
 		await mkdir(flowsDir(repo), { recursive: true });
 		await writeFile(join(flowsDir(repo), "old.json"), JSON.stringify(v1));
 		const loaded = await readFlowFile(repo, "old");
@@ -233,7 +233,7 @@ describe("version 1 files", () => {
 		const saved = JSON.parse(
 			await readFile(join(flowsDir(repo), "old.json"), "utf8"),
 		);
-		expect(saved.version).toBe(4);
+		expect(saved.version).toBe(5);
 		expect(saved).not.toHaveProperty("params");
 		expect(saved.inputs).toEqual([
 			{ name: "epic", type: "text", required: true },
@@ -249,7 +249,7 @@ describe("calls between flow files", () => {
 
 	/** One Call node with `each` running `called`. */
 	const outer = (called: string): Flow => ({
-		version: 4,
+		version: 5,
 		inputs: [],
 		outputs: [],
 		start: "each",

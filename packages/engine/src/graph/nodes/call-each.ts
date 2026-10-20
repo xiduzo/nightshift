@@ -415,7 +415,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				return next(element);
 			}
 			case "finished": {
-				const outputs = await bodyOutputs(ctx, body, ended.nodes);
+				const outputs = await bodyOutputs(ctx, body, ended);
 				if (haltOn.includes(ended.outcome)) {
 					await endItem(
 						element.facts.id,

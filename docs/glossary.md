@@ -79,7 +79,9 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Edge | A link from a Node to the next Node, taken on one Outcome. | PLAN §2 |
 | Max | How often a Run may take an Edge. Every loop needs an Edge with a Max. | Slice 2 |
 | Retry Loop | An Edge back to an earlier Node, bounded by a Max. | PLAN §2 |
-| Template Variable | A reference to a value in a prompt or command: a Node output, an Input, or a Run field, with an optional JSON path, for example `{{check.log_tail}}`, `{{item.parent.number}}`, or `{{run.branch}}`. | PLAN §3 |
+| Template Variable | A reference to a value in a prompt or command: a Node output, an Input, a Variable, or a Run field, with an optional JSON path, for example `{{check.log_tail}}`, `{{item.parent.number}}`, `{{vars.tries}}`, or `{{run.branch}}`. | PLAN §3 |
+| Variable | A named, typed value a Flow keeps while it runs, like a local variable of a function: text, number, yes or no, or JSON (with an optional schema). Declared on the Flow with an initial value, a template over the Inputs and `run`. Read as `{{vars.name}}`, and as `vars.name` in a Rule. Changed by a Node's Variable writes when its Step ends. Each Flow invocation has its own: the Run's top-level Flow, each Call, each Item. | Variables |
+| Variable write | One entry in a Node's `set`: a Variable, a template or a JSONata expression, and the Outcomes it writes on. Applied in order when the Step ends, and logged in `StepEnded`. A value that does not fit the Variable's type ends the Step `error`. | Variables |
 | Output | A named value a Step leaves for later Nodes, for example `summary` or `exit_code`. | Slice 2 |
 | Issue | One problem the validator finds in a Flow. A Flow with an error cannot run. | Slice 2 |
 | Run | One walk of a Flow in its own Worktree, driven as one Thread. It keeps a copy of the Flow from its start. | Slice 2 |

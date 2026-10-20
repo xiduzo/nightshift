@@ -300,7 +300,7 @@ export function createRecorders(input: { db: Database; bus: RunBus }) {
 	};
 }
 
-/** Templates of a node read the state's node outputs, the inputs and the run. */
+/** Templates of a node read the state's node outputs, the inputs, the variables and the run. */
 export function templateContext(
 	ctx: StepContext,
 	state: RunStateValues,
@@ -312,6 +312,7 @@ export function templateContext(
 	return {
 		nodes: state.nodes,
 		inputs: state.inputs,
+		vars: state.vars,
 		run: {
 			...fields,
 			worktree: ctx.run.worktreePath,

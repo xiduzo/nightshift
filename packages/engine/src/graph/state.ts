@@ -12,7 +12,7 @@ import type { StepOutcome, TranscriptEntry } from "../types";
  * while it runs (`RunEvent`, the `custom` stream mode).
  *
  * The event log stays the read model (design rule 3). The state here is the
- * walk's own bookkeeping: node outputs for templates, visit and edge counts,
+ * walk's own bookkeeping: node outputs and variables for templates, visit and edge counts,
  * Call cursors (`each`), and the step a park or a wait left pending, so that the
  * node the run re-enters continues the same step and harness session.
  * The log keeps the facts a person reads and the ones crash recovery
@@ -183,6 +183,13 @@ export const RunState = z.object({
 	}),
 	/** `StepEnded.outputs` of each node's latest ended visit, for templates. */
 	nodes: mergedRecord<StepOutputs>(),
+	/**
+	 * The flow's variables, by name: the values it started with
+	 * (`VariablesSet`), then each step's writes (`StepEnded.variables`). A
+	 * body has its own: each invocation of a flow starts from its own
+	 * declaration.
+	 */
+	vars: mergedRecord<JsonValue>(),
 	/**
 	 * Visits of each node this graph committed. The log counts one more for
 	 * a step the node started and did not commit yet (a step that runs, a

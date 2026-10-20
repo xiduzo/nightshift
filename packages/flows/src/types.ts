@@ -16,6 +16,8 @@ export type TemplateContext = {
 	/** The flow's input values, by name. */
 	inputs: Record<string, JsonValue>;
 	run: Record<RunField, string>;
+	/** The flow's variables, by name: `{{vars.tries}}`. Absent: the flow has none. */
+	vars?: Record<string, JsonValue>;
 };
 
 /**
@@ -56,7 +58,7 @@ export type ValidateOptions = {
 
 /**
  * One reference found in a template: `{{name.path.to.value}}`. `name` is a
- * node id, an input, or `run`; `path` may be empty (`{{epic}}`). Path keys
+ * node id, an input, `run`, or `vars`; `path` may be empty (`{{epic}}`). Path keys
  * are object keys or array indexes.
  */
 export type TemplateRef = { name: string; path: string[]; raw: string };

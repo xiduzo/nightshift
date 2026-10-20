@@ -17,6 +17,11 @@
  * Version 3 → 4 (`migrateCallNodes`): a Subflow node is a Call node, and a
  * For Each node a Call node with `each`.
  *
+ * Version 4 → 5: a flow can have variables (`variables`, `set`), read as
+ * `{{vars.x}}`. Nothing to change: the version says an older Night Shift
+ * cannot run the file, instead of dropping its variables. A node or an
+ * input named `vars` is a validation error from now on.
+ *
  * Any version:
  * - The built-in tool set `tools: ["github"]` → the CLI tool `clis: ["gh"]`
  *   (see `migrateToolSets`).
@@ -31,6 +36,9 @@ export function migrateFlow(json: unknown): unknown {
 	}
 	if (isRecord(current) && current.version === 3) {
 		current = migrateCallNodes(current);
+	}
+	if (isRecord(current) && current.version === 4) {
+		current = { ...current, version: 5 };
 	}
 	if (!isRecord(current) || !Array.isArray(current.nodes)) return current;
 	let changed = false;
