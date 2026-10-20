@@ -11,7 +11,6 @@ import {
 	AlertDialogTitle,
 } from "@nightshift/ui/components/alert-dialog";
 import { Badge } from "@nightshift/ui/components/badge";
-import { Button } from "@nightshift/ui/components/button";
 import { Checkbox } from "@nightshift/ui/components/checkbox";
 import {
 	Field,
@@ -23,15 +22,6 @@ import {
 	FieldTitle,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemMedia,
-	ItemTitle,
-} from "@nightshift/ui/components/item";
 import {
 	NativeSelect,
 	NativeSelectOption,
@@ -46,14 +36,7 @@ import {
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import {
-	BotIcon,
-	CircleAlertIcon,
-	ShareIcon,
-	SquareTerminalIcon,
-	WorkflowIcon,
-} from "lucide-react";
+import { BotIcon, CircleAlertIcon, SquareTerminalIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { offerQueries } from "@/features/devices/queries";
@@ -68,13 +51,14 @@ import type {
 	ProfileInput,
 	ProfileRow,
 } from "@/shared/api";
-import { EFFORTS, PERMISSION_MODES, permissionLabel } from "./agent-options";
+import { EFFORTS, PERMISSION_MODES } from "./agent-options";
 import { CliCheckBadge } from "./connections/cli-panel";
 import { KindBadge } from "./connections/parts";
 import { DetailSection, DetailShell } from "./detail-shell";
 import { harnessInfo } from "./harnesses";
 import { ModelCombobox, ModelSourceHint } from "./model-combobox";
 import { OfferDialog, WithdrawOfferDialog } from "./offer-dialog";
+import { ProfileOffers, ProfileUsedIn } from "./profile-sections";
 import { harnessQueries, profileMutations, profileQueries } from "./queries";
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
@@ -496,95 +480,14 @@ export function ProfileDetail({
 				</div>
 			</DetailSection>
 
-			<DetailSection
-				title="Used in flows"
-				description="Agent nodes that use this profile. Your changes apply from their next run."
-			>
-				{usedBy.length === 0 ? (
-					<p className="text-muted-foreground text-sm">No flow uses it yet.</p>
-				) : (
-					<ItemGroup className="gap-1">
-						{usedBy.map((use) => (
-							<Item
-								key={`${use.projectId}/${use.flowName}`}
-								size="xs"
-								variant="outline"
-								render={
-									<Link
-										to="/projects/$projectId/flows/$name"
-										params={{ projectId: use.projectId, name: use.flowName }}
-									/>
-								}
-							>
-								<ItemMedia variant="icon">
-									<WorkflowIcon />
-								</ItemMedia>
-								<ItemContent>
-									<ItemTitle>
-										<span className="text-muted-foreground">
-											{use.projectName} /
-										</span>
-										<span className="font-mono">{use.flowName}</span>
-									</ItemTitle>
-									<ItemDescription className="font-mono text-xs">
-										{use.nodeIds.join(", ")}
-									</ItemDescription>
-								</ItemContent>
-							</Item>
-						))}
-					</ItemGroup>
-				)}
-			</DetailSection>
+			<ProfileUsedIn usedBy={usedBy} />
 
 			{profile ? (
-				<DetailSection
-					title="Offered to Spaces"
-					description="People in these Spaces can run this profile on this computer, with your login and your tools."
-				>
-					{offered.length === 0 ? (
-						<div className="flex flex-wrap items-center gap-3">
-							<p className="text-muted-foreground text-sm">Only you run it.</p>
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => setOffering(true)}
-							>
-								<ShareIcon data-icon="inline-start" />
-								Offer to a Space…
-							</Button>
-						</div>
-					) : (
-						<ItemGroup className="gap-1">
-							{offered.map((offer) => (
-								<Item key={offer.spaceId} size="xs" variant="outline">
-									<ItemContent>
-										<ItemTitle>
-											{offer.spaceName}
-											{offer.listed ? null : (
-												<Badge variant="outline">Withdrawn in the Space</Badge>
-											)}
-										</ItemTitle>
-										<ItemDescription className="text-xs">
-											{permissionLabel(offer.permissionCap)} at most.{" "}
-											{offer.sessionCap === 1
-												? "One session at once."
-												: `${offer.sessionCap} sessions at once.`}
-										</ItemDescription>
-									</ItemContent>
-									<ItemActions>
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() => setWithdrawing(offer)}
-										>
-											Withdraw
-										</Button>
-									</ItemActions>
-								</Item>
-							))}
-						</ItemGroup>
-					)}
-				</DetailSection>
+				<ProfileOffers
+					offered={offered}
+					onOffer={() => setOffering(true)}
+					onWithdraw={setWithdrawing}
+				/>
 			) : null}
 
 			{profile ? (
