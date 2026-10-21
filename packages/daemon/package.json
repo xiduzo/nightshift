@@ -1,0 +1,33 @@
+{
+	"name": "@nightshift/daemon",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"check-types": "tsc -b ../api && tsc --noEmit",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@hocuspocus/provider": "^4.7.1",
+		"@hocuspocus/server": "^4.7.1",
+		"@nightshift/agents": "workspace:*",
+		"@nightshift/api": "workspace:*",
+		"@nightshift/auth": "workspace:*",
+		"@nightshift/db": "workspace:*",
+		"@nightshift/engine": "workspace:*",
+		"@orpc/client": "catalog:",
+		"@orpc/openapi": "catalog:",
+		"@orpc/server": "catalog:",
+		"@orpc/zod": "catalog:",
+		"drizzle-orm": "catalog:",
+		"hono": "^4.13.7",
+		"y-protocols": "catalog:",
+		"yjs": "catalog:"
+	},
+	"devDependencies": {
+		"@nightshift/config": "workspace:*",
+		"@types/bun": "catalog:",
+		"typescript": "catalog:"
+	}
+}

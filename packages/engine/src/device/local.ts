@@ -47,7 +47,7 @@ import type {
 /**
  * Everything on this computer a step body may touch: the harnesses, the
  * decider, the MCP connections with their secrets, the CLI tools, `sh -c`
- * and git worktrees. `services.ts` wires it from the daemon's stores; a
+ * and git worktrees. `createDaemon` (`@nightshift/daemon`) wires it from the daemon's stores; a
  * test wires it over fakes.
  */
 export type LocalDeviceDeps = {

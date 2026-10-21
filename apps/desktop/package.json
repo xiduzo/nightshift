@@ -18,8 +18,7 @@
 		"typescript": "catalog:"
 	},
 	"dependencies": {
-		"@nightshift/db": "workspace:*",
-		"fix-path": "^5.0.0",
-		"server": "workspace:*"
+		"@nightshift/daemon": "workspace:*",
+		"fix-path": "^5.0.0"
 	}
 }

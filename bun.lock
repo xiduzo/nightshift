@@ -20,9 +20,8 @@
     "apps/desktop": {
       "name": "desktop",
       "dependencies": {
-        "@nightshift/db": "workspace:*",
+        "@nightshift/daemon": "workspace:*",
         "fix-path": "^5.0.0",
-        "server": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -34,30 +33,24 @@
     "apps/server": {
       "name": "server",
       "dependencies": {
-        "@hocuspocus/provider": "^4.7.1",
-        "@hocuspocus/server": "^4.7.1",
         "@nightshift/agents": "workspace:*",
         "@nightshift/api": "workspace:*",
         "@nightshift/auth": "workspace:*",
+        "@nightshift/daemon": "workspace:*",
         "@nightshift/db": "workspace:*",
-        "@nightshift/engine": "workspace:*",
         "@orpc/client": "catalog:",
-        "@orpc/openapi": "catalog:",
-        "@orpc/server": "catalog:",
-        "@orpc/zod": "catalog:",
         "better-auth": "catalog:",
-        "hono": "^4.13.7",
         "libsql": "catalog:",
         "varlock": "catalog:",
-        "y-protocols": "catalog:",
-        "yjs": "catalog:",
-        "zod": "catalog:",
       },
       "devDependencies": {
+        "@hocuspocus/provider": "^4.7.1",
         "@nightshift/config": "workspace:*",
+        "@nightshift/engine": "workspace:*",
         "@types/bun": "catalog:",
         "tsdown": "^0.23.0",
         "typescript": "catalog:",
+        "yjs": "catalog:",
       },
     },
     "apps/web": {
@@ -175,6 +168,31 @@
     "packages/config": {
       "name": "@nightshift/config",
       "version": "0.0.0",
+    },
+    "packages/daemon": {
+      "name": "@nightshift/daemon",
+      "dependencies": {
+        "@hocuspocus/provider": "^4.7.1",
+        "@hocuspocus/server": "^4.7.1",
+        "@nightshift/agents": "workspace:*",
+        "@nightshift/api": "workspace:*",
+        "@nightshift/auth": "workspace:*",
+        "@nightshift/db": "workspace:*",
+        "@nightshift/engine": "workspace:*",
+        "@orpc/client": "catalog:",
+        "@orpc/openapi": "catalog:",
+        "@orpc/server": "catalog:",
+        "@orpc/zod": "catalog:",
+        "drizzle-orm": "catalog:",
+        "hono": "^4.13.7",
+        "y-protocols": "catalog:",
+        "yjs": "catalog:",
+      },
+      "devDependencies": {
+        "@nightshift/config": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
     },
     "packages/db": {
       "name": "@nightshift/db",
@@ -560,6 +578,8 @@
     "@nightshift/auth": ["@nightshift/auth@workspace:packages/auth"],
 
     "@nightshift/config": ["@nightshift/config@workspace:packages/config"],
+
+    "@nightshift/daemon": ["@nightshift/daemon@workspace:packages/daemon"],
 
     "@nightshift/db": ["@nightshift/db@workspace:packages/db"],
 

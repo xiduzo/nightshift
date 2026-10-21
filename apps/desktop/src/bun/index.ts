@@ -6,8 +6,8 @@ import Electrobun, {
 	Utils,
 } from "electrobun/main";
 
-import { type Daemon, PortTakenError, startDaemon } from "./daemon";
-import { startUpdates } from "./updates";
+import { type Daemon, PortTakenError, startDaemon } from "../features/daemon";
+import { startUpdates } from "../features/updates";
 
 const APP_NAME = "Night Shift";
 const WEB_DEV_SERVER_URL = "http://localhost:3001";

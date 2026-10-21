@@ -3,7 +3,6 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
-		"./lease": "./src/lease.ts",
 		"./testing": "./src/testing/index.ts"
 	},
 	"scripts": {

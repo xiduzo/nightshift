@@ -2,17 +2,10 @@ import { dirname, join } from "node:path";
 
 import type { ElectrobunConfig } from "electrobun";
 
-import { UPDATE_FEEDS } from "./src/bun/update-feeds";
+// The feeds only (pure data): the barrel of updates loads electrobun/main.
+import { UPDATE_FEEDS } from "./src/features/updates/update-feeds";
 
 const webBuildDir = "../web/dist/client";
-// The packaged app has no .env files and no varlock CLI (see the shims).
-const varlockShims = {
-	"varlock/auto-load": Bun.resolveSync(
-		"server/shims/varlock-auto-load",
-		import.meta.dir,
-	),
-	"varlock/env": Bun.resolveSync("server/shims/varlock-env", import.meta.dir),
-};
 
 /**
  * libsql loads its native binary from `@libsql/<platform>` at run time, which
@@ -61,7 +54,6 @@ export default {
 		mainProcess: "bun",
 		bun: {
 			entrypoint: "src/bun/index.ts",
-			alias: varlockShims,
 			// An optional peer of @tanstack/ai-sandbox, imported only when used.
 			external: ["@tanstack/ai-persistence"],
 		},
@@ -70,7 +62,7 @@ export default {
 			// `@nightshift/db` finds its migrations next to the module that runs.
 			"../../packages/db/src/migrations": "bun/migrations",
 			// A Worker's own file, next to the bundle that starts it (Bun runs it as is).
-			"src/bun/watchdog-worker.ts": "bun/watchdog-worker.ts",
+			"src/features/watchdog/watchdog-worker.ts": "bun/watchdog-worker.ts",
 			[libsqlNative]: `bun/node_modules/@libsql/${libsqlNative.split("/").pop()}`,
 		},
 		watchIgnore: [`${webBuildDir}/**`],

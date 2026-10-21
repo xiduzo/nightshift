@@ -98,7 +98,7 @@
 									"!@nightshift/db/data-dir",
 									"!@nightshift/db/migrate",
 									"!@nightshift/engine",
-									"!@nightshift/engine/lease",
+									"!@nightshift/daemon",
 									"!@nightshift/engine/testing",
 									"!@nightshift/flows",
 									"!@nightshift/flows/files",
@@ -111,13 +111,14 @@
 							},
 							{
 								"group": [
+									"server",
 									"server/**",
-									"!server/daemon-env",
-									"!server/health",
-									"!server/serve",
-									"!server/services"
+									"desktop",
+									"desktop/**",
+									"web",
+									"web/**"
 								],
-								"message": "Import the server app only by an entry in its package.json exports. Phase 4 replaces them with @nightshift/daemon."
+								"message": "No workspace imports an app (see docs/steering/STRUCTURE.md, section 1)."
 							},
 							{
 								"group": ["**/packages/**", "**/apps/*/src/**"],
@@ -185,7 +186,7 @@
 											"!@nightshift/db/data-dir",
 											"!@nightshift/db/migrate",
 											"!@nightshift/engine",
-											"!@nightshift/engine/lease",
+											"!@nightshift/daemon",
 											"!@nightshift/engine/testing",
 											"!@nightshift/flows",
 											"!@nightshift/flows/files",
@@ -198,13 +199,14 @@
 									},
 									{
 										"group": [
+											"server",
 											"server/**",
-											"!server/daemon-env",
-											"!server/health",
-											"!server/serve",
-											"!server/services"
+											"desktop",
+											"desktop/**",
+											"web",
+											"web/**"
 										],
-										"message": "Import the server app only by an entry in its package.json exports. Phase 4 replaces them with @nightshift/daemon."
+										"message": "No workspace imports an app (see docs/steering/STRUCTURE.md, section 1)."
 									},
 									{
 										"group": ["**/packages/**", "**/apps/*/src/**"],
@@ -245,7 +247,7 @@
 											"!@nightshift/db/data-dir",
 											"!@nightshift/db/migrate",
 											"!@nightshift/engine",
-											"!@nightshift/engine/lease",
+											"!@nightshift/daemon",
 											"!@nightshift/engine/testing",
 											"!@nightshift/flows",
 											"!@nightshift/flows/files",
@@ -258,13 +260,14 @@
 									},
 									{
 										"group": [
+											"server",
 											"server/**",
-											"!server/daemon-env",
-											"!server/health",
-											"!server/serve",
-											"!server/services"
+											"desktop",
+											"desktop/**",
+											"web",
+											"web/**"
 										],
-										"message": "Import the server app only by an entry in its package.json exports. Phase 4 replaces them with @nightshift/daemon."
+										"message": "No workspace imports an app (see docs/steering/STRUCTURE.md, section 1)."
 									},
 									{
 										"group": ["**/packages/**", "**/apps/*/src/**"],

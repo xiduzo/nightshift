@@ -21,6 +21,13 @@ export {
 	isDeviceKey,
 } from "./device-keys";
 export {
+	documentAccess,
+	type SyncAccess,
+	type SyncAuthorize,
+	type SyncDeviceKey,
+	type SyncGrant,
+} from "./document-access";
+export {
 	authEndpointAllowed,
 	type HostAccess,
 	type HostPolicy,

@@ -51,7 +51,7 @@ if (build.exitCode !== 0) {
 }
 
 function spawnServer() {
-	return Bun.spawn(["bun", "src/index.ts"], {
+	return Bun.spawn(["bun", "src/main.ts"], {
 		cwd: join(root, "apps", "server"),
 		env,
 		stdout: "inherit",

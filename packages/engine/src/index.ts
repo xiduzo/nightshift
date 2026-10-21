@@ -50,14 +50,6 @@ export {
 	settingsSchema,
 } from "./device-config";
 export type { FlowRef, FlowUse } from "./flows";
-export { chooseFolder } from "./folder-picker";
-export {
-	acquireLease,
-	LEASE_HEARTBEAT_MS,
-	type Lease,
-	LeaseHeldError,
-	pidAlive,
-} from "./lease";
 export type { TranscriptEntry } from "./log";
 export type {
 	DeviceRegistry,

@@ -121,6 +121,11 @@ export type Context = {
 			email?: string;
 		}): Promise<ProjectReadiness>;
 		installGit(): Promise<GitInstall>;
+		/**
+		 * Opens the native folder picker on the daemon's computer and waits
+		 * for a choice. Null when the person cancels.
+		 */
+		chooseFolder(prompt: string): Promise<string | null>;
 	};
 	/** Facts about this daemon that change only on a restart. */
 	daemon: {

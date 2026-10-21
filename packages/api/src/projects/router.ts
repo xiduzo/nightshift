@@ -1,4 +1,3 @@
-import { chooseFolder } from "@nightshift/engine";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
@@ -80,8 +79,10 @@ export const projects = {
 				"Opens the folder picker on this computer and returns the chosen folder.",
 		})
 		.output(output(z.string().nullable()))
-		.handler(() =>
-			chooseFolder("Choose a project folder to add to Night Shift"),
+		.handler(({ context }) =>
+			context.projectSetup.chooseFolder(
+				"Choose a project folder to add to Night Shift",
+			),
 		),
 	remove: permitted({ project: ["remove"] })
 		.route({
