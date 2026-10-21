@@ -16,7 +16,11 @@ export { applyRunCommand, COMMAND_PERMISSION } from "./exchange/commands";
 export type { EngineExchange } from "./exchange/engine-exchange";
 export { createEngineExchange } from "./exchange/engine-exchange";
 export type { FeedStep, FollowWant } from "./exchange/feeds";
-export { feedStepSchema, transcriptEntrySchema } from "./exchange/feeds";
+export {
+	feedStepSchema,
+	followWantSchema,
+	transcriptEntrySchema,
+} from "./exchange/feeds";
 export type { ListedSpace } from "./exchange/host-spaces";
 export { createHostSpaces, personOnHost } from "./exchange/host-spaces";
 export type { RunRows, SyncCursors } from "./exchange/rows";

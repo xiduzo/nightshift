@@ -10,29 +10,48 @@ import {
 } from "@nightshift/flows";
 import { z } from "zod";
 
+import { output } from "../output";
 import { ownerProcedure } from "../procedures";
 import { customAgentOf } from "./harnesses";
+import {
+	cliCheckSchema,
+	connectionListSchema,
+	connectionSchema,
+	mcpTestResultSchema,
+	mcpToolsSchema,
+} from "./schemas";
 
 const checkTarget = z.enum(harnessNameSchema.options);
 
 /** The CLIs Night Shift runs (harnesses, gh) and the MCP servers Agent nodes name. */
 export const connections = {
-	list: ownerProcedure.handler(async ({ context }) => {
-		const use = (await context.space.flowUse()).connections;
-		return {
-			connections: context.connections.list().map((c) => ({
-				...c,
-				usedBy: use.get(c.name) ?? [],
-				profiles: context.profiles
-					.list()
-					.filter((p) => p.connections.includes(c.name))
-					.map((p) => p.name),
-			})),
-			secrets: context.connections.secrets(),
-		};
-	}),
+	list: ownerProcedure
+		.route({
+			summary:
+				"Lists the connections (MCP servers) and secrets of this computer, with what uses them.",
+		})
+		.output(output(connectionListSchema))
+		.handler(async ({ context }) => {
+			const use = (await context.space.flowUse()).connections;
+			return {
+				connections: context.connections.list().map((c) => ({
+					...c,
+					usedBy: use.get(c.name) ?? [],
+					profiles: context.profiles
+						.list()
+						.filter((p) => p.connections.includes(c.name))
+						.map((p) => p.name),
+				})),
+				secrets: context.connections.secrets(),
+			};
+		}),
 	/** Runs `--version` and the login check of one CLI. Read-only. */
 	check: ownerProcedure
+		.route({
+			summary:
+				"Checks the CLI of a harness or a custom agent: where it is, its version and its login.",
+		})
+		.output(output(cliCheckSchema))
 		.input(z.object({ target: z.union([checkTarget, customHarnessSchema]) }))
 		.handler(({ context, input }) => {
 			const values = context.settings.current();
@@ -49,6 +68,8 @@ export const connections = {
 			);
 		}),
 	save: ownerProcedure
+		.route({ summary: "Adds a connection, or changes or renames one." })
+		.output(output(connectionSchema))
 		.input(
 			connectionInputSchema.extend({
 				/** The name it had, when the edit renames it. */
@@ -83,6 +104,11 @@ export const connections = {
 		}),
 	/** Also takes it off the profiles that name it. */
 	remove: ownerProcedure
+		.route({
+			summary:
+				"Removes a connection, and takes it off the profiles that name it.",
+		})
+		.output(output(z.void()))
 		.input(z.object({ name: z.string() }))
 		.handler(async ({ context, input }) => {
 			await context.connections.remove(input.name);
@@ -97,6 +123,11 @@ export const connections = {
 		}),
 	/** Connects to the server, lists its tools, and disconnects. A saved connection or a draft. */
 	test: ownerProcedure
+		.route({
+			summary:
+				"Connects to an MCP server, saved or a draft, and lists its tools.",
+		})
+		.output(output(mcpTestResultSchema))
 		.input(
 			z.union([
 				z.object({ name: z.string() }),
@@ -121,11 +152,15 @@ export const connections = {
 		}),
 	/** Saves a secret in the system keychain. The value never comes back. */
 	setSecret: ownerProcedure
+		.route({ summary: "Saves a secret in the keychain of this computer." })
+		.output(output(z.void()))
 		.input(z.object({ name: secretNameSchema, value: z.string().min(1) }))
 		.handler(({ context, input }) =>
 			context.connections.setSecret(input.name, input.value),
 		),
 	removeSecret: ownerProcedure
+		.route({ summary: "Removes a secret from the keychain of this computer." })
+		.output(output(z.void()))
 		.input(z.object({ name: secretNameSchema }))
 		.handler(({ context, input }) =>
 			context.connections.removeSecret(input.name),
@@ -136,6 +171,11 @@ export const connections = {
 	 * A connection that cannot be reached answers `ok: false` with why.
 	 */
 	tools: ownerProcedure
+		.route({
+			summary:
+				"Lists the tools of a saved connection, with their input schemas.",
+		})
+		.output(output(mcpToolsSchema))
 		.input(z.object({ name: z.string() }))
 		.handler(async ({ context, input }) => {
 			const { expansion, values } =

@@ -259,6 +259,13 @@ export type Settings = { [K in SettingKey]: z.output<Defs[K]["schema"]> };
 
 export const SETTING_KEYS = Object.keys(DEFS) as SettingKey[];
 
+/** Every setting's value, as `current()` returns them: the API's output schema. */
+export const settingsSchema = z.object(
+	Object.fromEntries(SETTING_KEYS.map((key) => [key, DEFS[key].schema])) as {
+		[K in SettingKey]: Defs[K]["schema"];
+	},
+);
+
 /** The setting that holds each harness's executable. */
 export const HARNESS_BIN = {
 	"claude-code": "claudeBin",

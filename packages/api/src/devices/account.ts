@@ -2,7 +2,9 @@ import { hasLogin } from "@nightshift/auth";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
+import { output } from "../output";
 import { ownerProcedure, publicProcedure } from "../procedures";
+import { accountStatusSchema } from "./schemas";
 
 /**
  * The owner's own sign-in, set on this computer: a Host without a screen
@@ -15,31 +17,42 @@ export const account = {
 	 * two-factor setup page. Public: a session the Host refuses until it
 	 * turns two-factor on reads it to know where to go.
 	 */
-	status: publicProcedure.handler(async ({ context }) => {
-		const session = context.session;
-		const required = context.requireTwoFactor && !context.fromThisComputer;
-		if (!session) {
+	status: publicProcedure
+		.route({
+			summary:
+				"Says how the session's Person signs in, and whether two-factor sign-in is needed.",
+		})
+		.output(output(accountStatusSchema))
+		.handler(async ({ context }) => {
+			const session = context.session;
+			const required = context.requireTwoFactor && !context.fromThisComputer;
+			if (!session) {
+				return {
+					signedIn: false,
+					person: null,
+					thisComputer: context.fromThisComputer,
+					hasPassword: false,
+					twoFactor: { enabled: false, required, setUpNeeded: false },
+				};
+			}
 			return {
-				signedIn: false,
-				person: null,
+				signedIn: true,
+				person: { name: session.user.name, email: session.user.email },
 				thisComputer: context.fromThisComputer,
-				hasPassword: false,
-				twoFactor: { enabled: false, required, setUpNeeded: false },
+				hasPassword: await hasLogin(context.db, session.user.id),
+				twoFactor: {
+					enabled: session.user.twoFactorEnabled === true,
+					required,
+					setUpNeeded: !context.hostAccess.allowed,
+				},
 			};
-		}
-		return {
-			signedIn: true,
-			person: { name: session.user.name, email: session.user.email },
-			thisComputer: context.fromThisComputer,
-			hasPassword: await hasLogin(context.db, session.user.id),
-			twoFactor: {
-				enabled: session.user.twoFactorEnabled === true,
-				required,
-				setUpNeeded: !context.hostAccess.allowed,
-			},
-		};
-	}),
+		}),
 	setLogin: ownerProcedure
+		.route({
+			summary:
+				"Sets the email and password of this computer's owner, on this computer only.",
+		})
+		.output(output(z.object({ email: z.string() })))
 		.input(
 			z.object({
 				email: z.string().trim().min(3).max(254),

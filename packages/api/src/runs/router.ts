@@ -1,7 +1,15 @@
 import { flowNameSchema, flowSchema, labelSchema } from "@nightshift/flows";
 import { z } from "zod";
 
+import { output, stream } from "../output";
 import { permitted, protectedProcedure } from "../procedures";
+import {
+	ownDeviceSchema,
+	placementSchema,
+	runDetailSchema,
+	runStreamItemSchema,
+	runSummarySchema,
+} from "./schemas";
 
 /** What starts a run: a flow file or an inline flow, and where its steps run. */
 export const runStartFields = {
@@ -20,14 +28,26 @@ const runStartInput = z.union([
 export const runs = {
 	/** The Person's Devices a run of the project can run on: this computer first. */
 	placements: protectedProcedure
+		.route({
+			summary:
+				"Lists the Devices a run of the project can run on, this computer first.",
+		})
+		.output(output(z.array(placementSchema)))
 		.input(z.object({ projectId: z.string() }))
 		.handler(({ context, input }) =>
 			context.space.listPlacements(input.projectId),
 		),
 	list: protectedProcedure
+		.route({ summary: "Lists the runs of the Space, or of one project." })
+		.output(output(z.array(runSummarySchema)))
 		.input(z.object({ projectId: z.string().optional() }).optional())
 		.handler(({ context, input }) => context.space.listRuns(input)),
 	get: protectedProcedure
+		.route({
+			summary:
+				"Reads one run: its flow, steps, resumes, commands and variables.",
+		})
+		.output(output(runDetailSchema))
 		.input(z.object({ runId: z.string() }))
 		.handler(({ context, input }) => context.space.getRun(input.runId)),
 	/**
@@ -35,6 +55,10 @@ export const runs = {
 	 * one of the Person's Devices (`placements`; default this computer).
 	 */
 	start: permitted({ run: ["start"] })
+		.route({
+			summary: "Starts a run of a flow file, or of a flow given inline.",
+		})
+		.output(output(runSummarySchema))
 		.input(runStartInput)
 		.handler(({ context, input }) =>
 			context.space.startRun({
@@ -43,6 +67,8 @@ export const runs = {
 			}),
 		),
 	stop: permitted({ run: ["stop"] })
+		.route({ summary: "Stops a run now, or after its running step." })
+		.output(output(z.void()))
 		.input(
 			z.object({
 				runId: z.string(),
@@ -57,17 +83,31 @@ export const runs = {
 	 * archived checkpoint. Not while a step runs.
 	 */
 	move: permitted({ run: ["move"] })
+		.route({
+			summary: "Moves the walk of a run to another of the Person's Devices.",
+		})
+		.output(output(z.void()))
 		.input(z.object({ runId: z.string(), deviceId: z.string().min(1).max(64) }))
 		.handler(({ context, input }) =>
 			context.space.moveRun(input.runId, input.deviceId),
 		),
 	/** The Person's Devices for the project: online, with a Clone or not (a node's Device, Move to). */
 	devices: protectedProcedure
+		.route({
+			summary:
+				"Lists the Person's Devices for a project: online or not, with a Clone or not.",
+		})
+		.output(output(z.array(ownDeviceSchema)))
 		.input(z.object({ projectId: z.string() }))
 		.handler(({ context, input }) =>
 			context.space.listDevices(input.projectId),
 		),
 	resume: permitted({ run: ["resume"] })
+		.route({
+			summary:
+				"Continues a stopped, failed or interrupted run at its last step.",
+		})
+		.output(output(z.void()))
 		.input(
 			z.object({ runId: z.string(), prompt: z.string().min(1).optional() }),
 		)
@@ -79,6 +119,10 @@ export const runs = {
 	 * follow-up prompt. With `stepId`, only while that step runs.
 	 */
 	restartStep: permitted({ run: ["stop", "resume"] })
+		.route({
+			summary: "Stops the running step of a run and starts it again at once.",
+		})
+		.output(output(z.void()))
 		.input(
 			z.object({
 				runId: z.string(),
@@ -98,6 +142,8 @@ export const runs = {
 	 * `fresh` starts a new one.
 	 */
 	rerun: permitted({ run: ["resume"] })
+		.route({ summary: "Runs a run again from one node of its own flow." })
+		.output(output(z.void()))
 		.input(
 			z.object({
 				runId: z.string(),
@@ -118,6 +164,11 @@ export const runs = {
 		),
 	/** Live transcript and status over SSE. Replays from disk first. */
 	watch: protectedProcedure
+		.route({
+			summary:
+				"Streams the status, steps and transcript of a run: what is saved first, then live.",
+		})
+		.output(stream(runStreamItemSchema))
 		.input(
 			z.object({ runId: z.string(), afterSeq: z.number().int().optional() }),
 		)
@@ -133,6 +184,8 @@ export const runs = {
 		}),
 	/** Sends a signal to a run whose Wait node waits for it. */
 	signal: permitted({ signal: ["send"] })
+		.route({ summary: "Sends a signal to a run whose Wait node waits for it." })
+		.output(output(z.void()))
 		.input(z.object({ runId: z.string(), name: labelSchema }))
 		.handler(({ context, input }) =>
 			context.space.signalRun(input.runId, input.name),

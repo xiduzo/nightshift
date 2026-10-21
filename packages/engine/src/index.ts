@@ -47,6 +47,7 @@ export {
 	secretStore,
 	selfDevice,
 	settingsPatchSchema,
+	settingsSchema,
 } from "./device-config";
 export type { FlowRef, FlowUse } from "./flows";
 export { chooseFolder } from "./folder-picker";
@@ -79,6 +80,7 @@ export {
 	type FollowWant,
 	ForeignRowsError,
 	feedStepSchema,
+	followWantSchema,
 	type HostLink,
 	type HostLinks,
 	type HostRole,

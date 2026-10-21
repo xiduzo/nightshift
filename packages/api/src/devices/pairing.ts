@@ -1,6 +1,12 @@
 import { z } from "zod";
 
+import { output } from "../output";
 import { deviceProcedure, publicProcedure } from "../procedures";
+import {
+	hostHelloSchema,
+	pairingRedeemedSchema,
+	pairingStartSchema,
+} from "./schemas";
 
 const deviceId = z.string().regex(/^[\w-]{1,64}$/);
 
@@ -10,6 +16,11 @@ const deviceId = z.string().regex(/^[\w-]{1,64}$/);
  */
 export const pairing = {
 	start: publicProcedure
+		.route({
+			summary:
+				"Gives a joining Device a pairing code for its Person to approve.",
+		})
+		.output(output(pairingStartSchema))
 		.input(
 			z.object({
 				deviceId,
@@ -19,6 +30,11 @@ export const pairing = {
 		)
 		.handler(({ context, input }) => context.devices.startPairing(input)),
 	redeem: publicProcedure
+		.route({
+			summary:
+				"Answers a joining Device's poll, with its Device key once the code is approved.",
+		})
+		.output(output(pairingRedeemedSchema))
 		.input(
 			z.object({
 				deviceCode: z.string().min(1).max(256),
@@ -33,11 +49,18 @@ export const pairing = {
 /** A paired Device's link to this Host: with its Device key. */
 export const link = {
 	/** The first call on a link: who the Host is, and its addresses now. */
-	hello: deviceProcedure("sync").handler(({ context }) =>
-		context.devices.hello(context.deviceKey),
-	),
+	hello: deviceProcedure("sync")
+		.route({
+			summary:
+				"Opens a paired Device's link: who the Host is and its addresses now.",
+		})
+		.output(output(hostHelloSchema))
+		.handler(({ context }) => context.devices.hello(context.deviceKey)),
 	/** Every few seconds: the Device is online while these answer. */
-	heartbeat: deviceProcedure("sync").handler(({ context }) =>
-		context.devices.hello(context.deviceKey),
-	),
+	heartbeat: deviceProcedure("sync")
+		.route({
+			summary: "Keeps a paired Device online, with the Host's facts now.",
+		})
+		.output(output(hostHelloSchema))
+		.handler(({ context }) => context.devices.hello(context.deviceKey)),
 };

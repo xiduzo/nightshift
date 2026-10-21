@@ -1,0 +1,41 @@
+import {
+	type FlowIssue,
+	type FlowListItem,
+	flowSchema,
+	type LoadedFlow,
+} from "@nightshift/flows";
+import { z } from "zod";
+
+import { exact } from "../output";
+
+/** One problem in a flow. A flow with any `error` cannot run. */
+export const flowIssueSchema = exact<FlowIssue>()(
+	z.object({
+		severity: z.enum(["error", "warning"]),
+		message: z.string(),
+		nodeId: z.string().optional(),
+		edgeId: z.string().optional(),
+	}),
+);
+
+/** A flow file of a project, without its flow. */
+export const flowListItemSchema = exact<FlowListItem>()(
+	z.object({
+		name: z.string(),
+		path: z.string(),
+		description: z.string().nullable(),
+		/** Null when the file is not a valid flow. */
+		nodeCount: z.number().nullable(),
+		errorCount: z.number(),
+	}),
+);
+
+/** A flow file of a project: its flow (null when not valid) and its problems. */
+export const loadedFlowSchema = exact<LoadedFlow>()(
+	z.object({
+		name: z.string(),
+		path: z.string(),
+		flow: flowSchema.nullable(),
+		issues: z.array(flowIssueSchema),
+	}),
+);

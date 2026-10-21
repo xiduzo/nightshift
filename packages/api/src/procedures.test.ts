@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "bun:test";
 import {
 	type HostPolicy,
 	OPEN_HOST,
@@ -15,6 +23,7 @@ import type { SpaceEngine } from "@nightshift/engine";
 import { call, ORPCError } from "@orpc/server";
 
 import type { Context } from "./context";
+import { onOutputMismatch } from "./output";
 import { appRouter } from "./router";
 
 /**
@@ -36,6 +45,14 @@ beforeEach(async () => {
 	args = [];
 });
 afterEach(() => sandbox.cleanup());
+
+// The fake engine answers `{ id: "run-1" }` to every call: these tests check
+// sessions and roles, not replies. contract.test.ts checks the replies.
+let quiet: () => void;
+beforeAll(() => {
+	quiet = onOutputMismatch(() => {});
+});
+afterAll(() => quiet());
 
 /** An engine that records the Space and method of every call. */
 const engine: Context["engine"] = {

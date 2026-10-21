@@ -1,0 +1,251 @@
+import {
+	offerCapsSchema,
+	type WorkReply,
+	type WorkRequest,
+	workReplySchema,
+	workRequestSchema,
+} from "@nightshift/engine";
+import { z } from "zod";
+
+import type {
+	DevicesOverview,
+	HostHello,
+	JoinProgress,
+	OfferView,
+	PairingRedeemed,
+	PairingReviewView,
+	PairingStart,
+	SpaceDeviceView,
+	WorkDelivery,
+} from "../context";
+import { exact, partOf } from "../output";
+import { runStatusSchema } from "../runs";
+
+/**
+ * The output schemas of Devices and Hosts: this computer's Devices and
+ * Offers, pairing, a paired Device's link and the work relay.
+ */
+
+const hostRoleSchema = z.enum(["home", "guest"]);
+
+const linkedHostSchema = z.object({
+	hostId: z.string(),
+	name: z.string(),
+	role: hostRoleSchema,
+	/** In the order Devices try them. */
+	addresses: z.array(z.string()),
+	/** The address that answers now. */
+	address: z.string().nullable(),
+	status: z.enum(["connecting", "online", "offline", "revoked"]),
+	/** Epoch ms of the last change of `status`. */
+	since: z.number(),
+	fingerprint: z.string().nullable(),
+});
+
+const pairedDeviceSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	platform: z.string(),
+	/** The Person who approved the pairing. */
+	ownerId: z.string(),
+	/** The address the Device joined by, when this Host is its home Host. */
+	homeHost: z.string().nullable(),
+	lastSeenAt: z.number().nullable(),
+	online: z.boolean(),
+	pairedAt: z.number(),
+	revokedAt: z.number().nullable(),
+});
+
+/** What the Devices page shows, for one Person. */
+export const devicesOverviewSchema = exact<DevicesOverview>()(
+	z.object({
+		/** This computer, for its owner. Null for another Person. */
+		thisComputer: z
+			.object({
+				id: z.string(),
+				name: z.string(),
+				platform: z.string(),
+				keyStore: z.enum(["keychain", "file"]),
+				host: z.object({
+					enabled: z.boolean(),
+					addresses: z.array(z.string()),
+					reachable: z.enum(["this-computer", "network"]),
+					restartNeeded: z.boolean(),
+					fingerprint: z.string().nullable(),
+				}),
+				hosts: z.array(linkedHostSchema),
+			})
+			.nullable(),
+		devices: z.array(pairedDeviceSchema),
+	}),
+);
+
+/** A Device of a Space, as every Member sees it. */
+export const spaceDeviceViewSchema = exact<SpaceDeviceView>()(
+	z.object({
+		id: z.string(),
+		name: z.string(),
+		/** Null when this computer cannot tell. */
+		online: z.boolean().nullable(),
+		thisDevice: z.boolean(),
+		clones: z.array(
+			z.object({ projectId: z.string(), projectName: z.string() }),
+		),
+		offers: z.array(offerCapsSchema.extend({ profile: z.string() })),
+	}),
+);
+
+/** A pairing code, as the Person approving it sees it. */
+export const pairingReviewViewSchema = exact<PairingReviewView>()(
+	z.object({
+		userCode: z.string(),
+		status: z.enum(["pending", "approved", "denied"]),
+		device: z.object({
+			id: z.string(),
+			name: z.string().nullable(),
+			platform: z.string().nullable(),
+		}),
+		fingerprint: z.string().nullable(),
+	}),
+);
+
+/** A call of a run that the Host walks, as it travels to a Device. */
+const workRequestViewSchema = partOf<WorkRequest>()(workRequestSchema);
+
+/** What a placed Device takes from its Host: a call to serve, or one to cancel. */
+export const workDeliverySchema = exact<WorkDelivery>()(
+	z.discriminatedUnion("kind", [
+		z.object({
+			kind: z.literal("call"),
+			id: z.string(),
+			request: workRequestViewSchema,
+		}),
+		z.object({ kind: z.literal("cancel"), id: z.string() }),
+	]),
+);
+
+/** One answer of a placed Device to a call. */
+export const workReplyViewSchema = exact<WorkReply>()(workReplySchema);
+
+/** How `nightshift join` goes, step by step. */
+export const joinProgressSchema = exact<JoinProgress>()(
+	z.discriminatedUnion("kind", [
+		z.object({
+			kind: z.literal("code"),
+			userCode: z.string(),
+			verificationUri: z.string().nullable(),
+			verificationUriComplete: z.string().nullable(),
+			fingerprint: z.string().nullable(),
+			expiresAt: z.number(),
+		}),
+		z.object({
+			kind: z.literal("joined"),
+			hostId: z.string(),
+			hostName: z.string(),
+			role: hostRoleSchema,
+		}),
+	]),
+);
+
+const twoFactorSchema = z.object({
+	enabled: z.boolean(),
+	required: z.boolean(),
+	/** The Host refuses the session until it turns two-factor on. */
+	setUpNeeded: z.boolean(),
+});
+
+/** How the session's Person signs in. */
+export const accountStatusSchema = z.union([
+	z.object({
+		signedIn: z.boolean(),
+		person: z.null(),
+		thisComputer: z.boolean(),
+		hasPassword: z.boolean(),
+		twoFactor: twoFactorSchema,
+	}),
+	z.object({
+		signedIn: z.boolean(),
+		person: z.object({ name: z.string(), email: z.string() }),
+		thisComputer: z.boolean(),
+		hasPassword: z.boolean(),
+		twoFactor: twoFactorSchema,
+	}),
+]);
+
+/** A pairing code for a joining Device, and where its Person approves it. */
+export const pairingStartSchema = exact<PairingStart>()(
+	z.object({
+		deviceCode: z.string(),
+		userCode: z.string(),
+		verificationUri: z.string(),
+		verificationUriComplete: z.string(),
+		expiresIn: z.number(),
+		interval: z.number(),
+		fingerprint: z.string().nullable(),
+	}),
+);
+
+const hostSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	addresses: z.array(z.string()),
+});
+
+/** The Host's answer to a joining Device's poll: the Device key once approved. */
+export const pairingRedeemedSchema = exact<PairingRedeemed>()(
+	z.union([
+		z.object({ status: z.enum(["pending", "slow-down", "denied", "expired"]) }),
+		z.object({
+			status: z.literal("joined"),
+			key: z.string(),
+			personId: z.string(),
+			host: hostSchema,
+		}),
+	]),
+);
+
+/** What a paired Device learns from its Host when its link answers. */
+export const hostHelloSchema = exact<HostHello>()(
+	z.object({
+		host: hostSchema,
+		deviceId: z.string(),
+		personId: z.string(),
+		/** The Spaces the Device's owner is a Member of on the Host. */
+		spaces: z.array(
+			z.object({
+				id: z.string(),
+				name: z.string(),
+				personal: z.boolean(),
+				role: z.string(),
+			}),
+		),
+	}),
+);
+
+/** One of this computer's Offers, and the runs it took. */
+const offerViewSchema = exact<OfferView>()(
+	offerCapsSchema.extend({
+		spaceId: z.string(),
+		spaceName: z.string(),
+		profile: z.string(),
+		offeredAt: z.number(),
+		/** False: it was withdrawn in the Space. */
+		listed: z.boolean(),
+		/** The runs of other Persons on this computer in that Space, newest first. */
+		runs: z.array(
+			z.object({
+				id: z.string(),
+				title: z.string(),
+				status: runStatusSchema,
+				startedBy: z.string().nullable(),
+				createdAt: z.number(),
+			}),
+		),
+	}),
+);
+
+export const offerListSchema = z.object({
+	offers: z.array(offerViewSchema),
+	/** The Spaces this computer can offer to. */
+	spaces: z.array(z.object({ id: z.string(), name: z.string() })),
+});

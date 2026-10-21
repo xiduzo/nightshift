@@ -3,7 +3,9 @@ import { offerCapsSchema } from "@nightshift/engine";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
+import { output } from "../output";
 import { ownerProcedure } from "../procedures";
+import { offerListSchema } from "./schemas";
 
 /** One Offer: a profile of a Device, in a Space. */
 export const offerRef = z.object({
@@ -18,13 +20,24 @@ export const offerRef = z.object({
  */
 export const offers = {
 	/** Its Offers with "Runs for <Space>", and the Spaces it can offer to. */
-	list: ownerProcedure.handler(async ({ context }) => {
-		const spaces = (await spacesOf(context.db, context.session.user.id))
-			.filter((s) => !s.personal && roleAllows(s.role, { offer: ["make"] }))
-			.map((s) => ({ id: s.id, name: s.name }));
-		return { offers: await context.offers.list(), spaces };
-	}),
+	list: ownerProcedure
+		.route({
+			summary:
+				"Lists this computer's Offers, with their runs, and the Spaces it can offer to.",
+		})
+		.output(output(offerListSchema))
+		.handler(async ({ context }) => {
+			const spaces = (await spacesOf(context.db, context.session.user.id))
+				.filter((s) => !s.personal && roleAllows(s.role, { offer: ["make"] }))
+				.map((s) => ({ id: s.id, name: s.name }));
+			return { offers: await context.offers.list(), spaces };
+		}),
 	make: ownerProcedure
+		.route({
+			summary:
+				"Offers one of this computer's profiles to a Space, or changes its caps.",
+		})
+		.output(output(z.void()))
 		.input(offerRef.extend(offerCapsSchema.shape))
 		.handler(async ({ context, input }) => {
 			if (!(await context.can({ offer: ["make"] }, input.spaceId))) {
@@ -36,6 +49,8 @@ export const offers = {
 		}),
 	/** Its running steps under it end as stopped. */
 	withdraw: ownerProcedure
+		.route({ summary: "Withdraws an Offer. Its running steps end as stopped." })
+		.output(output(z.void()))
 		.input(offerRef)
 		.handler(({ context, input }) =>
 			context.offers.withdraw(input, context.session.user.id),

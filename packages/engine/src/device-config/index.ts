@@ -46,6 +46,7 @@ export {
 	isHostAddress,
 	isLoopbackHost,
 	settingsPatchSchema,
+	settingsSchema,
 } from "./settings";
 export type { PersistedDocument } from "./ydoc";
 export { openPersistedDocument } from "./ydoc";

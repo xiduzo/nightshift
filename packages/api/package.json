@@ -22,6 +22,8 @@
 	},
 	"devDependencies": {
 		"@nightshift/config": "workspace:*",
+		"@orpc/openapi": "catalog:",
+		"@orpc/zod": "catalog:",
 		"typescript": "catalog:"
 	}
 }

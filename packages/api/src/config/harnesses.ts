@@ -20,7 +20,15 @@ import {
 } from "@nightshift/flows";
 import { z } from "zod";
 
+import { output } from "../output";
 import { ownerProcedure } from "../procedures";
+import {
+	customAgentViewSchema,
+	deciderViewSchema,
+	harnessModelsSchema,
+	harnessViewSchema,
+	installedSkillSchema,
+} from "./schemas";
 
 /** The custom agent of that flow name on this daemon, or undefined. */
 export function customAgentOf(
@@ -40,31 +48,42 @@ export function customAgentOf(
  * adds, removes and lists models.
  */
 export const harnesses = {
-	list: ownerProcedure.handler(({ context }) => {
-		const values = context.settings.current();
-		const view = context.settings.view();
-		return harnessViews({
-			added: values.harnesses,
-			customAgents: values.customAgents,
-			bin: (
-				name,
-			): { bin: string; setting: SettingKey; source: SettingField } => ({
-				bin: values[HARNESS_BIN[name]],
-				setting: HARNESS_BIN[name],
-				source: view.fields[HARNESS_BIN[name]],
-			}),
-			profilesOn: (name) =>
-				context.profiles
-					.list()
-					.filter((p) => p.harness === name)
-					.map((p) => p.name),
-		});
-	}),
+	list: ownerProcedure
+		.route({
+			summary:
+				"Lists the harnesses Agent nodes can run on: the built-in ones, then the custom agents.",
+		})
+		.output(output(z.array(harnessViewSchema)))
+		.handler(({ context }) => {
+			const values = context.settings.current();
+			const view = context.settings.view();
+			return harnessViews({
+				added: values.harnesses,
+				customAgents: values.customAgents,
+				bin: (
+					name,
+				): { bin: string; setting: SettingKey; source: SettingField } => ({
+					bin: values[HARNESS_BIN[name]],
+					setting: HARNESS_BIN[name],
+					source: view.fields[HARNESS_BIN[name]],
+				}),
+				profilesOn: (name) =>
+					context.profiles
+						.list()
+						.filter((p) => p.harness === name)
+						.map((p) => p.name),
+			});
+		}),
 	/**
 	 * Adds a custom agent, or changes one (`previousSlug`). Its slug, the
 	 * name flows use, never changes: a flow that names it keeps working.
 	 */
 	saveCustom: ownerProcedure
+		.route({
+			summary:
+				"Adds a custom agent, or changes one. Its name in flows stays the same.",
+		})
+		.output(output(customAgentViewSchema))
 		.input(
 			customAgentSchema.extend({
 				previousSlug: customAgentSchema.shape.slug.optional(),
@@ -92,6 +111,8 @@ export const harnesses = {
 			return saved;
 		}),
 	add: ownerProcedure
+		.route({ summary: "Adds a built-in harness on this computer." })
+		.output(output(z.void()))
 		.input(z.object({ harness: harnessNameSchema }))
 		.handler(async ({ context, input }) => {
 			const added = context.settings.current().harnesses;
@@ -100,6 +121,11 @@ export const harnesses = {
 		}),
 	/** Refused while a profile runs on it. A custom agent is gone after this. */
 	remove: ownerProcedure
+		.route({
+			summary:
+				"Removes a harness from this computer, unless a profile runs on it.",
+		})
+		.output(output(z.void()))
 		.input(z.object({ harness: agentHarnessSchema }))
 		.handler(async ({ context, input }) => {
 			const values = context.settings.current();
@@ -133,6 +159,11 @@ export const harnesses = {
 	 * A custom agent offers `default`: any other model it takes is typed.
 	 */
 	models: ownerProcedure
+		.route({
+			summary:
+				"Lists the models a harness offers: its known models, then what its CLI lists.",
+		})
+		.output(output(harnessModelsSchema))
 		.input(z.object({ harness: agentHarnessSchema }))
 		.handler(({ context, input }) =>
 			isCustomHarness(input.harness)
@@ -152,6 +183,11 @@ export const harnesses = {
 	 * on this computer), then those for every project here. Never throws.
 	 */
 	skills: ownerProcedure
+		.route({
+			summary:
+				"Lists the skills a harness can run, for a project or for this computer.",
+		})
+		.output(output(z.array(installedSkillSchema)))
 		.input(
 			z.object({
 				harness: agentHarnessSchema,
@@ -176,7 +212,13 @@ export const harnesses = {
  * its models (Ollama: the models pulled on this computer) puts those first.
  */
 export const deciders = {
-	list: ownerProcedure.handler(({ context }) =>
-		deciderViews((name) => context.connections.secretSource(name)),
-	),
+	list: ownerProcedure
+		.route({
+			summary:
+				"Lists the deciders Decision and Value nodes can use, with their models and API keys.",
+		})
+		.output(output(z.array(deciderViewSchema)))
+		.handler(({ context }) =>
+			deciderViews((name) => context.connections.secretSource(name)),
+		),
 };

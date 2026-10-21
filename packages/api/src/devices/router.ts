@@ -5,12 +5,21 @@ import {
 } from "@nightshift/engine";
 import { z } from "zod";
 
+import { output, stream } from "../output";
 import {
 	deviceProcedure,
 	ownerProcedure,
 	protectedProcedure,
 	readable,
 } from "../procedures";
+import {
+	devicesOverviewSchema,
+	joinProgressSchema,
+	pairingReviewViewSchema,
+	spaceDeviceViewSchema,
+	workDeliverySchema,
+	workReplyViewSchema,
+} from "./schemas";
 
 /**
  * Devices: this computer's own (its Hosts, "Be a Host"), and on a Host the
@@ -18,37 +27,63 @@ import {
  * only; approving a code binds it to the Person who entered it.
  */
 export const devices = {
-	list: protectedProcedure.handler(({ context }) =>
-		context.devices.overview({
-			personId: context.session.user.id,
-			owner: context.session.user.id === context.daemon.device.ownerId,
-		}),
-	),
+	list: protectedProcedure
+		.route({
+			summary:
+				"Lists this computer's Hosts, and on a Host the Person's paired Devices.",
+		})
+		.output(output(devicesOverviewSchema))
+		.handler(({ context }) =>
+			context.devices.overview({
+				personId: context.session.user.id,
+				owner: context.session.user.id === context.daemon.device.ownerId,
+			}),
+		),
 	/**
 	 * The Devices of the session's Space, as every Member sees them: name,
 	 * online, Clones of its Projects, offered profiles. Nothing else.
 	 */
-	space: protectedProcedure.handler(({ context }) =>
-		context.offers.spaceDevices(context.spaceId),
-	),
+	space: protectedProcedure
+		.route({
+			summary:
+				"Lists the Devices of the Space as every Member sees them: online, Clones and Offers.",
+		})
+		.output(output(z.array(spaceDeviceViewSchema)))
+		.handler(({ context }) => context.offers.spaceDevices(context.spaceId)),
 	/** Shows the device that waits with this code, and holds the code for the Person. */
 	review: protectedProcedure
+		.route({
+			summary:
+				"Shows the Device that waits with a pairing code, and holds the code for the Person.",
+		})
+		.output(output(pairingReviewViewSchema))
 		.input(z.object({ userCode: z.string().trim().min(1).max(32) }))
 		.handler(({ context, input }) =>
 			context.devices.review(context.headers, input.userCode),
 		),
 	approve: protectedProcedure
+		.route({
+			summary: "Approves a pairing code: the Device joins as the Person's.",
+		})
+		.output(output(z.void()))
 		.input(z.object({ userCode: z.string().trim().min(1).max(32) }))
 		.handler(({ context, input }) =>
 			context.devices.approve(context.headers, input.userCode),
 		),
 	deny: protectedProcedure
+		.route({ summary: "Denies a pairing code." })
+		.output(output(z.void()))
 		.input(z.object({ userCode: z.string().trim().min(1).max(32) }))
 		.handler(({ context, input }) =>
 			context.devices.deny(context.headers, input.userCode),
 		),
 	/** Removes a Device's access to this computer. */
 	revoke: protectedProcedure
+		.route({
+			summary:
+				"Removes the access of one of the Person's Devices to this computer.",
+		})
+		.output(output(z.void()))
 		.input(z.object({ deviceId: z.string().min(1) }))
 		.handler(({ context, input }) =>
 			context.devices.revoke(context.session.user.id, input.deviceId),
@@ -59,6 +94,11 @@ export const devices = {
 	 * as they come. The Host never dials a Device.
 	 */
 	work: deviceProcedure("relay")
+		.route({
+			summary:
+				"Streams the calls a Host sends to a placed Device, and their cancels.",
+		})
+		.output(stream(workDeliverySchema))
 		.input(
 			z
 				.object({
@@ -76,6 +116,11 @@ export const devices = {
 	 * stream carries the replies, and closing it cancels the call.
 	 */
 	call: deviceProcedure("relay")
+		.route({
+			summary:
+				"Calls another of the Person's Devices through this Host and streams its replies.",
+		})
+		.output(stream(workReplyViewSchema))
 		.input(
 			z.object({
 				deviceId: z.string().min(1).max(64),
@@ -94,12 +139,21 @@ export const devices = {
 		}),
 	/** Whether one of the key's Person's Devices (or this Host) takes work now. */
 	reachable: deviceProcedure("relay")
+		.route({
+			summary:
+				"Says whether one of the Person's Devices, or this Host, takes work now.",
+		})
+		.output(output(z.boolean()))
 		.input(z.object({ deviceId: z.string().min(1).max(64) }))
 		.handler(({ context, input }) =>
 			context.exchange.reachable(context.deviceKey, input.deviceId),
 		),
 	/** The placed Device's answers to a call it took. */
 	workReply: deviceProcedure("relay")
+		.route({
+			summary: "Takes the answers of a placed Device to a call it took.",
+		})
+		.output(output(z.object({ known: z.boolean() })))
 		.input(
 			z.object({
 				id: z.string().min(1).max(64),
@@ -115,6 +169,11 @@ export const devices = {
 	 * approve there, then the Host once it is approved.
 	 */
 	join: ownerProcedure
+		.route({
+			summary:
+				"Pairs this computer with a Host: streams the code to approve, then the Host.",
+		})
+		.output(stream(joinProgressSchema))
 		.input(
 			z.object({
 				url: z.string().trim().min(1),

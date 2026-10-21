@@ -1,4 +1,5 @@
 import type { RouterClient } from "@orpc/server";
+import { z } from "zod";
 
 import {
 	cliTools,
@@ -11,6 +12,7 @@ import {
 import { account, devices, link, offers, pairing } from "./devices";
 import { flows } from "./flows";
 import { gates } from "./gates";
+import { output } from "./output";
 import { archive, sync } from "./peer";
 import { publicProcedure } from "./procedures";
 import { projects } from "./projects";
@@ -30,7 +32,10 @@ import { invitations, members, spaces } from "./spaces";
  * the paired Devices all go through it.
  */
 export const appRouter = {
-	healthCheck: publicProcedure.handler(() => "OK"),
+	healthCheck: publicProcedure
+		.route({ summary: "Answers OK while Night Shift runs." })
+		.output(output(z.string()))
+		.handler(() => "OK"),
 	spaces,
 	members,
 	invitations,
