@@ -25,7 +25,7 @@ Last updated: 2026-10-21
 ## Architecture
 
 - **Pattern:** Ports and adapters. The engine depends on interfaces. Harnesses, decider providers and git (`packages/engine/src/projects/git.ts`) are adapters behind them.
-- **Module structure:** A layered vertical codebase in a Bun workspace. Packages sit in layers and import only downward. Inside a package, code is grouped by domain. `docs/steering/STRUCTURE.md` holds the layer map, what each package owns, and the rules.
+- **Module structure:** A layered vertical codebase in a Bun workspace. Packages sit in layers and import only downward. Inside a package, code is grouped by domain. `docs/steering/STRUCTURE.md` holds the layer map, what each package owns, and the rules. Two scripts check them on every commit and in CI: `scripts/check-layers.ts` (the layer map) and `scripts/check-verticals.ts` (the verticals of every workspace).
 - **State management:** The server stores durable facts in libsql and appends every change to an event log. The UI derives status from facts and subscribes to the event log over SSE through TanStack Query.
 - **Data flow:** UI → oRPC → engine → agents (harness or tool) → facts + event → SSE → UI. Everything runs in-process.
 - **API contract:** The oRPC router in `packages/api` is the one source of the API. The web client, the OpenAPI document and the agent tools all come from it. Every procedure declares an input schema, an output schema and a one-line summary. An output schema checks a reply and never changes it (`packages/api/src/output.ts`).
@@ -73,6 +73,10 @@ bun run check
 # Type-check
 bun run check-types
 
+# Structure: the layer map and the verticals
+bun scripts/check-layers.ts
+bun scripts/check-verticals.ts
+
 # Build (desktop last)
 bun run build
 
@@ -112,9 +116,9 @@ bun lefthook install
 | Run history in one global app data directory per daemon, not per project | The dashboard, inbox and run list read across projects, and the per-database lease keeps the dev and night daemons apart. Transcripts can hold unredacted secrets and grow large, so they stay out of repos. Run export bundles cover sharing one run. | 2026-10-18 |
 | Output schemas describe a reply and never change it | oRPC sends the value an output schema returns, and a zod object drops the keys it does not name. So `output()` checks the reply and sends the handler's own value. A mismatch is logged, not refused: the schema is the description for OpenAPI and agent tools. `exact<T>()` keeps each schema equal to its domain type when the code compiles. | 2026-10-21 |
 | A layered vertical codebase with enforced public surfaces | Packages import only downward and expose named entry points. Inside a package, code is grouped by domain. Kind buckets (`lib/`, `utils/`) and `"./*"` exports let any file reach any other, so a small change breaks far-away code. See `docs/steering/STRUCTURE.md`. | 2026-10-20 |
-
 | One daemon package, started by one function | A module that starts the daemon when it loads cannot be tested, reused or loaded twice. The CLI and the desktop app had two copies of the boot and the shutdown. | 2026-10-21 |
 | One devices package below the API, behind the engine's `Peers` port | The devices domain was split over the engine, the daemon and the API's context. The run engine calls it through one port, so the engine walks runs without knowing other Devices, and its tests run alone. | 2026-10-21 |
+| Structure migration done, enforced by check-layers and check-verticals | Every workspace except `ui` and `config` is cut into verticals with a barrel. The vertical check finds the workspaces and their verticals from the file system, so a new one is checked from its first commit. A rule that no check enforces drifts. | 2026-10-21 |
 
 Full ADRs go in `docs/adr/` when a decision needs more than one line of rationale.
 

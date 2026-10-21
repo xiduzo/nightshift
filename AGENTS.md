@@ -3,7 +3,8 @@
 Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
 
 - **Layers point down.** A package imports only from lower layers (`db`, `flows`, `ui`
-  → `auth`, `agents` → `engine` → `api` → apps). No package imports an app.
+  → `auth`, `agents` → `engine` → `devices` → `api` → `daemon` → apps). No
+  package imports an app.
 - **Group by domain, not by kind.** Put new code in the vertical it serves:
   `src/features/<vertical>/` in an app, `src/<vertical>/` in a package. Never
   create `lib/`, `utils/`, `hooks/` or `components/` at the top of `src/`, or a
@@ -14,6 +15,9 @@ Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
   `exports`. Never a deep path into its `src/`. Fakes and fixtures come from `./testing`.
 - **Apps wire, packages decide.** Domain logic goes in a package, not in `apps/*`.
   Routes in `apps/web` stay thin. Each web vertical owns its `queries.ts`.
+- **Run the checks.** `bun scripts/check-layers.ts` and
+  `bun scripts/check-verticals.ts` check these rules in every workspace. The
+  pre-commit hook and CI run them too.
 - **Do not copy a known deviation** (section 8 of `STRUCTURE.md`). Old code that breaks
   a rule is debt, not a pattern.
 

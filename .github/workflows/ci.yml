@@ -1,7 +1,7 @@
 # Checks every pull request and every push to main: lint and format, the
-# layer map, types, the tests of each workspace, and that the compiled
-# binary starts. The same commands run
-# on your computer (see CONTRIBUTING.md, "Check your change").
+# layer map, the verticals, types, the tests of each workspace, and that the
+# compiled binary starts. The same commands run on your computer (see
+# CONTRIBUTING.md, "Check your change").
 name: CI
 
 on:

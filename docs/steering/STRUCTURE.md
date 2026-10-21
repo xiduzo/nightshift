@@ -27,7 +27,7 @@ Code that changes together lives together. A boundary that is not enforced is no
 The apps:
 
 - `apps/server` imports the runtime and lower layers. It holds the dev entry and the CLI.
-- `apps/desktop` imports only the runtime (`@nightshift/daemon`) and `@nightshift/db/data-dir`.
+- `apps/desktop` imports only the runtime (`@nightshift/daemon`).
 - `apps/web` imports only `@nightshift/api/client` (types only, `import type`), `@nightshift/flows` (the browser-safe root, never `./files`) and `@nightshift/ui`. It never imports `engine`, `agents`, `auth` or `db`.
 
 Rules:
@@ -43,6 +43,7 @@ One package is one bounded context. One domain has one home.
 
 | Package | Owns | Does not own |
 | --- | --- | --- |
+| `config` | The shared TypeScript configuration (`tsconfig.base.json`). | Code. |
 | `db` | The libsql client, the drizzle schema, migrations, the data directory. | Queries of a domain. Those live with the domain. |
 | `flows` | The flow document: one file per node type (`nodes/`: its schema, its checks, its output fields), the flow schema and migration (`document/`), the checks of a whole flow (`validate/`), templates, rules and variables (`template/`), list sources (`lists/`, `recipes/`), and the pure edits of a draft (`draft/`: new nodes, graph and outcome edits, renames, the draft check). The `.nightshift/` file loader (`./files`, the only I/O). Schedules and agent profiles, because a flow document references them. The harness catalog (`harnesses/`): what a person sees of each built-in harness, browser-safe, for the web app and `agents`. | Running a flow. UI copy: the editor passes its own words to `checkDraft`. |
 | `ui` | shadcn/ui components and tokens. See `AGENTS.md`. | Anything domain-specific. |
@@ -61,6 +62,8 @@ One package is one bounded context. One domain has one home.
 Each table has one owning package. The schema file names the owner above each table group. Another package reads or writes that table only through the owner's functions. Example: the engine asks `@nightshift/auth` for the members of a Space. It does not query `member`. Example: the exchange of `@nightshift/devices` copies run history between Replicas through the engine's `RunHistory` (`PeerContext.history`). It does not query `run`, `step`, `agent_session` or `event`.
 
 The schema is in `packages/db/src/schema/`, one file per owner: `auth.ts`, `devices.ts`, `projects.ts`, `runs.ts`, `device-config.ts`, `engine.ts` and `daemon.ts`. A comment above each group of tables names the owning package and vertical. `schema/index.ts` lists every file with its owner. `auth:generate` writes `auth.ts`, so only the index names its owner. Put a new table in the file of its owner. When a table moves to another file, its migrations stay the same: `drizzle-kit generate` must report no changes.
+
+Three tables still have a second user: `device` and `host_space` (owner `devices`), and `daemon_lease` (owner `daemon`). Section 8 lists them.
 
 ### Ports for external I/O
 
@@ -90,6 +93,7 @@ The entries today:
 | `engine` | `.`, `./testing` |
 | `flows` | `.`, `./files` |
 | `ui` | `./components/*`, `./hooks/*`, `./lib/*`, `./globals.css`, `./postcss.config` |
+
 - A consumer imports a package by its name and a listed entry. Never by a relative path into another package (`../../packages/agents/src/...`).
 
 ## 4. Verticals
@@ -110,8 +114,8 @@ Every app and every package (except `ui` and `config`) is cut into verticals. Th
 
 | Workspace | Verticals in | Also at the top of `src/` |
 | --- | --- | --- |
-| An app (`apps/web`, `apps/server`, `apps/desktop`) | `src/features/<vertical>/` | `routes/` (web), `shared/`, the entry and composition root files |
-| A package (`engine`, `agents`, `flows`, `api`, `auth`, `db`, `daemon`, `devices`) | `src/<vertical>/` | `index.ts` (composes the vertical barrels into the package API), `testing/`, and the file that composes the verticals into one object when the package has one (`auth.ts`: the Better Auth instance, `daemon.ts`) |
+| An app (`apps/web`, `apps/server`, `apps/desktop`) | `src/features/<vertical>/` | `routes/` (web), `shared/`, the generated `env.ts`, and the entry files: `router.tsx` (web), `main.ts`, `cli.ts`, `join-cli.ts` and `auth-config.ts` (server), `bun/` (desktop, the Electrobun entry) |
+| A package (`engine`, `agents`, `flows`, `api`, `auth`, `db`, `daemon`, `devices`) | `src/<vertical>/` | `index.ts` (composes the vertical barrels into the package API), the other entries that `exports` names (`api`: `client.ts`, `context.ts`. `flows`: `files.ts`), `testing/`, the generated `env.ts` (`db`), and the files that compose the verticals or that every vertical uses: `auth.ts` (the Better Auth instance), `daemon.ts` and `start.ts`, `router.ts`, `procedures.ts` and `output.ts` (`api`), `wire.ts` (`devices`) |
 
 - **`shared/` (apps only)** holds cross-cutting code that is not a product area: the API client, logging, the page shell, time formatting. Each piece in `shared/` is a named folder with its own barrel (`shared/api/`, `shared/time/`). No loose files in `shared/`.
 - **No kind buckets at the top of `src/`.** Do not create `src/lib/`, `src/utils/`, `src/helpers/`, `src/hooks/`, `src/components/`, `src/types/`, `src/common/` or `src/misc/`. Exception: `packages/ui` (the shadcn layout).
@@ -124,6 +128,8 @@ Two exceptions exist, as in yapyap. Each one is listed by name in `scripts/check
 - **Leaf contract:** a pure-data file (no imports of its own) that a vertical exposes past its barrel, because importing the barrel would close a module-init cycle. Its symbols are also on the barrel.
 - **Peer port:** two verticals that depend on each other cross only through one named port file per direction. Every other deep import between them stays banned. Often only one direction closes the cycle. Then only that direction has a port, and the other direction imports the barrel.
 
+Today there is no leaf contract. There are seven peer ports, all in `apps/web` (section 5).
+
 ### Growth
 
 - Start a new concept inside the vertical that uses it. Promote it to its own vertical when a second vertical needs it.
@@ -133,9 +139,9 @@ Two exceptions exist, as in yapyap. Each one is listed by name in `scripts/check
 
 These are signals, not hard limits. A file past the limit needs a reason in its header comment.
 
-- A file over 600 lines: split it by sub-domain. Example: one file per node type, not one inspector for all types.
+- A source file over 600 lines (tests do not count): split it by sub-domain. Example: one file per node type, not one inspector for all types.
 - A route file over 80 lines: move the page body into its vertical.
-- A folder with more than 25 files: look for sub-verticals.
+- A folder with more than 25 source files (tests do not count, they stay next to their files): look for sub-verticals.
 
 ## 5. The web app
 
@@ -158,6 +164,8 @@ apps/web/src/
     flows/                 canvas/, editor/ (+ inspector/ one file per node type, io/, lib/), start/ (Start run, the flow's inputs)
     runs/                  components/ (+ run-page.tsx, details/), hooks/, lib/, transcript/ (+ items/ per group of item kinds)
     settings/              settings-page.tsx, components/ (one file per card), hooks/use-settings-form.ts
+    agents/                connections/ (MCP servers, CLI tools and secrets, on the Agents page)
+    gates/                 inbox/ (the Needs-you inbox)
 ```
 
 Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fails a cycle through barrels too.
@@ -190,24 +198,29 @@ An app wires packages together and talks to the outside world. It does not hold 
 
 ## 7. Enforcement
 
-| Check | Where | Status |
-| --- | --- | --- |
-| Layer map: `scripts/check-layers.ts` compares each workspace dependency in a `package.json` with the table in section 1. Bun links only declared dependencies, so this is the real import graph. | lefthook pre-commit, CI | Active |
-| Explicit `exports` in every `package.json` (section 3). A deep import fails `tsc` and fails at runtime. | TypeScript, Bun | Active |
-| Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, the `api` root and `flows/files` in `apps/web`. Biome replaces the options of a rule per override, so each override lists the whole set. | `biome.json` and its overrides | Active |
-| Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json` | Active |
-| CI on every pull request and push to `main`: `biome ci`, the layer check, the vertical check and its tests, `bun run check-types`, and `bun test` per workspace (without `*.live.test.ts`). | `.github/workflows/ci.yml` | Active |
-| Vertical boundaries: `scripts/check-verticals.ts` finds the verticals from the file system (so no list can drift), then fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks a workspace that is not enforced yet. | lefthook pre-commit, CI | Active (enforced for: `apps/desktop`, `apps/server`, `apps/web`, `packages/agents`, `packages/api`, `packages/auth`, `packages/daemon`, `packages/db`, `packages/devices`, `packages/engine`, `packages/flows`) |
-| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. A barrel that `package.json` `exports` names (`@nightshift/db/migrate`) is a public entry, like the root `index.ts`: other workspaces import it, so the script does not check it. | lefthook pre-commit, CI | Active (enforced for: `apps/desktop`, `apps/server`, `apps/web`, `packages/agents`, `packages/api`, `packages/auth`, `packages/daemon`, `packages/db`, `packages/devices`, `packages/engine`, `packages/flows`) |
-| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (enforced for: `apps/desktop`, `apps/server`, `apps/web`, `packages/agents`, `packages/api`, `packages/auth`, `packages/daemon`, `packages/db`, `packages/devices`, `packages/engine`, `packages/flows`) |
-| API contract: every procedure has a one-line summary and an output schema, and the OpenAPI document builds with both. Real replies of a sandbox engine match their schemas. `exact<T>()` fails the build when an output schema differs from its domain type. | `packages/api/src/contract.test.ts`, TypeScript | Active |
+The pre-commit hook is `lefthook.yml` (install it with `bun lefthook install`). CI is `.github/workflows/ci.yml`. It runs on every pull request and every push to `main`.
 
-When a check exists, change its status to "Active". When a workspace follows section 4, add it to `ENFORCED` in `scripts/check-verticals.ts` and to the list above. Fix a violation, do not add an exception. If a rule is wrong, change this document first.
+| Check | How it runs | Status |
+| --- | --- | --- |
+| Layer map: `scripts/check-layers.ts` compares each workspace dependency in a `package.json` with the table in section 1. Bun links only declared dependencies, so this is the real import graph. | lefthook pre-commit (when a `package.json` changes), CI | Active |
+| Explicit `exports` in every `package.json` (section 3). A deep import fails `tsc` and fails at runtime. | TypeScript (`bun run check-types`, CI), Bun at runtime | Active |
+| Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, the `api` root and `flows/files` in `apps/web`. Biome replaces the options of a rule per override, so each override lists the whole set. | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
+| Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
+| Vertical boundaries: `scripts/check-verticals.ts` finds the workspaces and their verticals from the file system, so no list can drift and a new workspace is checked from its first commit. It fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks one workspace. | lefthook pre-commit (when a `.ts` or `.tsx` file changes), CI | Active (every workspace except `ui` and `config`) |
+| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. A barrel that `package.json` `exports` names (`@nightshift/db/migrate`) is a public entry, like the root `index.ts`: other workspaces import it, so the script does not check it. | lefthook pre-commit, CI | Active (every workspace except `ui` and `config`) |
+| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (every workspace except `ui` and `config`) |
+| The checks have tests: `scripts/check-verticals.test.ts` proves each rule on small workspaces, and that the script passes on this repository. | `bun test ./scripts/`: lefthook pre-commit (when a check script changes), CI | Active |
+| Types and tests: `bun run check-types` (every workspace, with the web build), and `bun test` per workspace (without `*.live.test.ts`). | CI | Active |
+| The compiled binary starts: `apps/server/scripts/smoke-binary.ts` builds it and starts it as the Docker image does. | CI | Active |
+| API contract: every procedure has a one-line summary and an output schema, and the OpenAPI document builds with both. Real replies of a sandbox engine match their schemas. `exact<T>()` fails the build when an output schema differs from its domain type. | `packages/api/src/contract.test.ts` (CI), TypeScript | Active |
+
+When a check exists, change its status to "Active". The two scripts find the workspaces themselves, so a new workspace needs no list entry. Fix a violation, do not add an exception. If a rule is wrong, change this document first.
 
 ## 8. Known deviations
 
 The code does not yet follow every rule. These are debts. Do not copy them into new code.
 
-- Every workspace except `ui` and `config` is cut into barrel verticals (`features/<vertical>/index.ts` in apps, `src/<vertical>/index.ts` in packages). `scripts/check-verticals.ts` still keeps its `ENFORCED` list. Phase 8 removes it.
+- **The `device` and `host_space` tables have a second user.** Their owner is `devices` (`schema/devices.ts`). The engine sits below `devices`, so it cannot call its functions. It reads and writes the tables itself. `engine/device-config/self-device.ts` makes this computer's own `device` row and sets its owner. `engine/projects/projects.ts` reads the name of a Device and joins `device` to find this computer's Clone (`clonePathOf`). `engine/projects/space-document.ts` joins `device` for the Device names of the Clones (`importRows`) and reads `host_space` (`isHostedElsewhere`). The fix: the engine declares these reads on its `Peers` port, which `devices` implements. Or this computer's own Device row moves to a table the engine owns.
+- **The desktop watchdog reads `daemon_lease` with its own SQL.** The owner is `daemon` (`runtime/health.ts`, `readHeartbeatFile`). `apps/desktop/src/features/watchdog/watchdog-worker.ts` runs in a Worker as a file next to the bundle, so it imports nothing but Bun. The fix: bundle the worker, and import the heartbeat read from `@nightshift/daemon`.
 
-The migration plan that removes these debts is in the structure audit of 2026-10-20.
+To add a deviation, name the rule it breaks, the files, and the change that removes it. Remove the entry in the change that fixes it.
