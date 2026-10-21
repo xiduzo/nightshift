@@ -15,6 +15,7 @@
 	"dependencies": {
 		"@rn-primitives/alert-dialog": "^1.5.2",
 		"@rn-primitives/label": "^1.5.2",
+		"@rn-primitives/progress": "^1.5.2",
 		"@rn-primitives/select": "^1.5.2",
 		"@rn-primitives/separator": "^1.5.2",
 		"@rn-primitives/slot": "^1.5.2",
