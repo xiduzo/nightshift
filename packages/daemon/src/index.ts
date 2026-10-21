@@ -4,11 +4,18 @@
  * the desktop app use the helpers around it.
  */
 
+export type {
+	DesktopNotice,
+	DesktopNotifier,
+	DesktopWindow,
+	DesktopWindowState,
+} from "@nightshift/notifications";
 export {
 	createDaemon,
 	type Daemon,
 	type DaemonInfo,
 	type DaemonOptions,
+	type DesktopScreen,
 } from "./daemon";
 export {
 	directoryWeb,

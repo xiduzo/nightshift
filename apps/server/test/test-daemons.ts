@@ -57,6 +57,7 @@ export async function startDaemon(
 			NIGHTSHIFT_DATA_DIR: dataDir,
 			NIGHTSHIFT_SCHEDULER: "off",
 			NIGHTSHIFT_KEY_STORE: "file",
+			NIGHTSHIFT_DESKTOP_NOTIFICATIONS: "off",
 			...env,
 		},
 		stdout: "ignore",

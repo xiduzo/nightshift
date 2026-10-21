@@ -10,7 +10,11 @@ import { useEffect, useRef } from "react";
 
 import { useOpenGates } from "@/features/gates";
 import { runQueries } from "@/features/runs";
-import { notificationsSupported, settingsQueries } from "@/features/settings";
+import {
+	inDesktopApp,
+	notificationsSupported,
+	settingsQueries,
+} from "@/features/settings";
 import type { RunStatus } from "@/shared/api";
 
 /**
@@ -80,6 +84,8 @@ function show({
 	tag: string;
 	onClick: () => void;
 }) {
+	// The desktop app shows its own notifications: none twice.
+	if (inDesktopApp()) return;
 	if (!notificationsSupported() || Notification.permission !== "granted") {
 		return;
 	}

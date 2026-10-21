@@ -21,6 +21,8 @@ export type DaemonEnv = AuthConfig & {
 	readonly NIGHTSHIFT_TLS_CERT?: string;
 	readonly NIGHTSHIFT_TLS_KEY?: string;
 	readonly NIGHTSHIFT_REQUIRE_TWO_FACTOR?: string;
+	/** "off": no desktop notification, also where `desktop: "system"` asks for one. */
+	readonly NIGHTSHIFT_DESKTOP_NOTIFICATIONS?: string;
 	/** The other values are fallbacks of the settings (NIGHTSHIFT_CLAUDE_BIN, …). */
 	readonly [name: string]: string | undefined;
 };

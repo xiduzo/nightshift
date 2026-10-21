@@ -18,4 +18,6 @@ await startDaemon({
 	port: daemonPort(),
 	// One listener on PORT, as before: `bun run night` asks it for /health.
 	oneListener: true,
+	// Notifications on this computer's desktop, through the OS programs.
+	desktop: "system",
 });
