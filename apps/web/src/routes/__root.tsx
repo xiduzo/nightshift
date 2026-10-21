@@ -29,6 +29,12 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 			{
 				title: "Night Shift",
 			},
+			// Added to an iPhone or iPad Home Screen, it opens like an app
+			// and can get notifications (manifest.webmanifest).
+			{
+				name: "apple-mobile-web-app-title",
+				content: "Night Shift",
+			},
 		],
 		links: [
 			{
@@ -39,6 +45,14 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 				rel: "icon",
 				type: "image/svg+xml",
 				href: "/favicon.svg",
+			},
+			{
+				rel: "manifest",
+				href: "/manifest.webmanifest",
+			},
+			{
+				rel: "apple-touch-icon",
+				href: "/apple-touch-icon.png",
 			},
 		],
 	}),

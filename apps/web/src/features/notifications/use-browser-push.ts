@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
 	browserName,
 	currentSubscription,
+	needsHomeScreen,
 	ownScreenId,
 	pushSupported,
 	setOwnScreenId,
@@ -15,12 +16,14 @@ import { notificationMutations, notificationQueries } from "./queries";
 /**
  * Whether this browser gets your notifications while no Night Shift page is
  * open:
+ * - `home-screen`: an iPhone or iPad can, once Night Shift is on its Home Screen.
  * - `unsupported`: this browser, or this address, cannot.
  * - `denied`: the browser blocks notifications for this site.
  * - `off`, `on`.
  */
 export type BrowserPushState =
 	| "loading"
+	| "home-screen"
 	| "unsupported"
 	| "denied"
 	| "off"
@@ -38,11 +41,15 @@ export function useBrowserPush() {
 	const remove = useMutation(notificationMutations.removeScreen());
 	const [subscribed, setSubscribed] = useState<boolean | null>(null);
 	const [permission, setPermission] = useState<
-		NotificationPermission | "unsupported" | null
+		NotificationPermission | "home-screen" | "unsupported" | null
 	>(null);
 	const [busy, setBusy] = useState(false);
 
 	const read = useCallback(async () => {
+		if (needsHomeScreen()) {
+			setPermission("home-screen");
+			return;
+		}
 		if (!pushSupported()) {
 			setPermission("unsupported");
 			return;
@@ -58,10 +65,13 @@ export function useBrowserPush() {
 	const own = ownScreenId();
 	const listed = screens.data?.some((screen) => screen.id === own) ?? false;
 	const state: BrowserPushState =
-		permission === null || (permission !== "unsupported" && subscribed === null)
+		permission === null ||
+		(permission !== "unsupported" &&
+			permission !== "home-screen" &&
+			subscribed === null)
 			? "loading"
-			: permission === "unsupported"
-				? "unsupported"
+			: permission === "unsupported" || permission === "home-screen"
+				? permission
 				: permission === "denied"
 					? "denied"
 					: permission === "granted" && subscribed && listed

@@ -29,7 +29,7 @@ import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
 import { useQuery } from "@tanstack/react-query";
-import { BellOffIcon, CircleAlertIcon } from "lucide-react";
+import { BellOffIcon, CircleAlertIcon, SquarePlusIcon } from "lucide-react";
 import { useId, useMemo } from "react";
 import { toast } from "sonner";
 
@@ -379,6 +379,7 @@ function BrowserField() {
 					disabled={
 						push.busy ||
 						push.state === "loading" ||
+						push.state === "home-screen" ||
 						push.state === "unsupported" ||
 						push.state === "denied"
 					}
@@ -402,6 +403,16 @@ function BrowserField() {
 						Allow notifications for this site in the browser's site settings
 						(the icon left of the address). On macOS, also allow the browser in
 						System Settings, Notifications.
+					</AlertDescription>
+				</Alert>
+			) : push.state === "home-screen" ? (
+				<Alert>
+					<SquarePlusIcon />
+					<AlertTitle>Add Night Shift to your Home Screen</AlertTitle>
+					<AlertDescription>
+						An iPhone or iPad sends notifications only to apps on its Home
+						Screen. Tap Share, then Add to Home Screen. Open Night Shift from
+						there and turn this on.
 					</AlertDescription>
 				</Alert>
 			) : push.state === "unsupported" ? (
