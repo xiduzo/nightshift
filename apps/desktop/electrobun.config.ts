@@ -28,6 +28,33 @@ function libsqlNativePackage(): string {
 }
 const libsqlNative = libsqlNativePackage();
 
+/**
+ * The watchdog runs in a Worker, from its own file next to the bundle: Bun
+ * starts a Worker from a file and does not bundle it with the main process.
+ * So the worker is bundled here on its own, with what it imports
+ * (`@nightshift/daemon/heartbeat`). The file keeps the name the app starts
+ * it by (`watchdog-worker.ts`). Bun runs the bundled JavaScript in it as it is.
+ */
+async function bundleWatchdogWorker(): Promise<string> {
+	const outdir = join(import.meta.dir, "node_modules/.cache/watchdog");
+	const result = await Bun.build({
+		entrypoints: [
+			join(import.meta.dir, "src/features/watchdog/watchdog-worker.ts"),
+		],
+		outdir,
+		naming: "[name].ts",
+		target: "bun",
+	});
+	if (!result.success) {
+		throw new AggregateError(
+			result.logs,
+			"The watchdog worker did not bundle.",
+		);
+	}
+	return join(outdir, "watchdog-worker.ts");
+}
+const watchdogWorker = await bundleWatchdogWorker();
+
 // The release workflows set these. A local build is a stable build of 0.1.0.
 const version = process.env.NIGHTSHIFT_VERSION || "0.1.0";
 const feed =
@@ -61,10 +88,12 @@ export default {
 			[webBuildDir]: "views/mainview",
 			// `@nightshift/db` finds its migrations next to the module that runs.
 			"../../packages/db/src/migrate/migrations": "bun/migrations",
-			// A Worker's own file, next to the bundle that starts it (Bun runs it as is).
-			"src/features/watchdog/watchdog-worker.ts": "bun/watchdog-worker.ts",
+			// A Worker's own file, next to the bundle that starts it.
+			[watchdogWorker]: "bun/watchdog-worker.ts",
 			[libsqlNative]: `bun/node_modules/@libsql/${libsqlNative.split("/").pop()}`,
 		},
+		// The worker is no entrypoint and its bundle is in node_modules: watch its source.
+		watch: ["src/features/watchdog"],
 		watchIgnore: [`${webBuildDir}/**`],
 		mac: {
 			codesign,

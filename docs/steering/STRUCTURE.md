@@ -63,7 +63,7 @@ Each table has one owning package. The schema file names the owner above each ta
 
 The schema is in `packages/db/src/schema/`, one file per owner: `auth.ts`, `devices.ts`, `projects.ts`, `runs.ts`, `device-config.ts`, `engine.ts` and `daemon.ts`. A comment above each group of tables names the owning package and vertical. `schema/index.ts` lists every file with its owner. `auth:generate` writes `auth.ts`, so only the index names its owner. Put a new table in the file of its owner. When a table moves to another file, its migrations stay the same: `drizzle-kit generate` must report no changes.
 
-Three tables still have a second user: `device` and `host_space` (owner `devices`), and `daemon_lease` (owner `daemon`). Section 8 lists them.
+Two tables still have a second user: `device` and `host_space` (owner `devices`). Section 8 lists them.
 
 ### Ports for external I/O
 
@@ -89,7 +89,7 @@ The entries today:
 | `auth` | `.`, `./testing` |
 | `db` | `.`, `./schema`, `./data-dir`, `./migrate` |
 | `devices` | `.` |
-| `daemon` | `.` (`startDaemon`, `createDaemon`, the CLI's and the desktop app's helpers: `prepareDaemonEnv`, `checkHealth`, `DEFAULT_PORT`, the web UI handler) |
+| `daemon` | `.` (`startDaemon`, `createDaemon`, the CLI's and the desktop app's helpers: `prepareDaemonEnv`, `checkHealth`, `DEFAULT_PORT`, the web UI handler), `./heartbeat` (`readHeartbeatFile`: the lease heartbeat as another process reads it, Bun and Node only, for the desktop watchdog's Worker) |
 | `engine` | `.`, `./testing` |
 | `flows` | `.`, `./files` |
 | `ui` | `./components/*`, `./hooks/*`, `./lib/*`, `./globals.css`, `./postcss.config` |
@@ -115,7 +115,7 @@ Every app and every package (except `ui` and `config`) is cut into verticals. Th
 | Workspace | Verticals in | Also at the top of `src/` |
 | --- | --- | --- |
 | An app (`apps/web`, `apps/server`, `apps/desktop`) | `src/features/<vertical>/` | `routes/` (web), `shared/`, the generated `env.ts`, and the entry files: `router.tsx` (web), `main.ts`, `cli.ts`, `join-cli.ts` and `auth-config.ts` (server), `bun/` (desktop, the Electrobun entry) |
-| A package (`engine`, `agents`, `flows`, `api`, `auth`, `db`, `daemon`, `devices`) | `src/<vertical>/` | `index.ts` (composes the vertical barrels into the package API), the other entries that `exports` names (`api`: `client.ts`, `context.ts`. `flows`: `files.ts`), `testing/`, the generated `env.ts` (`db`), and the files that compose the verticals or that every vertical uses: `auth.ts` (the Better Auth instance), `daemon.ts` and `start.ts`, `router.ts`, `procedures.ts` and `output.ts` (`api`), `wire.ts` (`devices`) |
+| A package (`engine`, `agents`, `flows`, `api`, `auth`, `db`, `daemon`, `devices`) | `src/<vertical>/` | `index.ts` (composes the vertical barrels into the package API), the other entries that `exports` names (`api`: `client.ts`, `context.ts`. `flows`: `files.ts`. `daemon`: `heartbeat.ts`), `testing/`, the generated `env.ts` (`db`), and the files that compose the verticals or that every vertical uses: `auth.ts` (the Better Auth instance), `daemon.ts` and `start.ts`, `router.ts`, `procedures.ts` and `output.ts` (`api`), `wire.ts` (`devices`) |
 
 - **`shared/` (apps only)** holds cross-cutting code that is not a product area: the API client, logging, the page shell, time formatting. Each piece in `shared/` is a named folder with its own barrel (`shared/api/`, `shared/time/`). No loose files in `shared/`.
 - **No kind buckets at the top of `src/`.** Do not create `src/lib/`, `src/utils/`, `src/helpers/`, `src/hooks/`, `src/components/`, `src/types/`, `src/common/` or `src/misc/`. Exception: `packages/ui` (the shadcn layout).
@@ -221,6 +221,5 @@ When a check exists, change its status to "Active". The two scripts find the wor
 The code does not yet follow every rule. These are debts. Do not copy them into new code.
 
 - **The `device` and `host_space` tables have a second user.** Their owner is `devices` (`schema/devices.ts`). The engine sits below `devices`, so it cannot call its functions. It reads and writes the tables itself. `engine/device-config/self-device.ts` makes this computer's own `device` row and sets its owner. `engine/projects/projects.ts` reads the name of a Device and joins `device` to find this computer's Clone (`clonePathOf`). `engine/projects/space-document.ts` joins `device` for the Device names of the Clones (`importRows`) and reads `host_space` (`isHostedElsewhere`). The fix: the engine declares these reads on its `Peers` port, which `devices` implements. Or this computer's own Device row moves to a table the engine owns.
-- **The desktop watchdog reads `daemon_lease` with its own SQL.** The owner is `daemon` (`runtime/health.ts`, `readHeartbeatFile`). `apps/desktop/src/features/watchdog/watchdog-worker.ts` runs in a Worker as a file next to the bundle, so it imports nothing but Bun. The fix: bundle the worker, and import the heartbeat read from `@nightshift/daemon`.
 
 To add a deviation, name the rule it breaks, the files, and the change that removes it. Remove the entry in the change that fixes it.

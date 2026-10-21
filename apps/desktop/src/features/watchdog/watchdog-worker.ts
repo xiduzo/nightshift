@@ -1,10 +1,11 @@
 /**
  * The desktop app's watchdog, in a Worker: see `./watchdog.ts`. A Worker has
  * its own event loop and timers, so it keeps checking when the app's own
- * timers stopped. This file runs as it is, next to the app's bundle
- * (`electrobun.config.ts` copies it): it imports nothing but Bun.
+ * timers stopped. The app's build bundles this file on its own and puts it
+ * next to the app's bundle (`electrobun.config.ts`). It imports only the
+ * heartbeat read of `@nightshift/daemon`, an entry that loads nothing else.
  */
-import { Database } from "bun:sqlite";
+import { readHeartbeatFile } from "@nightshift/daemon/heartbeat";
 
 export type WatchdogStart = {
 	/** The database file. */
@@ -24,17 +25,8 @@ declare const self: Worker;
  */
 function heartbeatAge(start: WatchdogStart): number | null {
 	try {
-		const db = new Database(start.database, { readonly: true });
-		try {
-			const row = db
-				.query<{ owner: string | null; heartbeatAt: number }, []>(
-					"SELECT owner, heartbeat_at AS heartbeatAt FROM daemon_lease WHERE id = 1",
-				)
-				.get();
-			return row?.owner === start.owner ? Date.now() - row.heartbeatAt : null;
-		} finally {
-			db.close();
-		}
+		const row = readHeartbeatFile(start.database);
+		return row?.owner === start.owner ? Date.now() - row.heartbeatAt : null;
 	} catch (error) {
 		console.error("The watchdog could not read the database:", error);
 		return null;

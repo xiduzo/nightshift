@@ -1,7 +1,8 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // Owner: `@nightshift/daemon`, `runtime/`: the single-writer lease
-// (`lease.ts`), and the health check that reads it (`health.ts`).
+// (`lease.ts`), and the health check that reads it (`health.ts`). Another
+// process reads it through `@nightshift/daemon/heartbeat`.
 
 /**
  * The single-writer lease: one row, held by the one daemon that may write to

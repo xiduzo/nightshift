@@ -6,13 +6,12 @@ import { createDb } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { daemonLease } from "@nightshift/db/schema";
 
+import { type Heartbeat, readHeartbeatFile } from "../heartbeat";
 import {
 	checkHealth,
 	elapsedSeconds,
-	type Heartbeat,
 	leaseHealth,
 	readHeartbeat,
-	readHeartbeatFile,
 	stopHolder,
 } from "./health";
 import { acquireLease, pidAlive } from "./lease";
