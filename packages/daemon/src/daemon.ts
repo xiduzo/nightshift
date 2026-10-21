@@ -13,6 +13,7 @@ import {
 	hostPolicyFromEnv,
 	localPerson,
 	roleAllows,
+	spaceIds,
 } from "@nightshift/auth";
 import { createDb } from "@nightshift/db";
 import {
@@ -74,6 +75,11 @@ import {
 	isThisComputer,
 	trustedOriginsOf,
 } from "./http";
+import {
+	createKeepAwake,
+	engineRunSource,
+	systemSleepLock,
+} from "./keep-awake";
 import {
 	boundedStop,
 	chooseFolder,
@@ -181,6 +187,7 @@ export async function createDaemon(
 				hot.nightshiftDocument?.flush(),
 				hot.nightshiftSpaces?.flush(),
 				hot.nightshiftNotifications?.stop(),
+				hot.nightshiftKeepAwake?.stop(),
 				lease.release(),
 			]),
 		);
@@ -502,6 +509,20 @@ export async function createDaemon(
 	}
 	// Not awaited: the baseline reads every Space's open Gates.
 	void notifications.start();
+
+	/**
+	 * "Keep this computer awake while a run is running" (this computer's
+	 * setting): the OS's sleep lock while a run here needs it.
+	 */
+	hot.nightshiftKeepAwake?.stop();
+	const keepAwake = createKeepAwake({
+		enabled: () => settings.current().keepAwake,
+		runs: engineRunSource(engine, () => spaceIds(db)),
+		lock: systemSleepLock(),
+	});
+	hot.nightshiftKeepAwake = keepAwake;
+	// Not awaited: it reads the runs that have not ended.
+	void keepAwake.start();
 
 	const gitInstaller = systemGitInstaller();
 	const info: DaemonInfo = {

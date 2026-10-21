@@ -6,6 +6,7 @@ import type {
 } from "@nightshift/engine";
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
 
+import type { KeepAwake } from "../keep-awake";
 import type { Sync } from "../sync";
 import type { Lease } from "./lease";
 
@@ -20,7 +21,7 @@ import type { Lease } from "./lease";
  *   the in-app channel (an open notification stream outlives a reload),
  *   the listeners (Bun reloads a server of the same `id` in place);
  * - replaced, the old one stopped first: the engine (`dispose`), the
- *   notifier (`stop`), the scheduler (`abort`), the timers
+ *   notifier (`stop`), the keep-awake (`stop`), the scheduler (`abort`), the timers
  *   (`clearInterval`), the links (`close`).
  *
  * The names stay as they are: a running dev daemon reloads into new code
@@ -35,6 +36,7 @@ export type HotRegistry = {
 	nightshiftEngine?: Engine;
 	nightshiftInApp?: InAppChannel;
 	nightshiftNotifications?: Notifications;
+	nightshiftKeepAwake?: KeepAwake;
 	nightshiftScheduler?: AbortController;
 	nightshiftFacts?: Timer;
 	nightshiftPresence?: Timer;
