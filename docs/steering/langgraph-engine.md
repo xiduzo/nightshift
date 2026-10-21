@@ -45,8 +45,8 @@ below it, from the bottom up:
 lower vertical implements, or the contract). The engine reads the auth
 tables (`user`, `member`, `organization`) only through functions of
 `@nightshift/auth`. `testing/` holds the test
-helpers and fixtures. `lease.ts` and `folder-picker.ts` stay at the top of
-`src/` until the daemon package takes them.
+helpers and fixtures. The database lease and the folder picker are process
+concerns: they live in `@nightshift/daemon` (`src/runtime/`).
 
 ```
 packages/engine/src/

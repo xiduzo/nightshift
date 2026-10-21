@@ -14,6 +14,9 @@ services:
     # The image's health check marks a Night Shift that stops responding as
     # unhealthy (`docker compose ps`). Compose does not restart it for that:
     # Docker Swarm does (Dokploy).
+    # Under Docker Swarm, set `deploy.update_config.order: stop-first`: a
+    # second Night Shift on the same volume exits while the first holds the
+    # database lease (docs/deploy/public-server.md).
     # The name other computers show for this Host.
     hostname: nightshift
     environment:

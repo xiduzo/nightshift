@@ -63,6 +63,28 @@ the test, and a start period of at least 2 minutes:
 The times are in nanoseconds, as Docker takes them. The image has no
 `curl`: test with `nightshift health`, not with a web request.
 
+### Updates: stop the old container first
+
+One data folder has one Night Shift. Night Shift holds a lease on its
+database while it runs. A second Night Shift on the same volume does not
+start while the first one holds it: it exits with code 1. A rolling update
+that starts the new container before it stops the old one (`start-first`)
+fails for that reason.
+
+Set the update order to `stop-first`. In Dokploy: Advanced, Swarm Settings,
+Update Config:
+
+```json
+{
+  "Parallelism": 1,
+  "Order": "stop-first"
+}
+```
+
+In a Swarm stack file, that is `deploy.update_config.order: stop-first`.
+The old container stops cleanly on SIGTERM and gives the lease up, so the
+new one starts at once. Its runs continue in the new container.
+
 ## Without Docker
 
 Install the binary and the systemd unit

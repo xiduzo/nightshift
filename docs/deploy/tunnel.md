@@ -54,7 +54,9 @@ nightshift serve --listen 127.0.0.1 --require-two-factor \
 ```
 
 In Docker, set `NIGHTSHIFT_REQUIRE_TWO_FACTOR=on` and publish the port on
-`127.0.0.1` only (`-p 127.0.0.1:3000:3000`). Night Shift limits sign-in
+`127.0.0.1` only (`-p 127.0.0.1:3000:3000`). Stop the old container before
+you start a new one on the same volume: see
+[Updates](public-server.md#updates-stop-the-old-container-first). Night Shift limits sign-in
 tries per visitor by the `CF-Connecting-IP` header that Cloudflare adds. See
 [Require two-factor sign-in](README.md#require-two-factor-sign-in).
 

@@ -21,7 +21,7 @@ Code that changes together lives together. A boundary that is not enforced is no
 | 2. Core | `engine` | `db`, `flows`, `agents`, `auth` |
 | 3. Core domains | `devices` (planned) | Layer 2 and lower |
 | 4. Surface | `api` | Layer 3 and lower |
-| 5. Runtime | `daemon` (planned) | Layer 4 and lower |
+| 5. Runtime | `daemon` | Layer 4 and lower |
 | 6. Apps | `server`, `desktop`, `web` | See below |
 
 The apps:
@@ -48,11 +48,11 @@ One package is one bounded context. One domain has one home.
 | `ui` | shadcn/ui components and tokens. See `AGENTS.md`. | Anything domain-specific. |
 | `auth` | Identity and access on Better Auth: login, two-factor, pairing, device keys, Spaces, members, roles. The auth tables. | Device rows. |
 | `agents` | Harness sessions, one harness adapter per harness, decider providers, MCP and CLI tools, pricing, skills. | Run order, retries, gates. |
-| `engine` | The run engine: compile a flow to a graph, walk it, run policy, gates, the event log, the run read model, projects and worktrees, the device-config document. | Peers, sync and offers (moving to `devices`). Process concerns such as the lease and OS dialogs (moving to `daemon`). |
-| `devices` (planned) | Peers, hosts, the exchange, offers, placement, work relay. Today this domain is split over `engine/device`, `engine/exchange`, `apps/server/src/devices` and `api/context.ts`. | The execution port (`Device`). That stays in `engine`. |
+| `engine` | The run engine: compile a flow to a graph, walk it, run policy, gates, the event log, the run read model, projects and worktrees, the device-config document. | Peers, sync and offers (moving to `devices`). Process concerns such as the lease and OS dialogs (in `daemon`). |
+| `devices` (planned) | Peers, hosts, the exchange, offers, placement, work relay. Today this domain is split over `engine/device`, `engine/exchange`, `daemon/src/devices` and `api/context.ts`. | The execution port (`Device`). That stays in `engine`. |
 | `api` | The oRPC surface: procedures per domain, middleware, the router type the web app consumes. Every procedure declares an input schema, an output schema and a one-line summary. That makes the router the one source for the web client, OpenAPI and any agent tool surface (MCP). | Domain logic. A procedure validates, checks access and calls one domain function. |
-| `daemon` (planned) | Boot and runtime: `startDaemon()`, the Hono app, the lease, health, document sync transport, signals, hot-reload handover. | Domain logic. |
-| `apps/server` | The dev entry (`bun --hot`) and the CLI (`cli/`). | Domain logic. |
+| `daemon` | Boot and runtime: `createDaemon(env)` (the composition root), `startDaemon()` (the one boot sequence), the Hono app and its routes, the lease, health, the document sync transport, signals, the hot-reload handover, the harness table of this computer, OS dialogs. For now also the daemon's half of the devices domain (`src/devices/`, until `devices` exists). | Domain logic. The access policy of a synced document: that is `documentAccess` in `auth`. |
+| `apps/server` | The dev entry (`src/main.ts`, run by `bun --hot`), the CLI (`src/features/cli/`, entry `src/cli.ts`), the binary build (`scripts/`), the env schema, and the tests that start whole daemons as processes (`test/`). | Domain logic. |
 | `apps/desktop` | Tray, window, updates, watchdog. | Any logic of the daemon. |
 | `apps/web` | The UI. One vertical per product area. | Rules that the engine or `flows` already has. |
 
@@ -83,10 +83,10 @@ The entries today:
 | `api` | `.` (`appRouter` and its types), `./client` (types only, for `apps/web`), `./context` |
 | `auth` | `.`, `./testing` |
 | `db` | `.`, `./schema`, `./data-dir`, `./migrate` |
-| `engine` | `.`, `./lease` (light, for the health check, until phase 4 moves the lease to the daemon), `./testing` |
+| `daemon` | `.` (`startDaemon`, `createDaemon`, the CLI's and the desktop app's helpers: `prepareDaemonEnv`, `checkHealth`, `DEFAULT_PORT`, the web UI handler) |
+| `engine` | `.`, `./testing` |
 | `flows` | `.`, `./files` |
 | `ui` | `./components/*`, `./hooks/*`, `./lib/*`, `./globals.css`, `./postcss.config` |
-| `apps/server` | `.`, `./daemon-env`, `./health`, `./serve`, `./services`, `./shims/*` by name. A stopgap for `apps/desktop` until phase 4. |
 - A consumer imports a package by its name and a listed entry. Never by a relative path into another package (`../../packages/agents/src/...`).
 
 ## 4. Verticals
@@ -183,6 +183,7 @@ An app wires packages together and talks to the outside world. It does not hold 
 - A composition root is a function (`createDaemon(env)`), not a module with side effects at import time.
 - One boot sequence. The CLI and the desktop app call the same `startDaemon()`.
 - Constants such as the default port have one home.
+- Today: `createDaemon(env)` is in `packages/daemon/src/daemon.ts`, `startDaemon()` in `start.ts`. `bun run dev` (`apps/server/src/main.ts`), `nightshift serve` and the desktop app call `startDaemon()`. `DEFAULT_PORT` is in `daemon/src/runtime/port.ts`.
 
 ## 7. Enforcement
 
@@ -193,9 +194,9 @@ An app wires packages together and talks to the outside world. It does not hold 
 | Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, the `api` root and `flows/files` in `apps/web`. Biome replaces the options of a rule per override, so each override lists the whole set. | `biome.json` and its overrides | Active |
 | Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json` | Active |
 | CI on every pull request and push to `main`: `biome ci`, the layer check, the vertical check and its tests, `bun run check-types`, and `bun test` per workspace (without `*.live.test.ts`). | `.github/workflows/ci.yml` | Active |
-| Vertical boundaries: `scripts/check-verticals.ts` finds the verticals from the file system (so no list can drift), then fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks a workspace that is not enforced yet. | lefthook pre-commit, CI | Active (enforced for: `apps/web`, `packages/agents`, `packages/api`, `packages/engine`, `packages/flows`) |
-| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. | lefthook pre-commit, CI | Active (enforced for: `apps/web`, `packages/agents`, `packages/api`, `packages/engine`, `packages/flows`) |
-| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (enforced for: `apps/web`, `packages/agents`, `packages/api`, `packages/engine`, `packages/flows`) |
+| Vertical boundaries: `scripts/check-verticals.ts` finds the verticals from the file system (so no list can drift), then fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks a workspace that is not enforced yet. | lefthook pre-commit, CI | Active (enforced for: `apps/desktop`, `apps/server`, `apps/web`, `packages/agents`, `packages/api`, `packages/daemon`, `packages/engine`, `packages/flows`) |
+| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. | lefthook pre-commit, CI | Active (enforced for: `apps/desktop`, `apps/server`, `apps/web`, `packages/agents`, `packages/api`, `packages/daemon`, `packages/engine`, `packages/flows`) |
+| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (enforced for: `apps/desktop`, `apps/server`, `apps/web`, `packages/agents`, `packages/api`, `packages/daemon`, `packages/engine`, `packages/flows`) |
 | API contract: every procedure has a one-line summary and an output schema, and the OpenAPI document builds with both. Real replies of a sandbox engine match their schemas. `exact<T>()` fails the build when an output schema differs from its domain type. | `packages/api/src/contract.test.ts`, TypeScript | Active |
 
 When a check exists, change its status to "Active". When a workspace follows section 4, add it to `ENFORCED` in `scripts/check-verticals.ts` and to the list above. Fix a violation, do not add an exception. If a rule is wrong, change this document first.
@@ -207,10 +208,9 @@ The code does not yet follow every rule. These are debts. Do not copy them into 
 - `apps/web`: `routes/_auth/dashboard.tsx` holds its own markup: it is the old sign-in placeholder. `shared/api/orpc.ts` builds the account status key itself: the query client sends a refused session to sign in, and `shared/api` imports no feature.
 - `apps/web/src/features/agents/harnesses.ts` keeps its own copy of the harness catalog (label, initials, note, default model, models, where the code goes). The web app may not import `@nightshift/agents`. `harnesses.list` returns these facts, but only to an owner. The pickers, the canvas and the new-node defaults need them before the API answers. The model lists also differ: the API sends every model of the adapter, the editor shows a short list of suggestions. The agents package now keeps one record per harness (`packages/agents/src/harnesses/`). The fix is to put the browser-safe facts of those records where the web app may read them, with the suggestions as their own field.
 - The devices domain is split over four places (see section 2).
-- `apps/server/src/services.ts` starts the daemon at import time. `apps/desktop` imports the server app through a temporary `exports` map in `apps/server/package.json`. The layer check allows `desktop` → `server` with a temporary exception.
-- `@nightshift/engine/lease` is an extra entry. The desktop watchdog reads the health check before the daemon starts, and must not load the whole engine. Phase 4 moves the lease to the daemon.
 - Some procedures still compose stores instead of calling one domain function. `profiles.save` checks the connections and CLI tools a profile names. `connections.save`, `connections.remove` and `cliTools.remove` rewrite the profiles that name them. `harnesses.add`, `harnesses.remove` and `harnesses.saveCustom` edit the settings.
 - The engine owns the wire schemas of the exchange that the API uses (`runRowsSchema`, `workRequestSchema`, …). They move to `devices` in phase 5. The output schema of a work call checks only its outer part (`partOf<WorkRequest>()`).
-- Only `apps/web`, `packages/agents`, `packages/api`, `packages/engine` and `packages/flows` are cut into barrel verticals (`features/<vertical>/index.ts` in apps, `src/<vertical>/index.ts` in packages).
+- `packages/daemon/src/devices/` holds the daemon's half of the devices domain (Host pairing, links, the exchange client and server, Offers, work). It came from `apps/server/src/devices/`, because the desktop app may import only the daemon. It moves to `packages/devices` in phase 5.
+- Only `apps/desktop`, `apps/server`, `apps/web`, `packages/agents`, `packages/api`, `packages/daemon`, `packages/engine` and `packages/flows` are cut into barrel verticals (`features/<vertical>/index.ts` in apps, `src/<vertical>/index.ts` in packages).
 
 The migration plan that removes these debts is in the structure audit of 2026-10-20.

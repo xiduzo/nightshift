@@ -65,7 +65,7 @@ A node reads earlier values through templates, for example `{{check.log_tail}}`,
 flowchart LR
   subgraph desktop["Electrobun app (Bun main process)"]
     ui["apps/web — UI + React Flow editor"]
-    daemon["apps/server — Hono + oRPC daemon"]
+    daemon["packages/daemon — Hono + oRPC daemon"]
     engine["packages/engine — flow runner"]
     agents["packages/agents — harness sessions + tools"]
     db[("libsql — facts + event log + checkpoints")]
@@ -87,9 +87,10 @@ flowchart LR
 
 | Package | Owns |
 | --- | --- |
-| `apps/server` | The daemon. Hono, oRPC router, Better Auth, SSE fan-out of the event log, OS notifications. |
+| `apps/server` | The dev entry (`bun run dev`) and the `nightshift` command line. No logic. |
 | `apps/web` | The UI. Flow editor, run view with live transcripts, Needs-you inbox, run history. |
-| `apps/desktop` | The Electrobun shell. Tray and window. No logic. |
+| `apps/desktop` | The Electrobun shell. Tray, window, updates and the watchdog. No logic. |
+| `packages/daemon` | The daemon: one boot sequence (`startDaemon`) for all three. Hono, the oRPC handlers, Better Auth, the document sync relay, the database lease, health, signals, the hot-reload handover. |
 | `packages/db` | Drizzle schema on libsql. Durable facts and the event log. Full transcripts live on disk, indexed here. |
 | `packages/api` | The oRPC procedures, one group per domain. The web app takes only its router type. |
 | `packages/flows` | The flow schema (zod), the loader (`./files`), and the validator (unbounded loops, unknown names, missing outcomes). Each node type has one file in `src/nodes/` with its schema, its checks and its output fields. |
@@ -97,7 +98,7 @@ flowchart LR
 | `packages/agents` | Harness sessions through `@tanstack/ai` adapters, session resume, usage-limit waits, CLI tool permissions, the decider providers. |
 | `packages/ui` | Shared components and tokens. |
 
-The layer map, the planned `devices` and `daemon` packages, and the rules for where code lives are in `docs/steering/STRUCTURE.md`. That document wins when this table and it disagree.
+The layer map, the planned `devices` package, and the rules for where code lives are in `docs/steering/STRUCTURE.md`. That document wins when this table and it disagree.
 
 ## 5. Delivery
 

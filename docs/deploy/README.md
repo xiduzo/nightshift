@@ -87,6 +87,11 @@ curl http://127.0.0.1:3000/health   # 200 when it runs, else 503.
 - **Docker**: the image has a health check (`nightshift health`). Docker
   Swarm, and so Dokploy, replaces a container that is unhealthy. Plain
   Docker and Docker Compose only mark it unhealthy (`docker ps`).
+- **Updates in Docker Swarm and Dokploy**: stop the old container first
+  (update order `stop-first`). One data folder has one Night Shift. While
+  the old container holds the database, a new one on the same volume does
+  not start: it exits with code 1. See
+  [A public server](public-server.md#updates-stop-the-old-container-first).
 - **macOS**: two launchd agents. `nightshift.serve.plist` runs
   `nightshift serve` and starts it again when it stops.
   `nightshift.health.plist` runs `nightshift health --restart` every 60 s.

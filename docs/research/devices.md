@@ -25,7 +25,7 @@ and set aside; the first revision of this file has them.
 
 | Fact | Where |
 | --- | --- |
-| One daemon writes one database. A second daemon on it refuses to start (the Lease). | `packages/engine/src/lease.ts` |
+| One daemon writes one database. A second daemon on it refuses to start (the Lease). | `packages/daemon/src/runtime/lease.ts` |
 | A Project is an absolute path of a clone, unique in the database. | `project.repo_path` |
 | A Run has one worktree, a sibling folder of that clone, on this computer. | `run.worktree_path`, `projects/worktrees.ts` |
 | Harnesses, CLI Tools, Connections, Secrets and Agent Profiles are daemon-wide and say "this computer". | the Agents and Settings pages |
@@ -321,7 +321,7 @@ type Device = {
 };
 ```
 
-`localDevice(deps)` is what `services.ts` wires today. `remoteDevice(relay,
+`localDevice(deps)` is what `createDaemon` (`packages/daemon/src/daemon.ts`) wires today. `remoteDevice(relay,
 id)` makes the same calls through the Host to that Device's daemon, which
 serves them with its own `localDevice` after the Offer checks. The
 Walker's step runner asks `deviceFor(node, run)` once per step; node
@@ -465,9 +465,9 @@ travel as before.
   step's end closes the feed, a push of another Device is dropped);
   `packages/engine/src/peers/exchange/live-watch.test.ts` (the run page of a run
   walked elsewhere shows a running command's output);
-  `apps/server/src/devices/host-exchange.test.ts` (the Walker's stream
+  `packages/daemon/src/devices/host-exchange.test.ts` (the Walker's stream
   names a followed step, only the Walker pushes, a non-Member is
-  refused); `apps/server/src/devices/live-transcripts.test.ts` (two
+  refused); `apps/server/test/devices/live-transcripts.test.ts` (two
   daemons: each watches a running step the other walks, and a viewer
   resumes from its cursor).
 
@@ -602,7 +602,7 @@ iroh.
 
    **Landed (the Device port):** `packages/engine/src/device/`.
    `types.ts` is the port, `local.ts` is `localDevice`, wired in
-   `services.ts`. Choices where this file was open:
+   `createDaemon` (`packages/daemon/src/daemon.ts`). Choices where this file was open:
    - `capabilities(query?)` takes the programs to look up
      (`{ programs }`), so a run start asks for the CLI tools its nodes
      name. A kind says which with `NodeKind.programs`. Requirements read
@@ -627,7 +627,7 @@ iroh.
      them at start, before placement.
    - `StepStarted` gains `deviceId`, and `step.device_id` is the same:
      the Device the step runner placed the step on, not the Walker.
-     `services.ts` builds `localDevice` from the self `device` row.
+     `createDaemon` (`packages/daemon/src/daemon.ts`) builds `localDevice` from the self `device` row.
 2. **Spaces.** The organization plugin; every row gets a `space_id`; one
    personal Space holds everything; the Space switcher shows one. Sessions
    on the procedures replace public ones. No behaviour change for one
@@ -733,7 +733,7 @@ iroh.
      tables in this slice's migration would lose them before the import
      runs. A later migration drops them, once every install has started
      this version.
-   - **Hocuspocus in the daemon** at `/sync` (`apps/server/src/sync.ts`).
+   - **Hocuspocus in the daemon** at `/sync` (`packages/daemon/src/sync/sync.ts`).
      Bun accepts the socket (the daemon's default export is `{ fetch,
      websocket }`) and hands it to Hocuspocus 4's `handleConnection`. The
      daemon is the Owner of the documents it serves, so Hocuspocus gets no
@@ -743,7 +743,7 @@ iroh.
      `documentRows(db)`) is for a Host that keeps documents it does not
      own: slice 4.
    - **Who may connect**: the Device's owner only, by the same rule as the
-     procedures (`ownerOnly`, `apps/server/src/sync.ts`). The request's
+     procedures (`ownerOnly`, `packages/auth/src/document-access.ts`). The request's
      session decides; a request from this computer (`isThisComputer`: a
      loopback address, no `Origin` or one of the UI's) without a session
      of its own gets the local Person's session, as slice 2's procedures
@@ -797,7 +797,7 @@ iroh.
      plugin's hooks (a Space made, a Member added or removed, a new role,
      an invitation accepted: `createAuth(…, { onMembersChanged })`), the
      Space's `member` and `user` rows are written into `members`.
-   - **Who may open it** (`documentAccess`, `apps/server/src/sync.ts`,
+   - **Who may open it** (`documentAccess`, `packages/auth/src/document-access.ts`,
      which `ownerOnly` became): `device:<id>` its owner, as before;
      `space:<id>` a Member of that Space, by the same session rule, always
      read-only (Hocuspocus's `connectionConfig.readOnly`: it drops the
@@ -856,7 +856,7 @@ iroh.
      certificate in `host_link.certificate`. Bun 1.3's `fetch` and
      `WebSocket` never call `checkServerIdentity`, so the pin is the
      certificate as the only authority (`tls: { ca }`): a changed
-     certificate fails the link (`apps/server/src/devices/tls.ts`). A
+     certificate fails the link (`packages/daemon/src/devices/tls.ts`). A
      certificate this computer already trusts is not pinned (renewals).
    - **Pairing** (`packages/auth/src/pairing.ts`): Better Auth 1.7.7's
      device authorization plugin, client id = the joining Device's id,
@@ -872,7 +872,7 @@ iroh.
      `{ deviceId }`, permissions `sync`, `relay`, `archive`, hashed at
      rest, rate limit off. Idle expiry: a use moves `expiresAt` on, at
      most once a day. Pairing again replaces the Device's key.
-   - **On the Host** (`apps/server/src/devices/host.ts`, the registry
+   - **On the Host** (`packages/daemon/src/devices/host.ts`, the registry
      `packages/engine/src/peers/registry.ts`): the paired Device's
      `device` row (name, platform, owner, `home_host` = the address it
      joined by when this is its home Host, else null, `last_seen_at`,
@@ -897,7 +897,7 @@ iroh.
      Device documents of its home Devices (`KeptDocuments`: Hocuspocus
      loads and stores them in the Replica's `ydoc` rows); a guest Host
      keeps none, and refuses them.
-   - **The joining Device** (`apps/server/src/devices/join.ts`, `bun run
+   - **The joining Device** (`packages/daemon/src/devices/join.ts`, `bun run
      join <host> [--guest]` → the local daemon's `devices.join`, a
      stream): the link goes in `host_link` (Host id and name, addresses,
      pinned certificate, home or guest, the Person there, where the key
@@ -905,7 +905,7 @@ iroh.
      `nightshift-device-keys`), else in `<data dir>/device-keys/<host>`
      with mode 0600 (`NIGHTSHIFT_KEY_STORE=file` forces it). One home
      Host at most; a home link sets the self row's `home_host`.
-   - **The Link** (`apps/server/src/devices/link.ts`): `httpsLink` tries
+   - **The Link** (`packages/daemon/src/devices/link.ts`): `httpsLink` tries
      the addresses in order (a refusal is an answer, a network error
      falls through), keeps the first that answers, learns the Host's
      list from each answer (the Host's order, then the ones it did not
@@ -923,7 +923,7 @@ iroh.
      link the CLI prints opens it filled in (`/devices?pair=`).
    - `BETTER_AUTH_URL` and `CORS_ORIGIN` are not sensitive in
      `.env.schema`: varlock refused responses that carried them.
-   - Tests: `apps/server/src/devices/two-devices.test.ts` runs two
+   - Tests: `apps/server/test/devices/two-devices.test.ts` runs two
      daemons as processes (the services are one per process), B joins A
      through the CLI, A's Person approves, B is online on A, B's document
      opens on A, Remove access ends B's link, and A's log has the four
@@ -949,7 +949,7 @@ iroh.
      `walker_seq` this Replica has. Finer than "per Host and Walker", so a
      Space the owner joins later is exchanged from its start. For this
      computer's own Walker the row is the push cursor: what the Host took.
-   - **Over the Link** (`apps/server/src/devices/exchange.ts`, run while
+   - **Over the Link** (`packages/daemon/src/devices/exchange.ts`, run while
      the link is online): a push loop sends this computer's rows of the
      Spaces the Host keeps, after the cursor, whenever an event lands; a
      pull loop reads `sync.stream` (an oRPC event iterator: a batch, then
@@ -957,7 +957,7 @@ iroh.
      log ingests what arrives (`RunLog.ingest`, the same bookkeeping as an
      append) and the bus tells the run's watchers, so a run page of a run
      walked elsewhere updates live. `sync.pull` is the same batch once.
-   - **The Host filters** (`apps/server/src/devices/host-exchange.ts`): it
+   - **The Host filters** (`packages/daemon/src/devices/host-exchange.ts`): it
      serves rows of the Spaces the key's Person is a Member of, never the
      Device's own back; it takes only rows whose Walker is the key's
      Device, in those Spaces, and refuses the whole batch otherwise
@@ -1022,7 +1022,7 @@ iroh.
    - **Host offline**: every Device keeps walking its own runs; both loops
      start again at their cursors when the link is back.
    - Tests: `packages/engine/src/peers/exchange/exchange.test.ts` (two
-     Replicas in one process) and `apps/server/src/devices/exchange.test.ts`
+     Replicas in one process) and `apps/server/test/devices/exchange.test.ts`
      (two daemons, the harness of part A in `test-daemons.ts`): B walks a
      run in A's Space, A gets it live with the same status and B's name,
      answers its Gate from A, B applies it and the run finishes on both, A
@@ -1096,7 +1096,7 @@ iroh.
      an error of kind `network` (the run's policy waits and continues the
      session, as for a network failure).
    - **The relay's work half** (`devices.work`, the `relay` permission of a
-     Device key). On a Host, `createWorkHub` (`apps/server/src/devices/
+     Device key). On a Host, `createWorkHub` (`packages/daemon/src/devices/
      work-hub.ts`, in memory) holds the calls of the runs the Host walks,
      per placed Device. The placed Device takes them as a stream over its
      own Link (`createWorkServer`, `work.ts`, beside the exchange in
@@ -1149,8 +1149,8 @@ iroh.
    - Tests: `packages/engine/src/peers/placement.test.ts` (in-memory
      relay: the steps and worktree on B, a stop ends B's command, flows from
      B's Clone, rename and remove without a Clone, the refusals);
-     `apps/server/src/devices/work.test.ts` (`checkWork`, the hub);
-     `apps/server/src/devices/placement.test.ts` (two daemons: A the Host
+     `packages/daemon/src/devices/work.test.ts` (`checkWork`, the hub);
+     `apps/server/test/devices/placement.test.ts` (two daemons: A the Host
      without a Clone lists B's flows and walks a run whose command and
      fake Claude Code steps run on B, the events and transcript land in A's
      log, a stop on A kills B's session, another Person's Device is
@@ -1272,7 +1272,7 @@ iroh.
      "an open run continues on its own" test).
    - Tests: `packages/engine/src/peers/placement.test.ts` (per-node with
      the Hand-off there and back, a dirty worktree fails the step, offline
-     then back, an unknown name, the profile's Device); `apps/server/src/
+     then back, an unknown name, the profile's Device); `apps/server/test/
      devices/handoff.test.ts` (two daemons with one bare remote: A walks a
      run whose middle node runs on B, a dirty worktree, B walks a run with
      a node on A through A, a node whose Device is offline sleeps and
@@ -1404,7 +1404,7 @@ iroh.
      through its own Offers (`offeredDevice`). Before, any Member could
      run anything on the Host.
    - **The Device's own checks** (`checkWork` in
-     `apps/server/src/devices/work.ts`, a second code path): for a run its
+     `packages/daemon/src/devices/work.ts`, a second code path): for a run its
      owner did not start, the requester is a Member (the Space
      document's Member mirror) whose role allows `offer.use`; it has
      Offers in force into that Space; the call is an offered session of
@@ -1442,10 +1442,10 @@ iroh.
    - Tests: `packages/engine/src/peers/offers.test.ts` (the run-start rule, the
      clamp, the queue, another Person's run on the computer that walks it,
      withdrawing stops it, the Space document's entry has only the public
-     fields); `apps/server/src/devices/work.test.ts` (`checkWork` called
+     fields); `packages/daemon/src/devices/work.test.ts` (`checkWork` called
      directly, as a bypassed Host would: no Offer, an Offer on one side
      only, another profile, a command, a non-member, a viewer; the work
-     server's clamp, queue and abort); `apps/server/src/devices/offers.test.ts`
+     server's clamp, queue and abort); `apps/server/test/devices/offers.test.ts`
      (two daemons, two Persons: refused without an Offer, the offer
      listed with nothing else of B, another profile and a wider mode
      refused at start, a run through the Offer on B under the caps in the
@@ -1504,7 +1504,7 @@ iroh.
      entry embeds the web build and every `migration.sql` (imports `with {
      type: "file" }`) and hands them to the CLI (`src/headless/embedded.ts`).
      Two build plugins: varlock's loader becomes `process.env` (the shims
-     the desktop app used, moved to `apps/server/src/shims`), and libsql's
+     the desktop app used, moved to `apps/server/scripts/shims`), and libsql's
      run-time pick of `@libsql/<target>` becomes a fixed `require` of the
      target's `index.node`, which the executable then embeds. Another
      platform's native package is downloaded from npm once, checked against
@@ -1512,14 +1512,14 @@ iroh.
      sourcemap file; identifiers stay unminified so a stack trace reads.
      Tested: the darwin binary on this Mac with a fresh data folder; both
      Linux binaries in a Debian container (x64 under emulation).
-   - **The CLI** (`apps/server/src/cli.ts`): `nightshift serve` (flags
+   - **The CLI** (`apps/server/src/features/cli/cli.ts`): `nightshift serve` (flags
      over the environment: `--port`, `--data-dir`, `--host-address`
      repeated, `--listen`, `--tls-port`, `--web`), `nightshift join
      <host> [--guest]`, and new `nightshift pair <code> [--yes]`, which
      approves a code on a Host without a screen (it calls the local
      daemon's `devices.review` and `approve` as this computer's Person;
      `docker exec` works). `serve` fills the environment the way the
-     desktop app did (`apps/server/src/daemon-env.ts`, now shared):
+     desktop app did (`packages/daemon/src/runtime/daemon-env.ts`, now shared):
      `BETTER_AUTH_URL` and `CORS_ORIGIN` default to the first `https://`
      Host address (the UI is served by the daemon itself), else
      `http://localhost:<port>`. It extracts the migrations to
@@ -1550,7 +1550,7 @@ iroh.
      own certificate, `nightshift serve` and the desktop app keep plain
      http on `127.0.0.1:PORT` for this computer (the window, the CLI) and
      serve https on `NIGHTSHIFT_TLS_PORT` (default `PORT + 443`) at the
-     Host's hostname (`apps/server/src/serve.ts`). `bun run dev` keeps
+     Host's hostname (`packages/daemon/src/http/serve.ts`). `bun run dev` keeps
      slice 4's single listener.
    - **A proxy is not this computer.** Every way out connects to the
      daemon from the loopback. The local session now also needs no
@@ -1639,7 +1639,7 @@ Nothing is open. The next step is slice 1.
   `node:http` with crossws, and is not needed. One trap: Bun empties a
   request's headers once it upgrades it, so the sync keeps a copy for
   `onAuthenticate`. `HocuspocusProvider` syncs under Bun with its global
-  `WebSocket` (`apps/server/src/sync.test.ts`). The SQLite extension
+  `WebSocket` (`packages/daemon/src/sync/sync.test.ts`). The SQLite extension
   needs `better-sqlite3`, which Bun does not load: the Replica's own
   `ydoc` table is used instead.
 - ~~Better Auth version: the device authorization plugin needs 1.6.11+.~~
