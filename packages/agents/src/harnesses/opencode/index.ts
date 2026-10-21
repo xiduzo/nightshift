@@ -1,5 +1,2 @@
-export {
-	type OpencodeHarnessOptions,
-	opencodeHarness,
-	opencodePermission,
-} from "./harness";
+export { type OpencodeHarnessOptions, opencodeHarness } from "./harness";
+export { opencodePermission } from "./permissions";

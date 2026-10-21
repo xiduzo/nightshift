@@ -9,10 +9,10 @@ import {
 	createOpencodeObserver,
 	opencodeHarness,
 	opencodeMcpConfig,
-	opencodePermission,
 	opencodeSessionConfig,
 	rewriteServe,
 } from "./harness";
+import { opencodePermission } from "./permissions";
 
 let dir: string;
 let cwd: string;
