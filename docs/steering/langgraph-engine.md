@@ -29,7 +29,7 @@ below it, from the bottom up:
 
 | Vertical | Holds |
 | --- | --- |
-| `device-config/` | This computer's Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. This computer's own `device` row (`self-device.ts`). |
+| `device-config/` | This computer's Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. |
 | `log/` | The event payloads and append and parse (`events.ts`), the run log in memory (`run-log.ts`), the bus, the run and step rows (`run-row.ts`), the member events, the transcript files and the transcript event types (`step-events.ts`). |
 | `read/` | The pure projections of the log (`derive-run.ts`, `derive-steps.ts`), cost (`cost.ts`), the run views (`views.ts`), the read model, the Persons a run names (`people.ts`) and the run bundle. |
 | `projects/` | Projects, the Space document that defines them, the git port (`git.ts`: every `git` and `xcode-select` process, with its adapter `systemGit`), the git setup of a project folder, and run worktrees (`createWorktrees(git)`). |
@@ -40,8 +40,8 @@ below it, from the bottom up:
 | `run/` | The composition root (`engine.ts`), what a person does in one Space (`space.ts`), run start, recovery, and the run actions (`control.ts` over `stop.ts`, `move.ts`, `gate.ts`, `wake.ts` and the relay to a Walker in `relay.ts`). |
 
 `contract/` holds only types: `Engine`, `SpaceEngine`, `StartRunInput`,
-`EngineOptions`, `Relay` and `Peers`. A type-only import may point up (a
-port that a lower vertical implements, or the contract).
+`EngineOptions`, `Relay`, `Peers` and `DeviceDirectory`. A type-only import
+may point up (a port that a lower vertical implements, or the contract).
 
 The engine knows no other Device. `Peers` (`contract/peers.ts`) is the port
 of the other Devices and Hosts: where a step runs (Placement), the Offer
@@ -51,7 +51,13 @@ implements it (`createPeerEngine`). `createEngine` calls the factory in
 `EngineOptions.peers` once, with its own parts (`PeerContext`: the database,
 the run log, the bus, the documents, and how to take over or stop a run).
 The engine's own tests walk with `alonePeers` (`./testing`): a computer
-without other Devices. The engine reads the auth
+without other Devices. The engine reads the Device rows (`device`,
+`host_space`) only through `DeviceDirectory` (`contract/directory.ts`):
+this computer's Device id and its owner, the names of Devices, and the
+Spaces a Host keeps. `@nightshift/devices` implements it
+(`deviceDirectory`). The Space documents need it before the engine exists,
+so the daemon makes it first. The engine's own tests use `aloneDirectory`
+(`./testing`). The engine reads the auth
 tables (`user`, `member`, `organization`) only through functions of
 `@nightshift/auth`. `testing/` holds the test
 helpers and fixtures. The database lease and the folder picker are process
