@@ -36,6 +36,7 @@ const LAYERS: Record<string, Rule> = {
 	"@nightshift/db": { layer: 0, mayImport: [] },
 	"@nightshift/flows": { layer: 0, mayImport: [] },
 	"@nightshift/ui": { layer: 0, mayImport: [] },
+	"@nightshift/ui-native": { layer: 0, mayImport: [] },
 	// 1. Capabilities
 	"@nightshift/auth": { layer: 1, mayImport: ["@nightshift/db"] },
 	"@nightshift/agents": { layer: 1, mayImport: ["@nightshift/flows"] },
@@ -51,20 +52,41 @@ const LAYERS: Record<string, Rule> = {
 	},
 	// 3. Core domains
 	"@nightshift/devices": { layer: 3, mayImport: "lower" },
+	"@nightshift/notifications": { layer: 3, mayImport: "lower" },
 	// 4. Surface
 	"@nightshift/api": { layer: 4, mayImport: "lower" },
 	// 5. Runtime
 	"@nightshift/daemon": { layer: 5, mayImport: "lower" },
+	// Browser- and React-Native-safe client logic for the apps. Biome keeps
+	// it to `@nightshift/api/client` (types) and the `@nightshift/flows` root.
+	"@nightshift/client": {
+		layer: 5,
+		mayImport: ["@nightshift/api", "@nightshift/flows"],
+	},
 	// 6. Apps
 	server: { layer: 6, mayImport: "lower" },
 	desktop: { layer: 6, mayImport: ["@nightshift/daemon"] },
 	web: {
 		layer: 6,
-		mayImport: ["@nightshift/api", "@nightshift/flows", "@nightshift/ui"],
+		mayImport: [
+			"@nightshift/client",
+			"@nightshift/api",
+			"@nightshift/flows",
+			"@nightshift/ui",
+		],
+	},
+	mobile: {
+		layer: 6,
+		mayImport: [
+			"@nightshift/client",
+			"@nightshift/api",
+			"@nightshift/flows",
+			"@nightshift/ui-native",
+		],
 	},
 };
 
-const APPS = new Set(["server", "desktop", "web"]);
+const APPS = new Set(["server", "desktop", "web", "mobile"]);
 
 /**
  * Known deviations, each with the change that removes it, and each listed

@@ -369,12 +369,13 @@ describe("the command", () => {
 		expect((user + system) / 1000).toBeLessThan(15_000);
 	});
 
-	test("every workspace is checked, except ui and config", () => {
+	test("every workspace is checked, except ui, ui-native and config", () => {
 		const root = join(import.meta.dir, "..");
 		const found = workspacesOf(root);
 		expect(found).toContain("apps/web");
 		expect(found).toContain("packages/engine");
 		expect(found).not.toContain("packages/ui");
+		expect(found).not.toContain("packages/ui-native");
 		expect(found).not.toContain("packages/config");
 		for (const workspace of found) {
 			expect(
@@ -390,6 +391,7 @@ describe("the command", () => {
 			"apps/new",
 			"packages/new",
 			"packages/ui",
+			"packages/ui-native",
 			"packages/config",
 		]) {
 			mkdirSync(join(root, workspace), { recursive: true });

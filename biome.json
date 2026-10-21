@@ -107,7 +107,14 @@
 									"!@nightshift/ui/components/*",
 									"!@nightshift/ui/hooks/*",
 									"!@nightshift/ui/lib/*",
-									"!@nightshift/ui/globals.css"
+									"!@nightshift/ui/globals.css",
+									"!@nightshift/client",
+									"!@nightshift/notifications",
+									"!@nightshift/notifications/testing",
+									"!@nightshift/ui-native/components/*",
+									"!@nightshift/ui-native/hooks/*",
+									"!@nightshift/ui-native/lib/*",
+									"!@nightshift/ui-native/global.css"
 								],
 								"message": "Import a package by an entry in its package.json exports, never a path inside it (see docs/steering/STRUCTURE.md, section 3)."
 							},
@@ -118,7 +125,9 @@
 									"desktop",
 									"desktop/**",
 									"web",
-									"web/**"
+									"web/**",
+									"mobile",
+									"mobile/**"
 								],
 								"message": "No workspace imports an app (see docs/steering/STRUCTURE.md, section 1)."
 							},
@@ -197,7 +206,14 @@
 											"!@nightshift/ui/components/*",
 											"!@nightshift/ui/hooks/*",
 											"!@nightshift/ui/lib/*",
-											"!@nightshift/ui/globals.css"
+											"!@nightshift/ui/globals.css",
+											"!@nightshift/client",
+											"!@nightshift/notifications",
+											"!@nightshift/notifications/testing",
+											"!@nightshift/ui-native/components/*",
+											"!@nightshift/ui-native/hooks/*",
+											"!@nightshift/ui-native/lib/*",
+											"!@nightshift/ui-native/global.css"
 										],
 										"message": "Import a package by an entry in its package.json exports, never a path inside it (see docs/steering/STRUCTURE.md, section 3)."
 									},
@@ -208,7 +224,9 @@
 											"desktop",
 											"desktop/**",
 											"web",
-											"web/**"
+											"web/**",
+											"mobile",
+											"mobile/**"
 										],
 										"message": "No workspace imports an app (see docs/steering/STRUCTURE.md, section 1)."
 									},
@@ -260,7 +278,14 @@
 											"!@nightshift/ui/components/*",
 											"!@nightshift/ui/hooks/*",
 											"!@nightshift/ui/lib/*",
-											"!@nightshift/ui/globals.css"
+											"!@nightshift/ui/globals.css",
+											"!@nightshift/client",
+											"!@nightshift/notifications",
+											"!@nightshift/notifications/testing",
+											"!@nightshift/ui-native/components/*",
+											"!@nightshift/ui-native/hooks/*",
+											"!@nightshift/ui-native/lib/*",
+											"!@nightshift/ui-native/global.css"
 										],
 										"message": "Import a package by an entry in its package.json exports, never a path inside it (see docs/steering/STRUCTURE.md, section 3)."
 									},
@@ -271,7 +296,9 @@
 											"desktop",
 											"desktop/**",
 											"web",
-											"web/**"
+											"web/**",
+											"mobile",
+											"mobile/**"
 										],
 										"message": "No workspace imports an app (see docs/steering/STRUCTURE.md, section 1)."
 									},
@@ -297,9 +324,113 @@
 											"@nightshift/engine/**",
 											"@nightshift/api",
 											"@nightshift/api/context",
-											"@nightshift/flows/files"
+											"@nightshift/flows/files",
+											"@nightshift/notifications",
+											"@nightshift/notifications/**",
+											"@nightshift/ui-native",
+											"@nightshift/ui-native/**"
 										],
-										"message": "The web app imports only @nightshift/api/client (types), the @nightshift/flows root and @nightshift/ui."
+										"message": "The web app imports only @nightshift/client, @nightshift/api/client (types), the @nightshift/flows root and @nightshift/ui."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["apps/mobile/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": [
+											"@nightshift/**",
+											"!@nightshift/agents",
+											"!@nightshift/agents/harness-facts",
+											"!@nightshift/agents/mcp",
+											"!@nightshift/agents/pricing",
+											"!@nightshift/agents/types",
+											"!@nightshift/agents/testing",
+											"!@nightshift/api",
+											"!@nightshift/api/client",
+											"!@nightshift/api/context",
+											"!@nightshift/auth",
+											"!@nightshift/auth/testing",
+											"!@nightshift/db",
+											"!@nightshift/db/schema",
+											"!@nightshift/db/data-dir",
+											"!@nightshift/db/migrate",
+											"!@nightshift/engine",
+											"!@nightshift/daemon",
+											"!@nightshift/daemon/heartbeat",
+											"!@nightshift/devices",
+											"!@nightshift/engine/testing",
+											"!@nightshift/flows",
+											"!@nightshift/flows/files",
+											"!@nightshift/ui/components/*",
+											"!@nightshift/ui/hooks/*",
+											"!@nightshift/ui/lib/*",
+											"!@nightshift/ui/globals.css",
+											"!@nightshift/client",
+											"!@nightshift/notifications",
+											"!@nightshift/notifications/testing",
+											"!@nightshift/ui-native/components/*",
+											"!@nightshift/ui-native/hooks/*",
+											"!@nightshift/ui-native/lib/*",
+											"!@nightshift/ui-native/global.css"
+										],
+										"message": "Import a package by an entry in its package.json exports, never a path inside it (see docs/steering/STRUCTURE.md, section 3)."
+									},
+									{
+										"group": [
+											"server",
+											"server/**",
+											"desktop",
+											"desktop/**",
+											"web",
+											"web/**",
+											"mobile",
+											"mobile/**"
+										],
+										"message": "No workspace imports an app (see docs/steering/STRUCTURE.md, section 1)."
+									},
+									{
+										"group": ["**/packages/**", "**/apps/*/src/**"],
+										"message": "Never reach into another workspace by a relative path. Import the package by its name and a listed entry."
+									},
+									{
+										"group": ["@nightshift/*/testing"],
+										"message": "./testing holds fakes and test helpers. Only tests import it."
+									},
+									{
+										"group": [
+											"@nightshift/agents",
+											"@nightshift/agents/**",
+											"@nightshift/auth",
+											"@nightshift/auth/**",
+											"@nightshift/daemon",
+											"@nightshift/daemon/**",
+											"@nightshift/db",
+											"@nightshift/db/**",
+											"@nightshift/devices",
+											"@nightshift/devices/**",
+											"@nightshift/engine",
+											"@nightshift/engine/**",
+											"@nightshift/notifications",
+											"@nightshift/notifications/**",
+											"@nightshift/api",
+											"@nightshift/api/context",
+											"@nightshift/flows/files",
+											"@nightshift/ui",
+											"@nightshift/ui/**"
+										],
+										"message": "The phone app imports only @nightshift/client, @nightshift/api/client (types), the @nightshift/flows root and @nightshift/ui-native."
 									}
 								]
 							}

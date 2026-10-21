@@ -6,7 +6,7 @@
  * - a package (`packages/*`): every folder directly in `src/`, except `testing/`
  *
  * It checks every workspace in `apps/` and `packages/` except `packages/ui`
- * (the shadcn layout) and `packages/config` (no code). It finds those from
+ * and `packages/ui-native` (the shadcn layout) and `packages/config` (no code). It finds those from
  * the file system too, so a new workspace is checked from its first commit.
  * For each workspace it fails on:
  * (a) an import from outside a vertical into a file of it other than its
@@ -37,10 +37,15 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 
 /**
- * The workspaces that section 4 does not cover: `ui` keeps the shadcn
- * layout (`components/`, `hooks/`, `lib/`), and `config` holds no code.
+ * The workspaces that section 4 does not cover: `ui` and `ui-native` (React
+ * Native Reusables, shadcn for React Native) keep the shadcn layout
+ * (`components/`, `hooks/`, `lib/`), and `config` holds no code.
  */
-export const NOT_CHECKED = new Set(["packages/ui", "packages/config"]);
+export const NOT_CHECKED = new Set([
+	"packages/ui",
+	"packages/ui-native",
+	"packages/config",
+]);
 
 /**
  * Every workspace that section 4 covers, sorted: each folder in `apps/` and
