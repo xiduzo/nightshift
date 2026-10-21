@@ -1,8 +1,8 @@
 import {
 	ACP_DEFAULT_MODEL,
-	DECIDER_ADAPTERS,
-	deciderModels,
+	deciderViews,
 	HARNESS_ADAPTERS,
+	harnessViews,
 	installedSkills,
 } from "@nightshift/agents";
 import {
@@ -11,13 +11,10 @@ import {
 	type SettingKey,
 } from "@nightshift/engine";
 import {
-	type AgentHarnessName,
 	agentHarnessSchema,
 	type CustomAgent,
 	customAgentSchema,
 	customAgentSlug,
-	customHarnessName,
-	deciderNameSchema,
 	harnessNameSchema,
 	isCustomHarness,
 } from "@nightshift/flows";
@@ -46,51 +43,22 @@ export const harnesses = {
 	list: ownerProcedure.handler(({ context }) => {
 		const values = context.settings.current();
 		const view = context.settings.view();
-		const profilesOn = (name: string) =>
-			context.profiles
-				.list()
-				.filter((p) => p.harness === name)
-				.map((p) => p.name);
-		const builtIn = harnessNameSchema.options.map((name) => {
-			const adapter = HARNESS_ADAPTERS[name];
-			return {
-				name: name as AgentHarnessName,
-				label: adapter.label,
-				initials: adapter.initials,
-				pkg: adapter.pkg,
-				note: adapter.note,
-				offMachine: adapter.offMachine,
-				defaultModel: adapter.defaultModel,
-				models: [...adapter.models],
-				listing: adapter.listing
-					? [adapter.bin, ...adapter.listing].join(" ")
-					: null,
-				added: values.harnesses.includes(name),
+		return harnessViews({
+			added: values.harnesses,
+			customAgents: values.customAgents,
+			bin: (
+				name,
+			): { bin: string; setting: SettingKey; source: SettingField } => ({
 				bin: values[HARNESS_BIN[name]],
-				binSetting: HARNESS_BIN[name] as SettingKey | null,
-				binSource: view.fields[HARNESS_BIN[name]] as SettingField | null,
-				profiles: profilesOn(name),
-				custom: null as CustomAgent | null,
-			};
+				setting: HARNESS_BIN[name],
+				source: view.fields[HARNESS_BIN[name]],
+			}),
+			profilesOn: (name) =>
+				context.profiles
+					.list()
+					.filter((p) => p.harness === name)
+					.map((p) => p.name),
 		});
-		const custom = values.customAgents.map((agent) => ({
-			name: customHarnessName(agent.slug) as AgentHarnessName,
-			label: agent.label,
-			initials: agent.label.slice(0, 2).toUpperCase(),
-			pkg: "@tanstack/ai-acp",
-			note: `Model default uses the model ${agent.label} is set to. You can type another model it offers.`,
-			offMachine: `Prompts and code go wherever ${agent.label} sends them.`,
-			defaultModel: ACP_DEFAULT_MODEL,
-			models: [ACP_DEFAULT_MODEL],
-			listing: null,
-			added: true,
-			bin: agent.command,
-			binSetting: null,
-			binSource: null,
-			profiles: profilesOn(customHarnessName(agent.slug)),
-			custom: agent,
-		}));
-		return [...builtIn, ...custom];
 	}),
 	/**
 	 * Adds a custom agent, or changes one (`previousSlug`). Its slug, the
@@ -209,30 +177,6 @@ export const harnesses = {
  */
 export const deciders = {
 	list: ownerProcedure.handler(({ context }) =>
-		Promise.all(
-			deciderNameSchema.options.map(async (name) => {
-				const adapter = DECIDER_ADAPTERS[name];
-				const offered = await deciderModels(name);
-				return {
-					name,
-					label: adapter.label,
-					pkg: adapter.pkg,
-					models: offered.models,
-					listed: offered.listed,
-					listProblem: offered.problem,
-					defaultModel: adapter.defaultModel,
-					apiKey: adapter.apiKey,
-					apiKeySource: adapter.apiKey
-						? context.connections.secretSource(adapter.apiKey)
-						: null,
-					value: adapter.value
-						? {
-								defaultModel: adapter.value.defaultModel,
-								models: offered.valueModels,
-							}
-						: null,
-				};
-			}),
-		),
+		deciderViews((name) => context.connections.secretSource(name)),
 	),
 };

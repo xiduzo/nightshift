@@ -48,6 +48,7 @@ export {
 	selfDevice,
 	settingsPatchSchema,
 } from "./device-config";
+export type { FlowRef, FlowUse } from "./flows";
 export { chooseFolder } from "./folder-picker";
 export {
 	acquireLease,

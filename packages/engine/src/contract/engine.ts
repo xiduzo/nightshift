@@ -7,6 +7,7 @@ import type {
 	Schedule,
 	ScheduleIssue,
 } from "@nightshift/flows";
+import type { FlowUse } from "../flows";
 import type {
 	DeviceRegistry,
 	EngineExchange,
@@ -178,6 +179,12 @@ export interface SpaceEngine {
 	/** Saves drafts with errors too. Returns the issues of the saved flow. */
 	saveFlow(projectId: string, name: string, flow: Flow): Promise<FlowIssue[]>;
 	deleteFlow(projectId: string, name: string): Promise<void>;
+	/**
+	 * Who uses what, from every flow of the Space's projects: the flows that
+	 * name each connection and CLI tool, and the Agent nodes that name each
+	 * profile. A flow that cannot be read uses nothing.
+	 */
+	flowUse(): Promise<FlowUse>;
 
 	/** Open Gates over the Space's runs, oldest first. The Needs-you inbox. A Gate stays open across daemon restarts. */
 	listGates(): Promise<OpenGate[]>;

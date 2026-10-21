@@ -50,5 +50,7 @@ export {
 	checkHarness,
 	HARNESS_ADAPTERS,
 	type HarnessModels,
+	type HarnessView,
 	harnessModels,
+	harnessViews,
 } from "./registry";

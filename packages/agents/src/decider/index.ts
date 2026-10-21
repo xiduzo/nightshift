@@ -10,3 +10,4 @@ export {
 	tanstackDecider,
 	type ValueAdapter,
 } from "./decider";
+export { type DeciderView, deciderViews } from "./views";

@@ -1,5 +1,5 @@
 import type { Actor, SpaceEngine, StartRunInput } from "../contract";
-import type { FlowFiles } from "../flows";
+import { type FlowFiles, flowUse } from "../flows";
 import type { Runner } from "../graph";
 import type { RunLog, RunRow, RunTrigger } from "../log";
 import type { PlacementModule } from "../peers";
@@ -212,6 +212,10 @@ export function createSpaces(deps: SpacesDeps) {
 			async deleteFlow(projectId, name) {
 				await ready;
 				await deps.flowFiles.remove(spaceId, projectId, name);
+			},
+
+			flowUse() {
+				return flowUse(this);
 			},
 
 			async listRuns(input) {

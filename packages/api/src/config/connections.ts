@@ -11,7 +11,6 @@ import {
 import { z } from "zod";
 
 import { ownerProcedure } from "../procedures";
-import { flowUse } from "./flow-use";
 import { customAgentOf } from "./harnesses";
 
 const checkTarget = z.enum(harnessNameSchema.options);
@@ -19,7 +18,7 @@ const checkTarget = z.enum(harnessNameSchema.options);
 /** The CLIs Night Shift runs (harnesses, gh) and the MCP servers Agent nodes name. */
 export const connections = {
 	list: ownerProcedure.handler(async ({ context }) => {
-		const use = (await flowUse(context.space)).connections;
+		const use = (await context.space.flowUse()).connections;
 		return {
 			connections: context.connections.list().map((c) => ({
 				...c,

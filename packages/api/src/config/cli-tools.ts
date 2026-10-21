@@ -2,7 +2,6 @@ import { cliToolInputSchema } from "@nightshift/engine";
 import { z } from "zod";
 
 import { ownerProcedure } from "../procedures";
-import { flowUse } from "./flow-use";
 
 /**
  * CLI tools: programs on this computer that the agents may run. Agent nodes
@@ -10,7 +9,7 @@ import { flowUse } from "./flow-use";
  */
 export const cliTools = {
 	list: ownerProcedure.handler(async ({ context }) => {
-		const use = (await flowUse(context.space)).clis;
+		const use = (await context.space.flowUse()).clis;
 		return context.cliTools.list().map((tool) => ({
 			...tool,
 			usedBy: use.get(tool.name) ?? [],

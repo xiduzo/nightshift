@@ -12,6 +12,12 @@
  * (`harnessNameSchema`). The `Record<HarnessName, …>` types fail until all
  * are there.
  */
+
+import {
+	type CustomAgent,
+	customHarnessName,
+	harnessNameSchema,
+} from "@nightshift/flows";
 import {
 	baseCheck,
 	type CliCheck,
@@ -19,7 +25,9 @@ import {
 	probe,
 	resolveBin,
 } from "../doctor";
-import type { HarnessName } from "../port";
+
+import type { AgentHarnessName, HarnessName } from "../port";
+import { ACP_DEFAULT_MODEL } from "./acp/facts";
 import { ACP_ADAPTERS } from "./acp/record";
 import { CLAUDE_CODE_ADAPTER } from "./claude-code/record";
 import { CODEX_ADAPTER } from "./codex/record";
@@ -98,4 +106,96 @@ export async function harnessModels(
 	} catch (error) {
 		return result([], String(error));
 	}
+}
+
+/**
+ * A harness an Agent node can run on, as the Agents page lists it: a
+ * built-in harness or a custom agent. `Setting` and `Source` are the
+ * caller's: the setting that holds a built-in harness's executable, and
+ * where its value comes from.
+ */
+export type HarnessView<Setting, Source> = {
+	name: AgentHarnessName;
+	label: string;
+	initials: string;
+	/** The `@tanstack/ai-*` package that runs it. */
+	pkg: string;
+	note: string;
+	/** Where prompts and code go, for a harness that sends them off this computer. */
+	offMachine: string;
+	defaultModel: string;
+	models: string[];
+	/** The command that lists the CLI's own models. Null when it has none. */
+	listing: string | null;
+	/** It is added on this computer. A custom agent always is. */
+	added: boolean;
+	/** The executable: a built-in harness's setting, or a custom agent's command. */
+	bin: string;
+	binSetting: Setting | null;
+	binSource: Source | null;
+	/** The Agent Profiles that run on it. */
+	profiles: string[];
+	/** The custom agent itself. Null for a built-in harness. */
+	custom: CustomAgent | null;
+};
+
+/**
+ * Every harness an Agent node can run on: each built-in harness, and which
+ * of them are added on this computer, then the custom agents (any ACP agent
+ * a person added with its command).
+ */
+export function harnessViews<Setting, Source>(input: {
+	/** The built-in harnesses added on this computer. */
+	added: readonly HarnessName[];
+	customAgents: readonly CustomAgent[];
+	/** A built-in harness's executable, its setting, and where its value comes from. */
+	bin(name: HarnessName): { bin: string; setting: Setting; source: Source };
+	/** The names of the Agent Profiles that run on a harness. */
+	profilesOn(name: AgentHarnessName): string[];
+}): HarnessView<Setting, Source>[] {
+	const builtIn = harnessNameSchema.options.map(
+		(name): HarnessView<Setting, Source> => {
+			const adapter = HARNESS_ADAPTERS[name];
+			const bin = input.bin(name);
+			return {
+				name,
+				label: adapter.label,
+				initials: adapter.initials,
+				pkg: adapter.pkg,
+				note: adapter.note,
+				offMachine: adapter.offMachine,
+				defaultModel: adapter.defaultModel,
+				models: [...adapter.models],
+				listing: adapter.listing
+					? [adapter.bin, ...adapter.listing].join(" ")
+					: null,
+				added: input.added.includes(name),
+				bin: bin.bin,
+				binSetting: bin.setting,
+				binSource: bin.source,
+				profiles: input.profilesOn(name),
+				custom: null,
+			};
+		},
+	);
+	const custom = input.customAgents.map(
+		(agent): HarnessView<Setting, Source> => ({
+			name: customHarnessName(agent.slug),
+			label: agent.label,
+			initials: agent.label.slice(0, 2).toUpperCase(),
+			pkg: "@tanstack/ai-acp",
+			note: `Model default uses the model ${agent.label} is set to. You can type another model it offers.`,
+			offMachine: `Prompts and code go wherever ${agent.label} sends them.`,
+			defaultModel: ACP_DEFAULT_MODEL,
+			models: [ACP_DEFAULT_MODEL],
+			listing: null,
+			added: true,
+			bin: agent.command,
+			binSetting: null,
+			binSource: null,
+			profiles: input.profilesOn(customHarnessName(agent.slug)),
+			custom: agent,
+		}),
+	);
+	return [...builtIn, ...custom];
 }

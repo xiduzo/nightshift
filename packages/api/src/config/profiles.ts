@@ -2,12 +2,11 @@ import { agentProfileSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { ownerProcedure } from "../procedures";
-import { flowUse } from "./flow-use";
 
 /** Agent Profiles: a harness, a model and its tools under one name. Agent nodes name them. */
 export const profiles = {
 	list: ownerProcedure.handler(async ({ context }) => {
-		const use = await flowUse(context.space);
+		const use = await context.space.flowUse();
 		return context.profiles.list().map((p) => ({
 			...p,
 			usedBy: use.profiles.get(p.name) ?? [],
@@ -33,7 +32,7 @@ export const profiles = {
 				);
 			}
 			if (renamed) {
-				const use = (await flowUse(context.space)).profiles.get(previousName);
+				const use = (await context.space.flowUse()).profiles.get(previousName);
 				if (use && use.length > 0) {
 					throw new Error(
 						`The flows ${use.map((u) => u.flowName).join(", ")} use "${previousName}". Change it there first, or keep the name.`,
