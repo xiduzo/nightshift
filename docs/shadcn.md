@@ -56,7 +56,7 @@ CLI when you need them.
 | ✓ [Radio Group](https://ui.shadcn.com/docs/components/radio-group) | One choice from a few visible options. As cards (`FieldLabel` around a horizontal `Field`): a profile's harness, a Gate's choices in the inbox. |
 | ✓ [Select](https://ui.shadcn.com/docs/components/select) | One choice from a list, in a styled popup. |
 | ✓ [Native Select](https://ui.shadcn.com/docs/components/native-select) | One choice through the browser's own `<select>`. Good on touch screens and in dense forms. |
-| ✓ [Switch](https://ui.shadcn.com/docs/components/switch) | An on/off setting that applies at once (a schedule on or off, a Call node's "Run once per item"). |
+| ✓ [Switch](https://ui.shadcn.com/docs/components/switch) | An on/off setting that applies at once (a schedule on or off, a Call node's "Run once per item", each notification setting). |
 | [Slider](https://ui.shadcn.com/docs/components/slider) | A number in a range. |
 | [Calendar](https://ui.shadcn.com/docs/components/calendar) | Pick a date or range on a month grid. |
 | [Date Picker](https://ui.shadcn.com/docs/components/date-picker) | A button or input that opens a Calendar in a Popover. |
@@ -116,7 +116,7 @@ CLI when you need them.
 | [Carousel](https://ui.shadcn.com/docs/components/carousel) | Slides you swipe through (Embla). |
 | [Aspect Ratio](https://ui.shadcn.com/docs/components/aspect-ratio) | Keeps media at a fixed ratio. |
 | [Typography](https://ui.shadcn.com/docs/components/typography) | Class recipes for headings, paragraphs, lists, blockquotes and inline code. Copy the classes; there is nothing to install. |
-| ✓ [Item](https://ui.shadcn.com/docs/components/item) | One row of a list with media, title, description and actions: `ItemGroup`, `ItemMedia`, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`. Runs in a list, gates, projects, settings rows, the links of a Gate. |
+| ✓ [Item](https://ui.shadcn.com/docs/components/item) | One row of a list with media, title, description and actions: `ItemGroup`, `ItemMedia`, `ItemContent`, `ItemTitle`, `ItemDescription`, `ItemActions`. Runs in a list, gates, projects, settings rows, the links of a Gate, the phones and browsers that can notify you. |
 | ✓ [Kbd](https://ui.shadcn.com/docs/components/kbd) | A keyboard key or shortcut (⌘K). |
 
 ### More
