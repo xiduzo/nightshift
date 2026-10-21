@@ -209,11 +209,12 @@ apps/mobile/src/
   features/
     host/                  sign-in (address, the Host code, two-factor or backup code), the session, useHostQueries
     spaces/                the Space picker of Runs and Start, the Space remembered per Host
+    glance/                the glances outside the app: the home screen widget (Gates that wait, the latest runs) and a run followed on the lock screen (Live Activity, Android ongoing notification), on expo-widgets
     push/                  notifications on this phone: the permission card, the Expo push token registered with the Host, the categories and Android channels, the lock-screen buttons and withdraws (background task), the banner in front, where a tap goes
     inbox/  runs/  start/  dashboard/  settings/
 ```
 
-- The features, from the bottom: `host`, `spaces`, `push`, then the tabs. `shared/shell` composes them, as on the web. `push` sits below the tabs because the inbox and Settings show its card and the inbox stream dismisses a closed Gate's notification.
+- The features, from the bottom: `host`, `spaces`, `glance`, `push`, then the tabs. `shared/shell` composes them, as on the web. `push` sits below the tabs because the inbox and Settings show its card and the inbox stream dismisses a closed Gate's notification. `glance` sits below `push` because the background task of a push updates the widget.
 - `app/_layout.tsx` calls `startPushHandling()` in its module scope: iOS and Android start the app for a push in the background, and the background task must be defined before any screen renders.
 - A screen takes query options from `@nightshift/client` on the Host's client: `useHostQueries(createRunQueries)`. The phone keeps no module-level `orpc`, because its client changes with the Host.
 

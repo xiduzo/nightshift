@@ -1,8 +1,9 @@
-import { isGateClosed } from "@nightshift/client";
+import { glanceSnapshot, isGateClosed } from "@nightshift/client";
 import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
 import { AppState, Platform } from "react-native";
 
+import { updateGlance } from "@/features/glance";
 import { savedHost } from "@/features/host";
 import { defineCategories } from "./categories";
 import { inFrontPlace, showBanner } from "./in-front";
@@ -71,20 +72,41 @@ async function tellNotSent(data: PushData): Promise<void> {
 }
 
 /**
+ * Reads the open Gates and the latest runs again for the home screen
+ * widget, so it is right while the app is not in front. Without a Host the
+ * widget shows nothing. A failed read keeps what the widget shows.
+ */
+async function refreshGlance(): Promise<void> {
+	const host = await savedHost();
+	if (!host) {
+		updateGlance(null);
+		return;
+	}
+	const [gates, runs] = await Promise.all([
+		host.client.gates.list(),
+		host.client.runs.list({}),
+	]);
+	updateGlance(glanceSnapshot({ gates, runs }));
+}
+
+/**
  * The background task: a withdraw push takes away the notification of its
  * key. On Android a button on a notification also comes here when the app
- * does not run.
+ * does not run. Either way the home screen widget reads the Gates and runs
+ * again.
  */
 async function onTask({
 	data,
 }: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>) {
 	if (data && "actionIdentifier" in data) {
 		await answerFromButton(data);
+		await refreshGlance().catch(() => undefined);
 		return Notifications.BackgroundNotificationTaskResult.NoData;
 	}
 	const key = withdrawKeyOf(taskDataOf(data));
 	if (!key) return Notifications.BackgroundNotificationTaskResult.NoData;
 	await dismissKey(key).catch(() => undefined);
+	await refreshGlance().catch(() => undefined);
 	return Notifications.BackgroundNotificationTaskResult.NewData;
 }
 
