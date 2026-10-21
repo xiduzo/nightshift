@@ -93,6 +93,7 @@ The entries today:
 | `agents` | `.`, `./harness-facts`, `./mcp`, `./pricing`, `./types`, `./testing` (fakes, `fixturePath(name)`). The engine uses the four light entries: the root loads every harness. `./harness-facts` is browser-safe. |
 | `api` | `.` (`appRouter` and its types), `./client` (types only, for `apps/web`, `apps/mobile` and `client`), `./context` |
 | `auth` | `.`, `./testing` |
+| `client` | `.` (`createApiClient`, `createQueryUtils`, the `create<Vertical>Queries` and `create<Vertical>Mutations` factories, `followRun`, `mergeSteps`, the notify rules, the view types) |
 | `db` | `.`, `./schema`, `./data-dir`, `./migrate` |
 | `devices` | `.` |
 | `daemon` | `.` (`startDaemon`, `createDaemon`, the CLI's and the desktop app's helpers: `prepareDaemonEnv`, `checkHealth`, `DEFAULT_PORT`, the web UI handler), `./heartbeat` (`readHeartbeatFile`: the lease heartbeat as another process reads it, Bun and Node only, for the desktop watchdog's Worker) |
@@ -104,7 +105,6 @@ Planned with `docs/research/mobile.md`. `biome.json` already allows them. When a
 
 | Package | Entries |
 | --- | --- |
-| `client` | `.` |
 | `notifications` | `.`, `./testing` |
 | `ui-native` | `./components/*`, `./hooks/*`, `./lib/*`, `./global.css` |
 
@@ -164,7 +164,7 @@ apps/web/src/
   router.tsx               the router and its query client (TanStack Start reads it here)
   routes/                  thin TanStack Router files: createFileRoute, search and params, one page from a vertical
   shared/
-    api/                   the oRPC client, query client, server URL, auth client, refusal codes, contract.ts (every derived API type)
+    api/                   the oRPC client, query client, server URL, auth client, contract.ts (the API types only the web app needs; the rest come from @nightshift/client)
     page/                  the parts of a page: site header, page heading, loader, logo
     shell/                 the app frame (AppShell): theme, sidebar, toasts, night notifications
     format/  code/  data-table/  media-query/   other named cross-cutting pieces, each with a barrel
@@ -194,9 +194,10 @@ Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fai
 
 - A route file declares the route (path, `ssr`, search and params validation) and renders one page from a vertical's barrel. It gives the params and the search to the page as props. It holds no other markup.
 - A route loads data in a `loader` (`ensureQueryData`) only when that does not change what the person sees. No route has a loader today. The build prerenders the pages, so a loader also runs at build time. A loader that waits for data also blocks the navigation. Each page shows its own skeleton and its own error instead.
+- A vertical's `queries.ts` builds its factories from `@nightshift/client` on the app's `orpc` (`createRunQueries(orpc)`), when the package has them. The web-only ones (settings, access, agents) stay in the vertical.
 - Query options live in the vertical's queries. A component does not build `orpc.x.y.queryOptions(...)` for another vertical's data. It imports that vertical's factory from its barrel, or from its `queries.ts` through a peer port (see above).
 - A query factory keeps the query key of the oRPC procedure (`orpc.x.y.queryOptions({ input })`). A polling rule (`refetchInterval` and its `meta`) is part of the factory, in the vertical that owns the data. A call site adds only its own options (`enabled`, `select`, `staleTime`).
-- API types come from `shared/api` (`InferClientOutputs`). Never derive them again in a component.
+- API types come from `shared/api`. It passes on the view types of `@nightshift/client` and adds the ones only the web app needs (`contract.ts`, from `ApiOutputs`). Never derive them again in a component.
 - Rules that `@nightshift/flows` or the engine already has are imported, not copied. Example: template references, the harness catalog.
 - UI follows `AGENTS.md`: shadcn components only.
 
@@ -218,7 +219,7 @@ The pre-commit hook is `lefthook.yml` (install it with `bun lefthook install`). 
 | --- | --- | --- |
 | Layer map: `scripts/check-layers.ts` compares each workspace dependency in a `package.json` with the table in section 1. Bun links only declared dependencies, so this is the real import graph. | lefthook pre-commit (when a `package.json` changes), CI | Active |
 | Explicit `exports` in every `package.json` (section 3). A deep import fails `tsc` and fails at runtime. | TypeScript (`bun run check-types`, CI), Bun at runtime | Active |
-| Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, the `api` root and `flows/files` in `apps/web`. In `apps/mobile`, everything but `client`, `api/client`, the `flows` root and `ui-native`. Biome replaces the options of a rule per override, so each override lists the whole set. | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
+| Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, the `api` root and `flows/files` in `apps/web`. In `apps/mobile`, everything but `client`, `api/client`, the `flows` root and `ui-native`. In `packages/client` (tests apart), every `@nightshift` import but `api/client` and the `flows` root. `packages/client/src/platform-free.test.ts` also fails on any other package, on `node:` and `bun:`, and on a global of the DOM, Node or Bun. Biome replaces the options of a rule per override, so each override lists the whole set. | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
 | Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
 | Vertical boundaries: `scripts/check-verticals.ts` finds the workspaces and their verticals from the file system, so no list can drift and a new workspace is checked from its first commit. It fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks one workspace. | lefthook pre-commit (when a `.ts` or `.tsx` file changes), CI | Active (every workspace except `ui`, `ui-native` and `config`) |
 | Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. A barrel that `package.json` `exports` names (`@nightshift/db/migrate`) is a public entry, like the root `index.ts`: other workspaces import it, so the script does not check it. | lefthook pre-commit, CI | Active (every workspace except `ui`, `ui-native` and `config`) |
