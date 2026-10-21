@@ -5,7 +5,10 @@
  * - an app (`apps/*`): every folder in `src/features/` and `src/shared/`
  * - a package (`packages/*`): every folder directly in `src/`, except `testing/`
  *
- * For each workspace in ENFORCED it fails on:
+ * It checks every workspace in `apps/` and `packages/` except `packages/ui`
+ * (the shadcn layout) and `packages/config` (no code). It finds those from
+ * the file system too, so a new workspace is checked from its first commit.
+ * For each workspace it fails on:
  * (a) an import from outside a vertical into a file of it other than its
  *     `index.ts` barrel, apart from the LEAF_CONTRACTS and PEER_PORTS below;
  *     and a vertical with no `index.ts`
@@ -22,11 +25,10 @@
  * A namespace import (`import * as x`), `export * from` and a dynamic
  * `import()` that is not destructured count as a use of every name.
  *
- *   bun scripts/check-verticals.ts                 every workspace in ENFORCED
- *   bun scripts/check-verticals.ts packages/engine  that workspace (enforced or not)
+ *   bun scripts/check-verticals.ts                  every workspace
+ *   bun scripts/check-verticals.ts packages/engine  only that workspace
  *
  * Exits 1 and names each violation. Fix the import, do not add an exception.
- * When a workspace is cut into verticals, add it to ENFORCED.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -35,23 +37,29 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 
 /**
- * The workspaces that follow section 4. Each structure phase adds the
- * workspaces it converts. Phase 8 removes the list: then every workspace
- * except `packages/ui` and `packages/config` is checked.
+ * The workspaces that section 4 does not cover: `ui` keeps the shadcn
+ * layout (`components/`, `hooks/`, `lib/`), and `config` holds no code.
  */
-export const ENFORCED: string[] = [
-	"apps/desktop",
-	"apps/server",
-	"apps/web",
-	"packages/agents",
-	"packages/api",
-	"packages/auth",
-	"packages/daemon",
-	"packages/db",
-	"packages/devices",
-	"packages/engine",
-	"packages/flows",
-];
+export const NOT_CHECKED = new Set(["packages/ui", "packages/config"]);
+
+/**
+ * Every workspace that section 4 covers, sorted: each folder in `apps/` and
+ * `packages/` with a `package.json`, except NOT_CHECKED.
+ */
+export function workspacesOf(root: string): string[] {
+	const found: string[] = [];
+	for (const group of ["apps", "packages"]) {
+		const dir = join(root, group);
+		if (!existsSync(dir)) continue;
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			const workspace = `${group}/${entry.name}`;
+			if (!entry.isDirectory() || NOT_CHECKED.has(workspace)) continue;
+			if (existsSync(join(dir, entry.name, "package.json")))
+				found.push(workspace);
+		}
+	}
+	return found.sort();
+}
 
 /**
  * Leaf contracts: a pure-data file (no imports of its own) that a vertical
@@ -549,11 +557,11 @@ export function checkWorkspace(
 	return problems;
 }
 
-if (import.meta.main) {
-	const started = performance.now();
-	const root = join(import.meta.dir, "..");
-	const args = process.argv.slice(2);
-	const workspaces = args.length ? args : ENFORCED;
+/**
+ * The problems of each named workspace, with the listed exceptions of
+ * each. A name that is not a workspace is a problem too.
+ */
+export function checkWorkspaces(root: string, workspaces: string[]): string[] {
 	const problems: string[] = [];
 	for (const workspace of workspaces) {
 		if (!existsSync(join(root, workspace, "package.json"))) {
@@ -567,6 +575,15 @@ if (import.meta.main) {
 			}),
 		);
 	}
+	return problems;
+}
+
+if (import.meta.main) {
+	const started = performance.now();
+	const root = join(import.meta.dir, "..");
+	const args = process.argv.slice(2);
+	const workspaces = args.length ? args : workspacesOf(root);
+	const problems = checkWorkspaces(root, workspaces);
 	if (problems.length) {
 		console.error(
 			"Vertical check failed (docs/steering/STRUCTURE.md, section 4):\n",
@@ -575,9 +592,5 @@ if (import.meta.main) {
 		process.exit(1);
 	}
 	const ms = Math.round(performance.now() - started);
-	console.log(
-		workspaces.length
-			? `Vertical check passed: ${workspaces.join(", ")} (${ms} ms).`
-			: "Vertical check passed: no workspace is enforced yet (ENFORCED in scripts/check-verticals.ts).",
-	);
+	console.log(`Vertical check passed: ${workspaces.join(", ")} (${ms} ms).`);
 }

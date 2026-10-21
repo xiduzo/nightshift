@@ -10,9 +10,10 @@ import { dirname, join } from "node:path";
 
 import {
 	checkWorkspace,
-	ENFORCED,
+	checkWorkspaces,
 	isTest,
 	type Options,
+	workspacesOf,
 } from "./check-verticals";
 
 const roots: string[] = [];
@@ -345,26 +346,60 @@ describe("the command", () => {
 		expect(isTest("features/runs/run-list.tsx")).toBe(false);
 	});
 
-	test("it passes on this repository, fast", () => {
+	test("it passes on this repository", () => {
 		const result = Bun.spawnSync([
 			process.execPath,
 			join(import.meta.dir, "check-verticals.ts"),
 		]);
 		expect(result.stderr.toString()).toBe("");
 		expect(result.exitCode).toBe(0);
-		// The check's own time, as it prints it: without the start of the
-		// process, which a busy computer (other tests, a build) makes slow.
-		// The bound is generous for the same reason: the check takes about
-		// 0.5 s on an idle laptop, and a failing bound means a real slowdown.
-		const ms = Number(/\((\d+) ms\)/.exec(result.stdout.toString())?.[1]);
-		expect(ms).toBeLessThan(3000);
 	});
 
-	test("ENFORCED names real workspaces", () => {
-		for (const workspace of ENFORCED) {
+	test("it stays fast on this repository", () => {
+		// This guards against an accidental O(n²) (for example a parse per
+		// import), not against a slow computer. So it measures the CPU time
+		// of the check itself, in this process: other processes on a busy
+		// computer (a build, other tests) do not count. The check takes
+		// about 2 s of CPU on a laptop. A slip into O(n²) costs many
+		// times that, so the bound is generous.
+		const root = join(import.meta.dir, "..");
+		const before = process.cpuUsage();
+		expect(checkWorkspaces(root, workspacesOf(root))).toEqual([]);
+		const { user, system } = process.cpuUsage(before);
+		expect((user + system) / 1000).toBeLessThan(15_000);
+	});
+
+	test("every workspace is checked, except ui and config", () => {
+		const root = join(import.meta.dir, "..");
+		const found = workspacesOf(root);
+		expect(found).toContain("apps/web");
+		expect(found).toContain("packages/engine");
+		expect(found).not.toContain("packages/ui");
+		expect(found).not.toContain("packages/config");
+		for (const workspace of found) {
 			expect(
-				Bun.file(join(import.meta.dir, "..", workspace, "package.json")).size,
+				Bun.file(join(root, workspace, "package.json")).size,
 			).toBeGreaterThan(0);
 		}
+	});
+
+	test("a new workspace is checked without a list to update", () => {
+		const root = mkdtempSync(join(tmpdir(), "check-verticals-"));
+		roots.push(root);
+		for (const workspace of [
+			"apps/new",
+			"packages/new",
+			"packages/ui",
+			"packages/config",
+		]) {
+			mkdirSync(join(root, workspace), { recursive: true });
+			writeFileSync(join(root, workspace, "package.json"), "{}");
+		}
+		// A folder without a package.json is not a workspace.
+		mkdirSync(join(root, "packages/notes"), { recursive: true });
+		expect(workspacesOf(root)).toEqual(["apps/new", "packages/new"]);
+		expect(checkWorkspaces(root, ["packages/missing"])).toEqual([
+			"packages/missing: is not a workspace.",
+		]);
 	});
 });
