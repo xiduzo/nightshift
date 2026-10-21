@@ -3,6 +3,7 @@
 
 import { tryGetCurrentAuthEndpointContext } from "@better-auth/core/context";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
+import { expo } from "@better-auth/expo";
 import type { Database } from "@nightshift/db";
 import { authSchema as schema } from "@nightshift/db";
 import { betterAuth } from "better-auth";
@@ -90,6 +91,9 @@ export type AuthOptions = {
  * require it for sessions from other computers (`host-access/`).
  * Signing in and the second factor are rate limited per client address,
  * always: a Host may face the internet.
+ *
+ * The phone app signs in as a Person, like a browser (the expo plugin). It
+ * keeps the session cookie itself and sends it with each request.
  */
 export function createAuth(
 	env: AuthConfig,
@@ -167,6 +171,9 @@ export function createAuth(
 			},
 		},
 		plugins: [
+			// The phone app: its `expo-origin` header becomes the origin, so the
+			// trusted origins (the app's scheme) apply to it.
+			expo(),
 			admin({ defaultRole: "user", adminRoles: [HOST_ADMIN] }),
 			twoFactorPlugin(),
 			pairingPlugin(),

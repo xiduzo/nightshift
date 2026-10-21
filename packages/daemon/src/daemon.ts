@@ -58,11 +58,10 @@ import {
 
 import { localHarnesses, programChecks, reportDeviceFacts } from "./harnesses";
 import {
+	authOriginsOf,
 	createHttp,
 	type DaemonServe,
-	desktopOrigins,
 	isThisComputer,
-	localOrigins,
 	trustedOriginsOf,
 } from "./http";
 import {
@@ -176,7 +175,7 @@ export async function createDaemon(
 	const trustedOrigins = trustedOriginsOf(env, port);
 	/** The Host's addresses, once the settings below exist. */
 	let hostAddresses: () => readonly string[] = () => [];
-	const auth = createAuth(env, db, [...desktopOrigins, ...localOrigins(port)], {
+	const auth = createAuth(env, db, authOriginsOf(port), {
 		onMembersChanged: (spaceId) => spaces.mirrorMembers(spaceId),
 		// The audit of Members, in the Space's event log. Called on requests,
 		// long after the engine below is made.
