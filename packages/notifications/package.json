@@ -15,6 +15,7 @@
 		"@nightshift/db": "workspace:*",
 		"@nightshift/engine": "workspace:*",
 		"drizzle-orm": "catalog:",
+		"expo-server-sdk": "^7.2.0",
 		"zod": "catalog:"
 	},
 	"devDependencies": {

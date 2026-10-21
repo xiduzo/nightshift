@@ -3,7 +3,11 @@
 // `./testing`.
 
 export {
+	createExpoChannel,
 	createInAppChannel,
+	type ExpoChannel,
+	type ExpoChannelOptions,
+	type ExpoClient,
 	type InAppChannel,
 	type InAppItem,
 	type InAppTarget,
