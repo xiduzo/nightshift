@@ -10,7 +10,7 @@ import {
 } from "@nightshift/engine/testing";
 import type { AgentProfileSettings, Flow, FlowNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-import { createPeerEngine, type PeerEngine } from "../peers";
+import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
 import {
 	createOfferSlots,
@@ -195,7 +195,10 @@ describe("another Person's run on the computer that walks it", () => {
 
 	beforeEach(async () => {
 		sandbox = await createSandbox();
-		documents = createSpaceDocuments({ db: sandbox.db });
+		documents = createSpaceDocuments({
+			db: sandbox.db,
+			directory: deviceDirectory(sandbox.db),
+		});
 		signal = new AbortController();
 		own = [];
 		await sandbox.db
@@ -357,7 +360,10 @@ describe("a schedule that fires on another Person's Device", () => {
 
 	beforeEach(async () => {
 		sandbox = await createSandbox();
-		documents = createSpaceDocuments({ db: sandbox.db });
+		documents = createSpaceDocuments({
+			db: sandbox.db,
+			directory: deviceDirectory(sandbox.db),
+		});
 		signal = new AbortController();
 		own = [];
 		clock = at(16, 21, 59);

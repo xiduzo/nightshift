@@ -84,7 +84,7 @@ function engineOf(
 			scheduler: false,
 			...(options.relay ? { relay: options.relay } : {}),
 		}),
-		{ runLog: createRunLog(sandbox.db) },
+		{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
 	);
 }
 
@@ -531,7 +531,7 @@ describe("the Spaces of a Host", () => {
 
 describe("run logs", () => {
 	test("an ingested event is in the run log as on disk", async () => {
-		const runLog = createRunLog(b.db);
+		const runLog = createRunLog(b.db, { walkerId: b.deviceId });
 		const engineA = engineOf(a);
 		const engineB = createPeerEngine(
 			withPeers({

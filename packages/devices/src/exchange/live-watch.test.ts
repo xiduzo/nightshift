@@ -38,7 +38,7 @@ function engineOf(sandbox: Sandbox): PeerEngine {
 			dataDir: sandbox.dataDir,
 			scheduler: false,
 		}),
-		{ runLog: createRunLog(sandbox.db) },
+		{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
 	);
 }
 

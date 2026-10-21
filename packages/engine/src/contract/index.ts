@@ -1,5 +1,6 @@
-/** The engine's public contract: `Engine`, the view of one Space (`SpaceEngine`), what it takes (`EngineOptions`) and what it asks of the Hosts (`Relay`). */
+/** The engine's public contract: `Engine`, the view of one Space (`SpaceEngine`), what it takes (`EngineOptions`), what it asks of the Hosts (`Relay`), and its ports to the devices (`Peers`, `DeviceDirectory`). */
 
+export type { DeviceDirectory } from "./directory";
 export type {
 	Actor,
 	Engine,

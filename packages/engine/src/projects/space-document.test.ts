@@ -12,6 +12,7 @@ import { asc, eq } from "drizzle-orm";
 import type * as Y from "yjs";
 
 import { createEngine } from "../run/engine";
+import { aloneDirectory } from "../testing/alone-directory";
 import {
 	createSandbox,
 	otherSpace,
@@ -36,7 +37,10 @@ let documents: SpaceDocuments;
 let signal: AbortController;
 beforeEach(async () => {
 	sandbox = await createSandbox();
-	documents = createSpaceDocuments({ db: sandbox.db });
+	documents = createSpaceDocuments({
+		db: sandbox.db,
+		directory: aloneDirectory(sandbox.db),
+	});
 	signal = new AbortController();
 });
 afterEach(async () => {
@@ -114,7 +118,10 @@ describe("import", () => {
 		await sandbox.db
 			.insert(project)
 			.values({ id: "p2", spaceId: sandbox.spaceId, name: "later" });
-		const again = createSpaceDocuments({ db: sandbox.db });
+		const again = createSpaceDocuments({
+			db: sandbox.db,
+			directory: aloneDirectory(sandbox.db),
+		});
 		const reopened = await again.open(sandbox.spaceId);
 		expect([...spaceProjects(reopened).keys()]).toEqual(["p1"]);
 		await again.close();

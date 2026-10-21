@@ -1,4 +1,4 @@
-/** This computer's configuration in its Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers, and this computer's own Device row. */
+/** This computer's configuration in its Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. */
 
 export type { CliTool, CliToolGuide, CliToolStore } from "./cli-tools";
 export {
@@ -41,7 +41,6 @@ export type { McpExpansion } from "./mcp";
 export { expandMcpServers } from "./mcp";
 export type { ProfileStore, ProfileView } from "./profiles";
 export { createProfileStore } from "./profiles";
-export { selfDevice, selfOwnerId, setSelfOwner } from "./self-device";
 export type {
 	RunSettings,
 	SettingField,

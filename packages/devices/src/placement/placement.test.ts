@@ -24,7 +24,7 @@ import {
 import type { Flow } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
 import type { WorkRelay, WorkRequest } from "../contract";
-import { createPeerEngine, type PeerEngine } from "../peers";
+import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
 import { serveWork } from "../work/remote";
 
@@ -93,7 +93,10 @@ beforeEach(async () => {
 			}
 		},
 	};
-	const documents = createSpaceDocuments({ db: a.db });
+	const documents = createSpaceDocuments({
+		db: a.db,
+		directory: deviceDirectory(a.db),
+	});
 	engine = createPeerEngine(
 		withPeers({
 			db: a.db,

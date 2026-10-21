@@ -167,7 +167,7 @@ export async function startRun(
 		baseRef: "main",
 		walkerId: sandbox.deviceId,
 	});
-	const log = createRunLog(db);
+	const log = createRunLog(db, { walkerId: sandbox.deviceId });
 	await log.append({
 		type: "RunStarted",
 		runId,

@@ -15,6 +15,7 @@ import {
 	turnOnTwoFactor,
 } from "@nightshift/auth/testing";
 import { project } from "@nightshift/db/schema";
+import { deviceDirectory } from "@nightshift/devices";
 import {
 	createCliToolStore,
 	createSettingsStore,
@@ -31,7 +32,6 @@ import {
 } from "@nightshift/engine/testing";
 import type { Server } from "bun";
 import * as Y from "yjs";
-
 import { isThisComputer } from "../http";
 import { createSync, type SocketData, type Sync } from "./sync";
 
@@ -71,7 +71,10 @@ beforeEach(async () => {
 	deviceKeys = new Map();
 	keptOwners = new Map();
 	keptRows = new Map();
-	spaces = createSpaceDocuments({ db: people.db });
+	spaces = createSpaceDocuments({
+		db: people.db,
+		directory: deviceDirectory(people.db),
+	});
 	sync = createSync({
 		document: (name) =>
 			name === document.name

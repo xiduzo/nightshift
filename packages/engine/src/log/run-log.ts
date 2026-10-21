@@ -1,7 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema";
 import { asc, eq, inArray } from "drizzle-orm";
-import { selfDevice } from "../device-config";
 import {
 	appendEvent,
 	type EngineEventType,
@@ -55,8 +54,12 @@ export type Derive<T> = (events: readonly LoggedEvent[]) => T;
 export type RunLogOptions = {
 	/** How many events of ended runs to keep in memory. Default 20 000. */
 	maxIdleEvents?: number;
-	/** The Walker that appends: the Device id every event gets. Default: this database's own Device. */
-	walkerId?: string;
+	/**
+	 * The Walker that appends: the Device id every event gets. A function
+	 * is called once, on the first append or read that needs it (this
+	 * database's own Device, `DeviceDirectory.selfId`).
+	 */
+	walkerId: string | (() => Promise<string>);
 };
 
 const DEFAULT_MAX_IDLE_EVENTS = 20_000;
@@ -84,7 +87,7 @@ function insertBySeq(events: LoggedEvent[], e: LoggedEvent): void {
 	events.splice(at, 0, e);
 }
 
-export function createRunLog(db: Database, options: RunLogOptions = {}) {
+export function createRunLog(db: Database, options: RunLogOptions) {
 	const maxIdleEvents = options.maxIdleEvents ?? DEFAULT_MAX_IDLE_EVENTS;
 	/** Loaded logs by run id, least recently used first. */
 	const logs = new Map<string, Log>();
@@ -108,11 +111,12 @@ export function createRunLog(db: Database, options: RunLogOptions = {}) {
 			}
 		}
 	}
-	let walker: Promise<string> | undefined = options.walkerId
-		? Promise.resolve(options.walkerId)
-		: undefined;
+	const ownWalker = options.walkerId;
+	let walker: Promise<string> | undefined =
+		typeof ownWalker === "string" ? Promise.resolve(ownWalker) : undefined;
 	const walkerId = (): Promise<string> => {
-		walker ??= selfDevice(db).then((self) => self.id);
+		walker ??=
+			typeof ownWalker === "string" ? Promise.resolve(ownWalker) : ownWalker();
 		return walker;
 	};
 

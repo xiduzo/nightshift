@@ -59,7 +59,7 @@ function makeEngine(
 	harness: AgentHarness,
 	options: Partial<Pick<TestEngineOptions, "decider">> = {},
 ): SpaceEngine {
-	const runLog = createRunLog(sandbox.db);
+	const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 	runLogs.push(runLog);
 	return createEngine(
 		withDevice({

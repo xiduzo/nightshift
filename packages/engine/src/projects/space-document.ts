@@ -1,9 +1,10 @@
 import { spaceIds, spaceRoster } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { clone, device, hostSpace, project } from "@nightshift/db/schema";
+import { clone, project } from "@nightshift/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import type * as Y from "yjs";
 import { z } from "zod";
+import type { DeviceDirectory } from "../contract";
 import {
 	openPersistedDocument,
 	type PersistedDocument,
@@ -185,8 +186,10 @@ export type SpaceDocuments = {
 
 export function createSpaceDocuments(options: {
 	db: Database;
+	/** The names of the Devices of the Clones, and the Spaces a Host keeps. */
+	directory: Pick<DeviceDirectory, "names" | "hostedElsewhere">;
 }): SpaceDocuments {
-	const { db } = options;
+	const { db, directory } = options;
 	const opening = new Map<string, Promise<SpaceDocument>>();
 	const opened = new Map<string, SpaceDocument>();
 
@@ -203,7 +206,7 @@ export function createSpaceDocuments(options: {
 			},
 		});
 		const { doc } = persisted;
-		const hostedElsewhere = await isHostedElsewhere(db, spaceId);
+		const hostedElsewhere = await directory.hostedElsewhere(spaceId);
 		const document: SpaceDocument = {
 			...persisted,
 			spaceId,
@@ -216,7 +219,7 @@ export function createSpaceDocuments(options: {
 		};
 		holder.document = document;
 		if (!hostedElsewhere) {
-			await importRows(db, document);
+			await importRows(db, directory, document);
 			await mirror(db, document);
 		} else {
 			// What the Link brought before this start.
@@ -269,23 +272,33 @@ export function createSpaceDocuments(options: {
  * in from the Replica's rows, once: the document records that it did.
  * An entry the document has already stays as it is.
  */
-async function importRows(db: Database, document: SpaceDocument) {
+async function importRows(
+	db: Database,
+	directory: Pick<DeviceDirectory, "names">,
+	document: SpaceDocument,
+) {
 	const meta = document.doc.getMap("meta");
 	if (meta.get("importedAt") !== undefined) return;
 	const projects = await db
 		.select()
 		.from(project)
 		.where(eq(project.spaceId, document.spaceId));
-	const clones = await db
+	const rows = await db
 		.select({
 			projectId: clone.projectId,
 			deviceId: clone.deviceId,
 			createdAt: clone.createdAt,
-			deviceName: device.name,
 		})
 		.from(clone)
-		.innerJoin(device, eq(device.id, clone.deviceId))
 		.where(eq(clone.spaceId, document.spaceId));
+	// The Clones of a Device the directory knows, with its name.
+	const names = await directory.names([
+		...new Set(rows.map((r) => r.deviceId)),
+	]);
+	const clones = rows.flatMap((row) => {
+		const deviceName = names.get(row.deviceId);
+		return deviceName === undefined ? [] : [{ ...row, deviceName }];
+	});
 	await document.change(() => {
 		meta.set("spaceId", document.spaceId);
 		meta.set("importedAt", Date.now());
@@ -402,16 +415,4 @@ async function mirror(db: Database, document: SpaceDocument): Promise<void> {
 			}
 		}
 	});
-}
-
-/** Whether a Space is kept by a Host, not by this Replica. */
-export async function isHostedElsewhere(
-	db: Database,
-	spaceId: string,
-): Promise<boolean> {
-	const [row] = await db
-		.select({ spaceId: hostSpace.spaceId })
-		.from(hostSpace)
-		.where(eq(hostSpace.spaceId, spaceId));
-	return row !== undefined;
 }

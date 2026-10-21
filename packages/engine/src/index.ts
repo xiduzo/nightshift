@@ -7,6 +7,7 @@
 
 export type {
 	Actor,
+	DeviceDirectory,
 	Engine,
 	EngineOptions,
 	FeedStep,
@@ -75,9 +76,6 @@ export {
 	saveProfile,
 	secretNameSchema,
 	secretStore,
-	selfDevice,
-	selfOwnerId,
-	setSelfOwner,
 	settingsPatchSchema,
 	settingsSchema,
 	valueStore,

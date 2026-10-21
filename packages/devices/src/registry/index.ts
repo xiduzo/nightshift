@@ -1,4 +1,4 @@
-/** The Devices that paired with this Host: their rows, presence and its audit. */
+/** The Devices: this computer's own Device row, and on a Host the Devices that paired with it, their presence and its audit. */
 
 export {
 	createDeviceRegistry,
@@ -6,3 +6,9 @@ export {
 	deviceNamesOf,
 	type PairedDevice,
 } from "./registry";
+export {
+	selfDevice,
+	selfDeviceId,
+	selfOwnerId,
+	setSelfOwner,
+} from "./self-device";

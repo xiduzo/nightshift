@@ -28,10 +28,14 @@ import {
 	createWorkHub,
 	createWorkRelay,
 	type DeviceServices,
+	deviceDirectory,
 	deviceOffers,
 	listenHostname,
 	ownCertificate,
 	reachFor,
+	selfDevice,
+	selfOwnerId,
+	setSelfOwner,
 	wireDevices,
 } from "@nightshift/devices";
 import {
@@ -47,9 +51,6 @@ import {
 	memberRole,
 	openDeviceDocument,
 	secretStore,
-	selfDevice,
-	selfOwnerId,
-	setSelfOwner,
 	setUpGit,
 	spaceIdOf,
 	systemGitInstaller,
@@ -166,7 +167,10 @@ export async function createDaemon(
 	 * Members. The engine defines Projects in them, the relay serves them to
 	 * Members, and the auth hooks keep their Members in step.
 	 */
-	hot.nightshiftSpaces ??= createSpaceDocuments({ db });
+	hot.nightshiftSpaces ??= createSpaceDocuments({
+		db,
+		directory: deviceDirectory(db),
+	});
 	const spaces = hot.nightshiftSpaces;
 
 	const trustedOrigins = trustedOriginsOf(env, port);
@@ -309,7 +313,7 @@ export async function createDaemon(
 				})),
 			),
 		// The project's folder here: where its runs' worktrees branch from.
-		clonePath: clonePathOf(db),
+		clonePath: clonePathOf(db, async () => device.id),
 		// Its profiles, for a run placed here from another Device.
 		profileFor: (name) => profiles.settingsFor(name),
 	});

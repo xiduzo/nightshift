@@ -17,6 +17,7 @@ import {
 	type SpaceDocuments,
 	spaceProjects,
 } from "../projects/space-document";
+import { aloneDirectory } from "../testing/alone-directory";
 import {
 	createSandbox,
 	expectRunLogsInSync,
@@ -40,7 +41,10 @@ beforeEach(async () => {
 	sandbox = await createSandbox();
 	runLogs = [];
 	signal = new AbortController();
-	documents = createSpaceDocuments({ db: sandbox.db });
+	documents = createSpaceDocuments({
+		db: sandbox.db,
+		directory: aloneDirectory(sandbox.db),
+	});
 });
 afterEach(async () => {
 	signal.abort();
@@ -53,7 +57,7 @@ afterEach(async () => {
 });
 
 function makeEngine(internals: EngineInternals = {}): Engine {
-	const runLog = createRunLog(sandbox.db);
+	const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 	runLogs.push(runLog);
 	return createEngine(
 		withDevice({

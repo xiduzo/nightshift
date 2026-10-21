@@ -3,6 +3,7 @@ import type { AgentProfileSettings } from "@nightshift/flows";
 import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
 import type { Git, SpaceDocuments } from "../projects";
+import type { DeviceDirectory } from "./directory";
 import type { PeersFactory } from "./peers";
 import type { Relay } from "./relay";
 
@@ -12,11 +13,17 @@ export type EngineOptions = {
 	/** The Hosts, for the actions on rows another Device owns. */
 	relay?: Relay;
 	/**
-	 * This computer's Device id (`selfDevice`): the Walker of the runs this
-	 * engine starts, and the Device whose Clones it works in. Default: the
-	 * database's own Device.
+	 * This computer's Device id: the Walker of the runs this engine starts,
+	 * and the Device whose Clones it works in. Default: the database's own
+	 * Device (`directory.selfId()`).
 	 */
 	walkerId?: string;
+	/**
+	 * The Device rows the engine reads: this computer's Device and its
+	 * owner, the names of Devices, and the Spaces a Host keeps.
+	 * `@nightshift/devices` makes it (`deviceDirectory`).
+	 */
+	directory: DeviceDirectory;
 	/**
 	 * This computer as a Device (`localDevice`): its harnesses, decider,
 	 * connections, CLI tools, commands and worktrees. A run's steps run on
@@ -56,7 +63,7 @@ export type EngineOptions = {
 	profileFor?: (name: string) => AgentProfileSettings | null;
 	/**
 	 * The Space documents, where Projects are defined. The daemon passes
-	 * the ones the relay serves. Default: new ones over `db`.
+	 * the ones the relay serves. Default: new ones over `db` and `directory`.
 	 */
 	spaceDocuments?: SpaceDocuments;
 	/**

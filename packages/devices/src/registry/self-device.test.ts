@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { device } from "@nightshift/db/schema";
+import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
-import { createSandbox, type Sandbox } from "../testing/test-support";
-import { hostDeviceName, selfDevice } from "./self-device";
+import { hostDeviceName, selfDevice, selfDeviceId } from "./self-device";
 
 let sandbox: Sandbox;
 beforeEach(async () => {
@@ -40,6 +40,13 @@ describe("selfDevice", () => {
 		expect((await selfDevice(sandbox.db, host)).name).toBe("studio");
 		await sandbox.db.update(device).set({ name: "MacBook" });
 		expect((await selfDevice(sandbox.db, host)).name).toBe("MacBook");
+	});
+
+	test("its id, read without making a row", async () => {
+		expect(await selfDeviceId(sandbox.db)).toBe(sandbox.deviceId);
+		await sandbox.db.delete(device);
+		expect(await selfDeviceId(sandbox.db)).toBeNull();
+		expect(await sandbox.db.select().from(device)).toHaveLength(0);
 	});
 
 	test("the host name drops the .local of macOS", () => {

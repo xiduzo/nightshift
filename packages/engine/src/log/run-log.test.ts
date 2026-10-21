@@ -95,7 +95,7 @@ const edge = (runId: string, n: number): EventInput<"EdgeTaken"> => ({
 
 describe("run log", () => {
 	test("an append is kept as committed, with its seq and time", async () => {
-		const log = createRunLog(sandbox.db);
+		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 		await log.append(started("r1"));
 		expect(await log.events("r1")).toEqual(await fromDb("r1"));
 		const logged = await log.append(edge("r1", 1));
@@ -105,7 +105,7 @@ describe("run log", () => {
 	});
 
 	test("a read is a copy: a later append does not change it", async () => {
-		const log = createRunLog(sandbox.db);
+		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 		await log.append(started("r1"));
 		const before = await log.events("r1");
 		await log.append(edge("r1", 1));
@@ -114,7 +114,7 @@ describe("run log", () => {
 	});
 
 	test("concurrent appends to one run keep seq order", async () => {
-		const log = createRunLog(sandbox.db);
+		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 		await log.append(started("r1"));
 		await log.events("r1");
 		await Promise.all(
@@ -162,7 +162,7 @@ describe("run log", () => {
 	});
 
 	test("an append that throws leaves the log as it was", async () => {
-		const log = createRunLog(sandbox.db);
+		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 		await log.append(started("r1"));
 		await log.events("r1");
 		await sandbox.db.$client.execute(
@@ -176,7 +176,10 @@ describe("run log", () => {
 	});
 
 	test("ended runs are dropped least recently used first; open runs stay", async () => {
-		const log = createRunLog(sandbox.db, { maxIdleEvents: 4 });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			maxIdleEvents: 4,
+		});
 		await log.append(started("open"));
 		for (const runId of ["a", "b", "c"]) {
 			await log.append(started(runId));
@@ -203,7 +206,10 @@ describe("run log", () => {
 	});
 
 	test("derive keeps its value until the run's next append", async () => {
-		const log = createRunLog(sandbox.db, { maxIdleEvents: 0 });
+		const log = createRunLog(sandbox.db, {
+			walkerId: sandbox.deviceId,
+			maxIdleEvents: 0,
+		});
 		let calls = 0;
 		const count = (events: readonly LoggedEvent[]) => {
 			calls++;
@@ -244,7 +250,7 @@ describe("event identity: (walker, walker seq)", () => {
 			.orderBy(asc(event.seq));
 
 	test("each Walker counts its own events from 1; the local seq orders them all", async () => {
-		const here = createRunLog(sandbox.db);
+		const here = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 		const studio = createRunLog(sandbox.db, { walkerId: "studio" });
 		await here.append(started("r1"));
 		await studio.append(started("r2"));
@@ -263,7 +269,7 @@ describe("event identity: (walker, walker seq)", () => {
 	});
 
 	test("appends at once never share a number", async () => {
-		const log = createRunLog(sandbox.db);
+		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 		await Promise.all(
 			Array.from({ length: 20 }, (_, i) => log.append(edge(`r${i % 3}`, i))),
 		);

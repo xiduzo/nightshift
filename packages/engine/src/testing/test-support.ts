@@ -11,6 +11,7 @@ import { createDb, type Database } from "@nightshift/db";
 import { migrateDb } from "@nightshift/db/migrate";
 import { device, event, organization } from "@nightshift/db/schema";
 import { asc, eq, sql } from "drizzle-orm";
+import type { DeviceDirectory } from "../contract/directory";
 import type { EngineOptions } from "../contract/options";
 import type { PeersFactory } from "../contract/peers";
 import { type LocalDeviceDeps, localDevice } from "../device/local";
@@ -19,11 +20,11 @@ import {
 	type DeviceDocument,
 	openDeviceDocument,
 } from "../device-config/device-document";
-import { selfDevice } from "../device-config/self-device";
 import { parseEventRow } from "../log/events";
 import type { RunLog } from "../log/run-log";
 import { systemGit } from "../projects/git";
 import { clonePathOf } from "../projects/projects";
+import { aloneDirectory, ownDevice } from "./alone-directory";
 import { alonePeers } from "./alone-peers";
 
 /** Test helpers: a temp git repo, a migrated temp database, scripted harnesses. */
@@ -43,12 +44,17 @@ export function testDevice(
 }
 
 /** The engine's options with the Device's deps beside them, as a test writes them. */
-export type TestEngineOptions = Omit<EngineOptions, "device" | "peers"> &
+export type TestEngineOptions = Omit<
+	EngineOptions,
+	"device" | "peers" | "directory"
+> &
 	TestDeviceDeps & {
 		/** The test Device's id. Default `TEST_DEVICE_ID`. */
 		deviceId?: string;
 		/** The other Devices and Hosts. Default: none (`alonePeers`). */
 		peers?: PeersFactory;
+		/** The Device rows. Default: those of a computer alone (`aloneDirectory`). */
+		directory?: DeviceDirectory;
 	};
 
 /** Engine options whose Device is `testDevice` over the Device deps among them. */
@@ -68,10 +74,12 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 		git,
 		deviceId,
 		peers,
+		directory = aloneDirectory(options.db),
 		...engine
 	} = options;
 	return {
 		...engine,
+		directory,
 		peers: peers ?? alonePeers,
 		...(git ? { git } : {}),
 		device: testDevice(
@@ -87,7 +95,7 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 				findCli,
 				cliToolsFor,
 				// The Clones of the database's own Device, as the daemon wires it.
-				clonePath: clonePath ?? clonePathOf(engine.db),
+				clonePath: clonePath ?? clonePathOf(engine.db, directory.selfId),
 				git,
 			},
 			deviceId,
@@ -158,7 +166,7 @@ export async function createSandbox(): Promise<Sandbox> {
 	const dbPath = join(root, "nightshift.db");
 	const db = createDb({ DATABASE_URL: `file:${dbPath}` });
 	await migrateDb(db);
-	const deviceId = (await selfDevice(db)).id;
+	const deviceId = (await ownDevice(db)).id;
 	return {
 		root,
 		repoPath,

@@ -16,7 +16,7 @@ import type {
 	WorkRequest,
 } from "../contract";
 import { createOfferSlots, type DeviceOffer } from "../offers";
-import { createPeerEngine, type PeerEngine } from "../peers";
+import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
 import { checkWork, createOfferCalls, createWorkServer } from "./work";
 import { createWorkHub } from "./work-hub";
@@ -41,7 +41,10 @@ let worktree: string;
 beforeEach(async () => {
 	sandbox = await createSandbox();
 	own = [];
-	documents = createSpaceDocuments({ db: sandbox.db });
+	documents = createSpaceDocuments({
+		db: sandbox.db,
+		directory: deviceDirectory(sandbox.db),
+	});
 	engine = createPeerEngine(
 		withPeers({
 			db: sandbox.db,

@@ -7,6 +7,7 @@ import type { HostRelay } from "../contract";
 import type { EngineExchange } from "../exchange";
 import type { EngineOffers } from "../offers";
 import type { DeviceRegistry } from "../registry";
+import { deviceDirectory } from "./directory";
 import { type BuiltPeers, createPeers, type PeerOptions } from "./peers";
 
 /** The engine of this Device among its peers, with the devices' half beside it. */
@@ -22,8 +23,14 @@ export type PeerEngine = Engine & {
 	readonly offers: EngineOffers;
 };
 
-/** What `createPeerEngine` takes: the engine's options, with the peers' own. */
-export type PeerEngineOptions = Omit<EngineOptions, "peers" | "relay"> &
+/**
+ * What `createPeerEngine` takes: the engine's options, with the peers' own.
+ * The Device rows come from this package (`deviceDirectory`).
+ */
+export type PeerEngineOptions = Omit<
+	EngineOptions,
+	"peers" | "relay" | "directory"
+> &
 	PeerOptions & {
 		/** The Hosts this computer links to (`createRelay`). */
 		relay?: HostRelay;
@@ -43,6 +50,7 @@ export function createPeerEngine(
 	const engine = createEngine(
 		{
 			...engineOptions,
+			directory: deviceDirectory(options.db),
 			peers: ({ relay: _relay, ...context }) => {
 				built = createPeers(
 					{ ...context, ...(options.relay ? { relay: options.relay } : {}) },

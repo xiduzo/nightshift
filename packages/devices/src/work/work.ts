@@ -23,6 +23,7 @@ import {
 	offeredSession,
 	slotKey,
 } from "../offers";
+import { selfDeviceId } from "../registry";
 import { serveWork } from "./remote";
 
 /**
@@ -434,7 +435,10 @@ async function admitWork(
 		if (refusal !== null) return refuse(refusal);
 	}
 	if (!NEEDS_CLONE.has(call.kind)) return { offers };
-	const repoPath = await clonePathOf(db)(projectId, spaceId);
+	const repoPath = await clonePathOf(db, () => selfDeviceId(db))(
+		projectId,
+		spaceId,
+	);
 	if (repoPath === null) {
 		return refuse(
 			"This device does not have this project. Add its folder there first.",

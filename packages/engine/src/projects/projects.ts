@@ -5,7 +5,6 @@ import type { Database } from "@nightshift/db";
 import {
 	agentSession,
 	clone,
-	device,
 	event,
 	project,
 	run,
@@ -21,13 +20,12 @@ import {
 	or,
 	sql,
 } from "drizzle-orm";
-import type { Relay } from "../contract";
+import type { DeviceDirectory, Relay } from "../contract";
 import type { RunLog } from "../log";
 import { type Git, systemGit } from "./git";
 import { normaliseRemote } from "./remote";
 import {
 	cloneKey,
-	isHostedElsewhere,
 	projectClones,
 	projectEntry,
 	recordClone,
@@ -80,22 +78,25 @@ export type ListedProject = typeof project.$inferSelect & {
 
 /**
  * The folder of a project's Clone on this computer (the Replica's own
- * Device), or null: what `localDevice` works in. With a Space, a project of
- * another Space has none.
+ * Device, `selfId`), or null: what `localDevice` works in. With a Space, a
+ * project of another Space has none. Null too when this computer has no
+ * Device yet.
  */
 export function clonePathOf(
 	db: Database,
+	selfId: () => Promise<string | null>,
 ): (projectId: string, spaceId?: string) => Promise<string | null> {
 	return async (projectId, spaceId) => {
+		const deviceId = await selfId();
+		if (deviceId === null) return null;
 		const [row] = await db
 			.select({ path: clone.path })
 			.from(clone)
-			.innerJoin(device, eq(device.id, clone.deviceId))
 			.innerJoin(project, eq(project.id, clone.projectId))
 			.where(
 				and(
 					eq(clone.projectId, projectId),
-					eq(device.self, true),
+					eq(clone.deviceId, deviceId),
 					isNull(project.removedAt),
 					spaceId === undefined ? undefined : eq(project.spaceId, spaceId),
 				),
@@ -111,6 +112,8 @@ export type ProjectsDeps = {
 	deviceId(): Promise<string>;
 	/** The Space documents: the source of the Projects' definitions. */
 	documents: SpaceDocuments;
+	/** The names of Devices, and the Spaces a Host keeps. */
+	directory: Pick<DeviceDirectory, "names" | "hostedElsewhere">;
 	/** The Hosts: a Clone in a Space a Host keeps is recorded through it. */
 	relay?: Pick<Relay, "addClone">;
 	/** The git port, for a clone's top folder and remote. Default: the git programs on this computer. */
@@ -148,7 +151,7 @@ export function toProject(
 }
 
 export function createProjects(deps: ProjectsDeps) {
-	const { db, log, documents } = deps;
+	const { db, log, documents, directory } = deps;
 	const { originUrl, resolveRepoTopLevel } = createWorktrees(
 		deps.git ?? systemGit(),
 	);
@@ -180,12 +183,13 @@ export function createProjects(deps: ProjectsDeps) {
 		spaceId: string,
 		deviceId: string,
 	): Promise<void> {
-		const [self] = await db
-			.select({ name: device.name })
-			.from(device)
-			.where(eq(device.id, deviceId));
+		const names = await directory.names([deviceId]);
 		const document = await documents.open(spaceId);
-		const clone = { projectId, deviceId, deviceName: self?.name ?? deviceId };
+		const clone = {
+			projectId,
+			deviceId,
+			deviceName: names.get(deviceId) ?? deviceId,
+		};
 		if (document.hostedElsewhere) {
 			if (!deps.relay) throw new Error(HOSTED_ELSEWHERE);
 			await deps.relay.addClone({ spaceId, ...clone });
@@ -431,8 +435,8 @@ export function createProjects(deps: ProjectsDeps) {
 		async move(projectId: string, from: string, to: string): Promise<void> {
 			if (from === to) return;
 			if (
-				(await isHostedElsewhere(db, from)) ||
-				(await isHostedElsewhere(db, to))
+				(await directory.hostedElsewhere(from)) ||
+				(await directory.hostedElsewhere(to))
 			) {
 				throw new Error(HOSTED_ELSEWHERE);
 			}

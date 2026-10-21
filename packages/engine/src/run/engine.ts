@@ -1,11 +1,7 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { isCustomHarness } from "@nightshift/flows";
 import type { Engine, EngineOptions, StartRunInput } from "../contract";
-import {
-	defaultRunSettings,
-	type RunSettings,
-	selfOwnerId,
-} from "../device-config";
+import { defaultRunSettings, type RunSettings } from "../device-config";
 import { createFlowFiles } from "../flows";
 import { createRunner, resolvePolicy } from "../graph";
 import {
@@ -103,7 +99,7 @@ export function createEngine(
 ): Engine {
 	const minuteMs = internals.minuteMs ?? 60_000;
 	const now = internals.now ?? Date.now;
-	const { db, dataDir, device } = options;
+	const { db, dataDir, device, directory } = options;
 	const maxConcurrentRuns =
 		options.maxConcurrentRuns ?? DEFAULT_MAX_CONCURRENT_RUNS;
 	if (!Number.isInteger(maxConcurrentRuns) || maxConcurrentRuns < 1) {
@@ -123,8 +119,9 @@ export function createEngine(
 	const bus = createRunBus();
 	const runLog =
 		internals.runLog ??
-		createRunLog(db, options.walkerId ? { walkerId: options.walkerId } : {});
-	const documents = options.spaceDocuments ?? createSpaceDocuments({ db });
+		createRunLog(db, { walkerId: options.walkerId || directory.selfId });
+	const documents =
+		options.spaceDocuments ?? createSpaceDocuments({ db, directory });
 
 	/** Whether a run's own worktree is on this computer: placed here, or before Placement. */
 	const placedHere = (row: RunRow) =>
@@ -132,7 +129,7 @@ export function createEngine(
 		row.deviceId === device.id ||
 		row.deviceId === row.walkerId;
 
-	/** The Person who owns this computer (its `device` row), read when the engine is ready. */
+	/** The Person who owns this computer (`directory.selfOwnerId`), read when the engine is ready. */
 	let ownerId: string | null = null;
 
 	/** `ready` (below), for the peers made before it: it settles as `ready` does. */
@@ -175,6 +172,7 @@ export function createEngine(
 		log: runLog,
 		deviceId: runLog.walkerId,
 		documents,
+		directory,
 		git,
 		...(options.relay ? { relay: options.relay } : {}),
 	});
@@ -238,7 +236,7 @@ export function createEngine(
 		.then(() => placement.loadNames())
 		// Whose runs are this computer's own: another Person's take an Offer.
 		.then(async () => {
-			ownerId = await selfOwnerId(db);
+			ownerId = await directory.selfOwnerId();
 		})
 		// The interrupted runs' grace counts from now: the engine is ready.
 		.then(() => recovery.armResumes());

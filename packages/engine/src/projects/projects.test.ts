@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { clone, device, event, project } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { createRunLog } from "../log/run-log";
+import { aloneDirectory } from "../testing/alone-directory";
 import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
 import { createProjects } from "./projects";
 import { normaliseRemote } from "./remote";
@@ -13,7 +14,10 @@ let sandbox: Sandbox;
 let documents: SpaceDocuments;
 beforeEach(async () => {
 	sandbox = await createSandbox();
-	documents = createSpaceDocuments({ db: sandbox.db });
+	documents = createSpaceDocuments({
+		db: sandbox.db,
+		directory: aloneDirectory(sandbox.db),
+	});
 });
 afterEach(async () => {
 	await documents.close();
@@ -23,9 +27,10 @@ afterEach(async () => {
 const projectsOf = () =>
 	createProjects({
 		db: sandbox.db,
-		log: createRunLog(sandbox.db),
+		log: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }),
 		deviceId: async () => sandbox.deviceId,
 		documents,
+		directory: aloneDirectory(sandbox.db),
 	});
 
 /** A new git repository under the sandbox, with `origin` set when given. */

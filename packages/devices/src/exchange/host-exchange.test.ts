@@ -39,7 +39,7 @@ beforeEach(async () => {
 			dataDir: sandbox.dataDir,
 			scheduler: false,
 		}),
-		{ runLog: createRunLog(sandbox.db) },
+		{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
 	);
 	const [owner] = await sandbox.db.select().from(user);
 	ownerId = owner?.id as string;

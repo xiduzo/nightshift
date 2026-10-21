@@ -47,9 +47,18 @@ export {
 	type OfferView,
 	type SpaceDeviceView,
 } from "./offers";
-export { createPeerEngine, type PeerEngine } from "./peers";
+export {
+	createPeerEngine,
+	deviceDirectory,
+	type PeerEngine,
+} from "./peers";
 export { listenHostname, ownCertificate, reachFor } from "./reach";
-export type { PairedDevice } from "./registry";
+export {
+	type PairedDevice,
+	selfDevice,
+	selfOwnerId,
+	setSelfOwner,
+} from "./registry";
 export { createRelay, createWorkRelay } from "./relay";
 export { type DeviceServices, wireDevices } from "./wire";
 export { createWorkHub, type WorkHub } from "./work";

@@ -80,7 +80,7 @@ function makeDaemon(
 	options: Parameters<typeof makeEngine>[1] = {},
 	internals: EngineInternals = {},
 ): Engine {
-	const runLog = createRunLog(sandbox.db);
+	const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 	runLogs.push(runLog);
 	return createEngine(
 		withDevice({

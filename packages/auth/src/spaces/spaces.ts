@@ -119,7 +119,7 @@ export async function activeSpaceId(
  * Host has none.
  *
  * `self` is this computer's Device row, which auth does not own: the
- * Person it names, and how to name another (the engine's `setSelfOwner`).
+ * Person it names, and how to name another (`setSelfOwner` of `@nightshift/devices`).
  * Without it, the Person is the one with the local email.
  */
 export async function localPerson(
