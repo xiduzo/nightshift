@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { localPerson } from "../spaces";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
 import { turnOnTwoFactor } from "../testing/two-factor";
-import { hasLogin, setLogin } from "./login";
+import { endSession, hasLogin, setLogin } from "./login";
 
 let sandbox: AuthSandbox;
 beforeEach(async () => {
@@ -89,5 +89,24 @@ describe("a login for the Host admin of a Host without a screen", () => {
 		const headers = await sandbox.signIn(login.email, "a-new-password");
 		const session = await sandbox.auth.api.getSession({ headers });
 		expect(session?.user.twoFactorEnabled).toBe(false);
+	});
+});
+
+describe("ending a session", () => {
+	test("signs that screen out, and only the Person's own", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const bob = await sandbox.signUp("Bob");
+		const session = await sandbox.auth.api.getSession({ headers: ada.headers });
+		const sessionId = session?.session.id ?? "";
+
+		expect(await endSession(sandbox.db, bob.userId, sessionId)).toBe(false);
+		expect(
+			await sandbox.auth.api.getSession({ headers: ada.headers }),
+		).not.toBeNull();
+
+		expect(await endSession(sandbox.db, ada.userId, sessionId)).toBe(true);
+		expect(
+			await sandbox.auth.api.getSession({ headers: ada.headers }),
+		).toBeNull();
 	});
 });

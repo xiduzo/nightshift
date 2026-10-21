@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import { account } from "@nightshift/db/schema";
+import { account, session } from "@nightshift/db/schema";
 import { and, eq } from "drizzle-orm";
 
 import type { Auth } from "../auth";
@@ -84,4 +84,21 @@ export async function setLogin(
 		});
 	}
 	return { email };
+}
+
+/**
+ * Ends one of the Person's sessions: the screen that holds it is signed
+ * out at its next call. Removing a phone ends the session it signed in
+ * with. False when the Person has no session of that id.
+ */
+export async function endSession(
+	db: Database,
+	personId: string,
+	sessionId: string,
+): Promise<boolean> {
+	const ended = await db
+		.delete(session)
+		.where(and(eq(session.id, sessionId), eq(session.userId, personId)))
+		.returning({ id: session.id });
+	return ended.length > 0;
 }

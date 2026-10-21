@@ -1,1 +1,1 @@
-export { hasLogin, setLogin } from "./login";
+export { endSession, hasLogin, setLogin } from "./login";
