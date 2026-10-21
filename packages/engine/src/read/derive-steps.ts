@@ -147,6 +147,8 @@ export type DerivedStep = {
 	gate: {
 		question: string;
 		choices: GateChoice[];
+		/** The flow author let a person answer this Gate from the lock screen. */
+		lockScreen: boolean;
 		openedAt: number;
 		openedSeq: number;
 	} | null;
@@ -211,6 +213,7 @@ export function deriveSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 			step.gate = {
 				question: e.payload.question,
 				choices: e.payload.choices,
+				lockScreen: e.payload.lockScreen === true,
 				openedAt: e.at,
 				openedSeq: e.seq,
 			};

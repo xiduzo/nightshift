@@ -2471,6 +2471,7 @@ describe("gates", () => {
 			nodeId: "gate",
 			question: "The worker said: Built the parser.. Ship it?",
 			choices: [{ name: "approve" }, { name: "reject" }],
+			lockScreen: false,
 		});
 		let detail = await engine.getRun(run.id);
 		expect(detail.steps.at(-1)).toMatchObject({

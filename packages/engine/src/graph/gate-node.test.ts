@@ -273,6 +273,27 @@ describe("the Gate node", () => {
 		).toEqual([{ type: "gate-open", question: "Ready?", choices }]);
 	});
 
+	test("a Gate marked for the lock screen logs the mark with the Gate; an unmarked one logs nothing", async () => {
+		const h = await startRun(
+			sandbox,
+			flowOf({
+				start: "gate",
+				nodes: [{ ...gate("gate", "Ready?", CHOICES), lockScreen: true }],
+				edges: [],
+			}),
+		);
+		await drive(h, {});
+		const logged = await h.events();
+		expect(payloads(logged, "GateOpened")).toEqual([
+			{ question: "Ready?", choices: CHOICES, lockScreen: true },
+		]);
+		expect(deriveOpenGate(logged)?.lockScreen).toBe(true);
+
+		const plain = await startRun(sandbox, gateFlow());
+		await drive(plain, { inputs: { task: "it" } });
+		expect(deriveOpenGate(await plain.events())?.lockScreen).toBe(false);
+	});
+
 	test("an answer without a note, and a choice without an edge, is a chosen end", async () => {
 		const h = await startRun(sandbox, gateFlow());
 		await drive(h, { inputs: { task: "it" } });

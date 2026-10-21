@@ -98,10 +98,14 @@ function log() {
 				},
 				{ stepId },
 			),
-		gateOpened: (stepId: string, question = "Ship it?") =>
+		gateOpened: (stepId: string, question = "Ship it?", lockScreen = false) =>
 			push(
 				"GateOpened",
-				{ question, choices: [{ name: "approve" }, { name: "reject" }] },
+				{
+					question,
+					choices: [{ name: "approve" }, { name: "reject" }],
+					...(lockScreen ? { lockScreen: true as const } : {}),
+				},
 				{ stepId },
 			),
 		sessionStarted: (stepId: string, sessionId: string) =>
@@ -527,6 +531,7 @@ describe("gates", () => {
 			visit: 1,
 			question: "Ship PR 12?",
 			choices: [{ name: "approve" }, { name: "reject" }],
+			lockScreen: false,
 			openedAt: b.events.at(-1)?.at ?? 0,
 		});
 		expect(deriveSteps(b.events)[0]?.gate?.question).toBe("Ship PR 12?");
@@ -539,6 +544,15 @@ describe("gates", () => {
 			note: "yes",
 			visit: 1,
 		});
+	});
+
+	test("a Gate the author marked for the lock screen says so while it is open", () => {
+		const b = log()
+			.runStarted()
+			.stepStarted("s1", "gate")
+			.gateOpened("s1", "Ship it?", true);
+		expect(deriveOpenGate(b.events)?.lockScreen).toBe(true);
+		expect(deriveSteps(b.events)[0]?.gate?.lockScreen).toBe(true);
 	});
 
 	test("the Gates a run asked stay in its history after the answer", () => {

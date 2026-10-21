@@ -260,6 +260,8 @@ export type OpenGateFact = {
 	visit: number;
 	question: string;
 	choices: GateChoice[];
+	/** The flow author let a person answer this Gate from the lock screen. */
+	lockScreen: boolean;
 	openedAt: number;
 };
 
@@ -289,6 +291,7 @@ export function deriveOpenGate(
 		visit: open.visit,
 		question: open.gate.question,
 		choices: open.gate.choices,
+		lockScreen: open.gate.lockScreen,
 		openedAt: open.gate.openedAt,
 	};
 }

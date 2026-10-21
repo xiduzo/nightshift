@@ -16,6 +16,12 @@ export const openGateSchema = exact<OpenGate>()(
 		/** The rendered question. */
 		question: z.string(),
 		choices: z.array(gateChoiceSchema),
+		/**
+		 * The flow author let a person answer this Gate from the lock screen:
+		 * a notification may show its options as buttons. Otherwise the
+		 * answer needs the app.
+		 */
+		lockScreen: z.boolean(),
 		openedAt: z.number(),
 		walker: runWalkerSchema,
 		/** An answer is on its way to the Walker. */

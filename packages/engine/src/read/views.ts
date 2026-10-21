@@ -272,6 +272,12 @@ export type OpenGate = {
 	/** The rendered question. */
 	question: string;
 	choices: GateChoice[];
+	/**
+	 * The flow author let a person answer this Gate from the lock screen: a
+	 * notification may show its options as buttons. Otherwise the answer
+	 * needs the app.
+	 */
+	lockScreen: boolean;
 	openedAt: number;
 	walker: RunWalker;
 	/** An answer is on its way to the Walker. */
