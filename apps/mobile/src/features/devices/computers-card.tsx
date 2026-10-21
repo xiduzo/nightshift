@@ -51,7 +51,7 @@ export function ComputersCard({
 			<CardContent className="gap-3">
 				{computers ? (
 					computers.length === 0 ? (
-						<Text variant="muted">
+						<Text className="text-muted-foreground text-sm">
 							No computer yet. To run flows on one, open Devices in Night Shift
 							on that computer and choose Join a Host.
 						</Text>
@@ -101,7 +101,7 @@ function ComputerRow({ computer, now }: { computer: Computer; now: number }) {
 				<Text className="font-medium" numberOfLines={1}>
 					{computer.name}
 				</Text>
-				<Text variant="muted" className="text-xs" numberOfLines={1}>
+				<Text className="text-muted-foreground text-xs" numberOfLines={1}>
 					{computer.system}. {detail}.
 				</Text>
 			</View>

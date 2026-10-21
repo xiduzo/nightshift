@@ -34,7 +34,7 @@ export function RunHealth({ health, now }: { health: Health; now: number }) {
 					</Fragment>
 				))}
 				{health.more > 0 ? (
-					<Text variant="muted" className="text-xs">
+					<Text className="text-muted-foreground text-xs">
 						{health.more === 1
 							? "1 more is not shown."
 							: `${health.more} more are not shown.`}
@@ -67,7 +67,10 @@ function HealthRowView({ row, now }: { row: HealthRow; now: number }) {
 				indicatorClassName="bg-status-finished"
 			/>
 			<View className="flex-row items-center gap-2">
-				<Text variant="muted" className="flex-1 text-xs" numberOfLines={1}>
+				<Text
+					className="flex-1 text-muted-foreground text-xs"
+					numberOfLines={1}
+				>
 					{row.last
 						? `${row.detail}. Last run ${formatAgo(row.last.startedAt, now)}.`
 						: `${row.detail}.`}

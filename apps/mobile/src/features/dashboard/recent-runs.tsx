@@ -9,11 +9,11 @@ import {
 import { Separator } from "@nightshift/ui-native/components/ui/separator";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
-import { Link } from "expo-router";
+import { type Href, Link } from "expo-router";
 import { Fragment } from "react";
 import { Pressable, View } from "react-native";
 
-import { formatAgo, formatKnownCost } from "@/shared/format";
+import { runFacts } from "./cards";
 import { RunStatusBadge } from "./run-status-badge";
 
 /** The newest runs over every Space. A row opens its live run. */
@@ -53,17 +53,18 @@ export function RecentRuns({
 	);
 }
 
+/**
+ * The live run screen of the Runs tab. A path, not a typed route: the
+ * route lives in the runs vertical, which may not have it yet.
+ */
+function runHref(runId: string): Href {
+	return `/runs/${encodeURIComponent(runId)}` as Href;
+}
+
 function RunRow({ run, now }: { run: RunSummary; now: number }) {
-	const facts = [
-		run.flowName ?? "Quick run",
-		formatAgo(run.createdAt, now),
-		formatKnownCost(run),
-	].join(", ");
+	const facts = runFacts(run, now);
 	return (
-		<Link
-			href={{ pathname: "/runs/[runId]", params: { runId: run.id } }}
-			asChild
-		>
+		<Link href={runHref(run.id)} asChild>
 			<Pressable
 				className="flex-row items-center gap-3 active:opacity-70"
 				accessibilityRole="link"
@@ -73,7 +74,7 @@ function RunRow({ run, now }: { run: RunSummary; now: number }) {
 					<Text className="font-medium" numberOfLines={1}>
 						{run.title}
 					</Text>
-					<Text variant="muted" className="text-xs" numberOfLines={1}>
+					<Text className="text-muted-foreground text-xs" numberOfLines={1}>
 						{facts}
 					</Text>
 				</View>

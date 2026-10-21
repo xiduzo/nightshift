@@ -80,7 +80,7 @@ export function DashboardScreen() {
 				</EmptyState>
 			) : (
 				<>
-					<Text variant="muted">
+					<Text className="text-muted-foreground text-sm">
 						What runs, what waits for you, and what it cost, over every Space
 						you are in.
 					</Text>

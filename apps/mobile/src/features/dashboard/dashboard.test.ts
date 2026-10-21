@@ -1,8 +1,8 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import type { DashboardSummary } from "@nightshift/client";
+import type { DashboardSummary, RunSummary } from "@nightshift/client";
 
-import { hasRuns, statCards } from "./cards";
+import { hasRuns, runFacts, statCards } from "./cards";
 import { HEALTH_NIGHTS, healthOf } from "./health";
 
 type Nights = DashboardSummary["nights"][number];
@@ -242,5 +242,32 @@ describe("healthOf", () => {
 			healthOf(summary({ flowHealth: { rows: [], count: 0 } })),
 		).toBeNull();
 		expect(hasRuns(summary())).toBe(false);
+	});
+});
+
+describe("runFacts", () => {
+	const NOW = Date.UTC(2026, 9, 21, 12);
+	const run = {
+		title: "Fix the login",
+		flowName: "nightly-check",
+		createdAt: NOW - 5 * 60_000,
+		costUsd: 0.42,
+		costMissing: 0,
+	} as RunSummary;
+
+	test("names the flow, when the run started, and its cost", () => {
+		expect(runFacts(run, NOW)).toBe("nightly-check, 5 min ago, $0.42");
+	});
+
+	test("leaves the flow out when the title already says it", () => {
+		expect(runFacts({ ...run, title: "nightly-check" }, NOW)).toBe(
+			"5 min ago, $0.42",
+		);
+	});
+
+	test("calls a run without a flow a quick run", () => {
+		expect(runFacts({ ...run, flowName: null }, NOW)).toBe(
+			"Quick run, 5 min ago, $0.42",
+		);
 	});
 });

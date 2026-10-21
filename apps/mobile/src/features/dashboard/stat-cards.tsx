@@ -19,6 +19,7 @@ import { type StatCardView, statCards } from "./cards";
 /** Where a card goes when the person taps it. */
 const HREF = { inbox: "/", runs: "/runs" } as const;
 
+/** A waiting Gate colors the number and the line under it, failed runs only the line. */
 const TONE = {
 	plain: "",
 	waiting: "text-status-waiting",
@@ -69,7 +70,12 @@ function StatCard({ card }: { card: StatCardView }) {
 		>
 			<CardHeader className="gap-1 px-4">
 				<CardDescription className="text-xs">{card.label}</CardDescription>
-				<CardTitle className={cn("text-2xl tabular-nums", TONE[card.tone])}>
+				<CardTitle
+					className={cn(
+						"text-2xl tabular-nums",
+						card.tone === "waiting" && TONE.waiting,
+					)}
+				>
 					{card.value}
 				</CardTitle>
 			</CardHeader>
@@ -84,10 +90,13 @@ function StatCard({ card }: { card: StatCardView }) {
 				</CardContent>
 			) : null}
 			<CardFooter className="mt-auto flex-col items-start gap-1 px-4">
-				<Text className="font-medium text-sm" numberOfLines={2}>
+				<Text
+					className={cn("font-medium text-sm", TONE[card.tone])}
+					numberOfLines={2}
+				>
 					{card.headline}
 				</Text>
-				<Text variant="muted" className="text-xs" numberOfLines={2}>
+				<Text className="text-muted-foreground text-xs" numberOfLines={2}>
 					{card.footer}
 				</Text>
 			</CardFooter>

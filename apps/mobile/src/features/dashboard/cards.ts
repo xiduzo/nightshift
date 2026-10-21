@@ -1,8 +1,8 @@
-import type { DashboardSummary } from "@nightshift/client";
+import type { DashboardSummary, RunSummary } from "@nightshift/client";
 
-import { formatKnownCost, formatTime } from "@/shared/format";
+import { formatAgo, formatKnownCost, formatTime } from "@/shared/format";
 
-/** The color a card's number takes: a run status that needs the eye. */
+/** The status color a card takes, when a run needs the eye. */
 export type CardTone = "plain" | "waiting" | "failed";
 
 /** One stat card, ready to show. */
@@ -95,6 +95,19 @@ export function statCards(
 					: null,
 		},
 	];
+}
+
+/**
+ * The facts under a run's title: its flow (unless the title says it),
+ * when it started, and its cost. "nightly-check, 5 min ago, $0.42".
+ */
+export function runFacts(run: RunSummary, now: number): string {
+	const flow = run.flowName ?? "Quick run";
+	return [
+		...(flow === run.title ? [] : [flow]),
+		formatAgo(run.createdAt, now),
+		formatKnownCost(run),
+	].join(", ");
 }
 
 /** Whether any run is known: without one, the dashboard has nothing to show. */
