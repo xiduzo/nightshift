@@ -57,6 +57,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { SecretView } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
+import { formatDateTime, formatRelative, useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { connectionMutations, connectionQueries } from "../queries";
 
@@ -111,12 +112,43 @@ function usersOf(secret: SecretView): string[] {
 	];
 }
 
+/** A moment as "3 minutes ago", with the date and time on hover. */
+function Ago({ at, now }: { at: number; now: number }) {
+	return (
+		<Tooltip>
+			<TooltipTrigger render={<time dateTime={new Date(at).toISOString()} />}>
+				{formatRelative(at, now)}
+			</TooltipTrigger>
+			<TooltipContent>{formatDateTime(at)}</TooltipContent>
+		</Tooltip>
+	);
+}
+
+/** When a value was last saved: "—" when it is not saved here, or saved before the date was kept. */
+function LastSet({ secret, now }: { secret: SecretView; now: number }) {
+	if (secret.setAt !== null) return <Ago at={secret.setAt} now={now} />;
+	const hint = secret.saved
+		? "Saved earlier. The date is not known."
+		: "Not set in Night Shift.";
+	return (
+		<Tooltip>
+			<TooltipTrigger render={<span />}>
+				<span aria-hidden>—</span>
+				<span className="sr-only">{hint}</span>
+			</TooltipTrigger>
+			<TooltipContent>{hint}</TooltipContent>
+		</Tooltip>
+	);
+}
+
 const column = dataTableColumns<SecretView>();
 
 function secretColumns({
+	now,
 	onSet,
 	onRemove,
 }: {
+	now: number;
 	onSet: (name: string) => void;
 	onRemove: (name: string) => void;
 }) {
@@ -140,6 +172,29 @@ function secretColumns({
 				return users.length > 0 ? users.join(", ") : "—";
 			},
 			meta: { cellClassName: "font-mono text-muted-foreground" },
+		}),
+		column.accessor("setAt", {
+			header: "Last set",
+			cell: ({ row }) => <LastSet secret={row.original} now={now} />,
+			meta: {
+				headClassName: "hidden lg:table-cell",
+				cellClassName:
+					"hidden whitespace-nowrap text-muted-foreground lg:table-cell",
+			},
+		}),
+		column.accessor("usedAt", {
+			header: "Last used",
+			cell: ({ row: { original } }) =>
+				original.usedAt !== null ? (
+					<Ago at={original.usedAt} now={now} />
+				) : (
+					"Never"
+				),
+			meta: {
+				headClassName: "hidden md:table-cell",
+				cellClassName:
+					"hidden whitespace-nowrap text-muted-foreground md:table-cell",
+			},
 		}),
 		column.display({
 			id: "actions",
@@ -187,6 +242,7 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 	/** The secret being set; "" adds a new one. */
 	const [setting, setSetting] = useState<string | null>(null);
 	const [removing, setRemoving] = useState<string | null>(null);
+	const now = useNow(60_000);
 
 	return (
 		<PageSection
@@ -225,6 +281,7 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 						<DataTable
 							aria-label="Secrets"
 							columns={secretColumns({
+								now,
 								onSet: setSetting,
 								onRemove: setRemoving,
 							})}
