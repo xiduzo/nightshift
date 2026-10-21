@@ -2,9 +2,9 @@
 
 Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
 
-- **Layers point down.** A package imports only from lower layers (`db`, `flows`, `ui`
-  → `auth`, `agents` → `engine` → `devices` → `api` → `daemon` → apps). No
-  package imports an app.
+- **Layers point down.** A package imports only from lower layers (`db`, `flows`, `ui`,
+  `ui-native` → `auth`, `agents` → `engine` → `devices`, `notifications` → `api`
+  → `daemon`, `client` → apps). No package imports an app.
 - **Group by domain, not by kind.** Put new code in the vertical it serves:
   `src/features/<vertical>/` in an app, `src/<vertical>/` in a package. Never
   create `lib/`, `utils/`, `hooks/` or `components/` at the top of `src/`, or a
@@ -48,13 +48,23 @@ Night Shift uses it. Read it before you build UI.
 - Style is `base-vega` on Base UI: use the `render` prop where Radix docs say
   `asChild`.
 
+**The phone app** (`apps/mobile`) follows the same rules with
+[React Native Reusables](https://github.com/founded-labs/react-native-reusables) (shadcn for React
+Native) on Uniwind. The components live in `packages/ui-native`. Install
+them with its CLI, do not copy code by hand. Compose, do not invent: no
+hand-rolled buttons, cards or form controls. Do not use the HeroUI Native
+components of the Better-T-Stack template. Do not edit the generated files
+in `packages/ui-native`. `docs/research/mobile.md` holds the design.
+
 # UI copy: guide the person, hide the internals
 
 Every visible string tells the person what a control does for them and what
 happens next. It does not explain how Night Shift works inside. This covers
 titles, descriptions, hints, placeholders, empty states, tooltips, toasts,
-aria-labels, and the messages the server sends to the UI (run end reasons,
-schedule reasons, flow issues). Use the `ux-copy` and `ste-writing` skills.
+aria-labels, push notifications, and the messages the server sends to the
+UI (run end reasons, schedule reasons, flow issues). The same rules hold on
+the phone. A push says what waits and nothing more: "A Gate waits for you".
+Use the `ux-copy` and `ste-writing` skills.
 
 - **No implementation details.** Do not show: the daemon, worktrees, file
   paths (`.nightshift/...`), PATH, environment variables, `sh -c`, stdout,
