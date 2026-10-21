@@ -1,4 +1,4 @@
-/** The channels: the port every way to reach a screen implements, the in-app stream, and the push slots. */
+/** The channels: the port every way to reach a screen implements, the in-app stream, the push slots, and Web Push with its VAPID keys. */
 
 export {
 	gateKey,
@@ -17,3 +17,5 @@ export {
 	type InAppChannel,
 	type InAppItem,
 } from "./in-app";
+export { createVapidKeyStore, type VapidKeys } from "./vapid-keys";
+export { createWebPushChannel, type WebPushSender } from "./web-push";

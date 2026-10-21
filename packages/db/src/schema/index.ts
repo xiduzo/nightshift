@@ -11,8 +11,8 @@
 // - `device-config.ts`: `@nightshift/engine` `device-config/`.
 // - `engine.ts`: `@nightshift/engine` `graph/checkpointer.ts` (LangGraph).
 // - `daemon.ts`: `@nightshift/daemon` `runtime/` (the lease).
-// - `notifications.ts`: `@nightshift/notifications` `settings/`, `targets/`
-//   and `deliveries/`.
+// - `notifications.ts`: `@nightshift/notifications` `settings/`, `targets/`,
+//   `deliveries/` and `channels/` (the Web Push keys).
 //
 // drizzle-kit reads this file: every table must be exported from here.
 

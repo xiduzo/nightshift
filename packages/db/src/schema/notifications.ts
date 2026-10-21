@@ -11,8 +11,9 @@ import { createdAt, updatedAt } from "./columns";
 
 // Owner: `@nightshift/notifications`: `settings/` (a Person's notification
 // settings), `targets/` (the browsers, phones and desktop apps that get
-// notifications while no Night Shift page is open) and `deliveries/` (what
-// the notifier sent, held and withdrawn). No foreign keys to the auth
+// notifications while no Night Shift page is open), `deliveries/` (what
+// the notifier sent, held and withdrawn) and `channels/` (the VAPID keys of
+// Web Push). No foreign keys to the auth
 // tables: a Person's rows go with the Person through the owner's functions.
 
 /**
@@ -115,3 +116,19 @@ export const notificationDelivery = sqliteTable(
 		index("notification_delivery_status_idx").on(table.status),
 	],
 );
+
+/**
+ * The VAPID key pair this daemon signs its Web Push messages with. The
+ * daemon makes it once, the first time a browser asks for the public key
+ * or a push goes out. A browser subscribes with the public key, so the
+ * pair must stay: a new pair loses every browser subscription. One row.
+ */
+export const webPushKey = sqliteTable("web_push_key", {
+	/** Always `vapid`: one pair per daemon. */
+	id: text("id").primaryKey(),
+	/** The public key, URL-safe base64, as `PushManager.subscribe` takes it. */
+	publicKey: text("public_key").notNull(),
+	/** The private key, URL-safe base64. Never leaves this daemon. */
+	privateKey: text("private_key").notNull(),
+	createdAt: createdAt(),
+});

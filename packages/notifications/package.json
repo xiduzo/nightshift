@@ -15,11 +15,13 @@
 		"@nightshift/db": "workspace:*",
 		"@nightshift/engine": "workspace:*",
 		"drizzle-orm": "catalog:",
+		"web-push": "3.6.7",
 		"zod": "catalog:"
 	},
 	"devDependencies": {
 		"@nightshift/config": "workspace:*",
 		"@types/bun": "catalog:",
+		"@types/web-push": "3.6.4",
 		"typescript": "catalog:"
 	}
 }

@@ -2,7 +2,11 @@ import type {
 	NotificationChannel,
 	NotificationMessage,
 	SendResult,
+	VapidKeys,
+	WebPushSender,
 } from "../channels";
+// What a push service gets: only the fake reads it, past the barrel.
+import type { WebPushPayload, WebPushRequest } from "../channels/web-push";
 import type {
 	OpenGateRef,
 	RunEvent,
@@ -71,4 +75,47 @@ export function fakeRunEvents(): FakeRunEvents {
 			for (const listener of [...listeners]) listener(events);
 		},
 	};
+}
+
+export type FakeWebPushSender = {
+	send: WebPushSender;
+	/** Each request, in order. */
+	requests: WebPushRequest[];
+	/** The payload of each request, parsed, in order. */
+	payloads(): WebPushPayload[];
+	/** From now on, the push service answers this status for the endpoint. */
+	answer(endpoint: string, statusCode: number): void;
+};
+
+/** A Web Push sender that records each request and answers 201. */
+export function fakeWebPushSender(): FakeWebPushSender {
+	const requests: WebPushRequest[] = [];
+	const answers = new Map<string, number>();
+	return {
+		requests,
+		async send(request) {
+			requests.push(request);
+			return {
+				statusCode: answers.get(request.subscription.endpoint) ?? 201,
+			};
+		},
+		payloads: () =>
+			requests.map((r) => JSON.parse(r.payload) as WebPushPayload),
+		answer: (endpoint, statusCode) => answers.set(endpoint, statusCode),
+	};
+}
+
+/** Makes VAPID key pairs that a test can tell apart, and counts them. */
+export function fakeVapidKeys(): { generate(): VapidKeys; made: number } {
+	const counter = {
+		made: 0,
+		generate(): VapidKeys {
+			counter.made += 1;
+			return {
+				publicKey: `public-${counter.made}`,
+				privateKey: `private-${counter.made}`,
+			};
+		},
+	};
+	return counter;
 }

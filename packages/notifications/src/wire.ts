@@ -1,7 +1,15 @@
-import { spaceIds } from "@nightshift/auth";
+import { endSession, spaceIds } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 
-import type { InAppChannel, InAppItem, PushChannels } from "./channels";
+import {
+	createVapidKeyStore,
+	createWebPushChannel,
+	type InAppChannel,
+	type InAppItem,
+	type PushChannels,
+	type VapidKeys,
+	type WebPushSender,
+} from "./channels";
 import { createDeliveryLog } from "./deliveries";
 import { createNotifier, type RunEventSource, spaceAudience } from "./notifier";
 import {
@@ -31,6 +39,17 @@ export type NotificationsOptions = {
 	inApp: InAppChannel;
 	/** The push channels this daemon has. Default: none, the in-app stream only. */
 	push?: PushChannels;
+	/**
+	 * Web Push from this daemon, with the VAPID keys it keeps (made once).
+	 * `subject`: an `https:` URL or a `mailto:` address that push services
+	 * may contact. Without it, browsers get no pushes from this daemon.
+	 */
+	webPush?: {
+		subject: string;
+		sender?: WebPushSender;
+		/** Makes a new VAPID key pair. Default: `web-push`'s. */
+		generateKeys?: () => VapidKeys;
+	};
 	now?: () => number;
 	tickMs?: number;
 	/** The time zone of a Person without settings. Default: this computer's. */
@@ -59,8 +78,15 @@ export type Notifications = {
 			input: RegisterTarget,
 			sessionId?: string | null,
 		): Promise<PushTargetView>;
-		/** Null when the Person has no target of that id. */
+		/**
+		 * Removes one of the Person's screens. A phone is also signed out:
+		 * its session ends. Null when the Person has no target of that id.
+		 */
 		remove(personId: string, id: string): Promise<PushTargetView | null>;
+	};
+	webPush: {
+		/** The public VAPID key a browser subscribes with. Null: this daemon sends no Web Push. */
+		publicKey(): Promise<string | null>;
 	};
 	/** Reads the open Gates, then listens to the run events. */
 	start(): Promise<void>;
@@ -76,6 +102,17 @@ export function createNotifications(
 		...(options.timeZone ? { timeZone: options.timeZone } : {}),
 	});
 	const targets = createTargetStore(db, now);
+	const vapid = options.webPush
+		? createVapidKeyStore(db, options.webPush.generateKeys)
+		: null;
+	const push: PushChannels = { ...options.push };
+	if (options.webPush && vapid) {
+		push.web = createWebPushChannel({
+			keys: vapid,
+			subject: options.webPush.subject,
+			...(options.webPush.sender ? { sender: options.webPush.sender } : {}),
+		});
+	}
 	const notifier = createNotifier({
 		events: options.events,
 		audience: spaceAudience(db),
@@ -85,7 +122,7 @@ export function createNotifications(
 		targets,
 		deliveries: createDeliveryLog(db),
 		inApp: options.inApp,
-		push: options.push ?? {},
+		push,
 		now,
 		...(options.tickMs ? { tickMs: options.tickMs } : {}),
 	});
@@ -102,8 +139,16 @@ export function createNotifications(
 				targetView(await targets.register(personId, input, sessionId)),
 			remove: async (personId, id) => {
 				const removed = await targets.remove(personId, id);
-				return removed ? targetView(removed) : null;
+				if (!removed) return null;
+				// A phone is a push target plus its session: removing it signs it out.
+				if (removed.kind === "expo" && removed.sessionId) {
+					await endSession(db, personId, removed.sessionId);
+				}
+				return targetView(removed);
 			},
+		},
+		webPush: {
+			publicKey: async () => (vapid ? (await vapid.get()).publicKey : null),
 		},
 		start: () => notifier.start(),
 		stop: () => notifier.stop(),
