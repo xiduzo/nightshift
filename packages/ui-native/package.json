@@ -1,0 +1,36 @@
+{
+	"name": "@nightshift/ui-native",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./global.css": "./src/styles/global.css",
+		"./lib/*": "./src/lib/*.ts",
+		"./components/ui/*": "./src/components/ui/*.tsx",
+		"./hooks/*": "./src/hooks/*.ts"
+	},
+	"scripts": {
+		"check-types": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@rn-primitives/label": "^1.5.2",
+		"@rn-primitives/separator": "^1.5.2",
+		"@rn-primitives/slot": "^1.5.2",
+		"@rn-primitives/tabs": "^1.5.2",
+		"class-variance-authority": "^0.7.1",
+		"clsx": "^2.1.1",
+		"lucide-react-native": "catalog:",
+		"react": "catalog:",
+		"react-native": "catalog:",
+		"react-native-reanimated": "catalog:",
+		"react-native-svg": "catalog:",
+		"tailwind-merge": "^3.7.0",
+		"uniwind": "catalog:"
+	},
+	"devDependencies": {
+		"@nightshift/config": "workspace:*",
+		"@types/react": "catalog:",
+		"tailwindcss": "catalog:",
+		"typescript": "catalog:"
+	}
+}

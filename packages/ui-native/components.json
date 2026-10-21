@@ -1,0 +1,21 @@
+{
+	"$schema": "https://ui.shadcn.com/schema.json",
+	"style": "new-york",
+	"rsc": false,
+	"tsx": true,
+	"tailwind": {
+		"config": "",
+		"css": "src/styles/global.css",
+		"baseColor": "neutral",
+		"cssVariables": true,
+		"prefix": ""
+	},
+	"iconLibrary": "lucide",
+	"aliases": {
+		"components": "@nightshift/ui-native/components",
+		"utils": "@nightshift/ui-native/lib/utils",
+		"hooks": "@nightshift/ui-native/hooks",
+		"lib": "@nightshift/ui-native/lib",
+		"ui": "@nightshift/ui-native/components"
+	}
+}

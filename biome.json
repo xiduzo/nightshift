@@ -23,6 +23,7 @@
 			"!**/.nuxt",
 			"!bts.jsonc",
 			"!**/.expo",
+			"!**/uniwind-types.d.ts",
 			"!**/.wrangler",
 			"!**/.alchemy",
 			"!**/.svelte-kit",
@@ -111,7 +112,7 @@
 									"!@nightshift/client",
 									"!@nightshift/notifications",
 									"!@nightshift/notifications/testing",
-									"!@nightshift/ui-native/components/*",
+									"!@nightshift/ui-native/components/ui/*",
 									"!@nightshift/ui-native/hooks/*",
 									"!@nightshift/ui-native/lib/*",
 									"!@nightshift/ui-native/global.css"
@@ -157,7 +158,10 @@
 	},
 	"overrides": [
 		{
-			"includes": ["packages/ui/src/components/**"],
+			"includes": [
+				"packages/ui/src/components/**",
+				"packages/ui-native/src/components/**"
+			],
 			"linter": {
 				"enabled": false
 			}
@@ -210,7 +214,7 @@
 											"!@nightshift/client",
 											"!@nightshift/notifications",
 											"!@nightshift/notifications/testing",
-											"!@nightshift/ui-native/components/*",
+											"!@nightshift/ui-native/components/ui/*",
 											"!@nightshift/ui-native/hooks/*",
 											"!@nightshift/ui-native/lib/*",
 											"!@nightshift/ui-native/global.css"
@@ -282,7 +286,7 @@
 											"!@nightshift/client",
 											"!@nightshift/notifications",
 											"!@nightshift/notifications/testing",
-											"!@nightshift/ui-native/components/*",
+											"!@nightshift/ui-native/components/ui/*",
 											"!@nightshift/ui-native/hooks/*",
 											"!@nightshift/ui-native/lib/*",
 											"!@nightshift/ui-native/global.css"
@@ -380,7 +384,7 @@
 											"!@nightshift/client",
 											"!@nightshift/notifications",
 											"!@nightshift/notifications/testing",
-											"!@nightshift/ui-native/components/*",
+											"!@nightshift/ui-native/components/ui/*",
 											"!@nightshift/ui-native/hooks/*",
 											"!@nightshift/ui-native/lib/*",
 											"!@nightshift/ui-native/global.css"

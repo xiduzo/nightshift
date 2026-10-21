@@ -1,0 +1,14 @@
+{
+	"extends": "@nightshift/config/tsconfig.base.json",
+	"compilerOptions": {
+		"jsx": "react-jsx",
+		"lib": ["ESNext"],
+		"types": [],
+		"customConditions": ["react-native"],
+		"paths": {
+			"@nightshift/ui-native/*": ["./src/*"]
+		}
+	},
+	"include": ["src/**/*.ts", "src/**/*.tsx"],
+	"exclude": ["node_modules"]
+}

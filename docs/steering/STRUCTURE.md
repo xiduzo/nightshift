@@ -80,7 +80,7 @@ Every call to `git`, `gh`, a harness CLI, `osascript` or another OS program goes
 Each package lists its public entry points in `package.json` `exports`.
 
 - **No wildcard exports** (`"./*"`). Every entry point is named on purpose.
-- Exception: `@nightshift/ui` keeps `./components/*`, `./hooks/*` and `./lib/*`. That is the shadcn layout, and `components.json` depends on it. `@nightshift/ui-native` keeps the same three for the same reason (the React Native Reusables layout).
+- Exception: `@nightshift/ui` keeps `./components/*`, `./hooks/*` and `./lib/*`. That is the shadcn layout, and `components.json` depends on it. `@nightshift/ui-native` keeps `./components/ui/*`, `./hooks/*` and `./lib/*` for the same reason: the React Native Reusables CLI puts its components in `components/ui/`.
 - `index.ts` exports what consumers use. It is not a barrel of every file.
 - Test helpers, fakes and fixtures are public only through `./testing`. Production code never imports `./testing`.
 - An entry for the web app or the phone app is type-only and browser-safe (`@nightshift/api/client`).
@@ -99,6 +99,7 @@ The entries today:
 | `engine` | `.`, `./testing` |
 | `flows` | `.`, `./files` |
 | `ui` | `./components/*`, `./hooks/*`, `./lib/*`, `./globals.css`, `./postcss.config` |
+| `ui-native` | `./components/ui/*`, `./hooks/*`, `./lib/*` (`lib/theme`: the theme colors in hex, for JavaScript), `./global.css` (the theme tokens, for Uniwind) |
 
 Planned with `docs/research/mobile.md`. `biome.json` already allows them. When a package lands with other entries, change this table and `biome.json` together.
 
@@ -106,7 +107,6 @@ Planned with `docs/research/mobile.md`. `biome.json` already allows them. When a
 | --- | --- |
 | `client` | `.` |
 | `notifications` | `.`, `./testing` |
-| `ui-native` | `./components/*`, `./hooks/*`, `./lib/*`, `./global.css` |
 
 - A consumer imports a package by its name and a listed entry. Never by a relative path into another package (`../../packages/agents/src/...`).
 
