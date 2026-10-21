@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 
 import { useHostQueries, useSignedIn } from "@/features/host";
+import { dismissKey } from "@/features/push";
 
 /** The open Gates of every Space you are in, oldest first. */
 export function useInbox() {
@@ -45,7 +46,8 @@ function useInFront(): boolean {
 
 /**
  * Keeps the inbox live while the app is in front: it follows the person's
- * notifications and reads the Gates again when one opens or closes. After a
+ * notifications and reads the Gates again when one opens or closes. A Gate
+ * that closes takes its notification away. After a
  * reconnect, or when the app comes back to the front, it reads them again
  * too: items of that time are lost. The inbox query polls as a fallback.
  */
@@ -72,6 +74,10 @@ export function useLiveInbox(): void {
 			},
 			onItem: (item) => {
 				if (changesInbox(item)) refresh();
+				// Answered somewhere: its notification on this phone goes too.
+				if (item.kind === "gate-closed") {
+					void dismissKey(item.key).catch(() => undefined);
+				}
 			},
 		});
 		return () => controller.abort();

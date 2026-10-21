@@ -11,6 +11,7 @@ import type { ColorValue } from "react-native";
 
 import { useHost } from "@/features/host";
 import { useLiveInbox, useWaitingCount } from "@/features/inbox";
+import { usePhonePush } from "@/features/push";
 import { SpacePicker, useRememberedSpace } from "@/features/spaces";
 
 function icon(Icon: LucideIcon) {
@@ -36,6 +37,7 @@ export function AppTabs() {
 function SignedInTabs() {
 	useRememberedSpace();
 	useLiveInbox();
+	usePhonePush();
 	const waiting = useWaitingCount();
 
 	return (

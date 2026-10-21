@@ -18,6 +18,7 @@ import { router } from "expo-router";
 import { CircleAlert, CircleCheck, Inbox } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
+import { PushCard } from "@/features/push";
 import { EmptyState } from "@/shared/empty";
 import { Screen } from "@/shared/page";
 import { useAnswered } from "./answered";
@@ -42,11 +43,14 @@ export function InboxScreen() {
 			) : null}
 			{inbox.data ? (
 				inbox.data.length === 0 ? (
-					<EmptyState
-						icon={Inbox}
-						title="Nothing needs you"
-						description="When a run waits for your answer at a Gate, it shows up here. This inbox holds the Gates of every Space you are in."
-					/>
+					<>
+						<EmptyState
+							icon={Inbox}
+							title="Nothing needs you"
+							description="When a run waits for your answer at a Gate, it shows up here. This inbox holds the Gates of every Space you are in."
+						/>
+						<PushCard />
+					</>
 				) : (
 					inbox.data.map((gate) => (
 						<GateRow

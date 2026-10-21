@@ -8,14 +8,18 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { useUniwind } from "uniwind";
 
 import { HostProvider } from "@/features/host";
+import { InFrontBanner, useNotificationTaps } from "@/features/push";
 import { createQueryClient } from "@/shared/api";
 import { NAV_THEME } from "./nav-theme";
 
 /**
  * The app frame: data, the Host, the theme, gestures and the
- * keyboard. Portals (menus, dialogs) render last, above everything.
+ * keyboard. A tap on a notification opens its screen. The banner of a
+ * push in front and the portals (menus, dialogs) render last, above
+ * everything.
  */
 export function AppShell({ children }: { children: ReactNode }) {
+	useNotificationTaps();
 	const [queryClient] = useState(createQueryClient);
 	const { theme } = useUniwind();
 	const scheme = theme === "dark" ? "dark" : "light";
@@ -28,6 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 						<ThemeProvider value={NAV_THEME[scheme]}>
 							<StatusBar style={scheme === "dark" ? "light" : "dark"} />
 							{children}
+							<InFrontBanner />
 							<PortalHost />
 						</ThemeProvider>
 					</KeyboardProvider>

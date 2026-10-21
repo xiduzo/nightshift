@@ -22,11 +22,13 @@ import Constants from "expo-constants";
 import { router } from "expo-router";
 
 import { hostLabel, useHost, useSignedIn } from "@/features/host";
+import { removeThisPhone } from "@/features/push";
 import { forgetSpaceChoice } from "@/features/spaces";
 
 /**
- * This phone, as the Host lists it. "Remove this phone" signs it out and
- * forgets the Host here, as "Remove" in Settings on the web does.
+ * This phone, as the Host lists it. "Remove this phone" removes it from the
+ * Host's list (the Host then signs it out, as "Remove" in Settings on the
+ * web does) and forgets the Host here.
  */
 export function ThisPhoneCard() {
 	const { host } = useSignedIn();
@@ -35,6 +37,7 @@ export function ThisPhoneCard() {
 	const where = hostLabel(host.address);
 
 	async function remove() {
+		await removeThisPhone(host);
 		await forgetSpaceChoice(host.address).catch(() => undefined);
 		await forget();
 		router.replace("/connect");

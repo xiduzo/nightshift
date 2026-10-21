@@ -2,7 +2,12 @@ import "../../global.css";
 
 import { Stack } from "expo-router";
 
+import { startPushHandling } from "@/features/push";
 import { AppShell } from "@/shared/shell";
+
+// Before any screen: iOS and Android start the app for a push in the
+// background, and its task must be defined by then.
+startPushHandling();
 
 export const unstable_settings = {
 	anchor: "(tabs)",
