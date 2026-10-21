@@ -9,6 +9,7 @@ import {
 	createHostAuthClient,
 	type HostAuthClient,
 	hostTransport,
+	loadHostAddress,
 } from "@/shared/api";
 
 /** One Host as this phone talks to it: its address, its sign-in, its API. */
@@ -41,4 +42,13 @@ export function hostAt(address: string): Host {
 /** The address as the person reads it: `studio.example.com`, without `https://`. */
 export function hostLabel(address: string): string {
 	return address.replace(/^https:\/\//, "");
+}
+
+/**
+ * The Host this phone is signed in to, for code outside a screen: the
+ * answer from a lock-screen button. Null when the phone has no Host.
+ */
+export async function savedHost(): Promise<Host | null> {
+	const address = await loadHostAddress().catch(() => null);
+	return address ? hostAt(address) : null;
 }

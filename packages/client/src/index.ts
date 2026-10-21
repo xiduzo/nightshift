@@ -147,6 +147,7 @@ export {
 	type ValueEvent,
 	type Wait,
 	type WaitEvent,
+	waitFor,
 	whenLabel,
 } from "./runs";
 export {

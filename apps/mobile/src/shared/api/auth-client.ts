@@ -1,7 +1,8 @@
 import { expoClient } from "@better-auth/expo/client";
 import { twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
-import * as SecureStore from "expo-secure-store";
+
+import { keptStore } from "./kept-store";
 
 /** The app's scheme in app.json. The Host trusts it for sign-in. */
 const SCHEME = "nightshift";
@@ -17,7 +18,7 @@ function storagePrefixOf(address: string): string {
 
 /**
  * Better Auth for one Host. The expo plugin keeps the session cookie in
- * SecureStore and sends the app's scheme as its origin. The sign-in form
+ * SecureStore (readable on the lock screen, `keptStore`) and sends the app's scheme as its origin. The sign-in form
  * asks for the two-factor code itself (`twoFactorRedirect`).
  */
 export function createHostAuthClient(address: string) {
@@ -27,7 +28,7 @@ export function createHostAuthClient(address: string) {
 			expoClient({
 				scheme: SCHEME,
 				storagePrefix: storagePrefixOf(address),
-				storage: SecureStore,
+				storage: keptStore,
 			}),
 			twoFactorClient(),
 		],
