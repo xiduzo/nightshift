@@ -37,9 +37,12 @@ import ts from "typescript";
  * except `packages/ui` and `packages/config` is checked.
  */
 export const ENFORCED: string[] = [
+	"apps/desktop",
+	"apps/server",
 	"apps/web",
 	"packages/agents",
 	"packages/api",
+	"packages/daemon",
 	"packages/engine",
 	"packages/flows",
 ];

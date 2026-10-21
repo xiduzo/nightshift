@@ -73,15 +73,7 @@ const APPS = new Set(["server", "desktop", "web"]);
  * Known deviations, each with the phase that removes it. The check fails
  * when an exception is no longer needed, so it cannot outlive its fix.
  */
-const EXCEPTIONS: { from: string; to: string; why: string }[] = [
-	{
-		// TEMPORARY. Remove in phase 4 of the structure migration: the desktop
-		// app then imports only @nightshift/daemon (STRUCTURE.md section 8).
-		from: "desktop",
-		to: "server",
-		why: "apps/desktop boots the daemon through the server entries until phase 4",
-	},
-];
+const EXCEPTIONS: { from: string; to: string; why: string }[] = [];
 
 type Workspace = { name: string; file: string; deps: string[] };
 

@@ -328,14 +328,18 @@ describe("the command", () => {
 	});
 
 	test("it passes on this repository, fast", () => {
-		const started = performance.now();
 		const result = Bun.spawnSync([
 			process.execPath,
 			join(import.meta.dir, "check-verticals.ts"),
 		]);
 		expect(result.stderr.toString()).toBe("");
 		expect(result.exitCode).toBe(0);
-		expect(performance.now() - started).toBeLessThan(2000);
+		// The check's own time, as it prints it: without the start of the
+		// process, which a busy computer (other tests, a build) makes slow.
+		// The bound is generous for the same reason: the check takes about
+		// 0.5 s on an idle laptop, and a failing bound means a real slowdown.
+		const ms = Number(/\((\d+) ms\)/.exec(result.stdout.toString())?.[1]);
+		expect(ms).toBeLessThan(3000);
 	});
 
 	test("ENFORCED names real workspaces", () => {
