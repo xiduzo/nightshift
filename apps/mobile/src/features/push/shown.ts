@@ -3,6 +3,7 @@ import * as Notifications from "expo-notifications";
 import {
 	pushDataOf,
 	type ShownNotification,
+	shownAtMs,
 	shownButClosed,
 	shownWithKey,
 } from "./push-data";
@@ -13,7 +14,7 @@ async function shown(): Promise<ShownNotification[]> {
 	return presented.map((notification) => ({
 		id: notification.request.identifier,
 		key: pushDataOf(notification.request.content.data)?.key ?? null,
-		at: notification.date,
+		at: shownAtMs(notification.date),
 	}));
 }
 

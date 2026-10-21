@@ -127,6 +127,14 @@ export function answerOfAction(
 /** A notification the phone shows: its id, the Host's key when it is one of the Host's, when it came (ms). */
 export type ShownNotification = { id: string; key: string | null; at: number };
 
+/**
+ * When a shown notification came, in ms. iOS reports seconds since 1970,
+ * Android milliseconds: a number below 10^11 is seconds (before 1973 in ms).
+ */
+export function shownAtMs(date: number): number {
+	return date < 1e11 ? Math.round(date * 1000) : date;
+}
+
 /** The shown notifications of one key: a withdraw push dismisses them. */
 export function shownWithKey(
 	shown: ShownNotification[],

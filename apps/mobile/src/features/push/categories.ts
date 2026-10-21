@@ -31,11 +31,14 @@ const DECIDE_ACTIONS: Notifications.NotificationAction[] = [
  * and, on Android, the two channels. Safe to call at every start.
  */
 export async function defineCategories(): Promise<void> {
-	await Promise.all([
-		Notifications.setNotificationCategoryAsync(CATEGORY.decide, DECIDE_ACTIONS),
-		Notifications.setNotificationCategoryAsync(CATEGORY.open, []),
-		Notifications.setNotificationCategoryAsync(CATEGORY.run, []),
-	]);
+	// One at a time: iOS sets the whole list each time, so two at once
+	// would keep only one of them.
+	await Notifications.setNotificationCategoryAsync(
+		CATEGORY.decide,
+		DECIDE_ACTIONS,
+	);
+	await Notifications.setNotificationCategoryAsync(CATEGORY.open, []);
+	await Notifications.setNotificationCategoryAsync(CATEGORY.run, []);
 	if (Platform.OS !== "android") return;
 	await Promise.all([
 		Notifications.setNotificationChannelAsync(ANDROID_CHANNEL.gates, {

@@ -8,6 +8,7 @@ import {
 	pushDataOf,
 	routeOf,
 	showInFront,
+	shownAtMs,
 	shownButClosed,
 	shownWithKey,
 	taskDataOf,
@@ -182,6 +183,13 @@ describe("Gates that no longer wait", () => {
 	test("a push newer than the read stays: the read may not know its Gate yet", () => {
 		const shown = [{ id: "n1", key: "run-1:review", at: READ_AT - 5_000 }];
 		expect(shownButClosed(shown, new Set(), READ_AT)).toEqual([]);
+	});
+});
+
+describe("when a notification came", () => {
+	test("iOS seconds and Android milliseconds both become milliseconds", () => {
+		expect(shownAtMs(1792624525.675)).toBe(1792624525675);
+		expect(shownAtMs(1792624525675)).toBe(1792624525675);
 	});
 });
 

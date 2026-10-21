@@ -49,10 +49,10 @@ export function InFrontBanner() {
 				hideBanner(banner);
 				if (route) router.push(route);
 			}}
-			className="absolute right-4 left-4 active:opacity-80"
+			className="absolute right-4 left-4 rounded-lg shadow-black/10 shadow-lg active:opacity-80"
 			style={{ top: insets.top + 8 }}
 		>
-			<Alert icon={BellRing} className="shadow-black/10 shadow-lg">
+			<Alert icon={BellRing}>
 				<AlertTitle>{banner.title}</AlertTitle>
 				<AlertDescription>
 					{opensGate ? "Tap to answer it." : "Tap to open your inbox."}
