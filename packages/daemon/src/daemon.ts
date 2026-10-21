@@ -55,6 +55,12 @@ import {
 	spaceIdOf,
 	systemGitInstaller,
 } from "@nightshift/engine";
+import {
+	createInAppChannel,
+	createNotifications,
+	engineRunEvents,
+	oneSenderPerSpace,
+} from "@nightshift/notifications";
 
 import { localHarnesses, programChecks, reportDeviceFacts } from "./harnesses";
 import {
@@ -156,6 +162,7 @@ export async function createDaemon(
 			Promise.all([
 				hot.nightshiftDocument?.flush(),
 				hot.nightshiftSpaces?.flush(),
+				hot.nightshiftNotifications?.stop(),
 				lease.release(),
 			]),
 		);
@@ -425,6 +432,38 @@ export async function createDaemon(
 		kept: hot,
 	});
 
+	/**
+	 * The notifier: it reads the run events and tells each Member of a
+	 * Space about a new Gate, a finished run and a failed run, on every
+	 * screen. It sends for the Spaces this computer keeps as a Host, else
+	 * for its owner's personal Space only. The in-app channel outlives a
+	 * `bun --hot` reload, so the open pages keep their stream.
+	 */
+	hot.nightshiftInApp ??= createInAppChannel();
+	hot.nightshiftNotifications?.stop();
+	const directory = deviceDirectory(db);
+	const notifications = createNotifications({
+		db,
+		events: engineRunEvents(engine),
+		sendsFor: oneSenderPerSpace({
+			isHost: () => settings.current().host,
+			hostedElsewhere: (spaceId) => directory.hostedElsewhere(spaceId),
+			ownPersonalSpaceId: async () => person.spaceId,
+		}),
+		inApp: hot.nightshiftInApp,
+	});
+	hot.nightshiftNotifications = notifications;
+	// The switches this computer kept before notification settings moved
+	// to the Person: its owner gets them once.
+	const kept = settings.current();
+	await notifications.settings.seed(person.userId, {
+		gateOpened: kept.notifyGateOpened,
+		runFinished: kept.notifyRunFinished,
+		runFailed: kept.notifyRunFailed,
+	});
+	// Not awaited: the baseline reads every Space's open Gates.
+	void notifications.start();
+
 	const gitInstaller = systemGitInstaller();
 	const info: DaemonInfo = {
 		dataDir,
@@ -452,6 +491,7 @@ export async function createDaemon(
 		offers: devices.offers,
 		engine,
 		settings,
+		notifications,
 		connections,
 		cliTools,
 		profiles,

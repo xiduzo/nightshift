@@ -23,6 +23,7 @@ export type HttpServices = Pick<
 	| "db"
 	| "engine"
 	| "settings"
+	| "notifications"
 	| "connections"
 	| "cliTools"
 	| "profiles"
@@ -104,6 +105,7 @@ export function requestContexts(services: HttpServices): RequestContexts {
 				db,
 				engine: services.engine,
 				settings: services.settings,
+				notifications: services.notifications,
 				connections: services.connections,
 				cliTools: services.cliTools,
 				profiles: services.profiles,
