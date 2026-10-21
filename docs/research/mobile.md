@@ -404,6 +404,15 @@ What Night Shift does with it (the `glance` vertical of `apps/mobile`):
   Steps of a called flow do not count. A branch the run skips leaves x
   below y, so an ended run says "Ran 4 of 5 steps".
 
+Checked on 2026-10-22 with a development build on the iOS 27 simulator
+(`expo run:ios`, no EAS): the widget extension builds and embeds, the
+small and medium widget show the live count and runs and follow a
+refresh, a tap opens the inbox, and a followed run's Live Activity
+starts (iOS asks once to allow Live Activities), moves from step to
+step, shows "Waiting for you" at a Gate, and ends with "Finished".
+Android was checked to prebuild (the widget receiver and the
+notification permission are in the manifest), not built or run.
+
 Sources: [Expo Widgets docs](https://docs.expo.dev/versions/latest/sdk/widgets/),
 the `expo-widgets` 58.0.22 package (its `CHANGELOG.md`, `plugin/src`,
 `src/CustomNotifications.ts`), [Live Activities with Expo end to end](https://expo.dev/blog/live-activities-with-expo-end-to-end-client-and-backend)
