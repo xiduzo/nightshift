@@ -7,7 +7,11 @@ import {
 	type InAppChannel,
 	type Notifications,
 } from "@nightshift/notifications";
-import { fakeRunEvents } from "@nightshift/notifications/testing";
+import {
+	fakeRunEvents,
+	fakeVapidKeys,
+	fakeWebPushSender,
+} from "@nightshift/notifications/testing";
 import { call, ORPCError } from "@orpc/server";
 
 import type { Context } from "../context";
@@ -30,6 +34,11 @@ beforeEach(async () => {
 		events: fakeRunEvents().source,
 		sendsFor: async () => true,
 		inApp,
+		webPush: {
+			subject: "mailto:host@example.com",
+			sender: fakeWebPushSender().send,
+			generateKeys: fakeVapidKeys().generate,
+		},
 	});
 });
 afterEach(() => {
@@ -100,6 +109,39 @@ describe("notifications", () => {
 		expect(await errorOf(call(procedures.watch, undefined, { context }))).toBe(
 			"UNAUTHORIZED",
 		);
+		expect(
+			await errorOf(call(procedures.webPush.key, undefined, { context })),
+		).toBe("UNAUTHORIZED");
+	});
+
+	test("a Person gets the public key a browser subscribes with", async () => {
+		const ada = await contextFor((await sandbox.signUp("Ada")).headers);
+		const bob = await contextFor((await sandbox.signUp("Bob")).headers);
+		const { webPush } = appRouter.notifications;
+
+		const key = await call(webPush.key, undefined, { context: ada });
+		expect(key).toEqual({ publicKey: "public-1" });
+		expect(await call(webPush.key, undefined, { context: bob })).toEqual(key);
+	});
+
+	test("removing a phone signs that phone out", async () => {
+		const adaPerson = await sandbox.signUp("Ada");
+		const phoneHeaders = await sandbox.signIn("ada@example.com");
+		const ada = await contextFor(adaPerson.headers);
+		const onPhone = await contextFor(phoneHeaders);
+		const { targets } = appRouter.notifications;
+
+		// The phone registers itself with its own session.
+		const added = await call(targets.register, phone, { context: onPhone });
+		await call(targets.remove, { id: added.id }, { context: ada });
+
+		expect(
+			await sandbox.auth.api.getSession({ headers: phoneHeaders }),
+		).toBeNull();
+		expect(
+			await sandbox.auth.api.getSession({ headers: adaPerson.headers }),
+		).not.toBeNull();
+		expect((await contextFor(phoneHeaders)).session).toBeNull();
 	});
 
 	test("settings are each Person's own", async () => {

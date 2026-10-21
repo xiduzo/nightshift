@@ -11,6 +11,7 @@ import {
 	notificationItemSchema,
 	pushTargetSchema,
 	settingsSchema,
+	webPushKeySchema,
 } from "./schemas";
 
 /**
@@ -88,7 +89,8 @@ export const notifications = {
 			),
 		remove: protectedProcedure
 			.route({
-				summary: "Removes one of your screens: it gets no more notifications.",
+				summary:
+					"Removes one of your screens: it gets no more notifications, and a phone is signed out.",
 			})
 			.output(output(z.void()))
 			.input(z.object({ id: z.string().min(1) }))
@@ -103,5 +105,16 @@ export const notifications = {
 					});
 				}
 			}),
+	},
+	webPush: {
+		key: protectedProcedure
+			.route({
+				summary:
+					"Gives the public key a browser subscribes with to get your notifications while no Night Shift page is open.",
+			})
+			.output(output(webPushKeySchema))
+			.handler(async ({ context }) => ({
+				publicKey: await context.notifications.webPush.publicKey(),
+			})),
 	},
 };

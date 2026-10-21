@@ -53,3 +53,9 @@ export const notificationItemSchema = exact<InAppItem>()(
 		}),
 	]),
 );
+
+/** The public VAPID key of this Night Shift. Null: it sends no browser notifications. */
+export const webPushKeySchema = z.object({
+	/** URL-safe base64, as `PushManager.subscribe` takes it. */
+	publicKey: z.string().nullable(),
+});
