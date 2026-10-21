@@ -18,7 +18,12 @@ import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { RunStatusBadge } from "@/features/runs";
-import type { Project, RunStatus, RunSummary } from "@/shared/api";
+import type {
+	DashboardSummary,
+	NightsRange,
+	Project,
+	RunStatus,
+} from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatRelative, useNow } from "@/shared/format";
 import {
@@ -34,18 +39,10 @@ import {
 	Stat,
 	Swatch,
 } from "./details";
-import {
-	formatNight,
-	formatNightShort,
-	inLastNights,
-	lastNights,
-	nightOf,
-} from "./nights";
-import { OVERVIEW_ROWS } from "./overview";
-import { countRunStatuses, RUN_STATUS_CHART } from "./runs-donut";
-import { spendGroupOf } from "./spend";
+import { nightChartRows } from "./nights";
+import { nightsOf } from "./ranges";
+import { RUN_STATUS_CHART } from "./runs-donut";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 type Tab = "overview" | "groups" | "failed";
 
 /**
@@ -57,24 +54,20 @@ type Tab = "overview" | "groups" | "failed";
 export function RunsDialog({
 	open,
 	onOpenChange,
-	runs,
+	summary,
 	project,
-	projects,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	runs: RunSummary[];
+	summary: DashboardSummary;
 	/** One project; otherwise all of them. */
 	project?: Project;
-	/** To name the project of each run, over all projects. */
-	projects?: Project[];
 }) {
 	return (
 		<DetailsDialog open={open} onOpenChange={onOpenChange}>
 			<RunsDetails
-				runs={runs}
+				summary={summary}
 				project={project}
-				projects={projects}
 				onNavigate={() => onOpenChange(false)}
 			/>
 		</DetailsDialog>
@@ -82,67 +75,26 @@ export function RunsDialog({
 }
 
 function RunsDetails({
-	runs,
+	summary,
 	project,
-	projects,
 	onNavigate,
 }: {
-	runs: RunSummary[];
+	summary: DashboardSummary;
 	project?: Project;
-	projects?: Project[];
 	onNavigate: () => void;
 }) {
 	const now = useNow(60_000);
 	const [range, setRange] = useState<NightRange>(30);
 	const [tab, setTab] = useState<Tab>("overview");
-	const groupOf = spendGroupOf(project, projects);
-	const lastDay = runs.filter((run) => run.createdAt >= now - DAY_MS);
-	const inRange = runs.filter((run) => inLastNights(run.createdAt, range, now));
-	const ended = inRange.filter(
-		(run) => run.status === "finished" || run.status === "failed",
-	);
-	const finished = ended.filter((run) => run.status === "finished");
-	const nightsWithRuns = new Set(inRange.map((run) => nightOf(run.createdAt)))
-		.size;
-
+	const lastDay = summary.cards.lastDay;
+	const inRange: NightsRange["runs"] = nightsOf(summary, range).runs;
+	const { ended, finished, nightsWithRuns, groups, failed } = inRange;
 	// Only the statuses that occur, in the donut's order: live first.
-	const statuses = countRunStatuses(inRange).map(({ status }) => status);
-	const rows = lastNights(range, now).map((night) => {
-		const row: Record<string, number | string> = {
-			label: formatNightShort(night),
-			title: formatNight(night),
-		};
-		for (const status of statuses) row[status] = 0;
-		for (const run of inRange) {
-			if (nightOf(run.createdAt) === night) {
-				row[run.status] = (row[run.status] as number) + 1;
-			}
-		}
-		return row;
-	});
+	const statuses = inRange.statuses.map(({ status }) => status);
+	const rows = nightChartRows(inRange.perNight);
 	const config = Object.fromEntries(
 		statuses.map((status) => [status, RUN_STATUS_CHART[status]]),
 	);
-
-	const byGroup = new Map<string, RunSummary[]>();
-	for (const run of inRange) {
-		byGroup.set(groupOf(run), [...(byGroup.get(groupOf(run)) ?? []), run]);
-	}
-	const groups = [...byGroup.entries()]
-		.map(([label, ofGroup]) => ({
-			label,
-			runs: ofGroup.length,
-			finished: ofGroup.filter((run) => run.status === "finished").length,
-			failed: ofGroup.filter((run) => run.status === "failed").length,
-		}))
-		.sort((a, b) => b.runs - a.runs);
-	const failed = inRange
-		.filter((run) => run.status === "failed")
-		.sort((a, b) => b.createdAt - a.createdAt);
-	const lastDayFinished = lastDay.filter(
-		(run) => run.status === "finished",
-	).length;
-	const lastDayFailed = lastDay.filter((run) => run.status === "failed").length;
 
 	return (
 		<>
@@ -152,7 +104,7 @@ function RunsDetails({
 				tabs={[
 					{ value: "overview", label: "Overview" },
 					{ value: "groups", label: project ? "By flow" : "By project" },
-					{ value: "failed", label: "Failed", count: failed.length },
+					{ value: "failed", label: "Failed", count: failed.count },
 				]}
 				value={tab}
 				onValueChange={setTab}
@@ -162,32 +114,30 @@ function RunsDetails({
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 						<Stat
 							label="Last 24 h"
-							value={String(lastDay.length)}
+							value={String(lastDay.runs)}
 							hint={
-								lastDay.length === 0
+								lastDay.runs === 0
 									? "No runs in the last day"
-									: `${lastDayFinished} finished, ${lastDayFailed} failed`
+									: `${lastDay.finished} finished, ${lastDay.failed} failed`
 							}
 						/>
 						<Stat
 							label="Runs"
-							value={String(inRange.length)}
+							value={String(inRange.runs)}
 							hint={`Last ${range} nights`}
 						/>
 						<Stat
 							label="Finished"
 							value={
-								ended.length > 0
-									? `${Math.round((finished.length / ended.length) * 100)}%`
-									: "—"
+								ended > 0 ? `${Math.round((finished / ended) * 100)}%` : "—"
 							}
-							hint={`${finished.length} of ${ended.length} ended runs`}
+							hint={`${finished} of ${ended} ended runs`}
 						/>
 						<Stat
 							label="Per night"
 							value={
 								nightsWithRuns > 0
-									? (inRange.length / nightsWithRuns).toFixed(1)
+									? (inRange.runs / nightsWithRuns).toFixed(1)
 									: "—"
 							}
 							hint="Nights with runs"
@@ -198,7 +148,7 @@ function RunsDetails({
 						title="History"
 						hint="Runs per night, noon to noon, by status"
 					>
-						{inRange.length === 0 ? (
+						{inRange.runs === 0 ? (
 							<DetailsEmpty>No runs in the last {range} nights.</DetailsEmpty>
 						) : (
 							<ChartContainer
@@ -264,19 +214,19 @@ function RunsDetails({
 				<DetailsTabContent value="groups">
 					<ChartSection
 						title={project ? "Runs per flow" : "Runs per project"}
-						hint={`The top ${Math.min(groups.length, OVERVIEW_ROWS)}, the most runs first`}
+						hint={`The top ${groups.rows.length}, the most runs first`}
 					>
-						{groups.length === 0 ? (
+						{groups.count === 0 ? (
 							<DetailsEmpty>No runs in the last {range} nights.</DetailsEmpty>
 						) : (
 							<>
 								<DataTable
 									columns={groupColumns(project ? "Flow" : "Project")}
-									data={groups.slice(0, OVERVIEW_ROWS)}
+									data={groups.rows}
 									getRowId={(group) => group.label}
 								/>
 								<MoreRows
-									hidden={groups.length - OVERVIEW_ROWS}
+									hidden={groups.count - groups.rows.length}
 									where={project ? "flows" : "projects"}
 								/>
 							</>
@@ -287,16 +237,16 @@ function RunsDetails({
 				<DetailsTabContent value="failed">
 					<ChartSection
 						title="Failed runs"
-						hint={`The last ${Math.min(failed.length, OVERVIEW_ROWS)}, newest first`}
+						hint={`The last ${failed.rows.length}, newest first`}
 					>
-						{failed.length === 0 ? (
+						{failed.count === 0 ? (
 							<DetailsEmpty>
 								No run failed in the last {range} nights.
 							</DetailsEmpty>
 						) : (
 							<>
 								<ItemGroup className="gap-1">
-									{failed.slice(0, OVERVIEW_ROWS).map((run) => (
+									{failed.rows.map((run) => (
 										<Item
 											key={run.id}
 											size="xs"
@@ -313,7 +263,7 @@ function RunsDetails({
 													{run.title}
 												</ItemTitle>
 												<ItemDescription className="truncate">
-													{project ? null : `${groupOf(run)}, `}
+													{project ? null : `${run.group}, `}
 													{formatRelative(run.createdAt, now)}
 													{run.reason ? `: ${run.reason}` : null}
 												</ItemDescription>
@@ -325,7 +275,7 @@ function RunsDetails({
 									))}
 								</ItemGroup>
 								<MoreRows
-									hidden={failed.length - OVERVIEW_ROWS}
+									hidden={failed.count - failed.rows.length}
 									where="failed runs"
 								/>
 							</>
@@ -356,12 +306,7 @@ function RunsDetails({
 	);
 }
 
-type GroupRow = {
-	label: string;
-	runs: number;
-	finished: number;
-	failed: number;
-};
+type GroupRow = NightsRange["runs"]["groups"]["rows"][number];
 
 const groupColumn = dataTableColumns<GroupRow>();
 

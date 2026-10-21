@@ -19,7 +19,7 @@ import {
 	OctagonPauseIcon,
 } from "lucide-react";
 import { scheduleQueries } from "@/features/schedules";
-import type { RunSummary } from "@/shared/api";
+import type { DashboardSummary } from "@/shared/api";
 import {
 	dayWord,
 	formatDateTime,
@@ -43,10 +43,11 @@ type Upcoming = {
 /** What happens next on its own: scheduled starts, wake-ups and stop times. */
 export function UpNext({
 	projectId,
-	runs,
+	upNext,
 }: {
 	projectId: string;
-	runs: RunSummary[] | undefined;
+	/** The runs' wake-ups and stop times, the soonest first. */
+	upNext: DashboardSummary["upNext"] | undefined;
 }) {
 	const now = useNow(60_000);
 	const schedules = useQuery(scheduleQueries.listLive(projectId));
@@ -71,34 +72,20 @@ export function UpNext({
 					]
 				: [],
 		),
-		...(runs ?? []).flatMap((run) => {
-			const link = { to: "/runs/$runId", params: { runId: run.id } } as const;
-			if (run.status === "sleeping" && run.wakeAt) {
-				return [
-					{
-						key: `wake:${run.id}`,
-						at: run.wakeAt,
-						icon: MoonIcon,
-						title: run.title,
-						description: "Wakes and goes on",
-						link,
-					} satisfies Upcoming,
-				];
-			}
-			if (run.status === "running" && run.stopAt) {
-				return [
-					{
-						key: `stop:${run.id}`,
-						at: run.stopAt,
-						icon: OctagonPauseIcon,
-						title: run.title,
-						description: "Stop time: no new step starts after it",
-						link,
-					} satisfies Upcoming,
-				];
-			}
-			return [];
-		}),
+		...(upNext ?? []).map(
+			(item) =>
+				({
+					key: `${item.kind}:${item.runId}`,
+					at: item.at,
+					icon: item.kind === "wake" ? MoonIcon : OctagonPauseIcon,
+					title: item.title,
+					description:
+						item.kind === "wake"
+							? "Wakes and goes on"
+							: "Stop time: no new step starts after it",
+					link: { to: "/runs/$runId", params: { runId: item.runId } },
+				}) satisfies Upcoming,
+		),
 	]
 		.filter((item) => item.at >= now)
 		.sort((a, b) => a.at - b.at)

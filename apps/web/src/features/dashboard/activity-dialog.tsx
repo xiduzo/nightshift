@@ -19,7 +19,7 @@ import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { RunStatusBadge } from "@/features/runs";
-import type { Project, RunSummary } from "@/shared/api";
+import type { ActivityRange, DashboardSummary, Project } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	formatDayTime,
@@ -28,7 +28,6 @@ import {
 	formatTime,
 	useNow,
 } from "@/shared/format";
-import { activePerHour, isOpen } from "./activity";
 import {
 	ChartSection,
 	DetailsDialog,
@@ -41,8 +40,7 @@ import {
 	Stat,
 	Swatch,
 } from "./details";
-import { OVERVIEW_ROWS } from "./overview";
-import { spendGroupOf } from "./spend";
+import { hoursOf } from "./ranges";
 
 /** In hours: a day, two, a week. */
 const RANGES = [24, 48, 168] as const;
@@ -60,24 +58,20 @@ const CHART_CONFIG = {
 export function ActivityDialog({
 	open,
 	onOpenChange,
-	runs,
+	summary,
 	project,
-	projects,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	runs: RunSummary[];
+	summary: DashboardSummary;
 	/** One project; otherwise all of them. */
 	project?: Project;
-	/** To name the project of each run, over all projects. */
-	projects?: Project[];
 }) {
 	return (
 		<DetailsDialog open={open} onOpenChange={onOpenChange}>
 			<ActivityDetails
-				runs={runs}
+				summary={summary}
 				project={project}
-				projects={projects}
 				onNavigate={() => onOpenChange(false)}
 			/>
 		</DetailsDialog>
@@ -85,31 +79,21 @@ export function ActivityDialog({
 }
 
 function ActivityDetails({
-	runs,
+	summary,
 	project,
-	projects,
 	onNavigate,
 }: {
-	runs: RunSummary[];
+	summary: DashboardSummary;
 	project?: Project;
-	projects?: Project[];
 	onNavigate: () => void;
 }) {
 	const now = useNow(60_000);
 	const [range, setRange] = useState<Range>(24);
 	const [tab, setTab] = useState<Tab>("overview");
-	const groupOf = spendGroupOf(project, projects);
-	const hours = activePerHour(runs, range, now);
-	const since = hours[0]?.hour ?? now;
-	const peak = Math.max(0, ...hours.map((hour) => hour.active));
-	const busy = hours.filter((hour) => hour.active > 0).length;
-	const started = runs.filter((run) => run.createdAt >= since).length;
-	const open = runs.filter(isOpen).sort((a, b) => a.createdAt - b.createdAt);
-	const running = open.filter((run) => run.status === "running").length;
-	const nextWake = open
-		.flatMap((run) => (run.wakeAt ? [run.wakeAt] : []))
-		.sort((a, b) => a - b)[0];
-	const rows = hours.map(({ hour, active }) => ({
+	const { perHour, peak, busy, started, groups } = hoursOf(summary, range);
+	const open = summary.open;
+	const { running, nextWakeAt: nextWake } = open;
+	const rows = perHour.map(({ hour, active }) => ({
 		active,
 		label:
 			range > 48
@@ -118,7 +102,6 @@ function ActivityDetails({
 		title: formatDayTime(hour),
 	}));
 	const rangeWord = range > 48 ? "7 days" : `${range} h`;
-	const groups = atWorkPerGroup(runs, groupOf, since, now);
 
 	return (
 		<>
@@ -127,7 +110,7 @@ function ActivityDetails({
 			<DetailsTabs
 				tabs={[
 					{ value: "overview", label: "Overview" },
-					{ value: "open", label: "Open runs", count: open.length },
+					{ value: "open", label: "Open runs", count: open.count },
 					{ value: "groups", label: project ? "By flow" : "By project" },
 				]}
 				value={tab}
@@ -151,9 +134,9 @@ function ActivityDetails({
 							value={String(running)}
 							hint={
 								nextWake
-									? `${open.length} open, the next wakes at ${formatTime(nextWake)}`
-									: open.length > 0
-										? `${open.length} open`
+									? `${open.count} open, the next wakes at ${formatTime(nextWake)}`
+									: open.count > 0
+										? `${open.count} open`
 										: "Nothing open"
 							}
 						/>
@@ -235,14 +218,14 @@ function ActivityDetails({
 				<DetailsTabContent value="open">
 					<ChartSection
 						title="Open runs"
-						hint={`The oldest ${Math.min(open.length, OVERVIEW_ROWS)}: at work, waiting for you or asleep`}
+						hint={`The oldest ${open.rows.length}: at work, waiting for you or asleep`}
 					>
-						{open.length === 0 ? (
+						{open.count === 0 ? (
 							<DetailsEmpty>No run is at work, waiting or asleep.</DetailsEmpty>
 						) : (
 							<>
 								<ItemGroup className="gap-1">
-									{open.slice(0, OVERVIEW_ROWS).map((run) => (
+									{open.rows.map((run) => (
 										<Item
 											key={run.id}
 											size="xs"
@@ -259,7 +242,7 @@ function ActivityDetails({
 													{run.title}
 												</ItemTitle>
 												<ItemDescription>
-													{project ? null : `${groupOf(run)}, `}
+													{project ? null : `${run.group}, `}
 													started {formatRelative(run.createdAt, now)}
 													{run.wakeAt
 														? `, wakes at ${formatTime(run.wakeAt)}`
@@ -276,7 +259,7 @@ function ActivityDetails({
 									))}
 								</ItemGroup>
 								<MoreRows
-									hidden={open.length - OVERVIEW_ROWS}
+									hidden={open.count - open.rows.length}
 									where="open runs"
 								/>
 							</>
@@ -289,19 +272,19 @@ function ActivityDetails({
 						title={
 							project ? "Time at work per flow" : "Time at work per project"
 						}
-						hint={`The top ${Math.min(groups.length, OVERVIEW_ROWS)} of the last ${rangeWord}, the most time first`}
+						hint={`The top ${groups.rows.length} of the last ${rangeWord}, the most time first`}
 					>
-						{groups.length === 0 ? (
+						{groups.count === 0 ? (
 							<DetailsEmpty>Nothing ran in the last {rangeWord}.</DetailsEmpty>
 						) : (
 							<>
 								<DataTable
 									columns={groupColumns(project ? "Flow" : "Project")}
-									data={groups.slice(0, OVERVIEW_ROWS)}
+									data={groups.rows}
 									getRowId={(group) => group.label}
 								/>
 								<MoreRows
-									hidden={groups.length - OVERVIEW_ROWS}
+									hidden={groups.count - groups.rows.length}
 									where={project ? "flows" : "projects"}
 								/>
 							</>
@@ -332,48 +315,7 @@ function ActivityDetails({
 	);
 }
 
-type GroupRow = {
-	label: string;
-	/** Runs at work at some point since `since`. */
-	runs: number;
-	started: number;
-	/** The time its runs were at work since `since`, added up. */
-	atWork: number;
-	longest: number;
-};
-
-/**
- * How long the runs of each flow or project were at work since `since`,
- * the most first. Only the part since `since` counts. An open run works
- * until now.
- */
-function atWorkPerGroup(
-	runs: RunSummary[],
-	groupOf: (run: RunSummary) => string,
-	since: number,
-	now: number,
-): GroupRow[] {
-	const byLabel = new Map<string, GroupRow>();
-	for (const run of runs) {
-		const to = run.endedAt ?? (isOpen(run) ? now : run.createdAt);
-		if (to < since) continue;
-		const label = groupOf(run);
-		const group = byLabel.get(label) ?? {
-			label,
-			runs: 0,
-			started: 0,
-			atWork: 0,
-			longest: 0,
-		};
-		const atWork = Math.max(to - Math.max(run.createdAt, since), 0);
-		group.runs += 1;
-		if (run.createdAt >= since) group.started += 1;
-		group.atWork += atWork;
-		group.longest = Math.max(group.longest, atWork);
-		byLabel.set(label, group);
-	}
-	return [...byLabel.values()].sort((a, b) => b.atWork - a.atWork);
-}
+type GroupRow = ActivityRange["groups"]["rows"][number];
 
 const groupColumn = dataTableColumns<GroupRow>();
 

@@ -9,6 +9,7 @@ import {
 	profiles,
 	settings,
 } from "./config";
+import { dashboard } from "./dashboard";
 import { account, devices, link, offers, pairing } from "./devices";
 import { flows } from "./flows";
 import { gates } from "./gates";
@@ -46,6 +47,7 @@ export const appRouter = {
 	schedules,
 	runs,
 	notifications,
+	dashboard,
 	settings,
 	connections,
 	cliTools,

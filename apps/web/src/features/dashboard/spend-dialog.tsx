@@ -5,6 +5,7 @@ import {
 } from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import {
+	type ChartConfig,
 	ChartContainer,
 	ChartTooltip,
 	ChartTooltipContent,
@@ -23,13 +24,12 @@ import { ArrowRightIcon, CircleHelpIcon } from "lucide-react";
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { CostText, RunStatusBadge } from "@/features/runs";
-import type { Project, RunSummary } from "@/shared/api";
+import type { DashboardSummary, Project } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	formatCost,
 	formatKnownCost,
 	formatRelative,
-	sumKnownCost,
 	useNow,
 } from "@/shared/format";
 import {
@@ -44,10 +44,9 @@ import {
 	Stat,
 	Swatch,
 } from "./details";
-import { OVERVIEW_ROWS } from "./overview";
-import { spendGroupOf, spendPerNight } from "./spend";
+import { nightChartRows } from "./nights";
+import { nightsOf } from "./ranges";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 type Tab = "overview" | "groups" | "priciest";
 
 /**
@@ -58,24 +57,20 @@ type Tab = "overview" | "groups" | "priciest";
 export function SpendDialog({
 	open,
 	onOpenChange,
-	runs,
+	summary,
 	project,
-	projects,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	runs: RunSummary[];
+	summary: DashboardSummary;
 	/** One project; otherwise all of them. */
 	project?: Project;
-	/** To name the project of each run, over all projects. */
-	projects?: Project[];
 }) {
 	return (
 		<DetailsDialog open={open} onOpenChange={onOpenChange}>
 			<SpendDetails
-				runs={runs}
+				summary={summary}
 				project={project}
-				projects={projects}
 				onNavigate={() => onOpenChange(false)}
 			/>
 		</DetailsDialog>
@@ -83,34 +78,35 @@ export function SpendDialog({
 }
 
 function SpendDetails({
-	runs,
+	summary,
 	project,
-	projects,
 	onNavigate,
 }: {
-	runs: RunSummary[];
+	summary: DashboardSummary;
 	project?: Project;
-	projects?: Project[];
 	onNavigate: () => void;
 }) {
 	const now = useNow(60_000);
 	const [range, setRange] = useState<NightRange>(30);
 	const [tab, setTab] = useState<Tab>("overview");
-	const groupOf = spendGroupOf(project, projects);
-	const history = spendPerNight(runs, range, groupOf, now);
-	const lastDay = runs.filter((run) => run.createdAt >= now - DAY_MS);
-	const spentLastDay = sumKnownCost(lastDay);
+	const history = nightsOf(summary, range).spend;
+	const lastDay = summary.cards.lastDay;
 	// Runs with a step whose cost is not known: the totals leave that step out.
-	const unknown = history.inRange.filter((run) => run.costMissing > 0).length;
-	const latest = lastDay.reduce<number | null>(
-		(last, run) =>
-			last === null || run.createdAt > last ? run.createdAt : last,
-		null,
-	);
-	const priciest = history.inRange
-		.filter((run) => run.costUsd > 0)
-		.sort((a, b) => b.costUsd - a.costUsd)
-		.slice(0, OVERVIEW_ROWS);
+	const { unknown, priciest } = history;
+	const latest = lastDay.latestAt;
+	const rows = nightChartRows(history.perNight);
+	const config = Object.fromEntries(
+		history.groups.map((group, index) => [
+			group.key,
+			{
+				label: group.label,
+				color:
+					group.key === "other"
+						? "var(--muted-foreground)"
+						: `var(--chart-${index + 1})`,
+			},
+		]),
+	) satisfies ChartConfig;
 
 	return (
 		<>
@@ -143,11 +139,11 @@ function SpendDetails({
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 						<Stat
 							label="Last 24 h"
-							value={formatKnownCost(spentLastDay)}
+							value={formatKnownCost(lastDay.cost)}
 							hint={
-								lastDay.length === 0
+								lastDay.runs === 0
 									? "No runs in the last day"
-									: `${lastDay.length} ${lastDay.length === 1 ? "run" : "runs"}, the last ${latest ? formatRelative(latest, now) : ""}`
+									: `${lastDay.runs} ${lastDay.runs === 1 ? "run" : "runs"}, the last ${latest ? formatRelative(latest, now) : ""}`
 							}
 						/>
 						<Stat
@@ -158,8 +154,8 @@ function SpendDetails({
 						<Stat
 							label="Per run"
 							value={
-								history.inRange.length > 0
-									? formatCost(history.total / history.inRange.length)
+								history.runs > 0
+									? formatCost(history.total / history.runs)
 									: "—"
 							}
 							hint="Average"
@@ -183,10 +179,10 @@ function SpendDetails({
 							<DetailsEmpty>No spend in the last {range} nights.</DetailsEmpty>
 						) : (
 							<ChartContainer
-								config={history.config}
+								config={config}
 								className="aspect-auto h-56 w-full"
 							>
-								<BarChart data={history.rows} margin={{ left: 0, right: 0 }}>
+								<BarChart data={rows} margin={{ left: 0, right: 0 }}>
 									<CartesianGrid vertical={false} />
 									<XAxis
 										dataKey="label"
@@ -213,7 +209,7 @@ function SpendDetails({
 													<div className="flex w-full items-center gap-2">
 														<Swatch color={`var(--color-${name})`} />
 														<span className="text-muted-foreground">
-															{history.config[name as string]?.label ?? name}
+															{config[name as string]?.label ?? name}
 														</span>
 														<span className="ml-auto font-medium font-mono tabular-nums">
 															{formatCost(Number(value))}
@@ -257,7 +253,7 @@ function SpendDetails({
 								)}
 								data={history.groups.map((group) => ({
 									...group,
-									color: history.config[group.key]?.color,
+									color: config[group.key]?.color,
 								}))}
 								getRowId={(group) => group.key}
 							/>
@@ -291,7 +287,7 @@ function SpendDetails({
 												{run.title}
 											</ItemTitle>
 											<ItemDescription>
-												{project ? null : `${groupOf(run)}, `}
+												{project ? null : `${run.group}, `}
 												{formatRelative(run.createdAt, now)}
 											</ItemDescription>
 										</ItemContent>

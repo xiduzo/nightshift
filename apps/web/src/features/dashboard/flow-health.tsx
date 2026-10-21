@@ -7,13 +7,16 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
-import { flowQueries } from "@/features/flows";
 import { RunStatusBadge } from "@/features/runs";
-import type { Project, RunSummary } from "@/shared/api";
+import type {
+	DashboardSummary,
+	FlowHealthRow,
+	Project,
+	Spread,
+} from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	formatCost,
@@ -23,14 +26,6 @@ import {
 } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { FlowHealthDialog } from "./flow-health-dialog";
-import {
-	type FlowRun,
-	finishedCostOf,
-	hasEnded,
-	runsOf,
-	type Spread,
-} from "./flow-runs";
-import { inLastNights } from "./nights";
 import { OVERVIEW_ROWS } from "./overview";
 
 const NIGHTS = 30;
@@ -43,17 +38,18 @@ const NIGHTS = 30;
  */
 export function FlowHealth({
 	project,
-	runs,
+	summary,
 }: {
 	project: Project;
-	runs: RunSummary[] | undefined;
+	/** Undefined while it loads. */
+	summary: DashboardSummary | undefined;
 }) {
 	const now = useNow(60_000);
-	const flows = useQuery(flowQueries.list(project.id));
+	const health = summary?.flowHealth;
 	// The name stays while the dialog closes, so its body does not go blank.
 	const [details, setDetails] = useState<{ name: string; open: boolean }>();
 
-	if (!flows.isLoading && (flows.data?.length ?? 0) === 0) return null;
+	if (health && health.count === 0) return null;
 
 	return (
 		<PageSection
@@ -78,35 +74,27 @@ export function FlowHealth({
 		>
 			<Card className="py-0">
 				<CardContent className="px-0">
-					{flows.isLoading || !runs ? (
+					{!health ? (
 						<div className="flex flex-col gap-2 px-6 py-4">
 							<Skeleton className="h-9 w-full" />
 							<Skeleton className="h-9 w-full" />
 						</div>
 					) : (
 						<FlowHealthTable
-							rows={(flows.data ?? [])
-								.map((flow) => flowHealthOf(flow.name, runs, now))
-								// The busiest flows, then the one that ran last.
-								.sort(
-									(a, b) =>
-										b.runs - a.runs ||
-										(b.last?.startedAt ?? 0) - (a.last?.startedAt ?? 0),
-								)
-								.slice(0, OVERVIEW_ROWS)}
+							// The busiest flows, then the one that ran last.
+							rows={health.rows}
 							now={now}
 							onOpen={(name) => setDetails({ name, open: true })}
 						/>
 					)}
 				</CardContent>
 			</Card>
-			{details && runs ? (
+			{details ? (
 				<FlowHealthDialog
 					open={details.open}
 					onOpenChange={(open) => setDetails({ ...details, open })}
 					flowName={details.name}
 					project={project}
-					runs={runs}
 				/>
 			) : null}
 		</PageSection>
@@ -132,63 +120,6 @@ function FlowHealthTable({
 			onRowClick={(row) => onOpen(row.name)}
 		/>
 	);
-}
-
-type FlowHealthRow = {
-	name: string;
-	last: FlowRun | undefined;
-	/** Runs in the last nights. */
-	runs: number;
-	finished: number;
-	ended: number;
-	/** Percent of ended runs that finished; undefined when none ended. */
-	rate: number | undefined;
-	/** What a finished run that asked an agent or model cost; undefined when none did. */
-	cost: Spread | undefined;
-	/** The runs that ended without finishing, and what they spent together. */
-	unfinished: { count: number; costUsd: number };
-	/** Finished runs with a step whose cost is not known: not in `cost`. */
-	unknownCost: number;
-	/** Finished runs that asked no agent or model: not in `cost`. */
-	freeRuns: number;
-};
-
-function flowHealthOf(
-	name: string,
-	runs: RunSummary[],
-	now: number,
-): FlowHealthRow {
-	const mine = runsOf(name, runs);
-	const last = mine.reduce<FlowRun | undefined>(
-		(latest, run) =>
-			latest === undefined || run.startedAt > latest.startedAt ? run : latest,
-		undefined,
-	);
-	const recent = mine.filter((run) => inLastNights(run.startedAt, NIGHTS, now));
-	const ended = recent.filter(hasEnded);
-	const finished = ended.filter((run) => run.status === "finished");
-	// A run that failed early spent next to nothing, which would drag down
-	// what a run costs. Its spend shows on its own instead.
-	const unfinished = ended.filter((run) => run.status !== "finished");
-	const { cost, unknown, free } = finishedCostOf(finished);
-	return {
-		name,
-		last,
-		runs: recent.length,
-		finished: finished.length,
-		ended: ended.length,
-		rate:
-			ended.length > 0
-				? Math.round((finished.length / ended.length) * 100)
-				: undefined,
-		cost,
-		unknownCost: unknown,
-		freeRuns: free,
-		unfinished: {
-			count: unfinished.length,
-			costUsd: unfinished.reduce((total, run) => total + run.costUsd, 0),
-		},
-	};
 }
 
 const column = dataTableColumns<FlowHealthRow>();
@@ -234,12 +165,14 @@ function flowHealthColumns(
 					<span className="text-muted-foreground text-xs">Never run</span>
 				),
 		}),
-		column.accessor("rate", {
+		// Null (none ended) sorts like a missing value: last.
+		column.accessor((row) => row.rate ?? undefined, {
+			id: "rate",
 			header: "Finished",
 			enableSorting: true,
 			sortUndefined: "last",
 			cell: ({ row: { original } }) =>
-				original.rate === undefined ? (
+				original.rate === null ? (
 					<span className="text-muted-foreground text-xs">—</span>
 				) : (
 					<span
@@ -301,7 +234,7 @@ function CostCell({
 	freeRuns,
 	scaleMax,
 }: {
-	cost: Spread | undefined;
+	cost: Spread | null;
 	unfinished: FlowHealthRow["unfinished"];
 	unknownCost: number;
 	freeRuns: number;
@@ -332,7 +265,7 @@ function CostCell({
 				spent {formatCost(unfinished.costUsd)}.
 			</span>
 		) : null;
-	if (cost === undefined) {
+	if (cost === null) {
 		return unfinishedLine || unknownLine || freeLine ? (
 			<Tooltip>
 				<TooltipTrigger render={<span className="text-muted-foreground" />}>

@@ -6,6 +6,7 @@ import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 
 import { OVERVIEW_ROWS } from "./overview";
 import { SectionCards } from "./section-cards";
+import { useDashboard } from "./use-dashboard";
 
 /**
  * Home: tonight over all projects. The section cards, the recent runs, and
@@ -14,12 +15,9 @@ import { SectionCards } from "./section-cards";
 export function HomePage() {
 	const queryClient = useQueryClient();
 	const projects = useQuery(projectQueries.list());
+	// The project list shows how each project's runs stand.
 	const runs = useQuery(runQueries.everyRun());
-
-	const recentRuns = runs.data
-		?.slice()
-		.sort((a, b) => b.createdAt - a.createdAt)
-		.slice(0, OVERVIEW_ROWS);
+	const summary = useDashboard();
 
 	return (
 		<>
@@ -30,11 +28,7 @@ export function HomePage() {
 					description="What runs, what waits for you, and what it cost."
 				/>
 
-				<SectionCards
-					runs={runs.data}
-					isLoading={runs.isLoading}
-					projects={projects.data}
-				/>
+				<SectionCards summary={summary.data} isLoading={summary.isLoading} />
 
 				<PageSection
 					title="Recent runs"
@@ -43,9 +37,9 @@ export function HomePage() {
 					<Card className="py-0">
 						<CardContent className="px-0">
 							<RunList
-								runs={recentRuns}
+								runs={summary.data?.recent}
 								projects={projects.data}
-								isLoading={runs.isLoading}
+								isLoading={summary.isLoading}
 								emptyDescription="Open a project and start a run. It shows up here."
 							/>
 						</CardContent>

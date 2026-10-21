@@ -25,22 +25,13 @@ import {
 import { type ReactNode, useState } from "react";
 import { Bar, BarChart, YAxis } from "recharts";
 import { useOpenGates } from "@/features/gates";
-import type { Project, RunSummary } from "@/shared/api";
-import {
-	formatDateTime,
-	formatKnownCost,
-	formatTime,
-	sumKnownCost,
-	useNow,
-} from "@/shared/format";
-import { activePerHour, gatesPerHour, HOUR_MS, lastHours } from "./activity";
+import type { DashboardSummary, Project } from "@/shared/api";
+import { formatDateTime, formatKnownCost, formatTime } from "@/shared/format";
 import { ActivityDialog } from "./activity-dialog";
 import { GatesDialog } from "./gates-dialog";
 import { RunsDialog } from "./runs-dialog";
 import { SpendDialog } from "./spend-dialog";
 
-const DAY_MS = 24 * HOUR_MS;
-const SPARK_HOURS = 24;
 /** Which card's details are open. */
 type Details = "activity" | "gates" | "spend" | "runs";
 const SPEND_CONFIG = {
@@ -63,21 +54,19 @@ const OUTCOMES_CONFIG = {
 } satisfies ChartConfig;
 
 /**
- * The numbers on top, as in the shadcn `dashboard-01` block, from runs and
- * open Gates. Over all projects, or over one when `project` is given. Each
- * card opens its details.
+ * The numbers on top, as in the shadcn `dashboard-01` block, from the
+ * dashboard's numbers and the open Gates. Over all projects, or over one
+ * when `project` is given. Each card opens its details.
  */
 export function SectionCards({
-	runs,
+	summary,
 	isLoading,
 	project,
-	projects,
 }: {
-	runs: RunSummary[] | undefined;
+	/** Undefined while it loads. */
+	summary: DashboardSummary | undefined;
 	isLoading: boolean;
 	project?: Project;
-	/** To name the project of each run in the details. */
-	projects?: Project[];
 }) {
 	const projectId = project?.id;
 	const gates = useOpenGates();
@@ -86,20 +75,17 @@ export function SectionCards({
 		open: details === of,
 		onOpenChange: (open: boolean) => setDetails(open ? of : null),
 	});
-	const now = useNow(60_000);
-	const all = runs ?? [];
-	const running = all.filter((run) => run.status === "running").length;
-	const sleeping = all.filter((run) => run.status === "sleeping");
+	const cards = summary?.cards;
+	const loading = isLoading;
+	const running = cards?.running ?? 0;
+	const sleeping = cards?.sleeping ?? 0;
 	// The one that wakes first.
-	const nextWake = sleeping
-		.flatMap((run) => (run.wakeAt ? [run.wakeAt] : []))
-		.sort((a, b) => a - b)[0];
-	const lastDay = all.filter((run) => run.createdAt >= now - DAY_MS);
-	// A "+" when a run in it has a step without a known cost.
-	const spent = sumKnownCost(lastDay);
-	const spentAll = sumKnownCost(all);
-	const finished = lastDay.filter((run) => run.status === "finished").length;
-	const failed = lastDay.filter((run) => run.status === "failed").length;
+	const nextWake = cards?.nextWakeAt ?? null;
+	const lastDay = cards?.lastDay;
+	const lastDayRuns = lastDay?.runs ?? 0;
+	const finished = lastDay?.finished ?? 0;
+	const failed = lastDay?.failed ?? 0;
+	const hours = cards?.hours ?? [];
 	const openGates =
 		gates.data?.filter(
 			(gate) => projectId === undefined || gate.projectId === projectId,
@@ -112,16 +98,16 @@ export function SectionCards({
 				<StatCard
 					label="Running now"
 					onOpen={() => setDetails("activity")}
-					value={isLoading ? null : running}
-					chart={isLoading ? null : <ActiveSparkline runs={all} now={now} />}
+					value={loading ? null : running}
+					chart={loading ? null : <ActiveSparkline hours={hours} />}
 					badge={
-						sleeping.length > 0 ? (
+						sleeping > 0 ? (
 							<Badge
 								variant="outline"
 								className="border-status-sleeping/40 bg-status-sleeping/10 text-status-sleeping"
 							>
 								<MoonIcon aria-hidden="true" />
-								{sleeping.length} sleeping
+								{sleeping} sleeping
 							</Badge>
 						) : running > 0 ? (
 							<Badge
@@ -163,7 +149,7 @@ export function SectionCards({
 					label="Waiting for you"
 					onOpen={() => setDetails("gates")}
 					value={gates.isLoading ? null : gates.error ? "—" : waiting}
-					chart={isLoading ? null : <GatesSparkline runs={all} now={now} />}
+					chart={loading ? null : <GatesSparkline hours={hours} />}
 					className={
 						waiting > 0
 							? "ring-status-waiting/50 dark:ring-status-waiting/40"
@@ -199,33 +185,37 @@ export function SectionCards({
 				<StatCard
 					label="Spent, last 24 h"
 					onOpen={() => setDetails("spend")}
-					value={isLoading ? null : formatKnownCost(spent)}
-					chart={isLoading ? null : <SpendSparkline runs={all} now={now} />}
+					value={
+						loading ? null : formatKnownCost(lastDay?.cost ?? { costUsd: 0 })
+					}
+					chart={loading ? null : <SpendSparkline hours={hours} />}
 					badge={
 						<Badge variant="outline" className="tabular-nums">
-							{lastDay.length} {lastDay.length === 1 ? "run" : "runs"}
+							{lastDayRuns} {lastDayRuns === 1 ? "run" : "runs"}
 						</Badge>
 					}
 					headline={projectId ? "In this project" : "Over all projects"}
 					footer={
 						<>
 							All time{" "}
-							<span className="tabular-nums">{formatKnownCost(spentAll)}</span>
+							<span className="tabular-nums">
+								{cards ? formatKnownCost(cards.allTime) : "—"}
+							</span>
 						</>
 					}
 				/>
 				<StatCard
 					label="Runs, last 24 h"
 					onOpen={() => setDetails("runs")}
-					value={isLoading ? null : lastDay.length}
-					chart={isLoading ? null : <OutcomesSparkline runs={all} now={now} />}
+					value={loading ? null : lastDayRuns}
+					chart={loading ? null : <OutcomesSparkline hours={hours} />}
 					badge={
 						failed > 0 ? (
 							<Badge variant="destructive" className="tabular-nums">
 								<CircleXIcon aria-hidden="true" />
 								{failed} failed
 							</Badge>
-						) : lastDay.length > 0 ? (
+						) : lastDayRuns > 0 ? (
 							<Badge
 								variant="outline"
 								className="border-status-finished/40 bg-status-finished/10 text-status-finished"
@@ -240,97 +230,87 @@ export function SectionCards({
 						</span>
 					}
 					footer={
-						lastDay.length - finished - failed > 0
-							? `${lastDay.length - finished - failed} stopped, running or waiting`
+						lastDayRuns - finished - failed > 0
+							? `${lastDayRuns - finished - failed} stopped, running or waiting`
 							: "Started in the last day"
 					}
 				/>
 			</div>
-			<ActivityDialog
-				{...detailsProps("activity")}
-				runs={all}
-				project={project}
-				projects={projects}
-			/>
-			<GatesDialog
-				{...detailsProps("gates")}
-				gates={openGates}
-				runs={all}
-				project={project}
-				projects={projects}
-			/>
-			<SpendDialog
-				{...detailsProps("spend")}
-				runs={all}
-				project={project}
-				projects={projects}
-			/>
-			<RunsDialog
-				{...detailsProps("runs")}
-				runs={all}
-				project={project}
-				projects={projects}
-			/>
+			{summary ? (
+				<>
+					<ActivityDialog
+						{...detailsProps("activity")}
+						summary={summary}
+						project={project}
+					/>
+					<GatesDialog
+						{...detailsProps("gates")}
+						gates={openGates}
+						summary={summary}
+						project={project}
+					/>
+					<SpendDialog
+						{...detailsProps("spend")}
+						summary={summary}
+						project={project}
+					/>
+					<RunsDialog
+						{...detailsProps("runs")}
+						summary={summary}
+						project={project}
+					/>
+				</>
+			) : null}
 		</>
 	);
 }
 
+type CardHours = DashboardSummary["cards"]["hours"];
+
 /** Spend per hour over the last 24 hours, by when the run started. */
-function SpendSparkline({ runs, now }: { runs: RunSummary[]; now: number }) {
-	const data = startedPerHour(runs, now).map((ofHour) => ({
-		cost: ofHour.reduce((sum, run) => sum + run.costUsd, 0),
-	}));
-	return <Sparkline data={data} config={SPEND_CONFIG} />;
+function SpendSparkline({ hours }: { hours: CardHours }) {
+	return (
+		<Sparkline
+			data={hours.map(({ costUsd }) => ({ cost: costUsd }))}
+			config={SPEND_CONFIG}
+		/>
+	);
 }
 
 /** How many runs were at work in each of the last 24 hours. */
-function ActiveSparkline({ runs, now }: { runs: RunSummary[]; now: number }) {
+function ActiveSparkline({ hours }: { hours: CardHours }) {
 	return (
 		<Sparkline
-			data={activePerHour(runs, SPARK_HOURS, now).map(({ active }) => ({
-				active,
-			}))}
+			data={hours.map(({ active }) => ({ active }))}
 			config={ACTIVE_CONFIG}
 		/>
 	);
 }
 
 /** How many Gates waited for you in each of the last 24 hours. */
-function GatesSparkline({ runs, now }: { runs: RunSummary[]; now: number }) {
+function GatesSparkline({ hours }: { hours: CardHours }) {
 	return (
 		<Sparkline
-			data={gatesPerHour(runs, SPARK_HOURS, now).map(({ gates }) => ({
-				gates,
-			}))}
+			data={hours.map(({ gates }) => ({ gates }))}
 			config={GATES_CONFIG}
 		/>
 	);
 }
 
-/** Runs per hour over the last 24 hours, by how they ended. */
-function OutcomesSparkline({ runs, now }: { runs: RunSummary[]; now: number }) {
-	const data = startedPerHour(runs, now).map((ofHour) => {
-		const finished = ofHour.filter((run) => run.status === "finished").length;
-		const failed = ofHour.filter((run) => run.status === "failed").length;
-		return { finished, failed, other: ofHour.length - finished - failed };
-	});
-	return <Sparkline data={data} config={OUTCOMES_CONFIG} />;
-}
-
 /**
- * The runs started in the last day, by the hour they started, so the bars
- * add up to the card's number. The day reaches back into the hour before
- * the first bar; those runs count in the first hour.
+ * Runs per hour over the last 24 hours, by how they ended. The bars add up
+ * to the card's number.
  */
-function startedPerHour(runs: RunSummary[], now: number): RunSummary[][] {
-	const hours = lastHours(SPARK_HOURS, now);
-	const first = hours[0] ?? now;
-	const lastDay = runs.filter((run) => run.createdAt >= now - DAY_MS);
-	return hours.map((hour) =>
-		lastDay.filter((run) => {
-			const started = Math.max(run.createdAt, first);
-			return started >= hour && started < hour + HOUR_MS;
-		}),
+function OutcomesSparkline({ hours }: { hours: CardHours }) {
+	return (
+		<Sparkline
+			data={hours.map(({ finished, failed, other }) => ({
+				finished,
+				failed,
+				other,
+			}))}
+			config={OUTCOMES_CONFIG}
+		/>
 	);
 }
 

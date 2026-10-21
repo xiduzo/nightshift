@@ -25,15 +25,10 @@ import {
 	ZapIcon,
 } from "lucide-react";
 import { CostText, RunStatusBadge } from "@/features/runs";
-import type { RunSummary } from "@/shared/api";
-import {
-	formatDateTime,
-	formatKnownCost,
-	formatTime,
-	sumKnownCost,
-} from "@/shared/format";
+import type { DashboardSummary } from "@/shared/api";
+import { formatDateTime, formatKnownCost, formatTime } from "@/shared/format";
 import { PageSection } from "@/shared/page";
-import { formatNight, nightOf } from "./nights";
+import { formatNight } from "./nights";
 import { OVERVIEW_ROWS } from "./overview";
 
 /**
@@ -43,28 +38,21 @@ import { OVERVIEW_ROWS } from "./overview";
  */
 export function NightOutput({
 	projectId,
-	runs,
+	lastNight,
 	isLoading,
 	onQuickRun,
 	className,
 }: {
 	projectId: string;
-	runs: RunSummary[] | undefined;
+	/** Null without runs; undefined while it loads. */
+	lastNight: DashboardSummary["lastNight"] | undefined;
 	isLoading: boolean;
 	onQuickRun: () => void;
 	className?: string;
 }) {
-	const newest = runs?.reduce<number | null>(
-		(latest, run) =>
-			latest === null || run.createdAt > latest ? run.createdAt : latest,
-		null,
-	);
-	const night = newest == null ? null : nightOf(newest);
-	const ofNight = (runs ?? [])
-		.filter((run) => night !== null && nightOf(run.createdAt) === night)
-		.sort((a, b) => b.createdAt - a.createdAt);
-	const shown = ofNight.slice(0, OVERVIEW_ROWS);
-	const cost = sumKnownCost(ofNight);
+	const night = lastNight?.night ?? null;
+	const count = lastNight?.runs ?? 0;
+	const shown = lastNight?.latest ?? [];
 
 	return (
 		<PageSection
@@ -72,7 +60,7 @@ export function NightOutput({
 			description={
 				night === null
 					? "Runs and their branches, to review in the morning."
-					: `Night of ${formatNight(night)}, ${ofNight.length} ${ofNight.length === 1 ? "run" : "runs"}, ${formatKnownCost(cost)}`
+					: `Night of ${formatNight(night)}, ${count} ${count === 1 ? "run" : "runs"}, ${formatKnownCost(lastNight?.cost ?? { costUsd: 0 })}`
 			}
 			className={className}
 			actions={
@@ -96,7 +84,7 @@ export function NightOutput({
 							<Skeleton className="h-12 w-full" />
 							<Skeleton className="h-12 w-full" />
 						</div>
-					) : ofNight.length === 0 ? (
+					) : count === 0 ? (
 						<Empty>
 							<EmptyHeader>
 								<EmptyMedia variant="icon">
