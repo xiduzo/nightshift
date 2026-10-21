@@ -1,6 +1,6 @@
 /**
  * How the daemon refuses a call that needs a person first: nobody is
- * signed in, or two-factor sign-in must be on. The query client reads
+ * signed in, or two-factor sign-in must be on. The access feature reads
  * these to send the person to the right page.
  */
 

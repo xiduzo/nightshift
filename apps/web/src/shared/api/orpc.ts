@@ -5,26 +5,17 @@ import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { isSignInRequired, isTwoFactorRequired } from "./refusals";
 import { SERVER_URL } from "./server-url";
 
-export function createQueryClient() {
-	/**
-	 * The Host refused the session: nobody is signed in (or the session
-	 * ended), or two-factor must be on first. Read the account again, and
-	 * the root sends the person to sign in or to the setup page. No toast.
-	 * On this computer nobody signs in, so a refusal there still shows.
-	 */
-	const toAccess = (error: unknown) => {
-		if (isSignInRequired(error)) {
-			const status = client.getQueryData(orpc.account.status.queryKey());
-			if (status?.thisComputer) return false;
-		} else if (!isTwoFactorRequired(error)) {
-			return false;
-		}
-		void client.invalidateQueries({ queryKey: orpc.account.status.key() });
-		return true;
-	};
+/**
+ * What the app does with an error of a query or a mutation before the
+ * toast: true when it is handled, so no toast shows. The access feature
+ * gives it (`sendToAccess`), because `shared/api` imports no feature.
+ */
+export type ErrorHandler = (client: QueryClient, error: unknown) => boolean;
+
+export function createQueryClient(handle: ErrorHandler) {
+	const toAccess = (error: unknown) => handle(client, error);
 	const client = new QueryClient({
 		mutationCache: new MutationCache({
 			onError: (error) => {

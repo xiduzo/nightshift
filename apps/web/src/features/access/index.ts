@@ -4,5 +4,7 @@ export { isOutsideApp, safeRedirect } from "./access";
 export { AccountForm } from "./account-form";
 export { AccountPage } from "./account-page";
 export { LoginPage } from "./login-page";
+export { sendToAccess } from "./refusal";
+export { SignedInPage } from "./signed-in-page";
 export { TwoFactorPage } from "./two-factor-page";
 export { useAccessGuard } from "./use-access-guard";
