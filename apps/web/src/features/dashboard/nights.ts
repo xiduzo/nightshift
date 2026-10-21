@@ -1,25 +1,8 @@
 /**
  * Nights, not days: runs start late and go past midnight, so a night runs
- * from noon to noon. A run at 23:00 and one at 01:00 belong to the same night.
+ * from noon to noon. Night Shift counts per night on your clock
+ * (`dashboard.summary`). These name a night by the noon it starts.
  */
-
-/** The noon that starts the night `epochMs` falls in. */
-export function nightOf(epochMs: number): number {
-	const date = new Date(epochMs);
-	if (date.getHours() < 12) date.setDate(date.getDate() - 1);
-	date.setHours(12, 0, 0, 0);
-	return date.getTime();
-}
-
-/** The starts of the last `count` nights, oldest first, ending with tonight. */
-export function lastNights(count: number, now = Date.now()): number[] {
-	const tonight = nightOf(now);
-	return Array.from({ length: count }, (_, index) => {
-		const date = new Date(tonight);
-		date.setDate(date.getDate() - (count - 1 - index));
-		return date.getTime();
-	});
-}
 
 /** "Wed 15 Oct": the evening a night starts. */
 export function formatNight(nightStart: number): string {
@@ -38,11 +21,14 @@ export function formatNightShort(nightStart: number): string {
 	});
 }
 
-/** Whether `epochMs` falls in the last `count` nights, tonight included. */
-export function inLastNights(
-	epochMs: number,
-	count: number,
-	now = Date.now(),
-): boolean {
-	return nightOf(epochMs) >= (lastNights(count, now)[0] ?? 0);
+/** The rows of a chart per night: a label and a title per night, and its counts. */
+export function nightChartRows(
+	perNight: readonly { night: number; counts: Record<string, number> }[],
+): Record<string, number | string>[] {
+	return perNight.map(({ night, counts }) => ({
+		...counts,
+		night,
+		label: formatNightShort(night),
+		title: formatNight(night),
+	}));
 }

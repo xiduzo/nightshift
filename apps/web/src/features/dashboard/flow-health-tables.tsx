@@ -3,7 +3,7 @@ import { Button } from "@nightshift/ui/components/button";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { TriangleAlertIcon } from "lucide-react";
 import { RunStatusBadge } from "@/features/runs";
-import type { RunStatus } from "@/shared/api";
+import type { FlowRange, FlowRun } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	formatCost,
@@ -12,63 +12,37 @@ import {
 	formatRelative,
 } from "@/shared/format";
 import { ChartSection, MoreRows } from "./details";
-import type { FlowRun } from "./flow-runs";
-import { OVERVIEW_ROWS } from "./overview";
 import { RUN_STATUS_CHART } from "./runs-donut";
 
-type WarningRow = {
-	key: string;
-	nodeId: string | null;
-	message: string;
-	/** The runs that warned this, each counted once. */
-	runs: number;
-	last: { runId: string; at: number };
-};
+type WarningRow = FlowRange["warningRows"]["rows"][number];
 
 /**
  * The warnings of the runs, grouped by node and message, the most common
  * first: a warning many runs share is a systematic problem, not bad luck.
  */
 export function Warnings({
-	runs,
+	warnings,
 	now,
 	onNavigate,
 }: {
-	runs: FlowRun[];
+	warnings: FlowRange["warningRows"];
 	now: number;
 	onNavigate: () => void;
 }) {
-	const byKey = new Map<string, WarningRow & { runIds: Set<string> }>();
-	for (const run of runs) {
-		for (const warning of run.warnings) {
-			const key = `${warning.nodeId ?? ""}\u0000${warning.message}`;
-			const row = byKey.get(key) ?? {
-				key,
-				nodeId: warning.nodeId,
-				message: warning.message,
-				runs: 0,
-				runIds: new Set<string>(),
-				last: { runId: run.runId, at: warning.at },
-			};
-			row.runIds.add(run.runId);
-			row.runs = row.runIds.size;
-			if (warning.at >= row.last.at)
-				row.last = { runId: run.runId, at: warning.at };
-			byKey.set(key, row);
-		}
-	}
-	const rows = [...byKey.values()].sort((a, b) => b.runs - a.runs);
 	return (
 		<ChartSection
 			title="Warnings"
-			hint={`The top ${Math.min(rows.length, OVERVIEW_ROWS)}, the most common first`}
+			hint={`The top ${warnings.rows.length}, the most common first`}
 		>
 			<DataTable
 				columns={warningColumns(now, onNavigate)}
-				data={rows.slice(0, OVERVIEW_ROWS)}
+				data={warnings.rows}
 				getRowId={(row) => row.key}
 			/>
-			<MoreRows hidden={rows.length - OVERVIEW_ROWS} where="warnings" />
+			<MoreRows
+				hidden={warnings.count - warnings.rows.length}
+				where="warnings"
+			/>
 		</ChartSection>
 	);
 }
@@ -138,43 +112,37 @@ function warningColumns(now: number, onNavigate: () => void) {
 	]);
 }
 
-type ReasonRow = {
-	reason: string;
-	status: RunStatus;
-	runs: number;
-	last: FlowRun;
-};
+type ReasonRow = FlowRange["whyUnfinished"]["rows"][number];
+
+/** Why a run did not finish: its own reason, else its status (and its caller). */
+function reasonOf(row: ReasonRow): string {
+	return (
+		row.reason ??
+		(row.calledBy !== null
+			? `${RUN_STATUS_CHART[row.status].label} inside ${row.calledBy}`
+			: RUN_STATUS_CHART[row.status].label)
+	);
+}
 
 /** The runs that did not finish, grouped by why, the most common first. */
-export function WhyUnfinished({ runs, now }: { runs: FlowRun[]; now: number }) {
-	const byReason = new Map<string, ReasonRow>();
-	for (const run of runs) {
-		const reason =
-			run.reason ??
-			(run.calledBy !== null
-				? `${RUN_STATUS_CHART[run.status].label} inside ${run.calledBy}`
-				: RUN_STATUS_CHART[run.status].label);
-		const row = byReason.get(reason);
-		byReason.set(reason, {
-			reason,
-			status: run.status,
-			runs: (row?.runs ?? 0) + 1,
-			// Runs come oldest first: the latest one wins.
-			last: run,
-		});
-	}
-	const rows = [...byReason.values()].sort((a, b) => b.runs - a.runs);
+export function WhyUnfinished({
+	reasons,
+	now,
+}: {
+	reasons: FlowRange["whyUnfinished"];
+	now: number;
+}) {
 	return (
 		<ChartSection
 			title="Why runs did not finish"
-			hint={`The top ${Math.min(rows.length, OVERVIEW_ROWS)}, the most common first`}
+			hint={`The top ${reasons.rows.length}, the most common first`}
 		>
 			<DataTable
 				columns={reasonColumns(now)}
-				data={rows.slice(0, OVERVIEW_ROWS)}
-				getRowId={(row) => row.reason}
+				data={reasons.rows}
+				getRowId={reasonOf}
 			/>
-			<MoreRows hidden={rows.length - OVERVIEW_ROWS} where="reasons" />
+			<MoreRows hidden={reasons.count - reasons.rows.length} where="reasons" />
 		</ChartSection>
 	);
 }
@@ -183,12 +151,15 @@ const reasonColumn = dataTableColumns<ReasonRow>();
 
 function reasonColumns(now: number) {
 	return reasonColumn.columns([
-		reasonColumn.accessor("reason", {
+		reasonColumn.accessor(reasonOf, {
+			id: "reason",
 			header: "Reason",
 			cell: ({ row: { original } }) => (
 				<span className="flex min-w-0 items-center gap-2">
 					<RunStatusBadge status={original.status} />
-					<span className="whitespace-normal text-xs">{original.reason}</span>
+					<span className="whitespace-normal text-xs">
+						{reasonOf(original)}
+					</span>
 				</span>
 			),
 		}),
@@ -200,17 +171,17 @@ function reasonColumns(now: number) {
 				cellClassName: "text-right tabular-nums",
 			},
 		}),
-		reasonColumn.accessor((row) => row.last.startedAt, {
+		reasonColumn.accessor("lastAt", {
 			id: "last",
 			header: "Last",
 			enableSorting: true,
 			cell: ({ row: { original } }) => (
 				<time
-					dateTime={new Date(original.last.startedAt).toISOString()}
-					title={formatDateTime(original.last.startedAt)}
+					dateTime={new Date(original.lastAt).toISOString()}
+					title={formatDateTime(original.lastAt)}
 					className="text-muted-foreground text-xs"
 				>
-					{formatRelative(original.last.startedAt, now)}
+					{formatRelative(original.lastAt, now)}
 				</time>
 			),
 			meta: { headClassName: "w-28" },
@@ -234,7 +205,7 @@ export function LatestRuns({
 	return (
 		<ChartSection
 			title="Latest runs"
-			hint={`The last ${Math.min(runs.length, OVERVIEW_ROWS)}, newest first`}
+			hint={`The last ${runs.length}, newest first`}
 		>
 			<DataTable
 				columns={latestColumns(now, onNavigate)}

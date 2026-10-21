@@ -1,15 +1,16 @@
 import { Button } from "@nightshift/ui/components/button";
 import { DialogFooter } from "@nightshift/ui/components/dialog";
+import { Skeleton } from "@nightshift/ui/components/skeleton";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
-import type { Project, RunSummary } from "@/shared/api";
+import type { Project } from "@/shared/api";
 import {
 	formatCost,
 	formatDateTime,
 	formatDuration,
 	formatKnownCost,
-	sumKnownCost,
 	useNow,
 } from "@/shared/format";
 import {
@@ -24,15 +25,7 @@ import {
 } from "./details";
 import { CostPerRun, RunsPerNight } from "./flow-health-charts";
 import { LatestRuns, Warnings, WhyUnfinished } from "./flow-health-tables";
-import {
-	type FlowRun,
-	finishedCostOf,
-	hasEnded,
-	runsOf,
-	spreadOf,
-} from "./flow-runs";
-import { inLastNights } from "./nights";
-import { OVERVIEW_ROWS } from "./overview";
+import { dashboardQueries } from "./queries";
 
 type Tab = "overview" | "cost" | "problems" | "runs";
 
@@ -47,20 +40,17 @@ export function FlowHealthDialog({
 	onOpenChange,
 	flowName,
 	project,
-	runs,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	flowName: string;
 	project: Project;
-	runs: RunSummary[];
 }) {
 	return (
 		<DetailsDialog open={open} onOpenChange={onOpenChange}>
 			<FlowHealthDetails
 				flowName={flowName}
 				project={project}
-				runs={runs}
 				onNavigate={() => onOpenChange(false)}
 			/>
 		</DetailsDialog>
@@ -70,41 +60,19 @@ export function FlowHealthDialog({
 function FlowHealthDetails({
 	flowName,
 	project,
-	runs,
 	onNavigate,
 }: {
 	flowName: string;
 	project: Project;
-	runs: RunSummary[];
 	onNavigate: () => void;
 }) {
 	const now = useNow(60_000);
 	const [range, setRange] = useState<NightRange>(30);
 	const [tab, setTab] = useState<Tab>("overview");
-	const inRange = runsOf(flowName, runs)
-		.filter((run) => inLastNights(run.startedAt, range, now))
-		.sort((a, b) => a.startedAt - b.startedAt);
-	const asSubflow = inRange.filter((run) => run.calledBy !== null).length;
-	const ended = inRange.filter(hasEnded);
-	const finished = ended.filter((run) => run.status === "finished");
-	const unfinished = ended.filter((run) => run.status !== "finished");
-	const { cost } = finishedCostOf(finished);
-	const warnings = inRange.reduce(
-		(total, run) => total + run.warnings.length,
-		0,
-	);
-	const length = spreadOf(
-		finished.flatMap((run) =>
-			run.endedAt === null ? [] : [run.endedAt - run.startedAt],
-		),
-	);
-	const spent = sumKnownCost(inRange);
-	const spentUnfinished = sumKnownCost(unfinished);
-
-	const dearest = ended.reduce<FlowRun | undefined>(
-		(top, run) => (top === undefined || run.costUsd > top.costUsd ? run : top),
-		undefined,
-	);
+	const detail = useQuery(dashboardQueries.flow(project.id, flowName));
+	const inRange = detail.data?.ranges.find((r) => r.nights === range);
+	const unfinished = inRange?.unfinished ?? 0;
+	const warnings = inRange?.warnings ?? 0;
 
 	return (
 		<>
@@ -117,7 +85,7 @@ function FlowHealthDetails({
 					{
 						value: "problems",
 						label: "Problems",
-						count: unfinished.length + warnings,
+						count: unfinished + warnings,
 					},
 					{ value: "runs", label: "Runs" },
 				]}
@@ -125,7 +93,16 @@ function FlowHealthDetails({
 				onValueChange={setTab}
 				toggle={<NightRangeToggle value={range} onValueChange={setRange} />}
 			>
-				{inRange.length === 0 ? (
+				{detail.error && !inRange ? (
+					<DetailsEmpty>
+						This flow could not load. Close it and open it again.
+					</DetailsEmpty>
+				) : !inRange ? (
+					<div className="flex flex-col gap-3 pt-2">
+						<Skeleton className="h-20 w-full" />
+						<Skeleton className="h-48 w-full" />
+					</div>
+				) : inRange.runs === 0 ? (
 					<DetailsEmpty>
 						This flow did not run in the last {range} nights.
 					</DetailsEmpty>
@@ -135,83 +112,104 @@ function FlowHealthDetails({
 							<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 								<Stat
 									label="Runs"
-									value={String(inRange.length)}
+									value={String(inRange.runs)}
 									hint={
-										asSubflow > 0
-											? `${asSubflow} as a subflow`
+										inRange.asSubflow > 0
+											? `${inRange.asSubflow} as a subflow`
 											: "All on its own"
 									}
 								/>
 								<Stat
 									label="Finished"
 									value={
-										ended.length > 0
-											? `${Math.round((finished.length / ended.length) * 100)}%`
+										inRange.ended > 0
+											? `${Math.round((inRange.finished / inRange.ended) * 100)}%`
 											: "—"
 									}
-									hint={`${finished.length} of ${ended.length} ended runs`}
+									hint={`${inRange.finished} of ${inRange.ended} ended runs`}
 								/>
 								<Stat
 									label="Per finished run"
-									value={cost ? formatCost(cost.median) : "—"}
+									value={inRange.cost ? formatCost(inRange.cost.median) : "—"}
 									hint={
-										cost && cost.count > 1
-											? `Half cost ${formatCost(cost.q1)} to ${formatCost(cost.q3)}`
+										inRange.cost && inRange.cost.count > 1
+											? `Half cost ${formatCost(inRange.cost.q1)} to ${formatCost(inRange.cost.q3)}`
 											: undefined
 									}
 								/>
 								<Stat
 									label="Typical length"
-									value={length ? formatDuration(length.median) : "—"}
+									value={
+										inRange.length ? formatDuration(inRange.length.median) : "—"
+									}
 									hint={
-										length && length.count > 1
-											? `Half take ${formatDuration(length.q1)} to ${formatDuration(length.q3)}`
+										inRange.length && inRange.length.count > 1
+											? `Half take ${formatDuration(inRange.length.q1)} to ${formatDuration(inRange.length.q3)}`
 											: undefined
 									}
 								/>
 							</div>
-							<RunsPerNight runs={inRange} range={range} now={now} />
+							<RunsPerNight
+								perNight={inRange.perNight}
+								statuses={inRange.statuses}
+							/>
 						</DetailsTabContent>
 
 						<DetailsTabContent value="cost">
 							<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-								<Stat label="Spent in all" value={formatKnownCost(spent)} />
+								<Stat
+									label="Spent in all"
+									value={formatKnownCost(inRange.spent)}
+								/>
 								<Stat
 									label="Not finished"
-									value={formatKnownCost(spentUnfinished)}
+									value={formatKnownCost(inRange.spentUnfinished)}
 									hint={
-										unfinished.length === 1
+										unfinished === 1
 											? "Spent by 1 run"
-											: `Spent by ${unfinished.length} runs`
+											: `Spent by ${unfinished} runs`
 									}
 								/>
 								<Stat
 									label="Dearest run"
-									value={dearest ? formatCost(dearest.costUsd) : "—"}
-									hint={dearest ? formatDateTime(dearest.startedAt) : undefined}
+									value={
+										inRange.dearest ? formatCost(inRange.dearest.costUsd) : "—"
+									}
+									hint={
+										inRange.dearest
+											? formatDateTime(inRange.dearest.startedAt)
+											: undefined
+									}
 								/>
 							</div>
-							<CostPerRun runs={ended} median={cost?.median} />
+							<CostPerRun
+								runs={inRange.endedRuns}
+								median={inRange.cost?.median}
+							/>
 						</DetailsTabContent>
 
 						<DetailsTabContent value="problems">
-							{unfinished.length + warnings === 0 ? (
+							{unfinished + warnings === 0 ? (
 								<DetailsEmpty>
 									Every run in the last {range} nights finished, without
 									warnings.
 								</DetailsEmpty>
 							) : null}
-							{unfinished.length > 0 ? (
-								<WhyUnfinished runs={unfinished} now={now} />
+							{unfinished > 0 ? (
+								<WhyUnfinished reasons={inRange.whyUnfinished} now={now} />
 							) : null}
 							{warnings > 0 ? (
-								<Warnings runs={inRange} now={now} onNavigate={onNavigate} />
+								<Warnings
+									warnings={inRange.warningRows}
+									now={now}
+									onNavigate={onNavigate}
+								/>
 							) : null}
 						</DetailsTabContent>
 
 						<DetailsTabContent value="runs">
 							<LatestRuns
-								runs={inRange.slice(-OVERVIEW_ROWS).reverse()}
+								runs={inRange.latest}
 								now={now}
 								onNavigate={onNavigate}
 							/>

@@ -13,39 +13,23 @@ import {
 	XAxis,
 	YAxis,
 } from "recharts";
-import type { RunStatus } from "@/shared/api";
+import type { FlowRange, RunStatus } from "@/shared/api";
 import { formatCost, formatDateTime } from "@/shared/format";
-import { ChartSection, DetailsEmpty, type NightRange, Swatch } from "./details";
-import type { FlowRun } from "./flow-runs";
-import { formatNight, formatNightShort, lastNights, nightOf } from "./nights";
+import { ChartSection, DetailsEmpty, Swatch } from "./details";
+import { formatNightShort, nightChartRows } from "./nights";
 import { RUN_STATUS_CHART } from "./runs-donut";
 
 /** Runs per night, stacked by status, like the Runs details. */
 export function RunsPerNight({
-	runs,
-	range,
-	now,
+	perNight,
+	statuses: counts,
 }: {
-	runs: FlowRun[];
-	range: NightRange;
-	now: number;
+	perNight: FlowRange["perNight"];
+	/** The statuses that occur, in the chart's order. */
+	statuses: FlowRange["statuses"];
 }) {
-	const statuses = (Object.keys(RUN_STATUS_CHART) as RunStatus[]).filter(
-		(status) => runs.some((run) => run.status === status),
-	);
-	const rows = lastNights(range, now).map((night) => {
-		const row: Record<string, number | string> = {
-			label: formatNightShort(night),
-			title: formatNight(night),
-		};
-		for (const status of statuses) row[status] = 0;
-		for (const run of runs) {
-			if (nightOf(run.startedAt) === night) {
-				row[run.status] = (row[run.status] as number) + 1;
-			}
-		}
-		return row;
-	});
+	const statuses = counts.map(({ status }) => status);
+	const rows = nightChartRows(perNight);
 	const config = Object.fromEntries(
 		statuses.map((status) => [status, RUN_STATUS_CHART[status]]),
 	);
@@ -116,12 +100,12 @@ export function CostPerRun({
 	runs,
 	median,
 }: {
-	runs: FlowRun[];
+	runs: FlowRange["endedRuns"];
 	median: number | undefined;
 }) {
 	const rows = runs.map((run, index) => ({
 		key: `${run.runId}-${index}`,
-		label: formatNightShort(nightOf(run.startedAt)),
+		label: formatNightShort(run.night),
 		title: formatDateTime(run.startedAt),
 		costUsd: run.costUsd,
 		status: run.status,

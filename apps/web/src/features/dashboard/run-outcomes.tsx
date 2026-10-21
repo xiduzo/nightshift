@@ -10,23 +10,28 @@ import {
 } from "@nightshift/ui/components/toggle-group";
 import { type CSSProperties, useState } from "react";
 import { Label, Pie, PieChart } from "recharts";
-import type { RunSummary } from "@/shared/api";
-import { useNow } from "@/shared/format";
+import type { DashboardSummary } from "@/shared/api";
 import { PageSection } from "@/shared/page";
-import { inLastNights } from "./nights";
-import { countRunStatuses, RUN_STATUS_CHART } from "./runs-donut";
+import { nightsOf } from "./ranges";
+import { RUN_STATUS_CHART } from "./runs-donut";
 
 const RANGES = [7, 30] as const;
 type Range = (typeof RANGES)[number];
 
 /** How runs ended, as a donut with the total inside, after the shadcn `chart-pie-donut-text` block. */
-export function RunOutcomes({ runs }: { runs: RunSummary[] | undefined }) {
-	const now = useNow(60_000);
+export function RunOutcomes({
+	summary,
+}: {
+	summary: DashboardSummary | undefined;
+}) {
 	const [range, setRange] = useState<Range>(7);
-	const inRange = (runs ?? []).filter((run) =>
-		inLastNights(run.createdAt, range, now),
-	);
-	const counts = countRunStatuses(inRange);
+	const runs = summary ? nightsOf(summary, range).runs : undefined;
+	const total = runs?.runs ?? 0;
+	const counts = (runs?.statuses ?? []).map(({ status, count }) => ({
+		status,
+		count,
+		fill: `var(--color-${status})`,
+	}));
 
 	return (
 		<PageSection
@@ -59,7 +64,7 @@ export function RunOutcomes({ runs }: { runs: RunSummary[] | undefined }) {
 		>
 			<Card size="sm">
 				<CardContent>
-					{inRange.length === 0 ? (
+					{total === 0 ? (
 						<p className="rounded-md border border-dashed px-4 py-6 text-center text-muted-foreground text-sm">
 							No runs in the last {range} nights.
 						</p>
@@ -100,14 +105,14 @@ export function RunOutcomes({ runs }: { runs: RunSummary[] | undefined }) {
 															y={viewBox.cy}
 															className="fill-foreground font-semibold text-2xl tabular-nums"
 														>
-															{inRange.length}
+															{total}
 														</tspan>
 														<tspan
 															x={viewBox.cx}
 															y={(viewBox.cy ?? 0) + 18}
 															className="fill-muted-foreground text-xs"
 														>
-															{inRange.length === 1 ? "run" : "runs"}
+															{total === 1 ? "run" : "runs"}
 														</tspan>
 													</text>
 												) : null
@@ -134,7 +139,7 @@ export function RunOutcomes({ runs }: { runs: RunSummary[] | undefined }) {
 											{count}
 										</span>
 										<span className="w-9 text-right text-muted-foreground text-xs tabular-nums">
-											{Math.round((count / inRange.length) * 100)}%
+											{Math.round((count / total) * 100)}%
 										</span>
 									</li>
 								))}
