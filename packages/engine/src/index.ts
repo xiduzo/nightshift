@@ -23,6 +23,17 @@ export type {
 	SpaceEngine,
 	StartRunInput,
 } from "./contract";
+export {
+	type DashboardOptions,
+	type DashboardScope,
+	type DashboardSummary,
+	type FlowHealthDetail,
+	HOUR_RANGES,
+	isTimeZone,
+	NIGHT_RANGES,
+	summarizeDashboard,
+	summarizeFlow,
+} from "./dashboard";
 export type {
 	Capabilities,
 	CapabilityQuery,
