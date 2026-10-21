@@ -25,6 +25,16 @@ export {
 	openDeviceDocument,
 	refreshDeviceFacts,
 } from "./device-document";
+export {
+	addHarness,
+	customAgentOf,
+	removeCliTool,
+	removeConnection,
+	removeHarness,
+	saveConnection,
+	saveCustomAgent,
+	saveProfile,
+} from "./edits";
 export type { KeyStoreKind } from "./keychain";
 export { valueStore } from "./keychain";
 export type { McpExpansion } from "./mcp";

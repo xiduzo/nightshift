@@ -1,6 +1,9 @@
 import {
 	connectionInputSchema,
+	customAgentOf,
 	HARNESS_BIN,
+	removeConnection,
+	saveConnection,
 	secretNameSchema,
 } from "@nightshift/engine";
 import {
@@ -12,7 +15,6 @@ import { z } from "zod";
 
 import { output } from "../output";
 import { ownerProcedure } from "../procedures";
-import { customAgentOf } from "./harnesses";
 import {
 	cliCheckSchema,
 	connectionListSchema,
@@ -76,31 +78,9 @@ export const connections = {
 				previousName: z.string().optional(),
 			}),
 		)
-		.handler(async ({ context, input }) => {
+		.handler(({ context, input }) => {
 			const { previousName, ...connection } = input;
-			if (
-				previousName !== connection.name &&
-				context.connections.get(connection.name)
-			) {
-				throw new Error(
-					`A connection named "${connection.name}" already exists. Pick another name.`,
-				);
-			}
-			const saved = await context.connections.save(connection);
-			if (previousName && previousName !== connection.name) {
-				await context.connections.remove(previousName);
-				for (const p of context.profiles.list()) {
-					if (!p.connections.includes(previousName)) continue;
-					const { updatedAt: _at, ...profile } = p;
-					await context.profiles.save({
-						...profile,
-						connections: p.connections.map((c) =>
-							c === previousName ? connection.name : c,
-						),
-					});
-				}
-			}
-			return saved;
+			return saveConnection(context, connection, previousName);
 		}),
 	/** Also takes it off the profiles that name it. */
 	remove: ownerProcedure
@@ -110,17 +90,7 @@ export const connections = {
 		})
 		.output(output(z.void()))
 		.input(z.object({ name: z.string() }))
-		.handler(async ({ context, input }) => {
-			await context.connections.remove(input.name);
-			for (const p of context.profiles.list()) {
-				if (!p.connections.includes(input.name)) continue;
-				const { updatedAt: _at, ...profile } = p;
-				await context.profiles.save({
-					...profile,
-					connections: p.connections.filter((c) => c !== input.name),
-				});
-			}
-		}),
+		.handler(({ context, input }) => removeConnection(context, input.name)),
 	/** Connects to the server, lists its tools, and disconnects. A saved connection or a draft. */
 	test: ownerProcedure
 		.route({

@@ -1,20 +1,20 @@
 import {
 	ACP_DEFAULT_MODEL,
 	deciderViews,
-	HARNESS_ADAPTERS,
 	harnessViews,
 	installedSkills,
 } from "@nightshift/agents";
 import {
+	addHarness,
 	HARNESS_BIN,
+	removeHarness,
 	type SettingField,
 	type SettingKey,
+	saveCustomAgent,
 } from "@nightshift/engine";
 import {
 	agentHarnessSchema,
-	type CustomAgent,
 	customAgentSchema,
-	customAgentSlug,
 	harnessNameSchema,
 	isCustomHarness,
 } from "@nightshift/flows";
@@ -29,16 +29,6 @@ import {
 	harnessViewSchema,
 	installedSkillSchema,
 } from "./schemas";
-
-/** The custom agent of that flow name on this daemon, or undefined. */
-export function customAgentOf(
-	agents: readonly CustomAgent[],
-	name: string,
-): CustomAgent | undefined {
-	return isCustomHarness(name)
-		? agents.find((a) => a.slug === customAgentSlug(name))
-		: undefined;
-}
 
 /**
  * The harnesses Agent nodes run on: every TanStack AI harness adapter, and
@@ -89,36 +79,15 @@ export const harnesses = {
 				previousSlug: customAgentSchema.shape.slug.optional(),
 			}),
 		)
-		.handler(async ({ context, input }) => {
+		.handler(({ context, input }) => {
 			const { previousSlug, ...agent } = input;
-			const agents = context.settings.current().customAgents;
-			if (previousSlug === undefined) {
-				if (agents.some((a) => a.slug === agent.slug)) {
-					throw new Error(
-						`A custom agent named acp:${agent.slug} already exists. Pick another name.`,
-					);
-				}
-				await context.settings.save({ customAgents: [...agents, agent] });
-				return customAgentSchema.parse(agent);
-			}
-			if (!agents.some((a) => a.slug === previousSlug)) {
-				throw new Error("This custom agent was removed. Add it again.");
-			}
-			const saved = customAgentSchema.parse({ ...agent, slug: previousSlug });
-			await context.settings.save({
-				customAgents: agents.map((a) => (a.slug === previousSlug ? saved : a)),
-			});
-			return saved;
+			return saveCustomAgent(context, agent, previousSlug);
 		}),
 	add: ownerProcedure
 		.route({ summary: "Adds a built-in harness on this computer." })
 		.output(output(z.void()))
 		.input(z.object({ harness: harnessNameSchema }))
-		.handler(async ({ context, input }) => {
-			const added = context.settings.current().harnesses;
-			if (added.includes(input.harness)) return;
-			await context.settings.save({ harnesses: [...added, input.harness] });
-		}),
+		.handler(({ context, input }) => addHarness(context, input.harness)),
 	/** Refused while a profile runs on it. A custom agent is gone after this. */
 	remove: ownerProcedure
 		.route({
@@ -127,33 +96,7 @@ export const harnesses = {
 		})
 		.output(output(z.void()))
 		.input(z.object({ harness: agentHarnessSchema }))
-		.handler(async ({ context, input }) => {
-			const values = context.settings.current();
-			const custom = customAgentOf(values.customAgents, input.harness);
-			const label = isCustomHarness(input.harness)
-				? (custom?.label ?? input.harness)
-				: HARNESS_ADAPTERS[input.harness].label;
-			const using = context.profiles
-				.list()
-				.filter((p) => p.harness === input.harness)
-				.map((p) => p.name);
-			if (using.length > 0) {
-				throw new Error(
-					`The ${using.length === 1 ? "profile" : "profiles"} ${using.join(", ")} run on ${label}. Move ${using.length === 1 ? "it" : "them"} to another harness first.`,
-				);
-			}
-			if (isCustomHarness(input.harness)) {
-				await context.settings.save({
-					customAgents: values.customAgents.filter((a) => a !== custom),
-				});
-				return;
-			}
-			const name = input.harness;
-			const added = values.harnesses;
-			await context.settings.save({
-				harnesses: added.filter((h) => h !== name),
-			});
-		}),
+		.handler(({ context, input }) => removeHarness(context, input.harness)),
 	/**
 	 * The adapter's models, plus what the CLI lists itself. Never throws.
 	 * A custom agent offers `default`: any other model it takes is typed.

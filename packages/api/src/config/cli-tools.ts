@@ -1,4 +1,4 @@
-import { cliToolInputSchema } from "@nightshift/engine";
+import { cliToolInputSchema, removeCliTool } from "@nightshift/engine";
 import { z } from "zod";
 
 import { output } from "../output";
@@ -59,15 +59,5 @@ export const cliTools = {
 		})
 		.output(output(z.void()))
 		.input(z.object({ name: z.string() }))
-		.handler(async ({ context, input }) => {
-			await context.cliTools.remove(input.name);
-			for (const p of context.profiles.list()) {
-				if (!p.clis.includes(input.name)) continue;
-				const { updatedAt: _at, ...profile } = p;
-				await context.profiles.save({
-					...profile,
-					clis: p.clis.filter((c) => c !== input.name),
-				});
-			}
-		}),
+		.handler(({ context, input }) => removeCliTool(context, input.name)),
 };
