@@ -48,10 +48,14 @@ export const runQueries = {
 		refetchInterval: INBOX_POLL_MS,
 		meta: { quietErrors: true },
 	}),
-	/** The runs of every project for the night notifications. Polls; a failed poll does not toast. */
+	/**
+	 * The runs of every project for the night notifications. Polls, also while
+	 * the tab is in the background; a failed poll does not toast.
+	 */
 	everyRunForNotifications: () => ({
 		...orpc.runs.list.queryOptions({ input: {} }),
 		refetchInterval: NOTIFY_POLL_MS,
+		refetchIntervalInBackground: true,
 		meta: { quietErrors: true },
 	}),
 	/** One run with its steps. */

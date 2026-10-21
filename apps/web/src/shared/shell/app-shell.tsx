@@ -11,10 +11,11 @@ import { isOutsideApp, useAccessGuard } from "@/features/access";
 
 import { AppSidebar } from "./app-sidebar";
 import { NightNotifications } from "./use-night-notifications";
+import { TabBadge } from "./use-tab-badge";
 
 /**
  * The app frame around the page (`children`): the theme, the sidebar, the
- * toasts and the night notifications. A page outside the app (signing in)
+ * toasts, the night notifications and the tab badge. A page outside the app (signing in)
  * shows without the sidebar. The app shows only when the access guard
  * lets it.
  */
@@ -41,7 +42,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 				) : null}
 			</TooltipProvider>
 			<Toaster richColors />
-			{outsideApp || !appMayShow ? null : <NightNotifications />}
+			{outsideApp || !appMayShow ? null : (
+				<>
+					<NightNotifications />
+					<TabBadge />
+				</>
+			)}
 		</ThemeProvider>
 	);
 }

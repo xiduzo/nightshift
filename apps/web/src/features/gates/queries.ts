@@ -12,12 +12,14 @@ export const gateQueries = {
 	all: () => orpc.gates.key(),
 	/**
 	 * The open Gates over all runs, oldest first: the Needs-you inbox. Polls,
-	 * and refetches when the window gets focus. A failed poll does not toast;
-	 * the inbox shows the error itself.
+	 * also while the tab is in the background, so the tab badge and the
+	 * notifications stay current. Refetches when the window gets focus. A
+	 * failed poll does not toast; the inbox shows the error itself.
 	 */
 	open: () => ({
 		...orpc.gates.list.queryOptions(),
 		refetchInterval: POLL_MS,
+		refetchIntervalInBackground: true,
 		refetchOnWindowFocus: "always" as const,
 		meta: { quietErrors: true },
 	}),
