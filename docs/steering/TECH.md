@@ -156,7 +156,7 @@ Full ADRs go in `docs/adr/` when a decision needs more than one line of rational
 - Not yet verified: whether the harness adapters accept our own tools, and whether they expose session resume and the usage-limit reset time.
 - `drizzle-orm` is a release candidate.
 - Hermes (Expo SDK 58) cannot compile a destructured rest parameter, which `@orpc/client` uses. `apps/mobile/babel.config.js` runs `@babel/plugin-transform-parameters` on the `@orpc` packages only.
-- Bun's isolated installs keep several copies of one version of a package (one per set of peers). Expo's autolinking module resolution puts one copy of each in the phone's bundle, but `expo-doctor` reports the copies as duplicates. Not yet verified: a native build (`expo run:ios`) with them.
+- Bun's isolated installs keep several copies of one version of a package (one per set of peers). Expo's autolinking module resolution puts one copy of each in the phone's bundle, but `expo-doctor` reports the copies as duplicates. They do not break the native build: on 2026-10-21 `expo run:ios` (Xcode 27, iPhone 17 Pro simulator, iOS 26.5) built, installed and ran the app, Metro bundled it, and sign-in, the tabs and Settings worked against a sandbox Host. No fix was needed, so `check-layers` keeps its guarantees unchanged.
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
