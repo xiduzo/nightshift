@@ -1,8 +1,15 @@
-// The API of `@nightshift/auth`: the Better Auth instance (`auth.ts`), the
-// access of one request (`request.ts`), and the verticals' barrels.
+// The API of `@nightshift/auth`: the Better Auth instance (`auth.ts`, the
+// composition root of the package) and the verticals' barrels.
 
-export type { Permissions, Role } from "./access";
-export { roleAllows, statements } from "./access";
+export {
+	documentAccess,
+	type RequestAccess,
+	requestAccess,
+	type SyncAccess,
+	type SyncAuthorize,
+	type SyncDeviceKey,
+	type SyncGrant,
+} from "./access";
 export {
 	type Auth,
 	type AuthConfig,
@@ -22,13 +29,6 @@ export {
 	isDeviceKey,
 } from "./device-keys";
 export {
-	documentAccess,
-	type SyncAccess,
-	type SyncAuthorize,
-	type SyncDeviceKey,
-	type SyncGrant,
-} from "./document-access";
-export {
 	authEndpointAllowed,
 	type HostAccess,
 	type HostPolicy,
@@ -47,7 +47,6 @@ export {
 	reviewPairing,
 	startPairing,
 } from "./pairing";
-export { type RequestAccess, requestAccess } from "./request";
 // InvitationView, PendingInvitation and SpaceMember are in the API's
 // router type: its declaration must be able to name them.
 export {
@@ -60,11 +59,14 @@ export {
 	membersOf,
 	mirrorHostSpace,
 	type PendingInvitation,
+	type Permissions,
 	personalSpaceId,
 	personalSpaceIdBySlug,
 	personContact,
 	personNames,
+	type Role,
 	removeMemberships,
+	roleAllows,
 	roleIn,
 	type Space,
 	type SpaceMember,
@@ -73,5 +75,6 @@ export {
 	spaceIds,
 	spaceRoster,
 	spacesOf,
+	statements,
 } from "./spaces";
 export { TRUSTED_BROWSER_DAYS } from "./two-factor";

@@ -1,21 +1,15 @@
-// The access of one request: its session (`auth.ts`), its Space
-// (`spaces/`), the Host rules (`host-access/`) and the local session
-// (`local-session/`). It composes those verticals, so it sits beside
-// `auth.ts` at the root.
-
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 
-import type { Permissions, Role } from "./access";
-import { type Auth, hasPermission, type Session } from "./auth";
+import { type Auth, hasPermission, type Session } from "../auth";
 import {
 	type HostAccess,
 	type HostPolicy,
 	hostAccess,
 	OPEN_HOST,
-} from "./host-access";
-import type { LocalSession } from "./local-session";
-import { activeSpaceId } from "./spaces";
+} from "../host-access";
+import type { LocalSession } from "../local-session";
+import { activeSpaceId, type Permissions, type Role } from "../spaces";
 
 /** Who a request is, in which Space, and what they may do there. */
 export type RequestAccess = {

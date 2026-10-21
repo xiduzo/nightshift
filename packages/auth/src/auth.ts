@@ -9,16 +9,17 @@ import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin } from "better-auth/plugins/admin";
 import { organization } from "better-auth/plugins/organization";
-
-import { ac, type Permissions, roles } from "./access";
 import { deviceKeyPlugin } from "./device-keys";
 import { pairingPlugin } from "./pairing";
 import {
+	ac,
 	activeSpaceId,
 	ensurePersonalSpace,
 	HOST_ADMIN,
 	hasHostAdmin,
 	type MemberChange,
+	type Permissions,
+	roles,
 	signUpRefusal,
 } from "./spaces";
 import { twoFactorPlugin } from "./two-factor";

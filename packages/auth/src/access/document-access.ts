@@ -1,11 +1,11 @@
 import type { Database } from "@nightshift/db";
 
-import type { Auth } from "./auth";
-import { isDeviceKey } from "./device-keys";
-import type { HostPolicy } from "./host-access";
-import type { LocalSession } from "./local-session";
+import type { Auth } from "../auth";
+import { isDeviceKey } from "../device-keys";
+import type { HostPolicy } from "../host-access";
+import type { LocalSession } from "../local-session";
+import { roleIn } from "../spaces";
 import { requestAccess } from "./request";
-import { roleIn } from "./spaces";
 
 /**
  * What a client may do with a synced document: change it, only read it (a

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { requestAccess } from "../access";
 import { createLocalSession } from "../local-session";
-import { requestAccess } from "../request";
 import { localPerson } from "../spaces";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
 import { turnOnTwoFactor } from "../testing/two-factor";

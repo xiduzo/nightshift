@@ -9,8 +9,8 @@
 // - `projects.ts`: `@nightshift/engine` `projects/`.
 // - `runs.ts`: `@nightshift/engine` `log/`, `run/`, `graph/` and `read/`.
 // - `device-config.ts`: `@nightshift/engine` `device-config/`.
-// - `engine.ts`: `@nightshift/engine` `lease.ts` (moves to `daemon`) and
-//   `graph/checkpointer.ts`.
+// - `engine.ts`: `@nightshift/engine` `graph/checkpointer.ts` (LangGraph).
+// - `daemon.ts`: `@nightshift/daemon` `runtime/` (the lease).
 //
 // drizzle-kit reads this file: every table must be exported from here.
 
@@ -20,6 +20,7 @@ export * from "./auth";
  * the tables it owns, not the whole schema.
  */
 export * as authSchema from "./auth";
+export * from "./daemon";
 export * from "./device-config";
 export * from "./devices";
 export * from "./engine";

@@ -18,6 +18,14 @@ export {
 } from "./members";
 export { personContact, personNames } from "./people";
 export {
+	ac,
+	type Permissions,
+	type Role,
+	roleAllows,
+	roles,
+	statements,
+} from "./roles";
+export {
 	activeSpaceId,
 	ensurePersonalSpace,
 	localPerson,

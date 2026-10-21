@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { device, user } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
-
+import { requestAccess } from "../access";
 import { hasPermission, roleAllows } from "../index";
 import { createLocalSession } from "../local-session";
-import { requestAccess } from "../request";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
 import { LOCAL_EMAIL, localPerson, personalSpaceId, spacesOf } from "./spaces";
 

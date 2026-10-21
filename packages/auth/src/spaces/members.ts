@@ -3,7 +3,7 @@ import type { Database } from "@nightshift/db";
 import { invitation, member, organization, user } from "@nightshift/db/schema";
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
 
-import type { Role } from "../access";
+import type { Role } from "./roles";
 
 /**
  * Members of a Space and how people join a Host.

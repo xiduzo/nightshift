@@ -3,9 +3,8 @@ import { userInfo } from "node:os";
 import type { Database } from "@nightshift/db";
 import { device, member, organization, user } from "@nightshift/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
-
-import type { Role } from "../access";
 import { claimHostAdmin } from "./members";
+import type { Role } from "./roles";
 
 /**
  * Spaces as the organization plugin stores them, read and written straight
