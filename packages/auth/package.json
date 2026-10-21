@@ -11,9 +11,10 @@
 		"test": "bun test"
 	},
 	"dependencies": {
-		"@better-auth/api-key": "1.7.7",
-		"@better-auth/core": "1.7.7",
-		"@better-auth/drizzle-adapter": "1.7.7",
+		"@better-auth/api-key": "catalog:",
+		"@better-auth/core": "catalog:",
+		"@better-auth/drizzle-adapter": "catalog:",
+		"@better-auth/expo": "catalog:",
 		"@nightshift/db": "workspace:*",
 		"better-auth": "catalog:",
 		"drizzle-orm": "catalog:",
