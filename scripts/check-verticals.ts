@@ -41,6 +41,7 @@ export const ENFORCED: string[] = [
 	"packages/agents",
 	"packages/api",
 	"packages/engine",
+	"packages/flows",
 ];
 
 /**

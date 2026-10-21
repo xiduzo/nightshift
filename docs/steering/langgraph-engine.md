@@ -649,9 +649,11 @@ holds every fact for every kind as a table.
 
 ### How to add a node kind
 
-1. `packages/flows/src/schema.ts`: the node schema, in the `flowNodeSchema`
-   union; `packages/flows/src/validate.ts` for its checks; a flow version
-   bump when old flows must migrate.
+1. `packages/flows/src/nodes/<kind>.ts`: the node schema, its checks and
+   its output fields. Add it to the `flowNodeSchema` union and the
+   per-type switches in `packages/flows/src/document/`, and its check to
+   `packages/flows/src/validate/nodes.ts`. Bump the flow version when old
+   flows must migrate.
 2. `packages/engine/src/graph/nodes/<kind>.ts`: the factory (`runStep` with
    a body, or the lower seam `beginStep` for a loop-shaped node) and the
    descriptor: `{ ...PLAIN_KIND, type, make, resumeRules, ... }`, overriding

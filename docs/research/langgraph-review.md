@@ -233,7 +233,7 @@ the "check git status before you repeat anything" prompt (`engine.ts:102`) is lo
   stamp it on `StepStarted`/`EdgeTaken`; body `traversals` are per body invocation (per element),
   as the API comment says.
 - Security: `renderCommand` turns every `{{ref}}` into `${NS_…}` with the value in `env`
-  (`packages/flows/src/template.ts:97-137`), `runCommand` spawns `sh -c` with that `env`
+  (`packages/flows/src/template/template.ts:97-137`), `runCommand` spawns `sh -c` with that `env`
   (`command.ts:88-93`), for the Command node and the For Each command source alike — values never
   become shell text. `fileItems` refuses absolute, `~` and `..` globs; the GitHub parent is parsed
   as a positive integer; JSON sources go through `normalizeList` (array, unique ids);
