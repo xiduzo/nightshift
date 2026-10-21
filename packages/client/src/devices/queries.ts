@@ -12,6 +12,8 @@ export function createDeviceQueries(orpc: ApiQueryUtils) {
 	return {
 		/** Every query of the Devices overview. Invalidate it after a Device or a Host changes. */
 		overviewKey: () => orpc.devices.list.key(),
+		/** This computer, its Hosts, and the person's paired Devices, once. */
+		overview: () => orpc.devices.list.queryOptions(),
 		/** This computer, its Hosts, and the person's paired Devices. Polls; a failed background poll keeps the page. */
 		overviewLive: () => ({
 			...orpc.devices.list.queryOptions(),

@@ -13,13 +13,14 @@ import { NotificationSettingsCard } from "@/features/notifications";
 import { PageHeading, SiteHeader } from "@/shared/page";
 import { AgentDefaultsCard } from "./components/agent-defaults-card";
 import { AppearanceCard } from "./components/appearance-card";
+import { PhoneCard } from "./components/phone-card";
 import { ProjectsCard } from "./components/projects-card";
 import { RunPolicyCard } from "./components/run-policy-card";
 import { RunsCard } from "./components/runs-card";
 import { ThisComputerLink } from "./components/this-computer-link";
 import { settingsQueries } from "./queries";
 
-/** The Settings page: projects, runs, run policy, new Agent nodes, notifications, appearance. */
+/** The Settings page: projects, runs, run policy, new Agent nodes, notifications, the phone, appearance. */
 export function SettingsPage() {
 	const settings = useQuery(settingsQueries.get());
 
@@ -69,6 +70,7 @@ export function SettingsPage() {
 						</>
 					)}
 					<NotificationSettingsCard />
+					<PhoneCard />
 					<AppearanceCard />
 					<ThisComputerLink name={settings.data?.daemon.device.name} />
 				</div>

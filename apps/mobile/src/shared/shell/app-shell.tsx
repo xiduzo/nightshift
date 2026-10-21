@@ -7,12 +7,12 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { useUniwind } from "uniwind";
 
-import { ConnectionProvider } from "@/features/connection";
+import { HostProvider } from "@/features/host";
 import { createQueryClient } from "@/shared/api";
 import { NAV_THEME } from "./nav-theme";
 
 /**
- * The app frame: data, the Host connection, the theme, gestures and the
+ * The app frame: data, the Host, the theme, gestures and the
  * keyboard. Portals (menus, dialogs) render last, above everything.
  */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -22,7 +22,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 	return (
 		<QueryClientProvider client={queryClient}>
-			<ConnectionProvider>
+			<HostProvider>
 				<GestureHandlerRootView style={{ flex: 1 }}>
 					<KeyboardProvider>
 						<ThemeProvider value={NAV_THEME[scheme]}>
@@ -32,7 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 						</ThemeProvider>
 					</KeyboardProvider>
 				</GestureHandlerRootView>
-			</ConnectionProvider>
+			</HostProvider>
 		</QueryClientProvider>
 	);
 }

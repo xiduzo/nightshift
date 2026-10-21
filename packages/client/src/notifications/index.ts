@@ -5,6 +5,7 @@
  */
 
 export {
+	applySettingsPatch,
 	createNotificationMutations,
 	createNotificationQueries,
 } from "./queries";

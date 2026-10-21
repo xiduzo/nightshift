@@ -62,6 +62,7 @@ export {
 	type OpenGate,
 } from "./gates";
 export {
+	applySettingsPatch,
 	compareGates,
 	compareRuns,
 	createNotificationMutations,

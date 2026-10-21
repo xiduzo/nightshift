@@ -5,5 +5,5 @@ export {
 	loadHostAddress,
 	saveHostAddress,
 } from "./host-address";
-export { createHostClient, type HostClient } from "./orpc";
 export { createQueryClient } from "./query-client";
+export { hostTransport } from "./transport";
