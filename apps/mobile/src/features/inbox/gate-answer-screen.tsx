@@ -39,7 +39,7 @@ import {
 	Eye,
 	Fingerprint,
 } from "lucide-react-native";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { ScrollView, View } from "react-native";
 
 import { useHost, useHostQueries } from "@/features/host";
@@ -65,7 +65,6 @@ export function GateAnswerScreen() {
 /** What went wrong with the last answer. */
 type Problem =
 	| { kind: "check"; failure: CheckFailure }
-	| { kind: "closed" }
 	| { kind: "failed"; message: string };
 
 function GateAnswer() {
@@ -76,13 +75,11 @@ function GateAnswer() {
 	const inbox = useInbox();
 	const [closed, setClosed] = useState(false);
 	/** The answer went: the sheet keeps the Gate while it slides away. */
-	const [sent, setSent] = useState(false);
-	const last = useRef<OpenGate | null>(null);
-	const found = inbox.data?.find(
-		(open) => open.runId === runId && open.stepId === stepId,
-	);
-	if (found) last.current = found;
-	const gate = found ?? (sent ? last.current : undefined);
+	const [sent, setSent] = useState<OpenGate | null>(null);
+	const gate =
+		inbox.data?.find(
+			(open) => open.runId === runId && open.stepId === stepId,
+		) ?? sent;
 
 	if (closed) {
 		return (
@@ -96,7 +93,7 @@ function GateAnswer() {
 		return (
 			<OpenGateSheet
 				gate={gate}
-				onSent={() => setSent(true)}
+				onSent={() => setSent(gate)}
 				onClosed={() => setClosed(true)}
 			/>
 		);
@@ -353,13 +350,10 @@ function ProblemAlert({ problem }: { problem: Problem }) {
 	const copy =
 		problem.kind === "check"
 			? CHECK_COPY[problem.failure]
-			: problem.kind === "failed"
-				? {
-						title: "Your answer was not sent",
-						description: `${problem.message} Check that this phone is online. Then answer again.`,
-					}
-				: null;
-	if (!copy) return null;
+			: {
+					title: "Your answer was not sent",
+					description: `${problem.message} Check that this phone is online. Then answer again.`,
+				};
 	return (
 		<Alert icon={CircleAlert} variant="destructive">
 			<AlertTitle>{copy.title}</AlertTitle>
