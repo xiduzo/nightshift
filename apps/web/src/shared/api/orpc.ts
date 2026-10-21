@@ -1,7 +1,4 @@
-import type { AppRouterClient } from "@nightshift/api/client";
-import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
-import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import { createApiClient, createQueryUtils } from "@nightshift/client";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -46,16 +43,10 @@ export function createQueryClient(handle: ErrorHandler) {
 	return client;
 }
 
-const link = new RPCLink({
-	url: `${SERVER_URL}/rpc`,
-	fetch(url, options) {
-		return fetch(url, {
-			...options,
-			credentials: "include",
-		});
-	},
+/** The browser sends the session cookie with every call. */
+export const client = createApiClient({
+	baseUrl: SERVER_URL,
+	fetch: (request, init) => fetch(request, { ...init, credentials: "include" }),
 });
 
-export const client: AppRouterClient = createORPCClient(link);
-
-export const orpc = createTanstackQueryUtils(client);
+export const orpc = createQueryUtils(client);

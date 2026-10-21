@@ -1,3 +1,4 @@
+import { mergeSteps } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
@@ -25,7 +26,7 @@ import { projectQueries } from "@/features/projects";
 import type { RunStatus } from "@/shared/api";
 import { useMediaQuery } from "@/shared/media-query";
 import { type Crumb, SiteHeader } from "@/shared/page";
-import { mergeSteps, useRunStream } from "../hooks/use-run-stream";
+import { useRunStream } from "../hooks/use-run-stream";
 import {
 	calledFlowName,
 	calledFlowOf,
