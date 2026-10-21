@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { StepEvent, TranscriptEntry } from "@/shared/api/contract";
+import type { StepEvent, TranscriptEntry } from "@nightshift/client";
 import { applyEntries, emptyRunTranscript } from "./transcript";
 import type {
 	GateResolvedItem,

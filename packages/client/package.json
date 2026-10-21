@@ -1,0 +1,26 @@
+{
+	"name": "@nightshift/client",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"check-types": "tsc -b ../api && tsc --noEmit",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@nightshift/api": "workspace:*",
+		"@nightshift/flows": "workspace:*",
+		"@orpc/client": "catalog:",
+		"@orpc/tanstack-query": "^1.15.0"
+	},
+	"peerDependencies": {
+		"@tanstack/react-query": "^5.102.8"
+	},
+	"devDependencies": {
+		"@nightshift/config": "workspace:*",
+		"@tanstack/react-query": "^5.102.8",
+		"@types/bun": "catalog:",
+		"typescript": "catalog:"
+	}
+}

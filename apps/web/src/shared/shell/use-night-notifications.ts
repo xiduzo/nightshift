@@ -1,3 +1,9 @@
+import {
+	compareGates,
+	compareRuns,
+	describeNotice,
+	isWanted,
+} from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
@@ -5,17 +11,15 @@ import { useEffect, useRef } from "react";
 import { useOpenGates } from "@/features/gates";
 import { runQueries } from "@/features/runs";
 import { notificationsSupported, settingsQueries } from "@/features/settings";
-import type { OpenGate, RunStatus, RunSummary } from "@/shared/api";
-
-const gateKey = (gate: OpenGate) => `${gate.runId}:${gate.stepId}`;
+import type { RunStatus } from "@/shared/api";
 
 /**
  * Desktop notifications on this Mac: a Gate opens, a run finishes, a run
  * fails. Each kind is on or off in the settings. It polls the open Gates and
  * the runs (the same queries the inbox and the home page use, so they share
- * the cache) and compares with the last poll. What was there on the first
- * load is the baseline: it never notifies. It shows nothing until the browser
- * has permission. Mount it once.
+ * the cache) and compares with the last poll (`compareGates`, `compareRuns`).
+ * What was there on the first load is the baseline: it never notifies. It
+ * shows nothing until the browser has permission. Mount it once.
  */
 export function useNightNotifications() {
 	const navigate = useNavigate();
@@ -32,15 +36,13 @@ export function useNightNotifications() {
 
 	useEffect(() => {
 		if (!gates.data) return;
-		const before = seenGates.current;
-		seenGates.current = new Set(gates.data.map(gateKey));
-		if (!before || !values?.notifyGateOpened) return;
-		for (const gate of gates.data) {
-			if (before.has(gateKey(gate))) continue;
+		const { seen, notices } = compareGates(seenGates.current, gates.data);
+		seenGates.current = seen;
+		const choices = { notifyGateOpened: values?.notifyGateOpened };
+		for (const notice of notices) {
+			if (!isWanted(notice, choices)) continue;
 			show({
-				title: `${gate.projectName}: a Gate waits for you`,
-				body: `${gate.runTitle}\n${gate.question}`,
-				tag: `gate:${gateKey(gate)}`,
+				...describeNotice(notice),
 				onClick: () => void navigate({ to: "/inbox" }),
 			});
 		}
@@ -48,42 +50,21 @@ export function useNightNotifications() {
 
 	useEffect(() => {
 		if (!runs.data) return;
-		const before = runStatus.current;
-		runStatus.current = new Map(runs.data.map((run) => [run.id, run.status]));
-		if (!before) return;
-		for (const run of runs.data) {
-			const was = before.get(run.id);
-			if (was === run.status) continue;
-			const note = runNotice(run);
-			if (!note) continue;
-			if (run.status === "finished" && !values?.notifyRunFinished) continue;
-			if (run.status === "failed" && !values?.notifyRunFailed) continue;
+		const { seen, notices } = compareRuns(runStatus.current, runs.data);
+		runStatus.current = seen;
+		const choices = {
+			notifyRunFinished: values?.notifyRunFinished,
+			notifyRunFailed: values?.notifyRunFailed,
+		};
+		for (const notice of notices) {
+			if (notice.kind === "gate-opened" || !isWanted(notice, choices)) continue;
+			const runId = notice.run.id;
 			show({
-				...note,
-				tag: `run:${run.id}:${run.status}`,
-				onClick: () =>
-					void navigate({ to: "/runs/$runId", params: { runId: run.id } }),
+				...describeNotice(notice),
+				onClick: () => void navigate({ to: "/runs/$runId", params: { runId } }),
 			});
 		}
 	}, [runs.data, values?.notifyRunFinished, values?.notifyRunFailed, navigate]);
-}
-
-function runNotice(
-	run: RunSummary,
-): { title: string; body: string } | undefined {
-	if (run.status === "finished") {
-		return {
-			title: "A run finished",
-			body: run.reason ? `${run.title}\nEnded on ${run.reason}` : run.title,
-		};
-	}
-	if (run.status === "failed") {
-		return {
-			title: "A run failed",
-			body: run.reason ? `${run.title}\n${run.reason}` : run.title,
-		};
-	}
-	return undefined;
 }
 
 function show({

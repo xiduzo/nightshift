@@ -134,6 +134,7 @@ bun lefthook install
 | Out of scope for the phone: store submission, a publisher push relay, Apple Watch, end-to-end encrypted push, a demo Host for App Review | Each needs the user's own accounts, or a decision about other people's Hosts. A personal development build pushes from the user's own Host without them. | 2026-10-21 |
 | One React for the whole repo, pinned to 19.3.0 | Expo SDK 58 needs React 19.3.0 exactly, and a monorepo may hold only one React. The web app, the desktop app and the phone app share the catalog entry. | 2026-10-21 |
 | The phone's origins are trusted by Better Auth only | `nightshift://` and `exp://` (Expo Go and development builds) are in `authOriginsOf` (`packages/daemon/src/http/origins.ts`), not in `trustedOriginsOf`. A browser page never has these origins, so they open nothing to it, and they never get the local session. Device keys stay `Authorization: Bearer`. | 2026-10-21 |
+| `@nightshift/client` holds no client instance: its factories take the app's | Each app makes its own client (`createApiClient` with its `fetch` and headers: cookies on the web, `expo/fetch` on the phone) and passes it to `create<Vertical>Queries(orpc)`. A vertical's `queries.ts` in an app is one line per factory on that client. The package keeps no global state, and a test passes a fake. `followRun` takes any client with `runs.watch`. | 2026-10-21 |
 
 Full ADRs go in `docs/adr/` when a decision needs more than one line of rationale.
 

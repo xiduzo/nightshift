@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import type { StepSummary } from "@nightshift/client";
 import { FLOW_VERSION, type Flow } from "@nightshift/flows";
-
-import type { StepSummary } from "@/shared/api/contract";
 import { previewValue, scopeLabel, variableGroups } from "./run-variables";
 
 const origin = { x: 0, y: 0 };

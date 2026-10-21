@@ -1,0 +1,113 @@
+/**
+ * @nightshift/client: the client logic that the web app and the phone app
+ * share. The typed client of a Night Shift, the query and mutation options
+ * of each vertical (with their polling rules), the stream of one run, the
+ * view types derived from the API, and the notify rules. No DOM, no React
+ * Native, no Node or Bun: `platform-free.test.ts` checks it.
+ */
+
+export {
+	type ApiClient,
+	type ApiClientOptions,
+	type ApiInputs,
+	type ApiOutputs,
+	type ApiQueryUtils,
+	type ApiTransport,
+	createApiClient,
+	createQueryUtils,
+	isSignInRequired,
+	isTwoFactorRequired,
+} from "./api";
+export {
+	createDeviceMutations,
+	createDeviceQueries,
+	createOfferMutations,
+	createOfferQueries,
+	type DevicesOverview,
+	type LinkedHost,
+	type OfferView,
+	type PairedDevice,
+	type PairingReview,
+	type SpaceDevice,
+	type ThisComputer,
+} from "./devices";
+export {
+	createFlowMutations,
+	createFlowQueries,
+	type FlowListItem,
+	type LoadedFlow,
+} from "./flows";
+export {
+	createGateMutations,
+	createGateQueries,
+	type GateChoice,
+	type OpenGate,
+} from "./gates";
+export {
+	compareGates,
+	compareRuns,
+	describeNotice,
+	gateKey,
+	isWanted,
+	type Notice,
+	type NoticeChoices,
+} from "./notifications";
+export {
+	createProjectMutations,
+	createProjectQueries,
+	type GitInstall,
+	type Project,
+	type ProjectCheck,
+} from "./projects";
+export {
+	type AgentErrorKind,
+	type AgentEvent,
+	type AgentUsage,
+	type CommandEvent,
+	createRunMutations,
+	createRunQueries,
+	type DecisionEvent,
+	type FollowRunOptions,
+	followRun,
+	type GateEvent,
+	type ItemEvent,
+	type ItemState,
+	type ItemSummary,
+	mergeSteps,
+	type RunDetail,
+	type RunStatus,
+	type RunStreamConnection,
+	type RunStreamItem,
+	type RunSummary,
+	type RunTrigger,
+	type RunWatchClient,
+	retryDelay,
+	type SessionSummary,
+	type StartRunInput,
+	type StepEvent,
+	type StepOutcome,
+	type StepScope,
+	type StepSummary,
+	type ToolNodeEvent,
+	type TranscriptEntry,
+	type ValueEvent,
+	type Wait,
+	type WaitEvent,
+} from "./runs";
+export {
+	createScheduleMutations,
+	createScheduleQueries,
+	type ScheduleIssue,
+	type ScheduleList,
+	type ScheduleResult,
+	type ScheduleSummary,
+} from "./schedules";
+export {
+	createSpaceMutations,
+	createSpaceQueries,
+	type InvitationView,
+	type MembersOverview,
+	type PendingInvitation,
+	type SpaceMember,
+	type SpaceRole,
+} from "./spaces";

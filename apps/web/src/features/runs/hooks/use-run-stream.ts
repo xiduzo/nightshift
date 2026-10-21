@@ -1,7 +1,12 @@
+import {
+	followRun,
+	type RunStreamConnection,
+	type TranscriptEntry,
+} from "@nightshift/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import type { RunStatus, StepSummary, TranscriptEntry } from "@/shared/api";
+import type { RunStatus, StepSummary } from "@/shared/api";
 import { client } from "@/shared/api";
 import { runQueries } from "../queries";
 import {
@@ -10,23 +15,17 @@ import {
 	type RunTranscript,
 } from "../transcript/transcript";
 
-export type StreamConnection = "connecting" | "live" | "reconnecting";
-
-const RETRY_BASE_MS = 1000;
-const RETRY_MAX_MS = 15_000;
 /** Batches deltas so a fast stream or a long replay renders once per frame window. */
 const FLUSH_MS = 50;
 /** A burst of step items (the replay sends them all) refetches the run once. */
 const REFETCH_MS = 300;
 
 /**
- * Subscribes to `runs.watch` for one run. The server sends the status and
- * every step summary, replays the transcript, then streams live items. A
- * run another device walks streams the same way: the server follows its
- * running step live through the Host. Transcript entries are grouped by step. When the stream drops, the
- * hook reconnects with backoff and passes the last seen seq as `afterSeq`, so
- * it only receives entries it does not have yet. Status and step items
- * refetch the run, which carries the edge traversals and the cost.
+ * Follows `runs.watch` for one run (`followRun`: reconnects with backoff,
+ * resumes after the last seq, hands on each entry once). A run another
+ * device walks streams the same way: the server follows its running step
+ * live through the Host. Transcript entries are grouped by step. Status and
+ * step items refetch the run, which carries the edge traversals and the cost.
  */
 export function useRunStream(runId: string) {
 	const queryClient = useQueryClient();
@@ -36,12 +35,11 @@ export function useRunStream(runId: string) {
 		() => new Map(),
 	);
 	const [status, setStatus] = useState<RunStatus | null>(null);
-	const [connection, setConnection] = useState<StreamConnection>("connecting");
+	const [connection, setConnection] =
+		useState<RunStreamConnection>("connecting");
 
 	useEffect(() => {
 		const controller = new AbortController();
-		const { signal } = controller;
-		let lastSeq: number | undefined;
 		let pending: TranscriptEntry[] = [];
 		let pendingSteps: StepSummary[] = [];
 		let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -50,7 +48,6 @@ export function useRunStream(runId: string) {
 		setTranscript(emptyRunTranscript);
 		setSteps(new Map());
 		setStatus(null);
-		setConnection("connecting");
 
 		const flush = () => {
 			flushTimer = null;
@@ -79,57 +76,25 @@ export function useRunStream(runId: string) {
 			}, REFETCH_MS);
 		};
 
-		const run = async () => {
-			let attempt = 0;
-			while (!signal.aborted) {
-				try {
-					const stream = await client.runs.watch(
-						{ runId, afterSeq: lastSeq },
-						{ signal },
-					);
-					setConnection("live");
-					for await (const item of stream) {
-						attempt = 0;
-						switch (item.kind) {
-							case "transcript":
-								if (lastSeq !== undefined && item.entry.seq <= lastSeq) break;
-								lastSeq = item.entry.seq;
-								pending.push(item.entry);
-								scheduleFlush();
-								break;
-							case "step":
-								pendingSteps.push(item.step);
-								scheduleFlush();
-								scheduleRefetch();
-								break;
-							case "status":
-								setStatus(item.status);
-								scheduleRefetch();
-								break;
-						}
-					}
-				} catch {
-					// Dropped connection or server error: fall through to the retry.
-				}
-				if (signal.aborted) return;
-				setConnection("reconnecting");
-				const delay = Math.min(RETRY_BASE_MS * 2 ** attempt, RETRY_MAX_MS);
-				attempt += 1;
-				await new Promise<void>((resolve) => {
-					const timer = setTimeout(resolve, delay);
-					signal.addEventListener(
-						"abort",
-						() => {
-							clearTimeout(timer);
-							resolve();
-						},
-						{ once: true },
-					);
-				});
-			}
-		};
-
-		void run();
+		void followRun({
+			client,
+			runId,
+			signal: controller.signal,
+			onConnection: setConnection,
+			onEntry: (entry) => {
+				pending.push(entry);
+				scheduleFlush();
+			},
+			onStep: (step) => {
+				pendingSteps.push(step);
+				scheduleFlush();
+				scheduleRefetch();
+			},
+			onStatus: (next) => {
+				setStatus(next);
+				scheduleRefetch();
+			},
+		});
 
 		return () => {
 			controller.abort();
@@ -139,17 +104,4 @@ export function useRunStream(runId: string) {
 	}, [runId, queryClient]);
 
 	return { transcript, steps, status, connection };
-}
-
-/**
- * The run's steps: the fetched list, with the live summaries from the stream
- * laid over it, in the order they started.
- */
-export function mergeSteps(
-	fetched: readonly StepSummary[],
-	live: ReadonlyMap<string, StepSummary>,
-): StepSummary[] {
-	const byId = new Map(fetched.map((step) => [step.id, step]));
-	for (const [id, step] of live) byId.set(id, step);
-	return [...byId.values()].sort((a, b) => a.startedAt - b.startedAt);
 }
