@@ -268,6 +268,7 @@ export const flowHealthDetailSchema = exact<FlowHealthDetail>()(
 					z.object({
 						runId: z.string(),
 						startedAt: z.number(),
+						night: z.number(),
 						costUsd: z.number(),
 						status: runStatusSchema,
 					}),

@@ -264,6 +264,7 @@ function flowRange(
 		endedRuns: ended.map((run) => ({
 			runId: run.runId,
 			startedAt: run.startedAt,
+			night: run.night,
 			costUsd: run.costUsd,
 			status: run.status,
 		})),

@@ -361,6 +361,8 @@ export type FlowRange = {
 	endedRuns: {
 		runId: string;
 		startedAt: number;
+		/** The night it started in. */
+		night: number;
 		costUsd: number;
 		status: RunStatus;
 	}[];
