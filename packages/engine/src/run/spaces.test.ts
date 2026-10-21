@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
 import {
 	agentSession,
@@ -19,8 +21,10 @@ import {
 } from "../projects/space-document";
 import { aloneDirectory } from "../testing/alone-directory";
 import {
+	commitFile,
 	createSandbox,
 	expectRunLogsInSync,
+	mustGit,
 	otherSpace,
 	type Sandbox,
 	waitFor,
@@ -155,6 +159,55 @@ describe("Spaces", () => {
 		// The run still waits in its own Space.
 		expect((await mine.getRun(started.id)).status).toBe("waiting");
 		await mine.stopRun(started.id);
+	});
+
+	test("each Space lists its own open Gates, and a run names its Space", async () => {
+		const engine = makeEngine();
+		const mine = engine.space(sandbox.spaceId);
+		const platform = await otherSpace(sandbox.db, "Platform");
+		const theirs = engine.space(platform);
+		const secondRepo = join(sandbox.root, "second");
+		await mkdir(secondRepo, { recursive: true });
+		await mustGit(secondRepo, ["init", "-q", "-b", "main"]);
+		await commitFile(secondRepo, "README.md");
+
+		const ours = await mine.addProject({ repoPath: sandbox.repoPath });
+		const other = await theirs.addProject({ repoPath: secondRepo });
+		const first = await mine.startRun({ projectId: ours.id, flow });
+		const second = await theirs.startRun({ projectId: other.id, flow });
+		await waitFor(
+			async () =>
+				(await mine.getRun(first.id)).status === "waiting" &&
+				(await theirs.getRun(second.id)).status === "waiting",
+			{ label: "both Gates" },
+		);
+
+		const gatesOf = async (view: typeof mine) =>
+			(await view.listGates()).map((g) => [g.spaceId, g.runId]);
+		expect(await gatesOf(mine)).toEqual([[sandbox.spaceId, first.id]]);
+		expect(await gatesOf(theirs)).toEqual([[platform, second.id]]);
+		expect(await engine.spaceOfRun(first.id)).toBe(sandbox.spaceId);
+		expect(await engine.spaceOfRun(second.id)).toBe(platform);
+		expect(await engine.spaceOfRun("no-such-run")).toBeNull();
+
+		// The answer is bound to its run and step, and refused once the Gate is closed.
+		const [open] = await theirs.listGates();
+		if (!open) throw new Error("no Gate");
+		await theirs.resolveGate({
+			runId: second.id,
+			stepId: open.stepId,
+			choice: "no",
+		});
+		expect(await theirs.listGates()).toEqual([]);
+		await expect(
+			theirs.resolveGate({
+				runId: second.id,
+				stepId: open.stepId,
+				choice: "yes",
+			}),
+		).rejects.toThrow("does not wait at a Gate");
+		expect(await gatesOf(mine)).toEqual([[sandbox.spaceId, first.id]]);
+		await mine.stopRun(first.id);
 	});
 
 	test("every row a run writes carries its project's Space", async () => {

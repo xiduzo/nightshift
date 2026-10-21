@@ -33,6 +33,12 @@ export interface Engine {
 	 */
 	space(spaceId: string, actor?: Actor): SpaceEngine;
 	/**
+	 * The Space of a run this computer keeps, or null when it has none of
+	 * that id. Who may see or act on the run there is the caller's check:
+	 * then it goes through that Space's view.
+	 */
+	spaceOfRun(runId: string): Promise<string | null>;
+	/**
 	 * Logs a change of a Space's Members in that Space's event log
 	 * (`MemberJoined`, `MemberRemoved`, `MemberRoleChanged`), with who made it.
 	 */

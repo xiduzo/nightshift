@@ -263,6 +263,8 @@ export type HandOff = {
 
 /** A Gate that waits for a person. */
 export type OpenGate = {
+	/** The Space of the run: the inbox lists the Gates of every Space a person is in. */
+	spaceId: string;
 	runId: string;
 	runTitle: string;
 	projectId: string;

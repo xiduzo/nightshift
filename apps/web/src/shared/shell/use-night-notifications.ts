@@ -40,10 +40,12 @@ export function useNightNotifications() {
 		seenGates.current = seen;
 		const choices = { notifyGateOpened: values?.notifyGateOpened };
 		for (const notice of notices) {
-			if (!isWanted(notice, choices)) continue;
+			if (notice.kind !== "gate-opened" || !isWanted(notice, choices)) continue;
+			// The inbox shows the Gate of any Space: open it there.
+			const gate = notice.gate.stepId;
 			show({
 				...describeNotice(notice),
-				onClick: () => void navigate({ to: "/inbox" }),
+				onClick: () => void navigate({ to: "/inbox", search: { gate } }),
 			});
 		}
 	}, [gates.data, values?.notifyGateOpened, navigate]);

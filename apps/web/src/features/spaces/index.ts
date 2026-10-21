@@ -4,3 +4,4 @@ export { InvitePage } from "./invite-page";
 export { MembersPage } from "./members-page";
 export { spaceQueries } from "./queries";
 export { SpaceSwitcher } from "./space-switcher";
+export { useSwitchSpace } from "./use-switch-space";

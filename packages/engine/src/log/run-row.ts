@@ -17,6 +17,18 @@ export async function getRunRow(db: Database, runId: string): Promise<RunRow> {
 	return row;
 }
 
+/** The Space of the run, or null when this Replica has no run of that id. */
+export async function spaceOfRun(
+	db: Database,
+	runId: string,
+): Promise<string | null> {
+	const [row] = await db
+		.select({ spaceId: run.spaceId })
+		.from(run)
+		.where(eq(run.id, runId));
+	return row?.spaceId ?? null;
+}
+
 /** Whether this Replica has the run's row. */
 export async function hasRunRow(db: Database, runId: string): Promise<boolean> {
 	const [row] = await db
