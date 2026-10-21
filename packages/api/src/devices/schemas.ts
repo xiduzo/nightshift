@@ -221,6 +221,8 @@ const workCallSchema = z.discriminatedUnion("kind", [
 			command: z.string(),
 			cwd: z.string(),
 			env: z.record(z.string(), z.string()).optional(),
+			/** Secrets by name: the Device reads their values itself. */
+			secrets: z.array(z.string()).optional(),
 		}),
 	}),
 	z.object({

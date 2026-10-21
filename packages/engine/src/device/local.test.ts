@@ -242,6 +242,69 @@ describe("exec", () => {
 			spawnError: null,
 		});
 	});
+
+	const secrets = (
+		values: Record<string, string>,
+	): Partial<LocalDeviceDeps> => ({
+		secretEnv: async (names) => {
+			const missing = names.filter((name) => values[name] === undefined);
+			return missing.length > 0
+				? { ok: false, missing }
+				: {
+						ok: true,
+						env: Object.fromEntries(
+							names.map((name) => [name, values[name] ?? ""]),
+						),
+					};
+		},
+	});
+
+	test("a secret reaches the command under its own name, and its value comes back as •••", async () => {
+		const events = await collect(
+			device(
+				secrets({ ZAC_USER: "behandelaar", ZAC_PASSWORD: "s3cr3t!" }),
+			).exec({
+				command:
+					'[ "$ZAC_PASSWORD" = "s3cr3t!" ] && echo "user $ZAC_USER pass $ZAC_PASSWORD" && echo "$ZAC_PASSWORD" >&2',
+				cwd: sandbox.repoPath,
+				secrets: ["ZAC_USER", "ZAC_PASSWORD"],
+				signal: new AbortController().signal,
+			}),
+		);
+		const out = (stream: "stdout" | "stderr") =>
+			events
+				.flatMap((e) =>
+					e.type === "output" && e.stream === stream ? [e.text] : [],
+				)
+				.join("");
+		expect(out("stdout")).toBe("user ••• pass •••\n");
+		expect(out("stderr")).toBe("•••\n");
+		expect(events.at(-1)).toEqual({
+			type: "exit",
+			exitCode: 0,
+			spawnError: null,
+		});
+	});
+
+	test("a secret this computer does not have refuses the command before it starts", async () => {
+		const marker = join(sandbox.repoPath, "ran");
+		const events = await collect(
+			device(secrets({ ZAC_USER: "behandelaar" })).exec({
+				command: `touch ${marker}`,
+				cwd: sandbox.repoPath,
+				secrets: ["ZAC_USER", "ZAC_PASSWORD"],
+				signal: new AbortController().signal,
+			}),
+		);
+		expect(events).toEqual([
+			{
+				type: "refused",
+				message:
+					"The command needs the secret ZAC_PASSWORD, but it is not saved. Save it under Agents → Secrets, or remove it from the node.",
+			},
+		]);
+		expect(existsSync(marker)).toBe(false);
+	});
 });
 
 describe("callTool", () => {

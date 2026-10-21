@@ -10,11 +10,13 @@ export type FlowRef = {
 /**
  * Who uses what, from every flow of the Space's projects: the flows whose
  * Agent or Tool nodes name each connection, whose Agent nodes name each CLI
- * tool, and the Agent nodes that name each profile. By name.
+ * tool, whose Command nodes name each secret, and the Agent nodes that name
+ * each profile. By name.
  */
 export type FlowUse = {
 	connections: Map<string, FlowRef[]>;
 	clis: Map<string, FlowRef[]>;
+	secrets: Map<string, FlowRef[]>;
 	profiles: Map<string, (FlowRef & { nodeIds: string[] })[]>;
 };
 
@@ -32,6 +34,7 @@ export type FlowReader = {
 export async function flowUse(space: FlowReader): Promise<FlowUse> {
 	const connections = new Map<string, FlowRef[]>();
 	const clis = new Map<string, FlowRef[]>();
+	const secrets = new Map<string, FlowRef[]>();
 	const profiles = new Map<string, (FlowRef & { nodeIds: string[] })[]>();
 	for (const project of await space.listProjects()) {
 		const files = await space.listFlows(project.id).catch(() => []);
@@ -59,6 +62,12 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 			for (const name of new Set(agents.flatMap((n) => n.clis ?? []))) {
 				clis.set(name, [...(clis.get(name) ?? []), ref]);
 			}
+			const commandSecrets = (loaded?.flow?.nodes ?? []).flatMap((n) =>
+				n.type === "command" ? (n.secrets ?? []) : [],
+			);
+			for (const name of new Set(commandSecrets)) {
+				secrets.set(name, [...(secrets.get(name) ?? []), ref]);
+			}
 			const byProfile = new Map<string, string[]>();
 			for (const node of agents) {
 				if (node.profile === undefined) continue;
@@ -75,5 +84,5 @@ export async function flowUse(space: FlowReader): Promise<FlowUse> {
 			}
 		}
 	}
-	return { connections, clis, profiles };
+	return { connections, clis, secrets, profiles };
 }

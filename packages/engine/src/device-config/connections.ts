@@ -4,6 +4,7 @@ import {
 	type McpServer,
 	mcpServerSchema,
 	nameSchema,
+	secretNameSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -21,13 +22,6 @@ import { expandMcpServers, type McpExpansion } from "./mcp";
 
 /** `${NAME}`: an environment variable name, as a shell would read it. */
 const REFERENCE = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
-
-export const secretNameSchema = z
-	.string()
-	.regex(
-		/^[A-Za-z_][A-Za-z0-9_]{0,127}$/,
-		"Use letters, digits and _, starting with a letter or _.",
-	);
 
 export const connectionInputSchema = z.object({
 	name: nameSchema,
@@ -125,12 +119,19 @@ export type ConnectionStore = {
 	 * daemon's environment: a custom agent's env. `missing` names the
 	 * references with no value; then nothing is expanded.
 	 */
-	expandEnv(
-		values: Record<string, string>,
-	): Promise<
-		{ ok: true; env: Record<string, string> } | { ok: false; missing: string[] }
-	>;
+	expandEnv(values: Record<string, string>): Promise<SecretEnv>;
+	/**
+	 * Secrets by name, each as an environment variable of that name: the
+	 * keychain, then the daemon's environment. A Command node's `secrets`.
+	 * `missing` names the ones with no value; then `env` is not given.
+	 */
+	secretEnv(names: readonly string[]): Promise<SecretEnv>;
 };
+
+/** Environment values read from the secrets, or the names that have no value. */
+export type SecretEnv =
+	| { ok: true; env: Record<string, string> }
+	| { ok: false; missing: string[] };
 
 /** The `${NAME}` references of a server's env values and headers. */
 export function referencedVariables(server: McpServer): string[] {
@@ -342,6 +343,17 @@ export function createConnectionStore(options: {
 					]),
 				),
 			};
+		},
+		async secretEnv(names) {
+			const vars = await envFor(names);
+			const env: Record<string, string> = {};
+			const missing: string[] = [];
+			for (const name of new Set(names)) {
+				const value = vars[name];
+				if (value === undefined) missing.push(name);
+				else env[name] = value;
+			}
+			return missing.length > 0 ? { ok: false, missing } : { ok: true, env };
 		},
 		async secretValues() {
 			const names = new Set(secretView());

@@ -30,6 +30,11 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  * step's log file (`StepStarted.logPath`). A stop of the run or the node's
  * time budget aborts the step's signal, which kills the process group.
  *
+ * The node's `secrets` go to the Device by name: it reads their values
+ * itself and hands back output with them as `•••`, so the transcript, the
+ * log file, `log_tail` and `data` never hold one. A secret the Device does
+ * not have errors the step before the command runs.
+ *
  * With `output: "json"`, what the command printed on stdout is parsed as
  * one JSON value into `data` (`{{check.data.tests}}`); output that is not
  * JSON ends the step on the catch-all, as a command that cannot start does.
@@ -97,6 +102,9 @@ async function runShell(
 		command,
 		cwd: step.worktree,
 		env,
+		...(node.secrets && node.secrets.length > 0
+			? { secrets: node.secrets }
+			: {}),
 		logPath: commandLogPath(ctx.dataDir, ctx.run.id, stepId),
 		signal,
 		onOutput: (stream, text) => {
@@ -104,6 +112,10 @@ async function runShell(
 			step.record(null, { type: "command-output", stream, text });
 		},
 	});
+	// A secret the Device does not have: the command did not run.
+	if (result.refused !== null) {
+		return end("error", { visit }, result.refused);
+	}
 	step.record(null, { type: "command-exit", exitCode: result.exitCode });
 
 	const outputs: StepOutputs = { visit, log_tail: result.logTail };

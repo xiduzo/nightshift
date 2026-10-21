@@ -24,6 +24,7 @@ import {
 	cliToolsInstruction,
 	expandMcpServers,
 	type McpExpansion,
+	type SecretEnv,
 } from "../device-config";
 import {
 	checkProjectFolder,
@@ -33,11 +34,14 @@ import {
 	systemGit,
 } from "../projects";
 import { spawnCommand } from "./command";
+import { redactExec } from "./redact";
 import { callServerTool } from "./tool-call";
 import type {
 	Capabilities,
 	DeciderFacts,
 	Device,
+	ExecEvent,
+	ExecInput,
 	OfferedSessionInput,
 	SessionEvent,
 	SessionInput,
@@ -77,6 +81,11 @@ export type LocalDeviceDeps = {
 	mcpServersFor?: (
 		node: Pick<AgentNode, "connections" | "mcpServers">,
 	) => Promise<McpExpansion>;
+	/**
+	 * A Command node's secrets, by name: the keychain, then the daemon's
+	 * environment. Default: `process.env`.
+	 */
+	secretEnv?: (names: readonly string[]) => Promise<SecretEnv>;
 	/** The connections defined on this computer. */
 	connectionNames?: () => ReadonlySet<string>;
 	/** The CLI tools defined on this computer. */
@@ -114,6 +123,15 @@ function noDecider(
 	};
 }
 
+/** Why a command does not start: secrets it names that this computer does not have. */
+function missingSecretsMessage(missing: readonly string[]): string {
+	const [noun, isNot, it] =
+		missing.length === 1
+			? ["secret", "it is", "it"]
+			: ["secrets", "they are", "them"];
+	return `The command needs the ${noun} ${missing.join(", ")}, but ${isNot} not saved. Save ${it} under Agents → Secrets, or remove ${it} from the node.`;
+}
+
 /** This computer as a Device. */
 export function localDevice(deps: LocalDeviceDeps): Device {
 	const { harnesses, decider } = deps;
@@ -138,6 +156,18 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 						message: `The node uses connections (${node.connections?.join(", ")}), but there are none. Add them under Agents → Tools.`,
 					}
 				: expandMcpServers(node.mcpServers, process.env));
+	const secretEnv =
+		deps.secretEnv ??
+		(async (names: readonly string[]): Promise<SecretEnv> => {
+			const missing = names.filter((name) => process.env[name] === undefined);
+			if (missing.length > 0) return { ok: false, missing };
+			return {
+				ok: true,
+				env: Object.fromEntries(
+					names.map((name) => [name, process.env[name] ?? ""]),
+				),
+			};
+		});
 
 	/** The harness of that name, when it is added and built. */
 	const harnessFor = (name: AgentHarnessName): AgentHarness | undefined => {
@@ -224,6 +254,29 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 		return decider ? decider.decide(input) : noDecider("decision");
 	}
 
+	/**
+	 * `sh -c` here. A command's secrets read the keychain, then the
+	 * environment, on this computer: one it does not have refuses the
+	 * command before it starts. Their values go to the command only; its
+	 * output has them as `•••` before it leaves this computer.
+	 */
+	async function* exec(input: ExecInput): AsyncGenerator<ExecEvent> {
+		const { secrets = [], ...command } = input;
+		if (secrets.length === 0) {
+			yield* spawnCommand(command);
+			return;
+		}
+		const found = await secretEnv(secrets);
+		if (!found.ok) {
+			yield { type: "refused", message: missingSecretsMessage(found.missing) };
+			return;
+		}
+		yield* redactExec(
+			spawnCommand({ ...command, env: { ...command.env, ...found.env } }),
+			Object.values(found.env),
+		);
+	}
+
 	/** The folder of the project's Clone here; throws without one. */
 	async function cloneOf(projectId: string): Promise<string> {
 		const path = (await deps.clonePath?.(projectId)) ?? null;
@@ -257,7 +310,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			};
 		},
 		session,
-		exec: spawnCommand,
+		exec,
 		async callTool(input): Promise<ToolResult> {
 			const mcp = await mcpServersFor({ connections: [input.connection] });
 			if (!mcp.ok) return { kind: "refused", message: mcp.message };

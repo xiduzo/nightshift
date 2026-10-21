@@ -192,6 +192,12 @@ export type ExecInput = {
 	cwd: string;
 	/** Added to the Device's environment. */
 	env?: Record<string, string>;
+	/**
+	 * Secrets by name: the Device reads each from its own secrets and adds
+	 * it to the environment under that name. Their values never leave the
+	 * Device: the output it yields has them as `•••`.
+	 */
+	secrets?: string[];
 	/** Aborting kills the whole process group (SIGTERM, then SIGKILL). */
 	signal: AbortSignal;
 };
@@ -204,7 +210,12 @@ export type ExecEvent =
 			exitCode: number | null;
 			/** Set when the command could not start at all. */
 			spawnError: string | null;
-	  };
+	  }
+	/**
+	 * The command did not run: the Device does not have a secret it names.
+	 * The only event; the message says why, for the person.
+	 */
+	| { type: "refused"; message: string };
 
 export type ToolCallInput = {
 	connection: string;

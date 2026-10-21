@@ -19,6 +19,8 @@ export type CommandResult = {
 	exitCode: number | null;
 	/** Set when the command could not start at all. */
 	spawnError: string | null;
+	/** Set when the Device did not run it: it does not have a secret the command names. */
+	refused: string | null;
 	/** The last lines of stdout and stderr together. */
 	logTail: string;
 };
@@ -58,11 +60,20 @@ export async function runCommand(
 	let exit: Omit<CommandResult, "logTail"> = {
 		exitCode: null,
 		spawnError: null,
+		refused: null,
 	};
 	try {
 		for await (const event of device.exec(command)) {
+			if (event.type === "refused") {
+				exit = { ...exit, refused: event.message };
+				break;
+			}
 			if (event.type === "exit") {
-				exit = { exitCode: event.exitCode, spawnError: event.spawnError };
+				exit = {
+					exitCode: event.exitCode,
+					spawnError: event.spawnError,
+					refused: null,
+				};
 				break;
 			}
 			writeSync(log, event.text);
@@ -70,7 +81,7 @@ export async function runCommand(
 			onOutput(event.stream, event.text);
 		}
 	} catch (error) {
-		exit = { exitCode: null, spawnError: messageOf(error) };
+		exit = { exitCode: null, spawnError: messageOf(error), refused: null };
 	} finally {
 		closeSync(log);
 	}

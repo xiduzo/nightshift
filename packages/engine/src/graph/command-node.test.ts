@@ -376,6 +376,102 @@ describe("the Command node", () => {
 		expect(ended?.outputs).not.toHaveProperty("data");
 	});
 
+	describe("secrets", () => {
+		const secrets = { ZAC_USER: "behandelaar", ZAC_PASSWORD: "s3cr3t-pw" };
+		const withSecrets = (h: Awaited<ReturnType<typeof startRun>>) => {
+			h.local.secretEnv = async (names) => {
+				const missing = names.filter((name) => !(name in secrets));
+				if (missing.length > 0) return { ok: false, missing };
+				return {
+					ok: true,
+					env: Object.fromEntries(
+						names.map((name) => [name, secrets[name as keyof typeof secrets]]),
+					),
+				};
+			};
+			return h;
+		};
+
+		test("each secret reaches the command by name; its value is ••• in the transcript, the log file, log_tail and data", async () => {
+			const h = withSecrets(
+				await startRun(
+					sandbox,
+					flowOf({
+						start: "login",
+						nodes: [
+							command(
+								"login",
+								// The command checks the value it got; the output prints it.
+								`[ "$ZAC_PASSWORD" = "s3cr3t-pw" ] && printf '{"user": "%s", "token": "%s"}\\n' "$ZAC_USER" "$ZAC_PASSWORD" && echo "$ZAC_PASSWORD" >&2`,
+								{ output: "json", secrets: ["ZAC_USER", "ZAC_PASSWORD"] },
+							),
+						],
+						edges: [],
+					}),
+				),
+			);
+			const { parked } = await drive(h, { inputs: {} });
+			expect(parked).toEqual([]);
+			const logged = await h.events();
+			const [ended] = payloads(logged, "StepEnded");
+			expect(ended?.outcome).toBe("pass");
+			expect(ended?.outputs.data).toEqual({ user: "•••", token: "•••" });
+			expect(ended?.outputs.log_tail).not.toContain("s3cr3t-pw");
+			expect(ended?.outputs.log_tail).toContain('"token": "•••"');
+
+			const [derived] = deriveSteps(logged);
+			const transcript = await readTranscriptFile(
+				derived?.transcriptPath as string,
+			);
+			expect(
+				transcript
+					.flatMap((e) =>
+						e.event.type === "command-output"
+							? [`${e.event.stream}: ${e.event.text}`]
+							: [],
+					)
+					// The two streams may arrive in either order.
+					.sort(),
+			).toEqual(["stderr: •••\n", 'stdout: {"user": "•••", "token": "•••"}\n']);
+			const log = await readFile(derived?.logPath as string, "utf8");
+			expect(log).toContain("•••");
+			expect(log).not.toContain("s3cr3t-pw");
+			expect(log).not.toContain("behandelaar");
+		});
+
+		test("a secret the Device does not have errors the step before the command runs", async () => {
+			const marker = join(sandbox.repoPath, "ran");
+			const h = withSecrets(
+				await startRun(
+					sandbox,
+					flowOf({
+						start: "login",
+						nodes: [
+							command("login", `touch ${marker}`, {
+								secrets: ["ZAC_USER", "ZAC_BEHANDELAAR_PASSWORD"],
+							}),
+						],
+						edges: [],
+					}),
+				),
+			);
+			const { parked } = await drive(h, { inputs: {} });
+			const reason =
+				"The command needs the secret ZAC_BEHANDELAAR_PASSWORD, but it is not saved. Save it under Agents → Secrets, or remove it from the node.";
+			expect(parked[0]).toMatchObject({
+				status: "failed",
+				reason: `Node "login" failed: ${reason}`,
+			});
+			const [ended] = payloads(await h.events(), "StepEnded");
+			expect(ended).toEqual({
+				outcome: "error",
+				outputs: { outcome: "error", visit: 1 },
+				error: reason,
+			});
+			expect(await Bun.file(marker).exists()).toBe(false);
+		});
+	});
+
 	describe("exits", () => {
 		const exits = [
 			{ name: "success", code: 0 },

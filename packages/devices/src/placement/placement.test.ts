@@ -63,6 +63,13 @@ const bDevice = (projectOf: () => string) =>
 			findCli: (name) => (name === "git" ? "/usr/bin/git" : null),
 			// B has the profile "everywhere"; only A has "here_only".
 			profileFor: (name) => (name === "everywhere" ? PROFILE : null),
+			// Only B has the secret B_TOKEN.
+			secretEnv: async (names) => {
+				const missing = names.filter((name) => name !== "B_TOKEN");
+				return missing.length > 0
+					? { ok: false, missing }
+					: { ok: true, env: { B_TOKEN: "b-only-token" } };
+			},
 		},
 		B,
 	);
@@ -146,13 +153,14 @@ const flow = (nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow =>
 		edges,
 	}) as Flow;
 
-const command = (id: string, line: string) =>
+const command = (id: string, line: string, extra: object = {}) =>
 	({
 		id,
 		type: "command",
 		position: { x: 0, y: 0 },
 		command: line,
 		output: "text",
+		...extra,
 	}) as Flow["nodes"][number];
 
 const agent = (id: string, harness = "claude-code") =>
@@ -226,6 +234,22 @@ describe("a run placed on another Device", () => {
 				"session",
 			]),
 		);
+	});
+
+	test("a command's secrets are read there: the call names them, and the value comes back as •••", async () => {
+		const started = await space().startRun({
+			projectId,
+			flow: flow([
+				command("login", 'echo "token $B_TOKEN"', { secrets: ["B_TOKEN"] }),
+			]),
+			startedBy: personId,
+			deviceId: B,
+		});
+		const run = await until(started.id, "finished");
+		expect(run.steps[0]?.outputs.log_tail).toBe("token •••");
+		const exec = requests.find((r) => r.call.kind === "exec");
+		expect(exec?.call).toMatchObject({ input: { secrets: ["B_TOKEN"] } });
+		expect(JSON.stringify(requests)).not.toContain("b-only-token");
 	});
 
 	test("a stop here ends the command there", async () => {

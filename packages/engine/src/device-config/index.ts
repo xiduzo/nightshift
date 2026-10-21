@@ -9,13 +9,13 @@ export {
 export type {
 	Connection,
 	ConnectionStore,
+	SecretEnv,
 	SecretSource,
 	SecretView,
 } from "./connections";
 export {
 	connectionInputSchema,
 	createConnectionStore,
-	secretNameSchema,
 	secretStore,
 } from "./connections";
 export type { DeviceDocument } from "./device-document";

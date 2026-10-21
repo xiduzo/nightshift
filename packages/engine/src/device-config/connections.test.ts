@@ -311,6 +311,22 @@ describe("secrets", () => {
 			{ name: "TRACKER_TOKEN", saved: false, inEnv: true, usedBy: ["tracker"] },
 		]);
 	});
+
+	test("secretEnv: each name as itself, the keychain over the environment, or the names that are missing", async () => {
+		const secrets = memorySecrets();
+		const { store } = await makeStore(
+			{ ZAC_USER: "env-user", ZAC_PASSWORD: "env-pw", PATH: "/bin" },
+			secrets,
+		);
+		await store.setSecret("ZAC_PASSWORD", "keychain-pw");
+		expect(await store.secretEnv(["ZAC_USER", "ZAC_PASSWORD"])).toEqual({
+			ok: true,
+			env: { ZAC_USER: "env-user", ZAC_PASSWORD: "keychain-pw" },
+		});
+		expect(
+			await store.secretEnv(["ZAC_PASSWORD", "ZAC_ADMIN", "ZAC_ROOT"]),
+		).toEqual({ ok: false, missing: ["ZAC_ADMIN", "ZAC_ROOT"] });
+	});
 });
 
 describe("mcpServersFor", () => {

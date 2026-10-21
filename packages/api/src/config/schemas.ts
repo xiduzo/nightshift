@@ -84,7 +84,7 @@ const secretSourceSchema = exact<SecretSource>()(
 	z.enum(["keychain", "env", "missing"]),
 );
 
-/** A `${NAME}` secret the connections use. Its value never comes back. */
+/** A `${NAME}` secret the connections or Command nodes use. Its value never comes back. */
 const secretViewSchema = exact<SecretView>()(
 	z.object({
 		name: z.string(),
@@ -118,7 +118,12 @@ export const connectionListSchema = z.object({
 			profiles: z.array(z.string()),
 		}),
 	),
-	secrets: z.array(secretViewSchema),
+	secrets: z.array(
+		secretViewSchema.extend({
+			/** The flows whose Command nodes name it. */
+			flows: z.array(flowRefSchema),
+		}),
+	),
 });
 
 /** A CLI on this computer: where it is, its version and its login. */

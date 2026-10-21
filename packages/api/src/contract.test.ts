@@ -233,11 +233,22 @@ describe("replies of a real engine", () => {
 		});
 		const tools: Flow = {
 			...night,
-			nodes: night.nodes.map((node) =>
-				node.type === "agent"
-					? { ...node, profile: "fast", clis: ["jq"], connections: ["gh"] }
-					: node,
-			),
+			nodes: [
+				...night.nodes.map((node) =>
+					node.type === "agent"
+						? { ...node, profile: "fast", clis: ["jq"], connections: ["gh"] }
+						: node,
+				),
+				{
+					id: "login",
+					type: "command",
+					position: { x: 0, y: 200 },
+					command: 'curl -u "$ZAC_USER:$ZAC_PASSWORD" https://zac.test',
+					output: "text",
+					secrets: ["ZAC_USER", "ZAC_PASSWORD"],
+				},
+			],
+			edges: [{ id: "e1", from: "agent", outcome: "pass", to: "login" }],
 		};
 		await reply(appRouter.flows.save, {
 			projectId,
@@ -253,7 +264,27 @@ describe("replies of a real engine", () => {
 		await read(appRouter.flows.get, { projectId, name: "night" });
 
 		await read(appRouter.profiles.list);
-		await read(appRouter.connections.list);
+		await reply(appRouter.connections.setSecret, {
+			name: "ZAC_USER",
+			value: "behandelaar",
+		});
+		const list = (await read(appRouter.connections.list)) as {
+			secrets: { name: string; saved: boolean; flows: unknown[] }[];
+		};
+		// The flows whose Command nodes name a secret, saved or not.
+		const toolsFlow = { projectId, projectName: expect.any(String) };
+		expect(list.secrets).toEqual([
+			expect.objectContaining({
+				name: "ZAC_PASSWORD",
+				saved: false,
+				flows: [{ ...toolsFlow, flowName: "tools" }],
+			}),
+			expect.objectContaining({
+				name: "ZAC_USER",
+				saved: true,
+				flows: [{ ...toolsFlow, flowName: "tools" }],
+			}),
+		]);
 		await read(appRouter.cliTools.list);
 		await read(appRouter.harnesses.list);
 		await read(appRouter.deciders.list);

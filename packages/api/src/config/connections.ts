@@ -4,12 +4,12 @@ import {
 	HARNESS_BIN,
 	removeConnection,
 	saveConnection,
-	secretNameSchema,
 } from "@nightshift/engine";
 import {
 	customHarnessSchema,
 	harnessNameSchema,
 	isCustomHarness,
+	secretNameSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
 
@@ -34,17 +34,33 @@ export const connections = {
 		})
 		.output(output(connectionListSchema))
 		.handler(async ({ context }) => {
-			const use = (await context.space.flowUse()).connections;
+			const use = await context.space.flowUse();
+			const secrets = context.connections.secrets();
+			// A secret only a Command node names is listed too: saved or not.
+			const named = [...use.secrets.keys()]
+				.filter((name) => !secrets.some((s) => s.name === name))
+				.map((name) => ({
+					name,
+					saved: false,
+					inEnv: context.connections.secretSource(name) === "env",
+					usedBy: [],
+				}));
 			return {
 				connections: context.connections.list().map((c) => ({
 					...c,
-					usedBy: use.get(c.name) ?? [],
+					usedBy: use.connections.get(c.name) ?? [],
 					profiles: context.profiles
 						.list()
 						.filter((p) => p.connections.includes(c.name))
 						.map((p) => p.name),
 				})),
-				secrets: context.connections.secrets(),
+				secrets: [...secrets, ...named]
+					// The order of `secrets()`: by code point, as `sort()` puts names.
+					.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+					.map((secret) => ({
+						...secret,
+						flows: use.secrets.get(secret.name) ?? [],
+					})),
 			};
 		}),
 	/** Runs `--version` and the login check of one CLI. Read-only. */

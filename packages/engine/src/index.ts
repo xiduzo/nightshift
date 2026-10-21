@@ -74,7 +74,6 @@ export {
 	saveConnection,
 	saveCustomAgent,
 	saveProfile,
-	secretNameSchema,
 	secretStore,
 	settingsPatchSchema,
 	settingsSchema,

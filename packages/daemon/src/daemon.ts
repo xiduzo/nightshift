@@ -301,6 +301,8 @@ export async function createDaemon(
 		// Decision nodes decided by a model: TanStack AI deciders, with API keys from the secrets.
 		decider: tanstackDecider({ secret: (name) => connections.secret(name) }),
 		mcpServersFor: (node) => connections.mcpServersFor(node),
+		// A Command node's secrets: the keychain, then the environment.
+		secretEnv: (names) => connections.secretEnv(names),
 		connectionNames: () => connections.names(),
 		cliNames: () => cliTools.names(),
 		findCli: (name) => Bun.which(name),

@@ -15,7 +15,7 @@ const loaded = (name: string, nodes: unknown[]) =>
 	}) as never as LoadedFlow;
 
 describe("flowUse", () => {
-	test("finds the flows that name each connection, CLI tool and profile", async () => {
+	test("finds the flows that name each connection, CLI tool, secret and profile", async () => {
 		const flows: Record<string, LoadedFlow> = {
 			night: loaded("night", [
 				{
@@ -27,8 +27,13 @@ describe("flowUse", () => {
 				},
 				{ id: "fix", type: "agent", connections: ["gh"], profile: "fast" },
 				{ id: "file", type: "tool", connection: "linear" },
+				{ id: "login", type: "command", secrets: ["ZAC_USER", "ZAC_PW"] },
+				{ id: "again", type: "command", secrets: ["ZAC_USER"] },
 			]),
-			day: loaded("day", [{ id: "a", type: "agent", profile: "slow" }]),
+			day: loaded("day", [
+				{ id: "a", type: "agent", profile: "slow" },
+				{ id: "check", type: "command" },
+			]),
 		};
 		const reader: FlowReader = {
 			listProjects: async () => [project("p1", "App"), project("p2", "Site")],
@@ -69,6 +74,9 @@ describe("flowUse", () => {
 		expect(use.connections.get("gh")).toEqual([night]);
 		expect(use.connections.get("linear")).toEqual([night]);
 		expect(use.clis.get("jq")).toEqual([night]);
+		expect(use.secrets.get("ZAC_USER")).toEqual([night]);
+		expect(use.secrets.get("ZAC_PW")).toEqual([night]);
+		expect(use.secrets.size).toBe(2);
 		expect(use.profiles.get("fast")).toEqual([
 			{ ...night, nodeIds: ["plan", "fix"] },
 		]);
