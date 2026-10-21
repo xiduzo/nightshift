@@ -8,14 +8,14 @@
 
 {
   "$schema": "https://r2.better-t-stack.dev/schema.json",
-  "version": "3.44.3",
+  "version": "3.47.0",
   "createdAt": "2026-10-10T16:59:48.841Z",
-  "reproducibleCommand": "bun create better-t-stack@latest /Users/sander/personal/nightshift --frontend tanstack-start --backend hono --runtime bun --database sqlite --orm drizzle --api orpc --auth better-auth --payments none --addons electrobun turborepo biome lefthook --examples none --db-setup none --web-deploy none --server-deploy none --git --package-manager bun --install",
+  "reproducibleCommand": "bun create better-t-stack@latest /Users/sander/personal/nightshift --frontend tanstack-start native-uniwind --backend hono --runtime bun --database sqlite --orm drizzle --api orpc --auth better-auth --payments none --addons electrobun turborepo biome lefthook --examples none --db-setup none --web-deploy none --server-deploy none --git --package-manager bun --install",
   "database": "sqlite",
   "orm": "drizzle",
   "backend": "hono",
   "runtime": "bun",
-  "frontend": ["tanstack-start"],
+  "frontend": ["tanstack-start", "native-uniwind"],
   "addons": ["electrobun", "turborepo", "biome", "lefthook"],
   "examples": [],
   "auth": "better-auth",

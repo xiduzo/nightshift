@@ -1,0 +1,18 @@
+{
+	"extends": ["@nightshift/config/tsconfig.base.json", "expo/tsconfig.base"],
+	"references": [{ "path": "../../packages/api" }],
+	"compilerOptions": {
+		"types": [],
+		"customConditions": ["react-native", "react-native-legacy-deep-imports"],
+		"paths": {
+			"@/*": ["./src/*"]
+		}
+	},
+	"include": [
+		"**/*.ts",
+		"**/*.tsx",
+		".expo/types/**/*.ts",
+		"expo-env.d.ts",
+		"uniwind-types.d.ts"
+	]
+}

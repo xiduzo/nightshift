@@ -11,16 +11,16 @@ Last updated: 2026-10-21
 | Runtime | Bun | 1.3 |
 | Language | TypeScript | 6.0 |
 | Desktop shell | Electrobun | 2.0 |
-| Web UI | TanStack Start, TanStack Router, TanStack Query, React | Start 1.168, Router 1.170, Query 5.102, React 19.2 |
+| Web UI | TanStack Start, TanStack Router, TanStack Query, React | Start 1.168, Router 1.170, Query 5.102, React 19.3 (pinned to 19.3.0: Expo SDK 58 needs it) |
 | Styling | Tailwind CSS, shadcn | Tailwind 4.3, shadcn 4.21 |
 | API server | Hono | 4.13 |
 | API contract | oRPC with Zod | oRPC 1.15, Zod 4.5 |
 | Database | libsql (SQLite file) with Drizzle ORM | libsql 0.5, Drizzle 1.0.0-rc |
-| Auth | Better Auth | 1.7 |
+| Auth | Better Auth, with the expo plugin for the phone app | 1.7.12 |
 | Document sync | Yjs, served by Hocuspocus on Bun's WebSockets (the Device and Space documents) | Yjs 13.6, Hocuspocus 4.7 |
 | Agents | `@tanstack/ai` with harness adapters (`ai-claude-code`, `ai-opencode`, `ai-codex`) | ai 0.69, claude-code 0.9, opencode 0.5, codex 0.6 (planned, not installed yet) |
 | Flow editor | React Flow (`@xyflow/react`) | 12.12 (planned, not installed yet) |
-| Phone app | Expo with Expo Router, Uniwind, React Native Reusables, `@better-auth/expo`, from the Better-T-Stack `native-uniwind` skeleton | Expo SDK 58 (planned, not installed yet) |
+| Phone app | Expo with Expo Router, Uniwind, React Native Reusables, `@better-auth/expo`, from the Better-T-Stack `native-uniwind` skeleton (`apps/mobile`, `packages/ui-native`) | Expo SDK 58, React Native 0.88, Uniwind 1.13, React Native Reusables CLI 0.7 |
 | Push | `web-push` (VAPID), `expo-server-sdk`, `expo-notifications` | planned, not installed yet |
 | Tooling | Turborepo, Biome, Lefthook, varlock | Turbo 2.10, Biome 2.5 |
 
@@ -132,6 +132,8 @@ bun lefthook install
 | The phone app is Expo SDK 58 from the Better-T-Stack skeleton, with React Native Reusables on Uniwind | Better-T-Stack `native-uniwind` gives Expo Router, Uniwind, oRPC, TanStack Query, Better Auth and varlock in the shape of this repo. React Native Reusables is shadcn for React Native, so the shadcn-only rule extends to the phone. It replaces the template's HeroUI Native. NativeWind 5 is not stable. oRPC streams over `expo/fetch`. No Yjs and no libsql on the phone. The app reads and acts: no flow or schedule editing. | 2026-10-21 |
 | Three new packages for the phone: `ui-native` (layer 0), `notifications` (layer 3), `client` (layer 5) | One app cannot import another. The client logic that both apps need (query factories, the run-stream reconnect loop, derived view types, the notify rules of the in-app stream) goes in `@nightshift/client`, browser- and React-Native-safe. The notifier is a core domain beside `devices`. See `docs/steering/STRUCTURE.md`. | 2026-10-21 |
 | Out of scope for the phone: store submission, a publisher push relay, Apple Watch, end-to-end encrypted push, a demo Host for App Review | Each needs the user's own accounts, or a decision about other people's Hosts. A personal development build pushes from the user's own Host without them. | 2026-10-21 |
+| One React for the whole repo, pinned to 19.3.0 | Expo SDK 58 needs React 19.3.0 exactly, and a monorepo may hold only one React. The web app, the desktop app and the phone app share the catalog entry. | 2026-10-21 |
+| The phone's origins are trusted by Better Auth only | `nightshift://` and `exp://` (Expo Go and development builds) are in `authOriginsOf` (`packages/daemon/src/http/origins.ts`), not in `trustedOriginsOf`. A browser page never has these origins, so they open nothing to it, and they never get the local session. Device keys stay `Authorization: Bearer`. | 2026-10-21 |
 
 Full ADRs go in `docs/adr/` when a decision needs more than one line of rationale.
 
@@ -141,6 +143,8 @@ Full ADRs go in `docs/adr/` when a decision needs more than one line of rational
 - Electrobun packaging needs a static web build of TanStack Start. Not yet verified.
 - Not yet verified: whether the harness adapters accept our own tools, and whether they expose session resume and the usage-limit reset time.
 - `drizzle-orm` is a release candidate.
+- Hermes (Expo SDK 58) cannot compile a destructured rest parameter, which `@orpc/client` uses. `apps/mobile/babel.config.js` runs `@babel/plugin-transform-parameters` on the `@orpc` packages only.
+- Bun's isolated installs keep several copies of one version of a package (one per set of peers). Expo's autolinking module resolution puts one copy of each in the phone's bundle, but `expo-doctor` reports the copies as duplicates. Not yet verified: a native build (`expo run:ios`) with them.
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
