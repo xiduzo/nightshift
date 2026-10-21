@@ -34,6 +34,15 @@ describe("the dashboard query", () => {
 		expect(intervalOn(options, undefined)).toBe(60_000);
 	});
 
+	test("polls once a minute at the minute pace, also while a run is open", () => {
+		const options = dashboard.summary({ everySpace: true }, "minute");
+		expect(intervalOn(options, { open: { count: 2 } })).toBe(60_000);
+		expect(intervalOn(options, undefined)).toBe(60_000);
+		expect(options.queryKey).toEqual(
+			dashboard.summary({ everySpace: true }).queryKey,
+		);
+	});
+
 	test("keeps the keys of its procedures", () => {
 		expect(dashboard.all()).toEqual(orpc.dashboard.key());
 		expect(dashboard.flow("p1", "night").queryKey).toEqual(
