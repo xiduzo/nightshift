@@ -58,6 +58,7 @@
       "dependencies": {
         "@dagrejs/dagre": "3.1.1",
         "@nightshift/api": "workspace:*",
+        "@nightshift/client": "workspace:*",
         "@nightshift/flows": "workspace:*",
         "@nightshift/ui": "workspace:*",
         "@orpc/client": "catalog:",
@@ -164,6 +165,24 @@
       "devDependencies": {
         "@nightshift/config": "workspace:*",
         "typescript": "catalog:",
+      },
+    },
+    "packages/client": {
+      "name": "@nightshift/client",
+      "dependencies": {
+        "@nightshift/api": "workspace:*",
+        "@nightshift/flows": "workspace:*",
+        "@orpc/client": "catalog:",
+        "@orpc/tanstack-query": "^1.15.0",
+      },
+      "devDependencies": {
+        "@nightshift/config": "workspace:*",
+        "@tanstack/react-query": "^5.102.8",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+      "peerDependencies": {
+        "@tanstack/react-query": "^5.102.8",
       },
     },
     "packages/config": {
@@ -598,6 +617,8 @@
     "@nightshift/api": ["@nightshift/api@workspace:packages/api"],
 
     "@nightshift/auth": ["@nightshift/auth@workspace:packages/auth"],
+
+    "@nightshift/client": ["@nightshift/client@workspace:packages/client"],
 
     "@nightshift/config": ["@nightshift/config@workspace:packages/config"],
 

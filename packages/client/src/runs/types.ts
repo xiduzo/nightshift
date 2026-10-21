@@ -1,0 +1,62 @@
+import type { ApiInputs, ApiOutputs } from "../api";
+
+/** The view types of runs, their steps and their transcripts, derived from the API. */
+
+export type RunSummary = ApiOutputs["runs"]["list"][number];
+export type RunDetail = ApiOutputs["runs"]["get"];
+export type StepSummary = RunDetail["steps"][number];
+export type SessionSummary = StepSummary["sessions"][number];
+/** One item of a Call step's visit (`each`). */
+export type ItemSummary = StepSummary["items"][number];
+export type ItemState = ItemSummary["state"];
+export type StepScope = NonNullable<StepSummary["scope"]>;
+export type RunStatus = RunSummary["status"];
+export type StepOutcome = NonNullable<StepSummary["outcome"]>;
+export type StartRunInput = ApiInputs["runs"]["start"];
+export type RunTrigger = RunSummary["trigger"];
+
+/** One item of `runs.watch`: the run's status, a step summary, or a transcript entry. */
+export type RunStreamItem =
+	ApiOutputs["runs"]["watch"] extends AsyncIterable<infer Item> ? Item : never;
+export type TranscriptEntry = Extract<
+	RunStreamItem,
+	{ kind: "transcript" }
+>["entry"];
+export type StepEvent = TranscriptEntry["event"];
+export type CommandEvent = Extract<
+	StepEvent,
+	{ type: "command-start" | "command-output" | "command-exit" }
+>;
+export type DecisionEvent = Extract<
+	StepEvent,
+	{ type: "decision-start" | "decision" }
+>;
+export type GateEvent = Extract<
+	StepEvent,
+	{ type: "gate-open" | "gate-resolved" }
+>;
+export type ItemEvent = Extract<
+	StepEvent,
+	{ type: "items-read" | "item-start" | "item-end" }
+>;
+export type WaitEvent = Extract<StepEvent, { type: "wait" | "wake" }>;
+export type ValueEvent = Extract<StepEvent, { type: "value-start" | "value" }>;
+/** A Tool node's call and the tool's answer. */
+export type ToolNodeEvent = Extract<
+	StepEvent,
+	{ type: "tool-call" | "tool-called" }
+>;
+export type AgentEvent = Exclude<
+	StepEvent,
+	| CommandEvent
+	| DecisionEvent
+	| GateEvent
+	| ItemEvent
+	| WaitEvent
+	| ValueEvent
+	| ToolNodeEvent
+>;
+export type AgentUsage = NonNullable<
+	Extract<AgentEvent, { type: "finished" }>["usage"]
+>;
+export type AgentErrorKind = Extract<AgentEvent, { type: "error" }>["kind"];

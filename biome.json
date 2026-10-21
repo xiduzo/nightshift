@@ -242,6 +242,47 @@
 			}
 		},
 		{
+			"includes": ["packages/client/**", "!packages/client/**/*.test.ts"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"patterns": [
+									{
+										"group": [
+											"@nightshift/**",
+											"!@nightshift/api/client",
+											"!@nightshift/flows"
+										],
+										"message": "@nightshift/client imports only @nightshift/api/client (types) and the @nightshift/flows root (see docs/steering/STRUCTURE.md, section 1)."
+									},
+									{
+										"group": [
+											"server",
+											"server/**",
+											"desktop",
+											"desktop/**",
+											"web",
+											"web/**",
+											"mobile",
+											"mobile/**"
+										],
+										"message": "No workspace imports an app (see docs/steering/STRUCTURE.md, section 1)."
+									},
+									{
+										"group": ["**/packages/**", "**/apps/*/src/**"],
+										"message": "Never reach into another workspace by a relative path. Import the package by its name and a listed entry."
+									}
+								]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
 			"includes": ["apps/web/**"],
 			"linter": {
 				"rules": {
