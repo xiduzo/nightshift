@@ -1,6 +1,6 @@
 /** Runs: their query options, the stream of one run, and their view types. */
 
-export { costLabel, whenLabel } from "./format";
+export { costLabel, flowLabel, runStatusLabel, whenLabel } from "./format";
 export {
 	defaultPlacement,
 	type PlacementChoice,
@@ -13,8 +13,11 @@ export {
 	groupRuns,
 	hasEnded,
 	markdownPreview,
+	nodeLabels,
 	type RunGroup,
 	type StepState,
+	stepName,
+	stepPosition,
 	stepState,
 } from "./progress";
 export { createRunMutations, createRunQueries } from "./queries";

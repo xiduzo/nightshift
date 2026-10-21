@@ -1,4 +1,5 @@
 import type {
+	RunDetail,
 	RunStatus,
 	RunSummary,
 	StepSummary,
@@ -82,6 +83,44 @@ export function currentStep<
 		if (!current || step.startedAt >= current.startedAt) current = step;
 	}
 	return current;
+}
+
+/** The name of each node of a run, by id: its label, else its id. The run's own flow wins over the flows it calls. */
+export function nodeLabels(
+	run: Pick<RunDetail, "flow" | "calledFlows">,
+): Map<string, string> {
+	const labels = new Map<string, string>();
+	for (const flow of [...Object.values(run.calledFlows), run.flow]) {
+		for (const node of flow.nodes) labels.set(node.id, node.label || node.id);
+	}
+	return labels;
+}
+
+/** A step by its node's name, with the visit when the run came back to it: "Review (visit 2)". */
+export function stepName(
+	step: Pick<StepSummary, "nodeId" | "visit">,
+	labels: ReadonlyMap<string, string>,
+): string {
+	const name = labels.get(step.nodeId) ?? step.nodeId;
+	return step.visit > 1 ? `${name} (visit ${step.visit})` : name;
+}
+
+/**
+ * How far a run is through its flow: `at` is how many of the flow's nodes
+ * have started (a node the run came back to counts once), `of` is how many
+ * nodes the flow has. Only the run's own steps count, not those of a flow
+ * it calls. A branch the run does not take leaves `at` below `of`.
+ */
+export function stepPosition(
+	steps: readonly Pick<StepSummary, "nodeId" | "scope">[],
+	flow: Pick<RunDetail["flow"], "nodes">,
+): { at: number; of: number } {
+	const nodes = new Set(flow.nodes.map((node) => node.id));
+	const started = new Set<string>();
+	for (const step of steps) {
+		if (step.scope === null && nodes.has(step.nodeId)) started.add(step.nodeId);
+	}
+	return { at: started.size, of: nodes.size };
 }
 
 /** The latest message of an agent in one step, as it streams in. */
