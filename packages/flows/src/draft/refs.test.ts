@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow, flowSchema } from "../schema";
+import { FLOW_VERSION, type Flow, flowSchema } from "../document";
 import { setVariables } from "./graph";
 import { takenNames } from "./names";
 import { withWrites } from "./nodes";

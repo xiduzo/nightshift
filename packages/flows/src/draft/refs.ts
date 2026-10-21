@@ -1,7 +1,8 @@
 /** Renames in templates, rules and expressions. */
-import type { Flow, FlowNode, ListSource } from "../schema";
+import type { Flow, FlowNode } from "../document";
+import type { ListSource } from "../nodes";
+import type { TemplateRef } from "../template";
 import { templateRefs } from "../template";
-import type { TemplateRef } from "../types";
 
 /** A name a template can reference: a node id, an input, `run` or `vars`. */
 const REF_NAME = /^[a-z][a-z0-9_]*$/;

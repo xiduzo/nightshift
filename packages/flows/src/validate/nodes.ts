@@ -1,0 +1,61 @@
+import type { FlowNode } from "../document";
+import {
+	checkAgentNode,
+	checkCallNode,
+	checkCommandNode,
+	checkDecisionNode,
+	checkToolNode,
+	checkValueNode,
+	checkWaitNode,
+	type NodeCheck,
+} from "../nodes";
+import type { Report } from "./issues";
+import { checkRule, checkTemplate, type Scope } from "./scope";
+
+/**
+ * The checks of one node's own content. Each node type keeps its checks in
+ * `nodes/`. This gives them the flow they read: its templates, rules and
+ * edges.
+ */
+export function checkNode(
+	node: FlowNode,
+	scope: Scope,
+	error: Report,
+	warning: Report,
+): void {
+	const at = { nodeId: node.id };
+	const check: NodeCheck = {
+		error: (message) => error(message, at),
+		warning: (message) => warning(message, at),
+		template: (text, where) =>
+			checkTemplate(text, `The ${where} of "${node.id}"`, at, scope, error),
+		rule: (expr, subject) => checkRule(expr, subject, at, scope, error),
+		routed: (outcome) =>
+			scope.flow.edges.some(
+				(edge) => edge.from === node.id && edge.outcome === outcome,
+			),
+	};
+	switch (node.type) {
+		case "agent":
+			checkAgentNode(node, check);
+			break;
+		case "command":
+			checkCommandNode(node, check);
+			break;
+		case "decision":
+			checkDecisionNode(node, check);
+			break;
+		case "call":
+			checkCallNode(node, check);
+			break;
+		case "value":
+			checkValueNode(node, check);
+			break;
+		case "wait":
+			checkWaitNode(node, check);
+			break;
+		case "tool":
+			checkToolNode(node, check);
+			break;
+	}
+}

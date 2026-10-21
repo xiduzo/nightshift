@@ -1,4 +1,6 @@
 /** New nodes and flows, and edits of one node. */
+
+import { FLOW_VERSION, type Flow, type FlowNode } from "../document";
 import {
 	type AgentNode,
 	type CallEach,
@@ -8,9 +10,6 @@ import {
 	DEFAULT_COMMAND_EXITS,
 	type DecidedBy,
 	type DecisionNode,
-	FLOW_VERSION,
-	type Flow,
-	type FlowNode,
 	type ListSource,
 	type ToolNode,
 	type ValueBy,
@@ -20,7 +19,7 @@ import {
 	valueDeciderNameSchema,
 	type WaitNode,
 	type WaitUntil,
-} from "../schema";
+} from "../nodes";
 
 export type Position = { x: number; y: number };
 

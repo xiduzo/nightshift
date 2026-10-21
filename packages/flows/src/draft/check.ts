@@ -1,6 +1,6 @@
 /** Checks a draft: the schema, the connections and profiles it names, and `validateFlow`. */
-import { type Flow, flowSchema } from "../schema";
-import type { FlowIssue } from "../types";
+import { type Flow, flowSchema } from "../document";
+import type { FlowIssue } from "../validate";
 import { validateFlow } from "../validate";
 import type { ProjectFlowMap } from "./graph";
 import { missingConnections } from "./nodes";

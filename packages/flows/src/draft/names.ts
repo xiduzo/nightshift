@@ -1,5 +1,5 @@
 /** Free names for new nodes, inputs, outputs and edges. */
-import type { Flow } from "../schema";
+import type { Flow } from "../document";
 
 /**
  * The names a template can read in this flow: node ids, inputs and

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { FLOW_VERSION, type Flow } from "../schema";
+import { FLOW_VERSION, type Flow } from "../document";
 import { checkDraft, type DraftMessages, isSavable } from "./check";
 import { agentNode, commandNode } from "./nodes";
 

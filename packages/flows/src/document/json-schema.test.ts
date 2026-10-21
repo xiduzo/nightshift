@@ -56,7 +56,7 @@ describe("published schemas", () => {
 	});
 
 	test("the version 1 fixtures parse to the same flows", () => {
-		const dir = join(import.meta.dir, "..", "fixtures", "v1-rpgdotexe");
+		const dir = join(import.meta.dir, "fixtures", "v1-rpgdotexe");
 		const parsed = ["night", "feature", "trace"].map((name) =>
 			flows.parseFlow(
 				JSON.parse(readFileSync(join(dir, `${name}.json`), "utf8")),

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Flow } from "./document";
+import { singleAgentFlow } from "./document";
 import {
 	deleteFlowFile,
 	flowsDir,
@@ -10,8 +12,6 @@ import {
 	readFlowFile,
 	writeFlowFile,
 } from "./files";
-import { singleAgentFlow } from "./quick";
-import type { Flow } from "./schema";
 
 let repo: string;
 

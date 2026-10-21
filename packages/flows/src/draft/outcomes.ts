@@ -1,4 +1,12 @@
 /** The options, outcomes and exits of a node, and the edges that leave on them. */
+
+import {
+	type Flow,
+	type FlowEdge,
+	type FlowNode,
+	nodeOutcomes,
+	type Outcome,
+} from "../document";
 import {
 	type AgentNode,
 	type CallEach,
@@ -6,12 +14,7 @@ import {
 	type CommandNode,
 	commandExits,
 	type DecisionNode,
-	type Flow,
-	type FlowEdge,
-	type FlowNode,
-	nodeOutcomes,
-	type Outcome,
-} from "../schema";
+} from "../nodes";
 import { updateNode } from "./graph";
 
 /** A Decision option or an Agent's own outcome. Each one is an outcome of its node. */

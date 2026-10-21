@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { migrateFlow } from "./migrate";
+import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "./document";
+import { flowNameSchema } from "./nodes";
 import {
 	SCHEDULES_VERSION,
 	type Schedule,
@@ -9,9 +10,12 @@ import {
 	schedulesFileSchema,
 	validateSchedules,
 } from "./schedules";
-import { FLOW_VERSION, type Flow, flowNameSchema, flowSchema } from "./schema";
-import type { FlowIssue, FlowListItem, LoadedFlow } from "./types";
-import { parseFlow } from "./validate";
+import {
+	type FlowIssue,
+	type FlowListItem,
+	type LoadedFlow,
+	parseFlow,
+} from "./validate";
 
 /**
  * Node-only: reads and writes `.nightshift/flows/*.json` and
