@@ -14,6 +14,14 @@ export {
 } from "./channels";
 export type { NoticeKind } from "./deliveries";
 export {
+	createDesktopChannel,
+	type DesktopNotice,
+	type DesktopNotifier,
+	type DesktopWindow,
+	type DesktopWindowState,
+	systemDesktopNotifier,
+} from "./desktop";
+export {
 	engineRunEvents,
 	oneSenderPerSpace,
 	type RunEvent,
