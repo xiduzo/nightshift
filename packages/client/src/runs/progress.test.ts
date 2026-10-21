@@ -60,13 +60,21 @@ describe("the runs by group", () => {
 describe("where a step is", () => {
 	const gate = { question: "Ship it?", choices: [], openedAt: 1 };
 
-	test("running, waiting at its Gate, failed or done", () => {
-		expect(stepState({ endedAt: null, error: null, gate: null })).toBe(
-			"running",
-		);
-		expect(stepState({ endedAt: null, error: null, gate })).toBe("waiting");
-		expect(stepState({ endedAt: 5, error: "boom", gate: null })).toBe("failed");
-		expect(stepState({ endedAt: 5, error: null, gate })).toBe("done");
+	const step = (
+		endedAt: number | null,
+		error: string | null,
+		outcome: string | null,
+		open = false,
+	) => ({ endedAt, error, outcome, gate: open ? gate : null });
+
+	test("running, waiting at its Gate, failed, stopped or done", () => {
+		expect(stepState(step(null, null, null))).toBe("running");
+		expect(stepState(step(null, null, null, true))).toBe("waiting");
+		expect(stepState(step(5, "boom", null))).toBe("failed");
+		expect(stepState(step(5, null, "stopped"))).toBe("stopped");
+		expect(stepState(step(5, null, "interrupted"))).toBe("stopped");
+		expect(stepState(step(5, null, "ship", true))).toBe("done");
+		expect(stepState(step(5, null, "pass"))).toBe("done");
 	});
 
 	test("the current step is the last one that started and runs", () => {

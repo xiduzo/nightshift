@@ -22,7 +22,7 @@ const GROUP_OF: Record<RunStatus, RunGroup> = {
 };
 
 /** The group of a run's status. */
-export function runGroup(status: RunStatus): RunGroup {
+function runGroup(status: RunStatus): RunGroup {
 	return GROUP_OF[status];
 }
 
@@ -54,15 +54,22 @@ export function groupRuns<T extends Pick<RunSummary, "status" | "createdAt">>(
 
 /**
  * Where one step is: running, waiting for a person at its Gate, failed,
- * or done (with the outcome it ended on).
+ * stopped (by a person, or when Night Shift stopped), or done (with the
+ * outcome it ended on).
  */
-export type StepState = "running" | "waiting" | "failed" | "done";
+export type StepState = "running" | "waiting" | "failed" | "stopped" | "done";
+
+/** The outcomes of a step that did not finish its work. */
+const STOPPED_OUTCOMES = new Set(["stopped", "interrupted"]);
 
 export function stepState(
-	step: Pick<StepSummary, "endedAt" | "error" | "gate">,
+	step: Pick<StepSummary, "endedAt" | "error" | "gate" | "outcome">,
 ): StepState {
 	if (step.endedAt === null) return step.gate ? "waiting" : "running";
-	return step.error !== null ? "failed" : "done";
+	if (step.error !== null) return "failed";
+	return step.outcome !== null && STOPPED_OUTCOMES.has(step.outcome)
+		? "stopped"
+		: "done";
 }
 
 /** The step that runs now: the last one that started and has not ended. */

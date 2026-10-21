@@ -95,11 +95,11 @@ export {
 export {
 	type AgentErrorKind,
 	type AgentEvent,
-	type AgentMessage,
 	type AgentMessages,
 	type AgentUsage,
 	applyAgentMessages,
 	type CommandEvent,
+	costLabel,
 	createRunMutations,
 	createRunQueries,
 	currentStep,
@@ -118,9 +118,7 @@ export {
 	type PlacementChoice,
 	placementChoices,
 	type RunDetail,
-	type RunDevice,
 	type RunGroup,
-	type RunPlacement,
 	type RunStatus,
 	type RunStreamConnection,
 	type RunStreamItem,
@@ -128,7 +126,6 @@ export {
 	type RunTrigger,
 	type RunWatchClient,
 	retryDelay,
-	runGroup,
 	type SessionSummary,
 	type StartRunInput,
 	type StepEvent,
@@ -142,6 +139,7 @@ export {
 	type ValueEvent,
 	type Wait,
 	type WaitEvent,
+	whenLabel,
 } from "./runs";
 export {
 	createScheduleMutations,
