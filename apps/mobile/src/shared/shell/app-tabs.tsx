@@ -10,6 +10,7 @@ import {
 import type { ColorValue } from "react-native";
 
 import { useHost } from "@/features/host";
+import { useLiveInbox, useWaitingCount } from "@/features/inbox";
 import { SpacePicker, useRememberedSpace } from "@/features/spaces";
 
 function icon(Icon: LucideIcon) {
@@ -34,12 +35,24 @@ export function AppTabs() {
 
 function SignedInTabs() {
 	useRememberedSpace();
+	useLiveInbox();
+	const waiting = useWaitingCount();
 
 	return (
 		<Tabs>
 			<Tabs.Screen
 				name="index"
-				options={{ title: "Inbox", tabBarIcon: icon(Inbox) }}
+				options={{
+					title: "Inbox",
+					tabBarIcon: icon(Inbox),
+					tabBarBadge: waiting > 0 ? waiting : undefined,
+					tabBarAccessibilityLabel:
+						waiting === 0
+							? "Inbox"
+							: waiting === 1
+								? "Inbox, 1 Gate waits for you"
+								: `Inbox, ${waiting} Gates wait for you`,
+				}}
 			/>
 			<Tabs.Screen
 				name="runs"
