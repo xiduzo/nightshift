@@ -61,13 +61,19 @@ export {
 	type OpenGate,
 } from "./gates";
 export {
+	applySettingsPatch,
 	compareGates,
 	compareRuns,
+	createNotificationMutations,
+	createNotificationQueries,
 	describeNotice,
 	gateKey,
 	isWanted,
 	type Notice,
 	type NoticeChoices,
+	type NotificationSettings,
+	type NotificationSettingsPatch,
+	type PushTargetView,
 } from "./notifications";
 export {
 	createProjectMutations,
