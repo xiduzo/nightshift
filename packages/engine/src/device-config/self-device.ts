@@ -35,6 +35,25 @@ export async function selfOwnerId(db: Database): Promise<string | null> {
 }
 
 /**
+ * Names the Person who owns this computer's Device (`localPerson`). Throws
+ * when this computer has no Device row yet.
+ */
+export async function setSelfOwner(
+	db: Database,
+	personId: string,
+): Promise<void> {
+	const [row] = await db
+		.select({ id: device.id })
+		.from(device)
+		.where(eq(device.self, true));
+	if (!row) throw new Error("This computer has no Device row yet.");
+	await db
+		.update(device)
+		.set({ ownerId: personId })
+		.where(eq(device.id, row.id));
+}
+
+/**
  * This computer's Device, made when there is none. A name or platform the
  * migration left blank is filled in from `host`.
  */

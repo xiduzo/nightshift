@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { userInfo } from "node:os";
 import type { Database } from "@nightshift/db";
-import { device, member, organization, user } from "@nightshift/db/schema";
+import { member, organization, user } from "@nightshift/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { claimHostAdmin } from "./members";
 import type { Role } from "./roles";
@@ -117,15 +117,15 @@ export async function activeSpaceId(
  * database without one gets a new Person here. A blank name becomes the
  * name of the computer's account. A new Person is the Host admin when the
  * Host has none.
+ *
+ * `self` is this computer's Device row, which auth does not own: the
+ * Person it names, and how to name another (the engine's `setSelfOwner`).
+ * Without it, the Person is the one with the local email.
  */
 export async function localPerson(
 	db: Database,
+	self: OwnedDevice = UNOWNED,
 ): Promise<{ userId: string; spaceId: string }> {
-	const [self] = await db
-		.select({ id: device.id, ownerId: device.ownerId })
-		.from(device)
-		.where(eq(device.self, true));
-	if (!self) throw new Error("This computer has no Device row yet.");
 	const name = localName();
 	let [person] = self.ownerId
 		? await db.select().from(user).where(eq(user.id, self.ownerId))
@@ -142,17 +142,22 @@ export async function localPerson(
 		// The first Person on a Host is its admin.
 		await claimHostAdmin(db, userId);
 	}
-	if (self.ownerId !== userId) {
-		await db
-			.update(device)
-			.set({ ownerId: userId })
-			.where(eq(device.id, self.id));
-	}
+	if (self.ownerId !== userId) await self.setOwner(userId);
 	if (person && person.name.trim() === "") {
 		await db.update(user).set({ name }).where(eq(user.id, userId));
 	}
 	return { userId, spaceId: await ensurePersonalSpace(db, userId) };
 }
+
+/** This computer's Device as `localPerson` sees it: whom it names as its owner. */
+export type OwnedDevice = {
+	ownerId: string | null;
+	/** Names the Person who owns this computer's Device. */
+	setOwner(personId: string): Promise<void>;
+};
+
+/** A Device that names nobody and keeps no owner. */
+const UNOWNED: OwnedDevice = { ownerId: null, setOwner: async () => {} };
 
 function localName(): string {
 	try {

@@ -48,6 +48,8 @@ import {
 	openDeviceDocument,
 	secretStore,
 	selfDevice,
+	selfOwnerId,
+	setSelfOwner,
 	setUpGit,
 	spaceIdOf,
 	systemGitInstaller,
@@ -201,7 +203,10 @@ export async function createDaemon(
 	const document = hot.nightshiftDocument;
 
 	/** The Person who owns this computer, and their personal Space. */
-	const person = await localPerson(db);
+	const person = await localPerson(db, {
+		ownerId: await selfOwnerId(db),
+		setOwner: (personId) => setSelfOwner(db, personId),
+	});
 
 	// Every Space's document, before the relay serves them: the Projects of a
 	// Replica from before them are imported here, once.

@@ -10,12 +10,11 @@ import {
 
 import { createdAt, spaceId, updatedAt } from "./columns";
 
-// Owner: `@nightshift/engine`, `peers/`: the registry of Devices, the links
-// to Hosts, and the exchange of run history and commands with them
-// (`peers/exchange/`). It moves to `@nightshift/devices`. `device-config/`
-// makes this computer's own `device` row (`selfDevice`). Known deviation:
-// `@nightshift/auth` `localPerson()` writes `device.owner_id` (STRUCTURE.md
-// section 8).
+// Owner: `@nightshift/devices`: the registry of Devices (`registry/`), the
+// links to Hosts and their Spaces (`links/`), and the exchange of run
+// history and commands with them (`exchange/`). `@nightshift/engine`
+// `device-config/` makes this computer's own `device` row (`selfDevice`) and
+// names its owner (`setSelfOwner`, which the daemon gives `localPerson()`).
 
 /**
  * A computer that runs Night Shift. Exactly one row is this computer: the

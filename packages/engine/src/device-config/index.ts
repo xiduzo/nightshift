@@ -31,7 +31,7 @@ export type { McpExpansion } from "./mcp";
 export { expandMcpServers } from "./mcp";
 export type { ProfileStore, ProfileView } from "./profiles";
 export { createProfileStore } from "./profiles";
-export { selfDevice, selfOwnerId } from "./self-device";
+export { selfDevice, selfOwnerId, setSelfOwner } from "./self-device";
 export type {
 	RunSettings,
 	SettingField,

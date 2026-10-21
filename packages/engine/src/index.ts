@@ -68,6 +68,8 @@ export {
 	secretNameSchema,
 	secretStore,
 	selfDevice,
+	selfOwnerId,
+	setSelfOwner,
 	settingsPatchSchema,
 	settingsSchema,
 	valueStore,
