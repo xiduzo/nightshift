@@ -242,7 +242,7 @@ function OpenGateSheet({
 					<Badge variant="secondary">
 						<Text>{gate.spaceName}</Text>
 					</Badge>
-					<Text variant="muted" className="text-xs">
+					<Text variant="muted" className="text-muted-foreground text-xs">
 						Waiting {waitedText(now - gate.openedAt)}
 					</Text>
 				</View>
@@ -303,7 +303,7 @@ function OpenGateSheet({
 								editable={!busy}
 								numberOfLines={4}
 							/>
-							<Text variant="muted" className="text-xs">
+							<Text variant="muted" className="text-muted-foreground text-xs">
 								The next steps of the run get your note.
 							</Text>
 						</View>
@@ -327,14 +327,17 @@ function OpenGateSheet({
 									</Text>
 								</Button>
 								{choice.description ? (
-									<Text variant="muted" className="px-1 text-xs">
+									<Text
+										variant="muted"
+										className="px-1 text-muted-foreground text-xs"
+									>
 										{choice.description}
 									</Text>
 								) : null}
 							</View>
 						))}
 						{elsewhere ? (
-							<Text variant="muted" className="text-xs">
+							<Text variant="muted" className="text-muted-foreground text-xs">
 								{`Your answer goes to ${gate.walker.name}. The run goes on when ${gate.walker.name} is online.`}
 							</Text>
 						) : null}

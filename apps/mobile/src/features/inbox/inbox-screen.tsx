@@ -104,7 +104,7 @@ function GateRow({ gate, now }: { gate: OpenGate; now: number }) {
 						<Badge variant="secondary" className="max-w-[60%]">
 							<Text numberOfLines={1}>{gate.spaceName}</Text>
 						</Badge>
-						<Text variant="muted" className="text-xs">
+						<Text variant="muted" className="text-muted-foreground text-xs">
 							Waiting {waited}
 						</Text>
 					</View>
@@ -115,7 +115,7 @@ function GateRow({ gate, now }: { gate: OpenGate; now: number }) {
 						{gate.projectName} · {gate.runTitle}
 					</CardDescription>
 					{gate.canAnswer ? null : (
-						<Text variant="muted" className="text-xs">
+						<Text variant="muted" className="text-muted-foreground text-xs">
 							You can read this Gate. Your role in this Space does not let you
 							answer it.
 						</Text>
