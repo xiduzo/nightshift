@@ -9,7 +9,6 @@
 
 export {
 	type ApiClient,
-	type ApiClientOptions,
 	type ApiInputs,
 	type ApiOutputs,
 	type ApiQueryUtils,
@@ -22,10 +21,7 @@ export {
 export {
 	type ActivityRange,
 	createDashboardQueries,
-	type DashboardInput,
-	type DashboardRun,
 	type DashboardSummary,
-	type FlowHealthDetail,
 	type FlowHealthRow,
 	type FlowRange,
 	type FlowRun,
@@ -33,7 +29,6 @@ export {
 	type HourRange,
 	type NightRange,
 	type NightsRange,
-	readerTimeZone,
 	type Spread,
 } from "./dashboard";
 export {
@@ -56,7 +51,6 @@ export {
 	filledInputs,
 	type InputTexts,
 	jsonProblem,
-	type LoadedFlow,
 	missingInputs,
 } from "./flows";
 export {
@@ -77,23 +71,14 @@ export {
 } from "./gates";
 export {
 	applySettingsPatch,
-	compareGates,
-	compareRuns,
 	createNotificationMutations,
 	createNotificationQueries,
 	describeNotice,
-	type FollowNotificationsOptions,
 	followNotifications,
-	gateKey,
-	isWanted,
-	type Notice,
-	type NoticeChoices,
 	type NotificationItem,
 	type NotificationScreen,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
-	type NotificationWatchClient,
-	type RegisterScreenInput,
 } from "./notifications";
 export {
 	createProjectMutations,
@@ -104,23 +89,17 @@ export {
 } from "./projects";
 export {
 	type AgentErrorKind,
-	type AgentEvent,
 	type AgentMessages,
 	type AgentUsage,
 	applyAgentMessages,
-	type CommandEvent,
 	costLabel,
 	createRunMutations,
 	createRunQueries,
 	currentStep,
-	type DecisionEvent,
 	defaultPlacement,
-	type FollowRunOptions,
 	followRun,
-	type GateEvent,
 	groupRuns,
 	hasEnded,
-	type ItemEvent,
 	type ItemState,
 	type ItemSummary,
 	markdownPreview,
@@ -131,23 +110,13 @@ export {
 	type RunGroup,
 	type RunStatus,
 	type RunStreamConnection,
-	type RunStreamItem,
 	type RunSummary,
-	type RunTrigger,
-	type RunWatchClient,
-	retryDelay,
 	type SessionSummary,
-	type StartRunInput,
-	type StepEvent,
 	type StepOutcome,
-	type StepScope,
 	type StepState,
 	type StepSummary,
 	stepState,
-	type ToolNodeEvent,
 	type TranscriptEntry,
-	type ValueEvent,
-	type Wait,
 	type WaitEvent,
 	whenLabel,
 } from "./runs";
@@ -155,7 +124,6 @@ export {
 	createScheduleMutations,
 	createScheduleQueries,
 	type ScheduleIssue,
-	type ScheduleList,
 	type ScheduleResult,
 	type ScheduleSummary,
 } from "./schedules";

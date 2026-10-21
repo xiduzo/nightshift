@@ -175,7 +175,7 @@ describe("the check itself", () => {
 			'import { checkDraft } from "@nightshift/flows";',
 			'import { useQuery } from "@tanstack/react-query";',
 			'import { RPCLink } from "@orpc/client/fetch";',
-			'import { gateKey } from "./rules";',
+			'import { describeNotice } from "./rules";',
 			"const a = { document: 1, location: 2 };",
 			"const b = options.window;",
 			"type C = { process: string };",

@@ -3,7 +3,6 @@
 export { createScheduleMutations, createScheduleQueries } from "./queries";
 export type {
 	ScheduleIssue,
-	ScheduleList,
 	ScheduleResult,
 	ScheduleSummary,
 } from "./types";
