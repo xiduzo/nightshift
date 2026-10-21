@@ -2565,6 +2565,40 @@ describe("gates", () => {
 		).toEqual(["gate-open", "gate-resolved"]);
 	});
 
+	test("onRunEvents tells of each run event that lands, with its Space", async () => {
+		const daemon = makeDaemon(fakeHarness());
+		const engine = daemon.space(sandbox.spaceId);
+		const landed: { type: string; spaceId: string; runId: string }[] = [];
+		const off = daemon.onRunEvents((events) => {
+			for (const e of events) {
+				landed.push({ type: e.type, spaceId: e.spaceId, runId: e.runId });
+			}
+		});
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: gateFlow(),
+		});
+		const open = await openGateOf(engine, run.id);
+		await waitFor(async () => landed.find((e) => e.type === "GateOpened"), {
+			label: "the Gate's event",
+		});
+		off();
+		await engine.resolveGate({
+			runId: run.id,
+			stepId: open.stepId,
+			choice: "approve",
+		});
+		await waitForEnd(engine, run.id);
+
+		expect(landed[0]).toEqual({
+			type: "RunStarted",
+			spaceId: sandbox.spaceId,
+			runId: run.id,
+		});
+		// Nothing after the unsubscribe.
+		expect(landed.map((e) => e.type)).not.toContain("RunEnded");
+	});
+
 	test("resolveGate rejects a wrong step, a wrong choice and a run that does not wait", async () => {
 		const engine = makeEngine(fakeHarness());
 		const run = await engine.startRun({

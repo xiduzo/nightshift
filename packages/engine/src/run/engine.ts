@@ -10,6 +10,7 @@ import {
 	createRunLog,
 	getRunRow,
 	logMemberChange,
+	onLandedRunEvents,
 	type RunLog,
 	type RunRow,
 	type RunTrigger,
@@ -370,6 +371,7 @@ export function createEngine(
 	return {
 		space,
 		logMemberChange: (change) => logMemberChange(runLog, change),
+		onRunEvents: (listener) => onLandedRunEvents(db, runLog, listener),
 		async deviceBack(_deviceId) {
 			await ready;
 			await control.wakeOfflineSleeps();

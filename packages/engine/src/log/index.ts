@@ -34,6 +34,11 @@ export {
 	type OwnStepFiles,
 	type RunHistory,
 } from "./history";
+export {
+	type LandedRunEvent,
+	type LandedRunListener,
+	onLandedRunEvents,
+} from "./landed";
 export { logMemberChange } from "./member-events";
 export type { RunLog } from "./run-log";
 export { createRunLog } from "./run-log";

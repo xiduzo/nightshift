@@ -85,6 +85,8 @@ export { checkpointSnapshot, restoreCheckpoint } from "./graph";
 export type {
 	HistoryCursors,
 	HistoryRows,
+	LandedRunEvent,
+	LandedRunListener,
 	LoggedEvent,
 	OwnStepFiles,
 	RunBus,

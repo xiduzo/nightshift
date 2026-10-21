@@ -8,6 +8,7 @@ import type {
 	ScheduleIssue,
 } from "@nightshift/flows";
 import type { FlowUse } from "../flows";
+import type { LandedRunListener } from "../log";
 import type { Branches, Project } from "../projects";
 import type { OpenGate, RunDetail, RunStreamItem, RunSummary } from "../read";
 import type { ScheduleList } from "../schedules";
@@ -36,6 +37,13 @@ export interface Engine {
 	 * (`MemberJoined`, `MemberRemoved`, `MemberRoleChanged`), with who made it.
 	 */
 	logMemberChange(change: MemberChange): Promise<void>;
+	/**
+	 * Calls `listener` with the run events that land in this Replica from
+	 * now on: appended here, or brought by the exchange from another
+	 * Walker. Each carries its run's Space. The notifier reads Gates and
+	 * run endings from it. Returns the unsubscribe.
+	 */
+	onRunEvents(listener: LandedRunListener): () => void;
 	/**
 	 * A Device is back (its link to this Host took work again): the steps
 	 * of the runs this computer walks that sleep because a Device was

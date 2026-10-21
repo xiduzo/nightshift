@@ -68,6 +68,7 @@ const engine: Context["engine"] = {
 				},
 		}),
 	logMemberChange: async () => {},
+	onRunEvents: () => () => {},
 	deviceBack: async () => {},
 	endOverdueSteps: async () => {},
 	dispose: async () => {},
