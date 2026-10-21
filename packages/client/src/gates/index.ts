@@ -1,4 +1,13 @@
-/** Gates that wait for a person: the inbox query, the answer, and their view types. */
+/** Gates that wait for a person: the inbox query, the answer, the inbox order and wait time, what a question shows, and their view types. */
 
+export {
+	changesInbox,
+	inboxOrder,
+	isGateClosed,
+	waitedText,
+	waitingForYou,
+} from "./inbox";
+export type { GateLink } from "./links";
 export { createGateMutations, createGateQueries } from "./queries";
+export { type ContextItem, gateParts } from "./question";
 export type { GateChoice, OpenGate } from "./types";

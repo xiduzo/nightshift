@@ -18,6 +18,10 @@ export default function RootLayout() {
 					name="runs/[runId]"
 					options={{ title: "Run", headerBackButtonDisplayMode: "minimal" }}
 				/>
+				<Stack.Screen
+					name="gates/[runId]/[stepId]"
+					options={{ title: "Gate", presentation: "modal" }}
+				/>
 			</Stack>
 		</AppShell>
 	);

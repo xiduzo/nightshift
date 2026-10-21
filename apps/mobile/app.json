@@ -29,6 +29,12 @@
 			"expo-router",
 			"expo-secure-store",
 			[
+				"expo-local-authentication",
+				{
+					"faceIDPermission": "Night Shift asks for Face ID before it sends your answer to a Gate."
+				}
+			],
+			[
 				"expo-camera",
 				{
 					"cameraPermission": "Night Shift uses the camera to scan the code of your Host.",
