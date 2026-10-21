@@ -29,6 +29,7 @@ export type { RunLog } from "./run-log";
 export { createRunLog } from "./run-log";
 export type { RunRow } from "./run-row";
 export {
+	applyWalkerMoves,
 	getRunRow,
 	hasRunRow,
 	runIdsOfProject,

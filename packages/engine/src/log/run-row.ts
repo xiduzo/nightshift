@@ -1,6 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { run, step } from "@nightshift/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import type { LoggedEvent } from "./events";
 
 /**
  * The run's row: what a run is beside its event log (its project, flow
@@ -23,6 +24,27 @@ export async function hasRunRow(db: Database, runId: string): Promise<boolean> {
 		.from(run)
 		.where(eq(run.id, runId));
 	return row !== undefined;
+}
+
+/**
+ * Applies `WalkerMoved` to the run rows: the run's Walker is the latest
+ * `to`. A run from before Placement keeps its steps' Device: the Walker it
+ * had.
+ */
+export async function applyWalkerMoves(
+	db: Database,
+	events: readonly LoggedEvent[],
+): Promise<void> {
+	for (const e of events) {
+		if (e.type !== "WalkerMoved" || !e.runId) continue;
+		await db
+			.update(run)
+			.set({
+				deviceId: sql`coalesce(${run.deviceId}, ${run.walkerId})`,
+				walkerId: e.payload.to,
+			})
+			.where(eq(run.id, e.runId));
+	}
 }
 
 /** The ids of the project's runs. */

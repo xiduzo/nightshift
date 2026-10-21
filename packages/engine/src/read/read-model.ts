@@ -4,7 +4,7 @@ import type { Database } from "@nightshift/db";
 import { project, run, step } from "@nightshift/db/schema";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
 import { and, desc, eq, isNull } from "drizzle-orm";
-
+import type { FeedStep } from "../contract";
 import {
 	getRunRow,
 	type LoggedEvent,
@@ -17,7 +17,6 @@ import {
 	scopeKey,
 	type TranscriptEntry,
 } from "../log";
-import type { FeedStep } from "../peers";
 import { addCost, type CostTally, NO_COST, sessionCost } from "./cost";
 import {
 	deriveEndedAt,

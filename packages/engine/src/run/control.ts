@@ -1,8 +1,7 @@
 import type { Database } from "@nightshift/db";
-import type { Actor, SpaceEngine } from "../contract";
+import type { Actor, OwnDevice, RunsPort, SpaceEngine } from "../contract";
 import type { Runner } from "../graph";
 import type { RunBus, RunLog, RunRow } from "../log";
-import type { EngineExchange, OwnDevice, RunArchive } from "../peers";
 import type { ReadModel } from "../read";
 import { resolveGate } from "./gate";
 import { moveRun, takeOver } from "./move";
@@ -22,9 +21,11 @@ export function createRunControl(deps: {
 	runner: Runner;
 	reads: Pick<ReadModel, "untilLogged">;
 	relay: RunRelay;
-	archive: RunArchive;
-	commands: Pick<EngineExchange["commands"], "pendingOf">;
+	archive: Pick<RunsPort, "archiveForMove" | "restoreMoved">;
+	pendingCommands: RunsPort["pendingCommands"];
 	device: { id: string };
+	/** This computer's owner as the Host that keeps the Space knows them (`Peers.personOnHost`). */
+	personOnHost(spaceId: string): Promise<string | null>;
 	/** The Person's own Devices that a run of the project can move to. */
 	ownDevices(
 		spaceId: string,

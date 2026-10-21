@@ -3,7 +3,13 @@ import { device as deviceTable } from "@nightshift/db/schema";
 import type { FlowNode } from "@nightshift/flows";
 import type { FlowSources } from "@nightshift/flows/files";
 import { eq } from "drizzle-orm";
-import type { Relay } from "../contract";
+import type {
+	OfferedPlacement,
+	OwnDevice,
+	PlacedDevice,
+	Placement,
+	Relay,
+} from "../contract";
 import { type Device, remoteDevice, type WorkRelay } from "../device";
 import type { RunLog, RunRow } from "../log";
 import {
@@ -12,14 +18,8 @@ import {
 	projectClones,
 	type SpaceDocuments,
 } from "../projects";
-import type { PlacedDevice } from "../run";
 import { type HostSpaces, personOnHost } from "./exchange/host-spaces";
-import {
-	type DeviceOffer,
-	type OfferedPlacement,
-	offersNothing,
-	spaceOffers,
-} from "./offers";
+import { type DeviceOffer, offersNothing, spaceOffers } from "./offers";
 import type { DeviceRegistry } from "./registry";
 
 /**
@@ -507,28 +507,3 @@ export function createPlacement(deps: PlacementDeps) {
 		nameOf: (id: string) => names.get(id) ?? null,
 	};
 }
-
-/**
- * A Device a run of a project can be placed on, online, with a Clone of
- * the project: one of the Person's own, or another Person's that offers
- * profiles to the Space.
- */
-export type Placement = {
-	deviceId: string;
-	name: string;
-	/** This computer. */
-	thisDevice: boolean;
-	/**
-	 * Another Person's Device: the profiles it offers to the Space, the
-	 * only ones a run there may use. Absent for the Person's own Devices.
-	 */
-	offers?: string[];
-};
-
-/** One of a Person's Devices, as placement sees it. */
-export type OwnDevice = Placement & {
-	/** It takes work now. */
-	online: boolean;
-	/** It has a Clone of the project. */
-	hasClone: boolean;
-};

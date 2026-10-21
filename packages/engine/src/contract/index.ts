@@ -9,4 +9,17 @@ export type {
 	StartRunInput,
 } from "./engine";
 export type { EngineOptions } from "./options";
+export type {
+	FeedStep,
+	OfferedPlacement,
+	OffersPort,
+	OwnDevice,
+	PeerContext,
+	Peers,
+	PlacedDevice,
+	Placement,
+	PlacementPort,
+	RunsPort,
+	WithPaths,
+} from "./peers";
 export type { Relay } from "./relay";

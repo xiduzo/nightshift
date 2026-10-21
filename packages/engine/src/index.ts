@@ -5,7 +5,15 @@
  * that nothing outside the engine imports.
  */
 
-export type { Engine, Relay, SpaceEngine, StartRunInput } from "./contract";
+export type {
+	Engine,
+	FeedStep,
+	OwnDevice,
+	Placement,
+	Relay,
+	SpaceEngine,
+	StartRunInput,
+} from "./contract";
 export type { Device, SessionInput } from "./device";
 export {
 	localDevice,
@@ -51,12 +59,7 @@ export {
 } from "./device-config";
 export type { FlowRef, FlowUse } from "./flows";
 export type { TranscriptEntry } from "./log";
-export type {
-	DeviceRegistry,
-	OwnDevice,
-	PairedDevice,
-	Placement,
-} from "./peers";
+export type { DeviceRegistry, PairedDevice } from "./peers";
 export {
 	type ArchiveRef,
 	applyRunCommand,
@@ -68,7 +71,6 @@ export {
 	type DeviceOffer,
 	deviceKeyStore,
 	deviceOffers,
-	type FeedStep,
 	type FollowWant,
 	ForeignRowsError,
 	feedStepSchema,

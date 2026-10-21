@@ -8,7 +8,12 @@ import {
 	type FlowNodeType,
 	resolveAgentNode,
 } from "@nightshift/flows";
-import type { EngineOptions, StartRunInput } from "../contract";
+import type {
+	EngineOptions,
+	OffersPort,
+	PlacedDevice,
+	StartRunInput,
+} from "../contract";
 import type { Capabilities, Device } from "../device";
 import { flowsForRun } from "../flows";
 import {
@@ -23,7 +28,6 @@ import {
 	resolveInputs,
 } from "../graph";
 import type { InputValues, RunLog, RunTrigger } from "../log";
-import { type OfferedPlacement, offerRefusal, personOnHost } from "../peers";
 import type { ListedProject } from "../projects";
 import {
 	gitAuthorOf,
@@ -137,25 +141,6 @@ export function quickRunTitle(flow: Flow): string {
 	return `${text.slice(0, TITLE_MAX_CHARS - 1).trimEnd()}…`;
 }
 
-/** A Device a run's nodes run on, as run start placed it. */
-export type PlacedDevice = {
-	device: Device;
-	id: string;
-	name: string;
-	/** This computer: the Walker. */
-	thisDevice: boolean;
-	/** It has a Clone of the project: a step that works in the worktree can run there. */
-	hasClone: boolean;
-	/**
-	 * Another Person's Device (this computer too, for a Member who does not
-	 * own it): the run uses it through its Offers into the Space only. Its
-	 * nodes keep their profile unresolved (the Device resolves it), and the
-	 * Offer's rule (`offerRefusal`) replaces the requirements: its
-	 * capabilities are its owner's.
-	 */
-	offered?: OfferedPlacement;
-};
-
 /** What `prepareRun` needs: the Walker's profiles, the Devices nodes name, the clock. */
 export type PrepareRunDeps = {
 	/** An Agent Profile of this computer (the Walker) by name, or null. */
@@ -169,6 +154,8 @@ export type PrepareRunDeps = {
 	deviceNamed?(name: string): Promise<PlacedDevice>;
 	/** This computer, where a profile only it has runs. */
 	walker?: PlacedDevice;
+	/** The Offer rule for the nodes placed on another Person's Device (`Peers.offers`). */
+	offerRefusal: OffersPort["refusal"];
 };
 
 /** A run that passed every check and can start. */
@@ -345,7 +332,7 @@ export async function prepareRun(
 	}
 	for (const [at, nodes] of groups) {
 		const refusal = at.offered
-			? offerRefusal(nodes, at.offered)
+			? deps.offerRefusal(nodes, at.offered)
 			: refusalOf(nodes, await capabilitiesFor(nodes, at.device));
 		if (refusal !== null) throw new Error(refusal);
 		const worker = nodes.find((n) => kindOf(n).works(n) === "worktree");
@@ -414,6 +401,8 @@ export type RunStartDeps = Omit<PrepareRunDeps, "deviceNamed" | "walker"> & {
 	}>;
 	/** This computer's name: the Walker of the runs it starts. */
 	selfName: string;
+	/** The starter as the Host that keeps the Space knows them (`Peers.personOnHost`). */
+	personOnHost(spaceId: string): Promise<string | null>;
 };
 
 export type RunStart = ReturnType<typeof createRunStart>;
@@ -441,7 +430,7 @@ export function createRunStart(deps: RunStartDeps) {
 			const startedBy = input.startedBy
 				? trigger.kind === "schedule"
 					? input.startedBy
-					: ((await personOnHost(db, projectRow.spaceId)) ?? input.startedBy)
+					: ((await deps.personOnHost(projectRow.spaceId)) ?? input.startedBy)
 				: null;
 			const placement = await deps.place({
 				deviceId: input.deviceId,

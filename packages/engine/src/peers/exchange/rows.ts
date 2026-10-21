@@ -10,7 +10,12 @@ import {
 import { and, asc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { LoggedEvent, RunBus, RunLog } from "../../log";
+import {
+	applyWalkerMoves,
+	type LoggedEvent,
+	type RunBus,
+	type RunLog,
+} from "../../log";
 
 /**
  * The event log exchange: run history between Replicas, by cursor. Every
@@ -557,25 +562,4 @@ export function mergeCursors(into: SyncCursors, by: SyncCursors): SyncCursors {
 /** Whether a batch has no rows. */
 export function isEmpty(rows: RunRows): boolean {
 	return rows.events.length === 0;
-}
-
-/**
- * Applies `WalkerMoved` to the run rows: the run's Walker is the latest
- * `to`. A run from before Placement keeps its steps' Device: the Walker it
- * had.
- */
-export async function applyWalkerMoves(
-	db: Database,
-	events: readonly LoggedEvent[],
-): Promise<void> {
-	for (const e of events) {
-		if (e.type !== "WalkerMoved" || !e.runId) continue;
-		await db
-			.update(run)
-			.set({
-				deviceId: sql`coalesce(${run.deviceId}, ${run.walkerId})`,
-				walkerId: e.payload.to,
-			})
-			.where(eq(run.id, e.runId));
-	}
 }

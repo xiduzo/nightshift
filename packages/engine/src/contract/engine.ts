@@ -12,13 +12,12 @@ import type {
 	DeviceRegistry,
 	EngineExchange,
 	OfferCaps,
-	OwnDevice,
-	Placement,
 	SpaceOffer,
 } from "../peers";
 import type { Branches, Project } from "../projects";
 import type { OpenGate, RunDetail, RunStreamItem, RunSummary } from "../read";
 import type { ScheduleList } from "../schedules";
+import type { OwnDevice, Placement } from "./peers";
 
 /**
  * The engine's public contract: `Engine`, and the view of one Space,

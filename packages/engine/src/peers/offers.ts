@@ -6,6 +6,7 @@ import {
 	permissionModeSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
+import type { OfferedPlacement } from "../contract";
 import type {
 	Device,
 	ExecEvent,
@@ -233,15 +234,6 @@ function touchesDevice(node: FlowNode): boolean {
 			return node.each?.source.kind === "command";
 	}
 }
-
-/** What a run start knows of the Offers of the Device it places a run of another Person on. */
-export type OfferedPlacement = {
-	deviceName: string;
-	/** Its Offers into the run's Space. */
-	offers: readonly Pick<SpaceOffer, "profile" | "permissionCap">[];
-	/** The starter's role in the Space uses Offers (`offer.use`). */
-	mayUse: boolean;
-};
 
 /** The refusal of a run on another Person's Device that offers nothing to the Space. */
 export function offersNothing(deviceName: string): string {

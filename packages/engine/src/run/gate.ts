@@ -1,8 +1,7 @@
 import { optionProblem } from "@nightshift/flows";
-import type { Actor, SpaceEngine } from "../contract";
+import type { Actor, RunsPort, SpaceEngine } from "../contract";
 import type { Runner } from "../graph";
 import type { RunLog, RunRow } from "../log";
-import type { EngineExchange } from "../peers";
 import { deriveOpenGate, deriveSteps, type ReadModel } from "../read";
 import type { RunRelay } from "./relay";
 
@@ -23,7 +22,7 @@ export async function resolveGate(
 		>;
 		reads: Pick<ReadModel, "untilLogged">;
 		relay: RunRelay;
-		commands: Pick<EngineExchange["commands"], "pendingOf">;
+		pendingCommands: RunsPort["pendingCommands"];
 	},
 	row: RunRow,
 	actor: Actor | undefined,
@@ -39,7 +38,7 @@ export async function resolveGate(
 		}
 		const problem = optionProblem(gate.choices, choice);
 		if (problem !== null) throw new Error(problem);
-		const pending = await deps.commands.pendingOf(runId);
+		const pending = await deps.pendingCommands(runId);
 		if (pending.some((c) => c.kind === "gate.resolve")) {
 			throw new Error(
 				"An answer to this Gate is already on its way to the device that runs it.",

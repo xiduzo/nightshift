@@ -1,13 +1,13 @@
 import type { Database } from "@nightshift/db";
-import type { Actor } from "../contract";
+import type { Actor, OwnDevice, RunsPort } from "../contract";
 import type { Runner } from "../graph";
-import { getRunRow, type RunBus, type RunLog, type RunRow } from "../log";
 import {
 	applyWalkerMoves,
-	type OwnDevice,
-	personOnHost,
-	type RunArchive,
-} from "../peers";
+	getRunRow,
+	type RunBus,
+	type RunLog,
+	type RunRow,
+} from "../log";
 import { deriveRunState } from "../read";
 import type { RunRelay } from "./relay";
 
@@ -23,8 +23,10 @@ export async function moveRun(
 		bus: RunBus;
 		runner: Pick<Runner, "exclusive" | "isActive" | "forget">;
 		relay: RunRelay;
-		archive: Pick<RunArchive, "archiveForMove">;
+		archive: Pick<RunsPort, "archiveForMove">;
 		device: { id: string };
+		/** This computer's owner as the Host that keeps the Space knows them (`Peers.personOnHost`). */
+		personOnHost(spaceId: string): Promise<string | null>;
 		/** The Person's own Devices that a run of the project can move to. */
 		ownDevices(
 			spaceId: string,
@@ -58,7 +60,7 @@ export async function moveRun(
 		if (status === "finished") {
 			throw new Error("The run has ended. There is nothing to move.");
 		}
-		const personId = (await personOnHost(db, row.spaceId)) ?? actor.personId;
+		const personId = (await deps.personOnHost(row.spaceId)) ?? actor.personId;
 		const target = (
 			await deps.ownDevices(row.spaceId, personId, row.projectId)
 		).find((d) => d.deviceId === to);
@@ -93,7 +95,7 @@ export async function takeOver(
 		db: Database;
 		log: Pick<RunLog, "events">;
 		runner: Pick<Runner, "forget" | "sleeps">;
-		archive: Pick<RunArchive, "restoreMoved">;
+		archive: Pick<RunsPort, "restoreMoved">;
 	},
 	runId: string,
 ): Promise<void> {

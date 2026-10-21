@@ -38,6 +38,7 @@ export type { RunBundleSummary } from "./run-bundle";
 export { exportRun, openRunBundle } from "./run-bundle";
 export type {
 	OpenGate,
+	PendingCommand,
 	RunDetail,
 	RunStreamItem,
 	RunSummary,

@@ -1,8 +1,13 @@
-import type { Actor, SpaceEngine, StartRunInput } from "../contract";
+import type {
+	Actor,
+	PlacementPort,
+	SpaceEngine,
+	StartRunInput,
+	WithPaths,
+} from "../contract";
 import { type FlowFiles, flowUse } from "../flows";
 import type { Runner } from "../graph";
 import type { RunLog, RunRow, RunTrigger } from "../log";
-import type { PlacementModule } from "../peers";
 import {
 	type Branches,
 	type ListedProject,
@@ -19,13 +24,6 @@ import {
 import type { ScheduleFiles } from "../schedules";
 import type { Recovery } from "./recovery";
 import type { RunRelay } from "./relay";
-
-/** A run summary or detail with the worktree fields `pathsFor` may hide. */
-type WithPaths = {
-	device: { id: string; thisDevice: boolean };
-	worktreePath: string;
-	takeOverCommand?: string | null;
-};
 
 /**
  * What a person does in one Space (`SpaceEngine`). Every method reads and
@@ -49,7 +47,7 @@ export type SpacesDeps = {
 	/** The run's row, or "not found". */
 	runRow(runId: string): Promise<RunRow>;
 	listBranches(repoPath: string): Promise<Branches>;
-	placement: Pick<PlacementModule, "devicesFor" | "placements">;
+	placement: Pick<PlacementPort, "devicesFor" | "placements">;
 	flowFiles: FlowFiles;
 	scheduleFiles: ScheduleFiles;
 	reads: ReadModel;

@@ -18,19 +18,7 @@ import {
 	type RunTrigger,
 	runIdsOfProject,
 } from "../log";
-import {
-	createDeviceRegistry,
-	createEngineExchange,
-	createEngineOffers,
-	createHostSpaces,
-	createOfferedSessions,
-	createOffersHere,
-	createPlacement,
-	createPrivatePaths,
-	createRunArchive,
-	createWalkers,
-	runsMovedHere,
-} from "../peers";
+import { createPeers } from "../peers";
 import {
 	createProjects,
 	createSpaceDocuments,
@@ -137,7 +125,6 @@ export function createEngine(
 		internals.runLog ??
 		createRunLog(db, options.walkerId ? { walkerId: options.walkerId } : {});
 	const documents = options.spaceDocuments ?? createSpaceDocuments({ db });
-	const registry = createDeviceRegistry({ db, log: runLog, now });
 
 	/** Whether a run's own worktree is on this computer: placed here, or before Placement. */
 	const placedHere = (row: RunRow) =>
@@ -148,36 +135,45 @@ export function createEngine(
 	/** The Person who owns this computer (its `device` row), read when the engine is ready. */
 	let ownerId: string | null = null;
 
-	/** The offered sessions running now: what withdrawing an Offer stops. */
-	const offeredSessions = createOfferedSessions();
-	const work = options.work && offeredSessions.relay(options.work);
-	const { offersHere, localFor } = createOffersHere({
-		db,
-		device,
-		documents,
-		...(options.ownOffers ? { ownOffers: options.ownOffers } : {}),
-		...(options.profileFor ? { profileFor: options.profileFor } : {}),
-		ownerId: () => ownerId,
-		sessions: offeredSessions,
+	/** `ready` (below), for the peers made before it: it settles as `ready` does. */
+	let settleReady: [() => void, (error: unknown) => void] = [
+		() => {},
+		() => {},
+	];
+	const peersReady = new Promise<void>((resolve, reject) => {
+		settleReady = [resolve, reject];
 	});
+	peersReady.catch(() => {});
 
-	/** Where steps run: per node, else the run's Device (`peers/placement.ts`). */
-	const placement = createPlacement({
-		db,
-		device,
-		log: runLog,
-		registry,
-		documents,
-		hostSpaces: createHostSpaces(db),
-		project: (projectId, spaceId) => projects.find(projectId, spaceId),
-		...(work ? { work } : {}),
-		...(options.relay ? { relay: options.relay } : {}),
-		// Another Person's run here uses this computer through its Offers.
-		localFor,
-		offersHere,
-		mayUseOffers: (spaceId, personId) =>
-			options.mayUseOffers?.(spaceId, personId) ?? Promise.resolve(false),
-	});
+	/**
+	 * The other Devices and Hosts (`Peers`): where steps run, Offers, the
+	 * Host that keeps a Space, and the runs walked elsewhere.
+	 */
+	const built = createPeers(
+		{
+			db,
+			dataDir,
+			device,
+			log: runLog,
+			bus,
+			documents,
+			now,
+			...(options.relay ? { relay: options.relay } : {}),
+			...(options.profileFor ? { profileFor: options.profileFor } : {}),
+			ready: peersReady,
+			ownerId: () => ownerId,
+			project: (projectId, spaceId) => projects.find(projectId, spaceId),
+			takeOver: (runId) => control.takeOver(runId),
+			stopRun: (runId) => runner.stop(runId),
+		},
+		{
+			...(options.work ? { work: options.work } : {}),
+			...(options.ownOffers ? { ownOffers: options.ownOffers } : {}),
+			...(options.mayUseOffers ? { mayUseOffers: options.mayUseOffers } : {}),
+		},
+	);
+	const peers = built.port;
+	const { placement } = peers;
 
 	const git = options.git ?? systemGit();
 	const { listBranches } = createWorktrees(git);
@@ -255,36 +251,10 @@ export function createEngine(
 		.then(() => recovery.armResumes());
 	// Every method awaits `ready` and sees the error there.
 	ready.catch(() => {});
+	ready.then(...settleReady);
 
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
-	const hostOf = (spaceId: string) => exchange.hostSpaces.hostOf(spaceId);
-	const archive = createRunArchive({
-		db,
-		dataDir,
-		log: runLog,
-		hostOf,
-		...(options.relay ? { relay: options.relay } : {}),
-	});
-	const exchange = createEngineExchange({
-		db,
-		log: runLog,
-		bus,
-		dataDir,
-		documents,
-		// A run moved here: this computer walks it from now on.
-		onIngested: async (added) => {
-			const here = [await runLog.walkerId(), device.id];
-			for (const runId of runsMovedHere(added, here)) {
-				await control.takeOver(runId).catch((error) => {
-					console.error(`[engine] could not take over run ${runId}`, error);
-				});
-			}
-		},
-		// A Space a Host keeps: that Host's feed of the step, over its link.
-		...(options.relay?.follow
-			? { upstream: options.relay.follow.bind(options.relay) }
-			: {}),
-	});
+	const hostOf = peers.hostOf;
 
 	const reads = createReadModel({
 		db,
@@ -295,16 +265,10 @@ export function createEngine(
 		// A custom agent has no take-over command.
 		harnessOf: (name) =>
 			isCustomHarness(name) ? undefined : harnessFacts(name),
-		walkers: createWalkers({ db, log: runLog, device, documents }),
-		pendingCommands: async (runId) =>
-			(await exchange.commands.pendingOf(runId)).map((c) => ({
-				id: c.id,
-				kind: c.kind,
-				createdAt: c.createdAt,
-			})),
-		stepTranscript: archive.stepTranscript,
-		followStep: (step, afterSeq, signal) =>
-			exchange.feeds.follow(step, afterSeq, signal),
+		walkers: peers.runs.walkers,
+		pendingCommands: peers.runs.pendingCommands,
+		stepTranscript: peers.runs.stepTranscript,
+		followStep: peers.runs.followStep,
 	});
 
 	const runStart = createRunStart({
@@ -316,6 +280,8 @@ export function createEngine(
 		profileFor: options.profileFor ?? (() => null),
 		place: placement.place,
 		selfName: device.name,
+		personOnHost: peers.personOnHost,
+		offerRefusal: peers.offers.refusal,
 	});
 
 	const scheduler = createScheduler({
@@ -371,10 +337,11 @@ export function createEngine(
 		runner,
 		reads,
 		relay,
-		archive,
-		commands: exchange.commands,
+		archive: peers.runs,
+		pendingCommands: peers.runs.pendingCommands,
 		device,
 		ownDevices: placement.ownDevices,
+		personOnHost: peers.personOnHost,
 	});
 
 	const space = createSpaces({
@@ -395,53 +362,30 @@ export function createEngine(
 			elsewhere: placement.flowsElsewhere,
 		}),
 		scheduleFiles: createScheduleFiles({
-			db,
 			now,
 			scheduler,
 			runStatus: reads.runStatus,
-			documents,
-			devicesFor: placement.devicesFor,
-			offersHere,
-			...(options.mayUseOffers ? { mayUseOffers: options.mayUseOffers } : {}),
+			schedulesWithOffers: peers.offers.schedulesWithOffers,
 		}),
 		reads,
 		recovery,
 		relay,
 		hostOf,
 		startRun: startRunWith,
-		pathsFor: createPrivatePaths({ db, registry, ownerId: () => ownerId }),
+		pathsFor: peers.pathsFor,
 		control,
-	});
-
-	const offers = createEngineOffers({
-		ready,
-		documents,
-		log: runLog,
-		deviceId: device.id,
-		now,
-		hostOf,
-		...(options.relay ? { relay: options.relay } : {}),
-		async stopUnder(offer) {
-			await Promise.all(
-				offeredSessions.runsUnder(offer).map((runId) =>
-					runner.stop(runId).catch((error) => {
-						console.error(`The run ${runId} was not stopped:`, error);
-					}),
-				),
-			);
-		},
 	});
 
 	return {
 		space,
-		devices: registry,
-		exchange,
+		devices: built.registry,
+		exchange: built.exchange,
 		logMemberChange: (change) => logMemberChange(runLog, change),
 		async deviceBack(_deviceId) {
 			await ready;
 			await control.wakeOfflineSleeps();
 		},
-		offers,
+		offers: built.offers,
 		async endOverdueSteps() {
 			await ready;
 			await runner.endOverdueSteps();

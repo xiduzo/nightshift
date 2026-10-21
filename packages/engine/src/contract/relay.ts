@@ -1,12 +1,7 @@
 import type { TranscriptEntry } from "../log";
-import type {
-	ArchiveRef,
-	FeedStep,
-	OfferCaps,
-	OwnDevice,
-	RunCommandInput,
-} from "../peers";
+import type { ArchiveRef, OfferCaps, RunCommandInput } from "../peers";
 import type { StartRunInput } from "./engine";
+import type { FeedStep, OwnDevice } from "./peers";
 
 /**
  * What the engine asks of the Hosts this Device links to: the actions on

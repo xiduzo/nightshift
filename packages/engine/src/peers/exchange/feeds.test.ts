@@ -4,7 +4,6 @@ import { createRunBus, type RunBus } from "../../log/bus";
 import type { TranscriptEntry } from "../../log/step-events";
 import {
 	createTranscriptFeeds,
-	type FeedStep,
 	type FollowPumps,
 	type TranscriptFeeds,
 } from "./feeds";
@@ -18,7 +17,11 @@ import {
 
 const SPACE = "space-1";
 const RUN = "run-1";
-const STEP: FeedStep = { spaceId: SPACE, runId: RUN, stepId: "step-1" };
+const STEP: { spaceId: string; runId: string; stepId: string } = {
+	spaceId: SPACE,
+	runId: RUN,
+	stepId: "step-1",
+};
 
 let wBus: RunBus;
 /** W's transcript files, by step. */

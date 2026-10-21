@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { FeedStep } from "../../contract";
 import type { RunBus, TranscriptEntry } from "../../log";
 
 /**
@@ -27,9 +28,6 @@ import type { RunBus, TranscriptEntry } from "../../log";
  * Who may follow is the daemon's check (membership, the Walker of a
  * push), as for the archive.
  */
-
-/** One step, by its Space and run. */
-export type FeedStep = { spaceId: string; runId: string; stepId: string };
 
 /** A step a Host wants from its Walker, from the entry after `afterSeq`. */
 export type FollowWant = FeedStep & { afterSeq: number };
