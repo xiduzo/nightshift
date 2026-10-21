@@ -635,7 +635,7 @@ iroh.
 
    *Landed (Spaces):*
    - **Spaces are organizations.** `packages/auth` adds Better Auth's
-     organization plugin. `access.ts` holds the statements and the four
+     organization plugin. `spaces/roles.ts` holds the statements and the four
      roles of "Roles and permissions". The roles also keep the plugin's
      own statements (`organization`, `invitation`, `member` create,
      update, delete), because the plugin's endpoints check those. Custom
@@ -743,7 +743,7 @@ iroh.
      `documentRows(db)`) is for a Host that keeps documents it does not
      own: slice 4.
    - **Who may connect**: the Device's owner only, by the same rule as the
-     procedures (`ownerOnly`, `packages/auth/src/document-access.ts`). The request's
+     procedures (`ownerOnly`, `packages/auth/src/access/document-access.ts`). The request's
      session decides; a request from this computer (`isThisComputer`: a
      loopback address, no `Origin` or one of the UI's) without a session
      of its own gets the local Person's session, as slice 2's procedures
@@ -797,7 +797,7 @@ iroh.
      plugin's hooks (a Space made, a Member added or removed, a new role,
      an invitation accepted: `createAuth(…, { onMembersChanged })`), the
      Space's `member` and `user` rows are written into `members`.
-   - **Who may open it** (`documentAccess`, `packages/auth/src/document-access.ts`,
+   - **Who may open it** (`documentAccess`, `packages/auth/src/access/document-access.ts`,
      which `ownerOnly` became): `device:<id>` its owner, as before;
      `space:<id>` a Member of that Space, by the same session rule, always
      read-only (Hocuspocus's `connectionConfig.readOnly`: it drops the
@@ -858,7 +858,7 @@ iroh.
      certificate as the only authority (`tls: { ca }`): a changed
      certificate fails the link (`packages/daemon/src/devices/tls.ts`). A
      certificate this computer already trusts is not pinned (renewals).
-   - **Pairing** (`packages/auth/src/pairing.ts`): Better Auth 1.7.7's
+   - **Pairing** (`packages/auth/src/pairing/pairing.ts`): Better Auth 1.7.7's
      device authorization plugin, client id = the joining Device's id,
      codes valid 15 minutes, polled every 2 s. Reviewing a code binds it
      to the Person who entered it; another Person cannot review, approve
@@ -867,7 +867,7 @@ iroh.
      a Device key instead. The Device's name and platform are kept in
      memory with its pending code (a Host restart forgets them; the code
      still works, the Device shows as "Device").
-   - **Device keys** (`packages/auth/src/device-keys.ts`, the API key
+   - **Device keys** (`packages/auth/src/device-keys/device-keys.ts`, the API key
      plugin): prefix `nsd_`, bound to the approving Person, metadata
      `{ deviceId }`, permissions `sync`, `relay`, `archive`, hashed at
      rest, rate limit off. Idle expiry: a use moves `expiresAt` on, at
@@ -1298,7 +1298,7 @@ iroh.
      a `hooks.before` unless the Host has nobody yet, or the body names a
      pending, unexpired invitation of that email (`invitationId`): so the
      link, not only the email, makes the account
-     (`packages/auth/src/members.ts`). The admin's own `createUser` stays
+     (`packages/auth/src/spaces/members.ts`). The admin's own `createUser` stays
      open to the Host admin. One person on one computer is untouched: the
      local Person and the local session make no sign-up.
    - **No email server.** Invitations are stored only (no
@@ -1593,7 +1593,7 @@ iroh.
      (on the Host, or `docker exec`) gives it an email and a password,
      asked without echo or piped with `--password-stdin`
      (`account.setLogin`: the owner only, and only from this computer:
-     `Context.fromThisComputer`; `packages/auth/src/login.ts` links a
+     `Context.fromThisComputer`; `packages/auth/src/login/login.ts` links a
      credential account or replaces its password). `nightshift serve`
      reminds you while a Host's admin has none. Then the admin signs in at
      the public address and invites from Members; the invitation link uses
