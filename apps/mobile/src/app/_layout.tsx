@@ -14,6 +14,10 @@ export default function RootLayout() {
 			<Stack>
 				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 				<Stack.Screen name="connect" options={{ title: "Connect" }} />
+				<Stack.Screen
+					name="gates/[runId]/[stepId]"
+					options={{ title: "Gate", presentation: "modal" }}
+				/>
 			</Stack>
 		</AppShell>
 	);
