@@ -19,7 +19,7 @@ import {
 	createAuthSandbox,
 	turnOnTwoFactor,
 } from "@nightshift/auth/testing";
-import type { SpaceEngine } from "@nightshift/engine";
+import type { OpenGate, SpaceEngine } from "@nightshift/engine";
 import { call, ORPCError } from "@orpc/server";
 
 import type { Context } from "./context";
@@ -38,11 +38,20 @@ let calls: { space: string; method: string }[];
 let inputs: unknown[];
 /** Every argument of each engine call, in order. */
 let args: unknown[][];
+/** The open Gates the fake engine lists, per Space. */
+let gatesIn: Map<string, OpenGate[]>;
+/** The Space of each run the fake engine keeps. */
+let runSpaces: Map<string, string>;
+/** What the fake engine's `resolveGate` does after it records the call. */
+let onResolve: () => void;
 beforeEach(async () => {
 	sandbox = await createAuthSandbox();
 	calls = [];
 	inputs = [];
 	args = [];
+	gatesIn = new Map();
+	runSpaces = new Map();
+	onResolve = () => {};
 });
 afterEach(() => sandbox.cleanup());
 
@@ -64,9 +73,12 @@ const engine: Context["engine"] = {
 					calls.push({ space, method: String(method) });
 					inputs.push(input);
 					args.push([input, ...rest]);
+					if (method === "listGates") return gatesIn.get(space) ?? [];
+					if (method === "resolveGate") return onResolve();
 					return method === "listRuns" ? [] : { id: "run-1" };
 				},
 		}),
+	spaceOfRun: async (runId) => runSpaces.get(runId) ?? null,
 	logMemberChange: async () => {},
 	deviceBack: async () => {},
 	endOverdueSteps: async () => {},
@@ -166,6 +178,7 @@ describe("procedures", () => {
 
 		const viewer = await contextFor(cy.headers);
 		expect(viewer.spaceId).toBe(spaceId);
+		runSpaces.set("r", spaceId);
 		expect(
 			await errorOf(call(appRouter.runs.start, start, { context: viewer })),
 		).toBe("FORBIDDEN");
@@ -744,5 +757,127 @@ describe("the owner's own sign-in", () => {
 			}),
 		).toEqual({ email: "ada@example.com" });
 		expect(set).toEqual([ada.userId]);
+	});
+});
+
+/** An open Gate of a run in a Space, opened at `openedAt`. */
+function openGate(spaceId: string, runId: string, openedAt: number): OpenGate {
+	return {
+		spaceId,
+		runId,
+		runTitle: `Run ${runId}`,
+		projectId: `project-${runId}`,
+		projectName: "Project",
+		stepId: `step-${runId}`,
+		nodeId: "ship",
+		question: "Ship it?",
+		choices: [{ name: "yes" }, { name: "no" }],
+		openedAt,
+		walker: { id: "device", name: "test", thisDevice: true },
+		answerPending: false,
+	};
+}
+
+describe("the Needs-you inbox", () => {
+	test("lists the open Gates of every Space the Person is in, oldest first, with each Space's name", async () => {
+		const { ada, cy, spaceId } = await platform();
+		const personal = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
+		const dee = await sandbox.signUp("Dee");
+		const deesOwn = (await personalSpaceId(sandbox.db, dee.userId)) ?? "";
+		gatesIn.set(spaceId, [openGate(spaceId, "platform-run", 20)]);
+		gatesIn.set(personal, [openGate(personal, "ada-run", 10)]);
+		gatesIn.set(deesOwn, [openGate(deesOwn, "dee-run", 5)]);
+
+		// Ada works in Platform; her inbox has her personal Space's Gate too.
+		const context = await contextFor(ada.headers);
+		expect(context.spaceId).toBe(spaceId);
+		const listed = await call(appRouter.gates.list, undefined, { context });
+		expect(
+			listed.map((g) => [g.runId, g.spaceId, g.spaceName, g.canAnswer]),
+		).toEqual([
+			["ada-run", personal, "Personal", true],
+			["platform-run", spaceId, "Platform", true],
+		]);
+
+		// A viewer sees the Gate of Platform, and may not answer it.
+		const viewer = await contextFor(cy.headers);
+		const seen = await call(appRouter.gates.list, undefined, {
+			context: viewer,
+		});
+		expect(seen.map((g) => [g.runId, g.canAnswer])).toEqual([
+			["platform-run", false],
+		]);
+	});
+
+	test("answers a Gate in another of the Person's Spaces without a switch", async () => {
+		const { ada, spaceId } = await platform();
+		const personal = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
+		runSpaces.set("ada-run", personal);
+		const context = await contextFor(ada.headers);
+		expect(context.spaceId).toBe(spaceId);
+
+		const answer = { runId: "ada-run", stepId: "step-1", choice: "yes" };
+		await call(appRouter.gates.resolve, answer, { context });
+		expect(calls).toEqual([{ space: personal, method: "resolveGate" }]);
+		// Bound to its run and step.
+		expect(inputs.at(-1)).toEqual(answer);
+		// The session still works in Platform.
+		expect((await contextFor(ada.headers)).spaceId).toBe(spaceId);
+	});
+
+	test("refuses an answer outside the Person's Spaces, or that their role does not allow", async () => {
+		const { cy, spaceId } = await platform();
+		const dee = await sandbox.signUp("Dee");
+		runSpaces.set("platform-run", spaceId);
+		const answer = { runId: "platform-run", stepId: "s", choice: "yes" };
+
+		// Not a member: the same answer as a run that does not exist.
+		const outsider = await contextFor(dee.headers);
+		expect(
+			await errorOf(
+				call(appRouter.gates.resolve, answer, { context: outsider }),
+			),
+		).toBe("NOT_FOUND");
+		expect(
+			await errorOf(
+				call(
+					appRouter.gates.resolve,
+					{ ...answer, runId: "no-such-run" },
+					{ context: outsider },
+				),
+			),
+		).toBe("NOT_FOUND");
+
+		// A viewer of the Space.
+		const viewer = await contextFor(cy.headers);
+		expect(
+			await errorOf(call(appRouter.gates.resolve, answer, { context: viewer })),
+		).toBe("FORBIDDEN");
+		expect(calls).toEqual([]);
+	});
+
+	test("refuses an answer once the Gate is closed", async () => {
+		const { bob, spaceId } = await platform();
+		runSpaces.set("platform-run", spaceId);
+		onResolve = () => {
+			throw new Error("This run does not wait at a Gate.");
+		};
+		const context = await contextFor(bob.headers);
+		await expect(
+			call(
+				appRouter.gates.resolve,
+				{ runId: "platform-run", stepId: "s", choice: "yes" },
+				{ context },
+			),
+		).rejects.toThrow("This run does not wait at a Gate.");
+		expect(
+			await errorOf(
+				call(
+					appRouter.gates.resolve,
+					{ runId: "platform-run", stepId: "s", choice: "yes" },
+					{ context },
+				),
+			),
+		).toBe("BAD_REQUEST");
 	});
 });

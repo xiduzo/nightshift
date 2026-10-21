@@ -7,6 +7,8 @@ import { gateChoiceSchema, runWalkerSchema } from "../runs";
 /** A Gate that waits for a person: what it asks, and its choices. */
 export const openGateSchema = exact<OpenGate>()(
 	z.object({
+		/** The Space of the run. */
+		spaceId: z.string(),
 		runId: z.string(),
 		runTitle: z.string(),
 		projectId: z.string(),
@@ -22,3 +24,18 @@ export const openGateSchema = exact<OpenGate>()(
 		answerPending: z.boolean(),
 	}),
 );
+
+/** One Gate of the Needs-you inbox: an open Gate, its Space's name, and whether you may answer it. */
+export const inboxGateSchema = openGateSchema.extend({
+	spaceName: z.string(),
+	/** Your role in the Gate's Space allows `gate.resolve`. */
+	canAnswer: z.boolean(),
+});
+
+/** The answer to one open Gate, bound to its run and step. */
+export const gateAnswerSchema = z.object({
+	runId: z.string().min(1),
+	stepId: z.string().min(1),
+	choice: z.string().min(1),
+	note: z.string().optional(),
+});
