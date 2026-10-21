@@ -217,9 +217,10 @@ the Space:
 5. **No content in a push.** A push carries ids and one sentence: "A Gate
    waits for you." The app or the page fetches the question from the Host.
 
-**Without keys.** A Host without `EXPO_ACCESS_TOKEN` sends no Expo Push.
-The phone then gets the in-app stream only. Settings says so in plain
-words.
+**Without keys.** `EXPO_ACCESS_TOKEN` is optional. Without it, Expo
+still sends for a project that does not require a token ("enhanced push
+security" off in Expo). A project that requires one refuses the pushes,
+and the phone then gets the in-app stream only.
 
 ### Lock-screen Gates are marked by the flow author
 
@@ -237,6 +238,62 @@ the risk of a Gate. The app does not guess it.
   Gate.
 - Until the action handler is tested on iOS with SDK 58, iOS opens the app
   for every answer.
+
+### Phone push contract
+
+What the Host sends through Expo Push (`packages/notifications/src/channels/expo.ts`),
+and what the phone app must do with it.
+
+**Registration.** The app registers its Expo push token with
+`notifications.targets.register({ kind: "expo", name, platform, endpoint: <ExpoPushToken[...]> })`
+on every start. The Host upserts by token. After Expo reports
+`DeviceNotRegistered` the Host forgets the token, and the next start
+registers it again.
+
+**Every push** has a `title` (one sentence, for example "A Gate waits for
+you") and no `body`. `threadId`, `collapseId` and the Android `tag` are the
+key, so a second push of one key replaces the first. The `data`:
+
+| Field | Value |
+| --- | --- |
+| `kind` | `gate-opened`, `run-finished`, `run-failed` or `gates-waiting` |
+| `key` | `runId:stepId` for a Gate, `runId:end:<seq>` for a run's end, `waiting:<ms>` for `gates-waiting` |
+| `spaceId`, `runId` | The run and its Space. Null for `gates-waiting`, which spans Spaces |
+| `stepId` | The Gate's step. Null for a run and for `gates-waiting` |
+| `count` | `gates-waiting` only: how many Gates wait |
+| `options` | `gate-decide` only: `[{ id, label }, { id, label }]`, the two options in the author's order |
+
+**Categories.** The app defines them with
+`Notifications.setNotificationCategoryAsync`:
+
+| `categoryId` | When | Actions | A tap |
+| --- | --- | --- | --- |
+| `gate-decide` | A Gate the author marked (`lockScreen: true`) with exactly two options, sent to a person whose role allows an answer | `approve` and `reject`, both `authenticationRequired: true` and `opensAppToForeground: false` | Opens the Gate |
+| `gate-open` | Every other Gate, and `gates-waiting` | none | Opens the Gate, or the inbox when `runId` is null. A biometric check comes before the answer |
+| `run` | A run that finished or failed | none | Opens the run |
+
+The action `approve` answers `options[0].id`, `reject` answers
+`options[1].id`: `gates.resolve({ runId, stepId, choice })`. The buttons
+say "Approve" and "Reject", because an iOS category has fixed button
+titles. `options[n].label` is the author's text for the app to show. The
+Host refuses an answer to a Gate that is already closed.
+
+**Priority.** Gates and `gates-waiting`: `priority: "high"`,
+`interruptionLevel: "time-sensitive"` (the app needs the Time Sensitive
+Notifications capability). Runs: `priority: "normal"`,
+`interruptionLevel: "active"`.
+
+**Withdraw.** Expo cannot delete a delivered notification from the server.
+When a Gate closes, the Host sends a data-only push to every phone that
+got it: `data: { withdraw: key }`, `contentAvailable: true`,
+`priority: "normal"`, no title and no sound. The app handles it in a
+background notification task (`Notifications.registerTaskAsync`, with
+`remote-notification` in the iOS background modes) and in its foreground
+listener. It finds the shown notification whose `data.key` is the key
+(`getPresentedNotificationsAsync`) and dismisses it
+(`dismissNotificationAsync`). iOS delivers background pushes on a
+best-effort basis, so the app also dismisses, when it opens, every Gate
+notification that `gates.list` no longer has.
 
 ### The dashboard summary moves to the server
 
