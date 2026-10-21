@@ -157,6 +157,8 @@ async function serve(argv: string[]) {
 		tlsPort: options.tlsPort,
 		piAcp: embeddedPiAcp(),
 		migrationsFolder,
+		// Notifications on this computer's desktop, where it has one.
+		desktop: "system",
 		...(ui ? { web: ui } : {}),
 	});
 	if (daemon.info.reach === "this-computer") {

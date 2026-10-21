@@ -11,6 +11,17 @@ const SERVICE_WORKER = "/sw.js";
 /** Where this browser keeps the id of its own screen, to tell it apart in the list. */
 const SCREEN_ID_KEY = "nightshift.notifications.screen";
 
+/**
+ * True in the window of the Night Shift desktop app (its preload sets
+ * `window.nightshiftDesktop`). The app shows the notifications there.
+ */
+export function inDesktopApp(): boolean {
+	return (
+		typeof window !== "undefined" &&
+		(window as { nightshiftDesktop?: unknown }).nightshiftDesktop === true
+	);
+}
+
 /** True when this browser can show notifications. */
 export function notificationsSupported(): boolean {
 	return typeof window !== "undefined" && "Notification" in window;
@@ -55,6 +66,8 @@ export async function showNotification(options: {
 	path: string;
 	onClick: () => void;
 }): Promise<void> {
+	// The desktop app shows its own notifications: none twice.
+	if (inDesktopApp()) return;
 	if (!notificationsSupported() || Notification.permission !== "granted") {
 		return;
 	}

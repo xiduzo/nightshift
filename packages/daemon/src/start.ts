@@ -34,6 +34,7 @@ export async function startDaemon(
 		port: options.port,
 		piAcp: options.piAcp,
 		migrationsFolder: options.migrationsFolder,
+		desktop: options.desktop,
 	});
 	const { web } = options;
 	const servers = serveDaemon(daemon, {

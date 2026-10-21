@@ -1,6 +1,7 @@
 import {
 	startDaemon as bootDaemon,
 	DEFAULT_PORT,
+	type DesktopScreen,
 	tlsPortOf,
 } from "@nightshift/daemon";
 
@@ -45,8 +46,11 @@ async function probe(): Promise<"nightshift" | "other" | "free"> {
  * Runs the daemon in this process (PLAN §2, Shell): Bun is the main process,
  * so there is no sidecar. When a daemon already answers on the port, the app
  * opens a window on it instead: one database has one daemon.
+ *
+ * `desktop`: the app's own notifications and its window. Only a daemon of
+ * this app shows them; a shared one shows its own (the OS programs).
  */
-export async function startDaemon(): Promise<Daemon> {
+export async function startDaemon(desktop: DesktopScreen): Promise<Daemon> {
 	const found = await probe();
 	if (found === "nightshift") {
 		console.log(`Using the Night Shift daemon at ${DAEMON_URL}.`);
@@ -61,6 +65,7 @@ export async function startDaemon(): Promise<Daemon> {
 		env: prepareDaemonEnv(DAEMON_URL, DAEMON_PORT),
 		port: DAEMON_PORT,
 		tlsPort: tlsPortOf(process.env.NIGHTSHIFT_TLS_PORT),
+		desktop,
 	});
 
 	// Only for the daemon this app runs: a shared one has its own watchers.

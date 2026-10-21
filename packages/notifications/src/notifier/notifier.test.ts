@@ -282,6 +282,77 @@ describe("one sender per Space", () => {
 	});
 });
 
+describe("this computer's desktop", () => {
+	test("shows the Gates of a Space another Host sends for, and pushes nothing else", async () => {
+		senders.delete(SPACE);
+		await notifier.start();
+		const own = await register("ada", "desktop");
+		await register("ada", "web");
+		await register("bob", "expo");
+		const screen = openScreen("ada");
+
+		await openGate("run-1", "step-1");
+		await endRun("run-2", "finished");
+
+		expect(sentTo(desktop)).toEqual([
+			`${own.id}:run-1:step-1`,
+			`${own.id}:run-2:end:${seq}`,
+		]);
+		expect(web.calls).toEqual([]);
+		expect(expo.calls).toEqual([]);
+		// The page only updates: the Host alerts for the Space.
+		expect(screen.map((i) => "alert" in i && i.alert)).toEqual([false, false]);
+
+		await answerGate("run-1", "step-1");
+		expect(desktop.withdrawn()).toEqual(["run-1:step-1"]);
+	});
+
+	test("respects the person's events, screens and quiet hours there too", async () => {
+		senders.delete(SPACE);
+		await settings.save("ada", {
+			events: { runFinished: false },
+			quietHours: { start: "22:00", end: "07:00" },
+		});
+		await settings.save("bob", { screens: { desktop: false } });
+		await notifier.start();
+		const own = await register("ada", "desktop");
+		await register("bob", "desktop");
+
+		await endRun("run-2", "finished");
+		await openGate("run-1", "step-1");
+		expect(sentTo(desktop)).toEqual([`${own.id}:run-1:step-1`]);
+
+		clock = Date.UTC(2026, 9, 21, 23, 0);
+		await openGate("run-3", "step-3");
+		await openGate("run-4", "step-4");
+		expect(desktop.sent()).toHaveLength(1);
+
+		clock = Date.UTC(2026, 9, 22, 7, 0);
+		await notifier.tick();
+		expect(desktop.sent().map((m) => m.title)).toEqual([
+			"A Gate waits for you",
+			"2 Gates wait for you",
+		]);
+	});
+
+	test("the quiet-hours summary of a Space another Host sends for reaches no push", async () => {
+		senders.delete(SPACE);
+		await settings.save("ada", {
+			quietHours: { start: "22:00", end: "07:00" },
+		});
+		clock = Date.UTC(2026, 9, 21, 23, 0);
+		await notifier.start();
+		await register("ada", "web");
+
+		await openGate("run-1", "step-1");
+		await openGate("run-2", "step-2");
+		clock = Date.UTC(2026, 9, 22, 7, 0);
+		await notifier.tick();
+
+		expect(web.calls).toEqual([]);
+	});
+});
+
 describe("quiet hours", () => {
 	beforeEach(async () => {
 		await settings.save("ada", {

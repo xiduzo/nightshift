@@ -226,6 +226,19 @@ const DEFS = {
 		default: true,
 	} satisfies Def<boolean>,
 	/**
+	 * "Keep this computer awake while a run is running": the daemon holds
+	 * the OS's sleep lock while a run on this computer runs or sleeps until
+	 * its timer. A setting of the computer, not of a Person: the computer
+	 * sleeps, and a laptop and a desktop of one person want different
+	 * answers.
+	 */
+	keepAwake: {
+		schema: z.boolean(),
+		default: false,
+		env: "NIGHTSHIFT_KEEP_AWAKE",
+		fromEnv: onOff,
+	} satisfies Def<boolean>,
+	/**
 	 * "Be a Host": this computer lets other Devices pair with it and keeps
 	 * their documents. Off: it accepts no Device at all.
 	 */

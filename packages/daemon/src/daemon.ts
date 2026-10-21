@@ -13,6 +13,7 @@ import {
 	hostPolicyFromEnv,
 	localPerson,
 	roleAllows,
+	spaceIds,
 } from "@nightshift/auth";
 import { createDb } from "@nightshift/db";
 import {
@@ -56,10 +57,14 @@ import {
 	systemGitInstaller,
 } from "@nightshift/engine";
 import {
+	createDesktopChannel,
 	createInAppChannel,
 	createNotifications,
+	type DesktopNotifier,
+	type DesktopWindow,
 	engineRunEvents,
 	oneSenderPerSpace,
+	systemDesktopNotifier,
 } from "@nightshift/notifications";
 
 import { localHarnesses, programChecks, reportDeviceFacts } from "./harnesses";
@@ -70,6 +75,11 @@ import {
 	isThisComputer,
 	trustedOriginsOf,
 } from "./http";
+import {
+	createKeepAwake,
+	engineRunSource,
+	systemSleepLock,
+} from "./keep-awake";
 import {
 	boundedStop,
 	chooseFolder,
@@ -92,6 +102,20 @@ export type DaemonOptions = {
 	piAcp?: string[];
 	/** The migrations folder: the binary extracts its own. Default: the one of `@nightshift/db`. */
 	migrationsFolder?: string;
+	/**
+	 * How this computer shows its desktop notifications. The desktop app
+	 * passes Electrobun's, with its window. "system": the OS programs
+	 * (`systemDesktopNotifier`), unless NIGHTSHIFT_DESKTOP_NOTIFICATIONS is
+	 * off. Default: none.
+	 */
+	desktop?: DesktopScreen | "system";
+};
+
+/** This computer's desktop, as the app that runs the daemon shows it. */
+export type DesktopScreen = {
+	notifier: DesktopNotifier;
+	/** The app's window, when the daemon runs inside the app. */
+	window?: DesktopWindow;
 };
 
 /** Facts about this daemon that change only on a restart. */
@@ -164,6 +188,7 @@ export async function createDaemon(
 				hot.nightshiftDocument?.flush(),
 				hot.nightshiftSpaces?.flush(),
 				hot.nightshiftNotifications?.stop(),
+				hot.nightshiftKeepAwake?.stop(),
 				lease.release(),
 			]),
 		);
@@ -443,7 +468,17 @@ export async function createDaemon(
 	 */
 	hot.nightshiftInApp ??= createInAppChannel();
 	hot.nightshiftNotifications?.stop();
+	const inApp = hot.nightshiftInApp;
 	const directory = deviceDirectory(db);
+	const desktop = desktopScreen(options.desktop, env);
+	const desktopChannel = desktop
+		? createDesktopChannel({
+				deviceId: device.id,
+				notifier: desktop.notifier,
+				...(desktop.window ? { window: desktop.window } : {}),
+				streamHere: (personId) => inApp.isActiveHere(personId),
+			})
+		: null;
 	const notifications = createNotifications({
 		db,
 		events: engineRunEvents(engine),
@@ -452,8 +487,9 @@ export async function createDaemon(
 			hostedElsewhere: (spaceId) => directory.hostedElsewhere(spaceId),
 			ownPersonalSpaceId: async () => person.spaceId,
 		}),
-		inApp: hot.nightshiftInApp,
+		inApp,
 		webPush: { subject: webPushSubject(env) },
+		push: desktopChannel ? { desktop: desktopChannel } : {},
 	});
 	hot.nightshiftNotifications = notifications;
 	// The switches this computer kept before notification settings moved
@@ -464,8 +500,32 @@ export async function createDaemon(
 		runFinished: kept.notifyRunFinished,
 		runFailed: kept.notifyRunFailed,
 	});
+	// This computer's desktop is its owner's screen: registered at each
+	// start, so it keeps the computer's name.
+	if (desktopChannel) {
+		await notifications.targets.register(person.userId, {
+			kind: "desktop",
+			name: device.name,
+			platform: process.platform,
+			endpoint: device.id,
+		});
+	}
 	// Not awaited: the baseline reads every Space's open Gates.
 	void notifications.start();
+
+	/**
+	 * "Keep this computer awake while a run is running" (this computer's
+	 * setting): the OS's sleep lock while a run here needs it.
+	 */
+	hot.nightshiftKeepAwake?.stop();
+	const keepAwake = createKeepAwake({
+		enabled: () => settings.current().keepAwake,
+		runs: engineRunSource(engine, () => spaceIds(db)),
+		lock: systemSleepLock(),
+	});
+	hot.nightshiftKeepAwake = keepAwake;
+	// Not awaited: it reads the runs that have not ended.
+	void keepAwake.start();
 
 	const gitInstaller = systemGitInstaller();
 	const info: DaemonInfo = {
@@ -528,6 +588,26 @@ export async function createDaemon(
 		ownerHasLogin: () => hasLogin(db, person.userId),
 		stop,
 	};
+}
+
+/**
+ * The desktop of this computer: the one the app passes, the OS programs
+ * for "system", or none (also with NIGHTSHIFT_DESKTOP_NOTIFICATIONS=off,
+ * and on a computer with no desktop).
+ */
+function desktopScreen(
+	option: DaemonOptions["desktop"],
+	env: DaemonEnv,
+): DesktopScreen | null {
+	if (!option) return null;
+	if (option !== "system") return option;
+	if (env.NIGHTSHIFT_DESKTOP_NOTIFICATIONS?.trim().toLowerCase() === "off") {
+		return null;
+	}
+	const notifier = systemDesktopNotifier({
+		pageUrl: (path) => new URL(path, env.CORS_ORIGIN).toString(),
+	});
+	return notifier ? { notifier } : null;
 }
 
 /** The origins of a Host's addresses (`https://name:port`). */

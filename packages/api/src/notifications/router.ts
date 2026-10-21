@@ -32,9 +32,12 @@ export const notifications = {
 				once: true,
 			});
 			try {
+				// A page on this computer itself: the desktop notification
+				// here waits while it is open.
 				yield* context.notifications.watch(
 					context.session.user.id,
 					controller.signal,
+					{ here: context.fromThisComputer },
 				);
 			} catch (error) {
 				throw readable(error);

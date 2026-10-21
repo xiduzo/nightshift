@@ -7,6 +7,7 @@ import Electrobun, {
 } from "electrobun/main";
 
 import { type Daemon, PortTakenError, startDaemon } from "../features/daemon";
+import { electrobunNotifier, trackWindow } from "../features/notifications";
 import { startUpdates } from "../features/updates";
 
 const APP_NAME = "Night Shift";
@@ -122,8 +123,14 @@ function setApplicationMenu(): void {
 }
 setMenus();
 
+/** What the main window shows: the daemon shows no notification for it. */
+const windowState = trackWindow();
+
 try {
-	daemon = await startDaemon();
+	daemon = await startDaemon({
+		notifier: electrobunNotifier((options) => Utils.showNotification(options)),
+		window: windowState,
+	});
 } catch (error) {
 	console.error(error);
 	await Utils.showMessageBox({
@@ -148,19 +155,40 @@ function showWindow(): void {
 	if (mainWindow) {
 		mainWindow.show();
 		mainWindow.activate();
+		windowState.focused();
 		return;
 	}
 	const window = new BrowserWindow({
 		title: APP_NAME,
 		url,
 		// The packaged view loads /index.html: start the router at /.
-		preload: url.startsWith("views://")
-			? 'history.replaceState(null, "", "/");'
-			: undefined,
+		// The page knows it is in the desktop app, which shows the
+		// notifications itself. The packaged view loads /index.html: start
+		// the router at /.
+		preload: `window.nightshiftDesktop = true;${
+			url.startsWith("views://") ? ' history.replaceState(null, "", "/");' : ""
+		}`,
 		frame: { width: 1280, height: 820, x: 120, y: 120 },
 	});
+	windowState.opened();
+	window.on("focus", () => {
+		if (mainWindow === window) windowState.focused();
+	});
+	window.on("blur", () => {
+		if (mainWindow === window) windowState.blurred();
+	});
+	const navigated = (event: unknown) => {
+		const url = (event as { data?: { detail?: unknown } }).data?.detail;
+		if (mainWindow === window && typeof url === "string") {
+			windowState.navigated(url);
+		}
+	};
+	window.webview.on("did-navigate", navigated);
+	window.webview.on("did-navigate-in-page", navigated);
 	window.on("close", () => {
-		if (mainWindow === window) mainWindow = null;
+		if (mainWindow !== window) return;
+		mainWindow = null;
+		windowState.closed();
 	});
 	mainWindow = window;
 }

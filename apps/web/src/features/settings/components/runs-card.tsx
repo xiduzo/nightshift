@@ -77,6 +77,26 @@ export function RunsCard({ data }: { data: SettingsView }) {
 								</Alert>
 							) : null}
 							<FieldSeparator />
+							<Field orientation="horizontal">
+								<FieldContent>
+									<FieldLabel htmlFor={`${id}-keep-awake`}>
+										Keep this computer awake while a run is running
+									</FieldLabel>
+									<FieldDescription>
+										This computer does not go to sleep while a run on it is
+										running. It can sleep again when the last run ends.
+									</FieldDescription>
+								</FieldContent>
+								<Switch
+									id={`${id}-keep-awake`}
+									checked={data.values.keepAwake}
+									disabled={toggle.isPending}
+									onCheckedChange={(checked) =>
+										toggle.mutate({ keepAwake: checked })
+									}
+								/>
+							</Field>
+							<FieldSeparator />
 							<div className="grid gap-6 sm:grid-cols-2">
 								<TextSetting
 									form={form}
