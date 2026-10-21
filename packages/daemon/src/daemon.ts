@@ -56,6 +56,7 @@ import {
 	systemGitInstaller,
 } from "@nightshift/engine";
 import {
+	createExpoChannel,
 	createInAppChannel,
 	createNotifications,
 	engineRunEvents,
@@ -451,6 +452,16 @@ export async function createDaemon(
 			ownPersonalSpaceId: async () => person.spaceId,
 		}),
 		inApp: hot.nightshiftInApp,
+		push: {
+			// The phone app registers with a Host, so only a Host has phones
+			// to reach; `sendsFor` keeps every push to the Spaces this
+			// computer sends for. EXPO_ACCESS_TOKEN is optional.
+			expo: createExpoChannel({
+				...(env.EXPO_ACCESS_TOKEN?.trim()
+					? { accessToken: env.EXPO_ACCESS_TOKEN.trim() }
+					: {}),
+			}),
+		},
 	});
 	hot.nightshiftNotifications = notifications;
 	// The switches this computer kept before notification settings moved

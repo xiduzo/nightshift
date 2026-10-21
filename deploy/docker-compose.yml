@@ -24,6 +24,8 @@ services:
       # People who sign in from another computer must use two-factor sign-in.
       # Give the Host admin a password first (docs/deploy/README.md).
       # NIGHTSHIFT_REQUIRE_TWO_FACTOR: "on"
+      # Pushes to the phone app, when its Expo project requires a token.
+      # EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN}
     volumes:
       - nightshift:/data
     # No ports: only Caddy reaches it, on the compose network.

@@ -21,6 +21,8 @@ export type DaemonEnv = AuthConfig & {
 	readonly NIGHTSHIFT_TLS_CERT?: string;
 	readonly NIGHTSHIFT_TLS_KEY?: string;
 	readonly NIGHTSHIFT_REQUIRE_TWO_FACTOR?: string;
+	/** The Expo access token for pushes to the phone app. Optional. */
+	readonly EXPO_ACCESS_TOKEN?: string;
 	/** The other values are fallbacks of the settings (NIGHTSHIFT_CLAUDE_BIN, …). */
 	readonly [name: string]: string | undefined;
 };
