@@ -81,6 +81,7 @@ import {
 	secretFiles,
 	secretsDir,
 	stopOnSignals,
+	webPushSubject,
 } from "./runtime";
 import { createSync } from "./sync";
 
@@ -437,7 +438,8 @@ export async function createDaemon(
 	 * Space about a new Gate, a finished run and a failed run, on every
 	 * screen. It sends for the Spaces this computer keeps as a Host, else
 	 * for its owner's personal Space only. The in-app channel outlives a
-	 * `bun --hot` reload, so the open pages keep their stream.
+	 * `bun --hot` reload, so the open pages keep their stream. Web Push
+	 * signs with the VAPID keys this daemon makes once and keeps.
 	 */
 	hot.nightshiftInApp ??= createInAppChannel();
 	hot.nightshiftNotifications?.stop();
@@ -451,6 +453,7 @@ export async function createDaemon(
 			ownPersonalSpaceId: async () => person.spaceId,
 		}),
 		inApp: hot.nightshiftInApp,
+		webPush: { subject: webPushSubject(env) },
 	});
 	hot.nightshiftNotifications = notifications;
 	// The switches this computer kept before notification settings moved

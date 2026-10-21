@@ -127,3 +127,30 @@ export function secretFiles(dir: string | null): Record<string, string> {
 	}
 	return out;
 }
+
+/** Who Web Push messages come from when this daemon has no public address. */
+const WEB_PUSH_FALLBACK_SUBJECT = "https://github.com/xiduzo/nightshift";
+
+/**
+ * The VAPID subject of this daemon's Web Push messages: a push service may
+ * contact it. The daemon's public `https:` address (a Host), else the web
+ * app's, else the project's page. A local address is never one: Apple's
+ * push service refuses it.
+ */
+export function webPushSubject(env: DaemonEnv): string {
+	for (const value of [env.BETTER_AUTH_URL, env.CORS_ORIGIN]) {
+		if (!value) continue;
+		try {
+			const url = new URL(value);
+			const local =
+				url.hostname === "localhost" ||
+				url.hostname.endsWith(".localhost") ||
+				url.hostname.endsWith(".local") ||
+				/^(127\.|10\.|192\.168\.|\[::1\])/.test(url.hostname);
+			if (url.protocol === "https:" && !local) return url.origin;
+		} catch {
+			// Not a URL: try the next one.
+		}
+	}
+	return WEB_PUSH_FALLBACK_SUBJECT;
+}

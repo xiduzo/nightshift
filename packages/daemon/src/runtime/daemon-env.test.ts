@@ -17,6 +17,7 @@ import {
 	prepareDaemonEnv,
 	secretFiles,
 	secretsDir,
+	webPushSubject,
 } from "./daemon-env";
 
 const dir = () => mkdtempSync(join(tmpdir(), "nightshift-env-"));
@@ -101,5 +102,33 @@ describe("secret files on a computer without a keychain", () => {
 			}),
 		).toBe("/run/credentials/nightshift.service");
 		expect(secretsDir({})).toBeNull();
+	});
+});
+
+describe("who Web Push messages come from", () => {
+	const env = (values: Record<string, string>) =>
+		({
+			BETTER_AUTH_SECRET: SECRET,
+			BETTER_AUTH_URL: "http://localhost:3000",
+			CORS_ORIGIN: "http://localhost:3001",
+			...values,
+		}) as DaemonEnv;
+
+	test("a Host's public address", () => {
+		expect(
+			webPushSubject(env({ BETTER_AUTH_URL: "https://host.example.com/" })),
+		).toBe("https://host.example.com");
+		expect(webPushSubject(env({ CORS_ORIGIN: "https://ui.example.com" }))).toBe(
+			"https://ui.example.com",
+		);
+	});
+
+	test("never a local address", () => {
+		expect(webPushSubject(env({}))).toBe(
+			"https://github.com/xiduzo/nightshift",
+		);
+		expect(
+			webPushSubject(env({ BETTER_AUTH_URL: "https://mac.local:3000" })),
+		).toBe("https://github.com/xiduzo/nightshift");
 	});
 });

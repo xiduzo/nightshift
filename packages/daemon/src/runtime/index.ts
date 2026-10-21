@@ -3,6 +3,7 @@ export {
 	prepareDaemonEnv,
 	secretFiles,
 	secretsDir,
+	webPushSubject,
 } from "./daemon-env";
 export { chooseFolder } from "./folder-picker";
 export {
