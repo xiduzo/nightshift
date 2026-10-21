@@ -1,4 +1,6 @@
-import type { Auth } from "./auth";
+import { deviceAuthorization } from "better-auth/plugins/device-authorization";
+
+import type { Auth } from "../auth";
 
 /**
  * Pairing a Device with a Host, by device authorization (RFC 8628, Better
@@ -11,7 +13,7 @@ import type { Auth } from "./auth";
  *    `approvePairing` or `denyPairing` answers it.
  * 3. The Device polls `redeemPairing` until the answer comes. On approval
  *    it learns the approving Person; the Host then gives it a Device key
- *    (`device-keys.ts`). The plugin's own session token is never handed
+ *    (`device-keys/`). The plugin's own session token is never handed
  *    out: it is deleted the moment it is made.
  *
  * Better Auth 1.6.11 or later binds a code to the first Person who reviews
@@ -27,6 +29,23 @@ export const PAIRING_CODE_TTL = "15m";
 export const PAIRING_POLL_INTERVAL = "2s";
 /** What a Device key may do, as the pairing asks for it. */
 export const PAIRING_SCOPE = "sync relay archive";
+
+/**
+ * The device authorization plugin, typed by name: its inferred type names a
+ * type `better-call` does not export, which a declaration cannot name.
+ */
+export interface PairingPlugin
+	extends ReturnType<typeof deviceAuthorization<undefined>> {}
+
+/** The device authorization plugin, as `createAuth` adds it. */
+export function pairingPlugin(): PairingPlugin {
+	return deviceAuthorization({
+		expiresIn: PAIRING_CODE_TTL,
+		interval: PAIRING_POLL_INTERVAL,
+		// The client is the joining Device: its id.
+		validateClient: (clientId) => /^[\w-]{1,64}$/.test(clientId),
+	});
+}
 
 export type PairingCode = {
 	/** The Device's secret for polling. Never shown. */

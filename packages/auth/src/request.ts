@@ -1,3 +1,8 @@
+// The access of one request: its session (`auth.ts`), its Space
+// (`spaces/`), the Host rules (`host-access/`) and the local session
+// (`local-session/`). It composes those verticals, so it sits beside
+// `auth.ts` at the root.
+
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 
@@ -20,7 +25,7 @@ export type RequestAccess = {
 	/** The request's headers, with the local session when it got one: pass these to Better Auth. */
 	headers: Headers;
 	/**
-	 * Whether the session may use the Host (`host-access.ts`). Refused: a
+	 * Whether the session may use the Host (`host-access/`). Refused: a
 	 * session from another computer on a Host that requires two-factor,
 	 * whose Person has not turned it on.
 	 */

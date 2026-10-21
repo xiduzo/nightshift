@@ -2,15 +2,15 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { user } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
-import { hasPermission, type MemberChange } from "./index";
-import { invitationView, membersOf } from "./members";
-import { requestAccess } from "./request";
-import { LOCAL_EMAIL, localPerson, personalSpaceId } from "./spaces";
+import { hasPermission, type MemberChange } from "../index";
+import { requestAccess } from "../request";
 import {
 	type AuthSandbox,
 	cookiesOf,
 	createAuthSandbox,
-} from "./testing/sandbox";
+} from "../testing/sandbox";
+import { invitationView, membersOf } from "./members";
+import { LOCAL_EMAIL, localPerson, personalSpaceId } from "./spaces";
 
 let sandbox: AuthSandbox;
 let changes: MemberChange[];

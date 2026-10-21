@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { CLIENT_IP_HEADERS } from "./index";
+import { CLIENT_IP_HEADERS } from "../index";
 import {
 	type AuthSandbox,
 	cookiesOf,
 	createAuthSandbox,
-} from "./testing/sandbox";
-import { codeFor, codeNow, turnOnTwoFactor } from "./testing/two-factor";
+} from "../testing/sandbox";
+import { codeFor, codeNow, turnOnTwoFactor } from "../testing/two-factor";
 
 let sandbox: AuthSandbox;
 beforeEach(async () => {

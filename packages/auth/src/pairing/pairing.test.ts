@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { apikey } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 
-import { createDeviceKeys, type DeviceKeys } from "./device-keys";
+import { createDeviceKeys, type DeviceKeys } from "../device-keys/device-keys";
+import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
 import {
 	approvePairing,
 	denyPairing,
@@ -10,7 +11,6 @@ import {
 	reviewPairing,
 	startPairing,
 } from "./pairing";
-import { type AuthSandbox, createAuthSandbox } from "./testing/sandbox";
 
 /**
  * Pairing by device authorization, and the Device keys it ends in: through

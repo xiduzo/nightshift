@@ -42,6 +42,7 @@ export const ENFORCED: string[] = [
 	"apps/web",
 	"packages/agents",
 	"packages/api",
+	"packages/auth",
 	"packages/daemon",
 	"packages/engine",
 	"packages/flows",

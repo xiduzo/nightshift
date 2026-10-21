@@ -1,4 +1,6 @@
-import { apiKey } from "@better-auth/api-key";
+// The Better Auth instance: the composition root of this package. Each
+// vertical gives its plugin and its rules. This file wires them together.
+
 import { tryGetCurrentAuthEndpointContext } from "@better-auth/core/context";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import type { Database } from "@nightshift/db";
@@ -6,20 +8,20 @@ import { authSchema as schema } from "@nightshift/db";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin } from "better-auth/plugins/admin";
-import { deviceAuthorization } from "better-auth/plugins/device-authorization";
 import { organization } from "better-auth/plugins/organization";
-import { twoFactor } from "better-auth/plugins/two-factor";
 
 import { ac, type Permissions, roles } from "./access";
-import { DEVICE_KEY_PREFIX } from "./device-keys";
+import { deviceKeyPlugin } from "./device-keys";
+import { pairingPlugin } from "./pairing";
 import {
+	activeSpaceId,
+	ensurePersonalSpace,
 	HOST_ADMIN,
 	hasHostAdmin,
 	type MemberChange,
 	signUpRefusal,
-} from "./members";
-import { PAIRING_CODE_TTL, PAIRING_POLL_INTERVAL } from "./pairing";
-import { activeSpaceId, ensurePersonalSpace } from "./spaces";
+} from "./spaces";
+import { twoFactorPlugin } from "./two-factor";
 
 export type AuthConfig = {
 	BETTER_AUTH_URL: string;
@@ -31,9 +33,6 @@ const PERSONAL = "Nobody can join a personal Space. Create a Space to share.";
 
 /** How long an invitation link works. */
 export const INVITATION_DAYS = 7;
-
-/** How long a browser that a person trusts skips the second factor at sign-in. */
-export const TRUSTED_BROWSER_DAYS = 30;
 
 /**
  * The address of the computer at the other end of the connection. The
@@ -77,17 +76,17 @@ export type AuthOptions = {
  * session starts in it. Nobody can be invited to, added to, or delete a
  * personal Space.
  *
- * A Host is invitation-only (`members.ts`): the first Person is the Host
- * admin (the admin plugin), and every other sign-up names a pending
+ * A Host is invitation-only (`spaces/members.ts`): the first Person is the
+ * Host admin (the admin plugin), and every other sign-up names a pending
  * invitation of its email.
  *
  * Devices pair with a Host by device authorization (RFC 8628, the device
  * authorization plugin) and sign in with a Device key (the API key
- * plugin): see `pairing.ts` and `device-keys.ts`.
+ * plugin): see `pairing/` and `device-keys/`.
  *
  * A Person may add a second factor to their password (the two-factor
  * plugin): a code from an authenticator app, or a backup code. A Host can
- * require it for sessions from other computers (`host-access.ts`).
+ * require it for sessions from other computers (`host-access/`).
  * Signing in and the second factor are rate limited per client address,
  * always: a Host may face the internet.
  */
@@ -168,19 +167,9 @@ export function createAuth(
 		},
 		plugins: [
 			admin({ defaultRole: "user", adminRoles: [HOST_ADMIN] }),
-			twoFactor({
-				issuer: "Night Shift",
-				trustDeviceMaxAge: TRUSTED_BROWSER_DAYS * 24 * 3600,
-			}),
+			twoFactorPlugin(),
 			pairingPlugin(),
-			apiKey({
-				defaultPrefix: DEVICE_KEY_PREFIX,
-				enableMetadata: true,
-				// A Device calls its Host every few seconds; idle expiry, not a
-				// request count, ends a key nobody uses (`device-keys.ts`).
-				rateLimit: { enabled: false },
-				keyExpiration: { minExpiresIn: 1, maxExpiresIn: 365 },
-			}),
+			deviceKeyPlugin(),
 			organization({
 				ac,
 				roles,
@@ -259,22 +248,6 @@ export function createAuth(
 				},
 			}),
 		],
-	});
-}
-
-/**
- * The device authorization plugin, typed by name: its inferred type names a
- * type `better-call` does not export, which a declaration cannot name.
- */
-export interface PairingPlugin
-	extends ReturnType<typeof deviceAuthorization<undefined>> {}
-
-function pairingPlugin(): PairingPlugin {
-	return deviceAuthorization({
-		expiresIn: PAIRING_CODE_TTL,
-		interval: PAIRING_POLL_INTERVAL,
-		// The client is the joining Device: its id.
-		validateClient: (clientId) => /^[\w-]{1,64}$/.test(clientId),
 	});
 }
 

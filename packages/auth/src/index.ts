@@ -1,3 +1,6 @@
+// The API of `@nightshift/auth`: the Better Auth instance (`auth.ts`), the
+// access of one request (`request.ts`), and the verticals' barrels.
+
 export type { Permissions, Role } from "./access";
 export { roleAllows, statements } from "./access";
 export {
@@ -8,10 +11,8 @@ export {
 	createAuth,
 	hasPermission,
 	INVITATION_DAYS,
-	type PairingPlugin,
 	PEER_ADDRESS_HEADER,
 	type Session,
-	TRUSTED_BROWSER_DAYS,
 } from "./auth";
 export {
 	bearerDeviceKey,
@@ -37,39 +38,40 @@ export {
 } from "./host-access";
 export { createLocalSession, type LocalSession } from "./local-session";
 export { hasLogin, setLogin } from "./login";
+export {
+	approvePairing,
+	denyPairing,
+	normalizeUserCode,
+	type PairingPlugin,
+	redeemPairing,
+	reviewPairing,
+	startPairing,
+} from "./pairing";
+export { type RequestAccess, requestAccess } from "./request";
 // InvitationView, PendingInvitation and SpaceMember are in the API's
 // router type: its declaration must be able to name them.
 export {
 	addMembership,
 	type InvitationView,
 	invitationView,
+	localPerson,
 	type MemberChange,
 	membershipOf,
 	membersOf,
-	type PendingInvitation,
-	removeMemberships,
-	type SpaceMember,
-	setMembershipRole,
-	spaceRoster,
-} from "./members";
-export {
-	approvePairing,
-	denyPairing,
-	normalizeUserCode,
-	redeemPairing,
-	reviewPairing,
-	startPairing,
-} from "./pairing";
-export { personContact, personNames } from "./people";
-export { type RequestAccess, requestAccess } from "./request";
-export {
-	localPerson,
 	mirrorHostSpace,
+	type PendingInvitation,
 	personalSpaceId,
 	personalSpaceIdBySlug,
+	personContact,
+	personNames,
+	removeMemberships,
 	roleIn,
 	type Space,
+	type SpaceMember,
+	setMembershipRole,
 	spaceExists,
 	spaceIds,
+	spaceRoster,
 	spacesOf,
 } from "./spaces";
+export { TRUSTED_BROWSER_DAYS } from "./two-factor";

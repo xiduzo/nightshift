@@ -1,0 +1,32 @@
+// InvitationView, PendingInvitation and SpaceMember are in the API's
+// router type: its declaration must be able to name them.
+export {
+	addMembership,
+	HOST_ADMIN,
+	hasHostAdmin,
+	type InvitationView,
+	invitationView,
+	type MemberChange,
+	membershipOf,
+	membersOf,
+	type PendingInvitation,
+	removeMemberships,
+	type SpaceMember,
+	setMembershipRole,
+	signUpRefusal,
+	spaceRoster,
+} from "./members";
+export { personContact, personNames } from "./people";
+export {
+	activeSpaceId,
+	ensurePersonalSpace,
+	localPerson,
+	mirrorHostSpace,
+	personalSpaceId,
+	personalSpaceIdBySlug,
+	roleIn,
+	type Space,
+	spaceExists,
+	spaceIds,
+	spacesOf,
+} from "./spaces";

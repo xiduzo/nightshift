@@ -1,8 +1,9 @@
+import { apiKey } from "@better-auth/api-key";
 import type { Database } from "@nightshift/db";
 import { apikey } from "@nightshift/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
-import type { Auth } from "./auth";
+import type { Auth } from "../auth";
 
 /**
  * Device keys: what a paired Device signs in with on a Host. A key is an
@@ -18,6 +19,18 @@ import type { Auth } from "./auth";
 
 /** Every Device key starts with it, so a key is never taken for a session token. */
 export const DEVICE_KEY_PREFIX = "nsd_";
+
+/** The API key plugin, as `createAuth` adds it: Device keys are its keys. */
+export function deviceKeyPlugin() {
+	return apiKey({
+		defaultPrefix: DEVICE_KEY_PREFIX,
+		enableMetadata: true,
+		// A Device calls its Host every few seconds; idle expiry, not a
+		// request count, ends a key nobody uses (`createDeviceKeys`).
+		rateLimit: { enabled: false },
+		keyExpiration: { minExpiresIn: 1, maxExpiresIn: 365 },
+	});
+}
 
 /** What a Device key may do: sync (pull, push), relay (serve bodies), archive (put, get). */
 export const DEVICE_KEY_PERMISSIONS = {
