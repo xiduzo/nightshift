@@ -23,6 +23,8 @@ export type DaemonEnv = AuthConfig & {
 	readonly NIGHTSHIFT_REQUIRE_TWO_FACTOR?: string;
 	/** "off": no desktop notification, also where `desktop: "system"` asks for one. */
 	readonly NIGHTSHIFT_DESKTOP_NOTIFICATIONS?: string;
+	/** The Expo access token for pushes to the phone app. Optional. */
+	readonly EXPO_ACCESS_TOKEN?: string;
 	/** The other values are fallbacks of the settings (NIGHTSHIFT_CLAUDE_BIN, …). */
 	readonly [name: string]: string | undefined;
 };

@@ -12,6 +12,26 @@ import type { PushKind, PushTarget } from "../targets";
  * the rest.
  */
 
+/** One option of a Gate, as a notification button shows it. */
+export type GateOption = {
+	/** What the answer sends: the choice's name. */
+	id: string;
+	/** What the button says: the author's text. */
+	label: string;
+};
+
+/**
+ * What a push about a Gate may show beyond its ids. Only a Gate its author
+ * marked (`lockScreen` on its Decision), to a person whose role allows an
+ * answer, carries its options: they become buttons on the notification.
+ */
+export type GateFacts = {
+	/** The person may answer this Gate from the lock screen. */
+	lockScreen: boolean;
+	/** The Gate's options, in the author's order. Empty when `lockScreen` is false. */
+	options: GateOption[];
+};
+
 /** What one notification says. */
 export type NotificationMessage = {
 	/** The event key: `runId:stepId` for a Gate, `runId:end:<seq>` for a run that ended. */
@@ -33,6 +53,8 @@ export type NotificationMessage = {
 	alert: boolean;
 	/** How many Gates wait (`gates-waiting`). Null otherwise. */
 	count: number | null;
+	/** A pushed `gate-opened`: whether it can be answered from the lock screen. Absent otherwise. */
+	gate?: GateFacts;
 	at: number;
 };
 
@@ -48,6 +70,8 @@ export interface NotificationChannel<Target> {
 	send(target: Target, message: NotificationMessage): Promise<SendResult>;
 	/** Takes the notification of the key back from the target. */
 	withdraw(target: Target, key: string): Promise<void>;
+	/** Stops what the channel does in the background (Expo's receipt check). */
+	stop?(): void;
 }
 
 /**

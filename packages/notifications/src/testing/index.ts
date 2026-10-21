@@ -1,8 +1,8 @@
 /**
- * Test helpers of `@nightshift/notifications`: a fake push channel, run
- * events a test lands, a fake Web Push sender and VAPID keys, fakes of
- * the desktop notification's OS ports, and a migrated database. Only
- * tests import this entry.
+ * Test helpers of `@nightshift/notifications`: a fake push channel, a fake
+ * Expo push service, run events a test lands, a fake Web Push sender and
+ * VAPID keys, fakes of the desktop notification's OS ports, and a migrated
+ * database. Only tests import this entry.
  */
 export { testDatabase } from "./database";
 export {
@@ -11,6 +11,7 @@ export {
 	fakeDesktopNotifier,
 	fakePrograms,
 } from "./desktop";
+export { type FakeExpoClient, fakeExpoClient } from "./expo";
 export {
 	type ChannelCall,
 	type FakeChannel,

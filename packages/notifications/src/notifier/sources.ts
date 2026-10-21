@@ -19,8 +19,18 @@ export type RunEvent = {
 	payload: unknown;
 };
 
-/** An open Gate, by its run and step. */
-export type OpenGateRef = { runId: string; stepId: string };
+/**
+ * An open Gate, by its run and step, and what a lock-screen notification
+ * needs of it: the author's mark and the names of its options.
+ */
+export type OpenGateRef = {
+	runId: string;
+	stepId: string;
+	/** The author marked it to be answered from the lock screen. Default: false. */
+	lockScreen?: boolean;
+	/** The names of its options, in the author's order. */
+	choices?: string[];
+};
 
 export type RunEventSource = {
 	/** Calls `listener` with the run events that land from now on. Returns the unsubscribe. */
@@ -37,7 +47,12 @@ export function engineRunEvents(
 		subscribe: (listener) => engine.onRunEvents(listener),
 		async openGates(spaceId) {
 			const gates = await engine.space(spaceId).listGates();
-			return gates.map((g) => ({ runId: g.runId, stepId: g.stepId }));
+			return gates.map((g) => ({
+				runId: g.runId,
+				stepId: g.stepId,
+				lockScreen: g.lockScreen,
+				choices: g.choices.map((choice) => choice.name),
+			}));
 		},
 	};
 }
