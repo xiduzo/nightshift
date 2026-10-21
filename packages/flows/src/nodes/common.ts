@@ -21,6 +21,18 @@ export const nameSchema = z
 	);
 export const nodeIdSchema = nameSchema;
 
+/**
+ * A secret by name, as `${NAME}` reads it: saved under Agents → Secrets,
+ * else set in the environment of the computer that runs the step. The rule
+ * of an environment variable name, as a shell reads one.
+ */
+export const secretNameSchema = z
+	.string()
+	.regex(
+		/^[A-Za-z_][A-Za-z0-9_]{0,127}$/,
+		"Use letters, digits and _, starting with a letter or _.",
+	);
+
 /** A flow file name, without `.json`. */
 export const flowNameSchema = z
 	.string()

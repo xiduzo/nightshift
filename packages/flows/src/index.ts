@@ -113,6 +113,7 @@ export {
 	reservedNames,
 	reservedOutcomes,
 	STANDARD_EXIT_CODES,
+	secretNameSchema,
 	type ToolNode,
 	toolNodeSchema,
 	type ValueBy,

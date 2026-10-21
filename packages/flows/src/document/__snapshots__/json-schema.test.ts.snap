@@ -464,6 +464,13 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                   ],
                   "type": "object",
                 },
+                "secrets": {
+                  "items": {
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
                 "set": {
                   "items": {
                     "properties": {
@@ -1782,6 +1789,13 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     "y",
                   ],
                   "type": "object",
+                },
+                "secrets": {
+                  "items": {
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+                    "type": "string",
+                  },
+                  "type": "array",
                 },
                 "set": {
                   "items": {
@@ -3207,7 +3221,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "callNodeSchema": "121ccd0985ab06eb0ec5f6569f06bf2a323eb6c874e14cab91de4bea1db38da8",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "8aeb73dfd94f45d4271829acd38fd43aaf56fd36e3db9b446b0017b2f6444efa",
-  "commandNodeSchema": "4715a0f36e1b8798b2d2a81462a7f8423ac2229cf8719703d79816564ef15370",
+  "commandNodeSchema": "e0e64124d8334fd281fe3cf839fac05e52059357725e881107d56132a9468f9e",
   "commandSourceSchema": "29be5c28ca62374751ca03afaf9cd232962ffa7e0220220d34e0f64a0f2f3ecb",
   "customAgentSchema": "695fcb6e79464055898109624fe9bfb29190a3dccb2c722e26f4d9bdb622d425",
   "customAgentSlugSchema": "85b706ff2ef51fed369fb25c81f938328d9771d8a396bc7f1ed876637543e94a",
@@ -3221,9 +3235,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowEdgeSchema": "fa102c4d0dbb7e0dc39d6b2ff6a8dda61e677b0a5b06f37519200f3145d3e80d",
   "flowInputSchema": "614c08d07a4c7b5980a98cf8447cd5bd3491dd84a298256e50dee562624f2c57",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "ff46f30b703587789c07becbab6b25445e4bd882952b3f4263e7cc2e79b388b5",
+  "flowNodeSchema": "3a45a360996cb2d524a4794a96db2c7322c46c81c2a540521dd93b142f2b5847",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "5196f32bd5afd85272cee4a9efe10f13b55e84713e4ef7b6d720ba23a048a9c9",
+  "flowSchema": "a42802bb3f19b7514d6d249ffe81f7917e7001834709a694d66dd705ea65fa27",
   "flowVariableSchema": "bc241c9d8a19a055e9866d040bc4720e0dbd3eacb515865d1036ca65e8be7679",
   "harnessNameSchema": "5680ae13dedd38277934574bb77ad18e9ec2d67a68bd7c7266e1c5ebd57d3318",
   "jsonSchemaSchema": "5f8d604991fdf1ed7da4739406b681e55cba181bf749047debf0eae2673efece",
@@ -3240,6 +3254,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "scheduleIdSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
   "scheduleSchema": "8d24fd7c9303f41084ec74e1ef4da372577d1bea6c7205e82c193126037d91bc",
   "schedulesFileSchema": "a58f53e65cddb3ebb52d62f05fe5c0cd33da5c86fe05a7aa61e6984780f22eab",
+  "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
   "toolNodeSchema": "77f7d1564de94766384a1c28a5219e9d6c8fa3c63feb9e0ffac8cef75b33c724",
   "valueBySchema": "bd03d7f4d6a9ce81bfdb8638ac71508d4761cd359a8b94bdc2fc070915a01cfd",

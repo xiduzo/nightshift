@@ -67,6 +67,7 @@ export {
 	nodeIdSchema,
 	reservedNames,
 	reservedOutcomes,
+	secretNameSchema,
 	type VariableWrite,
 	variableWriteSchema,
 } from "./common";

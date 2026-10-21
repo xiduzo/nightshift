@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { labelSchema, type NodeCheck, nodeBase, placed } from "./common";
+import {
+	labelSchema,
+	type NodeCheck,
+	nodeBase,
+	placed,
+	secretNameSchema,
+} from "./common";
 import { checkOptions, outcomeColorSchema } from "./outcomes";
 
 /** The Command node: a shell command whose exit code picks the outcome. */
@@ -107,6 +113,14 @@ export const commandNodeSchema = z.object({
 	 * `pass` on 0 and `fail` on any other code (`commandExits`).
 	 */
 	exits: z.array(commandExitSchema).min(1).optional(),
+	/**
+	 * Secrets by name (Agents → Secrets): each reaches the command as an
+	 * environment variable of the same name (`"$ZAC_USER"`). The Device that
+	 * runs the step reads them: its keychain, then its daemon's environment.
+	 * A secret it does not have errors the step before the command runs.
+	 * Their values become `•••` in the step's output, log tail and data.
+	 */
+	secrets: z.array(secretNameSchema).optional(),
 });
 export type CommandNode = z.infer<typeof commandNodeSchema>;
 
@@ -140,9 +154,21 @@ export const commandOutputFields = [
 	"visit",
 ] as const;
 
-/** A Command node's templates read known names, and its own exits follow the outcome and exit rules. */
+/**
+ * A Command node's templates read known names, it names each secret once,
+ * and its own exits follow the outcome and exit rules.
+ */
 export function checkCommandNode(node: CommandNode, check: NodeCheck): void {
 	check.template(node.command, "command");
+	const secrets = new Set<string>();
+	for (const name of node.secrets ?? []) {
+		if (secrets.has(name)) {
+			check.error(
+				`Command node "${node.id}" names the secret ${name} more than once.`,
+			);
+		}
+		secrets.add(name);
+	}
 	if (node.exits !== undefined) {
 		checkOptions(
 			node.id,

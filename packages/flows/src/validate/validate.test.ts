@@ -1206,6 +1206,39 @@ describe("validateFlow: Command output", () => {
 	});
 });
 
+describe("validateFlow: Command secrets", () => {
+	const f = (secrets: string[]): Flow =>
+		flow([command("check", { secrets })], [], "check");
+
+	test("secrets with valid names parse", () => {
+		const result = parseFlow(f(["ZAC_BEHANDELAAR_USER", "_token", "a1"]));
+		expect(result.issues).toEqual([]);
+		expect(result.flow?.nodes[0]).toMatchObject({
+			secrets: ["ZAC_BEHANDELAAR_USER", "_token", "a1"],
+		});
+	});
+
+	test("a name that is not a valid secret name is a schema error", () => {
+		for (const name of ["1ST", "ZAC-USER", "$ZAC_USER", ""]) {
+			const result = parseFlow(f([name]));
+			expect(result.flow).toBeNull();
+			expect(result.issues.map((issue) => issue.message)).toEqual([
+				expect.stringMatching(/^nodes\.0\.secrets\.0: /),
+			]);
+		}
+	});
+
+	test("a secret named more than once is an error", () => {
+		expect(
+			errors(validateFlow(f(["ZAC_USER", "ZAC_PASSWORD", "ZAC_USER"]))).map(
+				(issue) => issue.message,
+			),
+		).toEqual([
+			'Command node "check" names the secret ZAC_USER more than once.',
+		]);
+	});
+});
+
 describe("validateFlow: outputs", () => {
 	const f = (outputs: Flow["outputs"]): Flow =>
 		withInputs(
