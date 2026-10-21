@@ -1,4 +1,5 @@
-/** This computer, its Hosts, paired Devices, Offers, and the Walker of a run. */
+/** This computer, its Hosts, paired Devices, Offers, the Walker of a run, and the Devices queries. */
 
 export { DevicesPage } from "./devices-page";
+export { deviceQueries } from "./queries";
 export { WalkerBadge, walkerName } from "./walker-badge";
