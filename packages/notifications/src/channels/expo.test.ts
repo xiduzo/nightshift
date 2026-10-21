@@ -106,6 +106,7 @@ describe("messages", () => {
 					stepId: "step-1",
 				},
 				categoryId: "gate-open",
+				channelId: "gates",
 				priority: "high",
 				interruptionLevel: "time-sensitive",
 			},
@@ -118,6 +119,7 @@ describe("messages", () => {
 		for (const [i, push] of expo.sent.entries()) {
 			expect(push).toMatchObject({
 				categoryId: "run",
+				channelId: "runs",
 				priority: "normal",
 				interruptionLevel: "active",
 				collapseId: "run-1:end:7",
@@ -148,6 +150,7 @@ describe("messages", () => {
 		expect(expo.sent[0]).toMatchObject({
 			title: "3 Gates wait for you",
 			categoryId: "gate-open",
+			channelId: "gates",
 			priority: "high",
 			data: { kind: "gates-waiting", key: "waiting:5", runId: null, count: 3 },
 		});
@@ -158,6 +161,7 @@ describe("lock-screen Gates", () => {
 	test("a marked Gate with two options gets Approve and Reject", async () => {
 		await channel.send(phone(), gate({ gate: SHIP_OR_HOLD }));
 		expect(expo.sent[0]?.categoryId).toBe("gate-decide");
+		expect(expo.sent[0]?.channelId).toBe("gates");
 		expect(expo.sent[0]?.data).toEqual({
 			kind: "gate-opened",
 			key: "run-1:step-1",

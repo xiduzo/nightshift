@@ -268,7 +268,7 @@ key, so a second push of one key replaces the first. The `data`:
 
 | `categoryId` | When | Actions | A tap |
 | --- | --- | --- | --- |
-| `gate-decide` | A Gate the author marked (`lockScreen: true`) with exactly two options, sent to a person whose role allows an answer | `approve` and `reject`, both `authenticationRequired: true` and `opensAppToForeground: false` | Opens the Gate |
+| `gate-decide` | A Gate the author marked (`lockScreen: true`) with exactly two options, sent to a person whose role allows an answer | `approve` and `reject`, both `isAuthenticationRequired: false` and `opensAppToForeground: false`: the author marked the Gate, so the answer needs no unlock | Opens the Gate |
 | `gate-open` | Every other Gate, and `gates-waiting` | none | Opens the Gate, or the inbox when `runId` is null. A biometric check comes before the answer |
 | `run` | A run that finished or failed | none | Opens the run |
 
@@ -280,8 +280,10 @@ Host refuses an answer to a Gate that is already closed.
 
 **Priority.** Gates and `gates-waiting`: `priority: "high"`,
 `interruptionLevel: "time-sensitive"` (the app needs the Time Sensitive
-Notifications capability). Runs: `priority: "normal"`,
-`interruptionLevel: "active"`.
+Notifications capability), Android `channelId: "gates"` (high importance).
+Runs: `priority: "normal"`, `interruptionLevel: "active"`, Android
+`channelId: "runs"` (default importance). The app defines both Android
+channels at start.
 
 **Withdraw.** Expo cannot delete a delivered notification from the server.
 When a Gate closes, the Host sends a data-only push to every phone that

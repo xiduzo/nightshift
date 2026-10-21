@@ -24,6 +24,8 @@ import type {
  *   (Approve and Reject, a Gate its author marked for the lock screen with
  *   exactly two options), `gate-open` (any other Gate: it opens the app),
  *   `run` (a run that finished or failed).
+ * - Android: a Gate goes to the `gates` channel (high importance), a
+ *   run to `runs` (default importance). The phone app defines both.
  * - One notification per key: the key is the thread id, the collapse id
  *   and the Android tag, so a Gate pushed again replaces itself.
  * - Withdraw: Expo cannot delete a delivered notification from the
@@ -80,6 +82,16 @@ export const EXPO_CATEGORY = {
 	run: "run",
 } as const;
 
+/**
+ * The Android notification channels the phone app defines: Gates at high
+ * importance (they show at the top and make a sound), runs at default.
+ * A person can mute one channel in Android's settings and keep the other.
+ */
+export const EXPO_ANDROID_CHANNEL = {
+	gates: "gates",
+	runs: "runs",
+} as const;
+
 const DEFAULT_RECEIPT_DELAY_MS = 15 * 60_000;
 const DEFAULT_RECEIPT_MAX_AGE_MS = 24 * 60 * 60_000;
 
@@ -108,6 +120,7 @@ export function expoMessage(
 			...once,
 			data,
 			categoryId: EXPO_CATEGORY.run,
+			channelId: EXPO_ANDROID_CHANNEL.runs,
 			priority: "normal",
 			interruptionLevel: "active",
 		};
@@ -122,6 +135,7 @@ export function expoMessage(
 		data,
 		categoryId:
 			options.length === 2 ? EXPO_CATEGORY.decide : EXPO_CATEGORY.open,
+		channelId: EXPO_ANDROID_CHANNEL.gates,
 		priority: "high",
 		interruptionLevel: "time-sensitive",
 	};
