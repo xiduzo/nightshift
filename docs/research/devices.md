@@ -31,7 +31,7 @@ and set aside; the first revision of this file has them.
 | Harnesses, CLI Tools, Connections, Secrets and Agent Profiles are daemon-wide and say "this computer". | the Agents and Settings pages |
 | Transcripts and command logs are files in the daemon's data directory. | `log/transcripts.ts` |
 | Every daemon's scheduler reads every project's `.nightshift/schedules.json`. | `schedules/scheduler.ts` |
-| The UI talks to one server URL. Procedures are public: local single-user mode. | `VITE_SERVER_URL`, `routers/index.ts` |
+| The UI talks to one server URL. Procedures are public: local single-user mode. | `VITE_SERVER_URL`, `packages/api/src/router.ts` |
 | Better Auth is wired; one local user is auto-created. | `packages/auth` |
 | TECH constraint already written: "Put a tenant id on every row. No query crosses a workspace." | `docs/steering/TECH.md` |
 
