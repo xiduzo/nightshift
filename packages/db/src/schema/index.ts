@@ -11,6 +11,8 @@
 // - `device-config.ts`: `@nightshift/engine` `device-config/`.
 // - `engine.ts`: `@nightshift/engine` `graph/checkpointer.ts` (LangGraph).
 // - `daemon.ts`: `@nightshift/daemon` `runtime/` (the lease).
+// - `notifications.ts`: `@nightshift/notifications` `settings/`, `targets/`
+//   and `deliveries/`.
 //
 // drizzle-kit reads this file: every table must be exported from here.
 
@@ -24,5 +26,6 @@ export * from "./daemon";
 export * from "./device-config";
 export * from "./devices";
 export * from "./engine";
+export * from "./notifications";
 export * from "./projects";
 export * from "./runs";

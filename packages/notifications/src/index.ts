@@ -1,0 +1,43 @@
+// The API of `@nightshift/notifications`: the notifier and what the API and
+// the daemon need of it. `wire.ts` composes the verticals. Fakes are in
+// `./testing`.
+
+export {
+	createInAppChannel,
+	type InAppChannel,
+	type InAppItem,
+	type InAppTarget,
+	type NotificationChannel,
+	type NotificationMessage,
+	type PushChannels,
+	type SendResult,
+} from "./channels";
+export type { NoticeKind } from "./deliveries";
+export {
+	engineRunEvents,
+	oneSenderPerSpace,
+	type RunEvent,
+	type RunEventSource,
+	type SenderFacts,
+} from "./notifier";
+export {
+	DEFAULT_HOLD_MINUTES,
+	type NotificationSettings,
+	type NotificationSettingsPatch,
+	notificationSettingsPatchSchema,
+	notificationSettingsSchema,
+} from "./settings";
+export {
+	PUSH_KINDS,
+	type PushKind,
+	type PushTarget,
+	type PushTargetView,
+	pushKindSchema,
+	type RegisterTarget,
+	registerTargetSchema,
+} from "./targets";
+export {
+	createNotifications,
+	type Notifications,
+	type NotificationsOptions,
+} from "./wire";

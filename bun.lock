@@ -335,6 +335,21 @@
         "typescript": "catalog:",
       },
     },
+    "packages/notifications": {
+      "name": "@nightshift/notifications",
+      "dependencies": {
+        "@nightshift/auth": "workspace:*",
+        "@nightshift/db": "workspace:*",
+        "@nightshift/engine": "workspace:*",
+        "drizzle-orm": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@nightshift/config": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "packages/ui": {
       "name": "@nightshift/ui",
       "version": "0.0.0",
@@ -894,6 +909,8 @@
     "@nightshift/engine": ["@nightshift/engine@workspace:packages/engine"],
 
     "@nightshift/flows": ["@nightshift/flows@workspace:packages/flows"],
+
+    "@nightshift/notifications": ["@nightshift/notifications@workspace:packages/notifications"],
 
     "@nightshift/ui": ["@nightshift/ui@workspace:packages/ui"],
 

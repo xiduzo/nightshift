@@ -1,0 +1,149 @@
+import type { NoticeKind } from "../deliveries";
+import {
+	type InAppTarget,
+	type NotificationChannel,
+	type NotificationMessage,
+	parseGateKey,
+} from "./channel";
+
+/**
+ * The in-app stream: every open page and the open phone app of a Person
+ * get each event at once, over one stream (`notifications.watch`). It
+ * replaces the web app's polling. It also tells the notifier whether the
+ * Person has a screen open now (`isActive`): the active screen goes first,
+ * and a push to a phone waits.
+ */
+
+/** One item of the in-app stream. */
+export type InAppItem =
+	| {
+			kind: NoticeKind;
+			key: string;
+			spaceId: string;
+			runId: string;
+			stepId: string | null;
+			title: string;
+			/** Show it as a notification. False: only update what the screen shows. */
+			alert: boolean;
+			at: number;
+	  }
+	/** A Gate closed: it was answered (on any screen), or its run stopped. */
+	| {
+			kind: "gate-closed";
+			key: string;
+			runId: string;
+			stepId: string;
+			at: number;
+	  };
+
+/** A screen counts as open this long after its stream ended: a page that reloads. */
+const DEFAULT_RECENT_MS = 60_000;
+
+export type InAppChannel = NotificationChannel<InAppTarget> & {
+	/**
+	 * The Person's stream: each item from now on, until `signal` aborts.
+	 * While it is open, the Person has a screen open.
+	 */
+	watch(personId: string, signal: AbortSignal): AsyncGenerator<InAppItem>;
+	/** Whether the Person has a screen open, or had one a moment ago. */
+	isActive(personId: string): boolean;
+};
+
+export function createInAppChannel(
+	options: { now?: () => number; recentMs?: number } = {},
+): InAppChannel {
+	const now = options.now ?? Date.now;
+	const recentMs = options.recentMs ?? DEFAULT_RECENT_MS;
+	const listeners = new Map<string, Set<(item: InAppItem) => void>>();
+	/** When each Person's last stream ended. */
+	const left = new Map<string, number>();
+
+	function publish(personId: string, item: InAppItem): void {
+		for (const listener of [...(listeners.get(personId) ?? [])]) {
+			try {
+				listener(item);
+			} catch {
+				// A broken stream must not stop the others.
+			}
+		}
+	}
+
+	return {
+		async send(target, message: NotificationMessage) {
+			if (
+				message.kind === "gates-waiting" ||
+				message.spaceId === null ||
+				message.runId === null
+			) {
+				return "sent";
+			}
+			publish(target.personId, {
+				kind: message.kind,
+				key: message.key,
+				spaceId: message.spaceId,
+				runId: message.runId,
+				stepId: message.stepId,
+				title: message.title,
+				alert: message.alert,
+				at: message.at,
+			});
+			return "sent";
+		},
+
+		async withdraw(target, key) {
+			const gate = parseGateKey(key);
+			if (!gate) return;
+			publish(target.personId, {
+				kind: "gate-closed",
+				key,
+				...gate,
+				at: now(),
+			});
+		},
+
+		isActive(personId) {
+			if ((listeners.get(personId)?.size ?? 0) > 0) return true;
+			const at = left.get(personId);
+			return at !== undefined && now() - at < recentMs;
+		},
+
+		async *watch(personId, signal) {
+			const queue: InAppItem[] = [];
+			let wake: (() => void) | null = null;
+			const notify = () => {
+				const resolve = wake;
+				wake = null;
+				resolve?.();
+			};
+			const listener = (item: InAppItem) => {
+				queue.push(item);
+				notify();
+			};
+			let set = listeners.get(personId);
+			if (!set) {
+				set = new Set();
+				listeners.set(personId, set);
+			}
+			set.add(listener);
+			signal.addEventListener("abort", notify, { once: true });
+			try {
+				while (!signal.aborted) {
+					const item = queue.shift();
+					if (item) {
+						yield item;
+						continue;
+					}
+					await new Promise<void>((resolve) => {
+						wake = resolve;
+					});
+				}
+			} finally {
+				signal.removeEventListener("abort", notify);
+				const current = listeners.get(personId);
+				current?.delete(listener);
+				if (current?.size === 0) listeners.delete(personId);
+				left.set(personId, now());
+			}
+		},
+	};
+}
