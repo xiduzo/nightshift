@@ -11,9 +11,9 @@ import { Text } from "@nightshift/ui-native/components/ui/text";
 import { Fragment } from "react";
 import { View } from "react-native";
 
+import { RunStatusBadge } from "@/features/runs";
 import { formatAgo } from "@/shared/format";
 import type { Health, HealthRow } from "./health";
-import { RunStatusBadge } from "./run-status-badge";
 
 /**
  * How each flow (one project) or each project (every Space) did: the share

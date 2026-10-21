@@ -3,3 +3,4 @@
 export { openRun } from "./run-row";
 export { RunScreen } from "./run-screen";
 export { RunsScreen } from "./runs-screen";
+export { RunStatusBadge } from "./status-badge";

@@ -198,15 +198,12 @@ function stepName(step: StepSummary, labels: Map<string, string>): string {
 	return step.visit > 1 ? `${name} (visit ${step.visit})` : name;
 }
 
-/**
- * The inbox's answer sheet of one Gate. Cast: the route lives in the inbox
- * vertical's branch, so typed routes may not list it yet.
- */
+/** The inbox's answer sheet of one Gate. */
 function answerHref(gate: Pick<OpenGate, "runId" | "stepId">): Href {
 	return {
 		pathname: "/gates/[runId]/[stepId]",
 		params: { runId: gate.runId, stepId: gate.stepId },
-	} as unknown as Href;
+	};
 }
 
 /** The Gates of this run that wait for a person, each with a button to answer it. */
