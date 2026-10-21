@@ -14,6 +14,10 @@ export type RunStatus = RunSummary["status"];
 export type StepOutcome = NonNullable<StepSummary["outcome"]>;
 export type StartRunInput = ApiInputs["runs"]["start"];
 export type RunTrigger = RunSummary["trigger"];
+/** A Device a run of the project can run on now (`runs.placements`). */
+export type RunPlacement = ApiOutputs["runs"]["placements"][number];
+/** One of the person's Devices for a project, online or not (`runs.devices`). */
+export type RunDevice = ApiOutputs["runs"]["devices"][number];
 
 /** One item of `runs.watch`: the run's status, a step summary, or a transcript entry. */
 export type RunStreamItem =

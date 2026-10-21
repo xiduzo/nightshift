@@ -9,6 +9,20 @@ const ACTIVE_POLL_MS = 15_000;
 /** How often the inbox looks for sleeping runs and when they wake. */
 const INBOX_POLL_MS = 15_000;
 
+/** Polls a list of runs while one of them is on its way. */
+function pollWhileActive(query: {
+	state: { data?: { status: string }[] | undefined };
+}): number | false {
+	return query.state.data?.some(
+		(run) =>
+			run.status === "running" ||
+			run.status === "waiting" ||
+			run.status === "sleeping",
+	)
+		? ACTIVE_POLL_MS
+		: false;
+}
+
 /** The query options of runs, and how often each run list polls. */
 export function createRunQueries(orpc: ApiQueryUtils) {
 	return {
@@ -16,6 +30,15 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		all: () => orpc.runs.key(),
 		/** The runs of every project. */
 		everyRun: () => orpc.runs.list.queryOptions({ input: {} }),
+		/**
+		 * The runs of the Space, of every project. Polls while a run is on its
+		 * way, like `ofProjectLive`. A failed background poll keeps the list.
+		 */
+		everyRunLive: () => ({
+			...orpc.runs.list.queryOptions({ input: {} }),
+			refetchInterval: pollWhileActive,
+			meta: { quietRefetchErrors: true },
+		}),
 		/** The runs of one project. */
 		ofProject: (projectId: string) =>
 			orpc.runs.list.queryOptions({ input: { projectId } }),
@@ -26,17 +49,7 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		 */
 		ofProjectLive: (projectId: string) => ({
 			...orpc.runs.list.queryOptions({ input: { projectId } }),
-			refetchInterval: (query: {
-				state: { data?: { status: string }[] | undefined };
-			}) =>
-				query.state.data?.some(
-					(run) =>
-						run.status === "running" ||
-						run.status === "waiting" ||
-						run.status === "sleeping",
-				)
-					? ACTIVE_POLL_MS
-					: false,
+			refetchInterval: pollWhileActive,
 			meta: { quietRefetchErrors: true },
 		}),
 		/** The runs of every project for the inbox. Polls; a failed poll does not toast. */

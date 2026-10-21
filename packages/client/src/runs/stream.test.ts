@@ -54,7 +54,7 @@ function fakeServer(connections: Connection[]) {
 	return { client, calls, signal: controller.signal, controller };
 }
 
-async function follow(connections: Connection[]) {
+async function follow(connections: Connection[], afterSeq?: number) {
 	const server = fakeServer(connections);
 	const entries: number[] = [];
 	const steps: string[] = [];
@@ -64,6 +64,7 @@ async function follow(connections: Connection[]) {
 	await followRun({
 		client: server.client,
 		runId: "run-1",
+		afterSeq,
 		signal: server.signal,
 		onEntry: (e: TranscriptEntry) => entries.push(e.seq),
 		onStep: (s: StepSummary) => steps.push(s.id),
@@ -113,6 +114,18 @@ describe("the stream of one run", () => {
 			},
 		]);
 		expect(run.entries).toEqual([1, 2, 3, 4, 5]);
+	});
+
+	test("follows on after the seq the caller already has", async () => {
+		const run = await follow(
+			[
+				{ items: [entry(3), entry(4), entry(5)], ending: "drop" },
+				{ items: [entry(6)], ending: "end" },
+			],
+			4,
+		);
+		expect(run.calls.map((call) => call.afterSeq)).toEqual([4, 5, 6]);
+		expect(run.entries).toEqual([5, 6]);
 	});
 
 	test("waits longer after each failed try, up to 15 seconds", async () => {

@@ -1,5 +1,23 @@
 /** Runs: their query options, the stream of one run, and their view types. */
 
+export {
+	defaultPlacement,
+	type PlacementChoice,
+	placementChoices,
+} from "./placements";
+export {
+	type AgentMessage,
+	type AgentMessages,
+	applyAgentMessages,
+	currentStep,
+	groupRuns,
+	hasEnded,
+	markdownPreview,
+	type RunGroup,
+	runGroup,
+	type StepState,
+	stepState,
+} from "./progress";
 export { createRunMutations, createRunQueries } from "./queries";
 export { mergeSteps } from "./steps";
 export {
@@ -22,6 +40,8 @@ export type {
 	ItemState,
 	ItemSummary,
 	RunDetail,
+	RunDevice,
+	RunPlacement,
 	RunStatus,
 	RunStreamItem,
 	RunSummary,

@@ -27,6 +27,12 @@ export type Wait = (ms: number, signal: AbortSignal) => Promise<void>;
 export type FollowRunOptions = {
 	client: RunWatchClient;
 	runId: string;
+	/**
+	 * The last seq the caller already has, from an earlier follow of the
+	 * same run: the stream starts after it. A phone that comes back from
+	 * the background follows on from there.
+	 */
+	afterSeq?: number;
 	/** Stops the stream. `followRun` resolves soon after. */
 	signal: AbortSignal;
 	/** A transcript entry the caller does not have yet, in order. */
@@ -71,11 +77,13 @@ export const waitFor: Wait = (ms, signal) =>
  * live items. When the stream drops or ends, it connects again with backoff
  * and passes the last seq it saw as `afterSeq`, so it gets only the entries
  * it does not have yet. An entry at or below that seq is dropped, so the
- * caller sees each entry once.
+ * caller sees each entry once. With `afterSeq`, the first try asks after
+ * that seq too.
  */
 export async function followRun({
 	client,
 	runId,
+	afterSeq,
 	signal,
 	onEntry,
 	onStep,
@@ -83,7 +91,7 @@ export async function followRun({
 	onConnection,
 	wait = waitFor,
 }: FollowRunOptions): Promise<void> {
-	let lastSeq: number | undefined;
+	let lastSeq: number | undefined = afterSeq;
 	let attempt = 0;
 	onConnection?.("connecting");
 	while (!signal.aborted) {
