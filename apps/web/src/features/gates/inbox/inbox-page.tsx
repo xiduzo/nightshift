@@ -1,4 +1,4 @@
-import { gateParts, waitedText } from "@nightshift/client";
+import { gateParts, gateRun, waitedText } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -239,6 +239,7 @@ function GateNavItem({
 	onClick: () => void;
 }) {
 	const { headline } = gateParts(gate.question);
+	const { flow, detail } = gateRun(gate);
 	return (
 		<Item
 			size="xs"
@@ -260,7 +261,8 @@ function GateNavItem({
 					<span className="line-clamp-2">{headline}</span>
 				</ItemTitle>
 				<ItemDescription className="truncate text-xs">
-					{gate.runTitle} ·{" "}
+					<span className="font-medium">{flow}</span>
+					{detail ? ` · ${detail}` : null} ·{" "}
 					<span className="text-status-waiting tabular-nums">
 						{waitedText(now - gate.openedAt)}
 					</span>

@@ -267,6 +267,8 @@ export type OpenGate = {
 	spaceId: string;
 	runId: string;
 	runTitle: string;
+	/** The flow file the run started from. Null for a quick run. */
+	flowName: string | null;
 	projectId: string;
 	projectName: string;
 	stepId: string;

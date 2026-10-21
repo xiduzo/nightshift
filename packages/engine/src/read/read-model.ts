@@ -633,6 +633,7 @@ export function createReadModel(deps: ReadModelDeps) {
 				spaceId: row.spaceId,
 				runId: row.id,
 				runTitle: row.title,
+				flowName: row.flowName,
 				projectId: row.projectId,
 				projectName,
 				stepId: gate.stepId,

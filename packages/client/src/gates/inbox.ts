@@ -35,6 +35,28 @@ export function waitedText(ms: number): string {
 	return days === 1 ? "1 day" : `${days} days`;
 }
 
+/**
+ * The run a Gate waits in: its flow ("Quick run" for a run without a flow
+ * file), and what sets this run apart from other runs of that flow (its
+ * inputs, or the prompt of a quick run). Null when nothing does.
+ */
+export function gateRun(gate: Pick<OpenGate, "flowName" | "runTitle">): {
+	flow: string;
+	detail: string | null;
+} {
+	const { flowName, runTitle } = gate;
+	if (!flowName) return { flow: "Quick run", detail: runTitle || null };
+	// A flow run's title is the flow name, then its text inputs.
+	const prefix = `${flowName} · `;
+	const detail =
+		runTitle === flowName
+			? ""
+			: runTitle.startsWith(prefix)
+				? runTitle.slice(prefix.length)
+				: runTitle;
+	return { flow: flowName, detail: detail || null };
+}
+
 /** Whether a notification changes the inbox: a Gate opened or closed. */
 export function changesInbox(item: { kind: string }): boolean {
 	return item.kind === "gate-opened" || item.kind === "gate-closed";

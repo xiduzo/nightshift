@@ -119,6 +119,15 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 							</time>
 						</Badge>
 						<span>
+							{gate.flowName ? (
+								<>
+									Flow <span className="font-mono">{gate.flowName}</span>
+								</>
+							) : (
+								"Quick run"
+							)}
+						</span>
+						<span>
 							Gate <span className="font-mono">{gate.nodeId}</span>
 						</span>
 					</div>

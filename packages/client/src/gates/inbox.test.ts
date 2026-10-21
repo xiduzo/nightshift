@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
 	changesInbox,
+	gateRun,
 	inboxOrder,
 	isGateClosed,
 	waitedText,
@@ -93,5 +94,34 @@ describe("isGateClosed", () => {
 		expect(isGateClosed({ code: "NOT_FOUND" })).toBe(false);
 		expect(isGateClosed(new Error("offline"))).toBe(false);
 		expect(isGateClosed(null)).toBe(false);
+	});
+});
+
+describe("gateRun", () => {
+	test("names the flow, and what sets this run apart", () => {
+		expect(
+			gateRun({ flowName: "ship", runTitle: "ship · ticket PZ-12" }),
+		).toEqual({ flow: "ship", detail: "ticket PZ-12" });
+	});
+
+	test("a flow run without inputs has no detail", () => {
+		expect(gateRun({ flowName: "ship", runTitle: "ship" })).toEqual({
+			flow: "ship",
+			detail: null,
+		});
+	});
+
+	test("a quick run shows its prompt", () => {
+		expect(gateRun({ flowName: null, runTitle: "Fix the login" })).toEqual({
+			flow: "Quick run",
+			detail: "Fix the login",
+		});
+	});
+
+	test("a title that does not start with the flow name stays whole", () => {
+		expect(gateRun({ flowName: "ship", runTitle: "Nightly" })).toEqual({
+			flow: "ship",
+			detail: "Nightly",
+		});
 	});
 });

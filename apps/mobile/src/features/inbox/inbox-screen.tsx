@@ -1,4 +1,9 @@
-import { gateParts, type OpenGate, waitedText } from "@nightshift/client";
+import {
+	gateParts,
+	gateRun,
+	type OpenGate,
+	waitedText,
+} from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -86,6 +91,7 @@ export function InboxScreen() {
 function GateRow({ gate, now }: { gate: OpenGate; now: number }) {
 	const { headline } = gateParts(gate.question);
 	const waited = waitedText(now - gate.openedAt);
+	const { flow, detail } = gateRun(gate);
 	return (
 		<Pressable
 			onPress={() =>
@@ -111,9 +117,14 @@ function GateRow({ gate, now }: { gate: OpenGate; now: number }) {
 					<CardTitle numberOfLines={3} className="leading-snug">
 						{headline}
 					</CardTitle>
-					<CardDescription numberOfLines={2}>
-						{gate.projectName} · {gate.runTitle}
-					</CardDescription>
+					<View className="gap-0.5">
+						<CardDescription numberOfLines={1}>
+							{gate.projectName} · {flow}
+						</CardDescription>
+						{detail ? (
+							<CardDescription numberOfLines={1}>{detail}</CardDescription>
+						) : null}
+					</View>
 					{gate.canAnswer ? null : (
 						<Text variant="muted" className="text-muted-foreground text-xs">
 							You can read this Gate. Your role in this Space does not let you

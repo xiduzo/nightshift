@@ -67,6 +67,7 @@ export {
 	type GateChoice,
 	type GateLink,
 	gateParts,
+	gateRun,
 	inboxOrder,
 	isGateClosed,
 	type OpenGate,
