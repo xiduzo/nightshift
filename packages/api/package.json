@@ -15,6 +15,7 @@
 		"@nightshift/agents": "workspace:*",
 		"@nightshift/auth": "workspace:*",
 		"@nightshift/db": "workspace:*",
+		"@nightshift/devices": "workspace:*",
 		"@nightshift/engine": "workspace:*",
 		"@nightshift/flows": "workspace:*",
 		"@orpc/server": "catalog:",

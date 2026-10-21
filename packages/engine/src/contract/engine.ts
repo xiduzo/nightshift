@@ -8,12 +8,6 @@ import type {
 	ScheduleIssue,
 } from "@nightshift/flows";
 import type { FlowUse } from "../flows";
-import type {
-	DeviceRegistry,
-	EngineExchange,
-	OfferCaps,
-	SpaceOffer,
-} from "../peers";
 import type { Branches, Project } from "../projects";
 import type { OpenGate, RunDetail, RunStreamItem, RunSummary } from "../read";
 import type { ScheduleList } from "../schedules";
@@ -37,20 +31,11 @@ export interface Engine {
 	 * travels to its Walker in their name.
 	 */
 	space(spaceId: string, actor?: Actor): SpaceEngine;
-	/** Run history between this Replica and others: rows, cursors, commands, the archive. */
-	readonly exchange: EngineExchange;
-	/**
-	 * On a Host: the Devices that paired with it, their presence and the
-	 * audit of it. Each Person sees their own Devices only (the API's rule).
-	 */
-	readonly devices: DeviceRegistry;
 	/**
 	 * Logs a change of a Space's Members in that Space's event log
 	 * (`MemberJoined`, `MemberRemoved`, `MemberRoleChanged`), with who made it.
 	 */
 	logMemberChange(change: MemberChange): Promise<void>;
-	/** The Offers of the Spaces: published in their documents, with their audit. */
-	readonly offers: EngineOffers;
 	/**
 	 * A Device is back (its link to this Host took work again): the steps
 	 * of the runs this computer walks that sleep because a Device was
@@ -75,43 +60,6 @@ export interface Engine {
 	 */
 	dispose(): Promise<void>;
 }
-
-/**
- * The Offers as the Space documents publish them. Who may make or
- * withdraw one is the caller's check (the Device's owner, a role that
- * allows `offer.make`); the Device's own entry is the daemon's (its
- * Device document).
- */
-export type EngineOffers = {
-	/** The Offers a Space lists, every Device's. */
-	list(spaceId: string): Promise<SpaceOffer[]>;
-	/**
-	 * Publishes an Offer (or its new caps) in the Space's document and logs
-	 * `OfferMade` there. A Space a Host keeps: through that Host, which
-	 * logs it in the name of this Device's owner.
-	 */
-	publish(
-		input: OfferCaps & {
-			spaceId: string;
-			deviceId: string;
-			deviceName: string;
-			profile: string;
-			by: string | null;
-		},
-	): Promise<void>;
-	/**
-	 * Takes an Offer off the Space's document, logs `OfferWithdrawn`, and
-	 * stops the runs walked here whose running step is a session under it:
-	 * the step ends as stopped. A Space a Host keeps: through that Host.
-	 * Nothing to withdraw is no error.
-	 */
-	withdraw(input: {
-		spaceId: string;
-		deviceId: string;
-		profile: string;
-		by: string | null;
-	}): Promise<void>;
-};
 
 /** A change of a Space's Members, as the auth hooks report it. */
 export type MemberChange =

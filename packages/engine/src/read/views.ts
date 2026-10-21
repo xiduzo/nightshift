@@ -4,6 +4,7 @@ import type {
 	ItemState,
 	JsonValue,
 } from "@nightshift/flows";
+import type { RunCommandKind } from "../contract";
 import type {
 	GateChoice,
 	ResumeAction,
@@ -15,7 +16,6 @@ import type {
 	StepOutcome,
 	TranscriptEntry,
 } from "../log";
-import type { RunCommandKind } from "../peers";
 import type { VariableChange } from "./derive-steps";
 
 /**

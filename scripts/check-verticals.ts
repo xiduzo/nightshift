@@ -48,6 +48,7 @@ export const ENFORCED: string[] = [
 	"packages/auth",
 	"packages/daemon",
 	"packages/db",
+	"packages/devices",
 	"packages/engine",
 	"packages/flows",
 ];

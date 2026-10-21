@@ -67,10 +67,7 @@ const engine: Context["engine"] = {
 					return method === "listRuns" ? [] : { id: "run-1" };
 				},
 		}),
-	devices: {} as Context["engine"]["devices"],
-	exchange: {} as Context["engine"]["exchange"],
 	logMemberChange: async () => {},
-	offers: {} as Context["engine"]["offers"],
 	deviceBack: async () => {},
 	endOverdueSteps: async () => {},
 	dispose: async () => {},

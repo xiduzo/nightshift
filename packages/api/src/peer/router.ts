@@ -5,9 +5,9 @@ import {
 	offerCapsSchema,
 	runRowsSchema,
 	syncCursorsSchema,
-	type TranscriptEntry,
 	transcriptEntrySchema,
-} from "@nightshift/engine";
+} from "@nightshift/devices";
+import type { TranscriptEntry } from "@nightshift/engine";
 import { flowNameSchema, flowSchema, labelSchema } from "@nightshift/flows";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";

@@ -1,9 +1,9 @@
 import type { Database } from "@nightshift/db";
 import type { AgentProfileSettings } from "@nightshift/flows";
-import type { Device, WorkRelay } from "../device";
+import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
-import type { DeviceOffer } from "../peers";
 import type { Git, SpaceDocuments } from "../projects";
+import type { PeersFactory } from "./peers";
 import type { Relay } from "./relay";
 
 /** What `createEngine` takes: the database, this computer as a Device, and the hooks of the daemon. */
@@ -24,11 +24,11 @@ export type EngineOptions = {
 	 */
 	device: Device;
 	/**
-	 * On a Host: how its runs reach the Devices they are placed on (the
-	 * hub those Devices pull their work from). Without it, every run runs
-	 * on this computer.
+	 * The other Devices and Hosts (`Peers`): where steps run, Offers, the
+	 * Host that keeps a Space, and the runs walked elsewhere. The engine
+	 * calls it once, with its own parts. `@nightshift/devices` makes it.
 	 */
-	work?: WorkRelay;
+	peers: PeersFactory;
 	/** Root for transcripts, command logs and other on-disk state, for example ~/.nightshift. */
 	dataDir: string;
 	/** How many runs may run a step at once. A run waiting at a Gate does not count. Default 2. */
@@ -54,18 +54,6 @@ export type EngineOptions = {
 	 * refuses to start. Without it, no profile exists.
 	 */
 	profileFor?: (name: string) => AgentProfileSettings | null;
-	/**
-	 * This computer's own Offers (its Device document). A run of another
-	 * Person placed here may use only those the Space also lists. Without
-	 * it, this computer offers nothing.
-	 */
-	ownOffers?: () => readonly DeviceOffer[];
-	/**
-	 * Whether a Person's role in a Space lets them use Offers (`offer.use`),
-	 * the Host's check before it places another Person's run through one.
-	 * Without it, nobody uses Offers here.
-	 */
-	mayUseOffers?: (spaceId: string, personId: string) => Promise<boolean>;
 	/**
 	 * The Space documents, where Projects are defined. The daemon passes
 	 * the ones the relay serves. Default: new ones over `db`.

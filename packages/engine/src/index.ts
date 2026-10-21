@@ -1,30 +1,42 @@
 /**
- * The public surface of the engine: what the API, the server and their
- * tests import. A type is also here when the API's router type names it,
+ * The public surface of the engine: what `@nightshift/devices`, the API, the
+ * daemon and their tests import. A type is also here when the API's router type names it,
  * because the router declaration must be able to name it. Remove a name
  * that nothing outside the engine imports.
  */
 
 export type {
+	Actor,
 	Engine,
+	EngineOptions,
 	FeedStep,
+	OfferedPlacement,
 	OwnDevice,
+	PeerContext,
+	Peers,
+	PlacedDevice,
 	Placement,
 	Relay,
+	RunCommandInput,
+	RunCommandKind,
 	SpaceEngine,
 	StartRunInput,
 } from "./contract";
-export type { Device, SessionInput } from "./device";
-export {
-	localDevice,
-	serveWork,
-	type WorkCall,
-	type WorkRelay,
-	type WorkReply,
-	type WorkRequest,
-	workReplySchema,
-	workRequestSchema,
+export type {
+	Capabilities,
+	CapabilityQuery,
+	Device,
+	ExecEvent,
+	ExecInput,
+	OfferedSessionInput,
+	RunRef,
+	SessionEvent,
+	SessionInput,
+	ToolCallInput,
+	ToolResult,
+	Worktree,
 } from "./device";
+export { localDevice } from "./device";
 export {
 	type CliTool,
 	type CliToolStore,
@@ -37,10 +49,12 @@ export {
 	createProfileStore,
 	createSettingsStore,
 	type DeviceDocument,
+	deviceDocumentName,
 	documentRows,
 	HARNESS_BIN,
 	isHostAddress,
 	isLoopbackHost,
+	type KeyStoreKind,
 	openDeviceDocument,
 	type ProfileStore,
 	type ProfileView,
@@ -56,62 +70,40 @@ export {
 	selfDevice,
 	settingsPatchSchema,
 	settingsSchema,
+	valueStore,
 } from "./device-config";
 export type { FlowRef, FlowUse } from "./flows";
-export type { TranscriptEntry } from "./log";
-export type { DeviceRegistry, PairedDevice } from "./peers";
+export { flowsForRun } from "./flows";
+export { checkpointSnapshot, restoreCheckpoint } from "./graph";
+export type {
+	LoggedEvent,
+	RunBus,
+	RunLog,
+	RunRow,
+	RunStatus,
+	TranscriptEntry,
+} from "./log";
 export {
-	type ArchiveRef,
-	applyRunCommand,
-	archiveRefSchema,
-	COMMAND_PERMISSION,
-	createHostLinks,
-	createOfferSlots,
-	type DeviceKeyStore,
-	type DeviceOffer,
-	deviceKeyStore,
-	deviceOffers,
-	type FollowWant,
-	ForeignRowsError,
-	feedStepSchema,
-	followWantSchema,
-	type HostLink,
-	type HostLinks,
-	type HostRole,
-	inForce,
-	isEmpty,
-	type KeyStoreKind,
-	type ListedSpace,
-	MissingProjectError,
-	mergeCursors,
-	type OfferCaps,
-	type OfferSlots,
-	offerCapsSchema,
-	offeredCallRefusal,
-	offeredSession,
-	personOnHost,
-	type RunCommand,
-	type RunCommandInput,
-	type RunRows,
-	removeDeviceOffer,
-	runRowsSchema,
-	SECOND_HOME,
-	type SyncCursors,
-	setDeviceOffer,
-	slotKey,
-	syncCursorsSchema,
-	transcriptEntrySchema,
-	withoutPrivatePaths,
-} from "./peers";
-export type { Project } from "./projects";
+	applyWalkerMoves,
+	commandLogPath,
+	followOwnStep,
+	parseTranscript,
+	readTranscriptFile,
+	stepIdsOfRun,
+} from "./log";
+export type { ListedProject, Project, SpaceDocument } from "./projects";
 export {
 	type Branches,
 	checkProjectFolder,
 	clonePathOf,
 	createSpaceDocuments,
+	deviceNameIn,
 	type GitInstall,
 	memberRole,
+	NOT_ON_THIS_COMPUTER,
 	type ProjectReadiness,
+	projectClones,
+	recordClone,
 	type SpaceDocuments,
 	setUpGit,
 	spaceDocumentName,
@@ -119,7 +111,18 @@ export {
 	systemGitInstaller,
 	worktreeLocation,
 } from "./projects";
-export type { OpenGate, RunDetail, RunStreamItem, RunSummary } from "./read";
-export { exportRun, openRunBundle, type RunBundleSummary } from "./read";
+export type {
+	OpenGate,
+	RunDetail,
+	RunStreamItem,
+	RunSummary,
+	RunWalker,
+} from "./read";
+export {
+	deriveSteps,
+	exportRun,
+	openRunBundle,
+	type RunBundleSummary,
+} from "./read";
 export { createEngine } from "./run";
 export type { ScheduleList } from "./schedules";

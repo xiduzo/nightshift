@@ -3,7 +3,6 @@
 export type {
 	Actor,
 	Engine,
-	EngineOffers,
 	MemberChange,
 	SpaceEngine,
 	StartRunInput,
@@ -22,4 +21,4 @@ export type {
 	RunsPort,
 	WithPaths,
 } from "./peers";
-export type { Relay } from "./relay";
+export type { Relay, RunCommandInput, RunCommandKind } from "./relay";

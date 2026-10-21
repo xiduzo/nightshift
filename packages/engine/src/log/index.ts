@@ -24,6 +24,7 @@ export type {
 	WaitReason,
 } from "./events";
 export { groupByRun, parseEventRow, scopeKey } from "./events";
+export { followOwnStep } from "./follow";
 export { logMemberChange } from "./member-events";
 export type { RunLog } from "./run-log";
 export { createRunLog } from "./run-log";

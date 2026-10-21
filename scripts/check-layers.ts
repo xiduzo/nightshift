@@ -27,8 +27,8 @@ type Rule = {
 };
 
 /**
- * Section 1 of STRUCTURE.md. A planned package (`devices`, `daemon`) may be
- * absent. Apps are not packages: no workspace may depend on an app.
+ * Section 1 of STRUCTURE.md. Apps are not packages: no workspace may depend
+ * on an app.
  */
 const LAYERS: Record<string, Rule> = {
 	// 0. Foundation
@@ -49,11 +49,11 @@ const LAYERS: Record<string, Rule> = {
 			"@nightshift/auth",
 		],
 	},
-	// 3. Core domains (planned)
+	// 3. Core domains
 	"@nightshift/devices": { layer: 3, mayImport: "lower" },
 	// 4. Surface
 	"@nightshift/api": { layer: 4, mayImport: "lower" },
-	// 5. Runtime (planned)
+	// 5. Runtime
 	"@nightshift/daemon": { layer: 5, mayImport: "lower" },
 	// 6. Apps
 	server: { layer: 6, mayImport: "lower" },

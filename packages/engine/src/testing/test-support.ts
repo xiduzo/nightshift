@@ -12,6 +12,7 @@ import { migrateDb } from "@nightshift/db/migrate";
 import { device, event, organization } from "@nightshift/db/schema";
 import { asc, eq, sql } from "drizzle-orm";
 import type { EngineOptions } from "../contract/options";
+import type { PeersFactory } from "../contract/peers";
 import { type LocalDeviceDeps, localDevice } from "../device/local";
 import type { Device } from "../device/types";
 import {
@@ -23,6 +24,7 @@ import { parseEventRow } from "../log/events";
 import type { RunLog } from "../log/run-log";
 import { systemGit } from "../projects/git";
 import { clonePathOf } from "../projects/projects";
+import { alonePeers } from "./alone-peers";
 
 /** Test helpers: a temp git repo, a migrated temp database, scripted harnesses. */
 
@@ -41,10 +43,12 @@ export function testDevice(
 }
 
 /** The engine's options with the Device's deps beside them, as a test writes them. */
-export type TestEngineOptions = Omit<EngineOptions, "device"> &
+export type TestEngineOptions = Omit<EngineOptions, "device" | "peers"> &
 	TestDeviceDeps & {
 		/** The test Device's id. Default `TEST_DEVICE_ID`. */
 		deviceId?: string;
+		/** The other Devices and Hosts. Default: none (`alonePeers`). */
+		peers?: PeersFactory;
 	};
 
 /** Engine options whose Device is `testDevice` over the Device deps among them. */
@@ -63,10 +67,12 @@ export function withDevice(options: TestEngineOptions): EngineOptions {
 		clonePath,
 		git,
 		deviceId,
+		peers,
 		...engine
 	} = options;
 	return {
 		...engine,
+		peers: peers ?? alonePeers,
 		...(git ? { git } : {}),
 		device: testDevice(
 			{

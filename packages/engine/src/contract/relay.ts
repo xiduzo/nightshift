@@ -1,12 +1,9 @@
-import type { TranscriptEntry } from "../log";
-import type { ArchiveRef, OfferCaps, RunCommandInput } from "../peers";
 import type { StartRunInput } from "./engine";
-import type { FeedStep, OwnDevice } from "./peers";
 
 /**
  * What the engine asks of the Hosts this Device links to: the actions on
- * rows another Device owns. The daemon gives it; without it, a run walked
- * elsewhere is read-only.
+ * rows another Device owns. `@nightshift/devices` gives it (with more, for
+ * the peers); without it, a run walked elsewhere is read-only.
  */
 export type Relay = {
 	/**
@@ -28,26 +25,6 @@ export type Relay = {
 		deviceId: string;
 		deviceName: string;
 	}): Promise<void>;
-	/** A file of the archive from the Host that keeps the Space. Null when it has none. */
-	archive(ref: ArchiveRef): Promise<string | null>;
-	/**
-	 * A step's live transcript from the Host that keeps the Space: its
-	 * entries after `afterSeq`, then each new one, until the step ends.
-	 * Throws when that Host cannot be reached.
-	 */
-	follow?(
-		step: FeedStep,
-		afterSeq: number,
-		signal: AbortSignal,
-	): AsyncIterable<TranscriptEntry>;
-	/** Publishes this Device's Offer in a Space a Host keeps, through that Host. */
-	offer(
-		input: OfferCaps & { spaceId: string; profile: string; deviceName: string },
-	): Promise<void>;
-	/** Withdraws this Device's Offer from a Space a Host keeps, through that Host. */
-	withdrawOffer(input: { spaceId: string; profile: string }): Promise<void>;
-	/** Keeps a file of a run this computer walks in the archive of the Host that keeps the Space. */
-	archivePut(ref: ArchiveRef, content: string): Promise<void>;
 	/**
 	 * Starts a run placed on another Device through the Host that keeps
 	 * the Space: the Host walks it. Returns the run's id; its rows follow
@@ -56,9 +33,21 @@ export type Relay = {
 	startRun(
 		input: StartRunInput & { spaceId: string; deviceId: string },
 	): Promise<{ runId: string }>;
-	/**
-	 * The actor's Devices, as the Host that keeps the Space knows them:
-	 * whether each is online and has a Clone of the project.
-	 */
-	devices(input: { spaceId: string; projectId: string }): Promise<OwnDevice[]>;
 };
+
+/** A command as the engine asks for it: a person's action on a run another Device walks. */
+export type RunCommandInput =
+	| {
+			kind: "gate.resolve";
+			payload: { stepId: string; choice: string; note?: string };
+	  }
+	| { kind: "signal.send"; payload: { name: string } }
+	| {
+			kind: "run.stop";
+			payload: { when?: "now" | "after-step" | "cancel-after-step" };
+	  }
+	/** Another Device walks the run from here on. */
+	| { kind: "run.move"; payload: { to: string } };
+
+/** What a command does. */
+export type RunCommandKind = RunCommandInput["kind"];

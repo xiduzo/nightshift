@@ -1,10 +1,10 @@
+import type { DeviceLinks, WorkHub } from "@nightshift/devices";
 import type {
 	DeviceDocument,
 	Engine,
 	SpaceDocuments,
 } from "@nightshift/engine";
 
-import type { DeviceLinks, WorkHub } from "../devices";
 import type { Sync } from "../sync";
 import type { Lease } from "./lease";
 

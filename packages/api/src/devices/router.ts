@@ -2,7 +2,8 @@ import {
 	type WorkRequest,
 	workReplySchema,
 	workRequestSchema,
-} from "@nightshift/engine";
+} from "@nightshift/devices";
+
 import { z } from "zod";
 
 import { output, stream } from "../output";

@@ -137,6 +137,7 @@
         "@nightshift/agents": "workspace:*",
         "@nightshift/auth": "workspace:*",
         "@nightshift/db": "workspace:*",
+        "@nightshift/devices": "workspace:*",
         "@nightshift/engine": "workspace:*",
         "@nightshift/flows": "workspace:*",
         "@orpc/server": "catalog:",
@@ -178,8 +179,8 @@
         "@nightshift/api": "workspace:*",
         "@nightshift/auth": "workspace:*",
         "@nightshift/db": "workspace:*",
+        "@nightshift/devices": "workspace:*",
         "@nightshift/engine": "workspace:*",
-        "@orpc/client": "catalog:",
         "@orpc/openapi": "catalog:",
         "@orpc/server": "catalog:",
         "@orpc/zod": "catalog:",
@@ -206,6 +207,27 @@
         "drizzle-kit": "1.0.0-rc.4",
         "typescript": "catalog:",
         "varlock": "catalog:",
+      },
+    },
+    "packages/devices": {
+      "name": "@nightshift/devices",
+      "dependencies": {
+        "@hocuspocus/provider": "^4.7.1",
+        "@nightshift/agents": "workspace:*",
+        "@nightshift/auth": "workspace:*",
+        "@nightshift/db": "workspace:*",
+        "@nightshift/engine": "workspace:*",
+        "@nightshift/flows": "workspace:*",
+        "@orpc/client": "catalog:",
+        "@orpc/server": "catalog:",
+        "drizzle-orm": "catalog:",
+        "yjs": "catalog:",
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@nightshift/config": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
       },
     },
     "packages/engine": {
@@ -582,6 +604,8 @@
     "@nightshift/daemon": ["@nightshift/daemon@workspace:packages/daemon"],
 
     "@nightshift/db": ["@nightshift/db@workspace:packages/db"],
+
+    "@nightshift/devices": ["@nightshift/devices@workspace:packages/devices"],
 
     "@nightshift/engine": ["@nightshift/engine@workspace:packages/engine"],
 

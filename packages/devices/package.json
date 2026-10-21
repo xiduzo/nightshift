@@ -1,0 +1,30 @@
+{
+	"name": "@nightshift/devices",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"build": "tsc -b",
+		"check-types": "tsc -b",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@hocuspocus/provider": "^4.7.1",
+		"@nightshift/agents": "workspace:*",
+		"@nightshift/auth": "workspace:*",
+		"@nightshift/db": "workspace:*",
+		"@nightshift/engine": "workspace:*",
+		"@nightshift/flows": "workspace:*",
+		"@orpc/client": "catalog:",
+		"@orpc/server": "catalog:",
+		"drizzle-orm": "catalog:",
+		"yjs": "catalog:",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@nightshift/config": "workspace:*",
+		"@types/bun": "catalog:",
+		"typescript": "catalog:"
+	}
+}

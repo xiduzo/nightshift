@@ -23,15 +23,25 @@ import {
 } from "@nightshift/db/data-dir";
 import { migrateDb } from "@nightshift/db/migrate";
 import {
+	createPeerEngine,
+	createRelay,
+	createWorkHub,
+	createWorkRelay,
+	type DeviceServices,
+	deviceOffers,
+	listenHostname,
+	ownCertificate,
+	reachFor,
+	wireDevices,
+} from "@nightshift/devices";
+import {
 	checkProjectFolder,
 	clonePathOf,
 	createCliToolStore,
 	createConnectionStore,
-	createEngine,
 	createProfileStore,
 	createSettingsStore,
 	createSpaceDocuments,
-	deviceOffers,
 	documentRows,
 	localDevice,
 	memberRole,
@@ -43,16 +53,6 @@ import {
 	systemGitInstaller,
 } from "@nightshift/engine";
 
-import {
-	createRelay,
-	createWorkHub,
-	createWorkRelay,
-	type DeviceServices,
-	listenHostname,
-	ownCertificate,
-	reachFor,
-	wireDevices,
-} from "./devices";
 import { localHarnesses, programChecks, reportDeviceFacts } from "./harnesses";
 import {
 	createHttp,
@@ -361,7 +361,7 @@ export async function createDaemon(
 		);
 	});
 
-	const engine = await createEngine({
+	const engine = createPeerEngine({
 		db,
 		walkerId: device.id,
 		device: local,

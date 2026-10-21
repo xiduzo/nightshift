@@ -2,11 +2,12 @@ import {
 	followWantSchema,
 	type RunCommand,
 	runRowsSchema,
+	type SyncBatch,
 	syncCursorsSchema,
-} from "@nightshift/engine";
+} from "@nightshift/devices";
+
 import { z } from "zod";
 
-import type { SyncBatch } from "../context";
 import { exact } from "../output";
 
 const commandFields = {

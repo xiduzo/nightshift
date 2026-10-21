@@ -1,7 +1,6 @@
 import type { Database } from "@nightshift/db";
-import type { Actor, Relay, StartRunInput } from "../contract";
+import type { Actor, Relay, RunCommandInput, StartRunInput } from "../contract";
 import { hasRunRow, type RunLog, type RunRow } from "../log";
-import type { RunCommandInput } from "../peers";
 import type { RunSummary } from "../read";
 
 /** How long a Device waits for a run its Host started to arrive. */

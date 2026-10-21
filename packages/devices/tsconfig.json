@@ -1,0 +1,18 @@
+{
+	"extends": "@nightshift/config/tsconfig.base.json",
+	"compilerOptions": {
+		"composite": true,
+		"declaration": true,
+		"declarationMap": true,
+		"emitDeclarationOnly": true,
+		"outDir": "dist"
+	},
+	"include": ["src/**/*.ts"],
+	"references": [
+		{ "path": "../agents" },
+		{ "path": "../auth" },
+		{ "path": "../db" },
+		{ "path": "../engine" },
+		{ "path": "../flows" }
+	]
+}

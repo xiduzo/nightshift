@@ -18,7 +18,6 @@ import {
 	type RunTrigger,
 	runIdsOfProject,
 } from "../log";
-import { createPeers } from "../peers";
 import {
 	createProjects,
 	createSpaceDocuments,
@@ -66,9 +65,9 @@ import { createSpaces } from "./space";
  * - `projects/`: projects by remote and their Clones on this computer,
  *   over the git port. A project is defined in its Space document. Its
  *   `project` row is the document's projection.
- * - `peers/`: placement, Offers, the exchange (run history in and out of
- *   this Replica by cursor, the commands a Host keeps for Walkers, and the
- *   archive). The daemon carries it over its Links.
+ * - `peers` (`EngineOptions.peers`, the port in `contract/peers.ts`):
+ *   placement, Offers, the Host that keeps a Space and the runs walked
+ *   elsewhere. `@nightshift/devices` implements it over its Links.
  *
  * Spaces: `createEngine` returns the Device's engine. `space(id)` is what
  * a person does in one Space. The walk, recovery and the scheduler run
@@ -149,30 +148,22 @@ export function createEngine(
 	 * The other Devices and Hosts (`Peers`): where steps run, Offers, the
 	 * Host that keeps a Space, and the runs walked elsewhere.
 	 */
-	const built = createPeers(
-		{
-			db,
-			dataDir,
-			device,
-			log: runLog,
-			bus,
-			documents,
-			now,
-			...(options.relay ? { relay: options.relay } : {}),
-			...(options.profileFor ? { profileFor: options.profileFor } : {}),
-			ready: peersReady,
-			ownerId: () => ownerId,
-			project: (projectId, spaceId) => projects.find(projectId, spaceId),
-			takeOver: (runId) => control.takeOver(runId),
-			stopRun: (runId) => runner.stop(runId),
-		},
-		{
-			...(options.work ? { work: options.work } : {}),
-			...(options.ownOffers ? { ownOffers: options.ownOffers } : {}),
-			...(options.mayUseOffers ? { mayUseOffers: options.mayUseOffers } : {}),
-		},
-	);
-	const peers = built.port;
+	const peers = options.peers({
+		db,
+		dataDir,
+		device,
+		log: runLog,
+		bus,
+		documents,
+		now,
+		...(options.relay ? { relay: options.relay } : {}),
+		...(options.profileFor ? { profileFor: options.profileFor } : {}),
+		ready: peersReady,
+		ownerId: () => ownerId,
+		project: (projectId, spaceId) => projects.find(projectId, spaceId),
+		takeOver: (runId) => control.takeOver(runId),
+		stopRun: (runId) => runner.stop(runId),
+	});
 	const { placement } = peers;
 
 	const git = options.git ?? systemGit();
@@ -378,14 +369,11 @@ export function createEngine(
 
 	return {
 		space,
-		devices: built.registry,
-		exchange: built.exchange,
 		logMemberChange: (change) => logMemberChange(runLog, change),
 		async deviceBack(_deviceId) {
 			await ready;
 			await control.wakeOfflineSleeps();
 		},
-		offers: built.offers,
 		async endOverdueSteps() {
 			await ready;
 			await runner.endOverdueSteps();

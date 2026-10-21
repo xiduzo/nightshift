@@ -1,5 +1,6 @@
 import { roleAllows, spacesOf } from "@nightshift/auth";
-import { offerCapsSchema } from "@nightshift/engine";
+import { offerCapsSchema } from "@nightshift/devices";
+
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 

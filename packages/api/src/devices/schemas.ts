@@ -1,23 +1,22 @@
 import {
+	type DevicesOverview,
+	type HostHello,
+	type JoinProgress,
+	type OfferView,
 	offerCapsSchema,
+	type PairingRedeemed,
+	type PairingReviewView,
+	type PairingStart,
+	type SpaceDeviceView,
+	type WorkDelivery,
 	type WorkReply,
 	type WorkRequest,
 	workReplySchema,
 	workRequestSchema,
-} from "@nightshift/engine";
+} from "@nightshift/devices";
+
 import { z } from "zod";
 
-import type {
-	DevicesOverview,
-	HostHello,
-	JoinProgress,
-	OfferView,
-	PairingRedeemed,
-	PairingReviewView,
-	PairingStart,
-	SpaceDeviceView,
-	WorkDelivery,
-} from "../context";
 import { exact, partOf } from "../output";
 import { runStatusSchema } from "../runs";
 
