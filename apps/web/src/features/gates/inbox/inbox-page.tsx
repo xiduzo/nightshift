@@ -55,11 +55,14 @@ import {
 import { SiteHeader } from "@/shared/page";
 import { useOpenGates } from "../use-open-gates";
 import { GateDetail, gateParts } from "./gate-detail";
+import { groupByProject } from "./group-gates";
 
 /**
  * The Needs-you inbox, laid out like the Agents page: open Gates on the left,
  * grouped by project and oldest first, and the selected Gate on the right.
- * Sleeping runs sit below the Gates. Each pane scrolls on its own.
+ * It holds the Gates of every Space you are in; each project group shows
+ * its Space. Sleeping runs (of the Space you work in) sit below the Gates.
+ * Each pane scrolls on its own.
  */
 export function InboxPage({
 	gateId,
@@ -113,12 +116,17 @@ export function InboxPage({
 							No open Gates right now.
 						</p>
 					) : (
-						byProject.map(([project, list], index) => (
-							<Fragment key={project}>
+						byProject.map(([projectId, list], index) => (
+							<Fragment key={projectId}>
 								{index > 0 ? <Separator /> : null}
 								<NavGroup
-									title={project}
+									title={list[0]?.projectName ?? "Project"}
 									hint={`${list.length} ${list.length === 1 ? "Gate waits" : "Gates wait"}`}
+									aside={
+										<Badge variant="outline" className="max-w-24 truncate">
+											{list[0]?.spaceName}
+										</Badge>
+									}
 								>
 									{list.map((gate) => (
 										<GateNavItem
@@ -174,8 +182,9 @@ export function InboxPage({
 								</EmptyMedia>
 								<EmptyTitle>Nothing waits for you</EmptyTitle>
 								<EmptyDescription>
-									When a run reaches a Gate node, its question shows up here.
-									Add one to a flow to ask before a step that matters.
+									When a run in one of your Spaces reaches a Gate node, its
+									question shows up here. Add one to a flow to ask before a step
+									that matters.
 								</EmptyDescription>
 							</EmptyHeader>
 							<EmptyContent>
@@ -195,18 +204,6 @@ export function InboxPage({
 			</div>
 		</>
 	);
-}
-
-/** The Gates by project, in the order of each project's oldest Gate. */
-function groupByProject(gates: OpenGate[]): [string, OpenGate[]][] {
-	const groups = new Map<string, OpenGate[]>();
-	for (const gate of gates) {
-		groups.set(gate.projectName, [
-			...(groups.get(gate.projectName) ?? []),
-			gate,
-		]);
-	}
-	return [...groups];
 }
 
 function NavGroup({

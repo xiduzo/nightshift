@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { gateQueries } from "./queries";
 
 /**
- * The open Gates over all runs, oldest first: the Needs-you inbox. Polls, and
+ * The open Gates of every Space you are in, oldest first: the Needs-you
+ * inbox. Each has its Space and whether you may answer it. Polls, and
  * refetches when the window gets focus. A failed poll does not toast; the
  * inbox shows the error itself.
  */

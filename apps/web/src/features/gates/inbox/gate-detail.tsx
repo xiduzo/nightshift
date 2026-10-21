@@ -1,3 +1,8 @@
+import {
+	Alert,
+	AlertDescription,
+	AlertTitle,
+} from "@nightshift/ui/components/alert";
 import { Badge } from "@nightshift/ui/components/badge";
 import {
 	Item,
@@ -9,14 +14,18 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Separator } from "@nightshift/ui/components/separator";
-import { Link } from "@tanstack/react-router";
+import { Spinner } from "@nightshift/ui/components/spinner";
+import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
 	ChevronRightIcon,
 	HandIcon,
 	HistoryIcon,
 	HourglassIcon,
+	LockIcon,
 } from "lucide-react";
 import { useId } from "react";
+import { spaceQueries, useSwitchSpace } from "@/features/spaces";
 import type { OpenGate } from "@/shared/api";
 import { formatDateTime, formatWaited } from "@/shared/format";
 import { GateChoiceForm } from "../gate-choice-form";
@@ -33,11 +42,23 @@ export function gateParts(gate: OpenGate) {
 
 /**
  * One open Gate in the inbox pane. What happened on the left; the links to
- * check and the answer on the right, in place while you read.
+ * check and the answer on the right, in place while you read. A Gate of
+ * another Space than the one you work in is answered here too; only opening
+ * its run switches the Space.
  */
 export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 	const answerId = useId();
 	const { headline, context, links } = gateParts(gate);
+	const spaces = useQuery(spaceQueries.list());
+	// Its project and run pages are in another Space: open them there.
+	const elsewhere =
+		spaces.data !== undefined && spaces.data.active !== gate.spaceId;
+	const switchSpace = useSwitchSpace();
+	const navigate = useNavigate();
+	const openRun = async () => {
+		await switchSpace.mutateAsync({ spaceId: gate.spaceId });
+		await navigate({ to: "/runs/$runId", params: { runId: gate.runId } });
+	};
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pt-8 pb-16 md:px-8">
@@ -50,21 +71,41 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 						aria-label="Where"
 						className="flex min-w-0 items-center gap-1 text-muted-foreground text-xs"
 					>
-						<Link
-							to="/projects/$projectId"
-							params={{ projectId: gate.projectId }}
-							className="shrink-0 underline-offset-3 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
-						>
-							{gate.projectName}
-						</Link>
+						<Badge variant="outline" className="shrink-0">
+							{gate.spaceName}
+						</Badge>
 						<ChevronRightIcon className="size-3 shrink-0" aria-hidden="true" />
-						<Link
-							to="/runs/$runId"
-							params={{ runId: gate.runId }}
-							className="min-w-0 truncate underline-offset-3 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
-						>
-							{gate.runTitle}
-						</Link>
+						{elsewhere ? (
+							<>
+								<span className="shrink-0">{gate.projectName}</span>
+								<ChevronRightIcon
+									className="size-3 shrink-0"
+									aria-hidden="true"
+								/>
+								<span className="min-w-0 truncate">{gate.runTitle}</span>
+							</>
+						) : (
+							<>
+								<Link
+									to="/projects/$projectId"
+									params={{ projectId: gate.projectId }}
+									className="shrink-0 underline-offset-3 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+								>
+									{gate.projectName}
+								</Link>
+								<ChevronRightIcon
+									className="size-3 shrink-0"
+									aria-hidden="true"
+								/>
+								<Link
+									to="/runs/$runId"
+									params={{ runId: gate.runId }}
+									className="min-w-0 truncate underline-offset-3 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+								>
+									{gate.runTitle}
+								</Link>
+							</>
+						)}
 					</nav>
 					<h1 className="whitespace-pre-wrap text-balance break-words font-semibold text-xl leading-snug tracking-tight">
 						{headline}
@@ -113,16 +154,27 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 								variant="outline"
 								size="sm"
 								render={
-									<Link to="/runs/$runId" params={{ runId: gate.runId }} />
+									elsewhere ? (
+										<button
+											type="button"
+											className="text-left"
+											disabled={switchSpace.isPending}
+											onClick={() => void openRun().catch(() => {})}
+										/>
+									) : (
+										<Link to="/runs/$runId" params={{ runId: gate.runId }} />
+									)
 								}
 							>
 								<ItemMedia variant="icon">
-									<HistoryIcon />
+									{switchSpace.isPending ? <Spinner /> : <HistoryIcon />}
 								</ItemMedia>
 								<ItemContent className="min-w-0">
 									<ItemTitle>Open the run</ItemTitle>
 									<ItemDescription className="truncate text-xs">
-										Its steps, outputs and transcript
+										{elsewhere
+											? `Switches you to ${gate.spaceName}`
+											: "Its steps, outputs and transcript"}
 									</ItemDescription>
 								</ItemContent>
 								<ItemActions>
@@ -139,7 +191,18 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 						<h2 id={answerId} className="font-medium text-sm">
 							Your answer
 						</h2>
-						<GateChoiceForm gate={gate} labelledBy={answerId} />
+						{gate.canAnswer ? (
+							<GateChoiceForm gate={gate} labelledBy={answerId} />
+						) : (
+							<Alert>
+								<LockIcon />
+								<AlertTitle>You can read this Gate only</AlertTitle>
+								<AlertDescription>
+									Your role in {gate.spaceName} does not allow answers. Ask a
+									member or the owner of the Space to answer it.
+								</AlertDescription>
+							</Alert>
+						)}
 					</section>
 				</aside>
 			</div>
