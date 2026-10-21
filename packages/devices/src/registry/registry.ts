@@ -1,8 +1,12 @@
 import { personalSpaceIdBySlug } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import { device, event } from "@nightshift/db/schema";
-import { deviceDocumentName, type RunLog } from "@nightshift/engine";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { device } from "@nightshift/db/schema";
+import {
+	deviceDocumentName,
+	type RunHistory,
+	type RunLog,
+} from "@nightshift/engine";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 /**
  * The Devices that paired with this Host: their `device` rows, whether they
@@ -81,6 +85,8 @@ export async function deviceNamesOf(
 export function createDeviceRegistry(deps: {
 	db: Database;
 	log: RunLog;
+	/** The engine's event log: the latest presence of each Device. */
+	history: Pick<RunHistory, "devicePresence">;
 	now?: () => number;
 }): DeviceRegistry {
 	const { db, log } = deps;
@@ -140,15 +146,7 @@ export function createDeviceRegistry(deps: {
 			.from(device)
 			.where(eq(device.self, false));
 		if (rows.length === 0) return;
-		const presence = await db
-			.select({
-				deviceId: sql<string>`json_extract(${event.payload}, '$.deviceId')`,
-				type: event.type,
-			})
-			.from(event)
-			.where(inArray(event.type, ["DeviceOnline", "DeviceOffline"]))
-			.orderBy(asc(event.seq));
-		const last = new Map(presence.map((p) => [p.deviceId, p.type]));
+		const last = await deps.history.devicePresence();
 		for (const r of rows) {
 			if (last.get(r.id) === "DeviceOnline" && !online.has(r.id)) {
 				await logPresence("DeviceOffline", r);

@@ -8,7 +8,13 @@ import type {
 import type { FlowSources } from "@nightshift/flows/files";
 import type { z } from "zod";
 import type { Device } from "../device";
-import type { RunBus, RunLog, RunRow, TranscriptEntry } from "../log";
+import type {
+	RunBus,
+	RunHistory,
+	RunLog,
+	RunRow,
+	TranscriptEntry,
+} from "../log";
 import type { ListedProject, SpaceDocuments } from "../projects";
 import type { PendingCommand, RunWalker } from "../read";
 import type { Actor } from "./engine";
@@ -52,6 +58,12 @@ export type PeerContext = {
 	device: Device;
 	log: RunLog;
 	bus: RunBus;
+	/**
+	 * The rows of runs, steps, agent sessions and events, as the exchange
+	 * reads and adds them, and the files of the steps this computer walked.
+	 * The engine owns those tables: the peers touch them only here.
+	 */
+	history: RunHistory;
 	documents: SpaceDocuments;
 	now(): number;
 	/** The Hosts this computer links to (`EngineOptions.relay`). */

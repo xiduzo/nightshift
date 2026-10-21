@@ -60,8 +60,9 @@ export function createPeers(
 	context: Omit<PeerContext, "relay"> & { relay?: HostRelay },
 	options: PeerOptions = {},
 ): BuiltPeers {
-	const { db, dataDir, device, log, bus, documents, now, relay } = context;
-	const registry = createDeviceRegistry({ db, log, now });
+	const { db, dataDir, device, log, bus, history, documents, now, relay } =
+		context;
+	const registry = createDeviceRegistry({ db, log, history, now });
 
 	/** The offered sessions running now: what withdrawing an Offer stops. */
 	const offeredSessions = createOfferedSessions();
@@ -100,6 +101,7 @@ export function createPeers(
 		db,
 		dataDir,
 		log,
+		history,
 		hostOf,
 		...(relay ? { relay } : {}),
 	});
@@ -107,6 +109,7 @@ export function createPeers(
 		db,
 		log,
 		bus,
+		history,
 		dataDir,
 		documents,
 		// A run moved here: this computer walks it from now on.

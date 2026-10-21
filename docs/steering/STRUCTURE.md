@@ -58,7 +58,7 @@ One package is one bounded context. One domain has one home.
 
 ### Tables have owners
 
-Each table has one owning package. The schema file names the owner above each table group. Another package reads or writes that table only through the owner's functions. Example: the engine asks `@nightshift/auth` for the members of a Space. It does not query `member`.
+Each table has one owning package. The schema file names the owner above each table group. Another package reads or writes that table only through the owner's functions. Example: the engine asks `@nightshift/auth` for the members of a Space. It does not query `member`. Example: the exchange of `@nightshift/devices` copies run history between Replicas through the engine's `RunHistory` (`PeerContext.history`). It does not query `run`, `step`, `agent_session` or `event`.
 
 The schema is in `packages/db/src/schema/`, one file per owner: `auth.ts`, `devices.ts`, `projects.ts`, `runs.ts`, `device-config.ts`, `engine.ts` and `daemon.ts`. A comment above each group of tables names the owning package and vertical. `schema/index.ts` lists every file with its owner. `auth:generate` writes `auth.ts`, so only the index names its owner. Put a new table in the file of its owner. When a table moves to another file, its migrations stay the same: `drizzle-kit generate` must report no changes.
 
@@ -209,7 +209,6 @@ When a check exists, change its status to "Active". When a workspace follows sec
 The code does not yet follow every rule. These are debts. Do not copy them into new code.
 
 - The output schema of a work call checks only its outer part (`partOf<WorkRequest>()`).
-- `@nightshift/devices` writes the run history of the engine (`run`, `step`, `agent_session`, `event`) directly: the exchange copies those rows between Replicas by cursor (`exchange/rows.ts`), and the archive reads step files. The engine owns the tables. The fix is an engine function that serves and takes a batch of rows.
 - Some verticals of `@nightshift/devices` name each other's types (a type-only cycle): `links/host-client.ts` names the types of the exchange, the work and the Offers it sends, and the Host's side names `PeerEngine` from `peers/`. Values import one way only.
 - Every workspace except `ui` and `config` is cut into barrel verticals (`features/<vertical>/index.ts` in apps, `src/<vertical>/index.ts` in packages). `scripts/check-verticals.ts` still keeps its `ENFORCED` list. Phase 8 removes it.
 

@@ -5,6 +5,7 @@
  */
 export { createRunBus } from "../log/bus";
 export { parseEventRow } from "../log/events";
+export { createRunHistory } from "../log/history";
 export { createRunLog } from "../log/run-log";
 export { alonePeers } from "./alone-peers";
 export {

@@ -86,17 +86,21 @@ export type { FlowRef, FlowUse } from "./flows";
 export { flowsForRun } from "./flows";
 export { checkpointSnapshot, restoreCheckpoint } from "./graph";
 export type {
+	HistoryCursors,
+	HistoryRows,
 	LoggedEvent,
+	OwnStepFiles,
 	RunBus,
+	RunHistory,
 	RunLog,
 	RunRow,
 	RunStatus,
 	TranscriptEntry,
 } from "./log";
 export {
-	applyWalkerMoves,
-	commandLogPath,
+	ForeignRowsError,
 	followOwnStep,
+	MissingProjectError,
 	parseTranscript,
 	readTranscriptFile,
 	stepIdsOfRun,

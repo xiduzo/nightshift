@@ -944,7 +944,9 @@ iroh.
      of its `HarnessSessionAssigned` event: a receiver fills it from that
      event. A batch carries its events in each Walker's order with the
      run, step and session rows they name, so parents go in first and the
-     foreign keys hold (`packages/devices/src/exchange/rows.ts`).
+     foreign keys hold. The engine owns those rows: it reads and adds
+     them (`packages/engine/src/log/history.ts`), and the exchange calls
+     it (`packages/devices/src/exchange/rows.ts`).
    - **Cursors** (`sync_cursor`): per Host, Space and Walker, the last
      `walker_seq` this Replica has. Finer than "per Host and Walker", so a
      Space the owner joins later is exchanged from its start. For this

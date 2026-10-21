@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { device, event } from "@nightshift/db/schema";
 import {
+	createRunBus,
+	createRunHistory,
 	createRunLog,
 	createSandbox,
 	parseEventRow,
@@ -17,9 +19,16 @@ let clock: number;
 let registry: DeviceRegistry;
 
 function newRegistry() {
+	const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 	return createDeviceRegistry({
 		db: sandbox.db,
-		log: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }),
+		log,
+		history: createRunHistory({
+			db: sandbox.db,
+			dataDir: sandbox.dataDir,
+			log,
+			bus: createRunBus(),
+		}),
 		now: () => clock,
 	});
 }

@@ -3,7 +3,6 @@
 export {
 	type ArchiveRef,
 	archiveRefSchema,
-	ownStepFiles,
 	readArchive,
 	writeArchive,
 } from "./archive";

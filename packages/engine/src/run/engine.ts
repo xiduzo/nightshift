@@ -10,6 +10,7 @@ import { createFlowFiles } from "../flows";
 import { createRunner, resolvePolicy } from "../graph";
 import {
 	createRunBus,
+	createRunHistory,
 	createRunLog,
 	getRunRow,
 	logMemberChange,
@@ -154,6 +155,7 @@ export function createEngine(
 		device,
 		log: runLog,
 		bus,
+		history: createRunHistory({ db, dataDir, log: runLog, bus }),
 		documents,
 		now,
 		...(options.relay ? { relay: options.relay } : {}),

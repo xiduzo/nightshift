@@ -1,10 +1,5 @@
-import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { Database } from "@nightshift/db";
-import { run, step } from "@nightshift/db/schema";
-import { commandLogPath } from "@nightshift/engine";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 /**
@@ -67,40 +62,4 @@ export async function readArchive(
 		if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
 		throw error;
 	}
-}
-
-/**
- * A step this Replica walked, as files: its transcript and its command log
- * (null when it has none). Null for a step of a run walked elsewhere.
- */
-export async function ownStepFiles(
-	db: Database,
-	dataDir: string,
-	stepId: string,
-	walkerId: string,
-): Promise<{
-	spaceId: string;
-	runId: string;
-	transcript: string | null;
-	log: string | null;
-} | null> {
-	const [row] = await db
-		.select({
-			spaceId: step.spaceId,
-			runId: step.runId,
-			transcriptPath: step.transcriptPath,
-			walkerId: run.walkerId,
-		})
-		.from(step)
-		.innerJoin(run, eq(run.id, step.runId))
-		.where(eq(step.id, stepId));
-	if (!row || row.walkerId !== walkerId) return null;
-	const read = async (path: string) =>
-		existsSync(path) ? readFile(path, "utf8") : null;
-	return {
-		spaceId: row.spaceId,
-		runId: row.runId,
-		transcript: await read(row.transcriptPath),
-		log: await read(commandLogPath(dataDir, row.runId, stepId)),
-	};
 }

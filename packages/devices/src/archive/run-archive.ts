@@ -3,6 +3,7 @@ import {
 	checkpointSnapshot,
 	type LoggedEvent,
 	parseTranscript,
+	type RunHistory,
 	type RunLog,
 	type RunRow,
 	type RunWalker,
@@ -12,12 +13,7 @@ import {
 	type TranscriptEntry,
 } from "@nightshift/engine";
 import type { HostRelay } from "../relay";
-import {
-	type ArchiveRef,
-	ownStepFiles,
-	readArchive,
-	writeArchive,
-} from "./archive";
+import { type ArchiveRef, readArchive, writeArchive } from "./archive";
 
 /**
  * A run in the archive of the Replica that keeps its Space (this one, or
@@ -28,6 +24,8 @@ export type RunArchiveDeps = {
 	db: Database;
 	dataDir: string;
 	log: Pick<RunLog, "walkerId">;
+	/** The engine's run history: the files of the steps this computer walked. */
+	history: Pick<RunHistory, "ownStepFiles">;
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
 	hostOf(spaceId: string): Promise<string | null>;
 	relay?: Pick<HostRelay, "archive" | "archivePut">;
@@ -53,7 +51,7 @@ export function createRunArchive(deps: RunArchiveDeps) {
 		};
 		const self = await deps.log.walkerId();
 		for (const stepId of await stepIdsOfRun(db, row.id)) {
-			const files = await ownStepFiles(db, dataDir, stepId, self);
+			const files = await deps.history.ownStepFiles(stepId, self);
 			if (!files) continue;
 			const at = { spaceId: row.spaceId, runId: row.id, stepId };
 			if (files.transcript !== null) {

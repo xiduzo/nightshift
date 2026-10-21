@@ -1,24 +1,18 @@
 import type { Database } from "@nightshift/db";
-import { run, step } from "@nightshift/db/schema";
 import {
 	checkpointSnapshot,
 	deriveSteps,
 	type LoggedEvent,
 	memberRole,
+	type OwnStepFiles,
 	parseTranscript,
 	type RunBus,
+	type RunHistory,
 	type RunLog,
-	readTranscriptFile,
 	recordClone,
 	type SpaceDocuments,
 } from "@nightshift/engine";
-import { eq } from "drizzle-orm";
-import {
-	type ArchiveRef,
-	ownStepFiles,
-	readArchive,
-	writeArchive,
-} from "../archive";
+import { type ArchiveRef, readArchive, writeArchive } from "../archive";
 import { createHostSpaces, type HostSpaces } from "../links";
 import { createRunCommands, type RunCommands } from "./commands";
 import {
@@ -49,7 +43,7 @@ export type EngineExchange = {
 		stepId: string,
 	): Promise<{ runId: string; walkerId: string; spaceId: string } | null>;
 	/** A step this Replica walked, as the files the archive keeps. Null for anyone else's. */
-	stepFiles(stepId: string): ReturnType<typeof ownStepFiles>;
+	stepFiles(stepId: string): Promise<OwnStepFiles | null>;
 	/** The run's latest checkpoints, as the archive keeps them. */
 	checkpoint(runId: string): Promise<string>;
 	readArchive(ref: ArchiveRef): Promise<string | null>;
@@ -78,6 +72,8 @@ export function createEngineExchange(deps: {
 	db: Database;
 	log: RunLog;
 	bus: RunBus;
+	/** The engine's run history: the rows the exchange copies, and the files of own steps. */
+	history: RunHistory;
 	dataDir: string;
 	documents: SpaceDocuments;
 	/** The events a batch added: a run moved here is taken over. */
@@ -85,15 +81,8 @@ export function createEngineExchange(deps: {
 	/** The feed of the Host that keeps a Space (over its link). */
 	upstream?: FeedPorts["upstream"];
 }): EngineExchange {
-	const { db, log, dataDir, documents } = deps;
-
-	async function runOwner(runId: string) {
-		const [row] = await db
-			.select({ walkerId: run.walkerId, spaceId: run.spaceId })
-			.from(run)
-			.where(eq(run.id, runId));
-		return row ?? null;
-	}
+	const { db, log, history, dataDir, documents } = deps;
+	const { runOwner } = history;
 
 	const hostSpaces = createHostSpaces(db);
 
@@ -108,14 +97,7 @@ export function createEngineExchange(deps: {
 			);
 			return found !== undefined && found.endedAt !== null;
 		},
-		async ownEntries({ runId, stepId }) {
-			const [row] = await db
-				.select({ runId: step.runId, transcriptPath: step.transcriptPath })
-				.from(step)
-				.where(eq(step.id, stepId));
-			if (!row || row.runId !== runId || !row.transcriptPath) return [];
-			return readTranscriptFile(row.transcriptPath);
-		},
+		ownEntries: (at) => history.ownTranscript(at),
 		async archived(at) {
 			const text = await readArchive(dataDir, { kind: "transcript", ...at });
 			return text === null ? null : parseTranscript(text);
@@ -129,20 +111,9 @@ export function createEngineExchange(deps: {
 		hostSpaces,
 		feeds,
 		runOwner,
-		async stepOwner(stepId) {
-			const [row] = await db
-				.select({
-					runId: step.runId,
-					walkerId: run.walkerId,
-					spaceId: step.spaceId,
-				})
-				.from(step)
-				.innerJoin(run, eq(run.id, step.runId))
-				.where(eq(step.id, stepId));
-			return row ?? null;
-		},
+		stepOwner: history.stepOwner,
 		async stepFiles(stepId) {
-			return ownStepFiles(db, dataDir, stepId, await log.walkerId());
+			return history.ownStepFiles(stepId, await log.walkerId());
 		},
 		checkpoint: (runId) => checkpointSnapshot(db, runId),
 		readArchive: (ref) => readArchive(dataDir, ref),
@@ -160,9 +131,7 @@ export function createEngineExchange(deps: {
 			const owner = await runOwner(ref.runId);
 			if (!owner || owner.walkerId !== (await log.walkerId())) return null;
 			if (ref.kind === "checkpoint") return checkpointSnapshot(db, ref.runId);
-			const files = await ownStepFiles(
-				db,
-				dataDir,
+			const files = await history.ownStepFiles(
 				ref.stepId,
 				await log.walkerId(),
 			);
