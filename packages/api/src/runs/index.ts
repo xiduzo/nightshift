@@ -4,6 +4,7 @@ export {
 	gateChoiceSchema,
 	ownDeviceSchema,
 	runStatusSchema,
+	runSummarySchema,
 	runWalkerSchema,
 	transcriptEntryViewSchema,
 } from "./schemas";

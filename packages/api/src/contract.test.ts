@@ -323,6 +323,14 @@ describe("replies of a real engine", () => {
 		await read(appRouter.runs.placements, { projectId });
 		await read(appRouter.runs.devices, { projectId });
 		await read(appRouter.gates.list);
+		// The dashboard says when it computed its numbers: two replies differ.
+		await reply(appRouter.dashboard.summary, { timeZone: "Europe/Amsterdam" });
+		await reply(appRouter.dashboard.summary, { everySpace: true });
+		const projectDashboard = (await reply(appRouter.dashboard.summary, {
+			projectId,
+		})) as { cards: { lastDay: { runs: number } } };
+		expect(projectDashboard.cards.lastDay.runs).toBe(1);
+		await reply(appRouter.dashboard.flow, { projectId, flowName: "night" });
 
 		const controller = new AbortController();
 		const events = (await call(
