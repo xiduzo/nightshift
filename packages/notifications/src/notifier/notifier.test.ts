@@ -17,7 +17,7 @@ import {
 	testDatabase,
 } from "../testing";
 import { createNotifier, type Notifier } from "./notifier";
-import { oneSenderPerSpace, type RunEvent } from "./sources";
+import { type OpenGateRef, oneSenderPerSpace, type RunEvent } from "./sources";
 
 /**
  * The rules of the notifier, on a real database with fake run events and
@@ -44,6 +44,8 @@ let targets: TargetStore;
 let deliveries: DeliveryLog;
 let members: Record<string, string[]>;
 let senders: Set<string>;
+/** Who may answer a Gate, as `${spaceId}:${personId}`. */
+let answerers: Set<string>;
 let notifier: Notifier;
 const streams: AbortController[] = [];
 
@@ -60,6 +62,7 @@ beforeEach(async () => {
 	deliveries = createDeliveryLog(db);
 	members = { [SPACE]: ["ada", "bob"], [OTHER_SPACE]: ["cy"] };
 	senders = new Set([SPACE, OTHER_SPACE]);
+	answerers = new Set([`${SPACE}:ada`, `${OTHER_SPACE}:cy`]);
 	notifier = makeNotifier();
 });
 
@@ -75,6 +78,8 @@ function makeNotifier(): Notifier {
 		audience: async (spaceId) => members[spaceId] ?? [],
 		spaces: async () => Object.keys(members),
 		sendsFor: async (spaceId) => senders.has(spaceId),
+		mayAnswer: async (spaceId, personId) =>
+			answerers.has(`${spaceId}:${personId}`),
 		settings,
 		targets,
 		deliveries,
@@ -120,10 +125,15 @@ function event(
 }
 
 /** A Gate opens: the engine reads it open from now on, and its event lands. */
-async function openGate(runId: string, stepId: string, spaceId = SPACE) {
+async function openGate(
+	runId: string,
+	stepId: string,
+	spaceId = SPACE,
+	facts: Omit<OpenGateRef, "runId" | "stepId"> = {},
+) {
 	events.setOpen(spaceId, [
 		...(await events.source.openGates(spaceId)),
-		{ runId, stepId },
+		{ runId, stepId, ...facts },
 	]);
 	events.land([event("GateOpened", runId, stepId, {}, spaceId)]);
 	await notifier.idle();
@@ -543,5 +553,60 @@ describe("once per key", () => {
 		await openGate("run-1", "step-1");
 
 		expect(web.sent()).toHaveLength(2);
+	});
+});
+
+describe("lock-screen Gates", () => {
+	const marked = { lockScreen: true, choices: ["ship", "hold"] };
+
+	test("a push about a marked Gate carries its options to a person who may answer", async () => {
+		await notifier.start();
+		await register("ada", "expo");
+		await register("bob", "expo");
+
+		await openGate("run-1", "step-1", SPACE, marked);
+
+		const [ada, bob] = expo.sent();
+		expect(ada?.gate).toEqual({
+			lockScreen: true,
+			options: [
+				{ id: "ship", label: "ship" },
+				{ id: "hold", label: "hold" },
+			],
+		});
+		// Bob's role does not allow an answer: no buttons for him.
+		expect(bob?.gate).toEqual({ lockScreen: false, options: [] });
+	});
+
+	test("an unmarked Gate carries no options", async () => {
+		await notifier.start();
+		await register("ada", "expo");
+
+		await openGate("run-1", "step-1", SPACE, { choices: ["ship", "hold"] });
+
+		expect(expo.sent()[0]?.gate).toEqual({ lockScreen: false, options: [] });
+	});
+
+	test("a held push still carries the options when it goes", async () => {
+		await notifier.start();
+		await register("ada", "expo");
+		openScreen("ada");
+
+		await openGate("run-1", "step-1", SPACE, marked);
+		expect(expo.sent()).toEqual([]);
+		await closeScreens();
+		clock += 30 * MINUTE;
+		await notifier.tick();
+
+		expect(expo.sent()[0]?.gate?.lockScreen).toBe(true);
+	});
+
+	test("a run that ended carries no Gate", async () => {
+		await notifier.start();
+		await register("ada", "expo");
+
+		await endRun("run-1", "finished");
+
+		expect(expo.sent()[0]).not.toHaveProperty("gate");
 	});
 });

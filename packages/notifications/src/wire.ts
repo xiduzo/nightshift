@@ -1,4 +1,4 @@
-import { spaceIds } from "@nightshift/auth";
+import { roleAllows, roleIn, spaceIds } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 
 import type { InAppChannel, InAppItem, PushChannels } from "./channels";
@@ -29,7 +29,7 @@ export type NotificationsOptions = {
 	/** Whether this daemon sends the pushes of the Space (`oneSenderPerSpace`). */
 	sendsFor(spaceId: string): Promise<boolean>;
 	inApp: InAppChannel;
-	/** The push channels this daemon has. Default: none, the in-app stream only. */
+	/** The push channels this daemon has. Default: none, the in-app stream only. `stop` stops them too. */
 	push?: PushChannels;
 	now?: () => number;
 	tickMs?: number;
@@ -81,6 +81,10 @@ export function createNotifications(
 		audience: spaceAudience(db),
 		spaces: () => spaceIds(db),
 		sendsFor: options.sendsFor,
+		mayAnswer: async (spaceId, personId) => {
+			const role = await roleIn(db, personId, spaceId);
+			return role !== null && roleAllows(role, { gate: ["resolve"] });
+		},
 		settings,
 		targets,
 		deliveries: createDeliveryLog(db),
@@ -106,6 +110,9 @@ export function createNotifications(
 			},
 		},
 		start: () => notifier.start(),
-		stop: () => notifier.stop(),
+		stop: () => {
+			notifier.stop();
+			for (const channel of Object.values(options.push ?? {})) channel.stop?.();
+		},
 	};
 }

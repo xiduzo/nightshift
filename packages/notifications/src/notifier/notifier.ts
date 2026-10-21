@@ -1,4 +1,5 @@
 import {
+	type GateFacts,
 	gateKey,
 	gatesWaitingTitle,
 	type InAppChannel,
@@ -15,7 +16,7 @@ import {
 	type SettingsStore,
 } from "../settings";
 import type { PushTarget, TargetStore } from "../targets";
-import type { RunEvent, RunEventSource } from "./sources";
+import type { OpenGateRef, RunEvent, RunEventSource } from "./sources";
 
 /**
  * The notifier: it reads the run events of this Replica and decides whom
@@ -39,6 +40,8 @@ import type { RunEvent, RunEventSource } from "./sources";
  *   is a screen of its own: it is not held.
  * - Answer once, clear everywhere: when a Gate closes, every screen that
  *   got it gets a withdraw, and what still waits is dropped.
+ * - Lock-screen answers: a push about a Gate its author marked carries its
+ *   options, only to a person whose role allows an answer (`mayAnswer`).
  *
  * The open Gates at start are the baseline: they tell nobody again. Every
  * piece of work runs one after the other, so two landings never race.
@@ -52,6 +55,11 @@ export type NotifierDeps = {
 	spaces(): Promise<string[]>;
 	/** Whether this daemon sends the pushes of the Space (`oneSenderPerSpace`). */
 	sendsFor(spaceId: string): Promise<boolean>;
+	/**
+	 * Whether the Person's role in the Space allows an answer to a Gate.
+	 * Default: nobody, so no push carries a Gate's options.
+	 */
+	mayAnswer?(spaceId: string, personId: string): Promise<boolean>;
 	settings: Pick<SettingsStore, "get">;
 	targets: Pick<TargetStore, "of" | "byIds" | "forget">;
 	deliveries: DeliveryLog;
@@ -85,6 +93,9 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			console.error(`[notifications] ${message}`, error));
 	/** The open Gates this notifier knows, by Space. */
 	const open = new Map<string, Set<string>>();
+	/** What the engine last said of each open Gate (lock-screen mark, options), by Space and key. */
+	const facts = new Map<string, Map<string, OpenGateRef>>();
+	const mayAnswer = deps.mayAnswer ?? (async () => false);
 	let queue: Promise<void> = Promise.resolve();
 	let stopped = false;
 	let unsubscribe: (() => void) | null = null;
@@ -110,6 +121,39 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			count: null,
 			at: now(),
 		};
+	}
+
+	/** The open Gates the engine read, by key. */
+	function readOpen(gates: readonly OpenGateRef[]): Map<string, OpenGateRef> {
+		return new Map(gates.map((g) => [gateKey(g.runId, g.stepId), g]));
+	}
+
+	/** What a push about the Gate may show the Person. */
+	async function gateFacts(
+		key: string,
+		spaceId: string,
+		personId: string,
+	): Promise<GateFacts> {
+		const ref = facts.get(spaceId)?.get(key);
+		if (!ref?.lockScreen || !(await mayAnswer(spaceId, personId))) {
+			return { lockScreen: false, options: [] };
+		}
+		return {
+			lockScreen: true,
+			options: (ref.choices ?? []).map((name) => ({ id: name, label: name })),
+		};
+	}
+
+	/** The message a push sends: a Gate's adds what its notification may show. */
+	async function pushMessage(
+		kind: NoticeKind,
+		key: string,
+		ids: { spaceId: string; runId: string; stepId: string | null },
+		personId: string,
+	): Promise<NotificationMessage> {
+		const msg = message(kind, key, ids, true);
+		if (kind !== "gate-opened") return msg;
+		return { ...msg, gate: await gateFacts(key, ids.spaceId, personId) };
 	}
 
 	function wants(settings: NotificationSettings, kind: NoticeKind): boolean {
@@ -166,7 +210,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				await push(
 					{ personId, key, kind, ...ids },
 					settings,
-					message(kind, key, ids, true),
+					await pushMessage(kind, key, ids, personId),
 				);
 			}
 		}
@@ -220,6 +264,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 
 	/** A Gate closed: withdraw it everywhere, and drop what still waits. */
 	async function close(spaceId: string, key: string): Promise<void> {
+		facts.get(spaceId)?.delete(key);
 		for (const personId of await deps.audience(spaceId)) {
 			await deps.inApp.withdraw({ kind: "in-app", personId }, key);
 		}
@@ -256,11 +301,9 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				[...known].map((key) => parseGateKey(key)?.runId),
 			);
 			if (asked.length > 0 || list.some((e) => runsWithGates.has(e.runId))) {
-				const openNow = new Set(
-					(await deps.events.openGates(spaceId)).map((g) =>
-						gateKey(g.runId, g.stepId),
-					),
-				);
+				const read = readOpen(await deps.events.openGates(spaceId));
+				facts.set(spaceId, read);
+				const openNow = new Set(read.keys());
 				for (const key of [...known]) {
 					if (openNow.has(key)) continue;
 					known.delete(key);
@@ -287,12 +330,12 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 	}
 
 	/** The message of a held entry, as it went out the first time. */
-	function messageOf(row: Delivery): NotificationMessage {
-		return message(
+	function messageOf(row: Delivery): Promise<NotificationMessage> {
+		return pushMessage(
 			row.kind,
 			row.key,
 			{ spaceId: row.spaceId, runId: row.runId, stepId: row.stepId },
-			true,
+			row.personId,
 		);
 	}
 
@@ -310,7 +353,10 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				row.kind !== "gate-opened" && deps.inApp.isActive(row.personId);
 			const sent = seen
 				? []
-				: await sendTo(await deps.targets.byIds(row.heldFor), messageOf(row));
+				: await sendTo(
+						await deps.targets.byIds(row.heldFor),
+						await messageOf(row),
+					);
 			const sentTo = [...row.sentTo, ...sent];
 			await deps.deliveries.update(row.personId, row.key, {
 				status: sentTo.length > 0 ? "sent" : "dropped",
@@ -344,7 +390,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				// One Gate: the Gate itself, so its answer withdraws it.
 				const sentTo = await sendTo(
 					await deps.targets.byIds(one.heldFor),
-					messageOf(one),
+					await messageOf(one),
 				);
 				await deps.deliveries.update(personId, one.key, {
 					status: sentTo.length > 0 ? "sent" : "dropped",
@@ -370,8 +416,9 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 
 	async function baseline(): Promise<void> {
 		for (const spaceId of await deps.spaces()) {
-			const gates = await deps.events.openGates(spaceId);
-			open.set(spaceId, new Set(gates.map((g) => gateKey(g.runId, g.stepId))));
+			const read = readOpen(await deps.events.openGates(spaceId));
+			facts.set(spaceId, read);
+			open.set(spaceId, new Set(read.keys()));
 		}
 		// Gates that closed while this daemon was away: withdraw them now.
 		const closed = new Map<string, string>();
