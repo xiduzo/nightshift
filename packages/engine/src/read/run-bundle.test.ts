@@ -17,14 +17,10 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import { UNKNOWN_DEVICE, UNKNOWN_SPACE } from "./bundle-rows";
 import { deriveRunState } from "./derive-run";
 import { deriveNodeOutputs, deriveSteps, sumCost } from "./derive-steps";
-import {
-	exportRun,
-	openRunBundle,
-	UNKNOWN_DEVICE,
-	UNKNOWN_SPACE,
-} from "./run-bundle";
+import { exportRun, openRunBundle } from "./run-bundle";
 
 const SECRET = "sk-test-0123456789";
 
