@@ -16,12 +16,19 @@ import {
 	withDevice,
 } from "@nightshift/engine/testing";
 import { type Flow, singleAgentFlow } from "@nightshift/flows";
+import {
+	createInAppChannel,
+	createNotifications,
+	engineRunEvents,
+	type Notifications,
+} from "@nightshift/notifications";
 import { OpenAPIGenerator } from "@orpc/openapi";
 import { type AnyProcedure, call, isProcedure, Procedure } from "@orpc/server";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { z } from "zod";
 
 import type { Context } from "./context";
+import { notificationItemSchema } from "./notifications/schemas";
 import { type OutputMismatch, onOutputMismatch, output } from "./output";
 import { appRouter } from "./router";
 import { runStreamItemSchema } from "./runs/schemas";
@@ -112,6 +119,8 @@ describe("output", () => {
 describe("replies of a real engine", () => {
 	let sandbox: Sandbox;
 	let engine: Engine;
+	let notifications: Notifications;
+	const inApp = createInAppChannel();
 	let context: Context;
 	const mismatches: { path: string; mismatch: OutputMismatch }[] = [];
 	let current = "";
@@ -146,6 +155,13 @@ describe("replies of a real engine", () => {
 				harnesses: { "claude-code": fakeHarness() },
 			}),
 		);
+		notifications = createNotifications({
+			db: sandbox.db,
+			events: engineRunEvents(engine),
+			sendsFor: async () => true,
+			inApp,
+		});
+		await notifications.start();
 		context = {
 			session: {
 				user: {
@@ -165,6 +181,7 @@ describe("replies of a real engine", () => {
 			db: sandbox.db,
 			engine,
 			settings,
+			notifications,
 			connections: createConnectionStore({ document, env: {}, secrets }),
 			cliTools: createCliToolStore({ document }),
 			profiles: createProfileStore({ document }),
@@ -179,6 +196,7 @@ describe("replies of a real engine", () => {
 	afterAll(async () => {
 		restore();
 		globalThis.fetch = realFetch;
+		notifications.stop();
 		await engine.dispose();
 		await sandbox.cleanup();
 	});
@@ -302,6 +320,24 @@ describe("replies of a real engine", () => {
 		await read(appRouter.schedules.list, { projectId });
 		await read(appRouter.schedules.preview, { cron: "0 22 * * 1-5" });
 
+		await read(appRouter.notifications.settings.get);
+		await reply(appRouter.notifications.settings.save, { holdMinutes: 5 });
+		await reply(appRouter.notifications.targets.register, {
+			kind: "web",
+			name: "This browser",
+			endpoint: "https://push.example/abc",
+			keys: { p256dh: "key", auth: "secret" },
+		});
+		await read(appRouter.notifications.targets.list);
+		const told = new AbortController();
+		const toldOf = (await call(appRouter.notifications.watch, undefined, {
+			context,
+			signal: told.signal,
+		})) as AsyncIterator<unknown>;
+		const firstNotice = toldOf.next();
+		const me = (context.session as { user: { id: string } }).user.id;
+		while (!inApp.isActive(me)) await Bun.sleep(5);
+
 		const started = (await reply(appRouter.runs.start, {
 			projectId,
 			flowName: "night",
@@ -323,6 +359,14 @@ describe("replies of a real engine", () => {
 		await read(appRouter.runs.placements, { projectId });
 		await read(appRouter.runs.devices, { projectId });
 		await read(appRouter.gates.list);
+		const notice = (await firstNotice).value;
+		expect(
+			notificationItemSchema.safeParse(notice).error,
+			"notifications.watch",
+		).toBe(undefined);
+		expect(notice).toMatchObject({ kind: "run-finished", runId: started.id });
+		told.abort();
+		await toldOf.return?.();
 
 		const controller = new AbortController();
 		const events = (await call(

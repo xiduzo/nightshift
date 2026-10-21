@@ -12,6 +12,7 @@ import {
 import { account, devices, link, offers, pairing } from "./devices";
 import { flows } from "./flows";
 import { gates } from "./gates";
+import { notifications } from "./notifications";
 import { output } from "./output";
 import { archive, sync } from "./peer";
 import { publicProcedure } from "./procedures";
@@ -44,6 +45,7 @@ export const appRouter = {
 	gates,
 	schedules,
 	runs,
+	notifications,
 	settings,
 	connections,
 	cliTools,

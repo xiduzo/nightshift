@@ -24,6 +24,7 @@ import type {
 	ProjectReadiness,
 	SettingsStore,
 } from "@nightshift/engine";
+import type { Notifications } from "@nightshift/notifications";
 
 export type Context = {
 	/** The request's session. On this computer, the local Person's when the request has none. */
@@ -79,6 +80,11 @@ export type Context = {
 	/** The engine of this Device. Procedures use the view of the session's Space. */
 	engine: Engine;
 	settings: SettingsStore;
+	/**
+	 * The notifier: each Person's in-app stream, notification settings and
+	 * push targets.
+	 */
+	notifications: Notifications;
 	connections: ConnectionStore;
 	cliTools: CliToolStore;
 	profiles: ProfileStore;

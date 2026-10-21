@@ -191,6 +191,7 @@
         "@nightshift/devices": "workspace:*",
         "@nightshift/engine": "workspace:*",
         "@nightshift/flows": "workspace:*",
+        "@nightshift/notifications": "workspace:*",
         "@orpc/server": "catalog:",
         "zod": "catalog:",
       },
