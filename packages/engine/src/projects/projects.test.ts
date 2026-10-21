@@ -5,7 +5,8 @@ import { clone, device, event, project } from "@nightshift/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { createRunLog } from "../log/run-log";
 import { createSandbox, mustGit, type Sandbox } from "../testing/test-support";
-import { createProjects, normaliseRemote } from "./projects";
+import { createProjects } from "./projects";
+import { normaliseRemote } from "./remote";
 import { createSpaceDocuments, type SpaceDocuments } from "./space-document";
 
 let sandbox: Sandbox;
