@@ -1,8 +1,9 @@
 import { spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { DeviceDocument, ProfileStore } from "@nightshift/engine";
+import type { DeviceDocument, Engine, ProfileStore } from "@nightshift/engine";
 import { personOnHost } from "../links";
-import type { PeerEngine } from "../peers";
+import type { DeviceRegistry } from "../registry";
+import type { EngineOffers } from "./engine-offers";
 import { deviceOffers, removeDeviceOffer, setDeviceOffer } from "./offers";
 import type { Offers, SpaceDeviceView } from "./types";
 
@@ -21,7 +22,18 @@ import type { Offers, SpaceDeviceView } from "./types";
  */
 export function createOffers(deps: {
 	db: Database;
-	engine: PeerEngine;
+	/**
+	 * This Device's engine (`PeerEngine`): the Offers of the Spaces, the
+	 * Devices paired with it, and the Members' names its Space documents
+	 * mirror.
+	 */
+	engine: Engine & {
+		offers: EngineOffers;
+		devices: Pick<DeviceRegistry, "get">;
+		exchange: {
+			memberName(spaceId: string, personId: string): Promise<string | null>;
+		};
+	};
 	document: DeviceDocument;
 	profiles: ProfileStore;
 	self: { id: string; name: string };

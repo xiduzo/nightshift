@@ -14,7 +14,7 @@ import {
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { SettingsStore } from "@nightshift/engine";
-import type { HostHello, PairingRedeemed, PairingStart } from "../links";
+import type { HostHello, PairingRedeemed, PairingStart } from "../contract";
 import type { DeviceRegistry } from "../registry";
 import type { PairingReviewView } from "./types";
 

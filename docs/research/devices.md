@@ -1086,7 +1086,8 @@ iroh.
      (`itemBranch`) and its glob source (`files`) run on the worktree's
      Device too.
    - **`remoteDevice(relay, device, forRun)`**
-     (`packages/devices/src/work/remote.ts`): every call is a
+     (`packages/devices/src/work/remote.ts`, its wire in
+     `packages/devices/src/contract/work.ts`): every call is a
      `WorkRequest`, plain data: who asks and for which run (`WorkFor`:
      Space, project, the Person who starts or started the run as the Host
      knows them, the run, null before it exists) and the call without its

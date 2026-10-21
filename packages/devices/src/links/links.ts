@@ -1,8 +1,8 @@
 import type * as Y from "yjs";
-import type { HostClient } from "./host-client";
+import type { HostClient, HostHello } from "../contract";
 import type { DeviceKeyStore, HostLink, HostLinks } from "./host-links";
 import { type HttpsLinkOptions, httpsLink, type Link } from "./link";
-import type { HostHello, LinkedHost } from "./types";
+import type { LinkedHost } from "./types";
 
 /**
  * This computer's running links, one per Host it paired with: started for

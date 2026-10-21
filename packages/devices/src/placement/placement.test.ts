@@ -23,9 +23,9 @@ import {
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
+import type { WorkRelay, WorkRequest } from "../contract";
 import { createPeerEngine, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
-import type { WorkRelay, WorkRequest } from "../work";
 import { serveWork } from "../work/remote";
 
 /**

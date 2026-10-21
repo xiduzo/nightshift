@@ -9,12 +9,15 @@ import {
 	worktreeLocation,
 } from "@nightshift/engine";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
-import type { HostClient } from "../links";
+import type {
+	HostClient,
+	WorkDelivery,
+	WorkReply,
+	WorkRequest,
+} from "../contract";
 import { createOfferSlots, type DeviceOffer } from "../offers";
 import { createPeerEngine, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
-import type { WorkReply, WorkRequest } from "./remote";
-import type { WorkDelivery } from "./types";
 import { checkWork, createOfferCalls, createWorkServer } from "./work";
 import { createWorkHub } from "./work-hub";
 

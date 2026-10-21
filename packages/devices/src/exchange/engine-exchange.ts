@@ -12,7 +12,8 @@ import {
 	recordClone,
 	type SpaceDocuments,
 } from "@nightshift/engine";
-import { type ArchiveRef, readArchive, writeArchive } from "../archive";
+import { readArchive, writeArchive } from "../archive";
+import type { ArchiveRef } from "../contract";
 import { createHostSpaces, type HostSpaces } from "../links";
 import { createRunCommands, type RunCommands } from "./commands";
 import {

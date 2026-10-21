@@ -3,10 +3,10 @@ import {
 	type Engine,
 	type EngineOptions,
 } from "@nightshift/engine";
+import type { HostRelay } from "../contract";
 import type { EngineExchange } from "../exchange";
 import type { EngineOffers } from "../offers";
 import type { DeviceRegistry } from "../registry";
-import type { HostRelay } from "../relay";
 import { type BuiltPeers, createPeers, type PeerOptions } from "./peers";
 
 /** The engine of this Device among its peers, with the devices' half beside it. */

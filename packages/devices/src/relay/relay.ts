@@ -1,7 +1,7 @@
-import type { DeviceLinks, HostClient } from "../links";
+import type { HostClient, HostRelay } from "../contract";
+import type { DeviceLinks } from "../links";
 import type { PeerEngine } from "../peers";
 import type { DeviceRegistry } from "../registry";
-import type { HostRelay } from "./types";
 
 /**
  * The engine's `Relay`: the actions on rows another Device owns, carried

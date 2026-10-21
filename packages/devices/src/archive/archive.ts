@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { z } from "zod";
+import type { ArchiveRef } from "../contract";
 
 /**
  * The archive: the run state of runs walked elsewhere, per Space. When a
@@ -16,21 +16,6 @@ import { z } from "zod";
  * `checkpoint.json`. Retention is undecided, as it is for run history:
  * everything is kept.
  */
-
-/** Ids that become path segments: no separators, no dots. */
-const segment = z.string().regex(/^[\w-]{1,128}$/);
-
-export const archiveRefSchema = z.discriminatedUnion("kind", [
-	z.object({
-		kind: z.enum(["transcript", "log"]),
-		spaceId: segment,
-		runId: segment,
-		stepId: segment,
-	}),
-	z.object({ kind: z.literal("checkpoint"), spaceId: segment, runId: segment }),
-]);
-/** One file of the archive. */
-export type ArchiveRef = z.infer<typeof archiveRefSchema>;
 
 export function archivePath(dataDir: string, ref: ArchiveRef): string {
 	const dir = join(dataDir, "archive", ref.spaceId, ref.runId);

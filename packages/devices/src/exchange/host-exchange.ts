@@ -1,22 +1,22 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
 import { roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { Device } from "@nightshift/engine";
+import type { Device, Engine } from "@nightshift/engine";
 import { ORPCError } from "@orpc/server";
-import type { ArchiveRef } from "../archive";
+import type { ArchiveRef, SyncBatch, SyncCursors } from "../contract";
 import { NOT_A_HOST } from "../host";
-import type { PeerEngine } from "../peers";
+import type { EngineOffers } from "../offers";
 import type { DeviceRegistry } from "../registry";
 import { type OfferDeps, serveChecked, type WorkHub } from "../work";
 import { applyRunCommand, COMMAND_PERMISSION } from "./commands";
+import type { EngineExchange } from "./engine-exchange";
 import {
 	isEmpty,
 	MissingProjectError,
 	mergeCursors,
-	type SyncCursors,
 	withoutPrivatePaths,
 } from "./rows";
-import type { HostExchange, SyncBatch } from "./types";
+import type { HostExchange } from "./types";
 
 /**
  * This computer as the Host of run history for its paired Devices: the
@@ -44,7 +44,8 @@ const STREAM_IDLE_MS = 20_000;
 
 export function createHostExchange(deps: {
 	db: Database;
-	engine: PeerEngine;
+	/** This Host's engine (`PeerEngine`): its half of the exchange and the Offers of its Spaces. */
+	engine: Engine & { exchange: EngineExchange; offers: EngineOffers };
 	registry: DeviceRegistry;
 	/** This Host's Device id: the Walker of its own runs. */
 	selfId: string;

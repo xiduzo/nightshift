@@ -1,13 +1,7 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
 import type { KeyStoreKind } from "@nightshift/engine";
-import type {
-	HostHello,
-	HostRole,
-	JoinProgress,
-	LinkedHost,
-	PairingRedeemed,
-	PairingStart,
-} from "../links";
+import type { HostHello, PairingRedeemed, PairingStart } from "../contract";
+import type { HostRole, JoinProgress, LinkedHost } from "../links";
 import type { PairedDevice } from "../registry";
 
 /** This computer's Devices, as the API serves them: as a Host (pairing, presence) and its links to Hosts. */

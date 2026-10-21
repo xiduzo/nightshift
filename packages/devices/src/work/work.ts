@@ -6,23 +6,24 @@ import {
 	type ProfileStore,
 	worktreeLocation,
 } from "@nightshift/engine";
-import { type HostClient, personOnHost } from "../links";
+import {
+	type HostClient,
+	type WorkCall,
+	type WorkReply,
+	type WorkRequest,
+	workRequestSchema,
+} from "../contract";
+import { type HostSpaces, personOnHost } from "../links";
 import {
 	type DeviceOffer,
+	type EngineOffers,
 	inForce,
 	type OfferSlots,
 	offeredCallRefusal,
 	offeredSession,
 	slotKey,
 } from "../offers";
-import type { PeerEngine } from "../peers";
-import {
-	serveWork,
-	type WorkCall,
-	type WorkReply,
-	type WorkRequest,
-	workRequestSchema,
-} from "./remote";
+import { serveWork } from "./remote";
 
 /**
  * This computer as a placed Device: the work of runs its Host walks with
@@ -90,6 +91,19 @@ export function createOfferCalls(): OfferCalls {
  */
 export const REPLY_DEADLINE_MS = 10 * 60_000;
 
+/**
+ * What the checks of a call read of this Device's engine (`PeerEngine`):
+ * the Host that keeps a Space, a Person's role there, and the Offers of
+ * the Space.
+ */
+export type WorkEngine = {
+	exchange: {
+		hostSpaces: Pick<HostSpaces, "hostOf">;
+		memberRole(spaceId: string, personId: string): Promise<string | null>;
+	};
+	offers: Pick<EngineOffers, "list">;
+};
+
 export type WorkServer = {
 	/** Takes and serves the Host's calls while its link is online. */
 	whileOnline(client: HostClient, signal: AbortSignal): Promise<void>;
@@ -102,7 +116,7 @@ export function createWorkServer(
 		/** The Host whose runs it serves. */
 		hostId: string;
 		db: Database;
-		engine: PeerEngine;
+		engine: WorkEngine;
 		/** This computer as a Device. */
 		device: Device;
 		retryMs?: number;
@@ -363,7 +377,7 @@ export async function checkWork(
 
 export type WorkCheckDeps = WorkVia & {
 	db: Database;
-	engine: PeerEngine;
+	engine: WorkEngine;
 	/** This computer as a Device: its id and name. */
 	device: Pick<Device, "id" | "name">;
 	offers?: () => readonly DeviceOffer[];

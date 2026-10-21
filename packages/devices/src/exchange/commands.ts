@@ -7,6 +7,7 @@ import type {
 	SpaceEngine,
 } from "@nightshift/engine";
 import { and, asc, eq, isNull } from "drizzle-orm";
+import type { RunCommand } from "../contract";
 
 /**
  * Commands: a person's action on a run that another Device walks. The
@@ -16,17 +17,6 @@ import { and, asc, eq, isNull } from "drizzle-orm";
  * Walker reports it applied, or why not; a command to a Walker that is
  * offline waits, and shows as pending.
  */
-
-/** A command on its way to a Walker. */
-export type RunCommand = RunCommandInput & {
-	id: string;
-	spaceId: string;
-	runId: string;
-	walkerId: string;
-	/** Who asked, on the Host. */
-	personId: string;
-	createdAt: number;
-};
 
 /** The permission each kind needs in the run's Space. */
 export const COMMAND_PERMISSION = {

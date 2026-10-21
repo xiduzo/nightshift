@@ -6,27 +6,16 @@ import type {
 	StartRunInput,
 	TranscriptEntry,
 } from "@nightshift/engine";
-import type { ArchiveRef } from "../archive";
-import type { OfferCaps } from "../offers";
-import type { WorkDelivery, WorkReply, WorkRequest } from "../work";
-import type { RunCommand } from "./commands";
-import type { FollowWant } from "./feeds";
-import type { RunRows, SyncCursors } from "./rows";
-
-/** One answer of the exchange: rows after the Device's cursors, and its commands. */
-export type SyncBatch = {
-	rows: RunRows;
-	/** The cursors moved past these rows. */
-	cursors: SyncCursors;
-	/** The commands that wait for the Device, as the Walker of their runs. */
-	commands: RunCommand[];
-	/**
-	 * The steps of runs the Device walks that someone follows now, with the
-	 * `seq` to send from: their live transcripts go to `archive.tail`.
-	 * The whole set each time; a step that left it is no longer wanted.
-	 */
-	follows: FollowWant[];
-};
+import type {
+	ArchiveRef,
+	OfferCaps,
+	RunRows,
+	SyncBatch,
+	SyncCursors,
+	WorkDelivery,
+	WorkReply,
+	WorkRequest,
+} from "../contract";
 
 /**
  * This computer as the Host of run history, for its paired Devices. Each

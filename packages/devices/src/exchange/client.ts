@@ -1,13 +1,9 @@
 import { roleAllows } from "@nightshift/auth";
-import type { ArchiveRef } from "../archive";
-import type { HostClient } from "../links";
-import type { PeerEngine } from "../peers";
-import {
-	applyRunCommand,
-	COMMAND_PERMISSION,
-	type RunCommand,
-} from "./commands";
-import { isEmpty, MissingProjectError, type RunRows } from "./rows";
+import type { Engine } from "@nightshift/engine";
+import type { ArchiveRef, HostClient, RunCommand, RunRows } from "../contract";
+import { applyRunCommand, COMMAND_PERMISSION } from "./commands";
+import type { EngineExchange } from "./engine-exchange";
+import { isEmpty, MissingProjectError } from "./rows";
 
 /**
  * The exchange of run history with one Host, while its Link is online
@@ -36,7 +32,8 @@ import { isEmpty, MissingProjectError, type RunRows } from "./rows";
  */
 
 export type ExchangeSession = {
-	engine: PeerEngine;
+	/** This Device's engine (`PeerEngine`), with its half of the exchange. */
+	engine: Engine & { exchange: EngineExchange };
 	hostId: string;
 	client: HostClient;
 	/** This computer's Device id: the Walker of its runs. */

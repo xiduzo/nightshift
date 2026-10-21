@@ -1,5 +1,6 @@
 import type { PeerContext, Peers } from "@nightshift/engine";
 import { createRunArchive, runsMovedHere } from "../archive";
+import type { HostRelay, WorkRelay } from "../contract";
 import { createEngineExchange, type EngineExchange } from "../exchange";
 import { createHostSpaces, personOnHost } from "../links";
 import {
@@ -13,8 +14,6 @@ import {
 } from "../offers";
 import { createPlacement } from "../placement";
 import { createDeviceRegistry, type DeviceRegistry } from "../registry";
-import type { HostRelay } from "../relay";
-import type { WorkRelay } from "../work";
 import { createPrivatePaths } from "./private-paths";
 import { createWalkers } from "./walkers";
 

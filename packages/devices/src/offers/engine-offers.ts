@@ -6,14 +6,12 @@ import type {
 	SpaceDocuments,
 } from "@nightshift/engine";
 import type { AgentProfileSettings } from "@nightshift/flows";
+import type { HostRelay, OfferCaps, WorkRelay } from "../contract";
 import { personOnHost } from "../links";
-import type { HostRelay } from "../relay";
-import type { WorkRelay } from "../work";
 import {
 	createOfferSlots,
 	type DeviceOffer,
 	inForce,
-	type OfferCaps,
 	offeredDevice,
 	publishOffer,
 	type SpaceOffer,

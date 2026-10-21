@@ -8,13 +8,19 @@
  * are here too: the API checks each call with them.
  */
 
-export { type ArchiveRef, archiveRefSchema } from "./archive";
 export {
+	type ArchiveRef,
+	archiveRefSchema,
 	type FollowWant,
-	ForeignRowsError,
 	feedStepSchema,
 	followWantSchema,
-	type HostExchange,
+	type HostClient,
+	type HostHello,
+	type ListedSpace,
+	type OfferCaps,
+	offerCapsSchema,
+	type PairingRedeemed,
+	type PairingStart,
 	type RunCommand,
 	type RunRows,
 	runRowsSchema,
@@ -22,28 +28,23 @@ export {
 	type SyncCursors,
 	syncCursorsSchema,
 	transcriptEntrySchema,
-} from "./exchange";
+	type WorkDelivery,
+	type WorkReply,
+	type WorkRequest,
+	workReplySchema,
+	workRequestSchema,
+} from "./contract";
+export { ForeignRowsError, type HostExchange } from "./exchange";
 export type {
 	Devices,
 	DevicesOverview,
 	PairingReviewView,
 } from "./host";
-export type {
-	DeviceLinks,
-	HostClient,
-	HostHello,
-	HostRole,
-	JoinProgress,
-	ListedSpace,
-	PairingRedeemed,
-	PairingStart,
-} from "./links";
+export type { DeviceLinks, HostRole, JoinProgress } from "./links";
 export {
 	deviceOffers,
-	type OfferCaps,
 	type Offers,
 	type OfferView,
-	offerCapsSchema,
 	type SpaceDeviceView,
 } from "./offers";
 export { createPeerEngine, type PeerEngine } from "./peers";
@@ -51,12 +52,4 @@ export { listenHostname, ownCertificate, reachFor } from "./reach";
 export type { PairedDevice } from "./registry";
 export { createRelay, createWorkRelay } from "./relay";
 export { type DeviceServices, wireDevices } from "./wire";
-export {
-	createWorkHub,
-	type WorkDelivery,
-	type WorkHub,
-	type WorkReply,
-	type WorkRequest,
-	workReplySchema,
-	workRequestSchema,
-} from "./work";
+export { createWorkHub, type WorkHub } from "./work";

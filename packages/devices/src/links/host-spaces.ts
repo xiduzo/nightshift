@@ -9,6 +9,7 @@ import {
 import type { Database } from "@nightshift/db";
 import { hostLink, hostSpace } from "@nightshift/db/schema";
 import { and, eq, inArray, notInArray } from "drizzle-orm";
+import type { ListedSpace } from "../contract";
 
 /**
  * The Spaces this computer takes part in through its Hosts. A Host lists
@@ -23,15 +24,6 @@ import { and, eq, inArray, notInArray } from "drizzle-orm";
  * Such a Space is the Host's: this Replica never writes its document. It
  * changes it only through the Host's procedures.
  */
-
-/** A Space as a Host lists it to a Device. */
-export type ListedSpace = {
-	id: string;
-	name: string;
-	personal: boolean;
-	/** The role of the Device's owner there. */
-	role: string;
-};
 
 export type HostSpaces = ReturnType<typeof createHostSpaces>;
 

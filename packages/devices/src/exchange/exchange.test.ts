@@ -18,8 +18,8 @@ import {
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
 import { and, eq } from "drizzle-orm";
+import type { HostRelay as Relay } from "../contract";
 import { createPeerEngine, type PeerEngine } from "../peers";
-import type { HostRelay as Relay } from "../relay";
 import { withPeers } from "../testing";
 import {
 	ForeignRowsError,

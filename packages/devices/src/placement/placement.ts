@@ -16,11 +16,11 @@ import {
 import type { FlowNode } from "@nightshift/flows";
 import type { FlowSources } from "@nightshift/flows/files";
 import { eq } from "drizzle-orm";
+import type { HostRelay, WorkRelay } from "../contract";
 import { type HostSpaces, personOnHost } from "../links";
 import { type DeviceOffer, offersNothing, spaceOffers } from "../offers";
 import type { DeviceRegistry } from "../registry";
-import type { HostRelay } from "../relay";
-import { remoteDevice, type WorkRelay } from "../work";
+import { remoteDevice } from "../work";
 
 /**
  * Placement: which Device a step runs on, and which of a Person's Devices

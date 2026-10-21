@@ -4,8 +4,8 @@ import type {
 	Relay,
 	TranscriptEntry,
 } from "@nightshift/engine";
-import type { ArchiveRef } from "../archive";
-import type { OfferCaps } from "../offers";
+import type { ArchiveRef } from "./archive";
+import type { OfferCaps } from "./offers";
 
 /**
  * What this Device asks of the Hosts it links to: the engine's `Relay` (the

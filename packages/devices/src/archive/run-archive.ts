@@ -12,8 +12,8 @@ import {
 	stepIdsOfRun,
 	type TranscriptEntry,
 } from "@nightshift/engine";
-import type { HostRelay } from "../relay";
-import { type ArchiveRef, readArchive, writeArchive } from "./archive";
+import type { ArchiveRef, HostRelay } from "../contract";
+import { readArchive, writeArchive } from "./archive";
 
 /**
  * A run in the archive of the Replica that keeps its Space (this one, or

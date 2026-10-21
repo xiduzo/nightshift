@@ -1,6 +1,7 @@
+import type { WorkRelay } from "../contract";
 import type { DeviceLinks } from "../links";
 import type { PeerEngine } from "../peers";
-import type { WorkHub, WorkRelay } from "../work";
+import type { WorkHub } from "../work";
 import { HOST_OFFLINE } from "./relay";
 
 /**

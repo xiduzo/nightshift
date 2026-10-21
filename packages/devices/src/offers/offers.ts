@@ -14,10 +14,10 @@ import {
 	type AgentProfileSettings,
 	type FlowNode,
 	nameSchema,
-	permissionModeSchema,
+	type permissionModeSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
-import type { WorkCall } from "../work";
+import { offerCapsSchema, type WorkCall } from "../contract";
 
 /**
  * Offers: an Agent Profile of a Device made available to one Space, with
@@ -56,9 +56,6 @@ export const PERMISSION_ORDER = [
 ] as const satisfies readonly z.infer<typeof permissionModeSchema>[];
 export type PermissionMode = (typeof PERMISSION_ORDER)[number];
 
-/** The most sessions one Offer may run at once. */
-export const MAX_SESSION_CAP = 16;
-
 /** Whether `mode` is no wider than `cap`. */
 export function withinCap(mode: PermissionMode, cap: PermissionMode): boolean {
 	return PERMISSION_ORDER.indexOf(mode) <= PERMISSION_ORDER.indexOf(cap);
@@ -71,12 +68,6 @@ export function clampToCap(
 ): PermissionMode {
 	return withinCap(mode, cap) ? mode : cap;
 }
-
-export const offerCapsSchema = z.object({
-	permissionCap: permissionModeSchema,
-	sessionCap: z.number().int().min(1).max(MAX_SESSION_CAP),
-});
-export type OfferCaps = z.infer<typeof offerCapsSchema>;
 
 const deviceOfferSchema = offerCapsSchema.extend({
 	spaceId: z.string().min(1),

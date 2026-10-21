@@ -1,5 +1,5 @@
 import type { RunSummary } from "@nightshift/engine";
-import type { OfferCaps } from "./offers";
+import type { OfferCaps } from "../contract";
 
 /** A run of another Person that ran (or runs) on this computer through an Offer. */
 export type OfferRun = {

@@ -1,9 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { ORPCError } from "@orpc/client";
-import type { HostClient } from "./host-client";
+import type { HostClient, HostHello } from "../contract";
 import type { HostLink } from "./host-links";
 import { firstAnswering, httpsLink, type LinkState } from "./link";
-import type { HostHello } from "./types";
 
 /** The Link's own logic, over fake Hosts: no network. */
 

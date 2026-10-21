@@ -4,10 +4,11 @@ import {
 } from "@hocuspocus/provider";
 import { ORPCError } from "@orpc/client";
 import type * as Y from "yjs";
+import type { HostClient, HostHello } from "../contract";
 import { pinnedWebSocket } from "../reach";
-import { type HostClient, hostClient } from "./host-client";
+import { hostClient } from "./host-client";
 import type { HostLink } from "./host-links";
-import type { HostHello, LinkStatus } from "./types";
+import type { LinkStatus } from "./types";
 
 /**
  * The `Link` port: a Device's outbound connection to one Host. The Host

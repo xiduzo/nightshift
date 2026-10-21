@@ -1,15 +1,6 @@
 /** Work on another Device: a Device through a Host (`remoteDevice`), the Host's hub, and the placed Device's server. */
 
-export {
-	remoteDevice,
-	type WorkCall,
-	type WorkRelay,
-	type WorkReply,
-	type WorkRequest,
-	workReplySchema,
-	workRequestSchema,
-} from "./remote";
-export type { WorkDelivery } from "./types";
+export { remoteDevice } from "./remote";
 export {
 	createOfferCalls,
 	createWorkServer,
