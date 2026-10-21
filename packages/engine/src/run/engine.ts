@@ -14,6 +14,7 @@ import {
 	type RunRow,
 	type RunTrigger,
 	runIdsOfProject,
+	spaceOfRun,
 } from "../log";
 import {
 	createProjects,
@@ -369,6 +370,10 @@ export function createEngine(
 
 	return {
 		space,
+		async spaceOfRun(runId) {
+			await ready;
+			return spaceOfRun(db, runId);
+		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
 		async deviceBack(_deviceId) {
 			await ready;

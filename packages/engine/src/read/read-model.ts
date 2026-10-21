@@ -630,6 +630,7 @@ export function createReadModel(deps: ReadModelDeps) {
 					(c) => c.kind === "gate.resolve",
 				);
 			gates.push({
+				spaceId: row.spaceId,
 				runId: row.id,
 				runTitle: row.title,
 				projectId: row.projectId,

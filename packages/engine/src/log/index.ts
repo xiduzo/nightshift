@@ -44,6 +44,7 @@ export {
 	hasRunRow,
 	runIdsOfProject,
 	runIdsWalkedBy,
+	spaceOfRun,
 	stepIdsOfRun,
 } from "./run-row";
 export type { StepEvent, TranscriptEntry } from "./step-events";
