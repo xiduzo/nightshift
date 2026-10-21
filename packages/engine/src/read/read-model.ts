@@ -66,6 +66,9 @@ import type {
  * The seam is narrow on purpose: the engine passes `db`, `log`, `bus` and
  * `isActive` and gets the reads back, so the shape of a summary changes in
  * one file (locality), and a test of a derivation needs no engine.
+ *
+ * Over 600 lines on purpose: that locality. Every view of a run that people
+ * see is made here.
  */
 
 /** The take-over facts of the harness of that name, or none. */

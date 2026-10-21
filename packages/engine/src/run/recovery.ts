@@ -51,6 +51,9 @@ import {
  * run log, the runner, the clock and the settings, and gets back three
  * calls. The run cap queue (`pendingResumes`, `onSlotFreed`) is the
  * module's own state, so the engine no longer knows a queue exists.
+ *
+ * Over 600 lines on purpose: startup recovery and resume share that rule,
+ * that mapping and the queue, so they stay in one module.
  */
 
 const INTERRUPTED_REASON = "Night Shift stopped while this run ran.";

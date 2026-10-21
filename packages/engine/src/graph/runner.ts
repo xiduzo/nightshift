@@ -76,6 +76,9 @@ import type {
  *   failed: …`.
  * - The custom stream chunks (`RunEvent`) are the runner's bookkeeping:
  *   transcript entries reach the bus from the recorder already.
+ *
+ * Over 600 lines on purpose: the stream, the interrupts, the stop and the
+ * slots of a run share one state per run, so they stay in one module.
  */
 
 export type RunnerDeps = {

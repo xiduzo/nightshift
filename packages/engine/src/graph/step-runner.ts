@@ -89,6 +89,9 @@ import type { RunStateValues } from "./state";
  *
  * The log is written exactly as before (design rule 3): the same payloads
  * in the same order as the nodes wrote them.
+ *
+ * Over 600 lines on purpose: this is the one module of the step lifecycle.
+ * A cut would spread that lifecycle over the nodes again.
  */
 
 /** Why a step's signal aborted. */

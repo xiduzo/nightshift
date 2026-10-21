@@ -70,6 +70,9 @@ import { decideWithin } from "./choosers/model";
  * usage limit or a network failure is a wait request; the runner plans the
  * wait and parks at the wait node (`wait__<id>`, the shared `waitNode`), or
  * ends the step `error` on a give-up.
+ *
+ * Over 600 lines on purpose: one file per node type (STRUCTURE.md, section
+ * 4), and `runSession` is one harness session from its start to its end.
  */
 export function agentNode(node: AgentNode, ctx: StepContext): NodeAction {
 	return (state, config) =>
