@@ -337,7 +337,7 @@ The stack:
 | Push | `expo-notifications` |
 | Biometric check | `expo-local-authentication` |
 | QR code (later) | `expo-camera` |
-| Live Activities, widgets (later) | `expo-widgets` |
+| Live Activities, widgets | `expo-widgets` (see below) |
 
 No Yjs and no libsql on the phone. `expo-sqlite` dropped libsql in SDK 58,
 and a client that reads and acts needs no Replica.
@@ -345,6 +345,84 @@ and a client that reads and acts needs no Replica.
 Event iterators do not retry by themselves. The reconnect loop of the run
 stream (`afterSeq` and dedup) moves out of `apps/web` into
 `@nightshift/client`, so both apps use one copy.
+
+### Widgets and Live Activities
+
+Researched on 2026-10-22 against `expo-widgets` 58.0.22 and `@expo/ui`
+58.0.22, the versions for SDK 58.
+
+What `expo-widgets` does:
+
+| Need | iOS | Android |
+| --- | --- | --- |
+| Home screen widget | Yes, WidgetKit, also the lock-screen families (`accessoryRectangular`, `accessoryInline`) | Yes, Glance, with `enableAndroid: true` |
+| Update from the app | `updateSnapshot(props)`, or `updateTimeline` for later entries | `updateSnapshot(props)` only |
+| Tap opens a link | `widgetURL(url)` modifier | No. A widget button sends a broadcast to the widget. There is no link. |
+| Live Activity | Yes, ActivityKit: `createLiveActivity`, `start`, `update`, `end`, `getInstances` | No |
+| Ongoing notification with progress | No | Yes, `createCustomNotification` (new in 58.0.17): `post`, `update`, `cancel`, `ongoing`, `timeoutAfter`, `url`, and a `LinearProgressIndicator` |
+
+How it is set up. The config plugin `expo-widgets` in `app.json` adds a
+widget extension target (`ExpoWidgetsTarget`) and an App Group
+(`groupIdentifier`, default `group.<bundle id>`) to the app at prebuild.
+Each `widgets[]` entry is one widget kind, and its `name` must match
+`createWidget(name, ...)`. A Live Activity has no entry: it is
+registered at runtime. Android needs `enableAndroid: true`. It does not
+work in Expo Go: it needs a development build, and a new build after a
+change to the plugin options.
+
+How data gets to the widget. The layout is a function with the
+`'widget'` directive. `babel-preset-expo` turns it into a string, and
+the extension runs it in its own JavaScript runtime with only `@expo/ui`
+components (SwiftUI on iOS, Jetpack Compose on Android) as globals. It
+may use nothing but its props and its environment: no imports, no
+hooks, no app state. `updateSnapshot` writes the props to the App
+Group's shared `UserDefaults` (iOS) or the app's storage (Android) and
+reloads the widget. So the app writes ready-made texts and colors into
+the props.
+
+Live Activity push. A Live Activity can be started and updated from the
+app while it runs. Push updates (`enablePushNotifications`,
+`getPushToken`, `addPushToStartTokenListener`, iOS 17.2+ for push to
+start) go to APNs directly, with the `liveactivity` push type and a
+token per activity. The Expo push service does not send them. Night
+Shift's Host sends through Expo Push only, so Night Shift updates its
+Live Activities locally: in the background they go out of date (the
+`staleDate`), and they catch up when the app opens. Push updates would
+need the Host to hold an APNs key (`.p8`) of the app's team, which a
+personal development build does not have.
+
+What Night Shift does with it (the `glance` vertical of `apps/mobile`):
+
+- **Home screen widget** "Night Shift" (`NightShiftGlance`): how many
+  Gates wait for you and the three newest runs of the active Space, each
+  with its flow and status. Counts, flow names and statuses only, never a
+  Gate's question or a run's inputs. The app writes it each time the
+  inbox or the runs refresh. `updateGlance(snapshot)` is the one door,
+  also for a background push task. A tap opens the inbox on iOS.
+- **Follow on the lock screen** on the run screen, and a switch on the
+  Start tab. iOS: a Live Activity with the flow, the step that runs now,
+  "Step 2 of 5", a progress bar and the status. Android: an ongoing
+  notification with the same, which a tap opens on the run. The app
+  reads a followed run every 5 seconds while it runs, and ends the
+  activity or notification when the run ends.
+- "Step x of y": x is how many of the flow's nodes have started (a node
+  the run came back to counts once), y is how many nodes the flow has.
+  Steps of a called flow do not count. A branch the run skips leaves x
+  below y, so an ended run says "Ran 4 of 5 steps".
+
+Checked on 2026-10-22 with a development build on the iOS 27 simulator
+(`expo run:ios`, no EAS): the widget extension builds and embeds, the
+small and medium widget show the live count and runs and follow a
+refresh, a tap opens the inbox, and a followed run's Live Activity
+starts (iOS asks once to allow Live Activities), moves from step to
+step, shows "Waiting for you" at a Gate, and ends with "Finished".
+Android was checked to prebuild (the widget receiver and the
+notification permission are in the manifest), not built or run.
+
+Sources: [Expo Widgets docs](https://docs.expo.dev/versions/latest/sdk/widgets/),
+the `expo-widgets` 58.0.22 package (its `CHANGELOG.md`, `plugin/src`,
+`src/CustomNotifications.ts`), [Live Activities with Expo end to end](https://expo.dev/blog/live-activities-with-expo-end-to-end-client-and-backend)
+(the backend sends to APNs with a `.p8` key), [Apple ActivityKit push updates](https://developer.apple.com/documentation/activitykit/starting-and-updating-live-activities-with-activitykit-push-notifications).
 
 ### Packages and layers
 

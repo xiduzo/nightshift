@@ -22,7 +22,8 @@
 				"monochromeImage": "./assets/images/android-icon-monochrome.png"
 			},
 			"predictiveBackGestureEnabled": false,
-			"package": "dev.nightshift.mobile"
+			"package": "dev.nightshift.mobile",
+			"permissions": ["android.permission.POST_NOTIFICATIONS"]
 		},
 		"web": {
 			"bundler": "metro",
@@ -63,6 +64,35 @@
 					"dark": {
 						"backgroundColor": "#0a0a0a"
 					}
+				}
+			],
+			[
+				"expo-widgets",
+				{
+					"bundleIdentifier": "dev.nightshift.mobile.widgets",
+					"groupIdentifier": "group.dev.nightshift.mobile",
+					"enableAndroid": true,
+					"enablePushNotifications": false,
+					"widgets": [
+						{
+							"name": "NightShiftGlance",
+							"displayName": "Night Shift",
+							"description": "See how many Gates wait for you and how your latest runs are doing.",
+							"ios": {
+								"supportedFamilies": [
+									"systemSmall",
+									"systemMedium",
+									"accessoryRectangular",
+									"accessoryInline"
+								]
+							},
+							"android": {
+								"targetCellWidth": 3,
+								"targetCellHeight": 2,
+								"resizeMode": "both"
+							}
+						}
+					]
 				}
 			]
 		],

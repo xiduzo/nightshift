@@ -4,13 +4,16 @@ import {
 	createProjectQueries,
 	createRunQueries,
 	currentStep,
+	flowLabel,
 	hasEnded,
 	markdownPreview,
 	mergeSteps,
+	nodeLabels,
 	type OpenGate,
 	type RunDetail,
 	type RunStatus,
 	type StepSummary,
+	stepName,
 	stepState,
 	whenLabel,
 } from "@nightshift/client";
@@ -30,11 +33,12 @@ import { type Href, Redirect, router, Stack } from "expo-router";
 import { Fragment, useCallback } from "react";
 import { View } from "react-native";
 
+import { FollowOnLockScreen } from "@/features/glance";
 import { useHost, useHostQueries } from "@/features/host";
 import { ErrorAlert } from "@/shared/feedback";
 import { Screen } from "@/shared/page";
 import { RunActions } from "./run-actions";
-import { flowLabel, titleDetail } from "./run-row";
+import { titleDetail } from "./run-row";
 import { RunStatusBadge, StepStateBadge } from "./status-badge";
 import { type LiveRun, useLiveRun } from "./use-live-run";
 
@@ -144,6 +148,7 @@ function RunBody({
 					) : null}
 				</CardHeader>
 				<RunActions runId={run.id} status={status} />
+				<FollowOnLockScreen runId={run.id} ended={hasEnded(status)} />
 			</Card>
 
 			{gates.length > 0 ? <GatesCard gates={gates} /> : null}
@@ -181,21 +186,6 @@ function RunBody({
 function startedLabel(at: number): string {
 	const when = whenLabel(at);
 	return `Started ${when.charAt(0).toLowerCase()}${when.slice(1)}`;
-}
-
-/** The name of each node, by id: its label, else its id. The run's own flow wins over the flows it calls. */
-function nodeLabels(run: RunDetail): Map<string, string> {
-	const labels = new Map<string, string>();
-	for (const flow of [...Object.values(run.calledFlows), run.flow]) {
-		for (const node of flow.nodes) labels.set(node.id, node.label || node.id);
-	}
-	return labels;
-}
-
-/** A step by its node's name, with the visit when the run came back to it. */
-function stepName(step: StepSummary, labels: Map<string, string>): string {
-	const name = labels.get(step.nodeId) ?? step.nodeId;
-	return step.visit > 1 ? `${name} (visit ${step.visit})` : name;
 }
 
 /** The inbox's answer sheet of one Gate. */

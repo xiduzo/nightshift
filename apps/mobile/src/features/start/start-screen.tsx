@@ -20,12 +20,16 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@nightshift/ui-native/components/ui/card";
+import { Label } from "@nightshift/ui-native/components/ui/label";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
+import { Switch } from "@nightshift/ui-native/components/ui/switch";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderGit2 } from "lucide-react-native";
 import { useCallback, useState } from "react";
+import { View } from "react-native";
 
+import { canFollowOnLockScreen, useFollowAfterStart } from "@/features/glance";
 import { useHostQueries } from "@/features/host";
 import { openRun } from "@/features/runs";
 import { EmptyState } from "@/shared/empty";
@@ -259,6 +263,8 @@ function InputsAndStart({
 	const queryClient = useQueryClient();
 	const [values, setValues] = useState<InputTexts>({});
 	const [chosenDevice, setChosenDevice] = useState<string | null>(null);
+	const [followOnLockScreen, setFollowOnLockScreen] = useState(false);
+	const followAfterStart = useFollowAfterStart();
 	const placements = useQuery(runQueries.placements(projectId));
 	const devices = useQuery(runQueries.devices(projectId));
 
@@ -273,6 +279,7 @@ function InputsAndStart({
 		runMutations.start({
 			onSuccess: (run) => {
 				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
+				if (followOnLockScreen) void followAfterStart(run.id);
 				openRun(run.id);
 			},
 		}),
@@ -350,6 +357,22 @@ function InputsAndStart({
 					message={start.error.message}
 					fix="Check the inputs and the device, then start it again."
 				/>
+			) : null}
+
+			{canFollowOnLockScreen ? (
+				<View className="flex-row items-center justify-between gap-3">
+					<Label
+						nativeID="follow-on-lock-screen"
+						onPress={() => setFollowOnLockScreen((on) => !on)}
+					>
+						Follow on the lock screen
+					</Label>
+					<Switch
+						checked={followOnLockScreen}
+						onCheckedChange={setFollowOnLockScreen}
+						aria-labelledby="follow-on-lock-screen"
+					/>
+				</View>
 			) : null}
 
 			{blocker ? (

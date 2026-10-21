@@ -3,8 +3,9 @@
  * share. The typed client of a Night Shift, the query and mutation options
  * of each vertical (with their polling rules), the stream of one run, the
  * view types derived from the API, the stream of the person's
- * notifications, and the notify rules. No DOM, no React
- * Native, no Node or Bun: `platform-free.test.ts` checks it.
+ * notifications, the notify rules, and the glances (the widget and the
+ * run on the lock screen). No DOM, no React Native, no Node or Bun:
+ * `platform-free.test.ts` checks it.
  */
 
 export {
@@ -74,6 +75,15 @@ export {
 	waitingForYou,
 } from "./gates";
 export {
+	type GlanceSnapshot,
+	type GlanceTone,
+	glanceSnapshot,
+	type RunProgress,
+	runProgress,
+	sameProgress,
+	waitingText,
+} from "./glance";
+export {
 	applySettingsPatch,
 	compareGates,
 	compareRuns,
@@ -114,6 +124,7 @@ export {
 	type DecisionEvent,
 	defaultPlacement,
 	type FollowRunOptions,
+	flowLabel,
 	followRun,
 	type GateEvent,
 	groupRuns,
@@ -123,6 +134,7 @@ export {
 	type ItemSummary,
 	markdownPreview,
 	mergeSteps,
+	nodeLabels,
 	type PlacementChoice,
 	placementChoices,
 	type RunDetail,
@@ -134,6 +146,7 @@ export {
 	type RunTrigger,
 	type RunWatchClient,
 	retryDelay,
+	runStatusLabel,
 	type SessionSummary,
 	type StartRunInput,
 	type StepEvent,
@@ -141,6 +154,8 @@ export {
 	type StepScope,
 	type StepState,
 	type StepSummary,
+	stepName,
+	stepPosition,
 	stepState,
 	type ToolNodeEvent,
 	type TranscriptEntry,
