@@ -57,10 +57,7 @@ const LAYERS: Record<string, Rule> = {
 	"@nightshift/daemon": { layer: 5, mayImport: "lower" },
 	// 6. Apps
 	server: { layer: 6, mayImport: "lower" },
-	desktop: {
-		layer: 6,
-		mayImport: ["@nightshift/daemon", "@nightshift/db"],
-	},
+	desktop: { layer: 6, mayImport: ["@nightshift/daemon"] },
 	web: {
 		layer: 6,
 		mayImport: ["@nightshift/api", "@nightshift/flows", "@nightshift/ui"],
@@ -70,8 +67,9 @@ const LAYERS: Record<string, Rule> = {
 const APPS = new Set(["server", "desktop", "web"]);
 
 /**
- * Known deviations, each with the phase that removes it. The check fails
- * when an exception is no longer needed, so it cannot outlive its fix.
+ * Known deviations, each with the change that removes it, and each listed
+ * in section 8 of STRUCTURE.md. None today. The check fails when an
+ * exception is no longer needed, so it cannot outlive its fix.
  */
 const EXCEPTIONS: { from: string; to: string; why: string }[] = [];
 
