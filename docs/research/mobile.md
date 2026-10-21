@@ -248,7 +248,9 @@ and what the phone app must do with it.
 `notifications.targets.register({ kind: "expo", name, platform, endpoint: <ExpoPushToken[...]> })`
 on every start. The Host upserts by token. After Expo reports
 `DeviceNotRegistered` the Host forgets the token, and the next start
-registers it again.
+registers it again. Expo gives a push token only with the EAS project id
+(`expo.extra.eas.projectId` in `apps/mobile/app.json`, written by
+`eas init`). Without it the app works, but the phone does not register.
 
 **Every push** has a `title` (one sentence, for example "A Gate waits for
 you") and no `body`. `threadId`, `collapseId` and the Android `tag` are the
@@ -295,7 +297,9 @@ listener. It finds the shown notification whose `data.key` is the key
 (`getPresentedNotificationsAsync`) and dismisses it
 (`dismissNotificationAsync`). iOS delivers background pushes on a
 best-effort basis, so the app also dismisses, when it opens, every Gate
-notification that `gates.list` no longer has.
+notification that `gates.list` no longer has. The iOS simulator
+(`xcrun simctl push`) does not hand a push without an alert to the app,
+so test the background withdraw on a phone.
 
 ### The dashboard summary moves to the server
 
