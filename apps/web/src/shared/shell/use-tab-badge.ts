@@ -10,7 +10,8 @@ const ICON_WAITING = "/favicon-waiting.svg";
 /**
  * Marks the browser tab while Gates wait for you: the count goes in front of
  * the title ("(2) Night Shift") and the icon gets a dot. It reads the open
- * Gates the inbox polls, so it shares their cache. It marks the tab again after
+ * Gates of the inbox, so it shares their cache: the notifications stream
+ * reads them again when a Gate opens or closes. It marks the tab again after
  * each page change, in case the page set its own title. Mount it once.
  */
 export function useTabBadge() {

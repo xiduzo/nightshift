@@ -1,11 +1,13 @@
 import type { ApiQueryUtils } from "../api";
 
-/** How often a project's runs poll while one of them is on its way. */
-const ACTIVE_POLL_MS = 5000;
+/**
+ * How often a project's runs poll while one of them is on its way. The
+ * notifications stream invalidates the runs when a Gate opens or closes
+ * and when a run ends: this catches the rest (a run that sleeps or stops).
+ */
+const ACTIVE_POLL_MS = 15_000;
 /** How often the inbox looks for sleeping runs and when they wake. */
 const INBOX_POLL_MS = 15_000;
-/** How often the notifications read the runs for a change of status. */
-const NOTIFY_POLL_MS = 10_000;
 
 /** The query options of runs, and how often each run list polls. */
 export function createRunQueries(orpc: ApiQueryUtils) {
@@ -18,8 +20,9 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		ofProject: (projectId: string) =>
 			orpc.runs.list.queryOptions({ input: { projectId } }),
 		/**
-		 * One project's runs. Polls while a run is on its way, so one that reaches
-		 * a Gate shows as waiting. A failed background poll keeps the list.
+		 * One project's runs. Polls while a run is on its way, so one that
+		 * sleeps or stops shows it. A Gate and a run's end come through the
+		 * notifications stream. A failed background poll keeps the list.
 		 */
 		ofProjectLive: (projectId: string) => ({
 			...orpc.runs.list.queryOptions({ input: { projectId } }),
@@ -40,16 +43,6 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		everyRunForInbox: () => ({
 			...orpc.runs.list.queryOptions({ input: {} }),
 			refetchInterval: INBOX_POLL_MS,
-			meta: { quietErrors: true },
-		}),
-		/**
-		 * The runs of every project for the notifications. Polls, also while the
-		 * app is in the background; a failed poll does not toast.
-		 */
-		everyRunForNotifications: () => ({
-			...orpc.runs.list.queryOptions({ input: {} }),
-			refetchInterval: NOTIFY_POLL_MS,
-			refetchIntervalInBackground: true,
 			meta: { quietErrors: true },
 		}),
 		/** One run with its steps. */

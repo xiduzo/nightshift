@@ -9,10 +9,10 @@ import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlertIcon } from "lucide-react";
+import { NotificationSettingsCard } from "@/features/notifications";
 import { PageHeading, SiteHeader } from "@/shared/page";
 import { AgentDefaultsCard } from "./components/agent-defaults-card";
 import { AppearanceCard } from "./components/appearance-card";
-import { NotificationsCard } from "./components/notifications-card";
 import { ProjectsCard } from "./components/projects-card";
 import { RunPolicyCard } from "./components/run-policy-card";
 import { RunsCard } from "./components/runs-card";
@@ -30,7 +30,7 @@ export function SettingsPage() {
 				<div className="mx-auto w-full max-w-4xl">
 					<PageHeading
 						title="Settings"
-						description="How Night Shift runs your flows, what a new Agent node starts with, and when this Mac tells you."
+						description="How Night Shift runs your flows, what a new Agent node starts with, and when Night Shift tells you."
 					/>
 				</div>
 
@@ -41,7 +41,6 @@ export function SettingsPage() {
 							<RunsCard data={settings.data} />
 							<RunPolicyCard data={settings.data} />
 							<AgentDefaultsCard data={settings.data} />
-							<NotificationsCard data={settings.data} />
 						</>
 					) : settings.error ? (
 						<Alert variant="destructive">
@@ -69,6 +68,7 @@ export function SettingsPage() {
 							<Skeleton className="h-72 w-full rounded-xl" />
 						</>
 					)}
+					<NotificationSettingsCard />
 					<AppearanceCard />
 					<ThisComputerLink name={settings.data?.daemon.device.name} />
 				</div>

@@ -1,9 +1,13 @@
 import type { ApiQueryUtils } from "../api";
 
-/** How often the inbox and its badge look for new open Gates. */
-const POLL_MS = 5000;
+/**
+ * How often the inbox and its badge read the open Gates again. The app
+ * follows `notifications.watch` (`followNotifications`) and reads them again
+ * on each item: this is only the fallback while that stream is down.
+ */
+const FALLBACK_POLL_MS = 60_000;
 
-/** The query options of Gates, and how often the inbox polls. */
+/** The query options of Gates, and how often the inbox reads them again. */
 export function createGateQueries(orpc: ApiQueryUtils) {
 	return {
 		/** Every gates query. Invalidate it after a Gate is answered. */
@@ -11,14 +15,15 @@ export function createGateQueries(orpc: ApiQueryUtils) {
 		/**
 		 * The open Gates of every Space the person is in, oldest first, each
 		 * with its Space and whether they may answer it: the Needs-you inbox.
-		 * It does not change with the active Space. Polls,
-		 * also while the app is in the background, so the badge and the
-		 * notifications stay current. Refetches when the window gets focus. A
-		 * failed poll does not toast; the inbox shows the error itself.
+		 * It does not change with the active Space. The notifications stream
+		 * invalidates it; it also reads again once a minute, also while the app
+		 * is in the background, for when the stream is down. Refetches when the
+		 * window gets focus. A failed read does not toast; the inbox shows the
+		 * error itself.
 		 */
 		open: () => ({
 			...orpc.gates.list.queryOptions(),
-			refetchInterval: POLL_MS,
+			refetchInterval: FALLBACK_POLL_MS,
 			refetchIntervalInBackground: true,
 			refetchOnWindowFocus: "always" as const,
 			meta: { quietErrors: true },
