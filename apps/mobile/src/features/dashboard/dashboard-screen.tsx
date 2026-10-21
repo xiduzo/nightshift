@@ -36,7 +36,7 @@ export function DashboardScreen() {
 	const gates = useHostQueries(createGateQueries);
 	const devices = useHostQueries(createDeviceQueries);
 
-	const summary = useQuery(dashboard.summary({ everySpace: true }, "minute"));
+	const summary = useQuery(dashboard.summary({ everySpace: true }));
 	const open = useQuery(gates.open());
 	const computers = useQuery(devices.overview());
 	const refresh = useScreenRefresh([

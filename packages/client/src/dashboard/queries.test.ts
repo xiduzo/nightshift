@@ -8,14 +8,6 @@ const orpc = createQueryUtils(
 );
 const dashboard = createDashboardQueries(orpc);
 
-/** The polling rule of a query, on this data. */
-function intervalOn(
-	options: ReturnType<typeof dashboard.summary>,
-	data: { open: { count: number } } | undefined,
-) {
-	return options.refetchInterval({ state: { data } });
-}
-
 describe("the dashboard query", () => {
 	test("asks for the numbers on this screen's clock", () => {
 		const options = dashboard.summary({ projectId: "p1" });
@@ -27,20 +19,12 @@ describe("the dashboard query", () => {
 		expect(readerTimeZone()).toBeString();
 	});
 
-	test("polls every 5 seconds while a run is open, else once a minute", () => {
-		const options = dashboard.summary();
-		expect(intervalOn(options, { open: { count: 2 } })).toBe(5000);
-		expect(intervalOn(options, { open: { count: 0 } })).toBe(60_000);
-		expect(intervalOn(options, undefined)).toBe(60_000);
-	});
-
-	test("polls once a minute at the minute pace, also while a run is open", () => {
-		const options = dashboard.summary({ everySpace: true }, "minute");
-		expect(intervalOn(options, { open: { count: 2 } })).toBe(60_000);
-		expect(intervalOn(options, undefined)).toBe(60_000);
-		expect(options.queryKey).toEqual(
-			dashboard.summary({ everySpace: true }).queryKey,
+	test("polls once a minute, also while a run is open", () => {
+		expect(dashboard.summary().refetchInterval).toBe(60_000);
+		expect(dashboard.summary({ everySpace: true }).refetchInterval).toBe(
+			60_000,
 		);
+		expect(dashboard.flow("p1", "night").refetchInterval).toBe(60_000);
 	});
 
 	test("keeps the keys of its procedures", () => {
