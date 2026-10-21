@@ -102,7 +102,7 @@ export function AgentsPage({
 	const connections = tools.data?.connections ?? [];
 	const secrets = tools.data?.secrets ?? [];
 	const missingSecrets = secrets.filter(
-		(s) => !s.saved && !s.inEnv && s.usedBy.length > 0,
+		(s) => !s.saved && !s.inEnv && (s.usedBy.length > 0 || s.flows.length > 0),
 	).length;
 
 	// Nothing chosen: the first profile, else the empty state.

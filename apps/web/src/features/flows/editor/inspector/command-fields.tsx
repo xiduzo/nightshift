@@ -1,4 +1,4 @@
-/** The fields of a Command node: the command, its output and its exit codes. */
+/** The fields of a Command node: the command, its output, its secrets and its exit codes. */
 import {
 	type CommandNode,
 	commandExits,
@@ -7,6 +7,7 @@ import {
 	uniqueOptionName,
 	withOptions,
 } from "@nightshift/flows";
+import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	DropdownMenu,
@@ -22,9 +23,12 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from "@nightshift/ui/components/toggle-group";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { useId } from "react";
+import { connectionQueries } from "@/features/agents";
 import { Field, InspectorSection, Note } from "../fields";
+import { SecretsField } from "../secrets-field";
 import { NodeOptionsField } from "./node-options-field";
 
 /** What a Command node keeps of its output, in the order the toggle shows them. */
@@ -45,6 +49,9 @@ export function CommandFields({
 	onRemoveOutcome: (index: number) => void;
 }) {
 	const id = useId();
+	// The secrets of this computer, to pick from.
+	const secrets = useQuery(connectionQueries.list()).data?.secrets;
+	const named = node.secrets ?? [];
 	const exits = commandExits(node);
 	const catchAll = exits.findIndex((exit) => exit.code === undefined);
 	const unusedCode = () => {
@@ -131,6 +138,29 @@ export function CommandFields({
 						))}
 					</ToggleGroup>
 				</Field>
+			</InspectorSection>
+
+			<InspectorSection
+				title="Secrets"
+				defaultOpen={named.length > 0}
+				aside={
+					named.length > 0 ? (
+						<Badge variant="secondary" className="tabular-nums">
+							{named.length}
+						</Badge>
+					) : null
+				}
+			>
+				<SecretsField
+					id={`${id}-secrets`}
+					names={named}
+					secrets={secrets}
+					onChange={(names) =>
+						onChange(({ secrets: _, ...rest }) =>
+							names.length > 0 ? { ...rest, secrets: names } : rest,
+						)
+					}
+				/>
 			</InspectorSection>
 
 			<NodeOptionsField

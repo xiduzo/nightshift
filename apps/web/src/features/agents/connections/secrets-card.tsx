@@ -98,6 +98,19 @@ function WhereBadges({ secret }: { secret: SecretView }) {
 	);
 }
 
+/** The flows whose Command nodes name the secret, each once. */
+function flowNamesOf(secret: SecretView): string[] {
+	return [...new Set(secret.flows.map((flow) => flow.flowName))];
+}
+
+/** What uses the secret: its tools, then its flows. */
+function usersOf(secret: SecretView): string[] {
+	return [
+		...secret.usedBy,
+		...flowNamesOf(secret).map((name) => `${name} (flow)`),
+	];
+}
+
 const column = dataTableColumns<SecretView>();
 
 function secretColumns({
@@ -122,8 +135,10 @@ function secretColumns({
 		}),
 		column.accessor("usedBy", {
 			header: "Used by",
-			cell: ({ row }) =>
-				row.original.usedBy.length > 0 ? row.original.usedBy.join(", ") : "—",
+			cell: ({ row }) => {
+				const users = usersOf(row.original);
+				return users.length > 0 ? users.join(", ") : "—";
+			},
 			meta: { cellClassName: "font-mono text-muted-foreground" },
 		}),
 		column.display({
@@ -167,7 +182,7 @@ function secretColumns({
 	]);
 }
 
-/** The `${NAME}` values connections read: saved in the keychain, or from the environment. */
+/** The `${NAME}` values connections and Command nodes read: saved in the keychain, or from the environment. */
 export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 	/** The secret being set; "" adds a new one. */
 	const [setting, setSetting] = useState<string | null>(null);
@@ -178,7 +193,7 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 			title="Secrets"
 			description={
 				<>
-					Tokens and passwords your tools use, written as{" "}
+					Tokens and passwords your tools and commands use, written as{" "}
 					<span className="font-mono">${"{NAME}"}</span>. Night Shift keeps them
 					in your macOS keychain and never shows them again.
 				</>
@@ -414,6 +429,23 @@ function RemoveSecretDialog({
 		}),
 	);
 	const usedBy = secret?.usedBy ?? [];
+	const flows = secret ? flowNamesOf(secret) : [];
+	const users = secret ? usersOf(secret) : [];
+	const consequence =
+		users.length === 0
+			? "Nothing uses it."
+			: secret?.inEnv
+				? `${users.join(", ")} will use the value that is set outside Night Shift instead.`
+				: [
+						usedBy.length > 0
+							? `${usedBy.join(", ")} will have no value for it. Agent nodes that use ${usedBy.length === 1 ? "that tool" : "those tools"} cannot run until you set it again.`
+							: null,
+						flows.length > 0
+							? `Flows that use it (${flows.join(", ")}) stop before the command runs until you set it again.`
+							: null,
+					]
+						.filter(Boolean)
+						.join(" ");
 
 	return (
 		<AlertDialog open={name !== null} onOpenChange={onOpenChange}>
@@ -422,13 +454,7 @@ function RemoveSecretDialog({
 					<AlertDialogTitle>
 						Remove <span className="font-mono">{name}</span> from the keychain?
 					</AlertDialogTitle>
-					<AlertDialogDescription>
-						{usedBy.length === 0
-							? "No tool uses it."
-							: secret?.inEnv
-								? `${usedBy.join(", ")} will use the value that is set outside Night Shift instead.`
-								: `${usedBy.join(", ")} will have no value for it. Agent nodes that use ${usedBy.length === 1 ? "that tool" : "those tools"} cannot run until you set it again.`}
-					</AlertDialogDescription>
+					<AlertDialogDescription>{consequence}</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>
 					<AlertDialogCancel>Cancel</AlertDialogCancel>
