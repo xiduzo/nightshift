@@ -146,6 +146,7 @@ const sessionFields = {
 	prompt: z.string(),
 	resumeSessionId: z.string().optional(),
 	stepReport: stepReportSchema.optional(),
+	artifacts: z.object({ runId: z.string(), stepId: z.string() }).optional(),
 };
 
 /** A session the Walker resolved: its harness, model, tools and MCP servers. */

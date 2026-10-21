@@ -7,6 +7,7 @@ import type {
 	Schedule,
 	ScheduleIssue,
 } from "@nightshift/flows";
+import type { Artifact } from "../artifacts";
 import type { FlowUse } from "../flows";
 import type { Branches, Project } from "../projects";
 import type { OpenGate, RunDetail, RunStreamItem, RunSummary } from "../read";
@@ -169,6 +170,16 @@ export interface SpaceEngine {
 
 	listRuns(input?: { projectId?: string }): Promise<RunSummary[]>;
 	getRun(runId: string): Promise<RunDetail>;
+	/**
+	 * The files the run's agents kept for the person, oldest first. Only
+	 * the ones kept on this computer.
+	 */
+	listArtifacts(runId: string): Promise<Artifact[]>;
+	/** One artifact of the run and where its file is, or null when there is none of that id. */
+	artifactFile(
+		runId: string,
+		artifactId: string,
+	): Promise<{ artifact: Artifact; path: string } | null>;
 
 	/**
 	 * Validates the flow (refuses one with errors), snapshots it, creates the

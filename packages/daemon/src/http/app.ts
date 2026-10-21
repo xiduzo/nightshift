@@ -10,6 +10,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { leaseHealth, readHeartbeat } from "../runtime";
 import type { Sync } from "../sync";
+import { artifactFileResponse } from "./artifact-file";
 import { type HttpServices, requestContexts } from "./context";
 import { desktopOrigins } from "./origins";
 import { runExportResponse } from "./run-export";
@@ -21,7 +22,7 @@ export const SYNC_PATH = "/sync";
 
 /**
  * What Bun serves: the Hono app (the health check, Better Auth, the run
- * export, the procedures), and the sync WebSocket beside it. Bun upgrades
+ * export, run artifacts, the procedures), and the sync WebSocket beside it. Bun upgrades
  * the socket itself, so the sync path never reaches Hono.
  */
 export function createHttp(
@@ -111,6 +112,27 @@ export function createHttp(
 			);
 		}
 		return runExportResponse({ db, connections }, c.req.param("id"), spaceId);
+	});
+
+	// A file, not an oRPC call: one artifact of a run of the session's Space,
+	// for an <img>, a <video> or a download.
+	app.get("/api/runs/:id/artifacts/:artifactId", async (c) => {
+		const { session, spaceId, hostAccess } = await access(c);
+		if (!session || !spaceId) {
+			return c.json({ message: "Sign in to use Night Shift." }, 401);
+		}
+		if (!hostAccess.allowed) {
+			return c.json(
+				{ code: hostAccess.code, message: hostAccess.message },
+				403,
+			);
+		}
+		return artifactFileResponse(
+			services.engine.space(spaceId, { personId: session.user.id }),
+			c.req.raw,
+			c.req.param("id"),
+			c.req.param("artifactId"),
+		);
 	});
 
 	const apiHandler = new OpenAPIHandler(appRouter, {

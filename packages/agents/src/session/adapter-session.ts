@@ -31,6 +31,7 @@ import {
 } from "@tanstack/ai-sandbox";
 import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
 import type { AgentEvent, AgentSessionInput, McpServerConfig } from "../port";
+import { ARTIFACT_INSTRUCTION, saveArtifactTool } from "./artifact-tool";
 import { streamSession } from "./session-stream";
 import { reportStepTool, stepReportSetup } from "./step-report";
 import { withSharedToolBridge } from "./tool-bridge";
@@ -85,9 +86,12 @@ export type HarnessSpec = {
 /** What the step report adds to one session: the prompt, the tool, the allow rule. */
 export type SessionReport = {
 	prompt: string;
-	/** `report_step`, bridged into the session over MCP, when the report uses it. */
+	/**
+	 * `report_step` when the report uses it, and `save_artifact` when the
+	 * session keeps artifacts: bridged into the session over MCP.
+	 */
 	tools: SessionTool[];
-	/** Claude Code's `--allowedTools`, with the report tool added. */
+	/** Claude Code's `--allowedTools`, with Night Shift's own tools added. */
 	allowedTools: string[] | undefined;
 };
 
@@ -113,7 +117,10 @@ export type AdapterSetup = {
  * adapter can compute its own allow rules from the same report.
  */
 export function sessionReport(
-	input: Pick<AgentSessionInput, "prompt" | "stepReport" | "permissionMode">,
+	input: Pick<
+		AgentSessionInput,
+		"prompt" | "stepReport" | "permissionMode" | "saveArtifact"
+	>,
 	spec: Pick<HarnessSpec, "report" | "profile">,
 	allowedTools?: string[],
 ): SessionReport {
@@ -128,10 +135,23 @@ export function sessionReport(
 		allowedTools,
 		spec.profile.reportToolId,
 	);
+	const tools: SessionTool[] = report.withTool
+		? [reportStepTool(input.stepReport)]
+		: [];
+	// The artifact tool rides the same bridge: only where tools run.
+	if (!input.saveArtifact || permissionMode === "plan") {
+		return { prompt: report.prompt, tools, allowedTools: report.allowedTools };
+	}
+	const artifactId = spec.profile.artifactToolId;
 	return {
-		prompt: report.prompt,
-		tools: report.withTool ? [reportStepTool(input.stepReport)] : [],
-		allowedTools: report.allowedTools,
+		prompt: `${report.prompt}\n\n${ARTIFACT_INSTRUCTION}`,
+		tools: [...tools, saveArtifactTool(input.saveArtifact)],
+		allowedTools:
+			artifactId && report.allowedTools
+				? [...new Set([...report.allowedTools, artifactId])]
+				: artifactId
+					? [artifactId]
+					: report.allowedTools,
 	};
 }
 

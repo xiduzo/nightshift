@@ -1,6 +1,7 @@
 import { harnessNoun } from "@nightshift/agents/harness-facts";
 import type {
 	AgentHarness,
+	AgentSessionInput,
 	Decider,
 	DeciderName,
 	DecisionInput,
@@ -19,6 +20,7 @@ import {
 } from "@nightshift/flows";
 import { readFlowSources } from "@nightshift/flows/files";
 
+import type { ArtifactStore } from "../artifacts";
 import {
 	type CliToolGuide,
 	cliToolsInstruction,
@@ -109,6 +111,8 @@ export type LocalDeviceDeps = {
 	git?: Git;
 	/** An Agent Profile defined on this computer, by name, or null. */
 	profileFor?: (name: string) => AgentProfileSettings | null;
+	/** Where a session keeps its artifacts. Without it, sessions keep none. */
+	artifacts?: Pick<ArtifactStore, "save">;
 };
 
 /** What `decide` answers on a Device without a decider (or one that makes no values). */
@@ -130,6 +134,18 @@ function missingSecretsMessage(missing: readonly string[]): string {
 			? ["secret", "it is", "it"]
 			: ["secrets", "they are", "them"];
 	return `The command needs the ${noun} ${missing.join(", ")}, but ${isNot} not saved. Save ${it} under Agents → Secrets, or remove ${it} from the node.`;
+}
+
+/** The session's `saveArtifact`: copies the file and tells the agent it is kept. */
+function keepArtifact(
+	store: Pick<ArtifactStore, "save">,
+	step: { runId: string; stepId: string },
+	cwd: string,
+): NonNullable<AgentSessionInput["saveArtifact"]> {
+	return async (file) => {
+		const artifact = await store.save({ ...step, cwd, ...file });
+		return `Kept "${artifact.title}" as an artifact of this run.`;
+	};
 }
 
 /** This computer as a Device. */
@@ -203,7 +219,14 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			};
 			return;
 		}
-		const { harness: name, connections, mcpServers, clis, ...rest } = input;
+		const {
+			harness: name,
+			connections,
+			mcpServers,
+			clis,
+			artifacts,
+			...rest
+		} = input;
 		const harness = harnessFor(name);
 		if (!harness) {
 			yield {
@@ -239,6 +262,9 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			...(clis && clis.length > 0 ? { clis } : {}),
 			...(Object.keys(mcp.servers).length > 0
 				? { mcpServers: mcp.servers }
+				: {}),
+			...(artifacts && deps.artifacts
+				? { saveArtifact: keepArtifact(deps.artifacts, artifacts, rest.cwd) }
 				: {}),
 		});
 	}

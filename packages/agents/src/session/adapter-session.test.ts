@@ -153,6 +153,79 @@ describe("sessionReport", () => {
 	});
 });
 
+describe("sessionReport: artifacts", () => {
+	const ARTIFACT_TOOL_ID = "mcp__fake__save_artifact";
+	const byMode = spec({
+		profile: {
+			label: "Fake",
+			sessionEvent: SESSION_EVENT,
+			createObserver: () => (signals: SdkSignals) => signals,
+			reportToolId: REPORT_TOOL_ID,
+			artifactToolId: ARTIFACT_TOOL_ID,
+		},
+	});
+	const saveArtifact = async () => "kept";
+
+	test("a session that keeps artifacts gets the tool, its instruction and its allow rule", () => {
+		const report = sessionReport(
+			input({ stepReport: true, saveArtifact }),
+			byMode,
+			["Read"],
+		);
+		expect(report.tools.map((t) => t.name)).toEqual([
+			"report_step",
+			"save_artifact",
+		]);
+		expect(report.allowedTools).toEqual([
+			"Read",
+			REPORT_TOOL_ID,
+			ARTIFACT_TOOL_ID,
+		]);
+		expect(report.prompt).toContain("`save_artifact`");
+	});
+
+	test("without a step report, the tool still comes", () => {
+		const report = sessionReport(input({ saveArtifact }), byMode);
+		expect(report.tools.map((t) => t.name)).toEqual(["save_artifact"]);
+		expect(report.allowedTools).toEqual([ARTIFACT_TOOL_ID]);
+	});
+
+	test("plan mode and a text harness run no tools: no artifact tool", () => {
+		const plan = sessionReport(
+			input({ saveArtifact, permissionMode: "plan" }),
+			byMode,
+		);
+		expect(plan.tools).toEqual([]);
+		expect(plan.prompt).toBe("Do the thing");
+		const text = sessionReport(
+			input({ saveArtifact }),
+			spec({ report: "text" }),
+		);
+		expect(text.tools).toEqual([]);
+	});
+
+	test("the tool hands the path and title to saveArtifact", async () => {
+		const kept: unknown[] = [];
+		const report = sessionReport(
+			input({
+				saveArtifact: async (file) => {
+					kept.push(file);
+					return "Kept.";
+				},
+			}),
+			spec({ report: "tool" }),
+		);
+		const tool = report.tools[0] as unknown as {
+			execute: (args: unknown) => Promise<unknown>;
+		};
+		expect(await tool.execute({ path: "shot.png", title: " Login " })).toBe(
+			"Kept.",
+		);
+		expect(kept).toEqual([{ path: "shot.png", title: "Login" }]);
+		await expect(tool.execute({ path: "" })).rejects.toThrow("path");
+	});
+});
+
 describe("harnessSession", () => {
 	test("one sandbox in cwd, the session id, the text, the cleanup", async () => {
 		const seen: Seen[] = [];

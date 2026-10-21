@@ -16,6 +16,12 @@ import {
 } from "@nightshift/ui/components/resizable";
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@nightshift/ui/components/tabs";
 import { cn } from "@nightshift/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -42,11 +48,12 @@ import { runQueries } from "../queries";
 import { StepTranscript } from "../transcript/step-transcript";
 import { emptyTranscript } from "../transcript/transcript";
 import { RunDetails } from "./details/run-details";
+import { RunArtifacts } from "./run-artifacts";
 import { FocusBreadcrumb, FocusChip, StepContext } from "./run-focus";
 import { RunGraph } from "./run-graph";
 import { RunActions, RunTitle } from "./run-header";
 import { RunStatusPanel } from "./run-status-panel";
-import { RunVariables } from "./run-variables";
+import { RunVariables, variableCount } from "./run-variables";
 import { RunWarnings } from "./run-warnings";
 import { StepRowMenu } from "./step-actions";
 import { CONSOLE_BAR_PX, StepConsole } from "./step-console";
@@ -54,6 +61,9 @@ import { StepSummary as StepSummaryView } from "./step-summary";
 import { StepTimeline } from "./step-timeline";
 
 const DESKTOP = "(min-width: 1024px)";
+
+/** The tabs of the run's card. */
+type RunTab = "steps" | "variables" | "artifacts";
 /** A run in one of these runs again from a step. */
 const RERUNNABLE: RunStatus[] = [
 	"failed",
@@ -88,6 +98,7 @@ export function RunPage({ runId }: { runId: string }) {
 	/** The call in focus (a Call step, or one of its elements): the steps and the graph narrow to it. */
 	const [focus, setFocus] = useState<ItemScope>(null);
 	const [consoleOpen, setConsoleOpen] = useState(false);
+	const [tab, setTab] = useState<RunTab>("steps");
 	const consolePanel = useRef<PanelHandle>(null);
 	/** The height the console last had open, to open it at again. */
 	const consoleSize = useRef<string>("45%");
@@ -96,6 +107,11 @@ export function RunPage({ runId }: { runId: string }) {
 		() => mergeSteps(run.data?.steps ?? [], stream.steps),
 		[run.data?.steps, stream.steps],
 	);
+	const liveStatus = stream.status ?? run.data?.status;
+	const artifacts = useQuery({
+		...runQueries.artifacts(runId, liveStatus === "running"),
+		enabled: run.data !== undefined,
+	});
 
 	if (run.isLoading) {
 		return (
@@ -160,6 +176,8 @@ export function RunPage({ runId }: { runId: string }) {
 		steps.find((step) => step.id === pickedStepId) ??
 		visible[visible.length - 1];
 	const lastStep = steps[steps.length - 1];
+	const variables = variableCount(runData, steps);
+	const artifactList = artifacts.data ?? [];
 	// A run that is not going runs again from a step, on the device that runs it.
 	const rerunnable = runData.walker.thisDevice && RERUNNABLE.includes(status);
 	const warnedStepIds = new Set(
@@ -243,67 +261,102 @@ export function RunPage({ runId }: { runId: string }) {
 		{ label: runData.title },
 	];
 
+	/** A tab's scroll area: the card's height on a desktop, a fixed height on a phone. */
+	const tabScroll = cn(
+		"min-h-0 flex-1",
+		!desktop && "max-h-96 [&>[data-slot=scroll-area-viewport]]:max-h-96",
+	);
+	const tabCount = (count: number) => (
+		<Badge variant="secondary" className="tabular-nums">
+			{count}
+		</Badge>
+	);
+
 	const stepsPane = (
-		<section
-			aria-labelledby="steps-heading"
-			className={cn("flex flex-col", desktop && "h-full")}
+		<Tabs
+			value={tab}
+			onValueChange={(next) => setTab(next as RunTab)}
+			aria-label="The run"
+			className={cn("gap-0", desktop && "h-full")}
 		>
 			<div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
-				<h2
-					id="steps-heading"
-					className="flex items-center gap-2 font-medium text-sm"
-				>
-					Steps
-					<Badge variant="secondary" className="tabular-nums">
-						{visible.length}
-					</Badge>
-				</h2>
-				{focus ? (
+				<TabsList variant="line" className="-mb-px">
+					<TabsTrigger value="steps">
+						Steps
+						{tabCount(visible.length)}
+					</TabsTrigger>
+					<TabsTrigger value="variables">
+						Variables
+						{variables > 0 ? tabCount(variables) : null}
+					</TabsTrigger>
+					<TabsTrigger value="artifacts">
+						Artifacts
+						{artifactList.length > 0 ? tabCount(artifactList.length) : null}
+					</TabsTrigger>
+				</TabsList>
+				{tab === "steps" && focus ? (
 					<FocusChip
 						steps={steps}
 						focus={focus}
 						onClear={() => selectItem(null)}
 					/>
 				) : null}
-				{pickedStepId ? (
+				{tab === "steps" && pickedStepId ? (
 					<Button
 						variant="ghost"
 						size="xs"
 						className="ml-auto"
 						title="Follow the latest step as the run goes on"
+						aria-label="Follow latest"
 						onClick={() => setPickedStepId(null)}
 					>
 						<ArrowDownToLineIcon data-icon="inline-start" />
-						Follow latest
+						<span className="hidden xl:inline">Follow latest</span>
 					</Button>
 				) : null}
 			</div>
-			<ScrollArea
-				className={cn(
-					"min-h-0 flex-1",
-					!desktop && "max-h-96 [&>[data-slot=scroll-area-viewport]]:max-h-96",
-				)}
-			>
-				<StepTimeline
-					steps={steps}
-					scope={focus}
-					runStatus={status}
-					selectedStepId={selectedStep?.id ?? null}
-					selectedItem={focus}
-					onSelect={setPickedStepId}
-					onSelectItem={selectItem}
-					calledName={(step) => calledFlowName(runData, steps, step)}
-					runsEach={(step) => stepRunsEach(runData, steps, step)}
-					outcomeColor={(step) => stepOutcomeColor(runData, steps, step)}
-					warnedStepIds={warnedStepIds}
-					stepAction={
-						rerunnable
-							? (step) => <StepRowMenu runId={runData.id} step={step} />
-							: undefined
-					}
-				/>
-			</ScrollArea>
-		</section>
+			<TabsContent value="steps" className="flex min-h-0 flex-1 flex-col">
+				<ScrollArea className={tabScroll}>
+					<StepTimeline
+						steps={steps}
+						scope={focus}
+						runStatus={status}
+						selectedStepId={selectedStep?.id ?? null}
+						selectedItem={focus}
+						onSelect={setPickedStepId}
+						onSelectItem={selectItem}
+						calledName={(step) => calledFlowName(runData, steps, step)}
+						runsEach={(step) => stepRunsEach(runData, steps, step)}
+						outcomeColor={(step) => stepOutcomeColor(runData, steps, step)}
+						warnedStepIds={warnedStepIds}
+						stepAction={
+							rerunnable
+								? (step) => <StepRowMenu runId={runData.id} step={step} />
+								: undefined
+						}
+					/>
+				</ScrollArea>
+			</TabsContent>
+			<TabsContent value="variables" className="flex min-h-0 flex-1 flex-col">
+				<ScrollArea className={tabScroll}>
+					<RunVariables
+						run={runData}
+						steps={steps}
+						onShowStep={setPickedStepId}
+					/>
+				</ScrollArea>
+			</TabsContent>
+			<TabsContent value="artifacts" className="flex min-h-0 flex-1 flex-col">
+				<ScrollArea className={tabScroll}>
+					<RunArtifacts
+						run={runData}
+						steps={steps}
+						artifacts={artifactList}
+						onShowStep={setPickedStepId}
+					/>
+				</ScrollArea>
+			</TabsContent>
+		</Tabs>
 	);
 
 	const flowPane = (
@@ -361,7 +414,6 @@ export function RunPage({ runId }: { runId: string }) {
 				lastStep={lastStep}
 			/>
 			<RunWarnings warnings={runData.warnings} onShowStep={setPickedStepId} />
-			<RunVariables run={runData} steps={steps} onShowStep={setPickedStepId} />
 		</section>
 	);
 

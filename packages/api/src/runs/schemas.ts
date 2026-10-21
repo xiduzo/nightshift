@@ -1,4 +1,5 @@
 import type {
+	Artifact,
 	OwnDevice,
 	Placement,
 	RunDetail,
@@ -394,4 +395,17 @@ export const placementSchema = exact<Placement>()(
 /** One of the Person's Devices, with whether it is online and has a Clone. */
 export const ownDeviceSchema = exact<OwnDevice>()(
 	placementSchema.extend({ online: z.boolean(), hasClone: z.boolean() }),
+);
+
+/** A file a run's agent kept for the person. */
+export const artifactSchema = exact<Artifact>()(
+	z.object({
+		id: z.string(),
+		stepId: z.string(),
+		name: z.string(),
+		title: z.string(),
+		mediaType: z.string(),
+		size: z.number(),
+		savedAt: z.number(),
+	}),
 );

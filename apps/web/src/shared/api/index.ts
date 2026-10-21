@@ -4,6 +4,7 @@ export { authClient } from "./auth-client";
 export type {
 	AgentErrorKind,
 	AgentUsage,
+	Artifact,
 	CheckTarget,
 	CliCheck,
 	CliTool,

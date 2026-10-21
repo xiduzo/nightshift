@@ -1,3 +1,4 @@
+import type { ArtifactStore } from "../artifacts";
 import type {
 	Actor,
 	PlacementPort,
@@ -51,6 +52,8 @@ export type SpacesDeps = {
 	flowFiles: FlowFiles;
 	scheduleFiles: ScheduleFiles;
 	reads: ReadModel;
+	/** The artifacts kept on this computer. */
+	artifacts: Pick<ArtifactStore, "list" | "file">;
 	recovery: Pick<Recovery, "resume" | "restartStep" | "rerunFrom">;
 	relay: RunRelay;
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
@@ -227,6 +230,18 @@ export function createSpaces(deps: SpacesDeps) {
 				await ready;
 				await getRunRow(runId, spaceId);
 				return (await deps.pathsFor(spaceId, actor))(await reads.getRun(runId));
+			},
+
+			async listArtifacts(runId) {
+				await ready;
+				await getRunRow(runId, spaceId);
+				return deps.artifacts.list(runId);
+			},
+
+			async artifactFile(runId, artifactId) {
+				await ready;
+				await getRunRow(runId, spaceId);
+				return deps.artifacts.file(runId, artifactId);
 			},
 
 			async startRun(input: StartRunInput) {

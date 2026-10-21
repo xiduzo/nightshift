@@ -4,6 +4,7 @@ import { z } from "zod";
 import { output, stream } from "../output";
 import { permitted, protectedProcedure } from "../procedures";
 import {
+	artifactSchema,
 	ownDeviceSchema,
 	placementSchema,
 	runDetailSchema,
@@ -50,6 +51,12 @@ export const runs = {
 		.output(output(runDetailSchema))
 		.input(z.object({ runId: z.string() }))
 		.handler(({ context, input }) => context.space.getRun(input.runId)),
+	/** The files the run's agents kept, oldest first. Fetch one at `GET /api/runs/:id/artifacts/:artifactId`. */
+	artifacts: protectedProcedure
+		.route({ summary: "Lists the files the agents of a run kept." })
+		.output(output(z.array(artifactSchema)))
+		.input(z.object({ runId: z.string() }))
+		.handler(({ context, input }) => context.space.listArtifacts(input.runId)),
 	/**
 	 * Starts a flow file by name, or a flow given inline (a quick run), on
 	 * one of the Person's Devices (`placements`; default this computer).

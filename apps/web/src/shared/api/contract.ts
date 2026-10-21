@@ -18,6 +18,8 @@ export type LoadedFlow = Outputs["flows"]["get"];
 export type RunSummary = Outputs["runs"]["list"][number];
 export type RunDetail = Outputs["runs"]["get"];
 export type StepSummary = RunDetail["steps"][number];
+/** A file a run's agent kept for the person. */
+export type Artifact = Outputs["runs"]["artifacts"][number];
 export type SessionSummary = StepSummary["sessions"][number];
 /** One item of a Call step's visit (`each`). */
 export type ItemSummary = StepSummary["items"][number];

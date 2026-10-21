@@ -320,6 +320,8 @@ export type HarnessProfile = {
 	 * when it is not `report_step` (Claude Code: `mcp__tanstack__report_step`).
 	 */
 	reportToolId?: string;
+	/** The same for the artifact tool (`mcp__tanstack__save_artifact`). */
+	artifactToolId?: string;
 };
 
 export type Translator = {
