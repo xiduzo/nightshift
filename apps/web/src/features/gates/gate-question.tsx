@@ -15,7 +15,7 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { ChevronDownIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { GateMarkdown } from "./gate-markdown";
+import { Markdown } from "@/shared/markdown";
 
 /** One labelled piece of what a Gate shows below its question. */
 export type ContextItem = {
@@ -182,7 +182,7 @@ export function ContextList({
 							</CodeBlockContent>
 						</CodeBlock>
 					) : (
-						<GateMarkdown text={item.value} />
+						<Markdown text={item.value} />
 					)}
 				</ContextBlock>
 			))}

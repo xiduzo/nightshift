@@ -26,6 +26,7 @@ import {
 	formatTime,
 	formatTokens,
 } from "@/shared/format";
+import { Markdown } from "@/shared/markdown";
 import type {
 	ErrorItem,
 	FinishedItem,
@@ -62,12 +63,12 @@ export function SessionBoundary({
 	);
 }
 
-/** The agent's own words. */
+/** The agent's own words, as Markdown. */
 export function MessageBlock({ item }: { item: MessageItem }) {
 	return (
 		<Message>
-			<MessageContent className="whitespace-pre-wrap text-sm leading-relaxed">
-				{item.text}
+			<MessageContent>
+				<Markdown text={item.text} className="max-w-none" />
 			</MessageContent>
 		</Message>
 	);

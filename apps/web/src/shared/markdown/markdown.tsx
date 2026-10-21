@@ -7,10 +7,10 @@ import {
 	TableRow,
 } from "@nightshift/ui/components/table";
 import { cn } from "@nightshift/ui/lib/utils";
-import Markdown, { type Components } from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-/** Every heading in a Gate's text sits below the Gate's own title. */
+/** Every heading in the text sits below the title of the block that shows it. */
 function Heading({ children }: { children?: React.ReactNode }) {
 	return <h3 className="pt-1 font-semibold text-sm">{children}</h3>;
 }
@@ -63,10 +63,10 @@ const COMPONENTS: Components = {
 };
 
 /**
- * Text a flow wrote for a Gate, as Markdown: headings, lists, code and links.
+ * Text an agent or a flow wrote, as Markdown: headings, lists, code and links.
  * Raw HTML in it shows as text.
  */
-export function GateMarkdown({
+export function Markdown({
 	text,
 	className,
 }: {
@@ -80,9 +80,9 @@ export function GateMarkdown({
 				className,
 			)}
 		>
-			<Markdown remarkPlugins={[remarkGfm]} components={COMPONENTS}>
+			<ReactMarkdown remarkPlugins={[remarkGfm]} components={COMPONENTS}>
 				{text}
-			</Markdown>
+			</ReactMarkdown>
 		</div>
 	);
 }
