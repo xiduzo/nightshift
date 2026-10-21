@@ -208,7 +208,6 @@ When a check exists, change its status to "Active". When a workspace follows sec
 
 The code does not yet follow every rule. These are debts. Do not copy them into new code.
 
-- The output schema of a work call checks only its outer part (`partOf<WorkRequest>()`).
 - Every workspace except `ui` and `config` is cut into barrel verticals (`features/<vertical>/index.ts` in apps, `src/<vertical>/index.ts` in packages). `scripts/check-verticals.ts` still keeps its `ENFORCED` list. Phase 8 removes it.
 
 The migration plan that removes these debts is in the structure audit of 2026-10-20.

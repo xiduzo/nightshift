@@ -73,16 +73,6 @@ export function stream<S extends z.ZodType>(events: S) {
 	} as typeof schema;
 }
 
-/**
- * A schema that checks part of `T` and stands for all of it, for a wire
- * type whose full schema is not practical: the calls of the work relay
- * carry the Device port's own inputs. Its JSON Schema shows the part it
- * checks. `partOf<WorkRequest>()(workRequestSchema)`.
- */
-export function partOf<T>() {
-	return (schema: z.ZodType): z.ZodType<T> => schema as unknown as z.ZodType<T>;
-}
-
 /** A and B are the same type, after intersections are flattened. */
 export type Same<A, B> =
 	(<T>() => T extends Flat<A> ? 1 : 2) extends <T>() => T extends Flat<B>
