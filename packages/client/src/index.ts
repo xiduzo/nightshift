@@ -56,10 +56,18 @@ export {
 	type LoadedFlow,
 } from "./flows";
 export {
+	type ContextItem,
+	changesInbox,
 	createGateMutations,
 	createGateQueries,
 	type GateChoice,
+	type GateLink,
+	gateParts,
+	inboxOrder,
+	isGateClosed,
 	type OpenGate,
+	waitedText,
+	waitingForYou,
 } from "./gates";
 export {
 	applySettingsPatch,
