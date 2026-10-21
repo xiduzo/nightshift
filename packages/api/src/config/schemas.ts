@@ -92,6 +92,10 @@ const secretViewSchema = exact<SecretView>()(
 		inEnv: z.boolean(),
 		/** The connections that reference it. */
 		usedBy: z.array(z.string()),
+		/** When a value was last saved through Night Shift (epoch ms). Null: not known, or never. */
+		setAt: z.number().nullable(),
+		/** When Night Shift last read it to use it (epoch ms), to the minute. Null: never. */
+		usedAt: z.number().nullable(),
 	}),
 );
 

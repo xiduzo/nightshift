@@ -271,18 +271,23 @@ describe("replies of a real engine", () => {
 		const list = (await read(appRouter.connections.list)) as {
 			secrets: { name: string; saved: boolean; flows: unknown[] }[];
 		};
-		// The flows whose Command nodes name a secret, saved or not.
+		// The flows whose Command nodes name a secret, saved or not, and
+		// when it was set (only a saved one) and used (not yet).
 		const toolsFlow = { projectId, projectName: expect.any(String) };
 		expect(list.secrets).toEqual([
 			expect.objectContaining({
 				name: "ZAC_PASSWORD",
 				saved: false,
 				flows: [{ ...toolsFlow, flowName: "tools" }],
+				setAt: null,
+				usedAt: null,
 			}),
 			expect.objectContaining({
 				name: "ZAC_USER",
 				saved: true,
 				flows: [{ ...toolsFlow, flowName: "tools" }],
+				setAt: expect.any(Number),
+				usedAt: null,
 			}),
 		]);
 		await read(appRouter.cliTools.list);

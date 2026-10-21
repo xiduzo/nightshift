@@ -3,6 +3,7 @@ import { connection } from "@nightshift/db/schema";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import {
 	type ConnectionInput,
+	type ConnectionStore,
 	createConnectionStore,
 	referencedVariables,
 	type SecretBackend,
@@ -42,11 +43,13 @@ function memorySecrets(initial: Record<string, string> = {}) {
 async function makeStore(
 	env: Record<string, string | undefined> = {},
 	secrets = memorySecrets(),
+	now?: () => number,
 ) {
 	const store = createConnectionStore({
 		document: await sandbox.openDocument(),
 		env,
 		secrets: secrets.backend,
+		now,
 	});
 	await store.load();
 	return { store, secrets };
@@ -55,9 +58,22 @@ async function makeStore(
 /** What the next start reads: the connection names and the facts' secret names. */
 async function savedNow() {
 	const document = await sandbox.openDocument();
+	const secrets =
+		(document.facts.get("secrets") as { name: string }[] | undefined) ?? [];
 	return {
 		connections: [...document.connections.keys()].sort(),
-		secrets: (document.facts.get("secrets") as string[] | undefined) ?? [],
+		secrets: secrets.map((s) => s.name),
+	};
+}
+
+/** A clock a test moves by hand. */
+function testClock(start = 1_000_000) {
+	let at = start;
+	return {
+		now: () => at,
+		advance(ms: number) {
+			at += ms;
+		},
 	};
 }
 
@@ -224,7 +240,12 @@ describe("secrets", () => {
 	});
 
 	test("the secrets view: referenced or saved names, where each is set, and who uses it", async () => {
-		const { store } = await makeStore({ TEAM: "night", UNUSED_ENV: "x" });
+		const clock = testClock(5000);
+		const { store } = await makeStore(
+			{ TEAM: "night", UNUSED_ENV: "x" },
+			memorySecrets(),
+			clock.now,
+		);
 		await store.save(docs);
 		await store.save(tracker);
 		await store.save({
@@ -237,21 +258,42 @@ describe("secrets", () => {
 		await store.setSecret("DOCS_TOKEN", "d");
 		await store.setSecret("ORPHAN", "o");
 
+		const never = { setAt: null, usedAt: null };
 		expect(store.secrets()).toEqual([
 			{
 				name: "DOCS_TOKEN",
 				saved: true,
 				inEnv: false,
 				usedBy: ["docs", "wiki"],
+				setAt: 5000,
+				usedAt: null,
 			},
-			{ name: "ORPHAN", saved: true, inEnv: false, usedBy: [] },
-			{ name: "TEAM", saved: false, inEnv: true, usedBy: ["docs"] },
+			{
+				name: "ORPHAN",
+				saved: true,
+				inEnv: false,
+				usedBy: [],
+				setAt: 5000,
+				usedAt: null,
+			},
+			{ name: "TEAM", saved: false, inEnv: true, usedBy: ["docs"], ...never },
 			{
 				name: "TRACKER_TOKEN",
 				saved: false,
 				inEnv: false,
 				usedBy: ["tracker"],
+				...never,
 			},
+		]);
+		// A name only a Command node uses is listed too.
+		expect(
+			store.secrets(["ZAC_USER", "TEAM"]).map((s) => [s.name, s.usedBy]),
+		).toEqual([
+			["DOCS_TOKEN", ["docs", "wiki"]],
+			["ORPHAN", []],
+			["TEAM", ["docs"]],
+			["TRACKER_TOKEN", ["tracker"]],
+			["ZAC_USER", []],
 		]);
 	});
 
@@ -308,7 +350,14 @@ describe("secrets", () => {
 			{ name: "TRACKER_TOKEN", source: "env" },
 		]);
 		expect(store.secrets()).toEqual([
-			{ name: "TRACKER_TOKEN", saved: false, inEnv: true, usedBy: ["tracker"] },
+			{
+				name: "TRACKER_TOKEN",
+				saved: false,
+				inEnv: true,
+				usedBy: ["tracker"],
+				setAt: null,
+				usedAt: null,
+			},
 		]);
 	});
 
@@ -326,6 +375,180 @@ describe("secrets", () => {
 		expect(
 			await store.secretEnv(["ZAC_PASSWORD", "ZAC_ADMIN", "ZAC_ROOT"]),
 		).toEqual({ ok: false, missing: ["ZAC_ADMIN", "ZAC_ROOT"] });
+	});
+});
+
+describe("when a secret was set and used", () => {
+	/** A store with a hand-moved clock, over a document the test holds too. */
+	async function timedStore(env: Record<string, string> = {}) {
+		const clock = testClock();
+		const document = await sandbox.openDocument();
+		const secrets = memorySecrets();
+		const store = createConnectionStore({
+			document,
+			env,
+			secrets: secrets.backend,
+			now: clock.now,
+		});
+		return { store, document, clock, secrets };
+	}
+	function times(store: ConnectionStore, name: string) {
+		const found = store.secrets([name]).find((s) => s.name === name);
+		return found && { setAt: found.setAt, usedAt: found.usedAt };
+	}
+
+	test("setting a value records when; setting it again moves it; a restart keeps it", async () => {
+		const { store, document, clock, secrets } = await timedStore();
+		await store.setSecret("TOKEN", "one");
+		expect(times(store, "TOKEN")).toEqual({ setAt: 1_000_000, usedAt: null });
+		clock.advance(5000);
+		await store.setSecret("TOKEN", "two");
+		expect(times(store, "TOKEN")).toEqual({ setAt: 1_005_000, usedAt: null });
+		expect(document.facts.get("secrets")).toEqual([
+			{ name: "TOKEN", setAt: 1_005_000 },
+		]);
+
+		await document.flush();
+		const { store: again } = await makeStore({}, secrets);
+		expect(times(again, "TOKEN")).toEqual({ setAt: 1_005_000, usedAt: null });
+	});
+
+	test("removing a secret removes its times; the environment's use starts over", async () => {
+		const { store, clock } = await timedStore({ TOKEN: "env" });
+		await store.setSecret("TOKEN", "keychain");
+		await store.setSecret("OTHER", "o");
+		clock.advance(1000);
+		await store.secretEnv(["TOKEN", "OTHER"]);
+		await store.removeSecret("TOKEN");
+		expect(times(store, "TOKEN")).toEqual({ setAt: null, usedAt: null });
+		expect(times(store, "OTHER")).toEqual({
+			setAt: 1_000_000,
+			usedAt: 1_001_000,
+		});
+	});
+
+	test("an older document's bare names still read, with no time; the next save keeps them", async () => {
+		const document = await sandbox.openDocument();
+		await document.change(() => {
+			document.facts.set("secrets", [
+				"OLD_TOKEN",
+				42,
+				{ name: "NEWER", setAt: 7 },
+			]);
+		});
+		const store = createConnectionStore({
+			document,
+			env: {},
+			secrets: memorySecrets({ OLD_TOKEN: "old" }).backend,
+			now: testClock().now,
+		});
+		expect(store.secrets().map((s) => [s.name, s.saved, s.setAt])).toEqual([
+			["NEWER", true, 7],
+			["OLD_TOKEN", true, null],
+		]);
+		expect(await store.secret("OLD_TOKEN")).toBe("old");
+
+		await store.setSecret("ADDED", "a");
+		expect(document.facts.get("secrets")).toEqual([
+			{ name: "ADDED", setAt: 1_000_000 },
+			{ name: "NEWER", setAt: 7 },
+			{ name: "OLD_TOKEN", setAt: null },
+		]);
+	});
+
+	test("each kind of use records the names it read; listing and masking do not", async () => {
+		const { store, clock } = await timedStore({
+			TEAM: "night",
+			FROM_ENV: "e",
+		});
+		await store.save(tracker);
+		await store.save(docs);
+		for (const name of ["TRACKER_TOKEN", "DOCS_TOKEN", "API_KEY", "CMD"]) {
+			await store.setSecret(name, "v");
+		}
+		await store.setSecret("UNUSED", "u");
+		const usedAt = (name: string) => times(store, name)?.usedAt ?? null;
+
+		// Reading for the list, the source, or to mask a run is not a use.
+		store.list();
+		store.secretSource("TRACKER_TOKEN");
+		await store.secretValues();
+		expect(store.secrets().every((s) => s.usedAt === null)).toBe(true);
+
+		clock.advance(1000); // an Agent node's or a Tool node's MCP server
+		await store.mcpServersFor({ connections: ["tracker"] });
+		expect(usedAt("TRACKER_TOKEN")).toBe(1_001_000);
+		expect(usedAt("DOCS_TOKEN")).toBeNull();
+
+		clock.advance(1000); // a connection test
+		await store.expandForTest({ name: "docs" });
+		expect(usedAt("DOCS_TOKEN")).toBe(1_002_000);
+		// A variable from the environment counts too.
+		expect(usedAt("TEAM")).toBe(1_002_000);
+
+		clock.advance(1000); // a custom agent's environment
+		await store.expandEnv({ X: ref("FROM_ENV") });
+		expect(usedAt("FROM_ENV")).toBe(1_003_000);
+
+		clock.advance(1000); // a Command node's secrets
+		await store.secretEnv(["CMD"]);
+		expect(usedAt("CMD")).toBe(1_004_000);
+
+		clock.advance(1000); // a decider's API key
+		await store.secret("API_KEY");
+		expect(usedAt("API_KEY")).toBe(1_005_000);
+
+		expect(usedAt("UNUSED")).toBeNull();
+	});
+
+	test("a use that fails for a missing value records nothing", async () => {
+		const { store } = await timedStore();
+		await store.setSecret("HAVE", "h");
+		await store.save({
+			name: "half",
+			server: { command: "x", env: { A: ref("HAVE"), B: ref("LACK") } },
+		});
+		expect((await store.mcpServersFor({ connections: ["half"] })).ok).toBe(
+			false,
+		);
+		expect((await store.expandForTest({ name: "half" })).expansion.ok).toBe(
+			false,
+		);
+		expect((await store.secretEnv(["HAVE", "LACK"])).ok).toBe(false);
+		expect((await store.expandEnv({ X: ref("HAVE") + ref("LACK") })).ok).toBe(
+			false,
+		);
+		expect(await store.secret("LACK")).toBeUndefined();
+		expect(store.secrets().map((s) => s.usedAt)).toEqual([null, null]);
+	});
+
+	test("a use writes the document at most once a minute per secret", async () => {
+		const { store, document, clock } = await timedStore();
+		await store.setSecret("A", "a");
+		await store.setSecret("B", "b");
+		let writes = 0;
+		document.doc.on("update", () => {
+			writes++;
+		});
+
+		await store.secretEnv(["A", "B"]);
+		expect(writes).toBe(1);
+		clock.advance(30_000);
+		await store.secretEnv(["A"]);
+		await store.secret("B");
+		expect(writes).toBe(1);
+		expect(times(store, "A")?.usedAt).toBe(1_000_000);
+
+		clock.advance(30_000);
+		await store.secretEnv(["A", "B"]);
+		expect(writes).toBe(2);
+		expect(times(store, "A")?.usedAt).toBe(1_060_000);
+		expect(times(store, "B")?.usedAt).toBe(1_060_000);
+
+		// What the next start reads.
+		await document.flush();
+		const { store: again } = await makeStore();
+		expect(times(again, "B")?.usedAt).toBe(1_060_000);
 	});
 });
 

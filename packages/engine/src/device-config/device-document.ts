@@ -52,8 +52,16 @@ export type DeviceFacts = {
 	harnesses: Record<string, string | null>;
 	/** The programs it can run by name. */
 	programs: string[];
-	/** The names of the secrets saved in its keychain. Never their values. */
-	secrets: string[];
+	/**
+	 * The secrets saved in its keychain, and when each was last set (null:
+	 * not known). Never their values. An older document holds bare names.
+	 */
+	secrets: { name: string; setAt: number | null }[];
+	/**
+	 * When Night Shift last read each secret to use it (epoch ms): saved
+	 * ones, and ones from the daemon's environment. Not a list of the saved.
+	 */
+	secretsUsedAt: Record<string, number>;
 	/** Its Clones: which Project, at which path. */
 	clones: { projectId: string; path: string }[];
 	/** When the Owner last looked (epoch ms). */
@@ -160,9 +168,12 @@ async function readLegacyRows(db: Database) {
 			},
 		]);
 	}
-	const secrets = (await db.select({ name: secret.name }).from(secret))
-		.map((row) => row.name)
-		.sort();
+	const secrets = (
+		await db
+			.select({ name: secret.name, updatedAt: secret.updatedAt })
+			.from(secret)
+			.orderBy(secret.name)
+	).map((row) => ({ name: row.name, setAt: row.updatedAt.getTime() }));
 	return { settings, connections, cliTools, profiles, secrets };
 }
 

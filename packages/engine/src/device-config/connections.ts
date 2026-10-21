@@ -17,7 +17,8 @@ import { expandMcpServers, type McpExpansion } from "./mcp";
  * by Agent nodes. Secrets stay `${NAME}` references. A reference reads the
  * system keychain first (a secret saved on the Connections page), then the
  * daemon's environment. Values never reach the database, the document, the
- * log or the UI: the document holds the names of the saved secrets only.
+ * log or the UI: the document holds the names of the saved secrets only,
+ * with when each was last set and last used.
  */
 
 /** `${NAME}`: an environment variable name, as a shell would read it. */
@@ -50,7 +51,14 @@ export type SecretView = {
 	inEnv: boolean;
 	/** The connections that reference it. */
 	usedBy: string[];
+	/** When a value was last saved through Night Shift (epoch ms). Null: not known, or never. */
+	setAt: number | null;
+	/** When Night Shift last read it to use it (epoch ms), to the minute. Null: never, or not since it was removed. */
+	usedAt: number | null;
 };
+
+/** A use is written at most once a minute per secret: the time is to the minute. */
+const SECRET_USE_INTERVAL_MS = 60_000;
 
 /** Where secret values live: the system keychain through `Bun.secrets`, or files on a headless computer. */
 export type SecretBackend = {
@@ -91,8 +99,12 @@ export type ConnectionStore = {
 	/** Creates or replaces a connection. */
 	save(input: ConnectionInput): Promise<Connection>;
 	remove(name: string): Promise<void>;
-	secrets(): SecretView[];
-	/** A secret's value: the keychain, then the daemon's environment. */
+	/**
+	 * The secrets: the saved ones and the ones connections reference, and
+	 * `named` (a Command node's), with where each is set and when.
+	 */
+	secrets(named?: Iterable<string>): SecretView[];
+	/** A secret's value, to use: the keychain, then the daemon's environment. */
 	secret(name: string): Promise<string | undefined>;
 	/** Where a secret's value comes from. */
 	secretSource(name: string): SecretSource;
@@ -111,7 +123,7 @@ export type ConnectionStore = {
 	): Promise<{ expansion: McpExpansion; values: string[] }>;
 	/**
 	 * The values of the saved secrets and of the variables the connections
-	 * reference, to take out of an exported run.
+	 * reference, to take out of an exported run. Not a use.
 	 */
 	secretValues(): Promise<string[]>;
 	/**
@@ -154,12 +166,20 @@ const entrySchema = z.object({
 	updatedAt: z.number(),
 });
 
+/** A saved secret as the Device facts hold it. An older document holds the bare name. */
+const savedSecretSchema = z.union([
+	z.string().transform((name) => ({ name, setAt: null })),
+	z.object({ name: z.string(), setAt: z.number().nullable() }),
+]);
+
 export function createConnectionStore(options: {
 	document: DeviceDocument;
 	env: Readonly<Record<string, string | undefined>>;
 	secrets: SecretBackend;
+	/** The clock for the set and use times. */
+	now?: () => number;
 }): ConnectionStore {
-	const { document, env, secrets } = options;
+	const { document, env, secrets, now = Date.now } = options;
 	const connectionView = mapView(document, document.connections, () => {
 		const out = new Map<string, Omit<Connection, "variables">>();
 		for (const [name, value] of document.connections.entries()) {
@@ -176,15 +196,74 @@ export function createConnectionStore(options: {
 		}
 		return out;
 	});
-	/** The secret names are a Device fact: the keychain cannot list them. */
+	/**
+	 * The saved secrets, name → when it was set, are a Device fact: the
+	 * keychain cannot list them. An entry that does not parse is skipped.
+	 */
 	const secretView = mapView(document, document.facts, () => {
-		const names = z.array(z.string()).safeParse(document.facts.get("secrets"));
-		return new Set(names.success ? names.data : []);
+		const stored = document.facts.get("secrets");
+		const out = new Map<string, number | null>();
+		for (const item of Array.isArray(stored) ? stored : []) {
+			const parsed = savedSecretSchema.safeParse(item);
+			if (parsed.success) out.set(parsed.data.name, parsed.data.setAt);
+		}
+		return out;
 	});
-	function writeSecretNames(names: Set<string>): Promise<void> {
+	/** When each secret was last used: any name, saved or from the environment. */
+	const usedView = mapView(document, document.facts, () => {
+		const parsed = z
+			.record(z.string(), z.unknown())
+			.safeParse(document.facts.get("secretsUsedAt"));
+		const out = new Map<string, number>();
+		for (const [name, at] of Object.entries(
+			parsed.success ? parsed.data : {},
+		)) {
+			if (typeof at === "number") out.set(name, at);
+		}
+		return out;
+	});
+	/** Writes the saved secrets, and the use times without `forget`. */
+	function writeSecrets(
+		saved: Map<string, number | null>,
+		forget?: string,
+	): Promise<void> {
 		return document.change(() => {
-			document.facts.set("secrets", [...names].sort());
+			document.facts.set(
+				"secrets",
+				[...saved.keys()].sort().map((name) => ({
+					name,
+					setAt: saved.get(name) ?? null,
+				})),
+			);
+			if (forget !== undefined && usedView().has(forget)) {
+				const used = new Map(usedView());
+				used.delete(forget);
+				document.facts.set("secretsUsedAt", Object.fromEntries(used));
+			}
 		});
+	}
+	/**
+	 * Notes that Night Shift read these secrets to use them. Writes the
+	 * document at most once a minute per name, and never holds up the use: a
+	 * failed write is logged by the document, and a lost time is fine.
+	 */
+	function recordUse(names: Iterable<string>): void {
+		const at = now();
+		const used = usedView();
+		const due = [...new Set(names)].filter((name) => {
+			const last = used.get(name);
+			return (
+				last === undefined || Math.abs(at - last) >= SECRET_USE_INTERVAL_MS
+			);
+		});
+		if (due.length === 0) return;
+		const next = new Map(used);
+		for (const name of due) next.set(name, at);
+		document
+			.change(() => {
+				document.facts.set("secretsUsedAt", Object.fromEntries(next));
+			})
+			.catch(() => {});
 	}
 
 	function source(variable: string): SecretSource {
@@ -219,7 +298,9 @@ export function createConnectionStore(options: {
 		servers: Record<string, McpServer>,
 	): Promise<McpExpansion> {
 		const names = Object.values(servers).flatMap(referencedVariables);
-		return expandMcpServers(servers, await envFor(names));
+		const expansion = expandMcpServers(servers, await envFor(names));
+		if (expansion.ok) recordUse(names);
+		return expansion;
 	}
 
 	return {
@@ -256,36 +337,42 @@ export function createConnectionStore(options: {
 				document.connections.delete(name);
 			});
 		},
-		secrets() {
+		secrets(named = []) {
 			const usedBy = new Map<string, string[]>();
 			for (const c of connectionView().values()) {
 				for (const name of referencedVariables(c.server)) {
 					usedBy.set(name, [...(usedBy.get(name) ?? []), c.name]);
 				}
 			}
-			const names = new Set([...usedBy.keys(), ...secretView()]);
+			const saved = secretView();
+			const used = usedView();
+			const names = new Set([...usedBy.keys(), ...saved.keys(), ...named]);
 			return [...names].sort().map((name) => ({
 				name,
-				saved: secretView().has(name),
+				saved: saved.has(name),
 				inEnv: env[name] !== undefined,
 				usedBy: usedBy.get(name) ?? [],
+				setAt: saved.get(name) ?? null,
+				usedAt: used.get(name) ?? null,
 			}));
 		},
 		async secret(name) {
-			return (await envFor([name]))[name];
+			const value = (await envFor([name]))[name];
+			if (value !== undefined) recordUse([name]);
+			return value;
 		},
 		secretSource: source,
 		async setSecret(name, value) {
 			secretNameSchema.parse(name);
 			if (value === "") throw new Error("A secret needs a value.");
 			await secrets.set(name, value);
-			await writeSecretNames(new Set([...secretView(), name]));
+			await writeSecrets(new Map(secretView()).set(name, now()));
 		},
 		async removeSecret(name) {
 			await secrets.delete(name);
-			const names = new Set(secretView());
-			names.delete(name);
-			await writeSecretNames(names);
+			const saved = new Map(secretView());
+			saved.delete(name);
+			await writeSecrets(saved, name);
 		},
 		async mcpServersFor(node) {
 			const servers: Record<string, McpServer> = {};
@@ -319,8 +406,11 @@ export function createConnectionStore(options: {
 			}
 			const variables = referencedVariables(server);
 			const vars = await envFor(variables);
+			const expansion = expandMcpServers({ [name]: server }, vars);
+			// A test connects to the server with the values: a use.
+			if (expansion.ok) recordUse(variables);
 			return {
-				expansion: expandMcpServers({ [name]: server }, vars),
+				expansion,
 				values: variables.flatMap((v) => (vars[v] ? [vars[v]] : [])),
 			};
 		},
@@ -334,6 +424,7 @@ export function createConnectionStore(options: {
 			const vars = await envFor(names);
 			const missing = [...names].filter((name) => vars[name] === undefined);
 			if (missing.length > 0) return { ok: false, missing };
+			recordUse(names);
 			return {
 				ok: true,
 				env: Object.fromEntries(
@@ -353,10 +444,12 @@ export function createConnectionStore(options: {
 				if (value === undefined) missing.push(name);
 				else env[name] = value;
 			}
-			return missing.length > 0 ? { ok: false, missing } : { ok: true, env };
+			if (missing.length > 0) return { ok: false, missing };
+			recordUse(names);
+			return { ok: true, env };
 		},
 		async secretValues() {
-			const names = new Set(secretView());
+			const names = new Set(secretView().keys());
 			for (const c of connectionView().values()) {
 				for (const name of referencedVariables(c.server)) names.add(name);
 			}

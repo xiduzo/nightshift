@@ -51,6 +51,9 @@ function stores(document: DeviceDocument) {
 	};
 }
 
+/** When the older rows' secret was last set. */
+const SECRET_SET_AT = 1_700_000_000_000;
+
 /** `${NAME}`: a reference to a secret. */
 const ref = (name: string) => `\${${name}}`;
 
@@ -82,7 +85,9 @@ async function seedOlderRows() {
 			connections: ["tracker"],
 		}),
 	});
-	await sandbox.db.insert(secret).values({ name: "TRACKER_TOKEN" });
+	await sandbox.db
+		.insert(secret)
+		.values({ name: "TRACKER_TOKEN", updatedAt: new Date(SECRET_SET_AT) });
 }
 
 describe("the Device document", () => {
@@ -111,6 +116,10 @@ describe("the Device document", () => {
 			connections: ["tracker"],
 		});
 		expect(s.profiles.get("builder")?.description).toBe("Builds.");
+		// A secret saved before keeps when it was set.
+		expect(s.connections.secrets()).toMatchObject([
+			{ name: "TRACKER_TOKEN", saved: true, setAt: SECRET_SET_AT },
+		]);
 	});
 
 	test("imports once: a later start keeps what changed since", async () => {
@@ -265,7 +274,7 @@ describe("facts", () => {
 		await connections.setSecret("TRACKER_TOKEN", "value");
 		const again = await sandbox.openDocument();
 		expect(deviceFacts(again)).toMatchObject({
-			secrets: ["TRACKER_TOKEN"],
+			secrets: [{ name: "TRACKER_TOKEN", setAt: expect.any(Number) }],
 			clones: [{ projectId: "p1", path: "/code/app" }],
 		});
 	});
