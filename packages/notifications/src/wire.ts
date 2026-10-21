@@ -38,8 +38,15 @@ export type NotificationsOptions = {
 };
 
 export type Notifications = {
-	/** The Person's in-app stream: every event of every Space they are in, until `signal` aborts. */
-	watch(personId: string, signal: AbortSignal): AsyncGenerator<InAppItem>;
+	/**
+	 * The Person's in-app stream: every event of every Space they are in,
+	 * until `signal` aborts. `here`: the screen is on this computer.
+	 */
+	watch(
+		personId: string,
+		signal: AbortSignal,
+		options?: { here?: boolean },
+	): AsyncGenerator<InAppItem>;
 	settings: {
 		get(personId: string): Promise<NotificationSettings>;
 		save(
@@ -90,7 +97,8 @@ export function createNotifications(
 		...(options.tickMs ? { tickMs: options.tickMs } : {}),
 	});
 	return {
-		watch: (personId, signal) => options.inApp.watch(personId, signal),
+		watch: (personId, signal, watch) =>
+			options.inApp.watch(personId, signal, watch),
 		settings: {
 			get: (personId) => settings.get(personId),
 			save: (personId, patch) => settings.save(personId, patch),

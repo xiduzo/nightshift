@@ -27,7 +27,10 @@ import type { RunEvent, RunEventSource } from "./sources";
  * - Every open page and app (the in-app stream) hears of every event at
  *   once, also in quiet hours. It shows a notification only when this
  *   daemon sends for the Space and the person wants that event.
- * - One sender per Space (`sendsFor`): only that daemon pushes.
+ * - One sender per Space (`sendsFor`): only that daemon pushes to the
+ *   browsers and phones. This computer's own desktop is not a push: the
+ *   daemon shows it for every Space it has, also for a Space another
+ *   Host keeps and sends for (`LOCAL_KINDS`).
  * - Once per key: the delivery log claims each (Person, key) once.
  * - Quiet hours hold pushes. When they end, one push says how many Gates
  *   still wait (or the one Gate itself). Runs that ended meanwhile go
@@ -36,7 +39,8 @@ import type { RunEvent, RunEventSource } from "./sources";
  *   a push to a phone or a closed browser waits `holdMinutes`. A Gate
  *   answered meanwhile is not pushed at all. A run that ended is pushed
  *   only when the person closed every screen meanwhile. The desktop app
- *   is a screen of its own: it is not held.
+ *   is a screen of its own: it is not held. Its channel skips what the
+ *   person already looks at on this computer (`desktop/`).
  * - Answer once, clear everywhere: when a Gate closes, every screen that
  *   got it gets a withdraw, and what still waits is dropped.
  *
@@ -76,6 +80,14 @@ export type Notifier = {
 };
 
 const DEFAULT_TICK_MS = 15_000;
+
+/**
+ * The screens of this computer itself: the desktop notification. The
+ * daemon here shows them for every Space this Replica has, not only the
+ * Spaces it sends for: a notification on this computer is no second
+ * sender of a push. Its channel reaches no other computer.
+ */
+const LOCAL_KINDS: ReadonlySet<PushTarget["kind"]> = new Set(["desktop"]);
 
 export function createNotifier(deps: NotifierDeps): Notifier {
 	const now = deps.now ?? Date.now;
@@ -157,31 +169,39 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		const sends = await deps.sendsFor(ids.spaceId);
 		for (const personId of await deps.audience(ids.spaceId)) {
 			const settings = await deps.settings.get(personId);
-			const alert = sends && wants(settings, kind);
+			const wanted = wants(settings, kind);
 			await deps.inApp.send(
 				{ kind: "in-app", personId },
-				message(kind, key, ids, alert),
+				message(kind, key, ids, sends && wanted),
 			);
-			if (alert) {
+			if (wanted) {
 				await push(
 					{ personId, key, kind, ...ids },
 					settings,
 					message(kind, key, ids, true),
+					sends,
 				);
 			}
 		}
 	}
 
-	/** Pushes one event to one Person, or holds it: once per key. */
+	/**
+	 * Pushes one event to one Person, or holds it: once per key. `sends`:
+	 * this daemon sends the Space's pushes. Else only this computer's own
+	 * screens get it.
+	 */
 	async function push(
 		claim: Claim,
 		settings: NotificationSettings,
 		msg: NotificationMessage,
+		sends: boolean,
 	): Promise<void> {
 		const at = now();
-		const targets = await pushTargets(claim.personId, settings);
+		const targets = (await pushTargets(claim.personId, settings)).filter(
+			(target) => sends || LOCAL_KINDS.has(target.kind),
+		);
 		if (targets.length === 0) {
-			await deps.deliveries.claim(claim, { status: "dropped" }, at);
+			if (sends) await deps.deliveries.claim(claim, { status: "dropped" }, at);
 			return;
 		}
 		if (inQuietHours(settings, at)) {
@@ -353,7 +373,13 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 					sentAt: sentTo.length > 0 ? at : null,
 				});
 			} else if (gates.length > 1) {
-				await sendTo(await pushTargets(personId, settings), {
+				// The screens that held the Gates: a Space another Host
+				// sends for held this computer's own screens only.
+				const held = [...new Set(gates.flatMap((row) => row.heldFor))];
+				const targets = (await deps.targets.byIds(held)).filter(
+					(target) => settings.screens[target.kind],
+				);
+				await sendTo(targets, {
 					key: `waiting:${at}`,
 					kind: "gates-waiting",
 					spaceId: null,

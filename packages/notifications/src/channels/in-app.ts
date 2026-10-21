@@ -42,11 +42,18 @@ const DEFAULT_RECENT_MS = 60_000;
 export type InAppChannel = NotificationChannel<InAppTarget> & {
 	/**
 	 * The Person's stream: each item from now on, until `signal` aborts.
-	 * While it is open, the Person has a screen open.
+	 * While it is open, the Person has a screen open. `here`: the screen
+	 * is on this computer (the request came from this computer itself).
 	 */
-	watch(personId: string, signal: AbortSignal): AsyncGenerator<InAppItem>;
+	watch(
+		personId: string,
+		signal: AbortSignal,
+		options?: { here?: boolean },
+	): AsyncGenerator<InAppItem>;
 	/** Whether the Person has a screen open, or had one a moment ago. */
 	isActive(personId: string): boolean;
+	/** Whether the Person has a screen open on this computer, or had one a moment ago. */
+	isActiveHere(personId: string): boolean;
 };
 
 export function createInAppChannel(
@@ -57,6 +64,9 @@ export function createInAppChannel(
 	const listeners = new Map<string, Set<(item: InAppItem) => void>>();
 	/** When each Person's last stream ended. */
 	const left = new Map<string, number>();
+	/** The open streams from this computer, and when the last one ended, per Person. */
+	const hereOpen = new Map<string, number>();
+	const leftHere = new Map<string, number>();
 
 	function publish(personId: string, item: InAppItem): void {
 		for (const listener of [...(listeners.get(personId) ?? [])]) {
@@ -107,7 +117,15 @@ export function createInAppChannel(
 			return at !== undefined && now() - at < recentMs;
 		},
 
-		async *watch(personId, signal) {
+		isActiveHere(personId) {
+			if ((hereOpen.get(personId) ?? 0) > 0) return true;
+			const at = leftHere.get(personId);
+			return at !== undefined && now() - at < recentMs;
+		},
+
+		async *watch(personId, signal, options = {}) {
+			const here = options.here === true;
+			if (here) hereOpen.set(personId, (hereOpen.get(personId) ?? 0) + 1);
 			const queue: InAppItem[] = [];
 			let wake: (() => void) | null = null;
 			const notify = () => {
@@ -143,6 +161,12 @@ export function createInAppChannel(
 				current?.delete(listener);
 				if (current?.size === 0) listeners.delete(personId);
 				left.set(personId, now());
+				if (here) {
+					const count = (hereOpen.get(personId) ?? 1) - 1;
+					if (count > 0) hereOpen.set(personId, count);
+					else hereOpen.delete(personId);
+					leftHere.set(personId, now());
+				}
 			}
 		},
 	};
