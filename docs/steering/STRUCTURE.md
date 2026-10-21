@@ -16,19 +16,21 @@ Code that changes together lives together. A boundary that is not enforced is no
 
 | Layer | Packages | May import (`@nightshift/*`) |
 | --- | --- | --- |
-| 0. Foundation | `config`, `db`, `flows`, `ui` | Nothing. `ui` imports only itself. |
+| 0. Foundation | `config`, `db`, `flows`, `ui`, `ui-native` | Nothing. `ui` and `ui-native` import only themselves. |
 | 1. Capabilities | `auth`, `agents` | `auth`: `db`. `agents`: `flows`. |
 | 2. Core | `engine` | `db`, `flows`, `agents`, `auth` |
-| 3. Core domains | `devices` | Layer 2 and lower |
+| 3. Core domains | `devices`, `notifications` | Layer 2 and lower |
 | 4. Surface | `api` | Layer 3 and lower |
-| 5. Runtime | `daemon` | Layer 4 and lower |
-| 6. Apps | `server`, `desktop`, `web` | See below |
+| 5. Runtime | `daemon`, `client` | `daemon`: layer 4 and lower. `client`: only `api` (the `./client` entry, `import type`) and `flows` (the root). |
+| 6. Apps | `server`, `desktop`, `web`, `mobile` | See below |
 
 The apps:
 
 - `apps/server` imports the runtime and lower layers. It holds the dev entry and the CLI.
 - `apps/desktop` imports only the runtime (`@nightshift/daemon`).
-- `apps/web` imports only `@nightshift/api/client` (types only, `import type`), `@nightshift/flows` (the browser-safe root, never `./files`) and `@nightshift/ui`. It never imports `engine`, `agents`, `auth` or `db`.
+- `apps/web` imports only `@nightshift/client`, `@nightshift/api/client` (types only, `import type`), `@nightshift/flows` (the browser-safe root, never `./files`) and `@nightshift/ui`. It never imports `engine`, `agents`, `auth` or `db`.
+- `apps/mobile` imports only `@nightshift/client`, `@nightshift/api/client` (types only, `import type`), `@nightshift/flows` (the root) and `@nightshift/ui-native`. It never imports `@nightshift/ui` (the DOM components), `engine`, `agents`, `auth`, `db`, `devices`, `notifications` or `daemon`.
+- `@nightshift/client` sits in layer 5 because it reads the API's types, but no runtime imports it: only the apps do. It uses no DOM, no React Native, and no Node or Bun API. React and TanStack Query are allowed.
 
 Rules:
 
@@ -47,15 +49,19 @@ One package is one bounded context. One domain has one home.
 | `db` | The libsql client, the drizzle schema, migrations, the data directory. | Queries of a domain. Those live with the domain. |
 | `flows` | The flow document: one file per node type (`nodes/`: its schema, its checks, its output fields), the flow schema and migration (`document/`), the checks of a whole flow (`validate/`), templates, rules and variables (`template/`), list sources (`lists/`, `recipes/`), and the pure edits of a draft (`draft/`: new nodes, graph and outcome edits, renames, the draft check). The `.nightshift/` file loader (`./files`, the only I/O). Schedules and agent profiles, because a flow document references them. The harness catalog (`harnesses/`): what a person sees of each built-in harness, browser-safe, for the web app and `agents`. | Running a flow. UI copy: the editor passes its own words to `checkDraft`. |
 | `ui` | shadcn/ui components and tokens. See `AGENTS.md`. | Anything domain-specific. |
+| `ui-native` | React Native Reusables components (shadcn for React Native) and their tokens for `apps/mobile`, on Uniwind. Installed with the React Native Reusables CLI. See `AGENTS.md`. | Anything domain-specific. The DOM components (those are `ui`). |
 | `auth` | Identity and access on Better Auth: login, two-factor, pairing, device keys, Spaces, members, roles, the access of a request and of a synced document. The auth tables. | Device rows. |
 | `agents` | Harness sessions, one harness adapter per harness, decider providers, MCP and CLI tools, pricing, skills. | Run order, retries, gates. |
 | `engine` | The run engine: compile a flow to a graph, walk it, run policy, gates, the event log, the run read model, projects and worktrees, the device-config document and the edits that keep it whole (`device-config/edits.ts`: a profile names connections and CLI tools that exist, a rename or a removal changes the profiles that name it). | Other Devices and Hosts: the engine declares the port it walks with (`Peers`, in `contract/peers.ts`), and `devices` implements it. The Device rows (`device`, `host_space`): the engine reads this computer's Device, the names of Devices and the Spaces a Host keeps through `DeviceDirectory` (`contract/directory.ts`), which `devices` implements too. Process concerns such as the lease and OS dialogs (in `daemon`). |
 | `devices` | This computer among other Devices and Hosts: the engine's `Peers` port (`createPeerEngine`) and `DeviceDirectory` port (`deviceDirectory`), this computer's own Device row and its owner (`registry/self-device.ts`), the device registry, Placement, Offers, the archive and the exchange of run history, the Links to Hosts and pairing, this computer as a Host, the work relay, and the peer protocol (`contract/`: its wire schemas and types, `HostClient`: the Host's procedures as a Device calls them, and `HostRelay`). `contract/` imports no other vertical, so every vertical names those types without a cycle. The API's ports `Devices`, `HostExchange` and `Offers`. | The execution port (`Device`) and this computer as a Device (`localDevice`). Those stay in `engine`. The procedures: those are `api`. |
+| `notifications` | The notifier: it reads the run log and decides whom to tell about a new Gate (keyed `runId:stepId`), a finished run and a failed run. The rules (answer once, clear everywhere, the active screen first, one sender per Space, quiet hours, no content in a push). The Person's notification settings, the push targets (each browser and each phone), what was sent and withdrawn. The channels behind ports, each with a fake: Web Push (`web-push`, the Host's VAPID keys), Expo Push (`expo-server-sdk`), the desktop notification (an OS port). Its tables. See `docs/research/mobile.md`. | The run log and the Gates (those are `engine`). The Person's session (that is `auth`). The in-app stream procedure (that is `api`, which calls the notifier). |
 | `api` | The oRPC surface: procedures per domain, middleware, the router type the web app consumes. Every procedure declares an input schema, an output schema and a one-line summary. That makes the router the one source for the web client, OpenAPI and any agent tool surface (MCP). | Domain logic. A procedure validates, checks access and calls one domain function. |
 | `daemon` | Boot and runtime: `createDaemon(env)` (the composition root), `startDaemon()` (the one boot sequence), the Hono app and its routes, the lease, health, the document sync transport, signals, the hot-reload handover, the harness table of this computer, OS dialogs. It wires `devices` (`createPeerEngine`, `wireDevices`) and keeps its relay and work hub across hot reloads. | Domain logic. The access policy of a synced document: that is `documentAccess` in `auth`. |
+| `client` | Client logic that `apps/web` and `apps/mobile` share: the oRPC query and mutation option factories with their query keys and polling rules, the run-stream reconnect loop (`afterSeq` and dedup), the view types derived from the API, the notify rules of the in-app stream. Browser- and React-Native-safe. | The oRPC client instance and its transport (each app makes its own: `fetch` on the web, `expo/fetch` on the phone). Components. Domain rules of `flows` or the engine. |
 | `apps/server` | The dev entry (`src/main.ts`, run by `bun --hot`), the CLI (`src/features/cli/`, entry `src/cli.ts`), the binary build (`scripts/`), the env schema, and the tests that start whole daemons as processes (`test/`). | Domain logic. |
 | `apps/desktop` | Tray, window, updates, watchdog. | Any logic of the daemon. |
 | `apps/web` | The UI. One vertical per product area. | Rules that the engine or `flows` already has. |
+| `apps/mobile` | The phone app on Expo (Expo Router): a Person's client of a Host that reads and acts. One vertical per product area. | Flow and schedule editing. A Replica, Yjs or libsql. Logic that `client` or a package has. |
 
 ### Tables have owners
 
@@ -74,10 +80,10 @@ Every call to `git`, `gh`, a harness CLI, `osascript` or another OS program goes
 Each package lists its public entry points in `package.json` `exports`.
 
 - **No wildcard exports** (`"./*"`). Every entry point is named on purpose.
-- Exception: `@nightshift/ui` keeps `./components/*`, `./hooks/*` and `./lib/*`. That is the shadcn layout, and `components.json` depends on it.
+- Exception: `@nightshift/ui` keeps `./components/*`, `./hooks/*` and `./lib/*`. That is the shadcn layout, and `components.json` depends on it. `@nightshift/ui-native` keeps the same three for the same reason (the React Native Reusables layout).
 - `index.ts` exports what consumers use. It is not a barrel of every file.
 - Test helpers, fakes and fixtures are public only through `./testing`. Production code never imports `./testing`.
-- An entry for the web app is type-only and browser-safe (`@nightshift/api/client`).
+- An entry for the web app or the phone app is type-only and browser-safe (`@nightshift/api/client`).
 - A type that the emitted declaration of another package names must be on an entry. Example: the API router type names engine and auth view types, so their roots export them. Without this, `tsc` fails with TS2883.
 
 The entries today:
@@ -85,7 +91,7 @@ The entries today:
 | Package | Entries |
 | --- | --- |
 | `agents` | `.`, `./harness-facts`, `./mcp`, `./pricing`, `./types`, `./testing` (fakes, `fixturePath(name)`). The engine uses the four light entries: the root loads every harness. `./harness-facts` is browser-safe. |
-| `api` | `.` (`appRouter` and its types), `./client` (types only, for `apps/web`), `./context` |
+| `api` | `.` (`appRouter` and its types), `./client` (types only, for `apps/web`, `apps/mobile` and `client`), `./context` |
 | `auth` | `.`, `./testing` |
 | `db` | `.`, `./schema`, `./data-dir`, `./migrate` |
 | `devices` | `.` |
@@ -94,11 +100,19 @@ The entries today:
 | `flows` | `.`, `./files` |
 | `ui` | `./components/*`, `./hooks/*`, `./lib/*`, `./globals.css`, `./postcss.config` |
 
+Planned with `docs/research/mobile.md`. `biome.json` already allows them. When a package lands with other entries, change this table and `biome.json` together.
+
+| Package | Entries |
+| --- | --- |
+| `client` | `.` |
+| `notifications` | `.`, `./testing` |
+| `ui-native` | `./components/*`, `./hooks/*`, `./lib/*`, `./global.css` |
+
 - A consumer imports a package by its name and a listed entry. Never by a relative path into another package (`../../packages/agents/src/...`).
 
 ## 4. Verticals
 
-Every app and every package (except `ui` and `config`) is cut into verticals. The model is the one yapyap uses.
+Every app and every package (except `ui`, `ui-native` and `config`) is cut into verticals. The model is the one yapyap uses.
 
 ### What a vertical is
 
@@ -114,11 +128,11 @@ Every app and every package (except `ui` and `config`) is cut into verticals. Th
 
 | Workspace | Verticals in | Also at the top of `src/` |
 | --- | --- | --- |
-| An app (`apps/web`, `apps/server`, `apps/desktop`) | `src/features/<vertical>/` | `routes/` (web), `shared/`, the generated `env.ts`, and the entry files: `router.tsx` (web), `main.ts`, `cli.ts`, `join-cli.ts` and `auth-config.ts` (server), `bun/` (desktop, the Electrobun entry) |
-| A package (`engine`, `agents`, `flows`, `api`, `auth`, `db`, `daemon`, `devices`) | `src/<vertical>/` | `index.ts` (composes the vertical barrels into the package API), the other entries that `exports` names (`api`: `client.ts`, `context.ts`. `flows`: `files.ts`. `daemon`: `heartbeat.ts`), `testing/`, the generated `env.ts` (`db`), and the files that compose the verticals or that every vertical uses: `auth.ts` (the Better Auth instance), `daemon.ts` and `start.ts`, `router.ts`, `procedures.ts` and `output.ts` (`api`), `wire.ts` (`devices`) |
+| An app (`apps/web`, `apps/server`, `apps/desktop`, `apps/mobile`) | `src/features/<vertical>/` | `routes/` (web), `app/` (mobile: the Expo Router files, thin like the web routes), `shared/`, the generated `env.ts`, and the entry files: `router.tsx` (web), `main.ts`, `cli.ts`, `join-cli.ts` and `auth-config.ts` (server), `bun/` (desktop, the Electrobun entry) |
+| A package (`engine`, `agents`, `flows`, `api`, `auth`, `db`, `daemon`, `devices`, `notifications`, `client`) | `src/<vertical>/` | `index.ts` (composes the vertical barrels into the package API), the other entries that `exports` names (`api`: `client.ts`, `context.ts`. `flows`: `files.ts`. `daemon`: `heartbeat.ts`), `testing/`, the generated `env.ts` (`db`), and the files that compose the verticals or that every vertical uses: `auth.ts` (the Better Auth instance), `daemon.ts` and `start.ts`, `router.ts`, `procedures.ts` and `output.ts` (`api`), `wire.ts` (`devices`) |
 
 - **`shared/` (apps only)** holds cross-cutting code that is not a product area: the API client, logging, the page shell, time formatting. Each piece in `shared/` is a named folder with its own barrel (`shared/api/`, `shared/time/`). No loose files in `shared/`.
-- **No kind buckets at the top of `src/`.** Do not create `src/lib/`, `src/utils/`, `src/helpers/`, `src/hooks/`, `src/components/`, `src/types/`, `src/common/` or `src/misc/`. Exception: `packages/ui` (the shadcn layout).
+- **No kind buckets at the top of `src/`.** Do not create `src/lib/`, `src/utils/`, `src/helpers/`, `src/hooks/`, `src/components/`, `src/types/`, `src/common/` or `src/misc/`. Exceptions: `packages/ui` and `packages/ui-native` (the shadcn layout).
 - No catch-all `types.ts` for a whole package. Types live in the vertical that owns them.
 
 ### Exceptions are listed, not implied
@@ -204,11 +218,11 @@ The pre-commit hook is `lefthook.yml` (install it with `bun lefthook install`). 
 | --- | --- | --- |
 | Layer map: `scripts/check-layers.ts` compares each workspace dependency in a `package.json` with the table in section 1. Bun links only declared dependencies, so this is the real import graph. | lefthook pre-commit (when a `package.json` changes), CI | Active |
 | Explicit `exports` in every `package.json` (section 3). A deep import fails `tsc` and fails at runtime. | TypeScript (`bun run check-types`, CI), Bun at runtime | Active |
-| Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, the `api` root and `flows/files` in `apps/web`. Biome replaces the options of a rule per override, so each override lists the whole set. | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
+| Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, the `api` root and `flows/files` in `apps/web`. In `apps/mobile`, everything but `client`, `api/client`, the `flows` root and `ui-native`. Biome replaces the options of a rule per override, so each override lists the whole set. | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
 | Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
-| Vertical boundaries: `scripts/check-verticals.ts` finds the workspaces and their verticals from the file system, so no list can drift and a new workspace is checked from its first commit. It fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks one workspace. | lefthook pre-commit (when a `.ts` or `.tsx` file changes), CI | Active (every workspace except `ui` and `config`) |
-| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. A barrel that `package.json` `exports` names (`@nightshift/db/migrate`) is a public entry, like the root `index.ts`: other workspaces import it, so the script does not check it. | lefthook pre-commit, CI | Active (every workspace except `ui` and `config`) |
-| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (every workspace except `ui` and `config`) |
+| Vertical boundaries: `scripts/check-verticals.ts` finds the workspaces and their verticals from the file system, so no list can drift and a new workspace is checked from its first commit. It fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks one workspace. | lefthook pre-commit (when a `.ts` or `.tsx` file changes), CI | Active (every workspace except `ui`, `ui-native` and `config`) |
+| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. A barrel that `package.json` `exports` names (`@nightshift/db/migrate`) is a public entry, like the root `index.ts`: other workspaces import it, so the script does not check it. | lefthook pre-commit, CI | Active (every workspace except `ui`, `ui-native` and `config`) |
+| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (every workspace except `ui`, `ui-native` and `config`) |
 | The checks have tests: `scripts/check-verticals.test.ts` proves each rule on small workspaces, and that the script passes on this repository. `scripts/test-workspaces.test.ts` does the same for the list of tested workspaces. | `bun test ./scripts/`: lefthook pre-commit (when a check script changes), CI | Active |
 | Types and tests: `bun run check-types` (every workspace, with the web build), and `bun test` per workspace (without `*.live.test.ts`). `scripts/test-workspaces.ts` finds the workspaces with tests, so CI tests a new workspace without an edit. | CI | Active |
 | The compiled binary starts: `apps/server/scripts/smoke-binary.ts` builds it and starts it as the Docker image does. | CI | Active |
