@@ -91,24 +91,33 @@ jobs:
         timeout-minutes: 3
         run: bun apps/server/scripts/smoke-binary.ts
 
+  # The workspaces with tests, found from the file system
+  # (scripts/test-workspaces.ts), so a new workspace's tests run without an
+  # edit here.
+  workspaces:
+    name: Find the tested workspaces
+    runs-on: ubuntu-24.04
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      # The script uses Node's fs only: no install needed.
+      - id: list
+        run: echo "list=$(bun scripts/test-workspaces.ts)" >> "$GITHUB_OUTPUT"
+
   test:
     name: Test (${{ matrix.workspace }})
+    needs: workspaces
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        workspace:
-          - apps/desktop
-          - apps/server
-          - apps/web
-          - packages/agents
-          - packages/api
-          - packages/auth
-          - packages/daemon
-          - packages/db
-          - packages/devices
-          - packages/engine
-          - packages/flows
+        workspace: ${{ fromJSON(needs.workspaces.outputs.list) }}
     steps:
       - uses: actions/checkout@v5
 

@@ -18,5 +18,7 @@ pre-commit:
       glob: "*.{ts,tsx}"
       run: bun scripts/check-verticals.ts
     - name: check tests
-      glob: "scripts/check-*.ts"
+      glob:
+        - "scripts/check-*.ts"
+        - "scripts/test-workspaces*.ts"
       run: bun test ./scripts/
