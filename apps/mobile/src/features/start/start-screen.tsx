@@ -3,7 +3,7 @@ import { Play } from "lucide-react-native";
 import { EmptyState } from "@/shared/empty";
 import { Screen } from "@/shared/page";
 
-/** Start a flow on the Host, with its inputs. */
+/** Start a flow of the Space you chose in the header, with its inputs. */
 export function StartScreen() {
 	return (
 		<Screen>

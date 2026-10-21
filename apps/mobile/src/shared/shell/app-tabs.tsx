@@ -10,12 +10,16 @@ import {
 import type { ColorValue } from "react-native";
 
 import { useHost } from "@/features/host";
+import { SpacePicker, useRememberedSpace } from "@/features/spaces";
 
 function icon(Icon: LucideIcon) {
 	return ({ color, size }: { color: ColorValue; size: number }) => (
 		<Icon color={color} size={size} />
 	);
 }
+
+/** Runs and starting a flow are per Space: their headers choose it. */
+const spacePicker = () => <SpacePicker />;
 
 /**
  * The five tabs. Without a Host, or signed out, the person goes to the
@@ -25,6 +29,11 @@ export function AppTabs() {
 	const { state } = useHost();
 	if (state.status === "loading") return null;
 	if (state.status === "signed-out") return <Redirect href="/connect" />;
+	return <SignedInTabs />;
+}
+
+function SignedInTabs() {
+	useRememberedSpace();
 
 	return (
 		<Tabs>
@@ -34,11 +43,19 @@ export function AppTabs() {
 			/>
 			<Tabs.Screen
 				name="runs"
-				options={{ title: "Runs", tabBarIcon: icon(History) }}
+				options={{
+					title: "Runs",
+					tabBarIcon: icon(History),
+					headerRight: spacePicker,
+				}}
 			/>
 			<Tabs.Screen
 				name="start"
-				options={{ title: "Start", tabBarIcon: icon(Play) }}
+				options={{
+					title: "Start",
+					tabBarIcon: icon(Play),
+					headerRight: spacePicker,
+				}}
 			/>
 			<Tabs.Screen
 				name="dashboard"
