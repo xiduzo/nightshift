@@ -418,16 +418,41 @@ Hosts:
 
 ## Open items
 
-- How the desktop app shows a native notification for a Space that a Host
-  keeps. Rule 3 makes the Host the sender. The Host never calls into a
-  Device. Lean: the desktop app's window gets the in-app stream from the
-  Host, and its daemon shows it through the OS port.
+Decided on 2026-10-21 (they were open items):
+
+- **The desktop notification covers every Space this computer has.**
+  The Host stays the only push sender of the Spaces it keeps (Web Push,
+  Expo Push). This computer's Replica gets the Host-kept Space's run
+  events through the exchange, and its own notifier shows them on its own
+  desktop, for its owner only. That is no second push: the desktop
+  channel reaches this computer only, and the Host never calls into a
+  Device. The desktop target is registered when the daemon starts
+  (`desktop`, the computer's name, the Device id as its endpoint). The
+  owner's events, quiet hours and the desktop screen switch apply. It
+  shows nothing while the desktop app's window has the focus on the inbox
+  (a Gate) or on the run (a run that ended). Without the window state (a
+  daemon outside the app), an open Night Shift page on this computer goes
+  first. In the desktop app, Electrobun shows it. Electrobun reports no
+  click and cannot take a notification back. Outside the app, the OS
+  programs show it: `terminal-notifier` (a click opens the page, a
+  withdraw works) or `osascript` (neither) on macOS, `notify-send` (both,
+  with `xdg-open` and `gdbus`) on Linux. Windows gets none.
+- **"Keep this computer awake while a run is running"** is a setting of
+  this computer, off by default (Settings → Runs, `keepAwake`,
+  `NIGHTSHIFT_KEEP_AWAKE`). The computer sleeps, not the person: a laptop
+  and a desktop of one person want different answers. The daemon holds
+  the OS's sleep lock while a run that this computer walks or runs steps
+  of is running, or sleeps until a timer: `caffeinate -i -w <pid>` on
+  macOS, `systemd-inhibit` on Linux. It lets go when the last such run
+  ends. A Gate that waits for a person does not keep the computer awake.
+
+Still open:
+
 - Whether React Native reads `oklch` colors. If it does not,
   `@nightshift/ui-native` keeps its own copy of the tokens.
 - Whether the iOS action handler of `expo-notifications` runs while the
   app is closed on SDK 58. Until then, iOS opens the app for every answer.
 - A "Deny and report" option for a Gate you did not expect.
-- "Keep this computer awake while a run needs it" on the desktop app.
 
 ## Sources
 
