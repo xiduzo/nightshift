@@ -1,10 +1,17 @@
-/** The fields of a Decision node: who decides, the prompt and the options. */
+/** The fields of a Decision node: who decides, the prompt, the options, and for a Gate the lock screen. */
 import { type DecisionNode, type Flow, withDecidedBy } from "@nightshift/flows";
+import {
+	FieldContent,
+	FieldDescription,
+	FieldLabel,
+	Field as ShadcnField,
+} from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
+import { Switch } from "@nightshift/ui/components/switch";
 import {
 	ToggleGroup,
 	ToggleGroupItem,
@@ -136,6 +143,34 @@ export function DecisionFields({
 						onChange((current) => ({ ...current, prompt: text }))
 					}
 				/>
+				{by === "person" ? (
+					<ShadcnField orientation="horizontal" className="items-start">
+						<Switch
+							id={`${id}-lock-screen`}
+							checked={node.lockScreen === true}
+							className="mt-0.5"
+							aria-describedby={`${id}-lock-screen-hint`}
+							onCheckedChange={(on) =>
+								onChange(({ lockScreen: _, ...current }) =>
+									on ? { ...current, lockScreen: true } : current,
+								)
+							}
+						/>
+						<FieldContent>
+							<FieldLabel htmlFor={`${id}-lock-screen`}>
+								Can be answered from the lock screen
+							</FieldLabel>
+							<FieldDescription
+								id={`${id}-lock-screen-hint`}
+								className="text-xs"
+							>
+								{node.lockScreen
+									? "Your phone shows the options as buttons on the notification. Use this only when a quick answer is safe."
+									: "The notification opens the app on your phone. The app checks that it is you before your answer goes."}
+							</FieldDescription>
+						</FieldContent>
+					</ShadcnField>
+				) : null}
 			</InspectorSection>
 
 			<NodeOptionsField

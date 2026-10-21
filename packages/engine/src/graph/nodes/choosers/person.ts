@@ -183,7 +183,11 @@ async function open(
 			type: "GateOpened",
 			runId: ctx.run.id,
 			stepId,
-			payload: { question, choices },
+			payload: {
+				question,
+				choices,
+				...(node.lockScreen === true ? { lockScreen: true as const } : {}),
+			},
 		});
 		step.record(null, { type: "gate-open", question, choices });
 		ctx.bus.publish(ctx.run.id, { kind: "step-changed", stepId });

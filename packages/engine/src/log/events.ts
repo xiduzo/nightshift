@@ -293,6 +293,14 @@ export type EnginePayloads = {
 		/** The rendered question. */
 		question: string;
 		choices: GateChoice[];
+		/**
+		 * The flow author marked this Gate to be answered from the lock
+		 * screen (`lockScreen` on its Decision). Written only when true, so
+		 * absent in older logs and on every other Gate. Kept with the Gate,
+		 * not read from the flow file, so an edit of the flow after it opened
+		 * does not change it.
+		 */
+		lockScreen?: true;
 	};
 	SessionStarted: {
 		prompt: string;

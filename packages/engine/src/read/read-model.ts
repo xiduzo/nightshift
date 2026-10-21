@@ -639,6 +639,7 @@ export function createReadModel(deps: ReadModelDeps) {
 				nodeId: gate.nodeId,
 				question: gate.question,
 				choices: gate.choices,
+				lockScreen: gate.lockScreen,
 				openedAt: gate.openedAt,
 				walker,
 				answerPending,
