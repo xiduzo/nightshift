@@ -1,3 +1,4 @@
+import { gateParts, gateRun, waitedText } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -46,15 +47,10 @@ import { toast } from "sonner";
 import { projectQueries } from "@/features/projects";
 import { runMutations, runQueries } from "@/features/runs/queries";
 import type { OpenGate, RunSummary } from "@/shared/api";
-import {
-	formatCountdown,
-	formatTime,
-	formatWaited,
-	useNow,
-} from "@/shared/format";
+import { formatCountdown, formatTime, useNow } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { useOpenGates } from "../use-open-gates";
-import { GateDetail, gateParts } from "./gate-detail";
+import { GateDetail } from "./gate-detail";
 import { groupByProject } from "./group-gates";
 
 /**
@@ -242,7 +238,8 @@ function GateNavItem({
 	selected: boolean;
 	onClick: () => void;
 }) {
-	const { headline } = gateParts(gate);
+	const { headline } = gateParts(gate.question);
+	const { flow, detail } = gateRun(gate);
 	return (
 		<Item
 			size="xs"
@@ -264,9 +261,10 @@ function GateNavItem({
 					<span className="line-clamp-2">{headline}</span>
 				</ItemTitle>
 				<ItemDescription className="truncate text-xs">
-					{gate.runTitle} ·{" "}
+					<span className="font-medium">{flow}</span>
+					{detail ? ` · ${detail}` : null} ·{" "}
 					<span className="text-status-waiting tabular-nums">
-						{formatWaited(now - gate.openedAt)}
+						{waitedText(now - gate.openedAt)}
 					</span>
 				</ItemDescription>
 			</ItemContent>

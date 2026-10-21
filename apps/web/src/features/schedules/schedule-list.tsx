@@ -1,3 +1,4 @@
+import { waitedText } from "@nightshift/client";
 import { describeCron, type Schedule } from "@nightshift/flows";
 import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import {
@@ -53,7 +54,6 @@ import {
 	formatDateTime,
 	formatDayTime,
 	formatTime,
-	formatWaited,
 	useNow,
 } from "@/shared/format";
 import { PageHeading } from "@/shared/page";
@@ -313,7 +313,7 @@ function nextStart(
 			{dayWord(schedule.nextAt, now)}, {formatDayTime(schedule.nextAt)}
 		</time>
 	);
-	const wait = formatWaited(schedule.nextAt - now);
+	const wait = waitedText(schedule.nextAt - now);
 	if (stacked) {
 		return (
 			<div className="flex flex-col gap-0.5">

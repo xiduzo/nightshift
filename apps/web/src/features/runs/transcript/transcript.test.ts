@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
-import type { StepEvent, TranscriptEntry } from "@nightshift/client";
+import type { TranscriptEntry } from "@nightshift/client";
 import { applyEntries, emptyRunTranscript } from "./transcript";
 import type {
 	GateResolvedItem,
 	ToolItem,
 	TranscriptItem,
 } from "./transcript-items";
+
+type StepEvent = TranscriptEntry["event"];
 
 function entriesOf(events: StepEvent[], from = 0): TranscriptEntry[] {
 	return events.map((event, at) => ({

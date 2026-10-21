@@ -1,10 +1,14 @@
 import type { ApiQueryUtils } from "../api";
 import type { DashboardInput } from "./types";
 
-/** How often the dashboard reads its numbers again while a run is on its way. */
-const ACTIVE_POLL_MS = 5000;
-/** How often it reads them again otherwise: "the last 24 hours" moves on. */
-const IDLE_POLL_MS = 60_000;
+/**
+ * How often the dashboard reads its numbers again by itself: "the last 24
+ * hours" moves on. What happens in between reaches it through the
+ * notifications stream: the web app reads the numbers again whenever it
+ * reads the runs again, the phone when the person opens the screen or
+ * pulls down.
+ */
+const POLL_MS = 60_000;
 
 /**
  * The time zone of this screen (IANA, such as `Europe/Amsterdam`): the
@@ -14,13 +18,6 @@ export function readerTimeZone(): string {
 	return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
-/**
- * How fast the dashboard reads its numbers again: `live` every 5 seconds
- * while a run is open, `minute` once a minute (a phone, which reads them
- * again when the person opens the screen or pulls down).
- */
-type DashboardPace = "live" | "minute";
-
 /** The query options of the dashboard, and how often it polls. */
 export function createDashboardQueries(orpc: ApiQueryUtils) {
 	return {
@@ -28,20 +25,14 @@ export function createDashboardQueries(orpc: ApiQueryUtils) {
 		all: () => orpc.dashboard.key(),
 		/**
 		 * The numbers of the Space, of one project (`projectId`), or of every
-		 * Space (`everySpace`). At the `live` pace (the default) it polls fast
-		 * while a run is open, else once a minute; at the `minute` pace always
-		 * once a minute. A failed background poll keeps the numbers.
+		 * Space (`everySpace`). Polls once a minute. A failed background poll
+		 * keeps the numbers.
 		 */
-		summary: (input: DashboardInput = {}, pace: DashboardPace = "live") => ({
+		summary: (input: DashboardInput = {}) => ({
 			...orpc.dashboard.summary.queryOptions({
 				input: { ...input, timeZone: readerTimeZone() },
 			}),
-			refetchInterval: (query: {
-				state: { data?: { open: { count: number } } | undefined };
-			}) =>
-				pace === "live" && (query.state.data?.open.count ?? 0) > 0
-					? ACTIVE_POLL_MS
-					: IDLE_POLL_MS,
+			refetchInterval: POLL_MS,
 			meta: { quietRefetchErrors: true },
 		}),
 		/** One flow of a project in detail. Polls once a minute. */
@@ -49,7 +40,7 @@ export function createDashboardQueries(orpc: ApiQueryUtils) {
 			...orpc.dashboard.flow.queryOptions({
 				input: { projectId, flowName, timeZone: readerTimeZone() },
 			}),
-			refetchInterval: IDLE_POLL_MS,
+			refetchInterval: POLL_MS,
 			meta: { quietRefetchErrors: true },
 		}),
 	};

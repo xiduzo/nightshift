@@ -767,6 +767,7 @@ function openGate(spaceId: string, runId: string, openedAt: number): OpenGate {
 		spaceId,
 		runId,
 		runTitle: `Run ${runId}`,
+		flowName: null,
 		projectId: `project-${runId}`,
 		projectName: "Project",
 		stepId: `step-${runId}`,

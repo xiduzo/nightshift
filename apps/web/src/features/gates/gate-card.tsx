@@ -1,3 +1,4 @@
+import { waitedText } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -16,7 +17,7 @@ import {
 } from "lucide-react";
 import { WalkerBadge, walkerName } from "@/features/devices";
 import type { OpenGate } from "@/shared/api";
-import { formatDateTime, formatWaited } from "@/shared/format";
+import { formatDateTime } from "@/shared/format";
 import { GateAnswer } from "./gate-answer";
 import { GateQuestion } from "./gate-question";
 
@@ -67,7 +68,7 @@ export function GateCard({ gate, now }: { gate: OpenGate; now: number }) {
 							title={`Opened ${formatDateTime(gate.openedAt)}`}
 							className="tabular-nums"
 						>
-							{formatWaited(now - gate.openedAt)}
+							{waitedText(now - gate.openedAt)}
 						</time>
 					</Badge>
 				</div>

@@ -14,7 +14,6 @@ export {
 	formatStepCost,
 	formatTime,
 	formatTokens,
-	formatWaited,
 	nextOccurrence,
 	noCostYet,
 	sumKnownCost,

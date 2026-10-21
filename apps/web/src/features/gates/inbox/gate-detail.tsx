@@ -1,3 +1,4 @@
+import { gateParts, waitedText } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -27,18 +28,10 @@ import {
 import { useId } from "react";
 import { spaceQueries, useSwitchSpace } from "@/features/spaces";
 import type { OpenGate } from "@/shared/api";
-import { formatDateTime, formatWaited } from "@/shared/format";
+import { formatDateTime } from "@/shared/format";
 import { GateChoiceForm } from "../gate-choice-form";
 import { GateLinkItem } from "../gate-link-item";
-import { extractGateLinks } from "../gate-links";
-import { ContextList, parseGateQuestion } from "../gate-question";
-
-/** The headline, links and context of a Gate's question. */
-export function gateParts(gate: OpenGate) {
-	const { links, question } = extractGateLinks(gate.question);
-	const { headline, context } = parseGateQuestion(question);
-	return { headline, context, links };
-}
+import { ContextList } from "../gate-question";
 
 /**
  * One open Gate in the inbox pane. What happened on the left; the links to
@@ -48,7 +41,7 @@ export function gateParts(gate: OpenGate) {
  */
 export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 	const answerId = useId();
-	const { headline, context, links } = gateParts(gate);
+	const { headline, context, links } = gateParts(gate.question);
 	const spaces = useQuery(spaceQueries.list());
 	// Its project and run pages are in another Space: open them there.
 	const elsewhere =
@@ -122,9 +115,18 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 								title={`Opened ${formatDateTime(gate.openedAt)}`}
 								className="tabular-nums"
 							>
-								{formatWaited(now - gate.openedAt)}
+								{waitedText(now - gate.openedAt)}
 							</time>
 						</Badge>
+						<span>
+							{gate.flowName ? (
+								<>
+									Flow <span className="font-mono">{gate.flowName}</span>
+								</>
+							) : (
+								"Quick run"
+							)}
+						</span>
 						<span>
 							Gate <span className="font-mono">{gate.nodeId}</span>
 						</span>

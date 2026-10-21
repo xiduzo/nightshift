@@ -1,3 +1,4 @@
+import { waitedText } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
@@ -20,13 +21,7 @@ import {
 } from "lucide-react";
 import { scheduleQueries } from "@/features/schedules";
 import type { DashboardSummary } from "@/shared/api";
-import {
-	dayWord,
-	formatDateTime,
-	formatTime,
-	formatWaited,
-	useNow,
-} from "@/shared/format";
+import { dayWord, formatDateTime, formatTime, useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 
 const MAX_ITEMS = 5;
@@ -144,7 +139,7 @@ export function UpNext({
 													</span>
 												</span>
 												<span className="text-muted-foreground">
-													in {formatWaited(at - now)}
+													in {waitedText(at - now)}
 												</span>
 											</time>
 										</ItemActions>

@@ -40,6 +40,42 @@ export function pushSupported(): boolean {
 	);
 }
 
+/** What `homeScreenNeeded` reads of this browser. */
+export type BrowserFacts = {
+	userAgent: string;
+	platform: string;
+	maxTouchPoints: number;
+	/** The page runs from the Home Screen, not in a browser tab. */
+	standalone: boolean;
+};
+
+/**
+ * True on an iPhone or iPad when Night Shift runs in a browser tab. iOS
+ * gives notifications only to a site added to the Home Screen.
+ */
+export function homeScreenNeeded(facts: BrowserFacts): boolean {
+	const iPhoneOrIPad =
+		/iPhone|iPad|iPod/.test(facts.userAgent) ||
+		// An iPad asks for the desktop site: it says it is a Mac with touch.
+		(facts.platform === "MacIntel" && facts.maxTouchPoints > 1);
+	return iPhoneOrIPad && !facts.standalone;
+}
+
+/** `homeScreenNeeded` for this browser. False on the server. */
+export function needsHomeScreen(): boolean {
+	if (typeof window === "undefined" || typeof navigator === "undefined") {
+		return false;
+	}
+	return homeScreenNeeded({
+		userAgent: navigator.userAgent,
+		platform: navigator.platform,
+		maxTouchPoints: navigator.maxTouchPoints,
+		standalone:
+			window.matchMedia?.("(display-mode: standalone)").matches === true ||
+			(navigator as { standalone?: boolean }).standalone === true,
+	});
+}
+
 /** Registers the service worker once. Null when this browser has none. */
 export async function serviceWorker(): Promise<ServiceWorkerRegistration | null> {
 	if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {

@@ -11,6 +11,8 @@ export const openGateSchema = exact<OpenGate>()(
 		spaceId: z.string(),
 		runId: z.string(),
 		runTitle: z.string(),
+		/** The flow file the run started from. Null for a quick run. */
+		flowName: z.string().nullable(),
 		projectId: z.string(),
 		projectName: z.string(),
 		stepId: z.string(),

@@ -1,3 +1,4 @@
+import { waitedText } from "@nightshift/client";
 import type { FlowInputDef } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -38,7 +39,6 @@ import { runMutations, runQueries } from "@/features/runs/queries";
 import {
 	dayWord,
 	formatDayTime,
-	formatWaited,
 	nextOccurrence,
 	useNow,
 } from "@/shared/format";
@@ -394,8 +394,8 @@ function StartRunForm({
 									>
 										{dayWord(stopAt, now)}, {formatDayTime(stopAt)}
 									</time>{" "}
-									(in {formatWaited(stopAt - now)}). No new step starts after
-									that time, and the run stops.
+									(in {waitedText(stopAt - now)}). No new step starts after that
+									time, and the run stops.
 								</>
 							)}
 						</FieldDescription>

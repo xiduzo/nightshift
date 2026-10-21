@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+	<title>Night Shift</title>
+	<!-- favicon.svg in its dark colours, on a square that fills the Home Screen tile. -->
+	<rect width="64" height="64" fill="#0a0a0a" />
+	<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+		<rect width="64" height="64" fill="#fff" />
+		<circle cx="42" cy="24" r="19" fill="#000" />
+	</mask>
+	<g transform="translate(32 32) scale(0.68) translate(-35.1 -28.9)">
+		<circle fill="#fafafa" cx="30" cy="32" r="22" mask="url(#m)" />
+		<circle stroke="#5db2f7" cx="42" cy="24" r="19" fill="none" stroke-width="2.5" />
+	</g>
+</svg>

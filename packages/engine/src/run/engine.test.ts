@@ -2451,6 +2451,22 @@ async function openGateOf(engine: SpaceEngine, runId: string) {
 }
 
 describe("gates", () => {
+	test("a Gate of a flow file names its flow", async () => {
+		const harness = fakeHarness((_input, call) =>
+			call === 0 ? reportingScript("pass", "Built the parser.") : {},
+		);
+		const engine = makeEngine(harness, { maxConcurrentRuns: 1 });
+		const id = await projectId(engine);
+		await engine.saveFlow(id, "ship", gateFlow());
+		const run = await engine.startRun({ projectId: id, flowName: "ship" });
+
+		expect(await openGateOf(engine, run.id)).toMatchObject({
+			flowName: "ship",
+			runTitle: "ship",
+		});
+		await engine.stopRun(run.id);
+	});
+
 	test("a gate waits without a slot, and its answer continues the walk", async () => {
 		const harness = fakeHarness((_input, call) =>
 			call === 0 ? reportingScript("pass", "Built the parser.") : {},
@@ -2466,6 +2482,7 @@ describe("gates", () => {
 		expect(open).toMatchObject({
 			runId: run.id,
 			runTitle: run.title,
+			flowName: null,
 			projectId: id,
 			projectName: "repo",
 			nodeId: "gate",

@@ -5,6 +5,7 @@ import {
 	createRunQueries,
 	type GateLink,
 	gateParts,
+	gateRun,
 	isGateClosed,
 	type OpenGate,
 	waitedText,
@@ -173,6 +174,7 @@ function OpenGateSheet({
 }) {
 	const now = useNow();
 	const { headline, context, links } = gateParts(gate.question);
+	const { flow, detail } = gateRun(gate);
 	const gateQueries = useHostQueries(createGateQueries);
 	const runQueries = useHostQueries(createRunQueries);
 	const mutations = useHostQueries(createGateMutations);
@@ -249,9 +251,12 @@ function OpenGateSheet({
 				<Text variant="large" selectable>
 					{headline}
 				</Text>
-				<Text variant="muted">
-					{gate.projectName} · {gate.runTitle}
-				</Text>
+				<View className="gap-0.5">
+					<Text variant="muted">
+						{gate.projectName} · {flow}
+					</Text>
+					{detail ? <Text variant="muted">{detail}</Text> : null}
+				</View>
 			</View>
 
 			{context.length > 0 ? (

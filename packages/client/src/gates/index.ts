@@ -2,6 +2,7 @@
 
 export {
 	changesInbox,
+	gateRun,
 	inboxOrder,
 	isGateClosed,
 	waitedText,
@@ -9,5 +10,5 @@ export {
 } from "./inbox";
 export type { GateLink } from "./links";
 export { createGateMutations, createGateQueries } from "./queries";
-export { type ContextItem, gateParts } from "./question";
+export { type ContextItem, gateParts, parseGateQuestion } from "./question";
 export type { GateChoice, OpenGate } from "./types";
