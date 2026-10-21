@@ -1,4 +1,9 @@
-import { costLabel, type RunSummary, whenLabel } from "@nightshift/client";
+import {
+	costLabel,
+	flowLabel,
+	type RunSummary,
+	whenLabel,
+} from "@nightshift/client";
 import {
 	Card,
 	CardContent,
@@ -15,11 +20,6 @@ import { RunStatusBadge } from "./status-badge";
 /** Opens the live view of a run. */
 export function openRun(runId: string): void {
 	router.push({ pathname: "/runs/[runId]", params: { runId } });
-}
-
-/** The flow of a run: its name, or "Quick run" for a flow that is not a file. */
-export function flowLabel(run: Pick<RunSummary, "flowName">): string {
-	return run.flowName ?? "Quick run";
 }
 
 /**

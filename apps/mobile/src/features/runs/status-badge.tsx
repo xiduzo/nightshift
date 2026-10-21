@@ -1,4 +1,8 @@
-import type { RunStatus, StepState } from "@nightshift/client";
+import {
+	type RunStatus,
+	runStatusLabel,
+	type StepState,
+} from "@nightshift/client";
 import { Badge } from "@nightshift/ui-native/components/ui/badge";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Text } from "@nightshift/ui-native/components/ui/text";
@@ -16,46 +20,46 @@ import {
 
 type Look = { label: string; icon: LucideIcon; box: string; text: string };
 
-/** A run status: its label, icon and color, as the web shows it. */
+/** A run status: its label (`runStatusLabel`), icon and color, as the web shows it. */
 const RUN: Record<RunStatus, Look> = {
 	running: {
-		label: "Running",
+		label: runStatusLabel("running"),
 		icon: LoaderCircle,
 		box: "border-status-running/40 bg-status-running/10",
 		text: "text-status-running",
 	},
 	waiting: {
-		label: "Waiting for you",
+		label: runStatusLabel("waiting"),
 		icon: Hourglass,
 		box: "border-status-waiting/40 bg-status-waiting/10",
 		text: "text-status-waiting",
 	},
 	sleeping: {
-		label: "Sleeping",
+		label: runStatusLabel("sleeping"),
 		icon: Moon,
 		box: "border-status-sleeping/40 bg-status-sleeping/10",
 		text: "text-status-sleeping",
 	},
 	finished: {
-		label: "Finished",
+		label: runStatusLabel("finished"),
 		icon: CircleCheck,
 		box: "border-status-finished/40 bg-status-finished/10",
 		text: "text-status-finished",
 	},
 	stopped: {
-		label: "Stopped",
+		label: runStatusLabel("stopped"),
 		icon: CircleStop,
 		box: "border-status-stopped/40 bg-status-stopped/10",
 		text: "text-status-stopped",
 	},
 	failed: {
-		label: "Failed",
+		label: runStatusLabel("failed"),
 		icon: CircleX,
 		box: "border-status-failed/40 bg-status-failed/10",
 		text: "text-status-failed",
 	},
 	interrupted: {
-		label: "Interrupted",
+		label: runStatusLabel("interrupted"),
 		icon: CircleAlert,
 		box: "border-status-interrupted/40 bg-status-interrupted/10",
 		text: "text-status-interrupted",
