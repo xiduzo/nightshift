@@ -196,6 +196,24 @@ Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fai
 - Rules that `@nightshift/flows` or the engine already has are imported, not copied. Example: template references, the harness catalog.
 - UI follows `AGENTS.md`: shadcn components only.
 
+### The phone app
+
+```
+apps/mobile/src/
+  app/                     thin Expo Router files: one screen from a vertical
+  shared/
+    api/                   the auth client per Host, the Host address, the transport (expo/fetch + cookie), the query client
+    page/  empty/          the screen body and the empty state
+    shell/                 the app frame (AppShell) and the tabs (AppTabs)
+  features/
+    host/                  sign-in (address, the Host code, two-factor or backup code), the session, useHostQueries
+    spaces/                the Space picker of Runs and Start, the Space remembered per Host
+    inbox/  runs/  start/  dashboard/  settings/
+```
+
+- The features, from the bottom: `host`, `spaces`, then the tabs. `shared/shell` composes them, as on the web.
+- A screen takes query options from `@nightshift/client` on the Host's client: `useHostQueries(createRunQueries)`. The phone keeps no module-level `orpc`, because its client changes with the Host.
+
 ## 6. Apps are composition roots
 
 An app wires packages together and talks to the outside world. It does not hold domain logic.
