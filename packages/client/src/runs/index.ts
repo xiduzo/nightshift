@@ -9,6 +9,7 @@ export {
 	type RunWatchClient,
 	retryDelay,
 	type Wait,
+	waitFor,
 } from "./stream";
 export type {
 	AgentErrorKind,

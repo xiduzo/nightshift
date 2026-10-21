@@ -52,7 +52,8 @@ export function retryDelay(attempt: number): number {
 	return Math.min(RETRY_BASE_MS * 2 ** attempt, RETRY_MAX_MS);
 }
 
-const waitFor: Wait = (ms, signal) =>
+/** Waits `ms`, or less when `signal` aborts: the wait of a stream between two tries. */
+export const waitFor: Wait = (ms, signal) =>
 	new Promise<void>((resolve) => {
 		if (signal.aborted) return resolve();
 		const timer = setTimeout(done, ms);

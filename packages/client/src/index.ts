@@ -2,7 +2,8 @@
  * @nightshift/client: the client logic that the web app and the phone app
  * share. The typed client of a Night Shift, the query and mutation options
  * of each vertical (with their polling rules), the stream of one run, the
- * view types derived from the API, and the notify rules. No DOM, no React
+ * view types derived from the API, the stream of the person's
+ * notifications, and the notify rules. No DOM, no React
  * Native, no Node or Bun: `platform-free.test.ts` checks it.
  */
 
@@ -63,11 +64,21 @@ export {
 export {
 	compareGates,
 	compareRuns,
+	createNotificationMutations,
+	createNotificationQueries,
 	describeNotice,
+	type FollowNotificationsOptions,
+	followNotifications,
 	gateKey,
 	isWanted,
 	type Notice,
 	type NoticeChoices,
+	type NotificationItem,
+	type NotificationScreen,
+	type NotificationSettings,
+	type NotificationSettingsPatch,
+	type NotificationWatchClient,
+	type RegisterScreenInput,
 } from "./notifications";
 export {
 	createProjectMutations,

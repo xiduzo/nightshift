@@ -1,5 +1,13 @@
-/** The notify rules: what changed between two polls, whether the person wants to know, and the words. */
+/**
+ * Notifications: the stream of what happens in every Space the person is
+ * in, their settings and screens, and the notify rules: what changed
+ * between two reads, whether the person wants to know, and the words.
+ */
 
+export {
+	createNotificationMutations,
+	createNotificationQueries,
+} from "./queries";
 export {
 	compareGates,
 	compareRuns,
@@ -9,3 +17,15 @@ export {
 	type Notice,
 	type NoticeChoices,
 } from "./rules";
+export {
+	type FollowNotificationsOptions,
+	followNotifications,
+	type NotificationWatchClient,
+} from "./stream";
+export type {
+	NotificationItem,
+	NotificationScreen,
+	NotificationSettings,
+	NotificationSettingsPatch,
+	RegisterScreenInput,
+} from "./types";
