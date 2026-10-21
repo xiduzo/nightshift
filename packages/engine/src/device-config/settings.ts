@@ -3,6 +3,7 @@ import {
 	customAgentSchema,
 	type DeciderName,
 	deciderNameSchema,
+	HARNESS_CATALOG,
 	type HarnessName,
 	harnessNameSchema,
 	permissionModeSchema,
@@ -266,17 +267,15 @@ export const settingsSchema = z.object(
 	},
 );
 
-/** The setting that holds each harness's executable. */
-export const HARNESS_BIN = {
-	"claude-code": "claudeBin",
-	opencode: "opencodeBin",
-	codex: "codexBin",
-	"grok-build": "grokBin",
-	copilot: "copilotBin",
-	gemini: "geminiBin",
-	cursor: "cursorBin",
-	pi: "piBin",
-} as const satisfies Record<HarnessName, SettingKey>;
+/** The setting that holds each harness's executable (`binSetting` of `HARNESS_CATALOG`). */
+export const HARNESS_BIN = Object.fromEntries(
+	harnessNameSchema.options.map((name) => [
+		name,
+		HARNESS_CATALOG[name].binSetting,
+	]),
+) as {
+	[K in HarnessName]: (typeof HARNESS_CATALOG)[K]["binSetting"];
+} satisfies Record<HarnessName, SettingKey>;
 
 /** A change: a value saves it, null forgets the saved value (back to the environment, then the default). */
 export const settingsPatchSchema = z

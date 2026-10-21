@@ -7,28 +7,22 @@
  * - `record.ts`: the facts, plus the models of its TanStack adapter and its
  *   install check (`HarnessAdapter`). `registry.ts` collects them.
  */
-import type { CliCheck } from "../doctor";
-import type { HarnessName } from "../port";
+import type { HarnessCatalogEntry } from "@nightshift/flows";
 
-/** What Night Shift knows about one harness without its adapter. */
-export type HarnessFacts = {
-	name: HarnessName;
-	/** The display name, for example "Claude Code". */
-	label: string;
-	/** Two letters for its tile. */
-	initials: string;
+import type { CliCheck } from "../doctor";
+
+/**
+ * What Night Shift knows about one harness without its adapter: what a
+ * person sees of it (`HARNESS_CATALOG` in `@nightshift/flows`, browser-safe),
+ * and how Night Shift runs it.
+ */
+export type HarnessFacts = HarnessCatalogEntry & {
 	/** The `@tanstack/ai-*` package. */
 	pkg: string;
 	/** The CLI it runs, as found on the PATH. */
 	bin: string;
-	/** A new node, or a switch to this harness, starts with this model. */
-	defaultModel: string;
 	/** The CLI's own command that lists the models it can reach, if it has one. */
 	listing: readonly string[] | null;
-	/** One line under the picker: what this harness needs. */
-	note: string;
-	/** Where prompts and code go. */
-	offMachine: string;
 	/**
 	 * The CLI's own command that reopens a session, given its id already
 	 * quoted for the shell. Null: the CLI has none.

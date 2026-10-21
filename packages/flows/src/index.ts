@@ -41,6 +41,7 @@ export {
 	variableTypeSchema,
 } from "./document";
 export * from "./draft";
+export { HARNESS_CATALOG, type HarnessCatalogEntry } from "./harnesses";
 export {
 	blockersFirst,
 	type ItemState,
