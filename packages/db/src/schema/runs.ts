@@ -12,6 +12,8 @@ import { project } from "./projects";
 // Owner: `@nightshift/engine`: `log/` appends the event log and writes the
 // run and step rows, `run/` starts and recovers runs, `graph/` adds steps
 // and Agent sessions while a run walks, and `read/` reads them all.
+// Known deviation: `@nightshift/devices` `exchange/` copies these rows
+// between Replicas by cursor (STRUCTURE.md section 8).
 //
 // Durable facts only. Status is derived from the event log, never stored.
 

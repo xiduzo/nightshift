@@ -404,7 +404,7 @@ travel as before.
 - **One feed per step.** Every Replica answers the same call,
   `follow(step, afterSeq)`: the step's transcript entries after
   `afterSeq`, first what was written, then each entry as it is written,
-  ending when the step ends (`packages/engine/src/peers/exchange/feeds.ts`).
+  ending when the step ends (`packages/devices/src/exchange/feeds.ts`).
   Where the entries come from depends on who walks the run:
   - this Replica walks it: its own file, then its bus;
   - this Replica keeps the Space (it is the Host) and a Device walks it:
@@ -458,14 +458,14 @@ travel as before.
 - **No new channel, no new library.** The demand rides on `sync.stream`,
   the entries on two oRPC procedures under the `archive` permission. Yjs
   stays with the documents: a transcript is a log, which it does not fit.
-- Tests: `packages/engine/src/peers/exchange/feeds.test.ts` (three Replicas and
+- Tests: `packages/devices/src/exchange/feeds.test.ts` (three Replicas and
   a fake link, through the feed's interface: catch-up then live, two
   followers on one pump, the last follower leaving stops the Walker's
   pushes, a reconnect from its cursor without duplicates or gaps, the
   step's end closes the feed, a push of another Device is dropped);
-  `packages/engine/src/peers/exchange/live-watch.test.ts` (the run page of a run
+  `packages/devices/src/exchange/live-watch.test.ts` (the run page of a run
   walked elsewhere shows a running command's output);
-  `packages/daemon/src/devices/host-exchange.test.ts` (the Walker's stream
+  `packages/devices/src/exchange/host-exchange.test.ts` (the Walker's stream
   names a followed step, only the Walker pushes, a non-Member is
   refused); `apps/server/test/devices/live-transcripts.test.ts` (two
   daemons: each watches a running step the other walks, and a viewer
@@ -856,7 +856,7 @@ iroh.
      certificate in `host_link.certificate`. Bun 1.3's `fetch` and
      `WebSocket` never call `checkServerIdentity`, so the pin is the
      certificate as the only authority (`tls: { ca }`): a changed
-     certificate fails the link (`packages/daemon/src/devices/tls.ts`). A
+     certificate fails the link (`packages/devices/src/reach/tls.ts`). A
      certificate this computer already trusts is not pinned (renewals).
    - **Pairing** (`packages/auth/src/pairing/pairing.ts`): Better Auth 1.7.7's
      device authorization plugin, client id = the joining Device's id,
@@ -872,8 +872,8 @@ iroh.
      `{ deviceId }`, permissions `sync`, `relay`, `archive`, hashed at
      rest, rate limit off. Idle expiry: a use moves `expiresAt` on, at
      most once a day. Pairing again replaces the Device's key.
-   - **On the Host** (`packages/daemon/src/devices/host.ts`, the registry
-     `packages/engine/src/peers/registry.ts`): the paired Device's
+   - **On the Host** (`packages/devices/src/host/host.ts`, the registry
+     `packages/devices/src/registry/registry.ts`): the paired Device's
      `device` row (name, platform, owner, `home_host` = the address it
      joined by when this is its home Host, else null, `last_seen_at`,
      new `revoked_at`), and `DeviceJoined`, `DeviceRevoked`,
@@ -897,7 +897,7 @@ iroh.
      Device documents of its home Devices (`KeptDocuments`: Hocuspocus
      loads and stores them in the Replica's `ydoc` rows); a guest Host
      keeps none, and refuses them.
-   - **The joining Device** (`packages/daemon/src/devices/join.ts`, `bun run
+   - **The joining Device** (`packages/devices/src/links/join.ts`, `bun run
      join <host> [--guest]` → the local daemon's `devices.join`, a
      stream): the link goes in `host_link` (Host id and name, addresses,
      pinned certificate, home or guest, the Person there, where the key
@@ -905,7 +905,7 @@ iroh.
      `nightshift-device-keys`), else in `<data dir>/device-keys/<host>`
      with mode 0600 (`NIGHTSHIFT_KEY_STORE=file` forces it). One home
      Host at most; a home link sets the self row's `home_host`.
-   - **The Link** (`packages/daemon/src/devices/link.ts`): `httpsLink` tries
+   - **The Link** (`packages/devices/src/links/link.ts`): `httpsLink` tries
      the addresses in order (a refusal is an answer, a network error
      falls through), keeps the first that answers, learns the Host's
      list from each answer (the Host's order, then the ones it did not
@@ -944,12 +944,12 @@ iroh.
      of its `HarnessSessionAssigned` event: a receiver fills it from that
      event. A batch carries its events in each Walker's order with the
      run, step and session rows they name, so parents go in first and the
-     foreign keys hold (`packages/engine/src/peers/exchange/rows.ts`).
+     foreign keys hold (`packages/devices/src/exchange/rows.ts`).
    - **Cursors** (`sync_cursor`): per Host, Space and Walker, the last
      `walker_seq` this Replica has. Finer than "per Host and Walker", so a
      Space the owner joins later is exchanged from its start. For this
      computer's own Walker the row is the push cursor: what the Host took.
-   - **Over the Link** (`packages/daemon/src/devices/exchange.ts`, run while
+   - **Over the Link** (`packages/devices/src/exchange/client.ts`, run while
      the link is online): a push loop sends this computer's rows of the
      Spaces the Host keeps, after the cursor, whenever an event lands; a
      pull loop reads `sync.stream` (an oRPC event iterator: a batch, then
@@ -957,7 +957,7 @@ iroh.
      log ingests what arrives (`RunLog.ingest`, the same bookkeeping as an
      append) and the bus tells the run's watchers, so a run page of a run
      walked elsewhere updates live. `sync.pull` is the same batch once.
-   - **The Host filters** (`packages/daemon/src/devices/host-exchange.ts`): it
+   - **The Host filters** (`packages/devices/src/exchange/host-exchange.ts`): it
      serves rows of the Spaces the key's Person is a Member of, never the
      Device's own back; it takes only rows whose Walker is the key's
      Device, in those Spaces, and refuses the whole batch otherwise
@@ -979,7 +979,7 @@ iroh.
      (`sync.addClone`, which needs `project.add`), then the `clone` row
      here. A new project, a rename, a removal or a move there is refused
      on the Device: "change its projects there".
-   - **Commands** (`run_command`, `peers/exchange/commands.ts`). The Walker is
+   - **Commands** (`run_command`, `packages/devices/src/exchange/commands.ts`). The Walker is
      the only writer of its run's events, so answering a Gate, sending a
      signal and stopping a run walked elsewhere is a command. The Replica
      that asks checks what it can first (the Gate is open, the choice is
@@ -1004,7 +1004,7 @@ iroh.
      the run page and the inbox; a run of another device has no take
      over, wake, resume or export, and its folder is not shown.
    - **The archive** (`archive.put`, `archive.get`, the `archive`
-     permission; `peers/exchange/archive.ts`). After a pushed batch with a node
+     permission; `packages/devices/src/archive/archive.ts`). After a pushed batch with a node
      that ended, the Walker puts that step's transcript and command log,
      and its run's latest checkpoint per namespace with its pending
      writes (JSON, blobs in base64). Rows first, then files, then the
@@ -1021,7 +1021,7 @@ iroh.
      Retention is undecided, as for run history: everything is kept.
    - **Host offline**: every Device keeps walking its own runs; both loops
      start again at their cursors when the link is back.
-   - Tests: `packages/engine/src/peers/exchange/exchange.test.ts` (two
+   - Tests: `packages/devices/src/exchange/exchange.test.ts` (two
      Replicas in one process) and `apps/server/test/devices/exchange.test.ts`
      (two daemons, the harness of part A in `test-daemons.ts`): B walks a
      run in A's Space, A gets it live with the same status and B's name,
@@ -1084,7 +1084,7 @@ iroh.
      (`itemBranch`) and its glob source (`files`) run on the worktree's
      Device too.
    - **`remoteDevice(relay, device, forRun)`**
-     (`packages/engine/src/device/remote.ts`): every call is a
+     (`packages/devices/src/work/remote.ts`): every call is a
      `WorkRequest`, plain data: who asks and for which run (`WorkFor`:
      Space, project, the Person who starts or started the run as the Host
      knows them, the run, null before it exists) and the call without its
@@ -1096,8 +1096,8 @@ iroh.
      an error of kind `network` (the run's policy waits and continues the
      session, as for a network failure).
    - **The relay's work half** (`devices.work`, the `relay` permission of a
-     Device key). On a Host, `createWorkHub` (`packages/daemon/src/devices/
-     work-hub.ts`, in memory) holds the calls of the runs the Host walks,
+     Device key). On a Host, `createWorkHub` (`packages/devices/src/
+     work/work-hub.ts`, in memory) holds the calls of the runs the Host walks,
      per placed Device. The placed Device takes them as a stream over its
      own Link (`createWorkServer`, `work.ts`, beside the exchange in
      `whileOnline`): the Host never dials a Device. It answers with
@@ -1110,7 +1110,7 @@ iroh.
      Replies that cannot reach the Host for a minute abort the call on the
      Device: nothing runs for a Walker that is gone.
    - **Two checks, two code paths.** The Host, before it places a run
-     (`place` in `peers/placement.ts`): the Device is paired here and not revoked,
+     (`place` in `packages/devices/src/placement/placement.ts`): the Device is paired here and not revoked,
      its owner is the Person who starts the run (another Person's Device
      is Offers, part B: "colleague-laptop is not your device."), it takes
      work now, and the Space document has its Clone of the project. The
@@ -1146,10 +1146,10 @@ iroh.
      (the run's Device), "Walked by" when that is another computer, "Ran
      on" per step. Take over shows only for a run whose steps run here.
      The runs list badges the run's Device.
-   - Tests: `packages/engine/src/peers/placement.test.ts` (in-memory
+   - Tests: `packages/devices/src/placement/placement.test.ts` (in-memory
      relay: the steps and worktree on B, a stop ends B's command, flows from
      B's Clone, rename and remove without a Clone, the refusals);
-     `packages/daemon/src/devices/work.test.ts` (`checkWork`, the hub);
+     `packages/devices/src/work/work.test.ts` (`checkWork`, the hub);
      `apps/server/test/devices/placement.test.ts` (two daemons: A the Host
      without a Clone lists B's flows and walks a run whose command and
      fake Claude Code steps run on B, the events and transcript land in A's
@@ -1172,7 +1172,7 @@ iroh.
      device"). `deviceNameSchema`: 1 to 64 characters. The flow editor's
      Device section lists your Devices (`runs.devices`); a name that is not
      one of yours stays, marked.
-   - **Where a step runs** (`packages/engine/src/peers/placement.ts`, one
+   - **Where a step runs** (`packages/devices/src/placement/placement.ts`, one
      module for both halves): the node's `device`, else the profile's
      Device, else the run's Device, else the Walker. "The profile's Device"
      is the run's Device when it defines the profile, else this computer
@@ -1270,7 +1270,7 @@ iroh.
    - **The resume grace** now counts from when the engine is ready (it
      started at recovery, before the engine's start ended: the flaky
      "an open run continues on its own" test).
-   - Tests: `packages/engine/src/peers/placement.test.ts` (per-node with
+   - Tests: `packages/devices/src/placement/placement.test.ts` (per-node with
      the Hand-off there and back, a dirty worktree fails the step, offline
      then back, an unknown name, the profile's Device); `apps/server/test/
      devices/handoff.test.ts` (two daemons with one bare remote: A walks a
@@ -1362,7 +1362,7 @@ iroh.
      step comes with them.
 
    *Landed (part B, Offers):*
-   - **An Offer is two entries** (`packages/engine/src/peers/offers.ts`): the
+   - **An Offer is two entries** (`packages/devices/src/offers/offers.ts`): the
      Device's own, in its Device document's `offers` (`DeviceOffer`: Space,
      profile, `permissionCap`, `sessionCap`, when), the caps the Device
      enforces; and the publication in the Space document's `offers`
@@ -1404,7 +1404,7 @@ iroh.
      through its own Offers (`offeredDevice`). Before, any Member could
      run anything on the Host.
    - **The Device's own checks** (`checkWork` in
-     `packages/daemon/src/devices/work.ts`, a second code path): for a run its
+     `packages/devices/src/work/work.ts`, a second code path): for a run its
      owner did not start, the requester is a Member (the Space
      document's Member mirror) whose role allows `offer.use`; it has
      Offers in force into that Space; the call is an offered session of
@@ -1439,10 +1439,10 @@ iroh.
      Withdraw. The Devices page: "Offered to Spaces" (each Offer with
      "Runs for <Space>": the runs of other people here, and Withdraw) and
      "Devices in this Space".
-   - Tests: `packages/engine/src/peers/offers.test.ts` (the run-start rule, the
+   - Tests: `packages/devices/src/offers/offers.test.ts` (the run-start rule, the
      clamp, the queue, another Person's run on the computer that walks it,
      withdrawing stops it, the Space document's entry has only the public
-     fields); `packages/daemon/src/devices/work.test.ts` (`checkWork` called
+     fields); `packages/devices/src/work/work.test.ts` (`checkWork` called
      directly, as a bypassed Host would: no Offer, an Offer on one side
      only, another profile, a command, a non-member, a viewer; the work
      server's clamp, queue and abort); `apps/server/test/devices/offers.test.ts`

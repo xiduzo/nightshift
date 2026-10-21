@@ -5,7 +5,7 @@
 //
 // - `auth.ts`: `@nightshift/auth` (Better Auth's tables). `auth:generate`
 //   writes this file, so its owner is named here.
-// - `devices.ts`: `@nightshift/engine` `peers/` (moves to `devices`).
+// - `devices.ts`: `@nightshift/devices`.
 // - `projects.ts`: `@nightshift/engine` `projects/`.
 // - `runs.ts`: `@nightshift/engine` `log/`, `run/`, `graph/` and `read/`.
 // - `device-config.ts`: `@nightshift/engine` `device-config/`.

@@ -106,6 +106,7 @@ jobs:
           - packages/auth
           - packages/daemon
           - packages/db
+          - packages/devices
           - packages/engine
           - packages/flows
     steps:

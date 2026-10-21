@@ -95,6 +95,7 @@ flowchart LR
 | `packages/api` | The oRPC procedures, one group per domain. The web app takes only its router type. |
 | `packages/flows` | The flow schema (zod), the loader (`./files`), and the validator (unbounded loops, unknown names, missing outcomes). Each node type has one file in `src/nodes/` with its schema, its checks and its output fields. |
 | `packages/engine` | The run engine on LangGraph (`docs/steering/langgraph-engine.md`): a flow compiled to a graph, one thread per run, run policy, gates, worktrees, the item ordering of a Call with `each`. |
+| `packages/devices` | This computer among other Devices and Hosts: Placement, Offers, the exchange of run history, the Links to Hosts and pairing, this computer as a Host, and the work relay. It implements the engine's `Peers` port. |
 | `packages/agents` | Harness sessions through `@tanstack/ai` adapters, session resume, usage-limit waits, CLI tool permissions, the decider providers. |
 | `packages/ui` | Shared components and tokens. |
 

@@ -34,15 +34,24 @@ below it, from the bottom up:
 | `read/` | The pure projections of the log (`derive-run.ts`, `derive-steps.ts`), cost (`cost.ts`), the run views (`views.ts`), the read model, the Persons a run names (`people.ts`) and the run bundle. |
 | `projects/` | Projects, the Space document that defines them, the git port (`git.ts`: every `git` and `xcode-select` process, with its adapter `systemGit`), the git setup of a project folder, and run worktrees (`createWorktrees(git)`). |
 | `flows/` | The flow files of a project (`flow-files.ts`) and the flows a run starts from (`run-flows.ts`). |
-| `device/` | The execution port (`Device`), this computer (`local.ts`), a Device through a Host (`remote.ts`), commands and tool calls. |
-| `peers/` | The device registry, host links, placement, Offers (`offers.ts`, and `engine-offers.ts`: publish, withdraw, this computer through its Offers), the Walker names, the worktree paths a Person may see, and the exchange of run history (`exchange/`, with the archive of a moved run in `run-archive.ts`). |
+| `device/` | The execution port (`Device`), this computer (`local.ts`), commands and tool calls. |
 | `graph/` | The flow as a graph, below. |
 | `schedules/` | The scheduler and the schedules file of a project (`schedule-files.ts`). |
 | `run/` | The composition root (`engine.ts`), what a person does in one Space (`space.ts`), run start, recovery, and the run actions (`control.ts` over `stop.ts`, `move.ts`, `gate.ts`, `wake.ts` and the relay to a Walker in `relay.ts`). |
 
 `contract/` holds only types: `Engine`, `SpaceEngine`, `StartRunInput`,
-`EngineOptions` and `Relay`. A type-only import may point up (a port that a
-lower vertical implements, or the contract). The engine reads the auth
+`EngineOptions`, `Relay` and `Peers`. A type-only import may point up (a
+port that a lower vertical implements, or the contract).
+
+The engine knows no other Device. `Peers` (`contract/peers.ts`) is the port
+of the other Devices and Hosts: where a step runs (Placement), the Offer
+rules, the Host that keeps a Space, and the runs walked elsewhere (their
+commands, transcripts and the archive of a moved run). `@nightshift/devices`
+implements it (`createPeerEngine`). `createEngine` calls the factory in
+`EngineOptions.peers` once, with its own parts (`PeerContext`: the database,
+the run log, the bus, the documents, and how to take over or stop a run).
+The engine's own tests walk with `alonePeers` (`./testing`): a computer
+without other Devices. The engine reads the auth
 tables (`user`, `member`, `organization`) only through functions of
 `@nightshift/auth`. `testing/` holds the test
 helpers and fixtures. The database lease and the folder picker are process
@@ -165,8 +174,8 @@ packages/engine/src/
                            root's interrupts and custom events.
   run/engine.ts            The composition root: createEngine makes the
                            runner, recovery, run start, the read model, the
-                           scheduler, placement, the exchange and the run
-                           actions, each behind a small seam that takes its
+                           scheduler, the peers (EngineOptions.peers) and
+                           the run actions, each behind a small seam that takes its
                            dependencies (db, log, runner, bus, settings,
                            clock), and wires them. It holds no logic.
   run/space.ts             createSpaces(deps): the SpaceEngine of one
