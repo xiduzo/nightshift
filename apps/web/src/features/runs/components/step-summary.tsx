@@ -1,3 +1,4 @@
+import { waitedText } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -8,7 +9,6 @@ import type { ReactNode } from "react";
 
 import type { RunDetail, StepSummary as Step } from "@/shared/api";
 import { CodeView } from "@/shared/code";
-import { formatWaited } from "@/shared/format";
 import { type ItemScope, stepRunsEach } from "../lib/run-steps";
 import { CallDetail } from "./call-detail";
 import { ItemList } from "./item-list";
@@ -77,10 +77,10 @@ export function StepSummary({
 			{waited !== null ? (
 				<p className="text-sm leading-relaxed">
 					{step.outcome === "timeout"
-						? `Timed out after ${formatWaited(waited * 60_000)}.`
+						? `Timed out after ${waitedText(waited * 60_000)}.`
 						: step.outcome === null
-							? `Waiting for ${formatWaited(waited * 60_000)} so far.`
-							: `Waited ${formatWaited(waited * 60_000)}.`}
+							? `Waiting for ${waitedText(waited * 60_000)} so far.`
+							: `Waited ${waitedText(waited * 60_000)}.`}
 				</p>
 			) : null}
 			{logTail ? (

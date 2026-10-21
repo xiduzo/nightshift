@@ -70,6 +70,7 @@ export {
 	inboxOrder,
 	isGateClosed,
 	type OpenGate,
+	parseGateQuestion,
 	waitedText,
 	waitingForYou,
 } from "./gates";

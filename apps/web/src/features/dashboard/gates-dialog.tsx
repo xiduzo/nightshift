@@ -1,3 +1,4 @@
+import { waitedText } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -27,12 +28,7 @@ import type {
 	Project,
 } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
-import {
-	formatDateTime,
-	formatRelative,
-	formatWaited,
-	useNow,
-} from "@/shared/format";
+import { formatDateTime, formatRelative, useNow } from "@/shared/format";
 import {
 	ChartSection,
 	DetailsDialog,
@@ -135,7 +131,7 @@ function GatesDetails({
 							value={String(waiting.length)}
 							hint={
 								oldest
-									? `The oldest for ${formatWaited(now - oldest.openedAt)}`
+									? `The oldest for ${waitedText(now - oldest.openedAt)}`
 									: "Nothing needs you"
 							}
 						/>
@@ -146,10 +142,10 @@ function GatesDetails({
 						/>
 						<Stat
 							label="Typical answer"
-							value={answerTime ? formatWaited(answerTime.median) : "—"}
+							value={answerTime ? waitedText(answerTime.median) : "—"}
 							hint={
 								answerTime && answerTime.count > 1
-									? `Half within ${formatWaited(answerTime.q1)} to ${formatWaited(answerTime.q3)}`
+									? `Half within ${waitedText(answerTime.q1)} to ${waitedText(answerTime.q3)}`
 									: `${asked.answered} answered`
 							}
 						/>
@@ -194,7 +190,7 @@ function GatesDetails({
 												</ItemDescription>
 											</ItemContent>
 											<ItemActions className="text-muted-foreground tabular-nums">
-												{formatWaited(now - gate.openedAt)}
+												{waitedText(now - gate.openedAt)}
 											</ItemActions>
 										</Item>
 									))}
@@ -277,7 +273,7 @@ function GatesDetails({
 												{STATE_CHART[gate.state].label}
 											</Badge>
 											<span className="w-28 text-right text-muted-foreground tabular-nums">
-												{gate.wait === null ? "—" : formatWaited(gate.wait)}
+												{gate.wait === null ? "—" : waitedText(gate.wait)}
 											</span>
 										</ItemActions>
 									</Item>
@@ -389,7 +385,7 @@ function groupColumns(groupLabel: string) {
 		headClassName: "text-right",
 		cellClassName: "text-right tabular-nums",
 	};
-	const wait = (ms: number | null) => (ms === null ? "—" : formatWaited(ms));
+	const wait = (ms: number | null) => (ms === null ? "—" : waitedText(ms));
 	return groupColumn.columns([
 		groupColumn.accessor("label", {
 			header: groupLabel,

@@ -118,19 +118,6 @@ export function formatDuration(ms: number): string {
 	return `${hours}h ${String(minutes % 60).padStart(2, "0")}m`;
 }
 
-/** How long something has waited: "under a minute", "12 min", "3 h 5 min", "2 days". */
-export function formatWaited(ms: number): string {
-	const minutes = Math.floor(Math.max(0, ms) / 60_000);
-	if (minutes < 1) return "under a minute";
-	if (minutes < 60) return `${minutes} min`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 24) {
-		return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`;
-	}
-	const days = Math.floor(hours / 24);
-	return days === 1 ? "1 day" : `${days} days`;
-}
-
 /** "Thu 16 Oct, 07:00": a moment within the next days, with its weekday. */
 export function formatDayTime(epochMs: number): string {
 	return new Date(epochMs).toLocaleString(undefined, {

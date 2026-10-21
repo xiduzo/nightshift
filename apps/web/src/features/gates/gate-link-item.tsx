@@ -1,3 +1,4 @@
+import type { GateLink } from "@nightshift/client";
 import {
 	Item,
 	ItemActions,
@@ -14,8 +15,6 @@ import {
 	type LucideIcon,
 	TicketIcon,
 } from "lucide-react";
-
-import type { GateLink } from "./gate-links";
 
 const ICONS: Record<GateLink["kind"], LucideIcon> = {
 	pull: GitPullRequestIcon,
