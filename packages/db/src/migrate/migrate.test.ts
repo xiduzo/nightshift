@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sql } from "drizzle-orm";
 
-import { createDb, type Database } from "./index";
+import { createDb, type Database } from "../client";
 import { migrateDb, migrationsFolder } from "./migrate";
 
 const roots: string[] = [];

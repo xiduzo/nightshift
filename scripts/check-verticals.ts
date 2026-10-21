@@ -9,7 +9,10 @@
  * (a) an import from outside a vertical into a file of it other than its
  *     `index.ts` barrel, apart from the LEAF_CONTRACTS and PEER_PORTS below;
  *     and a vertical with no `index.ts`
- * (b) a name on a barrel that no file outside the vertical imports
+ * (b) a name on a barrel that no file outside the vertical imports. A
+ *     barrel that `package.json` `exports` names is a public entry of the
+ *     package (`@nightshift/db/migrate`): other workspaces import it, so it
+ *     is not checked, like the root `index.ts`
  * (c) a kind bucket at the top of `src/` (lib, utils, helpers, hooks,
  *     components, types, common, misc), and a loose file in an app's `shared/`
  *
@@ -44,6 +47,7 @@ export const ENFORCED: string[] = [
 	"packages/api",
 	"packages/auth",
 	"packages/daemon",
+	"packages/db",
 	"packages/engine",
 	"packages/flows",
 ];
@@ -342,6 +346,24 @@ function resolveFile(base: string): string | undefined {
 
 type Vertical = { name: string; dir: string; barrel?: string };
 
+/** The files that the workspace's `package.json` `exports` names. */
+function entryFiles(workspace: string): Set<string> {
+	const file = join(workspace, "package.json");
+	if (!existsSync(file)) return new Set();
+	const targets: string[] = [];
+	const collect = (value: unknown): void => {
+		if (typeof value === "string") targets.push(value);
+		else if (value && typeof value === "object")
+			for (const inner of Object.values(value)) collect(inner);
+	};
+	collect(JSON.parse(readFileSync(file, "utf8")).exports);
+	return new Set(
+		targets
+			.filter((target) => !target.includes("*"))
+			.map((target) => resolve(workspace, target)),
+	);
+}
+
 function verticalsOf(src: string, app: boolean): Vertical[] {
 	const roots = app
 		? [
@@ -496,7 +518,8 @@ export function checkWorkspace(
 		}
 	}
 
-	// (b) Barrel reachability.
+	// (b) Barrel reachability. A barrel that is a package entry is public.
+	const entries = entryFiles(wsDir);
 	const exportsOf = (path: string, seen = new Set<string>()): string[] => {
 		if (seen.has(path)) return [];
 		seen.add(path);
@@ -510,7 +533,7 @@ export function checkWorkspace(
 		return names;
 	};
 	for (const vertical of verticals) {
-		if (!vertical.barrel) continue;
+		if (!vertical.barrel || entries.has(vertical.barrel)) continue;
 		const names = [...new Set(exportsOf(vertical.barrel))].sort();
 		const uses = used.get(vertical.barrel);
 		if (uses === "all") continue;

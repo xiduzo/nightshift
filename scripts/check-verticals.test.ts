@@ -269,6 +269,24 @@ describe("barrel reachability (b)", () => {
 		]);
 	});
 
+	test("a barrel that package.json exports is a public entry", () => {
+		const files = {
+			"src/migrate/index.ts": 'export { migrate } from "./migrate";\n',
+			"src/migrate/migrate.ts": "export const migrate = 1;\n",
+		};
+		expect(
+			check(PKG, {
+				...files,
+				"package.json": JSON.stringify({
+					exports: { "./migrate": "./src/migrate/index.ts" },
+				}),
+			}),
+		).toEqual([]);
+		expect(check(PKG, files)).toEqual([
+			'packages/demo/src/migrate/index.ts: nothing outside migrate imports "migrate". Take it off the barrel.',
+		]);
+	});
+
 	test("a package root index counts as an importer", () => {
 		expect(
 			check(PKG, {

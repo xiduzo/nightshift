@@ -5,7 +5,7 @@
  * (Bun cannot load the official one, which needs better-sqlite3).
  *
  * The tables `lg_checkpoint` and `lg_write` are drizzle schema
- * (`@nightshift/db/schema/nightshift`) and a migration owns them; the
+ * (`@nightshift/db/schema`, in `engine.ts`) and a migration owns them; the
  * saver never creates them.
  */
 

@@ -1,0 +1,167 @@
+import { sql } from "drizzle-orm";
+import {
+	index,
+	integer,
+	primaryKey,
+	sqliteTable,
+	text,
+	uniqueIndex,
+} from "drizzle-orm/sqlite-core";
+
+import { createdAt, spaceId, updatedAt } from "./columns";
+
+// Owner: `@nightshift/engine`, `peers/`: the registry of Devices, the links
+// to Hosts, and the exchange of run history and commands with them
+// (`peers/exchange/`). It moves to `@nightshift/devices`. `device-config/`
+// makes this computer's own `device` row (`selfDevice`). Known deviation:
+// `@nightshift/auth` `localPerson()` writes `device.owner_id` (STRUCTURE.md
+// section 8).
+
+/**
+ * A computer that runs Night Shift. Exactly one row is this computer: the
+ * one with `self` set. It is made on the first start (by the migration
+ * that added this table, else by `selfDevice`) with a random id that never
+ * changes. `self` is this database's own knowledge: a row of another
+ * Device that sync brings in never has it.
+ */
+export const device = sqliteTable(
+	"device",
+	{
+		id: text("id").primaryKey(),
+		/** What the person calls it. The host name until they change it. */
+		name: text("name").notNull(),
+		/** `process.platform`: darwin, linux, win32. */
+		platform: text("platform").notNull(),
+		/** The address of the Host that keeps its private configuration. Null: none yet. */
+		homeHost: text("home_host"),
+		lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }),
+		/**
+		 * The Person who owns the Device (a Better Auth user). This
+		 * computer's owner is the Person Night Shift signs in for you.
+		 */
+		ownerId: text("owner_id"),
+		/** This computer. At most one row has it. */
+		self: integer("self", { mode: "boolean" }).notNull().default(false),
+		createdAt: createdAt(),
+		/**
+		 * On a Host: when its owner removed the Device's access (its key is
+		 * gone). Pairing it again clears it.
+		 */
+		revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+	},
+	(table) => [
+		uniqueIndex("device_self_idx").on(table.self).where(sql`${table.self} = 1`),
+	],
+);
+
+/**
+ * This computer's link to a Host it paired with (`nightshift join`): where
+ * the Host answers, which certificate it pinned, and whether the Host is its
+ * home or a guest Host. The Device key itself is not here: it is in the
+ * keychain, else in a file of the data directory (`key_store`).
+ */
+export const hostLink = sqliteTable(
+	"host_link",
+	{
+		/** The Host's Device id. */
+		hostId: text("host_id").primaryKey(),
+		/** The Host's name, as it told this computer. */
+		name: text("name").notNull(),
+		/** JSON: the Host's addresses, in the order to try them. */
+		addresses: text("addresses").notNull(),
+		/**
+		 * The PEM of the Host's self-signed certificate, pinned at pairing.
+		 * Null when the Host's certificate is trusted by this computer, or the
+		 * address is a loopback `http://` one.
+		 */
+		certificate: text("certificate"),
+		/** The SHA-256 fingerprint of `certificate`, as shown at pairing. */
+		fingerprint: text("fingerprint"),
+		/** "home": the Host keeps this Device's document. "guest": shared Spaces only. */
+		role: text("role", { enum: ["home", "guest"] }).notNull(),
+		/** The Person on the Host whose key this is (who approved the pairing). */
+		personId: text("person_id").notNull(),
+		/** Where the key is: "keychain" or "file". */
+		keyStore: text("key_store", { enum: ["keychain", "file"] }).notNull(),
+		createdAt: createdAt(),
+		/** When the Host refused the key: its owner removed this computer's access. */
+		revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+	},
+	(table) => [
+		uniqueIndex("host_link_home_idx")
+			.on(table.role)
+			.where(sql`${table.role} = 'home'`),
+	],
+);
+
+/**
+ * A Space this computer takes part in through a Host: the Host keeps it,
+ * this Replica keeps a copy (its Space document, its runs). Its owner's
+ * role there comes with the Host's answer to the link; the Replica also
+ * gets an `organization` row and a `member` row for its own Person with
+ * that role, so sessions and permission checks work here unchanged.
+ */
+export const hostSpace = sqliteTable("host_space", {
+	spaceId: text("space_id").primaryKey(),
+	/** The Host's Device id. */
+	hostId: text("host_id").notNull(),
+	name: text("name").notNull(),
+	/** The role of this Device's owner in the Space, on the Host. */
+	role: text("role").notNull(),
+	/** The Space is the personal Space of this Device's owner on the Host. */
+	personal: integer("personal", { mode: "boolean" }).notNull().default(false),
+	updatedAt: updatedAt(),
+});
+
+/**
+ * How far this Replica has exchanged run history with one Host, per Space
+ * and Walker: the last `walker_seq` it has. For another Walker, the last of
+ * its events this Replica pulled from that Host. For this computer, the
+ * last of its own events that Host took (a push). A Space starts at 0, so
+ * a Space this Device's owner joins later is exchanged from its start.
+ */
+export const syncCursor = sqliteTable(
+	"sync_cursor",
+	{
+		hostId: text("host_id").notNull(),
+		spaceId: text("space_id").notNull(),
+		walkerId: text("walker_id").notNull(),
+		walkerSeq: integer("walker_seq").notNull(),
+		updatedAt: updatedAt(),
+	},
+	(table) => [
+		primaryKey({ columns: [table.hostId, table.spaceId, table.walkerId] }),
+	],
+);
+
+/**
+ * A person's action on a run that another Device walks, on its way to the
+ * Walker: answer a Gate, send a signal, stop. The Walker is the only writer
+ * of its run's events, so the Host keeps the command until the Walker has
+ * applied it (`done_at`), with the Walker's reason when it refused.
+ */
+export const runCommand = sqliteTable(
+	"run_command",
+	{
+		id: text("id").primaryKey(),
+		spaceId: spaceId(),
+		runId: text("run_id").notNull(),
+		/** The Device that walks the run and applies the command. */
+		walkerId: text("walker_id").notNull(),
+		kind: text("kind", {
+			enum: ["gate.resolve", "signal.send", "run.stop", "run.move"],
+		}).notNull(),
+		/** JSON: the action's input (the Gate's step, choice and note; the signal; when to stop). */
+		payload: text("payload").notNull(),
+		/** The Person who asked, on the Host. The Walker checks their role again. */
+		personId: text("person_id").notNull(),
+		createdAt: createdAt(),
+		doneAt: integer("done_at", { mode: "timestamp_ms" }),
+		/** Why the Walker did not apply it. Null when it did. */
+		error: text("error"),
+	},
+	(table) => [
+		index("run_command_walkerId_idx").on(table.walkerId),
+		index("run_command_runId_idx").on(table.runId),
+	],
+);

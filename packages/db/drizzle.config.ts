@@ -12,7 +12,7 @@ const dataDir = resolveDataDir({
 
 export default defineConfig({
 	schema: "./src/schema/index.ts",
-	out: "./src/migrations",
+	out: "./src/migrate/migrations",
 	dialect: "turso",
 	dbCredentials: {
 		url: databaseUrl(

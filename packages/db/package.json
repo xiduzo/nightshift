@@ -4,8 +4,8 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./schema": "./src/schema/index.ts",
-		"./data-dir": "./src/data-dir.ts",
-		"./migrate": "./src/migrate.ts"
+		"./data-dir": "./src/data-dir/index.ts",
+		"./migrate": "./src/migrate/index.ts"
 	},
 	"scripts": {
 		"build": "tsc -b",

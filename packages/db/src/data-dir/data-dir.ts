@@ -21,7 +21,7 @@ export const DATABASE_FILE = "nightshift.db";
 
 /** The checkout of Night Shift this module runs from. Only dev mode uses it. */
 export const checkoutRoot = fileURLToPath(
-	new URL("../../../", import.meta.url),
+	new URL("../../../../", import.meta.url),
 );
 
 export type DataDirSystem = {

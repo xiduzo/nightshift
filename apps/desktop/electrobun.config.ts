@@ -60,7 +60,7 @@ export default {
 		copy: {
 			[webBuildDir]: "views/mainview",
 			// `@nightshift/db` finds its migrations next to the module that runs.
-			"../../packages/db/src/migrations": "bun/migrations",
+			"../../packages/db/src/migrate/migrations": "bun/migrations",
 			// A Worker's own file, next to the bundle that starts it (Bun runs it as is).
 			"src/features/watchdog/watchdog-worker.ts": "bun/watchdog-worker.ts",
 			[libsqlNative]: `bun/node_modules/@libsql/${libsqlNative.split("/").pop()}`,

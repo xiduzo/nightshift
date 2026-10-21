@@ -1,9 +1,9 @@
 import { fileURLToPath } from "node:url";
 import { migrate } from "drizzle-orm/libsql/migrator";
 
-import type { Database } from "./index";
+import type { Database } from "../client";
 
-/** The SQL migrations that drizzle-kit generates from `./schema`. */
+/** The SQL migrations that drizzle-kit generates from the schema (`../schema`). */
 export const migrationsFolder = fileURLToPath(
 	new URL("./migrations", import.meta.url),
 );
