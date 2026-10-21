@@ -3,6 +3,14 @@ import type { OpenGate } from "./types";
 type Ordered = Pick<OpenGate, "openedAt" | "runId" | "stepId">;
 
 /**
+ * One Gate, everywhere: its run and its step. The Host keys a Gate's
+ * notification the same way, so a screen can match the two.
+ */
+export function gateKey(gate: Pick<OpenGate, "runId" | "stepId">): string {
+	return `${gate.runId}:${gate.stepId}`;
+}
+
+/**
  * The inbox order: the Gate that has waited longest first. Two Gates that
  * opened at the same moment keep one order on every screen.
  */

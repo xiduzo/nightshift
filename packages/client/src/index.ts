@@ -61,6 +61,7 @@ export {
 	createGateQueries,
 	type GateChoice,
 	type GateLink,
+	gateKey,
 	gateParts,
 	gateRun,
 	inboxOrder,

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
 	changesInbox,
+	gateKey,
 	gateRun,
 	inboxOrder,
 	isGateClosed,
@@ -10,6 +11,12 @@ import {
 } from "./inbox";
 
 const MINUTE = 60_000;
+
+describe("gateKey", () => {
+	test("names a Gate by its run and its step", () => {
+		expect(gateKey({ runId: "run-1", stepId: "review" })).toBe("run-1:review");
+	});
+});
 
 describe("inboxOrder", () => {
 	test("the Gate that has waited longest comes first", () => {
