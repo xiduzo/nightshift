@@ -10,30 +10,30 @@ import { Text } from "@nightshift/ui-native/components/ui/text";
 import { router } from "expo-router";
 import { BellOff } from "lucide-react-native";
 
-import { useConnection } from "@/features/connection";
+import { useHost } from "@/features/host";
 import { EmptyState } from "@/shared/empty";
 import { Screen } from "@/shared/page";
 
 /** This phone's Host and, later, its notification settings. */
 export function SettingsScreen() {
-	const { connection, signOut } = useConnection();
+	const { state, forget } = useHost();
 
 	async function disconnect() {
-		await signOut();
+		await forget();
 		router.replace("/connect");
 	}
 
 	return (
 		<Screen>
-			{connection.status === "connected" ? (
+			{state.status === "signed-in" ? (
 				<Card>
 					<CardHeader>
 						<CardTitle>Host</CardTitle>
-						<CardDescription>{connection.host.address}</CardDescription>
+						<CardDescription>{state.host.address}</CardDescription>
 					</CardHeader>
 					<CardContent className="gap-4">
 						<Text variant="muted">
-							Signed in as {connection.person.name} ({connection.person.email})
+							Signed in as {state.person.name} ({state.person.email})
 						</Text>
 						<Button variant="outline" onPress={disconnect}>
 							<Text>Sign out</Text>

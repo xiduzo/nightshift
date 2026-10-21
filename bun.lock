@@ -40,8 +40,6 @@
         "@nightshift/api": "workspace:*",
         "@nightshift/client": "workspace:*",
         "@nightshift/ui-native": "workspace:*",
-        "@orpc/client": "catalog:",
-        "@orpc/tanstack-query": "catalog:",
         "@rn-primitives/portal": "catalog:",
         "@tanstack/react-query": "catalog:",
         "@varlock/expo-integration": "1.2.1",
