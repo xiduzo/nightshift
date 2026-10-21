@@ -17,8 +17,8 @@ import { Label } from "@nightshift/ui-native/components/ui/label";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { router } from "expo-router";
 import { CircleAlert, ScanQrCode } from "lucide-react-native";
-import { type ReactNode, useState } from "react";
-import { View } from "react-native";
+import { type ReactNode, useRef, useState } from "react";
+import { type TextInput, View } from "react-native";
 import { ENV } from "@/env";
 import { Screen } from "@/shared/page";
 import { CodeScanner } from "./code-scanner";
@@ -45,6 +45,7 @@ export function ConnectScreen() {
 	const [code, setCode] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	const passwordInput = useRef<TextInput>(null);
 
 	async function submit() {
 		setBusy(true);
@@ -116,15 +117,20 @@ export function ConnectScreen() {
 									autoComplete="email"
 									keyboardType="email-address"
 									textContentType="emailAddress"
+									returnKeyType="next"
+									submitBehavior="submit"
+									onSubmitEditing={() => passwordInput.current?.focus()}
 								/>
 							</Field>
 							<Field label="Password">
 								<Input
+									ref={passwordInput}
 									value={password}
 									onChangeText={setPassword}
 									secureTextEntry
 									autoComplete="password"
 									textContentType="password"
+									returnKeyType="go"
 									onSubmitEditing={submit}
 								/>
 							</Field>

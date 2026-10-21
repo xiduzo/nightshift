@@ -44,7 +44,6 @@ export function SpacePicker() {
 			disabled={switchSpace.isPending}
 		>
 			<SelectTrigger
-				size="sm"
 				className="mr-4 max-w-48"
 				accessibilityLabel="Choose the Space"
 			>
