@@ -550,6 +550,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 "label": {
                   "type": "string",
                 },
+                "lockScreen": {
+                  "type": "boolean",
+                },
                 "model": {
                   "minLength": 1,
                   "type": "string",
@@ -1878,6 +1881,9 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                 },
                 "label": {
                   "type": "string",
+                },
+                "lockScreen": {
+                  "type": "boolean",
                 },
                 "model": {
                   "minLength": 1,
@@ -3228,16 +3234,16 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "customHarnessSchema": "340fd5e4d3041404dcebc63ea2a312d8dba0e6b3c15d5b50b154df7a8f58ddb7",
   "decidedBySchema": "ba1eaed1ee91e185e0fe25e4b3ab48ebc800aac50bbe3b6f3762a1ddd7c5e6fe",
   "deciderNameSchema": "844c61e968f871120362b07648dd4375a0c6183fe79a59bfd0d521792c578247",
-  "decisionNodeSchema": "4a359125cf5957796ecd7560090d0547831954f83065736abe5d964efb4c75e6",
+  "decisionNodeSchema": "33378bfad59b92ecba07e0f4f8bc8153d823c552e6b947eeadaf7765105f8b20",
   "deviceNameSchema": "c385fef4336b7131063a6ba2bc416a02725ab5eedb75af59ca29bafd252dc91b",
   "effortSchema": "493230d82c85cabb606d65dd36a75b762c05cb4a2b5fda14a43a1d6b1d2d1902",
   "filesSourceSchema": "4c1c5591c21b0adb94e9d96d93d697b93de410a801ccf6b4b7a258d8c76b3219",
   "flowEdgeSchema": "fa102c4d0dbb7e0dc39d6b2ff6a8dda61e677b0a5b06f37519200f3145d3e80d",
   "flowInputSchema": "614c08d07a4c7b5980a98cf8447cd5bd3491dd84a298256e50dee562624f2c57",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "3a45a360996cb2d524a4794a96db2c7322c46c81c2a540521dd93b142f2b5847",
+  "flowNodeSchema": "ac67351d65a4994fb6724cc3d9c19673d8b274a728e9de472b4214923f6680b2",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "a42802bb3f19b7514d6d249ffe81f7917e7001834709a694d66dd705ea65fa27",
+  "flowSchema": "ec98fd4e057d275a4583e4cbd34e637433150941e2914ef9f78e4d3260fb200b",
   "flowVariableSchema": "bc241c9d8a19a055e9866d040bc4720e0dbd3eacb515865d1036ca65e8be7679",
   "harnessNameSchema": "5680ae13dedd38277934574bb77ad18e9ec2d67a68bd7c7266e1c5ebd57d3318",
   "jsonSchemaSchema": "5f8d604991fdf1ed7da4739406b681e55cba181bf749047debf0eae2673efece",

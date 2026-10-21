@@ -87,14 +87,18 @@ export function decisionNode(
 	};
 }
 
-/** Changes who decides. A rule's `when` fields go; a model's name stays for when it comes back. */
+/**
+ * Changes who decides. A rule's `when` fields go, and `lockScreen` goes
+ * when a person no longer decides; a model's name stays for when it comes back.
+ */
 export function withDecidedBy(node: DecisionNode, by: DecidedBy): DecisionNode {
 	if (by === node.by) return node;
 	const options =
 		by === "rule"
 			? node.options
 			: node.options.map(({ when: _, ...option }) => option);
-	return { ...node, by, options };
+	const { lockScreen: _, ...rest } = node;
+	return { ...(by === "person" ? node : rest), by, options };
 }
 
 /** Runs a flow once. The called flow starts empty; the issues panel asks for one. */

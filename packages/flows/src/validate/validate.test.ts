@@ -739,6 +739,37 @@ describe("validateFlow: decisions and gates", () => {
 		]);
 	});
 
+	test("only a Gate can be answered from the lock screen", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					gate("ask", ["ok"], { lockScreen: true }),
+					decision("decide", ["go"], { lockScreen: true }),
+					ruled("pick", [["go"]], { lockScreen: true }),
+					decision("quiet", ["done"], { lockScreen: false }),
+				],
+				[
+					edge("a", "ask", "ok", "decide"),
+					edge("b", "decide", "go", "pick"),
+					edge("c", "pick", "go", "quiet"),
+				],
+				"ask",
+			),
+		);
+		expect(
+			errors(issues).map((issue) => [issue.nodeId, issue.message]),
+		).toEqual([
+			[
+				"decide",
+				'Decision node "decide" can be answered from the lock screen, but a model decides it. Remove lockScreen, or decide it yourself.',
+			],
+			[
+				"pick",
+				'Decision node "pick" can be answered from the lock screen, but a rule decides it. Remove lockScreen, or decide it yourself.',
+			],
+		]);
+	});
+
 	test("a rule Decision: every option but the default has a rule, and the default goes last", () => {
 		const twoDefaults = validateFlow(
 			flow(
