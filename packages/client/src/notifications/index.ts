@@ -3,6 +3,7 @@
  * in, their settings and screens, and the words of a notice.
  */
 
+export { PHONE_DELAYS, phoneDelayLabel } from "./phone-delay";
 export {
 	applySettingsPatch,
 	createNotificationMutations,

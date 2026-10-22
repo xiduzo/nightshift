@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
 import {
+	BrowserPushProblem,
 	browserName,
 	currentSubscription,
 	needsHomeScreen,
@@ -91,8 +92,8 @@ export function useBrowserPush() {
 				notificationQueries.webPushKey(),
 			);
 			if (!publicKey) {
-				throw new Error(
-					"This Night Shift cannot send notifications to a browser.",
+				throw new BrowserPushProblem(
+					"Notifications in a browser are not set up on this Host. Ask the person who runs your Host to turn them on.",
 				);
 			}
 			const subscription = await subscribe(publicKey);

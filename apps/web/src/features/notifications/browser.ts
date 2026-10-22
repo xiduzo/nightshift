@@ -262,3 +262,20 @@ export function setOwnScreenId(id: string | null): void {
 		// Private windows may refuse storage: the list then marks no row.
 	}
 }
+
+/** A reason Night Shift wrote for the person: it shows as it is. */
+export class BrowserPushProblem extends Error {}
+
+/**
+ * What a toast says when this browser's notifications did not turn on or
+ * off. A browser's own error is not for the person, so it gets fixed words.
+ */
+export function browserPushErrorText(
+	error: unknown,
+	turningOn: boolean,
+): string {
+	if (error instanceof BrowserPushProblem) return error.message;
+	return turningOn
+		? "Notifications in this browser did not turn on. Try again, or check the notification settings of this browser."
+		: "Notifications in this browser did not turn off. Try again.";
+}

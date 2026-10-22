@@ -4,6 +4,8 @@ import {
 	createNotificationQueries,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
+	PHONE_DELAYS,
+	phoneDelayLabel,
 } from "@nightshift/client";
 import {
 	Alert,
@@ -36,12 +38,7 @@ import { Alert as NativeAlert, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useHostQueries } from "@/features/host";
-import {
-	DELAY_OPTIONS,
-	delayLabel,
-	HOURS,
-	phoneTimeZone,
-} from "./notification-choices";
+import { HOURS, phoneTimeZone } from "./notification-choices";
 
 /** Quiet hours when the person turns them on: the night. */
 const DEFAULT_QUIET = { start: "22:00", end: "07:00" };
@@ -120,7 +117,7 @@ function NotificationFields({
 	const quiet = value.quietHours;
 	return (
 		<>
-			<Text variant="small">Tell me when</Text>
+			<Text variant="small">What Night Shift tells you about</Text>
 			<SwitchRow
 				label="A Gate waits for you"
 				checked={value.events.gateOpened}
@@ -138,8 +135,8 @@ function NotificationFields({
 			/>
 			<Separator />
 			<SwitchRow
-				label="Notify my phones"
-				hint="Off: your phones show the inbox, but do not tell you."
+				label="Phones"
+				hint="When off, your phones get no notifications. The inbox still shows what waits for you."
 				checked={value.screens.expo}
 				onChange={(on) => onChange({ screens: { expo: on } })}
 			/>
@@ -256,7 +253,7 @@ function DelaySelect({
 		<View className="gap-2">
 			<Label>Phone delay</Label>
 			<Select
-				value={{ value: String(value), label: delayLabel(value) }}
+				value={{ value: String(value), label: phoneDelayLabel(value) }}
 				onValueChange={(option) => option && onChange(Number(option.value))}
 			>
 				<SelectTrigger accessibilityLabel="Phone delay">
@@ -264,11 +261,11 @@ function DelaySelect({
 				</SelectTrigger>
 				<SelectContent insets={{ top: insets.top, bottom: insets.bottom }}>
 					<ScrollView className="max-h-64">
-						{DELAY_OPTIONS.map((minutes) => (
+						{PHONE_DELAYS.map((minutes) => (
 							<SelectItem
 								key={minutes}
 								value={String(minutes)}
-								label={delayLabel(minutes)}
+								label={phoneDelayLabel(minutes)}
 							/>
 						))}
 					</ScrollView>
