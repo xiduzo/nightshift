@@ -104,6 +104,24 @@ export function isRefusal(error: unknown): boolean {
 	);
 }
 
+/**
+ * How a call on the Host failed: `refused`, the Host does not know the
+ * key (its access was removed); `denied`, the Host answered and does not
+ * take this call now (not allowed, or not yet); `unreachable`, anything
+ * else (no answer, a timeout, a failure on the Host).
+ */
+export type HostError = "refused" | "denied" | "unreachable";
+
+export function hostErrorOf(error: unknown): HostError {
+	if (error instanceof ORPCError) {
+		if (error.code === "UNAUTHORIZED") return "refused";
+		if (error.code === "FORBIDDEN" || error.code === "CONFLICT") {
+			return "denied";
+		}
+	}
+	return "unreachable";
+}
+
 export function httpsLink(options: HttpsLinkOptions): Link {
 	const heartbeatMs = options.heartbeatMs ?? 15_000;
 	const firstBackoffMs = options.firstBackoffMs ?? 1_000;

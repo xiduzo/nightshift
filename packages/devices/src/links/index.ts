@@ -13,5 +13,6 @@ export {
 	personOnHost,
 } from "./host-spaces";
 export { joinHost } from "./join";
+export { hostErrorOf } from "./link";
 export { createDeviceLinks, type DeviceLinks } from "./links";
 export type { JoinProgress, LinkedHost } from "./types";

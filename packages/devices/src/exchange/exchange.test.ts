@@ -116,8 +116,11 @@ async function projectOnB(projectId: string) {
 	await b.db.insert(project).values(row);
 }
 
-/** Everything of A's Walker in A's Space after B's cursors, into B. */
-async function exchange(engineA: PeerEngine, engineB: PeerEngine) {
+/**
+ * Everything of A's Walker in A's Space after B's cursors, into B: the
+ * rows, without the Device's loop (device-exchange.test.ts tests that).
+ */
+async function copyRows(engineA: PeerEngine, engineB: PeerEngine) {
 	const cursors = await engineB.exchange.rows.cursorsWith(HOST);
 	const { rows, cursors: moved } = await engineA.exchange.rows.rowsAfter({
 		spaces: [a.spaceId],
@@ -142,7 +145,7 @@ describe("the run history exchange", () => {
 			.startRun({ projectId, flow: gateFlow });
 		await untilStatus(engineA, a.spaceId, run.id, "waiting");
 
-		const first = await exchange(engineA, engineB);
+		const first = await copyRows(engineA, engineB);
 		expect(first.length).toBeGreaterThan(0);
 		// Facts of no run (ProjectAdded) stay with their Replica.
 		expect(first.every((e) => e.runId === run.id)).toBe(true);
@@ -157,7 +160,7 @@ describe("the run history exchange", () => {
 		});
 
 		// The same rows again: nothing new.
-		expect(await exchange(engineA, engineB)).toEqual([]);
+		expect(await copyRows(engineA, engineB)).toEqual([]);
 		const again = await engineA.exchange.rows.rowsAfter({
 			spaces: [a.spaceId],
 			cursors: {},
@@ -173,7 +176,7 @@ describe("the run history exchange", () => {
 			choice: "approve",
 		});
 		await untilStatus(engineA, a.spaceId, run.id, "finished");
-		const rest = await exchange(engineA, engineB);
+		const rest = await copyRows(engineA, engineB);
 		expect(rest[0]?.seq).toBeGreaterThan(first.at(-1)?.seq ?? 0);
 		expect(await statusOf(engineB, a.spaceId, run.id)).toBe("finished");
 		expect(await engineB.space(a.spaceId).listGates()).toEqual([]);
@@ -225,7 +228,7 @@ describe("the run history exchange", () => {
 			} as Flow,
 		});
 		await untilStatus(engineA, a.spaceId, run.id, "finished");
-		await exchange(engineA, engineB);
+		await copyRows(engineA, engineB);
 		const [onA] = await a.db
 			.select()
 			.from(agentSession)
@@ -309,7 +312,7 @@ describe("a run walked elsewhere", () => {
 			.space(a.spaceId)
 			.startRun({ projectId, flow: gateFlow });
 		await untilStatus(engineA, a.spaceId, run.id, "waiting");
-		await exchange(engineA, engineB);
+		await copyRows(engineA, engineB);
 		const gate = (await engineB.space(a.spaceId).listGates())[0];
 		return { engineA, engineB, run, stepId: gate?.stepId as string };
 	}
@@ -554,7 +557,7 @@ describe("run logs", () => {
 		await untilStatus(engineA, a.spaceId, run.id, "waiting");
 		const landed: string[] = [];
 		runLog.onLanded((events) => landed.push(...events.map((e) => e.type)));
-		await exchange(engineA, engineB);
+		await copyRows(engineA, engineB);
 		expect(landed).toContain("GateOpened");
 		await runLog.events(run.id);
 		await expectRunLogsInSync(b.db, [runLog]);

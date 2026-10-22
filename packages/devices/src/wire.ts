@@ -9,8 +9,9 @@ import type {
 	SpaceDocuments,
 } from "@nightshift/engine";
 import {
+	createDeviceExchange,
 	createHostExchange,
-	exchangeWithHost,
+	type DeviceExchange,
 	type HostExchange,
 } from "./exchange";
 import { createDevices, createHost, type Devices, type Host } from "./host";
@@ -153,6 +154,21 @@ export async function wireDevices(deps: {
 		return server;
 	}
 
+	/**
+	 * Per Host: this computer's half of the exchange of run history. It
+	 * lives as long as the daemon, so a command it applied is not applied
+	 * again when the link drops and comes back.
+	 */
+	const deviceExchanges = new Map<string, DeviceExchange>();
+	function deviceExchange(hostId: string): DeviceExchange {
+		let exchange = deviceExchanges.get(hostId);
+		if (!exchange) {
+			exchange = createDeviceExchange({ engine, hostId, selfId: self.id });
+			deviceExchanges.set(hostId, exchange);
+		}
+		return exchange;
+	}
+
 	/** This computer's Offers into Spaces, as its owner makes and withdraws them. */
 	const offers = createOffers({
 		db,
@@ -199,13 +215,7 @@ export async function wireDevices(deps: {
 		// and the steps of the Host's runs placed on this computer.
 		whileOnline: (link, client, _hello, signal) =>
 			Promise.all([
-				exchangeWithHost({
-					engine,
-					hostId: link.hostId,
-					client,
-					selfId: self.id,
-					signal,
-				}),
+				deviceExchange(link.hostId).run(client, signal),
 				workServer(link.hostId).whileOnline(client, signal),
 			]).then(() => {}),
 	});
