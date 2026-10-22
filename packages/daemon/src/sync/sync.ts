@@ -5,14 +5,19 @@ import * as Y from "yjs";
 
 /**
  * The relay's document half: Hocuspocus over Bun's own WebSockets, in the
- * daemon's process. A client (a UI, later another Device of the same
- * owner) opens a document by name and Yjs keeps both sides in step.
+ * daemon's process. A client (a UI, or another Device over its Link)
+ * opens a document by name and Yjs keeps both sides in step. It serves
+ * two kinds of document:
  *
- * The daemon is the Owner of the documents it serves: it holds each one
- * (the engine's `DeviceDocument`) and writes it to the Replica itself.
- * Hocuspocus only carries updates, so it gets no persistence of its own:
- * when it loads a document it takes the Owner's state, and from then on
- * every update goes both ways until it unloads the document.
+ * - Owned documents: this Device's document and every Space document.
+ *   The engine holds each one (a `PersistedDocument`) and writes it to
+ *   the Replica on every update. Hocuspocus only carries their updates:
+ *   when it loads one it takes the engine's state, and from then on every
+ *   update goes both ways (the `BRIDGE` origin) until it unloads it.
+ * - Kept documents (`KeptDocuments`): on a Host, the Device documents of
+ *   the Devices whose home Host it is. The engine never opens them.
+ *   Hocuspocus loads them from the Replica's `ydoc` rows (`documentRows`)
+ *   and stores them back after changes, with its own debounce.
  *
  * This is the transport only. Who may open which document is the policy
  * of `@nightshift/auth` (`documentAccess`).
