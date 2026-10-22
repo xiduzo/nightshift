@@ -24,7 +24,7 @@ import {
 	type CutShort,
 	closeOpenWork as closeWork,
 } from "./open-work";
-import { loggedVisits, reenteredNode, reentryUpdate } from "./reentry";
+import type { ReentryPlan } from "./reentry";
 import { createSleeps } from "./sleep";
 import type { Parked, ResumeValue, RunEvent, RunStateUpdate } from "./state";
 import {
@@ -34,6 +34,7 @@ import {
 	type StreamInput,
 	type Thread,
 	type ThreadDeps,
+	type ThreadSnapshot,
 	type ThreadState,
 } from "./thread";
 
@@ -50,12 +51,11 @@ import {
  * timers and the wake of a sleeping run are the sleep module's (`sleeps`,
  * `graph/sleep.ts`), given the runner's thread seam.
  *
- * - `start` streams `{ inputs }`; `continueRun` streams `null` (the node a
- *   dead daemon left pending re-runs, rule 5); `resume` streams
- *   `Command({ resume })` into the interrupt the thread sits at; `reenter`
- *   jumps to a node of a thread that ended or never started (which node,
- *   and the seed state: `reenteredNode` and `reentryUpdate` in
- *   reentry.ts).
+ * - `start` streams `{ inputs }`; `resume` streams `Command({ resume })`
+ *   into the interrupt the thread sits at (a Gate's answer, a wake);
+ *   `enter` drives what a re-entry plan says (`planReentry` in
+ *   reentry.ts: answer the interrupt, run the pending node again, or jump
+ *   to a node).
  * - A drive that parks at the root's interrupt: a `wait` schedules the
  *   wake timer with the sleep module (`WaitStarted` is in the log
  *   already); a `gate` needs nothing (the Gate node logged `GateOpened`);
@@ -566,13 +566,6 @@ export function createRunner(deps: RunnerDeps) {
 		): void {
 			drive(row, inputOf({ kind: "start", inputs, stopAt }));
 		},
-		/**
-		 * Re-runs the node the thread is pending at (a daemon death or an
-		 * engine failure). `update` writes state first (a cleared stop time).
-		 */
-		continueRun(row: RunRow, update?: RunStateUpdate): void {
-			drive(row, inputOf({ kind: "continue", ...(update ? { update } : {}) }));
-		},
 		/** Answers the interrupt the thread sits at; `update` writes state before the node continues. */
 		resume(row: RunRow, value: ResumeValue, update?: RunStateUpdate): void {
 			drive(
@@ -581,82 +574,20 @@ export function createRunner(deps: RunnerDeps) {
 			);
 		},
 		/**
-		 * Jumps to a top-level node of a thread that reached END or never
-		 * ran. A finished run re-enters on its own latest checkpoint: `ended`
-		 * and `pending` cleared, and the `reenteredNode`'s last visit taken
-		 * back so the node reopens its step. A thread with no checkpoint (a
-		 * run from before this engine) is seeded from the log
-		 * (`reentryUpdate`). `update` writes on top (a cleared stop time).
+		 * Moves the thread as a re-entry plan says (`planReentry`): drops the
+		 * task the thread still has first when the plan says so, then drives
+		 * the entry. Takes over a reserved slot.
 		 */
-		async reenter(
+		async enter(
 			row: RunRow,
-			nodeId: string,
-			events: readonly LoggedEvent[],
-			update?: RunStateUpdate,
+			plan: Pick<ReentryPlan, "entry" | "clearTasks">,
 		): Promise<void> {
-			const thread = threadOf(row);
-			const snapshot = await thread.snapshot();
-			let seed: RunStateUpdate;
-			if (!snapshot.hasCheckpoint) {
-				seed = reentryUpdate(thread.ctx.flow, events);
-			} else {
-				const reentered = reenteredNode(events);
-				const visits = snapshot.values.visits ?? {};
-				const committed = reentered ? (visits[reentered] ?? 0) : 0;
-				seed = {
-					ended: null,
-					pending: null,
-					...(reentered && committed > 0
-						? { visits: { [reentered]: committed - 1 } }
-						: {}),
-				};
-			}
-			drive(
-				row,
-				inputOf({ kind: "goto", nodeId, update: { ...seed, ...update } }),
-			);
+			if (plan.clearTasks) await threadOf(row).clearTasks();
+			drive(row, inputOf(plan.entry));
 		},
-		/**
-		 * Walks the run again from `nodeId`, a top-level node, with a new
-		 * visit of it. The thread may be anywhere: parked at an interrupt,
-		 * pending at a node, at END, or without a checkpoint. A thread that
-		 * still has a task (an interrupt, or a node a stop or a death cut
-		 * short) has it cleared first (`updateState(…, END)`), so only the
-		 * jump runs. The visits are set to the log's counts (`loggedVisits`):
-		 * no step of an earlier walk is taken up again. The cursors of Calls
-		 * with `each` are cleared, so a Call starts its list over. Inputs,
-		 * node outputs and edge counts stay. `update` writes on top (a
-		 * cleared stop time). Takes over a reserved slot.
-		 */
-		async rerun(
-			row: RunRow,
-			nodeId: string,
-			events: readonly LoggedEvent[],
-			update?: RunStateUpdate,
-		): Promise<void> {
-			const thread = threadOf(row);
-			const snapshot = await thread.snapshot();
-			let seed: RunStateUpdate;
-			if (!snapshot.hasCheckpoint) {
-				seed = reentryUpdate(thread.ctx.flow, events, null);
-			} else {
-				if (snapshot.hasTasks) await thread.clearTasks();
-				const { loops } = snapshot.values;
-				seed = {
-					ended: null,
-					pending: null,
-					visits: loggedVisits(thread.ctx.flow, events, null),
-					loops: Object.fromEntries(
-						Object.keys(loops ?? {}).map((id) => [id, null]),
-					),
-				};
-			}
-			drive(
-				row,
-				inputOf({ kind: "goto", nodeId, update: { ...seed, ...update } }),
-			);
-		},
-		threadState,
+		/** The thread's latest checkpoint: where it is, its values and its tasks. */
+		threadSnapshot: (row: RunRow): Promise<ThreadSnapshot> =>
+			threadOf(row).snapshot(),
 		/**
 		 * Drops what this runner keeps of a run that another Device walks
 		 * now: its compiled thread and its wake timer.
