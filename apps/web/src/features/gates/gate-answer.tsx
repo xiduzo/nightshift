@@ -50,7 +50,11 @@ export function GateAnswer({
 		const trimmed = note.trim();
 		resolve.mutate(
 			{ runId, stepId, choice, note: trimmed === "" ? undefined : trimmed },
-			{ onSuccess: () => setNote("") },
+			{
+				onSuccess: (result) => {
+					if (result.kind === "answered") setNote("");
+				},
+			},
 		);
 	};
 

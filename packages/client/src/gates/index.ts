@@ -2,10 +2,7 @@
 
 export {
 	answerGate,
-	type GateAnswer,
-	type GateAnswerResult,
 	type GateRefusal,
-	gateRefusalOf,
 	gateRefusalText,
 } from "./answer";
 export {

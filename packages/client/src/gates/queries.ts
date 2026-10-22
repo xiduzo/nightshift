@@ -52,7 +52,5 @@ export function createGateMutations(orpc: ApiQueryUtils) {
 			mutationFn: (input) =>
 				answerGate({ gates: { resolve: orpc.gates.resolve.call } }, input),
 		}),
-		/** Going: the apps move to `answer`. */
-		resolve: orpc.gates.resolve.mutationOptions,
 	};
 }
