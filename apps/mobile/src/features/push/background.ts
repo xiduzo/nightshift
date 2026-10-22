@@ -1,4 +1,9 @@
-import { glanceSnapshot, isGateClosed } from "@nightshift/client";
+import {
+	glanceSnapshot,
+	isGateClosed,
+	PUSH_ANDROID_CHANNEL,
+	PUSH_CATEGORY,
+} from "@nightshift/client";
 import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
 import { AppState, Platform } from "react-native";
@@ -8,9 +13,7 @@ import { savedHost } from "@/features/host";
 import { defineCategories } from "./categories";
 import { inFrontPlace, showBanner } from "./in-front";
 import {
-	ANDROID_CHANNEL,
 	answerOfAction,
-	CATEGORY,
 	type PushData,
 	pushDataOf,
 	showInFront,
@@ -64,10 +67,12 @@ async function tellNotSent(data: PushData): Promise<void> {
 			title: "Your answer was not sent",
 			body: "Night Shift could not reach your Host. Open the Gate to answer it.",
 			data: ids,
-			categoryIdentifier: CATEGORY.open,
+			categoryIdentifier: PUSH_CATEGORY.open,
 		},
 		trigger:
-			Platform.OS === "android" ? { channelId: ANDROID_CHANNEL.gates } : null,
+			Platform.OS === "android"
+				? { channelId: PUSH_ANDROID_CHANNEL.gates }
+				: null,
 	}).catch(() => undefined);
 }
 

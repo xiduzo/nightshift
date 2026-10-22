@@ -2,34 +2,19 @@
  * What a push from the Host carries, and what the phone does with it. Pure:
  * the native parts (`notifications.ts`, `background.ts`) ask the phone, this
  * decides. The shapes follow the "Phone push contract" in
- * `docs/research/mobile.md` and `packages/notifications/src/channels/expo.ts`.
+ * `docs/research/mobile.md`. Its ids and kinds come from `@nightshift/client`.
  */
 
-/** The notification categories the Host names (`EXPO_CATEGORY` on the Host). */
-export const CATEGORY = {
-	/** A lock-screen Gate with two options: Approve and Reject on the notification. */
-	decide: "gate-decide",
-	/** Any other Gate, and the end of quiet hours: a tap opens the app. */
-	open: "gate-open",
-	/** A run that finished or failed: a tap opens the run. */
-	run: "run",
-} as const;
-
-/** The Android channels the Host names (`EXPO_ANDROID_CHANNEL` on the Host). */
-export const ANDROID_CHANNEL = { gates: "gates", runs: "runs" } as const;
-
-/** The two buttons of `gate-decide`. Approve answers the first option, Reject the second. */
-export const ACTION = { approve: "approve", reject: "reject" } as const;
-
-export type PushKind =
-	| "gate-opened"
-	| "run-finished"
-	| "run-failed"
-	| "gates-waiting";
+import {
+	isGateKey,
+	PUSH_ACTION,
+	PUSH_MESSAGE_KINDS,
+	type PushMessageKind,
+} from "@nightshift/client";
 
 /** The `data` of a push the person sees. */
 export type PushData = {
-	kind: PushKind;
+	kind: PushMessageKind;
 	/** `runId:stepId` for a Gate, `runId:end:<seq>` for a run's end, `waiting:<ms>`. */
 	key: string;
 	spaceId: string | null;
@@ -39,12 +24,7 @@ export type PushData = {
 	options?: { id: string; label: string }[];
 };
 
-const KINDS = new Set<string>([
-	"gate-opened",
-	"run-finished",
-	"run-failed",
-	"gates-waiting",
-]);
+const KINDS = new Set<string>(PUSH_MESSAGE_KINDS);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -61,7 +41,7 @@ export function pushDataOf(raw: unknown): PushData | null {
 	const key = text(raw.key);
 	if (!kind || !KINDS.has(kind) || !key) return null;
 	const data: PushData = {
-		kind: kind as PushKind,
+		kind: kind as PushMessageKind,
 		key,
 		spaceId: text(raw.spaceId),
 		runId: text(raw.runId),
@@ -118,7 +98,11 @@ export function answerOfAction(
 	if (data?.kind !== "gate-opened") return null;
 	if (!data.runId || !data.stepId || data.options?.length !== 2) return null;
 	const index =
-		actionId === ACTION.approve ? 0 : actionId === ACTION.reject ? 1 : -1;
+		actionId === PUSH_ACTION.approve
+			? 0
+			: actionId === PUSH_ACTION.reject
+				? 1
+				: -1;
 	const option = data.options[index];
 	if (!option) return null;
 	return { runId: data.runId, stepId: data.stepId, choice: option.id };
@@ -164,12 +148,6 @@ export function shownButClosed(
 
 /** How much older than the read a notification must be to count as answered. */
 const READ_MARGIN_MS = 30_000;
-
-/** A Gate's key is `runId:stepId`. A run's end has a third part, `waiting:` is not a Gate. */
-function isGateKey(key: string): boolean {
-	const parts = key.split(":");
-	return parts.length === 2 && parts[0] !== "waiting";
-}
 
 /** Where the person is in the app, for a push that comes while the app is in front. */
 export type InFrontPlace = {
