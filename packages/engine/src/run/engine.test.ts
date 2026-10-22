@@ -2135,7 +2135,12 @@ describe("automatic resume after a restart", () => {
 describe("deadlines without timers", () => {
 	test("the sweep ends a running step past its budget whose harness ignores everything", async () => {
 		const { harness, sessions } = scriptedHarness({ hang: true, silent: true });
-		const daemon = makeDaemon(harness, {}, { minuteMs: 50 });
+		// The sweep looks every 20 ms; its interval is set before the freeze.
+		const daemon = makeDaemon(
+			harness,
+			{},
+			{ minuteMs: 100, overdueSweepMs: 20 },
+		);
 		const engine = daemon.space(sandbox.spaceId);
 		const id = await projectId(engine);
 		// The step's own timers never fire: they are set while timers are frozen.
@@ -2156,13 +2161,11 @@ describe("deadlines without timers", () => {
 		const hung = sessions[0] as (typeof sessions)[number];
 
 		// Within its budget, and its grace: the sweep leaves it alone.
-		await daemon.endOverdueSteps();
+		await Bun.sleep(40);
 		expect(await statusOf(engine, run.id)).toBe("running");
 
-		// One minute (50 ms) of budget, one minute of grace.
-		await Bun.sleep(150);
-		await daemon.endOverdueSteps();
-		expect(hung.input.signal.aborted).toBe(true);
+		// One minute (100 ms) of budget, one minute of grace.
+		await waitFor(() => hung.input.signal.aborted, { label: "the sweep" });
 		const detail = await engine.getRun(run.id);
 		expect(detail.status).toBe("failed");
 		expect(detail.reason).toBe(

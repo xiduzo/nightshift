@@ -1001,7 +1001,5 @@ export function createRunner(deps: RunnerDeps) {
 		continueTranscriptAfter: recorders.continueAfter,
 		release,
 		dispose,
-		/** Checks the running steps against their limits now, as the sweep does. */
-		endOverdueSteps: sweepOverdue,
 	};
 }

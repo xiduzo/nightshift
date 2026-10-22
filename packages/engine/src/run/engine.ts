@@ -95,6 +95,8 @@ export type EngineInternals = {
 	resumeGraceMs?: number;
 	/** The run log the engine reads and appends through. Default: a new one on `options.db`. */
 	runLog?: RunLog;
+	/** How often the runner looks for steps past their time limits that their timers missed. Default 5 000 ms. */
+	overdueSweepMs?: number;
 };
 
 export function createEngine(
@@ -223,6 +225,9 @@ export function createEngine(
 		calledFlowsOf: parseCalledFlows,
 		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
 		signal,
+		...(internals.overdueSweepMs !== undefined
+			? { overdueSweepMs: internals.overdueSweepMs }
+			: {}),
 	});
 
 	const recovery = createRecovery({
@@ -394,10 +399,6 @@ export function createEngine(
 		async deviceBack(_deviceId) {
 			await ready;
 			await control.wakeOfflineSleeps();
-		},
-		async endOverdueSteps() {
-			await ready;
-			await runner.endOverdueSteps();
 		},
 		async dispose() {
 			lifetime.abort();

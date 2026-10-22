@@ -58,13 +58,6 @@ export interface Engine {
 	 */
 	deviceBack(deviceId: string): Promise<void>;
 	/**
-	 * Ends the running steps of the runs this computer walks that ran past
-	 * their time budget or idle limit, as the run's log records them, when
-	 * their own timers did not. For a periodic sweep: a step must be one
-	 * minute past its limit.
-	 */
-	endOverdueSteps(): Promise<void>;
-	/**
 	 * Hands this computer's runs over to a new engine in the same process
 	 * (`bun --hot` evaluates the daemon again). Stops the scheduler, the
 	 * resumes and the wake timers, and lets go of every run this engine
