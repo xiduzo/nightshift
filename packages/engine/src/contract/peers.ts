@@ -64,6 +64,12 @@ export type PeerContext = {
 	 * The engine owns those tables: the peers touch them only here.
 	 */
 	history: RunHistory;
+	/**
+	 * The walk state of the runs this computer walks, as the archive keeps
+	 * it. The engine owns the checkpoint tables: the peers read them only
+	 * here, and never write them.
+	 */
+	walks: WalkFiles;
 	documents: SpaceDocuments;
 	now(): number;
 	/** The Hosts this computer links to (`EngineOptions.relay`). */
@@ -183,6 +189,37 @@ export type RunsPort = {
 	archiveForMove(row: RunRow): Promise<void>;
 	/** The checkpoint of a run another Device moved here, from the archive into the checkpoint tables. */
 	restoreMoved(row: RunRow): Promise<void>;
+};
+
+/** A file of a run's walk state, by its Space and run (and step). */
+export type WalkRef =
+	| { kind: "checkpoint"; spaceId: string; runId: string }
+	| {
+			kind: "transcript" | "log";
+			spaceId: string;
+			runId: string;
+			stepId: string;
+	  };
+
+/** One file of a run's walk state. Its content is the engine's: the peers keep and carry it. */
+export type WalkFile = { ref: WalkRef; content: string };
+
+/** What the peers read of the walk state of the runs this computer walks. */
+export type WalkFiles = {
+	/**
+	 * The walk state of a run this computer walks: the transcript and the
+	 * command log of each of `steps` (default: every step of the run) that
+	 * it has, then the latest Checkpoint. Empty for a run walked elsewhere.
+	 */
+	exportWalk(
+		runId: string,
+		options?: { steps?: readonly string[] },
+	): Promise<WalkFile[]>;
+	/**
+	 * One file of a run this computer walks. Null when it has none, when
+	 * another Device walks the run, or when the step is not of the run.
+	 */
+	ownFile(ref: WalkRef): Promise<string | null>;
 };
 
 /** One step, by its Space and run. */

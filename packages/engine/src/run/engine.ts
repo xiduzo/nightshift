@@ -4,7 +4,7 @@ import { createArtifactStore } from "../artifacts";
 import type { Engine, EngineOptions, StartRunInput } from "../contract";
 import { defaultRunSettings, type RunSettings } from "../device-config";
 import { createFlowFiles } from "../flows";
-import { createRunner, resolvePolicy } from "../graph";
+import { createRunner, createRunWalks, resolvePolicy } from "../graph";
 import {
 	createRunBus,
 	createRunHistory,
@@ -145,6 +145,10 @@ export function createEngine(
 	});
 	peersReady.catch(() => {});
 
+	const history = createRunHistory({ db, dataDir, log: runLog, bus });
+	/** The walk state of the runs this computer walks, as files (`graph/walk-state.ts`). */
+	const walks = createRunWalks({ db, log: runLog, history });
+
 	/**
 	 * The other Devices and Hosts (`Peers`): where steps run, Offers, the
 	 * Host that keeps a Space, and the runs walked elsewhere.
@@ -155,7 +159,8 @@ export function createEngine(
 		device,
 		log: runLog,
 		bus,
-		history: createRunHistory({ db, dataDir, log: runLog, bus }),
+		history,
+		walks: { exportWalk: walks.exportWalk, ownFile: walks.ownFile },
 		documents,
 		now,
 		...(options.relay ? { relay: options.relay } : {}),

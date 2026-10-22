@@ -20,6 +20,9 @@ export type {
 	Placement,
 	PlacementPort,
 	RunsPort,
+	WalkFile,
+	WalkFiles,
+	WalkRef,
 	WithPaths,
 } from "./peers";
 export type { Relay, RunCommandInput, RunCommandKind } from "./relay";

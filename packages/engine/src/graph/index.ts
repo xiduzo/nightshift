@@ -10,3 +10,4 @@ export { resolvePolicy } from "./policy";
 export { latestStepOf, resumeTarget, sessionOf } from "./resume-point";
 export type { Runner, ThreadState } from "./runner";
 export { createRunner } from "./runner";
+export { createRunWalks } from "./walk-state";
