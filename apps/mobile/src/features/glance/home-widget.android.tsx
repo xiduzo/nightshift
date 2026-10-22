@@ -25,8 +25,8 @@ const layout = (props: HomeWidgetProps, environment: WidgetEnvironment) => {
 	"widget";
 	const dark = environment.colorScheme === "dark";
 	const runs = props.runs ?? [];
-	const text = dark ? "#fafafa" : "#0a0a0a";
-	const muted = dark ? "#a1a1a1" : "#737373";
+	const text = dark ? props.ink?.text.dark : props.ink?.text.light;
+	const muted = dark ? props.ink?.muted.dark : props.ink?.muted.light;
 	return (
 		<Column modifiers={[fillMaxSize(), paddingAll(12)]}>
 			<Text color={muted} style={{ fontSize: 12, fontWeight: "500" }}>

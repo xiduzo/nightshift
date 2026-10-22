@@ -37,8 +37,8 @@ const layout = (
 	"widget";
 	const dark = environment.colorScheme === "dark";
 	const color = dark ? props.dark : props.light;
-	const text = dark ? "#fafafa" : "#0a0a0a";
-	const muted = dark ? "#a1a1a1" : "#737373";
+	const text = dark ? props.ink?.text.dark : props.ink?.text.light;
+	const muted = dark ? props.ink?.muted.dark : props.ink?.muted.light;
 	const line = props.step
 		? `${props.position} · ${props.step}`
 		: props.position;

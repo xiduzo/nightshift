@@ -213,6 +213,10 @@ describe("the props outside the app", () => {
 			waitingText: "Open Night Shift to connect to your Host",
 			noRunsText: "",
 			runs: [],
+			ink: {
+				text: { light: "#0a0a0a", dark: "#fafafa" },
+				muted: { light: "#737373", dark: "#a1a1a1" },
+			},
 		});
 	});
 
@@ -228,6 +232,10 @@ describe("the props outside the app", () => {
 			light: "#0064b9",
 			dark: "#5db2f7",
 			staleText: "Open Night Shift to see the latest",
+			ink: {
+				text: { light: "#0a0a0a", dark: "#fafafa" },
+				muted: { light: "#737373", dark: "#a1a1a1" },
+			},
 		});
 	});
 });

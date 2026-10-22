@@ -3,20 +3,38 @@ import type {
 	GlanceTone,
 	RunProgress,
 } from "@nightshift/client";
+import { THEME } from "@nightshift/ui-native/lib/theme";
+
+/** A color for the light and for the dark color scheme. */
+export type SchemeColor = { light: string; dark: string };
+
+/** Both color schemes of one theme color (`@nightshift/ui-native/lib/theme`). */
+function schemeColor(
+	key: Exclude<keyof (typeof THEME)["light"], "radius">,
+): SchemeColor {
+	return { light: THEME.light[key], dark: THEME.dark[key] };
+}
 
 /**
- * The run status colors of the app (`--color-status-*` in ui-native's
- * `global.css`), in hex for light and dark. A widget and a Live Activity
- * render outside the app, so they get the colors in their props and pick
- * one by the color scheme. Change a value there and here together.
+ * The run status colors of the app. A widget and a Live Activity render
+ * outside the app, so they get the colors in their props and pick one by
+ * the color scheme.
  */
-const TONE_COLORS: Record<GlanceTone, { light: string; dark: string }> = {
-	running: { light: "#0064b9", dark: "#5db2f7" },
-	finished: { light: "#007840", dark: "#56d089" },
-	stopped: { light: "#555555", dark: "#ababab" },
-	failed: { light: "#c51e21", dark: "#fe6c66" },
-	waiting: { light: "#975800", dark: "#f7bc50" },
-	sleeping: { light: "#61529f", dark: "#b0a8e7" },
+const TONE_COLORS: Record<GlanceTone, SchemeColor> = {
+	running: schemeColor("statusRunning"),
+	finished: schemeColor("statusFinished"),
+	stopped: schemeColor("statusStopped"),
+	failed: schemeColor("statusFailed"),
+	waiting: schemeColor("statusWaiting"),
+	sleeping: schemeColor("statusSleeping"),
+};
+
+/** The text colors outside the app: the main text and the muted text. */
+export type InkColors = { text: SchemeColor; muted: SchemeColor };
+
+const INK: InkColors = {
+	text: schemeColor("foreground"),
+	muted: schemeColor("mutedForeground"),
 };
 
 /** One run on the home screen widget. */
@@ -34,6 +52,7 @@ export type HomeWidgetProps = {
 	waitingText: string;
 	noRunsText: string;
 	runs: WidgetRun[];
+	ink: InkColors;
 };
 
 /**
@@ -49,6 +68,7 @@ export function homeWidgetProps(
 			waitingText: "Open Night Shift to connect to your Host",
 			noRunsText: "",
 			runs: [],
+			ink: INK,
 		};
 	}
 	return {
@@ -61,6 +81,7 @@ export function homeWidgetProps(
 			statusText: run.statusText,
 			...TONE_COLORS[run.tone],
 		})),
+		ink: INK,
 	};
 }
 
@@ -77,6 +98,7 @@ export type RunActivityProps = {
 	dark: string;
 	/** What the Live Activity says when the app has not updated it for a while. */
 	staleText: string;
+	ink: InkColors;
 };
 
 /** The lock-screen props of a run's progress. */
@@ -90,5 +112,6 @@ export function runActivityProps(progress: RunProgress): RunActivityProps {
 		ended: progress.ended,
 		...TONE_COLORS[progress.tone],
 		staleText: "Open Night Shift to see the latest",
+		ink: INK,
 	};
 }

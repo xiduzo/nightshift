@@ -4,7 +4,9 @@
  *
  * The same tokens as `styles/global.css`, in hex: React Native has no
  * oklch(), and only the CSS goes through Uniwind, which converts it.
- * Change a value there and here together.
+ * Change a value there and here together. The `status*` colors are the
+ * run status tokens (`--color-status-*`): a widget or a lock-screen
+ * notification renders outside the app and takes them as props.
  */
 export const THEME = {
 	light: {
@@ -26,6 +28,13 @@ export const THEME = {
 		border: "#e5e5e5",
 		input: "#e5e5e5",
 		ring: "#a1a1a1",
+		statusRunning: "#0064b9",
+		statusFinished: "#007840",
+		statusStopped: "#555555",
+		statusFailed: "#c51e21",
+		statusInterrupted: "#b64e10",
+		statusWaiting: "#975800",
+		statusSleeping: "#61529f",
 		radius: 10,
 	},
 	dark: {
@@ -47,6 +56,13 @@ export const THEME = {
 		border: "#ffffff1a",
 		input: "#ffffff26",
 		ring: "#737373",
+		statusRunning: "#5db2f7",
+		statusFinished: "#56d089",
+		statusStopped: "#ababab",
+		statusFailed: "#fe6c66",
+		statusInterrupted: "#fc9252",
+		statusWaiting: "#f7bc50",
+		statusSleeping: "#b0a8e7",
 		radius: 10,
 	},
 } as const;
