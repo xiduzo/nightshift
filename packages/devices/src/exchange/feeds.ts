@@ -8,10 +8,13 @@ import type { FollowWant } from "../contract";
 
 /**
  * Live transcripts: one feed per step, the same on every Replica.
- * `follow(step, afterSeq)` yields the step's transcript entries after
- * `afterSeq`, first what was written, then each entry as it is written,
- * and ends when the step ends. Where the entries come from depends on who
- * walks the run:
+ * `entries(step, afterSeq)` is a viewer's transcript of a step (the
+ * engine's `RunsPort.stepEntries`): the archive's copy of a step that
+ * ended, else the step's feed, tried again until the step's transcript is
+ * whole. `follow(step, afterSeq)` is that feed, and what a Host serves:
+ * it yields the step's transcript entries after `afterSeq`, first what
+ * was written, then each entry as it is written, and ends when the step
+ * ends. Where the entries come from depends on who walks the run:
  *
  * - This Replica walks it: its own file, then its bus.
  * - This Replica keeps the Space (it is the Host) and a Device walks it:
@@ -46,7 +49,11 @@ export type FeedPorts = {
 	stepEnded(step: FeedStep): Promise<boolean>;
 	/** The transcript of a step this Replica walked, from its own file. */
 	ownEntries(step: FeedStep): Promise<TranscriptEntry[]>;
-	/** This Replica's archive copy of a step's transcript, or null. */
+	/**
+	 * The archive copy of a step that ended: this Replica's, else the
+	 * Host's that keeps the Space, kept here once fetched. Null when
+	 * neither has it. Asked only for a step that ended.
+	 */
 	archived(step: FeedStep): Promise<TranscriptEntry[] | null>;
 	/** The feed of the Host that keeps the Space. */
 	upstream?(
@@ -56,8 +63,17 @@ export type FeedPorts = {
 	): AsyncIterable<TranscriptEntry>;
 	/** How long a Host keeps a tail nobody follows. Default five minutes. */
 	idleMs?: number;
-	/** How long a pump waits before it sends a batch again. Default two seconds. */
+	/**
+	 * How long a pump waits before it sends a batch again, and a viewer
+	 * before it follows a step again. Default two seconds.
+	 */
 	retryMs?: number;
+	/**
+	 * How long the feed of a step that ended may stay silent before a
+	 * viewer looks in the archive again (a Walker of an older version, a
+	 * Host away). Default five seconds.
+	 */
+	graceMs?: number;
 };
 
 /** The Walker's side: the steps its Host wants, each sent by a pump. */
@@ -77,7 +93,26 @@ export type FeedSend = (
 ) => Promise<void>;
 
 export type TranscriptFeeds = {
-	/** The step's entries after `afterSeq`, then live, until it ends or `signal` aborts. */
+	/**
+	 * A viewer's transcript of a step (the engine's `RunsPort.stepEntries`):
+	 * a run walked here from its own file, then live. Else an ended step
+	 * from the archive (`archived`), and a running one from its feed
+	 * (`follow`). A feed that fails, or that stays silent for `graceMs`
+	 * after the step ended, is tried again after `retryMs`, from the last
+	 * entry it yielded. It returns when the transcript is whole, or when
+	 * `signal` aborts. It throws only for a run this Replica lacks.
+	 */
+	entries(
+		step: FeedStep,
+		afterSeq: number,
+		signal: AbortSignal,
+	): AsyncIterable<TranscriptEntry>;
+	/**
+	 * The step's feed: its entries after `afterSeq`, then live, until it
+	 * ends or `signal` aborts. What a Host serves, and what `entries`
+	 * reads a running step from. It does not try again: it throws when
+	 * the Host is away.
+	 */
 	follow(
 		step: FeedStep,
 		afterSeq: number,
@@ -112,11 +147,13 @@ type Tail = {
 };
 
 const DEFAULT_IDLE_MS = 5 * 60_000;
+const DEFAULT_GRACE_MS = 5_000;
 const BATCH = 500;
 
 export function createTranscriptFeeds(ports: FeedPorts): TranscriptFeeds {
 	const idleMs = ports.idleMs ?? DEFAULT_IDLE_MS;
 	const retryMs = ports.retryMs ?? 2_000;
+	const graceMs = ports.graceMs ?? DEFAULT_GRACE_MS;
 	const tails = new Map<string, Tail>();
 	const listeners = new Map<string, Set<() => void>>();
 
@@ -252,6 +289,74 @@ export function createTranscriptFeeds(ports: FeedPorts): TranscriptFeeds {
 		}
 	}
 
+	async function* entries(
+		step: FeedStep,
+		afterSeq: number,
+		signal: AbortSignal,
+	): AsyncGenerator<TranscriptEntry> {
+		const owner = await ports.runOwner(step.runId);
+		if (!owner || owner.spaceId !== step.spaceId) {
+			throw new Error(`Run not found: ${step.runId}`);
+		}
+		if (owner.walkerId === (await ports.selfId())) {
+			yield* own(step, afterSeq, signal);
+			return;
+		}
+		let at = afterSeq;
+		while (!signal.aborted) {
+			const ended = await ports.stepEnded(step);
+			if (ended) {
+				const copy = await ports.archived(step).catch(() => null);
+				if (copy) {
+					for (const entry of copy) {
+						if (signal.aborted) return;
+						if (entry.seq <= at) continue;
+						at = entry.seq;
+						yield entry;
+					}
+					return;
+				}
+			}
+			// The step runs, or its copy has not landed yet: its feed.
+			const feed = new AbortController();
+			const stop = () => feed.abort();
+			signal.addEventListener("abort", stop, { once: true });
+			let grace: ReturnType<typeof setTimeout> | null = null;
+			const silent = () => {
+				if (grace) clearTimeout(grace);
+				grace = setTimeout(stop, graceMs);
+			};
+			if (ended) silent();
+			const off = ports.bus.subscribe(step.runId, (item) => {
+				if (grace || item.kind === "transcript") return;
+				void ports
+					.stepEnded(step)
+					.then((now) => {
+						if (now && !grace) silent();
+					})
+					.catch(() => {});
+			});
+			let whole = false;
+			try {
+				for await (const entry of follow(step, at, feed.signal)) {
+					if (entry.seq <= at) continue;
+					at = entry.seq;
+					if (grace) silent();
+					yield entry;
+				}
+				whole = !feed.signal.aborted;
+			} catch {
+				// The Host is away, or does not know the feed: try again.
+			} finally {
+				off();
+				if (grace) clearTimeout(grace);
+				signal.removeEventListener("abort", stop);
+			}
+			if (whole) return;
+			await pause(retryMs, signal);
+		}
+	}
+
 	function pumps(send: FeedSend): FollowPumps {
 		const running = new Map<string, AbortController>();
 		/** Steps whose end the Host has, until they leave its set. */
@@ -359,6 +464,7 @@ export function createTranscriptFeeds(ports: FeedPorts): TranscriptFeeds {
 	}
 
 	return {
+		entries,
 		follow,
 		wanted(walkerId) {
 			const wants: FollowWant[] = [];

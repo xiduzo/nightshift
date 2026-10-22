@@ -394,6 +394,54 @@ describe("a run walked elsewhere", () => {
 		expect(await statusOf(restarted, a.spaceId, run.id)).toBe("waiting");
 	});
 
+	test("an ended step's transcript comes from the Host's archive once, and is kept here", async () => {
+		const files = new Map<string, string>();
+		const fetched: string[] = [];
+		const relay: Relay = {
+			command: async () => {},
+			addClone: async () => {},
+			archive: async (ref) => {
+				fetched.push(ref.kind === "checkpoint" ? ref.kind : ref.stepId);
+				return ref.kind === "transcript"
+					? (files.get(ref.stepId) ?? null)
+					: null;
+			},
+			archivePut: async () => {},
+			startRun: async () => {
+				throw new Error("not in this test");
+			},
+			offer: async () => {},
+			withdrawOffer: async () => {},
+			devices: async () => [],
+		};
+		const { engineA, engineB, run } = await waitingOnB(relay);
+		// The Host has A's files: A pushed them when the command ended.
+		for (const { ref, content } of await engineA.exchange.exportWalk(run.id)) {
+			if (ref.kind === "transcript") files.set(ref.stepId, content);
+		}
+		const hello = (await engineB.space(a.spaceId).getRun(run.id)).steps[0];
+		const step = { spaceId: a.spaceId, runId: run.id, stepId: hello?.id ?? "" };
+		const read = async () => {
+			const texts: string[] = [];
+			for await (const entry of engineB.exchange.feeds.entries(
+				step,
+				0,
+				new AbortController().signal,
+			)) {
+				if (entry.event.type === "command-output") {
+					texts.push(entry.event.text.trim());
+				}
+			}
+			return texts;
+		};
+		expect(await read()).toEqual(["hello"]);
+		expect(await read()).toEqual(["hello"]);
+		expect(fetched).toEqual([step.stepId]);
+		expect(
+			await engineB.exchange.readArchive({ kind: "transcript", ...step }),
+		).toBe(files.get(step.stepId) ?? "");
+	});
+
 	test("the Host keeps a command until its Walker reports it done", async () => {
 		const engineA = engineOf(a);
 		const { commands } = engineA.exchange;

@@ -120,6 +120,8 @@ export function createPeers(
 		},
 		// A Space a Host keeps: that Host's feed of the step, over its link.
 		...(relay?.follow ? { upstream: relay.follow.bind(relay) } : {}),
+		// And its archive copy of a step that ended.
+		archived: archive.archived,
 	});
 
 	const offers = createEngineOffers({

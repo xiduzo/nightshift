@@ -325,3 +325,196 @@ describe("a step's feed", () => {
 		expect(String(f.state.error)).toContain("Run not found");
 	});
 });
+
+describe("a viewer's transcript of a step (entries)", () => {
+	/** Steps whose end reached V's log, and V's archive copies. */
+	let endedOnV: Set<string>;
+	let archiveOnV: Map<string, TranscriptEntry[]>;
+	/** How often V asked for an archive copy, by step. */
+	let asked: string[];
+	/** The cursor of each call to V's upstream. */
+	let follows: number[];
+	/** How many of the next calls fail at once, and after how many entries the next one drops. */
+	let failNext: number;
+	let dropAfter: number | null;
+
+	beforeEach(() => {
+		endedOnV = new Set();
+		archiveOnV = new Map();
+		asked = [];
+		follows = [];
+		failNext = 0;
+		dropAfter = null;
+	});
+
+	/** V, a viewer through H, with its own log and archive. */
+	function viewer(upstream = true) {
+		return createTranscriptFeeds({
+			bus: createRunBus(),
+			selfId: async () => "v",
+			runOwner: owner,
+			hostOf: async () => "h",
+			stepEnded: async (s) => endedOnV.has(s.stepId),
+			ownEntries: async () => [],
+			archived: async (s) => {
+				asked.push(s.stepId);
+				return archiveOnV.get(s.stepId) ?? null;
+			},
+			...(upstream
+				? {
+						async *upstream(step, afterSeq, signal) {
+							follows.push(afterSeq);
+							if (failNext > 0) {
+								failNext -= 1;
+								throw new Error("The Host is away.");
+							}
+							let sent = 0;
+							for await (const entry of h.follow(step, afterSeq, signal)) {
+								if (sent === dropAfter) {
+									dropAfter = null;
+									throw new Error("The link dropped.");
+								}
+								sent += 1;
+								yield entry;
+							}
+						},
+					}
+				: {}),
+			retryMs: 5,
+			graceMs: 20,
+		});
+	}
+
+	/** Reads `entries` in the background, as `follow` above does. */
+	function read(feeds: TranscriptFeeds, afterSeq = 0, step = STEP) {
+		const controller = new AbortController();
+		controllers.push(controller);
+		const state = { got: [] as number[], ended: false, error: null as unknown };
+		const done = (async () => {
+			try {
+				for await (const entry of feeds.entries(
+					step,
+					afterSeq,
+					controller.signal,
+				)) {
+					state.got.push(entry.seq);
+				}
+				state.ended = !controller.signal.aborted;
+			} catch (error) {
+				state.error = error;
+			}
+		})();
+		return { state, stop: () => controller.abort(), done };
+	}
+
+	test("an ended step comes from the archive whole, and nothing crosses the link", async () => {
+		const written = [write(), write(), write()];
+		end();
+		endedOnV.add(STEP.stepId);
+		archiveOnV.set(STEP.stepId, written);
+		const r = read(viewer(), 1);
+		await r.done;
+		expect(r.state.got).toEqual([2, 3]);
+		expect(r.state.ended).toBe(true);
+		expect(follows).toEqual([]);
+		expect(pushes).toEqual([]);
+	});
+
+	test("a running step goes from live to its end, and then it is whole", async () => {
+		write();
+		const r = read(viewer());
+		await until(() => r.state.got.length === 1);
+		write();
+		await until(() => r.state.got.length === 2);
+		write();
+		end();
+		await r.done;
+		expect(r.state.got).toEqual([1, 2, 3]);
+		expect(r.state.ended).toBe(true);
+	});
+
+	test("a feed that fails is tried again from its last entry, without duplicates or gaps", async () => {
+		write();
+		write();
+		write();
+		// The Host is away twice, then the link drops after two entries.
+		failNext = 2;
+		dropAfter = 2;
+		const r = read(viewer());
+		await until(() => r.state.got.length === 3);
+		write();
+		end();
+		await r.done;
+		expect(r.state.got).toEqual([1, 2, 3, 4]);
+		expect(follows).toEqual([0, 0, 0, 2]);
+	});
+
+	test("an ended step whose feed stays silent is read from the archive once its copy lands", async () => {
+		const written = [write(), write()];
+		// The Walker is of an older version: it sends nothing.
+		stopDemand();
+		pumps.close();
+		end();
+		endedOnV.add(STEP.stepId);
+		const r = read(viewer());
+		await settle();
+		expect(r.state.got).toEqual([]);
+		archiveOnV.set(STEP.stepId, written);
+		await r.done;
+		expect(r.state.got).toEqual([1, 2]);
+		expect(r.state.ended).toBe(true);
+		// It looked in the archive, waited out the silence, and looked again.
+		expect(asked.length).toBeGreaterThan(1);
+	});
+
+	test("an ended step without a copy and without a Host is tried again, not given up", async () => {
+		write();
+		end();
+		endedOnV.add(STEP.stepId);
+		const r = read(viewer(false));
+		await settle();
+		expect(r.state.error).toBeNull();
+		expect(r.state.ended).toBe(false);
+		archiveOnV.set(STEP.stepId, files.get(STEP.stepId) ?? []);
+		await r.done;
+		expect(r.state.got).toEqual([1]);
+	});
+
+	test("on its Walker: the own file, then live; a step moved here with no file comes from the archive", async () => {
+		const moved = { ...STEP, stepId: "moved" };
+		const fromBefore: TranscriptEntry = {
+			...write(),
+			stepId: "moved",
+		};
+		files.delete(STEP.stepId);
+		endedOnW.add("moved");
+		const walker = createTranscriptFeeds({
+			bus: wBus,
+			selfId: async () => "w",
+			runOwner: owner,
+			hostOf: async () => "h",
+			stepEnded: async (s) => endedOnW.has(s.stepId),
+			ownEntries: async (s) => [...(files.get(s.stepId) ?? [])],
+			archived: async (s) => (s.stepId === "moved" ? [fromBefore] : null),
+		});
+		const old = read(walker, 0, moved);
+		await old.done;
+		expect(old.state.got).toEqual([1]);
+
+		write();
+		const r = read(walker);
+		await until(() => r.state.got.length === 1);
+		write();
+		end();
+		await r.done;
+		expect(r.state.got).toEqual([2, 3]);
+		expect(pushes).toEqual([]);
+	});
+
+	test("a run this Replica does not have is refused", async () => {
+		const r = read(viewer(), 0, { ...STEP, runId: "nope" });
+		await r.done;
+		expect(String(r.state.error)).toContain("Run not found");
+		expect(r.state.got).toEqual([]);
+	});
+});

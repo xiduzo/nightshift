@@ -80,6 +80,12 @@ export function createEngineExchange(deps: {
 	onIngested?(added: readonly LoggedEvent[]): Promise<void>;
 	/** The feed of the Host that keeps a Space (over its link). */
 	upstream?: FeedPorts["upstream"];
+	/**
+	 * A file of the archive: this Replica's copy, else the Host's that
+	 * keeps the Space (`RunsPort.archived`). Throws when that Host cannot
+	 * be reached. Without it, only this Replica's copy is read.
+	 */
+	archived?(ref: ArchiveRef): Promise<string | null>;
 }): EngineExchange {
 	const { db, log, history, walks, dataDir, documents } = deps;
 	const { runOwner } = history;
@@ -98,9 +104,16 @@ export function createEngineExchange(deps: {
 			return found !== undefined && found.endedAt !== null;
 		},
 		ownEntries: (at) => history.ownTranscript(at),
+		// Asked only for a step that ended: a copy from the Host is kept here.
 		async archived(at) {
-			const text = await readArchive(dataDir, { kind: "transcript", ...at });
-			return text === null ? null : parseTranscript(text);
+			const ref: ArchiveRef = { kind: "transcript", ...at };
+			const local = await readArchive(dataDir, ref);
+			if (local !== null) return parseTranscript(local);
+			const fetched = await deps.archived?.(ref).catch(() => null);
+			if (fetched === null || fetched === undefined) return null;
+			// Not `writeArchive` below: nothing about the step changed.
+			await writeArchive(dataDir, ref, fetched);
+			return parseTranscript(fetched);
 		},
 		...(deps.upstream ? { upstream: deps.upstream } : {}),
 	});
