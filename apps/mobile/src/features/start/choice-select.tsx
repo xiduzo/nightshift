@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export type Choice = { value: string; label: string; disabled?: boolean };
 
-/** A label and a Select of one of a few choices. */
+/** A label and a Select of one of a few choices. A screen reader hears the label and the choice. */
 export function ChoiceSelect({
 	label,
 	placeholder,
@@ -36,7 +36,10 @@ export function ChoiceSelect({
 				}
 				onValueChange={(option) => option && onChange(option.value)}
 			>
-				<SelectTrigger accessibilityLabel={label}>
+				<SelectTrigger
+					accessibilityLabel={label}
+					accessibilityValue={{ text: chosen?.label ?? placeholder }}
+				>
 					<SelectValue placeholder={placeholder} />
 				</SelectTrigger>
 				<SelectContent
