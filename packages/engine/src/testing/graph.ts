@@ -1,4 +1,3 @@
-import { MemorySaver } from "@langchain/langgraph";
 import type { AgentHarness, Decider } from "@nightshift/agents/types";
 import { project, run } from "@nightshift/db/schema";
 import {
@@ -14,8 +13,16 @@ import { localDevice } from "../device/local";
 import { defaultRunSettings } from "../device-config/settings";
 import { compileFlow } from "../graph/compile";
 import { createRecorders, type StepContext } from "../graph/context";
-import { kindOf } from "../graph/node-kinds";
 import type { Parked, RunEvent, RunStateValues } from "../graph/state";
+import {
+	type DriveOutcome,
+	driveGraph,
+	openThread,
+	type RunGraph,
+	type StreamInput,
+	type Thread,
+	type ThreadDeps,
+} from "../graph/thread";
 import { createRunBus } from "../log/bus";
 import type {
 	EngineEventType,
@@ -32,10 +39,11 @@ import {
 
 /**
  * The one set of helpers for a test that drives a compiled flow (with its
- * called flows) on a MemorySaver over the sandbox's database and git
- * repository: node builders, a run row with its log and a minimal
- * StepContext, and a driver that streams the graph as the runner does and
- * collects the root's interrupts and the custom events.
+ * called flows) over the sandbox's database and git repository: node
+ * builders, a run row with its log and its Thread (`openThread`, as the
+ * runner opens it: the same StepContext, fence and checkpoint saver), and
+ * a driver that runs the runner's stream loop (`driveGraph`) and collects
+ * the root's interrupts and the custom events.
  */
 
 export const agent = (
@@ -107,18 +115,25 @@ export function flowOf(
 export const MINUTE = 1_000;
 
 export type Harness = {
+	/** The thread's StepContext. A test may swap a field of it: the graph reads it at each use. */
 	ctx: StepContext;
 	/**
 	 * What the run's Device is made of, read at each step: a test changes
 	 * it between steps (a harness removed, a connection that fails).
 	 */
 	local: TestDeviceDeps;
+	/** The run log, not fenced: a test writes the runner's part with it. */
 	log: RunLog;
 	runId: string;
-	saver: MemorySaver;
+	/** The run's Thread, opened as the runner opens it. */
+	thread: Thread;
+	/** What the thread was opened with. */
+	deps: ThreadDeps;
+	/** The thread's fenced checkpoint saver on the sandbox's database. */
+	saver: Thread["saver"];
 	config: { configurable: { thread_id: string } };
 	/** Compiles the flow again over the same saver: a new daemon. */
-	graph(): ReturnType<ReturnType<typeof compileFlow>["compile"]>;
+	graph(): RunGraph;
 	events(): Promise<LoggedEvent[]>;
 	types(): Promise<string[]>;
 };
@@ -133,6 +148,8 @@ export type StartOptions = {
 	flows?: Record<string, Flow>;
 	/** The run's abort signal; read at each use, so a test can swap it. */
 	signal?: AbortSignal;
+	/** The clock. Default `Date.now`. */
+	now?: () => number;
 	/** What `RunStarted` records as the run's inputs. */
 	inputs?: InputValues;
 	branch?: string;
@@ -140,7 +157,7 @@ export type StartOptions = {
 
 let runs = 0;
 
-/** A run row, its log with `RunStarted`, and a minimal StepContext. */
+/** A run row, its log with `RunStarted`, and its Thread. */
 export async function startRun(
 	sandbox: Sandbox,
 	flow: Flow,
@@ -180,8 +197,6 @@ export async function startRun(
 		},
 	});
 	const bus = createRunBus();
-	const recorders = createRecorders({ db, bus });
-	const controller = new AbortController();
 	const [row] = await db.select().from(run).where(eq(run.id, runId));
 	if (!row) throw new Error("no run row");
 	const local: TestDeviceDeps = {
@@ -190,37 +205,39 @@ export async function startRun(
 		mcpServersFor:
 			options.mcpServersFor ?? (async () => ({ ok: true, servers: {} })),
 	};
-	const ctx: StepContext = {
+	const device = () =>
+		localDevice({ id: TEST_DEVICE_ID, name: "test", ...local });
+	const deps: ThreadDeps = {
 		db,
-		run: row,
-		flow,
-		flowName: "test",
-		flows,
-		policy: () => ({
+		log,
+		bus,
+		recorders: createRecorders({ db, bus }),
+		dataDir: sandbox.dataDir,
+		now: options.now ?? Date.now,
+		minuteMs: MINUTE,
+		settings: defaultRunSettings,
+		deviceFor: device,
+		deviceById: device,
+		flowOf: () => flow,
+		calledFlowsOf: () => flows,
+		policyFor: () => ({
 			usageLimitFirstWaitMinutes: 5,
 			usageLimitMaxWaitMinutes: 60,
 			networkGraceMinutes: 240,
 		}),
-		log,
-		bus,
-		recorder: (stepId, path) => recorders.open(runId, stepId, path),
-		deviceFor: () =>
-			localDevice({ id: TEST_DEVICE_ID, name: "test", ...local }),
-		deviceById: () =>
-			localDevice({ id: TEST_DEVICE_ID, name: "test", ...local }),
-		signal: () => options.signal ?? controller.signal,
-		now: Date.now,
-		minuteMs: MINUTE,
-		dataDir: sandbox.dataDir,
-		settings: defaultRunSettings,
-		kindOf,
 	};
-	const saver = new MemorySaver();
+	const thread = openThread(row, deps);
+	const { ctx, saver } = thread;
+	const own = ctx.signal;
+	// Read at each use: a test may set `options.signal` later.
+	ctx.signal = () => options.signal ?? own();
 	return {
 		ctx,
 		local,
 		log,
 		runId,
+		thread,
+		deps,
 		saver,
 		config: { configurable: { thread_id: runId } },
 		graph: () => compileFlow(flow, ctx).compile({ checkpointer: saver }),
@@ -230,50 +247,39 @@ export async function startRun(
 }
 
 export type Driven = {
-	/** The root's interrupts, innermost value first. */
+	/** The root's interrupts, in order. The runner reacts to the last. */
 	parked: Parked[];
 	events: RunEvent[];
 	state: RunStateValues;
 	next: string[];
+	/** How the drive ended, as the runner sees it (`endingOf` says what it appends). */
+	outcome: DriveOutcome;
 };
 
 /**
- * Streams the graph as the runner does (`durability: "sync"`) and collects
- * the root's interrupts and the custom events.
+ * Drives the graph with the runner's stream loop (`driveGraph`) under the
+ * thread's fence, and collects the root's interrupts and the custom
+ * events. Default: the thread's own graph. Pass `h.graph()` for a new
+ * daemon. Rejects as the runner's drive fails: an engine error, or a graph
+ * that stops without an end or an interrupt.
  */
 export async function drive(
 	h: Harness,
-	input: Parameters<ReturnType<Harness["graph"]>["stream"]>[0],
-	graph = h.graph(),
+	input: StreamInput,
+	graph: RunGraph = h.thread.graph,
 ): Promise<Driven> {
-	const parked: Parked[] = [];
 	const events: RunEvent[] = [];
-	const stream = await graph.stream(input, {
-		...h.config,
-		streamMode: ["updates", "custom"],
-		subgraphs: true,
-		durability: "sync",
+	const outcome = await driveGraph(graph, h.runId, input, {
+		fence: h.thread.fence,
+		onEvent: (event) => events.push(event),
 	});
-	for await (const chunk of stream) {
-		const [namespace, mode, data] = chunk as [string[], string, unknown];
-		if (mode === "custom") {
-			events.push(data as RunEvent);
-			continue;
-		}
-		for (const [node, update] of Object.entries(
-			data as Record<string, unknown>,
-		)) {
-			if (node !== "__interrupt__" || namespace.length > 0) continue;
-			const [first] = update as { value: Parked }[];
-			if (first) parked.push(first.value);
-		}
-	}
 	const snapshot = await graph.getState(h.config);
 	return {
-		parked,
+		parked: outcome.kind === "parked" ? outcome.interrupts : [],
 		events,
 		state: snapshot.values as RunStateValues,
 		next: [...snapshot.next],
+		outcome,
 	};
 }
 

@@ -32,7 +32,7 @@ import { DEFAULT_RESUME_PROMPT } from "./context";
 
 /**
  * The Agent node on the compiled graph, driven by the fake harness with a
- * real run log and a MemorySaver: what the Agent's body makes of a session
+ * real run log and checkpoint saver: what the Agent's body makes of a session
  * (the prompt, the step report, the checker, the CLI tools, the sessions it
  * continues), plus one wait and one crash re-entry through the whole graph.
  * The shared rules (the entry checks, the stop time, the sleep, the resume

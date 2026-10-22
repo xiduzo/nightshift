@@ -15,7 +15,7 @@ import { DEFAULT_RESUME_PROMPT } from "./context";
 
 /**
  * The Decision node on the compiled graph, driven by scripted deciders with
- * a real run log and a MemorySaver. The event log and the transcript are
+ * a real run log and checkpoint saver. The event log and the transcript are
  * compared with what the engine writes today (engine.test.ts "decisions").
  */
 

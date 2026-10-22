@@ -18,7 +18,7 @@ import { parseTime } from "./nodes/wait";
 
 /**
  * The Wait node on the compiled graph, with a real shell, run log and
- * MemorySaver. The clock is the harness's `ctx.now`, moved by hand as the
+ * checkpoint saver. The clock is the harness's `ctx.now`, moved by hand as the
  * other wait tests do; a wake is what the runner sends: `WaitEnded` in the
  * log, then `Command({ resume: { kind: "wake" } })`, on a new compile over
  * the same saver (a new daemon).

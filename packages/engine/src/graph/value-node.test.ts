@@ -10,7 +10,7 @@ import { DEFAULT_RESUME_PROMPT } from "./context";
 
 /**
  * The Value node on the compiled graph: a rule (JSONata) or a scripted
- * decider makes the data, with a real run log and a MemorySaver. Mirrors
+ * decider makes the data, with a real run log and checkpoint saver. Mirrors
  * decision-node.test.ts: the log, the transcript, the cost and the edges
  * are checked as the engine writes them.
  */
