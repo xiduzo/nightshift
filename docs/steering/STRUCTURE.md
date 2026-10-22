@@ -95,7 +95,7 @@ The entries today:
 | `auth` | `.`, `./testing` |
 | `client` | `.` (`createApiClient`, `createQueryUtils`, the `create<Vertical>Queries` and `create<Vertical>Mutations` factories, `followRun`, `followNotifications`, `useLiveCache`, `mergeSteps`, `answerGate` and `gateRefusalText`, the notify rules, the push contract (`gateKey`, `isGateKey`, `PUSH_CATEGORY`, `PUSH_ANDROID_CHANNEL`, `PUSH_ACTION`, `PUSH_MESSAGE_KINDS`, `PushData`, `pushDataOf`, `withdrawKeyOf`, `PushRoute`, `routeOf`, `webPathOf`, `staleGates`), the shared formatters (`formatCost`, `formatKnownCost`, `costLabel`, `whenLabel`, `agoLabel`, `platformName`, `PHONE_DELAYS`, `phoneDelayLabel`), the view types) |
 | `db` | `.`, `./schema`, `./data-dir`, `./migrate` |
-| `devices` | `.` |
+| `devices` | `.`, `./testing` (`withPeers`, `inMemoryHost`: a Host in memory behind `HostClient`, `pairedReplicas`: a Host and its paired Device in one process) |
 | `daemon` | `.` (`startDaemon`, `createDaemon`, the CLI's and the desktop app's helpers: `prepareDaemonEnv`, `checkHealth`, `DEFAULT_PORT`, the web UI handler, the desktop types `DesktopScreen`, `DesktopNotifier`, `DesktopWindow`), `./heartbeat` (`readHeartbeatFile`: the lease heartbeat as another process reads it, Bun and Node only, for the desktop watchdog's Worker) |
 | `engine` | `.`, `./testing` |
 | `flows` | `.`, `./files` |
