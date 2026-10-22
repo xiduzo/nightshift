@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
 	event,
@@ -119,6 +120,56 @@ const quickFlow = {
 	],
 	edges: [],
 } as Flow;
+
+/** A For Each over three items; its body (`say`, in the folder at `repoPath`) prints the item. */
+async function forEachFlow(repoPath: string): Promise<Flow> {
+	const flows = join(repoPath, ".nightshift", "flows");
+	await mkdir(flows, { recursive: true });
+	await writeFile(
+		join(flows, "say.json"),
+		JSON.stringify({
+			version: 5,
+			inputs: [{ name: "item", type: "json", required: true }],
+			outputs: [],
+			start: "say",
+			nodes: [
+				{
+					id: "say",
+					type: "command",
+					position: { x: 0, y: 0 },
+					command: "echo item {{item.id}}",
+					output: "text",
+				},
+			],
+			edges: [],
+		}),
+	);
+	return {
+		version: 5,
+		inputs: [],
+		outputs: [],
+		start: "loop",
+		nodes: [
+			{
+				id: "loop",
+				type: "call",
+				position: { x: 0, y: 0 },
+				flow: "say",
+				inputs: {},
+				each: {
+					source: {
+						kind: "command",
+						command: `printf '%s' '[{"id":"1"},{"id":"2"},{"id":"3"}]'`,
+					},
+					as: "item",
+					branch: "shared",
+					haltOn: ["halt"],
+				},
+			},
+		],
+		edges: [],
+	} as Flow;
+}
 
 /** One command that prints, waits for a file, and prints again. */
 function slowFlow(marker: string): Flow {
@@ -603,5 +654,41 @@ describe("live transcripts over the exchange", () => {
 		expect(new Set(seen).size).toBe(seen.length);
 		await again.stop();
 		await untilStatus(paired.host, run.id, "finished");
+	});
+
+	test.failing("A shows each item's output of a For Each B walked, in seq order, from its archive", async () => {
+		const run = await walkOnB(await forEachFlow(b.repoPath));
+		await untilStatus(paired.device, run.id, "finished");
+		online();
+		await untilStatus(paired.host, run.id, "finished");
+		// B's ended steps' files reach A's archive after their rows.
+		const steps = (await paired.host.space(a.spaceId).getRun(run.id)).steps;
+		await waitFor(
+			async () => {
+				for (const s of steps) {
+					const ref = {
+						kind: "transcript" as const,
+						spaceId: a.spaceId,
+						runId: run.id,
+						stepId: s.id,
+					};
+					if ((await paired.host.exchange.readArchive(ref)) === null) {
+						return false;
+					}
+				}
+				return true;
+			},
+			{ label: "B's transcripts in A's archive" },
+		);
+
+		const watching = watch(paired.host, run.id);
+		await waitFor(() => watching.lines().length >= 3, {
+			label: "the items' output on A",
+			timeoutMs: 2_000,
+		}).catch(() => {});
+		await watching.stop();
+		expect(watching.lines()).toEqual(["item 1", "item 2", "item 3"]);
+		const seqs = watching.seqs();
+		expect(seqs).toEqual(seqs.map((_, i) => i + 1));
 	});
 });
