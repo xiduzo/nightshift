@@ -125,8 +125,8 @@ export function ScreensCard() {
 								</EmptyMedia>
 								<EmptyTitle>Nothing notifies you yet</EmptyTitle>
 								<EmptyDescription>
-									Turn on notifications in this browser above, or sign in with
-									the Night Shift app on your phone.
+									Turn on notifications in this browser above, or in the Night
+									Shift app on your phone.
 								</EmptyDescription>
 							</EmptyHeader>
 						</Empty>
