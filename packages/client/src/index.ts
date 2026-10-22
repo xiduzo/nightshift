@@ -143,7 +143,6 @@ export {
 	type StepState,
 	type StepSummary,
 	stepName,
-	stepPosition,
 	stepState,
 	type TranscriptEntry,
 	type Wait,

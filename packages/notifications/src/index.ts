@@ -33,14 +33,12 @@ export {
 	type SenderFacts,
 } from "./notifier";
 export {
-	DEFAULT_HOLD_MINUTES,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
 	notificationSettingsPatchSchema,
 	notificationSettingsSchema,
 } from "./settings";
 export {
-	PUSH_KINDS,
 	type PushKind,
 	type PushTarget,
 	type PushTargetView,

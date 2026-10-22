@@ -3,7 +3,6 @@
 export {
 	type ComputerSwitches,
 	createSettingsStore,
-	DEFAULT_HOLD_MINUTES,
 	eventsOfSwitches,
 	inQuietHours,
 	type NotificationSettings,

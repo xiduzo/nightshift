@@ -2,7 +2,6 @@
 
 export {
 	createTargetStore,
-	PUSH_KINDS,
 	type PushKind,
 	type PushTarget,
 	type PushTargetView,
