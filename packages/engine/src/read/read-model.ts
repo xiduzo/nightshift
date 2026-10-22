@@ -31,6 +31,7 @@ import {
 	deriveTraversals,
 	deriveTrigger,
 	deriveWarnings,
+	isOpenStatus,
 } from "./derive-run";
 import {
 	type DerivedStep,
@@ -125,10 +126,7 @@ export function parseCalledFlows(row: RunRow): Record<string, Flow> {
 /** What a run summary reads from the log. The run log keeps it per run until the next append. */
 export function runFacts(events: readonly LoggedEvent[]) {
 	const state = deriveRunState(events);
-	const open =
-		state.status === "running" ||
-		state.status === "waiting" ||
-		state.status === "sleeping";
+	const open = isOpenStatus(state.status);
 	return {
 		status: state.status,
 		reason: state.reason,

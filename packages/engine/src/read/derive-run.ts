@@ -97,6 +97,11 @@ export function deriveRunStatus(events: readonly LoggedEvent[]): RunStatus {
 	return deriveRunState(events).status;
 }
 
+/** Whether a run with this status is still open: at work, waiting at a Gate, or asleep. */
+export function isOpenStatus(status: RunStatus): boolean {
+	return status === "running" || status === "waiting" || status === "sleeping";
+}
+
 /** When the run ended: the time of its `RunEnded`, or null while it is open again or never ended. */
 export function deriveEndedAt(events: readonly LoggedEvent[]): number | null {
 	const latest = latestRunEvent(events);

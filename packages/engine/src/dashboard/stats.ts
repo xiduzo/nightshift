@@ -1,5 +1,5 @@
 import type { RunStatus } from "../log";
-import type { RunSummary } from "../read";
+import { isOpenStatus, type RunSummary } from "../read";
 import {
 	type DashboardRun,
 	type KnownCost,
@@ -24,11 +24,7 @@ export const STATUS_ORDER: RunStatus[] = [
 
 /** Whether a run is still open: at work, waiting at a Gate, or asleep. */
 export function isOpen(run: { status: RunStatus }): boolean {
-	return (
-		run.status === "running" ||
-		run.status === "waiting" ||
-		run.status === "sleeping"
-	);
+	return isOpenStatus(run.status);
 }
 
 /**

@@ -15,6 +15,7 @@ import {
 	deriveRunState,
 	deriveSessions,
 	deriveSteps,
+	isOpenStatus,
 	parkedSteps,
 	withEnclosing,
 } from "../read";
@@ -81,9 +82,7 @@ export function openWork(
 			.filter((s) => s.endedAt === null && !parked.has(s.id))
 			.sort((a, b) => b.startSeq - a.startSeq),
 		endsRun:
-			cut === "interrupted"
-				? status === "running"
-				: status === "running" || status === "waiting" || status === "sleeping",
+			cut === "interrupted" ? status === "running" : isOpenStatus(status),
 	};
 }
 
