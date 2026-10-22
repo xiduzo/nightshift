@@ -220,7 +220,9 @@ the Space:
 **Without keys.** `EXPO_ACCESS_TOKEN` is optional. Without it, Expo
 still sends for a project that does not require a token ("enhanced push
 security" off in Expo). A project that requires one refuses the pushes,
-and the phone then gets the in-app stream only.
+and the phone then gets the in-app stream only. A Host with phones should
+set the token and turn enhanced push security on: then only that Host can
+push to the phones, and nobody else who learns a push token.
 
 ### Lock-screen Gates are marked by the flow author
 
@@ -236,6 +238,11 @@ the risk of a Gate. The app does not guess it.
 - Every answer is bound to one `runId` and `stepId`. The Host refuses it
   once that Gate is closed. A stale notification cannot answer another
   Gate.
+- A push is no proof that a Gate is marked: anyone with the phone's push
+  token can send one. Before a button answer goes out, the phone reads the
+  open Gates from the Host and sends only to a marked Gate, with one of its
+  choices. The answer carries `via: "lock-screen"`, and the Host refuses it
+  for a Gate that is not marked.
 - Until the action handler is tested on iOS with SDK 58, iOS opens the app
   for every answer.
 
