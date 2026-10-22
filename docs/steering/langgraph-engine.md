@@ -165,6 +165,12 @@ packages/engine/src/
   graph/output-schema.ts   the output schema check (ajv)
   graph/policy.ts          the run policy's wait plan (planWait), pure
   graph/consume.ts         reads a harness stream, gives up after a grace
+  graph/open-work.ts       Open work that is cut short (below): openWork
+                           (what a stop, a missed deadline or a daemon
+                           death ends), closingEvents (the pure list of
+                           SessionEnded, StepEnded and RunEnded events,
+                           inside out, with each kind's cutShortOutputs)
+                           and closeOpenWork (appends them, tells the bus).
   graph/thread.ts          One Run's Thread: openThread() builds the one
                            StepContext, the fenced log and checkpoint saver,
                            and compiles the flow; driveGraph() is the one
@@ -174,7 +180,9 @@ packages/engine/src/
                            input of a start, continue, resume or jump.
   graph/runner.ts          Per-run driver: start, continueRun, resume,
                            reenter (seeded by reentryUpdate for threads with
-                           no checkpoint), stop, closeParked. Drives each
+                           no checkpoint), stop, restart, the deadline
+                           sweep (each ends open work through
+                           closeOpenWork). Drives each
                            run's Thread, publishes to the bus, reacts to
                            how a drive ended, owns the slots, gives the sleep
                            module its thread seam (runner.sleeps), and prunes
@@ -214,7 +222,8 @@ packages/engine/src/
                            the thread to the runner.
   run/recovery.ts          createRecovery(deps): recoverInterruptedWork
                            (a dead daemon's open sessions, steps and runs
-                           become interrupted; sleeping runs get their
+                           become interrupted through closeOpenWork, as a
+                           stop ends them; sleeping runs get their
                            timers back through sleeps.restore; after a
                            grace period the daemon
                            resumes the rest unless daemonResumeBlock says
@@ -331,7 +340,8 @@ packages/engine/src/
 12. **Recovery at startup** keeps `recoverInterruptedWork`'s facts: open
     sessions, steps and runs become `interrupted`; sleeping runs get their
     timers back; open Gates stay; and the daemon resumes interrupted runs
-    itself under the same policy as before, now by `invoke(null)`.
+    itself under the same policy as before, now by `invoke(null)`. How the
+    steps end deviates (below: "Recovery ends work as a stop does").
 13. **A Call with `each`** (the For Each node until flow version 4) keeps its semantics: sources json, command and files;
     `blockersFirst`/`nextItem` ordering; blocked items; per-item
     branches on top of the last finished element (`branch: "per-item"`)
@@ -447,6 +457,20 @@ Decisions taken while implementing, from the code and its comments:
   model chooser and producer, the Wait node), so the log keeps one open
   step to end and the read model shows the step's real outcome and cost.
   This is the resume point's one rule for an existing step (below).
+- **Recovery ends work as a stop does** (`graph/open-work.ts`, 2026-10-22).
+  Rules 3 and 12 kept recovery's own `StepEnded` events: the raw outputs,
+  outside in. Now every cut (a stop, a missed deadline, a daemon death)
+  appends the events `closingEvents` gives, so two things changed for an
+  interrupted step. Its outputs are its kind's (`cutShortOutputs` with
+  `interrupted`): a Decision gets `note: ""`, a Call `ended: ""`, and a
+  Call with `each` its item counts, summary and results, so a template or
+  a rerun that reads `nodes.<id>.*` finds every field. And the steps end
+  from the inside out: a step inside a Call before the Call. No reader
+  depends on the order between steps. Recovery reads the run's whole log
+  for this, since its lifecycle filter has no item events, and publishes
+  on the bus. A step of a kind an old log has and the engine no longer
+  knows (a `gate` step) keeps its outputs, and a run whose snapshot cannot
+  be read ends its steps without their nodes, so no cut throws.
 - **The runner publishes `status-changed` on step chunks**
   (`runner.onCustom`). The `step-started` and `step-ended` custom stream
   chunks (`RunEvent`) make the runner publish `{ kind: "status-changed" }`
@@ -599,7 +623,8 @@ interrupt the thread sits at, appends `WaitEnded` and the transcript
 `wake`, and drives the thread with `{ kind: "wake" }` or `{ kind: "signal"
 }`; a full run cap queues a timer's wake (`drain()` on a freed slot) and
 refuses a person's. `forget(runId)` drops the timer and the queued wake of
-a run that was stopped while it slept (`closeParked`).
+a run that was stopped while it slept (the runner calls it before
+`closeOpenWork`).
 
 The pending wait has one shape (`PendingWait`): the step, the visit, the
 reason, `until`, the message, the streak, `session` (what a policy wait
@@ -644,7 +669,7 @@ own module. Now the engine asks the descriptor:
 | `endedLabel(node, outcome)` | the Call node | `endedLabel` in body.ts |
 | `logsCommandOutput(node)` | `beginStep` | the three-kind `logPath` rule |
 | `timeBudget(node)` | `beginStep`, `abortEnd` | the Gate and Wait timeout rule, the Agent idle rule |
-| `stoppedOutputs(open, node)` | `runner.closeParked` | the `nodeType` ternary |
+| `cutShortOutputs(open, node, outcome)` | `closingEvents` (`graph/open-work.ts`) | the `nodeType` ternary of the stop, and recovery's raw outputs |
 | `connections(node)` | `run-start.connectionsExist` | the Agent-or-Tool branch |
 | `requirements` | `run-start.REQUIREMENTS` | the per-kind requirement functions |
 
@@ -656,7 +681,7 @@ purpose: the zod union in `packages/flows` and the web's `NODE_TYPE` record
 (inherent, outside this package); the transcript-event unions in `log/step-events.ts`
 (typed data, no switch asks them); the `WaitReason` enum in `state.ts` (a
 Wait node's `until` kinds and the policy's reasons, not node kinds); which
-flow a Call calls (`flows/run-flows.ts`, `runner.nodesOf`: only a Call does,
+flow a Call calls (`flows/run-flows.ts`, `open-work.nodesOf`: only a Call does,
 both read `node.flow`); the first Agent prompt a quick run is titled by;
 and the resume target's "an Agent step with a harness session".
 
