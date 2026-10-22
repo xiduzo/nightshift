@@ -1,16 +1,16 @@
-import { gateRefusalText } from "@nightshift/client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { gateRefusalText, useLiveCache } from "@nightshift/client";
+import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { outcomeLabel } from "@/features/flows";
-import { runQueries } from "@/features/runs/queries";
-import { gateMutations, gateQueries } from "./queries";
+import { orpc } from "@/shared/api";
+import { gateMutations } from "./queries";
 
 /**
  * Answers an open Gate, in whichever of your Spaces it is: the Space you
  * work in stays as it is. An answer that went toasts. An answer to a Gate
  * that closed, or that is not in your Spaces, says so. Either way the Gate
- * leaves the inbox at once, and Gates and runs are read again to confirm.
+ * leaves the inbox at once (`afterGateAnswered`).
  * A role that does not allow an answer, or an answer that was not sent,
  * toasts an error and keeps the Gate.
  */
@@ -22,19 +22,7 @@ export function useResolveGate({
 	/** The device that runs the run, when it is not this computer: the answer goes to it. */
 	walkerName?: string;
 } = {}) {
-	const queryClient = useQueryClient();
-
-	/** Out of the inbox at once; the refetch confirms it. */
-	function dropGate(answered: { runId: string; stepId: string }) {
-		queryClient.setQueryData(gateQueries.open().queryKey, (gates) =>
-			gates?.filter(
-				(gate) =>
-					gate.runId !== answered.runId || gate.stepId !== answered.stepId,
-			),
-		);
-		void queryClient.invalidateQueries({ queryKey: gateQueries.all() });
-		void queryClient.invalidateQueries({ queryKey: runQueries.all() });
-	}
+	const live = useLiveCache(orpc);
 
 	return useMutation(
 		gateMutations.answer({
@@ -43,7 +31,7 @@ export function useResolveGate({
 					const { title, description } = gateRefusalText(result.refusal);
 					if (result.refusal === "closed" || result.refusal === "not-found") {
 						toast(title, { description });
-						dropGate(input);
+						live.afterGateAnswered(input);
 					} else {
 						toast.error(title, { description });
 					}
@@ -57,7 +45,7 @@ export function useResolveGate({
 							: "The run goes on.",
 					},
 				);
-				dropGate(input);
+				live.afterGateAnswered(input);
 			},
 			onError: (error) =>
 				toast.error("Your answer was not sent", { description: error.message }),

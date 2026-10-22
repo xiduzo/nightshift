@@ -3,6 +3,7 @@ import {
 	followNotifications,
 	gateKey,
 	routeOf,
+	useLiveCache,
 	webPathOf,
 } from "@nightshift/client";
 import {
@@ -16,7 +17,7 @@ import { toast } from "sonner";
 
 import { gateQueries } from "@/features/gates";
 import { runQueries } from "@/features/runs";
-import { client, type NotificationItem } from "@/shared/api";
+import { client, type NotificationItem, orpc } from "@/shared/api";
 import {
 	browserName,
 	closeAnsweredGates,
@@ -33,17 +34,18 @@ import { notificationMutations, notificationQueries } from "./queries";
 
 /**
  * Follows what happens in every Space you are in (`notifications.watch`),
- * in place of polling. Each item reads the Gates and the runs again (and
- * with them the inbox, the tab badge and the dashboard). An item with
+ * in place of polling. The live cache reads again what each item changes
+ * (and with it the inbox, the tab badge and the dashboard). An item with
  * `alert` tells you: a toast while this tab has focus, else a notification
  * of this computer. A closed Gate takes its toast and notification away.
  * Each read of the open Gates also closes the notifications of Gates that
- * were answered while no page was open. After the stream was down, it
- * reads everything again. Mount it once.
+ * were answered while no page was open. After the stream was down, the
+ * live cache reads everything again. Mount it once.
  */
 export function useNotificationStream() {
 	const queryClient = useQueryClient();
 	const router = useRouter();
+	const live = useLiveCache(orpc);
 	const gates = useQuery(gateQueries.open());
 
 	useEffect(() => {
@@ -57,11 +59,6 @@ export function useNotificationStream() {
 	useEffect(() => {
 		const controller = new AbortController();
 		const open = (path: string) => void router.navigate({ href: path });
-		const refresh = () => {
-			void queryClient.invalidateQueries({ queryKey: gateQueries.all() });
-			void queryClient.invalidateQueries({ queryKey: runQueries.all() });
-		};
-		let wasLive = false;
 
 		void serviceWorker().then(() => renewOwnScreen(queryClient));
 		const stopClicks = onNotificationClick(open);
@@ -69,14 +66,9 @@ export function useNotificationStream() {
 		void followNotifications({
 			client,
 			signal: controller.signal,
-			onConnection: (connection) => {
-				if (connection !== "live") return;
-				// Items of the time it was down are lost: read everything again.
-				if (wasLive) refresh();
-				wasLive = true;
-			},
+			onConnection: live.onNotificationsConnection,
 			onItem: (item) => {
-				refresh();
+				live.onNotification(item);
 				if (item.kind === "gate-closed") {
 					toast.dismiss(item.key);
 					void closeNotifications(item.key);
@@ -90,7 +82,7 @@ export function useNotificationStream() {
 			controller.abort();
 			stopClicks();
 		};
-	}, [queryClient, router]);
+	}, [queryClient, router, live]);
 }
 
 /** Mounts the notifications stream. Renders nothing. */
