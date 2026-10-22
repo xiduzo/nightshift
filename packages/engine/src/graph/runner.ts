@@ -395,7 +395,7 @@ export function createRunner(deps: RunnerDeps) {
 	 * node the drive was in.
 	 *
 	 * - `stopped` (a person stopped the run): every step ends `stopped` with
-	 *   its kind's outputs (`stoppedOutputs`), the run `stopped`.
+	 *   its kind's outputs (`cutShortOutputs`), the run `stopped`.
 	 * - `overdue` (a step ran past its time budget or idle limit and its
 	 *   timer did not end it): that step ends `error` with the timer's
 	 *   message, the steps around it and the run fail with the reason a
@@ -444,13 +444,18 @@ export function createRunner(deps: RunnerDeps) {
 				const node = nodesOf(flow, flows, withEnclosing(steps, step.id)).get(
 					step.id,
 				);
-				const outputs = kindOfType(step.nodeType).stoppedOutputs(step, node);
+				const outcome = halt.kind === "stopped" ? "stopped" : "error";
+				const outputs = kindOfType(step.nodeType).cutShortOutputs(
+					step,
+					node,
+					outcome,
+				);
 				const payload: EnginePayloads["StepEnded"] =
 					halt.kind === "stopped"
-						? { outcome: "stopped", outputs, error: null }
+						? { outcome, outputs, error: null }
 						: {
-								outcome: "error",
-								outputs: { ...outputs, outcome: "error" },
+								outcome,
+								outputs,
 								error: step.id === halt.stepId ? halt.error : reason,
 							};
 				await log.append({

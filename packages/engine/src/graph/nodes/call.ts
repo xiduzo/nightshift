@@ -177,9 +177,9 @@ function isChosenCallEnd(node: CallNode, outcome: Outcome): boolean {
 /**
  * The Call kind. Its facts follow `node.each`: a Call with `each` takes up
  * a cut-short loop, every outcome is a chosen end and `done` the plain
- * end, a command source writes the command log, and a stopped step counts
- * its items; a Call once reports `pass` as the plain end and an empty
- * `ended` when stopped. The one kind that may follow a `stopped` edge
+ * end, a command source writes the command log, and a cut-short step
+ * counts its items; a Call once reports `pass` as the plain end and an
+ * empty `ended` when cut short. The one kind that may follow a `stopped` edge
  * (`hasStoppedEdge`, `wrappingUp`).
  */
 export const CALL: NodeKind<CallNode> = {
@@ -202,15 +202,15 @@ export const CALL: NodeKind<CallNode> = {
 			? null
 			: endedAtReason(node, outcome),
 	logsCommandOutput: (node) => node.each?.source.kind === "command",
-	stoppedOutputs: (open, node) => {
+	cutShortOutputs: (open, node, outcome) => {
 		const each = node ? runsEach(node) : open.items.length > 0;
 		return each
 			? eachOutputs({
 					items: open.items,
 					visit: open.visit,
-					outcome: "stopped",
+					outcome,
 					waiting: [],
 				})
-			: { outcome: "stopped", ended: "", visit: open.visit };
+			: { outcome, ended: "", visit: open.visit };
 	},
 };

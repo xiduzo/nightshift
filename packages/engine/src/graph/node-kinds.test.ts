@@ -20,7 +20,7 @@ import { RESUME_RULES } from "./resume-point";
 /**
  * The node-kind descriptors as a table: one fact, every kind. Each table
  * pins what the switches said before the descriptor took them over
- * (`compile.ts`, `route.ts`, the step runner, `runner.closeOpenWork`,
+ * (`compile.ts`, `route.ts`, the step runner, `closeOpenWork`,
  * `body.endedLabel`, `run-start.REQUIREMENTS`), so a new kind shows up
  * here first and an old one cannot drift.
  */
@@ -296,7 +296,8 @@ describe("timeBudget: the step's timers", () => {
 	});
 });
 
-describe("stoppedOutputs: what a stop ends an open step with", () => {
+describe("cutShortOutputs: what a cut ends an open step with", () => {
+	const OUTCOMES = ["stopped", "error", "interrupted"] as const;
 	const open = (fields: Partial<DerivedStep>): DerivedStep =>
 		({
 			id: "s1",
@@ -317,51 +318,61 @@ describe("stoppedOutputs: what a stop ends an open step with", () => {
 
 	test("a Decision ends with an empty note", () => {
 		const step = open({ nodeType: "decision" });
-		expect(
-			kindOfType("decision").stoppedOutputs(step, decision("person")),
-		).toEqual({
-			outcome: "stopped",
-			note: "",
-			visit: 2,
-		});
+		for (const outcome of OUTCOMES) {
+			expect(
+				kindOfType("decision").cutShortOutputs(
+					step,
+					decision("person"),
+					outcome,
+				),
+			).toEqual({ outcome, note: "", visit: 2 });
+		}
 	});
 
 	test("a Call once ends with an empty label; a Call with each counts its items, also when the snapshot has no node", () => {
 		const once = open({ nodeType: "call" });
-		expect(kindOfType("call").stoppedOutputs(once, call())).toEqual({
-			outcome: "stopped",
-			ended: "",
-			visit: 2,
-		});
 		const each = open({
 			nodeType: "call",
 			items: [item("done"), item("failed")],
 		});
-		const counted = kindOfType("call").stoppedOutputs(each, callEach());
-		expect(counted).toMatchObject({
-			outcome: "stopped",
-			done_count: 1,
-			failed_count: 1,
-		});
-		expect(kindOfType("call").stoppedOutputs(each, undefined)).toEqual(counted);
-		expect(
-			kindOfType("call").stoppedOutputs(open({ nodeType: "call" }), undefined),
-		).toEqual({
-			outcome: "stopped",
-			ended: "",
-			visit: 2,
-		});
+		for (const outcome of OUTCOMES) {
+			expect(kindOfType("call").cutShortOutputs(once, call(), outcome)).toEqual(
+				{ outcome, ended: "", visit: 2 },
+			);
+			const counted = kindOfType("call").cutShortOutputs(
+				each,
+				callEach(),
+				outcome,
+			);
+			expect(counted).toMatchObject({
+				outcome,
+				done_count: 1,
+				failed_count: 1,
+			});
+			expect(
+				kindOfType("call").cutShortOutputs(each, undefined, outcome),
+			).toEqual(counted);
+			expect(
+				kindOfType("call").cutShortOutputs(
+					open({ nodeType: "call" }),
+					undefined,
+					outcome,
+				),
+			).toEqual({ outcome, ended: "", visit: 2 });
+		}
 	});
 
-	test("every other kind keeps the outputs it had, marked stopped", () => {
+	test("every other kind keeps the outputs it had, marked with the outcome", () => {
 		for (const type of ["agent", "command", "tool", "value", "wait"] as const) {
-			expect(
-				kindOfType(type).stoppedOutputs(open({ nodeType: type }), undefined),
-			).toEqual({
-				visit: 2,
-				summary: "so far",
-				outcome: "stopped",
-			});
+			for (const outcome of OUTCOMES) {
+				expect(
+					kindOfType(type).cutShortOutputs(
+						open({ nodeType: type }),
+						undefined,
+						outcome,
+					),
+				).toEqual({ visit: 2, summary: "so far", outcome });
+			}
 		}
 	});
 });

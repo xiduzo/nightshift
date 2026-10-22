@@ -198,11 +198,16 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	/** The step's timers (`beginStep`), and the idle minutes an abort names. */
 	timeBudget(node: N): TimeBudget;
 	/**
-	 * The outputs an open step of this node ends with when the run is
-	 * stopped (`runner.closeOpenWork`). `node` is undefined when
+	 * The outputs an open step of this node ends with when its work is cut
+	 * short (`closeOpenWork`): a stop, a missed deadline, or a daemon that
+	 * died. `outcome` is the step's outcome then. `node` is undefined when
 	 * the run's flow snapshot has no node for the step.
 	 */
-	stoppedOutputs(open: DerivedStep, node: N | undefined): StepOutputs;
+	cutShortOutputs(
+		open: DerivedStep,
+		node: N | undefined,
+		outcome: CutShortOutcome,
+	): StepOutputs;
 	/** The connections the node needs the Device to have (`run-start.connectionsExist`). */
 	connections(node: N): readonly string[];
 	/** The programs the node needs on the Device, looked up before its requirements run. */
@@ -218,6 +223,9 @@ export type NodeKind<N extends FlowNode = FlowNode> = {
 	works(node: N): "worktree" | "device" | null;
 };
 
+/** The outcome of a step whose work was cut short: stopped, overdue (`error`), or interrupted. */
+export type CutShortOutcome = "stopped" | "error" | "interrupted";
+
 /** The `RunEnded` reason of a chosen end that is not the flow's plain end. */
 export function endedAtReason(node: FlowNode, outcome: Outcome): string {
 	return `Ended at node "${node.id}" with "${outcome}".`;
@@ -227,7 +235,7 @@ export function endedAtReason(node: FlowNode, outcome: Outcome): string {
  * The facts most kinds share, for a kind to spread and override: no
  * auxiliary node, `pass` is the one chosen end and the plain end, no
  * label for a Call, no command log, the node's own `timeoutMinutes`, a
- * stopped step keeps its outputs, no connections, no programs, no
+ * cut-short step keeps its outputs, no connections, no programs, no
  * requirements.
  */
 export const PLAIN_KIND = {
@@ -241,7 +249,7 @@ export const PLAIN_KIND = {
 		timeoutMinutes: node.timeoutMinutes,
 		idleMinutes: undefined,
 	}),
-	stoppedOutputs: (open) => ({ ...open.outputs, outcome: "stopped" }),
+	cutShortOutputs: (open, _node, outcome) => ({ ...open.outputs, outcome }),
 	connections: () => [],
 	programs: () => [],
 	requirements: [],

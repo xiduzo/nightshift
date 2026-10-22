@@ -17,7 +17,7 @@ import { WAIT } from "./nodes/wait";
  * engine: `compile.ts` picked the factory and the auxiliary graph nodes,
  * `route.ts` knew which ends are chosen and what `RunEnded` says, the step
  * runner knew which steps write a command log and which have a time
- * budget, `runner.closeParked` knew the stopped outputs, `body.ts` knew the
+ * budget, the runner knew the stopped outputs, `body.ts` knew the
  * Call's `ended` label and `run-start.ts` knew which kinds need a
  * connection, a harness or the decider. Adding the Tool node touched 16
  * files; adding the Wait node touched `state.ts`, `route.ts`, `context.ts`

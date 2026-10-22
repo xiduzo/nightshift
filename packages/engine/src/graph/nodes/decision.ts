@@ -93,6 +93,7 @@ export const DECISION: NodeKind<DecisionNode> = {
 		timeoutMinutes: node.by === "person" ? undefined : node.timeoutMinutes,
 		idleMinutes: undefined,
 	}),
-	stoppedOutputs: (open) => decisionOutputs("stopped", "", open.visit),
+	cutShortOutputs: (open, _node, outcome) =>
+		decisionOutputs(outcome, "", open.visit),
 	requirements: [modelDecisionsHaveDecider],
 };
