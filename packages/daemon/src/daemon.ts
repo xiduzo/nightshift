@@ -488,6 +488,7 @@ export async function createDaemon(
 	const http = createHttp({
 		auth,
 		db,
+		dataDir,
 		localSession,
 		hostPolicy,
 		trustedOrigins,

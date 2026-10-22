@@ -120,6 +120,7 @@ describe("exportRun", () => {
 		const path = join(sandbox.root, "run.nightshift.sqlite");
 		const summary = await exportRun({
 			db: sandbox.db,
+			dataDir: sandbox.dataDir,
 			runId,
 			spaceId: sandbox.spaceId,
 			path,
@@ -177,7 +178,13 @@ describe("exportRun", () => {
 	test("a round trip derives the same status, steps, outputs and cost", async () => {
 		const runId = await finishedRun();
 		const path = join(sandbox.root, "run.nightshift.sqlite");
-		await exportRun({ db: sandbox.db, runId, spaceId: sandbox.spaceId, path });
+		await exportRun({
+			db: sandbox.db,
+			dataDir: sandbox.dataDir,
+			runId,
+			spaceId: sandbox.spaceId,
+			path,
+		});
 		const live = await liveEvents(runId);
 
 		const opened = await openRunBundle(path);
@@ -222,7 +229,13 @@ describe("exportRun", () => {
 	test("a format 1 bundle still opens: its path is its one Clone, its Walker unknown", async () => {
 		const runId = await finishedRun();
 		const path = join(sandbox.root, "run.nightshift.sqlite");
-		await exportRun({ db: sandbox.db, runId, spaceId: sandbox.spaceId, path });
+		await exportRun({
+			db: sandbox.db,
+			dataDir: sandbox.dataDir,
+			runId,
+			spaceId: sandbox.spaceId,
+			path,
+		});
 		const live = await liveEvents(runId);
 		// What a Night Shift before Clones wrote.
 		const file = createDb({ DATABASE_URL: `file:${path}` });
@@ -264,7 +277,13 @@ describe("exportRun", () => {
 	test("a format 3 bundle still opens: nobody known started it", async () => {
 		const runId = await finishedRun();
 		const path = join(sandbox.root, "run.nightshift.sqlite");
-		await exportRun({ db: sandbox.db, runId, spaceId: sandbox.spaceId, path });
+		await exportRun({
+			db: sandbox.db,
+			dataDir: sandbox.dataDir,
+			runId,
+			spaceId: sandbox.spaceId,
+			path,
+		});
 		// What a Night Shift before Members wrote.
 		const file = createDb({ DATABASE_URL: `file:${path}` });
 		for (const statement of [
@@ -285,7 +304,13 @@ describe("exportRun", () => {
 	test("a format 2 bundle still opens: its Space unknown", async () => {
 		const runId = await finishedRun();
 		const path = join(sandbox.root, "run.nightshift.sqlite");
-		await exportRun({ db: sandbox.db, runId, spaceId: sandbox.spaceId, path });
+		await exportRun({
+			db: sandbox.db,
+			dataDir: sandbox.dataDir,
+			runId,
+			spaceId: sandbox.spaceId,
+			path,
+		});
 		const live = await liveEvents(runId);
 		// What a Night Shift before Spaces wrote.
 		const file = createDb({ DATABASE_URL: `file:${path}` });
@@ -312,6 +337,7 @@ describe("exportRun", () => {
 		expect(
 			await exportRun({
 				db: sandbox.db,
+				dataDir: sandbox.dataDir,
 				runId,
 				spaceId: await otherSpace(sandbox.db),
 				path,
@@ -337,6 +363,7 @@ describe("exportRun", () => {
 		const path = join(sandbox.root, "run.nightshift.sqlite");
 		const summary = await exportRun({
 			db: sandbox.db,
+			dataDir: sandbox.dataDir,
 			runId,
 			spaceId: sandbox.spaceId,
 			path,
@@ -351,11 +378,35 @@ describe("exportRun", () => {
 		opened.close();
 	});
 
+	test("reads each transcript in this computer's data folder, also when its row names another (a run moved here)", async () => {
+		const runId = await finishedRun();
+		// The rows a run moved here keeps name its old Walker's folder.
+		for (const s of await liveSteps(runId)) {
+			await sandbox.db
+				.update(step)
+				.set({ transcriptPath: join("/elsewhere", `${s.id}.ndjson`) })
+				.where(eq(step.id, s.id));
+		}
+		const path = join(sandbox.root, "run.nightshift.sqlite");
+		const summary = await exportRun({
+			db: sandbox.db,
+			dataDir: sandbox.dataDir,
+			runId,
+			spaceId: sandbox.spaceId,
+			path,
+		});
+		expect(summary?.missingTranscripts).toEqual([]);
+		const opened = await openRunBundle(path);
+		expect((await opened.transcript()).length).toBeGreaterThan(0);
+		opened.close();
+	});
+
 	test("secret values become ••• and every line still parses", async () => {
 		const runId = await finishedRun();
 		const path = join(sandbox.root, "run.nightshift.sqlite");
 		await exportRun({
 			db: sandbox.db,
+			dataDir: sandbox.dataDir,
 			runId,
 			spaceId: sandbox.spaceId,
 			path,
@@ -380,6 +431,7 @@ describe("exportRun", () => {
 		expect(
 			await exportRun({
 				db: sandbox.db,
+				dataDir: sandbox.dataDir,
 				runId: "nope",
 				spaceId: sandbox.spaceId,
 				path,
@@ -390,7 +442,13 @@ describe("exportRun", () => {
 		const runId = await finishedRun();
 		await writeFile(path, "");
 		await expect(
-			exportRun({ db: sandbox.db, runId, spaceId: sandbox.spaceId, path }),
+			exportRun({
+				db: sandbox.db,
+				dataDir: sandbox.dataDir,
+				runId,
+				spaceId: sandbox.spaceId,
+				path,
+			}),
 		).rejects.toThrow("already exists");
 		await expect(openRunBundle(sandbox.dbPath)).rejects.toThrow(
 			"not a Night Shift run bundle",

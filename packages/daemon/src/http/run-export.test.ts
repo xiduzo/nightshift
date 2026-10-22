@@ -69,6 +69,7 @@ const leftovers = async () =>
 
 const deps = () => ({
 	db: sandbox.db,
+	dataDir: sandbox.dataDir,
 	connections: { secretValues: async () => ["hunter2-secret"] },
 	tmpDir: sandbox.root,
 });

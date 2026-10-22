@@ -29,6 +29,8 @@ export function createHttp(
 	services: HttpServices & {
 		/** The web app's address (CORS_ORIGIN). */
 		corsOrigin: string;
+		/** This computer's data folder: the run export reads transcripts there. */
+		dataDir: string;
 		/** The lease this daemon holds, to tell another daemon's apart. */
 		leaseOwner: string;
 		sync: Sync;
@@ -111,7 +113,11 @@ export function createHttp(
 				403,
 			);
 		}
-		return runExportResponse({ db, connections }, c.req.param("id"), spaceId);
+		return runExportResponse(
+			{ db, dataDir: services.dataDir, connections },
+			c.req.param("id"),
+			spaceId,
+		);
 	});
 
 	// A file, not an oRPC call: one artifact of a run of the session's Space,

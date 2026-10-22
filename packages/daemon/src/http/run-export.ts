@@ -20,6 +20,8 @@ import {
 export async function runExportResponse(
 	deps: {
 		db: Database;
+		/** This computer's data folder, where the steps' transcripts are. */
+		dataDir: string;
 		connections: Pick<ConnectionStore, "secretValues">;
 		/** Where the temp directory goes. The OS temp directory by default. */
 		tmpDir?: string;
@@ -34,6 +36,7 @@ export async function runExportResponse(
 	try {
 		const summary = await exportRun({
 			db: deps.db,
+			dataDir: deps.dataDir,
 			runId,
 			spaceId,
 			path: join(dir, "run.nightshift.sqlite"),
