@@ -2,7 +2,6 @@
 
 export {
 	changesInbox,
-	gateKey,
 	gateRun,
 	inboxOrder,
 	isGateClosed,

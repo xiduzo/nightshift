@@ -119,7 +119,7 @@ async function wordsOf(
 				(g) => g.runId === item.runId && g.stepId === item.stepId,
 			);
 			if (gate) {
-				return describeNotice({ kind: item.kind, key: item.key, gate });
+				return describeNotice({ kind: item.kind, gate });
 			}
 		} else {
 			const runs = await queryClient.fetchQuery(runQueries.everyRun());

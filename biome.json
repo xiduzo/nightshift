@@ -112,6 +112,7 @@
 									"!@nightshift/client",
 									"!@nightshift/notifications",
 									"!@nightshift/notifications/testing",
+									"!@nightshift/notifications/contract",
 									"!@nightshift/ui-native/components/ui/*",
 									"!@nightshift/ui-native/hooks/*",
 									"!@nightshift/ui-native/lib/*",
@@ -214,6 +215,7 @@
 											"!@nightshift/client",
 											"!@nightshift/notifications",
 											"!@nightshift/notifications/testing",
+											"!@nightshift/notifications/contract",
 											"!@nightshift/ui-native/components/ui/*",
 											"!@nightshift/ui-native/hooks/*",
 											"!@nightshift/ui-native/lib/*",
@@ -258,9 +260,10 @@
 										"group": [
 											"@nightshift/**",
 											"!@nightshift/api/client",
-											"!@nightshift/flows"
+											"!@nightshift/flows",
+											"!@nightshift/notifications/contract"
 										],
-										"message": "@nightshift/client imports only @nightshift/api/client (types) and the @nightshift/flows root (see docs/steering/STRUCTURE.md, section 1)."
+										"message": "@nightshift/client imports only @nightshift/api/client (types), the @nightshift/flows root and @nightshift/notifications/contract (see docs/steering/STRUCTURE.md, section 1)."
 									},
 									{
 										"group": [
@@ -327,6 +330,7 @@
 											"!@nightshift/client",
 											"!@nightshift/notifications",
 											"!@nightshift/notifications/testing",
+											"!@nightshift/notifications/contract",
 											"!@nightshift/ui-native/components/ui/*",
 											"!@nightshift/ui-native/hooks/*",
 											"!@nightshift/ui-native/lib/*",
@@ -425,6 +429,7 @@
 											"!@nightshift/client",
 											"!@nightshift/notifications",
 											"!@nightshift/notifications/testing",
+											"!@nightshift/notifications/contract",
 											"!@nightshift/ui-native/components/ui/*",
 											"!@nightshift/ui-native/hooks/*",
 											"!@nightshift/ui-native/lib/*",

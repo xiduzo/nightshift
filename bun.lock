@@ -231,6 +231,7 @@
       "dependencies": {
         "@nightshift/api": "workspace:*",
         "@nightshift/flows": "workspace:*",
+        "@nightshift/notifications": "workspace:*",
         "@orpc/client": "catalog:",
         "@orpc/tanstack-query": "^1.15.0",
       },

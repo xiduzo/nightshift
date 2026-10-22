@@ -21,13 +21,11 @@ describe("the words of a notice", () => {
 		expect(
 			describeNotice({
 				kind: "gate-opened",
-				key: "r1:review",
 				gate: gate("r1", "review"),
 			}),
 		).toEqual({
 			title: "app: a Gate waits for you",
 			body: "Fix the login\nShip it?",
-			tag: "gate:r1:review",
 		});
 	});
 
@@ -40,10 +38,9 @@ describe("the words of a notice", () => {
 		).toEqual({
 			title: "A run finished",
 			body: "Run r1\nEnded on ship",
-			tag: "run:r1:finished",
 		});
 		expect(
 			describeNotice({ kind: "run-failed", run: run("r2", "failed") }),
-		).toEqual({ title: "A run failed", body: "Run r2", tag: "run:r2:failed" });
+		).toEqual({ title: "A run failed", body: "Run r2" });
 	});
 });

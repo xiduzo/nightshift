@@ -14,6 +14,7 @@ import ts from "typescript";
 const ALLOWED: Record<string, "types" | "values"> = {
 	"@nightshift/api/client": "types",
 	"@nightshift/flows": "values",
+	"@nightshift/notifications/contract": "values",
 	"@orpc/client": "values",
 	"@orpc/client/fetch": "values",
 	"@orpc/tanstack-query": "values",
@@ -40,8 +41,16 @@ const PLATFORM_GLOBALS = new Set([
 	"Deno",
 ]);
 
-/** What in `source` breaks the rules, one line per problem. */
-function violations(file: string, source: string): string[] {
+/**
+ * What in `source` breaks the rules, one line per problem. `allowed`: the
+ * packages it may import. `parent`: whether it may import from `../`.
+ */
+function violations(
+	file: string,
+	source: string,
+	allowed: Record<string, "types" | "values"> = ALLOWED,
+	parent = true,
+): string[] {
 	const found: string[] = [];
 	const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
 	const where = (node: ts.Node) =>
@@ -52,11 +61,12 @@ function violations(file: string, source: string): string[] {
 		specifier: string,
 		typeOnly: boolean,
 	) => {
-		if (specifier.startsWith("./") || specifier.startsWith("../")) return;
-		const allowed = ALLOWED[specifier];
-		if (!allowed) {
+		if (specifier.startsWith("./")) return;
+		if (parent && specifier.startsWith("../")) return;
+		const may = allowed[specifier];
+		if (!may) {
 			found.push(`${where(node)} imports "${specifier}"`);
-		} else if (allowed === "types" && !typeOnly) {
+		} else if (may === "types" && !typeOnly) {
 			found.push(`${where(node)} imports "${specifier}" without "import type"`);
 		}
 	};
@@ -136,6 +146,18 @@ describe("the client package", () => {
 	});
 });
 
+describe("the push contract it reads", () => {
+	test("imports nothing and uses no API of one platform", () => {
+		const dir = join(import.meta.dir, "../../notifications/src/contract");
+		const files = sourceFiles(dir);
+		expect(files.length).toBeGreaterThan(1);
+		const found = files.flatMap((file) =>
+			violations(relative(dir, file), readFileSync(file, "utf8"), {}, false),
+		);
+		expect(found).toEqual([]);
+	});
+});
+
 describe("the check itself", () => {
 	test("fails on Node, Bun, the DOM and React Native", () => {
 		const source = [
@@ -165,6 +187,18 @@ describe("the check itself", () => {
 			'bad.ts:10 uses "window"',
 			'bad.ts:11 uses "process"',
 			'bad.ts:12 uses "Bun"',
+		]);
+	});
+
+	test("keeps a leaf to its own folder", () => {
+		const source = [
+			'import { gateKey } from "./keys";',
+			'import { titleOf } from "../channels";',
+			'import { z } from "zod";',
+		].join("\n");
+		expect(violations("leaf.ts", source, {}, false)).toEqual([
+			'leaf.ts:2 imports "../channels"',
+			'leaf.ts:3 imports "zod"',
 		]);
 	});
 
