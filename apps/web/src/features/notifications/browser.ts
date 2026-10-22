@@ -5,6 +5,8 @@
  * without these features: it does nothing, or answers "unsupported".
  */
 
+import { staleGates } from "@nightshift/client";
+
 /** The service worker's path. Its scope is the whole app. */
 const SERVICE_WORKER = "/sw.js";
 
@@ -97,7 +99,7 @@ export async function serviceWorker(): Promise<ServiceWorkerRegistration | null>
  */
 export async function showNotification(options: {
 	key: string;
-	/** What happened: `gate-opened` lets `closeAnsweredGates` find it. */
+	/** What happened. */
 	kind: string;
 	title: string;
 	body?: string;
@@ -144,36 +146,11 @@ export async function closeNotifications(key: string): Promise<void> {
 	for (const notification of shown) notification.close();
 }
 
-/** What `answeredGates` reads of one shown notification. */
-export type ShownNotification = { tag: string; data: unknown };
-
-/**
- * The tags of the shown Gate notifications whose Gate no longer waits:
- * not in `openKeys`, and shown before the Gates were read (`readAt`). One
- * shown after that read may be a Gate the read did not know yet.
- */
-export function answeredGates(
-	shown: readonly ShownNotification[],
-	openKeys: ReadonlySet<string>,
-	readAt: number,
-): string[] {
-	const tags = new Set<string>();
-	for (const notification of shown) {
-		const data = notification.data as {
-			kind?: unknown;
-			shownAt?: unknown;
-		} | null;
-		if (data?.kind !== "gate-opened") continue;
-		if (typeof data.shownAt !== "number" || data.shownAt >= readAt) continue;
-		if (!openKeys.has(notification.tag)) tags.add(notification.tag);
-	}
-	return [...tags];
-}
-
 /**
  * Closes the Gate notifications of this browser whose Gate no longer
  * waits. No push takes a notification back (a push must show one), so an
- * open page does it each time it reads the open Gates.
+ * open page does it each time it reads the open Gates. The rule is the
+ * phone's (`staleGates`): only one shown more than 30 s before the read.
  */
 export async function closeAnsweredGates(
 	openKeys: ReadonlySet<string>,
@@ -184,14 +161,25 @@ export async function closeAnsweredGates(
 	}
 	try {
 		const registration = await navigator.serviceWorker.getRegistration();
-		const shown = (await registration?.getNotifications()) ?? [];
-		const stale = new Set(answeredGates(shown, openKeys, readAt));
-		for (const notification of shown) {
-			if (stale.has(notification.tag)) notification.close();
+		const shown = ((await registration?.getNotifications()) ?? []).map(
+			(notification) => ({
+				key: notification.tag || null,
+				at: shownAtOf(notification.data),
+				notification,
+			}),
+		);
+		for (const { notification } of staleGates(shown, openKeys, readAt)) {
+			notification.close();
 		}
 	} catch {
 		// The next read of the open Gates tries again.
 	}
+}
+
+/** When a notification showed, as its data says. Unknown: it never counts as stale. */
+function shownAtOf(data: unknown): number {
+	const shownAt = (data as { shownAt?: unknown } | null)?.shownAt;
+	return typeof shownAt === "number" ? shownAt : Number.POSITIVE_INFINITY;
 }
 
 /** Calls `open` with the path of each notification the person clicks. Returns the unsubscribe. */

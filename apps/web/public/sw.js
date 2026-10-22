@@ -3,7 +3,7 @@
  * pushes to this browser while no Night Shift page is open (Web Push).
  *
  * A push carries no content: what happened, its ids and one short sentence
- * (`@nightshift/notifications`, `channels/web-push.ts`, `WebPushPayload`):
+ * (`WebPushPayload` in `@nightshift/notifications`, `channels/web-push.ts`):
  *   { type: "show", kind, key, spaceId, runId, stepId, title, count }
  * Every push shows a notification: the subscription is `userVisibleOnly`,
  * and a push that shows nothing costs the site its subscription (Safari)
@@ -13,6 +13,11 @@
  * The notification's tag is the key, so a second push of one key replaces
  * the first. Its data has the kind and when it showed, for that page. A
  * click opens the Gate or the run in an open Night Shift tab, or in a new one.
+ *
+ * The rules come from the push contract (`@nightshift/notifications/contract`):
+ * the key, and where a tap goes (`routeOf`, `webPathOf`). This file cannot
+ * import it, so `src/features/notifications/sw.test.ts` runs this worker
+ * against the contract. Change both together.
  *
  * Vite copies `public/` into the build as it is: this file is plain
  * JavaScript, served at `/sw.js`, with the whole app as its scope.
@@ -26,9 +31,9 @@ self.addEventListener("activate", (event) => {
 	event.waitUntil(self.clients.claim());
 });
 
-/** Where a click on the notification goes in the app. */
+/** Where a click on the notification goes in the app (the contract's `webPathOf(routeOf(push))`). */
 function pathOf(push) {
-	if (push.kind === "gate-opened" && push.stepId) {
+	if (push.kind === "gate-opened" && push.runId && push.stepId) {
 		return `/inbox?gate=${encodeURIComponent(push.stepId)}`;
 	}
 	if (
