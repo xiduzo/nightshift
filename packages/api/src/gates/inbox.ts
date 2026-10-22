@@ -41,7 +41,9 @@ export async function inboxOf(context: InboxContext): Promise<InboxGate[]> {
  * with their role there; the session's Space stays as it is. A run outside
  * their Spaces is "not found", the same as one that does not exist. The
  * engine refuses a step that is not the run's open Gate, so an answer to a
- * closed Gate is refused too.
+ * closed Gate is refused too. An answer from the lock screen goes only to
+ * a Gate its author marked for it: the push that shows the buttons is not
+ * proof of that.
  */
 export async function answerGate(
 	context: InboxContext,
@@ -60,5 +62,22 @@ export async function answerGate(
 			message: "Your role in this Space does not allow this.",
 		});
 	}
-	await context.engine.space(spaceId, { personId }).resolveGate(input);
+	const { via, ...answer } = input;
+	const space = context.engine.space(spaceId, { personId });
+	if (via === "lock-screen") {
+		const gate = (await space.listGates()).find(
+			(open) => open.runId === answer.runId && open.stepId === answer.stepId,
+		);
+		if (!gate) {
+			throw new ORPCError("BAD_REQUEST", {
+				message: "This Gate is no longer open.",
+			});
+		}
+		if (!gate.lockScreen) {
+			throw new ORPCError("FORBIDDEN", {
+				message: "Open this Gate in Night Shift to answer it.",
+			});
+		}
+	}
+	await space.resolveGate(answer);
 }
