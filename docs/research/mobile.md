@@ -249,7 +249,10 @@ the risk of a Gate. The app does not guess it.
 ### Phone push contract
 
 What the Host sends through Expo Push (`packages/notifications/src/channels/expo.ts`),
-and what the phone app must do with it.
+and what the phone app must do with it. The values in the tables below have one
+source: the contract entry `@nightshift/notifications/contract` (`contract/`: the keys,
+the categories, channels and buttons, `PushData`, and where a tap goes). The Host builds
+pushes from it, and the phone and the browser read it through `@nightshift/client`.
 
 **Registration.** The app registers its Expo push token with
 `notifications.targets.register({ kind: "expo", name, platform, endpoint: <ExpoPushToken[...]> })`
