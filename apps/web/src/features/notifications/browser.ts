@@ -97,6 +97,8 @@ export async function serviceWorker(): Promise<ServiceWorkerRegistration | null>
  */
 export async function showNotification(options: {
 	key: string;
+	/** What happened: `gate-opened` lets `closeAnsweredGates` find it. */
+	kind: string;
 	title: string;
 	body?: string;
 	path: string;
@@ -113,7 +115,7 @@ export async function showNotification(options: {
 			tag: options.key,
 			body: options.body,
 			icon: "/favicon.svg",
-			data: { path: options.path },
+			data: { path: options.path, kind: options.kind, shownAt: Date.now() },
 		});
 		return;
 	}
@@ -140,6 +142,56 @@ export async function closeNotifications(key: string): Promise<void> {
 	const registration = await navigator.serviceWorker.getRegistration();
 	const shown = (await registration?.getNotifications({ tag: key })) ?? [];
 	for (const notification of shown) notification.close();
+}
+
+/** What `answeredGates` reads of one shown notification. */
+export type ShownNotification = { tag: string; data: unknown };
+
+/**
+ * The tags of the shown Gate notifications whose Gate no longer waits:
+ * not in `openKeys`, and shown before the Gates were read (`readAt`). One
+ * shown after that read may be a Gate the read did not know yet.
+ */
+export function answeredGates(
+	shown: readonly ShownNotification[],
+	openKeys: ReadonlySet<string>,
+	readAt: number,
+): string[] {
+	const tags = new Set<string>();
+	for (const notification of shown) {
+		const data = notification.data as {
+			kind?: unknown;
+			shownAt?: unknown;
+		} | null;
+		if (data?.kind !== "gate-opened") continue;
+		if (typeof data.shownAt !== "number" || data.shownAt >= readAt) continue;
+		if (!openKeys.has(notification.tag)) tags.add(notification.tag);
+	}
+	return [...tags];
+}
+
+/**
+ * Closes the Gate notifications of this browser whose Gate no longer
+ * waits. No push takes a notification back (a push must show one), so an
+ * open page does it each time it reads the open Gates.
+ */
+export async function closeAnsweredGates(
+	openKeys: ReadonlySet<string>,
+	readAt: number,
+): Promise<void> {
+	if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+		return;
+	}
+	try {
+		const registration = await navigator.serviceWorker.getRegistration();
+		const shown = (await registration?.getNotifications()) ?? [];
+		const stale = new Set(answeredGates(shown, openKeys, readAt));
+		for (const notification of shown) {
+			if (stale.has(notification.tag)) notification.close();
+		}
+	} catch {
+		// The next read of the open Gates tries again.
+	}
 }
 
 /** Calls `open` with the path of each notification the person clicks. Returns the unsubscribe. */

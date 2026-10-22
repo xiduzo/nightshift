@@ -35,8 +35,9 @@ export const decisionNodeSchema = z.object({
 	/** `by: "model"` only. The decider's model. Unset: the decider's default (`jev-latest` for TypeSafe). */
 	model: z.string().min(1).optional(),
 	/**
-	 * `by: "person"` only: this Gate can be answered from the lock screen.
-	 * Its notification on a phone shows the options as buttons. Without it
+	 * `by: "person"` only, with exactly two options: this Gate can be
+	 * answered from the lock screen. Its notification on a phone shows
+	 * Approve (the first option) and Reject (the second). Without it
 	 * (the default), the notification opens the app, which checks it is you
 	 * before the answer goes. An optional field: older files read as false,
 	 * so the flow version stays the same.
@@ -76,8 +77,9 @@ export function checkDecisionNode(node: DecisionNode, check: NodeCheck): void {
  * belong to a Decision decided by a rule, where every option but the last
  * has one: the first rule that holds picks its option, and the option
  * without a rule is the default. A rule must parse, and the names it reads
- * must be inputs or nodes of the flow. Only a Gate can be answered from
- * the lock screen (`lockScreen`).
+ * must be inputs or nodes of the flow. Only a Gate with two options can
+ * be answered from the lock screen (`lockScreen`): Approve answers the
+ * first, Reject the second.
  */
 function checkDecidedBy(node: DecisionNode, check: NodeCheck): void {
 	const ruled = node.options.filter(
@@ -86,6 +88,11 @@ function checkDecidedBy(node: DecisionNode, check: NodeCheck): void {
 	if (node.lockScreen === true && node.by !== "person") {
 		check.error(
 			`Decision node "${node.id}" is decided by ${node.by === "rule" ? "a rule" : "a model"}. Only a person can answer from the lock screen. Turn off "Can be answered from the lock screen", or let a person decide.`,
+		);
+	} else if (node.lockScreen === true && node.options.length !== 2) {
+		// The phone's buttons have fixed titles: Approve, Reject.
+		check.error(
+			`Decision node "${node.id}" can be answered from the lock screen, but it has ${node.options.length} ${node.options.length === 1 ? "option" : "options"}. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or remove lockScreen.`,
 		);
 	}
 	if (node.by !== "rule") {

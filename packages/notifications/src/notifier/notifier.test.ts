@@ -312,9 +312,22 @@ describe("this computer's desktop", () => {
 		expect(expo.calls).toEqual([]);
 		// The page only updates: the Host alerts for the Space.
 		expect(screen.map((i) => "alert" in i && i.alert)).toEqual([false, false]);
+		// So the desktop does not wait for the page.
+		expect(desktop.sent().map((m) => m.toldInApp)).toEqual([false, false]);
 
 		await answerGate("run-1", "step-1");
 		expect(desktop.withdrawn()).toEqual(["run-1:step-1"]);
+	});
+
+	test("says when an open page showed the notice, so the desktop does not show it twice", async () => {
+		await notifier.start();
+		await register("ada", "desktop");
+		const screen = openScreen("ada");
+
+		await openGate("run-1", "step-1");
+
+		expect(screen.map((i) => "alert" in i && i.alert)).toEqual([true]);
+		expect(desktop.sent().map((m) => m.toldInApp)).toEqual([true]);
 	});
 
 	test("respects the person's events, screens and quiet hours there too", async () => {
@@ -379,7 +392,11 @@ describe("quiet hours", () => {
 		await openGate("run-1", "step-1");
 		await endRun("run-2", "finished");
 		expect(web.calls).toEqual([]);
-		expect(screen.map((i) => i.kind)).toEqual(["gate-opened", "run-finished"]);
+		// The open page updates, but shows no notification at night.
+		expect(screen.map((i) => [i.kind, "alert" in i && i.alert])).toEqual([
+			["gate-opened", false],
+			["run-finished", false],
+		]);
 
 		clock = Date.UTC(2026, 9, 22, 6, 59);
 		await notifier.tick();
@@ -413,6 +430,31 @@ describe("quiet hours", () => {
 			count: 2,
 			spaceId: null,
 		});
+	});
+
+	test("when they end, each screen hears only of the Gates it held", async () => {
+		// Another Host sends for OTHER_SPACE: only this computer's desktop held its Gate.
+		members[OTHER_SPACE] = ["ada"];
+		senders.delete(OTHER_SPACE);
+		await notifier.start();
+		const phone = await register("ada", "expo");
+		const own = await register("ada", "desktop");
+
+		await openGate("run-1", "step-1");
+		await openGate("run-2", "step-2", OTHER_SPACE);
+
+		clock = Date.UTC(2026, 9, 22, 7, 30);
+		await notifier.tick();
+
+		expect(sentTo(expo)).toEqual([`${phone.id}:run-1:step-1`]);
+		expect(desktop.sent().map((m) => m.title)).toEqual([
+			"2 Gates wait for you",
+		]);
+		expect(sentTo(desktop)).toEqual([`${own.id}:waiting:${clock}`]);
+
+		// The phone got the Gate itself: its answer withdraws it there.
+		await answerGate("run-1", "step-1");
+		expect(expo.withdrawn()).toEqual(["run-1:step-1"]);
 	});
 
 	test("are in the person's own time zone", async () => {
@@ -591,15 +633,36 @@ describe("once per key", () => {
 		expect(web.sent()).toHaveLength(1);
 	});
 
-	test("the Gates open at start are the baseline: they tell nobody", async () => {
-		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
-		await notifier.start();
+	test("a Gate told before is not told again at start", async () => {
 		await register("ada", "web");
+		await notifier.start();
+		await openGate("run-1", "step-1");
+		notifier.stop();
 
+		notifier = makeNotifier();
+		const screen = openScreen("ada");
+		await notifier.start();
 		events.land([event("StepStarted", "run-1", "step-2")]);
 		await notifier.idle();
 
-		expect(web.calls).toEqual([]);
+		expect(web.sent()).toHaveLength(1);
+		expect(screen).toEqual([]);
+	});
+
+	test("a Gate that opened while no notifier listened is pushed at start", async () => {
+		await register("ada", "web");
+		const phone = await register("bob", "expo");
+		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
+
+		await notifier.start();
+
+		expect(sentTo(expo)).toEqual([`${phone.id}:run-1:step-1`]);
+		expect(web.sent()).toHaveLength(1);
+		// Once: the next start finds it in the log.
+		notifier.stop();
+		notifier = makeNotifier();
+		await notifier.start();
+		expect(expo.sent()).toHaveLength(1);
 	});
 
 	test("a Gate that closed while Night Shift was away is withdrawn at start", async () => {

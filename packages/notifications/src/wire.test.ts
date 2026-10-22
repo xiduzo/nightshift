@@ -76,7 +76,7 @@ test("a browser subscribes with the public key this daemon keeps", async () => {
 	expect(await withoutWebPush.webPush.publicKey()).toBeNull();
 });
 
-test("a new Gate goes to the Person's browser, and its answer withdraws it", async () => {
+test("a new Gate goes to the Person's browser, and its answer sends no push that shows nothing", async () => {
 	const ada = await sandbox.signUp("Ada");
 	const spaceId = (await personalSpaceId(sandbox.db, ada.userId)) ?? "";
 	expect(spaceId).not.toBe("");
@@ -95,6 +95,17 @@ test("a new Gate goes to the Person's browser, and its answer withdraws it", asy
 		},
 	]);
 	await waitFor(() => sender.requests.length === 1);
+	// A page opens now: a page open before would hold the push.
+	const closed: string[] = [];
+	const controller = new AbortController();
+	void (async () => {
+		for await (const item of notifications.watch(
+			ada.userId,
+			controller.signal,
+		)) {
+			if (item.kind === "gate-closed") closed.push(item.key);
+		}
+	})();
 
 	events.setOpen(spaceId, []);
 	events.land([
@@ -107,8 +118,11 @@ test("a new Gate goes to the Person's browser, and its answer withdraws it", asy
 			payload: {},
 		},
 	]);
-	await waitFor(() => sender.requests.length === 2);
+	// The open page closes the notification: no push goes to the browser.
+	await waitFor(() => closed.length === 1);
+	controller.abort();
 
+	expect(closed).toEqual(["run-1:review"]);
 	expect(sender.payloads()).toEqual([
 		{
 			type: "show",
@@ -120,7 +134,6 @@ test("a new Gate goes to the Person's browser, and its answer withdraws it", asy
 			title: "A Gate waits for you",
 			count: null,
 		},
-		{ type: "withdraw", key: "run-1:review" },
 	]);
 });
 

@@ -127,12 +127,30 @@ describe("the desktop channel", () => {
 
 	test("without the window state, an open page on this computer goes first", async () => {
 		const unknown = channel({ window: null, streamHere: true });
-		await unknown.desktop.send(target(), gate);
+		await unknown.desktop.send(target(), { ...gate, toldInApp: true });
 		expect(unknown.notifier.shown).toEqual([]);
 
 		const noPath = channel({
 			window: { focused: true, path: null },
 			streamHere: false,
+		});
+		await noPath.desktop.send(target(), gate);
+		expect(noPath.notifier.shown).toHaveLength(1);
+	});
+
+	test("an open page that only updated does not count: the desktop shows it", async () => {
+		// A Space another Host sends for, or quiet hours: the page shows no notification.
+		const page = channel({ window: null, streamHere: true });
+		await page.desktop.send(target(), { ...gate, toldInApp: false });
+		await page.desktop.send(target(), failed);
+		expect(page.notifier.shown.map((n) => n.id)).toEqual([
+			"run-1:step-1",
+			"run-1:end:9",
+		]);
+
+		const noPath = channel({
+			window: { focused: true, path: null },
+			streamHere: true,
 		});
 		await noPath.desktop.send(target(), gate);
 		expect(noPath.notifier.shown).toHaveLength(1);

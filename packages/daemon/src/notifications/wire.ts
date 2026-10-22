@@ -90,6 +90,11 @@ export async function wireNotifications(
 		},
 	});
 	hot.nightshiftNotifications = notifications;
+	// Listens at once: the engine already recovers runs and wakes timers,
+	// and an event that lands before the notifier listens is lost. Not
+	// awaited: it reads every Space's open Gates first, and pushes the ones
+	// that opened while no notifier listened.
+	void notifications.start();
 	// The switches this computer kept before notification settings moved
 	// to the Person: its owner gets them once.
 	await notifications.settings.seed(owner.userId, settings.current());
@@ -103,8 +108,6 @@ export async function wireNotifications(
 			endpoint: device.id,
 		});
 	}
-	// Not awaited: the baseline reads every Space's open Gates.
-	void notifications.start();
 	return {
 		notifications,
 		settings: adoptingSwitches(settings, notifications, owner.userId),

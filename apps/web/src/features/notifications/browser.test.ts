@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+	answeredGates,
 	BrowserPushProblem,
 	browserPushErrorText,
 	homeScreenNeeded,
@@ -72,5 +73,38 @@ describe("browserPushErrorText", () => {
 		expect(browserPushErrorText(raw, false)).toBe(
 			"Notifications in this browser did not turn off. Try again.",
 		);
+	});
+});
+
+describe("answeredGates", () => {
+	const gate = (tag: string, shownAt: number) => ({
+		tag,
+		data: { kind: "gate-opened", shownAt },
+	});
+
+	test("a Gate notification whose Gate no longer waits is answered", () => {
+		expect(
+			answeredGates(
+				[gate("run-1:review", 10), gate("run-2:ship", 10)],
+				new Set(["run-2:ship"]),
+				100,
+			),
+		).toEqual(["run-1:review"]);
+	});
+
+	test("one shown after the read may be a Gate the read did not know yet", () => {
+		expect(answeredGates([gate("run-1:review", 100)], new Set(), 100)).toEqual(
+			[],
+		);
+	});
+
+	test("a run's notification is never a Gate's", () => {
+		expect(
+			answeredGates(
+				[{ tag: "run-1:end:4", data: { kind: "run-finished", shownAt: 1 } }],
+				new Set(),
+				100,
+			),
+		).toEqual([]);
 	});
 });

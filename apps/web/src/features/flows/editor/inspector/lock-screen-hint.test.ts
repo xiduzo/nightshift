@@ -16,8 +16,8 @@ describe("the lock-screen hint", () => {
 			lockScreen: true,
 			options: [option("merge"), option("close")],
 		});
-		expect(hint).toContain("Approve picks the first option");
-		expect(hint).toContain("Reject picks the second");
+		expect(hint).toContain('Approve picks "merge"');
+		expect(hint).toContain('Reject picks "close"');
 	});
 
 	test("on with another number of options: it says it has no effect", () => {

@@ -192,6 +192,14 @@ describe("a run's progress on the lock screen", () => {
 		expect(failed.tone).toBe("failed");
 	});
 
+	test("an interrupted run has not ended: Night Shift resumes it after a restart", () => {
+		const progress = runProgress(
+			detail("interrupted", [step("plan", 1, 2), step("build", 3, 4)]),
+		);
+		expect(progress.ended).toBe(false);
+		expect(progress.statusText).toBe("Interrupted");
+	});
+
 	test("knows when an update changes nothing", () => {
 		const a = runProgress(detail("running", [step("plan", 1, null)]));
 		const b = runProgress(detail("running", [step("plan", 1, null)]));

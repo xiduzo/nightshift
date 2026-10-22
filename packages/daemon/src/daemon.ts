@@ -410,6 +410,18 @@ export async function createDaemon(
 	});
 	hot.nightshiftEngine = engine;
 
+	const { notifications, settings: computerSettings } = await wireNotifications(
+		{
+			db,
+			env,
+			engine,
+			settings,
+			device,
+			owner: person,
+			desktop: options.desktop,
+		},
+	);
+
 	/*
 	 * Secure by default: this daemon answers this computer only, until it is
 	 * a Host with an https:// address (read at start: a change applies on
@@ -440,18 +452,6 @@ export async function createDaemon(
 			sync.disconnect((context) => context.deviceId === deviceId),
 		kept: hot,
 	});
-
-	const { notifications, settings: computerSettings } = await wireNotifications(
-		{
-			db,
-			env,
-			engine,
-			settings,
-			device,
-			owner: person,
-			desktop: options.desktop,
-		},
-	);
 
 	/**
 	 * "Keep this computer awake" (this computer's

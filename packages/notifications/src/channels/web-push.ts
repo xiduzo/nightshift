@@ -15,26 +15,30 @@ import type { VapidKeyStore, VapidKeys } from "./vapid-keys";
  * subscription and signs it with this daemon's VAPID keys. The service
  * worker of the web app (`apps/web/public/sw.js`) shows it.
  *
- * The message carries no content, only ids and one short sentence. A
- * withdraw is a message of its own: the service worker closes the
- * notifications with that tag (the key). Both use one Web Push topic per
- * key, so a withdraw replaces a message the push service still holds.
+ * The message carries no content, only ids and one short sentence. It
+ * goes on one Web Push topic per key, so a second message of a key
+ * replaces one the push service still holds.
+ *
+ * A withdraw sends nothing. The browser subscribes with
+ * `userVisibleOnly`: every push must show a notification, and a push that
+ * shows none costs the site (Safari ends the subscription after a few,
+ * Chrome shows a notice of its own). An open Night Shift page closes the
+ * notifications of the Gates that no longer wait instead (`apps/web`,
+ * `features/notifications`).
  */
 
 /** What the service worker gets. */
-export type WebPushPayload =
-	| {
-			type: "show";
-			kind: NotificationMessage["kind"];
-			key: string;
-			spaceId: string | null;
-			runId: string | null;
-			stepId: string | null;
-			title: string;
-			/** How many Gates wait (`gates-waiting`). Null otherwise. */
-			count: number | null;
-	  }
-	| { type: "withdraw"; key: string };
+export type WebPushPayload = {
+	type: "show";
+	kind: NotificationMessage["kind"];
+	key: string;
+	spaceId: string | null;
+	runId: string | null;
+	stepId: string | null;
+	title: string;
+	/** How many Gates wait (`gates-waiting`). Null otherwise. */
+	count: number | null;
+};
 
 /** A browser's push subscription, as `PushSubscription.toJSON()` gives it. */
 export type WebPushSubscription = {
@@ -171,11 +175,7 @@ export function createWebPushChannel(
 				urgencyOf(message.kind),
 			);
 		},
-		async withdraw(target, key) {
-			const subscription = subscriptionOf(target);
-			if (!subscription) return;
-			// A browser that unsubscribed has nothing to close.
-			await deliver(subscription, { type: "withdraw", key }, "normal");
-		},
+		// No push: a push that shows nothing breaks `userVisibleOnly` (see above).
+		async withdraw() {},
 	};
 }

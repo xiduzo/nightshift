@@ -27,15 +27,16 @@ import type { OpenGateRef, RunEvent, RunEventSource } from "./sources";
  * - Who: the Members of the run's Space.
  * - Every open page and app (the in-app stream) hears of every event at
  *   once, also in quiet hours. It shows a notification only when this
- *   daemon sends for the Space and the person wants that event.
+ *   daemon sends for the Space, the person wants that event, and it is
+ *   not quiet hours.
  * - One sender per Space (`sendsFor`): only that daemon pushes to the
  *   browsers and phones. This computer's own desktop is not a push: the
  *   daemon shows it for every Space it has, also for a Space another
  *   Host keeps and sends for (`LOCAL_KINDS`).
  * - Once per key: the delivery log claims each (Person, key) once.
- * - Quiet hours hold pushes. When they end, one push says how many Gates
- *   still wait (or the one Gate itself). Runs that ended meanwhile go
- *   without a push.
+ * - Quiet hours hold pushes. When they end, each screen gets one push that
+ *   says how many of the Gates it held still wait (or the one Gate
+ *   itself). Runs that ended meanwhile go without a push.
  * - The active screen first: while the person has a page or the app open,
  *   a push to a phone or a closed browser waits `holdMinutes`. A Gate
  *   answered meanwhile is not pushed at all. A run that ended is pushed
@@ -47,8 +48,10 @@ import type { OpenGateRef, RunEvent, RunEventSource } from "./sources";
  * - Lock-screen answers: a push about a Gate its author marked carries its
  *   options, only to a person whose role allows an answer (`mayAnswer`).
  *
- * The open Gates at start are the baseline: they tell nobody again. Every
- * piece of work runs one after the other, so two landings never race.
+ * At start, the open Gates are read: one the log has not told yet (it
+ * opened while no notifier listened) is pushed then, the others tell
+ * nobody again. Every piece of work runs one after the other, so two
+ * landings never race.
  */
 
 export type NotifierDeps = {
@@ -77,7 +80,10 @@ export type NotifierDeps = {
 };
 
 export type Notifier = {
-	/** Reads the baseline, then listens. Resolves once the baseline is read. */
+	/**
+	 * Listens at once, and reads the open Gates first: the events that land
+	 * meanwhile wait for that read. Resolves once it is done.
+	 */
 	start(): Promise<void>;
 	/** Stops listening and checking. What was held stays in the log. */
 	stop(): void;
@@ -204,25 +210,37 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		return sent;
 	}
 
-	/** Tells every screen of the Space's audience about one event. */
+	/**
+	 * Tells every screen of the Space's audience about one event. `inApp`
+	 * false: pushes only, for a Gate found open at start (the open pages
+	 * read everything again when they connect).
+	 */
 	async function tell(
 		kind: NoticeKind,
 		key: string,
 		ids: { spaceId: string; runId: string; stepId: string | null },
+		inApp = true,
 	): Promise<void> {
 		const sends = await deps.sendsFor(ids.spaceId);
 		for (const personId of await deps.audience(ids.spaceId)) {
 			const settings = await deps.settings.get(personId);
 			const wanted = wants(settings, kind);
-			await deps.inApp.send(
-				{ kind: "in-app", personId },
-				message(kind, key, ids, sends && wanted),
-			);
+			// Quiet hours hold the alert of an open page too: it only updates.
+			const alert = inApp && sends && wanted && !inQuietHours(settings, now());
+			if (inApp) {
+				await deps.inApp.send(
+					{ kind: "in-app", personId },
+					message(kind, key, ids, alert),
+				);
+			}
 			if (wanted) {
 				await push(
 					{ personId, key, kind, ...ids },
 					settings,
-					await pushMessage(kind, key, ids, personId),
+					{
+						...(await pushMessage(kind, key, ids, personId)),
+						toldInApp: alert,
+					},
 					sends,
 				);
 			}
@@ -398,43 +416,49 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			const settings = await deps.settings.get(personId);
 			if (inQuietHours(settings, at)) continue;
 			const gates = rows.filter((row) => row.kind === "gate-opened");
-			const one = gates.length === 1 ? gates[0] : undefined;
+			// Runs that ended meanwhile go without a push.
 			for (const row of rows) {
-				if (row === one) continue;
+				if (row.kind === "gate-opened") continue;
 				await deps.deliveries.update(personId, row.key, {
 					status: "dropped",
 					heldFor: [],
 				});
 			}
-			if (one) {
-				// One Gate: the Gate itself, so its answer withdraws it.
-				const sentTo = await sendTo(
-					await deps.targets.byIds(one.heldFor),
-					await messageOf(one),
-				);
-				await deps.deliveries.update(personId, one.key, {
-					status: sentTo.length > 0 ? "sent" : "dropped",
-					sentTo,
+			// Each screen hears of the Gates it held, and only of those: a
+			// Space another Host sends for held this computer's own screens.
+			const held = [...new Set(gates.flatMap((row) => row.heldFor))];
+			const targets = (await deps.targets.byIds(held)).filter(
+				(target) => settings.screens[target.kind],
+			);
+			const sentTo = new Map<string, string[]>();
+			for (const target of targets) {
+				const waiting = gates.filter((row) => row.heldFor.includes(target.id));
+				const [one] = waiting;
+				if (waiting.length === 1 && one) {
+					// One Gate: the Gate itself, so its answer withdraws it.
+					const sent = await sendTo([target], await messageOf(one));
+					sentTo.set(one.key, [...(sentTo.get(one.key) ?? []), ...sent]);
+				} else if (waiting.length > 1) {
+					await sendTo([target], {
+						key: `waiting:${at}`,
+						kind: "gates-waiting",
+						spaceId: null,
+						runId: null,
+						stepId: null,
+						title: gatesWaitingTitle(waiting.length),
+						alert: true,
+						count: waiting.length,
+						at,
+					});
+				}
+			}
+			for (const row of gates) {
+				const sent = sentTo.get(row.key) ?? [];
+				await deps.deliveries.update(personId, row.key, {
+					status: sent.length > 0 ? "sent" : "dropped",
+					sentTo: sent,
 					heldFor: [],
-					sentAt: sentTo.length > 0 ? at : null,
-				});
-			} else if (gates.length > 1) {
-				// The screens that held the Gates: a Space another Host
-				// sends for held this computer's own screens only.
-				const held = [...new Set(gates.flatMap((row) => row.heldFor))];
-				const targets = (await deps.targets.byIds(held)).filter(
-					(target) => settings.screens[target.kind],
-				);
-				await sendTo(targets, {
-					key: `waiting:${at}`,
-					kind: "gates-waiting",
-					spaceId: null,
-					runId: null,
-					stepId: null,
-					title: gatesWaitingTitle(gates.length),
-					alert: true,
-					count: gates.length,
-					at,
+					sentAt: sent.length > 0 ? at : null,
 				});
 			}
 		}
@@ -453,6 +477,14 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				closed.set(row.key, row.spaceId);
 		}
 		for (const [key, spaceId] of closed) await close(spaceId, key);
+		// Gates that opened while no notifier listened (a reload, a start, a
+		// run that woke): pushed now. The log drops the ones already told.
+		for (const [spaceId, keys] of open) {
+			for (const key of keys) {
+				const gate = parseGateKey(key);
+				if (gate) await tell("gate-opened", key, { spaceId, ...gate }, false);
+			}
+		}
 	}
 
 	return {
