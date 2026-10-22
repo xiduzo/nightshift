@@ -432,3 +432,85 @@ describe("startup recovery: what a dead daemon's work ends with", () => {
 		});
 	});
 });
+
+describe("a re-entry whose thread cannot move", () => {
+	/** A recovery over a runner whose `enter` throws: the thread cannot move. */
+	function recoveryWithStuckThread() {
+		const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const runner = {
+			reserveSlot: () => {},
+			releaseStartingSlot: () => {},
+			isActive: () => false,
+			activeCount: () => 0,
+			threadSnapshot: async () => ({
+				state: { kind: "ended", ended: null },
+				values: {},
+				hasCheckpoint: true,
+				hasTasks: false,
+			}),
+			enter: async () => {
+				throw new Error("the checkpoint is gone");
+			},
+			restart: async (
+				_runId: string,
+				_check: unknown,
+				next: () => Promise<void>,
+			) => next(),
+			sleeps: { restore: () => {} },
+		} as unknown as Runner;
+		const recovery = createRecovery({
+			...deps(),
+			log: runLog,
+			bus: createRunBus(),
+			calledFlowsOf: () => ({}),
+			runner,
+			resumeGraceMs: 0,
+		});
+		return { runLog, recovery };
+	}
+
+	const failed = {
+		type: "RunEnded",
+		payload: {
+			status: "failed",
+			reason: "The run could not start again: the checkpoint is gone",
+		},
+	};
+
+	test("a resume ends the run failed, so the log does not say it runs", async () => {
+		await insertRun(sandbox.repoPath);
+		const { runLog, recovery } = recoveryWithStuckThread();
+		await runLog.append({ ...started(), runId: RUN_ID });
+		await runLog.append({
+			type: "RunEnded",
+			runId: RUN_ID,
+			payload: { status: "stopped", reason: null },
+		});
+		await expect(recovery.resume(RUN_ID, { by: "person" })).rejects.toThrow(
+			"the checkpoint is gone",
+		);
+		const events = await runLog.events(RUN_ID);
+		expect(events.at(-2)?.type).toBe("RunResumed");
+		expect(events.at(-1)).toMatchObject(failed);
+	});
+
+	test("so does a restart", async () => {
+		await insertRun(sandbox.repoPath);
+		const { runLog, recovery } = recoveryWithStuckThread();
+		await runLog.append({ ...started(), runId: RUN_ID });
+		await runLog.append({
+			type: "RunEnded",
+			runId: RUN_ID,
+			payload: { status: "stopped", reason: null },
+		});
+		await expect(
+			recovery.restartStep(RUN_ID, { by: "person" }),
+		).rejects.toThrow("the checkpoint is gone");
+		const events = await runLog.events(RUN_ID);
+		expect(events.at(-2)).toMatchObject({
+			type: "RunResumed",
+			payload: { action: "restart" },
+		});
+		expect(events.at(-1)).toMatchObject(failed);
+	});
+});

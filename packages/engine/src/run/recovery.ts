@@ -349,7 +349,8 @@ export function createRecovery(deps: RecoveryDeps) {
 	 * A re-entry, on a run whose slot the caller holds: plans it from the
 	 * log and the thread's latest checkpoint (`planReentry`, which refuses
 	 * a run that runs, waits or sleeps), appends the plan's `RunResumed`,
-	 * and moves the thread as the plan says (`runner.enter`).
+	 * and moves the thread as the plan says (`runner.enter`). A thread that
+	 * cannot move ends the run `failed`.
 	 */
 	async function reenter(row: RunRow, request: ReentryRequest): Promise<void> {
 		const runId = row.id;
@@ -364,8 +365,8 @@ export function createRecovery(deps: RecoveryDeps) {
 		try {
 			await runner.enter(row, plan);
 		} catch (error) {
-			if (request.kind !== "rerun") throw error;
-			// No drive took the run: end the walk `RunResumed` began.
+			// No drive took the run: end the walk `RunResumed` began, so the
+			// log does not say it runs.
 			await log.append({
 				type: "RunEnded",
 				runId,
