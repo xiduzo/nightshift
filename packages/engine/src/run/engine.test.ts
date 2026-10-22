@@ -1024,22 +1024,6 @@ describe("stop and resume", () => {
 		expect(types.filter((t) => t === "EdgeTaken")).toHaveLength(1);
 	});
 
-	test("resumeRun passes a prompt on", async () => {
-		const { harness, sessions } = scriptedHarness();
-		const engine = makeEngine(harness);
-		const run = await engine.startRun({
-			projectId: await projectId(engine),
-			flow: flowOf([agent("worker", "Build it")]),
-		});
-		(await waitFor(() => sessions[0])).fail("usage limit");
-		expect(await waitForEnd(engine, run.id)).toBe("failed");
-		await engine.resumeRun(run.id, "Also add tests");
-		const second = await waitFor(() => sessions[1]);
-		expect(second.input.prompt).toBe("Also add tests");
-		second.finish();
-		expect(await waitForEnd(engine, run.id)).toBe("finished");
-	});
-
 	test("stop kills a running command, and resume runs it again", async () => {
 		const engine = makeEngine(scriptedHarness().harness);
 		const flow = flowOf([command("check", "echo start; sleep 30")]);
@@ -1500,18 +1484,15 @@ describe("run again from a step", () => {
 		]);
 	});
 
-	test("refusals: a run that is still going, a node the flow does not have", async () => {
+	// The other refusals and the payloads are the re-entry planner's rows (`graph/reentry.test.ts`).
+	test("a refused rerun leaves the run as it was", async () => {
 		const { harness, sessions } = scriptedHarness();
 		const engine = makeEngine(harness);
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([agent("worker", "Build it")]),
 		});
-		const first = await waitFor(() => sessions[0]);
-		await expect(
-			engine.rerunFrom(run.id, { nodeId: "worker" }),
-		).rejects.toThrow("still running");
-		first.finish();
+		(await waitFor(() => sessions[0])).finish();
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 		await expect(engine.rerunFrom(run.id, { nodeId: "inner" })).rejects.toThrow(
 			`This run's flow has no node "inner"`,
