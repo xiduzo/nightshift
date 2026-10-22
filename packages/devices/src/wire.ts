@@ -29,6 +29,7 @@ import {
 } from "./offers";
 import type { PeerEngine } from "./peers";
 import type { Reach } from "./reach";
+import { OFFLINE_AFTER_MS } from "./registry";
 import {
 	createOfferCalls,
 	createWorkServer,
@@ -36,9 +37,6 @@ import {
 	type WorkHub,
 	type WorkServer,
 } from "./work";
-
-/** A Device whose link says nothing for this long is offline. Its heartbeat comes every 15 s. */
-const OFFLINE_AFTER_MS = 45_000;
 
 /** What `bun --hot` keeps of the devices across reloads. */
 type Kept = { nightshiftLinks?: DeviceLinks; nightshiftPresence?: Timer };

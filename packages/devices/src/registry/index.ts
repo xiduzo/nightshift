@@ -4,6 +4,7 @@ export {
 	createDeviceRegistry,
 	type DeviceRegistry,
 	deviceNamesOf,
+	OFFLINE_AFTER_MS,
 	type PairedDevice,
 } from "./registry";
 export {

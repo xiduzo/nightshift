@@ -9,6 +9,14 @@ import {
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 /**
+ * A paired Device whose Link says nothing for this long is offline: three
+ * of its heartbeats, which come every 15 s. The Host's two answers to
+ * "is it online?" use the same window: the registry's sweep (`online`,
+ * for people) and the work hub's (`online`, for placement).
+ */
+export const OFFLINE_AFTER_MS = 45_000;
+
+/**
  * The Devices that paired with this Host: their `device` rows, whether they
  * are online, and the audit of it in their owner's personal Space
  * (`DeviceJoined`, `DeviceRevoked`, `DeviceOnline`, `DeviceOffline`).
@@ -34,6 +42,12 @@ export type PairedDevice = {
 	homeHost: string | null;
 	/** Epoch ms. Null: never answered after the pairing. */
 	lastSeenAt: number | null;
+	/**
+	 * Its Link answers: a hello or a heartbeat in the last
+	 * `OFFLINE_AFTER_MS`. What people see (the Devices page, a Space's
+	 * devices, `DeviceOnline` and `DeviceOffline`). Whether it takes the
+	 * work of a step now is the work hub's `online`.
+	 */
 	online: boolean;
 	pairedAt: number;
 	/** Epoch ms when its owner removed its access. */

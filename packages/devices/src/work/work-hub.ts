@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { WorkDelivery, WorkRelay, WorkReply } from "../contract";
+import { OFFLINE_AFTER_MS } from "../registry";
 
 /**
  * The relay's work half on a Host (`devices.work`): the calls of runs this
@@ -11,8 +12,9 @@ import type { WorkDelivery, WorkRelay, WorkReply } from "../contract";
  *
  * The hub is in memory: a Host that stops loses its calls, and its runs
  * are recovered like any interrupted run. A Device whose stream drops
- * keeps its calls for `lostAfterMs`; a call it has not finished by then
- * ends with an error here.
+ * keeps its calls for `lostAfterMs` (by default `OFFLINE_AFTER_MS`, the
+ * window after which the registry says it is offline too); a call it has
+ * not finished by then ends with an error here.
  */
 
 export type WorkHub = WorkRelay & {
@@ -64,7 +66,7 @@ export function createWorkHub(
 		onBack?: (deviceId: string) => void;
 	} = {},
 ): WorkHub {
-	const lostAfterMs = options.lostAfterMs ?? 45_000;
+	const lostAfterMs = options.lostAfterMs ?? OFFLINE_AFTER_MS;
 	const inboxes = new Map<string, Inbox>();
 	const calls = new Map<string, OpenCall>();
 
@@ -111,9 +113,12 @@ export function createWorkHub(
 	}
 
 	return {
-		// Online: a stream is open now. A new step on a Device without one
-		// waits for it (`device-offline`); a call already made waits out a
-		// short drop.
+		// Online: it takes work now, a stream is open (for placement and
+		// `reachable`). Its Link keeps the stream open while it is online, so
+		// this differs from the registry's `online` (its Link answers) only
+		// while the stream backs off after a failure, and for the window after
+		// a drop. A new step on a Device without a stream waits for it
+		// (`device-offline`); a call already made waits out a short drop.
 		online: (deviceId) => (inboxes.get(deviceId)?.streams ?? 0) > 0,
 
 		async *call(deviceId, request, signal) {
