@@ -5,11 +5,11 @@ type PeerEngineOptions = Parameters<typeof createPeerEngine>[0];
 
 /** A test engine's options for `createPeerEngine`: `withDevice`, and the peers' options. */
 export function withPeers(
-	options: Omit<TestEngineOptions, "peers" | "relay"> &
+	options: Omit<TestEngineOptions, "peers"> &
 		Pick<PeerEngineOptions, "work" | "ownOffers" | "mayUseOffers" | "relay">,
 ): PeerEngineOptions {
 	const { work, ownOffers, mayUseOffers, relay, ...engine } = options;
-	const { peers: _alone, relay: _none, ...rest } = withDevice(engine);
+	const { peers: _alone, ...rest } = withDevice(engine);
 	return {
 		...rest,
 		...(relay ? { relay } : {}),

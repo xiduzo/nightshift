@@ -3,7 +3,6 @@ import {
 	type Engine,
 	type EngineOptions,
 } from "@nightshift/engine";
-import type { HostRelay } from "../contract";
 import type { EngineExchange } from "../exchange";
 import type { EngineOffers } from "../offers";
 import type { DeviceRegistry } from "../registry";
@@ -27,14 +26,8 @@ export type PeerEngine = Engine & {
  * What `createPeerEngine` takes: the engine's options, with the peers' own.
  * The Device rows come from this package (`deviceDirectory`).
  */
-export type PeerEngineOptions = Omit<
-	EngineOptions,
-	"peers" | "relay" | "directory"
-> &
-	PeerOptions & {
-		/** The Hosts this computer links to (`createRelay`). */
-		relay?: HostRelay;
-	};
+export type PeerEngineOptions = Omit<EngineOptions, "peers" | "directory"> &
+	PeerOptions;
 
 /**
  * The engine of this Device (`createEngine`), wired to its peers
@@ -45,21 +38,19 @@ export function createPeerEngine(
 	options: PeerEngineOptions,
 	internals?: Parameters<typeof createEngine>[1],
 ): PeerEngine {
-	const { work, ownOffers, mayUseOffers, ...engineOptions } = options;
+	const { work, ownOffers, mayUseOffers, relay, ...engineOptions } = options;
 	let built: BuiltPeers | undefined;
 	const engine = createEngine(
 		{
 			...engineOptions,
 			directory: deviceDirectory(options.db),
-			peers: ({ relay: _relay, ...context }) => {
-				built = createPeers(
-					{ ...context, ...(options.relay ? { relay: options.relay } : {}) },
-					{
-						...(work ? { work } : {}),
-						...(ownOffers ? { ownOffers } : {}),
-						...(mayUseOffers ? { mayUseOffers } : {}),
-					},
-				);
+			peers: (context) => {
+				built = createPeers(context, {
+					...(relay ? { relay } : {}),
+					...(work ? { work } : {}),
+					...(ownOffers ? { ownOffers } : {}),
+					...(mayUseOffers ? { mayUseOffers } : {}),
+				});
 				return built.port;
 			},
 		},

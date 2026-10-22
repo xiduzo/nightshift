@@ -19,6 +19,8 @@ import { createWalkers } from "./walkers";
 
 /** What the peers take beside the engine's own parts. */
 export type PeerOptions = {
+	/** The Hosts this computer links to (`createRelay`). None on a computer alone. */
+	relay?: HostRelay;
 	/**
 	 * On a Host: how its runs reach the Devices they are placed on (the
 	 * hub those Devices pull their work from). Without it, every run runs
@@ -56,11 +58,11 @@ export type BuiltPeers = {
  * history, wired into the engine's port (`Peers`).
  */
 export function createPeers(
-	context: Omit<PeerContext, "relay"> & { relay?: HostRelay },
+	context: PeerContext,
 	options: PeerOptions = {},
 ): BuiltPeers {
-	const { db, dataDir, device, log, bus, history, documents, now, relay } =
-		context;
+	const { db, dataDir, device, log, bus, history, documents, now } = context;
+	const { relay } = options;
 	const registry = createDeviceRegistry({ db, log, history, now });
 
 	/** The offered sessions running now: what withdrawing an Offer stops. */
@@ -171,6 +173,7 @@ export function createPeers(
 			keepWalk: archive.keepWalk,
 			archived: archive.archived,
 		},
+		...(relay ? { relay } : {}),
 		pathsFor: createPrivatePaths({ db, registry, ownerId: context.ownerId }),
 	};
 

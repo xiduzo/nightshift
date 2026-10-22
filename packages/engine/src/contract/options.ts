@@ -5,13 +5,10 @@ import type { RunSettings } from "../device-config";
 import type { Git, SpaceDocuments } from "../projects";
 import type { DeviceDirectory } from "./directory";
 import type { PeersFactory } from "./peers";
-import type { Relay } from "./relay";
 
 /** What `createEngine` takes: the database, this computer as a Device, and the hooks of the daemon. */
 export type EngineOptions = {
 	db: Database;
-	/** The Hosts, for the actions on rows another Device owns. */
-	relay?: Relay;
 	/**
 	 * This computer's Device id: the Walker of the runs this engine starts,
 	 * and the Device whose Clones it works in. Default: the database's own

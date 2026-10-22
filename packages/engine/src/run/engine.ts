@@ -167,7 +167,6 @@ export function createEngine(
 		walks: { exportWalk: walks.exportWalk, ownFile: walks.ownFile },
 		documents,
 		now,
-		...(options.relay ? { relay: options.relay } : {}),
 		...(options.profileFor ? { profileFor: options.profileFor } : {}),
 		ready: peersReady,
 		ownerId: () => ownerId,
@@ -183,7 +182,7 @@ export function createEngine(
 			await runner.take(runId, { kind: "stop" });
 		},
 	});
-	const { placement } = peers;
+	const { placement, relay: hosts } = peers;
 
 	const git = options.git ?? systemGit();
 	const { listBranches } = createWorktrees(git);
@@ -194,7 +193,7 @@ export function createEngine(
 		documents,
 		directory,
 		git,
-		...(options.relay ? { relay: options.relay } : {}),
+		...(hosts ? { relay: hosts } : {}),
 	});
 	// The engine's lifetime: a test's signal, or `dispose` (a `bun --hot`
 	// handover) ends it.
@@ -337,7 +336,7 @@ export function createEngine(
 	const relay = createRunRelay({
 		db,
 		log: runLog,
-		...(options.relay ? { relay: options.relay } : {}),
+		...(hosts ? { relay: hosts } : {}),
 		now,
 		listRuns: reads.listRuns,
 	});

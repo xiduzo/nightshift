@@ -41,6 +41,11 @@ export type Peers = {
 	/** The runs walked elsewhere, and the runs that move between Walkers. */
 	runs: RunsPort;
 	/**
+	 * The Hosts this computer links to: the actions on rows another Device
+	 * owns travel through them. None on a computer alone.
+	 */
+	relay?: Relay;
+	/**
 	 * A run as a Person may read it: the worktree path (and the take-over
 	 * command that names it) only for the owner of the run's Device.
 	 */
@@ -72,8 +77,6 @@ export type PeerContext = {
 	walks: WalkFiles;
 	documents: SpaceDocuments;
 	now(): number;
-	/** The Hosts this computer links to (`EngineOptions.relay`). */
-	relay?: Relay;
 	/** An Agent Profile of this computer by name (`EngineOptions.profileFor`). */
 	profileFor?: (name: string) => AgentProfileSettings | null;
 	/** Resolves when the engine is ready. */
