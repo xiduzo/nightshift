@@ -54,15 +54,16 @@ async function answerFromButton(
 }
 
 /**
- * The answer did not reach the Host: a notification says so, and a tap
- * opens the Gate to answer it there. Same key, so a withdraw clears it.
+ * The Host did not take the answer (no Host, no connection, or a refusal
+ * such as the person's role): a notification says so, and a tap opens the
+ * Gate to answer it there. Same key, so a withdraw clears it.
  */
 async function tellNotSent(data: PushData): Promise<void> {
 	const { options: _buttons, ...ids } = data;
 	await Notifications.scheduleNotificationAsync({
 		content: {
 			title: "Your answer was not sent",
-			body: "Night Shift could not reach your Host. Open the Gate to answer it.",
+			body: "Night Shift did not send your answer. Open the Gate to answer it there.",
 			data: ids,
 			categoryIdentifier: CATEGORY.open,
 		},
