@@ -1,7 +1,7 @@
+export { hostAddressOf, needsHttps } from "./address";
 export { createHostAuthClient, type HostAuthClient } from "./auth-client";
 export {
 	forgetHostAddress,
-	hostAddressOf,
 	loadHostAddress,
 	saveHostAddress,
 } from "./host-address";
