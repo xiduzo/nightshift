@@ -27,7 +27,8 @@ import type { OpenGateRef, RunEvent, RunEventSource } from "./sources";
  * - Who: the Members of the run's Space.
  * - Every open page and app (the in-app stream) hears of every event at
  *   once, also in quiet hours. It shows a notification only when this
- *   daemon sends for the Space and the person wants that event.
+ *   daemon sends for the Space, the person wants that event, and it is
+ *   not quiet hours.
  * - One sender per Space (`sendsFor`): only that daemon pushes to the
  *   browsers and phones. This computer's own desktop is not a push: the
  *   daemon shows it for every Space it has, also for a Space another
@@ -214,15 +215,20 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		for (const personId of await deps.audience(ids.spaceId)) {
 			const settings = await deps.settings.get(personId);
 			const wanted = wants(settings, kind);
+			// Quiet hours hold the alert of an open page too: it only updates.
+			const alert = sends && wanted && !inQuietHours(settings, now());
 			await deps.inApp.send(
 				{ kind: "in-app", personId },
-				message(kind, key, ids, sends && wanted),
+				message(kind, key, ids, alert),
 			);
 			if (wanted) {
 				await push(
 					{ personId, key, kind, ...ids },
 					settings,
-					await pushMessage(kind, key, ids, personId),
+					{
+						...(await pushMessage(kind, key, ids, personId)),
+						toldInApp: alert,
+					},
 					sends,
 				);
 			}

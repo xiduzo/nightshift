@@ -312,9 +312,22 @@ describe("this computer's desktop", () => {
 		expect(expo.calls).toEqual([]);
 		// The page only updates: the Host alerts for the Space.
 		expect(screen.map((i) => "alert" in i && i.alert)).toEqual([false, false]);
+		// So the desktop does not wait for the page.
+		expect(desktop.sent().map((m) => m.toldInApp)).toEqual([false, false]);
 
 		await answerGate("run-1", "step-1");
 		expect(desktop.withdrawn()).toEqual(["run-1:step-1"]);
+	});
+
+	test("says when an open page showed the notice, so the desktop does not show it twice", async () => {
+		await notifier.start();
+		await register("ada", "desktop");
+		const screen = openScreen("ada");
+
+		await openGate("run-1", "step-1");
+
+		expect(screen.map((i) => "alert" in i && i.alert)).toEqual([true]);
+		expect(desktop.sent().map((m) => m.toldInApp)).toEqual([true]);
 	});
 
 	test("respects the person's events, screens and quiet hours there too", async () => {
@@ -379,7 +392,11 @@ describe("quiet hours", () => {
 		await openGate("run-1", "step-1");
 		await endRun("run-2", "finished");
 		expect(web.calls).toEqual([]);
-		expect(screen.map((i) => i.kind)).toEqual(["gate-opened", "run-finished"]);
+		// The open page updates, but shows no notification at night.
+		expect(screen.map((i) => [i.kind, "alert" in i && i.alert])).toEqual([
+			["gate-opened", false],
+			["run-finished", false],
+		]);
 
 		clock = Date.UTC(2026, 9, 22, 6, 59);
 		await notifier.tick();

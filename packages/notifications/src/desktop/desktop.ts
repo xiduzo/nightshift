@@ -73,7 +73,9 @@ export type DesktopChannelOptions = {
  *   the inbox (a Gate), or the run (a run that ended). A window that is
  *   closed or behind another one shows nothing.
  * - Else (no window state, or a focused window that did not say its
- *   page): the person has a Night Shift page open on this computer.
+ *   page): the person has a Night Shift page open on this computer, and
+ *   that page showed it (`toldInApp`). A page that only updated (a Space
+ *   another Host sends for, quiet hours) shows no notification of its own.
  */
 export function createDesktopChannel(
 	options: DesktopChannelOptions,
@@ -107,7 +109,8 @@ function onScreen(
 		}
 		return message.runId !== null && path === `/runs/${message.runId}`;
 	}
-	return options.streamHere(personId);
+	// A page here shows it only when its in-app item alerted.
+	return message.toldInApp === true && options.streamHere(personId);
 }
 
 /** What the notification says, and where a click opens Night Shift. */

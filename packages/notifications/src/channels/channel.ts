@@ -55,6 +55,12 @@ export type NotificationMessage = {
 	count: number | null;
 	/** A pushed `gate-opened`: whether it can be answered from the lock screen. Absent otherwise. */
 	gate?: GateFacts;
+	/**
+	 * The open pages of the person showed this as a notification (an
+	 * in-app item with `alert`). Absent or false: a page only updated, so
+	 * the desktop of this computer must still show it.
+	 */
+	toldInApp?: boolean;
 	at: number;
 };
 
