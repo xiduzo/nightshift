@@ -1,12 +1,12 @@
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui/components/card";
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@nightshift/ui/components/empty";
 import {
 	Item,
 	ItemContent,
@@ -30,6 +30,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@nightshift/ui/components/table";
+import { VariableIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { RunDetail, StepSummary } from "@/shared/api";
@@ -53,8 +54,7 @@ export const TYPE_LABEL = {
 
 /**
  * The run's variables: per flow it ran, each variable's value now and the
- * step that set it. A variable opens every value it had. Shown only when
- * the run has variables.
+ * step that set it. A variable opens every value it had.
  */
 export function RunVariables({
 	run,
@@ -68,7 +68,21 @@ export function RunVariables({
 	const groups = useMemo(() => variableGroups(run, steps), [run, steps]);
 	/** The open variable: its group's key and its name. */
 	const [open, setOpen] = useState<{ key: string; name: string } | null>(null);
-	if (groups.length === 0) return null;
+	if (groups.length === 0) {
+		return (
+			<Empty>
+				<EmptyHeader>
+					<EmptyMedia variant="icon">
+						<VariableIcon />
+					</EmptyMedia>
+					<EmptyTitle>No variables</EmptyTitle>
+					<EmptyDescription>
+						Variables keep values while a flow runs. This flow has none.
+					</EmptyDescription>
+				</EmptyHeader>
+			</Empty>
+		);
+	}
 	const openGroup = open
 		? groups.find((group) => group.key === open.key)
 		: undefined;
@@ -80,30 +94,20 @@ export function RunVariables({
 	};
 
 	return (
-		<Card className="shrink-0 gap-3 py-4">
-			<CardHeader className="px-4">
-				<CardTitle>Variables</CardTitle>
-				<CardDescription>
-					Values the flow keeps while it runs, and the step that set each one.
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="px-4">
-				<ScrollArea className="max-h-64 [&>[data-slot=scroll-area-viewport]]:max-h-64">
-					<div className="flex flex-col gap-4">
-						{groups.map((group) => (
-							<VariableTable
-								key={group.key}
-								run={run}
-								steps={steps}
-								group={group}
-								titled={groups.length > 1}
-								onOpen={(name) => setOpen({ key: group.key, name })}
-								onShowStep={onShowStep}
-							/>
-						))}
-					</div>
-				</ScrollArea>
-			</CardContent>
+		<>
+			<div className="flex flex-col gap-4 p-3">
+				{groups.map((group) => (
+					<VariableTable
+						key={group.key}
+						run={run}
+						steps={steps}
+						group={group}
+						titled={groups.length > 1}
+						onOpen={(name) => setOpen({ key: group.key, name })}
+						onShowStep={onShowStep}
+					/>
+				))}
+			</div>
 			<Sheet
 				open={openRow !== undefined}
 				onOpenChange={(next) => {
@@ -120,7 +124,15 @@ export function RunVariables({
 					) : null}
 				</SheetContent>
 			</Sheet>
-		</Card>
+		</>
+	);
+}
+
+/** How many variables the run has, over every flow it ran. */
+export function variableCount(run: RunDetail, steps: StepSummary[]): number {
+	return variableGroups(run, steps).reduce(
+		(count, group) => count + group.rows.length,
+		0,
 	);
 }
 
@@ -177,7 +189,7 @@ function VariableTable({
 									) : null}
 								</div>
 							</TableCell>
-							<TableCell className="max-w-64 truncate font-mono">
+							<TableCell className="w-full max-w-0 truncate font-mono">
 								<ValuePreview value={row.last.value} />
 							</TableCell>
 							<TableCell className="whitespace-nowrap">
@@ -228,7 +240,7 @@ export function SetBy({
 	steps,
 	onShowStep,
 }: {
-	change: VariableChange;
+	change: Pick<VariableChange, "stepId">;
 	steps: StepSummary[];
 	onShowStep: (stepId: string) => void;
 }) {

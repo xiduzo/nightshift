@@ -146,7 +146,7 @@ export type DeciderFacts = {
 
 export type SessionInput = Omit<
 	AgentSessionInput,
-	"mcpServers" | "clis" | "prompt"
+	"mcpServers" | "clis" | "prompt" | "saveArtifact"
 > & {
 	harness: AgentHarnessName;
 	/** The node's prompt. The Device adds what a new session learns about its CLI tools. */
@@ -156,6 +156,11 @@ export type SessionInput = Omit<
 	connections?: string[];
 	/** The node's own MCP servers, with `${NAME}` references as written. */
 	mcpServers?: AgentNode["mcpServers"];
+	/**
+	 * The step the session runs for: the agent keeps artifacts of it with
+	 * `save_artifact`. The Device that runs the session keeps them.
+	 */
+	artifacts?: { runId: string; stepId: string };
 };
 
 /**

@@ -111,6 +111,7 @@ export {
 	type AgentErrorKind,
 	type AgentMessages,
 	type AgentUsage,
+	type Artifact,
 	agoLabel,
 	applyAgentMessages,
 	costLabel,

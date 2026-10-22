@@ -8,6 +8,7 @@ export type {
 	ActivityRange,
 	AgentErrorKind,
 	AgentUsage,
+	Artifact,
 	DashboardSummary,
 	FlowHealthRow,
 	FlowListItem,

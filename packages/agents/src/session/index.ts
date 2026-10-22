@@ -10,6 +10,7 @@ export {
 	harnessSession,
 	type SessionReport,
 } from "./adapter-session";
+export { ARTIFACT_TOOL_NAME } from "./artifact-tool";
 export { REPORT_TOOL_NAME } from "./step-report";
 export {
 	asNumber,

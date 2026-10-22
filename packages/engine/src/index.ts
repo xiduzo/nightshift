@@ -5,6 +5,11 @@
  * that nothing outside the engine imports.
  */
 
+export {
+	type Artifact,
+	type ArtifactStore,
+	createArtifactStore,
+} from "./artifacts";
 export type {
 	Actor,
 	DeviceDirectory,

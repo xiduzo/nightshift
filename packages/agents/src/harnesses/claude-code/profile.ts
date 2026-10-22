@@ -3,12 +3,13 @@
  * translation drops what usage-limit detection needs: `rate_limit_event`,
  * the assistant `error` field and the result's `is_error`. This profile
  * reads them from the raw stream-json messages, and adds up the usage so
- * far over the model calls. It also names the report tool as Claude Code
- * sees it, for `--allowedTools`.
+ * far over the model calls. It also names the report and artifact tools as
+ * Claude Code sees them, for `--allowedTools`.
  */
 import { BRIDGED_MCP_SERVER_NAME } from "@tanstack/ai-claude-code";
 import type { AgentUsage } from "../../port";
 import {
+	ARTIFACT_TOOL_NAME,
 	asNumber,
 	asString,
 	failureKind,
@@ -24,6 +25,9 @@ export const SESSION_ID_EVENT = "claude-code.session-id";
 
 /** The report tool as Claude Code sees it: bridged over MCP, for `--allowedTools`. */
 export const REPORT_TOOL_ID = `mcp__${BRIDGED_MCP_SERVER_NAME}__${REPORT_TOOL_NAME}`;
+
+/** The artifact tool as Claude Code sees it. */
+export const ARTIFACT_TOOL_ID = `mcp__${BRIDGED_MCP_SERVER_NAME}__${ARTIFACT_TOOL_NAME}`;
 
 function resetAtFromInfo(info: unknown): number | undefined {
 	if (!isRecord(info)) return undefined;
@@ -244,4 +248,5 @@ export const CLAUDE_CODE_PROFILE: HarnessProfile = {
 	sessionEvent: SESSION_ID_EVENT,
 	createObserver: createClaudeCodeObserver,
 	reportToolId: REPORT_TOOL_ID,
+	artifactToolId: ARTIFACT_TOOL_ID,
 };

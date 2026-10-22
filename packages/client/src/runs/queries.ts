@@ -60,6 +60,12 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 		}),
 		/** One run with its steps. */
 		get: (runId: string) => orpc.runs.get.queryOptions({ input: { runId } }),
+		/** The files a run's agents kept. Polls while the run runs, so a new one shows. */
+		artifacts: (runId: string, live: boolean) => ({
+			...orpc.runs.artifacts.queryOptions({ input: { runId } }),
+			refetchInterval: live ? ACTIVE_POLL_MS : (false as const),
+			meta: { quietRefetchErrors: true },
+		}),
 		/** The person's Devices for the project, online or not: a node's Device, Move to. */
 		devices: (projectId: string) =>
 			orpc.runs.devices.queryOptions({ input: { projectId } }),

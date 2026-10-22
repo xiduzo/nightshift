@@ -194,6 +194,52 @@ describe("session", () => {
 		expect(plan?.prompt).toBe("Work.");
 		expect(asked).toEqual([["gh"]]);
 	});
+
+	test("a session for a step keeps its artifacts in the store, from the worktree", async () => {
+		const harness = fakeHarness();
+		const saved: unknown[] = [];
+		const d = device({
+			harnesses: { "claude-code": harness },
+			artifacts: {
+				save: async (input) => {
+					saved.push(input);
+					return {
+						id: "a1",
+						stepId: input.stepId,
+						name: "shot.png",
+						title: input.title ?? "shot.png",
+						mediaType: "image/png",
+						size: 1,
+						savedAt: 1,
+					};
+				},
+			},
+		});
+		await collect(
+			d.session(
+				sessionInput({
+					cwd: "/work",
+					artifacts: { runId: "r1", stepId: "s1" },
+				}),
+			),
+		);
+		await collect(d.session(sessionInput()));
+		const [forStep, plain] = harness.calls;
+		expect(forStep && "artifacts" in forStep).toBe(false);
+		expect(
+			await forStep?.saveArtifact?.({ path: "shot.png", title: "Login" }),
+		).toBe('Kept "Login" as an artifact of this run.');
+		expect(saved).toEqual([
+			{
+				runId: "r1",
+				stepId: "s1",
+				cwd: "/work",
+				path: "shot.png",
+				title: "Login",
+			},
+		]);
+		expect(plain?.saveArtifact).toBeUndefined();
+	});
 });
 
 describe("exec", () => {

@@ -341,7 +341,7 @@ const SPENT_EVERY_MS = 5_000;
  * report, the output schema and the node's outcomes; or a wait request.
  */
 async function runSession(
-	_ctx: StepContext,
+	ctx: StepContext,
 	node: AgentNode,
 	step: StepHandle,
 	input: { prompt: string | null; resumeSessionId: string | null },
@@ -385,6 +385,7 @@ async function runSession(
 		prompt,
 		resumeSessionId: resumeSessionId ?? undefined,
 		stepReport: stepReportOf(node),
+		artifacts: { runId: ctx.run.id, stepId: step.stepId },
 		signal,
 	};
 	const stream = step.device

@@ -40,6 +40,7 @@ export {
 export type {
 	AgentErrorKind,
 	AgentUsage,
+	Artifact,
 	ItemState,
 	ItemSummary,
 	RunDetail,

@@ -62,6 +62,14 @@ export type AgentSessionInput = {
 	clis?: string[];
 	/** MCP servers by name, added to the harness's own configuration. */
 	mcpServers?: Record<string, McpServerConfig>;
+	/**
+	 * Keeps a file for the person: an artifact of the run. With it, a
+	 * session that can use tools gets the `save_artifact` tool (see
+	 * `artifact-tool.ts`). `path` is what the agent gives: relative to
+	 * `cwd`, or absolute. Returns the tool's answer to the agent. Throws
+	 * when the file cannot be kept; the agent gets the error.
+	 */
+	saveArtifact?: (file: { path: string; title?: string }) => Promise<string>;
 	/** Aborting stops the harness process. The stream then ends with an `error` event of kind `aborted`. */
 	signal: AbortSignal;
 };

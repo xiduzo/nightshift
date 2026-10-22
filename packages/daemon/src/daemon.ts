@@ -42,6 +42,7 @@ import {
 import {
 	checkProjectFolder,
 	clonePathOf,
+	createArtifactStore,
 	createCliToolStore,
 	createConnectionStore,
 	createProfileStore,
@@ -333,6 +334,8 @@ export async function createDaemon(
 		clonePath: clonePathOf(db, async () => device.id),
 		// Its profiles, for a run placed here from another Device.
 		profileFor: (name) => profiles.settingsFor(name),
+		// The files agents keep for the person, next to the run history.
+		artifacts: createArtifactStore(dataDir),
 	});
 
 	/**

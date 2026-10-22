@@ -1,5 +1,6 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { isCustomHarness } from "@nightshift/flows";
+import { createArtifactStore } from "../artifacts";
 import type { Engine, EngineOptions, StartRunInput } from "../contract";
 import { defaultRunSettings, type RunSettings } from "../device-config";
 import { createFlowFiles } from "../flows";
@@ -361,6 +362,7 @@ export function createEngine(
 			schedulesWithOffers: peers.offers.schedulesWithOffers,
 		}),
 		reads,
+		artifacts: createArtifactStore(dataDir),
 		recovery,
 		relay,
 		hostOf,
