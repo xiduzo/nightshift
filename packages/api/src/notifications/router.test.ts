@@ -248,34 +248,3 @@ describe("notifications", () => {
 		await stream.return?.();
 	});
 });
-
-describe("this computer's notification switches", () => {
-	test("also change the owner's own notification settings", async () => {
-		const ada = await sandbox.signUp("Ada");
-		const context = await contextFor(ada.headers);
-		const values = {
-			notifyGateOpened: true,
-			notifyRunFinished: false,
-			notifyRunFailed: true,
-		};
-		const owned = {
-			...context,
-			daemon: { device: { id: "device", name: "mac", ownerId: ada.userId } },
-			settings: { save: async () => ({ values, fields: {} }) },
-		} as unknown as Context;
-
-		await call(
-			appRouter.settings.save,
-			{ notifyRunFinished: false },
-			{
-				context: owned,
-			},
-		);
-
-		expect((await notifications.settings.get(ada.userId)).events).toEqual({
-			gateOpened: true,
-			runFinished: false,
-			runFailed: true,
-		});
-	});
-});

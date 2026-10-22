@@ -15,7 +15,6 @@ export {
 	type Daemon,
 	type DaemonInfo,
 	type DaemonOptions,
-	type DesktopScreen,
 } from "./daemon";
 export {
 	directoryWeb,
@@ -24,6 +23,7 @@ export {
 	type WebFiles,
 	webHandler,
 } from "./http";
+export type { DesktopScreen } from "./notifications";
 export {
 	checkHealth,
 	type DaemonEnv,

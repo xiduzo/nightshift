@@ -56,17 +56,6 @@ import {
 	spaceIdOf,
 	systemGitInstaller,
 } from "@nightshift/engine";
-import {
-	createDesktopChannel,
-	createExpoChannel,
-	createInAppChannel,
-	createNotifications,
-	type DesktopNotifier,
-	type DesktopWindow,
-	engineRunEvents,
-	oneSenderPerSpace,
-	systemDesktopNotifier,
-} from "@nightshift/notifications";
 
 import { localHarnesses, programChecks, reportDeviceFacts } from "./harnesses";
 import {
@@ -81,6 +70,7 @@ import {
 	engineRunSource,
 	systemSleepLock,
 } from "./keep-awake";
+import { type DesktopScreen, wireNotifications } from "./notifications";
 import {
 	boundedStop,
 	chooseFolder,
@@ -92,7 +82,6 @@ import {
 	secretFiles,
 	secretsDir,
 	stopOnSignals,
-	webPushSubject,
 } from "./runtime";
 import { createSync } from "./sync";
 
@@ -110,13 +99,6 @@ export type DaemonOptions = {
 	 * off. Default: none.
 	 */
 	desktop?: DesktopScreen | "system";
-};
-
-/** This computer's desktop, as the app that runs the daemon shows it. */
-export type DesktopScreen = {
-	notifier: DesktopNotifier;
-	/** The app's window, when the daemon runs inside the app. */
-	window?: DesktopWindow;
 };
 
 /** Facts about this daemon that change only on a restart. */
@@ -459,70 +441,17 @@ export async function createDaemon(
 		kept: hot,
 	});
 
-	/**
-	 * The notifier: it reads the run events and tells each Member of a
-	 * Space about a new Gate, a finished run and a failed run, on every
-	 * screen. It sends for the Spaces this computer keeps as a Host, else
-	 * for its owner's personal Space only. The in-app channel outlives a
-	 * `bun --hot` reload, so the open pages keep their stream. Web Push
-	 * signs with the VAPID keys this daemon makes once and keeps.
-	 */
-	hot.nightshiftInApp ??= createInAppChannel();
-	hot.nightshiftNotifications?.stop();
-	const inApp = hot.nightshiftInApp;
-	const directory = deviceDirectory(db);
-	const desktop = desktopScreen(options.desktop, env);
-	const desktopChannel = desktop
-		? createDesktopChannel({
-				deviceId: device.id,
-				notifier: desktop.notifier,
-				...(desktop.window ? { window: desktop.window } : {}),
-				streamHere: (personId) => inApp.isActiveHere(personId),
-			})
-		: null;
-	const notifications = createNotifications({
-		db,
-		events: engineRunEvents(engine),
-		sendsFor: oneSenderPerSpace({
-			isHost: () => settings.current().host,
-			hostedElsewhere: (spaceId) => directory.hostedElsewhere(spaceId),
-			ownPersonalSpaceId: async () => person.spaceId,
-		}),
-		inApp,
-		webPush: { subject: webPushSubject(env) },
-		push: {
-			...(desktopChannel ? { desktop: desktopChannel } : {}),
-			// The phone app registers with a Host, so only a Host has phones
-			// to reach; `sendsFor` keeps every push to the Spaces this
-			// computer sends for. EXPO_ACCESS_TOKEN is optional.
-			expo: createExpoChannel({
-				...(env.EXPO_ACCESS_TOKEN?.trim()
-					? { accessToken: env.EXPO_ACCESS_TOKEN.trim() }
-					: {}),
-			}),
+	const { notifications, settings: computerSettings } = await wireNotifications(
+		{
+			db,
+			env,
+			engine,
+			settings,
+			device,
+			owner: person,
+			desktop: options.desktop,
 		},
-	});
-	hot.nightshiftNotifications = notifications;
-	// The switches this computer kept before notification settings moved
-	// to the Person: its owner gets them once.
-	const kept = settings.current();
-	await notifications.settings.seed(person.userId, {
-		gateOpened: kept.notifyGateOpened,
-		runFinished: kept.notifyRunFinished,
-		runFailed: kept.notifyRunFailed,
-	});
-	// This computer's desktop is its owner's screen: registered at each
-	// start, so it keeps the computer's name.
-	if (desktopChannel) {
-		await notifications.targets.register(person.userId, {
-			kind: "desktop",
-			name: device.name,
-			platform: process.platform,
-			endpoint: device.id,
-		});
-	}
-	// Not awaited: the baseline reads every Space's open Gates.
-	void notifications.start();
+	);
 
 	/**
 	 * "Keep this computer awake while a run is running" (this computer's
@@ -564,7 +493,7 @@ export async function createDaemon(
 		exchange: devices.hostExchange,
 		offers: devices.offers,
 		engine,
-		settings,
+		settings: computerSettings,
 		notifications,
 		connections,
 		cliTools,
@@ -599,26 +528,6 @@ export async function createDaemon(
 		ownerHasLogin: () => hasLogin(db, person.userId),
 		stop,
 	};
-}
-
-/**
- * The desktop of this computer: the one the app passes, the OS programs
- * for "system", or none (also with NIGHTSHIFT_DESKTOP_NOTIFICATIONS=off,
- * and on a computer with no desktop).
- */
-function desktopScreen(
-	option: DaemonOptions["desktop"],
-	env: DaemonEnv,
-): DesktopScreen | null {
-	if (!option) return null;
-	if (option !== "system") return option;
-	if (env.NIGHTSHIFT_DESKTOP_NOTIFICATIONS?.trim().toLowerCase() === "off") {
-		return null;
-	}
-	const notifier = systemDesktopNotifier({
-		pageUrl: (path) => new URL(path, env.CORS_ORIGIN).toString(),
-	});
-	return notifier ? { notifier } : null;
 }
 
 /** The origins of a Host's addresses (`https://name:port`). */

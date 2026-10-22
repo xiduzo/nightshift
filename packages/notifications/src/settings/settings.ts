@@ -82,6 +82,33 @@ export type NotificationSettingsPatch = z.infer<
 /** How long a push waits while a screen is open, by default. */
 export const DEFAULT_HOLD_MINUTES = 3;
 
+/**
+ * This computer's three notification switches: its own settings from
+ * before notification settings moved to the Person.
+ */
+export type ComputerSwitches = {
+	notifyGateOpened: boolean;
+	notifyRunFinished: boolean;
+	notifyRunFailed: boolean;
+};
+
+const SWITCH_KEYS = [
+	"notifyGateOpened",
+	"notifyRunFinished",
+	"notifyRunFailed",
+] as const;
+
+/** The Person's events that the computer's switches stand for. */
+export function eventsOfSwitches(
+	switches: ComputerSwitches,
+): NotificationSettings["events"] {
+	return {
+		gateOpened: switches.notifyGateOpened,
+		runFinished: switches.notifyRunFinished,
+		runFailed: switches.notifyRunFailed,
+	};
+}
+
 /** This computer's time zone, else UTC. */
 export function localTimeZone(): string {
 	try {
@@ -210,24 +237,27 @@ export function createSettingsStore(
 		return row ? fromRow(row) : defaultSettings(fallbackZone);
 	}
 
+	/** Saves a change of the Person's settings and returns them all. */
+	async function save(
+		personId: string,
+		patch: NotificationSettingsPatch,
+	): Promise<NotificationSettings> {
+		const parsed = notificationSettingsPatchSchema.parse(patch);
+		const next = applyPatch(await get(personId), parsed);
+		const row = toRow(personId, next);
+		await db.insert(notificationSettings).values(row).onConflictDoUpdate({
+			target: notificationSettings.personId,
+			set: row,
+		});
+		return next;
+	}
+
 	return {
 		/** The Person's settings, or the defaults. */
 		get,
 
 		/** Saves a change of the Person's settings and returns them all. */
-		async save(
-			personId: string,
-			patch: NotificationSettingsPatch,
-		): Promise<NotificationSettings> {
-			const parsed = notificationSettingsPatchSchema.parse(patch);
-			const next = applyPatch(await get(personId), parsed);
-			const row = toRow(personId, next);
-			await db.insert(notificationSettings).values(row).onConflictDoUpdate({
-				target: notificationSettings.personId,
-				set: row,
-			});
-			return next;
-		},
+		save,
 
 		/**
 		 * Gives a Person who has no settings yet these choices, once: the
@@ -243,6 +273,20 @@ export function createSettingsStore(
 				.insert(notificationSettings)
 				.values(toRow(personId, settings))
 				.onConflictDoNothing();
+		},
+
+		/**
+		 * After a save of the computer's settings that changed one of its
+		 * three switches: the Person's events take the switches' values, for
+		 * a client that still sends them. A save without them changes nothing.
+		 */
+		async adoptComputerSwitches(
+			personId: string,
+			patch: Partial<Record<keyof ComputerSwitches, unknown>>,
+			switches: ComputerSwitches,
+		): Promise<void> {
+			if (!SWITCH_KEYS.some((key) => patch[key] !== undefined)) return;
+			await save(personId, { events: eventsOfSwitches(switches) });
 		},
 	};
 }

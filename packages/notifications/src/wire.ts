@@ -13,7 +13,9 @@ import {
 import { createDeliveryLog } from "./deliveries";
 import { createNotifier, type RunEventSource, spaceAudience } from "./notifier";
 import {
+	type ComputerSwitches,
 	createSettingsStore,
+	eventsOfSwitches,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
 } from "./settings";
@@ -72,10 +74,16 @@ export type Notifications = {
 			personId: string,
 			patch: NotificationSettingsPatch,
 		): Promise<NotificationSettings>;
-		/** The one-time copy of the choices a computer kept, for a Person without settings. */
-		seed(
+		/** The one-time copy of the switches a computer kept, for a Person without settings. */
+		seed(personId: string, switches: ComputerSwitches): Promise<void>;
+		/**
+		 * After a save of the computer's settings: when it changed one of
+		 * the three switches, the Person's events take their values.
+		 */
+		adoptComputerSwitches(
 			personId: string,
-			events: Partial<NotificationSettings["events"]>,
+			patch: Partial<Record<keyof ComputerSwitches, unknown>>,
+			switches: ComputerSwitches,
 		): Promise<void>;
 	};
 	targets: {
@@ -143,7 +151,10 @@ export function createNotifications(
 		settings: {
 			get: (personId) => settings.get(personId),
 			save: (personId, patch) => settings.save(personId, patch),
-			seed: (personId, events) => settings.seed(personId, events),
+			seed: (personId, switches) =>
+				settings.seed(personId, eventsOfSwitches(switches)),
+			adoptComputerSwitches: (personId, patch, switches) =>
+				settings.adoptComputerSwitches(personId, patch, switches),
 		},
 		targets: {
 			list: async (personId) => (await targets.of(personId)).map(targetView),

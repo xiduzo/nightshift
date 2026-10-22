@@ -1,8 +1,10 @@
 /** A Person's notification settings: which events, quiet hours, which screens, the phone delay. */
 
 export {
+	type ComputerSwitches,
 	createSettingsStore,
 	DEFAULT_HOLD_MINUTES,
+	eventsOfSwitches,
 	inQuietHours,
 	type NotificationSettings,
 	type NotificationSettingsPatch,

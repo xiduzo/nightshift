@@ -106,4 +106,30 @@ describe("the settings store", () => {
 			runFailed: true,
 		});
 	});
+
+	test("a save of the computer's switches also changes the Person's events", async () => {
+		const store = createSettingsStore(db, { timeZone: "UTC" });
+		const switches = {
+			notifyGateOpened: true,
+			notifyRunFinished: false,
+			notifyRunFailed: true,
+		};
+		await store.save("ada", { holdMinutes: 10 });
+
+		await store.adoptComputerSwitches("ada", {}, switches);
+		expect((await store.get("ada")).events.runFinished).toBe(true);
+
+		await store.adoptComputerSwitches(
+			"ada",
+			{ notifyRunFinished: false },
+			switches,
+		);
+		const after = await store.get("ada");
+		expect(after.events).toEqual({
+			gateOpened: true,
+			runFinished: false,
+			runFailed: true,
+		});
+		expect(after.holdMinutes).toBe(10);
+	});
 });
