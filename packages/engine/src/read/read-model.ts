@@ -1,10 +1,9 @@
 import { shellQuote } from "@nightshift/agents/harness-facts";
 import type { AgentHarness, AgentHarnessName } from "@nightshift/agents/types";
 import type { Database } from "@nightshift/db";
-import { project, run, step } from "@nightshift/db/schema";
+import { project, run } from "@nightshift/db/schema";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
 import { and, desc, eq, isNull } from "drizzle-orm";
-import type { FeedStep } from "../contract";
 import {
 	getRunRow,
 	type LoggedEvent,
@@ -41,6 +40,7 @@ import {
 	sumCost,
 } from "./derive-steps";
 import { namesOf, runPerson } from "./people";
+import { followRunTranscript, type StepEntries } from "./run-transcript";
 import type {
 	ItemSummary,
 	OpenGate,
@@ -474,30 +474,9 @@ export type ReadModelDeps = {
 	): Promise<Map<string, RunWalker>>;
 	/** The run's actions that wait for its Walker. */
 	pendingCommands(runId: string): Promise<PendingCommand[]>;
-	/**
-	 * A step's transcript. A step of a run walked elsewhere comes from the
-	 * archive; `ended` says whether it can change still.
-	 */
-	stepTranscript(
-		row: { id: string; runId: string; spaceId: string; transcriptPath: string },
-		walker: RunWalker,
-		ended: boolean,
-	): Promise<TranscriptEntry[]>;
-	/**
-	 * A step's live transcript wherever its run is walked: its entries
-	 * after `afterSeq`, then each new one, until the step ends.
-	 */
-	followStep(
-		step: FeedStep,
-		afterSeq: number,
-		signal: AbortSignal,
-	): AsyncIterable<TranscriptEntry>;
+	/** A step's transcript, wherever its run is walked (`RunsPort.stepEntries`). */
+	stepEntries: StepEntries;
 };
-
-/** How long a step that ended may keep its feed silent before the archive takes over. */
-const ENDED_GRACE_MS = 5_000;
-/** How long the run page waits before it follows a step again after its feed failed. */
-const FOLLOW_RETRY_MS = 2_000;
 
 /** A Walker the Replica knows nothing of: a name is all it lacks. */
 const walkerOf = (walkers: Map<string, RunWalker>, id: string): RunWalker =>
@@ -519,13 +498,6 @@ export function createReadModel(deps: ReadModelDeps) {
 			ids.filter((id): id is string => id !== null),
 		);
 		return (id) => walkerOf(known, id);
-	}
-
-	async function walkerOfRun(row: RunRow): Promise<RunWalker> {
-		return walkerOf(
-			await deps.walkers(row.spaceId, [row.walkerId]),
-			row.walkerId,
-		);
 	}
 
 	/** The Space's runs (of one project), newest first, with the facts the log gives each one. */
@@ -676,7 +648,10 @@ export function createReadModel(deps: ReadModelDeps) {
 	/**
 	 * The run's status, its steps and its transcript so far, then every
 	 * change as it happens, until `signal` aborts. Transcript entries up to
-	 * `afterSeq` are skipped.
+	 * `afterSeq` are skipped. The transcript goes out in `seq` order
+	 * (`followRunTranscript`), wherever the run is walked. When it cannot
+	 * be read, the watch ends with that error: the viewer reads again from
+	 * its cursor.
 	 */
 	async function* watch(
 		runId: string,
@@ -684,13 +659,13 @@ export function createReadModel(deps: ReadModelDeps) {
 		afterSeq: number,
 	): AsyncGenerator<RunStreamItem> {
 		const runRow = await getRunRow(db, runId);
-		const walker = await walkerOfRun(runRow);
 		if (signal.aborted) return;
 
 		const queue: (
 			| { kind: "transcript"; entry: TranscriptEntry }
 			| { kind: "status-changed" }
 			| { kind: "step-changed"; stepId: string }
+			| { kind: "error"; error: unknown }
 		)[] = [];
 		let wakeWatcher: (() => void) | null = null;
 		const notify = () => {
@@ -698,16 +673,21 @@ export function createReadModel(deps: ReadModelDeps) {
 			wakeWatcher = null;
 			resolve?.();
 		};
-		// Subscribe before reading the log and the disk: an entry is on disk
-		// before it is published, so every entry is either on disk or queued.
+		// Subscribe before reading the log: no change of a step is missed.
+		// The transcript has its own reader.
 		const unsubscribe = bus.subscribe(runId, (item) => {
+			if (item.kind === "transcript") return;
 			queue.push(item);
 			notify();
 		});
-		signal.addEventListener("abort", notify, { once: true });
+		const transcript = new AbortController();
+		const stopTranscript = () => {
+			transcript.abort();
+			notify();
+		};
+		signal.addEventListener("abort", stopTranscript, { once: true });
 
 		try {
-			let lastSeq = afterSeq;
 			const events = await log.events(runId);
 			let lastStatus: RunStatus = deriveRunState(events).status;
 			yield { kind: "status", status: lastStatus };
@@ -722,41 +702,23 @@ export function createReadModel(deps: ReadModelDeps) {
 				yield { kind: "step", step: toStepSummary(derived, deviceOf) };
 			}
 
-			if (walker.thisDevice) {
-				const rows = await db
-					.select({
-						id: step.id,
-						runId: step.runId,
-						spaceId: step.spaceId,
-						transcriptPath: step.transcriptPath,
-					})
-					.from(step)
-					.where(eq(step.runId, runId));
-				const ended = new Set(
-					steps.filter((s) => s.endedAt !== null).map((s) => s.id),
-				);
-				const replay = (
-					await Promise.all(
-						rows.map((row) =>
-							deps.stepTranscript(row, walker, ended.has(row.id)),
-						),
-					)
-				)
-					.flat()
-					.sort((a, b) => a.seq - b.seq);
-				for (const entry of replay) {
-					if (signal.aborted) return;
-					if (entry.seq <= lastSeq) continue;
-					lastSeq = entry.seq;
-					yield { kind: "transcript", entry };
-				}
-			} else {
-				// Walked elsewhere: step by step, from the archive or live.
-				void tailElsewhere(runRow, walker, lastSeq, signal, (entry) => {
-					queue.push({ kind: "transcript", entry });
+			void (async () => {
+				try {
+					for await (const entry of followRunTranscript(
+						{ log, bus, stepEntries: deps.stepEntries },
+						runRow,
+						afterSeq,
+						transcript.signal,
+					)) {
+						queue.push({ kind: "transcript", entry });
+						notify();
+					}
+				} catch (error) {
+					if (transcript.signal.aborted) return;
+					queue.push({ kind: "error", error });
 					notify();
-				});
-			}
+				}
+			})();
 
 			while (!signal.aborted) {
 				const item = queue.shift();
@@ -767,9 +729,9 @@ export function createReadModel(deps: ReadModelDeps) {
 					continue;
 				}
 				if (item.kind === "transcript") {
-					if (item.entry.seq <= lastSeq) continue;
-					lastSeq = item.entry.seq;
 					yield item;
+				} else if (item.kind === "error") {
+					throw item.error;
 				} else if (item.kind === "step-changed") {
 					const current = deriveSteps(await log.events(runId)).find(
 						(s) => s.id === item.stepId,
@@ -797,137 +759,8 @@ export function createReadModel(deps: ReadModelDeps) {
 			}
 		} finally {
 			unsubscribe();
-			signal.removeEventListener("abort", notify);
-		}
-	}
-
-	/**
-	 * The transcript of a run another Device walks, step by step in the
-	 * order they opened: an ended step from the archive, a running one from
-	 * its live feed (`followStep`). It moves to the next step when the feed
-	 * ends. A step that ended while its feed stays silent (a Walker of an
-	 * older version, a Host away) is read from the archive once its copy
-	 * lands. Pushes each entry once, in `seq` order, until `signal` aborts.
-	 */
-	async function tailElsewhere(
-		runRow: RunRow,
-		walker: RunWalker,
-		afterSeq: number,
-		signal: AbortSignal,
-		push: (entry: TranscriptEntry) => void,
-	): Promise<void> {
-		const runId = runRow.id;
-		let last = afterSeq;
-		const emit = (entry: TranscriptEntry) => {
-			if (entry.seq <= last) return;
-			last = entry.seq;
-			push(entry);
-		};
-		/** Steps whose transcript went out whole, by id and opening. */
-		const complete = new Set<string>();
-		let pending = false;
-		let wake: (() => void) | null = null;
-		const notify = () => {
-			pending = true;
-			const resolve = wake;
-			wake = null;
-			resolve?.();
-		};
-		const off = bus.subscribe(runId, (item) => {
-			if (item.kind !== "transcript") notify();
-		});
-		signal.addEventListener("abort", notify, { once: true });
-		const changed = () =>
-			pending || signal.aborted
-				? Promise.resolve()
-				: new Promise<void>((resolve) => {
-						wake = resolve;
-					});
-		const endedNow = async (stepId: string) =>
-			deriveSteps(await log.events(runId)).find((s) => s.id === stepId)
-				?.endedAt != null;
-		try {
-			while (!signal.aborted) {
-				pending = false;
-				const steps = deriveSteps(await log.events(runId)).sort(
-					(a, b) => a.openedSeq - b.openedSeq,
-				);
-				const next = steps.find((s) => !complete.has(`${s.id}:${s.openedSeq}`));
-				if (!next) {
-					await changed();
-					continue;
-				}
-				const key = `${next.id}:${next.openedSeq}`;
-				const row = {
-					id: next.id,
-					runId,
-					spaceId: runRow.spaceId,
-					transcriptPath: next.transcriptPath,
-				};
-				if (next.endedAt !== null) {
-					const archived = await deps
-						.stepTranscript(row, walker, true)
-						.catch(() => []);
-					if (archived.length > 0) {
-						for (const entry of archived) emit(entry);
-						complete.add(key);
-						continue;
-					}
-				}
-				const feed = new AbortController();
-				const stop = () => feed.abort();
-				signal.addEventListener("abort", stop, { once: true });
-				let grace: ReturnType<typeof setTimeout> | null = null;
-				const giveUp = () => {
-					grace ??= setTimeout(stop, ENDED_GRACE_MS);
-				};
-				if (next.endedAt !== null) giveUp();
-				const offEnd = bus.subscribe(runId, (item) => {
-					if (grace || item.kind === "transcript") return;
-					void endedNow(next.id).then((ended) => {
-						if (ended) giveUp();
-					});
-				});
-				let finished = false;
-				try {
-					for await (const entry of deps.followStep(
-						{ spaceId: runRow.spaceId, runId, stepId: next.id },
-						last,
-						feed.signal,
-					)) {
-						emit(entry);
-					}
-					finished = !feed.signal.aborted;
-				} catch {
-					// The Host is away or does not know the feed: try again.
-				} finally {
-					offEnd();
-					if (grace) clearTimeout(grace);
-					signal.removeEventListener("abort", stop);
-				}
-				if (finished) {
-					complete.add(key);
-					continue;
-				}
-				if (signal.aborted) return;
-				await new Promise((resolve) => {
-					const timer = setTimeout(resolve, FOLLOW_RETRY_MS);
-					signal.addEventListener(
-						"abort",
-						() => {
-							clearTimeout(timer);
-							resolve(undefined);
-						},
-						{ once: true },
-					);
-				});
-			}
-		} catch (error) {
-			if (!signal.aborted)
-				console.error(`[engine] transcript of ${runId}`, error);
-		} finally {
-			off();
-			signal.removeEventListener("abort", notify);
+			transcript.abort();
+			signal.removeEventListener("abort", stopTranscript);
 		}
 	}
 

@@ -59,6 +59,5 @@ export {
 	openTranscriptWriter,
 	parseTranscript,
 	readRunTranscript,
-	readTranscriptFile,
 	transcriptPath,
 } from "./transcripts";

@@ -168,19 +168,15 @@ export type RunsPort = {
 	/** The actions on a run that wait for its Walker. */
 	pendingCommands(runId: string): Promise<PendingCommand[]>;
 	/**
-	 * A step's transcript: this Replica's own file, or for a run walked
-	 * elsewhere the archive's copy. `ended` says whether it can change still.
+	 * A step's transcript, wherever its run is walked and wherever its copy
+	 * is kept: its entries after `afterSeq` (the run-wide seq), in `seq`
+	 * order, each once, then each new one as it is written. It returns when
+	 * the transcript is whole: the step ended and its last entry went out.
+	 * Aborting `signal` ends it too, without an error. A Host that is away
+	 * or a feed that drops does not end it: it tries again. It throws only
+	 * when this Replica does not have the run.
 	 */
-	stepTranscript(
-		row: { id: string; runId: string; spaceId: string; transcriptPath: string },
-		walker: RunWalker,
-		ended: boolean,
-	): Promise<TranscriptEntry[]>;
-	/**
-	 * A step's live transcript wherever its run is walked: its entries
-	 * after `afterSeq`, then each new one, until the step ends.
-	 */
-	followStep(
+	stepEntries(
 		step: FeedStep,
 		afterSeq: number,
 		signal: AbortSignal,

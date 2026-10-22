@@ -656,7 +656,7 @@ describe("live transcripts over the exchange", () => {
 		await untilStatus(paired.host, run.id, "finished");
 	});
 
-	test.failing("A shows each item's output of a For Each B walked, in seq order, from its archive", async () => {
+	test("A shows each item's output of a For Each B walked, in seq order, from its archive", async () => {
 		const run = await walkOnB(await forEachFlow(b.repoPath));
 		await untilStatus(paired.device, run.id, "finished");
 		online();

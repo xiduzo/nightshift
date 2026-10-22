@@ -118,7 +118,6 @@ export {
 	followOwnStep,
 	MissingProjectError,
 	parseTranscript,
-	readTranscriptFile,
 } from "./log";
 export type { ListedProject, Project, SpaceDocument } from "./projects";
 export {

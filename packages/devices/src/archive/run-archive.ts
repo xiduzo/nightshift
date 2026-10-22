@@ -1,20 +1,13 @@
-import {
-	type LoggedEvent,
-	parseTranscript,
-	type RunWalker,
-	readTranscriptFile,
-	type TranscriptEntry,
-	type WalkFile,
-	type WalkRef,
-} from "@nightshift/engine";
-import type { ArchiveRef, HostRelay } from "../contract";
+import type { LoggedEvent, WalkFile, WalkRef } from "@nightshift/engine";
+import type { HostRelay } from "../contract";
 import { readArchive, writeArchive } from "./archive";
 
 /**
  * A run in the archive of the Replica that keeps its Space (this one, or
  * its Host): the walk files a run takes to a new Walker, and the
- * transcripts of steps walked elsewhere. The engine writes and reads the
- * files. The archive only keeps and carries them.
+ * transcripts of steps walked elsewhere (read through the exchange's
+ * feeds). The engine writes and reads the files. The archive only keeps
+ * and carries them.
  */
 export type RunArchiveDeps = {
 	dataDir: string;
@@ -52,36 +45,7 @@ export function createRunArchive(deps: RunArchiveDeps) {
 		);
 	}
 
-	/**
-	 * A step's transcript: this Replica's own file, or for a run walked
-	 * elsewhere the archive's copy, fetched from the Host when this
-	 * Replica lacks it. A copy is kept once the step has ended.
-	 */
-	async function stepTranscript(
-		row: { id: string; runId: string; spaceId: string; transcriptPath: string },
-		walker: RunWalker,
-		ended: boolean,
-	): Promise<TranscriptEntry[]> {
-		if (walker.thisDevice) {
-			// A step of a run walked here before it moved here is in the archive.
-			const own = await readTranscriptFile(row.transcriptPath);
-			if (own.length > 0 || !ended) return own;
-		}
-		const ref: ArchiveRef = {
-			kind: "transcript",
-			spaceId: row.spaceId,
-			runId: row.runId,
-			stepId: row.id,
-		};
-		let text = await readArchive(dataDir, ref);
-		if (text === null && relay) {
-			text = await relay.archive(ref).catch(() => null);
-			if (text !== null && ended) await writeArchive(dataDir, ref, text);
-		}
-		return text === null ? [] : parseTranscript(text);
-	}
-
-	return { keepWalk, archived, stepTranscript };
+	return { keepWalk, archived };
 }
 
 /** The runs that new events moved to this computer (`WalkerMoved` to one of its ids). */

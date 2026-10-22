@@ -1,8 +1,6 @@
-import { step as stepTable } from "@nightshift/db/schema";
-import { eq } from "drizzle-orm";
 import type { OwnDevice, PeerContext, Peers, PlacedDevice } from "../contract";
 import type { PeersFactory } from "../contract/peers";
-import { followOwnStep, readTranscriptFile } from "../log";
+import { followOwnStep } from "../log";
 import { NOT_ON_THIS_COMPUTER } from "../projects";
 import { deriveSteps } from "../read";
 
@@ -13,7 +11,7 @@ import { deriveSteps } from "../read";
  * `@nightshift/devices`, whose tests cover the engine among other Devices.
  */
 export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
-	const { db, device, log } = context;
+	const { device, log } = context;
 
 	async function here(spaceId: string, projectId: string): Promise<OwnDevice> {
 		const project = await context.project(projectId, spaceId);
@@ -106,10 +104,8 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 				);
 			},
 			pendingCommands: async () => [],
-			async stepTranscript(row, walker) {
-				return walker.thisDevice ? readTranscriptFile(row.transcriptPath) : [];
-			},
-			followStep: (step, afterSeq, signal) =>
+			// Every run is walked here: its own file, then live.
+			stepEntries: (step, afterSeq, signal) =>
 				followOwnStep(
 					{
 						bus: context.bus,
@@ -119,17 +115,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 							);
 							return found !== undefined && found.endedAt !== null;
 						},
-						async ownEntries({ runId, stepId }) {
-							const [row] = await db
-								.select({
-									runId: stepTable.runId,
-									transcriptPath: stepTable.transcriptPath,
-								})
-								.from(stepTable)
-								.where(eq(stepTable.id, stepId));
-							if (!row || row.runId !== runId || !row.transcriptPath) return [];
-							return readTranscriptFile(row.transcriptPath);
-						},
+						ownEntries: context.history.ownTranscript,
 						archived: async () => null,
 					},
 					step,

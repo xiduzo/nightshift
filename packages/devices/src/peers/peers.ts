@@ -165,9 +165,8 @@ export function createPeers(
 					kind: c.kind,
 					createdAt: c.createdAt,
 				})),
-			stepTranscript: archive.stepTranscript,
-			followStep: (step, afterSeq, signal) =>
-				exchange.feeds.follow(step, afterSeq, signal),
+			stepEntries: (step, afterSeq, signal) =>
+				exchange.feeds.entries(step, afterSeq, signal),
 			keepWalk: archive.keepWalk,
 			archived: archive.archived,
 		},

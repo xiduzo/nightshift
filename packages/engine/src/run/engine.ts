@@ -268,8 +268,7 @@ export function createEngine(
 			isCustomHarness(name) ? undefined : harnessFacts(name),
 		walkers: peers.runs.walkers,
 		pendingCommands: peers.runs.pendingCommands,
-		stepTranscript: peers.runs.stepTranscript,
-		followStep: peers.runs.followStep,
+		stepEntries: peers.runs.stepEntries,
 	});
 
 	const runStart = createRunStart({

@@ -261,8 +261,10 @@ export interface SpaceEngine {
 
 	/**
 	 * Emits the current status and every step summary, replays the full
-	 * transcript from disk (oldest first), then yields live items until the
-	 * signal aborts. `afterSeq` skips transcript entries the caller already has.
+	 * transcript in `seq` order (from this computer's files or the
+	 * archive), then yields live items until the signal aborts. `afterSeq`
+	 * skips transcript entries the caller already has. It throws when the
+	 * transcript cannot be read: the caller watches again from its cursor.
 	 */
 	watchRun(
 		runId: string,
