@@ -1,13 +1,13 @@
 import {
-	changesInbox,
 	createGateQueries,
 	followNotifications,
 	inboxOrder,
 	type OpenGate,
+	useLiveCache,
 	waitingForYou,
 } from "@nightshift/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 
 import { useHostQueries, useSignedIn } from "@/features/host";
@@ -46,34 +46,25 @@ function useInFront(): boolean {
 
 /**
  * Keeps the inbox live while the app is in front: it follows the person's
- * notifications and reads the Gates again when one opens or closes. A Gate
- * that closes takes its notification away. After a
- * reconnect, or when the app comes back to the front, it reads them again
- * too: items of that time are lost. The inbox query polls as a fallback.
+ * notifications, and the live cache reads again what each item changes. A
+ * Gate that closes takes its notification away. After a reconnect, or when
+ * the app comes back to the front, the cache reads everything again: items
+ * of that time are lost. The inbox query polls as a fallback.
  */
 export function useLiveInbox(): void {
 	const { host } = useSignedIn();
-	const queries = useHostQueries(createGateQueries);
-	const queryClient = useQueryClient();
+	const live = useLiveCache(host.orpc);
 	const inFront = useInFront();
-	/** The stream was live before: a new `live` may have missed items. */
-	const wasLive = useRef(false);
 
 	useEffect(() => {
 		if (!inFront) return;
 		const controller = new AbortController();
-		const refresh = () =>
-			void queryClient.invalidateQueries({ queryKey: queries.all() });
 		void followNotifications({
 			client: host.client,
 			signal: controller.signal,
-			onConnection: (connection) => {
-				if (connection !== "live") return;
-				if (wasLive.current) refresh();
-				wasLive.current = true;
-			},
+			onConnection: live.onNotificationsConnection,
 			onItem: (item) => {
-				if (changesInbox(item)) refresh();
+				live.onNotification(item);
 				// Answered somewhere: its notification on this phone goes too.
 				if (item.kind === "gate-closed") {
 					void dismissKey(item.key).catch(() => undefined);
@@ -81,5 +72,5 @@ export function useLiveInbox(): void {
 			},
 		});
 		return () => controller.abort();
-	}, [inFront, host.client, queries, queryClient]);
+	}, [inFront, host.client, live]);
 }

@@ -58,7 +58,6 @@ export {
 export {
 	answerGate,
 	type ContextItem,
-	changesInbox,
 	createGateMutations,
 	createGateQueries,
 	type GateChoice,

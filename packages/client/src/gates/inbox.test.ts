@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-	changesInbox,
-	gateRun,
-	inboxOrder,
-	waitedText,
-	waitingForYou,
-} from "./inbox";
+import { gateRun, inboxOrder, waitedText, waitingForYou } from "./inbox";
 
 const MINUTE = 60_000;
 
@@ -75,15 +69,6 @@ describe("waitedText", () => {
 	test("days", () => {
 		expect(waitedText(24 * 60 * MINUTE)).toBe("1 day");
 		expect(waitedText(3 * 24 * 60 * MINUTE + 5 * MINUTE)).toBe("3 days");
-	});
-});
-
-describe("changesInbox", () => {
-	test("a Gate that opens or closes changes the inbox, a run end does not", () => {
-		expect(changesInbox({ kind: "gate-opened" })).toBe(true);
-		expect(changesInbox({ kind: "gate-closed" })).toBe(true);
-		expect(changesInbox({ kind: "run-finished" })).toBe(false);
-		expect(changesInbox({ kind: "gates-waiting" })).toBe(false);
 	});
 });
 

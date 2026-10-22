@@ -56,8 +56,3 @@ export function gateRun(gate: Pick<OpenGate, "flowName" | "runTitle">): {
 				: runTitle;
 	return { flow: flowName, detail: detail || null };
 }
-
-/** Whether a notification changes the inbox: a Gate opened or closed. */
-export function changesInbox(item: { kind: string }): boolean {
-	return item.kind === "gate-opened" || item.kind === "gate-closed";
-}

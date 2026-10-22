@@ -6,7 +6,6 @@ export {
 	gateRefusalText,
 } from "./answer";
 export {
-	changesInbox,
 	gateRun,
 	inboxOrder,
 	waitedText,

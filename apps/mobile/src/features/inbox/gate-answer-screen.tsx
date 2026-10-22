@@ -1,14 +1,13 @@
 import {
 	type ContextItem,
 	createGateMutations,
-	createGateQueries,
-	createRunQueries,
 	type GateLink,
 	type GateRefusal,
 	gateParts,
 	gateRefusalText,
 	gateRun,
 	type OpenGate,
+	useLiveCache,
 	waitedText,
 } from "@nightshift/client";
 import {
@@ -31,7 +30,7 @@ import { Separator } from "@nightshift/ui-native/components/ui/separator";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { Textarea } from "@nightshift/ui-native/components/ui/textarea";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import {
@@ -44,7 +43,7 @@ import {
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 
-import { useHost, useHostQueries } from "@/features/host";
+import { useHost, useHostQueries, useSignedIn } from "@/features/host";
 import { EmptyState } from "@/shared/empty";
 import { Screen } from "@/shared/page";
 import { CHECK_COPY, type CheckFailure } from "./answer-check";
@@ -170,24 +169,15 @@ function OpenGateSheet({
 	const now = useNow();
 	const { headline, context, links } = gateParts(gate.question);
 	const { flow, detail } = gateRun(gate);
-	const gateQueries = useHostQueries(createGateQueries);
-	const runQueries = useHostQueries(createRunQueries);
+	const { host } = useSignedIn();
+	const live = useLiveCache(host.orpc);
 	const mutations = useHostQueries(createGateMutations);
-	const queryClient = useQueryClient();
 	const [note, setNote] = useState("");
 	const [checking, setChecking] = useState<string | null>(null);
 	const [problem, setProblem] = useState<Problem | null>(null);
 
 	/** Takes this Gate out of the inbox at once; the refetch confirms it. */
-	function dropGate() {
-		queryClient.setQueryData<OpenGate[]>(gateQueries.open().queryKey, (gates) =>
-			gates?.filter(
-				(open) => open.runId !== gate.runId || open.stepId !== gate.stepId,
-			),
-		);
-		void queryClient.invalidateQueries({ queryKey: gateQueries.all() });
-		void queryClient.invalidateQueries({ queryKey: runQueries.all() });
-	}
+	const dropGate = () => live.afterGateAnswered(gate);
 
 	const resolve = useMutation(
 		mutations.answer({

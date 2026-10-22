@@ -1,24 +1,18 @@
 import {
 	type AgentMessages,
 	applyAgentMessages,
-	createGateQueries,
-	createRunQueries,
-	followRun,
 	type RunStatus,
 	type RunStreamConnection,
 	type StepSummary,
-	type TranscriptEntry,
+	useLiveCache,
 } from "@nightshift/client";
-import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 
-import { useHostQueries, useSignedIn } from "@/features/host";
+import { useSignedIn } from "@/features/host";
 
 /** Batches a fast stream or a long replay so the screen renders once per window. */
 const FLUSH_MS = 100;
-/** A burst of step items (each connect sends them all) reads the run once. */
-const REFETCH_MS = 300;
 
 /** Whether the app is on screen. iOS ends a stream of an app in the background. */
 function useAppActive(): boolean {
@@ -43,19 +37,19 @@ export type LiveRun = {
 };
 
 /**
- * Follows one run live (`followRun`: reconnects with backoff, hands on
- * each entry once). While the app is in the background it stops; when the
- * app comes back it follows on after the last seq it has, so nothing is
- * read twice. Status and step items read the run and its Gates again.
+ * Follows one run live through the live cache (`followRun`: reconnects with
+ * backoff, hands on each entry once, in batches of 100 ms). While the app
+ * is in the background it stops, and keeps what came in before the stop;
+ * when the app comes back it follows on after the last seq it has, so
+ * nothing is read twice. Status and step items read the run and its Gates
+ * again.
  */
 export function useLiveRun(runId: string): LiveRun {
 	const { host } = useSignedIn();
-	const queryClient = useQueryClient();
-	const runQueries = useHostQueries(createRunQueries);
-	const gateQueries = useHostQueries(createGateQueries);
+	const live = useLiveCache(host.orpc);
 	const active = useAppActive();
 	const lastSeq = useRef<{ runId: string; seq: number } | null>(null);
-	const [live, setLive] = useState<Omit<LiveRun, "connection">>(() => ({
+	const [state, setState] = useState<Omit<LiveRun, "connection">>(() => ({
 		steps: new Map(),
 		status: null,
 		messages: new Map(),
@@ -69,78 +63,40 @@ export function useLiveRun(runId: string): LiveRun {
 		const known = lastSeq.current;
 		const afterSeq = known?.runId === runId ? known.seq : undefined;
 		if (afterSeq === undefined) {
-			setLive({ steps: new Map(), status: null, messages: new Map() });
+			setState({ steps: new Map(), status: null, messages: new Map() });
 		}
-		let entries: TranscriptEntry[] = [];
-		let steps: StepSummary[] = [];
-		let status: RunStatus | null = null;
-		let flushTimer: ReturnType<typeof setTimeout> | null = null;
-		let refetchTimer: ReturnType<typeof setTimeout> | null = null;
 
-		const flush = () => {
-			flushTimer = null;
-			const batch = { entries, steps, status };
-			entries = [];
-			steps = [];
-			status = null;
-			setLive((current) => {
-				let nextSteps = current.steps;
-				if (batch.steps.length > 0) {
-					const map = new Map(current.steps);
-					for (const step of batch.steps) map.set(step.id, step);
-					nextSteps = map;
-				}
-				return {
-					steps: nextSteps,
-					status: batch.status ?? current.status,
-					messages: applyAgentMessages(current.messages, batch.entries),
-				};
-			});
-		};
-		const scheduleFlush = () => {
-			flushTimer ??= setTimeout(flush, FLUSH_MS);
-		};
-		const scheduleRefetch = () => {
-			refetchTimer ??= setTimeout(() => {
-				refetchTimer = null;
-				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
-				void queryClient.invalidateQueries({ queryKey: gateQueries.all() });
-			}, REFETCH_MS);
-		};
-
-		void followRun({
+		void live.followRun({
 			client: host.client,
 			runId,
 			afterSeq,
 			signal: controller.signal,
+			flushMs: FLUSH_MS,
+			// Keep what came in before the stop: the next follow starts after it.
+			flushOnStop: true,
 			onConnection: setConnection,
-			onEntry: (entry) => {
-				lastSeq.current = { runId, seq: entry.seq };
-				entries.push(entry);
-				scheduleFlush();
-			},
-			onStep: (step) => {
-				steps.push(step);
-				scheduleFlush();
-				scheduleRefetch();
-			},
-			onStatus: (next) => {
-				status = next;
-				scheduleFlush();
-				scheduleRefetch();
+			onBatch: (batch) => {
+				if (batch.lastSeq !== null) {
+					lastSeq.current = { runId, seq: batch.lastSeq };
+				}
+				setState((current) => {
+					let nextSteps = current.steps;
+					if (batch.steps.length > 0) {
+						const map = new Map(current.steps);
+						for (const step of batch.steps) map.set(step.id, step);
+						nextSteps = map;
+					}
+					return {
+						steps: nextSteps,
+						status: batch.status ?? current.status,
+						messages: applyAgentMessages(current.messages, batch.entries),
+					};
+				});
 			},
 		});
 
-		return () => {
-			controller.abort();
-			if (refetchTimer) clearTimeout(refetchTimer);
-			// Keep what came in before the stop: the next follow starts after it.
-			if (flushTimer) {
-				clearTimeout(flushTimer);
-				flush();
-			}
-		};
-	}, [active, runId, host.client, queryClient, runQueries, gateQueries]);
+		return () => controller.abort();
+	}, [active, runId, host.client, live]);
 
-	return { ...live, connection };
+	return { ...state, connection };
 }
