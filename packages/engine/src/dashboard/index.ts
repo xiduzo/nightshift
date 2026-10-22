@@ -2,11 +2,7 @@
 
 export { isTimeZone } from "./clock";
 export { summarizeFlow } from "./flow-health";
-export {
-	type DashboardOptions,
-	type DashboardScope,
-	summarizeDashboard,
-} from "./summary";
+export { projectDashboard, spacesDashboard } from "./spaces";
 export {
 	type DashboardSummary,
 	type FlowHealthDetail,

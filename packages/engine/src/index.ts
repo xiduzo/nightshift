@@ -24,14 +24,13 @@ export type {
 	StartRunInput,
 } from "./contract";
 export {
-	type DashboardOptions,
-	type DashboardScope,
 	type DashboardSummary,
 	type FlowHealthDetail,
 	HOUR_RANGES,
 	isTimeZone,
 	NIGHT_RANGES,
-	summarizeDashboard,
+	projectDashboard,
+	spacesDashboard,
 	summarizeFlow,
 } from "./dashboard";
 export type {

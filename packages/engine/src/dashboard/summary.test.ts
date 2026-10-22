@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunSummary } from "../read";
 import { summarizeFlow } from "./flow-health";
+import { projectDashboard, spacesDashboard } from "./spaces";
 import { type DashboardScope, summarizeDashboard } from "./summary";
 
 /**
@@ -260,6 +261,48 @@ describe("spend over a night range", () => {
 			nightsOf(summary, 30).spend.groups.map((group) => group.label),
 		).toEqual(["website", "Removed"]);
 		expect(summary.flowHealth).toBeNull();
+	});
+});
+
+describe("the dashboard of Spaces and of one project", () => {
+	/** One Space's engine, as the dashboard reads it. */
+	function aSpace(runs: RunSummary[], projects: Record<string, string>) {
+		return {
+			listRuns: async (input?: { projectId?: string }) =>
+				runs.filter(
+					(run) => !input?.projectId || run.projectId === input.projectId,
+				),
+			listProjects: async () =>
+				Object.entries(projects).map(([id, name]) => ({ id, name })) as never,
+			listFlows: async () => [{ name: "night" }, { name: "fix" }] as never,
+		};
+	}
+
+	test("every Space's runs count, grouped by the project's name", async () => {
+		const summary = await spacesDashboard(
+			[
+				aSpace([aRun({ projectId: "p1", costUsd: 2 })], { p1: "website" }),
+				aSpace([aRun({ projectId: "p2", costUsd: 1 })], { p2: "shop" }),
+			],
+			{ now: NOW, timeZone: "UTC" },
+		);
+		expect(summary.cards.lastDay.runs).toBe(2);
+		expect(
+			nightsOf(summary, 30).spend.groups.map((group) => group.label),
+		).toEqual(["website", "shop"]);
+	});
+
+	test("one project counts its own runs, with its flows", async () => {
+		const space = aSpace(
+			[aRun({ projectId: "p1" }), aRun({ projectId: "p2" })],
+			{ p1: "website", p2: "shop" },
+		);
+		const summary = await projectDashboard(space, "p1", {
+			now: NOW,
+			timeZone: "UTC",
+		});
+		expect(summary.cards.lastDay.runs).toBe(1);
+		expect(summary.flowHealth?.rows.map((row) => row.name)).toContain("fix");
 	});
 });
 

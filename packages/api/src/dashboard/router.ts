@@ -1,8 +1,7 @@
 import { spacesOf } from "@nightshift/auth";
 import {
-	type DashboardScope,
-	type SpaceEngine,
-	summarizeDashboard,
+	projectDashboard,
+	spacesDashboard,
 	summarizeFlow,
 } from "@nightshift/engine";
 import { z } from "zod";
@@ -14,14 +13,6 @@ import {
 	flowHealthDetailSchema,
 	timeZoneSchema,
 } from "./schemas";
-
-/** Every project of `spaces`, by id: its name, to group runs by project. */
-async function projectNames(
-	spaces: SpaceEngine[],
-): Promise<Map<string, string>> {
-	const lists = await Promise.all(spaces.map((space) => space.listProjects()));
-	return new Map(lists.flat().map((project) => [project.id, project.name]));
-}
 
 /**
  * The dashboard's numbers, computed from the runs here, so the web app and
@@ -49,35 +40,17 @@ export const dashboard = {
 				.default({ timeZone: "UTC" }),
 		)
 		.handler(async ({ context, input }) => {
-			const actor = { personId: context.session.user.id };
-			const now = Date.now();
-			const { projectId, timeZone } = input;
-			if (projectId !== undefined) {
-				const [runs, flows] = await Promise.all([
-					context.space.listRuns({ projectId }),
-					context.space.listFlows(projectId),
-				]);
-				return summarizeDashboard(runs, {
-					now,
-					timeZone,
-					scope: { kind: "project", flows: flows.map((flow) => flow.name) },
-				});
+			const read = { now: Date.now(), timeZone: input.timeZone };
+			if (input.projectId !== undefined) {
+				return projectDashboard(context.space, input.projectId, read);
 			}
+			const personId = context.session.user.id;
 			const spaces = input.everySpace
-				? (await spacesOf(context.db, context.session.user.id)).map((space) =>
-						context.engine.space(space.id, actor),
+				? (await spacesOf(context.db, personId)).map((space) =>
+						context.engine.space(space.id, { personId }),
 					)
 				: [context.space];
-			const [runs, names] = await Promise.all([
-				Promise.all(spaces.map((space) => space.listRuns())),
-				projectNames(spaces),
-			]);
-			const scope: DashboardScope = { kind: "all", projectNames: names };
-			return summarizeDashboard(runs.flat(), {
-				now,
-				timeZone,
-				scope,
-			});
+			return spacesDashboard(spaces, read);
 		}),
 	/** One flow of a project, behind its Flow health row. */
 	flow: protectedProcedure
