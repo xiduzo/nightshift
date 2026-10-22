@@ -13,6 +13,7 @@ import {
 	type Sandbox,
 	waitFor,
 } from "@nightshift/engine/testing";
+import { ORPCError } from "@orpc/server";
 import { createPeerEngine, type PeerEngine } from "../peers";
 import type { DeviceRegistry } from "../registry";
 import { withPeers } from "../testing";
@@ -363,5 +364,70 @@ describe("live transcripts", () => {
 		expect(
 			(await host().pull(keyOf("device-colleague", "colleague"), {})).follows,
 		).toEqual([]);
+	});
+});
+
+describe("a push the Host refuses", () => {
+	/** A run of `walkerId` in the owner's Space, of `project`, with one event. */
+	const rowsOf = (walkerId: string, project = projectId) => ({
+		runs: [
+			{
+				id: "run-pushed",
+				spaceId: sandbox.spaceId,
+				projectId: project,
+				flowName: null,
+				flow: "{}",
+				bodyFlows: "{}",
+				title: "Pushed",
+				worktreePath: "",
+				branch: "nightshift/pushed",
+				baseRef: "main",
+				walkerId,
+				startedBy: ownerId,
+				deviceId: null,
+				placements: null,
+				createdAt: Date.now(),
+			},
+		],
+		steps: [],
+		sessions: [],
+		events: [
+			{
+				spaceId: sandbox.spaceId,
+				runId: "run-pushed",
+				stepId: null,
+				sessionId: null,
+				type: "RunStarted",
+				payload: "{}",
+				at: Date.now(),
+				walkerId,
+				walkerSeq: 1,
+			},
+		],
+	});
+
+	/** The code of the ORPCError a call ends in. */
+	async function codeOf(promise: Promise<unknown>) {
+		const error = await promise.then(
+			() => null,
+			(e: unknown) => e,
+		);
+		expect(error).toBeInstanceOf(ORPCError);
+		return (error as ORPCError<string, unknown>).code;
+	}
+
+	test("is FORBIDDEN for another Walker's row, and CONFLICT for a project it lacks yet", async () => {
+		const mine = keyOf("device-mine", ownerId);
+		expect(await codeOf(host().push(mine, rowsOf("device-colleague")))).toBe(
+			"FORBIDDEN",
+		);
+		expect(
+			await codeOf(host().push(mine, rowsOf("device-mine", "project-later"))),
+		).toBe("CONFLICT");
+		expect(await sandbox.db.select().from(runTable)).toEqual([]);
+		// The same batch from its own Walker is taken.
+		expect(await host().push(mine, rowsOf("device-mine"))).toEqual({
+			events: 1,
+		});
 	});
 });

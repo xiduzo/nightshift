@@ -1,6 +1,5 @@
 import {
 	archiveRefSchema,
-	ForeignRowsError,
 	feedStepSchema,
 	offerCapsSchema,
 	runRowsSchema,
@@ -9,7 +8,6 @@ import {
 } from "@nightshift/devices";
 import type { TranscriptEntry } from "@nightshift/engine";
 import { flowNameSchema, flowSchema, labelSchema } from "@nightshift/flows";
-import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { offerRef } from "../devices";
@@ -56,16 +54,9 @@ export const sync = {
 		.route({ summary: "Takes the rows of the runs a paired Device walks." })
 		.output(output(z.object({ events: z.number() })))
 		.input(runRowsSchema)
-		.handler(async ({ context, input }) => {
-			try {
-				return await context.exchange.push(context.deviceKey, input);
-			} catch (error) {
-				if (error instanceof ForeignRowsError) {
-					throw new ORPCError("FORBIDDEN", { message: error.message });
-				}
-				throw error;
-			}
-		}),
+		.handler(({ context, input }) =>
+			context.exchange.push(context.deviceKey, input),
+		),
 	/** A person's action on a run walked elsewhere, in the name of the key's Person. */
 	command: deviceProcedure("sync")
 		.route({

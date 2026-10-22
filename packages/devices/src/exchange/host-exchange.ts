@@ -11,6 +11,7 @@ import { type OfferDeps, serveChecked, type WorkHub } from "../work";
 import { applyRunCommand, COMMAND_PERMISSION } from "./commands";
 import type { EngineExchange } from "./engine-exchange";
 import {
+	ForeignRowsError,
 	isEmpty,
 	MissingProjectError,
 	mergeCursors,
@@ -187,6 +188,9 @@ export function createHostExchange(deps: {
 				});
 				return { events: added.length };
 			} catch (error) {
+				// A row of another Walker or Space: never taken. A project the
+				// Space document has not brought yet: not yet.
+				if (error instanceof ForeignRowsError) forbidden(error.message);
 				if (error instanceof MissingProjectError) {
 					throw new ORPCError("CONFLICT", { message: error.message });
 				}

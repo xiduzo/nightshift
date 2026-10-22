@@ -34,7 +34,7 @@ export {
 	workReplySchema,
 	workRequestSchema,
 } from "./contract";
-export { ForeignRowsError, type HostExchange } from "./exchange";
+export type { HostExchange } from "./exchange";
 export type {
 	Devices,
 	DevicesOverview,

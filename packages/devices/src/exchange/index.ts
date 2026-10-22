@@ -3,5 +3,4 @@
 export { exchangeWithHost } from "./client";
 export { createEngineExchange, type EngineExchange } from "./engine-exchange";
 export { createHostExchange } from "./host-exchange";
-export { ForeignRowsError } from "./rows";
 export type { HostExchange } from "./types";

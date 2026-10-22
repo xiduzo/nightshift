@@ -21,6 +21,10 @@ import type {
  * This computer as the Host of run history, for its paired Devices. Each
  * call carries the Device key; the Host filters by its Person's membership
  * and never lets a Device write a row of another Walker.
+ *
+ * Refusals are ORPCErrors: UNAUTHORIZED (the Device has no access),
+ * FORBIDDEN (it may not do this), CONFLICT (not yet: try again later).
+ * Any other error is a failure written for people.
  */
 export type HostExchange = {
 	/** Rows of the Spaces the key's Person is a Member of, after the cursors, but the Device's own. */

@@ -620,6 +620,32 @@ describe("Device keys on the procedures", () => {
 		).toMatchObject({ deviceId: "device-b", personId: "ada" });
 	});
 
+	test("the peer router passes a refusal of the Host's exchange on, and a plain error as BAD_REQUEST", async () => {
+		let refusal: Error = new ORPCError("FORBIDDEN", {
+			message: "A row of another Walker.",
+		});
+		const context = {
+			...(await deviceContext({ sync: ["pull", "push"] })),
+			exchange: {
+				push: async () => {
+					throw refusal;
+				},
+			},
+		} as unknown as Context;
+		const rows = { runs: [], steps: [], sessions: [], events: [] };
+		expect(
+			await refusalOf(call(appRouter.sync.push, rows, { context })),
+		).toMatchObject({ code: "FORBIDDEN", message: "A row of another Walker." });
+		refusal = new ORPCError("CONFLICT", { message: "Not yet." });
+		expect(await errorOf(call(appRouter.sync.push, rows, { context }))).toBe(
+			"CONFLICT",
+		);
+		refusal = new Error("The disk is full.");
+		expect(
+			await refusalOf(call(appRouter.sync.push, rows, { context })),
+		).toMatchObject({ code: "BAD_REQUEST", message: "The disk is full." });
+	});
+
 	test("a Device key is not a Person: no Space, no runs, no settings", async () => {
 		const context = await deviceContext({ sync: ["pull", "push"] });
 		expect(
