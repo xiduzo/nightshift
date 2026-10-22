@@ -335,7 +335,7 @@ export type SettingsStore = {
 };
 
 const SCHEDULER_LOCK =
-	"Night Shift was started with schedules turned off, so you cannot turn them on here. To use schedules, restart Night Shift without this setting.";
+	"Night Shift was started with schedules turned off. You cannot turn them on here. To turn them on, start Night Shift again with schedules on.";
 
 export function createSettingsStore(options: {
 	document: DeviceDocument;

@@ -3,7 +3,6 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui/components/alert";
-import { Badge } from "@nightshift/ui/components/badge";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Field,
@@ -64,15 +63,7 @@ export function RunsCard({ data }: { data: SettingsView }) {
 							{scheduler.locked ? (
 								<Alert id={`${id}-scheduler-lock`}>
 									<LockIcon />
-									<AlertTitle className="flex flex-wrap items-center gap-2">
-										Schedules are paused on this computer
-										<Badge
-											variant="outline"
-											className="border-status-waiting/40 bg-status-waiting/10 font-mono text-status-waiting"
-										>
-											NIGHTSHIFT_SCHEDULER=off
-										</Badge>
-									</AlertTitle>
+									<AlertTitle>Schedules are paused on this computer</AlertTitle>
 									<AlertDescription>{scheduler.locked}</AlertDescription>
 								</Alert>
 							) : null}
