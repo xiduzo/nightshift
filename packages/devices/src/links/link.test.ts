@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { HostUnreachableError } from "@nightshift/engine";
 import { ORPCError } from "@orpc/client";
 import type { HostHello } from "../contract";
 import { partialHostClient } from "../testing";
@@ -293,8 +294,8 @@ describe("httpsLink", () => {
 			maxBackoffMs: 5,
 		});
 		await until(() => link.state().status === "offline");
-		await expect(link.call(async () => "answered")).rejects.toThrow(
-			"studio cannot be reached now.",
+		await expect(link.call(async () => "answered")).rejects.toBeInstanceOf(
+			HostUnreachableError,
 		);
 		const ready = link.ready();
 		up = true;

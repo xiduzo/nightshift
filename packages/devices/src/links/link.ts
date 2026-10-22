@@ -2,6 +2,7 @@ import {
 	HocuspocusProvider,
 	HocuspocusProviderWebsocket,
 } from "@hocuspocus/provider";
+import { HostUnreachableError } from "@nightshift/engine";
 import { ORPCError } from "@orpc/client";
 import type * as Y from "yjs";
 import type { HostClient, HostHello } from "../contract";
@@ -55,7 +56,7 @@ export type Link = {
 		name: string,
 		open: (client: HostClient, signal: AbortSignal) => Promise<void>,
 	): () => void;
-	/** One call on the Host. Rejects at once while the link is offline. */
+	/** One call on the Host. Rejects at once with `HostUnreachableError` while the link is offline. */
 	call<T>(use: (client: HostClient) => Promise<T>): Promise<T>;
 	/**
 	 * The Host's procedures as soon as the link is online. Rejects when
@@ -404,11 +405,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 		},
 		async call(use) {
 			const client = current;
-			if (!client) {
-				throw new Error(
-					`${link.name} cannot be reached now. Try again when it is online.`,
-				);
-			}
+			if (!client) throw new HostUnreachableError();
 			try {
 				return await use(client);
 			} catch (error) {
