@@ -142,16 +142,7 @@ export function createPeers(
 	});
 
 	const port: Peers = {
-		placement: {
-			deviceFor: placement.deviceFor,
-			deviceById: placement.deviceById,
-			place: placement.place,
-			ownDevices: placement.ownDevices,
-			devicesFor: placement.devicesFor,
-			placements: placement.placements,
-			flowsElsewhere: placement.flowsElsewhere,
-			loadNames: placement.loadNames,
-		},
+		placement,
 		offers: {
 			refusal: offerRefusal,
 			schedulesWithOffers: createScheduleOffers({
