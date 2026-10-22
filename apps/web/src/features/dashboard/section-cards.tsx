@@ -14,7 +14,6 @@ import {
 } from "@nightshift/ui/components/chart";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { cn } from "@nightshift/ui/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	ArrowRightIcon,
@@ -26,7 +25,6 @@ import {
 import { type ReactNode, useState } from "react";
 import { Bar, BarChart, YAxis } from "recharts";
 import { useOpenGates } from "@/features/gates";
-import { spaceQueries } from "@/features/spaces";
 import type { DashboardSummary, Project } from "@/shared/api";
 import { formatDateTime, formatKnownCost, formatTime } from "@/shared/format";
 import { ActivityDialog } from "./activity-dialog";
@@ -57,8 +55,8 @@ const OUTCOMES_CONFIG = {
 
 /**
  * The numbers on top, as in the shadcn `dashboard-01` block, from the
- * dashboard's numbers and the open Gates of this Space. Over all projects,
- * or over one when `project` is given. Each card opens its details.
+ * dashboard's numbers and the open Gates. Over all projects, or over one
+ * when `project` is given. Each card opens its details.
  */
 export function SectionCards({
 	summary,
@@ -71,9 +69,8 @@ export function SectionCards({
 	project?: Project;
 }) {
 	const projectId = project?.id;
+	// Every Space, like the inbox and its badge; the other numbers are this Space's.
 	const gates = useOpenGates();
-	// The inbox spans every Space; the other numbers are this Space's only.
-	const activeSpace = useQuery(spaceQueries.list()).data?.active;
 	const [details, setDetails] = useState<Details | null>(null);
 	const detailsProps = (of: Details) => ({
 		open: details === of,
@@ -92,9 +89,7 @@ export function SectionCards({
 	const hours = cards?.hours ?? [];
 	const openGates =
 		gates.data?.filter(
-			(gate) =>
-				(activeSpace === undefined || gate.spaceId === activeSpace) &&
-				(projectId === undefined || gate.projectId === projectId),
+			(gate) => projectId === undefined || gate.projectId === projectId,
 		) ?? [];
 	const waiting = openGates.length;
 
@@ -186,7 +181,11 @@ export function SectionCards({
 							"Nothing needs you"
 						)
 					}
-					footer="Runs pause at a Gate for you"
+					footer={
+						projectId
+							? "Runs pause at a Gate for you"
+							: "Gates of every Space you are in"
+					}
 				/>
 				<StatCard
 					label="Spent, last 24 h"
