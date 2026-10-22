@@ -3,6 +3,7 @@ import type {
 	HostAccess,
 	Permissions,
 } from "@nightshift/auth";
+import { HostUnreachableError } from "@nightshift/engine";
 import { ORPCError, os } from "@orpc/server";
 
 import type { Context } from "./context";
@@ -23,12 +24,27 @@ const readableErrors = o.middleware(async ({ next }) => {
 });
 
 /**
- * An error written for people, as a bad request with its message. A
- * streaming handler throws after the middleware returned, so it passes its
- * errors through this itself.
+ * The code of an action that this computer cannot take to the Host that
+ * keeps its Space now. A screen says so in its own words: the person
+ * tries again later.
+ */
+const HOST_UNREACHABLE_CODE = "HOST_UNREACHABLE";
+
+/**
+ * An error written for people, as a bad request with its message. The
+ * Host of the Space that cannot be reached is `HOST_UNREACHABLE` (503)
+ * instead. A streaming handler throws after the middleware returned, so
+ * it passes its errors through this itself.
  */
 export function readable(error: unknown): unknown {
 	if (error instanceof ORPCError || !(error instanceof Error)) return error;
+	if (error instanceof HostUnreachableError) {
+		return new ORPCError(HOST_UNREACHABLE_CODE, {
+			status: 503,
+			message: error.message,
+			cause: error,
+		});
+	}
 	return new ORPCError("BAD_REQUEST", { message: error.message, cause: error });
 }
 

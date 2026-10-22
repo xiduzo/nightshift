@@ -21,6 +21,8 @@ import {
 } from "@nightshift/auth/testing";
 import {
 	GateClosedError,
+	HOST_UNREACHABLE,
+	HostUnreachableError,
 	type OpenGate,
 	type SpaceEngine,
 } from "@nightshift/engine";
@@ -1034,6 +1036,28 @@ describe("the Needs-you inbox", () => {
 			code: "BAD_REQUEST",
 			defined: false,
 			message: "The run cap is reached: 2 runs at once.",
+		});
+	});
+
+	test("an answer the Host of the Space cannot take now has its own code", async () => {
+		const { bob, spaceId } = await platform();
+		runSpaces.set("platform-run", spaceId);
+		onResolve = () => {
+			throw new HostUnreachableError();
+		};
+		const context = await contextFor(bob.headers);
+		expect(
+			await refusalOf(
+				call(
+					appRouter.gates.resolve,
+					{ runId: "platform-run", stepId: "s", choice: "yes" },
+					{ context },
+				),
+			),
+		).toEqual({
+			code: "HOST_UNREACHABLE",
+			defined: false,
+			message: HOST_UNREACHABLE,
 		});
 	});
 

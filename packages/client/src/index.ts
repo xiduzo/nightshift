@@ -69,6 +69,7 @@ export {
 	inboxOrder,
 	type OpenGate,
 	parseGateQuestion,
+	unreachableAnswerText,
 	waitedText,
 	waitingForYou,
 } from "./gates";

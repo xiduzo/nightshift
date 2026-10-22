@@ -5,5 +5,9 @@ export {
 	createApiClient,
 	createQueryUtils,
 } from "./client";
-export { isSignInRequired, isTwoFactorRequired } from "./refusals";
+export {
+	isHostUnreachable,
+	isSignInRequired,
+	isTwoFactorRequired,
+} from "./refusals";
 export type { ApiClient, ApiInputs, ApiOutputs, ApiQueryUtils } from "./types";

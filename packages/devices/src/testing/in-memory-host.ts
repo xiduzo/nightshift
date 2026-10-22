@@ -1,4 +1,5 @@
 import type { DeviceKeyAccess, DeviceKeyPermission } from "@nightshift/auth";
+import { HostUnreachableError } from "@nightshift/engine";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import {
@@ -27,7 +28,8 @@ import type { HostExchange } from "../exchange";
  *   FORBIDDEN (`link.*` and `sync.*` need `sync`, `archive.*` needs
  *   `archive`, `devices.*` needs `relay`).
  * - Errors: an ORPCError passes on as it is. A plain Error of a call is
- *   a BAD_REQUEST with its message (the API's `readable`, procedures.ts).
+ *   a BAD_REQUEST with its message, a `HostUnreachableError` is a
+ *   HOST_UNREACHABLE (the API's `readable`, procedures.ts).
  *   A plain Error inside a stream is an INTERNAL_SERVER_ERROR, as oRPC
  *   sends it.
  * - Values: inputs are checked with the wire schemas the router uses from
@@ -289,6 +291,13 @@ function rejectOn(gone: AbortSignal): Promise<never> {
 /** A plain error written for people, as the API's `readable` passes it on. */
 function readable(error: unknown): unknown {
 	if (error instanceof ORPCError || !(error instanceof Error)) return error;
+	if (error instanceof HostUnreachableError) {
+		return new ORPCError("HOST_UNREACHABLE", {
+			status: 503,
+			message: error.message,
+			cause: error,
+		});
+	}
 	return new ORPCError("BAD_REQUEST", { message: error.message, cause: error });
 }
 

@@ -1,4 +1,8 @@
-import { gateRefusalText, useLiveCache } from "@nightshift/client";
+import {
+	gateRefusalText,
+	unreachableAnswerText,
+	useLiveCache,
+} from "@nightshift/client";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -11,8 +15,9 @@ import { gateMutations } from "./queries";
  * work in stays as it is. An answer that went toasts. An answer to a Gate
  * that closed, or that is not in your Spaces, says so. Either way the Gate
  * leaves the inbox at once (`afterGateAnswered`).
- * A role that does not allow an answer, or an answer that was not sent,
- * toasts an error and keeps the Gate.
+ * A role that does not allow an answer, an answer the Host of the Space
+ * cannot take now, or an answer that was not sent, toasts an error and
+ * keeps the Gate.
  */
 export function useResolveGate({
 	runTitle,
@@ -47,8 +52,16 @@ export function useResolveGate({
 				);
 				live.afterGateAnswered(input);
 			},
-			onError: (error) =>
-				toast.error("Your answer was not sent", { description: error.message }),
+			onError: (error) => {
+				const unreachable = unreachableAnswerText(error);
+				if (unreachable) {
+					toast.error(unreachable.title, {
+						description: unreachable.description,
+					});
+					return;
+				}
+				toast.error("Your answer was not sent", { description: error.message });
+			},
 		}),
 	);
 }

@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/client";
 
-import type { ApiClient, ApiInputs } from "../api";
+import { type ApiClient, type ApiInputs, isHostUnreachable } from "../api";
 
 /** An answer to one Gate: its run, its step and the choice. `via: "lock-screen"` for a notification button. */
 export type GateAnswer = ApiInputs["gates"]["resolve"];
@@ -90,4 +90,21 @@ export function gateRefusalText(refusal: GateRefusal): {
 					"This Gate is not in one of your Spaces. Your inbox shows the Gates that wait for you.",
 			};
 	}
+}
+
+/**
+ * What a screen says when an answer was not sent because the Host that
+ * keeps the Gate's Space cannot be reached now. It is no refusal: the
+ * Gate still waits. Null for any other error, so each screen says that
+ * the answer was not sent in its own words.
+ */
+export function unreachableAnswerText(
+	error: unknown,
+): { title: string; description: string } | null {
+	if (!isHostUnreachable(error)) return null;
+	return {
+		title: "The Host of this Space cannot be reached",
+		description:
+			"Night Shift did not send your answer. The Gate still waits. Try again later.",
+	};
 }

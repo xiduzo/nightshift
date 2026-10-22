@@ -6,6 +6,7 @@ import {
 	PUSH_CATEGORY,
 	type PushData,
 	pushDataOf,
+	unreachableAnswerText,
 	withdrawKeyOf,
 } from "@nightshift/client";
 import * as Notifications from "expo-notifications";
@@ -57,8 +58,14 @@ async function answerFromButton(
 		} else if (result.kind === "refused" && result.refusal !== "closed") {
 			await tellNotSent(data);
 		}
-	} catch {
-		await tellNotSent(data);
+	} catch (error) {
+		const unreachable = unreachableAnswerText(error);
+		await (unreachable
+			? tellOpenGate(data, {
+					title: unreachable.title,
+					body: unreachable.description,
+				})
+			: tellNotSent(data));
 	} finally {
 		Notifications.clearLastNotificationResponse();
 		await dismissOne(identifier);

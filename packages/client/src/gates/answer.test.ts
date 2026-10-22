@@ -7,6 +7,7 @@ import {
 	type GateRefusal,
 	gateRefusalOf,
 	gateRefusalText,
+	unreachableAnswerText,
 } from "./answer";
 
 const answer = { runId: "run-1", stepId: "review", choice: "ship" };
@@ -102,6 +103,38 @@ describe("gateRefusalText", () => {
 				expect(sentence.split(" ").length).toBeLessThanOrEqual(20);
 			}
 			expect(`${title} ${description}`).not.toMatch(/[;]|n't/);
+		}
+	});
+});
+
+describe("an answer while the Host of the Space cannot be reached", () => {
+	const unreachable = new ORPCError("HOST_UNREACHABLE", {
+		status: 503,
+		message: "The computer that keeps this Space cannot be reached.",
+	});
+
+	test("is no refusal: the answer throws, and the Gate still waits", async () => {
+		expect(gateRefusalOf(unreachable)).toBeNull();
+		await expect(
+			answerGate(
+				clientOf(async () => {
+					throw unreachable;
+				}),
+				answer,
+			),
+		).rejects.toBe(unreachable);
+	});
+
+	test("has its own words; any other error has none", () => {
+		const text = unreachableAnswerText(unreachable);
+		expect(text?.title).toBe("The Host of this Space cannot be reached");
+		expect(text?.description).not.toMatch(/[;]|n't/);
+		for (const other of [
+			new ORPCError("BAD_REQUEST", { message: "The run cap is reached." }),
+			declared("SOMETHING_NEW", 409),
+			new TypeError("Failed to fetch"),
+		]) {
+			expect(unreachableAnswerText(other)).toBeNull();
 		}
 	});
 });

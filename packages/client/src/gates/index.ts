@@ -4,6 +4,7 @@ export {
 	answerGate,
 	type GateRefusal,
 	gateRefusalText,
+	unreachableAnswerText,
 } from "./answer";
 export {
 	gateRun,

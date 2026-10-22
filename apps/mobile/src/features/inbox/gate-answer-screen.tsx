@@ -7,6 +7,7 @@ import {
 	gateRefusalText,
 	gateRun,
 	type OpenGate,
+	unreachableAnswerText,
 	useLiveCache,
 	waitedText,
 } from "@nightshift/client";
@@ -67,6 +68,8 @@ export function GateAnswerScreen() {
 type Problem =
 	| { kind: "check"; failure: CheckFailure }
 	| { kind: "refused"; refusal: GateRefusal }
+	/** The Host of the Space cannot be reached now: the Gate still waits. */
+	| { kind: "unreachable"; text: { title: string; description: string } }
 	| { kind: "failed"; message: string };
 
 function GateAnswer() {
@@ -197,7 +200,12 @@ function OpenGateSheet({
 				dropGate();
 			},
 			onError: (error) => {
-				setProblem({ kind: "failed", message: error.message });
+				const unreachable = unreachableAnswerText(error);
+				setProblem(
+					unreachable
+						? { kind: "unreachable", text: unreachable }
+						: { kind: "failed", message: error.message },
+				);
 			},
 		}),
 	);
@@ -349,10 +357,12 @@ function ProblemAlert({ problem }: { problem: Problem }) {
 			? CHECK_COPY[problem.failure]
 			: problem.kind === "refused"
 				? gateRefusalText(problem.refusal)
-				: {
-						title: "Your answer was not sent",
-						description: `${problem.message} Check that this phone is online. Then answer again.`,
-					};
+				: problem.kind === "unreachable"
+					? problem.text
+					: {
+							title: "Your answer was not sent",
+							description: `${problem.message} Check that this phone is online. Then answer again.`,
+						};
 	return (
 		<Alert icon={CircleAlert} variant="destructive">
 			<AlertTitle>{copy.title}</AlertTitle>

@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { ORPCError } from "@orpc/client";
 
-import { isSignInRequired, isTwoFactorRequired } from "./refusals";
+import {
+	isHostUnreachable,
+	isSignInRequired,
+	isTwoFactorRequired,
+} from "./refusals";
 
 describe("the refusal of a call without a session", () => {
 	test("is told apart from other errors", () => {
@@ -27,5 +31,21 @@ describe("the refusal of a session without two-factor", () => {
 		expect(isTwoFactorRequired({ code: "TWO_FACTOR_REQUIRED" })).toBe(true);
 		expect(isTwoFactorRequired({ code: "UNAUTHORIZED" })).toBe(false);
 		expect(isTwoFactorRequired(null)).toBe(false);
+	});
+});
+
+describe("the refusal of an action while the Host cannot be reached", () => {
+	test("is told apart from other errors", () => {
+		expect(
+			isHostUnreachable(
+				new ORPCError("HOST_UNREACHABLE", {
+					status: 503,
+					message: "The computer that keeps this Space cannot be reached.",
+				}),
+			),
+		).toBe(true);
+		expect(isHostUnreachable({ code: "BAD_REQUEST" })).toBe(false);
+		expect(isHostUnreachable(new TypeError("Failed to fetch"))).toBe(false);
+		expect(isHostUnreachable(null)).toBe(false);
 	});
 });
