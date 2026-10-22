@@ -1,3 +1,4 @@
+import { runStatusLabel } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
@@ -13,47 +14,37 @@ import {
 
 import type { RunStatus } from "@/shared/api";
 
-const STATUS: Record<
-	RunStatus,
-	{ label: string; icon: LucideIcon; className: string }
-> = {
+const STATUS: Record<RunStatus, { icon: LucideIcon; className: string }> = {
 	running: {
-		label: "Running",
 		icon: LoaderCircleIcon,
 		className:
 			"border-status-running/40 bg-status-running/10 text-status-running [&>svg]:animate-spin motion-reduce:[&>svg]:animate-none",
 	},
 	waiting: {
-		label: "Waiting for you",
 		icon: HourglassIcon,
 		className:
 			"border-status-waiting/40 bg-status-waiting/10 text-status-waiting",
 	},
 	sleeping: {
-		label: "Sleeping",
 		icon: MoonIcon,
 		className:
 			"border-status-sleeping/40 bg-status-sleeping/10 text-status-sleeping",
 	},
 	finished: {
-		label: "Finished",
 		icon: CircleCheckIcon,
 		className:
 			"border-status-finished/40 bg-status-finished/10 text-status-finished",
 	},
 	stopped: {
-		label: "Stopped",
 		icon: CircleStopIcon,
 		className:
 			"border-status-stopped/40 bg-status-stopped/10 text-status-stopped",
 	},
 	failed: {
-		label: "Failed",
 		icon: CircleXIcon,
 		className: "border-status-failed/40 bg-status-failed/10 text-status-failed",
 	},
 	interrupted: {
-		label: "Interrupted",
 		icon: CircleAlertIcon,
 		className:
 			"border-status-interrupted/40 bg-status-interrupted/10 text-status-interrupted",
@@ -67,7 +58,8 @@ export function RunStatusBadge({
 	status: RunStatus;
 	className?: string;
 }) {
-	const { label, icon: Icon, className: statusClassName } = STATUS[status];
+	const { icon: Icon, className: statusClassName } = STATUS[status];
+	const label = runStatusLabel(status);
 	return (
 		<Badge variant="outline" className={cn(statusClassName, className)}>
 			<Icon aria-hidden="true" />

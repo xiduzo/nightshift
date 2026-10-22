@@ -1,3 +1,4 @@
+import { runStatusLabel } from "@nightshift/client";
 import {
 	type ChartConfig,
 	ChartContainer,
@@ -19,13 +20,22 @@ const ORDER: RunStatus[] = [
 ];
 
 export const RUN_STATUS_CHART = {
-	running: { label: "Running", color: "var(--status-running)" },
-	waiting: { label: "Waiting for you", color: "var(--status-waiting)" },
-	sleeping: { label: "Sleeping", color: "var(--status-sleeping)" },
-	finished: { label: "Finished", color: "var(--status-finished)" },
-	failed: { label: "Failed", color: "var(--status-failed)" },
-	interrupted: { label: "Interrupted", color: "var(--status-interrupted)" },
-	stopped: { label: "Stopped", color: "var(--status-stopped)" },
+	running: { label: runStatusLabel("running"), color: "var(--status-running)" },
+	waiting: { label: runStatusLabel("waiting"), color: "var(--status-waiting)" },
+	sleeping: {
+		label: runStatusLabel("sleeping"),
+		color: "var(--status-sleeping)",
+	},
+	finished: {
+		label: runStatusLabel("finished"),
+		color: "var(--status-finished)",
+	},
+	failed: { label: runStatusLabel("failed"), color: "var(--status-failed)" },
+	interrupted: {
+		label: runStatusLabel("interrupted"),
+		color: "var(--status-interrupted)",
+	},
+	stopped: { label: runStatusLabel("stopped"), color: "var(--status-stopped)" },
 } satisfies ChartConfig;
 
 /** How many runs have each status, in a fixed order, without the empty ones. */

@@ -6,6 +6,7 @@ export {
 	flowLabel,
 	formatCost,
 	formatKnownCost,
+	type KnownCost,
 	runStatusLabel,
 	whenLabel,
 } from "./format";

@@ -137,6 +137,7 @@ export {
 	hasEnded,
 	type ItemState,
 	type ItemSummary,
+	type KnownCost,
 	markdownPreview,
 	mergeSteps,
 	nodeLabels,

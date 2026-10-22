@@ -52,9 +52,11 @@ export function whenLabel(at: number, now = Date.now()): string {
 	return `${day} ${clock(date)}`;
 }
 
-/** A cost and how sure it is, as runs, steps and the dashboard carry it. */
+/** A cost and how sure it is, as runs, steps, subflow runs and the dashboard carry it. */
 export type KnownCost = {
 	costUsd: number;
+	/** Part of it is estimated from tokens. */
+	costEstimated?: boolean;
 	/** Parts that ended without a cost: not in `costUsd`. */
 	costMissing?: number;
 };

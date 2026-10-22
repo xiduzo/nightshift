@@ -1,7 +1,11 @@
-import { formatCost, formatKnownCost } from "@nightshift/client";
+import {
+	formatCost,
+	formatKnownCost,
+	type KnownCost,
+} from "@nightshift/client";
 
 // One way to write a cost on every screen: the phone uses the same two.
-export { formatCost, formatKnownCost };
+export { formatCost, formatKnownCost, type KnownCost };
 
 const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
@@ -36,15 +40,6 @@ export function formatTime(epochMs: number): string {
 		timeStyle: "short",
 	});
 }
-
-/** A cost and how sure it is, as runs, steps and subflow runs carry it. */
-export type KnownCost = {
-	costUsd: number;
-	/** Part of it is estimated from tokens. */
-	costEstimated?: boolean;
-	/** Parts that ended without a cost: not in `costUsd`. */
-	costMissing?: number;
-};
 
 /** A step that runs and has not reported any spend yet: its cost is not known. */
 export function noCostYet(step: {
