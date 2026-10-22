@@ -1,9 +1,10 @@
 import type { Database } from "@nightshift/db";
-import type {
-	Device,
-	RunLog,
-	RunRow,
-	SpaceDocuments,
+import {
+	type Device,
+	HostUnreachableError,
+	type RunLog,
+	type RunRow,
+	type SpaceDocuments,
 } from "@nightshift/engine";
 import type { AgentProfileSettings } from "@nightshift/flows";
 import type { HostRelay, OfferCaps, WorkRelay } from "../contract";
@@ -192,9 +193,6 @@ export type EngineOffers = {
 	}): Promise<void>;
 };
 
-const HOST_UNREACHABLE =
-	"The computer that keeps this Space cannot be reached. Try again when it is online.";
-
 /**
  * The Offers of the Spaces: published in their documents, with their
  * audit (`OfferMade`, `OfferWithdrawn`). In a Space a Host keeps, this
@@ -229,7 +227,7 @@ export function createEngineOffers(deps: {
 			const { spaceId, by, ...offer } = input;
 			if ((await deps.hostOf(spaceId)) !== null) {
 				if (!relay || offer.deviceId !== deps.deviceId) {
-					throw new Error(HOST_UNREACHABLE);
+					throw new HostUnreachableError();
 				}
 				await relay.offer({
 					spaceId,
@@ -263,7 +261,7 @@ export function createEngineOffers(deps: {
 			const { spaceId, deviceId, profile, by } = input;
 			if ((await deps.hostOf(spaceId)) !== null) {
 				if (!relay || deviceId !== deps.deviceId) {
-					throw new Error(HOST_UNREACHABLE);
+					throw new HostUnreachableError();
 				}
 				await relay.withdrawOffer({ spaceId, profile });
 				// The runs this computer walks stop their steps under it too.

@@ -2,6 +2,7 @@ import type { Database } from "@nightshift/db";
 import { device as deviceTable } from "@nightshift/db/schema";
 import {
 	type Device,
+	HostUnreachableError,
 	type ListedProject,
 	NOT_ON_THIS_COMPUTER,
 	type OfferedPlacement,
@@ -175,10 +176,14 @@ export function createPlacement(deps: PlacementDeps) {
 			hasClone: project.repoPath !== null,
 		};
 		if ((await hostSpaces.hostOf(spaceId)) !== null) {
+			// The Host cannot be reached: the list shows this computer only.
 			const listed = deps.relay
 				? await deps.relay
 						.devices({ spaceId, projectId })
-						.catch(() => [] as OwnDevice[])
+						.catch((error: unknown) => {
+							if (error instanceof HostUnreachableError) return [];
+							throw error;
+						})
 				: [];
 			for (const d of listed) names.set(d.deviceId, d.name);
 			return [
