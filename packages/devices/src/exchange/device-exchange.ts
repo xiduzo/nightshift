@@ -1,7 +1,7 @@
 import { roleAllows } from "@nightshift/auth";
 import type { Engine } from "@nightshift/engine";
 import type { HostClient, RunCommand, RunRows } from "../contract";
-import { hostErrorOf } from "../links";
+import { hostErrorOf, pause } from "../links";
 import { applyRunCommand, COMMAND_PERMISSION } from "./commands";
 import type { EngineExchange } from "./engine-exchange";
 import { isEmpty, MissingProjectError } from "./rows";
@@ -236,17 +236,4 @@ export function createDeviceExchange(deps: {
 			await Promise.all([push(client, signal), pull(client, signal)]);
 		},
 	};
-}
-
-function pause(ms: number, signal: AbortSignal): Promise<void> {
-	return new Promise((resolve) => {
-		if (signal.aborted) return resolve();
-		const done = () => {
-			clearTimeout(timer);
-			signal.removeEventListener("abort", done);
-			resolve();
-		};
-		const timer = setTimeout(done, ms);
-		signal.addEventListener("abort", done, { once: true });
-	});
 }

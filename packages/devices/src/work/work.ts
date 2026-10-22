@@ -13,7 +13,7 @@ import {
 	type WorkRequest,
 	workRequestSchema,
 } from "../contract";
-import { type HostSpaces, personOnHost } from "../links";
+import { type HostSpaces, pause, personOnHost } from "../links";
 import {
 	type DeviceOffer,
 	type EngineOffers,
@@ -461,17 +461,4 @@ async function admitWork(
 		}
 	}
 	return { offers };
-}
-
-function pause(ms: number, signal: AbortSignal): Promise<void> {
-	return new Promise((resolve) => {
-		if (signal.aborted) return resolve();
-		const done = () => {
-			clearTimeout(timer);
-			signal.removeEventListener("abort", done);
-			resolve();
-		};
-		const timer = setTimeout(done, ms);
-		signal.addEventListener("abort", done, { once: true });
-	});
 }

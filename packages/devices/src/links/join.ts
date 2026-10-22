@@ -1,5 +1,6 @@
 import { isHostAddress, isLoopbackHost } from "@nightshift/engine";
 import { hostCertificate } from "../reach";
+import { pause } from "./backoff";
 import { hostClient } from "./host-client";
 import {
 	type DeviceKeyStore,
@@ -68,7 +69,7 @@ export async function* joinHost(
 		expiresAt: Date.now() + code.expiresIn * 1000,
 	};
 
-	const sleep = deps.sleep ?? abortableSleep;
+	const sleep = deps.sleep ?? pause;
 	let interval = code.interval * 1000;
 	while (true) {
 		await sleep(interval, signal);
@@ -172,17 +173,4 @@ function certificateError(error: unknown): Error | null {
 	return new Error(
 		"This computer cannot check the certificate of the Host. Give the Host a certificate from a public authority, or one it signs itself.",
 	);
-}
-
-function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
-	return new Promise((resolve) => {
-		if (signal?.aborted) return resolve();
-		const timer = setTimeout(done, ms);
-		function done() {
-			clearTimeout(timer);
-			signal?.removeEventListener("abort", done);
-			resolve();
-		}
-		signal?.addEventListener("abort", done, { once: true });
-	});
 }

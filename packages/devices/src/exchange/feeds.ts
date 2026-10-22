@@ -5,6 +5,7 @@ import {
 	type TranscriptEntry,
 } from "@nightshift/engine";
 import type { FollowWant } from "../contract";
+import { pause } from "../links";
 
 /**
  * Live transcripts: one feed per step, the same on every Replica.
@@ -552,17 +553,4 @@ function waker(signal: AbortSignal) {
 			signal.removeEventListener("abort", notify);
 		},
 	};
-}
-
-function pause(ms: number, signal: AbortSignal): Promise<void> {
-	return new Promise((resolve) => {
-		if (signal.aborted) return resolve();
-		const done = () => {
-			clearTimeout(timer);
-			signal.removeEventListener("abort", done);
-			resolve();
-		};
-		const timer = setTimeout(done, ms);
-		signal.addEventListener("abort", done, { once: true });
-	});
 }

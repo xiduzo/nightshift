@@ -6,6 +6,7 @@ import { ORPCError } from "@orpc/client";
 import type * as Y from "yjs";
 import type { HostClient, HostHello } from "../contract";
 import { pinnedWebSocket } from "../reach";
+import { backoff, pause } from "./backoff";
 import { hostClient } from "./host-client";
 import type { HostLink } from "./host-links";
 import type { LinkStatus } from "./types";
@@ -235,18 +236,18 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 	}
 
 	async function run() {
-		let failures = 0;
+		const waits = backoff({ firstMs: firstBackoffMs, maxMs: maxBackoffMs });
 		while (!stop.signal.aborted) {
 			try {
 				const { address, value } = await firstAnswering(addresses, answer);
 				learn(value, address);
 				setState("online", address);
-				failures = 0;
+				waits.reset();
 				await syncDocuments(address, value);
 				goOnline(current as HostClient, value);
 				while (!stop.signal.aborted) {
 					nudge = new AbortController();
-					await sleep(
+					await pause(
 						heartbeatMs,
 						AbortSignal.any([stop.signal, nudge.signal]),
 					);
@@ -274,11 +275,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 					return;
 				}
 				setState("offline", null);
-				failures++;
-				await sleep(
-					Math.min(maxBackoffMs, firstBackoffMs * 2 ** (failures - 1)),
-					stop.signal,
-				);
+				await pause(waits.next(), stop.signal);
 			}
 		}
 	}
@@ -299,18 +296,4 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 			await running;
 		},
 	};
-}
-
-/** Resolves after `ms`, or at once when the signal aborts. */
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-	return new Promise((resolve) => {
-		if (signal.aborted) return resolve();
-		const timer = setTimeout(done, ms);
-		function done() {
-			clearTimeout(timer);
-			signal.removeEventListener("abort", done);
-			resolve();
-		}
-		signal.addEventListener("abort", done, { once: true });
-	});
 }

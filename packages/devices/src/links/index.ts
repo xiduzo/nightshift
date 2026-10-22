@@ -1,5 +1,6 @@
 /** This computer's Links to the Hosts it paired with: the links it keeps, the Spaces of those Hosts, pairing from the Device's side, and the procedures it calls on a Host. */
 
+export { pause } from "./backoff";
 export {
 	createHostLinks,
 	type DeviceKeyStore,
