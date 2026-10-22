@@ -7,9 +7,9 @@ import { createDesktopChannel, type DesktopWindowState } from "./desktop";
 
 const DEVICE = "device-1";
 
-const target = (endpoint = DEVICE): PushTarget => ({
+const target = (endpoint = DEVICE, personId = "ada"): PushTarget => ({
 	id: "target-1",
-	personId: "ada",
+	personId,
 	kind: "desktop",
 	name: "Ada's Mac",
 	platform: "darwin",
@@ -46,6 +46,7 @@ function channel(
 	const notifier = fakeDesktopNotifier();
 	const desktop = createDesktopChannel({
 		deviceId: DEVICE,
+		ownerId: "ada",
 		notifier,
 		...(options.window !== undefined
 			? { window: { state: () => options.window ?? null } }
@@ -84,6 +85,14 @@ describe("the desktop channel", () => {
 		const { notifier, desktop } = channel();
 		expect(await desktop.send(target("device-2"), gate)).toBe("gone");
 		await desktop.withdraw(target("device-2"), gate.key);
+		expect(notifier.shown).toEqual([]);
+		expect(notifier.withdrawn).toEqual([]);
+	});
+
+	test("shows only its owner's notifications: another Person's target of this computer is gone", async () => {
+		const { notifier, desktop } = channel();
+		expect(await desktop.send(target(DEVICE, "mallory"), gate)).toBe("gone");
+		await desktop.withdraw(target(DEVICE, "mallory"), gate.key);
 		expect(notifier.shown).toEqual([]);
 		expect(notifier.withdrawn).toEqual([]);
 	});

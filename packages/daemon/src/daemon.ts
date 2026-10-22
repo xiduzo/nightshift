@@ -475,6 +475,7 @@ export async function createDaemon(
 	const desktopChannel = desktop
 		? createDesktopChannel({
 				deviceId: device.id,
+				ownerId: person.userId,
 				notifier: desktop.notifier,
 				...(desktop.window ? { window: desktop.window } : {}),
 				streamHere: (personId) => inApp.isActiveHere(personId),
