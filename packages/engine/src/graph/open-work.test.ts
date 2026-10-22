@@ -135,6 +135,16 @@ const FLOWS: RunFlows = {
 } as unknown as RunFlows;
 
 const STOPPED: CutShort = { kind: "stopped" };
+const INTERRUPTED: CutShort = {
+	kind: "interrupted",
+	reason: "Night Shift stopped while this run ran.",
+};
+const LOST = "Night Shift stopped while this ran.";
+const LOST_SESSION = {
+	outcome: "interrupted",
+	error: LOST,
+	errorKind: null,
+} as const;
 
 const sessionEnded = (
 	stepId: string,
@@ -284,6 +294,83 @@ describe("closingEvents: a missed deadline", () => {
 			stepEnded("c", { ended: "", visit: 1 }, "error", reason),
 			runEnded("failed", reason),
 		]);
+	});
+});
+
+describe("closingEvents: a daemon that died", () => {
+	test("an Agent step and its session end interrupted, and the run with the cut's reason", () => {
+		const { events } = log()
+			.started()
+			.step("s1", "a", "agent")
+			.session("s1", "x");
+		expect(closingEvents(events, INTERRUPTED, FLOWS)).toEqual([
+			sessionEnded("s1", "x", LOST_SESSION),
+			stepEnded("s1", { visit: 1 }, "interrupted", LOST),
+			runEnded("interrupted", INTERRUPTED.reason),
+		]);
+	});
+
+	test("a Call ends after the step inside it, with its kind's outputs", () => {
+		const { events } = log()
+			.started()
+			.step("c", "once", "call")
+			.step("w", "w", "agent", { parentStepId: "c", itemId: null });
+		expect(closingEvents(events, INTERRUPTED, FLOWS)).toEqual([
+			stepEnded("w", { visit: 1 }, "interrupted", LOST),
+			stepEnded("c", { ended: "", visit: 1 }, "interrupted", LOST),
+			runEnded("interrupted", INTERRUPTED.reason),
+		]);
+	});
+
+	test("an open Gate and a sleeping step stay open, and so does their run", () => {
+		const gate = log().started().step("g", "d", "decision").gate("g");
+		expect(closingEvents(gate.events, INTERRUPTED, FLOWS)).toEqual([]);
+		const nap = log()
+			.started()
+			.step("c", "once", "call")
+			.step("n", "nap", "wait", { parentStepId: "c", itemId: null })
+			.sleep("n");
+		expect(closingEvents(nap.events, INTERRUPTED, FLOWS)).toEqual([]);
+	});
+
+	test("a run that is not running gets only its stray steps ended", () => {
+		const { events } = log()
+			.started()
+			.step("s1", "a", "agent")
+			.ended("stopped");
+		expect(closingEvents(events, INTERRUPTED, FLOWS)).toEqual([
+			stepEnded("s1", { visit: 1 }, "interrupted", LOST),
+		]);
+	});
+});
+
+describe("closingEvents: an old log or a broken snapshot", () => {
+	test("a step of a kind that no longer exists keeps its outputs, for every cut", () => {
+		const { events } = log().started().step("g", "approve", "gate");
+		expect(closingEvents(events, STOPPED, FLOWS)).toEqual([
+			stepEnded("g", { visit: 1 }),
+			runEnded("stopped"),
+		]);
+		expect(closingEvents(events, INTERRUPTED, FLOWS)).toEqual([
+			stepEnded("g", { visit: 1 }, "interrupted", LOST),
+			runEnded("interrupted", INTERRUPTED.reason),
+		]);
+	});
+
+	test("without the flows, a Call with each still counts its items from the log", () => {
+		const { events } = log()
+			.started()
+			.step("c", "loop", "call")
+			.item("c", "i1", 1)
+			.itemEnded("c", "i1", "done");
+		expect(closingEvents(events, STOPPED, null)[0]).toMatchObject({
+			stepId: "c",
+			payload: { outputs: { outcome: "stopped", done_count: 1 } },
+		});
+		const once = log().started().step("c", "once", "call");
+		expect(closingEvents(once.events, STOPPED, null)[0]).toEqual(
+			stepEnded("c", { ended: "", visit: 1 }),
+		);
 	});
 });
 

@@ -221,11 +221,13 @@ export function createEngine(
 	const recovery = createRecovery({
 		db,
 		log: runLog,
+		bus,
 		runner,
 		now,
 		settings: runSettings,
 		schedulerOn: options.scheduler !== false,
 		flowOf: parseRunFlow,
+		calledFlowsOf: parseCalledFlows,
 		placedElsewhere: (row) => !placedHere(row),
 		resumeGraceMs: internals.resumeGraceMs ?? DAEMON_RESUME_GRACE_MS,
 		signal,

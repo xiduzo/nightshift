@@ -12,7 +12,6 @@ export {
 	deriveStopAt,
 	deriveTraversals,
 	deriveWorktrees,
-	openWork,
 	parkedSteps,
 } from "./derive-run";
 export type {

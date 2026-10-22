@@ -11,9 +11,7 @@ import {
 } from "../log";
 import {
 	bySeq,
-	type DerivedSession,
 	type DerivedStep,
-	deriveSessions,
 	deriveSteps,
 	type EventOf,
 	ofType,
@@ -342,28 +340,6 @@ export function parkedSteps(events: readonly LoggedEvent[]): DerivedStep[] {
 	if (!stepId) return [];
 	const steps = deriveSteps(events);
 	return withEnclosing(steps, stepId);
-}
-
-/**
- * What a daemon that died left open, per run: sessions and steps that
- * started but never ended, and whether the run itself never ended. An open
- * Gate or a sleeping step is not lost work: it waits for a person or a
- * timer, so it stays open (with the calling steps around it) and its run
- * stays `waiting` or `sleeping`.
- */
-export function openWork(events: readonly LoggedEvent[]): {
-	sessions: DerivedSession[];
-	steps: DerivedStep[];
-	runOpen: boolean;
-} {
-	const parked = new Set(parkedSteps(events).map((s) => s.id));
-	return {
-		sessions: deriveSessions(events).filter((s) => s.ending === null),
-		steps: deriveSteps(events).filter(
-			(s) => s.endedAt === null && !parked.has(s.id),
-		),
-		runOpen: deriveRunStatus(events) === "running",
-	};
 }
 
 /** A running step's time budget, as the log has it, and when it counts from. */

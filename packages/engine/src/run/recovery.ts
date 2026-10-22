@@ -5,9 +5,11 @@ import type { Flow } from "@nightshift/flows";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import type { RunSettings } from "../device-config";
 import {
+	closeOpenWork,
 	DEFAULT_RESUME_PROMPT,
 	latestStepOf,
 	messageOf,
+	openWork,
 	type Runner,
 	resumeTarget,
 	sessionOf,
@@ -20,6 +22,7 @@ import {
 	type LoggedEvent,
 	parseEventRow,
 	type ResumedBy,
+	type RunBus,
 	type RunLog,
 	type RunRow,
 	type RunStatus,
@@ -29,7 +32,6 @@ import {
 	deriveRunState,
 	deriveSteps,
 	deriveStopAt,
-	openWork,
 } from "../read";
 
 /**
@@ -39,7 +41,8 @@ import {
  * (`resumeTarget`, `ThreadState`):
  *
  * - Startup recovery (`recoverInterruptedWork`): a daemon that died left
- *   sessions, steps and runs open. They become `interrupted`, sleeping runs
+ *   sessions, steps and runs open. They become `interrupted` as a stop
+ *   ends them (`closeOpenWork`, `graph/open-work.ts`), sleeping runs
  *   get their timers back, and after a grace period the daemon resumes the
  *   interrupted runs itself unless `daemonResumeBlock` says why not. A
  *   step past its recorded time budget or idle limit ends as its timer
@@ -159,6 +162,10 @@ export async function daemonResumeBlock(
 
 export type RecoveryDeps = ResumeBlockDeps & {
 	log: RunLog;
+	/** Told of the steps and runs recovery ends. */
+	bus: RunBus;
+	/** The flows the run's Call nodes call, from its snapshot. */
+	calledFlowsOf(row: RunRow): Record<string, Flow>;
 	runner: Runner;
 	/** How long after its start the daemon resumes the runs recovery interrupted. */
 	resumeGraceMs: number;
@@ -216,64 +223,36 @@ export function createRecovery(deps: RecoveryDeps) {
 			)
 			.orderBy(asc(event.seq));
 		const byRun = groupByRun(rows.map(parseEventRow));
-		const error = "Night Shift stopped while this ran.";
 		toResume = [];
 		for (const [runId, events] of byRun) {
-			const open = openWork(events);
+			// The lifecycle events are enough to see what is open.
+			const open = openWork(events, "interrupted");
 			// A step that ran past its time budget or idle limit meanwhile
 			// ends as its timer would have ended it, and the run fails: it
 			// does not continue.
 			if (
-				open.runOpen &&
+				open.endsRun &&
 				open.steps.length > 0 &&
 				(await runner.endIfOverdue(runId, 0))
 			) {
 				continue;
 			}
-			for (const session of open.sessions) {
-				await log.append({
-					type: "SessionEnded",
-					runId,
-					stepId: session.stepId,
-					sessionId: session.id,
-					payload: {
-						outcome: "interrupted",
-						error,
-						errorKind: null,
-						usage: null,
-						costUsd: null,
-						resetAt: null,
-					},
+			const why = open.endsRun
+				? await daemonResumeBlock(runId, events, deps)
+				: null;
+			if (open.endsRun || open.steps.length > 0 || open.sessions.length > 0) {
+				// The open work ends as a stop ends it (`closeOpenWork`), from
+				// the run's whole log: a Call with `each` counts its items.
+				await closeOpenWork(deps, runId, {
+					kind: "interrupted",
+					reason: why
+						? `${INTERRUPTED_REASON} It did not continue on its own: ${why}`
+						: INTERRUPTED_REASON,
 				});
 			}
-			for (const open_ of open.steps) {
-				await log.append({
-					type: "StepEnded",
-					runId,
-					stepId: open_.id,
-					payload: {
-						outcome: "interrupted",
-						outputs: { ...open_.outputs, outcome: "interrupted" },
-						error,
-					},
-				});
-			}
-			if (open.runOpen) {
-				const why = await daemonResumeBlock(runId, events, deps);
-				await log.append({
-					type: "RunEnded",
-					runId,
-					payload: {
-						status: "interrupted",
-						reason: why
-							? `${INTERRUPTED_REASON} It did not continue on its own: ${why}`
-							: INTERRUPTED_REASON,
-					},
-				});
-				if (!why) toResume.push(runId);
-			}
+			if (open.endsRun && !why) toResume.push(runId);
 			// A sleeping run gets its timer back from the log (`deriveSleep`).
-			if (!open.runOpen) runner.sleeps.restore(runId, events);
+			if (!open.endsRun) runner.sleeps.restore(runId, events);
 		}
 	}
 

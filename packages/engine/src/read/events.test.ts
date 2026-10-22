@@ -20,7 +20,7 @@ import {
 	deriveStopAt,
 	deriveTraversals,
 	deriveWarnings,
-	openWork,
+	parkedSteps,
 } from "./derive-run";
 import {
 	countVisits,
@@ -288,22 +288,6 @@ test("sumCost adds the cost of each ended session once", () => {
 		.sessionEnded("s2", "c", "finished", 0.5)
 		.sessionEnded("s2", "c", "finished", 9);
 	expect(sumCost(events).usd).toBe(0.75);
-});
-
-test("openWork lists what a dead daemon left open", () => {
-	const { events } = log()
-		.runStarted()
-		.stepStarted("s1", "check")
-		.stepEnded("s1", "fail")
-		.stepStarted("s2", "worker")
-		.sessionStarted("s2", "a");
-	const open = openWork(events);
-	expect(open.sessions.map((s) => s.id)).toEqual(["a"]);
-	expect(open.steps.map((s) => s.id)).toEqual(["s2"]);
-	expect(open.runOpen).toBe(true);
-
-	const done = log().runStarted().ended("finished");
-	expect(openWork(done.events).runOpen).toBe(false);
 });
 
 test("sumCost and step costs include what a step spent itself", () => {
@@ -578,8 +562,8 @@ describe("gates", () => {
 		const { events } = log().runStarted().stepStarted("s1", "gate");
 		expect(deriveOpenGate(events)).toBeNull();
 		expect(deriveRunState(events).status).toBe("running");
-		// Recovery interrupts it like any other open step.
-		expect(openWork(events).steps.map((s) => s.id)).toEqual(["s1"]);
+		// Recovery interrupts it like any other open step: it is not parked.
+		expect(parkedSteps(events)).toEqual([]);
 	});
 
 	test("an ended run has no open Gate", () => {
@@ -599,10 +583,8 @@ describe("gates", () => {
 			.stepEnded("s1", "pass")
 			.stepStarted("s2", "gate")
 			.gateOpened("s2");
-		const open = openWork(events);
-		expect(open.steps).toEqual([]);
-		expect(open.sessions).toEqual([]);
-		expect(open.runOpen).toBe(false);
+		expect(deriveRunState(events).status).toBe("waiting");
+		expect(parkedSteps(events).map((s) => s.id)).toEqual(["s2"]);
 	});
 
 	test("a Gate closed by a stop is no longer open", () => {
@@ -762,17 +744,15 @@ describe("Call scopes", () => {
 		);
 		expect(deriveRunState(b.events).status).toBe("sleeping");
 		expect(deriveSleep(b.events)).toMatchObject({ stepId: "w", until: 5000 });
-		const open = openWork(b.events);
-		expect(open.steps).toEqual([]);
-		expect(open.runOpen).toBe(false);
+		expect(parkedSteps(b.events).map((s) => s.id)).toEqual([
+			"w",
+			"inner",
+			"outer",
+		]);
 
 		b.push("WaitEnded", { early: false }, { stepId: "w" });
 		expect(deriveRunState(b.events).status).toBe("running");
-		expect(openWork(b.events).steps.map((s) => s.id)).toEqual([
-			"outer",
-			"inner",
-			"w",
-		]);
+		expect(parkedSteps(b.events)).toEqual([]);
 	});
 
 	test("stop after the step and the stop time", () => {

@@ -7,6 +7,7 @@ import {
 	type RunBus,
 	type RunLog,
 	type RunRow,
+	type StepOutputs,
 } from "../log";
 import {
 	type DerivedSession,
@@ -17,9 +18,9 @@ import {
 	parkedSteps,
 	withEnclosing,
 } from "../read";
-import type { CutShortOutcome } from "./context";
+import { type CutShortOutcome, type NodeKind, PLAIN_KIND } from "./context";
 import type { Overdue } from "./deadlines";
-import { kindOfType } from "./node-kinds";
+import { NODE_KINDS } from "./node-kinds";
 
 /**
  * Open work that is cut short: one module ends the sessions, steps and run
@@ -157,7 +158,8 @@ const CUTS = {
  * - `interrupted`: every step gets "Night Shift stopped while this ran.";
  *   the run gets `cut.reason`.
  *
- * `flows` gives each step its node (null: no step has one).
+ * `flows` gives each step its node (null: no step has one). A step of a
+ * kind an old log has and the engine no longer knows keeps its outputs.
  */
 export function closingEvents(
 	events: readonly LoggedEvent[],
@@ -196,11 +198,7 @@ export function closingEvents(
 			stepId: step.id,
 			payload: {
 				outcome: rule.step,
-				outputs: kindOfType(step.nodeType).cutShortOutputs(
-					step,
-					node,
-					rule.step,
-				),
+				outputs: cutShortOutputsOf(step, node, rule.step),
 				error: stepError(step),
 			},
 		});
@@ -248,10 +246,41 @@ export async function closeOpenWork(
 	if (closing.length > 0) deps.bus.publish(runId, { kind: "status-changed" });
 }
 
-/** The run's flows, from its row. */
-async function runFlowsOf(deps: CloseDeps, runId: string): Promise<RunFlows> {
-	const row = await getRunRow(deps.db, runId);
-	return { flow: deps.flowOf(row), called: deps.calledFlowsOf(row) };
+/**
+ * The run's flows, from its row; null when the row is missing or its
+ * snapshot cannot be read. The work still ends: startup recovery must not
+ * stop at one broken run.
+ */
+async function runFlowsOf(
+	deps: CloseDeps,
+	runId: string,
+): Promise<RunFlows | null> {
+	try {
+		const row = await getRunRow(deps.db, runId);
+		return { flow: deps.flowOf(row), called: deps.calledFlowsOf(row) };
+	} catch (error) {
+		console.warn(
+			`[engine] the flow of run ${runId} cannot be read: its open steps end without their nodes`,
+			error,
+		);
+		return null;
+	}
+}
+
+/**
+ * The outputs a cut-short step ends with (`NodeKind.cutShortOutputs`). A
+ * step of a kind that no longer exists (a log from before the kinds of
+ * today, such as a `gate` step) keeps its outputs, as a plain kind does.
+ */
+function cutShortOutputsOf(
+	step: DerivedStep,
+	node: FlowNode | undefined,
+	outcome: CutShortOutcome,
+): StepOutputs {
+	const kind: NodeKind | undefined = NODE_KINDS[step.nodeType] as
+		| NodeKind
+		| undefined;
+	return (kind ?? PLAIN_KIND).cutShortOutputs(step, node, outcome);
 }
 
 /**
