@@ -19,7 +19,11 @@ import {
 	createAuthSandbox,
 	turnOnTwoFactor,
 } from "@nightshift/auth/testing";
-import type { OpenGate, SpaceEngine } from "@nightshift/engine";
+import {
+	GateClosedError,
+	type OpenGate,
+	type SpaceEngine,
+} from "@nightshift/engine";
 import { call, ORPCError } from "@orpc/server";
 
 import type { Context } from "./context";
@@ -127,6 +131,25 @@ async function errorOf(promise: Promise<unknown>): Promise<string> {
 		await promise;
 	} catch (error) {
 		if (error instanceof ORPCError) return error.code;
+		throw error;
+	}
+	throw new Error("The call did not fail.");
+}
+
+/** The refusal a call ends in: its code, whether the procedure declares it, and its message. */
+async function refusalOf(
+	promise: Promise<unknown>,
+): Promise<{ code: string; defined: boolean; message: string }> {
+	try {
+		await promise;
+	} catch (error) {
+		if (error instanceof ORPCError) {
+			return {
+				code: error.code,
+				defined: error.defined,
+				message: error.message,
+			};
+		}
 		throw error;
 	}
 	throw new Error("The call did not fail.");
@@ -885,21 +908,56 @@ describe("the Needs-you inbox", () => {
 		});
 
 		expect(
-			await errorOf(
+			await refusalOf(
 				call(appRouter.gates.resolve, fromLockScreen("plain-run"), {
 					context,
 				}),
 			),
-		).toBe("FORBIDDEN");
-		// A Gate that is no longer open counts as closed.
-		runSpaces.set("closed-run", spaceId);
+		).toEqual({
+			code: "NEEDS_APP",
+			defined: true,
+			message: "Open this Gate in Night Shift to answer it.",
+		});
+		// A choice the Gate does not have needs the app too.
 		expect(
 			await errorOf(
+				call(
+					appRouter.gates.resolve,
+					{ ...fromLockScreen("marked-run"), choice: "approve-deploy" },
+					{ context },
+				),
+			),
+		).toBe("NEEDS_APP");
+		// A Gate that is no longer open is closed.
+		runSpaces.set("closed-run", spaceId);
+		expect(
+			await refusalOf(
 				call(appRouter.gates.resolve, fromLockScreen("closed-run"), {
 					context,
 				}),
 			),
-		).toBe("BAD_REQUEST");
+		).toEqual({
+			code: "GATE_CLOSED",
+			defined: true,
+			message: "This Gate does not wait anymore.",
+		});
+		// So is one with an answer on its way.
+		runSpaces.set("pending-run", spaceId);
+		gatesIn.set(spaceId, [
+			{
+				...openGate(spaceId, "pending-run", 3),
+				lockScreen: true,
+				answerPending: true,
+			},
+			openGate(spaceId, "plain-run", 2),
+		]);
+		expect(
+			await errorOf(
+				call(appRouter.gates.resolve, fromLockScreen("pending-run"), {
+					context,
+				}),
+			),
+		).toBe("GATE_CLOSED");
 		expect(
 			calls.filter((c) => c.method === "resolveGate").map((c) => c.space),
 		).toEqual([spaceId]);
@@ -910,28 +968,65 @@ describe("the Needs-you inbox", () => {
 		expect(inputs.at(-1)).toEqual(inApp);
 	});
 
-	test("refuses an answer once the Gate is closed", async () => {
+	test("refuses an answer once the Gate is closed, without the step's id", async () => {
 		const { bob, spaceId } = await platform();
 		runSpaces.set("platform-run", spaceId);
 		onResolve = () => {
-			throw new Error("This run does not wait at a Gate.");
+			throw new GateClosedError("Step s is not the open Gate of this run.");
 		};
 		const context = await contextFor(bob.headers);
-		await expect(
-			call(
-				appRouter.gates.resolve,
-				{ runId: "platform-run", stepId: "s", choice: "yes" },
-				{ context },
-			),
-		).rejects.toThrow("This run does not wait at a Gate.");
 		expect(
-			await errorOf(
+			await refusalOf(
 				call(
 					appRouter.gates.resolve,
 					{ runId: "platform-run", stepId: "s", choice: "yes" },
 					{ context },
 				),
 			),
-		).toBe("BAD_REQUEST");
+		).toEqual({
+			code: "GATE_CLOSED",
+			defined: true,
+			message: "This Gate does not wait anymore.",
+		});
+	});
+
+	test("another problem stays a bad request with its message", async () => {
+		const { bob, spaceId } = await platform();
+		runSpaces.set("platform-run", spaceId);
+		onResolve = () => {
+			throw new Error("The run cap is reached: 2 runs at once.");
+		};
+		const context = await contextFor(bob.headers);
+		expect(
+			await refusalOf(
+				call(
+					appRouter.gates.resolve,
+					{ runId: "platform-run", stepId: "s", choice: "yes" },
+					{ context },
+				),
+			),
+		).toEqual({
+			code: "BAD_REQUEST",
+			defined: false,
+			message: "The run cap is reached: 2 runs at once.",
+		});
+	});
+
+	test("each refusal of an answer is declared", async () => {
+		const { cy, spaceId } = await platform();
+		const dee = await sandbox.signUp("Dee");
+		runSpaces.set("platform-run", spaceId);
+		const answer = { runId: "platform-run", stepId: "s", choice: "yes" };
+		for (const [headers, code] of [
+			[dee.headers, "NOT_FOUND"],
+			[cy.headers, "FORBIDDEN"],
+		] as const) {
+			const refusal = await refusalOf(
+				call(appRouter.gates.resolve, answer, {
+					context: await contextFor(headers),
+				}),
+			);
+			expect([refusal.code, refusal.defined]).toEqual([code, true]);
+		}
 	});
 });
