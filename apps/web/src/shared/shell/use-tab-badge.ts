@@ -1,3 +1,4 @@
+import { waitingForYou } from "@nightshift/client";
 import { useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 
@@ -16,7 +17,8 @@ const ICON_WAITING = "/favicon-waiting.svg";
  */
 export function useTabBadge() {
 	const gates = useOpenGates();
-	const open = gates.data?.length ?? 0;
+	// Only the Gates your role lets you answer wait for you.
+	const open = waitingForYou(gates.data ?? []);
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: a page change can reset the title.
