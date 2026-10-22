@@ -14,13 +14,12 @@ import { PageHeading, SiteHeader } from "@/shared/page";
 import { AgentDefaultsCard } from "./components/agent-defaults-card";
 import { AppearanceCard } from "./components/appearance-card";
 import { PhoneCard } from "./components/phone-card";
-import { ProjectsCard } from "./components/projects-card";
 import { RunPolicyCard } from "./components/run-policy-card";
 import { RunsCard } from "./components/runs-card";
 import { ThisComputerLink } from "./components/this-computer-link";
 import { settingsQueries } from "./queries";
 
-/** The Settings page: projects, runs, run policy, new Agent nodes, notifications, the phone, appearance. */
+/** The Settings page: runs, run policy, new Agent nodes, notifications, the phone, appearance. */
 export function SettingsPage() {
 	const settings = useQuery(settingsQueries.get());
 
@@ -36,7 +35,6 @@ export function SettingsPage() {
 				</div>
 
 				<div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-					<ProjectsCard />
 					{settings.data ? (
 						<>
 							<RunsCard data={settings.data} />

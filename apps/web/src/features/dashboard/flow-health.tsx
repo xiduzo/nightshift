@@ -110,11 +110,9 @@ function FlowHealthTable({
 	now: number;
 	onOpen: (name: string) => void;
 }) {
-	// One scale for every row, so the costs of two flows compare at a glance.
-	const scaleMax = Math.max(0, ...rows.map((row) => row.cost?.max ?? 0));
 	return (
 		<DataTable
-			columns={flowHealthColumns(now, scaleMax, onOpen)}
+			columns={flowHealthColumns(now, onOpen)}
 			data={rows}
 			getRowId={(row) => row.name}
 			onRowClick={(row) => onOpen(row.name)}
@@ -124,11 +122,7 @@ function FlowHealthTable({
 
 const column = dataTableColumns<FlowHealthRow>();
 
-function flowHealthColumns(
-	now: number,
-	scaleMax: number,
-	onOpen: (name: string) => void,
-) {
+function flowHealthColumns(now: number, onOpen: (name: string) => void) {
 	return column.columns([
 		column.accessor("name", {
 			header: "Flow",
@@ -208,7 +202,6 @@ function flowHealthColumns(
 					unfinished={original.unfinished}
 					unknownCost={original.unknownCost}
 					freeRuns={original.freeRuns}
-					scaleMax={scaleMax}
 				/>
 			),
 			meta: {
@@ -225,20 +218,21 @@ const PLOT_HEIGHT = 14;
 /**
  * The median cost of a finished run, with a box plot of the spread: the
  * whiskers reach the cheapest and the dearest run, the box holds the middle
- * half. What the runs that did not finish spent goes in the tooltip.
+ * half. Each plot runs from zero to the dearest run of its own flow: some
+ * flows cost far more than others, and one shared scale would squash the
+ * cheap ones flat. What the runs that did not finish spent goes in the
+ * tooltip.
  */
 function CostCell({
 	cost,
 	unfinished,
 	unknownCost,
 	freeRuns,
-	scaleMax,
 }: {
 	cost: Spread | null;
 	unfinished: FlowHealthRow["unfinished"];
 	unknownCost: number;
 	freeRuns: number;
-	scaleMax: number;
 }) {
 	const freeLine =
 		freeRuns > 0 ? (
@@ -283,7 +277,7 @@ function CostCell({
 		);
 	}
 	const x = (usd: number) =>
-		scaleMax > 0 ? 1 + (usd / scaleMax) * (PLOT_WIDTH - 2) : 1;
+		cost.max > 0 ? 1 + (usd / cost.max) * (PLOT_WIDTH - 2) : 1;
 	const mid = PLOT_HEIGHT / 2;
 	return (
 		<Tooltip>

@@ -1,7 +1,7 @@
 import { Button } from "@nightshift/ui/components/button";
 import { ZapIcon } from "lucide-react";
 import { useState } from "react";
-import { ProjectPage, projectFolder } from "@/features/projects";
+import { ProjectMenu, ProjectPage, projectFolder } from "@/features/projects";
 import { QuickRunDialog } from "@/features/runs";
 import { PageHeading } from "@/shared/page";
 import { FlowHealth } from "./flow-health";
@@ -36,14 +36,17 @@ export function ProjectDashboardPage({ projectId }: { projectId: string }) {
 							</span>
 						}
 						actions={
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => setQuickRun(true)}
-							>
-								<ZapIcon data-icon="inline-start" />
-								Quick run
-							</Button>
+							<>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setQuickRun(true)}
+								>
+									<ZapIcon data-icon="inline-start" />
+									Quick run
+								</Button>
+								<ProjectMenu project={project} variant="outline" />
+							</>
 						}
 					/>
 

@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@nightshift/ui/components/card";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ProjectList, projectQueries } from "@/features/projects";
 import { RunList, runQueries } from "@/features/runs";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
@@ -13,7 +13,6 @@ import { useDashboard } from "./use-dashboard";
  * the projects.
  */
 export function HomePage() {
-	const queryClient = useQueryClient();
 	const projects = useQuery(projectQueries.list());
 	// The project list shows how each project's runs stand.
 	const runs = useQuery(runQueries.everyRun());
@@ -54,9 +53,6 @@ export function HomePage() {
 						projects={projects.data}
 						runs={runs.data}
 						isLoading={projects.isLoading}
-						onRemoved={() =>
-							void queryClient.invalidateQueries({ queryKey: runQueries.all() })
-						}
 					/>
 				</PageSection>
 			</div>

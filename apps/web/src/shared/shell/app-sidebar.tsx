@@ -132,6 +132,16 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 						</SidebarMenuItem>
 						<SidebarMenuItem>
 							<SidebarMenuButton
+								tooltip="Devices"
+								isActive={Boolean(matchRoute({ to: "/devices" }))}
+								render={<Link to="/devices" />}
+							>
+								<MonitorSmartphoneIcon aria-hidden="true" />
+								<span>Devices</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton
 								tooltip="Account"
 								isActive={Boolean(matchRoute({ to: "/account" }))}
 								render={<Link to="/account" />}
@@ -143,6 +153,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 					</SidebarMenu>
 				</SidebarGroup>
 				<NavProjects projects={projects.data} />
+				{/* Saved on this computer only: its agents and its settings. */}
 				<SidebarGroup className="mt-auto">
 					<SidebarGroupLabel>This Mac</SidebarGroupLabel>
 					<SidebarMenu>
@@ -154,16 +165,6 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 							>
 								<BotIcon aria-hidden="true" />
 								<span>Agents</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								tooltip="Devices"
-								isActive={Boolean(matchRoute({ to: "/devices" }))}
-								render={<Link to="/devices" />}
-							>
-								<MonitorSmartphoneIcon aria-hidden="true" />
-								<span>Devices</span>
 							</SidebarMenuButton>
 						</SidebarMenuItem>
 						<SidebarMenuItem>
