@@ -1,3 +1,4 @@
+import { platformName } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -48,7 +49,6 @@ import {
 } from "@/features/settings/queries";
 import type { ThisComputer } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
-import { platformName } from "./platform";
 import { deviceQueries } from "./queries";
 
 /**

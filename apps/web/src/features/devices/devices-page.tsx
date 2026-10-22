@@ -1,3 +1,4 @@
+import { platformName } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -55,7 +56,6 @@ import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 import { JoinHostDialog } from "./join-host-dialog";
 import { SpaceDevices, ThisComputerOffers } from "./offers-section";
 import { PairDeviceDialog } from "./pair-device-dialog";
-import { platformName } from "./platform";
 import { deviceMutations, deviceQueries } from "./queries";
 import { ThisComputerCard } from "./this-computer-card";
 

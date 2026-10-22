@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import type { DevicesOverview } from "@nightshift/client";
 
-import { computersOf, systemName } from "./computers";
+import { computersOf } from "./computers";
 
 type Paired = DevicesOverview["devices"][number];
 
@@ -68,12 +68,5 @@ describe("computersOf", () => {
 			isHost: true,
 		});
 		expect(list[1]?.isHost).toBe(false);
-	});
-
-	test("names the systems as people say them", () => {
-		expect(systemName("darwin")).toBe("macOS");
-		expect(systemName("win32")).toBe("Windows");
-		expect(systemName("freebsd")).toBe("freebsd");
-		expect(systemName(null)).toBe("Unknown system");
 	});
 });

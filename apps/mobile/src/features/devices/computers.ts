@@ -1,4 +1,4 @@
-import type { DevicesOverview } from "@nightshift/client";
+import { type DevicesOverview, platformName } from "@nightshift/client";
 
 /** A computer that can run the person's flows, as the phone lists it. */
 export type Computer = {
@@ -12,20 +12,6 @@ export type Computer = {
 	isHost: boolean;
 };
 
-/** A platform as people say it: `darwin` is macOS. */
-export function systemName(platform: string | null | undefined): string {
-	switch (platform) {
-		case "darwin":
-			return "macOS";
-		case "linux":
-			return "Linux";
-		case "win32":
-			return "Windows";
-		default:
-			return platform || "Unknown system";
-	}
-}
-
 /**
  * The person's computers: the Host first when they own it (it answers, so
  * it is online), then their paired computers, online ones first, by name.
@@ -38,7 +24,7 @@ export function computersOf(overview: DevicesOverview): Computer[] {
 		.map((device) => ({
 			id: device.id,
 			name: device.name,
-			system: systemName(device.platform),
+			system: platformName(device.platform),
 			online: device.online,
 			lastSeenAt: device.lastSeenAt,
 			isHost: false,
@@ -52,7 +38,7 @@ export function computersOf(overview: DevicesOverview): Computer[] {
 				{
 					id: host.id,
 					name: host.name,
-					system: systemName(host.platform),
+					system: platformName(host.platform),
 					online: true,
 					lastSeenAt: null,
 					isHost: true,

@@ -1,5 +1,6 @@
 /** Devices, pairing and Offers: their query options and view types. */
 
+export { platformName } from "./platform";
 export {
 	createDeviceMutations,
 	createDeviceQueries,

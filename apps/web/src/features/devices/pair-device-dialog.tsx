@@ -1,3 +1,4 @@
+import { platformName } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -41,7 +42,7 @@ import { toast } from "sonner";
 
 import type { PairingReview } from "@/shared/api";
 
-import { formatUserCode, platformName } from "./platform";
+import { formatUserCode } from "./platform";
 import { deviceMutations, deviceQueries } from "./queries";
 
 /**
