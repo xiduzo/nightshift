@@ -4,9 +4,11 @@ import type { Runner, RunWalks } from "../graph";
 import {
 	applyWalkerMoves,
 	getRunRow,
+	parseTranscript,
 	type RunBus,
 	type RunLog,
 	type RunRow,
+	stepIdsOfRun,
 } from "../log";
 import { deriveRunState } from "../read";
 import type { RunRelay } from "./relay";
@@ -89,14 +91,15 @@ export async function moveRun(
 /**
  * This computer walks a run another Device moved here (`WalkerMoved`):
  * its Checkpoint comes from the archive (this Replica's, else the Host's)
- * into the checkpoint tables, and a sleeping run gets its wake timer. A
- * run at a Gate waits for its answer here; a stopped one for a resume.
+ * into the checkpoint tables, its transcript continues after the entries
+ * the archive keeps, and a sleeping run gets its wake timer. A run at a
+ * Gate waits for its answer here; a stopped one for a resume.
  */
 export async function takeOver(
 	deps: {
 		db: Database;
 		log: Pick<RunLog, "events">;
-		runner: Pick<Runner, "forget" | "sleeps">;
+		runner: Pick<Runner, "forget" | "sleeps" | "continueTranscriptAfter">;
 		archive: Pick<RunsPort, "archived">;
 		walks: Pick<RunWalks, "importWalk">;
 	},
@@ -112,6 +115,21 @@ export async function takeOver(
 		throw new Error("The archive has no checkpoint of the run.");
 	}
 	await deps.walks.importWalk(runId, checkpoint);
+	// The old Walker's transcript files are on its disk, not here: the
+	// next entry is numbered after the last one it archived.
+	let lastSeq = 0;
+	for (const stepId of await stepIdsOfRun(deps.db, runId)) {
+		const text = await deps.archive.archived({
+			kind: "transcript",
+			spaceId: row.spaceId,
+			runId,
+			stepId,
+		});
+		for (const entry of text === null ? [] : parseTranscript(text)) {
+			lastSeq = Math.max(lastSeq, entry.seq);
+		}
+	}
+	deps.runner.continueTranscriptAfter(runId, lastSeq);
 	deps.runner.forget(runId);
 	deps.runner.sleeps.restore(runId, await deps.log.events(runId));
 }

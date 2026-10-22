@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
-import { project } from "@nightshift/db/schema";
+import { project, step } from "@nightshift/db/schema";
 import type { CommandNode, DecisionNode, Flow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import type {
@@ -10,6 +12,7 @@ import type {
 	WalkRef,
 } from "../contract/peers";
 import { createRunLog } from "../log/run-log";
+import { parseTranscript, readTranscriptFile } from "../log/transcripts";
 import { alonePeers } from "../testing/alone-peers";
 import {
 	createSandbox,
@@ -214,6 +217,51 @@ describe("a run that moves to another Device", () => {
 		]);
 		// A walks it no more: its walk state is empty there.
 		expect(await a.context.walks.exportWalk(runId)).toEqual([]);
+	});
+
+	test("its new Walker numbers transcript entries after those of the old one", async () => {
+		const { a, b } = await pair();
+		const { runId, projectId } = await waitingOn(a);
+		const steps = (await spaceOf(a, a).getRun(runId)).steps;
+		const open = steps[1]?.id as string;
+		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		// B is another computer: the files A wrote are not on its disk.
+		await rm(join(a.sandbox.dataDir, "transcripts"), {
+			recursive: true,
+			force: true,
+		});
+		await copyRows(a, b, projectId);
+		await b.context.takeOver(runId);
+
+		const onB = spaceOf(b, a);
+		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
+		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
+			label: "the run to end on B",
+		});
+		const before = steps.flatMap((s) =>
+			parseTranscript(
+				archive.get(
+					keyOf({
+						kind: "transcript",
+						spaceId: a.sandbox.spaceId,
+						runId,
+						stepId: s.id,
+					}),
+				) ?? "",
+			),
+		);
+		const lastOnA = Math.max(...before.map((e) => e.seq));
+		expect(lastOnA).toBeGreaterThan(0);
+		const [gateRow] = await b.sandbox.db
+			.select({ transcriptPath: step.transcriptPath })
+			.from(step)
+			.where(eq(step.id, open));
+		// What B wrote of the Gate's step: its answer.
+		const written = await readTranscriptFile(gateRow?.transcriptPath as string);
+		expect(written.length).toBeGreaterThan(0);
+		expect(written.map((e) => e.seq)).toEqual(
+			written.map((_, i) => lastOnA + 1 + i),
+		);
 	});
 
 	test("a second take-over of the same Checkpoint changes nothing", async () => {

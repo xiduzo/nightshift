@@ -737,6 +737,8 @@ export function createRunner(deps: RunnerDeps) {
 		},
 		/** The sleeping runs: `wake(runId, how)`, `restore(runId, events)` (`graph/sleep.ts`). */
 		sleeps,
+		/** A run moved here: its transcript continues after `seq`, the last entry its old Walker wrote. */
+		continueTranscriptAfter: recorders.continueAfter,
 		stop,
 		restart,
 		release,
