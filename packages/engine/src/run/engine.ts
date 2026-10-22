@@ -36,11 +36,12 @@ import {
 	createScheduler,
 	DEFAULT_SCHEDULE_TICK_MS,
 } from "../schedules";
-import { createRunControl } from "./control";
+import { takeOver } from "./move";
 import { createRecovery } from "./recovery";
 import { createRunRelay } from "./relay";
 import { createRunStart } from "./run-start";
-import { createSpaces } from "./space";
+import { createSpaces, type RunActionDeps } from "./space";
+import { wakeOfflineSleeps } from "./wake";
 
 /**
  * The engine: projects, flows, schedules, Gates and runs, over the event
@@ -56,7 +57,7 @@ import { createSpaces } from "./space";
  *   before the thread moves).
  * - `space.ts`: what a person does in one Space (`SpaceEngine`).
  * - `stop.ts`, `move.ts`, `gate.ts`, `wake.ts`: the actions that write one
- *   run-level fact each. On a run another Device walks they write
+ *   run-level fact each, over one `actions` object. On a run another Device walks they write
  *   nothing: the Walker is the only writer of its run's events, so the
  *   action travels to it as a command (`relay.ts`), and the Walker
  *   applies it. Every other action on such a run is refused.
@@ -177,7 +178,7 @@ export function createEngine(
 			return found !== undefined && found.endedAt !== null;
 		},
 		project: (projectId, spaceId) => projects.find(projectId, spaceId),
-		takeOver: (runId) => control.takeOver(runId),
+		takeOver: (runId) => takeOver(actions, runId),
 		stopRun: async (runId) => {
 			await runner.take(runId, { kind: "stop" });
 		},
@@ -341,7 +342,8 @@ export function createEngine(
 		listRuns: reads.listRuns,
 	});
 
-	const control = createRunControl({
+	/** What the run actions (`stop.ts`, `move.ts`, `gate.ts`, `wake.ts`) and a take-over need. */
+	const actions: RunActionDeps & Parameters<typeof takeOver>[0] = {
 		db,
 		log: runLog,
 		bus,
@@ -353,7 +355,7 @@ export function createEngine(
 		device,
 		ownDevices: placement.ownDevices,
 		personOnHost: peers.personOnHost,
-	});
+	};
 
 	const space = createSpaces({
 		ready,
@@ -385,7 +387,7 @@ export function createEngine(
 		hostOf,
 		startRun: startRunWith,
 		pathsFor: peers.pathsFor,
-		control,
+		actions,
 	});
 
 	return {
@@ -398,7 +400,7 @@ export function createEngine(
 		onRunEvents: (listener) => onLandedRunEvents(db, runLog, listener),
 		async deviceBack(_deviceId) {
 			await ready;
-			await control.wakeOfflineSleeps();
+			await wakeOfflineSleeps(actions);
 		},
 		async dispose() {
 			lifetime.abort();

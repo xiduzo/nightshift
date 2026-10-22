@@ -23,8 +23,18 @@ import {
 	type RunSummary,
 } from "../read";
 import type { ScheduleFiles } from "../schedules";
+import { resolveGate } from "./gate";
+import { moveRun } from "./move";
 import type { Recovery } from "./recovery";
 import type { RunRelay } from "./relay";
+import { stopRun } from "./stop";
+import { signalRun } from "./wake";
+
+/** What the run actions need (`stop.ts`, `move.ts`, `gate.ts`, `wake.ts`): one object for all four. */
+export type RunActionDeps = Parameters<typeof stopRun>[0] &
+	Parameters<typeof moveRun>[0] &
+	Parameters<typeof resolveGate>[0] &
+	Parameters<typeof signalRun>[0];
 
 /**
  * What a person does in one Space (`SpaceEngine`). Every method reads and
@@ -64,25 +74,12 @@ export type SpacesDeps = {
 		spaceId: string,
 		actor: Actor | undefined,
 	): Promise<<T extends WithPaths>(summary: T) => Promise<T>>;
-	/** The run actions that write a run-level fact, or travel to the Walker (`stop.ts`, `move.ts`, `gate.ts`, `wake.ts`). */
-	control: {
-		stop(
-			row: RunRow,
-			actor: Actor | undefined,
-			options: Parameters<SpaceEngine["stopRun"]>[1],
-		): Promise<void>;
-		move(row: RunRow, actor: Actor | undefined, to: string): Promise<void>;
-		resolveGate(
-			row: RunRow,
-			actor: Actor | undefined,
-			input: Parameters<SpaceEngine["resolveGate"]>[0],
-		): Promise<void>;
-		signal(row: RunRow, actor: Actor | undefined, name: string): Promise<void>;
-	};
+	/** What the run actions that write a run-level fact, or travel to the Walker, need. */
+	actions: RunActionDeps;
 };
 
 export function createSpaces(deps: SpacesDeps) {
-	const { ready, log, projects, documents, reads, recovery, control } = deps;
+	const { ready, log, projects, documents, reads, recovery, actions } = deps;
 
 	/** The run's row when it is in the Space, else "not found". */
 	async function getRunRow(runId: string, spaceId: string): Promise<RunRow> {
@@ -265,13 +262,13 @@ export function createSpaces(deps: SpacesDeps) {
 			async stopRun(runId, stopOptions) {
 				await ready;
 				const row = await getRunRow(runId, spaceId);
-				await control.stop(row, actor, stopOptions);
+				await stopRun(actions, row, actor, stopOptions);
 			},
 
 			async moveRun(runId, to) {
 				await ready;
 				const row = await getRunRow(runId, spaceId);
-				await control.move(row, actor, to);
+				await moveRun(actions, row, actor, to);
 			},
 
 			async resumeRun(runId, prompt) {
@@ -325,13 +322,13 @@ export function createSpaces(deps: SpacesDeps) {
 			async resolveGate(input) {
 				await ready;
 				const row = await getRunRow(input.runId, spaceId);
-				await control.resolveGate(row, actor, input);
+				await resolveGate(actions, row, actor, input);
 			},
 
 			async signalRun(runId, name) {
 				await ready;
 				const row = await getRunRow(runId, spaceId);
-				await control.signal(row, actor, name);
+				await signalRun(actions, row, actor, name);
 			},
 
 			watchRun(runId, { signal: watching, afterSeq }) {

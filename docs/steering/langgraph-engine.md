@@ -37,7 +37,7 @@ below it, from the bottom up:
 | `device/` | The execution port (`Device`), this computer (`local.ts`), commands and tool calls. |
 | `graph/` | The flow as a graph, below. |
 | `schedules/` | The scheduler and the schedules file of a project (`schedule-files.ts`). |
-| `run/` | The composition root (`engine.ts`), what a person does in one Space (`space.ts`), run start, recovery, and the run actions (`control.ts` over `stop.ts`, `move.ts`, `gate.ts`, `wake.ts` and the relay to a Walker in `relay.ts`). |
+| `run/` | The composition root (`engine.ts`), what a person does in one Space (`space.ts`), run start, recovery, and the run actions (`stop.ts`, `move.ts`, `gate.ts`, `wake.ts`, over one `actions` object, and the relay to a Walker in `relay.ts`). |
 
 `contract/` holds only types: `Engine`, `SpaceEngine`, `StartRunInput`,
 `EngineOptions`, `Relay`, `Peers` and `DeviceDirectory`. A type-only import
@@ -209,12 +209,12 @@ packages/engine/src/
                            Space. Each method waits for the engine, checks
                            the Space and hands over to the module that
                            owns the action.
-  run/control.ts           createRunControl(deps): stopRun (stop.ts),
-                           moveRun and takeOver (move.ts), resolveGate
-                           (gate.ts), signalRun and the wake when a Device
-                           is back (wake.ts). Each writes one run-level
-                           fact. On a run another Device walks, it travels
-                           to the Walker (relay.ts).
+  run/stop.ts, move.ts,    The run actions: stopRun, moveRun and takeOver,
+  gate.ts, wake.ts         resolveGate, signalRun and the wake when a Device
+                           is back. Each writes one run-level fact, in a
+                           Turn of the runner. On a run another Device
+                           walks, it travels to the Walker (relay.ts).
+                           engine.ts gives all of them one actions object.
   run/run-start.ts         Run start. prepareRun loads and validates the
                            flow and its called flows, resolves profiles and
                            asks every requirement in REQUIREMENTS (the
