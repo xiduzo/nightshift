@@ -71,7 +71,6 @@ export {
 	gateRefusalText,
 	gateRun,
 	inboxOrder,
-	isGateClosed,
 	type OpenGate,
 	parseGateQuestion,
 	waitedText,

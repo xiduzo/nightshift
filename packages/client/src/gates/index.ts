@@ -12,7 +12,6 @@ export {
 	changesInbox,
 	gateRun,
 	inboxOrder,
-	isGateClosed,
 	waitedText,
 	waitingForYou,
 } from "./inbox";

@@ -62,37 +62,6 @@ export function answerOfAction(
 	return { runId: data.runId, stepId: data.stepId, choice: option.id };
 }
 
-/** An open Gate as the Host lists it, as far as a lock-screen button needs it. */
-export type ButtonGate = {
-	runId: string;
-	stepId: string;
-	lockScreen: boolean;
-	choices: readonly { name: string }[];
-};
-
-/**
- * What a lock-screen button does with its answer, after the phone read the
- * open Gates from the Host. The push alone is no proof: anyone with the
- * phone's push token can send one.
- * - `send`: the Gate is open, its author marked it for the lock screen,
- *   and the answer is one of its choices.
- * - `closed`: the Gate no longer waits. The phone does nothing more.
- * - `open-app`: the Gate needs the app (and its check that it is you).
- */
-export function buttonAnswerCheck(
-	answer: ActionAnswer,
-	gates: readonly ButtonGate[],
-): "send" | "closed" | "open-app" {
-	const gate = gates.find(
-		(open) => open.runId === answer.runId && open.stepId === answer.stepId,
-	);
-	if (!gate) return "closed";
-	if (!gate.lockScreen) return "open-app";
-	return gate.choices.some((choice) => choice.name === answer.choice)
-		? "send"
-		: "open-app";
-}
-
 /** A notification the phone shows: its id, the Host's key when it is one of the Host's, when it came (ms). */
 export type ShownNotification = Shown & { id: string };
 

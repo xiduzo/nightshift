@@ -4,7 +4,6 @@ import {
 	changesInbox,
 	gateRun,
 	inboxOrder,
-	isGateClosed,
 	waitedText,
 	waitingForYou,
 } from "./inbox";
@@ -85,15 +84,6 @@ describe("changesInbox", () => {
 		expect(changesInbox({ kind: "gate-closed" })).toBe(true);
 		expect(changesInbox({ kind: "run-finished" })).toBe(false);
 		expect(changesInbox({ kind: "gates-waiting" })).toBe(false);
-	});
-});
-
-describe("isGateClosed", () => {
-	test("the refusal of an answer to a closed Gate", () => {
-		expect(isGateClosed({ code: "BAD_REQUEST" })).toBe(true);
-		expect(isGateClosed({ code: "NOT_FOUND" })).toBe(false);
-		expect(isGateClosed(new Error("offline"))).toBe(false);
-		expect(isGateClosed(null)).toBe(false);
 	});
 });
 

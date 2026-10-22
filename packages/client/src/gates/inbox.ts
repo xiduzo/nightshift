@@ -61,16 +61,3 @@ export function gateRun(gate: Pick<OpenGate, "flowName" | "runTitle">): {
 export function changesInbox(item: { kind: string }): boolean {
 	return item.kind === "gate-opened" || item.kind === "gate-closed";
 }
-
-/**
- * Whether Night Shift refused an answer because the Gate is closed: someone
- * answered it first, or its run ended. `gates.resolve` refuses that with
- * BAD_REQUEST.
- */
-export function isGateClosed(error: unknown): boolean {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		(error as { code?: unknown }).code === "BAD_REQUEST"
-	);
-}

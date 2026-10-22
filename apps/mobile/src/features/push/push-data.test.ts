@@ -5,7 +5,6 @@ import { pushDataOf, routeOf, withdrawKeyOf } from "@nightshift/client";
 
 import {
 	answerOfAction,
-	buttonAnswerCheck,
 	permissionOf,
 	phoneRouteOf,
 	showInFront,
@@ -189,36 +188,5 @@ describe("the permission", () => {
 		expect(
 			permissionOf({ granted: false, canAskAgain: false, iosStatus: 1 }),
 		).toBe("off");
-	});
-});
-
-describe("an answer from a lock-screen button", () => {
-	const answer = { runId: "run-1", stepId: "review", choice: "ship" };
-	const gate = {
-		runId: "run-1",
-		stepId: "review",
-		lockScreen: true,
-		choices: [{ name: "ship" }, { name: "hold" }],
-	};
-
-	test("goes to an open Gate its author marked for the lock screen", () => {
-		expect(buttonAnswerCheck(answer, [gate])).toBe("send");
-	});
-
-	test("does nothing for a Gate that no longer waits", () => {
-		expect(buttonAnswerCheck(answer, [])).toBe("closed");
-		expect(buttonAnswerCheck(answer, [{ ...gate, stepId: "other-step" }])).toBe(
-			"closed",
-		);
-	});
-
-	test("needs the app for any other Gate, whatever the push said", () => {
-		// A push can name any Gate and any choice: the Host's list decides.
-		expect(buttonAnswerCheck(answer, [{ ...gate, lockScreen: false }])).toBe(
-			"open-app",
-		);
-		expect(
-			buttonAnswerCheck({ ...answer, choice: "approve-deploy" }, [gate]),
-		).toBe("open-app");
 	});
 });
