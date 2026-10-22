@@ -1,4 +1,3 @@
-import { Command, END } from "@langchain/langgraph";
 import type { Database } from "@nightshift/db";
 import type {
 	Flow,
@@ -25,33 +24,29 @@ import {
 	deriveSteps,
 	withEnclosing,
 } from "../read";
-import { compileFlow } from "./compile";
-import { createRecorders, messageOf, type StepContext } from "./context";
+import { createRecorders, messageOf } from "./context";
 import { findOverdue, type Overdue } from "./deadlines";
-import {
-	createFence,
-	type Fence,
-	FencedError,
-	FencedSaver,
-	fencedLog,
-} from "./fence";
-import { kindOf, kindOfType } from "./node-kinds";
+import { FencedError } from "./fence";
+import { kindOfType } from "./node-kinds";
 import { loggedVisits, reenteredNode, reentryUpdate } from "./resume-point";
 import { createSleeps } from "./sleep";
-import type {
-	Ended,
-	Parked,
-	ResumeValue,
-	RunEvent,
-	RunStateUpdate,
-	RunStateValues,
-} from "./state";
+import type { Parked, ResumeValue, RunEvent, RunStateUpdate } from "./state";
+import {
+	endingOf,
+	inputOf,
+	openThread,
+	type StreamInput,
+	type Thread,
+	type ThreadDeps,
+	type ThreadState,
+} from "./thread";
 
 /**
  * The per-run driver: every run is one LangGraph thread (thread id = run
- * id) on a graph compiled from the run's flow snapshot (design rule 1).
- * The runner streams the graph, reacts to its interrupts, appends
- * `RunEnded`, and owns what the walk owned around the steps: the slots and
+ * id) on a graph compiled from the run's flow snapshot (design rule 1),
+ * opened and streamed by the Thread module (`thread.ts`). The runner
+ * drives the thread, reacts to how a drive ended, appends `RunEnded`, and
+ * owns what the walk owned around the steps: the slots and
  * the run cap, the per-run `exclusive` queue, and a stop. A stop waits for
  * nothing: it fences the drive off (`fence.ts`) and ends the run's open
  * work itself (`closeOpenWork`). A step past the time limits its log
@@ -65,11 +60,10 @@ import type {
  *   jumps to a node of a thread that ended or never started (which node,
  *   and the seed state: `reenteredNode` and `reentryUpdate` in
  *   resume-point.ts, next to the rule the nodes re-enter by).
- * - Only the root namespace's `__interrupt__` counts (one interrupt repeats
- *   once per level). A `wait` schedules the wake timer with the sleep
- *   module (`WaitStarted` is in the log already); a `gate` needs nothing
- *   (the Gate node logged `GateOpened`); `parked` appends `RunEnded` with
- *   its status and reason.
+ * - A drive that parks at the root's interrupt: a `wait` schedules the
+ *   wake timer with the sleep module (`WaitStarted` is in the log
+ *   already); a `gate` needs nothing (the Gate node logged `GateOpened`);
+ *   `parked` appends `RunEnded` with its status and reason (`endingOf`).
  * - A stream that ends with `state.ended` set appends `RunEnded finished`
  *   and prunes the thread to its latest checkpoint (the log is the
  *   record); one that throws appends `RunEnded failed` with `The engine
@@ -77,9 +71,11 @@ import type {
  * - The custom stream chunks (`RunEvent`) are the runner's bookkeeping:
  *   transcript entries reach the bus from the recorder already.
  *
- * Over 600 lines on purpose: the stream, the interrupts, the stop and the
+ * Over 600 lines on purpose: the drive, the interrupts, the stop and the
  * slots of a run share one state per run, so they stay in one module.
  */
+
+export type { ThreadState } from "./thread";
 
 export type RunnerDeps = {
 	db: Database;
@@ -104,17 +100,6 @@ export type RunnerDeps = {
 	onSlotFreed?: () => void;
 };
 
-/** Where a run's thread is, for the engine's resume mapping (design rule 9). */
-export type ThreadState =
-	/** The thread sits at an interrupt: a wait, a Gate, or a parked step. */
-	| { kind: "interrupted"; value: Parked }
-	/** A node is pending without an interrupt: the daemon died, or the engine failed, while it ran. */
-	| { kind: "pending"; next: string[] }
-	/** The thread reached END. */
-	| { kind: "ended"; ended: Ended | null }
-	/** No checkpoint yet: the thread never ran. */
-	| { kind: "fresh" };
-
 type Walk = {
 	/** Aborts when a person stops the run. */
 	controller: AbortController;
@@ -125,22 +110,6 @@ type Walk = {
 
 /** A slot is reserved before any await, so two calls cannot both pass the cap. */
 type Slot = Walk | "starting";
-
-type Thread = {
-	ctx: StepContext;
-	graph: ReturnType<ReturnType<typeof compileFlow>["compile"]>;
-	/** The controller of the current drive; a new one per drive. */
-	controller: AbortController;
-	/**
-	 * Every write of the thread's drives goes through it: the log in `ctx`
-	 * and `saver`. A stop closes it and drops the thread from the cache, so
-	 * the next drive of the run compiles a new thread with a new fence.
-	 */
-	fence: Fence;
-	saver: FencedSaver;
-};
-
-type StreamInput = Parameters<Thread["graph"]["stream"]>[0];
 
 /** A restart that came after the drive ended the run itself: there is no step left to restart. */
 export class RestartTooLate extends Error {
@@ -155,7 +124,22 @@ export type Runner = ReturnType<typeof createRunner>;
 export function createRunner(deps: RunnerDeps) {
 	const { db, log, bus } = deps;
 	const recorders = createRecorders({ db, bus });
-	/** Compiled graphs by run id, kept while the run is likely to continue soon. */
+	const threadDeps: ThreadDeps = {
+		db,
+		log,
+		bus,
+		recorders,
+		dataDir: deps.dataDir,
+		now: deps.now,
+		minuteMs: deps.minuteMs,
+		settings: deps.settings,
+		deviceFor: deps.deviceFor,
+		deviceById: deps.deviceById,
+		flowOf: deps.flowOf,
+		calledFlowsOf: deps.calledFlowsOf,
+		policyFor: deps.policyFor,
+	};
+	/** Open threads by run id, kept while the run is likely to continue soon. */
 	const threads = new Map<string, Thread>();
 	/** Keyed by run id: the runs that walk in this process. */
 	const slots = new Map<string, Slot>();
@@ -178,7 +162,7 @@ export function createRunner(deps: RunnerDeps) {
 			state: threadState,
 			reserveSlot,
 			releaseStartingSlot,
-			resume: (row, value) => drive(row, new Command({ resume: value })),
+			resume: (row, value) => drive(row, inputOf({ kind: "resume", value })),
 		},
 	});
 
@@ -212,44 +196,11 @@ export function createRunner(deps: RunnerDeps) {
 		dispose();
 	}
 
-	const configOf = (runId: string) => ({
-		configurable: { thread_id: runId },
-	});
-
-	/** The run's compiled graph, from its snapshot; compiled once per run. */
+	/** The run's open thread; opened once per run, from its snapshot. */
 	function threadOf(row: RunRow): Thread {
 		const cached = threads.get(row.id);
 		if (cached) return cached;
-		const flow = deps.flowOf(row);
-		const fence = createFence(row.id);
-		const ctx: StepContext = {
-			db,
-			run: row,
-			flow,
-			flowName: row.flowName ?? row.title,
-			flows: deps.calledFlowsOf(row),
-			// Resolved at each use: the settings may change while the thread is cached.
-			policy: () => deps.policyFor(flow),
-			log: fencedLog(log, fence),
-			bus,
-			recorder: (stepId, path) => recorders.open(row.id, stepId, path),
-			deviceFor: deps.deviceFor,
-			deviceById: deps.deviceById,
-			signal: () => thread.controller.signal,
-			now: deps.now,
-			minuteMs: deps.minuteMs,
-			dataDir: deps.dataDir,
-			settings: deps.settings,
-			kindOf,
-		};
-		const saver = new FencedSaver(db, fence);
-		const thread: Thread = {
-			ctx,
-			graph: compileFlow(flow, ctx).compile({ checkpointer: saver }),
-			controller: new AbortController(),
-			fence,
-			saver,
-		};
+		const thread = openThread(row, threadDeps);
 		threads.set(row.id, thread);
 		return thread;
 	}
@@ -331,7 +282,7 @@ export function createRunner(deps: RunnerDeps) {
 	}
 
 	/**
-	 * Streams the thread and records how the drive ended. A drive whose
+	 * Drives the thread and records how the drive ended. A drive whose
 	 * fence a stop closed records nothing: the stop wrote the run's end.
 	 */
 	async function driveThread(
@@ -345,47 +296,16 @@ export function createRunner(deps: RunnerDeps) {
 			// Before the first await: a stop that comes in later finds the thread.
 			thread = threadOf(row);
 			walk.thread = thread;
-			thread.controller = walk.controller;
-			const stream = await thread.graph.stream(input, {
-				...configOf(runId),
-				streamMode: ["updates", "custom"],
-				subgraphs: true,
-				durability: "sync",
-				// Every node visit, park, wait and Call element is one
-				// super-step, and LangGraph's default stops a drive at 25. The
-				// step cap is the walk's own (`beginStep`, from the log), so the
-				// graph's limit is out of the way. Bodies inherit it through the
-				// config `runBody` passes on.
-				recursionLimit: Number.MAX_SAFE_INTEGER,
+			const outcome = await thread.drive(input, {
+				controller: walk.controller,
+				onEvent: (event) => onCustom(runId, event),
 			});
-			let parked: Parked | null = null;
-			for await (const chunk of stream) {
-				const [namespace, mode, data] = chunk as [string[], string, unknown];
-				if (mode === "custom") {
-					onCustom(runId, data as RunEvent);
-					continue;
-				}
-				if (namespace.length > 0) continue;
-				const interrupts = (data as Record<string, unknown>).__interrupt__ as
-					| { value: Parked }[]
-					| undefined;
-				const first = interrupts?.[0];
-				if (first) parked = first.value;
-			}
-			if (thread.fence.closed) return;
-			if (parked) {
-				await onInterrupt(thread, runId, parked);
-				return;
-			}
-			const snapshot = await thread.graph.getState(configOf(runId));
-			const ended = (snapshot.values as RunStateValues).ended;
-			if (!ended) {
-				throw new Error("The graph stopped without an end or an interrupt.");
-			}
-			if (thread.fence.closed) return;
+			if (outcome.kind === "parked") onInterrupt(runId, outcome.parked);
+			const ending = endingOf(outcome);
+			if (!ending) return;
 			dropThread(runId, thread);
-			await endRun(thread.ctx.log, runId, "finished", ended.reason);
-			await pruneThread(thread, runId);
+			await endRun(thread.ctx.log, runId, ending.status, ending.reason);
+			if (outcome.kind === "ended") await pruneThread(thread, runId);
 		} catch (error) {
 			// A stop took the run from this drive: it writes nothing more.
 			if (thread?.fence.closed) return;
@@ -412,7 +332,7 @@ export function createRunner(deps: RunnerDeps) {
 	 */
 	async function pruneThread(thread: Thread, runId: string): Promise<void> {
 		try {
-			await thread.saver.pruneThread(runId);
+			await thread.prune();
 		} catch (error) {
 			if (error instanceof FencedError) return;
 			console.error(
@@ -432,24 +352,13 @@ export function createRunner(deps: RunnerDeps) {
 	/**
 	 * The root's interrupt ended the drive. A stop that came in while the
 	 * wait began or the Gate opened closed the drive's fence, so the drive
-	 * never gets here: the stop closed the parked step itself.
+	 * never gets here: the stop closed the parked step itself. A `parked`
+	 * step ends the run (`endingOf`); a Gate needs nothing.
 	 */
-	async function onInterrupt(
-		thread: Thread,
-		runId: string,
-		parked: Parked,
-	): Promise<void> {
-		switch (parked.kind) {
-			case "wait":
-				// A wait with no time (a signal with no timeout) has no timer.
-				if (parked.until !== null) sleeps.schedule(runId, parked.until);
-				return;
-			case "gate":
-				return;
-			case "parked":
-				dropThread(runId, thread);
-				await endRun(thread.ctx.log, runId, parked.status, parked.reason);
-				return;
+	function onInterrupt(runId: string, parked: Parked): void {
+		// A wait with no time (a signal with no timeout) has no timer.
+		if (parked.kind === "wait" && parked.until !== null) {
+			sleeps.schedule(runId, parked.until);
 		}
 	}
 
@@ -708,25 +617,8 @@ export function createRunner(deps: RunnerDeps) {
 	}
 
 	/** Where the run's thread is, from its latest checkpoint. */
-	async function threadState(row: RunRow): Promise<ThreadState> {
-		const thread = threadOf(row);
-		const snapshot = await thread.graph.getState(configOf(row.id));
-		const interrupt = snapshot.tasks
-			.flatMap((task) => task.interrupts)
-			.find((i) => i.value !== undefined);
-		if (interrupt) {
-			return { kind: "interrupted", value: interrupt.value as Parked };
-		}
-		if (snapshot.next.length > 0) {
-			return { kind: "pending", next: [...snapshot.next] };
-		}
-		if (snapshot.config?.configurable?.checkpoint_id === undefined) {
-			return { kind: "fresh" };
-		}
-		return {
-			kind: "ended",
-			ended: (snapshot.values as Partial<RunStateValues>).ended ?? null,
-		};
+	function threadState(row: RunRow): Promise<ThreadState> {
+		return threadOf(row).state();
 	}
 
 	return {
@@ -742,18 +634,21 @@ export function createRunner(deps: RunnerDeps) {
 			inputs: Record<string, JsonValue>,
 			stopAt: number | null,
 		): void {
-			drive(row, { inputs, stopAt });
+			drive(row, inputOf({ kind: "start", inputs, stopAt }));
 		},
 		/**
 		 * Re-runs the node the thread is pending at (a daemon death or an
 		 * engine failure). `update` writes state first (a cleared stop time).
 		 */
 		continueRun(row: RunRow, update?: RunStateUpdate): void {
-			drive(row, update ? new Command({ update }) : null);
+			drive(row, inputOf({ kind: "continue", ...(update ? { update } : {}) }));
 		},
 		/** Answers the interrupt the thread sits at; `update` writes state before the node continues. */
 		resume(row: RunRow, value: ResumeValue, update?: RunStateUpdate): void {
-			drive(row, new Command({ resume: value, ...(update ? { update } : {}) }));
+			drive(
+				row,
+				inputOf({ kind: "resume", value, ...(update ? { update } : {}) }),
+			);
 		},
 		/**
 		 * Jumps to a top-level node of a thread that reached END or never
@@ -770,13 +665,13 @@ export function createRunner(deps: RunnerDeps) {
 			update?: RunStateUpdate,
 		): Promise<void> {
 			const thread = threadOf(row);
-			const snapshot = await thread.graph.getState(configOf(row.id));
+			const snapshot = await thread.snapshot();
 			let seed: RunStateUpdate;
-			if (snapshot.config?.configurable?.checkpoint_id === undefined) {
+			if (!snapshot.hasCheckpoint) {
 				seed = reentryUpdate(thread.ctx.flow, events);
 			} else {
 				const reentered = reenteredNode(events);
-				const visits = (snapshot.values as RunStateValues).visits;
+				const visits = snapshot.values.visits ?? {};
 				const committed = reentered ? (visits[reentered] ?? 0) : 0;
 				seed = {
 					ended: null,
@@ -786,12 +681,10 @@ export function createRunner(deps: RunnerDeps) {
 						: {}),
 				};
 			}
-			// The node names are the flow's, which the graph's type cannot know.
-			const jump = new Command({
-				goto: nodeId,
-				update: { ...seed, ...update },
-			}) as unknown as StreamInput;
-			drive(row, jump);
+			drive(
+				row,
+				inputOf({ kind: "goto", nodeId, update: { ...seed, ...update } }),
+			);
 		},
 		/**
 		 * Walks the run again from `nodeId`, a top-level node, with a new
@@ -812,16 +705,13 @@ export function createRunner(deps: RunnerDeps) {
 			update?: RunStateUpdate,
 		): Promise<void> {
 			const thread = threadOf(row);
-			const config = configOf(row.id);
-			const snapshot = await thread.graph.getState(config);
+			const snapshot = await thread.snapshot();
 			let seed: RunStateUpdate;
-			if (snapshot.config?.configurable?.checkpoint_id === undefined) {
+			if (!snapshot.hasCheckpoint) {
 				seed = reentryUpdate(thread.ctx.flow, events, null);
 			} else {
-				if (snapshot.tasks.length > 0) {
-					await thread.graph.updateState(config, null, END);
-				}
-				const { loops } = snapshot.values as RunStateValues;
+				if (snapshot.hasTasks) await thread.clearTasks();
+				const { loops } = snapshot.values;
 				seed = {
 					ended: null,
 					pending: null,
@@ -831,11 +721,10 @@ export function createRunner(deps: RunnerDeps) {
 					),
 				};
 			}
-			const jump = new Command({
-				goto: nodeId,
-				update: { ...seed, ...update },
-			}) as unknown as StreamInput;
-			drive(row, jump);
+			drive(
+				row,
+				inputOf({ kind: "goto", nodeId, update: { ...seed, ...update } }),
+			);
 		},
 		threadState,
 		/**
