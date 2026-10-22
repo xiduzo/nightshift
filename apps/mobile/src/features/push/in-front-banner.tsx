@@ -1,3 +1,4 @@
+import { routeOf } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -10,7 +11,7 @@ import { Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { hideBanner, setInFrontPlace, useBanner } from "./in-front";
-import { routeOf, showInFront } from "./push-data";
+import { phoneRouteOf, showInFront } from "./push-data";
 
 /** How long the banner stays when the person does not tap it. */
 const SHOWN_MS = 6000;
@@ -39,7 +40,7 @@ export function InFrontBanner() {
 
 	if (!banner) return null;
 	const route = routeOf(banner.data);
-	const opensGate = route?.pathname === "/gates/[runId]/[stepId]";
+	const opensGate = route.to === "gate";
 
 	return (
 		<Pressable
@@ -47,7 +48,7 @@ export function InFrontBanner() {
 			accessibilityHint={opensGate ? "Opens the Gate" : "Opens the inbox"}
 			onPress={() => {
 				hideBanner(banner);
-				if (route) router.push(route);
+				router.push(phoneRouteOf(route));
 			}}
 			className="absolute right-4 left-4 rounded-lg shadow-black/10 shadow-lg active:opacity-80"
 			style={{ top: insets.top + 8 }}

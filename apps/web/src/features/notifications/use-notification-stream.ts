@@ -2,6 +2,8 @@ import {
 	describeNotice,
 	followNotifications,
 	gateKey,
+	routeOf,
+	webPathOf,
 } from "@nightshift/client";
 import {
 	type QueryClient,
@@ -99,14 +101,6 @@ export function NotificationStream() {
 
 type Told = Exclude<NotificationItem, { kind: "gate-closed" }>;
 
-/** Where the item opens in the app. */
-function pathOf(item: Told): string {
-	if (item.kind === "gate-opened" && item.stepId) {
-		return `/inbox?gate=${encodeURIComponent(item.stepId)}`;
-	}
-	return `/runs/${encodeURIComponent(item.runId)}`;
-}
-
 /** The words of the item: the project, run and question when this page can read them. */
 async function wordsOf(
 	queryClient: QueryClient,
@@ -119,7 +113,7 @@ async function wordsOf(
 				(g) => g.runId === item.runId && g.stepId === item.stepId,
 			);
 			if (gate) {
-				return describeNotice({ kind: item.kind, key: item.key, gate });
+				return describeNotice({ kind: item.kind, gate });
 			}
 		} else {
 			const runs = await queryClient.fetchQuery(runQueries.everyRun());
@@ -138,7 +132,7 @@ async function tell(
 	open: (path: string) => void,
 ): Promise<void> {
 	const { title, body } = await wordsOf(queryClient, item);
-	const path = pathOf(item);
+	const path = webPathOf(routeOf(item));
 	const granted =
 		typeof Notification !== "undefined" &&
 		Notification.permission === "granted";

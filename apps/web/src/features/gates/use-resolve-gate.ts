@@ -1,3 +1,4 @@
+import { gateRefusalText } from "@nightshift/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -7,8 +8,11 @@ import { gateMutations, gateQueries } from "./queries";
 
 /**
  * Answers an open Gate, in whichever of your Spaces it is: the Space you
- * work in stays as it is. On success it toasts, takes the Gate out of the
- * inbox at once, and refetches Gates and runs to confirm.
+ * work in stays as it is. An answer that went toasts. An answer to a Gate
+ * that closed, or that is not in your Spaces, says so. Either way the Gate
+ * leaves the inbox at once, and Gates and runs are read again to confirm.
+ * A role that does not allow an answer, or an answer that was not sent,
+ * toasts an error and keeps the Gate.
  */
 export function useResolveGate({
 	runTitle,
@@ -19,9 +23,32 @@ export function useResolveGate({
 	walkerName?: string;
 } = {}) {
 	const queryClient = useQueryClient();
+
+	/** Out of the inbox at once; the refetch confirms it. */
+	function dropGate(answered: { runId: string; stepId: string }) {
+		queryClient.setQueryData(gateQueries.open().queryKey, (gates) =>
+			gates?.filter(
+				(gate) =>
+					gate.runId !== answered.runId || gate.stepId !== answered.stepId,
+			),
+		);
+		void queryClient.invalidateQueries({ queryKey: gateQueries.all() });
+		void queryClient.invalidateQueries({ queryKey: runQueries.all() });
+	}
+
 	return useMutation(
-		gateMutations.resolve({
-			onSuccess: (_, input) => {
+		gateMutations.answer({
+			onSuccess: (result, input) => {
+				if (result.kind === "refused") {
+					const { title, description } = gateRefusalText(result.refusal);
+					if (result.refusal === "closed" || result.refusal === "not-found") {
+						toast(title, { description });
+						dropGate(input);
+					} else {
+						toast.error(title, { description });
+					}
+					return;
+				}
 				toast.success(
 					`Answered ${outcomeLabel(input.choice)}${runTitle ? ` · ${runTitle}` : ""}`,
 					{
@@ -30,17 +57,10 @@ export function useResolveGate({
 							: "The run goes on.",
 					},
 				);
-				// Out of the inbox at once; the refetch confirms it.
-				queryClient.setQueryData(gateQueries.open().queryKey, (gates) =>
-					gates?.filter(
-						(gate) =>
-							gate.runId !== input.runId || gate.stepId !== input.stepId,
-					),
-				);
-				void queryClient.invalidateQueries({ queryKey: gateQueries.all() });
-				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
+				dropGate(input);
 			},
-			onError: (error) => toast.error(`Could not answer: ${error.message}`),
+			onError: (error) =>
+				toast.error("Your answer was not sent", { description: error.message }),
 		}),
 	);
 }

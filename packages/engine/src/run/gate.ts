@@ -8,6 +8,13 @@ import type { RunRelay } from "./relay";
 type GateAnswer = Parameters<SpaceEngine["resolveGate"]>[0];
 
 /**
+ * An answer to a Gate that no longer waits: someone answered it, its run
+ * moved on, or an answer is already on its way. An answer that is not valid
+ * for the Gate is a plain Error.
+ */
+export class GateClosedError extends Error {}
+
+/**
  * Answers the open Gate of a run. Here, the thread continues at once with
  * the answer, and this returns once the Gate's step has ended. On a run
  * another Device walks, the answer travels to its Walker as a command,
@@ -32,15 +39,17 @@ export async function resolveGate(
 	const runId = row.id;
 	if (await relay.walkedElsewhere(row)) {
 		const gate = deriveOpenGate(await log.events(runId));
-		if (!gate) throw new Error("This run does not wait at a Gate.");
+		if (!gate) throw new GateClosedError("This run does not wait at a Gate.");
 		if (gate.stepId !== stepId) {
-			throw new Error(`Step ${stepId} is not the open Gate of this run.`);
+			throw new GateClosedError(
+				`Step ${stepId} is not the open Gate of this run.`,
+			);
 		}
 		const problem = optionProblem(gate.choices, choice);
 		if (problem !== null) throw new Error(problem);
 		const pending = await deps.pendingCommands(runId);
 		if (pending.some((c) => c.kind === "gate.resolve")) {
-			throw new Error(
+			throw new GateClosedError(
 				"An answer to this Gate is already on its way to the device that runs it.",
 			);
 		}
@@ -53,9 +62,11 @@ export async function resolveGate(
 	await runner.exclusive(runId, async () => {
 		const events = await log.events(runId);
 		const gate = deriveOpenGate(events);
-		if (!gate) throw new Error("This run does not wait at a Gate.");
+		if (!gate) throw new GateClosedError("This run does not wait at a Gate.");
 		if (gate.stepId !== stepId) {
-			throw new Error(`Step ${stepId} is not the open Gate of this run.`);
+			throw new GateClosedError(
+				`Step ${stepId} is not the open Gate of this run.`,
+			);
 		}
 		const problem = optionProblem(gate.choices, choice);
 		if (problem !== null) throw new Error(problem);

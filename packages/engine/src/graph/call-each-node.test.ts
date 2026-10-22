@@ -969,7 +969,13 @@ describe("the Call node with each", () => {
 				by: "person",
 			},
 		});
-		const second = await drive(h, new Command({ resume: { kind: "resume" } }));
+		// A stop drops the run's thread: the resume compiles it again, with
+		// the new signal in the body too.
+		const second = await drive(
+			h,
+			new Command({ resume: { kind: "resume" } }),
+			h.graph(),
+		);
 		expect(second.parked).toEqual([]);
 		expect(second.state.ended?.outcome).toBe("done");
 		expect(

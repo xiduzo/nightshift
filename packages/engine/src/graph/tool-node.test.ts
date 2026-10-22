@@ -20,7 +20,7 @@ import { dataOf } from "./nodes/tool";
 /**
  * The Tool node on the compiled graph, against the fake stdio MCP server
  * of `@nightshift/agents/testing` (`fake-mcp.ts`), with a real run log
- * and MemorySaver.
+ * and checkpoint saver.
  */
 
 const fakeMcp: McpServerConfig = {

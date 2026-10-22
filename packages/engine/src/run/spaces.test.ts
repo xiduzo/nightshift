@@ -31,6 +31,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine, type EngineInternals } from "./engine";
+import { GateClosedError } from "./gate";
 
 /**
  * Spaces: every row carries its Space, and a Space's view of the engine
@@ -205,7 +206,7 @@ describe("Spaces", () => {
 				stepId: open.stepId,
 				choice: "yes",
 			}),
-		).rejects.toThrow("does not wait at a Gate");
+		).rejects.toBeInstanceOf(GateClosedError);
 		expect(await gatesOf(mine)).toEqual([[sandbox.spaceId, first.id]]);
 		await mine.stopRun(first.id);
 	});

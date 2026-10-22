@@ -2,60 +2,19 @@
  * What a push from the Host carries, and what the phone does with it. Pure:
  * the native parts (`notifications.ts`, `background.ts`) ask the phone, this
  * decides. The shapes follow the "Phone push contract" in
- * `docs/research/mobile.md`. Its ids and kinds come from `@nightshift/client`.
+ * `docs/research/mobile.md`. What a push carries, its keys and where a tap
+ * goes come from `@nightshift/client` (the push contract).
  */
 
 import {
-	isGateKey,
 	PUSH_ACTION,
-	PUSH_MESSAGE_KINDS,
-	type PushMessageKind,
+	type PushData,
+	type PushRoute,
+	type ShownNotification as Shown,
 } from "@nightshift/client";
-
-/** The `data` of a push the person sees. */
-export type PushData = {
-	kind: PushMessageKind;
-	/** `runId:stepId` for a Gate, `runId:end:<seq>` for a run's end, `waiting:<ms>`. */
-	key: string;
-	spaceId: string | null;
-	runId: string | null;
-	stepId: string | null;
-	/** `gate-decide` only: the two options in the author's order. */
-	options?: { id: string; label: string }[];
-};
-
-const KINDS = new Set<string>(PUSH_MESSAGE_KINDS);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function text(value: unknown): string | null {
-	return typeof value === "string" && value !== "" ? value : null;
-}
-
-/** The `data` of a shown notification as the Host sent it, or null when it is not one of the Host's. */
-export function pushDataOf(raw: unknown): PushData | null {
-	if (!isRecord(raw)) return null;
-	const kind = text(raw.kind);
-	const key = text(raw.key);
-	if (!kind || !KINDS.has(kind) || !key) return null;
-	const data: PushData = {
-		kind: kind as PushMessageKind,
-		key,
-		spaceId: text(raw.spaceId),
-		runId: text(raw.runId),
-		stepId: text(raw.stepId),
-	};
-	if (Array.isArray(raw.options)) {
-		const options = raw.options.flatMap((option) => {
-			if (!isRecord(option)) return [];
-			const id = text(option.id);
-			return id ? [{ id, label: text(option.label) ?? id }] : [];
-		});
-		if (options.length === 2) data.options = options;
-	}
-	return data;
 }
 
 /**
@@ -76,11 +35,6 @@ export function taskDataOf(payload: unknown): Record<string, unknown> | null {
 	}
 	if (isRecord(data.body)) return data.body;
 	return data;
-}
-
-/** The key of a withdraw push (`{ withdraw: key }`), or null for any other push. */
-export function withdrawKeyOf(data: unknown): string | null {
-	return isRecord(data) ? text(data.withdraw) : null;
 }
 
 /** The answer a lock-screen button sends: bound to one run and one step. */
@@ -108,39 +62,8 @@ export function answerOfAction(
 	return { runId: data.runId, stepId: data.stepId, choice: option.id };
 }
 
-/** An open Gate as the Host lists it, as far as a lock-screen button needs it. */
-export type ButtonGate = {
-	runId: string;
-	stepId: string;
-	lockScreen: boolean;
-	choices: readonly { name: string }[];
-};
-
-/**
- * What a lock-screen button does with its answer, after the phone read the
- * open Gates from the Host. The push alone is no proof: anyone with the
- * phone's push token can send one.
- * - `send`: the Gate is open, its author marked it for the lock screen,
- *   and the answer is one of its choices.
- * - `closed`: the Gate no longer waits. The phone does nothing more.
- * - `open-app`: the Gate needs the app (and its check that it is you).
- */
-export function buttonAnswerCheck(
-	answer: ActionAnswer,
-	gates: readonly ButtonGate[],
-): "send" | "closed" | "open-app" {
-	const gate = gates.find(
-		(open) => open.runId === answer.runId && open.stepId === answer.stepId,
-	);
-	if (!gate) return "closed";
-	if (!gate.lockScreen) return "open-app";
-	return gate.choices.some((choice) => choice.name === answer.choice)
-		? "send"
-		: "open-app";
-}
-
 /** A notification the phone shows: its id, the Host's key when it is one of the Host's, when it came (ms). */
-export type ShownNotification = { id: string; key: string | null; at: number };
+export type ShownNotification = Shown & { id: string };
 
 /**
  * When a shown notification came, in ms. iOS reports seconds since 1970,
@@ -157,28 +80,6 @@ export function shownWithKey(
 ): string[] {
 	return shown.filter((item) => item.key === key).map((item) => item.id);
 }
-
-/**
- * The shown Gate notifications whose Gate no longer waits: someone answered
- * it, or its run ended. iOS may drop a withdraw push, so the phone clears
- * them when it reads the inbox. Only Gate keys (`runId:stepId`) count, and
- * only notifications that came before `readAt` with a margin: a read that
- * started before a push came does not know its Gate yet.
- */
-export function shownButClosed(
-	shown: ShownNotification[],
-	openKeys: ReadonlySet<string>,
-	readAt: number,
-): string[] {
-	return shown
-		.filter((item) => item.at < readAt - READ_MARGIN_MS)
-		.filter((item) => item.key !== null && isGateKey(item.key))
-		.filter((item) => !openKeys.has(item.key as string))
-		.map((item) => item.id);
-}
-
-/** How much older than the read a notification must be to count as answered. */
-const READ_MARGIN_MS = 30_000;
 
 /** Where the person is in the app, for a push that comes while the app is in front. */
 export type InFrontPlace = {
@@ -204,8 +105,8 @@ export function showInFront(data: PushData | null, place: InFrontPlace) {
 	return true;
 }
 
-/** Where a tap on a notification goes. */
-export type PushRoute =
+/** A screen of the phone app, as Expo Router opens it. */
+export type PhoneRoute =
 	| {
 			pathname: "/gates/[runId]/[stepId]";
 			params: { runId: string; stepId: string };
@@ -213,21 +114,19 @@ export type PushRoute =
 	| { pathname: "/runs/[runId]"; params: { runId: string } }
 	| { pathname: "/" };
 
-/** The screen a tap opens: the Gate, the run, or the inbox. */
-export function routeOf(data: PushData | null): PushRoute | null {
-	if (!data) return null;
-	if (data.kind === "run-finished" || data.kind === "run-failed") {
-		return data.runId
-			? { pathname: "/runs/[runId]", params: { runId: data.runId } }
-			: null;
+/** The screen of a route: the Gate, the run, or the inbox (`/`). */
+export function phoneRouteOf(route: PushRoute): PhoneRoute {
+	switch (route.to) {
+		case "gate":
+			return {
+				pathname: "/gates/[runId]/[stepId]",
+				params: { runId: route.runId, stepId: route.stepId },
+			};
+		case "run":
+			return { pathname: "/runs/[runId]", params: { runId: route.runId } };
+		case "inbox":
+			return { pathname: "/" };
 	}
-	if (data.kind === "gate-opened" && data.runId && data.stepId) {
-		return {
-			pathname: "/gates/[runId]/[stepId]",
-			params: { runId: data.runId, stepId: data.stepId },
-		};
-	}
-	return { pathname: "/" };
 }
 
 /**

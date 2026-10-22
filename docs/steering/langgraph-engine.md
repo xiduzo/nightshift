@@ -165,19 +165,26 @@ packages/engine/src/
   graph/output-schema.ts   the output schema check (ajv)
   graph/policy.ts          the run policy's wait plan (planWait), pure
   graph/consume.ts         reads a harness stream, gives up after a grace
+  graph/thread.ts          One Run's Thread: openThread() builds the one
+                           StepContext, the fenced log and checkpoint saver,
+                           and compiles the flow; driveGraph() is the one
+                           stream loop (root interrupts only, no recursion
+                           limit); endingOf() says what RunEnded a drive's
+                           outcome asks for; inputOf() builds the LangGraph
+                           input of a start, continue, resume or jump.
   graph/runner.ts          Per-run driver: start, continueRun, resume,
                            reenter (seeded by reentryUpdate for threads with
-                           no checkpoint), stop, closeParked. Streams the
-                           graph, publishes to the bus, reacts to
-                           interrupts, owns the slots, gives the sleep module
-                           its thread seam (runner.sleeps), and prunes a
-                           finished run's thread to its latest checkpoint.
+                           no checkpoint), stop, closeParked. Drives each
+                           run's Thread, publishes to the bus, reacts to
+                           how a drive ended, owns the slots, gives the sleep
+                           module its thread seam (runner.sleeps), and prunes
+                           a finished run's thread to its latest checkpoint.
   testing/graph.ts         The one set of graph test helpers: node builders
                            (agent(), command(), edge(), flowOf()), startRun()
-                           for a run row with its log and a StepContext, and
-                           drive(), which streams a compiled flow on a
-                           MemorySaver as the runner does and collects the
-                           root's interrupts and custom events.
+                           for a run row with its log and its Thread (opened
+                           as the runner opens it, on the sqlite saver), and
+                           drive(), which runs the runner's stream loop and
+                           collects the root's interrupts and custom events.
   run/engine.ts            The composition root: createEngine makes the
                            runner, recovery, run start, the read model, the
                            scheduler, the peers (EngineOptions.peers) and

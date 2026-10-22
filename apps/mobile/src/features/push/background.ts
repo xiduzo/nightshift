@@ -1,8 +1,12 @@
 import {
+	answerGate,
+	gateRefusalText,
 	glanceSnapshot,
-	isGateClosed,
 	PUSH_ANDROID_CHANNEL,
 	PUSH_CATEGORY,
+	type PushData,
+	pushDataOf,
+	withdrawKeyOf,
 } from "@nightshift/client";
 import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
@@ -12,15 +16,7 @@ import { updateGlance } from "@/features/glance";
 import { savedHost } from "@/features/host";
 import { defineCategories } from "./categories";
 import { inFrontPlace, showBanner } from "./in-front";
-import {
-	answerOfAction,
-	buttonAnswerCheck,
-	type PushData,
-	pushDataOf,
-	showInFront,
-	taskDataOf,
-	withdrawKeyOf,
-} from "./push-data";
+import { answerOfAction, showInFront, taskDataOf } from "./push-data";
 import { dismissKey, dismissOne } from "./shown";
 
 /** The background task that gets the Host's pushes while the app is not in front. */
@@ -32,11 +28,12 @@ const handled = new Set<string>();
 /**
  * Answers a Gate from a button on its notification, with the app in the
  * background or not running. The answer is bound to the run and the step
- * of the push. The phone first reads the open Gates from the Host: only a
- * Gate its author marked for the lock screen takes the answer, and the
- * Host checks that again. A Gate that closed in the meantime takes no
- * answer: the phone does nothing more. Any other Gate gets a notification
- * that opens it in the app. Then the notification goes away.
+ * of the push. The Host alone checks it: only a Gate its author marked for
+ * the lock screen, with one of its choices, takes the answer. The push is
+ * no proof of that, because anyone with the phone's push token can send
+ * one. A Gate that closed in the meantime takes no answer: the phone does
+ * nothing more. Any other Gate gets a notification that opens it in the
+ * app. Then the notification goes away.
  */
 async function answerFromButton(
 	response: Notifications.NotificationResponse,
@@ -51,29 +48,21 @@ async function answerFromButton(
 	try {
 		const host = await savedHost();
 		if (!host) throw new Error("This phone has no Host.");
-		const check = buttonAnswerCheck(answer, await host.client.gates.list());
-		if (check === "closed") return;
-		if (check === "open-app") {
+		const result = await answerGate(host.client, {
+			...answer,
+			via: "lock-screen",
+		});
+		if (result.kind === "refused" && result.refusal === "needs-app") {
 			await tellAnswerInApp(data);
-			return;
+		} else if (result.kind === "refused" && result.refusal !== "closed") {
+			await tellNotSent(data);
 		}
-		await host.client.gates.resolve({ ...answer, via: "lock-screen" });
-	} catch (error) {
-		if (isForbidden(error)) await tellAnswerInApp(data);
-		else if (!isGateClosed(error)) await tellNotSent(data);
+	} catch {
+		await tellNotSent(data);
 	} finally {
 		Notifications.clearLastNotificationResponse();
 		await dismissOne(identifier);
 	}
-}
-
-/** The Host refused the answer from the lock screen: the Gate needs the app. */
-function isForbidden(error: unknown): boolean {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		(error as { code?: unknown }).code === "FORBIDDEN"
-	);
 }
 
 /**
@@ -90,10 +79,8 @@ function tellNotSent(data: PushData): Promise<void> {
 
 /** The Gate needs the app: a tap opens it there. */
 function tellAnswerInApp(data: PushData): Promise<void> {
-	return tellOpenGate(data, {
-		title: "Answer this Gate in the app",
-		body: "Open the Gate to answer it.",
-	});
+	const { title, description } = gateRefusalText("needs-app");
+	return tellOpenGate(data, { title, body: description });
 }
 
 /** A notification without buttons: a tap opens the Gate. */

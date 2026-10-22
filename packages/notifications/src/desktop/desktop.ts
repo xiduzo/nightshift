@@ -3,6 +3,7 @@ import type {
 	NotificationMessage,
 	SendResult,
 } from "../channels";
+import { routeOf, webPathOf } from "../contract";
 import type { PushTarget } from "../targets";
 
 /**
@@ -128,37 +129,19 @@ function onScreen(
 
 /** What the notification says, and where a click opens Night Shift. */
 export function noticeOf(message: NotificationMessage): DesktopNotice {
-	const base = { id: message.key, title: message.title };
+	const base = {
+		id: message.key,
+		title: message.title,
+		open: webPathOf(routeOf(message)),
+	};
 	switch (message.kind) {
 		case "gate-opened":
-			return {
-				...base,
-				body: "Open the inbox to answer it.",
-				open: message.stepId
-					? `/inbox?gate=${encodeURIComponent(message.stepId)}`
-					: "/inbox",
-			};
+			return { ...base, body: "Open the inbox to answer it." };
 		case "gates-waiting":
-			return {
-				...base,
-				body: "Open the inbox to answer them.",
-				open: "/inbox",
-			};
+			return { ...base, body: "Open the inbox to answer them." };
 		case "run-finished":
-			return {
-				...base,
-				body: "Open the run to see its outcome.",
-				open: runPath(message.runId),
-			};
+			return { ...base, body: "Open the run to see its outcome." };
 		case "run-failed":
-			return {
-				...base,
-				body: "Open the run to see why it failed.",
-				open: runPath(message.runId),
-			};
+			return { ...base, body: "Open the run to see why it failed." };
 	}
-}
-
-function runPath(runId: string | null): string {
-	return runId ? `/runs/${encodeURIComponent(runId)}` : "/";
 }

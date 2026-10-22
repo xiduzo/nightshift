@@ -27,6 +27,9 @@ export type {
 	RunCommandKind,
 	SpaceEngine,
 	StartRunInput,
+	WalkFile,
+	WalkFiles,
+	WalkRef,
 } from "./contract";
 export {
 	type DashboardSummary,
@@ -96,7 +99,6 @@ export {
 } from "./device-config";
 export type { FlowRef, FlowUse } from "./flows";
 export { flowsForRun } from "./flows";
-export { checkpointSnapshot, restoreCheckpoint } from "./graph";
 export type {
 	HistoryCursors,
 	HistoryRows,
@@ -117,7 +119,6 @@ export {
 	MissingProjectError,
 	parseTranscript,
 	readTranscriptFile,
-	stepIdsOfRun,
 } from "./log";
 export type { ListedProject, Project, SpaceDocument } from "./projects";
 export {
@@ -152,5 +153,5 @@ export {
 	openRunBundle,
 	type RunBundleSummary,
 } from "./read";
-export { createEngine } from "./run";
+export { createEngine, GateClosedError } from "./run";
 export type { ScheduleList } from "./schedules";

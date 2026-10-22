@@ -1,4 +1,7 @@
+import type { UseMutationOptions } from "@tanstack/react-query";
+
 import type { ApiQueryUtils } from "../api";
+import { answerGate, type GateAnswer, type GateAnswerResult } from "./answer";
 
 /**
  * How often the inbox and its badge read the open Gates again. The app
@@ -31,12 +34,23 @@ export function createGateQueries(orpc: ApiQueryUtils) {
 	};
 }
 
+type AnswerOptions = UseMutationOptions<GateAnswerResult, Error, GateAnswer>;
+
 /**
- * The mutation options of Gates. `resolve` answers a Gate in any of the
- * person's Spaces, bound to its `runId` and `stepId`; the active Space stays.
+ * The mutation options of Gates. `answer` answers a Gate in any of the
+ * person's Spaces, bound to its `runId` and `stepId`; the active Space
+ * stays. It resolves with what came of the answer: a refusal is a result
+ * (`answerGate`), and only an answer that was not sent fails.
  */
 export function createGateMutations(orpc: ApiQueryUtils) {
 	return {
-		resolve: orpc.gates.resolve.mutationOptions,
+		answer: (
+			options: Omit<AnswerOptions, "mutationKey" | "mutationFn"> = {},
+		): AnswerOptions => ({
+			...options,
+			mutationKey: orpc.gates.resolve.mutationKey(),
+			mutationFn: (input) =>
+				answerGate({ gates: { resolve: orpc.gates.resolve.call } }, input),
+		}),
 	};
 }

@@ -16,7 +16,7 @@ import {
 
 /**
  * The Command node on the compiled graph, with a real shell, run log and
- * MemorySaver. The event log, the transcript and the log file are compared
+ * checkpoint saver. The event log, the transcript and the log file are compared
  * with what the engine writes today (engine.test.ts "a command step").
  */
 

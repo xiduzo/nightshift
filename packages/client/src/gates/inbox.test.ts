@@ -2,21 +2,13 @@ import { describe, expect, test } from "bun:test";
 
 import {
 	changesInbox,
-	gateKey,
 	gateRun,
 	inboxOrder,
-	isGateClosed,
 	waitedText,
 	waitingForYou,
 } from "./inbox";
 
 const MINUTE = 60_000;
-
-describe("gateKey", () => {
-	test("names a Gate by its run and its step", () => {
-		expect(gateKey({ runId: "run-1", stepId: "review" })).toBe("run-1:review");
-	});
-});
 
 describe("inboxOrder", () => {
 	test("the Gate that has waited longest comes first", () => {
@@ -92,15 +84,6 @@ describe("changesInbox", () => {
 		expect(changesInbox({ kind: "gate-closed" })).toBe(true);
 		expect(changesInbox({ kind: "run-finished" })).toBe(false);
 		expect(changesInbox({ kind: "gates-waiting" })).toBe(false);
-	});
-});
-
-describe("isGateClosed", () => {
-	test("the refusal of an answer to a closed Gate", () => {
-		expect(isGateClosed({ code: "BAD_REQUEST" })).toBe(true);
-		expect(isGateClosed({ code: "NOT_FOUND" })).toBe(false);
-		expect(isGateClosed(new Error("offline"))).toBe(false);
-		expect(isGateClosed(null)).toBe(false);
 	});
 });
 

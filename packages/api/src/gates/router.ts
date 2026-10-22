@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { output } from "../output";
 import { protectedProcedure } from "../procedures";
-import { answerGate, inboxOf } from "./inbox";
+import { answerGate, answerRefusals, inboxOf } from "./inbox";
 import { gateAnswerSchema, inboxGateSchema } from "./schemas";
 
 /**
@@ -18,11 +18,14 @@ export const gates = {
 		.output(output(z.array(inboxGateSchema)))
 		.handler(({ context }) => inboxOf(context)),
 	resolve: protectedProcedure
+		.errors(answerRefusals)
 		.route({
 			summary:
 				"Answers an open Gate in any of the Person's Spaces with one of its choices, and the run goes on.",
 		})
 		.output(output(z.void()))
 		.input(gateAnswerSchema)
-		.handler(({ context, input }) => answerGate(context, input)),
+		.handler(({ context, input, errors }) =>
+			answerGate(context, input, errors),
+		),
 };

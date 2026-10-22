@@ -1,20 +1,23 @@
 import type { Database } from "@nightshift/db";
 import type { Actor, OwnDevice, RunsPort } from "../contract";
-import type { Runner } from "../graph";
+import type { Runner, RunWalks } from "../graph";
 import {
 	applyWalkerMoves,
 	getRunRow,
+	parseTranscript,
 	type RunBus,
 	type RunLog,
 	type RunRow,
+	stepIdsOfRun,
 } from "../log";
 import { deriveRunState } from "../read";
 import type { RunRelay } from "./relay";
 
 /**
  * A run moves to another of the Person's Devices while it waits, sleeps or
- * has stopped: this computer puts its checkpoint and step files in the
- * archive and logs `WalkerMoved`; the new Walker takes it over from there.
+ * has stopped: this computer keeps the run's walk state (its Checkpoint
+ * and its steps' files) in the archive and logs `WalkerMoved`. The new
+ * Walker takes it over from there.
  */
 export async function moveRun(
 	deps: {
@@ -23,7 +26,8 @@ export async function moveRun(
 		bus: RunBus;
 		runner: Pick<Runner, "exclusive" | "isActive" | "forget">;
 		relay: RunRelay;
-		archive: Pick<RunsPort, "archiveForMove">;
+		archive: Pick<RunsPort, "keepWalk">;
+		walks: Pick<RunWalks, "exportWalk">;
 		device: { id: string };
 		/** This computer's owner as the Host that keeps the Space knows them (`Peers.personOnHost`). */
 		personOnHost(spaceId: string): Promise<string | null>;
@@ -72,7 +76,7 @@ export async function moveRun(
 				`${target.name} is offline. Move the run when it is online.`,
 			);
 		}
-		await deps.archive.archiveForMove(row);
+		await deps.archive.keepWalk(await deps.walks.exportWalk(runId));
 		runner.forget(runId);
 		const moved = await log.append({
 			type: "WalkerMoved",
@@ -86,21 +90,46 @@ export async function moveRun(
 
 /**
  * This computer walks a run another Device moved here (`WalkerMoved`):
- * its checkpoint comes from the archive (this Replica's, else the Host's)
- * into the checkpoint tables, and a sleeping run gets its wake timer. A
- * run at a Gate waits for its answer here; a stopped one for a resume.
+ * its Checkpoint comes from the archive (this Replica's, else the Host's)
+ * into the checkpoint tables, its transcript continues after the entries
+ * the archive keeps, and a sleeping run gets its wake timer. A run at a
+ * Gate waits for its answer here; a stopped one for a resume.
  */
 export async function takeOver(
 	deps: {
 		db: Database;
 		log: Pick<RunLog, "events">;
-		runner: Pick<Runner, "forget" | "sleeps">;
-		archive: Pick<RunsPort, "restoreMoved">;
+		runner: Pick<Runner, "forget" | "sleeps" | "continueTranscriptAfter">;
+		archive: Pick<RunsPort, "archived">;
+		walks: Pick<RunWalks, "importWalk">;
 	},
 	runId: string,
 ): Promise<void> {
 	const row = await getRunRow(deps.db, runId);
-	await deps.archive.restoreMoved(row);
+	const checkpoint = await deps.archive.archived({
+		kind: "checkpoint",
+		spaceId: row.spaceId,
+		runId,
+	});
+	if (checkpoint === null) {
+		throw new Error("The archive has no checkpoint of the run.");
+	}
+	await deps.walks.importWalk(runId, checkpoint);
+	// The old Walker's transcript files are on its disk, not here: the
+	// next entry is numbered after the last one it archived.
+	let lastSeq = 0;
+	for (const stepId of await stepIdsOfRun(deps.db, runId)) {
+		const text = await deps.archive.archived({
+			kind: "transcript",
+			spaceId: row.spaceId,
+			runId,
+			stepId,
+		});
+		for (const entry of text === null ? [] : parseTranscript(text)) {
+			lastSeq = Math.max(lastSeq, entry.seq);
+		}
+	}
+	deps.runner.continueTranscriptAfter(runId, lastSeq);
 	deps.runner.forget(runId);
 	deps.runner.sleeps.restore(runId, await deps.log.events(runId));
 }

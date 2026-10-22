@@ -136,12 +136,10 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 					afterSeq,
 					signal,
 				),
-			async archiveForMove() {
+			async keepWalk() {
 				throw new Error("This computer is alone. It has no archive.");
 			},
-			async restoreMoved() {
-				throw new Error("This computer is alone. It has no archive.");
-			},
+			archived: async () => null,
 		},
 		async pathsFor(_spaceId, actor) {
 			const viewer = actor?.personId ?? null;

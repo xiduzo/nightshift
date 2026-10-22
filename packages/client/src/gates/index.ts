@@ -1,11 +1,14 @@
 /** Gates that wait for a person: the inbox query, the answer, the inbox order and wait time, what a question shows, and their view types. */
 
 export {
+	answerGate,
+	type GateRefusal,
+	gateRefusalText,
+} from "./answer";
+export {
 	changesInbox,
-	gateKey,
 	gateRun,
 	inboxOrder,
-	isGateClosed,
 	waitedText,
 	waitingForYou,
 } from "./inbox";

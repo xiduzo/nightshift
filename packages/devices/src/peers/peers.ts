@@ -97,10 +97,7 @@ export function createPeers(
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
 	const hostOf = (spaceId: string) => exchange.hostSpaces.hostOf(spaceId);
 	const archive = createRunArchive({
-		db,
 		dataDir,
-		log,
-		history,
 		hostOf,
 		...(relay ? { relay } : {}),
 	});
@@ -109,6 +106,7 @@ export function createPeers(
 		log,
 		bus,
 		history,
+		walks: context.walks,
 		dataDir,
 		documents,
 		// A run moved here: this computer walks it from now on.
@@ -144,16 +142,7 @@ export function createPeers(
 	});
 
 	const port: Peers = {
-		placement: {
-			deviceFor: placement.deviceFor,
-			deviceById: placement.deviceById,
-			place: placement.place,
-			ownDevices: placement.ownDevices,
-			devicesFor: placement.devicesFor,
-			placements: placement.placements,
-			flowsElsewhere: placement.flowsElsewhere,
-			loadNames: placement.loadNames,
-		},
+		placement,
 		offers: {
 			refusal: offerRefusal,
 			schedulesWithOffers: createScheduleOffers({
@@ -177,8 +166,8 @@ export function createPeers(
 			stepTranscript: archive.stepTranscript,
 			followStep: (step, afterSeq, signal) =>
 				exchange.feeds.follow(step, afterSeq, signal),
-			archiveForMove: archive.archiveForMove,
-			restoreMoved: archive.restoreMoved,
+			keepWalk: archive.keepWalk,
+			archived: archive.archived,
 		},
 		pathsFor: createPrivatePaths({ db, registry, ownerId: context.ownerId }),
 	};

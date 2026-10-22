@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { sendNotification, WebPushError } from "web-push";
 
+import type { PushData } from "../contract";
 import type { PushTarget } from "../targets";
 import type {
 	NotificationChannel,
@@ -27,18 +28,14 @@ import type { VapidKeyStore, VapidKeys } from "./vapid-keys";
  * `features/notifications`).
  */
 
-/** What the service worker gets. */
-export type WebPushPayload = {
-	type: "show";
-	kind: NotificationMessage["kind"];
-	key: string;
-	spaceId: string | null;
-	runId: string | null;
-	stepId: string | null;
-	title: string;
-	/** How many Gates wait (`gates-waiting`). Null otherwise. */
-	count: number | null;
-};
+/**
+ * What the service worker gets: the data of the push (`PushData`, without
+ * the lock-screen options), with what to show.
+ */
+export type WebPushPayload = { type: "show"; title: string } & Omit<
+	PushData,
+	"options"
+>;
 
 /** A browser's push subscription, as `PushSubscription.toJSON()` gives it. */
 export type WebPushSubscription = {

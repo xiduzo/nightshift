@@ -1,46 +1,37 @@
 import { describe, expect, test } from "bun:test";
 
-import { gateKey } from "../gates";
-import {
-	isGateKey,
-	PUSH_ACTION,
-	PUSH_ANDROID_CHANNEL,
-	PUSH_CATEGORY,
-	PUSH_MESSAGE_KINDS,
-} from "./push";
+import { staleGates } from "./push";
 
-/**
- * The Host sends these values (`push-contract.test.ts` in
- * `@nightshift/notifications` pins the same ones). A change here is a
- * change of the phone push contract: change both sides.
- */
-describe("the phone push contract", () => {
-	test("names the categories, channels and kinds the Host sends", () => {
-		expect(PUSH_CATEGORY).toEqual({
-			decide: "gate-decide",
-			open: "gate-open",
-			run: "run",
-		});
-		expect(PUSH_ANDROID_CHANNEL).toEqual({ gates: "gates", runs: "runs" });
-		expect(PUSH_ACTION).toEqual({ approve: "approve", reject: "reject" });
-		expect([...PUSH_MESSAGE_KINDS]).toEqual([
-			"gate-opened",
-			"run-finished",
-			"run-failed",
-			"gates-waiting",
+describe("Gates that no longer wait", () => {
+	const READ_AT = 1_000_000;
+	const old = READ_AT - 60_000;
+
+	test("a shown Gate the inbox no longer has goes", () => {
+		const shown = [
+			{ id: "n1", key: "run-1:review", at: old },
+			{ id: "n2", key: "run-2:review", at: old },
+		];
+		expect(staleGates(shown, new Set(["run-2:review"]), READ_AT)).toEqual([
+			{ id: "n1", key: "run-1:review", at: old },
 		]);
 	});
 
-	test("a Gate's key is its run and step, as the Host keys it", () => {
-		const key = gateKey({ runId: "run-1", stepId: "review" });
-		expect(key).toBe("run-1:review");
-		expect(isGateKey(key)).toBe(true);
+	test("a run's end, the end of quiet hours and other notifications stay", () => {
+		const shown = [
+			{ key: "run-1:end:7", at: old },
+			{ key: "waiting:5", at: old },
+			{ key: null, at: old },
+		];
+		expect(staleGates(shown, new Set(), READ_AT)).toEqual([]);
 	});
 
-	test("a run's end and the end of quiet hours are not Gates", () => {
-		expect(isGateKey("run-1:end:7")).toBe(false);
-		expect(isGateKey("waiting:1700000000000")).toBe(false);
-		expect(isGateKey("run-1")).toBe(false);
-		expect(isGateKey(":review")).toBe(false);
+	test("a notification shown 10 s before the read stays: the read may not know its Gate yet", () => {
+		const shown = [{ key: "run-1:review", at: READ_AT - 10_000 }];
+		expect(staleGates(shown, new Set(), READ_AT)).toEqual([]);
+	});
+
+	test("one shown after the read stays too", () => {
+		const shown = [{ key: "run-1:review", at: READ_AT + 1 }];
+		expect(staleGates(shown, new Set(), READ_AT)).toEqual([]);
 	});
 });

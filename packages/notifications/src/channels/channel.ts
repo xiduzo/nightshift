@@ -1,3 +1,4 @@
+import type { GateOption } from "../contract";
 import type { NoticeKind } from "../deliveries";
 import type { PushKind, PushTarget } from "../targets";
 
@@ -11,14 +12,6 @@ import type { PushKind, PushTarget } from "../targets";
  * for the person ("A Gate waits for you"). A screen asks Night Shift for
  * the rest.
  */
-
-/** One option of a Gate, as a notification button shows it. */
-export type GateOption = {
-	/** What the answer sends: the choice's name. */
-	id: string;
-	/** What the button says: the author's text. */
-	label: string;
-};
 
 /**
  * What a push about a Gate may show beyond its ids. Only a Gate its author
@@ -34,7 +27,7 @@ export type GateFacts = {
 
 /** What one notification says. */
 export type NotificationMessage = {
-	/** The event key: `runId:stepId` for a Gate, `runId:end:<seq>` for a run that ended. */
+	/** The notification key (`contract/keys.ts`): a Gate, a run's end, or the end of quiet hours. */
 	key: string;
 	/** What happened. `gates-waiting`: quiet hours ended and Gates still wait. */
 	kind: NoticeKind | "gates-waiting";
@@ -89,25 +82,6 @@ export interface NotificationChannel<Target> {
 export type PushChannels = Partial<
 	Record<PushKind, NotificationChannel<PushTarget>>
 >;
-
-/** The key of a Gate. */
-export function gateKey(runId: string, stepId: string): string {
-	return `${runId}:${stepId}`;
-}
-
-/** The run and step of a Gate's key. Run ids hold no colon. */
-export function parseGateKey(
-	key: string,
-): { runId: string; stepId: string } | null {
-	const at = key.indexOf(":");
-	if (at <= 0 || at === key.length - 1) return null;
-	return { runId: key.slice(0, at), stepId: key.slice(at + 1) };
-}
-
-/** The key of one ending of a run: a run can end again after a resume. */
-export function runEndKey(runId: string, seq: number): string {
-	return `${runId}:end:${seq}`;
-}
 
 /** The sentence each notification says. */
 export function titleOf(kind: NoticeKind): string {

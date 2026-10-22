@@ -1,12 +1,7 @@
+import { pushDataOf, staleGates } from "@nightshift/client";
 import * as Notifications from "expo-notifications";
 
-import {
-	pushDataOf,
-	type ShownNotification,
-	shownAtMs,
-	shownButClosed,
-	shownWithKey,
-} from "./push-data";
+import { type ShownNotification, shownAtMs, shownWithKey } from "./push-data";
 
 /** The notifications the phone shows now, with the Host's key of each. */
 async function shown(): Promise<ShownNotification[]> {
@@ -36,7 +31,8 @@ export async function dismissClosed(
 	openKeys: ReadonlySet<string>,
 	readAt: number,
 ): Promise<void> {
-	await dismiss(shownButClosed(await shown(), openKeys, readAt));
+	const stale = staleGates(await shown(), openKeys, readAt);
+	await dismiss(stale.map((item) => item.id));
 }
 
 export function dismissOne(id: string): Promise<void> {

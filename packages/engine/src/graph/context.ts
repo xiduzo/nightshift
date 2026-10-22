@@ -261,6 +261,8 @@ export function createRecorders(input: { db: Database; bus: RunBus }) {
 	const { db, bus } = input;
 	/** The last transcript seq written per run. Loaded from disk on first use. */
 	const lastSeqs = new Map<string, number>();
+	/** The last seq another Walker wrote of a run moved here: its files are not on this disk. */
+	const movedSeqs = new Map<string, number>();
 
 	async function lastSeqOf(runId: string): Promise<number> {
 		const known = lastSeqs.get(runId);
@@ -272,12 +274,27 @@ export function createRecorders(input: { db: Database; bus: RunBus }) {
 		const entries = await readRunTranscript(rows.map((r) => r.transcriptPath));
 		const last = entries.at(-1)?.seq ?? 0;
 		// A step of this run may have written meanwhile; keep the larger.
-		const current = Math.max(last, lastSeqs.get(runId) ?? 0);
+		const current = Math.max(
+			last,
+			lastSeqs.get(runId) ?? 0,
+			movedSeqs.get(runId) ?? 0,
+		);
 		lastSeqs.set(runId, current);
+		movedSeqs.delete(runId);
 		return current;
 	}
 
 	return {
+		/**
+		 * A run another Device walked until now: its next entry comes after
+		 * `seq`, the last one that Device wrote. A seq known here already
+		 * (the run walked here before) is kept when it is larger.
+		 */
+		continueAfter(runId: string, seq: number): void {
+			const known = lastSeqs.get(runId);
+			if (known !== undefined) lastSeqs.set(runId, Math.max(known, seq));
+			else movedSeqs.set(runId, Math.max(movedSeqs.get(runId) ?? 0, seq));
+		},
 		async open(runId: string, stepId: string, path: string): Promise<Recorder> {
 			await lastSeqOf(runId);
 			const writer = openTranscriptWriter(path);

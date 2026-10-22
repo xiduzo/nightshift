@@ -4,9 +4,10 @@ import {
 	createGateQueries,
 	createRunQueries,
 	type GateLink,
+	type GateRefusal,
 	gateParts,
+	gateRefusalText,
 	gateRun,
-	isGateClosed,
 	type OpenGate,
 	waitedText,
 } from "@nightshift/client";
@@ -66,6 +67,7 @@ export function GateAnswerScreen() {
 /** What went wrong with the last answer. */
 type Problem =
 	| { kind: "check"; failure: CheckFailure }
+	| { kind: "refused"; refusal: GateRefusal }
 	| { kind: "failed"; message: string };
 
 function GateAnswer() {
@@ -82,14 +84,7 @@ function GateAnswer() {
 			(open) => open.runId === runId && open.stepId === stepId,
 		) ?? sent;
 
-	if (closed) {
-		return (
-			<ClosedGate
-				title="Someone already answered this Gate"
-				description="Night Shift did not send your answer. Your inbox no longer shows this Gate."
-			/>
-		);
-	}
+	if (closed) return <ClosedGate {...gateRefusalText("closed")} />;
 	if (gate) {
 		return (
 			<OpenGateSheet
@@ -169,7 +164,7 @@ function OpenGateSheet({
 	gate: OpenGate;
 	/** The Host took the answer. */
 	onSent(): void;
-	/** The Host refused the answer: the Gate closed in the meantime. */
+	/** Night Shift refused the answer: the Gate closed in the meantime. */
 	onClosed(): void;
 }) {
 	const now = useNow();
@@ -195,19 +190,23 @@ function OpenGateSheet({
 	}
 
 	const resolve = useMutation(
-		mutations.resolve({
-			onSuccess: (_done, input) => {
+		mutations.answer({
+			onSuccess: (result, input) => {
+				if (result.kind === "refused") {
+					if (result.refusal === "closed") {
+						onClosed();
+						dropGate();
+					} else {
+						setProblem({ kind: "refused", refusal: result.refusal });
+					}
+					return;
+				}
 				onSent();
 				confirmAnswer({ choice: input.choice, runTitle: gate.runTitle });
 				goBack();
 				dropGate();
 			},
 			onError: (error) => {
-				if (isGateClosed(error)) {
-					onClosed();
-					dropGate();
-					return;
-				}
 				setProblem({ kind: "failed", message: error.message });
 			},
 		}),
@@ -358,10 +357,12 @@ function ProblemAlert({ problem }: { problem: Problem }) {
 	const copy =
 		problem.kind === "check"
 			? CHECK_COPY[problem.failure]
-			: {
-					title: "Your answer was not sent",
-					description: `${problem.message} Check that this phone is online. Then answer again.`,
-				};
+			: problem.kind === "refused"
+				? gateRefusalText(problem.refusal)
+				: {
+						title: "Your answer was not sent",
+						description: `${problem.message} Check that this phone is online. Then answer again.`,
+					};
 	return (
 		<Alert icon={CircleAlert} variant="destructive">
 			<AlertTitle>{copy.title}</AlertTitle>

@@ -3,13 +3,14 @@ import { dirname, join } from "node:path";
 import type { ArchiveRef } from "../contract";
 
 /**
- * The archive: the run state of runs walked elsewhere, per Space. When a
+ * The archive: the walk state of runs walked elsewhere, per Space. When a
  * node ends, its Walker copies the step's transcript and command log, and
- * the run's latest LangGraph checkpoints, to its Host (`archive.put`). A
- * Replica that opens a transcript of a run another Device walks reads it
- * here, and fetches it from the Host on demand when it lacks it
- * (`archive.get`), keeping the copy. The Host's own runs are served from
- * their own files.
+ * the run's latest Checkpoint, to its Host (`archive.put`). The engine
+ * writes and reads those files (`WalkFiles`); the archive only keeps and
+ * carries them. A Replica that opens a transcript of a run another Device
+ * walks reads it here, and fetches it from the Host on demand when it
+ * lacks it (`archive.get`), keeping the copy. The Host's own runs are
+ * served from their own files.
  *
  * Layout, the same on a Host and as a Device's cache:
  * `<data dir>/archive/<space>/<run>/<step>.ndjson`, `<step>.log` and

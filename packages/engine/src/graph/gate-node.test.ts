@@ -20,7 +20,7 @@ import {
 
 /**
  * The Gate node on the compiled graph with a real run log and a
- * MemorySaver. The event log and the transcript are compared with what the
+ * checkpoint saver. The event log and the transcript are compared with what the
  * engine writes today (engine.test.ts "gates"): `GateOpened` and `gate-open`
  * when the Gate opens, `StepEnded` with the choice and `gate-resolved` on
  * the answer. The runner's part (`StepEnded stopped`, `RunEnded`,

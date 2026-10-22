@@ -24,9 +24,8 @@ import {
 } from "../testing/graph";
 import { createSandbox, type Sandbox, waitFor } from "../testing/test-support";
 import { DEFAULT_RESUME_PROMPT, STOP_TIME_REASON } from "./context";
-import type { ThreadState } from "./runner";
 import { createSleeps, pendingWaitOf, type Sleeps } from "./sleep";
-import type { Parked, Pending, ResumeValue } from "./state";
+import type { Pending, ResumeValue } from "./state";
 
 /**
  * The sleep module end to end, for both kinds of wait: a usage limit of an
@@ -68,20 +67,6 @@ const wait = (
 	...extra,
 });
 
-/** Where the thread is, from the saver, as the runner's `threadState` answers it. */
-async function threadStateOf(h: Harness): Promise<ThreadState> {
-	const snapshot = await h.graph().getState(h.config);
-	const interrupt = snapshot.tasks
-		.flatMap((task) => task.interrupts)
-		.find((i) => i.value !== undefined);
-	if (interrupt) {
-		return { kind: "interrupted", value: interrupt.value as Parked };
-	}
-	if (snapshot.next.length > 0)
-		return { kind: "pending", next: [...snapshot.next] };
-	return { kind: "ended", ended: null };
-}
-
 /**
  * The daemon side of the module on a fake thread seam: a resume drives the
  * graph on a new compile over the same saver (a new daemon), and the test
@@ -103,7 +88,7 @@ function daemon(
 		thread: {
 			settled: async () => {},
 			exclusive: (_runId, fn) => fn(),
-			state: () => threadStateOf(h),
+			state: () => h.thread.state(),
 			reserveSlot: () => {
 				if (options.full) throw new Error("The run cap is reached");
 			},

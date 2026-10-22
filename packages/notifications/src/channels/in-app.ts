@@ -1,9 +1,9 @@
+import { parseGateKey } from "../contract";
 import type { NoticeKind } from "../deliveries";
-import {
-	type InAppTarget,
-	type NotificationChannel,
-	type NotificationMessage,
-	parseGateKey,
+import type {
+	InAppTarget,
+	NotificationChannel,
+	NotificationMessage,
 } from "./channel";
 
 /**
