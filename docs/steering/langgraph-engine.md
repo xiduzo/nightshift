@@ -182,15 +182,17 @@ packages/engine/src/
                            limit); endingOf() says what RunEnded a drive's
                            outcome asks for; inputOf() builds the LangGraph
                            input of a start, continue, resume or jump.
-  graph/runner.ts          Per-run driver: start, resume (a Gate's answer, a
-                           wake), enter (what a re-entry plan says, after
-                           threadSnapshot), stop, restart, the deadline
-                           sweep (each ends open work through
-                           closeOpenWork). Drives each
-                           run's Thread, publishes to the bus, reacts to
-                           how a drive ended, owns the slots, gives the sleep
-                           module its thread seam (runner.sleeps), and prunes
-                           a finished run's thread to its latest checkpoint.
+  graph/runner.ts          Per-run driver behind one entry: take(runId,
+                           intent) is a Turn (start, answer, wake, resume,
+                           restart, rerun, stop, overdue) and hold(runId,
+                           fn) a Turn that drives nothing. It owns the
+                           per-run queue, the slots, the run cap and its
+                           queue, the drive, the wake timers and the
+                           overdue sweep; it appends RunResumed (from
+                           planReentry) and WaitEnded (recordWake) before a
+                           drive, ends open work through closeOpenWork,
+                           reacts to how a drive ended, and prunes a
+                           finished run's thread to its latest checkpoint.
   testing/graph.ts         The one set of graph test helpers: node builders
                            (agent(), command(), edge(), flowOf()), startRun()
                            for a run row with its log and its Thread (opened
@@ -220,27 +222,25 @@ packages/engine/src/
                            from its descriptor: CLI tools defined and
                            installed, harnesses, the decider) whether this
                            daemon has what the nodes need; it writes
-                           nothing. createRunStart(deps).start holds
-                           the slot, creates the worktree and the run row,
-                           appends RunStarted and WorktreeCreated and hands
-                           the thread to the runner.
+                           nothing. createRunStart(deps).start is the
+                           start's Turn: with the slot held, it creates the
+                           worktree and the run row, appends RunStarted and
+                           WorktreeCreated, and the runner drives.
   run/recovery.ts          createRecovery(deps): recoverInterruptedWork
                            (a dead daemon's open sessions, steps and runs
                            become interrupted through closeOpenWork, as a
                            stop ends them; sleeping runs get their
-                           timers back through sleeps.restore; after a
+                           timers back through runner.restore; after a
                            grace period the daemon
                            resumes the rest unless daemonResumeBlock says
-                           why not), resume, restartStep and rerunFrom
-                           (each plans with planReentry, appends its
-                           RunResumed before the thread moves, and ends the
-                           run failed when the thread cannot move) and
-                           onSlotFreed (the queue on a full run cap).
+                           why not, queued on a full run cap), resume,
+                           restartStep and rerunFrom (their refusals, then
+                           a Turn of the runner).
   read/read-model.ts       What people see of a run, from the log: runFacts,
                            toSummary, toStepSummary, toRunDetail,
                            takeOverCommand, the flow snapshot parsers;
                            createReadModel(deps) adds listRuns, getRun,
-                           listGates, runStatus, watch and untilLogged.
+                           listGates, runStatus and watch.
                            Reads only.
   log/events.ts            Unchanged payloads, append and parse.
   read/derive-*.ts         The derivations for the read model and the walk.
@@ -308,8 +308,9 @@ packages/engine/src/
    parks at `wait__<nodeId>`; the wait node interrupts
    `{ kind: "wait", until, reason }`. The runner gives the interrupt to
    `sleeps.schedule` for the wake timer (and recovery rebuilds the timers
-   from `deriveSleep` through `sleeps.restore` at startup). A wake is
-   `sleeps.wake(runId, how)`: `WaitEnded`, the transcript `wake`, then
+   from `deriveSleep` through `runner.restore` at startup). A wake is a
+   Turn (`runner.take(runId, { kind: "wake", ... })`): `WaitEnded`, the
+   transcript `wake`, then
    `Command({ resume: { kind: "wake", early, prompt } })`; the Agent node
    re-enters with `pending` and continues the session.
    A Wait node sleeps the same way with its own `until` (`graph/nodes/wait.ts`,
@@ -317,7 +318,7 @@ packages/engine/src/
    deadline, the four kinds are `WaitReason`s next to the policy's two, a
    wait with no time (a signal with no timeout) has `until: null` and no
    timer, and a signal is `Command({ resume: { kind: "signal", name } })`
-   through the same `sleeps.wake` (`Engine.signalRun`).
+   through the same wake Turn (`Engine.signalRun`).
 9. **Resume mapping** (`Engine.resumeRun`): stopped or failed → the thread
    is parked → `resume: { kind: "resume", prompt }`. Interrupted (daemon
    died) → the last checkpoint is before the node → `invoke(null)` re-runs
@@ -440,7 +441,7 @@ Decisions taken while implementing, from the code and its comments:
   `done` without an edge is a chosen end, `timeout` a failure. A parked or
   interrupted Wait step starts a new visit, as a Command does.
 - **`resumeRun` of a thread that ended or never ran re-enters with a
-  `Command({ goto, update })`** (`planReentry`, `runner.enter`). A finished run (rule
+  `Command({ goto, update })`** (`planReentry`, the runner's re-entry Turn). A finished run (rule
   10) or a run from before this engine has no checkpoint at an interrupt,
   so the engine jumps to the top-level node the log points at instead of
   `Command({ resume })` (rule 9). A finished run re-enters on its own
@@ -542,10 +543,11 @@ whether the leftover task is cleared first. It throws the refusals with a
 message for the person: a run that runs, waits or sleeps, a node that is
 not a top-level node of the run's flow, a step that is not that node's.
 
-Recovery's `reenter(row, request)` is the one place that appends
-`RunResumed`: it plans, appends, and hands the entry to `runner.enter`. A
-thread that cannot move ends the run `failed` ("The run could not start
-again: ..."), so the log never says a run runs that no drive holds.
+The runner's re-entry Turn (`reenter` in `runner.ts`) is the one place
+that appends `RunResumed`: with the run's slot held, it plans, appends,
+and drives the entry. A thread that cannot move ends the run `failed`
+("The run could not start again: ..."), so the log never says a run runs
+that no drive holds.
 
 The planner reads the node side's helpers: `resumeTarget` (the node, and
 the Agent step whose harness session the resume continues, `sessionOf`),
@@ -638,18 +640,19 @@ prompt when a person gave one), a `signal` (`pending.signal` is set; the
 Wait node reads it) and a `resume` (the run was stopped while it slept:
 the step is parked as stopped and the node reopens or restarts it).
 
-The daemon side is `createSleeps(deps)`, one per runner, with the runner's
-thread seam as its dependency (where the thread is, a slot, a drive into
-the wait node under `exclusive`). `schedule(runId, until)` sets the timer;
-`restore(runId, events)` sets it from `deriveSleep` for a run that slept
-when the last daemon died (the log stays the restart source); `wake(runId,
-how)` checks that the run still sleeps in the log and that the wait is the
-interrupt the thread sits at, appends `WaitEnded` and the transcript
-`wake`, and drives the thread with `{ kind: "wake" }` or `{ kind: "signal"
-}`; a full run cap queues a timer's wake (`drain()` on a freed slot) and
-refuses a person's. `forget(runId)` drops the timer and the queued wake of
-a run that was stopped while it slept (the runner calls it before
-`closeOpenWork`).
+The daemon side is the runner's wake Turn over three parts of this module.
+`planWake(events, threadState, how, now)` (pure) checks that the run still
+sleeps in the log and that the wait is the interrupt the thread sits at,
+says when a timer fired before its time, and gives the resume value
+(`{ kind: "wake" }` or `{ kind: "signal" }`). `recordWake` appends
+`WaitEnded` and the transcript `wake` once the run holds a slot.
+`createSleeps(deps)`, one per runner, holds the timers: `schedule(runId,
+until)` sets one, and a timer that fires hands the run to the runner's
+wake Turn; `restore(runId, events)` sets it from `deriveSleep` for a run
+that slept when the last daemon died (the log stays the restart source);
+`forget(runId)` drops it (the runner calls it before `closeOpenWork`). A
+full run cap queues a timer's wake in the runner's cap queue and refuses a
+person's.
 
 The pending wait has one shape (`PendingWait`): the step, the visit, the
 reason, `until`, the message, the streak, `session` (what a policy wait

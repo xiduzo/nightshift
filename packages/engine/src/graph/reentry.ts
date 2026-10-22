@@ -32,8 +32,8 @@ import type { ThreadEntry, ThreadSnapshot } from "./thread";
  * the same question is the resume point (`resume-point.ts`): what a node
  * does with its step when it re-enters. Both read `sessionOf`.
  *
- * Recovery appends the plan's `RunResumed`, and the runner drives its
- * entry (its re-entry Turn). This module appends nothing and drives nothing:
+ * The runner's re-entry Turn appends the plan's `RunResumed` and drives
+ * its entry (`runner.ts`). This module appends nothing and drives nothing:
  * it only decides. Its table test (`reentry.test.ts`) also checks each
  * plan against the resume point.
  */
