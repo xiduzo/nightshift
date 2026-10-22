@@ -214,7 +214,7 @@ export async function startRun(
 		db,
 		log,
 		bus,
-		recorders: createRecorders({ db, bus }),
+		recorders: createRecorders({ db, bus, dataDir: sandbox.dataDir }),
 		dataDir: sandbox.dataDir,
 		now: options.now ?? Date.now,
 		minuteMs: MINUTE,

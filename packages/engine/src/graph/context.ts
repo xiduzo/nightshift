@@ -23,6 +23,8 @@ import {
 	type StepEvent,
 	type StepOutputs,
 	type TranscriptEntry,
+	transcriptPath,
+	transcriptToRead,
 } from "../log";
 import type { DerivedStep } from "../read";
 import type { ResumeRules } from "./resume-point";
@@ -96,8 +98,11 @@ export type StepContext = {
 	/** `append` writes a fact; `events(runId)` reads the log for lookups. */
 	log: RunLog;
 	bus: RunBus;
-	/** Opens a step's transcript for appending; `seq` continues the run's count. */
-	recorder(stepId: string, path: string): Promise<Recorder>;
+	/**
+	 * Opens a step's transcript in this computer's data folder for
+	 * appending; `seq` continues the run's count.
+	 */
+	recorder(stepId: string): Promise<Recorder>;
 	/**
 	 * The Device a step of `node` runs on (its Placement). The step runner
 	 * asks once per step and hands the Device to the body; no body touches
@@ -265,8 +270,12 @@ export function messageOf(error: unknown): string {
  * of the run (ported from `openRecorder` and `lastSeqOf`). The runner makes
  * one per daemon and binds `StepContext.recorder` to the run.
  */
-export function createRecorders(input: { db: Database; bus: RunBus }) {
-	const { db, bus } = input;
+export function createRecorders(input: {
+	db: Database;
+	bus: RunBus;
+	dataDir: string;
+}) {
+	const { db, bus, dataDir } = input;
 	/** The last transcript seq written per run. Loaded from disk on first use. */
 	const lastSeqs = new Map<string, number>();
 	/** The last seq another Walker wrote of a run moved here: its files are not on this disk. */
@@ -276,10 +285,12 @@ export function createRecorders(input: { db: Database; bus: RunBus }) {
 		const known = lastSeqs.get(runId);
 		if (known !== undefined) return known;
 		const rows = await db
-			.select({ transcriptPath: step.transcriptPath })
+			.select({ id: step.id, transcriptPath: step.transcriptPath })
 			.from(step)
 			.where(eq(step.runId, runId));
-		const entries = await readRunTranscript(rows.map((r) => r.transcriptPath));
+		const entries = await readRunTranscript(
+			rows.map((r) => transcriptToRead(dataDir, runId, r.id, r.transcriptPath)),
+		);
 		const last = entries.at(-1)?.seq ?? 0;
 		// A step of this run may have written meanwhile; keep the larger.
 		const current = Math.max(
@@ -303,9 +314,11 @@ export function createRecorders(input: { db: Database; bus: RunBus }) {
 			if (known !== undefined) lastSeqs.set(runId, Math.max(known, seq));
 			else movedSeqs.set(runId, Math.max(movedSeqs.get(runId) ?? 0, seq));
 		},
-		async open(runId: string, stepId: string, path: string): Promise<Recorder> {
+		async open(runId: string, stepId: string): Promise<Recorder> {
 			await lastSeqOf(runId);
-			const writer = openTranscriptWriter(path);
+			const writer = openTranscriptWriter(
+				transcriptPath(dataDir, runId, stepId),
+			);
 			return {
 				record(sessionId, stepEvent) {
 					const seq = (lastSeqs.get(runId) ?? 0) + 1;

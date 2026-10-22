@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
-import { project, step } from "@nightshift/db/schema";
+import { project } from "@nightshift/db/schema";
 import type { CommandNode, DecisionNode, Flow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import type {
@@ -12,7 +12,11 @@ import type {
 	WalkRef,
 } from "../contract/peers";
 import { createRunLog } from "../log/run-log";
-import { parseTranscript, readTranscriptFile } from "../log/transcripts";
+import {
+	parseTranscript,
+	readTranscriptFile,
+	transcriptPath,
+} from "../log/transcripts";
 import { alonePeers } from "../testing/alone-peers";
 import {
 	createSandbox,
@@ -252,14 +256,10 @@ describe("a run that moves to another Device", () => {
 		);
 		const lastOnA = Math.max(...before.map((e) => e.seq));
 		expect(lastOnA).toBeGreaterThan(0);
-		const [gateRow] = await b.sandbox.db
-			.select({ transcriptPath: step.transcriptPath })
-			.from(step)
-			.where(eq(step.id, open));
 		// What B wrote of the Gate's step, its answer, comes after A's part.
 		const fromA = before.filter((e) => e.stepId === open).length;
 		const written = (
-			await readTranscriptFile(gateRow?.transcriptPath as string)
+			await readTranscriptFile(transcriptPath(b.sandbox.dataDir, runId, open))
 		).slice(fromA);
 		expect(written.length).toBeGreaterThan(0);
 		expect(written.map((e) => e.seq)).toEqual(
@@ -319,6 +319,31 @@ describe("a run that moves to another Device", () => {
 		controller.abort();
 		await watching;
 		expect(seen).toEqual(kept.map((e) => e.seq));
+	});
+
+	test("its new Walker writes a step's transcript in its own data folder", async () => {
+		const { a, b } = await pair();
+		const { runId, projectId } = await waitingOn(a);
+		const open = (await spaceOf(a, a).getRun(runId)).steps[1]?.id as string;
+		const onA = transcriptPath(a.sandbox.dataDir, runId, open);
+		const fromA = await readTranscriptFile(onA);
+		expect(fromA.length).toBeGreaterThan(0);
+		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await copyRows(a, b, projectId);
+		await b.context.takeOver(runId);
+
+		const onB = spaceOf(b, a);
+		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
+		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
+			label: "the run to end on B",
+		});
+		// The rows B got name A's data folder. B writes in its own.
+		const ownFile = await readTranscriptFile(
+			transcriptPath(b.sandbox.dataDir, runId, open),
+		);
+		expect(ownFile.slice(0, fromA.length)).toEqual(fromA);
+		expect(ownFile.length).toBeGreaterThan(fromA.length);
+		expect(await readTranscriptFile(onA)).toEqual(fromA);
 	});
 
 	test("a second take-over of the same Checkpoint changes nothing", async () => {

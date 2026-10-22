@@ -10,6 +10,7 @@ import {
 	type RunLog,
 	readTranscriptFile,
 	stepIdsOfRun,
+	transcriptPath,
 } from "../log";
 
 /*
@@ -32,7 +33,8 @@ export type RunWalks = WalkFiles & {
 	importWalk(runId: string, checkpoint: string): Promise<void>;
 	/**
 	 * Writes the transcript a step's old Walker wrote (the content of its
-	 * `transcript` file) into the step's own file here, when it has none:
+	 * `transcript` file) into the step's own file in this computer's data
+	 * folder, when it has none:
 	 * the entries this computer writes of the step come after it. So a
 	 * step that waited through a move keeps its first part, on the run
 	 * page and in what this computer archives of it.
@@ -46,10 +48,12 @@ export type RunWalks = WalkFiles & {
 
 export function createRunWalks(deps: {
 	db: Database;
+	/** This computer's data folder, where its steps' transcripts are. */
+	dataDir: string;
 	log: Pick<RunLog, "walkerId">;
 	history: Pick<RunHistory, "runOwner" | "ownStepFiles">;
 }): RunWalks {
-	const { db, log, history } = deps;
+	const { db, dataDir, log, history } = deps;
 
 	/** The run's Space when this computer walks it, else null. */
 	async function ownSpace(runId: string): Promise<string | null> {
@@ -137,13 +141,15 @@ export function createRunWalks(deps: {
 		content: string,
 	): Promise<void> {
 		const [row] = await db
-			.select({ runId: step.runId, transcriptPath: step.transcriptPath })
+			.select({ runId: step.runId })
 			.from(step)
 			.where(eq(step.id, stepId));
-		if (!row || row.runId !== runId || !row.transcriptPath) return;
-		if ((await readTranscriptFile(row.transcriptPath)).length > 0) return;
-		await mkdir(dirname(row.transcriptPath), { recursive: true });
-		await writeFile(row.transcriptPath, content);
+		if (!row || row.runId !== runId) return;
+		// Not the row's path: that names the old Walker's data folder.
+		const path = transcriptPath(dataDir, runId, stepId);
+		if ((await readTranscriptFile(path)).length > 0) return;
+		await mkdir(dirname(path), { recursive: true });
+		await writeFile(path, content);
 	}
 
 	return { exportWalk, ownFile, importWalk, importTranscript };

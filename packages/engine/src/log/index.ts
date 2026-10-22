@@ -61,4 +61,5 @@ export {
 	readRunTranscript,
 	readTranscriptFile,
 	transcriptPath,
+	transcriptToRead,
 } from "./transcripts";

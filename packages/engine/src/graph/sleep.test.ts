@@ -98,7 +98,7 @@ function daemon(h: Harness, time: { now(): number }) {
 				log: h.log,
 				bus: h.ctx.bus,
 				recorders: {
-					open: (_runId, stepId, path) => h.ctx.recorder(stepId, path),
+					open: (_runId, stepId) => h.ctx.recorder(stepId),
 				},
 			},
 			h.runId,

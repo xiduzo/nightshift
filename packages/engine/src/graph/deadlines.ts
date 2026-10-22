@@ -1,4 +1,4 @@
-import { type LoggedEvent, lastEntryAt } from "../log";
+import { type LoggedEvent, lastEntryAt, transcriptToRead } from "../log";
 import { deriveStepClocks } from "../read";
 import { type AbortReason, budgetError } from "./step-runner";
 
@@ -35,6 +35,8 @@ export type Overdue = {
 export async function findOverdue(
 	events: readonly LoggedEvent[],
 	clock: { now: number; graceMs: number; minuteMs: number },
+	/** The run, and this computer's data folder: where its transcripts are. */
+	of: { runId: string; dataDir: string },
 ): Promise<Overdue | null> {
 	let found: { at: number; overdue: Overdue } | null = null;
 	for (const { step, timeoutMs, idleMs, since } of deriveStepClocks(events)) {
@@ -49,7 +51,9 @@ export async function findOverdue(
 		if (idleMs !== null && clock.now >= since + idleMs + clock.graceMs) {
 			const active = Math.max(
 				since,
-				(await lastEntryAt(step.transcriptPath)) ?? since,
+				(await lastEntryAt(
+					transcriptToRead(of.dataDir, of.runId, step.id, step.transcriptPath),
+				)) ?? since,
 			);
 			limits.push({ reason: "idle", ms: idleMs, at: active + idleMs });
 		}

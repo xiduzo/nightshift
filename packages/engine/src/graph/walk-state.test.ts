@@ -128,6 +128,7 @@ function walksOf(sandbox: Sandbox) {
 	const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 	return createRunWalks({
 		db: sandbox.db,
+		dataDir: sandbox.dataDir,
 		log,
 		history: createRunHistory({
 			db: sandbox.db,

@@ -71,7 +71,11 @@ function log() {
 }
 
 const check = (events: LoggedEvent[], now: number, graceMs = 0) =>
-	findOverdue(events, { now, graceMs, minuteMs: MINUTE });
+	findOverdue(
+		events,
+		{ now, graceMs, minuteMs: MINUTE },
+		{ runId: "run-1", dataDir: dir },
+	);
 
 describe("findOverdue", () => {
 	test("a step past its budget is overdue once the grace passed too", async () => {

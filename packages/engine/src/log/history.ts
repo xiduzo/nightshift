@@ -8,7 +8,11 @@ import type { LoggedEvent } from "./events";
 import type { ForeignEvent, RunLog } from "./run-log";
 import { applyWalkerMoves } from "./run-row";
 import type { TranscriptEntry } from "./step-events";
-import { commandLogPath, readTranscriptFile } from "./transcripts";
+import {
+	commandLogPath,
+	readTranscriptFile,
+	transcriptToRead,
+} from "./transcripts";
 
 /**
  * The run history of this Replica, as the exchange of `@nightshift/devices`
@@ -449,7 +453,9 @@ export function createRunHistory(deps: {
 		return {
 			spaceId: row.spaceId,
 			runId: row.runId,
-			transcript: await read(row.transcriptPath),
+			transcript: await read(
+				transcriptToRead(dataDir, row.runId, stepId, row.transcriptPath),
+			),
 			log: await read(commandLogPath(dataDir, row.runId, stepId)),
 		};
 	}
@@ -463,8 +469,10 @@ export function createRunHistory(deps: {
 			.select({ runId: step.runId, transcriptPath: step.transcriptPath })
 			.from(step)
 			.where(eq(step.id, at.stepId));
-		if (!row || row.runId !== at.runId || !row.transcriptPath) return [];
-		return readTranscriptFile(row.transcriptPath);
+		if (!row || row.runId !== at.runId) return [];
+		return readTranscriptFile(
+			transcriptToRead(dataDir, at.runId, at.stepId, row.transcriptPath),
+		);
 	}
 
 	/** The latest presence event of each Device (`DeviceOnline` or `DeviceOffline`), by Device id. */

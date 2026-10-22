@@ -153,7 +153,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 		policy: () => deps.policyFor(flow),
 		log: fencedLog(deps.log, fence),
 		bus: deps.bus,
-		recorder: (stepId, path) => deps.recorders.open(runId, stepId, path),
+		recorder: (stepId) => deps.recorders.open(runId, stepId),
 		deviceFor: deps.deviceFor,
 		deviceById: deps.deviceById,
 		signal: () => controller.signal,

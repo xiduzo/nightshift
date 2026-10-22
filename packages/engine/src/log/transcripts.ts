@@ -1,4 +1,4 @@
-import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { type FileHandle, open, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
@@ -17,6 +17,25 @@ export function transcriptPath(
 	stepId: string,
 ): string {
 	return join(dataDir, "transcripts", runId, `${stepId}.ndjson`);
+}
+
+/**
+ * The transcript file of a step to read on this computer. This computer
+ * writes a step's transcript at `transcriptPath` under its own data
+ * folder, also for a step another Walker started. The path in the step's
+ * row names the data folder of the Walker that started the step: after
+ * "Move to …" that is another computer's. A file that is only at the
+ * row's path on this disk (a run moved before this rule) is read there.
+ */
+export function transcriptToRead(
+	dataDir: string,
+	runId: string,
+	stepId: string,
+	rowPath: string,
+): string {
+	const own = transcriptPath(dataDir, runId, stepId);
+	if (rowPath === "" || rowPath === own || existsSync(own)) return own;
+	return existsSync(rowPath) ? rowPath : own;
 }
 
 export function commandLogPath(

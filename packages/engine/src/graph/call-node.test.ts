@@ -449,12 +449,12 @@ describe("the Call node", () => {
 		// StepStarted, before its session).
 		const recorder = h.ctx.recorder;
 		let crashes = 1;
-		h.ctx.recorder = async (stepId, path) => {
+		h.ctx.recorder = async (stepId) => {
 			const own = deriveSteps(await h.events()).find((s) => s.id === stepId);
 			if (own?.nodeId === "second" && crashes-- > 0) {
 				throw new Error("the daemon died");
 			}
-			return recorder(stepId, path);
+			return recorder(stepId);
 		};
 		await expect(drive(h, { inputs: {} })).rejects.toThrow("the daemon died");
 		expect(harness.calls.map((c) => c.prompt)).toEqual(["First"]);

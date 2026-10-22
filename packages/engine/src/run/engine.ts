@@ -151,7 +151,7 @@ export function createEngine(
 
 	const history = createRunHistory({ db, dataDir, log: runLog, bus });
 	/** The walk state of the runs this computer walks, as files (`graph/walk-state.ts`). */
-	const walks = createRunWalks({ db, log: runLog, history });
+	const walks = createRunWalks({ db, dataDir, log: runLog, history });
 
 	/**
 	 * The other Devices and Hosts (`Peers`): where steps run, Offers, the

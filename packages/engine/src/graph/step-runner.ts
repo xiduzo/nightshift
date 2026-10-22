@@ -515,7 +515,6 @@ export async function beginStep(
 		existing = deriveSteps(logged).find((s) => s.id === start.stepId) ?? null;
 		if (!existing) throw new Error(`Step not found: ${start.stepId}`);
 		stepId = existing.id;
-		path = existing.transcriptPath;
 		visit = existing.visit;
 		if (start.kind === "reopen") {
 			await ctx.log.append({
@@ -539,7 +538,7 @@ export async function beginStep(
 		});
 	}
 
-	const recorder = await ctx.recorder(stepId, path);
+	const recorder = await ctx.recorder(stepId);
 
 	// The step's own signal: a stop of the run, the node's time budget, or
 	// no activity for too long.

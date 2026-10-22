@@ -237,7 +237,7 @@ const isGoing = (status: RunStatus) =>
 export function createRunner(deps: RunnerDeps) {
 	const { db, log, bus } = deps;
 	const open = deps.openThread ?? openThread;
-	const recorders = createRecorders({ db, bus });
+	const recorders = createRecorders({ db, bus, dataDir: deps.dataDir });
 	const threadDeps: ThreadDeps = {
 		db,
 		log,
@@ -838,11 +838,11 @@ export function createRunner(deps: RunnerDeps) {
 		turn: TurnState,
 	): Promise<Taken> {
 		if (deriveRunState(events).status !== "running") return UNCHANGED;
-		const overdue = await findOverdue(events, {
-			now: deps.now(),
-			graceMs,
-			minuteMs: deps.minuteMs,
-		});
+		const overdue = await findOverdue(
+			events,
+			{ now: deps.now(), graceMs, minuteMs: deps.minuteMs },
+			{ runId, dataDir: deps.dataDir },
+		);
 		if (!overdue) return UNCHANGED;
 		const walk = walkOf(runId);
 		if (walk) {

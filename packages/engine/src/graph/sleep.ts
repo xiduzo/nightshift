@@ -373,7 +373,7 @@ export type WakePlan =
 	/** The wait ends: `WaitEnded` on `step`, then `resume` into the wait node. */
 	| {
 			kind: "wake";
-			step: Pick<DerivedStep, "id" | "transcriptPath">;
+			step: Pick<DerivedStep, "id">;
 			resume: ResumeValue;
 	  };
 
@@ -421,7 +421,7 @@ export type WakeDeps = {
 	log: RunLog;
 	bus: RunBus;
 	recorders: {
-		open(runId: string, stepId: string, path: string): Promise<Recorder>;
+		open(runId: string, stepId: string): Promise<Recorder>;
 	};
 };
 
@@ -444,11 +444,7 @@ export async function recordWake(
 		stepId: step.id,
 		payload: { early: how.early, ...signal },
 	});
-	const recorder = await deps.recorders.open(
-		runId,
-		step.id,
-		step.transcriptPath,
-	);
+	const recorder = await deps.recorders.open(runId, step.id);
 	try {
 		recorder.record(null, { type: "wake", ...signal });
 	} finally {
