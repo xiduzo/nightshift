@@ -209,11 +209,15 @@ export async function wireDevices(deps: {
 		},
 		// Run history both ways, the commands for the runs this computer walks,
 		// and the steps of the Host's runs placed on this computer.
-		whileOnline: (link, client, _hello, signal) =>
-			Promise.all([
-				deviceExchange(link.hostId).run(client, signal),
-				workServer(link.hostId).whileOnline(client, signal),
-			]).then(() => {}),
+		attach: (hostLink, link) => {
+			const stops = [
+				deviceExchange(hostLink.hostId).attach(link),
+				workServer(hostLink.hostId).attach(link),
+			];
+			return () => {
+				for (const stop of stops) stop();
+			};
+		},
 	});
 	await deps.kept.nightshiftLinks.start();
 	const deviceLinks = deps.kept.nightshiftLinks;

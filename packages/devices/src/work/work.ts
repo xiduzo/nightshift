@@ -7,13 +7,18 @@ import {
 	worktreeLocation,
 } from "@nightshift/engine";
 import {
-	type HostClient,
 	type WorkCall,
 	type WorkReply,
 	type WorkRequest,
 	workRequestSchema,
 } from "../contract";
-import { type HostSpaces, pause, personOnHost } from "../links";
+import {
+	backoff,
+	type HostSpaces,
+	type Link,
+	pause,
+	personOnHost,
+} from "../links";
 import {
 	type DeviceOffer,
 	type EngineOffers,
@@ -29,16 +34,17 @@ import { serveWork } from "./remote";
 /**
  * This computer as a placed Device: the work of runs its Host walks with
  * their steps here. It takes its calls over its own Link (`devices.work`,
- * outbound only), checks each one from its own Replica before it starts
- * anything (`checkWork`), serves it with its own `localDevice`
- * (`serveWork`), and sends the replies back (`devices.workReply`), a batch
- * at a time. A cancel from the Host aborts the call here: its session or
+ * outbound only, a stream of the Link), checks each one from its own
+ * Replica before it starts anything (`checkWork`), serves it with its own
+ * `localDevice` (`serveWork`), and sends the replies back
+ * (`devices.workReply`), a batch at a time. A cancel from the Host aborts the call here: its session or
  * command ends.
  *
  * A call outlives its stream: the replies of a session that runs while
- * the link drops go when it is back. A call whose replies cannot reach the
- * Host for `replyDeadlineMs` is aborted: nothing runs here for a Walker
- * that is gone.
+ * the link drops go when it is back, after a backoff when the Host does
+ * not take them. A call whose replies cannot reach the Host for
+ * `replyDeadlineMs` is aborted: nothing runs here for a Walker that is
+ * gone.
  *
  * Another Person's run uses this computer through its Offers only
  * (`checkWork`). Its sessions name an offered profile, which this computer
@@ -106,8 +112,8 @@ export type WorkEngine = {
 };
 
 export type WorkServer = {
-	/** Takes and serves the Host's calls while its link is online. */
-	whileOnline(client: HostClient, signal: AbortSignal): Promise<void>;
+	/** Takes and serves the Host's calls over its link while it is online. Returns how to stop. */
+	attach(link: Pick<Link, "stream" | "ready">): () => void;
 	/** The calls running here now. */
 	running(): number;
 };
@@ -120,14 +126,13 @@ export function createWorkServer(
 		engine: WorkEngine;
 		/** This computer as a Device. */
 		device: Device;
-		retryMs?: number;
 		replyDeadlineMs?: number;
 	} & Partial<OfferDeps>,
 ): WorkServer {
-	const retryMs = deps.retryMs ?? 2_000;
 	const replyDeadlineMs = deps.replyDeadlineMs ?? REPLY_DEADLINE_MS;
 	const calls = new Map<string, AbortController>();
-	let client: HostClient | null = null;
+	/** The link the replies go over: the one attached last. A call outlives a link that restarts. */
+	let link: Pick<Link, "ready"> | null = null;
 
 	/** The replies of one call, sent in order, a batch at a time. */
 	function outbox(id: string, abort: () => void) {
@@ -136,6 +141,8 @@ export function createWorkServer(
 		let closed = false;
 		let busy = false;
 		let failingSince: number | null = null;
+		/** The waits of a batch the Host did not take. */
+		const waits = backoff({ firstMs: 1_000, maxMs: 30_000 });
 		async function pump() {
 			if (busy || closed) return;
 			busy = true;
@@ -143,14 +150,22 @@ export function createWorkServer(
 				while (pending.length > 0 || ended) {
 					const replies = pending.splice(0, 500);
 					const done = ended && pending.length === 0;
+					const since = failingSince ?? Date.now();
 					try {
-						if (!client) throw new Error("No link to the Host.");
+						if (!link) throw new Error("No link to the Host.");
+						// Offline: wait for the link, but not past the deadline.
+						const client = await link.ready(
+							AbortSignal.timeout(
+								Math.max(0, since + replyDeadlineMs - Date.now()),
+							),
+						);
 						const { known } = await client.devices.workReply({
 							id,
 							replies,
 							done,
 						});
 						failingSince = null;
+						waits.reset();
 						// The Host no longer waits for it (it restarted, or the
 						// Walker gave up): the call stops here.
 						if (!known) {
@@ -164,13 +179,13 @@ export function createWorkServer(
 						}
 					} catch {
 						pending.unshift(...replies);
-						failingSince ??= Date.now();
-						if (Date.now() - failingSince > replyDeadlineMs) {
+						failingSince = since;
+						if (Date.now() - failingSince >= replyDeadlineMs) {
 							closed = true;
 							abort();
 							return;
 						}
-						await Bun.sleep(1_000);
+						await pause(waits.next());
 					}
 				}
 			} finally {
@@ -223,27 +238,25 @@ export function createWorkServer(
 
 	return {
 		running: () => calls.size,
-		async whileOnline(next, signal) {
-			client = next;
-			while (!signal.aborted) {
-				try {
-					const stream = await next.devices.work(
-						{ running: [...calls.keys()] },
-						{ signal },
-					);
-					for await (const delivery of stream) {
-						if (delivery.kind === "cancel") {
-							calls.get(delivery.id)?.abort();
-						} else if (!calls.has(delivery.id)) {
-							void serve(delivery.id, delivery.request);
-						}
+		attach(next) {
+			link = next;
+			const stop = next.stream("devices.work", async (client, signal) => {
+				const stream = await client.devices.work(
+					{ running: [...calls.keys()] },
+					{ signal },
+				);
+				for await (const delivery of stream) {
+					if (delivery.kind === "cancel") {
+						calls.get(delivery.id)?.abort();
+					} else if (!calls.has(delivery.id)) {
+						void serve(delivery.id, delivery.request);
 					}
-				} catch (error) {
-					if (signal.aborted) return;
-					console.error("Work from the Host was not received:", error);
 				}
-				await pause(retryMs, signal);
-			}
+			});
+			return () => {
+				stop();
+				if (link === next) link = null;
+			};
 		},
 	};
 }

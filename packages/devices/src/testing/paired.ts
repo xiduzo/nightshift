@@ -9,7 +9,7 @@ import {
 import { eq } from "drizzle-orm";
 import type { HostClient, HostHello } from "../contract";
 import { createHostExchange, type HostExchange } from "../exchange";
-import type { DeviceLinks } from "../links";
+import type { DeviceLinks, Link } from "../links";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { createRelay } from "../relay";
 import { createWorkHub } from "../work";
@@ -199,16 +199,21 @@ export async function pairedReplicas(
 	};
 }
 
-/** Links that are always online, one per Host: what a relay reads. */
+/**
+ * Links that are always online, one per Host: what a relay reads. They
+ * run no streams: a test of the exchange starts its own `httpsLink`.
+ */
 function linksTo(clients: Map<string, HostClient>): DeviceLinks {
-	const linkOf = (hostId: string, client: HostClient) => ({
+	const linkOf = (hostId: string, client: HostClient): Link => ({
 		hostId,
-		state: () => ({
-			status: "online" as const,
-			address: "memory",
-			since: 0,
-		}),
+		state: () => ({ status: "online", address: "memory", since: 0 }),
 		client: () => client,
+		stream: () => {
+			throw new Error("This link runs no streams in memory.");
+		},
+		call: (use) => use(client),
+		ready: async () => client,
+		check: () => {},
 		close: async () => {},
 	});
 	return {

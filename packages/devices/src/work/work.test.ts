@@ -9,15 +9,11 @@ import {
 	worktreeLocation,
 } from "@nightshift/engine";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
-import type {
-	HostClient,
-	WorkDelivery,
-	WorkReply,
-	WorkRequest,
-} from "../contract";
+import type { WorkReply, WorkRequest } from "../contract";
+import { httpsLink } from "../links/link";
 import { createOfferSlots, type DeviceOffer } from "../offers";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
-import { withPeers } from "../testing";
+import { partialHostClient, withPeers } from "../testing";
 import { checkWork, createOfferCalls, createWorkServer } from "./work";
 import { createWorkHub } from "./work-hub";
 
@@ -282,50 +278,58 @@ describe("checkWork", () => {
 	});
 });
 
-/** A Host's side of the work stream, in memory: what it delivers, what comes back. */
-function fakeHost() {
-	const deliveries: WorkDelivery[] = [];
-	let wake: (() => void) | null = null;
-	const replies = new Map<string, WorkReply[]>();
-	const done = new Set<string>();
-	const client = {
-		devices: {
-			async work(_input: unknown, options: { signal: AbortSignal }) {
-				const { signal } = options;
-				return (async function* () {
-					while (!signal.aborted) {
-						const next = deliveries.shift();
-						if (next) {
-							yield next;
-							continue;
-						}
-						await new Promise<void>((resolve) => {
-							wake = resolve;
-							signal.addEventListener("abort", () => resolve(), { once: true });
-						});
-					}
-				})();
-			},
-			async workReply(input: {
-				id: string;
-				replies: WorkReply[];
-				done: boolean;
-			}) {
-				replies.set(input.id, [
-					...(replies.get(input.id) ?? []),
-					...input.replies,
-				]);
-				if (input.done) done.add(input.id);
-			},
+/**
+ * A Host's side of the work stream: a real work hub behind the two
+ * procedures a placed Device calls, and this computer's link to it.
+ */
+function hubHost() {
+	const hub = createWorkHub();
+	const link = httpsLink({
+		link: {
+			hostId: HOST,
+			name: "studio",
+			addresses: ["memory"],
+			certificate: null,
+			fingerprint: null,
+			role: "guest",
+			personId: ME,
+			keyStore: "file",
+			createdAt: 0,
+			revokedAt: null,
 		},
-	} as unknown as HostClient;
+		key: "nsd_key",
+		clientFor: () =>
+			partialHostClient({
+				link: { hello: async () => hello, heartbeat: async () => hello },
+				devices: {
+					work: async (input, options) =>
+						hub.take(DEVICE.id, options?.signal as AbortSignal, input.running),
+					workReply: async (input) => ({
+						known: hub.reply(DEVICE.id, input),
+					}),
+				},
+			}),
+	});
+	const hello = {
+		host: { id: HOST, name: "studio", addresses: [] },
+		deviceId: DEVICE.id,
+		personId: ME,
+		spaces: [],
+	};
 	return {
-		client,
-		replies,
-		done,
-		deliver(id: string, request: WorkRequest) {
-			deliveries.push({ kind: "call", id, request });
-			wake?.();
+		hub,
+		link,
+		/** A call of the Host's Walker: its replies, until the call ends. */
+		call(request: WorkRequest) {
+			const replies: WorkReply[] = [];
+			let done = false;
+			void (async () => {
+				for await (const reply of hub.call(DEVICE.id, request)) {
+					replies.push(reply);
+				}
+				done = true;
+			})();
+			return { replies, done: () => done };
 		},
 	};
 }
@@ -379,15 +383,15 @@ describe("the work server under an Offer", () => {
 			slots: createOfferSlots(),
 			calls,
 		});
-		const host = fakeHost();
-		const online = new AbortController();
-		const serving = server.whileOnline(host.client, online.signal);
+		const host = hubHost();
+		const detach = server.attach(host.link);
+		await waitUntil(() => host.hub.online(DEVICE.id, "") === true);
 		const colleague = request({
 			personId: "colleague",
 			call: offered("coder"),
 		});
-		host.deliver("first", colleague);
-		host.deliver("second", colleague);
+		const first = host.call(colleague);
+		const second = host.call(colleague);
 		await waitUntil(() => sessions.length === 1);
 		expect(sessions[0]?.input).toMatchObject({
 			harness: "claude-code",
@@ -403,14 +407,18 @@ describe("the work server under an Offer", () => {
 		expect(sessions).toHaveLength(1);
 		sessions[0]?.end();
 		await waitUntil(() => sessions.length === 2);
-		await waitUntil(() => host.done.has("first"));
+		await waitUntil(first.done);
+		expect(first.replies[0]).toEqual({
+			kind: "item",
+			item: { type: "ready", harness: "claude-code" },
+		});
 
 		calls.withdrawn(SPACE, "coder");
-		await waitUntil(() => host.done.has("second"));
+		await waitUntil(second.done);
 		expect(sessions[1]?.input.signal.aborted).toBe(true);
 		expect(server.running()).toBe(0);
-		online.abort();
-		await serving;
+		detach();
+		await host.link.close();
 	});
 });
 

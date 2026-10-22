@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { ORPCError } from "@orpc/client";
-import type { HostClient, HostHello } from "../contract";
+import type { HostHello } from "../contract";
+import { partialHostClient } from "../testing";
 import type { HostLink } from "./host-links";
 import { firstAnswering, httpsLink, type LinkState } from "./link";
 
@@ -40,9 +41,7 @@ function fakeHost(answers: Record<string, () => Promise<HostHello>>) {
 			calls.push(address);
 			return (answers[address] ?? unreachable)();
 		};
-		return {
-			link: { hello: answer, heartbeat: answer },
-		} as unknown as HostClient;
+		return partialHostClient({ link: { hello: answer, heartbeat: answer } });
 	};
 	return { calls, clientFor };
 }
@@ -177,5 +176,141 @@ describe("httpsLink", () => {
 		expect(revoked).toBe(1);
 		expect(link.client()).toBeNull();
 		await link.close();
+	});
+
+	test("a stream runs while the link is online, stops when it drops, and starts again when it is back", async () => {
+		let up = true;
+		const host = fakeHost({
+			"https://studio.local": () =>
+				up ? Promise.resolve(hello([])) : unreachable(),
+		});
+		const link = httpsLink({
+			link: LINK,
+			key: "nsd_key",
+			clientFor: host.clientFor,
+			heartbeatMs: 5,
+			firstBackoffMs: 5,
+		});
+		const opened: AbortSignal[] = [];
+		const stop = link.stream("test", async (_client, signal) => {
+			opened.push(signal);
+			await new Promise((resolve) =>
+				signal.addEventListener("abort", resolve, { once: true }),
+			);
+		});
+		try {
+			await until(() => opened.length === 1);
+			up = false;
+			await until(() => link.state().status === "offline");
+			expect(opened[0]?.aborted).toBe(true);
+			up = true;
+			await until(() => opened.length === 2);
+			expect(opened[1]?.aborted).toBe(false);
+			stop();
+			expect(opened[1]?.aborted).toBe(true);
+		} finally {
+			await link.close();
+		}
+	});
+
+	test("a stream that throws starts again after its backoff; one that ran well and returns starts again at once", async () => {
+		const host = fakeHost({
+			"https://studio.local": async () => hello([]),
+		});
+		const link = httpsLink({
+			link: LINK,
+			key: "nsd_key",
+			clientFor: host.clientFor,
+			heartbeatMs: 20,
+			streamBackoff: { firstMs: 60, maxMs: 60 },
+		});
+		const failing: number[] = [];
+		const returning: number[] = [];
+		const errors = console.error;
+		console.error = () => {};
+		try {
+			link.stream("failing", async () => {
+				failing.push(Date.now());
+				throw new TypeError("Unable to connect.");
+			});
+			link.stream("returning", async () => {
+				returning.push(Date.now());
+				await Bun.sleep(25);
+			});
+			await until(() => failing.length >= 2 && returning.length >= 3);
+			expect((failing[1] ?? 0) - (failing[0] ?? 0)).toBeGreaterThanOrEqual(55);
+			// Each return ran a heartbeat or more: no wait between them.
+			expect((returning[2] ?? 0) - (returning[1] ?? 0)).toBeLessThan(55);
+		} finally {
+			console.error = errors;
+			await link.close();
+		}
+	});
+
+	test("a stream call the Host refuses makes the link ask the Host now: revoked", async () => {
+		let refuse = false;
+		const host = fakeHost({
+			"https://studio.local": () =>
+				refuse
+					? Promise.reject(new ORPCError("UNAUTHORIZED"))
+					: Promise.resolve(hello([])),
+		});
+		const link = httpsLink({
+			link: LINK,
+			key: "nsd_key",
+			clientFor: host.clientFor,
+			// No heartbeat in this test: only the refusal makes it ask.
+			heartbeatMs: 60_000,
+		});
+		const errors = console.error;
+		console.error = () => {};
+		try {
+			// The owner removes this computer's access while the stream runs.
+			link.stream("refused", async () => {
+				refuse = true;
+				throw new ORPCError("UNAUTHORIZED");
+			});
+			await until(() => link.state().status === "revoked");
+			expect(link.client()).toBeNull();
+		} finally {
+			console.error = errors;
+			await link.close();
+		}
+	});
+
+	test("a call rejects at once while the link is offline; ready waits for it, and ends when it closes", async () => {
+		let up = false;
+		const host = fakeHost({
+			"https://studio.local": () =>
+				up ? Promise.resolve(hello([])) : unreachable(),
+		});
+		const link = httpsLink({
+			link: LINK,
+			key: "nsd_key",
+			clientFor: host.clientFor,
+			heartbeatMs: 5,
+			firstBackoffMs: 5,
+			maxBackoffMs: 5,
+		});
+		await until(() => link.state().status === "offline");
+		await expect(link.call(async () => "answered")).rejects.toThrow(
+			"studio cannot be reached now.",
+		);
+		const ready = link.ready();
+		up = true;
+		expect(await ready).toBe(
+			link.client() as NonNullable<ReturnType<typeof link.client>>,
+		);
+		expect(await link.call(async () => "answered")).toBe("answered");
+
+		const stopped = new AbortController();
+		up = false;
+		await until(() => link.state().status === "offline");
+		const waiting = link.ready(stopped.signal);
+		stopped.abort();
+		await expect(waiting).rejects.toBeDefined();
+		const closing = link.ready();
+		await link.close();
+		await expect(closing).rejects.toThrow("The link to studio is closed.");
 	});
 });

@@ -1,5 +1,5 @@
 import type * as Y from "yjs";
-import type { HostClient, HostHello } from "../contract";
+import type { HostHello } from "../contract";
 import type { DeviceKeyStore, HostLink, HostLinks } from "./host-links";
 import { type HttpsLinkOptions, httpsLink, type Link } from "./link";
 import type { LinkedHost } from "./types";
@@ -32,24 +32,35 @@ export function createDeviceLinks(deps: {
 		link: HostLink,
 		hello: HostHello,
 	): Promise<{ name: string; doc: Y.Doc }[]>;
-	/** Runs while a link is online: the exchange of run history with its Host. */
-	whileOnline?(
-		link: HostLink,
-		client: HostClient,
-		hello: HostHello,
-		signal: AbortSignal,
-	): Promise<void>;
+	/**
+	 * Called once for each link it starts: what runs over it (the exchange
+	 * of run history, the work of placed steps), as the link's streams.
+	 * The function it returns is called when the link stops.
+	 */
+	attach?(hostLink: HostLink, link: Link): () => void;
 	/** For tests: shorter heartbeats and backoffs. */
 	linkOptions?: Pick<
 		HttpsLinkOptions,
-		"heartbeatMs" | "firstBackoffMs" | "maxBackoffMs" | "answerTimeoutMs"
+		| "heartbeatMs"
+		| "firstBackoffMs"
+		| "maxBackoffMs"
+		| "answerTimeoutMs"
+		| "streamBackoff"
 	>;
 }): DeviceLinks {
 	const running = new Map<string, Link>();
+	/** Per running link: how to stop what was attached to it. */
+	const detach = new Map<string, () => void>();
+
+	async function stop(hostId: string) {
+		detach.get(hostId)?.();
+		detach.delete(hostId);
+		await running.get(hostId)?.close();
+		running.delete(hostId);
+	}
 
 	async function add(link: HostLink, key?: string) {
-		await running.get(link.hostId)?.close();
-		running.delete(link.hostId);
+		await stop(link.hostId);
 		if (link.revokedAt) return;
 		const secret = key ?? (await deps.keys.get(link.hostId));
 		if (!secret) {
@@ -58,41 +69,30 @@ export function createDeviceLinks(deps: {
 			);
 			return;
 		}
-		running.set(
-			link.hostId,
-			httpsLink({
-				...deps.linkOptions,
-				link,
-				key: secret,
-				document: deps.document,
-				...(deps.spaceDocuments
-					? {
-							spaceDocuments: (hello: HostHello) =>
-								deps.spaceDocuments?.(link, hello) ?? Promise.resolve([]),
-						}
-					: {}),
-				...(deps.whileOnline
-					? {
-							whileOnline: (
-								client: HostClient,
-								hello: HostHello,
-								signal: AbortSignal,
-							) =>
-								deps.whileOnline?.(link, client, hello, signal) ??
-								Promise.resolve(),
-						}
-					: {}),
-				onAddresses: (addresses) => {
-					deps.links.setAddresses(link.hostId, addresses).catch(() => {});
-				},
-				onRevoked: () => {
-					void deps.links
-						.revoked(link.hostId)
-						.then(() => deps.keys.delete(link.hostId))
-						.catch(() => {});
-				},
-			}),
-		);
+		const started = httpsLink({
+			...deps.linkOptions,
+			link,
+			key: secret,
+			document: deps.document,
+			...(deps.spaceDocuments
+				? {
+						spaceDocuments: (hello: HostHello) =>
+							deps.spaceDocuments?.(link, hello) ?? Promise.resolve([]),
+					}
+				: {}),
+			onAddresses: (addresses) => {
+				deps.links.setAddresses(link.hostId, addresses).catch(() => {});
+			},
+			onRevoked: () => {
+				void deps.links
+					.revoked(link.hostId)
+					.then(() => deps.keys.delete(link.hostId))
+					.catch(() => {});
+			},
+		});
+		running.set(link.hostId, started);
+		const attached = deps.attach?.(link, started);
+		if (attached) detach.set(link.hostId, attached);
 	}
 
 	return {
@@ -117,8 +117,7 @@ export function createDeviceLinks(deps: {
 		},
 		get: (hostId) => running.get(hostId),
 		async close() {
-			await Promise.all([...running.values()].map((link) => link.close()));
-			running.clear();
+			await Promise.all([...running.keys()].map(stop));
 		},
 	};
 }

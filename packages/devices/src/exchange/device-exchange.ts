@@ -1,7 +1,7 @@
 import { roleAllows } from "@nightshift/auth";
 import type { Engine } from "@nightshift/engine";
 import type { HostClient, RunCommand, RunRows } from "../contract";
-import { hostErrorOf, pause } from "../links";
+import { type Link, pause } from "../links";
 import { applyRunCommand, COMMAND_PERMISSION } from "./commands";
 import type { EngineExchange } from "./engine-exchange";
 import { isEmpty, MissingProjectError } from "./rows";
@@ -9,11 +9,13 @@ import { isEmpty, MissingProjectError } from "./rows";
 /**
  * This Device's half of the exchange of run history with one Host (the
  * Host's half is `HostExchange`). One per Host for the life of the
- * daemon; `run` is one online period of its Link. Two loops, both
- * outbound, both by cursor:
+ * daemon. It runs as two streams of its Link (`attach`), both outbound,
+ * both by cursor. The Link starts them when it is online, stops them when
+ * it drops, and starts them again after a failure:
  *
  * - Push: the rows this computer walked in the Spaces the Host keeps,
- *   after the Host's cursor, whenever an event lands here. After a batch
+ *   after the Host's cursor, whenever an event lands here (`sync.push`).
+ *   After a batch
  *   with a node that ended, that step's transcript and command log, and
  *   its run's walk state, go to the Host's archive (the Host takes files
  *   of runs it has). The cursor moves when both are done: a batch that
@@ -40,8 +42,8 @@ import { isEmpty, MissingProjectError } from "./rows";
  * is back, both loops start at the cursors and catch up.
  */
 export type DeviceExchange = {
-	/** Pushes, pulls and applies over `client` until `signal` aborts (the link dropped). Never throws. */
-	run(client: HostClient, signal: AbortSignal): Promise<void>;
+	/** Pushes, pulls and applies over the link while it is online. Returns how to stop. */
+	attach(link: Pick<Link, "stream">): () => void;
 };
 
 export function createDeviceExchange(deps: {
@@ -50,8 +52,6 @@ export function createDeviceExchange(deps: {
 	hostId: string;
 	/** This computer's Device id: the Walker of its runs. */
 	selfId: string;
-	/** How long to wait after a failure before trying again. Default 2 s. */
-	retryMs?: number;
 	/** How long a batch waits for its project before the stream starts again. Default 30 s. */
 	projectWaitMs?: number;
 	/** How long the push loop waits for a new row before it looks again. Default 15 s. */
@@ -59,21 +59,18 @@ export function createDeviceExchange(deps: {
 }): DeviceExchange {
 	const { engine, hostId, selfId } = deps;
 	const { rows } = engine.exchange;
-	const retryMs = deps.retryMs ?? 2_000;
 
 	/** The commands applied here, with what each reported, while the Host still sends them. */
 	const applied = new Map<string, string | null>();
 
+	/** Sends this computer's rows, a batch at a time, until `signal` aborts. Throws when a batch fails. */
 	async function push(client: HostClient, signal: AbortSignal) {
-		/** The batch the Host refused last: said once, not at every retry. */
-		let refused: string | null = null;
 		while (!signal.aborted) {
 			const cycle = new AbortController();
 			const landed = rows.landed(
 				AbortSignal.any([signal, cycle.signal]),
 				deps.idleMs ?? 15_000,
 			);
-			let batchKey: string | null = null;
 			try {
 				const spaces = await engine.exchange.hostSpaces.ofHost(hostId);
 				const { rows: batch, cursors } = await rows.rowsAfter({
@@ -86,19 +83,11 @@ export function createDeviceExchange(deps: {
 					await landed;
 					continue;
 				}
-				batchKey = JSON.stringify(cursors);
+				// A batch the Host refuses goes again, whole, after the link's backoff.
 				await client.sync.push(batch, { signal });
 				// The Host has the runs now: their ended nodes' files follow.
 				await archive(client, batch, signal);
 				await rows.advance(hostId, cursors);
-				refused = null;
-			} catch (error) {
-				if (signal.aborted) return;
-				if (hostErrorOf(error) !== "denied" || refused !== batchKey) {
-					console.error("Run history was not sent to the Host:", error);
-				}
-				if (hostErrorOf(error) === "denied") refused = batchKey;
-				await pause(retryMs, signal);
 			} finally {
 				cycle.abort();
 			}
@@ -130,59 +119,51 @@ export function createDeviceExchange(deps: {
 		}
 	}
 
+	/** One pull stream: rows, commands and follows until it ends or `signal` aborts. */
 	async function pull(client: HostClient, signal: AbortSignal) {
-		/** The commands whose result the Host has from this online period. */
+		/** The commands whose result the Host has from this stream. */
 		const reported = new Set<string>();
-		while (!signal.aborted) {
-			// The live transcripts the Host wants of this computer's runs. A
-			// stream that ends stops them: the next one says again what it wants.
-			const pumps = engine.exchange.feeds.pumps((step, entries, ended, stop) =>
-				client.archive.tail(
-					{ step, entries, ended },
-					{ signal: AbortSignal.any([signal, stop]) },
-				),
+		// The live transcripts the Host wants of this computer's runs. A
+		// stream that ends stops them: the next one says again what it wants.
+		const pumps = engine.exchange.feeds.pumps((step, entries, ended, stop) =>
+			client.archive.tail(
+				{ step, entries, ended },
+				{ signal: AbortSignal.any([signal, stop]) },
+			),
+		);
+		try {
+			const stream = await client.sync.stream(
+				{ cursors: await rows.cursorsWith(hostId) },
+				{ signal },
 			);
-			try {
-				const stream = await client.sync.stream(
-					{ cursors: await rows.cursorsWith(hostId) },
-					{ signal },
-				);
-				for await (const batch of stream) {
-					// A Host of an older version sends no follows.
-					pumps.set(batch.follows ?? []);
-					if (!isEmpty(batch.rows)) {
-						await ingestWhenReady(batch.rows, signal);
-						await rows.advance(hostId, batch.cursors);
-					}
-					for (const command of batch.commands) {
-						if (reported.has(command.id)) continue;
-						let error = applied.get(command.id);
-						if (error === undefined) {
-							error = await apply(command);
-							applied.set(command.id, error);
-						}
-						await client.sync.commandDone(
-							{ id: command.id, error },
-							{ signal },
-						);
-						reported.add(command.id);
-					}
-					// The batch has every command that waits: one it lacks is done there.
-					const pending = new Set(batch.commands.map((c) => c.id));
-					for (const id of applied.keys()) {
-						if (!pending.has(id)) applied.delete(id);
-					}
-					for (const id of reported) {
-						if (!pending.has(id)) reported.delete(id);
-					}
+			for await (const batch of stream) {
+				// A Host of an older version sends no follows.
+				pumps.set(batch.follows ?? []);
+				if (!isEmpty(batch.rows)) {
+					await ingestWhenReady(batch.rows, signal);
+					await rows.advance(hostId, batch.cursors);
 				}
-			} catch (error) {
-				if (signal.aborted) return;
-				console.error("Run history was not received from the Host:", error);
-			} finally {
-				pumps.close();
+				for (const command of batch.commands) {
+					if (reported.has(command.id)) continue;
+					let error = applied.get(command.id);
+					if (error === undefined) {
+						error = await apply(command);
+						applied.set(command.id, error);
+					}
+					await client.sync.commandDone({ id: command.id, error }, { signal });
+					reported.add(command.id);
+				}
+				// The batch has every command that waits: one it lacks is done there.
+				const pending = new Set(batch.commands.map((c) => c.id));
+				for (const id of applied.keys()) {
+					if (!pending.has(id)) applied.delete(id);
+				}
+				for (const id of reported) {
+					if (!pending.has(id)) reported.delete(id);
+				}
 			}
-			await pause(retryMs, signal);
+		} finally {
+			pumps.close();
 		}
 	}
 
@@ -232,8 +213,14 @@ export function createDeviceExchange(deps: {
 	}
 
 	return {
-		async run(client, signal) {
-			await Promise.all([push(client, signal), pull(client, signal)]);
+		attach(link) {
+			const stops = [
+				link.stream("sync.push", push),
+				link.stream("sync.stream", pull),
+			];
+			return () => {
+				for (const stop of stops) stop();
+			};
 		},
 	};
 }

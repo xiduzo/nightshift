@@ -1102,8 +1102,8 @@ iroh.
      Device key). On a Host, `createWorkHub` (`packages/devices/src/
      work/work-hub.ts`, in memory) holds the calls of the runs the Host walks,
      per placed Device. The placed Device takes them as a stream over its
-     own Link (`createWorkServer`, `work.ts`, beside the exchange in
-     `whileOnline`): the Host never dials a Device. It answers with
+     own Link (`createWorkServer`, `work.ts`, a stream of the Link beside
+     the exchange's two): the Host never dials a Device. It answers with
      `devices.workReply`, a batch at a time (what accumulates while one is
      on its way). A cancel follows an abort. A Device whose stream drops
      keeps its calls for 45 s, then they end with "went offline"; calls

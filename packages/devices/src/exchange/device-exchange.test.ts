@@ -19,14 +19,17 @@ import {
 import type { Flow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import type { HostClient } from "../contract";
+import type { Link } from "../links";
+import { httpsLink } from "../links/link";
 import type { PeerEngine } from "../peers";
 import { type PairedReplicas, pairedReplicas } from "../testing";
 import { createDeviceExchange, type DeviceExchange } from "./device-exchange";
 
 /**
  * The Device's exchange with its Host, in one process: B (the Device)
- * runs its real exchange against A (the Host) in memory. Each `online`
- * is one online period of the link; `memory.down()` is the network gone.
+ * runs its real exchange over a real Link to A (the Host) in memory.
+ * `memory.down()` is the network gone: the link goes offline, and comes
+ * back by itself after `memory.up()`.
  */
 
 let a: Sandbox;
@@ -34,7 +37,7 @@ let b: Sandbox;
 let paired: PairedReplicas;
 let projectId: string;
 let exchange: DeviceExchange;
-/** The online periods still open: closed after each test. */
+/** The links still open: closed after each test. */
 let periods: { stop(): Promise<void> }[];
 
 beforeEach(async () => {
@@ -56,25 +59,46 @@ function deviceExchange(): DeviceExchange {
 		engine: paired.device,
 		hostId: paired.hostId,
 		selfId: b.deviceId,
-		retryMs: 10,
 		projectWaitMs: 5_000,
 		idleMs: 1_000,
 	});
 }
 
-/** One online period: the exchange runs over `client` until `stop`. */
+/** B's link to A over `client`, with the exchange attached, until `stop`. */
 function online(client: HostClient = paired.memory.client(paired.key)) {
-	const controller = new AbortController();
-	const running = exchange.run(client, controller.signal);
+	const link = httpsLink({
+		link: {
+			hostId: paired.hostId,
+			name: "A",
+			addresses: ["memory"],
+			certificate: null,
+			fingerprint: null,
+			role: "guest",
+			personId: paired.personId,
+			keyStore: "file",
+			createdAt: 0,
+			revokedAt: null,
+		},
+		key: "memory",
+		clientFor: () => client,
+		heartbeatMs: 20,
+		firstBackoffMs: 5,
+		maxBackoffMs: 20,
+		streamBackoff: { firstMs: 5, maxMs: 20 },
+	});
+	const detach = exchange.attach(link);
 	const period = {
+		link,
 		async stop() {
-			controller.abort();
-			await running;
+			detach();
+			await link.close();
 		},
 	};
 	periods.push(period);
 	return period;
 }
+
+const status = (period: { link: Link }) => period.link.state().status;
 
 /** A command, then a Gate. */
 const gateFlow = {
@@ -308,7 +332,6 @@ describe("the Device's exchange with its Host", () => {
 			engine: paired.device,
 			hostId: paired.hostId,
 			selfId: b.deviceId,
-			retryMs: 10,
 			projectWaitMs: 50,
 		});
 		const run = await paired.host
@@ -360,15 +383,11 @@ describe("the Device's exchange with its Host", () => {
 
 	test("a Command applied just before the link dropped is not applied again when it is back", async () => {
 		const run = await walkOnB(gateFlow);
-		let first = online();
-		await untilStatus(paired.host, run.id, "waiting");
-		await first.stop();
-
 		// The link drops after B applied the answer, before A heard so.
 		const client = paired.memory.client(paired.key);
 		const reported: (string | null)[] = [];
 		let dropped = false;
-		first = online(
+		const period = online(
 			withSync(client, {
 				commandDone: async (input, options) => {
 					if (!dropped) {
@@ -381,6 +400,7 @@ describe("the Device's exchange with its Host", () => {
 				},
 			}),
 		);
+		await untilStatus(paired.host, run.id, "waiting");
 		const gate = (await paired.host.space(a.spaceId).listGates())[0];
 		await paired.host
 			.space(a.spaceId, { personId: paired.personId })
@@ -390,21 +410,14 @@ describe("the Device's exchange with its Host", () => {
 				choice: "approve",
 			});
 		const [command] = await paired.host.exchange.commands.pendingOf(run.id);
-		await waitFor(() => dropped, { label: "the link to drop" });
-		await first.stop();
+		await waitFor(() => dropped && status(period) === "offline", {
+			label: "the link to drop",
+		});
 		await untilStatus(paired.device, run.id, "finished");
 		expect((await commandOnA(command?.id as string)).done).toBe(false);
 
 		// Back online: A sends the Command again; B reports its first result.
 		paired.memory.up();
-		online(
-			withSync(client, {
-				commandDone: async (input, options) => {
-					reported.push(input.error);
-					return client.sync.commandDone(input, options);
-				},
-			}),
-		);
 		await waitFor(async () => (await commandOnA(command?.id as string)).done, {
 			label: "the Command done on A",
 		});
@@ -460,7 +473,7 @@ describe("the Device's exchange with its Host", () => {
 
 	test("B keeps walking while A is away, and A catches up from the cursor when the link is back", async () => {
 		const before = await walkOnB(quickFlow);
-		const first = online();
+		const period = online();
 		await untilStatus(paired.host, before.id, "finished");
 		await waitFor(
 			async () =>
@@ -468,7 +481,9 @@ describe("the Device's exchange with its Host", () => {
 				(await eventsOf(b, before.id)).length,
 		);
 		paired.memory.down();
-		await first.stop();
+		await waitFor(() => status(period) === "offline", {
+			label: "the link offline",
+		});
 
 		const away = await paired.device
 			.space(a.spaceId)
@@ -477,7 +492,6 @@ describe("the Device's exchange with its Host", () => {
 		expect(await statusOn(paired.host, away.id)).toBeNull();
 
 		paired.memory.up();
-		online();
 		await untilStatus(paired.host, away.id, "finished");
 		await waitFor(
 			async () =>
@@ -488,6 +502,25 @@ describe("the Device's exchange with its Host", () => {
 		for (const id of [before.id, away.id]) {
 			expect(await eventsOf(a, id)).toEqual(await eventsOf(b, id));
 		}
+	});
+
+	test("a key A no longer knows ends the link: revoked, and nothing more goes to A", async () => {
+		let removed = false;
+		const period = online(
+			paired.memory.client(() => (removed ? null : paired.key)),
+		);
+		const before = await walkOnB(quickFlow);
+		await untilStatus(paired.host, before.id, "finished");
+
+		// A's owner removes B's access.
+		removed = true;
+		await waitFor(() => status(period) === "revoked", { label: "revoked" });
+		const after = await paired.device
+			.space(a.spaceId)
+			.startRun({ projectId, flow: quickFlow });
+		await untilStatus(paired.device, after.id, "finished");
+		await Bun.sleep(100);
+		expect(await statusOn(paired.host, after.id)).toBeNull();
 	});
 
 	test("a Space B's owner is not a Member of never reaches B", async () => {
