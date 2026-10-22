@@ -127,6 +127,7 @@ export {
 	createSpaceDocuments,
 	deviceNameIn,
 	type GitInstall,
+	memberName,
 	memberRole,
 	NOT_ON_THIS_COMPUTER,
 	type ProjectReadiness,

@@ -22,6 +22,7 @@ import {
 } from "../testing/test-support";
 import {
 	createSpaceDocuments,
+	memberName,
 	type SpaceDocuments,
 	spaceDocumentName,
 	spaceProjects,
@@ -311,5 +312,25 @@ describe("members", () => {
 		expect(
 			(await sandbox.db.select().from(organization)).map((o) => o.id),
 		).toContain(space);
+	});
+
+	test("a Member's name comes from the mirror", async () => {
+		const space = await otherSpace(sandbox.db, "Platform");
+		await sandbox.db
+			.insert(user)
+			.values({ id: "u-ada", name: "Ada", email: "ada@example.com" });
+		await sandbox.db.insert(member).values({
+			id: "m1",
+			organizationId: space,
+			userId: "u-ada",
+			role: "owner",
+			createdAt: new Date(),
+		});
+		const document = await documents.open(space);
+		expect(memberName(document, "u-ada")).toBe("Ada");
+		expect(memberName(document, "u-nobody")).toBeNull();
+		// An entry that is not a Member's shape has no name.
+		document.members.set("u-odd", { role: "viewer" });
+		expect(memberName(document, "u-odd")).toBeNull();
 	});
 });

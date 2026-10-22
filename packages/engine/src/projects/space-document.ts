@@ -84,6 +84,17 @@ export function memberRole(
 	return typeof entry?.role === "string" ? entry.role : null;
 }
 
+/** The name of a Member as the document's mirror has it, or null for anyone else. */
+export function memberName(
+	document: SpaceDocument,
+	personId: string,
+): string | null {
+	const entry = document.members.get(personId) as
+		| Partial<SpaceMember>
+		| undefined;
+	return typeof entry?.name === "string" ? entry.name : null;
+}
+
 /** The name of a Device as the document has it (a Device with a Clone), or null. */
 export function deviceNameIn(
 	document: SpaceDocument,

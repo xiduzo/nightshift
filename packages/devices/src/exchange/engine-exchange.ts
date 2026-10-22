@@ -2,6 +2,7 @@ import type { Database } from "@nightshift/db";
 import {
 	type FeedStep,
 	type LoggedEvent,
+	memberName,
 	memberRole,
 	parseTranscript,
 	type RunBus,
@@ -146,10 +147,7 @@ export function createEngineExchange(deps: {
 			return memberRole(await documents.open(spaceId), personId);
 		},
 		async memberName(spaceId, personId) {
-			const entry = (await documents.open(spaceId)).members.get(personId) as
-				| { name?: unknown }
-				| undefined;
-			return typeof entry?.name === "string" ? entry.name : null;
+			return memberName(await documents.open(spaceId), personId);
 		},
 	};
 }

@@ -15,6 +15,7 @@ export type { SpaceDocument, SpaceDocuments } from "./space-document";
 export {
 	createSpaceDocuments,
 	deviceNameIn,
+	memberName,
 	memberRole,
 	projectClones,
 	recordClone,
