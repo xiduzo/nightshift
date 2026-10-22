@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { homeScreenNeeded } from "./browser";
+import { answeredGates, homeScreenNeeded } from "./browser";
 
 const iPhone =
 	"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
@@ -50,5 +50,38 @@ describe("homeScreenNeeded", () => {
 				standalone: false,
 			}),
 		).toBe(false);
+	});
+});
+
+describe("answeredGates", () => {
+	const gate = (tag: string, shownAt: number) => ({
+		tag,
+		data: { kind: "gate-opened", shownAt },
+	});
+
+	test("a Gate notification whose Gate no longer waits is answered", () => {
+		expect(
+			answeredGates(
+				[gate("run-1:review", 10), gate("run-2:ship", 10)],
+				new Set(["run-2:ship"]),
+				100,
+			),
+		).toEqual(["run-1:review"]);
+	});
+
+	test("one shown after the read may be a Gate the read did not know yet", () => {
+		expect(answeredGates([gate("run-1:review", 100)], new Set(), 100)).toEqual(
+			[],
+		);
+	});
+
+	test("a run's notification is never a Gate's", () => {
+		expect(
+			answeredGates(
+				[{ tag: "run-1:end:4", data: { kind: "run-finished", shownAt: 1 } }],
+				new Set(),
+				100,
+			),
+		).toEqual([]);
 	});
 });

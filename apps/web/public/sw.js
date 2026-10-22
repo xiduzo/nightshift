@@ -1,15 +1,18 @@
 /**
  * The service worker of Night Shift: it shows the notifications Night Shift
- * pushes to this browser while no Night Shift page is open (Web Push), and
- * closes them again when a Gate is answered on any screen.
+ * pushes to this browser while no Night Shift page is open (Web Push).
  *
  * A push carries no content: what happened, its ids and one short sentence
  * (`@nightshift/notifications`, `channels/web-push.ts`, `WebPushPayload`):
  *   { type: "show", kind, key, spaceId, runId, stepId, title, count }
- *   { type: "withdraw", key }
+ * Every push shows a notification: the subscription is `userVisibleOnly`,
+ * and a push that shows nothing costs the site its subscription (Safari)
+ * or a notice of the browser's own (Chrome). So no push takes one back: the
+ * next open Night Shift page closes the notifications of the Gates that no
+ * longer wait (`features/notifications`, `closeAnsweredGates`).
  * The notification's tag is the key, so a second push of one key replaces
- * the first and a withdraw finds it. A click opens the Gate or the run in an
- * open Night Shift tab, or in a new one.
+ * the first. Its data has the kind and when it showed, for that page. A
+ * click opens the Gate or the run in an open Night Shift tab, or in a new one.
  *
  * Vite copies `public/` into the build as it is: this file is plain
  * JavaScript, served at `/sw.js`, with the whole app as its scope.
@@ -37,12 +40,6 @@ function pathOf(push) {
 	return "/inbox";
 }
 
-/** Closes every notification of the key. */
-async function closeTagged(key) {
-	const shown = await self.registration.getNotifications({ tag: key });
-	for (const notification of shown) notification.close();
-}
-
 self.addEventListener("push", (event) => {
 	let push = null;
 	try {
@@ -51,17 +48,13 @@ self.addEventListener("push", (event) => {
 		push = null;
 	}
 	if (!push || typeof push.key !== "string") return;
-	if (push.type === "withdraw") {
-		event.waitUntil(closeTagged(push.key));
-		return;
-	}
 	if (push.type !== "show") return;
 	event.waitUntil(
 		self.registration.showNotification(push.title || "Night Shift", {
 			tag: push.key,
 			icon: "/favicon.svg",
 			badge: "/favicon.svg",
-			data: { path: pathOf(push) },
+			data: { path: pathOf(push), kind: push.kind, shownAt: Date.now() },
 		}),
 	);
 });

@@ -7,7 +7,7 @@ import { createWebPushChannel, topicOf } from "./web-push";
 
 /**
  * The Web Push adapter, on a fake sender: what a browser gets (ids and one
- * sentence, no content), how a withdraw goes, and what a push service's
+ * sentence, no content), that a withdraw sends nothing, and what a push service's
  * answer means.
  */
 
@@ -77,7 +77,7 @@ test("a push carries ids and one sentence, signed with the VAPID keys", async ()
 	]);
 });
 
-test("a withdraw is a push of its own, on the same topic", async () => {
+test("a withdraw sends no push: every push to a browser must show a notification", async () => {
 	const sender = fakeWebPushSender();
 	const channel = createWebPushChannel({
 		keys,
@@ -88,11 +88,8 @@ test("a withdraw is a push of its own, on the same topic", async () => {
 	await channel.send(browser, gate);
 	await channel.withdraw(browser, "run-1:review");
 
-	expect(sender.payloads()[1]).toEqual({
-		type: "withdraw",
-		key: "run-1:review",
-	});
-	expect(sender.requests[1]?.topic).toBe(sender.requests[0]?.topic);
+	expect(sender.requests).toHaveLength(1);
+	expect(sender.payloads()[0]).toMatchObject({ type: "show" });
 });
 
 test("a browser the push service no longer knows is gone", async () => {

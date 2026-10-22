@@ -1,5 +1,13 @@
-import { describeNotice, followNotifications } from "@nightshift/client";
-import { type QueryClient, useQueryClient } from "@tanstack/react-query";
+import {
+	describeNotice,
+	followNotifications,
+	gateKey,
+} from "@nightshift/client";
+import {
+	type QueryClient,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
@@ -9,6 +17,7 @@ import { runQueries } from "@/features/runs";
 import { client, type NotificationItem } from "@/shared/api";
 import {
 	browserName,
+	closeAnsweredGates,
 	closeNotifications,
 	currentSubscription,
 	onNotificationClick,
@@ -26,11 +35,22 @@ import { notificationQueries } from "./queries";
  * with them the inbox, the tab badge and the dashboard). An item with
  * `alert` tells you: a toast while this tab has focus, else a notification
  * of this computer. A closed Gate takes its toast and notification away.
- * After the stream was down, it reads everything again. Mount it once.
+ * Each read of the open Gates also closes the notifications of Gates that
+ * were answered while no page was open. After the stream was down, it
+ * reads everything again. Mount it once.
  */
 export function useNotificationStream() {
 	const queryClient = useQueryClient();
 	const router = useRouter();
+	const gates = useQuery(gateQueries.open());
+
+	useEffect(() => {
+		if (!gates.data) return;
+		void closeAnsweredGates(
+			new Set(gates.data.map(gateKey)),
+			gates.dataUpdatedAt,
+		);
+	}, [gates.data, gates.dataUpdatedAt]);
 
 	useEffect(() => {
 		const controller = new AbortController();
@@ -132,6 +152,7 @@ async function tell(
 	}
 	await showNotification({
 		key: item.key,
+		kind: item.kind,
 		title,
 		body,
 		path,
