@@ -793,11 +793,11 @@ describe("validateFlow: decisions and gates", () => {
 		).toEqual([
 			[
 				"one",
-				'Decision node "one" can be answered from the lock screen, but it has 1 option. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or remove lockScreen.',
+				'Decision node "one" can be answered from the lock screen, but it has 1 option. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or turn off "Can be answered from the lock screen".',
 			],
 			[
 				"three",
-				'Decision node "three" can be answered from the lock screen, but it has 3 options. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or remove lockScreen.',
+				'Decision node "three" can be answered from the lock screen, but it has 3 options. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or turn off "Can be answered from the lock screen".',
 			],
 		]);
 	});

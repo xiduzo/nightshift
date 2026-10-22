@@ -92,7 +92,7 @@ function checkDecidedBy(node: DecisionNode, check: NodeCheck): void {
 	} else if (node.lockScreen === true && node.options.length !== 2) {
 		// The phone's buttons have fixed titles: Approve, Reject.
 		check.error(
-			`Decision node "${node.id}" can be answered from the lock screen, but it has ${node.options.length} ${node.options.length === 1 ? "option" : "options"}. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or remove lockScreen.`,
+			`Decision node "${node.id}" can be answered from the lock screen, but it has ${node.options.length} ${node.options.length === 1 ? "option" : "options"}. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or turn off "Can be answered from the lock screen".`,
 		);
 	}
 	if (node.by !== "rule") {
