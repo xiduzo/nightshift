@@ -118,6 +118,9 @@ export function createAuth(
 		],
 		appName: "Night Shift",
 		emailAndPassword: { enabled: true },
+		// The expo plugin's OAuth helper redirects to any https site. Night
+		// Shift has no OAuth sign-in: the phone needs only the plugin's origin.
+		disabledPaths: ["/expo-authorization-proxy"],
 		secret: env.BETTER_AUTH_SECRET,
 		baseURL: env.BETTER_AUTH_URL,
 		// On whatever NODE_ENV says: Better Auth turns it on in production only.
