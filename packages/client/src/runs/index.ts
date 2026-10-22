@@ -33,6 +33,7 @@ export { mergeSteps } from "./steps";
 export {
 	followRun,
 	type RunStreamConnection,
+	type RunWatchClient,
 	retryDelay,
 	type Wait,
 	waitFor,
