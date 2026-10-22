@@ -80,6 +80,8 @@ export type PeerContext = {
 	ready: Promise<void>;
 	/** The Person who owns this computer, or null before the engine is ready. */
 	ownerId(): string | null;
+	/** Whether a step has ended (and not reopened since), as this Replica's log says. */
+	stepEnded(step: FeedStep): Promise<boolean>;
 	/** A project a person has not removed, with its Clone here or null. */
 	project(projectId: string, spaceId: string): Promise<ListedProject>;
 	/** This computer walks a run another Device moved here, from now on. */

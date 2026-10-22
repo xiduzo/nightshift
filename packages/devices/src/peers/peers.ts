@@ -107,6 +107,7 @@ export function createPeers(
 		bus,
 		history,
 		walks: context.walks,
+		stepEnded: context.stepEnded,
 		dataDir,
 		documents,
 		// A run moved here: this computer walks it from now on.

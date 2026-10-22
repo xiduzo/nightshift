@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import {
-	deriveSteps,
+	type FeedStep,
 	type LoggedEvent,
 	memberRole,
 	parseTranscript,
@@ -78,6 +78,8 @@ export function createEngineExchange(deps: {
 	documents: SpaceDocuments;
 	/** The events a batch added: a run moved here is taken over. */
 	onIngested?(added: readonly LoggedEvent[]): Promise<void>;
+	/** Whether a step has ended, as this Replica's log says (`PeerContext.stepEnded`). */
+	stepEnded(step: FeedStep): Promise<boolean>;
 	/** The feed of the Host that keeps a Space (over its link). */
 	upstream?: FeedPorts["upstream"];
 	/**
@@ -97,12 +99,7 @@ export function createEngineExchange(deps: {
 		selfId: () => log.walkerId(),
 		runOwner,
 		hostOf: (spaceId) => hostSpaces.hostOf(spaceId),
-		async stepEnded({ runId, stepId }) {
-			const found = deriveSteps(await log.events(runId)).find(
-				(s) => s.id === stepId,
-			);
-			return found !== undefined && found.endedAt !== null;
-		},
+		stepEnded: deps.stepEnded,
 		ownEntries: (at) => history.ownTranscript(at),
 		// Asked only for a step that ended: a copy from the Host is kept here.
 		async archived(at) {

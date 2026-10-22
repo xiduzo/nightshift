@@ -147,7 +147,6 @@ export type {
 	RunWalker,
 } from "./read";
 export {
-	deriveSteps,
 	exportRun,
 	openRunBundle,
 	type RunBundleSummary,

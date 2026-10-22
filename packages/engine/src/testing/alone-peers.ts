@@ -2,7 +2,6 @@ import type { OwnDevice, PeerContext, Peers, PlacedDevice } from "../contract";
 import type { PeersFactory } from "../contract/peers";
 import { followOwnStep } from "../log";
 import { NOT_ON_THIS_COMPUTER } from "../projects";
-import { deriveSteps } from "../read";
 
 /**
  * The peers of a computer that is alone: no other Device, no Host, no
@@ -109,12 +108,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 				followOwnStep(
 					{
 						bus: context.bus,
-						async stepEnded({ runId, stepId }) {
-							const found = deriveSteps(await log.events(runId)).find(
-								(s) => s.id === stepId,
-							);
-							return found !== undefined && found.endedAt !== null;
-						},
+						stepEnded: context.stepEnded,
 						ownEntries: context.history.ownTranscript,
 						archived: async () => null,
 					},

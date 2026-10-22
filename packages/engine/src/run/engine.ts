@@ -26,6 +26,7 @@ import {
 } from "../projects";
 import {
 	createReadModel,
+	deriveSteps,
 	parseCalledFlows,
 	parseRunFlow,
 	type RunSummary,
@@ -167,6 +168,12 @@ export function createEngine(
 		...(options.profileFor ? { profileFor: options.profileFor } : {}),
 		ready: peersReady,
 		ownerId: () => ownerId,
+		async stepEnded({ runId, stepId }) {
+			const found = deriveSteps(await runLog.events(runId)).find(
+				(s) => s.id === stepId,
+			);
+			return found !== undefined && found.endedAt !== null;
+		},
 		project: (projectId, spaceId) => projects.find(projectId, spaceId),
 		takeOver: (runId) => control.takeOver(runId),
 		stopRun: (runId) => runner.stop(runId),
