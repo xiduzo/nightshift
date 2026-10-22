@@ -81,6 +81,12 @@ describe("the desktop channel", () => {
 		});
 	});
 
+	test("a run without its id opens the inbox", async () => {
+		const { notifier, desktop } = channel();
+		await desktop.send(target(), { ...failed, runId: null });
+		expect(notifier.shown[0]).toMatchObject({ open: "/inbox" });
+	});
+
 	test("reaches this computer only: another computer's desktop is gone here", async () => {
 		const { notifier, desktop } = channel();
 		expect(await desktop.send(target("device-2"), gate)).toBe("gone");

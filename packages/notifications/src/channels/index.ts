@@ -2,14 +2,11 @@
 
 export {
 	type GateFacts,
-	gateKey,
 	gatesWaitingTitle,
 	type InAppTarget,
 	type NotificationChannel,
 	type NotificationMessage,
 	type PushChannels,
-	parseGateKey,
-	runEndKey,
 	type SendResult,
 	titleOf,
 } from "./channel";

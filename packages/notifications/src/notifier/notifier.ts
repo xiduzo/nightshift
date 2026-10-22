@@ -1,14 +1,12 @@
 import {
 	type GateFacts,
-	gateKey,
 	gatesWaitingTitle,
 	type InAppChannel,
 	type NotificationMessage,
 	type PushChannels,
-	parseGateKey,
-	runEndKey,
 	titleOf,
 } from "../channels";
+import { gateKey, parseGateKey, runEndKey, waitingKey } from "../contract";
 import type { Claim, Delivery, DeliveryLog, NoticeKind } from "../deliveries";
 import {
 	inQuietHours,
@@ -143,7 +141,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 
 	/** The open Gates the engine read, by key. */
 	function readOpen(gates: readonly OpenGateRef[]): Map<string, OpenGateRef> {
-		return new Map(gates.map((g) => [gateKey(g.runId, g.stepId), g]));
+		return new Map(gates.map((g) => [gateKey(g), g]));
 	}
 
 	/** What a push about the Gate may show the Person. */
@@ -334,7 +332,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			open.set(spaceId, known);
 			const asked = list
 				.filter((e) => e.type === "GateOpened" && e.stepId !== null)
-				.map((e) => gateKey(e.runId, e.stepId as string));
+				.map((e) => gateKey({ runId: e.runId, stepId: e.stepId as string }));
 			const runsWithGates = new Set(
 				[...known].map((key) => parseGateKey(key)?.runId),
 			);
@@ -440,7 +438,7 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 					sentTo.set(one.key, [...(sentTo.get(one.key) ?? []), ...sent]);
 				} else if (waiting.length > 1) {
 					await sendTo([target], {
-						key: `waiting:${at}`,
+						key: waitingKey(at),
 						kind: "gates-waiting",
 						spaceId: null,
 						runId: null,
