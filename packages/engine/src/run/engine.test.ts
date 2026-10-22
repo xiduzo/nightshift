@@ -41,6 +41,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine, type EngineInternals } from "./engine";
+import { GateClosedError } from "./gate";
 
 let sandbox: Sandbox;
 /** The run log of each engine the test made, oldest first: checked against the database after it. */
@@ -2637,7 +2638,7 @@ describe("gates", () => {
 				stepId: workerStep,
 				choice: "approve",
 			}),
-		).rejects.toThrow("is not the open Gate of this run");
+		).rejects.toBeInstanceOf(GateClosedError);
 		await expect(
 			engine.resolveGate({
 				runId: "missing",
@@ -2659,7 +2660,7 @@ describe("gates", () => {
 				stepId: open.stepId,
 				choice: "approve",
 			}),
-		).rejects.toThrow();
+		).rejects.toBeInstanceOf(GateClosedError);
 		expect(await waitForEnd(engine, run.id)).toBe("finished");
 		await expect(
 			engine.resolveGate({
