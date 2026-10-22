@@ -24,6 +24,11 @@ function projectId(): string | null {
 	return extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? null;
 }
 
+/** Whether Expo can give this build a push token: it has an EAS project id. */
+export function canGetPushToken(): boolean {
+	return projectId() !== null;
+}
+
 /** This phone's Expo push token. */
 async function pushToken(): Promise<string> {
 	const id = projectId();
