@@ -9,9 +9,9 @@ const env = {
 };
 
 describe("the origins Better Auth trusts", () => {
-	test("hold the phone app's scheme and Expo Go", () => {
+	test("hold the phone app's scheme", () => {
 		expect(authOriginsOf(3000)).toContain("nightshift://");
-		expect(authOriginsOf(3000)).toContain("exp://");
+		expect(authOriginsOf(3000)).not.toContain("exp://");
 		expect(authOriginsOf(3000)).toContain("views://mainview");
 		expect(authOriginsOf(3000)).toContain("http://localhost:3000");
 	});
@@ -21,6 +21,21 @@ describe("the origins Better Auth trusts", () => {
 		for (const origin of phoneOrigins) expect(local.has(origin)).toBe(false);
 	});
 });
+
+/**
+ * The origins Better Auth trusts for a request: its own list, with what
+ * its plugins add when it starts.
+ */
+async function requestOrigins(sandbox: AuthSandbox): Promise<unknown[]> {
+	// After it starts, the list is a function (plugins add to it).
+	const trustedOrigins = (await sandbox.auth.$context).options
+		.trustedOrigins as unknown as
+		| readonly unknown[]
+		| (() => Promise<readonly unknown[]> | readonly unknown[]);
+	return typeof trustedOrigins === "function"
+		? [...(await trustedOrigins())]
+		: [...trustedOrigins];
+}
 
 /**
  * Better Auth skips its origin check under `bun test`, so these ask its
@@ -62,11 +77,13 @@ describe("a sign-in from the phone app", () => {
 		expect(await trusted(origin)).toBe(true);
 	});
 
-	test("may come from Expo Go while you build the app", async () => {
+	test("does not come from Expo Go outside development", async () => {
 		const origin = await originOf({
-			"expo-origin": "exp://192.168.1.20:8081/--/",
+			"expo-origin": "exp://attacker.example/--/",
 		});
-		expect(await trusted(origin)).toBe(true);
+		expect(origin).toBe("exp://attacker.example/--/");
+		expect(await trusted(origin)).toBe(false);
+		expect(await requestOrigins(sandbox)).not.toContain("exp://");
 	});
 
 	test("cannot replace the origin of a page", async () => {
@@ -82,5 +99,24 @@ describe("a sign-in from the phone app", () => {
 		expect(
 			await trusted(await originOf({ "expo-origin": "otherapp://" })),
 		).toBe(false);
+	});
+});
+
+describe("a sign-in from Expo Go", () => {
+	let sandbox: AuthSandbox;
+	const nodeEnv = process.env.NODE_ENV;
+	beforeAll(async () => {
+		// The expo plugin reads NODE_ENV when Better Auth starts.
+		process.env.NODE_ENV = "development";
+		sandbox = await createAuthSandbox({ trustedOrigins: () => phoneOrigins });
+		await sandbox.auth.$context;
+	});
+	afterAll(() => {
+		process.env.NODE_ENV = nodeEnv;
+		sandbox.cleanup();
+	});
+
+	test("is trusted while you build the app", async () => {
+		expect(await requestOrigins(sandbox)).toContain("exp://");
 	});
 });
