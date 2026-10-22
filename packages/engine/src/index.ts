@@ -151,5 +151,10 @@ export {
 	openRunBundle,
 	type RunBundleSummary,
 } from "./read";
-export { createEngine, GateClosedError } from "./run";
+export {
+	createEngine,
+	GateClosedError,
+	HOST_UNREACHABLE,
+	HostUnreachableError,
+} from "./run";
 export type { ScheduleList } from "./schedules";

@@ -3,6 +3,22 @@ import type { Actor, Relay, RunCommandInput, StartRunInput } from "../contract";
 import { hasRunRow, type RunLog, type RunRow } from "../log";
 import type { RunSummary } from "../read";
 
+/** What a person reads when the Host that keeps a Space cannot be reached. */
+export const HOST_UNREACHABLE =
+	"The computer that keeps this Space cannot be reached. Try again when it is online.";
+
+/**
+ * The Host that keeps the Space cannot be reached now: this computer has
+ * no online Link to it. The person tries again later. `Relay` throws it
+ * for an action on such a Space.
+ */
+export class HostUnreachableError extends Error {
+	constructor() {
+		super(HOST_UNREACHABLE);
+		this.name = "HostUnreachableError";
+	}
+}
+
 /** How long a Device waits for a run its Host started to arrive. */
 const RUN_ARRIVES_MS = 30_000;
 
@@ -57,11 +73,7 @@ export function createRunRelay(deps: {
 			input: StartRunInput & { deviceId: string },
 			spaceId: string,
 		): Promise<RunSummary> {
-			if (!relay) {
-				throw new Error(
-					"The computer that keeps this Space cannot be reached. Try again when it is online.",
-				);
-			}
+			if (!relay) throw new HostUnreachableError();
 			const { runId } = await relay.startRun({ ...input, spaceId });
 			const deadline = deps.now() + RUN_ARRIVES_MS;
 			while (deps.now() < deadline) {

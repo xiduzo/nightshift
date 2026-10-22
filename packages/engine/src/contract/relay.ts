@@ -8,7 +8,8 @@ import type { StartRunInput } from "./engine";
 export type Relay = {
 	/**
 	 * Hands a person's action on a run walked elsewhere to its Walker,
-	 * through the Host. Throws when no Host takes it.
+	 * through the Host. Throws when no Host takes it: `HostUnreachableError`
+	 * when the Host cannot be reached.
 	 */
 	command(
 		command: RunCommandInput & {

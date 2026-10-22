@@ -2,3 +2,4 @@
 
 export { createEngine } from "./engine";
 export { GateClosedError } from "./gate";
+export { HOST_UNREACHABLE, HostUnreachableError } from "./relay";
