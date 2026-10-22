@@ -12,7 +12,7 @@ import {
 	type SpaceDocuments,
 	type WalkFiles,
 } from "@nightshift/engine";
-import { readArchive, writeArchive } from "../archive";
+import { dropArchive, readArchive, writeArchive } from "../archive";
 import type { ArchiveRef } from "../contract";
 import { createHostSpaces, type HostSpaces } from "../links";
 import { createRunCommands, type RunCommands } from "./commands";
@@ -116,8 +116,33 @@ export function createEngineExchange(deps: {
 		...(deps.upstream ? { upstream: deps.upstream } : {}),
 	});
 
+	/**
+	 * A step another Replica reopened: the copy of its transcript kept
+	 * here from an earlier end is not whole any more. It goes, so the step
+	 * is read again once it ends. In a Space this Replica keeps, the
+	 * archive is the Walker's own copy, and the Walker puts it again.
+	 */
+	async function dropReopenedCopies(added: readonly LoggedEvent[]) {
+		for (const e of added) {
+			if (e.type !== "StepReopened" || !e.runId || !e.stepId) continue;
+			const owner = await runOwner(e.runId);
+			if (!owner || (await hostSpaces.hostOf(owner.spaceId)) === null) {
+				continue;
+			}
+			await dropArchive(dataDir, {
+				kind: "transcript",
+				spaceId: owner.spaceId,
+				runId: e.runId,
+				stepId: e.stepId,
+			});
+		}
+	}
+
 	return {
-		rows: withIngested(createExchange(deps), deps.onIngested),
+		rows: withIngested(createExchange(deps), async (added) => {
+			await dropReopenedCopies(added);
+			await deps.onIngested?.(added);
+		}),
 		commands: createRunCommands({ db }),
 		hostSpaces,
 		feeds,
@@ -155,9 +180,8 @@ export function createEngineExchange(deps: {
 /** The exchange, with a hook on the events each ingested batch added. */
 function withIngested(
 	exchange: Exchange,
-	onIngested?: (added: readonly LoggedEvent[]) => Promise<void>,
+	onIngested: (added: readonly LoggedEvent[]) => Promise<void>,
 ): Exchange {
-	if (!onIngested) return exchange;
 	return {
 		...exchange,
 		async ingest(rows, check) {

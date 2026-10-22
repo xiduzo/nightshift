@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { type FakeHarness, fakeHarness } from "@nightshift/agents/testing";
 import {
 	event,
 	member,
@@ -35,6 +36,8 @@ import { createDeviceExchange, type DeviceExchange } from "./device-exchange";
 let a: Sandbox;
 let b: Sandbox;
 let paired: PairedReplicas;
+/** The agent of both Replicas: a first session that writes, then waits; then one that ends. */
+let agent: FakeHarness;
 let projectId: string;
 let exchange: DeviceExchange;
 /** The links still open: closed after each test. */
@@ -42,7 +45,19 @@ let periods: { stop(): Promise<void> }[];
 
 beforeEach(async () => {
 	[a, b] = await Promise.all([createSandbox(), createSandbox()]);
-	paired = await pairedReplicas(a, b);
+	agent = fakeHarness((_input, call) =>
+		call === 0
+			? {
+					steps: [
+						{ type: "text", text: "first part", chunkSize: 100 },
+						{ type: "wait", ms: 60_000 },
+					],
+				}
+			: { steps: [{ type: "text", text: "second part", chunkSize: 100 }] },
+	);
+	paired = await pairedReplicas(a, b, {
+		harnesses: { "claude-code": agent },
+	});
 	projectId = (
 		await paired.host.space(a.spaceId).addProject({ repoPath: a.repoPath })
 	).id;
@@ -125,6 +140,27 @@ const gateFlow = {
 		},
 	],
 	edges: [{ id: "e1", from: "hello", outcome: "pass", to: "ship" }],
+} as Flow;
+
+/** One Agent step. */
+const agentFlow = {
+	version: 5,
+	inputs: [],
+	outputs: [],
+	start: "work",
+	nodes: [
+		{
+			id: "work",
+			type: "agent",
+			position: { x: 0, y: 0 },
+			prompt: "Work.",
+			harness: "claude-code",
+			model: "sonnet",
+			permissionMode: "acceptEdits",
+			session: "fresh",
+		},
+	],
+	edges: [],
 } as Flow;
 
 /** One command step: a run that ends on its own. */
@@ -266,6 +302,36 @@ const outputOf = (items: RunStreamItem[]) =>
 			? [item.entry.event.text.trim()]
 			: [],
 	);
+
+/** The text of a step's transcript entries in `items`. */
+const textOf = (items: RunStreamItem[], stepId: string) =>
+	items
+		.flatMap((item) =>
+			item.kind === "transcript" && item.entry.stepId === stepId
+				? [JSON.stringify(item.entry.event)]
+				: [],
+		)
+		.join("\n");
+
+/** Watches a run on `engine` in the background: every item it streams. */
+function watchItems(engine: PeerEngine, runId: string) {
+	const controller = new AbortController();
+	const items: RunStreamItem[] = [];
+	const done = (async () => {
+		for await (const item of engine
+			.space(a.spaceId)
+			.watchRun(runId, { signal: controller.signal })) {
+			items.push(item);
+		}
+	})().catch(() => {});
+	return {
+		items,
+		async stop() {
+			controller.abort();
+			await done;
+		},
+	};
+}
 
 /** Watches a run on `engine` in the background: its transcript entries. */
 function watch(engine: PeerEngine, runId: string, afterSeq?: number) {
@@ -687,6 +753,58 @@ describe("live transcripts over the exchange", () => {
 		expect(new Set(seen).size).toBe(seen.length);
 		await again.stop();
 		await untilStatus(paired.host, run.id, "finished");
+	});
+
+	test("B shows a step A reopened whole, not the copy it kept of the step's first end", async () => {
+		await paired.projectOnDevice(projectId);
+		const onA = paired.host.space(a.spaceId, { personId: paired.personId });
+		const run = await onA.startRun({ projectId, flow: agentFlow });
+		const step = await waitFor(
+			async () => (await onA.getRun(run.id)).steps[0]?.id,
+			{ label: "the step on A" },
+		);
+		const onDisk = join(a.dataDir, "transcripts", run.id, `${step}.ndjson`);
+		await waitFor(
+			async () =>
+				(
+					await Bun.file(onDisk)
+						.text()
+						.catch(() => "")
+				).includes("first part"),
+			{ label: "the first part on A" },
+		);
+		await onA.stopRun(run.id);
+		await untilStatus(paired.host, run.id, "stopped");
+		online();
+		await untilStatus(paired.device, run.id, "stopped");
+
+		// B reads the ended step from A, and keeps the copy.
+		const first = watchItems(paired.device, run.id);
+		await waitFor(() => textOf(first.items, step).includes("first part"), {
+			label: "the step on B",
+		});
+		await first.stop();
+		const ref = {
+			kind: "transcript" as const,
+			spaceId: a.spaceId,
+			runId: run.id,
+			stepId: step,
+		};
+		expect(await paired.device.exchange.readArchive(ref)).not.toBeNull();
+
+		// A resume reopens the step: its session goes on, and the run ends.
+		await onA.resumeRun(run.id);
+		await untilStatus(paired.host, run.id, "finished");
+		await untilStatus(paired.device, run.id, "finished");
+		expect((await onA.getRun(run.id)).steps.map((s) => s.id)).toEqual([step]);
+
+		const again = watchItems(paired.device, run.id);
+		await waitFor(() => textOf(again.items, step).includes("second part"), {
+			label: "the reopened step on B",
+			timeoutMs: 3_000,
+		}).catch(() => {});
+		await again.stop();
+		expect(textOf(again.items, step)).toContain("second part");
 	});
 
 	test("A shows each item's output of a For Each B walked, in seq order, from its archive", async () => {

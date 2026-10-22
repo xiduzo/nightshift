@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ArchiveRef } from "../contract";
 
@@ -35,6 +35,14 @@ export async function writeArchive(
 	const temporary = `${path}.${process.pid}.tmp`;
 	await writeFile(temporary, content);
 	await rename(temporary, path);
+}
+
+/** Removes one file of the archive. Nothing happens when this Replica has none. */
+export async function dropArchive(
+	dataDir: string,
+	ref: ArchiveRef,
+): Promise<void> {
+	await rm(archivePath(dataDir, ref), { force: true });
 }
 
 /** One file of the archive, or null when this Replica has none. */
