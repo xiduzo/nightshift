@@ -18,7 +18,7 @@ import {
 	showNotification,
 	subscriptionParts,
 } from "./browser";
-import { notificationQueries } from "./queries";
+import { notificationMutations, notificationQueries } from "./queries";
 
 /**
  * Follows what happens in every Space you are in (`notifications.watch`),
@@ -156,11 +156,15 @@ async function renewOwnScreen(queryClient: QueryClient): Promise<void> {
 			setOwnScreenId(null);
 			return;
 		}
-		const screen = await client.notifications.targets.register({
-			kind: "web",
-			...browserName(),
-			...subscriptionParts(subscription),
-		});
+		// The same mutation as the Settings card, run outside a component.
+		const screen = await queryClient
+			.getMutationCache()
+			.build(queryClient, notificationMutations.registerScreen())
+			.execute({
+				kind: "web",
+				...browserName(),
+				...subscriptionParts(subscription),
+			});
 		setOwnScreenId(screen.id);
 		void queryClient.invalidateQueries({
 			queryKey: notificationQueries.all(),
