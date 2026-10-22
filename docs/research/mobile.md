@@ -288,7 +288,14 @@ The action `approve` answers `options[0].id`, `reject` answers
 `options[1].id`: `gates.resolve({ runId, stepId, choice })`. The buttons
 say "Approve" and "Reject", because an iOS category has fixed button
 titles. `options[n].label` is the author's text for the app to show. The
-Host refuses an answer to a Gate that is already closed.
+button sends `via: "lock-screen"`, and the Host alone checks it. `gates.resolve`
+declares its refusals: `GATE_CLOSED` (the Gate does not wait anymore: someone
+answered it, its run ended, or an answer is on its way), `NEEDS_APP` (the author
+did not mark the Gate for the lock screen, or the choice is not one of its
+choices), `FORBIDDEN` (the role does not allow an answer) and `NOT_FOUND` (the
+Gate is not in one of the person's Spaces). The phone does nothing more for a
+closed Gate, shows "Answer this Gate in the app" for `NEEDS_APP`, and "Your
+answer was not sent" for any other refusal or error.
 
 **Priority.** Gates and `gates-waiting`: `priority: "high"`,
 `interruptionLevel: "time-sensitive"` (the app needs the Time Sensitive
