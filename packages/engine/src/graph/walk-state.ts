@@ -1,11 +1,14 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import type { Database } from "@nightshift/db";
-import { lgCheckpoint, lgWrite } from "@nightshift/db/schema";
+import { lgCheckpoint, lgWrite, step } from "@nightshift/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import type { WalkFile, WalkFiles, WalkRef } from "../contract";
 import {
 	ForeignRowsError,
 	type RunHistory,
 	type RunLog,
+	readTranscriptFile,
 	stepIdsOfRun,
 } from "../log";
 
@@ -27,6 +30,18 @@ export type RunWalks = WalkFiles & {
 	 * is refused whole (`ForeignRowsError`).
 	 */
 	importWalk(runId: string, checkpoint: string): Promise<void>;
+	/**
+	 * Writes the transcript a step's old Walker wrote (the content of its
+	 * `transcript` file) into the step's own file here, when it has none:
+	 * the entries this computer writes of the step come after it. So a
+	 * step that waited through a move keeps its first part, on the run
+	 * page and in what this computer archives of it.
+	 */
+	importTranscript(
+		runId: string,
+		stepId: string,
+		content: string,
+	): Promise<void>;
 };
 
 export function createRunWalks(deps: {
@@ -116,7 +131,22 @@ export function createRunWalks(deps: {
 		});
 	}
 
-	return { exportWalk, ownFile, importWalk };
+	async function importTranscript(
+		runId: string,
+		stepId: string,
+		content: string,
+	): Promise<void> {
+		const [row] = await db
+			.select({ runId: step.runId, transcriptPath: step.transcriptPath })
+			.from(step)
+			.where(eq(step.id, stepId));
+		if (!row || row.runId !== runId || !row.transcriptPath) return;
+		if ((await readTranscriptFile(row.transcriptPath)).length > 0) return;
+		await mkdir(dirname(row.transcriptPath), { recursive: true });
+		await writeFile(row.transcriptPath, content);
+	}
+
+	return { exportWalk, ownFile, importWalk, importTranscript };
 }
 
 /**

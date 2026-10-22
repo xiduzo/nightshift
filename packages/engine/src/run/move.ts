@@ -101,7 +101,7 @@ export async function takeOver(
 		log: Pick<RunLog, "events">;
 		runner: Pick<Runner, "forget" | "sleeps" | "continueTranscriptAfter">;
 		archive: Pick<RunsPort, "archived">;
-		walks: Pick<RunWalks, "importWalk">;
+		walks: Pick<RunWalks, "importWalk" | "importTranscript">;
 	},
 	runId: string,
 ): Promise<void> {
@@ -115,8 +115,10 @@ export async function takeOver(
 		throw new Error("The archive has no checkpoint of the run.");
 	}
 	await deps.walks.importWalk(runId, checkpoint);
-	// The old Walker's transcript files are on its disk, not here: the
-	// next entry is numbered after the last one it archived.
+	// The old Walker's transcript files are on its disk, not here: each
+	// step's file starts as the archive's copy (a step reopened or answered
+	// here goes on in it), and the next entry is numbered after the last
+	// one the old Walker archived.
 	let lastSeq = 0;
 	for (const stepId of await stepIdsOfRun(deps.db, runId)) {
 		const text = await deps.archive.archived({
@@ -125,7 +127,9 @@ export async function takeOver(
 			runId,
 			stepId,
 		});
-		for (const entry of text === null ? [] : parseTranscript(text)) {
+		if (text === null) continue;
+		await deps.walks.importTranscript(runId, stepId, text);
+		for (const entry of parseTranscript(text)) {
 			lastSeq = Math.max(lastSeq, entry.seq);
 		}
 	}

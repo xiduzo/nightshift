@@ -23,7 +23,7 @@ export function createRunControl(deps: {
 	relay: RunRelay;
 	archive: Pick<RunsPort, "keepWalk" | "archived">;
 	/** The walk state of this computer's runs: what a move keeps, and what a take-over imports. */
-	walks: Pick<RunWalks, "exportWalk" | "importWalk">;
+	walks: Pick<RunWalks, "exportWalk" | "importWalk" | "importTranscript">;
 	pendingCommands: RunsPort["pendingCommands"];
 	device: { id: string };
 	/** This computer's owner as the Host that keeps the Space knows them (`Peers.personOnHost`). */

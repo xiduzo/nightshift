@@ -256,12 +256,69 @@ describe("a run that moves to another Device", () => {
 			.select({ transcriptPath: step.transcriptPath })
 			.from(step)
 			.where(eq(step.id, open));
-		// What B wrote of the Gate's step: its answer.
-		const written = await readTranscriptFile(gateRow?.transcriptPath as string);
+		// What B wrote of the Gate's step, its answer, comes after A's part.
+		const fromA = before.filter((e) => e.stepId === open).length;
+		const written = (
+			await readTranscriptFile(gateRow?.transcriptPath as string)
+		).slice(fromA);
 		expect(written.length).toBeGreaterThan(0);
 		expect(written.map((e) => e.seq)).toEqual(
 			written.map((_, i) => lastOnA + 1 + i),
 		);
+	});
+
+	test("the step it waits in keeps what the old Walker wrote of it, on the run page and in what the new Walker archives", async () => {
+		const { a, b } = await pair();
+		const { runId, projectId } = await waitingOn(a);
+		const open = (await spaceOf(a, a).getRun(runId)).steps[1]?.id as string;
+		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		const ref = {
+			kind: "transcript" as const,
+			spaceId: a.sandbox.spaceId,
+			runId,
+			stepId: open,
+		};
+		const before = parseTranscript(archive.get(keyOf(ref)) ?? "");
+		expect(before.length).toBeGreaterThan(0);
+		// B is another computer: the files A wrote are not on its disk.
+		await rm(join(a.sandbox.dataDir, "transcripts"), {
+			recursive: true,
+			force: true,
+		});
+		await copyRows(a, b, projectId);
+		await b.context.takeOver(runId);
+
+		const onB = spaceOf(b, a);
+		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
+		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
+			label: "the run to end on B",
+		});
+		// What B archives of the step once it ended: A's entries, then B's.
+		const [file] = (await b.context.walks.exportWalk(runId)).filter(
+			(f) => f.ref.kind === "transcript" && f.ref.stepId === open,
+		);
+		const kept = parseTranscript(file?.content ?? "");
+		expect(kept.slice(0, before.length)).toEqual(before);
+		expect(kept.length).toBeGreaterThan(before.length);
+
+		// The run page on B shows the step whole.
+		const controller = new AbortController();
+		const seen: number[] = [];
+		const watching = (async () => {
+			for await (const item of onB.watchRun(runId, {
+				signal: controller.signal,
+			})) {
+				if (item.kind === "transcript" && item.entry.stepId === open) {
+					seen.push(item.entry.seq);
+				}
+			}
+		})();
+		await waitFor(() => seen.length >= kept.length, {
+			label: "the Gate's step on B's run page",
+		}).catch(() => {});
+		controller.abort();
+		await watching;
+		expect(seen).toEqual(kept.map((e) => e.seq));
 	});
 
 	test("a second take-over of the same Checkpoint changes nothing", async () => {

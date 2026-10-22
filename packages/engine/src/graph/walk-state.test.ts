@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { readFile, rm } from "node:fs/promises";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { lgCheckpoint, lgWrite, run, step } from "@nightshift/db/schema";
 import type { CommandNode, DecisionNode, Flow } from "@nightshift/flows";
@@ -257,6 +259,32 @@ describe("the walk state of a run", () => {
 		// A second import changes nothing, and rows B has are kept.
 		await walks.importWalk(detail.id, checkpoint);
 		expect(await checkpointRows(b, detail.id)).toEqual(onB);
+		await a.space.stopRun(detail.id);
+	});
+
+	test("takes a step's transcript from its old Walker into the step's own file, and never over one it has", async () => {
+		const a = await computer();
+		const detail = await waitingRun(a.space, a.sandbox.repoPath);
+		const gateStep = detail.steps[1]?.id as string;
+		const [row] = await a.sandbox.db
+			.select({ transcriptPath: step.transcriptPath })
+			.from(step)
+			.where(eq(step.id, gateStep));
+		const path = row?.transcriptPath as string;
+		const own = await readFile(path, "utf8");
+		const walks = walksOf(a.sandbox);
+		const fromBefore = `${JSON.stringify({ ...JSON.parse(own.split("\n")[0] as string), seq: 99 })}\n`;
+
+		// It has entries of its own: they stay.
+		await walks.importTranscript(detail.id, gateStep, fromBefore);
+		expect(await readFile(path, "utf8")).toBe(own);
+		// Not a step of the run: nothing is written.
+		await rm(path);
+		await walks.importTranscript("another-run", gateStep, fromBefore);
+		expect(existsSync(path)).toBe(false);
+		// None here: the old Walker's part is the start of its file.
+		await walks.importTranscript(detail.id, gateStep, fromBefore);
+		expect(await readFile(path, "utf8")).toBe(fromBefore);
 		await a.space.stopRun(detail.id);
 	});
 
