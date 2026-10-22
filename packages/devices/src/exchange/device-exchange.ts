@@ -111,10 +111,15 @@ export function createDeviceExchange(deps: {
 		}
 		for (const [runId, steps] of ended) {
 			// Empty for a run that has moved since: its new Walker sends its files.
-			for (const { ref, content } of await engine.exchange.exportWalk(runId, {
-				steps,
-			})) {
-				await client.archive.put({ ref, content }, { signal });
+			for (const { ref, content, stamp } of await engine.exchange.exportWalk(
+				runId,
+				{ steps },
+			)) {
+				// The stamp says which end of the step the copy holds.
+				await client.archive.put(
+					{ ref, content, ...(stamp ? { stamp } : {}) },
+					{ signal },
+				);
 			}
 		}
 	}

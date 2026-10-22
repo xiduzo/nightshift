@@ -1,5 +1,6 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
 import type {
+	CopyStamp,
 	FeedStep,
 	OwnDevice,
 	RunCommandInput,
@@ -66,13 +67,18 @@ export type HostExchange = {
 		key: DeviceKeyAccess,
 		input: { spaceId: string; profile: string },
 	): Promise<void>;
-	/** Keeps a file of a run the Device walks. */
+	/** Keeps a file of a run the Device walks, with its stamp for a step's file (none from an older Walker). */
 	archivePut(
 		key: DeviceKeyAccess,
 		ref: ArchiveRef,
 		content: string,
+		stamp?: CopyStamp,
 	): Promise<void>;
-	/** A file of a run of a Space the key's Person is a Member of. Null when there is none. */
+	/**
+	 * A file of a run of a Space the key's Person is a Member of. A copy
+	 * of a step's file only when its stamp holds the step as this Host's
+	 * log says. Null when there is none.
+	 */
 	archiveGet(key: DeviceKeyAccess, ref: ArchiveRef): Promise<string | null>;
 	/**
 	 * A step's live transcript, for a Member of its run's Space: its

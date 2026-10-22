@@ -42,6 +42,8 @@ let projectId: string;
 let exchange: DeviceExchange;
 /** The links still open: closed after each test. */
 let periods: { stop(): Promise<void> }[];
+/** More Replicas a test paired with A: removed after its links. */
+let others: Sandbox[];
 
 beforeEach(async () => {
 	[a, b] = await Promise.all([createSandbox(), createSandbox()]);
@@ -63,24 +65,31 @@ beforeEach(async () => {
 	).id;
 	exchange = deviceExchange();
 	periods = [];
+	others = [];
 });
 afterEach(async () => {
 	for (const period of periods) await period.stop();
-	await Promise.all([a.cleanup(), b.cleanup()]);
+	await Promise.all([a, b, ...others].map((s) => s.cleanup()));
 });
 
-function deviceExchange(): DeviceExchange {
+function deviceExchange(
+	engine: PeerEngine = paired.device,
+	selfId: string = b.deviceId,
+): DeviceExchange {
 	return createDeviceExchange({
-		engine: paired.device,
+		engine,
 		hostId: paired.hostId,
-		selfId: b.deviceId,
+		selfId,
 		projectWaitMs: 5_000,
 		idleMs: 1_000,
 	});
 }
 
-/** B's link to A over `client`, with the exchange attached, until `stop`. */
-function online(client: HostClient = paired.memory.client(paired.key)) {
+/** B's link to A over `client`, with the exchange attached (B's by default), until `stop`. */
+function online(
+	client: HostClient = paired.memory.client(paired.key),
+	on: DeviceExchange = exchange,
+) {
 	const link = httpsLink({
 		link: {
 			hostId: paired.hostId,
@@ -101,7 +110,7 @@ function online(client: HostClient = paired.memory.client(paired.key)) {
 		maxBackoffMs: 20,
 		streamBackoff: { firstMs: 5, maxMs: 20 },
 	});
-	const detach = exchange.attach(link);
+	const detach = on.attach(link);
 	const period = {
 		link,
 		async stop() {
@@ -806,6 +815,113 @@ describe("live transcripts over the exchange", () => {
 		await again.stop();
 		expect(textOf(again.items, step)).toContain("second part");
 	});
+
+	test("C, a third Replica, reads a step B reopened between B's rows and B's copy, and shows its second end", async () => {
+		const c = await createSandbox();
+		others.push(c);
+		const viewer = await paired.pair(c, "C");
+		await viewer.projectOnDevice(projectId);
+
+		// B's copies of the transcript wait at the Host's door while `held`.
+		let held = false;
+		let release = () => {};
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const client = paired.memory.client(paired.key);
+		online({
+			...client,
+			archive: {
+				...client.archive,
+				put: (async (input, options) => {
+					if (held && input.ref.kind === "transcript") await gate;
+					return client.archive.put(input, options);
+				}) as HostClient["archive"]["put"],
+			},
+		});
+		const run = await walkOnB(agentFlow);
+		const onB = paired.device.space(a.spaceId, { personId: paired.personId });
+		const step = await waitFor(
+			async () => (await onB.getRun(run.id)).steps[0]?.id,
+			{ label: "the step on B" },
+		);
+		const ref = {
+			kind: "transcript" as const,
+			spaceId: a.spaceId,
+			runId: run.id,
+			stepId: step,
+		};
+		const onDisk = join(b.dataDir, "transcripts", run.id, `${step}.ndjson`);
+		await waitFor(
+			async () =>
+				(
+					await Bun.file(onDisk)
+						.text()
+						.catch(() => "")
+				).includes("first part"),
+			{ label: "the first part on B" },
+		);
+		await onB.stopRun(run.id);
+		await untilStatus(paired.host, run.id, "stopped");
+		await waitFor(
+			async () =>
+				(await paired.hostExchange.archiveGet(paired.key, ref))?.includes(
+					"first part",
+				),
+			{ label: "the copy of the first end on A" },
+		);
+
+		// The step ends again. Its rows reach A, its copy does not yet.
+		held = true;
+		await onB.resumeRun(run.id);
+		/** The step ended after its reopen, as `engine` knows it. */
+		const endedAgain = (engine: PeerEngine) =>
+			waitFor(
+				async () => {
+					const steps = await engine
+						.space(a.spaceId)
+						.getRun(run.id)
+						.then((r) => r.steps)
+						.catch(() => []);
+					return steps[0]?.endedAt != null && steps[0].sessions.length === 2;
+				},
+				{ label: "the second end of the step" },
+			);
+		await endedAgain(paired.host);
+		online(
+			paired.memory.client(viewer.key),
+			deviceExchange(viewer.engine, c.deviceId),
+		);
+		await endedAgain(viewer.engine);
+
+		// C reads the step now: never the copy of the first end as the whole step.
+		const between = watchItems(viewer.engine, run.id);
+		await waitFor(() => textOf(between.items, step).includes("second part"), {
+			label: "the second end on C, before the copy",
+			timeoutMs: 3_000,
+		}).catch(() => {});
+		await between.stop();
+		expect(await viewer.engine.exchange.readArchive(ref)).toBeNull();
+
+		// The copy lands. C reads the step again.
+		release();
+		await waitFor(
+			async () =>
+				(await paired.hostExchange.archiveGet(paired.key, ref))?.includes(
+					"second part",
+				),
+			{ label: "the copy of the second end on A" },
+		);
+		const after = watchItems(viewer.engine, run.id);
+		await waitFor(() => textOf(after.items, step).includes("second part"), {
+			label: "the second end on C",
+			timeoutMs: 3_000,
+		}).catch(() => {});
+		await after.stop();
+
+		expect(textOf(between.items, step)).toContain("second part");
+		expect(textOf(after.items, step)).toContain("second part");
+	}, 20_000);
 
 	test("A shows each item's output of a For Each B walked, in seq order, from its archive", async () => {
 		const run = await walkOnB(await forEachFlow(b.repoPath));

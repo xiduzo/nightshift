@@ -9,6 +9,7 @@ import type {
 	OwnDevice,
 	PeerContext,
 	PeersFactory,
+	WalkFile,
 	WalkRef,
 } from "../contract/peers";
 import { createRunLog } from "../log/run-log";
@@ -76,9 +77,12 @@ const keyOf = (ref: WalkRef) =>
 let sandboxes: Sandbox[];
 /** The archive both computers keep a Space in. */
 let archive: Map<string, string>;
+/** The stamps of the files in `archive`. */
+let stamps: Map<string, WalkFile["stamp"]>;
 beforeEach(() => {
 	sandboxes = [];
 	archive = new Map();
+	stamps = new Map();
 });
 afterEach(async () => {
 	for (const s of sandboxes) await s.cleanup();
@@ -106,7 +110,10 @@ async function computer(others: () => OwnDevice[] = () => []) {
 			runs: {
 				...alone.runs,
 				async keepWalk(files) {
-					for (const f of files) archive.set(keyOf(f.ref), f.content);
+					for (const f of files) {
+						archive.set(keyOf(f.ref), f.content);
+						stamps.set(keyOf(f.ref), f.stamp);
+					}
 				},
 				archived: async (ref) => archive.get(keyOf(ref)) ?? null,
 			},
@@ -226,6 +233,48 @@ describe("a run that moves to another Device", () => {
 		]);
 		// A walks it no more: its walk state is empty there.
 		expect(await a.context.walks.exportWalk(runId)).toEqual([]);
+	});
+
+	test("its new Walker stamps each step's copy as the old one did, and the Gate's with its end once answered", async () => {
+		const { a, b } = await pair();
+		const { runId, projectId } = await waitingOn(a);
+		const [build, open] = (await spaceOf(a, a).getRun(runId)).steps.map(
+			(s) => s.id,
+		) as [string, string];
+		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		const transcript = (stepId: string): WalkRef => ({
+			kind: "transcript",
+			spaceId: a.sandbox.spaceId,
+			runId,
+			stepId,
+		});
+		expect(stamps.get(keyOf(transcript(build)))).toEqual({
+			opening: 1,
+			ended: true,
+		});
+		// The Gate waits: its copy is of a step that runs.
+		expect(stamps.get(keyOf(transcript(open)))).toEqual({
+			opening: 1,
+			ended: false,
+		});
+
+		await copyRows(a, b, projectId);
+		await b.context.takeOver(runId);
+		/** The stamp of a step's transcript as B exports it. */
+		const onB = async (stepId: string) =>
+			(await b.context.walks.exportWalk(runId)).find(
+				(f) => keyOf(f.ref) === keyOf(transcript(stepId)),
+			)?.stamp;
+		// From B's log: the same stamps, wherever the run's events came from.
+		expect(await onB(build)).toEqual(stamps.get(keyOf(transcript(build))));
+		expect(await onB(open)).toEqual(stamps.get(keyOf(transcript(open))));
+
+		await spaceOf(b, a).resolveGate({ runId, stepId: open, choice: "approve" });
+		await waitFor(
+			async () => (await spaceOf(b, a).getRun(runId)).status === "finished",
+			{ label: "the run to end on B" },
+		);
+		expect(await onB(open)).toEqual({ opening: 1, ended: true });
 	});
 
 	test("its new Walker numbers transcript entries after those of the old one", async () => {

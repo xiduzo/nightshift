@@ -180,6 +180,40 @@ describe("the walk state of a run", () => {
 		await a.space.stopRun(detail.id);
 	});
 
+	test("stamps each step's files with the end they hold, as the log says", async () => {
+		const a = await computer();
+		const detail = await waitingRun(a.space, a.sandbox.repoPath);
+		const [build, open] = detail.steps.map((s) => s.id) as [string, string];
+
+		const files = await a.context.walks.exportWalk(detail.id);
+		const stampOf = (kind: string, stepId: string) =>
+			files.find(
+				(f) =>
+					f.ref.kind === kind && "stepId" in f.ref && f.ref.stepId === stepId,
+			)?.stamp;
+		// The command step ended. The Gate waits: its opening has not ended.
+		expect(stampOf("log", build)).toEqual({ opening: 1, ended: true });
+		expect(stampOf("transcript", open)).toEqual({ opening: 1, ended: false });
+		expect(files.at(-1)?.stamp).toBeUndefined();
+
+		// The same stamp a reader of this Replica's log knows the step by.
+		const step = (stepId: string) => ({
+			spaceId: a.sandbox.spaceId,
+			runId: detail.id,
+			stepId,
+		});
+		expect(await a.context.stepStamp(step(build))).toEqual({
+			opening: 1,
+			ended: true,
+		});
+		expect(await a.context.stepStamp(step(open))).toEqual({
+			opening: 1,
+			ended: false,
+		});
+		expect(await a.context.stepStamp(step("no-such-step"))).toBeNull();
+		await a.space.stopRun(detail.id);
+	});
+
 	test("of a run walked elsewhere is empty, and so is each of its files", async () => {
 		const a = await computer();
 		const detail = await waitingRun(a.space, a.sandbox.repoPath);

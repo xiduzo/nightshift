@@ -32,7 +32,8 @@ import type { HostExchange } from "./types";
  * - A command needs the role that allows the action, checked here. A run
  *   this Host walks gets it at once; any other waits for its Walker.
  * - The archive keeps what a Walker puts for its own runs, and gives a
- *   Member what it asks of their Spaces' runs.
+ *   Member what it asks of their Spaces' runs: a copy of a step's file
+ *   only when its stamp holds the step as this Host's log says.
  * - A Walker's paths (its worktree, its transcripts and logs on disk) stay
  *   with its owner's Replicas: the Host drops them from the rows of a
  *   Device of another Person before it keeps them, and from the rows it
@@ -267,10 +268,10 @@ export function createHostExchange(deps: {
 			});
 		},
 
-		async archivePut(key, ref, content) {
+		async archivePut(key, ref, content, stamp) {
 			await admit(key);
 			await ownRun(key, ref);
-			await exchange.writeArchive(ref, content);
+			await exchange.writeArchive(ref, content, stamp);
 		},
 
 		async archiveGet(key, ref) {
@@ -287,6 +288,8 @@ export function createHostExchange(deps: {
 				const step = await exchange.stepOwner(ref.stepId);
 				if (step?.runId !== ref.runId) return null;
 			}
+			// Its own files are the step as it is now. A copy of a step's file
+			// of an earlier end is not there yet (`EngineExchange.readArchive`).
 			return owner.walkerId === deps.selfId
 				? exchange.ownFile(ref)
 				: exchange.readArchive(ref);

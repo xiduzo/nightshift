@@ -102,6 +102,7 @@ export function createPeers(
 		dataDir,
 		hostOf,
 		...(relay ? { relay } : {}),
+		stepStamp: context.stepStamp,
 	});
 	const exchange = createEngineExchange({
 		db,
@@ -109,7 +110,7 @@ export function createPeers(
 		bus,
 		history,
 		walks: context.walks,
-		stepEnded: context.stepEnded,
+		stepStamp: context.stepStamp,
 		dataDir,
 		documents,
 		// A run moved here: this computer walks it from now on.

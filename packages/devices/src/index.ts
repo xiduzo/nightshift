@@ -11,6 +11,7 @@
 export {
 	type ArchiveRef,
 	archiveRefSchema,
+	copyStampSchema,
 	type FollowWant,
 	feedStepSchema,
 	followWantSchema,

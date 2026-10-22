@@ -1,5 +1,6 @@
 import {
 	archiveRefSchema,
+	copyStampSchema,
 	feedStepSchema,
 	offerCapsSchema,
 	runRowsSchema,
@@ -200,9 +201,21 @@ export const archive = {
 				"Keeps a file of a run walked elsewhere: a transcript, a command log or checkpoints.",
 		})
 		.output(output(z.void()))
-		.input(z.object({ ref: archiveRefSchema, content: z.string() }))
+		.input(
+			z.object({
+				ref: archiveRefSchema,
+				content: z.string(),
+				// Which end of its step the copy holds. A Walker of an older version sends none.
+				stamp: copyStampSchema.optional(),
+			}),
+		)
 		.handler(({ context, input }) =>
-			context.exchange.archivePut(context.deviceKey, input.ref, input.content),
+			context.exchange.archivePut(
+				context.deviceKey,
+				input.ref,
+				input.content,
+				input.stamp,
+			),
 		),
 	/** A file of a run in a Space the Device's owner is in. Null when there is none. */
 	get: deviceProcedure("archive")

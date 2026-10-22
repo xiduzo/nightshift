@@ -4,6 +4,7 @@ import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import {
 	archiveRefSchema,
+	copyStampSchema,
 	feedStepSchema,
 	type HostClient,
 	type HostHello,
@@ -199,7 +200,8 @@ export function inMemoryHost(deps: {
 			archive: {
 				put: unary("archive", (key, input: Input<"archive", "put">) => {
 					archiveRefSchema.parse(input.ref);
-					return exchange.archivePut(key, input.ref, input.content);
+					const stamp = input.stamp && copyStampSchema.parse(input.stamp);
+					return exchange.archivePut(key, input.ref, input.content, stamp);
 				}),
 				get: unary("archive", (key, input: Input<"archive", "get">) => {
 					archiveRefSchema.parse(input.ref);

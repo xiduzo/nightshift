@@ -16,6 +16,25 @@ import { createWorkHub } from "../work";
 import { inMemoryHost, type MemoryHost } from "./in-memory-host";
 import { withPeers } from "./peers";
 
+/** A Device paired with A: its engine, its key on A, and its copies of A's Spaces. */
+export type PairedDevice = {
+	/** The Device's engine: a Device of A's owner, paired with A. */
+	engine: PeerEngine;
+	/** Its Device key on A. */
+	key: DeviceKeyAccess;
+	/** Its Space documents: its read-only copies of A's Spaces. */
+	documents: SpaceDocuments;
+	/**
+	 * Brings a project of A to the Device, as the Space document does.
+	 * With `clone`, the Device has a folder of it too, so it can walk its
+	 * runs.
+	 */
+	projectOnDevice(
+		projectId: string,
+		options?: { clone?: boolean },
+	): Promise<void>;
+};
+
 /** Replica A as a Host and Replica B as its paired Device, in one process. */
 export type PairedReplicas = {
 	/** A's engine: the Host, and the Walker of its own runs. */
@@ -34,14 +53,10 @@ export type PairedReplicas = {
 	personId: string;
 	/** B's Space documents: its read-only copies of A's Spaces. */
 	documents: SpaceDocuments;
-	/**
-	 * Brings a project of A to B, as the Space document does. With
-	 * `clone`, B has a folder of it too, so B can walk its runs.
-	 */
-	projectOnDevice(
-		projectId: string,
-		options?: { clone?: boolean },
-	): Promise<void>;
+	/** Brings a project of A to B (`PairedDevice.projectOnDevice`). */
+	projectOnDevice: PairedDevice["projectOnDevice"];
+	/** Pairs one more Device of A's owner with A, as B is: a third Replica. */
+	pair(sandbox: Sandbox, name: string): Promise<PairedDevice>;
 };
 
 /**
@@ -49,7 +64,8 @@ export type PairedReplicas = {
  * on A's registry with a key of A's owner, B keeps A's Spaces (a
  * `host_link`, the Host's Spaces, their Members mirrored into B's Space
  * documents), and each engine has its relay. B reaches A through `memory`
- * only: A's own relay has no links.
+ * only: A's own relay has no links. `pair` adds another Device the same
+ * way.
  */
 export async function pairedReplicas(
 	a: Sandbox,
@@ -77,13 +93,6 @@ export async function pairedReplicas(
 		}),
 		{ runLog: createRunLog(a.db, { walkerId: a.deviceId }) },
 	);
-	await host.devices.join({
-		id: b.deviceId,
-		name: "B",
-		platform: "test",
-		ownerId: personId,
-		homeHost: null,
-	});
 	const hostExchange = createHostExchange({
 		db: a.db,
 		engine: host,
@@ -93,16 +102,6 @@ export async function pairedReplicas(
 		isHost: () => true,
 		work: createWorkHub(),
 	});
-	const key: DeviceKeyAccess = {
-		keyId: "key-b",
-		deviceId: b.deviceId,
-		personId,
-		permissions: {
-			sync: ["pull", "push"],
-			relay: ["serve"],
-			archive: ["put", "get"],
-		},
-	};
 
 	async function hello(access: DeviceKeyAccess): Promise<HostHello> {
 		const paired = await host.devices.get(access.deviceId);
@@ -119,83 +118,111 @@ export async function pairedReplicas(
 	}
 	const memory = inMemoryHost({ exchange: hostExchange, hello });
 
-	const documents = createSpaceDocuments({
-		db: b.db,
-		directory: deviceDirectory(b.db),
-	});
-	const device: PeerEngine = createPeerEngine(
-		withPeers({
-			db: b.db,
-			harnesses,
-			deviceId: b.deviceId,
-			dataDir: b.dataDir,
-			scheduler: false,
-			spaceDocuments: documents,
-			relay: createRelay({
-				engine: () => device,
-				registry: () => device.devices,
-				links: () => linksTo(new Map([[hostId, memory.client(key)]])),
-			}),
-		}),
-		{ runLog: createRunLog(b.db, { walkerId: b.deviceId }) },
-	);
-
-	// B keeps A's Spaces, as its link does with the Host's answer.
-	await b.db.insert(hostLink).values({
-		hostId,
-		name: "A",
-		addresses: "[]",
-		role: "home",
-		personId,
-		keyStore: "file",
-	});
-	const [local] = await b.db.select().from(user);
-	const listed = await hello(key);
-	await device.exchange.hostSpaces.update(
-		{ id: hostId, name: "A" },
-		listed.spaces,
-		local?.id as string,
-	);
-	// Their Members, as the Space documents mirror them.
-	for (const space of listed.spaces) {
-		const members = await a.db
-			.select({ id: user.id, name: user.name, role: member.role })
-			.from(member)
-			.innerJoin(user, eq(user.id, member.userId))
-			.where(eq(member.organizationId, space.id));
-		const document = await documents.open(space.id);
-		document.doc.transact(() => {
-			for (const m of members) {
-				document.members.set(m.id, { name: m.name, role: m.role });
-			}
+	async function pair(sandbox: Sandbox, name: string): Promise<PairedDevice> {
+		await host.devices.join({
+			id: sandbox.deviceId,
+			name,
+			platform: "test",
+			ownerId: personId,
+			homeHost: null,
 		});
+		const key: DeviceKeyAccess = {
+			keyId: `key-${sandbox.deviceId}`,
+			deviceId: sandbox.deviceId,
+			personId,
+			permissions: {
+				sync: ["pull", "push"],
+				relay: ["serve"],
+				archive: ["put", "get"],
+			},
+		};
+		const documents = createSpaceDocuments({
+			db: sandbox.db,
+			directory: deviceDirectory(sandbox.db),
+		});
+		const engine: PeerEngine = createPeerEngine(
+			withPeers({
+				db: sandbox.db,
+				harnesses,
+				deviceId: sandbox.deviceId,
+				dataDir: sandbox.dataDir,
+				scheduler: false,
+				spaceDocuments: documents,
+				relay: createRelay({
+					engine: () => engine,
+					registry: () => engine.devices,
+					links: () => linksTo(new Map([[hostId, memory.client(key)]])),
+				}),
+			}),
+			{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
+		);
+
+		// The Device keeps A's Spaces, as its link does with the Host's answer.
+		await sandbox.db.insert(hostLink).values({
+			hostId,
+			name: "A",
+			addresses: "[]",
+			role: "home",
+			personId,
+			keyStore: "file",
+		});
+		const [local] = await sandbox.db.select().from(user);
+		const listed = await hello(key);
+		await engine.exchange.hostSpaces.update(
+			{ id: hostId, name: "A" },
+			listed.spaces,
+			local?.id as string,
+		);
+		// Their Members, as the Space documents mirror them.
+		for (const space of listed.spaces) {
+			const members = await a.db
+				.select({ id: user.id, name: user.name, role: member.role })
+				.from(member)
+				.innerJoin(user, eq(user.id, member.userId))
+				.where(eq(member.organizationId, space.id));
+			const document = await documents.open(space.id);
+			document.doc.transact(() => {
+				for (const m of members) {
+					document.members.set(m.id, { name: m.name, role: m.role });
+				}
+			});
+		}
+
+		return {
+			engine,
+			key,
+			documents,
+			async projectOnDevice(projectId, { clone: withClone = false } = {}) {
+				const [row] = await a.db
+					.select()
+					.from(project)
+					.where(eq(project.id, projectId));
+				if (!row) throw new Error(`A has no project ${projectId}.`);
+				await sandbox.db.insert(project).values(row);
+				if (!withClone) return;
+				await sandbox.db.insert(clone).values({
+					id: `clone-${projectId}`,
+					spaceId: row.spaceId,
+					projectId,
+					deviceId: sandbox.deviceId,
+					path: sandbox.repoPath,
+				});
+			},
+		};
 	}
 
+	const paired = await pair(b, "B");
 	return {
 		host,
-		device,
+		device: paired.engine,
 		hostExchange,
 		memory,
-		key,
+		key: paired.key,
 		hostId,
 		personId,
-		documents,
-		async projectOnDevice(projectId, { clone: withClone = false } = {}) {
-			const [row] = await a.db
-				.select()
-				.from(project)
-				.where(eq(project.id, projectId));
-			if (!row) throw new Error(`A has no project ${projectId}.`);
-			await b.db.insert(project).values(row);
-			if (!withClone) return;
-			await b.db.insert(clone).values({
-				id: `clone-${projectId}`,
-				spaceId: row.spaceId,
-				projectId,
-				deviceId: b.deviceId,
-				path: b.repoPath,
-			});
-		},
+		documents: paired.documents,
+		projectOnDevice: paired.projectOnDevice,
+		pair,
 	};
 }
 

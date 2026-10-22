@@ -349,6 +349,61 @@ describe("live transcripts", () => {
 		controller.abort();
 	});
 
+	/** The colleague's Device logs a step event of the live run, as its `walkerSeq`th. */
+	async function logged(type: "StepEnded" | "StepReopened", walkerSeq: number) {
+		await host().push(keyOf("device-colleague", "colleague"), {
+			runs: [],
+			steps: [],
+			sessions: [],
+			events: [
+				{
+					spaceId: sandbox.spaceId,
+					runId: "run-live",
+					stepId: "step-live",
+					sessionId: null,
+					type,
+					payload: JSON.stringify(
+						type === "StepEnded"
+							? { outcome: "pass", outputs: { visit: 1 }, error: null }
+							: { prompt: null },
+					),
+					at: Date.now(),
+					walkerId: "device-colleague",
+					walkerSeq,
+				},
+			],
+		});
+	}
+
+	test("the Host serves a step's copy only of the end its log knows, and an older Walker's copy as before", async () => {
+		const step = await colleagueRun();
+		const exchange = host();
+		const walker = keyOf("device-colleague", "colleague");
+		const reader = keyOf("device-mine", ownerId);
+		const ref = { kind: "transcript" as const, ...step };
+
+		await logged("StepEnded", 2);
+		await exchange.archivePut(walker, ref, "first end", {
+			opening: 1,
+			ended: true,
+		});
+		expect(await exchange.archiveGet(reader, ref)).toBe("first end");
+
+		// Reopened and ended again: its rows are here, its copy not yet.
+		await logged("StepReopened", 3);
+		await logged("StepEnded", 4);
+		expect(await exchange.archiveGet(reader, ref)).toBeNull();
+		await exchange.archivePut(walker, ref, "second end", {
+			opening: 2,
+			ended: true,
+		});
+		expect(await exchange.archiveGet(reader, ref)).toBe("second end");
+
+		// A Walker of an older version puts no stamp: its copy is served.
+		await exchange.archivePut(walker, ref, "unstamped");
+		expect(await exchange.archiveGet(reader, ref)).toBe("unstamped");
+	});
+
 	test("a Person who is not a Member of the run's Space is refused", async () => {
 		const step = await colleagueRun();
 		const follow = async () => {

@@ -79,8 +79,12 @@ export function createRelay(deps: {
 			yield* await client.archive.follow({ step, afterSeq }, { signal });
 		},
 
-		async archivePut(ref, content) {
-			await (await host(ref.spaceId)).archive.put({ ref, content });
+		async archivePut(ref, content, stamp) {
+			await (await host(ref.spaceId)).archive.put({
+				ref,
+				content,
+				...(stamp ? { stamp } : {}),
+			});
 		},
 
 		async startRun(input) {

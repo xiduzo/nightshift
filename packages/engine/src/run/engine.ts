@@ -6,6 +6,7 @@ import { defaultRunSettings, type RunSettings } from "../device-config";
 import { createFlowFiles } from "../flows";
 import { createRunner, createRunWalks, resolvePolicy } from "../graph";
 import {
+	copyStampOf,
 	createRunBus,
 	createRunHistory,
 	createRunLog,
@@ -26,7 +27,6 @@ import {
 } from "../projects";
 import {
 	createReadModel,
-	deriveSteps,
 	parseCalledFlows,
 	parseRunFlow,
 	type RunSummary,
@@ -170,12 +170,8 @@ export function createEngine(
 		...(options.profileFor ? { profileFor: options.profileFor } : {}),
 		ready: peersReady,
 		ownerId: () => ownerId,
-		async stepEnded({ runId, stepId }) {
-			const found = deriveSteps(await runLog.events(runId)).find(
-				(s) => s.id === stepId,
-			);
-			return found !== undefined && found.endedAt !== null;
-		},
+		stepStamp: async ({ runId, stepId }) =>
+			copyStampOf(await runLog.events(runId), stepId),
 		project: (projectId, spaceId) => projects.find(projectId, spaceId),
 		takeOver: (runId) => takeOver(actions, runId),
 		stopRun: async (runId) => {

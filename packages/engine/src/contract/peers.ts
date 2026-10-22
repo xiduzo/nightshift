@@ -9,6 +9,7 @@ import type { FlowSources } from "@nightshift/flows/files";
 import type { z } from "zod";
 import type { Device } from "../device";
 import type {
+	CopyStamp,
 	RunBus,
 	RunHistory,
 	RunLog,
@@ -83,8 +84,12 @@ export type PeerContext = {
 	ready: Promise<void>;
 	/** The Person who owns this computer, or null before the engine is ready. */
 	ownerId(): string | null;
-	/** Whether a step has ended (and not reopened since), as this Replica's log says. */
-	stepEnded(step: FeedStep): Promise<boolean>;
+	/**
+	 * The stamp a copy of a step's files taken now carries, as this
+	 * Replica's log says: which opening of the step, and whether it ended
+	 * (and was not reopened since). Null for a step this Replica lacks.
+	 */
+	stepStamp(step: FeedStep): Promise<CopyStamp | null>;
 	/** A project a person has not removed, with its Clone here or null. */
 	project(projectId: string, spaceId: string): Promise<ListedProject>;
 	/** This computer walks a run another Device moved here, from now on. */
@@ -192,7 +197,11 @@ export type RunsPort = {
 	 * from. Throws when that Host cannot be reached.
 	 */
 	keepWalk(files: readonly WalkFile[]): Promise<void>;
-	/** A file of the archive: this Replica's copy, else its Host's. Null when neither has it. */
+	/**
+	 * A file of the archive: this Replica's copy, else its Host's. A copy
+	 * of a step's file only when its stamp holds the step as this
+	 * Replica's log says (`stampHolds`). Null when neither has one.
+	 */
 	archived(ref: WalkRef): Promise<string | null>;
 };
 
@@ -206,15 +215,19 @@ export type WalkRef =
 			stepId: string;
 	  };
 
-/** One file of a run's walk state. Its content is the engine's: the peers keep and carry it. */
-export type WalkFile = { ref: WalkRef; content: string };
+/**
+ * One file of a run's walk state. Its content is the engine's: the peers
+ * keep and carry it. A step's file has the stamp of the end it holds.
+ */
+export type WalkFile = { ref: WalkRef; content: string; stamp?: CopyStamp };
 
 /** What the peers read of the walk state of the runs this computer walks. */
 export type WalkFiles = {
 	/**
 	 * The walk state of a run this computer walks: the transcript and the
 	 * command log of each of `steps` (default: every step of the run) that
-	 * it has, then the latest Checkpoint. Empty for a run walked elsewhere.
+	 * it has, each with its stamp, then the latest Checkpoint. Empty for a
+	 * run walked elsewhere.
 	 */
 	exportWalk(
 		runId: string,

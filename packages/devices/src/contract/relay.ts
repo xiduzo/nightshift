@@ -1,4 +1,5 @@
 import type {
+	CopyStamp,
 	FeedStep,
 	OwnDevice,
 	Relay,
@@ -32,8 +33,15 @@ export type HostRelay = Relay & {
 	): Promise<void>;
 	/** Withdraws this Device's Offer from a Space a Host keeps, through that Host. */
 	withdrawOffer(input: { spaceId: string; profile: string }): Promise<void>;
-	/** Keeps a file of a run this computer walks in the archive of the Host that keeps the Space. */
-	archivePut(ref: ArchiveRef, content: string): Promise<void>;
+	/**
+	 * Keeps a file of a run this computer walks in the archive of the Host
+	 * that keeps the Space, with its stamp for a step's file.
+	 */
+	archivePut(
+		ref: ArchiveRef,
+		content: string,
+		stamp?: CopyStamp,
+	): Promise<void>;
 	/**
 	 * The actor's Devices, as the Host that keeps the Space knows them:
 	 * whether each is online and has a Clone of the project.

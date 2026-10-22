@@ -6,7 +6,7 @@
  * these types without a cycle.
  */
 
-export { type ArchiveRef, archiveRefSchema } from "./archive";
+export { type ArchiveRef, archiveRefSchema, copyStampSchema } from "./archive";
 export type { HostClient } from "./host-client";
 export type {
 	HostHello,

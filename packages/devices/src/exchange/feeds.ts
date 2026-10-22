@@ -54,7 +54,8 @@ export type FeedPorts = {
 	/**
 	 * The archive copy of a step that ended: this Replica's, else the
 	 * Host's that keeps the Space, kept here once fetched. Null when
-	 * neither has it. Asked only for a step that ended.
+	 * neither has a copy of the end this Replica knows of (its stamp): the
+	 * feed reads the step instead. Asked only for a step that ended.
 	 */
 	archived(step: FeedStep): Promise<TranscriptEntry[] | null>;
 	/** The feed of the Host that keeps the Space. */

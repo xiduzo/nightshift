@@ -100,6 +100,7 @@ export {
 export type { FlowRef, FlowUse } from "./flows";
 export { flowsForRun } from "./flows";
 export type {
+	CopyStamp,
 	HistoryCursors,
 	HistoryRows,
 	LandedRunEvent,
@@ -118,6 +119,7 @@ export {
 	followOwnStep,
 	MissingProjectError,
 	parseTranscript,
+	stampHolds,
 } from "./log";
 export type { ListedProject, Project, SpaceDocument } from "./projects";
 export {

@@ -1,4 +1,5 @@
 import type {
+	CopyStamp,
 	FeedStep,
 	OwnDevice,
 	RunCommandInput,
@@ -62,7 +63,7 @@ export type HostClient = {
 		>;
 	};
 	archive: {
-		put: Call<{ ref: ArchiveRef; content: string }, void>;
+		put: Call<{ ref: ArchiveRef; content: string; stamp?: CopyStamp }, void>;
 		get: Call<{ ref: ArchiveRef }, string | null>;
 		follow: Call<
 			{ step: FeedStep; afterSeq: number },

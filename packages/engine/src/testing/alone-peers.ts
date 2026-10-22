@@ -108,7 +108,8 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 				followOwnStep(
 					{
 						bus: context.bus,
-						stepEnded: context.stepEnded,
+						stepEnded: async (step) =>
+							(await context.stepStamp(step))?.ended === true,
 						ownEntries: context.history.ownTranscript,
 						archived: async () => null,
 					},

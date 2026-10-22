@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import {
+	type CopyStamp,
 	type FeedStep,
 	type LoggedEvent,
 	memberName,
@@ -12,7 +13,7 @@ import {
 	type SpaceDocuments,
 	type WalkFiles,
 } from "@nightshift/engine";
-import { dropArchive, readArchive, writeArchive } from "../archive";
+import { dropArchive, readCopy, writeArchive } from "../archive";
 import type { ArchiveRef } from "../contract";
 import { createHostSpaces, type HostSpaces } from "../links";
 import { createRunCommands, type RunCommands } from "./commands";
@@ -45,9 +46,17 @@ export type EngineExchange = {
 	): Promise<{ runId: string; walkerId: string; spaceId: string } | null>;
 	/** The walk state of a run this Replica walks, as the archive keeps it (`WalkFiles.exportWalk`). Empty for anyone else's. */
 	exportWalk: WalkFiles["exportWalk"];
+	/**
+	 * A file of the archive here: a copy of a step's file only when its
+	 * stamp holds the step as this Replica's log says. Null otherwise.
+	 */
 	readArchive(ref: ArchiveRef): Promise<string | null>;
-	/** Keeps a file of the archive. A transcript tells the run's watchers. */
-	writeArchive(ref: ArchiveRef, content: string): Promise<void>;
+	/** Keeps a file of the archive, with its stamp. A transcript tells the run's watchers. */
+	writeArchive(
+		ref: ArchiveRef,
+		content: string,
+		stamp?: CopyStamp,
+	): Promise<void>;
 	/**
 	 * A file of a run this Replica walks, for the archive's readers: a
 	 * step's transcript or command log, or the run's Checkpoint. Null when
@@ -79,8 +88,8 @@ export function createEngineExchange(deps: {
 	documents: SpaceDocuments;
 	/** The events a batch added: a run moved here is taken over. */
 	onIngested?(added: readonly LoggedEvent[]): Promise<void>;
-	/** Whether a step has ended, as this Replica's log says (`PeerContext.stepEnded`). */
-	stepEnded(step: FeedStep): Promise<boolean>;
+	/** A step as this Replica's log says (`PeerContext.stepStamp`): which copy of its files holds it. */
+	stepStamp(step: FeedStep): Promise<CopyStamp | null>;
 	/** The feed of the Host that keeps a Space (over its link). */
 	upstream?: FeedPorts["upstream"];
 	/**
@@ -95,22 +104,31 @@ export function createEngineExchange(deps: {
 
 	const hostSpaces = createHostSpaces(db);
 
+	/** This Replica's copy of a file, when it holds the step as this Replica's log says. */
+	async function ownCopy(ref: ArchiveRef): Promise<string | null> {
+		const known = ref.kind === "checkpoint" ? null : await deps.stepStamp(ref);
+		return readCopy(dataDir, ref, known);
+	}
+
 	const feeds = createTranscriptFeeds({
 		bus: deps.bus,
 		selfId: () => log.walkerId(),
 		runOwner,
 		hostOf: (spaceId) => hostSpaces.hostOf(spaceId),
-		stepEnded: deps.stepEnded,
+		stepEnded: async (step) => (await deps.stepStamp(step))?.ended === true,
 		ownEntries: (at) => history.ownTranscript(at),
-		// Asked only for a step that ended: a copy from the Host is kept here.
+		// Asked only for a step that ended. A copy of another end is not
+		// there yet: the feed reads the step instead, and again later. A
+		// copy from the Host is kept here, with the end it holds.
 		async archived(at) {
 			const ref: ArchiveRef = { kind: "transcript", ...at };
-			const local = await readArchive(dataDir, ref);
+			const known = await deps.stepStamp(at);
+			const local = await readCopy(dataDir, ref, known);
 			if (local !== null) return parseTranscript(local);
 			const fetched = await deps.archived?.(ref).catch(() => null);
 			if (fetched === null || fetched === undefined) return null;
 			// Not `writeArchive` below: nothing about the step changed.
-			await writeArchive(dataDir, ref, fetched);
+			if (known?.ended) await writeArchive(dataDir, ref, fetched, known);
 			return parseTranscript(fetched);
 		},
 		...(deps.upstream ? { upstream: deps.upstream } : {}),
@@ -149,9 +167,9 @@ export function createEngineExchange(deps: {
 		runOwner,
 		stepOwner: history.stepOwner,
 		exportWalk: walks.exportWalk,
-		readArchive: (ref) => readArchive(dataDir, ref),
-		async writeArchive(ref, content) {
-			await writeArchive(dataDir, ref, content);
+		readArchive: ownCopy,
+		async writeArchive(ref, content, stamp) {
+			await writeArchive(dataDir, ref, content, stamp);
 			// A watcher of the run reads the step's transcript again.
 			if (ref.kind === "transcript") {
 				deps.bus.publish(ref.runId, {

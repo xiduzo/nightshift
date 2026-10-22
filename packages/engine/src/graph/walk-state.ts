@@ -5,6 +5,7 @@ import { lgCheckpoint, lgWrite, step } from "@nightshift/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import type { WalkFile, WalkFiles, WalkRef } from "../contract";
 import {
+	copyStampOf,
 	ForeignRowsError,
 	parseTranscript,
 	type RunHistory,
@@ -52,7 +53,7 @@ export function createRunWalks(deps: {
 	db: Database;
 	/** This computer's data folder, where its steps' transcripts are. */
 	dataDir: string;
-	log: Pick<RunLog, "walkerId">;
+	log: Pick<RunLog, "walkerId" | "events">;
 	history: Pick<RunHistory, "runOwner" | "ownStepFiles">;
 }): RunWalks {
 	const { db, dataDir, log, history } = deps;
@@ -72,20 +73,30 @@ export function createRunWalks(deps: {
 		if (spaceId === null) return [];
 		const self = await log.walkerId();
 		const { steps } = options;
+		// The stamps before the files: a file read after a reopen holds more
+		// than its stamp says, never less.
+		const events = await log.events(runId);
 		const files: WalkFile[] = [];
 		for (const stepId of await stepIdsOfRun(db, runId)) {
 			if (steps && !steps.includes(stepId)) continue;
+			const stamp = copyStampOf(events, stepId);
 			const own = await history.ownStepFiles(stepId, self);
 			if (!own) continue;
 			const at = { spaceId, runId, stepId };
+			const stamped = stamp ? { stamp } : {};
 			if (own.transcript !== null) {
 				files.push({
 					ref: { kind: "transcript", ...at },
 					content: own.transcript,
+					...stamped,
 				});
 			}
 			if (own.log !== null) {
-				files.push({ ref: { kind: "log", ...at }, content: own.log });
+				files.push({
+					ref: { kind: "log", ...at },
+					content: own.log,
+					...stamped,
+				});
 			}
 		}
 		files.push({
