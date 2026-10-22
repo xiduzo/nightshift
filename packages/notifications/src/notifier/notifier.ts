@@ -48,8 +48,10 @@ import type { OpenGateRef, RunEvent, RunEventSource } from "./sources";
  * - Lock-screen answers: a push about a Gate its author marked carries its
  *   options, only to a person whose role allows an answer (`mayAnswer`).
  *
- * The open Gates at start are the baseline: they tell nobody again. Every
- * piece of work runs one after the other, so two landings never race.
+ * At start, the open Gates are read: one the log has not told yet (it
+ * opened while no notifier listened) is pushed then, the others tell
+ * nobody again. Every piece of work runs one after the other, so two
+ * landings never race.
  */
 
 export type NotifierDeps = {
@@ -78,7 +80,10 @@ export type NotifierDeps = {
 };
 
 export type Notifier = {
-	/** Reads the baseline, then listens. Resolves once the baseline is read. */
+	/**
+	 * Listens at once, and reads the open Gates first: the events that land
+	 * meanwhile wait for that read. Resolves once it is done.
+	 */
 	start(): Promise<void>;
 	/** Stops listening and checking. What was held stays in the log. */
 	stop(): void;
@@ -205,22 +210,29 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		return sent;
 	}
 
-	/** Tells every screen of the Space's audience about one event. */
+	/**
+	 * Tells every screen of the Space's audience about one event. `inApp`
+	 * false: pushes only, for a Gate found open at start (the open pages
+	 * read everything again when they connect).
+	 */
 	async function tell(
 		kind: NoticeKind,
 		key: string,
 		ids: { spaceId: string; runId: string; stepId: string | null },
+		inApp = true,
 	): Promise<void> {
 		const sends = await deps.sendsFor(ids.spaceId);
 		for (const personId of await deps.audience(ids.spaceId)) {
 			const settings = await deps.settings.get(personId);
 			const wanted = wants(settings, kind);
 			// Quiet hours hold the alert of an open page too: it only updates.
-			const alert = sends && wanted && !inQuietHours(settings, now());
-			await deps.inApp.send(
-				{ kind: "in-app", personId },
-				message(kind, key, ids, alert),
-			);
+			const alert = inApp && sends && wanted && !inQuietHours(settings, now());
+			if (inApp) {
+				await deps.inApp.send(
+					{ kind: "in-app", personId },
+					message(kind, key, ids, alert),
+				);
+			}
 			if (wanted) {
 				await push(
 					{ personId, key, kind, ...ids },
@@ -459,6 +471,14 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 				closed.set(row.key, row.spaceId);
 		}
 		for (const [key, spaceId] of closed) await close(spaceId, key);
+		// Gates that opened while no notifier listened (a reload, a start, a
+		// run that woke): pushed now. The log drops the ones already told.
+		for (const [spaceId, keys] of open) {
+			for (const key of keys) {
+				const gate = parseGateKey(key);
+				if (gate) await tell("gate-opened", key, { spaceId, ...gate }, false);
+			}
+		}
 	}
 
 	return {

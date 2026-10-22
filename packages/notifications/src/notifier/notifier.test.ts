@@ -608,15 +608,36 @@ describe("once per key", () => {
 		expect(web.sent()).toHaveLength(1);
 	});
 
-	test("the Gates open at start are the baseline: they tell nobody", async () => {
-		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
-		await notifier.start();
+	test("a Gate told before is not told again at start", async () => {
 		await register("ada", "web");
+		await notifier.start();
+		await openGate("run-1", "step-1");
+		notifier.stop();
 
+		notifier = makeNotifier();
+		const screen = openScreen("ada");
+		await notifier.start();
 		events.land([event("StepStarted", "run-1", "step-2")]);
 		await notifier.idle();
 
-		expect(web.calls).toEqual([]);
+		expect(web.sent()).toHaveLength(1);
+		expect(screen).toEqual([]);
+	});
+
+	test("a Gate that opened while no notifier listened is pushed at start", async () => {
+		await register("ada", "web");
+		const phone = await register("bob", "expo");
+		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
+
+		await notifier.start();
+
+		expect(sentTo(expo)).toEqual([`${phone.id}:run-1:step-1`]);
+		expect(web.sent()).toHaveLength(1);
+		// Once: the next start finds it in the log.
+		notifier.stop();
+		notifier = makeNotifier();
+		await notifier.start();
+		expect(expo.sent()).toHaveLength(1);
 	});
 
 	test("a Gate that closed while Night Shift was away is withdrawn at start", async () => {

@@ -428,37 +428,6 @@ export async function createDaemon(
 	});
 	hot.nightshiftEngine = engine;
 
-	/*
-	 * Secure by default: this daemon answers this computer only, until it is
-	 * a Host with an https:// address (read at start: a change applies on
-	 * the next start). It serves https:// itself when it has a certificate
-	 * (NIGHTSHIFT_TLS_CERT, NIGHTSHIFT_TLS_KEY).
-	 */
-	const reach = reachFor(settings.current());
-	const certificate = ownCertificate(env);
-
-	devices = await wireDevices({
-		auth,
-		db,
-		engine,
-		settings,
-		profiles,
-		document,
-		spaces,
-		self: device,
-		ownerId: person.userId,
-		local,
-		workHub,
-		dataDir,
-		keyStore,
-		reach,
-		fingerprint: certificate?.fingerprint ?? null,
-		devicesPage: new URL("/devices", env.CORS_ORIGIN).toString(),
-		disconnect: (deviceId) =>
-			sync.disconnect((context) => context.deviceId === deviceId),
-		kept: hot,
-	});
-
 	/**
 	 * The notifier: it reads the run events and tells each Member of a
 	 * Space about a new Gate, a finished run and a failed run, on every
@@ -503,6 +472,11 @@ export async function createDaemon(
 		},
 	});
 	hot.nightshiftNotifications = notifications;
+	// Listens at once: the engine already recovers runs and wakes timers,
+	// and an event that lands before the notifier listens is lost. Not
+	// awaited: it reads every Space's open Gates first, and pushes the ones
+	// that opened while no notifier listened.
+	void notifications.start();
 	// The switches this computer kept before notification settings moved
 	// to the Person: its owner gets them once.
 	const kept = settings.current();
@@ -521,8 +495,37 @@ export async function createDaemon(
 			endpoint: device.id,
 		});
 	}
-	// Not awaited: the baseline reads every Space's open Gates.
-	void notifications.start();
+
+	/*
+	 * Secure by default: this daemon answers this computer only, until it is
+	 * a Host with an https:// address (read at start: a change applies on
+	 * the next start). It serves https:// itself when it has a certificate
+	 * (NIGHTSHIFT_TLS_CERT, NIGHTSHIFT_TLS_KEY).
+	 */
+	const reach = reachFor(settings.current());
+	const certificate = ownCertificate(env);
+
+	devices = await wireDevices({
+		auth,
+		db,
+		engine,
+		settings,
+		profiles,
+		document,
+		spaces,
+		self: device,
+		ownerId: person.userId,
+		local,
+		workHub,
+		dataDir,
+		keyStore,
+		reach,
+		fingerprint: certificate?.fingerprint ?? null,
+		devicesPage: new URL("/devices", env.CORS_ORIGIN).toString(),
+		disconnect: (deviceId) =>
+			sync.disconnect((context) => context.deviceId === deviceId),
+		kept: hot,
+	});
 
 	/**
 	 * "Keep this computer awake while a run is running" (this computer's
