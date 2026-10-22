@@ -81,19 +81,6 @@ export async function startDaemon(
 	return { name, url, port: at, dataDir, env, client, process: child };
 }
 
-/** The procedures of a Host at one address, as a Device calls them: with its Device key. */
-export function hostClient(
-	address: string,
-	options: { key?: string } = {},
-): AppRouterClient {
-	return createORPCClient(
-		new RPCLink({
-			url: `${address.replace(/\/$/, "")}/rpc`,
-			headers: options.key ? { authorization: `Bearer ${options.key}` } : {},
-		}),
-	);
-}
-
 /** Stops a daemon the way a person does (SIGTERM), and waits for it. */
 export async function stopDaemon(daemon: Daemon | undefined): Promise<void> {
 	if (!daemon) return;

@@ -1,15 +1,13 @@
-import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AppRouterClient } from "@nightshift/api";
 import type { RunSummary } from "@nightshift/engine";
-import { type InferClientInputs, ORPCError } from "@orpc/client";
+import type { InferClientInputs } from "@orpc/client";
 
 import {
 	type Daemon,
-	hostClient,
 	pair,
 	startDaemon,
 	stopDaemon,
@@ -20,8 +18,9 @@ import {
  * The event log exchange between two daemons: A is the Host, B pairs with
  * it. B walks a run in A's Space; A's Replica gets it as it goes, answers
  * its Gate (B applies the answer), and opens the transcript from the
- * archive. A Space B's owner is not in never reaches B; a row of another
- * Walker is refused; B keeps walking while A is down and A catches up.
+ * archive. This is the transport's smoke test: the exchange itself (by
+ * cursor, Commands, refusals, a Host that was away) is tested in memory
+ * in packages/devices (`device-exchange.test.ts`).
  */
 
 const root = mkdtempSync(join(tmpdir(), "nightshift-exchange-"));
@@ -97,31 +96,8 @@ const gateFlow: Flow = {
 	edges: [{ id: "e1", from: "hello", outcome: "pass", to: "ship" }],
 } as Flow;
 
-/** One command step: a run that ends on its own. */
-const quickFlow: Flow = {
-	version: 5,
-	inputs: [],
-	outputs: [],
-	start: "hello",
-	nodes: [
-		{
-			id: "hello",
-			type: "command",
-			position: { x: 0, y: 0 },
-			command: "echo while the Host was away",
-			output: "text",
-		},
-	],
-	edges: [],
-} as Flow;
-
 async function runOn(daemon: Daemon, runId: string) {
 	return (await daemon.client.runs.list()).find((r) => r.id === runId);
-}
-
-/** B's Device key on A, as B keeps it (in a file: NIGHTSHIFT_KEY_STORE=file). */
-function keyOfB(): string {
-	return readFileSync(join(b.dataDir, "device-keys", aId), "utf8").trim();
 }
 
 beforeAll(async () => {
@@ -254,130 +230,4 @@ describe("the event log exchange", () => {
 		controller.abort();
 		expect(output).toContain("hello from B");
 	}, 90_000);
-
-	test("a Space B's owner is not a Member of never reaches B", async () => {
-		// Another Person's Space on A, with a run of A's own.
-		const db = new Database(join(a.dataDir, "nightshift.db"));
-		const now = Date.now();
-		db.run(
-			"insert into user (id, name, email, email_verified, created_at, updated_at) values ('stranger', 'Stranger', 'stranger@example.invalid', 0, ?, ?)",
-			[now, now],
-		);
-		db.run(
-			"insert into organization (id, name, slug, created_at, personal) values ('space-private', 'Private', 'space-private', ?, 0)",
-			[now],
-		);
-		db.run(
-			"insert into member (id, organization_id, user_id, role, created_at) values ('m-stranger', 'space-private', 'stranger', 'owner', ?)",
-			[now],
-		);
-		db.run(
-			"insert into project (id, space_id, name, remote, created_at) values ('project-private', 'space-private', 'Private', null, ?)",
-			[now],
-		);
-		db.run(
-			"insert into run (id, space_id, project_id, flow_name, flow, body_flows, title, worktree_path, branch, base_ref, walker_id, created_at) values ('run-private', 'space-private', 'project-private', null, '{}', '{}', 'Private run', '/nowhere', 'nightshift/private', 'main', ?, ?)",
-			[aId, now],
-		);
-		db.run(
-			"insert into event (space_id, run_id, type, payload, created_at, walker_id, walker_seq) values ('space-private', 'run-private', 'RunStarted', '{}', ?, ?, 1000000)",
-			[now, aId],
-		);
-		db.close();
-
-		const host = hostClient(a.url, { key: keyOfB() });
-		const pulled = await host.sync.pull({ cursors: {} });
-		expect(pulled.rows.runs.map((r) => r.spaceId)).not.toContain(
-			"space-private",
-		);
-		expect(pulled.rows.events.map((e) => e.runId)).not.toContain("run-private");
-		expect(Object.keys(pulled.cursors)).not.toContain("space-private");
-		// And not by the archive either.
-		expect(
-			await host.archive.get({
-				ref: {
-					kind: "checkpoint",
-					spaceId: "space-private",
-					runId: "run-private",
-				},
-			}),
-		).toBeNull();
-
-		const replica = new Database(join(b.dataDir, "nightshift.db"), {
-			readonly: true,
-		});
-		const leaked = replica
-			.query("select id from run where space_id = 'space-private'")
-			.all();
-		replica.close();
-		expect(leaked).toEqual([]);
-	}, 30_000);
-
-	test("a row of another Walker is refused, and so is a Space B's owner is not in", async () => {
-		const host = hostClient(a.url, { key: keyOfB() });
-		const run = {
-			id: "run-forged",
-			spaceId,
-			projectId,
-			flowName: null,
-			flow: "{}",
-			bodyFlows: "{}",
-			title: "Forged",
-			worktreePath: "/nowhere",
-			branch: "nightshift/forged",
-			baseRef: "main",
-			walkerId: "someone-else",
-			createdAt: Date.now(),
-		};
-		const event = {
-			spaceId,
-			runId: "run-forged",
-			stepId: null,
-			sessionId: null,
-			type: "RunStarted",
-			payload: "{}",
-			at: Date.now(),
-			walkerId: "someone-else",
-			walkerSeq: 1,
-		};
-		const refused = await host.sync
-			.push({ runs: [run], steps: [], sessions: [], events: [event] })
-			.catch((error) => error);
-		expect(refused).toBeInstanceOf(ORPCError);
-		expect((refused as ORPCError<string, unknown>).code).toBe("FORBIDDEN");
-
-		// B's own Walker, in a Space its owner is not in: refused as well.
-		const elsewhere = await host.sync
-			.push({
-				runs: [{ ...run, walkerId: bId, spaceId: "space-private" }],
-				steps: [],
-				sessions: [],
-				events: [{ ...event, walkerId: bId, spaceId: "space-private" }],
-			})
-			.catch((error) => error);
-		expect((elsewhere as ORPCError<string, unknown>).code).toBe("FORBIDDEN");
-		expect(await runOn(a, "run-forged")).toBeUndefined();
-	}, 30_000);
-
-	test("B keeps walking while A is down, and A catches up when it is back", async () => {
-		await stopDaemon(a);
-		await waitFor(
-			async () => (await b.client.devices.list()).thisComputer?.hosts ?? [],
-			(hosts) => hosts[0]?.status === "offline",
-		);
-
-		const started = await b.client.runs.start({ projectId, flow: quickFlow });
-		await waitFor(
-			() => runOn(b, started.id),
-			(r) => r?.status === "finished",
-		);
-
-		a = await startDaemon(root, "a", a.env, a.port);
-		const caught = await waitFor(
-			() => runOn(a, started.id),
-			(r) => r?.status === "finished",
-			60_000,
-		);
-		expect(caught?.walker.id).toBe(bId);
-	}, 120_000);
 });

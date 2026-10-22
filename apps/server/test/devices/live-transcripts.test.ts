@@ -15,8 +15,10 @@ import {
 
 /**
  * Live transcripts between two daemons: A is the Host, B pairs with it.
- * Each watches a running step of a run the other walks, and sees its
- * output as it is written, before the step ends.
+ * A watches a running step of a run B walks, and sees its output as it
+ * is written, before the step ends. The transport's smoke test: both
+ * ways and the resume from a cursor are tested in memory in
+ * packages/devices (`device-exchange.test.ts`).
  */
 
 const root = mkdtempSync(join(tmpdir(), "nightshift-live-"));
@@ -81,28 +83,23 @@ function slowFlow(marker: string): Flow {
 	} as Flow;
 }
 
-/**
- * Watches a run on `viewer` in the background: the command output it gets,
- * and whether the step had ended there when each line came.
- */
-function watch(viewer: Daemon, runId: string, afterSeq?: number) {
+/** Watches a run on `viewer` in the background: the command output it gets. */
+function watch(viewer: Daemon, runId: string) {
 	const controller = new AbortController();
 	const lines: string[] = [];
-	const seqs: number[] = [];
 	const done = (async () => {
 		const stream = await viewer.client.runs.watch(
-			{ runId, ...(afterSeq === undefined ? {} : { afterSeq }) },
+			{ runId },
 			{ signal: controller.signal },
 		);
 		for await (const item of stream) {
 			if (item.kind !== "transcript") continue;
-			seqs.push(item.entry.seq);
 			if (item.entry.event.type === "command-output") {
 				lines.push(item.entry.event.text.trim());
 			}
 		}
 	})().catch(() => {});
-	return { lines, seqs, stop: () => controller.abort(), done };
+	return { lines, stop: () => controller.abort(), done };
 }
 
 async function stepOf(daemon: Daemon, runId: string) {
@@ -169,39 +166,5 @@ describe("live transcripts across Devices", () => {
 		expect(watching.lines).toEqual(["first line", "second line"]);
 		watching.stop();
 		await watching.done;
-	}, 60_000);
-
-	test("a Device shows a running step that its Host walks, and resumes from its cursor", async () => {
-		const marker = join(root, "go-a");
-		const started = await a.client.runs.start({
-			projectId,
-			flow: slowFlow(marker),
-		});
-		await waitFor(
-			() => stepOf(b, started.id).catch(() => undefined),
-			(step) => step !== undefined && step.endedAt === null,
-		);
-
-		const first = watch(b, started.id);
-		await waitFor(
-			() => first.lines,
-			(lines) => lines.includes("first line"),
-		);
-		expect((await stepOf(a, started.id))?.endedAt).toBeNull();
-		first.stop();
-		await first.done;
-
-		// Back from its last entry: what follows, nothing twice.
-		const again = watch(b, started.id, first.seqs.at(-1));
-		await Bun.write(marker, "");
-		await waitFor(
-			() => again.lines,
-			(lines) => lines.includes("second line"),
-		);
-		expect(again.lines).toEqual(["second line"]);
-		const seen = [...first.seqs, ...again.seqs];
-		expect(new Set(seen).size).toBe(seen.length);
-		again.stop();
-		await again.done;
 	}, 60_000);
 });
