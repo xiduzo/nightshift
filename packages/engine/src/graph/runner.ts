@@ -24,7 +24,7 @@ import {
 	type CutShort,
 	closeOpenWork as closeWork,
 } from "./open-work";
-import { loggedVisits, reenteredNode, reentryUpdate } from "./resume-point";
+import { loggedVisits, reenteredNode, reentryUpdate } from "./reentry";
 import { createSleeps } from "./sleep";
 import type { Parked, ResumeValue, RunEvent, RunStateUpdate } from "./state";
 import {
@@ -55,7 +55,7 @@ import {
  *   `Command({ resume })` into the interrupt the thread sits at; `reenter`
  *   jumps to a node of a thread that ended or never started (which node,
  *   and the seed state: `reenteredNode` and `reentryUpdate` in
- *   resume-point.ts, next to the rule the nodes re-enter by).
+ *   reentry.ts).
  * - A drive that parks at the root's interrupt: a `wait` schedules the
  *   wake timer with the sleep module (`WaitStarted` is in the log
  *   already); a `gate` needs nothing (the Gate node logged `GateOpened`);
@@ -70,8 +70,6 @@ import {
  * Over 600 lines on purpose: the drive, the interrupts, the stop and the
  * slots of a run share one state per run, so they stay in one module.
  */
-
-export type { ThreadState } from "./thread";
 
 export type RunnerDeps = {
 	db: Database;

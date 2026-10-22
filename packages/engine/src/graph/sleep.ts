@@ -21,7 +21,6 @@ import {
 import { interruptNode } from "./interrupt";
 import { planWait, type WaitStreak } from "./policy";
 import { waitNodeId } from "./route";
-import type { ThreadState } from "./runner";
 import type {
 	Pending,
 	PendingParked,
@@ -30,6 +29,7 @@ import type {
 	RunStateValues,
 } from "./state";
 import type { OpenStep } from "./step-runner";
+import type { ThreadState } from "./thread";
 
 /**
  * The sleep module: one deep module owns a sleep from the moment a step

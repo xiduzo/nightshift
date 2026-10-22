@@ -15,7 +15,7 @@ import {
 	startRun,
 } from "../testing/graph";
 import { createSandbox, type Sandbox } from "../testing/test-support";
-import { reentryUpdate } from "./resume-point";
+import { reentryUpdate } from "./reentry";
 
 /**
  * Variables on the compiled graph: the values a flow starts with
