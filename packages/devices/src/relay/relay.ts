@@ -19,9 +19,14 @@ export const HOST_OFFLINE =
 
 export function createRelay(deps: {
 	/** Lazy: the engine is made with this relay. */
-	engine(): PeerEngine;
-	registry(): DeviceRegistry;
-	links(): DeviceLinks;
+	engine(): {
+		exchange: {
+			hostSpaces: Pick<PeerEngine["exchange"]["hostSpaces"], "hostOf">;
+			commands: Pick<PeerEngine["exchange"]["commands"], "enqueue">;
+		};
+	};
+	registry(): Pick<DeviceRegistry, "get">;
+	links(): Pick<DeviceLinks, "get">;
 }): HostRelay {
 	const hostOf = (spaceId: string) =>
 		deps.engine().exchange.hostSpaces.hostOf(spaceId);

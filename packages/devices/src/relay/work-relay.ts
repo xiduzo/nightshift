@@ -15,10 +15,14 @@ import { HOST_OFFLINE } from "./relay";
  *   Host checks the Device is the same Person's.
  */
 export function createWorkRelay(deps: {
-	hub: WorkHub;
+	hub: Pick<WorkHub, "call" | "online">;
 	/** Lazy: the engine is made with this relay. */
-	engine(): PeerEngine;
-	links(): DeviceLinks;
+	engine(): {
+		exchange: {
+			hostSpaces: Pick<PeerEngine["exchange"]["hostSpaces"], "hostOf">;
+		};
+	};
+	links(): Pick<DeviceLinks, "get">;
 }): WorkRelay {
 	const hostOf = (spaceId: string) =>
 		deps.engine().exchange.hostSpaces.hostOf(spaceId);
