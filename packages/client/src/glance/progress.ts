@@ -28,6 +28,7 @@ export type RunProgress = {
 	position: string;
 	/** How far the run is, from 0 to 1, for a progress bar. */
 	fraction: number;
+	/** It finished, failed or was stopped. Not when it is interrupted: Night Shift resumes it. */
 	ended: boolean;
 };
 
@@ -38,7 +39,9 @@ export function runProgress(
 		"id" | "flowName" | "status" | "steps" | "flow" | "calledFlows"
 	>,
 ): RunProgress {
-	const ended = hasEnded(run.status);
+	// Night Shift resumes an interrupted run by itself after a restart:
+	// the lock screen keeps following it until it truly ends.
+	const ended = hasEnded(run.status) && run.status !== "interrupted";
 	const { at, of } = stepPosition(run.steps, run.flow);
 	const top = run.steps.filter((step) => step.scope === null);
 	const current = ended ? null : currentStep(top);
