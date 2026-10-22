@@ -454,7 +454,7 @@ export async function createDaemon(
 	);
 
 	/**
-	 * "Keep this computer awake while a run is running" (this computer's
+	 * "Keep this computer awake" (this computer's
 	 * setting): the OS's sleep lock while a run here needs it.
 	 */
 	hot.nightshiftKeepAwake?.stop();

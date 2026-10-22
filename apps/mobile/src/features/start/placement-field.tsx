@@ -10,17 +10,17 @@ import { View } from "react-native";
 /** What one place is, for the person who picks it. */
 function hintOf(choice: PlacementChoice): string {
 	if (!choice.online) {
-		return "Offline. Open Night Shift on this device to run flows on it.";
+		return "Offline. Open Night Shift on that computer to run flows on it.";
 	}
 	if (choice.offers !== undefined) {
 		return choice.offers.length === 0
-			? "Another person offers this device to the Space, with no profiles."
-			: `Another person offers this device to the Space, with ${choice.offers.join(", ")}.`;
+			? "Another person offers this computer to the Space, with no profiles."
+			: `Another person offers this computer to the Space, with ${choice.offers.join(", ")}.`;
 	}
-	return choice.thisDevice ? "Your Host." : "One of your devices.";
+	return choice.thisDevice ? "Your Host." : "One of your computers.";
 }
 
-/** Where the run goes: the Host, or a device that is online. Offline ones show why they cannot take it. */
+/** Where the run goes: the Host, or a computer that is online. Offline ones show why they cannot take it. */
 export function PlacementField({
 	choices,
 	value,

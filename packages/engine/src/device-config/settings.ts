@@ -226,7 +226,7 @@ const DEFS = {
 		default: true,
 	} satisfies Def<boolean>,
 	/**
-	 * "Keep this computer awake while a run is running": the daemon holds
+	 * "Keep this computer awake": the daemon holds
 	 * the OS's sleep lock while a run on this computer runs or sleeps until
 	 * its timer. A setting of the computer, not of a Person: the computer
 	 * sleeps, and a laptop and a desktop of one person want different

@@ -77,7 +77,7 @@
 						{
 							"name": "NightShiftGlance",
 							"displayName": "Night Shift",
-							"description": "See how many Gates wait for you and how your latest runs are doing.",
+							"description": "See how many Gates wait for you and the status of your latest runs.",
 							"ios": {
 								"supportedFamilies": [
 									"systemSmall",

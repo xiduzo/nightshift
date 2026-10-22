@@ -85,7 +85,7 @@ function checkDecidedBy(node: DecisionNode, check: NodeCheck): void {
 	);
 	if (node.lockScreen === true && node.by !== "person") {
 		check.error(
-			`Decision node "${node.id}" can be answered from the lock screen, but ${node.by === "rule" ? "a rule" : "a model"} decides it. Remove lockScreen, or decide it yourself.`,
+			`Decision node "${node.id}" is decided by ${node.by === "rule" ? "a rule" : "a model"}. Only a person can answer from the lock screen. Turn off "Can be answered from the lock screen", or let a person decide.`,
 		);
 	}
 	if (node.by !== "rule") {

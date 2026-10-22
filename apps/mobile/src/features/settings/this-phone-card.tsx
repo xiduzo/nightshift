@@ -73,7 +73,7 @@ export function ThisPhoneCard() {
 								<Text>Cancel</Text>
 							</AlertDialogCancel>
 							<AlertDialogAction onPress={remove}>
-								<Text>Remove</Text>
+								<Text>Remove this phone</Text>
 							</AlertDialogAction>
 						</AlertDialogFooter>
 					</AlertDialogContent>

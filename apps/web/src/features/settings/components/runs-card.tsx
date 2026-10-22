@@ -80,11 +80,12 @@ export function RunsCard({ data }: { data: SettingsView }) {
 							<Field orientation="horizontal">
 								<FieldContent>
 									<FieldLabel htmlFor={`${id}-keep-awake`}>
-										Keep this computer awake while a run is running
+										Keep this computer awake
 									</FieldLabel>
 									<FieldDescription>
-										This computer does not go to sleep while a run on it is
-										running. It can sleep again when the last run ends.
+										This computer does not go to sleep while a run on it works
+										or waits for a timer. A run that waits at a Gate does not
+										keep it awake.
 									</FieldDescription>
 								</FieldContent>
 								<Switch

@@ -291,7 +291,7 @@ function InputsAndStart({
 			: badJson.length > 0
 				? `Check the format of ${badJson.map((input) => input.label || input.name).join(", ")} first.`
 				: placements.data !== undefined && !place
-					? "No device can take the run now."
+					? "No computer can take the run now."
 					: null;
 
 	return (
@@ -318,7 +318,7 @@ function InputsAndStart({
 				<CardHeader>
 					<CardTitle>Where it runs</CardTitle>
 					<CardDescription>
-						The steps run on the device you choose. It must be online and have
+						The steps run on the computer you choose. It must be online and have
 						this project.
 					</CardDescription>
 				</CardHeader>
@@ -327,7 +327,7 @@ function InputsAndStart({
 						<Skeleton className="h-16 w-full" />
 					) : placements.data === undefined ? (
 						<ErrorAlert
-							title="The devices did not load"
+							title="The computers did not load"
 							message={placements.error?.message ?? ""}
 							fix="Check that this phone is online, then try again."
 							onRetry={() => void placements.refetch()}
@@ -341,8 +341,8 @@ function InputsAndStart({
 							/>
 							{!place ? (
 								<ErrorAlert
-									title="No device can take this run now"
-									message="None of your devices with this project is online."
+									title="No computer can take this run now"
+									message="None of your computers with this project is online."
 									fix="Open Night Shift on one of them, then pull down to check again."
 								/>
 							) : null}
@@ -355,7 +355,7 @@ function InputsAndStart({
 				<ErrorAlert
 					title="The run did not start"
 					message={start.error.message}
-					fix="Check the inputs and the device, then start it again."
+					fix="Check the inputs and the computer, then start it again."
 				/>
 			) : null}
 

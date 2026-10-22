@@ -3,7 +3,7 @@
  * in, their settings and screens, and the words of a notice.
  */
 
-export { HOLD_MINUTES, holdLabel } from "./hold";
+export { PHONE_DELAYS, phoneDelayLabel } from "./phone-delay";
 export {
 	isGateKey,
 	PUSH_ACTION,

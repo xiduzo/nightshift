@@ -2,10 +2,10 @@ import {
 	applySettingsPatch,
 	createNotificationMutations,
 	createNotificationQueries,
-	HOLD_MINUTES,
-	holdLabel,
 	type NotificationSettings,
 	type NotificationSettingsPatch,
+	PHONE_DELAYS,
+	phoneDelayLabel,
 } from "@nightshift/client";
 import {
 	Alert,
@@ -117,7 +117,7 @@ function NotificationFields({
 	const quiet = value.quietHours;
 	return (
 		<>
-			<Text variant="small">Tell me when</Text>
+			<Text variant="small">What Night Shift tells you about</Text>
 			<SwitchRow
 				label="A Gate waits for you"
 				checked={value.events.gateOpened}
@@ -135,8 +135,8 @@ function NotificationFields({
 			/>
 			<Separator />
 			<SwitchRow
-				label="Notify my phones"
-				hint="Off: your phones show the inbox, but do not tell you."
+				label="Phones"
+				hint="When off, your phones get no notifications. The inbox still shows what waits for you."
 				checked={value.screens.expo}
 				onChange={(on) => onChange({ screens: { expo: on } })}
 			/>
@@ -253,7 +253,7 @@ function DelaySelect({
 		<View className="gap-2">
 			<Label>Phone delay</Label>
 			<Select
-				value={{ value: String(value), label: holdLabel(value) }}
+				value={{ value: String(value), label: phoneDelayLabel(value) }}
 				onValueChange={(option) => option && onChange(Number(option.value))}
 			>
 				<SelectTrigger accessibilityLabel="Phone delay">
@@ -261,11 +261,11 @@ function DelaySelect({
 				</SelectTrigger>
 				<SelectContent insets={{ top: insets.top, bottom: insets.bottom }}>
 					<ScrollView className="max-h-64">
-						{HOLD_MINUTES.map((minutes) => (
+						{PHONE_DELAYS.map((minutes) => (
 							<SelectItem
 								key={minutes}
 								value={String(minutes)}
-								label={holdLabel(minutes)}
+								label={phoneDelayLabel(minutes)}
 							/>
 						))}
 					</ScrollView>

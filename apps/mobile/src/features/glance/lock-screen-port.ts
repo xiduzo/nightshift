@@ -26,7 +26,7 @@ export type LockScreenPort = {
 /** A phone that cannot show a run outside the app (the web build). */
 export const NO_LOCK_SCREEN: LockScreenPort = {
 	available: false,
-	refusedText: "This device cannot show a run on the lock screen.",
+	refusedText: "This phone cannot show a run on the lock screen.",
 	allow: async () => false,
 	show: async () => {
 		throw new Error("No lock screen");

@@ -1,4 +1,4 @@
-import { HOLD_MINUTES, holdLabel } from "@nightshift/client";
+import { PHONE_DELAYS, phoneDelayLabel } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -36,6 +36,7 @@ import { toast } from "sonner";
 
 import type { NotificationSettings } from "@/shared/api";
 import { PageSection } from "@/shared/page";
+import { browserPushErrorText } from "../browser";
 import { notificationQueries } from "../queries";
 import { useBrowserPush } from "../use-browser-push";
 import { useSaveSettings } from "../use-save-settings";
@@ -48,17 +49,17 @@ const EVENTS: {
 }[] = [
 	{
 		key: "gateOpened",
-		label: "A Gate opens",
+		label: "A Gate waits for you",
 		description: "A run waits for your answer.",
 	},
 	{
 		key: "runFinished",
-		label: "A run finishes",
-		description: "A run got to its end.",
+		label: "A run finished",
+		description: "A run ended with its outcome.",
 	},
 	{
 		key: "runFailed",
-		label: "A run fails",
+		label: "A run failed",
 		description: "A run stopped on an error.",
 	},
 ];
@@ -81,7 +82,8 @@ const SCREENS: {
 	{
 		key: "expo",
 		label: "Phones",
-		description: "The Night Shift app on your phones.",
+		description:
+			"When off, your phones get no notifications. The inbox still shows what waits for you.",
 	},
 ];
 
@@ -177,13 +179,10 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 					</FieldSet>
 					<FieldSeparator />
 					<FieldSet>
-						<FieldLegend>Quiet hours</FieldLegend>
 						<FieldGroup>
 							<Field orientation="horizontal">
 								<FieldContent>
-									<FieldLabel htmlFor={`${id}-quiet`}>
-										Hold notifications at night
-									</FieldLabel>
+									<FieldLabel htmlFor={`${id}-quiet`}>Quiet hours</FieldLabel>
 									<FieldDescription>
 										When quiet hours end, Night Shift tells you what still waits
 										for you.
@@ -276,9 +275,9 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 							<Field>
 								<FieldLabel htmlFor={`${id}-hold`}>Phone delay</FieldLabel>
 								<Select
-									items={HOLD_MINUTES.map((minutes) => ({
+									items={PHONE_DELAYS.map((minutes) => ({
 										value: minutes,
-										label: holdLabel(minutes),
+										label: phoneDelayLabel(minutes),
 									}))}
 									value={data.holdMinutes}
 									onValueChange={(minutes) => {
@@ -294,9 +293,9 @@ function SettingsForm({ data }: { data: NotificationSettings }) {
 									</SelectTrigger>
 									<SelectContent>
 										<SelectGroup>
-											{HOLD_MINUTES.map((minutes) => (
+											{PHONE_DELAYS.map((minutes) => (
 												<SelectItem key={minutes} value={minutes}>
-													{holdLabel(minutes)}
+													{phoneDelayLabel(minutes)}
 												</SelectItem>
 											))}
 										</SelectGroup>
@@ -379,11 +378,7 @@ function BrowserField() {
 					onCheckedChange={(checked) => {
 						const change = checked ? push.turnOn() : push.turnOff();
 						change.catch((error: unknown) =>
-							toast.error(
-								error instanceof Error
-									? error.message
-									: "Night Shift could not change this browser.",
-							),
+							toast.error(browserPushErrorText(error, checked)),
 						);
 					}}
 				/>
