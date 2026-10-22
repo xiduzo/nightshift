@@ -1,6 +1,7 @@
 import {
 	type FeedStep,
 	followOwnStep,
+	HostUnreachableError,
 	type RunBus,
 	type TranscriptEntry,
 } from "@nightshift/engine";
@@ -280,7 +281,7 @@ export function createTranscriptFeeds(ports: FeedPorts): TranscriptFeeds {
 			return;
 		}
 		if (!ports.upstream) {
-			throw new Error("This computer cannot reach the Host of this Space.");
+			throw new HostUnreachableError();
 		}
 		let at = afterSeq;
 		for await (const entry of ports.upstream(step, afterSeq, signal)) {

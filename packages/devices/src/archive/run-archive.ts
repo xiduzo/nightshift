@@ -1,4 +1,9 @@
-import type { LoggedEvent, WalkFile, WalkRef } from "@nightshift/engine";
+import {
+	HostUnreachableError,
+	type LoggedEvent,
+	type WalkFile,
+	type WalkRef,
+} from "@nightshift/engine";
 import type { HostRelay } from "../contract";
 import { readArchive, writeArchive } from "./archive";
 
@@ -23,17 +28,15 @@ export function createRunArchive(deps: RunArchiveDeps) {
 
 	/**
 	 * Keeps a run's walk files in the archive of the Replica that keeps
-	 * its Space: this one, or its Host. Throws when that Host cannot be
-	 * reached.
+	 * its Space: this one, or its Host. Throws `HostUnreachableError` when
+	 * that Host cannot be reached.
 	 */
 	async function keepWalk(files: readonly WalkFile[]): Promise<void> {
 		for (const { ref, content } of files) {
 			if ((await deps.hostOf(ref.spaceId)) === null) {
 				await writeArchive(dataDir, ref, content);
 			} else if (relay) await relay.archivePut(ref, content);
-			else {
-				throw new Error("This computer cannot reach the Host of this Space.");
-			}
+			else throw new HostUnreachableError();
 		}
 	}
 

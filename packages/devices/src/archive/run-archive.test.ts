@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { WalkFile, WalkRef } from "@nightshift/engine";
+import {
+	HostUnreachableError,
+	type WalkFile,
+	type WalkRef,
+} from "@nightshift/engine";
 import { archivePath, readArchive } from "./archive";
 import { createRunArchive } from "./run-archive";
 
@@ -80,7 +84,7 @@ describe("the run archive", () => {
 	test("cannot keep the walk of a hosted Space without a way to its Host", async () => {
 		const archive = createRunArchive({ dataDir, hostOf });
 		await expect(archive.keepWalk(walkOf(HOSTED))).rejects.toThrow(
-			"This computer cannot reach the Host of this Space.",
+			HostUnreachableError,
 		);
 		const checkpoint = walkOf(HOSTED).at(-1)?.ref as WalkRef;
 		expect(await archive.archived(checkpoint)).toBeNull();
