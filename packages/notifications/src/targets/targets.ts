@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { pushTarget } from "@nightshift/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
+import { Expo } from "expo-server-sdk";
 import { z } from "zod";
 
 /**
@@ -42,15 +43,74 @@ export type PushTargetView = {
 	lastSeenAt: number | null;
 };
 
-/** What a screen sends to register itself. */
-export const registerTargetSchema = z.object({
-	kind: pushKindSchema,
+const targetFields = {
 	name: z.string().trim().min(1).max(120),
 	platform: z.string().trim().max(60).default(""),
 	endpoint: z.string().trim().min(1).max(2048),
 	keys: z.record(z.string(), z.string().max(512)).nullable().default(null),
+};
+
+/** A push target as this daemon registers it, the desktop one included. */
+export const registerTargetSchema = z.object({
+	kind: pushKindSchema,
+	...targetFields,
 });
 export type RegisterTarget = z.input<typeof registerTargetSchema>;
+
+/**
+ * The push services a browser subscribes with: Chrome and the browsers
+ * built on it (FCM), Firefox (Mozilla), Safari (Apple) and Edge (Windows).
+ * A Web Push endpoint is a URL the Host posts to, so it must be one of
+ * these: any other address would let a Person make the Host call into its
+ * own network.
+ */
+const WEB_PUSH_HOSTS = [
+	"fcm.googleapis.com",
+	"android.googleapis.com",
+	"push.services.mozilla.com",
+	"push.apple.com",
+	"notify.windows.com",
+];
+
+/** Whether the Host may post a Web Push to this endpoint: `https:` on a known push service. */
+function isWebPushEndpoint(endpoint: string): boolean {
+	let url: URL;
+	try {
+		url = new URL(endpoint);
+	} catch {
+		return false;
+	}
+	if (url.protocol !== "https:" || url.port !== "") return false;
+	if (url.username !== "" || url.password !== "") return false;
+	const host = url.hostname.toLowerCase();
+	return WEB_PUSH_HOSTS.some(
+		(known) => host === known || host.endsWith(`.${known}`),
+	);
+}
+
+/**
+ * What a screen sends to register itself: a browser (Web Push) or a phone
+ * (Expo Push). The desktop target is this computer's own: only its daemon
+ * registers it, for the computer's owner.
+ */
+export const registerScreenSchema = z
+	.object({ kind: z.enum(["web", "expo"]), ...targetFields })
+	.superRefine((screen, ctx) => {
+		if (screen.kind === "web" && !isWebPushEndpoint(screen.endpoint)) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["endpoint"],
+				message: "This browser's push service is not one Night Shift knows.",
+			});
+		}
+		if (screen.kind === "expo" && !Expo.isExpoPushToken(screen.endpoint)) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["endpoint"],
+				message: "This phone's push token is not valid.",
+			});
+		}
+	});
 
 export type TargetStore = ReturnType<typeof createTargetStore>;
 

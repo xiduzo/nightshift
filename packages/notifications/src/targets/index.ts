@@ -8,7 +8,7 @@ export {
 	type PushTargetView,
 	pushKindSchema,
 	type RegisterTarget,
-	registerTargetSchema,
+	registerScreenSchema,
 	type TargetStore,
 	targetView,
 } from "./targets";

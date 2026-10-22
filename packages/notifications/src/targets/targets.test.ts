@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
 
 import { testDatabase } from "../testing";
-import { createTargetStore, targetView } from "./targets";
+import { createTargetStore, registerScreenSchema, targetView } from "./targets";
 
 let db: Database;
 let cleanup: () => void;
@@ -63,4 +63,51 @@ test("a Person removes only their own screens", async () => {
 	expect(await store.of("ada")).toHaveLength(1);
 	expect((await store.remove("ada", phone.id))?.id).toBe(phone.id);
 	expect(await store.of("ada")).toEqual([]);
+});
+
+describe("a screen that registers itself", () => {
+	const accepts = (screen: Record<string, unknown>) =>
+		registerScreenSchema.safeParse({ name: "Screen", ...screen }).success;
+	const keys = { p256dh: "key", auth: "secret" };
+
+	test("is a browser on a known push service", () => {
+		for (const endpoint of [
+			"https://fcm.googleapis.com/fcm/send/abc",
+			"https://updates.push.services.mozilla.com/wpush/v2/abc",
+			"https://web.push.apple.com/abc",
+			"https://wns2-par02p.notify.windows.com/w/?token=abc",
+		]) {
+			expect(accepts({ kind: "web", endpoint, keys })).toBe(true);
+		}
+	});
+
+	test("never makes the Host call another address", () => {
+		for (const endpoint of [
+			"https://10.0.0.5:8443/admin/reset",
+			"https://127.0.0.1/",
+			"https://169.254.169.254/latest/meta-data",
+			"http://fcm.googleapis.com/fcm/send/abc",
+			"https://fcm.googleapis.com:8443/fcm/send/abc",
+			"https://user@fcm.googleapis.com/fcm/send/abc",
+			"https://fcm.googleapis.com.evil.example/abc",
+			"https://evilfcm.googleapis.com.example/abc",
+			"https://push.example/abc",
+			"not a url",
+		]) {
+			expect(accepts({ kind: "web", endpoint, keys })).toBe(false);
+		}
+	});
+
+	test("is a phone with an Expo push token", () => {
+		expect(
+			accepts({ kind: "expo", endpoint: "ExponentPushToken[abc123]" }),
+		).toBe(true);
+		expect(accepts({ kind: "expo", endpoint: "https://10.0.0.5/" })).toBe(
+			false,
+		);
+	});
+
+	test("is never this computer's desktop", () => {
+		expect(accepts({ kind: "desktop", endpoint: "device-1" })).toBe(false);
+	});
 });

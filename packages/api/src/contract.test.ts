@@ -325,7 +325,7 @@ describe("replies of a real engine", () => {
 		await reply(appRouter.notifications.targets.register, {
 			kind: "web",
 			name: "This browser",
-			endpoint: "https://push.example/abc",
+			endpoint: "https://fcm.googleapis.com/fcm/send/abc",
 			keys: { p256dh: "key", auth: "secret" },
 		});
 		await read(appRouter.notifications.targets.list);
