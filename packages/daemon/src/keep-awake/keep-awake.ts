@@ -3,7 +3,7 @@ import type { Engine, RunSummary } from "@nightshift/engine";
 import type { SleepHold, SleepLock } from "./sleep-lock";
 
 /**
- * "Keep this computer awake while a run is running": while the setting is
+ * "Keep this computer awake": while the setting is
  * on and a run needs this computer, the daemon holds the OS's sleep lock.
  * It lets go when the last such run ends, or when the setting goes off.
  *
