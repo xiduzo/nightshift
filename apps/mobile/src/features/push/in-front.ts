@@ -1,6 +1,7 @@
+import type { PushData } from "@nightshift/client";
 import { useSyncExternalStore } from "react";
 
-import type { InFrontPlace, PushData } from "./push-data";
+import type { InFrontPlace } from "./push-data";
 
 /** A push that came while the app was in front, shown as a banner in the app. */
 export type Banner = { title: string; data: PushData; at: number };

@@ -1,22 +1,20 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 
+import { pushDataOf, routeOf, withdrawKeyOf } from "@nightshift/client";
+
 import {
 	answerOfAction,
 	buttonAnswerCheck,
-	type PushData,
 	permissionOf,
-	pushDataOf,
-	routeOf,
+	phoneRouteOf,
 	showInFront,
 	shownAtMs,
-	shownButClosed,
 	shownWithKey,
 	taskDataOf,
-	withdrawKeyOf,
 } from "./push-data";
 
-/** A push as the Host's Expo channel sends it (`expoMessage`). */
+/** A push as the Host's Expo channel sends it (`expoMessage`). The contract's own tests read it in full. */
 const lockScreenGate = {
 	kind: "gate-opened",
 	key: "run-1:review",
@@ -30,52 +28,6 @@ const lockScreenGate = {
 };
 
 const plainGate = { ...lockScreenGate, options: undefined };
-
-describe("the data of a push", () => {
-	test("reads a Gate with its two options", () => {
-		expect(pushDataOf(lockScreenGate)).toEqual(lockScreenGate as PushData);
-	});
-
-	test("a push without the Host's kind or key is not one of the Host's", () => {
-		expect(pushDataOf({ withdraw: "run-1:review" })).toBeNull();
-		expect(pushDataOf({ kind: "other", key: "x" })).toBeNull();
-		expect(pushDataOf({ kind: "gate-opened" })).toBeNull();
-		expect(pushDataOf(null)).toBeNull();
-		expect(pushDataOf("text")).toBeNull();
-	});
-
-	test("options are kept only when there are exactly two", () => {
-		const three = {
-			...lockScreenGate,
-			options: [{ id: "a" }, { id: "b" }, { id: "c" }],
-		};
-		expect(pushDataOf(three)?.options).toBeUndefined();
-		const noLabel = { ...lockScreenGate, options: [{ id: "a" }, { id: "b" }] };
-		expect(pushDataOf(noLabel)?.options).toEqual([
-			{ id: "a", label: "a" },
-			{ id: "b", label: "b" },
-		]);
-	});
-
-	test("the end of quiet hours has no run", () => {
-		expect(
-			pushDataOf({
-				kind: "gates-waiting",
-				key: "waiting:5",
-				spaceId: null,
-				runId: null,
-				stepId: null,
-				count: 3,
-			}),
-		).toEqual({
-			kind: "gates-waiting",
-			key: "waiting:5",
-			spaceId: null,
-			runId: null,
-			stepId: null,
-		});
-	});
-});
 
 describe("a button on the lock screen", () => {
 	const data = pushDataOf(lockScreenGate);
@@ -115,13 +67,6 @@ describe("a button on the lock screen", () => {
 });
 
 describe("withdraw", () => {
-	test("reads the key of a withdraw push, nothing else", () => {
-		expect(withdrawKeyOf({ withdraw: "run-1:review" })).toBe("run-1:review");
-		expect(withdrawKeyOf(lockScreenGate)).toBeNull();
-		expect(withdrawKeyOf({ withdraw: "" })).toBeNull();
-		expect(withdrawKeyOf(undefined)).toBeNull();
-	});
-
 	test("finds the data in the background task's payload on each platform", () => {
 		const fields = { withdraw: "run-1:review" };
 		// iOS: the Expo body as a JSON string, and as `body`.
@@ -155,35 +100,6 @@ describe("withdraw", () => {
 		];
 		expect(shownWithKey(shown, "run-1:review")).toEqual(["n1", "n3"]);
 		expect(shownWithKey(shown, "run-9:review")).toEqual([]);
-	});
-});
-
-describe("Gates that no longer wait", () => {
-	const READ_AT = 1_000_000;
-	const old = READ_AT - 60_000;
-
-	test("a shown Gate the inbox no longer has goes", () => {
-		const shown = [
-			{ id: "n1", key: "run-1:review", at: old },
-			{ id: "n2", key: "run-2:review", at: old },
-		];
-		expect(shownButClosed(shown, new Set(["run-2:review"]), READ_AT)).toEqual([
-			"n1",
-		]);
-	});
-
-	test("a run's end, the end of quiet hours and other notifications stay", () => {
-		const shown = [
-			{ id: "n1", key: "run-1:end:7", at: old },
-			{ id: "n2", key: "waiting:5", at: old },
-			{ id: "n3", key: null, at: old },
-		];
-		expect(shownButClosed(shown, new Set(), READ_AT)).toEqual([]);
-	});
-
-	test("a push newer than the read stays: the read may not know its Gate yet", () => {
-		const shown = [{ id: "n1", key: "run-1:review", at: READ_AT - 5_000 }];
-		expect(shownButClosed(shown, new Set(), READ_AT)).toEqual([]);
 	});
 });
 
@@ -225,8 +141,13 @@ describe("a push while the app is in front", () => {
 });
 
 describe("where a tap goes", () => {
+	const screenOf = (raw: unknown) => {
+		const data = pushDataOf(raw);
+		return data ? phoneRouteOf(routeOf(data)) : null;
+	};
+
 	test("a Gate opens the Gate", () => {
-		expect(routeOf(pushDataOf(lockScreenGate))).toEqual({
+		expect(screenOf(lockScreenGate)).toEqual({
 			pathname: "/gates/[runId]/[stepId]",
 			params: { runId: "run-1", stepId: "review" },
 		});
@@ -234,20 +155,21 @@ describe("where a tap goes", () => {
 
 	test("a run's end opens the run", () => {
 		expect(
-			routeOf(
-				pushDataOf({ kind: "run-finished", key: "r:end:1", runId: "run-1" }),
-			),
+			screenOf({ kind: "run-finished", key: "r:end:1", runId: "run-1" }),
 		).toEqual({ pathname: "/runs/[runId]", params: { runId: "run-1" } });
 	});
 
-	test("the end of quiet hours opens the inbox", () => {
-		expect(
-			routeOf(pushDataOf({ kind: "gates-waiting", key: "waiting:5" })),
-		).toEqual({ pathname: "/" });
+	test("the end of quiet hours, or a run's end without its run, opens the inbox", () => {
+		expect(screenOf({ kind: "gates-waiting", key: "waiting:5" })).toEqual({
+			pathname: "/",
+		});
+		expect(screenOf({ kind: "run-failed", key: "r:end:1" })).toEqual({
+			pathname: "/",
+		});
 	});
 
 	test("a push that is not the Host's goes nowhere", () => {
-		expect(routeOf(null)).toBeNull();
+		expect(screenOf({ withdraw: "run-1:review" })).toBeNull();
 	});
 });
 

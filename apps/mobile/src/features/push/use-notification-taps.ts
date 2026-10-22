@@ -1,8 +1,9 @@
+import { pushDataOf, routeOf } from "@nightshift/client";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { useEffect } from "react";
 
-import { pushDataOf, routeOf } from "./push-data";
+import { phoneRouteOf } from "./push-data";
 
 /** Opens the screen of a tapped notification: the Gate, the run or the inbox. */
 function open(response: Notifications.NotificationResponse): boolean {
@@ -10,9 +11,9 @@ function open(response: Notifications.NotificationResponse): boolean {
 	if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
 		return false;
 	}
-	const route = routeOf(pushDataOf(response.notification.request.content.data));
-	if (!route) return false;
-	router.push(route);
+	const data = pushDataOf(response.notification.request.content.data);
+	if (!data) return false;
+	router.push(phoneRouteOf(routeOf(data)));
 	return true;
 }
 
