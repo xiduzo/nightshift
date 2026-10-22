@@ -24,7 +24,7 @@ export type {
 	WaitReason,
 } from "./events";
 export { groupByRun, parseEventRow, scopeKey } from "./events";
-export { followOwnStep } from "./follow";
+export { followOwnStep, waker } from "./follow";
 export {
 	createRunHistory,
 	ForeignRowsError,

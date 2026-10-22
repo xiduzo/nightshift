@@ -81,7 +81,7 @@ export async function* followOwnStep(
  * Wakes one waiting loop. A notify before the wait is not lost: the next
  * wait returns at once. Aborting the signal wakes it too.
  */
-function waker(signal: AbortSignal) {
+export function waker(signal: AbortSignal) {
 	let pending = false;
 	let resolve: (() => void) | null = null;
 	const notify = () => {
