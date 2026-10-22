@@ -1,3 +1,4 @@
+import { agoLabel } from "@nightshift/client";
 import {
 	Card,
 	CardContent,
@@ -12,7 +13,6 @@ import { Fragment } from "react";
 import { View } from "react-native";
 
 import { RunStatusBadge } from "@/features/runs";
-import { formatAgo } from "@/shared/format";
 import type { Health, HealthRow } from "./health";
 
 /**
@@ -72,7 +72,7 @@ function HealthRowView({ row, now }: { row: HealthRow; now: number }) {
 					numberOfLines={1}
 				>
 					{row.last
-						? `${row.detail}. Last run ${formatAgo(row.last.startedAt, now)}.`
+						? `${row.detail}. Last run ${agoLabel(row.last.startedAt, now)}.`
 						: `${row.detail}.`}
 				</Text>
 				{row.last ? <RunStatusBadge status={row.last.status} /> : null}

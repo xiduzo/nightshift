@@ -1,4 +1,4 @@
-import type { DevicesOverview } from "@nightshift/client";
+import { agoLabel, type DevicesOverview } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -20,7 +20,6 @@ import { CircleAlert, Laptop, Server } from "lucide-react-native";
 import { Fragment } from "react";
 import { View } from "react-native";
 
-import { formatAgo } from "@/shared/format";
 import { type Computer, computersOf } from "./computers";
 
 /**
@@ -87,7 +86,7 @@ function ComputerRow({ computer, now }: { computer: Computer; now: number }) {
 		: computer.online
 			? "Connected now"
 			: computer.lastSeenAt
-				? `Last seen ${formatAgo(computer.lastSeenAt, now)}`
+				? `Last seen ${agoLabel(computer.lastSeenAt, now)}`
 				: "Not connected yet";
 	return (
 		<View className="flex-row items-center gap-3">

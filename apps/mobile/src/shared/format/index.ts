@@ -1,4 +1,3 @@
-/** How the phone writes costs and times. */
+/** How the phone writes a time of day. Costs and "5 min ago" come from `@nightshift/client`. */
 
-export { formatKnownCost } from "./cost";
-export { formatAgo, formatTime } from "./time";
+export { formatTime } from "./time";

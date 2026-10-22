@@ -1,6 +1,14 @@
 /** Runs: their query options, the stream of one run, and their view types. */
 
-export { costLabel, flowLabel, runStatusLabel, whenLabel } from "./format";
+export {
+	agoLabel,
+	costLabel,
+	flowLabel,
+	formatCost,
+	formatKnownCost,
+	runStatusLabel,
+	whenLabel,
+} from "./format";
 export {
 	defaultPlacement,
 	type PlacementChoice,

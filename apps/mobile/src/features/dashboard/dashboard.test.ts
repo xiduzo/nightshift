@@ -253,6 +253,7 @@ describe("runFacts", () => {
 		createdAt: NOW - 5 * 60_000,
 		costUsd: 0.42,
 		costMissing: 0,
+		costCalls: 2,
 	} as RunSummary;
 
 	test("names the flow, when the run started, and its cost", () => {
@@ -263,6 +264,12 @@ describe("runFacts", () => {
 		expect(runFacts({ ...run, title: "nightly-check" }, NOW)).toBe(
 			"5 min ago, $0.42",
 		);
+	});
+
+	test("leaves the cost out while it is not known, as the Runs tab does", () => {
+		expect(
+			runFacts({ ...run, costUsd: 0, costMissing: 0, costCalls: 0 }, NOW),
+		).toBe("nightly-check, 5 min ago");
 	});
 
 	test("calls a run without a flow a quick run", () => {
