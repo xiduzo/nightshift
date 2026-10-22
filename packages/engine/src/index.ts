@@ -27,6 +27,7 @@ export type {
 	RunCommandKind,
 	SpaceEngine,
 	StartRunInput,
+	WalkFiles,
 } from "./contract";
 export {
 	type DashboardSummary,

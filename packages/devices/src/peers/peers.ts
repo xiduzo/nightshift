@@ -109,6 +109,7 @@ export function createPeers(
 		log,
 		bus,
 		history,
+		walks: context.walks,
 		dataDir,
 		documents,
 		// A run moved here: this computer walks it from now on.

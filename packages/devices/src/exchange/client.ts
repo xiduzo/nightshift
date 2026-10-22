@@ -1,6 +1,6 @@
 import { roleAllows } from "@nightshift/auth";
 import type { Engine } from "@nightshift/engine";
-import type { ArchiveRef, HostClient, RunCommand, RunRows } from "../contract";
+import type { HostClient, RunCommand, RunRows } from "../contract";
 import { applyRunCommand, COMMAND_PERMISSION } from "./commands";
 import type { EngineExchange } from "./engine-exchange";
 import { isEmpty, MissingProjectError } from "./rows";
@@ -86,33 +86,22 @@ async function pushLoop(session: ExchangeSession): Promise<void> {
 /** Puts the files of the batch's ended nodes, and their runs' checkpoints, in the Host's archive. */
 async function archive(session: ExchangeSession, batch: RunRows) {
 	const { engine, client, signal } = session;
-	const ended = batch.events.filter(
-		(e) => (e.type === "StepEnded" && e.stepId) || e.type === "RunEnded",
-	);
-	const runs = new Map<string, string>();
-	for (const e of ended) {
-		runs.set(e.runId, e.spaceId);
-		if (e.type !== "StepEnded" || !e.stepId) continue;
-		const files = await engine.exchange.stepFiles(e.stepId);
-		if (!files) continue;
-		const at = { spaceId: files.spaceId, runId: files.runId, stepId: e.stepId };
-		const puts: [ArchiveRef, string | null][] = [
-			[{ kind: "transcript", ...at }, files.transcript],
-			[{ kind: "log", ...at }, files.log],
-		];
-		for (const [ref, content] of puts) {
-			if (content !== null)
-				await client.archive.put({ ref, content }, { signal });
-		}
+	/** The ended steps of each run with an ended step or end. */
+	const ended = new Map<string, string[]>();
+	for (const e of batch.events) {
+		const stepId = e.type === "StepEnded" ? e.stepId : null;
+		if (!stepId && e.type !== "RunEnded") continue;
+		const steps = ended.get(e.runId) ?? [];
+		if (stepId) steps.push(stepId);
+		ended.set(e.runId, steps);
 	}
-	for (const [runId, spaceId] of runs) {
-		await client.archive.put(
-			{
-				ref: { kind: "checkpoint", spaceId, runId },
-				content: await engine.exchange.checkpoint(runId),
-			},
-			{ signal },
-		);
+	for (const [runId, steps] of ended) {
+		// Empty for a run that has moved since: its new Walker sends its files.
+		for (const { ref, content } of await engine.exchange.exportWalk(runId, {
+			steps,
+		})) {
+			await client.archive.put({ ref, content }, { signal });
+		}
 	}
 }
 

@@ -1,16 +1,15 @@
 import type { Database } from "@nightshift/db";
 import {
-	checkpointSnapshot,
 	deriveSteps,
 	type LoggedEvent,
 	memberRole,
-	type OwnStepFiles,
 	parseTranscript,
 	type RunBus,
 	type RunHistory,
 	type RunLog,
 	recordClone,
 	type SpaceDocuments,
+	type WalkFiles,
 } from "@nightshift/engine";
 import { readArchive, writeArchive } from "../archive";
 import type { ArchiveRef } from "../contract";
@@ -43,16 +42,14 @@ export type EngineExchange = {
 	stepOwner(
 		stepId: string,
 	): Promise<{ runId: string; walkerId: string; spaceId: string } | null>;
-	/** A step this Replica walked, as the files the archive keeps. Null for anyone else's. */
-	stepFiles(stepId: string): Promise<OwnStepFiles | null>;
-	/** The run's latest checkpoints, as the archive keeps them. */
-	checkpoint(runId: string): Promise<string>;
+	/** The walk state of a run this Replica walks, as the archive keeps it (`WalkFiles.exportWalk`). Empty for anyone else's. */
+	exportWalk: WalkFiles["exportWalk"];
 	readArchive(ref: ArchiveRef): Promise<string | null>;
 	/** Keeps a file of the archive. A transcript tells the run's watchers. */
 	writeArchive(ref: ArchiveRef, content: string): Promise<void>;
 	/**
-	 * A file of a run this Replica walked, for the archive's readers: its
-	 * transcript or command log from disk, or its checkpoints. Null when
+	 * A file of a run this Replica walks, for the archive's readers: a
+	 * step's transcript or command log, or the run's Checkpoint. Null when
 	 * it has none, or another Device walks the run.
 	 */
 	ownFile(ref: ArchiveRef): Promise<string | null>;
@@ -73,8 +70,10 @@ export function createEngineExchange(deps: {
 	db: Database;
 	log: RunLog;
 	bus: RunBus;
-	/** The engine's run history: the rows the exchange copies, and the files of own steps. */
+	/** The engine's run history: the rows the exchange copies. */
 	history: RunHistory;
+	/** The engine's walk state of own runs: the files the archive keeps. */
+	walks: WalkFiles;
 	dataDir: string;
 	documents: SpaceDocuments;
 	/** The events a batch added: a run moved here is taken over. */
@@ -82,7 +81,7 @@ export function createEngineExchange(deps: {
 	/** The feed of the Host that keeps a Space (over its link). */
 	upstream?: FeedPorts["upstream"];
 }): EngineExchange {
-	const { db, log, history, dataDir, documents } = deps;
+	const { db, log, history, walks, dataDir, documents } = deps;
 	const { runOwner } = history;
 
 	const hostSpaces = createHostSpaces(db);
@@ -113,10 +112,7 @@ export function createEngineExchange(deps: {
 		feeds,
 		runOwner,
 		stepOwner: history.stepOwner,
-		async stepFiles(stepId) {
-			return history.ownStepFiles(stepId, await log.walkerId());
-		},
-		checkpoint: (runId) => checkpointSnapshot(db, runId),
+		exportWalk: walks.exportWalk,
 		readArchive: (ref) => readArchive(dataDir, ref),
 		async writeArchive(ref, content) {
 			await writeArchive(dataDir, ref, content);
@@ -128,17 +124,7 @@ export function createEngineExchange(deps: {
 				});
 			}
 		},
-		async ownFile(ref) {
-			const owner = await runOwner(ref.runId);
-			if (!owner || owner.walkerId !== (await log.walkerId())) return null;
-			if (ref.kind === "checkpoint") return checkpointSnapshot(db, ref.runId);
-			const files = await history.ownStepFiles(
-				ref.stepId,
-				await log.walkerId(),
-			);
-			if (!files || files.runId !== ref.runId) return null;
-			return ref.kind === "log" ? files.log : files.transcript;
-		},
+		ownFile: walks.ownFile,
 		async recordClone(input) {
 			const document = await documents.open(input.spaceId);
 			if (document.hostedElsewhere || !document.projects.has(input.projectId)) {
