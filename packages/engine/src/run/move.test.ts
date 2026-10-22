@@ -160,8 +160,13 @@ async function waitingOn(a: Computer, flow = gateFlow) {
 	return { runId: run.id, projectId };
 }
 
-/** B gets A's run rows (and the project row, as the Space document brings it), as the exchange does. */
-async function copyRows(a: Computer, b: Computer, projectId: string) {
+/** B gets A's run rows in the Space (A's own by default) and the project row (as the Space document brings it), as the exchange does. */
+async function copyRows(
+	a: Computer,
+	b: Computer,
+	projectId: string,
+	spaceId = a.sandbox.spaceId,
+) {
 	const [row] = await a.sandbox.db
 		.select()
 		.from(project)
@@ -169,7 +174,7 @@ async function copyRows(a: Computer, b: Computer, projectId: string) {
 	if (!row) throw new Error("no project");
 	await b.sandbox.db.insert(project).values(row).onConflictDoNothing();
 	const { rows } = await a.context.history.rowsAfter({
-		spaces: [a.sandbox.spaceId],
+		spaces: [spaceId],
 		cursors: {},
 	});
 	return b.context.history.ingest(rows);
@@ -344,6 +349,55 @@ describe("a run that moves to another Device", () => {
 		expect(ownFile.slice(0, fromA.length)).toEqual(fromA);
 		expect(ownFile.length).toBeGreaterThan(fromA.length);
 		expect(await readTranscriptFile(onA)).toEqual(fromA);
+	});
+
+	test("moved back, its first Walker keeps what the other one wrote of a step", async () => {
+		const twoGates = flowOf(
+			[
+				command("build", "echo built"),
+				gate,
+				{ ...gate, id: "again", prompt: "Really?" },
+			],
+			[
+				{ id: "e1", from: "build", outcome: "pass", to: "gate" },
+				{ id: "e2", from: "gate", outcome: "approve", to: "again" },
+			],
+		);
+		const { a, b } = await pair();
+		const { runId, projectId } = await waitingOn(a, twoGates);
+		const first = (await spaceOf(a, a).getRun(runId)).steps[1]?.id as string;
+		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await copyRows(a, b, projectId);
+		await b.context.takeOver(runId);
+		const onB = spaceOf(b, a);
+		await onB.resolveGate({ runId, stepId: first, choice: "approve" });
+		await waitFor(async () => (await onB.getRun(runId)).steps.length === 3, {
+			label: "the second Gate on B",
+		});
+		await waitFor(async () => (await onB.getRun(runId)).status === "waiting", {
+			label: "the run to wait on B",
+		});
+		const onBFile = await readTranscriptFile(
+			transcriptPath(b.sandbox.dataDir, runId, first),
+		);
+
+		await onB.moveRun(runId, a.sandbox.deviceId);
+		await copyRows(b, a, projectId, a.sandbox.spaceId);
+		await a.context.takeOver(runId);
+		// A's own file of the step had only A's part: now it has B's too.
+		expect(
+			await readTranscriptFile(transcriptPath(a.sandbox.dataDir, runId, first)),
+		).toEqual(onBFile);
+		const second = (await spaceOf(a, a).getRun(runId)).steps[2]?.id as string;
+		await spaceOf(a, a).resolveGate({
+			runId,
+			stepId: second,
+			choice: "reject",
+		});
+		await waitFor(
+			async () => (await spaceOf(a, a).getRun(runId)).status === "finished",
+			{ label: "the run to end on A" },
+		);
 	});
 
 	test("a second take-over of the same Checkpoint changes nothing", async () => {

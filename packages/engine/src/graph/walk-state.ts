@@ -6,6 +6,7 @@ import { and, eq, sql } from "drizzle-orm";
 import type { WalkFile, WalkFiles, WalkRef } from "../contract";
 import {
 	ForeignRowsError,
+	parseTranscript,
 	type RunHistory,
 	type RunLog,
 	readTranscriptFile,
@@ -34,7 +35,8 @@ export type RunWalks = WalkFiles & {
 	/**
 	 * Writes the transcript a step's old Walker wrote (the content of its
 	 * `transcript` file) into the step's own file in this computer's data
-	 * folder, when it has none:
+	 * folder, unless that file goes as far already (a second import, or
+	 * the step went on here):
 	 * the entries this computer writes of the step come after it. So a
 	 * step that waited through a move keeps its first part, on the run
 	 * page and in what this computer archives of it.
@@ -147,7 +149,14 @@ export function createRunWalks(deps: {
 		if (!row || row.runId !== runId) return;
 		// Not the row's path: that names the old Walker's data folder.
 		const path = transcriptPath(dataDir, runId, stepId);
-		if ((await readTranscriptFile(path)).length > 0) return;
+		// A run moved back finds its own older part here: the copy goes further.
+		const lastOf = (entries: readonly { seq: number }[]) =>
+			entries.at(-1)?.seq ?? 0;
+		if (
+			lastOf(await readTranscriptFile(path)) >= lastOf(parseTranscript(content))
+		) {
+			return;
+		}
 		await mkdir(dirname(path), { recursive: true });
 		await writeFile(path, content);
 	}

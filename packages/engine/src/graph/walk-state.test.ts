@@ -263,7 +263,7 @@ describe("the walk state of a run", () => {
 		await a.space.stopRun(detail.id);
 	});
 
-	test("takes a step's transcript from its old Walker into the step's own file, and never over one it has", async () => {
+	test("takes a step's transcript from its old Walker into the step's own file, and never over one that goes as far", async () => {
 		const a = await computer();
 		const detail = await waitingRun(a.space, a.sandbox.repoPath);
 		const gateStep = detail.steps[1]?.id as string;
@@ -274,16 +274,21 @@ describe("the walk state of a run", () => {
 		const path = row?.transcriptPath as string;
 		const own = await readFile(path, "utf8");
 		const walks = walksOf(a.sandbox);
-		const fromBefore = `${JSON.stringify({ ...JSON.parse(own.split("\n")[0] as string), seq: 99 })}\n`;
+		const entry = (seq: number) =>
+			`${JSON.stringify({ ...JSON.parse(own.split("\n")[0] as string), seq })}\n`;
+		const fromBefore = entry(99);
 
-		// It has entries of its own: they stay.
-		await walks.importTranscript(detail.id, gateStep, fromBefore);
+		// It has entries of its own that go as far: they stay.
+		await walks.importTranscript(detail.id, gateStep, entry(1));
 		expect(await readFile(path, "utf8")).toBe(own);
 		// Not a step of the run: nothing is written.
 		await rm(path);
 		await walks.importTranscript("another-run", gateStep, fromBefore);
 		expect(existsSync(path)).toBe(false);
 		// None here: the old Walker's part is the start of its file.
+		await walks.importTranscript(detail.id, gateStep, entry(1));
+		expect(await readFile(path, "utf8")).toBe(entry(1));
+		// A copy that goes further (the run comes back): it replaces the file.
 		await walks.importTranscript(detail.id, gateStep, fromBefore);
 		expect(await readFile(path, "utf8")).toBe(fromBefore);
 		await a.space.stopRun(detail.id);
