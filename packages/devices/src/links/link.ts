@@ -130,21 +130,12 @@ export function isRefusal(error: unknown): boolean {
 }
 
 /**
- * How a call on the Host failed: `refused`, the Host does not know the
- * key (its access was removed); `denied`, the Host answered and does not
- * take this call now (not allowed, or not yet); `unreachable`, anything
- * else (no answer, a timeout, a failure on the Host).
+ * The Host does not know the key (its access was removed): the link asks
+ * the Host at once instead of at the next heartbeat. A call the Host does
+ * not allow (`FORBIDDEN`) is not this: the key is still good.
  */
-export type HostError = "refused" | "denied" | "unreachable";
-
-export function hostErrorOf(error: unknown): HostError {
-	if (error instanceof ORPCError) {
-		if (error.code === "UNAUTHORIZED") return "refused";
-		if (error.code === "FORBIDDEN" || error.code === "CONFLICT") {
-			return "denied";
-		}
-	}
-	return "unreachable";
+function isUnknownKey(error: unknown): boolean {
+	return error instanceof ORPCError && error.code === "UNAUTHORIZED";
 }
 
 /** A stream of the link: what it runs, and how long it waits after a failure. */
@@ -294,7 +285,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 			if (failure === null) {
 				if (well) continue;
 			} else {
-				if (hostErrorOf(failure) === "refused") check();
+				if (isUnknownKey(failure)) check();
 				const said = String(failure);
 				if (stream.logged !== said) {
 					stream.logged = said;
@@ -409,7 +400,7 @@ export function httpsLink(options: HttpsLinkOptions): Link {
 			try {
 				return await use(client);
 			} catch (error) {
-				if (hostErrorOf(error) === "refused") check();
+				if (isUnknownKey(error)) check();
 				throw error;
 			}
 		},
