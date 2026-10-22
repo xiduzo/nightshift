@@ -1,10 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import type { OwnDevice, TranscriptEntry } from "@nightshift/engine";
+import {
+	HostUnreachableError,
+	type OwnDevice,
+	type TranscriptEntry,
+	HOST_UNREACHABLE as UNREACHABLE,
+} from "@nightshift/engine";
 import { createSandbox } from "@nightshift/engine/testing";
 import type { HostClient, WorkReply, WorkRequest } from "../contract";
 import type { DeviceLinks } from "../links";
 import { pairedReplicas } from "../testing";
 import { createRelay } from "./relay";
+import { createSpaceRoutes } from "./route";
 import { createWorkRelay } from "./work-relay";
 
 /**
@@ -12,9 +18,6 @@ import { createWorkRelay } from "./work-relay";
  * Link, or nowhere while the Host cannot be reached. The Links, the Host
  * and the hub are fakes, except in the last test: a real Host in memory.
  */
-
-const UNREACHABLE =
-	"The computer that keeps this Space cannot be reached. Try again when it is online.";
 
 /** `space-own`: kept here. `space-team`: host-1, online. `space-gone`: host-2, no Link. `space-off`: host-3, its Link offline. */
 const HOSTS: Record<string, string | null> = {
@@ -216,6 +219,52 @@ function actions(relay: ReturnType<typeof createRelay>, spaceId: string) {
 	};
 }
 
+describe("the Space route", () => {
+	const host = fakeHost();
+	const routes = createSpaceRoutes({
+		hostOf: hostSpaces.hostOf,
+		links: () => fakeLinks({ "host-1": host.client, "host-3": null }),
+	});
+
+	test("says where a call for each Space goes now", async () => {
+		expect(await routes.route("space-own")).toEqual({ at: "here" });
+		expect(await routes.route("space-team")).toEqual({
+			at: "host",
+			hostId: "host-1",
+			client: host.client,
+		});
+		// No Link to the Host, and a Link that is offline.
+		expect(await routes.route("space-gone")).toEqual({
+			at: "unreachable",
+			hostId: "host-2",
+		});
+		expect(await routes.route("space-off")).toEqual({
+			at: "unreachable",
+			hostId: "host-3",
+		});
+	});
+
+	test("reads the Link at each call", async () => {
+		let client: HostClient | null = null;
+		const live = createSpaceRoutes({
+			hostOf: hostSpaces.hostOf,
+			links: () => fakeLinks({ "host-1": client }),
+		});
+		expect((await live.route("space-team")).at).toBe("unreachable");
+		client = host.client;
+		expect((await live.route("space-team")).at).toBe("host");
+	});
+
+	test("the Host's procedures only while it can be reached", async () => {
+		expect(await routes.host("space-team")).toBe(host.client);
+		for (const spaceId of ["space-gone", "space-off", "space-own"]) {
+			await expect(routes.host(spaceId)).rejects.toBeInstanceOf(
+				HostUnreachableError,
+			);
+		}
+	});
+});
+
 describe("the relay, while the Host of the Space cannot be reached", () => {
 	for (const spaceId of ["space-gone", "space-off"]) {
 		test(`every action refuses with one message (${spaceId})`, async () => {
@@ -225,7 +274,7 @@ describe("the relay, while the Host of the Space cannot be reached", () => {
 					() => null,
 					(error: unknown) => error,
 				);
-				expect(refused, name).toBeInstanceOf(Error);
+				expect(refused, name).toBeInstanceOf(HostUnreachableError);
 				expect((refused as Error).message, name).toBe(UNREACHABLE);
 			}
 			expect(host.taken).toEqual([]);
@@ -271,7 +320,7 @@ describe("the relay, for a Space kept here", () => {
 			...hostOnly
 		} = actions(relay, "space-own");
 		for (const [name, act] of Object.entries(hostOnly)) {
-			await expect(act(), name).rejects.toThrow(UNREACHABLE);
+			await expect(act(), name).rejects.toBeInstanceOf(HostUnreachableError);
 		}
 	});
 });
@@ -486,7 +535,7 @@ describe("the relay of a paired Device", () => {
 			const offline = relayOver(null);
 			await expect(
 				offline.devices({ spaceId: a.spaceId, projectId }),
-			).rejects.toThrow(UNREACHABLE);
+			).rejects.toBeInstanceOf(HostUnreachableError);
 		} finally {
 			await Promise.all([a.cleanup(), b.cleanup()]);
 		}

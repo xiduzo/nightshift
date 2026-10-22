@@ -1,11 +1,13 @@
+import { HOST_UNREACHABLE } from "@nightshift/engine";
 import type { WorkRelay } from "../contract";
 import type { DeviceLinks } from "../links";
 import type { PeerEngine } from "../peers";
 import type { WorkHub } from "../work";
-import { HOST_OFFLINE } from "./relay";
+import { createSpaceRoutes } from "./route";
 
 /**
- * How this computer's runs reach the Devices their steps are placed on.
+ * How this computer's runs reach the Devices their steps are placed on
+ * (`createSpaceRoutes`).
  *
  * - A Space this Replica keeps (it is that Space's Host): the hub, which
  *   the placed Devices pull their calls from over their own links.
@@ -13,6 +15,8 @@ import { HOST_OFFLINE } from "./relay";
  *   to the Host over this computer's link (`devices.call`), which relays it
  *   to the Device, or serves it itself; closing the stream cancels it. The
  *   Host checks the Device is the same Person's.
+ * - A Host that cannot be reached: the call answers with one `offline`
+ *   error, so the step waits for its Device. The Device is not online.
  */
 export function createWorkRelay(deps: {
 	hub: Pick<WorkHub, "call" | "online">;
@@ -24,28 +28,24 @@ export function createWorkRelay(deps: {
 	};
 	links(): Pick<DeviceLinks, "get">;
 }): WorkRelay {
-	const hostOf = (spaceId: string) =>
-		deps.engine().exchange.hostSpaces.hostOf(spaceId);
-
-	async function clientOf(spaceId: string) {
-		const hostId = await hostOf(spaceId);
-		if (hostId === null) return null;
-		return deps.links().get(hostId)?.client() ?? null;
-	}
+	const { route } = createSpaceRoutes({
+		hostOf: (spaceId) => deps.engine().exchange.hostSpaces.hostOf(spaceId),
+		links: deps.links,
+	});
 
 	return {
 		async *call(deviceId, request, signal) {
-			if ((await hostOf(request.spaceId)) === null) {
+			const to = await route(request.spaceId);
+			if (to.at === "here") {
 				yield* deps.hub.call(deviceId, request, signal);
 				return;
 			}
-			const client = await clientOf(request.spaceId);
-			if (!client) {
-				yield { kind: "error", message: HOST_OFFLINE, offline: true };
+			if (to.at === "unreachable") {
+				yield { kind: "error", message: HOST_UNREACHABLE, offline: true };
 				return;
 			}
 			try {
-				const replies = await client.devices.call(
+				const replies = await to.client.devices.call(
 					{ deviceId, request },
 					signal ? { signal } : {},
 				);
@@ -61,12 +61,10 @@ export function createWorkRelay(deps: {
 		},
 
 		async online(deviceId, spaceId) {
-			if ((await hostOf(spaceId)) === null) {
-				return deps.hub.online(deviceId, spaceId);
-			}
-			const client = await clientOf(spaceId);
-			if (!client) return false;
-			return client.devices.reachable({ deviceId }).catch(() => false);
+			const to = await route(spaceId);
+			if (to.at === "here") return deps.hub.online(deviceId, spaceId);
+			if (to.at === "unreachable") return false;
+			return to.client.devices.reachable({ deviceId }).catch(() => false);
 		},
 	};
 }
