@@ -34,9 +34,9 @@ import type { OpenGateRef, RunEvent, RunEventSource } from "./sources";
  *   daemon shows it for every Space it has, also for a Space another
  *   Host keeps and sends for (`LOCAL_KINDS`).
  * - Once per key: the delivery log claims each (Person, key) once.
- * - Quiet hours hold pushes. When they end, one push says how many Gates
- *   still wait (or the one Gate itself). Runs that ended meanwhile go
- *   without a push.
+ * - Quiet hours hold pushes. When they end, each screen gets one push that
+ *   says how many of the Gates it held still wait (or the one Gate
+ *   itself). Runs that ended meanwhile go without a push.
  * - The active screen first: while the person has a page or the app open,
  *   a push to a phone or a closed browser waits `holdMinutes`. A Gate
  *   answered meanwhile is not pushed at all. A run that ended is pushed
@@ -416,43 +416,49 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			const settings = await deps.settings.get(personId);
 			if (inQuietHours(settings, at)) continue;
 			const gates = rows.filter((row) => row.kind === "gate-opened");
-			const one = gates.length === 1 ? gates[0] : undefined;
+			// Runs that ended meanwhile go without a push.
 			for (const row of rows) {
-				if (row === one) continue;
+				if (row.kind === "gate-opened") continue;
 				await deps.deliveries.update(personId, row.key, {
 					status: "dropped",
 					heldFor: [],
 				});
 			}
-			if (one) {
-				// One Gate: the Gate itself, so its answer withdraws it.
-				const sentTo = await sendTo(
-					await deps.targets.byIds(one.heldFor),
-					await messageOf(one),
-				);
-				await deps.deliveries.update(personId, one.key, {
-					status: sentTo.length > 0 ? "sent" : "dropped",
-					sentTo,
+			// Each screen hears of the Gates it held, and only of those: a
+			// Space another Host sends for held this computer's own screens.
+			const held = [...new Set(gates.flatMap((row) => row.heldFor))];
+			const targets = (await deps.targets.byIds(held)).filter(
+				(target) => settings.screens[target.kind],
+			);
+			const sentTo = new Map<string, string[]>();
+			for (const target of targets) {
+				const waiting = gates.filter((row) => row.heldFor.includes(target.id));
+				const [one] = waiting;
+				if (waiting.length === 1 && one) {
+					// One Gate: the Gate itself, so its answer withdraws it.
+					const sent = await sendTo([target], await messageOf(one));
+					sentTo.set(one.key, [...(sentTo.get(one.key) ?? []), ...sent]);
+				} else if (waiting.length > 1) {
+					await sendTo([target], {
+						key: `waiting:${at}`,
+						kind: "gates-waiting",
+						spaceId: null,
+						runId: null,
+						stepId: null,
+						title: gatesWaitingTitle(waiting.length),
+						alert: true,
+						count: waiting.length,
+						at,
+					});
+				}
+			}
+			for (const row of gates) {
+				const sent = sentTo.get(row.key) ?? [];
+				await deps.deliveries.update(personId, row.key, {
+					status: sent.length > 0 ? "sent" : "dropped",
+					sentTo: sent,
 					heldFor: [],
-					sentAt: sentTo.length > 0 ? at : null,
-				});
-			} else if (gates.length > 1) {
-				// The screens that held the Gates: a Space another Host
-				// sends for held this computer's own screens only.
-				const held = [...new Set(gates.flatMap((row) => row.heldFor))];
-				const targets = (await deps.targets.byIds(held)).filter(
-					(target) => settings.screens[target.kind],
-				);
-				await sendTo(targets, {
-					key: `waiting:${at}`,
-					kind: "gates-waiting",
-					spaceId: null,
-					runId: null,
-					stepId: null,
-					title: gatesWaitingTitle(gates.length),
-					alert: true,
-					count: gates.length,
-					at,
+					sentAt: sent.length > 0 ? at : null,
 				});
 			}
 		}

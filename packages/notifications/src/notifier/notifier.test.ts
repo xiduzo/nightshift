@@ -432,6 +432,31 @@ describe("quiet hours", () => {
 		});
 	});
 
+	test("when they end, each screen hears only of the Gates it held", async () => {
+		// Another Host sends for OTHER_SPACE: only this computer's desktop held its Gate.
+		members[OTHER_SPACE] = ["ada"];
+		senders.delete(OTHER_SPACE);
+		await notifier.start();
+		const phone = await register("ada", "expo");
+		const own = await register("ada", "desktop");
+
+		await openGate("run-1", "step-1");
+		await openGate("run-2", "step-2", OTHER_SPACE);
+
+		clock = Date.UTC(2026, 9, 22, 7, 30);
+		await notifier.tick();
+
+		expect(sentTo(expo)).toEqual([`${phone.id}:run-1:step-1`]);
+		expect(desktop.sent().map((m) => m.title)).toEqual([
+			"2 Gates wait for you",
+		]);
+		expect(sentTo(desktop)).toEqual([`${own.id}:waiting:${clock}`]);
+
+		// The phone got the Gate itself: its answer withdraws it there.
+		await answerGate("run-1", "step-1");
+		expect(expo.withdrawn()).toEqual(["run-1:step-1"]);
+	});
+
 	test("are in the person's own time zone", async () => {
 		await settings.save("ada", { timeZone: "Asia/Tokyo" });
 		await notifier.start();
