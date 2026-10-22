@@ -282,9 +282,9 @@ function OpenGateSheet({
 				</Alert>
 			) : !gate.canAnswer ? (
 				<Alert icon={Eye}>
-					<AlertTitle>You cannot answer this Gate</AlertTitle>
+					<AlertTitle>You can read this Gate only</AlertTitle>
 					<AlertDescription>
-						{`Your role in ${gate.spaceName} lets you read Gates, not answer them. Ask an owner or admin of the Space for another role.`}
+						{`Your role in ${gate.spaceName} does not let you answer Gates. Ask an owner or admin of the Space to answer it, or to give you another role.`}
 					</AlertDescription>
 				</Alert>
 			) : (

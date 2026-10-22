@@ -105,7 +105,9 @@ function GateRow({ gate, now }: { gate: OpenGate; now: number }) {
 				})
 			}
 			accessibilityRole="button"
-			accessibilityHint="Opens the Gate to answer it"
+			accessibilityHint={
+				gate.canAnswer ? "Opens the Gate to answer it" : "Opens the Gate"
+			}
 			className="active:opacity-70"
 		>
 			<Card className="gap-3 py-4">

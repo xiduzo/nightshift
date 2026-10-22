@@ -200,8 +200,9 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 								<LockIcon />
 								<AlertTitle>You can read this Gate only</AlertTitle>
 								<AlertDescription>
-									Your role in {gate.spaceName} does not allow answers. Ask a
-									member or the owner of the Space to answer it.
+									Your role in {gate.spaceName} does not let you answer Gates.
+									Ask an owner or admin of the Space to answer it, or to give
+									you another role.
 								</AlertDescription>
 							</Alert>
 						)}
