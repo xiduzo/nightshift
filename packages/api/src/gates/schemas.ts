@@ -46,4 +46,10 @@ export const gateAnswerSchema = z.object({
 	stepId: z.string().min(1),
 	choice: z.string().min(1),
 	note: z.string().optional(),
+	/**
+	 * `lock-screen`: the answer comes from a button on a notification,
+	 * without an unlock. Only a Gate its author marked for the lock screen
+	 * takes it.
+	 */
+	via: z.enum(["lock-screen"]).optional(),
 });

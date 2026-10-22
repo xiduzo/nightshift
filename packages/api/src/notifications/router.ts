@@ -1,6 +1,6 @@
 import {
 	notificationSettingsPatchSchema,
-	registerTargetSchema,
+	registerScreenSchema,
 } from "@nightshift/notifications";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
@@ -82,7 +82,7 @@ export const notifications = {
 					"Registers this browser, phone or desktop app to get your notifications.",
 			})
 			.output(output(pushTargetSchema))
-			.input(registerTargetSchema)
+			.input(registerScreenSchema)
 			.handler(({ context, input }) =>
 				context.notifications.targets.register(
 					context.session.user.id,

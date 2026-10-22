@@ -14,7 +14,7 @@ import { CameraOff, CircleAlert } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Linking, View } from "react-native";
 
-import { hostAddressOf } from "@/shared/api";
+import { hostAddressOf, needsHttps } from "@/shared/api";
 
 type CodeScannerProps = {
 	/** The Host address in the code. */
@@ -30,7 +30,10 @@ type CodeScannerProps = {
  */
 export function CodeScanner({ onScanned, onCancel }: CodeScannerProps) {
 	const [permission, requestPermission] = useCameraPermissions();
-	const [wrongCode, setWrongCode] = useState(false);
+	/** What was wrong with the last code: none, no Host address, or `http://`. */
+	const [wrongCode, setWrongCode] = useState<"none" | "no-address" | "http">(
+		"none",
+	);
 	/** The camera reports a code many times a second: take the first. */
 	const done = useRef(false);
 
@@ -38,7 +41,7 @@ export function CodeScanner({ onScanned, onCancel }: CodeScannerProps) {
 		if (done.current) return;
 		const address = hostAddressOf(data);
 		if (!address) {
-			setWrongCode(true);
+			setWrongCode(needsHttps(data) ? "http" : "no-address");
 			return;
 		}
 		done.current = true;
@@ -94,7 +97,15 @@ export function CodeScanner({ onScanned, onCancel }: CodeScannerProps) {
 					onBarcodeScanned={scanned}
 				/>
 			</View>
-			{wrongCode ? (
+			{wrongCode === "http" ? (
+				<Alert icon={CircleAlert} variant="destructive">
+					<AlertTitle>This code has no https:// address</AlertTitle>
+					<AlertDescription>
+						A Host needs an https:// address. Scan the code under Settings, "Use
+						Night Shift on your phone".
+					</AlertDescription>
+				</Alert>
+			) : wrongCode === "no-address" ? (
 				<Alert icon={CircleAlert} variant="destructive">
 					<AlertTitle>This code has no Host address</AlertTitle>
 					<AlertDescription>

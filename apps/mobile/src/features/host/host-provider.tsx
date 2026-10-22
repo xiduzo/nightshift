@@ -15,6 +15,7 @@ import {
 	forgetHostAddress,
 	hostAddressOf,
 	loadHostAddress,
+	needsHttps,
 	saveHostAddress,
 } from "@/shared/api";
 import { type Host, hostAt } from "./host";
@@ -116,7 +117,9 @@ export function HostProvider({ children }: { children: ReactNode }) {
 			const address = hostAddressOf(typed);
 			if (!address) {
 				throw new Error(
-					"Check the Host address. Example: nightshift.example.com",
+					needsHttps(typed)
+						? "A Host needs an https:// address. Example: https://nightshift.example.com"
+						: "Check the Host address. Example: nightshift.example.com",
 				);
 			}
 			const next = hostAt(address);

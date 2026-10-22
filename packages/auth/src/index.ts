@@ -37,7 +37,7 @@ export {
 	TWO_FACTOR_REQUIRED,
 } from "./host-access";
 export { createLocalSession, type LocalSession } from "./local-session";
-export { endSession, hasLogin, setLogin } from "./login";
+export { endSession, hasLogin, liveSessionIds, setLogin } from "./login";
 export {
 	approvePairing,
 	denyPairing,

@@ -61,6 +61,7 @@ export async function wireNotifications(
 	const desktopChannel = desktop
 		? createDesktopChannel({
 				deviceId: device.id,
+				ownerId: owner.userId,
 				notifier: desktop.notifier,
 				...(desktop.window ? { window: desktop.window } : {}),
 				streamHere: (personId) => inApp.isActiveHere(personId),

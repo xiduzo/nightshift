@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { liveSessionIds } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { pushTarget } from "@nightshift/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
+import { Expo } from "expo-server-sdk";
 import { z } from "zod";
 
 /**
@@ -42,15 +44,74 @@ export type PushTargetView = {
 	lastSeenAt: number | null;
 };
 
-/** What a screen sends to register itself. */
-export const registerTargetSchema = z.object({
-	kind: pushKindSchema,
+const targetFields = {
 	name: z.string().trim().min(1).max(120),
 	platform: z.string().trim().max(60).default(""),
 	endpoint: z.string().trim().min(1).max(2048),
 	keys: z.record(z.string(), z.string().max(512)).nullable().default(null),
+};
+
+/** A push target as this daemon registers it, the desktop one included. */
+export const registerTargetSchema = z.object({
+	kind: pushKindSchema,
+	...targetFields,
 });
 export type RegisterTarget = z.input<typeof registerTargetSchema>;
+
+/**
+ * The push services a browser subscribes with: Chrome and the browsers
+ * built on it (FCM), Firefox (Mozilla), Safari (Apple) and Edge (Windows).
+ * A Web Push endpoint is a URL the Host posts to, so it must be one of
+ * these: any other address would let a Person make the Host call into its
+ * own network.
+ */
+const WEB_PUSH_HOSTS = [
+	"fcm.googleapis.com",
+	"android.googleapis.com",
+	"push.services.mozilla.com",
+	"push.apple.com",
+	"notify.windows.com",
+];
+
+/** Whether the Host may post a Web Push to this endpoint: `https:` on a known push service. */
+function isWebPushEndpoint(endpoint: string): boolean {
+	let url: URL;
+	try {
+		url = new URL(endpoint);
+	} catch {
+		return false;
+	}
+	if (url.protocol !== "https:" || url.port !== "") return false;
+	if (url.username !== "" || url.password !== "") return false;
+	const host = url.hostname.toLowerCase();
+	return WEB_PUSH_HOSTS.some(
+		(known) => host === known || host.endsWith(`.${known}`),
+	);
+}
+
+/**
+ * What a screen sends to register itself: a browser (Web Push) or a phone
+ * (Expo Push). The desktop target is this computer's own: only its daemon
+ * registers it, for the computer's owner.
+ */
+export const registerScreenSchema = z
+	.object({ kind: z.enum(["web", "expo"]), ...targetFields })
+	.superRefine((screen, ctx) => {
+		if (screen.kind === "web" && !isWebPushEndpoint(screen.endpoint)) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["endpoint"],
+				message: "This browser's push service is not one Night Shift knows.",
+			});
+		}
+		if (screen.kind === "expo" && !Expo.isExpoPushToken(screen.endpoint)) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["endpoint"],
+				message: "This phone's push token is not valid.",
+			});
+		}
+	});
 
 export type TargetStore = ReturnType<typeof createTargetStore>;
 
@@ -70,15 +131,44 @@ export function createTargetStore(db: Database, now: () => number = Date.now) {
 		};
 	}
 
+	/**
+	 * A phone is a push target plus its session. When the session ended
+	 * (signed out, expired, revoked), the phone may hold another Person's
+	 * session by now: its target is forgotten, so it gets nothing more.
+	 */
+	async function withoutEndedPhones(
+		targets: PushTarget[],
+	): Promise<PushTarget[]> {
+		const phoneSessions = targets.flatMap((target) =>
+			target.kind === "expo" && target.sessionId ? [target.sessionId] : [],
+		);
+		if (phoneSessions.length === 0) return targets;
+		const live = await liveSessionIds(db, phoneSessions, now());
+		const ended = targets.filter(
+			(target) =>
+				target.kind === "expo" &&
+				target.sessionId !== null &&
+				!live.has(target.sessionId),
+		);
+		if (ended.length === 0) return targets;
+		await db.delete(pushTarget).where(
+			inArray(
+				pushTarget.id,
+				ended.map((target) => target.id),
+			),
+		);
+		return targets.filter((target) => !ended.includes(target));
+	}
+
 	return {
-		/** The Person's push targets, oldest first. */
+		/** The Person's push targets, oldest first. A phone whose session ended is forgotten. */
 		async of(personId: string): Promise<PushTarget[]> {
 			const rows = await db
 				.select()
 				.from(pushTarget)
 				.where(eq(pushTarget.personId, personId))
 				.orderBy(pushTarget.createdAt);
-			return rows.map(toTarget);
+			return withoutEndedPhones(rows.map(toTarget));
 		},
 
 		/** These push targets, by id. An id without a row is left out. */
@@ -94,6 +184,8 @@ export function createTargetStore(db: Database, now: () => number = Date.now) {
 		/**
 		 * Registers a screen for the Person, or, when the Person has its
 		 * endpoint already, gives it the new name and keys and marks it seen.
+		 * A phone holds one Person's session at a time: its push token stops
+		 * reaching any other Person who signed in on it before.
 		 */
 		async register(
 			personId: string,
@@ -102,6 +194,17 @@ export function createTargetStore(db: Database, now: () => number = Date.now) {
 		): Promise<PushTarget> {
 			const parsed = registerTargetSchema.parse(input);
 			const at = new Date(now());
+			if (parsed.kind === "expo") {
+				await db
+					.delete(pushTarget)
+					.where(
+						and(
+							eq(pushTarget.endpoint, parsed.endpoint),
+							eq(pushTarget.kind, "expo"),
+							ne(pushTarget.personId, personId),
+						),
+					);
+			}
 			const [row] = await db
 				.insert(pushTarget)
 				.values({

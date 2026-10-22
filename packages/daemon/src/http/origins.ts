@@ -2,16 +2,17 @@
 export const desktopOrigins = ["views://mainview"];
 
 /**
- * The phone app (`apps/mobile`): its own scheme, and `exp://` for Expo Go
- * and development builds. A pattern without a host matches every address of
- * that scheme. `@better-auth/expo` sends it in the `expo-origin` header,
- * which its server plugin turns into the request's origin.
+ * The phone app (`apps/mobile`): its own scheme. A pattern without a host
+ * matches every address of that scheme. `@better-auth/expo` sends it in
+ * the `expo-origin` header, which its server plugin turns into the
+ * request's origin. Expo Go and development builds use `exp://`: the
+ * plugin trusts it itself, only while NODE_ENV is `development`.
  *
- * These only let Better Auth accept the phone's sign-in. A web page never
- * has one of these origins, so they open nothing to a browser. They are not
- * in `trustedOriginsOf`: they never get the local session.
+ * This only lets Better Auth accept the phone's sign-in. A web page never
+ * has this origin, so it opens nothing to a browser. It is not in
+ * `trustedOriginsOf`: it never gets the local session.
  */
-export const phoneOrigins = ["nightshift://", "exp://"];
+export const phoneOrigins = ["nightshift://"];
 
 /**
  * The daemon's own addresses on this computer: the UI it serves itself

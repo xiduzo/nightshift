@@ -14,6 +14,7 @@ import { defineCategories } from "./categories";
 import { inFrontPlace, showBanner } from "./in-front";
 import {
 	answerOfAction,
+	buttonAnswerCheck,
 	type PushData,
 	pushDataOf,
 	showInFront,
@@ -31,8 +32,11 @@ const handled = new Set<string>();
 /**
  * Answers a Gate from a button on its notification, with the app in the
  * background or not running. The answer is bound to the run and the step
- * of the push. A Gate that closed in the meantime takes no answer: the
- * phone does nothing more. Then the notification goes away.
+ * of the push. The phone first reads the open Gates from the Host: only a
+ * Gate its author marked for the lock screen takes the answer, and the
+ * Host checks that again. A Gate that closed in the meantime takes no
+ * answer: the phone does nothing more. Any other Gate gets a notification
+ * that opens it in the app. Then the notification goes away.
  */
 async function answerFromButton(
 	response: Notifications.NotificationResponse,
@@ -47,13 +51,29 @@ async function answerFromButton(
 	try {
 		const host = await savedHost();
 		if (!host) throw new Error("This phone has no Host.");
-		await host.client.gates.resolve(answer);
+		const check = buttonAnswerCheck(answer, await host.client.gates.list());
+		if (check === "closed") return;
+		if (check === "open-app") {
+			await tellAnswerInApp(data);
+			return;
+		}
+		await host.client.gates.resolve({ ...answer, via: "lock-screen" });
 	} catch (error) {
-		if (!isGateClosed(error)) await tellNotSent(data);
+		if (isForbidden(error)) await tellAnswerInApp(data);
+		else if (!isGateClosed(error)) await tellNotSent(data);
 	} finally {
 		Notifications.clearLastNotificationResponse();
 		await dismissOne(identifier);
 	}
+}
+
+/** The Host refused the answer from the lock screen: the Gate needs the app. */
+function isForbidden(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		(error as { code?: unknown }).code === "FORBIDDEN"
+	);
 }
 
 /**
@@ -61,12 +81,30 @@ async function answerFromButton(
  * such as the person's role): a notification says so, and a tap opens the
  * Gate to answer it there. Same key, so a withdraw clears it.
  */
-async function tellNotSent(data: PushData): Promise<void> {
+function tellNotSent(data: PushData): Promise<void> {
+	return tellOpenGate(data, {
+		title: "Your answer was not sent",
+		body: "Night Shift did not send your answer. Open the Gate to answer it there.",
+	});
+}
+
+/** The Gate needs the app: a tap opens it there. */
+function tellAnswerInApp(data: PushData): Promise<void> {
+	return tellOpenGate(data, {
+		title: "Answer this Gate in the app",
+		body: "Open the Gate to answer it.",
+	});
+}
+
+/** A notification without buttons: a tap opens the Gate. */
+async function tellOpenGate(
+	data: PushData,
+	text: { title: string; body: string },
+): Promise<void> {
 	const { options: _buttons, ...ids } = data;
 	await Notifications.scheduleNotificationAsync({
 		content: {
-			title: "Your answer was not sent",
-			body: "Night Shift did not send your answer. Open the Gate to answer it there.",
+			...text,
 			data: ids,
 			categoryIdentifier: PUSH_CATEGORY.open,
 		},

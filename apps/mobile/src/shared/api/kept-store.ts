@@ -5,10 +5,13 @@ import * as SecureStore from "expo-secure-store";
  * since a restart). The answer to a lock-screen Gate goes from a locked
  * phone: it needs the Host address and the session cookie then. The
  * default (`WHEN_UNLOCKED`) would hide them. A write moves an item that
- * was kept with the default to this setting.
+ * was kept with another setting to this one.
+ *
+ * Only on this phone: a backup restored onto another phone does not take
+ * the session along. That phone signs in again.
  */
 const OPTIONS: SecureStore.SecureStoreOptions = {
-	keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+	keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
 };
 
 /**

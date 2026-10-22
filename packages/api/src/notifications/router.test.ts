@@ -208,6 +208,40 @@ describe("notifications", () => {
 		).toBe("BAD_REQUEST");
 	});
 
+	test("refuses a browser outside a known push service, and this computer's desktop", async () => {
+		const ada = await contextFor((await sandbox.signUp("Ada")).headers);
+		const register = (screen: Record<string, unknown>) =>
+			errorOf(
+				call(
+					appRouter.notifications.targets.register,
+					screen as unknown as typeof phone,
+					{ context: ada },
+				),
+			);
+
+		// The Host would post each notification to this address.
+		expect(
+			await register({
+				kind: "web",
+				name: "Safari",
+				endpoint: "https://10.0.0.5:8443/admin/reset",
+				keys: { p256dh: "key", auth: "secret" },
+			}),
+		).toBe("BAD_REQUEST");
+		// Only this computer's daemon registers its desktop, for its owner.
+		expect(
+			await register({ kind: "desktop", name: "x", endpoint: "device-1" }),
+		).toBe("BAD_REQUEST");
+		expect(await register({ ...phone, endpoint: "not-a-token" })).toBe(
+			"BAD_REQUEST",
+		);
+		expect(
+			await call(appRouter.notifications.targets.list, undefined, {
+				context: ada,
+			}),
+		).toEqual([]);
+	});
+
 	test("a Person's stream carries only what is theirs", async () => {
 		const adaPerson = await sandbox.signUp("Ada");
 		const bobPerson = await sandbox.signUp("Bob");

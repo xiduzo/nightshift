@@ -57,6 +57,8 @@ export type DesktopWindow = {
 export type DesktopChannelOptions = {
 	/** This computer's Device id: the endpoint of its desktop target. */
 	deviceId: string;
+	/** This computer's owner: the only Person whose notifications its desktop shows. */
+	ownerId: string;
 	notifier: DesktopNotifier;
 	/** The app's window. Absent: the daemon runs outside the desktop app. */
 	window?: DesktopWindow;
@@ -65,8 +67,9 @@ export type DesktopChannelOptions = {
 };
 
 /**
- * The desktop channel. It reaches only this computer: a desktop target
- * of another computer is gone here. It shows nothing when the person
+ * The desktop channel. It reaches only this computer, for its owner: a
+ * desktop target of another computer, or of another Person, is gone
+ * here. It shows nothing when the person
  * already looks at what the notification would open:
  *
  * - When the window state is known: the window has the focus and shows
@@ -80,16 +83,26 @@ export function createDesktopChannel(
 ): NotificationChannel<PushTarget> {
 	return {
 		async send(target, message): Promise<SendResult> {
-			if (target.endpoint !== options.deviceId) return "gone";
+			if (!isOwnDesktop(options, target)) return "gone";
 			if (onScreen(options, target.personId, message)) return "sent";
 			await options.notifier.show(noticeOf(message));
 			return "sent";
 		},
 		async withdraw(target, key) {
-			if (target.endpoint !== options.deviceId) return;
+			if (!isOwnDesktop(options, target)) return;
 			await options.notifier.withdraw(key);
 		},
 	};
+}
+
+/** This computer's desktop, as its owner's screen. */
+function isOwnDesktop(
+	options: DesktopChannelOptions,
+	target: PushTarget,
+): boolean {
+	return (
+		target.endpoint === options.deviceId && target.personId === options.ownerId
+	);
 }
 
 /** Whether the person already sees what the notification would open. */

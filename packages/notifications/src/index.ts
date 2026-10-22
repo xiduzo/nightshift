@@ -44,7 +44,7 @@ export {
 	type PushTargetView,
 	pushKindSchema,
 	type RegisterTarget,
-	registerTargetSchema,
+	registerScreenSchema,
 } from "./targets";
 export {
 	createNotifications,

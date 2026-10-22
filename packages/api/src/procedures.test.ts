@@ -859,6 +859,57 @@ describe("the Needs-you inbox", () => {
 		expect(calls).toEqual([]);
 	});
 
+	test("takes an answer from the lock screen only for a Gate its author marked for it", async () => {
+		const { bob, spaceId } = await platform();
+		runSpaces.set("marked-run", spaceId);
+		runSpaces.set("plain-run", spaceId);
+		gatesIn.set(spaceId, [
+			{ ...openGate(spaceId, "marked-run", 1), lockScreen: true },
+			openGate(spaceId, "plain-run", 2),
+		]);
+		const context = await contextFor(bob.headers);
+		const fromLockScreen = (runId: string) => ({
+			runId,
+			stepId: `step-${runId}`,
+			choice: "yes",
+			via: "lock-screen" as const,
+		});
+
+		await call(appRouter.gates.resolve, fromLockScreen("marked-run"), {
+			context,
+		});
+		expect(inputs.at(-1)).toEqual({
+			runId: "marked-run",
+			stepId: "step-marked-run",
+			choice: "yes",
+		});
+
+		expect(
+			await errorOf(
+				call(appRouter.gates.resolve, fromLockScreen("plain-run"), {
+					context,
+				}),
+			),
+		).toBe("FORBIDDEN");
+		// A Gate that is no longer open counts as closed.
+		runSpaces.set("closed-run", spaceId);
+		expect(
+			await errorOf(
+				call(appRouter.gates.resolve, fromLockScreen("closed-run"), {
+					context,
+				}),
+			),
+		).toBe("BAD_REQUEST");
+		expect(
+			calls.filter((c) => c.method === "resolveGate").map((c) => c.space),
+		).toEqual([spaceId]);
+
+		// From the app, the same Gate takes the answer.
+		const { via: _via, ...inApp } = fromLockScreen("plain-run");
+		await call(appRouter.gates.resolve, inApp, { context });
+		expect(inputs.at(-1)).toEqual(inApp);
+	});
+
 	test("refuses an answer once the Gate is closed", async () => {
 		const { bob, spaceId } = await platform();
 		runSpaces.set("platform-run", spaceId);
