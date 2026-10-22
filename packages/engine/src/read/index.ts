@@ -13,8 +13,13 @@ export {
 	deriveTraversals,
 	deriveWorktrees,
 	openWork,
+	parkedSteps,
 } from "./derive-run";
-export type { DerivedItem, DerivedStep } from "./derive-steps";
+export type {
+	DerivedItem,
+	DerivedSession,
+	DerivedStep,
+} from "./derive-steps";
 export {
 	countVisits,
 	deriveNodeOutputs,

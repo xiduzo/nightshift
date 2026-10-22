@@ -7,27 +7,23 @@ import type {
 } from "@nightshift/flows";
 import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
-import {
-	type EnginePayloads,
-	getRunRow,
-	type LoggedEvent,
-	type RunBus,
-	type RunEnding,
-	type RunLog,
-	type RunRow,
-	type RunStatus,
+import type {
+	LoggedEvent,
+	RunBus,
+	RunEnding,
+	RunLog,
+	RunRow,
+	RunStatus,
 } from "../log";
-import {
-	type DerivedStep,
-	deriveRunState,
-	deriveSessions,
-	deriveSteps,
-	withEnclosing,
-} from "../read";
+import { deriveRunState } from "../read";
 import { createRecorders, messageOf } from "./context";
-import { findOverdue, type Overdue } from "./deadlines";
+import { findOverdue } from "./deadlines";
 import { FencedError } from "./fence";
-import { kindOfType } from "./node-kinds";
+import {
+	type CloseDeps,
+	type CutShort,
+	closeOpenWork as closeWork,
+} from "./open-work";
 import { loggedVisits, reenteredNode, reentryUpdate } from "./resume-point";
 import { createSleeps } from "./sleep";
 import type { Parked, ResumeValue, RunEvent, RunStateUpdate } from "./state";
@@ -387,93 +383,24 @@ export function createRunner(deps: RunnerDeps) {
 		await settled;
 	}
 
+	const closeDeps: CloseDeps = {
+		db,
+		log,
+		bus,
+		flowOf: deps.flowOf,
+		calledFlowsOf: deps.calledFlowsOf,
+	};
+
 	/**
-	 * Ends the run's open work: its open sessions, then its open steps from
-	 * the inside out (a running step, an open Gate or a sleeping step, and
-	 * the Call steps around them), then the run. The thread stays where it
-	 * is: a resume re-enters it (design rule 7), at its interrupt or at the
-	 * node the drive was in.
-	 *
-	 * - `stopped` (a person stopped the run): every step ends `stopped` with
-	 *   its kind's outputs (`cutShortOutputs`), the run `stopped`.
-	 * - `overdue` (a step ran past its time budget or idle limit and its
-	 *   timer did not end it): that step ends `error` with the timer's
-	 *   message, the steps around it and the run fail with the reason a
-	 *   failed step gives (`route`). The sessions end as the timer's abort
-	 *   ends them: `failed`, aborted.
+	 * Ends the run's open work as `cut` says (`graph/open-work.ts`): its
+	 * open sessions, then its open steps from the inside out, then the run.
+	 * The run's wake timer goes first. The thread stays where it is: a
+	 * resume re-enters it (design rule 7), at its interrupt or at the node
+	 * the drive was in.
 	 */
-	async function closeOpenWork(
-		runId: string,
-		halt: { kind: "stopped" } | ({ kind: "overdue" } & Overdue),
-	): Promise<void> {
-		const reason =
-			halt.kind === "overdue"
-				? `Node "${halt.nodeId}" failed: ${halt.error}`
-				: null;
-		const events = await log.events(runId);
-		const steps = deriveSteps(events);
+	async function closeOpenWork(runId: string, cut: CutShort): Promise<void> {
 		sleeps.forget(runId);
-		for (const session of deriveSessions(events)) {
-			if (session.ending !== null) continue;
-			const ending: EnginePayloads["SessionEnded"] = {
-				outcome: halt.kind === "stopped" ? "stopped" : "failed",
-				error: "The session was aborted.",
-				errorKind: "aborted",
-				usage: null,
-				costUsd: null,
-				resetAt: null,
-			};
-			await log.append({
-				type: "SessionEnded",
-				runId,
-				stepId: session.stepId,
-				sessionId: session.id,
-				payload: ending,
-			});
-		}
-		const open = steps
-			.filter((s) => s.endedAt === null)
-			.sort((a, b) => b.startSeq - a.startSeq);
-		if (open.length > 0) {
-			const row = await getRunRow(db, runId);
-			const flow = deps.flowOf(row);
-			const flows = deps.calledFlowsOf(row);
-			for (const step of open) {
-				// The kind says what a stopped step ends with; the node is the
-				// logged kind's, or missing when the snapshot has no node for it.
-				const node = nodesOf(flow, flows, withEnclosing(steps, step.id)).get(
-					step.id,
-				);
-				const outcome = halt.kind === "stopped" ? "stopped" : "error";
-				const outputs = kindOfType(step.nodeType).cutShortOutputs(
-					step,
-					node,
-					outcome,
-				);
-				const payload: EnginePayloads["StepEnded"] =
-					halt.kind === "stopped"
-						? { outcome, outputs, error: null }
-						: {
-								outcome,
-								outputs,
-								error: step.id === halt.stepId ? halt.error : reason,
-							};
-				await log.append({
-					type: "StepEnded",
-					runId,
-					stepId: step.id,
-					payload,
-				});
-				bus.publish(runId, { kind: "step-changed", stepId: step.id });
-			}
-		}
-		await endRun(
-			log,
-			runId,
-			halt.kind === "stopped" ? "stopped" : "failed",
-			reason,
-		);
-		bus.publish(runId, { kind: "status-changed" });
+		await closeWork(closeDeps, runId, cut);
 	}
 
 	/** A drive's slot is free: what waited for one may go now. */
@@ -751,28 +678,4 @@ export function createRunner(deps: RunnerDeps) {
 		endOverdueSteps,
 		dispose,
 	};
-}
-
-/**
- * The node of each step in a chain of calling steps (inside out, as
- * `withEnclosing` gives it): the outermost is in the run's flow, each inner
- * one in the flow its caller's Call node names. Stops at a node the
- * snapshot does not have.
- */
-function nodesOf(
-	flow: Flow,
-	flows: Record<string, Flow>,
-	chain: readonly DerivedStep[],
-): Map<string, FlowNode> {
-	const nodes = new Map<string, FlowNode>();
-	let current: Flow | undefined = flow;
-	for (const step of [...chain].reverse()) {
-		const node: FlowNode | undefined = current?.nodes.find(
-			(n) => n.id === step.nodeId,
-		);
-		if (!node) break;
-		nodes.set(step.id, node);
-		current = node.type === "call" ? flows[node.flow] : undefined;
-	}
-	return nodes;
 }
