@@ -1,3 +1,4 @@
+import { HOLD_MINUTES, holdLabel } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -83,14 +84,6 @@ const SCREENS: {
 		description: "The Night Shift app on your phones.",
 	},
 ];
-
-const HOLD_MINUTES = [0, 1, 3, 5, 10, 15, 30] as const;
-const holdLabel = (minutes: number) =>
-	minutes === 0
-		? "Do not wait"
-		: minutes === 1
-			? "1 minute"
-			: `${minutes} minutes`;
 
 /** Quiet hours when you turn them on. */
 const DEFAULT_QUIET = { start: "22:00", end: "07:00" };

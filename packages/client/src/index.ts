@@ -87,6 +87,8 @@ export {
 	createNotificationQueries,
 	describeNotice,
 	followNotifications,
+	HOLD_MINUTES,
+	holdLabel,
 	isGateKey,
 	type NotificationItem,
 	type NotificationScreen,

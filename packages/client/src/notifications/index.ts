@@ -3,6 +3,7 @@
  * in, their settings and screens, and the words of a notice.
  */
 
+export { HOLD_MINUTES, holdLabel } from "./hold";
 export {
 	isGateKey,
 	PUSH_ACTION,
