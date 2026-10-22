@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { lgCheckpoint, lgWrite } from "@nightshift/db/schema";
+import { and, eq, sql } from "drizzle-orm";
 import type { WalkFile, WalkFiles, WalkRef } from "../contract";
 import {
 	ForeignRowsError,
@@ -7,7 +8,6 @@ import {
 	type RunLog,
 	stepIdsOfRun,
 } from "../log";
-import { checkpointSnapshot } from "./checkpoint-snapshot";
 
 /*
  * A run's walk state as files: its latest Checkpoint and each step's
@@ -117,6 +117,52 @@ export function createRunWalks(deps: {
 	}
 
 	return { exportWalk, ownFile, importWalk };
+}
+
+/**
+ * The run's latest checkpoint per namespace and their pending writes, as
+ * JSON (the blobs in base64): what a resume elsewhere needs. Replicas of
+ * older versions read this format too: keep it as it is.
+ */
+async function checkpointSnapshot(
+	db: Database,
+	runId: string,
+): Promise<string> {
+	const latest = sql`(select max(c.checkpoint_id) from ${lgCheckpoint} c where c.thread_id = ${lgCheckpoint.threadId} and c.checkpoint_ns = ${lgCheckpoint.checkpointNs})`;
+	const checkpoints = await db
+		.select()
+		.from(lgCheckpoint)
+		.where(
+			and(
+				eq(lgCheckpoint.threadId, runId),
+				sql`${lgCheckpoint.checkpointId} = ${latest}`,
+			),
+		);
+	const writes = [];
+	for (const c of checkpoints) {
+		writes.push(
+			...(await db
+				.select()
+				.from(lgWrite)
+				.where(
+					and(
+						eq(lgWrite.threadId, runId),
+						eq(lgWrite.checkpointNs, c.checkpointNs),
+						eq(lgWrite.checkpointId, c.checkpointId),
+					),
+				)),
+		);
+	}
+	const base64 = (value: Buffer | null) => value?.toString("base64") ?? null;
+	return JSON.stringify({
+		runId,
+		checkpoints: checkpoints.map((c) => ({
+			...c,
+			checkpoint: base64(c.checkpoint),
+			metadata: base64(c.metadata),
+		})),
+		writes: writes.map((w) => ({ ...w, value: base64(w.value) })),
+	});
 }
 
 /** The `checkpoint` file of a run: its rows, the blobs in base64. */

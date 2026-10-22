@@ -1260,7 +1260,7 @@ iroh.
      as its Device), and the exchange takes a moved run's rows from each of
      its Walkers. The new Walker takes it over when the event arrives:
      the checkpoint from the archive into its own tables
-     (`restoreCheckpoint`), and a sleeping run's timer; a run at a Gate
+     (`importWalk` of the engine's walk state), and a sleeping run's timer; a run at a Gate
      waits there, a stopped one for a resume. A run walked elsewhere moves
      by a `run.move` command to its Walker. A moved step's transcript is
      read from the archive.

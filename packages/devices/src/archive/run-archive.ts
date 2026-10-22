@@ -1,31 +1,23 @@
-import type { Database } from "@nightshift/db";
 import {
-	checkpointSnapshot,
 	type LoggedEvent,
 	parseTranscript,
-	type RunHistory,
-	type RunLog,
-	type RunRow,
 	type RunWalker,
 	readTranscriptFile,
-	restoreCheckpoint,
-	stepIdsOfRun,
 	type TranscriptEntry,
+	type WalkFile,
+	type WalkRef,
 } from "@nightshift/engine";
 import type { ArchiveRef, HostRelay } from "../contract";
 import { readArchive, writeArchive } from "./archive";
 
 /**
  * A run in the archive of the Replica that keeps its Space (this one, or
- * its Host): what moves with a run to a new Walker, what the new Walker
- * takes from it, and the transcripts of steps walked elsewhere.
+ * its Host): the walk files a run takes to a new Walker, and the
+ * transcripts of steps walked elsewhere. The engine writes and reads the
+ * files. The archive only keeps and carries them.
  */
 export type RunArchiveDeps = {
-	db: Database;
 	dataDir: string;
-	log: Pick<RunLog, "walkerId">;
-	/** The engine's run history: the files of the steps this computer walked. */
-	history: Pick<RunHistory, "ownStepFiles">;
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
 	hostOf(spaceId: string): Promise<string | null>;
 	relay?: Pick<HostRelay, "archive" | "archivePut">;
@@ -34,54 +26,30 @@ export type RunArchiveDeps = {
 export type RunArchive = ReturnType<typeof createRunArchive>;
 
 export function createRunArchive(deps: RunArchiveDeps) {
-	const { db, dataDir, relay } = deps;
+	const { dataDir, relay } = deps;
 
 	/**
-	 * What a new Walker needs of a run this computer walks: its latest
-	 * checkpoint and its steps' transcripts and command logs, in the archive
-	 * of the Replica that keeps the Space (this one, or its Host).
+	 * Keeps a run's walk files in the archive of the Replica that keeps
+	 * its Space: this one, or its Host. Throws when that Host cannot be
+	 * reached.
 	 */
-	async function archiveForMove(row: RunRow): Promise<void> {
-		const keptHere = (await deps.hostOf(row.spaceId)) === null;
-		const put = async (ref: ArchiveRef, content: string) => {
-			if (keptHere) await writeArchive(dataDir, ref, content);
-			else if (relay) await relay.archivePut(ref, content);
-			else
+	async function keepWalk(files: readonly WalkFile[]): Promise<void> {
+		for (const { ref, content } of files) {
+			if ((await deps.hostOf(ref.spaceId)) === null) {
+				await writeArchive(dataDir, ref, content);
+			} else if (relay) await relay.archivePut(ref, content);
+			else {
 				throw new Error("This computer cannot reach the Host of this Space.");
-		};
-		const self = await deps.log.walkerId();
-		for (const stepId of await stepIdsOfRun(db, row.id)) {
-			const files = await deps.history.ownStepFiles(stepId, self);
-			if (!files) continue;
-			const at = { spaceId: row.spaceId, runId: row.id, stepId };
-			if (files.transcript !== null) {
-				await put({ kind: "transcript", ...at }, files.transcript);
 			}
-			if (files.log !== null) await put({ kind: "log", ...at }, files.log);
 		}
-		await put(
-			{ kind: "checkpoint", spaceId: row.spaceId, runId: row.id },
-			await checkpointSnapshot(db, row.id),
-		);
 	}
 
-	/**
-	 * The checkpoint of a run another Device moved here, from the archive
-	 * (this Replica's, else the Host's), into the checkpoint tables.
-	 */
-	async function restoreMoved(row: RunRow): Promise<void> {
-		const ref: ArchiveRef = {
-			kind: "checkpoint",
-			spaceId: row.spaceId,
-			runId: row.id,
-		};
-		const snapshot =
+	/** A file of the archive: this Replica's copy, else its Host's. Null when neither has it. */
+	async function archived(ref: WalkRef): Promise<string | null> {
+		return (
 			(await readArchive(dataDir, ref)) ??
-			(relay ? await relay.archive(ref) : null);
-		if (snapshot === null) {
-			throw new Error("The archive has no checkpoint of the run.");
-		}
-		await restoreCheckpoint(db, snapshot);
+			(relay ? await relay.archive(ref) : null)
+		);
 	}
 
 	/**
@@ -113,7 +81,7 @@ export function createRunArchive(deps: RunArchiveDeps) {
 		return text === null ? [] : parseTranscript(text);
 	}
 
-	return { archiveForMove, restoreMoved, stepTranscript };
+	return { keepWalk, archived, stepTranscript };
 }
 
 /** The runs that new events moved to this computer (`WalkerMoved` to one of its ids). */

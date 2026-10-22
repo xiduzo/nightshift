@@ -337,6 +337,7 @@ export function createEngine(
 		reads,
 		relay,
 		archive: peers.runs,
+		walks,
 		pendingCommands: peers.runs.pendingCommands,
 		device,
 		ownDevices: placement.ownDevices,

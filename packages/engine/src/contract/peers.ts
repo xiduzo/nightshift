@@ -185,10 +185,14 @@ export type RunsPort = {
 		afterSeq: number,
 		signal: AbortSignal,
 	): AsyncIterable<TranscriptEntry>;
-	/** Puts what a new Walker needs of a run this computer walks in the archive. */
-	archiveForMove(row: RunRow): Promise<void>;
-	/** The checkpoint of a run another Device moved here, from the archive into the checkpoint tables. */
-	restoreMoved(row: RunRow): Promise<void>;
+	/**
+	 * Keeps a run's walk files in the archive of the Replica that keeps its
+	 * Space (this one, or its Host): what a new Walker takes the run over
+	 * from. Throws when that Host cannot be reached.
+	 */
+	keepWalk(files: readonly WalkFile[]): Promise<void>;
+	/** A file of the archive: this Replica's copy, else its Host's. Null when neither has it. */
+	archived(ref: WalkRef): Promise<string | null>;
 };
 
 /** A file of a run's walk state, by its Space and run (and step). */

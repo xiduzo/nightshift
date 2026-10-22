@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import type { Actor, OwnDevice, RunsPort } from "../contract";
-import type { Runner } from "../graph";
+import type { Runner, RunWalks } from "../graph";
 import {
 	applyWalkerMoves,
 	getRunRow,
@@ -13,8 +13,9 @@ import type { RunRelay } from "./relay";
 
 /**
  * A run moves to another of the Person's Devices while it waits, sleeps or
- * has stopped: this computer puts its checkpoint and step files in the
- * archive and logs `WalkerMoved`; the new Walker takes it over from there.
+ * has stopped: this computer keeps the run's walk state (its Checkpoint
+ * and its steps' files) in the archive and logs `WalkerMoved`. The new
+ * Walker takes it over from there.
  */
 export async function moveRun(
 	deps: {
@@ -23,7 +24,8 @@ export async function moveRun(
 		bus: RunBus;
 		runner: Pick<Runner, "exclusive" | "isActive" | "forget">;
 		relay: RunRelay;
-		archive: Pick<RunsPort, "archiveForMove">;
+		archive: Pick<RunsPort, "keepWalk">;
+		walks: Pick<RunWalks, "exportWalk">;
 		device: { id: string };
 		/** This computer's owner as the Host that keeps the Space knows them (`Peers.personOnHost`). */
 		personOnHost(spaceId: string): Promise<string | null>;
@@ -72,7 +74,7 @@ export async function moveRun(
 				`${target.name} is offline. Move the run when it is online.`,
 			);
 		}
-		await deps.archive.archiveForMove(row);
+		await deps.archive.keepWalk(await deps.walks.exportWalk(runId));
 		runner.forget(runId);
 		const moved = await log.append({
 			type: "WalkerMoved",
@@ -86,7 +88,7 @@ export async function moveRun(
 
 /**
  * This computer walks a run another Device moved here (`WalkerMoved`):
- * its checkpoint comes from the archive (this Replica's, else the Host's)
+ * its Checkpoint comes from the archive (this Replica's, else the Host's)
  * into the checkpoint tables, and a sleeping run gets its wake timer. A
  * run at a Gate waits for its answer here; a stopped one for a resume.
  */
@@ -95,12 +97,21 @@ export async function takeOver(
 		db: Database;
 		log: Pick<RunLog, "events">;
 		runner: Pick<Runner, "forget" | "sleeps">;
-		archive: Pick<RunsPort, "restoreMoved">;
+		archive: Pick<RunsPort, "archived">;
+		walks: Pick<RunWalks, "importWalk">;
 	},
 	runId: string,
 ): Promise<void> {
 	const row = await getRunRow(deps.db, runId);
-	await deps.archive.restoreMoved(row);
+	const checkpoint = await deps.archive.archived({
+		kind: "checkpoint",
+		spaceId: row.spaceId,
+		runId,
+	});
+	if (checkpoint === null) {
+		throw new Error("The archive has no checkpoint of the run.");
+	}
+	await deps.walks.importWalk(runId, checkpoint);
 	deps.runner.forget(runId);
 	deps.runner.sleeps.restore(runId, await deps.log.events(runId));
 }

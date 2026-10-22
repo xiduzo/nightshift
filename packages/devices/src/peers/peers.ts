@@ -97,10 +97,7 @@ export function createPeers(
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
 	const hostOf = (spaceId: string) => exchange.hostSpaces.hostOf(spaceId);
 	const archive = createRunArchive({
-		db,
 		dataDir,
-		log,
-		history,
 		hostOf,
 		...(relay ? { relay } : {}),
 	});
@@ -178,8 +175,8 @@ export function createPeers(
 			stepTranscript: archive.stepTranscript,
 			followStep: (step, afterSeq, signal) =>
 				exchange.feeds.follow(step, afterSeq, signal),
-			archiveForMove: archive.archiveForMove,
-			restoreMoved: archive.restoreMoved,
+			keepWalk: archive.keepWalk,
+			archived: archive.archived,
 		},
 		pathsFor: createPrivatePaths({ db, registry, ownerId: context.ownerId }),
 	};
