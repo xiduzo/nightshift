@@ -8,7 +8,8 @@ type StopOptions = Parameters<SpaceEngine["stopRun"]>[1];
 
 /**
  * Stops a run: now, or after its running step (`after-step`, which
- * `cancel-after-step` takes back). Each writes one run-level fact. On a
+ * `cancel-after-step` takes back). Each writes one run-level fact, in a
+ * Turn of the runner (`take` a stop, `hold` for the rest). On a
  * run another Device walks the stop travels to its Walker as a command,
  * and a run that has ended takes none.
  */
@@ -16,7 +17,7 @@ export async function stopRun(
 	deps: {
 		log: RunLog;
 		bus: RunBus;
-		runner: Pick<Runner, "exclusive" | "stop">;
+		runner: Pick<Runner, "take" | "hold">;
 		relay: RunRelay;
 	},
 	row: RunRow,
@@ -38,8 +39,7 @@ export async function stopRun(
 	}
 	if (options?.when === "after-step" || options?.when === "cancel-after-step") {
 		const request = options.when === "after-step";
-		await runner.exclusive(runId, async () => {
-			const events = await log.events(runId);
+		await runner.hold(runId, async ({ events }) => {
 			const status = deriveRunState(events).status;
 			if (
 				status !== "running" &&
@@ -58,5 +58,5 @@ export async function stopRun(
 		});
 		return;
 	}
-	await runner.stop(runId);
+	await runner.take(runId, { kind: "stop" });
 }

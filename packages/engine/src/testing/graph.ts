@@ -13,6 +13,7 @@ import { localDevice } from "../device/local";
 import { defaultRunSettings } from "../device-config/settings";
 import { compileFlow } from "../graph/compile";
 import { createRecorders, type StepContext } from "../graph/context";
+import { createRunner, type Runner, type RunnerDeps } from "../graph/runner";
 import type { Parked, RunEvent, RunStateValues } from "../graph/state";
 import {
 	type DriveOutcome,
@@ -31,6 +32,7 @@ import type {
 	LoggedEvent,
 } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
+import { parseCalledFlows, parseRunFlow } from "../read/read-model";
 import {
 	type Sandbox,
 	TEST_DEVICE_ID,
@@ -43,7 +45,8 @@ import {
  * builders, a run row with its log and its Thread (`openThread`, as the
  * runner opens it: the same StepContext, fence and checkpoint saver), and
  * a driver that runs the runner's stream loop (`driveGraph`) and collects
- * the root's interrupts and the custom events.
+ * the root's interrupts and the custom events. `testRunner` is a real
+ * runner over the same database, log and Device.
  */
 
 export const agent = (
@@ -290,3 +293,21 @@ export const payloads = <T extends EngineEventType>(
 	events
 		.filter((e) => e.type === type)
 		.map((e) => e.payload as EnginePayloads[T]);
+
+/**
+ * A real runner over the harness's database, log, bus and Device, as the
+ * engine makes one. Each run's flow comes from its row. It opens its own
+ * threads: a drive of the harness and a Turn of the runner are two daemons
+ * on one database.
+ */
+export function testRunner(
+	h: Harness,
+	overrides: Partial<RunnerDeps> = {},
+): Runner {
+	return createRunner({
+		...h.deps,
+		flowOf: parseRunFlow,
+		calledFlowsOf: parseCalledFlows,
+		...overrides,
+	});
+}

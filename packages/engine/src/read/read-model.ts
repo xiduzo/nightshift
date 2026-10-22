@@ -62,10 +62,10 @@ import type {
  * `takeOverCommand`, the flow snapshot parsers) turns rows and events into
  * the `views.ts` shapes; `createReadModel` adds the queries that need the
  * database, the run log and the bus (`listRuns`, `getRun`, `listGates`,
- * `runStatus`, `watch`, `untilLogged`).
+ * `runStatus`, `watch`).
  *
  * The seam is narrow on purpose: the engine passes `db`, `log`, `bus` and
- * `isActive` and gets the reads back, so the shape of a summary changes in
+ * the peers' reads and gets the reads back, so the shape of a summary changes in
  * one file (locality), and a test of a derivation needs no engine.
  *
  * Over 600 lines on purpose: that locality. Every view of a run that people
@@ -463,8 +463,6 @@ export type ReadModelDeps = {
 	db: Database;
 	log: RunLog;
 	bus: RunBus;
-	/** Whether the run holds a slot (the runner's `isActive`). */
-	isActive(runId: string): boolean;
 	/** The harness port of that name, for its take-over command. */
 	harnessOf: HarnessOf;
 	/** The Walkers of runs of a Space (and the Devices their steps run on), by id. */
@@ -486,7 +484,7 @@ export type ReadModel = ReturnType<typeof createReadModel>;
 
 /** The reads that need the database, the run log or the bus. */
 export function createReadModel(deps: ReadModelDeps) {
-	const { db, log, bus, isActive, harnessOf } = deps;
+	const { db, log, bus, harnessOf } = deps;
 
 	/** Names the Devices a Space's runs name: their Walkers and Placements. */
 	async function namer(
@@ -620,32 +618,6 @@ export function createReadModel(deps: ReadModelDeps) {
 	}
 
 	/**
-	 * Resolves once `done` holds for the run's log, or the run's drive ended
-	 * without it. Subscribes before the first look, so an append between the
-	 * two is not missed.
-	 */
-	function untilLogged(
-		runId: string,
-		done: (events: readonly LoggedEvent[]) => boolean,
-	): Promise<void> {
-		return new Promise<void>((resolve) => {
-			let settled = false;
-			const unsubscribe = bus.subscribe(runId, () => void check());
-			async function check(): Promise<void> {
-				if (settled) return;
-				const events = await log.events(runId);
-				if (settled) return;
-				if (done(events) || !isActive(runId)) {
-					settled = true;
-					unsubscribe();
-					resolve();
-				}
-			}
-			void check();
-		});
-	}
-
-	/**
 	 * The run's status, its steps and its transcript so far, then every
 	 * change as it happens, until `signal` aborts. Transcript entries up to
 	 * `afterSeq` are skipped. The transcript goes out in `seq` order
@@ -764,5 +736,5 @@ export function createReadModel(deps: ReadModelDeps) {
 		}
 	}
 
-	return { listRuns, getRun, runStatus, listGates, untilLogged, watch };
+	return { listRuns, getRun, runStatus, listGates, watch };
 }

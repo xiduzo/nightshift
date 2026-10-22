@@ -176,7 +176,9 @@ export function createEngine(
 		},
 		project: (projectId, spaceId) => projects.find(projectId, spaceId),
 		takeOver: (runId) => control.takeOver(runId),
-		stopRun: (runId) => runner.stop(runId),
+		stopRun: async (runId) => {
+			await runner.take(runId, { kind: "stop" });
+		},
 	});
 	const { placement } = peers;
 
@@ -221,8 +223,6 @@ export function createEngine(
 		calledFlowsOf: parseCalledFlows,
 		policyFor: (flow) => resolvePolicy(flow.policy, runSettings().policy),
 		signal,
-		// `recovery` is assigned below; the runner frees its first slot later.
-		onSlotFreed: () => recovery.onSlotFreed(),
 	});
 
 	const recovery = createRecovery({
@@ -268,7 +268,6 @@ export function createEngine(
 		db,
 		log: runLog,
 		bus,
-		isActive: runner.isActive,
 		// Any harness, added or not: an old run's session stays takeable.
 		// A custom agent has no take-over command.
 		harnessOf: (name) =>
@@ -342,7 +341,6 @@ export function createEngine(
 		log: runLog,
 		bus,
 		runner,
-		reads,
 		relay,
 		archive: peers.runs,
 		walks,

@@ -27,7 +27,7 @@ import {
 	type Runner,
 	resolveInputs,
 } from "../graph";
-import type { InputValues, RunLog, RunTrigger } from "../log";
+import type { InputValues, RunLog, RunRow, RunTrigger } from "../log";
 import type { ListedProject } from "../projects";
 import {
 	gitAuthorOf,
@@ -46,7 +46,8 @@ import {
  *   whether the run's Device has what the nodes need (its
  *   `capabilities`: connections, CLI tools, harnesses, a decider). It writes nothing; a refusal is an `Error` with
  *   the message the person sees, and a pass is a `PreparedRun`.
- * - `createRunStart(deps).start` holds the slot, places the run on its
+ * - `createRunStart(deps).start` is the start's Turn of the runner
+ *   (`runner.take`): with the slot held, it places the run on its
  *   Device (`deps.place`: this computer, or another of the starter's
  *   Devices through the Host), prepares on that Device, has it create the
  *   worktree, writes the run row, appends `RunStarted` and
@@ -376,7 +377,7 @@ export async function prepareRun(
 export type RunStartDeps = Omit<PrepareRunDeps, "deviceNamed" | "walker"> & {
 	db: Database;
 	log: RunLog;
-	runner: Runner;
+	runner: Pick<Runner, "take">;
 	/**
 	 * A project a person has not removed, in any Space (the run takes its
 	 * Space); throws for another id. Its Clone may be on another Device.
@@ -414,106 +415,113 @@ export function createRunStart(deps: RunStartDeps) {
 	/**
 	 * Validates the flow (refuses one with errors), snapshots it, creates the
 	 * worktree, starts the thread at the start node, and returns at once.
-	 * The slot is reserved before the first await, so two starts cannot both
-	 * pass the run cap.
+	 * All of it is the start's Turn (`runner.take`): the slot is held before
+	 * the first await, so two starts cannot both pass the run cap, and a
+	 * stop that comes meanwhile waits for the walk to begin.
 	 */
 	async function start(
 		input: StartRunInput,
 		trigger: RunTrigger,
 	): Promise<RunSummary> {
 		const runId = randomUUID();
-		runner.reserveSlot(runId);
-		try {
-			const projectRow = await deps.projectRow(input.projectId);
-			// In a Host's Space, the Person as the Host knows them. A
-			// schedule names its Person as the Space knows them already.
-			const startedBy = input.startedBy
-				? trigger.kind === "schedule"
-					? input.startedBy
-					: ((await deps.personOnHost(projectRow.spaceId)) ?? input.startedBy)
-				: null;
-			const placement = await deps.place({
-				deviceId: input.deviceId,
-				project: projectRow,
-				runId,
-				personId: startedBy,
-			});
-			const { device } = placement.run;
-			const prepared = await prepareRun(input, placement.run, {
-				...deps,
-				walker: placement.walker,
-				deviceNamed: placement.deviceNamed,
-			});
-			const { flow, flowName, calledFlows, inputs, title } = prepared;
-			const author = input.startedBy
-				? await gitAuthorOf(db, input.startedBy)
-				: null;
-			// The worktree lives on the run's Device.
-			const worktree = await device.worktree({
-				id: runId,
-				projectId: projectRow.id,
-				...(input.baseRef !== undefined ? { baseRef: input.baseRef } : {}),
-				...(author ? { author } : {}),
-			});
-			const walkerId = await log.walkerId();
-			const [row] = await db
-				.insert(run)
-				.values({
+		let started:
+			| { row: RunRow; walkerId: string; device: PlacedDevice["device"] }
+			| undefined;
+		await runner.take(runId, {
+			kind: "start",
+			prepare: async () => {
+				const projectRow = await deps.projectRow(input.projectId);
+				// In a Host's Space, the Person as the Host knows them. A
+				// schedule names its Person as the Space knows them already.
+				const startedBy = input.startedBy
+					? trigger.kind === "schedule"
+						? input.startedBy
+						: ((await deps.personOnHost(projectRow.spaceId)) ?? input.startedBy)
+					: null;
+				const placement = await deps.place({
+					deviceId: input.deviceId,
+					project: projectRow,
+					runId,
+					personId: startedBy,
+				});
+				const { device } = placement.run;
+				const prepared = await prepareRun(input, placement.run, {
+					...deps,
+					walker: placement.walker,
+					deviceNamed: placement.deviceNamed,
+				});
+				const { flow, flowName, calledFlows, inputs, title } = prepared;
+				const author = input.startedBy
+					? await gitAuthorOf(db, input.startedBy)
+					: null;
+				// The worktree lives on the run's Device.
+				const worktree = await device.worktree({
 					id: runId,
-					// The run is in its project's Space, also when the scheduler starts it.
-					spaceId: projectRow.spaceId,
 					projectId: projectRow.id,
-					flowName,
-					flow: JSON.stringify(flow),
-					bodyFlows: JSON.stringify(calledFlows),
-					title,
-					worktreePath: worktree.worktreePath,
-					branch: worktree.branch,
-					baseRef: worktree.baseRef,
-					walkerId,
-					deviceId: device.id,
-					placements:
-						Object.keys(prepared.placements).length > 0
-							? JSON.stringify(prepared.placements)
-							: null,
-					startedBy,
-				})
-				.returning();
-			if (!row) throw new Error("Could not create the run.");
-			await log.append({
-				type: "RunStarted",
-				runId,
-				payload: {
-					projectId: projectRow.id,
-					flowName,
-					title,
-					start: flow.start,
-					stopAt: prepared.stopAt,
-					inputs,
-					trigger,
-					startedBy,
-				},
-			});
-			await log.append({
-				type: "WorktreeCreated",
-				runId,
-				payload: worktree,
-			});
-			runner.start(row, inputs, prepared.stopAt);
-			return toSummary(
-				row,
-				runFacts(await log.events(runId)),
-				await namesOf(db, [row.startedBy]),
-				{ id: walkerId, name: deps.selfName, thisDevice: true },
-				{
-					id: device.id,
-					name: device.id === walkerId ? deps.selfName : device.name,
-					thisDevice: device.id === walkerId,
-				},
-			);
-		} finally {
-			runner.releaseStartingSlot(runId);
-		}
+					...(input.baseRef !== undefined ? { baseRef: input.baseRef } : {}),
+					...(author ? { author } : {}),
+				});
+				const walkerId = await log.walkerId();
+				const [row] = await db
+					.insert(run)
+					.values({
+						id: runId,
+						// The run is in its project's Space, also when the scheduler starts it.
+						spaceId: projectRow.spaceId,
+						projectId: projectRow.id,
+						flowName,
+						flow: JSON.stringify(flow),
+						bodyFlows: JSON.stringify(calledFlows),
+						title,
+						worktreePath: worktree.worktreePath,
+						branch: worktree.branch,
+						baseRef: worktree.baseRef,
+						walkerId,
+						deviceId: device.id,
+						placements:
+							Object.keys(prepared.placements).length > 0
+								? JSON.stringify(prepared.placements)
+								: null,
+						startedBy,
+					})
+					.returning();
+				if (!row) throw new Error("Could not create the run.");
+				await log.append({
+					type: "RunStarted",
+					runId,
+					payload: {
+						projectId: projectRow.id,
+						flowName,
+						title,
+						start: flow.start,
+						stopAt: prepared.stopAt,
+						inputs,
+						trigger,
+						startedBy,
+					},
+				});
+				await log.append({
+					type: "WorktreeCreated",
+					runId,
+					payload: worktree,
+				});
+				started = { row, walkerId, device };
+				return { row, inputs, stopAt: prepared.stopAt };
+			},
+		});
+		if (!started) throw new Error("Could not create the run.");
+		const { row, walkerId, device } = started;
+		return toSummary(
+			row,
+			runFacts(await log.events(runId)),
+			await namesOf(db, [row.startedBy]),
+			{ id: walkerId, name: deps.selfName, thisDevice: true },
+			{
+				id: device.id,
+				name: device.id === walkerId ? deps.selfName : device.name,
+				thisDevice: device.id === walkerId,
+			},
+		);
 	}
 
 	return { start };

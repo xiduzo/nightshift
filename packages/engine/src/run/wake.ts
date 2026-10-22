@@ -13,7 +13,7 @@ import type { RunRelay } from "./relay";
 export async function signalRun(
 	deps: {
 		log: Pick<RunLog, "events">;
-		runner: Pick<Runner, "sleeps">;
+		runner: Pick<Runner, "take">;
 		relay: RunRelay;
 	},
 	row: RunRow,
@@ -33,7 +33,7 @@ export async function signalRun(
 	}
 	// The thread continues at once, like a wake a person asks for: a
 	// full run cap fails here rather than queueing the signal.
-	await deps.runner.sleeps.wake(row.id, { early: true, signal: name });
+	await deps.runner.take(row.id, { kind: "wake", early: true, signal: name });
 }
 
 /**
@@ -44,7 +44,7 @@ export async function signalRun(
 export async function wakeOfflineSleeps(deps: {
 	db: Database;
 	log: Pick<RunLog, "walkerId" | "derive">;
-	runner: Pick<Runner, "sleeps">;
+	runner: Pick<Runner, "take">;
 }): Promise<void> {
 	const self = await deps.log.walkerId();
 	const sleeping = await deps.log.derive(
@@ -53,6 +53,6 @@ export async function wakeOfflineSleeps(deps: {
 	);
 	for (const [runId, sleep] of sleeping) {
 		if (sleep?.reason !== "device-offline") continue;
-		deps.runner.sleeps.wake(runId, { early: true }).catch(() => {});
+		deps.runner.take(runId, { kind: "wake", early: true }).catch(() => {});
 	}
 }

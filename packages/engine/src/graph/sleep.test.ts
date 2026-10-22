@@ -24,16 +24,24 @@ import {
 } from "../testing/graph";
 import { createSandbox, type Sandbox, waitFor } from "../testing/test-support";
 import { DEFAULT_RESUME_PROMPT, STOP_TIME_REASON } from "./context";
-import { createSleeps, pendingWaitOf, type Sleeps } from "./sleep";
+import {
+	createSleeps,
+	pendingWaitOf,
+	planWake,
+	recordWake,
+	type Wake,
+} from "./sleep";
 import type { Pending, ResumeValue } from "./state";
 
 /**
  * The sleep module end to end, for both kinds of wait: a usage limit of an
  * Agent step (the run policy plans it) and a Wait node's own wait. Plan,
- * persist, interrupt, then the daemon side on a fake thread seam over the
- * compiled graph: a wake by the timer, a signal, a person's early resume, a
- * wake past the stop time, and a new daemon that restores the timer from
- * the log. The clock is `ctx.now`, moved by hand.
+ * persist, interrupt, then the daemon side: `planWake` and `recordWake` as
+ * the runner's wake Turn calls them, over the compiled graph. A wake by the
+ * timer, a signal, a person's early resume, a wake past the stop time, and
+ * a new daemon that restores the timer from the log. The slot, the run cap
+ * and the queue are the runner's (`runner.test.ts`). The clock is
+ * `ctx.now`, moved by hand.
  */
 
 let sandbox: Sandbox;
@@ -68,38 +76,44 @@ const wait = (
 });
 
 /**
- * The daemon side of the module on a fake thread seam: a resume drives the
- * graph on a new compile over the same saver (a new daemon), and the test
- * reads what the wake sent and what the drive gave.
+ * The daemon side of the module as the runner's wake Turn uses it:
+ * `planWake`, then `recordWake` and the resume into the wait node, driven
+ * on a new compile over the same saver (a new daemon). The timers hand a
+ * fired run to the same wake. The test reads what the wake sent and what
+ * the drive gave.
  */
-function daemon(
-	h: Harness,
-	time: { now(): number },
-	options = { full: false },
-) {
+function daemon(h: Harness, time: { now(): number }) {
 	const resumed: ResumeValue[] = [];
 	const drives: Promise<Driven>[] = [];
-	const sleeps: Sleeps = createSleeps({
-		db: sandbox.db,
-		log: h.log,
-		bus: h.ctx.bus,
+	async function wake(how: Wake): Promise<void> {
+		const plan = planWake(
+			await h.events(),
+			await h.thread.state(),
+			how,
+			time.now(),
+		);
+		if (plan.kind !== "wake") return;
+		await recordWake(
+			{
+				log: h.log,
+				bus: h.ctx.bus,
+				recorders: {
+					open: (_runId, stepId, path) => h.ctx.recorder(stepId, path),
+				},
+			},
+			h.runId,
+			plan,
+			how,
+		);
+		resumed.push(plan.resume);
+		drives.push(drive(h, new Command({ resume: plan.resume }), h.graph()));
+	}
+	const sleeps = createSleeps({
 		now: time.now,
-		recorders: { open: (_runId, stepId, path) => h.ctx.recorder(stepId, path) },
-		thread: {
-			settled: async () => {},
-			exclusive: (_runId, fn) => fn(),
-			state: () => h.thread.state(),
-			reserveSlot: () => {
-				if (options.full) throw new Error("The run cap is reached");
-			},
-			releaseStartingSlot: () => {},
-			resume: (_row, value) => {
-				resumed.push(value);
-				drives.push(drive(h, new Command({ resume: value }), h.graph()));
-			},
-		},
+		wake: () => void wake({ early: false }),
 	});
 	return {
+		wake,
 		sleeps,
 		resumed,
 		/** The drive the latest wake started. */
@@ -182,13 +196,13 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 
 		// A timer that fires before its time wakes nothing.
 		const d = daemon(h, time);
-		await d.sleeps.wake(h.runId, { early: false });
+		await d.wake({ early: false });
 		expect(d.resumed).toEqual([]);
 		expect(payloads(await h.events(), "WaitEnded")).toEqual([]);
 
 		// The wake: WaitEnded, the transcript wake, the resume into the wait node.
 		time.advance(31);
-		await d.sleeps.wake(h.runId, { early: false });
+		await d.wake({ early: false });
 		expect(d.resumed).toEqual([{ kind: "wake", early: false }]);
 		expect(payloads(await h.events(), "WaitEnded")).toEqual([{ early: false }]);
 		const woken = await d.driven();
@@ -216,7 +230,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 			resumeSessionId: "fake-session-1",
 		});
 		// A second wake finds no sleeping run and does nothing.
-		await d.sleeps.wake(h.runId, { early: false });
+		await d.wake({ early: false });
 		expect(d.resumed).toHaveLength(1);
 	});
 
@@ -229,7 +243,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		await drive(h, { inputs: {} });
 		const d = daemon(h, time);
 		time.advance(1);
-		await d.sleeps.wake(h.runId, { early: true, prompt: "Hurry up." });
+		await d.wake({ early: true, prompt: "Hurry up." });
 		expect(d.resumed).toEqual([
 			{ kind: "wake", early: true, prompt: "Hurry up." },
 		]);
@@ -278,7 +292,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		expect(payloads(await h.events(), "WaitStarted")).toHaveLength(1);
 		const d = daemon(h, time);
 		time.advance(60);
-		await d.sleeps.wake(h.runId, { early: false });
+		await d.wake({ early: false });
 		const woken = await d.driven();
 		expect(woken.parked).toEqual([
 			{
@@ -307,27 +321,51 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		});
 	});
 
-	test("a full run cap queues the timer's wake and refuses a person's; a freed slot drains it", async () => {
+	test("planWake: a timer before its time is too soon, an early wake is not, and a run that no longer sleeps wakes nothing", async () => {
 		const time = clock();
+		const resetAt = time.now() + 30 * MINUTE;
 		const h = await startRun(sandbox, flowOf([agent("worker", "Go")]), {
-			harness: limited(time.now() + 30 * MINUTE),
+			harness: limited(resetAt),
 		});
 		h.ctx.now = time.now;
 		await drive(h, { inputs: {} });
-		const full = { full: true };
-		const d = daemon(h, time, full);
-		time.advance(31);
-		await d.sleeps.wake(h.runId, { early: false });
-		expect(d.resumed).toEqual([]);
-		await expect(d.sleeps.wake(h.runId, { early: true })).rejects.toThrow(
-			"run cap",
-		);
-		expect(payloads(await h.events(), "WaitEnded")).toEqual([]);
-		full.full = false;
-		d.sleeps.drain();
-		await waitFor(() => d.resumed.length === 1);
-		await d.driven();
-		expect(payloads(await h.events(), "WaitEnded")).toEqual([{ early: false }]);
+		const events = await h.events();
+		const at = await h.thread.state();
+		const stepId = deriveSteps(events)[0]?.id as string;
+		expect(planWake(events, at, { early: false }, time.now())).toEqual({
+			kind: "too-soon",
+			until: resetAt + MINUTE,
+		});
+		expect(
+			planWake(events, at, { early: true, prompt: "Now." }, time.now()),
+		).toMatchObject({
+			kind: "wake",
+			step: { id: stepId },
+			resume: { kind: "wake", early: true, prompt: "Now." },
+		});
+		expect(
+			planWake(events, at, { early: true, signal: "go" }, time.now()),
+		).toMatchObject({ kind: "wake", resume: { kind: "signal", name: "go" } });
+		expect(planWake(events, { kind: "fresh" }, { early: true }, 0)).toEqual({
+			kind: "not-sleeping",
+		});
+		// The log says the run stopped: the thread still sits at its wait.
+		expect(
+			planWake(
+				[
+					...events,
+					{
+						...(events.at(-1) as (typeof events)[number]),
+						seq: 10_000,
+						type: "RunEnded",
+						payload: { status: "stopped", reason: null },
+					} as (typeof events)[number],
+				],
+				at,
+				{ early: true },
+				time.now(),
+			),
+		).toEqual({ kind: "not-sleeping" });
 	});
 
 	test("a stop while it sleeps, then a resume: the wait node parks the step and the node reopens it with its session", async () => {
@@ -361,7 +399,7 @@ describe("the sleep module: an Agent step's usage-limit wait", () => {
 		});
 		const d = daemon(h, time);
 		// A stopped run does not sleep: the wake does nothing.
-		await d.sleeps.wake(h.runId, { early: true });
+		await d.wake({ early: true });
 		expect(d.resumed).toEqual([]);
 		const resumed = await drive(
 			h,
@@ -464,7 +502,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 
 		const d = daemon(h, time);
 		time.advance(15);
-		await d.sleeps.wake(h.runId, { early: false });
+		await d.wake({ early: false });
 		expect(d.resumed).toEqual([{ kind: "wake", early: false }]);
 		expect(payloads(await h.events(), "WaitEnded")).toEqual([{ early: false }]);
 		expect((await transcriptOf(h, stepId)).map((e) => e.type)).toEqual([
@@ -488,7 +526,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 		await drive(h, { inputs: {} });
 		const d = daemon(h, time);
 		time.advance(10);
-		await d.sleeps.wake(h.runId, { early: true });
+		await d.wake({ early: true });
 		expect(d.resumed).toEqual([{ kind: "wake", early: true }]);
 		expect(payloads(await h.events(), "WaitEnded")).toEqual([{ early: true }]);
 		await d.driven();
@@ -527,7 +565,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 
 		const d = daemon(h, time);
 		time.advance(5);
-		await d.sleeps.wake(h.runId, { early: true });
+		await d.wake({ early: true });
 		const again = await d.driven();
 		expect(again.parked[0]).toMatchObject({
 			kind: "wait",
@@ -541,7 +579,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 		expect(again.state.pending).not.toHaveProperty("signal");
 
 		time.advance(5);
-		await d.sleeps.wake(h.runId, { early: true, signal: "deployed" });
+		await d.wake({ early: true, signal: "deployed" });
 		expect(d.resumed[1]).toEqual({ kind: "signal", name: "deployed" });
 		expect(payloads(await h.events(), "WaitEnded")).toEqual([
 			{ early: true },
@@ -568,7 +606,7 @@ describe("the sleep module: a Wait node's own wait", () => {
 		await drive(h, { inputs: {}, stopAt: time.now() + 60 * MINUTE });
 		const d = daemon(h, time);
 		time.advance(120);
-		await d.sleeps.wake(h.runId, { early: false });
+		await d.wake({ early: false });
 		const woken = await d.driven();
 		expect(woken.parked).toEqual([
 			{

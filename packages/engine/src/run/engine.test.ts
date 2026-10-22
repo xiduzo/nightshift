@@ -1024,6 +1024,66 @@ describe("stop and resume", () => {
 		expect(types.filter((t) => t === "EdgeTaken")).toHaveLength(1);
 	});
 
+	test.each([
+		[
+			"a resume",
+			(engine: SpaceEngine, runId: string) => engine.resumeRun(runId),
+		],
+		[
+			"a rerun",
+			(engine: SpaceEngine, runId: string) =>
+				engine.rerunFrom(runId, { nodeId: "worker" }),
+		],
+	])(
+		"a stop that comes while %s begins is not lost: it stops the new walk",
+		async (_name, reenter) => {
+			// The log holds `RunResumed` back until the test lets it go: the
+			// re-entry is half done when the stop comes.
+			const inner = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+			runLogs.push(inner);
+			let release = () => {};
+			let held: Promise<void> | null = null;
+			const runLog: RunLog = {
+				...inner,
+				async append(input) {
+					if (input.type === "RunResumed" && held === null) {
+						held = new Promise<void>((resolve) => {
+							release = resolve;
+						});
+						await held;
+					}
+					return inner.append(input);
+				},
+			};
+			const { harness, sessions } = scriptedHarness();
+			const engine = makeDaemon(harness, {}, { runLog }).space(sandbox.spaceId);
+			const run = await engine.startRun({
+				projectId: await projectId(engine),
+				flow: flowOf(
+					[agent("worker", "Build it"), command("check", "echo ok")],
+					[edge("e1", "worker", "pass", "check")],
+				),
+			});
+			await waitFor(() => sessions[0]);
+			await engine.stopRun(run.id);
+
+			const reentering = reenter(engine, run.id);
+			await waitFor(() => held !== null);
+			const stopping = engine.stopRun(run.id);
+			await Bun.sleep(20);
+			release();
+			await reentering;
+			await stopping;
+
+			expect(await statusOf(engine, run.id)).toBe("stopped");
+			const resumed = sessions[1];
+			if (resumed) expect(resumed.input.signal.aborted).toBe(true);
+			const types = await loggedTypes();
+			expect(types.filter((t) => t === "StopRequested")).toHaveLength(2);
+			expect(types.at(-1)).toBe("RunEnded");
+		},
+	);
+
 	test("stop kills a running command, and resume runs it again", async () => {
 		const engine = makeEngine(scriptedHarness().harness);
 		const flow = flowOf([command("check", "echo start; sleep 30")]);
@@ -1218,8 +1278,11 @@ describe("restart a step", () => {
 				});
 				second.finish(0.25);
 			} else {
-				// The session ended first and the run finished: nothing to restart.
-				expect(restarted).toMatch(/has ended|ended before it could restart/);
+				// The session ended first: its step ended, or the run did too.
+				// Nothing is left to restart.
+				expect(restarted).toMatch(
+					/has ended|ended before it could restart|No step runs right now/,
+				);
 				expect(sessions).toHaveLength(1);
 			}
 			expect(await waitForEnd(engine, run.id)).toBe("finished");

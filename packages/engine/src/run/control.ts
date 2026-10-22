@@ -2,7 +2,6 @@ import type { Database } from "@nightshift/db";
 import type { Actor, OwnDevice, RunsPort, SpaceEngine } from "../contract";
 import type { Runner, RunWalks } from "../graph";
 import type { RunBus, RunLog, RunRow } from "../log";
-import type { ReadModel } from "../read";
 import { resolveGate } from "./gate";
 import { moveRun, takeOver } from "./move";
 import type { RunRelay } from "./relay";
@@ -19,7 +18,6 @@ export function createRunControl(deps: {
 	log: RunLog;
 	bus: RunBus;
 	runner: Runner;
-	reads: Pick<ReadModel, "untilLogged">;
 	relay: RunRelay;
 	archive: Pick<RunsPort, "keepWalk" | "archived">;
 	/** The walk state of this computer's runs: what a move keeps, and what a take-over imports. */

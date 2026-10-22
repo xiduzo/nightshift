@@ -1,16 +1,13 @@
 import { Command, type LangGraphRunnableConfig } from "@langchain/langgraph";
-import type { Database } from "@nightshift/db";
 import type { FlowNode, WaitUntil } from "@nightshift/flows";
 
+import type { LoggedEvent, PolicyWaitReason, RunBus, RunLog } from "../log";
 import {
-	getRunRow,
-	type LoggedEvent,
-	type PolicyWaitReason,
-	type RunBus,
-	type RunLog,
-	type RunRow,
-} from "../log";
-import { deriveRunState, deriveSleep, deriveSteps } from "../read";
+	type DerivedStep,
+	deriveRunState,
+	deriveSleep,
+	deriveSteps,
+} from "../read";
 import {
 	DEFAULT_RESUME_PROMPT,
 	type NodeAction,
@@ -50,12 +47,14 @@ import type { ThreadState } from "./thread";
  *    step continues with its prompt), a `signal` (the Wait node reads
  *    `pending.signal`) and a `resume` (the run was stopped while it slept:
  *    the step parks as stopped and the node reopens or restarts it).
- * 3. `createSleeps(deps)`: the daemon side, the interface for the runner,
- *    recovery and the engine. The wake timers, the queue on a full run cap,
- *    `wake(runId, how)` (checks the run still sleeps in the log and in the
- *    checkpoint, appends `WaitEnded` and the transcript `wake`, drives the
- *    thread into its wait node) and `restore(runId, events)` (a new
- *    daemon's timers, from `deriveSleep`: the log stays the restart source).
+ * 3. The daemon side, for the runner. `planWake` (pure) says what a wake
+ *    does: the run still sleeps in the log and in the checkpoint, a timer
+ *    before its time is set again, and the resume value for the wait node.
+ *    `recordWake` appends `WaitEnded` and the transcript `wake`.
+ *    `createSleeps(deps)` holds the wake timers, and `restore(runId,
+ *    events)` gives a new daemon its timers from `deriveSleep` (the log
+ *    stays the restart source). The slot, the run cap and the drive into
+ *    the wait node are the runner's: it wakes a run in a Turn (`take`).
  *
  * Before this module the same sequence lived in five files: `beginWait` in
  * context.ts, the Wait node's private `sleep()`, `graph/wait.ts`, the
@@ -365,75 +364,140 @@ const MAX_TIMER_MS = 2 ** 31 - 1;
 /** How a sleep ends: the timer, a person early (with a follow-up), or a signal. */
 export type Wake = { early: boolean; prompt?: string; signal?: string };
 
-/** What the daemon side of the sleep module needs: the log, the clock, and the runner's thread seam. */
-export type SleepDeps = {
-	db: Database;
+/** What a wake does to a run, from its log and its thread (`planWake`). */
+export type WakePlan =
+	/** The run no longer sleeps (a stop ended the sleep, or it woke already): nothing happens. */
+	| { kind: "not-sleeping" }
+	/** A timer that fired before its time: it is set again for `until`. */
+	| { kind: "too-soon"; until: number }
+	/** The wait ends: `WaitEnded` on `step`, then `resume` into the wait node. */
+	| {
+			kind: "wake";
+			step: Pick<DerivedStep, "id" | "transcriptPath">;
+			resume: ResumeValue;
+	  };
+
+/**
+ * Pure: what a wake does. The run must still sleep by the log (a stop ends
+ * the sleep with the thread left at its wait) and by the checkpoint (the
+ * wait is the interrupt the thread sits at). A timer's wake (`early`
+ * false) before the wait's time is too soon.
+ *
+ * `early`: a person resumed the run before its time, with `prompt` as the
+ * step's follow-up. `signal`: someone sent the run that signal; the resume
+ * is `{ kind: "signal" }` and the Wait node on it ends `done`.
+ */
+export function planWake(
+	events: readonly LoggedEvent[],
+	at: ThreadState,
+	how: Wake,
+	now: number,
+): WakePlan {
+	if (deriveRunState(events).status !== "sleeping") {
+		return { kind: "not-sleeping" };
+	}
+	if (at.kind !== "interrupted" || at.value.kind !== "wait") {
+		return { kind: "not-sleeping" };
+	}
+	const sleeping = at.value;
+	if (!how.early && sleeping.until !== null && now < sleeping.until) {
+		return { kind: "too-soon", until: sleeping.until };
+	}
+	const step = deriveSteps(events).find((s) => s.id === sleeping.stepId);
+	if (!step) throw new Error(`Step not found: ${sleeping.stepId}`);
+	const resume: ResumeValue =
+		how.signal !== undefined
+			? { kind: "signal", name: how.signal }
+			: {
+					kind: "wake",
+					early: how.early,
+					...(how.prompt !== undefined ? { prompt: how.prompt } : {}),
+				};
+	return { kind: "wake", step, resume };
+}
+
+/** What `recordWake` writes to. */
+export type WakeDeps = {
 	log: RunLog;
 	bus: RunBus;
-	now(): number;
 	recorders: {
 		open(runId: string, stepId: string, path: string): Promise<Recorder>;
 	};
-	/** The runner's side of a wake: where the thread is, and a drive into its wait node under a slot. */
-	thread: {
-		/** Resolves once the drive that began the wait has unwound. */
-		settled(runId: string): Promise<void>;
-		/** Runs `fn` after every earlier call for the run: a wake never interleaves with a stop. */
-		exclusive<T>(runId: string, fn: () => Promise<T>): Promise<T>;
-		/** Where the run's thread is, from its latest checkpoint. */
-		state(row: RunRow): Promise<ThreadState>;
-		/** Holds a slot for the woken run; throws on a full run cap. */
-		reserveSlot(runId: string): void;
-		releaseStartingSlot(runId: string): void;
-		/** Answers the wait node's interrupt in the background; takes over the reserved slot. */
-		resume(row: RunRow, value: ResumeValue): void;
-	};
+};
+
+/**
+ * Records the end of a sleep: `WaitEnded` on the step that waited, the
+ * transcript `wake` entry, and the bus. The runner calls it in the wake's
+ * Turn, once the woken run holds a slot and before the thread moves.
+ */
+export async function recordWake(
+	deps: WakeDeps,
+	runId: string,
+	plan: Extract<WakePlan, { kind: "wake" }>,
+	how: Wake,
+): Promise<void> {
+	const { step } = plan;
+	const signal = how.signal !== undefined ? { signal: how.signal } : {};
+	await deps.log.append({
+		type: "WaitEnded",
+		runId,
+		stepId: step.id,
+		payload: { early: how.early, ...signal },
+	});
+	const recorder = await deps.recorders.open(
+		runId,
+		step.id,
+		step.transcriptPath,
+	);
+	try {
+		recorder.record(null, { type: "wake", ...signal });
+	} finally {
+		recorder.close();
+	}
+	deps.bus.publish(runId, { kind: "step-changed", stepId: step.id });
+}
+
+/** What the wake timers need: the clock, and who wakes a run when its timer fires. */
+export type SleepDeps = {
+	now(): number;
+	/** The timer of the run fired: the runner takes the run to wake it. */
+	wake(runId: string): void;
 };
 
 export type Sleeps = ReturnType<typeof createSleeps>;
 
 /**
- * The daemon side of sleeping runs: the wake timers, the wakes queued on a
- * full run cap, and the wake itself. One per runner.
+ * The wake timers of sleeping runs. One per runner. A timer that fires
+ * hands the run to `deps.wake`; the runner then wakes it in a Turn
+ * (`planWake`, `recordWake`), or queues it on a full run cap.
  */
 export function createSleeps(deps: SleepDeps) {
-	const { log, bus, thread } = deps;
 	/** Timers that end the waits of sleeping runs, by run id. */
 	const timers = new Map<string, ReturnType<typeof setTimeout>>();
-	/** Sleeping runs whose wait ended while the run cap was full. */
-	const queued = new Set<string>();
 	let disposed = false;
 
-	/** Clears every timer and ignores later wakes: the daemon dies. */
+	/** Clears every timer and sets no new one: the daemon dies. */
 	function dispose(): void {
 		disposed = true;
 		for (const timer of timers.values()) clearTimeout(timer);
 		timers.clear();
-		queued.clear();
 	}
 
-	function clearTimer(runId: string): void {
+	/** Drops the run's timer: the run woke, was stopped, or moved. */
+	function forget(runId: string): void {
 		const timer = timers.get(runId);
 		if (timer !== undefined) clearTimeout(timer);
 		timers.delete(runId);
 	}
 
-	/** Drops the run's timer and its queued wake: the run was stopped while it slept. */
-	function forget(runId: string): void {
-		clearTimer(runId);
-		queued.delete(runId);
-	}
-
 	/** Wakes the run at `until` (at once when it has passed). Replaces an earlier timer. */
 	function schedule(runId: string, until: number): void {
-		clearTimer(runId);
+		forget(runId);
 		if (disposed) return;
 		const delay = Math.min(Math.max(0, until - deps.now()), MAX_TIMER_MS);
 		const timer = setTimeout(() => {
 			timers.delete(runId);
-			wake(runId, { early: false }).catch((error) => {
-				console.error(`[engine] could not wake run ${runId}`, error);
-			});
+			deps.wake(runId);
 		}, delay);
 		timer.unref?.();
 		timers.set(runId, timer);
@@ -450,95 +514,5 @@ export function createSleeps(deps: SleepDeps) {
 		if (sleeping?.until != null) schedule(runId, sleeping.until);
 	}
 
-	/** A slot freed: the wakes the full run cap held try again. */
-	function drain(): void {
-		if (disposed) return;
-		for (const runId of [...queued]) {
-			queued.delete(runId);
-			wake(runId, { early: false }).catch((error) => {
-				console.error(`[engine] could not wake run ${runId}`, error);
-			});
-		}
-	}
-
-	/**
-	 * Ends the wait of a sleeping run and continues the step that waited:
-	 * `WaitEnded`, the transcript `wake` entry, then `Command({ resume:
-	 * { kind: "wake" } })` into the wait node. The run must still sleep by
-	 * the log (a stop ends the sleep with the thread left at its wait) and
-	 * by the checkpoint (the wait is the interrupt the thread sits at); else
-	 * nothing happens. A timer that fires before its time is set again.
-	 *
-	 * `early`: a person resumed the run before its time (a full run cap then
-	 * fails); otherwise a full cap queues the wake until a slot frees.
-	 * `signal`: someone sent the run that signal; the resume is `{ kind:
-	 * "signal" }` and the Wait node on it ends `done`.
-	 */
-	async function wake(runId: string, how: Wake): Promise<void> {
-		if (disposed) return;
-		await thread.settled(runId);
-		await thread.exclusive(runId, async () => {
-			if (disposed) return;
-			const events = await log.events(runId);
-			if (deriveRunState(events).status !== "sleeping") return;
-			const row = await getRunRow(deps.db, runId);
-			const at = await thread.state(row);
-			if (at.kind !== "interrupted" || at.value.kind !== "wait") return;
-			const sleeping = at.value;
-			if (
-				!how.early &&
-				sleeping.until !== null &&
-				deps.now() < sleeping.until
-			) {
-				schedule(runId, sleeping.until);
-				return;
-			}
-			// The timer goes; a wake the cap queued stays queued.
-			clearTimer(runId);
-			try {
-				thread.reserveSlot(runId);
-			} catch (error) {
-				if (how.early) throw error;
-				queued.add(runId);
-				return;
-			}
-			try {
-				const waiting = deriveSteps(events).find(
-					(s) => s.id === sleeping.stepId,
-				);
-				if (!waiting) throw new Error(`Step not found: ${sleeping.stepId}`);
-				const signal = how.signal !== undefined ? { signal: how.signal } : {};
-				await log.append({
-					type: "WaitEnded",
-					runId,
-					stepId: waiting.id,
-					payload: { early: how.early, ...signal },
-				});
-				const recorder = await deps.recorders.open(
-					runId,
-					waiting.id,
-					waiting.transcriptPath,
-				);
-				try {
-					recorder.record(null, { type: "wake", ...signal });
-				} finally {
-					recorder.close();
-				}
-				bus.publish(runId, { kind: "step-changed", stepId: waiting.id });
-				const resume: ResumeValue =
-					how.signal !== undefined
-						? { kind: "signal", name: how.signal }
-						: {
-								kind: "wake",
-								early: how.early,
-								...(how.prompt !== undefined ? { prompt: how.prompt } : {}),
-							};
-				thread.resume(row, resume);
-			} finally {
-				thread.releaseStartingSlot(runId);
-			}
-		});
-	}
-
-	return { schedule, restore, wake, forget, drain, dispose };
+	return { schedule, restore, forget, dispose };
 }

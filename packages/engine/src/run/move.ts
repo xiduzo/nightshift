@@ -16,15 +16,16 @@ import type { RunRelay } from "./relay";
 /**
  * A run moves to another of the Person's Devices while it waits, sleeps or
  * has stopped: this computer keeps the run's walk state (its Checkpoint
- * and its steps' files) in the archive and logs `WalkerMoved`. The new
- * Walker takes it over from there.
+ * and its steps' files) in the archive and logs `WalkerMoved`, in a Turn
+ * of the runner (`hold`), so no answer, wake or resume comes in between.
+ * The new Walker takes it over from there.
  */
 export async function moveRun(
 	deps: {
 		db: Database;
 		log: RunLog;
 		bus: RunBus;
-		runner: Pick<Runner, "exclusive" | "isActive" | "forget">;
+		runner: Pick<Runner, "hold" | "forget">;
 		relay: RunRelay;
 		archive: Pick<RunsPort, "keepWalk">;
 		walks: Pick<RunWalks, "exportWalk">;
@@ -53,10 +54,9 @@ export async function moveRun(
 	if (to === self || to === deps.device.id) {
 		throw new Error("This computer walks the run already.");
 	}
-	await runner.exclusive(runId, async () => {
-		const events = await log.events(runId);
+	await runner.hold(runId, async ({ events, active }) => {
 		const status = deriveRunState(events).status;
-		if (status === "running" || runner.isActive(runId)) {
+		if (status === "running" || active) {
 			throw new Error(
 				"The run is in the middle of a step. Move it when it waits, sleeps or has stopped.",
 			);
@@ -99,7 +99,7 @@ export async function takeOver(
 	deps: {
 		db: Database;
 		log: Pick<RunLog, "events">;
-		runner: Pick<Runner, "forget" | "sleeps" | "continueTranscriptAfter">;
+		runner: Pick<Runner, "forget" | "restore" | "continueTranscriptAfter">;
 		archive: Pick<RunsPort, "archived">;
 		walks: Pick<RunWalks, "importWalk" | "importTranscript">;
 	},
@@ -135,5 +135,5 @@ export async function takeOver(
 	}
 	deps.runner.continueTranscriptAfter(runId, lastSeq);
 	deps.runner.forget(runId);
-	deps.runner.sleeps.restore(runId, await deps.log.events(runId));
+	deps.runner.restore(runId, await deps.log.events(runId));
 }

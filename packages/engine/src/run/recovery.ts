@@ -8,8 +8,6 @@ import {
 	closeOpenWork,
 	messageOf,
 	openWork,
-	planReentry,
-	type ReentryRequest,
 	type Runner,
 	rerunNodeRefusal,
 } from "../graph";
@@ -34,8 +32,6 @@ import {
 
 /**
  * Recovery: what a daemon does about runs that did not end on their own.
- * Two things live here because they share one rule (design rule 9: a resume
- * appends `RunResumed` before the thread moves) and the queue:
  *
  * - Startup recovery (`recoverInterruptedWork`): a daemon that died left
  *   sessions, steps and runs open. They become `interrupted` as a stop
@@ -43,17 +39,13 @@ import {
  *   get their timers back, and after a grace period the daemon resumes the
  *   interrupted runs itself unless `daemonResumeBlock` says why not. A
  *   step past its recorded time budget or idle limit ends as its timer
- *   would have ended it instead (`runner.endIfOverdue`).
+ *   would have ended it instead (an `overdue` Turn of the runner).
  * - Resume (`resume`, `restartStep`, `rerunFrom`): a person's resume and
- *   the daemon's both come here. The re-entry planner (`planReentry`,
- *   `graph/reentry.ts`) decides from the log and the thread's checkpoint
- *   what `RunResumed` records and how the thread moves; `reenter` appends
- *   the one and hands the other to the runner.
- *
- * The seam is `createRecovery(deps)`: the engine gives the database, the
- * run log, the runner, the clock and the settings, and gets back three
- * calls. The run cap queue (`pendingResumes`, `onSlotFreed`) is the
- * module's own state, so the engine no longer knows a queue exists.
+ *   the daemon's both come here for their refusals: a run another Device
+ *   walks, a step that does not run. The rest is a Turn of the runner
+ *   (`runner.take`): the slot, the re-entry plan (`planReentry`),
+ *   `RunResumed` before the thread moves (design rule 9), and the drive.
+ *   The daemon's resume waits in the runner's cap queue on a full run cap.
  *
  */
 
@@ -77,6 +69,27 @@ const NOT_RUNNING: Record<Exclude<RunStatus, "running">, string> = {
 	stopped: "This run has ended. Resume it, or run it again from a step.",
 	interrupted: "This run has ended. Resume it, or run it again from a step.",
 };
+/**
+ * Throws why a restart is refused, from the run's log: the run runs no
+ * step, or `stepId` is not the step that runs.
+ */
+function refuseRestart(
+	events: readonly LoggedEvent[],
+	stepId: string | undefined,
+): void {
+	const status = deriveRunState(events).status;
+	if (status !== "running") throw new Error(NOT_RUNNING[status]);
+	const open = deriveSteps(events).filter((s) => s.endedAt === null);
+	if (open.length === 0) {
+		throw new Error(
+			"No step runs right now. Try again when the next step starts.",
+		);
+	}
+	if (stepId !== undefined && !open.some((s) => s.id === stepId)) {
+		throw new Error("That step has ended. Restart the step that runs now.");
+	}
+}
+
 /** Daemon resumes in a row (no person in between) before a run waits for a person. */
 const MAX_DAEMON_RESUMES = 3;
 /** Event types that open or close work. Startup recovery reads only these. */
@@ -169,9 +182,7 @@ export type RecoveryDeps = ResumeBlockDeps & {
 export type Recovery = ReturnType<typeof createRecovery>;
 
 export function createRecovery(deps: RecoveryDeps) {
-	const { db, log, runner, now, settings } = deps;
-	/** Interrupted runs the daemon resumes when a slot frees. */
-	const pendingResumes = new Set<string>();
+	const { db, log, runner } = deps;
 	let resumeTimer: ReturnType<typeof setTimeout> | undefined;
 	/** The runs startup recovery interrupted, to resume once the engine is ready. */
 	let toResume: string[] = [];
@@ -183,7 +194,6 @@ export function createRecovery(deps: RecoveryDeps) {
 		() => {
 			disposed = true;
 			clearTimeout(resumeTimer);
-			pendingResumes.clear();
 		},
 		{ once: true },
 	);
@@ -226,7 +236,8 @@ export function createRecovery(deps: RecoveryDeps) {
 			if (
 				open.endsRun &&
 				open.steps.length > 0 &&
-				(await runner.endIfOverdue(runId, 0))
+				(await runner.take(runId, { kind: "overdue", graceMs: 0 })).kind ===
+					"halted"
 			) {
 				continue;
 			}
@@ -245,7 +256,7 @@ export function createRecovery(deps: RecoveryDeps) {
 			}
 			if (open.endsRun && !why) toResume.push(runId);
 			// A sleeping run gets its timer back from the log (`deriveSleep`).
-			if (!open.endsRun) runner.sleeps.restore(runId, events);
+			if (!open.endsRun) runner.restore(runId, events);
 		}
 	}
 
@@ -267,7 +278,8 @@ export function createRecovery(deps: RecoveryDeps) {
 	/**
 	 * Resumes a run that startup recovery interrupted, through the same path
 	 * as a person's resume. Checks again first: a person may have resumed it,
-	 * or the stop time came meanwhile. A full run cap queues it.
+	 * or the stop time came meanwhile. A full run cap queues it: a freed
+	 * slot asks again from the top.
 	 */
 	async function resumeAfterRestart(runId: string): Promise<void> {
 		if (disposed) return;
@@ -287,106 +299,47 @@ export function createRecovery(deps: RecoveryDeps) {
 				);
 				return;
 			}
-			await resume(runId, { by: "daemon" });
+			await runner.take(
+				runId,
+				{ kind: "resume", by: "daemon" },
+				{ whenFull: "queue", retry: () => void resumeAfterRestart(runId) },
+			);
 		} catch (error) {
 			console.error(`[engine] could not resume run ${runId}`, error);
 		}
 	}
 
-	/** The runner freed a slot: the queued daemon resumes try again. */
-	function onSlotFreed(): void {
-		if (disposed) return;
-		for (const runId of [...pendingResumes]) {
-			pendingResumes.delete(runId);
-			void resumeAfterRestart(runId);
-		}
-	}
-
 	/**
 	 * Continues a stopped, failed or interrupted run, or wakes a sleeping
-	 * one. A person's resume and the daemon's after a restart both come
-	 * here; `RunResumed` says which, and is appended before the thread
-	 * moves (design rule 9). The daemon's queues on a full run cap, like a
-	 * wake. Where the thread continues comes from its checkpoint
-	 * (`planReentry`): its interrupt is answered, its pending node runs
-	 * again, or a thread that ended or never ran jumps to the top-level
-	 * node the log points at.
+	 * one, as a person asks. `RunResumed` says who, and is appended before
+	 * the thread moves (design rule 9). Where the thread continues comes
+	 * from its checkpoint (`planReentry`): its interrupt is answered, its
+	 * pending node runs again, or a thread that ended or never ran jumps to
+	 * the top-level node the log points at.
 	 */
 	async function resume(
 		runId: string,
 		input: { by: ResumedBy; prompt?: string },
 	): Promise<void> {
-		const { prompt } = input;
-		const row = await getRunRow(db, runId);
-		if (row.walkerId !== (await log.walkerId())) {
-			throw new Error(WALKED_ELSEWHERE);
-		}
-		const before = await log.events(runId);
-		if (deriveRunState(before).status === "sleeping") {
-			await runner.sleeps.wake(runId, {
-				early: true,
-				...(prompt !== undefined ? { prompt } : {}),
-			});
-			return;
-		}
-		if (
-			input.by === "daemon" &&
-			!runner.isActive(runId) &&
-			runner.activeCount() >= settings().maxConcurrentRuns
-		) {
-			pendingResumes.add(runId);
-			return;
-		}
-		runner.reserveSlot(runId);
-		try {
-			await reenter(row, { kind: "resume", ...input });
-		} finally {
-			runner.releaseStartingSlot(runId);
-		}
+		await refuseElsewhere(runId, WALKED_ELSEWHERE);
+		await runner.take(runId, { kind: "resume", ...input });
 	}
 
-	/**
-	 * A re-entry, on a run whose slot the caller holds: plans it from the
-	 * log and the thread's latest checkpoint (`planReentry`, which refuses
-	 * a run that runs, waits or sleeps), appends the plan's `RunResumed`,
-	 * and moves the thread as the plan says (`runner.enter`). A thread that
-	 * cannot move ends the run `failed`.
-	 */
-	async function reenter(row: RunRow, request: ReentryRequest): Promise<void> {
-		const runId = row.id;
-		const plan = planReentry({
-			flow: deps.flowOf(row),
-			events: await log.events(runId),
-			thread: await runner.threadSnapshot(row),
-			request,
-			now: now(),
-		});
-		await log.append({ type: "RunResumed", runId, payload: plan.resumed });
-		try {
-			await runner.enter(row, plan);
-		} catch (error) {
-			// No drive took the run: end the walk `RunResumed` began, so the
-			// log does not say it runs.
-			await log.append({
-				type: "RunEnded",
-				runId,
-				payload: {
-					status: "failed",
-					reason: `The run could not start again: ${messageOf(error)}`,
-				},
-			});
-			throw error;
-		}
+	/** Throws `message` for a run another Device walks. */
+	async function refuseElsewhere(runId: string, message: string) {
+		const row = await getRunRow(db, runId);
+		if (row.walkerId !== (await log.walkerId())) throw new Error(message);
+		return row;
 	}
 
 	/**
 	 * Stops the running step and continues it at once, as a stop now and a
-	 * resume would, in one action (`runner.restart`): nothing comes in
-	 * between, the old drive is fenced off and its harness aborted before
-	 * the resume reads the log, and the run keeps its slot. The resume is
-	 * Resume's (`reenter`), so the step continues as Resume continues it: an
-	 * Agent step with a harness session reopens it with `prompt` (default
-	 * "Continue where you left off."), any other step runs again.
+	 * resume would, in one Turn of the runner: nothing comes in between,
+	 * the old drive is fenced off and its harness aborted before the resume
+	 * reads the log, and the run keeps its slot. The step continues as
+	 * Resume continues it: an Agent step with a harness session reopens it
+	 * with `prompt` (default "Continue where you left off."), any other step
+	 * runs again.
 	 *
 	 * Refused unless a step runs: for a run another Device walks, a run that
 	 * waits, sleeps or ended, and between steps. With `stepId`, also when
@@ -396,37 +349,12 @@ export function createRecovery(deps: RecoveryDeps) {
 		runId: string,
 		input: { by: ResumedBy; prompt?: string; stepId?: string },
 	): Promise<void> {
-		const row = await getRunRow(db, runId);
-		if (row.walkerId !== (await log.walkerId())) {
-			throw new Error(RESTART_ELSEWHERE);
-		}
-		await runner.restart(
+		await refuseElsewhere(runId, RESTART_ELSEWHERE);
+		const { stepId, ...restart } = input;
+		await runner.take(
 			runId,
-			(events) => {
-				const status = deriveRunState(events).status;
-				if (status !== "running") throw new Error(NOT_RUNNING[status]);
-				const open = deriveSteps(events).filter((s) => s.endedAt === null);
-				if (open.length === 0) {
-					throw new Error(
-						"No step runs right now. Try again when the next step starts.",
-					);
-				}
-				if (
-					input.stepId !== undefined &&
-					!open.some((s) => s.id === input.stepId)
-				) {
-					throw new Error(
-						"That step has ended. Restart the step that runs now.",
-					);
-				}
-			},
-			() =>
-				reenter(row, {
-					kind: "resume",
-					by: input.by,
-					action: "restart",
-					...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
-				}),
+			{ kind: "restart", ...restart },
+			{ check: (events) => refuseRestart(events, stepId) },
 		);
 	}
 
@@ -456,19 +384,11 @@ export function createRecovery(deps: RecoveryDeps) {
 			fresh?: boolean;
 		},
 	): Promise<void> {
-		const row = await getRunRow(db, runId);
-		if (row.walkerId !== (await log.walkerId())) {
-			throw new Error(RERUN_ELSEWHERE);
-		}
+		const row = await refuseElsewhere(runId, RERUN_ELSEWHERE);
 		// Before the slot: a node the flow does not have is refused first.
 		const refusal = rerunNodeRefusal(deps.flowOf(row), input.nodeId);
 		if (refusal) throw new Error(refusal);
-		runner.reserveSlot(runId);
-		try {
-			await reenter(row, { kind: "rerun", ...input });
-		} finally {
-			runner.releaseStartingSlot(runId);
-		}
+		await runner.take(runId, { kind: "rerun", ...input });
 	}
 
 	return {
@@ -477,6 +397,5 @@ export function createRecovery(deps: RecoveryDeps) {
 		resume,
 		restartStep,
 		rerunFrom,
-		onSlotFreed,
 	};
 }
