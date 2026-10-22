@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { liveSessionIds } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { pushTarget } from "@nightshift/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { Expo } from "expo-server-sdk";
 import { z } from "zod";
 
@@ -130,15 +131,44 @@ export function createTargetStore(db: Database, now: () => number = Date.now) {
 		};
 	}
 
+	/**
+	 * A phone is a push target plus its session. When the session ended
+	 * (signed out, expired, revoked), the phone may hold another Person's
+	 * session by now: its target is forgotten, so it gets nothing more.
+	 */
+	async function withoutEndedPhones(
+		targets: PushTarget[],
+	): Promise<PushTarget[]> {
+		const phoneSessions = targets.flatMap((target) =>
+			target.kind === "expo" && target.sessionId ? [target.sessionId] : [],
+		);
+		if (phoneSessions.length === 0) return targets;
+		const live = await liveSessionIds(db, phoneSessions, now());
+		const ended = targets.filter(
+			(target) =>
+				target.kind === "expo" &&
+				target.sessionId !== null &&
+				!live.has(target.sessionId),
+		);
+		if (ended.length === 0) return targets;
+		await db.delete(pushTarget).where(
+			inArray(
+				pushTarget.id,
+				ended.map((target) => target.id),
+			),
+		);
+		return targets.filter((target) => !ended.includes(target));
+	}
+
 	return {
-		/** The Person's push targets, oldest first. */
+		/** The Person's push targets, oldest first. A phone whose session ended is forgotten. */
 		async of(personId: string): Promise<PushTarget[]> {
 			const rows = await db
 				.select()
 				.from(pushTarget)
 				.where(eq(pushTarget.personId, personId))
 				.orderBy(pushTarget.createdAt);
-			return rows.map(toTarget);
+			return withoutEndedPhones(rows.map(toTarget));
 		},
 
 		/** These push targets, by id. An id without a row is left out. */
@@ -154,6 +184,8 @@ export function createTargetStore(db: Database, now: () => number = Date.now) {
 		/**
 		 * Registers a screen for the Person, or, when the Person has its
 		 * endpoint already, gives it the new name and keys and marks it seen.
+		 * A phone holds one Person's session at a time: its push token stops
+		 * reaching any other Person who signed in on it before.
 		 */
 		async register(
 			personId: string,
@@ -162,6 +194,17 @@ export function createTargetStore(db: Database, now: () => number = Date.now) {
 		): Promise<PushTarget> {
 			const parsed = registerTargetSchema.parse(input);
 			const at = new Date(now());
+			if (parsed.kind === "expo") {
+				await db
+					.delete(pushTarget)
+					.where(
+						and(
+							eq(pushTarget.endpoint, parsed.endpoint),
+							eq(pushTarget.kind, "expo"),
+							ne(pushTarget.personId, personId),
+						),
+					);
+			}
 			const [row] = await db
 				.insert(pushTarget)
 				.values({

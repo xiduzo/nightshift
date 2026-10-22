@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { account, session } from "@nightshift/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, inArray } from "drizzle-orm";
 
 import type { Auth } from "../auth";
 
@@ -101,4 +101,26 @@ export async function endSession(
 		.where(and(eq(session.id, sessionId), eq(session.userId, personId)))
 		.returning({ id: session.id });
 	return ended.length > 0;
+}
+
+/**
+ * Which of these sessions still work: the session exists and has not
+ * expired. A phone's push target lives as long as its session.
+ */
+export async function liveSessionIds(
+	db: Database,
+	sessionIds: readonly string[],
+	now: number = Date.now(),
+): Promise<Set<string>> {
+	if (sessionIds.length === 0) return new Set();
+	const rows = await db
+		.select({ id: session.id })
+		.from(session)
+		.where(
+			and(
+				inArray(session.id, [...sessionIds]),
+				gt(session.expiresAt, new Date(now)),
+			),
+		);
+	return new Set(rows.map((row) => row.id));
 }
