@@ -104,7 +104,8 @@ export const notifications = {
 				);
 				if (!removed) {
 					throw new ORPCError("NOT_FOUND", {
-						message: "This screen is not in your list.",
+						message:
+							"This phone or browser is not in your list. Reload the page to see the list now.",
 					});
 				}
 			}),

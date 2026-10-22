@@ -128,7 +128,10 @@ export function createTargetStore(db: Database, now: () => number = Date.now) {
 					},
 				})
 				.returning();
-			if (!row) throw new Error("The screen was not saved. Try again.");
+			if (!row)
+				throw new Error(
+					"Night Shift could not turn on notifications here. Try again.",
+				);
 			return toTarget(row);
 		},
 

@@ -88,7 +88,9 @@ export function ScreensCard() {
 				toast.success(
 					toRemove?.kind === "expo"
 						? `${toRemove.name} is removed and signed out`
-						: `${toRemove?.name ?? "The screen"} is removed`,
+						: toRemove
+							? `${toRemove.name} is removed`
+							: "It is removed",
 				);
 			},
 			onError: (error) => toast.error(`Not removed: ${error.message}`),
@@ -200,7 +202,9 @@ export function ScreensCard() {
 									? "Removing…"
 									: toRemove?.kind === "expo"
 										? "Remove and sign out"
-										: "Remove"}
+										: toRemove?.kind === "desktop"
+											? "Remove desktop app"
+											: "Remove browser"}
 							</AlertDialogAction>
 						</AlertDialogFooter>
 					</AlertDialogContent>
