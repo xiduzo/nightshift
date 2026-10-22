@@ -322,7 +322,7 @@ export function createRunner(deps: RunnerDeps) {
 	 * Keeps a finished run's latest checkpoint and deletes the older ones
 	 * and the body namespaces. The history was the walk's bookkeeping and
 	 * the event log is the record; the final state is what `resumeRun` of a
-	 * finished run re-enters on (`reenter`).
+	 * finished run re-enters on (`planReentry`, `enter`).
 	 */
 	async function pruneThread(thread: Thread, runId: string): Promise<void> {
 		try {

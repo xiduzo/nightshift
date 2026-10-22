@@ -108,9 +108,13 @@ packages/engine/src/
                            decides how a node re-enters (new, continue,
                            reopen) from the checkpoint and the log, per
                            kind rules (RESUME_RULES); uncommittedStep,
-                           latestStepOf, sessionOf. The daemon side of the
-                           same question: reenteredNode, reentryUpdate,
-                           resumeTarget.
+                           rerunEntryOf, latestStepOf, sessionOf.
+  graph/reentry.ts         The re-entry planner (below), the daemon side of
+                           the same question: planReentry() says what
+                           RunResumed records and how the thread moves for a
+                           resume, a restart or a rerun, pure; with
+                           resumeTarget, reenteredNode, reentryUpdate and
+                           loggedVisits.
   graph/sleep.ts           The sleep module (below): sleep() plans a wait
                            (the policy's, or a Wait node's own) and persists
                            it; waitNode(nodeId) is the one wait node;
@@ -178,9 +182,9 @@ packages/engine/src/
                            limit); endingOf() says what RunEnded a drive's
                            outcome asks for; inputOf() builds the LangGraph
                            input of a start, continue, resume or jump.
-  graph/runner.ts          Per-run driver: start, continueRun, resume,
-                           reenter (seeded by reentryUpdate for threads with
-                           no checkpoint), stop, restart, the deadline
+  graph/runner.ts          Per-run driver: start, resume (a Gate's answer, a
+                           wake), enter (what a re-entry plan says, after
+                           threadSnapshot), stop, restart, the deadline
                            sweep (each ends open work through
                            closeOpenWork). Drives each
                            run's Thread, publishes to the bus, reacts to
@@ -227,11 +231,11 @@ packages/engine/src/
                            timers back through sleeps.restore; after a
                            grace period the daemon
                            resumes the rest unless daemonResumeBlock says
-                           why not), resume (a person's and the daemon's,
-                           mapped from the thread's checkpoint through
-                           resumeTarget; appends RunResumed before the
-                           thread moves) and onSlotFreed (the queue on a
-                           full run cap).
+                           why not), resume, restartStep and rerunFrom
+                           (each plans with planReentry, appends its
+                           RunResumed before the thread moves, and ends the
+                           run failed when the thread cannot move) and
+                           onSlotFreed (the queue on a full run cap).
   read/read-model.ts       What people see of a run, from the log: runFacts,
                            toSummary, toStepSummary, toRunDetail,
                            takeOverCommand, the flow snapshot parsers;
@@ -436,7 +440,7 @@ Decisions taken while implementing, from the code and its comments:
   `done` without an edge is a chosen end, `timeout` a failure. A parked or
   interrupted Wait step starts a new visit, as a Command does.
 - **`resumeRun` of a thread that ended or never ran re-enters with a
-  `Command({ goto, update })`** (`runner.reenter`). A finished run (rule
+  `Command({ goto, update })`** (`planReentry`, `runner.enter`). A finished run (rule
   10) or a run from before this engine has no checkpoint at an interrupt,
   so the engine jumps to the top-level node the log points at instead of
   `Command({ resume })` (rule 9). A finished run re-enters on its own
@@ -523,14 +527,35 @@ all `ResumeRules` lets them say (`RESUME_RULES`):
 | Wait | `new` | `new` |
 | Command, Tool, Decision or Value by a rule (`fresh`) | `new` | `new` |
 
-The daemon side lives next to it, on the same helpers: `resumeTarget`
-(what `RunResumed` records: the node, and the Agent step whose harness
-session the resume continues, `sessionOf`), `reenteredNode` (the last
-top-level step the walk did not move on from) and `reentryUpdate` (the
-seed state of a thread with no checkpoint). The engine promises in
-`RunResumed` what the node finds when it re-enters, by construction.
 `graph/resume-point.test.ts` holds the rule as a table: one situation,
 every kind.
+
+## The re-entry planner (`graph/reentry.ts`)
+
+The daemon side of the same question: a person or the daemon asks a run
+that is not going to resume, to restart its running step, or to run again
+from a node. `planReentry({ flow, events, thread, request, now })` is pure.
+From the log and the thread's latest checkpoint (`ThreadSnapshot`) it
+gives one plan: the `RunResumed` payload, the thread entry (`ThreadEntry`:
+answer the interrupt, run the pending node again, or jump to a node) and
+whether the leftover task is cleared first. It throws the refusals with a
+message for the person: a run that runs, waits or sleeps, a node that is
+not a top-level node of the run's flow, a step that is not that node's.
+
+Recovery's `reenter(row, request)` is the one place that appends
+`RunResumed`: it plans, appends, and hands the entry to `runner.enter`. A
+thread that cannot move ends the run `failed` ("The run could not start
+again: ..."), so the log never says a run runs that no drive holds.
+
+The planner reads the node side's helpers: `resumeTarget` (the node, and
+the Agent step whose harness session the resume continues, `sessionOf`),
+`reenteredNode` (the last top-level step the walk did not move on from),
+`reentryUpdate` (the seed state of a thread with no checkpoint) and
+`loggedVisits` (a rerun's visits). Because one call gives both the
+payload and the entry, the engine promises in `RunResumed` what the node
+finds when it re-enters. `graph/reentry.test.ts` holds the plans as a
+table, and its promise rows apply each plan and ask the resume point
+(`resumePoint`, `rerunEntryOf`) what the node then does.
 
 ## The step runner (`graph/step-runner.ts`)
 
