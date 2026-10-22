@@ -22,6 +22,7 @@ import { deciderQueries } from "@/features/agents";
 import { DECIDED_BY_ICON } from "../../canvas/node-type";
 import { Field, InspectorSection, Note } from "../fields";
 import { TemplateField } from "../template-field";
+import { lockScreenHint } from "./lock-screen-hint";
 import { deciderModelHint, withoutField } from "./model-defaults";
 import { NodeOptionsField } from "./node-options-field";
 
@@ -164,9 +165,7 @@ export function DecisionFields({
 								id={`${id}-lock-screen-hint`}
 								className="text-xs"
 							>
-								{node.lockScreen
-									? "Your phone shows the options as buttons on the notification. Use this only when a quick answer is safe."
-									: "The notification opens the app on your phone. The app checks that it is you before your answer goes."}
+								{lockScreenHint(node)}
 							</FieldDescription>
 						</FieldContent>
 					</ShadcnField>

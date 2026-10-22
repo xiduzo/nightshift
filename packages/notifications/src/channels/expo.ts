@@ -127,8 +127,9 @@ export function expoMessage(
 	}
 	if (message.kind === "gates-waiting") data.count = message.count;
 	const options = message.gate?.lockScreen ? message.gate.options : [];
-	// Labels are the author's text, shown on the buttons: the author marked
-	// this Gate to be answered from the lock screen.
+	// The author marked this Gate to be answered from the lock screen. The
+	// phone's buttons say Approve and Reject: Approve sends the first
+	// option's id and Reject the second. The labels are not shown.
 	if (options.length === 2) data.options = options;
 	return {
 		...once,

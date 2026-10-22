@@ -761,11 +761,11 @@ describe("validateFlow: decisions and gates", () => {
 		).toEqual([
 			[
 				"decide",
-				'Decision node "decide" can be answered from the lock screen, but a model decides it. Remove lockScreen, or decide it yourself.',
+				'Decision node "decide" is decided by a model. Only a person can answer from the lock screen. Turn off "Can be answered from the lock screen", or let a person decide.',
 			],
 			[
 				"pick",
-				'Decision node "pick" can be answered from the lock screen, but a rule decides it. Remove lockScreen, or decide it yourself.',
+				'Decision node "pick" is decided by a rule. Only a person can answer from the lock screen. Turn off "Can be answered from the lock screen", or let a person decide.',
 			],
 		]);
 	});
