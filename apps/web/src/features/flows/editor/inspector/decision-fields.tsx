@@ -165,7 +165,7 @@ export function DecisionFields({
 								className="text-xs"
 							>
 								{node.lockScreen
-									? "Your phone shows the options as buttons on the notification. Use this only when a quick answer is safe."
+									? lockScreenHint(node.options)
 									: "The notification opens the app on your phone. The app checks that it is you before your answer goes."}
 							</FieldDescription>
 						</FieldContent>
@@ -268,4 +268,16 @@ export function DecisionFields({
 			) : null}
 		</>
 	);
+}
+
+/**
+ * What the lock-screen buttons answer. The phone's buttons always say
+ * Approve and Reject: Approve answers the first option, Reject the second.
+ */
+function lockScreenHint(options: readonly { name: string }[]): string {
+	const [first, second] = options;
+	if (options.length === 2 && first && second) {
+		return `Your phone shows Approve and Reject on the notification. Approve answers "${first.name}", Reject answers "${second.name}". Use this only when a quick answer is safe.`;
+	}
+	return "Your phone shows Approve and Reject on the notification. Approve answers the first option, Reject the second. Give this Gate two options.";
 }

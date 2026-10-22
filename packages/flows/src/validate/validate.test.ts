@@ -743,13 +743,14 @@ describe("validateFlow: decisions and gates", () => {
 		const issues = validateFlow(
 			flow(
 				[
-					gate("ask", ["ok"], { lockScreen: true }),
+					gate("ask", ["ok", "no"], { lockScreen: true }),
 					decision("decide", ["go"], { lockScreen: true }),
 					ruled("pick", [["go"]], { lockScreen: true }),
 					decision("quiet", ["done"], { lockScreen: false }),
 				],
 				[
 					edge("a", "ask", "ok", "decide"),
+					edge("n", "ask", "no", "decide"),
 					edge("b", "decide", "go", "pick"),
 					edge("c", "pick", "go", "quiet"),
 				],
@@ -766,6 +767,37 @@ describe("validateFlow: decisions and gates", () => {
 			[
 				"pick",
 				'Decision node "pick" can be answered from the lock screen, but a rule decides it. Remove lockScreen, or decide it yourself.',
+			],
+		]);
+	});
+
+	test("a lock-screen Gate has two options: Approve answers the first, Reject the second", () => {
+		const issues = validateFlow(
+			flow(
+				[
+					gate("one", ["ok"], { lockScreen: true }),
+					gate("three", ["ship", "wait", "drop"], { lockScreen: true }),
+					gate("two", ["ship", "skip"], { lockScreen: true }),
+				],
+				[
+					edge("a", "one", "ok", "three"),
+					edge("b", "three", "ship", "two"),
+					edge("c", "three", "wait", "two"),
+					edge("d", "three", "drop", "two"),
+				],
+				"one",
+			),
+		);
+		expect(
+			errors(issues).map((issue) => [issue.nodeId, issue.message]),
+		).toEqual([
+			[
+				"one",
+				'Decision node "one" can be answered from the lock screen, but it has 1 option. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or remove lockScreen.',
+			],
+			[
+				"three",
+				'Decision node "three" can be answered from the lock screen, but it has 3 options. The lock screen shows Approve for the first option and Reject for the second. Give it two options, or remove lockScreen.',
 			],
 		]);
 	});

@@ -7,7 +7,9 @@ import { ACTION, ANDROID_CHANNEL, CATEGORY } from "./push-data";
  * The buttons of a lock-screen Gate. The author marked the Gate, so the
  * answer goes without an unlock and without opening the app. An iOS
  * category has fixed button titles: they say Approve and Reject, and
- * answer the first and the second option of the Gate.
+ * answer the first and the second option of the Gate. Flow validation
+ * holds a lock-screen Gate to two options, and the editor names the option
+ * each button answers.
  */
 const DECIDE_ACTIONS: Notifications.NotificationAction[] = [
 	{
