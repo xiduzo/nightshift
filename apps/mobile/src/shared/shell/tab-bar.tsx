@@ -30,9 +30,10 @@ export function TabBar({ waiting }: TabBarProps) {
 					sf={{ default: "tray", selected: "tray.fill" }}
 				/>
 				<NativeTabs.Trigger.Label>Inbox</NativeTabs.Trigger.Label>
-				<NativeTabs.Trigger.Badge hidden={waiting === 0}>
-					{String(waiting)}
-				</NativeTabs.Trigger.Badge>
+				{/* No Badge, no badge: `hidden` and empty children leave a mark on iOS. */}
+				{waiting > 0 ? (
+					<NativeTabs.Trigger.Badge>{String(waiting)}</NativeTabs.Trigger.Badge>
+				) : null}
 			</NativeTabs.Trigger>
 			<NativeTabs.Trigger name="runs">
 				<NativeTabs.Trigger.Icon
