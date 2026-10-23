@@ -120,13 +120,52 @@ USER bun
 - Pin the versions. The image then changes only when you change it.
 - Go back to `USER bun` at the end. Night Shift does not run as root.
 - Add each tool on the Agents page, under Tools. An Agent node may then run
-  it.
+  it. Give it its login there (below), not in the image.
 
-Give the logins of the CLIs in the environment of the container, for
-example `GH_TOKEN` for `gh`. Every Agent node and Command node gets them.
 For Claude Code, make a token with `claude setup-token` and set
-`CLAUDE_CODE_OAUTH_TOKEN`. Night Shift does not give `ANTHROPIC_API_KEY`
-to Claude Code. For a secret that only some steps use, see
+`CLAUDE_CODE_OAUTH_TOKEN` in the environment of the container. Night Shift
+does not give `ANTHROPIC_API_KEY` to Claude Code.
+
+### Sign your CLI tools in
+
+Give each CLI tool its login in Night Shift, not in the image. Open the
+Agents page, then the tool, then Edit:
+
+- **Login → variables.** A value can read a secret, for example
+  `GH_TOKEN = ${GH_WORK_TOKEN}`. Save the secret under Agents → Secrets,
+  or set it in the environment of the container.
+- **Several accounts of one program.** Add one tool per account: `gh` and
+  `gh-work` both run the program `gh`, each with its own token. The agent
+  types the tool's name. Say which account it is in the description.
+- **A program that keeps its sign-in in a file**, such as acli: turn on
+  "Keep its own sign-in". Night Shift keeps a folder for the tool in the
+  data folder, `/data/tools/<name>`, and points the program at it with a
+  variable (`HOME` for acli). Its sign-in command runs there before the
+  first step, and again when a secret it reads changes. Give the token as
+  the command's input, never in the command:
+
+  ```text
+  Program          acli
+  Name             acli-dimpact
+  Folder variable  HOME
+  Sign-in command  acli jira auth login --site dimpact.atlassian.net --email you@example.com --token
+  Input            ${DIMPACT_ATLASSIAN_TOKEN}
+  ```
+
+- **Git host.** In the steps that have the tool, `git push` to this host
+  signs in with the tool's login, for example `github.com` for `gh`.
+
+A step gets only the logins of its own tools. The secrets that logins
+read do not reach other agents and commands, also when they are set in
+the environment of the container. A Command node that names one in
+`secrets` still gets it. The record of a step shows each value as `•••`.
+
+The agent runs as the same user as Night Shift. An agent that looks for a
+token in its tools can find it. Give each tool a token that can do only
+what the agent needs: a fine-grained token for the repositories it works
+on.
+
+For other secrets, see
 [Secrets on a computer without a keychain](#secrets-on-a-computer-without-a-keychain).
 
 ### Keep it running
