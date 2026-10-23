@@ -96,8 +96,12 @@ export async function runCommand(
  */
 export async function* spawnCommand(
 	input: ExecInput,
+	/** Taken out of Night Shift's environment before `env` is added. */
+	scrubEnv: readonly string[] = [],
 ): AsyncGenerator<ExecEvent> {
 	const { command, cwd, env, signal } = input;
+	const inherited = { ...process.env };
+	for (const name of scrubEnv) delete inherited[name];
 	const queue: ExecEvent[] = [];
 	let wake: (() => void) | null = null;
 	const push = (event: ExecEvent) => {
@@ -142,7 +146,7 @@ export async function* spawnCommand(
 	try {
 		child = spawn("sh", ["-c", command], {
 			cwd,
-			env: { ...process.env, ...env },
+			env: { ...inherited, ...env },
 			detached: true,
 			stdio: ["ignore", "pipe", "pipe"],
 		});

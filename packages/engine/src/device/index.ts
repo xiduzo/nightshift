@@ -2,6 +2,7 @@
 
 export { runCommand, tailOf } from "./command";
 export { localDevice } from "./local";
+export { createToolLaunchers } from "./tool-launchers";
 export type {
 	Capabilities,
 	CapabilityQuery,

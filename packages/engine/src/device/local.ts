@@ -36,8 +36,9 @@ import {
 	systemGit,
 } from "../projects";
 import { spawnCommand } from "./command";
-import { redactExec } from "./redact";
+import { redactExec, redactSession } from "./redact";
 import { callServerTool } from "./tool-call";
+import type { ToolLaunchers } from "./tool-launchers";
 import type {
 	Capabilities,
 	DeciderFacts,
@@ -99,6 +100,11 @@ export type LocalDeviceDeps = {
 	 * A new session gets them after its prompt. Without it, nothing.
 	 */
 	cliToolsFor?: (names: readonly string[]) => Promise<CliToolGuide[]>;
+	/**
+	 * The CLI tools' launchers and logins (`createToolLaunchers`). Without
+	 * it, a tool runs the program of its name with this computer's sign-in.
+	 */
+	toolLaunchers?: Pick<ToolLaunchers, "prepare" | "guarded">;
 	/**
 	 * The folder of a project's Clone on this computer, or null when it has
 	 * none. Without it, this computer has no Clones: a run cannot start here.
@@ -245,28 +251,52 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			yield { type: "refused", message: mcp.message };
 			return;
 		}
-		// A new session learns its CLI tools after the prompt. A resumed
-		// session has them already. Plan mode runs no command.
-		const guide =
-			!input.resumeSessionId &&
-			input.permissionMode !== "plan" &&
-			clis !== undefined &&
-			clis.length > 0 &&
-			deps.cliToolsFor
-				? cliToolsInstruction(await deps.cliToolsFor(clis))
-				: "";
-		yield { type: "ready", harness: name };
-		yield* harness.run({
-			...rest,
-			prompt: guide ? `${input.prompt}\n\n${guide}` : input.prompt,
-			...(clis && clis.length > 0 ? { clis } : {}),
-			...(Object.keys(mcp.servers).length > 0
-				? { mcpServers: mcp.servers }
-				: {}),
-			...(artifacts && deps.artifacts
-				? { saveArtifact: keepArtifact(deps.artifacts, artifacts, rest.cwd) }
-				: {}),
-		});
+		// Plan mode runs no command: no CLI tools, no logins.
+		const runsCommands = input.permissionMode !== "plan";
+		const withClis = runsCommands && clis !== undefined && clis.length > 0;
+		// Each CLI tool with a login runs through a launcher of this session.
+		// The secrets the logins read go to the launchers only.
+		const tools =
+			withClis && deps.toolLaunchers
+				? await deps.toolLaunchers.prepare(clis)
+				: null;
+		if (tools && !tools.ok) {
+			yield { type: "refused", message: tools.message };
+			return;
+		}
+		try {
+			// A new session learns its CLI tools after the prompt. A resumed
+			// session has them already.
+			const guide =
+				!input.resumeSessionId && withClis && deps.cliToolsFor
+					? cliToolsInstruction(await deps.cliToolsFor(clis))
+					: "";
+			const guarded = deps.toolLaunchers?.guarded() ?? [];
+			yield { type: "ready", harness: name };
+			const events = harness.run({
+				...rest,
+				prompt: guide ? `${input.prompt}\n\n${guide}` : input.prompt,
+				...(clis && clis.length > 0 ? { clis } : {}),
+				...(Object.keys(mcp.servers).length > 0
+					? { mcpServers: mcp.servers }
+					: {}),
+				...(artifacts && deps.artifacts
+					? {
+							saveArtifact: keepArtifact(deps.artifacts, artifacts, rest.cwd),
+						}
+					: {}),
+				...(tools?.toolsPath ? { toolsPath: tools.toolsPath } : {}),
+				...(tools && Object.keys(tools.env).length > 0
+					? { env: tools.env }
+					: {}),
+				...(guarded.length > 0 ? { scrubEnv: guarded } : {}),
+			});
+			yield* tools && tools.values.length > 0
+				? redactSession(events, tools.values)
+				: events;
+		} finally {
+			await tools?.cleanup();
+		}
 	}
 
 	function decide(input: DecisionInput): Promise<DecisionResult>;
@@ -288,8 +318,13 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	 */
 	async function* exec(input: ExecInput): AsyncGenerator<ExecEvent> {
 		const { secrets = [], ...command } = input;
+		// The secrets of the CLI tools' logins go to their launchers only. A
+		// command that names one in `secrets` gets it below.
+		const scrub = (deps.toolLaunchers?.guarded() ?? []).filter(
+			(name) => !secrets.includes(name),
+		);
 		if (secrets.length === 0) {
-			yield* spawnCommand(command);
+			yield* spawnCommand(command, scrub);
 			return;
 		}
 		const found = await secretEnv(secrets);
@@ -298,7 +333,10 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 			return;
 		}
 		yield* redactExec(
-			spawnCommand({ ...command, env: { ...command.env, ...found.env } }),
+			spawnCommand(
+				{ ...command, env: { ...command.env, ...found.env } },
+				scrub,
+			),
 			Object.values(found.env),
 		);
 	}

@@ -56,7 +56,7 @@ export type {
 	ToolResult,
 	Worktree,
 } from "./device";
-export { localDevice } from "./device";
+export { createToolLaunchers, localDevice } from "./device";
 export {
 	addHarness,
 	type CliTool,
@@ -81,6 +81,7 @@ export {
 	openDeviceDocument,
 	type ProfileStore,
 	type ProfileView,
+	programOf,
 	refreshDeviceFacts,
 	removeCliTool,
 	removeConnection,

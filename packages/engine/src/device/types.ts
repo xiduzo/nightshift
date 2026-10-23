@@ -157,6 +157,10 @@ export type SessionInput = Omit<
 	harness: AgentHarnessName;
 	/** The node's prompt. The Device adds what a new session learns about its CLI tools. */
 	prompt: string;
+	/**
+	 * CLI tools by name. The Device runs each with its own login, through
+	 * a launcher it makes for the session (`tool-launchers.ts`).
+	 */
 	clis?: string[];
 	/** Connections by name: the Device expands them with its own secrets. */
 	connections?: string[];

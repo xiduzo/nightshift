@@ -195,6 +195,79 @@ describe("session", () => {
 		expect(asked).toEqual([["gh"]]);
 	});
 
+	test("CLI tools with logins: launchers, git settings and guarded secrets reach the harness; values come back as •••", async () => {
+		const harness = fakeHarness({
+			steps: [
+				{
+					type: "tool",
+					name: "Bash",
+					input: { command: "gh-work auth token" },
+					result: "tok-work",
+				},
+			],
+		});
+		const prepared: string[][] = [];
+		let cleaned = 0;
+		const d = device({
+			harnesses: { "claude-code": harness },
+			toolLaunchers: {
+				prepare: async (names) => {
+					prepared.push([...names]);
+					return {
+						ok: true,
+						toolsPath: "/tmp/nightshift-tools-1",
+						env: { GIT_CONFIG_COUNT: "2" },
+						values: ["tok-work"],
+						cleanup: async () => {
+							cleaned += 1;
+						},
+					};
+				},
+				guarded: () => ["GH_WORK_TOKEN"],
+			},
+		});
+		const events = await collect(
+			d.session(sessionInput({ clis: ["gh-work"] })),
+		);
+		expect(prepared).toEqual([["gh-work"]]);
+		expect(harness.calls[0]).toMatchObject({
+			toolsPath: "/tmp/nightshift-tools-1",
+			env: { GIT_CONFIG_COUNT: "2" },
+			scrubEnv: ["GH_WORK_TOKEN"],
+		});
+		expect(events).toContainEqual(
+			expect.objectContaining({ type: "tool-result", content: "•••" }),
+		);
+		expect(JSON.stringify(events)).not.toContain("tok-work");
+		expect(cleaned).toBe(1);
+	});
+
+	test("a CLI tool that cannot run refuses the session; plan mode prepares none", async () => {
+		const harness = fakeHarness();
+		let prepares = 0;
+		const d = device({
+			harnesses: { "claude-code": harness },
+			toolLaunchers: {
+				prepare: async () => {
+					prepares += 1;
+					return { ok: false, message: "The CLI tool gh-work needs GH_WORK." };
+				},
+				guarded: () => [],
+			},
+		});
+		expect(
+			await collect(d.session(sessionInput({ clis: ["gh-work"] }))),
+		).toEqual([
+			{ type: "refused", message: "The CLI tool gh-work needs GH_WORK." },
+		]);
+		await collect(
+			d.session(sessionInput({ clis: ["gh-work"], permissionMode: "plan" })),
+		);
+		expect(prepares).toBe(1);
+		expect(harness.calls).toHaveLength(1);
+		expect(harness.calls[0]?.toolsPath).toBeUndefined();
+	});
+
 	test("a session for a step keeps its artifacts in the store, from the worktree", async () => {
 		const harness = fakeHarness();
 		const saved: unknown[] = [];
@@ -330,6 +403,38 @@ describe("exec", () => {
 			exitCode: 0,
 			spawnError: null,
 		});
+	});
+
+	test("a secret that a login reads does not reach a command, unless the command names it", async () => {
+		const previous = process.env.NIGHTSHIFT_TEST_LOGIN;
+		process.env.NIGHTSHIFT_TEST_LOGIN = "from-env";
+		try {
+			const d = device({
+				...secrets({ NIGHTSHIFT_TEST_LOGIN: "from-env" }),
+				toolLaunchers: {
+					prepare: async () => ({ ok: false, message: "unused" }),
+					guarded: () => ["NIGHTSHIFT_TEST_LOGIN"],
+				},
+			});
+			const output = async (named: string[]) =>
+				(
+					await collect(
+						d.exec({
+							command: 'printf "%s" "${NIGHTSHIFT_TEST_LOGIN:-none}"',
+							cwd: sandbox.repoPath,
+							secrets: named,
+							signal: new AbortController().signal,
+						}),
+					)
+				)
+					.flatMap((e) => (e.type === "output" ? [e.text] : []))
+					.join("");
+			expect(await output([])).toBe("none");
+			expect(await output(["NIGHTSHIFT_TEST_LOGIN"])).toBe("•••");
+		} finally {
+			if (previous === undefined) delete process.env.NIGHTSHIFT_TEST_LOGIN;
+			else process.env.NIGHTSHIFT_TEST_LOGIN = previous;
+		}
 	});
 
 	test("a secret this computer does not have refuses the command before it starts", async () => {
