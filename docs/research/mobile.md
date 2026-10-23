@@ -442,15 +442,21 @@ each composed from Reusables pieces and the tokens:
 | `list` | `ListGroup`, `ListRow`, `SwitchRow`, `SectionHead` | ListRow: `title`, `titleLines`, `overline`, `status` (a `Look` as a line of icon and word under the title), `caption`, `detail` (a string or parts, a part may be `mono` or take a `tone`), `icon` + `tone` or `look`, `iconLabel`, `leading`, `value`, `valueLabel`, `href` or `onPress`, `chevron`, `selected` (a check at the end, for a row you choose from a list), `disabled`, `accessibilityLabel`, `accessibilityHint`. SwitchRow: `title`, `caption`, `checked`, `onChange`, `disabled` (the whole row is one switch). SectionHead: `title`, `hint`, `seeAll` (`href` or `onPress`) |
 | `header` | `LargeTitleHeader`, `HeaderButton`, `AvatarButton` | `title`, `summary`, `leading`, `actions`, `compact`; buttons: `icon` or `name`, `label`, `hint`, `href` or `onPress` (44 pt, round) |
 | `avatar` | `InitialsAvatar` | `name`, `size` (`sm` row, `md` header) |
-| `tiles` | `StatTile`, `StatGrid`, `FactTile`, `FactGrid` | StatTile: `value` (undefined loads), `label`, `icon`, `tone`, `caption`, `detail`, `href` or `onPress`. FactTile: `label`, `value`, `sub`, `mono`, `look`. Grids: two by two |
-| `chips` | `ChipRail`, `Chip` | Chip: `label`, `count`, `selected`, `icon`, `onPress`, `accessibilityHint` (`default` when chosen, `outline` when not) |
+| `tiles` | `StatTile`, `StatGrid`, `FactTile`, `FactGrid` | StatTile: `value` (undefined loads), `label`, `icon`, `tone`, `caption`, `detail`, `href` or `onPress`. FactTile: `label`, `value`, `sub`, `mono`, `look`, `wide` (a row of its own, for a run id). Grids: two by two. A StatTile number shrinks to fit on one line |
+| `chips` | `ChipRail`, `Chip` | Chip: `label`, `count`, `selected`, `icon`, `onPress`, `accessibilityHint` (`default` when chosen, `outline` when not). The rail scrolls the chosen chip into view, also when a link chose it |
 | `trail` | `StepTrail`, `trailItemOf` | `items`; `trailItemOf(step, { labels, runStatus, now })` gives kind, name, look, error and "4 min · $0.12" |
 | `action-bar` | `ActionBar` | `caption`, `label`, `destructive`, `action` (`label`, `onPress`, `disabled`, `busy`, `busyLabel`, `variant`); give it to `Screen` as `footer` |
 | `page` | `Screen` | `onRefresh`, `footer` |
 
 Each row and tile is one accessible element with a full label ("Needs you,
-Review the plan, website, waited 12 min"). Targets are at least 44 pt. Rows
-have no fixed heights, so Dynamic Type grows them.
+Review the plan, website, waited 12 min"); a status word that the icon and
+the caption both say is read once. Targets are at least 44 pt. Rows and
+chips have no fixed heights, so Dynamic Type grows them. From a text scale
+of 1.35 a row's value moves under its title, so the title keeps its width.
+
+`font-mono` needs a single font name on a phone: `global.css` of
+`ui-native` sets `--font-mono` to Menlo on iOS and `monospace` on Android
+(Tailwind's default is a web font stack, which React Native ignores).
 
 **Home.** Every Space you are in, from `dashboard.summary({ everySpace:
 true })` and `gates.list` (`features/home`, pure logic in `last-night.ts`).
