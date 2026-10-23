@@ -57,6 +57,7 @@ import {
 	useState,
 } from "react";
 import { describeRunStatuses, RunsDonut } from "@/features/dashboard";
+import { ThisDeviceLabel } from "@/features/devices";
 import { flowQueries } from "@/features/flows";
 import { useOpenGates } from "@/features/gates";
 import { AddProjectDialog, projectQueries } from "@/features/projects";
@@ -155,7 +156,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
 				<NavProjects projects={projects.data} />
 				{/* Saved on this computer only: its agents and its settings. */}
 				<SidebarGroup className="mt-auto">
-					<SidebarGroupLabel>This Mac</SidebarGroupLabel>
+					<ThisDeviceLabel />
 					<SidebarMenu>
 						<SidebarMenuItem>
 							<SidebarMenuButton

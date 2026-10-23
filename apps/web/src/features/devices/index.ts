@@ -2,4 +2,5 @@
 
 export { DevicesPage } from "./devices-page";
 export { deviceQueries } from "./queries";
+export { ThisDeviceLabel } from "./this-device-label";
 export { WalkerBadge, walkerName } from "./walker-badge";
