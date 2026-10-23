@@ -1,26 +1,19 @@
 import type { PlacementChoice } from "@nightshift/client";
-import { Label } from "@nightshift/ui-native/components/ui/label";
 import {
 	RadioGroup,
 	RadioGroupItem,
 } from "@nightshift/ui-native/components/ui/radio-group";
 import { Text } from "@nightshift/ui-native/components/ui/text";
-import { View } from "react-native";
+import { cn } from "@nightshift/ui-native/lib/utils";
+import { Pressable, View } from "react-native";
 
-/** What one place is, for the person who picks it. */
-function hintOf(choice: PlacementChoice): string {
-	if (!choice.online) {
-		return "Offline. Open Night Shift on that computer to run flows on it.";
-	}
-	if (choice.offers !== undefined) {
-		return choice.offers.length === 0
-			? "Another person offers this computer to the Space, with no profiles."
-			: `Another person offers this computer to the Space, with ${choice.offers.join(", ")}.`;
-	}
-	return choice.thisDevice ? "Your Host." : "One of your computers.";
-}
+import { ListGroup } from "@/shared/list";
+import { placementHint } from "./start-words";
 
-/** Where the run goes: the Host, or a computer that is online. Offline ones show why they cannot take it. */
+/**
+ * Where the run goes: your Host, or a computer that is online, as radio
+ * rows in one card. Offline ones show why they cannot take it.
+ */
 export function PlacementField({
 	choices,
 	value,
@@ -31,32 +24,41 @@ export function PlacementField({
 	onChange: (deviceId: string) => void;
 }) {
 	return (
-		<RadioGroup value={value ?? ""} onValueChange={onChange} className="gap-4">
-			{choices.map((choice) => {
-				const id = `place-${choice.deviceId}`;
-				return (
-					<View key={choice.deviceId} className="flex-row items-start gap-3">
-						<RadioGroupItem
-							value={choice.deviceId}
-							aria-labelledby={id}
+		<RadioGroup value={value ?? ""} onValueChange={onChange}>
+			<ListGroup>
+				{choices.map((choice) => {
+					const checked = choice.deviceId === value;
+					const hint = placementHint(choice);
+					return (
+						<Pressable
+							key={choice.deviceId}
+							onPress={() => onChange(choice.deviceId)}
 							disabled={!choice.online}
-							className="mt-0.5"
-						/>
-						<View className="flex-1 gap-1">
-							<Label
-								nativeID={id}
-								disabled={!choice.online}
-								onPress={() => choice.online && onChange(choice.deviceId)}
+							accessibilityRole="radio"
+							accessibilityLabel={`${choice.name}, ${hint}`}
+							accessibilityState={{ checked, disabled: !choice.online }}
+							className={cn(
+								"min-h-14 flex-row items-center gap-3 px-4 py-3 active:bg-accent",
+								!choice.online && "opacity-50",
+							)}
+						>
+							<View
+								accessibilityElementsHidden
+								importantForAccessibility="no-hide-descendants"
 							>
-								{choice.name}
-							</Label>
-							<Text variant="muted" className="text-muted-foreground">
-								{hintOf(choice)}
-							</Text>
-						</View>
-					</View>
-				);
-			})}
+								<RadioGroupItem
+									value={choice.deviceId}
+									disabled={!choice.online}
+								/>
+							</View>
+							<View className="flex-1 gap-0.5">
+								<Text className="font-medium text-base">{choice.name}</Text>
+								<Text className="text-muted-foreground text-sm">{hint}</Text>
+							</View>
+						</Pressable>
+					);
+				})}
+			</ListGroup>
 		</RadioGroup>
 	);
 }

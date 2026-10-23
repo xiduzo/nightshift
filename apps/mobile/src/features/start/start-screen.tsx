@@ -4,27 +4,19 @@ import {
 	createRunMutations,
 	createRunQueries,
 	defaultPlacement,
-	type FlowListItem,
 	filledInputs,
 	type InputTexts,
 	jsonProblem,
 	missingInputs,
+	type Project,
 	placementChoices,
 } from "@nightshift/client";
-import type { FlowInputDef } from "@nightshift/flows";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui-native/components/ui/card";
-import { Label } from "@nightshift/ui-native/components/ui/label";
+import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
-import { Switch } from "@nightshift/ui-native/components/ui/switch";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FolderGit2 } from "lucide-react-native";
+import { router } from "expo-router";
+import { FolderGit2, Workflow } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { View } from "react-native";
 
@@ -34,28 +26,27 @@ import { openRun } from "@/features/runs";
 import { ActionBar } from "@/shared/action-bar";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
+import { ListGroup, ListRow, SectionHead, SwitchRow } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { ChoiceSelect } from "./choice-select";
 import { FlowInputFields } from "./flow-input-fields";
 import { PlacementField } from "./placement-field";
-
-/** A flow file that is not valid cannot start. */
-function canRun(flow: FlowListItem): boolean {
-	return flow.nodeCount !== null && flow.errorCount === 0;
-}
+import { canRun, flowCaption, startBlocker } from "./start-words";
 
 /**
- * Start a flow of the Space you chose in the header: pick a project and
- * one of its flows, fill in the flow's inputs, choose where it runs, then
- * start it and follow it live.
+ * New run, in the Space you chose in the header: pick one of a project's
+ * flows, fill in its inputs, choose where it runs, then start it and
+ * follow it live. `projectId` chooses the project first (from a project
+ * page).
  */
-export function StartScreen() {
+export function StartScreen({ projectId }: { projectId?: string }) {
 	const projectQueries = useHostQueries(createProjectQueries);
 	const flowQueries = useHostQueries(createFlowQueries);
 	const queryClient = useQueryClient();
 	const projects = useQuery(projectQueries.list());
-	const [projectId, setProjectId] = useState<string | null>(null);
-	const [flowName, setFlowName] = useState<string | null>(null);
+	const [chosenProject, setChosenProject] = useState<string | null>(
+		projectId ?? null,
+	);
 
 	const refresh = useCallback(
 		() =>
@@ -102,229 +93,218 @@ export function StartScreen() {
 
 	// One project: nothing to choose.
 	const project =
-		list.find((p) => p.id === projectId) ??
+		list.find((p) => p.id === chosenProject) ??
 		(list.length === 1 ? list[0] : undefined);
 
 	return (
-		<Screen onRefresh={refresh}>
-			<Card>
-				<CardHeader>
-					<CardTitle>Start a flow</CardTitle>
-					<CardDescription>
-						Choose a project and one of its flows. You follow the run here.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="gap-4">
-					<ChoiceSelect
-						label="Project"
-						placeholder="Choose a project"
-						choices={list.map((p) => ({ value: p.id, label: p.name }))}
-						value={project?.id ?? null}
-						onChange={(id) => {
-							setProjectId(id);
-							setFlowName(null);
-						}}
-					/>
-					{project ? (
-						<FlowPicker
-							projectId={project.id}
-							value={flowName}
-							onChange={setFlowName}
-						/>
-					) : null}
-				</CardContent>
-			</Card>
-			{project && flowName ? (
-				<StartForm
-					key={`${project.id}:${flowName}`}
-					projectId={project.id}
-					flowName={flowName}
-				/>
-			) : null}
-		</Screen>
-	);
-}
-
-/** The flows of one project. A flow that is not valid shows, but cannot be chosen. */
-function FlowPicker({
-	projectId,
-	value,
-	onChange,
-}: {
-	projectId: string;
-	value: string | null;
-	onChange: (name: string) => void;
-}) {
-	const flowQueries = useHostQueries(createFlowQueries);
-	const flows = useQuery(flowQueries.list(projectId));
-
-	const list = flows.data;
-	if (!list) {
-		if (!flows.isError) return <Skeleton className="h-16 w-full" />;
-		return (
-			<ErrorAlert
-				title="The flows did not load"
-				message={flows.error?.message ?? ""}
-				fix="Check that this phone is online, then try again."
-				onRetry={() => void flows.refetch()}
-			/>
-		);
-	}
-	if (list.length === 0) {
-		return (
-			<Text variant="muted" className="text-muted-foreground">
-				This project has no flows yet. Make one in Night Shift on your computer.
-			</Text>
-		);
-	}
-	const chosen = list.find((flow) => flow.name === value);
-	return (
-		<>
-			<ChoiceSelect
-				label="Flow"
-				placeholder="Choose a flow"
-				choices={list.map((flow) => ({
-					value: flow.name,
-					label: canRun(flow) ? flow.name : `${flow.name} (not valid)`,
-					disabled: !canRun(flow),
-				}))}
-				value={value}
-				onChange={onChange}
-			/>
-			{chosen?.description ? (
-				<Text variant="muted" className="text-muted-foreground">
-					{chosen.description}
-				</Text>
-			) : null}
-			{list.some((flow) => !canRun(flow)) ? (
-				<Text variant="muted" className="text-muted-foreground">
-					A flow that is not valid cannot start. Fix it in Night Shift on your
-					computer.
-				</Text>
-			) : null}
-		</>
-	);
-}
-
-/** The inputs of the flow, where it runs, and the Start button. */
-function StartForm({
-	projectId,
-	flowName,
-}: {
-	projectId: string;
-	flowName: string;
-}) {
-	const flowQueries = useHostQueries(createFlowQueries);
-	const flow = useQuery(flowQueries.get(projectId, flowName));
-
-	const loaded = flow.data;
-	if (!loaded) {
-		if (!flow.isError) {
-			return <Skeleton className="h-48 w-full rounded-xl" />;
-		}
-		return (
-			<ErrorAlert
-				title="The flow did not load"
-				message={flow.error?.message ?? ""}
-				fix="Check that this phone is online, then try again."
-				onRetry={() => void flow.refetch()}
-			/>
-		);
-	}
-	if (!loaded.flow) {
-		return (
-			<ErrorAlert
-				title="This flow is not valid"
-				message="It cannot start until it is fixed."
-				fix="Fix it in Night Shift on your computer, then pull down to load it again."
-			/>
-		);
-	}
-	return (
-		<InputsAndStart
-			projectId={projectId}
-			flowName={flowName}
-			inputs={loaded.flow.inputs}
+		<NewRun
+			// Another project starts a new form.
+			key={project?.id ?? "none"}
+			projects={list}
+			project={project}
+			onProject={setChosenProject}
+			onRefresh={refresh}
 		/>
 	);
 }
 
-function InputsAndStart({
-	projectId,
-	flowName,
-	inputs,
+/** The form of one project: its flows, the chosen flow's inputs, where it runs, and the Start run bar. */
+function NewRun({
+	projects,
+	project,
+	onProject,
+	onRefresh,
 }: {
-	projectId: string;
-	flowName: string;
-	inputs: FlowInputDef[];
+	projects: Project[];
+	project: Project | undefined;
+	onProject: (projectId: string) => void;
+	onRefresh: () => Promise<unknown>;
 }) {
+	const flowQueries = useHostQueries(createFlowQueries);
 	const runQueries = useHostQueries(createRunQueries);
 	const runMutations = useHostQueries(createRunMutations);
 	const queryClient = useQueryClient();
+	const projectId = project?.id ?? "";
+	const [flowName, setFlowName] = useState<string | null>(null);
 	const [values, setValues] = useState<InputTexts>({});
 	const [chosenDevice, setChosenDevice] = useState<string | null>(null);
 	const [followOnLockScreen, setFollowOnLockScreen] = useState(false);
 	const followAfterStart = useFollowAfterStart();
-	const placements = useQuery(runQueries.placements(projectId));
-	const devices = useQuery(runQueries.devices(projectId));
 
+	const flows = useQuery({
+		...flowQueries.list(projectId),
+		enabled: project !== undefined,
+	});
+	const flow = useQuery({
+		...flowQueries.get(projectId, flowName ?? ""),
+		enabled: project !== undefined && flowName !== null,
+	});
+	const placements = useQuery({
+		...runQueries.placements(projectId),
+		enabled: project !== undefined,
+	});
+	const devices = useQuery({
+		...runQueries.devices(projectId),
+		enabled: project !== undefined,
+	});
+
+	const inputs = flow.data?.flow?.inputs ?? [];
 	const choices = placementChoices(placements.data ?? [], devices.data ?? []);
 	const place = defaultPlacement(choices, chosenDevice);
-	const missing = missingInputs(inputs, values);
 	const badJson = inputs.filter(
 		(input) => jsonProblem(input, values[input.name]) !== null,
 	);
+	const blocker = startBlocker({
+		flowChosen: flowName !== null,
+		missing: missingInputs(inputs, values),
+		badJson,
+		placementsLoaded: placements.data !== undefined,
+		hasPlace: place !== null,
+	});
 
 	const start = useMutation(
 		runMutations.start({
 			onSuccess: (run) => {
 				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
 				if (followOnLockScreen) void followAfterStart(run.id);
+				// Close New run, then follow the run on the main screens.
+				if (router.canDismiss()) router.dismiss();
 				openRun(run.id);
 			},
 		}),
 	);
 
-	const blocker =
-		missing.length > 0
-			? `Fill in ${missing.map((input) => input.label || input.name).join(", ")} first.`
-			: badJson.length > 0
-				? `Check the format of ${badJson.map((input) => input.label || input.name).join(", ")} first.`
-				: placements.data !== undefined && !place
-					? "No computer can take the run now."
-					: null;
+	const ready =
+		flowName !== null && flow.data?.flow != null && blocker === null && place;
 
 	return (
-		<>
-			{inputs.length > 0 ? (
-				<Card>
-					<CardHeader>
-						<CardTitle>Inputs</CardTitle>
-						<CardDescription>
-							What the flow works with. An empty field takes its default.
-						</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<FlowInputFields
-							inputs={inputs}
-							values={values}
-							onChange={setValues}
-						/>
-					</CardContent>
-				</Card>
+		<Screen
+			onRefresh={onRefresh}
+			footer={
+				<ActionBar
+					caption={blocker ?? (place ? `Runs on ${place.name}` : "New run")}
+					label={flowName ?? "Choose a flow"}
+					action={{
+						label: "Start run",
+						busyLabel: "Starting…",
+						busy: start.isPending,
+						disabled: !ready,
+						onPress: () => {
+							if (!project || !flowName || !place) return;
+							const filled = filledInputs(inputs, values);
+							start.mutate({
+								projectId: project.id,
+								flowName,
+								...(Object.keys(filled).length > 0 ? { inputs: filled } : {}),
+								...(place.thisDevice ? {} : { deviceId: place.deviceId }),
+							});
+						},
+					}}
+				/>
+			}
+		>
+			{projects.length > 1 ? (
+				<ChoiceSelect
+					label="Project"
+					placeholder="Choose a project"
+					choices={projects.map((p) => ({ value: p.id, label: p.name }))}
+					value={project?.id ?? null}
+					onChange={onProject}
+				/>
 			) : null}
 
-			<Card>
-				<CardHeader>
-					<CardTitle>Where it runs</CardTitle>
-					<CardDescription>
-						The steps run on the computer you choose. It must be online and have
-						this project.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="gap-4">
+			{project ? (
+				<View className="gap-3">
+					<SectionHead
+						title="Flow"
+						hint={
+							projects.length === 1
+								? `The flows of ${project.name}.`
+								: undefined
+						}
+					/>
+					{flows.data ? (
+						flows.data.length === 0 ? (
+							<Line text="This project has no flows yet. Make one in Night Shift on your computer." />
+						) : (
+							<ListGroup>
+								{flows.data.map((item) => (
+									<ListRow
+										key={item.name}
+										icon={Workflow}
+										title={item.name}
+										caption={flowCaption(item)}
+										selected={item.name === flowName}
+										disabled={!canRun(item)}
+										onPress={() => {
+											setFlowName(item.name);
+											setValues({});
+										}}
+										accessibilityHint="Chooses this flow for the run"
+									/>
+								))}
+							</ListGroup>
+						)
+					) : flows.isError ? (
+						<ErrorAlert
+							title="The flows did not load"
+							message={flows.error.message}
+							fix="Check that this phone is online, then try again."
+							onRetry={() => void flows.refetch()}
+						/>
+					) : (
+						<Skeleton className="h-32 w-full rounded-xl" />
+					)}
+				</View>
+			) : null}
+
+			{project && flowName ? (
+				flow.data ? (
+					flow.data.flow ? (
+						inputs.length > 0 ? (
+							<View className="gap-3">
+								<SectionHead
+									title="Inputs"
+									hint="What the flow works with. An empty field takes its default."
+								/>
+								<Card className="py-4">
+									<CardContent className="px-4">
+										<FlowInputFields
+											inputs={inputs}
+											values={values}
+											onChange={setValues}
+										/>
+									</CardContent>
+								</Card>
+							</View>
+						) : null
+					) : (
+						<ErrorAlert
+							title="This flow is not valid"
+							message="It cannot start until it is fixed."
+							fix="Fix it in Night Shift on your computer, then pull down to load it again."
+						/>
+					)
+				) : flow.isError ? (
+					<ErrorAlert
+						title="The flow did not load"
+						message={flow.error.message}
+						fix="Check that this phone is online, then try again."
+						onRetry={() => void flow.refetch()}
+					/>
+				) : (
+					<Skeleton className="h-32 w-full rounded-xl" />
+				)
+			) : null}
+
+			{project && flowName ? (
+				<View className="gap-3">
+					<SectionHead
+						title="Where it runs"
+						hint="The computer must be online and have this project."
+					/>
 					{placements.data === undefined && !placements.isError ? (
-						<Skeleton className="h-16 w-full" />
+						<Skeleton className="h-16 w-full rounded-xl" />
 					) : placements.data === undefined ? (
 						<ErrorAlert
 							title="The computers did not load"
@@ -348,8 +328,19 @@ function InputsAndStart({
 							) : null}
 						</>
 					)}
-				</CardContent>
-			</Card>
+				</View>
+			) : null}
+
+			{project && flowName && canFollowOnLockScreen ? (
+				<ListGroup>
+					<SwitchRow
+						title="Follow on the lock screen"
+						caption="The lock screen shows how the run goes."
+						checked={followOnLockScreen}
+						onChange={setFollowOnLockScreen}
+					/>
+				</ListGroup>
+			) : null}
 
 			{start.error ? (
 				<ErrorAlert
@@ -358,43 +349,17 @@ function InputsAndStart({
 					fix="Check the inputs and the computer, then start it again."
 				/>
 			) : null}
+		</Screen>
+	);
+}
 
-			{canFollowOnLockScreen ? (
-				<View className="flex-row items-center justify-between gap-3">
-					<Label
-						nativeID="follow-on-lock-screen"
-						onPress={() => setFollowOnLockScreen((on) => !on)}
-					>
-						Follow on the lock screen
-					</Label>
-					<Switch
-						checked={followOnLockScreen}
-						onCheckedChange={setFollowOnLockScreen}
-						aria-labelledby="follow-on-lock-screen"
-					/>
-				</View>
-			) : null}
-
-			<ActionBar
-				caption={blocker ?? (place ? `Runs on ${place.name}` : undefined)}
-				label={flowName}
-				action={{
-					label: "Start run",
-					busyLabel: "Starting…",
-					busy: start.isPending,
-					disabled: blocker !== null || !place,
-					onPress: () => {
-						if (!place) return;
-						const filled = filledInputs(inputs, values);
-						start.mutate({
-							projectId,
-							flowName,
-							...(Object.keys(filled).length > 0 ? { inputs: filled } : {}),
-							...(place.thisDevice ? {} : { deviceId: place.deviceId }),
-						});
-					},
-				}}
-			/>
-		</>
+/** One muted line in a Card: a list with nothing in it. */
+function Line({ text }: { text: string }) {
+	return (
+		<Card className="py-4">
+			<CardContent className="px-4">
+				<Text className="text-muted-foreground text-sm">{text}</Text>
+			</CardContent>
+		</Card>
 	);
 }
