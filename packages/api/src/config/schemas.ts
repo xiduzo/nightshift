@@ -18,6 +18,7 @@ import {
 	type SecretView,
 	type SettingField,
 	type SettingKey,
+	type SignInResult,
 	settingsSchema,
 } from "@nightshift/engine";
 import {
@@ -128,6 +129,8 @@ export const connectionListSchema = z.object({
 		secretViewSchema.extend({
 			/** The flows whose Command nodes name it. */
 			flows: z.array(flowRefSchema),
+			/** The CLI tools whose logins read it. */
+			tools: z.array(z.string()),
 		}),
 	),
 });
@@ -196,6 +199,17 @@ export const cliToolListSchema = z.array(
 	cliToolSchema.extend({
 		usedBy: z.array(flowRefSchema),
 		profiles: z.array(z.string()),
+		/** When its login last signed in (epoch ms). Null: never, or it has no sign-in. */
+		signedInAt: z.number().nullable(),
+	}),
+);
+
+/** What signing a CLI tool's login in did. */
+export const signInResultSchema = exact<SignInResult>()(
+	z.object({
+		ok: z.boolean(),
+		output: z.string(),
+		signedInAt: z.number().nullable(),
 	}),
 );
 

@@ -24,6 +24,7 @@ import type {
 	ProfileStore,
 	ProjectReadiness,
 	SettingsStore,
+	ToolLaunchers,
 } from "@nightshift/engine";
 import type { Notifications } from "@nightshift/notifications";
 
@@ -88,6 +89,8 @@ export type Context = {
 	notifications: Notifications;
 	connections: ConnectionStore;
 	cliTools: CliToolStore;
+	/** The CLI tools' logins: signing one in, when it last did, its folder. */
+	toolLaunchers: Pick<ToolLaunchers, "signIn" | "signedInAt" | "forget">;
 	profiles: ProfileStore;
 	/** Read-only checks of the CLIs and MCP servers on this machine. */
 	checks: {

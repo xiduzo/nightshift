@@ -1,4 +1,8 @@
-import { cliToolInputSchema, removeCliTool } from "@nightshift/engine";
+import {
+	cliToolInputSchema,
+	programOf,
+	removeCliTool,
+} from "@nightshift/engine";
 import { z } from "zod";
 
 import { output } from "../output";
@@ -7,11 +11,13 @@ import {
 	cliToolCheckSchema,
 	cliToolListSchema,
 	cliToolSchema,
+	signInResultSchema,
 } from "./schemas";
 
 /**
  * CLI tools: programs on this computer that the agents may run. Agent nodes
- * and profiles name them in `clis`.
+ * and profiles name them in `clis`. A tool can run another program with a
+ * login of its own: several accounts of one program.
  */
 export const cliTools = {
 	list: ownerProcedure
@@ -22,14 +28,19 @@ export const cliTools = {
 		.output(output(cliToolListSchema))
 		.handler(async ({ context }) => {
 			const use = (await context.space.flowUse()).clis;
-			return context.cliTools.list().map((tool) => ({
-				...tool,
-				usedBy: use.get(tool.name) ?? [],
-				profiles: context.profiles
-					.list()
-					.filter((p) => p.clis.includes(tool.name))
-					.map((p) => p.name),
-			}));
+			return Promise.all(
+				context.cliTools.list().map(async (tool) => ({
+					...tool,
+					usedBy: use.get(tool.name) ?? [],
+					profiles: context.profiles
+						.list()
+						.filter((p) => p.clis.includes(tool.name))
+						.map((p) => p.name),
+					signedInAt: tool.login?.signIn
+						? await context.toolLaunchers.signedInAt(tool.name)
+						: null,
+				})),
+			);
 		}),
 	/** The programs this computer can run by name, to pick one from. */
 	programs: ownerProcedure
@@ -40,24 +51,42 @@ export const cliTools = {
 	check: ownerProcedure
 		.route({
 			summary:
-				"Checks a program: where it is, its version and the help the agents read.",
+				"Checks a program: where it is, its version and the help the agents read. A CLI tool's name checks the program it runs.",
 		})
 		.output(output(cliToolCheckSchema))
 		.input(z.object({ name: cliToolInputSchema.shape.name }))
-		.handler(({ context, input }) => context.checks.cli(input.name)),
-	/** Adds a CLI tool, or changes its description. */
+		.handler(({ context, input }) => {
+			const tool = context.cliTools.get(input.name);
+			return context.checks.cli(tool ? programOf(tool) : input.name);
+		}),
+	/** Adds a CLI tool, or changes it. */
 	save: ownerProcedure
-		.route({ summary: "Adds a CLI tool, or changes its description." })
+		.route({
+			summary:
+				"Adds a CLI tool, or changes its program, description, login or git host.",
+		})
 		.output(output(cliToolSchema))
 		.input(cliToolInputSchema)
 		.handler(({ context, input }) => context.cliTools.save(input)),
-	/** Also takes it off the profiles that name it. */
+	/** Runs the sign-in command of a tool's login now. */
+	signIn: ownerProcedure
+		.route({
+			summary:
+				"Signs a CLI tool's login in: runs its sign-in command in the tool's own folder. The output shows secret values as •••.",
+		})
+		.output(output(signInResultSchema))
+		.input(z.object({ name: cliToolInputSchema.shape.name }))
+		.handler(({ context, input }) => context.toolLaunchers.signIn(input.name)),
+	/** Also takes it off the profiles that name it, and removes its login's folder. */
 	remove: ownerProcedure
 		.route({
 			summary:
-				"Removes a CLI tool, and takes it off the profiles that name it.",
+				"Removes a CLI tool and its login's folder, and takes it off the profiles that name it.",
 		})
 		.output(output(z.void()))
 		.input(z.object({ name: z.string() }))
-		.handler(({ context, input }) => removeCliTool(context, input.name)),
+		.handler(async ({ context, input }) => {
+			await removeCliTool(context, input.name);
+			await context.toolLaunchers.forget(input.name);
+		}),
 };

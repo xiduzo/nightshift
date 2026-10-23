@@ -525,6 +525,7 @@ export async function createDaemon(
 		notifications,
 		connections,
 		cliTools,
+		toolLaunchers,
 		profiles,
 		checks: programChecks(),
 		projectSetup: {

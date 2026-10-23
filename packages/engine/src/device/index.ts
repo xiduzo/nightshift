@@ -2,7 +2,12 @@
 
 export { runCommand, tailOf } from "./command";
 export { localDevice } from "./local";
-export { createToolLaunchers } from "./tool-launchers";
+export {
+	createToolLaunchers,
+	loginReferences,
+	type SignInResult,
+	type ToolLaunchers,
+} from "./tool-launchers";
 export type {
 	Capabilities,
 	CapabilityQuery,

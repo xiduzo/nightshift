@@ -184,6 +184,11 @@ describe("replies of a real engine", () => {
 			notifications,
 			connections: createConnectionStore({ document, env: {}, secrets }),
 			cliTools: createCliToolStore({ document }),
+			toolLaunchers: {
+				signIn: async () => ({ ok: false, output: "", signedInAt: null }),
+				signedInAt: async () => null,
+				forget: async () => {},
+			},
 			profiles: createProfileStore({ document }),
 			daemon: {
 				dataDir: sandbox.dataDir,
@@ -235,6 +240,13 @@ describe("replies of a real engine", () => {
 			server: { command: "gh-mcp", args: [], env: {} },
 		});
 		await reply(appRouter.cliTools.save, { name: "jq" });
+		// A second account of gh: its login reads a secret.
+		await reply(appRouter.cliTools.save, {
+			name: "gh-work",
+			program: "gh",
+			login: { env: { GH_TOKEN: "${GH_WORK_TOKEN}" } },
+			git: { host: "github.com" },
+		});
 		await reply(appRouter.profiles.save, {
 			name: "fast",
 			harness: "claude-code",
@@ -293,6 +305,13 @@ describe("replies of a real engine", () => {
 		// when it was set (only a saved one) and used (not yet).
 		const toolsFlow = { projectId, projectName: expect.any(String) };
 		expect(list.secrets).toEqual([
+			// A secret only a CLI tool's login reads.
+			expect.objectContaining({
+				name: "GH_WORK_TOKEN",
+				saved: false,
+				flows: [],
+				tools: ["gh-work"],
+			}),
 			expect.objectContaining({
 				name: "ZAC_PASSWORD",
 				saved: false,
@@ -309,6 +328,7 @@ describe("replies of a real engine", () => {
 			}),
 		]);
 		await read(appRouter.cliTools.list);
+		await reply(appRouter.cliTools.signIn, { name: "gh-work" });
 		await read(appRouter.harnesses.list);
 		await read(appRouter.deciders.list);
 		await read(appRouter.settings.get);

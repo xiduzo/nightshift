@@ -56,7 +56,13 @@ export type {
 	ToolResult,
 	Worktree,
 } from "./device";
-export { createToolLaunchers, localDevice } from "./device";
+export {
+	createToolLaunchers,
+	localDevice,
+	loginReferences,
+	type SignInResult,
+	type ToolLaunchers,
+} from "./device";
 export {
 	addHarness,
 	type CliTool,

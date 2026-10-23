@@ -2,6 +2,7 @@ import {
 	connectionInputSchema,
 	customAgentOf,
 	HARNESS_BIN,
+	loginReferences,
 	removeConnection,
 	saveConnection,
 } from "@nightshift/engine";
@@ -35,6 +36,15 @@ export const connections = {
 		.output(output(connectionListSchema))
 		.handler(async ({ context }) => {
 			const use = await context.space.flowUse();
+			const toolsBySecret = new Map<string, string[]>();
+			for (const tool of context.cliTools.list()) {
+				for (const name of tool.login ? loginReferences(tool.login) : []) {
+					toolsBySecret.set(name, [
+						...(toolsBySecret.get(name) ?? []),
+						tool.name,
+					]);
+				}
+			}
 			return {
 				connections: context.connections.list().map((c) => ({
 					...c,
@@ -44,12 +54,14 @@ export const connections = {
 						.filter((p) => p.connections.includes(c.name))
 						.map((p) => p.name),
 				})),
-				// A secret only a Command node names is listed too: saved or not.
+				// A secret only a Command node or a CLI tool's login names is
+				// listed too: saved or not.
 				secrets: context.connections
-					.secrets(use.secrets.keys())
+					.secrets([...use.secrets.keys(), ...toolsBySecret.keys()])
 					.map((secret) => ({
 						...secret,
 						flows: use.secrets.get(secret.name) ?? [],
+						tools: toolsBySecret.get(secret.name) ?? [],
 					})),
 			};
 		}),
