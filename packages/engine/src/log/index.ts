@@ -1,4 +1,4 @@
-/** The event log of each run: the event payloads, append and parse, the run log in memory, the run bus, the run row, the transcript files, the run history the exchange copies between Replicas, and the stamps of the copies of a step's files. */
+/** The event log of each run: the event payloads, append and parse, the run log in memory, the run bus, the run row, the transcript files, the run history the exchange copies between Replicas, and the stamps of the copies of a step's files, and the worktrees removed on this computer. */
 
 export type { RunBus } from "./bus";
 export { createRunBus } from "./bus";
@@ -64,3 +64,4 @@ export {
 	transcriptPath,
 	transcriptToRead,
 } from "./transcripts";
+export { worktreeRemovals } from "./worktree-removals";

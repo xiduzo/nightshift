@@ -190,6 +190,20 @@ export type EnginePayloads = {
 	};
 	WorktreeCreated: { worktreePath: string; branch: string; baseRef: string };
 	/**
+	 * Night Shift removed what a run left on this computer: its worktree
+	 * (`worktreePath`, null when it stayed), local branches, or both.
+	 * `by: "cleanup"` is the scheduled cleanup, `person` a person's action.
+	 * A fact of this computer, not of the run: the event has no run, names
+	 * the run in its payload, and the exchange does not copy it.
+	 */
+	WorktreeRemoved: {
+		projectId: string;
+		runId: string;
+		worktreePath: string | null;
+		branches: string[];
+		by: "person" | "cleanup";
+	};
+	/**
 	 * The run's work moved to another Device before a step there: the
 	 * Device that had it pushed the branch (it had nothing uncommitted), and
 	 * the next one fetched it into its own worktree of the run.

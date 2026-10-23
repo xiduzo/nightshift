@@ -35,6 +35,7 @@ import {
 	CircleUserRoundIcon,
 	FolderIcon,
 	FolderOpenIcon,
+	GitBranchIcon,
 	HistoryIcon,
 	HouseIcon,
 	InboxIcon,
@@ -345,6 +346,16 @@ function ProjectFolder({ project }: { project: Project }) {
 							) : null
 						}
 					/>
+					{/* What runs left in the project's folder: only where it has one. */}
+					{project.repoPath !== null ? (
+						<ProjectPageItem
+							to="/projects/$projectId/branches"
+							projectId={project.id}
+							label="Branches"
+							icon={GitBranchIcon}
+							badge={null}
+						/>
+					) : null}
 				</SidebarMenu>
 			</CollapsibleContent>
 		</Collapsible>
@@ -362,7 +373,8 @@ function ProjectPageItem({
 	to:
 		| "/projects/$projectId/flows"
 		| "/projects/$projectId/runs"
-		| "/projects/$projectId/schedules";
+		| "/projects/$projectId/schedules"
+		| "/projects/$projectId/branches";
 	projectId: string;
 	label: string;
 	icon: LucideIcon;

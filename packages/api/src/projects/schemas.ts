@@ -3,10 +3,12 @@ import type {
 	GitInstall,
 	Project,
 	ProjectReadiness,
+	RunCopies,
 } from "@nightshift/engine";
 import { z } from "zod";
 
 import { exact } from "../output";
+import { runStatusSchema } from "../runs";
 
 /** A project of the Space, and the Devices with a Clone of it. */
 export const projectSchema = exact<Project>()(
@@ -50,6 +52,40 @@ export const projectReadinessSchema = exact<ProjectReadiness>()(
 				status: z.enum(["ok", "failed", "skipped"]),
 				problem: z.string().nullable(),
 				fix: z.enum(["install-git", "use-top-folder", "set-up-git"]).nullable(),
+			}),
+		),
+	}),
+);
+
+/** A local branch of a run, and where its commits are kept. */
+const runBranchSchema = z.object({
+	name: z.string(),
+	merged: z.boolean(),
+	pushed: z.boolean(),
+	ahead: z.number().nullable(),
+	unsaved: z.number(),
+});
+
+/** The runs of a project with a copy or branches left on this computer. */
+export const runCopiesSchema = exact<RunCopies>()(
+	z.object({
+		defaultBranch: z.string().nullable(),
+		copies: z.array(
+			z.object({
+				runId: z.string(),
+				title: z.string(),
+				status: runStatusSchema,
+				active: z.boolean(),
+				createdAt: z.number(),
+				endedAt: z.number().nullable(),
+				copy: z.boolean(),
+				changes: z.number().nullable(),
+				branches: z.array(runBranchSchema),
+				safe: z.boolean(),
+				cleanupAt: z.number().nullable(),
+				removed: z
+					.object({ at: z.number(), by: z.enum(["person", "cleanup"]) })
+					.nullable(),
 			}),
 		),
 	}),

@@ -10,6 +10,7 @@ export {
 	type ArtifactStore,
 	createArtifactStore,
 } from "./artifacts";
+export type { RunCopies, RunCopy } from "./cleanup";
 export type {
 	Actor,
 	DeviceDirectory,

@@ -119,6 +119,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | Transcript | The structured record of a Step: agent messages, tool calls, and command output, on disk. Each entry has a `seq` that grows by one per entry in the Run, across its Steps. A Run's Transcript is its Steps' entries in that order: the run page shows it so, wherever the Run is walked. | Slice 1 |
 | Artifact | A file a Run keeps for the person: a screenshot, a recording, a report. An agent keeps one with the `save_artifact` tool; Night Shift copies it into its data folder on the Device that ran the Step. Shown on the Run page under Artifacts. | Artifacts |
 | Worktree | A git worktree in a sibling directory of the clone, used by one Run. | Slice 1 |
+| Cleanup | The removal of what ended Runs left on this computer: their Worktree and local branches, never a branch on origin. Each Run is shown on its project's Branches page. On its own (setting `cleanUpRuns`, after `cleanUpAfterDays`, default on and 14 days), Night Shift removes only what is merged or pushed and has no uncommitted changes. A person removes the rest. | Cleanup |
 | Device | A computer that runs Night Shift. In code, the port a Step body uses to touch a computer (`packages/engine/src/device/`): it reports its Capabilities (harnesses, connections, CLI tools, programs, decider) and runs Sessions, commands, Tool calls, decisions and Worktrees. The step runner asks for the Step's Device once per Step; `StepStarted` names it. Today every Step runs on this computer (`localDevice`). | Devices, slice 1 |
 | Cost | What a Session or a model call cost, in US dollars at API prices, also on a subscription: the person sees what the work would cost. The harness reports it, or Night Shift estimates it from the tokens and a price list it updates daily. A cost that neither can tell is not known: totals leave it out and show "+", and the Run warns. While a Session runs, its Cost so far counts. | Costs |
 | Warning | Something that went wrong in a Run without failing a Step, such as a Step whose Cost is not known. Shown on the Run and grouped per Flow in Flow health. | Costs |
@@ -187,6 +188,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 | MemberRemoved | A Person is no longer a Member of a Space, and who removed them. |
 | RunStarted | A Run began, with its copy of the Flow, and the Person who started it (none for a Schedule). |
 | WorktreeCreated | A Worktree was created for a Run. |
+| WorktreeRemoved | Night Shift removed what a Run left on this computer: its Worktree, its local branches, or both. `by` says whether a person or the Cleanup did it. A fact of this computer: it names the Run in its payload and is not copied to other Devices. |
 | RunResumed | A person resumed a Run, or the daemon did after a restart (`by: "daemon"`). `action` says when it was more: `restart` (a person restarted the running Step) or `rerun` (a person ran the Run again from a Node). |
 | StepStarted | A Step began a Visit of a Node. |
 | StepReopened | A resume continued an Agent Step's Session in place. |

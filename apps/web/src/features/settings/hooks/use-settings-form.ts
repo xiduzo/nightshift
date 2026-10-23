@@ -19,6 +19,7 @@ type Kind =
 const KINDS: Partial<Record<SettingKey, Kind>> = {
 	maxConcurrentRuns: { type: "int", min: 1, max: 16 },
 	maxStepsPerRun: { type: "int", min: 1, max: 100_000 },
+	cleanUpAfterDays: { type: "int", min: 1, max: 365 },
 	usageLimitFirstWaitMinutes: { type: "minutes" },
 	usageLimitMaxWaitMinutes: { type: "minutes" },
 	networkGraceMinutes: { type: "minutes" },

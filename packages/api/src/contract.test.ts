@@ -358,6 +358,10 @@ describe("replies of a real engine", () => {
 		await read(appRouter.runs.get, { runId: started.id });
 		await read(appRouter.runs.placements, { projectId });
 		await read(appRouter.runs.devices, { projectId });
+		const copies = (await read(appRouter.projects.runCopies, {
+			projectId,
+		})) as { copies: { runId: string }[] };
+		expect(copies.copies.map((c) => c.runId)).toEqual([started.id]);
 		await read(appRouter.gates.list);
 		const notice = (await firstNotice).value;
 		expect(

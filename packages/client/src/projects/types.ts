@@ -5,3 +5,5 @@ export type Project = ApiOutputs["projects"]["list"][number];
 export type ProjectCheck = ApiOutputs["projects"]["check"];
 /** The result of installing git on this computer. */
 export type GitInstall = ApiOutputs["projects"]["installGit"];
+/** A run's copy of the project and its branches on this computer. */
+export type RunCopy = ApiOutputs["projects"]["runCopies"]["copies"][number];
