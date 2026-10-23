@@ -57,7 +57,9 @@ export {
 } from "./flows";
 export {
 	answerGate,
+	type ChoiceRoute,
 	type ContextItem,
+	choiceRoutes,
 	createGateMutations,
 	createGateQueries,
 	type GateChoice,

@@ -1,99 +1,15 @@
 import type {
+	ChoiceRoute,
 	ContextItem,
 	GateChoice,
 	GateLink,
-	RunDetail,
 } from "@nightshift/client";
 
 /**
- * What the Gate screen shows, without React Native: where each choice
- * leads, which choices need a confirm, the parts of the question, and the
+ * What the Gate screen shows, without React Native: the words for where
+ * each choice leads, which choices need a confirm, the parts of the question, and the
  * words after an answer went.
  */
-
-/**
- * Where a choice leads, from the run's flow:
- * - `node`: the run goes on at that node.
- * - `end`: no edge leaves the Gate on it. The run ends.
- * - `limit`: the run took that path its most times. The run stops.
- */
-export type ChoiceRoute =
-	| { kind: "node"; nodeId: string; label: string }
-	| { kind: "end" }
-	| { kind: "limit" };
-
-type FlowOfRun = Pick<RunDetail, "flow" | "traversals" | "steps">;
-
-/**
- * The edge a run takes after `from` ends on `outcome`: the first edge (in
- * file order) on that outcome whose `max` is not reached. The engine's
- * rule, `nextEdge` of `@nightshift/flows`. Here again so the phone does
- * not bundle the flow package for ten lines.
- */
-function nextEdge({
-	flow,
-	from,
-	outcome,
-	traversals,
-}: {
-	flow: RunDetail["flow"];
-	from: string;
-	outcome: string;
-	traversals: Readonly<Record<string, number>>;
-}):
-	| { kind: "edge"; edge: RunDetail["flow"]["edges"][number] }
-	| { kind: "end" }
-	| { kind: "exhausted" } {
-	const edges = flow.edges.filter(
-		(edge) => edge.from === from && edge.outcome === outcome,
-	);
-	if (edges.length === 0) return { kind: "end" };
-	const edge = edges.find(
-		(candidate) =>
-			candidate.max === undefined ||
-			(traversals[candidate.id] ?? 0) < candidate.max,
-	);
-	return edge ? { kind: "edge", edge } : { kind: "exhausted" };
-}
-
-/**
- * Where each choice of a Gate leads, by choice name. Empty when the run is
- * not loaded, or when the Gate is in a flow that a Call step started: its
- * end goes back to that step, not out of the run.
- */
-export function choiceRoutes(
-	run: FlowOfRun | undefined,
-	gate: { stepId: string; nodeId: string },
-	choices: readonly Pick<GateChoice, "name">[],
-	labels: ReadonlyMap<string, string>,
-): Map<string, ChoiceRoute> {
-	const routes = new Map<string, ChoiceRoute>();
-	if (!run) return routes;
-	const step = run.steps.find((one) => one.id === gate.stepId);
-	if (step?.scope) return routes;
-	if (!run.flow.nodes.some((node) => node.id === gate.nodeId)) return routes;
-	for (const choice of choices) {
-		const next = nextEdge({
-			flow: run.flow,
-			from: gate.nodeId,
-			outcome: choice.name,
-			traversals: run.traversals,
-		});
-		routes.set(
-			choice.name,
-			next.kind === "edge"
-				? {
-						kind: "node",
-						nodeId: next.edge.to,
-						label: labels.get(next.edge.to) ?? next.edge.to,
-					}
-				: next.kind === "end"
-					? { kind: "end" }
-					: { kind: "limit" },
-		);
-	}
-	return routes;
-}
 
 /** The line under a choice: "Goes to Build", "Ends the run". */
 export function routeText(route: ChoiceRoute | undefined): string | null {

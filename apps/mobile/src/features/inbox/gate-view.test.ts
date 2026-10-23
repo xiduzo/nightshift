@@ -1,14 +1,8 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import {
-	type ContextItem,
-	parseGateQuestion,
-	type RunDetail,
-} from "@nightshift/client";
-import { nextEdge } from "@nightshift/flows";
+import { type ContextItem, parseGateQuestion } from "@nightshift/client";
 
 import {
-	choiceRoutes,
 	needsConfirm,
 	openLinkText,
 	questionSections,
@@ -16,135 +10,6 @@ import {
 	sentText,
 	stepsHint,
 } from "./gate-view";
-
-/** A run whose flow has a Gate `review`: approve goes to `build`, reject ends, retry loops back once. */
-function run(fields: Partial<RunDetail> = {}): RunDetail {
-	return {
-		flow: {
-			nodes: [{ id: "plan" }, { id: "review" }, { id: "build" }],
-			edges: [
-				{ id: "e1", from: "review", outcome: "approve", to: "build" },
-				{ id: "e2", from: "review", outcome: "retry", to: "plan", max: 1 },
-			],
-		},
-		traversals: {},
-		steps: [{ id: "s2", nodeId: "review", scope: null }],
-		...fields,
-	} as unknown as RunDetail;
-}
-
-const labels = new Map([
-	["plan", "Plan"],
-	["build", "Build it"],
-]);
-const choices = [{ name: "approve" }, { name: "reject" }, { name: "retry" }];
-
-describe("choiceRoutes", () => {
-	test("each choice leads where the flow's edges say", () => {
-		const routes = choiceRoutes(
-			run(),
-			{ stepId: "s2", nodeId: "review" },
-			choices,
-			labels,
-		);
-		expect(routes.get("approve")).toEqual({
-			kind: "node",
-			nodeId: "build",
-			label: "Build it",
-		});
-		expect(routes.get("reject")).toEqual({ kind: "end" });
-		expect(routes.get("retry")).toEqual({
-			kind: "node",
-			nodeId: "plan",
-			label: "Plan",
-		});
-	});
-
-	test("a path the run took its most times stops the run", () => {
-		const routes = choiceRoutes(
-			run({ traversals: { e2: 1 } }),
-			{ stepId: "s2", nodeId: "review" },
-			choices,
-			labels,
-		);
-		expect(routes.get("retry")).toEqual({ kind: "limit" });
-	});
-
-	test("a node without a label goes by its id", () => {
-		const routes = choiceRoutes(
-			run(),
-			{ stepId: "s2", nodeId: "review" },
-			[{ name: "approve" }],
-			new Map(),
-		);
-		expect(routes.get("approve")).toMatchObject({ label: "build" });
-	});
-
-	test("nothing while the run loads, or for a Gate in a called flow", () => {
-		expect(
-			choiceRoutes(
-				undefined,
-				{ stepId: "s2", nodeId: "review" },
-				choices,
-				labels,
-			).size,
-		).toBe(0);
-		const called = run({
-			steps: [
-				{
-					id: "s9",
-					nodeId: "review",
-					scope: { parentStepId: "s1", itemId: null },
-				},
-			] as unknown as RunDetail["steps"],
-		});
-		expect(
-			choiceRoutes(called, { stepId: "s9", nodeId: "review" }, choices, labels)
-				.size,
-		).toBe(0);
-		expect(
-			choiceRoutes(
-				run(),
-				{ stepId: "s3", nodeId: "elsewhere" },
-				choices,
-				labels,
-			).size,
-		).toBe(0);
-	});
-});
-
-describe("the engine's edge rule", () => {
-	test("choiceRoutes takes the edge the engine takes", () => {
-		for (const traversals of [{}, { e2: 1 }] as Record<string, number>[]) {
-			const detail = run({ traversals });
-			const routes = choiceRoutes(
-				detail,
-				{ stepId: "s2", nodeId: "review" },
-				choices,
-				labels,
-			);
-			for (const { name } of choices) {
-				const engine = nextEdge({
-					flow: detail.flow,
-					from: "review",
-					outcome: name,
-					traversals,
-				});
-				const route = routes.get(name);
-				expect(route?.kind).toBe(
-					engine.kind === "edge"
-						? "node"
-						: engine.kind === "end"
-							? "end"
-							: "limit",
-				);
-				if (engine.kind === "edge" && route?.kind === "node") {
-					expect(route.nodeId).toBe(engine.edge.to);
-				}
-			}
-		}
-	});
-});
 
 describe("routeText and needsConfirm", () => {
 	test("says where a choice leads", () => {

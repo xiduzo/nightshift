@@ -1,4 +1,4 @@
-import type { GateChoice } from "@nightshift/client";
+import type { ChoiceRoute, GateChoice } from "@nightshift/client";
 import { Badge } from "@nightshift/ui-native/components/ui/badge";
 import { Card } from "@nightshift/ui-native/components/ui/card";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
@@ -11,7 +11,7 @@ import { cn } from "@nightshift/ui-native/lib/utils";
 import { ArrowRight, CircleStop, TriangleAlert } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
-import { type ChoiceRoute, isDestructive, routeText } from "./gate-view";
+import { isDestructive, routeText } from "./gate-view";
 
 /**
  * The options of a Gate as cards in a RadioGroup: each with its name, its

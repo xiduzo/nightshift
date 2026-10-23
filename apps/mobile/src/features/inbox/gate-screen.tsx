@@ -1,4 +1,5 @@
 import {
+	choiceRoutes,
 	costLabel,
 	createRunQueries,
 	createSpaceQueries,
@@ -75,7 +76,6 @@ import { StepTrail, trailItemOf } from "@/shared/trail";
 import { CHECK_COPY } from "./answer-check";
 import { ChoiceCards } from "./choice-cards";
 import {
-	choiceRoutes,
 	isDestructive,
 	LINK_WORD,
 	needsConfirm,
