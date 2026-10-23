@@ -44,6 +44,8 @@ export function Screen({ children, onRefresh, footer }: ScreenProps) {
 			// iOS: a field near the bottom (a Gate's note) scrolls above the keyboard.
 			automaticallyAdjustKeyboardInsets
 			keyboardShouldPersistTaps="handled"
+			// Drag the page down to put the keyboard away.
+			keyboardDismissMode="interactive"
 			refreshControl={
 				onRefresh ? (
 					<RefreshControl

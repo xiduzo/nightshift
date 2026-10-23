@@ -64,7 +64,8 @@ function HealthRowView({ row, now }: { row: HealthRow; now: number }) {
 			<Progress
 				value={row.share ?? 0}
 				className="h-1.5 bg-muted"
-				indicatorClassName="bg-status-finished"
+				// At 0 the rounded bar still draws a dot: hide it.
+				indicatorClassName={cn("bg-status-finished", !row.share && "opacity-0")}
 			/>
 			<Text className="text-muted-foreground text-sm">{row.detail}</Text>
 			{row.more ? (

@@ -113,7 +113,7 @@ export function CodeScanner({ onScanned, onCancel }: CodeScannerProps) {
 					</AlertDescription>
 				</Alert>
 			) : (
-				<Text variant="muted">
+				<Text variant="muted" className="text-muted-foreground">
 					Point the camera at the code under Settings, "Use Night Shift on your
 					phone", in Night Shift on your computer.
 				</Text>

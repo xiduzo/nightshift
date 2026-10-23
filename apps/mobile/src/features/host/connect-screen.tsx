@@ -229,7 +229,11 @@ function Field({
 		<View className="gap-2">
 			<Label>{label}</Label>
 			{children}
-			{hint ? <Text variant="muted">{hint}</Text> : null}
+			{hint ? (
+				<Text variant="muted" className="text-muted-foreground">
+					{hint}
+				</Text>
+			) : null}
 		</View>
 	);
 }

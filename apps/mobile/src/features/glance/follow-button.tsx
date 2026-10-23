@@ -31,7 +31,6 @@ export function FollowOnLockScreen({
 		<CardContent className="gap-2 px-4">
 			<Button
 				variant="outline"
-				className="self-start"
 				disabled={busy}
 				onPress={() => void (following ? unfollow() : follow())}
 			>

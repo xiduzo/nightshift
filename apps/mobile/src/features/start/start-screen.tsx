@@ -182,7 +182,11 @@ function NewRun({
 			onRefresh={onRefresh}
 			footer={
 				<ActionBar
-					caption={blocker ?? (place ? `Runs on ${place.name}` : "New run")}
+					caption={
+						flowName
+							? (blocker ?? (place ? `Runs on ${place.name}` : "New run"))
+							: "New run"
+					}
 					label={flowName ?? "Choose a flow"}
 					action={{
 						label: "Start run",

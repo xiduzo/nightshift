@@ -57,7 +57,7 @@ export function RunActions({
 
 	return (
 		<CardContent className="gap-3 px-4">
-			<View className="flex-row flex-wrap gap-2">
+			<View className="gap-2">
 				{canStop ? (
 					<Confirm
 						button="Stop run"

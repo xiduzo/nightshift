@@ -229,7 +229,7 @@ function DelaySelect({
 					</ScrollView>
 				</SelectContent>
 			</Select>
-			<Text variant="muted">
+			<Text variant="muted" className="text-muted-foreground">
 				While you use Night Shift on another screen, your phones wait this long.
 				A Gate you answer in that time does not reach your phones.
 			</Text>

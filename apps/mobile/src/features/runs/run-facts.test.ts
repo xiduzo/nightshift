@@ -110,6 +110,17 @@ describe("runFacts", () => {
 			value: "Not known",
 		});
 	});
+
+	test("an ended run that cost nothing says None", () => {
+		const fact = byLabel(
+			runFacts(factRun({ costUsd: 0, costCalls: 0 }), {
+				status: "finished",
+				steps: 1,
+				now: NOW,
+			}),
+		).get("Cost");
+		expect(fact).toMatchObject({ value: "None" });
+	});
 });
 
 describe("runLinks", () => {

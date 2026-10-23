@@ -25,6 +25,17 @@ const sheet = {
 
 /** Starting a run is per Space: its header chooses it. */
 const spacePicker = () => <SpacePicker />;
+/**
+ * iOS 26 puts a glass pill behind a header item. The picker is a bordered
+ * Select already, so it goes without the pill.
+ */
+const spacePickerItems = () => [
+	{
+		type: "custom" as const,
+		element: <SpacePicker />,
+		hidesSharedBackground: true,
+	},
+];
 
 export default function RootLayout() {
 	return (
@@ -48,6 +59,7 @@ export default function RootLayout() {
 						title: "New run",
 						presentation: "modal",
 						headerRight: spacePicker,
+						unstable_headerRightItems: spacePickerItems,
 					}}
 				/>
 				<Stack.Screen

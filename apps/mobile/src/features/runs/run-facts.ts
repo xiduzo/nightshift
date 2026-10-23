@@ -48,12 +48,13 @@ function costFact(
 		RunDetail,
 		"costUsd" | "costMissing" | "costCalls" | "costEstimated"
 	>,
+	ended: boolean,
 ): RunFact {
 	const known = costLabel(run);
 	if (known === null) {
 		return run.costMissing > 0
 			? { label: "Cost", value: "Not known", sub: "No step reported its cost" }
-			: { label: "Cost", value: "None yet" };
+			: { label: "Cost", value: ended ? "None" : "None yet" };
 	}
 	return {
 		label: "Cost",
@@ -106,7 +107,7 @@ export function runFacts(
 			value: waitedText(end - run.createdAt),
 			sub: steps === 1 ? "1 step" : `${steps} steps`,
 		},
-		costFact(run),
+		costFact(run, hasEnded(status)),
 		{ label: "Run", value: run.id, mono: true, wide: true },
 	];
 }

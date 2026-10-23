@@ -46,7 +46,8 @@ export function SpacePicker({ className }: { className?: string }) {
 		>
 			<SelectTrigger
 				className={cn("max-w-48", className)}
-				accessibilityLabel="Choose the Space"
+				accessibilityLabel={active ? `Space, ${active.name}` : "Choose a Space"}
+				accessibilityHint="Chooses the Space this phone works in"
 			>
 				<SelectValue placeholder="Choose a Space" />
 			</SelectTrigger>

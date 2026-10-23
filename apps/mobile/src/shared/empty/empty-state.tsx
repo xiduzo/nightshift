@@ -31,7 +31,7 @@ export function EmptyState({
 				<Text variant="large" className="text-center">
 					{title}
 				</Text>
-				<Text variant="muted" className="text-center">
+				<Text variant="muted" className="text-center text-muted-foreground">
 					{description}
 				</Text>
 			</View>
