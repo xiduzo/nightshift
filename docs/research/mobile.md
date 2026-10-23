@@ -423,8 +423,10 @@ labelled values as tiles ("At a glance"), the run's steps as a trail, its
 links, and the choices as cards in a RadioGroup. Where each choice leads
 comes from the run's flow edges by the engine's own rule
 (`choiceRoutes` of `@nightshift/client`, on `nextEdge` of
-`@nightshift/flows`): "Goes to Build", or "Ends the run". A red choice, or one that ends the run, asks in an AlertDialog
-first. The bar at the bottom sends the answer, after the biometric check.
+`@nightshift/flows`): "Goes to Build", "Ends the run" (the run
+finishes), or "Stops the run" (the path reached its limit: the run stops
+and can resume). A red choice, or one that ends or stops the run, asks in
+an AlertDialog first. The bar at the bottom sends the answer, after the biometric check.
 Then a Sent card offers the next Gate or the way back to the inbox. The
 run's steps, flow and transcript load only in the Space this phone works
 in; for a Gate in another Space the screen offers to switch to it.

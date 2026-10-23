@@ -3,9 +3,11 @@ import { describe, expect, test } from "bun:test";
 import { type ContextItem, parseGateQuestion } from "@nightshift/client";
 
 import {
+	confirmText,
 	needsConfirm,
 	openLinkText,
 	questionSections,
+	routeNote,
 	routeText,
 	sentText,
 	stepsHint,
@@ -17,7 +19,9 @@ describe("routeText and needsConfirm", () => {
 			"Goes to Build",
 		);
 		expect(routeText({ kind: "end" })).toBe("Ends the run");
-		expect(routeText({ kind: "limit" })).toContain("limit");
+		expect(routeText({ kind: "limit" })).toBe("Stops the run");
+		expect(routeNote({ kind: "limit" })).toBe("This path reached its limit.");
+		expect(routeNote({ kind: "end" })).toBeNull();
 		expect(routeText(undefined)).toBeNull();
 	});
 
@@ -28,6 +32,31 @@ describe("routeText and needsConfirm", () => {
 		expect(needsConfirm({ color: "green" }, { kind: "end" })).toBe(true);
 		expect(needsConfirm({}, { kind: "limit" })).toBe(true);
 		expect(needsConfirm({}, undefined)).toBe(false);
+	});
+});
+
+describe("confirmText", () => {
+	test("ending and stopping the run are two things", () => {
+		expect(confirmText({ kind: "end" }, "reject", "Fix login")).toEqual({
+			title: "End the run?",
+			body: "This answer ends the run Fix login.",
+		});
+		const stop = confirmText({ kind: "limit" }, "retry", "Fix login");
+		expect(stop.title).toBe("Stop the run?");
+		expect(stop.body).toContain("stops the run Fix login");
+		expect(
+			confirmText(
+				{ kind: "node", nodeId: "b", label: "Build" },
+				"approve",
+				"Fix login",
+			),
+		).toEqual({
+			title: "Send approve?",
+			body: "Goes to Build in the run Fix login.",
+		});
+		expect(confirmText(undefined, "approve", "Fix login").body).toBe(
+			"The run Fix login gets this answer.",
+		);
 	});
 });
 

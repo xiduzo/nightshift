@@ -11,7 +11,11 @@ import type {
  * words after an answer went.
  */
 
-/** The line under a choice: "Goes to Build", "Ends the run". */
+/**
+ * Where a choice leads, in a few words: "Goes to Build", "Ends the run"
+ * (the run finishes), "Stops the run" (the path reached its limit: the
+ * run stops, and you can resume it).
+ */
 export function routeText(route: ChoiceRoute | undefined): string | null {
 	switch (route?.kind) {
 		case "node":
@@ -19,9 +23,44 @@ export function routeText(route: ChoiceRoute | undefined): string | null {
 		case "end":
 			return "Ends the run";
 		case "limit":
-			return "This path reached its limit. The run stops.";
+			return "Stops the run";
 		default:
 			return null;
+	}
+}
+
+/** Why a choice stops the run, under its card. */
+export function routeNote(route: ChoiceRoute | undefined): string | null {
+	return route?.kind === "limit" ? "This path reached its limit." : null;
+}
+
+/** The words of the confirm before a red choice, or one that ends or stops the run. */
+export function confirmText(
+	route: ChoiceRoute | undefined,
+	choiceName: string,
+	runTitle: string,
+): { title: string; body: string } {
+	switch (route?.kind) {
+		case "end":
+			return {
+				title: "End the run?",
+				body: `This answer ends the run ${runTitle}.`,
+			};
+		case "limit":
+			return {
+				title: "Stop the run?",
+				body: `This path reached its limit. This answer stops the run ${runTitle}. You can resume it later.`,
+			};
+		case "node":
+			return {
+				title: `Send ${choiceName}?`,
+				body: `${routeText(route)} in the run ${runTitle}.`,
+			};
+		default:
+			return {
+				title: `Send ${choiceName}?`,
+				body: `The run ${runTitle} gets this answer.`,
+			};
 	}
 }
 

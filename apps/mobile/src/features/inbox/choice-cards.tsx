@@ -11,7 +11,7 @@ import { cn } from "@nightshift/ui-native/lib/utils";
 import { ArrowRight, CircleStop, TriangleAlert } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
-import { isDestructive, routeText } from "./gate-view";
+import { isDestructive, routeNote, routeText } from "./gate-view";
 
 /**
  * The options of a Gate as cards in a RadioGroup: each with its name, its
@@ -66,16 +66,22 @@ function ChoiceCard({
 	disabled: boolean;
 }) {
 	const destructive = isDestructive(choice);
+	// "Ends the run" or "Stops the run" shows as the badge, "Goes to …" as a line.
 	const ends = route?.kind === "end" || route?.kind === "limit";
-	// "Ends the run" shows as the badge.
-	const next = route?.kind === "end" ? null : routeText(route);
+	const next = route?.kind === "node" ? routeText(route) : null;
+	const note = routeNote(route);
 	return (
 		<Pressable
 			onPress={onPress}
 			disabled={disabled}
 			accessibilityRole="radio"
 			accessibilityState={{ checked: selected, disabled }}
-			accessibilityLabel={[choice.name, choice.description, routeText(route)]
+			accessibilityLabel={[
+				choice.name,
+				choice.description,
+				routeText(route),
+				note,
+			]
 				.filter(Boolean)
 				.join(", ")}
 		>
@@ -120,6 +126,9 @@ function ChoiceCard({
 							<Text className="flex-shrink text-sm">{next}</Text>
 						</View>
 					) : null}
+					{note ? (
+						<Text className="text-muted-foreground text-sm">{note}</Text>
+					) : null}
 					{ends ? (
 						<Badge
 							variant="outline"
@@ -136,7 +145,7 @@ function ChoiceCard({
 								)}
 							/>
 							<Text className={cn(destructive && "text-destructive")}>
-								Ends the run
+								{routeText(route)}
 							</Text>
 						</Badge>
 					) : null}

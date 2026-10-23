@@ -1,4 +1,5 @@
 import {
+	type ChoiceRoute,
 	choiceRoutes,
 	costLabel,
 	createRunQueries,
@@ -79,10 +80,10 @@ import { StepTrail, trailItemOf } from "@/shared/trail";
 import { CHECK_COPY } from "./answer-check";
 import { ChoiceCards } from "./choice-cards";
 import {
+	confirmText,
 	isDestructive,
 	LINK_WORD,
 	needsConfirm,
-	routeText,
 	sentText,
 	stepsHint,
 } from "./gate-view";
@@ -444,8 +445,7 @@ function OpenGateScreen({
 					open={confirming}
 					onOpenChange={setConfirming}
 					choice={chosen}
-					next={routeText(chosenRoute)}
-					ends={chosenRoute?.kind === "end" || chosenRoute?.kind === "limit"}
+					route={chosenRoute}
 					runTitle={gate.runTitle}
 					onConfirm={() => {
 						setConfirming(false);
@@ -621,44 +621,35 @@ function CheckFirst({
 	);
 }
 
-/** Before a choice that ends the run, or a red one: are you sure? */
+/** Before a choice that ends or stops the run, or a red one: are you sure? */
 function ConfirmDialog({
 	open,
 	onOpenChange,
 	choice,
-	next,
-	ends,
+	route,
 	runTitle,
 	onConfirm,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	choice: GateChoice;
-	next: string | null;
-	ends: boolean;
+	route: ChoiceRoute | undefined;
 	runTitle: string;
 	onConfirm: () => void;
 }) {
 	const destructive = isDestructive(choice);
+	const words = confirmText(route, choice.name, runTitle);
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
 			<AlertDialogContent>
 				<AlertDialogHeader>
-					<AlertDialogTitle>
-						{ends ? "End the run?" : `Send ${choice.name}?`}
-					</AlertDialogTitle>
+					<AlertDialogTitle>{words.title}</AlertDialogTitle>
 					{choice.description ? (
 						<AlertDialogDescription>
 							{choice.description}
 						</AlertDialogDescription>
 					) : null}
-					<AlertDialogDescription>
-						{ends
-							? `This answer ends the run ${runTitle}.`
-							: next
-								? `${next} in the run ${runTitle}.`
-								: `The run ${runTitle} gets this answer.`}
-					</AlertDialogDescription>
+					<AlertDialogDescription>{words.body}</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>
 					<AlertDialogCancel>
