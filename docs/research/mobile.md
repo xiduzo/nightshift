@@ -446,6 +446,28 @@ Host has it:
   and files): a pull request is no entity. Only Gate links and run items
   of kind "pull" that are already in the data may show.
 
+**Projects, a project, New run, Settings and Connect.** The Projects tab
+lists the projects of the active Space (`projects.list`) in one
+ListGroup: the initials, the name, "2 Gates need you" as a status line
+(the open Gates of every Space that you may answer, `gates.list`) or
+"Nothing needs you", and "Last run 3 h ago · title" from the runs of the
+Space. Its summary counts both ("4 projects · 2 Gates need you"). A
+project page shows the owner of its remote, its name, the computers with
+a copy of it, its remote as a link to the browser, and + for New run in
+that project. Its rows lead on with the project as a search param:
+Gates to `/inbox?project=<id>`, Runs to `/runs?project=<id>`, Flows to
+`/flows?projectId=<id>` (`features/projects/links.ts`). Then Needs you
+(the project's open Gates, oldest first) and Runs (newest first), five
+each, with See all past five. New run (`/start`, `?projectId=<id>`
+chooses the project) lists the flows of the project as rows to choose
+from (a flow that is not valid shows, but cannot be chosen), then the
+inputs, then where it runs as radio rows; Start run is the ActionBar in
+the Screen's footer, with why it waits as its caption. After a start, New
+run closes and the run opens on the main stack. Settings is Account,
+Notifications (switch rows in groups, quiet hours, the phone delay) and
+This phone. Connect leads with Scan the code, then the address, email
+and password in a card, and the two-factor or backup code.
+
 ### Widgets and Live Activities
 
 Researched on 2026-10-22 against `expo-widgets` 58.0.22 and `@expo/ui`
