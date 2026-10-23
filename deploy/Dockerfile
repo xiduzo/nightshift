@@ -25,16 +25,24 @@ RUN bun install --frozen-lockfile --ignore-scripts \
 	&& bun run --cwd apps/server build:binary \
 	&& cp "apps/server/dist/bin/nightshift-linux-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')" /nightshift
 
-FROM oven/bun:1.3.10-slim AS runtime
+# Plain Debian, not the Bun image: the binary holds its own Bun, and the Bun
+# image keeps the Debian packages of the day Bun shipped. `apt-get upgrade`
+# takes the security fixes Debian has made since its own image.
+FROM debian:trixie-slim AS runtime
 # git for the projects and their worktrees, ssh for git remotes over SSH.
+# The `bun` user (uid 1000) stays, for the images built on this one.
 RUN apt-get update \
+	&& apt-get upgrade -y \
 	&& apt-get install -y --no-install-recommends git openssh-client ca-certificates \
 	&& rm -rf /var/lib/apt/lists/* \
+	&& groupadd --gid 1000 bun \
+	&& useradd --uid 1000 --gid bun --create-home --shell /bin/sh bun \
 	&& mkdir -p /data \
 	&& chown bun:bun /data
 COPY --from=build /nightshift /usr/local/bin/nightshift
 
 USER bun
+WORKDIR /home/bun
 ENV NIGHTSHIFT_DATA_DIR=/data \
 	PORT=3000 \
 	NIGHTSHIFT_HOST=on
