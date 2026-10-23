@@ -393,12 +393,28 @@ header: each screen starts with a `LargeTitleHeader`.
 | `projects/[projectId]` | pushed screen | a project row |
 | `runs/[runId]` | pushed screen | a run row, a push |
 | `gates/[runId]/[stepId]` | modal | a Gate row, a push, `nightshift://gates/<runId>/<stepId>` |
+| `inbox-filter` | native sheet | the place chip of the Inbox |
+| `gate-link`, `gate-actions`, `transcript/[runId]` | native sheet | a link, "More" and "Transcript" on a Gate |
 | `connect` | pushed screen | signed out |
 
 A secondary view is a route with a native presentation, never a hand-built
 overlay. The inbox is `/inbox`: a tap on a "gates waiting" push, the
 in-front banner rule, the home widget (`nightshift://inbox`) and the Gate
-screen's way back all go there. `/` is Home.
+screen's way back all go there. `/` is Home. `/inbox?project=<id>` opens
+the inbox on one project.
+
+**The inbox and a Gate.** The Inbox groups the open Gates of every Space
+by project ("Space · project" when you are in more than one Space), oldest
+first. Chips choose all Gates, a Space or a project (the `inbox-filter`
+sheet), and the order. The Gate screen shows the question, its short
+labelled values as tiles ("At a glance"), the run's steps as a trail, its
+links, and the choices as cards in a RadioGroup. Where each choice leads
+comes from the run's flow edges (`nextEdge`): "Goes to Build", or "Ends
+the run". A red choice, or one that ends the run, asks in an AlertDialog
+first. The bar at the bottom sends the answer, after the biometric check.
+Then a Sent card offers the next Gate or the way back to the inbox. The
+run's steps, flow and transcript load only in the Space this phone works
+in; for a Gate in another Space the screen offers to switch to it.
 
 **Tokens.** The tokens of `@nightshift/ui-native/global.css`, unchanged:
 the page is `background` and a card is `card` with a `border`, as on the
