@@ -27,6 +27,32 @@ prerelease. Apps on the stable feed skip it.
 Release notes come from the pull requests since the last tag. Edit them on
 the release page after the workflow ends.
 
+## The Docker image
+
+[Docker image](../.github/workflows/docker.yml) builds `deploy/Dockerfile`
+for linux/amd64 and linux/arm64. Release and Nightly call it, so the image
+follows the same versions as the desktop app:
+
+- A release publishes its version (`0.2.0`), the minor version (`0.2`)
+  and `latest`. A prerelease publishes its own version only.
+- A nightly build publishes its version (`0.2.1-nightly.20261020.12`) and
+  moves the `nightly` tag to it.
+- Each build also publishes `sha-<commit>`.
+- A pull request that changes the image builds it and starts it, but does
+  not publish it.
+
+It publishes to `ghcr.io/xiduzo/nightshift`, and to Docker Hub when these
+are set:
+
+| Setting | Kind | Value |
+| --- | --- | --- |
+| `DOCKERHUB_USERNAME` | Repository variable | The Docker Hub account, for example `xiduzo` |
+| `DOCKERHUB_TOKEN` | Repository secret | A Docker Hub personal access token with Read & Write access |
+
+The first push makes the `nightshift` repository on Docker Hub. On GitHub,
+make the package public once: open it under the account's Packages, then
+choose **Package settings > Change visibility**.
+
 ## Nightly builds
 
 The Nightly workflow skips a night without new commits on `main`. Run it from
