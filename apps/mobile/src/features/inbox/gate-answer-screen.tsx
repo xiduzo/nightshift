@@ -155,7 +155,7 @@ function ClosedGate({
 /** Back to where the person came from; from a notification, to the inbox. */
 function goBack() {
 	if (router.canGoBack()) router.back();
-	else router.replace("/");
+	else router.replace("/inbox");
 }
 
 function OpenGateSheet({

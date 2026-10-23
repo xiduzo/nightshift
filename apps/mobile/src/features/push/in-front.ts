@@ -7,6 +7,7 @@ import type { InFrontPlace } from "./push-data";
 export type Banner = { title: string; data: PushData; at: number };
 
 let banner: Banner | null = null;
+/** Home, where the app opens, until the banner reads the screen in front. */
 let place: InFrontPlace = { pathname: "/" };
 const listeners = new Set<() => void>();
 

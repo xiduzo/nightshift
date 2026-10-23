@@ -83,7 +83,7 @@ export function shownWithKey(
 
 /** Where the person is in the app, for a push that comes while the app is in front. */
 export type InFrontPlace = {
-	/** The pathname of the screen in front: `/` is the inbox. */
+	/** The pathname of the screen in front: `/inbox` is the inbox, `/` is Home. */
 	pathname: string;
 };
 
@@ -98,7 +98,7 @@ export function showInFront(data: PushData | null, place: InFrontPlace) {
 	if (data.kind !== "gate-opened" && data.kind !== "gates-waiting") {
 		return false;
 	}
-	if (place.pathname === "/") return false;
+	if (place.pathname === "/inbox") return false;
 	if (data.runId && data.stepId) {
 		return place.pathname !== `/gates/${data.runId}/${data.stepId}`;
 	}
@@ -112,9 +112,9 @@ export type PhoneRoute =
 			params: { runId: string; stepId: string };
 	  }
 	| { pathname: "/runs/[runId]"; params: { runId: string } }
-	| { pathname: "/" };
+	| { pathname: "/inbox" };
 
-/** The screen of a route: the Gate, the run, or the inbox (`/`). */
+/** The screen of a route: the Gate, the run, or the inbox (`/inbox`). */
 export function phoneRouteOf(route: PushRoute): PhoneRoute {
 	switch (route.to) {
 		case "gate":
@@ -125,7 +125,7 @@ export function phoneRouteOf(route: PushRoute): PhoneRoute {
 		case "run":
 			return { pathname: "/runs/[runId]", params: { runId: route.runId } };
 		case "inbox":
-			return { pathname: "/" };
+			return { pathname: "/inbox" };
 	}
 }
 

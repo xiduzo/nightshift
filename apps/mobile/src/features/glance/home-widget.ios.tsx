@@ -37,7 +37,9 @@ const layout = (props: HomeWidgetProps, environment: WidgetEnvironment) => {
 
 	if (environment.widgetFamily === "accessoryInline") {
 		return (
-			<Text modifiers={[widgetURL("nightshift://")]}>{props.waitingText}</Text>
+			<Text modifiers={[widgetURL("nightshift://inbox")]}>
+				{props.waitingText}
+			</Text>
 		);
 	}
 
@@ -47,7 +49,7 @@ const layout = (props: HomeWidgetProps, environment: WidgetEnvironment) => {
 			<VStack
 				alignment="leading"
 				spacing={2}
-				modifiers={[widgetURL("nightshift://")]}
+				modifiers={[widgetURL("nightshift://inbox")]}
 			>
 				<Text modifiers={[font({ weight: "semibold", size: 15 })]}>
 					{props.waitingText}
@@ -91,7 +93,7 @@ const layout = (props: HomeWidgetProps, environment: WidgetEnvironment) => {
 				alignment="leading"
 				modifiers={[
 					frame({ maxWidth: 10000, maxHeight: 10000, alignment: "topLeading" }),
-					widgetURL("nightshift://"),
+					widgetURL("nightshift://inbox"),
 				]}
 			>
 				{waiting}
@@ -105,7 +107,7 @@ const layout = (props: HomeWidgetProps, environment: WidgetEnvironment) => {
 			spacing={16}
 			modifiers={[
 				frame({ maxWidth: 10000, maxHeight: 10000, alignment: "topLeading" }),
-				widgetURL("nightshift://"),
+				widgetURL("nightshift://inbox"),
 			]}
 		>
 			{waiting}

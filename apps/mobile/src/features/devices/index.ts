@@ -1,3 +1,3 @@
-/** The person's computers on this phone: which ones can run a flow now. */
+/** The person's computers on this phone: which ones can run a flow now (the Computers sheet). */
 
-export { ComputersCard } from "./computers-card";
+export { ComputersScreen } from "./computers-screen";

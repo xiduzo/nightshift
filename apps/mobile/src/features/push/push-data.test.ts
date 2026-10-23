@@ -113,19 +113,21 @@ describe("a push while the app is in front", () => {
 	const gate = pushDataOf(plainGate);
 
 	test("a Gate shows as a banner on any other screen", () => {
+		expect(showInFront(gate, { pathname: "/" })).toBe(true);
 		expect(showInFront(gate, { pathname: "/runs" })).toBe(true);
 		expect(showInFront(gate, { pathname: "/gates/run-2/review" })).toBe(true);
 	});
 
 	test("no banner on the inbox, or on that Gate", () => {
-		expect(showInFront(gate, { pathname: "/" })).toBe(false);
+		expect(showInFront(gate, { pathname: "/inbox" })).toBe(false);
 		expect(showInFront(gate, { pathname: "/gates/run-1/review" })).toBe(false);
 	});
 
 	test("the end of quiet hours shows, except on the inbox", () => {
 		const waiting = pushDataOf({ kind: "gates-waiting", key: "waiting:5" });
 		expect(showInFront(waiting, { pathname: "/settings" })).toBe(true);
-		expect(showInFront(waiting, { pathname: "/" })).toBe(false);
+		expect(showInFront(waiting, { pathname: "/" })).toBe(true);
+		expect(showInFront(waiting, { pathname: "/inbox" })).toBe(false);
 	});
 
 	test("a run's end shows no banner", () => {
@@ -160,10 +162,10 @@ describe("where a tap goes", () => {
 
 	test("the end of quiet hours, or a run's end without its run, opens the inbox", () => {
 		expect(screenOf({ kind: "gates-waiting", key: "waiting:5" })).toEqual({
-			pathname: "/",
+			pathname: "/inbox",
 		});
 		expect(screenOf({ kind: "run-failed", key: "r:end:1" })).toEqual({
-			pathname: "/",
+			pathname: "/inbox",
 		});
 	});
 

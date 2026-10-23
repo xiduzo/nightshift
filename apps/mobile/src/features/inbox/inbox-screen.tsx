@@ -3,6 +3,8 @@ import {
 	gateRun,
 	type OpenGate,
 	waitedText,
+	waitingForYou,
+	waitingText,
 } from "@nightshift/client";
 import {
 	Alert,
@@ -25,6 +27,7 @@ import { Pressable, View } from "react-native";
 
 import { PushCard } from "@/features/push";
 import { EmptyState } from "@/shared/empty";
+import { LargeTitleHeader } from "@/shared/header";
 import { Screen } from "@/shared/page";
 import { useAnswered } from "./answered";
 import { useInbox } from "./use-inbox";
@@ -38,6 +41,12 @@ export function InboxScreen() {
 
 	return (
 		<Screen onRefresh={() => inbox.refetch()}>
+			<LargeTitleHeader
+				title="Inbox"
+				summary={
+					inbox.data ? waitingText(waitingForYou(inbox.data)) : undefined
+				}
+			/>
 			{answered ? (
 				<Alert icon={CircleCheck}>
 					<AlertTitle>Answered {answered.choice}</AlertTitle>
