@@ -44,15 +44,21 @@ export function rowLabel(row: {
 	value?: string;
 	valueLabel?: string;
 }): string {
-	return [
-		row.iconLabel,
-		row.title,
-		row.overline,
-		row.status,
-		...captionParts(row.caption).map(partText),
-		...captionParts(row.detail).map(partText),
-		row.valueLabel ?? row.value,
-	]
-		.filter((part): part is string => part !== undefined && part.trim() !== "")
-		.join(", ");
+	return (
+		[
+			row.iconLabel,
+			row.title,
+			row.overline,
+			row.status,
+			...captionParts(row.caption).map(partText),
+			...captionParts(row.detail).map(partText),
+			row.valueLabel ?? row.value,
+		]
+			.filter(
+				(part): part is string => part !== undefined && part.trim() !== "",
+			)
+			// A status word in the caption that the icon already said is read once.
+			.filter((part, index, parts) => parts.indexOf(part) === index)
+			.join(", ")
+	);
 }

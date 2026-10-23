@@ -20,6 +20,16 @@ describe("captionText", () => {
 });
 
 describe("rowLabel", () => {
+	test("reads a word once when the icon and the caption both say it", () => {
+		expect(
+			rowLabel({
+				iconLabel: "Failed",
+				title: "release",
+				caption: [{ text: "Failed", tone: "failed" }, "website"],
+			}),
+		).toBe("Failed, release, website");
+	});
+
 	test("reads the icon's meaning, the title, the captions and the value", () => {
 		expect(
 			rowLabel({

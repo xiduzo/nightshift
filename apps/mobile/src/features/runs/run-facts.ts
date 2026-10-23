@@ -22,6 +22,8 @@ export type RunFact = {
 	value: string;
 	sub?: string;
 	mono?: boolean;
+	/** A row of its own: the run id. */
+	wide?: boolean;
 };
 
 type Computer = Pick<RunDetail["device"], "name" | "thisDevice">;
@@ -105,7 +107,7 @@ export function runFacts(
 			sub: steps === 1 ? "1 step" : `${steps} steps`,
 		},
 		costFact(run),
-		{ label: "Run", value: run.id, mono: true },
+		{ label: "Run", value: run.id, mono: true, wide: true },
 	];
 }
 

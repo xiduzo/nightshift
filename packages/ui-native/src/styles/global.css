@@ -110,3 +110,20 @@
 	--radius-xl: 14px;
 	--radius-2xl: 18px;
 }
+
+/*
+ * font-mono: React Native takes one font name, not the web's stack of
+ * fallbacks, so Tailwind's default does nothing on a phone. The web uses
+ * Geist Mono; the phone uses the system's monospaced font for ids,
+ * branches and commands.
+ */
+@layer theme {
+	:root {
+		@variant ios {
+			--font-mono: Menlo;
+		}
+		@variant android {
+			--font-mono: monospace;
+		}
+	}
+}

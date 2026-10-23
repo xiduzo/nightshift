@@ -19,6 +19,8 @@ export function FactTile({
 	mono,
 	look,
 }: {
+	/** A row of its own in a FactGrid, for a long value. */
+	wide?: boolean;
 	label: string;
 	value: string;
 	/** A muted line under the value: "of $2.00 so far". */
