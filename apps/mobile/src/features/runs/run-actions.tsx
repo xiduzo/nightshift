@@ -14,7 +14,11 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from "@nightshift/ui-native/components/ui/alert-dialog";
-import { Button } from "@nightshift/ui-native/components/ui/button";
+import {
+	Button,
+	buttonTextVariants,
+	buttonVariants,
+} from "@nightshift/ui-native/components/ui/button";
 import { CardContent } from "@nightshift/ui-native/components/ui/card";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Text } from "@nightshift/ui-native/components/ui/text";
@@ -142,10 +146,22 @@ function Confirm({
 						<Text>Cancel</Text>
 					</AlertDialogCancel>
 					<AlertDialogAction
-						className={destructive ? "bg-destructive" : undefined}
+						className={
+							destructive
+								? buttonVariants({ variant: "destructive" })
+								: undefined
+						}
 						onPress={onConfirm}
 					>
-						<Text>{confirm}</Text>
+						<Text
+							className={
+								destructive
+									? buttonTextVariants({ variant: "destructive" })
+									: undefined
+							}
+						>
+							{confirm}
+						</Text>
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>

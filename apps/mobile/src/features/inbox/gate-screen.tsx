@@ -28,14 +28,17 @@ import {
 	AlertDialogTitle,
 } from "@nightshift/ui-native/components/ui/alert-dialog";
 import { Badge } from "@nightshift/ui-native/components/ui/badge";
-import { Button } from "@nightshift/ui-native/components/ui/button";
+import {
+	Button,
+	buttonTextVariants,
+	buttonVariants,
+} from "@nightshift/ui-native/components/ui/button";
 import { Card } from "@nightshift/ui-native/components/ui/card";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Label } from "@nightshift/ui-native/components/ui/label";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { Textarea } from "@nightshift/ui-native/components/ui/textarea";
-import { cn } from "@nightshift/ui-native/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
 	type Href,
@@ -662,10 +665,20 @@ function ConfirmDialog({
 						<Text>Cancel</Text>
 					</AlertDialogCancel>
 					<AlertDialogAction
-						className={cn(destructive && "bg-destructive")}
+						className={
+							destructive
+								? buttonVariants({ variant: "destructive" })
+								: undefined
+						}
 						onPress={onConfirm}
 					>
-						<Text className={cn(destructive && "text-white")}>
+						<Text
+							className={
+								destructive
+									? buttonTextVariants({ variant: "destructive" })
+									: undefined
+							}
+						>
 							{`Send ${choice.name}`}
 						</Text>
 					</AlertDialogAction>
