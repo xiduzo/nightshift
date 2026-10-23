@@ -16,9 +16,10 @@
  * event first, one terminal event last, never throws) is `session-stream.ts`.
  */
 import { randomUUID } from "node:crypto";
-import { readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { delimiter, join } from "node:path";
 import { type AnyTextAdapter, chat } from "@tanstack/ai";
 import {
 	defineSandbox,
@@ -30,7 +31,12 @@ import {
 	withSandbox,
 } from "@tanstack/ai-sandbox";
 import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
-import type { AgentEvent, AgentSessionInput, McpServerConfig } from "../port";
+import {
+	type AgentEvent,
+	type AgentSessionInput,
+	type McpServerConfig,
+	shellQuoteAlways,
+} from "../port";
 import { ARTIFACT_INSTRUCTION, saveArtifactTool } from "./artifact-tool";
 import { streamSession } from "./session-stream";
 import { reportStepTool, stepReportSetup } from "./step-report";
@@ -81,6 +87,13 @@ export type HarnessSpec = {
 	resumeIsSilent?: boolean;
 	/** Environment variables the harness process never sees. */
 	scrubEnv?: string[];
+	/**
+	 * The variable that names a script the harness sources before each
+	 * shell command (Claude Code's `CLAUDE_ENV_FILE`). The step's launcher
+	 * folder goes first on PATH there too: a login shell's own files can
+	 * reorder PATH after the harness starts.
+	 */
+	shellEnvFile?: string;
 };
 
 /** What the step report adds to one session: the prompt, the tool, the allow rule. */
@@ -173,6 +186,84 @@ function mcpSkills(
 	);
 }
 
+/** The environment of one session: what the harness process gets and loses. */
+export type SessionEnvironment = {
+	/** Set on the sandbox: the harness and every command it runs get these. */
+	env: Record<string, string>;
+	/** Removed from what the harness inherits. */
+	scrubEnv: string[];
+	/** Removes the shell file, when one was written. */
+	cleanup: () => Promise<void>;
+};
+
+/**
+ * The session's environment: the input's variables, and the launcher
+ * folder first on PATH, and in the harness's shell file where it has one.
+ * The spec's and the input's scrubbed variables go, except the ones the
+ * input sets itself.
+ */
+export async function sessionEnvironment(
+	input: Pick<AgentSessionInput, "env" | "scrubEnv" | "toolsPath">,
+	spec: Pick<HarnessSpec, "scrubEnv" | "shellEnvFile">,
+	base: Readonly<Record<string, string | undefined>> = process.env,
+): Promise<SessionEnvironment> {
+	const env: Record<string, string> = { ...input.env };
+	let cleanup = async () => {};
+	const tools = input.toolsPath;
+	if (tools) {
+		env.PATH = [tools, env.PATH ?? base.PATH ?? ""]
+			.filter(Boolean)
+			.join(delimiter);
+		const variable = spec.shellEnvFile;
+		if (variable) {
+			const dir = await mkdtemp(join(tmpdir(), "nightshift-shell-"));
+			const file = join(dir, "env.sh");
+			const own = env[variable] ?? base[variable];
+			await writeFile(
+				file,
+				[
+					"# Night Shift: the CLI tools of this step come first.",
+					...(own ? [`. ${shellQuoteAlways(own)}`] : []),
+					`export PATH=${shellQuoteAlways(tools)}:"$PATH"`,
+					"",
+				].join("\n"),
+				{ mode: 0o600 },
+			);
+			env[variable] = file;
+			cleanup = () => rm(dir, { recursive: true, force: true });
+		}
+	}
+	const scrubEnv = [
+		...new Set([...(spec.scrubEnv ?? []), ...(input.scrubEnv ?? [])]),
+	].filter((name) => !(name in env));
+	return { env, scrubEnv, cleanup };
+}
+
+/** A sandbox provider whose handles have `env` set: every process they start gets it. */
+export function withSessionEnv(
+	provider: SandboxProvider,
+	env: Record<string, string>,
+): SandboxProvider {
+	const apply = async <
+		H extends { env: { set(vars: Record<string, string>): Promise<void> } },
+	>(
+		handle: H,
+	): Promise<H> => {
+		await handle.env.set(env);
+		return handle;
+	};
+	return {
+		name: provider.name,
+		capabilities: () => provider.capabilities(),
+		create: async (input) => apply(await provider.create(input)),
+		resume: async (input) => {
+			const handle = await provider.resume(input);
+			return handle ? apply(handle) : null;
+		},
+		destroy: (input) => provider.destroy(input),
+	};
+}
+
 /**
  * Run one harness session and keep the AgentHarness contract. Never throws:
  * a throw from `adapter` (called lazily, once the stream is read) ends the
@@ -199,6 +290,7 @@ export function harnessSession(options: {
 			: {}),
 	});
 	let cleanup = async () => {};
+	let cleanupEnv = async () => {};
 	return runAdapterSession({
 		signal: input.signal,
 		translator,
@@ -208,6 +300,8 @@ export function harnessSession(options: {
 			const report = sessionReport(input, spec, options.allowedTools);
 			const setup = await options.adapter(report);
 			cleanup = setup.cleanup ?? cleanup;
+			const environment = await sessionEnvironment(input, spec);
+			cleanupEnv = environment.cleanup;
 
 			// One id per session: the sandbox middleware keys its in-memory
 			// instances by sandbox id and thread id, so concurrent sessions
@@ -217,11 +311,17 @@ export function harnessSession(options: {
 				dir: input.cwd,
 				// Never delete the run's worktree when the sandbox is destroyed.
 				removeOnDestroy: false,
-				...(spec.scrubEnv ? { scrubEnv: spec.scrubEnv } : {}),
+				...(environment.scrubEnv.length > 0
+					? { scrubEnv: environment.scrubEnv }
+					: {}),
 			});
+			const wrapped = setup.wrapProvider?.(provider) ?? provider;
 			const sandbox = defineSandbox({
 				id,
-				provider: setup.wrapProvider?.(provider) ?? provider,
+				provider:
+					Object.keys(environment.env).length > 0
+						? withSessionEnv(wrapped, environment.env)
+						: wrapped,
 				fileEvents: false,
 				// Required: the adapters read the workspace projection. With a
 				// local-process `dir`, the virtual `/workspace` is `input.cwd`.
@@ -261,6 +361,7 @@ export function harnessSession(options: {
 			: {}),
 		cleanup: async () => {
 			await cleanup();
+			await cleanupEnv();
 			await removeProjectionMarkers(input.cwd);
 		},
 	});

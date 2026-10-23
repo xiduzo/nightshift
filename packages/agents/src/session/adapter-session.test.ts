@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AnyTextAdapter, TextOptions } from "@tanstack/ai";
@@ -9,6 +9,7 @@ import {
 	type AdapterSetup,
 	type HarnessSpec,
 	harnessSession,
+	sessionEnvironment,
 	sessionReport,
 } from "./adapter-session";
 import type { SdkSignals } from "./translate";
@@ -381,5 +382,114 @@ describe("harnessSession", () => {
 			type: "error",
 			message: expect.stringContaining("Remove fs from the node"),
 		});
+	});
+});
+
+describe("sessionEnvironment", () => {
+	test("without CLI tools: the input's variables, and the scrubbed ones it does not set", async () => {
+		const environment = await sessionEnvironment(
+			{ env: { GIT_CONFIG_COUNT: "1" }, scrubEnv: ["GH_TOKEN", "X"] },
+			{ scrubEnv: ["ANTHROPIC_API_KEY", "X"] },
+			{ PATH: "/usr/bin" },
+		);
+		expect(environment.env).toEqual({ GIT_CONFIG_COUNT: "1" });
+		expect(environment.scrubEnv).toEqual([
+			"ANTHROPIC_API_KEY",
+			"X",
+			"GH_TOKEN",
+		]);
+	});
+
+	test("a variable the input sets on purpose is not scrubbed", async () => {
+		const environment = await sessionEnvironment(
+			{ env: { ANTHROPIC_API_KEY: "sk-1" } },
+			{ scrubEnv: ["ANTHROPIC_API_KEY"] },
+		);
+		expect(environment.scrubEnv).toEqual([]);
+	});
+
+	test("the launcher folder goes first on PATH", async () => {
+		const environment = await sessionEnvironment(
+			{ toolsPath: "/tmp/tools" },
+			{},
+			{ PATH: "/usr/bin:/bin" },
+		);
+		expect(environment.env).toEqual({ PATH: "/tmp/tools:/usr/bin:/bin" });
+	});
+
+	test("a harness with a shell file gets one that puts the folder first, after the person's own", async () => {
+		const environment = await sessionEnvironment(
+			{ toolsPath: "/tmp/it's tools" },
+			{ shellEnvFile: "CLAUDE_ENV_FILE" },
+			{ PATH: "/usr/bin", CLAUDE_ENV_FILE: "/home/me/env.sh" },
+		);
+		const file = environment.env.CLAUDE_ENV_FILE ?? "";
+		expect(file).toEndWith("env.sh");
+		expect(await readFile(file, "utf8")).toBe(
+			[
+				"# Night Shift: the CLI tools of this step come first.",
+				". '/home/me/env.sh'",
+				`export PATH='/tmp/it'\\''s tools':"$PATH"`,
+				"",
+			].join("\n"),
+		);
+		expect((await stat(file)).mode & 0o777).toBe(0o600);
+		await environment.cleanup();
+		await expect(stat(file)).rejects.toThrow();
+	});
+});
+
+describe("harnessSession: environment", () => {
+	test("the harness's processes get the session's variables and the launchers, never a scrubbed one", async () => {
+		const tools = await mkdtemp(join(tmpdir(), "nightshift-tools-"));
+		const seen: string[] = [];
+		const previous = process.env.NIGHTSHIFT_TEST_SECRET;
+		process.env.NIGHTSHIFT_TEST_SECRET = "leaked";
+		try {
+			let handle: Awaited<ReturnType<SandboxProvider["create"]>> | undefined;
+			const adapter = {
+				...fakeAdapter([]),
+				chatStream: async function* (options: TextOptions) {
+					const out = await handle?.process.exec(
+						'printf "%s|%s|%s" "$NS_SESSION" "${NIGHTSHIFT_TEST_SECRET:-none}" "$PATH"',
+					);
+					seen.push(out?.stdout ?? "");
+					for (const chunk of finishedTurn(options.threadId)) {
+						yield chunk as never;
+					}
+				},
+			} as unknown as AnyTextAdapter;
+			await collect(
+				harnessSession({
+					input: input({
+						env: { NS_SESSION: "on" },
+						toolsPath: tools,
+						scrubEnv: ["NIGHTSHIFT_TEST_SECRET"],
+					}),
+					spec: spec(),
+					adapter: (): AdapterSetup => ({
+						adapter,
+						wrapProvider: (provider) => ({
+							name: provider.name,
+							capabilities: () => provider.capabilities(),
+							create: async (create) => {
+								handle = await provider.create(create);
+								return handle;
+							},
+							resume: (resume) => provider.resume(resume),
+							destroy: (destroy) => provider.destroy(destroy),
+						}),
+					}),
+				}),
+			);
+		} finally {
+			if (previous === undefined) delete process.env.NIGHTSHIFT_TEST_SECRET;
+			else process.env.NIGHTSHIFT_TEST_SECRET = previous;
+			await rm(tools, { recursive: true, force: true });
+		}
+		const [session, secret, path] = (seen[0] ?? "").split("|");
+		expect(session).toBe("on");
+		expect(secret).toBe("none");
+		expect(path).toStartWith(`${tools}:`);
 	});
 });

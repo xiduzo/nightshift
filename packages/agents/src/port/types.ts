@@ -63,6 +63,19 @@ export type AgentSessionInput = {
 	/** MCP servers by name, added to the harness's own configuration. */
 	mcpServers?: Record<string, McpServerConfig>;
 	/**
+	 * A folder of the step's CLI tool launchers (`gh-work` runs `gh` with
+	 * its own login). The agent's shell finds it first on its PATH.
+	 */
+	toolsPath?: string;
+	/** Added to the environment of the harness and of every command it runs. */
+	env?: Record<string, string>;
+	/**
+	 * Environment variables the harness and its commands never see: the
+	 * secrets that only the step's CLI tools may read. A variable `env`
+	 * sets is kept.
+	 */
+	scrubEnv?: string[];
+	/**
 	 * Keeps a file for the person: an artifact of the run. With it, a
 	 * session that can use tools gets the `save_artifact` tool (see
 	 * `artifact-tool.ts`). `path` is what the agent gives: relative to
