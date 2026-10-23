@@ -308,6 +308,18 @@ function OpenGateScreen({
 				</View>
 			</View>
 
+			{answer.sent ? (
+				<SentCard
+					answer={answer.sent}
+					outcome={sentText(
+						routes.get(answer.sent.choice),
+						gate.runTitle,
+						elsewhere,
+					)}
+					next={nextGate(inbox, gate)}
+				/>
+			) : null}
+
 			<QuestionSections context={context} />
 
 			<View className="gap-2">
@@ -358,73 +370,67 @@ function OpenGateScreen({
 				runHref={runHref}
 			/>
 
-			<View className="gap-3">
-				<SectionHead
-					title="Your answer"
-					hint={
-						answerable && !answer.sent && !gate.lockScreen
-							? "Your phone checks that it is you before Night Shift sends your answer."
-							: undefined
-					}
-				/>
-				{answer.sent ? (
-					<SentCard
-						answer={answer.sent}
-						outcome={sentText(
-							routes.get(answer.sent.choice),
-							gate.runTitle,
-							elsewhere,
-						)}
-						next={nextGate(inbox, gate)}
+			{answer.sent ? null : (
+				<View className="gap-3">
+					<SectionHead
+						title="Your answer"
+						hint={
+							answerable && !answer.sent && !gate.lockScreen
+								? "Your phone checks that it is you before Night Shift sends your answer."
+								: undefined
+						}
 					/>
-				) : gate.answerPending ? (
-					<Alert icon={CircleCheck}>
-						<AlertTitle>Someone already answered this Gate</AlertTitle>
-						<AlertDescription>
-							{elsewhere
-								? `The run goes on when ${elsewhere} is online.`
-								: "The run goes on in a moment."}
-						</AlertDescription>
-					</Alert>
-				) : !gate.canAnswer ? (
-					<Alert icon={Eye}>
-						<AlertTitle>You can read this Gate only</AlertTitle>
-						<AlertDescription>
-							{`Your role in ${gate.spaceName} does not let you answer Gates. Ask an owner or admin of the Space to answer it, or to give you another role.`}
-						</AlertDescription>
-					</Alert>
-				) : (
-					<>
-						<ChoiceCards
-							choices={gate.choices}
-							routes={routes}
-							chosen={answer.choice}
-							onChoose={answer.choose}
-							disabled={answer.busy}
-						/>
-						<View className="gap-2">
-							<Label nativeID="gate-note">Note for the run (optional)</Label>
-							<Textarea
-								aria-labelledby="gate-note"
-								value={answer.note}
-								onChangeText={answer.setNote}
-								placeholder="Context for the next steps"
-								editable={!answer.busy}
-								numberOfLines={4}
+					{gate.answerPending ? (
+						<Alert icon={CircleCheck}>
+							<AlertTitle>Someone already answered this Gate</AlertTitle>
+							<AlertDescription>
+								{elsewhere
+									? `The run goes on when ${elsewhere} is online.`
+									: "The run goes on in a moment."}
+							</AlertDescription>
+						</Alert>
+					) : !gate.canAnswer ? (
+						<Alert icon={Eye}>
+							<AlertTitle>You can read this Gate only</AlertTitle>
+							<AlertDescription>
+								{`Your role in ${gate.spaceName} does not let you answer Gates. Ask an owner or admin of the Space to answer it, or to give you another role.`}
+							</AlertDescription>
+						</Alert>
+					) : (
+						<>
+							<ChoiceCards
+								choices={gate.choices}
+								routes={routes}
+								chosen={answer.choice}
+								onChoose={answer.choose}
+								disabled={answer.busy}
 							/>
-							<Text className="text-muted-foreground text-xs">
-								The next steps of the run get your note.
-							</Text>
-						</View>
-						{elsewhere ? (
-							<Text className="text-muted-foreground text-xs">
-								{`Your answer goes to ${elsewhere}. The run goes on when ${elsewhere} is online.`}
-							</Text>
-						) : null}
-						{answer.problem ? <ProblemAlert problem={answer.problem} /> : null}
-					</>
-				)}
-			</View>
+							<View className="gap-2">
+								<Label nativeID="gate-note">Note for the run (optional)</Label>
+								<Textarea
+									aria-labelledby="gate-note"
+									value={answer.note}
+									onChangeText={answer.setNote}
+									placeholder="Context for the next steps"
+									editable={!answer.busy}
+									numberOfLines={4}
+								/>
+								<Text className="text-muted-foreground text-xs">
+									The next steps of the run get your note.
+								</Text>
+							</View>
+							{elsewhere ? (
+								<Text className="text-muted-foreground text-xs">
+									{`Your answer goes to ${elsewhere}. The run goes on when ${elsewhere} is online.`}
+								</Text>
+							) : null}
+							{answer.problem ? (
+								<ProblemAlert problem={answer.problem} />
+							) : null}
+						</>
+					)}
+				</View>
+			)}
 
 			{chosen ? (
 				<ConfirmDialog
@@ -564,7 +570,7 @@ function CheckFirst({
 						title={link.label}
 						titleLines={1}
 						caption={[
-							LINK_WORD[link.kind],
+							link.label === LINK_WORD[link.kind] ? "" : LINK_WORD[link.kind],
 							{ text: link.short, mono: link.kind !== "web" },
 							link.where === link.short ? "" : link.where,
 						]}
@@ -634,10 +640,13 @@ function ConfirmDialog({
 							{choice.description}
 						</AlertDialogDescription>
 					) : null}
-					{next ? (
-						<AlertDialogDescription>{next}</AlertDialogDescription>
-					) : null}
-					<AlertDialogDescription>{runTitle}</AlertDialogDescription>
+					<AlertDialogDescription>
+						{ends
+							? `This answer ends the run ${runTitle}.`
+							: next
+								? `${next} in the run ${runTitle}.`
+								: `The run ${runTitle} gets this answer.`}
+					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>
 					<AlertDialogCancel>

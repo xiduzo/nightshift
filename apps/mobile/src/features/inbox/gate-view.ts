@@ -136,9 +136,9 @@ export function sentText(
 		route?.kind === "node"
 			? `${runTitle} goes on at ${route.label}`
 			: `${runTitle} goes on`;
-	return walkerElsewhere
-		? `${goesOn} when ${walkerElsewhere} is online.`
-		: `${goesOn}.`;
+	if (walkerElsewhere) return `${goesOn} when ${walkerElsewhere} is online.`;
+	// A step label may end in its own mark: "Announce it?".
+	return /[.?!]$/.test(goesOn) ? goesOn : `${goesOn}.`;
 }
 
 /** The longest text that shows as a tile under "At a glance". */

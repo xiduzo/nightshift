@@ -176,6 +176,13 @@ describe("sentText", () => {
 			),
 		).toBe("Fix login goes on at Build.");
 		expect(sentText(undefined, "Fix login", null)).toBe("Fix login goes on.");
+		expect(
+			sentText(
+				{ kind: "node", nodeId: "a", label: "Announce it?" },
+				"Ship",
+				null,
+			),
+		).toBe("Ship goes on at Announce it?");
 		expect(sentText(undefined, "Fix login", "Mac mini")).toBe(
 			"Fix login goes on when Mac mini is online.",
 		);
