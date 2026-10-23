@@ -1,4 +1,8 @@
-import type { DashboardSummary, RunStatus } from "@nightshift/client";
+import {
+	type DashboardSummary,
+	formatCost,
+	type RunStatus,
+} from "@nightshift/client";
 
 /** The nights the health rows cover, as the web dashboard's default range. */
 export const HEALTH_NIGHTS = 30;
@@ -7,11 +11,16 @@ export const HEALTH_NIGHTS = 30;
 export type HealthRow = {
 	key: string;
 	label: string;
+	/** A flow's name shows in mono, a project's name does not. */
+	mono: boolean;
 	/** The share of its runs that finished, 0 to 100. Null when none ended. */
 	share: number | null;
+	/** "3 of 4 finished · 1 failed". */
 	detail: string;
+	/** A second line: "Typical cost $0.40 · 1 did not finish". Null when there is nothing to add. */
+	more: string | null;
 	/** Its last run, when the server tells (a flow's row). */
-	last: { status: RunStatus; startedAt: number } | null;
+	last: { runId: string; status: RunStatus; startedAt: number } | null;
 };
 
 export type Health = {
@@ -19,8 +28,13 @@ export type Health = {
 	description: string;
 	rows: HealthRow[];
 	/** Rows the server left out: the list holds the busiest only. */
-	more: number;
+	hidden: number;
 };
+
+function parts(list: readonly (string | null)[]): string | null {
+	const shown = list.filter((part): part is string => part !== null);
+	return shown.length > 0 ? shown.join(" · ") : null;
+}
 
 /**
  * How the flows did (one project), or how the projects did (every Space).
@@ -33,20 +47,31 @@ export function healthOf(summary: DashboardSummary): Health | null {
 		if (flows.count === 0) return null;
 		return {
 			title: "Flow health",
-			description: `The busiest flows over the last ${HEALTH_NIGHTS} nights. The bar shows how many of their ended runs finished.`,
+			description: `The busiest flows of the last ${HEALTH_NIGHTS} nights. The bar shows how many of their ended runs finished.`,
 			rows: flows.rows.map((row) => ({
 				key: row.name,
 				label: row.name,
+				mono: true,
 				share: row.rate,
 				detail:
 					row.rate === null
 						? "No run ended yet"
 						: `${row.finished} of ${row.ended} finished`,
+				more: parts([
+					row.cost ? `Typical cost ${formatCost(row.cost.median)}` : null,
+					row.unfinished.count > 0
+						? `${row.unfinished.count} did not finish`
+						: null,
+				]),
 				last: row.last
-					? { status: row.last.status, startedAt: row.last.startedAt }
+					? {
+							runId: row.last.runId,
+							status: row.last.status,
+							startedAt: row.last.startedAt,
+						}
 					: null,
 			})),
-			more: flows.count - flows.rows.length,
+			hidden: flows.count - flows.rows.length,
 		};
 	}
 	const range = summary.nights.find(
@@ -56,14 +81,27 @@ export function healthOf(summary: DashboardSummary): Health | null {
 	if (!groups || groups.count === 0) return null;
 	return {
 		title: "Runs per project",
-		description: `The busiest projects over the last ${HEALTH_NIGHTS} nights. The bar shows how many of their runs finished.`,
+		description: `The busiest projects of the last ${HEALTH_NIGHTS} nights, over every Space you are in. The bar shows how many of their runs finished.`,
 		rows: groups.rows.map((row) => ({
 			key: row.label,
 			label: row.label,
+			mono: false,
 			share: row.runs > 0 ? Math.round((row.finished / row.runs) * 100) : null,
-			detail: `${row.finished} of ${row.runs} finished, ${row.failed} failed`,
+			detail: parts([
+				`${row.finished} of ${row.runs} finished`,
+				row.failed > 0 ? `${row.failed} failed` : null,
+			]) as string,
+			more: null,
 			last: null,
 		})),
-		more: groups.count - groups.rows.length,
+		hidden: groups.count - groups.rows.length,
 	};
+}
+
+/** "2 more are not shown." Null when every row shows. */
+export function hiddenText(hidden: number): string | null {
+	if (hidden <= 0) return null;
+	return hidden === 1
+		? "1 more is not shown."
+		: `${hidden} more are not shown.`;
 }

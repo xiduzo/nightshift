@@ -1,9 +1,8 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import type { DashboardSummary, RunSummary } from "@nightshift/client";
+import type { DashboardSummary } from "@nightshift/client";
 
-import { hasRuns, runFacts, statCards } from "./cards";
-import { HEALTH_NIGHTS, healthOf } from "./health";
+import { HEALTH_NIGHTS, healthOf, hiddenText } from "./health";
 
 type Nights = DashboardSummary["nights"][number];
 type FlowHealth = NonNullable<DashboardSummary["flowHealth"]>;
@@ -81,86 +80,6 @@ function summary(over: Partial<DashboardSummary> = {}): DashboardSummary {
 	};
 }
 
-describe("statCards", () => {
-	test("shows the four numbers of the web dashboard", () => {
-		const cards = statCards(
-			summary({
-				cards: {
-					...summary().cards,
-					running: 2,
-					lastDay: {
-						runs: 5,
-						finished: 3,
-						failed: 1,
-						cost: cost(1.5, 1),
-						latestAt: 1,
-					},
-					allTime: cost(12),
-				},
-			}),
-			1,
-		);
-		expect(cards.map((card) => [card.label, card.value])).toEqual([
-			["Running now", "2"],
-			["Waiting for you", "1"],
-			["Spent, last 24 h", "$1.50+"],
-			["Runs, last 24 h", "5"],
-		]);
-		const [running, waiting, spent, runs] = cards;
-		expect(running?.headline).toBe("Agents are at work");
-		expect(waiting).toMatchObject({
-			headline: "A Gate needs your answer",
-			tone: "waiting",
-			opens: "inbox",
-		});
-		expect(spent).toMatchObject({
-			headline: "In 5 runs",
-			footer: "All time $12.00",
-		});
-		expect(runs).toMatchObject({
-			headline: "3 finished, 1 failed",
-			footer: "1 stopped, running or waiting",
-			tone: "failed",
-			finishedShare: 60,
-		});
-	});
-
-	test("reads calm when nothing runs and nothing waits", () => {
-		const [running, waiting, , runs] = statCards(summary(), 0);
-		expect(running).toMatchObject({
-			headline: "Nothing running",
-			footer: "Tap + on Home to start a run.",
-		});
-		expect(waiting).toMatchObject({
-			headline: "Nothing needs you",
-			tone: "plain",
-		});
-		expect(runs).toMatchObject({
-			footer: "Started in the last day",
-			tone: "plain",
-			finishedShare: null,
-		});
-	});
-
-	test("says when the next sleeping run wakes", () => {
-		const [running] = statCards(
-			summary({
-				cards: { ...summary().cards, sleeping: 1, nextWakeAt: Date.now() },
-			}),
-			0,
-		);
-		expect(running?.footer).toStartWith("1 run sleeps. The next wakes at ");
-	});
-
-	test("shows a dash when the open Gates did not load", () => {
-		const [, waiting] = statCards(summary(), null);
-		expect(waiting).toMatchObject({
-			value: "—",
-			headline: "Nothing needs you",
-		});
-	});
-});
-
 describe("healthOf", () => {
 	test("lists the runs per project over every Space, with the server's labels", () => {
 		const health = healthOf(
@@ -178,20 +97,24 @@ describe("healthOf", () => {
 			}),
 		);
 		expect(health?.title).toBe("Runs per project");
-		expect(health?.more).toBe(5);
+		expect(health?.hidden).toBe(5);
 		expect(health?.rows).toEqual([
 			{
 				key: "nightshift",
 				label: "nightshift",
+				mono: false,
 				share: 75,
-				detail: "3 of 4 finished, 1 failed",
+				detail: "3 of 4 finished · 1 failed",
+				more: null,
 				last: null,
 			},
 			{
 				key: "zac",
 				label: "zac",
+				mono: false,
 				share: 0,
-				detail: "0 of 3 finished, 3 failed",
+				detail: "0 of 3 finished · 3 failed",
+				more: null,
 				last: null,
 			},
 		]);
@@ -210,27 +133,52 @@ describe("healthOf", () => {
 			unknownCost: 0,
 			freeRuns: 0,
 		};
-		const fresh = { ...row, name: "fresh", last: null, rate: null };
+		const fresh = {
+			...row,
+			name: "fresh",
+			last: null,
+			rate: null,
+			unfinished: { count: 0, costUsd: 0 },
+		};
+		const priced = {
+			...row,
+			name: "priced",
+			cost: { min: 0.1, q1: 0.2, median: 0.4, q3: 0.5, max: 0.9, count: 2 },
+		};
 		const health = healthOf(
-			summary({ flowHealth: { rows: [row, fresh], count: 2 } }),
+			summary({ flowHealth: { rows: [row, fresh, priced], count: 3 } }),
 		);
 		expect(health?.title).toBe("Flow health");
 		expect(health?.rows).toEqual([
 			{
 				key: "nightly",
 				label: "nightly",
+				mono: true,
 				share: 67,
 				detail: "2 of 3 finished",
-				last: { status: "failed", startedAt: 9 },
+				more: "1 did not finish",
+				last: { runId: "r1", status: "failed", startedAt: 9 },
 			},
 			{
 				key: "fresh",
 				label: "fresh",
+				mono: true,
 				share: null,
 				detail: "No run ended yet",
+				more: null,
 				last: null,
 			},
+			{
+				key: "priced",
+				label: "priced",
+				mono: true,
+				share: 67,
+				detail: "2 of 3 finished",
+				more: "Typical cost $0.40 · 1 did not finish",
+				last: { runId: "r1", status: "failed", startedAt: 9 },
+			},
 		]);
+		expect(health?.hidden).toBe(0);
 	});
 
 	test("has nothing to show without runs", () => {
@@ -241,40 +189,11 @@ describe("healthOf", () => {
 		expect(
 			healthOf(summary({ flowHealth: { rows: [], count: 0 } })),
 		).toBeNull();
-		expect(hasRuns(summary())).toBe(false);
-	});
-});
-
-describe("runFacts", () => {
-	const NOW = Date.UTC(2026, 9, 21, 12);
-	const run = {
-		title: "Fix the login",
-		flowName: "nightly-check",
-		createdAt: NOW - 5 * 60_000,
-		costUsd: 0.42,
-		costMissing: 0,
-		costCalls: 2,
-	} as RunSummary;
-
-	test("names the flow, when the run started, and its cost", () => {
-		expect(runFacts(run, NOW)).toBe("nightly-check, 5 min ago, $0.42");
 	});
 
-	test("leaves the flow out when the title already says it", () => {
-		expect(runFacts({ ...run, title: "nightly-check" }, NOW)).toBe(
-			"5 min ago, $0.42",
-		);
-	});
-
-	test("leaves the cost out while it is not known, as the Runs tab does", () => {
-		expect(
-			runFacts({ ...run, costUsd: 0, costMissing: 0, costCalls: 0 }, NOW),
-		).toBe("nightly-check, 5 min ago");
-	});
-
-	test("calls a run without a flow a quick run", () => {
-		expect(runFacts({ ...run, flowName: null }, NOW)).toBe(
-			"Quick run, 5 min ago, $0.42",
-		);
+	test("says how many rows the server left out", () => {
+		expect(hiddenText(0)).toBeNull();
+		expect(hiddenText(1)).toBe("1 more is not shown.");
+		expect(hiddenText(4)).toBe("4 more are not shown.");
 	});
 });
