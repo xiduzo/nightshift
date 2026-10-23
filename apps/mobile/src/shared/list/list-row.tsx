@@ -6,7 +6,7 @@ import { ChevronRight, type LucideIcon } from "lucide-react-native";
 import { Fragment, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 
-import { iconOf } from "@/shared/status";
+import { iconOf, StatusText } from "@/shared/status";
 import { type Look, TONE_CLASS, type Tone } from "@/shared/tone";
 import { type Caption, captionParts, partText, rowLabel } from "./caption";
 
@@ -17,6 +17,8 @@ export type ListRowProps = {
 	titleLines?: number;
 	/** A small muted line above the title: "website · Feature factory". */
 	overline?: string;
+	/** A status under the title, as its icon and word: "2 Gates need you". */
+	status?: Look;
 	/** A muted line under the title. Parts show split by " · ". */
 	caption?: Caption;
 	/** A second muted line under the caption. */
@@ -55,6 +57,7 @@ export function ListRow({
 	title,
 	titleLines = 2,
 	overline,
+	status,
 	caption,
 	detail,
 	icon,
@@ -80,6 +83,7 @@ export function ListRow({
 			iconLabel: iconLabel ?? look?.label,
 			title,
 			overline,
+			status: status?.label,
 			caption,
 			detail,
 			value,
@@ -107,6 +111,7 @@ export function ListRow({
 				<Text className="font-medium text-base" numberOfLines={titleLines}>
 					{title}
 				</Text>
+				{status ? <StatusText look={status} /> : null}
 				<CaptionLine caption={caption} />
 				<CaptionLine caption={detail} />
 			</View>

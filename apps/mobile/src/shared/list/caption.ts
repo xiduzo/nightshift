@@ -37,6 +37,8 @@ export function rowLabel(row: {
 	iconLabel?: string;
 	title: string;
 	overline?: string;
+	/** The word of a status line under the title: "2 Gates need you". */
+	status?: string;
 	caption?: Caption;
 	detail?: Caption;
 	value?: string;
@@ -46,6 +48,7 @@ export function rowLabel(row: {
 		row.iconLabel,
 		row.title,
 		row.overline,
+		row.status,
 		...captionParts(row.caption).map(partText),
 		...captionParts(row.detail).map(partText),
 		row.valueLabel ?? row.value,
