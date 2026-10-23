@@ -9,7 +9,7 @@ import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "expo-router";
+import { type Href, Link } from "expo-router";
 import {
 	CircleCheck,
 	FolderGit2,
@@ -34,6 +34,7 @@ import { Screen } from "@/shared/page";
 import { useScreenRefresh } from "@/shared/refresh";
 import { GateRow, NightRunRow } from "./home-rows";
 import {
+	endedCount,
 	needsYou,
 	needsYouHint,
 	nightLine,
@@ -43,6 +44,9 @@ import {
 	runningNow,
 } from "./last-night";
 import { NightTiles } from "./night-tiles";
+
+/** The Runs tab, showing only the runs on their way. */
+const RUNNING_RUNS: Href = { pathname: "/runs", params: { filter: "running" } };
 
 /**
  * Home: what happened last night over every Space you are in, what needs
@@ -131,7 +135,11 @@ export function HomeScreen() {
 						count={data.open.running}
 						now={now}
 					/>
-					<NightOutputSection runs={nightOutput(data)} now={now} />
+					<NightOutputSection
+						runs={nightOutput(data)}
+						ended={endedCount(data)}
+						now={now}
+					/>
 				</>
 			) : !data && !summary.isError ? (
 				<Skeleton className="h-32 w-full rounded-xl" />
@@ -236,7 +244,7 @@ function RunningSection({
 			<SectionHead
 				title="Running now"
 				hint={runningHint(count)}
-				seeAll={count > 0 ? { href: "/runs" } : undefined}
+				seeAll={count > 0 ? { href: RUNNING_RUNS } : undefined}
 			/>
 			{runs.length > 0 ? (
 				<ListGroup>
@@ -252,7 +260,7 @@ function RunningSection({
 							count === 1 ? "1 run is at work" : `${count} runs are at work`
 						}
 						caption="See them on the Runs tab."
-						href="/runs"
+						href={RUNNING_RUNS}
 					/>
 				</ListGroup>
 			) : (
@@ -270,9 +278,12 @@ function RunningSection({
 
 function NightOutputSection({
 	runs,
+	ended,
 	now,
 }: {
 	runs: ReturnType<typeof nightOutput>;
+	/** Every run of the night that ended, also the ones the summary does not list. */
+	ended: number | null;
 	now: number;
 }) {
 	return (
@@ -287,6 +298,15 @@ function NightOutputSection({
 					{runs.map((run) => (
 						<NightRunRow key={run.id} run={run} now={now} />
 					))}
+				</ListGroup>
+			) : ended ? (
+				<ListGroup>
+					<ListRow
+						icon={History}
+						title={ended === 1 ? "1 run ended" : `${ended} runs ended`}
+						caption="See them on the Runs tab."
+						href="/runs"
+					/>
 				</ListGroup>
 			) : (
 				<ListGroup>

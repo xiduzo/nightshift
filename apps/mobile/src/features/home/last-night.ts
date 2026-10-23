@@ -104,6 +104,30 @@ function runTimeText(summary: DashboardSummary): string | null {
 	return `${partial ? "Over " : ""}${waitedText(total)} of run time in the last 24 h`;
 }
 
+/** The statuses of a run that has not ended. */
+const LIVE = new Set(["running", "waiting", "sleeping"]);
+
+/**
+ * How many runs of the last night ended, also the ones the summary does
+ * not list. Null when the summary does not tell.
+ */
+export function endedCount(summary: DashboardSummary): number | null {
+	const night = summary.lastNight;
+	if (!night) return 0;
+	const counts = summary.nights
+		.flatMap((range) => range.runs.perNight)
+		.find((entry) => entry.night === night.night)?.counts;
+	if (counts) {
+		return Object.entries(counts)
+			.filter(([status]) => !LIVE.has(status))
+			.reduce((sum, [, count]) => sum + (count ?? 0), 0);
+	}
+	if (night.latest.length >= night.runs) {
+		return night.latest.filter((run) => !LIVE.has(run.status)).length;
+	}
+	return null;
+}
+
 /** The Gates on Home: the ones you may answer, oldest first, at most `limit`. */
 export function needsYou<G extends Pick<OpenGate, "canAnswer">>(
 	gates: readonly G[],
@@ -131,10 +155,7 @@ export function runningNow(summary: DashboardSummary): NightRun[] {
 /** The runs of the last night that ended, newest first: what there is to check. */
 export function nightOutput(summary: DashboardSummary): NightRun[] {
 	return (summary.lastNight?.latest ?? []).filter(
-		(run) =>
-			run.status !== "running" &&
-			run.status !== "waiting" &&
-			run.status !== "sleeping",
+		(run) => !LIVE.has(run.status),
 	);
 }
 

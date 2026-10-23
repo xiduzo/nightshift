@@ -4,6 +4,7 @@ import type { DashboardSummary } from "@nightshift/client";
 
 import {
 	type Clock,
+	endedCount,
 	type NightRun,
 	needsYou,
 	needsYouHint,
@@ -231,5 +232,33 @@ describe("nightOutput", () => {
 			}),
 		);
 		expect(list.map((r) => r.id)).toEqual(["failed", "done", "halted"]);
+	});
+});
+
+describe("endedCount", () => {
+	test("counts the night's ended runs from the night ranges, also the unlisted ones", () => {
+		const night = lastNight([run("going", { status: "running" })], 6);
+		const s = summary({
+			lastNight: night,
+			nights: [
+				nights(7, [
+					{
+						night: NIGHT,
+						counts: { running: 1, finished: 3, failed: 1, stopped: 1 },
+					},
+				]),
+			],
+		});
+		expect(endedCount(s)).toBe(5);
+	});
+
+	test("counts the listed runs when the summary lists the whole night", () => {
+		const night = lastNight([run("done"), run("waits", { status: "waiting" })]);
+		expect(endedCount(summary({ lastNight: night }))).toBe(1);
+	});
+
+	test("does not tell when the summary lists part of the night without counts", () => {
+		const night = lastNight([run("waits", { status: "waiting" })], 4);
+		expect(endedCount(summary({ lastNight: night }))).toBeNull();
 	});
 });
