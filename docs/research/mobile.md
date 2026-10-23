@@ -479,7 +479,9 @@ true })` and `gates.list` (`features/home`, pure logic in `last-night.ts`).
 clock). Its line gives the night and the starts of its runs ("Wed 22 Oct
 · 4 runs, 18:02–03:15"; "12 runs, the newest at 03:15" when the summary
 lists only the newest five). Four tiles: Finished and Failed (that
-night's counts from the night ranges), Needs you (the Gates you may
+night's counts from the night ranges; Failed counts interrupted runs too,
+as the Failed chip of Runs does; a tap opens every such run, not only that
+night's), Needs you (the Gates you may
 answer now) and Spent (the night's cost). The run time under Spent is
 the time runs were at work in the last 24 hours, Gates included: the
 Host counts no agent time per night. Then Needs you (the five oldest

@@ -128,7 +128,10 @@ describe("nightNumbers", () => {
 				nights: [
 					nights(7, [
 						{ night: NIGHT - 24 * HOUR, counts: { finished: 5 } },
-						{ night: NIGHT, counts: { finished: 6, failed: 2, running: 1 } },
+						{
+							night: NIGHT,
+							counts: { finished: 6, failed: 2, interrupted: 1, running: 1 },
+						},
 					]),
 				],
 				activity: [activity([2 * HOUR, 20 * 60_000])],
@@ -136,7 +139,7 @@ describe("nightNumbers", () => {
 		);
 		expect(numbers).toEqual({
 			finished: 6,
-			failed: 2,
+			failed: 3,
 			cost: "$1.50",
 			costCaption: "In 9 runs",
 			runTime: "2 h 20 min of run time in the last 24 h",

@@ -37,7 +37,7 @@ export function NightTiles({
 				icon={CircleCheck}
 				tone={finished ? "finished" : "neutral"}
 				href={{ pathname: "/runs", params: { filter: "finished" } }}
-				accessibilityHint="Opens your finished runs"
+				accessibilityHint="Opens every finished run, not only last night's"
 			/>
 			<StatTile
 				value={numbers ? shown(failed) : undefined}
@@ -45,7 +45,7 @@ export function NightTiles({
 				icon={CircleX}
 				tone={failed ? "failed" : "neutral"}
 				href={{ pathname: "/runs", params: { filter: "failed" } }}
-				accessibilityHint="Opens your failed runs"
+				accessibilityHint="Opens every failed or interrupted run, not only last night's"
 			/>
 			<StatTile
 				value={shown(waiting)}

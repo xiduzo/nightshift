@@ -56,6 +56,7 @@ export function nightLine(night: LastNight, clock = PHONE_CLOCK): string {
 /** The numbers of the "Last night" card. Null where the summary does not tell. */
 export type NightNumbers = {
 	finished: number | null;
+	/** Failed and interrupted runs, as the Runs tab's Failed chip counts them. */
 	failed: number | null;
 	cost: string;
 	/** "In 12 runs". */
@@ -79,15 +80,15 @@ export function nightNumbers(summary: DashboardSummary): NightNumbers | null {
 		.flatMap((range) => range.runs.perNight)
 		.find((entry) => entry.night === night.night)?.counts;
 	const complete = night.latest.length >= night.runs;
-	const count = (status: string): number | null =>
+	const count = (...statuses: string[]): number | null =>
 		counts
-			? (counts[status] ?? 0)
+			? statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0)
 			: complete
-				? night.latest.filter((run) => run.status === status).length
+				? night.latest.filter((run) => statuses.includes(run.status)).length
 				: null;
 	return {
 		finished: count("finished"),
-		failed: count("failed"),
+		failed: count("failed", "interrupted"),
 		cost: formatKnownCost(night.cost),
 		costCaption: `In ${plural(night.runs, "run", "runs")}`,
 		runTime: runTimeText(summary),
