@@ -33,6 +33,7 @@ export function Chip({
 	selected = false,
 	icon,
 	onPress,
+	accessibilityHint,
 }: {
 	label: string;
 	/** How many items the filter shows. */
@@ -40,6 +41,8 @@ export function Chip({
 	selected?: boolean;
 	icon?: LucideIcon;
 	onPress: () => void;
+	/** What a tap does, when the label does not say it: "Shows the runs of every project". */
+	accessibilityHint?: string;
 }) {
 	return (
 		<Button
@@ -49,6 +52,7 @@ export function Chip({
 			accessibilityRole="tab"
 			accessibilityState={{ selected }}
 			accessibilityLabel={count === undefined ? label : `${label}, ${count}`}
+			accessibilityHint={accessibilityHint}
 		>
 			{icon ? <Icon as={icon} /> : null}
 			<Text>{label}</Text>
