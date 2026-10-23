@@ -389,7 +389,7 @@ header: each screen starts with a `LargeTitleHeader`.
 | --- | --- | --- |
 | `settings` | pushed screen | the avatar on Home |
 | `start` ("New run") | modal, Space picker in its header | + on Home, "Start a flow" |
-| `search`, `flows`, `computers` | native sheet (`formSheet`, detents 0.6 and 1; search 1) | Home |
+| `search`, `flows` (`?projectId=…` for one project), `computers` | native sheet (`formSheet`, detents 0.6 and 1; search 1) | Home, a project |
 | `projects/[projectId]` | pushed screen | a project row |
 | `runs/[runId]` | pushed screen | a run row, a push |
 | `gates/[runId]/[stepId]` | modal | a Gate row, a push, `nightshift://gates/<runId>/<stepId>` |
@@ -435,6 +435,25 @@ each composed from Reusables pieces and the tokens:
 Each row and tile is one accessible element with a full label ("Needs you,
 Review the plan, website, waited 12 min"). Targets are at least 44 pt. Rows
 have no fixed heights, so Dynamic Type grows them.
+
+**Home.** Every Space you are in, from `dashboard.summary({ everySpace:
+true })` and `gates.list` (`features/home`, pure logic in `last-night.ts`).
+"Last night" is the latest night with runs (noon to noon on the phone's
+clock). Its line gives the night and the starts of its runs ("Wed 22 Oct
+· 4 runs, 18:02–03:15"; "12 runs, the newest at 03:15" when the summary
+lists only the newest five). Four tiles: Finished and Failed (that
+night's counts from the night ranges), Needs you (the Gates you may
+answer now) and Spent (the night's cost). The run time under Spent is
+the time runs were at work in the last 24 hours, Gates included: the
+Host counts no agent time per night. Then Needs you (the five oldest
+Gates you may answer), Running now (the running runs among the oldest
+open runs and the night's newest runs; the count is every running run),
+Ended last night (the night's runs that ended, newest first) and Your
+work. Search (`features/search`) filters what the phone loaded: the open
+Gates of every Space and the runs of the active Space. Flows
+(`features/dashboard`) shows each project over every Space, or each flow
+of one project with `/flows?projectId=…`. Computers (`features/devices`)
+lists the Host and the paired computers, online first.
 
 **What the sketch shows that the Host has no data for.** Left out until the
 Host has it:
