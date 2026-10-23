@@ -1,7 +1,8 @@
 # Builds main every night and publishes it to the rolling `nightly`
 # prerelease. Apps with "Get Nightly Builds" on update from there. The Docker
-# image of the same build gets the `nightly` tag. A night
-# without new commits is skipped. Run it from the Actions tab to build now.
+# image of the same build gets the `nightly` tag. A night without new
+# commits skips the apps, but builds the image again: it then gets the newest
+# Debian security fixes. Run it from the Actions tab to build now.
 name: Nightly
 
 on:
@@ -33,10 +34,10 @@ jobs:
         run: |
           sha="$(git rev-parse HEAD)"
           last="$(git rev-parse -q --verify 'refs/tags/nightly^{commit}' || true)"
+          build=true
           if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$last" = "$sha" ]; then
-            echo "The nightly build of $sha exists."
-            echo "build=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "The nightly build of $sha exists. Only the image builds again."
+            build=false
           fi
           # Nightly builds are prereleases of the next patch version.
           stable="$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
@@ -46,7 +47,7 @@ jobs:
           else
             next="0.1.0"
           fi
-          echo "build=true" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "version=$next-nightly.$(date -u +%Y%m%d).$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
 
@@ -61,9 +62,9 @@ jobs:
     secrets: inherit
 
   # The Docker image of the same build, as `nightly` and its version.
+  # It builds every night, also without new commits.
   image:
     needs: plan
-    if: needs.plan.outputs.build == 'true'
     uses: ./.github/workflows/docker.yml
     permissions:
       contents: read
