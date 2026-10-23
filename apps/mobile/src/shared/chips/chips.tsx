@@ -78,7 +78,9 @@ export function ChipRail({ children }: { children: ReactNode }) {
 
 /**
  * One filter of a ChipRail: a rounded Button, `default` when it is
- * chosen and `outline` when not, with an optional count. 44 pt high.
+ * chosen and `outline` when not, with an optional count. 44 pt high. A
+ * screen reader hears a filter as a tab; a chip that does something else
+ * (opens a sheet, flips the order, clears a filter) takes `role="button"`.
  */
 export function Chip({
 	label,
@@ -86,6 +88,7 @@ export function Chip({
 	selected = false,
 	icon,
 	onPress,
+	role = "tab",
 	accessibilityHint,
 }: {
 	label: string;
@@ -94,6 +97,8 @@ export function Chip({
 	selected?: boolean;
 	icon?: LucideIcon;
 	onPress: () => void;
+	/** "tab": one filter of the rail. "button": a chip that acts. */
+	role?: "tab" | "button";
 	/** What a tap does, when the label does not say it: "Shows the runs of every project". */
 	accessibilityHint?: string;
 }) {
@@ -116,8 +121,8 @@ export function Chip({
 			// At least 44 pt, and taller with large text.
 			className="h-auto min-h-11 rounded-full px-4 py-2"
 			onPress={onPress}
-			accessibilityRole="tab"
-			accessibilityState={{ selected }}
+			accessibilityRole={role}
+			accessibilityState={role === "tab" ? { selected } : undefined}
 			accessibilityLabel={count === undefined ? label : `${label}, ${count}`}
 			accessibilityHint={accessibilityHint}
 		>

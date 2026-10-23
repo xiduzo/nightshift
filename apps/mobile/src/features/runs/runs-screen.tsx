@@ -170,6 +170,7 @@ export function RunsScreen() {
 							setLimit(RUNS_PAGE);
 							clearProject();
 						}}
+						role="button"
 						accessibilityHint="Shows the runs of every project"
 					/>
 				) : null}

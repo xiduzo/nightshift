@@ -130,12 +130,20 @@ function FilterChips({ gates, view }: { gates: OpenGate[]; view: InboxView }) {
 				icon={ListFilter}
 				selected={!all}
 				onPress={() => router.push("/inbox-filter")}
+				role="button"
+				accessibilityHint="Opens the list of projects and Spaces"
 			/>
 			<Chip
 				label={view.sort === "oldest" ? "Oldest first" : "Newest first"}
 				icon={ArrowDownUp}
 				onPress={() =>
 					setInboxView({ sort: view.sort === "oldest" ? "newest" : "oldest" })
+				}
+				role="button"
+				accessibilityHint={
+					view.sort === "oldest"
+						? "Shows the newest Gates first"
+						: "Shows the oldest Gates first"
 				}
 			/>
 		</ChipRail>
