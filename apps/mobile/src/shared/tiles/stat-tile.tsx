@@ -63,7 +63,14 @@ export function StatTile({
 			{value === undefined ? (
 				<Skeleton className="my-1 h-8 w-14" />
 			) : (
-				<Text className="font-semibold text-3xl tabular-nums">{value}</Text>
+				<Text
+					className="font-semibold text-3xl tabular-nums"
+					// A big number shrinks to fit rather than break: "$0.0 / 0".
+					numberOfLines={1}
+					adjustsFontSizeToFit
+				>
+					{value}
+				</Text>
 			)}
 			{caption ? (
 				<Text

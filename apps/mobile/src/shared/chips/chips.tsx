@@ -113,7 +113,8 @@ export function Chip({
 				if (first && selected) reveal?.(x, width, false);
 			}}
 			variant={selected ? "default" : "outline"}
-			className="h-11 rounded-full px-4"
+			// At least 44 pt, and taller with large text.
+			className="h-auto min-h-11 rounded-full px-4 py-2"
 			onPress={onPress}
 			accessibilityRole="tab"
 			accessibilityState={{ selected }}

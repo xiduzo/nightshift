@@ -4,7 +4,7 @@ import { cn } from "@nightshift/ui-native/lib/utils";
 import { type Href, Link } from "expo-router";
 import { Check, ChevronRight, type LucideIcon } from "lucide-react-native";
 import { Fragment, type ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, useWindowDimensions, View } from "react-native";
 
 import { iconOf, StatusText } from "@/shared/status";
 import { type Look, TONE_CLASS, type Tone } from "@/shared/tone";
@@ -81,6 +81,8 @@ export function ListRow({
 	disabled,
 }: ListRowProps) {
 	const opens = href !== undefined || onPress !== undefined;
+	// With large text the value moves under the title, so the title keeps its width.
+	const stacked = useWindowDimensions().fontScale >= 1.35;
 	const leadIcon = icon ?? (look ? iconOf(look.icon) : undefined);
 	const leadTone = tone ?? look?.tone ?? "neutral";
 	const label =
@@ -120,8 +122,13 @@ export function ListRow({
 				{status ? <StatusText look={status} /> : null}
 				<CaptionLine caption={caption} />
 				<CaptionLine caption={detail} />
+				{value && stacked ? (
+					<Text className="text-muted-foreground text-sm tabular-nums">
+						{value}
+					</Text>
+				) : null}
 			</View>
-			{value ? (
+			{value && !stacked ? (
 				<Text className="text-muted-foreground text-sm tabular-nums">
 					{value}
 				</Text>
