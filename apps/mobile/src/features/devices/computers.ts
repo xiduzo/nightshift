@@ -47,3 +47,16 @@ export function computersOf(overview: DevicesOverview): Computer[] {
 			]
 		: paired;
 }
+
+/** The line under the title: "2 of 3 online", or how your one computer is. */
+export function onlineSummary(
+	computers: readonly Pick<Computer, "online">[],
+): string {
+	const online = computers.filter((computer) => computer.online).length;
+	if (computers.length === 1) {
+		return online === 1
+			? "Your computer is online"
+			: "Your computer is offline";
+	}
+	return `${online} of ${computers.length} online`;
+}
