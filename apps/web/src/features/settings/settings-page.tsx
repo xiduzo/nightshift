@@ -13,6 +13,7 @@ import { NotificationSettingsCard } from "@/features/notifications";
 import { PageHeading, SiteHeader } from "@/shared/page";
 import { AgentDefaultsCard } from "./components/agent-defaults-card";
 import { AppearanceCard } from "./components/appearance-card";
+import { CleanupCard } from "./components/cleanup-card";
 import { PhoneCard } from "./components/phone-card";
 import { RunPolicyCard } from "./components/run-policy-card";
 import { RunsCard } from "./components/runs-card";
@@ -39,6 +40,7 @@ export function SettingsPage() {
 						<>
 							<RunsCard data={settings.data} />
 							<RunPolicyCard data={settings.data} />
+							<CleanupCard data={settings.data} />
 							<AgentDefaultsCard data={settings.data} />
 						</>
 					) : settings.error ? (

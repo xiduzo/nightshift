@@ -124,6 +124,22 @@ const DEFS = {
 		env: "NIGHTSHIFT_RESUME_INTERRUPTED_RUNS",
 		fromEnv: onOff,
 	} satisfies Def<boolean>,
+	/**
+	 * The cleanup of run worktrees and branches on this computer: an ended
+	 * run's worktree and local branches go once the run is
+	 * `cleanUpAfterDays` old, and only when its work is merged or pushed
+	 * and nothing is left uncommitted (`cleanup/`).
+	 */
+	cleanUpRuns: {
+		schema: z.boolean(),
+		default: true,
+		env: "NIGHTSHIFT_CLEAN_UP_RUNS",
+		fromEnv: onOff,
+	} satisfies Def<boolean>,
+	cleanUpAfterDays: {
+		schema: z.number().int().min(1).max(365),
+		default: 14,
+	} satisfies Def<number>,
 	claudeBin: {
 		schema: z.string().trim().min(1),
 		default: "claude",
@@ -321,7 +337,12 @@ export type SettingsView = {
 /** The settings the engine reads when they apply. */
 export type RunSettings = Pick<
 	Settings,
-	"scheduler" | "maxConcurrentRuns" | "maxStepsPerRun" | "resumeInterruptedRuns"
+	| "scheduler"
+	| "maxConcurrentRuns"
+	| "maxStepsPerRun"
+	| "resumeInterruptedRuns"
+	| "cleanUpRuns"
+	| "cleanUpAfterDays"
 > & { policy: Omit<ResolvedPolicy, "maxSteps" | "resumeInterruptedRuns"> };
 
 export type SettingsStore = {
@@ -445,6 +466,8 @@ export function createSettingsStore(options: {
 				maxConcurrentRuns: s.maxConcurrentRuns,
 				maxStepsPerRun: s.maxStepsPerRun,
 				resumeInterruptedRuns: s.resumeInterruptedRuns,
+				cleanUpRuns: s.cleanUpRuns,
+				cleanUpAfterDays: s.cleanUpAfterDays,
 				policy: {
 					usageLimitFirstWaitMinutes: s.usageLimitFirstWaitMinutes,
 					usageLimitMaxWaitMinutes: s.usageLimitMaxWaitMinutes,
@@ -462,6 +485,8 @@ export function defaultRunSettings(): RunSettings {
 		maxConcurrentRuns: DEFS.maxConcurrentRuns.default,
 		maxStepsPerRun: DEFS.maxStepsPerRun.default,
 		resumeInterruptedRuns: DEFS.resumeInterruptedRuns.default,
+		cleanUpRuns: DEFS.cleanUpRuns.default,
+		cleanUpAfterDays: DEFS.cleanUpAfterDays.default,
 		policy: {
 			usageLimitFirstWaitMinutes: DEFS.usageLimitFirstWaitMinutes.default,
 			usageLimitMaxWaitMinutes: DEFS.usageLimitMaxWaitMinutes.default,

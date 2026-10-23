@@ -1,6 +1,7 @@
 import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { isCustomHarness } from "@nightshift/flows";
 import { createArtifactStore } from "../artifacts";
+import { createRunCopies, startCleanupJob } from "../cleanup";
 import type { Engine, EngineOptions, StartRunInput } from "../contract";
 import { defaultRunSettings, type RunSettings } from "../device-config";
 import { createFlowFiles } from "../flows";
@@ -21,6 +22,7 @@ import {
 } from "../log";
 import {
 	createProjects,
+	createRunBranches,
 	createSpaceDocuments,
 	createWorktrees,
 	systemGit,
@@ -64,6 +66,8 @@ import { wakeOfflineSleeps } from "./wake";
  * - `read/read-model.ts`: the summaries, `getRun`, `listGates`, `watchRun`.
  * - `flows/`: the flow files of a project. `schedules/`: the scheduler and
  *   the schedules file.
+ * - `cleanup/`: what ended runs left on this computer (worktrees and
+ *   branches), their removal, and the scheduled sweep.
  * - `projects/`: projects by remote and their Clones on this computer,
  *   over the git port. A project is defined in its Space document. Its
  *   `project` row is the document's projection.
@@ -98,6 +102,10 @@ export type EngineInternals = {
 	runLog?: RunLog;
 	/** How often the runner looks for steps past their time limits that their timers missed. Default 5 000 ms. */
 	overdueSweepMs?: number;
+	/** How long after the engine is ready the cleanup of run copies first sweeps. Default 60 000 ms. */
+	cleanupDelayMs?: number;
+	/** How often the cleanup of run copies sweeps. Default 6 h. */
+	cleanupEveryMs?: number;
 };
 
 export function createEngine(
@@ -352,6 +360,31 @@ export function createEngine(
 		personOnHost: peers.personOnHost,
 	};
 
+	/** What runs left on this computer: the overview, its two actions, and the scheduled cleanup. */
+	const runCopies = createRunCopies({
+		db,
+		log: runLog,
+		branches: createRunBranches(git),
+		projects,
+		listRuns: reads.listRuns,
+		runRow: (runId) => getRunRow(db, runId),
+		runStatus: reads.runStatus,
+		isActive: (runId) => runner.isActive(runId),
+		now,
+		settings: runSettings,
+	});
+	startCleanupJob({
+		sweep: runCopies.sweep,
+		ready,
+		signal,
+		...(internals.cleanupDelayMs !== undefined
+			? { delayMs: internals.cleanupDelayMs }
+			: {}),
+		...(internals.cleanupEveryMs !== undefined
+			? { everyMs: internals.cleanupEveryMs }
+			: {}),
+	});
+
 	const space = createSpaces({
 		ready,
 		signal,
@@ -363,6 +396,7 @@ export function createEngine(
 		runIdsOfProject: (projectId) => runIdsOfProject(db, projectId),
 		runRow: (runId) => getRunRow(db, runId),
 		listBranches,
+		runCopies,
 		placement,
 		flowFiles: createFlowFiles({
 			find: projects.find,

@@ -35,6 +35,7 @@ export type {
 	PendingInvitation,
 	Project,
 	ProjectCheck,
+	RunCopy,
 	RunDetail,
 	RunStatus,
 	RunSummary,

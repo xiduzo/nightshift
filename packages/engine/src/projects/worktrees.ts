@@ -6,7 +6,8 @@ import { type Git, gitOrThrow, systemGit } from "./git";
 /**
  * Clones and run worktrees over the git port (`git.ts`). A run's worktree
  * lives in a sibling directory of the user's clone:
- * `<parent>/<repo>.nightshift/<short>`. Nothing here deletes a worktree.
+ * `<parent>/<repo>.nightshift/<short>`. Nothing here deletes a worktree:
+ * `run-branches.ts` removes them, when `cleanup/` says so.
  */
 
 export function worktreeLocation(repoPath: string, shortId: string) {

@@ -8,6 +8,7 @@ import type {
 	ScheduleIssue,
 } from "@nightshift/flows";
 import type { Artifact } from "../artifacts";
+import type { RunCopies } from "../cleanup";
 import type { FlowUse } from "../flows";
 import type { LandedRunListener } from "../log";
 import type { Branches, Project } from "../projects";
@@ -123,6 +124,29 @@ export interface SpaceEngine {
 
 	/** The local and remote branches of the project's clone, newest first. A run can start from one. */
 	listBranches(projectId: string): Promise<Branches>;
+
+	/**
+	 * The project's runs with a worktree or local branches left on this
+	 * computer, newest first: whether each is merged into the default
+	 * branch, pushed, or has work that is only here. Also the runs whose
+	 * leftovers were removed. Read-only, no fetch.
+	 */
+	listRunCopies(projectId: string): Promise<RunCopies>;
+	/**
+	 * Removes the run's worktree on this computer; its branches stay.
+	 * Refuses a run that is still open, and a worktree with changes that
+	 * are not committed unless `force`.
+	 */
+	removeRunCopy(runId: string, options?: { force?: boolean }): Promise<void>;
+	/**
+	 * Deletes the run's local branches on this computer, never a branch on
+	 * origin. Refuses while its worktree is there, a run that is still
+	 * open, and commits that are only on this computer unless `force`.
+	 */
+	deleteRunBranches(
+		runId: string,
+		options?: { force?: boolean },
+	): Promise<void>;
 
 	/**
 	 * The flow files in the project's clone, `.nightshift/flows/*.json`:

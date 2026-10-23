@@ -1,4 +1,5 @@
 import type { ArtifactStore } from "../artifacts";
+import type { RunCopiesService } from "../cleanup";
 import type {
 	Actor,
 	PlacementPort,
@@ -58,6 +59,11 @@ export type SpacesDeps = {
 	/** The run's row, or "not found". */
 	runRow(runId: string): Promise<RunRow>;
 	listBranches(repoPath: string): Promise<Branches>;
+	/** What runs left on this computer, and their removal. */
+	runCopies: Pick<
+		RunCopiesService,
+		"list" | "removeRunCopy" | "deleteRunBranches"
+	>;
 	placement: Pick<PlacementPort, "devicesFor" | "placements">;
 	flowFiles: FlowFiles;
 	scheduleFiles: ScheduleFiles;
@@ -178,6 +184,21 @@ export function createSpaces(deps: SpacesDeps) {
 				await ready;
 				const row = await projects.get(projectId, spaceId);
 				return deps.listBranches(row.repoPath);
+			},
+
+			async listRunCopies(projectId) {
+				await ready;
+				return deps.runCopies.list(spaceId, projectId);
+			},
+
+			async removeRunCopy(runId, options) {
+				await ready;
+				await deps.runCopies.removeRunCopy(spaceId, runId, options);
+			},
+
+			async deleteRunBranches(runId, options) {
+				await ready;
+				await deps.runCopies.deleteRunBranches(spaceId, runId, options);
 			},
 
 			async listDevices(projectId) {
