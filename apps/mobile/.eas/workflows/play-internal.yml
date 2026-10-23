@@ -1,0 +1,18 @@
+# Builds the Android app and sends it to the internal testing track of Google Play.
+# Run it with: eas workflow:run .eas/workflows/play-internal.yml
+name: Play internal testing
+
+jobs:
+  build_android:
+    name: Build Android
+    type: build
+    params:
+      platform: android
+      profile: production
+
+  submit_android:
+    name: Submit to Google Play
+    needs: [build_android]
+    type: submit
+    params:
+      build_id: ${{ needs.build_android.outputs.build_id }}

@@ -745,7 +745,7 @@ Taken on 2026-10-21:
 | Mobile UI kit | HeroUI Native (the template's), RN Reusables, or `@expo/ui` | **React Native Reusables** on Uniwind, in `@nightshift/ui-native`. The shadcn-only rule of `AGENTS.md` extends to mobile. |
 | Skeleton | Hand-made Expo app, or Better-T-Stack | **Better-T-Stack** `native-uniwind` (Expo SDK 58, Expo Router), then the vertical rules of `STRUCTURE.md`. |
 | Editing from the phone | Read and act, or also flows and schedules | **Read and act.** |
-| Distribution | Personal build, or the stores | **TestFlight, internal testers only**, for daily use. A development build to work on the app. See [Getting the app on a phone](#getting-the-app-on-a-phone). |
+| Distribution | Personal build, or the stores | **TestFlight and Google Play internal testing**, for daily use. A development build to work on the app. See [Getting the app on a phone](#getting-the-app-on-a-phone). |
 
 ## Getting the app on a phone
 
@@ -765,25 +765,54 @@ Decided on 2026-10-23. The app has native code (`expo-widgets`,
   Review. `ITSAppUsesNonExemptEncryption: false` in the `infoPlist` of
   `app.json` skips the export question on each build.
 
-The EAS workflow `apps/mobile/.eas/workflows/testflight.yml` builds and
-submits a TestFlight build. Start it by hand, so it does not use a build of
-the EAS quota on every push:
+- **Google Play internal testing build** (`production` profile, an `.aab`),
+  to use the app on Android. `eas.json` sends it to the `internal` track.
+  Testers join through the opt-in link of that track. It needs no Play
+  review.
+
+Three EAS workflows in `apps/mobile/.eas/workflows/` build and submit. Start
+them by hand, so they do not use builds of the EAS quota on every push:
 
 ```bash
 cd apps/mobile
-eas workflow:run .eas/workflows/testflight.yml
+eas workflow:run .eas/workflows/testflight.yml     # iOS only
+eas workflow:run .eas/workflows/play-internal.yml  # Android only
+eas workflow:run .eas/workflows/release.yml        # both
 ```
 
-The workflow runs without questions. So run the first build once by hand
-(`eas build --platform ios --profile production --auto-submit`). It creates
-the App Store signing profile, the App Store Connect app and its API key.
+The workflows run without questions. So each store needs a setup by hand
+first:
+
+- **iOS.** Run the first build once by hand
+  (`eas build --platform ios --profile production --auto-submit`). It
+  creates the App Store signing profile, the App Store Connect app and its
+  API key.
+- **Android.** Google Play has no API to create an app or to take its first
+  upload.
+  1. Create the app in the Play Console with the package
+     `dev.nightshift.mobile`.
+  2. Build once by hand (`eas build --platform android --profile production`).
+     EAS creates the upload keystore.
+  3. Upload that `.aab` by hand to the internal testing track and roll it
+     out.
+  4. Create a Google Cloud service account, invite it in the Play Console
+     with release rights, and give its JSON key to EAS (`eas credentials`,
+     Android, Google Service Account).
+
+  While the app is a draft, Google accepts only draft releases. If a submit
+  fails with that message, set `"releaseStatus": "draft"` next to `track` in
+  `eas.json` until the first rollout is done.
+
+Push on Android needs Firebase Cloud Messaging: a `google-services.json`
+(`android.googleServicesFile` in `app.json`) and the FCM V1 key on EAS. The
+app does not have these yet, so an Android phone does not get Gate pushes.
 
 ## Out of scope
 
 These need the user's own accounts, or a decision about other people's
 Hosts:
 
-- App Store and Play release. TestFlight for internal testers is in scope.
+- App Store and Play release. TestFlight and Play internal testing are in scope.
 - A publisher push relay for other people's Hosts.
 - Apple Watch.
 - End-to-end encrypted push.
