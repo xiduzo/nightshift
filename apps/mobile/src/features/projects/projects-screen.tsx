@@ -1,36 +1,55 @@
-import { createProjectQueries } from "@nightshift/client";
+import {
+	createGateQueries,
+	createProjectQueries,
+	createRunQueries,
+} from "@nightshift/client";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { FolderGit2 } from "lucide-react-native";
+import { useMemo } from "react";
 
 import { useHostQueries } from "@/features/host";
 import { SpacePicker } from "@/features/spaces";
-import { InitialsAvatar } from "@/shared/avatar";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { LargeTitleHeader } from "@/shared/header";
-import { ListGroup, ListRow } from "@/shared/list";
+import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useScreenRefresh } from "@/shared/refresh";
+import { projectOverviews, projectsSummary } from "./overview";
+import { ProjectRow } from "./rows";
 
-/** The projects of the Space you chose in the header. A tap opens one. */
+/**
+ * The projects of the Space you chose in the header: for each, what needs
+ * you and its last run. A tap opens one.
+ */
 export function ProjectsScreen() {
 	const projectQueries = useHostQueries(createProjectQueries);
+	const gateQueries = useHostQueries(createGateQueries);
+	const runQueries = useHostQueries(createRunQueries);
 	const projects = useQuery(projectQueries.list());
-	const refresh = useScreenRefresh([projects.refetch]);
+	const gates = useQuery(gateQueries.open());
+	const runs = useQuery(runQueries.everyRunLive());
+	const refresh = useScreenRefresh([
+		projects.refetch,
+		gates.refetch,
+		runs.refetch,
+	]);
+
 	const list = projects.data;
+	const overviews = useMemo(
+		() => projectOverviews(list ?? [], gates.data ?? [], runs.data ?? []),
+		[list, gates.data, runs.data],
+	);
+	const needsYou = overviews.reduce((sum, row) => sum + row.needsYou, 0);
+	// The rows render again on each poll: often enough for "3 h ago".
+	const now = Math.max(runs.dataUpdatedAt, gates.dataUpdatedAt) || Date.now();
 
 	return (
 		<Screen onRefresh={refresh}>
 			<LargeTitleHeader
 				title="Projects"
-				summary={
-					list
-						? list.length === 1
-							? "1 project in this Space"
-							: `${list.length} projects in this Space`
-						: undefined
-				}
+				summary={list ? projectsSummary(list.length, needsYou) : undefined}
 				actions={<SpacePicker />}
 			/>
 			{list ? (
@@ -42,16 +61,11 @@ export function ProjectsScreen() {
 					/>
 				) : (
 					<ListGroup>
-						{list.map((project) => (
-							<ListRow
-								key={project.id}
-								leading={<InitialsAvatar name={project.name} />}
-								title={project.name}
-								caption={project.remote ?? undefined}
-								href={{
-									pathname: "/projects/[projectId]",
-									params: { projectId: project.id },
-								}}
+						{overviews.map((overview) => (
+							<ProjectRow
+								key={overview.project.id}
+								overview={overview}
+								now={now}
 							/>
 						))}
 					</ListGroup>
