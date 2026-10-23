@@ -404,16 +404,26 @@ A secondary view is a route with a native presentation, never a hand-built
 overlay. The inbox is `/inbox`: a tap on a "gates waiting" push, the
 in-front banner rule, the home widget (`nightshift://inbox`) and the Gate
 screen's way back all go there. `/` is Home. `/inbox?project=<id>` opens
-the inbox on one project.
+the inbox on one project. The tabs stay under every root screen, so a
+root screen goes back to a tab with `dismissTo` (`Link dismissTo`,
+`router.dismissTo`), never `navigate` or `push`, which would open a second
+set of tabs. Every root screen that needs the session is wrapped in
+`SignedInOnly` (`features/host`): signed out, it goes to `connect`. Sign
+out and Remove this phone clear the stack before they open `connect`.
 
 **The inbox and a Gate.** The Inbox groups the open Gates of every Space
 by project ("Space · project" when you are in more than one Space), oldest
 first. Chips choose all Gates, a Space or a project (the `inbox-filter`
-sheet), and the order. The Gate screen shows the question, its short
+sheet), and the order. One `GateRow` (`features/inbox`) shows a Gate on
+Home, the Inbox, Search, a project and a run: "project · flow", the
+question, then its status word (`gateLook`: Needs you, Answer on its
+way, Waits for another person), its choices and node, and how long it
+waited. The Gate screen shows the question, its short
 labelled values as tiles ("At a glance"), the run's steps as a trail, its
 links, and the choices as cards in a RadioGroup. Where each choice leads
-comes from the run's flow edges (`nextEdge`): "Goes to Build", or "Ends
-the run". A red choice, or one that ends the run, asks in an AlertDialog
+comes from the run's flow edges by the engine's own rule
+(`choiceRoutes` of `@nightshift/client`, on `nextEdge` of
+`@nightshift/flows`): "Goes to Build", or "Ends the run". A red choice, or one that ends the run, asks in an AlertDialog
 first. The bar at the bottom sends the answer, after the biometric check.
 Then a Sent card offers the next Gate or the way back to the inbox. The
 run's steps, flow and transcript load only in the Space this phone works
@@ -440,9 +450,9 @@ each composed from Reusables pieces and the tokens:
 
 | Folder | Block | Props |
 | --- | --- | --- |
-| `tone` | the status map, pure | `Tone`, `Look` (`tone`, `icon`, `label`), `runStatusLook(status)`, `stepLook({ state, outcome, nodeType }, runStatus?)`, `stepKind(step)`, `NEEDS_YOU`, `TONE_CLASS[tone]` (`text`, `badge` classes) |
+| `tone` | the status map, pure | `Tone`, `Look` (`tone`, `icon`, `label`), `runStatusLook(status)`, `stepLook({ state, outcome, nodeType }, runStatus?)`, `stepKind(step)`, `NEEDS_YOU`, `gateLook({ canAnswer, answerPending })` (Needs you, Answer on its way, Waits for another person), `TONE_CLASS[tone]` (`text`, `badge` classes) |
 | `status` | `StatusBadge`, `StatusText`, `iconOf` | `look` (outline Badge with icon and word; or icon and word in a line) |
-| `list` | `ListGroup`, `ListRow`, `SwitchRow`, `SectionHead` | ListRow: `title`, `titleLines`, `overline`, `status` (a `Look` as a line of icon and word under the title), `caption`, `detail` (a string or parts, a part may be `mono` or take a `tone`), `icon` + `tone` or `look`, `iconLabel`, `leading`, `value`, `valueLabel`, `href` or `onPress`, `chevron`, `selected` (a check at the end, for a row you choose from a list), `disabled`, `accessibilityLabel`, `accessibilityHint`. SwitchRow: `title`, `caption`, `checked`, `onChange`, `disabled` (the whole row is one switch). SectionHead: `title`, `hint`, `seeAll` (`href` or `onPress`) |
+| `list` | `ListGroup`, `ListRow`, `SwitchRow`, `SectionHead` | ListRow: `title`, `titleLines`, `overline`, `status` (a `Look` as a line of icon and word under the title), `caption`, `detail` (a string or parts, a part may be `mono` or take a `tone`), `icon` + `tone` or `look`, `iconLabel`, `leading`, `value`, `valueLabel`, `href` (with `dismissTo` to go back to a tab under a root screen) or `onPress`, `chevron`, `selected` (a check at the end, for a row you choose from a list), `disabled`, `accessibilityLabel`, `accessibilityHint`. SwitchRow: `title`, `caption`, `checked`, `onChange`, `disabled` (the whole row is one switch). SectionHead: `title`, `hint`, `seeAll` (`href` and `dismissTo`, or `onPress`) |
 | `header` | `LargeTitleHeader`, `HeaderButton`, `AvatarButton` | `title`, `summary`, `leading`, `actions`, `compact`; buttons: `icon` or `name`, `label`, `hint`, `href` or `onPress` (44 pt, round) |
 | `avatar` | `InitialsAvatar` | `name`, `size` (`sm` row, `md` header) |
 | `tiles` | `StatTile`, `StatGrid`, `FactTile`, `FactGrid` | StatTile: `value` (undefined loads), `label`, `icon`, `tone`, `caption`, `detail`, `href` or `onPress`. FactTile: `label`, `value`, `sub`, `mono`, `look`, `wide` (a row of its own, for a run id). Grids: two by two. A StatTile number shrinks to fit on one line |
@@ -471,7 +481,7 @@ night's counts from the night ranges), Needs you (the Gates you may
 answer now) and Spent (the night's cost). The run time under Spent is
 the time runs were at work in the last 24 hours, Gates included: the
 Host counts no agent time per night. Then Needs you (the five oldest
-Gates you may answer), Running now (the running runs among the oldest
+Gates you may answer that nobody answered yet), Running now (the running runs among the oldest
 open runs and the night's newest runs; the count is every running run),
 Ended last night (the night's runs that ended, newest first) and Your
 work. Search (`features/search`) filters what the phone loaded: the open

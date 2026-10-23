@@ -1,19 +1,10 @@
-import {
-	gateParts,
-	gateRun,
-	type OpenGate,
-	type RunSummary,
-	waitedText,
-} from "@nightshift/client";
-import { GitPullRequest } from "lucide-react-native";
+import type { RunSummary } from "@nightshift/client";
 
 import { InitialsAvatar } from "@/shared/avatar";
 import { ListRow } from "@/shared/list";
 import { runStatusLook } from "@/shared/tone";
 import { projectLinks } from "./links";
 import {
-	choicesText,
-	gateLook,
 	lastRunText,
 	needsYouText,
 	type ProjectOverview,
@@ -41,31 +32,6 @@ export function ProjectRow({
 			detail={lastRunText(lastRun, now)}
 			href={projectLinks.page(project.id)}
 			accessibilityHint="Opens the project"
-		/>
-	);
-}
-
-/** An open Gate of a project: what it asks, its run, its choices and how long it has waited. */
-export function ProjectGateRow({ gate, now }: { gate: OpenGate; now: number }) {
-	const { flow, detail } = gateRun(gate);
-	const waited = waitedText(now - gate.openedAt);
-	const { headline, links } = gateParts(gate.question);
-	// As in the inbox: a pull-request icon when the Gate links one.
-	const pull = links.some((link) => link.kind === "pull");
-	return (
-		<ListRow
-			look={gateLook(gate)}
-			icon={pull ? GitPullRequest : undefined}
-			overline={detail ? `${flow} · ${detail}` : flow}
-			title={headline}
-			caption={[
-				choicesText(gate.choices.length),
-				{ text: gate.nodeId, mono: true },
-			]}
-			value={waited}
-			valueLabel={`waited ${waited}`}
-			href={projectLinks.gate(gate)}
-			accessibilityHint="Opens the Gate"
 		/>
 	);
 }

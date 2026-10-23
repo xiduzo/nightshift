@@ -5,14 +5,7 @@ import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import {
-	ArrowDownUp,
-	GitPullRequest,
-	Hand,
-	Inbox,
-	ListFilter,
-	Search,
-} from "lucide-react-native";
+import { ArrowDownUp, Inbox, ListFilter, Search } from "lucide-react-native";
 import { useEffect } from "react";
 import { View } from "react-native";
 
@@ -22,12 +15,12 @@ import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { HeaderButton, LargeTitleHeader } from "@/shared/header";
-import { ListGroup, ListRow } from "@/shared/list";
+import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
+import { GateRow } from "./gate-row";
 import { setInboxView, useInboxView } from "./inbox-filter";
 import {
 	ALL_GATES,
-	gateRowText,
 	type InboxView,
 	inboxGroups,
 	inboxSummary,
@@ -203,30 +196,4 @@ function GateGroups({
 			</ListGroup>
 		</View>
 	));
-}
-
-/** One Gate: "project · flow", its question, its choices and node, how long it waited. */
-function GateRow({ gate, now }: { gate: OpenGate; now: number }) {
-	const row = gateRowText(gate, now);
-	const needsYou = gate.canAnswer && !gate.answerPending;
-	return (
-		<ListRow
-			icon={row.pullRequest ? GitPullRequest : Hand}
-			tone={needsYou ? "waiting" : "neutral"}
-			iconLabel={needsYou ? "Needs you" : undefined}
-			overline={row.overline}
-			title={row.title}
-			caption={[row.choices, { text: row.nodeId, mono: true }]}
-			detail={row.note ?? undefined}
-			value={row.waited}
-			valueLabel={`waited ${row.waited}`}
-			href={{
-				pathname: "/gates/[runId]/[stepId]",
-				params: { runId: gate.runId, stepId: gate.stepId },
-			}}
-			accessibilityHint={
-				gate.canAnswer ? "Opens the Gate to answer it" : "Opens the Gate"
-			}
-		/>
-	);
 }

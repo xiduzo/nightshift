@@ -26,13 +26,14 @@ import type { ReactNode } from "react";
 import { View } from "react-native";
 
 import { useHostQueries, useSignedIn } from "@/features/host";
+import { GateRow } from "@/features/inbox";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { AvatarButton, HeaderButton, LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { useScreenRefresh } from "@/shared/refresh";
-import { GateRow, NightRunRow } from "./home-rows";
+import { NightRunRow } from "./home-rows";
 import {
 	endedCount,
 	needsYou,

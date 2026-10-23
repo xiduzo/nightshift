@@ -211,7 +211,7 @@ export function choicesText(count: number): string {
 	return count === 1 ? "1 choice" : `${count} choices`;
 }
 
-/** The words of one Gate's row in the inbox. */
+/** The words of one Gate's row. Its status word is `gateLook` of `shared/tone`. */
 export type GateRowText = {
 	/** "website · Feature factory" */
 	overline: string;
@@ -220,8 +220,6 @@ export type GateRowText = {
 	/** "2 choices", then the node id in mono. */
 	choices: string;
 	nodeId: string;
-	/** Why you cannot answer it, or that an answer is on its way. */
-	note: string | null;
 	/** "12 min" */
 	waited: string;
 	/** The question links a pull request: the row shows its icon. */
@@ -238,8 +236,6 @@ export function gateRowText(
 		| "choices"
 		| "nodeId"
 		| "openedAt"
-		| "canAnswer"
-		| "answerPending"
 	>,
 	now: number,
 ): GateRowText {
@@ -250,11 +246,6 @@ export function gateRowText(
 		title: headline,
 		choices: choicesText(gate.choices.length),
 		nodeId: gate.nodeId,
-		note: gate.answerPending
-			? "Someone answered it"
-			: gate.canAnswer
-				? null
-				: "You can read it only",
 		waited: waitedText(now - gate.openedAt),
 		pullRequest: links.some((link) => link.kind === "pull"),
 	};

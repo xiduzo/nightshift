@@ -5,6 +5,7 @@
  */
 
 export {
+	gateLook,
 	type Look,
 	NEEDS_YOU,
 	runStatusLook,

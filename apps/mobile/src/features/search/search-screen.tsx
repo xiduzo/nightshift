@@ -13,9 +13,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { View } from "react-native";
-
-import { GateRow } from "@/features/home";
 import { useHostQueries } from "@/features/host";
+import { GateRow } from "@/features/inbox";
 import { EmptyState } from "@/shared/empty";
 import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";

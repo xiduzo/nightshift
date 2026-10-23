@@ -3,6 +3,8 @@ import { describe, expect, test } from "bun:test";
 import type { RunStatus } from "@nightshift/client";
 
 import {
+	gateLook,
+	NEEDS_YOU,
 	outcomeLook,
 	runStatusLook,
 	stepKind,
@@ -125,5 +127,29 @@ describe("TONE_CLASS", () => {
 			expect(classes.badge.length).toBeGreaterThan(0);
 			if (tone !== "neutral") expect(classes.badge).toContain(tone);
 		}
+	});
+});
+
+describe("gateLook", () => {
+	test("a Gate you may answer needs you", () => {
+		expect(gateLook({ canAnswer: true, answerPending: false })).toEqual(
+			NEEDS_YOU,
+		);
+	});
+
+	test("a Gate you may only read, or one answered, says so in a word", () => {
+		expect(gateLook({ canAnswer: false, answerPending: false })).toEqual({
+			tone: "neutral",
+			icon: "hand",
+			label: "Waits for another person",
+		});
+		expect(gateLook({ canAnswer: true, answerPending: true })).toEqual({
+			tone: "neutral",
+			icon: "circle-check",
+			label: "Answer on its way",
+		});
+		expect(gateLook({ canAnswer: false, answerPending: true }).label).toBe(
+			"Answer on its way",
+		);
 	});
 });

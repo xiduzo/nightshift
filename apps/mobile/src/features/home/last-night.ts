@@ -128,12 +128,16 @@ export function endedCount(summary: DashboardSummary): number | null {
 	return null;
 }
 
-/** The Gates on Home: the ones you may answer, oldest first, at most `limit`. */
-export function needsYou<G extends Pick<OpenGate, "canAnswer">>(
-	gates: readonly G[],
-	limit = 5,
-): G[] {
-	return gates.filter((gate) => gate.canAnswer).slice(0, limit);
+/**
+ * The Gates on Home: the ones you may answer and nobody answered yet, as
+ * in the inbox, oldest first, at most `limit`.
+ */
+export function needsYou<
+	G extends Pick<OpenGate, "canAnswer" | "answerPending">,
+>(gates: readonly G[], limit = 5): G[] {
+	return gates
+		.filter((gate) => gate.canAnswer && !gate.answerPending)
+		.slice(0, limit);
 }
 
 /**

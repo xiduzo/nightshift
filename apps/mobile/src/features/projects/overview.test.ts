@@ -2,9 +2,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-	choicesText,
 	clonesText,
-	gateLook,
 	lastRunText,
 	needsYouText,
 	newestFirst,
@@ -110,11 +108,6 @@ describe("the words", () => {
 			]),
 		).toBe("On 3 computers");
 	});
-
-	test("choicesText counts choices", () => {
-		expect(choicesText(1)).toBe("1 choice");
-		expect(choicesText(2)).toBe("2 choices");
-	});
 });
 
 describe("remoteParts", () => {
@@ -140,16 +133,6 @@ describe("remoteParts", () => {
 		});
 		expect(remoteParts(null)).toBeNull();
 		expect(remoteParts("  ")).toBeNull();
-	});
-});
-
-test("gateLook: a Gate you may answer needs you", () => {
-	expect(gateLook({ canAnswer: true }).label).toBe("Needs you");
-	expect(gateLook({ canAnswer: true }).tone).toBe("waiting");
-	expect(gateLook({ canAnswer: false })).toEqual({
-		tone: "neutral",
-		icon: "hand",
-		label: "Waits for another person",
 	});
 });
 

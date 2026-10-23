@@ -127,6 +127,28 @@ export const NEEDS_YOU: Look = {
 	label: "Needs you",
 };
 
+/**
+ * An open Gate, for the person who looks at it: it needs you, an answer is
+ * on its way, or it waits for another person (you may only read it). The
+ * same Gate reads the same on Home, the Inbox, Search, a project and a run.
+ */
+export function gateLook(gate: {
+	canAnswer: boolean;
+	answerPending: boolean;
+}): Look {
+	if (gate.answerPending) {
+		return {
+			tone: "neutral",
+			icon: "circle-check",
+			label: "Answer on its way",
+		};
+	}
+	if (!gate.canAnswer) {
+		return { tone: "neutral", icon: "hand", label: "Waits for another person" };
+	}
+	return NEEDS_YOU;
+}
+
 /** The outcomes with a fixed look. Any other outcome is a Decision label or a Gate choice. */
 const OUTCOME: Record<string, Look> = {
 	pass: { tone: "pass", icon: "circle-check", label: "Pass" },

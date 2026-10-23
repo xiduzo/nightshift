@@ -4,7 +4,6 @@ import {
 	createProjectQueries,
 	createRunQueries,
 	currentStep,
-	gateParts,
 	hasEnded,
 	markdownPreview,
 	mergeSteps,
@@ -15,7 +14,6 @@ import {
 	type StepSummary,
 	stepName,
 	stepState,
-	waitedText,
 } from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
@@ -36,11 +34,11 @@ import { Share, View } from "react-native";
 
 import { FollowOnLockScreen } from "@/features/glance";
 import { useHost, useHostQueries } from "@/features/host";
+import { GateRow } from "@/features/inbox";
 import { ErrorAlert } from "@/shared/feedback";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { FactGrid, FactTile } from "@/shared/tiles";
-import { NEEDS_YOU } from "@/shared/tone";
 import { StepTrail, trailItemOf } from "@/shared/trail";
 import { RunActions } from "./run-actions";
 import {
@@ -230,34 +228,13 @@ function projectHref(projectId: string): Href {
 	return { pathname: "/projects/[projectId]", params: { projectId } };
 }
 
-/** The answer screen of one Gate. */
-function gateHref(gate: Pick<OpenGate, "runId" | "stepId">): Href {
-	return {
-		pathname: "/gates/[runId]/[stepId]",
-		params: { runId: gate.runId, stepId: gate.stepId },
-	};
-}
-
 /** The Gates of this run that wait for a person. A tap opens the Gate. */
 function GateRows({ gates, now }: { gates: OpenGate[]; now: number }) {
 	return (
 		<ListGroup>
-			{gates.map((gate) => {
-				const waited = waitedText(now - gate.openedAt);
-				const word = gate.canAnswer ? "Needs you" : "Waits for an answer";
-				const headline = gateParts(gate.question).headline;
-				return (
-					<ListRow
-						key={gate.stepId}
-						look={NEEDS_YOU}
-						title={headline}
-						caption={[{ text: word, tone: "waiting" }, `waited ${waited}`]}
-						href={gateHref(gate)}
-						accessibilityLabel={`${word}, ${headline}, waited ${waited}`}
-						accessibilityHint="Opens the Gate"
-					/>
-				);
-			})}
+			{gates.map((gate) => (
+				<GateRow key={gate.stepId} gate={gate} now={now} overline={null} />
+			))}
 		</ListGroup>
 	);
 }

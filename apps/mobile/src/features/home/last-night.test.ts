@@ -182,9 +182,14 @@ describe("nightNumbers", () => {
 describe("needsYou", () => {
 	test("keeps the Gates you may answer, in their order, at most five", () => {
 		const gates = [
-			{ id: 1, canAnswer: true },
-			{ id: 2, canAnswer: false },
-			...[3, 4, 5, 6, 7].map((id) => ({ id, canAnswer: true })),
+			{ id: 1, canAnswer: true, answerPending: false },
+			{ id: 2, canAnswer: false, answerPending: false },
+			{ id: 8, canAnswer: true, answerPending: true },
+			...[3, 4, 5, 6, 7].map((id) => ({
+				id,
+				canAnswer: true,
+				answerPending: false,
+			})),
 		];
 		expect(needsYou(gates).map((gate) => gate.id)).toEqual([1, 3, 4, 5, 6]);
 	});

@@ -3,6 +3,7 @@ import {
 	createGateQueries,
 	createProjectQueries,
 	createRunQueries,
+	gateRun,
 	inboxOrder,
 	type OpenGate,
 	type Project,
@@ -26,6 +27,7 @@ import type { ReactNode } from "react";
 import { Linking, View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
+import { GateRow } from "@/features/inbox";
 import { InitialsAvatar } from "@/shared/avatar";
 import { ErrorAlert } from "@/shared/feedback";
 import { HeaderButton, LargeTitleHeader } from "@/shared/header";
@@ -34,7 +36,7 @@ import { Screen } from "@/shared/page";
 import { useScreenRefresh } from "@/shared/refresh";
 import { projectLinks } from "./links";
 import { clonesText, newestFirst, remoteParts } from "./overview";
-import { ProjectGateRow, ProjectRunRow } from "./rows";
+import { ProjectRunRow } from "./rows";
 
 /** How many Gates and runs a section shows. "See all" opens the rest. */
 const SHOWN = 5;
@@ -119,10 +121,11 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 							gates.data.length > 0 ? (
 								<ListGroup>
 									{gates.data.slice(0, SHOWN).map((gate) => (
-										<ProjectGateRow
+										<GateRow
 											key={`${gate.runId}:${gate.stepId}`}
 											gate={gate}
 											now={now}
+											overline={gateOverline(gate)}
 										/>
 									))}
 								</ListGroup>
@@ -250,6 +253,12 @@ function ProjectHeader({ project }: { project: Project }) {
 			) : null}
 		</View>
 	);
+}
+
+/** The overline of a Gate on its project's page: its flow and run, not the project again. */
+function gateOverline(gate: OpenGate): string {
+	const { flow, detail } = gateRun(gate);
+	return detail ? `${flow} · ${detail}` : flow;
 }
 
 /** A section with nothing in it: one muted line in a Card, and what to do. */

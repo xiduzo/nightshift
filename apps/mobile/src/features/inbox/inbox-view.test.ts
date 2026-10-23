@@ -192,7 +192,6 @@ describe("gateRowText", () => {
 			title: "Ship the fix?",
 			choices: "2 choices",
 			nodeId: "review",
-			note: null,
 			waited: "12 min",
 			pullRequest: false,
 		});
@@ -209,15 +208,9 @@ describe("gateRowText", () => {
 		expect(row.pullRequest).toBe(true);
 	});
 
-	test("a quick run, a Gate you can only read, and one answered elsewhere", () => {
-		expect(
-			gateRowText(gate({ flowName: null, canAnswer: false }), 0),
-		).toMatchObject({
-			overline: "website · Quick run",
-			note: "You can read it only",
-		});
-		expect(gateRowText(gate({ answerPending: true }), 0).note).toBe(
-			"Someone answered it",
+	test("a quick run", () => {
+		expect(gateRowText(gate({ flowName: null }), 0).overline).toBe(
+			"website · Quick run",
 		);
 	});
 

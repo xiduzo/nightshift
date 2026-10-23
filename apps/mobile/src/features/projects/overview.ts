@@ -6,8 +6,6 @@ import {
 	waitedText,
 } from "@nightshift/client";
 
-import { type Look, NEEDS_YOU } from "@/shared/tone";
-
 /**
  * What the Projects tab and a project page say about a project, without
  * React Native: how many Gates need you, its last run, where its copies
@@ -111,18 +109,6 @@ export function remoteParts(
 	// host/owner/repo: the owner is the segment before the repository.
 	const owner = segments.length >= 3 ? (segments.at(-2) ?? null) : null;
 	return { owner, url: `https://${path}` };
-}
-
-/** A Gate you may answer needs you. One you may not answer waits for another person. */
-export function gateLook(gate: Pick<OpenGate, "canAnswer">): Look {
-	return gate.canAnswer
-		? NEEDS_YOU
-		: { tone: "neutral", icon: "hand", label: "Waits for another person" };
-}
-
-/** "2 choices", "1 choice". */
-export function choicesText(count: number): string {
-	return count === 1 ? "1 choice" : `${count} choices`;
 }
 
 /**
