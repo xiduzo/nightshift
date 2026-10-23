@@ -207,7 +207,7 @@ apps/mobile/src/
     page/  empty/          the screen body (Screen, with an optional footer) and the empty state
     feedback/              ErrorAlert: what went wrong on a screen, and how to try again
     format/                a time of day (formatTime); costs and "5 min ago" come from @nightshift/client
-    refresh/               reading a screen again: on focus (useScreenRefresh) and on pull-down (usePullRefresh)
+    refresh/               reading a screen again: on focus and on pull-down (useScreenRefresh)
     theme/                 useThemeColors: the light or dark colors for props that take a color
     tone/                  the status map, pure: tone, icon name and word of a run status, a step, a step kind
     status/                StatusBadge and StatusText: a tone drawn with its icon and word
