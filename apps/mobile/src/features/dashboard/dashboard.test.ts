@@ -129,7 +129,7 @@ describe("statCards", () => {
 		const [running, waiting, , runs] = statCards(summary(), 0);
 		expect(running).toMatchObject({
 			headline: "Nothing running",
-			footer: "Start a flow in the Start tab.",
+			footer: "Tap + on Home to start a run.",
 		});
 		expect(waiting).toMatchObject({
 			headline: "Nothing needs you",

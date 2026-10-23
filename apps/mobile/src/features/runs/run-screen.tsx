@@ -37,9 +37,11 @@ import { FollowOnLockScreen } from "@/features/glance";
 import { useHost, useHostQueries } from "@/features/host";
 import { ErrorAlert } from "@/shared/feedback";
 import { Screen } from "@/shared/page";
+import { FactGrid, FactTile } from "@/shared/tiles";
+import { StepTrail, trailItemOf } from "@/shared/trail";
 import { RunActions } from "./run-actions";
 import { titleDetail } from "./run-row";
-import { RunStatusBadge, StepStateBadge } from "./status-badge";
+import { RunStatusBadge } from "./status-badge";
 import { type LiveRun, useLiveRun } from "./use-live-run";
 
 /**
@@ -123,9 +125,6 @@ function RunBody({
 	const current = hasEnded(status) ? null : currentStep(steps);
 	const message = current ? live.messages.get(current.id) : undefined;
 	const cost = costLabel(run);
-	const facts = [projectName, startedLabel(run.createdAt), cost]
-		.filter((fact): fact is string => fact !== null)
-		.join(" · ");
 
 	return (
 		<>
@@ -140,7 +139,6 @@ function RunBody({
 						) : null}
 					</View>
 					<CardTitle>{titleDetail(run) ?? flowLabel(run)}</CardTitle>
-					<CardDescription>{facts}</CardDescription>
 					{hasEnded(status) && run.reason ? (
 						<Text variant="muted" className="text-muted-foreground">
 							{run.reason}
@@ -150,6 +148,13 @@ function RunBody({
 				<RunActions runId={run.id} status={status} />
 				<FollowOnLockScreen runId={run.id} ended={hasEnded(status)} />
 			</Card>
+
+			<FactGrid>
+				{projectName ? <FactTile label="Project" value={projectName} /> : null}
+				<FactTile label="Started" value={startedLabel(run.createdAt)} />
+				{cost ? <FactTile label="Cost" value={cost} /> : null}
+				<FactTile label="Run" value={run.id} mono />
+			</FactGrid>
 
 			{gates.length > 0 ? <GatesCard gates={gates} /> : null}
 
@@ -177,15 +182,15 @@ function RunBody({
 			<StepsCard
 				steps={steps.filter((step) => step.scope === null)}
 				labels={labels}
+				status={status}
 			/>
 		</>
 	);
 }
 
-/** "Started just now", "Started today 09:41", "Started 3 Oct 14:20". */
+/** "Just now", "Today 09:41", "3 Oct 14:20". */
 function startedLabel(at: number): string {
-	const when = whenLabel(at);
-	return `Started ${when.charAt(0).toLowerCase()}${when.slice(1)}`;
+	return whenLabel(at);
 }
 
 /** The inbox's answer sheet of one Gate. */
@@ -230,14 +235,17 @@ function GatesCard({ gates }: { gates: OpenGate[] }) {
 	);
 }
 
-/** The steps of the run, in the order they started. */
+/** The steps of the run, in the order they started, as a trail. */
 function StepsCard({
 	steps,
 	labels,
+	status,
 }: {
 	steps: StepSummary[];
 	labels: Map<string, string>;
+	status: RunStatus;
 }) {
+	const now = Date.now();
 	return (
 		<Card>
 			<CardHeader>
@@ -249,29 +257,11 @@ function StepsCard({
 						The first step starts soon.
 					</Text>
 				) : (
-					steps.map((step, index) => (
-						<Fragment key={step.id}>
-							{index > 0 ? <Separator /> : null}
-							<View className="flex-row items-center justify-between gap-3">
-								<View className="flex-1 gap-0.5">
-									<Text numberOfLines={1}>{stepName(step, labels)}</Text>
-									{step.error ? (
-										<Text
-											variant="muted"
-											className="text-muted-foreground"
-											numberOfLines={2}
-										>
-											{step.error}
-										</Text>
-									) : null}
-								</View>
-								<StepStateBadge
-									state={stepState(step)}
-									outcome={step.outcome}
-								/>
-							</View>
-						</Fragment>
-					))
+					<StepTrail
+						items={steps.map((step) =>
+							trailItemOf(step, { labels, runStatus: status, now }),
+						)}
+					/>
 				)}
 			</CardContent>
 		</Card>

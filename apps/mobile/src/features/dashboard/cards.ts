@@ -55,7 +55,7 @@ export function statCards(
 			footer:
 				nextWakeAt && sleeping > 0
 					? `${plural(sleeping, "run sleeps", "runs sleep")}. The next wakes at ${formatTime(nextWakeAt)}.`
-					: "Start a flow in the Start tab.",
+					: "Tap + on Home to start a run.",
 			tone: "plain",
 			opens: "runs",
 			finishedShare: null,

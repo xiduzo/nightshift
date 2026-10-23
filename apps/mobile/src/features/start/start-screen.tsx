@@ -12,7 +12,6 @@ import {
 	placementChoices,
 } from "@nightshift/client";
 import type { FlowInputDef } from "@nightshift/flows";
-import { Button } from "@nightshift/ui-native/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -32,6 +31,7 @@ import { View } from "react-native";
 import { canFollowOnLockScreen, useFollowAfterStart } from "@/features/glance";
 import { useHostQueries } from "@/features/host";
 import { openRun } from "@/features/runs";
+import { ActionBar } from "@/shared/action-bar";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
 import { Screen } from "@/shared/page";
@@ -375,27 +375,26 @@ function InputsAndStart({
 				</View>
 			) : null}
 
-			{blocker ? (
-				<Text variant="muted" className="text-center text-muted-foreground">
-					{blocker}
-				</Text>
-			) : null}
-			<Button
-				size="lg"
-				disabled={blocker !== null || !place || start.isPending}
-				onPress={() => {
-					if (!place) return;
-					const filled = filledInputs(inputs, values);
-					start.mutate({
-						projectId,
-						flowName,
-						...(Object.keys(filled).length > 0 ? { inputs: filled } : {}),
-						...(place.thisDevice ? {} : { deviceId: place.deviceId }),
-					});
+			<ActionBar
+				caption={blocker ?? (place ? `Runs on ${place.name}` : undefined)}
+				label={flowName}
+				action={{
+					label: "Start run",
+					busyLabel: "Starting…",
+					busy: start.isPending,
+					disabled: blocker !== null || !place,
+					onPress: () => {
+						if (!place) return;
+						const filled = filledInputs(inputs, values);
+						start.mutate({
+							projectId,
+							flowName,
+							...(Object.keys(filled).length > 0 ? { inputs: filled } : {}),
+							...(place.thisDevice ? {} : { deviceId: place.deviceId }),
+						});
+					},
 				}}
-			>
-				<Text>{start.isPending ? "Starting…" : "Start run"}</Text>
-			</Button>
+			/>
 		</>
 	);
 }

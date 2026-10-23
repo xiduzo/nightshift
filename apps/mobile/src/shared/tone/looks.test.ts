@@ -1,0 +1,129 @@
+/// <reference types="bun" />
+import { describe, expect, test } from "bun:test";
+import type { RunStatus } from "@nightshift/client";
+
+import {
+	outcomeLook,
+	runStatusLook,
+	stepKind,
+	stepLook,
+	TONE_CLASS,
+} from "./looks";
+
+const STATUSES: RunStatus[] = [
+	"running",
+	"waiting",
+	"sleeping",
+	"finished",
+	"stopped",
+	"failed",
+	"interrupted",
+];
+
+describe("runStatusLook", () => {
+	test("each status takes its own tone, an icon and its word", () => {
+		for (const status of STATUSES) {
+			const look = runStatusLook(status);
+			expect(look.tone).toBe(status);
+			expect(look.label.length).toBeGreaterThan(0);
+		}
+		expect(runStatusLook("running")).toEqual({
+			tone: "running",
+			icon: "loader",
+			label: "Running",
+		});
+		expect(runStatusLook("failed").icon).toBe("circle-x");
+	});
+});
+
+describe("outcomeLook", () => {
+	test("pass, fail and needs input have a fixed look", () => {
+		expect(outcomeLook("pass")).toEqual({
+			tone: "pass",
+			icon: "circle-check",
+			label: "Pass",
+		});
+		expect(outcomeLook("fail").tone).toBe("fail");
+		expect(outcomeLook("needs-input").label).toBe("Needs input");
+	});
+
+	test("any other outcome shows its own name", () => {
+		expect(outcomeLook("approve")).toEqual({
+			tone: "label",
+			icon: "circle-dot",
+			label: "approve",
+		});
+		// Not a key of Object.prototype either.
+		expect(outcomeLook("constructor").label).toBe("constructor");
+	});
+});
+
+describe("stepLook", () => {
+	test("a step that has not ended runs, or sleeps in a sleeping run", () => {
+		expect(stepLook({ state: "running", outcome: null }).label).toBe("Running");
+		expect(
+			stepLook(
+				{ state: "running", outcome: null, nodeType: "wait" },
+				"sleeping",
+			).tone,
+		).toBe("sleeping");
+		expect(
+			stepLook(
+				{ state: "running", outcome: null, nodeType: "call" },
+				"sleeping",
+			).tone,
+		).toBe("running");
+	});
+
+	test("an open Gate waits for you", () => {
+		expect(stepLook({ state: "waiting", outcome: null })).toEqual({
+			tone: "waiting",
+			icon: "hand",
+			label: "Waiting for you",
+		});
+	});
+
+	test("an ended step shows how it ended", () => {
+		expect(stepLook({ state: "failed", outcome: null }).tone).toBe("failed");
+		expect(stepLook({ state: "stopped", outcome: "stopped" }).tone).toBe(
+			"stopped",
+		);
+		expect(stepLook({ state: "stopped", outcome: "interrupted" }).tone).toBe(
+			"interrupted",
+		);
+		expect(stepLook({ state: "done", outcome: "pass" }).label).toBe("Pass");
+		expect(stepLook({ state: "done", outcome: "ship" }).label).toBe("ship");
+		expect(stepLook({ state: "done", outcome: null }).label).toBe("Done");
+	});
+});
+
+describe("stepKind", () => {
+	test("names each node type as the flow editor does", () => {
+		expect(stepKind({ nodeType: "agent", gate: null })).toEqual({
+			label: "Agent",
+			icon: "bot",
+		});
+		expect(stepKind({ nodeType: "call", gate: null }).label).toBe("Subflow");
+		expect(stepKind({ nodeType: "decision", gate: null }).label).toBe(
+			"Decision",
+		);
+	});
+
+	test("a Decision that asks a person is a Gate", () => {
+		const gate = { question: "Ship it?", choices: [], openedAt: 0 };
+		expect(stepKind({ nodeType: "decision", gate })).toEqual({
+			label: "Gate",
+			icon: "hand",
+		});
+	});
+});
+
+describe("TONE_CLASS", () => {
+	test("every tone has a text color and a badge tint", () => {
+		for (const [tone, classes] of Object.entries(TONE_CLASS)) {
+			expect(classes.text.startsWith("text-")).toBe(true);
+			expect(classes.badge.length).toBeGreaterThan(0);
+			if (tone !== "neutral") expect(classes.badge).toContain(tone);
+		}
+	});
+});

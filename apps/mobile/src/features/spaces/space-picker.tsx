@@ -8,6 +8,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@nightshift/ui-native/components/ui/select";
+import { cn } from "@nightshift/ui-native/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,11 +17,11 @@ import { useHostQueries } from "@/features/host";
 import { useSwitchSpace } from "./use-switch-space";
 
 /**
- * The Space this phone works in, in a screen's header. Runs and starting a
- * flow are per Space. The inbox and the dashboard show every Space and do
+ * The Space this phone works in, in a screen's header. Runs, projects and
+ * starting a flow are per Space. Home and the inbox show every Space and do
  * not need it.
  */
-export function SpacePicker() {
+export function SpacePicker({ className }: { className?: string }) {
 	const spaceQueries = useHostQueries(createSpaceQueries);
 	const spaces = useQuery(spaceQueries.list());
 	const switchSpace = useSwitchSpace();
@@ -44,7 +45,7 @@ export function SpacePicker() {
 			disabled={switchSpace.isPending}
 		>
 			<SelectTrigger
-				className="mr-4 max-w-48"
+				className={cn("max-w-48", className)}
 				accessibilityLabel="Choose the Space"
 			>
 				<SelectValue placeholder="Choose a Space" />
