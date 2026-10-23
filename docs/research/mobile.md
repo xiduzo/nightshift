@@ -334,11 +334,12 @@ schedules.
 | Screen | What it does |
 | --- | --- |
 | Sign in | The Host's address, email, password, code |
-| Needs you | The open Gates of every Space. Answer one. |
-| Runs | The runs of the active Space, with status. A run page with the live steps. |
-| Start run | Pick a flow, fill its inputs, pick the computer |
-| Home | The dashboard summary |
-| Settings | Notification settings, this phone, sign out |
+| Home (tab) | Last night's numbers, and the way to the rest of your work |
+| Inbox (tab) | The open Gates of every Space. Answer one. |
+| Runs (tab) | The runs of the active Space, with status. A run page with the live steps. |
+| Projects (tab) | The projects of the active Space. A project page. |
+| New run | Pick a flow, fill its inputs, pick the computer. Opens from + on Home. |
+| Settings | Notification settings, this phone, sign out. Opens from the avatar on Home. |
 
 The stack:
 
@@ -362,6 +363,88 @@ and a client that reads and acts needs no Replica.
 Event iterators do not retry by themselves. The reconnect loop of the run
 stream (`afterSeq` and dedup) moves out of `apps/web` into
 `@nightshift/client`, so both apps use one copy.
+
+### Phone UI
+
+The person's sketch (an iPhone prototype) sets the layout: what is on each
+screen, in what order, grouped how. React Native Reusables' default look
+and the existing shadcn tokens draw it, the same as the desktop app: no
+iOS system palette, no tint color, no colored icon tiles. Light and dark
+follow the phone's setting (`userInterfaceStyle: automatic`).
+
+**Tabs.** Home (`(tabs)/index`), Inbox (`(tabs)/inbox`), Runs
+(`(tabs)/runs`), Projects (`(tabs)/projects`). On iOS they are native tabs
+(`expo-router/native-tabs`): on iOS 26 the system's floating Liquid Glass
+bar, with SF Symbols (`house`, `tray`, `play.circle`, `folder`). The chosen
+tab takes `primary`. The Inbox badge is the number of Gates that wait for
+you (`useWaitingCount`), in `destructive`, and its label says it ("Inbox, 3
+Gates wait for you"). Android keeps the JavaScript tab bar with lucide
+icons (`tab-bar.android.tsx`): its native tabs need `expo-symbols` or
+drawables for icons, which the app does not ship. A tab has no navigation
+header: each screen starts with a `LargeTitleHeader`.
+
+**Routes.** The root stack holds the rest:
+
+| Route | Shows as | Opens from |
+| --- | --- | --- |
+| `settings` | pushed screen | the avatar on Home |
+| `start` ("New run") | modal, Space picker in its header | + on Home, "Start a flow" |
+| `search`, `flows`, `computers` | native sheet (`formSheet`, detents 0.6 and 1; search 1) | Home |
+| `projects/[projectId]` | pushed screen | a project row |
+| `runs/[runId]` | pushed screen | a run row, a push |
+| `gates/[runId]/[stepId]` | modal | a Gate row, a push, `nightshift://gates/<runId>/<stepId>` |
+| `connect` | pushed screen | signed out |
+
+A secondary view is a route with a native presentation, never a hand-built
+overlay. The inbox is `/inbox`: a tap on a "gates waiting" push, the
+in-front banner rule, the home widget (`nightshift://inbox`) and the Gate
+screen's way back all go there. `/` is Home.
+
+**Tokens.** The tokens of `@nightshift/ui-native/global.css`, unchanged:
+the page is `background` and a card is `card` with a `border`, as on the
+desktop app (white on white with a border in light, `#171717` cards on
+`#0a0a0a` in dark). A navigation header takes `background` too. Statuses
+use the run status and outcome tokens (`status-waiting` amber for a Gate
+that needs you, `status-finished` green, `status-failed` red,
+`status-running` blue, `status-sleeping` and `status-stopped` muted), and
+always pair with an icon and a word. Colors that a prop takes (the
+navigation theme, the tab bar, a RefreshControl) come from
+`useThemeColors()` (`shared/theme`), which reads `lib/theme.ts` per scheme.
+No component holds a hex color. Type: the system font at Reusables' Text
+sizes; a tab's title `text-3xl font-bold`, a sheet's `text-2xl`, a section
+`text-xl font-semibold`, a row title `text-base font-medium`, captions
+`text-sm text-muted-foreground`, small labels `text-xs`; mono for node ids,
+branches, run ids and commands.
+
+**Building blocks.** Thin Night Shift wrappers in `apps/mobile/src/shared/`,
+each composed from Reusables pieces and the tokens:
+
+| Folder | Block | Props |
+| --- | --- | --- |
+| `tone` | the status map, pure | `Tone`, `Look` (`tone`, `icon`, `label`), `runStatusLook(status)`, `stepLook({ state, outcome, nodeType }, runStatus?)`, `stepKind(step)`, `NEEDS_YOU`, `TONE_CLASS[tone]` (`text`, `badge` classes) |
+| `status` | `StatusBadge`, `StatusText`, `iconOf` | `look` (outline Badge with icon and word; or icon and word in a line) |
+| `list` | `ListGroup`, `ListRow`, `SectionHead` | ListRow: `title`, `titleLines`, `overline`, `caption`, `detail` (a string or parts, a part may be `mono` or take a `tone`), `icon` + `tone` or `look`, `iconLabel`, `leading`, `value`, `valueLabel`, `href` or `onPress`, `chevron`, `accessibilityLabel`, `accessibilityHint`. SectionHead: `title`, `hint`, `seeAll` (`href` or `onPress`) |
+| `header` | `LargeTitleHeader`, `HeaderButton`, `AvatarButton` | `title`, `summary`, `leading`, `actions`, `compact`; buttons: `icon` or `name`, `label`, `hint`, `href` or `onPress` (44 pt, round) |
+| `avatar` | `InitialsAvatar` | `name`, `size` (`sm` row, `md` header) |
+| `tiles` | `StatTile`, `StatGrid`, `FactTile`, `FactGrid` | StatTile: `value` (undefined loads), `label`, `icon`, `tone`, `caption`, `detail`, `href` or `onPress`. FactTile: `label`, `value`, `sub`, `mono`, `look`. Grids: two by two |
+| `chips` | `ChipRail`, `Chip` | Chip: `label`, `count`, `selected`, `icon`, `onPress` (`default` when chosen, `outline` when not) |
+| `trail` | `StepTrail`, `trailItemOf` | `items`; `trailItemOf(step, { labels, runStatus, now })` gives kind, name, look, error and "4 min · $0.12" |
+| `action-bar` | `ActionBar` | `caption`, `label`, `destructive`, `action` (`label`, `onPress`, `disabled`, `busy`, `busyLabel`, `variant`); give it to `Screen` as `footer` |
+| `page` | `Screen` | `onRefresh`, `footer` |
+
+Each row and tile is one accessible element with a full label ("Needs you,
+Review the plan, website, waited 12 min"). Targets are at least 44 pt. Rows
+have no fixed heights, so Dynamic Type grows them.
+
+**What the sketch shows that the Host has no data for.** Left out until the
+Host has it:
+
+- Unread Gates (the dot): the Host keeps no read state.
+- Undo after sending an answer: the Host cannot reopen a Gate.
+- A suggested choice on a Gate: nothing proposes one.
+- Pull requests as their own list ("What the night produced", PR checks
+  and files): a pull request is no entity. Only Gate links and run items
+  of kind "pull" that are already in the data may show.
 
 ### Widgets and Live Activities
 
@@ -417,7 +500,7 @@ What Night Shift does with it (the `glance` vertical of `apps/mobile`):
   inbox or the runs refresh. `updateGlance(snapshot)` is the one door,
   also for a background push task. A tap opens the inbox on iOS.
 - **Follow on the lock screen** on the run screen, and a switch on the
-  Start tab. iOS: a Live Activity with the flow, the step that runs now,
+  New run screen. iOS: a Live Activity with the flow, the step that runs now,
   "Step 2 of 5", a progress bar and the status. Android: an ongoing
   notification with the same, which a tap opens on the run. The app
   reads a followed run every 5 seconds while it runs, and ends the
@@ -479,7 +562,7 @@ and it gets the same protections and more.
 | Settings → Phones (web) | Each phone: name, last seen, Remove. Later: a QR code to add one. |
 | Home (web) | Reads `dashboard.summary`. |
 | Flow editor | "Allow an answer from the lock screen" on a Decision that you decide. |
-| Phone app (new) | Sign in, Needs you, Runs, run page, Start run, Home, Settings. |
+| Phone app (new) | Sign in, Home, Inbox, Runs, Projects, run page, Gate, New run, Settings. |
 
 ## What moves in the data
 

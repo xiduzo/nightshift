@@ -204,21 +204,31 @@ apps/mobile/src/
   app/                     thin Expo Router files: one screen from a vertical
   shared/
     api/                   the auth client per Host, the Host address, the transport (expo/fetch + cookie), the query client
-    page/  empty/          the screen body and the empty state
+    page/  empty/          the screen body (Screen, with an optional footer) and the empty state
     feedback/              ErrorAlert: what went wrong on a screen, and how to try again
     format/                a time of day (formatTime); costs and "5 min ago" come from @nightshift/client
     refresh/               reading a screen again: on focus (useScreenRefresh) and on pull-down (usePullRefresh)
-    shell/                 the app frame (AppShell) and the tabs (AppTabs)
+    theme/                 useThemeColors: the light or dark colors for props that take a color
+    tone/                  the status map, pure: tone, icon name and word of a run status, a step, a step kind
+    status/                StatusBadge and StatusText: a tone drawn with its icon and word
+    list/                  ListGroup, ListRow, SectionHead: lists in a card
+    header/  avatar/       LargeTitleHeader, HeaderButton, AvatarButton; InitialsAvatar
+    tiles/  chips/         StatTile and FactTile two by two; filter chips (ChipRail, Chip)
+    trail/  action-bar/    a run's steps as a timeline (StepTrail); the bar at the bottom of a screen (ActionBar)
+    shell/                 the app frame (AppShell) and the tabs (AppTabs: native tabs on iOS, JS tabs on Android)
   features/
     host/                  sign-in (address, the Host code, two-factor or backup code), the session, useHostQueries
-    spaces/                the Space picker of Runs and Start, the Space remembered per Host
+    spaces/                the Space picker of Runs, Projects and New run, the Space remembered per Host
     glance/                the glances outside the app: the home screen widget (Gates that wait, the latest runs) and a run followed on the lock screen (Live Activity, Android ongoing notification), on expo-widgets
     push/                  notifications on this phone: the permission card, the Expo push token registered with the Host, the categories and Android channels, the lock-screen buttons and withdraws (background task), the banner in front, where a tap goes
-    devices/               the person's computers and whether each can run a flow now (the Dashboard tab shows them)
-    inbox/  runs/  start/  dashboard/  settings/
+    devices/               the person's computers and whether each can run a flow now (the Computers sheet)
+    dashboard/             the numbers on Home (StatCards) and how each flow did (the Flows sheet)
+    home/  inbox/  runs/  projects/  start/  search/  settings/
 ```
 
-- The features, from the bottom: `host`, `spaces`, `glance`, `push`, `devices`, then the tabs. `shared/shell` composes them, as on the web. `push` sits below the tabs because the inbox and Settings show its card and the inbox stream dismisses a closed Gate's notification. `glance` sits below `push` because the background task of a push updates the widget.
+- The phone UI and its building blocks are in `docs/research/mobile.md`, "Phone UI". A block composes React Native Reusables pieces and tokens. A block a screen needs and no block covers goes in a new named `shared/<name>/`, or in the vertical when only it uses the block.
+
+- The features, from the bottom: `host`, `spaces`, `glance`, `push`, `devices`, then the tabs. `shared/shell` composes them, as on the web. `push` sits below the screens because the inbox and Settings show its card and the inbox stream dismisses a closed Gate's notification. `glance` sits below `push` because the background task of a push updates the widget.
 - `app/_layout.tsx` calls `startPushHandling()` in its module scope: iOS and Android start the app for a push in the background, and the background task must be defined before any screen renders.
 - A screen takes query options from `@nightshift/client` on the Host's client: `useHostQueries(createRunQueries)`. The phone keeps no module-level `orpc`, because its client changes with the Host.
 
