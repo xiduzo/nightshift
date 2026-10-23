@@ -5,11 +5,11 @@ import { StatusBar } from "expo-status-bar";
 import { type ReactNode, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import { useUniwind } from "uniwind";
 
 import { HostProvider } from "@/features/host";
 import { InFrontBanner, useNotificationTaps } from "@/features/push";
 import { createQueryClient } from "@/shared/api";
+import { useThemeColors } from "@/shared/theme";
 import { NAV_THEME } from "./nav-theme";
 
 /**
@@ -21,8 +21,7 @@ import { NAV_THEME } from "./nav-theme";
 export function AppShell({ children }: { children: ReactNode }) {
 	useNotificationTaps();
 	const [queryClient] = useState(createQueryClient);
-	const { theme } = useUniwind();
-	const scheme = theme === "dark" ? "dark" : "light";
+	const { scheme } = useThemeColors();
 
 	return (
 		<QueryClientProvider client={queryClient}>

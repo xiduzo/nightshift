@@ -1,6 +1,6 @@
-import { THEME } from "@nightshift/ui-native/lib/theme";
 import { useCallback, useState } from "react";
-import { useUniwind } from "uniwind";
+
+import { useThemeColors } from "@/shared/theme";
 
 /**
  * Pull to refresh for a list that is not a `Screen`: the props of its
@@ -12,7 +12,7 @@ export function usePullRefresh(refetch: () => Promise<unknown>): {
 	tintColor: string;
 } {
 	const [refreshing, setRefreshing] = useState(false);
-	const { theme } = useUniwind();
+	const { colors } = useThemeColors();
 	const onRefresh = useCallback(() => {
 		setRefreshing(true);
 		void refetch().finally(() => setRefreshing(false));
@@ -20,6 +20,6 @@ export function usePullRefresh(refetch: () => Promise<unknown>): {
 	return {
 		refreshing,
 		onRefresh,
-		tintColor: THEME[theme === "dark" ? "dark" : "light"].mutedForeground,
+		tintColor: colors.mutedForeground,
 	};
 }
