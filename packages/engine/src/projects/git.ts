@@ -7,7 +7,21 @@
  */
 
 /** What one git command gave back. The output is trimmed. */
-export type GitResult = { exitCode: number; stdout: string; stderr: string };
+export type GitResult = {
+	exitCode: number;
+	stdout: string;
+	stderr: string;
+	/** The command ran past its `timeoutMs` and was stopped. */
+	timedOut?: boolean;
+};
+
+/** How to run one git command. */
+export type GitRunOptions = {
+	/** Variables on top of this computer's environment. */
+	env?: Record<string, string>;
+	/** Stops the command after this many milliseconds. Default: no limit. */
+	timeoutMs?: number;
+};
 
 /**
  * What starting the git installer did.
@@ -25,7 +39,7 @@ export type Git = {
 	 * Runs git in `cwd`. Throws `GitNotInstalledError` when git cannot
 	 * start, so that a missing git does not read as "not a repository".
 	 */
-	run(cwd: string, args: string[]): Promise<GitResult>;
+	run(cwd: string, args: string[], options?: GitRunOptions): Promise<GitResult>;
 	/** The git version, or null when git is not on this computer. */
 	probe(): Promise<string | null>;
 	/** The `install-git` fix. Never installs anything without the system's own prompt. */
@@ -82,6 +96,7 @@ const leakingGitVariables = [
 	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
 ];
 
+/** This computer's environment without the variables of a git hook. */
 function gitEnv(): Record<string, string> {
 	const env: Record<string, string> = {};
 	for (const [key, value] of Object.entries(process.env)) {
@@ -91,21 +106,44 @@ function gitEnv(): Record<string, string> {
 	return env;
 }
 
-async function runGit(cwd: string, args: string[]): Promise<GitResult> {
+async function runGit(
+	cwd: string,
+	args: string[],
+	options: GitRunOptions = {},
+): Promise<GitResult> {
 	if (Bun.which("git") === null) throw new GitNotInstalledError();
-	const proc = Bun.spawn(["git", ...args], {
+	return runProcess(["git", ...args], cwd, options);
+}
+
+/**
+ * Runs a program (an argv array, never a shell) in `cwd` and gives back its
+ * output. `timeoutMs` stops it, and then `timedOut` is true.
+ */
+export async function runProcess(
+	argv: string[],
+	cwd: string,
+	options: GitRunOptions = {},
+): Promise<GitResult> {
+	const proc = Bun.spawn(argv, {
 		cwd,
-		env: gitEnv(),
+		env: { ...gitEnv(), ...options.env },
 		stdin: "ignore",
 		stdout: "pipe",
 		stderr: "pipe",
+		...(options.timeoutMs ? { timeout: options.timeoutMs } : {}),
 	});
 	const [stdout, stderr, exitCode] = await Promise.all([
 		new Response(proc.stdout).text(),
 		new Response(proc.stderr).text(),
 		proc.exited,
 	]);
-	return { exitCode, stdout: stdout.trim(), stderr: stderr.trim() };
+	const timedOut = Boolean(options.timeoutMs) && proc.signalCode !== null;
+	return {
+		exitCode,
+		stdout: stdout.trim(),
+		stderr: stderr.trim(),
+		...(timedOut ? { timedOut: true } : {}),
+	};
 }
 
 /** The pauses between the tries of `git --version` in the probe. Null: the last try. */

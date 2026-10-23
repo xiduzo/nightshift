@@ -21,8 +21,22 @@ export function createProjectQueries(orpc: ApiQueryUtils) {
 		/** Every run-copies query of a project. Invalidate it after a removal. */
 		runCopiesKey: (projectId: string) =>
 			orpc.projects.runCopies.key({ input: { projectId } }),
+		/** How a project can be added on this computer: a folder picker, GitHub. */
+		sources: () => orpc.projects.sources.queryOptions(),
+		/** The person's GitHub repositories, when GitHub is signed in on this computer. */
+		gitHubRepos: () => orpc.projects.gitHubRepos.queryOptions(),
+		/** How copying a GitHub repository goes. Polls while it copies. */
+		gitHubClone: (repo: string) => ({
+			...orpc.projects.gitHubClone.queryOptions({ input: { repo } }),
+			refetchInterval: (query: {
+				state: { data?: { state: string } | null };
+			}) => (query.state.data?.state === "cloning" ? CLONE_POLL_MS : false),
+		}),
 	};
 }
+
+/** How often a clone from GitHub is asked about while it copies. */
+const CLONE_POLL_MS = 1_000;
 
 /** The mutation options of projects. */
 export function createProjectMutations(orpc: ApiQueryUtils) {
@@ -32,6 +46,7 @@ export function createProjectMutations(orpc: ApiQueryUtils) {
 		rename: orpc.projects.rename.mutationOptions,
 		move: orpc.projects.move.mutationOptions,
 		chooseFolder: orpc.projects.chooseFolder.mutationOptions,
+		cloneFromGitHub: orpc.projects.cloneFromGitHub.mutationOptions,
 		installGit: orpc.projects.installGit.mutationOptions,
 		setUpGit: orpc.projects.setUpGit.mutationOptions,
 		removeRunCopy: orpc.projects.removeRunCopy.mutationOptions,

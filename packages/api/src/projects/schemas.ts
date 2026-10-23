@@ -1,5 +1,8 @@
 import type {
 	Branches,
+	GitHubAccess,
+	GitHubClone,
+	GitHubRepo,
 	GitInstall,
 	Project,
 	ProjectReadiness,
@@ -89,6 +92,46 @@ export const runCopiesSchema = exact<RunCopies>()(
 			}),
 		),
 	}),
+);
+
+/** How a project can be added on this computer. */
+export const projectSourcesSchema = exact<{
+	folderPicker: boolean;
+	gitHub: GitHubAccess;
+}>()(
+	z.object({
+		/** This computer can open a folder picker. */
+		folderPicker: z.boolean(),
+		/** The GitHub CLI on this computer. */
+		gitHub: z.enum(["missing", "signed-out", "signed-in"]),
+	}),
+);
+
+/** A repository the person can open on GitHub. */
+export const gitHubRepoSchema = exact<GitHubRepo>()(
+	z.object({
+		name: z.string(),
+		description: z.string().nullable(),
+		private: z.boolean(),
+	}),
+);
+
+/** How one clone from GitHub goes. */
+export const gitHubCloneSchema = exact<GitHubClone>()(
+	z.discriminatedUnion("state", [
+		z.object({ state: z.literal("cloning"), repo: z.string() }),
+		z.object({
+			state: z.literal("done"),
+			repo: z.string(),
+			path: z.string(),
+			reused: z.boolean(),
+		}),
+		z.object({
+			state: z.literal("failed"),
+			repo: z.string(),
+			problem: z.string(),
+		}),
+	]),
 );
 
 /** What starting the git installer did. */

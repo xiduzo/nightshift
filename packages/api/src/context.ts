@@ -19,6 +19,7 @@ import type {
 	CliToolStore,
 	ConnectionStore,
 	Engine,
+	GitHubClones,
 	GitInstall,
 	ProfileStore,
 	ProjectReadiness,
@@ -115,6 +116,10 @@ export type Context = {
 		 * for a choice. Null when the person cancels.
 		 */
 		chooseFolder(prompt: string): Promise<string | null>;
+		/** This computer can open a folder picker (`chooseFolder`). */
+		folderPicker: boolean;
+		/** Clones from GitHub into Night Shift's own projects folder, and the GitHub CLI on this computer. */
+		gitHub: GitHubClones;
 	};
 	/** Facts about this daemon that change only on a restart. */
 	daemon: {

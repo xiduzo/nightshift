@@ -45,6 +45,7 @@ import {
 	createArtifactStore,
 	createCliToolStore,
 	createConnectionStore,
+	createGitHubClones,
 	createProfileStore,
 	createSettingsStore,
 	createSpaceDocuments,
@@ -74,6 +75,7 @@ import {
 import { type DesktopScreen, wireNotifications } from "./notifications";
 import {
 	boundedStop,
+	canChooseFolder,
 	chooseFolder,
 	type DaemonEnv,
 	daemonPort,
@@ -471,6 +473,9 @@ export async function createDaemon(
 	void keepAwake.start();
 
 	const gitInstaller = systemGitInstaller();
+	// A clone from GitHub outlives a `bun --hot` reload: keep who tracks it.
+	hot.nightshiftGitHubClones ??= createGitHubClones({ dataDir });
+	const gitHubClones = hot.nightshiftGitHubClones;
 	const info: DaemonInfo = {
 		dataDir,
 		device: { ...device, ownerId: person.userId },
@@ -508,6 +513,8 @@ export async function createDaemon(
 			setUpGit: (input) => setUpGit(input),
 			installGit: () => gitInstaller.install(),
 			chooseFolder: (prompt) => chooseFolder(prompt),
+			folderPicker: canChooseFolder(),
+			gitHub: gitHubClones,
 		},
 		daemon: {
 			dataDir: info.dataDir,
