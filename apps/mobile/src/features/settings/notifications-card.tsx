@@ -7,19 +7,7 @@ import {
 	PHONE_DELAYS,
 	phoneDelayLabel,
 } from "@nightshift/client";
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui-native/components/ui/alert";
-import { Button } from "@nightshift/ui-native/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui-native/components/ui/card";
+import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
 import { Label } from "@nightshift/ui-native/components/ui/label";
 import {
 	Select,
@@ -28,16 +16,15 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@nightshift/ui-native/components/ui/select";
-import { Separator } from "@nightshift/ui-native/components/ui/separator";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
-import { Switch } from "@nightshift/ui-native/components/ui/switch";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert } from "lucide-react-native";
 import { Alert as NativeAlert, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useHostQueries } from "@/features/host";
+import { ErrorAlert } from "@/shared/feedback";
+import { ListGroup, SectionHead, SwitchRow } from "@/shared/list";
 import { HOURS, phoneTimeZone } from "./notification-choices";
 
 /** Quiet hours when the person turns them on: the night. */
@@ -73,37 +60,27 @@ export function NotificationsCard() {
 	);
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Notifications</CardTitle>
-				<CardDescription>
-					What Night Shift tells you about, on every screen where you use it.
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="gap-4">
-				{settings.data ? (
-					<NotificationFields
-						value={settings.data}
-						onChange={(patch) => save.mutate(patch)}
-					/>
-				) : settings.error ? (
-					<Alert icon={CircleAlert} variant="destructive">
-						<AlertTitle>The notification settings did not load</AlertTitle>
-						<AlertDescription>{settings.error.message}</AlertDescription>
-						<Button
-							variant="outline"
-							size="sm"
-							className="mt-2 self-start"
-							onPress={() => void settings.refetch()}
-						>
-							<Text>Try again</Text>
-						</Button>
-					</Alert>
-				) : (
-					<Skeleton className="h-64 w-full" />
-				)}
-			</CardContent>
-		</Card>
+		<View className="gap-3">
+			<SectionHead
+				title="Notifications"
+				hint="What Night Shift tells you about, on every screen where you use it."
+			/>
+			{settings.data ? (
+				<NotificationFields
+					value={settings.data}
+					onChange={(patch) => save.mutate(patch)}
+				/>
+			) : settings.error ? (
+				<ErrorAlert
+					title="The notification settings did not load"
+					message={settings.error.message}
+					fix="Check that this phone is online, then try again."
+					onRetry={() => void settings.refetch()}
+				/>
+			) : (
+				<Skeleton className="h-64 w-full rounded-xl" />
+			)}
+		</View>
 	);
 }
 
@@ -117,93 +94,74 @@ function NotificationFields({
 	const quiet = value.quietHours;
 	return (
 		<>
-			<Text variant="small">What Night Shift tells you about</Text>
-			<SwitchRow
-				label="A Gate waits for you"
-				checked={value.events.gateOpened}
-				onChange={(on) => onChange({ events: { gateOpened: on } })}
-			/>
-			<SwitchRow
-				label="A run finished"
-				checked={value.events.runFinished}
-				onChange={(on) => onChange({ events: { runFinished: on } })}
-			/>
-			<SwitchRow
-				label="A run failed"
-				checked={value.events.runFailed}
-				onChange={(on) => onChange({ events: { runFailed: on } })}
-			/>
-			<Separator />
-			<SwitchRow
-				label="Phones"
-				hint="When off, your phones get no notifications. The inbox still shows what waits for you."
-				checked={value.screens.expo}
-				onChange={(on) => onChange({ screens: { expo: on } })}
-			/>
-			<Separator />
-			<SwitchRow
-				label="Quiet hours"
-				hint={
-					quiet
-						? `No notifications in these hours. Times are in ${value.timeZone}.`
-						: "Choose hours without notifications, for example at night."
-				}
-				checked={quiet !== null}
-				onChange={(on) =>
-					onChange(
-						on
-							? { quietHours: DEFAULT_QUIET, timeZone: phoneTimeZone() }
-							: { quietHours: null },
-					)
-				}
-			/>
-			{quiet ? (
-				<View className="flex-row gap-4">
-					<TimeSelect
-						label="From"
-						value={quiet.start}
-						onChange={(start) => onChange({ quietHours: { ...quiet, start } })}
+			<ListGroup>
+				<SwitchRow
+					title="A Gate waits for you"
+					checked={value.events.gateOpened}
+					onChange={(on) => onChange({ events: { gateOpened: on } })}
+				/>
+				<SwitchRow
+					title="A run finished"
+					checked={value.events.runFinished}
+					onChange={(on) => onChange({ events: { runFinished: on } })}
+				/>
+				<SwitchRow
+					title="A run failed"
+					checked={value.events.runFailed}
+					onChange={(on) => onChange({ events: { runFailed: on } })}
+				/>
+			</ListGroup>
+			<ListGroup>
+				<SwitchRow
+					title="Phones"
+					caption="When off, your phones get no notifications. The inbox still shows what waits for you."
+					checked={value.screens.expo}
+					onChange={(on) => onChange({ screens: { expo: on } })}
+				/>
+			</ListGroup>
+			<ListGroup>
+				<SwitchRow
+					title="Quiet hours"
+					caption={
+						quiet
+							? `No notifications in these hours. Times are in ${value.timeZone}.`
+							: "Choose hours without notifications, for example at night."
+					}
+					checked={quiet !== null}
+					onChange={(on) =>
+						onChange(
+							on
+								? { quietHours: DEFAULT_QUIET, timeZone: phoneTimeZone() }
+								: { quietHours: null },
+						)
+					}
+				/>
+				{quiet ? (
+					<View className="flex-row gap-4 px-4 py-3">
+						<TimeSelect
+							label="From"
+							value={quiet.start}
+							onChange={(start) =>
+								onChange({ quietHours: { ...quiet, start } })
+							}
+						/>
+						<TimeSelect
+							label="Until"
+							value={quiet.end}
+							onChange={(end) => onChange({ quietHours: { ...quiet, end } })}
+						/>
+					</View>
+				) : null}
+			</ListGroup>
+			<Card className="py-4">
+				<CardContent className="px-4">
+					<DelaySelect
+						value={value.holdMinutes}
+						onChange={(holdMinutes) => onChange({ holdMinutes })}
 					/>
-					<TimeSelect
-						label="Until"
-						value={quiet.end}
-						onChange={(end) => onChange({ quietHours: { ...quiet, end } })}
-					/>
-				</View>
-			) : null}
-			<Separator />
-			<DelaySelect
-				value={value.holdMinutes}
-				onChange={(holdMinutes) => onChange({ holdMinutes })}
-			/>
+				</CardContent>
+			</Card>
 		</>
-	);
-}
-
-/** A label, an optional hint and its Switch, on one row. */
-function SwitchRow({
-	label,
-	hint,
-	checked,
-	onChange,
-}: {
-	label: string;
-	hint?: string;
-	checked: boolean;
-	onChange(checked: boolean): void;
-}) {
-	return (
-		<View className="flex-row items-center justify-between gap-4">
-			<View className="flex-1 gap-1">
-				<Label onPress={() => onChange(!checked)}>{label}</Label>
-				{hint ? <Text variant="muted">{hint}</Text> : null}
-			</View>
-			<Switch
-				checked={checked}
-				onCheckedChange={onChange}
-				accessibilityLabel={label}
-			/>
-		</View>
 	);
 }
 
