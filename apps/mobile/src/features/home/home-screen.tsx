@@ -290,7 +290,7 @@ function NightOutputSection({
 		<Section>
 			<SectionHead
 				title="Ended last night"
-				hint="Newest first"
+				hint={ended ? `Newest first · ${ended} ended` : "Newest first"}
 				seeAll={{ href: "/runs" }}
 			/>
 			{runs.length > 0 ? (

@@ -5,6 +5,7 @@ import {
 	type RunSummary,
 	waitedText,
 } from "@nightshift/client";
+import { GitPullRequest } from "lucide-react-native";
 
 import { InitialsAvatar } from "@/shared/avatar";
 import { ListRow } from "@/shared/list";
@@ -48,11 +49,15 @@ export function ProjectRow({
 export function ProjectGateRow({ gate, now }: { gate: OpenGate; now: number }) {
 	const { flow, detail } = gateRun(gate);
 	const waited = waitedText(now - gate.openedAt);
+	const { headline, links } = gateParts(gate.question);
+	// As in the inbox: a pull-request icon when the Gate links one.
+	const pull = links.some((link) => link.kind === "pull");
 	return (
 		<ListRow
 			look={gateLook(gate)}
+			icon={pull ? GitPullRequest : undefined}
 			overline={detail ? `${flow} · ${detail}` : flow}
-			title={gateParts(gate.question).headline}
+			title={headline}
 			caption={[
 				choicesText(gate.choices.length),
 				{ text: gate.nodeId, mono: true },
