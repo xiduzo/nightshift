@@ -1,6 +1,6 @@
 import {
 	startDaemon as bootDaemon,
-	DEFAULT_PORT,
+	DESKTOP_PORT,
 	type DesktopScreen,
 	tlsPortOf,
 } from "@nightshift/daemon";
@@ -9,11 +9,14 @@ import { startWatchdog } from "../watchdog";
 import { prepareDaemonEnv } from "./daemon-env";
 
 /**
- * The web build calls the daemon at VITE_SERVER_URL, which `apps/web/.env`
- * sets to this address at build time. PORT (as for `bun run night`) moves the
- * daemon: build the web app with a matching VITE_SERVER_URL.
+ * Its own port, apart from a `bun run dev` daemon (DEFAULT_PORT). The window
+ * tells the web view this address (`window.nightshiftDaemonUrl`), so the web
+ * build's VITE_SERVER_URL does not matter here. Not PORT: a shell that sets
+ * it for dev must not move the app onto the dev port.
  */
-export const DAEMON_PORT = Number(process.env.PORT || DEFAULT_PORT);
+export const DAEMON_PORT = Number(
+	process.env.NIGHTSHIFT_DESKTOP_PORT || DESKTOP_PORT,
+);
 export const DAEMON_URL = `http://localhost:${DAEMON_PORT}`;
 
 export type Daemon = {

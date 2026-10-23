@@ -12,6 +12,16 @@ describe("the Night Shift the UI calls", () => {
 		).toBe("https://studio.tail1234.ts.net");
 	});
 
+	test("in the desktop window, the daemon the app started", () => {
+		expect(
+			serverUrlFor("http://localhost:3000", {
+				origin: "views://mainview",
+				servedByDaemon: false,
+				desktopDaemonUrl: "http://localhost:4300",
+			}),
+		).toBe("http://localhost:4300");
+	});
+
 	test("else the address the UI was built for", () => {
 		expect(
 			serverUrlFor("http://localhost:3000/", {

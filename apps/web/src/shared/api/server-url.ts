@@ -10,5 +10,12 @@ export const SERVER_URL = serverUrlFor(
 				origin: window.location.origin,
 				servedByDaemon:
 					document.querySelector('meta[name="nightshift-daemon"]') !== null,
+				desktopDaemonUrl: desktopDaemonUrl(),
 			},
 );
+
+/** The daemon the desktop window started, when the page runs in it. */
+function desktopDaemonUrl(): string | undefined {
+	const url = (window as { nightshiftDaemonUrl?: unknown }).nightshiftDaemonUrl;
+	return typeof url === "string" ? url : undefined;
+}

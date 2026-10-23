@@ -6,7 +6,12 @@ import Electrobun, {
 	Utils,
 } from "electrobun/main";
 
-import { type Daemon, PortTakenError, startDaemon } from "../features/daemon";
+import {
+	DAEMON_URL,
+	type Daemon,
+	PortTakenError,
+	startDaemon,
+} from "../features/daemon";
 import { electrobunNotifier, trackWindow } from "../features/notifications";
 import { startUpdates } from "../features/updates";
 
@@ -161,11 +166,10 @@ function showWindow(): void {
 	const window = new BrowserWindow({
 		title: APP_NAME,
 		url,
-		// The packaged view loads /index.html: start the router at /.
 		// The page knows it is in the desktop app, which shows the
-		// notifications itself. The packaged view loads /index.html: start
-		// the router at /.
-		preload: `window.nightshiftDesktop = true;${
+		// notifications itself, and which daemon to call. The packaged view
+		// loads /index.html: start the router at /.
+		preload: `window.nightshiftDesktop = true; window.nightshiftDaemonUrl = ${JSON.stringify(DAEMON_URL)};${
 			url.startsWith("views://") ? ' history.replaceState(null, "", "/");' : ""
 		}`,
 		frame: { width: 1280, height: 820, x: 120, y: 120 },

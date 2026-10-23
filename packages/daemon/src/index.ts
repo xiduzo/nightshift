@@ -28,6 +28,7 @@ export {
 	checkHealth,
 	type DaemonEnv,
 	DEFAULT_PORT,
+	DESKTOP_PORT,
 	daemonPort,
 	guardProcess,
 	HEALTH_STALE_AFTER_MS,

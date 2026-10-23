@@ -40,7 +40,8 @@ jobs:
           - os: ubuntu-24.04
             target: linux-x64
     env:
-      # The packaged window calls the daemon it starts on this computer.
+      # The web build needs one. The packaged window ignores it: it calls the
+      # daemon it starts (DESKTOP_PORT), which the window names itself.
       VITE_SERVER_URL: http://localhost:3000
       NODE_ENV: production
       NIGHTSHIFT_VERSION: ${{ inputs.version }}

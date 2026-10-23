@@ -1,1 +1,6 @@
-export { type Daemon, PortTakenError, startDaemon } from "./daemon";
+export {
+	DAEMON_URL,
+	type Daemon,
+	PortTakenError,
+	startDaemon,
+} from "./daemon";
