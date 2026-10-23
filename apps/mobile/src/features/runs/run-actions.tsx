@@ -21,7 +21,10 @@ import {
 } from "@nightshift/ui-native/components/ui/button";
 import { CardContent } from "@nightshift/ui-native/components/ui/card";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
-import { Text } from "@nightshift/ui-native/components/ui/text";
+import {
+	Text,
+	TextClassContext,
+} from "@nightshift/ui-native/components/ui/text";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CircleStop, type LucideIcon, Play } from "lucide-react-native";
 import { View } from "react-native";
@@ -153,15 +156,14 @@ function Confirm({
 						}
 						onPress={onConfirm}
 					>
-						<Text
-							className={
-								destructive
-									? buttonTextVariants({ variant: "destructive" })
-									: undefined
-							}
+						{/* The Action gives its className to the text too: the label takes the text classes of its variant only. */}
+						<TextClassContext.Provider
+							value={buttonTextVariants({
+								variant: destructive ? "destructive" : "default",
+							})}
 						>
-							{confirm}
-						</Text>
+							<Text>{confirm}</Text>
+						</TextClassContext.Provider>
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>

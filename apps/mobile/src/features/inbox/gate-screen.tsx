@@ -38,7 +38,10 @@ import { Card } from "@nightshift/ui-native/components/ui/card";
 import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Label } from "@nightshift/ui-native/components/ui/label";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
-import { Text } from "@nightshift/ui-native/components/ui/text";
+import {
+	Text,
+	TextClassContext,
+} from "@nightshift/ui-native/components/ui/text";
 import { Textarea } from "@nightshift/ui-native/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -663,15 +666,14 @@ function ConfirmDialog({
 						}
 						onPress={onConfirm}
 					>
-						<Text
-							className={
-								destructive
-									? buttonTextVariants({ variant: "destructive" })
-									: undefined
-							}
+						{/* The Action gives its className to the text too: the label takes the text classes of its variant only. */}
+						<TextClassContext.Provider
+							value={buttonTextVariants({
+								variant: destructive ? "destructive" : "default",
+							})}
 						>
-							{`Send ${choice.name}`}
-						</Text>
+							<Text>{`Send ${choice.name}`}</Text>
+						</TextClassContext.Provider>
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>
