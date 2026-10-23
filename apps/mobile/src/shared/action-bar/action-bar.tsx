@@ -1,4 +1,5 @@
 import { Button } from "@nightshift/ui-native/components/ui/button";
+import { Card } from "@nightshift/ui-native/components/ui/card";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { cn } from "@nightshift/ui-native/lib/utils";
 import { View } from "react-native";
@@ -23,8 +24,8 @@ export type ActionBarProps = {
 };
 
 /**
- * The bar at the bottom of a screen: what the person chose, and the one
- * button that acts on it. Give it to the Screen as its `footer`, so it
+ * The bar at the bottom of a screen, on a Card: what the person chose,
+ * and the one button that acts on it. Give it to the Screen as its `footer`, so it
  * stays in place while the screen scrolls.
  */
 export function ActionBar({
@@ -34,7 +35,7 @@ export function ActionBar({
 	action,
 }: ActionBarProps) {
 	return (
-		<View className="flex-row items-center gap-3 rounded-2xl border border-border bg-card py-2 pr-2 pl-4 shadow-black/5 shadow-sm">
+		<Card className="flex-row items-center gap-3 py-2 pr-2 pl-4">
 			<View
 				className="flex-1 gap-0.5"
 				accessible
@@ -66,6 +67,6 @@ export function ActionBar({
 					{action.busy && action.busyLabel ? action.busyLabel : action.label}
 				</Text>
 			</Button>
-		</View>
+		</Card>
 	);
 }
