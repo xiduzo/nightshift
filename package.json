@@ -49,6 +49,7 @@
 	"scripts": {
 		"dev": "turbo run dev",
 		"night": "bun scripts/night.ts",
+		"icons": "bun scripts/icons.ts",
 		"build": "turbo run build --filter='!desktop' && turbo run build -F desktop",
 		"check-types": "turbo run check-types",
 		"dev:web": "turbo run dev -F web --",
@@ -74,6 +75,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.12",
 		"@nightshift/config": "workspace:*",
+		"@resvg/resvg-js": "^2.6.2",
 		"@types/bun": "catalog:",
 		"lefthook": "^2.1.12",
 		"turbo": "^2.10.12",

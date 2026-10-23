@@ -198,7 +198,13 @@ function showWindow(): void {
 }
 
 // Runs go on when the window closes: the app stays in the menu bar until you quit.
-tray = new Tray({ title: "☾" });
+// A template image: macOS tints it to match the menu bar.
+tray = new Tray({
+	image: "views://tray-icon.png",
+	template: true,
+	width: 18,
+	height: 18,
+});
 setMenus();
 
 function onAction(action: string): void {

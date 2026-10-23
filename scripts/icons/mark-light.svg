@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="7.975 1.775 54.25 54.25">
+	<title>Night Shift</title>
+	<!-- The mark for a light background. `bun run icons` draws every app icon from it. -->
+	<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+		<rect width="64" height="64" fill="#fff" />
+		<circle cx="42" cy="24" r="19" fill="#000" />
+	</mask>
+	<circle fill="#0a0a0a" cx="30" cy="32" r="22" mask="url(#m)" />
+	<circle stroke="#0064b9" cx="42" cy="24" r="19" fill="none" stroke-width="2.5" />
+</svg>
