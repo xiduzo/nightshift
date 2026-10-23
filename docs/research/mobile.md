@@ -416,9 +416,10 @@ by project ("Space · project" when you are in more than one Space), oldest
 first. Chips choose all Gates, a Space or a project (the `inbox-filter`
 sheet), and the order. One `GateRow` (`features/inbox`) shows a Gate on
 Home, the Inbox, Search, a project and a run: "project · flow", the
-question, then its status word (`gateLook`: Needs you, Answer on its
-way, Waits for another person), its choices and node, and how long it
-waited. The Gate screen shows the question, its short
+question, its choices and node, and how long it waited. Its look is
+`gateLook`: a Gate that needs you shows the amber hand (spoken "Needs
+you"); any other Gate puts its word first in the caption ("Answer on its
+way", "Waits for another person"). The Gate screen shows the question, its short
 labelled values as tiles ("At a glance"), the run's steps as a trail, its
 links, and the choices as cards in a RadioGroup. Where each choice leads
 comes from the run's flow edges by the engine's own rule
