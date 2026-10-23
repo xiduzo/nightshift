@@ -1,5 +1,6 @@
 # Builds main every night and publishes it to the rolling `nightly`
-# prerelease. Apps with "Get Nightly Builds" on update from there. A night
+# prerelease. Apps with "Get Nightly Builds" on update from there. The Docker
+# image of the same build gets the `nightly` tag. A night
 # without new commits is skipped. Run it from the Actions tab to build now.
 name: Nightly
 
@@ -53,6 +54,20 @@ jobs:
     needs: plan
     if: needs.plan.outputs.build == 'true'
     uses: ./.github/workflows/desktop-build.yml
+    with:
+      ref: ${{ needs.plan.outputs.sha }}
+      version: ${{ needs.plan.outputs.version }}
+      feed: nightly
+    secrets: inherit
+
+  # The Docker image of the same build, as `nightly` and its version.
+  image:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    uses: ./.github/workflows/docker.yml
+    permissions:
+      contents: read
+      packages: write
     with:
       ref: ${{ needs.plan.outputs.sha }}
       version: ${{ needs.plan.outputs.version }}

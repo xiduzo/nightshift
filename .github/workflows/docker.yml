@@ -1,0 +1,219 @@
+# Builds the Night Shift image (deploy/Dockerfile) for linux/amd64 and
+# linux/arm64, and publishes it. release.yml and nightly.yml call it:
+#
+# - A release (0.2.0) publishes `0.2.0`, `0.2` and `latest`. A prerelease
+#   (0.2.0-beta.1) publishes its own version only.
+# - A nightly build (0.2.1-nightly.20261020.12) publishes its version and the
+#   rolling `nightly` tag.
+# - Each also publishes `sha-<commit>`.
+# - A pull request that changes the image builds it and starts it, without
+#   publishing.
+#
+# It publishes to the GitHub Container Registry (ghcr.io/<owner>/nightshift),
+# and to Docker Hub when the repository variable DOCKERHUB_USERNAME and the
+# secret DOCKERHUB_TOKEN are set (docker.io/<DOCKERHUB_USERNAME>/nightshift).
+#
+# The image holds Night Shift, git and ssh, and nothing else: it is a base to
+# build on. Each platform builds on its own runner, not under emulation.
+name: Docker image
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit or tag to build.
+        type: string
+        required: true
+      version:
+        description: Version of the image, such as 0.2.0 or 0.2.1-nightly.20261020.12.
+        type: string
+        required: true
+      feed:
+        description: Where the build goes, stable or nightly.
+        type: string
+        required: true
+  pull_request:
+    paths:
+      - deploy/Dockerfile
+      - deploy/Dockerfile.dockerignore
+      - .github/workflows/docker.yml
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-${{ inputs.version || github.ref }}
+  # A release and a nightly build always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/nightshift
+  DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_USERNAME && format('docker.io/{0}/nightshift', vars.DOCKERHUB_USERNAME) || '' }}
+  PUBLISH: ${{ github.event_name != 'pull_request' }}
+
+jobs:
+  build:
+    name: Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - id: names
+        name: Name the images
+        run: |
+          images="$GHCR_IMAGE"
+          [ -n "$DOCKERHUB_IMAGE" ] && images="$images,$DOCKERHUB_IMAGE"
+          echo "images=$images" >> "$GITHUB_OUTPUT"
+          platform="${{ matrix.platform }}"
+          echo "pair=${platform//\//-}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      # The image runs as Docker Swarm and Dokploy run it: a Host that stops
+      # at start would only show up as an old container that keeps serving.
+      - name: Build the image to test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          target: runtime
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: nightshift:test
+          cache-from: type=gha,scope=${{ steps.names.outputs.pair }}
+          cache-to: type=gha,scope=${{ steps.names.outputs.pair }},mode=max
+
+      - name: Start the image
+        timeout-minutes: 3
+        run: |
+          docker run -d --name nightshift \
+            -e NIGHTSHIFT_HOST_ADDRESSES=https://nightshift.example.com \
+            -p 127.0.0.1:3000:3000 nightshift:test
+          for _ in $(seq 60); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3000/ \
+              && docker exec nightshift nightshift health; then
+              echo "Night Shift runs."
+              exit 0
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' nightshift)" != true ]; then
+              break
+            fi
+            sleep 2
+          done
+          docker logs nightshift
+          echo "::error::The image does not start."
+          exit 1
+
+      - uses: docker/login-action@v3
+        if: env.PUBLISH == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - uses: docker/login-action@v3
+        if: env.PUBLISH == 'true' && env.DOCKERHUB_IMAGE != ''
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.names.outputs.images }}
+          labels: |
+            org.opencontainers.image.title=Night Shift
+            org.opencontainers.image.description=Night Shift as a headless Host. A base image: add your own agent CLIs and tools.
+
+      # The same build again, from the cache: pushed by digest, tagged in merge.
+      - id: push
+        name: Push the image
+        if: env.PUBLISH == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          target: runtime
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,"name=${{ steps.names.outputs.images }}",push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ steps.names.outputs.pair }}
+
+      - name: Keep the digest
+        if: env.PUBLISH == 'true'
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        if: env.PUBLISH == 'true'
+        with:
+          name: digest-${{ steps.names.outputs.pair }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # One tag for both platforms: Docker picks the image of the computer.
+  merge:
+    name: Publish the tags
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - uses: docker/login-action@v3
+        if: env.DOCKERHUB_IMAGE != ''
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.GHCR_IMAGE }}
+            ${{ env.DOCKERHUB_IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ inputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }},enable=${{ inputs.feed == 'stable' }}
+            type=raw,value=latest,enable=${{ inputs.feed == 'stable' && !contains(inputs.version, '-') }}
+            type=raw,value=nightly,enable=${{ inputs.feed == 'nightly' }}
+            type=sha,format=short
+
+      - name: Tag the images
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "$GHCR_IMAGE@sha256:%s " *)
+
+      - name: Show the image
+        run: docker buildx imagetools inspect "${{ fromJSON(steps.meta.outputs.json).tags[0] }}"

@@ -1,4 +1,4 @@
-# Releases one version of the desktop app.
+# Releases one version of the desktop app and of the Docker image.
 #
 # - Run it from the Actions tab with a version (0.2.0): it tags the commit
 #   you run it on as v0.2.0, builds, and publishes the release.
@@ -71,6 +71,20 @@ jobs:
   build:
     needs: tag
     uses: ./.github/workflows/desktop-build.yml
+    with:
+      ref: ${{ needs.tag.outputs.tag }}
+      version: ${{ needs.tag.outputs.version }}
+      feed: stable
+    secrets: inherit
+
+  # The Docker image of the same version. A tag this workflow pushes starts
+  # no other workflow, so it calls docker.yml itself.
+  image:
+    needs: tag
+    uses: ./.github/workflows/docker.yml
+    permissions:
+      contents: read
+      packages: write
     with:
       ref: ${{ needs.tag.outputs.tag }}
       version: ${{ needs.tag.outputs.version }}

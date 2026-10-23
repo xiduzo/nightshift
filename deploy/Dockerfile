@@ -8,6 +8,11 @@
 # Build it from the root of the repository. The first stage compiles the
 # `nightshift` binary (web UI, migrations and libsql inside), the second
 # runs it. See docs/deploy/ for a proxy with TLS in front.
+#
+# CI publishes the second stage as xiduzo/nightshift on Docker Hub and as
+# ghcr.io/xiduzo/nightshift (.github/workflows/docker.yml). It holds Night
+# Shift, git and ssh only: no agent CLIs, no tools. Build your own image on
+# it with the CLIs your flows use (docs/deploy/README.md, "Add your tools").
 
 # The web build runs Vite on Node: Vite's prerender does not run under Bun alone.
 FROM node:22-bookworm-slim AS build

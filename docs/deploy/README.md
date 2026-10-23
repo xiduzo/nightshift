@@ -68,6 +68,60 @@ Two ready-made setups are in [`deploy/`](../../deploy/):
   [`docker-compose.yml`](../../deploy/docker-compose.yml): a container,
   with Caddy in front for TLS.
 
+### The Docker image
+
+Each release and each nightly build is on Docker Hub as
+`xiduzo/nightshift` and on GitHub as `ghcr.io/xiduzo/nightshift`, for
+linux/amd64 and linux/arm64:
+
+| Tag | What it is |
+| --- | --- |
+| `latest` | The latest full release |
+| `0.2.0`, `0.2` | A release, or the latest patch of a minor version |
+| `nightly` | The latest nightly build of `main`. It can break. |
+| `0.2.1-nightly.20261020.12` | One nightly build |
+| `sha-1a2b3c4` | The build of one commit |
+
+```bash
+docker run -d --name nightshift -p 127.0.0.1:3000:3000 -v nightshift:/data \
+  -e NIGHTSHIFT_HOST_ADDRESSES=https://nightshift.example.com xiduzo/nightshift
+```
+
+### Add your tools
+
+The image holds Night Shift, git and ssh. It has no agent CLIs and no other
+tools: you choose them. Build your own image on it, with the CLIs your flows
+use. For example:
+
+```dockerfile
+FROM xiduzo/nightshift:latest
+USER root
+# A tool from the Debian packages.
+RUN apt-get update && apt-get install -y --no-install-recommends jq \
+  && rm -rf /var/lib/apt/lists/*
+# A CLI from npm needs Node.
+COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+  && npm install -g @anthropic-ai/claude-code@2
+ENV DISABLE_AUTOUPDATER=1
+USER bun
+```
+
+- Install into `/usr/local`, not into the home folder of `bun`. A volume on
+  the home folder would keep old versions after you update the image.
+- Pin the versions. The image then changes only when you change it.
+- Go back to `USER bun` at the end. Night Shift does not run as root.
+- Add each tool on the Agents page, under Tools. An Agent node may then run
+  it.
+
+Give the logins of the CLIs in the environment of the container, for
+example `GH_TOKEN` for `gh`. Every Agent node and Command node gets them.
+For Claude Code, make a token with `claude setup-token` and set
+`CLAUDE_CODE_OAUTH_TOKEN`. Night Shift does not give `ANTHROPIC_API_KEY`
+to Claude Code. For a secret that only some steps use, see
+[Secrets on a computer without a keychain](#secrets-on-a-computer-without-a-keychain).
+
 ### Keep it running
 
 Night Shift can stop responding while it still answers web requests. Each
