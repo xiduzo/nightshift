@@ -23,7 +23,12 @@
 			},
 			"predictiveBackGestureEnabled": false,
 			"package": "dev.nightshift.mobile",
-			"permissions": ["android.permission.POST_NOTIFICATIONS"]
+			"permissions": [
+				"android.permission.POST_NOTIFICATIONS",
+				"android.permission.USE_BIOMETRIC",
+				"android.permission.USE_FINGERPRINT",
+				"android.permission.CAMERA"
+			]
 		},
 		"web": {
 			"bundler": "metro",
@@ -100,6 +105,34 @@
 		"experiments": {
 			"typedRoutes": true,
 			"reactCompiler": true
-		}
+		},
+		"extra": {
+			"router": {
+				"asyncRoutes": {
+					"web": true
+				}
+			},
+			"eas": {
+				"build": {
+					"experimental": {
+						"ios": {
+							"appExtensions": [
+								{
+									"targetName": "ExpoWidgetsTarget",
+									"bundleIdentifier": "dev.nightshift.mobile.widgets",
+									"entitlements": {
+										"com.apple.security.application-groups": [
+											"group.dev.nightshift.mobile"
+										]
+									}
+								}
+							]
+						}
+					}
+				},
+				"projectId": "61f0dd73-7856-4392-9f90-3464f62df875"
+			}
+		},
+		"owner": "xiduzo"
 	}
 }
