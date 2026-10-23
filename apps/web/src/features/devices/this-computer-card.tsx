@@ -35,7 +35,6 @@ import {
 	FolderIcon,
 	GlobeIcon,
 	KeyRoundIcon,
-	LaptopIcon,
 	LockIcon,
 	PlugIcon,
 	RotateCwIcon,
@@ -49,6 +48,7 @@ import {
 } from "@/features/settings/queries";
 import type { ThisComputer } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
+import { deviceIcon } from "./device-icon";
 import { deviceQueries } from "./queries";
 
 /**
@@ -60,6 +60,7 @@ export function ThisComputerCard({ computer }: { computer: ThisComputer }) {
 	const daemon = settings.data?.daemon;
 	const dataDir = daemon?.dataDir;
 	const lease = daemon?.lease;
+	const ComputerIcon = deviceIcon(computer);
 
 	return (
 		<Card>
@@ -67,7 +68,7 @@ export function ThisComputerCard({ computer }: { computer: ThisComputer }) {
 				<ItemGroup>
 					<Item size="sm" className="px-0">
 						<ItemMedia variant="icon">
-							<LaptopIcon aria-hidden="true" />
+							<ComputerIcon aria-hidden="true" />
 						</ItemMedia>
 						<ItemContent className="min-w-0">
 							<ItemTitle>{computer.name}</ItemTitle>

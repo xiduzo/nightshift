@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { hostname } from "node:os";
 import type { Database } from "@nightshift/db";
 import { device } from "@nightshift/db/schema";
@@ -13,17 +14,59 @@ import { eq } from "drizzle-orm";
  */
 export type SelfDevice = { id: string; name: string };
 
-export type SelfDeviceHost = { name: string; platform: string };
+export type SelfDeviceHost = {
+	name: string;
+	platform: string;
+	/**
+	 * A name an earlier default gave, which `name` now replaces: the host
+	 * name before NIGHTSHIFT_DEVICE_NAME was set, or a container id. A name
+	 * the person chose is never stale.
+	 */
+	stale?: (name: string) => boolean;
+};
 
 /** The host name without the `.local` that macOS adds. */
 export function hostDeviceName(name = hostname()): string {
 	return name.replace(/\.local$/i, "") || "This computer";
 }
 
-const thisHost = (): SelfDeviceHost => ({
-	name: hostDeviceName(),
-	platform: process.platform,
-});
+/** The host name Docker gives a container: the first 12 (or all 64) hex digits of its id. */
+export function isContainerId(name: string): boolean {
+	return /^(?:[0-9a-f]{12}|[0-9a-f]{64})$/.test(name);
+}
+
+/** Whether this process runs in a Docker or Podman container. */
+function inContainer(): boolean {
+	return existsSync("/.dockerenv") || existsSync("/run/.containerenv");
+}
+
+/**
+ * This computer's default Device name and platform: NIGHTSHIFT_DEVICE_NAME
+ * when set, else the host name. In a container whose host name is its id,
+ * the default is "Host".
+ */
+export function defaultSelfDeviceHost(
+	opts: {
+		env?: Record<string, string | undefined>;
+		hostName?: string;
+		container?: boolean;
+		platform?: string;
+	} = {},
+): SelfDeviceHost {
+	const env = opts.env ?? process.env;
+	const raw = hostDeviceName(opts.hostName ?? hostname());
+	const container = opts.container ?? inContainer();
+	const name =
+		env.NIGHTSHIFT_DEVICE_NAME?.trim() ||
+		(container && isContainerId(raw) ? "Host" : raw);
+	return {
+		name,
+		platform: opts.platform ?? process.platform,
+		stale: (current) =>
+			current !== name &&
+			(current === raw || (container && isContainerId(current))),
+	};
+}
 
 /** This computer's Device id, or null when the database has none yet. It makes nothing. */
 export async function selfDeviceId(db: Database): Promise<string | null> {
@@ -64,14 +107,24 @@ export async function setSelfOwner(
 
 /**
  * This computer's Device, made when there is none. A name or platform the
- * migration left blank is filled in from `host`.
+ * migration left blank is filled in from `host`, and so is a stale default
+ * name (`SelfDeviceHost.stale`).
  */
 export async function selfDevice(
 	db: Database,
-	host: SelfDeviceHost = thisHost(),
+	host: SelfDeviceHost = defaultSelfDeviceHost(),
 ): Promise<SelfDevice> {
 	const [row] = await db.select().from(device).where(eq(device.self, true));
 	if (row) {
+		// A default that a newer default replaces: a container id, or the host
+		// name from before NIGHTSHIFT_DEVICE_NAME was set.
+		if (row.name !== "" && host.stale?.(row.name)) {
+			await db
+				.update(device)
+				.set({ name: host.name })
+				.where(eq(device.id, row.id));
+			return selfDevice(db, host);
+		}
 		if (row.name !== "" && row.platform !== "") {
 			return { id: row.id, name: row.name };
 		}

@@ -87,6 +87,13 @@ docker run -d --name nightshift -p 127.0.0.1:3000:3000 -v nightshift:/data \
   -e NIGHTSHIFT_HOST_ADDRESSES=https://nightshift.example.com xiduzo/nightshift
 ```
 
+The Host shows its name in the sidebar and on the Devices page of each
+computer that pairs with it. Set the name with `NIGHTSHIFT_DEVICE_NAME`, for
+example `-e NIGHTSHIFT_DEVICE_NAME="Office Host"`. Without it, the name is
+the host name of the computer. In a container that Docker names by its id,
+the name is "Host". A Host that has a container id as its name gets the new
+name when it starts.
+
 ### Add your tools
 
 The image holds Night Shift, git and ssh. It has no agent CLIs and no other
