@@ -12,7 +12,6 @@ import {
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import Constants from "expo-constants";
-import { router } from "expo-router";
 import { Smartphone } from "lucide-react-native";
 import { View } from "react-native";
 
@@ -20,6 +19,7 @@ import { hostLabel, useHost, useSignedIn } from "@/features/host";
 import { removeThisPhone } from "@/features/push";
 import { forgetSpaceChoice } from "@/features/spaces";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
+import { goToConnect } from "./to-connect";
 
 /**
  * This phone, as the Host lists it. "Remove this phone" removes it from the
@@ -36,7 +36,7 @@ export function ThisPhoneCard() {
 		await removeThisPhone(host);
 		await forgetSpaceChoice(host.address).catch(() => undefined);
 		await forget();
-		router.replace("/connect");
+		goToConnect();
 	}
 
 	return (

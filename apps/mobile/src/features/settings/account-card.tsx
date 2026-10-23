@@ -1,6 +1,5 @@
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Text } from "@nightshift/ui-native/components/ui/text";
-import { router } from "expo-router";
 import { Server } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
@@ -9,6 +8,7 @@ import { hostLabel, useHost, useSignedIn } from "@/features/host";
 import { removeThisPhone } from "@/features/push";
 import { InitialsAvatar } from "@/shared/avatar";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
+import { goToConnect } from "./to-connect";
 
 /** Who is signed in, at which Host, and Sign out. Signed out, this phone gets no more notifications. */
 export function AccountCard() {
@@ -21,7 +21,7 @@ export function AccountCard() {
 		try {
 			await removeThisPhone(host);
 			await signOut();
-			router.replace("/connect");
+			goToConnect();
 		} finally {
 			setBusy(false);
 		}

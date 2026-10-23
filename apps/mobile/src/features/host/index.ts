@@ -8,3 +8,4 @@ export {
 	useHostQueries,
 	useSignedIn,
 } from "./host-provider";
+export { SignedInOnly } from "./signed-in-only";

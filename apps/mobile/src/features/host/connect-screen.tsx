@@ -55,7 +55,8 @@ export function ConnectScreen() {
 			} else {
 				await verifyCode(code, codeKind);
 			}
-			router.replace("/");
+			// Back to the tabs that wait under this screen, or to new ones.
+			router.dismissTo("/");
 		} catch (failed) {
 			setError(failed instanceof Error ? failed.message : String(failed));
 		} finally {

@@ -3,6 +3,7 @@ import "../../global.css";
 import { Stack } from "expo-router";
 import type { ComponentProps } from "react";
 
+import { SignedInOnly } from "@/features/host";
 import { startPushHandling } from "@/features/push";
 import { SpacePicker } from "@/features/spaces";
 import { AppShell } from "@/shared/shell";
@@ -23,8 +24,16 @@ const sheet = {
 	headerShown: false,
 } satisfies ComponentProps<typeof Stack.Screen>["options"];
 
-/** Starting a run is per Space: its header chooses it. */
-const spacePicker = () => <SpacePicker />;
+/**
+ * Starting a run is per Space: its header chooses it. Signed out, the
+ * header shows nothing while the screen goes to the connect screen.
+ */
+const signedInPicker = (
+	<SignedInOnly signedOut={null}>
+		<SpacePicker />
+	</SignedInOnly>
+);
+const spacePicker = () => signedInPicker;
 /**
  * iOS 26 puts a glass pill behind a header item. The picker is a bordered
  * Select already, so it goes without the pill.
@@ -32,7 +41,7 @@ const spacePicker = () => <SpacePicker />;
 const spacePickerItems = () => [
 	{
 		type: "custom" as const,
-		element: <SpacePicker />,
+		element: signedInPicker,
 		hidesSharedBackground: true,
 	},
 ];

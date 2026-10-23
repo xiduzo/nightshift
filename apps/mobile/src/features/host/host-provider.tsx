@@ -213,8 +213,9 @@ export function useHost(): HostValue {
 }
 
 /**
- * The Host and the Person of a screen behind the sign-in. The tabs render
- * only when someone is signed in, so their screens may use it.
+ * The Host and the Person of a screen behind the sign-in. The tabs, and
+ * the screens in `SignedInOnly`, render only when someone is signed in, so
+ * their screens may use it.
  */
 export function useSignedIn(): { host: Host; person: Person } {
 	const { state } = useHost();
