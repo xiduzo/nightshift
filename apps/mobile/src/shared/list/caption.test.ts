@@ -35,6 +35,16 @@ describe("rowLabel", () => {
 		);
 	});
 
+	test("reads a status line after the title", () => {
+		expect(
+			rowLabel({
+				title: "website",
+				status: "2 Gates need you",
+				caption: "Last run 3 h ago",
+			}),
+		).toBe("website, 2 Gates need you, Last run 3 h ago");
+	});
+
 	test("takes the value as it shows when it has no spoken form", () => {
 		expect(rowLabel({ title: "Runs", value: "12" })).toBe("Runs, 12");
 	});

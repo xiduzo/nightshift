@@ -439,7 +439,7 @@ each composed from Reusables pieces and the tokens:
 | --- | --- | --- |
 | `tone` | the status map, pure | `Tone`, `Look` (`tone`, `icon`, `label`), `runStatusLook(status)`, `stepLook({ state, outcome, nodeType }, runStatus?)`, `stepKind(step)`, `NEEDS_YOU`, `TONE_CLASS[tone]` (`text`, `badge` classes) |
 | `status` | `StatusBadge`, `StatusText`, `iconOf` | `look` (outline Badge with icon and word; or icon and word in a line) |
-| `list` | `ListGroup`, `ListRow`, `SectionHead` | ListRow: `title`, `titleLines`, `overline`, `caption`, `detail` (a string or parts, a part may be `mono` or take a `tone`), `icon` + `tone` or `look`, `iconLabel`, `leading`, `value`, `valueLabel`, `href` or `onPress`, `chevron`, `accessibilityLabel`, `accessibilityHint`. SectionHead: `title`, `hint`, `seeAll` (`href` or `onPress`) |
+| `list` | `ListGroup`, `ListRow`, `SwitchRow`, `SectionHead` | ListRow: `title`, `titleLines`, `overline`, `status` (a `Look` as a line of icon and word under the title), `caption`, `detail` (a string or parts, a part may be `mono` or take a `tone`), `icon` + `tone` or `look`, `iconLabel`, `leading`, `value`, `valueLabel`, `href` or `onPress`, `chevron`, `selected` (a check at the end, for a row you choose from a list), `disabled`, `accessibilityLabel`, `accessibilityHint`. SwitchRow: `title`, `caption`, `checked`, `onChange`, `disabled` (the whole row is one switch). SectionHead: `title`, `hint`, `seeAll` (`href` or `onPress`) |
 | `header` | `LargeTitleHeader`, `HeaderButton`, `AvatarButton` | `title`, `summary`, `leading`, `actions`, `compact`; buttons: `icon` or `name`, `label`, `hint`, `href` or `onPress` (44 pt, round) |
 | `avatar` | `InitialsAvatar` | `name`, `size` (`sm` row, `md` header) |
 | `tiles` | `StatTile`, `StatGrid`, `FactTile`, `FactGrid` | StatTile: `value` (undefined loads), `label`, `icon`, `tone`, `caption`, `detail`, `href` or `onPress`. FactTile: `label`, `value`, `sub`, `mono`, `look`. Grids: two by two |
@@ -502,6 +502,28 @@ Host has it:
 - Pull requests as their own list ("What the night produced", PR checks
   and files): a pull request is no entity. Only Gate links and run items
   of kind "pull" that are already in the data may show.
+
+**Projects, a project, New run, Settings and Connect.** The Projects tab
+lists the projects of the active Space (`projects.list`) in one
+ListGroup: the initials, the name, "2 Gates need you" as a status line
+(the open Gates of every Space that you may answer, `gates.list`) or
+"Nothing needs you", and "Last run 3 h ago · title" from the runs of the
+Space. Its summary counts both ("4 projects · 2 Gates need you"). A
+project page shows the owner of its remote, its name, the computers with
+a copy of it, its remote as a link to the browser, and + for New run in
+that project. Its rows lead on with the project as a search param:
+Gates to `/inbox?project=<id>`, Runs to `/runs?project=<id>`, Flows to
+`/flows?projectId=<id>` (`features/projects/links.ts`). Then Needs you
+(the project's open Gates, oldest first) and Runs (newest first), five
+each, with See all past five. New run (`/start`, `?projectId=<id>`
+chooses the project) lists the flows of the project as rows to choose
+from (a flow that is not valid shows, but cannot be chosen), then the
+inputs, then where it runs as radio rows; Start run is the ActionBar in
+the Screen's footer, with why it waits as its caption. After a start, New
+run closes and the run opens on the main stack. Settings is Account,
+Notifications (switch rows in groups, quiet hours, the phone delay) and
+This phone. Connect leads with Scan the code, then the address, email
+and password in a card, and the two-factor or backup code.
 
 ### Widgets and Live Activities
 

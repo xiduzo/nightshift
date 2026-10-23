@@ -4,14 +4,7 @@ import {
 	AlertTitle,
 } from "@nightshift/ui-native/components/ui/alert";
 import { Button } from "@nightshift/ui-native/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui-native/components/ui/card";
-import { Icon } from "@nightshift/ui-native/components/ui/icon";
+import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
 import { Input } from "@nightshift/ui-native/components/ui/input";
 import { Label } from "@nightshift/ui-native/components/ui/label";
 import { Text } from "@nightshift/ui-native/components/ui/text";
@@ -20,6 +13,8 @@ import { CircleAlert, ScanQrCode } from "lucide-react-native";
 import { type ReactNode, useRef, useState } from "react";
 import { type TextInput, View } from "react-native";
 import { ENV } from "@/env";
+import { LargeTitleHeader } from "@/shared/header";
+import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { CodeScanner } from "./code-scanner";
 import { type CodeKind, useHost } from "./host-provider";
@@ -68,31 +63,56 @@ export function ConnectScreen() {
 		}
 	}
 
+	const submitLabel =
+		step === "sign-in"
+			? busy
+				? "Connecting…"
+				: "Connect"
+			: busy
+				? "Checking the code…"
+				: "Verify code";
+
 	return (
 		<Screen>
-			<Card>
-				<CardHeader>
-					<CardTitle>Connect to your Host</CardTitle>
-					<CardDescription>
-						Sign in to the Host that runs your flows. Then you answer Gates and
-						follow runs from this phone.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="gap-4">
-					{step === "scan" ? (
-						<CodeScanner
-							onScanned={(scanned) => {
-								setAddress(scanned);
-								setError(null);
-								setStep("sign-in");
-							}}
-							onCancel={() => setStep("sign-in")}
+			<LargeTitleHeader
+				title={
+					step === "code" ? "Check that it is you" : "Connect to your Host"
+				}
+				summary={
+					step === "code"
+						? "Your Host asks for a second code before you sign in."
+						: "Sign in to the Host that runs your flows. Then you answer Gates and follow runs from this phone."
+				}
+			/>
+			{step === "scan" ? (
+				<CodeScanner
+					onScanned={(scanned) => {
+						setAddress(scanned);
+						setError(null);
+						setStep("sign-in");
+					}}
+					onCancel={() => setStep("sign-in")}
+				/>
+			) : step === "sign-in" ? (
+				<>
+					<ListGroup>
+						<ListRow
+							icon={ScanQrCode}
+							title="Scan the code"
+							caption="In Night Shift on your computer, under Settings"
+							onPress={() => setStep("scan")}
+							accessibilityHint="Opens the camera to read the Host address"
 						/>
-					) : step === "sign-in" ? (
-						<>
+					</ListGroup>
+					<SectionHead
+						title="Or sign in by hand"
+						hint="Type the Host address, your email and your password."
+					/>
+					<Card className="py-4">
+						<CardContent className="gap-5 px-4">
 							<Field
 								label="Host address"
-								hint="The address where you open Night Shift in a browser. Or scan the code under Settings in Night Shift on your computer."
+								hint="The address where you open Night Shift in a browser."
 							>
 								<Input
 									value={address}
@@ -102,11 +122,8 @@ export function ConnectScreen() {
 									autoCorrect={false}
 									keyboardType="url"
 									textContentType="URL"
+									accessibilityLabel="Host address"
 								/>
-								<Button variant="outline" onPress={() => setStep("scan")}>
-									<Icon as={ScanQrCode} />
-									<Text>Scan the code</Text>
-								</Button>
 							</Field>
 							<Field label="Email">
 								<Input
@@ -120,6 +137,7 @@ export function ConnectScreen() {
 									returnKeyType="next"
 									submitBehavior="submit"
 									onSubmitEditing={() => passwordInput.current?.focus()}
+									accessibilityLabel="Email"
 								/>
 							</Field>
 							<Field label="Password">
@@ -132,10 +150,15 @@ export function ConnectScreen() {
 									textContentType="password"
 									returnKeyType="go"
 									onSubmitEditing={submit}
+									accessibilityLabel="Password"
 								/>
 							</Field>
-						</>
-					) : (
+						</CardContent>
+					</Card>
+				</>
+			) : (
+				<Card className="py-4">
+					<CardContent className="gap-3 px-4">
 						<Field
 							label={codeKind === "app" ? "Two-factor code" : "Backup code"}
 							hint={
@@ -154,45 +177,40 @@ export function ConnectScreen() {
 								keyboardType={codeKind === "app" ? "number-pad" : "default"}
 								textContentType={codeKind === "app" ? "oneTimeCode" : "none"}
 								onSubmitEditing={submit}
+								accessibilityLabel={
+									codeKind === "app" ? "Two-factor code" : "Backup code"
+								}
 							/>
-							<Button
-								variant="link"
-								className="self-start px-0"
-								onPress={() => {
-									setCode("");
-									setError(null);
-									setCodeKind(codeKind === "app" ? "backup" : "app");
-								}}
-							>
-								<Text>
-									{codeKind === "app"
-										? "Use a backup code"
-										: "Use the code from your app"}
-								</Text>
-							</Button>
 						</Field>
-					)}
-					{error ? (
-						<Alert icon={CircleAlert} variant="destructive">
-							<AlertTitle>You are not connected</AlertTitle>
-							<AlertDescription>{error}</AlertDescription>
-						</Alert>
-					) : null}
-					{step === "scan" ? null : (
-						<Button onPress={submit} disabled={busy}>
+						<Button
+							variant="link"
+							className="h-11 self-start px-0"
+							onPress={() => {
+								setCode("");
+								setError(null);
+								setCodeKind(codeKind === "app" ? "backup" : "app");
+							}}
+						>
 							<Text>
-								{step === "sign-in"
-									? busy
-										? "Connecting…"
-										: "Connect"
-									: busy
-										? "Checking the code…"
-										: "Verify code"}
+								{codeKind === "app"
+									? "Use a backup code"
+									: "Use the code from your app"}
 							</Text>
 						</Button>
-					)}
-				</CardContent>
-			</Card>
+					</CardContent>
+				</Card>
+			)}
+			{error ? (
+				<Alert icon={CircleAlert} variant="destructive">
+					<AlertTitle>You are not connected</AlertTitle>
+					<AlertDescription>{error}</AlertDescription>
+				</Alert>
+			) : null}
+			{step === "scan" ? null : (
+				<Button size="lg" onPress={submit} disabled={busy}>
+					<Text>{submitLabel}</Text>
+				</Button>
+			)}
 		</Screen>
 	);
 }

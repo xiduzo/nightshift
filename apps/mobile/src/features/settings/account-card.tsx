@@ -1,19 +1,14 @@
 import { Button } from "@nightshift/ui-native/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui-native/components/ui/card";
-import { Separator } from "@nightshift/ui-native/components/ui/separator";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { router } from "expo-router";
+import { Server } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
 
 import { hostLabel, useHost, useSignedIn } from "@/features/host";
 import { removeThisPhone } from "@/features/push";
+import { InitialsAvatar } from "@/shared/avatar";
+import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 
 /** Who is signed in, at which Host, and Sign out. Signed out, this phone gets no more notifications. */
 export function AccountCard() {
@@ -33,23 +28,25 @@ export function AccountCard() {
 	}
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>{person.name}</CardTitle>
-				<CardDescription>{person.email}</CardDescription>
-			</CardHeader>
-			<CardContent className="gap-4">
-				<Separator />
-				<View className="gap-1">
-					<Text variant="small">Host</Text>
-					<Text variant="muted" selectable>
-						{hostLabel(host.address)}
-					</Text>
-				</View>
-				<Button variant="outline" onPress={leave} disabled={busy}>
-					<Text>{busy ? "Signing out…" : "Sign out"}</Text>
-				</Button>
-			</CardContent>
-		</Card>
+		<View className="gap-3">
+			<SectionHead title="Account" />
+			<ListGroup>
+				<ListRow
+					leading={<InitialsAvatar name={person.name} />}
+					title={person.name}
+					caption={person.email}
+				/>
+				<ListRow icon={Server} title="Host" caption={hostLabel(host.address)} />
+			</ListGroup>
+			<Button
+				variant="outline"
+				className="h-11"
+				onPress={leave}
+				disabled={busy}
+				accessibilityHint="This phone gets no more notifications until you sign in again"
+			>
+				<Text>{busy ? "Signing out…" : "Sign out"}</Text>
+			</Button>
+		</View>
 	);
 }
