@@ -1,4 +1,7 @@
-import { createDashboardQueries } from "@nightshift/client";
+import {
+	createDashboardQueries,
+	createProjectQueries,
+} from "@nightshift/client";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { Workflow } from "lucide-react-native";
@@ -12,12 +15,24 @@ import { healthOf } from "./health";
 import { RunHealth } from "./run-health";
 
 /**
- * How your flows did over every Space you are in: the share of their runs
- * that finished. A sheet from Home and from a project.
+ * How your flows did: the share of their runs that finished. With a
+ * project, each flow of it; without one, each project over every Space you
+ * are in. A sheet from Home (`/flows`) and from a project
+ * (`/flows?projectId=…`).
  */
-export function FlowHealthScreen() {
+export function FlowHealthScreen({ projectId }: { projectId?: string }) {
 	const dashboard = useHostQueries(createDashboardQueries);
-	const summary = useQuery(dashboard.summary({ everySpace: true }));
+	const projectQueries = useHostQueries(createProjectQueries);
+	const summary = useQuery(
+		dashboard.summary(projectId ? { projectId } : { everySpace: true }),
+	);
+	const projects = useQuery({
+		...projectQueries.list(),
+		enabled: projectId !== undefined,
+	});
+	const project = projectId
+		? projects.data?.find((p) => p.id === projectId)
+		: undefined;
 	const health = summary.data ? healthOf(summary.data) : null;
 	const now = summary.data?.at ?? Date.now();
 
@@ -25,8 +40,8 @@ export function FlowHealthScreen() {
 		<Screen onRefresh={() => summary.refetch()}>
 			<LargeTitleHeader
 				compact
-				title="Flows"
-				summary="How often the runs of each flow finish."
+				title={project ? `Flows in ${project.name}` : "Flows"}
+				summary="How often their runs finish."
 			/>
 			{summary.data ? (
 				health ? (

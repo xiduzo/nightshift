@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import type { DevicesOverview } from "@nightshift/client";
 
-import { computersOf } from "./computers";
+import { computersOf, onlineSummary } from "./computers";
 
 type Paired = DevicesOverview["devices"][number];
 
@@ -68,5 +68,15 @@ describe("computersOf", () => {
 			isHost: true,
 		});
 		expect(list[1]?.isHost).toBe(false);
+	});
+});
+
+describe("onlineSummary", () => {
+	test("counts the computers that are online", () => {
+		expect(
+			onlineSummary([{ online: true }, { online: false }, { online: true }]),
+		).toBe("2 of 3 online");
+		expect(onlineSummary([{ online: true }])).toBe("Your computer is online");
+		expect(onlineSummary([{ online: false }])).toBe("Your computer is offline");
 	});
 });

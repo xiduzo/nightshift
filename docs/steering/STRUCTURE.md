@@ -222,7 +222,7 @@ apps/mobile/src/
     glance/                the glances outside the app: the home screen widget (Gates that wait, the latest runs) and a run followed on the lock screen (Live Activity, Android ongoing notification), on expo-widgets
     push/                  notifications on this phone: the permission card, the Expo push token registered with the Host, the categories and Android channels, the lock-screen buttons and withdraws (background task), the banner in front, where a tap goes
     devices/               the person's computers and whether each can run a flow now (the Computers sheet)
-    dashboard/             the numbers on Home (StatCards) and how each flow did (the Flows sheet)
+    dashboard/             how each flow did, or each project over every Space (the Flows sheet)
     home/  inbox/  runs/  projects/  start/  search/  settings/
 ```
 
