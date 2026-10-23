@@ -37,6 +37,7 @@ import {
 	FieldError,
 	FieldGroup,
 	FieldLabel,
+	FieldSeparator,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
@@ -55,8 +56,15 @@ import { checkState } from "./connections/cli-panel";
 import { CheckBadge, FactList } from "./connections/parts";
 
 import { DetailSection, DetailShell } from "./detail-shell";
-import { cliToolMutations, cliToolQueries, profileQueries } from "./queries";
+import {
+	cliToolMutations,
+	cliToolQueries,
+	connectionQueries,
+	profileQueries,
+} from "./queries";
 import { UsedBySection } from "./tool-detail";
+import { LoginFields, LoginSection } from "./tool-login";
+import { gitOf, loginDraftOf, loginOf, loginProblem } from "./tool-login-draft";
 
 /** The program name only: what a shell types to run it. */
 const PROGRAM = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
@@ -202,6 +210,8 @@ export function CliToolDetail({
 				</div>
 			</DetailSection>
 
+			<LoginSection tool={tool} />
+
 			{data?.path ? (
 				<DetailSection
 					title="Help for agents"
@@ -280,7 +290,7 @@ export function CliToolDialog({
 }) {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg">
+			<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
 				{open ? (
 					<CliToolForm
 						tool={tool}
@@ -307,11 +317,14 @@ function CliToolForm({
 }) {
 	const id = useId();
 	const queryClient = useQueryClient();
+	const [program, setProgram] = useState(tool?.program ?? tool?.name ?? "");
+	// A new tool is named after its program until the person names it.
 	const [name, setName] = useState(tool?.name ?? "");
+	const [named, setNamed] = useState(tool !== null);
 	const [description, setDescription] = useState(tool?.description ?? "");
+	const [login, setLogin] = useState(() => loginDraftOf(tool));
 	const programs = useQuery({
 		...cliToolQueries.programs(),
-		enabled: tool === null,
 		staleTime: 5 * 60_000,
 		meta: { quietErrors: true },
 	});
@@ -322,14 +335,18 @@ function CliToolForm({
 				void queryClient.invalidateQueries({
 					queryKey: cliToolQueries.lists(),
 				});
+				void queryClient.invalidateQueries({
+					queryKey: connectionQueries.lists(),
+				});
 				onDone(saved.name);
 			},
 		}),
 	);
 
-	const trimmed = name.trim();
-	const available = (programs.data ?? []).filter((p) => !taken.includes(p));
-	const query = trimmed.toLowerCase();
+	const trimmedProgram = program.trim();
+	const trimmed = (named ? name : program).trim();
+	const available = programs.data ?? [];
+	const query = trimmedProgram.toLowerCase();
 	const matches = available.filter((p) => p.toLowerCase().includes(query));
 	// The names that start with what was typed come first.
 	matches.sort(
@@ -338,15 +355,19 @@ function CliToolForm({
 			Number(!b.toLowerCase().startsWith(query)),
 	);
 	const shown = matches.slice(0, SHOWN);
-	const invalid = trimmed !== "" && !PROGRAM.test(trimmed);
+	const programInvalid = trimmedProgram !== "" && !PROGRAM.test(trimmedProgram);
+	const nameInvalid = trimmed !== "" && !PROGRAM.test(trimmed);
 	const exists = tool === null && taken.includes(trimmed);
 	const notFound =
-		tool === null &&
 		programs.data !== undefined &&
+		PROGRAM.test(trimmedProgram) &&
+		!programs.data.includes(trimmedProgram);
+	const problem = loginProblem(login);
+	const canSave =
+		PROGRAM.test(trimmedProgram) &&
 		PROGRAM.test(trimmed) &&
 		!exists &&
-		!programs.data.includes(trimmed);
-	const canSave = PROGRAM.test(trimmed) && !exists;
+		problem === null;
 
 	return (
 		<form
@@ -354,9 +375,14 @@ function CliToolForm({
 			onSubmit={(event) => {
 				event.preventDefault();
 				if (!canSave) return;
+				const savedLogin = loginOf(login);
+				const git = gitOf(login);
 				save.mutate({
 					name: trimmed,
+					...(trimmedProgram !== trimmed ? { program: trimmedProgram } : {}),
 					description: description.trim() || undefined,
+					...(savedLogin ? { login: savedLogin } : {}),
+					...(git ? { git } : {}),
 				});
 			}}
 		>
@@ -364,79 +390,104 @@ function CliToolForm({
 				<DialogTitle>{tool ? `Edit ${tool.name}` : "Add CLI tool"}</DialogTitle>
 				<DialogDescription>
 					Pick a program on this computer. Agents with this tool run it without
-					asking.
+					asking. Add a tool for each account of a program, for example gh and
+					gh-work.
 				</DialogDescription>
 			</DialogHeader>
 
 			<FieldGroup className="gap-5">
-				{tool ? null : (
-					<Field data-invalid={invalid || exists || undefined}>
-						<FieldLabel htmlFor={`${id}-name`}>Program</FieldLabel>
-						<Combobox
-							items={available}
-							filteredItems={shown}
-							filter={null}
-							value={available.includes(trimmed) ? trimmed : null}
-							inputValue={name}
-							onInputValueChange={setName}
-							onValueChange={(next: string | null) => {
-								if (next) setName(next);
-							}}
+				<Field data-invalid={programInvalid || undefined}>
+					<FieldLabel htmlFor={`${id}-program`}>Program</FieldLabel>
+					<Combobox
+						items={available}
+						filteredItems={shown}
+						filter={null}
+						value={available.includes(trimmedProgram) ? trimmedProgram : null}
+						inputValue={program}
+						onInputValueChange={setProgram}
+						onValueChange={(next: string | null) => {
+							if (next) setProgram(next);
+						}}
+					>
+						<ComboboxInput
+							id={`${id}-program`}
+							className="w-full font-mono"
+							placeholder="gh"
+							autoComplete="off"
+							spellCheck={false}
+							autoFocus={tool === null}
+							aria-invalid={programInvalid || undefined}
+							aria-describedby={`${id}-program-hint`}
+						/>
+						<ComboboxContent>
+							<ComboboxEmpty>
+								{programs.isPending
+									? "Looking for programs…"
+									: "No program with that name on this computer."}
+							</ComboboxEmpty>
+							<ComboboxList>
+								{(item: string) => (
+									<ComboboxItem key={item} value={item} className="font-mono">
+										{item}
+									</ComboboxItem>
+								)}
+							</ComboboxList>
+						</ComboboxContent>
+					</Combobox>
+					{programInvalid ? (
+						<FieldError id={`${id}-program-hint`}>
+							Type the program name only, for example gh or aws.
+						</FieldError>
+					) : notFound ? (
+						<FieldDescription
+							id={`${id}-program-hint`}
+							className="text-status-waiting"
 						>
-							<ComboboxInput
-								id={`${id}-name`}
-								className="w-full font-mono"
-								placeholder="gh"
-								autoComplete="off"
-								spellCheck={false}
-								autoFocus
-								aria-invalid={invalid || exists || undefined}
-								aria-describedby={`${id}-name-hint`}
-							/>
-							<ComboboxContent>
-								<ComboboxEmpty>
-									{programs.isPending
-										? "Looking for programs…"
-										: "No program with that name on this computer."}
-								</ComboboxEmpty>
-								<ComboboxList>
-									{(program: string) => (
-										<ComboboxItem
-											key={program}
-											value={program}
-											className="font-mono"
-										>
-											{program}
-										</ComboboxItem>
-									)}
-								</ComboboxList>
-							</ComboboxContent>
-						</Combobox>
-						{invalid ? (
-							<FieldError id={`${id}-name-hint`}>
-								Type the program name only, for example gh or aws.
-							</FieldError>
-						) : exists ? (
-							<FieldError id={`${id}-name-hint`}>
-								{trimmed} is a CLI tool already.
-							</FieldError>
-						) : notFound ? (
-							<FieldDescription
-								id={`${id}-name-hint`}
-								className="text-status-waiting"
-							>
-								Night Shift cannot find {trimmed} on this computer. Flows with
-								it do not start until you install it.
-							</FieldDescription>
-						) : (
-							<FieldDescription id={`${id}-name-hint`}>
-								{matches.length > SHOWN
-									? `${matches.length} programs. Type to narrow the list.`
-									: "Profiles and Agent nodes name it like this."}
-							</FieldDescription>
-						)}
-					</Field>
-				)}
+							Night Shift cannot find {trimmedProgram} on this computer. Flows
+							with this tool do not start until you install it.
+						</FieldDescription>
+					) : (
+						<FieldDescription id={`${id}-program-hint`}>
+							{matches.length > SHOWN
+								? `${matches.length} programs. Type to narrow the list.`
+								: "The program that runs when an agent uses this tool."}
+						</FieldDescription>
+					)}
+				</Field>
+
+				<Field data-invalid={nameInvalid || exists || undefined}>
+					<FieldLabel htmlFor={`${id}-name`}>Name</FieldLabel>
+					<Input
+						id={`${id}-name`}
+						value={named ? name : program}
+						onChange={(event) => {
+							setNamed(true);
+							setName(event.target.value);
+						}}
+						placeholder={trimmedProgram || "gh"}
+						className="font-mono"
+						autoComplete="off"
+						spellCheck={false}
+						disabled={tool !== null}
+						aria-invalid={nameInvalid || exists || undefined}
+						aria-describedby={`${id}-name-hint`}
+					/>
+					{nameInvalid ? (
+						<FieldError id={`${id}-name-hint`}>
+							Use letters, digits and . _ + -, for example gh-work.
+						</FieldError>
+					) : exists ? (
+						<FieldError id={`${id}-name-hint`}>
+							{trimmed} is a CLI tool already. Give this account another name,
+							for example {trimmed}-work.
+						</FieldError>
+					) : (
+						<FieldDescription id={`${id}-name-hint`}>
+							Agents type this name to run it. Profiles and Agent nodes name it
+							like this.
+						</FieldDescription>
+					)}
+				</Field>
 
 				<Field>
 					<FieldLabel htmlFor={`${id}-description`}>
@@ -454,10 +505,28 @@ function CliToolForm({
 						autoFocus={tool !== null}
 					/>
 					<FieldDescription>
-						Agents read this before the help text of the program. Example:
-						"Jira: read and update issues in the PROJ project."
+						Agents read this before the help text of the program. Say which
+						account it is. Example: "GitHub as work-org. Use it for repositories
+						under work-org/."
 					</FieldDescription>
 				</Field>
+
+				<FieldSeparator />
+
+				<LoginFields
+					draft={login}
+					onChange={setLogin}
+					program={trimmedProgram}
+					name={trimmed}
+				/>
+
+				{problem ? (
+					<Alert variant="destructive">
+						<CircleAlertIcon />
+						<AlertTitle>Check the login</AlertTitle>
+						<AlertDescription>{problem}</AlertDescription>
+					</Alert>
+				) : null}
 
 				{save.error ? (
 					<Alert variant="destructive">
