@@ -1,89 +1,122 @@
-import {
-	createProjectQueries,
-	createRunQueries,
-	groupRuns,
-	type RunGroup,
-	type RunSummary,
-} from "@nightshift/client";
+import { createProjectQueries, createRunQueries } from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { History } from "lucide-react-native";
-import { useCallback, useMemo, useState } from "react";
-import { RefreshControl, SectionList, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { History, Search, X } from "lucide-react-native";
+import { useMemo, useState } from "react";
 
 import { useHostQueries } from "@/features/host";
 import { SpacePicker } from "@/features/spaces";
 import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
-import { LargeTitleHeader } from "@/shared/header";
+import { HeaderButton, LargeTitleHeader } from "@/shared/header";
+import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
-import { usePullRefresh } from "@/shared/refresh";
+import { useScreenRefresh } from "@/shared/refresh";
 import { RunRow } from "./run-row";
+import {
+	emptyFilterTitle,
+	filterCounts,
+	filterRuns,
+	ofProject,
+	RUN_FILTERS,
+	RUNS_PAGE,
+	type RunFilter,
+	runFilterOf,
+	runsSummary,
+} from "./runs-list";
 
-const GROUP_TITLE: Record<RunGroup, string> = {
-	running: "Running",
-	waiting: "Waiting for you",
-	ended: "Ended",
-};
-
-/** The chips over the list: every run, or one group. */
-const FILTERS: { key: RunGroup | "all"; label: string }[] = [
-	{ key: "all", label: "All" },
-	{ key: "running", label: "Running" },
-	{ key: "waiting", label: "Waiting for you" },
-	{ key: "ended", label: "Ended" },
-];
-
-function RunsHeader() {
-	return <LargeTitleHeader title="Runs" actions={<SpacePicker />} />;
+function RunsHeader({ summary }: { summary?: string }) {
+	return (
+		<LargeTitleHeader
+			title="Runs"
+			summary={summary}
+			actions={
+				<>
+					<SpacePicker />
+					<HeaderButton
+						icon={Search}
+						label="Search"
+						hint="Finds a run or a Gate"
+						href="/search"
+					/>
+				</>
+			}
+		/>
+	);
 }
 
-/** The runs of the Space you chose in the header: running, waiting for you, ended. Newest first. */
+/**
+ * The filter and project of the list, kept in the link: `/runs?filter=failed`
+ * shows the failed runs, `/runs?project=<id>` the runs of one project.
+ */
+function useRunsParams(): {
+	filter: RunFilter;
+	projectId: string | null;
+	setFilter: (filter: RunFilter) => void;
+	clearProject: () => void;
+} {
+	const params = useLocalSearchParams<{ filter?: string; project?: string }>();
+	const projectId =
+		typeof params.project === "string" && params.project !== ""
+			? params.project
+			: null;
+	return {
+		filter: runFilterOf(params.filter),
+		projectId,
+		setFilter: (filter) =>
+			router.setParams({ filter: filter === "all" ? undefined : filter }),
+		clearProject: () => router.setParams({ project: undefined }),
+	};
+}
+
+/**
+ * The runs of the Space you chose in the header, newest first. Chips show
+ * the runs on their way, the runs that need you, the failed and the
+ * finished ones. Pull down, or come back to the tab, to read them again.
+ */
 export function RunsScreen() {
-	const [filter, setFilter] = useState<RunGroup | "all">("all");
+	const { filter, projectId, setFilter, clearProject } = useRunsParams();
 	const runQueries = useHostQueries(createRunQueries);
 	const projectQueries = useHostQueries(createProjectQueries);
 	const runs = useQuery(runQueries.everyRunLive());
 	const projects = useQuery(projectQueries.list());
-	const refetch = useCallback(
-		() => Promise.all([runs.refetch(), projects.refetch()]),
-		[runs.refetch, projects.refetch],
-	);
-	const pull = usePullRefresh(refetch);
+	const [limit, setLimit] = useState(RUNS_PAGE);
+	const refresh = useScreenRefresh([runs.refetch, projects.refetch]);
 
 	const projectNames = useMemo(
 		() => new Map((projects.data ?? []).map((p) => [p.id, p.name])),
 		[projects.data],
 	);
-	const groups = useMemo(() => groupRuns(runs.data ?? []), [runs.data]);
-	const counts = new Map<RunGroup | "all", number>([
-		["all", runs.data?.length ?? 0],
-		...groups.map(({ group, runs: data }) => [group, data.length] as const),
-	]);
-	// A group that empties (its last run ended) falls back to every run.
-	const shown = counts.has(filter) ? filter : "all";
-	const sections = useMemo(
-		() =>
-			groups
-				.filter(({ group }) => shown === "all" || group === shown)
-				.map(({ group, runs: data }) => ({ title: GROUP_TITLE[group], data })),
-		[groups, shown],
+	const inProject = useMemo(
+		() => ofProject(runs.data ?? [], projectId),
+		[runs.data, projectId],
 	);
-	// The list renders again on each poll; that is often enough for "12 min ago".
+	const counts = useMemo(() => filterCounts(inProject), [inProject]);
+	const shown = useMemo(
+		() => filterRuns(inProject, filter),
+		[inProject, filter],
+	);
+	const projectName = projectId
+		? (projectNames.get(projectId) ?? "This project")
+		: null;
+	// The list renders again on each poll: often enough for "12 min".
 	const now = runs.dataUpdatedAt || Date.now();
+
+	const choose = (next: RunFilter) => {
+		setLimit(RUNS_PAGE);
+		setFilter(next);
+	};
 
 	if (runs.isPending) {
 		return (
 			<Screen>
 				<RunsHeader />
-				<Skeleton className="h-4 w-24" />
-				<Skeleton className="h-24 w-full rounded-xl" />
-				<Skeleton className="h-24 w-full rounded-xl" />
-				<Skeleton className="h-24 w-full rounded-xl" />
+				<Skeleton className="h-11 w-full rounded-full" />
+				<Skeleton className="h-72 w-full rounded-xl" />
 			</Screen>
 		);
 	}
@@ -91,7 +124,7 @@ export function RunsScreen() {
 	// A failed poll keeps the list it has.
 	if (runs.isError && runs.data === undefined) {
 		return (
-			<Screen>
+			<Screen onRefresh={refresh}>
 				<RunsHeader />
 				<ErrorAlert
 					title="The runs did not load"
@@ -103,60 +136,92 @@ export function RunsScreen() {
 		);
 	}
 
+	if (runs.data.length === 0) {
+		return (
+			<Screen onRefresh={refresh}>
+				<RunsHeader />
+				<EmptyState
+					icon={History}
+					title="No runs yet"
+					description="The runs of this Space show up here, newest first. Start a flow to make the first one."
+				>
+					<Button onPress={() => router.push("/start")}>
+						<Text>New run</Text>
+					</Button>
+				</EmptyState>
+			</Screen>
+		);
+	}
+
 	return (
-		<SectionList<RunSummary, { title: string }>
-			className="flex-1 bg-background"
-			contentContainerClassName="flex-grow gap-3 p-4"
-			contentInsetAdjustmentBehavior="automatic"
-			sections={sections}
-			keyExtractor={(run) => run.id}
-			stickySectionHeadersEnabled={false}
-			refreshControl={<RefreshControl {...pull} />}
-			ListHeaderComponent={
-				<View className="gap-4">
-					<RunsHeader />
-					{runs.data && runs.data.length > 0 ? (
-						<ChipRail>
-							{FILTERS.filter(({ key }) => counts.has(key)).map(
-								({ key, label }) => (
-									<Chip
-										key={key}
-										label={label}
-										count={counts.get(key)}
-										selected={shown === key}
-										onPress={() => setFilter(key)}
-									/>
-								),
-							)}
-						</ChipRail>
-					) : null}
-				</View>
-			}
-			renderSectionHeader={({ section }) => (
-				<Text variant="small" className="pt-2 text-muted-foreground">
-					{section.title}
-				</Text>
-			)}
-			renderItem={({ item }) => (
-				<RunRow
-					run={item}
-					projectName={projectNames.get(item.projectId) ?? null}
-					now={now}
-				/>
-			)}
-			ListEmptyComponent={
-				<View className="flex-1">
-					<EmptyState
-						icon={History}
-						title="No runs yet"
-						description="The runs of this Space show up here, newest first. Start a flow to make the first one."
-					>
-						<Button onPress={() => router.push("/start")}>
-							<Text>Start a flow</Text>
+		<Screen onRefresh={refresh}>
+			<RunsHeader summary={runsSummary(shown.length, projectName)} />
+			<ChipRail>
+				{projectName ? (
+					<Chip
+						label={projectName}
+						icon={X}
+						selected
+						onPress={() => {
+							setLimit(RUNS_PAGE);
+							clearProject();
+						}}
+						accessibilityHint="Shows the runs of every project"
+					/>
+				) : null}
+				{RUN_FILTERS.map(({ key, label }) => (
+					<Chip
+						key={key}
+						label={label}
+						count={counts[key]}
+						selected={filter === key}
+						onPress={() => choose(key)}
+					/>
+				))}
+			</ChipRail>
+			{shown.length > 0 ? (
+				<>
+					<ListGroup>
+						{shown.slice(0, limit).map((run) => (
+							<RunRow
+								key={run.id}
+								run={run}
+								projectName={projectNames.get(run.projectId) ?? null}
+								now={now}
+							/>
+						))}
+					</ListGroup>
+					{shown.length > limit ? (
+						<Button
+							variant="outline"
+							className="self-center"
+							onPress={() => setLimit((current) => current + RUNS_PAGE)}
+						>
+							<Text>Show more runs</Text>
 						</Button>
-					</EmptyState>
-				</View>
-			}
-		/>
+					) : null}
+				</>
+			) : filter === "all" ? (
+				<EmptyState
+					icon={History}
+					title="No runs in this project"
+					description="The runs of this project show up here. Show every project to see the other runs."
+				>
+					<Button variant="outline" onPress={clearProject}>
+						<Text>Show every project</Text>
+					</Button>
+				</EmptyState>
+			) : (
+				<EmptyState
+					icon={History}
+					title={emptyFilterTitle(filter)}
+					description="Choose another filter, or show all runs."
+				>
+					<Button variant="outline" onPress={() => choose("all")}>
+						<Text>Show all runs</Text>
+					</Button>
+				</EmptyState>
+			)}
+		</Screen>
 	);
 }

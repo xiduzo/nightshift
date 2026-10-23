@@ -1,10 +1,10 @@
 import {
-	costLabel,
+	type Artifact,
 	createGateQueries,
 	createProjectQueries,
 	createRunQueries,
 	currentStep,
-	flowLabel,
+	gateParts,
 	hasEnded,
 	markdownPreview,
 	mergeSteps,
@@ -15,39 +15,50 @@ import {
 	type StepSummary,
 	stepName,
 	stepState,
-	whenLabel,
+	waitedText,
 } from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui-native/components/ui/card";
-import { Separator } from "@nightshift/ui-native/components/ui/separator";
+import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
+import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type Href, Redirect, router, Stack } from "expo-router";
-import { Fragment, useCallback } from "react";
-import { View } from "react-native";
+import { type Href, Link, Redirect } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import {
+	ChevronRight,
+	FileText,
+	Link2,
+	Share as ShareIcon,
+} from "lucide-react-native";
+import { useCallback } from "react";
+import { Share, View } from "react-native";
 
 import { FollowOnLockScreen } from "@/features/glance";
 import { useHost, useHostQueries } from "@/features/host";
 import { ErrorAlert } from "@/shared/feedback";
+import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { FactGrid, FactTile } from "@/shared/tiles";
+import { NEEDS_YOU } from "@/shared/tone";
 import { StepTrail, trailItemOf } from "@/shared/trail";
 import { RunActions } from "./run-actions";
-import { titleDetail } from "./run-row";
+import {
+	itemStateLabel,
+	type RunLink,
+	runActionsFor,
+	runFacts,
+	runLinks,
+	sizeLabel,
+} from "./run-facts";
 import { RunStatusBadge } from "./status-badge";
 import { type LiveRun, useLiveRun } from "./use-live-run";
 
 /**
- * One run, live: its status, its steps, what the agent of the running step
- * says now, the Gates that wait for an answer, and Stop or Resume. Opened
- * from the Runs tab, after a start, or from a notification.
+ * One run, live: its status, the Gates that wait in it, Stop or Resume,
+ * its details, its steps as a trail, what it made, and how to take it
+ * over in a terminal. Opened from the Runs tab, after a start, or from a
+ * notification.
  */
 export function RunScreen({ runId }: { runId: string }) {
 	const { state } = useHost();
@@ -75,11 +86,8 @@ function SignedInRun({ runId }: { runId: string }) {
 		[queryClient, runQueries, gateQueries],
 	);
 
-	const title = run.data ? flowLabel(run.data) : "Run";
-
 	return (
 		<Screen onRefresh={refresh}>
-			<Stack.Screen options={{ title }} />
 			{run.data ? (
 				<RunBody
 					run={run.data}
@@ -99,9 +107,10 @@ function SignedInRun({ runId }: { runId: string }) {
 				/>
 			) : (
 				<>
-					<Skeleton className="h-32 w-full rounded-xl" />
-					<Skeleton className="h-24 w-full rounded-xl" />
-					<Skeleton className="h-48 w-full rounded-xl" />
+					<Skeleton className="h-6 w-24 rounded-full" />
+					<Skeleton className="h-8 w-3/4" />
+					<Skeleton className="h-40 w-full rounded-xl" />
+					<Skeleton className="h-64 w-full rounded-xl" />
 				</>
 			)}
 		</Screen>
@@ -120,150 +129,257 @@ function RunBody({
 	projectName: string | null;
 }) {
 	const status: RunStatus = live.status ?? run.status;
+	const ended = hasEnded(status);
 	const steps = mergeSteps(run.steps, live.steps);
+	const ownSteps = steps.filter((step) => step.scope === null);
 	const labels = nodeLabels(run);
-	const current = hasEnded(status) ? null : currentStep(steps);
+	const current = ended ? null : currentStep(steps);
 	const message = current ? live.messages.get(current.id) : undefined;
-	const cost = costLabel(run);
+	const { canStop, canResume } = runActionsFor(status);
+	const now = Date.now();
 
 	return (
 		<>
-			<Card>
-				<CardHeader className="gap-3">
-					<View className="flex-row flex-wrap items-center gap-2">
-						<RunStatusBadge status={status} />
-						{live.connection === "reconnecting" && !hasEnded(status) ? (
-							<Text variant="muted" className="text-muted-foreground">
-								Reconnecting…
-							</Text>
-						) : null}
-					</View>
-					<CardTitle>{titleDetail(run) ?? flowLabel(run)}</CardTitle>
-					{hasEnded(status) && run.reason ? (
-						<Text variant="muted" className="text-muted-foreground">
-							{run.reason}
-						</Text>
+			<View className="gap-2">
+				<View className="flex-row flex-wrap items-center gap-2">
+					<RunStatusBadge status={status} />
+					{live.connection === "reconnecting" && !ended ? (
+						<Text className="text-muted-foreground text-sm">Reconnecting…</Text>
 					) : null}
-				</CardHeader>
-				<RunActions runId={run.id} status={status} />
-				<FollowOnLockScreen runId={run.id} ended={hasEnded(status)} />
-			</Card>
+				</View>
+				<Text
+					accessibilityRole="header"
+					className="font-bold text-2xl tracking-tight"
+				>
+					{run.title}
+				</Text>
+				{projectName ? (
+					<Link href={projectHref(run.projectId)} asChild>
+						<Button
+							variant="link"
+							className="h-11 self-start px-0"
+							accessibilityHint="Opens the project"
+						>
+							<Text className="text-muted-foreground">{projectName}</Text>
+							<Icon as={ChevronRight} className="text-muted-foreground" />
+						</Button>
+					</Link>
+				) : null}
+				{ended && run.reason ? (
+					<Text className="text-muted-foreground text-sm">{run.reason}</Text>
+				) : null}
+			</View>
 
-			<FactGrid>
-				{projectName ? <FactTile label="Project" value={projectName} /> : null}
-				<FactTile label="Started" value={startedLabel(run.createdAt)} />
-				{cost ? <FactTile label="Cost" value={cost} /> : null}
-				<FactTile label="Run" value={run.id} mono />
-			</FactGrid>
+			{gates.length > 0 ? <GateRows gates={gates} now={now} /> : null}
 
-			{gates.length > 0 ? <GatesCard gates={gates} /> : null}
+			{canStop || canResume ? (
+				<Card className="gap-4 py-4">
+					<RunActions runId={run.id} status={status} />
+					<FollowOnLockScreen runId={run.id} ended={ended} />
+				</Card>
+			) : null}
 
 			{current &&
 			(message || current.nodeType === "agent") &&
 			stepState(current) === "running" ? (
-				<Card>
-					<CardHeader>
-						<CardDescription>Now</CardDescription>
-						<CardTitle>{stepName(current, labels)}</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<Text
-							numberOfLines={8}
-							className={message ? undefined : "text-muted-foreground"}
-						>
-							{message
-								? markdownPreview(message.text)
-								: "No message from this step yet."}
-						</Text>
-					</CardContent>
-				</Card>
+				<View className="gap-3">
+					<SectionHead title="Now" hint={stepName(current, labels)} />
+					<Card className="py-4">
+						<CardContent className="px-4">
+							<Text
+								numberOfLines={8}
+								className={message ? undefined : "text-muted-foreground"}
+							>
+								{message
+									? markdownPreview(message.text)
+									: "No message from this step yet."}
+							</Text>
+						</CardContent>
+					</Card>
+				</View>
 			) : null}
 
-			<StepsCard
-				steps={steps.filter((step) => step.scope === null)}
+			<View className="gap-3">
+				<SectionHead title="Details" />
+				<FactGrid>
+					{runFacts(run, { status, steps: ownSteps.length, now }).map(
+						(fact) => (
+							<FactTile key={fact.label} {...fact} />
+						),
+					)}
+				</FactGrid>
+			</View>
+
+			<StepsSection
+				steps={ownSteps}
 				labels={labels}
 				status={status}
+				now={now}
 			/>
+
+			<MadeSection run={run} live={!ended} links={runLinks(steps)} />
+
+			{run.takeOverCommand ? <TakeOver command={run.takeOverCommand} /> : null}
 		</>
 	);
 }
 
-/** "Just now", "Today 09:41", "3 Oct 14:20". */
-function startedLabel(at: number): string {
-	return whenLabel(at);
+function projectHref(projectId: string): Href {
+	return { pathname: "/projects/[projectId]", params: { projectId } };
 }
 
-/** The inbox's answer sheet of one Gate. */
-function answerHref(gate: Pick<OpenGate, "runId" | "stepId">): Href {
+/** The answer screen of one Gate. */
+function gateHref(gate: Pick<OpenGate, "runId" | "stepId">): Href {
 	return {
 		pathname: "/gates/[runId]/[stepId]",
 		params: { runId: gate.runId, stepId: gate.stepId },
 	};
 }
 
-/** The Gates of this run that wait for a person, each with a button to answer it. */
-function GatesCard({ gates }: { gates: OpenGate[] }) {
+/** The Gates of this run that wait for a person. A tap opens the Gate. */
+function GateRows({ gates, now }: { gates: OpenGate[]; now: number }) {
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Waiting for an answer</CardTitle>
-				<CardDescription>The run goes on when someone answers.</CardDescription>
-			</CardHeader>
-			<CardContent className="gap-4">
-				{gates.map((gate, index) => (
-					<Fragment key={gate.stepId}>
-						{index > 0 ? <Separator /> : null}
-						<View className="gap-3">
-							<Text>{gate.question}</Text>
-							{gate.canAnswer ? (
-								<Button
-									className="self-start"
-									onPress={() => router.push(answerHref(gate))}
-								>
-									<Text>Answer</Text>
-								</Button>
-							) : (
-								<Text variant="muted" className="text-muted-foreground">
-									Your role in this Space does not let you answer Gates.
-								</Text>
-							)}
-						</View>
-					</Fragment>
-				))}
-			</CardContent>
-		</Card>
+		<ListGroup>
+			{gates.map((gate) => {
+				const waited = waitedText(now - gate.openedAt);
+				const word = gate.canAnswer ? "Needs you" : "Waits for an answer";
+				const headline = gateParts(gate.question).headline;
+				return (
+					<ListRow
+						key={gate.stepId}
+						look={NEEDS_YOU}
+						title={headline}
+						caption={[{ text: word, tone: "waiting" }, `waited ${waited}`]}
+						href={gateHref(gate)}
+						accessibilityLabel={`${word}, ${headline}, waited ${waited}`}
+						accessibilityHint="Opens the Gate"
+					/>
+				);
+			})}
+		</ListGroup>
 	);
 }
 
-/** The steps of the run, in the order they started, as a trail. */
-function StepsCard({
+/** The run's own steps, in the order they started, as a trail. */
+function StepsSection({
 	steps,
 	labels,
 	status,
+	now,
 }: {
 	steps: StepSummary[];
 	labels: Map<string, string>;
 	status: RunStatus;
+	now: number;
 }) {
-	const now = Date.now();
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Steps</CardTitle>
-			</CardHeader>
-			<CardContent className="gap-3">
-				{steps.length === 0 ? (
-					<Text variant="muted" className="text-muted-foreground">
-						The first step starts soon.
-					</Text>
-				) : (
-					<StepTrail
-						items={steps.map((step) =>
-							trailItemOf(step, { labels, runStatus: status, now }),
-						)}
+		<View className="gap-3">
+			<SectionHead title="Steps" hint="Oldest first" />
+			<Card className="py-4">
+				<CardContent className="px-4">
+					{steps.length === 0 ? (
+						<Text className="text-muted-foreground">
+							The first step starts soon.
+						</Text>
+					) : (
+						<StepTrail
+							items={steps.map((step) =>
+								trailItemOf(step, { labels, runStatus: status, now }),
+							)}
+						/>
+					)}
+				</CardContent>
+			</Card>
+		</View>
+	);
+}
+
+/**
+ * What the run made: the links of its items (a pull request, a ticket)
+ * and the files its agents kept. Nothing when it made neither.
+ */
+function MadeSection({
+	run,
+	live,
+	links,
+}: {
+	run: RunDetail;
+	live: boolean;
+	links: RunLink[];
+}) {
+	const runQueries = useHostQueries(createRunQueries);
+	const artifacts = useQuery(runQueries.artifacts(run.id, live));
+	const files: Artifact[] = artifacts.data ?? [];
+	if (links.length === 0 && files.length === 0) return null;
+
+	return (
+		<View className="gap-3">
+			<SectionHead
+				title="What it made"
+				hint={
+					files.length > 0
+						? "Open the files in Night Shift on your computer."
+						: undefined
+				}
+			/>
+			<ListGroup>
+				{links.map((link) => (
+					<ListRow
+						key={link.url}
+						icon={Link2}
+						title={link.title}
+						caption={[
+							itemStateLabel(link.state),
+							link.branch ? { text: link.branch, mono: true } : "",
+						]}
+						onPress={() => void WebBrowser.openBrowserAsync(link.url)}
+						accessibilityHint="Opens the link in the browser"
 					/>
-				)}
-			</CardContent>
-		</Card>
+				))}
+				{files.map((file) => (
+					<ListRow
+						key={file.id}
+						icon={FileText}
+						title={file.title || file.name}
+						caption={[{ text: file.name, mono: true }, sizeLabel(file.size)]}
+					/>
+				))}
+			</ListGroup>
+		</View>
+	);
+}
+
+/**
+ * The command that opens the agent's session of this run in a terminal,
+ * in mono. Touch and hold it to copy it, or share it.
+ */
+function TakeOver({ command }: { command: string }) {
+	return (
+		<View className="gap-3">
+			<SectionHead
+				title="Take over"
+				hint="Go on with the agent in a terminal on the computer that runs it."
+			/>
+			<Card className="py-4">
+				<CardContent className="gap-3 px-4">
+					<Text
+						selectable
+						accessibilityHint="Touch and hold to copy the command."
+						className="font-mono text-sm"
+					>
+						{command}
+					</Text>
+					<Button
+						variant="outline"
+						className="self-start"
+						onPress={() => void Share.share({ message: command })}
+						accessibilityHint="Opens the share sheet. Choose Copy to paste the command in a terminal."
+					>
+						<Icon as={ShareIcon} />
+						<Text>Share the command</Text>
+					</Button>
+				</CardContent>
+			</Card>
+		</View>
 	);
 }

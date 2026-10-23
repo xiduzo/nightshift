@@ -443,7 +443,7 @@ each composed from Reusables pieces and the tokens:
 | `header` | `LargeTitleHeader`, `HeaderButton`, `AvatarButton` | `title`, `summary`, `leading`, `actions`, `compact`; buttons: `icon` or `name`, `label`, `hint`, `href` or `onPress` (44 pt, round) |
 | `avatar` | `InitialsAvatar` | `name`, `size` (`sm` row, `md` header) |
 | `tiles` | `StatTile`, `StatGrid`, `FactTile`, `FactGrid` | StatTile: `value` (undefined loads), `label`, `icon`, `tone`, `caption`, `detail`, `href` or `onPress`. FactTile: `label`, `value`, `sub`, `mono`, `look`. Grids: two by two |
-| `chips` | `ChipRail`, `Chip` | Chip: `label`, `count`, `selected`, `icon`, `onPress` (`default` when chosen, `outline` when not) |
+| `chips` | `ChipRail`, `Chip` | Chip: `label`, `count`, `selected`, `icon`, `onPress`, `accessibilityHint` (`default` when chosen, `outline` when not) |
 | `trail` | `StepTrail`, `trailItemOf` | `items`; `trailItemOf(step, { labels, runStatus, now })` gives kind, name, look, error and "4 min · $0.12" |
 | `action-bar` | `ActionBar` | `caption`, `label`, `destructive`, `action` (`label`, `onPress`, `disabled`, `busy`, `busyLabel`, `variant`); give it to `Screen` as `footer` |
 | `page` | `Screen` | `onRefresh`, `footer` |
@@ -471,12 +471,34 @@ Gates of every Space and the runs of the active Space. Flows
 of one project with `/flows?projectId=…`. Computers (`features/devices`)
 lists the Host and the paired computers, online first.
 
+**Runs and a run.** The Runs tab lists the runs of the active Space in one
+ListGroup, newest first, 30 at a time ("Show more runs"). Its chips are
+All, Running (running and sleeping), Needs you (waiting), Failed (failed
+and interrupted) and Finished, each with its count; a stopped run shows
+only under All. The link keeps the filter and the project:
+`/runs?filter=running|needs-you|failed|finished` and `/runs?project=<projectId>`
+(a removable project chip). A row ends with how long a Gate has waited,
+how long a run on its way has run, or when an ended run started. The run
+screen shows its status, title and project, its open Gates as rows to
+the Gate, Stop or Resume and Follow on the lock screen in one card, what
+the agent says now, Details as fact tiles (flow, branch, computer, start
+and who started it, duration and steps, cost, run id), the steps as the
+trail, what it made (item links, and the files its agents kept), and the
+take-over command in mono. The phone has no clipboard module, so the
+command is selectable text with a share button (the share sheet has
+Copy); `expo-clipboard` would need a new dev build.
+
 **What the sketch shows that the Host has no data for.** Left out until the
 Host has it:
 
 - Unread Gates (the dot): the Host keeps no read state.
 - Undo after sending an answer: the Host cannot reopen a Gate.
 - A suggested choice on a Gate: nothing proposes one.
+- The current step of each run in the Runs list: `runs.list` has no steps.
+  The row shows the status and the project.
+- The harness and model of a run (the sketch's "Harness" tile).
+- Opening a file a run's agent kept: the phone lists it, the desktop app
+  opens it.
 - Pull requests as their own list ("What the night produced", PR checks
   and files): a pull request is no entity. Only Gate links and run items
   of kind "pull" that are already in the data may show.

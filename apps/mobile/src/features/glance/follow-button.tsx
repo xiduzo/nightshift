@@ -28,7 +28,7 @@ export function FollowOnLockScreen({
 	if (!available || ended) return null;
 
 	return (
-		<CardContent className="gap-2">
+		<CardContent className="gap-2 px-4">
 			<Button
 				variant="outline"
 				className="self-start"
