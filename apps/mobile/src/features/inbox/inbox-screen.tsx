@@ -69,8 +69,10 @@ export function InboxScreen() {
 							description="When a run waits for your answer at a Gate, it shows up here. This inbox holds the Gates of every Space you are in."
 						>
 							<Button
+								size="lg"
 								variant="outline"
 								onPress={() => router.navigate("/runs")}
+								className="h-auto min-h-11 py-2"
 							>
 								<Text>Go to Runs</Text>
 							</Button>
@@ -167,8 +169,10 @@ function GateGroups({
 				description={`Nothing waits for you in ${placeLabel(view.place, gates)}. ${gates.length === 1 ? "1 Gate waits" : `${gates.length} Gates wait`} elsewhere.`}
 			>
 				<Button
+					size="lg"
 					variant="outline"
 					onPress={() => setInboxView({ place: ALL_GATES.place })}
+					className="h-auto min-h-11 py-2"
 				>
 					<Text>Show all Gates</Text>
 				</Button>

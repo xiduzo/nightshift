@@ -39,8 +39,9 @@ export function AccountCard() {
 				<ListRow icon={Server} title="Host" caption={hostLabel(host.address)} />
 			</ListGroup>
 			<Button
+				size="lg"
 				variant="outline"
-				className="h-11"
+				className="h-auto min-h-11 py-2"
 				onPress={leave}
 				disabled={busy}
 				accessibilityHint="This phone gets no more notifications until you sign in again"

@@ -60,7 +60,7 @@ export function ActionBar({
 				variant={action.variant ?? "default"}
 				disabled={action.disabled || action.busy}
 				onPress={action.onPress}
-				className="min-w-24"
+				className="h-auto min-h-11 min-w-24 py-2"
 			>
 				<Text>
 					{action.busy && action.busyLabel ? action.busyLabel : action.label}

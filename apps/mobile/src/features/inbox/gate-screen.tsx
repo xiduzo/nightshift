@@ -167,7 +167,11 @@ function ClosedGate({
 	return (
 		<Screen>
 			<EmptyState icon={CircleCheck} title={title} description={description}>
-				<Button onPress={() => router.dismissTo("/inbox")}>
+				<Button
+					size="lg"
+					onPress={() => router.dismissTo("/inbox")}
+					className="h-auto min-h-11 py-2"
+				>
 					<Text>Back to Inbox</Text>
 				</Button>
 			</EmptyState>
@@ -497,7 +501,11 @@ function Crumb({ label, href }: { label: string; href: Href | undefined }) {
 	}
 	return (
 		<Link href={href} asChild>
-			<Button variant="link" size="sm" className="h-11 flex-shrink px-0">
+			<Button
+				variant="link"
+				size="sm"
+				className="h-auto min-h-11 flex-shrink px-0 py-2"
+			>
 				<Text className="text-sm" numberOfLines={1}>
 					{label}
 				</Text>
@@ -521,8 +529,9 @@ function OtherSpace({
 				{`This run is in ${spaceName}. Switch to that Space to see its steps and where each choice leads.`}
 			</Text>
 			<Button
+				size="lg"
 				variant="outline"
-				className="self-start"
+				className="h-auto min-h-11 self-start py-2"
 				disabled={switchSpace.isPending}
 				onPress={() => switchSpace.mutate({ spaceId })}
 			>

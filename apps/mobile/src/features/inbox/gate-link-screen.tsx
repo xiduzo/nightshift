@@ -57,6 +57,7 @@ export function GateLinkScreen() {
 				size="lg"
 				onPress={() => void WebBrowser.openBrowserAsync(params.url)}
 				accessibilityHint="Opens the page in the browser"
+				className="h-auto min-h-11 py-2"
 			>
 				<Text>{openLinkText(link)}</Text>
 				<Icon as={ExternalLink} className="text-primary-foreground" />

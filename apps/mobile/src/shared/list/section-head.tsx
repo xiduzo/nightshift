@@ -20,7 +20,7 @@ export function SectionHead({ title, hint, seeAll }: SectionHeadProps) {
 		<Button
 			variant="ghost"
 			size="sm"
-			className="-mr-2 h-11"
+			className="-mr-2 h-auto min-h-11 py-2"
 			onPress={"onPress" in seeAll ? seeAll.onPress : undefined}
 			accessibilityLabel={`${label}, ${title}`}
 		>

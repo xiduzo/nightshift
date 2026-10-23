@@ -145,7 +145,11 @@ export function RunsScreen() {
 					title="No runs yet"
 					description="The runs of this Space show up here, newest first. Start a flow to make the first one."
 				>
-					<Button onPress={() => router.push("/start")}>
+					<Button
+						size="lg"
+						onPress={() => router.push("/start")}
+						className="h-auto min-h-11 py-2"
+					>
 						<Text>New run</Text>
 					</Button>
 				</EmptyState>
@@ -193,8 +197,9 @@ export function RunsScreen() {
 					</ListGroup>
 					{shown.length > limit ? (
 						<Button
+							size="lg"
 							variant="outline"
-							className="self-center"
+							className="h-auto min-h-11 self-center py-2"
 							onPress={() => setLimit((current) => current + RUNS_PAGE)}
 						>
 							<Text>Show more runs</Text>
@@ -207,7 +212,12 @@ export function RunsScreen() {
 					title="No runs in this project"
 					description="The runs of this project show up here. Show every project to see the other runs."
 				>
-					<Button variant="outline" onPress={clearProject}>
+					<Button
+						size="lg"
+						variant="outline"
+						onPress={clearProject}
+						className="h-auto min-h-11 py-2"
+					>
 						<Text>Show every project</Text>
 					</Button>
 				</EmptyState>
@@ -217,7 +227,12 @@ export function RunsScreen() {
 					title={emptyFilterTitle(filter)}
 					description="Choose another filter, or show all runs."
 				>
-					<Button variant="outline" onPress={() => choose("all")}>
+					<Button
+						size="lg"
+						variant="outline"
+						onPress={() => choose("all")}
+						className="h-auto min-h-11 py-2"
+					>
 						<Text>Show all runs</Text>
 					</Button>
 				</EmptyState>

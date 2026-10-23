@@ -33,7 +33,7 @@ export function ErrorAlert({
 				<Button
 					variant="outline"
 					size="sm"
-					className="mt-2 self-start"
+					className="mt-2 h-auto min-h-11 self-start py-2"
 					onPress={onRetry}
 				>
 					<Text>Try again</Text>

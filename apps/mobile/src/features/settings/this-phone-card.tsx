@@ -54,7 +54,11 @@ export function ThisPhoneCard() {
 			</ListGroup>
 			<AlertDialog>
 				<AlertDialogTrigger asChild>
-					<Button variant="destructive" className="h-11">
+					<Button
+						size="lg"
+						variant="destructive"
+						className="h-auto min-h-11 py-2"
+					>
 						<Text>Remove this phone</Text>
 					</Button>
 				</AlertDialogTrigger>

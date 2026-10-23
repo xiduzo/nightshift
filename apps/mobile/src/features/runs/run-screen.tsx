@@ -156,8 +156,9 @@ function RunBody({
 				{projectName ? (
 					<Link href={projectHref(run.projectId)} asChild>
 						<Button
+							size="lg"
 							variant="link"
-							className="h-11 self-start px-0"
+							className="h-auto min-h-11 self-start px-0 py-2"
 							accessibilityHint="Opens the project"
 						>
 							<Text className="text-muted-foreground">{projectName}</Text>
@@ -380,8 +381,9 @@ function TakeOver({ command }: { command: string }) {
 						{command}
 					</Text>
 					<Button
+						size="lg"
 						variant="outline"
-						className="self-start"
+						className="h-auto min-h-11 self-start py-2"
 						onPress={() => void Share.share({ message: command })}
 						accessibilityHint="Opens the share sheet. Choose Copy to paste the command in a terminal."
 					>

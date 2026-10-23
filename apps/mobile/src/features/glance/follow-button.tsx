@@ -30,9 +30,11 @@ export function FollowOnLockScreen({
 	return (
 		<CardContent className="gap-2 px-4">
 			<Button
+				size="lg"
 				variant="outline"
 				disabled={busy}
 				onPress={() => void (following ? unfollow() : follow())}
+				className="h-auto min-h-11 py-2"
 			>
 				<Text>
 					{following

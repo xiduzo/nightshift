@@ -74,13 +74,20 @@ export function CodeScanner({ onScanned, onCancel }: CodeScannerProps) {
 					</AlertDescription>
 				</Alert>
 				<Button
+					size="lg"
 					onPress={() =>
 						refused ? Linking.openSettings() : requestPermission()
 					}
+					className="h-auto min-h-11 py-2"
 				>
 					<Text>{refused ? "Open Settings" : "Allow the camera"}</Text>
 				</Button>
-				<Button variant="outline" onPress={onCancel}>
+				<Button
+					size="lg"
+					variant="outline"
+					onPress={onCancel}
+					className="h-auto min-h-11 py-2"
+				>
 					<Text>Type the address</Text>
 				</Button>
 			</View>
@@ -118,7 +125,12 @@ export function CodeScanner({ onScanned, onCancel }: CodeScannerProps) {
 					phone", in Night Shift on your computer.
 				</Text>
 			)}
-			<Button variant="outline" onPress={onCancel}>
+			<Button
+				size="lg"
+				variant="outline"
+				onPress={onCancel}
+				className="h-auto min-h-11 py-2"
+			>
 				<Text>Type the address</Text>
 			</Button>
 		</View>

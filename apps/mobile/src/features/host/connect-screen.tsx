@@ -184,8 +184,9 @@ export function ConnectScreen() {
 							/>
 						</Field>
 						<Button
+							size="lg"
 							variant="link"
-							className="h-11 self-start px-0"
+							className="h-auto min-h-11 self-start px-0 py-2"
 							onPress={() => {
 								setCode("");
 								setError(null);
@@ -208,7 +209,12 @@ export function ConnectScreen() {
 				</Alert>
 			) : null}
 			{step === "scan" ? null : (
-				<Button size="lg" onPress={submit} disabled={busy}>
+				<Button
+					size="lg"
+					onPress={submit}
+					disabled={busy}
+					className="h-auto min-h-11 py-2"
+				>
 					<Text>{submitLabel}</Text>
 				</Button>
 			)}

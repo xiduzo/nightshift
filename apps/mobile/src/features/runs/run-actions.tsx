@@ -122,7 +122,12 @@ function Confirm({
 	return (
 		<AlertDialog>
 			<AlertDialogTrigger asChild>
-				<Button variant={destructive ? "outline" : "default"} disabled={busy}>
+				<Button
+					size="lg"
+					variant={destructive ? "outline" : "default"}
+					disabled={busy}
+					className="h-auto min-h-11 py-2"
+				>
 					<Icon as={icon} />
 					<Text>{busy ? `${button}…` : button}</Text>
 				</Button>

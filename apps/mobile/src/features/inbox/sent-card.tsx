@@ -59,6 +59,7 @@ export function SentCard({
 								})
 							}
 							accessibilityHint={`Opens ${gateParts(next.question).headline}`}
+							className="h-auto min-h-11 py-2"
 						>
 							<Text>Next Gate</Text>
 							<Icon as={ArrowRight} className="text-primary-foreground" />
@@ -76,6 +77,7 @@ export function SentCard({
 					size="lg"
 					variant="outline"
 					onPress={() => router.dismissTo("/inbox")}
+					className="h-auto min-h-11 py-2"
 				>
 					<Text>Back to Inbox</Text>
 				</Button>

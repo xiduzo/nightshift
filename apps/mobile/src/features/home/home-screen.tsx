@@ -114,7 +114,7 @@ export function HomeScreen() {
 					description="Start a flow tonight. In the morning you see here what it did and what it cost."
 				>
 					<Link href="/start" asChild>
-						<Button>
+						<Button size="lg" className="h-auto min-h-11 py-2">
 							<Text>New run</Text>
 						</Button>
 					</Link>

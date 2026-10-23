@@ -163,7 +163,11 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 							) : (
 								<Line text="No runs yet. Start one of its flows with New run.">
 									<Link href={projectLinks.start(projectId)} asChild>
-										<Button variant="outline" className="h-11 self-start">
+										<Button
+											size="lg"
+											variant="outline"
+											className="h-auto min-h-11 self-start py-2"
+										>
 											<Icon as={Plus} />
 											<Text>New run</Text>
 										</Button>
@@ -231,8 +235,9 @@ function ProjectHeader({ project }: { project: Project }) {
 			/>
 			{remote && project.remote ? (
 				<Button
+					size="lg"
 					variant="ghost"
-					className="-ml-3 h-11 self-start"
+					className="-ml-3 h-auto min-h-11 self-start py-2"
 					onPress={() => void Linking.openURL(remote.url)}
 					accessibilityRole="link"
 					accessibilityLabel={`Open ${project.remote} in the browser`}

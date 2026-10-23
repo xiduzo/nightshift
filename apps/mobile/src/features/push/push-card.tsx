@@ -64,9 +64,11 @@ export function PushCard() {
 					</CardHeader>
 					<CardContent>
 						<Button
+							size="lg"
 							variant="outline"
 							onPress={() => void Linking.openSettings()}
 							accessibilityHint="Opens the Settings app of your phone"
+							className="h-auto min-h-11 py-2"
 						>
 							<Text>Open Settings</Text>
 						</Button>
@@ -99,7 +101,12 @@ export function PushCard() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<Button onPress={() => void turnOn()} disabled={asking}>
+					<Button
+						size="lg"
+						onPress={() => void turnOn()}
+						disabled={asking}
+						className="h-auto min-h-11 py-2"
+					>
 						<Text>Turn on notifications</Text>
 					</Button>
 				</CardContent>
