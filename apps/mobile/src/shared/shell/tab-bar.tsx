@@ -7,14 +7,14 @@ import { inboxTabLabel, type TabBarProps } from "./tabs";
  * The four tabs on the system's own tab bar: on iOS 26 the floating Liquid
  * Glass bar, with SF Symbols. The chosen tab takes the theme's `primary`
  * (near black, near white in dark), not a brand color. The Inbox shows how
- * many Gates wait for you. Android has its own file (`tab-bar.android.tsx`).
+ * many Gates wait for you, in the system's badge color. Android has its own file (`tab-bar.android.tsx`).
  */
 export function TabBar({ waiting }: TabBarProps) {
 	const { colors } = useThemeColors();
 	return (
 		<NativeTabs
+			// The badge keeps the system's color: waiting Gates are no error.
 			tintColor={colors.primary}
-			badgeBackgroundColor={colors.destructive}
 		>
 			<NativeTabs.Trigger name="index">
 				<NativeTabs.Trigger.Icon

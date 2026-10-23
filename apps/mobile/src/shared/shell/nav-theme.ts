@@ -8,7 +8,8 @@ import {
 /**
  * Headers and sheets in the theme's colors. A header takes the page's
  * `background`, not `card`, so it reads as one surface with the screen,
- * as the desktop app's header does.
+ * as the desktop app's header does. A tab's badge (Android) takes
+ * `primary`: waiting Gates are no error.
  */
 export const NAV_THEME: Record<"light" | "dark", Theme> = {
 	light: {
@@ -17,7 +18,7 @@ export const NAV_THEME: Record<"light" | "dark", Theme> = {
 			background: THEME.light.background,
 			border: THEME.light.border,
 			card: THEME.light.background,
-			notification: THEME.light.destructive,
+			notification: THEME.light.primary,
 			primary: THEME.light.primary,
 			text: THEME.light.foreground,
 		},
@@ -28,7 +29,7 @@ export const NAV_THEME: Record<"light" | "dark", Theme> = {
 			background: THEME.dark.background,
 			border: THEME.dark.border,
 			card: THEME.dark.background,
-			notification: THEME.dark.destructive,
+			notification: THEME.dark.primary,
 			primary: THEME.dark.primary,
 			text: THEME.dark.foreground,
 		},

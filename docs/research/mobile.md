@@ -377,11 +377,14 @@ follow the phone's setting (`userInterfaceStyle: automatic`).
 (`expo-router/native-tabs`): on iOS 26 the system's floating Liquid Glass
 bar, with SF Symbols (`house`, `tray`, `play.circle`, `folder`). The chosen
 tab takes `primary`. The Inbox badge is the number of Gates that wait for
-you (`useWaitingCount`), in `destructive`, and its label says it ("Inbox, 3
-Gates wait for you"). Android keeps the JavaScript tab bar with lucide
-icons (`tab-bar.android.tsx`): its native tabs need `expo-symbols` or
-drawables for icons, which the app does not ship. A tab has no navigation
-header: each screen starts with a `LargeTitleHeader`.
+you (`useWaitingCount`), and its label says it ("Inbox, 3 Gates wait for
+you"). It is not `destructive`: waiting Gates are no error. iOS draws its
+own badge color; on Android the navigation theme's `notification` is
+`primary`. Android keeps the JavaScript tab bar with lucide icons
+(`tab-bar.android.tsx`): its native tabs need `expo-symbols` or drawables
+for icons, which the app does not ship. A tab has no navigation header:
+each screen starts with a `LargeTitleHeader`. Android draws the app under
+the status bar, so its tab scenes take the top inset as padding.
 
 **Routes.** The root stack holds the rest:
 
