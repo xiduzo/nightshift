@@ -91,6 +91,8 @@ export default {
 			// A Worker's own file, next to the bundle that starts it.
 			[watchdogWorker]: "bun/watchdog-worker.ts",
 			[libsqlNative]: `bun/node_modules/@libsql/${libsqlNative.split("/").pop()}`,
+			// The menu bar icon, for `views://tray-icon.png`.
+			"assets/tray-icon.png": "views/tray-icon.png",
 		},
 		// The worker is no entrypoint and its bundle is in node_modules: watch its source.
 		watch: ["src/features/watchdog"],
@@ -98,14 +100,18 @@ export default {
 		mac: {
 			codesign,
 			notarize,
+			// The app icons, drawn from the web app's favicon.
+			icons: "assets/icon.iconset",
 			bundleCEF: true,
 			defaultRenderer: "cef",
 		},
 		linux: {
+			icon: "assets/icon.png",
 			bundleCEF: true,
 			defaultRenderer: "cef",
 		},
 		win: {
+			icon: "assets/icon.png",
 			bundleCEF: true,
 			defaultRenderer: "cef",
 		},

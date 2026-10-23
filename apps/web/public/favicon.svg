@@ -1,17 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-	<title>Night Shift</title>
-	<style>
-		.fg { fill: oklch(0.145 0 0); }
-		.run { stroke: oklch(0.5 0.16 250); }
-		@media (prefers-color-scheme: dark) {
-			.fg { fill: oklch(0.985 0 0); }
-			.run { stroke: oklch(0.74 0.13 245); }
-		}
-	</style>
-	<mask id="m">
-		<rect width="64" height="64" fill="#fff" />
-		<circle cx="42" cy="24" r="19" fill="#000" />
-	</mask>
-	<circle class="fg" cx="30" cy="32" r="22" mask="url(#m)" />
-	<circle class="run" cx="42" cy="24" r="19" fill="none" stroke-width="2.5" />
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><title>Night Shift</title><style>.dark{display:none}@media (prefers-color-scheme: dark){.light{display:none}.dark{display:inline}}</style><image href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjcuOTc1IDEuNzc1IDU0LjI1IDU0LjI1Ij4KCTx0aXRsZT5OaWdodCBTaGlmdDwvdGl0bGU+Cgk8IS0tIFRoZSBtYXJrIGZvciBhIGxpZ2h0IGJhY2tncm91bmQuIGBidW4gcnVuIGljb25zYCBkcmF3cyBldmVyeSBhcHAgaWNvbiBmcm9tIGl0LiAtLT4KCTxtYXNrIGlkPSJtIiBtYXNrVW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4PSIwIiB5PSIwIiB3aWR0aD0iNjQiIGhlaWdodD0iNjQiPgoJCTxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2ZmZiIgLz4KCQk8Y2lyY2xlIGN4PSI0MiIgY3k9IjI0IiByPSIxOSIgZmlsbD0iIzAwMCIgLz4KCTwvbWFzaz4KCTxjaXJjbGUgZmlsbD0iIzBhMGEwYSIgY3g9IjMwIiBjeT0iMzIiIHI9IjIyIiBtYXNrPSJ1cmwoI20pIiAvPgoJPGNpcmNsZSBzdHJva2U9IiMwMDY0YjkiIGN4PSI0MiIgY3k9IjI0IiByPSIxOSIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIyLjUiIC8+Cjwvc3ZnPgo=" x="5" y="5" width="54" height="54" class="light"/><image href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjcuOTc1IDEuNzc1IDU0LjI1IDU0LjI1Ij4KCTx0aXRsZT5OaWdodCBTaGlmdDwvdGl0bGU+Cgk8IS0tIFRoZSBtYXJrIGZvciBhIGRhcmsgYmFja2dyb3VuZC4gYGJ1biBydW4gaWNvbnNgIGRyYXdzIGV2ZXJ5IGFwcCBpY29uIGZyb20gaXQuIC0tPgoJPG1hc2sgaWQ9Im0iIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+CgkJPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZmZmIiAvPgoJCTxjaXJjbGUgY3g9IjQyIiBjeT0iMjQiIHI9IjE5IiBmaWxsPSIjMDAwIiAvPgoJPC9tYXNrPgoJPGNpcmNsZSBmaWxsPSIjZmFmYWZhIiBjeD0iMzAiIGN5PSIzMiIgcj0iMjIiIG1hc2s9InVybCgjbSkiIC8+Cgk8Y2lyY2xlIHN0cm9rZT0iIzVkYjJmNyIgY3g9IjQyIiBjeT0iMjQiIHI9IjE5IiBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjIuNSIgLz4KPC9zdmc+Cg==" x="5" y="5" width="54" height="54" class="dark"/></svg>

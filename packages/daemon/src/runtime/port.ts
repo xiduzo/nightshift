@@ -6,6 +6,13 @@
  */
 export const DEFAULT_PORT = 3000;
 
+/**
+ * The desktop app's daemon port. Not DEFAULT_PORT: the packaged app and a
+ * `bun run dev` daemon run side by side and never take each other's port.
+ * NIGHTSHIFT_DESKTOP_PORT moves it.
+ */
+export const DESKTOP_PORT = 4300;
+
 /** PORT, else DEFAULT_PORT. Not checked: `serve` checks its own. */
 export function daemonPort(
 	env: Record<string, string | undefined> = process.env,

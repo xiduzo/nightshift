@@ -1,13 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-	<title>Night Shift</title>
-	<!-- favicon.svg in its dark colours, on a square that fills the Home Screen tile. -->
-	<rect width="64" height="64" fill="#0a0a0a" />
-	<mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
-		<rect width="64" height="64" fill="#fff" />
-		<circle cx="42" cy="24" r="19" fill="#000" />
-	</mask>
-	<g transform="translate(32 32) scale(0.68) translate(-35.1 -28.9)">
-		<circle fill="#fafafa" cx="30" cy="32" r="22" mask="url(#m)" />
-		<circle stroke="#5db2f7" cx="42" cy="24" r="19" fill="none" stroke-width="2.5" />
-	</g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><title>Night Shift</title><rect width="64" height="64" fill="#0a0a0a"/><image href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjcuOTc1IDEuNzc1IDU0LjI1IDU0LjI1Ij4KCTx0aXRsZT5OaWdodCBTaGlmdDwvdGl0bGU+Cgk8IS0tIFRoZSBtYXJrIGZvciBhIGRhcmsgYmFja2dyb3VuZC4gYGJ1biBydW4gaWNvbnNgIGRyYXdzIGV2ZXJ5IGFwcCBpY29uIGZyb20gaXQuIC0tPgoJPG1hc2sgaWQ9Im0iIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+CgkJPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZmZmIiAvPgoJCTxjaXJjbGUgY3g9IjQyIiBjeT0iMjQiIHI9IjE5IiBmaWxsPSIjMDAwIiAvPgoJPC9tYXNrPgoJPGNpcmNsZSBmaWxsPSIjZmFmYWZhIiBjeD0iMzAiIGN5PSIzMiIgcj0iMjIiIG1hc2s9InVybCgjbSkiIC8+Cgk8Y2lyY2xlIHN0cm9rZT0iIzVkYjJmNyIgY3g9IjQyIiBjeT0iMjQiIHI9IjE5IiBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjIuNSIgLz4KPC9zdmc+Cg==" x="13.5" y="13.5" width="37" height="37" /></svg>
