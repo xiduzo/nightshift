@@ -1,0 +1,18 @@
+# Builds the iOS app and sends it to TestFlight.
+# Run it with: eas workflow:run .eas/workflows/testflight.yml
+name: TestFlight
+
+jobs:
+  build_ios:
+    name: Build iOS
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit_ios:
+    name: Submit to TestFlight
+    needs: [build_ios]
+    type: submit
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}

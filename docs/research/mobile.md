@@ -705,8 +705,8 @@ Each stage ends with docs, checks and tests.
 2. **The app: read and act.** Sign in to a Host address with a code.
    Space switcher. Inbox. Runs and a live run page (`runs.watch` with
    retry). Start a flow with inputs and a computer. Answer Gates. Show
-   presence ("This computer is offline. The run waits."). A personal
-   development build.
+   presence ("This computer is offline. The run waits."). A development
+   build to work on the app, and TestFlight to use it.
 
    *Done when:* you can start, follow and unblock an overnight flow from
    the phone alone.
@@ -745,14 +745,45 @@ Taken on 2026-10-21:
 | Mobile UI kit | HeroUI Native (the template's), RN Reusables, or `@expo/ui` | **React Native Reusables** on Uniwind, in `@nightshift/ui-native`. The shadcn-only rule of `AGENTS.md` extends to mobile. |
 | Skeleton | Hand-made Expo app, or Better-T-Stack | **Better-T-Stack** `native-uniwind` (Expo SDK 58, Expo Router), then the vertical rules of `STRUCTURE.md`. |
 | Editing from the phone | Read and act, or also flows and schedules | **Read and act.** |
-| Distribution | Personal build, or the stores | **Personal development build.** |
+| Distribution | Personal build, or the stores | **TestFlight, internal testers only**, for daily use. A development build to work on the app. See [Getting the app on a phone](#getting-the-app-on-a-phone). |
+
+## Getting the app on a phone
+
+Decided on 2026-10-23. The app has native code (`expo-widgets`,
+`expo-dev-client`), so Expo Go cannot run it. There are two builds:
+
+- **Development build** (`eas build --profile development --platform ios`),
+  to work on the app. It loads the JavaScript from `bun run dev` on your
+  computer. It is an ad hoc build: it installs only on a device that is in
+  its provisioning profile. Register a new iPhone with `eas device:create`
+  first, then build again and let EAS regenerate the profile. Without that,
+  iOS says "This app cannot be installed because its integrity could not be
+  verified".
+- **TestFlight build** (`production` profile), to use the app. It holds its
+  own JavaScript. Internal testers of the App Store Connect team install it
+  with the TestFlight app. It needs no registered devices and no Beta App
+  Review. `ITSAppUsesNonExemptEncryption: false` in the `infoPlist` of
+  `app.json` skips the export question on each build.
+
+The EAS workflow `apps/mobile/.eas/workflows/testflight.yml` builds and
+submits a TestFlight build. Start it by hand, so it does not use a build of
+the EAS quota on every push:
+
+```bash
+cd apps/mobile
+eas workflow:run .eas/workflows/testflight.yml
+```
+
+The workflow runs without questions. So run the first build once by hand
+(`eas build --platform ios --profile production --auto-submit`). It creates
+the App Store signing profile, the App Store Connect app and its API key.
 
 ## Out of scope
 
 These need the user's own accounts, or a decision about other people's
 Hosts:
 
-- App Store and Play submission.
+- App Store and Play release. TestFlight for internal testers is in scope.
 - A publisher push relay for other people's Hosts.
 - Apple Watch.
 - End-to-end encrypted push.

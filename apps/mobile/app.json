@@ -12,6 +12,9 @@
 			"bundleIdentifier": "dev.nightshift.mobile",
 			"entitlements": {
 				"com.apple.developer.usernotifications.time-sensitive": true
+			},
+			"infoPlist": {
+				"ITSAppUsesNonExemptEncryption": false
 			}
 		},
 		"android": {
