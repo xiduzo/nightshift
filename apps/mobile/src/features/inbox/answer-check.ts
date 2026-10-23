@@ -56,21 +56,20 @@ export const CHECK_COPY: Record<
 > = {
 	cancelled: {
 		title: "Your answer was not sent",
-		description: "You cancelled the check. Choose an answer again to send it.",
+		description: "You cancelled the check. Tap Send to try again.",
 	},
 	"not-set-up": {
 		title: "Set up a screen lock to answer",
 		description:
-			"This Gate needs Face ID, a fingerprint or a passcode before your answer goes. Set one up in the Settings app of your phone. Then answer again.",
+			"This Gate needs Face ID, a fingerprint or a passcode before your answer goes. Set one up in the Settings app of your phone. Then send your answer again.",
 	},
 	"locked-out": {
 		title: "Your phone stopped the check",
 		description:
-			"There were too many tries. Unlock your phone with its passcode. Then answer again.",
+			"There were too many tries. Unlock your phone with its passcode. Then send your answer again.",
 	},
 	failed: {
 		title: "Your phone could not check that it is you",
-		description:
-			"Your answer was not sent. Choose an answer again to try once more.",
+		description: "Your answer was not sent. Tap Send to try once more.",
 	},
 };

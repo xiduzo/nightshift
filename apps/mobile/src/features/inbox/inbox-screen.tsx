@@ -1,153 +1,228 @@
-import {
-	gateParts,
-	gateRun,
-	type OpenGate,
-	waitedText,
-	waitingForYou,
-	waitingText,
-} from "@nightshift/client";
-import {
-	Alert,
-	AlertDescription,
-	AlertTitle,
-} from "@nightshift/ui-native/components/ui/alert";
+import { createSpaceQueries, type OpenGate } from "@nightshift/client";
 import { Badge } from "@nightshift/ui-native/components/ui/badge";
 import { Button } from "@nightshift/ui-native/components/ui/button";
-import {
-	Card,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@nightshift/ui-native/components/ui/card";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
 import { Text } from "@nightshift/ui-native/components/ui/text";
-import { router } from "expo-router";
-import { CircleAlert, CircleCheck, Inbox } from "lucide-react-native";
-import { Pressable, View } from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import { router, useLocalSearchParams } from "expo-router";
+import {
+	ArrowDownUp,
+	GitPullRequest,
+	Hand,
+	Inbox,
+	ListFilter,
+	Search,
+} from "lucide-react-native";
+import { useEffect } from "react";
+import { View } from "react-native";
 
+import { useHostQueries } from "@/features/host";
 import { PushCard } from "@/features/push";
+import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
-import { LargeTitleHeader } from "@/shared/header";
+import { ErrorAlert } from "@/shared/feedback";
+import { HeaderButton, LargeTitleHeader } from "@/shared/header";
+import { ListGroup, ListRow } from "@/shared/list";
 import { Screen } from "@/shared/page";
-import { useAnswered } from "./answered";
+import { setInboxView, useInboxView } from "./inbox-filter";
+import {
+	ALL_GATES,
+	gateRowText,
+	type InboxView,
+	inboxGroups,
+	inboxSummary,
+	placeLabel,
+	spaceCount,
+} from "./inbox-view";
 import { useInbox } from "./use-inbox";
 import { useNow } from "./use-now";
 
-/** The Needs-you inbox: the open Gates of every Space you are in, oldest first. */
+/**
+ * The Inbox tab: the open Gates of every Space you are in, grouped by
+ * project, oldest first. Chips choose a project or Space and the order.
+ * `/inbox?project=<id>` opens it on one project.
+ */
 export function InboxScreen() {
 	const inbox = useInbox();
-	const answered = useAnswered();
+	const view = useInboxView();
 	const now = useNow();
+	const manySpaces = useManySpaces(inbox.data);
+	useProjectParam();
 
+	const gates = inbox.data;
 	return (
 		<Screen onRefresh={() => inbox.refetch()}>
 			<LargeTitleHeader
 				title="Inbox"
-				summary={
-					inbox.data ? waitingText(waitingForYou(inbox.data)) : undefined
-				}
+				summary={gates ? inboxSummary(gates) : undefined}
+				actions={<HeaderButton icon={Search} label="Search" href="/search" />}
 			/>
-			{answered ? (
-				<Alert icon={CircleCheck}>
-					<AlertTitle>Answered {answered.choice}</AlertTitle>
-					<AlertDescription>
-						{answered.runTitle}: the run goes on.
-					</AlertDescription>
-				</Alert>
+			{gates && gates.length > 0 ? (
+				<FilterChips gates={gates} view={view} />
 			) : null}
-			{inbox.data ? (
-				inbox.data.length === 0 ? (
+			{gates ? (
+				gates.length === 0 ? (
 					<>
 						<EmptyState
 							icon={Inbox}
 							title="Nothing needs you"
 							description="When a run waits for your answer at a Gate, it shows up here. This inbox holds the Gates of every Space you are in."
-						/>
+						>
+							<Button
+								variant="outline"
+								onPress={() => router.navigate("/runs")}
+							>
+								<Text>Go to Runs</Text>
+							</Button>
+						</EmptyState>
 						<PushCard />
 					</>
 				) : (
-					inbox.data.map((gate) => (
-						<GateRow
-							key={`${gate.runId}:${gate.stepId}`}
-							gate={gate}
-							now={now}
-						/>
-					))
+					<GateGroups
+						gates={gates}
+						view={view}
+						manySpaces={manySpaces}
+						now={now}
+					/>
 				)
 			) : inbox.error ? (
-				<Alert icon={CircleAlert} variant="destructive">
-					<AlertTitle>The inbox did not load</AlertTitle>
-					<AlertDescription>
-						Check that this phone is online. Then pull down or try again.
-					</AlertDescription>
-					<Button
-						variant="outline"
-						size="sm"
-						className="mt-2 self-start"
-						onPress={() => void inbox.refetch()}
-					>
-						<Text>Try again</Text>
-					</Button>
-				</Alert>
+				<ErrorAlert
+					title="The inbox did not load"
+					message="Check that this phone is online. Then pull down or try again."
+					onRetry={() => void inbox.refetch()}
+				/>
 			) : (
 				<>
-					<Skeleton className="h-28 w-full" />
-					<Skeleton className="h-28 w-full" />
-					<Skeleton className="h-28 w-full" />
+					<Skeleton className="h-11 w-2/3 rounded-full" />
+					<Skeleton className="h-24 w-full rounded-xl" />
+					<Skeleton className="h-24 w-full rounded-xl" />
 				</>
 			)}
 		</Screen>
 	);
 }
 
-/** One Gate: its question, its run, its Space and how long it has waited. Opens the answer sheet. */
-function GateRow({ gate, now }: { gate: OpenGate; now: number }) {
-	const { headline } = gateParts(gate.question);
-	const waited = waitedText(now - gate.openedAt);
-	const { flow, detail } = gateRun(gate);
+/** You are in more than one Space: each group names its Space. */
+function useManySpaces(gates: readonly OpenGate[] | undefined): boolean {
+	const spaceQueries = useHostQueries(createSpaceQueries);
+	const spaces = useQuery(spaceQueries.list());
+	if (spaces.data) return spaces.data.spaces.length > 1;
+	return gates ? spaceCount(gates) > 1 : false;
+}
+
+/** `/inbox?project=<id>`, from a project's Gates row: shows that project once. */
+function useProjectParam() {
+	const { project } = useLocalSearchParams<{ project?: string }>();
+	useEffect(() => {
+		if (!project) return;
+		setInboxView({ place: { kind: "project", projectId: project } });
+		router.setParams({ project: undefined });
+	}, [project]);
+}
+
+function FilterChips({ gates, view }: { gates: OpenGate[]; view: InboxView }) {
+	const all = view.place.kind === "all";
 	return (
-		<Pressable
-			onPress={() =>
-				router.push({
-					pathname: "/gates/[runId]/[stepId]",
-					params: { runId: gate.runId, stepId: gate.stepId },
-				})
-			}
-			accessibilityRole="button"
+		<ChipRail>
+			<Chip
+				label="All"
+				count={gates.length}
+				selected={all}
+				onPress={() => setInboxView({ place: ALL_GATES.place })}
+			/>
+			<Chip
+				label={placeLabel(view.place, gates)}
+				icon={ListFilter}
+				selected={!all}
+				onPress={() => router.push("/inbox-filter")}
+			/>
+			<Chip
+				label={view.sort === "oldest" ? "Oldest first" : "Newest first"}
+				icon={ArrowDownUp}
+				onPress={() =>
+					setInboxView({ sort: view.sort === "oldest" ? "newest" : "oldest" })
+				}
+			/>
+		</ChipRail>
+	);
+}
+
+function GateGroups({
+	gates,
+	view,
+	manySpaces,
+	now,
+}: {
+	gates: OpenGate[];
+	view: InboxView;
+	manySpaces: boolean;
+	now: number;
+}) {
+	const groups = inboxGroups(gates, view, manySpaces);
+	if (groups.length === 0) {
+		return (
+			<EmptyState
+				icon={Inbox}
+				title="No Gates here"
+				description={`Nothing waits for you in ${placeLabel(view.place, gates)}. ${gates.length === 1 ? "1 Gate waits" : `${gates.length} Gates wait`} elsewhere.`}
+			>
+				<Button
+					variant="outline"
+					onPress={() => setInboxView({ place: ALL_GATES.place })}
+				>
+					<Text>Show all Gates</Text>
+				</Button>
+			</EmptyState>
+		);
+	}
+	return groups.map((group) => (
+		<View key={group.key} className="gap-2">
+			<View className="flex-row items-center gap-2">
+				<Text
+					accessibilityRole="header"
+					className="flex-shrink font-semibold text-base"
+					numberOfLines={1}
+				>
+					{group.title}
+				</Text>
+				<Badge
+					variant="secondary"
+					accessibilityLabel={`${group.gates.length} open`}
+				>
+					<Text className="tabular-nums">{group.gates.length}</Text>
+				</Badge>
+			</View>
+			<ListGroup>
+				{group.gates.map((gate) => (
+					<GateRow key={`${gate.runId}:${gate.stepId}`} gate={gate} now={now} />
+				))}
+			</ListGroup>
+		</View>
+	));
+}
+
+/** One Gate: "project · flow", its question, its choices and node, how long it waited. */
+function GateRow({ gate, now }: { gate: OpenGate; now: number }) {
+	const row = gateRowText(gate, now);
+	const needsYou = gate.canAnswer && !gate.answerPending;
+	return (
+		<ListRow
+			icon={row.pullRequest ? GitPullRequest : Hand}
+			tone={needsYou ? "waiting" : "neutral"}
+			iconLabel={needsYou ? "Needs you" : undefined}
+			overline={row.overline}
+			title={row.title}
+			caption={[row.choices, { text: row.nodeId, mono: true }]}
+			detail={row.note ?? undefined}
+			value={row.waited}
+			valueLabel={`waited ${row.waited}`}
+			href={{
+				pathname: "/gates/[runId]/[stepId]",
+				params: { runId: gate.runId, stepId: gate.stepId },
+			}}
 			accessibilityHint={
 				gate.canAnswer ? "Opens the Gate to answer it" : "Opens the Gate"
 			}
-			className="active:opacity-70"
-		>
-			<Card className="gap-3 py-4">
-				<CardHeader className="gap-2 px-4">
-					<View className="flex-row items-center justify-between gap-2">
-						<Badge variant="secondary" className="max-w-[60%]">
-							<Text numberOfLines={1}>{gate.spaceName}</Text>
-						</Badge>
-						<Text variant="muted" className="text-muted-foreground text-xs">
-							Waiting {waited}
-						</Text>
-					</View>
-					<CardTitle numberOfLines={3} className="leading-snug">
-						{headline}
-					</CardTitle>
-					<View className="gap-0.5">
-						<CardDescription numberOfLines={1}>
-							{gate.projectName} · {flow}
-						</CardDescription>
-						{detail ? (
-							<CardDescription numberOfLines={1}>{detail}</CardDescription>
-						) : null}
-					</View>
-					{gate.canAnswer ? null : (
-						<Text variant="muted" className="text-muted-foreground text-xs">
-							You can read this Gate. Your role in this Space does not let you
-							answer it.
-						</Text>
-					)}
-				</CardHeader>
-			</Card>
-		</Pressable>
+		/>
 	);
 }

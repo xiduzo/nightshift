@@ -41,6 +41,8 @@ export function Screen({ children, onRefresh, footer }: ScreenProps) {
 			className="flex-1 bg-background"
 			contentContainerClassName="flex-grow gap-4 p-4"
 			contentInsetAdjustmentBehavior="automatic"
+			// iOS: a field near the bottom (a Gate's note) scrolls above the keyboard.
+			automaticallyAdjustKeyboardInsets
 			keyboardShouldPersistTaps="handled"
 			refreshControl={
 				onRefresh ? (

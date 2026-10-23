@@ -56,6 +56,10 @@ export default function RootLayout() {
 				/>
 				<Stack.Screen name="flows" options={sheet} />
 				<Stack.Screen name="computers" options={sheet} />
+				<Stack.Screen name="inbox-filter" options={sheet} />
+				<Stack.Screen name="gate-link" options={sheet} />
+				<Stack.Screen name="gate-actions" options={sheet} />
+				<Stack.Screen name="transcript/[runId]" options={sheet} />
 			</Stack>
 		</AppShell>
 	);
