@@ -56,6 +56,7 @@ export default function RootLayout() {
 				/>
 				<Stack.Screen name="flows" options={sheet} />
 				<Stack.Screen name="computers" options={sheet} />
+				<Stack.Screen name="inbox-filter" options={sheet} />
 			</Stack>
 		</AppShell>
 	);
