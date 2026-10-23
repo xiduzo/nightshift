@@ -4,14 +4,15 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@nightshift/ui-native/components/ui/alert";
-import { router, usePathname } from "expo-router";
+import { usePathname } from "expo-router";
 import { BellRing } from "lucide-react-native";
 import { useEffect } from "react";
 import { Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { hideBanner, setInFrontPlace, useBanner } from "./in-front";
-import { phoneRouteOf, showInFront } from "./push-data";
+import { openPhoneRoute } from "./open-route";
+import { showInFront } from "./push-data";
 
 /** How long the banner stays when the person does not tap it. */
 const SHOWN_MS = 6000;
@@ -48,7 +49,7 @@ export function InFrontBanner() {
 			accessibilityHint={opensGate ? "Opens the Gate" : "Opens the inbox"}
 			onPress={() => {
 				hideBanner(banner);
-				router.push(phoneRouteOf(route));
+				openPhoneRoute(route);
 			}}
 			className="absolute right-4 left-4 rounded-lg shadow-black/10 shadow-lg active:opacity-80"
 			style={{ top: insets.top + 8 }}

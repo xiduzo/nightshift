@@ -114,7 +114,10 @@ export type PhoneRoute =
 	| { pathname: "/runs/[runId]"; params: { runId: string } }
 	| { pathname: "/inbox" };
 
-/** The screen of a route: the Gate, the run, or the inbox (`/inbox`). */
+/**
+ * The screen of a route: the Gate, the run, or the inbox (`/inbox`). The
+ * inbox is a tab: go back to it with `router.dismissTo`, push the others.
+ */
 export function phoneRouteOf(route: PushRoute): PhoneRoute {
 	switch (route.to) {
 		case "gate":

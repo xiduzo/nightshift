@@ -8,8 +8,8 @@ export type SectionHeadProps = {
 	/** A muted line under the title: "Oldest first · 3 open". */
 	hint?: string;
 	/** "See all" on the right: opens the whole list. */
-	seeAll?:
-		| { href: Href; label?: string }
+	seeAll?: /** `dismissTo`: go back to `href` when it is open under this screen. */
+		| { href: Href; dismissTo?: boolean; label?: string }
 		| { onPress: () => void; label?: string };
 };
 
@@ -41,7 +41,7 @@ export function SectionHead({ title, hint, seeAll }: SectionHeadProps) {
 				) : null}
 			</View>
 			{seeAll && "href" in seeAll ? (
-				<Link href={seeAll.href} asChild>
+				<Link href={seeAll.href} dismissTo={seeAll.dismissTo} asChild>
 					{button}
 				</Link>
 			) : (

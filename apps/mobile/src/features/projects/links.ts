@@ -4,7 +4,8 @@ import type { Href } from "expo-router";
  * Where a project page leads. The Inbox and Runs take the project as the
  * search param `project`, Flows as `projectId`: each then shows only the
  * project's Gates, runs or flows. New run takes `projectId` as the
- * project to start in.
+ * project to start in. The Inbox and Runs are tabs under the project
+ * page: open them with `dismissTo`, so the tabs that are there show them.
  */
 export const projectLinks = {
 	page: (projectId: string): Href => ({

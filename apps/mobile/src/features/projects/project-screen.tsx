@@ -82,6 +82,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 							value={gates.data ? String(gates.data.length) : undefined}
 							valueLabel={gates.data ? `${gates.data.length} open` : undefined}
 							href={projectLinks.inbox(projectId)}
+							dismissTo
 							accessibilityHint="Opens the Inbox with the Gates of this project"
 						/>
 						<ListRow
@@ -89,6 +90,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 							title="Runs"
 							value={runs.data ? String(runs.data.length) : undefined}
 							href={projectLinks.runs(projectId)}
+							dismissTo
 							accessibilityHint="Opens Runs with the runs of this project"
 						/>
 						<ListRow
@@ -109,7 +111,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 							}
 							seeAll={
 								gates.data && gates.data.length > SHOWN
-									? { href: projectLinks.inbox(projectId) }
+									? { href: projectLinks.inbox(projectId), dismissTo: true }
 									: undefined
 							}
 						/>
@@ -147,7 +149,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 							}
 							seeAll={
 								runs.data && runs.data.length > SHOWN
-									? { href: projectLinks.runs(projectId) }
+									? { href: projectLinks.runs(projectId), dismissTo: true }
 									: undefined
 							}
 						/>

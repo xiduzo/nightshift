@@ -38,6 +38,11 @@ export type ListRowProps = {
 	valueLabel?: string;
 	/** Opens a screen. */
 	href?: Href;
+	/**
+	 * Goes back to `href` when it is open under this screen, as the tabs are
+	 * under a root screen, instead of opening a second copy of it.
+	 */
+	dismissTo?: boolean;
 	onPress?: () => void;
 	/** The chevron at the end. On by default when the row opens something. */
 	chevron?: boolean;
@@ -73,6 +78,7 @@ export function ListRow({
 	value,
 	valueLabel,
 	href,
+	dismissTo,
 	onPress,
 	chevron,
 	selected,
@@ -162,7 +168,7 @@ export function ListRow({
 		</Pressable>
 	);
 	return href !== undefined ? (
-		<Link href={href} asChild>
+		<Link href={href} dismissTo={dismissTo} asChild>
 			{row}
 		</Link>
 	) : (

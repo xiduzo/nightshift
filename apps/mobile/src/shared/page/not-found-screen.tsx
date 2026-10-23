@@ -14,7 +14,7 @@ export function NotFoundScreen() {
 				title="This page does not exist"
 				description="The link may be old. Go back to your inbox to see what needs you."
 			>
-				<Link href="/inbox" asChild>
+				<Link href="/inbox" dismissTo asChild>
 					<Button>
 						<Text>Open the inbox</Text>
 					</Button>

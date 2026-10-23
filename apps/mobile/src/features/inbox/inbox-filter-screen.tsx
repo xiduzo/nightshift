@@ -34,7 +34,7 @@ export function InboxFilterScreen() {
 	function choose(option: PlaceOption) {
 		setInboxView({ place: option.place });
 		if (router.canGoBack()) router.back();
-		else router.replace("/inbox");
+		else router.dismissTo("/inbox");
 	}
 
 	return (
