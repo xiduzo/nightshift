@@ -2,7 +2,7 @@ import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { Text } from "@nightshift/ui-native/components/ui/text";
 import { cn } from "@nightshift/ui-native/lib/utils";
 import { type Href, Link } from "expo-router";
-import { ChevronRight, type LucideIcon } from "lucide-react-native";
+import { Check, ChevronRight, type LucideIcon } from "lucide-react-native";
 import { Fragment, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 
@@ -41,6 +41,11 @@ export type ListRowProps = {
 	onPress?: () => void;
 	/** The chevron at the end. On by default when the row opens something. */
 	chevron?: boolean;
+	/**
+	 * A row you choose from a list: a check at the end when chosen, and no
+	 * chevron. A screen reader hears "selected".
+	 */
+	selected?: boolean;
 	/** The whole row as one sentence, when the parts do not say it well. */
 	accessibilityLabel?: string;
 	/** What a tap does: "Opens the Gate". */
@@ -70,6 +75,7 @@ export function ListRow({
 	href,
 	onPress,
 	chevron,
+	selected,
 	accessibilityLabel,
 	accessibilityHint,
 	disabled,
@@ -120,7 +126,9 @@ export function ListRow({
 					{value}
 				</Text>
 			) : null}
-			{(chevron ?? opens) ? (
+			{selected ? (
+				<Icon as={Check} className="size-5 text-foreground" />
+			) : (chevron ?? (opens && selected === undefined)) ? (
 				<Icon as={ChevronRight} className="size-4 text-muted-foreground" />
 			) : null}
 		</View>
@@ -140,8 +148,8 @@ export function ListRow({
 			accessibilityRole="button"
 			accessibilityLabel={label}
 			accessibilityHint={accessibilityHint}
-			accessibilityState={{ disabled }}
-			className="active:bg-accent"
+			accessibilityState={{ disabled, selected }}
+			className={cn("active:bg-accent", disabled && "opacity-50")}
 		>
 			{body}
 		</Pressable>
