@@ -22,6 +22,8 @@ export {
 	type HarnessName,
 	harnessNameSchema,
 	isCustomHarness,
+	type Login,
+	loginSchema,
 	type McpServer,
 	mcpServerSchema,
 	permissionModeSchema,

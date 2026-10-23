@@ -108,6 +108,41 @@ export const customAgentSchema = z.object({
 });
 export type CustomAgent = z.infer<typeof customAgentSchema>;
 
+/**
+ * A login: how a program signs in, so that one computer can hold several
+ * accounts of one program. Set on the computer only (a CLI tool), never in
+ * a flow file: a flow names the tool, not its secrets. `${NAME}` in a value
+ * reads a secret when a step starts.
+ */
+export const loginSchema = z
+	.object({
+		/** Only the program gets these, for example `GH_TOKEN: "${GH_WORK_TOKEN}"`. */
+		env: z.record(envNameSchema, z.string()).default({}),
+		/**
+		 * The variable that points the program at a folder Night Shift keeps
+		 * for this login, for a program that keeps its sign-in in a file:
+		 * `HOME` for acli, `GH_CONFIG_DIR` for gh.
+		 */
+		folder: envNameSchema.optional(),
+		/**
+		 * Signs the program in, in its folder: once, and again when a value
+		 * it reads changes. `input` goes to its standard input, so a token is
+		 * never part of the command.
+		 */
+		signIn: z
+			.object({
+				command: z.string().trim().min(1).max(2000),
+				input: z.string().max(2000).optional(),
+			})
+			.optional(),
+	})
+	.refine((login) => login.signIn === undefined || login.folder !== undefined, {
+		message:
+			"A sign-in needs a folder of its own. Choose the variable that points the program at it, for example HOME.",
+		path: ["folder"],
+	});
+export type Login = z.infer<typeof loginSchema>;
+
 export const effortSchema = z.enum(["low", "medium", "high", "xhigh", "max"]);
 
 /**

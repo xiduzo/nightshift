@@ -63,6 +63,7 @@ export {
 	type CliToolStore,
 	type Connection,
 	type ConnectionStore,
+	cliToolGitSchema,
 	cliToolInputSchema,
 	connectionInputSchema,
 	createCliToolStore,
