@@ -211,6 +211,7 @@ function RunBody({
 			</View>
 
 			<StepsSection
+				runId={run.id}
 				steps={ownSteps}
 				labels={labels}
 				status={status}
@@ -262,11 +263,13 @@ function GateRows({ gates, now }: { gates: OpenGate[]; now: number }) {
 
 /** The run's own steps, in the order they started, as a trail. */
 function StepsSection({
+	runId,
 	steps,
 	labels,
 	status,
 	now,
 }: {
+	runId: string;
 	steps: StepSummary[];
 	labels: Map<string, string>;
 	status: RunStatus;
@@ -274,7 +277,14 @@ function StepsSection({
 }) {
 	return (
 		<View className="gap-3">
-			<SectionHead title="Steps" hint="Oldest first" />
+			<SectionHead
+				title="Steps"
+				hint="Oldest first"
+				seeAll={{
+					href: { pathname: "/transcript/[runId]", params: { runId } },
+					label: "Transcript",
+				}}
+			/>
 			<Card className="py-4">
 				<CardContent className="px-4">
 					{steps.length === 0 ? (

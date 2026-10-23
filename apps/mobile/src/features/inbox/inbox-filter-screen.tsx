@@ -3,7 +3,7 @@ import { Icon } from "@nightshift/ui-native/components/ui/icon";
 import { cn } from "@nightshift/ui-native/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { Check, FolderGit2, Inbox, Users } from "lucide-react-native";
+import { FolderGit2, Inbox, Users } from "lucide-react-native";
 import { View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
@@ -47,7 +47,6 @@ export function InboxFilterScreen() {
 			<ListGroup>
 				{options.map((option) => {
 					const shown = samePlace(option.place, view.place);
-					const count = `${option.count} open`;
 					return (
 						<ListRow
 							key={placeKey(option)}
@@ -59,26 +58,17 @@ export function InboxFilterScreen() {
 									)}
 								>
 									<Icon
-										as={shown ? Check : iconOf(option)}
-										className={cn(
-											"size-5",
-											shown ? "text-foreground" : "text-muted-foreground",
-										)}
+										as={iconOf(option)}
+										className="size-5 text-muted-foreground"
 									/>
 								</View>
 							}
 							title={option.label}
 							titleLines={1}
 							value={String(option.count)}
-							chevron={false}
+							selected={shown}
 							onPress={() => choose(option)}
-							accessibilityLabel={[
-								option.label,
-								count,
-								shown ? "shown now" : undefined,
-							]
-								.filter(Boolean)
-								.join(", ")}
+							accessibilityLabel={`${option.label}, ${option.count} open`}
 							accessibilityHint="Shows the Gates of this place in the inbox"
 						/>
 					);
