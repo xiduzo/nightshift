@@ -5,7 +5,7 @@ export {
 	secretsDir,
 	webPushSubject,
 } from "./daemon-env";
-export { chooseFolder } from "./folder-picker";
+export { canChooseFolder, chooseFolder } from "./folder-picker";
 export {
 	checkHealth,
 	HEALTH_STALE_AFTER_MS,

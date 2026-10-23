@@ -2,6 +2,7 @@ import type { DeviceLinks, WorkHub } from "@nightshift/devices";
 import type {
 	DeviceDocument,
 	Engine,
+	GitHubClones,
 	SpaceDocuments,
 } from "@nightshift/engine";
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
@@ -38,6 +39,8 @@ export type HotRegistry = {
 	nightshiftNotifications?: Notifications;
 	nightshiftKeepAwake?: KeepAwake;
 	nightshiftScheduler?: AbortController;
+	/** The clones from GitHub that run, and how the last ones ended. */
+	nightshiftGitHubClones?: GitHubClones;
 	nightshiftFacts?: Timer;
 	nightshiftPresence?: Timer;
 	nightshiftLinks?: DeviceLinks;

@@ -2,6 +2,14 @@
 const USER_CANCELED = "-128";
 
 /**
+ * Whether this computer can show the folder picker: a Mac with `osascript`.
+ * A Linux server or the Docker image cannot, so a project comes from GitHub there.
+ */
+export function canChooseFolder(): boolean {
+	return process.platform === "darwin" && Bun.which("osascript") !== null;
+}
+
+/**
  * Opens the native macOS folder picker on this Mac and waits for a choice.
  * Returns the absolute path without a trailing slash, or null when the user
  * cancels. The server runs on the user's Mac, so the dialog shows there for

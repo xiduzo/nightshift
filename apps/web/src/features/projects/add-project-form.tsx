@@ -24,14 +24,19 @@ import {
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Spinner } from "@nightshift/ui/components/spinner";
+import { Tabs, TabsList, TabsTrigger } from "@nightshift/ui/components/tabs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderGitIcon, FolderOpenIcon, PlusIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
+import { GitHubCopyStatus, GitHubRepoField } from "./github-repo-field";
 import { ProjectReadiness } from "./project-readiness";
 import { projectMutations, projectQueries } from "./queries";
 
-/** Adds a folder as a project, in a dialog, after its readiness check. */
+/** Where a new project comes from: a folder on this computer, or a GitHub repository. */
+type Source = "folder" | "github";
+
+/** Adds a folder or a GitHub repository as a project, in a dialog, after its readiness check. */
 export function AddProjectDialog({
 	open,
 	onOpenChange,
@@ -51,24 +56,54 @@ export function AddProjectDialog({
 export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 	const id = useId();
 	const queryClient = useQueryClient();
-	const [repoPath, setRepoPath] = useState("");
-	const [name, setName] = useState("");
+	const sources = useQuery(projectQueries.sources());
+	// Until the server answers, assume the folder picker: most computers are Macs.
+	const folderPicker = sources.data?.folderPicker ?? true;
+	const [chosen, setChosen] = useState<Source | null>(null);
+	const source: Source = folderPicker ? (chosen ?? "folder") : "github";
 
-	// The server opens the native folder picker on this Mac.
+	const [folderPath, setFolderPath] = useState("");
+	const [repo, setRepo] = useState("");
+	const [name, setName] = useState("");
+	/** The person asked to add the GitHub repository: add it once its copy is ready. */
+	const [addWhenReady, setAddWhenReady] = useState(false);
+
+	// The server opens the folder picker on its own computer.
 	const chooseFolder = useMutation(
 		projectMutations.chooseFolder({
 			onSuccess: (path) => {
-				if (path) setRepoPath(path);
+				if (path) setFolderPath(path);
 			},
 		}),
 	);
+
+	// The copy from GitHub runs on the server. Its status is polled while it copies.
+	const startCopy = useMutation(projectMutations.cloneFromGitHub());
+	const copyRepo = startCopy.data?.repo ?? "";
+	const copyStatus = useQuery({
+		...projectQueries.gitHubClone(copyRepo),
+		enabled: startCopy.data?.state === "cloning",
+	});
+	const copy = copyStatus.data ?? startCopy.data ?? null;
+	const copying = startCopy.isPending || copy?.state === "cloning";
+	const copyProblem =
+		startCopy.error?.message ??
+		(copy?.state === "failed" ? copy.problem : null) ??
+		(copyStatus.data === null && !copyStatus.isFetching && startCopy.data
+			? "Night Shift stopped copying the repository. Try again."
+			: null);
+	const gitHubPath = copy?.state === "done" ? copy.path : "";
+
+	const repoPath = source === "folder" ? folderPath : gitHubPath;
 
 	const addProject = useMutation(
 		projectMutations.add({
 			onSuccess: (project) => {
 				toast.success(`Added ${project.name}`);
-				setRepoPath("");
+				setFolderPath("");
+				setRepo("");
 				setName("");
+				startCopy.reset();
 				void queryClient.invalidateQueries({
 					queryKey: projectQueries.all(),
 				});
@@ -83,82 +118,159 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 	});
 	const ready = readiness.data?.ready === true;
 
-	const folderName = repoPath.split("/").at(-1) || repoPath;
+	const folderName = folderPath.split("/").at(-1) || folderPath;
+	// The folder of a copy is in lower case: the repository keeps its own name.
+	const repoName = (copy?.repo ?? repo).split("/").at(-1)?.trim() ?? "";
+	const defaultName = source === "folder" ? folderName : repoName;
+
+	const add = () =>
+		addProject.mutate({
+			repoPath,
+			name: name.trim() || (source === "github" ? repoName : undefined),
+		});
+
+	// Add the repository as soon as its copy is ready, when the person asked for it.
+	useEffect(() => {
+		if (!addWhenReady || source !== "github") return;
+		if (copy?.state === "failed" || startCopy.error) setAddWhenReady(false);
+		else if (readiness.data && !readiness.isFetching) {
+			setAddWhenReady(false);
+			if (readiness.data.ready && !addProject.isPending) add();
+		}
+	});
+
+	const submit = () => {
+		if (source === "folder") {
+			if (folderPath && ready) add();
+			return;
+		}
+		if (gitHubPath) {
+			if (ready) add();
+			return;
+		}
+		if (!repo.trim() || copying) return;
+		setAddWhenReady(true);
+		startCopy.mutate({ repo: repo.trim() });
+	};
+
+	const busy = addProject.isPending || (source === "github" && copying);
+	const canSubmit =
+		source === "folder"
+			? Boolean(folderPath) && ready
+			: gitHubPath
+				? ready
+				: repo.trim() !== "";
 
 	return (
 		<form
 			className="contents"
 			onSubmit={(event) => {
 				event.preventDefault();
-				if (!repoPath || !ready) return;
-				addProject.mutate({ repoPath, name: name.trim() || undefined });
+				submit();
 			}}
 		>
 			<DialogHeader>
 				<DialogTitle>Add project</DialogTitle>
 				<DialogDescription>
-					Choose a project folder on this Mac. Each run works in its own copy,
-					so your files stay as they are.
+					{folderPicker
+						? "Choose a folder on this computer, or copy a repository from GitHub. Each run works in its own copy, so your files stay as they are."
+						: "Copy a repository from GitHub to this computer. Each run works in its own copy of it."}
 				</DialogDescription>
 			</DialogHeader>
 			<FieldGroup className="gap-5">
-				<Field data-invalid={chooseFolder.error ? true : undefined}>
-					<FieldLabel>Folder</FieldLabel>
-					{repoPath ? (
-						<Item variant="outline" size="sm">
-							<ItemMedia variant="icon">
-								<FolderGitIcon />
-							</ItemMedia>
-							<ItemContent className="min-w-0">
-								<ItemTitle>{folderName}</ItemTitle>
-								<ItemDescription
-									className="truncate font-mono"
-									title={repoPath}
-								>
-									{repoPath}
-								</ItemDescription>
-							</ItemContent>
-							<ItemActions>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									disabled={chooseFolder.isPending}
-									onClick={() => chooseFolder.mutate()}
-								>
-									{chooseFolder.isPending ? (
-										<Spinner data-icon="inline-start" />
-									) : null}
-									Change
-								</Button>
-							</ItemActions>
-						</Item>
-					) : (
-						<Button
-							type="button"
-							variant="outline"
-							disabled={chooseFolder.isPending}
-							onClick={() => chooseFolder.mutate()}
-							autoFocus
-						>
-							{chooseFolder.isPending ? (
-								<Spinner data-icon="inline-start" />
-							) : (
-								<FolderOpenIcon data-icon="inline-start" />
-							)}
-							{chooseFolder.isPending ? "Choosing…" : "Choose folder…"}
-						</Button>
-					)}
-					{chooseFolder.error ? (
-						<FieldError>{chooseFolder.error.message}</FieldError>
-					) : null}
-				</Field>
-				{readiness.data && !ready ? (
+				{folderPicker ? (
+					<Tabs
+						value={source}
+						onValueChange={(next) => setChosen(next as Source)}
+					>
+						<TabsList className="w-full">
+							<TabsTrigger value="folder">Folder</TabsTrigger>
+							<TabsTrigger value="github">GitHub</TabsTrigger>
+						</TabsList>
+					</Tabs>
+				) : null}
+				{source === "folder" ? (
+					<Field data-invalid={chooseFolder.error ? true : undefined}>
+						<FieldLabel>Folder</FieldLabel>
+						{folderPath ? (
+							<Item variant="outline" size="sm">
+								<ItemMedia variant="icon">
+									<FolderGitIcon />
+								</ItemMedia>
+								<ItemContent className="min-w-0">
+									<ItemTitle>{folderName}</ItemTitle>
+									<ItemDescription
+										className="truncate font-mono"
+										title={folderPath}
+									>
+										{folderPath}
+									</ItemDescription>
+								</ItemContent>
+								<ItemActions>
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										disabled={chooseFolder.isPending}
+										onClick={() => chooseFolder.mutate()}
+									>
+										{chooseFolder.isPending ? (
+											<Spinner data-icon="inline-start" />
+										) : null}
+										Change
+									</Button>
+								</ItemActions>
+							</Item>
+						) : (
+							<Button
+								type="button"
+								variant="outline"
+								disabled={chooseFolder.isPending}
+								onClick={() => chooseFolder.mutate()}
+								autoFocus
+							>
+								{chooseFolder.isPending ? (
+									<Spinner data-icon="inline-start" />
+								) : (
+									<FolderOpenIcon data-icon="inline-start" />
+								)}
+								{chooseFolder.isPending ? "Choosing…" : "Choose folder…"}
+							</Button>
+						)}
+						{chooseFolder.error ? (
+							<FieldError>{chooseFolder.error.message}</FieldError>
+						) : null}
+					</Field>
+				) : (
+					<>
+						<GitHubRepoField
+							id={`${id}-repo`}
+							access={sources.data?.gitHub ?? "missing"}
+							value={repo}
+							onChange={(next) => {
+								setRepo(next);
+								// Another repository: its copy starts again.
+								if (startCopy.data || startCopy.error) startCopy.reset();
+								setAddWhenReady(false);
+							}}
+							disabled={copying}
+							error={copyProblem}
+						/>
+						{copy && copy.state !== "failed" ? (
+							<GitHubCopyStatus
+								repo={copy.repo}
+								copying={copy.state === "cloning"}
+								reused={copy.state === "done" && copy.reused}
+							/>
+						) : null}
+					</>
+				)}
+				{repoPath && readiness.data && !ready ? (
 					<ProjectReadiness
 						readiness={readiness.data}
 						checking={readiness.isFetching}
 						onRecheck={() => void readiness.refetch()}
-						onUseFolder={setRepoPath}
+						onUseFolder={setFolderPath}
 					/>
 				) : null}
 				{readiness.error ? (
@@ -175,7 +287,7 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 						id={`${id}-name`}
 						value={name}
 						onChange={(event) => setName(event.target.value)}
-						placeholder={folderName || "Folder name"}
+						placeholder={defaultName || "Project name"}
 						autoComplete="off"
 					/>
 				</Field>
@@ -187,16 +299,17 @@ export function AddProjectForm({ onAdded }: { onAdded?: () => void }) {
 				<DialogClose render={<Button variant="outline" type="button" />}>
 					Cancel
 				</DialogClose>
-				<Button
-					type="submit"
-					disabled={!repoPath || !ready || addProject.isPending}
-				>
-					{addProject.isPending ? (
+				<Button type="submit" disabled={!canSubmit || busy}>
+					{busy ? (
 						<Spinner data-icon="inline-start" />
 					) : (
 						<PlusIcon data-icon="inline-start" />
 					)}
-					{addProject.isPending ? "Adding…" : "Add project"}
+					{addProject.isPending
+						? "Adding…"
+						: source === "github" && copying
+							? "Copying…"
+							: "Add project"}
 				</Button>
 			</DialogFooter>
 		</form>

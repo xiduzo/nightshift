@@ -5,9 +5,12 @@ import { output } from "../output";
 import { ownerProcedure, permitted, protectedProcedure } from "../procedures";
 import {
 	branchesSchema,
+	gitHubCloneSchema,
+	gitHubRepoSchema,
 	gitInstallSchema,
 	projectReadinessSchema,
 	projectSchema,
+	projectSourcesSchema,
 	runCopiesSchema,
 } from "./schemas";
 
@@ -110,7 +113,7 @@ export const projects = {
 		})
 		.output(output(gitInstallSchema))
 		.handler(({ context }) => context.projectSetup.installGit()),
-	/** Opens the native folder picker on this Mac. Null when cancelled. */
+	/** Opens the native folder picker on this computer (macOS only, see `sources`). Null when cancelled. */
 	chooseFolder: ownerProcedure
 		.route({
 			summary:
@@ -121,6 +124,50 @@ export const projects = {
 			context.projectSetup.chooseFolder(
 				"Choose a project folder to add to Night Shift",
 			),
+		),
+	/** How a project can be added on this computer: a folder picker, the GitHub CLI. */
+	sources: ownerProcedure
+		.route({
+			summary:
+				"Says how a project can be added on this computer: a folder picker, GitHub.",
+		})
+		.output(output(projectSourcesSchema))
+		.handler(async ({ context }) => ({
+			folderPicker: context.projectSetup.folderPicker,
+			gitHub: await context.projectSetup.gitHub.access(),
+		})),
+	/** The person's GitHub repositories, through the GitHub CLI on this computer. */
+	gitHubRepos: ownerProcedure
+		.route({
+			summary:
+				"Lists the GitHub repositories the GitHub CLI on this computer can open.",
+		})
+		.output(output(z.array(gitHubRepoSchema)))
+		.handler(({ context }) => context.projectSetup.gitHub.repos()),
+	/**
+	 * Starts a clone of a GitHub repository into Night Shift's projects
+	 * folder, or uses the clone that is there. Returns at once: poll
+	 * `gitHubClone`. Add the folder with `check` and `add` when it is done.
+	 */
+	cloneFromGitHub: ownerProcedure
+		.route({
+			summary:
+				"Starts to copy a GitHub repository to this computer, for a new project.",
+		})
+		.output(output(gitHubCloneSchema))
+		.input(z.object({ repo: z.string().trim().min(1).max(300) }))
+		.handler(({ context, input }) =>
+			context.projectSetup.gitHub.start(input.repo),
+		),
+	/** How the clone of a GitHub repository goes. Null: none started. */
+	gitHubClone: ownerProcedure
+		.route({
+			summary: "Says how copying a GitHub repository to this computer goes.",
+		})
+		.output(output(gitHubCloneSchema.nullable()))
+		.input(z.object({ repo: z.string().trim().min(1).max(300) }))
+		.handler(({ context, input }) =>
+			context.projectSetup.gitHub.status(input.repo),
 		),
 	remove: permitted({ project: ["remove"] })
 		.route({
