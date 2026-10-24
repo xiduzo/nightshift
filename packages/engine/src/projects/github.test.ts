@@ -61,6 +61,20 @@ describe("reposOf", () => {
 		]);
 	});
 
+	test("reads every page of a paginated reply", () => {
+		expect(
+			reposOf(
+				JSON.stringify([
+					[{ full_name: "me/notes", description: null, private: false }],
+					[{ full_name: "acme/app", description: "The app", private: true }],
+				]),
+			),
+		).toEqual([
+			{ name: "me/notes", description: null, private: false },
+			{ name: "acme/app", description: "The app", private: true },
+		]);
+	});
+
 	test("gives none for a reply that is not a list", () => {
 		expect(reposOf("not json")).toEqual([]);
 		expect(reposOf('{"message":"Bad credentials"}')).toEqual([]);
@@ -103,6 +117,23 @@ describe("systemGitHubCli", () => {
 	test("is signed out when gh auth status fails", async () => {
 		const gh = cli(true, () => ({ exitCode: 1, stdout: "", stderr: "" }));
 		expect(await gh.access()).toBe("signed-out");
+	});
+
+	test("lists the repositories from every page", async () => {
+		const gh = cli(true, () =>
+			ok(
+				JSON.stringify([
+					[{ full_name: "me/notes", description: null, private: false }],
+					[{ full_name: "acme/app", description: null, private: true }],
+				]),
+			),
+		);
+		expect((await gh.repos()).map((repo) => repo.name)).toEqual([
+			"me/notes",
+			"acme/app",
+		]);
+		expect(calls[0]?.argv).toContain("--paginate");
+		expect(calls[0]?.argv).toContain("--slurp");
 	});
 
 	test("clones with an argv, never a shell line", async () => {

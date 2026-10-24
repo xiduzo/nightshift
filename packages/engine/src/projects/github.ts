@@ -121,6 +121,8 @@ export function systemGitHubCli(
 				[
 					"api",
 					"user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator,organization_member",
+					"--paginate",
+					"--slurp",
 				],
 				process.cwd(),
 				{ timeoutMs: ASK_TIMEOUT_MS },
@@ -142,15 +144,21 @@ export function systemGitHubCli(
 	};
 }
 
-/** The repositories in a reply of the GitHub API (`GET /user/repos`). */
+/**
+ * The repositories in a reply of the GitHub API (`GET /user/repos`): one
+ * page, or every page in a list (`gh api --paginate --slurp`).
+ */
 export function reposOf(json: string): GitHubRepo[] {
-	let rows: unknown;
+	let reply: unknown;
 	try {
-		rows = JSON.parse(json);
+		reply = JSON.parse(json);
 	} catch {
 		return [];
 	}
-	if (!Array.isArray(rows)) return [];
+	if (!Array.isArray(reply)) return [];
+	const rows: unknown[] = reply.flatMap((page) =>
+		Array.isArray(page) ? page : [page],
+	);
 	const repos: GitHubRepo[] = [];
 	for (const row of rows) {
 		if (typeof row !== "object" || row === null) continue;
