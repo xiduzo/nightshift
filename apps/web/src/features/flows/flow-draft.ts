@@ -305,6 +305,55 @@ const MESSAGES: DraftMessages = {
 	missingProfile: missingProfileMessage,
 };
 
+/** A `{{` the cursor is in: where it starts, and the name typed after it so far. */
+export type OpenTemplate = { start: number; query: string };
+
+/** The `{{` just before the cursor that is not closed yet, or null. `{{plan` gives `plan`. */
+export function openTemplate(
+	text: string,
+	cursor: number,
+): OpenTemplate | null {
+	const match = /\{\{\s*([\w.-]*)$/.exec(text.slice(0, cursor));
+	return match ? { start: match.index, query: match[1] ?? "" } : null;
+}
+
+/** The groups again, with only the variables whose reference holds the query. */
+export function matchVariables(
+	groups: readonly VariableGroup[],
+	query: string,
+): VariableGroup[] {
+	const needle = query.toLowerCase();
+	return groups
+		.map(({ scope, variables }) => ({
+			scope,
+			variables: variables.filter((variable) =>
+				variable.text.slice(2, -2).toLowerCase().includes(needle),
+			),
+		}))
+		.filter((group) => group.variables.length > 0);
+}
+
+/**
+ * Puts the variable in place of the open `{{` and the name after it, up to a
+ * `}}` that is already there. A JSON value leaves the cursor before the
+ * closing braces, ready for a path: `{{planner.data|}}`.
+ */
+export function completeTemplate(
+	text: string,
+	cursor: number,
+	open: OpenTemplate,
+	variable: TemplateVariable,
+): { text: string; cursor: number } {
+	const rest = /^[\w.-]*(?:\s*\}\})?/.exec(text.slice(cursor))?.[0] ?? "";
+	return {
+		text:
+			text.slice(0, open.start) +
+			variable.text +
+			text.slice(cursor + rest.length),
+		cursor: open.start + variable.text.length - (variable.json ? 2 : 0),
+	};
+}
+
 /**
  * Checks the draft with `checkDraft`, in the editor's words. `flows` holds
  * the project's flow files by name, so Call nodes can check the flows they

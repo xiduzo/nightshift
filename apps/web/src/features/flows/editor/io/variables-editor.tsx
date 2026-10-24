@@ -251,7 +251,6 @@ function VariableRow({
 				onChange={(value) => setOptional("initial", value)}
 				placeholder={variable.type === "json" ? "[]" : "Empty (optional)"}
 				multiline={false}
-				variablesOpen={false}
 			/>
 			{variable.type === "json" ? (
 				<OutputSchemaField

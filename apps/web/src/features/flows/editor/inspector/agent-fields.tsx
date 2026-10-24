@@ -443,7 +443,7 @@ export function AgentFields({
 							flow={flow}
 							nodeId={node.id}
 							value={node.prompt}
-							multiline={false}
+							className="min-h-16"
 							placeholder="{{item.id}}"
 							onChange={(prompt) =>
 								onChange((current) => ({ ...current, prompt }))

@@ -310,7 +310,6 @@ export function InputBindings({
 						value={value}
 						invalid={missing}
 						multiline={false}
-						variablesOpen={false}
 						placeholder={
 							input.default ?? (input.type === "json" ? "{{plan.data}}" : "")
 						}

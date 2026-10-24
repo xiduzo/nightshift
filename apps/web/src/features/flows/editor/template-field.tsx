@@ -5,13 +5,35 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@nightshift/ui/components/collapsible";
+import {
+	Command,
+	CommandGroup,
+	CommandItem,
+	CommandList,
+} from "@nightshift/ui/components/command";
 import { Input } from "@nightshift/ui/components/input";
+import { Popover, PopoverContent } from "@nightshift/ui/components/popover";
 import { Textarea } from "@nightshift/ui/components/textarea";
 import { cn } from "@nightshift/ui/lib/utils";
 import { BracesIcon, ChevronRightIcon } from "lucide-react";
-import { type ReactNode, useRef } from "react";
+import {
+	type KeyboardEvent,
+	type ReactNode,
+	type RefObject,
+	useEffect,
+	useId,
+	useRef,
+	useState,
+} from "react";
 
-import { type TemplateVariable, templateVariables } from "../flow-draft";
+import {
+	completeTemplate,
+	matchVariables,
+	openTemplate,
+	type TemplateVariable,
+	templateVariables,
+	type VariableGroup,
+} from "../flow-draft";
 
 import { Field, Note, Optional } from "./fields";
 import { useProjectFlowMap } from "./project-flows-context";
@@ -19,7 +41,8 @@ import { useProjectFlowMap } from "./project-flows-context";
 /**
  * A text field that takes `{{name.path}}` templates, with the variables it
  * can use below it: the flow's inputs, other nodes' outputs, and `run`.
- * Clicking one inserts it at the cursor. A JSON value (an Agent's `data`, a
+ * Clicking one inserts it at the cursor. Typing `{{` lists the variables that
+ * match what follows it, to pick with the arrow keys and Enter or Tab. A JSON value (an Agent's `data`, a
  * Call's `results`, a JSON input) leaves the cursor before the closing
  * braces, ready for a path: `{{planner.data.tasks}}`.
  */
@@ -35,7 +58,6 @@ export function TemplateField({
 	invalid,
 	className,
 	multiline = true,
-	variablesOpen = true,
 	scopes,
 	required,
 }: {
@@ -52,26 +74,44 @@ export function TemplateField({
 	className?: string;
 	/** False: a one-line input, for a binding or a list source. */
 	multiline?: boolean;
-	/** Whether the variable list starts open. */
-	variablesOpen?: boolean;
 	/** Only these groups of variables (`inputs`, `run`, …). Default: all. */
 	scopes?: readonly string[];
 	required?: boolean;
 }) {
 	const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
+	const flows = useProjectFlowMap();
+	const groups = templateVariables(flow, nodeId, flows).filter(
+		(group) => scopes === undefined || scopes.includes(group.scope),
+	);
+
+	const moveCursor = (field: HTMLTextAreaElement | null, cursor: number) => {
+		requestAnimationFrame(() => {
+			if (!field) return;
+			field.focus();
+			field.setSelectionRange(cursor, cursor);
+		});
+	};
 
 	const insert = (variable: TemplateVariable) => {
 		const field = ref.current;
 		const start = field?.selectionStart ?? value.length;
 		const end = field?.selectionEnd ?? value.length;
 		onChange(value.slice(0, start) + variable.text + value.slice(end));
-		requestAnimationFrame(() => {
-			if (!field) return;
-			field.focus();
-			// A JSON value: the cursor waits before `}}` for a `.path`.
-			const cursor = start + variable.text.length - (variable.json ? 2 : 0);
-			field.setSelectionRange(cursor, cursor);
-		});
+		// A JSON value: the cursor waits before `}}` for a `.path`.
+		moveCursor(field, start + variable.text.length - (variable.json ? 2 : 0));
+	};
+
+	const suggest = useTemplateSuggestions(value, groups);
+	const complete = (variable: TemplateVariable) => {
+		if (!suggest.open) return;
+		const next = completeTemplate(
+			value,
+			suggest.cursor,
+			suggest.open,
+			variable,
+		);
+		onChange(next.text);
+		moveCursor(ref.current, next.cursor);
 	};
 
 	const describedBy = hint ? `${id}-hint` : undefined;
@@ -105,7 +145,12 @@ export function TemplateField({
 						aria-invalid={invalid}
 						aria-required={required}
 						aria-describedby={describedBy}
-						onChange={(event) => onChange(event.target.value)}
+						{...suggest.fieldProps}
+						onChange={(event) => {
+							onChange(event.target.value);
+							suggest.track(event.target);
+						}}
+						onKeyDown={(event) => suggest.onKeyDown(event, complete)}
 					/>
 				) : (
 					<Input
@@ -114,49 +159,35 @@ export function TemplateField({
 						value={value}
 						placeholder={placeholder}
 						className={cn("font-mono text-xs", className)}
-						autoComplete="off"
 						spellCheck={false}
 						aria-invalid={invalid}
 						aria-required={required}
 						aria-describedby={describedBy}
-						onChange={(event) => onChange(event.target.value)}
+						{...suggest.fieldProps}
+						onChange={(event) => {
+							onChange(event.target.value);
+							suggest.track(event.target);
+						}}
+						onKeyDown={(event) => suggest.onKeyDown(event, complete)}
 					/>
 				)}
 			</Field>
-			<TemplateVariables
-				flow={flow}
-				nodeId={nodeId}
-				scopes={scopes}
-				open={variablesOpen}
-				onInsert={insert}
-			/>
+			<TemplateSuggestions anchor={ref} suggest={suggest} onPick={complete} />
+			<TemplateVariables groups={groups} onInsert={insert} />
 		</div>
 	);
 }
 
 /** The variables a field can use, grouped by name; a click inserts one. */
-export function TemplateVariables({
-	flow,
-	nodeId,
-	scopes,
-	open,
+function TemplateVariables({
+	groups,
 	onInsert,
 }: {
-	flow: Flow;
-	nodeId: string | null;
-	/** Only these groups. Default: all. */
-	scopes?: readonly string[];
-	/** Whether the list starts open. */
-	open: boolean;
+	groups: readonly VariableGroup[];
 	onInsert: (variable: TemplateVariable) => void;
 }) {
-	const flows = useProjectFlowMap();
-	const groups = templateVariables(flow, nodeId, flows).filter(
-		(group) => scopes === undefined || scopes.includes(group.scope),
-	);
-
 	return (
-		<Collapsible defaultOpen={open} className="rounded-lg border border-dashed">
+		<Collapsible className="rounded-lg border border-dashed">
 			<CollapsibleTrigger
 				render={
 					<Button
@@ -216,5 +247,158 @@ export function TemplateVariables({
 				</Note>
 			</CollapsibleContent>
 		</Collapsible>
+	);
+}
+
+type Suggestions = ReturnType<typeof useTemplateSuggestions>;
+
+/**
+ * The variables to offer while the cursor is in an open `{{`: what matches
+ * the name typed so far, and which one the arrow keys point at. Escape
+ * hides them until the next `{{`.
+ */
+function useTemplateSuggestions(
+	value: string,
+	groups: readonly VariableGroup[],
+) {
+	const listId = useId();
+	const [cursor, setCursor] = useState<number | null>(null);
+	const [dismissed, setDismissed] = useState<number | null>(null);
+	// The option the arrow keys point at, for the name it was picked for.
+	const [active, setActive] = useState({ query: "", index: 0 });
+
+	const open = cursor === null ? null : openTemplate(value, cursor);
+	const matches = open ? matchVariables(groups, open.query) : [];
+	const options = matches.flatMap((group) => group.variables);
+	const shown = open !== null && options.length > 0 && dismissed !== open.start;
+	// A new name typed: point at the first match again.
+	const query = open?.query ?? "";
+	const index = active.query === query ? active.index : 0;
+	const highlighted = options[Math.min(index, options.length - 1)];
+
+	const track = (field: HTMLTextAreaElement | HTMLInputElement) => {
+		setCursor(
+			field.selectionStart === field.selectionEnd ? field.selectionStart : null,
+		);
+	};
+
+	const onKeyDown = (
+		event: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>,
+		pick: (variable: TemplateVariable) => void,
+	) => {
+		if (!shown || !open) return;
+		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+			event.preventDefault();
+			const step = event.key === "ArrowDown" ? 1 : -1;
+			setActive({
+				query,
+				index:
+					(Math.min(index, options.length - 1) + step + options.length) %
+					options.length,
+			});
+		} else if ((event.key === "Enter" || event.key === "Tab") && highlighted) {
+			event.preventDefault();
+			pick(highlighted);
+		} else if (event.key === "Escape") {
+			event.preventDefault();
+			event.stopPropagation();
+			setDismissed(open.start);
+		}
+	};
+
+	return {
+		listId,
+		open: shown ? open : null,
+		cursor: cursor ?? value.length,
+		matches,
+		highlighted,
+		point: (text: string) =>
+			setActive({
+				query,
+				index: Math.max(
+					0,
+					options.findIndex((option) => option.text === text),
+				),
+			}),
+		dismiss: () => open && setDismissed(open.start),
+		track,
+		onKeyDown,
+		fieldProps: {
+			autoComplete: "off",
+			"aria-autocomplete": "list" as const,
+			"aria-controls": shown ? listId : undefined,
+			onSelect: (event: {
+				currentTarget: HTMLTextAreaElement | HTMLInputElement;
+			}) => track(event.currentTarget),
+			onBlur: () => setCursor(null),
+		},
+	};
+}
+
+/** The matching variables, in a list below the field. */
+function TemplateSuggestions({
+	anchor,
+	suggest,
+	onPick,
+}: {
+	anchor: RefObject<HTMLElement | null>;
+	suggest: Suggestions;
+	onPick: (variable: TemplateVariable) => void;
+}) {
+	const listRef = useRef<HTMLDivElement>(null);
+	const highlighted = suggest.highlighted?.text;
+	useEffect(() => {
+		if (!highlighted) return;
+		listRef.current
+			?.querySelector("[data-selected=true]")
+			?.scrollIntoView({ block: "nearest" });
+	}, [highlighted]);
+
+	return (
+		<Popover
+			open={suggest.open !== null}
+			onOpenChange={(open, details) => {
+				if (!open && details.reason === "escape-key") suggest.dismiss();
+			}}
+		>
+			<PopoverContent
+				anchor={anchor}
+				align="start"
+				initialFocus={false}
+				finalFocus={false}
+				// Keep the cursor in the field while you pick with the mouse.
+				onMouseDown={(event) => event.preventDefault()}
+				className="w-(--anchor-width) min-w-64 gap-0 p-0"
+			>
+				<Command
+					value={highlighted ?? ""}
+					onValueChange={suggest.point}
+					shouldFilter={false}
+					className="rounded-md!"
+				>
+					<CommandList id={suggest.listId} ref={listRef} className="max-h-60">
+						{suggest.matches.map(({ scope, variables }) => (
+							<CommandGroup key={scope} heading={scope}>
+								{variables.map((variable) => (
+									<CommandItem
+										key={variable.text}
+										value={variable.text}
+										onSelect={() => onPick(variable)}
+										className="font-mono text-xs"
+									>
+										<span className="truncate">{variable.text}</span>
+										{variable.description ? (
+											<span className="ml-auto max-w-[50%] truncate font-sans text-muted-foreground">
+												{variable.description}
+											</span>
+										) : null}
+									</CommandItem>
+								))}
+							</CommandGroup>
+						))}
+					</CommandList>
+				</Command>
+			</PopoverContent>
+		</Popover>
 	);
 }

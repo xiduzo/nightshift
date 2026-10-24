@@ -70,8 +70,7 @@ export function RunGraph({
 				data: {
 					node,
 					isStart: flow.start === node.id,
-					errorCount: 0,
-					warningCount: 0,
+					issues: [],
 					run: runStates.get(node.id) ?? null,
 				},
 			})),

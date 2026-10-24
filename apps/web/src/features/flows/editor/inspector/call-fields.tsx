@@ -355,7 +355,6 @@ function SourceFields({
 						value={source.command}
 						invalid={source.command.trim() === ""}
 						className="min-h-16"
-						variablesOpen={false}
 						placeholder="cat tasks.json"
 						onChange={(command) => onChange({ kind: "command", command })}
 					/>
@@ -381,7 +380,6 @@ function SourceFields({
 					value={source.glob}
 					invalid={source.glob.trim() === ""}
 					multiline={false}
-					variablesOpen={false}
 					placeholder="src/**/*.test.ts"
 					onChange={(glob) => onChange({ kind: "files", glob })}
 				/>

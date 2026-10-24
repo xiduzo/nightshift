@@ -18,11 +18,14 @@ function PopoverContent({
 	alignOffset = 0,
 	side = "bottom",
 	sideOffset = 4,
+	anchor,
 	...props
 }: PopoverPrimitive.Popup.Props &
+	// Night Shift: `anchor` passes through, as in ComboboxContent, so a popover
+	// can open beside a text field that is not its trigger.
 	Pick<
 		PopoverPrimitive.Positioner.Props,
-		"align" | "alignOffset" | "side" | "sideOffset"
+		"align" | "alignOffset" | "side" | "sideOffset" | "anchor"
 	>) {
 	return (
 		<PopoverPrimitive.Portal>
@@ -31,6 +34,7 @@ function PopoverContent({
 				alignOffset={alignOffset}
 				side={side}
 				sideOffset={sideOffset}
+				anchor={anchor}
 				className="isolate z-50"
 			>
 				<PopoverPrimitive.Popup

@@ -84,13 +84,13 @@ CLI when you need them.
 | ✓ [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog) | Confirm a destructive or irreversible step (stop a run, delete a flow). |
 | ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), the mobile sidebar. |
 | [Drawer](https://ui.shadcn.com/docs/components/drawer) | A bottom sheet for mobile (Vaul). |
-| ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form, the flow editor's issues. |
+| ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form, the flow editor's issues, the variables a template field offers after `{{`. |
 | ✓ [Tooltip](https://ui.shadcn.com/docs/components/tooltip) | A short label on hover or focus, mostly for icon buttons. Needs `TooltipProvider` (in the root). |
 | ✓ [Hover Card](https://ui.shadcn.com/docs/components/hover-card) | A preview on hover (a PR, an issue, a node). |
 | ✓ [Context Menu](https://ui.shadcn.com/docs/components/context-menu) | A right-click menu (canvas nodes). |
 | ✓ [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu) | Actions behind a button ("…" menus, user menu). |
 | [Menubar](https://ui.shadcn.com/docs/components/menubar) | A desktop-app menubar (File, Edit, View). |
-| ✓ [Command](https://ui.shadcn.com/docs/components/command) | A searchable list of commands; `CommandDialog` is a ⌘K palette. |
+| ✓ [Command](https://ui.shadcn.com/docs/components/command) | A searchable list of commands; `CommandDialog` is a ⌘K palette. The list of variables a template field offers after `{{`. |
 
 ### Feedback and status
 

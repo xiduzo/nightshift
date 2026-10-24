@@ -251,7 +251,6 @@ function CheckerFields({
 				flow={flow}
 				nodeId={node.id}
 				value={checker.prompt ?? ""}
-				variablesOpen={false}
 				placeholder="Pick pass only when the tests ran and passed."
 				onChange={(text) => {
 					const { prompt: _, ...rest } = checker;

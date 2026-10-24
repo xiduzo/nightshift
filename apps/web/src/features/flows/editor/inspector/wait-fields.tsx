@@ -91,7 +91,6 @@ export function WaitFields({
 					value={until.at}
 					placeholder="07:00"
 					multiline={false}
-					variablesOpen={false}
 					invalid={until.at.trim() === ""}
 					onChange={(at) => setUntil({ ...until, at })}
 				/>

@@ -107,7 +107,6 @@ export function OutputsEditor({
 									nodeId={null}
 									value={output.value}
 									multiline={false}
-									variablesOpen={false}
 									placeholder="{{review.data}}"
 									onChange={(value) =>
 										update(index, (current) => ({ ...current, value }))

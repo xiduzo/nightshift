@@ -237,7 +237,6 @@ function WriteRow({
 						onChange(({ expression: _, ...rest }) => ({ ...rest, value }))
 					}
 					multiline={false}
-					variablesOpen={false}
 				/>
 			) : (
 				<Field

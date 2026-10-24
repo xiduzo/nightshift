@@ -1,5 +1,6 @@
 import {
 	commandExits,
+	type FlowIssue,
 	type FlowNode,
 	type FlowNodeType,
 	nodeOutcomes,
@@ -8,6 +9,11 @@ import {
 	type WaitUntil,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
 import {
 	Handle,
@@ -58,8 +64,8 @@ export type NodeRunState = {
 export type FlowNodeData = {
 	node: FlowNode;
 	isStart: boolean;
-	errorCount: number;
-	warningCount: number;
+	/** The node's issues. The badge counts them and its tooltip lists them. */
+	issues: readonly FlowIssue[];
 	/** Run view only: the node's latest step, or null when the run never reached it. */
 	run?: NodeRunState | null;
 };
@@ -152,13 +158,79 @@ function overviewZoom(state: ReactFlowState): number | null {
 		: null;
 }
 
+/**
+ * The count of a node's errors, or of its warnings when it has none. Its
+ * tooltip lists every issue of the node, errors first.
+ */
+function IssueBadge({
+	errors,
+	warnings,
+}: {
+	errors: readonly FlowIssue[];
+	warnings: readonly FlowIssue[];
+}) {
+	const isError = errors.length > 0;
+	const count = isError ? errors.length : warnings.length;
+	const Icon = isError ? CircleAlertIcon : TriangleAlertIcon;
+	return (
+		<Tooltip>
+			<TooltipTrigger
+				render={
+					<Badge
+						variant={isError ? "destructive" : "outline"}
+						className={cn(
+							"h-4 gap-0.5 px-1.5 text-[10px] tabular-nums",
+							!isError &&
+								"border-status-waiting bg-status-waiting text-background",
+						)}
+					/>
+				}
+			>
+				<Icon aria-hidden="true" />
+				<span className="sr-only">{isError ? "Errors:" : "Warnings:"}</span>
+				{count}
+			</TooltipTrigger>
+			<TooltipContent side="top" className="max-w-72">
+				<ul className="flex flex-col gap-1">
+					{[...errors, ...warnings].map((issue, index) => {
+						const IssueIcon =
+							issue.severity === "error" ? CircleAlertIcon : TriangleAlertIcon;
+						return (
+							<li
+								// The same message can come twice.
+								key={`${issue.severity}:${issue.message}:${index}`}
+								className="flex items-start gap-1.5"
+							>
+								<IssueIcon
+									className={cn(
+										"mt-0.5 size-3 shrink-0",
+										issue.severity === "error"
+											? "text-destructive"
+											: "text-status-waiting",
+									)}
+									aria-hidden="true"
+								/>
+								<span>{issue.message}</span>
+							</li>
+						);
+					})}
+				</ul>
+			</TooltipContent>
+		</Tooltip>
+	);
+}
+
 const FlowNodeCard = memo(function FlowNodeCard({
 	id,
 	data,
 	selected,
 	isConnectable,
 }: NodeProps<FlowCanvasNode>) {
-	const { node, isStart, errorCount, warningCount, run } = data;
+	const { node, isStart, issues, run } = data;
+	const errors = issues.filter((issue) => issue.severity === "error");
+	const warnings = issues.filter((issue) => issue.severity === "warning");
+	const errorCount = errors.length;
+	const warningCount = warnings.length;
 	const meta = NODE_TYPE[node.type];
 	const Icon =
 		node.type === "decision"
@@ -264,26 +336,8 @@ const FlowNodeCard = memo(function FlowNodeCard({
 									sets {writes.length}
 								</Badge>
 							) : null}
-							{errorCount > 0 ? (
-								<Badge
-									variant="destructive"
-									className="h-4 gap-0.5 px-1.5 text-[10px] tabular-nums"
-									title={`${errorCount} ${errorCount === 1 ? "error" : "errors"}`}
-								>
-									<CircleAlertIcon aria-hidden="true" />
-									<span className="sr-only">Errors:</span>
-									{errorCount}
-								</Badge>
-							) : warningCount > 0 ? (
-								<Badge
-									variant="outline"
-									className="h-4 gap-0.5 border-status-waiting bg-status-waiting px-1.5 text-[10px] text-background tabular-nums"
-									title={`${warningCount} ${warningCount === 1 ? "warning" : "warnings"}`}
-								>
-									<TriangleAlertIcon aria-hidden="true" />
-									<span className="sr-only">Warnings:</span>
-									{warningCount}
-								</Badge>
+							{errorCount > 0 || warningCount > 0 ? (
+								<IssueBadge errors={errors} warnings={warnings} />
 							) : null}
 							{run ? (
 								<OutcomeBadge

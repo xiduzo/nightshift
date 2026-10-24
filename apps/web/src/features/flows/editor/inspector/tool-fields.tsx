@@ -326,7 +326,6 @@ function Arguments({
 								? "min-h-16"
 								: undefined
 						}
-						variablesOpen={false}
 						placeholder={PLACEHOLDER[property.type] ?? PLACEHOLDER.string}
 						onChange={(next) => set(property.name, next)}
 					/>
@@ -360,7 +359,6 @@ function Arguments({
 					nodeId={node.id}
 					value={node.arguments[name] ?? ""}
 					multiline={false}
-					variablesOpen={false}
 					placeholder={PLACEHOLDER.string}
 					onChange={(next) => set(name, next)}
 				/>

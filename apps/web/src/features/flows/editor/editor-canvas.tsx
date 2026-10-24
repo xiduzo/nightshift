@@ -1,4 +1,4 @@
-import type { Flow, FlowNodeType, Outcome } from "@nightshift/flows";
+import type { Flow, FlowIssue, FlowNodeType, Outcome } from "@nightshift/flows";
 import {
 	addEdge,
 	addNode,
@@ -55,6 +55,9 @@ type SelectionSetter = (
 
 /** Below the node a new one lands on, so repeated adds do not stack exactly. */
 const ADD_OFFSET = 32;
+
+/** One empty list for every node without issues, so its data stays the same. */
+const NO_ISSUES: FlowIssue[] = [];
 
 /**
  * Adds a node and selects it: where it was dropped (`at`, a point on the
@@ -180,14 +183,13 @@ export function EditorCanvas({
 	}, [initialized, fitView]);
 
 	const counts = useMemo(() => {
-		const byNode = new Map<string, { errors: number; warnings: number }>();
+		const byNode = new Map<string, FlowIssue[]>();
 		const edgeErrors = new Set<string>();
 		for (const issue of check.issues) {
 			if (issue.nodeId) {
-				const count = byNode.get(issue.nodeId) ?? { errors: 0, warnings: 0 };
-				if (issue.severity === "error") count.errors += 1;
-				else count.warnings += 1;
-				byNode.set(issue.nodeId, count);
+				const issues = byNode.get(issue.nodeId) ?? [];
+				issues.push(issue);
+				byNode.set(issue.nodeId, issues);
 			}
 			if (issue.edgeId && issue.severity === "error")
 				edgeErrors.add(issue.edgeId);
@@ -198,7 +200,6 @@ export function EditorCanvas({
 	const nodes = useMemo<FlowCanvasNode[]>(
 		() =>
 			flow.nodes.map((node) => {
-				const count = counts.byNode.get(node.id);
 				return {
 					id: node.id,
 					type: node.type,
@@ -208,8 +209,7 @@ export function EditorCanvas({
 					data: {
 						node,
 						isStart: flow.start === node.id,
-						errorCount: count?.errors ?? 0,
-						warningCount: count?.warnings ?? 0,
+						issues: counts.byNode.get(node.id) ?? NO_ISSUES,
 					},
 				};
 			}),

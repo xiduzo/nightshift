@@ -80,7 +80,7 @@ export function NodeDock({
 									onDragEnd={() => onDragChange(null)}
 									onClick={() => onAdd(type)}
 									className={DOCK_ITEM}
-									aria-label={`Add a ${label} node`}
+									aria-label={label}
 								/>
 							}
 						>
@@ -89,9 +89,7 @@ export function NodeDock({
 						<TooltipContent side="right" className="max-w-60">
 							<span className="flex flex-col gap-0.5">
 								<span className="font-medium">{label}</span>
-								<span className="opacity-80">
-									{blurb} Drag it onto the canvas, or click to add it.
-								</span>
+								<span className="opacity-80">{blurb}</span>
 							</span>
 						</TooltipContent>
 					</Tooltip>
