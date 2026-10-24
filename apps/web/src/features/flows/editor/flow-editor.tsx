@@ -1,4 +1,4 @@
-import type { Flow, FlowIssue } from "@nightshift/flows";
+import type { Flow, FlowIssue, FlowNodeType } from "@nightshift/flows";
 import {
 	callersOf,
 	isSavable,
@@ -11,13 +11,6 @@ import {
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
-import { Card } from "@nightshift/ui/components/card";
-import {
-	ResizableHandle,
-	ResizablePanel,
-	ResizablePanelGroup,
-} from "@nightshift/ui/components/resizable";
-import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
@@ -25,19 +18,21 @@ import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { CheckIcon, CircleDotIcon, PlayIcon, SaveIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useMediaQuery } from "@/shared/media-query";
 import { SiteHeader } from "@/shared/page";
+import { NODE_TYPE } from "../canvas/node-type";
 import { OpenFlowContext } from "../canvas/open-flow-context";
 import { checkFlow } from "../flow-draft";
 import { flowMutations, flowQueries } from "../queries";
 import { StartRunDialog } from "../start/start-run-dialog";
 import { EdgeInspector } from "./edge-inspector";
-import { EditorCanvas, NodePalette, type Selection } from "./editor-canvas";
+import { EditorCanvas, type Selection, useAddNode } from "./editor-canvas";
+import { FloatingInspector } from "./floating-inspector";
 import { FlowInspector } from "./flow-inspector";
-import { FlowSignature } from "./flow-signature";
+import { FlowTitleCard } from "./flow-title-card";
 import { NodeInspector } from "./inspector/node-inspector";
-import { IssuesPanel } from "./issues-panel";
+import { IssuesPopover } from "./issues-popover";
 import { LeaveDialog } from "./leave-dialog";
+import { NodeDock } from "./node-dock";
 import { nodeEdits } from "./node-edits";
 import { ProjectFlowsContext } from "./project-flows-context";
 import { useEditorData } from "./use-editor-data";
@@ -96,7 +91,10 @@ function Editor({
 	);
 	const [starting, setStarting] = useState(false);
 	const savable = useMemo(() => isSavable(draft), [draft]);
-	const wide = useMediaQuery("(min-width: 1024px)", true);
+	// The flow's settings show in the inspector while nothing is selected.
+	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [dragging, setDragging] = useState<FlowNodeType | null>(null);
+	const addNode = useAddNode(draft, setDraft, setSelection, nodeDefaults);
 	const errorCount = check.issues.filter(
 		(issue) => issue.severity === "error",
 	).length;
@@ -322,14 +320,38 @@ function Editor({
 				setSelection(null);
 			}}
 		/>
-	) : (
+	) : settingsOpen ? (
 		<FlowInspector
 			flow={draft}
 			name={name}
 			policyDefaults={policyDefaults}
 			onChange={changeFlow}
 		/>
-	);
+	) : null;
+
+	const closeInspector = useCallback(() => {
+		setSelection(null);
+		setSettingsOpen(false);
+	}, []);
+	const inspectorOpen = inspector !== null;
+	// Escape closes the inspector, but not while you type in a field or a
+	// menu, a list or a dialog has the focus: Escape closes those first.
+	useEffect(() => {
+		if (!inspectorOpen || starting) return;
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key !== "Escape" || event.defaultPrevented) return;
+			const target = event.target as HTMLElement | null;
+			if (
+				target?.closest(
+					"input, textarea, select, [contenteditable='true'], [role='dialog'], [role='alertdialog'], [role='menu'], [role='listbox'], [data-slot$='-content']",
+				)
+			)
+				return;
+			closeInspector();
+		};
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [inspectorOpen, starting, closeInspector]);
 
 	return (
 		<>
@@ -396,69 +418,63 @@ function Editor({
 			</SiteHeader>
 
 			<ProjectFlowsContext.Provider value={projectFlows.flows}>
-				<div className="flex h-[calc(100svh-3.5rem)] min-h-0 flex-col">
-					<ResizablePanelGroup
-						key={wide ? "wide" : "narrow"}
-						orientation={wide ? "horizontal" : "vertical"}
-						className="min-h-0 flex-1"
-					>
-						<ResizablePanel
-							id="canvas"
-							defaultSize={wide ? "70%" : "58%"}
-							minSize={wide ? "35%" : 200}
-							className="flex min-h-0 min-w-0 flex-col gap-3 p-3 pb-1.5 lg:p-4 lg:pr-2"
-						>
-							<div className="@container flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-								<NodePalette
-									flow={draft}
-									onFlowChange={changeFlow}
-									onSelect={setSelection}
-									defaults={nodeDefaults}
-								/>
-								<FlowSignature
-									projectId={projectId}
-									inputs={draft.inputs}
-									variables={draft.variables ?? []}
-									callers={callers}
-								/>
-							</div>
-							<div className="min-h-0 flex-1">
-								<OpenFlowContext.Provider value={openFlow}>
-									<EditorCanvas
-										flow={draft}
-										check={check}
-										selection={selection}
-										onFlowChange={changeFlow}
-										onSelect={setSelection}
-									/>
-								</OpenFlowContext.Provider>
-							</div>
-							<IssuesPanel
+				<div className="relative h-[calc(100svh-3.5rem)] min-h-0">
+					<div className="absolute inset-0">
+						<OpenFlowContext.Provider value={openFlow}>
+							<EditorCanvas
+								flow={draft}
 								check={check}
-								onSelect={selectIssue}
-								defaultOpen={wide}
+								selection={selection}
+								onFlowChange={changeFlow}
+								onSelect={setSelection}
+								onDropNode={addNode}
 							/>
-						</ResizablePanel>
-						<ResizableHandle
-							withHandle
-							className="bg-transparent focus-visible:bg-ring"
+						</OpenFlowContext.Provider>
+					</div>
+
+					{/* The panels float over the canvas; the gaps between them pass
+					    clicks and drops through to it. */}
+					<div className="pointer-events-none absolute inset-0">
+						<FlowTitleCard
+							projectId={projectId}
+							name={name}
+							flow={draft}
+							callers={callers}
+							settingsOpen={settingsOpen && selection === null}
+							onToggleSettings={() => {
+								// With a node selected, the button shows the settings.
+								setSettingsOpen((open) => selection !== null || !open);
+								setSelection(null);
+							}}
+							className="pointer-events-auto absolute top-3 left-3 w-[min(24rem,calc(100%-1.5rem))]"
 						/>
-						<ResizablePanel
-							id="inspector"
-							defaultSize={wide ? "30%" : "42%"}
-							minSize={wide ? 320 : 160}
-							maxSize={wide ? "55%" : undefined}
-							className="min-h-0 min-w-0 p-3 pt-1.5 lg:p-4 lg:pl-2"
-						>
-							<aside aria-label="Inspector" className="h-full">
-								<Card className="h-full gap-0 py-0">
-									<ScrollArea className="h-full min-h-0">
-										<div key={selectionKey(selection)}>{inspector}</div>
-									</ScrollArea>
-								</Card>
-							</aside>
-						</ResizablePanel>
-					</ResizablePanelGroup>
+						<NodeDock
+							onAdd={(type) => addNode(type)}
+							onDragChange={setDragging}
+							className="pointer-events-auto absolute top-1/2 left-3 -translate-y-1/2"
+						/>
+						<IssuesPopover
+							check={check}
+							onSelect={selectIssue}
+							className="pointer-events-auto absolute right-3 bottom-3 lg:top-3 lg:right-auto lg:bottom-auto lg:left-1/2 lg:-translate-x-1/2"
+						/>
+						{dragging ? (
+							<div className="absolute inset-3 flex items-end justify-center rounded-xl border-2 border-primary/40 border-dashed pb-20">
+								<span className="rounded-full bg-background px-3 py-1 text-muted-foreground text-xs shadow-sm">
+									Drop to add the {NODE_TYPE[dragging].label} node here
+								</span>
+							</div>
+						) : null}
+						{inspector ? (
+							<FloatingInspector
+								label={selection ? "Selected" : "Flow settings"}
+								onClose={closeInspector}
+								className="pointer-events-auto absolute top-3 right-3 bottom-3 w-[min(400px,calc(100%-1.5rem))]"
+							>
+								<div key={selectionKey(selection)}>{inspector}</div>
+							</FloatingInspector>
+						) : null}
+					</div>
 				</div>
 			</ProjectFlowsContext.Provider>
 

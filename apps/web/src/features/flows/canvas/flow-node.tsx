@@ -203,7 +203,13 @@ const FlowNodeCard = memo(function FlowNodeCard({
 			className={cn(
 				"relative w-64 rounded-lg border bg-card text-card-foreground text-xs shadow-xs transition-[box-shadow,opacity,border-color] motion-reduce:transition-none",
 				selected && "ring-2 ring-ring",
-				errorCount > 0 && "border-destructive",
+				// A node with issues tints its card and gets a band on top, so it
+				// stands out even zoomed out. Warnings are dashed amber.
+				errorCount > 0 &&
+					"border-destructive bg-[color-mix(in_oklch,var(--destructive)_6%,var(--card))]",
+				errorCount === 0 &&
+					warningCount > 0 &&
+					"border-status-waiting border-dashed bg-[color-mix(in_oklch,var(--status-waiting)_7%,var(--card))]",
 				active &&
 					"shadow-[0_0_0_1px_var(--status-running),0_0_18px_0_color-mix(in_oklch,var(--status-running)_35%,transparent)]",
 				waiting &&
@@ -221,6 +227,15 @@ const FlowNodeCard = memo(function FlowNodeCard({
 				className="size-2.5! min-h-0! min-w-0! border-2! border-card! bg-muted-foreground!"
 				style={{ top: 20 }}
 			/>
+			{errorCount > 0 || warningCount > 0 ? (
+				<span
+					aria-hidden="true"
+					className={cn(
+						"pointer-events-none absolute -inset-x-px -top-px h-1 rounded-t-lg",
+						errorCount > 0 ? "bg-destructive" : "bg-status-waiting",
+					)}
+				/>
+			) : null}
 			{/* Kept in the overview, only hidden: the node keeps its size, so
 			    the layout and the edges stay where they are. */}
 			<div className={cn(overview && "invisible")}>
@@ -262,7 +277,7 @@ const FlowNodeCard = memo(function FlowNodeCard({
 							) : warningCount > 0 ? (
 								<Badge
 									variant="outline"
-									className="h-4 gap-0.5 border-status-waiting/40 bg-status-waiting/10 px-1.5 text-[10px] text-status-waiting tabular-nums"
+									className="h-4 gap-0.5 border-status-waiting bg-status-waiting px-1.5 text-[10px] text-background tabular-nums"
 									title={`${warningCount} ${warningCount === 1 ? "warning" : "warnings"}`}
 								>
 									<TriangleAlertIcon aria-hidden="true" />

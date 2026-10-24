@@ -71,13 +71,9 @@ export function FlowPage({
 		return (
 			<>
 				<SiteHeader crumbs={crumbs} />
-				<div className="flex h-[calc(100svh-3.5rem)] min-h-0 flex-col gap-3 p-3 lg:flex-row lg:p-4">
-					<div className="flex min-h-0 flex-1 flex-col gap-3">
-						<Skeleton className="h-8 w-full max-w-md" />
-						<Skeleton className="min-h-0 flex-1 rounded-xl" />
-						<Skeleton className="h-11 w-full rounded-xl" />
-					</div>
-					<Skeleton className="h-64 rounded-xl lg:h-full lg:w-[30%]" />
+				<div className="relative h-[calc(100svh-3.5rem)] min-h-0 bg-muted/40 dark:bg-muted/20">
+					<Skeleton className="absolute top-3 left-3 h-24 w-[min(24rem,calc(100%-1.5rem))] rounded-xl" />
+					<Skeleton className="absolute top-1/2 left-3 h-80 w-[58px] -translate-y-1/2 rounded-2xl" />
 				</div>
 			</>
 		);

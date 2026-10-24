@@ -74,7 +74,7 @@ CLI when you need them.
 | ✓ [Tabs](https://ui.shadcn.com/docs/components/tabs) | Switch between views of one thing (a schedule's Time and days / Cron line). `variant="line"` for underline tabs. |
 | ✓ [Separator](https://ui.shadcn.com/docs/components/separator) | A thin rule between sections or toolbar items. |
 | ✓ [Scroll Area](https://ui.shadcn.com/docs/components/scroll-area) | A scroll region with styled scrollbars (transcripts, long lists in a fixed height). |
-| ✓ [Resizable](https://ui.shadcn.com/docs/components/resizable) | Panels with a drag handle between them (canvas beside an inspector). On a run: steps beside the flow, and the step console below, a `collapsible` panel whose collapsed size is its one-line bar. |
+| ✓ [Resizable](https://ui.shadcn.com/docs/components/resizable) | Panels with a drag handle between them. On a run: steps beside the flow, and the step console below, a `collapsible` panel whose collapsed size is its one-line bar. |
 
 ### Overlays and dialogs
 
@@ -84,7 +84,7 @@ CLI when you need them.
 | ✓ [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog) | Confirm a destructive or irreversible step (stop a run, delete a flow). |
 | ✓ [Sheet](https://ui.shadcn.com/docs/components/sheet) | A panel that slides in from an edge: details beside a list, a run's facts (branch, worktree, times), the mobile sidebar. |
 | [Drawer](https://ui.shadcn.com/docs/components/drawer) | A bottom sheet for mobile (Vaul). |
-| ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form. |
+| ✓ [Popover](https://ui.shadcn.com/docs/components/popover) | Small floating content on click: a picker, a short form, the flow editor's issues. |
 | ✓ [Tooltip](https://ui.shadcn.com/docs/components/tooltip) | A short label on hover or focus, mostly for icon buttons. Needs `TooltipProvider` (in the root). |
 | ✓ [Hover Card](https://ui.shadcn.com/docs/components/hover-card) | A preview on hover (a PR, an issue, a node). |
 | ✓ [Context Menu](https://ui.shadcn.com/docs/components/context-menu) | A right-click menu (canvas nodes). |
@@ -109,7 +109,7 @@ CLI when you need them.
 | Component | What it is for |
 | --- | --- |
 | ✓ [Avatar](https://ui.shadcn.com/docs/components/avatar) | A person or harness picture with fallback initials. |
-| ✓ [Card](https://ui.shadcn.com/docs/components/card) | A bordered group of content: `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`. Stat tiles, gate cards, flow cards. |
+| ✓ [Card](https://ui.shadcn.com/docs/components/card) | A bordered group of content: `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`. Stat tiles, gate cards, flow cards. The flow editor's floating panels: the flow's title card and the inspector, over a canvas that fills the page. |
 | ✓ [Table](https://ui.shadcn.com/docs/components/table) | Rows and columns of data (runs, schedules, events). |
 | [Data Table](https://ui.shadcn.com/docs/components/data-table) | A Table with TanStack Table: sorting, filters, pagination, row selection. A guide, not a component. |
 | ✓ [Chart](https://ui.shadcn.com/docs/components/chart) | Recharts with theme colors, `ChartTooltip` and `ChartLegend`. The run-status donut (sidebar, Run outcomes), a sparkline in every stat card, and the history chart in each card's details dialog. Recharts keeps a 5px margin by default; set `margin` to zero on tiny charts. A chart whose values are all zero draws no bars; give it a hidden `YAxis` with a domain of at least 1. |
@@ -123,7 +123,7 @@ CLI when you need them.
 
 | Component | What it is for |
 | --- | --- |
-| ✓ [Collapsible](https://ui.shadcn.com/docs/components/collapsible) | One section that opens and closes (a tool call's input, raw JSON, the flow editor's issues, a run's status under its flow). |
+| ✓ [Collapsible](https://ui.shadcn.com/docs/components/collapsible) | One section that opens and closes (a tool call's input, raw JSON, a run's status under its flow). |
 | ✓ [Toggle](https://ui.shadcn.com/docs/components/toggle) | A button that stays pressed (show/hide a panel). |
 | ✓ [Toggle Group](https://ui.shadcn.com/docs/components/toggle-group) | A set of toggles where one or many are on: a segmented control (Canvas / JSON, transcript levels, a Command node's output Text / JSON). |
 | ✓ [Pagination](https://ui.shadcn.com/docs/components/pagination) | Page links under a long list. `DataTable` shows them when it gets a `pageSize`: Recent runs on Home (5 a page), a project's runs page (15 a page). |
@@ -199,6 +199,7 @@ files into the app; then adapt the copy. Browse them at
 | Long content in a fixed box | Scroll Area |
 
 Custom components are for what shadcn does not cover. In Night Shift that is
-the flow canvas (React Flow nodes and edges) and domain wrappers that compose
-shadcn pieces, such as a run-status badge. Build them from shadcn components
+the flow canvas (React Flow nodes and edges, and the node dock of shadcn
+Buttons over it) and domain wrappers that compose shadcn pieces, such as a
+run-status badge. Build them from shadcn components
 and theme tokens, never with a parallel set of styles.
