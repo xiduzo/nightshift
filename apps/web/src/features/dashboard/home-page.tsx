@@ -14,8 +14,8 @@ import { useDashboard } from "./use-dashboard";
  */
 export function HomePage() {
 	const projects = useQuery(projectQueries.list());
-	// The project list shows how each project's runs stand.
-	const runs = useQuery(runQueries.everyRun());
+	// Recent runs and the project list, which shows how each project's runs stand.
+	const runs = useQuery(runQueries.everyRunLive());
 	const summary = useDashboard();
 
 	return (
@@ -29,16 +29,14 @@ export function HomePage() {
 
 				<SectionCards summary={summary.data} isLoading={summary.isLoading} />
 
-				<PageSection
-					title="Recent runs"
-					description={`The last ${OVERVIEW_ROWS} runs over all projects, newest first.`}
-				>
+				<PageSection title="Recent runs">
 					<Card className="py-0">
 						<CardContent className="px-0">
 							<RunList
-								runs={summary.data?.recent}
+								runs={runs.data}
 								projects={projects.data}
-								isLoading={summary.isLoading}
+								isLoading={runs.isLoading}
+								pageSize={OVERVIEW_ROWS}
 								emptyDescription="Open a project and start a run. It shows up here."
 							/>
 						</CardContent>

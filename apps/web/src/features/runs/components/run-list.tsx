@@ -25,7 +25,7 @@ import { RunStatusBadge } from "./run-status-badge";
 /**
  * Runs as a table, newest first: status, title (a link to the run), project,
  * flow, branch, cost and start. Cost and start sort. Narrow screens keep
- * status, title and cost.
+ * status, title and cost. With `pageSize`, the runs show in pages.
  */
 export function RunList({
 	runs,
@@ -33,6 +33,7 @@ export function RunList({
 	isLoading,
 	emptyDescription,
 	emptyAction,
+	pageSize,
 }: {
 	runs: RunSummary[] | undefined;
 	/** Pass to show the project of each run. */
@@ -41,6 +42,8 @@ export function RunList({
 	emptyDescription: string;
 	/** A next step for the empty state, such as a button. */
 	emptyAction?: ReactNode;
+	/** Runs per page. Without it, every run shows. */
+	pageSize?: number;
 }) {
 	if (isLoading) {
 		return (
@@ -78,6 +81,7 @@ export function RunList({
 			getRowId={(run) => run.id}
 			initialSorting={[{ id: "started", desc: true }]}
 			rowClassName={() => "relative"}
+			pageSize={pageSize}
 		/>
 	);
 }

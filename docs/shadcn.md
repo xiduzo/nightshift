@@ -126,7 +126,7 @@ CLI when you need them.
 | ✓ [Collapsible](https://ui.shadcn.com/docs/components/collapsible) | One section that opens and closes (a tool call's input, raw JSON, the flow editor's issues, a run's status under its flow). |
 | ✓ [Toggle](https://ui.shadcn.com/docs/components/toggle) | A button that stays pressed (show/hide a panel). |
 | ✓ [Toggle Group](https://ui.shadcn.com/docs/components/toggle-group) | A set of toggles where one or many are on: a segmented control (Canvas / JSON, transcript levels, a Command node's output Text / JSON). |
-| [Pagination](https://ui.shadcn.com/docs/components/pagination) | Page links under a long list. |
+| ✓ [Pagination](https://ui.shadcn.com/docs/components/pagination) | Page links under a long list. `DataTable` shows them when it gets a `pageSize`: Recent runs on Home (5 a page), a project's runs page (15 a page). |
 | [Direction](https://ui.shadcn.com/docs/components/direction) | Right-to-left support. |
 
 ### AI and chat (newer registry items)

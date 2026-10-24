@@ -12,6 +12,9 @@ import { useProjectRuns } from "../hooks/use-project-runs";
 import { QuickRunDialog } from "./new-run-form";
 import { RunList } from "./run-list";
 
+/** The runs one page of the list shows. */
+const RUNS_PER_PAGE = 15;
+
 export function ProjectRunsPage({ projectId }: { projectId: string }) {
 	const runs = useProjectRuns(projectId);
 	const gates = useOpenGates();
@@ -80,6 +83,7 @@ export function ProjectRunsPage({ projectId }: { projectId: string }) {
 							<RunList
 								runs={runs.data}
 								isLoading={runs.isLoading}
+								pageSize={RUNS_PER_PAGE}
 								emptyDescription="Start a quick run, or run a flow from Flows. Your runs show up here."
 								emptyAction={
 									<Button onClick={() => setQuickRun(true)}>

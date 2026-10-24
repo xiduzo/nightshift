@@ -71,6 +71,7 @@ An overview shows **at most 5 rows** in a list or table. This covers the section
 - Show the top 5 for the list's question: newest first, the most runs, the highest cost. Say which in the hint ("The last 5, newest first", "The top 5, the most runs first").
 - The full list is one link away: a section action ("Flows", "All runs") or the dialog footer. Under a cut list in a dialog, `MoreRows` says how many rows it leaves out.
 - Pages whose job is the full list (the runs page, the inbox, the flows page) do not use this limit.
+- Recent runs on Home pages through every run, 5 to a page, instead of a cut list. It needs no hint and no "All runs" link. A project's runs page shows 15 runs to a page.
 
 ### Details dialogs
 
