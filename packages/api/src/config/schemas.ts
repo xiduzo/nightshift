@@ -11,6 +11,7 @@ import type {
 import {
 	type CliTool,
 	type Connection,
+	cliToolGitSchema,
 	type FlowRef,
 	type ProfileView,
 	type SecretSource,
@@ -25,6 +26,7 @@ import {
 	type CustomAgent,
 	customAgentSchema,
 	deciderNameSchema,
+	loginSchema,
 	mcpServerSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
@@ -182,7 +184,10 @@ export const mcpToolsSchema = z.object({
 export const cliToolSchema = exact<CliTool>()(
 	z.object({
 		name: z.string(),
+		program: z.string().nullable(),
 		description: z.string().nullable(),
+		login: loginSchema.nullable(),
+		git: cliToolGitSchema.nullable(),
 		updatedAt: z.number(),
 	}),
 );

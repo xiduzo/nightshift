@@ -1,7 +1,12 @@
 /** This computer's configuration in its Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. */
 
-export type { CliTool, CliToolGuide, CliToolStore } from "./cli-tools";
+export type {
+	CliTool,
+	CliToolGuide,
+	CliToolStore,
+} from "./cli-tools";
 export {
+	cliToolGitSchema,
 	cliToolInputSchema,
 	cliToolsInstruction,
 	createCliToolStore,

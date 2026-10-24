@@ -3250,6 +3250,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "jsonSourceSchema": "a3a5fddca4b7a01134d1e5ae0b6af454545831c5d63dd9272c4506e020eb8b1a",
   "labelSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
   "listSourceSchema": "08e4d5396923d469929e91f604743e2b4ba8976aa0e96f901f10a2a47d3015f1",
+  "loginSchema": "23ccb4d365d96d062435a2ef12ff312587d07237ee383dfa9c7330e9db6ad64d",
   "mcpServerSchema": "a26196da9adb9b7777c1554b9c04c2be3e49961c1dc5b9a2b94ed1d9b1253727",
   "nameSchema": "82cd45042469c87788418eea427bbaeb9f7aef07c90da2027149303eeab2f03c",
   "nodeIdSchema": "82cd45042469c87788418eea427bbaeb9f7aef07c90da2027149303eeab2f03c",

@@ -48,6 +48,91 @@ describe("createCliToolStore", () => {
 		expect([...third.names()]).toEqual(["gh"]);
 	});
 
+	test("keeps a tool's program, login and git host", async () => {
+		const store = createCliToolStore({
+			document: await sandbox.openDocument(),
+		});
+		await store.save({
+			name: "gh-work",
+			program: "gh",
+			login: { env: { GH_TOKEN: "${GH_WORK_TOKEN}" } },
+			git: { host: "GitHub.com" },
+		});
+		await store.save({
+			name: "acli-dimpact",
+			program: "acli",
+			login: {
+				folder: "HOME",
+				signIn: {
+					command: "acli jira auth login --token",
+					input: "${DIMPACT_TOKEN}",
+				},
+			},
+		});
+		const again = createCliToolStore({
+			document: await sandbox.openDocument(),
+		});
+		expect(again.get("gh-work")).toMatchObject({
+			program: "gh",
+			login: { env: { GH_TOKEN: "${GH_WORK_TOKEN}" } },
+			git: { host: "github.com", helper: "auth git-credential" },
+		});
+		expect(again.get("acli-dimpact")?.login).toEqual({
+			env: {},
+			folder: "HOME",
+			signIn: {
+				command: "acli jira auth login --token",
+				input: "${DIMPACT_TOKEN}",
+			},
+		});
+	});
+
+	test("a program of the same name and an empty login are none", async () => {
+		const store = createCliToolStore({
+			document: await sandbox.openDocument(),
+		});
+		const saved = await store.save({
+			name: "gh",
+			program: "gh",
+			login: { env: {} },
+		});
+		expect(saved).toMatchObject({ program: null, login: null, git: null });
+	});
+
+	test("a sign-in needs a folder of its own", async () => {
+		const store = createCliToolStore({
+			document: await sandbox.openDocument(),
+		});
+		await expect(
+			store.save({
+				name: "acli",
+				login: { signIn: { command: "acli jira auth login" } },
+			}),
+		).rejects.toThrow(/folder of its own/);
+	});
+
+	test("an older entry, or a login this version cannot read, runs without one", async () => {
+		const document = await sandbox.openDocument();
+		await document.change(() => {
+			document.cliTools.set("aws", { description: null, updatedAt: 1 });
+			document.cliTools.set("gh", {
+				description: "GitHub",
+				login: { env: { "not a name": "x" } },
+				updatedAt: 2,
+			});
+		});
+		const store = createCliToolStore({ document });
+		expect(store.get("aws")).toMatchObject({
+			program: null,
+			login: null,
+			git: null,
+		});
+		expect(store.get("gh")).toMatchObject({
+			description: "GitHub",
+			login: null,
+		});
+	});
+
 	test("a name that is not a program name is refused", async () => {
 		const store = createCliToolStore({
 			document: await sandbox.openDocument(),
@@ -92,6 +177,25 @@ describe("cliToolsInstruction", () => {
 			"### gh\n\nGitHub\n\n`gh --help`:\n\n```text\nUsage: gh <command>\n```\n\n### jq",
 		);
 		expect(text).toEndWith("### jq");
+	});
+
+	test("a tool that runs another program says so, and whether it has its own login", () => {
+		const text = cliToolsInstruction([
+			{
+				name: "gh-work",
+				program: "gh",
+				login: true,
+				description: "GitHub as work-org.",
+				help: null,
+			},
+			{ name: "g", program: "git", description: null, help: null },
+		]);
+		expect(text).toContain(
+			"### gh-work\n\nGitHub as work-org.\n\n`gh-work` runs `gh` with its own login. Type `gh-work` where you would type `gh`.",
+		);
+		expect(text).toContain(
+			"### g\n\n`g` runs `git`. Type `g` where you would type `git`.",
+		);
 	});
 
 	test("help with a code fence of its own gets a longer fence", () => {
