@@ -1,9 +1,3 @@
-import { Button } from "@nightshift/ui/components/button";
-import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from "@nightshift/ui/components/collapsible";
 import {
 	FieldDescription,
 	FieldError,
@@ -11,18 +5,9 @@ import {
 	Field as ShadcnField,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemMedia,
-	ItemTitle,
-} from "@nightshift/ui/components/item";
-import { Separator } from "@nightshift/ui/components/separator";
 import { cn } from "@nightshift/ui/lib/utils";
-import { ChevronRightIcon, type LucideIcon } from "lucide-react";
-import { type ReactNode, useEffect, useId, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
+import { PanelSection } from "@/shared/panel";
 
 /** The muted "(optional)" after a label. */
 export function Optional({ children = "optional" }: { children?: ReactNode }) {
@@ -100,59 +85,6 @@ export function Note({
 }
 
 /**
- * The top of the inspector: what is selected, as a shadcn Item with the
- * type's icon, a small kicker, the id in mono, and the actions on it.
- */
-export function InspectorHeader({
-	icon: Icon,
-	kicker,
-	title,
-	badges,
-	actions,
-	className,
-}: {
-	icon: LucideIcon;
-	kicker: ReactNode;
-	title: ReactNode;
-	badges?: ReactNode;
-	actions?: ReactNode;
-	className?: string;
-}) {
-	return (
-		<Item
-			size="sm"
-			className={cn("flex-nowrap rounded-none border-0 p-4", className)}
-		>
-			<ItemMedia
-				variant="icon"
-				className="size-9 rounded-lg border bg-muted text-muted-foreground"
-			>
-				<Icon aria-hidden="true" />
-			</ItemMedia>
-			<ItemContent className="min-w-0 gap-0.5">
-				<ItemDescription className="flex items-center gap-1.5 text-xs uppercase tracking-wider">
-					{kicker}
-					{badges}
-				</ItemDescription>
-				<ItemTitle className="block w-full truncate font-mono">
-					<h2 className="truncate">{title}</h2>
-				</ItemTitle>
-			</ItemContent>
-			{actions ? <ItemActions className="gap-1">{actions}</ItemActions> : null}
-		</Item>
-	);
-}
-
-/** The small uppercase heading of an inspector section. */
-function SectionTitle({ children }: { children: ReactNode }) {
-	return (
-		<span className="flex-1 text-left font-medium text-muted-foreground text-xs uppercase tracking-wider">
-			{children}
-		</span>
-	);
-}
-
-/**
  * One section of the inspector: a separator, a small uppercase heading, and
  * the fields. Every section folds from its heading.
  */
@@ -173,45 +105,13 @@ export function InspectorSection({
 	children: ReactNode;
 	className?: string;
 }) {
-	const id = useId();
-	const [open, setOpen] = useState(defaultOpen);
-	const body = (
-		<div className={cn("flex flex-col gap-5", className)}>
-			{description ? <Note>{description}</Note> : null}
-			{children}
-		</div>
-	);
-
 	return (
-		<>
-			<Separator />
-			<Collapsible
-				open={open}
-				onOpenChange={setOpen}
-				render={<section aria-labelledby={id} />}
-			>
-				<h3 id={id}>
-					<CollapsibleTrigger
-						render={
-							<Button
-								variant="ghost"
-								className="group/section h-12 w-full justify-start gap-2 rounded-none px-4"
-							/>
-						}
-					>
-						<ChevronRightIcon
-							className="size-3.5 text-muted-foreground transition-transform group-data-panel-open/section:rotate-90 motion-reduce:transition-none"
-							aria-hidden="true"
-						/>
-						<SectionTitle>{title}</SectionTitle>
-						{aside}
-					</CollapsibleTrigger>
-				</h3>
-				<CollapsibleContent className="px-4 pt-1 pb-4">
-					{body}
-				</CollapsibleContent>
-			</Collapsible>
-		</>
+		<PanelSection title={title} aside={aside} defaultOpen={defaultOpen}>
+			<div className={cn("flex flex-col gap-5", className)}>
+				{description ? <Note>{description}</Note> : null}
+				{children}
+			</div>
+		</PanelSection>
 	);
 }
 

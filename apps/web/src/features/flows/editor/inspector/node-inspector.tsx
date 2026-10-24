@@ -15,6 +15,7 @@ import { Button } from "@nightshift/ui/components/button";
 import { Input } from "@nightshift/ui/components/input";
 import { PlayIcon, Trash2Icon } from "lucide-react";
 import { useId, useState } from "react";
+import { PanelHeader } from "@/shared/panel";
 import { NODE_TYPE } from "../../canvas/node-type";
 import type { DaemonConnection } from "../connections-field";
 import {
@@ -23,12 +24,7 @@ import {
 	runsOnDevice,
 	withDevice,
 } from "../device-field";
-import {
-	Field,
-	InspectorHeader,
-	InspectorSection,
-	PositiveIntInput,
-} from "../fields";
+import { Field, InspectorSection, PositiveIntInput } from "../fields";
 import { VariableWritesSection } from "../variable-writes-field";
 import { AgentAdvanced } from "./agent-advanced";
 import { AgentFields } from "./agent-fields";
@@ -85,7 +81,7 @@ export function NodeInspector({
 
 	return (
 		<div className="flex flex-col">
-			<InspectorHeader
+			<PanelHeader
 				icon={Icon}
 				kicker={typeLabel}
 				title={node.id}

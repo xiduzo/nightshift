@@ -1,4 +1,5 @@
-/** The left side of the Agents page: the groups of profiles, harnesses, connections and tools. */
+/** The list of the Agents page: the groups of profiles, harnesses, connections and tools. */
+import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Item,
@@ -6,67 +7,39 @@ import {
 	ItemContent,
 	ItemDescription,
 	ItemGroup,
-	ItemMedia,
 	ItemTitle,
 } from "@nightshift/ui/components/item";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
-import { LaptopIcon, PlusIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { PanelSection } from "@/shared/panel";
 
-/**
- * One Device's profiles, harnesses, tools and secrets, under its name.
- * Today the only Device is this computer.
- */
-export function DeviceSection({
-	name,
-	description,
-	children,
-}: {
-	/** Undefined while it loads. */
-	name: string | undefined;
-	description: string;
-	children: ReactNode;
-}) {
-	return (
-		<section aria-label={name ?? description} className="flex flex-col gap-5">
-			<Item size="sm" variant="muted">
-				<ItemMedia variant="icon">
-					<LaptopIcon />
-				</ItemMedia>
-				<ItemContent className="min-w-0">
-					{name === undefined ? (
-						<Skeleton className="h-4 w-32" />
-					) : (
-						<ItemTitle className="max-w-full truncate">{name}</ItemTitle>
-					)}
-					<ItemDescription className="text-xs">{description}</ItemDescription>
-				</ItemContent>
-			</Item>
-			{children}
-		</section>
-	);
-}
-
+/** One group of the list: a heading that folds it, its count, and an Add button. */
 export function Group({
 	title,
-	hint,
+	count,
 	addLabel,
 	onAdd,
 	children,
 }: {
 	title: string;
-	hint: string;
+	/** Undefined while it loads. */
+	count: number | undefined;
 	addLabel: string;
 	onAdd: () => void;
 	children: ReactNode;
 }) {
 	return (
-		<section className="flex flex-col gap-1">
-			<div className="flex items-center justify-between px-2">
-				<div>
-					<h2 className="font-medium text-sm">{title}</h2>
-					<p className="text-muted-foreground text-xs">{hint}</p>
-				</div>
+		<PanelSection
+			title={title}
+			aside={
+				count === undefined ? null : (
+					<Badge variant="secondary" className="tabular-nums">
+						{count}
+					</Badge>
+				)
+			}
+			action={
 				<Button
 					variant="ghost"
 					size="icon-sm"
@@ -76,23 +49,23 @@ export function Group({
 				>
 					<PlusIcon />
 				</Button>
-			</div>
+			}
+			contentClassName="px-2 pb-3"
+		>
 			<ItemGroup className="gap-0.5">{children}</ItemGroup>
-		</section>
+		</PanelSection>
 	);
 }
 
 export function ListItem({
 	selected,
 	onClick,
-	icon,
 	title,
 	description,
 	aside,
 }: {
 	selected: boolean;
 	onClick: () => void;
-	icon: ReactNode;
 	title: ReactNode;
 	description?: string;
 	aside?: ReactNode;
@@ -110,7 +83,6 @@ export function ListItem({
 			}
 			onClick={onClick}
 		>
-			<ItemMedia variant="icon">{icon}</ItemMedia>
 			<ItemContent className="min-w-0">
 				<ItemTitle className="max-w-full truncate">{title}</ItemTitle>
 				{description ? (

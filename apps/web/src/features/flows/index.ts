@@ -14,7 +14,7 @@ export {
 export type { FlowCanvasEdge } from "./canvas/outcome-edge";
 export { edgeColor, edgeTypes, OutcomeMarkers } from "./canvas/outcome-edge";
 export { useMeasured } from "./canvas/use-measured";
-export { InspectorHeader, InspectorSection } from "./editor/fields";
+export { InspectorSection } from "./editor/fields";
 export { FlowPage } from "./flow-page";
 export { ProjectFlowsPage } from "./project-flows-page";
 export { flowQueries } from "./queries";

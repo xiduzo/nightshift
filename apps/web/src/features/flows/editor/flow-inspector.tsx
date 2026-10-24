@@ -11,14 +11,9 @@ import { Textarea } from "@nightshift/ui/components/textarea";
 import { Link } from "@tanstack/react-router";
 import { SettingsIcon, WorkflowIcon } from "lucide-react";
 import { useId } from "react";
+import { PanelHeader } from "@/shared/panel";
 import { POLICY_DEFAULTS } from "../flow-draft";
-import {
-	Field,
-	InspectorHeader,
-	InspectorSection,
-	Note,
-	PositiveIntInput,
-} from "./fields";
+import { Field, InspectorSection, Note, PositiveIntInput } from "./fields";
 import { InputsEditor } from "./io/inputs-editor";
 import { OutputsEditor } from "./io/outputs-editor";
 import { VariablesEditor } from "./io/variables-editor";
@@ -72,7 +67,7 @@ export function FlowInspector({
 	);
 	return (
 		<div className="flex flex-col">
-			<InspectorHeader
+			<PanelHeader
 				icon={WorkflowIcon}
 				kicker="Flow"
 				title={name ?? "This flow"}

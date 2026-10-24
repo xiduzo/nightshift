@@ -10,10 +10,11 @@ import { Link } from "@tanstack/react-router";
 import { InfoIcon, MonitorIcon, WorkflowIcon } from "lucide-react";
 import { useState } from "react";
 import { walkerName } from "@/features/devices";
-import { InspectorHeader, InspectorSection } from "@/features/flows";
+import { InspectorSection } from "@/features/flows";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
 import { authClient } from "@/shared/api";
 import { formatDayTime } from "@/shared/format";
+import { PanelHeader } from "@/shared/panel";
 import { Elapsed } from "../elapsed";
 import { RunStatusBadge } from "../run-status-badge";
 import { InputsSection, VariablesSection } from "./run-details-data";
@@ -56,7 +57,7 @@ export function RunDetails({
 				<span className="hidden sm:inline">Details</span>
 			</SheetTrigger>
 			<SheetContent className="gap-0 data-[side=right]:sm:max-w-md">
-				<InspectorHeader
+				<PanelHeader
 					icon={WorkflowIcon}
 					kicker="Run"
 					badges={<RunStatusBadge status={status} />}

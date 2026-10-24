@@ -16,15 +16,9 @@ import {
 import { cn } from "@nightshift/ui/lib/utils";
 import { ArrowRightIcon, SplineIcon, Trash2Icon } from "lucide-react";
 import { useId } from "react";
-
+import { PanelHeader } from "@/shared/panel";
 import { outcomeLabel, outcomeStyle } from "../canvas/outcome-badge";
-
-import {
-	Field,
-	InspectorHeader,
-	InspectorSection,
-	PositiveIntInput,
-} from "./fields";
+import { Field, InspectorSection, PositiveIntInput } from "./fields";
 
 /** An outcome as a small outline Badge in its own colour. */
 export function OutcomePill({
@@ -67,7 +61,7 @@ export function EdgeInspector({
 
 	return (
 		<div className="flex flex-col">
-			<InspectorHeader
+			<PanelHeader
 				icon={SplineIcon}
 				kicker="Edge"
 				title={
