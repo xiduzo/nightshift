@@ -19,6 +19,7 @@ import {
 	ItemActions,
 	ItemContent,
 	ItemDescription,
+	ItemFooter,
 	ItemGroup,
 	ItemMedia,
 	ItemSeparator,
@@ -46,11 +47,13 @@ import {
 	settingsMutations,
 	settingsQueries,
 } from "@/features/settings/queries";
+import { spaceQueries } from "@/features/spaces";
 import type { ThisComputer } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { deviceIcon } from "./device-icon";
 import { JoinHostDialog } from "./join-host-dialog";
+import { OpenSpaceButton } from "./open-space";
 import { deviceQueries } from "./queries";
 import { HostStatus } from "./status-badges";
 
@@ -327,6 +330,7 @@ function isHostAddress(value: string): boolean {
 /** The Hosts this computer joined, each with the Spaces it keeps for it, and Join a Host. */
 function Hosts({ hosts }: { hosts: ThisComputer["hosts"] }) {
 	const [joining, setJoining] = useState(false);
+	const activeSpace = useQuery(spaceQueries.list()).data?.active;
 	const hasHome = hosts.some(
 		(host) => host.role === "home" && host.status !== "revoked",
 	);
@@ -370,10 +374,32 @@ function Hosts({ hosts }: { hosts: ThisComputer["hosts"] }) {
 										{host.status === "revoked"
 											? "The Host removed the access of this computer. Join it again to sync."
 											: host.spaces.length > 0
-												? `Keeps ${host.spaces.map((space) => space.name).join(", ")}.`
+												? "Open a Space to work in it. Each one is also in the Space switcher."
 												: "Keeps no Space of yours yet."}
 									</ItemDescription>
 								</ItemContent>
+								{host.status !== "revoked" && host.spaces.length > 0 ? (
+									<ItemFooter>
+										<ItemGroup className="w-full gap-1">
+											{host.spaces.map((space) => (
+												<Item key={space.id} variant="muted" size="xs">
+													<ItemContent className="min-w-0">
+														<ItemTitle className="max-w-full truncate">
+															{space.name}
+														</ItemTitle>
+													</ItemContent>
+													<ItemActions>
+														{space.id === activeSpace ? (
+															<Badge variant="secondary">Current</Badge>
+														) : (
+															<OpenSpaceButton spaceId={space.id} />
+														)}
+													</ItemActions>
+												</Item>
+											))}
+										</ItemGroup>
+									</ItemFooter>
+								) : null}
 							</Item>
 						))}
 					</ItemGroup>

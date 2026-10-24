@@ -29,6 +29,7 @@ import {
 	HostListItem,
 } from "./devices-list";
 import { HostDetail } from "./host-detail";
+import { HostSpacesAlert, hostKeptSpaces } from "./open-space";
 import { PairDeviceDialog } from "./pair-device-dialog";
 import { deviceQueries, runQueries } from "./queries";
 import { spaceView } from "./space-view";
@@ -108,6 +109,11 @@ export function DevicesPage({
 			? all.find((c) => c.id === selection.id)
 			: undefined;
 	// Pairing joins this computer as a Host: only where it keeps the Space.
+	// A Space this computer keeps: point to the Spaces its Hosts keep.
+	const elsewhere =
+		view?.host.kind === "this-computer" && computer
+			? hostKeptSpaces(computer.hosts)
+			: [];
 	const canPair =
 		view?.host.kind === "this-computer" &&
 		computer?.host.enabled === true &&
@@ -127,6 +133,11 @@ export function DevicesPage({
 			<SiteHeader crumbs={[{ label: "Devices" }]} />
 			<div className="flex h-[calc(100svh-3.5rem)] min-h-0">
 				<div className="min-w-0 flex-1 overflow-y-auto">
+					{elsewhere.length > 0 ? (
+						<div className="mx-auto w-full max-w-6xl px-4 pt-8 md:px-8">
+							<HostSpacesAlert spaces={elsewhere} />
+						</div>
+					) : null}
 					{error && !view ? (
 						<div className="p-8">
 							<Alert variant="destructive">
