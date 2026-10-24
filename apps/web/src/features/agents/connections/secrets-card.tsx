@@ -104,10 +104,11 @@ function flowNamesOf(secret: SecretView): string[] {
 	return [...new Set(secret.flows.map((flow) => flow.flowName))];
 }
 
-/** What uses the secret: its tools, then its flows. */
+/** What uses the secret: its connections and CLI tools, then its flows. */
 function usersOf(secret: SecretView): string[] {
 	return [
 		...secret.usedBy,
+		...secret.tools,
 		...flowNamesOf(secret).map((name) => `${name} (flow)`),
 	];
 }
@@ -485,7 +486,7 @@ function RemoveSecretDialog({
 			onError: (error) => toast.error(`Not removed: ${error.message}`),
 		}),
 	);
-	const usedBy = secret?.usedBy ?? [];
+	const usedBy = secret ? [...secret.usedBy, ...secret.tools] : [];
 	const flows = secret ? flowNamesOf(secret) : [];
 	const users = secret ? usersOf(secret) : [];
 	const consequence =

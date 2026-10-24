@@ -79,6 +79,7 @@ export const cliToolQueries = {
 export const cliToolMutations = {
 	save: orpc.cliTools.save.mutationOptions,
 	remove: orpc.cliTools.remove.mutationOptions,
+	signIn: orpc.cliTools.signIn.mutationOptions,
 };
 
 export const deciderQueries = {
