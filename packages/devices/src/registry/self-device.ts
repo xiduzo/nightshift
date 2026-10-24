@@ -19,8 +19,8 @@ export type SelfDeviceHost = {
 	platform: string;
 	/**
 	 * A name an earlier default gave, which `name` now replaces: the host
-	 * name before NIGHTSHIFT_DEVICE_NAME was set, or a container id. A name
-	 * the person chose is never stale.
+	 * name before NIGHTSHIFT_DEVICE_NAME was set, or a container id or "Host"
+	 * in a container. A name the person chose is never stale.
 	 */
 	stale?: (name: string) => boolean;
 };
@@ -40,10 +40,22 @@ function inContainer(): boolean {
 	return existsSync("/.dockerenv") || existsSync("/run/.containerenv");
 }
 
+/** The host name of the first of NIGHTSHIFT_HOST_ADDRESSES, or null. */
+function addressName(addresses: string | undefined): string | null {
+	for (const address of (addresses ?? "").split(",")) {
+		try {
+			const name = new URL(address.trim()).hostname;
+			if (name) return name;
+		} catch {}
+	}
+	return null;
+}
+
 /**
  * This computer's default Device name and platform: NIGHTSHIFT_DEVICE_NAME
- * when set, else the host name. In a container whose host name is its id,
- * the default is "Host".
+ * when set, else the host name. A container whose host name is its id
+ * cannot see the name of its computer: its default is the name in its first
+ * Host address, else "Host".
  */
 export function defaultSelfDeviceHost(
 	opts: {
@@ -56,15 +68,17 @@ export function defaultSelfDeviceHost(
 	const env = opts.env ?? process.env;
 	const raw = hostDeviceName(opts.hostName ?? hostname());
 	const container = opts.container ?? inContainer();
+	const unnamed = container && isContainerId(raw);
 	const name =
 		env.NIGHTSHIFT_DEVICE_NAME?.trim() ||
-		(container && isContainerId(raw) ? "Host" : raw);
+		(unnamed ? addressName(env.NIGHTSHIFT_HOST_ADDRESSES) || "Host" : raw);
 	return {
 		name,
 		platform: opts.platform ?? process.platform,
 		stale: (current) =>
 			current !== name &&
-			(current === raw || (container && isContainerId(current))),
+			(current === raw ||
+				(container && (isContainerId(current) || current === "Host"))),
 	};
 }
 

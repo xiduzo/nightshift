@@ -10,7 +10,7 @@
 # runs it. See docs/deploy/ for a proxy with TLS in front.
 #
 # The Host's name is NIGHTSHIFT_DEVICE_NAME, else the host name. A host name
-# that is the container id gives the name "Host".
+# that is the container id gives the domain of the first Host address.
 #
 # CI publishes the second stage as xiduzo/nightshift on Docker Hub and as
 # ghcr.io/xiduzo/nightshift (.github/workflows/docker.yml). It holds Night

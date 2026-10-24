@@ -90,9 +90,11 @@ docker run -d --name nightshift -p 127.0.0.1:3000:3000 -v nightshift:/data \
 The Host shows its name in the sidebar and on the Devices page of each
 computer that pairs with it. Set the name with `NIGHTSHIFT_DEVICE_NAME`, for
 example `-e NIGHTSHIFT_DEVICE_NAME="Office Host"`. Without it, the name is
-the host name of the computer. In a container that Docker names by its id,
-the name is "Host". A Host that has a container id as its name gets the new
-name when it starts.
+the host name of the computer. A container that Docker names by its id
+cannot see the name of its computer: its name is the domain of its first
+Host address, else "Host". A Host named by an earlier default (a container
+id, or "Host") gets the new name when it starts. The sidebar marks the
+computer as a Host next to its name.
 
 ### Add your tools
 

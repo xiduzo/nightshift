@@ -90,9 +90,22 @@ describe("defaultSelfDeviceHost", () => {
 		expect(host.stale?.("Office Host")).toBe(false);
 	});
 
-	test("a container named by its id is a Host", () => {
+	test("a container named by its id takes the name of its Host address", () => {
+		const host = of("cea79743b08a", true, {
+			NIGHTSHIFT_HOST_ADDRESSES: "not a url, https://ns.example.com:8443",
+		});
+		expect(host.name).toBe("ns.example.com");
+		expect(host.stale?.("Host")).toBe(true);
+		expect(host.stale?.("cea79743b08a")).toBe(true);
+	});
+
+	test("a container named by its id without an address is a Host", () => {
 		expect(of("cea79743b08a", true).name).toBe("Host");
 		expect(of("nightshift", true).name).toBe("nightshift");
+	});
+
+	test("outside a container, Host is a chosen name", () => {
+		expect(of("Adas-MacBook", false).stale?.("Host")).toBe(false);
 	});
 
 	test("outside a container the host name stays, hex or not", () => {

@@ -1,4 +1,5 @@
 import { platformName } from "@nightshift/client";
+import { Badge } from "@nightshift/ui/components/badge";
 import { SidebarGroupLabel } from "@nightshift/ui/components/sidebar";
 import {
 	Tooltip,
@@ -6,13 +7,12 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { useQuery } from "@tanstack/react-query";
-import { deviceIcon } from "./device-icon";
 import { deviceQueries } from "./queries";
 
 /**
  * The sidebar label of the group that is saved on the computer that serves
- * this app: its Device name and an icon. "This computer" until the name is
- * known, and for a person who does not own it.
+ * this app: its Device name, and "Host" when it is a Host. "This computer"
+ * until the name is known, and for a person who does not own it.
  */
 export function ThisDeviceLabel() {
 	const overview = useQuery({
@@ -22,17 +22,21 @@ export function ThisDeviceLabel() {
 	});
 	const computer = overview.data?.thisComputer ?? null;
 	const name = computer?.name || "This computer";
-	const Icon = deviceIcon(computer);
+	const host = computer?.host.enabled ?? false;
 
 	return (
 		<Tooltip>
 			<TooltipTrigger render={<SidebarGroupLabel className="gap-2" />}>
-				<Icon aria-hidden="true" />
 				<span className="truncate">{name}</span>
+				{host ? (
+					<Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+						Host
+					</Badge>
+				) : null}
 			</TooltipTrigger>
 			<TooltipContent side="right">
 				{computer
-					? `${computer.name}, ${platformName(computer.platform)}`
+					? `${computer.name}, ${platformName(computer.platform)}${host ? ", a Host" : ""}`
 					: name}
 			</TooltipContent>
 		</Tooltip>
