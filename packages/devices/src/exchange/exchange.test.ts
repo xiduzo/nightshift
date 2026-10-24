@@ -548,6 +548,11 @@ describe("the Spaces of a Host", () => {
 			expect.arrayContaining(["space-mine", "space-team"]),
 		);
 		expect(await hostSpaces.hostOf(b.spaceId)).toBeNull();
+		// Listed by name for the Devices and Settings pages, personal first.
+		expect(await hostSpaces.listed(HOST)).toEqual([
+			{ id: "space-mine", name: "Personal on studio", personal: true },
+			{ id: "space-team", name: "Platform", personal: false },
+		]);
 		const [mine] = await b.db
 			.select()
 			.from(organization)

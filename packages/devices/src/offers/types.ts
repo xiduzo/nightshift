@@ -24,9 +24,9 @@ export type OfferView = OfferCaps & {
 };
 
 /**
- * A Device of a Space, as any Member sees it: its name, whether it is
- * online, which of the Space's Projects it has a Clone of, and the
- * profiles it offers. Nothing else of the Device.
+ * A Device of a Space, as any Member sees it: its name, its owner,
+ * whether it is online, which of the Space's Projects it has a Clone of,
+ * and the profiles it offers. Nothing else of the Device.
  */
 export type SpaceDeviceView = {
 	id: string;
@@ -34,6 +34,14 @@ export type SpaceDeviceView = {
 	/** Null when this computer cannot tell (it is not the Space's Host). */
 	online: boolean | null;
 	thisDevice: boolean;
+	/** One of the Person's own Devices: this computer, or one of theirs the Space knows. */
+	mine: boolean;
+	/** Its owner's name in the Space. Null when this computer cannot tell. */
+	owner: string | null;
+	/** `process.platform`. Null when this computer cannot tell. */
+	platform: string | null;
+	/** Epoch ms of its last connection. Null when this computer cannot tell. */
+	lastSeenAt: number | null;
 	clones: { projectId: string; projectName: string }[];
 	offers: (OfferCaps & { profile: string })[];
 };
@@ -55,6 +63,9 @@ export type Offers = {
 		input: { spaceId: string; profile: string },
 		by: string,
 	): Promise<void>;
-	/** The Devices of a Space as its Members see them (`SpaceDeviceView`). */
-	spaceDevices(spaceId: string): Promise<SpaceDeviceView[]>;
+	/**
+	 * The Devices of a Space as its Members see them (`SpaceDeviceView`),
+	 * for the Person of the session: `mine` marks theirs.
+	 */
+	spaceDevices(spaceId: string, personId: string): Promise<SpaceDeviceView[]>;
 };

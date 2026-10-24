@@ -258,7 +258,7 @@ describe("a colleague's run on another Person's Device", () => {
 			thisDevice: false,
 			offers: ["coder"],
 		});
-		// What the colleague sees of B: name, online, Clones, offered profiles.
+		// What the colleague sees of B: name, owner, online, Clones, offered profiles.
 		const devices = await colleague.devices.space();
 		const seen = devices.find((d) => d.id === bId);
 		expect(seen).toEqual({
@@ -266,11 +266,18 @@ describe("a colleague's run on another Person's Device", () => {
 			name: bName,
 			online: true,
 			thisDevice: false,
+			mine: false,
+			owner: expect.any(String),
+			platform: process.platform,
+			lastSeenAt: expect.any(Number),
 			clones: [{ projectId, projectName: "on-a" }],
 			offers: [
 				{ profile: "coder", permissionCap: "acceptEdits", sessionCap: 1 },
 			],
 		});
+		// B's owner sees B as one of their own.
+		const own = (await a.client.devices.space()).find((d) => d.id === bId);
+		expect(own).toMatchObject({ mine: true, owner: seen?.owner });
 		expect(JSON.stringify(devices)).not.toContain("sonnet");
 		expect(JSON.stringify(devices)).not.toContain("bypassPermissions");
 		// B's own view: listed in the Space.

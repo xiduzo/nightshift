@@ -224,6 +224,7 @@ export async function wireDevices(deps: {
 		host,
 		links: deviceLinks,
 		hostLinks,
+		hostSpaces: engine.exchange.hostSpaces,
 		keys: keyStore,
 		settings: deps.settings,
 		self: { id: self.id, name: self.name, platform: process.platform },

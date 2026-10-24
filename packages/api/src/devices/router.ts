@@ -50,7 +50,9 @@ export const devices = {
 				"Lists the Devices of the Space as every Member sees them: online, Clones and Offers.",
 		})
 		.output(output(z.array(spaceDeviceViewSchema)))
-		.handler(({ context }) => context.offers.spaceDevices(context.spaceId)),
+		.handler(({ context }) =>
+			context.offers.spaceDevices(context.spaceId, context.session.user.id),
+		),
 	/** Shows the device that waits with this code, and holds the code for the Person. */
 	review: protectedProcedure
 		.route({

@@ -8,7 +8,7 @@ import {
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import { hostLink, hostSpace } from "@nightshift/db/schema";
-import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, notInArray } from "drizzle-orm";
 import type { ListedSpace } from "../contract";
 
 /**
@@ -26,6 +26,9 @@ import type { ListedSpace } from "../contract";
  */
 
 export type HostSpaces = ReturnType<typeof createHostSpaces>;
+
+/** A Space a Host keeps, as this computer lists it. */
+export type HostSpaceRef = { id: string; name: string; personal: boolean };
 
 export function createHostSpaces(db: Database) {
 	return {
@@ -111,6 +114,19 @@ export function createHostSpaces(db: Database) {
 				.from(hostSpace)
 				.where(eq(hostSpace.spaceId, spaceId));
 			return row?.hostId ?? null;
+		},
+
+		/** The Spaces this computer takes part in through the Host, by name. */
+		async listed(hostId: string): Promise<HostSpaceRef[]> {
+			return db
+				.select({
+					id: hostSpace.spaceId,
+					name: hostSpace.name,
+					personal: hostSpace.personal,
+				})
+				.from(hostSpace)
+				.where(eq(hostSpace.hostId, hostId))
+				.orderBy(desc(hostSpace.personal), asc(hostSpace.name));
 		},
 
 		/** The Spaces this computer takes part in through the Host. */

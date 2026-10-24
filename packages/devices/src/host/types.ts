@@ -1,7 +1,12 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
 import type { KeyStoreKind } from "@nightshift/engine";
 import type { HostHello, PairingRedeemed, PairingStart } from "../contract";
-import type { HostRole, JoinProgress, LinkedHost } from "../links";
+import type {
+	HostRole,
+	HostSpaceRef,
+	JoinProgress,
+	LinkedHost,
+} from "../links";
 import type { PairedDevice } from "../registry";
 
 /** This computer's Devices, as the API serves them: as a Host (pairing, presence) and its links to Hosts. */
@@ -27,8 +32,8 @@ export type DevicesOverview = {
 			/** The SHA-256 fingerprint of the certificate it serves itself, if any. */
 			fingerprint: string | null;
 		};
-		/** Its home Host and guest Hosts. */
-		hosts: LinkedHost[];
+		/** Its home Host and guest Hosts, each with the Spaces it keeps for this computer. */
+		hosts: (LinkedHost & { spaces: HostSpaceRef[] })[];
 	} | null;
 	/** The Person's Devices paired with this computer, when it is a Host. */
 	devices: PairedDevice[];

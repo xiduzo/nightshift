@@ -10,6 +10,7 @@ export {
 } from "./host-links";
 export {
 	createHostSpaces,
+	type HostSpaceRef,
 	type HostSpaces,
 	personOnHost,
 } from "./host-spaces";

@@ -3,6 +3,7 @@ import {
 	type DeviceKeyStore,
 	type DeviceLinks,
 	type HostLinks,
+	type HostSpaces,
 	joinHost,
 } from "../links";
 import { type Reach, reachFor } from "../reach";
@@ -14,6 +15,8 @@ export function createDevices(deps: {
 	host: Host;
 	links: DeviceLinks;
 	hostLinks: HostLinks;
+	/** The Spaces this computer takes part in through each Host. */
+	hostSpaces: Pick<HostSpaces, "listed">;
 	keys: DeviceKeyStore;
 	settings: SettingsStore;
 	self: { id: string; name: string; platform: string };
@@ -38,7 +41,12 @@ export function createDevices(deps: {
 								restartNeeded: reachFor(settings) !== deps.reach,
 								fingerprint: deps.fingerprint,
 							},
-							hosts: await deps.links.hosts(),
+							hosts: await Promise.all(
+								(await deps.links.hosts()).map(async (linked) => ({
+									...linked,
+									spaces: await deps.hostSpaces.listed(linked.hostId),
+								})),
+							),
 						}
 					: null,
 				devices: await host.registry.list(personId),

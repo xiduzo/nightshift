@@ -45,6 +45,10 @@ const linkedHostSchema = z.object({
 	/** Epoch ms of the last change of `status`. */
 	since: z.number(),
 	fingerprint: z.string().nullable(),
+	/** The Spaces it keeps for this computer. */
+	spaces: z.array(
+		z.object({ id: z.string(), name: z.string(), personal: z.boolean() }),
+	),
 });
 
 const pairedDeviceSchema = z.object({
@@ -93,6 +97,10 @@ export const spaceDeviceViewSchema = exact<SpaceDeviceView>()(
 		/** Null when this computer cannot tell. */
 		online: z.boolean().nullable(),
 		thisDevice: z.boolean(),
+		mine: z.boolean(),
+		owner: z.string().nullable(),
+		platform: z.string().nullable(),
+		lastSeenAt: z.number().nullable(),
 		clones: z.array(
 			z.object({ projectId: z.string(), projectName: z.string() }),
 		),

@@ -131,10 +131,17 @@ export function createOffers(deps: {
 			}
 		},
 
-		async spaceDevices(spaceId) {
+		async spaceDevices(spaceId, personId) {
 			const projects = await engine.space(spaceId).listProjects();
 			const offers = await engine.offers.list(spaceId);
+			// This computer's owner, as the Space knows them: on the Host of a
+			// Space it keeps, they have the id of their link there.
+			const owner = (await personOnHost(db, spaceId)) ?? deps.ownerId;
+			// The session's Person, as the Space knows them.
+			const me = personId === deps.ownerId ? owner : personId;
 			const devices = new Map<string, SpaceDeviceView>();
+			/** Each Device's owner, as the Space knows them. */
+			const owners = new Map<string, string>();
 			const entry = (id: string, name: string | null, thisDevice: boolean) => {
 				let found = devices.get(id);
 				if (!found) {
@@ -143,10 +150,15 @@ export function createOffers(deps: {
 						name: name ?? "A device",
 						online: thisDevice ? true : null,
 						thisDevice,
+						mine: false,
+						owner: null,
+						platform: null,
+						lastSeenAt: null,
 						clones: [],
 						offers: [],
 					};
 					devices.set(id, found);
+					if (thisDevice) owners.set(id, owner);
 				}
 				return found;
 			};
@@ -170,12 +182,27 @@ export function createOffers(deps: {
 					permissionCap: offer.permissionCap,
 					sessionCap: offer.sessionCap,
 				});
+				// Only a Device's owner offers its profiles.
+				if (offer.by && !owners.has(offer.deviceId)) {
+					owners.set(offer.deviceId, offer.by);
+				}
 			}
 			for (const device of devices.values()) {
-				if (device.thisDevice) continue;
-				// A Host knows whether its paired Devices are online.
-				const paired = await engine.devices.get(device.id);
-				if (paired) device.online = paired.revokedAt === null && paired.online;
+				if (!device.thisDevice) {
+					// A Host knows its paired Devices: their owner, whether they are online.
+					const paired = await engine.devices.get(device.id);
+					if (paired) {
+						device.online = paired.revokedAt === null && paired.online;
+						device.platform = paired.platform;
+						device.lastSeenAt = paired.lastSeenAt;
+						owners.set(device.id, paired.ownerId);
+					}
+				}
+				const owner = owners.get(device.id);
+				if (owner) {
+					device.mine = owner === me;
+					device.owner = await engine.exchange.memberName(spaceId, owner);
+				}
 			}
 			return [...devices.values()];
 		},
