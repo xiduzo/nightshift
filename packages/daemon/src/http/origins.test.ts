@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { type AuthSandbox, createAuthSandbox } from "@nightshift/auth/testing";
 
-import { authOriginsOf, phoneOrigins, trustedOriginsOf } from "./origins";
+import {
+	authOriginsOf,
+	hostAuthOrigins,
+	phoneOrigins,
+	trustedOriginsOf,
+} from "./origins";
 
 const env = {
 	CORS_ORIGIN: "http://localhost:3001",
@@ -9,11 +14,27 @@ const env = {
 };
 
 describe("the origins Better Auth trusts", () => {
-	test("hold the phone app's scheme", () => {
-		expect(authOriginsOf(3000)).toContain("nightshift://");
+	test("hold the desktop app and this daemon's own pages", () => {
 		expect(authOriginsOf(3000)).not.toContain("exp://");
 		expect(authOriginsOf(3000)).toContain("views://mainview");
 		expect(authOriginsOf(3000)).toContain("http://localhost:3000");
+	});
+
+	test("hold the phone app's scheme only on a Host", () => {
+		expect(authOriginsOf(3000)).not.toContain("nightshift://");
+		expect(hostAuthOrigins({ host: false, hostAddresses: [] })).toEqual([]);
+		expect(
+			hostAuthOrigins({
+				host: true,
+				hostAddresses: ["https://ns.example:8443/path", "not an address"],
+			}),
+		).toEqual(["https://ns.example:8443", "nightshift://"]);
+	});
+
+	test("keep the Host's addresses while it is no Host", () => {
+		expect(
+			hostAuthOrigins({ host: false, hostAddresses: ["https://ns.example"] }),
+		).toEqual(["https://ns.example"]);
 	});
 
 	test("the phone app never gets the local session", () => {

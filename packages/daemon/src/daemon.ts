@@ -66,6 +66,7 @@ import {
 	authOriginsOf,
 	createHttp,
 	type DaemonServe,
+	hostAuthOrigins,
 	isThisComputer,
 	trustedOriginsOf,
 } from "./http";
@@ -194,16 +195,18 @@ export async function createDaemon(
 	const spaces = hot.nightshiftSpaces;
 
 	const trustedOrigins = trustedOriginsOf(env, port);
-	/** The Host's addresses, once the settings below exist. */
-	let hostAddresses: () => readonly string[] = () => [];
+	/** Whether this computer is a Host, and its addresses, once the settings below exist. */
+	let hostSettings: () => { host: boolean; hostAddresses: readonly string[] } =
+		() => ({ host: false, hostAddresses: [] });
 	const auth = createAuth(env, db, authOriginsOf(port), {
 		onMembersChanged: (spaceId) => spaces.mirrorMembers(spaceId),
 		// The audit of Members, in the Space's event log. Called on requests,
 		// long after the engine below is made.
 		onMemberChange: (change) => engine.logMemberChange(change),
-		// A browser may sign in at any of the Host's addresses. Read per
-		// request; Better Auth also asks once now, before the settings exist.
-		trustedOrigins: () => hostOrigins(hostAddresses()),
+		// A browser may sign in at any of the Host's addresses, the phone app
+		// only at a Host. Read per request; Better Auth also asks once now,
+		// before the settings exist.
+		trustedOrigins: () => hostAuthOrigins(hostSettings()),
 	});
 
 	/**
@@ -257,7 +260,7 @@ export async function createDaemon(
 		env.NIGHTSHIFT_KEY_STORE === "file" ? { prefer: "file" as const } : {};
 
 	const settings = createSettingsStore({ document, env: fallbacks });
-	hostAddresses = () => settings.current().hostAddresses;
+	hostSettings = () => settings.current();
 	const connections = createConnectionStore({
 		document,
 		env: fallbacks,
@@ -559,15 +562,4 @@ export async function createDaemon(
 		ownerHasLogin: () => hasLogin(db, person.userId),
 		stop,
 	};
-}
-
-/** The origins of a Host's addresses (`https://name:port`). */
-function hostOrigins(addresses: readonly string[]): string[] {
-	return addresses.flatMap((address) => {
-		try {
-			return [new URL(address).origin];
-		} catch {
-			return [];
-		}
-	});
 }

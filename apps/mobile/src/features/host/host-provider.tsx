@@ -129,8 +129,11 @@ export function HostProvider({ children }: { children: ReactNode }) {
 					throw new Error(UNREACHABLE);
 				});
 			if (result.error) {
+				// Only a Host lets the phone app sign in: another computer refuses its origin.
 				throw new Error(
-					result.error.message ?? "Check your email and password.",
+					result.error.status === 403
+						? "This address is not a Night Shift Host. Turn on Be a Host in the settings of that computer, then try again."
+						: (result.error.message ?? "Check your email and password."),
 				);
 			}
 			if (

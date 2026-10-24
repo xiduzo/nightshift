@@ -10,7 +10,9 @@ export const desktopOrigins = ["views://mainview"];
  *
  * This only lets Better Auth accept the phone's sign-in. A web page never
  * has this origin, so it opens nothing to a browser. It is not in
- * `trustedOriginsOf`: it never gets the local session.
+ * `trustedOriginsOf`: it never gets the local session. Only a Host trusts
+ * it (`hostAuthOrigins`): a phone signs in to a Host, never to a computer
+ * that is not one.
  */
 export const phoneOrigins = ["nightshift://"];
 
@@ -23,11 +25,30 @@ export function localOrigins(port: number): string[] {
 }
 
 /**
- * The origins Better Auth trusts besides CORS_ORIGIN and the Host's own
- * addresses: the desktop app, this daemon's own pages, and the phone app.
+ * The origins Better Auth always trusts besides CORS_ORIGIN: the desktop
+ * app and this daemon's own pages.
  */
 export function authOriginsOf(port: number): string[] {
-	return [...desktopOrigins, ...localOrigins(port), ...phoneOrigins];
+	return [...desktopOrigins, ...localOrigins(port)];
+}
+
+/**
+ * The origins Better Auth trusts from the settings, read per request: the
+ * Host's addresses, where a browser may sign in, and the phone app while
+ * this computer is a Host.
+ */
+export function hostAuthOrigins(settings: {
+	host: boolean;
+	hostAddresses: readonly string[];
+}): string[] {
+	const addresses = settings.hostAddresses.flatMap((address) => {
+		try {
+			return [new URL(address).origin];
+		} catch {
+			return [];
+		}
+	});
+	return settings.host ? [...addresses, ...phoneOrigins] : addresses;
 }
 
 /** Pages that may call this daemon: the web app, the desktop app, its own. */
