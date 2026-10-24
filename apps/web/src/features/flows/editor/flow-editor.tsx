@@ -20,7 +20,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/shared/page";
 import { NODE_TYPE } from "../canvas/node-type";
-import { OpenFlowContext } from "../canvas/open-flow-context";
+import {
+	EnterSubflowContext,
+	OpenFlowContext,
+} from "../canvas/open-flow-context";
 import { checkFlow } from "../flow-draft";
 import { flowMutations, flowQueries } from "../queries";
 import { StartRunDialog } from "../start/start-run-dialog";
@@ -35,6 +38,8 @@ import { LeaveDialog } from "./leave-dialog";
 import { NodeDock } from "./node-dock";
 import { nodeEdits } from "./node-edits";
 import { ProjectFlowsContext } from "./project-flows-context";
+import { SubflowView } from "./subflow/subflow-view";
+import { useSubflowStack } from "./subflow/use-subflow-stack";
 import { useEditorData } from "./use-editor-data";
 
 type Props = {
@@ -262,6 +267,17 @@ function Editor({
 			? draft.edges.find((edge) => edge.id === selection.id)
 			: undefined;
 
+	// Looking inside a Subflow: the canvas shows its flow, read only. Nothing
+	// stays selected here, so no key edits this flow under that view.
+	const subflows = useSubflowStack({
+		flow: draft,
+		selectedNodeId: selectedNode?.id ?? null,
+		beforeEnter: () => {
+			setSelection(null);
+			setSettingsOpen(false);
+		},
+	});
+
 	const {
 		renameSelected,
 		renameSelectedOutcome,
@@ -419,22 +435,28 @@ function Editor({
 
 			<ProjectFlowsContext.Provider value={projectFlows.flows}>
 				<div className="relative h-[calc(100svh-3.5rem)] min-h-0">
-					<div className="absolute inset-0">
+					<div className="absolute inset-0" inert={subflows.inside}>
 						<OpenFlowContext.Provider value={openFlow}>
-							<EditorCanvas
-								flow={draft}
-								check={check}
-								selection={selection}
-								onFlowChange={changeFlow}
-								onSelect={setSelection}
-								onDropNode={addNode}
-							/>
+							<EnterSubflowContext.Provider value={subflows.enter}>
+								<EditorCanvas
+									flow={draft}
+									check={check}
+									selection={selection}
+									onFlowChange={changeFlow}
+									onSelect={setSelection}
+									onDropNode={addNode}
+									onNodeDoubleClick={subflows.enterNode}
+								/>
+							</EnterSubflowContext.Provider>
 						</OpenFlowContext.Provider>
 					</div>
 
 					{/* The panels float over the canvas; the gaps between them pass
 					    clicks and drops through to it. */}
-					<div className="pointer-events-none absolute inset-0">
+					<div
+						className="pointer-events-none absolute inset-0"
+						hidden={subflows.inside}
+					>
 						<FlowTitleCard
 							projectId={projectId}
 							name={name}
@@ -475,6 +497,19 @@ function Editor({
 							</FloatingInspector>
 						) : null}
 					</div>
+
+					{subflows.inside ? (
+						<OpenFlowContext.Provider value={openFlow}>
+							<SubflowView
+								rootFlow={name}
+								stack={subflows.stack}
+								flows={projectFlows.flows}
+								onEnter={subflows.enter}
+								onGoTo={subflows.goTo}
+								onEdit={openFlow}
+							/>
+						</OpenFlowContext.Provider>
+					) : null}
 				</div>
 			</ProjectFlowsContext.Provider>
 

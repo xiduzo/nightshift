@@ -157,6 +157,7 @@ export function EditorCanvas({
 	onFlowChange,
 	onSelect,
 	onDropNode,
+	onNodeDoubleClick,
 }: {
 	flow: Flow;
 	check: FlowCheck;
@@ -165,6 +166,8 @@ export function EditorCanvas({
 	onSelect: SelectionSetter;
 	/** A node type dragged from the dock was dropped at this point of the screen. */
 	onDropNode: (type: FlowNodeType, at: { x: number; y: number }) => void;
+	/** A node was double-clicked, for example a Subflow to look inside. */
+	onNodeDoubleClick?: (nodeId: string) => void;
 }) {
 	const [measured, applyDimensions] = useMeasured();
 	const { fitView } = useReactFlow();
@@ -382,6 +385,7 @@ export function EditorCanvas({
 					onConnect={onConnect}
 					isValidConnection={isValidConnection}
 					onPaneClick={() => onSelect(null)}
+					onNodeDoubleClick={(_, node) => onNodeDoubleClick?.(node.id)}
 					onDragOver={(event) => {
 						if (!event.dataTransfer.types.includes(NODE_DRAG_TYPE)) return;
 						event.preventDefault();
