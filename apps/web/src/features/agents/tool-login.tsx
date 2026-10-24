@@ -105,7 +105,6 @@ export function LoginFields({
 								id={`${id}-folder`}
 								value={draft.folder}
 								onChange={(event) => set({ folder: event.target.value })}
-								placeholder="HOME"
 								className="font-mono"
 								autoComplete="off"
 								spellCheck={false}
@@ -126,14 +125,17 @@ export function LoginFields({
 								id={`${id}-sign-in`}
 								value={draft.signInCommand}
 								onChange={(event) => set({ signInCommand: event.target.value })}
-								placeholder="acli jira auth login --site your-site.atlassian.net --email you@example.com --token"
 								className="font-mono"
 								autoComplete="off"
 								spellCheck={false}
 							/>
 							<FieldDescription>
 								Night Shift runs it before the first step, and again when a
-								secret it reads changes.
+								secret it reads changes. Example:{" "}
+								<span className="font-mono">
+									acli jira auth login --site your-site.atlassian.net --email
+									you@example.com --token
+								</span>
 							</FieldDescription>
 						</Field>
 						{draft.signInCommand.trim() ? (
@@ -148,14 +150,14 @@ export function LoginFields({
 									id={`${id}-input`}
 									value={draft.signInInput}
 									onChange={(event) => set({ signInInput: event.target.value })}
-									placeholder="${ACLI_TOKEN}"
 									className="font-mono"
 									autoComplete="off"
 									spellCheck={false}
 								/>
 								<FieldDescription>
 									The command reads this as its input. Give a token here, not in
-									the command.
+									the command. Example:{" "}
+									<span className="font-mono">${"{ACLI_TOKEN}"}</span>
 								</FieldDescription>
 							</Field>
 						) : null}
@@ -171,14 +173,14 @@ export function LoginFields({
 					id={`${id}-git`}
 					value={draft.gitHost}
 					onChange={(event) => set({ gitHost: event.target.value })}
-					placeholder="github.com"
 					className="font-mono"
 					autoComplete="off"
 					spellCheck={false}
 				/>
 				<FieldDescription>
 					In steps with this tool, git signs in to this host with its login.
-					Works with programs that sign git in, such as gh.
+					Works with programs that sign git in, such as gh. Example:{" "}
+					<span className="font-mono">github.com</span>
 				</FieldDescription>
 			</Field>
 		</>

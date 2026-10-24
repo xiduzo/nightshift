@@ -60,6 +60,7 @@ import { DataTable, dataTableColumns } from "@/shared/data-table";
 import { formatDateTime, formatRelative, useNow } from "@/shared/format";
 import { PageSection } from "@/shared/page";
 import { connectionMutations, connectionQueries } from "../queries";
+import { OUTSIDE_HINT } from "./parts";
 
 const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 
@@ -89,11 +90,16 @@ function WhereBadges({ secret }: { secret: SecretView }) {
 					variant="outline"
 					className="border-status-finished/40 bg-status-finished/10 text-status-finished"
 				>
-					Keychain
+					Saved
 				</Badge>
 			) : null}
 			{secret.inEnv ? (
-				<Badge variant="secondary">Outside Night Shift</Badge>
+				<Tooltip>
+					<TooltipTrigger render={<span className="inline-flex" />}>
+						<Badge variant="secondary">Outside Night Shift</Badge>
+					</TooltipTrigger>
+					<TooltipContent className="max-w-64">{OUTSIDE_HINT}</TooltipContent>
+				</Tooltip>
 			) : null}
 		</span>
 	);
@@ -217,7 +223,7 @@ function secretColumns({
 									<Button
 										variant="ghost"
 										size="icon-sm"
-										aria-label={`Remove ${secret.name} from the keychain`}
+										aria-label={`Remove ${secret.name}`}
 										className="text-muted-foreground hover:text-destructive"
 										onClick={() => onRemove(secret.name)}
 									/>
@@ -225,7 +231,7 @@ function secretColumns({
 							>
 								<Trash2Icon />
 							</TooltipTrigger>
-							<TooltipContent>Remove from keychain</TooltipContent>
+							<TooltipContent>Remove the saved value</TooltipContent>
 						</Tooltip>
 					) : null}
 				</div>
@@ -252,7 +258,7 @@ export function SecretsCard({ secrets }: { secrets: SecretView[] }) {
 				<>
 					Tokens and passwords your tools and commands use, written as{" "}
 					<span className="font-mono">${"{NAME}"}</span>. Night Shift keeps them
-					in your macOS keychain and never shows them again.
+					safe on this computer and never shows them again.
 				</>
 			}
 			actions={
@@ -355,7 +361,7 @@ function SecretForm({
 	const setSecret = useMutation(
 		connectionMutations.setSecret({
 			onSuccess: () => {
-				toast.success(`Saved ${name} in the keychain`);
+				toast.success(`Saved ${name}`);
 				void queryClient.invalidateQueries({
 					queryKey: connectionQueries.lists(),
 				});
@@ -387,7 +393,7 @@ function SecretForm({
 					)}
 				</DialogTitle>
 				<DialogDescription>
-					Night Shift keeps it in your macOS keychain and never shows it again.
+					Night Shift keeps it safe on this computer and never shows it again.
 					{secret?.inEnv
 						? " It replaces the value that is set outside Night Shift."
 						: null}
@@ -457,7 +463,7 @@ function SecretForm({
 				</DialogClose>
 				<Button type="submit" disabled={!canSave || setSecret.isPending}>
 					{setSecret.isPending ? <Spinner data-icon="inline-start" /> : null}
-					{setSecret.isPending ? "Saving…" : "Save in keychain"}
+					{setSecret.isPending ? "Saving…" : "Save"}
 				</Button>
 			</DialogFooter>
 		</form>
@@ -477,7 +483,7 @@ function RemoveSecretDialog({
 	const removeSecret = useMutation(
 		connectionMutations.removeSecret({
 			onSuccess: () => {
-				toast.success(`Removed ${name} from the keychain`);
+				toast.success(`Removed ${name}`);
 				void queryClient.invalidateQueries({
 					queryKey: connectionQueries.lists(),
 				});
@@ -510,7 +516,7 @@ function RemoveSecretDialog({
 			<AlertDialogContent>
 				<AlertDialogHeader>
 					<AlertDialogTitle>
-						Remove <span className="font-mono">{name}</span> from the keychain?
+						Remove <span className="font-mono">{name}</span>?
 					</AlertDialogTitle>
 					<AlertDialogDescription>{consequence}</AlertDialogDescription>
 				</AlertDialogHeader>
@@ -526,7 +532,7 @@ function RemoveSecretDialog({
 						{removeSecret.isPending ? (
 							<Spinner data-icon="inline-start" />
 						) : null}
-						{removeSecret.isPending ? "Removing…" : "Remove from keychain"}
+						{removeSecret.isPending ? "Removing…" : "Remove"}
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>

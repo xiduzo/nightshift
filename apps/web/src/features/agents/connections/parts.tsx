@@ -127,8 +127,12 @@ export function KindBadge({ kind }: { kind: "command" | "url" }) {
 	);
 }
 
+/** What "Outside Night Shift" means, for its tooltip. */
+export const OUTSIDE_HINT =
+	"Set where Night Shift starts, for example in Docker or in your shell. A value you save here takes its place.";
+
 const SOURCE_LABEL: Record<SecretSource, string> = {
-	keychain: "Keychain",
+	keychain: "Saved",
 	env: "Outside Night Shift",
 	missing: "Missing",
 };
@@ -157,14 +161,16 @@ export function VariableBadge({
 			<span className="font-normal opacity-80">· {SOURCE_LABEL[source]}</span>
 		</Badge>
 	);
-	if (source !== "missing") return badge;
+	if (source === "keychain") return badge;
 	return (
 		<Tooltip>
 			<TooltipTrigger render={<span className="inline-flex max-w-full" />}>
 				{badge}
 			</TooltipTrigger>
 			<TooltipContent className="max-w-64">
-				No value yet. Save one under Secrets below.
+				{source === "env"
+					? OUTSIDE_HINT
+					: "No value yet. Save one under Secrets below."}
 			</TooltipContent>
 		</Tooltip>
 	);
