@@ -169,6 +169,13 @@ export const dashboardSummarySchema = exact<DashboardSummary>()(
 				cost: knownCostSchema,
 				latestAt: z.number().nullable(),
 			}),
+			dayBefore: z.object({
+				runs: z.number(),
+				finished: z.number(),
+				failed: z.number(),
+				cost: knownCostSchema,
+			}),
+			yesterday: z.object({ running: z.number(), gates: z.number() }),
 			allTime: knownCostSchema,
 			hours: z.array(
 				z.object({

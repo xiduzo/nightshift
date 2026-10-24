@@ -107,6 +107,30 @@ describe("the stat cards", () => {
 		expect(summary.cards.allTime.costUsd).toBe(6.25);
 	});
 
+	test("the day before and this time yesterday give the cards something to compare with", () => {
+		const summary = summarize([
+			aRun({ status: "finished", costUsd: 1, createdAt: NOW - 2 * HOUR }),
+			aRun({ status: "failed", costUsd: 2, createdAt: NOW - 25 * HOUR }),
+			// At work this time yesterday, with a Gate open.
+			aRun({
+				status: "finished",
+				costUsd: 0.5,
+				createdAt: NOW - 26 * HOUR,
+				endedAt: NOW - 23 * HOUR,
+				gates: [{ openedAt: NOW - 25 * HOUR, closedAt: NOW - 23 * HOUR }],
+			}),
+			// Older than two days: in neither.
+			aRun({ status: "finished", costUsd: 4, createdAt: NOW - 50 * HOUR }),
+		]);
+		expect(summary.cards.dayBefore).toEqual({
+			runs: 2,
+			finished: 1,
+			failed: 1,
+			cost: { costUsd: 2.5, costEstimated: false, costMissing: 0 },
+		});
+		expect(summary.cards.yesterday).toEqual({ running: 1, gates: 1 });
+	});
+
 	test("the bars of the last 24 hours add up to the runs of the last day", () => {
 		const runs = [
 			aRun({ status: "finished", costUsd: 1, createdAt: NOW - 90 * 60_000 }),

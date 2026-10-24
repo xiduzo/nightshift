@@ -20,13 +20,21 @@ import {
 	CircleXIcon,
 	HourglassIcon,
 	LoaderCircleIcon,
+	MinusIcon,
 	MoonIcon,
+	TrendingDownIcon,
+	TrendingUpIcon,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Bar, BarChart, YAxis } from "recharts";
 import { useOpenGates } from "@/features/gates";
 import type { DashboardSummary, Project } from "@/shared/api";
-import { formatDateTime, formatKnownCost, formatTime } from "@/shared/format";
+import {
+	formatCost,
+	formatDateTime,
+	formatKnownCost,
+	formatTime,
+} from "@/shared/format";
 import { ActivityDialog } from "./activity-dialog";
 import { GatesDialog } from "./gates-dialog";
 import { RunsDialog } from "./runs-dialog";
@@ -87,6 +95,8 @@ export function SectionCards({
 	const finished = lastDay?.finished ?? 0;
 	const failed = lastDay?.failed ?? 0;
 	const hours = cards?.hours ?? [];
+	const dayBefore = cards?.dayBefore;
+	const yesterday = cards?.yesterday;
 	const openGates =
 		gates.data?.filter(
 			(gate) => projectId === undefined || gate.projectId === projectId,
@@ -100,6 +110,15 @@ export function SectionCards({
 					label="Running now"
 					onOpen={() => setDetails("activity")}
 					value={loading ? null : running}
+					trend={
+						yesterday ? (
+							<Trend
+								now={running}
+								before={yesterday.running}
+								than="this time yesterday"
+							/>
+						) : null
+					}
 					chart={loading ? null : <ActiveSparkline hours={hours} />}
 					badge={
 						sleeping > 0 ? (
@@ -150,6 +169,15 @@ export function SectionCards({
 					label="Waiting for you"
 					onOpen={() => setDetails("gates")}
 					value={gates.isLoading ? null : gates.error ? "—" : waiting}
+					trend={
+						yesterday && gates.data ? (
+							<Trend
+								now={waiting}
+								before={yesterday.gates}
+								than="this time yesterday"
+							/>
+						) : null
+					}
 					chart={loading ? null : <GatesSparkline hours={hours} />}
 					className={
 						waiting > 0
@@ -193,6 +221,17 @@ export function SectionCards({
 					value={
 						loading ? null : formatKnownCost(lastDay?.cost ?? { costUsd: 0 })
 					}
+					trend={
+						dayBefore ? (
+							<Trend
+								now={lastDay?.cost.costUsd ?? 0}
+								before={dayBefore.cost.costUsd}
+								than="the 24 hours before"
+								format={formatCost}
+								fewer="less"
+							/>
+						) : null
+					}
 					chart={loading ? null : <SpendSparkline hours={hours} />}
 					badge={
 						<Badge variant="outline" className="tabular-nums">
@@ -213,6 +252,15 @@ export function SectionCards({
 					label="Runs, last 24 h"
 					onOpen={() => setDetails("runs")}
 					value={loading ? null : lastDayRuns}
+					trend={
+						dayBefore ? (
+							<Trend
+								now={lastDayRuns}
+								before={dayBefore.runs}
+								than="the 24 hours before"
+							/>
+						) : null
+					}
 					chart={loading ? null : <OutcomesSparkline hours={hours} />}
 					badge={
 						failed > 0 ? (
@@ -363,9 +411,48 @@ function Sparkline({
 	);
 }
 
+/**
+ * How a card's number compares with an earlier one: "2 more than the 24
+ * hours before". Plain words, so it needs no tooltip.
+ */
+function Trend({
+	now,
+	before,
+	than,
+	format = String,
+	fewer = "fewer",
+}: {
+	now: number;
+	before: number;
+	/** The earlier moment or period, as it ends the sentence. */
+	than: string;
+	format?: (difference: number) => string;
+	/** The word for a drop: "fewer" for counts, "less" for money. */
+	fewer?: string;
+}) {
+	const difference = now - before;
+	const Icon =
+		difference > 0
+			? TrendingUpIcon
+			: difference < 0
+				? TrendingDownIcon
+				: MinusIcon;
+	return (
+		<span className="flex items-center gap-1 text-muted-foreground text-xs tabular-nums">
+			<Icon className="size-3.5 shrink-0" aria-hidden="true" />
+			<span className="truncate">
+				{difference === 0
+					? `Same as ${than}`
+					: `${format(Math.abs(difference))} ${difference > 0 ? "more" : fewer} than ${than}`}
+			</span>
+		</span>
+	);
+}
+
 function StatCard({
 	label,
 	value,
+	trend,
 	badge,
 	chart,
 	headline,
@@ -376,6 +463,8 @@ function StatCard({
 	label: string;
 	/** Null while loading. */
 	value: ReactNode | null;
+	/** How the number compares with an earlier one, below it. */
+	trend?: ReactNode;
 	badge?: ReactNode;
 	/** A small chart between the number and the footer. */
 	chart?: ReactNode;
@@ -413,6 +502,7 @@ function StatCard({
 				<CardTitle className="font-semibold @[250px]/card:text-3xl text-2xl tabular-nums">
 					{value === null ? <Skeleton className="h-9 w-20" /> : value}
 				</CardTitle>
+				{value !== null && trend ? trend : null}
 				{badge ? (
 					<CardAction className="@max-[250px]/card:hidden">{badge}</CardAction>
 				) : null}

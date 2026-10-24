@@ -9,6 +9,7 @@ import {
 	type CardHour,
 	type DashboardCards,
 	type DashboardSummary,
+	type DayCounts,
 	HOUR_RANGES,
 	type HourRange,
 	NIGHT_RANGES,
@@ -63,6 +64,21 @@ function spanOf(run: RunSummary, now: number) {
 
 type Span = { from: number; to: number };
 
+/** How many spans include the moment `at`. */
+function atMoment(at: number, spans: readonly Span[]): number {
+	return spans.filter((span) => span.from <= at && span.to >= at).length;
+}
+
+/** How many runs started, how they ended and what they cost. */
+function dayCountsOf(runs: readonly RunSummary[]): DayCounts {
+	return {
+		runs: runs.length,
+		finished: runs.filter((run) => run.status === "finished").length,
+		failed: runs.filter((run) => run.status === "failed").length,
+		cost: sumKnownCost(runs),
+	};
+}
+
 /** How many spans touch each hour. */
 function perHour(hours: readonly number[], spans: readonly Span[]): number[] {
 	return hours.map(
@@ -73,8 +89,9 @@ function perHour(hours: readonly number[], spans: readonly Span[]): number[] {
 }
 
 /**
- * The numbers on top: what runs now, what slept, and the last day. The
- * small charts count per hour. Runs count in the hour they started, so the
+ * The numbers on top: what runs now, what slept, and the last day, with
+ * the day before and this time yesterday to compare with. The small
+ * charts count per hour. Runs count in the hour they started, so the
  * bars add up to the card's number. The day reaches back into the hour
  * before the first bar: those runs count in the first hour.
  */
@@ -85,21 +102,20 @@ function cardsOf(
 ): DashboardCards {
 	const sleeping = runs.filter((run) => run.status === "sleeping");
 	const lastDay = runs.filter((run) => run.createdAt >= now - DAY_MS);
+	const dayBefore = runs.filter(
+		(run) => run.createdAt >= now - 2 * DAY_MS && run.createdAt < now - DAY_MS,
+	);
 	const hours = lastHours(CARD_HOURS, now, timeZone);
 	const first = hours[0] ?? now;
-	const active = perHour(
-		hours,
-		runs.map((run) => spanOf(run, now)),
+	const runSpans = runs.map((run) => spanOf(run, now));
+	const gateSpans = runs.flatMap((run) =>
+		run.gates.map((gate) => ({
+			from: gate.openedAt,
+			to: gate.closedAt ?? (run.status === "waiting" ? now : gate.openedAt),
+		})),
 	);
-	const gates = perHour(
-		hours,
-		runs.flatMap((run) =>
-			run.gates.map((gate) => ({
-				from: gate.openedAt,
-				to: gate.closedAt ?? (run.status === "waiting" ? now : gate.openedAt),
-			})),
-		),
-	);
+	const active = perHour(hours, runSpans);
+	const gates = perHour(hours, gateSpans);
 	const cardHours: CardHour[] = hours.map((hour, index) => {
 		const started = lastDay.filter((run) => {
 			const at = Math.max(run.createdAt, first);
@@ -122,15 +138,17 @@ function cardsOf(
 		sleeping: sleeping.length,
 		nextWakeAt: earliest(sleeping.map((run) => run.wakeAt)),
 		lastDay: {
-			runs: lastDay.length,
-			finished: lastDay.filter((run) => run.status === "finished").length,
-			failed: lastDay.filter((run) => run.status === "failed").length,
-			cost: sumKnownCost(lastDay),
+			...dayCountsOf(lastDay),
 			latestAt: lastDay.reduce<number | null>(
 				(last, run) =>
 					last === null || run.createdAt > last ? run.createdAt : last,
 				null,
 			),
+		},
+		dayBefore: dayCountsOf(dayBefore),
+		yesterday: {
+			running: atMoment(now - DAY_MS, runSpans),
+			gates: atMoment(now - DAY_MS, gateSpans),
 		},
 		allTime: sumKnownCost(runs),
 		hours: cardHours,

@@ -79,6 +79,14 @@ export type CardHour = {
 	other: number;
 };
 
+/** The runs started in one 24-hour period. */
+export type DayCounts = {
+	runs: number;
+	finished: number;
+	failed: number;
+	cost: KnownCost;
+};
+
 /** The numbers on top of the dashboard. */
 export type DashboardCards = {
 	running: number;
@@ -86,14 +94,17 @@ export type DashboardCards = {
 	/** When the sleeping run that wakes first wakes. */
 	nextWakeAt: number | null;
 	/** The runs started in the last 24 hours. */
-	lastDay: {
-		runs: number;
-		finished: number;
-		failed: number;
-		cost: KnownCost;
+	lastDay: DayCounts & {
 		/** When the newest of them started. */
 		latestAt: number | null;
 	};
+	/** The runs started in the 24 hours before the last day, to compare with. */
+	dayBefore: DayCounts;
+	/**
+	 * This time yesterday, to compare with what runs and waits now. A run
+	 * counts while it is at work, also when it waits or sleeps.
+	 */
+	yesterday: { running: number; gates: number };
 	allTime: KnownCost;
 	/** The last 24 hours, oldest first. */
 	hours: CardHour[];

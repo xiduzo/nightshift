@@ -66,6 +66,8 @@ function summary(over: Partial<DashboardSummary> = {}): DashboardSummary {
 				cost: cost(0),
 				latestAt: null,
 			},
+			dayBefore: { runs: 0, finished: 0, failed: 0, cost: cost(0) },
+			yesterday: { running: 0, gates: 0 },
 			allTime: cost(0),
 			hours: [],
 		},
