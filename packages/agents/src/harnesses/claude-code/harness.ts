@@ -175,6 +175,8 @@ export const CLAUDE_CODE_SPEC: HarnessSpec = {
 	reasoningFor: () => true,
 	// Claude Code then uses the user's own `claude login`.
 	scrubEnv: ["ANTHROPIC_API_KEY"],
+	// Sourced before each shell command: the step's CLI tools stay first on PATH.
+	shellEnvFile: "CLAUDE_ENV_FILE",
 };
 
 /** The `claude` adapter of one session, with its `--mcp-config` temp file. */

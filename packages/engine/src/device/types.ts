@@ -146,7 +146,13 @@ export type DeciderFacts = {
 
 export type SessionInput = Omit<
 	AgentSessionInput,
-	"mcpServers" | "clis" | "prompt" | "saveArtifact"
+	| "mcpServers"
+	| "clis"
+	| "prompt"
+	| "saveArtifact"
+	| "toolsPath"
+	| "env"
+	| "scrubEnv"
 > & {
 	harness: AgentHarnessName;
 	/** The node's prompt. The Device adds what a new session learns about its CLI tools. */
