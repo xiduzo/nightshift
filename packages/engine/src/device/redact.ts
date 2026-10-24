@@ -54,6 +54,73 @@ export function redactText(text: string, values: readonly string[]): string {
 	return redactor.push(text) + redactor.flush();
 }
 
+/** `value` with every secret value in `values` as `•••`, in each string it holds. */
+function redactDeep(value: unknown, values: readonly string[]): unknown {
+	if (typeof value === "string") return redactText(value, values);
+	if (Array.isArray(value))
+		return value.map((item) => redactDeep(item, values));
+	if (typeof value === "object" && value !== null) {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, item]) => [
+				key,
+				redactDeep(item, values),
+			]),
+		);
+	}
+	return value;
+}
+
+/**
+ * A session's events with the secret values in `values` as `•••`: its
+ * tool calls and their results, and its text. The text of a message
+ * comes in deltas, so a value split over two deltas is still found: a
+ * delta's end that could start a value waits for the next delta of that
+ * message, or for the next event.
+ */
+export async function* redactSession<E extends { type: string }>(
+	events: AsyncIterable<E>,
+	values: readonly string[],
+): AsyncGenerator<E> {
+	const texts = new Map<string, ReturnType<typeof streamRedactor>>();
+	function* flush(except?: string): Generator<E> {
+		for (const [messageId, redactor] of texts) {
+			if (messageId === except) continue;
+			texts.delete(messageId);
+			const delta = redactor.flush();
+			if (delta !== "")
+				yield { type: "text", messageId, delta } as unknown as E;
+		}
+	}
+	for await (const event of events) {
+		if (isText(event)) {
+			yield* flush(event.messageId);
+			let redactor = texts.get(event.messageId);
+			if (!redactor) {
+				redactor = streamRedactor(values);
+				texts.set(event.messageId, redactor);
+			}
+			const delta = redactor.push(event.delta);
+			if (delta !== "") yield { ...event, delta };
+			continue;
+		}
+		yield* flush();
+		yield redactDeep(event, values) as E;
+	}
+	yield* flush();
+}
+
+function isText(event: {
+	type: string;
+}): event is { type: "text"; messageId: string; delta: string } {
+	return (
+		event.type === "text" &&
+		"messageId" in event &&
+		typeof event.messageId === "string" &&
+		"delta" in event &&
+		typeof event.delta === "string"
+	);
+}
+
 /**
  * A command's events with the secret values in `values` taken out of its
  * output, per stream, and out of the reason it could not start.

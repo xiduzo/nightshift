@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { redactExec, redactText, streamRedactor } from "./redact";
+import {
+	redactExec,
+	redactSession,
+	redactText,
+	streamRedactor,
+} from "./redact";
 import type { ExecEvent } from "./types";
 
 /** Every chunk through one redactor, then what it held back. */
@@ -96,5 +101,51 @@ describe("redactExec", () => {
 			{ type: "output", stream: "stdout", text: "hun" },
 			{ type: "exit", exitCode: null, spawnError: "bad •••" },
 		]);
+	});
+});
+
+describe("redactSession", () => {
+	async function* from<T>(items: T[]): AsyncGenerator<T> {
+		for (const item of items) yield item;
+	}
+	const collectAll = async <T>(stream: AsyncIterable<T>) => {
+		const out: T[] = [];
+		for await (const item of stream) out.push(item);
+		return out;
+	};
+
+	test("a value split over the deltas of a message is masked, and the text stays whole", async () => {
+		const events = await collectAll(
+			redactSession(
+				from([
+					{ type: "text", messageId: "m1", delta: "token: tok-" },
+					{ type: "text", messageId: "m1", delta: "work, done" },
+					{
+						type: "tool-result",
+						toolCallId: "t1",
+						content: "tok-work",
+					},
+					{ type: "text", messageId: "m2", delta: "ends with tok-wo" },
+					{ type: "finished" },
+				]),
+				["tok-work"],
+			),
+		);
+		const text = (id: string) =>
+			events
+				.flatMap((e) =>
+					e.type === "text" && "messageId" in e && e.messageId === id
+						? [e.delta]
+						: [],
+				)
+				.join("");
+		expect(text("m1")).toBe("token: •••, done");
+		expect(text("m2")).toBe("ends with tok-wo");
+		expect(events).toContainEqual({
+			type: "tool-result",
+			toolCallId: "t1",
+			content: "•••",
+		});
+		expect(events.at(-1)).toEqual({ type: "finished" });
 	});
 });

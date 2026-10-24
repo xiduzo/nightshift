@@ -49,10 +49,12 @@ import {
 	createProfileStore,
 	createSettingsStore,
 	createSpaceDocuments,
+	createToolLaunchers,
 	documentRows,
 	localDevice,
 	memberRole,
 	openDeviceDocument,
+	programOf,
 	secretStore,
 	setUpGit,
 	spaceIdOf,
@@ -262,6 +264,17 @@ export async function createDaemon(
 		secrets: await secretStore({ dataDir, ...keyStore }),
 	});
 	const cliTools = createCliToolStore({ document });
+	// Each CLI tool with a login runs through a launcher of its step. A
+	// login's own folder is in the data folder, so it outlives a restart.
+	const toolLaunchers = createToolLaunchers({
+		tools: cliTools,
+		secretEnv: (names) => connections.secretEnv(names),
+		dataDir,
+		env: { ...process.env, ...env },
+	});
+	/** The program a CLI tool runs, by the tool's name. A name no tool has is a program. */
+	const programNamed = (name: string) =>
+		programOf(cliTools.get(name) ?? { name, program: null });
 	const profiles = createProfileStore({ document });
 	await Promise.all([
 		settings.load(),
@@ -323,15 +336,21 @@ export async function createDaemon(
 		secretEnv: (names) => connections.secretEnv(names),
 		connectionNames: () => connections.names(),
 		cliNames: () => cliTools.names(),
-		findCli: (name) => Bun.which(name),
+		findCli: (name) => Bun.which(programNamed(name)),
 		cliToolsFor: (names) =>
 			Promise.all(
-				names.map(async (name) => ({
-					name,
-					description: cliTools.get(name)?.description ?? null,
-					help: await cliHelp(name),
-				})),
+				names.map(async (name) => {
+					const tool = cliTools.get(name);
+					return {
+						name,
+						...(tool?.program ? { program: tool.program } : {}),
+						...(tool?.login ? { login: true } : {}),
+						description: tool?.description ?? null,
+						help: await cliHelp(programNamed(name)),
+					};
+				}),
 			),
+		toolLaunchers,
 		// The project's folder here: where its runs' worktrees branch from.
 		clonePath: clonePathOf(db, async () => device.id),
 		// Its profiles, for a run placed here from another Device.

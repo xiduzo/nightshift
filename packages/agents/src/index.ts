@@ -74,6 +74,7 @@ export {
 	type StepReportOutcome,
 	type StepReportSpec,
 	shellQuote,
+	shellQuoteAlways,
 	type ValueInput,
 	type ValueResult,
 } from "./port";

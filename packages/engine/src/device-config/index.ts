@@ -10,6 +10,7 @@ export {
 	cliToolInputSchema,
 	cliToolsInstruction,
 	createCliToolStore,
+	programOf,
 } from "./cli-tools";
 export type {
 	Connection,
