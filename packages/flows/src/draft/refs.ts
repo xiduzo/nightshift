@@ -13,7 +13,7 @@ const REF_KEY = /^[A-Za-z0-9_-]+$/;
  * Rewrites the references in a template that `rename` gives a new text for.
  * Everything else stays as it is.
  */
-function rewriteRefs(
+export function rewriteRefs(
 	text: string,
 	rename: (ref: TemplateRef) => string | undefined,
 ): string {
@@ -177,11 +177,11 @@ function rewriteSource(
 }
 
 /**
- * Applies `rewrite` to every template of the node: a prompt, a command, a
- * question, a list source, the bindings of a called flow's inputs, and the
- * values of its variable writes.
+ * Applies `rewrite` to every template of the node: a prompt (an Agent's
+ * checker prompt too), a command, a question, a list source, the bindings
+ * of a called flow's inputs, and the values of its variable writes.
  */
-function rewriteTemplates(
+export function rewriteTemplates(
 	node: FlowNode,
 	rewrite: (text: string) => string,
 ): FlowNode {
@@ -197,13 +197,25 @@ function rewriteTemplates(
 	};
 }
 
-/** The templates of the node's own kind. */
-function rewriteOwnTemplates(
+/** The templates of the node's own kind: all but the values of its variable writes. */
+export function rewriteOwnTemplates(
 	node: FlowNode,
 	rewrite: (text: string) => string,
 ): FlowNode {
 	switch (node.type) {
 		case "agent":
+			return {
+				...node,
+				prompt: rewrite(node.prompt),
+				...(node.checker?.prompt !== undefined
+					? {
+							checker: {
+								...node.checker,
+								prompt: rewrite(node.checker.prompt),
+							},
+						}
+					: {}),
+			};
 		case "decision":
 			return { ...node, prompt: rewrite(node.prompt) };
 		case "command":

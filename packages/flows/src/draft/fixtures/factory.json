@@ -1,0 +1,739 @@
+{
+	"version": 5,
+	"description": "A neutral copy of the shape of a build flow: intake, spec, build, review, ship.",
+	"inputs": [
+		{
+			"name": "issue",
+			"type": "text",
+			"required": true
+		},
+		{
+			"name": "notes",
+			"type": "text",
+			"default": ""
+		}
+	],
+	"outputs": [
+		{
+			"name": "issue",
+			"value": "{{branch.data.key}}"
+		},
+		{
+			"name": "pull_requests",
+			"value": "{{publish.data.prs}}"
+		}
+	],
+	"variables": [
+		{
+			"name": "findings",
+			"type": "json",
+			"initial": "[]"
+		},
+		{
+			"name": "approved",
+			"type": "boolean",
+			"initial": "false"
+		},
+		{
+			"name": "round",
+			"type": "number",
+			"initial": "0"
+		},
+		{
+			"name": "spec_commit",
+			"type": "text"
+		}
+	],
+	"start": "branch",
+	"nodes": [
+		{
+			"id": "branch",
+			"type": "command",
+			"position": {
+				"x": 0,
+				"y": 328
+			},
+			"command": "prepare \"{{issue}}\"",
+			"output": "json",
+			"exits": [
+				{
+					"name": "ready",
+					"code": 0
+				},
+				{
+					"name": "busy",
+					"code": 3
+				},
+				{
+					"name": "failed"
+				}
+			]
+		},
+		{
+			"id": "rest",
+			"type": "command",
+			"position": {
+				"x": 384,
+				"y": 472
+			},
+			"command": "echo \"Busy: {{branch.data.key}}\"",
+			"output": "text"
+		},
+		{
+			"id": "design",
+			"type": "command",
+			"position": {
+				"x": 384,
+				"y": 192
+			},
+			"command": "designs \"{{branch.data.key}}\"",
+			"output": "json",
+			"exits": [
+				{
+					"name": "found",
+					"code": 0
+				},
+				{
+					"name": "none",
+					"code": 4
+				},
+				{
+					"name": "unavailable",
+					"code": 5
+				},
+				{
+					"name": "failed"
+				}
+			]
+		},
+		{
+			"id": "spec",
+			"type": "agent",
+			"position": {
+				"x": 768,
+				"y": 192
+			},
+			"prompt": "Write the spec for {{branch.data.key}}. Notes: {{notes}}. Designs: {{design.data}}. Answers: {{clarify.note}}. Last check: {{validate.log_tail}}",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"outcomes": [
+				{
+					"name": "specified"
+				},
+				{
+					"name": "needs-refinement"
+				},
+				{
+					"name": "out-of-scope"
+				}
+			]
+		},
+		{
+			"id": "clarify",
+			"type": "decision",
+			"position": {
+				"x": 1152,
+				"y": 256
+			},
+			"prompt": "Answer the questions: {{spec.data.questions}}",
+			"by": "person",
+			"options": [
+				{
+					"name": "answer"
+				},
+				{
+					"name": "stop"
+				}
+			]
+		},
+		{
+			"id": "validate",
+			"type": "command",
+			"position": {
+				"x": 1152,
+				"y": 0
+			},
+			"command": "check-spec \"{{spec.data.name}}\"",
+			"output": "json",
+			"exits": [
+				{
+					"name": "valid",
+					"code": 0
+				},
+				{
+					"name": "invalid",
+					"code": 3
+				},
+				{
+					"name": "failed"
+				}
+			],
+			"set": [
+				{
+					"variable": "spec_commit",
+					"value": "{{validate.data.commit}}",
+					"on": ["valid"]
+				}
+			]
+		},
+		{
+			"id": "build",
+			"type": "agent",
+			"position": {
+				"x": 0,
+				"y": 848
+			},
+			"prompt": "Build {{spec.data.name}} on {{vars.spec_commit}}. Fix: {{vars.findings}}. Note: {{human.note}}. Last check: {{stack.log_tail}}",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"outcomes": [
+				{
+					"name": "built"
+				},
+				{
+					"name": "blocked"
+				}
+			],
+			"set": [
+				{
+					"variable": "findings",
+					"expression": "[]"
+				},
+				{
+					"variable": "approved",
+					"expression": "false"
+				},
+				{
+					"variable": "round",
+					"expression": "vars.round + 1",
+					"on": ["built"]
+				}
+			]
+		},
+		{
+			"id": "stack",
+			"type": "command",
+			"position": {
+				"x": 384,
+				"y": 920
+			},
+			"command": "check-layers \"{{vars.spec_commit}}\"",
+			"output": "json",
+			"exits": [
+				{
+					"name": "ordered",
+					"code": 0
+				},
+				{
+					"name": "mixed",
+					"code": 3
+				},
+				{
+					"name": "failed"
+				}
+			]
+		},
+		{
+			"id": "scope",
+			"type": "command",
+			"position": {
+				"x": 768,
+				"y": 920
+			},
+			"command": "check-scope",
+			"output": "text",
+			"exits": [
+				{
+					"name": "frontend",
+					"code": 0
+				},
+				{
+					"name": "backend",
+					"code": 5
+				},
+				{
+					"name": "failed"
+				}
+			]
+		},
+		{
+			"id": "ux",
+			"type": "agent",
+			"position": {
+				"x": 1152,
+				"y": 984
+			},
+			"prompt": "Review the change. Layers: {{stack.data.layers}}",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"outcomes": [
+				{
+					"name": "pass"
+				},
+				{
+					"name": "changes"
+				}
+			],
+			"set": [
+				{
+					"variable": "findings",
+					"expression": "$append(vars.findings, [ux.data])",
+					"on": ["changes"]
+				}
+			]
+		},
+		{
+			"id": "ui_design",
+			"type": "agent",
+			"position": {
+				"x": 1536,
+				"y": 984
+			},
+			"prompt": "Review the change. Layers: {{stack.data.layers}}",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"outcomes": [
+				{
+					"name": "pass"
+				},
+				{
+					"name": "changes"
+				}
+			],
+			"set": [
+				{
+					"variable": "findings",
+					"expression": "$append(vars.findings, [ui_design.data])",
+					"on": ["changes"]
+				}
+			]
+		},
+		{
+			"id": "security",
+			"type": "agent",
+			"position": {
+				"x": 1920,
+				"y": 912
+			},
+			"prompt": "Review the change. Layers: {{stack.data.layers}}",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"outcomes": [
+				{
+					"name": "pass"
+				},
+				{
+					"name": "changes"
+				}
+			],
+			"set": [
+				{
+					"variable": "findings",
+					"expression": "$append(vars.findings, [security.data])",
+					"on": ["changes"]
+				}
+			]
+		},
+		{
+			"id": "code",
+			"type": "agent",
+			"position": {
+				"x": 2304,
+				"y": 912
+			},
+			"prompt": "Review the change. Layers: {{stack.data.layers}}",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"outcomes": [
+				{
+					"name": "pass"
+				},
+				{
+					"name": "changes"
+				}
+			],
+			"set": [
+				{
+					"variable": "findings",
+					"expression": "$append(vars.findings, [code.data])",
+					"on": ["changes"]
+				}
+			]
+		},
+		{
+			"id": "verdict",
+			"type": "decision",
+			"position": {
+				"x": 2688,
+				"y": 848
+			},
+			"prompt": "",
+			"by": "rule",
+			"options": [
+				{
+					"name": "changes",
+					"when": "$count(vars.findings) > 0"
+				},
+				{
+					"name": "pass"
+				}
+			]
+		},
+		{
+			"id": "approver",
+			"type": "agent",
+			"position": {
+				"x": 3072,
+				"y": 768
+			},
+			"prompt": "Decide. Reviews: {{ux.summary}} {{ui_design.summary}} {{security.summary}} {{code.summary}}. Builds: {{vars.round}}. Build: {{build.data}}",
+			"harness": "claude-code",
+			"model": "sonnet",
+			"permissionMode": "acceptEdits",
+			"outcomes": [
+				{
+					"name": "approve"
+				},
+				{
+					"name": "escalate"
+				}
+			],
+			"set": [
+				{
+					"variable": "approved",
+					"expression": "true",
+					"on": ["approve"]
+				}
+			]
+		},
+		{
+			"id": "publish",
+			"type": "command",
+			"position": {
+				"x": 3456,
+				"y": 856
+			},
+			"command": "publish \"{{build.data.layers}}\"",
+			"output": "json"
+		},
+		{
+			"id": "route",
+			"type": "decision",
+			"position": {
+				"x": 3840,
+				"y": 848
+			},
+			"prompt": "",
+			"by": "rule",
+			"options": [
+				{
+					"name": "approved",
+					"when": "vars.approved = true"
+				},
+				{
+					"name": "needs-human"
+				}
+			]
+		},
+		{
+			"id": "human",
+			"type": "decision",
+			"position": {
+				"x": 4224,
+				"y": 856
+			},
+			"prompt": "Decide. {{approver.summary}} {{build.summary}} {{publish.data.prs}} {{vars.findings}}",
+			"by": "person",
+			"options": [
+				{
+					"name": "approve"
+				},
+				{
+					"name": "revise"
+				},
+				{
+					"name": "close"
+				},
+				{
+					"name": "keep"
+				}
+			]
+		},
+		{
+			"id": "ready",
+			"type": "command",
+			"position": {
+				"x": 4608,
+				"y": 1320
+			},
+			"command": "ready \"{{publish.data.prs}}\"",
+			"output": "text"
+		},
+		{
+			"id": "close",
+			"type": "command",
+			"position": {
+				"x": 4608,
+				"y": 888
+			},
+			"command": "close \"{{publish.data.prs}}\" \"{{human.note}}\"",
+			"output": "text"
+		}
+	],
+	"edges": [
+		{
+			"id": "branch-ready-design",
+			"from": "branch",
+			"outcome": "ready",
+			"to": "design"
+		},
+		{
+			"id": "branch-busy-rest",
+			"from": "branch",
+			"outcome": "busy",
+			"to": "rest"
+		},
+		{
+			"id": "design-found-spec",
+			"from": "design",
+			"outcome": "found",
+			"to": "spec"
+		},
+		{
+			"id": "design-none-spec",
+			"from": "design",
+			"outcome": "none",
+			"to": "spec"
+		},
+		{
+			"id": "design-unavailable-spec",
+			"from": "design",
+			"outcome": "unavailable",
+			"to": "spec"
+		},
+		{
+			"id": "design-failed-spec",
+			"from": "design",
+			"outcome": "failed",
+			"to": "spec"
+		},
+		{
+			"id": "spec-specified-validate",
+			"from": "spec",
+			"outcome": "specified",
+			"to": "validate"
+		},
+		{
+			"id": "spec-needs-refinement-clarify",
+			"from": "spec",
+			"outcome": "needs-refinement",
+			"to": "clarify"
+		},
+		{
+			"id": "clarify-answer-spec",
+			"from": "clarify",
+			"outcome": "answer",
+			"to": "spec",
+			"max": 3
+		},
+		{
+			"id": "validate-valid-build",
+			"from": "validate",
+			"outcome": "valid",
+			"to": "build"
+		},
+		{
+			"id": "validate-invalid-spec",
+			"from": "validate",
+			"outcome": "invalid",
+			"to": "spec",
+			"max": 2
+		},
+		{
+			"id": "build-built-stack",
+			"from": "build",
+			"outcome": "built",
+			"to": "stack"
+		},
+		{
+			"id": "build-blocked-human",
+			"from": "build",
+			"outcome": "blocked",
+			"to": "human"
+		},
+		{
+			"id": "stack-ordered-scope",
+			"from": "stack",
+			"outcome": "ordered",
+			"to": "scope"
+		},
+		{
+			"id": "stack-mixed-build",
+			"from": "stack",
+			"outcome": "mixed",
+			"to": "build",
+			"max": 2
+		},
+		{
+			"id": "scope-frontend-ux",
+			"from": "scope",
+			"outcome": "frontend",
+			"to": "ux"
+		},
+		{
+			"id": "scope-backend-security",
+			"from": "scope",
+			"outcome": "backend",
+			"to": "security"
+		},
+		{
+			"id": "ux-pass-ui_design",
+			"from": "ux",
+			"outcome": "pass",
+			"to": "ui_design"
+		},
+		{
+			"id": "ux-changes-ui_design",
+			"from": "ux",
+			"outcome": "changes",
+			"to": "ui_design"
+		},
+		{
+			"id": "ui_design-pass-security",
+			"from": "ui_design",
+			"outcome": "pass",
+			"to": "security"
+		},
+		{
+			"id": "ui_design-changes-security",
+			"from": "ui_design",
+			"outcome": "changes",
+			"to": "security"
+		},
+		{
+			"id": "security-pass-code",
+			"from": "security",
+			"outcome": "pass",
+			"to": "code"
+		},
+		{
+			"id": "security-changes-code",
+			"from": "security",
+			"outcome": "changes",
+			"to": "code"
+		},
+		{
+			"id": "code-pass-verdict",
+			"from": "code",
+			"outcome": "pass",
+			"to": "verdict"
+		},
+		{
+			"id": "code-changes-verdict",
+			"from": "code",
+			"outcome": "changes",
+			"to": "verdict"
+		},
+		{
+			"id": "verdict-changes-build",
+			"from": "verdict",
+			"outcome": "changes",
+			"to": "build",
+			"max": 2
+		},
+		{
+			"id": "verdict-changes-publish",
+			"from": "verdict",
+			"outcome": "changes",
+			"to": "publish"
+		},
+		{
+			"id": "verdict-pass-approver",
+			"from": "verdict",
+			"outcome": "pass",
+			"to": "approver"
+		},
+		{
+			"id": "approver-approve-publish",
+			"from": "approver",
+			"outcome": "approve",
+			"to": "publish"
+		},
+		{
+			"id": "approver-escalate-publish",
+			"from": "approver",
+			"outcome": "escalate",
+			"to": "publish"
+		},
+		{
+			"id": "publish-pass-route",
+			"from": "publish",
+			"outcome": "pass",
+			"to": "route"
+		},
+		{
+			"id": "route-approved-ready",
+			"from": "route",
+			"outcome": "approved",
+			"to": "ready"
+		},
+		{
+			"id": "route-needs-human-human",
+			"from": "route",
+			"outcome": "needs-human",
+			"to": "human"
+		},
+		{
+			"id": "human-approve-ready",
+			"from": "human",
+			"outcome": "approve",
+			"to": "ready"
+		},
+		{
+			"id": "human-revise-build",
+			"from": "human",
+			"outcome": "revise",
+			"to": "build",
+			"max": 3
+		},
+		{
+			"id": "human-close-close",
+			"from": "human",
+			"outcome": "close",
+			"to": "close"
+		}
+	],
+	"sections": [
+		{
+			"id": "intake",
+			"label": "Intake",
+			"nodes": ["branch", "rest", "design"]
+		},
+		{
+			"id": "spec",
+			"label": "Spec",
+			"nodes": ["spec", "clarify", "validate"]
+		},
+		{
+			"id": "build",
+			"label": "Build",
+			"nodes": ["build", "stack", "scope"]
+		},
+		{
+			"id": "review",
+			"label": "Review",
+			"nodes": ["ux", "ui_design", "security", "code", "verdict"]
+		},
+		{
+			"id": "ship",
+			"label": "Ship",
+			"nodes": ["approver", "publish", "route", "human", "ready", "close"]
+		}
+	]
+}

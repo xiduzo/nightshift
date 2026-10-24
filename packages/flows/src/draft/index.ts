@@ -73,3 +73,12 @@ export {
 	type SectionFields,
 	updateSection,
 } from "./sections";
+export {
+	planSubflowFromSection,
+	type SubflowBlocker,
+	type SubflowChange,
+	type SubflowInputSource,
+	type SubflowOptions,
+	type SubflowPlan,
+	type SubflowReader,
+} from "./subflow";
