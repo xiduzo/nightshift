@@ -9,7 +9,6 @@ import {
 	BreadcrumbSeparator,
 } from "@nightshift/ui/components/breadcrumb";
 import { Button } from "@nightshift/ui/components/button";
-import { ButtonGroup } from "@nightshift/ui/components/button-group";
 import { Card, CardContent } from "@nightshift/ui/components/card";
 import {
 	Empty,
@@ -30,7 +29,6 @@ import { cn } from "@nightshift/ui/lib/utils";
 import {
 	Background,
 	BackgroundVariant,
-	Panel,
 	ReactFlow,
 	ReactFlowProvider,
 	useNodesInitialized,
@@ -40,9 +38,6 @@ import {
 	ArrowUpIcon,
 	EyeIcon,
 	FileWarningIcon,
-	MaximizeIcon,
-	MinusIcon,
-	PlusIcon,
 	RepeatIcon,
 	SearchXIcon,
 	SquarePenIcon,
@@ -55,15 +50,17 @@ import {
 	useMemo,
 	useState,
 } from "react";
+import { groupEdges } from "../../canvas/edge-groups";
 import { type FlowCanvasNode, nodeTypes } from "../../canvas/flow-node";
 import { EnterSubflowContext } from "../../canvas/open-flow-context";
 import {
-	edgeColor,
+	canvasEdges,
 	edgeTypes,
 	type FlowCanvasEdge,
 	OutcomeMarkers,
 } from "../../canvas/outcome-edge";
 import { useMeasured } from "../../canvas/use-measured";
+import { CanvasControls } from "../editor-canvas";
 import {
 	type SubflowStack,
 	type SubflowViewport,
@@ -379,25 +376,17 @@ function ReadOnlyCanvas({
 		[flow.nodes, flow.start, measured, selectedId],
 	);
 
+	// The called flow draws its edges as plain step paths: its layout routes
+	// belong to its own editor.
 	const edges = useMemo<FlowCanvasEdge[]>(
 		() =>
-			flow.edges.map((edge) => ({
-				id: edge.id,
-				type: "outcome",
-				source: edge.from,
-				sourceHandle: edge.outcome,
-				target: edge.to,
+			canvasEdges(flow, groupEdges(flow)).map((edge) => ({
+				...edge,
 				selectable: false,
 				focusable: false,
 				deletable: false,
-				data: {
-					outcome: edge.outcome,
-					color: edgeColor(flow.nodes, edge),
-					max: edge.max,
-					hasError: false,
-				},
 			})),
-		[flow.edges, flow.nodes],
+		[flow],
 	);
 
 	return (
@@ -434,54 +423,8 @@ function ReadOnlyCanvas({
 					size={1.25}
 					color="color-mix(in oklch, var(--foreground) 16%, transparent)"
 				/>
-				<ZoomControls />
+				<CanvasControls />
 			</ReactFlow>
 		</EnterSubflowContext.Provider>
-	);
-}
-
-/** Zoom in, zoom out and fit, as the editor's canvas controls look. */
-function ZoomControls() {
-	const { zoomIn, zoomOut, fitView } = useReactFlow();
-	const controls = [
-		{
-			label: "Zoom in",
-			icon: PlusIcon,
-			onClick: () => void zoomIn({ duration: 150 }),
-		},
-		{
-			label: "Zoom out",
-			icon: MinusIcon,
-			onClick: () => void zoomOut({ duration: 150 }),
-		},
-		{
-			label: "Fit view",
-			icon: MaximizeIcon,
-			onClick: () => void fitView({ ...FIT, duration: 200 }),
-		},
-	];
-	return (
-		<Panel position="bottom-left" className="m-3!">
-			<ButtonGroup orientation="vertical" aria-label="Canvas controls">
-				{controls.map(({ label, icon: Icon, onClick }) => (
-					<Tooltip key={label}>
-						<TooltipTrigger
-							render={
-								<Button
-									variant="outline"
-									size="icon-sm"
-									className="bg-background dark:bg-background"
-									aria-label={label}
-									onClick={onClick}
-								/>
-							}
-						>
-							<Icon />
-						</TooltipTrigger>
-						<TooltipContent side="right">{label}</TooltipContent>
-					</Tooltip>
-				))}
-			</ButtonGroup>
-		</Panel>
 	);
 }

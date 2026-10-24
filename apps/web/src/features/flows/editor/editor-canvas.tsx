@@ -108,8 +108,15 @@ export function useAddNode(
 	};
 }
 
-/** Zoom in, zoom out, fit and auto layout, as a vertical shadcn button group. */
-function CanvasControls({ onAutoLayout }: { onAutoLayout: () => void }) {
+/**
+ * Zoom in, zoom out, fit and auto layout, as a vertical shadcn button group.
+ * Without `onAutoLayout`, as on a read-only canvas, there is no Lay out.
+ */
+export function CanvasControls({
+	onAutoLayout,
+}: {
+	onAutoLayout?: () => void;
+}) {
 	const { zoomIn, zoomOut, fitView } = useReactFlow();
 	const controls = [
 		{
@@ -127,11 +134,9 @@ function CanvasControls({ onAutoLayout }: { onAutoLayout: () => void }) {
 			icon: MaximizeIcon,
 			onClick: () => void fitView({ duration: 200, maxZoom: 1, padding: 0.15 }),
 		},
-		{
-			label: "Auto layout",
-			icon: WorkflowIcon,
-			onClick: onAutoLayout,
-		},
+		...(onAutoLayout
+			? [{ label: "Auto layout", icon: WorkflowIcon, onClick: onAutoLayout }]
+			: []),
 	];
 	return (
 		<Panel position="bottom-left" className="m-3!">
