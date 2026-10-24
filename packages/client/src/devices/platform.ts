@@ -7,6 +7,10 @@ export function platformName(platform: string | null | undefined): string {
 			return "Linux";
 		case "win32":
 			return "Windows";
+		case "ios":
+			return "iOS";
+		case "android":
+			return "Android";
 		default:
 			return platform || "Unknown system";
 	}

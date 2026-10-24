@@ -13,12 +13,15 @@ import {
 import { cn } from "@nightshift/ui/lib/utils";
 import { PlusIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import type { Phone } from "@/shared/api";
+import { formatRelative } from "@/shared/format";
 import { PanelSection } from "@/shared/panel";
 import type { SpaceComputer, SpaceHost } from "./space-view";
 
-/** Which item of the list is open: the Host, or a computer by its id. */
+/** Which item of the list is open: the Host, one of your phones on it, or a computer, by id. */
 export type DevicesSelection =
 	| { kind: "host" }
+	| { kind: "phone"; id: string }
 	| { kind: "computer"; id: string };
 
 /** One group of the list: a heading that folds it, its count, and an optional Add button. */
@@ -117,6 +120,35 @@ export function HostListItem({
 			title={name}
 			description={description}
 			aside={<OnlineDot online={online} />}
+		/>
+	);
+}
+
+export function PhoneListItem({
+	phone,
+	now,
+	selected,
+	onClick,
+}: {
+	phone: Phone;
+	now: number;
+	selected: boolean;
+	onClick: () => void;
+}) {
+	return (
+		<ListItem
+			selected={selected}
+			onClick={onClick}
+			title={phone.name}
+			description={[
+				platformName(phone.platform),
+				phone.lastSeenAt
+					? `seen ${formatRelative(phone.lastSeenAt, now)}`
+					: null,
+			]
+				.filter(Boolean)
+				.join(" · ")}
+			aside={null}
 		/>
 	);
 }

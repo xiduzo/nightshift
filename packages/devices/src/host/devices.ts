@@ -1,4 +1,5 @@
-import type { SettingsStore } from "@nightshift/engine";
+import { HostUnreachableError, type SettingsStore } from "@nightshift/engine";
+import type { HostClient } from "../contract";
 import {
 	type DeviceKeyStore,
 	type DeviceLinks,
@@ -16,7 +17,7 @@ export function createDevices(deps: {
 	links: DeviceLinks;
 	hostLinks: HostLinks;
 	/** The Spaces this computer takes part in through each Host. */
-	hostSpaces: Pick<HostSpaces, "listed">;
+	hostSpaces: Pick<HostSpaces, "listed" | "hostOf">;
 	keys: DeviceKeyStore;
 	settings: SettingsStore;
 	self: { id: string; name: string; platform: string };
@@ -26,6 +27,14 @@ export function createDevices(deps: {
 	fingerprint: string | null;
 }): Devices {
 	const { host } = deps;
+	/** One call on a Host this computer joined. Its link is not running: unreachable. */
+	function onHost<T>(
+		hostId: string,
+		use: (client: HostClient) => Promise<T>,
+	): Promise<T> {
+		const link = deps.links.get(hostId);
+		return link ? link.call(use) : Promise.reject(new HostUnreachableError());
+	}
 	return {
 		async overview({ personId, owner }): Promise<DevicesOverview> {
 			const settings = deps.settings.current();
@@ -59,6 +68,10 @@ export function createDevices(deps: {
 		deny: (headers, code) => host.deny(headers, code),
 		revoke: (personId, deviceId) => host.revoke(personId, deviceId),
 		hello: (key) => host.hello(key),
+		hostOf: (spaceId) => deps.hostSpaces.hostOf(spaceId),
+		phonesAt: (hostId) => onHost(hostId, (client) => client.link.phones()),
+		removePhoneAt: (hostId, phoneId) =>
+			onHost(hostId, (client) => client.link.removePhone({ id: phoneId })),
 		join: (input, signal) =>
 			joinHost(
 				{

@@ -18,6 +18,19 @@ export type HostHello = {
 	spaces: ListedSpace[];
 };
 
+/**
+ * A phone signed in to a Host as its Person, as the Person sees it: the
+ * Night Shift app with its notifications on. It runs nothing: it is not a
+ * Device.
+ */
+export type PhoneView = {
+	id: string;
+	name: string;
+	platform: string;
+	createdAt: number;
+	lastSeenAt: number | null;
+};
+
 /** The Host's answer to a joining Device's poll. */
 export type PairingRedeemed =
 	| { status: "pending" | "slow-down" | "denied" | "expired" }

@@ -50,7 +50,7 @@ web app and paired Devices use.
 
 | Term | Meaning |
 | --- | --- |
-| Phone | A phone with the Night Shift app, signed in to a Host as a Person. It reads and acts. It runs nothing. It shows in Settings under the Person, and the Person can remove it. Not a Device. |
+| Phone | A phone with the Night Shift app, signed in to a Host as a Person. It reads and acts. It runs nothing. It belongs to the Host, not to a Space: the Devices page lists it under the Host, and the Person can sign it out. Not a Device. |
 | Screen | Where a person sees Night Shift: a browser, the desktop app, or a phone. A word for this document and for the settings ("which screens"), not a row. |
 | Push target | A browser or a phone that gets notifications while no Night Shift page is open: its push address, a name, and when it was last seen. A phone is one push target plus its session. |
 | Notifier | The server piece that reads the run log and decides whom to tell, about what, and on which screen. |
@@ -144,8 +144,13 @@ takes that role.
   Host's addresses and a one-time code.
 - **Addresses.** The phone keeps the Host's `https://` addresses and
   tries them in order, as a Link does. No Wi-Fi name detection.
-- **Revoke.** Settings lists each phone with its name and when it was last
-  seen. "Remove" ends its session and deletes its push target.
+- **Only a Host.** The phone app signs in to a Host only. A computer that
+  is not a Host does not trust the app's origin, so it refuses the
+  sign-in (`hostAuthOrigins`). It also listens on itself only.
+- **Revoke.** The Devices page lists each phone under the Host, with its
+  name and when it was last seen (Settings → Notifications lists it too).
+  "Sign out" ends its session and deletes its push target. A phone shows
+  once its notifications are on: the Host knows it by its push target.
 
 ### Personal work on the phone
 
@@ -662,7 +667,7 @@ and it gets the same protections and more.
 | --- | --- |
 | Inbox (web) | Gates of every Space I am in, with the Space on each Gate. |
 | Settings → Notifications (web) | The Person's settings: events, quiet hours, screens, phone delay. "Get notifications in this browser" turns on Web Push. |
-| Settings → Phones (web) | Each phone: name, last seen, Remove. Later: a QR code to add one. |
+| Devices → Your phones (web) | Under the Host of the Space: each phone with its name and last seen, and Sign out. For a Space a Host keeps, the computer asks the Host over its link (`link.phones`). Later: a QR code to add one. |
 | Home (web) | Reads `dashboard.summary`. |
 | Flow editor | "Allow an answer from the lock screen" on a Decision that you decide. |
 | Phone app (new) | Sign in, Home, Inbox, Runs, Projects, run page, Gate, New run, Settings. |

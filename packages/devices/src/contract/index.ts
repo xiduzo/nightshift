@@ -13,6 +13,7 @@ export type {
 	ListedSpace,
 	PairingRedeemed,
 	PairingStart,
+	PhoneView,
 } from "./links";
 export { type OfferCaps, offerCapsSchema } from "./offers";
 export type { HostRelay } from "./relay";

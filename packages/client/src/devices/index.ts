@@ -13,6 +13,7 @@ export type {
 	OfferView,
 	PairedDevice,
 	PairingReview,
+	Phone,
 	SpaceDevice,
 	ThisComputer,
 } from "./types";

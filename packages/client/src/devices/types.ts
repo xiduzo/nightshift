@@ -8,3 +8,5 @@ export type PairedDevice = DevicesOverview["devices"][number];
 export type PairingReview = ApiOutputs["devices"]["review"];
 export type OfferView = ApiOutputs["offers"]["list"]["offers"][number];
 export type SpaceDevice = ApiOutputs["devices"]["space"][number];
+/** A phone signed in to the Host of the Space, as its Person. */
+export type Phone = ApiOutputs["devices"]["phones"][number];

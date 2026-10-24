@@ -1,6 +1,11 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
 import type { KeyStoreKind } from "@nightshift/engine";
-import type { HostHello, PairingRedeemed, PairingStart } from "../contract";
+import type {
+	HostHello,
+	PairingRedeemed,
+	PairingStart,
+	PhoneView,
+} from "../contract";
 import type {
 	HostRole,
 	HostSpaceRef,
@@ -76,6 +81,12 @@ export type Devices = {
 	revoke(personId: string, deviceId: string): Promise<void>;
 	/** A paired Device's link answered. */
 	hello(key: DeviceKeyAccess): Promise<HostHello>;
+	/** The Host this computer joined that keeps the Space, or null for a Space it keeps itself. */
+	hostOf(spaceId: string): Promise<string | null>;
+	/** The phones of this computer's owner on a Host it joined. */
+	phonesAt(hostId: string): Promise<PhoneView[]>;
+	/** Signs out one of those phones. */
+	removePhoneAt(hostId: string, phoneId: string): Promise<void>;
 	/** Pairs this computer with a Host, step by step (`nightshift join`). */
 	join(
 		input: { url: string; role: HostRole },

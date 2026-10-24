@@ -42,6 +42,7 @@ export {
 	type OfferView,
 	type PairedDevice,
 	type PairingReview,
+	type Phone,
 	platformName,
 	type SpaceDevice,
 	type ThisComputer,

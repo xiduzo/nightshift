@@ -7,6 +7,7 @@ import {
 	type PairingRedeemed,
 	type PairingReviewView,
 	type PairingStart,
+	type PhoneView,
 	type SpaceDeviceView,
 	type WorkDelivery,
 	type WorkReply,
@@ -393,3 +394,14 @@ export const offerListSchema = z.object({
 	/** The Spaces this computer can offer to. */
 	spaces: z.array(z.object({ id: z.string(), name: z.string() })),
 });
+
+/** A phone signed in to a Host as its Person. */
+export const phoneSchema = exact<PhoneView>()(
+	z.object({
+		id: z.string(),
+		name: z.string(),
+		platform: z.string(),
+		createdAt: z.number(),
+		lastSeenAt: z.number().nullable(),
+	}),
+);

@@ -2,10 +2,12 @@ import { z } from "zod";
 
 import { output } from "../output";
 import { deviceProcedure, publicProcedure } from "../procedures";
+import { phonesOf, removePhone } from "./phones";
 import {
 	hostHelloSchema,
 	pairingRedeemedSchema,
 	pairingStartSchema,
+	phoneSchema,
 } from "./schemas";
 
 const deviceId = z.string().regex(/^[\w-]{1,64}$/);
@@ -63,4 +65,23 @@ export const link = {
 		})
 		.output(output(hostHelloSchema))
 		.handler(({ context }) => context.devices.hello(context.deviceKey)),
+	/** The phones of the key's Person here, for the Devices page of their computer. */
+	phones: deviceProcedure("sync")
+		.route({
+			summary: "Lists the phones of a paired Device's Person on this Host.",
+		})
+		.output(output(z.array(phoneSchema)))
+		.handler(({ context }) =>
+			phonesOf(context.notifications, context.deviceKey.personId),
+		),
+	/** Signs out one of them, from their computer. */
+	removePhone: deviceProcedure("sync")
+		.route({
+			summary: "Signs out one phone of a paired Device's Person on this Host.",
+		})
+		.output(output(z.void()))
+		.input(z.object({ id: z.string().min(1) }))
+		.handler(({ context, input }) =>
+			removePhone(context.notifications, context.deviceKey.personId, input.id),
+		),
 };

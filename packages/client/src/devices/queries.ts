@@ -20,6 +20,14 @@ export function createDeviceQueries(orpc: ApiQueryUtils) {
 			refetchInterval: OVERVIEW_POLL_MS,
 			meta: { quietRefetchErrors: true },
 		}),
+		/** Every query of your phones. Invalidate it after one signs out. */
+		phonesKey: () => orpc.devices.phones.key(),
+		/** Your phones on the Host of the active Space. Polls; a failed background poll keeps the list. */
+		phonesLive: () => ({
+			...orpc.devices.phones.queryOptions(),
+			refetchInterval: SPACE_POLL_MS,
+			meta: { quietRefetchErrors: true },
+		}),
 		/** The Devices of the active Space and their Offers. Polls; a failed background poll keeps the list. */
 		spaceLive: () => ({
 			...orpc.devices.space.queryOptions(),
@@ -36,6 +44,7 @@ export function createDeviceMutations(orpc: ApiQueryUtils) {
 		approve: orpc.devices.approve.mutationOptions,
 		deny: orpc.devices.deny.mutationOptions,
 		revoke: orpc.devices.revoke.mutationOptions,
+		removePhone: orpc.devices.removePhone.mutationOptions,
 	};
 }
 

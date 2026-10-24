@@ -154,6 +154,11 @@ export function inMemoryHost(deps: {
 			link: {
 				hello: unary("sync", (key) => deps.hello(key)),
 				heartbeat: unary("sync", (key) => deps.hello(key)),
+				// Phones sign in to a real Host: this one keeps none.
+				phones: unary("sync", async () => []),
+				removePhone: async () => {
+					throw new Error("This Host keeps no phones.");
+				},
 			},
 			pairing: {
 				start: notServed,

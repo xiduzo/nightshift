@@ -33,6 +33,7 @@ export type {
 	PairedDevice,
 	PairingReview,
 	PendingInvitation,
+	Phone,
 	Project,
 	ProjectCheck,
 	RunCopy,

@@ -19,6 +19,7 @@ import { useMemo, useState } from "react";
 import { projectQueries } from "@/features/projects";
 import { spaceQueries } from "@/features/spaces";
 import type { RunSummary } from "@/shared/api";
+import { useNow } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { PanelHeader } from "@/shared/panel";
 import { ComputerDetail } from "./computer-detail";
@@ -27,14 +28,18 @@ import {
 	DevicesGroup,
 	type DevicesSelection,
 	HostListItem,
+	PhoneListItem,
 } from "./devices-list";
 import { HostDetail } from "./host-detail";
 import { HostSpacesAlert, hostKeptSpaces } from "./open-space";
 import { PairDeviceDialog } from "./pair-device-dialog";
+import { PhoneDetail } from "./phone-detail";
 import { deviceQueries, runQueries } from "./queries";
 import { spaceView } from "./space-view";
 
 const ON_THEIR_WAY = new Set(["running", "waiting", "sleeping"]);
+/** The `device` of a phone in the address: `phone:<id>`. */
+const PHONE = "phone:";
 
 /**
  * The Devices page shows the Space you work in: the Host that keeps it,
@@ -42,9 +47,11 @@ const ON_THEIR_WAY = new Set(["running", "waiting", "sleeping"]);
  * sits in a card on the right, like the Agents page. The one you pick
  * opens on the left. This computer's own settings are on the Settings page.
  *
- * `selected` is "host" or a computer's id: nothing chosen opens this
- * computer. `pair` is a code from the link a device printed: it opens
- * "Pair a device" with it. `onPairClosed` takes the code out of the address.
+ * `selected` is "host", "phone:<id>" or a computer's id: nothing chosen
+ * opens this computer. Your phones sit under the Host: a phone signs in
+ * to a Host, not to a Space. `pair` is a code from the link a device
+ * printed: it opens "Pair a device" with it. `onPairClosed` takes the
+ * code out of the address.
  */
 export function DevicesPage({
 	selected,
@@ -62,6 +69,8 @@ export function DevicesPage({
 	const spaces = useQuery(spaceQueries.list());
 	const runs = useQuery(runQueries.everyRunLive());
 	const projects = useQuery(projectQueries.list());
+	const phones = useQuery(deviceQueries.phonesLive());
+	const now = useNow(30_000);
 	const [pairing, setPairing] = useState(false);
 	const pairOpen = pairing || pair !== undefined;
 
@@ -95,25 +104,41 @@ export function DevicesPage({
 	);
 
 	const all = view ? [...view.yours, ...view.members] : [];
+	const phoneId = selected?.startsWith(PHONE)
+		? selected.slice(PHONE.length)
+		: null;
+	const openedPhone = phoneId
+		? phones.data?.find((p) => p.id === phoneId)
+		: undefined;
 	const selection: DevicesSelection =
 		selected === "host"
 			? { kind: "host" }
-			: {
-					kind: "computer",
-					id: all.some((c) => c.id === selected)
-						? (selected as string)
-						: (view?.yours[0]?.id ?? ""),
-				};
+			: openedPhone
+				? { kind: "phone", id: openedPhone.id }
+				: {
+						kind: "computer",
+						id: all.some((c) => c.id === selected)
+							? (selected as string)
+							: (view?.yours[0]?.id ?? ""),
+					};
 	const opened =
 		selection.kind === "computer"
 			? all.find((c) => c.id === selection.id)
 			: undefined;
-	// Pairing joins this computer as a Host: only where it keeps the Space.
+	const hostName = !view
+		? ""
+		: view.host.kind === "linked"
+			? view.host.host.name
+			: (view.host.computer?.name ?? "this computer");
+	// A phone signs in to a Host only: here, only while this computer is one.
+	const phonesHere =
+		view?.host.kind === "linked" || computer?.host.enabled === true;
 	// A Space this computer keeps: point to the Spaces its Hosts keep.
 	const elsewhere =
 		view?.host.kind === "this-computer" && computer
 			? hostKeptSpaces(computer.hosts)
 			: [];
+	// Pairing joins this computer as a Host: only where it keeps the Space.
 	const canPair =
 		view?.host.kind === "this-computer" &&
 		computer?.host.enabled === true &&
@@ -178,6 +203,12 @@ export function DevicesPage({
 							space={space}
 							onPair={canPair ? () => setPairOpen(true) : undefined}
 						/>
+					) : selection.kind === "phone" && openedPhone ? (
+						<PhoneDetail
+							key={openedPhone.id}
+							phone={openedPhone}
+							hostName={hostName}
+						/>
 					) : opened ? (
 						<ComputerDetail
 							key={opened.id}
@@ -206,6 +237,32 @@ export function DevicesPage({
 											selected={selection.kind === "host"}
 											onClick={() => onSelect("host")}
 										/>
+									</DevicesGroup>
+									<DevicesGroup
+										title="Your phones"
+										count={phones.data?.length ?? 0}
+									>
+										{phones.data && phones.data.length > 0 ? (
+											phones.data.map((phone) => (
+												<PhoneListItem
+													key={phone.id}
+													phone={phone}
+													now={now}
+													selected={openedPhone?.id === phone.id}
+													onClick={() => onSelect(`${PHONE}${phone.id}`)}
+												/>
+											))
+										) : (
+											<p className="px-2.5 py-2 text-muted-foreground text-xs">
+												{phones.isPending
+													? "Loading."
+													: phones.error
+														? `${hostName} does not answer now.`
+														: phonesHere
+															? `Sign in to ${hostName} in the Night Shift app on your phone, and turn on its notifications.`
+															: "A phone signs in to a Host. Turn on Be a Host in Settings, or open a Space of a Host you joined."}
+											</p>
+										)}
 									</DevicesGroup>
 									<DevicesGroup
 										title={

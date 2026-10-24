@@ -4,6 +4,7 @@ import {
 	workRequestSchema,
 } from "@nightshift/devices";
 
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { output, stream } from "../output";
@@ -13,10 +14,12 @@ import {
 	protectedProcedure,
 	readable,
 } from "../procedures";
+import { phonesOf, removePhone } from "./phones";
 import {
 	devicesOverviewSchema,
 	joinProgressSchema,
 	pairingReviewViewSchema,
+	phoneSchema,
 	spaceDeviceViewSchema,
 	workDeliverySchema,
 	workReplyViewSchema,
@@ -91,6 +94,46 @@ export const devices = {
 		.handler(({ context, input }) =>
 			context.devices.revoke(context.session.user.id, input.deviceId),
 		),
+	/**
+	 * Your phones on the Host of the session's Space: this computer's own
+	 * when it keeps the Space, else the Host's, asked over this computer's
+	 * link. The link is its owner's: another Person gets none through it.
+	 */
+	phones: protectedProcedure
+		.route({ summary: "Lists your phones on the Host of the Space." })
+		.output(output(z.array(phoneSchema)))
+		.handler(async ({ context }) => {
+			const personId = context.session.user.id;
+			const hostId = context.spaceId
+				? await context.devices.hostOf(context.spaceId)
+				: null;
+			if (hostId === null) return phonesOf(context.notifications, personId);
+			return personId === context.daemon.device.ownerId
+				? context.devices.phonesAt(hostId)
+				: [];
+		}),
+	/** Signs out one of your phones on the Host of the session's Space. */
+	removePhone: protectedProcedure
+		.route({
+			summary: "Signs out one of your phones on the Host of the Space.",
+		})
+		.output(output(z.void()))
+		.input(z.object({ id: z.string().min(1) }))
+		.handler(async ({ context, input }) => {
+			const personId = context.session.user.id;
+			const hostId = context.spaceId
+				? await context.devices.hostOf(context.spaceId)
+				: null;
+			if (hostId === null) {
+				return removePhone(context.notifications, personId, input.id);
+			}
+			if (personId !== context.daemon.device.ownerId) {
+				throw new ORPCError("FORBIDDEN", {
+					message: "Only the owner of this computer can do this here.",
+				});
+			}
+			await context.devices.removePhoneAt(hostId, input.id);
+		}),
 	/**
 	 * The relay's work half, as a placed Device calls it on its Host with
 	 * its Device key: the calls of the runs the Host walks on this Device,

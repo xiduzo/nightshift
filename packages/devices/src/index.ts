@@ -22,6 +22,7 @@ export {
 	offerCapsSchema,
 	type PairingRedeemed,
 	type PairingStart,
+	type PhoneView,
 	type RunCommand,
 	type RunRows,
 	runRowsSchema,

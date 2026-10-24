@@ -8,7 +8,12 @@ import type {
 } from "@nightshift/engine";
 import type { Client } from "@orpc/client";
 import type { ArchiveRef } from "./archive";
-import type { HostHello, PairingRedeemed, PairingStart } from "./links";
+import type {
+	HostHello,
+	PairingRedeemed,
+	PairingStart,
+	PhoneView,
+} from "./links";
 import type { OfferCaps } from "./offers";
 import type { RunRows, SyncCursors } from "./rows";
 import type { SyncBatch } from "./sync";
@@ -34,6 +39,10 @@ export type HostClient = {
 	link: {
 		hello: Call<undefined, HostHello>;
 		heartbeat: Call<undefined, HostHello>;
+		/** The phones of the key's Person on the Host. */
+		phones: Call<undefined, PhoneView[]>;
+		/** Signs out one of them. */
+		removePhone: Call<{ id: string }, void>;
 	};
 	pairing: {
 		start: Call<
