@@ -20,6 +20,7 @@ import {
 	BackgroundVariant,
 	type Connection,
 	type EdgeChange,
+	type InternalNode,
 	type IsValidConnection,
 	MiniMap,
 	type NodeChange,
@@ -30,18 +31,26 @@ import {
 	useStoreApi,
 } from "@xyflow/react";
 import { MaximizeIcon, MinusIcon, PlusIcon, WorkflowIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { groupEdges } from "../canvas/edge-groups";
 import { type FlowCanvasNode, nodeTypes } from "../canvas/flow-node";
 import {
-	edgeColor,
+	canvasEdges,
 	edgeTypes,
 	type FlowCanvasEdge,
 	OutcomeMarkers,
 	SelectEdgeContext,
 } from "../canvas/outcome-edge";
+import {
+	type RouteBook,
+	readRoutes,
+	recordRoutes,
+	writeRoutes,
+} from "../canvas/route-cache";
 import { useMeasured } from "../canvas/use-measured";
-import { layoutFlow } from "./lib/flow-layout";
+import { loadElk } from "./lib/elk";
+import { layoutFlow, type NodeHandles } from "./lib/flow-layout";
 import { isNodeType, NODE_DRAG_TYPE } from "./node-dock";
 
 export type Selection =
@@ -150,8 +159,37 @@ function CanvasControls({ onAutoLayout }: { onAutoLayout: () => void }) {
 	);
 }
 
+/**
+ * Where React Flow measured each node's handles, from the node's top-left
+ * corner. Only the height counts: inputs sit on the left side of a node and
+ * outcomes on its right.
+ */
+function measuredHandles(
+	nodeLookup: ReadonlyMap<string, InternalNode<FlowCanvasNode>>,
+): Record<string, NodeHandles> {
+	const handles: Record<string, NodeHandles> = {};
+	for (const [id, node] of nodeLookup) {
+		const bounds = node.internals.handleBounds;
+		const width = node.measured.width;
+		if (!bounds || width === undefined) continue;
+		const input = bounds.target?.[0];
+		handles[id] = {
+			input: input ? { x: 0, y: input.y + input.height / 2 } : undefined,
+			outcomes: Object.fromEntries(
+				(bounds.source ?? []).flatMap((handle) =>
+					handle.id
+						? [[handle.id, { x: width, y: handle.y + handle.height / 2 }]]
+						: [],
+				),
+			),
+		};
+	}
+	return handles;
+}
+
 export function EditorCanvas({
 	flow,
+	routesKey,
 	check,
 	selection,
 	onFlowChange,
@@ -160,6 +198,8 @@ export function EditorCanvas({
 	onNodeDoubleClick,
 }: {
 	flow: Flow;
+	/** Names the flow for the routes this browser keeps of its last layout. */
+	routesKey: string;
 	check: FlowCheck;
 	selection: Selection;
 	onFlowChange: (change: (flow: Flow) => Flow) => void;
@@ -219,23 +259,22 @@ export function EditorCanvas({
 		[flow.nodes, flow.start, counts, measured, selection],
 	);
 
+	// The routes of the last "Lay out". Each holds while its nodes stay put.
+	const [routes, setRoutes] = useState<RouteBook>(() => readRoutes(routesKey));
+	const groups = useMemo(() => groupEdges(flow), [flow]);
 	const edges = useMemo<FlowCanvasEdge[]>(
 		() =>
-			flow.edges.map((edge) => ({
-				id: edge.id,
-				type: "outcome",
-				source: edge.from,
-				sourceHandle: edge.outcome,
-				target: edge.to,
-				selected: selection?.kind === "edge" && selection.id === edge.id,
-				data: {
-					outcome: edge.outcome,
-					color: edgeColor(flow.nodes, edge),
-					max: edge.max,
-					hasError: counts.edgeErrors.has(edge.id),
-				},
-			})),
-		[flow.edges, flow.nodes, counts, selection],
+			canvasEdges(flow, groups, {
+				routes,
+				errors: counts.edgeErrors,
+				selected: selection?.kind === "edge" ? selection.id : undefined,
+			}),
+		[flow, groups, routes, counts, selection],
+	);
+	// A drawn edge carries every edge of its node pair, under its first id.
+	const groupOf = useMemo(
+		() => new Map(groups.map((group) => [group.id, group])),
+		[groups],
 	);
 
 	const onNodesChange = useCallback(
@@ -281,33 +320,38 @@ export function EditorCanvas({
 
 	const onEdgesChange = useCallback(
 		(changes: EdgeChange<FlowCanvasEdge>[]) => {
-			const removed = changes.flatMap((change) =>
-				change.type === "remove" ? [change.id] : [],
-			);
+			const ids = (id: string) =>
+				groupOf.get(id)?.edges.map((edge) => edge.id) ?? [id];
+			const selected = selection?.kind === "edge" ? selection.id : undefined;
+			// Delete removes the edge you selected in a drawn edge, or all of
+			// them when none is selected (its node went).
+			const removed = changes.flatMap((change) => {
+				if (change.type !== "remove") return [];
+				const inGroup = ids(change.id);
+				return selected && inGroup.includes(selected) ? [selected] : inGroup;
+			});
 			if (removed.length > 0) {
 				onFlowChange((current) =>
 					removed.reduce((next, id) => removeEdge(next, id), current),
 				);
 			}
 			for (const change of changes) {
-				if (change.type === "select") {
-					onSelect((current) =>
-						change.selected
-							? { kind: "edge", id: change.id }
-							: current?.kind === "edge" && current.id === change.id
-								? null
-								: current,
-					);
-				} else if (change.type === "remove") {
-					onSelect((current) =>
-						current?.kind === "edge" && current.id === change.id
+				if (change.type !== "select" && change.type !== "remove") continue;
+				const inGroup = ids(change.id);
+				const isIn = (current: Selection) =>
+					current?.kind === "edge" && inGroup.includes(current.id);
+				onSelect((current) =>
+					change.type === "select" && change.selected
+						? isIn(current)
+							? current
+							: { kind: "edge", id: change.id }
+						: isIn(current)
 							? null
 							: current,
-					);
-				}
+				);
 			}
 		},
-		[onFlowChange, onSelect],
+		[groupOf, selection, onFlowChange, onSelect],
 	);
 
 	const onConnect = useCallback(
@@ -339,32 +383,65 @@ export function EditorCanvas({
 
 	// Every node moves at once, so the toast offers the old places back. Fit
 	// after React Flow has the new positions: a layout you cannot see looks
-	// like nothing happened. The layout fills the canvas the fit will show,
-	// less its padding, so a long flow wraps into rows.
+	// like nothing happened. The layout picks the direction that shows the
+	// nodes biggest in the canvas the fit will show, less its padding.
 	const store = useStoreApi<FlowCanvasNode, FlowCanvasEdge>();
-	const autoLayout = useCallback(() => {
+	const laying = useRef(false);
+	const autoLayout = useCallback(async () => {
+		if (laying.current) return;
+		laying.current = true;
 		const before = new Map(flow.nodes.map((node) => [node.id, node.position]));
-		const { width, height } = store.getState();
+		const routesBefore = routes;
+		const { width, height, nodeLookup } = store.getState();
 		const viewport = { width: width / 1.15, height: height / 1.15 };
-		onFlowChange((current) =>
-			layoutFlow(current, { sizes: measured, viewport }),
-		);
+		try {
+			const laid = await layoutFlow(flow, {
+				layout: await loadElk(),
+				sizes: measured,
+				handles: measuredHandles(nodeLookup),
+				viewport,
+			});
+			const at = new Map(
+				laid.flow.nodes.map((node) => [node.id, node.position]),
+			);
+			const book = recordRoutes(
+				laid.flow.nodes,
+				groupEdges(laid.flow),
+				laid.routes,
+			);
+			setRoutes(book);
+			writeRoutes(routesKey, book);
+			onFlowChange((current) =>
+				current.nodes.reduce((next, node) => {
+					const position = at.get(node.id);
+					return position ? moveNode(next, node.id, position) : next;
+				}, current),
+			);
+		} catch {
+			toast.error("Could not lay out the flow. Try again.");
+			return;
+		} finally {
+			laying.current = false;
+		}
 		requestAnimationFrame(
 			() => void fitView({ duration: 200, maxZoom: 1, padding: 0.15 }),
 		);
 		toast.info("Laid out the flow.", {
 			action: {
 				label: "Undo",
-				onClick: () =>
+				onClick: () => {
+					setRoutes(routesBefore);
+					writeRoutes(routesKey, routesBefore);
 					onFlowChange((current) =>
 						current.nodes.reduce((next, node) => {
 							const position = before.get(node.id);
 							return position ? moveNode(next, node.id, position) : next;
 						}, current),
-					),
+					);
+				},
 			},
 		});
-	}, [flow.nodes, measured, onFlowChange, fitView, store]);
+	}, [flow, routes, routesKey, measured, onFlowChange, fitView, store]);
 
 	const selectEdge = useCallback(
 		(id: string) => onSelect({ kind: "edge", id }),
@@ -414,7 +491,7 @@ export function EditorCanvas({
 						size={1.25}
 						color="color-mix(in oklch, var(--foreground) 16%, transparent)"
 					/>
-					<CanvasControls onAutoLayout={autoLayout} />
+					<CanvasControls onAutoLayout={() => void autoLayout()} />
 					{flow.nodes.length > 4 ? (
 						<MiniMap
 							pannable

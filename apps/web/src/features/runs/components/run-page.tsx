@@ -399,6 +399,11 @@ export function RunPage({ runId }: { runId: string }) {
 					steps={graphSteps}
 					runStatus={status}
 					traversals={graphTraversals}
+					routesKey={
+						!graphScope && runData.flowName
+							? `${runData.projectId}/${runData.flowName}`
+							: undefined
+					}
 					selectedNodeId={graphSelected?.nodeId ?? null}
 					onSelectNode={selectNode}
 					label={graphScope ? "The flow of the call in focus" : undefined}

@@ -13,10 +13,15 @@ import {
 	NativeSelect,
 	NativeSelectOption,
 } from "@nightshift/ui/components/native-select";
+import {
+	ToggleGroup,
+	ToggleGroupItem,
+} from "@nightshift/ui/components/toggle-group";
 import { cn } from "@nightshift/ui/lib/utils";
 import { ArrowRightIcon, SplineIcon, Trash2Icon } from "lucide-react";
 import { useId } from "react";
 import { PanelHeader } from "@/shared/panel";
+import { groupEdges, pairKey } from "../canvas/edge-groups";
 import { outcomeLabel, outcomeStyle } from "../canvas/outcome-badge";
 import { Field, InspectorSection, PositiveIntInput } from "./fields";
 
@@ -43,11 +48,14 @@ export function OutcomePill({
 export function EdgeInspector({
 	flow,
 	edge,
+	onSelectEdge,
 	onChange,
 	onDelete,
 }: {
 	flow: Flow;
 	edge: FlowEdge;
+	/** Selects another edge of the flow: one that shares this edge's line. */
+	onSelectEdge: (id: string) => void;
 	onChange: (change: (edge: FlowEdge) => FlowEdge) => void;
 	onDelete: () => void;
 }) {
@@ -58,6 +66,10 @@ export function EdgeInspector({
 	const missing = !known.includes(edge.outcome);
 	const outcomes = missing ? [edge.outcome, ...known] : known;
 	const loopsBack = edgeInLoop(flow, edge);
+	// The canvas draws the edges between two nodes as one line.
+	const siblings =
+		groupEdges(flow).find((group) => group.key === pairKey(edge.from, edge.to))
+			?.edges ?? [];
 
 	return (
 		<div className="flex flex-col">
@@ -96,6 +108,43 @@ export function EdgeInspector({
 			/>
 
 			<InspectorSection title="Route">
+				{siblings.length > 1 ? (
+					<Field
+						id={`${id}-line`}
+						label="Edges on this line"
+						hint={`${siblings.length} edges lead from ${edge.from} to ${edge.to}. Pick the one to change or delete.`}
+					>
+						<ToggleGroup
+							id={`${id}-line`}
+							variant="outline"
+							size="sm"
+							spacing={0}
+							className="flex-wrap"
+							aria-describedby={`${id}-line-hint`}
+							value={[edge.id]}
+							onValueChange={(next: string[]) => {
+								const pick = next[0];
+								if (pick) onSelectEdge(pick);
+							}}
+						>
+							{siblings.map((sibling) => (
+								<ToggleGroupItem
+									key={sibling.id}
+									value={sibling.id}
+									className={cn(
+										"font-mono",
+										outcomeStyle(
+											sibling.outcome,
+											source && outcomeColor(source, sibling.outcome),
+										).text,
+									)}
+								>
+									{outcomeLabel(sibling.outcome)}
+								</ToggleGroupItem>
+							))}
+						</ToggleGroup>
+					</Field>
+				) : null}
 				<Field
 					id={`${id}-outcome`}
 					label="Outcome"

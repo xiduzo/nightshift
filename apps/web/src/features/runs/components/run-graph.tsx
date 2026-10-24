@@ -8,13 +8,15 @@ import {
 } from "@xyflow/react";
 import { type ReactNode, useMemo } from "react";
 import {
-	edgeColor,
+	canvasEdges,
 	edgeTypes,
 	type FlowCanvasEdge,
 	type FlowCanvasNode,
+	groupEdges,
 	type NodeRunState,
 	nodeTypes,
 	OutcomeMarkers,
+	readRoutes,
 	stepState,
 	useMeasured,
 } from "@/features/flows";
@@ -33,6 +35,7 @@ export function RunGraph({
 	selectedNodeId,
 	onSelectNode,
 	breadcrumb,
+	routesKey,
 	label = "Flow of this run",
 }: {
 	flow: Flow;
@@ -44,6 +47,8 @@ export function RunGraph({
 	onSelectNode: (nodeId: string) => void;
 	/** Shown over the canvas, top left: where in the run this graph is. */
 	breadcrumb?: ReactNode;
+	/** Names the flow for the routes this browser keeps of its last layout. */
+	routesKey?: string;
 	label?: string;
 }) {
 	const [measured, applyDimensions] = useMeasured();
@@ -77,25 +82,18 @@ export function RunGraph({
 		[flow, measured, selectedNodeId, runStates],
 	);
 
+	// The run's copy of the flow draws the routes of the flow's last layout,
+	// as long as its nodes stand where that layout put them.
+	const routes = useMemo(
+		() => (routesKey ? readRoutes(routesKey) : {}),
+		[routesKey],
+	);
 	const edges = useMemo<FlowCanvasEdge[]>(
 		() =>
-			flow.edges.map((edge) => ({
-				id: edge.id,
-				type: "outcome",
-				source: edge.from,
-				sourceHandle: edge.outcome,
-				target: edge.to,
-				selectable: false,
-				focusable: false,
-				data: {
-					outcome: edge.outcome,
-					color: edgeColor(flow.nodes, edge),
-					max: edge.max,
-					hasError: false,
-					traversals: traversals[edge.id] ?? 0,
-				},
-			})),
-		[flow.edges, flow.nodes, traversals],
+			canvasEdges(flow, groupEdges(flow), { routes, traversals }).map(
+				(edge) => ({ ...edge, selectable: false, focusable: false }),
+			),
+		[flow, routes, traversals],
 	);
 
 	return (

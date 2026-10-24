@@ -328,6 +328,7 @@ function Editor({
 			key={selectedEdge.id}
 			flow={draft}
 			edge={selectedEdge}
+			onSelectEdge={(id) => setSelection({ kind: "edge", id })}
 			onChange={(change) =>
 				setDraft((current) => updateEdge(current, selectedEdge.id, change))
 			}
@@ -440,6 +441,7 @@ function Editor({
 							<EnterSubflowContext.Provider value={subflows.enter}>
 								<EditorCanvas
 									flow={draft}
+									routesKey={`${projectId}/${name}`}
 									check={check}
 									selection={selection}
 									onFlowChange={changeFlow}
