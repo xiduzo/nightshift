@@ -9,6 +9,7 @@ import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlertIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { NotificationSettingsCard } from "@/features/notifications";
 import { PageHeading, SiteHeader } from "@/shared/page";
 import { AgentDefaultsCard } from "./components/agent-defaults-card";
@@ -17,11 +18,14 @@ import { CleanupCard } from "./components/cleanup-card";
 import { PhoneCard } from "./components/phone-card";
 import { RunPolicyCard } from "./components/run-policy-card";
 import { RunsCard } from "./components/runs-card";
-import { ThisComputerLink } from "./components/this-computer-link";
 import { settingsQueries } from "./queries";
 
-/** The Settings page: runs, run policy, new Agent nodes, notifications, the phone, appearance. */
-export function SettingsPage() {
+/**
+ * The Settings page: runs, run policy, new Agent nodes, notifications, the
+ * phone, appearance, and `thisComputer`: the section of this computer, which
+ * the Devices vertical owns.
+ */
+export function SettingsPage({ thisComputer }: { thisComputer: ReactNode }) {
 	const settings = useQuery(settingsQueries.get());
 
 	return (
@@ -72,7 +76,7 @@ export function SettingsPage() {
 					<NotificationSettingsCard />
 					<PhoneCard />
 					<AppearanceCard />
-					<ThisComputerLink name={settings.data?.daemon.device.name} />
+					{thisComputer}
 				</div>
 			</div>
 		</>

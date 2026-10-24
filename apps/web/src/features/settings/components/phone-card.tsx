@@ -88,8 +88,8 @@ export function PhoneCard() {
 							<ItemContent className="min-w-0">
 								<ItemTitle>Your phone needs an https:// address</ItemTitle>
 								<ItemDescription className="line-clamp-none">
-									Be a Host and add an https:// address on the Devices page.
-									Then the code for your phone shows here.
+									Turn on Be a Host and add an https:// address under This
+									computer below. Then the code for your phone shows here.
 								</ItemDescription>
 							</ItemContent>
 							<ItemActions>
@@ -97,9 +97,9 @@ export function PhoneCard() {
 									variant="outline"
 									size="sm"
 									nativeButton={false}
-									render={<Link to="/devices" />}
+									render={<Link to="/settings" hash="this-computer" />}
 								>
-									Devices
+									This computer
 								</Button>
 							</ItemActions>
 						</Item>

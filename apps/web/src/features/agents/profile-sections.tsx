@@ -13,8 +13,8 @@ import {
 import { Link } from "@tanstack/react-router";
 import { ShareIcon, WorkflowIcon } from "lucide-react";
 import type { OfferView, ProfileRow } from "@/shared/api";
+import { DetailSection } from "@/shared/detail";
 import { permissionLabel } from "./agent-options";
-import { DetailSection } from "./detail-shell";
 
 /** The Agent nodes that use the profile, by flow. */
 export function ProfileUsedIn({ usedBy }: { usedBy: ProfileRow["usedBy"] }) {

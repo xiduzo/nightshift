@@ -51,10 +51,10 @@ import type {
 	ProfileInput,
 	ProfileRow,
 } from "@/shared/api";
+import { DetailSection, DetailShell } from "@/shared/detail";
 import { EFFORTS, PERMISSION_MODES } from "./agent-options";
 import { CliCheckBadge } from "./connections/cli-panel";
 import { KindBadge } from "./connections/parts";
-import { DetailSection, DetailShell } from "./detail-shell";
 import { harnessInfo } from "./harnesses";
 import { ModelCombobox, ModelSourceHint } from "./model-combobox";
 import { OfferDialog, WithdrawOfferDialog } from "./offer-dialog";

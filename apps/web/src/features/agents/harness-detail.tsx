@@ -37,9 +37,9 @@ import type {
 	HarnessRowName,
 	SettingsView,
 } from "@/shared/api";
+import { DetailSection, DetailShell } from "@/shared/detail";
 import { CliCheckBadge, CliPanel, toolFor } from "./connections/cli-panel";
 import { MonoTile } from "./connections/parts";
-import { DetailSection, DetailShell } from "./detail-shell";
 import type { BuiltInHarnessName } from "./harnesses";
 import { ModelSourceHint, useHarnessModels } from "./model-combobox";
 import { harnessMutations, harnessQueries } from "./queries";

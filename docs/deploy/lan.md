@@ -42,7 +42,7 @@ nightshift serve --host-address https://studio.local:3443
 ```
 
 In the desktop app, set the same two variables before you open it, and add
-`https://studio.local:3443` under Devices → Be a Host.
+`https://studio.local:3443` under Settings → This computer → Be a Host.
 
 Set `NIGHTSHIFT_TLS_PORT` for another port.
 
@@ -50,7 +50,7 @@ Set `NIGHTSHIFT_TLS_PORT` for another port.
 
 Follow [Pair a computer with the Host](README.md#pair-a-computer-with-the-host).
 The other computer shows the fingerprint of the certificate with the code.
-The Host shows its fingerprint on its Devices page. Allow the computer only
+The Host shows its fingerprint in Settings, under This computer. Allow the computer only
 when the two are the same.
 
 When you make a new certificate, pair your computers again: they trust only

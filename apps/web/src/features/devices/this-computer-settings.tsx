@@ -29,14 +29,14 @@ import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
 import { Textarea } from "@nightshift/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import {
 	CopyIcon,
 	FolderIcon,
 	GlobeIcon,
+	HouseIcon,
 	KeyRoundIcon,
+	LinkIcon,
 	LockIcon,
-	PlugIcon,
 	RotateCwIcon,
 	ShieldCheckIcon,
 } from "lucide-react";
@@ -48,14 +48,42 @@ import {
 } from "@/features/settings/queries";
 import type { ThisComputer } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
+import { PageSection } from "@/shared/page";
 import { deviceIcon } from "./device-icon";
+import { JoinHostDialog } from "./join-host-dialog";
 import { deviceQueries } from "./queries";
+import { HostStatus } from "./status-badges";
 
 /**
- * This computer: its name, where its data is, whether Night Shift runs, and
- * "Be a Host" with the addresses other computers use. Its owner's only.
+ * This computer on the Settings page: what belongs to the computer and not
+ * to a Space. Its name, "Be a Host" with the addresses other computers use,
+ * the Hosts it joined with the Spaces each keeps, and where its data is.
+ * Its owner's only: nothing for another Person.
  */
-export function ThisComputerCard({ computer }: { computer: ThisComputer }) {
+export function ThisComputerSettings() {
+	const overview = useQuery(deviceQueries.overviewLive());
+	const computer = overview.data?.thisComputer;
+	if (overview.data && !computer) return null;
+	// The Devices page links here.
+	return (
+		<PageSection
+			className="scroll-mt-4"
+			title={<span id="this-computer">This computer</span>}
+			description="Whether other computers can pair with it, the Hosts it joined, and where it keeps its data."
+		>
+			{computer ? (
+				<>
+					<ThisComputerCard computer={computer} />
+					<Hosts hosts={computer.hosts} />
+				</>
+			) : (
+				<Skeleton className="h-64 w-full rounded-xl" />
+			)}
+		</PageSection>
+	);
+}
+
+function ThisComputerCard({ computer }: { computer: ThisComputer }) {
 	const settings = useQuery(settingsQueries.get());
 	const daemon = settings.data?.daemon;
 	const dataDir = daemon?.dataDir;
@@ -105,12 +133,16 @@ export function ThisComputerCard({ computer }: { computer: ThisComputer }) {
 						</ItemMedia>
 						<ItemContent className="min-w-0">
 							<ItemTitle>Data folder</ItemTitle>
-							<ItemDescription
-								className="truncate font-mono text-xs"
-								title={dataDir}
-							>
-								{dataDir ?? <Skeleton className="h-4 w-64" />}
-							</ItemDescription>
+							{dataDir ? (
+								<ItemDescription
+									className="truncate font-mono text-xs"
+									title={dataDir}
+								>
+									{dataDir}
+								</ItemDescription>
+							) : (
+								<Skeleton className="h-4 w-64" />
+							)}
 						</ItemContent>
 						{dataDir ? (
 							<ItemActions>
@@ -136,39 +168,15 @@ export function ThisComputerCard({ computer }: { computer: ThisComputer }) {
 						</ItemMedia>
 						<ItemContent>
 							<ItemTitle>Status</ItemTitle>
-							<ItemDescription className="line-clamp-none">
-								{lease ? (
-									<>
-										On {lease.host} since {formatDateTime(lease.since)}. Only
-										one Night Shift at a time can use this data.
-									</>
-								) : (
-									<Skeleton className="h-4 w-64" />
-								)}
-							</ItemDescription>
+							{lease ? (
+								<ItemDescription className="line-clamp-none">
+									On {lease.host} since {formatDateTime(lease.since)}. Only one
+									Night Shift at a time can use this data.
+								</ItemDescription>
+							) : (
+								<Skeleton className="h-4 w-64" />
+							)}
 						</ItemContent>
-					</Item>
-					<ItemSeparator />
-					<Item size="sm" className="px-0">
-						<ItemMedia variant="icon">
-							<PlugIcon aria-hidden="true" />
-						</ItemMedia>
-						<ItemContent>
-							<ItemTitle>Coding agents</ItemTitle>
-							<ItemDescription className="line-clamp-none">
-								Check where your harnesses are installed, on the Agents page.
-							</ItemDescription>
-						</ItemContent>
-						<ItemActions>
-							<Button
-								variant="outline"
-								size="sm"
-								nativeButton={false}
-								render={<Link to="/agents" />}
-							>
-								Agents
-							</Button>
-						</ItemActions>
 					</Item>
 				</ItemGroup>
 			</CardContent>
@@ -314,4 +322,68 @@ function isHostAddress(value: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+/** The Hosts this computer joined, each with the Spaces it keeps for it, and Join a Host. */
+function Hosts({ hosts }: { hosts: ThisComputer["hosts"] }) {
+	const [joining, setJoining] = useState(false);
+	const hasHome = hosts.some(
+		(host) => host.role === "home" && host.status !== "revoked",
+	);
+	return (
+		<Card>
+			<CardContent className="flex flex-col gap-3">
+				<div className="flex items-end justify-between gap-4">
+					<div className="flex flex-col gap-1">
+						<h3 className="font-medium text-sm">Hosts it joined</h3>
+						<p className="text-muted-foreground text-sm">
+							{hosts.length === 0
+								? "This computer keeps its own Spaces. Join a Host to work in a Space another computer keeps: yours, a server, or a colleague's."
+								: "Each Space lives on one Host. Your home Host also keeps the settings of this computer."}
+						</p>
+					</div>
+					<Button variant="outline" size="sm" onClick={() => setJoining(true)}>
+						<LinkIcon data-icon="inline-start" />
+						Join a Host
+					</Button>
+				</div>
+				{hosts.length > 0 ? (
+					<ItemGroup className="gap-2">
+						{hosts.map((host) => (
+							<Item key={host.hostId} variant="outline" size="sm">
+								<ItemMedia variant="icon">
+									{host.role === "home" ? (
+										<HouseIcon aria-hidden="true" />
+									) : (
+										<LinkIcon aria-hidden="true" />
+									)}
+								</ItemMedia>
+								<ItemContent className="min-w-0">
+									<ItemTitle>
+										{host.name}
+										<Badge variant="secondary">
+											{host.role === "home" ? "Home Host" : "Guest Host"}
+										</Badge>
+										<HostStatus status={host.status} />
+									</ItemTitle>
+									<ItemDescription className="line-clamp-none">
+										{host.status === "revoked"
+											? "The Host removed the access of this computer. Join it again to sync."
+											: host.spaces.length > 0
+												? `Keeps ${host.spaces.map((space) => space.name).join(", ")}.`
+												: "Keeps no Space of yours yet."}
+									</ItemDescription>
+								</ItemContent>
+							</Item>
+						))}
+					</ItemGroup>
+				) : null}
+			</CardContent>
+			<JoinHostDialog
+				open={joining}
+				onOpenChange={setJoining}
+				hasHome={hasHome}
+			/>
+		</Card>
+	);
 }

@@ -323,11 +323,12 @@ sign in: use the sign-in from `nightshift admin`.
 
 Do this after any of the guides.
 
-1. On the Host, add the address. Open Devices, turn on Be a Host, and add the
-   `https://` address. Or start the Host with `--host-address`, or set
-   `NIGHTSHIFT_HOST_ADDRESSES`. Restart Night Shift when the Devices page
-   asks for it.
-2. On the other computer, open Devices and choose Join a Host. Or run:
+1. On the Host, add the address. Open Settings, turn on Be a Host under This
+   computer, and add the `https://` address. Or start the Host with
+   `--host-address`, or set `NIGHTSHIFT_HOST_ADDRESSES`. Restart Night Shift
+   when Settings asks for it.
+2. On the other computer, open Settings and choose Join a Host under This
+   computer. Or run:
 
    ```bash
    nightshift join https://nightshift.example.com

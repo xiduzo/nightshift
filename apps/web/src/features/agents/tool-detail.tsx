@@ -37,10 +37,9 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Connection } from "@/shared/api";
+import { DetailSection, DetailShell } from "@/shared/detail";
 import { FactList, OffMachineNote, VariableBadge } from "./connections/parts";
 import { McpTestOutcome } from "./connections/test-result";
-
-import { DetailSection, DetailShell } from "./detail-shell";
 import {
 	connectionMutations,
 	connectionQueries,

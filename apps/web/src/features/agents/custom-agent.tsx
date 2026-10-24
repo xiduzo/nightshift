@@ -47,6 +47,7 @@ import {
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { HarnessRow } from "@/shared/api";
+import { DetailSection, DetailShell } from "@/shared/detail";
 import { formatDateTime, formatTime } from "@/shared/format";
 import { useCliCheck } from "./connections/cli-panel";
 import {
@@ -56,7 +57,6 @@ import {
 	rowsFrom,
 } from "./connections/key-value-rows";
 import { FactList, OffMachineNote } from "./connections/parts";
-import { DetailSection, DetailShell } from "./detail-shell";
 import { connectionQueries, harnessMutations, harnessQueries } from "./queries";
 
 /** `${NAME}`: a reference to a secret. */

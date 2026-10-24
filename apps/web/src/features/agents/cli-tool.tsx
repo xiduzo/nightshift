@@ -52,10 +52,9 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import type { CliTool } from "@/shared/api";
 import { CodeView } from "@/shared/code";
+import { DetailSection, DetailShell } from "@/shared/detail";
 import { checkState } from "./connections/cli-panel";
 import { CheckBadge, FactList } from "./connections/parts";
-
-import { DetailSection, DetailShell } from "./detail-shell";
 import {
 	cliToolMutations,
 	cliToolQueries,

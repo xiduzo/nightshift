@@ -22,10 +22,10 @@ import { useId } from "react";
 import { toast } from "sonner";
 import type { CliTool } from "@/shared/api";
 import { CodeView } from "@/shared/code";
+import { DetailSection } from "@/shared/detail";
 import { formatDateTime, formatRelative, useNow } from "@/shared/format";
 import { KeyValueRows } from "./connections/key-value-rows";
 import { FactList } from "./connections/parts";
-import { DetailSection } from "./detail-shell";
 import { cliToolMutations, cliToolQueries, connectionQueries } from "./queries";
 import { type LoginDraft, loginPreset } from "./tool-login-draft";
 
