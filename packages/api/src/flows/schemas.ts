@@ -15,6 +15,7 @@ export const flowIssueSchema = exact<FlowIssue>()(
 		message: z.string(),
 		nodeId: z.string().optional(),
 		edgeId: z.string().optional(),
+		sectionId: z.string().optional(),
 	}),
 );
 

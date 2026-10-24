@@ -23,6 +23,7 @@ import {
 	waitNode,
 } from "./nodes";
 import { renameRefs, rewriteFlowTemplates } from "./refs";
+import { sectionsWithoutNode, sectionsWithRenamedNode } from "./sections";
 
 /** The flow files of a project, by name. Null when a file does not load. */
 export type ProjectFlowMap = Readonly<Record<string, Flow | null>>;
@@ -115,20 +116,26 @@ export function moveNode(flow: Flow, id: string, position: Position): Flow {
 	}));
 }
 
-/** Removes the node and its edges. A removed start node hands start to the first node left. */
+/**
+ * Removes the node and its edges, and takes it out of its Section. A
+ * removed start node hands start to the first node left.
+ */
 export function removeNode(flow: Flow, id: string): Flow {
 	const nodes = flow.nodes.filter((node) => node.id !== id);
-	return {
-		...flow,
-		nodes,
-		edges: flow.edges.filter((edge) => edge.from !== id && edge.to !== id),
-		start: flow.start === id ? (nodes[0]?.id ?? "") : flow.start,
-	};
+	return sectionsWithoutNode(
+		{
+			...flow,
+			nodes,
+			edges: flow.edges.filter((edge) => edge.from !== id && edge.to !== id),
+			start: flow.start === id ? (nodes[0]?.id ?? "") : flow.start,
+		},
+		id,
+	);
 }
 
 /**
- * Renames a node everywhere: its edges, the start, and `{{old…}}`
- * references in the flow's templates and outputs.
+ * Renames a node everywhere: its edges, the start, its Section, and
+ * `{{old…}}` references in the flow's templates and outputs.
  */
 export function renameNode(flow: Flow, from: string, to: string): Flow {
 	if (from === to) return flow;
@@ -141,15 +148,19 @@ export function renameNode(flow: Flow, from: string, to: string): Flow {
 		},
 		(text) => renameRefs(text, from, to),
 	);
-	return {
-		...renamed,
-		start: flow.start === from ? to : flow.start,
-		edges: flow.edges.map((edge) => ({
-			...edge,
-			from: edge.from === from ? to : edge.from,
-			to: edge.to === from ? to : edge.to,
-		})),
-	};
+	return sectionsWithRenamedNode(
+		{
+			...renamed,
+			start: flow.start === from ? to : flow.start,
+			edges: flow.edges.map((edge) => ({
+				...edge,
+				from: edge.from === from ? to : edge.from,
+				to: edge.to === from ? to : edge.to,
+			})),
+		},
+		from,
+		to,
+	);
 }
 
 export function addEdge(

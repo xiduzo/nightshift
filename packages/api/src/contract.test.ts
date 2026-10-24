@@ -293,6 +293,25 @@ describe("replies of a real engine", () => {
 		await read(appRouter.flows.list, { projectId });
 		await read(appRouter.flows.get, { projectId, name: "night" });
 
+		// Sections round-trip, and a Section issue names its Section.
+		const sections: Flow["sections"] = [
+			{ id: "work", label: "Work", color: "blue", nodes: ["agent"] },
+			{ id: "stray", label: "Stray", nodes: ["nowhere"] },
+		];
+		const sectionIssues = (await reply(appRouter.flows.save, {
+			projectId,
+			name: "sectioned",
+			flow: { ...night, sections },
+		})) as { sectionId?: string }[];
+		expect(sectionIssues).toContainEqual(
+			expect.objectContaining({ severity: "warning", sectionId: "stray" }),
+		);
+		const sectioned = (await read(appRouter.flows.get, {
+			projectId,
+			name: "sectioned",
+		})) as { flow: Flow | null };
+		expect(sectioned.flow?.sections).toEqual(sections);
+
 		await read(appRouter.profiles.list);
 		await reply(appRouter.connections.setSecret, {
 			name: "ZAC_USER",

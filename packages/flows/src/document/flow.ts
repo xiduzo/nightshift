@@ -23,7 +23,8 @@ import {
  * migrate on load (`migrateFlow`).
  *
  * Each node type has its own file in `nodes/`. This file puts them
- * together with the edges, inputs, outputs, variables and policy.
+ * together with the edges, inputs, outputs, variables, policy and the
+ * editor's Sections.
  */
 
 export const FLOW_VERSION = 5;
@@ -127,6 +128,40 @@ export const flowVariableSchema = z.object({
 	description: z.string().optional(),
 });
 
+/**
+ * The colours a Section can take: names, not values, so the file stays
+ * the same in light and dark. The web app maps each name to its theme
+ * colour. A subset of the outcome colours. Unset: a neutral frame.
+ */
+export const sectionColors = [
+	"gray",
+	"red",
+	"orange",
+	"yellow",
+	"green",
+	"teal",
+	"blue",
+	"violet",
+	"pink",
+] as const;
+export const sectionColorSchema = z.enum(sectionColors);
+
+/**
+ * A named, coloured frame around nodes of this flow, in the editor only:
+ * the engine and the run do not read it. Its nodes should form one
+ * connected part that the flow enters at one node (`validateFlow` warns
+ * when they do not). Whether it is folded is not in the file: each person
+ * folds it in their own browser.
+ */
+export const flowSectionSchema = z.object({
+	id: z.string().min(1),
+	label: z.string(),
+	color: sectionColorSchema.optional(),
+	description: z.string().optional(),
+	/** The ids of the nodes in the Section. A node is in at most one Section. */
+	nodes: z.array(nodeIdSchema),
+});
+
 export const flowSchema = z.object({
 	version: z.literal(FLOW_VERSION),
 	description: z.string().optional(),
@@ -140,6 +175,12 @@ export const flowSchema = z.object({
 	start: nodeIdSchema,
 	nodes: z.array(flowNodeSchema),
 	edges: z.array(flowEdgeSchema),
+	/**
+	 * Frames around nodes, for the editor only. Optional, so a flow without
+	 * Sections keeps its file as it is, and no version change: a Night Shift
+	 * that does not know them still runs the flow the same.
+	 */
+	sections: z.array(flowSectionSchema).optional(),
 });
 
 export type Flow = z.infer<typeof flowSchema>;
@@ -161,5 +202,7 @@ export type FlowOutputDef = z.infer<typeof flowOutputSchema>;
 export type FlowVariableDef = z.infer<typeof flowVariableSchema>;
 export type VariableType = z.infer<typeof variableTypeSchema>;
 export type FlowEdge = z.infer<typeof flowEdgeSchema>;
+export type FlowSection = z.infer<typeof flowSectionSchema>;
+export type SectionColor = z.infer<typeof sectionColorSchema>;
 export type Outcome = z.infer<typeof outcomeSchema>;
 export type FlowNodeType = FlowNode["type"];

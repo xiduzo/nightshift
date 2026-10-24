@@ -6,6 +6,8 @@ export type FlowIssue = {
 	message: string;
 	nodeId?: string;
 	edgeId?: string;
+	/** The Section the issue is about, so the editor can mark its frame. */
+	sectionId?: string;
 };
 
 export type ValidateOptions = {
@@ -23,7 +25,7 @@ export type ValidateOptions = {
 	name?: string;
 };
 
-export type At = Pick<FlowIssue, "nodeId" | "edgeId">;
+export type At = Pick<FlowIssue, "nodeId" | "edgeId" | "sectionId">;
 export type Report = (message: string, at: At) => void;
 
 /** A flow file in a project. */

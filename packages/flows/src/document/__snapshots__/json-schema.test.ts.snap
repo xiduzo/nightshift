@@ -1246,6 +1246,50 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
         },
         "type": "object",
       },
+      "sections": {
+        "items": {
+          "properties": {
+            "color": {
+              "enum": [
+                "gray",
+                "red",
+                "orange",
+                "yellow",
+                "green",
+                "teal",
+                "blue",
+                "violet",
+                "pink",
+              ],
+              "type": "string",
+            },
+            "description": {
+              "type": "string",
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "label": {
+              "type": "string",
+            },
+            "nodes": {
+              "items": {
+                "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                "type": "string",
+              },
+              "type": "array",
+            },
+          },
+          "required": [
+            "id",
+            "label",
+            "nodes",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
       "start": {
         "pattern": "^[a-z][a-z0-9_]{0,39}$",
         "type": "string",
@@ -2610,6 +2654,51 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
         },
         "type": "object",
       },
+      "sections": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "color": {
+              "enum": [
+                "gray",
+                "red",
+                "orange",
+                "yellow",
+                "green",
+                "teal",
+                "blue",
+                "violet",
+                "pink",
+              ],
+              "type": "string",
+            },
+            "description": {
+              "type": "string",
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "label": {
+              "type": "string",
+            },
+            "nodes": {
+              "items": {
+                "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                "type": "string",
+              },
+              "type": "array",
+            },
+          },
+          "required": [
+            "id",
+            "label",
+            "nodes",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
       "start": {
         "pattern": "^[a-z][a-z0-9_]{0,39}$",
         "type": "string",
@@ -3243,7 +3332,8 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
   "flowNodeSchema": "ac67351d65a4994fb6724cc3d9c19673d8b274a728e9de472b4214923f6680b2",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "ec98fd4e057d275a4583e4cbd34e637433150941e2914ef9f78e4d3260fb200b",
+  "flowSchema": "7dc1abb156ddf9daab850d7858e558b969be89d79ea592ca4e9c713be2e2846f",
+  "flowSectionSchema": "09621da4661a5960a1be94d3f38e096b6553ed764a5b4de4e5cc43e9ef46c19c",
   "flowVariableSchema": "bc241c9d8a19a055e9866d040bc4720e0dbd3eacb515865d1036ca65e8be7679",
   "harnessNameSchema": "5680ae13dedd38277934574bb77ad18e9ec2d67a68bd7c7266e1c5ebd57d3318",
   "jsonSchemaSchema": "5f8d604991fdf1ed7da4739406b681e55cba181bf749047debf0eae2673efece",
@@ -3262,6 +3352,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "scheduleSchema": "8d24fd7c9303f41084ec74e1ef4da372577d1bea6c7205e82c193126037d91bc",
   "schedulesFileSchema": "a58f53e65cddb3ebb52d62f05fe5c0cd33da5c86fe05a7aa61e6984780f22eab",
   "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
+  "sectionColorSchema": "eb33494a8a38518924b512496789c058e769c86bca49c34eca8ae5888c5489a1",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
   "toolNodeSchema": "77f7d1564de94766384a1c28a5219e9d6c8fa3c63feb9e0ffac8cef75b33c724",
   "valueBySchema": "bd03d7f4d6a9ce81bfdb8638ac71508d4761cd359a8b94bdc2fc070915a01cfd",

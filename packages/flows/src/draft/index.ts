@@ -67,3 +67,9 @@ export {
 	renameInput,
 	renameVariable,
 } from "./refs";
+export {
+	addSection,
+	removeSection,
+	type SectionFields,
+	updateSection,
+} from "./sections";

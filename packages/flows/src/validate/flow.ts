@@ -11,6 +11,7 @@ import { findCycles } from "./cycles";
 import type { FlowIssue, Flows, Report, ValidateOptions } from "./issues";
 import { checkNode } from "./nodes";
 import { describeNode, type Scope } from "./scope";
+import { checkSections } from "./sections";
 import {
 	checkInputs,
 	checkOutputs,
@@ -31,7 +32,8 @@ import {
  * names and fields, outputs, and no cycle without an edge that has a `max`
  * (a Gate in a cycle too: a person could loop forever).
  * Warns about unreachable nodes and about outcomes without an edge, since
- * ending on one ends the run as failed.
+ * ending on one ends the run as failed. Warns about Sections that are not
+ * one connected part with one entry, share a node, or name unknown nodes.
  *
  * With `options.flows`, a Call node must call a flow that exists and
  * parses, bind only inputs it declares and every required input it has no
@@ -200,6 +202,8 @@ function validateIn(
 			}
 		}
 	}
+
+	checkSections(flow, warning);
 
 	return issues;
 }
