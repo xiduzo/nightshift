@@ -5,11 +5,13 @@ import { createEngineExchange, type EngineExchange } from "../exchange";
 import { createHostSpaces, personOnHost } from "../links";
 import {
 	createEngineOffers,
+	createOfferAdmission,
 	createOfferedSessions,
-	createOffersHere,
 	createScheduleOffers,
 	type DeviceOffer,
 	type EngineOffers,
+	type OfferAdmission,
+	type OfferUse,
 	offerRefusal,
 } from "../offers";
 import { createPlacement } from "../placement";
@@ -39,6 +41,12 @@ export type PeerOptions = {
 	 * Without it, nobody uses Offers here.
 	 */
 	mayUseOffers?: (spaceId: string, personId: string) => Promise<boolean>;
+	/**
+	 * The sessions and calls under each of this computer's Offers, which a
+	 * `bun --hot` reload hands to the next engine. Without it, the engine
+	 * makes its own.
+	 */
+	offerUse?: OfferUse;
 };
 
 /** The port the engine walks with, and what the daemon uses beside it. */
@@ -50,6 +58,8 @@ export type BuiltPeers = {
 	exchange: EngineExchange;
 	/** The Offers of the Spaces. */
 	offers: EngineOffers;
+	/** This computer's admission of the calls of runs: every Offer check, one slot map per Offer. */
+	admission: OfferAdmission;
 };
 
 /**
@@ -68,13 +78,17 @@ export function createPeers(
 	/** The offered sessions running now: what withdrawing an Offer stops. */
 	const offeredSessions = createOfferedSessions();
 	const work = options.work && offeredSessions.relay(options.work);
-	const { offersHere, localFor } = createOffersHere({
+	/**
+	 * Every call of another Person's run on this computer, walked here or
+	 * sent by a Walker elsewhere: one admission, one slot map per Offer.
+	 */
+	const admission = createOfferAdmission({
 		db,
 		device,
 		documents,
 		...(options.ownOffers ? { ownOffers: options.ownOffers } : {}),
 		...(context.profileFor ? { profileFor: context.profileFor } : {}),
-		ownerId: context.ownerId,
+		...(options.offerUse ? { use: options.offerUse } : {}),
 		sessions: offeredSessions,
 	});
 
@@ -90,8 +104,8 @@ export function createPeers(
 		...(work ? { work } : {}),
 		...(relay ? { relay } : {}),
 		// Another Person's run here uses this computer through its Offers.
-		localFor,
-		offersHere,
+		localFor: admission.deviceFor,
+		offersHere: admission.inForce,
 		mayUseOffers: (spaceId, personId) =>
 			options.mayUseOffers?.(spaceId, personId) ?? Promise.resolve(false),
 	});
@@ -155,7 +169,7 @@ export function createPeers(
 				db,
 				documents,
 				devicesFor: placement.devicesFor,
-				offersHere,
+				offersHere: admission.inForce,
 				...(options.mayUseOffers ? { mayUseOffers: options.mayUseOffers } : {}),
 			}),
 		},
@@ -178,5 +192,5 @@ export function createPeers(
 		pathsFor: createPrivatePaths({ db, registry, ownerId: context.ownerId }),
 	};
 
-	return { port, registry, exchange, offers };
+	return { port, registry, exchange, offers, admission };
 }

@@ -19,7 +19,12 @@ import type { FlowSources } from "@nightshift/flows/files";
 import { eq } from "drizzle-orm";
 import type { HostRelay, WorkRelay } from "../contract";
 import { type HostSpaces, personOnHost } from "../links";
-import { type DeviceOffer, offersNothing, spaceOffers } from "../offers";
+import {
+	type DeviceOffer,
+	NO_STARTER,
+	offersNothing,
+	spaceOffers,
+} from "../offers";
 import type { DeviceRegistry } from "../registry";
 import { remoteDevice } from "../work";
 
@@ -57,7 +62,8 @@ export type PlacementDeps = {
 	relay?: HostRelay;
 	/**
 	 * This computer for a step of a run: itself, or for another Person's
-	 * run, itself through its Offers (`offeredDevice`). Default: itself.
+	 * run, itself through its Offer admission (`OfferAdmission.deviceFor`).
+	 * Default: itself.
 	 */
 	localFor?(row: RunRow): Device;
 	/** This computer's own Offers into a Space that are in force. Default: none. */
@@ -78,6 +84,14 @@ const UNREACHABLE: WorkRelay = {
 		};
 	},
 	online: () => false,
+};
+
+/** A run with no starter: nothing is sent, and every call is refused here. */
+const NO_STARTER_RELAY: WorkRelay = {
+	async *call() {
+		yield { kind: "error", message: NO_STARTER };
+	},
+	online: () => true,
 };
 
 /** The Devices a run's nodes name, by name, from its row. */
@@ -130,7 +144,7 @@ export function createPlacement(deps: PlacementDeps) {
 			return deps.localFor?.(row) ?? device;
 		}
 		return remoteDevice(
-			work,
+			row.startedBy === null ? NO_STARTER_RELAY : work,
 			{
 				id,
 				name: names.get(id) ?? named ?? "The device of this step",

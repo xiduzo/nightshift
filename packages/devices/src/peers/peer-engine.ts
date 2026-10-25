@@ -4,7 +4,7 @@ import {
 	type EngineOptions,
 } from "@nightshift/engine";
 import type { EngineExchange } from "../exchange";
-import type { EngineOffers } from "../offers";
+import type { EngineOffers, OfferAdmission } from "../offers";
 import type { DeviceRegistry } from "../registry";
 import { deviceDirectory } from "./directory";
 import { type BuiltPeers, createPeers, type PeerOptions } from "./peers";
@@ -20,6 +20,13 @@ export type PeerEngine = Engine & {
 	readonly devices: DeviceRegistry;
 	/** The Offers of the Spaces: published in their documents, with their audit. */
 	readonly offers: EngineOffers;
+	/**
+	 * This computer's Offer admission: every check of a call of a run on
+	 * this computer, walked here or sent by a Walker elsewhere, with one
+	 * slot map per Offer. The work server and the Host's own steps serve
+	 * through it.
+	 */
+	readonly admission: OfferAdmission;
 };
 
 /**
@@ -38,7 +45,8 @@ export function createPeerEngine(
 	options: PeerEngineOptions,
 	internals?: Parameters<typeof createEngine>[1],
 ): PeerEngine {
-	const { work, ownOffers, mayUseOffers, relay, ...engineOptions } = options;
+	const { work, ownOffers, mayUseOffers, offerUse, relay, ...engineOptions } =
+		options;
 	let built: BuiltPeers | undefined;
 	const engine = createEngine(
 		{
@@ -50,6 +58,7 @@ export function createPeerEngine(
 					...(work ? { work } : {}),
 					...(ownOffers ? { ownOffers } : {}),
 					...(mayUseOffers ? { mayUseOffers } : {}),
+					...(offerUse ? { offerUse } : {}),
 				});
 				return built.port;
 			},
@@ -62,5 +71,6 @@ export function createPeerEngine(
 		exchange: built.exchange,
 		devices: built.registry,
 		offers: built.offers,
+		admission: built.admission,
 	};
 }

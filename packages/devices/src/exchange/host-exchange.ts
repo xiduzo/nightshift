@@ -1,7 +1,7 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
 import { roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { Device, Engine } from "@nightshift/engine";
+import type { Engine } from "@nightshift/engine";
 import { ORPCError } from "@orpc/server";
 import {
 	type ArchiveRef,
@@ -9,9 +9,9 @@ import {
 	type SyncBatch,
 	type SyncCursors,
 } from "../contract";
-import type { EngineOffers } from "../offers";
+import type { EngineOffers, OfferAdmission } from "../offers";
 import type { DeviceRegistry } from "../registry";
-import { type OfferDeps, serveChecked, type WorkHub } from "../work";
+import type { WorkHub } from "../work";
 import { applyRunCommand, COMMAND_PERMISSION } from "./commands";
 import type { EngineExchange } from "./engine-exchange";
 import {
@@ -51,8 +51,16 @@ const STREAM_IDLE_MS = 20_000;
 
 export function createHostExchange(deps: {
 	db: Database;
-	/** This Host's engine (`PeerEngine`): its half of the exchange and the Offers of its Spaces. */
-	engine: Engine & { exchange: EngineExchange; offers: EngineOffers };
+	/**
+	 * This Host's engine (`PeerEngine`): its half of the exchange, the
+	 * Offers of its Spaces, and its admission of the calls of runs a Device
+	 * walks with steps here.
+	 */
+	engine: Engine & {
+		exchange: EngineExchange;
+		offers: EngineOffers;
+		admission: Pick<OfferAdmission, "serve">;
+	};
 	registry: DeviceRegistry;
 	/** This Host's Device id: the Walker of its own runs. */
 	selfId: string;
@@ -61,10 +69,6 @@ export function createHostExchange(deps: {
 	isHost(): boolean;
 	/** The calls of runs this Host walks, for the Devices they are placed on. */
 	work: WorkHub;
-	/** This Host as a Device: it serves the calls of runs a Device walks with steps here. */
-	local?: Device;
-	/** This Host's own Offers, for the steps of other Persons' runs it serves itself. */
-	offerDeps?: OfferDeps;
 }): HostExchange {
 	const { db, engine, registry } = deps;
 	const { exchange } = engine;
@@ -367,21 +371,10 @@ export function createHostExchange(deps: {
 			}
 			await mayStart(key, request.spaceId);
 			if (deviceId === deps.selfId) {
-				const local = deps.local;
-				if (!local) {
-					yield { kind: "error", message: "This Host does not run steps." };
-					return;
-				}
 				// Its owner's run, or another Person's through its Offers.
-				yield* serveChecked(
+				yield* engine.admission.serve(
 					request,
-					{
-						ownerId: deps.ownerId,
-						db,
-						engine,
-						device: local,
-						...deps.offerDeps,
-					},
+					{ keptHere: true },
 					signal ?? new AbortController().signal,
 				);
 				return;

@@ -1,23 +1,16 @@
 import type {
-	Device,
 	DeviceDocument,
-	ExecEvent,
-	ExecInput,
 	OfferedPlacement,
-	OfferedSessionInput,
-	SessionEvent,
-	SessionInput,
 	SpaceDocument,
 } from "@nightshift/engine";
 import {
 	type AgentNode,
-	type AgentProfileSettings,
 	type FlowNode,
 	nameSchema,
 	type permissionModeSchema,
 } from "@nightshift/flows";
 import { z } from "zod";
-import { offerCapsSchema, type WorkCall } from "../contract";
+import { offerCapsSchema } from "../contract";
 
 /**
  * Offers: an Agent Profile of a Device made available to one Space, with
@@ -41,9 +34,8 @@ import { offerCapsSchema, type WorkCall } from "../contract";
  * Two checks, two code paths. The Walker refuses at run start a flow
  * whose nodes would do on that Device anything but run an offered profile
  * (`offerRefusal`). The Device checks every call again from its own
- * Replica (`offeredCallRefusal`), resolves the profile itself
- * (`offeredSession`), clamps the permission mode to the cap and queues a
- * session over the session cap (`createOfferSlots`).
+ * Replica (`admission.ts`): it resolves the profile itself, clamps the
+ * permission mode to the cap and queues a session over the session cap.
  */
 
 /** The permission modes from the narrowest to the widest. */
@@ -179,7 +171,7 @@ function names(offers: readonly { profile: string }[]): string {
 }
 
 /** What a Device offers into a Space, for a refusal. */
-function offersNothingOr(
+export function offersNothingOr(
 	deviceName: string,
 	offers: readonly { profile: string }[],
 	not?: string,
@@ -273,233 +265,4 @@ export function offerRefusal(
 		}
 	}
 	return null;
-}
-
-/**
- * The offering Device's check of one call of another Person's run, given
- * its Offers in force into the run's Space: an offered session of one of
- * them, or the run's own folder work (its flows, its worktree, its files,
- * its item branches, the Hand-off of its work to and from it). Anything else is refused: a command, a tool, the
- * decider, a session it did not offer, and its capabilities (private to
- * its owner). Null when it serves the call.
- */
-export function offeredCallRefusal(
-	call: WorkCall,
-	deviceName: string,
-	offers: readonly DeviceOffer[],
-): string | null {
-	if (offers.length === 0) return offersNothingOr(deviceName, offers);
-	switch (call.kind) {
-		case "flows":
-		case "worktree":
-		case "files":
-		case "itemBranch":
-		case "handOff":
-		case "receiveHandOff":
-			return null;
-		case "session": {
-			if (!("offered" in call.input)) {
-				return `${deviceName} runs only the profiles its owner offers to this Space. ${offersNothingOr(deviceName, offers)}`;
-			}
-			const { profile } = call.input.offered;
-			return offers.some((o) => o.profile === profile)
-				? null
-				: offersNothingOr(deviceName, offers, profile);
-		}
-		default:
-			return `${deviceName} runs only the profiles its owner offers to this Space. ${offersNothingOr(deviceName, offers)}`;
-	}
-}
-
-/**
- * An offered session as the offering Device runs it: its profile as its
- * owner set it (harness, model, effort, CLI tools, connections), and the
- * permission mode the node asks for, else the profile's, never wider than
- * the Offer's cap.
- */
-export function offeredSession<T extends Omit<OfferedSessionInput, "signal">>(
-	input: T,
-	profile: AgentProfileSettings,
-	cap: PermissionMode,
-): Omit<SessionInput, "signal"> & Omit<T, "offered"> {
-	const { offered, ...rest } = input;
-	return {
-		...rest,
-		harness: profile.harness,
-		model: profile.model,
-		permissionMode: clampToCap(
-			offered.permissionMode ?? profile.permissionMode,
-			cap,
-		),
-		...(profile.effort !== undefined ? { effort: profile.effort } : {}),
-		...(profile.clis.length > 0 ? { clis: profile.clis } : {}),
-		...(profile.connections.length > 0
-			? { connections: profile.connections }
-			: {}),
-	};
-}
-
-/** The sessions running under each Offer, at most its cap at once. */
-export type OfferSlots = {
-	/**
-	 * Waits for a free session of the Offer (`key`), first come first
-	 * served, and resolves to its release. A session over the cap waits;
-	 * it is not refused. Rejects when `signal` aborts while it waits.
-	 */
-	take(key: string, cap: number, signal: AbortSignal): Promise<() => void>;
-	/** The sessions running under the Offer now. */
-	running(key: string): number;
-};
-
-/** The key of an Offer's slots. */
-export const slotKey = (spaceId: string, profile: string) =>
-	deviceKey(spaceId, profile);
-
-export function createOfferSlots(): OfferSlots {
-	const running = new Map<string, number>();
-	const waiting = new Map<string, (() => void)[]>();
-
-	function release(key: string) {
-		running.set(key, (running.get(key) ?? 1) - 1);
-		waiting.get(key)?.shift()?.();
-	}
-
-	return {
-		running: (key) => running.get(key) ?? 0,
-		async take(key, cap, signal) {
-			while ((running.get(key) ?? 0) >= cap) {
-				if (signal.aborted) throw new Error("The session was stopped.");
-				await new Promise<void>((resolve, reject) => {
-					const queue = waiting.get(key) ?? [];
-					waiting.set(key, queue);
-					const wake = () => {
-						signal.removeEventListener("abort", stop);
-						resolve();
-					};
-					const stop = () => {
-						const at = queue.indexOf(wake);
-						if (at >= 0) queue.splice(at, 1);
-						reject(new Error("The session was stopped."));
-					};
-					queue.push(wake);
-					signal.addEventListener("abort", stop, { once: true });
-				});
-			}
-			running.set(key, (running.get(key) ?? 0) + 1);
-			let released = false;
-			return () => {
-				if (released) return;
-				released = true;
-				release(key);
-			};
-		},
-	};
-}
-
-/**
- * This computer as the Device of another Person's run that it walks
- * itself (the Walker is the offering Device): the same rule as for a run
- * walked elsewhere. A session runs only an offered profile, resolved here
- * against the Offers in force when it starts, with the caps; a command, a
- * tool and the decider are refused; the run's folder work passes.
- */
-export function offeredDevice(
-	inner: Device,
-	deps: {
-		/** The Offers in force into the run's Space, read at each session. */
-		inForce(): Promise<DeviceOffer[]>;
-		profileFor(name: string): AgentProfileSettings | null;
-		slots: OfferSlots;
-		spaceId: string;
-		/** Called while an offered session runs, until the returned function is called. */
-		track?(profile: string): () => void;
-		/** Whether the run is the Device owner's own after all: then it is the Device as is. */
-		own?(): Promise<boolean>;
-	},
-): Device {
-	const own = () => deps.own?.() ?? Promise.resolve(false);
-	const refused = (offers: readonly DeviceOffer[]) =>
-		`${inner.name} runs only the profiles its owner offers to this Space. ${offersNothingOr(inner.name, offers)}`;
-
-	async function* session(
-		input: SessionInput | OfferedSessionInput,
-	): AsyncGenerator<SessionEvent> {
-		if (await own()) {
-			yield* inner.session(input);
-			return;
-		}
-		const offers = await deps.inForce();
-		if (!("offered" in input)) {
-			yield { type: "refused", message: refused(offers) };
-			return;
-		}
-		const { signal } = input;
-		const { profile } = input.offered;
-		const offer = offers.find((o) => o.profile === profile);
-		const settings = offer ? deps.profileFor(profile) : null;
-		if (!offer || !settings) {
-			yield {
-				type: "refused",
-				message: offer
-					? `${inner.name} no longer has the profile "${profile}".`
-					: offersNothingOr(inner.name, offers, profile),
-			};
-			return;
-		}
-		let release: () => void;
-		try {
-			release = await deps.slots.take(
-				slotKey(deps.spaceId, profile),
-				offer.sessionCap,
-				signal,
-			);
-		} catch (error) {
-			yield {
-				type: "refused",
-				message: error instanceof Error ? error.message : String(error),
-			};
-			return;
-		}
-		const untrack = deps.track?.(profile);
-		try {
-			yield* inner.session({
-				...offeredSession(input, settings, offer.permissionCap),
-				signal,
-			});
-		} finally {
-			untrack?.();
-			release();
-		}
-	}
-
-	async function* exec(input: ExecInput): AsyncGenerator<ExecEvent> {
-		if (await own()) {
-			yield* inner.exec(input);
-			return;
-		}
-		yield {
-			type: "exit",
-			exitCode: null,
-			spawnError: refused(await deps.inForce()),
-		};
-	}
-
-	return {
-		...inner,
-		session,
-		exec,
-		async callTool(input) {
-			if (await own()) return inner.callTool(input);
-			return { kind: "refused", message: refused(await deps.inForce()) };
-		},
-		decide: (async (input: Parameters<Device["decide"]>[0]) => {
-			if (await own()) return inner.decide(input as never);
-			return {
-				kind: "error",
-				errorKind: "harness",
-				message: refused(await deps.inForce()),
-				costUsd: null,
-			};
-		}) as Device["decide"],
-	};
 }

@@ -30,9 +30,12 @@ import {
 	type WorkRequest,
 	workRequestSchema,
 } from "../contract";
+import { createHostSpaces } from "../links";
+import { NO_STARTER } from "../offers";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
 import { serveWork } from "../work/remote";
+import { createPlacement } from "./placement";
 
 /**
  * Run-level Placement in one process: A walks a run whose steps run on
@@ -576,6 +579,44 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		expect(
 			run.flow.nodes.map((n) => ("device" in n ? n.device : null)),
 		).toEqual([null, "test"]);
+	});
+});
+
+describe("a run with no starter", () => {
+	test("sends nothing to another Device: its calls there are refused here", async () => {
+		const placement = createPlacement({
+			db: a.db,
+			device: testDevice({ harnesses: {} }, a.deviceId),
+			log: { walkerId: async () => a.deviceId } as never,
+			registry: {} as never,
+			documents,
+			hostSpaces: createHostSpaces(a.db),
+			project: async () => {
+				throw new Error("No project here.");
+			},
+			work,
+		});
+		// A run from before every run had a starter, moved here.
+		const there = placement.deviceById(B, {
+			id: "older-run",
+			spaceId: a.spaceId,
+			projectId,
+			walkerId: a.deviceId,
+			deviceId: B,
+			startedBy: null,
+		} as Parameters<typeof placement.deviceById>[1]);
+		const events = [];
+		for await (const event of there.exec({
+			command: "true",
+			cwd: b.repoPath,
+			signal: new AbortController().signal,
+		})) {
+			events.push(event);
+		}
+		expect(events).toEqual([
+			{ type: "exit", exitCode: null, spawnError: NO_STARTER },
+		]);
+		expect(requests).toEqual([]);
 	});
 });
 

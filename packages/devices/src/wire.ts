@@ -23,10 +23,11 @@ import {
 	type LinkOptions,
 } from "./links";
 import {
-	createOfferSlots,
 	createOffers,
+	createOfferUse,
 	deviceOffers,
 	type Offers,
+	type OfferUse,
 } from "./offers";
 import {
 	createPeerEngine,
@@ -37,10 +38,8 @@ import { listenHostname, ownCertificate, type Reach, reachFor } from "./reach";
 import { OFFLINE_AFTER_MS } from "./registry";
 import { createRelay, createWorkRelay } from "./relay";
 import {
-	createOfferCalls,
 	createWorkHub,
 	createWorkServer,
-	type OfferDeps,
 	type ServedCalls,
 	servedCalls,
 	type WorkHub,
@@ -88,8 +87,12 @@ type Handover = {
 	 * placed on. A Device's stream outlives a reload.
 	 */
 	readonly hub: WorkHub;
-	/** The sessions and the calls under each of this computer's Offers, for every Host and itself. */
-	readonly offerUse: Pick<OfferDeps, "slots" | "calls">;
+	/**
+	 * The sessions and the calls under each of this computer's Offers, by
+	 * either path: the engine's Offer admission counts them in one slot map
+	 * per Offer, so a session that runs on through a reload still counts.
+	 */
+	readonly offerUse: OfferUse;
 	/** Per Host: the commands this computer applied, and the calls it serves as a placed Device. */
 	readonly hosts: Map<
 		string,
@@ -184,16 +187,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		return kept;
 	}
 
-	/**
-	 * This computer's Offers, for the steps of other Persons' runs it serves:
-	 * the sessions and calls running under each, for every Host and itself.
-	 */
-	const offerDeps: OfferDeps = {
-		offers: () => deviceOffers(deps.document),
-		profileFor: (name) => deps.profiles.settingsFor(name),
-		...handover.offerUse,
-	};
-
 	// The engine takes the relays, and the relays reach the engine and the
 	// Links: they read both when they are called, after this function.
 	const engine = createPeerEngine(
@@ -218,8 +211,10 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 				registry: () => engine.devices,
 				links: () => links,
 			}),
-			// This computer's own Offers, and who may use Offers in a Space.
+			// This computer's own Offers, the sessions and calls under them,
+			// and who may use Offers in a Space.
 			ownOffers: () => deviceOffers(deps.document),
+			offerUse: handover.offerUse,
 			mayUseOffers: async (spaceId, personId) => {
 				const role = memberRole(await deps.spaces.open(spaceId), personId);
 				return role !== null && roleAllows(role, { offer: ["use"] });
@@ -249,8 +244,6 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		ownerId,
 		isHost: host.isHost,
 		work: handover.hub,
-		local,
-		offerDeps,
 	});
 
 	/** This computer's Offers into Spaces, as its owner makes and withdraws them. */
@@ -262,7 +255,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		self: { id: self.id, name: self.name },
 		ownerId,
 		withdrawn: (spaceId, profile) =>
-			offerDeps.calls.withdrawn(spaceId, profile),
+			engine.admission.withdrawn(spaceId, profile),
 	});
 
 	/** This computer's links to the Hosts it paired with. */
@@ -301,12 +294,10 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 					selfId: self.id,
 					applied,
 				}).attach(link),
+				// Every call passes the engine's Offer admission.
 				createWorkServer({
-					hostId,
-					db,
-					engine,
-					device: local,
-					...offerDeps,
+					serve: (request, signal) =>
+						engine.admission.serve(request, { hostId }, signal),
 					served,
 				}).attach(link),
 			];
@@ -401,7 +392,7 @@ async function takeOver(kept: KeptDevices): Promise<Handover> {
 	const handover: Handover = {
 		hub:
 			hub ?? createWorkHub({ onBack: (deviceId) => handover.wake(deviceId) }),
-		offerUse: { slots: createOfferSlots(), calls: createOfferCalls() },
+		offerUse: createOfferUse(),
 		hosts: new Map(),
 		wake: () => {},
 		release: async () => {},

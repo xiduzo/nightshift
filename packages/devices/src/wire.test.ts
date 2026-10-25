@@ -19,6 +19,7 @@ import type { Flow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import type { HostClient, WorkReply, WorkRequest } from "./contract";
 import { deviceKeyStore } from "./links";
+import { setDeviceOffer } from "./offers/offers";
 import type { PeerEngine } from "./peers";
 import { type PairedReplicas, pairedReplicas, withPeers } from "./testing";
 import { type DevicesRuntime, type KeptDevices, startDevices } from "./wire";
@@ -463,5 +464,85 @@ describe("the devices runtime across a reload", () => {
 			{ kind: "item", item: { type: "ready", harness: "claude-code" } },
 			{ kind: "item", item: { type: "text", delta: "done" } },
 		]);
+	});
+
+	test("a session under an Offer runs on through the reload and still counts: the next one waits for it", async () => {
+		const projectId = await projectOnBoth();
+		// B offers "coder" to A's Space, one session at a time, and a
+		// colleague of A's owner is a Member there.
+		await createProfileStore({ document }).save({
+			name: "coder",
+			harness: "claude-code",
+			model: "sonnet",
+			permissionMode: "acceptEdits",
+			clis: [],
+			connections: [],
+		});
+		await setDeviceOffer(document, {
+			spaceId: a.spaceId,
+			profile: "coder",
+			permissionCap: "acceptEdits",
+			sessionCap: 1,
+			offeredAt: 1,
+		});
+		const space = await paired.documents.open(a.spaceId);
+		space.doc.transact(() => {
+			space.members.set("colleague", { name: "Colleague", role: "member" });
+			space.offers.set(`${b.deviceId}/coder`, {
+				deviceId: b.deviceId,
+				deviceName: "B",
+				profile: "coder",
+				permissionCap: "acceptEdits",
+				sessionCap: 1,
+				offeredAt: 1,
+				by: paired.personId,
+			});
+		});
+		/** The colleague's session of one run, sent to B through A. */
+		const sessionOf = (runtime: DevicesRuntime, run: string) =>
+			(async () => {
+				const replies: WorkReply[] = [];
+				for await (const reply of runtime.engine.admission.serve(
+					{
+						spaceId: a.spaceId,
+						projectId,
+						personId: "colleague",
+						runId: run,
+						call: {
+							kind: "session",
+							input: {
+								cwd: worktreeLocation(b.repoPath, run.slice(0, 8)).worktreePath,
+								prompt: "Work.",
+								offered: { profile: "coder" },
+							},
+						},
+					},
+					{ hostId: paired.hostId },
+					new AbortController().signal,
+				)) {
+					replies.push(reply);
+				}
+				return replies;
+			})();
+
+		const before = await startB();
+		const first = sessionOf(before, "abcdef12-0000-0000-0000-000000000000");
+		await waitFor(() => sessions.length === 1, { label: "the first session" });
+
+		const after = await startB();
+		const second = sessionOf(after, "beefcafe-0000-0000-0000-000000000000");
+		await Bun.sleep(200);
+		// The cap is 1: the session from before the reload still holds it.
+		expect(sessions).toHaveLength(1);
+
+		sessions[0]?.end();
+		await waitFor(() => sessions.length === 2, { label: "the second session" });
+		sessions[1]?.end();
+		for (const replies of [await first, await second]) {
+			expect(replies.at(-1)).toEqual({
+				kind: "item",
+				item: { type: "text", delta: "done" },
+			});
+		}
 	});
 });

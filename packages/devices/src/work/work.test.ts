@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { join } from "node:path";
 import { clone, hostLink, project, user } from "@nightshift/db/schema";
 import {
 	createSpaceDocuments,
@@ -11,16 +10,17 @@ import {
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import type { WorkReply, WorkRequest } from "../contract";
 import { httpsLink } from "../links/link";
-import { createOfferSlots, type DeviceOffer } from "../offers";
+import { createOfferAdmission, type DeviceOffer } from "../offers";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { partialHostClient, withPeers } from "../testing";
-import { checkWork, createOfferCalls, createWorkServer } from "./work";
+import { createWorkServer } from "./work";
 import { createWorkHub } from "./work-hub";
 
 /**
- * The placed Device's own checks, from its Replica, before it starts
- * anything; and the Host's hub, which carries calls, replies and cancels
- * between a Walker and the Device that pulls its work.
+ * The placed Device's work server, which takes its Host's calls over its
+ * Link and serves each through its Offer admission (`admission.test.ts`
+ * has the checks); and the Host's hub, which carries calls, replies and
+ * cancels between a Walker and the Device that pulls its work.
  */
 
 const HOST = "host-1";
@@ -107,15 +107,6 @@ function request(overrides: Partial<WorkRequest> = {}): WorkRequest {
 let own: DeviceOffer[] = [];
 const DEVICE = { id: "device-b", name: "hetzner-1" };
 
-const check = (r: WorkRequest) =>
-	checkWork(r, {
-		hostId: HOST,
-		db: sandbox.db,
-		engine,
-		device: DEVICE,
-		offers: () => own,
-	});
-
 /** The Host lists an Offer of this computer in the Space's document. */
 async function listed(profile: string) {
 	const document = await documents.open(SPACE);
@@ -135,147 +126,6 @@ async function listed(profile: string) {
 const offered = (profile: string, cwd = worktree): WorkRequest["call"] => ({
 	kind: "session",
 	input: { cwd, prompt: "Do the work.", offered: { profile } },
-});
-
-describe("checkWork", () => {
-	test("serves its owner's run, in the run's own folder", async () => {
-		expect(await check(request())).toBeNull();
-		expect(
-			await check(request({ call: exec(join(worktree, "packages", "app")) })),
-		).toBeNull();
-		expect(
-			await check(
-				request({ runId: null, call: { kind: "capabilities", query: {} } }),
-			),
-		).toBeNull();
-	});
-
-	test("another Person's run takes an Offer in force, even when the Host is bypassed", async () => {
-		const colleague = request({ personId: "colleague" });
-		expect(await check({ ...colleague, call: offered("coder") })).toBe(
-			"hetzner-1 offers nothing to this Space. Its owner can offer a profile on the Agents page.",
-		);
-		// Its own entry alone, or the Space's alone, is no Offer in force.
-		own = [
-			{
-				spaceId: SPACE,
-				profile: "coder",
-				permissionCap: "acceptEdits",
-				sessionCap: 1,
-				offeredAt: 1,
-			},
-		];
-		expect(await check({ ...colleague, call: offered("coder") })).toContain(
-			"offers nothing",
-		);
-		own = [];
-		await listed("coder");
-		expect(await check({ ...colleague, call: offered("coder") })).toContain(
-			"offers nothing",
-		);
-		own = [
-			{
-				spaceId: SPACE,
-				profile: "coder",
-				permissionCap: "acceptEdits",
-				sessionCap: 1,
-				offeredAt: 1,
-			},
-		];
-
-		// In force: an offered session of it, and the run's own folder work.
-		expect(await check({ ...colleague, call: offered("coder") })).toBeNull();
-		expect(
-			await check({
-				...colleague,
-				call: { kind: "worktree", run: { id: RUN, projectId: "p1" } },
-			}),
-		).toBeNull();
-		expect(await check({ ...colleague, call: { kind: "flows" } })).toBeNull();
-
-		// Anything else is refused.
-		expect(await check({ ...colleague, call: offered("claude") })).toBe(
-			'hetzner-1 offers "coder" to this Space, not "claude".',
-		);
-		for (const call of [
-			exec(worktree),
-			{ kind: "capabilities", query: {} },
-			{
-				kind: "callTool",
-				input: { connection: "github", tool: "x", arguments: {} },
-			},
-			{
-				kind: "session",
-				input: {
-					cwd: worktree,
-					prompt: "Do the work.",
-					harness: "claude-code",
-					model: "sonnet",
-					permissionMode: "bypassPermissions",
-				},
-			},
-		] as WorkRequest["call"][]) {
-			expect(await check({ ...colleague, call })).toBe(
-				'hetzner-1 runs only the profiles its owner offers to this Space. hetzner-1 offers "coder" to this Space.',
-			);
-		}
-		// Its own folder rules hold under an Offer too.
-		expect(await check({ ...colleague, call: offered("coder", "/") })).toBe(
-			"This device works only in the run's own folder.",
-		);
-	});
-
-	test("another Person's run: a Member whose role uses Offers", async () => {
-		own = [
-			{
-				spaceId: SPACE,
-				profile: "coder",
-				permissionCap: "acceptEdits",
-				sessionCap: 1,
-				offeredAt: 1,
-			},
-		];
-		await listed("coder");
-		expect(
-			await check(request({ personId: "stranger", call: offered("coder") })),
-		).toBe("This device runs steps for Members of this Space only.");
-		expect(
-			await check(request({ personId: "viewer", call: offered("coder") })),
-		).toBe("Your role in this Space does not allow using what others offer.");
-	});
-
-	test("refuses a Space it does not take part in through this Host, and a role that does not start runs", async () => {
-		expect(await check(request({ spaceId: sandbox.spaceId }))).toBe(
-			"This device does not take part in that Space through this Host.",
-		);
-		await sandbox.db.$client.execute(
-			"update host_link set person_id = 'viewer'",
-		);
-		expect(await check(request({ personId: "viewer" }))).toBe(
-			"Your role in this Space does not allow starting runs.",
-		);
-	});
-
-	test("refuses a project it has no Clone of, and a folder outside the run's worktree", async () => {
-		expect(await check(request({ projectId: "elsewhere" }))).toBe(
-			"This device does not have this project. Add its folder there first.",
-		);
-		for (const cwd of [sandbox.repoPath, `${worktree}-other`, "/"]) {
-			expect(await check(request({ call: exec(cwd) }))).toBe(
-				"This device works only in the run's own folder.",
-			);
-		}
-		expect(
-			await check(
-				request({
-					call: {
-						kind: "worktree",
-						run: { id: "another-run", projectId: "p1" },
-					},
-				}),
-			),
-		).toBe("This device adds a folder only for the run that asks.");
-	});
 });
 
 /**
@@ -334,8 +184,8 @@ function hubHost() {
 	};
 }
 
-describe("the work server under an Offer", () => {
-	test("runs the profile as its owner set it, the mode clamped to the cap; a session over the cap waits; withdrawing aborts it", async () => {
+describe("the work server", () => {
+	test("serves the Host's calls through the Offer admission: the profile as its owner set it, a session over the cap waits, withdrawing aborts it", async () => {
 		own = [
 			{
 				spaceId: SPACE,
@@ -363,13 +213,11 @@ describe("the work server under an Offer", () => {
 				await ended;
 			},
 		} as unknown as Device;
-		const calls = createOfferCalls();
-		const server = createWorkServer({
-			hostId: HOST,
+		const admission = createOfferAdmission({
 			db: sandbox.db,
-			engine,
 			device,
-			offers: () => own,
+			documents,
+			ownOffers: () => own,
 			profileFor: (name) =>
 				name === "coder"
 					? {
@@ -380,8 +228,10 @@ describe("the work server under an Offer", () => {
 							connections: [],
 						}
 					: null,
-			slots: createOfferSlots(),
-			calls,
+		});
+		const server = createWorkServer({
+			serve: (request, signal) =>
+				admission.serve(request, { hostId: HOST }, signal),
 		});
 		const host = hubHost();
 		const detach = server.attach(host.link);
@@ -413,7 +263,7 @@ describe("the work server under an Offer", () => {
 			item: { type: "ready", harness: "claude-code" },
 		});
 
-		calls.withdrawn(SPACE, "coder");
+		admission.withdrawn(SPACE, "coder");
 		await waitUntil(second.done);
 		expect(sessions[1]?.input.signal.aborted).toBe(true);
 		expect(server.running()).toBe(0);

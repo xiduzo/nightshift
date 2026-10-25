@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
-import { event, user } from "@nightshift/db/schema";
-import { createSpaceDocuments, type SpaceDocuments } from "@nightshift/engine";
+import { event, member, user } from "@nightshift/db/schema";
+import {
+	createSpaceDocuments,
+	type SpaceDocuments,
+	worktreeLocation,
+} from "@nightshift/engine";
 import {
 	createSandbox,
 	parseEventRow,
@@ -10,23 +14,22 @@ import {
 } from "@nightshift/engine/testing";
 import type { AgentProfileSettings, Flow, FlowNode } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
+import type { WorkReply } from "../contract";
+import { createHostExchange } from "../exchange";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
+import type { DeviceRegistry } from "../registry";
 import { withPeers } from "../testing";
-import {
-	createOfferSlots,
-	type DeviceOffer,
-	offeredSession,
-	offerRefusal,
-	spaceOffers,
-} from "./offers";
+import { createWorkHub } from "../work";
+import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
 
 /**
- * Offers on the engine's side: the run start's rule (`offerRefusal`), the
- * offering Device's resolution of an offered session and its session cap,
- * and a run of another Person on the computer that walks it: placed
- * through this computer's Offers, its profile resolved here and never in
- * the run's copy, stopped when the Offer is withdrawn, the Offer's facts
- * in the Space's log.
+ * Offers on the engine's side: the run start's rule (`offerRefusal`), and
+ * a run of another Person on the computer that walks it: placed through
+ * this computer's Offers, its profile resolved here and never in the
+ * run's copy, its Offer's session cap shared with the calls of Walkers
+ * elsewhere, stopped when the Offer is withdrawn, the Offer's facts in
+ * the Space's log. The offering Device's checks of each call are in
+ * `admission.test.ts`.
  */
 
 const node = (n: Partial<FlowNode> & { id: string; type: string }) =>
@@ -117,62 +120,6 @@ const coder: AgentProfileSettings = {
 	connections: ["github"],
 };
 
-describe("the offering Device", () => {
-	test("resolves an offered session to its own profile, the permission mode at most the cap", () => {
-		const base = { cwd: "/w", prompt: "Do the work." };
-		expect(
-			offeredSession({ ...base, offered: { profile: "coder" } }, coder, "auto"),
-		).toEqual({
-			...base,
-			harness: "claude-code",
-			model: "sonnet",
-			permissionMode: "auto",
-			clis: ["gh"],
-			connections: ["github"],
-		});
-		// A node may ask for less than the cap; never more.
-		expect(
-			offeredSession(
-				{ ...base, offered: { profile: "coder", permissionMode: "plan" } },
-				coder,
-				"acceptEdits",
-			).permissionMode,
-		).toBe("plan");
-		expect(
-			offeredSession(
-				{
-					...base,
-					offered: { profile: "coder", permissionMode: "bypassPermissions" },
-				},
-				coder,
-				"acceptEdits",
-			).permissionMode,
-		).toBe("acceptEdits");
-	});
-
-	test("a session over the cap waits for a free one, in order; one stopped while it waits leaves", async () => {
-		const slots = createOfferSlots();
-		const signal = new AbortController().signal;
-		const first = await slots.take("o", 1, signal);
-		const order: string[] = [];
-		const second = slots.take("o", 1, signal).then((release) => {
-			order.push("second");
-			return release;
-		});
-		const stopped = new AbortController();
-		const third = slots.take("o", 1, stopped.signal);
-		await Bun.sleep(10);
-		expect(order).toEqual([]);
-		expect(slots.running("o")).toBe(1);
-		stopped.abort();
-		await expect(third).rejects.toThrow("The session was stopped.");
-		first();
-		(await second)();
-		expect(order).toEqual(["second"]);
-		expect(slots.running("o")).toBe(0);
-	});
-});
-
 describe("another Person's run on the computer that walks it", () => {
 	let sandbox: Sandbox;
 	let documents: SpaceDocuments;
@@ -204,6 +151,13 @@ describe("another Person's run on the computer that walks it", () => {
 		await sandbox.db
 			.insert(user)
 			.values({ id: carol, name: "Carol", email: "carol@example.com" });
+		await sandbox.db.insert(member).values({
+			id: "m-carol",
+			organizationId: sandbox.spaceId,
+			userId: carol,
+			role: "member",
+			createdAt: new Date(),
+		});
 		engine = createPeerEngine(
 			withPeers({
 				db: sandbox.db,
@@ -227,6 +181,7 @@ describe("another Person's run on the computer that walks it", () => {
 	});
 
 	async function offer() {
+		await documents.mirrorMembers(sandbox.spaceId);
 		own = [
 			{
 				spaceId: sandbox.spaceId,
@@ -328,6 +283,83 @@ describe("another Person's run on the computer that walks it", () => {
 		]);
 	});
 
+	test("its Offer's session cap holds for a session a Walker elsewhere sends through this Host too", async () => {
+		await offer();
+		const space = engine.space(sandbox.spaceId);
+		const { id: projectId } = await space.addProject({
+			repoPath: sandbox.repoPath,
+		});
+		const before = harness.calls.length;
+		await space.startRun({
+			projectId,
+			flow: flow("Go slow."),
+			startedBy: carol,
+		});
+		await waitFor(() => harness.calls.length === before + 1, {
+			label: "the session walked here",
+		});
+
+		// Carol's other Device walks another run, with a step here.
+		const [owner] = await sandbox.db.select().from(user);
+		const host = createHostExchange({
+			db: sandbox.db,
+			engine,
+			registry: {
+				get: async (id: string) =>
+					id === "device-carol"
+						? { id, ownerId: carol, revokedAt: null }
+						: null,
+			} as unknown as DeviceRegistry,
+			selfId: sandbox.deviceId,
+			ownerId: owner?.id as string,
+			isHost: () => true,
+			work: createWorkHub(),
+		});
+		const other = "beefcafe-0000-0000-0000-000000000000";
+		const replies: WorkReply[] = [];
+		void (async () => {
+			for await (const reply of host.call(
+				{
+					keyId: "key-carol",
+					deviceId: "device-carol",
+					personId: carol,
+					permissions: {},
+				},
+				{
+					deviceId: sandbox.deviceId,
+					request: {
+						spaceId: sandbox.spaceId,
+						projectId,
+						personId: carol,
+						runId: other,
+						call: {
+							kind: "session",
+							input: {
+								cwd: worktreeLocation(sandbox.repoPath, other.slice(0, 8))
+									.worktreePath,
+								prompt: "Sent here.",
+								offered: { profile: "coder" },
+							},
+						},
+					},
+				},
+				signal.signal,
+			)) {
+				replies.push(reply);
+			}
+		})();
+		await Bun.sleep(200);
+		// The cap is 1: the session sent here waits for the one walked here.
+		expect(harness.calls).toHaveLength(before + 1);
+		expect(replies).toEqual([]);
+		await engine.offers.withdraw({
+			spaceId: sandbox.spaceId,
+			deviceId: sandbox.deviceId,
+			profile: "coder",
+			by: "the-owner",
+		});
+	});
+
 	test("the Space document publishes the Offer's name and caps, nothing of the profile", async () => {
 		await offer();
 		const document = await documents.open(sandbox.spaceId);
@@ -370,6 +402,13 @@ describe("a schedule that fires on another Person's Device", () => {
 		await sandbox.db
 			.insert(user)
 			.values({ id: carol, name: "Carol", email: "carol@example.com" });
+		await sandbox.db.insert(member).values({
+			id: "m-carol",
+			organizationId: sandbox.spaceId,
+			userId: carol,
+			role: "member",
+			createdAt: new Date(),
+		});
 		engine = createPeerEngine(
 			withPeers({
 				db: sandbox.db,
