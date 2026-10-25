@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Engine } from "@nightshift/engine";
 import { ORPCError } from "@orpc/client";
 import type { HostClient, RunCommand, RunRows } from "../contract";
@@ -15,8 +16,8 @@ import type { RunHistoryExchange } from "./run-history";
  * - Push: the rows this computer walked in the Spaces the Host keeps,
  *   after the Host's cursor, whenever an event lands here (`sync.push`).
  *   After a batch with a node that ended, that step's transcript and
- *   command log, and its run's walk state, go to the Host's archive (the
- *   Host takes files of runs it has). The cursor moves when both are
+ *   command log, and its run's walk state when it changed, go to the
+ *   Host's archive (the Host takes files of runs it has). The cursor moves when both are
  *   done: a batch that fails halfway goes again, whole.
  * - Pull: `sync.stream` from this Replica's cursors: other Walkers' rows
  *   as they land on the Host, each batch in one transaction. A batch whose
@@ -74,6 +75,8 @@ export function createDeviceExchange(deps: {
 	 * and the Commands of a run still on its way here. Default 15 s.
 	 */
 	idleMs?: number;
+	/** The most rows in one pushed batch. Default 200. */
+	batchRows?: number;
 }): DeviceExchange {
 	const { engine, hostId, selfId } = deps;
 	const { exchange } = engine;
@@ -150,7 +153,7 @@ export function createDeviceExchange(deps: {
 					spaces,
 					cursors: await exchange.cursorsWith(hostId),
 					only: selfId,
-					limit: 200,
+					limit: deps.batchRows ?? 200,
 				});
 				if (isEmpty(batch)) {
 					await landed;
@@ -167,6 +170,13 @@ export function createDeviceExchange(deps: {
 		}
 	}
 
+	/**
+	 * The walk state each run last put in the Host's archive, by a hash of
+	 * it. Steps that end in one superstep (the items of a For Each), and a
+	 * run's end after its last step, leave it as it was: it goes once.
+	 */
+	const putCheckpoints = new Map<string, string>();
+
 	/** Puts the files of the batch's ended nodes, and their runs' walk state, in the Host's archive. */
 	async function archive(
 		client: HostClient,
@@ -174,11 +184,21 @@ export function createDeviceExchange(deps: {
 		signal: AbortSignal,
 	) {
 		for (const { ref, content, stamp } of await exchange.walkFilesOf(batch)) {
+			const hash =
+				ref.kind === "checkpoint"
+					? createHash("sha256").update(content).digest("base64")
+					: null;
+			if (hash !== null && putCheckpoints.get(ref.runId) === hash) continue;
 			// The stamp says which end of the step the copy holds.
 			await client.archive.put(
 				{ ref, content, ...(stamp ? { stamp } : {}) },
 				{ signal },
 			);
+			if (hash !== null) putCheckpoints.set(ref.runId, hash);
+		}
+		// An ended run's walk state changes no more.
+		for (const event of batch.events) {
+			if (event.type === "RunEnded") putCheckpoints.delete(event.runId);
 		}
 	}
 

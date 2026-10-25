@@ -1266,6 +1266,51 @@ describe("live transcripts over the exchange", () => {
 		expect(textOf(after.items, step)).toContain("second part");
 	}, 20_000);
 
+	test("B puts a run's walk state in A's archive only when it changed", async () => {
+		const run = await walkOnB(await forEachFlow(b.repoPath));
+		await untilStatus(paired.device, run.id, "finished");
+		const client = paired.memory.client(paired.key);
+		/** The walk states B put, in order. */
+		const puts: string[] = [];
+		const small = createDeviceExchange({
+			engine: paired.device,
+			hostId: paired.hostId,
+			selfId: b.deviceId,
+			idleMs: 1_000,
+			// A batch of a few rows: each with a step's end, of the finished run.
+			batchRows: 5,
+		});
+		online(
+			{
+				...client,
+				archive: {
+					...client.archive,
+					put: (async (input, options) => {
+						if (input.ref.kind === "checkpoint") puts.push(input.content);
+						return client.archive.put(input, options);
+					}) as HostClient["archive"]["put"],
+				},
+			},
+			small,
+		);
+		await untilStatus(paired.host, run.id, "finished");
+		const checkpoint = {
+			kind: "checkpoint" as const,
+			spaceId: a.spaceId,
+			runId: run.id,
+		};
+		await waitFor(
+			async () =>
+				(await paired.host.exchange.archive.read(checkpoint)) !== null,
+			{ label: "the walk state in A's archive" },
+		);
+		// The run finished before the link was up: one walk state, put once.
+		expect(puts).toHaveLength(1);
+		expect(await paired.host.exchange.archive.read(checkpoint)).toBe(
+			puts[0] ?? "",
+		);
+	});
+
 	test("A shows each item's output of a For Each B walked, in seq order, from its archive", async () => {
 		const run = await walkOnB(await forEachFlow(b.repoPath));
 		await untilStatus(paired.device, run.id, "finished");
