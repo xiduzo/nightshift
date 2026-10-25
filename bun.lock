@@ -197,6 +197,7 @@
         "@nightshift/engine": "workspace:*",
         "@nightshift/flows": "workspace:*",
         "@nightshift/notifications": "workspace:*",
+        "@nightshift/refusal": "workspace:*",
         "@orpc/server": "catalog:",
         "zod": "catalog:",
       },
@@ -215,6 +216,7 @@
         "@better-auth/drizzle-adapter": "catalog:",
         "@better-auth/expo": "catalog:",
         "@nightshift/db": "workspace:*",
+        "@nightshift/refusal": "workspace:*",
         "better-auth": "catalog:",
         "drizzle-orm": "catalog:",
         "zod": "catalog:",
@@ -300,6 +302,7 @@
         "@nightshift/db": "workspace:*",
         "@nightshift/engine": "workspace:*",
         "@nightshift/flows": "workspace:*",
+        "@nightshift/refusal": "workspace:*",
         "@orpc/client": "catalog:",
         "@orpc/contract": "catalog:",
         "@orpc/server": "catalog:",
@@ -324,6 +327,7 @@
         "@nightshift/auth": "workspace:*",
         "@nightshift/db": "workspace:*",
         "@nightshift/flows": "workspace:*",
+        "@nightshift/refusal": "workspace:*",
         "ajv": "^8.20.0",
         "drizzle-orm": "catalog:",
         "yjs": "catalog:",
@@ -338,6 +342,7 @@
     "packages/flows": {
       "name": "@nightshift/flows",
       "dependencies": {
+        "@nightshift/refusal": "workspace:*",
         "croner": "^10.0.1",
         "jsonata": "^2.2.2",
         "zod": "catalog:",
@@ -363,6 +368,14 @@
         "@nightshift/config": "workspace:*",
         "@types/bun": "catalog:",
         "@types/web-push": "3.6.4",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/refusal": {
+      "name": "@nightshift/refusal",
+      "devDependencies": {
+        "@nightshift/config": "workspace:*",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
       },
     },
@@ -933,6 +946,8 @@
     "@nightshift/flows": ["@nightshift/flows@workspace:packages/flows"],
 
     "@nightshift/notifications": ["@nightshift/notifications@workspace:packages/notifications"],
+
+    "@nightshift/refusal": ["@nightshift/refusal@workspace:packages/refusal"],
 
     "@nightshift/ui": ["@nightshift/ui@workspace:packages/ui"],
 

@@ -12,6 +12,7 @@
 		{ "path": "../db" },
 		{ "path": "../agents" },
 		{ "path": "../auth" },
-		{ "path": "../flows" }
+		{ "path": "../flows" },
+		{ "path": "../refusal" }
 	]
 }

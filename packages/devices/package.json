@@ -17,6 +17,7 @@
 		"@nightshift/db": "workspace:*",
 		"@nightshift/engine": "workspace:*",
 		"@nightshift/flows": "workspace:*",
+		"@nightshift/refusal": "workspace:*",
 		"@orpc/client": "catalog:",
 		"@orpc/contract": "catalog:",
 		"@orpc/server": "catalog:",

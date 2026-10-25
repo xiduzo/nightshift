@@ -15,6 +15,7 @@
 		{ "path": "../devices" },
 		{ "path": "../engine" },
 		{ "path": "../flows" },
-		{ "path": "../notifications" }
+		{ "path": "../notifications" },
+		{ "path": "../refusal" }
 	]
 }

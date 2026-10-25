@@ -13,6 +13,7 @@
 		{ "path": "../auth" },
 		{ "path": "../db" },
 		{ "path": "../engine" },
-		{ "path": "../flows" }
+		{ "path": "../flows" },
+		{ "path": "../refusal" }
 	]
 }

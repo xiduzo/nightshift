@@ -4,8 +4,9 @@
  * (L1) Every `apps/*` and `packages/*` workspace may depend only on the
  *      workspaces its layer allows. Bun links only declared dependencies,
  *      so the dependencies in each package.json are the real import graph
- *      between workspaces. `@nightshift/config` (shared tsconfig) is
- *      allowed everywhere.
+ *      between workspaces. `@nightshift/config` (shared tsconfig)
+ *      and `@nightshift/refusal` (the refusal type, which imports nothing)
+ *      are allowed everywhere.
  * (L2) Every declared workspace dependency is used: a file of the
  *      workspace imports it (a .ts, .tsx, .js, .mjs, .cjs or .css file), or
  *      its tsconfig extends it.
@@ -28,8 +29,11 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-/** Allowed everywhere: shared TypeScript config, no code. */
-const EVERYWHERE = new Set(["@nightshift/config"]);
+/**
+ * Allowed everywhere: the shared TypeScript config (no code), and the
+ * refusal type, which imports nothing. Every layer throws a refusal.
+ */
+const EVERYWHERE = new Set(["@nightshift/config", "@nightshift/refusal"]);
 
 export type Rule = {
 	layer: number;
@@ -44,6 +48,7 @@ export type Rule = {
 export const LAYERS: Record<string, Rule> = {
 	// 0. Foundation
 	"@nightshift/config": { layer: 0, mayImport: [] },
+	"@nightshift/refusal": { layer: 0, mayImport: [] },
 	"@nightshift/db": { layer: 0, mayImport: [] },
 	"@nightshift/flows": { layer: 0, mayImport: [] },
 	"@nightshift/ui": { layer: 0, mayImport: [] },
