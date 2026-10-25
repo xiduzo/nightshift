@@ -22,7 +22,10 @@ afterAll(() => {
 	for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-/** Writes `files` (path → source) to a new root and checks one workspace. */
+/**
+ * Writes `files` (path → source) to a new root and checks one workspace.
+ * An app has `routes/` as its entry folder, like the web app.
+ */
 function check(
 	workspace: string,
 	files: Record<string, string>,
@@ -35,7 +38,7 @@ function check(
 		mkdirSync(dirname(full), { recursive: true });
 		writeFileSync(full, text);
 	}
-	return checkWorkspace(root, workspace, options);
+	return checkWorkspace(root, workspace, { entryDirs: ["routes"], ...options });
 }
 
 const APP = "apps/demo";
@@ -99,6 +102,32 @@ describe("deep imports (a)", () => {
 		);
 	});
 
+	test('require() and a type written as import("x").Name count as imports', () => {
+		const problems = check(APP, {
+			...runs,
+			"src/main.ts":
+				'export type List = import("./features/runs/run-list").RunList;\nexport const format = require("./features/runs/lib/format");\n',
+		});
+		expect(problems.filter((p) => p.includes("past the barrel"))).toEqual([
+			'apps/demo/src/main.ts: imports "./features/runs/run-list" past the barrel of features/runs. Import "./features/runs" instead.',
+			'apps/demo/src/main.ts: imports "./features/runs/lib/format" past the barrel of features/runs. Import "./features/runs" instead.',
+		]);
+	});
+
+	test('import("x").Name through the barrel uses only that name', () => {
+		expect(
+			check(APP, {
+				...runs,
+				"src/features/runs/index.ts":
+					'export { RunList } from "./run-list";\nexport { format } from "./lib/format";\n',
+				"src/main.ts":
+					'export type List = typeof import("./features/runs").RunList;\n',
+			}),
+		).toEqual([
+			'apps/demo/src/features/runs/index.ts: nothing outside features/runs imports "format". Take it off the barrel.',
+		]);
+	});
+
 	test("inside a vertical, relative imports may reach any file", () => {
 		// run-list.ts imports ./lib/format: no problem.
 		expect(
@@ -128,7 +157,8 @@ describe("deep imports (a)", () => {
 			"src/features/runs/index.ts":
 				'export { RunList } from "./run-list";\nexport { RUN_LIMIT } from "./limits";\n',
 			"src/features/runs/limits.ts": "export const RUN_LIMIT = 3;\n",
-			"src/features/gates/index.ts":
+			"src/features/gates/index.ts": 'export { gate } from "./gate";\n',
+			"src/features/gates/gate.ts":
 				'import { RUN_LIMIT } from "../runs/limits";\nimport { RunList } from "../runs";\nexport const gate = [RUN_LIMIT, RunList];\n',
 			"src/main.ts":
 				'import { gate } from "./features/gates";\nimport { RUN_LIMIT } from "./features/runs";\nexport default [gate, RUN_LIMIT];\n',
@@ -166,7 +196,6 @@ describe("deep imports (a)", () => {
 		expect(
 			check(PKG, {
 				"src/graph/compile.ts": "export const compile = 1;\n",
-				"src/index.ts": "export const x = 1;\n",
 			}),
 		).toEqual([
 			'packages/demo/src/graph/: the vertical "graph" has no index.ts. Add a barrel that exports what other code uses.',
@@ -192,7 +221,7 @@ describe("barrel reachability (b)", () => {
 			check(APP, {
 				...runs,
 				"src/features/runs/index.ts":
-					'export { RunList } from "./run-list";\nexport { format } from "./lib/format";\nexport type Unused = string;\n',
+					'export { RunList } from "./run-list";\nexport { format } from "./lib/format";\nexport type { Unused } from "./run-list";\n',
 				"src/main.ts":
 					'import { RunList } from "./features/runs";\nexport default RunList;\n',
 			}),
@@ -216,7 +245,8 @@ describe("barrel reachability (b)", () => {
 	test("a test counts for a testing vertical", () => {
 		expect(
 			check(APP, {
-				"src/shared/testing/index.ts": "export const fake = 1;\n",
+				"src/shared/testing/index.ts": 'export { fake } from "./fake";\n',
+				"src/shared/testing/fake.ts": "export const fake = 1;\n",
 				"src/main.test.ts": 'import { fake } from "./shared/testing";\nfake;\n',
 			}),
 		).toEqual([]);
@@ -307,7 +337,8 @@ describe("top-level layout (c)", () => {
 			'apps/demo/src/lib/: "lib" is a kind bucket. Move each file into the vertical that uses it (src/features/<vertical>/ or a named src/shared/<name>/).',
 		]);
 		const problems = check(PKG, {
-			"src/utils/index.ts": "export const f = 1;\n",
+			"src/utils/index.ts": 'export { f } from "./f";\n',
+			"src/utils/f.ts": "export const f = 1;\n",
 			"src/index.ts": 'export { f } from "./utils";\n',
 		});
 		expect(problems).toEqual([
@@ -336,6 +367,290 @@ describe("top-level layout (c)", () => {
 		]);
 	});
 });
+
+describe("imports that leave the workspace (d)", () => {
+	test("a relative import out of the workspace fails, found or not", () => {
+		expect(
+			check(PKG, {
+				"src/runs/index.ts": 'export { run } from "./run";\n',
+				"src/runs/run.ts":
+					'import { x } from "../../../agents/src/x";\nimport type { Y } from "../../../../apps/web/src/y";\nexport const run = [x] as Y[];\n',
+				"src/index.ts": 'export { run } from "./runs";\n',
+			}),
+		).toEqual([
+			'packages/demo/src/runs/run.ts: imports "../../../agents/src/x", a path outside packages/demo. Import the package by its name and an entry that its package.json exports.',
+			'packages/demo/src/runs/run.ts: imports "../../../../apps/web/src/y", a path outside packages/demo. Import the package by its name and an entry that its package.json exports.',
+		]);
+	});
+
+	test("a relative import inside the workspace passes", () => {
+		expect(
+			check(PKG, {
+				"src/runs/index.ts": 'export { run } from "./run";\n',
+				"src/runs/run.ts":
+					'import { config } from "../../config";\nexport const run = config;\n',
+				"config.ts": "export const config = 1;\n",
+				"src/index.ts": 'export { run } from "./runs";\n',
+			}),
+		).toEqual([]);
+	});
+});
+
+describe("the workspace's own name (e)", () => {
+	const files = {
+		"package.json": JSON.stringify({ name: "@demo/pkg" }),
+		"src/runs/index.ts": 'export { run } from "./run";\n',
+		"src/runs/run.ts": "export const run = 1;\n",
+		"src/gates/index.ts": 'export { gate } from "./gate";\n',
+		"src/index.ts":
+			'export { run } from "./runs";\nexport { gate } from "./gates";\n',
+	};
+
+	test("an import of its own package name fails, in a test too", () => {
+		expect(
+			check(PKG, {
+				...files,
+				"src/gates/gate.ts":
+					'import { run } from "@demo/pkg";\nexport const gate = run;\n',
+				"src/gates/gate.test.ts":
+					'import { fake } from "@demo/pkg/testing";\nfake;\n',
+			}),
+		).toEqual([
+			'packages/demo/src/gates/gate.test.ts: imports its own package by name ("@demo/pkg/testing"). Import the file or the vertical\'s barrel by a relative path.',
+			'packages/demo/src/gates/gate.ts: imports its own package by name ("@demo/pkg"). Import the file or the vertical\'s barrel by a relative path.',
+		]);
+	});
+
+	test("another package's name passes", () => {
+		expect(
+			check(PKG, {
+				...files,
+				"src/gates/gate.ts":
+					'import { z } from "@demo/pkg-two";\nexport const gate = z;\n',
+			}),
+		).toEqual([]);
+	});
+});
+
+describe("tests stay out of production code (f)", () => {
+	const files = {
+		"src/runs/index.ts": 'export { run } from "./run";\n',
+		"src/index.ts": 'export { run } from "./runs";\n',
+		"src/runs/fixtures/flow.ts": "export const flow = 1;\n",
+		"src/runs/test-support.ts": "export const support = 1;\n",
+		"src/testing/index.ts": 'export { fake } from "./fake";\n',
+		"src/testing/fake.ts": "export const fake = 1;\n",
+	};
+
+	test("production code that imports a fake, a fixture or a test helper fails", () => {
+		expect(
+			check(PKG, {
+				...files,
+				"src/runs/run.ts":
+					'import { fake } from "../testing";\nimport { flow } from "./fixtures/flow";\nimport { support } from "./test-support";\nexport const run = [fake, flow, support];\n',
+			}),
+		).toEqual([
+			'packages/demo/src/runs/run.ts: imports "../testing", which only tests may use (a test, a fake, a fixture or a test helper). Production code never imports it.',
+			'packages/demo/src/runs/run.ts: imports "./fixtures/flow", which only tests may use (a test, a fake, a fixture or a test helper). Production code never imports it.',
+			'packages/demo/src/runs/run.ts: imports "./test-support", which only tests may use (a test, a fake, a fixture or a test helper). Production code never imports it.',
+		]);
+	});
+
+	test("a test may import them", () => {
+		expect(
+			check(PKG, {
+				...files,
+				"src/runs/run.ts": "export const run = 1;\n",
+				"src/runs/run.test.ts":
+					'import { fake } from "../testing";\nimport { flow } from "./fixtures/flow";\nimport { support } from "./test-support";\n[fake, flow, support];\n',
+			}),
+		).toEqual([]);
+	});
+});
+
+describe("the top of an app's src/ (g)", () => {
+	test("a folder other than features/, shared/ and the entry folder fails", () => {
+		expect(
+			check(APP, {
+				"src/store/runs.ts": "export const runs = 1;\n",
+				"src/routes/index.ts": "export const page = 1;\n",
+				"src/router.tsx": "export const router = 1;\n",
+			}),
+		).toEqual([
+			"apps/demo/src/store/: the top of an app's src/ holds only features/, shared/, routes/ and entry files. Move it into src/features/<vertical>/ or a named src/shared/<name>/.",
+		]);
+	});
+
+	test("an entry folder is allowed only for its own app", () => {
+		const files = { "src/routes/index.ts": "export const page = 1;\n" };
+		expect(check(APP, files, { entryDirs: ["routes"] })).toEqual([]);
+		expect(check(APP, files, { entryDirs: ["app"] })).toEqual([
+			"apps/demo/src/routes/: the top of an app's src/ holds only features/, shared/, app/ and entry files. Move it into src/features/<vertical>/ or a named src/shared/<name>/.",
+		]);
+	});
+
+	test("in a package, a folder at the top of src/ is a vertical", () => {
+		expect(
+			check(PKG, {
+				"src/store/index.ts": 'export { store } from "./store";\n',
+				"src/store/store.ts": "export const store = 1;\n",
+				"src/index.ts": 'export { store } from "./store";\n',
+			}),
+		).toEqual([]);
+	});
+});
+
+describe("the order of an app's shared pieces (h)", () => {
+	const files = {
+		...runs,
+		"src/shared/shell/index.ts": 'export { AppShell } from "./app-shell";\n',
+		"src/shared/shell/app-shell.ts":
+			'import { RunList } from "../../features/runs";\nexport const AppShell = RunList;\n',
+		"src/shared/format/index.ts": 'export { formatTime } from "./format";\n',
+		"src/shared/format/format.ts": "export const formatTime = 1;\n",
+		"src/routes/root.ts":
+			'import { AppShell } from "../shared/shell";\nimport { formatTime } from "../shared/format";\nexport default [AppShell, formatTime];\n',
+	};
+
+	test("the shell imports features, and the routes import the shell", () => {
+		expect(check(APP, files)).toEqual([]);
+	});
+
+	test("a shared piece that imports a feature fails, in a test too", () => {
+		expect(
+			check(APP, {
+				...files,
+				"src/shared/format/format.ts":
+					'import { RunList } from "../../features/runs";\nexport const formatTime = RunList;\n',
+				"src/shared/format/format.test.ts":
+					'import { RunList } from "../../features/runs";\nRunList();\n',
+			}),
+		).toEqual([
+			"apps/demo/src/shared/format/format.test.ts: the shared piece shared/format imports the feature features/runs. A shared piece imports no feature: let an entry file pass the feature's rule in (STRUCTURE.md section 5).",
+			"apps/demo/src/shared/format/format.ts: the shared piece shared/format imports the feature features/runs. A shared piece imports no feature: let an entry file pass the feature's rule in (STRUCTURE.md section 5).",
+		]);
+	});
+
+	test("a feature or a shared piece that imports the shell fails", () => {
+		expect(
+			check(APP, {
+				...files,
+				"src/features/gates/index.ts": 'export { Inbox } from "./inbox";\n',
+				"src/features/gates/inbox.ts":
+					'import { AppShell } from "../../shared/shell";\nexport const Inbox = AppShell;\n',
+				"src/shared/format/format.ts":
+					'import { AppShell } from "../shell";\nexport const formatTime = AppShell;\n',
+				"src/routes/gates.ts":
+					'import { Inbox } from "../features/gates";\nexport default Inbox;\n',
+			}),
+		).toEqual([
+			"apps/demo/src/features/gates/inbox.ts: imports shared/shell, which composes the features. Only the routes and the app's entry files import it.",
+			"apps/demo/src/shared/format/format.ts: imports shared/shell, which composes the features. Only the routes and the app's entry files import it.",
+		]);
+	});
+});
+
+describe("peer ports import only shared pieces (i)", () => {
+	const files = {
+		"src/shared/api/index.ts": 'export { orpc } from "./orpc";\n',
+		"src/shared/api/orpc.ts": "export const orpc = 1;\n",
+		"src/features/projects/index.ts":
+			'export { Projects } from "./projects";\n',
+		"src/features/projects/projects.ts": "export const Projects = 1;\n",
+		"src/features/settings/index.ts":
+			'export { settingsQueries } from "./queries";\nexport { SettingsPage } from "./settings-page";\n',
+		"src/features/settings/settings-page.ts":
+			'import { Projects } from "../projects";\nexport const SettingsPage = Projects;\n',
+		"src/features/settings/types.ts": "export type Settings = { a: 1 };\n",
+		"src/features/flows/index.ts": 'export { Editor } from "./editor";\n',
+		"src/features/flows/editor.ts":
+			'import { settingsQueries } from "../settings/queries";\nexport const Editor = settingsQueries;\n',
+		"src/routes/index.ts":
+			'import { Editor } from "../features/flows";\nimport { SettingsPage, settingsQueries } from "../features/settings";\nexport default [Editor, SettingsPage, settingsQueries];\n',
+	};
+	const ports = {
+		peerPorts: { "features/flows": { "features/settings": "queries" } },
+	};
+
+	test("a port that imports shared pieces and its own vertical passes", () => {
+		expect(
+			check(
+				APP,
+				{
+					...files,
+					"src/features/settings/queries.ts":
+						'import { orpc } from "../../shared/api";\nimport type { Settings } from "./types";\nexport const settingsQueries = orpc as unknown as Settings;\n',
+				},
+				ports,
+			),
+		).toEqual([]);
+	});
+
+	test("a port that imports another feature fails, through its own files too", () => {
+		expect(
+			check(
+				APP,
+				{
+					...files,
+					"src/features/settings/queries.ts":
+						'import { orpc } from "../../shared/api";\nimport { more } from "./more";\nexport const settingsQueries = [orpc, more];\n',
+					"src/features/settings/more.ts":
+						'import { Projects } from "../projects";\nexport const more = Projects;\n',
+				},
+				ports,
+			),
+		).toEqual([
+			'apps/demo/src/features/settings/more.ts: imports features/projects, but it is (or the peer port "features/settings/queries" reaches it). A peer port imports no other vertical than a shared piece, so it closes no cycle.',
+		]);
+	});
+
+	test("a port that is not a file fails", () => {
+		expect(
+			check(APP, files, {
+				peerPorts: { "features/flows": { "features/settings": "missing" } },
+			}),
+		).toContainEqual(
+			'scripts/check-verticals.ts: the peer port "features/settings/missing" of features/flows is not a file of apps/demo. Fix or remove it.',
+		);
+	});
+});
+
+describe("barrels hold only imports and exports (j)", () => {
+	test("a barrel with code fails, and so does a package's root index.ts", () => {
+		expect(
+			check(PKG, {
+				"src/runs/index.ts":
+					'import { run } from "./run";\nexport const runTwice = () => [run, run];\n',
+				"src/runs/run.ts": "export const run = 1;\n",
+				"src/index.ts":
+					'import { runTwice } from "./runs";\nexport function start() {\n\treturn runTwice();\n}\n',
+			}),
+		).toEqual([
+			"packages/demo/src/runs/index.ts: a barrel holds only import and export statements. Move the code into a file of runs and export it from there.",
+			"packages/demo/src/index.ts: a barrel holds only import and export statements. Move the code into its vertical and export it from there.",
+		]);
+	});
+
+	test("imports, re-exports, an export list and a default export pass", () => {
+		expect(
+			check(PKG, {
+				"src/runs/index.ts":
+					'import { run } from "./run";\nexport type { Run } from "./run";\nexport { run };\nexport default run;\n',
+				"src/runs/run.ts":
+					"export const run = 1;\nexport type Run = typeof run;\n",
+				"src/index.ts":
+					'export { default, run, type Run } from "./runs";\nexport * as runs from "./runs";\n',
+			}),
+		).toEqual([]);
+	});
+});
+
+/**
+ * A run over the whole repository takes seconds of wall time, and many
+ * more on a busy computer. Its wall time is no signal: the CPU bound of
+ * "it stays fast" is the guard.
+ */
+const WHOLE_REPOSITORY = { timeout: 120_000 };
 
 describe("the command", () => {
 	test("tests are told apart from production files", () => {

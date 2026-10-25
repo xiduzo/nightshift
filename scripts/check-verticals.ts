@@ -1,5 +1,5 @@
 /**
- * Checks the vertical rules of docs/steering/STRUCTURE.md (section 4).
+ * Checks the vertical rules of docs/steering/STRUCTURE.md (sections 4 and 5).
  *
  * It finds the verticals from the file system, so no list can drift:
  * - an app (`apps/*`): every folder in `src/features/` and `src/shared/`
@@ -18,12 +18,24 @@
  *     is not checked, like the root `index.ts`
  * (c) a kind bucket at the top of `src/` (lib, utils, helpers, hooks,
  *     components, types, common, misc), and a loose file in an app's `shared/`
+ * (d) a relative import that leaves the workspace
+ * (e) an import of the workspace's own package name
+ * (f) production code that imports a test, a fake, a fixture or a test helper
+ * (g) a folder at the top of an app's `src/` other than `features/`,
+ *     `shared/` and the app's ENTRY_DIRS
+ * (h) in an app, a shared piece that imports a feature, and a vertical that
+ *     imports `shared/shell` (only the routes and the entry files compose it)
+ * (i) a peer port, or a file of its vertical that it imports, that imports
+ *     another vertical than a shared piece
+ * (j) a barrel, or a package's root `index.ts`, with a statement that is
+ *     not an import or an export
  *
  * Tests may deep-import, and they do not count as importers for (b), except
  * for a vertical named `testing`. A test is a `*.test.ts(x)` file, a
  * `test-support.ts` file, or a file in a `testing/` or `fixtures/` folder.
  * A namespace import (`import * as x`), `export * from` and a dynamic
- * `import()` that is not destructured count as a use of every name.
+ * `import()` or `require()` that is not destructured count as a use of
+ * every name. A type written as `import("x").Name` counts as an import.
  *
  *   bun scripts/check-verticals.ts                  every workspace
  *   bun scripts/check-verticals.ts packages/engine  only that workspace
@@ -128,6 +140,19 @@ export const PEER_PORTS: Record<
 	},
 };
 
+/**
+ * The folders at the top of an app's `src/` besides `features/` and
+ * `shared/`: the one folder of entry files that its framework reads.
+ */
+export const ENTRY_DIRS: Record<string, string[]> = {
+	// TanStack Router's file routes.
+	"apps/web": ["routes"],
+	// Expo Router's files.
+	"apps/mobile": ["app"],
+	// Electrobun's main process entry.
+	"apps/desktop": ["bun"],
+};
+
 /** Kind buckets: never a folder at the top of `src/`. */
 const KIND_BUCKETS = new Set([
 	"lib",
@@ -140,11 +165,16 @@ const KIND_BUCKETS = new Set([
 	"misc",
 ]);
 
+/** The app's shared piece that composes the features. */
+const SHELL = "shared/shell";
+
 const SKIP_DIRS = new Set(["node_modules", "dist", ".hutch", ".turbo"]);
 
 export type Options = {
 	leafContracts?: Record<string, string[]>;
 	peerPorts?: Record<string, Record<string, string>>;
+	/** An app's entry folders at the top of `src/` (ENTRY_DIRS). */
+	entryDirs?: string[];
 };
 
 type Import = {
@@ -158,6 +188,8 @@ type SourceFile = {
 	test: boolean;
 	imports: Import[];
 	exports: { names: string[]; stars: string[] };
+	/** Every statement is an import or an export of names (rule j). */
+	onlyImportsAndExports: boolean;
 };
 
 export function isTest(path: string): boolean {
@@ -168,9 +200,13 @@ export function isTest(path: string): boolean {
 	);
 }
 
+/** The files to check under `dir`, in name order on every file system. */
 function walk(dir: string, out: string[]): void {
 	if (!existsSync(dir)) return;
-	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+	const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+		a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+	);
+	for (const entry of entries) {
 		if (SKIP_DIRS.has(entry.name)) continue;
 		const path = join(dir, entry.name);
 		if (entry.isDirectory()) walk(path, out);
@@ -216,6 +252,23 @@ function destructured(call: ts.CallExpression): string[] | "all" {
 		return names;
 	}
 	return "all";
+}
+
+/** `import("x").A.B`: the name A. A plain `import("x")` uses every name. */
+function typeReference(node: ts.ImportTypeNode): string[] | "all" {
+	let qualifier = node.qualifier;
+	if (!qualifier) return "all";
+	while (ts.isQualifiedName(qualifier)) qualifier = qualifier.left;
+	return [qualifier.text];
+}
+
+/** An import or an export of names: what a barrel may hold (rule j). */
+function importOrExport(statement: ts.Statement): boolean {
+	return (
+		ts.isImportDeclaration(statement) ||
+		ts.isExportDeclaration(statement) ||
+		(ts.isExportAssignment(statement) && ts.isIdentifier(statement.expression))
+	);
 }
 
 function parse(path: string): SourceFile {
@@ -268,13 +321,24 @@ function parse(path: string): SourceFile {
 			exportNames.push("default");
 		} else if (
 			ts.isCallExpression(node) &&
-			node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+			(node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+				(ts.isIdentifier(node.expression) &&
+					node.expression.text === "require")) &&
 			node.arguments[0] &&
 			ts.isStringLiteralLike(node.arguments[0])
 		) {
 			imports.push({
 				specifier: node.arguments[0].text,
 				names: destructured(node),
+			});
+		} else if (
+			ts.isImportTypeNode(node) &&
+			ts.isLiteralTypeNode(node.argument) &&
+			ts.isStringLiteral(node.argument.literal)
+		) {
+			imports.push({
+				specifier: node.argument.literal.text,
+				names: typeReference(node),
 			});
 		} else if (ts.isImportEqualsDeclaration(node)) {
 			const ref = node.moduleReference;
@@ -315,6 +379,7 @@ function parse(path: string): SourceFile {
 		test: false,
 		imports,
 		exports: { names: exportNames, stars },
+		onlyImportsAndExports: source.statements.every(importOrExport),
 	};
 }
 
@@ -360,17 +425,24 @@ function resolveFile(base: string): string | undefined {
 
 type Vertical = { name: string; dir: string; barrel?: string };
 
+/** The workspace's `package.json`, or nothing. */
+function packageJson(workspace: string): {
+	name?: string;
+	exports?: unknown;
+} {
+	const file = join(workspace, "package.json");
+	return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
+}
+
 /** The files that the workspace's `package.json` `exports` names. */
 function entryFiles(workspace: string): Set<string> {
-	const file = join(workspace, "package.json");
-	if (!existsSync(file)) return new Set();
 	const targets: string[] = [];
 	const collect = (value: unknown): void => {
 		if (typeof value === "string") targets.push(value);
 		else if (value && typeof value === "object")
 			for (const inner of Object.values(value)) collect(inner);
 	};
-	collect(JSON.parse(readFileSync(file, "utf8")).exports);
+	collect(packageJson(workspace).exports);
 	return new Set(
 		targets
 			.filter((target) => !target.includes("*"))
@@ -415,15 +487,33 @@ export function checkWorkspace(
 	const src = join(wsDir, "src");
 	const app = workspace.replace(/\\/g, "/").startsWith("apps/");
 	const rel = (path: string) => relative(root, path).split(sep).join("/");
+	const inside = (dir: string, path: string) =>
+		path === dir || path.startsWith(`${dir}${sep}`);
 	const problems: string[] = [];
 
 	if (!existsSync(src)) return [`${workspace}: has no src/ folder.`];
 
-	// (c) Top-level layout.
+	// (c) and (g) Top-level layout.
+	const entryDirs = new Set(options.entryDirs ?? []);
+	const appTop = [
+		"features/",
+		"shared/",
+		...[...entryDirs].map((d) => `${d}/`),
+	];
 	for (const entry of readdirSync(src, { withFileTypes: true })) {
-		if (entry.isDirectory() && KIND_BUCKETS.has(entry.name)) {
+		if (!entry.isDirectory()) continue;
+		if (KIND_BUCKETS.has(entry.name)) {
 			problems.push(
 				`${rel(join(src, entry.name))}/: "${entry.name}" is a kind bucket. Move each file into the vertical that uses it (${app ? "src/features/<vertical>/ or a named src/shared/<name>/" : "src/<vertical>/"}).`,
+			);
+		} else if (
+			app &&
+			entry.name !== "features" &&
+			entry.name !== "shared" &&
+			!entryDirs.has(entry.name)
+		) {
+			problems.push(
+				`${rel(join(src, entry.name))}/: the top of an app's src/ holds only ${appTop.join(", ")} and entry files. Move it into src/features/<vertical>/ or a named src/shared/<name>/.`,
 			);
 		}
 	}
@@ -497,6 +587,39 @@ export function checkWorkspace(
 		return path.startsWith(".") ? path : `./${path}`;
 	};
 
+	// (d), (e) and (f): imports that leave the workspace, name it, or reach
+	// a test from production code.
+	const ownName = packageJson(wsDir).name;
+	for (const file of files.values()) {
+		for (const { specifier } of file.imports) {
+			if (
+				specifier.startsWith(".") &&
+				!inside(wsDir, resolve(dirname(file.path), specifier))
+			) {
+				problems.push(
+					`${rel(file.path)}: imports "${specifier}", a path outside ${workspace}. Import the package by its name and an entry that its package.json exports.`,
+				);
+				continue;
+			}
+			if (
+				ownName &&
+				(specifier === ownName || specifier.startsWith(`${ownName}/`))
+			) {
+				problems.push(
+					`${rel(file.path)}: imports its own package by name ("${specifier}"). Import the file or the vertical's barrel by a relative path.`,
+				);
+				continue;
+			}
+			if (file.test) continue;
+			const target = resolveImport(file.path, specifier);
+			if (target && files.get(target)?.test) {
+				problems.push(
+					`${rel(file.path)}: imports "${specifier}", which only tests may use (a test, a fake, a fixture or a test helper). Production code never imports it.`,
+				);
+			}
+		}
+	}
+
 	// (a) Deep imports, and the uses of each barrel for (b).
 	const used = new Map<string, Set<string> | "all">();
 	const markUsed = (barrel: string, names: string[] | "all") => {
@@ -528,6 +651,83 @@ export function checkWorkspace(
 			const port = from ? peerPorts[from.name]?.[to.name] : undefined;
 			problems.push(
 				`${rel(file.path)}: imports "${imported.specifier}" past the barrel of ${to.name}. ${port ? `These verticals cross only through their port: import "${barrelSpecifier(file.path, to)}/${port}".` : `Import "${barrelSpecifier(file.path, to)}" instead.`}`,
+			);
+		}
+	}
+
+	// (h) The order of an app's shared pieces: they import no feature, and
+	// only the routes and the entry files import the shell. Tests too.
+	if (app) {
+		for (const file of files.values()) {
+			const from = verticalOf(file.path);
+			if (!from) continue;
+			for (const { specifier } of file.imports) {
+				const target = resolveImport(file.path, specifier);
+				const to = target ? verticalOf(target) : undefined;
+				if (!to || to === from) continue;
+				if (to.name === SHELL) {
+					problems.push(
+						`${rel(file.path)}: imports ${SHELL}, which composes the features. Only the routes and the app's entry files import it.`,
+					);
+				} else if (
+					from.name.startsWith("shared/") &&
+					from.name !== SHELL &&
+					to.name.startsWith("features/")
+				) {
+					problems.push(
+						`${rel(file.path)}: the shared piece ${from.name} imports the feature ${to.name}. A shared piece imports no feature: let an entry file pass the feature's rule in (STRUCTURE.md section 5).`,
+					);
+				}
+			}
+		}
+	}
+
+	// (i) A peer port, and each file of its vertical that it reaches, import
+	// no other vertical than a shared piece: so the port closes no cycle.
+	for (const [fromName, ports] of Object.entries(peerPorts)) {
+		for (const [toName, port] of Object.entries(ports)) {
+			const to = verticals.find((v) => v.name === toName);
+			const start = to ? resolveFile(join(to.dir, port)) : undefined;
+			if (!to || !start) {
+				problems.push(
+					`scripts/check-verticals.ts: the peer port "${toName}/${port}" of ${fromName} is not a file of ${workspace}. Fix or remove it.`,
+				);
+				continue;
+			}
+			const seen = new Set<string>();
+			const queue = [start];
+			while (queue.length) {
+				const path = queue.pop() as string;
+				if (seen.has(path)) continue;
+				seen.add(path);
+				const file = files.get(path);
+				if (!file) continue;
+				for (const { specifier } of file.imports) {
+					const target = resolveImport(path, specifier);
+					if (!target) continue;
+					const other = verticalOf(target);
+					if (other === to) queue.push(target);
+					else if (other && !other.name.startsWith("shared/")) {
+						problems.push(
+							`${rel(path)}: imports ${other.name}, but it is (or the peer port "${toName}/${port}" reaches it). A peer port imports no other vertical than a shared piece, so it closes no cycle.`,
+						);
+					}
+				}
+			}
+		}
+	}
+
+	// (j) A barrel, and a package's root index.ts, hold only imports and
+	// exports.
+	const barrels = verticals.flatMap((v) =>
+		v.barrel ? [{ path: v.barrel, home: `a file of ${v.name}` }] : [],
+	);
+	const rootIndex = app ? undefined : resolveFile(join(src, "index"));
+	if (rootIndex) barrels.push({ path: rootIndex, home: "its vertical" });
+	for (const { path, home } of barrels) {
+		if (files.get(path)?.onlyImportsAndExports === false) {
+			problems.push(
+				`${rel(path)}: a barrel holds only import and export statements. Move the code into ${home} and export it from there.`,
 			);
 		}
 	}
@@ -577,6 +777,7 @@ export function checkWorkspaces(root: string, workspaces: string[]): string[] {
 			...checkWorkspace(root, workspace, {
 				leafContracts: LEAF_CONTRACTS[workspace],
 				peerPorts: PEER_PORTS[workspace],
+				entryDirs: ENTRY_DIRS[workspace],
 			}),
 		);
 	}
@@ -591,7 +792,7 @@ if (import.meta.main) {
 	const problems = checkWorkspaces(root, workspaces);
 	if (problems.length) {
 		console.error(
-			"Vertical check failed (docs/steering/STRUCTURE.md, section 4):\n",
+			"Vertical check failed (docs/steering/STRUCTURE.md, sections 4 and 5):\n",
 		);
 		for (const problem of problems) console.error(`- ${problem}`);
 		process.exit(1);
