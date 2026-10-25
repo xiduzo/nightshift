@@ -266,6 +266,14 @@ export function FlowInspector({
 						it.
 					</li>
 					<li>
+						Hold <Kbd>Shift</Kbd> and drag a box around nodes to select them.{" "}
+						<KbdGroup>
+							<Kbd>⌘/Ctrl</Kbd>
+							<Kbd>G</Kbd>
+						</KbdGroup>{" "}
+						makes them a Section: a named frame you can fold.
+					</li>
+					<li>
 						A Decision node has one outcome per option, a Command node one per
 						exit code, an Agent node one per own outcome. Renaming one moves its
 						edges along.

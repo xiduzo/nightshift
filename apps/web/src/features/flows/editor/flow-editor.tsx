@@ -1,3 +1,9 @@
+// The flow editor: the canvas, the floating panels, the inspector of what
+// is selected, saving, and the keys that act on the whole flow. Over 600
+// lines because it wires every inspector (node, edge, Section, flow) to the
+// one draft. The edits themselves live in `node-edits.ts`,
+// `sections/section-edits.ts` and `@nightshift/flows`.
+
 import type { Flow, FlowIssue, FlowNodeType } from "@nightshift/flows";
 import {
 	callersOf,
@@ -6,8 +12,10 @@ import {
 	newFlow,
 	removeEdge,
 	removeNode,
+	sectionOf,
 	updateEdge,
 	updateNode,
+	updateSection,
 } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
@@ -24,11 +32,13 @@ import {
 	EnterSubflowContext,
 	OpenFlowContext,
 } from "../canvas/open-flow-context";
+import { useFoldedSections } from "../canvas/sections/use-section-canvas";
 import { checkFlow } from "../flow-draft";
 import { flowMutations, flowQueries } from "../queries";
 import { StartRunDialog } from "../start/start-run-dialog";
+import { useAddNode } from "./canvas-controls";
 import { EdgeInspector } from "./edge-inspector";
-import { EditorCanvas, type Selection, useAddNode } from "./editor-canvas";
+import { EditorCanvas } from "./editor-canvas";
 import { FloatingInspector } from "./floating-inspector";
 import { FlowInspector } from "./flow-inspector";
 import { FlowTitleCard } from "./flow-title-card";
@@ -38,6 +48,10 @@ import { LeaveDialog } from "./leave-dialog";
 import { NodeDock } from "./node-dock";
 import { nodeEdits } from "./node-edits";
 import { ProjectFlowsContext } from "./project-flows-context";
+import { MakeSubflowDialog } from "./sections/make-subflow-dialog";
+import { sectionEdits } from "./sections/section-edits";
+import { SectionInspector } from "./sections/section-inspector";
+import { type Selection, selectedNodeIds } from "./selection";
 import { SubflowView } from "./subflow/subflow-view";
 import { useSubflowStack } from "./subflow/use-subflow-stack";
 import { useEditorData } from "./use-editor-data";
@@ -75,6 +89,11 @@ function Editor({
 		initiallySaved ? JSON.stringify(initialFlow) : "",
 	);
 	const [selection, setSelection] = useState<Selection>(null);
+	// The Section just made: its inspector asks for a name first.
+	const [madeSection, setMadeSection] = useState<string | null>(null);
+	// The Section "Make subflow" works on, while its dialog is open.
+	const [subflowOf, setSubflowOf] = useState<string | null>(null);
+	const folds = useFoldedSections(`${projectId}/${name}`);
 
 	const dirty = useMemo(
 		() => JSON.stringify(draft) !== savedJson,
@@ -209,11 +228,38 @@ function Editor({
 		openFlow(calledName);
 	};
 
+	const sections = sectionEdits(draft, setDraft, setSelection, folds.setFolded);
+	const draftRef = useRef(draft);
+	draftRef.current = draft;
+	const subflowSection = draft.sections?.find(
+		(section) => section.id === subflowOf,
+	);
+	const makeSection = (nodeIds: readonly string[]) => {
+		const id = sections.makeSection(nodeIds);
+		if (id) setMadeSection(id);
+	};
+	const makeSectionRef = useRef(makeSection);
+	makeSectionRef.current = makeSection;
+	const selectionRef = useRef(selection);
+	selectionRef.current = selection;
+
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key.toLowerCase() === "s" && (event.metaKey || event.ctrlKey)) {
+			const mod = event.metaKey || event.ctrlKey;
+			const key = event.key.toLowerCase();
+			if (key === "s" && mod) {
 				event.preventDefault();
 				save();
+			}
+			// Cmd/Ctrl+G: make a Section of the selected nodes.
+			if (key === "g" && mod && !event.shiftKey && !event.altKey) {
+				const target = event.target as HTMLElement | null;
+				if (target?.closest("input, textarea, [contenteditable='true']"))
+					return;
+				const ids = selectedNodeIds(selectionRef.current);
+				if (ids.length === 0) return;
+				event.preventDefault();
+				makeSectionRef.current(ids);
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
@@ -236,11 +282,27 @@ function Editor({
 			: null;
 	const callers = projectFlows.flows ? callersOf(name, projectFlows.flows) : [];
 
+	const selectNode = (nodeId: string) => {
+		// A node inside a folded Section shows again.
+		const holder = sectionOf(draft, nodeId);
+		if (holder && folds.folded.has(holder.id))
+			folds.setFolded(holder.id, false);
+		setSelection({ kind: "node", id: nodeId });
+		void fitView({ nodes: [{ id: nodeId }], duration: 300, maxZoom: 1 });
+	};
+
 	const selectIssue = (issue: FlowIssue) => {
 		if (issue.nodeId && draft.nodes.some((node) => node.id === issue.nodeId)) {
-			setSelection({ kind: "node", id: issue.nodeId });
+			selectNode(issue.nodeId);
+			return;
+		}
+		const issueSection = draft.sections?.find(
+			(section) => section.id === issue.sectionId,
+		);
+		if (issueSection) {
+			setSelection({ kind: "section", id: issueSection.id });
 			void fitView({
-				nodes: [{ id: issue.nodeId }],
+				nodes: [{ id: `section:${issueSection.id}` }],
 				duration: 300,
 				maxZoom: 1,
 			});
@@ -264,6 +326,10 @@ function Editor({
 	const selectedEdge =
 		selection?.kind === "edge"
 			? draft.edges.find((edge) => edge.id === selection.id)
+			: undefined;
+	const selectedSection =
+		selection?.kind === "section"
+			? draft.sections?.find((section) => section.id === selection.id)
 			: undefined;
 
 	// Looking inside a Subflow: the canvas shows its flow, read only. Nothing
@@ -334,6 +400,28 @@ function Editor({
 				setDraft((current) => removeEdge(current, selectedEdge.id));
 				setSelection(null);
 			}}
+		/>
+	) : selectedSection ? (
+		<SectionInspector
+			key={selectedSection.id}
+			flow={draft}
+			section={selectedSection}
+			issues={check.issues.filter(
+				(issue) => issue.sectionId === selectedSection.id,
+			)}
+			folded={folds.folded.has(selectedSection.id)}
+			autoFocus={madeSection === selectedSection.id}
+			onChange={(change) =>
+				setDraft((current) =>
+					updateSection(current, selectedSection.id, change),
+				)
+			}
+			onSetFolded={(folded) =>
+				sections.setSectionFolded(selectedSection.id, folded)
+			}
+			onRemove={() => sections.removeWithUndo(selectedSection.id)}
+			onSelectNode={selectNode}
+			onMakeSubflow={() => setSubflowOf(selectedSection.id)}
 		/>
 	) : settingsOpen ? (
 		<FlowInspector
@@ -442,8 +530,11 @@ function Editor({
 									routesKey={`${projectId}/${name}`}
 									check={check}
 									selection={selection}
+									folded={folds.folded}
 									onFlowChange={changeFlow}
 									onSelect={setSelection}
+									onSetFolded={sections.setSectionFolded}
+									onMakeSection={makeSection}
 									onDropNode={addNode}
 									onNodeDoubleClick={subflows.enterNode}
 								/>
@@ -501,6 +592,7 @@ function Editor({
 					{subflows.inside ? (
 						<OpenFlowContext.Provider value={openFlow}>
 							<SubflowView
+								projectId={projectId}
 								rootFlow={name}
 								stack={subflows.stack}
 								flows={projectFlows.flows}
@@ -521,6 +613,31 @@ function Editor({
 				inputs={draft.inputs}
 			/>
 
+			{subflowSection ? (
+				<MakeSubflowDialog
+					open
+					onOpenChange={(open) => {
+						if (!open) setSubflowOf(null);
+					}}
+					projectId={projectId}
+					flowName={name}
+					draft={draft}
+					section={subflowSection}
+					flows={projectFlows.flows}
+					onMade={(made) => {
+						sections.applySubflow(
+							subflowSection.id,
+							made,
+							() => draftRef.current,
+						);
+						// The Subflow view reads the new flow from the project's list.
+						void queryClient.invalidateQueries({
+							queryKey: flowQueries.lists(),
+						});
+					}}
+				/>
+			) : null}
+
 			<LeaveDialog
 				blocked={blocker.status === "blocked"}
 				name={name}
@@ -536,5 +653,8 @@ function Editor({
 }
 
 function selectionKey(selection: Selection): string {
-	return selection ? `${selection.kind}:${selection.id}` : "flow";
+	if (!selection) return "flow";
+	return selection.kind === "nodes"
+		? `nodes:${selection.ids.join(",")}`
+		: `${selection.kind}:${selection.id}`;
 }

@@ -1,8 +1,6 @@
 /** Flows: the list, the canvas, the editor, the flow draft, and starting a run of a flow. */
 
-export { groupEdges } from "./canvas/edge-groups";
 export type { FlowCanvasNode, NodeRunState } from "./canvas/flow-node";
-export { nodeTypes } from "./canvas/flow-node";
 export { hasCost, NODE_TYPE } from "./canvas/node-type";
 export {
 	ItemStateBadge,
@@ -19,6 +17,15 @@ export {
 	OutcomeMarkers,
 } from "./canvas/outcome-edge";
 export { readRoutes } from "./canvas/route-cache";
+export type { CanvasNode } from "./canvas/sections/section-nodes";
+export {
+	canvasNodeTypes,
+	SectionActionsContext,
+} from "./canvas/sections/section-nodes";
+export {
+	useFoldedSections,
+	useSectionCanvas,
+} from "./canvas/sections/use-section-canvas";
 export { useMeasured } from "./canvas/use-measured";
 export { InspectorSection } from "./editor/fields";
 export { FlowPage } from "./flow-page";

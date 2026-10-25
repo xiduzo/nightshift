@@ -25,7 +25,7 @@ import {
 /**
  * The validator's findings, as one button over the canvas that shows the
  * counts. It opens the list, errors first; a click on an issue selects its
- * node or edge.
+ * node, edge or Section.
  */
 export function IssuesPopover({
 	check,
@@ -104,7 +104,8 @@ export function IssuesPopover({
 						) : (
 							<ul className="flex flex-col gap-0.5">
 								{sorted.map((issue, index) => {
-									const target = issue.nodeId ?? issue.edgeId;
+									const target =
+										issue.nodeId ?? issue.edgeId ?? issue.sectionId;
 									const isError = issue.severity === "error";
 									const Icon = isError ? CircleAlertIcon : TriangleAlertIcon;
 									return (
@@ -140,7 +141,10 @@ export function IssuesPopover({
 													<ItemTitle className="line-clamp-none block w-full font-normal text-xs leading-relaxed">
 														{target ? (
 															<span className="mr-1.5 font-mono text-muted-foreground">
-																{issue.nodeId ?? `edge ${issue.edgeId}`}
+																{issue.nodeId ??
+																	(issue.edgeId
+																		? `edge ${issue.edgeId}`
+																		: `section ${issue.sectionId}`)}
 															</span>
 														) : null}
 														{issue.message}

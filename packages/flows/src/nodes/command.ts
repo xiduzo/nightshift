@@ -37,7 +37,7 @@ export const DEFAULT_COMMAND_EXITS: CommandExit[] = [
 		description: "The command succeeded.",
 		color: "green",
 	},
-	{ name: "error", code: 1, description: "General error.", color: "red" },
+	{ name: "failure", code: 1, description: "General error.", color: "red" },
 	{ name: "other", description: "Any other exit code.", color: "gray" },
 ];
 
@@ -52,7 +52,7 @@ export const STANDARD_EXIT_CODES: CommandExit[] = [
 		description: "The command succeeded.",
 		color: "green",
 	},
-	{ name: "error", code: 1, description: "General error.", color: "red" },
+	{ name: "failure", code: 1, description: "General error.", color: "red" },
 	{
 		name: "misuse",
 		code: 2,
@@ -72,7 +72,7 @@ export const STANDARD_EXIT_CODES: CommandExit[] = [
 		color: "red",
 	},
 	{
-		name: "interrupted",
+		name: "cancelled",
 		code: 130,
 		description: "Stopped with Ctrl+C (SIGINT).",
 		color: "amber",

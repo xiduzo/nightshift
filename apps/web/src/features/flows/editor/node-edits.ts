@@ -18,7 +18,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";
 import { outcomeLabel } from "../canvas/outcome-badge";
 import { optionNoun } from "../flow-draft";
-import type { Selection } from "./editor-canvas";
+import type { Selection } from "./selection";
 
 /** Why a node cannot take a name, by what the name clashes with. */
 const NODE_NAME_TAKEN: Record<NameClash, (name: string) => string> = {

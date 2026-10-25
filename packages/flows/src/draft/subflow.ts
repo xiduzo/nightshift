@@ -848,8 +848,12 @@ class Planner {
 		});
 
 		// End nodes of the new flow, where the Call must tell the exit apart.
+		// They go in a column right of every inner node, each level with its
+		// node unless the end above is in the way, so none covers a node.
 		const endNodes = new Map<string, DecisionNode>();
-		const endsBelow = new Map<string, number>();
+		const endX =
+			Math.max(...this.inner.map((node) => node.position.x)) - minX + STEP_X;
+		let endY = Number.NEGATIVE_INFINITY;
 		this.exits.forEach((exit, index) => {
 			const from = this.byId.get(exit.from);
 			const label = exitLabels[index];
@@ -861,16 +865,13 @@ class Planner {
 					members.has(e.to),
 			);
 			if (!decided && endsFlow(from, exit.outcome) && !leadsInside) return;
-			const below = endsBelow.get(exit.from) ?? 0;
-			endsBelow.set(exit.from, below + 1);
+			const y = Math.max(from.position.y - minY, endY + STEP_Y);
+			endY = y;
 			const color = outcomeColor(from, exit.outcome);
 			endNodes.set(groupKey(exit), {
 				id: claim(subTaken, `end_${label.replace(/-/g, "_")}`, 40, "_"),
 				type: "decision",
-				position: {
-					x: from.position.x - minX + STEP_X,
-					y: from.position.y - minY + below * STEP_Y,
-				},
+				position: { x: endX, y },
 				prompt: "",
 				by: "rule",
 				decider: "typesafe",

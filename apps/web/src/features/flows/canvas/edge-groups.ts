@@ -18,14 +18,33 @@ export type EdgeGroup = {
 	id: string;
 	/** Source and target. Stays the same while the group's edges change. */
 	key: string;
+	/**
+	 * The canvas nodes the drawn edge joins. A node's id, or a folded
+	 * Section's box (`foldEdgeGroups`): then its edges come from, or lead
+	 * to, several nodes inside it.
+	 */
 	from: string;
 	to: string;
 	/** In the order the source node shows its outcomes. Never empty. */
 	edges: FlowEdge[];
+	/**
+	 * The node pair whose kept route this drawn edge follows, when it joins
+	 * a folded Section's box (`foldEdgeGroups`). "Lay out" routes node
+	 * pairs, so a drawn edge to a box follows its first edge's pair.
+	 */
+	routedAs?: EdgeGroup;
 };
 
 export function pairKey(from: string, to: string): string {
 	return `${from}->${to}`;
+}
+
+/**
+ * The handle of a folded Section's box that the edges of one node and
+ * outcome leave from. Node ids and outcomes hold no `:`, so it reads back.
+ */
+export function exitHandleId(from: string, outcome: string): string {
+	return `${from}:${outcome}`;
 }
 
 /**
@@ -62,6 +81,13 @@ export type EdgeSegment = {
 	/** The edge's id in the flow file. */
 	id: string;
 	outcome: string;
+	/**
+	 * The edge's source node, when the drawn edge leaves a folded Section's
+	 * box instead: the label then names the node too ("verdict.pass").
+	 */
+	from?: string;
+	/** The handle the edge leaves from. Unset: the outcome's own handle. */
+	handle?: string;
 	/** The colour the source node gives the outcome, if any. */
 	color?: OutcomeColor;
 	max?: number;
@@ -74,7 +100,8 @@ export type EdgeSegment = {
 
 /** One segment of a label: the outcome, its max, and how often it was taken. */
 export function segmentText(segment: EdgeSegment): string {
-	const label = outcomeLabel(segment.outcome);
+	const outcome = outcomeLabel(segment.outcome);
+	const label = segment.from ? `${segment.from}.${outcome}` : outcome;
 	const { max, traversals } = segment;
 	if (traversals === undefined) return max ? `${label} ×${max}` : label;
 	if (traversals > 0)
@@ -108,18 +135,31 @@ export function labelAtRest(segments: readonly EdgeSegment[]): boolean {
 	);
 }
 
-/** The segments of a group, before the canvas adds errors or run counts. */
+/**
+ * The segments of a group, before the canvas adds errors or run counts.
+ * Each edge reads its colour from its own source node: a group that leaves
+ * a folded Section holds edges of several nodes.
+ */
 export function groupSegments(
 	flow: Pick<Flow, "nodes">,
 	group: EdgeGroup,
 ): EdgeSegment[] {
-	const source = flow.nodes.find((node) => node.id === group.from);
-	const outcomes = source ? nodeOutcomes(source) : [];
-	return group.edges.map((edge) => ({
-		id: edge.id,
-		outcome: edge.outcome,
-		color: source ? outcomeColor(source, edge.outcome) : undefined,
-		max: edge.max,
-		onNode: outcomes.includes(edge.outcome),
-	}));
+	return group.edges.map((edge) => {
+		const source = flow.nodes.find((node) => node.id === edge.from);
+		const boxed = edge.from !== group.from;
+		return {
+			id: edge.id,
+			outcome: edge.outcome,
+			...(boxed && {
+				from: edge.from,
+				handle: exitHandleId(edge.from, edge.outcome),
+			}),
+			color: source ? outcomeColor(source, edge.outcome) : undefined,
+			max: edge.max,
+			// A folded Section's box shows a row for each node and outcome.
+			onNode:
+				boxed ||
+				(source !== undefined && nodeOutcomes(source).includes(edge.outcome)),
+		};
+	});
 }

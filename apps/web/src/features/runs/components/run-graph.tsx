@@ -8,23 +8,28 @@ import {
 } from "@xyflow/react";
 import { type ReactNode, useMemo } from "react";
 import {
+	type CanvasNode,
 	canvasEdges,
+	canvasNodeTypes,
 	edgeTypes,
 	type FlowCanvasEdge,
 	type FlowCanvasNode,
-	groupEdges,
 	type NodeRunState,
-	nodeTypes,
 	OutcomeMarkers,
 	readRoutes,
+	SectionActionsContext,
 	stepState,
+	useFoldedSections,
 	useMeasured,
+	useSectionCanvas,
 } from "@/features/flows";
 import type { RunStatus, StepSummary } from "@/shared/api";
 
 /**
  * The run's copy of its flow, read-only. Each node shows its latest step's
  * outcome and how often the run visited it; each edge how often it was taken.
+ * Sections show as in the editor, folded as this browser keeps them: a
+ * folded Section shows what its nodes do and which one runs now.
  * The same view shows a called flow with one item's steps.
  */
 export function RunGraph({
@@ -36,6 +41,7 @@ export function RunGraph({
 	onSelectNode,
 	breadcrumb,
 	routesKey,
+	foldKey,
 	label = "Flow of this run",
 }: {
 	flow: Flow;
@@ -49,6 +55,8 @@ export function RunGraph({
 	breadcrumb?: ReactNode;
 	/** Names the flow for the routes this browser keeps of its last layout. */
 	routesKey?: string;
+	/** Names the flow (`<project>/<flow>`) for the Sections this browser keeps folded. */
+	foldKey?: string;
 	label?: string;
 }) {
 	const [measured, applyDimensions] = useMeasured();
@@ -62,24 +70,50 @@ export function RunGraph({
 		return states;
 	}, [steps, runStatus]);
 
-	const nodes = useMemo<FlowCanvasNode[]>(
-		() =>
-			flow.nodes.map((node) => ({
-				id: node.id,
-				type: node.type,
-				position: node.position,
-				measured: measured[node.id],
-				selected: node.id === selectedNodeId,
-				draggable: false,
-				connectable: false,
-				data: {
-					node,
-					isStart: flow.start === node.id,
-					issues: [],
-					run: runStates.get(node.id) ?? null,
-				},
-			})),
-		[flow, measured, selectedNodeId, runStates],
+	const { folded, setFolded } = useFoldedSections(foldKey);
+	const run = useMemo(
+		() => ({ states: runStates, order: steps.map((step) => step.nodeId) }),
+		[runStates, steps],
+	);
+	const sections = useSectionCanvas(flow, {
+		folded,
+		measured,
+		editable: false,
+		selectedNode: selectedNodeId,
+		run,
+	});
+	const sectionActions = useMemo(
+		() => ({ setFolded, selectNode: onSelectNode }),
+		[setFolded, onSelectNode],
+	);
+
+	const nodes = useMemo<CanvasNode[]>(
+		() => [
+			...sections.frames,
+			...flow.nodes.flatMap((node): FlowCanvasNode[] =>
+				sections.hidden.has(node.id)
+					? []
+					: [
+							{
+								id: node.id,
+								type: node.type,
+								position: node.position,
+								measured: measured[node.id],
+								selected: node.id === selectedNodeId,
+								draggable: false,
+								connectable: false,
+								data: {
+									node,
+									isStart: flow.start === node.id,
+									issues: [],
+									run: runStates.get(node.id) ?? null,
+								},
+							},
+						],
+			),
+			...sections.boxes,
+		],
+		[flow, measured, selectedNodeId, runStates, sections],
 	);
 
 	// The run's copy of the flow draws the routes of the flow's last layout,
@@ -90,41 +124,52 @@ export function RunGraph({
 	);
 	const edges = useMemo<FlowCanvasEdge[]>(
 		() =>
-			canvasEdges(flow, groupEdges(flow), { routes, traversals }).map(
-				(edge) => ({ ...edge, selectable: false, focusable: false }),
-			),
-		[flow, routes, traversals],
+			canvasEdges(flow, sections.groups, {
+				routes,
+				traversals,
+				boxes: sections.boxPositions,
+				endOf: sections.endOf,
+			}).map((edge) => ({ ...edge, selectable: false, focusable: false })),
+		[flow, routes, traversals, sections],
 	);
 
 	return (
 		<div className="relative size-full min-h-0">
-			<OutcomeMarkers />
-			<ReactFlow<FlowCanvasNode, FlowCanvasEdge>
-				nodes={nodes}
-				edges={edges}
-				nodeTypes={nodeTypes}
-				edgeTypes={edgeTypes}
-				onNodesChange={applyDimensions}
-				onNodeClick={(_, node) => onSelectNode(node.id)}
-				nodesDraggable={false}
-				nodesConnectable={false}
-				edgesFocusable={false}
-				deleteKeyCode={null}
-				selectionKeyCode={null}
-				multiSelectionKeyCode={null}
-				fitView
-				fitViewOptions={{ maxZoom: 1, padding: 0.2 }}
-				minZoom={0.2}
-				aria-label={label}
-			>
-				{breadcrumb ? (
-					<Panel position="top-left" className="m-2">
-						{breadcrumb}
-					</Panel>
-				) : null}
-				<Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-				<Controls showInteractive={false} position="bottom-left" />
-			</ReactFlow>
+			<SectionActionsContext.Provider value={sectionActions}>
+				<OutcomeMarkers />
+				<ReactFlow<CanvasNode, FlowCanvasEdge>
+					nodes={nodes}
+					edges={edges}
+					nodeTypes={canvasNodeTypes}
+					edgeTypes={edgeTypes}
+					onNodesChange={applyDimensions}
+					onNodeClick={(_, node) => {
+						// A folded box shows the node in it that runs now.
+						if (node.type === "sectionBox") {
+							const now = node.data.run?.now;
+							if (now) onSelectNode(now.nodeId);
+						} else if (node.type !== "sectionFrame") onSelectNode(node.id);
+					}}
+					nodesDraggable={false}
+					nodesConnectable={false}
+					edgesFocusable={false}
+					deleteKeyCode={null}
+					selectionKeyCode={null}
+					multiSelectionKeyCode={null}
+					fitView
+					fitViewOptions={{ maxZoom: 1, padding: 0.2 }}
+					minZoom={0.2}
+					aria-label={label}
+				>
+					{breadcrumb ? (
+						<Panel position="top-left" className="m-2">
+							{breadcrumb}
+						</Panel>
+					) : null}
+					<Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+					<Controls showInteractive={false} position="bottom-left" />
+				</ReactFlow>
+			</SectionActionsContext.Provider>
 		</div>
 	);
 }
