@@ -213,4 +213,29 @@ describe("a copy of a step's file", () => {
 			await Bun.file(`${archivePath(dataDir, transcript)}.stamp`).exists(),
 		).toBe(false);
 	});
+
+	test("written twice at once, in one process, is one of the two whole, with its own stamp", async () => {
+		// Two puts of the same step on a Host: a Walker's push, and the push
+		// again after its link came back.
+		const big = (end: number) => `entry of end ${end}\n`.repeat(20_000);
+		for (let round = 0; round < 5; round++) {
+			await Promise.all(
+				[1, 2].map((end) =>
+					writeArchive(dataDir, transcript, big(end), {
+						opening: end,
+						ended: true,
+					}),
+				),
+			);
+			const content = await readArchive(dataDir, transcript);
+			const end = content === big(1) ? 1 : content === big(2) ? 2 : null;
+			expect(end).not.toBeNull();
+			expect(
+				await readCopy(dataDir, transcript, {
+					opening: end as number,
+					ended: true,
+				}),
+			).toBe(content);
+		}
+	});
 });

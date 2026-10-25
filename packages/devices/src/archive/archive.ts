@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { type CopyStamp, stampHolds } from "@nightshift/engine";
@@ -30,12 +31,34 @@ export function archivePath(dataDir: string, ref: ArchiveRef): string {
 const stampPath = (dataDir: string, ref: ArchiveRef) =>
 	`${archivePath(dataDir, ref)}.stamp`;
 
-/** Writes a file whole: to a temporary file, then a rename. */
+/** Writes a file whole: to a temporary file of its own, then a rename. */
 async function writeWhole(path: string, content: string) {
 	await mkdir(dirname(path), { recursive: true });
-	const temporary = `${path}.${process.pid}.tmp`;
-	await writeFile(temporary, content);
-	await rename(temporary, path);
+	const temporary = `${path}.${randomUUID()}.tmp`;
+	try {
+		await writeFile(temporary, content);
+		await rename(temporary, path);
+	} finally {
+		await rm(temporary, { force: true });
+	}
+}
+
+/**
+ * The changes of each file of the archive in this process, one at a time
+ * in the order they came: a Host can get the same step twice at once (a
+ * push, and the push again after the link came back), and a step's file
+ * and its stamp must stay a pair.
+ */
+const changing = new Map<string, Promise<void>>();
+
+function oneAtATime(path: string, change: () => Promise<void>): Promise<void> {
+	const next = (changing.get(path) ?? Promise.resolve()).then(change, change);
+	changing.set(path, next);
+	const forget = () => {
+		if (changing.get(path) === next) changing.delete(path);
+	};
+	next.then(forget, forget);
+	return next;
 }
 
 /**
@@ -51,11 +74,13 @@ export async function writeArchive(
 	content: string,
 	stamp?: CopyStamp,
 ): Promise<void> {
-	if (!stamp) await rm(stampPath(dataDir, ref), { force: true });
-	await writeWhole(archivePath(dataDir, ref), content);
-	if (stamp && ref.kind !== "checkpoint") {
-		await writeWhole(stampPath(dataDir, ref), JSON.stringify(stamp));
-	}
+	return oneAtATime(archivePath(dataDir, ref), async () => {
+		if (!stamp) await rm(stampPath(dataDir, ref), { force: true });
+		await writeWhole(archivePath(dataDir, ref), content);
+		if (stamp && ref.kind !== "checkpoint") {
+			await writeWhole(stampPath(dataDir, ref), JSON.stringify(stamp));
+		}
+	});
 }
 
 /** Removes one file of the archive. Nothing happens when this Replica has none. */
@@ -63,8 +88,10 @@ export async function dropArchive(
 	dataDir: string,
 	ref: ArchiveRef,
 ): Promise<void> {
-	await rm(archivePath(dataDir, ref), { force: true });
-	await rm(stampPath(dataDir, ref), { force: true });
+	return oneAtATime(archivePath(dataDir, ref), async () => {
+		await rm(archivePath(dataDir, ref), { force: true });
+		await rm(stampPath(dataDir, ref), { force: true });
+	});
 }
 
 /** One file of the archive, or null when this Replica has none. */
