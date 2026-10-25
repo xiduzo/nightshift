@@ -1800,6 +1800,60 @@ describe("recovery", () => {
 	});
 });
 
+describe("recovery prunes", () => {
+	test("a run the daemon died in keeps only the checkpoints a re-entry reads, and resumes from them", async () => {
+		const dying = scriptedHarness({ hang: true });
+		const first = makeEngine(dying.harness);
+		const run = await first.startRun({
+			projectId: await projectId(first),
+			flow: flowOf(
+				[
+					command("prepare", "true"),
+					command("build", "true"),
+					agent("worker", "Go"),
+					command("check", "true"),
+				],
+				[
+					edge("e1", "prepare", "pass", "build"),
+					edge("e2", "build", "pass", "worker"),
+					edge("e3", "worker", "pass", "check"),
+				],
+			),
+		});
+		await waitFor(() => dying.sessions[0]);
+		const checkpoints = async () =>
+			(
+				await sandbox.db
+					.select()
+					.from(lgCheckpoint)
+					.where(eq(lgCheckpoint.threadId, run.id))
+			).length;
+		expect(await checkpoints()).toBeGreaterThan(1);
+
+		// A new daemon on the same database: the run is interrupted.
+		const { harness, sessions } = scriptedHarness();
+		const second = makeEngine(
+			harness,
+			{ settings: settingsWith({ resumeInterruptedRuns: false }) },
+			{ resumeGraceMs: 0 },
+		);
+		expect(await statusOf(second, run.id)).toBe("interrupted");
+		expect(await checkpoints()).toBe(1);
+
+		await second.resumeRun(run.id);
+		(await waitFor(() => sessions[0], { label: "the resume" })).finish();
+		expect(await waitForEnd(second, run.id)).toBe("finished");
+		expect(
+			(await second.getRun(run.id)).steps.map((s) => [s.nodeId, s.outcome]),
+		).toEqual([
+			["prepare", "pass"],
+			["build", "pass"],
+			["worker", "pass"],
+			["check", "pass"],
+		]);
+	});
+});
+
 describe("automatic resume after a restart", () => {
 	/** A daemon that dies mid-step: its harness never ends. Returns the run. */
 	async function dieMidStep(

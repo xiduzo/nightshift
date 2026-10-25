@@ -21,9 +21,10 @@ import { countDaemonResumes, deriveRunState, deriveStopAt } from "../read";
  * Startup recovery: what a new daemon does about the runs the last one
  * left open. A daemon that died left sessions, steps and runs open. They
  * become `interrupted` as a stop ends them (`closeOpenWork`,
- * `graph/open-work.ts`), sleeping runs get their timers back, and after a
- * grace period the daemon resumes the interrupted runs itself unless
- * `daemonResumeBlock` says why not. A step past its
+ * `graph/open-work.ts`), a run that ends so keeps only the checkpoints a
+ * re-entry reads (a `prune` Turn of the runner), sleeping runs get their
+ * timers back, and after a grace period the daemon resumes the interrupted
+ * runs itself unless `daemonResumeBlock` says why not. A step past its
  * recorded time budget or idle limit ends as its timer would have ended it
  * instead (an `overdue` Turn of the runner).
  *
@@ -207,6 +208,14 @@ export function createRecovery(deps: RecoveryDeps) {
 					reason: why
 						? `${INTERRUPTED_REASON} It did not continue on its own: ${why}`
 						: INTERRUPTED_REASON,
+				});
+			}
+			// A run that ended so keeps only what a re-entry reads, as a
+			// drive's end leaves it. A run whose flow cannot be read keeps
+			// its history: recovery goes on with the next run.
+			if (open.endsRun) {
+				await runner.take(runId, { kind: "prune" }).catch((error) => {
+					console.warn(`[engine] could not prune run ${runId}`, error);
 				});
 			}
 			if (open.endsRun && !why) toResume.push(runId);

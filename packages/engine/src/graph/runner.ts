@@ -63,6 +63,7 @@ import {
  *   (`overdue`, `deadlines.ts`), from the runner's own sweep.
  * - A run that ended (finished, failed, stopped) keeps only the
  *   checkpoints a re-entry reads (`Thread.prune`): the log is the record.
+ *   One that a dead daemon left is pruned by startup recovery (`prune`).
  * - How a sleep ends is the sleep module's (`planWake`, `recordWake`,
  *   `graph/sleep.ts`); how a re-entry moves the thread is the planner's
  *   (`planReentry`, `graph/reentry.ts`).
@@ -168,7 +169,12 @@ export type Intent =
 	/** Stops the run now, whatever its drive does. */
 	| { kind: "stop" }
 	/** Ends the running step when it ran past its time budget or idle limit by `graceMs`. */
-	| { kind: "overdue"; graceMs: number };
+	| { kind: "overdue"; graceMs: number }
+	/**
+	 * Drops the checkpoint history of a run that ended without a drive here
+	 * (startup recovery: the daemon died), as a drive's end drops it.
+	 */
+	| { kind: "prune" };
 
 /** What a Turn did. */
 export type Taken =
@@ -889,8 +895,18 @@ export function createRunner(deps: RunnerDeps) {
 		const row = await getRunRow(db, runId);
 		if (row.walkerId !== (await log.walkerId())) {
 			// The sweep and startup recovery look at runs; they refuse nothing.
-			if (intent.kind === "overdue") return UNCHANGED;
+			if (intent.kind === "overdue" || intent.kind === "prune") {
+				return UNCHANGED;
+			}
 			throw new RunRefusal("walked-elsewhere", WALKED_ELSEWHERE);
+		}
+		if (intent.kind === "prune") {
+			// The thread opens for the prune only: a resume opens its own.
+			await pruneThread(
+				() => threads.get(runId) ?? open(row, threadDeps),
+				runId,
+			);
+			return UNCHANGED;
 		}
 		const events = await log.events(runId);
 		options.check?.(events);
