@@ -174,11 +174,11 @@ export const PEER_PORTS: Record<
  * Shape: { workspace: ["vertical"] }
  */
 export const KNOWN_CYCLES: Record<string, string[]> = {
-	// contract/ names the types of the verticals that implement its ports
-	// (Actor, StartRunInput, FeedStep, the WalkFile types, DeviceDirectory
-	// and more), and those verticals import contract/. The fix moves those
-	// types into contract/, so it imports no vertical, as the contract of
-	// devices does.
+	// contract/ names types of the verticals behind its ports (Device,
+	// RunSettings, Project, RunDetail, ScheduleList and more), and those
+	// verticals import contract/ (Actor, StartRunInput, the ports). The fix
+	// moves the types it names into contract/, so it imports no vertical,
+	// as the contract of devices does.
 	"packages/engine": ["contract"],
 };
 

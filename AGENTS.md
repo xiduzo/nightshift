@@ -4,15 +4,22 @@ Read `docs/steering/STRUCTURE.md` before you add a file, a folder or a package.
 
 - **Layers point down.** A package imports only from lower layers (`db`, `flows`, `ui`,
   `ui-native` → `auth`, `agents` → `engine` → `devices`, `notifications` → `api`
-  → `daemon`, `client` → apps). No package imports an app.
+  → `daemon`, `client` → apps). No package imports an app. The web and phone apps
+  import only `client`, the `flows` root and `ui` or `ui-native`. A workspace
+  declares only the workspaces it imports.
 - **Group by domain, not by kind.** Put new code in the vertical it serves:
   `src/features/<vertical>/` in an app, `src/<vertical>/` in a package. Never
   create `lib/`, `utils/`, `hooks/` or `components/` at the top of `src/`, or a
-  catch-all `types.ts`. Cross-cutting app code goes in a named `shared/<name>/`.
+  catch-all `types.ts`. No file or folder named `utils`, `helpers`, `common` or
+  `misc` at any depth. Cross-cutting app code goes in a named `shared/<name>/`.
 - **A vertical's barrel is its only door.** Import another vertical through its
   `index.ts`, never a file inside it. Every barrel export needs an outside importer.
+  A barrel holds only imports and exports. No cycles between verticals, `import type`
+  included.
 - **Import only public entries.** Use a package's name and an entry listed in its
   `exports`. Never a deep path into its `src/`. Fakes and fixtures come from `./testing`.
+  Every package entry, and every value name on it, needs an importer in another
+  workspace. No `export *`.
 - **Apps wire, packages decide.** Domain logic goes in a package, not in `apps/*`.
   Routes in `apps/web` stay thin. Each web vertical owns its `queries.ts`.
 - **Run the checks.** `bun scripts/check-layers.ts` and

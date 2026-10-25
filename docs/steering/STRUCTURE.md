@@ -28,15 +28,16 @@ The apps:
 
 - `apps/server` imports the runtime and lower layers. It holds the dev entry and the CLI.
 - `apps/desktop` imports only the runtime (`@nightshift/daemon`).
-- `apps/web` imports only `@nightshift/client`, `@nightshift/api/client` (types only, `import type`), `@nightshift/flows` (the browser-safe root, never `./files`) and `@nightshift/ui`. It never imports `engine`, `agents`, `auth` or `db`.
-- `apps/mobile` imports only `@nightshift/client`, `@nightshift/api/client` (types only, `import type`), `@nightshift/flows` (the root) and `@nightshift/ui-native`. It never imports `@nightshift/ui` (the DOM components), `engine`, `agents`, `auth`, `db`, `devices`, `notifications` or `daemon`.
+- `apps/web` imports only `@nightshift/client`, `@nightshift/flows` (the browser-safe root, never `./files`) and `@nightshift/ui`. The API's types come through `@nightshift/client`. It never imports `api`, `engine`, `agents`, `auth` or `db`, and it does not declare them.
+- `apps/mobile` imports only `@nightshift/client`, `@nightshift/flows` (the root) and `@nightshift/ui-native`. It never imports `@nightshift/ui` (the DOM components), `api`, `engine`, `agents`, `auth`, `db`, `devices`, `notifications` or `daemon`.
 - `@nightshift/client` sits in layer 5 because it reads the API's types, but no runtime imports it: only the apps do. It uses no DOM, no React Native, and no Node or Bun API. React and TanStack Query are allowed.
 
 Rules:
 
 - Dependencies point down. A lower layer never knows a higher one.
 - No package imports another app. An app is never a dependency.
-- No cycles between packages. No cycles between the verticals of one package.
+- No cycles between packages. No cycles between the verticals of one workspace, type-only imports included. The only way back is a peer port (section 4).
+- A workspace declares only the workspaces it imports. A dependency that no file imports comes out of `package.json`.
 - When a lower layer must call a higher one, the lower layer declares a port (an interface). The higher layer implements it, and the composition root wires it.
 
 ## 2. What each package owns
@@ -81,26 +82,30 @@ Each package lists its public entry points in `package.json` `exports`.
 
 - **No wildcard exports** (`"./*"`). Every entry point is named on purpose.
 - Exception: `@nightshift/ui` keeps `./components/*`, `./hooks/*` and `./lib/*`. That is the shadcn layout, and `components.json` depends on it. `@nightshift/ui-native` keeps `./components/ui/*`, `./hooks/*` and `./lib/*` for the same reason: the React Native Reusables CLI puts its components in `components/ui/`.
+- **An entry points at a barrel or a top-level file:** `src/index.ts`, a file directly in `src/` (`src/files.ts`), or a barrel one folder down (`src/migrate/index.ts`, `src/testing/index.ts`). An entry that must point deeper is a light entry, listed with its reason in `LIGHT_ENTRIES` of `scripts/check-layers.ts`. Today that is `@nightshift/agents/harness-facts`: the barrel of harnesses loads every harness.
+- **Every entry has an importer in another workspace**, tests included. An entry nobody imports comes out of `exports`.
+- **Every value name on an entry has an importer in another workspace**, tests included. A name only the package itself uses comes off the entry. For an entry that is also a vertical's barrel, a file of the package outside that vertical counts too, and the root `index.ts` counts for the names it passes on that are used in turn. Types are exempt: a type that the emitted declaration of another package names must stay on an entry (TS2883, see below).
+- **No `export *`.** Every entry and barrel names what it exports. The one exception is the drizzle schema index (`@nightshift/db/schema`): drizzle reads every table from it.
 - `index.ts` exports what consumers use. It is not a barrel of every file.
 - Test helpers, fakes and fixtures are public only through `./testing`. Production code never imports `./testing`.
-- An entry for the web app or the phone app is type-only and browser-safe (`@nightshift/api/client`).
+- An entry that `client` reads for the web app and the phone app is type-only and browser-safe (`@nightshift/api/client`). The apps read the API types through `client`.
 - A type that the emitted declaration of another package names must be on an entry. Example: the API router type names engine and auth view types, so their roots export them. Without this, `tsc` fails with TS2883.
 
 The entries today:
 
 | Package | Entries |
 | --- | --- |
-| `agents` | `.`, `./harness-facts`, `./mcp`, `./pricing`, `./types`, `./testing` (fakes, `fixturePath(name)`). The engine uses the four light entries: the root loads every harness. `./harness-facts` is browser-safe. |
-| `api` | `.` (`appRouter` and its types, `runSpaceFor`: the run's Space for a Person, for the daemon's run file routes), `./client` (types only, for `apps/web`, `apps/mobile` and `client`), `./context` |
+| `agents` | `.`, `./harness-facts`, `./pricing`, `./tools` (the MCP client the Tool node calls), `./types` (the port barrel: the harness contract's types and its shell quoting), `./testing` (fakes, `fixturePath(name)`). The engine uses the four light entries: the root loads every harness. `./harness-facts` is browser-safe. |
+| `api` | `.` (`appRouter` and its types, `runSpaceFor`: the run's Space for a Person, for the daemon's run file routes), `./client` (types only, for `client`, which passes them on to `apps/web` and `apps/mobile`), `./context` |
 | `auth` | `.`, `./testing` |
 | `client` | `.` (`createApiClient`, `createQueryUtils`, the `create<Vertical>Queries` and `create<Vertical>Mutations` factories, `useFollowHost`, `useLiveRun`, `useAnswerGate`, the seam `ShownNotifications` (with `Notice`, `ListedNotification`), `EntryFold`, `HostApi`, `mergeSteps`, `answerGate` and `gateRefusalText`, which actions a run allows (`runActions` and `whyNot`, passed on from `@nightshift/engine/run-status`), the notify rules, the push contract (`gateKey`, `isGateKey`, `PUSH_CATEGORY`, `PUSH_ANDROID_CHANNEL`, `PUSH_ACTION`, `PUSH_MESSAGE_KINDS`, `PushData`, `pushDataOf`, `withdrawKeyOf`, `PushRoute`, `routeOf`, `webPathOf`, `staleGates`), the shared formatters (`formatCost`, `formatKnownCost`, `costLabel`, `whenLabel`, `agoLabel`, `platformName`, `PHONE_DELAYS`, `phoneDelayLabel`), the view types) |
 | `db` | `.`, `./schema`, `./data-dir`, `./migrate` |
-| `devices` | `.` (with `hostContract`, `hostRouter` and `HostClient`: the peer protocol, for the API to mount), `./testing` (`withPeers`, `inMemoryHost`: the Host's own router in memory, behind `HostClient`, `pairedReplicas`: a Host and its paired Device in one process) |
-| `daemon` | `.` (`startDaemon`, `createDaemon`, the CLI's and the desktop app's helpers: `prepareDaemonEnv`, `checkHealth`, `DEFAULT_PORT`, `DESKTOP_PORT`, the web UI handler, the desktop types `DesktopScreen`, `DesktopNotifier`, `DesktopWindow`), `./heartbeat` (`readHeartbeatFile`: the lease heartbeat as another process reads it, Bun and Node only, for the desktop watchdog's Worker) |
+| `devices` | `.` (with `hostContract`, `hostRouter` and `HostClient`: the peer protocol, for the API to mount), `./testing` (`withPeers`, `inMemoryHost`: the Host's own router in memory, behind `HostClient`, `pairedReplicas`: a Host and its paired Device in one process; only the tests of `devices` use it today, see section 8) |
+| `daemon` | `.` (`startDaemon`, the CLI's and the desktop app's helpers: `prepareDaemonEnv`, `checkHealth`, `DEFAULT_PORT`, `DESKTOP_PORT`, the web UI handler, the desktop types `DesktopScreen`, `DesktopNotifier`, `DesktopWindow`), `./heartbeat` (`readHeartbeatFile`: the lease heartbeat as another process reads it, Bun and Node only, for the desktop watchdog's Worker) |
 | `engine` | `.`, `./run-status` (the run's status and the actions it allows: `runActions`, `whyNot`, `RunRefusal`; imports nothing, for `client`), `./testing` |
 | `flows` | `.`, `./files` |
 | `notifications` | `.` (`createNotifications`, `createInAppChannel`, `createExpoChannel`, `engineRunEvents`, `oneSenderPerSpace`, `createDesktopChannel`, `systemDesktopNotifier`, the settings and push target schemas, the channel port `NotificationChannel`, the Expo port `ExpoClient`, the desktop ports `DesktopNotifier` and `DesktopWindow`), `./contract` (the notification contract: keys, push data, where a tap goes; imports nothing, for `client`), `./testing` (`fakeChannel`, `fakeRunEvents`, `fakeWebPushSender`, `fakeVapidKeys`, `testDatabase`, `fakeDesktopNotifier`, `fakePrograms`, `fakeExpoClient`) |
-| `ui` | `./components/*`, `./hooks/*`, `./lib/*`, `./globals.css`, `./postcss.config` |
+| `ui` | `./components/*`, `./hooks/*`, `./lib/*`, `./globals.css` |
 | `ui-native` | `./components/ui/*`, `./hooks/*` (no hook yet: the CLI's `hooks` alias in `components.json` puts one there), `./lib/*` (`lib/theme`: the theme colors in hex, the run status colors too, for JavaScript and for the widgets), `./global.css` (the theme tokens, for Uniwind) |
 
 - A consumer imports a package by its name and a listed entry. Never by a relative path into another package (`../../packages/agents/src/...`).
@@ -112,7 +117,7 @@ Every app and every package (except `ui`, `ui-native` and `config`) is cut into 
 ### What a vertical is
 
 - A vertical is a folder named with a domain word from `docs/glossary.md`: `runs/`, `gates/`, `schedules/`, `projects/`.
-- Its `index.ts` is a barrel. The barrel is the **only** public surface of the vertical.
+- Its `index.ts` is a barrel. The barrel is the **only** public surface of the vertical. A barrel holds only import and export statements, and so does a package's root `index.ts`: code goes in a file of the vertical.
 - Code outside the vertical imports from the barrel only. A deep import into another vertical (`features/runs/components/run-list`) is an error.
 - Inside the vertical, code uses relative imports and may reach any file.
 - A vertical holds everything about its domain: components, hooks, query options, types, utilities, constants and tests.
@@ -126,18 +131,24 @@ Every app and every package (except `ui`, `ui-native` and `config`) is cut into 
 | An app (`apps/web`, `apps/server`, `apps/desktop`, `apps/mobile`) | `src/features/<vertical>/` | `routes/` (web), `app/` (mobile: the Expo Router files, thin like the web routes), `shared/`, the generated `env.ts`, and the entry files: `router.tsx` (web), `main.ts`, `cli.ts`, `join-cli.ts` and `auth-config.ts` (server), `bun/` (desktop, the Electrobun entry) |
 | A package (`engine`, `agents`, `flows`, `api`, `auth`, `db`, `daemon`, `devices`, `notifications`, `client`) | `src/<vertical>/` | `index.ts` (composes the vertical barrels into the package API), the other entries that `exports` names (`api`: `client.ts`, `context.ts`. `flows`: `files.ts`. `daemon`: `heartbeat.ts`), `testing/`, the generated `env.ts` (`db`), and the files that compose the verticals or that every vertical uses: `auth.ts` (the Better Auth instance), `daemon.ts` and `start.ts`, `router.ts`, `procedures.ts` and `output.ts` (`api`), `wire.ts` (`devices`, `notifications`) |
 
+- **The top of an app's `src/`** holds only `features/`, `shared/`, the one entry folder its framework reads (`routes/` on the web, `app/` on the phone, `bun/` on the desktop, listed in `ENTRY_DIRS` of `scripts/check-verticals.ts`) and entry files. No other folder.
 - **`shared/` (apps only)** holds cross-cutting code that is not a product area: the API client, logging, the page shell, time formatting. Each piece in `shared/` is a named folder with its own barrel (`shared/api/`, `shared/time/`). No loose files in `shared/`.
 - **No kind buckets at the top of `src/`.** Do not create `src/lib/`, `src/utils/`, `src/helpers/`, `src/hooks/`, `src/components/`, `src/types/`, `src/common/` or `src/misc/`. Exceptions: `packages/ui` and `packages/ui-native` (the shadcn layout).
+- **No catch-all names at any depth.** No file named `utils`, `util`, `helpers`, `helper`, `common`, `misc` or `shared`, and no folder named `utils`, `util`, `helpers`, `helper`, `common` or `misc`. Name a file for what it holds (`nodes/base.ts`: what every node type shares).
 - No catch-all `types.ts` for a whole package. Types live in the vertical that owns them.
+- **Files outside `src/`** (config files, scripts, `test/`) belong to no vertical. They import a vertical through its barrel, like any other file, and count as its importers. A file in `test/` is a test.
+- **Imports stay inside the workspace.** A relative import never leaves it, and no file imports its own package by name. Production code never imports a test, a fake, a fixture or a test helper.
 
 ### Exceptions are listed, not implied
 
 Two exceptions exist, as in yapyap. Each one is listed by name in `scripts/check-verticals.ts` with a comment that says why.
 
-- **Leaf contract:** a pure-data file (no imports of its own) that a vertical exposes past its barrel, because importing the barrel would close a module-init cycle. Its symbols are also on the barrel.
-- **Peer port:** two verticals that depend on each other cross only through one named port file per direction. Every other deep import between them stays banned. Often only one direction closes the cycle. Then only that direction has a port, and the other direction imports the barrel.
+- **Leaf contract:** a pure-data file (no imports of its own) that a vertical exposes past its barrel, because importing the barrel would close a module-init cycle or load what the importer cannot load. A leaf contract that imports anything fails.
+- **Peer port:** two verticals that depend on each other cross only through one named port file per direction. Every other deep import between them stays banned. Often only one direction closes the cycle. Then only that direction has a port, and the other direction imports the barrel. A port, and every file of its vertical that it imports, imports no other vertical than a shared piece, so the port closes no cycle.
 
-Today there is no leaf contract. There are seven peer ports, all in `apps/web` (section 5).
+The check fails on a leaf contract or a peer port that nothing uses any more, so neither outlives its reason.
+
+Today there is one leaf contract: `features/updates/update-feeds.ts` in `apps/desktop`. The build config (`electrobun.config.ts`) reads the feeds, and the barrel of `updates` loads `electrobun/main`, which only the app's main process can load. There are seven peer ports, all in `apps/web` (section 5).
 
 ### Growth
 
@@ -178,13 +189,13 @@ apps/web/src/
     notifications/         the stream (use-notification-stream.ts: the live cache follows the Host, with this browser's adapter in browser-notifications.ts), this browser's Web Push (browser.ts, with public/sw.js), components/ (the notification settings and screens cards)
 ```
 
-Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fails a cycle through barrels too.
+Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fails a cycle through barrels too, and `scripts/check-verticals.ts` fails a cycle between verticals with type-only imports in it.
 
 - Routes and `router.tsx` may import any vertical, through its barrel.
-- `shared/shell` composes the features. It is the only shared piece that imports a feature. No feature imports it.
-- The other shared pieces import no feature. Every feature may use them. When a shared piece needs a feature's rule, `router.tsx` passes it in. Example: `createQueryClient` takes `sendToAccess` from `access`, which sends a refused session to sign in.
+- `shared/shell` composes the features. It is the only shared piece that imports a feature. No feature and no other shared piece imports it: only the routes and the entry files do. The check enforces this, tests included.
+- The other shared pieces import no feature (checked, tests included). Every feature may use them. When a shared piece needs a feature's rule, `router.tsx` passes it in. Example: `createQueryClient` takes `sendToAccess` from `access`, which sends a refused session to sign in.
 - The features, from the bottom: `access`, `spaces`, `projects`, `agents`, then `flows`, `devices`, `gates`, `runs`, then `notifications`, then `settings`, `schedules` and `dashboard`. A feature imports only features below it. The notifications stream follows the Host for every page, so `notifications` sits above the pages it keeps live. The Settings page shows projects, flows, runs, agent defaults and the notification settings, so `settings` sits above them.
-- Data can go the other way. Examples: the flow editor reads the settings, and the inbox lists runs. A vertical below the owner of the data imports the owner's `queries.ts` through a peer port (`scripts/check-verticals.ts`), not its barrel. A `queries.ts` imports only `shared/api`, so the port closes no cycle. Today `agents`, `flows` and `devices` read `settings/queries`. `flows` and `gates` read `runs/queries`. `agents` reads `devices/queries` (the Offers of a profile).
+- Data can go the other way. Examples: the flow editor reads the settings, and the inbox lists runs. A vertical below the owner of the data imports the owner's `queries.ts` through a peer port (`scripts/check-verticals.ts`), not its barrel. A `queries.ts` imports only `shared/api`, so the port closes no cycle. The check fails on a port that imports another feature. Today `agents`, `flows` and `devices` read `settings/queries`. `flows` and `gates` read `runs/queries`. `agents` reads `devices/queries` (the Offers of a profile).
 - `devices` and `runs` show each other (the Walker of a run, the runs of an Offer). `devices` reaches the run status badge through a peer port.
 - A concept goes to the vertical that owns it in `docs/glossary.md`, not to its biggest user. Outcomes are declared by flow nodes, so `outcome-badge` is in `flows/canvas`. The Walker is a Device, so `walker-badge` is in `devices`.
 
@@ -249,14 +260,17 @@ The pre-commit hook is `lefthook.yml` (install it with `bun lefthook install`). 
 
 | Check | How it runs | Status |
 | --- | --- | --- |
-| Layer map: `scripts/check-layers.ts` compares each workspace dependency in a `package.json` with the table in section 1. Bun links only declared dependencies, so this is the real import graph. | lefthook pre-commit (when a `package.json` changes), CI | Active |
+| Layer map (L1): `scripts/check-layers.ts` compares each workspace dependency in a `package.json` with the table in section 1. Bun links only declared dependencies, so this is the real import graph. | lefthook pre-commit (when a `package.json`, a `tsconfig`, `biome.json` or a source file changes), CI | Active |
+| Package rules: the same script fails on a declared workspace dependency that no file imports or extends (L2), an entry that no other workspace imports (L3), an entry that points past a barrel and is not a light entry (L4), and an allow-list of `noRestrictedImports` in `biome.json` that does not name exactly the entries of every `package.json` (L5). Exceptions (`EXCEPTIONS`, `ENTRY_EXCEPTIONS`, `LIGHT_ENTRIES`) fail once they are not needed. | lefthook pre-commit, CI | Active |
 | Explicit `exports` in every `package.json` (section 3). A deep import fails `tsc` and fails at runtime. | TypeScript (`bun run check-types`, CI), Bun at runtime | Active |
-| Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, the `api` root and `flows/files` in `apps/web`. In `apps/mobile`, everything but `client`, `api/client`, the `flows` root and `ui-native`. In `packages/client` (tests apart), every `@nightshift` import but `api/client`, `engine/run-status`, the `flows` root and `notifications/contract`. `packages/client/src/platform-free.test.ts` also fails on any other package, on `node:` and `bun:`, and on a global of the DOM, Node or Bun, and on any import in the two leaves it reads (`engine/run-status`, `notifications/contract`). Biome replaces the options of a rule per override, so each override lists the whole set. | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
-| Biome `correctness/noUndeclaredDependencies` and `suspicious/noImportCycles`. | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
-| Vertical boundaries: `scripts/check-verticals.ts` finds the workspaces and their verticals from the file system, so no list can drift and a new workspace is checked from its first commit. It fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks one workspace. | lefthook pre-commit (when a `.ts` or `.tsx` file changes), CI | Active (every workspace except `ui`, `ui-native` and `config`) |
-| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports. A barrel that `package.json` `exports` names (`@nightshift/db/migrate`) is a public entry, like the root `index.ts`: other workspaces import it, so the script does not check it. | lefthook pre-commit, CI | Active (every workspace except `ui`, `ui-native` and `config`) |
-| Top-level layout: the same script fails on a kind bucket at the top of `src/` (section 4), and on loose files in an app's `shared/`. | lefthook pre-commit, CI | Active (every workspace except `ui`, `ui-native` and `config`) |
-| The checks have tests: `scripts/check-verticals.test.ts` proves each rule on small workspaces, and that the script passes on this repository. `scripts/test-workspaces.test.ts` does the same for the list of tested workspaces. | `bun test ./scripts/`: lefthook pre-commit (when a check script changes), CI | Active |
+| Biome `style/noRestrictedImports`: forbid a path that `exports` does not list, a relative path into another workspace, `./testing` outside tests, and `engine`, `agents`, `auth`, `db`, every `api` entry and `flows/files` in `apps/web`. In `apps/mobile`, everything but `client`, the `flows` root and `ui-native`. In `packages/client` (tests apart), every `@nightshift` import but `api/client`, `engine/run-status`, the `flows` root and `notifications/contract`. `packages/client/src/platform-free.test.ts` also fails on any other package, on `node:` and `bun:`, and on a global of the DOM, Node or Bun, and on any import in the two leaves it reads (`engine/run-status`, `notifications/contract`). Biome replaces the options of a rule per override, so each override lists the whole set, and the layer check (L5) keeps the lists equal. | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
+| Biome `correctness/noUndeclaredDependencies`, `suspicious/noImportCycles` and `performance/noReExportAll` (off only for the drizzle schema index). | `biome.json`: lefthook pre-commit (staged files), CI (`biome ci`) | Active |
+| Vertical boundaries: `scripts/check-verticals.ts` finds the workspaces and their verticals from the file system, so no list can drift and a new workspace is checked from its first commit. It reads every file of a workspace, not only `src/`. It fails on any import past another vertical's barrel, apart from the listed leaf contracts and peer ports, and on a vertical without `index.ts`. It also fails on a relative import that leaves the workspace, an import of the workspace's own name, production code that imports a test, a fake, a fixture or a test helper, a peer port that imports another feature, and a leaf contract or peer port that nothing uses. Tests may deep-import. `bun scripts/check-verticals.ts <workspace>` checks one workspace. | lefthook pre-commit (when a source file, a `package.json` or a `tsconfig.json` changes), CI | Active (every workspace except `ui`, `ui-native` and `config`) |
+| Barrel reachability: the same script fails when a barrel exports a name that no file outside the vertical imports, and when a barrel or a package's root `index.ts` holds a statement that is not an import or an export. | lefthook pre-commit, CI | Active (every workspace except `ui`, `ui-native` and `config`) |
+| Entry names: the same script fails when a value name on a package entry has no importer in another workspace (section 3). Types are exempt. `PENDING_NAMES` lists names that code on its way imports, and fails once they have an importer. | lefthook pre-commit, CI | Active (the entries of every workspace except `ui`, `ui-native` and `config`) |
+| Cycles between verticals: the same script fails on a cycle between the verticals of a workspace, type-only imports included. An import through a peer port or of a leaf contract is not part of a cycle. `KNOWN_CYCLES` lists the ones that wait for their fix, and fails once the cycle is gone. | lefthook pre-commit, CI | Active |
+| Top-level layout: the same script fails on a kind bucket at the top of `src/`, a folder at the top of an app's `src/` other than `features/`, `shared/` and its entry folder, a loose file in an app's `shared/`, a shared piece that imports a feature, a vertical that imports `shared/shell`, and a catch-all file or folder name at any depth (section 4). | lefthook pre-commit, CI | Active (every workspace except `ui`, `ui-native` and `config`) |
+| The checks have tests: `scripts/check-verticals.test.ts` and `scripts/check-layers.test.ts` prove each rule on small workspaces, with one tree that breaks it and one that keeps it, and that each script passes on this repository. `scripts/test-workspaces.test.ts` does the same for the list of tested workspaces. | `bun test ./scripts/`: lefthook pre-commit (when a check script changes), CI | Active |
 | Types and tests: `bun run check-types` (every workspace, with the web build), and `bun test` per workspace (without `*.live.test.ts`). `scripts/test-workspaces.ts` finds the workspaces with tests, so CI tests a new workspace without an edit. | CI | Active |
 | The compiled binary starts: `apps/server/scripts/smoke-binary.ts` builds it and starts it as the Docker image does. | CI | Active |
 | API contract: every procedure has a one-line summary and an output schema, and the OpenAPI document builds with both. Real replies of a sandbox engine match their schemas. `exact<T>()` fails the build when an output schema differs from its domain type. | `packages/api/src/contract.test.ts` (CI), TypeScript | Active |
@@ -265,4 +279,8 @@ When a check exists, change its status to "Active". The scripts find the workspa
 
 ## 8. Known deviations
 
-None. When code must break a rule for a while, add an entry here: the rule it breaks, the files, and the change that removes it. Remove the entry in the change that fixes it. Do not copy a deviation into new code.
+When code must break a rule for a while, add an entry here: the rule it breaks, the files, and the change that removes it. Remove the entry in the change that fixes it. Do not copy a deviation into new code. Each entry is listed in a check too, and that check fails once the deviation is gone.
+
+- **The engine's `contract/` is not a leaf** (no cycles between verticals, section 1). `contract/` names types of the verticals behind its ports (`Device`, `RunSettings`, `Project`, `RunDetail`, `ScheduleList` and more), and those verticals import `contract/` (`Actor`, `StartRunInput`, the ports): one cycle through cleanup, contract, device, flows, log, projects, read and schedules. Listed in `KNOWN_CYCLES` of `scripts/check-verticals.ts`. Fix: move the types that `contract/` names into it, so it imports no vertical, as the contract of `devices` does.
+- **`@nightshift/devices/testing` has no importer in another workspace** (every entry has an importer, section 3). Only the tests of `devices` use its fakes. Listed in `ENTRY_EXCEPTIONS` of `scripts/check-layers.ts`. Fix: a test of `api` or `daemon` uses `inMemoryHost` or `pairedReplicas`, or the entry goes and the fakes stay inside `devices`.
+- **Seven names on the `@nightshift/flows` root wait for their importer** (every value name on an entry has an importer, section 3): `addSection`, `updateSection`, `removeSection`, `sectionColors`, `sectionOf`, `nodeOutputFields` and `runFields`. The flow canvas work on `main` imports them, and this branch has not taken it yet. Listed in `PENDING_NAMES` of `scripts/check-verticals.ts`. Fix: merge that work, then remove each name the check reports.
