@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { appRouter } from "@nightshift/api";
+import { ORPCError } from "@orpc/client";
 
 import {
 	createApiClient,
@@ -139,5 +140,60 @@ describe("calls made together", () => {
 		};
 		walk(appRouter, []);
 		expect([...STREAMING_PROCEDURES].sort()).toEqual(streaming.sort());
+	});
+
+	test("keep each call's refusal, and fail every call when the Host does not answer", async () => {
+		const reply = (body: unknown, status = 200) =>
+			new Response(JSON.stringify(body), {
+				status,
+				headers: { "content-type": "application/json" },
+			});
+		const notFound = {
+			json: {
+				defined: false,
+				code: "NOT_FOUND",
+				status: 404,
+				message: "This run is not in one of your Spaces.",
+			},
+		};
+		const errors = async (fetch: (request: Request) => Promise<Response>) => {
+			const client = createApiClient({
+				baseUrl: "http://localhost:3000",
+				fetch,
+				batch: true,
+			});
+			const settled = await Promise.allSettled([
+				client.runs.get({ runId: "gone" }),
+				client.projects.list(),
+			]);
+			return settled.map((s) => (s.status === "rejected" ? s.reason : null));
+		};
+
+		// A refusal is the call's own: an ORPCError, never retried.
+		const [refused, listed] = await errors(async () =>
+			reply(
+				[
+					{ index: 0, status: 404, body: notFound },
+					{ index: 1, body: { json: [] } },
+				],
+				207,
+			),
+		);
+		expect(refused).toBeInstanceOf(ORPCError);
+		expect((refused as ORPCError<string, unknown>).code).toBe("NOT_FOUND");
+		expect(listed).toBeNull();
+
+		// No answer: no ORPCError, so the query client tries again.
+		for (const reason of await errors(async () => {
+			throw new TypeError("Unable to connect.");
+		})) {
+			expect(reason).not.toBeInstanceOf(ORPCError);
+		}
+		// A Host of an older version that knows no batch.
+		for (const reason of await errors(
+			async () => new Response("Not Found", { status: 404 }),
+		)) {
+			expect(reason).not.toBeInstanceOf(ORPCError);
+		}
 	});
 });
