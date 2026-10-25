@@ -6,6 +6,7 @@ import {
 	type RunHistory,
 	type RunLog,
 } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 /**
@@ -186,7 +187,7 @@ export function createDeviceRegistry(deps: {
 				.from(device)
 				.where(eq(device.self, true));
 			if (self?.id === input.id) {
-				throw new Error("A computer cannot pair with itself.");
+				throw new Refusal("invalid", "A computer cannot pair with itself.");
 			}
 			const values = {
 				name: input.name,
@@ -260,8 +261,12 @@ export function createDeviceRegistry(deps: {
 		async revoke(id) {
 			await ready;
 			const found = await row(id);
-			if (!found)
-				throw new Error("This device is not paired with this computer.");
+			if (!found) {
+				throw new Refusal(
+					"not-found",
+					"This device is not paired with this computer.",
+				);
+			}
 			if (found.revokedAt) return;
 			await db
 				.update(device)

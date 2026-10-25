@@ -23,6 +23,7 @@ import {
 } from "@nightshift/engine";
 import type { AgentProfileSettings, FlowNode } from "@nightshift/flows";
 import type { FlowSources } from "@nightshift/flows/files";
+import { Refusal } from "@nightshift/refusal";
 import type { HostRelay, WorkRelay } from "../contract";
 import { type HostSpaces, personInSpace } from "../links";
 import {
@@ -127,7 +128,8 @@ export function deviceNamed(
 	const here = all.filter((d) => d.thisDevice);
 	const matches = own.length > 0 ? own : here.length > 0 ? here : all;
 	if (matches.length > 1) {
-		throw new Error(
+		throw new Refusal(
+			"conflict",
 			`Two of your devices are named "${name}". Rename one on the Devices page.`,
 		);
 	}
@@ -400,10 +402,11 @@ export function createPlacement(deps: PlacementDeps) {
 			if (hostedHere) {
 				const paired = await registry.get(id);
 				if (!paired || paired.revokedAt !== null || !deps.work) {
-					throw new Error(UNREACHABLE_DEVICE);
+					throw new Refusal("invalid", UNREACHABLE_DEVICE);
 				}
 				if (personId === null) {
-					throw new Error(
+					throw new Refusal(
+						"forbidden",
 						`${paired.name} is not your device. A run can use your own devices only.`,
 					);
 				}
@@ -411,7 +414,8 @@ export function createPlacement(deps: PlacementDeps) {
 					offered = await offersOf(id, paired.name);
 				}
 			} else if (!found) {
-				throw new Error(
+				throw new Refusal(
+					"forbidden",
 					"That device is not one of your devices on the Host of this Space.",
 				);
 			} else if (found.offers) {
@@ -420,7 +424,8 @@ export function createPlacement(deps: PlacementDeps) {
 			const name =
 				found?.name ?? (await registry.get(id))?.name ?? "That device";
 			if (!found?.online) {
-				throw new Error(
+				throw new Refusal(
+					"unavailable",
 					`${name} is offline. Start the run when it is online, or choose another device.`,
 				);
 			}
@@ -450,7 +455,9 @@ export function createPlacement(deps: PlacementDeps) {
 		): Promise<OfferedPlacement> {
 			const offers = spaceOffers(await documents.open(spaceId), id);
 			// The Device refuses even its folder to another Person without an Offer.
-			if (offers.length === 0) throw new Error(offersNothing(name));
+			if (offers.length === 0) {
+				throw new Refusal("conflict", offersNothing(name));
+			}
 			return { deviceName: name, offers, mayUse: await mayUse() };
 		}
 
@@ -497,7 +504,7 @@ export function createPlacement(deps: PlacementDeps) {
 		for (const { at, nodes } of planned.groups) {
 			if (!at.offered) continue;
 			const refusal = offerRefusal(nodes, at.offered);
-			if (refusal !== null) throw new Error(refusal);
+			if (refusal !== null) throw new Refusal("conflict", refusal);
 		}
 		return planned;
 	}
@@ -519,7 +526,8 @@ export function createPlacement(deps: PlacementDeps) {
 		).find((d) => d.deviceId === to);
 		if (!target || target.thisDevice) return null;
 		if (!target.online) {
-			throw new Error(
+			throw new Refusal(
+				"unavailable",
 				`${target.name} is offline. Move the run when it is online.`,
 			);
 		}
@@ -545,7 +553,7 @@ export function createPlacement(deps: PlacementDeps) {
 				)
 			: undefined;
 		if (!personId || !deps.work || !at) {
-			throw new Error(NOT_ON_THIS_COMPUTER);
+			throw new Refusal("conflict", NOT_ON_THIS_COMPUTER);
 		}
 		return remoteDevice(
 			work,

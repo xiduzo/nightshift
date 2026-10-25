@@ -2,9 +2,11 @@ import {
 	type FeedStep,
 	followOwnStep,
 	HostUnreachableError,
+	RUN_NOT_FOUND,
 	type RunBus,
 	type TranscriptEntry,
 } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import type { FollowWant } from "../contract";
 import { pause } from "../links";
 
@@ -271,7 +273,7 @@ export function createTranscriptFeeds(ports: FeedPorts): TranscriptFeeds {
 	): AsyncGenerator<TranscriptEntry> {
 		const owner = await ports.runOwner(step.runId);
 		if (!owner || owner.spaceId !== step.spaceId) {
-			throw new Error(`Run not found: ${step.runId}`);
+			throw new Refusal("not-found", RUN_NOT_FOUND);
 		}
 		if (owner.walkerId === (await ports.selfId())) {
 			yield* own(step, afterSeq, signal);
@@ -299,7 +301,7 @@ export function createTranscriptFeeds(ports: FeedPorts): TranscriptFeeds {
 	): AsyncGenerator<TranscriptEntry> {
 		const owner = await ports.runOwner(step.runId);
 		if (!owner || owner.spaceId !== step.spaceId) {
-			throw new Error(`Run not found: ${step.runId}`);
+			throw new Refusal("not-found", RUN_NOT_FOUND);
 		}
 		if (owner.walkerId === (await ports.selfId())) {
 			yield* own(step, afterSeq, signal);

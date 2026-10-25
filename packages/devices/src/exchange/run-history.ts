@@ -10,6 +10,7 @@ import {
 	type WalkFile,
 	type WalkFiles,
 } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import { eq, sql } from "drizzle-orm";
 import { dropArchive, readCopy, writeArchive } from "../archive";
 import type { ArchiveRef, RunCommand, RunRows, SyncCursors } from "../contract";
@@ -326,7 +327,10 @@ export function createRunHistoryExchange(deps: {
 			}
 			// A run that moved here takes its walk state first.
 			if (!(await takeOvers.arrived(command.runId))) {
-				throw new Error("The run is still on its way to this device.");
+				throw new Refusal(
+					"conflict",
+					"The run is still on its way to this device.",
+				);
 			}
 			const role = memberRole(
 				await documents.open(command.spaceId),

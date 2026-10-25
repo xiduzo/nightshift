@@ -7,6 +7,7 @@ import {
 } from "@nightshift/engine";
 import type { FlowNode, Schedule } from "@nightshift/flows";
 import { readFlowSources } from "@nightshift/flows/files";
+import { Refusal } from "@nightshift/refusal";
 import { personInSpace } from "../links";
 import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
 
@@ -81,7 +82,8 @@ export function createScheduleOffers(deps: {
 				mayUse: (await deps.mayUseOffers?.(spaceId, personId)) ?? false,
 			});
 			if (refusal !== null) {
-				throw new Error(
+				throw new Refusal(
+					"conflict",
 					`The schedule "${schedule.id}" fires on another person's device. ${refusal}`,
 				);
 			}

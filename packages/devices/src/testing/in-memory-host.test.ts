@@ -103,7 +103,7 @@ describe("a Host in memory", () => {
 		).toBe("FORBIDDEN");
 	});
 
-	test("passes the exchange's refusals on, and a plain error as BAD_REQUEST", async () => {
+	test("passes the exchange's refusals on, and a refusal as BAD_REQUEST with its words", async () => {
 		const client = paired.memory.client(paired.key);
 		expect(await codeOf(client.sync.push(rowsOf("someone-else")))).toBe(
 			"FORBIDDEN",
@@ -119,7 +119,7 @@ describe("a Host in memory", () => {
 		expect(error).toBeInstanceOf(ORPCError);
 		expect(error).toMatchObject({
 			code: "BAD_REQUEST",
-			message: "Run not found: run-none",
+			message: "Night Shift cannot find this run.",
 		});
 		// A batch that is not valid never reaches the exchange.
 		const invalid = { ...rowsOf(b.deviceId), events: "none" };

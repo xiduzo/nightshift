@@ -16,6 +16,7 @@ import type {
 	Worktree,
 } from "@nightshift/engine";
 import type { FlowSources } from "@nightshift/flows/files";
+import { Refusal, wordsFor } from "@nightshift/refusal";
 import type {
 	WorkCall,
 	WorkFor,
@@ -47,6 +48,14 @@ function stopped(name: string): string {
 	return `${name} stopped answering before the step ended.`;
 }
 
+/**
+ * The error of a reply, as a refusal: the serving Device sent words for
+ * people (its refusal, or its plain words for a failure it logged).
+ */
+function refusalOf(reply: { message: string; offline?: boolean }): Refusal {
+	return new Refusal(reply.offline ? "unavailable" : "conflict", reply.message);
+}
+
 /** Another Device, reached through `relay`, working for one run (or its start). */
 export function remoteDevice(
 	relay: WorkRelay,
@@ -60,13 +69,13 @@ export function remoteDevice(
 			signal,
 		);
 
-	/** The one result of a call; throws its error. */
+	/** The one result of a call; throws its error as a refusal (`refusalOf`). */
 	async function once<T>(call: WorkCall, signal?: AbortSignal): Promise<T> {
 		for await (const reply of ask(call, signal)) {
 			if (reply.kind === "result") return reply.value as T;
-			if (reply.kind === "error") throw new Error(reply.message);
+			if (reply.kind === "error") throw refusalOf(reply);
 		}
-		throw new Error(stopped(device.name));
+		throw new Refusal("unavailable", stopped(device.name));
 	}
 
 	async function* session(
@@ -166,9 +175,9 @@ export function remoteDevice(
 		flows: async (projectId) => {
 			for await (const reply of ask({ kind: "flows" }, undefined, projectId)) {
 				if (reply.kind === "result") return reply.value as FlowSources;
-				if (reply.kind === "error") throw new Error(reply.message);
+				if (reply.kind === "error") throw refusalOf(reply);
 			}
-			throw new Error(stopped(device.name));
+			throw new Refusal("unavailable", stopped(device.name));
 		},
 		session,
 		exec,
@@ -272,9 +281,12 @@ export async function* serveWork(
 				return;
 		}
 	} catch (error) {
-		yield {
-			kind: "error",
-			message: error instanceof Error ? error.message : String(error),
-		};
+		if (!(error instanceof Refusal)) {
+			console.error(
+				`[work] a ${call.kind} call for ${request.spaceId} failed:`,
+				error,
+			);
+		}
+		yield { kind: "error", message: wordsFor(error) };
 	}
 }

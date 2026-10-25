@@ -1,6 +1,7 @@
 import { X509Certificate } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { connect } from "node:tls";
+import { Refusal } from "@nightshift/refusal";
 
 /**
  * The Host's certificate, as a joining Device sees it. A Host with a
@@ -31,6 +32,11 @@ export function certificateFingerprint(pem: string): string {
 	return new X509Certificate(pem).fingerprint256;
 }
 
+/** What a person reads when the address of a Host does not answer. */
+function notAnswering(address: string): string {
+	return `${address} does not answer. Check the address, and that the Host is online.`;
+}
+
 /**
  * The certificate an `https://` address serves, read with a TLS handshake
  * that accepts any certificate (it only reads it). Null for `http://`.
@@ -54,7 +60,12 @@ export async function hostCertificate(
 				const peer = socket.getPeerCertificate(true);
 				socket.end();
 				if (!peer?.raw) {
-					reject(new Error(`${address} sent no certificate.`));
+					reject(
+						new Refusal(
+							"conflict",
+							`${address} sent no certificate. Check the address of the Host.`,
+						),
+					);
 					return;
 				}
 				const pem = toPem(peer.raw);
@@ -67,10 +78,12 @@ export async function hostCertificate(
 		);
 		socket.setTimeout(10_000, () => {
 			socket.destroy();
-			reject(new Error(`${address} does not answer.`));
+			reject(new Refusal("unavailable", notAnswering(address)));
 		});
 		socket.on("error", (error) => {
-			reject(new Error(`${address} does not answer: ${error.message}`));
+			reject(
+				new Refusal("unavailable", notAnswering(address), { cause: error }),
+			);
 		});
 	});
 }

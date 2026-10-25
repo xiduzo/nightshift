@@ -1,5 +1,6 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
 import { HostUnreachableError, type TranscriptEntry } from "@nightshift/engine";
+import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
 import { implement, ORPCError } from "@orpc/server";
 import { hostContract, type PhoneView, type WorkRequest } from "../contract";
 import type { HostExchange } from "../exchange";
@@ -14,9 +15,12 @@ import type { Devices } from "./types";
  * - The key: a procedure whose meta names a permission needs a Device key
  *   that allows it. None is UNAUTHORIZED, one without it is FORBIDDEN.
  *   Pairing needs none.
- * - Errors: an ORPCError passes on as it is. A plain Error of a call is a
- *   BAD_REQUEST with its message, a `HostUnreachableError` is a
- *   HOST_UNREACHABLE (503). An error inside a stream passes on as it is.
+ * - Errors: an ORPCError passes on as it is. A `HostUnreachableError` is
+ *   a HOST_UNREACHABLE (503), and any other `Refusal` a BAD_REQUEST with
+ *   its words: an older Device reads every refusal so, and a FORBIDDEN
+ *   would tell it that its key is no good. Any other error is a failure:
+ *   an INTERNAL_SERVER_ERROR with plain words, and the details go to the
+ *   Host's log. An error inside a stream passes on as it is.
  * - Values: the contract's input schemas check every input, with their
  *   defaults and their transforms. Its output schemas describe a reply and
  *   never change it.
@@ -42,12 +46,12 @@ export type HostPeerContext = {
 
 const os = implement(hostContract).$context<HostPeerContext>();
 
-/** The procedures that pass an error written for people on to the Device. */
-const peer = os.use(async ({ next }) => {
+/** The procedures that pass a refusal on to the Device, and keep the details of a failure here. */
+const peer = os.use(async ({ next, path }) => {
 	try {
 		return await next();
 	} catch (error) {
-		throw readable(error);
+		throw readable(error, path);
 	}
 });
 
@@ -192,9 +196,12 @@ export const hostRouter = os.router({
 	},
 });
 
-/** An error written for people, as a BAD_REQUEST with its message; the Host of a Space out of reach as HOST_UNREACHABLE. */
-function readable(error: unknown): unknown {
-	if (error instanceof ORPCError || !(error instanceof Error)) return error;
+/**
+ * The error a Device gets for `error`, thrown by the procedure at `path`,
+ * in the codes older Devices know (see the router's comment).
+ */
+function readable(error: unknown, path: readonly string[]): unknown {
+	if (error instanceof ORPCError) return error;
 	if (error instanceof HostUnreachableError) {
 		return new ORPCError("HOST_UNREACHABLE", {
 			status: 503,
@@ -202,5 +209,15 @@ function readable(error: unknown): unknown {
 			cause: error,
 		});
 	}
-	return new ORPCError("BAD_REQUEST", { message: error.message, cause: error });
+	if (error instanceof Refusal) {
+		return new ORPCError("BAD_REQUEST", {
+			message: error.message,
+			cause: error,
+		});
+	}
+	console.error(`[host] ${path.join(".")} failed:`, error);
+	return new ORPCError("INTERNAL_SERVER_ERROR", {
+		message: FAILURE_MESSAGE,
+		cause: error,
+	});
 }

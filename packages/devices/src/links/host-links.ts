@@ -2,6 +2,7 @@ import { join } from "node:path";
 import type { Database } from "@nightshift/db";
 import { device, hostLink } from "@nightshift/db/schema";
 import { type KeyStoreKind, valueStore } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import { and, asc, eq, isNull, ne } from "drizzle-orm";
 
 export type { KeyStoreKind } from "@nightshift/engine";
@@ -93,7 +94,9 @@ export function createHostLinks(db: Database): HostLinks {
 						.where(
 							and(eq(hostLink.role, "home"), ne(hostLink.hostId, link.hostId)),
 						);
-					if (other && !other.revokedAt) throw new Error(SECOND_HOME);
+					if (other && !other.revokedAt) {
+						throw new Refusal("conflict", SECOND_HOME);
+					}
 					if (other) {
 						await tx.delete(hostLink).where(eq(hostLink.hostId, other.hostId));
 					}

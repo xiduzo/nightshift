@@ -3,9 +3,12 @@ import { roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import {
 	type Engine,
+	PROJECT_NOT_FOUND,
+	RUN_NOT_FOUND,
 	recordClone,
 	type SpaceDocuments,
 } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import { ORPCError } from "@orpc/server";
 import {
 	type ArchiveRef,
@@ -85,7 +88,7 @@ export function createHostExchange(deps: {
 
 	/** The Device may use the exchange: this is a Host, and the Device has access. */
 	async function admit(key: DeviceKeyAccess): Promise<void> {
-		if (!deps.isHost()) throw new Error(NOT_A_HOST);
+		if (!deps.isHost()) throw new Refusal("unavailable", NOT_A_HOST);
 		const paired = await registry.get(key.deviceId);
 		if (!paired || paired.revokedAt) {
 			throw new ORPCError("UNAUTHORIZED", {
@@ -269,7 +272,7 @@ export function createHostExchange(deps: {
 			await admit(key);
 			const owner = await exchange.runOwner(input.runId);
 			if (!owner || !(await isMember(key, owner.spaceId))) {
-				throw new Error(`Run not found: ${input.runId}`);
+				throw new Refusal("not-found", RUN_NOT_FOUND);
 			}
 			const role = await roleIn(db, key.personId, owner.spaceId);
 			if (!role || !roleAllows(role, COMMAND_PERMISSION[input.kind])) {
@@ -307,7 +310,7 @@ export function createHostExchange(deps: {
 			}
 			const document = await deps.documents.open(input.spaceId);
 			if (document.hostedElsewhere || !document.projects.has(input.projectId)) {
-				throw new Error(`Project not found: ${input.projectId}`);
+				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
 			await document.change(() =>
 				recordClone(document, { ...input, deviceId: key.deviceId }),
@@ -331,7 +334,7 @@ export function createHostExchange(deps: {
 			await admit(key);
 			// The Device's owner withdraws its own Offer, whatever their role now.
 			if (!(await isMember(key, input.spaceId))) {
-				throw new Error(`Space not found: ${input.spaceId}`);
+				throw new Refusal("not-found", "That Space does not exist.");
 			}
 			await engine.offers.withdraw({
 				...input,
@@ -419,7 +422,7 @@ export function createHostExchange(deps: {
 		async devices(key, input) {
 			await admit(key);
 			if (!(await isMember(key, input.spaceId))) {
-				throw new Error(`Project not found: ${input.projectId}`);
+				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
 			return engine
 				.space(input.spaceId, { personId: key.personId })

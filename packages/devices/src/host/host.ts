@@ -14,6 +14,7 @@ import {
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { SettingsStore } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import {
 	type HostHello,
 	NOT_A_HOST,
@@ -72,7 +73,7 @@ export function createHost(deps: {
 
 	const isHost = () => settings.current().host;
 	function requireHost() {
-		if (!isHost()) throw new Error(NOT_A_HOST);
+		if (!isHost()) throw new Refusal("unavailable", NOT_A_HOST);
 	}
 	function pendingByUserCode(userCode: string): Pending | undefined {
 		const code = normalizeUserCode(userCode);
@@ -124,7 +125,7 @@ export function createHost(deps: {
 		}): Promise<PairingStart> {
 			requireHost();
 			if (input.deviceId === deps.self.id) {
-				throw new Error("A computer cannot pair with itself.");
+				throw new Refusal("invalid", "A computer cannot pair with itself.");
 			}
 			prune();
 			const code = await startPairing(auth, input.deviceId);
@@ -213,7 +214,7 @@ export function createHost(deps: {
 		async revoke(personId: string, deviceId: string) {
 			const paired = await registry.get(deviceId);
 			if (!paired || paired.ownerId !== personId) {
-				throw new Error("This device is not one of yours here.");
+				throw new Refusal("forbidden", "This device is not one of yours here.");
 			}
 			await keys.revoke(deviceId);
 			await registry.revoke(deviceId);
@@ -226,7 +227,10 @@ export function createHost(deps: {
 			requireHost();
 			const paired = await registry.get(key.deviceId);
 			if (!paired || paired.revokedAt) {
-				throw new Error("This device has no access here. Pair it again.");
+				throw new Refusal(
+					"forbidden",
+					"This device has no access here. Pair it again.",
+				);
 			}
 			await registry.seen(key.deviceId);
 			return {

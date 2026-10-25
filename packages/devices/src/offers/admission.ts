@@ -11,6 +11,7 @@ import {
 	worktreeLocation,
 } from "@nightshift/engine";
 import type { AgentProfileSettings } from "@nightshift/flows";
+import { Refusal, wordsFor } from "@nightshift/refusal";
 import type { WorkCall, WorkRelay, WorkReply, WorkRequest } from "../contract";
 import { createHostSpaces, personInSpace, personOnHost } from "../links";
 import { selfDeviceId, selfOwnerId } from "../registry";
@@ -70,6 +71,9 @@ export type CallVia =
 
 /** A call of a run this computer walks itself. */
 const WALKED_HERE = { walkedHere: true } as const;
+
+/** Why a session that waited for a free one of the Offer did not start: it was stopped. */
+const SESSION_STOPPED = "The session was stopped.";
 type Via = CallVia | typeof WALKED_HERE;
 
 export type OfferAdmission = {
@@ -276,10 +280,14 @@ export function createOfferAdmission(deps: {
 				};
 			}
 		} catch (error) {
-			yield {
-				kind: "error",
-				message: error instanceof Error ? error.message : String(error),
-			};
+			// Words for people go to the Walker. A failure's details stay here.
+			if (!(error instanceof Refusal)) {
+				console.error(
+					`[offers] a ${request.call.kind} call for ${request.spaceId} failed:`,
+					error,
+				);
+			}
+			yield { kind: "error", message: wordsFor(error) };
 		}
 	}
 
@@ -473,7 +481,7 @@ function createOfferSlots(): OfferUse["slots"] {
 		running: (key) => running.get(key) ?? 0,
 		async take(key, cap, signal) {
 			while ((running.get(key) ?? 0) >= cap) {
-				if (signal.aborted) throw new Error("The session was stopped.");
+				if (signal.aborted) throw new Refusal("conflict", SESSION_STOPPED);
 				await new Promise<void>((resolve, reject) => {
 					const queue = waiting.get(key) ?? [];
 					waiting.set(key, queue);
@@ -484,7 +492,7 @@ function createOfferSlots(): OfferUse["slots"] {
 					const stop = () => {
 						const at = queue.indexOf(wake);
 						if (at >= 0) queue.splice(at, 1);
-						reject(new Error("The session was stopped."));
+						reject(new Refusal("conflict", SESSION_STOPPED));
 					};
 					queue.push(wake);
 					signal.addEventListener("abort", stop, { once: true });

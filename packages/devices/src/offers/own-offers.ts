@@ -1,6 +1,7 @@
 import { spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { DeviceDocument, Engine, ProfileStore } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import { personInSpace } from "../links";
 import type { DeviceRegistry } from "../registry";
 import type { EngineOffers } from "./engine-offers";
@@ -95,14 +96,16 @@ export function createOffers(deps: {
 
 		async make(input, by) {
 			if (!deps.profiles.get(input.profile)) {
-				throw new Error(
+				throw new Refusal(
+					"conflict",
 					`There is no profile named "${input.profile}". Add it under Agents first.`,
 				);
 			}
 			const space = await spaceRow(input.spaceId);
-			if (!space) throw new Error(`Space not found: ${input.spaceId}`);
+			if (!space) throw new Refusal("not-found", "That Space does not exist.");
 			if (space.personal) {
-				throw new Error(
+				throw new Refusal(
+					"invalid",
 					"Nobody else is in a personal Space. Offer the profile to a shared Space.",
 				);
 			}

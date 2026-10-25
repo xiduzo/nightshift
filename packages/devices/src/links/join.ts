@@ -1,4 +1,5 @@
 import { isHostAddress, isLoopbackHost } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import { hostCertificate } from "../reach";
 import { pause } from "./backoff";
 import { hostClient } from "./host-client";
@@ -40,7 +41,9 @@ export async function* joinHost(
 		const home = (await deps.links.list()).find(
 			(l) => l.role === "home" && !l.revokedAt,
 		);
-		if (home && !home.addresses.includes(address)) throw new Error(SECOND_HOME);
+		if (home && !home.addresses.includes(address)) {
+			throw new Refusal("conflict", SECOND_HOME);
+		}
 	}
 
 	const certificate = await hostCertificate(address);
@@ -90,9 +93,12 @@ export async function* joinHost(
 				interval += 5_000;
 				continue;
 			case "denied":
-				throw new Error("The pairing was declined on the Host.");
+				throw new Refusal("forbidden", "The pairing was declined on the Host.");
 			case "expired":
-				throw new Error("The code expired. Run the pairing again.");
+				throw new Refusal(
+					"conflict",
+					"The code expired. Run the pairing again.",
+				);
 			case "joined": {
 				await deps.keys.set(answer.host.id, answer.key);
 				const addresses = [...answer.host.addresses];
@@ -130,7 +136,8 @@ export function hostOrigin(url: string): string {
 		? trimmed
 		: `https://${trimmed}`;
 	if (!isHostAddress(withScheme)) {
-		throw new Error(
+		throw new Refusal(
+			"invalid",
 			"Use the Host's https:// address, for example https://studio.example.com.",
 		);
 	}
@@ -170,7 +177,8 @@ function certificateError(error: unknown): Error | null {
 			/CERT|ISSUER|SELF_SIGNED|LEAF_SIGNATURE/.test(code),
 	);
 	if (!tls) return null;
-	return new Error(
+	return new Refusal(
+		"conflict",
 		"This computer cannot check the certificate of the Host. Give the Host a certificate from a public authority, or one it signs itself.",
 	);
 }

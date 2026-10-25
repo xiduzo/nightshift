@@ -322,7 +322,9 @@ describe("a step's feed", () => {
 	test("a run this Replica does not have is refused", async () => {
 		const f = follow(v, 0, { ...STEP, runId: "nope" });
 		await f.done;
-		expect(String(f.state.error)).toContain("Run not found");
+		expect(String(f.state.error)).toContain(
+			"Night Shift cannot find this run.",
+		);
 	});
 });
 
@@ -514,7 +516,9 @@ describe("a viewer's transcript of a step (entries)", () => {
 	test("a run this Replica does not have is refused", async () => {
 		const r = read(viewer(), 0, { ...STEP, runId: "nope" });
 		await r.done;
-		expect(String(r.state.error)).toContain("Run not found");
+		expect(String(r.state.error)).toContain(
+			"Night Shift cannot find this run.",
+		);
 		expect(r.state.got).toEqual([]);
 	});
 });

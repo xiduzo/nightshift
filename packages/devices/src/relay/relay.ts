@@ -1,4 +1,5 @@
 import { HostUnreachableError } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 import type { HostRelay } from "../contract";
 import type { DeviceLinks } from "../links";
 import type { PeerEngine } from "../peers";
@@ -42,7 +43,8 @@ export function createRelay(deps: {
 			}
 			const walker = await deps.registry().get(command.walkerId);
 			if (!walker || walker.revokedAt) {
-				throw new Error(
+				throw new Refusal(
+					"conflict",
 					"The device that runs this run has no access to this computer.",
 				);
 			}
