@@ -10,7 +10,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
-import { shellQuoteAlways } from "@nightshift/agents";
+import { shellQuoteAlways } from "@nightshift/agents/types";
 import type { Login } from "@nightshift/flows";
 
 import {

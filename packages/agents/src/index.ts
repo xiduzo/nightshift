@@ -1,7 +1,8 @@
 /**
  * `@nightshift/agents`: the package API, composed from the barrels of its
- * verticals. This root loads every harness. The engine uses the light
- * entries (`./types`, `./harness-facts`, `./pricing`, `./mcp`) instead.
+ * verticals. This root brings every harness and decider; their TanStack
+ * packages load on first use. The engine uses the light entries
+ * (`./types`, `./harness-facts`, `./pricing`, `./tools`) instead.
  */
 export {
 	type DeciderAdapter,
@@ -39,27 +40,26 @@ export {
 	opencodeHarness,
 	runPiAcp,
 } from "./harnesses";
-export {
-	type AgentErrorKind,
-	type AgentEvent,
-	type AgentHarness,
-	type AgentHarnessName,
-	type AgentSessionInput,
-	type AgentUsage,
-	type CustomHarnessName,
-	type Decider,
-	type DeciderName,
-	type DecisionInput,
-	type DecisionResult,
-	type Effort,
-	type HarnessName,
-	type McpServerConfig,
-	type PermissionMode,
-	type StepReportOutcome,
-	type StepReportSpec,
-	shellQuoteAlways,
-	type ValueInput,
-	type ValueResult,
+export type {
+	AgentErrorKind,
+	AgentEvent,
+	AgentHarness,
+	AgentHarnessName,
+	AgentSessionInput,
+	AgentUsage,
+	CustomHarnessName,
+	Decider,
+	DeciderName,
+	DecisionInput,
+	DecisionResult,
+	Effort,
+	HarnessName,
+	McpServerConfig,
+	PermissionMode,
+	StepReportOutcome,
+	StepReportSpec,
+	ValueInput,
+	ValueResult,
 } from "./port";
 export {
 	type CostSource,
