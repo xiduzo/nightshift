@@ -14,7 +14,7 @@ and the three ways a run ends early (failed, stopped, needs a person) are
 LangGraph `interrupt`s, so a resume always lands back at the exact node, at
 any depth.
 
-What did **not** change: the `Engine` interface (`contract/`), the API, the
+What did **not** change: the `Engine` interface (`run/engine.ts`), the API, the
 web app, the event log as the read model, transcripts on disk, the bus,
 the scheduler, worktrees, leases, run bundles, settings, profiles,
 connections and the harnesses. The existing engine test
@@ -29,6 +29,7 @@ below it, from the bottom up:
 
 | Vertical | Holds |
 | --- | --- |
+| `contract/` | What the engine shares with its callers and the Devices: who acts (`Actor`), a change of Members (`MemberChange`), a run start and its schema (`StartRunInput`, `startRunInputSchema`), where a run can be placed (`Placement`, `OwnDevice`, `NodeToPlace`), and the ports a vertical asks of the devices: the Device rows (`DeviceDirectory`), the Hosts (`Relay`) and the Offer rule of a schedule (`OffersPort`). It imports no other vertical. |
 | `run-status/` | A run's status and which actions it allows (`runActions`, `whyNot`), with the refusal they share (`RunRefusal`, one named rule each). It imports nothing: the package entry `@nightshift/engine/run-status` gives it to `@nightshift/client` for the apps. |
 | `device-config/` | This computer's Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. |
 | `log/` | The event payloads and append and parse (`events.ts`), the run log in memory (`run-log.ts`), the bus, the run and step rows (`run-row.ts`), the member events, the transcript files and the transcript event types (`step-events.ts`). |
@@ -38,13 +39,16 @@ below it, from the bottom up:
 | `device/` | The execution port (`Device`), this computer (`local.ts`), commands and tool calls. |
 | `graph/` | The flow as a graph, below. |
 | `schedules/` | The scheduler and the schedules file of a project (`schedule-files.ts`). |
-| `run/` | The composition root (`engine.ts`), what a person does in one Space (`space.ts`), run start, startup recovery, the run actions (`actions.ts`, with the relay to a Walker in `relay.ts`), the other end of a move (`take-over.ts`) and the wake when a Device is back (`wake.ts`). |
+| `run/` | The composition root (`engine.ts`, with the `Engine` it returns), what it takes (`engine-options.ts`), the port of the other Devices it walks with (`peers.ts`), what a person does in one Space (`space-engine.ts` is the interface, `space.ts` the module), run start, startup recovery, the run actions (`actions.ts`, with the relay to a Walker in `relay.ts`), the other end of a move (`take-over.ts`) and the wake when a Device is back (`wake.ts`). |
 
-`contract/` holds only types: `Engine`, `SpaceEngine`, `StartRunInput`,
-`EngineOptions`, `Relay`, `Peers` and `DeviceDirectory`. A type-only import
-may point up (a port that a lower vertical implements, or the contract).
+No import points up, `import type` included: `scripts/check-verticals.ts`
+fails on a cycle between verticals. `contract/` holds only types and the
+schema of a run start, and imports no vertical, so every vertical may name
+them. The engine's interface (`Engine`, `SpaceEngine`, `EngineOptions`) and
+the `Peers` port name the types of many verticals, so they sit in `run/`,
+with `createEngine`.
 
-The engine knows no other Device. `Peers` (`contract/peers.ts`) is the port
+The engine knows no other Device. `Peers` (`run/peers.ts`) is the port
 of the other Devices and Hosts: where a step runs (Placement), the Offer
 rules, the Host that keeps a Space, and the runs walked elsewhere (their
 commands, transcripts and the archive of a moved run). `@nightshift/devices`
