@@ -266,6 +266,12 @@ anything:
   (`user.name`, `user.email` in the worktree's config), so commits are in
   their name, not the Device owner's.
 
+One module does these checks (the Offer admission, `offers/admission.ts`),
+whether the Device walks the Run itself or a Walker elsewhere sends the
+call through a Host. The role is checked at every call, a call that names
+no starter is refused, and the session cap counts the sessions of both
+paths.
+
 What an Offer cannot hide, and the Offer dialog says so: an agent on your
 Device runs with your harness login and your CLI tools. A `gh pr create`
 in a flow a colleague wrote is your `gh`. Offer a profile whose tools you
