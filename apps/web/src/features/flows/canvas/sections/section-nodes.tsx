@@ -174,7 +174,8 @@ const SectionFrame = memo(function SectionFrame({
 			<div
 				className={cn(
 					"pointer-events-auto flex cursor-grab items-start gap-2 rounded-t-[10px] px-3 pt-1.5 active:cursor-grabbing",
-					overview && "invisible",
+					// Zoomed out, the header stays where it is to grab, unseen.
+					overview && "opacity-0",
 				)}
 				style={{ height: header }}
 			>
@@ -207,9 +208,10 @@ const SectionFrame = memo(function SectionFrame({
 				<FoldButton section={section} folded={false} className="-mr-1.5" />
 			</div>
 			{overview ? (
-				// Zoomed out, the name stands above the frame in large type.
+				// Zoomed out, the name stands above the frame in large type, and
+				// takes the frame along when dragged.
 				<span
-					className="pointer-events-none absolute bottom-full left-1 mb-[0.2em] whitespace-nowrap font-medium leading-none"
+					className="pointer-events-auto absolute bottom-full left-1 mb-[0.2em] cursor-grab whitespace-nowrap font-medium leading-none active:cursor-grabbing"
 					style={{
 						fontSize: overviewText,
 						color: section.color ? color : undefined,
