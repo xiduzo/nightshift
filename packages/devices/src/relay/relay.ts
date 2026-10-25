@@ -1,7 +1,7 @@
 import { HostUnreachableError } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
 import type { HostRelay } from "../contract";
-import type { DeviceLinks } from "../links";
+import { type DeviceLinks, fromHost } from "../links";
 import type { PeerEngine } from "../peers";
 import type { DeviceRegistry } from "../registry";
 import { createSpaceRoutes } from "./route";
@@ -17,6 +17,10 @@ import { createSpaceRoutes } from "./route";
  *   this Device's key; the Host checks the role of the key's Person.
  * - A Host that cannot be reached: every call throws
  *   `HostUnreachableError`. The person tries again later.
+ *
+ * The Host's errors come back in this computer's words (`fromHost`): its
+ * refusals keep their words and their kind, and a key the Host no longer
+ * knows asks the person to pair this computer again.
  */
 export function createRelay(deps: {
 	/** Lazy: the engine is made with this relay. */
@@ -27,7 +31,7 @@ export function createRelay(deps: {
 	registry(): Pick<DeviceRegistry, "get">;
 	links(): Pick<DeviceLinks, "get">;
 }): HostRelay {
-	const { route, host } = createSpaceRoutes({
+	const { route, onHost } = createSpaceRoutes({
 		hostOf: (spaceId) => deps.engine().hostSpaces.hostOf(spaceId),
 		links: deps.links,
 	});
@@ -38,7 +42,7 @@ export function createRelay(deps: {
 			if (to.at === "unreachable") throw new HostUnreachableError();
 			if (to.at === "host") {
 				// The Host acts in the name of the key's Person, never a Person the call names.
-				await to.client.sync.command(command);
+				await to.ask((client) => client.sync.command(command));
 				return;
 			}
 			const walker = await deps.registry().get(command.walkerId);
@@ -52,51 +56,57 @@ export function createRelay(deps: {
 		},
 
 		async addClone({ spaceId, projectId, deviceName }) {
-			await (await host(spaceId)).sync.addClone({
-				spaceId,
-				projectId,
-				deviceName,
-			});
+			await onHost(spaceId, (client) =>
+				client.sync.addClone({ spaceId, projectId, deviceName }),
+			);
 		},
 
 		async offer(input) {
 			// The Host publishes it for the key's Device, in its Person's name.
-			await (await host(input.spaceId)).sync.offer(input);
+			await onHost(input.spaceId, (client) => client.sync.offer(input));
 		},
 
 		async withdrawOffer(input) {
-			await (await host(input.spaceId)).sync.withdrawOffer(input);
+			await onHost(input.spaceId, (client) => client.sync.withdrawOffer(input));
 		},
 
 		async archive(ref) {
 			const to = await route(ref.spaceId);
 			if (to.at === "unreachable") throw new HostUnreachableError();
-			return to.at === "host" ? to.client.archive.get({ ref }) : null;
+			return to.at === "host"
+				? to.ask((client) => client.archive.get({ ref }))
+				: null;
 		},
 
 		async *follow(step, afterSeq, signal) {
-			const client = await host(step.spaceId);
-			yield* await client.archive.follow({ step, afterSeq }, { signal });
+			const entries = await onHost(step.spaceId, (client) =>
+				client.archive.follow({ step, afterSeq }, { signal }),
+			);
+			try {
+				yield* entries;
+			} catch (error) {
+				throw fromHost(error);
+			}
 		},
 
 		async archivePut(ref, content, stamp) {
-			await (await host(ref.spaceId)).archive.put({
-				ref,
-				content,
-				...(stamp ? { stamp } : {}),
-			});
+			await onHost(ref.spaceId, (client) =>
+				client.archive.put({ ref, content, ...(stamp ? { stamp } : {}) }),
+			);
 		},
 
 		async startRun(input) {
 			// The Host starts it in the name of the key's Person.
 			const { startedBy: _person, ...start } = input;
-			return (await host(input.spaceId)).sync.startRun(start);
+			return onHost(input.spaceId, (client) => client.sync.startRun(start));
 		},
 
 		async devices(input) {
 			const to = await route(input.spaceId);
 			if (to.at === "unreachable") throw new HostUnreachableError();
-			return to.at === "host" ? to.client.sync.devices(input) : [];
+			return to.at === "host"
+				? to.ask((client) => client.sync.devices(input))
+				: [];
 		},
 	};
 }

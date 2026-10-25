@@ -6,8 +6,11 @@ import {
 	HOST_UNREACHABLE as UNREACHABLE,
 } from "@nightshift/engine";
 import { createSandbox } from "@nightshift/engine/testing";
+import { Refusal } from "@nightshift/refusal";
+import { ORPCError } from "@orpc/client";
 import type { HostClient, WorkReply, WorkRequest } from "../contract";
 import type { DeviceLinks } from "../links";
+import { NOT_PAIRED } from "../links/from-host";
 import { pairedReplicas } from "../testing";
 import { createRelay } from "./relay";
 import { createSpaceRoutes } from "./route";
@@ -228,7 +231,7 @@ describe("the Space route", () => {
 
 	test("says where a call for each Space goes now", async () => {
 		expect(await routes.route("space-own")).toEqual({ at: "here" });
-		expect(await routes.route("space-team")).toEqual({
+		expect(await routes.route("space-team")).toMatchObject({
 			at: "host",
 			hostId: "host-1",
 			client: host.client,
@@ -256,12 +259,25 @@ describe("the Space route", () => {
 	});
 
 	test("the Host's procedures only while it can be reached", async () => {
-		expect(await routes.host("space-team")).toBe(host.client);
+		expect(await routes.onHost("space-team", async (c) => c)).toBe(host.client);
 		for (const spaceId of ["space-gone", "space-off", "space-own"]) {
-			await expect(routes.host(spaceId)).rejects.toBeInstanceOf(
-				HostUnreachableError,
-			);
+			await expect(
+				routes.onHost(spaceId, async (c) => c),
+			).rejects.toBeInstanceOf(HostUnreachableError);
 		}
+	});
+
+	test("a call for a person gets the Host's errors in this computer's words", async () => {
+		const refused = (error: unknown) =>
+			routes.onHost("space-team", async () => {
+				throw error;
+			});
+		// The Host no longer knows the key: pair again, never "sign in".
+		await expect(
+			refused(new ORPCError("UNAUTHORIZED", { message: "Pair it again." })),
+		).rejects.toMatchObject({ kind: "conflict", message: NOT_PAIRED });
+		const lost = new TypeError("The network connection was lost.");
+		await expect(refused(lost)).rejects.toBe(lost);
 	});
 });
 
@@ -536,6 +552,58 @@ describe("the relay of a paired Device", () => {
 			await expect(
 				offline.devices({ spaceId: a.spaceId, projectId }),
 			).rejects.toBeInstanceOf(HostUnreachableError);
+		} finally {
+			await Promise.all([a.cleanup(), b.cleanup()]);
+		}
+	});
+
+	test("passes the Host's refusals on with their kind, and a removed key as a refusal to pair again", async () => {
+		const [a, b] = await Promise.all([createSandbox(), createSandbox()]);
+		try {
+			const paired = await pairedReplicas(a, b);
+			const { id: projectId } = await paired.host
+				.space(a.spaceId)
+				.addProject({ repoPath: a.repoPath });
+			let key: typeof paired.key | null = paired.key;
+			const relay = createRelay({
+				engine: () => paired.device,
+				registry: () => paired.device.devices,
+				links: () =>
+					fakeLinks({ [paired.hostId]: paired.memory.client(() => key) }),
+			});
+			const unknownRun = {
+				kind: "signal.send" as const,
+				payload: { name: "go" },
+				spaceId: a.spaceId,
+				runId: "run-unknown",
+				walkerId: a.deviceId,
+				personId: paired.personId,
+			};
+
+			// A refusal of the Host is a BAD_REQUEST on the wire, with its kind.
+			const notFound = await relay.command(unknownRun).then(
+				() => null,
+				(error: unknown) => error,
+			);
+			expect(notFound).toBeInstanceOf(Refusal);
+			expect(notFound).toMatchObject({ kind: "not-found" });
+
+			// The Host removed B's access: B's person is not sent to sign in.
+			key = null;
+			for (const act of [
+				() => relay.command(unknownRun),
+				() => relay.devices({ spaceId: a.spaceId, projectId }),
+			]) {
+				const refused = await act().then(
+					() => null,
+					(error: unknown) => error,
+				);
+				expect(refused).toBeInstanceOf(Refusal);
+				expect(refused).toMatchObject({
+					kind: "conflict",
+					message: NOT_PAIRED,
+				});
+			}
 		} finally {
 			await Promise.all([a.cleanup(), b.cleanup()]);
 		}

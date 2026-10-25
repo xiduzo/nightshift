@@ -3,6 +3,7 @@ import type { HostClient } from "../contract";
 import {
 	type DeviceKeyStore,
 	type DeviceLinks,
+	fromHost,
 	type HostLinks,
 	type HostSpaces,
 	joinHost,
@@ -27,13 +28,22 @@ export function createDevices(deps: {
 	fingerprint: string | null;
 }): Devices {
 	const { host } = deps;
-	/** One call on a Host this computer joined. Its link is not running: unreachable. */
-	function onHost<T>(
+	/**
+	 * One call for a person on a Host this computer joined. Its link is not
+	 * running: unreachable. The Host's errors come back in this computer's
+	 * words (`fromHost`).
+	 */
+	async function onHost<T>(
 		hostId: string,
 		use: (client: HostClient) => Promise<T>,
 	): Promise<T> {
 		const link = deps.links.get(hostId);
-		return link ? link.call(use) : Promise.reject(new HostUnreachableError());
+		if (!link) throw new HostUnreachableError();
+		try {
+			return await link.call(use);
+		} catch (error) {
+			throw fromHost(error);
+		}
 	}
 	return {
 		async overview({ personId, owner }): Promise<DevicesOverview> {

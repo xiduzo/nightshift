@@ -212,6 +212,7 @@ function readable(error: unknown, path: readonly string[]): unknown {
 	if (error instanceof Refusal) {
 		return new ORPCError("BAD_REQUEST", {
 			message: error.message,
+			data: { kind: error.kind },
 			cause: error,
 		});
 	}

@@ -12,6 +12,7 @@ export {
 	type HostProcedureMeta,
 	hostContract,
 	NOT_A_HOST,
+	refusalDataSchema,
 } from "./host-contract";
 export {
 	type HostHello,

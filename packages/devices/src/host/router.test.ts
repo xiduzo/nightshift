@@ -39,12 +39,14 @@ async function errorOf(thrown: Error): Promise<ORPCError<string, unknown>> {
 }
 
 describe("the Host's errors on the wire", () => {
-	test("a refusal is a BAD_REQUEST with its words, whatever its kind", async () => {
+	test("a refusal is a BAD_REQUEST with its words, whatever its kind, and its kind beside them", async () => {
 		for (const kind of ["forbidden", "not-found", "conflict"] as const) {
 			const error = await errorOf(new Refusal(kind, "Words for people."));
+			// An older Device reads the code and the words, a Device of this version the kind too.
 			expect(error).toMatchObject({
 				code: "BAD_REQUEST",
 				message: "Words for people.",
+				data: { kind },
 			});
 		}
 	});

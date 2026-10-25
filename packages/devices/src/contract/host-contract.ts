@@ -5,6 +5,7 @@ import {
 	type TranscriptEntry,
 } from "@nightshift/engine";
 import { labelSchema } from "@nightshift/flows";
+import type { RefusalKind } from "@nightshift/refusal";
 import { type ContractRouterClient, oc } from "@orpc/contract";
 import { z } from "zod";
 import { archiveRefSchema, copyStampSchema } from "./archive";
@@ -52,17 +53,35 @@ export const NOT_A_HOST =
 	"This computer does not accept devices. Turn on Be a Host on its Devices page.";
 
 /**
+ * The kind of a refusal a Host sends as a BAD_REQUEST (`Refusal.kind`).
+ * An older Device reads only the code and the words, and ignores it. An
+ * older Host sends none: the Device reads its refusal as `invalid`.
+ */
+export const refusalDataSchema = exact<{ kind: RefusalKind }>()(
+	z.object({
+		kind: z.enum([
+			"invalid",
+			"signed-out",
+			"forbidden",
+			"not-found",
+			"conflict",
+			"unavailable",
+		]),
+	}),
+);
+
+/**
  * How a Host refuses a call. UNAUTHORIZED: the Device has no access here
  * (pair it again). FORBIDDEN: it may not do this. CONFLICT: not yet, try
- * again later. BAD_REQUEST: a refusal or a failure written for people.
- * HOST_UNREACHABLE: the Host of a Space this Host does not keep cannot be
- * reached now.
+ * again later. BAD_REQUEST: a refusal written for people, with its kind
+ * (`refusalDataSchema`). HOST_UNREACHABLE: the Host of a Space this Host
+ * does not keep cannot be reached now.
  */
 const procedure = oc.$meta<HostProcedureMeta>({}).errors({
 	UNAUTHORIZED: { status: 401 },
 	FORBIDDEN: { status: 403 },
 	CONFLICT: { status: 409 },
-	BAD_REQUEST: { status: 400 },
+	BAD_REQUEST: { status: 400, data: refusalDataSchema.optional() },
 	HOST_UNREACHABLE: { status: 503 },
 });
 /** A paired Device's link and the exchange of run history. */
