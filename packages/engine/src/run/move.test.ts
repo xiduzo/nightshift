@@ -504,7 +504,7 @@ describe("a run that moves to another Device", () => {
 		);
 		await expect(
 			a.engine.space(a.sandbox.spaceId).moveRun(runId, b.sandbox.deviceId),
-		).rejects.toThrow("Sign in to move a run.");
+		).rejects.toThrow("Sign in to act on this run.");
 		expect(archive.size).toBe(0);
 		await space.stopRun(runId);
 	});

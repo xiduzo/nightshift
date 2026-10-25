@@ -19,6 +19,7 @@ import {
 	type RunStatus,
 } from "../log";
 import { deriveRunState, deriveSteps } from "../read";
+import { RunRefusal, WALKED_ELSEWHERE } from "../run-status";
 import { createRecorders, messageOf } from "./context";
 import { findOverdue } from "./deadlines";
 import { FencedError } from "./fence";
@@ -94,7 +95,10 @@ import {
  * - I8 A Turn waits on no harness and no timer. The one wait is an
  *   answer's: until the Gate's step ended, or no drive holds the run.
  * - I9 A Turn reads the run's row and refuses a run another Device walks
- *   now (a move is a Turn too).
+ *   now (a move is a Turn too), with the one refusal for that rule
+ *   (`walked-elsewhere`). The person's actions ask the same rule before
+ *   they queue (`run/actions.ts`); this read is for a move that came
+ *   between.
  * - I10 One cap queue, first in first out, one entry per run. A freed
  *   slot runs every queued retry once; each retry is a new Turn that
  *   checks again.
@@ -194,18 +198,18 @@ export type Held = {
 };
 
 /** A restart that came after the drive ended the run itself: there is no step left to restart. */
-export class RestartTooLate extends Error {
+export class RestartTooLate extends RunRefusal {
 	constructor(readonly status: RunStatus) {
-		super(`The step ended before it could restart. The run is ${status} now.`);
+		super(
+			"step-ended",
+			`The step ended before it could restart. The run is ${status} now.`,
+		);
 		this.name = "RestartTooLate";
 	}
 }
 
 /** What a released runner says to a Turn: the engine hands its runs to the next one. */
 export const RELEASED = "Night Shift is restarting. Try again in a moment.";
-/** A Turn of a run another Device walks now (I9). */
-export const WALKED_ELSEWHERE_NOW =
-	"Another device runs this run now. Try it on that device.";
 /** How long `release` waits for the Turns in flight. */
 const RELEASE_WAIT_MS = 5_000;
 const DEFAULT_OVERDUE_SWEEP_MS = 5_000;
@@ -886,7 +890,7 @@ export function createRunner(deps: RunnerDeps) {
 		if (row.walkerId !== (await log.walkerId())) {
 			// The sweep and startup recovery look at runs; they refuse nothing.
 			if (intent.kind === "overdue") return UNCHANGED;
-			throw new Error(WALKED_ELSEWHERE_NOW);
+			throw new RunRefusal("walked-elsewhere", WALKED_ELSEWHERE);
 		}
 		const events = await log.events(runId);
 		options.check?.(events);
@@ -964,7 +968,7 @@ export function createRunner(deps: RunnerDeps) {
 		return inTurn(runId, async () => {
 			const row = await getRunRow(db, runId);
 			if (row.walkerId !== (await log.walkerId())) {
-				throw new Error(WALKED_ELSEWHERE_NOW);
+				throw new RunRefusal("walked-elsewhere", WALKED_ELSEWHERE);
 			}
 			return fn({
 				row,

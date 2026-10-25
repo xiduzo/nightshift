@@ -24,25 +24,16 @@ import {
 	type RunSummary,
 } from "../read";
 import type { ScheduleFiles } from "../schedules";
-import { resolveGate } from "./gate";
-import { moveRun } from "./move";
-import type { Recovery } from "./recovery";
+import type { RunActions } from "./actions";
 import type { RunRelay } from "./relay";
-import { stopRun } from "./stop";
-import { signalRun } from "./wake";
-
-/** What the run actions need (`stop.ts`, `move.ts`, `gate.ts`, `wake.ts`): one object for all four. */
-export type RunActionDeps = Parameters<typeof stopRun>[0] &
-	Parameters<typeof moveRun>[0] &
-	Parameters<typeof resolveGate>[0] &
-	Parameters<typeof signalRun>[0];
 
 /**
  * What a person does in one Space (`SpaceEngine`). Every method reads and
  * touches that Space's rows only: a project or run of another Space is
  * "not found", the same answer as one that does not exist. Each method
  * waits for the engine to be ready, then hands over to the module that
- * owns the action.
+ * owns the action: the run actions to `actions.ts`, which reads the run's
+ * row itself.
  */
 export type SpacesDeps = {
 	ready: Promise<unknown>;
@@ -70,8 +61,9 @@ export type SpacesDeps = {
 	reads: ReadModel;
 	/** The artifacts kept on this computer. */
 	artifacts: Pick<ArtifactStore, "list" | "file">;
-	recovery: Pick<Recovery, "resume" | "restartStep" | "rerunFrom">;
-	relay: RunRelay;
+	/** Stop, answer, signal, move, resume, restart and run again (`actions.ts`). */
+	actions: RunActions;
+	relay: Pick<RunRelay, "startOnHost">;
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
 	hostOf(spaceId: string): Promise<string | null>;
 	startRun(input: StartRunInput, trigger: RunTrigger): Promise<RunSummary>;
@@ -80,12 +72,10 @@ export type SpacesDeps = {
 		spaceId: string,
 		actor: Actor | undefined,
 	): Promise<<T extends WithPaths>(summary: T) => Promise<T>>;
-	/** What the run actions that write a run-level fact, or travel to the Walker, need. */
-	actions: RunActionDeps;
 };
 
 export function createSpaces(deps: SpacesDeps) {
-	const { ready, log, projects, documents, reads, recovery, actions } = deps;
+	const { ready, log, projects, documents, reads, actions } = deps;
 
 	/** The run's row when it is in the Space, else "not found". */
 	async function getRunRow(runId: string, spaceId: string): Promise<RunRow> {
@@ -287,30 +277,29 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async stopRun(runId, stopOptions) {
 				await ready;
-				const row = await getRunRow(runId, spaceId);
-				await stopRun(actions, row, actor, stopOptions);
+				await actions.act(spaceId, actor, runId, {
+					kind: "stop",
+					...(stopOptions?.when ? { when: stopOptions.when } : {}),
+				});
 			},
 
 			async moveRun(runId, to) {
 				await ready;
-				const row = await getRunRow(runId, spaceId);
-				await moveRun(actions, row, actor, to);
+				await actions.act(spaceId, actor, runId, { kind: "move", to });
 			},
 
 			async resumeRun(runId, prompt) {
 				await ready;
-				await getRunRow(runId, spaceId);
-				await recovery.resume(runId, {
-					by: "person",
+				await actions.act(spaceId, actor, runId, {
+					kind: "resume",
 					...(prompt !== undefined ? { prompt } : {}),
 				});
 			},
 
 			async restartStep(runId, options) {
 				await ready;
-				await getRunRow(runId, spaceId);
-				await recovery.restartStep(runId, {
-					by: "person",
+				await actions.act(spaceId, actor, runId, {
+					kind: "restart",
 					...(options?.prompt !== undefined ? { prompt: options.prompt } : {}),
 					...(options?.stepId !== undefined ? { stepId: options.stepId } : {}),
 				});
@@ -318,9 +307,8 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async rerunFrom(runId, options) {
 				await ready;
-				await getRunRow(runId, spaceId);
-				await recovery.rerunFrom(runId, {
-					by: "person",
+				await actions.act(spaceId, actor, runId, {
+					kind: "rerun",
 					nodeId: options.nodeId,
 					...(options.stepId !== undefined ? { stepId: options.stepId } : {}),
 					...(options.prompt !== undefined ? { prompt: options.prompt } : {}),
@@ -345,16 +333,19 @@ export function createSpaces(deps: SpacesDeps) {
 				return deps.scheduleFiles.save(row, spaceId, actor, schedules);
 			},
 
-			async resolveGate(input) {
+			async resolveGate({ runId, stepId, choice, note }) {
 				await ready;
-				const row = await getRunRow(input.runId, spaceId);
-				await resolveGate(actions, row, actor, input);
+				await actions.act(spaceId, actor, runId, {
+					kind: "answer",
+					stepId,
+					choice,
+					...(note !== undefined ? { note } : {}),
+				});
 			},
 
 			async signalRun(runId, name) {
 				await ready;
-				const row = await getRunRow(runId, spaceId);
-				await signalRun(actions, row, actor, name);
+				await actions.act(spaceId, actor, runId, { kind: "signal", name });
 			},
 
 			watchRun(runId, { signal: watching, afterSeq }) {

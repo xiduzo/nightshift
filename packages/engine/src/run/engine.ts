@@ -39,11 +39,12 @@ import {
 	createScheduler,
 	DEFAULT_SCHEDULE_TICK_MS,
 } from "../schedules";
-import { takeOver } from "./move";
+import { createRunActions } from "./actions";
 import { createRecovery } from "./recovery";
 import { createRunRelay } from "./relay";
 import { createRunStart } from "./run-start";
-import { createSpaces, type RunActionDeps } from "./space";
+import { createSpaces } from "./space";
+import { takeOver } from "./take-over";
 import { wakeOfflineSleeps } from "./wake";
 
 /**
@@ -55,15 +56,15 @@ import { wakeOfflineSleeps } from "./wake";
  *
  * - `run-start.ts`: `startRun` validates, checks what this daemon has,
  *   writes `RunStarted` and hands the thread to the runner.
- * - `recovery.ts`: startup recovery, the daemon's automatic resume,
- *   `resumeRun`, `restartStep` and `rerunFrom` (each appends `RunResumed`
- *   before the thread moves).
+ * - `recovery.ts`: startup recovery and the daemon's automatic resume.
  * - `space.ts`: what a person does in one Space (`SpaceEngine`).
- * - `stop.ts`, `move.ts`, `gate.ts`, `wake.ts`: the actions that write one
- *   run-level fact each, over one `actions` object. On a run another Device walks they write
- *   nothing: the Walker is the only writer of its run's events, so the
- *   action travels to it as a command (`relay.ts`), and the Walker
- *   applies it. Every other action on such a run is refused.
+ * - `actions.ts`: the run actions (stop, answer a Gate, send a Signal,
+ *   move, resume, restart a step, run again). One entry reads the run's
+ *   row once, refuses by the run's one rule (`run-status/`), and takes the
+ *   action here as a Turn of the runner, or hands it to the run's Walker
+ *   as a command (`relay.ts`): the Walker is the only writer of its run's
+ *   events. `take-over.ts` is the other end of a move. `wake.ts` wakes
+ *   the runs that slept for a Device that is back.
  * - `read/read-model.ts`: the summaries, `getRun`, `listGates`, `watchRun`.
  * - `flows/`: the flow files of a project. `schedules/`: the scheduler and
  *   the schedules file.
@@ -182,7 +183,8 @@ export function createEngine(
 		stepStamp: async ({ runId, stepId }) =>
 			copyStampOf(await runLog.events(runId), stepId),
 		project: (projectId, spaceId) => projects.find(projectId, spaceId),
-		takeOver: (runId) => takeOver(actions, runId),
+		takeOver: (runId) =>
+			takeOver({ db, log: runLog, runner, archive: peers.runs, walks }, runId),
 		stopRun: async (runId) => {
 			await runner.take(runId, { kind: "stop" });
 		},
@@ -341,8 +343,7 @@ export function createEngine(
 		listRuns: reads.listRuns,
 	});
 
-	/** What the run actions (`stop.ts`, `move.ts`, `gate.ts`, `wake.ts`) and a take-over need. */
-	const actions: RunActionDeps & Parameters<typeof takeOver>[0] = {
+	const actions = createRunActions({
 		db,
 		log: runLog,
 		bus,
@@ -350,10 +351,11 @@ export function createEngine(
 		relay,
 		archive: peers.runs,
 		walks,
-		pendingCommands: peers.runs.pendingCommands,
 		device,
+		runRow: (runId) => getRunRow(db, runId),
+		flowOf: parseRunFlow,
 		placement,
-	};
+	});
 
 	/** What runs left on this computer: the overview, its two actions, and the scheduled cleanup. */
 	const runCopies = createRunCopies({
@@ -406,12 +408,11 @@ export function createEngine(
 		}),
 		reads,
 		artifacts: createArtifactStore(dataDir),
-		recovery,
+		actions,
 		relay,
 		hostOf,
 		startRun: startRunWith,
 		pathsFor: peers.pathsFor,
-		actions,
 	});
 
 	return {
@@ -424,7 +425,7 @@ export function createEngine(
 		onRunEvents: (listener) => onLandedRunEvents(db, runLog, listener),
 		async deviceBack(_deviceId) {
 			await ready;
-			await wakeOfflineSleeps(actions);
+			await wakeOfflineSleeps({ db, log: runLog, runner });
 		},
 		async dispose() {
 			lifetime.abort();

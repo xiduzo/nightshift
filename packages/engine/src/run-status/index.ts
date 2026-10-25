@@ -1,0 +1,18 @@
+/**
+ * A run's status and the actions it allows: one rule for the engine, which
+ * refuses by it, and for every screen, which offers only what it allows.
+ * It imports nothing, so it runs in a browser, in React Native and in Bun:
+ * `@nightshift/client` passes it on to the apps (`@nightshift/engine/run-status`).
+ */
+
+export {
+	type RefusalRule,
+	type RunAction,
+	type RunActions,
+	RunRefusal,
+	refuseUnless,
+	runActions,
+	WALKED_ELSEWHERE,
+	whyNot,
+} from "./actions";
+export type { RunStatus } from "./status";

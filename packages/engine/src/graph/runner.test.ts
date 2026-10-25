@@ -6,6 +6,7 @@ import { defaultRunSettings } from "../device-config/settings";
 import { getRunRow } from "../log/run-row";
 import { deriveOpenGate, deriveRunState } from "../read/derive-run";
 import { deriveSteps } from "../read/derive-steps";
+import { WALKED_ELSEWHERE } from "../run-status";
 import {
 	agent,
 	command,
@@ -21,12 +22,7 @@ import {
 	scriptedHarness,
 	waitFor,
 } from "../testing/test-support";
-import {
-	RELEASED,
-	type Runner,
-	type RunnerDeps,
-	WALKED_ELSEWHERE_NOW,
-} from "./runner";
+import { RELEASED, type Runner, type RunnerDeps } from "./runner";
 import { openThread } from "./thread";
 
 /**
@@ -173,10 +169,10 @@ describe("take: one Turn at a time per run", () => {
 			.set({ walkerId: "another-device" })
 			.where(eq(run.id, h.runId));
 		await expect(runner.take(h.runId, { kind: "stop" })).rejects.toThrow(
-			WALKED_ELSEWHERE_NOW,
+			WALKED_ELSEWHERE,
 		);
 		await expect(runner.hold(h.runId, async () => {})).rejects.toThrow(
-			WALKED_ELSEWHERE_NOW,
+			WALKED_ELSEWHERE,
 		);
 		expect(await runner.take(h.runId, { kind: "overdue", graceMs: 0 })).toEqual(
 			{ kind: "unchanged" },

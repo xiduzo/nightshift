@@ -220,6 +220,12 @@ export interface SpaceEngine {
 	 * worktree, starts walking at the start node, and returns at once.
 	 */
 	startRun(input: StartRunInput): Promise<RunSummary>;
+
+	// The run actions (`run/actions.ts`). Each one refuses what the run does
+	// not allow now (`run-status/`, the rule the screens read too) with a
+	// `RunRefusal`. On a run another Device walks, a stop, an answer, a
+	// signal and a move travel to its Walker; the rest are refused.
+
 	/**
 	 * `now` (default): aborts the running step, closes an open Gate or ends a
 	 * sleep, and ends the run as `stopped`. `after-step`: lets the running
@@ -233,7 +239,8 @@ export interface SpaceEngine {
 	): Promise<void>;
 	/**
 	 * Continues a stopped, failed or interrupted run at its last step's node
-	 * (inside a Call with `each`, at the same item). A sleeping run wakes at once.
+	 * (inside a Call with `each`, at the same item). A finished run reopens
+	 * its last step. A sleeping run wakes at once.
 	 * An Agent node with a harness session continues that session with the
 	 * prompt (default "Continue where you left off."). Any other node runs
 	 * again. Edge counts carry over. Fails while the run is running.

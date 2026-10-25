@@ -16,6 +16,7 @@ import type {
 } from "@nightshift/flows";
 import { sql } from "drizzle-orm";
 
+import type { RunStatus } from "../run-status";
 import { upgradePayload } from "./upgrade-payload";
 
 /**
@@ -567,15 +568,8 @@ export function groupByRun(
 	return grouped;
 }
 
-/** Derived from the event log, never stored. */
-export type RunStatus =
-	| "running" // a step is in progress, or the walk is between steps
-	| "waiting" // a Gate waits for a person in the Needs-you inbox
-	| "sleeping" // a usage limit or a network failure: a timer continues the same session
-	| "finished" // the walk reached `pass`, a Decision label or a Gate choice with no edge left to take
-	| "stopped" // a person stopped the run
-	| "failed" // a step errored, a `fail`/`needs-input` had no edge, or a loop hit its max
-	| "interrupted"; // the daemon died while a step ran
+/** Derived from the event log, never stored (`run-status/`). */
+export type { RunStatus };
 
 /**
  * How one visit of a node ended: one of the node's outcomes (`pass`, a

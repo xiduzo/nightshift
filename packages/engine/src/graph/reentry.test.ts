@@ -477,7 +477,7 @@ describe("planReentry: a resume", () => {
 		).toBe("restart");
 	});
 
-	test("a run that runs, waits or sleeps is refused", () => {
+	test("a run that runs or waits is refused, by the run's own rule; a sleeping one is the runner's to wake", () => {
 		const running = logOf(runStarted(), started("s1", "a", 1));
 		expect(() => plan(running, threadAt(PENDING))).toThrow(
 			"This run is still running. Stop it or wait for it to end.",
@@ -505,7 +505,7 @@ describe("planReentry: a resume", () => {
 			},
 		});
 		expect(() => plan(sleeping, threadAt(PENDING))).toThrow(
-			"This run sleeps until a wait ends. Resume it again to wake it now.",
+			"A sleeping run wakes. It does not re-enter.",
 		);
 	});
 });

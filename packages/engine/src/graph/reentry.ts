@@ -15,6 +15,7 @@ import {
 	deriveTraversals,
 	deriveVariables,
 } from "../read";
+import { RunRefusal, refuseUnless } from "../run-status";
 import { DEFAULT_RESUME_PROMPT } from "./context";
 import { sessionOf } from "./resume-point";
 import {
@@ -167,10 +168,10 @@ export function rerunNodeRefusal(flow: Flow, nodeId: string): string | null {
 }
 
 /**
- * Pure: what a re-entry records and how the thread moves. Throws an Error
- * with a person-readable message when the run refuses the request: it
- * runs, waits or sleeps; a rerun node is not a top-level node of the
- * flow; a rerun step is not a step of that node.
+ * Pure: what a re-entry records and how the thread moves. Throws a
+ * `RunRefusal` when the run refuses the request: it runs, waits or sleeps
+ * (the run's own rule, `run-status/`); a rerun node is not a top-level node
+ * of the flow; a rerun step is not a step of that node.
  *
  * A resume continues where the thread is (design rule 9):
  *
@@ -208,9 +209,9 @@ export function planReentry(input: {
 		: undefined;
 	if (request.kind === "rerun") {
 		const refusal = rerunNodeRefusal(flow, request.nodeId);
-		if (refusal) throw new Error(refusal);
+		if (refusal) throw new RunRefusal("unknown-node", refusal);
 	}
-	refuseLive(deriveRunState(events).status);
+	refuseLive(request.kind, deriveRunState(events).status);
 	if (request.kind === "rerun") {
 		return planRerun(flow, events, thread, request, clearStopAt, cleared);
 	}
@@ -299,7 +300,8 @@ function planRerun(
 		request.stepId !== undefined &&
 		(last?.nodeId !== nodeId || last.scope !== null)
 	) {
-		throw new Error(
+		throw new RunRefusal(
+			"unknown-step",
 			`That step is not a step of "${nodeId}" in the run's own flow.`,
 		);
 	}
@@ -332,21 +334,14 @@ function planRerun(
 	};
 }
 
-/** Throws for a run that is still going: it must stop first. */
-function refuseLive(status: RunStatus): void {
-	if (status === "running") {
-		throw new Error(
-			"This run is still running. Stop it or wait for it to end.",
-		);
-	}
-	if (status === "waiting") {
-		throw new Error(
-			"This run waits at a Gate. Answer the Gate, or stop the run first.",
-		);
-	}
+/**
+ * Throws for a run that is still going: it must stop first. The refusal
+ * is the run's own rule (`run-status/`). A resume of a sleeping run is a
+ * wake, which the runner takes before it gets here.
+ */
+function refuseLive(kind: ReentryRequest["kind"], status: RunStatus): void {
+	refuseUnless(kind, status, true);
 	if (status === "sleeping") {
-		throw new Error(
-			"This run sleeps until a wait ends. Resume it again to wake it now.",
-		);
+		throw new Error("A sleeping run wakes. It does not re-enter.");
 	}
 }

@@ -30,8 +30,8 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import { GateClosedError } from "./actions";
 import { createEngine, type EngineInternals } from "./engine";
-import { GateClosedError } from "./gate";
 
 /**
  * Spaces: every row carries its Space, and a Space's view of the engine

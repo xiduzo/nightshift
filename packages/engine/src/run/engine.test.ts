@@ -40,8 +40,8 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import { GateClosedError } from "./actions";
 import { createEngine, type EngineInternals } from "./engine";
-import { GateClosedError } from "./gate";
 
 let sandbox: Sandbox;
 /** The run log of each engine the test made, oldest first: checked against the database after it. */
@@ -1387,14 +1387,16 @@ describe("restart a step", () => {
 			.update(run)
 			.set({ walkerId: "another-device" })
 			.where(eq(run.id, walked.id));
-		await expect(engine.restartStep(walked.id)).rejects.toThrow(
-			"Another device runs this run. Restart the step on that device.",
-		);
-		await expect(
-			engine.rerunFrom(walked.id, { nodeId: "worker" }),
-		).rejects.toThrow(
-			"Another device runs this run. Run it again on that device.",
-		);
+		// One rule, one refusal: only the Walker resumes, restarts or reruns.
+		for (const act of [
+			() => engine.resumeRun(walked.id),
+			() => engine.restartStep(walked.id),
+			() => engine.rerunFrom(walked.id, { nodeId: "worker" }),
+		]) {
+			await expect(act()).rejects.toThrow(
+				"Another device runs this run. Try again on that device.",
+			);
+		}
 		expect(await loggedTypes()).toEqual(before);
 	});
 });

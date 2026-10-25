@@ -3,6 +3,7 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
+		"./run-status": "./src/run-status/index.ts",
 		"./testing": "./src/testing/index.ts"
 	},
 	"scripts": {

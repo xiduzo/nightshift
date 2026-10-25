@@ -2,6 +2,7 @@ import type { Database } from "@nightshift/db";
 import type { Actor, Relay, RunCommandInput, StartRunInput } from "../contract";
 import { hasRunRow, type RunLog, type RunRow } from "../log";
 import type { RunSummary } from "../read";
+import { RunRefusal } from "../run-status";
 
 /** What a person reads when the Host that keeps a Space cannot be reached. */
 export const HOST_UNREACHABLE =
@@ -30,7 +31,7 @@ const RUN_ARRIVES_MS = 30_000;
  */
 export function createRunRelay(deps: {
 	db: Database;
-	log: Pick<RunLog, "walkerId" | "events">;
+	log: Pick<RunLog, "events">;
 	relay?: Relay;
 	now(): number;
 	/** The runs of a project in the Space, as the run list shows them. */
@@ -39,11 +40,6 @@ export function createRunRelay(deps: {
 	const { db, log, relay } = deps;
 
 	return {
-		/** Whether another Device walks the run. */
-		async walkedElsewhere(row: RunRow): Promise<boolean> {
-			return row.walkerId !== (await log.walkerId());
-		},
-
 		/** Hands an action on a run walked elsewhere to its Walker, in the actor's name. */
 		async send(
 			row: RunRow,
@@ -51,11 +47,14 @@ export function createRunRelay(deps: {
 			command: RunCommandInput,
 		): Promise<void> {
 			if (!relay) {
-				throw new Error(
+				throw new RunRefusal(
+					"walker-unreachable",
 					"Another device runs this run, and this computer cannot reach it.",
 				);
 			}
-			if (!actor) throw new Error("Sign in to act on a run of another device.");
+			if (!actor) {
+				throw new RunRefusal("signed-out", "Sign in to act on this run.");
+			}
 			await relay.command({
 				...command,
 				spaceId: row.spaceId,
