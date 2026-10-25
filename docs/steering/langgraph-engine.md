@@ -104,17 +104,21 @@ packages/engine/src/
                            point to route(); beginStep/OpenStep is the lower
                            seam for the loop-shaped nodes (Call, Call with
                            `each`, the Gate).
+  graph/run-position.ts    The run position (below): where a run is, as
+                           the checkpoint and the log agree. commitVisit
+                           (the one writer of visits), positionOf (the held
+                           step, a loop mid-way, the uncommitted step, a
+                           step that is done, the next visit), the front of
+                           the walk, the re-entry seeds, a stale hold.
   graph/resume-point.ts    The one resume point (below): resumePoint()
                            decides how a node re-enters (new, continue,
-                           reopen) from the checkpoint and the log, per
-                           kind rules (RESUME_RULES); uncommittedStep,
-                           rerunEntryOf, latestStepOf, sessionOf.
+                           reopen, done) from the run position, per kind
+                           rules (RESUME_RULES); rerunEntryOf, sessionOf.
   graph/reentry.ts         The re-entry planner (below), the daemon side of
                            the same question: planReentry() says what
                            RunResumed records and how the thread moves for a
                            resume, a restart or a rerun, pure; with
-                           resumeTarget, reenteredNode, reentryUpdate and
-                           loggedVisits.
+                           resumeTarget and reentryUpdate.
   graph/sleep.ts           The sleep module (below): sleep() plans a wait
                            (the policy's, or a Wait node's own) and persists
                            it; waitNode(nodeId) is the one wait node;
@@ -191,8 +195,8 @@ packages/engine/src/
                            overdue sweep; it appends RunResumed (from
                            planReentry) and WaitEnded (recordWake) before a
                            drive, ends open work through closeOpenWork,
-                           reacts to how a drive ended, and prunes a
-                           finished run's thread to its latest checkpoint.
+                           reacts to how a drive ended, and prunes an ended
+                           run's thread to what a re-entry reads.
   testing/graph.ts         The one set of graph test helpers: node builders
                            (agent(), command(), edge(), flowOf()), startRun()
                            for a run row with its log and its Thread (opened
@@ -327,11 +331,17 @@ packages/engine/src/
    `interrupt()` until it gets a choice). `RunResumed` is appended by the
    engine before any of these.
 10. **Finish.** When the root stream ends with `state.ended.status ===
-    "finished"`, the runner appends `RunEnded finished` with the reason
-    the old walk used (`Ended at node "x" with "y".` for a non-`pass`
-    chosen end), then prunes the thread to its latest checkpoint
-    (`saver.pruneThread`: the older root checkpoints and the body
-    namespaces go). The history was the walk's bookkeeping and the event
+    "finished"`, the runner prunes the thread to its latest checkpoint
+    (`Thread.prune`: the older root checkpoints and the body namespaces
+    go), then appends `RunEnded finished` with the reason the old walk
+    used (`Ended at node "x" with "y".` for a non-`pass` chosen end). The
+    prune comes first, so a person who resumes once the log says the run
+    ended finds no drive holding it. Since 2026-10-25 every end prunes: a failed or stopped run (by
+    its drive, a stop or a step past its time) keeps its latest root
+    checkpoint and the namespaces of the tasks that checkpoint still has,
+    so a body that parked, waits or was cut short inside a Call goes on
+    in its own namespace. An interrupted run (the daemon died) prunes when
+    its next drive ends. The history was the walk's bookkeeping and the event
     log is the record; the final state is what `resumeRun` of a finished
     run re-enters on: `Command({ goto, update: { ended: null, pending:
     null } })` with the last step's visit taken back, so its node reopens
@@ -485,17 +495,138 @@ Decisions taken while implementing, from the code and its comments:
   returns once the log has the step's `StepEnded`, so the run no longer
   waits when the caller looks again. A full run cap leaves the Gate open.
 
+## The run position (`graph/run-position.ts`)
+
+One rule keeps the checkpoint and the event log in agreement. The
+checkpoint counts the visits of each node it committed (`visits`). The log
+counts every step the node started. When the log counts one more, the
+node's latest step did not commit: a step that runs, a Gate that is open,
+the step of a daemon that died, or a step a re-entry left uncommitted on
+purpose. Before 2026-10-25 that rule was written in `route.ts`, `sleep.ts`
+and `call-each.ts`, seeded in `reentry.ts` and read in `resume-point.ts`.
+Now one module owns it, behind a small interface:
+
+- `commitVisit(node, visit)`: the one writer of `visits`. A node commits
+  when its step ended, when its step sleeps, and after each element of a
+  Call with `each`. A Gate does not commit while it is open.
+- `positionOf(state, events, scope)`: where the run is in one scope, for
+  one node at a time. `held` (what a wait, a park or a Gate holds),
+  `looping`, `latest`, `uncommitted`, `done`, `cursorBehind` and
+  `nextVisit` (the visit a new step gets).
+- `frontOf`, `latestFront`, `reenteredNode`: the front of the walk in the
+  log, its last step and whether the walk moved on from it.
+- `loggedVisits`, `takeBackVisit`: the visits a re-entry seeds, so that
+  exactly the step it means is left uncommitted.
+- `holdEnded`: a held wait or Gate whose step a stop ended in the log.
+
+The log is at most one super-step ahead of the checkpoint. A crash test at
+every write of one flow (`graph/crash.test.ts`: the daemon dies, or a person
+stops the run, just before each log append, row and checkpoint write)
+found four places where the two did not agree. Each is now a rule of the
+run position:
+
+1. **A step that ended before its commit is done.** The daemon died, a
+   stop fenced the drive off or the engine failed between `StepEnded` and
+   the commit. The node re-ran it: an Agent reopened its session, a
+   Command ran again, a Gate asked again. Now `Position.done` finds a step
+   the checkpoint holds open or never committed that ended on its own (not
+   `stopped`, `error` or `interrupted`), and the node goes on from its
+   logged end (`routeDone`): the same update, and the `EdgeTaken` the log
+   has, taken in the state only. The one exception is the last step of a
+   run that finished: a resume reopens it on purpose (rule 10).
+2. **A task whose writes are saved keeps the thread pending.** LangGraph's
+   `next` leaves out a task whose writes are saved before its super-step
+   was checkpointed. The planner read that thread as ended and jumped, and
+   LangGraph refused two writes to `pending` in one step. `ThreadState`
+   now says `pending`, and `invoke(null)` applies the writes and goes on.
+3. **A loop's cursor catches up.** An element of a Call with `each` ended
+   and the commit after it never landed. The re-run started the next
+   element in the same task, so in the namespace of the body that had
+   ended, which returned at once. Now the node commits the cursor first
+   (`cursorBehind`), and the next element gets a super-step of its own.
+4. **A stale hold lets go.** A stop ended an open Gate or a sleep after the
+   node held it and before the hold was checkpointed. The resume went on
+   into the ask or wait node, which waited for an answer that no one could
+   give. Now an interrupting node with no answer waiting lets a stale hold
+   go (`interruptNode`'s `stale`): the Gate asks again in a new visit, a
+   sleep parks as stopped.
+
+The checkpoint is still the walk's and the log still the read model (ADR
+"The walk reads the checkpoint; the event log is the read model"). The run
+position is the one place where the two are compared.
+`graph/run-position.test.ts` holds the rule as tables.
+
+## Fan-out and join (a plan, not built)
+
+Night Shift has no parallel branches yet: the four reviews of the ZAC
+feature factory run one after another. This is the plan to add them,
+against the run position.
+
+**The shape.** A Fan-out is one node kind. Its branches run at the same
+time; its end is the join. Each branch is a body, as a Call's is: a called
+flow (or a Section) in its own scope `{ parentStepId, itemId: <branch> }`.
+The join waits for every branch and ends on a join rule (every branch
+passed, any passed, the first that ended), with each branch's outputs in
+the node's outputs. The branch ends are facts in the log, as items are for
+a Call with `each`.
+
+**In LangGraph.** The fan-out node sends one task per branch (`Send` to a
+branch node), and a join node runs in the super-step after them. Each
+branch task has its own task id, so its body has its own checkpoint
+namespace (`<node>:<task id>`). Two bodies called from one task would share
+one namespace, so the branches cannot be concurrent calls inside one node.
+A branch that parks or waits interrupts its own task. LangGraph keeps the
+writes of the branch tasks that ended, and a resume runs only the
+interrupted ones.
+
+**What the run position learns: the branch is a key.**
+
+1. Inside a branch, the body has its own state, so `visits`, `pending`,
+   `loops` and the front work per scope as today.
+2. At the root, the branch tasks write in one super-step. `pending` is one
+   slot (a last-value channel), and two writes to it in one step throw.
+   Branch tasks write no root `pending`; the fan-out keeps its work per
+   branch in a channel keyed by branch, with a merging reducer. The
+   fan-out commits its own visit once, at the join.
+3. `latestFront` (one last step over every scope) becomes one front per
+   branch, and `reenteredNode` and `resumeTarget` with it. `RunResumed`
+   names one step today; a run with two parked branches needs one target
+   per branch.
+4. `ThreadState.interrupted` holds one interrupt; the root can have one per
+   branch. `driveGraph` collects every root interrupt already. A resume
+   answers one interrupt by its id (`Command({ resume: { [id]: value } })`).
+5. The Turn. A branch's Gate can open while another branch runs, and the
+   super-step ends only when every branch task ended or interrupted. One
+   drive per run (runner invariant I4) means an answer waits until then.
+   Open question for the product: say "Your answer is saved. The run goes
+   on when the other branches finish", or let a branch drive alone.
+6. Status, stop and recovery. A run with a Gate open in one branch and a
+   step running in another is running, with the Gate in the inbox.
+   `closeOpenWork` ends every open step from the inside out already; a
+   parked Gate stays open on recovery, per branch.
+
+**The order to build it.** The run position keyed per branch; the thread
+state with one interrupt per branch; the Turn for an answer during a
+super-step; then the node kind, with a fan-out in the crash test's flow.
+
 ## The resume point (`graph/resume-point.ts`)
 
 One module answers one question for every node: how does the node
 re-enter after a park, a wake, a resume or a daemon death? It is a deep
 module behind a small interface. `resumePoint(node, state, events, scope,
-rules)` returns `{ kind: "new" }`, `{ kind: "continue", step }` or
-`{ kind: "reopen", step, prompt }`. `entryOf(point)` turns that into the
-`StepStart` for `beginStep`. The module appends nothing: it decides, and
-`beginStep` writes the log as before (rule 3).
+rules)` returns `{ kind: "new" }`, `{ kind: "continue", step }`,
+`{ kind: "reopen", step, prompt }` or `{ kind: "done", step }`.
+`entryOf(point)` turns a point other than `done` into the `StepStart` for
+`beginStep`; a step that is done begins nothing, and the node routes on it
+(`routeDone`). The module appends nothing: it decides, and `beginStep`
+writes the log as before (rule 3). Where the node is comes from the run
+position.
 
 The rule, in this order:
+
+0. The step the checkpoint holds open or never committed ended on its own
+   after the last commit (`Position.done`): `done`. The same for every
+   kind.
 
 1. `pending` is this node's wait that ended: the step continues while it
    is open in the log, and is reopened when recovery ended it after the
@@ -507,8 +638,8 @@ The rule, in this order:
 3. The node loops over elements (`loops`): its latest step in this scope
    continues (open) or is reopened (ended).
 4. The log has a step of this node in this scope that the checkpoint never
-   saw (`uncommittedStep`, rule 5): taken up when the kind's `crashed`
-   rule says so, else a new visit.
+   saw (`Position.uncommitted`, rule 5): taken up when the kind's
+   `crashed` rule says so, else a new visit.
 5. Else a new visit.
 
 The prompt and the harness session are set only for a step with a harness
@@ -550,10 +681,12 @@ and drives the entry. A thread that cannot move ends the run `failed`
 that no drive holds.
 
 The planner reads the node side's helpers: `resumeTarget` (the node, and
-the Agent step whose harness session the resume continues, `sessionOf`),
+the Agent step whose harness session the resume continues, `sessionOf`;
+none for a step that is done) and `reentryUpdate` (the seed state of a
+thread with no checkpoint). Where the run is comes from the run position:
 `reenteredNode` (the last top-level step the walk did not move on from),
-`reentryUpdate` (the seed state of a thread with no checkpoint) and
-`loggedVisits` (a rerun's visits). Because one call gives both the
+`takeBackVisit` (a finished run's last visit) and `loggedVisits` (a
+rerun's visits). Because one call gives both the
 payload and the entry, the engine promises in `RunResumed` what the node
 finds when it re-enters. `graph/reentry.test.ts` holds the plans as a
 table, and its promise rows apply each plan and ask the resume point
@@ -594,7 +727,10 @@ The `StepHandle` a body gets is what a body reads and records: `stepId`,
 `visit`, `existing`, `events`, `tctx`, `signal`, `record()`, `touch()` and
 `session()`. `session()` records a harness session: the `agent_session`
 row, `SessionStarted`, `HarnessSessionAssigned`, `SessionEnded`. No node
-module writes a database row.
+module writes a database row. A row and the event that names it are one
+write of the drive (`StepContext.write`, `graph/fence.ts`): a stop lands
+before both or after both, so it never leaves a `step` or `agent_session`
+row without its event.
 
 The node modules keep their body only: `runSession` (Agent), `runShell`
 (Command), `callTool` (Tool), `decide` (Decision by a model), `make`
