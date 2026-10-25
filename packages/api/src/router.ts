@@ -10,12 +10,11 @@ import {
 	settings,
 } from "./config";
 import { dashboard } from "./dashboard";
-import { account, devices, link, offers, pairing } from "./devices";
+import { account, devices, hostPeer, offers } from "./devices";
 import { flows } from "./flows";
 import { gates } from "./gates";
 import { notifications } from "./notifications";
 import { output } from "./output";
-import { archive, sync } from "./peer";
 import { publicProcedure } from "./procedures";
 import { projects } from "./projects";
 import { runs } from "./runs";
@@ -29,7 +28,8 @@ import { invitations, members, spaces } from "./spaces";
 // (`runProcedure`). What changes them needs a role that allows it. The
 // Needs-you inbox spans every Space of the Person. This computer's own
 // configuration is its owner's. A paired Device calls with its Device key,
-// not a session.
+// not a session: the peer protocol of `@nightshift/devices`, mounted at
+// its paths.
 
 /**
  * The API: one router from the procedures of each domain. Its keys and
@@ -58,12 +58,13 @@ export const appRouter = {
 	deciders,
 	profiles,
 	offers,
-	devices,
+	// A Person's Devices, and the work relay a paired Device calls.
+	devices: { ...devices, ...hostPeer.devices },
 	account,
-	pairing,
-	link,
-	sync,
-	archive,
+	pairing: hostPeer.pairing,
+	link: hostPeer.link,
+	sync: hostPeer.sync,
+	archive: hostPeer.archive,
 };
 export type AppRouter = typeof appRouter;
 export type AppRouterClient = RouterClient<typeof appRouter>;

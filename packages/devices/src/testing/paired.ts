@@ -1,14 +1,19 @@
-import { type DeviceKeyAccess, spacesOf } from "@nightshift/auth";
+import type { Auth, DeviceKeyAccess } from "@nightshift/auth";
 import { clone, hostLink, member, project, user } from "@nightshift/db/schema";
-import { createSpaceDocuments, type SpaceDocuments } from "@nightshift/engine";
+import {
+	createSettingsStore,
+	createSpaceDocuments,
+	type SpaceDocuments,
+} from "@nightshift/engine";
 import {
 	createRunLog,
 	type Sandbox,
 	type TestEngineOptions,
 } from "@nightshift/engine/testing";
 import { eq } from "drizzle-orm";
-import type { HostClient, HostHello } from "../contract";
+import type { HostClient } from "../contract";
 import { createHostExchange, type HostExchange } from "../exchange";
+import { createHost } from "../host";
 import type { DeviceLinks, Link } from "../links";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { createRelay } from "../relay";
@@ -93,29 +98,33 @@ export async function pairedReplicas(
 		}),
 		{ runLog: createRunLog(a.db, { walkerId: a.deviceId }) },
 	);
+	// A as a Host, with "Be a Host" on: its own answer to a link. It serves
+	// no pairing here, so it needs no Better Auth.
+	const settings = createSettingsStore({
+		document: await a.openDocument(),
+		env: { NIGHTSHIFT_HOST: "on" },
+	});
+	await settings.load();
+	const asHost = createHost({
+		auth: noPairing,
+		db: a.db,
+		registry: host.devices,
+		settings,
+		self: { id: hostId, name: "A" },
+		devicesPage: "https://a.invalid/devices",
+		fingerprint: null,
+		disconnect: () => {},
+	});
 	const hostExchange = createHostExchange({
 		db: a.db,
 		engine: host,
 		registry: host.devices,
 		selfId: a.deviceId,
 		ownerId: personId,
-		isHost: () => true,
+		isHost: asHost.isHost,
 		work: createWorkHub(),
 	});
-
-	async function hello(access: DeviceKeyAccess): Promise<HostHello> {
-		const paired = await host.devices.get(access.deviceId);
-		if (!paired || paired.revokedAt) {
-			throw new Error("This device has no access here. Pair it again.");
-		}
-		await host.devices.seen(access.deviceId);
-		return {
-			host: { id: hostId, name: "A", addresses: [] },
-			deviceId: access.deviceId,
-			personId: access.personId,
-			spaces: await spacesOf(a.db, access.personId),
-		};
-	}
+	const hello = asHost.hello;
 	const memory = inMemoryHost({ exchange: hostExchange, hello });
 
 	async function pair(sandbox: Sandbox, name: string): Promise<PairedDevice> {
@@ -225,6 +234,13 @@ export async function pairedReplicas(
 		pair,
 	};
 }
+
+/** Better Auth for a Host that serves no pairing: any use of it fails. */
+const noPairing = new Proxy({} as Auth, {
+	get() {
+		throw new Error("Pairing is not served in memory.");
+	},
+});
 
 /**
  * Links that are always online, one per Host: what a relay reads. They

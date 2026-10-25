@@ -6,9 +6,9 @@ import { inMemoryHostClient } from "./in-memory-host";
 import { type PairedReplicas, pairedReplicas } from "./paired";
 
 /**
- * The Host in memory answers a Device as the API's router does: the same
- * refusals for a key, the same errors, values that are copies, and a
- * network that can drop.
+ * The Host in memory is the router the API serves (`hostRouter`): the
+ * same refusals for a key, the same input checks and errors. It adds
+ * values that are copies, and a network that can drop.
  */
 
 let a: Sandbox;
@@ -111,7 +111,6 @@ describe("a Host in memory", () => {
 		const error = await errorOf(
 			client.sync.command({
 				runId: "run-none",
-				spaceId: a.spaceId,
 				kind: "signal.send",
 				payload: { name: "go" },
 			}),

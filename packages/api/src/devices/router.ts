@@ -1,34 +1,23 @@
-import {
-	type WorkRequest,
-	workReplySchema,
-	workRequestSchema,
-} from "@nightshift/devices";
-
+import { phoneSchema } from "@nightshift/devices";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { output, stream } from "../output";
-import {
-	deviceProcedure,
-	ownerProcedure,
-	protectedProcedure,
-	readable,
-} from "../procedures";
+import { ownerProcedure, protectedProcedure, readable } from "../procedures";
 import { phonesOf, removePhone } from "./phones";
 import {
 	devicesOverviewSchema,
 	joinProgressSchema,
 	pairingReviewViewSchema,
-	phoneSchema,
 	spaceDeviceViewSchema,
-	workDeliverySchema,
-	workReplyViewSchema,
 } from "./schemas";
 
 /**
  * Devices: this computer's own (its Hosts, "Be a Host"), and on a Host the
  * Person's paired Devices. A Person sees and removes their own Devices
- * only; approving a code binds it to the Person who entered it.
+ * only; approving a code binds it to the Person who entered it. The work
+ * relay that a paired Device calls under `devices` is the Host's router
+ * (`hostPeer`).
  */
 export const devices = {
 	list: protectedProcedure
@@ -134,82 +123,6 @@ export const devices = {
 			}
 			await context.devices.removePhoneAt(hostId, input.id);
 		}),
-	/**
-	 * The relay's work half, as a placed Device calls it on its Host with
-	 * its Device key: the calls of the runs the Host walks on this Device,
-	 * as they come. The Host never dials a Device.
-	 */
-	work: deviceProcedure("relay")
-		.route({
-			summary:
-				"Streams the calls a Host sends to a placed Device, and their cancels.",
-		})
-		.output(stream(workDeliverySchema))
-		.input(
-			z
-				.object({
-					/** The calls the Device still serves: any other it took has ended there. */
-					running: z.array(z.string().min(1).max(64)).max(1_000),
-				})
-				.default({ running: [] }),
-		)
-		.handler(async function* ({ context, input, signal }) {
-			yield* context.exchange.work(context.deviceKey, input, signal);
-		}),
-	/**
-	 * The Walker → Host → Device leg: a Device that walks a run calls
-	 * another of its Person's Devices (or this Host) through here; the
-	 * stream carries the replies, and closing it cancels the call.
-	 */
-	call: deviceProcedure("relay")
-		.route({
-			summary:
-				"Calls another of the Person's Devices through this Host and streams its replies.",
-		})
-		.output(stream(workReplyViewSchema))
-		.input(
-			z.object({
-				deviceId: z.string().min(1).max(64),
-				request: workRequestSchema,
-			}),
-		)
-		.handler(async function* ({ context, input, signal }) {
-			yield* context.exchange.call(
-				context.deviceKey,
-				{
-					deviceId: input.deviceId,
-					request: input.request as unknown as WorkRequest,
-				},
-				signal,
-			);
-		}),
-	/** Whether one of the key's Person's Devices (or this Host) takes work now. */
-	reachable: deviceProcedure("relay")
-		.route({
-			summary:
-				"Says whether one of the Person's Devices, or this Host, takes work now.",
-		})
-		.output(output(z.boolean()))
-		.input(z.object({ deviceId: z.string().min(1).max(64) }))
-		.handler(({ context, input }) =>
-			context.exchange.reachable(context.deviceKey, input.deviceId),
-		),
-	/** The placed Device's answers to a call it took. */
-	workReply: deviceProcedure("relay")
-		.route({
-			summary: "Takes the answers of a placed Device to a call it took.",
-		})
-		.output(output(z.object({ known: z.boolean() })))
-		.input(
-			z.object({
-				id: z.string().min(1).max(64),
-				replies: z.array(workReplySchema).max(1_000),
-				done: z.boolean(),
-			}),
-		)
-		.handler(({ context, input }) =>
-			context.exchange.workReply(context.deviceKey, input),
-		),
 	/**
 	 * Pairs this computer with a Host (`nightshift join`): yields the code to
 	 * approve there, then the Host once it is approved.

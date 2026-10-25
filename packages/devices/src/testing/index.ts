@@ -1,7 +1,7 @@
 /**
  * Test helpers of `@nightshift/devices`: the engine's test options with
- * the peers' own (`withPeers`), a Host in memory behind `HostClient`
- * (`inMemoryHost`), a Host with a few procedures for one test
+ * the peers' own (`withPeers`), the Host's own router in memory behind
+ * `HostClient` (`inMemoryHost`), a Host with a few procedures for one test
  * (`partialHostClient`), and a Host with its paired Device in one process
  * (`pairedReplicas`).
  */

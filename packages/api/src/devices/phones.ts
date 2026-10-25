@@ -1,4 +1,4 @@
-import type { PhoneView } from "@nightshift/devices";
+import type { HostPhones, PhoneView } from "@nightshift/devices";
 import type { Notifications } from "@nightshift/notifications";
 import { ORPCError } from "@orpc/server";
 
@@ -38,4 +38,12 @@ export async function removePhone(
 		});
 	}
 	await notifications.targets.remove(personId, id);
+}
+
+/** A Person's phones here, as the Host's router reads them for a paired Device's link. */
+export function hostPhones(notifications: Notifications): HostPhones {
+	return {
+		list: (personId) => phonesOf(notifications, personId),
+		remove: (personId, id) => removePhone(notifications, personId, id),
+	};
 }

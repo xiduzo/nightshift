@@ -1,26 +1,11 @@
 import {
 	type DevicesOverview,
-	type HostHello,
 	type JoinProgress,
 	type OfferView,
 	offerCapsSchema,
-	type PairingRedeemed,
 	type PairingReviewView,
-	type PairingStart,
-	type PhoneView,
 	type SpaceDeviceView,
-	type WorkDelivery,
-	type WorkReply,
-	type WorkRequest,
-	workReplySchema,
 } from "@nightshift/devices";
-import {
-	agentHarnessSchema,
-	deciderNameSchema,
-	effortSchema,
-	mcpServerSchema,
-	permissionModeSchema,
-} from "@nightshift/flows";
 
 import { z } from "zod";
 
@@ -28,8 +13,9 @@ import { exact } from "../output";
 import { runStatusSchema } from "../runs";
 
 /**
- * The output schemas of Devices and Hosts: this computer's Devices and
- * Offers, pairing, a paired Device's link and the work relay.
+ * The output schemas of Devices and Hosts, as a Person sees them: this
+ * computer's Devices and Offers, and pairing. A paired Device's link and
+ * the work relay are the Host's contract (`@nightshift/devices`).
  */
 
 const hostRoleSchema = z.enum(["home", "guest"]);
@@ -123,155 +109,6 @@ export const pairingReviewViewSchema = exact<PairingReviewView>()(
 	}),
 );
 
-/** What a run start asks a Device about. */
-const capabilityQuerySchema = z.object({
-	programs: z.array(z.string()).readonly().optional(),
-	profiles: z.array(z.string()).readonly().optional(),
-});
-
-/** A run, as the Device that holds its worktree sees it. */
-const runRefSchema = z.object({
-	id: z.string(),
-	projectId: z.string(),
-	baseRef: z.string().optional(),
-	author: z.object({ name: z.string(), email: z.string() }).optional(),
-});
-
-/** The step report a session asks for: the default outcomes, or its own. */
-const stepReportSchema = z.union([
-	z.boolean(),
-	z.object({
-		outcomes: z
-			.array(z.object({ name: z.string(), description: z.string().optional() }))
-			.optional(),
-		output: z.record(z.string(), z.unknown()).optional(),
-		outcome: z.boolean().optional(),
-	}),
-]);
-
-/** What every session has: where it works, its prompt, the session it continues. */
-const sessionFields = {
-	cwd: z.string(),
-	prompt: z.string(),
-	resumeSessionId: z.string().optional(),
-	stepReport: stepReportSchema.optional(),
-	artifacts: z.object({ runId: z.string(), stepId: z.string() }).optional(),
-};
-
-/** A session the Walker resolved: its harness, model, tools and MCP servers. */
-const sessionInputSchema = z.object({
-	...sessionFields,
-	harness: agentHarnessSchema,
-	model: z.string(),
-	permissionMode: permissionModeSchema,
-	effort: effortSchema.optional(),
-	clis: z.array(z.string()).optional(),
-	connections: z.array(z.string()).optional(),
-	mcpServers: z.record(z.string(), mcpServerSchema).optional(),
-});
-
-/** A session of a profile the Device offers: the Device resolves the profile. */
-const offeredSessionInputSchema = z.object({
-	...sessionFields,
-	offered: z.object({
-		profile: z.string(),
-		permissionMode: permissionModeSchema.optional(),
-	}),
-});
-
-/** A Decision node's question, or a Value node's brief, for a decider. */
-const decideInputSchema = z.union([
-	z.object({
-		decider: deciderNameSchema,
-		prompt: z.string(),
-		labels: z.array(
-			z.object({ name: z.string(), description: z.string().optional() }),
-		),
-		model: z.string().optional(),
-	}),
-	z.object({
-		decider: deciderNameSchema,
-		prompt: z.string(),
-		output: z.record(z.string(), z.unknown()),
-		model: z.string().optional(),
-	}),
-]);
-
-/** One call of the Device port, as plain data: the call without its signal. */
-const workCallSchema = z.discriminatedUnion("kind", [
-	z.object({ kind: z.literal("capabilities"), query: capabilityQuerySchema }),
-	z.object({ kind: z.literal("flows") }),
-	z.object({ kind: z.literal("worktree"), run: runRefSchema }),
-	z.object({ kind: z.literal("files"), cwd: z.string(), glob: z.string() }),
-	z.object({
-		kind: z.literal("itemBranch"),
-		cwd: z.string(),
-		name: z.string(),
-		base: z.string().nullable(),
-		fallback: z.string(),
-	}),
-	z.object({
-		kind: z.literal("handOff"),
-		cwd: z.string(),
-		runBranch: z.string(),
-	}),
-	z.object({
-		kind: z.literal("receiveHandOff"),
-		run: runRefSchema,
-		branch: z.string(),
-		commit: z.string(),
-	}),
-	z.object({
-		kind: z.literal("session"),
-		input: z.union([sessionInputSchema, offeredSessionInputSchema]),
-	}),
-	z.object({
-		kind: z.literal("exec"),
-		input: z.object({
-			command: z.string(),
-			cwd: z.string(),
-			env: z.record(z.string(), z.string()).optional(),
-			/** Secrets by name: the Device reads their values itself. */
-			secrets: z.array(z.string()).optional(),
-		}),
-	}),
-	z.object({
-		kind: z.literal("callTool"),
-		input: z.object({
-			connection: z.string(),
-			tool: z.string(),
-			arguments: z.record(z.string(), z.json()),
-		}),
-	}),
-	z.object({ kind: z.literal("decide"), input: decideInputSchema }),
-]);
-
-/** A call of a run that the Host walks, as it travels to a Device: who asks, for which run, and the call. */
-const workRequestViewSchema = exact<WorkRequest>()(
-	z.object({
-		spaceId: z.string(),
-		projectId: z.string(),
-		personId: z.string(),
-		runId: z.string().nullable(),
-		call: workCallSchema,
-	}),
-);
-
-/** What a placed Device takes from its Host: a call to serve, or one to cancel. */
-export const workDeliverySchema = exact<WorkDelivery>()(
-	z.discriminatedUnion("kind", [
-		z.object({
-			kind: z.literal("call"),
-			id: z.string(),
-			request: workRequestViewSchema,
-		}),
-		z.object({ kind: z.literal("cancel"), id: z.string() }),
-	]),
-);
-
-/** One answer of a placed Device to a call. */
-export const workReplyViewSchema = exact<WorkReply>()(workReplySchema);
-
 /** How `nightshift join` goes, step by step. */
 export const joinProgressSchema = exact<JoinProgress>()(
 	z.discriminatedUnion("kind", [
@@ -317,56 +154,6 @@ export const accountStatusSchema = z.union([
 	}),
 ]);
 
-/** A pairing code for a joining Device, and where its Person approves it. */
-export const pairingStartSchema = exact<PairingStart>()(
-	z.object({
-		deviceCode: z.string(),
-		userCode: z.string(),
-		verificationUri: z.string(),
-		verificationUriComplete: z.string(),
-		expiresIn: z.number(),
-		interval: z.number(),
-		fingerprint: z.string().nullable(),
-	}),
-);
-
-const hostSchema = z.object({
-	id: z.string(),
-	name: z.string(),
-	addresses: z.array(z.string()),
-});
-
-/** The Host's answer to a joining Device's poll: the Device key once approved. */
-export const pairingRedeemedSchema = exact<PairingRedeemed>()(
-	z.union([
-		z.object({ status: z.enum(["pending", "slow-down", "denied", "expired"]) }),
-		z.object({
-			status: z.literal("joined"),
-			key: z.string(),
-			personId: z.string(),
-			host: hostSchema,
-		}),
-	]),
-);
-
-/** What a paired Device learns from its Host when its link answers. */
-export const hostHelloSchema = exact<HostHello>()(
-	z.object({
-		host: hostSchema,
-		deviceId: z.string(),
-		personId: z.string(),
-		/** The Spaces the Device's owner is a Member of on the Host. */
-		spaces: z.array(
-			z.object({
-				id: z.string(),
-				name: z.string(),
-				personal: z.boolean(),
-				role: z.string(),
-			}),
-		),
-	}),
-);
-
 /** One of this computer's Offers, and the runs it took. */
 const offerViewSchema = exact<OfferView>()(
 	offerCapsSchema.extend({
@@ -394,14 +181,3 @@ export const offerListSchema = z.object({
 	/** The Spaces this computer can offer to. */
 	spaces: z.array(z.object({ id: z.string(), name: z.string() })),
 });
-
-/** A phone signed in to a Host as its Person. */
-export const phoneSchema = exact<PhoneView>()(
-	z.object({
-		id: z.string(),
-		name: z.string(),
-		platform: z.string(),
-		createdAt: z.number(),
-		lastSeenAt: z.number().nullable(),
-	}),
-);

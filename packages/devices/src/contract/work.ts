@@ -7,7 +7,15 @@ import type {
 	SessionInput,
 	ToolCallInput,
 } from "@nightshift/engine";
+import {
+	agentHarnessSchema,
+	deciderNameSchema,
+	effortSchema,
+	mcpServerSchema,
+	permissionModeSchema,
+} from "@nightshift/flows";
 import { z } from "zod";
+import { exact } from "./described";
 
 /**
  * The wire of the work relay: a call of the Device port as plain data
@@ -123,3 +131,153 @@ export type WorkRelay = {
 export type WorkDelivery =
 	| { kind: "call"; id: string; request: WorkRequest }
 	| { kind: "cancel"; id: string };
+
+/** What a run start asks a Device about. */
+const capabilityQuerySchema = z.object({
+	programs: z.array(z.string()).readonly().optional(),
+	profiles: z.array(z.string()).readonly().optional(),
+});
+
+/** A run, as the Device that holds its worktree sees it. */
+const runRefSchema = z.object({
+	id: z.string(),
+	projectId: z.string(),
+	baseRef: z.string().optional(),
+	author: z.object({ name: z.string(), email: z.string() }).optional(),
+});
+
+/** The step report a session asks for: the default outcomes, or its own. */
+const stepReportSchema = z.union([
+	z.boolean(),
+	z.object({
+		outcomes: z
+			.array(z.object({ name: z.string(), description: z.string().optional() }))
+			.optional(),
+		output: z.record(z.string(), z.unknown()).optional(),
+		outcome: z.boolean().optional(),
+	}),
+]);
+
+/** What every session has: where it works, its prompt, the session it continues. */
+const sessionFields = {
+	cwd: z.string(),
+	prompt: z.string(),
+	resumeSessionId: z.string().optional(),
+	stepReport: stepReportSchema.optional(),
+	artifacts: z.object({ runId: z.string(), stepId: z.string() }).optional(),
+};
+
+/** A session the Walker resolved: its harness, model, tools and MCP servers. */
+const sessionInputSchema = z.object({
+	...sessionFields,
+	harness: agentHarnessSchema,
+	model: z.string(),
+	permissionMode: permissionModeSchema,
+	effort: effortSchema.optional(),
+	clis: z.array(z.string()).optional(),
+	connections: z.array(z.string()).optional(),
+	mcpServers: z.record(z.string(), mcpServerSchema).optional(),
+});
+
+/** A session of a profile the Device offers: the Device resolves the profile. */
+const offeredSessionInputSchema = z.object({
+	...sessionFields,
+	offered: z.object({
+		profile: z.string(),
+		permissionMode: permissionModeSchema.optional(),
+	}),
+});
+
+/** A Decision node's question, or a Value node's brief, for a decider. */
+const decideInputSchema = z.union([
+	z.object({
+		decider: deciderNameSchema,
+		prompt: z.string(),
+		labels: z.array(
+			z.object({ name: z.string(), description: z.string().optional() }),
+		),
+		model: z.string().optional(),
+	}),
+	z.object({
+		decider: deciderNameSchema,
+		prompt: z.string(),
+		output: z.record(z.string(), z.unknown()),
+		model: z.string().optional(),
+	}),
+]);
+
+/** One call of the Device port, as plain data: the call without its signal. */
+const workCallSchema = z.discriminatedUnion("kind", [
+	z.object({ kind: z.literal("capabilities"), query: capabilityQuerySchema }),
+	z.object({ kind: z.literal("flows") }),
+	z.object({ kind: z.literal("worktree"), run: runRefSchema }),
+	z.object({ kind: z.literal("files"), cwd: z.string(), glob: z.string() }),
+	z.object({
+		kind: z.literal("itemBranch"),
+		cwd: z.string(),
+		name: z.string(),
+		base: z.string().nullable(),
+		fallback: z.string(),
+	}),
+	z.object({
+		kind: z.literal("handOff"),
+		cwd: z.string(),
+		runBranch: z.string(),
+	}),
+	z.object({
+		kind: z.literal("receiveHandOff"),
+		run: runRefSchema,
+		branch: z.string(),
+		commit: z.string(),
+	}),
+	z.object({
+		kind: z.literal("session"),
+		input: z.union([sessionInputSchema, offeredSessionInputSchema]),
+	}),
+	z.object({
+		kind: z.literal("exec"),
+		input: z.object({
+			command: z.string(),
+			cwd: z.string(),
+			env: z.record(z.string(), z.string()).optional(),
+			/** Secrets by name: the Device reads their values itself. */
+			secrets: z.array(z.string()).optional(),
+		}),
+	}),
+	z.object({
+		kind: z.literal("callTool"),
+		input: z.object({
+			connection: z.string(),
+			tool: z.string(),
+			arguments: z.record(z.string(), z.json()),
+		}),
+	}),
+	z.object({ kind: z.literal("decide"), input: decideInputSchema }),
+]);
+
+/**
+ * A call of a run that the Host walks, as it travels to a Device: who
+ * asks, for which run, and the whole call. It describes the call;
+ * `exact` keeps it equal to `WorkRequest` when the code compiles.
+ */
+const workRequestViewSchema = exact<WorkRequest>()(
+	z.object({
+		spaceId: z.string(),
+		projectId: z.string(),
+		personId: z.string(),
+		runId: z.string().nullable(),
+		call: workCallSchema,
+	}),
+);
+
+/** What a placed Device takes from its Host: a call to serve, or one to cancel. */
+export const workDeliverySchema = exact<WorkDelivery>()(
+	z.discriminatedUnion("kind", [
+		z.object({
+			kind: z.literal("call"),
+			id: z.string(),
+			request: workRequestViewSchema,
+		}),
+		z.object({ kind: z.literal("cancel"), id: z.string() }),
+	]),
+);

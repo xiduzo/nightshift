@@ -1,8 +1,4 @@
-import type {
-	DeviceKeyPermission,
-	HostAccess,
-	Permissions,
-} from "@nightshift/auth";
+import type { HostAccess, Permissions } from "@nightshift/auth";
 import { HostUnreachableError } from "@nightshift/engine";
 import { ORPCError, os } from "@orpc/server";
 
@@ -116,24 +112,3 @@ export const ownerOnly = o.middleware(async ({ context, next }) => {
  * connections, CLI tools): private to the Person who owns it, in any Space.
  */
 export const ownerProcedure = protectedProcedure.use(ownerOnly);
-
-/**
- * A call of a paired Device, with its Device key, for a key that allows
- * `need`. A Device is not a Person: it has no session and no Space here.
- */
-export function deviceProcedure(need: DeviceKeyPermission) {
-	return publicProcedure.use(async ({ context, next }) => {
-		const key = context.deviceKey;
-		if (!key) {
-			throw new ORPCError("UNAUTHORIZED", {
-				message: "This device has no access here. Pair it again.",
-			});
-		}
-		if (!key.permissions[need]?.length) {
-			throw new ORPCError("FORBIDDEN", {
-				message: "This device may not do this here.",
-			});
-		}
-		return next({ context: { deviceKey: key } });
-	});
-}

@@ -4,9 +4,10 @@ import type { HostClient } from "../contract";
 import { pinnedFetch } from "../reach";
 
 /**
- * The procedures of a Host at one address, as a Device calls them: with its
- * Device key once it has one, trusting only the pinned certificate when it
- * pinned one.
+ * The procedures of a Host at one address, as a Device calls them: the
+ * Host's contract over HTTPS, `HostClient`'s production adapter. With its
+ * Device key once it has one, trusting only the pinned certificate when
+ * it pinned one.
  */
 export function hostClient(
 	address: string,

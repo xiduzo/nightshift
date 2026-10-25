@@ -4,43 +4,42 @@
  * this computer as a Host, its Links to the Hosts it paired with, the
  * exchange of run history, Offers, and the work of runs placed on another
  * Device. The API serves it (`Devices`, `HostExchange`, `Offers`) and the
- * daemon wires it (`wireDevices`). The wire schemas of the peer protocol
- * are here too: the API checks each call with them.
+ * daemon wires it (`wireDevices`). The peer protocol is here too: the
+ * Host's procedures as one oRPC contract (`hostContract`), implemented
+ * once (`hostRouter`), which the API mounts at its paths.
  */
 
 export {
 	type ArchiveRef,
-	archiveRefSchema,
-	copyStampSchema,
 	type FollowWant,
-	feedStepSchema,
-	followWantSchema,
 	type HostClient,
 	type HostHello,
+	type HostProcedureMeta,
+	hostContract,
 	type ListedSpace,
 	type OfferCaps,
 	offerCapsSchema,
+	offerRefSchema,
 	type PairingRedeemed,
 	type PairingStart,
 	type PhoneView,
+	phoneSchema,
 	type RunCommand,
 	type RunRows,
-	runRowsSchema,
 	type SyncBatch,
 	type SyncCursors,
-	syncCursorsSchema,
-	transcriptEntrySchema,
 	type WorkDelivery,
 	type WorkReply,
 	type WorkRequest,
-	workReplySchema,
-	workRequestSchema,
 } from "./contract";
 export type { HostExchange } from "./exchange";
-export type {
-	Devices,
-	DevicesOverview,
-	PairingReviewView,
+export {
+	type Devices,
+	type DevicesOverview,
+	type HostPeerContext,
+	type HostPhones,
+	hostRouter,
+	type PairingReviewView,
 } from "./host";
 export type { DeviceLinks, HostRole, JoinProgress } from "./links";
 export {

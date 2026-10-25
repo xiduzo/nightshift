@@ -1,5 +1,5 @@
 import { roleAllows, spacesOf } from "@nightshift/auth";
-import { offerCapsSchema } from "@nightshift/devices";
+import { offerCapsSchema, offerRefSchema } from "@nightshift/devices";
 
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
@@ -7,12 +7,6 @@ import { z } from "zod";
 import { output } from "../output";
 import { ownerProcedure } from "../procedures";
 import { offerListSchema } from "./schemas";
-
-/** One Offer: a profile of a Device, in a Space. */
-export const offerRef = z.object({
-	spaceId: z.string().min(1),
-	profile: z.string().min(1).max(64),
-});
 
 /**
  * This computer's Offers: one of its profiles made available to a Space,
@@ -39,7 +33,7 @@ export const offers = {
 				"Offers one of this computer's profiles to a Space, or changes its caps.",
 		})
 		.output(output(z.void()))
-		.input(offerRef.extend(offerCapsSchema.shape))
+		.input(offerRefSchema.extend(offerCapsSchema.shape))
 		.handler(async ({ context, input }) => {
 			if (!(await context.can({ offer: ["make"] }, input.spaceId))) {
 				throw new ORPCError("FORBIDDEN", {
@@ -52,7 +46,7 @@ export const offers = {
 	withdraw: ownerProcedure
 		.route({ summary: "Withdraws an Offer. Its running steps end as stopped." })
 		.output(output(z.void()))
-		.input(offerRef)
+		.input(offerRefSchema)
 		.handler(({ context, input }) =>
 			context.offers.withdraw(input, context.session.user.id),
 		),

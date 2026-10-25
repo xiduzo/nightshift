@@ -3,8 +3,12 @@ import { roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { Device, Engine } from "@nightshift/engine";
 import { ORPCError } from "@orpc/server";
-import type { ArchiveRef, SyncBatch, SyncCursors } from "../contract";
-import { NOT_A_HOST } from "../host";
+import {
+	type ArchiveRef,
+	NOT_A_HOST,
+	type SyncBatch,
+	type SyncCursors,
+} from "../contract";
 import type { EngineOffers } from "../offers";
 import type { DeviceRegistry } from "../registry";
 import { type OfferDeps, serveChecked, type WorkHub } from "../work";
@@ -20,9 +24,10 @@ import {
 import type { HostExchange } from "./types";
 
 /**
- * This computer as the Host of run history for its paired Devices: the
- * relay's oRPC half (`sync.*`, `archive.*`). Every call names a Device by
- * its key; the Host answers it in the name of the key's Person:
+ * This computer as the Host of run history for its paired Devices: what
+ * the Host's router (`hostRouter`) calls for `sync.*`, `archive.*` and
+ * the work relay. Every call names a Device by its key; the Host answers
+ * it in the name of the key's Person:
  *
  * - It serves only rows of Spaces that Person is a Member of, and never a
  *   Device's own rows back to it. Its own Walker's rows are served the

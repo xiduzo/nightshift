@@ -303,7 +303,7 @@ function hubHost() {
 				link: { hello: async () => hello, heartbeat: async () => hello },
 				devices: {
 					work: async (input, options) =>
-						hub.take(DEVICE.id, options?.signal as AbortSignal, input.running),
+						hub.take(DEVICE.id, options?.signal as AbortSignal, input?.running),
 					workReply: async (input) => ({
 						known: hub.reply(DEVICE.id, input),
 					}),

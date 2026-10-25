@@ -581,79 +581,21 @@ describe("Members", () => {
 	});
 });
 
+/**
+ * A Device key on the API's own procedures. The Host's peer protocol and
+ * its key rules are `@nightshift/devices`' (`hostRouter`), tested there.
+ */
 describe("Device keys on the procedures", () => {
-	/** A Host whose `hello` answers with the key it was given. */
-	const devices = {
-		hello: async (key: { deviceId: string; personId: string }) => ({
-			host: { id: "host", name: "studio", addresses: [] },
-			deviceId: key.deviceId,
-			personId: key.personId,
-		}),
-	} as unknown as Context["devices"];
-
-	async function deviceContext(
-		permissions: Record<string, string[]> | null,
-	): Promise<Context> {
-		const context = await contextFor(null);
-		return {
-			...context,
-			devices,
-			deviceKey: permissions
-				? { keyId: "k", deviceId: "device-b", personId: "ada", permissions }
-				: null,
-		};
-	}
-
-	test("a Device's link needs a key that allows sync", async () => {
-		expect(
-			await errorOf(
-				call(appRouter.link.hello, undefined, {
-					context: await deviceContext(null),
-				}),
-			),
-		).toBe("UNAUTHORIZED");
-		expect(
-			await errorOf(
-				call(appRouter.link.heartbeat, undefined, {
-					context: await deviceContext({ archive: ["put", "get"] }),
-				}),
-			),
-		).toBe("FORBIDDEN");
-		expect(
-			await call(appRouter.link.hello, undefined, {
-				context: await deviceContext({ sync: ["pull", "push"] }),
-			}),
-		).toMatchObject({ deviceId: "device-b", personId: "ada" });
-	});
-
-	test("the peer router passes a refusal of the Host's exchange on, and a plain error as BAD_REQUEST", async () => {
-		let refusal: Error = new ORPCError("FORBIDDEN", {
-			message: "A row of another Walker.",
-		});
-		const context = {
-			...(await deviceContext({ sync: ["pull", "push"] })),
-			exchange: {
-				push: async () => {
-					throw refusal;
-				},
-			},
-		} as unknown as Context;
-		const rows = { runs: [], steps: [], sessions: [], events: [] };
-		expect(
-			await refusalOf(call(appRouter.sync.push, rows, { context })),
-		).toMatchObject({ code: "FORBIDDEN", message: "A row of another Walker." });
-		refusal = new ORPCError("CONFLICT", { message: "Not yet." });
-		expect(await errorOf(call(appRouter.sync.push, rows, { context }))).toBe(
-			"CONFLICT",
-		);
-		refusal = new Error("The disk is full.");
-		expect(
-			await refusalOf(call(appRouter.sync.push, rows, { context })),
-		).toMatchObject({ code: "BAD_REQUEST", message: "The disk is full." });
-	});
-
 	test("a Device key is not a Person: no Space, no runs, no settings", async () => {
-		const context = await deviceContext({ sync: ["pull", "push"] });
+		const context: Context = {
+			...(await contextFor(null)),
+			deviceKey: {
+				keyId: "k",
+				deviceId: "device-b",
+				personId: "ada",
+				permissions: { sync: ["pull", "push"] },
+			},
+		};
 		expect(
 			await errorOf(call(appRouter.runs.list, undefined, { context })),
 		).toBe("UNAUTHORIZED");

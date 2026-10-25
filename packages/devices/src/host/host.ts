@@ -14,7 +14,12 @@ import {
 } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { SettingsStore } from "@nightshift/engine";
-import type { HostHello, PairingRedeemed, PairingStart } from "../contract";
+import {
+	type HostHello,
+	NOT_A_HOST,
+	type PairingRedeemed,
+	type PairingStart,
+} from "../contract";
 import type { DeviceRegistry } from "../registry";
 import type { PairingReviewView } from "./types";
 
@@ -25,9 +30,6 @@ import type { PairingReviewView } from "./types";
  * request. All of it only while "Be a Host" is on.
  */
 export type Host = ReturnType<typeof createHost>;
-
-export const NOT_A_HOST =
-	"This computer does not accept devices. Turn on Be a Host on its Devices page.";
 
 /** A joining Device, as it introduced itself when it asked for a code. */
 type Pending = {

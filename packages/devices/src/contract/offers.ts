@@ -9,3 +9,9 @@ export const offerCapsSchema = z.object({
 	sessionCap: z.number().int().min(1).max(MAX_SESSION_CAP),
 });
 export type OfferCaps = z.infer<typeof offerCapsSchema>;
+
+/** One Offer: a profile of a Device, in a Space. */
+export const offerRefSchema = z.object({
+	spaceId: z.string().min(1),
+	profile: z.string().min(1).max(64),
+});

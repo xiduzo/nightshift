@@ -1,6 +1,12 @@
 import type { FeedStep, RunCommandInput } from "@nightshift/engine";
 import { z } from "zod";
-import type { RunRows, SyncCursors } from "./rows";
+import { exact } from "./described";
+import {
+	type RunRows,
+	runRowsSchema,
+	type SyncCursors,
+	syncCursorsSchema,
+} from "./rows";
 
 /** A command on its way to a Walker. */
 export type RunCommand = RunCommandInput & {
@@ -49,3 +55,55 @@ export type SyncBatch = {
 	 */
 	follows: FollowWant[];
 };
+
+const commandFields = {
+	id: z.string(),
+	spaceId: z.string(),
+	runId: z.string(),
+	walkerId: z.string(),
+	/** Who asked, on the Host. */
+	personId: z.string(),
+	createdAt: z.number(),
+};
+
+/** A person's action on a run another Device walks, on its way to that Walker. */
+const runCommandSchema = exact<RunCommand>()(
+	z.discriminatedUnion("kind", [
+		z.object({
+			kind: z.literal("gate.resolve"),
+			payload: z.object({
+				stepId: z.string(),
+				choice: z.string(),
+				note: z.string().optional(),
+			}),
+			...commandFields,
+		}),
+		z.object({
+			kind: z.literal("signal.send"),
+			payload: z.object({ name: z.string() }),
+			...commandFields,
+		}),
+		z.object({
+			kind: z.literal("run.stop"),
+			payload: z.object({
+				when: z.enum(["now", "after-step", "cancel-after-step"]).optional(),
+			}),
+			...commandFields,
+		}),
+		z.object({
+			kind: z.literal("run.move"),
+			payload: z.object({ to: z.string() }),
+			...commandFields,
+		}),
+	]),
+);
+
+/** One answer of the exchange, as the Host describes it (`SyncBatch`). */
+export const syncBatchSchema = exact<SyncBatch>()(
+	z.object({
+		rows: runRowsSchema,
+		cursors: syncCursorsSchema,
+		commands: z.array(runCommandSchema),
+		follows: z.array(followWantSchema),
+	}),
+);

@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { WorkRequest } from "@nightshift/devices";
-
-import { workDeliverySchema } from "./schemas";
+import { type WorkRequest, workDeliverySchema } from "./work";
 
 /**
  * The output schema of the work relay checks every call it carries, whole.

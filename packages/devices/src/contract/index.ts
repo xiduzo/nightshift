@@ -1,36 +1,30 @@
 /**
- * The peer protocol of `@nightshift/devices`: the wire schemas and types a
- * Device and its Host exchange, the Host's procedures as a Device calls
- * them (`HostClient`), and what this Device asks of its Hosts
- * (`HostRelay`). It imports no other vertical, so every vertical may name
- * these types without a cycle.
+ * The peer protocol of `@nightshift/devices`: the Host's procedures as one
+ * oRPC contract (`hostContract`, its client `HostClient`), the wire schemas
+ * and types a Device and its Host exchange, and what this Device asks of
+ * its Hosts (`HostRelay`). It imports no other vertical, so every vertical
+ * may name these types without a cycle.
  */
 
-export { type ArchiveRef, archiveRefSchema, copyStampSchema } from "./archive";
-export type { HostClient } from "./host-client";
-export type {
-	HostHello,
-	ListedSpace,
-	PairingRedeemed,
-	PairingStart,
-	PhoneView,
+export type { ArchiveRef } from "./archive";
+export {
+	type HostClient,
+	type HostProcedureMeta,
+	hostContract,
+	NOT_A_HOST,
+} from "./host-contract";
+export {
+	type HostHello,
+	type ListedSpace,
+	type PairingRedeemed,
+	type PairingStart,
+	type PhoneView,
+	phoneSchema,
 } from "./links";
-export { type OfferCaps, offerCapsSchema } from "./offers";
+export { type OfferCaps, offerCapsSchema, offerRefSchema } from "./offers";
 export type { HostRelay } from "./relay";
-export {
-	type RunRows,
-	runRowsSchema,
-	type SyncCursors,
-	syncCursorsSchema,
-} from "./rows";
-export {
-	type FollowWant,
-	feedStepSchema,
-	followWantSchema,
-	type RunCommand,
-	type SyncBatch,
-	transcriptEntrySchema,
-} from "./sync";
+export type { RunRows, SyncCursors } from "./rows";
+export type { FollowWant, RunCommand, SyncBatch } from "./sync";
 export {
 	type WorkCall,
 	type WorkDelivery,
@@ -38,6 +32,5 @@ export {
 	type WorkRelay,
 	type WorkReply,
 	type WorkRequest,
-	workReplySchema,
 	workRequestSchema,
 } from "./work";
