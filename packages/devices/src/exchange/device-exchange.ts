@@ -8,8 +8,8 @@ import { isEmpty, MissingProjectError } from "./rows";
 
 /**
  * This Device's half of the exchange of run history with one Host (the
- * Host's half is `HostExchange`). One per Host for the life of the
- * daemon. It runs as two streams of its Link (`attach`), both outbound,
+ * Host's half is `HostExchange`). One per Host and engine. It runs as two
+ * streams of its Link (`attach`), both outbound,
  * both by cursor. The Link starts them when it is online, stops them when
  * it drops, and starts them again after a failure:
  *
@@ -32,11 +32,13 @@ import { isEmpty, MissingProjectError } from "./rows";
  * computer's, and the Person who asked is a Member of its Space with a
  * role that allows the action (the Space document's mirror of the
  * Members). Then it is applied like a local action, and the Host is told.
- * A command is applied once: its result is kept until the Host stops
- * sending it, so a link that drops before the Host heard the result sends
- * the same result again, and does not apply the command twice. The
- * results are kept in memory: a restart between the two can still apply
- * a command twice.
+ * A command is applied once (`AppliedCommands`): it is noted when it
+ * starts, and its result is kept until the Host stops sending it. So a
+ * second stream that takes it meanwhile waits for that result, and a link
+ * that drops before the Host heard the result sends the same result
+ * again. The results are kept in memory, across a `bun --hot` reload but
+ * not a restart: a restart between the two can still apply a command
+ * twice.
  *
  * The Host offline: this computer keeps walking its runs. When the link
  * is back, both loops start at the cursors and catch up.
@@ -46,12 +48,22 @@ export type DeviceExchange = {
 	attach(link: Pick<Link, "stream">): () => void;
 };
 
+/**
+ * The commands this computer applies for one Host, by id: what each
+ * reports (null when it was applied), while the Host still sends it. A
+ * command is in it from the moment it starts. It outlives the exchange:
+ * the next one takes it over (`createDeviceExchange({ applied })`).
+ */
+export type AppliedCommands = Map<string, Promise<string | null>>;
+
 export function createDeviceExchange(deps: {
 	/** This Device's engine (`PeerEngine`), with its half of the exchange. */
 	engine: Engine & { exchange: EngineExchange };
 	hostId: string;
 	/** This computer's Device id: the Walker of its runs. */
 	selfId: string;
+	/** The commands of the exchange before this one, which this one takes over. Default: none. */
+	applied?: AppliedCommands;
 	/** How long a batch waits for its project before the stream starts again. Default 30 s. */
 	projectWaitMs?: number;
 	/** How long the push loop waits for a new row before it looks again. Default 15 s. */
@@ -59,9 +71,20 @@ export function createDeviceExchange(deps: {
 }): DeviceExchange {
 	const { engine, hostId, selfId } = deps;
 	const { rows } = engine.exchange;
+	const applied: AppliedCommands = deps.applied ?? new Map();
 
-	/** The commands applied here, with what each reported, while the Host still sends them. */
-	const applied = new Map<string, string | null>();
+	/** The command's result: applied here once, by whichever stream takes it first. */
+	function applyOnce(command: RunCommand): Promise<string | null> {
+		const known = applied.get(command.id);
+		if (known) return known;
+		const result = apply(command);
+		applied.set(command.id, result);
+		// A failure to read the checks applies nothing: the next stream tries again.
+		result.catch(() => {
+			if (applied.get(command.id) === result) applied.delete(command.id);
+		});
+		return result;
+	}
 
 	/** Sends this computer's rows, a batch at a time, until `signal` aborts. Throws when a batch fails. */
 	async function push(client: HostClient, signal: AbortSignal) {
@@ -150,11 +173,7 @@ export function createDeviceExchange(deps: {
 				}
 				for (const command of batch.commands) {
 					if (reported.has(command.id)) continue;
-					let error = applied.get(command.id);
-					if (error === undefined) {
-						error = await apply(command);
-						applied.set(command.id, error);
-					}
+					const error = await applyOnce(command);
 					await client.sync.commandDone({ id: command.id, error }, { signal });
 					reported.add(command.id);
 				}

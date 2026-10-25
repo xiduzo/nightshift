@@ -25,7 +25,11 @@ import type { Link } from "../links";
 import { httpsLink } from "../links/link";
 import type { PeerEngine } from "../peers";
 import { type PairedReplicas, pairedReplicas } from "../testing";
-import { createDeviceExchange, type DeviceExchange } from "./device-exchange";
+import {
+	type AppliedCommands,
+	createDeviceExchange,
+	type DeviceExchange,
+} from "./device-exchange";
 
 /**
  * The Device's exchange with its Host, in one process: B (the Device)
@@ -511,6 +515,90 @@ describe("the Device's exchange with its Host", () => {
 		});
 		expect(reported).toEqual([null]);
 		await untilStatus(paired.host, run.id, "finished");
+	});
+
+	test("a Command two streams take at once is applied once, and both report its one result", async () => {
+		const run = await walkOnB(gateFlow);
+		// Two exchanges share what B applies, as a reload hands it over. B's
+		// checks wait until both streams hold the Command.
+		const applied: AppliedCommands = new Map();
+		const both = Promise.withResolvers<void>();
+		let holding = 0;
+		let applies = 0;
+		const slow: PeerEngine = {
+			...paired.device,
+			exchange: {
+				...paired.device.exchange,
+				async runOwner(runId) {
+					await Promise.race([both.promise, Bun.sleep(5_000)]);
+					return paired.device.exchange.runOwner(runId);
+				},
+			},
+			space(spaceId, actor) {
+				applies++;
+				return paired.device.space(spaceId, actor);
+			},
+		};
+		const reported: (string | null)[] = [];
+		const client = paired.memory.client(paired.key);
+		const reporting = withSync(client, {
+			stream: (async (input, options) => {
+				const batches = await client.sync.stream(input, options);
+				return (async function* () {
+					for await (const batch of batches) {
+						if (batch.commands.length > 0 && ++holding === 2) both.resolve();
+						yield batch;
+					}
+				})();
+			}) as HostClient["sync"]["stream"],
+			commandDone: async (input, options) => {
+				reported.push(input.error);
+				return client.sync.commandDone(input, options);
+			},
+		});
+		// The second pushes nothing: B's rows reach A once, over the first.
+		const pullOnly = withSync(reporting, {
+			push: (_batch, options) =>
+				new Promise((_, reject) =>
+					options?.signal?.addEventListener("abort", () =>
+						reject(new Error("The stream stopped.")),
+					),
+				),
+		});
+		for (const over of [reporting, pullOnly]) {
+			online(
+				over,
+				createDeviceExchange({
+					engine: slow,
+					hostId: paired.hostId,
+					selfId: b.deviceId,
+					applied,
+					projectWaitMs: 5_000,
+					idleMs: 1_000,
+				}),
+			);
+		}
+		await untilStatus(paired.host, run.id, "waiting");
+		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		await paired.host
+			.space(a.spaceId, { personId: paired.personId })
+			.resolveGate({
+				runId: run.id,
+				stepId: gate?.stepId as string,
+				choice: "approve",
+			});
+		const [command] = await paired.host.exchange.commands.pendingOf(run.id);
+		await untilStatus(paired.device, run.id, "finished");
+		await waitFor(async () => (await commandOnA(command?.id as string)).done, {
+			label: "the Command done on A",
+		});
+		await waitFor(() => reported.length === 2, { label: "both reports" });
+		expect(applies).toBe(1);
+		expect(reported).toEqual([null, null]);
+		expect(await commandOnA(command?.id as string)).toEqual({
+			done: true,
+			error: null,
+		});
 	});
 
 	test("B refuses a Command for a run it does not walk, or from a role that does not allow it; A records why", async () => {
