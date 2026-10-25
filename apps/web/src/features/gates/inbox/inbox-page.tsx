@@ -1,4 +1,4 @@
-import { gateParts, gateRun, waitedText } from "@nightshift/client";
+import { gateParts, gateRun, runActions, waitedText } from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -335,24 +335,27 @@ function SleepingGroup({
 								) : null}
 							</ItemDescription>
 						</ItemContent>
-						<ItemActions>
-							<Tooltip>
-								<TooltipTrigger
-									render={
-										<Button
-											variant="ghost"
-											size="icon-sm"
-											aria-label={`Wake ${run.title} now`}
-											disabled={waking}
-											onClick={() => wake.mutate({ runId: run.id })}
-										/>
-									}
-								>
-									{waking ? <Spinner /> : <SunriseIcon />}
-								</TooltipTrigger>
-								<TooltipContent>Wake now</TooltipContent>
-							</Tooltip>
-						</ItemActions>
+						{/* Only the device that runs it wakes it. */}
+						{runActions(run.status, run.walker.thisDevice).resume ? (
+							<ItemActions>
+								<Tooltip>
+									<TooltipTrigger
+										render={
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												aria-label={`Wake ${run.title} now`}
+												disabled={waking}
+												onClick={() => wake.mutate({ runId: run.id })}
+											/>
+										}
+									>
+										{waking ? <Spinner /> : <SunriseIcon />}
+									</TooltipTrigger>
+									<TooltipContent>Wake now</TooltipContent>
+								</Tooltip>
+							</ItemActions>
+						) : null}
 					</Item>
 				);
 			})}

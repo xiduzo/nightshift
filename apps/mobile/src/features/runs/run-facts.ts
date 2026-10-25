@@ -12,8 +12,8 @@ import {
 } from "@nightshift/client";
 
 /**
- * The run screen without React Native: its Details tiles, what the run
- * made, and which actions it offers.
+ * The run screen without React Native: its Details tiles and what the run
+ * made. Which actions it offers is the engine's rule (`runActions`).
  */
 
 /** One Details tile: "Branch / nightshift/run-42" (mono). */
@@ -155,18 +155,4 @@ export function sizeLabel(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
 	if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/** A run that ended this way can go on at its last step. */
-const RESUMABLE: readonly RunStatus[] = ["stopped", "failed", "interrupted"];
-
-/** What a person can do with a run now: stop it while it is on its way, resume it after it stopped or failed. */
-export function runActionsFor(status: RunStatus): {
-	canStop: boolean;
-	canResume: boolean;
-} {
-	return {
-		canStop: !hasEnded(status),
-		canResume: RESUMABLE.includes(status),
-	};
 }

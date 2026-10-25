@@ -1,3 +1,4 @@
+import { runActions } from "@nightshift/client";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -51,8 +52,6 @@ import { MoveMenu } from "./move-menu";
 import { RunStatusBadge } from "./run-status-badge";
 import { RestartStepDialog } from "./step-actions";
 
-const STOPPABLE: RunStatus[] = ["running", "waiting", "sleeping"];
-
 /**
  * The run on one line: its title, status and stop plans, and how long it ran
  * and what it cost. The rest of its facts sit in `RunDetails`
@@ -69,7 +68,7 @@ export function RunTitle({
 	status: RunStatus;
 	reconnecting: boolean;
 }) {
-	const stoppable = STOPPABLE.includes(status);
+	const stoppable = runActions(status, run.walker.thisDevice).stop;
 	// Counts up while a step runs; otherwise ends at the last step's end.
 	const lastEnd = steps.some((step) => step.endedAt === null)
 		? null
@@ -141,11 +140,11 @@ export function RunActions({
 	steps: StepSummary[];
 }) {
 	const [restarting, setRestarting] = useState(false);
+	const allows = runActions(status, run.walker.thisDevice);
 	// The innermost step that runs: a step inside a called flow starts after its caller.
-	const running =
-		status === "running"
-			? [...steps].reverse().find((step) => step.endedAt === null)
-			: undefined;
+	const running = allows.restart
+		? [...steps].reverse().find((step) => step.endedAt === null)
+		: undefined;
 	const queryClient = useQueryClient();
 	const stopRun = useMutation(
 		runMutations.stop({
@@ -178,7 +177,7 @@ export function RunActions({
 		return (
 			<>
 				<MoveMenu run={run} status={status} />
-				{STOPPABLE.includes(status) ? (
+				{allows.stop ? (
 					<StopMenu
 						key={run.id}
 						status={status}
@@ -241,7 +240,7 @@ export function RunActions({
 				</TooltipContent>
 			</Tooltip>
 			<MoveMenu run={run} status={status} />
-			{STOPPABLE.includes(status) ? (
+			{allows.stop ? (
 				<StopMenu
 					key={run.id}
 					status={status}

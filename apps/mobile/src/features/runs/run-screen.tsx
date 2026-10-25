@@ -11,6 +11,7 @@ import {
 	type OpenGate,
 	type RunDetail,
 	type RunStatus,
+	runActions,
 	type StepSummary,
 	stepName,
 	stepState,
@@ -44,7 +45,6 @@ import { RunActions } from "./run-actions";
 import {
 	itemStateLabel,
 	type RunLink,
-	runActionsFor,
 	runFacts,
 	runLinks,
 	sizeLabel,
@@ -133,7 +133,7 @@ function RunBody({
 	const labels = nodeLabels(run);
 	const current = ended ? null : currentStep(steps);
 	const message = current ? live.entries.get(current.id) : undefined;
-	const { canStop, canResume } = runActionsFor(status);
+	const allows = runActions(status, run.walker.thisDevice);
 	const now = Date.now();
 
 	return (
@@ -171,9 +171,9 @@ function RunBody({
 
 			{gates.length > 0 ? <GateRows gates={gates} now={now} /> : null}
 
-			{canStop || canResume ? (
+			{allows.stop || allows.resume ? (
 				<Card className="gap-4 py-4">
-					<RunActions runId={run.id} status={status} />
+					<RunActions runId={run.id} allows={allows} />
 					<FollowOnLockScreen runId={run.id} ended={ended} />
 				</Card>
 			) : null}

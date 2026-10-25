@@ -1,3 +1,4 @@
+import { runActions } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card } from "@nightshift/ui/components/card";
 import {
@@ -165,6 +166,7 @@ function noticeOf({
 }): Notice | null {
 	// A run of another device: answers, signals and stops go to it; only it resumes.
 	const elsewhere = run.walker.thisDevice ? null : walkerName(run.walker);
+	const allows = runActions(status, run.walker.thisDevice);
 	const resumeHere = elsewhere
 		? `Only ${elsewhere} can resume it.`
 		: "Resume it to continue.";
@@ -270,7 +272,7 @@ function noticeOf({
 						{wait?.message ? `\n${wait.message}` : null}
 					</>
 				),
-				actions: elsewhere ? undefined : <WakeButton runId={run.id} />,
+				actions: allows.resume ? <WakeButton runId={run.id} /> : undefined,
 			};
 		}
 		case "failed":
@@ -280,7 +282,7 @@ function noticeOf({
 				title: "The run failed",
 				gist: firstLine(run.reason) ?? resumeHere,
 				body: run.reason ?? `The run failed. ${resumeHere}`,
-				resumable: !elsewhere,
+				resumable: allows.resume,
 			};
 		case "interrupted":
 			return {
@@ -291,7 +293,7 @@ function noticeOf({
 					firstLine(run.reason) ??
 					"Night Shift stopped while this run was going.",
 				body: `${run.reason ?? "Night Shift stopped while this run was going."} ${elsewhere ? resumeHere : "Resume it to continue where it left off."}`,
-				resumable: !elsewhere,
+				resumable: allows.resume,
 			};
 		case "stopped":
 			return {
@@ -302,7 +304,7 @@ function noticeOf({
 				body:
 					run.reason ??
 					`The run stopped before its end. ${elsewhere ? resumeHere : "Resume it to continue where it left off."}`,
-				resumable: !elsewhere,
+				resumable: allows.resume,
 			};
 		default:
 			return null;

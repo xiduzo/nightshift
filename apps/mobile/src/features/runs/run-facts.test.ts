@@ -1,14 +1,8 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import type { RunDetail, StepSummary } from "@nightshift/client";
+import type { StepSummary } from "@nightshift/client";
 
-import {
-	itemStateLabel,
-	runActionsFor,
-	runFacts,
-	runLinks,
-	sizeLabel,
-} from "./run-facts";
+import { itemStateLabel, runFacts, runLinks, sizeLabel } from "./run-facts";
 
 const MIN = 60_000;
 const NOW = new Date(2026, 9, 23, 10, 0).getTime();
@@ -171,22 +165,5 @@ describe("sizeLabel", () => {
 		expect(sizeLabel(512)).toBe("512 B");
 		expect(sizeLabel(12 * 1024)).toBe("12 KB");
 		expect(sizeLabel(1.4 * 1024 * 1024)).toBe("1.4 MB");
-	});
-});
-
-describe("runActionsFor", () => {
-	test("stop while on its way, resume after a stop or a failure", () => {
-		const cases: [RunDetail["status"], boolean, boolean][] = [
-			["running", true, false],
-			["sleeping", true, false],
-			["waiting", true, false],
-			["stopped", false, true],
-			["failed", false, true],
-			["interrupted", false, true],
-			["finished", false, false],
-		];
-		for (const [status, canStop, canResume] of cases) {
-			expect(runActionsFor(status)).toEqual({ canStop, canResume });
-		}
 	});
 });

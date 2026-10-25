@@ -155,12 +155,14 @@ export {
 	nodeLabels,
 	type PlacementChoice,
 	placementChoices,
+	type RunActions,
 	type RunDetail,
 	type RunGroup,
 	type RunStatus,
 	type RunStreamConnection,
 	type RunSummary,
 	retryDelay,
+	runActions,
 	runStatusLabel,
 	type SessionSummary,
 	type StepOutcome,
@@ -173,6 +175,7 @@ export {
 	type WaitEvent,
 	waitFor,
 	whenLabel,
+	whyNot,
 } from "./runs";
 export {
 	createScheduleMutations,

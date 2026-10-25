@@ -1,7 +1,7 @@
 import {
+	type RunActions as Allowed,
 	createRunMutations,
 	createRunQueries,
-	type RunStatus,
 } from "@nightshift/client";
 import {
 	AlertDialog,
@@ -31,19 +31,18 @@ import { View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
 import { ErrorAlert } from "@/shared/feedback";
-import { runActionsFor } from "./run-facts";
 
 /**
- * Stop a run that is on its way, or resume one that stopped, failed or
- * was interrupted. Each asks first. The content of the run's Card, or
- * nothing when the run can do neither.
+ * Stop a run that is on its way, or resume one that is not, as the run
+ * allows (`runActions`). Each asks first. The content of the run's Card,
+ * or nothing when the run can do neither.
  */
 export function RunActions({
 	runId,
-	status,
+	allows,
 }: {
 	runId: string;
-	status: RunStatus;
+	allows: Pick<Allowed, "stop" | "resume">;
 }) {
 	const runQueries = useHostQueries(createRunQueries);
 	const runMutations = useHostQueries(createRunMutations);
@@ -53,7 +52,7 @@ export function RunActions({
 	const stop = useMutation(runMutations.stop({ onSuccess: refetch }));
 	const resume = useMutation(runMutations.resume({ onSuccess: refetch }));
 
-	const { canStop, canResume } = runActionsFor(status);
+	const { stop: canStop, resume: canResume } = allows;
 	const failure = stop.error
 		? { title: "The run did not stop", message: stop.error.message }
 		: resume.error

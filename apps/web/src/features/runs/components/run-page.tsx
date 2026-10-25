@@ -1,4 +1,4 @@
-import { mergeSteps } from "@nightshift/client";
+import { mergeSteps, runActions } from "@nightshift/client";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Card, CardContent } from "@nightshift/ui/components/card";
@@ -29,7 +29,6 @@ import { Link } from "@tanstack/react-router";
 import { ArrowDownToLineIcon, SearchXIcon, WorkflowIcon } from "lucide-react";
 import { type ComponentProps, useMemo, useRef, useState } from "react";
 import { projectQueries } from "@/features/projects";
-import type { RunStatus } from "@/shared/api";
 import { useMediaQuery } from "@/shared/media-query";
 import { type Crumb, SiteHeader } from "@/shared/page";
 import { useRunStream } from "../hooks/use-run-stream";
@@ -65,13 +64,6 @@ const DESKTOP = "(min-width: 1024px)";
 
 /** The tabs of the run's card. */
 type RunTab = "steps" | "variables" | "artifacts";
-/** A run in one of these runs again from a step. */
-const RERUNNABLE: RunStatus[] = [
-	"failed",
-	"stopped",
-	"interrupted",
-	"finished",
-];
 
 /** The closed console's panel: its bar, and the gaps above and below its card. */
 const CONSOLE_CLOSED_PX = CONSOLE_BAR_PX + 8 + 16;
@@ -180,7 +172,7 @@ export function RunPage({ runId }: { runId: string }) {
 	const variables = variableCount(runData, steps);
 	const artifactList = artifacts.data ?? [];
 	// A run that is not going runs again from a step, on the device that runs it.
-	const rerunnable = runData.walker.thisDevice && RERUNNABLE.includes(status);
+	const rerunnable = runActions(status, runData.walker.thisDevice).rerun;
 	const warnedStepIds = new Set(
 		runData.warnings.flatMap((warning) =>
 			warning.stepId ? [warning.stepId] : [],

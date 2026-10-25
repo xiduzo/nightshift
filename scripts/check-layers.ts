@@ -58,13 +58,14 @@ const LAYERS: Record<string, Rule> = {
 	// 5. Runtime
 	"@nightshift/daemon": { layer: 5, mayImport: "lower" },
 	// Browser- and React-Native-safe client logic for the apps. Biome keeps
-	// it to `@nightshift/api/client` (types), the `@nightshift/flows` root
-	// and `@nightshift/notifications/contract` (only `./contract`, kept so
-	// by biome).
+	// it to `@nightshift/api/client` (types), the `@nightshift/flows` root,
+	// `@nightshift/engine/run-status` and `@nightshift/notifications/contract`
+	// (only those two leaf entries, kept so by biome).
 	"@nightshift/client": {
 		layer: 5,
 		mayImport: [
 			"@nightshift/api",
+			"@nightshift/engine",
 			"@nightshift/flows",
 			"@nightshift/notifications",
 		],

@@ -13,6 +13,7 @@ import ts from "typescript";
 /** The packages the source may import, and whether only `import type` may. */
 const ALLOWED: Record<string, "types" | "values"> = {
 	"@nightshift/api/client": "types",
+	"@nightshift/engine/run-status": "values",
 	"@nightshift/flows": "values",
 	"@nightshift/notifications/contract": "values",
 	"@orpc/client": "values",
@@ -149,6 +150,18 @@ describe("the client package", () => {
 describe("the push contract it reads", () => {
 	test("imports nothing and uses no API of one platform", () => {
 		const dir = join(import.meta.dir, "../../notifications/src/contract");
+		const files = sourceFiles(dir);
+		expect(files.length).toBeGreaterThan(1);
+		const found = files.flatMap((file) =>
+			violations(relative(dir, file), readFileSync(file, "utf8"), {}, false),
+		);
+		expect(found).toEqual([]);
+	});
+});
+
+describe("the run rule it reads", () => {
+	test("imports nothing and uses no API of one platform", () => {
+		const dir = join(import.meta.dir, "../../engine/src/run-status");
 		const files = sourceFiles(dir);
 		expect(files.length).toBeGreaterThan(1);
 		const found = files.flatMap((file) =>

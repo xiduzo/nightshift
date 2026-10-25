@@ -1,5 +1,6 @@
-/** Runs: their query options, the stream of one run, and their view types. */
+/** Runs: their query options, the stream of one run, the actions a run allows, and their view types. */
 
+export { type RunActions, runActions, whyNot } from "./actions";
 export {
 	agoLabel,
 	costLabel,
