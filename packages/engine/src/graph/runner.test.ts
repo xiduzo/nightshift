@@ -249,10 +249,12 @@ describe("take: the run cap", () => {
 			),
 		).toEqual({ kind: "queued" });
 		await runner.take(h.runId, { kind: "stop" });
-		await waitFor(() => runner.isActive(queued));
-		expect(
-			(await h.log.events(queued)).filter((e) => e.type === "RunResumed"),
-		).toHaveLength(1);
+		// The Turn holds the slot before it appends RunResumed (I5).
+		const resumed = async () =>
+			(await h.log.events(queued)).filter((e) => e.type === "RunResumed");
+		await waitFor(async () => (await resumed()).length > 0);
+		expect(await resumed()).toHaveLength(1);
+		expect(runner.isActive(queued)).toBe(true);
 	});
 });
 

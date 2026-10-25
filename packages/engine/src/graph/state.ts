@@ -199,13 +199,15 @@ export const RunState = z.object({
 	 * a step the node started and did not commit yet (a step that runs, a
 	 * Gate that is open, or the step of a daemon that died, design rule 5);
 	 * a node that waits or loops over elements commits its visit while its
-	 * step is still open.
+	 * step is still open. The run position (`run-position.ts`) owns the
+	 * rule: `commitVisit` is the one writer of this channel.
 	 */
 	visits: mergedRecord<number>(),
 	/** How often each edge was taken. */
 	traversals: mergedRecord<number>(),
 	/** The cursors of Call nodes with `each`, by node id; null once the loop ended. */
 	loops: mergedRecord<Loop | null>(),
+	/** One slot per graph: a walk with parallel branches keys it per branch (see `run-position.ts`). */
 	pending: withLangGraph(pendingSchema.nullable(), {
 		default: () => null as Pending | null,
 	}),
