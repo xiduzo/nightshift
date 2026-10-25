@@ -611,8 +611,9 @@ What Night Shift does with it (the `glance` vertical of `apps/mobile`):
   New run screen. iOS: a Live Activity with the flow, the step that runs now,
   "Step 2 of 5", a progress bar and the status. Android: an ongoing
   notification with the same, which a tap opens on the run. The app
-  reads a followed run every 5 seconds while it runs, and ends the
-  activity or notification when the run ends.
+  reads a followed run again each time the Host says it changed (a step
+  starts or ends, the run sleeps, stops or ends: `run-changed`), and ends
+  the activity or notification when the run ends.
 - "Step x of y": x is how many of the flow's nodes have started (a node
   the run came back to counts once), y is how many nodes the flow has.
   Steps of a called flow do not count. A branch the run skips leaves x
