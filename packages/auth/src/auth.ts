@@ -20,7 +20,6 @@ import {
 	HOST_ADMIN,
 	hasHostAdmin,
 	type MemberChange,
-	type Permissions,
 	roles,
 	signUpRefusal,
 } from "./spaces";
@@ -284,22 +283,3 @@ function refuse(message: string): never {
 
 export type Auth = ReturnType<typeof createAuth>;
 export type Session = Auth["$Infer"]["Session"];
-
-/**
- * Whether the session's Person may do `permissions` in the Space: the
- * organization plugin's `hasPermission`, with the request's headers.
- */
-export async function hasPermission(
-	auth: Auth,
-	headers: Headers,
-	spaceId: string,
-	permissions: Permissions,
-): Promise<boolean> {
-	const result = await auth.api
-		.hasPermission({
-			headers,
-			body: { organizationId: spaceId, permissions },
-		})
-		.catch(() => null);
-	return result?.success === true;
-}

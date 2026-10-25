@@ -1,6 +1,7 @@
 import type { Context as ApiContext } from "@nightshift/api/context";
 import {
 	type Auth,
+	authEndpointAccess,
 	type HostPolicy,
 	type LocalSession,
 	requestAccess,
@@ -50,8 +51,20 @@ export type RequestContexts = {
 	 * `hostAccess` says whether the session may use the Host.
 	 */
 	access(context: HonoContext): ReturnType<typeof requestAccess>;
-	/** The oRPC context of a request. */
-	createContext(context: HonoContext): Promise<ApiContext>;
+	/**
+	 * What a call to Better Auth's own endpoints needs: the headers to pass
+	 * on (the local session for this computer) and whether the Host lets
+	 * the session in. Better Auth reads the session itself.
+	 */
+	authAccess(context: HonoContext): ReturnType<typeof authEndpointAccess>;
+	/**
+	 * The oRPC context of a request. `signedOut`: the request needs no
+	 * session (the API reference), so none is read.
+	 */
+	createContext(
+		context: HonoContext,
+		options?: { signedOut?: boolean },
+	): Promise<ApiContext>;
 };
 
 export function requestContexts(services: HttpServices): RequestContexts {
@@ -73,8 +86,17 @@ export function requestContexts(services: HttpServices): RequestContexts {
 
 	return {
 		access,
-		async createContext(context) {
-			const deviceKey = await services.deviceKeyOf(context.req.raw.headers);
+		authAccess: (context) =>
+			authEndpointAccess(
+				auth,
+				context.req.raw.headers,
+				isLocal(context) ? localSession : null,
+				hostPolicy,
+			),
+		async createContext(context, options = {}) {
+			const deviceKey = options.signedOut
+				? null
+				: await services.deviceKeyOf(context.req.raw.headers);
 			const {
 				session,
 				spaceId,
@@ -84,9 +106,10 @@ export function requestContexts(services: HttpServices): RequestContexts {
 				members,
 				headers,
 				hostAccess,
-			} = deviceKey
-				? await requestAccess(auth, db, new Headers(), null)
-				: await access(context);
+			} =
+				deviceKey || options.signedOut
+					? await requestAccess(auth, db, new Headers(), null)
+					: await access(context);
 			return {
 				session,
 				spaceId,
@@ -95,7 +118,7 @@ export function requestContexts(services: HttpServices): RequestContexts {
 				headers,
 				hostAccess,
 				requireTwoFactor: hostPolicy.requireTwoFactor,
-				fromThisComputer: !deviceKey && isLocal(context),
+				fromThisComputer: !deviceKey && !options.signedOut && isLocal(context),
 				setLogin: (personId, input) => setLogin(auth, personId, input),
 				deviceKey,
 				devices: services.devices,

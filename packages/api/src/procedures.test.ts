@@ -249,6 +249,20 @@ describe("procedures", () => {
 		).toBe("FORBIDDEN");
 	});
 
+	test("a permitted call reads the session and the memberships once, and decides in memory", async () => {
+		const { bob, spaceId } = await platform();
+		const statements = sandbox.countStatements();
+		const member = await contextFor(bob.headers);
+		await call(appRouter.runs.start, start, { context: member });
+		expect(calls.at(-1)).toEqual({ space: spaceId, method: "startRun" });
+		// The session and its Person, then the memberships. It was 7.
+		expect(statements()).toBe(3);
+		// The inbox of every Space: the roles come with the Spaces, not 4
+		// statements more per Space.
+		await call(appRouter.gates.list, undefined, { context: member });
+		expect(statements()).toBe(4);
+	});
+
 	test("a session works in its own Space only, never one it is not a member of", async () => {
 		const { spaceId } = await platform();
 		const dee = await sandbox.signUp("Dee");

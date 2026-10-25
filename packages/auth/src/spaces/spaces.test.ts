@@ -2,8 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { device, user } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 import { requestAccess } from "../access";
-import { hasPermission } from "../auth";
-import { roleAllows } from "../index";
+import { type Permissions, roleAllows } from "../index";
 import { createLocalSession } from "../local-session";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
 import { LOCAL_EMAIL, localPerson, personalSpaceId, spacesOf } from "./spaces";
@@ -111,10 +110,11 @@ describe("roles", () => {
 				body: { userId: person.userId, role, organizationId: platform },
 			});
 		}
-		const can = (
-			who: typeof ada,
-			permissions: Parameters<typeof hasPermission>[3],
-		) => hasPermission(sandbox.auth, who.headers, platform, permissions);
+		const can = async (who: typeof ada, permissions: Permissions) =>
+			(await requestAccess(sandbox.auth, sandbox.db, who.headers, null)).can(
+				permissions,
+				platform,
+			);
 
 		expect(await can(bob, { run: ["start"], gate: ["resolve"] })).toBe(true);
 		expect(await can(cy, { run: ["start"] })).toBe(false);

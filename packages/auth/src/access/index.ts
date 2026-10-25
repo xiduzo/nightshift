@@ -8,4 +8,8 @@ export {
 	type SyncDeviceKey,
 	type SyncGrant,
 } from "./document-access";
-export { type RequestAccess, requestAccess } from "./request";
+export {
+	authEndpointAccess,
+	type RequestAccess,
+	requestAccess,
+} from "./request";

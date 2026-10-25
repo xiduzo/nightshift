@@ -2,8 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { user } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 import { requestAccess } from "../access";
-import { hasPermission } from "../auth";
-import type { MemberChange } from "../index";
+import type { MemberChange, Permissions } from "../index";
 import {
 	type AuthSandbox,
 	cookiesOf,
@@ -243,9 +242,9 @@ describe("roles in a Space", () => {
 	test("a viewer cannot invite", async () => {
 		const { bob, platform } = await spaceWith("viewer");
 		expect(
-			await hasPermission(sandbox.auth, bob.headers, platform, {
-				member: ["invite"],
-			}),
+			await (
+				await requestAccess(sandbox.auth, sandbox.db, bob.headers, null)
+			).can({ member: ["invite"] }, platform),
 		).toBe(false);
 		await expect(
 			invite(bob.headers, platform, "dee@example.com"),
@@ -254,8 +253,11 @@ describe("roles in a Space", () => {
 
 	test("an admin invites and changes roles, but cannot delete the Space", async () => {
 		const { bob, platform } = await spaceWith("admin");
-		const can = (permissions: Parameters<typeof hasPermission>[3]) =>
-			hasPermission(sandbox.auth, bob.headers, platform, permissions);
+		const can = async (permissions: Permissions) =>
+			(await requestAccess(sandbox.auth, sandbox.db, bob.headers, null)).can(
+				permissions,
+				platform,
+			);
 		expect(await can({ member: ["invite", "remove", "role"] })).toBe(true);
 		expect(await can({ space: ["delete"] })).toBe(false);
 		await invite(bob.headers, platform, "dee@example.com");

@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { session as sessionTable } from "@nightshift/db/schema";
-import { setRequestCookie } from "better-auth/cookies";
+import { parseCookies, setRequestCookie } from "better-auth/cookies";
 import { makeSignature } from "better-auth/crypto";
 import { and, desc, eq, gt } from "drizzle-orm";
 
@@ -16,6 +16,9 @@ import type { Auth, Session } from "../auth";
  * does (its active Space, the organization plugin's endpoints, permission
  * checks) works the same. Its cookie is only ever added on the server, to
  * the request's headers.
+ *
+ * The session's token and expiry stay in memory: a request reads the
+ * session once, through Better Auth, and never looks the token up first.
  */
 export type LocalSession = {
 	/**
@@ -25,6 +28,12 @@ export type LocalSession = {
 	resolve(
 		headers: Headers,
 	): Promise<{ session: Session | null; headers: Headers }>;
+	/**
+	 * The headers to pass on to Better Auth: the request's own when it
+	 * carries a live session, else with the local session's cookie. Reads
+	 * no session without a cookie of the request's own.
+	 */
+	headers(headers: Headers): Promise<Headers>;
 };
 
 export function createLocalSession(
@@ -32,19 +41,13 @@ export function createLocalSession(
 	db: Database,
 	personId: string,
 ): LocalSession {
-	let token: string | null = null;
+	let current: { token: string; expiresAt: number } | null = null;
 
 	/** An unexpired session of the Person, else a new one. */
 	async function currentToken(): Promise<string> {
-		const context = await auth.$context;
-		if (token) {
-			const found = await context.internalAdapter.findSession(token);
-			if (found && found.session.expiresAt.getTime() > Date.now()) {
-				return token;
-			}
-		}
+		if (current && current.expiresAt > Date.now()) return current.token;
 		const [latest] = await db
-			.select({ token: sessionTable.token })
+			.select({ token: sessionTable.token, expiresAt: sessionTable.expiresAt })
 			.from(sessionTable)
 			.where(
 				and(
@@ -54,10 +57,11 @@ export function createLocalSession(
 			)
 			.orderBy(desc(sessionTable.expiresAt))
 			.limit(1);
-		token =
-			latest?.token ??
-			(await context.internalAdapter.createSession(personId)).token;
-		return token;
+		const found =
+			latest ??
+			(await (await auth.$context).internalAdapter.createSession(personId));
+		current = { token: found.token, expiresAt: found.expiresAt.getTime() };
+		return current.token;
 	}
 
 	async function withLocalCookie(headers: Headers): Promise<Headers> {
@@ -69,15 +73,47 @@ export function createLocalSession(
 		return local;
 	}
 
+	/** Whether the request carries a session cookie of its own. */
+	async function hasOwnCookie(headers: Headers): Promise<boolean> {
+		const cookie = headers.get("cookie");
+		if (!cookie) return false;
+		const name = (await auth.$context).authCookies.sessionToken.name;
+		return parseCookies(cookie).has(name);
+	}
+
+	/** The local Person's session. A session that ended (signed out) gives way to a new one, once. */
+	async function localSession(
+		headers: Headers,
+		retry = true,
+	): Promise<{ session: Session | null; headers: Headers }> {
+		const local = await withLocalCookie(headers);
+		const session = await auth.api.getSession({ headers: local });
+		if (session) {
+			current = {
+				token: session.session.token,
+				expiresAt: session.session.expiresAt.getTime(),
+			};
+			return { session, headers: local };
+		}
+		current = null;
+		return retry
+			? localSession(headers, false)
+			: { session: null, headers: local };
+	}
+
 	return {
 		async resolve(headers) {
-			const own = await auth.api.getSession({ headers });
-			if (own) return { session: own, headers };
-			const local = await withLocalCookie(headers);
-			return {
-				session: await auth.api.getSession({ headers: local }),
-				headers: local,
-			};
+			if (await hasOwnCookie(headers)) {
+				const own = await auth.api.getSession({ headers });
+				if (own) return { session: own, headers };
+			}
+			return localSession(headers);
+		},
+		async headers(headers) {
+			const own =
+				(await hasOwnCookie(headers)) &&
+				(await auth.api.getSession({ headers })) !== null;
+			return own ? headers : withLocalCookie(headers);
 		},
 	};
 }

@@ -1,4 +1,4 @@
-import { spacesOf } from "@nightshift/auth";
+import { roleAllows, spacesOf } from "@nightshift/auth";
 import { GateClosedError, type SpaceEngine } from "@nightshift/engine";
 import type { ORPCErrorConstructorMap } from "@orpc/server";
 import type { z } from "zod";
@@ -7,7 +7,7 @@ import type { Context } from "../context";
 import type { gateAnswerSchema, inboxGateSchema } from "./schemas";
 
 /** The parts of a request the inbox needs: who asks, and this computer's engine and database. */
-type InboxContext = Pick<Context, "db" | "engine" | "can"> & {
+type InboxContext = Pick<Context, "db" | "engine"> & {
 	session: NonNullable<Context["session"]>;
 };
 
@@ -16,17 +16,18 @@ type InboxGate = z.output<typeof inboxGateSchema>;
 /**
  * The open Gates of every Space the Person is a member of on this computer,
  * oldest first, each with its Space's name and whether their role there
- * allows an answer. Each Space's list comes from its own run log.
+ * allows an answer (their role, read with the Spaces). Each Space's list
+ * comes from its own run log.
  */
 export async function inboxOf(context: InboxContext): Promise<InboxGate[]> {
 	const personId = context.session.user.id;
 	const spaces = await spacesOf(context.db, personId);
 	const lists = await Promise.all(
 		spaces.map(async (space) => {
-			const [open, canAnswer] = await Promise.all([
-				context.engine.space(space.id, { personId }).listGates(),
-				context.can({ gate: ["resolve"] }, space.id),
-			]);
+			const open = await context.engine
+				.space(space.id, { personId })
+				.listGates();
+			const canAnswer = roleAllows(space.role, { gate: ["resolve"] });
 			return open.map((gate) => ({
 				...gate,
 				spaceName: space.name,

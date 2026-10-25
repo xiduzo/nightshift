@@ -20,6 +20,15 @@ import { peerAddress } from "./this-computer";
 /** The relay's WebSocket: Yjs documents sync here (see `sync/`). */
 export const SYNC_PATH = "/sync";
 
+/** Where the procedures answer as plain HTTP, with their reference. */
+const API_REFERENCE = "/api-reference";
+
+/** The reference's own page and spec: anyone may read them, without a session. */
+const API_REFERENCE_PAGES = new Set([
+	API_REFERENCE,
+	`${API_REFERENCE}/spec.json`,
+]);
+
 /**
  * What Bun serves: the Hono app (the health check, Better Auth, the run
  * export, run artifacts, the procedures), and the sync WebSocket beside it. Bun upgrades
@@ -39,7 +48,7 @@ export function createHttp(
 	},
 ): DaemonServe {
 	const { auth, db, connections, sync } = services;
-	const { access, createContext } = requestContexts(services);
+	const { access, authAccess, createContext } = requestContexts(services);
 	const app = new Hono();
 
 	// For watchdogs and health checks, before the logger: they ask often. 200
@@ -75,9 +84,10 @@ export function createHttp(
 	// this computer without a session goes in with the local session. A
 	// session the Host refuses (two-factor required, not on) may only set it
 	// up and sign out. The connection's address goes along for the rate
-	// limits: the client's own copy of the header never does.
+	// limits: the client's own copy of the header never does. Better Auth
+	// reads the session itself.
 	app.on(["POST", "GET"], "/api/auth/*", async (c) => {
-		const { headers, hostAccess } = await access(c);
+		const { headers, hostAccess } = await authAccess(c);
 		if (!hostAccess.allowed) {
 			const path = c.req.path.replace(/^\/api\/auth/, "");
 			if (!authEndpointAllowed(hostAccess, path)) {
@@ -175,27 +185,29 @@ export function createHttp(
 		interceptors: [onError(logUnanswered)],
 	});
 
-	app.use("/*", async (c, next) => {
-		const context = await createContext(c);
-
+	// The procedures: only a call to one reads the request's session. The
+	// API reference (its page and its spec) needs none.
+	app.use("/rpc/*", async (c, next) => {
 		const rpcResult = await rpcHandler.handle(c.req.raw, {
 			prefix: "/rpc",
-			context: context,
+			context: await createContext(c),
 		});
-
 		if (rpcResult.matched) {
 			return c.newResponse(rpcResult.response.body, rpcResult.response);
 		}
+		await next();
+	});
 
+	app.use(`${API_REFERENCE}/*`, async (c, next) => {
 		const apiResult = await apiHandler.handle(c.req.raw, {
-			prefix: "/api-reference",
-			context: context,
+			prefix: API_REFERENCE,
+			context: await createContext(c, {
+				signedOut: API_REFERENCE_PAGES.has(c.req.path.replace(/\/+$/, "")),
+			}),
 		});
-
 		if (apiResult.matched) {
 			return c.newResponse(apiResult.response.body, apiResult.response);
 		}
-
 		await next();
 	});
 

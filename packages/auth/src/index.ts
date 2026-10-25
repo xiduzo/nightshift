@@ -2,6 +2,7 @@
 // composition root of the package) and the verticals' barrels.
 
 export {
+	authEndpointAccess,
 	documentAccess,
 	type RequestAccess,
 	requestAccess,

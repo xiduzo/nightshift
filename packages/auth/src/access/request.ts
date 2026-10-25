@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { Refusal } from "@nightshift/refusal";
 
-import { type Auth, hasPermission, type Session } from "../auth";
+import type { Auth, Session } from "../auth";
 import {
 	type HostAccess,
 	type HostPolicy,
@@ -10,10 +10,21 @@ import {
 	OPEN_HOST,
 } from "../host-access";
 import type { LocalSession } from "../local-session";
-import { activeSpaceId, type Permissions, type Role } from "../spaces";
+import {
+	ensurePersonalSpace,
+	type Permissions,
+	type Role,
+	roleAllows,
+	type Space,
+	spacesOf,
+} from "../spaces";
 import { refuse } from "./auth-refusals";
 
-/** Who a request is, in which Space, and what they may do there. */
+/**
+ * Who a request is, in which Space, and what they may do there. It reads
+ * the session and the Person's memberships once, when the request starts,
+ * and answers `can` from the role it has, in memory.
+ */
 export type RequestAccess = {
 	session: Session | null;
 	/** The session's active Space, else the Person's personal Space. Null without a session. */
@@ -27,8 +38,9 @@ export type RequestAccess = {
 	 */
 	hostAccess: HostAccess;
 	/**
-	 * The organization plugin's `hasPermission` for the session in
-	 * `spaceId`, or in another Space of the Person's.
+	 * Whether the Person's role in `spaceId`, or in another Space of the
+	 * Person's, allows `permissions` (`roleAllows`). False without a
+	 * session, or in a Space the Person is not a member of.
 	 */
 	can(permissions: Permissions, inSpace?: string): Promise<boolean>;
 	/**
@@ -73,7 +85,23 @@ export async function requestAccess(
 		? await local.resolve(headers)
 		: { session: await auth.api.getSession({ headers }), headers };
 	const { session } = resolved;
-	const spaceId = session ? await activeSpaceId(db, session.session) : null;
+	const personId = session?.user.id ?? null;
+
+	// The Person's role in each of their Spaces, read once. A change of the
+	// memberships through this request reads them again.
+	let memberships: Promise<Space[]> | null = null;
+	const spaces = () => {
+		memberships ??= personId ? spacesOf(db, personId) : Promise.resolve([]);
+		return memberships;
+	};
+	const changed = <T>(result: T): T => {
+		memberships = null;
+		return result;
+	};
+
+	const spaceId = session
+		? await workingSpace(db, session.session, await spaces())
+		: null;
 	const inSpace = () => {
 		if (!spaceId) {
 			throw new Refusal("signed-out", "Sign in to use Night Shift.");
@@ -88,11 +116,11 @@ export async function requestAccess(
 			session,
 			fromThisComputer: local !== null,
 		}),
-		can: (permissions, inSpace) => {
+		async can(permissions, inSpace) {
 			const space = inSpace ?? spaceId;
-			return space && session
-				? hasPermission(auth, resolved.headers, space, permissions)
-				: Promise.resolve(false);
+			if (!space || !session) return false;
+			const role = (await spaces()).find((s) => s.id === space)?.role;
+			return role !== undefined && roleAllows(role, permissions);
 		},
 		async setActiveSpace(id) {
 			await auth.api
@@ -126,7 +154,8 @@ export async function requestAccess(
 						headers: resolved.headers,
 						body: { memberId, role, organizationId: inSpace() },
 					})
-					.catch(refuse);
+					.catch(refuse)
+					.then(changed);
 			},
 			async remove(memberId) {
 				await auth.api
@@ -134,7 +163,8 @@ export async function requestAccess(
 						headers: resolved.headers,
 						body: { memberIdOrEmail: memberId, organizationId: inSpace() },
 					})
-					.catch(refuse);
+					.catch(refuse)
+					.then(changed);
 			},
 			async accept(invitationId) {
 				const accepted = await auth.api
@@ -142,7 +172,8 @@ export async function requestAccess(
 						headers: resolved.headers,
 						body: { invitationId },
 					})
-					.catch(refuse);
+					.catch(refuse)
+					.then(changed);
 				if (!accepted) throw new Error("Could not accept the invitation.");
 				return { spaceId: accepted.member.organizationId };
 			},
@@ -153,11 +184,56 @@ export async function requestAccess(
 					headers: resolved.headers,
 					body: { name, slug: `${slugOf(name)}-${randomUUID().slice(0, 8)}` },
 				})
-				.catch(refuse);
+				.catch(refuse)
+				.then(changed);
 			if (!created) throw new Error("Could not create the Space.");
 			return { id: created.id };
 		},
 	};
+}
+
+/**
+ * The headers and the Host's decision for a call to Better Auth's own
+ * endpoints, which read the session themselves. It reads the session only
+ * when the decision needs it: a session from another computer, on a Host
+ * that requires two-factor sign-in.
+ */
+export async function authEndpointAccess(
+	auth: Auth,
+	headers: Headers,
+	local: LocalSession | null,
+	policy: HostPolicy = OPEN_HOST,
+): Promise<{ headers: Headers; hostAccess: HostAccess }> {
+	if (local) {
+		return {
+			headers: await local.headers(headers),
+			hostAccess: hostAccess(policy, { session: null, fromThisComputer: true }),
+		};
+	}
+	const session = policy.requireTwoFactor
+		? await auth.api.getSession({ headers })
+		: null;
+	return {
+		headers,
+		hostAccess: hostAccess(policy, { session, fromThisComputer: false }),
+	};
+}
+
+/**
+ * The Space a session works in: its active Space when the Person is still
+ * a member of it, else their personal Space.
+ */
+async function workingSpace(
+	db: Database,
+	session: { userId: string; activeOrganizationId?: string | null },
+	spaces: Space[],
+): Promise<string> {
+	const active = session.activeOrganizationId;
+	if (active && spaces.some((s) => s.id === active)) return active;
+	return (
+		spaces.find((s) => s.personal)?.id ??
+		(await ensurePersonalSpace(db, session.userId))
+	);
 }
 
 /** A slug from a Space's name: lower case letters, digits and dashes. */

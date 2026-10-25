@@ -24,7 +24,7 @@ export const statements = {
 
 export const ac = createAccessControl(statements);
 
-/** A set of actions per statement, as `hasPermission` takes it. */
+/** A set of actions per statement, as `roleAllows` and the organization plugin take it. */
 export type Permissions = {
 	[S in keyof typeof statements]?: (typeof statements)[S][number][];
 };
@@ -68,11 +68,17 @@ export const roles = {
 export type Role = keyof typeof roles;
 
 /**
- * Whether a role allows `permissions`, without a request: for checks that
- * have a Person and a Space but no session headers (the sync socket). An
- * unknown role allows nothing.
+ * Whether a role allows `permissions`: the one check of who may do what in
+ * a Space, for a request (`requestAccess`) and for checks without one (the
+ * sync socket). Like the organization plugin, a member row may hold more
+ * roles, comma separated: one that allows is enough. An unknown role
+ * allows nothing.
  */
 export function roleAllows(role: string, permissions: Permissions): boolean {
-	const known = roles[role as Role] as (typeof roles)[Role] | undefined;
-	return known?.authorize(permissions).success === true;
+	return role.split(",").some((name) => {
+		const known = roles[name.trim() as Role] as
+			| (typeof roles)[Role]
+			| undefined;
+		return known?.authorize(permissions).success === true;
+	});
 }

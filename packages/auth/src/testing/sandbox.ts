@@ -29,6 +29,11 @@ export type AuthSandbox = {
 	signUp(name: string): Promise<{ userId: string; headers: Headers }>;
 	/** Signs in with email and password: the headers of the new session. */
 	signIn(email: string, password?: string): Promise<Headers>;
+	/**
+	 * Counts the statements the database runs from now on: one per
+	 * statement, in a batch too. Returns the count so far.
+	 */
+	countStatements(): () => number;
 	cleanup(): void;
 };
 
@@ -67,6 +72,23 @@ export async function createAuthSandbox(
 			return { userId: user.id, headers: await signIn(email) };
 		},
 		signIn,
+		countStatements: () => countStatements(db),
 		cleanup: () => rmSync(root, { recursive: true, force: true }),
 	};
+}
+
+function countStatements(db: Database): () => number {
+	const client = db.$client;
+	let count = 0;
+	const execute = client.execute.bind(client);
+	const batch = client.batch.bind(client);
+	client.execute = ((...args: Parameters<typeof execute>) => {
+		count += 1;
+		return execute(...args);
+	}) as typeof client.execute;
+	client.batch = ((...args: Parameters<typeof batch>) => {
+		count += args[0].length;
+		return batch(...args);
+	}) as typeof client.batch;
+	return () => count;
 }
