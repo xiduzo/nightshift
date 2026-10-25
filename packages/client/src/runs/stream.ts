@@ -1,3 +1,5 @@
+import { ORPCError } from "@orpc/client";
+
 import type {
 	RunStatus,
 	RunStreamItem,
@@ -5,8 +7,23 @@ import type {
 	TranscriptEntry,
 } from "./types";
 
-/** The state of the stream of one run, for a "Reconnecting" hint. */
-export type RunStreamConnection = "connecting" | "live" | "reconnecting";
+/**
+ * The state of the stream of one run, for a "Reconnecting" hint.
+ * `not-found`: the run is not in one of the person's Spaces. The stream
+ * stopped and does not try again.
+ */
+export type RunStreamConnection =
+	| "connecting"
+	| "live"
+	| "reconnecting"
+	| "not-found";
+
+/** Whether `runs.watch` refused the run as not in one of the person's Spaces: a defined refusal, not a drop. */
+function isRunNotFound(error: unknown): boolean {
+	return (
+		error instanceof ORPCError && error.defined && error.code === "NOT_FOUND"
+	);
+}
 
 /**
  * The one procedure the stream needs: `runs.watch`. The client of
@@ -78,7 +95,8 @@ export const waitFor: Wait = (ms, signal) =>
  * and passes the last seq it saw as `afterSeq`, so it gets only the entries
  * it does not have yet. An entry at or below that seq is dropped, so the
  * caller sees each entry once. With `afterSeq`, the first try asks after
- * that seq too.
+ * that seq too. A run that is not in one of the person's Spaces stops the
+ * stream (`not-found`): a retry would get the same answer.
  */
 export async function followRun({
 	client,
@@ -117,7 +135,11 @@ export async function followRun({
 						break;
 				}
 			}
-		} catch {
+		} catch (error) {
+			if (isRunNotFound(error) && !signal.aborted) {
+				onConnection?.("not-found");
+				return;
+			}
 			// Dropped connection or server error: fall through to the retry.
 		}
 		if (signal.aborted) return;

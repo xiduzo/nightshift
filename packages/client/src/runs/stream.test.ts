@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { ORPCError } from "@orpc/client";
 
 import {
 	followRun,
@@ -157,6 +158,54 @@ describe("the stream of one run", () => {
 			"live",
 			"reconnecting",
 		]);
+	});
+
+	test("stops without a retry when the run is not in one of the person's Spaces", async () => {
+		for (const when of ["call", "stream"] as const) {
+			const controller = new AbortController();
+			let calls = 0;
+			const notFound = new ORPCError("NOT_FOUND", { defined: true });
+			const client: RunWatchClient = {
+				runs: {
+					async watch() {
+						calls += 1;
+						// A second try would loop: the test stops it.
+						if (calls > 1) controller.abort();
+						if (when === "call") throw notFound;
+						return (async function* () {
+							yield status("running");
+							throw notFound;
+						})();
+					},
+				},
+			};
+			const states: RunStreamConnection[] = [];
+			const delays: number[] = [];
+			await followRun({
+				client,
+				runId: "run-1",
+				signal: controller.signal,
+				onEntry: () => {},
+				onStep: () => {},
+				onStatus: () => {},
+				onConnection: (state) => states.push(state),
+				wait: async (ms) => {
+					delays.push(ms);
+				},
+			});
+			expect(calls).toBe(1);
+			expect(delays).toEqual([]);
+			expect(states.at(-1)).toBe("not-found");
+		}
+	});
+
+	test("an error the procedure does not declare is tried again", async () => {
+		const run = await follow([
+			{ items: [], ending: "refuse" },
+			{ items: [entry(1)], ending: "end" },
+		]);
+		expect(run.delays).toEqual([1000, 1000]);
+		expect(run.entries).toEqual([1]);
 	});
 
 	test("stops without a retry when the caller stops it", async () => {
