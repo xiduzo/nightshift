@@ -950,23 +950,48 @@ iroh.
      nothing is updated across Devices. The one column that changes after
      its insert, `agent_session.harness_session_id`, is the Walker's copy
      of its `HarnessSessionAssigned` event: a receiver fills it from that
-     event. A batch carries its events in each Walker's order with the
-     run, step and session rows they name, so parents go in first and the
-     foreign keys hold. The engine owns those rows: it reads and adds
-     them (`packages/engine/src/log/history.ts`), and the exchange calls
-     it (`packages/devices/src/exchange/rows.ts`).
+     event. A batch carries its events in the order they landed on the
+     Replica that serves it (its `seq`: each Walker's in its own order,
+     and a moved run's old Walker before its new one) with the run, step
+     and session rows they name, so parents go in first and the foreign
+     keys hold. A batch lands in one transaction, and what follows from it
+     is read from the log (see "Run-history ingest" below). The engine
+     owns those rows: it reads and adds them
+     (`packages/engine/src/log/history.ts`), and both halves of the
+     exchange call it through one module
+     (`packages/devices/src/exchange/run-history.ts`).
    - **Cursors** (`sync_cursor`): per Host, Space and Walker, the last
      `walker_seq` this Replica has. Finer than "per Host and Walker", so a
      Space the owner joins later is exchanged from its start. For this
      computer's own Walker the row is the push cursor: what the Host took.
-   - **Over the Link** (`packages/devices/src/exchange/client.ts`, run while
-     the link is online): a push loop sends this computer's rows of the
-     Spaces the Host keeps, after the cursor, whenever an event lands; a
-     pull loop reads `sync.stream` (an oRPC event iterator: a batch, then
-     every new one as rows land on the Host or a command waits). The run
-     log ingests what arrives (`RunLog.ingest`, the same bookkeeping as an
-     append) and the bus tells the run's watchers, so a run page of a run
-     walked elsewhere updates live. `sync.pull` is the same batch once.
+   - **Run-history ingest** (`RunHistoryExchange`,
+     `packages/devices/src/exchange/run-history.ts`): the one module the
+     Device's half and the Host's half go through. A batch lands in one
+     transaction (`RunLog.ingest` runs one `db.batch`: the rows, the
+     events, and the columns that follow from them). Everything that
+     follows an ingest is read from the log, so a batch that comes again
+     after a crash repeats it safely: the run's Walker (the `to` of its
+     latest `WalkerMoved`) and a session's harness id, in the same
+     transaction; a run that moved here, taken over until its
+     `WalkerArrived` is in the log; a copy of a step reopened elsewhere,
+     dropped. A Command's id is in the first event it writes, so the log
+     is the dedup across restarts. The wire stays compatible both ways:
+     `sync.commands` and the `commands: false` option of `sync.stream` are
+     new and optional, and the order of a batch needs nothing of the
+     receiver. Tests: `exchange.test.ts` ("a batch and what follows from
+     it": a crash mid-batch, a third Replica, take-overs again and after a
+     restart) and `device-exchange.test.ts` (a Command applied before a
+     restart, Commands while the rows hang, a Host of an older version).
+   - **Over the Link** (`packages/devices/src/exchange/device-exchange.ts`,
+     run while the link is online): a push loop sends this computer's rows
+     of the Spaces the Host keeps, after the cursor, whenever an event
+     lands; a pull loop reads `sync.stream` (an oRPC event iterator: a
+     batch, then every new one as rows land on the Host); a third loop
+     reads `sync.commands`, the Commands for its runs, so they never wait
+     behind rows. The run log ingests what arrives (`RunLog.ingest`, the
+     same bookkeeping as an append) and the bus tells the run's watchers,
+     so a run page of a run walked elsewhere updates live. `sync.pull` is
+     the same batch once.
    - **The Host filters** (`packages/devices/src/exchange/host-exchange.ts`): it
      serves rows of the Spaces the key's Person is a Member of, never the
      Device's own back; it takes only rows whose Walker is the key's
@@ -998,13 +1023,18 @@ iroh.
      sends it to the Host (`sync.command`), which checks the role of the
      key's Person (`gate.resolve`, `signal.send`, `run.stop`) and applies
      it at once when it walks the run itself. The Walker takes its
-     commands with the stream, checks again from its own Replica (the run
-     is its own; the Space document's Member mirror gives the Person a
-     role that allows it), applies it as the local action, and reports
-     it (`sync.commandDone`, with its reason when it refused). It applies
-     a command once: it notes the command when it starts and keeps the
-     result until the Host stops sending it, also across a `bun --hot`
-     reload (`AppliedCommands`), but not across a restart. A command
+     commands on their own stream (`sync.commands`; a Host of an older
+     version sends them with the rows), checks again from its own Replica
+     (the run is its own; the Space document's Member mirror gives the
+     Person a role that allows it), applies it as the local action, and
+     reports it (`sync.commandDone`, with its reason when it refused). It
+     applies a command once: the first event the command writes to its
+     run carries the command's id (`commandId`), so its log says which
+     commands it applied, also after a restart. While one is applied it
+     is noted in memory, also across a `bun --hot` reload
+     (`AppliedCommands`), so a second stream waits for its result. A
+     command for a run that is not walked here yet waits for the rows
+     that move it here, and for the run's take-over. A command
      to an offline Walker waits; the run page, the inbox and the run
      header show it as sent ("Answer sent"). Pending commands are known
      where they wait: on the Host. A Device whose Host is offline refuses
@@ -1278,9 +1308,13 @@ iroh.
      its Walkers. The new Walker takes it over when the event arrives:
      the checkpoint from the archive into its own tables
      (`importWalk` of the engine's walk state), and a sleeping run's timer; a run at a Gate
-     waits there, a stopped one for a resume. A run walked elsewhere moves
-     by a `run.move` command to its Walker. A moved step's transcript is
-     read from the archive.
+     waits there, a stopped one for a resume. It ends the take-over with
+     `WalkerArrived` (from), its first event of the run. Until that is in
+     its log the run still arrives: a take-over that fails (the Host away,
+     the archive without the checkpoint yet) is tried again with a growing
+     wait, and one a restart cut short is done when the next engine is
+     ready. A run walked elsewhere moves by a `run.move` command to its
+     Walker. A moved step's transcript is read from the archive.
    - **Schedules**: `device` in `schedules.json` names the Device that
      fires the schedule; without one, the Replica that keeps the Space
      fires it (its Host, or the one Device of a Space without one), so a
