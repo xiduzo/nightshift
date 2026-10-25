@@ -791,10 +791,17 @@ describe("a run opened by its id", () => {
 		expect(own).not.toBe(spaceId);
 
 		await readFollowStop(context, "platform-run");
+		// "Move to…" lists the Devices as the run's own Space sees them.
+		await call(
+			appRouter.runs.moveTargets,
+			{ runId: "platform-run" },
+			{ context },
+		);
 		expect(calls).toEqual([
 			{ space: spaceId, method: "getRun" },
 			{ space: spaceId, method: "watchRun" },
 			{ space: spaceId, method: "stopRun" },
+			{ space: spaceId, method: "listMoveTargets" },
 		]);
 		// The session still works in its own Space, and lists stay there.
 		expect((await contextFor(bob.headers)).spaceId).toBe(own);

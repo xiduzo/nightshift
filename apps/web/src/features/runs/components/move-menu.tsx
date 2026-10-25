@@ -1,3 +1,4 @@
+import { hasEnded, runActions, whyNot } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	DropdownMenu,
@@ -15,15 +16,6 @@ import { toast } from "sonner";
 import type { RunDetail, RunStatus } from "@/shared/api";
 import { runMutations, runQueries } from "../queries";
 
-/** A run in the middle of a step does not move; one that ended has nothing to move. */
-const MOVABLE: readonly RunStatus[] = [
-	"waiting",
-	"sleeping",
-	"stopped",
-	"failed",
-	"interrupted",
-];
-
 /**
  * "Move to…": another of your devices walks the run from here on. Its
  * steps still run where they are placed. Shown when you have another
@@ -37,14 +29,12 @@ export function MoveMenu({
 	status: RunStatus;
 }) {
 	const queryClient = useQueryClient();
-	const devices = useQuery({
-		...runQueries.devices(run.projectId),
+	// Your own devices that are online, from the run's own Space.
+	const moveTargets = useQuery({
+		...runQueries.moveTargets(run.id),
 		meta: { quietErrors: true },
 	});
-	// Your own devices only: another person's device offers steps, not walks.
-	const targets = (devices.data ?? []).filter(
-		(d) => d.online && d.deviceId !== run.walker.id && d.offers === undefined,
-	);
+	const targets = moveTargets.data ?? [];
 	const move = useMutation(
 		runMutations.move({
 			onSuccess: (_, input) => {
@@ -55,8 +45,10 @@ export function MoveMenu({
 			onError: (error) => toast.error(`Could not move: ${error.message}`),
 		}),
 	);
-	if (targets.length === 0 || status === "finished") return null;
-	const movable = MOVABLE.includes(status);
+	const walkedHere = run.walker.thisDevice;
+	const movable = runActions(status, walkedHere).move;
+	// A run that ended for good has nothing to move.
+	if (targets.length === 0 || (!movable && hasEnded(status))) return null;
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger
@@ -65,11 +57,7 @@ export function MoveMenu({
 						variant="outline"
 						size="sm"
 						disabled={!movable || move.isPending}
-						title={
-							movable
-								? undefined
-								: "Move the run when it waits, sleeps or has stopped."
-						}
+						title={whyNot("move", status, walkedHere) ?? undefined}
 					/>
 				}
 			>

@@ -288,6 +288,11 @@ export function createSpaces(deps: SpacesDeps) {
 				await actions.act(spaceId, actor, runId, { kind: "move", to });
 			},
 
+			async listMoveTargets(runId) {
+				await ready;
+				return actions.moveTargets(spaceId, actor, runId);
+			},
+
 			async resumeRun(runId, prompt) {
 				await ready;
 				await actions.act(spaceId, actor, runId, {

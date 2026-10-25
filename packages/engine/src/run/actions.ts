@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { type Flow, optionProblem } from "@nightshift/flows";
-import type { Actor, PlacementPort, RunsPort } from "../contract";
+import type { Actor, OwnDevice, PlacementPort, RunsPort } from "../contract";
 import { type Runner, type RunWalks, rerunNodeRefusal } from "../graph";
 import {
 	applyWalkerMoves,
@@ -70,8 +70,11 @@ export type RunActionsDeps = {
 	runRow(runId: string): Promise<RunRow>;
 	/** The run's flow, from its snapshot. */
 	flowOf(row: RunRow): Flow;
-	/** Where the walk may move: one of the Person's own Devices, online (`PlacementPort.moveTo`). */
-	placement: Pick<PlacementPort, "moveTo">;
+	/**
+	 * Where the walk may move (`moveTo`: one of the Person's own Devices,
+	 * online), and the Person's Devices to offer for it (`devicesFor`).
+	 */
+	placement: Pick<PlacementPort, "moveTo" | "devicesFor">;
 };
 
 /**
@@ -373,6 +376,35 @@ export function createRunActions(deps: RunActionsDeps) {
 				return onWalker(row, actor, request);
 			}
 			return here(row, actor, request);
+		},
+
+		/**
+		 * The Person's own Devices the run can move to: online, and not its
+		 * Walker. From the run's own Space, whichever Space the person works
+		 * in. Another Person's Device takes steps through its Offers, never a
+		 * walk.
+		 */
+		async moveTargets(
+			spaceId: string,
+			actor: Actor | undefined,
+			runId: string,
+		): Promise<OwnDevice[]> {
+			const row = await rowIn(spaceId, runId);
+			if (!actor) throw signedOut();
+			const walkedHere = row.walkerId === (await log.walkerId());
+			return (
+				await deps.placement.devicesFor(
+					row.spaceId,
+					actor.personId,
+					row.projectId,
+				)
+			).filter(
+				(d) =>
+					d.offers === undefined &&
+					d.online &&
+					d.deviceId !== row.walkerId &&
+					!(walkedHere && d.thisDevice),
+			);
 		},
 	};
 }

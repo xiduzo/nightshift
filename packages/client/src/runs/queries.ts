@@ -40,13 +40,16 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 			meta: { quietRefetchErrors: true },
 		}),
 		/**
-		 * The person's Devices for the project, online or not (Move to). With
+		 * The person's Devices for the project, online or not. With
 		 * `forNode`, the Devices that node may name, as the Host decides.
 		 */
 		devices: (projectId: string, forNode?: { profile?: string }) =>
 			orpc.runs.devices.queryOptions({
 				input: { projectId, ...(forNode ? { forNode } : {}) },
 			}),
+		/** The person's own Devices the run can move to now, from the run's own Space ("Move to…"). */
+		moveTargets: (runId: string) =>
+			orpc.runs.moveTargets.queryOptions({ input: { runId } }),
 		/** The person's Devices a run of the project can run on, this computer first. */
 		placements: (projectId: string) =>
 			orpc.runs.placements.queryOptions({ input: { projectId } }),

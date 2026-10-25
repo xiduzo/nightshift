@@ -105,10 +105,20 @@ export const runs = {
 		.handler(({ context, input }) =>
 			context.space.moveRun(input.runId, input.deviceId),
 		),
+	/** The Person's own Devices the run can move to now, from the run's own Space ("Move to…"). */
+	moveTargets: runProcedure(z.object({ runId: z.string() }))
+		.route({
+			summary:
+				"Lists the Person's own Devices that can walk the run from here on.",
+		})
+		.output(output(z.array(ownDeviceSchema)))
+		.handler(({ context, input }) =>
+			context.space.listMoveTargets(input.runId),
+		),
 	/**
-	 * The Person's Devices for the project: online, with a Clone or not
-	 * (Move to). With `forNode`, the Devices that node may name (a node's
-	 * Device): another person's only when it offers the node's profile.
+	 * The Person's Devices for the project: online, with a Clone or not.
+	 * With `forNode`, the Devices that node may name (a node's Device):
+	 * another person's only when it offers the node's profile.
 	 */
 	devices: protectedProcedure
 		.route({
@@ -132,7 +142,7 @@ export const runs = {
 	)
 		.route({
 			summary:
-				"Continues a stopped, failed or interrupted run at its last step.",
+				"Continues a run that is not going at its last step, or wakes a sleeping one.",
 		})
 		.output(output(z.void()))
 		.handler(({ context, input }) =>

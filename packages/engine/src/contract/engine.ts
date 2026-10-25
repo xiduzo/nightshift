@@ -285,6 +285,11 @@ export interface SpaceEngine {
 	 * moves it.
 	 */
 	moveRun(runId: string, toDeviceId: string): Promise<void>;
+	/**
+	 * The actor's own Devices the run can move to now: online, and not its
+	 * Walker. From the run's own Space, whichever Space the person works in.
+	 */
+	listMoveTargets(runId: string): Promise<OwnDevice[]>;
 
 	/**
 	 * Emits the current status and every step summary, replays the full

@@ -119,6 +119,15 @@ async function computer(
 					if (!target.online) throw new Error("The planner refuses it.");
 					return { id: target.deviceId, name: target.name };
 				},
+				devicesFor: async (spaceId, personId, projectId, forNode) => [
+					...(await alone.placement.devicesFor(
+						spaceId,
+						personId,
+						projectId,
+						forNode,
+					)),
+					...others(),
+				],
 			},
 			runs: {
 				...alone.runs,
@@ -507,6 +516,29 @@ describe("a run that moves to another Device", () => {
 		).rejects.toThrow("Sign in to act on this run.");
 		expect(archive.size).toBe(0);
 		await space.stopRun(runId);
+	});
+
+	test("can go to the owner's other Devices that are online, never to its own Walker", async () => {
+		const { a, b } = await pair();
+		const { runId } = await waitingOn(a);
+		const targets = async () =>
+			(await spaceOf(a, a).listMoveTargets(runId)).map((d) => d.deviceId);
+		expect(await targets()).toEqual([b.sandbox.deviceId]);
+
+		// B walks it now: it can come back to this computer.
+		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		expect(await targets()).toEqual([a.sandbox.deviceId]);
+		// A run of another Space is not found there.
+		await expect(
+			a.engine.space("another-space", actor).listMoveTargets(runId),
+		).rejects.toThrow("Run not found");
+	});
+
+	test("has no target while the owner's other Device is offline", async () => {
+		const { a } = await pair(false);
+		const { runId } = await waitingOn(a);
+		expect(await spaceOf(a, a).listMoveTargets(runId)).toEqual([]);
+		await spaceOf(a, a).stopRun(runId);
 	});
 
 	test("is refused when the planner refuses its Device, and keeps nothing", async () => {
