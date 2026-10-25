@@ -102,9 +102,10 @@ type Handover = {
 	/**
 	 * On a Host: the Devices online now, and the pairings in progress. A
 	 * Device's link outlives a reload, and so does a code it asked for.
+	 * Not read-only: a runtime of an older version kept neither.
 	 */
-	readonly presence: DevicePresence;
-	readonly pending: PendingPairings;
+	presence: DevicePresence;
+	pending: PendingPairings;
 	/** Per Host: the commands this computer applied, and the calls it serves as a placed Device. */
 	readonly hosts: Map<
 		string,
@@ -395,6 +396,11 @@ async function takeOver(kept: KeptDevices): Promise<Handover> {
 		// Nothing keeps the runtime before: a Device back meanwhile waits for its minute.
 		before.wake = () => {};
 		before.release = async () => {};
+		// A runtime of an older version kept less: what it lacks starts
+		// empty here, in the same handover (its work hub wakes through it).
+		const older: Partial<Pick<Handover, "presence" | "pending">> = before;
+		older.presence ??= new Map();
+		older.pending ??= new Map();
 		return before;
 	}
 	await kept.nightshiftLinks?.close();

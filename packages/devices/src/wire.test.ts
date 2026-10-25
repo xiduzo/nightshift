@@ -379,6 +379,26 @@ describe("the devices runtime across a reload", () => {
 		expect(presence).toEqual(["DeviceOnline"]);
 	});
 
+	test("from a runtime of an older version, which kept no presence: the Devices online are handed over from then on", async () => {
+		await startB({ host: true });
+		const older = kept.nightshiftDevices as unknown as Record<string, unknown>;
+		delete older.presence;
+		delete older.pending;
+		const second = await startB({ host: true });
+		const [owner] = await b.db.select().from(user);
+		await second.engine.devices.join({
+			id: "device-c",
+			name: "C",
+			platform: "test",
+			ownerId: owner?.id as string,
+			homeHost: null,
+		});
+		await second.engine.devices.seen("device-c");
+
+		const third = await startB({ host: true });
+		expect((await third.engine.devices.get("device-c"))?.online).toBe(true);
+	});
+
 	test("a pairing started before the reload keeps the joining Device's name and platform", async () => {
 		const people = await createAuthSandbox();
 		try {
