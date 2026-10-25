@@ -37,10 +37,15 @@ export function createQueryClient(handle: ErrorHandler): QueryClient {
 	});
 }
 
-/** The browser sends the session cookie with every call. */
+/**
+ * The browser sends the session cookie with every call. The calls a page
+ * makes together go in one request: the Night Shift that served this page
+ * reads batches.
+ */
 export const client = createApiClient({
 	baseUrl: SERVER_URL,
 	fetch: (request, init) => fetch(request, { ...init, credentials: "include" }),
+	batch: true,
 });
 
 export const orpc = createQueryUtils(client);

@@ -18,6 +18,7 @@ const ALLOWED: Record<string, "types" | "values"> = {
 	"@nightshift/notifications/contract": "values",
 	"@orpc/client": "values",
 	"@orpc/client/fetch": "values",
+	"@orpc/client/plugins": "values",
 	"@orpc/tanstack-query": "values",
 	"@tanstack/react-query": "values",
 	react: "values",
