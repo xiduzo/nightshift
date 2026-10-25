@@ -278,6 +278,7 @@ export function createDeviceExchange(deps: {
 				} finally {
 					cycle.abort();
 				}
+				if (signal.aborted) return;
 				waits = (await take(client, latest, reported, true, signal)) !== null;
 			}
 		} finally {
