@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import type { Actor } from "@nightshift/engine";
-import { personOnHost } from "../links";
+import { personInSpace } from "../links";
 import type { DeviceRegistry } from "../registry";
 
 /**
@@ -19,9 +19,9 @@ export function createPrivatePaths(deps: {
 	const { db, registry } = deps;
 	return async function pathsFor(spaceId: string, actor: Actor | undefined) {
 		const viewer = actor
-			? ((await personOnHost(db, spaceId)) ?? actor.personId)
+			? await personInSpace(db, spaceId, actor.personId)
 			: null;
-		const here = (await personOnHost(db, spaceId)) ?? deps.ownerId();
+		const here = await personInSpace(db, spaceId, deps.ownerId());
 		const owners = new Map<string, string | null>();
 		return async <
 			T extends {

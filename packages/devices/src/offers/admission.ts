@@ -12,7 +12,7 @@ import {
 } from "@nightshift/engine";
 import type { AgentProfileSettings } from "@nightshift/flows";
 import type { WorkCall, WorkRelay, WorkReply, WorkRequest } from "../contract";
-import { createHostSpaces, personOnHost } from "../links";
+import { createHostSpaces, personInSpace, personOnHost } from "../links";
 import { selfDeviceId, selfOwnerId } from "../registry";
 import { remoteDevice, serveWork } from "../work";
 import type { OfferedSessions } from "./engine-offers";
@@ -122,7 +122,7 @@ export function createOfferAdmission(deps: {
 
 	/** This computer's owner, as the Space's Host knows them. */
 	async function ownerHere(spaceId: string): Promise<string | null> {
-		return (await personOnHost(db, spaceId)) ?? (await selfOwnerId(db));
+		return personInSpace(db, spaceId, await selfOwnerId(db));
 	}
 
 	/**

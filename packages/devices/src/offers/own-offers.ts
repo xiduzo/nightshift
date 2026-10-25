@@ -1,7 +1,7 @@
 import { spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
 import type { DeviceDocument, Engine, ProfileStore } from "@nightshift/engine";
-import { personOnHost } from "../links";
+import { personInSpace } from "../links";
 import type { DeviceRegistry } from "../registry";
 import type { EngineOffers } from "./engine-offers";
 import { deviceOffers, removeDeviceOffer, setDeviceOffer } from "./offers";
@@ -60,7 +60,7 @@ export function createOffers(deps: {
 					(o) => o.deviceId === self.id && o.profile === offer.profile,
 				);
 				// This computer's Person, as the Space knows them.
-				const me = (await personOnHost(db, offer.spaceId)) ?? deps.ownerId;
+				const me = await personInSpace(db, offer.spaceId, deps.ownerId);
 				const runs = [];
 				for (const r of (await engine.space(offer.spaceId).listRuns())
 					.filter(
@@ -110,7 +110,7 @@ export function createOffers(deps: {
 				...input,
 				deviceId: self.id,
 				deviceName: self.name,
-				by: (await personOnHost(db, input.spaceId)) ?? by,
+				by: await personInSpace(db, input.spaceId, by),
 			});
 			await setDeviceOffer(document, { ...input, offeredAt: Date.now() });
 		},
@@ -121,7 +121,7 @@ export function createOffers(deps: {
 				await engine.offers.withdraw({
 					...input,
 					deviceId: self.id,
-					by: (await personOnHost(db, input.spaceId)) ?? by,
+					by: await personInSpace(db, input.spaceId, by),
 				});
 			} finally {
 				deps.withdrawn(input.spaceId, input.profile);
@@ -133,7 +133,7 @@ export function createOffers(deps: {
 			const offers = await engine.offers.list(spaceId);
 			// This computer's owner, as the Space knows them: on the Host of a
 			// Space it keeps, they have the id of their link there.
-			const owner = (await personOnHost(db, spaceId)) ?? deps.ownerId;
+			const owner = await personInSpace(db, spaceId, deps.ownerId);
 			// The session's Person, as the Space knows them.
 			const me = personId === deps.ownerId ? owner : personId;
 			const devices = new Map<string, SpaceDeviceView>();

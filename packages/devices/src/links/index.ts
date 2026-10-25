@@ -12,6 +12,7 @@ export {
 	createHostSpaces,
 	type HostSpaceRef,
 	type HostSpaces,
+	personInSpace,
 	personOnHost,
 } from "./host-spaces";
 export { joinHost } from "./join";

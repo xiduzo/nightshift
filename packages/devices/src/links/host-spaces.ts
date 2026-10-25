@@ -141,10 +141,34 @@ export function createHostSpaces(db: Database) {
 }
 
 /**
+ * A Person of this computer as the Space knows them: in a Space a Host
+ * keeps, the Person of this computer's link to that Host (this computer
+ * has one Person there, whoever asks here); in a Space of this Replica's
+ * own, the Person as is. A run this computer starts in a Host's Space
+ * names that Person, so every Replica of the Space reads the same
+ * `started_by`.
+ */
+export async function personInSpace(
+	db: Database,
+	spaceId: string,
+	personId: string,
+): Promise<string>;
+export async function personInSpace(
+	db: Database,
+	spaceId: string,
+	personId: string | null,
+): Promise<string | null>;
+export async function personInSpace(
+	db: Database,
+	spaceId: string,
+	personId: string | null,
+): Promise<string | null> {
+	return (await personOnHost(db, spaceId)) ?? personId;
+}
+
+/**
  * This computer's Person as the Host of a Space knows them (the Person of
- * its link), or null for a Space this Replica keeps itself. A run this
- * computer starts in a Host's Space names that Person, so every Replica of
- * the Space reads the same `started_by`.
+ * its link), or null for a Space this Replica keeps itself.
  */
 export async function personOnHost(
 	db: Database,
