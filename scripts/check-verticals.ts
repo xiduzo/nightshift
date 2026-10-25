@@ -30,9 +30,14 @@
  * (j) a barrel, or a package's root `index.ts`, with a statement that is
  *     not an import or an export
  *
+ * It reads every file of the workspace, not only `src/`. A file outside
+ * `src/` (a config file, a script) belongs to no vertical: it imports a
+ * vertical through its barrel, and it counts as an importer for (b).
+ *
  * Tests may deep-import, and they do not count as importers for (b), except
  * for a vertical named `testing`. A test is a `*.test.ts(x)` file, a
- * `test-support.ts` file, or a file in a `testing/` or `fixtures/` folder.
+ * `test-support.ts` file, a file in a `testing/` or `fixtures/` folder, or a
+ * file in the workspace's `test/` folder.
  * A namespace import (`import * as x`), `export * from` and a dynamic
  * `import()` or `require()` that is not destructured count as a use of
  * every name. A type written as `import("x").Name` counts as an import.
@@ -81,13 +86,21 @@ export function workspacesOf(root: string): string[] {
 /**
  * Leaf contracts: a pure-data file (no imports of its own) that a vertical
  * exposes past its barrel, because importing the barrel would close a
- * module-init cycle. Its names are on the barrel too. One entry per file,
- * with a comment that says why.
+ * module-init cycle or load what the importer cannot load. One entry per
+ * file, with a comment that says why. The check fails on a leaf contract
+ * that imports anything, and on one that nothing imports any more.
  *
  * Shape: { workspace: { vertical: ["path/inside/the/vertical" (no extension)] } }
  * A vertical is named by its path in `src/`: `features/runs`, `shared/api`, `graph`.
  */
-export const LEAF_CONTRACTS: Record<string, Record<string, string[]>> = {};
+export const LEAF_CONTRACTS: Record<string, Record<string, string[]>> = {
+	"apps/desktop": {
+		// The build config (electrobun.config.ts) reads the update feeds. The
+		// barrel of updates loads electrobun/main, which only the app's main
+		// process can load.
+		"features/updates": ["update-feeds"],
+	},
+};
 
 /**
  * Peer ports: two verticals that depend on each other cross only through one
@@ -168,7 +181,17 @@ const KIND_BUCKETS = new Set([
 /** The app's shared piece that composes the features. */
 const SHELL = "shared/shell";
 
-const SKIP_DIRS = new Set(["node_modules", "dist", ".hutch", ".turbo"]);
+/** Folders that hold no source, anywhere: installs and build output. */
+const SKIP_DIRS = new Set(["node_modules", "dist"]);
+
+/**
+ * Folders at the top of a workspace that hold no source of its own: build
+ * output, and the native projects that Expo makes.
+ */
+const SKIP_TOP_DIRS = new Set(["build", "ios", "android"]);
+
+/** A folder the walk skips: an install, build output, or a dot folder. */
+const skipped = (name: string) => SKIP_DIRS.has(name) || name.startsWith(".");
 
 export type Options = {
 	leafContracts?: Record<string, string[]>;
@@ -192,22 +215,31 @@ type SourceFile = {
 	onlyImportsAndExports: boolean;
 };
 
+/** A test, by its path in the workspace (`src/runs/run.test.ts`, `test/x.ts`). */
 export function isTest(path: string): boolean {
 	return (
 		/\.test\.tsx?$/.test(path) ||
 		/(^|[\\/])test-support\.tsx?$/.test(path) ||
-		/(^|[\\/])(testing|fixtures)[\\/]/.test(path)
+		/(^|[\\/])(testing|fixtures)[\\/]/.test(path) ||
+		/^test[\\/]/.test(path)
 	);
 }
 
-/** The files to check under `dir`, in name order on every file system. */
-function walk(dir: string, out: string[]): void {
+/**
+ * The files to check under `dir` (a workspace when `top`), in name order on
+ * every file system.
+ */
+function walk(dir: string, out: string[], top = false): void {
 	if (!existsSync(dir)) return;
 	const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
 		a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
 	);
 	for (const entry of entries) {
-		if (SKIP_DIRS.has(entry.name)) continue;
+		if (
+			entry.isDirectory() &&
+			(skipped(entry.name) || (top && SKIP_TOP_DIRS.has(entry.name)))
+		)
+			continue;
 		const path = join(dir, entry.name);
 		if (entry.isDirectory()) walk(path, out);
 		else if (/\.tsx?$/.test(entry.name) && !entry.name.endsWith(".d.ts"))
@@ -461,7 +493,7 @@ function verticalsOf(src: string, app: boolean): Vertical[] {
 	for (const { dir, prefix } of roots) {
 		if (!existsSync(dir)) continue;
 		for (const entry of readdirSync(dir, { withFileTypes: true })) {
-			if (!entry.isDirectory() || SKIP_DIRS.has(entry.name)) continue;
+			if (!entry.isDirectory() || skipped(entry.name)) continue;
 			if (!app && entry.name === "testing") continue;
 			const path = join(dir, entry.name);
 			found.push({
@@ -541,12 +573,14 @@ export function checkWorkspace(
 	const verticalOf = (path: string) =>
 		verticals.find((v) => path.startsWith(`${v.dir}${sep}`));
 
+	// Every file of the workspace: the files outside src/ (config files,
+	// scripts, tests) belong to no vertical, but they import verticals.
 	const files = new Map<string, SourceFile>();
 	const paths: string[] = [];
-	walk(src, paths);
+	walk(wsDir, paths, true);
 	for (const path of paths) {
 		const file = parse(path);
-		file.test = isTest(relative(src, path));
+		file.test = isTest(relative(wsDir, path));
 		files.set(path, file);
 	}
 
@@ -567,6 +601,8 @@ export function checkWorkspace(
 
 	const leafContracts = options.leafContracts ?? {};
 	const peerPorts = options.peerPorts ?? {};
+	/** The leaf contracts and peer ports that an import uses. */
+	const usedExemptions = new Set<string>();
 	const exempt = (
 		from: Vertical | undefined,
 		to: Vertical,
@@ -576,8 +612,14 @@ export function checkWorkspace(
 			.split(sep)
 			.join("/")
 			.replace(/\.tsx?$/, "");
-		if ((leafContracts[to.name] ?? []).includes(inside)) return true;
-		if (from && peerPorts[from.name]?.[to.name] === inside) return true;
+		if ((leafContracts[to.name] ?? []).includes(inside)) {
+			usedExemptions.add(`leaf ${to.name}/${inside}`);
+			return true;
+		}
+		if (from && peerPorts[from.name]?.[to.name] === inside) {
+			usedExemptions.add(`port ${from.name} ${to.name}`);
+			return true;
+		}
 		return false;
 	};
 	const barrelSpecifier = (from: string, to: Vertical) => {
@@ -652,6 +694,39 @@ export function checkWorkspace(
 			problems.push(
 				`${rel(file.path)}: imports "${imported.specifier}" past the barrel of ${to.name}. ${port ? `These verticals cross only through their port: import "${barrelSpecifier(file.path, to)}/${port}".` : `Import "${barrelSpecifier(file.path, to)}" instead.`}`,
 			);
+		}
+	}
+
+	// A leaf contract imports nothing, and is still needed. So is a port.
+	for (const [toName, contracts] of Object.entries(leafContracts)) {
+		for (const contract of contracts) {
+			const to = verticals.find((v) => v.name === toName);
+			const path = to ? resolveFile(join(to.dir, contract)) : undefined;
+			const file = path ? files.get(path) : undefined;
+			if (!path || !file) {
+				problems.push(
+					`scripts/check-verticals.ts: the leaf contract "${toName}/${contract}" is not a file of ${workspace}. Fix or remove it.`,
+				);
+			} else if (file.imports.length) {
+				problems.push(
+					`${rel(path)}: a leaf contract imports nothing, but it imports ${file.imports.map((i) => `"${i.specifier}"`).join(", ")}.`,
+				);
+			} else if (!usedExemptions.has(`leaf ${toName}/${contract}`)) {
+				problems.push(
+					`scripts/check-verticals.ts: nothing imports the leaf contract "${toName}/${contract}" past the barrel any more. Remove it from LEAF_CONTRACTS.`,
+				);
+			}
+		}
+	}
+	for (const [fromName, ports] of Object.entries(peerPorts)) {
+		for (const [toName, port] of Object.entries(ports)) {
+			const to = verticals.find((v) => v.name === toName);
+			if (!to || !resolveFile(join(to.dir, port))) continue;
+			if (!usedExemptions.has(`port ${fromName} ${toName}`)) {
+				problems.push(
+					`scripts/check-verticals.ts: ${fromName} does not import the peer port "${toName}/${port}" any more. Remove it from PEER_PORTS.`,
+				);
+			}
 		}
 	}
 

@@ -615,6 +615,135 @@ describe("peer ports import only shared pieces (i)", () => {
 	});
 });
 
+describe("the whole workspace", () => {
+	const feeds = {
+		"src/features/updates/index.ts":
+			'export { startUpdates } from "./updates";\n',
+		"src/features/updates/updates.ts":
+			'import { FEEDS } from "./feeds";\nexport const startUpdates = () => FEEDS;\n',
+		"src/features/updates/feeds.ts": "export const FEEDS = [1];\n",
+		"src/main.ts":
+			'import { startUpdates } from "./features/updates";\nstartUpdates();\n',
+	};
+
+	test("a config file outside src/ that deep-imports fails", () => {
+		expect(
+			check(APP, {
+				...feeds,
+				"build.config.ts":
+					'import { FEEDS } from "./src/features/updates/feeds";\nexport default FEEDS;\n',
+			}),
+		).toEqual([
+			'apps/demo/build.config.ts: imports "./src/features/updates/feeds" past the barrel of features/updates. Import "./src/features/updates" instead.',
+		]);
+	});
+
+	test("the same file passes through a leaf contract", () => {
+		expect(
+			check(
+				APP,
+				{
+					...feeds,
+					"build.config.ts":
+						'import { FEEDS } from "./src/features/updates/feeds";\nexport default FEEDS;\n',
+				},
+				{ leafContracts: { "features/updates": ["feeds"] } },
+			),
+		).toEqual([]);
+	});
+
+	test("a script outside src/ counts as an importer", () => {
+		expect(
+			check(APP, {
+				...feeds,
+				"src/main.ts": "export {};\n",
+				"scripts/release.ts":
+					'import { startUpdates } from "../src/features/updates";\nstartUpdates();\n',
+			}),
+		).toEqual([]);
+	});
+
+	test("a file in test/ is a test: it may deep-import, and it does not count", () => {
+		expect(
+			check(APP, {
+				...feeds,
+				"src/main.ts": "export {};\n",
+				"test/updates.test.ts":
+					'import { startUpdates } from "../src/features/updates";\nstartUpdates();\n',
+				"test/daemons.ts":
+					'import { FEEDS } from "../src/features/updates/feeds";\nexport const daemons = FEEDS;\n',
+			}),
+		).toEqual([
+			'apps/demo/src/features/updates/index.ts: nothing outside features/updates imports "startUpdates". Take it off the barrel.',
+		]);
+	});
+
+	test("installs, build output and dot folders are not read", () => {
+		const deepImport =
+			'import { FEEDS } from "../src/features/updates/feeds";\nexport default FEEDS;\n';
+		expect(
+			check(APP, {
+				...feeds,
+				"node_modules/x/index.ts": deepImport,
+				"dist/index.ts": deepImport,
+				".expo/types.ts": deepImport,
+				"ios/widget.ts": deepImport,
+			}),
+		).toEqual([]);
+	});
+});
+
+describe("leaf contracts and peer ports expire", () => {
+	const files = {
+		"src/runs/index.ts": 'export { run } from "./run";\n',
+		"src/runs/run.ts": "export const run = 1;\n",
+		"src/runs/limits.ts": "export const LIMIT = 3;\n",
+		"src/gates/index.ts": 'export { gate } from "./gate";\n',
+		"src/gates/gate.ts":
+			'import { run } from "../runs";\nexport const gate = run;\n',
+		"src/index.ts":
+			'export { run } from "./runs";\nexport { gate } from "./gates";\n',
+	};
+
+	test("a leaf contract that nothing imports past the barrel fails", () => {
+		expect(check(PKG, files, { leafContracts: { runs: ["limits"] } })).toEqual([
+			'scripts/check-verticals.ts: nothing imports the leaf contract "runs/limits" past the barrel any more. Remove it from LEAF_CONTRACTS.',
+		]);
+	});
+
+	test("a leaf contract that imports anything fails", () => {
+		expect(
+			check(
+				PKG,
+				{
+					...files,
+					"src/runs/limits.ts":
+						'import { run } from "./run";\nexport const LIMIT = run;\n',
+					"src/gates/gate.ts":
+						'import { LIMIT } from "../runs/limits";\nexport const gate = LIMIT;\n',
+				},
+				{ leafContracts: { runs: ["limits"] } },
+			),
+		).toEqual([
+			'packages/demo/src/runs/limits.ts: a leaf contract imports nothing, but it imports "./run".',
+		]);
+	});
+
+	test("a leaf contract that is not a file fails", () => {
+		expect(check(PKG, files, { leafContracts: { runs: ["gone"] } })).toEqual([
+			'scripts/check-verticals.ts: the leaf contract "runs/gone" is not a file of packages/demo. Fix or remove it.',
+		]);
+	});
+
+	test("a peer port that its vertical does not import fails", () => {
+		expect(
+			check(PKG, files, { peerPorts: { gates: { runs: "limits" } } }),
+		).toEqual([
+			'scripts/check-verticals.ts: gates does not import the peer port "runs/limits" any more. Remove it from PEER_PORTS.',
+		]);
+	});
+});
+
 describe("barrels hold only imports and exports (j)", () => {
 	test("a barrel with code fails, and so does a package's root index.ts", () => {
 		expect(
@@ -658,7 +787,9 @@ describe("the command", () => {
 		expect(isTest("test-support.ts")).toBe(true);
 		expect(isTest("testing/fake.ts")).toBe(true);
 		expect(isTest("graph/fixtures/flow.ts")).toBe(true);
+		expect(isTest("test/devices/two-devices.ts")).toBe(true);
 		expect(isTest("features/runs/run-list.tsx")).toBe(false);
+		expect(isTest("src/features/test/run.ts")).toBe(false);
 	});
 
 	// The two runs on the whole repository get the time a busy computer
