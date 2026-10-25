@@ -3,16 +3,30 @@ import {
 	type Engine,
 	type EngineOptions,
 } from "@nightshift/engine";
-import type { EngineExchange } from "../exchange";
+import type { RunHistoryExchange } from "../exchange";
+import type { HostSpaces } from "../links";
 import type { EngineOffers, OfferAdmission } from "../offers";
 import type { DeviceRegistry } from "../registry";
 import { deviceDirectory } from "./directory";
-import { type BuiltPeers, createPeers, type PeerOptions } from "./peers";
+import {
+	type BuiltPeers,
+	createPeers,
+	type PeerOptions,
+	type SpaceMembers,
+} from "./peers";
 
 /** The engine of this Device among its peers, with the devices' half beside it. */
 export type PeerEngine = Engine & {
-	/** Run history between this Replica and others: rows, cursors, commands, the archive. */
-	readonly exchange: EngineExchange;
+	/**
+	 * Run history between this Replica and its Hosts: rows by cursor, the
+	 * ingest and what follows from it, Commands, live transcripts, the
+	 * archive files.
+	 */
+	readonly exchange: RunHistoryExchange;
+	/** The Spaces the Hosts this computer links to keep (`host_space`). */
+	readonly hostSpaces: HostSpaces;
+	/** The Members of each Space, as its document mirrors them. */
+	readonly members: SpaceMembers;
 	/**
 	 * On a Host: the Devices that paired with it, their presence and the
 	 * audit of it. Each Person sees their own Devices only (the API's rule).
@@ -66,9 +80,17 @@ export function createPeerEngine(
 		internals,
 	);
 	if (!built) throw new Error("The engine did not make its peers.");
+	const { exchange } = built;
 	return {
 		...engine,
-		exchange: built.exchange,
+		// The runs that still arrive are this engine's no more.
+		async dispose() {
+			exchange.close();
+			await engine.dispose();
+		},
+		exchange,
+		hostSpaces: built.hostSpaces,
+		members: built.members,
 		devices: built.registry,
 		offers: built.offers,
 		admission: built.admission,

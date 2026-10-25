@@ -239,6 +239,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	const hostExchange = createHostExchange({
 		db,
 		engine,
+		documents: deps.spaces,
 		registry: engine.devices,
 		selfId: self.id,
 		ownerId,
@@ -266,7 +267,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		// The Spaces the Host lists: kept here as the Host's, their documents
 		// synced read-only, before run rows that name their projects arrive.
 		spaceDocuments: async (link, hello) => {
-			const { hostSpaces } = engine.exchange;
+			const { hostSpaces } = engine;
 			await hostSpaces.update(
 				{ id: link.hostId, name: hello.host.name },
 				hello.spaces,
@@ -341,7 +342,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		host,
 		links,
 		hostLinks,
-		hostSpaces: engine.exchange.hostSpaces,
+		hostSpaces: engine.hostSpaces,
 		keys: keyStore,
 		settings: deps.settings,
 		self: { id: self.id, name: self.name, platform: process.platform },

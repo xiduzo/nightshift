@@ -15,7 +15,8 @@ import type { RunCommand } from "../contract";
  * signal or a stop travels to it as a command, and the Walker applies it
  * like a local action. The Host keeps a command (`run_command`) until the
  * Walker reports it applied, or why not; a command to a Walker that is
- * offline waits, and shows as pending.
+ * offline waits, and shows as pending. The Walker's log says which
+ * commands it applied (`RunHistoryExchange.apply`).
  */
 
 /** The permission each kind needs in the run's Space. */
@@ -104,10 +105,11 @@ export function createRunCommands(deps: { db: Database }) {
 				.update(runCommand)
 				.set({ doneAt: new Date(), error })
 				.where(and(eq(runCommand.id, id), eq(runCommand.walkerId, walkerId)));
+			for (const listener of [...listeners]) listener();
 		},
 
-		/** Calls `listener` when a command is kept. Returns the unsubscribe. */
-		onEnqueued(listener: () => void): () => void {
+		/** Calls `listener` when a command is kept, or reported done. Returns the unsubscribe. */
+		onChanged(listener: () => void): () => void {
 			listeners.add(listener);
 			return () => listeners.delete(listener);
 		},

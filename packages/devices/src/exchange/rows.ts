@@ -1,18 +1,11 @@
-import type { Database } from "@nightshift/db";
-import { syncCursor } from "@nightshift/db/schema";
-import type { LoggedEvent, RunHistory, RunLog } from "@nightshift/engine";
-import { eq, sql } from "drizzle-orm";
 import type { RunRows, SyncCursors } from "../contract";
 
 export { ForeignRowsError, MissingProjectError } from "@nightshift/engine";
 
 /**
- * The event log exchange: run history between Replicas, by cursor. The
- * engine reads and adds the rows (`RunHistory`: what moves, the merge, the
- * checks of a batch). The exchange owns the wire: the schemas of a batch
- * and of the cursors, and this Replica's cursor with each Host
- * (`sync_cursor`): "this Walker's events in this Space after `walker_seq`
- * N". Its wire schemas are in `contract/`.
+ * Batches of run history as the exchange carries them: what both halves
+ * do to a batch beside the ingest (`run-history.ts`). The wire schemas of
+ * a batch and of the cursors are in `contract/`.
  */
 
 /** A batch with no rows. */
@@ -22,102 +15,6 @@ export const NO_ROWS: RunRows = {
 	sessions: [],
 	events: [],
 };
-
-export type Exchange = ReturnType<typeof createExchange>;
-
-export function createExchange(deps: {
-	db: Database;
-	log: RunLog;
-	history: Pick<RunHistory, "rowsAfter" | "ingest">;
-}) {
-	const { db, log, history } = deps;
-
-	/**
-	 * The run rows of `spaces` after `cursors`, oldest first per Walker:
-	 * every Walker's but `except`, or only `only`'s. At most `limit`
-	 * events per Space and Walker. Returns the cursors moved past them.
-	 */
-	async function rowsAfter(input: {
-		spaces: readonly string[];
-		cursors: SyncCursors;
-		only?: string;
-		except?: string;
-		limit?: number;
-	}): Promise<{ rows: RunRows; cursors: SyncCursors }> {
-		return history.rowsAfter(input);
-	}
-
-	/**
-	 * Adds a batch to this Replica: rows it has are skipped. With `walker`,
-	 * every row must be that Walker's; with `spaces`, every row must be in
-	 * one of them (`RunHistory.ingest`). Returns the events that were new.
-	 */
-	async function ingest(
-		rows: RunRows,
-		check: { walker?: string; spaces?: readonly string[] } = {},
-	): Promise<LoggedEvent[]> {
-		return history.ingest(rows, check);
-	}
-
-	/** This Replica's cursors with a Host. */
-	async function cursorsWith(hostId: string): Promise<SyncCursors> {
-		const rows = await db
-			.select()
-			.from(syncCursor)
-			.where(eq(syncCursor.hostId, hostId));
-		const cursors: SyncCursors = {};
-		for (const row of rows) {
-			cursors[row.spaceId] = {
-				...cursors[row.spaceId],
-				[row.walkerId]: row.walkerSeq,
-			};
-		}
-		return cursors;
-	}
-
-	/** Moves this Replica's cursors with a Host forward (never back). */
-	async function advance(hostId: string, cursors: SyncCursors): Promise<void> {
-		for (const [spaceId, walkers] of Object.entries(cursors)) {
-			for (const [walkerId, walkerSeq] of Object.entries(walkers)) {
-				await db
-					.insert(syncCursor)
-					.values({ hostId, spaceId, walkerId, walkerSeq })
-					.onConflictDoUpdate({
-						target: [
-							syncCursor.hostId,
-							syncCursor.spaceId,
-							syncCursor.walkerId,
-						],
-						set: {
-							walkerSeq: sql`max(${syncCursor.walkerSeq}, excluded.walker_seq)`,
-							updatedAt: sql`(cast(unixepoch('subsecond') * 1000 as integer))`,
-						},
-					});
-			}
-		}
-	}
-
-	/**
-	 * Resolves when an event lands in this Replica (appended or ingested),
-	 * after `timeoutMs`, or when `signal` aborts: whichever comes first.
-	 */
-	function landed(signal: AbortSignal, timeoutMs: number): Promise<void> {
-		return new Promise((resolve) => {
-			if (signal.aborted) return resolve();
-			const done = () => {
-				clearTimeout(timer);
-				off();
-				signal.removeEventListener("abort", done);
-				resolve();
-			};
-			const timer = setTimeout(done, timeoutMs);
-			const off = log.onLanded(done);
-			signal.addEventListener("abort", done, { once: true });
-		});
-	}
-
-	return { rowsAfter, ingest, cursorsWith, advance, landed };
-}
 
 /**
  * The rows without the Walker's own paths: where its worktree, transcripts

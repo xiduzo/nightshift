@@ -1,8 +1,13 @@
-import type { PeerContext, Peers } from "@nightshift/engine";
-import { createRunArchive, runsMovedHere } from "../archive";
+import {
+	memberName,
+	memberRole,
+	type PeerContext,
+	type Peers,
+} from "@nightshift/engine";
+import { createRunArchive } from "../archive";
 import type { HostRelay, WorkRelay } from "../contract";
-import { createEngineExchange, type EngineExchange } from "../exchange";
-import { createHostSpaces, personOnHost } from "../links";
+import { createRunHistoryExchange, type RunHistoryExchange } from "../exchange";
+import { createHostSpaces, type HostSpaces, personOnHost } from "../links";
 import {
 	createEngineOffers,
 	createOfferAdmission,
@@ -49,13 +54,25 @@ export type PeerOptions = {
 	offerUse?: OfferUse;
 };
 
+/** The Members of a Space, as its document mirrors them: a Person this Replica may have no account of. */
+export type SpaceMembers = {
+	/** A Person's role in a Space. */
+	role(spaceId: string, personId: string): Promise<string | null>;
+	/** A Member's name. */
+	name(spaceId: string, personId: string): Promise<string | null>;
+};
+
 /** The port the engine walks with, and what the daemon uses beside it. */
 export type BuiltPeers = {
 	port: Peers;
 	/** On a Host: the Devices that paired with it. */
 	registry: DeviceRegistry;
-	/** Run history between this Replica and others. */
-	exchange: EngineExchange;
+	/** Run history between this Replica and its Hosts. */
+	exchange: RunHistoryExchange;
+	/** The Spaces the Hosts this computer links to keep. */
+	hostSpaces: HostSpaces;
+	/** The Members of each Space. */
+	members: SpaceMembers;
 	/** The Offers of the Spaces. */
 	offers: EngineOffers;
 	/** This computer's admission of the calls of runs: every Offer check, one slot map per Offer. */
@@ -71,9 +88,10 @@ export function createPeers(
 	context: PeerContext,
 	options: PeerOptions = {},
 ): BuiltPeers {
-	const { db, dataDir, device, log, bus, history, documents, now } = context;
+	const { db, dataDir, device, log, history, documents, now } = context;
 	const { relay } = options;
 	const registry = createDeviceRegistry({ db, log, history, now });
+	const hostSpaces = createHostSpaces(db);
 
 	/** The offered sessions running now: what withdrawing an Offer stops. */
 	const offeredSessions = createOfferedSessions();
@@ -99,7 +117,7 @@ export function createPeers(
 		log,
 		registry,
 		documents,
-		hostSpaces: createHostSpaces(db),
+		hostSpaces,
 		project: context.project,
 		...(work ? { work } : {}),
 		...(relay ? { relay } : {}),
@@ -111,31 +129,16 @@ export function createPeers(
 	});
 
 	/** The Host that keeps the Space, or null for a Space of this Replica's own. */
-	const hostOf = (spaceId: string) => exchange.hostSpaces.hostOf(spaceId);
+	const hostOf = (spaceId: string) => hostSpaces.hostOf(spaceId);
 	const archive = createRunArchive({
 		dataDir,
 		hostOf,
 		...(relay ? { relay } : {}),
 		stepStamp: context.stepStamp,
 	});
-	const exchange = createEngineExchange({
-		db,
-		log,
-		bus,
-		history,
-		walks: context.walks,
-		stepStamp: context.stepStamp,
-		dataDir,
-		documents,
-		// A run moved here: this computer walks it from now on.
-		onIngested: async (added) => {
-			const here = [await log.walkerId(), device.id];
-			for (const runId of runsMovedHere(added, here)) {
-				await context.takeOver(runId).catch((error) => {
-					console.error(`[engine] could not take over run ${runId}`, error);
-				});
-			}
-		},
+	const exchange = createRunHistoryExchange({
+		context,
+		hostSpaces,
 		// A Space a Host keeps: that Host's feed of the step, over its link.
 		...(relay?.follow ? { upstream: relay.follow.bind(relay) } : {}),
 		// And its archive copy of a step that ended.
@@ -192,5 +195,20 @@ export function createPeers(
 		pathsFor: createPrivatePaths({ db, registry, ownerId: context.ownerId }),
 	};
 
-	return { port, registry, exchange, offers, admission };
+	const members: SpaceMembers = {
+		role: async (spaceId, personId) =>
+			memberRole(await documents.open(spaceId), personId),
+		name: async (spaceId, personId) =>
+			memberName(await documents.open(spaceId), personId),
+	};
+
+	return {
+		port,
+		registry,
+		exchange,
+		hostSpaces,
+		members,
+		offers,
+		admission,
+	};
 }

@@ -9,6 +9,7 @@ import type {
 } from "@nightshift/engine";
 import type {
 	ArchiveRef,
+	CommandBatch,
 	OfferCaps,
 	RunRows,
 	SyncBatch,
@@ -30,12 +31,24 @@ import type {
 export type HostExchange = {
 	/** Rows of the Spaces the key's Person is a Member of, after the cursors, but the Device's own. */
 	pull(key: DeviceKeyAccess, cursors: SyncCursors): Promise<SyncBatch>;
-	/** The same, then every new batch as rows land, until the signal aborts. */
+	/**
+	 * The same, then every new batch as rows land, until the signal
+	 * aborts. `commands: false` leaves the Commands out: the Device takes
+	 * them from `commands`.
+	 */
 	stream(
 		key: DeviceKeyAccess,
-		cursors: SyncCursors,
+		input: { cursors: SyncCursors; commands?: boolean },
 		signal?: AbortSignal,
 	): AsyncIterable<SyncBatch>;
+	/**
+	 * The Commands that wait for the key's Device, the whole set, then
+	 * again each time it changes, until the signal aborts.
+	 */
+	commands(
+		key: DeviceKeyAccess,
+		signal?: AbortSignal,
+	): AsyncIterable<CommandBatch>;
 	/** Takes the Device's own rows. Refuses a batch with a row of another Walker or Space. */
 	push(key: DeviceKeyAccess, rows: RunRows): Promise<{ events: number }>;
 	/** A person's action on a run another Device walks, in the name of the key's Person. */

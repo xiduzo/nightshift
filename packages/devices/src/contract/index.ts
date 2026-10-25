@@ -24,7 +24,12 @@ export {
 export { type OfferCaps, offerCapsSchema, offerRefSchema } from "./offers";
 export type { HostRelay } from "./relay";
 export type { RunRows, SyncCursors } from "./rows";
-export type { FollowWant, RunCommand, SyncBatch } from "./sync";
+export type {
+	CommandBatch,
+	FollowWant,
+	RunCommand,
+	SyncBatch,
+} from "./sync";
 export {
 	type WorkCall,
 	type WorkDelivery,

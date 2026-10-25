@@ -44,8 +44,8 @@ function offersWith(paired: Record<string, object>) {
 			],
 		},
 		devices: { get: async (id: string) => paired[id] ?? null },
-		exchange: {
-			memberName: async (_space: string, person: string) =>
+		members: {
+			name: async (_space: string, person: string) =>
 				({ me: "Sander", marieke: "Marieke" })[person] ?? null,
 		},
 	};

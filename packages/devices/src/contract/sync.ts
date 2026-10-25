@@ -98,6 +98,18 @@ const runCommandSchema = exact<RunCommand>()(
 	]),
 );
 
+/**
+ * The Commands that wait for a Device, as the Walker of their runs: the
+ * whole set each time it changes (`sync.commands`). A Command it lacks
+ * is done there.
+ */
+export type CommandBatch = { commands: RunCommand[] };
+
+/** The Commands that wait for a Device, as the Host describes them (`CommandBatch`). */
+export const commandBatchSchema = exact<CommandBatch>()(
+	z.object({ commands: z.array(runCommandSchema) }),
+);
+
 /** One answer of the exchange, as the Host describes it (`SyncBatch`). */
 export const syncBatchSchema = exact<SyncBatch>()(
 	z.object({

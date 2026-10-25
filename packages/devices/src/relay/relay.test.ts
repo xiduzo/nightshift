@@ -136,8 +136,8 @@ function relayWith(host = fakeHost()) {
 	const enqueued: unknown[] = [];
 	const relay = createRelay({
 		engine: () => ({
+			hostSpaces,
 			exchange: {
-				hostSpaces,
 				commands: {
 					enqueue: async (command) => {
 						enqueued.push(command);
@@ -409,7 +409,7 @@ function workRelayWith(host = fakeHost()) {
 			},
 			online: (deviceId) => deviceId === "device-here",
 		},
-		engine: () => ({ exchange: { hostSpaces } }),
+		engine: () => ({ hostSpaces }),
 		links: () => fakeLinks({ "host-1": host.client, "host-3": null }),
 	});
 	return { relay, host, hubCalls };

@@ -27,6 +27,7 @@ describe("the Host's contract", () => {
 			"sync.push",
 			"sync.command",
 			"sync.commandDone",
+			"sync.commands",
 			"sync.startRun",
 			"sync.devices",
 			"sync.offer",

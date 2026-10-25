@@ -13,7 +13,12 @@ import {
 } from "./links";
 import { offerCapsSchema, offerRefSchema } from "./offers";
 import { runRowsSchema, syncCursorsSchema } from "./rows";
-import { feedStepSchema, syncBatchSchema, transcriptEntrySchema } from "./sync";
+import {
+	commandBatchSchema,
+	feedStepSchema,
+	syncBatchSchema,
+	transcriptEntrySchema,
+} from "./sync";
 import { workDeliverySchema, workReplySchema, workRequestSchema } from "./work";
 
 /**
@@ -204,7 +209,14 @@ export const hostContract = {
 				summary:
 					"Streams the rows of other Walkers after a Device's cursors, then each new batch.",
 			})
-			.input(z.object({ cursors: syncCursorsSchema }))
+			.input(
+				z.object({
+					cursors: syncCursorsSchema,
+					// False: the Device takes its Commands from `sync.commands`, so
+					// they never wait behind rows. An older Device sends none.
+					commands: z.boolean().optional(),
+				}),
+			)
 			.output(describedStream(syncBatchSchema)),
 		/** The Device's own rows: runs it walks, in Spaces its owner is in. */
 		push: sync
@@ -232,6 +244,18 @@ export const hostContract = {
 				}),
 			)
 			.output(described(z.void())),
+		/**
+		 * The Commands for the runs the Device walks, on their own stream:
+		 * the whole set, then again each time it changes. An older Host has
+		 * none: its Commands come with the rows.
+		 */
+		commands: sync
+			.route({
+				summary:
+					"Streams the Commands that wait for a Device, then the whole set each time it changes.",
+			})
+			.input(z.object({}).default({}))
+			.output(describedStream(commandBatchSchema)),
 		/** Starts a run placed on another Device, for the key's Person: this Host walks it. */
 		startRun: sync
 			.route({

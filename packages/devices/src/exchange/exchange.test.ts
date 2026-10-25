@@ -6,9 +6,10 @@ import {
 	member,
 	organization,
 	project,
+	run as runTable,
 	user,
 } from "@nightshift/db/schema";
-import type { RunStatus } from "@nightshift/engine";
+import type { RunStatus, WalkRef } from "@nightshift/engine";
 import {
 	createRunLog,
 	createSandbox,
@@ -17,13 +18,14 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { HostRelay as Relay } from "../contract";
 import { createPeerEngine, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
 import {
 	ForeignRowsError,
 	MissingProjectError,
+	mergeCursors,
 	NO_ROWS,
 	withoutPrivatePaths,
 } from "./rows";
@@ -121,14 +123,14 @@ async function projectOnB(projectId: string) {
  * rows, without the Device's loop (device-exchange.test.ts tests that).
  */
 async function copyRows(engineA: PeerEngine, engineB: PeerEngine) {
-	const cursors = await engineB.exchange.rows.cursorsWith(HOST);
-	const { rows, cursors: moved } = await engineA.exchange.rows.rowsAfter({
+	const cursors = await engineB.exchange.cursorsWith(HOST);
+	const { rows, cursors: moved } = await engineA.exchange.rowsAfter({
 		spaces: [a.spaceId],
 		cursors,
 		except: b.deviceId,
 	});
-	const added = await engineB.exchange.rows.ingest(rows);
-	await engineB.exchange.rows.advance(HOST, moved);
+	const added = await engineB.exchange.ingest(rows);
+	await engineB.exchange.advance(HOST, moved);
 	return added;
 }
 
@@ -161,12 +163,12 @@ describe("the run history exchange", () => {
 
 		// The same rows again: nothing new.
 		expect(await copyRows(engineA, engineB)).toEqual([]);
-		const again = await engineA.exchange.rows.rowsAfter({
+		const again = await engineA.exchange.rowsAfter({
 			spaces: [a.spaceId],
 			cursors: {},
 			except: b.deviceId,
 		});
-		expect(await engineB.exchange.rows.ingest(again.rows)).toEqual([]);
+		expect(await engineB.exchange.ingest(again.rows)).toEqual([]);
 
 		// A answers; the rest comes after the cursor only.
 		const gate = (await engineA.space(a.spaceId).listGates())[0];
@@ -251,22 +253,22 @@ describe("the run history exchange", () => {
 			.space(a.spaceId)
 			.startRun({ projectId, flow: gateFlow });
 		await untilStatus(engineA, a.spaceId, run.id, "waiting");
-		const { rows } = await engineA.exchange.rows.rowsAfter({
+		const { rows } = await engineA.exchange.rowsAfter({
 			spaces: [a.spaceId],
 			cursors: {},
 		});
 
 		// Before the Space document brought the project: not yet.
-		expect(engineB.exchange.rows.ingest(rows)).rejects.toBeInstanceOf(
+		expect(engineB.exchange.ingest(rows)).rejects.toBeInstanceOf(
 			MissingProjectError,
 		);
 		await projectOnB(projectId);
 
 		expect(
-			engineB.exchange.rows.ingest(rows, { walker: "someone-else" }),
+			engineB.exchange.ingest(rows, { walker: "someone-else" }),
 		).rejects.toBeInstanceOf(ForeignRowsError);
 		expect(
-			engineB.exchange.rows.ingest(rows, {
+			engineB.exchange.ingest(rows, {
 				walker: a.deviceId,
 				spaces: ["another-space"],
 			}),
@@ -276,26 +278,263 @@ describe("the run history exchange", () => {
 			...NO_ROWS,
 			events: [{ ...rows.events[0], walkerId: "someone-else" }],
 		} as typeof rows;
-		await engineB.exchange.rows.ingest(rows, {
+		await engineB.exchange.ingest(rows, {
 			walker: a.deviceId,
 			spaces: [a.spaceId],
 		});
 		expect(
-			engineB.exchange.rows.ingest(forged, { walker: "someone-else" }),
+			engineB.exchange.ingest(forged, { walker: "someone-else" }),
 		).rejects.toBeInstanceOf(ForeignRowsError);
 		expect(await statusOf(engineB, a.spaceId, run.id)).toBe("waiting");
 	});
 
 	test("cursors move forward per Host, Space and Walker, never back", async () => {
 		const engineB = engineOf(b);
-		const { rows } = engineB.exchange;
-		await rows.advance(HOST, { s1: { w1: 5, w2: 3 } });
-		await rows.advance(HOST, { s1: { w1: 2 }, s2: { w1: 7 } });
-		await rows.advance("another-host", { s1: { w1: 9 } });
-		expect(await rows.cursorsWith(HOST)).toEqual({
+		const { exchange } = engineB;
+		await exchange.advance(HOST, { s1: { w1: 5, w2: 3 } });
+		await exchange.advance(HOST, { s1: { w1: 2 }, s2: { w1: 7 } });
+		await exchange.advance("another-host", { s1: { w1: 9 } });
+		expect(await exchange.cursorsWith(HOST)).toEqual({
 			s1: { w1: 5, w2: 3 },
 			s2: { w1: 7 },
 		});
+	});
+});
+
+describe("a batch and what follows from it", () => {
+	/** A's run of `gateFlow`, waiting at its Gate, with its project on B. */
+	async function waitingOnA(engineA: PeerEngine) {
+		const { id: projectId } = await engineA
+			.space(a.spaceId)
+			.addProject({ repoPath: a.repoPath });
+		await projectOnB(projectId);
+		const run = await engineA
+			.space(a.spaceId)
+			.startRun({ projectId, flow: gateFlow });
+		await untilStatus(engineA, a.spaceId, run.id, "waiting");
+		return { projectId, runId: run.id };
+	}
+
+	/** An event of the run in `sandbox`'s log, as `walkerId`'s next: a fixture, past the engine. */
+	async function logOn(
+		sandbox: Sandbox,
+		runId: string,
+		walkerId: string,
+		type: string,
+		payload: object,
+	) {
+		await sandbox.db.insert(event).values({
+			spaceId: a.spaceId,
+			runId,
+			type,
+			payload: JSON.stringify(payload),
+			walkerId,
+			walkerSeq: sql`(select coalesce(max(${event.walkerSeq}), 0) + 1 from ${event} where ${event.walkerId} = ${walkerId})`,
+		});
+	}
+
+	/** The types of the run's events on a Replica, in the order they landed there. */
+	async function typesOn(sandbox: Sandbox, runId: string) {
+		return (
+			await sandbox.db
+				.select()
+				.from(event)
+				.where(eq(event.runId, runId))
+				.orderBy(event.seq)
+		).map((e) => `${e.walkerId === a.deviceId ? "A" : e.walkerId}:${e.type}`);
+	}
+
+	/** A relay whose archive answers with `archive`. */
+	function relayOf(archive: (ref: WalkRef) => Promise<string | null>): Relay {
+		return {
+			command: async () => {},
+			addClone: async () => {},
+			archive,
+			archivePut: async () => {},
+			startRun: async () => {
+				throw new Error("not in this test");
+			},
+			offer: async () => {},
+			withdrawOffer: async () => {},
+			devices: async () => [],
+		};
+	}
+
+	/**
+	 * A moves its run to B, as `moveRun` does: its walk state into the
+	 * archive (returned, by kind and step), then `WalkerMoved` as its last
+	 * event.
+	 */
+	async function moveToB(engineA: PeerEngine, runId: string) {
+		const files = new Map<string, string>();
+		const own = async (ref: WalkRef) => {
+			const content = await engineA.exchange.archive.own(ref);
+			if (content !== null) files.set(fileKey(ref), content);
+		};
+		await own({ kind: "checkpoint", spaceId: a.spaceId, runId });
+		for (const { id } of (await engineA.space(a.spaceId).getRun(runId)).steps) {
+			await own({ kind: "transcript", spaceId: a.spaceId, runId, stepId: id });
+		}
+		await logOn(a, runId, a.deviceId, "WalkerMoved", {
+			from: a.deviceId,
+			to: b.deviceId,
+			by: null,
+		});
+		return files;
+	}
+
+	const fileKey = (ref: WalkRef) =>
+		ref.kind === "checkpoint" ? ref.kind : `${ref.kind}:${ref.stepId}`;
+
+	test("lands whole or not at all: a crash before the run's Walker moved repeats the move when the batch comes again", async () => {
+		const engineA = engineOf(a);
+		const engineB = engineOf(b);
+		const { runId } = await waitingOnA(engineA);
+		await logOn(a, runId, a.deviceId, "WalkerMoved", {
+			from: a.deviceId,
+			to: "device-c",
+			by: null,
+		});
+		// B stops as it gives the run its new Walker.
+		await b.db.run(
+			sql.raw(
+				"create trigger stop_here before update of walker_id on run begin select raise(abort, 'The computer stopped.'); end",
+			),
+		);
+		await expect(copyRows(engineA, engineB)).rejects.toThrow();
+		// Nothing of the batch landed, not even in the run log in memory.
+		expect(await typesOn(b, runId)).toEqual([]);
+		await expect(engineB.space(a.spaceId).getRun(runId)).rejects.toThrow();
+		expect(await engineB.exchange.cursorsWith(HOST)).toEqual({});
+
+		// B starts again, and the batch comes again: all of it lands.
+		await b.db.run(sql.raw("drop trigger stop_here"));
+		await copyRows(engineA, engineB);
+		expect(await typesOn(b, runId)).toEqual(await typesOn(a, runId));
+		expect((await engineB.space(a.spaceId).getRun(runId)).walker.id).toBe(
+			"device-c",
+		);
+
+		// A Replica that an older build left with the old Walker gets the
+		// new one back when the batch comes again.
+		await b.db
+			.update(runTable)
+			.set({ walkerId: a.deviceId })
+			.where(eq(runTable.id, runId));
+		const again = await engineA.exchange.rowsAfter({
+			spaces: [a.spaceId],
+			cursors: {},
+		});
+		expect(await engineB.exchange.ingest(again.rows)).toEqual([]);
+		expect((await engineB.space(a.spaceId).getRun(runId)).walker.id).toBe(
+			"device-c",
+		);
+	});
+
+	test("comes in the order its events landed on the Host: a third Replica stores a moved run as it happened", async () => {
+		const c = await createSandbox();
+		try {
+			const engineA = engineOf(a);
+			// B is the Host here, C another of its Devices.
+			const host = engineOf(b);
+			const third = engineOf(c);
+			const { projectId, runId } = await waitingOnA(engineA);
+			const [row] = await a.db
+				.select()
+				.from(project)
+				.where(eq(project.id, projectId));
+			await c.db.insert(project).values(row as typeof project.$inferInsert);
+			await copyRows(engineA, host);
+			// On the Host: A moved the run, then its new Walker went on with it.
+			// The new Walker's id sorts before A's, and its count is lower.
+			const next = "-next-walker";
+			await logOn(b, runId, a.deviceId, "WalkerMoved", {
+				from: a.deviceId,
+				to: next,
+				by: null,
+			});
+			await logOn(b, runId, next, "WalkerArrived", { from: a.deviceId });
+			await logOn(b, runId, next, "StopRequested", {});
+
+			const { rows } = await host.exchange.rowsAfter({
+				spaces: [a.spaceId],
+				cursors: {},
+				limit: 3,
+			});
+			// The first batch is the run's start: the new Walker's events wait.
+			expect(rows.events.every((e) => e.walkerId === a.deviceId)).toBe(true);
+			let cursors = {};
+			while (true) {
+				const batch = await host.exchange.rowsAfter({
+					spaces: [a.spaceId],
+					cursors,
+					limit: 3,
+				});
+				if (batch.rows.events.length === 0) break;
+				await third.exchange.ingest(batch.rows);
+				cursors = mergeCursors(cursors, batch.cursors);
+			}
+			expect(await typesOn(c, runId)).toEqual(await typesOn(b, runId));
+			expect((await typesOn(c, runId)).slice(-3)).toEqual([
+				"A:WalkerMoved",
+				`${next}:WalkerArrived`,
+				`${next}:StopRequested`,
+			]);
+		} finally {
+			await c.cleanup();
+		}
+	});
+
+	test("a run moved here is taken over again until it arrives", async () => {
+		let archive = new Map<string, string>();
+		const engineA = engineOf(a);
+		const engineB = engineOf(b, {
+			relay: relayOf(async (ref) => archive.get(fileKey(ref)) ?? null),
+		});
+		const { runId } = await waitingOnA(engineA);
+		const files = await moveToB(engineA, runId);
+		// The archive does not have the run's walk state yet.
+		await copyRows(engineA, engineB);
+		expect((await engineB.space(a.spaceId).getRun(runId)).walker.id).toBe(
+			b.deviceId,
+		);
+		await Bun.sleep(200);
+		expect(await typesOn(b, runId)).not.toContain(
+			`${b.deviceId}:WalkerArrived`,
+		);
+
+		// It is there now: the next try takes the run over.
+		archive = files;
+		await waitFor(
+			async () =>
+				(await typesOn(b, runId)).at(-1) === `${b.deviceId}:WalkerArrived`,
+			{ label: "the run to arrive", timeoutMs: 15_000 },
+		);
+		expect(await statusOf(engineB, a.spaceId, runId)).toBe("waiting");
+	});
+
+	test("a run moved here that a restart cut short is taken over when the next engine is ready", async () => {
+		let archive = new Map<string, string>();
+		const relay = relayOf(async (ref) => archive.get(fileKey(ref)) ?? null);
+		const engineA = engineOf(a);
+		const before = engineOf(b, { relay });
+		const { runId } = await waitingOnA(engineA);
+		const files = await moveToB(engineA, runId);
+		await copyRows(engineA, before);
+		await Bun.sleep(200);
+		await before.dispose();
+		expect(await typesOn(b, runId)).not.toContain(
+			`${b.deviceId}:WalkerArrived`,
+		);
+
+		archive = files;
+		const after = engineOf(b, { relay });
+		await waitFor(
+			async () =>
+				(await typesOn(b, runId)).at(-1) === `${b.deviceId}:WalkerArrived`,
+			{ label: "the run to arrive", timeoutMs: 15_000 },
+		);
+		expect(await statusOf(after, a.spaceId, runId)).toBe("waiting");
 	});
 });
 
@@ -416,8 +655,16 @@ describe("a run walked elsewhere", () => {
 		};
 		const { engineA, engineB, run } = await waitingOnB(relay);
 		// The Host has A's files: A pushed them when the command ended.
-		for (const { ref, content } of await engineA.exchange.exportWalk(run.id)) {
-			if (ref.kind === "transcript") files.set(ref.stepId, content);
+		for (const { id } of (await engineA.space(a.spaceId).getRun(run.id))
+			.steps) {
+			const ref = {
+				kind: "transcript" as const,
+				spaceId: a.spaceId,
+				runId: run.id,
+				stepId: id,
+			};
+			const content = await engineA.exchange.archive.own(ref);
+			if (content !== null) files.set(id, content);
 		}
 		const hello = (await engineB.space(a.spaceId).getRun(run.id)).steps[0];
 		const step = { spaceId: a.spaceId, runId: run.id, stepId: hello?.id ?? "" };
@@ -438,7 +685,7 @@ describe("a run walked elsewhere", () => {
 		expect(await read()).toEqual(["hello"]);
 		expect(fetched).toEqual([step.stepId]);
 		expect(
-			await engineB.exchange.readArchive({ kind: "transcript", ...step }),
+			await engineB.exchange.archive.read({ kind: "transcript", ...step }),
 		).toBe(files.get(step.stepId) ?? "");
 	});
 
@@ -475,7 +722,7 @@ describe("a Walker's paths", () => {
 			.space(a.spaceId)
 			.startRun({ projectId, flow: gateFlow });
 		await untilStatus(engineA, a.spaceId, run.id, "waiting");
-		const { rows } = await engineA.exchange.rows.rowsAfter({
+		const { rows } = await engineA.exchange.rowsAfter({
 			spaces: [a.spaceId],
 			cursors: {},
 		});
@@ -530,7 +777,7 @@ describe("projects of a Space without a Clone here", () => {
 describe("the Spaces of a Host", () => {
 	test("a listed Space becomes a Space here, for this computer's Person, in the Host's role", async () => {
 		const engineB = engineOf(b);
-		const { hostSpaces } = engineB.exchange;
+		const { hostSpaces } = engineB;
 		const [person] = await b.db.select().from(user);
 		const personId = person?.id as string;
 		const host = { id: HOST, name: "studio" };

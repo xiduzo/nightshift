@@ -30,8 +30,8 @@ export function createOffers(deps: {
 	engine: Engine & {
 		offers: EngineOffers;
 		devices: Pick<DeviceRegistry, "get">;
-		exchange: {
-			memberName(spaceId: string, personId: string): Promise<string | null>;
+		members: {
+			name(spaceId: string, personId: string): Promise<string | null>;
 		};
 	};
 	document: DeviceDocument;
@@ -78,10 +78,7 @@ export function createOffers(deps: {
 						startedBy:
 							r.startedBy?.name ??
 							(r.startedBy
-								? await engine.exchange.memberName(
-										offer.spaceId,
-										r.startedBy.id,
-									)
+								? await engine.members.name(offer.spaceId, r.startedBy.id)
 								: null),
 						createdAt: r.createdAt,
 					});
@@ -201,7 +198,7 @@ export function createOffers(deps: {
 				const owner = owners.get(device.id);
 				if (owner) {
 					device.mine = owner === me;
-					device.owner = await engine.exchange.memberName(spaceId, owner);
+					device.owner = await engine.members.name(spaceId, owner);
 				}
 			}
 			return [...devices.values()];

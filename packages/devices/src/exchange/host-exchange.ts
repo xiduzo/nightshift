@@ -1,7 +1,11 @@
 import type { DeviceKeyAccess } from "@nightshift/auth";
 import { roleAllows, roleIn, spacesOf } from "@nightshift/auth";
 import type { Database } from "@nightshift/db";
-import type { Engine } from "@nightshift/engine";
+import {
+	type Engine,
+	recordClone,
+	type SpaceDocuments,
+} from "@nightshift/engine";
 import { ORPCError } from "@orpc/server";
 import {
 	type ArchiveRef,
@@ -13,7 +17,6 @@ import type { EngineOffers, OfferAdmission } from "../offers";
 import type { DeviceRegistry } from "../registry";
 import type { WorkHub } from "../work";
 import { applyRunCommand, COMMAND_PERMISSION } from "./commands";
-import type { EngineExchange } from "./engine-exchange";
 import {
 	ForeignRowsError,
 	isEmpty,
@@ -21,6 +24,7 @@ import {
 	mergeCursors,
 	withoutPrivatePaths,
 } from "./rows";
+import type { RunHistoryExchange } from "./run-history";
 import type { HostExchange } from "./types";
 
 /**
@@ -34,8 +38,12 @@ import type { HostExchange } from "./types";
  *   same way as the ones Devices pushed: its Replica keeps everything.
  * - It takes only a Device's own rows (the runs it walks), in Spaces its
  *   Person is a Member of. Anything else refuses the whole batch.
+ * - Rows go out in the order they landed in this Host's Replica
+ *   (`RunHistoryExchange.rowsAfter`), so a third Replica stores a moved
+ *   run's events as they happened.
  * - A command needs the role that allows the action, checked here. A run
- *   this Host walks gets it at once; any other waits for its Walker.
+ *   this Host walks gets it at once; any other waits for its Walker, which
+ *   takes it on its own stream (`commands`), never behind rows.
  * - The archive keeps what a Walker puts for its own runs, and gives a
  *   Member what it asks of their Spaces' runs: a copy of a step's file
  *   only when its stamp holds the step as this Host's log says.
@@ -52,15 +60,17 @@ const STREAM_IDLE_MS = 20_000;
 export function createHostExchange(deps: {
 	db: Database;
 	/**
-	 * This Host's engine (`PeerEngine`): its half of the exchange, the
-	 * Offers of its Spaces, and its admission of the calls of runs a Device
-	 * walks with steps here.
+	 * This Host's engine (`PeerEngine`): its run history, the Offers of its
+	 * Spaces, and its admission of the calls of runs a Device walks with
+	 * steps here.
 	 */
 	engine: Engine & {
-		exchange: EngineExchange;
+		exchange: RunHistoryExchange;
 		offers: EngineOffers;
 		admission: Pick<OfferAdmission, "serve">;
 	};
+	/** The Space documents of this Host: a Device's Clone is recorded there. */
+	documents: SpaceDocuments;
 	registry: DeviceRegistry;
 	/** This Host's Device id: the Walker of its own runs. */
 	selfId: string;
@@ -106,9 +116,10 @@ export function createHostExchange(deps: {
 	async function batch(
 		key: DeviceKeyAccess,
 		cursors: SyncCursors,
+		withCommands = true,
 	): Promise<SyncBatch> {
 		await admit(key);
-		const { rows, cursors: moved } = await exchange.rows.rowsAfter({
+		const { rows, cursors: moved } = await exchange.rowsAfter({
 			spaces: await memberSpaces(key),
 			cursors,
 			except: key.deviceId,
@@ -123,25 +134,41 @@ export function createHostExchange(deps: {
 				(walkerId) => owners.get(walkerId) === key.personId,
 			),
 			cursors: moved,
-			commands: await exchange.commands.pendingFor(key.deviceId),
+			commands: withCommands
+				? await exchange.commands.pendingFor(key.deviceId)
+				: [],
 			follows: exchange.feeds.wanted(key.deviceId),
 		};
 	}
 
 	/**
-	 * Resolves when rows land, a command is kept, the steps someone follows
-	 * of the Device's runs change, the time is up, or the signal aborts.
+	 * Resolves when rows land, the Commands change (with `commands`), the
+	 * steps someone follows of the Device's runs change, the time is up, or
+	 * the signal aborts.
 	 */
-	function change(signal: AbortSignal, deviceId: string): Promise<void> {
+	function change(
+		signal: AbortSignal,
+		deviceId: string,
+		on: { rows: boolean; commands: boolean },
+	): Promise<void> {
 		return new Promise((resolve) => {
 			const done = () => {
 				off();
 				offFollows();
+				clearTimeout(timer);
+				signal.removeEventListener("abort", done);
 				resolve();
 			};
-			const off = exchange.commands.onEnqueued(done);
-			const offFollows = exchange.feeds.onWanted(deviceId, done);
-			void exchange.rows.landed(signal, STREAM_IDLE_MS).then(done);
+			const off = on.commands
+				? exchange.commands.onChanged(done)
+				: () => undefined;
+			const offFollows = on.rows
+				? exchange.feeds.onWanted(deviceId, done)
+				: () => false;
+			const timer = setTimeout(done, STREAM_IDLE_MS);
+			if (on.rows) void exchange.landed(signal, STREAM_IDLE_MS).then(done);
+			if (signal.aborted) done();
+			else signal.addEventListener("abort", done, { once: true });
 		});
 	}
 
@@ -155,17 +182,21 @@ export function createHostExchange(deps: {
 	return {
 		pull: batch,
 
-		async *stream(key, cursors, signal) {
-			let at = cursors;
+		async *stream(key, input, signal) {
+			let at = input.cursors;
+			const withCommands = input.commands !== false;
 			let sentCommands = "";
 			let sentFollows = "";
 			while (!signal?.aborted) {
 				const cycle = new AbortController();
 				const signals = signal ? [signal, cycle.signal] : [cycle.signal];
 				// Listen before reading, so nothing lands unseen between the two.
-				const changed = change(AbortSignal.any(signals), key.deviceId);
+				const changed = change(AbortSignal.any(signals), key.deviceId, {
+					rows: true,
+					commands: withCommands,
+				});
 				try {
-					const next = await batch(key, at);
+					const next = await batch(key, at, withCommands);
 					const commands = next.commands.map((c) => c.id).join();
 					const follows = followsOf(next);
 					if (
@@ -186,13 +217,39 @@ export function createHostExchange(deps: {
 			}
 		},
 
+		async *commands(key, signal) {
+			let sent: string | null = null;
+			while (!signal?.aborted) {
+				const cycle = new AbortController();
+				const signals = signal ? [signal, cycle.signal] : [cycle.signal];
+				// Listen before reading, so no Command is kept unseen between the two.
+				const changed = change(AbortSignal.any(signals), key.deviceId, {
+					rows: false,
+					commands: true,
+				});
+				try {
+					await admit(key);
+					const commands = await exchange.commands.pendingFor(key.deviceId);
+					const ids = commands.map((c) => c.id).join();
+					if (ids !== sent) {
+						sent = ids;
+						yield { commands };
+						continue;
+					}
+					await changed;
+				} finally {
+					cycle.abort();
+				}
+			}
+		},
+
 		async push(key, rows) {
 			await admit(key);
 			try {
 				// Another Person's Device: its paths never land in this Replica.
 				const kept =
 					key.personId === deps.ownerId ? rows : withoutPrivatePaths(rows);
-				const added = await exchange.rows.ingest(kept, {
+				const added = await exchange.ingest(kept, {
 					walker: key.deviceId,
 					spaces: await memberSpaces(key),
 				});
@@ -248,7 +305,13 @@ export function createHostExchange(deps: {
 			if (!role || !roleAllows(role, { project: ["add"] })) {
 				forbidden("Your role in this Space does not allow this.");
 			}
-			await exchange.recordClone({ ...input, deviceId: key.deviceId });
+			const document = await deps.documents.open(input.spaceId);
+			if (document.hostedElsewhere || !document.projects.has(input.projectId)) {
+				throw new Error(`Project not found: ${input.projectId}`);
+			}
+			await document.change(() =>
+				recordClone(document, { ...input, deviceId: key.deviceId }),
+			);
 		},
 
 		async offer(key, input) {
@@ -280,7 +343,7 @@ export function createHostExchange(deps: {
 		async archivePut(key, ref, content, stamp) {
 			await admit(key);
 			await ownRun(key, ref);
-			await exchange.writeArchive(ref, content, stamp);
+			await exchange.archive.write(ref, content, stamp);
 		},
 
 		async archiveGet(key, ref) {
@@ -298,10 +361,10 @@ export function createHostExchange(deps: {
 				if (step?.runId !== ref.runId) return null;
 			}
 			// Its own files are the step as it is now. A copy of a step's file
-			// of an earlier end is not there yet (`EngineExchange.readArchive`).
+			// of an earlier end is not there yet (`RunHistoryExchange.archive`).
 			return owner.walkerId === deps.selfId
-				? exchange.ownFile(ref)
-				: exchange.readArchive(ref);
+				? exchange.archive.own(ref)
+				: exchange.archive.read(ref);
 		},
 
 		async *archiveFollow(key, { step, afterSeq }, signal) {

@@ -83,6 +83,11 @@ export async function pairedReplicas(
 	const personId = owner.id;
 	const hostId = a.deviceId;
 
+	// A's Space documents: the engine's, and where the Host records a Clone.
+	const hostDocuments = createSpaceDocuments({
+		db: a.db,
+		directory: deviceDirectory(a.db),
+	});
 	const host: PeerEngine = createPeerEngine(
 		withPeers({
 			db: a.db,
@@ -90,6 +95,7 @@ export async function pairedReplicas(
 			deviceId: a.deviceId,
 			dataDir: a.dataDir,
 			scheduler: false,
+			spaceDocuments: hostDocuments,
 			relay: createRelay({
 				engine: () => host,
 				registry: () => host.devices,
@@ -118,6 +124,7 @@ export async function pairedReplicas(
 	const hostExchange = createHostExchange({
 		db: a.db,
 		engine: host,
+		documents: hostDocuments,
 		registry: host.devices,
 		selfId: a.deviceId,
 		ownerId: personId,
@@ -177,7 +184,7 @@ export async function pairedReplicas(
 		});
 		const [local] = await sandbox.db.select().from(user);
 		const listed = await hello(key);
-		await engine.exchange.hostSpaces.update(
+		await engine.hostSpaces.update(
 			{ id: hostId, name: "A" },
 			listed.spaces,
 			local?.id as string,

@@ -20,16 +20,14 @@ import { createSpaceRoutes } from "./route";
 export function createRelay(deps: {
 	/** Lazy: the engine is made with this relay. */
 	engine(): {
-		exchange: {
-			hostSpaces: Pick<PeerEngine["exchange"]["hostSpaces"], "hostOf">;
-			commands: Pick<PeerEngine["exchange"]["commands"], "enqueue">;
-		};
+		hostSpaces: Pick<PeerEngine["hostSpaces"], "hostOf">;
+		exchange: { commands: Pick<PeerEngine["exchange"]["commands"], "enqueue"> };
 	};
 	registry(): Pick<DeviceRegistry, "get">;
 	links(): Pick<DeviceLinks, "get">;
 }): HostRelay {
 	const { route, host } = createSpaceRoutes({
-		hostOf: (spaceId) => deps.engine().exchange.hostSpaces.hostOf(spaceId),
+		hostOf: (spaceId) => deps.engine().hostSpaces.hostOf(spaceId),
 		links: deps.links,
 	});
 

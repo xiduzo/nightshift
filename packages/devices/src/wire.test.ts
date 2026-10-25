@@ -376,11 +376,11 @@ describe("the devices runtime across a reload", () => {
 		// B's checks of the Command go on only once the reload began.
 		const entered = Promise.withResolvers<void>();
 		const go = Promise.withResolvers<void>();
-		const runOwner = first.engine.exchange.runOwner;
-		first.engine.exchange.runOwner = async (runId) => {
+		const apply = first.engine.exchange.apply;
+		first.engine.exchange.apply = async (command, engine) => {
 			entered.resolve();
 			await go.promise;
-			return runOwner(runId);
+			return apply(command, engine);
 		};
 		const gate = (await paired.host.space(a.spaceId).listGates())[0];
 		await paired.host

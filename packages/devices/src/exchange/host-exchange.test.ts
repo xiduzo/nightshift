@@ -7,6 +7,7 @@ import {
 	step as stepTable,
 	user,
 } from "@nightshift/db/schema";
+import { createSpaceDocuments, type SpaceDocuments } from "@nightshift/engine";
 import {
 	createRunLog,
 	createSandbox,
@@ -14,7 +15,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import { ORPCError } from "@orpc/server";
-import { createPeerEngine, type PeerEngine } from "../peers";
+import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import type { DeviceRegistry } from "../registry";
 import { withPeers } from "../testing";
 import { createWorkHub } from "../work";
@@ -28,10 +29,15 @@ import { createHostExchange } from "./host-exchange";
 
 let sandbox: Sandbox;
 let engine: PeerEngine;
+let documents: SpaceDocuments;
 let ownerId: string;
 let projectId: string;
 beforeEach(async () => {
 	sandbox = await createSandbox();
+	documents = createSpaceDocuments({
+		db: sandbox.db,
+		directory: deviceDirectory(sandbox.db),
+	});
 	engine = createPeerEngine(
 		withPeers({
 			db: sandbox.db,
@@ -39,6 +45,7 @@ beforeEach(async () => {
 			deviceId: sandbox.deviceId,
 			dataDir: sandbox.dataDir,
 			scheduler: false,
+			spaceDocuments: documents,
 		}),
 		{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
 	);
@@ -87,6 +94,7 @@ function host() {
 	return createHostExchange({
 		db: sandbox.db,
 		engine,
+		documents,
 		registry,
 		selfId: sandbox.deviceId,
 		ownerId,

@@ -61,7 +61,7 @@ beforeEach(async () => {
 		keyStore: "file",
 	});
 	const [local] = await sandbox.db.select().from(user);
-	await engine.exchange.hostSpaces.update(
+	await engine.hostSpaces.update(
 		{ id: HOST, name: "studio" },
 		[{ id: SPACE, name: "Team", personal: false, role: "member" }],
 		local?.id as string,

@@ -13,18 +13,20 @@ import {
 } from "@nightshift/db/schema";
 import type { RunStatus, RunStreamItem } from "@nightshift/engine";
 import {
+	createRunLog,
 	createSandbox,
 	type Sandbox,
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { ORPCError } from "@orpc/client";
 import { eq } from "drizzle-orm";
 import type { HostClient } from "../contract";
 import { onReplyMismatch, type ReplyMismatch } from "../contract/described";
 import type { Link } from "../links";
 import { httpsLink } from "../links/link";
-import type { PeerEngine } from "../peers";
-import { type PairedReplicas, pairedReplicas } from "../testing";
+import { createPeerEngine, type PeerEngine } from "../peers";
+import { type PairedReplicas, pairedReplicas, withPeers } from "../testing";
 import {
 	type AppliedCommands,
 	createDeviceExchange,
@@ -95,6 +97,7 @@ function deviceExchange(
 		selfId,
 		projectWaitMs: 5_000,
 		idleMs: 1_000,
+		commandWaitMs: 500,
 	});
 }
 
@@ -439,9 +442,7 @@ describe("the Device's exchange with its Host", () => {
 		);
 		// Past the wait: the stream starts again, the cursor did not move.
 		await waitFor(() => streams >= 3, { label: "a stream again" });
-		expect(
-			await paired.device.exchange.rows.cursorsWith(paired.hostId),
-		).toEqual({});
+		expect(await paired.device.exchange.cursorsWith(paired.hostId)).toEqual({});
 		expect(await statusOn(paired.device, run.id)).toBeNull();
 
 		// The Space document brings the project: the run lands.
@@ -529,9 +530,9 @@ describe("the Device's exchange with its Host", () => {
 			...paired.device,
 			exchange: {
 				...paired.device.exchange,
-				async runOwner(runId) {
+				async apply(command, engine) {
 					await Promise.race([both.promise, Bun.sleep(5_000)]);
-					return paired.device.exchange.runOwner(runId);
+					return paired.device.exchange.apply(command, engine);
 				},
 			},
 			space(spaceId, actor) {
@@ -542,15 +543,15 @@ describe("the Device's exchange with its Host", () => {
 		const reported: (string | null)[] = [];
 		const client = paired.memory.client(paired.key);
 		const reporting = withSync(client, {
-			stream: (async (input, options) => {
-				const batches = await client.sync.stream(input, options);
+			commands: (async (input, options) => {
+				const batches = await client.sync.commands(input, options);
 				return (async function* () {
 					for await (const batch of batches) {
 						if (batch.commands.length > 0 && ++holding === 2) both.resolve();
 						yield batch;
 					}
 				})();
-			}) as HostClient["sync"]["stream"],
+			}) as HostClient["sync"]["commands"],
 			commandDone: async (input, options) => {
 				reported.push(input.error);
 				return client.sync.commandDone(input, options);
@@ -641,6 +642,138 @@ describe("the Device's exchange with its Host", () => {
 			error: "The person who asked may not do this in this Space.",
 		});
 		expect(await statusOn(paired.device, run.id)).toBe("waiting");
+	});
+
+	test("a Command applied before a restart is not applied again: its id is in the event it wrote", async () => {
+		const run = await walkOnB(gateFlow);
+		// A never hears that B applied it: the link to A breaks at the report.
+		const client = paired.memory.client(paired.key);
+		const lost = withSync(client, {
+			commandDone: async () => {
+				throw new TypeError("The network connection was lost.");
+			},
+		});
+		const first = online(lost);
+		await untilStatus(paired.host, run.id, "waiting");
+		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		await paired.host
+			.space(a.spaceId, { personId: paired.personId })
+			.resolveGate({
+				runId: run.id,
+				stepId: gate?.stepId as string,
+				choice: "approve",
+			});
+		const [command] = await paired.host.exchange.commands.pendingOf(run.id);
+		await untilStatus(paired.device, run.id, "finished");
+		await first.stop();
+		await paired.device.dispose();
+		const answers = async () =>
+			(await b.db.select().from(event).where(eq(event.runId, run.id)))
+				.filter((e) => e.type === "StepEnded")
+				.map((e) => JSON.parse(e.payload))
+				.filter((p) => p.outcome === "approve");
+		expect(await answers()).toEqual([
+			expect.objectContaining({ commandId: command?.id }),
+		]);
+
+		// B restarts: a fresh engine over the same Replica, nothing in memory.
+		let applies = 0;
+		const fresh = createPeerEngine(
+			withPeers({
+				db: b.db,
+				harnesses: { "claude-code": agent },
+				deviceId: b.deviceId,
+				dataDir: b.dataDir,
+				scheduler: false,
+				spaceDocuments: paired.documents,
+			}),
+			{ runLog: createRunLog(b.db, { walkerId: b.deviceId }) },
+		);
+		const counting: PeerEngine = {
+			...fresh,
+			space(spaceId, actor) {
+				applies++;
+				return fresh.space(spaceId, actor);
+			},
+		};
+		online(client, deviceExchange(counting));
+		await waitFor(async () => (await commandOnA(command?.id as string)).done, {
+			label: "the Command done on A",
+		});
+		expect(await commandOnA(command?.id as string)).toEqual({
+			done: true,
+			error: null,
+		});
+		expect(applies).toBe(0);
+		expect(await answers()).toHaveLength(1);
+		await fresh.dispose();
+	});
+
+	test("a Command does not wait behind rows: it comes on its own stream", async () => {
+		const run = await walkOnB(gateFlow);
+		// The rows from A never come: B's pull stream hangs.
+		const client = paired.memory.client(paired.key);
+		online(
+			withSync(client, {
+				stream: (async (_input, options) =>
+					(async function* () {
+						await new Promise<void>((resolve) =>
+							options?.signal?.addEventListener("abort", () => resolve()),
+						);
+					})()) as HostClient["sync"]["stream"],
+			}),
+		);
+		await untilStatus(paired.host, run.id, "waiting");
+		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		await paired.host
+			.space(a.spaceId, { personId: paired.personId })
+			.resolveGate({
+				runId: run.id,
+				stepId: gate?.stepId as string,
+				choice: "approve",
+			});
+		await untilStatus(paired.device, run.id, "finished");
+		await untilStatus(paired.host, run.id, "finished");
+	});
+
+	test("a Host of an older version has no Commands stream: its Commands come with the rows", async () => {
+		const run = await walkOnB(gateFlow);
+		const client = paired.memory.client(paired.key);
+		let asked = 0;
+		online(
+			withSync(client, {
+				// It knows neither the procedure nor the option.
+				commands: (async () => {
+					asked++;
+					throw new ORPCError("NOT_FOUND", { status: 404 });
+				}) as HostClient["sync"]["commands"],
+				stream: ((input, options) =>
+					client.sync.stream(
+						{ cursors: input.cursors },
+						options,
+					)) as HostClient["sync"]["stream"],
+			}),
+		);
+		await untilStatus(paired.host, run.id, "waiting");
+		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		await paired.host
+			.space(a.spaceId, { personId: paired.personId })
+			.resolveGate({
+				runId: run.id,
+				stepId: gate?.stepId as string,
+				choice: "approve",
+			});
+		const [command] = await paired.host.exchange.commands.pendingOf(run.id);
+		await untilStatus(paired.device, run.id, "finished");
+		await waitFor(async () => (await commandOnA(command?.id as string)).done, {
+			label: "the Command done on A",
+		});
+		expect(await commandOnA(command?.id as string)).toEqual({
+			done: true,
+			error: null,
+		});
+		// It asked once, and waits: no stream that starts again and again.
+		expect(asked).toBe(1);
 	});
 
 	test("B keeps walking while A is away, and A catches up from the cursor when the link is back", async () => {
@@ -756,7 +889,7 @@ describe("the Device's exchange with its Host", () => {
 			.where(eq(runTable.spaceId, "space-private"));
 		expect(leaked).toEqual([]);
 		expect(
-			Object.keys(await paired.device.exchange.rows.cursorsWith(paired.hostId)),
+			Object.keys(await paired.device.exchange.cursorsWith(paired.hostId)),
 		).not.toContain("space-private");
 		// And not by the archive either.
 		expect(
@@ -896,7 +1029,7 @@ describe("live transcripts over the exchange", () => {
 			runId: run.id,
 			stepId: step,
 		};
-		expect(await paired.device.exchange.readArchive(ref)).not.toBeNull();
+		expect(await paired.device.exchange.archive.read(ref)).not.toBeNull();
 
 		// A resume reopens the step: its session goes on, and the run ends.
 		await onA.resumeRun(run.id);
@@ -998,7 +1131,7 @@ describe("live transcripts over the exchange", () => {
 			timeoutMs: 3_000,
 		}).catch(() => {});
 		await between.stop();
-		expect(await viewer.engine.exchange.readArchive(ref)).toBeNull();
+		expect(await viewer.engine.exchange.archive.read(ref)).toBeNull();
 
 		// The copy lands. C reads the step again.
 		release();
@@ -1036,7 +1169,7 @@ describe("live transcripts over the exchange", () => {
 						runId: run.id,
 						stepId: s.id,
 					};
-					if ((await paired.host.exchange.readArchive(ref)) === null) {
+					if ((await paired.host.exchange.archive.read(ref)) === null) {
 						return false;
 					}
 				}

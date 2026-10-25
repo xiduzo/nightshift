@@ -100,7 +100,13 @@ export const hostRouter = os.router({
 			input,
 			signal,
 		}) {
-			yield* context.exchange.stream(context.key, input.cursors, signal);
+			yield* context.exchange.stream(context.key, input, signal);
+		}),
+		commands: keyed.sync.commands.handler(async function* ({
+			context,
+			signal,
+		}) {
+			yield* context.exchange.commands(context.key, signal);
 		}),
 		push: keyed.sync.push.handler(({ context, input }) =>
 			context.exchange.push(context.key, input),

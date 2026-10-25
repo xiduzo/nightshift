@@ -21,15 +21,11 @@ import { createSpaceRoutes } from "./route";
 export function createWorkRelay(deps: {
 	hub: Pick<WorkHub, "call" | "online">;
 	/** Lazy: the engine is made with this relay. */
-	engine(): {
-		exchange: {
-			hostSpaces: Pick<PeerEngine["exchange"]["hostSpaces"], "hostOf">;
-		};
-	};
+	engine(): { hostSpaces: Pick<PeerEngine["hostSpaces"], "hostOf"> };
 	links(): Pick<DeviceLinks, "get">;
 }): WorkRelay {
 	const { route } = createSpaceRoutes({
-		hostOf: (spaceId) => deps.engine().exchange.hostSpaces.hostOf(spaceId),
+		hostOf: (spaceId) => deps.engine().hostSpaces.hostOf(spaceId),
 		links: deps.links,
 	});
 
