@@ -1,7 +1,6 @@
 import {
 	createGateQueries,
 	inboxOrder,
-	type OpenGate,
 	waitingForYou,
 } from "@nightshift/client";
 import { useQuery } from "@tanstack/react-query";
@@ -16,7 +15,7 @@ export function useInbox() {
 	const queries = useHostQueries(createGateQueries);
 	return useQuery({
 		...queries.open(),
-		select: (gates: OpenGate[]) => inboxOrder(gates),
+		select: inboxOrder,
 	});
 }
 
@@ -25,7 +24,7 @@ export function useWaitingCount(): number {
 	const queries = useHostQueries(createGateQueries);
 	const inbox = useQuery({
 		...queries.open(),
-		select: (gates: OpenGate[]) => waitingForYou(gates),
+		select: waitingForYou,
 	});
 	return inbox.data ?? 0;
 }

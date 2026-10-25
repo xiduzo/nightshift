@@ -3,7 +3,6 @@ import {
 	createProjectQueries,
 	createRunQueries,
 	inboxOrder,
-	type OpenGate,
 	type RunSummary,
 	whenLabel,
 } from "@nightshift/client";
@@ -34,7 +33,7 @@ export function SearchScreen() {
 	const projectQueries = useHostQueries(createProjectQueries);
 	const gates = useQuery({
 		...gateQueries.open(),
-		select: (open: OpenGate[]) => inboxOrder(open),
+		select: inboxOrder,
 	});
 	const runs = useQuery(runQueries.everyRun());
 	const projects = useQuery(projectQueries.list());

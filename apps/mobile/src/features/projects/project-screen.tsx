@@ -7,7 +7,6 @@ import {
 	inboxOrder,
 	type OpenGate,
 	type Project,
-	type RunSummary,
 } from "@nightshift/client";
 import { Button } from "@nightshift/ui-native/components/ui/button";
 import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
@@ -23,7 +22,7 @@ import {
 	Plus,
 	Workflow,
 } from "lucide-react-native";
-import type { ReactNode } from "react";
+import { type ReactNode, useCallback } from "react";
 import { Linking, View } from "react-native";
 
 import { useHostQueries } from "@/features/host";
@@ -52,14 +51,15 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 	const runQueries = useHostQueries(createRunQueries);
 	const flowQueries = useHostQueries(createFlowQueries);
 	const projects = useQuery(projectQueries.list());
-	const gates = useQuery({
-		...gateQueries.open(),
-		select: (open: OpenGate[]) =>
+	const ofProject = useCallback(
+		(open: OpenGate[]) =>
 			inboxOrder(open.filter((gate) => gate.projectId === projectId)),
-	});
+		[projectId],
+	);
+	const gates = useQuery({ ...gateQueries.open(), select: ofProject });
 	const runs = useQuery({
 		...runQueries.ofProject(projectId),
-		select: (list: RunSummary[]) => newestFirst(list),
+		select: newestFirst,
 	});
 	const flows = useQuery(flowQueries.list(projectId));
 	const refresh = useScreenRefresh([

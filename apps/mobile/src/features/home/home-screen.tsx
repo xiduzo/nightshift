@@ -61,7 +61,7 @@ export function HomeScreen() {
 	const summary = useQuery(dashboard.summary({ everySpace: true }));
 	const gates = useQuery({
 		...gateQueries.open(),
-		select: (open: OpenGate[]) => inboxOrder(open),
+		select: inboxOrder,
 	});
 	const refresh = useScreenRefresh([summary.refetch, gates.refetch]);
 
