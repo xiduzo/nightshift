@@ -44,4 +44,21 @@ describe("routes", () => {
 		};
 		expect(routeOf(book, more, at())).toBeUndefined();
 	});
+
+	test("drop when an end folds into a Section box, or unfolds out of one", () => {
+		const folded = (id: string) => (id === "b" ? "section:late" : id);
+		expect(routeOf(book, group, at(), folded)).toBeUndefined();
+		const boxed = recordRoutes(
+			nodes,
+			[group],
+			new Map([["a->b", route]]),
+			folded,
+		);
+		expect(boxed["a->b"]?.ends).toEqual(["a", "section:late"]);
+		expect(routeOf(boxed, group, at(), folded)).toEqual(route);
+		expect(routeOf(boxed, group, at())).toBeUndefined();
+		// Drawn as their nodes: nothing extra in the book.
+		expect(book["a->b"]?.ends).toBeUndefined();
+		expect(routeOf(book, group, at(), (id) => id)).toEqual(route);
+	});
 });
