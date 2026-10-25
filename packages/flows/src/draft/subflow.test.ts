@@ -130,6 +130,19 @@ describe("planSubflowFromSection on the build flow", () => {
 		});
 		// Positions start at the Section's corner.
 		expect(nodeOf(subflow, "build").position).toEqual({ x: 0, y: 0 });
+		// End nodes stand in their own column, so none covers a node.
+		const ends = subflow.nodes.filter((n) => n.id.startsWith("end_"));
+		const innerRight = Math.max(
+			...subflow.nodes
+				.filter((n) => !n.id.startsWith("end_"))
+				.map((n) => n.position.x),
+		);
+		expect(ends.length).toBeGreaterThan(0);
+		for (const end of ends) {
+			expect(end.position.x).toBeGreaterThan(innerRight);
+		}
+		const endYs = ends.map((n) => n.position.y);
+		expect(new Set(endYs).size).toBe(endYs.length);
 
 		// The caller: the Call where the Section was, its bindings and writes.
 		expect(nodeOf(caller, "build_part")).toEqual({
