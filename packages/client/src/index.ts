@@ -16,6 +16,7 @@ export {
 	type ApiQueryUtils,
 	type ApiTransport,
 	createApiClient,
+	createQueryClient,
 	createQueryUtils,
 	isSignInRequired,
 	isTwoFactorRequired,

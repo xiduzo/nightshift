@@ -1,5 +1,9 @@
-import { createApiClient, createQueryUtils } from "@nightshift/client";
-import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
+import {
+	createApiClient,
+	createQueryUtils,
+	createQueryClient as createSharedQueryClient,
+} from "@nightshift/client";
+import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { SERVER_URL } from "./server-url";
@@ -11,38 +15,26 @@ import { SERVER_URL } from "./server-url";
  */
 export type ErrorHandler = (client: QueryClient, error: unknown) => boolean;
 
-export function createQueryClient(handle: ErrorHandler) {
-	const toAccess = (error: unknown) => handle(client, error);
-	const client = new QueryClient({
-		mutationCache: new MutationCache({
-			onError: (error) => {
-				toAccess(error);
-			},
-		}),
-		queryCache: new QueryCache({
-			onError: (error, query) => {
-				if (toAccess(error)) return;
-				// Polling queries show their own error instead of a toast per poll.
-				if (query.meta?.quietErrors) return;
-				// A failed background refetch keeps the data it has; no toast either.
-				if (query.meta?.quietRefetchErrors && query.state.data !== undefined) {
-					return;
-				}
-				// Queries that fail for one reason (a run that is gone) show one toast.
-				toast.error(`Error: ${error.message}`, {
-					id: `query-error:${error.message}`,
-					action: {
-						label: "retry",
-						onClick: () => {
-							query.invalidate();
-						},
+/**
+ * The query client of this app: the shared rules of `@nightshift/client`,
+ * the access redirect, and a toast for a query error the person should see.
+ */
+export function createQueryClient(handle: ErrorHandler): QueryClient {
+	return createSharedQueryClient({
+		handle,
+		show: (error, query) => {
+			// Queries that fail for one reason (a run that is gone) show one toast.
+			toast.error(`Error: ${error.message}`, {
+				id: `query-error:${error.message}`,
+				action: {
+					label: "retry",
+					onClick: () => {
+						query.invalidate();
 					},
-				});
-			},
-		}),
-		defaultOptions: { queries: { staleTime: 60 * 1000 } },
+				},
+			});
+		},
 	});
-	return client;
 }
 
 /** The browser sends the session cookie with every call. */
