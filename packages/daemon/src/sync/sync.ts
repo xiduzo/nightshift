@@ -85,7 +85,10 @@ export type KeptSync = { nightshiftSync?: Sync };
  * Device keys and registry.
  */
 export function keepSync(kept: KeptSync, options: SyncOptions): Sync {
-	kept.nightshiftSync?.rebind(options);
+	const before = kept.nightshiftSync;
+	// A relay of an older version cannot be bound again: it stays as it is
+	// until the next restart.
+	if (typeof before?.rebind === "function") before.rebind(options);
 	kept.nightshiftSync ??= createSync(options);
 	return kept.nightshiftSync;
 }
