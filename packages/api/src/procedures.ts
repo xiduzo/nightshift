@@ -1,21 +1,22 @@
 import type { HostAccess, Permissions } from "@nightshift/auth";
 import { HostUnreachableError } from "@nightshift/engine";
+import {
+	FAILURE_MESSAGE,
+	Refusal,
+	type RefusalKind,
+} from "@nightshift/refusal";
 import { ORPCError, os } from "@orpc/server";
 
 import type { Context } from "./context";
 
 export const o = os.$context<Context>();
 
-/**
- * The engine and the stores throw errors written for people ("The run cap is
- * reached: …"). oRPC masks a plain Error as an internal server error, so pass
- * its message on as a bad request instead.
- */
-const readableErrors = o.middleware(async ({ next }) => {
+/** Every error of a procedure goes through `readable`, the one rule at the API seam. */
+const readableErrors = o.middleware(async ({ next, path }) => {
 	try {
 		return await next();
 	} catch (error) {
-		throw readable(error);
+		throw readable(error, path);
 	}
 });
 
@@ -26,14 +27,32 @@ const readableErrors = o.middleware(async ({ next }) => {
  */
 const HOST_UNREACHABLE_CODE = "HOST_UNREACHABLE";
 
+/** The oRPC code of each kind of refusal. oRPC gives each its HTTP status. */
+const REFUSAL_CODES: Record<RefusalKind, string> = {
+	invalid: "BAD_REQUEST",
+	"signed-out": "UNAUTHORIZED",
+	forbidden: "FORBIDDEN",
+	"not-found": "NOT_FOUND",
+	conflict: "CONFLICT",
+	unavailable: "SERVICE_UNAVAILABLE",
+};
+
 /**
- * An error written for people, as a bad request with its message. The
- * Host of the Space that cannot be reached is `HOST_UNREACHABLE` (503)
- * instead. A streaming handler throws after the middleware returned, so
- * it passes its errors through this itself.
+ * The error a person gets for `error`, thrown by the procedure at `path`:
+ * - An `ORPCError` passes on as it is: a declared error of the procedure
+ *   (`.errors`), or a refusal the API writes itself.
+ * - The Host of the Space that cannot be reached is `HOST_UNREACHABLE` (503).
+ * - A `Refusal` is the status of its kind, with its own words.
+ * - Anything else is a failure: a 500 with plain words. The error, with
+ *   its stack and the procedure's path, goes to the log, never to the person.
+ * A streaming handler throws after the middleware returned, so it passes
+ * its errors through this itself.
  */
-export function readable(error: unknown): unknown {
-	if (error instanceof ORPCError || !(error instanceof Error)) return error;
+export function readable(
+	error: unknown,
+	path: readonly string[],
+): ORPCError<string, unknown> {
+	if (error instanceof ORPCError) return error;
 	if (error instanceof HostUnreachableError) {
 		return new ORPCError(HOST_UNREACHABLE_CODE, {
 			status: 503,
@@ -41,7 +60,17 @@ export function readable(error: unknown): unknown {
 			cause: error,
 		});
 	}
-	return new ORPCError("BAD_REQUEST", { message: error.message, cause: error });
+	if (error instanceof Refusal) {
+		return new ORPCError(REFUSAL_CODES[error.kind], {
+			message: error.message,
+			cause: error,
+		});
+	}
+	console.error(`[api] ${path.join(".") || "a procedure"} failed:`, error);
+	return new ORPCError("INTERNAL_SERVER_ERROR", {
+		message: FAILURE_MESSAGE,
+		cause: error,
+	});
 }
 
 /** No session needed: the health check only. */

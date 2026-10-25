@@ -12,6 +12,7 @@ import {
 	isCustomHarness,
 	secretNameSchema,
 } from "@nightshift/flows";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { output } from "../output";
@@ -78,7 +79,9 @@ export const connections = {
 			if (isCustomHarness(input.target)) {
 				const agent = customAgentOf(values.customAgents, input.target);
 				if (!agent) {
-					throw new Error("This custom agent was removed. Add it again.");
+					throw new ORPCError("NOT_FOUND", {
+						message: "This custom agent was removed. Add it again.",
+					});
 				}
 				return context.checks.customAgent(agent.command, agent.label);
 			}
@@ -135,7 +138,12 @@ export const connections = {
 				};
 			}
 			const [config] = Object.values(expansion.servers);
-			if (!config) throw new Error("Nothing to test.");
+			if (!config) {
+				throw new ORPCError("BAD_REQUEST", {
+					message:
+						"This connection names no server. Add one, then test it again.",
+				});
+			}
 			return context.checks.mcp(config, values);
 		}),
 	/** Saves a secret in the system keychain. The value never comes back. */
@@ -172,7 +180,11 @@ export const connections = {
 				return { ok: false, tools: [], error: expansion.message };
 			}
 			const [config] = Object.values(expansion.servers);
-			if (!config) throw new Error("Nothing to list.");
+			if (!config) {
+				throw new ORPCError("BAD_REQUEST", {
+					message: "This connection names no server. Add one first.",
+				});
+			}
 			const result = await context.checks.mcp(config, values);
 			return { ok: result.ok, tools: result.tools, error: result.error };
 		}),

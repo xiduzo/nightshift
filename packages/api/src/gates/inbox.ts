@@ -48,8 +48,8 @@ export async function inboxOf(context: InboxContext): Promise<InboxGate[]> {
  *   the Gate's words for the refusal of `runProcedure`, which also refuses
  *   as `FORBIDDEN` when the Person's role in the Space does not allow an
  *   answer.
- * Any other problem (the run cap, a choice that is not an option) stays a
- * bad request with its message.
+ * Any other refusal (the run cap, a choice that is not an option) is the
+ * status of its kind with its words, and a failure a 500 (`readable`).
  */
 export const answerRefusals = {
 	GATE_CLOSED: { status: 409, message: "This Gate does not wait anymore." },

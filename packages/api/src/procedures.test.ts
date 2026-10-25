@@ -5,6 +5,7 @@ import {
 	beforeEach,
 	describe,
 	expect,
+	spyOn,
 	test,
 } from "bun:test";
 import {
@@ -26,10 +27,16 @@ import {
 	type OpenGate,
 	type SpaceEngine,
 } from "@nightshift/engine";
+import {
+	FAILURE_MESSAGE,
+	Refusal,
+	type RefusalKind,
+} from "@nightshift/refusal";
 import { call, ORPCError } from "@orpc/server";
 
 import type { Context } from "./context";
 import { onOutputMismatch } from "./output";
+import { readable } from "./procedures";
 import { appRouter } from "./router";
 
 /**
@@ -680,7 +687,10 @@ describe("a Host that requires two-factor sign-in", () => {
 });
 
 describe("a streaming procedure", () => {
-	test("passes an error written for people on, as it does for a plain call", async () => {
+	/** The error `devices.join` ends in after its code, when the join throws `thrown`. */
+	async function joinEndsIn(
+		thrown: Error,
+	): Promise<ORPCError<string, unknown>> {
 		const ada = await sandbox.signUp("Ada");
 		const base = await contextFor(ada.headers);
 		const context = {
@@ -700,27 +710,48 @@ describe("a streaming procedure", () => {
 						fingerprint: null,
 						expiresAt: 0,
 					};
-					throw new Error("The pairing was declined on the Host.");
+					throw thrown;
 				},
 			},
 		} as unknown as Context;
 		const progress = await call(
 			appRouter.devices.join,
 			{ url: "https://studio.example.com", role: "guest" },
-			{ context },
+			{ context, path: ["devices", "join"] },
 		);
 		const seen: string[] = [];
 		try {
 			for await (const step of progress) seen.push(step.kind);
-			throw new Error("The stream did not fail.");
 		} catch (error) {
+			expect(seen).toEqual(["code"]);
 			expect(error).toBeInstanceOf(ORPCError);
-			expect((error as ORPCError<string, unknown>).code).toBe("BAD_REQUEST");
-			expect((error as Error).message).toBe(
-				"The pairing was declined on the Host.",
-			);
+			return error as ORPCError<string, unknown>;
 		}
-		expect(seen).toEqual(["code"]);
+		throw new Error("The stream did not fail.");
+	}
+
+	test("passes a refusal on with its words, as it does for a plain call", async () => {
+		const error = await joinEndsIn(
+			new Refusal("forbidden", "The pairing was declined on the Host."),
+		);
+		expect(error.code).toBe("FORBIDDEN");
+		expect(error.message).toBe("The pairing was declined on the Host.");
+	});
+
+	test("ends a failure in plain words, and logs it with the procedure", async () => {
+		const failure = new Error("ECONNRESET: socket hang up at 10.0.0.7:443");
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const error = await joinEndsIn(failure);
+			expect(error.code).toBe("INTERNAL_SERVER_ERROR");
+			expect(error.message).toBe(FAILURE_MESSAGE);
+			expect(logged).toHaveBeenCalledWith(
+				"[api] devices.join failed:",
+				failure,
+			);
+		} finally {
+			logged.mockRestore();
+		}
 	});
 });
 
@@ -1091,11 +1122,11 @@ describe("the Needs-you inbox", () => {
 		});
 	});
 
-	test("another problem stays a bad request with its message", async () => {
+	test("another refusal is the status of its kind, with its words", async () => {
 		const { bob, spaceId } = await platform();
 		runSpaces.set("platform-run", spaceId);
 		onResolve = () => {
-			throw new Error("The run cap is reached: 2 runs at once.");
+			throw new Refusal("conflict", "The run cap is reached: 2 runs at once.");
 		};
 		const context = await contextFor(bob.headers);
 		expect(
@@ -1107,10 +1138,72 @@ describe("the Needs-you inbox", () => {
 				),
 			),
 		).toEqual({
-			code: "BAD_REQUEST",
+			code: "CONFLICT",
 			defined: false,
 			message: "The run cap is reached: 2 runs at once.",
 		});
+	});
+
+	test("a failure is a 500 in plain words, and its details go to the log", async () => {
+		const { bob, spaceId } = await platform();
+		runSpaces.set("platform-run", spaceId);
+		const failure = new Error(
+			"git worktree add failed: fatal: '/Users/bob/work' is already checked out (exit code 128)",
+		);
+		onResolve = () => {
+			throw failure;
+		};
+		const context = await contextFor(bob.headers);
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const error = await call(
+				appRouter.gates.resolve,
+				{ runId: "platform-run", stepId: "s", choice: "yes" },
+				{ context, path: ["gates", "resolve"] },
+			).catch((e: unknown) => e as ORPCError<string, unknown>);
+			expect(error).toBeInstanceOf(ORPCError);
+			expect(error).toMatchObject({
+				code: "INTERNAL_SERVER_ERROR",
+				status: 500,
+				defined: false,
+				message: FAILURE_MESSAGE,
+			});
+			expect(error.message).not.toContain("fatal");
+			expect(logged).toHaveBeenCalledWith(
+				"[api] gates.resolve failed:",
+				failure,
+			);
+		} finally {
+			logged.mockRestore();
+		}
+	});
+
+	test("a bug in the code is a failure too", async () => {
+		const { bob, spaceId } = await platform();
+		runSpaces.set("platform-run", spaceId);
+		onResolve = () => {
+			(null as unknown as { gate: string }).gate;
+		};
+		const context = await contextFor(bob.headers);
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			expect(
+				await refusalOf(
+					call(
+						appRouter.gates.resolve,
+						{ runId: "platform-run", stepId: "s", choice: "yes" },
+						{ context },
+					),
+				),
+			).toEqual({
+				code: "INTERNAL_SERVER_ERROR",
+				defined: false,
+				message: FAILURE_MESSAGE,
+			});
+			expect(logged.mock.calls[0]?.[1]).toBeInstanceOf(TypeError);
+		} finally {
+			logged.mockRestore();
+		}
 	});
 
 	test("an answer the Host of the Space cannot take now has its own code", async () => {
@@ -1151,5 +1244,33 @@ describe("the Needs-you inbox", () => {
 			);
 			expect([refusal.code, refusal.defined]).toEqual([code, true]);
 		}
+	});
+});
+
+describe("the error rule at the API seam", () => {
+	test("gives each kind of refusal its status, with its words", () => {
+		const expected: Record<RefusalKind, { code: string; status: number }> = {
+			invalid: { code: "BAD_REQUEST", status: 400 },
+			"signed-out": { code: "UNAUTHORIZED", status: 401 },
+			forbidden: { code: "FORBIDDEN", status: 403 },
+			"not-found": { code: "NOT_FOUND", status: 404 },
+			conflict: { code: "CONFLICT", status: 409 },
+			unavailable: { code: "SERVICE_UNAVAILABLE", status: 503 },
+		};
+		for (const [kind, answer] of Object.entries(expected)) {
+			const refusal = new Refusal(kind as RefusalKind, "Words for people.");
+			expect(readable(refusal, ["runs", "start"])).toMatchObject({
+				...answer,
+				message: "Words for people.",
+			});
+		}
+	});
+
+	test("passes an oRPC error on as it is, a declared one too", () => {
+		const declared = new ORPCError("GATE_CLOSED", {
+			status: 409,
+			message: "This Gate does not wait anymore.",
+		});
+		expect(readable(declared, ["gates", "resolve"])).toBe(declared);
 	});
 });

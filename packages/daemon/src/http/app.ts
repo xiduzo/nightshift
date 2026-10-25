@@ -2,7 +2,7 @@ import { appRouter, runSpaceFor } from "@nightshift/api";
 import { authEndpointAllowed, PEER_ADDRESS_HEADER } from "@nightshift/auth";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
-import { onError } from "@orpc/server";
+import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { Hono } from "hono";
@@ -152,25 +152,27 @@ export function createHttp(
 		);
 	});
 
+	/**
+	 * The procedures answer their own errors and log their failures (`readable`
+	 * in `@nightshift/api`, the peer protocol in `@nightshift/devices`). This
+	 * logs only an error outside them, such as a reply that cannot be encoded.
+	 */
+	const logUnanswered = (error: unknown) => {
+		if (!(error instanceof ORPCError))
+			console.error("[http] a call failed:", error);
+	};
+
 	const apiHandler = new OpenAPIHandler(appRouter, {
 		plugins: [
 			new OpenAPIReferencePlugin({
 				schemaConverters: [new ZodToJsonSchemaConverter()],
 			}),
 		],
-		interceptors: [
-			onError((error) => {
-				console.error(error);
-			}),
-		],
+		interceptors: [onError(logUnanswered)],
 	});
 
 	const rpcHandler = new RPCHandler(appRouter, {
-		interceptors: [
-			onError((error) => {
-				console.error(error);
-			}),
-		],
+		interceptors: [onError(logUnanswered)],
 	});
 
 	app.use("/*", async (c, next) => {

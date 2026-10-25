@@ -2,7 +2,7 @@ import { flowNameSchema, flowSchema, labelSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { output, stream } from "../output";
-import { permitted, protectedProcedure } from "../procedures";
+import { permitted, protectedProcedure, readable } from "../procedures";
 import { runProcedure } from "./run-space";
 import {
 	artifactSchema,
@@ -205,15 +205,19 @@ export const runs = {
 				"Streams the status, steps and transcript of a run: what is saved first, then live.",
 		})
 		.output(stream(runStreamItemSchema))
-		.handler(async function* ({ context, input, signal }) {
+		.handler(async function* ({ context, input, signal, path }) {
 			const controller = new AbortController();
 			signal?.addEventListener("abort", () => controller.abort(), {
 				once: true,
 			});
-			yield* context.space.watchRun(input.runId, {
-				signal: controller.signal,
-				afterSeq: input.afterSeq,
-			});
+			try {
+				yield* context.space.watchRun(input.runId, {
+					signal: controller.signal,
+					afterSeq: input.afterSeq,
+				});
+			} catch (error) {
+				throw readable(error, path);
+			}
 		}),
 	/** Sends a signal to a run whose Wait node waits for it. */
 	signal: runProcedure(z.object({ runId: z.string(), name: labelSchema }), {

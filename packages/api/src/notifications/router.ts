@@ -28,7 +28,7 @@ export const notifications = {
 		})
 		.input(watchInputSchema)
 		.output(stream(notificationItemSchema))
-		.handler(async function* ({ context, input, signal }) {
+		.handler(async function* ({ context, input, signal, path }) {
 			const controller = new AbortController();
 			signal?.addEventListener("abort", () => controller.abort(), {
 				once: true,
@@ -42,7 +42,7 @@ export const notifications = {
 					{ here: context.fromThisComputer, phone: input?.phone === true },
 				);
 			} catch (error) {
-				throw readable(error);
+				throw readable(error, path);
 			} finally {
 				controller.abort();
 			}

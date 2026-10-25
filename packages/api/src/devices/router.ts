@@ -139,11 +139,11 @@ export const devices = {
 				role: z.enum(["home", "guest"]).default("home"),
 			}),
 		)
-		.handler(async function* ({ context, input, signal }) {
+		.handler(async function* ({ context, input, signal, path }) {
 			try {
 				yield* context.devices.join(input, signal);
 			} catch (error) {
-				throw readable(error);
+				throw readable(error, path);
 			}
 		}),
 };
