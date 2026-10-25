@@ -117,19 +117,19 @@ describe("flowGraph", () => {
 			flowOf(
 				["a", "b", "c"],
 				[
-					edge("a", "error", "b"),
+					edge("a", "failure", "b"),
 					edge("a", "success", "b"),
 					edge("b", "success", "c"),
-					edge("c", "error", "a", 2),
+					edge("c", "failure", "a", 2),
 					edge("c", "gone", "b"),
 				],
 			),
 		);
-		// Command nodes show success, error and other.
+		// Command nodes show success, failure and other.
 		expect(graph.edges.map((e) => [e.id, e.label?.text])).toEqual([
-			["a->b", "success · error"],
+			["a->b", "success · failure"],
 			["b->c", undefined],
-			["c->a", "error ×2"],
+			["c->a", "failure ×2"],
 			["c->b", "gone"],
 		]);
 		expect(graph.edges.map((e) => e.back ?? false)).toEqual([
@@ -176,7 +176,7 @@ describe("layoutFlow", () => {
 			await laidOut(
 				flowOf(
 					["a", "onFail", "onPass"],
-					[edge("a", "error", "onFail"), edge("a", "success", "onPass")],
+					[edge("a", "failure", "onFail"), edge("a", "success", "onPass")],
 				),
 			),
 		);
@@ -192,7 +192,7 @@ describe("layoutFlow", () => {
 			flowOf(
 				["check", "fix", "begin"],
 				[
-					edge("check", "error", "fix"),
+					edge("check", "failure", "fix"),
 					edge("fix", "success", "check", 3),
 					edge("begin", "success", "fix"),
 				],

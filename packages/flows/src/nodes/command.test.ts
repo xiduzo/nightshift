@@ -18,7 +18,6 @@ describe("Command exits", () => {
 		const node = { ...commandNode("check", { x: 0, y: 0 }), command: "true" };
 		const flow: Flow = {
 			version: FLOW_VERSION,
-			name: "check",
 			start: "check",
 			inputs: [],
 			outputs: [],

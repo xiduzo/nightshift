@@ -37,13 +37,13 @@ function flowOf(edges: FlowEdge[]): Flow {
 
 describe("groupEdges", () => {
 	test("draws one edge per node pair, its outcomes in handle order", () => {
-		// Command nodes show success, error, other.
+		// Command nodes show success, failure, other.
 		const groups = groupEdges(
 			flowOf([
 				edge("a", "other", "b"),
 				edge("a", "success", "c"),
 				edge("a", "success", "b"),
-				edge("b", "error", "c"),
+				edge("b", "failure", "c"),
 			]),
 		);
 		expect(
@@ -51,7 +51,7 @@ describe("groupEdges", () => {
 		).toEqual([
 			["a-success-b", "a->b", 2],
 			["a-success-c", "a->c", 1],
-			["b-error-c", "b->c", 1],
+			["b-failure-c", "b->c", 1],
 		]);
 		expect(groups[0]?.edges.map((e) => e.outcome)).toEqual([
 			"success",
@@ -63,18 +63,18 @@ describe("groupEdges", () => {
 		const groups = groupEdges(
 			flowOf([
 				edge("a", "gone", "b"),
-				edge("a", "error", "b"),
+				edge("a", "failure", "b"),
 				edge("a", "success", "ghost"),
 			]),
 		);
 		expect(groups).toHaveLength(1);
-		expect(groups[0]?.edges.map((e) => e.outcome)).toEqual(["error", "gone"]);
+		expect(groups[0]?.edges.map((e) => e.outcome)).toEqual(["failure", "gone"]);
 	});
 
 	test("keeps every edge: the run counts of a drawn edge add up", () => {
 		const flow = flowOf([
 			edge("a", "success", "b"),
-			edge("a", "error", "b"),
+			edge("a", "failure", "b"),
 			edge("a", "other", "c"),
 		]);
 		const ids = groupEdges(flow).flatMap((group) =>
