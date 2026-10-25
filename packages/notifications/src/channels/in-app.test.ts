@@ -58,6 +58,47 @@ test("each open stream of the Person gets each item; a closed one stays active a
 	expect(inApp.isActive("ada")).toBe(false);
 });
 
+test("the phone app counts as open while its stream is, and closed once it leaves the front", async () => {
+	let clock = 1_000;
+	const inApp = createInAppChannel({ now: () => clock, recentMs: 60_000 });
+	const stop = new AbortController();
+	const done = (async () => {
+		for await (const _ of inApp.watch("ada", stop.signal, { phone: true })) {
+		}
+	})();
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	expect(inApp.isActive("ada")).toBe(true);
+
+	stop.abort();
+	await done;
+	clock += 1;
+	expect(inApp.isActive("ada")).toBe(false);
+});
+
+test("a run that changed reaches each open stream of the Person, with no key and no alert", async () => {
+	const inApp = createInAppChannel({ now: () => 5 });
+	const stop = new AbortController();
+	const got: InAppItem[] = [];
+	const done = (async () => {
+		for await (const item of inApp.watch("ada", stop.signal)) got.push(item);
+	})();
+	inApp.runChanged(
+		{ kind: "in-app", personId: "ada" },
+		{ spaceId: "space-1", runId: "run-1" },
+	);
+	inApp.runChanged(
+		{ kind: "in-app", personId: "bob" },
+		{ spaceId: "space-1", runId: "run-2" },
+	);
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	stop.abort();
+	await done;
+
+	expect(got).toEqual([
+		{ kind: "run-changed", spaceId: "space-1", runId: "run-1", at: 5 },
+	]);
+});
+
 test("a stream from this computer makes the Person active here; one from elsewhere does not", async () => {
 	let clock = 1_000;
 	const inApp = createInAppChannel({ now: () => clock, recentMs: 60_000 });

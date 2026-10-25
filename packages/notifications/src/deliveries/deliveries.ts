@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { notificationDelivery } from "@nightshift/db/schema";
-import { and, eq, inArray, lte } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 /**
  * The delivery log: what the notifier did with each event for each
@@ -14,7 +14,7 @@ import { and, eq, inArray, lte } from "drizzle-orm";
 export type NoticeKind = "gate-opened" | "run-finished" | "run-failed";
 
 /**
- * `held`: waits until `dueAt`, because another screen is open. `quiet`:
+ * `held`: waits until `dueAt` while another screen is open. `quiet`:
  * waits for the end of quiet hours. `sent`: went out. `dropped`: did not
  * go out and never will. `withdrawn`: the Gate closed after it went out.
  */
@@ -173,17 +173,12 @@ export function createDeliveryLog(db: Database) {
 			return rows.map(toDelivery);
 		},
 
-		/** The held entries whose time has come. */
-		async due(now: number): Promise<Delivery[]> {
+		/** The held entries: each waits for its time, or until its Person has no screen open. */
+		async held(): Promise<Delivery[]> {
 			const rows = await db
 				.select()
 				.from(notificationDelivery)
-				.where(
-					and(
-						eq(notificationDelivery.status, "held"),
-						lte(notificationDelivery.dueAt, new Date(now)),
-					),
-				);
+				.where(eq(notificationDelivery.status, "held"));
 			return rows.map(toDelivery);
 		},
 

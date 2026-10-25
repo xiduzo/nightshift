@@ -93,13 +93,23 @@ function makeNotifier(): Notifier {
 	});
 }
 
-/** A Person's open page: what its in-app stream got. */
-function openScreen(personId: string): InAppItem[] {
+/**
+ * A Person's open page, or the phone app in front (`phone`): what its
+ * in-app stream got.
+ */
+function openScreen(
+	personId: string,
+	options: { phone?: boolean } = {},
+): InAppItem[] {
 	const items: InAppItem[] = [];
 	const controller = new AbortController();
 	streams.push(controller);
 	void (async () => {
-		for await (const item of inApp.watch(personId, controller.signal)) {
+		for await (const item of inApp.watch(
+			personId,
+			controller.signal,
+			options,
+		)) {
 			items.push(item);
 		}
 	})();
@@ -209,11 +219,14 @@ describe("who hears of an event", () => {
 			["gate-opened", true],
 			["run-failed", true],
 			["run-finished", true],
+			// A run that stops tells nobody, but the open pages update.
+			["run-changed", false],
 		]);
 		expect(bob.map((i) => [i.kind, "alert" in i && i.alert])).toEqual([
 			["gate-opened", true],
 			["run-failed", false],
 			["run-finished", true],
+			["run-changed", false],
 		]);
 		expect(ada[1]).toMatchObject({ title: "A run failed", stepId: null });
 	});
@@ -552,6 +565,147 @@ describe("the active screen first", () => {
 		expect(web.sent()).toHaveLength(1);
 		expect(expo.sent()).toHaveLength(1);
 	});
+
+	test("the phone app in front holds the push; its stream gets the Gate at once to show it", async () => {
+		await notifier.start();
+		await register("ada", "expo");
+		const phone = openScreen("ada", { phone: true });
+
+		await openGate("run-1", "step-1");
+
+		expect(phone.map((i) => [i.kind, "alert" in i && i.alert])).toEqual([
+			["gate-opened", true],
+		]);
+		expect(expo.calls).toEqual([]);
+	});
+
+	test("a phone app that went to the background is no open screen: a new Gate is pushed at once", async () => {
+		await notifier.start();
+		const phone = await register("ada", "expo");
+		openScreen("ada", { phone: true });
+		await closeScreens();
+
+		clock += 10_000;
+		await openGate("run-1", "step-1");
+
+		expect(sentTo(expo)).toEqual([`${phone.id}:run-1:step-1`]);
+	});
+
+	test("a page that closed counts as open for a minute: it may reload", async () => {
+		await notifier.start();
+		await register("ada", "expo");
+		openScreen("ada");
+		await closeScreens();
+
+		clock += 10_000;
+		await openGate("run-1", "step-1");
+
+		expect(expo.calls).toEqual([]);
+	});
+
+	test("a held push goes once the person has no screen open, not after the full delay", async () => {
+		await notifier.start();
+		const phone = await register("ada", "expo");
+		openScreen("ada", { phone: true });
+		await openGate("run-1", "step-1");
+		expect(expo.calls).toEqual([]);
+
+		// The person puts the phone away without an answer.
+		await closeScreens();
+		clock += 15_000;
+		await notifier.tick();
+
+		expect(sentTo(expo)).toEqual([`${phone.id}:run-1:step-1`]);
+	});
+
+	test("a held push waits out the minute of a page that closed, then goes", async () => {
+		await notifier.start();
+		const phone = await register("ada", "expo");
+		openScreen("ada");
+		await openGate("run-1", "step-1");
+		await closeScreens();
+
+		clock += 30_000;
+		await notifier.tick();
+		expect(expo.calls).toEqual([]);
+
+		clock += 31_000;
+		await notifier.tick();
+		expect(sentTo(expo)).toEqual([`${phone.id}:run-1:step-1`]);
+	});
+});
+
+describe("the open screens hear when a run changes", () => {
+	test("a run that starts, sleeps, wakes, moves, stops or ends tells each open screen of its Space, quietly", async () => {
+		await notifier.start();
+		await register("ada", "web");
+		const ada = openScreen("ada");
+		const cy = openScreen("cy");
+
+		for (const type of [
+			"RunStarted",
+			"StepStarted",
+			"WaitStarted",
+			"WaitEnded",
+			"WalkerMoved",
+			"StopRequested",
+			"StepEnded",
+		]) {
+			events.land([event(type, "run-1", "step-1")]);
+			await notifier.idle();
+		}
+		await endRun("run-1", "stopped");
+
+		expect(ada).toHaveLength(8);
+		expect(ada[0]).toEqual({
+			kind: "run-changed",
+			spaceId: SPACE,
+			runId: "run-1",
+			at: NOON,
+		});
+		expect(new Set(ada.map((i) => i.kind))).toEqual(new Set(["run-changed"]));
+		// Not a Member of the run's Space.
+		expect(cy).toEqual([]);
+		// Quiet: no push.
+		expect(web.calls).toEqual([]);
+	});
+
+	test("once per run in a landing; a run told of otherwise in it hears nothing more", async () => {
+		await notifier.start();
+		const ada = openScreen("ada");
+		events.setOpen(SPACE, [{ runId: "run-2", stepId: "gate" }]);
+
+		events.land([
+			event("StepStarted", "run-1", "a"),
+			event("StepEnded", "run-1", "a"),
+			event("StepStarted", "run-1", "b"),
+			event("StepStarted", "run-2", "gate"),
+			event("GateOpened", "run-2", "gate"),
+			event("StepEnded", "run-3", "c"),
+			event("RunEnded", "run-3", null, { status: "finished", reason: null }),
+		]);
+		await notifier.idle();
+
+		expect(ada.map((i) => [i.kind, i.runId])).toEqual([
+			["gate-opened", "run-2"],
+			["run-finished", "run-3"],
+			["run-changed", "run-1"],
+		]);
+	});
+
+	test("what changes no list of runs tells nothing", async () => {
+		await notifier.start();
+		const ada = openScreen("ada");
+
+		events.land([
+			event("SessionUsage", "run-1", "a"),
+			event("EdgeTaken", "run-1", "a"),
+			event("VariablesSet", "run-1", "a"),
+		]);
+		await notifier.idle();
+
+		expect(ada).toEqual([]);
+	});
 });
 
 describe("answer once, clear everywhere", () => {
@@ -646,7 +800,7 @@ describe("once per key", () => {
 		await notifier.idle();
 
 		expect(web.sent()).toHaveLength(1);
-		expect(screen).toEqual([]);
+		expect(screen.map((i) => i.kind)).toEqual(["run-changed"]);
 	});
 
 	test("a Gate that opened while no notifier listened is pushed at start", async () => {

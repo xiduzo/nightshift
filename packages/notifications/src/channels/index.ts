@@ -20,6 +20,7 @@ export {
 	createInAppChannel,
 	type InAppChannel,
 	type InAppItem,
+	type WatchOptions,
 } from "./in-app";
 export { createVapidKeyStore, type VapidKeys } from "./vapid-keys";
 export { createWebPushChannel, type WebPushSender } from "./web-push";

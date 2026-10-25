@@ -281,4 +281,32 @@ describe("notifications", () => {
 		controller.abort();
 		await stream.return?.();
 	});
+
+	test("the phone app's stream carries a run that changed, and counts as closed once it ends", async () => {
+		const adaPerson = await sandbox.signUp("Ada");
+		const ada = await contextFor(adaPerson.headers);
+		const controller = new AbortController();
+		const stream = (await call(
+			appRouter.notifications.watch,
+			{ phone: true },
+			{ context: ada, signal: controller.signal },
+		)) as AsyncIterator<unknown>;
+		const first = stream.next();
+		while (!inApp.isActive(adaPerson.userId)) await Bun.sleep(5);
+
+		inApp.runChanged(
+			{ kind: "in-app", personId: adaPerson.userId },
+			{ spaceId: "space-1", runId: "run-1" },
+		);
+
+		expect((await first).value).toEqual({
+			kind: "run-changed",
+			spaceId: "space-1",
+			runId: "run-1",
+			at: expect.any(Number),
+		});
+		controller.abort();
+		await stream.return?.();
+		expect(inApp.isActive(adaPerson.userId)).toBe(false);
+	});
 });

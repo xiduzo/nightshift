@@ -8,6 +8,7 @@ import {
 	type InAppItem,
 	type PushChannels,
 	type VapidKeys,
+	type WatchOptions,
 	type WebPushSender,
 } from "./channels";
 import { createDeliveryLog } from "./deliveries";
@@ -62,11 +63,12 @@ export type Notifications = {
 	/**
 	 * The Person's in-app stream: every event of every Space they are in,
 	 * until `signal` aborts. `here`: the screen is on this computer.
+	 * `phone`: the phone app, which counts as closed once it leaves the front.
 	 */
 	watch(
 		personId: string,
 		signal: AbortSignal,
-		options?: { here?: boolean },
+		options?: WatchOptions,
 	): AsyncGenerator<InAppItem>;
 	settings: {
 		get(personId: string): Promise<NotificationSettings>;

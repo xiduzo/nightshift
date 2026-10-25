@@ -11,6 +11,7 @@ import {
 	notificationItemSchema,
 	pushTargetSchema,
 	settingsSchema,
+	watchInputSchema,
 	webPushKeySchema,
 } from "./schemas";
 
@@ -23,10 +24,11 @@ export const notifications = {
 	watch: protectedProcedure
 		.route({
 			summary:
-				"Streams what happens in every Space you are in: a new Gate, a closed Gate, a finished run, a failed run.",
+				"Streams what happens in every Space you are in: a new Gate, a closed Gate, a finished run, a failed run, a run that changed.",
 		})
+		.input(watchInputSchema)
 		.output(stream(notificationItemSchema))
-		.handler(async function* ({ context, signal }) {
+		.handler(async function* ({ context, input, signal }) {
 			const controller = new AbortController();
 			signal?.addEventListener("abort", () => controller.abort(), {
 				once: true,
@@ -37,7 +39,7 @@ export const notifications = {
 				yield* context.notifications.watch(
 					context.session.user.id,
 					controller.signal,
-					{ here: context.fromThisComputer },
+					{ here: context.fromThisComputer, phone: input?.phone === true },
 				);
 			} catch (error) {
 				throw readable(error);

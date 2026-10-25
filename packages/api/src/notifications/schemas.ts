@@ -51,8 +51,27 @@ export const notificationItemSchema = exact<InAppItem>()(
 			stepId: z.string(),
 			at: z.number(),
 		}),
+		/**
+		 * A run started, slept or woke, moved, stopped or ended, or a step
+		 * started or ended. No key and no `alert`: an older screen reads
+		 * everything again and shows nothing.
+		 */
+		z.object({
+			kind: z.literal("run-changed"),
+			spaceId: z.string(),
+			runId: z.string(),
+			at: z.number(),
+		}),
 	]),
 );
+
+/** Who follows the stream. Optional, so an older screen sends nothing. */
+export const watchInputSchema = z
+	.object({
+		/** The phone app: it counts as closed once it leaves the front. */
+		phone: z.boolean().optional(),
+	})
+	.optional();
 
 /** The public VAPID key of this Night Shift. Null: it sends no browser notifications. */
 export const webPushKeySchema = z.object({

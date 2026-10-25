@@ -9,9 +9,9 @@ import type {
 /**
  * The in-app stream: every open page and the open phone app of a Person
  * get each event at once, over one stream (`notifications.watch`). It
- * replaces the web app's polling. It also tells the notifier whether the
- * Person has a screen open now (`isActive`): the active screen goes first,
- * and a push to a phone waits.
+ * replaces polling. It also tells the notifier whether the Person has a
+ * screen open now (`isActive`): the active screen goes first, and a push
+ * to a phone waits.
  */
 
 /** One item of the in-app stream. */
@@ -34,23 +34,53 @@ export type InAppItem =
 			runId: string;
 			stepId: string;
 			at: number;
+	  }
+	/**
+	 * A run changed what a list of runs shows: it started, slept or woke,
+	 * moved, stopped or ended, or a step started or ended. Quiet: no key
+	 * and no `alert`, so a screen only reads the run again. A screen that
+	 * does not know the kind reads everything again, which is safe.
+	 */
+	| {
+			kind: "run-changed";
+			spaceId: string;
+			runId: string;
+			at: number;
 	  };
 
-/** A screen counts as open this long after its stream ended: a page that reloads. */
+/** A page counts as open this long after its stream ended: a page that reloads. */
 const DEFAULT_RECENT_MS = 60_000;
+
+/** Where a stream comes from. */
+export type WatchOptions = {
+	/** The screen is on this computer (the request came from this computer itself). */
+	here?: boolean;
+	/**
+	 * The phone app. It ends its stream when it leaves the front, so it
+	 * counts as closed at once: no minute for a reload.
+	 */
+	phone?: boolean;
+};
 
 export type InAppChannel = NotificationChannel<InAppTarget> & {
 	/**
 	 * The Person's stream: each item from now on, until `signal` aborts.
-	 * While it is open, the Person has a screen open. `here`: the screen
-	 * is on this computer (the request came from this computer itself).
+	 * While it is open, the Person has a screen open.
 	 */
 	watch(
 		personId: string,
 		signal: AbortSignal,
-		options?: { here?: boolean },
+		options?: WatchOptions,
 	): AsyncGenerator<InAppItem>;
-	/** Whether the Person has a screen open, or had one a moment ago. */
+	/** Tells the Person's open screens that a run changed. No push, no notification. */
+	runChanged(
+		target: InAppTarget,
+		run: { spaceId: string; runId: string },
+	): void;
+	/**
+	 * Whether the Person has a screen open, or closed a page a moment ago.
+	 * A phone app that left the front does not count.
+	 */
 	isActive(personId: string): boolean;
 	/** Whether the Person has a screen open on this computer, or had one a moment ago. */
 	isActiveHere(personId: string): boolean;
@@ -62,7 +92,7 @@ export function createInAppChannel(
 	const now = options.now ?? Date.now;
 	const recentMs = options.recentMs ?? DEFAULT_RECENT_MS;
 	const listeners = new Map<string, Set<(item: InAppItem) => void>>();
-	/** When each Person's last stream ended. */
+	/** When each Person's last page closed its stream. */
 	const left = new Map<string, number>();
 	/** The open streams from this computer, and when the last one ended, per Person. */
 	const hereOpen = new Map<string, number>();
@@ -109,6 +139,10 @@ export function createInAppChannel(
 				...gate,
 				at: now(),
 			});
+		},
+
+		runChanged(target, run) {
+			publish(target.personId, { kind: "run-changed", ...run, at: now() });
 		},
 
 		isActive(personId) {
@@ -160,7 +194,8 @@ export function createInAppChannel(
 				const current = listeners.get(personId);
 				current?.delete(listener);
 				if (current?.size === 0) listeners.delete(personId);
-				left.set(personId, now());
+				// The phone app left the front: that is no reload.
+				if (options.phone !== true) left.set(personId, now());
 				if (here) {
 					const count = (hereOpen.get(personId) ?? 1) - 1;
 					if (count > 0) hereOpen.set(personId, count);

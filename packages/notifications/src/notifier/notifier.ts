@@ -6,7 +6,7 @@ import {
 	type PushChannels,
 	titleOf,
 } from "../channels";
-import { runEndKey, waitingKey } from "../contract";
+import { parseGateKey, runEndKey, waitingKey } from "../contract";
 import type { Claim, Delivery, DeliveryLog, NoticeKind } from "../deliveries";
 import {
 	inQuietHours,
@@ -37,11 +37,17 @@ import type { RunEvent, RunEventSource } from "./sources";
  *   says how many of the Gates it held still wait (or the one Gate
  *   itself). Runs that ended meanwhile go without a push.
  * - The active screen first: while the person has a page or the app open,
- *   a push to a phone or a closed browser waits `holdMinutes`. A Gate
- *   answered meanwhile is not pushed at all. A run that ended is pushed
- *   only when the person closed every screen meanwhile. The desktop app
- *   is a screen of its own: it is not held. Its channel skips what the
- *   person already looks at on this computer (`desktop/`).
+ *   a push to a phone or a closed browser waits, at most `holdMinutes`.
+ *   It goes once the person has no screen open (`isActive`: a page counts
+ *   for a minute after it closes, the phone app not after it leaves the
+ *   front). A Gate answered meanwhile is not pushed at all. A run that
+ *   ended is pushed only when the person closed every screen meanwhile.
+ *   The desktop app is a screen of its own: it is not held. Its channel
+ *   skips what the person already looks at on this computer (`desktop/`).
+ * - Open screens hear when a run changes (`run-changed`): it starts,
+ *   sleeps or wakes, moves, stops or ends, or a step starts or ends. That
+ *   is quiet: no push, and the item shows nothing. A screen reads the run
+ *   again instead of polling.
  * - Answer once, clear everywhere: when a Gate closes, every screen that
  *   got it gets a withdraw, and what still waits is dropped.
  * - Lock-screen answers: a push about a Gate its author marked carries its
@@ -101,6 +107,27 @@ const DEFAULT_TICK_MS = 15_000;
  * sender of a push. Its channel reaches no other computer.
  */
 const LOCAL_KINDS: ReadonlySet<PushTarget["kind"]> = new Set(["desktop"]);
+
+/**
+ * The run events that change what a list of runs shows: the status, the
+ * step that runs, the Walker, a stop that waits. A Gate and a run's end
+ * have items of their own. Cost and transcript events do not count.
+ */
+const RUN_CHANGES: ReadonlySet<string> = new Set([
+	"RunStarted",
+	"RunResumed",
+	"RunEnded",
+	"StepStarted",
+	"StepReopened",
+	"StepEnded",
+	"WaitStarted",
+	"WaitEnded",
+	"WalkerMoved",
+	"HandedOff",
+	"StopRequested",
+	"StopAfterStepRequested",
+	"StopAfterStepCancelled",
+]);
 
 export function createNotifier(deps: NotifierDeps): Notifier {
 	const now = deps.now ?? Date.now;
@@ -321,10 +348,17 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			bySpace.set(event.spaceId, list);
 		}
 		for (const [spaceId, list] of bySpace) {
+			/** The runs of this landing an item already tells of: a screen reads them again. */
+			const told = new Set<string>();
 			const { opened, closed } = await gates.apply(spaceId, list);
-			for (const key of closed) await close(spaceId, key);
+			for (const key of closed) {
+				await close(spaceId, key);
+				const gate = parseGateKey(key);
+				if (gate) told.add(gate.runId);
+			}
 			for (const { key, runId, stepId } of opened) {
 				await tell("gate-opened", key, { spaceId, runId, stepId });
+				told.add(runId);
 			}
 			for (const event of list) {
 				if (event.type !== "RunEnded") continue;
@@ -335,6 +369,28 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 					runEndKey(event.runId, event.seq),
 					{ spaceId, runId: event.runId, stepId: null },
 				);
+				told.add(event.runId);
+			}
+			await runsChanged(spaceId, list, told);
+		}
+	}
+
+	/** Tells the open screens of the Space's audience, once per run, that a run changed. */
+	async function runsChanged(
+		spaceId: string,
+		events: readonly RunEvent[],
+		told: ReadonlySet<string>,
+	): Promise<void> {
+		const runs = new Set(
+			events
+				.filter((e) => RUN_CHANGES.has(e.type) && !told.has(e.runId))
+				.map((e) => e.runId),
+		);
+		if (runs.size === 0) return;
+		const audience = await deps.audience(spaceId);
+		for (const runId of runs) {
+			for (const personId of audience) {
+				deps.inApp.runChanged({ kind: "in-app", personId }, { spaceId, runId });
 			}
 		}
 	}
@@ -349,8 +405,19 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		);
 	}
 
+	/**
+	 * Sends the held pushes that are due: their time came, or their Person
+	 * has no screen open anymore (the phone app went to the background, the
+	 * last page closed a minute ago).
+	 */
 	async function sendDue(at: number): Promise<void> {
-		for (const row of await deps.deliveries.due(at)) {
+		const held = await deps.deliveries.held();
+		const due = held.filter(
+			(row) =>
+				(row.dueAt !== null && row.dueAt <= at) ||
+				!deps.inApp.isActive(row.personId),
+		);
+		for (const row of due) {
 			const settings = await deps.settings.get(row.personId);
 			if (inQuietHours(settings, at)) {
 				await deps.deliveries.update(row.personId, row.key, {
