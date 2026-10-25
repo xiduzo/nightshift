@@ -22,16 +22,11 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { Refusal } from "@nightshift/refusal";
 import { type AnyTextAdapter, chat } from "@tanstack/ai";
-import {
-	defineSandbox,
-	defineWorkspace,
-	localSource,
+import type {
 	mcpSkill,
-	type SandboxPolicy,
-	type SandboxProvider,
-	withSandbox,
+	SandboxPolicy,
+	SandboxProvider,
 } from "@tanstack/ai-sandbox";
-import { localProcessSandbox } from "@tanstack/ai-sandbox-local-process";
 import {
 	type AgentEvent,
 	type AgentSessionInput,
@@ -41,7 +36,6 @@ import {
 import { ARTIFACT_INSTRUCTION, saveArtifactTool } from "./artifact-tool";
 import { streamSession } from "./session-stream";
 import { reportStepTool, stepReportSetup } from "./step-report";
-import { withSharedToolBridge } from "./tool-bridge";
 import {
 	createTranslator,
 	type HarnessProfile,
@@ -170,10 +164,25 @@ export function sessionReport(
 }
 
 /**
+ * The sandbox packages and the shared tool bridge. They load on the first
+ * session, not when Night Shift starts.
+ */
+async function sandboxKit() {
+	const [sandbox, { localProcessSandbox }, { withSharedToolBridge }] =
+		await Promise.all([
+			import("@tanstack/ai-sandbox"),
+			import("@tanstack/ai-sandbox-local-process"),
+			import("./tool-bridge"),
+		]);
+	return { ...sandbox, localProcessSandbox, withSharedToolBridge };
+}
+
+/**
  * The session's MCP servers as workspace skills. Returns a problem text when
  * a server is a command: the adapter can hand over URL servers only.
  */
 function mcpSkills(
+	skill: typeof mcpSkill,
 	mcpServers: Record<string, McpServerConfig> = {},
 ): ReturnType<typeof mcpSkill>[] | string {
 	const commands = Object.entries(mcpServers)
@@ -183,7 +192,7 @@ function mcpSkills(
 		return `This harness can use connections with a URL only. Remove ${commands.join(", ")} from the node, or run it on another harness.`;
 	}
 	return Object.entries(mcpServers).map(([name, server]) =>
-		mcpSkill(name, "url" in server ? { ...server } : {}),
+		skill(name, "url" in server ? { ...server } : {}),
 	);
 }
 
@@ -296,7 +305,18 @@ export function harnessSession(options: {
 		signal: input.signal,
 		translator,
 		start: async function* (abortController) {
-			const skills = spec.mcpAsSkills ? mcpSkills(input.mcpServers) : [];
+			const {
+				defineSandbox,
+				defineWorkspace,
+				localProcessSandbox,
+				localSource,
+				mcpSkill,
+				withSandbox,
+				withSharedToolBridge,
+			} = await sandboxKit();
+			const skills = spec.mcpAsSkills
+				? mcpSkills(mcpSkill, input.mcpServers)
+				: [];
 			if (typeof skills === "string") throw new Refusal("invalid", skills);
 			const report = sessionReport(input, spec, options.allowedTools);
 			const setup = await options.adapter(report);

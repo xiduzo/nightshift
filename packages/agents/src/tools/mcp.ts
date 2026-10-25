@@ -1,16 +1,8 @@
 import { homedir } from "node:os";
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import {
-	getDefaultEnvironment,
-	StdioClientTransport,
-} from "@modelcontextprotocol/sdk/client/stdio.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
-import {
-	type CallToolResult,
-	CallToolResultSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 import type { McpServerConfig } from "../port";
 
@@ -20,7 +12,8 @@ import type { McpServerConfig } from "../port";
  * thing, and close it. A command server starts in the home directory, with
  * the daemon's default environment under the server's own. Secret values
  * are in the config already (`${NAME}` expanded by the engine): nothing here
- * logs the config.
+ * logs the config. The MCP SDK loads with the first client, not when Night
+ * Shift starts.
  */
 
 export const MCP_TIMEOUT_MS = 20_000;
@@ -45,18 +38,25 @@ export type McpSession = {
 	close(): Promise<void>;
 };
 
-function transportFor(config: McpServerConfig) {
-	return "command" in config
-		? new StdioClientTransport({
-				command: config.command,
-				args: config.args,
-				env: { ...getDefaultEnvironment(), ...config.env },
-				cwd: homedir(),
-				stderr: "pipe",
-			})
-		: new StreamableHTTPClientTransport(new URL(config.url), {
-				requestInit: { headers: config.headers },
-			});
+async function transportFor(config: McpServerConfig) {
+	if ("command" in config) {
+		const { getDefaultEnvironment, StdioClientTransport } = await import(
+			"@modelcontextprotocol/sdk/client/stdio.js"
+		);
+		return new StdioClientTransport({
+			command: config.command,
+			args: config.args,
+			env: { ...getDefaultEnvironment(), ...config.env },
+			cwd: homedir(),
+			stderr: "pipe",
+		});
+	}
+	const { StreamableHTTPClientTransport } = await import(
+		"@modelcontextprotocol/sdk/client/streamableHttp.js"
+	);
+	return new StreamableHTTPClientTransport(new URL(config.url), {
+		requestInit: { headers: config.headers },
+	});
 }
 
 /**
@@ -75,8 +75,9 @@ export async function withMcpClient<T>(
 	} = {},
 ): Promise<T> {
 	const timeoutMs = options.timeoutMs ?? MCP_TIMEOUT_MS;
+	const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
 	const client = new Client({ name: "nightshift", version: "1.0.0" });
-	const transport = transportFor(config);
+	const transport = await transportFor(config);
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let onAbort: (() => void) | undefined;
 	const stop = new Promise<never>((_, reject) => {
@@ -173,6 +174,9 @@ export async function callMcpTool(
 	args: Record<string, unknown>,
 	options?: RequestOptions,
 ): Promise<McpToolCall> {
+	const { CallToolResultSchema } = await import(
+		"@modelcontextprotocol/sdk/types.js"
+	);
 	const result = await client.callTool(
 		{ name, arguments: args },
 		CallToolResultSchema,
