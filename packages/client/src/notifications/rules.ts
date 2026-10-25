@@ -1,17 +1,16 @@
 import type { OpenGate } from "../gates";
 import type { RunSummary } from "../runs";
 
-/**
- * What to tell the person about: a Gate opened, a run finished, a run
- * failed. Each app shows the notice its own way.
- */
-export type Notice =
+/** What a notice tells about: the Gate that opened, or the run that ended. */
+type NoticeFacts =
 	| { kind: "gate-opened"; gate: OpenGate }
-	| { kind: "run-finished"; run: RunSummary }
-	| { kind: "run-failed"; run: RunSummary };
+	| {
+			kind: "run-finished" | "run-failed";
+			run: Pick<RunSummary, "title" | "reason">;
+	  };
 
-/** The words of a notice. */
-export function describeNotice(notice: Notice): {
+/** The words of a notice: the project, the run and the question, or the run and how it ended. */
+export function describeNotice(notice: NoticeFacts): {
 	title: string;
 	body: string;
 } {

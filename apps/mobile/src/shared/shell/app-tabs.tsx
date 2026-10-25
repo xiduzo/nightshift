@@ -1,18 +1,21 @@
+import { useFollowHost } from "@nightshift/client";
 import { Redirect } from "expo-router";
 import { useEffect } from "react";
 
 import { LockScreenRuns, updateGlance, useHomeWidget } from "@/features/glance";
-import { useHost } from "@/features/host";
-import { useLiveInbox, useWaitingCount } from "@/features/inbox";
-import { usePhonePush } from "@/features/push";
+import { useHost, useSignedIn } from "@/features/host";
+import { useWaitingCount } from "@/features/inbox";
+import { phoneNotifications, usePhonePush } from "@/features/push";
 import { useRememberedSpace } from "@/features/spaces";
+import { useInFront } from "@/shared/in-front";
 import { TabBar } from "./tab-bar";
 
 /**
  * The four tabs: Home, Inbox, Runs and Projects. Without a Host, or
  * signed out, the person goes to the connect screen first. While signed
- * in, the inbox stays live, and the home screen widget and the runs
- * followed on the lock screen stay up to date.
+ * in and in front, the app follows the Host: the live cache reads again
+ * what changed, and a new Gate shows as a banner in the app. The home
+ * screen widget and the runs followed on the lock screen stay up to date.
  */
 export function AppTabs() {
 	const { state } = useHost();
@@ -26,8 +29,14 @@ export function AppTabs() {
 }
 
 function SignedInTabs() {
+	const { host } = useSignedIn();
+	const inFront = useInFront();
 	useRememberedSpace();
-	useLiveInbox();
+	useFollowHost(host, {
+		shown: phoneNotifications,
+		enabled: inFront,
+		phone: true,
+	});
 	usePhonePush();
 	useHomeWidget();
 	const waiting = useWaitingCount();

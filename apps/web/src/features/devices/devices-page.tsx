@@ -67,7 +67,7 @@ export function DevicesPage({
 	const overview = useQuery(deviceQueries.overviewLive());
 	const spaceDevices = useQuery(deviceQueries.spaceLive());
 	const spaces = useQuery(spaceQueries.list());
-	const runs = useQuery(runQueries.everyRunLive());
+	const runs = useQuery(runQueries.everyRun());
 	const projects = useQuery(projectQueries.list());
 	const phones = useQuery(deviceQueries.phonesLive());
 	const now = useNow(30_000);

@@ -88,8 +88,9 @@ export type InFrontPlace = {
 };
 
 /**
- * Whether a push that comes while the app is in front shows as a banner in
- * the app. The phone never shows its own banner then: the app does it.
+ * Whether a notice that comes while the app is in front (a push, or an
+ * item of the stream through the live cache) shows as a banner in the
+ * app. The phone never shows its own banner then: the app does it.
  * A Gate shows, unless the person already looks at the inbox or at that
  * Gate. A run's end shows nothing: the run list updates by itself.
  */

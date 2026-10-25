@@ -36,7 +36,7 @@ export function SearchScreen() {
 		...gateQueries.open(),
 		select: (open: OpenGate[]) => inboxOrder(open),
 	});
-	const runs = useQuery(runQueries.everyRunLive());
+	const runs = useQuery(runQueries.everyRun());
 	const projects = useQuery(projectQueries.list());
 
 	const names = useMemo(

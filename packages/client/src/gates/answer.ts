@@ -43,6 +43,20 @@ export function gateRefusalOf(error: unknown): GateRefusal | null {
 }
 
 /**
+ * Whether the Gate leaves the inbox after an answer: the answer went, or
+ * Night Shift says the Gate is closed or not in the person's Spaces. A
+ * refusal for the person's role or for the lock screen keeps it: the Gate
+ * still waits.
+ */
+export function leavesInbox(result: GateAnswerResult): boolean {
+	return (
+		result.kind === "answered" ||
+		result.refusal === "closed" ||
+		result.refusal === "not-found"
+	);
+}
+
+/**
  * Answers a Gate. A refusal is a result, so each screen says why. A dropped
  * connection or any other error throws: the answer was not sent.
  */

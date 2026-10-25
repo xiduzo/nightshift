@@ -1,7 +1,10 @@
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 
-import type { ApiQueryUtils } from "../api";
+import type { ApiClient, ApiQueryUtils } from "../api";
 import { createLiveCache, type LiveCache } from "./cache";
+
+/** The Host an app talks to: its client and the query helpers on that client. */
+export type HostApi = { client: ApiClient; orpc: ApiQueryUtils };
 
 /** One live cache per query client and Host, so every screen shares what it knows. */
 const caches = new WeakMap<QueryClient, WeakMap<ApiQueryUtils, LiveCache>>();

@@ -1,16 +1,12 @@
 import {
-	createGateMutations,
 	type GateRefusal,
-	gateKey,
 	type OpenGate,
 	unreachableAnswerText,
-	useLiveCache,
+	useAnswerGate,
 } from "@nightshift/client";
-import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { useHostQueries, useSignedIn } from "@/features/host";
-import { dismissKey } from "@/features/push";
+import { useSignedIn } from "@/features/host";
 import type { CheckFailure } from "./answer-check";
 import { checkBeforeAnswer } from "./person-check";
 
@@ -25,62 +21,56 @@ export type Problem =
 /** The answer that went out. */
 export type SentAnswer = { choice: string; note: string | null };
 
+/** Why the Gate left: it closed in the meantime, or it is not in your Spaces. */
+export type GoneRefusal = Extract<GateRefusal, "closed" | "not-found">;
+
 /**
  * The answer to one Gate: the chosen option, the note, the check that it
- * is you, and the send. A sent answer takes the Gate out of the inbox at
- * once and takes its notification away.
+ * is you, and the send. Whether the Gate leaves the inbox, and its
+ * notification goes, is the live cache's rule (`useAnswerGate`).
  */
 export function useGateAnswer(
 	gate: OpenGate,
 	{
 		onSent,
-		onClosed,
+		onGone,
 	}: {
 		/** The Host took the answer: keep the Gate on screen while the inbox drops it. */
 		onSent: () => void;
-		/** Night Shift refused the answer: the Gate closed in the meantime. */
-		onClosed: () => void;
+		/** Night Shift refused the answer: the Gate closed in the meantime, or is not in your Spaces. */
+		onGone: (refusal: GoneRefusal) => void;
 	},
 ) {
 	const { host } = useSignedIn();
-	const live = useLiveCache(host.orpc);
-	const mutations = useHostQueries(createGateMutations);
 	const [choice, setChoice] = useState<string | null>(null);
 	const [note, setNote] = useState("");
 	const [checking, setChecking] = useState(false);
 	const [problem, setProblem] = useState<Problem | null>(null);
 	const [sent, setSent] = useState<SentAnswer | null>(null);
 
-	/** Takes this Gate out of the inbox at once; the refetch confirms it. */
-	const dropGate = () => live.afterGateAnswered(gate);
-
-	const resolve = useMutation(
-		mutations.answer({
-			onSuccess: (result, input) => {
-				if (result.kind === "refused") {
-					if (result.refusal === "closed") {
-						onClosed();
-						dropGate();
-					} else {
-						setProblem({ kind: "refused", refusal: result.refusal });
-					}
-					return;
-				}
+	const resolve = useAnswerGate(host, {
+		onSuccess: (result, input) => {
+			if (result.kind === "answered") {
 				setSent({ choice: input.choice, note: input.note ?? null });
 				onSent();
-				dropGate();
-				void dismissKey(gateKey(gate)).catch(() => undefined);
-			},
-			onError: (error) => {
-				const unreachable = unreachableAnswerText(error);
-				setProblem(
-					unreachable
-						? { kind: "unreachable", text: unreachable }
-						: { kind: "failed", message: error.message },
-				);
-			},
-		}),
-	);
+			} else if (
+				result.refusal === "closed" ||
+				result.refusal === "not-found"
+			) {
+				onGone(result.refusal);
+			} else {
+				setProblem({ kind: "refused", refusal: result.refusal });
+			}
+		},
+		onError: (error) => {
+			const unreachable = unreachableAnswerText(error);
+			setProblem(
+				unreachable
+					? { kind: "unreachable", text: unreachable }
+					: { kind: "failed", message: error.message },
+			);
+		},
+	});
 
 	const busy = checking || resolve.isPending || sent !== null;
 

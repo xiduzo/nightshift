@@ -75,6 +75,7 @@ import { useHost, useHostQueries } from "@/features/host";
 import { ActionBar } from "@/shared/action-bar";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
+import { useNow } from "@/shared/format";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
 import { StatusBadge } from "@/shared/status";
@@ -93,9 +94,12 @@ import {
 import { nextGate } from "./inbox-view";
 import { QuestionSections } from "./question-sections";
 import { SentCard } from "./sent-card";
-import { type Problem, useGateAnswer } from "./use-gate-answer";
+import {
+	type GoneRefusal,
+	type Problem,
+	useGateAnswer,
+} from "./use-gate-answer";
 import { useInbox } from "./use-inbox";
-import { useNow } from "./use-now";
 
 /**
  * One open Gate, to answer it: `gates/<runId>/<stepId>`, also the link
@@ -114,7 +118,8 @@ function GateAnswer() {
 		stepId: string;
 	}>();
 	const inbox = useInbox();
-	const [closed, setClosed] = useState(false);
+	/** Night Shift refused the answer: the Gate does not wait for you anymore. */
+	const [gone, setGone] = useState<GoneRefusal | null>(null);
 	/** The answer went: the screen keeps the Gate while the inbox drops it. */
 	const [sent, setSent] = useState<OpenGate | null>(null);
 	const gate =
@@ -122,7 +127,7 @@ function GateAnswer() {
 			(open) => open.runId === runId && open.stepId === stepId,
 		) ?? sent;
 
-	if (closed) return <ClosedGate {...gateRefusalText("closed")} />;
+	if (gone) return <ClosedGate {...gateRefusalText(gone)} />;
 	if (gate) {
 		return (
 			<OpenGateScreen
@@ -131,7 +136,7 @@ function GateAnswer() {
 				inbox={inbox.data ?? []}
 				onRefresh={() => inbox.refetch()}
 				onSent={() => setSent(gate)}
-				onClosed={() => setClosed(true)}
+				onGone={setGone}
 			/>
 		);
 	}
@@ -193,14 +198,14 @@ function OpenGateScreen({
 	inbox,
 	onRefresh,
 	onSent,
-	onClosed,
+	onGone,
 }: {
 	gate: OpenGate;
 	/** Every open Gate, for the next one after this answer. */
 	inbox: readonly OpenGate[];
 	onRefresh: () => Promise<unknown>;
 	onSent: () => void;
-	onClosed: () => void;
+	onGone: (refusal: GoneRefusal) => void;
 }) {
 	const now = useNow();
 	const { headline, context, links } = gateParts(gate.question);
@@ -217,7 +222,7 @@ function OpenGateScreen({
 	const run = useQuery(runQueries.get(gate.runId));
 	const labels = run.data ? nodeLabels(run.data) : NO_LABELS;
 	const routes = choiceRoutes(run.data, gate, gate.choices, labels);
-	const answer = useGateAnswer(gate, { onSent, onClosed });
+	const answer = useGateAnswer(gate, { onSent, onGone });
 	const [confirming, setConfirming] = useState(false);
 
 	const chosen = gate.choices.find((choice) => choice.name === answer.choice);

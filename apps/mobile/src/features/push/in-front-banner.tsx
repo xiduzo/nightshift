@@ -18,9 +18,11 @@ import { showInFront } from "./push-data";
 const SHOWN_MS = 6000;
 
 /**
- * A push that came while the app is in front, as a banner at the top of
- * the app: the phone shows no banner of its own then. A tap opens the Gate.
- * It also tells the push handling which screen is in front.
+ * A Gate that opened while the app is in front, as a banner at the top of
+ * the app: the live cache shows it from the stream at once, and a push
+ * that comes in front shows it too. The phone shows no banner of its own
+ * then. A tap opens the Gate. It also tells the push handling which
+ * screen is in front.
  */
 export function InFrontBanner() {
 	const pathname = usePathname();

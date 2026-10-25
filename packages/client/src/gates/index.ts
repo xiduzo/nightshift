@@ -2,8 +2,11 @@
 
 export {
 	answerGate,
+	type GateAnswer,
+	type GateAnswerResult,
 	type GateRefusal,
 	gateRefusalText,
+	leavesInbox,
 	unreachableAnswerText,
 } from "./answer";
 export {

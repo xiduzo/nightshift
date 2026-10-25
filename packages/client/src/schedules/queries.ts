@@ -1,10 +1,11 @@
 import type { ApiQueryUtils } from "../api";
 
 /**
- * How often a list of schedules reads them again: the next start moves on,
- * and a schedule may have fired.
+ * How often a list of schedules reads them again: the next start moves on
+ * when a schedule skips a start. A schedule that fires starts a run, and
+ * the live cache reads the schedules again with the runs.
  */
-const POLL_MS = 30_000;
+const POLL_MS = 60_000;
 
 /** The query options of schedules, and how often they poll. */
 export function createScheduleQueries(orpc: ApiQueryUtils) {

@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { runQueries } from "../queries";
 
 /**
- * One project's runs. Polls while a run is on its way, so one that reaches a
- * Gate shows as waiting.
+ * One project's runs. The live cache reads them again when a run starts,
+ * sleeps, stops or ends, or reaches a Gate.
  */
 export function useProjectRuns(projectId: string) {
-	return useQuery(runQueries.ofProjectLive(projectId));
+	return useQuery(runQueries.ofProject(projectId));
 }

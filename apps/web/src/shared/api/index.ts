@@ -25,7 +25,6 @@ export type {
 	MembersOverview,
 	NightRange,
 	NightsRange,
-	NotificationItem,
 	NotificationScreen,
 	NotificationSettings,
 	OfferView,

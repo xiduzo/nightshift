@@ -28,7 +28,7 @@ export {
 	createNotificationQueries,
 } from "./queries";
 export { describeNotice } from "./rules";
-export { followNotifications } from "./stream";
+export { followNotifications, type NotificationWatchClient } from "./stream";
 export type {
 	NotificationItem,
 	NotificationScreen,

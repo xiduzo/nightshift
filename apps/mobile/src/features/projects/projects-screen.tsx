@@ -12,6 +12,7 @@ import { useHostQueries } from "@/features/host";
 import { SpacePicker } from "@/features/spaces";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
+import { useNow } from "@/shared/format";
 import { LargeTitleHeader } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
@@ -29,7 +30,7 @@ export function ProjectsScreen() {
 	const runQueries = useHostQueries(createRunQueries);
 	const projects = useQuery(projectQueries.list());
 	const gates = useQuery(gateQueries.open());
-	const runs = useQuery(runQueries.everyRunLive());
+	const runs = useQuery(runQueries.everyRun());
 	const refresh = useScreenRefresh([
 		projects.refetch,
 		gates.refetch,
@@ -42,8 +43,8 @@ export function ProjectsScreen() {
 		[list, gates.data, runs.data],
 	);
 	const needsYou = overviews.reduce((sum, row) => sum + row.needsYou, 0);
-	// The rows render again on each poll: often enough for "3 h ago".
-	const now = Math.max(runs.dataUpdatedAt, gates.dataUpdatedAt) || Date.now();
+	// Again every 30 s: often enough for "3 h ago".
+	const now = useNow();
 
 	return (
 		<Screen onRefresh={refresh}>

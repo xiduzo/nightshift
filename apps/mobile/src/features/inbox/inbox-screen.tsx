@@ -14,6 +14,7 @@ import { PushCard } from "@/features/push";
 import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
+import { useNow } from "@/shared/format";
 import { HeaderButton, LargeTitleHeader } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
@@ -28,7 +29,6 @@ import {
 	spaceCount,
 } from "./inbox-view";
 import { useInbox } from "./use-inbox";
-import { useNow } from "./use-now";
 
 /**
  * The Inbox tab: the open Gates of every Space you are in, grouped by

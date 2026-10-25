@@ -240,10 +240,13 @@
         "@nightshift/config": "workspace:*",
         "@tanstack/react-query": "^5.102.8",
         "@types/bun": "catalog:",
+        "@types/react": "catalog:",
+        "react": "catalog:",
         "typescript": "catalog:",
       },
       "peerDependencies": {
         "@tanstack/react-query": "^5.102.8",
+        "react": "^19.3.0",
       },
     },
     "packages/config": {

@@ -1,4 +1,5 @@
 import { Button } from "@nightshift/ui/components/button";
+import { useQuery } from "@tanstack/react-query";
 import { ZapIcon } from "lucide-react";
 import { useState } from "react";
 import { ProjectMenu, ProjectPage, projectFolder } from "@/features/projects";
@@ -7,10 +8,10 @@ import { PageHeading } from "@/shared/page";
 import { FlowHealth } from "./flow-health";
 import { NightOutput } from "./night-output";
 import { ProjectClones } from "./project-clones";
+import { dashboardQueries } from "./queries";
 import { RunOutcomes } from "./run-outcomes";
 import { SectionCards } from "./section-cards";
 import { UpNext } from "./up-next";
-import { useDashboard } from "./use-dashboard";
 
 /**
  * The project's root: a morning review. What the night made, what comes next,
@@ -18,7 +19,7 @@ import { useDashboard } from "./use-dashboard";
  * schedules have their own pages.
  */
 export function ProjectDashboardPage({ projectId }: { projectId: string }) {
-	const summary = useDashboard({ projectId });
+	const summary = useQuery(dashboardQueries.summary({ projectId }));
 	const [quickRun, setQuickRun] = useState(false);
 
 	return (

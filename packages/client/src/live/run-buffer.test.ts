@@ -36,7 +36,6 @@ function buffer(lastSeq?: number) {
 	let refetches = 0;
 	const it = createRunStreamBuffer({
 		flushMs: 50,
-		refetchMs: 300,
 		schedule: timers.schedule,
 		lastSeq,
 		onFlush: (batch) => batches.push(batch),
@@ -66,23 +65,14 @@ describe("the buffer of a run's stream", () => {
 		]);
 	});
 
-	test("a burst of steps reads the run once", () => {
-		const { it, timers, refetches } = buffer();
-		for (const id of ["a", "b", "c"]) it.step(step(id));
-		it.status("finished" as RunStatus);
-		timers.due(300);
-		expect(refetches()).toBe(1);
-		it.step(step("d"));
-		timers.due(300);
-		expect(refetches()).toBe(2);
-	});
-
-	test("entries alone do not read the run", () => {
+	test("each step and status says the run changed; entries alone do not", () => {
 		const { it, timers, refetches } = buffer();
 		it.entry(entry(1));
 		timers.due(50);
-		timers.due(300);
 		expect(refetches()).toBe(0);
+		it.step(step("a"));
+		it.status("finished" as RunStatus);
+		expect(refetches()).toBe(2);
 	});
 
 	test("the last seq follows the entries, from where the follow started", () => {
@@ -101,10 +91,10 @@ describe("the buffer of a run's stream", () => {
 		it.stop({ flush: true });
 		expect(batches.map((batch) => batch.entries.length)).toEqual([1]);
 		it.entry(entry(2));
+		it.step(step("test"));
 		timers.due(50);
-		timers.due(300);
 		expect(batches).toHaveLength(1);
-		expect(refetches()).toBe(0);
+		expect(refetches()).toBe(1);
 		expect(timers.waiting).toEqual([]);
 	});
 

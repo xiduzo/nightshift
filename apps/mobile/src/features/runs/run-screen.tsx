@@ -50,7 +50,7 @@ import {
 	sizeLabel,
 } from "./run-facts";
 import { RunStatusBadge } from "./status-badge";
-import { type LiveRun, useLiveRun } from "./use-live-run";
+import { type PhoneLiveRun, usePhoneLiveRun } from "./use-live-run";
 
 /**
  * One run, live: its status, the Gates that wait in it, Stop or Resume,
@@ -73,7 +73,7 @@ function SignedInRun({ runId }: { runId: string }) {
 	const run = useQuery(runQueries.get(runId));
 	const gates = useQuery(gateQueries.open());
 	const projects = useQuery(projectQueries.list());
-	const live = useLiveRun(runId);
+	const live = usePhoneLiveRun(runId);
 
 	const refresh = useCallback(
 		() =>
@@ -122,7 +122,7 @@ function RunBody({
 	projectName,
 }: {
 	run: RunDetail;
-	live: LiveRun;
+	live: PhoneLiveRun;
 	gates: OpenGate[];
 	projectName: string | null;
 }) {
@@ -132,7 +132,7 @@ function RunBody({
 	const ownSteps = steps.filter((step) => step.scope === null);
 	const labels = nodeLabels(run);
 	const current = ended ? null : currentStep(steps);
-	const message = current ? live.messages.get(current.id) : undefined;
+	const message = current ? live.entries.get(current.id) : undefined;
 	const { canStop, canResume } = runActionsFor(status);
 	const now = Date.now();
 

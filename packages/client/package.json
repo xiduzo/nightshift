@@ -16,12 +16,15 @@
 		"@orpc/tanstack-query": "^1.15.0"
 	},
 	"peerDependencies": {
-		"@tanstack/react-query": "^5.102.8"
+		"@tanstack/react-query": "^5.102.8",
+		"react": "^19.3.0"
 	},
 	"devDependencies": {
 		"@nightshift/config": "workspace:*",
 		"@tanstack/react-query": "^5.102.8",
 		"@types/bun": "catalog:",
+		"@types/react": "catalog:",
+		"react": "catalog:",
 		"typescript": "catalog:"
 	}
 }

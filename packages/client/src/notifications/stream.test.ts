@@ -114,6 +114,28 @@ describe("the stream of the person's notifications", () => {
 		]);
 	});
 
+	test("the phone app says so on each connection; a page says nothing", async () => {
+		const inputs: unknown[] = [];
+		for (const phone of [true, false]) {
+			const controller = new AbortController();
+			await followNotifications({
+				client: {
+					notifications: {
+						async watch(input) {
+							inputs.push(input);
+							controller.abort();
+							return (async function* () {})();
+						},
+					},
+				},
+				phone,
+				signal: controller.signal,
+				onItem: () => {},
+			});
+		}
+		expect(inputs).toEqual([{ phone: true }, undefined]);
+	});
+
 	test("stops at once when the signal aborts", async () => {
 		const controller = new AbortController();
 		controller.abort();

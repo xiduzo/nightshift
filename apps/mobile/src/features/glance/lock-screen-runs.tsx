@@ -5,14 +5,12 @@ import { useEffect } from "react";
 import { useHostQueries } from "@/features/host";
 import { syncFollowedRun, useFollowedRuns } from "./use-lock-screen";
 
-/** How often a followed run is read again while the app runs. */
-const FOLLOW_POLL_MS = 5_000;
-
 /**
  * Keeps each followed run on the lock screen up to date while the app
- * runs, and ends it when the run ends. Renders nothing. While the app is
- * in the background the phone stops it; the run catches up when the app
- * opens again.
+ * runs, and ends it when the run ends. Renders nothing. The live cache
+ * reads a run again when a step starts or ends, or the run sleeps, stops
+ * or ends. While the app is in the background the phone stops it; the run
+ * catches up when the app opens again.
  */
 export function LockScreenRuns() {
 	const runs = useFollowedRuns();
@@ -27,10 +25,7 @@ export function LockScreenRuns() {
 
 function FollowedRun({ runId }: { runId: string }) {
 	const runQueries = useHostQueries(createRunQueries);
-	const run = useQuery({
-		...runQueries.get(runId),
-		refetchInterval: FOLLOW_POLL_MS,
-	});
+	const run = useQuery(runQueries.get(runId));
 	useEffect(() => {
 		if (run.data) syncFollowedRun(runId, run.data);
 	}, [runId, run.data]);

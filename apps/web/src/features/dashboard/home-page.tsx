@@ -5,8 +5,8 @@ import { RunList, runQueries } from "@/features/runs";
 import { PageHeading, PageSection, SiteHeader } from "@/shared/page";
 
 import { OVERVIEW_ROWS } from "./overview";
+import { dashboardQueries } from "./queries";
 import { SectionCards } from "./section-cards";
-import { useDashboard } from "./use-dashboard";
 
 /**
  * Home: tonight over all projects. The section cards, the recent runs, and
@@ -15,8 +15,8 @@ import { useDashboard } from "./use-dashboard";
 export function HomePage() {
 	const projects = useQuery(projectQueries.list());
 	// Recent runs and the project list, which shows how each project's runs stand.
-	const runs = useQuery(runQueries.everyRunLive());
-	const summary = useDashboard();
+	const runs = useQuery(runQueries.everyRun());
+	const summary = useQuery(dashboardQueries.summary());
 
 	return (
 		<>

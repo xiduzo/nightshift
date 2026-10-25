@@ -1,10 +1,11 @@
 /**
  * @nightshift/client: the client logic that the web app and the phone app
  * share. The typed client of a Night Shift, the query and mutation options
- * of each vertical (with their polling rules), the stream of one run, the
- * view types derived from the API, the stream of the person's
- * notifications, the notify rules, and the glances (the widget and the
- * run on the lock screen). No DOM, no React Native, no Node or Bun:
+ * of each vertical (with their polling rules), the live cache (the one
+ * follower of a Host: its notifications stream and one run's stream, what
+ * each item reads again, the notices it shows), the view types derived from
+ * the API, the push contract, and the glances (the widget and the run on
+ * the lock screen). No DOM, no React Native, no Node or Bun:
  * `platform-free.test.ts` checks it.
  */
 
@@ -61,7 +62,6 @@ export {
 	type ChoiceRoute,
 	type ContextItem,
 	choiceRoutes,
-	createGateMutations,
 	createGateQueries,
 	type GateChoice,
 	type GateLink,
@@ -85,13 +85,21 @@ export {
 	sameProgress,
 	waitingText,
 } from "./glance";
-export { type LiveCache, type RunStreamBatch, useLiveCache } from "./live";
+export {
+	type EntryFold,
+	type HostApi,
+	type ListedNotification,
+	type LiveRun,
+	type Notice,
+	type ShownNotifications,
+	useAnswerGate,
+	useFollowHost,
+	useLiveRun,
+} from "./live";
 export {
 	applySettingsPatch,
 	createNotificationMutations,
 	createNotificationQueries,
-	describeNotice,
-	followNotifications,
 	gateKey,
 	isGateKey,
 	type NotificationItem,
@@ -135,7 +143,6 @@ export {
 	currentStep,
 	defaultPlacement,
 	flowLabel,
-	followRun,
 	formatCost,
 	formatKnownCost,
 	groupRuns,

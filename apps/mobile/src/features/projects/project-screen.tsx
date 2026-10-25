@@ -30,6 +30,7 @@ import { useHostQueries } from "@/features/host";
 import { GateRow } from "@/features/inbox";
 import { InitialsAvatar } from "@/shared/avatar";
 import { ErrorAlert } from "@/shared/feedback";
+import { useNow } from "@/shared/format";
 import { HeaderButton, LargeTitleHeader } from "@/shared/header";
 import { ListGroup, ListRow, SectionHead } from "@/shared/list";
 import { Screen } from "@/shared/page";
@@ -57,7 +58,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 			inboxOrder(open.filter((gate) => gate.projectId === projectId)),
 	});
 	const runs = useQuery({
-		...runQueries.ofProjectLive(projectId),
+		...runQueries.ofProject(projectId),
 		select: (list: RunSummary[]) => newestFirst(list),
 	});
 	const flows = useQuery(flowQueries.list(projectId));
@@ -68,8 +69,8 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
 		flows.refetch,
 	]);
 	const project = projects.data?.find((p) => p.id === projectId);
-	// The rows render again on each poll: often enough for "waited 12 min".
-	const now = Math.max(runs.dataUpdatedAt, gates.dataUpdatedAt) || Date.now();
+	// Again every 30 s: often enough for "waited 12 min".
+	const now = useNow();
 
 	return (
 		<Screen onRefresh={refresh}>

@@ -17,7 +17,7 @@ export function useHomeWidget(): void {
 	const gateQueries = useHostQueries(createGateQueries);
 	const runQueries = useHostQueries(createRunQueries);
 	const gates = useQuery(gateQueries.open());
-	const runs = useQuery(runQueries.everyRunLive());
+	const runs = useQuery(runQueries.everyRun());
 
 	useEffect(() => {
 		if (!gates.data || !runs.data) return;

@@ -1,11 +1,12 @@
 /**
- * What this browser can do for notifications: show one, close the ones of
- * a key, and keep a Web Push subscription with the service worker
- * (`public/sw.js`). Every function is safe on the server and in a browser
- * without these features: it does nothing, or answers "unsupported".
+ * What this browser can do for notifications: show one, list the ones it
+ * shows, close the ones of a key, and keep a Web Push subscription with
+ * the service worker (`public/sw.js`). Every function is safe on the
+ * server and in a browser without these features: it does nothing, or
+ * answers "unsupported".
  */
 
-import { staleGates } from "@nightshift/client";
+import type { ListedNotification } from "@nightshift/client";
 
 /** The service worker's path. Its scope is the whole app. */
 const SERVICE_WORKER = "/sw.js";
@@ -147,33 +148,22 @@ export async function closeNotifications(key: string): Promise<void> {
 }
 
 /**
- * Closes the Gate notifications of this browser whose Gate no longer
- * waits. No push takes a notification back (a push must show one), so an
- * open page does it each time it reads the open Gates. The rule is the
- * phone's (`staleGates`): only one shown more than 30 s before the read.
+ * The notifications this browser shows now, each with its key (its tag)
+ * and when it showed. No push takes a notification back (a push must show
+ * one), so an open page closes the ones whose Gate no longer waits.
  */
-export async function closeAnsweredGates(
-	openKeys: ReadonlySet<string>,
-	readAt: number,
-): Promise<void> {
+export async function listNotifications(): Promise<ListedNotification[]> {
 	if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
-		return;
+		return [];
 	}
-	try {
-		const registration = await navigator.serviceWorker.getRegistration();
-		const shown = ((await registration?.getNotifications()) ?? []).map(
-			(notification) => ({
-				key: notification.tag || null,
-				at: shownAtOf(notification.data),
-				notification,
-			}),
-		);
-		for (const { notification } of staleGates(shown, openKeys, readAt)) {
-			notification.close();
-		}
-	} catch {
-		// The next read of the open Gates tries again.
-	}
+	const registration = await navigator.serviceWorker.getRegistration();
+	return ((await registration?.getNotifications()) ?? []).map(
+		(notification) => ({
+			key: notification.tag || null,
+			at: shownAtOf(notification.data),
+			dismiss: () => notification.close(),
+		}),
+	);
 }
 
 /** When a notification showed, as its data says. Unknown: it never counts as stale. */

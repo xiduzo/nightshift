@@ -12,6 +12,7 @@ import { SpacePicker } from "@/features/spaces";
 import { Chip, ChipRail } from "@/shared/chips";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
+import { useNow } from "@/shared/format";
 import { HeaderButton, LargeTitleHeader } from "@/shared/header";
 import { ListGroup } from "@/shared/list";
 import { Screen } from "@/shared/page";
@@ -82,7 +83,7 @@ export function RunsScreen() {
 	const { filter, projectId, setFilter, clearProject } = useRunsParams();
 	const runQueries = useHostQueries(createRunQueries);
 	const projectQueries = useHostQueries(createProjectQueries);
-	const runs = useQuery(runQueries.everyRunLive());
+	const runs = useQuery(runQueries.everyRun());
 	const projects = useQuery(projectQueries.list());
 	const [limit, setLimit] = useState(RUNS_PAGE);
 	const refresh = useScreenRefresh([runs.refetch, projects.refetch]);
@@ -103,8 +104,8 @@ export function RunsScreen() {
 	const projectName = projectId
 		? (projectNames.get(projectId) ?? "This project")
 		: null;
-	// The list renders again on each poll: often enough for "12 min".
-	const now = runs.dataUpdatedAt || Date.now();
+	// Again every 30 s: often enough for "12 min".
+	const now = useNow();
 
 	const choose = (next: RunFilter) => {
 		setLimit(RUNS_PAGE);
@@ -121,7 +122,7 @@ export function RunsScreen() {
 		);
 	}
 
-	// A failed poll keeps the list it has.
+	// A failed read again keeps the list it has.
 	if (runs.isError && runs.data === undefined) {
 		return (
 			<Screen onRefresh={refresh}>

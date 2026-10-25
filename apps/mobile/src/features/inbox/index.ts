@@ -12,4 +12,4 @@ export { GateAnswerScreen } from "./gate-screen";
 export { InboxFilterScreen } from "./inbox-filter-screen";
 export { InboxScreen } from "./inbox-screen";
 export { TranscriptScreen } from "./transcript-screen";
-export { useLiveInbox, useWaitingCount } from "./use-inbox";
+export { useWaitingCount } from "./use-inbox";

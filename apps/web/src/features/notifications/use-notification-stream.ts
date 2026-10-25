@@ -1,149 +1,49 @@
-import {
-	describeNotice,
-	followNotifications,
-	gateKey,
-	routeOf,
-	useLiveCache,
-	webPathOf,
-} from "@nightshift/client";
-import {
-	type QueryClient,
-	useQuery,
-	useQueryClient,
-} from "@tanstack/react-query";
+import { useFollowHost } from "@nightshift/client";
+import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useEffect, useMemo } from "react";
 
-import { gateQueries } from "@/features/gates";
-import { runQueries } from "@/features/runs";
-import { client, type NotificationItem, orpc } from "@/shared/api";
+import { client, orpc } from "@/shared/api";
 import {
 	browserName,
-	closeAnsweredGates,
-	closeNotifications,
 	currentSubscription,
 	onNotificationClick,
 	ownScreenId,
 	serviceWorker,
 	setOwnScreenId,
-	showNotification,
 	subscriptionParts,
 } from "./browser";
+import { browserNotifications } from "./browser-notifications";
 import { notificationMutations, notificationQueries } from "./queries";
 
 /**
- * Follows what happens in every Space you are in (`notifications.watch`),
- * in place of polling. The live cache reads again what each item changes
- * (and with it the inbox, the tab badge and the dashboard). An item with
- * `alert` tells you: a toast while this tab has focus, else a notification
- * of this computer. A closed Gate takes its toast and notification away.
- * Each read of the open Gates also closes the notifications of Gates that
- * were answered while no page was open. After the stream was down, the
- * live cache reads everything again. Mount it once.
+ * Follows what happens in every Space you are in, in place of polling. The
+ * live cache of `@nightshift/client` does the work: it reads again what
+ * each item changes (the inbox, the tab badge, the runs, the dashboard),
+ * shows an item that alerts (a toast while this tab has focus, else a
+ * notification of this computer), and closes the notifications of Gates
+ * that no longer wait. This page also renews its Web Push subscription and
+ * opens the page of a notification you click. Mount it once.
  */
 export function useNotificationStream() {
 	const queryClient = useQueryClient();
 	const router = useRouter();
-	const live = useLiveCache(orpc);
-	const gates = useQuery(gateQueries.open());
+	const shown = useMemo(
+		() => browserNotifications((path) => void router.navigate({ href: path })),
+		[router],
+	);
+	useFollowHost({ client, orpc }, { shown });
 
 	useEffect(() => {
-		if (!gates.data) return;
-		void closeAnsweredGates(
-			new Set(gates.data.map(gateKey)),
-			gates.dataUpdatedAt,
-		);
-	}, [gates.data, gates.dataUpdatedAt]);
-
-	useEffect(() => {
-		const controller = new AbortController();
-		const open = (path: string) => void router.navigate({ href: path });
-
 		void serviceWorker().then(() => renewOwnScreen(queryClient));
-		const stopClicks = onNotificationClick(open);
-
-		void followNotifications({
-			client,
-			signal: controller.signal,
-			onConnection: live.onNotificationsConnection,
-			onItem: (item) => {
-				live.onNotification(item);
-				if (item.kind === "gate-closed") {
-					toast.dismiss(item.key);
-					void closeNotifications(item.key);
-					return;
-				}
-				if (item.alert) void tell(queryClient, item, open);
-			},
-		});
-
-		return () => {
-			controller.abort();
-			stopClicks();
-		};
-	}, [queryClient, router, live]);
+		return onNotificationClick((path) => void router.navigate({ href: path }));
+	}, [queryClient, router]);
 }
 
 /** Mounts the notifications stream. Renders nothing. */
 export function NotificationStream() {
 	useNotificationStream();
 	return null;
-}
-
-type Told = Exclude<NotificationItem, { kind: "gate-closed" }>;
-
-/** The words of the item: the project, run and question when this page can read them. */
-async function wordsOf(
-	queryClient: QueryClient,
-	item: Told,
-): Promise<{ title: string; body?: string }> {
-	try {
-		if (item.kind === "gate-opened") {
-			const gates = await queryClient.fetchQuery(gateQueries.open());
-			const gate = gates.find(
-				(g) => g.runId === item.runId && g.stepId === item.stepId,
-			);
-			if (gate) {
-				return describeNotice({ kind: item.kind, gate });
-			}
-		} else {
-			const runs = await queryClient.fetchQuery(runQueries.everyRun());
-			const run = runs.find((r) => r.id === item.runId);
-			if (run) return describeNotice({ kind: item.kind, run });
-		}
-	} catch {
-		// The short sentence of the item is enough.
-	}
-	return { title: item.title };
-}
-
-async function tell(
-	queryClient: QueryClient,
-	item: Told,
-	open: (path: string) => void,
-): Promise<void> {
-	const { title, body } = await wordsOf(queryClient, item);
-	const path = webPathOf(routeOf(item));
-	const granted =
-		typeof Notification !== "undefined" &&
-		Notification.permission === "granted";
-	if (document.hasFocus() || !granted) {
-		toast(title, {
-			id: item.key,
-			description: body,
-			action: { label: "Open", onClick: () => open(path) },
-		});
-		return;
-	}
-	await showNotification({
-		key: item.key,
-		kind: item.kind,
-		title,
-		body,
-		path,
-		onClick: () => open(path),
-	});
 }
 
 /**

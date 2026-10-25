@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 
 import type { InFrontPlace } from "./push-data";
 
-/** A push that came while the app was in front, shown as a banner in the app. */
+/** A Gate that opened while the app was in front (from the stream or a push), shown as a banner in the app. */
 export type Banner = { title: string; data: PushData; at: number };
 
 let banner: Banner | null = null;

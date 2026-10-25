@@ -4,9 +4,9 @@ import type { ApiQueryUtils } from "../api";
 import { answerGate, type GateAnswer, type GateAnswerResult } from "./answer";
 
 /**
- * How often the inbox and its badge read the open Gates again. The app
- * follows `notifications.watch` (`followNotifications`) and reads them again
- * on each item: this is only the fallback while that stream is down.
+ * How often the inbox and its badge read the open Gates again. The live
+ * cache follows `notifications.watch` and reads them again on each item:
+ * this is only the fallback while that stream is down.
  */
 const FALLBACK_POLL_MS = 60_000;
 

@@ -19,12 +19,12 @@ describe("the dashboard query", () => {
 		expect(readerTimeZone()).toBeString();
 	});
 
-	test("polls once a minute, also while a run is open", () => {
-		expect(dashboard.summary().refetchInterval).toBe(60_000);
+	test("polls every 5 minutes: the live cache reads it again with the runs", () => {
+		expect(dashboard.summary().refetchInterval).toBe(300_000);
 		expect(dashboard.summary({ everySpace: true }).refetchInterval).toBe(
-			60_000,
+			300_000,
 		);
-		expect(dashboard.flow("p1", "night").refetchInterval).toBe(60_000);
+		expect(dashboard.flow("p1", "night").refetchInterval).toBe(300_000);
 	});
 
 	test("keeps the keys of its procedures", () => {

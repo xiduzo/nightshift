@@ -1,69 +1,42 @@
 import type { ApiQueryUtils } from "../api";
 
 /**
- * How often a project's runs poll while one of them is on its way. The
- * notifications stream invalidates the runs when a Gate opens or closes
- * and when a run ends: this catches the rest (a run that sleeps or stops).
+ * How often a run's files are read again while it runs: an agent keeps a
+ * file in the middle of a step, and no stream item says so.
  */
-const ACTIVE_POLL_MS = 15_000;
-/** How often the inbox looks for sleeping runs and when they wake. */
-const INBOX_POLL_MS = 15_000;
+const ARTIFACTS_POLL_MS = 15_000;
 
-/** Polls a list of runs while one of them is on its way. */
-function pollWhileActive(query: {
-	state: { data?: { status: string }[] | undefined };
-}): number | false {
-	return query.state.data?.some(
-		(run) =>
-			run.status === "running" ||
-			run.status === "waiting" ||
-			run.status === "sleeping",
-	)
-		? ACTIVE_POLL_MS
-		: false;
-}
-
-/** The query options of runs, and how often each run list polls. */
+/**
+ * The query options of runs. No list polls: the live cache follows the
+ * Host, and a run that starts, sleeps, wakes, moves, stops or ends, or a
+ * step that starts or ends, reads the runs again (`run-changed`). After a
+ * drop of the stream it reads them again too.
+ */
 export function createRunQueries(orpc: ApiQueryUtils) {
 	return {
 		/** Every runs query. Invalidate it after a run changes. */
 		all: () => orpc.runs.key(),
-		/** The runs of every project. */
-		everyRun: () => orpc.runs.list.queryOptions({ input: {} }),
-		/**
-		 * The runs of the Space, of every project. Polls while a run is on its
-		 * way, like `ofProjectLive`. A failed background poll keeps the list.
-		 */
-		everyRunLive: () => ({
+		/** The runs of the Space, of every project. A failed read again keeps the list. */
+		everyRun: () => ({
 			...orpc.runs.list.queryOptions({ input: {} }),
-			refetchInterval: pollWhileActive,
 			meta: { quietRefetchErrors: true },
 		}),
-		/** The runs of one project. */
-		ofProject: (projectId: string) =>
-			orpc.runs.list.queryOptions({ input: { projectId } }),
-		/**
-		 * One project's runs. Polls while a run is on its way, so one that
-		 * sleeps or stops shows it. A Gate and a run's end come through the
-		 * notifications stream. A failed background poll keeps the list.
-		 */
-		ofProjectLive: (projectId: string) => ({
-			...orpc.runs.list.queryOptions({ input: { projectId } }),
-			refetchInterval: pollWhileActive,
-			meta: { quietRefetchErrors: true },
-		}),
-		/** The runs of every project for the inbox. Polls; a failed poll does not toast. */
+		/** The runs of every project for the inbox: its sleeping runs. A failed read does not toast. */
 		everyRunForInbox: () => ({
 			...orpc.runs.list.queryOptions({ input: {} }),
-			refetchInterval: INBOX_POLL_MS,
 			meta: { quietErrors: true },
+		}),
+		/** The runs of one project. A failed read again keeps the list. */
+		ofProject: (projectId: string) => ({
+			...orpc.runs.list.queryOptions({ input: { projectId } }),
+			meta: { quietRefetchErrors: true },
 		}),
 		/** One run with its steps. */
 		get: (runId: string) => orpc.runs.get.queryOptions({ input: { runId } }),
 		/** The files a run's agents kept. Polls while the run runs, so a new one shows. */
 		artifacts: (runId: string, live: boolean) => ({
 			...orpc.runs.artifacts.queryOptions({ input: { runId } }),
-			refetchInterval: live ? ACTIVE_POLL_MS : (false as const),
+			refetchInterval: live ? ARTIFACTS_POLL_MS : (false as const),
 			meta: { quietRefetchErrors: true },
 		}),
 		/** The person's Devices for the project, online or not: a node's Device, Move to. */

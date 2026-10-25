@@ -3,12 +3,11 @@ import type { DashboardInput } from "./types";
 
 /**
  * How often the dashboard reads its numbers again by itself: "the last 24
- * hours" moves on. What happens in between reaches it through the
- * notifications stream: the web app reads the numbers again whenever it
- * reads the runs again, the phone when the person opens the screen or
- * pulls down.
+ * hours" moves on. What happens to the runs reaches it at once: the live
+ * cache reads the numbers again each time it reads the runs again, on the
+ * web and on the phone.
  */
-const POLL_MS = 60_000;
+const POLL_MS = 5 * 60_000;
 
 /**
  * The time zone of this screen (IANA, such as `Europe/Amsterdam`): the
@@ -25,7 +24,7 @@ export function createDashboardQueries(orpc: ApiQueryUtils) {
 		all: () => orpc.dashboard.key(),
 		/**
 		 * The numbers of the Space, of one project (`projectId`), or of every
-		 * Space (`everySpace`). Polls once a minute. A failed background poll
+		 * Space (`everySpace`). Polls every 5 minutes. A failed background poll
 		 * keeps the numbers.
 		 */
 		summary: (input: DashboardInput = {}) => ({
@@ -35,7 +34,7 @@ export function createDashboardQueries(orpc: ApiQueryUtils) {
 			refetchInterval: POLL_MS,
 			meta: { quietRefetchErrors: true },
 		}),
-		/** One flow of a project in detail. Polls once a minute. */
+		/** One flow of a project in detail. Polls every 5 minutes. */
 		flow: (projectId: string, flowName: string) => ({
 			...orpc.dashboard.flow.queryOptions({
 				input: { projectId, flowName, timeZone: readerTimeZone() },

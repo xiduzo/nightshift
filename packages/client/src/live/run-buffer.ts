@@ -24,13 +24,11 @@ export type RunStreamBatch = {
 export type RunStreamBufferOptions = {
 	/** How long items gather before one batch. */
 	flushMs: number;
-	/** How long a burst of step and status items gathers before one `onRunChanged`. */
-	refetchMs: number;
 	schedule: Schedule;
 	/** The seq the stream starts after, when the caller has entries already. */
 	lastSeq?: number | null;
 	onFlush(batch: RunStreamBatch): void;
-	/** A step or the status changed: read the run again. Once per burst. */
+	/** A step or the status changed: the run is read again. */
 	onRunChanged(): void;
 };
 
@@ -40,15 +38,14 @@ export type RunStreamBuffer = {
 	status(status: RunStatus): void;
 	/**
 	 * Stops the buffer: nothing more comes out. `flush: true` hands on what
-	 * gathered first; else it is dropped. A refetch that waits is dropped too.
+	 * gathered first; else it is dropped.
 	 */
 	stop(options?: { flush?: boolean }): void;
 };
 
 /**
  * Gathers the items of one run's stream, so a fast stream or a long replay
- * renders once per window, and a burst of step items (each connect sends
- * them all) reads the run once.
+ * renders once per window.
  */
 export function createRunStreamBuffer(
 	options: RunStreamBufferOptions,
@@ -58,7 +55,6 @@ export function createRunStreamBuffer(
 	let status: RunStatus | null = null;
 	let lastSeq = options.lastSeq ?? null;
 	let cancelFlush: (() => void) | null = null;
-	let cancelRefetch: (() => void) | null = null;
 	let stopped = false;
 
 	function flush() {
@@ -72,12 +68,6 @@ export function createRunStreamBuffer(
 	function scheduleFlush() {
 		cancelFlush ??= options.schedule(flush, options.flushMs);
 	}
-	function scheduleRefetch() {
-		cancelRefetch ??= options.schedule(() => {
-			cancelRefetch = null;
-			options.onRunChanged();
-		}, options.refetchMs);
-	}
 
 	return {
 		entry(entry) {
@@ -90,19 +80,17 @@ export function createRunStreamBuffer(
 			if (stopped) return;
 			steps.push(step);
 			scheduleFlush();
-			scheduleRefetch();
+			options.onRunChanged();
 		},
 		status(next) {
 			if (stopped) return;
 			status = next;
 			scheduleFlush();
-			scheduleRefetch();
+			options.onRunChanged();
 		},
 		stop({ flush: handOn = false } = {}) {
 			if (stopped) return;
 			stopped = true;
-			cancelRefetch?.();
-			cancelRefetch = null;
 			if (!cancelFlush) return;
 			cancelFlush();
 			if (handOn) flush();

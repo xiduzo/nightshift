@@ -13,7 +13,7 @@ import type { NotificationItem } from "./types";
 export type NotificationWatchClient = {
 	notifications: {
 		watch: (
-			input: undefined,
+			input: { phone?: boolean } | undefined,
 			options: { signal: AbortSignal },
 		) => Promise<AsyncIterable<NotificationItem>>;
 	};
@@ -21,6 +21,11 @@ export type NotificationWatchClient = {
 
 export type FollowNotificationsOptions = {
 	client: NotificationWatchClient;
+	/**
+	 * The phone app follows. It stops the stream when it leaves the front,
+	 * so Night Shift counts it as closed at once and pushes to it.
+	 */
+	phone?: boolean;
 	/** Stops the stream. `followNotifications` resolves soon after. */
 	signal: AbortSignal;
 	/** Each item, in order. */
@@ -42,6 +47,7 @@ export type FollowNotificationsOptions = {
  */
 export async function followNotifications({
 	client,
+	phone = false,
 	signal,
 	onItem,
 	onConnection,
@@ -51,7 +57,10 @@ export async function followNotifications({
 	onConnection?.("connecting");
 	while (!signal.aborted) {
 		try {
-			const stream = await client.notifications.watch(undefined, { signal });
+			const stream = await client.notifications.watch(
+				phone ? { phone: true } : undefined,
+				{ signal },
+			);
 			attempt = 0;
 			onConnection?.("live");
 			for await (const item of stream) onItem(item);
