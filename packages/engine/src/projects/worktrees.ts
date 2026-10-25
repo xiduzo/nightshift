@@ -55,9 +55,10 @@ export function itemBranchName(
 	return `nightshift/${shortId}-${slug}`;
 }
 
-export class DirtyWorktreeError extends Error {
+export class DirtyWorktreeError extends Refusal {
 	constructor(message: string) {
-		super(message);
+		// Words for the person: the step that fails shows them as they are.
+		super("conflict", message);
 		this.name = "DirtyWorktreeError";
 	}
 }
