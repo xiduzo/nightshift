@@ -1,5 +1,5 @@
 import type { Flow, Policy } from "@nightshift/flows";
-import { setPolicyValue } from "@nightshift/flows";
+import { DEFAULT_POLICY, setPolicyValue } from "@nightshift/flows";
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
@@ -12,7 +12,6 @@ import { Link } from "@tanstack/react-router";
 import { SettingsIcon, WorkflowIcon } from "lucide-react";
 import { useId } from "react";
 import { PanelHeader } from "@/shared/panel";
-import { POLICY_DEFAULTS } from "../flow-draft";
 import { Field, InspectorSection, Note, PositiveIntInput } from "./fields";
 import { InputsEditor } from "./io/inputs-editor";
 import { OutputsEditor } from "./io/outputs-editor";
@@ -194,7 +193,7 @@ export function FlowInspector({
 							placeholder={
 								policyDefaults
 									? `${policyDefaults[key]} (from Settings)`
-									: `${POLICY_DEFAULTS[key]} (default)`
+									: `${DEFAULT_POLICY[key]} (default)`
 							}
 							describedBy={`${id}-${key}-hint`}
 							onChange={(value) =>
@@ -230,7 +229,7 @@ export function FlowInspector({
 						}}
 					>
 						<NativeSelectOption value="">
-							{`${(policyDefaults ?? POLICY_DEFAULTS).resumeInterruptedRuns ? "Resume" : "Wait"} (${policyDefaults ? "from Settings" : "default"})`}
+							{`${(policyDefaults ?? DEFAULT_POLICY).resumeInterruptedRuns ? "Resume" : "Wait"} (${policyDefaults ? "from Settings" : "default"})`}
 						</NativeSelectOption>
 						<NativeSelectOption value="on">
 							Resume on its own

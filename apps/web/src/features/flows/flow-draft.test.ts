@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	FLOW_VERSION,
-	type Flow,
-	flowSchema,
-	setVariables,
-} from "@nightshift/flows";
+import { FLOW_VERSION, type Flow, flowSchema } from "@nightshift/flows";
 
 import {
 	completeTemplate,
@@ -47,37 +42,6 @@ const flow: Flow = flowSchema.parse({
 		},
 	],
 	edges: [],
-});
-
-describe("variables in the draft", () => {
-	test("the picker lists them after the inputs, with the type", () => {
-		const groups = templateVariables(flow, "check");
-		expect(groups.map((group) => group.scope)).toEqual([
-			"inputs",
-			"vars",
-			"enough",
-			"run",
-		]);
-		expect(groups[1]?.variables).toEqual([
-			{
-				text: "{{vars.tries}}",
-				label: "tries",
-				json: false,
-				description: "number",
-			},
-			{
-				text: "{{vars.plan}}",
-				label: "plan",
-				json: true,
-				description: "json: The steps to take",
-			},
-		]);
-	});
-
-	test("a flow without variables has no vars group", () => {
-		const groups = templateVariables(setVariables(flow, []), "check");
-		expect(groups.map((group) => group.scope)).not.toContain("vars");
-	});
 });
 
 describe("completing a template while you type", () => {

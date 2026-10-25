@@ -58,7 +58,7 @@ export function TemplateField({
 	invalid,
 	className,
 	multiline = true,
-	scopes,
+	initialValue,
 	required,
 }: {
 	id: string;
@@ -74,15 +74,13 @@ export function TemplateField({
 	className?: string;
 	/** False: a one-line input, for a binding or a list source. */
 	multiline?: boolean;
-	/** Only these groups of variables (`inputs`, `run`, …). Default: all. */
-	scopes?: readonly string[];
+	/** A variable's initial value: it reads the inputs and run only. */
+	initialValue?: boolean;
 	required?: boolean;
 }) {
 	const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
 	const flows = useProjectFlowMap();
-	const groups = templateVariables(flow, nodeId, flows).filter(
-		(group) => scopes === undefined || scopes.includes(group.scope),
-	);
+	const groups = templateVariables(flow, nodeId, { flows, initialValue });
 
 	const moveCursor = (field: HTMLTextAreaElement | null, cursor: number) => {
 		requestAnimationFrame(() => {

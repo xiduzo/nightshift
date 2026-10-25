@@ -246,7 +246,7 @@ function VariableRow({
 				}
 				flow={flow}
 				nodeId={null}
-				scopes={["inputs", "run"]}
+				initialValue
 				value={variable.initial ?? ""}
 				onChange={(value) => setOptional("initial", value)}
 				placeholder={variable.type === "json" ? "[]" : "Empty (optional)"}

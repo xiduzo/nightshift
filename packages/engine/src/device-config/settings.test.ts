@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { setting } from "@nightshift/db/schema";
+import { DEFAULT_POLICY } from "@nightshift/flows";
 import { createSandbox, type Sandbox } from "../testing/test-support";
 import type { DeviceDocument } from "./device-document";
 import { createSettingsStore, defaultRunSettings } from "./settings";
@@ -50,6 +51,17 @@ describe("precedence", () => {
 			default: 240,
 		});
 		expect(s.run()).toEqual(defaultRunSettings());
+	});
+
+	test("the run policy settings fall back to the flow's built-in policy", async () => {
+		const { fields } = (await store()).view();
+		expect({
+			usageLimitFirstWaitMinutes: fields.usageLimitFirstWaitMinutes.default,
+			usageLimitMaxWaitMinutes: fields.usageLimitMaxWaitMinutes.default,
+			networkGraceMinutes: fields.networkGraceMinutes.default,
+			maxSteps: fields.maxStepsPerRun.default,
+			resumeInterruptedRuns: fields.resumeInterruptedRuns.default,
+		}).toEqual(DEFAULT_POLICY);
 	});
 
 	test("the environment beats the default, and a saved value beats both", async () => {

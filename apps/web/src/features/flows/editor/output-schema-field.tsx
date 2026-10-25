@@ -1,3 +1,4 @@
+import { schemaFields } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	Field,
@@ -12,7 +13,6 @@ import {
 } from "@nightshift/ui/components/toggle-group";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { schemaFields } from "../flow-draft";
 import { Note } from "./fields";
 import {
 	fromJsonSchema,
@@ -159,8 +159,8 @@ export function OutputSchemaField({
 		send(schema);
 	};
 
-	const fields = schemaFields(output);
 	const base = reference ?? `${nodeId}.data`;
+	const fields = schemaFields(output, base);
 
 	return (
 		<Field className="gap-2" data-invalid={error !== null ? true : undefined}>
@@ -299,7 +299,7 @@ export function OutputSchemaField({
 							{fields.map((field, index) => (
 								<span key={field.name}>
 									{index > 0 ? ", " : null}
-									<code className="font-mono">{`{{${base}.${field.name}}}`}</code>
+									<code className="font-mono">{`{{${field.ref}}}`}</code>
 								</span>
 							))}
 							. A list feeds a Subflow that runs once per item.

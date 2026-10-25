@@ -197,6 +197,18 @@ export type ResolvedPolicy = Required<
 	Omit<Policy, "maxSteps" | "resumeInterruptedRuns">
 > &
 	Pick<Policy, "maxSteps" | "resumeInterruptedRuns">;
+
+/**
+ * The built-in run policy: what each value is when neither the flow nor the
+ * daemon's settings set it. The settings fall back to these.
+ */
+export const DEFAULT_POLICY: Readonly<Required<Policy>> = {
+	usageLimitFirstWaitMinutes: 5,
+	usageLimitMaxWaitMinutes: 60,
+	networkGraceMinutes: 240,
+	maxSteps: 500,
+	resumeInterruptedRuns: true,
+};
 export type FlowInputDef = z.infer<typeof flowInputSchema>;
 export type FlowOutputDef = z.infer<typeof flowOutputSchema>;
 export type FlowVariableDef = z.infer<typeof flowVariableSchema>;

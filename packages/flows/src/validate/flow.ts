@@ -12,6 +12,7 @@ import type { FlowIssue, Flows, Report, ValidateOptions } from "./issues";
 import { checkNode } from "./nodes";
 import { describeNode, type Scope } from "./scope";
 import { checkSections } from "./sections";
+import { templateScope } from "./template-scope";
 import {
 	checkInputs,
 	checkOutputs,
@@ -96,8 +97,15 @@ function validateIn(
 		}
 	}
 
+	const scope: Scope = {
+		flow,
+		nodes,
+		flows,
+		template: templateScope(flow, { flows }),
+		readVars: new Set(),
+	};
 	checkInputs(flow, nodes, error);
-	checkVariables(flow, nodes, error);
+	checkVariables(scope, error);
 
 	if (!nodes.has(flow.start)) {
 		error(`Start node "${flow.start}" does not exist.`, {
@@ -150,7 +158,6 @@ function validateIn(
 	}
 
 	// Node content.
-	const scope: Scope = { flow, nodes, flows, readVars: new Set() };
 	for (const node of nodes.values()) {
 		checkNode(node, scope, error, warning);
 		checkWrites(node, scope, error);

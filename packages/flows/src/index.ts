@@ -1,6 +1,7 @@
 // Browser-safe. File access lives in "@nightshift/flows/files".
 
 export {
+	DEFAULT_POLICY,
 	FLOW_VERSION,
 	type Flow,
 	type FlowEdge,
@@ -217,6 +218,12 @@ export {
 	type FlowListItem,
 	type LoadedFlow,
 	parseFlow,
+	schemaFields,
+	type TemplateField,
+	type TemplateNode,
+	type TemplateScope,
+	type TemplateScopeOptions,
+	templateScope,
 	type ValidateOptions,
 	validateFlow,
 } from "./validate";

@@ -1,6 +1,7 @@
 import {
 	type CustomAgent,
 	customAgentSchema,
+	DEFAULT_POLICY,
 	type DeciderName,
 	deciderNameSchema,
 	HARNESS_CATALOG,
@@ -102,25 +103,25 @@ const DEFS = {
 	} satisfies Def<number>,
 	maxStepsPerRun: {
 		schema: z.number().int().min(1).max(100_000),
-		default: 500,
+		default: DEFAULT_POLICY.maxSteps,
 		env: "NIGHTSHIFT_MAX_STEPS_PER_RUN",
 		fromEnv: int,
 	} satisfies Def<number>,
 	usageLimitFirstWaitMinutes: {
 		schema: positiveMinutes,
-		default: 5,
+		default: DEFAULT_POLICY.usageLimitFirstWaitMinutes,
 	} satisfies Def<number>,
 	usageLimitMaxWaitMinutes: {
 		schema: positiveMinutes,
-		default: 60,
+		default: DEFAULT_POLICY.usageLimitMaxWaitMinutes,
 	} satisfies Def<number>,
 	networkGraceMinutes: {
 		schema: positiveMinutes,
-		default: 240,
+		default: DEFAULT_POLICY.networkGraceMinutes,
 	} satisfies Def<number>,
 	resumeInterruptedRuns: {
 		schema: z.boolean(),
-		default: true,
+		default: DEFAULT_POLICY.resumeInterruptedRuns,
 		env: "NIGHTSHIFT_RESUME_INTERRUPTED_RUNS",
 		fromEnv: onOff,
 	} satisfies Def<boolean>,

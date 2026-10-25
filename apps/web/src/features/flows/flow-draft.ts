@@ -5,7 +5,6 @@
  */
 import {
 	type AgentNode,
-	calledFlow,
 	checkDraft,
 	type DraftMessages,
 	type Flow,
@@ -15,10 +14,10 @@ import {
 	type ListSource,
 	nameSchema,
 	nodeOptions,
-	nodeOutputFields,
-	type Policy,
 	type ProjectFlowMap,
-	runFields,
+	type TemplateField,
+	type TemplateNode,
+	templateScope,
 	type ValueNode,
 	type WaitUntil,
 } from "@nightshift/flows";
@@ -69,18 +68,6 @@ export function sourceSummary(source: ListSource): string {
 	}
 }
 
-/**
- * The built-in defaults of the run policy. A number the flow leaves out comes
- * from the daemon's settings; these stand in while the settings load.
- */
-export const POLICY_DEFAULTS: Required<Policy> = {
-	usageLimitFirstWaitMinutes: 5,
-	usageLimitMaxWaitMinutes: 60,
-	networkGraceMinutes: 240,
-	maxSteps: 500,
-	resumeInterruptedRuns: true,
-};
-
 /** What an option is called on its node: an option, an outcome, or an exit. */
 export function optionNoun(node: FlowNode): "option" | "outcome" | "exit" {
 	if (node.type === "decision") return "option";
@@ -115,133 +102,94 @@ export type VariableGroup = {
 	variables: TemplateVariable[];
 };
 
-/** The top-level keys of a JSON Schema object, with whether each holds JSON. */
-export function schemaFields(
-	schema: unknown,
-): { name: string; json: boolean }[] {
-	if (!schema || typeof schema !== "object") return [];
-	const properties = (schema as { properties?: unknown }).properties;
-	if (!properties || typeof properties !== "object") return [];
-	return Object.entries(properties as Record<string, unknown>)
-		.filter(([name]) => /^[A-Za-z0-9_-]+$/.test(name))
-		.map(([name, field]) => {
-			const type =
-				field && typeof field === "object"
-					? (field as { type?: unknown }).type
-					: undefined;
-			return { name, json: type === "array" || type === "object" };
-		});
-}
-
-const JSON_FIELDS: readonly string[] = ["data", "results"];
-
-function nodeVariables(
-	node: FlowNode,
-	flows: ProjectFlowMap | undefined,
-): TemplateVariable[] {
-	const called = calledFlow(node, flows);
-	const own: readonly string[] = nodeOutputFields(node);
-	const variables: TemplateVariable[] = nodeOutputFields(node, called).map(
-		(field) => {
-			const output = own.includes(field)
-				? undefined
-				: called?.outputs.find((candidate) => candidate.name === field);
-			return {
-				text: `{{${node.id}.${field}}}`,
-				label: field,
-				// A called flow's output may hold JSON: a path can go below it.
-				json: JSON_FIELDS.includes(field) || output !== undefined,
-				description: output
-					? (output.description ??
-						`An output of ${node.type === "call" ? node.flow : "the called flow"}`)
-					: undefined,
-			};
-		},
-	);
-	if (node.type === "agent") {
-		for (const field of schemaFields(node.output)) {
-			variables.push({
-				text: `{{${node.id}.data.${field.name}}}`,
-				label: `data.${field.name}`,
-				json: field.json,
-				description: "A field of the output schema",
-			});
-		}
-	}
-	if (node.type === "value") {
-		for (const field of schemaFields(node.output)) {
-			variables.push({
-				text: `{{${node.id}.data.${field.name}}}`,
-				label: `data.${field.name}`,
-				json: field.json,
-				description: "A field of the value",
-			});
-		}
-	}
-	return variables;
-}
-
 /**
- * The `{{…}}` variables a node can use: the flow's inputs, its variables,
- * other nodes' outputs, and the run's fields. With `nodeId` null (the flow's outputs),
- * every node counts. `flows` adds the outputs of the flows that Call
- * nodes call.
+ * The `{{…}}` variables a field can use, in groups: the template scope of
+ * `@nightshift/flows` (what the checks accept), in the editor's words. The
+ * node `nodeId` is left out (null: every node counts). `flows` adds the
+ * outputs of the flows that Subflow nodes call. `initialValue`: a
+ * variable's initial value, which reads the inputs and run only.
  */
 export function templateVariables(
 	flow: Flow,
 	nodeId: string | null,
-	flows?: ProjectFlowMap,
+	options: { flows?: ProjectFlowMap; initialValue?: boolean } = {},
 ): VariableGroup[] {
-	const inputs: VariableGroup[] =
-		flow.inputs.length > 0
-			? [
-					{
-						scope: "inputs",
-						variables: flow.inputs.map((input) => ({
-							text: `{{${input.name}}}`,
-							label: input.name,
-							json: input.type === "json",
-							description: input.description ?? input.label,
-						})),
-					},
-				]
-			: [];
-	const variables = flow.variables ?? [];
-	const vars: VariableGroup[] =
-		variables.length > 0
-			? [
-					{
-						scope: "vars",
-						variables: variables.map((variable) => ({
-							text: `{{vars.${variable.name}}}`,
-							label: variable.name,
-							json: variable.type === "json",
-							description: variable.description
-								? `${variable.type}: ${variable.description}`
-								: variable.type,
-						})),
-					},
-				]
-			: [];
-	const nodes = flow.nodes
-		.filter((node) => node.id !== nodeId)
-		.map((node) => ({
-			scope: node.id,
-			variables: nodeVariables(node, flows),
-		}));
+	const scope = templateScope(flow, options);
+	const groups: VariableGroup[] = [];
+	if (scope.inputs.length > 0) {
+		groups.push({
+			scope: "inputs",
+			variables: scope.inputs.map((field) =>
+				variableOf(field, field.name, field.description),
+			),
+		});
+	}
+	if (scope.vars && scope.vars.length > 0) {
+		groups.push({
+			scope: "vars",
+			variables: scope.vars.map((field) => {
+				const type =
+					flow.variables?.find((variable) => variable.name === field.name)
+						?.type ?? "text";
+				return variableOf(
+					field,
+					field.name,
+					field.description ? `${type}: ${field.description}` : type,
+				);
+			}),
+		});
+	}
+	for (const node of scope.nodes) {
+		if (node.id === nodeId) continue;
+		const own = flow.nodes.find((candidate) => candidate.id === node.id);
+		groups.push({ scope: node.id, variables: nodeVariables(node, own) });
+	}
+	groups.push({
+		scope: "run",
+		variables: scope.run.map((field) => variableOf(field, field.name)),
+	});
+	return groups;
+}
+
+/** A node's fields, then the keys its output schema names below `data`. */
+function nodeVariables(
+	node: TemplateNode,
+	own: FlowNode | undefined,
+): TemplateVariable[] {
+	const keyWords =
+		own?.type === "value"
+			? "A field of the value"
+			: "A field of the output schema";
 	return [
-		...inputs,
-		...vars,
-		...nodes,
-		{
-			scope: "run",
-			variables: runFields.map((field) => ({
-				text: `{{run.${field}}}`,
-				label: field,
-				json: false,
-			})),
-		},
+		...node.fields.map((field) =>
+			variableOf(
+				field,
+				field.name,
+				field.output
+					? (field.description ??
+							`An output of ${own?.type === "call" ? own.flow : "the called flow"}`)
+					: undefined,
+			),
+		),
+		...node.fields.flatMap((field) =>
+			(field.keys ?? []).map((key) =>
+				variableOf(key, `${field.name}.${key.name}`, keyWords),
+			),
+		),
 	];
+}
+
+function variableOf(
+	field: TemplateField,
+	label: string,
+	description?: string,
+): TemplateVariable {
+	return {
+		text: `{{${field.ref}}}`,
+		label,
+		json: field.json,
+		...(description === undefined ? {} : { description }),
+	};
 }
 
 const FIELD_MESSAGES: Record<string, string> = {

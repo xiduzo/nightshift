@@ -7,7 +7,14 @@ import {
 import { nameSchema, reservedNames } from "../nodes";
 import { coerceVariable, templateRefs } from "../template";
 import type { Report } from "./issues";
-import { checkRule, checkTemplate, describeNode, type Scope } from "./scope";
+import {
+	checkRef,
+	checkRule,
+	checkTemplate,
+	describeNode,
+	type Scope,
+} from "./scope";
+import { readsName, templateScope } from "./template-scope";
 
 /** The values of a flow: its inputs, outputs and variables, and the writes of its nodes. */
 
@@ -16,14 +23,16 @@ const SECRET_REF = /\$\{[A-Za-z_][A-Za-z0-9_]*\}/;
 
 /**
  * Variables: unique names, valid and not reserved, not an input or a node
- * id, a schema on `json` only, and an initial value that reads only inputs
- * and `run`, holds no secret, and (as plain text) fits the type.
+ * id, a schema on `json` only, and an initial value that reads only what
+ * its template scope holds (the inputs and `run`), holds no secret, and
+ * (as plain text) fits the type.
  */
-export function checkVariables(
-	flow: Flow,
-	nodes: ReadonlyMap<string, FlowNode>,
-	error: Report,
-): void {
+export function checkVariables(scope: Scope, error: Report): void {
+	const { flow, nodes } = scope;
+	const initialScope: Scope = {
+		...scope,
+		template: templateScope(flow, { initialValue: true }),
+	};
 	const reserved: readonly string[] = reservedNames;
 	const inputs = new Set(flow.inputs.map((input) => input.name));
 	const seen = new Set<string>();
@@ -72,11 +81,14 @@ export function checkVariables(
 		}
 		const refs = templateRefs(initial);
 		for (const ref of refs) {
-			if (ref.name === "run" || inputs.has(ref.name)) continue;
-			error(
-				`${subject} uses ${ref.raw}. It can read the inputs and run only: no step ran yet.`,
-				{},
-			);
+			if (readsName(initialScope.template, ref.name)) {
+				checkRef(ref, `${subject} uses ${ref.raw}`, {}, initialScope, error);
+			} else {
+				error(
+					`${subject} uses ${ref.raw}. It can read the inputs and run only: no step ran yet.`,
+					{},
+				);
+			}
 		}
 		if (refs.length === 0) {
 			const fits = coerceVariable(variable.type, initial, true);

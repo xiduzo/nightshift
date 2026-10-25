@@ -5,6 +5,7 @@
  */
 
 export {
+	DEFAULT_POLICY,
 	FLOW_VERSION,
 	type Flow,
 	type FlowEdge,
