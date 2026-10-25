@@ -6,25 +6,32 @@ import { type LockPrograms, systemSleepLock } from "./sleep-lock";
 /** Run facts that a test sets, and run events it lands. */
 function fakeRuns(open: RunFacts[] = []) {
 	const runs = new Map(open.map((run) => [run.id, run]));
-	const listeners = new Set<
-		(runs: readonly { spaceId: string; runId: string }[]) => void
-	>();
+	const listeners = new Set<(runIds: readonly string[]) => void>();
+	let reads = 0;
 	const source: RunSource = {
 		subscribe(listener) {
 			listeners.add(listener);
 			return () => listeners.delete(listener);
 		},
-		run: async (_spaceId, runId) => runs.get(runId) ?? null,
-		openRuns: async () => [...runs.values()],
+		run: async (runId) => {
+			reads++;
+			return runs.get(runId) ?? null;
+		},
+		openRuns: async () => {
+			reads++;
+			return [...runs.values()];
+		},
 	};
 	return {
 		source,
 		set(run: RunFacts) {
 			runs.set(run.id, run);
-			for (const listener of listeners) {
-				listener([{ spaceId: "space-1", runId: run.id }]);
-			}
+			for (const listener of listeners) listener([run.id]);
 		},
+		/** Whether the keep-awake follows the runs now. */
+		followed: () => listeners.size > 0,
+		/** How many times the runs were read. */
+		reads: () => reads,
 	};
 }
 
@@ -36,12 +43,8 @@ const run = (
 	id,
 	status,
 	wakeAt: where.wakeAt ?? null,
-	walker: { id: "w", name: null, thisDevice: where.walker ?? true },
-	device: {
-		id: "d",
-		name: null,
-		thisDevice: where.device ?? where.walker ?? true,
-	},
+	walker: { thisDevice: where.walker ?? true },
+	device: { thisDevice: where.device ?? where.walker ?? true },
 });
 
 /** A sleep lock that counts its holds. */
@@ -113,13 +116,31 @@ describe("keep this computer awake", () => {
 		});
 		await awake.start();
 		expect(awake.holding()).toBe(false);
+		// Off: it does not follow the runs, nor read them.
+		expect(runs.followed()).toBe(false);
+		runs.set(run("run-2", "running"));
+		await awake.idle();
+		expect(runs.reads()).toBe(0);
 
 		enabled = true;
 		awake.check();
+		await awake.idle();
+		expect(runs.followed()).toBe(true);
 		expect(awake.holding()).toBe(true);
 
 		enabled = false;
 		awake.check();
+		expect(lock.live()).toBe(0);
+		expect(runs.followed()).toBe(false);
+
+		// On again: it reads the runs again and follows them.
+		enabled = true;
+		awake.check();
+		await awake.idle();
+		expect(lock.live()).toBe(1);
+		runs.set(run("run-1", "finished"));
+		runs.set(run("run-2", "finished"));
+		await awake.idle();
 		expect(lock.live()).toBe(0);
 		awake.stop();
 	});

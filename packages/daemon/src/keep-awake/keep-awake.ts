@@ -11,22 +11,23 @@ import type { SleepHold, SleepLock } from "./sleep-lock";
  * usage limit, a network failure, a Wait with a timeout), and this
  * computer walks it or runs its steps. A run that waits for a person at a
  * Gate, or for a signal with no timeout, does not keep it awake.
+ *
+ * It follows the runs only while the setting is on (and the OS has a
+ * sleep lock): with it off, a landed event costs nothing here.
  */
 
 /** What decides whether a run needs this computer. */
-export type RunFacts = Pick<
-	RunSummary,
-	"id" | "status" | "wakeAt" | "walker" | "device"
->;
+export type RunFacts = Pick<RunSummary, "id" | "status" | "wakeAt"> & {
+	walker: { thisDevice: boolean };
+	device: { thisDevice: boolean };
+};
 
 /** The runs of this Replica, as the keep-awake reads them. */
 export type RunSource = {
-	/** Calls `listener` with the runs whose events landed. Returns the unsubscribe. */
-	subscribe(
-		listener: (runs: readonly { spaceId: string; runId: string }[]) => void,
-	): () => void;
+	/** Calls `listener` with the ids of the runs whose events landed. Returns the unsubscribe. */
+	subscribe(listener: (runIds: readonly string[]) => void): () => void;
 	/** The run now. Null when this Replica has no such run. */
-	run(spaceId: string, runId: string): Promise<RunFacts | null>;
+	run(runId: string): Promise<RunFacts | null>;
 	/** The runs that have not ended, at the start. */
 	openRuns(): Promise<RunFacts[]>;
 };
@@ -40,24 +41,25 @@ export function needsThisComputer(run: RunFacts): boolean {
 
 /** The engine's runs, in every Space of this Replica. */
 export function engineRunSource(
-	engine: Pick<Engine, "onRunEvents" | "space">,
+	engine: Pick<Engine, "onRunEvents" | "runHere" | "space">,
 	spaces: () => Promise<string[]>,
 ): RunSource {
 	return {
 		subscribe: (listener) =>
 			engine.onRunEvents((events) => {
-				const seen = new Map<string, { spaceId: string; runId: string }>();
-				for (const e of events) {
-					seen.set(e.runId, { spaceId: e.spaceId, runId: e.runId });
-				}
-				listener([...seen.values()]);
+				listener([...new Set(events.map((e) => e.runId))]);
 			}),
-		async run(spaceId, runId) {
-			try {
-				return await engine.space(spaceId).getRun(runId);
-			} catch {
-				return null;
-			}
+		async run(runId) {
+			// One row and the facts the run log keeps, not the run page.
+			const here = await engine.runHere(runId).catch(() => null);
+			if (!here) return null;
+			return {
+				id: here.id,
+				status: here.status,
+				wakeAt: here.wakeAt,
+				walker: { thisDevice: here.walkedHere },
+				device: { thisDevice: here.stepsHere },
+			};
 		},
 		async openRuns() {
 			const out: RunFacts[] = [];
@@ -85,13 +87,13 @@ export type KeepAwakeOptions = {
 };
 
 export type KeepAwake = {
-	/** Reads the runs that need this computer, then follows their events. */
+	/** While the setting is on: reads the runs that need this computer, then follows their events. */
 	start(): Promise<void>;
 	/** Lets go of the lock and stops following. */
 	stop(): void;
 	/** Whether the lock is held now. */
 	holding(): boolean;
-	/** Applies the setting and the runs now. For tests. */
+	/** Applies the setting and the runs now: follows the runs or stops. For tests. */
 	check(): void;
 	/** Resolves once every run read so far is done. For tests. */
 	idle(): Promise<void>;
@@ -110,7 +112,10 @@ export function createKeepAwake(options: KeepAwakeOptions): KeepAwake {
 	/** When a hold last ended on its own. */
 	let brokeAt: number | null = null;
 	let queue: Promise<void> = Promise.resolve();
+	/** Set while the runs are followed. */
 	let unsubscribe: (() => void) | null = null;
+	/** Counts the follows, so a read of an earlier one changes nothing. */
+	let follows = 0;
 	let timer: ReturnType<typeof setInterval> | null = null;
 	let stopped = false;
 
@@ -126,9 +131,43 @@ export function createKeepAwake(options: KeepAwakeOptions): KeepAwake {
 		current?.release();
 	}
 
+	/** Reads the runs that need this computer, then follows their events. */
+	function follow(): void {
+		const current = ++follows;
+		const read = async (runIds: readonly string[]) => {
+			for (const runId of runIds) {
+				const run = await options.runs.run(runId);
+				if (current !== follows) return;
+				if (run && needsThisComputer(run)) active.add(runId);
+				else active.delete(runId);
+			}
+			check();
+		};
+		unsubscribe = options.runs.subscribe((runIds) => {
+			enqueue(() => read(runIds));
+		});
+		enqueue(async () => {
+			const open = await options.runs.openRuns();
+			if (current !== follows) return;
+			for (const run of open) {
+				if (needsThisComputer(run)) active.add(run.id);
+			}
+			check();
+		});
+	}
+
+	function unfollow(): void {
+		follows++;
+		unsubscribe?.();
+		unsubscribe = null;
+		active.clear();
+	}
+
 	function check(): void {
-		const wanted =
-			!stopped && options.lock !== null && options.enabled() && active.size > 0;
+		const on = !stopped && options.lock !== null && options.enabled();
+		if (on && !unsubscribe) follow();
+		if (!on && unsubscribe) unfollow();
+		const wanted = on && active.size > 0;
 		if (!wanted) {
 			release();
 			return;
@@ -152,29 +191,13 @@ export function createKeepAwake(options: KeepAwakeOptions): KeepAwake {
 	return {
 		async start() {
 			stopped = false;
-			unsubscribe = options.runs.subscribe((runs) => {
-				enqueue(async () => {
-					for (const { spaceId, runId } of runs) {
-						const run = await options.runs.run(spaceId, runId);
-						if (run && needsThisComputer(run)) active.add(runId);
-						else active.delete(runId);
-					}
-					check();
-				});
-			});
 			timer = setInterval(check, options.checkMs ?? 5_000);
-			enqueue(async () => {
-				for (const run of await options.runs.openRuns()) {
-					if (needsThisComputer(run)) active.add(run.id);
-				}
-				check();
-			});
+			check();
 			await queue;
 		},
 		stop() {
 			stopped = true;
-			unsubscribe?.();
-			unsubscribe = null;
+			unfollow();
 			if (timer) clearInterval(timer);
 			timer = null;
 			release();
