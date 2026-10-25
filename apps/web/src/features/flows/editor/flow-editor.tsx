@@ -1,3 +1,9 @@
+// The flow editor: the canvas, the floating panels, the inspector of what
+// is selected, saving, and the keys that act on the whole flow. Over 600
+// lines because it wires every inspector (node, edge, Section, flow) to the
+// one draft. The edits themselves live in `node-edits.ts`,
+// `sections/section-edits.ts` and `@nightshift/flows`.
+
 import type { Flow, FlowIssue, FlowNodeType } from "@nightshift/flows";
 import {
 	callersOf,
@@ -30,8 +36,9 @@ import { useFoldedSections } from "../canvas/sections/use-section-canvas";
 import { checkFlow } from "../flow-draft";
 import { flowMutations, flowQueries } from "../queries";
 import { StartRunDialog } from "../start/start-run-dialog";
+import { useAddNode } from "./canvas-controls";
 import { EdgeInspector } from "./edge-inspector";
-import { EditorCanvas, useAddNode } from "./editor-canvas";
+import { EditorCanvas } from "./editor-canvas";
 import { FloatingInspector } from "./floating-inspector";
 import { FlowInspector } from "./flow-inspector";
 import { FlowTitleCard } from "./flow-title-card";

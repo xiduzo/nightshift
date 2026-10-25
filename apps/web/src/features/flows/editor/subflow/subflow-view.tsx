@@ -68,7 +68,7 @@ import {
 	useSectionCanvas,
 } from "../../canvas/sections/use-section-canvas";
 import { useMeasured } from "../../canvas/use-measured";
-import { CanvasControls } from "../editor-canvas";
+import { CanvasControls } from "../canvas-controls";
 import {
 	type SubflowStack,
 	type SubflowViewport,

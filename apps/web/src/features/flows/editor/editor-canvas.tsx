@@ -1,22 +1,14 @@
 import type { Flow, FlowIssue, FlowNodeType, Outcome } from "@nightshift/flows";
 import {
 	addEdge,
-	addNode,
 	type FlowCheck,
 	moveNode,
-	type NodeDefaults,
 	removeEdge,
 	removeNode,
 	sectionBoundary,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
-import { ButtonGroup } from "@nightshift/ui/components/button-group";
 import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@nightshift/ui/components/tooltip";
 import {
 	Background,
 	BackgroundVariant,
@@ -27,20 +19,13 @@ import {
 	MiniMap,
 	type NodeChange,
 	NodeToolbar,
-	Panel,
 	Position,
 	ReactFlow,
 	useNodesInitialized,
 	useReactFlow,
 	useStoreApi,
 } from "@xyflow/react";
-import {
-	GroupIcon,
-	MaximizeIcon,
-	MinusIcon,
-	PlusIcon,
-	WorkflowIcon,
-} from "lucide-react";
+import { GroupIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { exitHandleId, groupEdges } from "../canvas/edge-groups";
@@ -71,6 +56,7 @@ import {
 } from "../canvas/sections/section-nodes";
 import { useSectionCanvas } from "../canvas/sections/use-section-canvas";
 import { useMeasured } from "../canvas/use-measured";
+import { CanvasControls } from "./canvas-controls";
 import { loadElk } from "./lib/elk";
 import { layoutFlow, type NodeHandles, type Size } from "./lib/flow-layout";
 import { isNodeType, NODE_DRAG_TYPE } from "./node-dock";
@@ -82,107 +68,8 @@ import {
 	withoutNodes,
 } from "./selection";
 
-/** Below the node a new one lands on, so repeated adds do not stack exactly. */
-const ADD_OFFSET = 32;
-
 /** One empty list for every node without issues, so its data stays the same. */
 const NO_ISSUES: FlowIssue[] = [];
-
-/**
- * Adds a node and selects it: where it was dropped (`at`, a point on the
- * screen), or else in the middle of the visible canvas, a third from the
- * top. Nudged past nodes already on that spot.
- */
-export function useAddNode(
-	flow: Flow,
-	onFlowChange: (change: (flow: Flow) => Flow) => void,
-	onSelect: SelectionSetter,
-	defaults: NodeDefaults | undefined,
-) {
-	const { screenToFlowPosition } = useReactFlow();
-	const store = useStoreApi();
-	return (type: FlowNodeType, at?: { x: number; y: number }) => {
-		const rect = store.getState().domNode?.getBoundingClientRect();
-		const center = at
-			? screenToFlowPosition(at)
-			: rect
-				? screenToFlowPosition({
-						x: rect.left + rect.width / 2,
-						y: rect.top + rect.height / 3,
-					})
-				: { x: 0, y: 0 };
-		// Nudge down past nodes that already sit on that spot.
-		let position = { x: Math.round(center.x - 120), y: Math.round(center.y) };
-		while (
-			flow.nodes.some(
-				(node) =>
-					Math.abs(node.position.x - position.x) < ADD_OFFSET &&
-					Math.abs(node.position.y - position.y) < ADD_OFFSET,
-			)
-		) {
-			position = { x: position.x + ADD_OFFSET, y: position.y + ADD_OFFSET };
-		}
-		const result = addNode(flow, type, position, defaults);
-		onFlowChange(() => result.flow);
-		onSelect({ kind: "node", id: result.id });
-	};
-}
-
-/**
- * Zoom in, zoom out, fit and auto layout, as a vertical shadcn button group.
- * Without `onAutoLayout`, as on a read-only canvas, there is no Lay out.
- */
-export function CanvasControls({
-	onAutoLayout,
-}: {
-	onAutoLayout?: () => void;
-}) {
-	const { zoomIn, zoomOut, fitView } = useReactFlow();
-	const controls = [
-		{
-			label: "Zoom in",
-			icon: PlusIcon,
-			onClick: () => void zoomIn({ duration: 150 }),
-		},
-		{
-			label: "Zoom out",
-			icon: MinusIcon,
-			onClick: () => void zoomOut({ duration: 150 }),
-		},
-		{
-			label: "Fit view",
-			icon: MaximizeIcon,
-			onClick: () => void fitView({ duration: 200, maxZoom: 1, padding: 0.15 }),
-		},
-		...(onAutoLayout
-			? [{ label: "Auto layout", icon: WorkflowIcon, onClick: onAutoLayout }]
-			: []),
-	];
-	return (
-		<Panel position="bottom-left" className="m-3!">
-			<ButtonGroup orientation="vertical" aria-label="Canvas controls">
-				{controls.map(({ label, icon: Icon, onClick }) => (
-					<Tooltip key={label}>
-						<TooltipTrigger
-							render={
-								<Button
-									variant="outline"
-									size="icon-sm"
-									className="bg-background dark:bg-background"
-									aria-label={label}
-									onClick={onClick}
-								/>
-							}
-						>
-							<Icon />
-						</TooltipTrigger>
-						<TooltipContent side="right">{label}</TooltipContent>
-					</Tooltip>
-				))}
-			</ButtonGroup>
-		</Panel>
-	);
-}
 
 /**
  * Where React Flow measured each node's handles, from the node's top-left
