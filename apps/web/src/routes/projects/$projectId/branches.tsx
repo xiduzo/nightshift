@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { ProjectRunCopiesPage } from "@/features/runs";
+import { ProjectRunCopiesPage, preloadRunCopiesPage } from "@/features/runs";
 
 export const Route = createFileRoute("/projects/$projectId/branches")({
+	loader: ({ context, params }) =>
+		preloadRunCopiesPage(context.queryClient, params.projectId),
 	component: ProjectBranchesRoute,
 });
 

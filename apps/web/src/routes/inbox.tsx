@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { InboxPage } from "@/features/gates";
+import { InboxPage, preloadInboxPage } from "@/features/gates";
 
 export const Route = createFileRoute("/inbox")({
 	// Polls from the browser; nothing to render on the server.
@@ -8,6 +8,7 @@ export const Route = createFileRoute("/inbox")({
 	/** `gate`: the step id of the Gate the pane shows. */
 	validateSearch: (search: Record<string, unknown>): { gate?: string } =>
 		typeof search.gate === "string" ? { gate: search.gate } : {},
+	loader: ({ context }) => preloadInboxPage(context.queryClient),
 	component: InboxRoute,
 });
 

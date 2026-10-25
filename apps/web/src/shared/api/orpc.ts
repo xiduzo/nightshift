@@ -28,7 +28,9 @@ export function createQueryClient(handle: ErrorHandler) {
 				if (query.meta?.quietRefetchErrors && query.state.data !== undefined) {
 					return;
 				}
+				// Queries that fail for one reason (a run that is gone) show one toast.
 				toast.error(`Error: ${error.message}`, {
+					id: `query-error:${error.message}`,
 					action: {
 						label: "retry",
 						onClick: () => {

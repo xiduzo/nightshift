@@ -11,6 +11,9 @@ export const getRouter = () => {
 	const router = createTanStackRouter({
 		routeTree,
 		scrollRestoration: true,
+		// Pointing at a link loads its page and starts its data (each route's loader).
+		// TanStack Query decides when data is stale, so the router keeps none.
+		defaultPreload: "intent",
 		defaultPreloadStaleTime: 0,
 		context: { orpc, queryClient },
 		defaultPendingComponent: () => <Loader />,

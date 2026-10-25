@@ -101,10 +101,10 @@ export function RunPage({ runId }: { runId: string }) {
 		[run.data?.steps, stream.steps],
 	);
 	const liveStatus = stream.status ?? run.data?.status;
-	const artifacts = useQuery({
-		...runQueries.artifacts(runId, liveStatus === "running"),
-		enabled: run.data !== undefined,
-	});
+	// It needs only the run's id, so it loads beside the run, not after it.
+	const artifacts = useQuery(
+		runQueries.artifacts(runId, liveStatus === "running"),
+	);
 
 	if (run.isLoading) {
 		return (

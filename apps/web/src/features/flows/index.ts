@@ -29,6 +29,7 @@ export {
 export { useMeasured } from "./canvas/use-measured";
 export { InspectorSection } from "./editor/fields";
 export { FlowPage } from "./flow-page";
+export { preloadFlowPage } from "./preload";
 export { ProjectFlowsPage } from "./project-flows-page";
 export { flowQueries } from "./queries";
 export { BaseRefCombobox } from "./start/base-ref-combobox";

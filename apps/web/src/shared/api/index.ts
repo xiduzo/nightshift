@@ -75,4 +75,5 @@ export type {
 	SettingsView,
 } from "./contract";
 export { client, createQueryClient, orpc } from "./orpc";
+export { preloadQuery } from "./preload";
 export { SERVER_URL } from "./server-url";
