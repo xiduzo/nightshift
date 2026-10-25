@@ -14,7 +14,6 @@ import {
 	localPerson,
 	spaceIds,
 } from "@nightshift/auth";
-import { createDb } from "@nightshift/db";
 import {
 	databaseUrl,
 	ensureDataDir,
@@ -74,6 +73,7 @@ import {
 	guardProcess,
 	holdLease,
 	hot,
+	processDatabase,
 	secretFiles,
 	secretsDir,
 	stopOnSignals,
@@ -157,7 +157,8 @@ export async function createDaemon(
 	}
 
 	const url = databaseUrl(env, dataDir);
-	const db = createDb({ DATABASE_URL: url });
+	// One client per process: a `bun --hot` reload takes the one it has.
+	const db = processDatabase(url);
 	await migrateDb(db, { migrationsFolder: options.migrationsFolder });
 
 	const lease = await holdLease(db);

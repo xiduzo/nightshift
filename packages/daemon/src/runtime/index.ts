@@ -5,6 +5,7 @@ export {
 	secretsDir,
 	webPushSubject,
 } from "./daemon-env";
+export { processDatabase } from "./database";
 export { canChooseFolder, chooseFolder } from "./folder-picker";
 export {
 	checkHealth,
