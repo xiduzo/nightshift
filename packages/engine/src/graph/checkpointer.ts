@@ -259,23 +259,36 @@ export class LibsqlSaver extends BaseCheckpointSaver {
 
 	/**
 	 * Keeps the thread's latest root checkpoint (with its pending writes) and
-	 * deletes every other checkpoint and write of the thread: the older root
-	 * ones and every subgraph namespace. The thread stays re-enterable from
-	 * its final state; its history goes.
+	 * the subgraph namespaces in `live` (with every namespace below them),
+	 * and deletes every other checkpoint and write of the thread: the older
+	 * root ones and the namespaces of tasks that are done. The thread stays
+	 * re-enterable from where it is; its history goes.
+	 *
+	 * A namespace is `<node>:<task id>`, and a namespace below it adds
+	 * `|<node>:<task id>`. Without `live`, every subgraph namespace goes.
 	 */
-	async pruneThread(threadId: string): Promise<void> {
+	async pruneThread(
+		threadId: string,
+		live: readonly string[] = [],
+	): Promise<void> {
 		const latest = `(SELECT MAX(checkpoint_id) FROM lg_checkpoint
         WHERE thread_id = ? AND checkpoint_ns = '')`;
-		const keep = `checkpoint_ns = '' AND checkpoint_id = ${latest}`;
+		const root = `(checkpoint_ns = '' AND checkpoint_id = ${latest})`;
+		const below = live.map(
+			() => "(checkpoint_ns = ? OR substr(checkpoint_ns, 1, ?) = ?)",
+		);
+		const keep = [root, ...below].join(" OR ");
+		const args: InValue[] = [threadId, threadId];
+		for (const ns of live) args.push(ns, ns.length + 1, `${ns}|`);
 		await this.client.batch(
 			[
 				{
 					sql: `DELETE FROM lg_checkpoint WHERE thread_id = ? AND NOT (${keep})`,
-					args: [threadId, threadId],
+					args,
 				},
 				{
 					sql: `DELETE FROM lg_write WHERE thread_id = ? AND NOT (${keep})`,
-					args: [threadId, threadId],
+					args,
 				},
 			],
 			"write",

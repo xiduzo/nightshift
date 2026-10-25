@@ -343,6 +343,101 @@ describe("take: a drive's time and a thread that cannot move", () => {
 	});
 });
 
+describe("an ended run keeps only the checkpoints a re-entry reads", () => {
+	/** The run's checkpoints per namespace: "" for the root. */
+	async function checkpoints(runId: string): Promise<Record<string, number>> {
+		const result = await sandbox.db.$client.execute({
+			sql: "SELECT checkpoint_ns AS ns, count(*) AS n FROM lg_checkpoint WHERE thread_id = ? GROUP BY checkpoint_ns",
+			args: [runId],
+		});
+		return Object.fromEntries(
+			result.rows.map((row) => [String(row.ns), Number(row.n)]),
+		);
+	}
+
+	test("a failed run keeps its latest checkpoint, and a resume goes on from it", async () => {
+		const { h, runner, sessions } = await setup(worker());
+		await start(runner, h.runId);
+		(await waitFor(() => sessions[0])).fail("The harness broke.");
+		await waitFor(async () => (await statusOf(h)) === "failed");
+		await waitFor(() => !runner.isActive(h.runId));
+		expect(await checkpoints(h.runId)).toEqual({ "": 1 });
+
+		await runner.take(h.runId, { kind: "resume", by: "person" });
+		const resumed = await waitFor(() => sessions[1]);
+		expect(resumed.input.resumeSessionId).toBe("harness-0");
+		resumed.emit({ type: "report", outcome: "pass", summary: "Done." });
+		resumed.finish();
+		await waitFor(async () => (await statusOf(h)) === "finished");
+		expect(
+			deriveSteps(await h.events()).map((s) => [s.nodeId, s.outcome]),
+		).toEqual([
+			["worker", "pass"],
+			["check", "pass"],
+		]);
+	});
+
+	test("a run stopped at a Gate inside a Call keeps the body's namespace: a resume asks again inside it, and runs nothing twice", async () => {
+		const review = flowOf(
+			[
+				{
+					id: "first",
+					type: "decision",
+					position: { x: 0, y: 0 },
+					prompt: "",
+					options: [{ name: "go", when: "true" }],
+					by: "rule",
+				},
+				gate("approve"),
+			],
+			[edge("r1", "first", "go", "approve")],
+		);
+		const call = {
+			id: "call",
+			type: "call" as const,
+			position: { x: 0, y: 0 },
+			flow: "review",
+			inputs: {},
+		};
+		const h = await startRun(sandbox, flowOf([call]), {
+			flows: { review },
+		});
+		const runner = testRunner(h);
+		runners.push(runner);
+		await start(runner, h.runId);
+		await waitFor(async () => (await statusOf(h)) === "waiting");
+		const before = await checkpoints(h.runId);
+		expect(before[""]).toBeGreaterThan(1);
+
+		await runner.take(h.runId, { kind: "stop" });
+		const kept = await checkpoints(h.runId);
+		expect(kept[""]).toBe(1);
+		const bodies = Object.keys(kept).filter((ns) => ns !== "");
+		expect(bodies).toHaveLength(1);
+		expect(bodies[0]).toStartWith("call:");
+
+		await runner.take(h.runId, { kind: "resume", by: "person" });
+		await waitFor(async () => (await statusOf(h)) === "waiting");
+		const gateStep = deriveOpenGate(await h.events())?.stepId as string;
+		await runner.take(h.runId, {
+			kind: "answer",
+			stepId: gateStep,
+			choice: "yes",
+			note: "",
+		});
+		await waitFor(async () => (await statusOf(h)) === "finished");
+		const steps = deriveSteps(await h.events());
+		expect(steps.filter((s) => s.nodeId === "first")).toHaveLength(1);
+		expect(steps.map((s) => [s.nodeId, s.visit, s.outcome])).toEqual([
+			["call", 1, "pass"],
+			["first", 1, "go"],
+			["approve", 1, "stopped"],
+			["approve", 2, "yes"],
+		]);
+		expect(await checkpoints(h.runId)).toEqual({ "": 1 });
+	});
+});
+
 describe("release: the handover to a new engine (I7)", () => {
 	test("new Turns and queued ones are refused, the Turn in flight finishes, and the drive writes nothing more", async () => {
 		const hung = scriptedHarness({ hang: true });

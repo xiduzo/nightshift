@@ -54,14 +54,14 @@ import {
  *   wake timer (`WaitStarted` is in the log already); a `gate` needs
  *   nothing (the Gate node logged `GateOpened`); `parked` appends
  *   `RunEnded` with its status and reason (`endingOf`).
- * - A stream that ends with `state.ended` set appends `RunEnded finished`
- *   and prunes the thread to its latest checkpoint (the log is the
- *   record); one that throws appends `RunEnded failed` with `The engine
- *   failed: …`.
+ * - A stream that ends with `state.ended` set appends `RunEnded finished`;
+ *   one that throws appends `RunEnded failed` with `The engine failed: …`.
  * - A stop waits for nothing: it fences the drive off (`fence.ts`) and
  *   ends the run's open work itself (`closeOpenWork`, `open-work.ts`). A
  *   step past the time limits its log records ends the same way
  *   (`overdue`, `deadlines.ts`), from the runner's own sweep.
+ * - A run that ended (finished, failed, stopped) keeps only the
+ *   checkpoints a re-entry reads (`Thread.prune`): the log is the record.
  * - How a sleep ends is the sleep module's (`planWake`, `recordWake`,
  *   `graph/sleep.ts`); how a re-entry moves the thread is the planner's
  *   (`planReentry`, `graph/reentry.ts`).
@@ -541,12 +541,15 @@ export function createRunner(deps: RunnerDeps) {
 			const ending = endingOf(outcome);
 			if (!ending) return;
 			dropThread(runId, thread);
+			// The prune comes first: once the log says the run ended, a
+			// person may resume it, and the slot frees right after the end.
+			await pruneThread(thread, runId);
 			await endRun(thread.ctx.log, runId, ending.status, ending.reason);
-			if (outcome.kind === "ended") await pruneThread(thread, runId);
 		} catch (error) {
 			// A stop took the run from this drive: it writes nothing more.
 			if (thread?.fence.closed) return;
 			console.error(`[engine] the walk of run ${runId} failed`, error);
+			if (thread) await pruneThread(thread, runId);
 			await endRun(
 				thread?.ctx.log ?? log,
 				runId,
@@ -562,14 +565,19 @@ export function createRunner(deps: RunnerDeps) {
 	}
 
 	/**
-	 * Keeps a finished run's latest checkpoint and deletes the older ones
-	 * and the body namespaces. The history was the walk's bookkeeping and
-	 * the event log is the record; the final state is what a resume of a
-	 * finished run re-enters on (`planReentry`).
+	 * Drops an ended run's checkpoint history (`Thread.prune`): it keeps the
+	 * latest root checkpoint and the namespaces of the tasks it still has.
+	 * The history was the walk's bookkeeping and the event log is the
+	 * record. What is kept is all a resume, a restart or a rerun reads
+	 * (`planReentry`): a finished run's final state, or a failed or stopped
+	 * run's interrupt or cut-short node with the body it parked in.
 	 */
-	async function pruneThread(thread: Thread, runId: string): Promise<void> {
+	async function pruneThread(
+		thread: Thread | (() => Thread),
+		runId: string,
+	): Promise<void> {
 		try {
-			await thread.prune();
+			await (typeof thread === "function" ? thread() : thread).prune();
 		} catch (error) {
 			if (error instanceof FencedError) return;
 			console.error(
@@ -631,9 +639,11 @@ export function createRunner(deps: RunnerDeps) {
 	 * resume re-enters it (design rule 7), at its interrupt or at the node
 	 * the drive was in.
 	 */
-	async function halt(runId: string, cut: CutShort): Promise<void> {
-		sleeps.forget(runId);
-		await closeOpenWork(closeDeps, runId, cut);
+	async function halt(row: RunRow, cut: CutShort): Promise<void> {
+		sleeps.forget(row.id);
+		await closeOpenWork(closeDeps, row.id, cut);
+		// The drive's thread is fenced off: the run's open thread prunes.
+		await pruneThread(() => threadOf(row), row.id);
 	}
 
 	/**
@@ -792,7 +802,7 @@ export function createRunner(deps: RunnerDeps) {
 		const status = deriveRunState(await log.events(runId)).status;
 		if (!isGoing(status)) throw new RestartTooLate(status);
 		await log.append({ type: "StopRequested", runId, payload: {} });
-		await halt(runId, { kind: "stopped" });
+		await halt(row, { kind: "stopped" });
 		await reenter(row, {
 			kind: "resume",
 			by: intent.by,
@@ -808,7 +818,8 @@ export function createRunner(deps: RunnerDeps) {
 	 * that waits at a Gate or sleeps. Waits on no drive and no timer: a
 	 * harness that hangs cannot hold a stop.
 	 */
-	async function stopTurn(runId: string, turn: TurnState): Promise<Taken> {
+	async function stopTurn(row: RunRow, turn: TurnState): Promise<Taken> {
+		const runId = row.id;
 		const walk = walkOf(runId);
 		if (walk) {
 			await takeFromDrive(runId, walk);
@@ -820,7 +831,7 @@ export function createRunner(deps: RunnerDeps) {
 		await log.append({ type: "StopRequested", runId, payload: {} });
 		// A drive may have ended the run before the stop took it.
 		if (!isGoing(status)) return UNCHANGED;
-		await halt(runId, { kind: "stopped" });
+		await halt(row, { kind: "stopped" });
 		return HALTED;
 	}
 
@@ -832,11 +843,12 @@ export function createRunner(deps: RunnerDeps) {
 	 * more.
 	 */
 	async function overdueTurn(
-		runId: string,
+		row: RunRow,
 		events: readonly LoggedEvent[],
 		graceMs: number,
 		turn: TurnState,
 	): Promise<Taken> {
+		const runId = row.id;
 		if (deriveRunState(events).status !== "running") return UNCHANGED;
 		const overdue = await findOverdue(
 			events,
@@ -849,7 +861,7 @@ export function createRunner(deps: RunnerDeps) {
 			await takeFromDrive(runId, walk);
 			turn.freed = true;
 		}
-		await halt(runId, { kind: "overdue", ...overdue });
+		await halt(row, { kind: "overdue", ...overdue });
 		return HALTED;
 	}
 
@@ -901,9 +913,9 @@ export function createRunner(deps: RunnerDeps) {
 			case "restart":
 				return restartTurn(row, intent, turn);
 			case "stop":
-				return stopTurn(runId, turn);
+				return stopTurn(row, turn);
 			case "overdue":
-				return overdueTurn(runId, events, intent.graceMs, turn);
+				return overdueTurn(row, events, intent.graceMs, turn);
 		}
 	}
 
