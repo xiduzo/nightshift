@@ -869,6 +869,40 @@ describe("runs", () => {
 });
 
 describe("stop and resume", () => {
+	test("stop ends a run the log says runs when its drive could not log the end", async () => {
+		// The run log fails the first RunEnded: the drive ends, the run does not.
+		const inner = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		runLogs.push(inner);
+		let failed = false;
+		const runLog: RunLog = {
+			...inner,
+			async append(e) {
+				if (e.type === "RunEnded" && !failed) {
+					failed = true;
+					throw new Error("The disk is full.");
+				}
+				return inner.append(e);
+			},
+		};
+		const engine = makeEngine(scriptedHarness().harness, {}, { runLog });
+		const run = await engine.startRun({
+			projectId: await projectId(engine),
+			flow: flowOf([command("check", "true")]),
+		});
+		await waitFor(
+			async () =>
+				failed && (await engine.getRun(run.id)).steps[0]?.outcome === "pass",
+			{ label: "the drive to end without its RunEnded" },
+		);
+		expect(await statusOf(engine, run.id)).toBe("running");
+
+		await engine.stopRun(run.id);
+		expect(await statusOf(engine, run.id)).toBe("stopped");
+		// It goes on as any stopped run does.
+		await engine.resumeRun(run.id);
+		expect(await waitForEnd(engine, run.id)).toBe("finished");
+	});
+
 	test("stop aborts the agent step, and resume continues its session", async () => {
 		const { harness, sessions } = scriptedHarness();
 		const engine = makeEngine(harness);

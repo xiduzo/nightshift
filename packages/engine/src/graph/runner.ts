@@ -815,8 +815,10 @@ export function createRunner(deps: RunnerDeps) {
 	/**
 	 * A stop, whatever the drive does: takes the run from the running drive
 	 * (`takeFromDrive`) and ends its open work as stopped, or closes a run
-	 * that waits at a Gate or sleeps. Waits on no drive and no timer: a
-	 * harness that hangs cannot hold a stop.
+	 * that waits at a Gate or sleeps. A run the log says runs but no drive
+	 * in this process holds (its drive died, or could not log its end) is
+	 * closed the same way: nothing else can end it. Waits on no drive and no
+	 * timer: a harness that hangs cannot hold a stop.
 	 */
 	async function stopTurn(row: RunRow, turn: TurnState): Promise<Taken> {
 		const runId = row.id;
@@ -826,8 +828,7 @@ export function createRunner(deps: RunnerDeps) {
 			turn.freed = true;
 		}
 		const status = deriveRunState(await log.events(runId)).status;
-		const parked = status === "waiting" || status === "sleeping";
-		if (!walk && !parked) return UNCHANGED;
+		if (!walk && !isGoing(status)) return UNCHANGED;
 		await log.append({ type: "StopRequested", runId, payload: {} });
 		// A drive may have ended the run before the stop took it.
 		if (!isGoing(status)) return UNCHANGED;

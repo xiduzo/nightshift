@@ -160,9 +160,10 @@ describe("take: one Turn at a time per run", () => {
 		await expect(
 			runner.hold(h.runId, () => runner.take(h.runId, { kind: "stop" })),
 		).rejects.toThrow("cannot wait for another Turn of the same run");
+		// The other run started, and no drive holds it: the stop ends it.
 		await expect(
 			runner.hold(h.runId, () => runner.take(other, { kind: "stop" })),
-		).resolves.toEqual({ kind: "unchanged" });
+		).resolves.toEqual({ kind: "halted" });
 	});
 
 	test("a Turn on a run another Device walks now is refused; the overdue check leaves it (I9)", async () => {
@@ -180,6 +181,40 @@ describe("take: one Turn at a time per run", () => {
 		expect(await runner.take(h.runId, { kind: "overdue", graceMs: 0 })).toEqual(
 			{ kind: "unchanged" },
 		);
+	});
+});
+
+describe("take: a stop", () => {
+	test("ends a run the log says runs when no drive holds it: its drive could not log the end", async () => {
+		const h = await startRun(sandbox, flowOf([command("check", "true")]));
+		let failed = false;
+		const runner = testRunner(h, {
+			log: {
+				...h.log,
+				async append(event) {
+					if (event.type === "RunEnded" && !failed) {
+						failed = true;
+						throw new Error("The disk is full.");
+					}
+					return h.log.append(event);
+				},
+			},
+		});
+		runners.push(runner);
+		await start(runner, h.runId);
+		await waitFor(() => failed && !runner.isActive(h.runId), {
+			label: "the drive to end without its RunEnded",
+		});
+		expect(await statusOf(h)).toBe("running");
+
+		expect(await runner.take(h.runId, { kind: "stop" })).toEqual({
+			kind: "halted",
+		});
+		expect(await statusOf(h)).toBe("stopped");
+		// A second stop has nothing left to end.
+		expect(await runner.take(h.runId, { kind: "stop" })).toEqual({
+			kind: "unchanged",
+		});
 	});
 });
 
