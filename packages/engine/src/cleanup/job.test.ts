@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { waitFor } from "../testing/test-support";
 import { startCleanupJob } from "./job";
 import { cleanupTime, isSafeToRemove } from "./safety";
 
@@ -15,8 +16,8 @@ test("sweeps after the delay and then on its interval, survives a failed sweep, 
 		delayMs: 5,
 		everyMs: 10,
 	});
-	await Bun.sleep(60);
-	expect(sweeps).toBeGreaterThanOrEqual(3);
+	// The first sweep fails; the interval still brings the next two.
+	await waitFor(() => sweeps >= 3, { label: "three sweeps" });
 	controller.abort();
 	const stopped = sweeps;
 	await Bun.sleep(40);
@@ -27,8 +28,10 @@ test("never sweeps twice at once, nor when the engine did not start", async () =
 	const controller = new AbortController();
 	let running = 0;
 	let most = 0;
+	let started = 0;
 	startCleanupJob({
 		sweep: async () => {
+			started++;
 			running++;
 			most = Math.max(most, running);
 			await Bun.sleep(30);
@@ -48,7 +51,8 @@ test("never sweeps twice at once, nor when the engine did not start", async () =
 		signal: controller.signal,
 		delayMs: 0,
 	});
-	await Bun.sleep(80);
+	// Each sweep outlasts several intervals: the next waits for it.
+	await waitFor(() => started >= 2, { label: "two sweeps" });
 	controller.abort();
 	expect(most).toBe(1);
 	expect(never).toBe(0);
