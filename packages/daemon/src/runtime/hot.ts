@@ -1,7 +1,6 @@
-import type { DeviceLinks, WorkHub } from "@nightshift/devices";
+import type { KeptDevices } from "@nightshift/devices";
 import type {
 	DeviceDocument,
-	Engine,
 	GitHubClones,
 	SpaceDocuments,
 } from "@nightshift/engine";
@@ -18,23 +17,24 @@ import type { Lease } from "./lease";
  * that must have one owner per process keeps it:
  *
  * - kept as it is: the lease, the Device and Space documents (one writer
- *   each), the relay, the work hub (a Device's stream outlives a reload),
- *   the in-app channel (an open notification stream outlives a reload),
- *   the listeners (Bun reloads a server of the same `id` in place);
- * - replaced, the old one stopped first: the engine (`dispose`), the
- *   notifier (`stop`), the keep-awake (`stop`), the scheduler (`abort`), the timers
- *   (`clearInterval`), the links (`close`).
+ *   each), the relay, the in-app channel (an open notification stream
+ *   outlives a reload), the listeners (Bun reloads a server of the same
+ *   `id` in place);
+ * - handed over: the devices (`startDevices` keeps one slot,
+ *   `nightshiftDevices`: its engine lets go of its runs, and the work hub,
+ *   the applied commands and the calls served for a Host go on);
+ * - replaced, the old one stopped first: the notifier (`stop`), the
+ *   keep-awake (`stop`), the scheduler (`abort`), the timers
+ *   (`clearInterval`).
  *
  * The names stay as they are: a running dev daemon reloads into new code
  * with the same names.
  */
-export type HotRegistry = {
+export type HotRegistry = KeptDevices & {
 	nightshiftLease?: Lease;
 	nightshiftDocument?: DeviceDocument;
 	nightshiftSpaces?: SpaceDocuments;
 	nightshiftSync?: Sync;
-	nightshiftWork?: WorkHub;
-	nightshiftEngine?: Engine;
 	nightshiftInApp?: InAppChannel;
 	nightshiftNotifications?: Notifications;
 	nightshiftKeepAwake?: KeepAwake;
@@ -42,8 +42,6 @@ export type HotRegistry = {
 	/** The clones from GitHub that run, and how the last ones ended. */
 	nightshiftGitHubClones?: GitHubClones;
 	nightshiftFacts?: Timer;
-	nightshiftPresence?: Timer;
-	nightshiftLinks?: DeviceLinks;
 	/** The stop of the newest daemon: the signal handlers call it. */
 	nightshiftStop?: () => Promise<void>;
 };

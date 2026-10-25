@@ -12,7 +12,6 @@ import {
 	hasLogin,
 	hostPolicyFromEnv,
 	localPerson,
-	roleAllows,
 	spaceIds,
 } from "@nightshift/auth";
 import { createDb } from "@nightshift/db";
@@ -24,20 +23,11 @@ import {
 } from "@nightshift/db/data-dir";
 import { migrateDb } from "@nightshift/db/migrate";
 import {
-	createPeerEngine,
-	createRelay,
-	createWorkHub,
-	createWorkRelay,
-	type DeviceServices,
 	deviceDirectory,
-	deviceOffers,
-	listenHostname,
-	ownCertificate,
-	reachFor,
 	selfDevice,
 	selfOwnerId,
 	setSelfOwner,
-	wireDevices,
+	startDevices,
 } from "@nightshift/devices";
 import {
 	checkProjectFolder,
@@ -52,7 +42,6 @@ import {
 	createToolLaunchers,
 	documentRows,
 	localDevice,
-	memberRole,
 	openDeviceDocument,
 	programOf,
 	secretStore,
@@ -131,10 +120,11 @@ export type Daemon = DaemonServe & {
 
 /**
  * The daemon's composition root: every service of one daemon, wired. It
- * holds the database lease, opens the documents, starts the engine and the
- * timers, and returns what Bun serves. It does not listen: `startDaemon`
- * does. One per process: `bun --hot` calls it again on each reload, and the
- * hot-reload registry (`runtime/hot.ts`) keeps what must have one owner.
+ * holds the database lease, opens the documents, starts the devices with
+ * the engine (`startDevices`) and the timers, and returns what Bun
+ * serves. It does not listen: `startDaemon` does. One per process: `bun
+ * --hot` calls it again on each reload, and the hot-reload registry
+ * (`runtime/hot.ts`) keeps what must have one owner.
  */
 export async function createDaemon(
 	env: DaemonEnv,
@@ -288,39 +278,6 @@ export async function createDaemon(
 
 	reportDeviceFacts({ db, document, deviceId: device.id, settings, kept: hot });
 
-	/** Set once the engine runs: the Host's half of the devices. */
-	let devices: DeviceServices;
-
-	/**
-	 * The relay's document half: the owner's clients sync this Device's
-	 * document here. Kept across `bun --hot` reloads, like the document.
-	 */
-	hot.nightshiftSync ??= createSync({
-		document: (name) =>
-			name === document.name
-				? document.doc
-				: (spaces.byName(name)?.doc ?? null),
-		// On a Host: the documents of the Devices whose home Host this is.
-		kept: {
-			has: async (name) =>
-				(await engine.devices.keptDocumentOwner(name)) !== null,
-			...documentRows(db),
-		},
-		authorize: documentAccess({
-			auth,
-			db,
-			localSession,
-			ownerId: person.userId,
-			isThisComputer: (peer, request) =>
-				isThisComputer(peer, request, trustedOrigins),
-			spaceIdOf,
-			policy: hostPolicy,
-			keptOwner: (name) => engine.devices.keptDocumentOwner(name),
-			deviceKey: (token) => devices.host.syncKey(token),
-		}),
-	});
-	const sync = hot.nightshiftSync;
-
 	// Only the newest engine may start scheduled runs: the one before stops
 	// its scheduler.
 	hot.nightshiftScheduler?.abort();
@@ -363,27 +320,6 @@ export async function createDaemon(
 	});
 
 	/**
-	 * On a Host: the calls of the runs it walks, for the Devices they are
-	 * placed on, which take them over their own links. Kept across `bun --hot`
-	 * reloads, so a Device's stream outlives a reload.
-	 */
-	hot.nightshiftWork ??= createWorkHub({
-		// A Device is back: the steps that slept while it was away look again.
-		onBack: (deviceId) => {
-			engine.deviceBack(deviceId).catch((error) => {
-				console.error("Steps that waited for a device were not woken:", error);
-			});
-		},
-	});
-	const workHub = hot.nightshiftWork;
-	/** The hub for the Spaces this computer keeps; its Hosts for the others. */
-	const work = createWorkRelay({
-		hub: workHub,
-		engine: () => engine,
-		links: () => devices.deviceLinks,
-	});
-
-	/**
 	 * The price list that prices tokens when a harness reports no cost: the
 	 * bundled one, then a newer one fetched once a day into the data folder.
 	 * Not awaited: the daemon starts on the bundled list, never on the network.
@@ -394,48 +330,68 @@ export async function createDaemon(
 	});
 
 	/**
-	 * The actions on rows another Device owns (a Gate of a run walked
-	 * elsewhere, a Clone in a Space a Host keeps), carried over the links.
-	 * Lazy: the engine and the links are made below.
+	 * This computer among Devices: the engine with its peers, the Host it
+	 * may be, its Offers and its Links to its Hosts. Secure by default: it
+	 * answers this computer only until it is a Host with an https://
+	 * address (read at start). On a `bun --hot` reload the runtime before
+	 * hands over to this one: its engine lets go of its runs first, and the
+	 * work of placed steps goes on.
 	 */
-	const relayToHosts = createRelay({
-		engine: () => engine,
-		registry: () => engine.devices,
-		links: () => devices.deviceLinks,
-	});
-
-	// The engine before a `bun --hot` reload lets go of its runs first: else
-	// its drives, harnesses and step timers run on beside the runs this
-	// engine's recovery continues, and end steps that are no longer theirs.
-	await hot.nightshiftEngine?.dispose().catch((error) => {
-		console.error(
-			"The engine before the reload did not let go of its runs:",
-			error,
-		);
-	});
-
-	const engine = createPeerEngine({
+	const devices = await startDevices({
+		auth,
 		db,
-		walkerId: device.id,
-		device: local,
-		work,
-		relay: relayToHosts,
+		env,
+		settings,
+		profiles,
+		document,
+		spaces,
+		self: device,
+		ownerId: person.userId,
+		local,
 		dataDir,
-		settings: () => settings.run(),
-		profileFor: (name) => profiles.settingsFor(name),
-		// This computer's own Offers, and who may use Offers in a Space.
-		ownOffers: () => deviceOffers(document),
-		mayUseOffers: async (spaceId, personId) => {
-			const role = memberRole(await spaces.open(spaceId), personId);
-			return role !== null && roleAllows(role, { offer: ["use"] });
-		},
-		spaceDocuments: spaces,
+		keyStore,
 		// NIGHTSHIFT_SCHEDULER=off: no scheduler at all, whatever Settings says.
 		// Otherwise the Settings switch is read on every tick.
 		scheduler:
 			env.NIGHTSHIFT_SCHEDULER === "off" ? false : { signal: scheduler.signal },
+		// The relay below is made once per process, before any access is removed.
+		disconnect: (deviceId) =>
+			hot.nightshiftSync?.disconnect(
+				(context) => context.deviceId === deviceId,
+			),
+		kept: hot,
 	});
-	hot.nightshiftEngine = engine;
+	const { engine } = devices;
+
+	/**
+	 * The relay's document half: the owner's clients sync this Device's
+	 * document here. Kept across `bun --hot` reloads, like the document.
+	 */
+	hot.nightshiftSync ??= createSync({
+		document: (name) =>
+			name === document.name
+				? document.doc
+				: (spaces.byName(name)?.doc ?? null),
+		// On a Host: the documents of the Devices whose home Host this is.
+		kept: {
+			has: async (name) =>
+				(await engine.devices.keptDocumentOwner(name)) !== null,
+			...documentRows(db),
+		},
+		authorize: documentAccess({
+			auth,
+			db,
+			localSession,
+			ownerId: person.userId,
+			isThisComputer: (peer, request) =>
+				isThisComputer(peer, request, trustedOrigins),
+			spaceIdOf,
+			policy: hostPolicy,
+			keptOwner: (name) => engine.devices.keptDocumentOwner(name),
+			deviceKey: (token) => devices.host.syncKey(token),
+		}),
+	});
+	const sync = hot.nightshiftSync;
 
 	const { notifications, settings: computerSettings } = await wireNotifications(
 		{
@@ -448,37 +404,6 @@ export async function createDaemon(
 			desktop: options.desktop,
 		},
 	);
-
-	/*
-	 * Secure by default: this daemon answers this computer only, until it is
-	 * a Host with an https:// address (read at start: a change applies on
-	 * the next start). It serves https:// itself when it has a certificate
-	 * (NIGHTSHIFT_TLS_CERT, NIGHTSHIFT_TLS_KEY).
-	 */
-	const reach = reachFor(settings.current());
-	const certificate = ownCertificate(env);
-
-	devices = await wireDevices({
-		auth,
-		db,
-		engine,
-		settings,
-		profiles,
-		document,
-		spaces,
-		self: device,
-		ownerId: person.userId,
-		local,
-		workHub,
-		dataDir,
-		keyStore,
-		reach,
-		fingerprint: certificate?.fingerprint ?? null,
-		devicesPage: new URL("/devices", env.CORS_ORIGIN).toString(),
-		disconnect: (deviceId) =>
-			sync.disconnect((context) => context.deviceId === deviceId),
-		kept: hot,
-	});
 
 	/**
 	 * "Keep this computer awake" (this computer's
@@ -509,7 +434,7 @@ export async function createDaemon(
 		},
 		databaseUrl: url,
 		leaseOwner: lease.owner,
-		reach,
+		reach: devices.reach,
 	};
 
 	const http = createHttp({
@@ -547,13 +472,9 @@ export async function createDaemon(
 		corsOrigin: env.CORS_ORIGIN,
 		leaseOwner: lease.owner,
 		sync,
-		// How Bun serves this daemon: the hostname of its reach, and its own TLS.
-		serve: {
-			hostname: listenHostname(reach, env.NIGHTSHIFT_LISTEN),
-			...(certificate
-				? { tls: { cert: certificate.cert, key: certificate.key } }
-				: {}),
-		},
+		// How Bun serves this daemon: the hostname of its reach, and its own
+		// TLS when it has a certificate (NIGHTSHIFT_TLS_CERT, NIGHTSHIFT_TLS_KEY).
+		serve: devices.serve,
 	});
 
 	return {

@@ -16,5 +16,9 @@ export {
 } from "./host-spaces";
 export { joinHost } from "./join";
 export type { Link } from "./link";
-export { createDeviceLinks, type DeviceLinks } from "./links";
+export {
+	createDeviceLinks,
+	type DeviceLinks,
+	type LinkOptions,
+} from "./links";
 export type { JoinProgress, LinkedHost } from "./types";

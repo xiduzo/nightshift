@@ -3,10 +3,12 @@
  * Hosts. It implements the engine's `Peers` port (`createPeerEngine`),
  * this computer as a Host, its Links to the Hosts it paired with, the
  * exchange of run history, Offers, and the work of runs placed on another
- * Device. The API serves it (`Devices`, `HostExchange`, `Offers`) and the
- * daemon wires it (`wireDevices`). The peer protocol is here too: the
- * Host's procedures as one oRPC contract (`hostContract`), implemented
- * once (`hostRouter`), which the API mounts at its paths.
+ * Device. The API serves it (`Devices`, `HostExchange`, `Offers`). The
+ * daemon starts it with one call (`startDevices`): the engine and every
+ * devices piece, handed over on a `bun --hot` reload. The peer protocol
+ * is here too: the Host's procedures as one oRPC contract
+ * (`hostContract`), implemented once (`hostRouter`), which the API mounts
+ * at its paths.
  */
 
 export {
@@ -41,25 +43,13 @@ export {
 	hostRouter,
 	type PairingReviewView,
 } from "./host";
-export type { DeviceLinks, HostRole, JoinProgress } from "./links";
-export {
-	deviceOffers,
-	type Offers,
-	type OfferView,
-	type SpaceDeviceView,
-} from "./offers";
-export {
-	createPeerEngine,
-	deviceDirectory,
-	type PeerEngine,
-} from "./peers";
-export { listenHostname, ownCertificate, reachFor } from "./reach";
+export type { HostRole, JoinProgress } from "./links";
+export type { Offers, OfferView, SpaceDeviceView } from "./offers";
+export { deviceDirectory, type PeerEngine } from "./peers";
 export {
 	type PairedDevice,
 	selfDevice,
 	selfOwnerId,
 	setSelfOwner,
 } from "./registry";
-export { createRelay, createWorkRelay } from "./relay";
-export { type DeviceServices, wireDevices } from "./wire";
-export { createWorkHub, type WorkHub } from "./work";
+export { type DevicesRuntime, type KeptDevices, startDevices } from "./wire";

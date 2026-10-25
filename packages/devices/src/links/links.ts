@@ -22,6 +22,17 @@ export type DeviceLinks = {
 	close(): Promise<void>;
 };
 
+/** The options of each Link that a test may set (`httpsLink`). */
+export type LinkOptions = Pick<
+	HttpsLinkOptions,
+	| "heartbeatMs"
+	| "firstBackoffMs"
+	| "maxBackoffMs"
+	| "answerTimeoutMs"
+	| "streamBackoff"
+	| "clientFor"
+>;
+
 export function createDeviceLinks(deps: {
 	links: HostLinks;
 	keys: DeviceKeyStore;
@@ -38,15 +49,8 @@ export function createDeviceLinks(deps: {
 	 * The function it returns is called when the link stops.
 	 */
 	attach?(hostLink: HostLink, link: Link): () => void;
-	/** For tests: shorter heartbeats and backoffs. */
-	linkOptions?: Pick<
-		HttpsLinkOptions,
-		| "heartbeatMs"
-		| "firstBackoffMs"
-		| "maxBackoffMs"
-		| "answerTimeoutMs"
-		| "streamBackoff"
-	>;
+	/** For tests: shorter heartbeats and backoffs, and the Host at an address. */
+	linkOptions?: LinkOptions;
 }): DeviceLinks {
 	const running = new Map<string, Link>();
 	/** Per running link: how to stop what was attached to it. */

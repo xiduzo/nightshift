@@ -5,7 +5,8 @@ export {
 	createOfferCalls,
 	createWorkServer,
 	type OfferDeps,
+	type ServedCalls,
 	serveChecked,
-	type WorkServer,
+	servedCalls,
 } from "./work";
 export { createWorkHub, type WorkHub } from "./work-hub";
