@@ -786,7 +786,10 @@ export function createRunner(deps: RunnerDeps) {
 	 *
 	 * When the drive ended the run itself just before its fence closed,
 	 * there is nothing left to restart: throws `RestartTooLate` with the
-	 * run as it ended.
+	 * run as it ended. When it ended the step but not the run, the run goes
+	 * on from the step's end on a new drive, as the old one would have
+	 * (the run position finds the step done), and the restart is too late
+	 * too.
 	 */
 	async function restartTurn(
 		row: RunRow,
@@ -799,8 +802,13 @@ export function createRunner(deps: RunnerDeps) {
 		else reserve(runId, intent, {});
 		// The old drive may never unwind to free its slot itself.
 		turn.freed = true;
-		const status = deriveRunState(await log.events(runId)).status;
+		const events = await log.events(runId);
+		const status = deriveRunState(events).status;
 		if (!isGoing(status)) throw new RestartTooLate(status);
+		if (walk && deriveSteps(events).every((s) => s.endedAt !== null)) {
+			drive(row, inputOf({ kind: "continue" }));
+			throw new RestartTooLate(status);
+		}
 		await log.append({ type: "StopRequested", runId, payload: {} });
 		await halt(row, { kind: "stopped" });
 		await reenter(row, {
