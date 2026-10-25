@@ -373,7 +373,18 @@ describe("replies of a real engine", () => {
 			context,
 			signal: told.signal,
 		})) as AsyncIterator<unknown>;
-		const firstNotice = toldOf.next();
+		/** What the stream says until the run ends: quiet changes first, then its end. */
+		const notices = (async () => {
+			const items: unknown[] = [];
+			for (;;) {
+				const next = await toldOf.next();
+				if (next.done) return items;
+				items.push(next.value);
+				if ((next.value as { kind: string }).kind === "run-finished") {
+					return items;
+				}
+			}
+		})();
 		const me = (context.session as { user: { id: string } }).user.id;
 		while (!inApp.isActive(me)) await Bun.sleep(5);
 
@@ -402,12 +413,18 @@ describe("replies of a real engine", () => {
 		})) as { copies: { runId: string }[] };
 		expect(copies.copies.map((c) => c.runId)).toEqual([started.id]);
 		await read(appRouter.gates.list);
-		const notice = (await firstNotice).value;
-		expect(
-			notificationItemSchema.safeParse(notice).error,
-			"notifications.watch",
-		).toBe(undefined);
-		expect(notice).toMatchObject({ kind: "run-finished", runId: started.id });
+		const heard = await notices;
+		for (const notice of heard) {
+			expect(
+				notificationItemSchema.safeParse(notice).error,
+				"notifications.watch",
+			).toBe(undefined);
+		}
+		expect(heard[0]).toMatchObject({ kind: "run-changed", runId: started.id });
+		expect(heard.at(-1)).toMatchObject({
+			kind: "run-finished",
+			runId: started.id,
+		});
 		told.abort();
 		await toldOf.return?.();
 
