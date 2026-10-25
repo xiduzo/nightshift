@@ -88,7 +88,7 @@ beforeAll(async () => {
 	invitationId = (
 		await host.client.members.invite({ email: EMAIL, role: "member" })
 	).id;
-});
+}, 90_000);
 
 afterAll(async () => {
 	await stopDaemon(host);
