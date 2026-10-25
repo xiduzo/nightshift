@@ -1,6 +1,10 @@
 import type { Flow } from "@nightshift/flows";
-import { useQueries, useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import {
+	type UseQueryResult,
+	useQueries,
+	useQuery,
+} from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
 
 import { flowQueries } from "./queries";
 
@@ -27,37 +31,38 @@ export function useProjectFlows(
 		...flowQueries.list(projectId),
 		staleTime: STALE_MS,
 	});
-	const names = (list.data ?? [])
-		.map((item) => item.name)
-		.filter((name) => name !== except);
+	const names = useMemo(
+		() =>
+			(list.data ?? [])
+				.map((item) => item.name)
+				.filter((name) => name !== except),
+		[list.data, except],
+	);
 
-	const results = useQueries({
+	// The combined record keeps its identity while its content stays the same,
+	// so a validation memo on it does not rerun each render.
+	const combine = useCallback(
+		(results: UseQueryResult<{ flow: Flow | null }>[]) => {
+			if (!results.every((result) => result.isSuccess || result.isError)) {
+				return undefined;
+			}
+			const flows: Record<string, Flow | null> = {};
+			names.forEach((name, index) => {
+				flows[name] = results[index]?.data?.flow ?? null;
+			});
+			return flows;
+		},
+		[names],
+	);
+	const flows = useQueries({
 		queries: names.map((name) => ({
 			...flowQueries.get(projectId, name),
 			staleTime: STALE_MS,
 			refetchOnWindowFocus: false,
 			meta: { quietErrors: true },
 		})),
+		combine,
 	});
-	const settled =
-		list.data !== undefined &&
-		results.every((result) => result.isSuccess || result.isError);
-
-	// One snapshot per content, so a validation memo on it does not rerun each render.
-	let snapshot: string | null = null;
-	if (settled) {
-		const flows: Record<string, Flow | null> = {};
-		names.forEach((name, index) => {
-			flows[name] = results[index]?.data?.flow ?? null;
-		});
-		snapshot = JSON.stringify(flows);
-	}
-	const flows = useMemo(
-		() =>
-			snapshot === null
-				? undefined
-				: (JSON.parse(snapshot) as Record<string, Flow | null>),
-		[snapshot],
-	);
-	return { flows, isLoading: !settled };
+	const settled = list.data !== undefined && flows !== undefined;
+	return { flows: settled ? flows : undefined, isLoading: !settled };
 }
