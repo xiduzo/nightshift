@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import { Refusal } from "@nightshift/refusal";
 import {
 	CLAUDE_CODE_PROFILE,
 	observeSdkMessage,
@@ -301,15 +302,41 @@ describe("createTranslator", () => {
 		});
 	});
 
-	test("a thrown stream ends with a harness error", () => {
+	test("a thrown stream ends with a harness error in plain words; its details go to the log", () => {
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const boom = new Error("boom");
+			const events = feed(newTranslator(), [session], {
+				aborted: false,
+				thrown: boom,
+			});
+			expect(events.at(-1)).toEqual({
+				type: "error",
+				kind: "harness",
+				message:
+					"Claude Code stopped with an error. Night Shift saved the details. Try again.",
+			});
+			expect(logged).toHaveBeenCalledWith(
+				"[agents] the Claude Code session failed:",
+				boom,
+			);
+		} finally {
+			logged.mockRestore();
+		}
+	});
+
+	test("a thrown refusal keeps its words: Night Shift wrote them for the person", () => {
 		const events = feed(newTranslator(), [session], {
 			aborted: false,
-			thrown: new Error("boom"),
+			thrown: new Refusal(
+				"invalid",
+				"Goose needs the secret GOOSE_API_KEY, but it is not saved.",
+			),
 		});
 		expect(events.at(-1)).toEqual({
 			type: "error",
 			kind: "harness",
-			message: "boom",
+			message: "Goose needs the secret GOOSE_API_KEY, but it is not saved.",
 		});
 	});
 

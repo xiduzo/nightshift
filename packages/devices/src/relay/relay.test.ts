@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import {
 	HostUnreachableError,
 	type OwnDevice,
@@ -497,17 +497,44 @@ describe("the work relay", () => {
 			},
 		});
 		const { relay } = workRelayWith(host);
+		const logged = spyOn(console, "warn").mockImplementation(() => {});
+		try {
+			// Plain words for the step: the details go to the log.
+			expect(
+				await repliesOf(relay.call("device-b", request("space-team"))),
+			).toEqual([
+				{
+					kind: "error",
+					message: "The computer that keeps this Space stopped answering.",
+					offline: true,
+				},
+			]);
+			expect(logged).toHaveBeenCalled();
+		} finally {
+			logged.mockRestore();
+		}
+		expect(await relay.online("device-b", "space-team")).toBe(false);
+	});
+
+	test("the Host refuses the call: its words", async () => {
+		const host = fakeHost({
+			// biome-ignore lint/correctness/useYield: the stream fails before its first reply.
+			async *replies() {
+				throw new ORPCError("FORBIDDEN", {
+					message: "A device may ask only for its own Person's runs.",
+				});
+			},
+		});
+		const { relay } = workRelayWith(host);
 		expect(
 			await repliesOf(relay.call("device-b", request("space-team"))),
 		).toEqual([
 			{
 				kind: "error",
-				message:
-					"The computer that keeps this Space stopped answering: socket closed",
+				message: "A device may ask only for its own Person's runs.",
 				offline: true,
 			},
 		]);
-		expect(await relay.online("device-b", "space-team")).toBe(false);
 	});
 
 	test("a call cancelled by its signal ends without a reply", async () => {

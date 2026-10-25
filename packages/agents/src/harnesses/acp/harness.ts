@@ -17,6 +17,7 @@
  */
 import { ndJsonStream } from "@agentclientprotocol/sdk";
 import { type CustomAgent, customHarnessName } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import type { AcpPermissionMode } from "@tanstack/ai-acp";
 import { acpCompatible, spawnHandleToAcpTransport } from "@tanstack/ai-acp";
 import {
@@ -253,7 +254,8 @@ async function acpAdapter(
 ): Promise<AdapterSetup> {
 	const servers = Object.keys(input.mcpServers ?? {});
 	if (agent.mcp === false && servers.length > 0) {
-		throw new Error(
+		throw new Refusal(
+			"invalid",
 			`${agent.label} cannot use connections yet. Remove ${servers.join(", ")} from the node, or run it on another harness.`,
 		);
 	}

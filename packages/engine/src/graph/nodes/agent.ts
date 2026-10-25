@@ -29,7 +29,6 @@ import { consumeStream } from "../consume";
 import {
 	harnessLabel,
 	isWaitKind,
-	messageOf,
 	type NodeAction,
 	type NodeKind,
 	onDevice,
@@ -37,6 +36,7 @@ import {
 	type Requirement,
 	STOP_GRACE_MS,
 	type StepContext,
+	stepFailure,
 } from "../context";
 import {
 	deciderCostSource,
@@ -559,7 +559,15 @@ async function runSession(
 			},
 		);
 	} catch (error) {
-		ending ??= endWithoutResult(messageOf(error));
+		// A harness ends its stream with an `error` event: a throw is not one of its words.
+		ending ??= endWithoutResult(
+			signal.aborted
+				? ""
+				: stepFailure(
+						error,
+						`the session of node "${node.id}" of run ${ctx.run.id}`,
+					),
+		);
 	}
 	const final: SessionEnding =
 		ending ?? endWithoutResult("The harness stream ended without a result.");

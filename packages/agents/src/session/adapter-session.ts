@@ -20,6 +20,7 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
+import { Refusal } from "@nightshift/refusal";
 import { type AnyTextAdapter, chat } from "@tanstack/ai";
 import {
 	defineSandbox,
@@ -296,7 +297,7 @@ export function harnessSession(options: {
 		translator,
 		start: async function* (abortController) {
 			const skills = spec.mcpAsSkills ? mcpSkills(input.mcpServers) : [];
-			if (typeof skills === "string") throw new Error(skills);
+			if (typeof skills === "string") throw new Refusal("invalid", skills);
 			const report = sessionReport(input, spec, options.allowedTools);
 			const setup = await options.adapter(report);
 			cleanup = setup.cleanup ?? cleanup;

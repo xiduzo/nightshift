@@ -5,6 +5,7 @@
  */
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { Refusal } from "@nightshift/refusal";
 import { baseCheck, type CliCheck, firstLine, probe } from "../../doctor";
 
 /**
@@ -21,7 +22,8 @@ export function piAcpCommand(): string[] {
 		// Not installed next to this module.
 	}
 	if (!entry || !existsSync(entry)) {
-		throw new Error(
+		throw new Refusal(
+			"unavailable",
 			"Night Shift cannot start pi on this computer: a part it needs is missing. Install Night Shift again, or run the node on another harness.",
 		);
 	}

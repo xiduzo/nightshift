@@ -10,6 +10,7 @@ import type {
 	ResolvedPolicy,
 	TemplateContext,
 } from "@nightshift/flows";
+import { Refusal, wordsFor } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
 import type { Capabilities, Device } from "../device";
 import type { RunSettings } from "../device-config";
@@ -270,6 +271,18 @@ export const PLAIN_KIND = {
 
 export function messageOf(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The words a person sees for an error that ends a step: a refusal keeps
+ * its own. Any other error is a failure: plain words (`wordsFor`), and the
+ * error goes to the log, with `where` it happened.
+ */
+export function stepFailure(error: unknown, where: string): string {
+	if (!(error instanceof Refusal)) {
+		console.error(`[engine] ${where} failed:`, error);
+	}
+	return wordsFor(error);
 }
 
 /**

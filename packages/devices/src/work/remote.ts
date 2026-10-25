@@ -56,6 +56,13 @@ function refusalOf(reply: { message: string; offline?: boolean }): Refusal {
 	return new Refusal(reply.offline ? "unavailable" : "conflict", reply.message);
 }
 
+/** The words a step shows for a call that failed: a refusal's own, else plain words, and the details go to the log. */
+function failureWords(error: unknown, call: string): string {
+	if (!(error instanceof Refusal))
+		console.error(`[work] ${call} failed:`, error);
+	return wordsFor(error);
+}
+
 /** Another Device, reached through `relay`, working for one run (or its start). */
 export function remoteDevice(
 	relay: WorkRelay,
@@ -156,7 +163,7 @@ export function remoteDevice(
 			return {
 				kind: "error",
 				errorKind: signal.aborted ? "aborted" : "harness",
-				message: error instanceof Error ? error.message : String(error),
+				message: failureWords(error, `a decide call on ${device.name}`),
 				costUsd: null,
 			};
 		}
@@ -191,7 +198,7 @@ export function remoteDevice(
 			} catch (error) {
 				return {
 					kind: "failed",
-					message: error instanceof Error ? error.message : String(error),
+					message: failureWords(error, `a tool call on ${device.name}`),
 					arguments: null,
 				};
 			}

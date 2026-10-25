@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -352,20 +352,30 @@ describe("harnessSession", () => {
 	});
 
 	test("a failing adapter factory ends the stream with an error, never a throw", async () => {
-		const events = await collect(
-			harnessSession({
-				input: input(),
-				spec: spec(),
-				adapter: () => {
-					throw new Error("no executable");
-				},
-			}),
-		);
-		expect(events.at(-1)).toMatchObject({
-			type: "error",
-			kind: "harness",
-			message: expect.stringContaining("no executable"),
-		});
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const events = await collect(
+				harnessSession({
+					input: input(),
+					spec: spec(),
+					adapter: () => {
+						throw new Error("no executable");
+					},
+				}),
+			);
+			// Plain words for the person; the error itself goes to the log.
+			expect(events.at(-1)).toMatchObject({
+				type: "error",
+				kind: "harness",
+				message: expect.stringContaining("Night Shift saved the details"),
+			});
+			expect(logged).toHaveBeenCalledWith(
+				expect.stringContaining("session failed"),
+				expect.objectContaining({ message: "no executable" }),
+			);
+		} finally {
+			logged.mockRestore();
+		}
 	});
 
 	test("MCP servers as skills take URL servers only", async () => {

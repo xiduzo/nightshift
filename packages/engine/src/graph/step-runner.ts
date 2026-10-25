@@ -31,11 +31,11 @@ import {
 } from "../read";
 import {
 	emit,
-	messageOf,
 	pastStopTime,
 	STOP_AFTER_STEP_REASON,
 	STOP_TIME_REASON,
 	type StepContext,
+	stepFailure,
 	stopAtOf,
 	templateContext,
 } from "./context";
@@ -297,7 +297,7 @@ export async function runStep(
 			kind: "end",
 			outcome: "error",
 			outputs: await blank("error"),
-			error: messageOf(error),
+			error: stepFailure(error, `node "${node.id}" of run ${ctx.run.id}`),
 		};
 	}
 
@@ -810,7 +810,7 @@ export async function readyDevice(
 		});
 	} catch (error) {
 		return fail(
-			`The run's work on ${from.name} cannot move to ${device.name}. ${messageOf(error)}`,
+			`The run's work on ${from.name} cannot move to ${device.name}. ${stepFailure(error, `the hand-off of run ${ctx.run.id}`)}`,
 		);
 	}
 	const author = ctx.run.startedBy
@@ -829,7 +829,7 @@ export async function readyDevice(
 		});
 	} catch (error) {
 		return fail(
-			`${device.name} could not take the run's work from ${from.name}. ${messageOf(error)}`,
+			`${device.name} could not take the run's work from ${from.name}. ${stepFailure(error, `the hand-off of run ${ctx.run.id}`)}`,
 		);
 	}
 	await ctx.log.append({

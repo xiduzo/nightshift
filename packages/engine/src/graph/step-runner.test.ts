@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import type { Command } from "@langchain/langgraph";
 import { step as stepTable } from "@nightshift/db/schema";
+import { FAILURE_MESSAGE, Refusal } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
 import type { EngineEventType } from "../log/events";
 import { deriveSteps } from "../read/derive-steps";
@@ -67,6 +68,7 @@ type Behaviour =
 	| "ends"
 	| "aborts-mid-body"
 	| "throws"
+	| "refuses"
 	| "requests-wait"
 	| "stop-requested-ends"
 	| "runs-until-aborted";
@@ -176,6 +178,8 @@ async function runRow(row: Row) {
 				return { kind: "aborted", outputs: { visit: step.visit } };
 			case "throws":
 				throw new Error("boom");
+			case "refuses":
+				throw new Refusal("invalid", "Check the rule of this option.");
 			case "requests-wait":
 				return {
 					kind: "wait",
@@ -284,7 +288,7 @@ const rows: Row[] = [
 		pending: {
 			kind: "parked",
 			status: "failed",
-			reason: 'Node "n" failed: boom',
+			reason: `Node "n" failed: ${FAILURE_MESSAGE}`,
 		},
 	},
 	{
@@ -466,20 +470,47 @@ describe("the step runner", () => {
 			},
 		]);
 
-		const thrown = await runRow({
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const thrown = await runRow({
+				entry: "new",
+				situation: "none",
+				body: "throws",
+				appends: [],
+				goto: "",
+				ran: true,
+			});
+			// A thrown body ends with the node's empty outputs (`spec.outputs`).
+			// A failure shows plain words: its details go to the log.
+			expect(payloads(thrown.events, "StepEnded")).toEqual([
+				{
+					outcome: "error",
+					outputs: { visit: 1, note: "", outcome: "error" },
+					error: FAILURE_MESSAGE,
+				},
+			]);
+			expect(logged).toHaveBeenCalledWith(
+				expect.stringContaining('[engine] node "n" of run'),
+				expect.objectContaining({ message: "boom" }),
+			);
+		} finally {
+			logged.mockRestore();
+		}
+
+		// A refusal keeps its words: they are written for the person.
+		const refused = await runRow({
 			entry: "new",
 			situation: "none",
-			body: "throws",
+			body: "refuses",
 			appends: [],
 			goto: "",
 			ran: true,
 		});
-		// A thrown body ends with the node's empty outputs (`spec.outputs`).
-		expect(payloads(thrown.events, "StepEnded")).toEqual([
+		expect(payloads(refused.events, "StepEnded")).toEqual([
 			{
 				outcome: "error",
 				outputs: { visit: 1, note: "", outcome: "error" },
-				error: "boom",
+				error: "Check the rule of this option.",
 			},
 		]);
 

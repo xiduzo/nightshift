@@ -8,9 +8,9 @@ import {
 import type { Device } from "../../../device";
 import {
 	isWaitKind,
-	messageOf,
 	STOP_GRACE_MS,
 	type StepContext,
+	stepFailure,
 } from "../../context";
 import { deciderCostSource, warnDeciderCost } from "../../cost";
 import { RESUME_RULES } from "../../resume-point";
@@ -136,7 +136,7 @@ export function decideWithin(
 				(error): DecisionResult => ({
 					kind: "error",
 					errorKind: "harness",
-					message: messageOf(error),
+					message: stepFailure(error, "a decider"),
 					costUsd: null,
 				}),
 			),

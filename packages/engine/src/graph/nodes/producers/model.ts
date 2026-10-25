@@ -1,6 +1,6 @@
 import type { ValueResult } from "@nightshift/agents/types";
 import { renderTemplate, type ValueNode } from "@nightshift/flows";
-import { isWaitKind, messageOf, type StepContext } from "../../context";
+import { isWaitKind, type StepContext, stepFailure } from "../../context";
 import { deciderCostSource, warnDeciderCost } from "../../cost";
 import { schemaProblem } from "../../output-schema";
 import { RESUME_RULES } from "../../resume-point";
@@ -78,7 +78,7 @@ async function make(node: ValueNode, step: StepHandle): Promise<BodyResult> {
 				(error): ValueResult => ({
 					kind: "error",
 					errorKind: "harness",
-					message: messageOf(error),
+					message: stepFailure(error, `the decider of node "${node.id}"`),
 					costUsd: null,
 				}),
 			),

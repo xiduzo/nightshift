@@ -43,6 +43,7 @@
  * reads in its raw messages is in that harness's profile.
  */
 
+import { Refusal } from "@nightshift/refusal";
 import type {
 	AgentErrorKind,
 	AgentEvent,
@@ -274,10 +275,29 @@ function isErrorResult(chunk: AgUiChunk): boolean {
 /** The result the adapter synthesizes for a call the run never resolved. */
 const INTERRUPTED_RESULT = JSON.stringify({ status: "interrupted" });
 
-function errorMessage(error: unknown, label: string): string {
+/** The text of an error the chunk stream threw: what the failure checks read, never what a person sees. */
+function thrownText(error: unknown, label: string): string {
 	if (error instanceof Error && error.message) return error.message;
 	if (typeof error === "string" && error) return error;
 	return `${label} session failed`;
+}
+
+/**
+ * What a person sees for an error the chunk stream threw. A refusal keeps
+ * its words: Night Shift wrote them for people (a secret that is not
+ * saved, a harness that cannot use connections). Any other throw is a
+ * failure: plain words for its kind, and the error goes to the log.
+ */
+function thrownWords(
+	error: unknown,
+	label: string,
+	kind: AgentErrorKind,
+): string {
+	if (error instanceof Refusal) return error.message;
+	console.error(`[agents] the ${label} session failed:`, error);
+	if (kind === "usage-limit") return `${label} reached its usage limit.`;
+	if (kind === "network") return `${label} lost its connection.`;
+	return `${label} stopped with an error. Night Shift saved the details. Try again.`;
 }
 
 function errorEvent(
@@ -520,10 +540,14 @@ export function createTranslator(options: {
 	function terminal({ aborted, thrown }: FinishInput): AgentEvent {
 		if (aborted) return errorEvent("aborted", "The session was aborted");
 
+		// The harness's own report of a failure is its words. A throw is not:
+		// its text only sorts the failure, and the person sees plain words.
+		const reported = signals.resultError ?? runError;
 		const failure =
-			signals.resultError ??
-			runError ??
-			(thrown !== undefined ? errorMessage(thrown, profile.label) : undefined);
+			reported ??
+			(thrown !== undefined ? thrownText(thrown, profile.label) : undefined);
+		const shown = (kind: AgentErrorKind) =>
+			reported ?? thrownWords(thrown, profile.label, kind);
 
 		if (signals.usageLimit) {
 			const { message, resetAt } = signals.usageLimit;
@@ -538,14 +562,14 @@ export function createTranslator(options: {
 			if (signals.rejectedResetAt !== undefined || kind === "usage-limit") {
 				return errorEvent(
 					"usage-limit",
-					failure,
+					shown("usage-limit"),
 					parseLegacyResetAt(failure) ?? signals.rejectedResetAt,
 				);
 			}
 			if (kind === "network" || signals.networkError !== undefined) {
-				return errorEvent("network", failure);
+				return errorEvent("network", shown("network"));
 			}
-			return errorEvent("harness", failure);
+			return errorEvent("harness", shown("harness"));
 		}
 		if (runFinished || signals.done) {
 			const usage = finishedUsage(runFinished?.usage, signals.resultUsage);

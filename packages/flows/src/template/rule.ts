@@ -1,3 +1,4 @@
+import { Refusal } from "@nightshift/refusal";
 import jsonata from "jsonata";
 import type { JsonValue, Option } from "../nodes";
 import type { TemplateContext } from "./context";
@@ -81,7 +82,9 @@ export async function chooseByRule(
 		try {
 			result = await evaluateRule(option.when, context);
 		} catch (error) {
-			throw new Error(
+			// The person wrote the rule: JSONata's words say what to fix in it.
+			throw new Refusal(
+				"invalid",
 				`The rule of option "${option.name}" failed: ${ruleMessage(error)}`,
 			);
 		}

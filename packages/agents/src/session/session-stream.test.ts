@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { effortEnv } from "../harnesses/claude-code/harness";
 import { CLAUDE_CODE_PROFILE } from "../harnesses/claude-code/profile";
 import type { AgentEvent } from "../port/types";
@@ -107,18 +107,26 @@ describe("streamSession", () => {
 			yield session;
 			throw new Error("spawn claude ENOENT");
 		}
-		const events = await collect(
-			streamSession({
-				chunks: source(),
-				translator: translator(),
-				signal: new AbortController().signal,
-			}),
-		);
-		expect(events.at(-1)).toEqual({
-			type: "error",
-			kind: "harness",
-			message: "spawn claude ENOENT",
-		});
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const events = await collect(
+				streamSession({
+					chunks: source(),
+					translator: translator(),
+					signal: new AbortController().signal,
+				}),
+			);
+			// Plain words for the person; the details go to the log.
+			expect(events.at(-1)).toEqual({
+				type: "error",
+				kind: "harness",
+				message:
+					"Claude Code stopped with an error. Night Shift saved the details. Try again.",
+			});
+			expect(logged).toHaveBeenCalled();
+		} finally {
+			logged.mockRestore();
+		}
 	});
 
 	test("stopping early closes the source", async () => {

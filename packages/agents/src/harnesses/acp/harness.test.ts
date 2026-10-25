@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Refusal } from "@nightshift/refusal";
 import type { AgentEvent, AgentSessionInput } from "../../port/types";
 import { fakeBin } from "../../testing/fixtures/bin";
 import {
@@ -343,8 +344,9 @@ describe("customAcpHarness", () => {
 	});
 
 	test("an env that cannot be read ends the session with its reason", async () => {
+		// The daemon refuses with words for the person (a secret that is not saved).
 		const harness = await custom(async () => {
-			throw new Error("Goose needs the secret GOOSE_API_KEY.");
+			throw new Refusal("invalid", "Goose needs the secret GOOSE_API_KEY.");
 		});
 		const events: AgentEvent[] = [];
 		for await (const event of harness.run(input({ model: "default" }))) {
