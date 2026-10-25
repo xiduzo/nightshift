@@ -16,7 +16,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";
 import { outcomeLabel } from "../canvas/outcome-badge";
 import { optionNoun } from "../flow-draft";
-import type { Selection } from "./editor-canvas";
+import type { Selection } from "./selection";
 
 /**
  * The edits of the selected node that reach past the node: a rename, and

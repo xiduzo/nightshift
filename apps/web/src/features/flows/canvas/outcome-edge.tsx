@@ -69,6 +69,7 @@ export function canvasEdges(
 		errors,
 		traversals,
 		selected,
+		boxes,
 	}: {
 		routes?: RouteBook;
 		/** Ids of edges with an error. */
@@ -77,9 +78,14 @@ export function canvasEdges(
 		traversals?: Readonly<Record<string, number>>;
 		/** The id of the selected edge of the flow. */
 		selected?: string;
+		/** Where each folded Section's box is, by its canvas id. */
+		boxes?: ReadonlyMap<string, Point>;
 	} = {},
 ): FlowCanvasEdge[] {
-	const at = new Map(flow.nodes.map((node) => [node.id, node.position]));
+	const at = new Map<string, Point>(
+		flow.nodes.map((node) => [node.id, node.position]),
+	);
+	for (const [id, position] of boxes ?? []) at.set(id, position);
 	return groups.map((group) => {
 		const segments = groupSegments(flow, group).map((segment) => ({
 			...segment,
@@ -93,12 +99,17 @@ export function canvasEdges(
 			id: group.id,
 			type: "outcome",
 			source: group.from,
-			sourceHandle: segments[0]?.outcome,
+			sourceHandle: segments[0] && handleOf(segments[0]),
 			target: group.to,
 			selected: selectedSegment !== undefined,
 			data: { segments, selectedSegment, route: routeOf(routes, group, at) },
 		};
 	});
+}
+
+/** The handle an edge leaves from: its outcome's, or a folded Section's exit. */
+function handleOf(segment: EdgeSegment): string {
+	return segment.handle ?? segment.outcome;
 }
 
 /** Lets an edge label select one edge of the flow. Absent in read-only canvases. */
@@ -153,8 +164,8 @@ const NO_STEMS: (Point | null)[] = [];
  * Where the handles of an edge's other outcomes are: a drawn edge that
  * carries several outcomes starts at the first handle and joins the others.
  */
-function useStemStarts(source: string, outcomes: string[]): (Point | null)[] {
-	const key = outcomes.join("\u0000");
+function useStemStarts(source: string, handles: string[]): (Point | null)[] {
+	const key = handles.join("\u0000");
 	return useStore(
 		useCallback(
 			(state: ReactFlowState) => {
@@ -164,8 +175,8 @@ function useStemStarts(source: string, outcomes: string[]): (Point | null)[] {
 				const bounds = node?.internals.handleBounds?.source;
 				if (!node || !bounds) return NO_STEMS;
 				const { x, y } = node.internals.positionAbsolute;
-				return rest.map((outcome) => {
-					const handle = bounds.find((bound) => bound.id === outcome);
+				return rest.map((id) => {
+					const handle = bounds.find((bound) => bound.id === id);
 					// As React Flow ends an edge on a handle on the right.
 					return handle
 						? {
@@ -270,10 +281,7 @@ const OutcomeEdge = memo(function OutcomeEdge({
 }: EdgeProps<FlowCanvasEdge>) {
 	const selectEdge = useContext(SelectEdgeContext);
 	const segments = data?.segments ?? [];
-	const stemStarts = useStemStarts(
-		source,
-		segments.map((segment) => segment.outcome),
-	);
+	const stemStarts = useStemStarts(source, segments.map(handleOf));
 	const hover = useHover();
 	const first = segments[0];
 	if (!data || !first) return null;

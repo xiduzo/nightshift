@@ -50,8 +50,7 @@ import {
 	useMemo,
 	useState,
 } from "react";
-import { groupEdges } from "../../canvas/edge-groups";
-import { type FlowCanvasNode, nodeTypes } from "../../canvas/flow-node";
+import type { FlowCanvasNode } from "../../canvas/flow-node";
 import { EnterSubflowContext } from "../../canvas/open-flow-context";
 import {
 	canvasEdges,
@@ -59,6 +58,15 @@ import {
 	type FlowCanvasEdge,
 	OutcomeMarkers,
 } from "../../canvas/outcome-edge";
+import {
+	type CanvasNode,
+	canvasNodeTypes,
+	SectionActionsContext,
+} from "../../canvas/sections/section-nodes";
+import {
+	useFoldedSections,
+	useSectionCanvas,
+} from "../../canvas/sections/use-section-canvas";
 import { useMeasured } from "../../canvas/use-measured";
 import { CanvasControls } from "../editor-canvas";
 import {
@@ -76,6 +84,7 @@ const FIT = { maxZoom: 1, padding: 0.15 } as const;
  * A breadcrumb leads back up, and a button opens the flow's own editor.
  */
 export function SubflowView({
+	projectId,
 	rootFlow,
 	stack,
 	flows,
@@ -84,6 +93,8 @@ export function SubflowView({
 	onEdit,
 	className,
 }: {
+	/** For the Sections this browser keeps folded in each flow. */
+	projectId: string;
 	/** The flow open in the editor. */
 	rootFlow: string;
 	/** At least one level. */
@@ -113,6 +124,7 @@ export function SubflowView({
 						<ReadOnlyCanvas
 							flow={content.flow}
 							name={current.flow}
+							foldKey={`${projectId}/${current.flow}`}
 							viewport={current.viewport}
 							onEnter={onEnter}
 						/>
@@ -309,18 +321,21 @@ function SubflowProblem({
 }
 
 /**
- * One flow, read only: no drag, no connect, no delete. The same nodes and
- * edges as the editor. A Subflow in it opens deeper: click its flow name,
+ * One flow, read only: no drag, no connect, no delete. The same nodes,
+ * edges and Section frames as the editor. Its Sections fold as in that
+ * flow's own editor: the fold is per browser, not a change of the flow. A Subflow in it opens deeper: click its flow name,
  * double-click the node, or select it and press `i`.
  */
 function ReadOnlyCanvas({
 	flow,
 	name,
+	foldKey,
 	viewport,
 	onEnter,
 }: {
 	flow: Flow;
 	name: string;
+	foldKey: string;
 	/** Where this canvas looked before: restored instead of a fit. */
 	viewport: SubflowViewport | undefined;
 	onEnter: (nodeId: string, flow: string, viewport: SubflowViewport) => void;
@@ -360,71 +375,98 @@ function ReadOnlyCanvas({
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [flow.nodes, selectedId, enter]);
 
-	const nodes = useMemo<FlowCanvasNode[]>(
-		() =>
-			flow.nodes.map((node) => ({
-				id: node.id,
-				type: node.type,
-				position: node.position,
-				measured: measured[node.id],
-				selected: node.id === selectedId,
-				draggable: false,
-				connectable: false,
-				deletable: false,
-				data: { node, isStart: flow.start === node.id, issues: [] },
-			})),
-		[flow.nodes, flow.start, measured, selectedId],
+	const { folded, setFolded } = useFoldedSections(foldKey);
+	const sections = useSectionCanvas(flow, {
+		folded,
+		measured,
+		editable: false,
+	});
+	const sectionActions = useMemo(() => ({ setFolded }), [setFolded]);
+
+	const nodes = useMemo<CanvasNode[]>(
+		() => [
+			...sections.frames,
+			...flow.nodes.flatMap((node): FlowCanvasNode[] =>
+				sections.hidden.has(node.id)
+					? []
+					: [
+							{
+								id: node.id,
+								type: node.type,
+								position: node.position,
+								measured: measured[node.id],
+								selected: node.id === selectedId,
+								draggable: false,
+								connectable: false,
+								deletable: false,
+								data: { node, isStart: flow.start === node.id, issues: [] },
+							},
+						],
+			),
+			...sections.boxes,
+		],
+		[flow.nodes, flow.start, measured, selectedId, sections],
 	);
 
 	// The called flow draws its edges as plain step paths: its layout routes
 	// belong to its own editor.
 	const edges = useMemo<FlowCanvasEdge[]>(
 		() =>
-			canvasEdges(flow, groupEdges(flow)).map((edge) => ({
+			canvasEdges(flow, sections.groups, {
+				boxes: sections.boxPositions,
+			}).map((edge) => ({
 				...edge,
 				selectable: false,
 				focusable: false,
 				deletable: false,
 			})),
-		[flow],
+		[flow, sections.groups, sections.boxPositions],
 	);
 
 	return (
 		<EnterSubflowContext.Provider value={enter}>
-			<OutcomeMarkers />
-			<ReactFlow<FlowCanvasNode, FlowCanvasEdge>
-				nodes={nodes}
-				edges={edges}
-				nodeTypes={nodeTypes}
-				edgeTypes={edgeTypes}
-				onNodesChange={applyDimensions}
-				onNodeClick={(_, node) => setSelectedId(node.id)}
-				onNodeDoubleClick={(_, { data: { node } }) => {
-					if (node.type === "call") enter(node.id, node.flow);
-				}}
-				onPaneClick={() => setSelectedId(null)}
-				nodesDraggable={false}
-				nodesConnectable={false}
-				edgesFocusable={false}
-				deleteKeyCode={null}
-				selectionKeyCode={null}
-				multiSelectionKeyCode={null}
-				zoomOnDoubleClick={false}
-				fitView={viewport === undefined}
-				fitViewOptions={FIT}
-				defaultViewport={viewport}
-				minZoom={0.2}
-				className="[--xy-background-color:transparent]"
-				aria-label={`Flow ${name}, read only`}
-			>
-				<Background
-					variant={BackgroundVariant.Dots}
-					gap={16}
-					size={1.25}
-					color="color-mix(in oklch, var(--foreground) 16%, transparent)"
-				/>
-				<CanvasControls />
-			</ReactFlow>
+			<SectionActionsContext.Provider value={sectionActions}>
+				<OutcomeMarkers />
+				<ReactFlow<CanvasNode, FlowCanvasEdge>
+					nodes={nodes}
+					edges={edges}
+					nodeTypes={canvasNodeTypes}
+					edgeTypes={edgeTypes}
+					onNodesChange={applyDimensions}
+					onNodeClick={(_, node) => setSelectedId(node.id)}
+					onNodeDoubleClick={(_, canvasNode) => {
+						if (
+							canvasNode.type === "sectionFrame" ||
+							canvasNode.type === "sectionBox"
+						)
+							return;
+						const { node } = canvasNode.data;
+						if (node.type === "call") enter(node.id, node.flow);
+					}}
+					onPaneClick={() => setSelectedId(null)}
+					nodesDraggable={false}
+					nodesConnectable={false}
+					edgesFocusable={false}
+					deleteKeyCode={null}
+					selectionKeyCode={null}
+					multiSelectionKeyCode={null}
+					zoomOnDoubleClick={false}
+					fitView={viewport === undefined}
+					fitViewOptions={FIT}
+					defaultViewport={viewport}
+					minZoom={0.2}
+					className="[--xy-background-color:transparent]"
+					aria-label={`Flow ${name}, read only`}
+				>
+					<Background
+						variant={BackgroundVariant.Dots}
+						gap={16}
+						size={1.25}
+						color="color-mix(in oklch, var(--foreground) 16%, transparent)"
+					/>
+					<CanvasControls />
+				</ReactFlow>
+			</SectionActionsContext.Provider>
 		</EnterSubflowContext.Provider>
 	);
 }

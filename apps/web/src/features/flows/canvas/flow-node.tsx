@@ -159,10 +159,19 @@ function overviewZoom(state: ReactFlowState): number | null {
 }
 
 /**
+ * The font size, in canvas pixels, that reads as `OVERVIEW_TEXT` on screen
+ * when zoomed out to the overview (at most `max`). Zero when zoomed in.
+ */
+export function useOverviewText(max = OVERVIEW_TEXT_MAX): number {
+	const overview = useStore(overviewZoom);
+	return overview ? Math.min(OVERVIEW_TEXT / overview, max) : 0;
+}
+
+/**
  * The count of a node's errors, or of its warnings when it has none. Its
  * tooltip lists every issue of the node, errors first.
  */
-function IssueBadge({
+export function IssueBadge({
 	errors,
 	warnings,
 }: {
@@ -265,10 +274,8 @@ const FlowNodeCard = memo(function FlowNodeCard({
 	}, [id, outcomesKey, updateNodeInternals]);
 
 	const label = node.label?.trim();
-	const overview = useStore(overviewZoom);
-	const overviewText = overview
-		? Math.min(OVERVIEW_TEXT / overview, OVERVIEW_TEXT_MAX)
-		: 0;
+	const overviewText = useOverviewText();
+	const overview = overviewText > 0;
 
 	return (
 		<div
