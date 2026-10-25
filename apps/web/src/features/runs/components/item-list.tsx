@@ -30,8 +30,9 @@ import {
 import { ItemStateBadge } from "@/features/flows";
 import type { ItemState, ItemSummary, StepSummary } from "@/shared/api";
 import { JsonDetails } from "@/shared/code";
-import { formatDuration, formatTime, useNow } from "@/shared/format";
+import { formatTime } from "@/shared/format";
 import { type ItemScope, itemsOf, scopeKey } from "../lib/run-steps";
+import { Elapsed } from "./elapsed";
 
 /**
  * The elements of one Call step with `each`, in the order they started: state, id
@@ -50,7 +51,6 @@ export function ItemList({
 	selectedItem: ItemScope;
 	onSelectItem: (scope: ItemScope) => void;
 }) {
-	const now = useNow(1000);
 	const items = itemsOf(step, steps);
 	const counts = new Map<ItemState, number>();
 	for (const item of items) {
@@ -99,7 +99,6 @@ export function ItemList({
 						<ItemRow
 							key={item.id}
 							item={item}
-							now={now}
 							selected={scopeKey(selectedItem) === scopeKey(scope)}
 							onFocus={() =>
 								onSelectItem(
@@ -116,12 +115,10 @@ export function ItemList({
 
 function ItemRow({
 	item,
-	now,
 	selected,
 	onFocus,
 }: {
 	item: ItemSummary;
-	now: number;
 	selected: boolean;
 	onFocus: () => void;
 }) {
@@ -191,7 +188,7 @@ function ItemRow({
 					className="text-muted-foreground text-xs tabular-nums"
 					title={`Started ${formatTime(item.startedAt)}`}
 				>
-					{formatDuration((item.endedAt ?? now) - item.startedAt)}
+					<Elapsed start={item.startedAt} end={item.endedAt ?? null} />
 				</span>
 				<Tooltip>
 					<TooltipTrigger

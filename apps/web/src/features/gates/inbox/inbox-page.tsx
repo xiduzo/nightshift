@@ -279,6 +279,16 @@ function GateNavItem({
 	);
 }
 
+/** How long until a sleeping run wakes, again each second. Only this text updates, not the whole group. */
+function WakeCountdown({ at }: { at: number }) {
+	const now = useNow(1000);
+	return (
+		<span className="font-mono tabular-nums">
+			({formatCountdown(at - now)})
+		</span>
+	);
+}
+
 /** Runs that wait on a usage limit or the network. They go on by themselves. */
 function SleepingGroup({
 	runs,
@@ -287,7 +297,6 @@ function SleepingGroup({
 	runs: RunSummary[];
 	projectNames: Map<string, string>;
 }) {
-	const now = useNow(1000);
 	const runActed = useRunActed({ orpc });
 	const wake = useMutation(
 		runMutations.resume({
@@ -333,9 +342,7 @@ function SleepingGroup({
 										{" · "}
 										<span className="text-status-sleeping">
 											wakes {formatTime(run.wakeAt)}{" "}
-											<span className="font-mono tabular-nums">
-												({formatCountdown(run.wakeAt - now)})
-											</span>
+											<WakeCountdown at={run.wakeAt} />
 										</span>
 									</>
 								) : null}
