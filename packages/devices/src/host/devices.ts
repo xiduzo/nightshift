@@ -1,5 +1,5 @@
 import { HostUnreachableError, type SettingsStore } from "@nightshift/engine";
-import type { HostClient } from "../contract";
+import type { HostClient, PhoneView } from "../contract";
 import {
 	type DeviceKeyStore,
 	type DeviceLinks,
@@ -11,6 +11,9 @@ import {
 import { type Reach, reachFor } from "../reach";
 import type { Host } from "./host";
 import type { Devices, DevicesOverview } from "./types";
+
+/** How long the phones a Host listed stay as they are, in milliseconds. */
+const PHONES_FOR_MS = 30_000;
 
 /** The API's `Devices`: this computer as a Host, and its own links to Hosts. */
 export function createDevices(deps: {
@@ -26,8 +29,17 @@ export function createDevices(deps: {
 	reach: Reach;
 	/** The SHA-256 fingerprint of the certificate this daemon serves itself. */
 	fingerprint: string | null;
+	/** The clock, in milliseconds. Default: `Date.now`. */
+	now?: () => number;
 }): Devices {
 	const { host } = deps;
+	const now = deps.now ?? Date.now;
+	/**
+	 * The phones on each Host, as it last said: the Devices page asks every
+	 * few seconds, and a phone signs in rarely. Signing one out here asks
+	 * again.
+	 */
+	const phones = new Map<string, { at: number; list: Promise<PhoneView[]> }>();
 	/**
 	 * One call for a person on a Host this computer joined. Its link is not
 	 * running: unreachable. The Host's errors come back in this computer's
@@ -79,9 +91,26 @@ export function createDevices(deps: {
 		revoke: (personId, deviceId) => host.revoke(personId, deviceId),
 		hello: (key) => host.hello(key),
 		hostOf: (spaceId) => deps.hostSpaces.hostOf(spaceId),
-		phonesAt: (hostId) => onHost(hostId, (client) => client.link.phones()),
-		removePhoneAt: (hostId, phoneId) =>
-			onHost(hostId, (client) => client.link.removePhone({ id: phoneId })),
+		phonesAt(hostId) {
+			const known = phones.get(hostId);
+			if (known && now() - known.at < PHONES_FOR_MS) return known.list;
+			const list = onHost(hostId, (client) => client.link.phones());
+			phones.set(hostId, { at: now(), list });
+			// A Host that did not answer is asked again next time.
+			list.catch(() => {
+				if (phones.get(hostId)?.list === list) phones.delete(hostId);
+			});
+			return list;
+		},
+		async removePhoneAt(hostId, phoneId) {
+			try {
+				return await onHost(hostId, (client) =>
+					client.link.removePhone({ id: phoneId }),
+				);
+			} finally {
+				phones.delete(hostId);
+			}
+		},
 		join: (input, signal) =>
 			joinHost(
 				{
