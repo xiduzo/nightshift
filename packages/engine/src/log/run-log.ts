@@ -18,7 +18,8 @@ import {
  * The daemon is the only writer of its database, and every append of the
  * engine goes through `append`, so the copy here is exactly the log on disk.
  *
- * - A run's log is read from the database once, on its first use.
+ * - A run's log is read from the database once, on its first use. Reads
+ *   at once share one query per run: a log being read is never read twice.
  * - `append` writes the event first, in one batch with the rows it names,
  *   and keeps it only once the batch committed: nothing is kept (or
  *   published by the caller) before it is durable. A write that throws
@@ -26,8 +27,10 @@ import {
  * - Open runs (running, waiting, sleeping) stay in memory. The logs of ended
  *   runs are dropped, least recently used first, beyond `maxIdleEvents`.
  * - `derive` keeps a value derived from a run's log (a run summary, an open
- *   Gate) until the run's next append, also after its log was dropped. The
- *   run list reads it without parsing every run's log again.
+ *   Gate, its steps) until the run's next append, also after its log was
+ *   dropped. Every reader of a run's derived state goes through it, so the
+ *   run list, each watcher of a run and the copy stamps share one
+ *   derivation per append instead of parsing the log again each.
  * - `ingest` adds the events of runs another Device walks, as the exchange
  *   brings them (`exchange/`), in one transaction with the rows they name
  *   and what follows from them: the same bookkeeping as an append, once
@@ -99,10 +102,14 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 	const maxIdleEvents = options.maxIdleEvents ?? DEFAULT_MAX_IDLE_EVENTS;
 	/** Loaded logs by run id, least recently used first. */
 	const logs = new Map<string, Log>();
-	/** Logs being read, with the appends that landed meanwhile. */
+	/**
+	 * Logs being read, with the appends that landed meanwhile. `keep`: a
+	 * reader asked for the log itself (`logOf`), so it stays in memory also
+	 * when the run has ended.
+	 */
 	const loading = new Map<
 		string,
-		{ promise: Promise<Log>; landed: LoggedEvent[] }
+		{ promise: Promise<Log>; landed: LoggedEvent[]; keep: boolean }
 	>();
 	/** Derived values by run id, then by function. Cleared by an append. */
 	const memos = new Map<string, Map<Derive<unknown>, unknown>>();
@@ -158,26 +165,57 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 		}
 	}
 
+	/**
+	 * Reads the logs of `runIds` that are neither in memory nor being read,
+	 * in one query. A log is kept once read only when a reader asked for it
+	 * (`keep`, `logOf`). The bookkeeping happens as the rows return, before
+	 * any reader goes on, so no append is lost between.
+	 */
+	function load(runIds: readonly string[]): void {
+		const fresh = runIds.filter((id) => !logs.has(id) && !loading.has(id));
+		if (fresh.length === 0) return;
+		const read = readRuns(fresh).then(groupByRun);
+		for (const runId of fresh) {
+			const entry = {
+				landed: [] as LoggedEvent[],
+				keep: false,
+				promise: undefined as unknown as Promise<Log>,
+			};
+			entry.promise = read.then(
+				(byRun) => {
+					loading.delete(runId);
+					const events = byRun.get(runId) ?? [];
+					for (const e of entry.landed) insertBySeq(events, e);
+					const log = { events, open: isOpen(events) };
+					if (entry.keep) {
+						logs.set(runId, log);
+						trim(runId);
+					}
+					return log;
+				},
+				(error: unknown) => {
+					loading.delete(runId);
+					throw error;
+				},
+			);
+			// A reader that gave up early must not leave the failure unhandled.
+			entry.promise.catch(() => {});
+			loading.set(runId, entry);
+		}
+	}
+
 	function logOf(runId: string): Promise<Log> {
 		const cached = logs.get(runId);
 		if (cached) {
 			touch(runId, cached);
 			return Promise.resolve(cached);
 		}
-		const pending = loading.get(runId);
-		if (pending) return pending.promise;
-		const landed: LoggedEvent[] = [];
-		const promise = readRuns([runId])
-			.then((events) => {
-				for (const e of landed) insertBySeq(events, e);
-				const log = { events, open: isOpen(events) };
-				logs.set(runId, log);
-				trim(runId);
-				return log;
-			})
-			.finally(() => loading.delete(runId));
-		loading.set(runId, { promise, landed });
-		return promise;
+		load([runId]);
+		const entry = loading.get(runId) as NonNullable<
+			ReturnType<typeof loading.get>
+		>;
+		entry.keep = true;
+		return entry.promise;
 	}
 
 	function remember<T>(runId: string, fn: Derive<T>, value: T): T {
@@ -216,7 +254,9 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 
 		/**
 		 * `fn` of each run's log, kept until the run's next append. The logs
-		 * that are not in memory are read in one query and not kept.
+		 * that are not in memory are read in one query; a log another read
+		 * already asked for is not read again. A log only `derive` read is not
+		 * kept. Calls at once compute `fn` once per run.
 		 */
 		async derive<T>(
 			runIds: readonly string[],
@@ -235,18 +275,26 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 				else missing.push(runId);
 			}
 			if (missing.length === 0) return values;
-			const before = missing.map((runId) => versions.get(runId) ?? 0);
-			const byRun = groupByRun(await readRuns(missing));
-			for (const [i, runId] of missing.entries()) {
-				if ((versions.get(runId) ?? 0) === before[i]) {
-					values.set(runId, remember(runId, fn, fn(byRun.get(runId) ?? [])));
-				} else {
-					// An append landed during the read: read the run through its log.
-					values.set(
-						runId,
-						remember(runId, fn, fn((await logOf(runId)).events)),
-					);
+			load(missing);
+			const reads = missing.map((runId) => ({
+				runId,
+				before: versions.get(runId) ?? 0,
+				read: loading.get(runId)?.promise ?? logOf(runId),
+			}));
+			for (const { runId, before, read } of reads) {
+				const loaded = await read;
+				// Another call computed it meanwhile, and no append came since.
+				const memo = memos.get(runId);
+				if (memo?.has(fn as Derive<unknown>)) {
+					values.set(runId, memo.get(fn as Derive<unknown>) as T);
+					continue;
 				}
+				// A kept log is up to date. A log not kept that an append
+				// passed is read again, through its log.
+				const log =
+					logs.get(runId) ??
+					((versions.get(runId) ?? 0) === before ? loaded : await logOf(runId));
+				values.set(runId, remember(runId, fn, fn(log.events)));
 			}
 			return values;
 		},

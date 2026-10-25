@@ -77,6 +77,22 @@ function heldReads(db: Database, held: Promise<void>): Database {
 	});
 }
 
+/** `db`, counting its selects. */
+function countedReads(db: Database) {
+	const counter = { selects: 0 };
+	const counted = new Proxy(db, {
+		get(t, key) {
+			const value = Reflect.get(t, key, t);
+			if (key !== "select") return value;
+			return (...args: unknown[]) => {
+				counter.selects++;
+				return value.apply(t, args);
+			};
+		},
+	});
+	return { db: counted, counter };
+}
+
 const started = (runId: string): EventInput<"RunStarted"> => ({
 	type: "RunStarted",
 	runId,
@@ -266,6 +282,52 @@ describe("run log", () => {
 		await log.append(edge("a", 1));
 		expect((await log.derive(["a", "b"], count)).get("a")).toBe(2);
 		expect(calls).toBe(4);
+	});
+
+	test("reads at once of a log not in memory read it once, and derive once", async () => {
+		const { db, counter } = countedReads(sandbox.db);
+		await createRunLog(sandbox.db, { walkerId: sandbox.deviceId }).append(
+			started("r1"),
+		);
+		const log = createRunLog(db, { walkerId: sandbox.deviceId });
+		let calls = 0;
+		const count = (events: readonly LoggedEvent[]) => {
+			calls++;
+			return events.length;
+		};
+		const before = counter.selects;
+		// A run page opens: the run list, the Gates and the run itself at once.
+		const [listed, gates, events] = await Promise.all([
+			log.derive(["r1"], count),
+			log.derive(["r1"], count),
+			log.events("r1"),
+			log.derive(["r1"], deriveRunStatus),
+		]);
+		expect(counter.selects - before).toBe(1);
+		expect(calls).toBe(1);
+		expect(listed.get("r1")).toBe(1);
+		expect(gates.get("r1")).toBe(1);
+		expect(events).toEqual(await fromDb("r1"));
+	});
+
+	test("every watcher of a run shares one derivation per append", async () => {
+		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		let calls = 0;
+		const count = (events: readonly LoggedEvent[]) => {
+			calls++;
+			return events.length;
+		};
+		await log.append(started("r1"));
+		for (let n = 1; n <= 3; n++) {
+			await log.append(edge("r1", n));
+			const seen = await Promise.all(
+				Array.from({ length: 5 }, () => log.derive(["r1"], count)),
+			);
+			expect(seen.map((values) => values.get("r1"))).toEqual(
+				Array(5).fill(n + 1),
+			);
+			expect(calls).toBe(n);
+		}
 	});
 });
 
