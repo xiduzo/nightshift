@@ -4,12 +4,24 @@ import {
 	FLOW_VERSION,
 	type Flow,
 	type FlowEdge,
+	nodeOutcomes,
 } from "@nightshift/flows";
 import type { ElkNode } from "elkjs/lib/elk-api.js";
 
 import { groupEdges } from "../../canvas/edge-groups";
 import featureFactory from "./fixtures/feature-factory.json";
-import { type ElkLayout, flowGraph, layoutFlow, walk } from "./flow-layout";
+import {
+	type Box,
+	type ElkLayout,
+	elkGraph,
+	flowGraph,
+	type LaidFlow,
+	layoutFlow,
+	readLayout,
+	SECTION_PADDING,
+	sectionNodeId,
+	walk,
+} from "./flow-layout";
 
 // elkjs in this thread. Bun defines `self`, so elkjs would look for a Web
 // Worker: hide it while elkjs loads.
@@ -309,6 +321,9 @@ describe("layoutFlow", () => {
 		expect(groups).toHaveLength(28);
 		for (const group of groups) {
 			const route = result.routes.get(group.key);
+			// ELK's wrapping leaves some loops without a usable route: those
+			// get none, and the canvas draws a plain step path.
+			if (!route && result.direction === "wrapped") continue;
 			expect(route?.points.length ?? 0).toBeGreaterThanOrEqual(2);
 		}
 		// Three candidates, the first one with elkjs still warming up.
@@ -324,8 +339,327 @@ describe("layoutFlow", () => {
 		);
 	});
 
+	test("gives no route to an edge whose route misses its handles", async () => {
+		const graph = flowGraph(flowOf(["a", "b"], [edge("a", "success", "b")]));
+		const result = await layout(elkGraph(graph));
+		expect(readLayout(result, graph).routes.has("a->b")).toBe(true);
+		const [line] = result.edges ?? [];
+		const section = line?.sections?.[0];
+		if (section) section.endPoint = { x: section.endPoint.x, y: -400 };
+		expect(readLayout(result, graph).routes.has("a->b")).toBe(false);
+	});
+
 	test("leaves an empty flow alone", async () => {
 		const flow = flowOf([], []);
 		expect(await laidOut(flow)).toBe(flow);
+	});
+});
+
+describe("Sections", () => {
+	const sectioned = (
+		sections: NonNullable<Flow["sections"]> = [
+			{ id: "intake", label: "Intake", nodes: ["branch", "rest", "design"] },
+			{ id: "specify", label: "Spec", nodes: ["spec", "clarify", "validate"] },
+			{ id: "make", label: "Build", nodes: ["build", "stack", "scope"] },
+			{ id: "review", label: "Review", nodes: ["security", "code", "verdict"] },
+		],
+	) =>
+		({
+			version: FLOW_VERSION,
+			inputs: [],
+			outputs: [],
+			...featureFactory,
+			sections,
+		}) as unknown as Flow;
+	const flow = sectioned();
+	const W = 256;
+	const H = 160;
+	const order = ["intake", "specify", "make", "review"];
+
+	const overlap = (a: Box, b: Box) =>
+		a.x < b.x + b.width &&
+		b.x < a.x + a.width &&
+		a.y < b.y + b.height &&
+		b.y < a.y + a.height;
+	const nodeBox = (laid: Flow, id: string): Box => {
+		const node = laid.nodes.find((candidate) => candidate.id === id);
+		return { ...(node?.position ?? origin), width: W, height: H };
+	};
+
+	/** Every visible thing apart; members inside their frame, under its label. */
+	function expectTidy({
+		flow: laid,
+		sections,
+	}: Pick<LaidFlow, "flow" | "sections">) {
+		const owner = new Map<string, string>();
+		for (const id of sections.keys()) {
+			const section = laid.sections?.find((candidate) => candidate.id === id);
+			for (const node of section?.nodes ?? []) owner.set(node, id);
+		}
+		const visible: [string, Box][] = [];
+		for (const [id, box] of sections) visible.push([`section ${id}`, box]);
+		for (const node of laid.nodes) {
+			const section = owner.get(node.id);
+			const frame = section ? sections.get(section) : undefined;
+			if (!frame) {
+				visible.push([node.id, nodeBox(laid, node.id)]);
+				continue;
+			}
+			if (frame.folded) continue;
+			const box = nodeBox(laid, node.id);
+			expect(box.x).toBeGreaterThanOrEqual(frame.x + SECTION_PADDING.left - 8);
+			expect(box.y).toBeGreaterThanOrEqual(frame.y + SECTION_PADDING.top - 8);
+			expect(box.x + W).toBeLessThanOrEqual(frame.x + frame.width);
+			expect(box.y + H).toBeLessThanOrEqual(frame.y + frame.height);
+			// Other members only.
+			for (const other of laid.nodes) {
+				if (other.id <= node.id || owner.get(other.id) !== section) continue;
+				expect(overlap(box, nodeBox(laid, other.id))).toBe(false);
+			}
+		}
+		for (const [i, [id, one]] of visible.entries()) {
+			for (const [otherId, other] of visible.slice(i + 1)) {
+				if (overlap(one, other)) throw new Error(`${id} overlaps ${otherId}`);
+			}
+		}
+	}
+
+	/** Each route runs in straight lines, without a gap, from handle to handle. */
+	function expectRoutes(
+		laid: LaidFlow,
+		/** A folded Section's box has a handle for every exit. */
+		ends: (id: string) => Box & { folded?: boolean } = (id) =>
+			nodeBox(laid.flow, id),
+	) {
+		for (const group of groupEdges(laid.flow)) {
+			const route = laid.routes.get(group.key);
+			// ELK's wrapping leaves some loops without a usable route.
+			if (!route && laid.direction === "wrapped") continue;
+			if (!route) throw new Error(`no route for ${group.key}`);
+			const { points } = route;
+			for (const [i, point] of points.slice(1).entries()) {
+				const before = points[i] as { x: number; y: number };
+				expect(point.x === before.x || point.y === before.y).toBe(true);
+			}
+			const first = points[0];
+			const last = points[points.length - 1];
+			const from = ends(group.from);
+			const to = ends(group.to);
+			// Nodes snap to the grid after ELK routes: allow half a grid step.
+			// An outcome the node does not show has no handle: ELK picks a spot.
+			const source = laid.flow.nodes.find((node) => node.id === group.from);
+			const shown =
+				from.folded ||
+				(source &&
+					nodeOutcomes(source).includes(group.edges[0]?.outcome ?? ""));
+			const off = [
+				shown ? Math.abs((first?.x ?? 0) - (from.x + from.width)) : 0,
+				Math.abs((last?.x ?? 0) - to.x),
+			];
+			if (Math.max(...off) > 4) {
+				throw new Error(
+					`${group.key} is off its handles: ${JSON.stringify({ points, from, to })}`,
+				);
+			}
+		}
+	}
+
+	const leftToRightInside = (laid: Flow) => {
+		const x = (id: string) => nodeBox(laid, id).x;
+		expect(x("branch")).toBeLessThan(x("design"));
+		expect(x("spec")).toBeLessThan(x("validate"));
+		expect(x("build")).toBeLessThan(x("stack"));
+		expect(x("stack")).toBeLessThan(x("scope"));
+		expect(x("security")).toBeLessThan(x("code"));
+		expect(x("code")).toBeLessThan(x("verdict"));
+	};
+
+	test("groups the nodes of each Section, and leaves out Sections it cannot keep", () => {
+		const graph = flowGraph(
+			sectioned([
+				{ id: "intake", label: "Intake", nodes: ["design", "branch", "rest"] },
+				{ id: "twice", label: "Twice", nodes: ["rest", "spec"] },
+				{ id: "ghost", label: "Ghost", nodes: ["build", "gone"] },
+				{ id: "empty", label: "Empty", nodes: [] },
+			]),
+		);
+		// In model order, whatever order the file lists them in.
+		expect(graph.groups).toEqual([
+			{ id: "intake", nodes: ["branch", "rest", "design"] },
+		]);
+		expect(flowGraph(sectioned([])).groups).toBeUndefined();
+	});
+
+	test("makes a folded Section one box, with an input and a port per exit", () => {
+		const graph = flowGraph(flow, {
+			folded: new Set(["review"]),
+			sectionSizes: { review: { width: 300, height: 140 } },
+		});
+		const box = graph.nodes.find((node) => node.id === sectionNodeId("review"));
+		expect(box).toMatchObject({ width: 300, height: 140 });
+		expect(box?.ports.map((port) => port.side)).toEqual([
+			"WEST",
+			"EAST",
+			"EAST",
+		]);
+		const ids = graph.nodes.map((node) => node.id);
+		for (const id of ["security", "code", "verdict"]) {
+			expect(ids).not.toContain(id);
+		}
+		expect(graph.groups?.map((group) => group.id)).toEqual([
+			"intake",
+			"specify",
+			"make",
+		]);
+		const keys = graph.edges.map((edge) => edge.id);
+		expect(keys).not.toContain("security->code");
+		expect(keys).not.toContain("code->verdict");
+		// verdict.changes leads to build and to publish: one exit, two edges.
+		const into = graph.edges.find((edge) => edge.id === "scope->security");
+		const back = graph.edges.find((edge) => edge.id === "verdict->build");
+		const on = graph.edges.find((edge) => edge.id === "verdict->publish");
+		expect(into).toMatchObject({ target: sectionNodeId("review") });
+		expect(into?.targetPort).toBe(box?.ports[0]?.id);
+		expect(back).toMatchObject({ source: sectionNodeId("review"), back: true });
+		expect(back?.sourcePort).toBe(box?.ports[1]?.id);
+		expect(on?.sourcePort).toBe(box?.ports[1]?.id);
+	});
+
+	test("lays out each direction: members left to right in frames, Sections in order", async () => {
+		const graph = flowGraph(flow);
+		for (const direction of ["RIGHT", "DOWN"]) {
+			const { boxes, routes } = readLayout(
+				await layout(elkGraph(graph, { "elk.direction": direction })),
+				graph,
+			);
+			const frames = order.map((id) => boxes.get(sectionNodeId(id)) as Box);
+			const along = (box: Box) => (direction === "RIGHT" ? box.x : box.y);
+			// Loops between Sections keep their hint: ELK puts no later one first.
+			for (const [i, frame] of frames.slice(1).entries()) {
+				expect(along(frame)).toBeGreaterThan(along(frames[i] as Box));
+			}
+			expect(routes.size).toBe(groupEdges(flow).length);
+		}
+	});
+
+	test("lays out and routes the feature-factory flow with open Sections", async () => {
+		const started = performance.now();
+		for (const viewport of [
+			undefined,
+			{ width: 1600, height: 900 },
+			{ width: 600, height: 2400 },
+		]) {
+			const laid = await layoutFlow(flow, { layout, viewport });
+			expect([...laid.sections.keys()]).toEqual(order);
+			expect([...laid.sections.values()].every((box) => !box.folded)).toBe(
+				true,
+			);
+			expectTidy(laid);
+			expectRoutes(laid);
+			leftToRightInside(laid.flow);
+			for (const box of laid.sections.values()) {
+				for (const value of [box.x, box.y, box.width, box.height]) {
+					expect(value % 8).toBe(0);
+				}
+			}
+			for (const { position } of laid.flow.nodes) {
+				expect(position.x % 8).toBe(0);
+				expect(position.y % 8).toBe(0);
+			}
+		}
+		// Nine layouts, the first one with elkjs still warming up.
+		expect(performance.now() - started).toBeLessThan(8000);
+	});
+
+	test("joins an edge that crosses two frames into one route", async () => {
+		const laid = await layoutFlow(flow, { layout });
+		const frame = (id: string) => laid.sections.get(id) as Box;
+		// scope (Build) to security (Review): out of one frame, into the other.
+		const points = laid.routes.get("scope->security")?.points ?? [];
+		const xs = points.map((point) => point.x);
+		expect(Math.max(...xs)).toBeGreaterThan(frame("review").x);
+		expect(Math.min(...xs)).toBeLessThan(frame("make").x + frame("make").width);
+		// The loop from verdict back to build runs right to left.
+		const loop = laid.routes.get("verdict->build")?.points ?? [];
+		expect(loop[0]?.x).toBeGreaterThan(loop[loop.length - 1]?.x ?? 0);
+	});
+
+	test("moves the members of a folded Section as one block, onto its box", async () => {
+		// Members somewhere, apart: the block keeps their places.
+		const spread = {
+			...flow,
+			nodes: flow.nodes.map((node, i) => ({
+				...node,
+				position: { x: i * 40, y: 1000 - i * 24 },
+			})),
+		};
+		for (const folded of [
+			new Set(["review"]),
+			new Set(["intake", "specify", "make", "review"]),
+		]) {
+			for (const viewport of [undefined, { width: 1600, height: 900 }]) {
+				const laid = await layoutFlow(spread, { layout, viewport, folded });
+				expectTidy(laid);
+				const boxOf = new Map<string, Box & { folded: boolean }>();
+				for (const section of spread.sections ?? []) {
+					const box = laid.sections.get(section.id) as Box & {
+						folded: boolean;
+					};
+					expect(box.folded).toBe(folded.has(section.id));
+					if (!box.folded) continue;
+					const before = spread.nodes.filter((n) =>
+						section.nodes.includes(n.id),
+					);
+					const after = laid.flow.nodes.filter((n) =>
+						section.nodes.includes(n.id),
+					);
+					const dx = (after[0]?.position.x ?? 0) - (before[0]?.position.x ?? 0);
+					const dy = (after[0]?.position.y ?? 0) - (before[0]?.position.y ?? 0);
+					for (const [i, node] of after.entries()) {
+						expect(node.position.x - (before[i]?.position.x ?? 0)).toBe(dx);
+						expect(node.position.y - (before[i]?.position.y ?? 0)).toBe(dy);
+					}
+					expect(Math.min(...after.map((n) => n.position.x))).toBe(box.x);
+					expect(Math.min(...after.map((n) => n.position.y))).toBe(box.y);
+					for (const id of section.nodes) boxOf.set(id, box);
+				}
+				// No route inside a folded Section; the others end on its box.
+				for (const group of groupEdges(spread)) {
+					const from = boxOf.get(group.from);
+					if (from && from === boxOf.get(group.to)) {
+						expect(laid.routes.has(group.key)).toBe(false);
+						continue;
+					}
+					if (laid.direction !== "wrapped") {
+						expect(laid.routes.has(group.key)).toBe(true);
+					}
+				}
+				expectRoutes(
+					{
+						...laid,
+						flow: {
+							...laid.flow,
+							edges: laid.flow.edges.filter(
+								(e) =>
+									!boxOf.has(e.from) || boxOf.get(e.from) !== boxOf.get(e.to),
+							),
+						},
+					},
+					(id) => boxOf.get(id) ?? nodeBox(laid.flow, id),
+				);
+			}
+		}
+	});
+
+	test("lays out the nodes of a Section it cannot keep as loose nodes", async () => {
+		const laid = await layoutFlow(
+			sectioned([
+				{ id: "intake", label: "Intake", nodes: ["branch", "rest", "design"] },
+				{ id: "twice", label: "Twice", nodes: ["design", "spec"] },
+			]),
+			{ layout },
+		);
+		expect([...laid.sections.keys()]).toEqual(["intake"]);
+		expectTidy(laid);
 	});
 });
