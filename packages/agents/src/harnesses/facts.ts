@@ -4,8 +4,8 @@
  * (`testing/fake.ts`) implement `label` and `takeOverCommand` from this
  * table, so a fake and a real harness are interchangeable at the same seam.
  *
- * Each harness folder gives its own facts (`<harness>/facts.ts`). This
- * module only collects them. It is the `./harness-facts` entry: it imports
+ * Each harness folder gives its own facts (`<harness>/facts.ts`), and
+ * `facts-table.ts` collects them. This module is the `./harness-facts` entry: it imports
  * no adapter code and no `node:` module, so it is browser-safe, an adapter
  * may import it without a cycle, and the engine may use `HARNESS_LABELS`
  * for a harness it has no instance of (one that is not added).
@@ -17,23 +17,10 @@ import {
 	type HarnessName,
 	shellQuote,
 } from "../port";
-import { ACP_FACTS } from "./acp/facts";
-import { CLAUDE_CODE_FACTS } from "./claude-code/facts";
-import { CODEX_FACTS } from "./codex/facts";
-import { GROK_BUILD_FACTS } from "./grok-build/facts";
+import { HARNESS_FACTS } from "./facts-table";
 import type { HarnessFacts } from "./harness-record";
-import { OPENCODE_FACTS } from "./opencode/facts";
 
 export { shellQuote };
-
-/** Every harness an Agent node can run on, in the order the pickers show them. */
-export const HARNESS_FACTS: Record<HarnessName, HarnessFacts> = {
-	"claude-code": CLAUDE_CODE_FACTS,
-	opencode: OPENCODE_FACTS,
-	codex: CODEX_FACTS,
-	"grok-build": GROK_BUILD_FACTS,
-	...ACP_FACTS,
-};
 
 function byHarness<T>(
 	pick: (facts: HarnessFacts) => T,
@@ -52,7 +39,7 @@ export const HARNESS_LABELS: Record<HarnessName, string> = byHarness(
  * The CLI's own command that reopens a session, given its id already quoted
  * for the shell. Null: the CLI has none.
  */
-export const HARNESS_TAKE_OVER: Record<
+const HARNESS_TAKE_OVER: Record<
 	HarnessName,
 	((quotedSessionId: string) => string) | null
 > = byHarness((facts) => facts.takeOver);

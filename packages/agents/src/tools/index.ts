@@ -7,19 +7,14 @@ export {
 	type CliToolCheck,
 	checkCli,
 	cliHelp,
-	cliHelpAt,
-	HELP_MAX_CHARS,
 	pathPrograms,
 } from "./cli-tools";
 export {
 	callMcpTool,
-	listMcpTools,
 	MCP_TIMEOUT_MS,
 	type McpToolCall,
 	type McpToolInfo,
-	toolCallOf,
 	toolInfo,
-	toolResultText,
 	withMcpClient,
 } from "./mcp";
 export { type McpTestResult, testMcpServer } from "./mcp-test";
