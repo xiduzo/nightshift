@@ -5,7 +5,9 @@
  *   the browser-safe `./harness-facts` entry and the engine read it
  *   without loading a harness.
  * - `record.ts`: the facts, plus the models of its TanStack adapter and its
- *   install check (`HarnessAdapter`). `registry.ts` collects them.
+ *   install check (`HarnessAdapter`). The models are a copy, typed against
+ *   the adapter's list, so the registry loads no adapter. `registry.ts`
+ *   collects them.
  */
 import type { HarnessCatalogEntry } from "@nightshift/flows";
 

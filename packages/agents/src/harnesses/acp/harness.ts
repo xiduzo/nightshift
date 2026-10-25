@@ -15,11 +15,9 @@
  * Verified live: pi 1.3 through pi-acp 0.0.34, with an Ollama model. The
  * other launch commands are from each agent's docs.
  */
-import { ndJsonStream } from "@agentclientprotocol/sdk";
 import { type CustomAgent, customHarnessName } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
 import type { AcpPermissionMode } from "@tanstack/ai-acp";
-import { acpCompatible, spawnHandleToAcpTransport } from "@tanstack/ai-acp";
 import {
 	type AgentHarness,
 	type AgentSessionInput,
@@ -245,13 +243,21 @@ export function acpSpec(name: string, agent: AcpAgent): HarnessSpec {
 	};
 }
 
-/** The adapter of one ACP agent session. */
+/**
+ * The adapter of one ACP agent session. The adapter packages load on the
+ * first session, not when Night Shift starts.
+ */
 async function acpAdapter(
 	name: string,
 	agent: AcpAgent,
 	input: AgentSessionInput,
 	options: AcpHarnessOptions,
 ): Promise<AdapterSetup> {
+	const [{ ndJsonStream }, { acpCompatible, spawnHandleToAcpTransport }] =
+		await Promise.all([
+			import("@agentclientprotocol/sdk"),
+			import("@tanstack/ai-acp"),
+		]);
 	const servers = Object.keys(input.mcpServers ?? {});
 	if (agent.mcp === false && servers.length > 0) {
 		throw new Refusal(

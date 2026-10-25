@@ -18,7 +18,6 @@
  */
 import { rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { grokBuildText } from "@tanstack/ai-grok-build";
 import type { SandboxPolicy } from "@tanstack/ai-sandbox";
 import type {
 	AgentHarness,
@@ -116,6 +115,8 @@ async function grokBuildAdapter(
 	input: AgentSessionInput,
 	options: GrokBuildHarnessOptions,
 ): Promise<AdapterSetup> {
+	// The adapter package loads on the first session, not when Night Shift starts.
+	const { grokBuildText } = await import("@tanstack/ai-grok-build");
 	const grokDir = join(input.cwd, ".grok");
 	const hadGrokDir = await exists(grokDir);
 	const policy = grokPolicy(input.permissionMode);

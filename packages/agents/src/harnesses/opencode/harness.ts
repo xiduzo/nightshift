@@ -38,7 +38,6 @@
  * - An abort reaches the server as a session abort; the server process is
  *   killed only if it is still alive 10 s later (see `withSpawnRewrite`).
  */
-import { opencodeText } from "@tanstack/ai-opencode";
 import type { SandboxHandle, SandboxProvider } from "@tanstack/ai-sandbox";
 import type {
 	AgentHarness,
@@ -454,6 +453,8 @@ async function opencodeAdapter(
 	input: AgentSessionInput,
 	options: OpencodeHarnessOptions,
 ): Promise<AdapterSetup> {
+	// The adapter package loads on the first session, not when Night Shift starts.
+	const { opencodeText } = await import("@tanstack/ai-opencode");
 	const port = await freePort();
 	const executable = options.opencodeExecutable ?? "opencode";
 	const config = opencodeSessionConfig(input, options.config);

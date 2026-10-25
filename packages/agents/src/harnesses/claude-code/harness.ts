@@ -8,10 +8,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-	type ClaudeCodeSettingSource,
-	claudeCodeText,
-} from "@tanstack/ai-claude-code";
+import type { ClaudeCodeSettingSource } from "@tanstack/ai-claude-code";
 import type {
 	AgentHarness,
 	AgentSessionInput,
@@ -179,12 +176,17 @@ export const CLAUDE_CODE_SPEC: HarnessSpec = {
 	shellEnvFile: "CLAUDE_ENV_FILE",
 };
 
-/** The `claude` adapter of one session, with its `--mcp-config` temp file. */
+/**
+ * The `claude` adapter of one session, with its `--mcp-config` temp file.
+ * The adapter package loads on the first session, not when Night Shift
+ * starts.
+ */
 async function claudeCodeAdapter(
 	input: AgentSessionInput,
 	options: ClaudeCodeHarnessOptions,
 	report: SessionReport,
 ): Promise<AdapterSetup> {
+	const { claudeCodeText } = await import("@tanstack/ai-claude-code");
 	const mcp = await writeMcpConfig(input.mcpServers);
 	const allowedTools = claudeAllowedTools(input, report.allowedTools);
 	// Typed as `opus`, the model with every Effort level, so `chat()` accepts

@@ -6,7 +6,7 @@
  * far over the model calls. It also names the report and artifact tools as
  * Claude Code sees them, for `--allowedTools`.
  */
-import { BRIDGED_MCP_SERVER_NAME } from "@tanstack/ai-claude-code";
+import type { BRIDGED_MCP_SERVER_NAME as ADAPTER_BRIDGE_NAME } from "@tanstack/ai-claude-code";
 import type { AgentUsage } from "../../port";
 import {
 	ARTIFACT_TOOL_NAME,
@@ -22,6 +22,12 @@ import {
 } from "../../session";
 
 export const SESSION_ID_EVENT = "claude-code.session-id";
+
+/**
+ * The name the adapter gives its MCP bridge. A copy, so the profile does not
+ * load the adapter: the type fails when the package's name changes.
+ */
+const BRIDGED_MCP_SERVER_NAME: typeof ADAPTER_BRIDGE_NAME = "tanstack";
 
 /** The report tool as Claude Code sees it: bridged over MCP, for `--allowedTools`. */
 export const REPORT_TOOL_ID = `mcp__${BRIDGED_MCP_SERVER_NAME}__${REPORT_TOOL_NAME}`;

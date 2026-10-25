@@ -1,4 +1,4 @@
-import { CLAUDE_CODE_MODELS } from "@tanstack/ai-claude-code";
+import type { CLAUDE_CODE_MODELS } from "@tanstack/ai-claude-code";
 import { baseCheck, type CliCheck, probe } from "../../doctor";
 import type { HarnessAdapter } from "../harness-record";
 import { CLAUDE_CODE_FACTS } from "./facts";
@@ -37,9 +37,24 @@ async function claudeCheck(bin: string): Promise<CliCheck> {
 	}
 }
 
+/**
+ * The models `@tanstack/ai-claude-code` knows. A copy, so the registry does
+ * not load the adapter: the type fails when the package's list changes.
+ */
+const MODELS = [
+	"claude-opus-4-8",
+	"claude-opus-4-7",
+	"claude-opus-4-6",
+	"claude-sonnet-4-6",
+	"claude-haiku-4-5",
+	"opus",
+	"sonnet",
+	"haiku",
+] as const satisfies typeof CLAUDE_CODE_MODELS;
+
 /** Claude Code in the harness registry. */
 export const CLAUDE_CODE_ADAPTER: HarnessAdapter = {
 	...CLAUDE_CODE_FACTS,
-	models: CLAUDE_CODE_MODELS,
+	models: MODELS,
 	check: claudeCheck,
 };

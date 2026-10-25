@@ -15,7 +15,6 @@
  * Unverified: the `codex` CLI was not installed when this was written. It is
  * tested against a fake `codex` that speaks the JSONL the adapter expects.
  */
-import { CODEX_MODELS, codexText } from "@tanstack/ai-codex";
 import type {
 	AgentHarness,
 	AgentSessionInput,
@@ -33,6 +32,7 @@ import {
 	type SdkSignals,
 } from "../../session";
 import { harnessFacts } from "../facts";
+import { CODEX_ADAPTER } from "./record";
 
 export type CodexHarnessOptions = {
 	/** Path or name of the `codex` executable. Defaults to `codex`. */
@@ -131,7 +131,7 @@ export function codexEffort(effort: Effort): string {
 	return effort === "max" ? "xhigh" : effort;
 }
 
-const KNOWN_MODELS: ReadonlySet<string> = new Set(CODEX_MODELS);
+const KNOWN_MODELS: ReadonlySet<string> = new Set(CODEX_ADAPTER.models);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -239,11 +239,15 @@ export function codexSetup(
 	};
 }
 
-/** The `codex` adapter of one session. */
-function codexAdapter(
+/**
+ * The `codex` adapter of one session. The adapter package loads on the
+ * first session, not when Night Shift starts.
+ */
+async function codexAdapter(
 	input: AgentSessionInput,
 	options: CodexHarnessOptions,
-): AdapterSetup {
+): Promise<AdapterSetup> {
+	const { codexText } = await import("@tanstack/ai-codex");
 	const setup = codexSetup(input, options);
 	const adapter = codexText(input.model, {
 		// The adapter runs `<executable> exec …` through `sh -c`.
