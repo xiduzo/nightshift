@@ -1309,11 +1309,13 @@ iroh.
      the checkpoint from the archive into its own tables
      (`importWalk` of the engine's walk state), and a sleeping run's timer; a run at a Gate
      waits there, a stopped one for a resume. It ends the take-over with
-     `WalkerArrived` (from), its first event of the run. Until that is in
-     its log the run still arrives: a take-over that fails (the Host away,
-     the archive without the checkpoint yet) is tried again with a growing
-     wait, and one a restart cut short is done when the next engine is
-     ready. A run walked elsewhere moves by a `run.move` command to its
+     `WalkerArrived` (from), its first event of the run. Until the new
+     Walker wrote to the run, it still arrives (`runsArriving`): recovery
+     leaves it alone, a take-over that fails (the Host away, the archive
+     without the checkpoint yet) is tried again with a growing wait, and
+     one a restart cut short is done when the next engine is ready. Recovery takes the runs whose row names this computer, with
+     their whole log, so a run that arrived gets its timer back after a
+     restart. A run walked elsewhere moves by a `run.move` command to its
      Walker. A moved step's transcript is read from the archive.
    - **Schedules**: `device` in `schedules.json` names the Device that
      fires the schedule; without one, the Replica that keeps the Space

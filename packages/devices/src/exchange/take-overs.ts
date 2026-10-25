@@ -2,11 +2,12 @@
  * The runs that moved to this computer, taken over until they arrived.
  *
  * Which runs still arrive is read from the log (`RunHistory.arriving`):
- * their latest `WalkerMoved` names this computer, and its `WalkerArrived`
- * is not there yet. So a take-over that fails (the Host away, the archive
- * without the run's Checkpoint yet) is tried again, with a growing wait,
- * and one that a crash or a restart cut short is found again when the
- * engine is ready. A take-over repeats safely (`takeOver` in the engine).
+ * their latest `WalkerMoved` names this computer, and this computer wrote
+ * nothing to them since (its first event is `WalkerArrived`). So a
+ * take-over that fails (the Host away, the archive without the run's
+ * Checkpoint yet) is tried again, with a growing wait, and one that a
+ * crash or a restart cut short is found again when the engine is ready.
+ * A take-over repeats safely (`takeOver` in the engine).
  */
 export type TakeOvers = {
 	/** Looks for runs that arrive, and takes each over. */
