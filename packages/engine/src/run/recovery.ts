@@ -4,7 +4,13 @@ import { event, run } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import type { RunSettings } from "../device-config";
-import { closeOpenWork, messageOf, openWork, type Runner } from "../graph";
+import {
+	closeOpenWork,
+	messageOf,
+	openWork,
+	pruneCheckpoints,
+	type Runner,
+} from "../graph";
 import {
 	type EngineEventType,
 	groupByRun,
@@ -22,7 +28,8 @@ import { countDaemonResumes, deriveRunState, deriveStopAt } from "../read";
  * left open. A daemon that died left sessions, steps and runs open. They
  * become `interrupted` as a stop ends them (`closeOpenWork`,
  * `graph/open-work.ts`), a run that ends so keeps only the checkpoints a
- * re-entry reads (a `prune` Turn of the runner), sleeping runs get their
+ * re-entry reads (a `prune` Turn of the runner; a sweep first prunes every
+ * thread the same way), sleeping runs get their
  * timers back, and after a grace period the daemon resumes the interrupted
  * runs itself unless `daemonResumeBlock` says why not. A step past its
  * recorded time budget or idle limit ends as its timer would have ended it
@@ -158,6 +165,10 @@ export function createRecovery(deps: RecoveryDeps) {
 	}
 
 	async function recover(): Promise<void> {
+		// Every thread keeps only what a resume reads. Cheap once clean.
+		await pruneCheckpoints(db).catch((error) => {
+			console.warn("[engine] could not prune the checkpoints", error);
+		});
 		// Only the runs this Device walks, as their rows say: a run walked
 		// elsewhere is its Walker's to recover. A run moved here has the
 		// events of its old Walker too, and a run moved away is not ours.

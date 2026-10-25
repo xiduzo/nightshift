@@ -1844,7 +1844,14 @@ describe("recovery prunes", () => {
 					.from(lgCheckpoint)
 					.where(eq(lgCheckpoint.threadId, run.id))
 			).length;
-		expect(await checkpoints()).toBeGreaterThan(1);
+		// The saver keeps the latest checkpoint only, while the run runs.
+		expect(await checkpoints()).toBe(1);
+		// A database from before kept every super-step: one older checkpoint.
+		await sandbox.db.$client.execute({
+			sql: "INSERT INTO lg_checkpoint (thread_id, checkpoint_ns, checkpoint_id, type, checkpoint, metadata) VALUES (?, '', '0', 'json', '{}', '{}')",
+			args: [run.id],
+		});
+		expect(await checkpoints()).toBe(2);
 
 		// A new daemon on the same database: the run is interrupted.
 		const { harness, sessions } = scriptedHarness();
