@@ -216,7 +216,7 @@ Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fai
 apps/mobile/src/
   app/                     thin Expo Router files: one screen from a vertical
   shared/
-    api/                   the auth client per Host, the Host address, the transport (expo/fetch + cookie), the query client
+    api/                   the auth client per Host, the Host address, the transport (expo/fetch + cookie), the query client (app focus, network), the reads kept between starts
     page/  empty/          the screen body (Screen, with an optional footer) and the empty state
     feedback/              ErrorAlert: what went wrong on a screen, and how to try again
     format/                a time of day (formatTime); the time now for "12 min ago" (useNow), costs and the words of "5 min ago" come from @nightshift/client
