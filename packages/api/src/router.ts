@@ -24,9 +24,12 @@ import { invitations, members, spaces } from "./spaces";
 
 // Every procedure but the health check needs a session in a Space. One
 // person on one computer has one without signing in (the local session).
-// Runs, Gates and projects are the session's Space's; what changes them
-// needs a role that allows it. This computer's own configuration is its
-// owner's. A paired Device calls with its Device key, not a session.
+// Lists, starts and projects are the session's Space's. A procedure keyed
+// by a run id is the run's own Space's, for a Person with a role there
+// (`runProcedure`). What changes them needs a role that allows it. The
+// Needs-you inbox spans every Space of the Person. This computer's own
+// configuration is its owner's. A paired Device calls with its Device key,
+// not a session.
 
 /**
  * The API: one router from the procedures of each domain. Its keys and

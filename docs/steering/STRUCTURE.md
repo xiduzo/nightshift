@@ -91,7 +91,7 @@ The entries today:
 | Package | Entries |
 | --- | --- |
 | `agents` | `.`, `./harness-facts`, `./mcp`, `./pricing`, `./types`, `./testing` (fakes, `fixturePath(name)`). The engine uses the four light entries: the root loads every harness. `./harness-facts` is browser-safe. |
-| `api` | `.` (`appRouter` and its types), `./client` (types only, for `apps/web`, `apps/mobile` and `client`), `./context` |
+| `api` | `.` (`appRouter` and its types, `runSpaceFor`: the run's Space for a Person, for the daemon's run file routes), `./client` (types only, for `apps/web`, `apps/mobile` and `client`), `./context` |
 | `auth` | `.`, `./testing` |
 | `client` | `.` (`createApiClient`, `createQueryUtils`, the `create<Vertical>Queries` and `create<Vertical>Mutations` factories, `followRun`, `followNotifications`, `useLiveCache`, `mergeSteps`, `answerGate` and `gateRefusalText`, the notify rules, the push contract (`gateKey`, `isGateKey`, `PUSH_CATEGORY`, `PUSH_ANDROID_CHANNEL`, `PUSH_ACTION`, `PUSH_MESSAGE_KINDS`, `PushData`, `pushDataOf`, `withdrawKeyOf`, `PushRoute`, `routeOf`, `webPathOf`, `staleGates`), the shared formatters (`formatCost`, `formatKnownCost`, `costLabel`, `whenLabel`, `agoLabel`, `platformName`, `PHONE_DELAYS`, `phoneDelayLabel`), the view types) |
 | `db` | `.`, `./schema`, `./data-dir`, `./migrate` |

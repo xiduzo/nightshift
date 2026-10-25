@@ -18,7 +18,7 @@ A Flow speaks only in Nodes, Edges, Steps, and Gates. A method's own language (f
 
 | Term | Meaning | Source |
 |------|---------|--------|
-| Space | What is shared, and with whom: Projects, their Runs and Gates, and the Members. A Better Auth organization. Every Person has a personal Space ("Personal") that nobody can be invited to, and everything starts there. Every row of a Project, Clone, Run, Step, Session or Event carries its Space; a person always works in one Space at a time (the session's active Space). | Devices, slice 2 |
+| Space | What is shared, and with whom: Projects, their Runs and Gates, and the Members. A Better Auth organization. Every Person has a personal Space ("Personal") that nobody can be invited to, and everything starts there. Every row of a Project, Clone, Run, Step, Session or Event carries its Space; a person always works in one Space at a time (the session's active Space): its lists, starts and project pages. A Run and its Gates open by the run's id from any of the Person's Spaces, with their role in the run's own Space. | Devices, slice 2 |
 | Project | A repository, by its remote: the normalised `origin` (`github.com/acme/app`), so its ssh and https URLs are one Project. Its folders are its Clones. A repository without a remote is a Project on one Device only. | Devices |
 | Clone | A Project's repository on one Device, at a path. A Device has at most one Clone of a Project. Adding a folder whose `origin` names a known Project makes a Clone of it, not a second Project. | Devices |
 | Device | A computer that runs Night Shift, with its own database. One row of the `device` table is this computer: made on the first start, with a random id that never changes and the host name as its name. | Devices |
