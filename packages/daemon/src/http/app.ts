@@ -1,11 +1,14 @@
 import { appRouter, runSpaceFor } from "@nightshift/api";
 import { authEndpointAllowed, PEER_ADDRESS_HEADER } from "@nightshift/auth";
+import { READS, READS_HEADER } from "@nightshift/devices";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
+import { BatchHandlerPlugin } from "@orpc/server/plugins";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { Hono } from "hono";
+import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { leaseHealth, readHeartbeat } from "../runtime";
@@ -13,6 +16,7 @@ import type { Sync } from "../sync";
 import { artifactFileResponse } from "./artifact-file";
 import { type HttpServices, requestContexts } from "./context";
 import { desktopOrigins } from "./origins";
+import { decodedRequest, UnreadableBody } from "./request-encoding";
 import { runExportResponse } from "./run-export";
 import type { DaemonServe } from "./serve";
 import { peerAddress } from "./this-computer";
@@ -45,6 +49,8 @@ export function createHttp(
 		sync: Sync;
 		/** Where Bun listens, and the daemon's own TLS. */
 		serve: Pick<DaemonServe, "hostname" | "tls">;
+		/** Logs each request (`bun run dev`). */
+		logRequests?: boolean;
 	},
 ): DaemonServe {
 	const { auth, db, connections, sync } = services;
@@ -69,7 +75,8 @@ export function createHttp(
 		}
 	});
 
-	app.use(logger());
+	// Each poll is a request: only a developer reads a line for each.
+	if (services.logRequests) app.use(logger());
 	app.use(
 		"/*",
 		cors({
@@ -79,6 +86,9 @@ export function createHttp(
 			credentials: true,
 		}),
 	);
+	// A reply the caller accepts compressed: JSON, text. Never a stream of
+	// events (`text/event-stream`), nor a reply under 1 KB.
+	app.use(compress());
 
 	// Better Auth's own endpoints (the session, the Spaces). A request from
 	// this computer without a session goes in with the local session. A
@@ -181,18 +191,31 @@ export function createHttp(
 		interceptors: [onError(logUnanswered)],
 	});
 
+	// Several calls in one request each get their own reply, with one
+	// context: the request's access is read once for all of them.
 	const rpcHandler = new RPCHandler(appRouter, {
+		plugins: [new BatchHandlerPlugin({ maxSize: 10 })],
 		interceptors: [onError(logUnanswered)],
 	});
 
 	// The procedures: only a call to one reads the request's session. The
-	// API reference (its page and its spec) needs none.
+	// API reference (its page and its spec) needs none. Each answer says
+	// what this daemon reads (`READS_HEADER`): a caller of a newer version
+	// batches its calls and compresses its large bodies then.
 	app.use("/rpc/*", async (c, next) => {
-		const rpcResult = await rpcHandler.handle(c.req.raw, {
+		let request: Request;
+		try {
+			request = await decodedRequest(c.req.raw);
+		} catch (error) {
+			if (!(error instanceof UnreadableBody)) throw error;
+			return c.json({ message: error.message }, error.status);
+		}
+		const rpcResult = await rpcHandler.handle(request, {
 			prefix: "/rpc",
 			context: await createContext(c),
 		});
 		if (rpcResult.matched) {
+			c.header(READS_HEADER, READS);
 			return c.newResponse(rpcResult.response.body, rpcResult.response);
 		}
 		await next();

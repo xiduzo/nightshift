@@ -472,6 +472,7 @@ export async function createDaemon(
 		},
 		corsOrigin: env.CORS_ORIGIN,
 		leaseOwner: lease.owner,
+		logRequests: dev,
 		sync,
 		// How Bun serves this daemon: the hostname of its reach, and its own
 		// TLS when it has a certificate (NIGHTSHIFT_TLS_CERT, NIGHTSHIFT_TLS_KEY).
