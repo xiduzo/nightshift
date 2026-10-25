@@ -75,13 +75,17 @@ const engine: Context["engine"] = {
 		new Proxy({} as SpaceEngine, {
 			get:
 				(_, method) =>
-				async (input: unknown, ...rest: unknown[]) => {
+				(input: unknown, ...rest: unknown[]) => {
 					calls.push({ space, method: String(method) });
 					inputs.push(input);
 					args.push([input, ...rest]);
-					if (method === "listGates") return gatesIn.get(space) ?? [];
-					if (method === "resolveGate") return onResolve();
-					return method === "listRuns" ? [] : { id: "run-1" };
+					// A watch is a stream, not a promise: this one has no items.
+					if (method === "watchRun") return (async function* () {})();
+					return (async () => {
+						if (method === "listGates") return gatesIn.get(space) ?? [];
+						if (method === "resolveGate") return onResolve();
+						return method === "listRuns" ? [] : { id: "run-1" };
+					})();
 				},
 		}),
 	spaceOfRun: async (runId) => runSpaces.get(runId) ?? null,
@@ -356,6 +360,7 @@ describe("procedures", () => {
 
 	test("a member restarts a step and runs a run again from a step; a viewer may not", async () => {
 		const { bob, cy, spaceId } = await platform();
+		runSpaces.set("r", spaceId);
 		const member = await contextFor(bob.headers);
 		await call(
 			appRouter.runs.restartStep,
@@ -808,6 +813,126 @@ describe("the owner's own sign-in", () => {
 			}),
 		).toEqual({ email: "ada@example.com" });
 		expect(set).toEqual([ada.userId]);
+	});
+});
+
+describe("a run opened by its id", () => {
+	/** Platform's run, and Bob, Cy and Dee each in their personal Space. */
+	async function aRunOfPlatform() {
+		const people = await platform();
+		const dee = await sandbox.signUp("Dee");
+		for (const person of [people.bob, people.cy]) {
+			const own = (await personalSpaceId(sandbox.db, person.userId)) ?? "";
+			await sandbox.auth.api.setActiveOrganization({
+				headers: person.headers,
+				body: { organizationId: own },
+			});
+		}
+		runSpaces.set("platform-run", people.spaceId);
+		return { ...people, dee };
+	}
+
+	/** Reads the run, follows it to its end and stops it: one call each. */
+	async function readFollowStop(context: Context, runId: string) {
+		await call(appRouter.runs.get, { runId }, { context });
+		const followed = await call(appRouter.runs.watch, { runId }, { context });
+		for await (const _ of followed) {
+			// The fake run has no items.
+		}
+		await call(appRouter.runs.stop, { runId, when: "now" }, { context });
+	}
+
+	test("reads, follows and stops a run of another of the Person's Spaces, without a switch", async () => {
+		const { bob, spaceId } = await aRunOfPlatform();
+		const context = await contextFor(bob.headers);
+		const own = context.spaceId ?? "";
+		expect(own).not.toBe(spaceId);
+
+		await readFollowStop(context, "platform-run");
+		expect(calls).toEqual([
+			{ space: spaceId, method: "getRun" },
+			{ space: spaceId, method: "watchRun" },
+			{ space: spaceId, method: "stopRun" },
+		]);
+		// The session still works in its own Space, and lists stay there.
+		expect((await contextFor(bob.headers)).spaceId).toBe(own);
+		await call(appRouter.runs.list, undefined, { context });
+		expect(calls.at(-1)).toEqual({ space: own, method: "listRuns" });
+	});
+
+	test("is not found outside the Person's Spaces, the same as a run that does not exist", async () => {
+		const { dee } = await aRunOfPlatform();
+		const outsider = await contextFor(dee.headers);
+		const notFound = {
+			code: "NOT_FOUND",
+			defined: true,
+			message: "This run is not in one of your Spaces.",
+		};
+		for (const runId of ["platform-run", "no-such-run"]) {
+			const { runs } = appRouter;
+			expect(
+				await refusalOf(call(runs.get, { runId }, { context: outsider })),
+			).toEqual(notFound);
+			expect(
+				await refusalOf(call(runs.watch, { runId }, { context: outsider })),
+			).toEqual(notFound);
+			expect(
+				await refusalOf(call(runs.stop, { runId }, { context: outsider })),
+			).toEqual(notFound);
+		}
+		expect(calls).toEqual([]);
+	});
+
+	test("acts only as far as the Person's role in the run's Space allows", async () => {
+		const { cy, spaceId } = await aRunOfPlatform();
+		const viewer = await contextFor(cy.headers);
+		await call(
+			appRouter.runs.get,
+			{ runId: "platform-run" },
+			{ context: viewer },
+		);
+		expect(
+			await refusalOf(
+				call(
+					appRouter.runs.stop,
+					{ runId: "platform-run" },
+					{ context: viewer },
+				),
+			),
+		).toEqual({
+			code: "FORBIDDEN",
+			defined: true,
+			message: "Your role in this Space does not allow this.",
+		});
+		expect(calls).toEqual([{ space: spaceId, method: "getRun" }]);
+	});
+
+	test("removes what a run of another Space left on this computer, for its owner only", async () => {
+		const { bob, cy, spaceId } = await aRunOfPlatform();
+		const asOwner = async (person: { headers: Headers; userId: string }) => {
+			const base = await contextFor(person.headers);
+			return {
+				...base,
+				daemon: {
+					...base.daemon,
+					device: { ...base.daemon.device, ownerId: person.userId },
+				},
+			} as Context;
+		};
+		const copy = { runId: "platform-run" };
+		await call(appRouter.projects.removeRunCopy, copy, {
+			context: await asOwner(bob),
+		});
+		expect(calls).toEqual([{ space: spaceId, method: "removeRunCopy" }]);
+		// Cy is a Member of Platform, but this computer is not hers.
+		expect(
+			await errorOf(
+				call(appRouter.projects.deleteRunBranches, copy, {
+					context: await contextFor(cy.headers),
+				}),
+			),
+		).toBe("FORBIDDEN");
+		expect(calls).toHaveLength(1);
 	});
 });
 

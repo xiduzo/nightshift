@@ -1,5 +1,5 @@
 import { spacesOf } from "@nightshift/auth";
-import { GateClosedError } from "@nightshift/engine";
+import { GateClosedError, type SpaceEngine } from "@nightshift/engine";
 import type { ORPCErrorConstructorMap } from "@orpc/server";
 import type { z } from "zod";
 
@@ -44,8 +44,10 @@ export async function inboxOf(context: InboxContext): Promise<InboxGate[]> {
  *   its run ended, or an answer is on its way.
  * - `NEEDS_APP`: a lock-screen answer to a Gate that its author did not
  *   mark for the lock screen, or with a choice it does not have.
- * - `FORBIDDEN`: the Person's role in the Space does not allow an answer.
- * - `NOT_FOUND`: the run is not in one of the Person's Spaces.
+ * - `NOT_FOUND`: the run is not in one of the Person's Spaces. These are
+ *   the Gate's words for the refusal of `runProcedure`, which also refuses
+ *   as `FORBIDDEN` when the Person's role in the Space does not allow an
+ *   answer.
  * Any other problem (the run cap, a choice that is not an option) stays a
  * bad request with its message.
  */
@@ -54,10 +56,6 @@ export const answerRefusals = {
 	NEEDS_APP: {
 		status: 403,
 		message: "Open this Gate in Night Shift to answer it.",
-	},
-	FORBIDDEN: {
-		status: 403,
-		message: "Your role in this Space does not allow this.",
 	},
 	NOT_FOUND: {
 		status: 404,
@@ -68,30 +66,19 @@ export const answerRefusals = {
 type AnswerRefusals = ORPCErrorConstructorMap<typeof answerRefusals>;
 
 /**
- * Answers the open Gate of a run in whichever of the Person's Spaces it is,
- * with their role there; the session's Space stays as it is. A run outside
- * their Spaces is "not found", the same as one that does not exist. The
- * engine refuses an answer to a Gate that no longer waits, and this says
- * so as `GATE_CLOSED`. An answer from the lock screen goes only to a Gate
- * its author marked for it, with one of its choices: the push that shows
- * the buttons is not proof of that. The Host alone checks it.
+ * Answers the open Gate of a run, through the view of the run's own Space
+ * (`runProcedure` found it and checked the role there). The engine refuses
+ * an answer to a Gate that no longer waits, and this says so as
+ * `GATE_CLOSED`. An answer from the lock screen goes only to a Gate its
+ * author marked for it, with one of its choices: the push that shows the
+ * buttons is not proof of that. The Host alone checks it.
  */
 export async function answerGate(
-	context: InboxContext,
+	space: Pick<SpaceEngine, "listGates" | "resolveGate">,
 	input: z.output<typeof gateAnswerSchema>,
 	errors: AnswerRefusals,
 ): Promise<void> {
-	const personId = context.session.user.id;
-	const spaceId = await context.engine.spaceOfRun(input.runId);
-	const spaces = spaceId ? await spacesOf(context.db, personId) : [];
-	if (!spaceId || !spaces.some((space) => space.id === spaceId)) {
-		throw errors.NOT_FOUND();
-	}
-	if (!(await context.can({ gate: ["resolve"] }, spaceId))) {
-		throw errors.FORBIDDEN();
-	}
 	const { via, ...answer } = input;
-	const space = context.engine.space(spaceId, { personId });
 	if (via === "lock-screen") {
 		const gate = (await space.listGates()).find(
 			(open) => open.runId === answer.runId && open.stepId === answer.stepId,

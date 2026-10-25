@@ -1,4 +1,4 @@
-import { appRouter } from "@nightshift/api";
+import { appRouter, runSpaceFor } from "@nightshift/api";
 import { authEndpointAllowed, PEER_ADDRESS_HEADER } from "@nightshift/auth";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -94,10 +94,10 @@ export function createHttp(
 		return auth.handler(new Request(c.req.raw, { headers: forwarded }));
 	});
 
-	// A file download, not an oRPC call: the run of the session's Space, for a
-	// role that may export runs.
+	// A file download, not an oRPC call: a run of any of the Person's
+	// Spaces, for a role that may export runs there (`runSpaceFor`).
 	app.get("/api/runs/:id/export", async (c) => {
-		const { session, spaceId, can, hostAccess } = await access(c);
+		const { session, spaceId, hostAccess } = await access(c);
 		if (!session || !spaceId) {
 			return c.json({ message: "Sign in to use Night Shift." }, 401);
 		}
@@ -107,21 +107,27 @@ export function createHttp(
 				403,
 			);
 		}
-		if (!(await can({ run: ["export"] }))) {
-			return c.json(
-				{ message: "Your role in this Space does not allow this." },
-				403,
-			);
+		const runId = c.req.param("id");
+		const found = await runSpaceFor(services, session.user.id, runId, {
+			run: ["export"],
+		});
+		if ("refused" in found) {
+			return found.refused === "forbidden"
+				? c.json(
+						{ message: "Your role in this Space does not allow this." },
+						403,
+					)
+				: c.json({ message: "This run is not in one of your Spaces." }, 404);
 		}
 		return runExportResponse(
 			{ db, dataDir: services.dataDir, connections },
-			c.req.param("id"),
-			spaceId,
+			runId,
+			found.spaceId,
 		);
 	});
 
-	// A file, not an oRPC call: one artifact of a run of the session's Space,
-	// for an <img>, a <video> or a download.
+	// A file, not an oRPC call: one artifact of a run of any of the Person's
+	// Spaces (`runSpaceFor`), for an <img>, a <video> or a download.
 	app.get("/api/runs/:id/artifacts/:artifactId", async (c) => {
 		const { session, spaceId, hostAccess } = await access(c);
 		if (!session || !spaceId) {
@@ -133,10 +139,15 @@ export function createHttp(
 				403,
 			);
 		}
+		const runId = c.req.param("id");
+		const found = await runSpaceFor(services, session.user.id, runId);
+		if ("refused" in found) {
+			return c.json({ message: "Artifact not found." }, 404);
+		}
 		return artifactFileResponse(
-			services.engine.space(spaceId, { personId: session.user.id }),
+			services.engine.space(found.spaceId, { personId: session.user.id }),
 			c.req.raw,
-			c.req.param("id"),
+			runId,
 			c.req.param("artifactId"),
 		);
 	});

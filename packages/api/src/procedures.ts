@@ -101,20 +101,21 @@ export function permitted(permissions: Permissions) {
 	});
 }
 
+/** Lets only the Person who owns this computer through. */
+export const ownerOnly = o.middleware(async ({ context, next }) => {
+	if (context.session?.user.id !== context.daemon.device.ownerId) {
+		throw new ORPCError("FORBIDDEN", {
+			message: "Only the owner of this computer can see or change this.",
+		});
+	}
+	return next();
+});
+
 /**
  * This computer's own configuration (settings, harnesses, profiles,
  * connections, CLI tools): private to the Person who owns it, in any Space.
  */
-export const ownerProcedure = protectedProcedure.use(
-	async ({ context, next }) => {
-		if (context.session.user.id !== context.daemon.device.ownerId) {
-			throw new ORPCError("FORBIDDEN", {
-				message: "Only the owner of this computer can see or change this.",
-			});
-		}
-		return next();
-	},
-);
+export const ownerProcedure = protectedProcedure.use(ownerOnly);
 
 /**
  * A call of a paired Device, with its Device key, for a key that allows
