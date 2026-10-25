@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createSandbox, type Sandbox } from "@nightshift/engine/testing";
 import { ORPCError } from "@orpc/server";
-import type { RunRows } from "../contract";
+import type { RunCommand, RunRows } from "../contract";
 import { inMemoryHostClient } from "./in-memory-host";
 import { type PairedReplicas, pairedReplicas } from "./paired";
 
@@ -155,6 +155,108 @@ describe("a Host in memory", () => {
 		const seen: unknown[] = [];
 		for await (const batch of again) seen.push(batch);
 		expect(seen.length).toBeLessThanOrEqual(1);
+	});
+
+	test("checks every input as the API does: defaults fill in, unknown keys go, transforms apply", async () => {
+		const seen: { rows?: RunRows; command?: object; clone?: object } = {};
+		let running: unknown;
+		const client = inMemoryHostClient(
+			{
+				...paired.hostExchange,
+				async push(_key, rows) {
+					seen.rows = rows;
+					return { events: 0 };
+				},
+				async command(_key, input) {
+					seen.command = input;
+				},
+				async addClone(_key, input) {
+					seen.clone = input;
+				},
+				work(_key, input) {
+					running = input.running;
+					return (async function* () {})();
+				},
+			},
+			paired.key,
+		);
+
+		// A Device of an older version sends a run without the fields it did
+		// not know yet, and one of a newer version a field this Host does not.
+		const rows = rowsOf(b.deviceId);
+		const [run] = rows.runs;
+		if (!run) throw new Error("No run.");
+		const { startedBy, deviceId, placements, ...older } = run;
+		await client.sync.push({
+			...rows,
+			runs: [{ ...older, newer: true } as unknown as typeof run],
+		});
+		expect(seen.rows?.runs).toEqual([
+			{ ...older, startedBy: null, deviceId: null, placements: null },
+		]);
+
+		// A command names its run: the Host acts in the key's Person's name,
+		// in the run's own Space, never one the Device names.
+		const command: RunCommand = {
+			id: "command-1",
+			spaceId: "another-space",
+			runId: "run-1",
+			walkerId: b.deviceId,
+			personId: "someone-else",
+			createdAt: 0,
+			kind: "signal.send",
+			payload: { name: "go" },
+		};
+		await client.sync.command(command);
+		expect(seen.command).toEqual({
+			runId: "run-1",
+			kind: "signal.send",
+			payload: { name: "go" },
+		});
+
+		await client.sync.addClone({
+			spaceId: a.spaceId,
+			projectId: "project-1",
+			deviceName: "  B  ",
+		});
+		expect(seen.clone).toEqual({
+			spaceId: a.spaceId,
+			projectId: "project-1",
+			deviceName: "B",
+		});
+
+		// A Device that serves no calls yet sends no list of them.
+		for await (const _ of await client.devices.work()) break;
+		expect(running).toEqual([]);
+	});
+
+	test("refuses an input the API refuses", async () => {
+		const client = paired.memory.client(paired.key);
+		expect(
+			await codeOf(
+				client.sync.command({
+					runId: "run-1",
+					kind: "gate.resolve",
+					payload: { stepId: "step-1", choice: "" },
+				}),
+			),
+		).toBe("BAD_REQUEST");
+		const entries = Array.from({ length: 1_001 }, (_, i) => ({
+			seq: i + 1,
+			stepId: "step-1",
+			sessionId: null,
+			at: 0,
+			event: { type: "text", text: "." },
+		}));
+		expect(
+			await codeOf(
+				client.archive.tail({
+					step: { spaceId: a.spaceId, runId: "run-1", stepId: "step-1" },
+					entries: entries as never,
+					ended: false,
+				}),
+			),
+		).toBe("BAD_REQUEST");
 	});
 
 	test("gives the Host a copy of what the Device sends, and the Device a copy of the answer", async () => {

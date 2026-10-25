@@ -20,6 +20,7 @@ import {
 import type { Flow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import type { HostClient } from "../contract";
+import { onReplyMismatch, type ReplyMismatch } from "../contract/described";
 import type { Link } from "../links";
 import { httpsLink } from "../links/link";
 import type { PeerEngine } from "../peers";
@@ -30,7 +31,8 @@ import { createDeviceExchange, type DeviceExchange } from "./device-exchange";
  * The Device's exchange with its Host, in one process: B (the Device)
  * runs its real exchange over a real Link to A (the Host) in memory.
  * `memory.down()` is the network gone: the link goes offline, and comes
- * back by itself after `memory.up()`.
+ * back by itself after `memory.up()`. Every reply of the Host matches
+ * its schema in the contract.
  */
 
 let a: Sandbox;
@@ -44,6 +46,9 @@ let exchange: DeviceExchange;
 let periods: { stop(): Promise<void> }[];
 /** More Replicas a test paired with A: removed after its links. */
 let others: Sandbox[];
+/** The Host's replies that did not match their schemas. */
+let mismatches: ReplyMismatch[];
+let restoreReplies: () => void;
 
 beforeEach(async () => {
 	[a, b] = await Promise.all([createSandbox(), createSandbox()]);
@@ -66,10 +71,14 @@ beforeEach(async () => {
 	exchange = deviceExchange();
 	periods = [];
 	others = [];
+	mismatches = [];
+	restoreReplies = onReplyMismatch((mismatch) => mismatches.push(mismatch));
 });
 afterEach(async () => {
 	for (const period of periods) await period.stop();
+	restoreReplies();
 	await Promise.all([a, b, ...others].map((s) => s.cleanup()));
+	expect(mismatches).toEqual([]);
 });
 
 function deviceExchange(
