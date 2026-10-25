@@ -506,13 +506,25 @@ describe("a run that moves to another Device", () => {
 		await spaceOf(a, a).stopRun(runId);
 	});
 
-	test("cannot be taken over without its Checkpoint in the archive", async () => {
+	test("cannot be taken over without its Checkpoint in the archive, and arrives once it is there", async () => {
 		const { a, b } = await pair();
 		const { runId, projectId } = await waitingOn(a);
+		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		const kept = new Map(archive);
+		archive.clear();
 		await copyRows(a, b, projectId);
+		const here = [b.sandbox.deviceId];
 		await expect(b.context.takeOver(runId)).rejects.toThrow(
 			"The archive has no checkpoint of the run.",
 		);
-		await spaceOf(a, a).stopRun(runId);
+		// Nothing says it arrived: the take-over is tried again.
+		expect(await b.context.history.arriving(here)).toEqual([runId]);
+		for (const [key, content] of kept) archive.set(key, content);
+		await b.context.takeOver(runId);
+		expect(await b.context.history.arriving(here)).toEqual([]);
+		expect((await b.context.log.events(runId)).at(-1)).toMatchObject({
+			type: "WalkerArrived",
+			payload: { from: a.sandbox.deviceId },
+		});
 	});
 });

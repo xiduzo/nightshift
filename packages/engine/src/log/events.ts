@@ -222,6 +222,12 @@ export type EnginePayloads = {
 	 */
 	WalkerMoved: { from: string; to: string; by: string | null };
 	/**
+	 * The new Walker has the run's Walk state from the archive, and walks
+	 * it from here: its first event after `WalkerMoved`. Until it is in the
+	 * log, the run still arrives, and the new Walker tries again.
+	 */
+	WalkerArrived: { from: string };
+	/**
 	 * A person continued a stopped, failed or interrupted run, or the daemon
 	 * continued a run it had stopped mid-step, after a restart.
 	 */
@@ -461,6 +467,11 @@ export type EngineEventType = keyof EnginePayloads;
 /** What a run warning is about. `cost-unknown`: a step ended without a cost. */
 export type RunWarningKind = "cost-unknown";
 
+/**
+ * One event as this Replica's log has it. Any payload may also carry
+ * `commandId`: the Command whose first event of its run this is
+ * (`command-stamp.ts`). Readers of the payloads above never need it.
+ */
 export type LoggedEvent = {
 	[T in EngineEventType]: {
 		seq: number;

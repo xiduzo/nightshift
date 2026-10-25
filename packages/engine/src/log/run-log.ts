@@ -1,6 +1,8 @@
 import type { Database } from "@nightshift/db";
 import { event } from "@nightshift/db/schema";
 import { asc, eq, inArray } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
+import { stampedAppend } from "./command-stamp";
 import {
 	appendEvent,
 	type EngineEventType,
@@ -25,8 +27,12 @@ import {
  *   Gate) until the run's next append, also after its log was dropped. The
  *   run list reads it without parsing every run's log again.
  * - `ingest` adds the events of runs another Device walks, as the exchange
- *   brings them (`exchange/`): the same bookkeeping as an append, so the
- *   copy here stays exactly the log on disk.
+ *   brings them (`exchange/`), in one transaction with the rows they name
+ *   and what follows from them: the same bookkeeping as an append, once
+ *   the transaction committed, so the copy here stays exactly the log on
+ *   disk.
+ * - An append made while a Command is applied (`asCommand`) carries the
+ *   Command's id when it is the Command's first event of its run.
  * - `onLanded` tells a listener about every event that landed, appended or
  *   ingested: the exchange pushes and streams on it.
  */
@@ -43,6 +49,16 @@ export type ForeignEvent = {
 	at: number;
 	walkerId: string;
 	walkerSeq: number;
+};
+
+/**
+ * Statements that commit with the events of an ingest, in one
+ * transaction: `before` the events (the rows they name), `after` them
+ * (what the log says now: a run's Walker, a session's harness id).
+ */
+export type IngestWrites = {
+	before?: readonly BatchItem<"sqlite">[];
+	after?: readonly BatchItem<"sqlite">[];
 };
 
 /** Called with the events that just landed in this Replica. */
@@ -253,7 +269,12 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 		async append<T extends EngineEventType>(
 			input: EventInput<T>,
 		): Promise<LoggedEvent> {
-			const logged = await appendEvent(db, input, await walkerId());
+			const walker = await walkerId();
+			const logged = await stampedAppend(
+				input.runId,
+				input.payload,
+				(payload) => appendEvent(db, { ...input, payload }, walker),
+			);
 			keep(logged);
 			landed([logged]);
 			return logged;
@@ -261,14 +282,21 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 
 		/**
 		 * Adds events of runs another Device walks, in the order given (each
-		 * Walker's in its own order). An event this Replica has already (the
-		 * same Walker and `walker_seq`) is skipped. Returns the ones that
-		 * were new, as committed.
+		 * Walker's in its own order), in one transaction with `writes`. An
+		 * event this Replica has already (the same Walker and `walker_seq`)
+		 * is skipped. Returns the ones that were new, as committed. Nothing
+		 * is kept or told before the transaction committed.
+		 *
+		 * One `batch`, not an interactive transaction: its statements run at
+		 * once on one connection, so the walk's own appends beside it never
+		 * meet a write lock held across an await.
 		 */
-		async ingest(events: readonly ForeignEvent[]): Promise<LoggedEvent[]> {
-			const added: LoggedEvent[] = [];
-			for (const e of events) {
-				const [row] = await db
+		async ingest(
+			events: readonly ForeignEvent[],
+			writes: IngestWrites = {},
+		): Promise<LoggedEvent[]> {
+			const inserts = events.map((e) =>
+				db
 					.insert(event)
 					.values({
 						spaceId: e.spaceId,
@@ -282,7 +310,22 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 						walkerSeq: e.walkerSeq,
 					})
 					.onConflictDoNothing()
-					.returning();
+					.returning(),
+			);
+			const before = writes.before ?? [];
+			const statements = [...before, ...inserts, ...(writes.after ?? [])];
+			if (statements.length === 0) return [];
+			const results = await db.batch(
+				statements as unknown as [
+					BatchItem<"sqlite">,
+					...BatchItem<"sqlite">[],
+				],
+			);
+			const added: LoggedEvent[] = [];
+			for (const [i] of inserts.entries()) {
+				const [row] = results[
+					before.length + i
+				] as (typeof event.$inferSelect)[];
 				if (!row) continue;
 				const logged = parseEventRow(row);
 				keep(logged);

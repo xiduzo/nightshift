@@ -1,6 +1,6 @@
 import type { Database } from "@nightshift/db";
-import { run, step } from "@nightshift/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { event, run, step } from "@nightshift/db/schema";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { LoggedEvent } from "./events";
 
 /**
@@ -47,16 +47,34 @@ export async function applyWalkerMoves(
 	db: Database,
 	events: readonly LoggedEvent[],
 ): Promise<void> {
-	for (const e of events) {
-		if (e.type !== "WalkerMoved" || !e.runId) continue;
-		await db
-			.update(run)
-			.set({
-				deviceId: sql`coalesce(${run.deviceId}, ${run.walkerId})`,
-				walkerId: e.payload.to,
-			})
-			.where(eq(run.id, e.runId));
-	}
+	const runIds = events.flatMap((e) =>
+		e.type === "WalkerMoved" && e.runId ? [e.runId] : [],
+	);
+	if (runIds.length > 0) await followWalkerMoves(db, runIds);
+}
+
+/**
+ * The statement that gives each of the runs the Walker its log names: the
+ * `to` of its latest `WalkerMoved`. It reads the log, not the events that
+ * just came, so it repeats safely: a run whose Walker already follows its
+ * log is not touched. A run from before Placement keeps its steps'
+ * Device: the Walker it had.
+ */
+export function followWalkerMoves(db: Database, runIds: readonly string[]) {
+	const latestTo = sql<string>`(select json_extract(${event.payload}, '$.to') from ${event} where ${event.runId} = ${run.id} and ${event.type} = 'WalkerMoved' order by ${event.seq} desc limit 1)`;
+	return db
+		.update(run)
+		.set({
+			deviceId: sql`coalesce(${run.deviceId}, ${run.walkerId})`,
+			walkerId: latestTo,
+		})
+		.where(
+			and(
+				inArray(run.id, [...runIds]),
+				sql`${latestTo} is not null`,
+				sql`${run.walkerId} is not ${latestTo}`,
+			),
+		);
 }
 
 /** The ids of the project's runs. */

@@ -4,9 +4,10 @@ import type { Database } from "@nightshift/db";
 import { agentSession, event, project, run, step } from "@nightshift/db/schema";
 import { and, asc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { RunBus } from "./bus";
+import { asCommand } from "./command-stamp";
 import type { LoggedEvent } from "./events";
 import type { ForeignEvent, RunLog } from "./run-log";
-import { applyWalkerMoves } from "./run-row";
+import { followWalkerMoves } from "./run-row";
 import type { TranscriptEntry } from "./step-events";
 import {
 	commandLogPath,
@@ -30,9 +31,16 @@ import {
  * - What moves: runs, steps, agent sessions and the events of runs. Facts
  *   of no run (a project's, a schedule's, a Device's) stay on the Replica
  *   that wrote them: the Space document carries the Space's definitions.
- * - A batch carries its events in each Walker's order, with the run, step
- *   and session rows they name, so a receiver inserts parents first and
- *   foreign keys hold.
+ * - A batch carries its events in the order they landed in the Replica
+ *   that serves it (its `seq`), so each Walker's in its own order, and a
+ *   moved run's events of its old Walker before those of its new one. It
+ *   carries the run, step and session rows they name, so a receiver
+ *   inserts parents first and foreign keys hold.
+ * - A batch lands in one transaction: its rows, its events, and the
+ *   columns that follow from the log (the run's Walker, a session's
+ *   harness id). Each of those is read from the log, so a batch that comes
+ *   again after a crash repeats them, and an older Replica that lost one
+ *   gets it back.
  * - One column changes after its insert: `agent_session.harness_session_id`.
  *   It is the Walker's copy of its `HarnessSessionAssigned` event, so a
  *   receiver fills it from that event, never from another Replica's row.
@@ -105,9 +113,15 @@ export function createRunHistory(deps: {
 	const { db, dataDir, log, bus } = deps;
 
 	/**
-	 * The run rows of `spaces` after `cursors`, oldest first per Walker:
-	 * every Walker's but `except`, or only `only`'s. At most `limit`
-	 * events per Space and Walker. Returns the cursors moved past them.
+	 * The run rows of `spaces` after `cursors`, in the order their events
+	 * landed here: every Walker's but `except`, or only `only`'s. At most
+	 * `limit` events. Returns the cursors moved past them.
+	 *
+	 * This Replica's order keeps each Walker's order per Space (its events
+	 * land here in that order), and it is the only order that knows a
+	 * moved run's Walkers apart: the new Walker wrote nothing before the
+	 * move landed. A receiver that adds the batch in this order stores the
+	 * run as it happened.
 	 */
 	async function rowsAfter(input: {
 		spaces: readonly string[];
@@ -117,7 +131,7 @@ export function createRunHistory(deps: {
 		limit?: number;
 	}): Promise<{ rows: HistoryRows; cursors: HistoryCursors }> {
 		const limit = input.limit ?? 500;
-		const events: (typeof event.$inferSelect)[] = [];
+		const found: (typeof event.$inferSelect)[] = [];
 		const cursors: HistoryCursors = {};
 		if (input.spaces.length === 0) return { rows: NO_ROWS, cursors };
 		const walkers = await db
@@ -131,9 +145,13 @@ export function createRunHistory(deps: {
 					input.except ? sql`${event.walkerId} <> ${input.except}` : undefined,
 				),
 			);
+		// Each Walker's first `limit` in a Space hold all of its events among
+		// the first `limit` of them all: the merge by `seq` takes those.
+		/** Each event's place in its Walker's order, in this batch. */
+		const next = new Map<(typeof found)[number], number>();
 		for (const { spaceId, walkerId } of walkers) {
 			const after = input.cursors[spaceId]?.[walkerId] ?? 0;
-			const rows = await db
+			const list = await db
 				.select()
 				.from(event)
 				.where(
@@ -146,13 +164,21 @@ export function createRunHistory(deps: {
 				)
 				.orderBy(asc(event.walkerSeq))
 				.limit(limit);
-			const last = rows.at(-1);
-			if (!last) continue;
-			events.push(...rows);
-			cursors[spaceId] = {
-				...cursors[spaceId],
-				[walkerId]: last.walkerSeq,
-			};
+			for (const [i, e] of list.entries()) next.set(e, i);
+			found.push(...list);
+		}
+		// A cursor counts in the Walker's order, so each Walker's events go
+		// in that order: one that landed here out of it waits for the next
+		// batch, with every later one of its Walker.
+		const taken = new Map<string, number>();
+		const events: typeof found = [];
+		for (const e of found.sort((x, y) => x.seq - y.seq)) {
+			if (events.length >= limit) break;
+			const key = `${e.spaceId}\n${e.walkerId}`;
+			if (next.get(e) !== (taken.get(key) ?? 0)) continue;
+			taken.set(key, (taken.get(key) ?? 0) + 1);
+			events.push(e);
+			cursors[e.spaceId] = { ...cursors[e.spaceId], [e.walkerId]: e.walkerSeq };
 		}
 		return { rows: await withParents(events), cursors };
 	}
@@ -202,12 +228,14 @@ export function createRunHistory(deps: {
 	}
 
 	/**
-	 * Adds a batch to this Replica: rows it has are skipped. With `walker`,
-	 * every row must be that Walker's (a Device sends only the runs it
-	 * walks); with `spaces`, every row must be in one of them. A batch that
-	 * breaks either is refused whole (`ForeignRowsError`). A run whose
-	 * project is not here refuses it as not yet (`MissingProjectError`).
-	 * Returns the events that were new.
+	 * Adds a batch to this Replica, in one transaction: rows it has are
+	 * skipped. With `walker`, every row must be that Walker's (a Device
+	 * sends only the runs it walks); with `spaces`, every row must be in
+	 * one of them. A batch that breaks either is refused whole
+	 * (`ForeignRowsError`). A run whose project is not here refuses it as
+	 * not yet (`MissingProjectError`). The same transaction gives each run
+	 * of the batch the Walker its log names, and each session its harness
+	 * id, from the log. Returns the events that were new.
 	 */
 	async function ingest(
 		rows: HistoryRows,
@@ -228,52 +256,81 @@ export function createRunHistory(deps: {
 			const missing = projectIds.filter((id) => !found.has(id));
 			if (missing.length > 0) throw new MissingProjectError(missing);
 		}
+		const before = [];
 		if (rows.runs.length > 0) {
-			await db
-				.insert(run)
-				.values(
-					rows.runs.map((r) => ({ ...r, createdAt: new Date(r.createdAt) })),
-				)
-				.onConflictDoNothing();
+			before.push(
+				db
+					.insert(run)
+					.values(
+						rows.runs.map((r) => ({ ...r, createdAt: new Date(r.createdAt) })),
+					)
+					.onConflictDoNothing(),
+			);
 		}
 		if (rows.steps.length > 0) {
-			await db
-				.insert(step)
-				.values(
-					rows.steps.map((s) => ({ ...s, createdAt: new Date(s.createdAt) })),
-				)
-				.onConflictDoNothing();
+			before.push(
+				db
+					.insert(step)
+					.values(
+						rows.steps.map((s) => ({ ...s, createdAt: new Date(s.createdAt) })),
+					)
+					.onConflictDoNothing(),
+			);
 		}
 		if (rows.sessions.length > 0) {
-			await db
-				.insert(agentSession)
-				.values(
-					rows.sessions.map((s) => ({
-						...s,
-						createdAt: new Date(s.createdAt),
-					})),
-				)
-				.onConflictDoNothing();
+			before.push(
+				db
+					.insert(agentSession)
+					.values(
+						rows.sessions.map((s) => ({
+							...s,
+							createdAt: new Date(s.createdAt),
+						})),
+					)
+					.onConflictDoNothing(),
+			);
 		}
-		const added = await log.ingest(rows.events);
+		const runIds = [
+			...new Set([
+				...rows.runs.map((r) => r.id),
+				...rows.events.map((e) => e.runId),
+			]),
+		];
+		const sessionIds = [
+			...new Set(
+				rows.events.flatMap((e) =>
+					e.type === "HarnessSessionAssigned" && e.sessionId
+						? [e.sessionId]
+						: [],
+				),
+			),
+		];
+		const after = [];
 		// The run's Walker follows its `WalkerMoved`, on every Replica.
-		await applyWalkerMoves(db, added);
-		for (const e of added) {
-			// The Walker's own copy of this fact, filled here from the fact.
-			if (e.type === "HarnessSessionAssigned" && e.sessionId) {
-				await db
-					.update(agentSession)
-					.set({ harnessSessionId: e.payload.harnessSessionId })
-					.where(
-						and(
-							eq(agentSession.id, e.sessionId),
-							isNull(agentSession.harnessSessionId),
-						),
-					);
-			}
-		}
+		if (runIds.length > 0) after.push(followWalkerMoves(db, runIds));
+		// The Walker's own copy of this fact, filled here from the fact.
+		if (sessionIds.length > 0) after.push(fillHarnessSessions(sessionIds));
+		const added = await log.ingest(rows.events, { before, after });
 		publish(added);
 		return added;
+	}
+
+	/**
+	 * The statement that gives each of the sessions the harness id of its
+	 * first `HarnessSessionAssigned` in the log, unless it has one.
+	 */
+	function fillHarnessSessions(sessionIds: readonly string[]) {
+		const assigned = sql<string>`(select json_extract(${event.payload}, '$.harnessSessionId') from ${event} where ${event.sessionId} = ${agentSession.id} and ${event.type} = 'HarnessSessionAssigned' order by ${event.seq} limit 1)`;
+		return db
+			.update(agentSession)
+			.set({ harnessSessionId: assigned })
+			.where(
+				and(
+					inArray(agentSession.id, [...sessionIds]),
+					isNull(agentSession.harnessSessionId),
+					sql`${assigned} is not null`,
+				),
+			);
 	}
 
 	/** The Walker and Space of each run a batch names, from the batch or this Replica. */
@@ -475,6 +532,49 @@ export function createRunHistory(deps: {
 		);
 	}
 
+	/**
+	 * Whether this Replica's log has an event the Command wrote: it was
+	 * applied here, also before a restart (`command-stamp.ts`).
+	 */
+	async function applied(command: {
+		id: string;
+		runId: string;
+	}): Promise<boolean> {
+		const [row] = await db
+			.select({ seq: event.seq })
+			.from(event)
+			.where(
+				and(
+					eq(event.runId, command.runId),
+					sql`json_extract(${event.payload}, '$.commandId') = ${command.id}`,
+				),
+			)
+			.limit(1);
+		return row !== undefined;
+	}
+
+	/**
+	 * The runs that moved to one of `here` and have not arrived: their
+	 * latest `WalkerMoved` names one of them, and no `WalkerArrived` came
+	 * after it. Read from the log, so a take-over that failed, or that a
+	 * restart cut short, is found again.
+	 */
+	async function arriving(here: readonly string[]): Promise<string[]> {
+		if (here.length === 0) return [];
+		const lastMove = sql`(select max(w.seq) from ${event} w where w.run_id = ${run.id} and w.type = 'WalkerMoved')`;
+		const rows = await db
+			.select({ id: run.id })
+			.from(run)
+			.where(
+				and(
+					inArray(run.walkerId, [...here]),
+					sql`(select json_extract(m.payload, '$.to') from ${event} m where m.seq = ${lastMove}) in ${[...here]}`,
+					sql`not exists (select 1 from ${event} a where a.run_id = ${run.id} and a.type = 'WalkerArrived' and a.seq > ${lastMove})`,
+				),
+			);
+		return rows.map((r) => r.id);
+	}
+
 	/** The latest presence event of each Device (`DeviceOnline` or `DeviceOffline`), by Device id. */
 	async function devicePresence(): Promise<Map<string, string>> {
 		const presence = await db
@@ -496,5 +596,9 @@ export function createRunHistory(deps: {
 		ownStepFiles,
 		ownTranscript,
 		devicePresence,
+		applied,
+		/** Runs `fn` as the Command: the first event it writes to the Command's run carries its id (`command-stamp.ts`). */
+		applying: asCommand,
+		arriving,
 	};
 }
