@@ -1,5 +1,6 @@
-/** Free names for new nodes, inputs, outputs and edges. */
+/** Free names for new nodes, inputs, outputs and edges, and the clash of a new name. */
 import type { Flow } from "../document";
+import { reservedNames } from "../nodes";
 
 /**
  * The names a template can read in this flow: node ids, inputs and
@@ -7,12 +8,59 @@ import type { Flow } from "../document";
  */
 export function takenNames(flow: Flow): Set<string> {
 	return new Set([
-		"run",
-		"vars",
+		...reservedNames,
 		...flow.nodes.map((node) => node.id),
 		...flow.inputs.map((input) => input.name),
 		...(flow.variables ?? []).map((variable) => variable.name),
 	]);
+}
+
+/** What a name clashes with in the one namespace of a flow. */
+export type NameClash = "reserved" | "node" | "input" | "variable";
+
+/** The thing that takes the name: it may keep its own name. */
+export type NameOwner =
+	| { node: string }
+	| { input: number }
+	| { variable: number };
+
+/**
+ * What `name` clashes with when `owner` takes it: a reserved name (`run`,
+ * `vars`), another node, input or variable. Null when the name is free.
+ * Validation refuses a flow with a clash, so an edit checks here first.
+ */
+export function nameClash(
+	flow: Flow,
+	name: string,
+	owner: NameOwner,
+): NameClash | null {
+	const reserved: readonly string[] = reservedNames;
+	if (reserved.includes(name)) return "reserved";
+	if (
+		flow.nodes.some(
+			(node) => node.id === name && !("node" in owner && owner.node === name),
+		)
+	) {
+		return "node";
+	}
+	if (
+		flow.inputs.some(
+			(input, index) =>
+				input.name === name && !("input" in owner && owner.input === index),
+		)
+	) {
+		return "input";
+	}
+	if (
+		(flow.variables ?? []).some(
+			(variable, index) =>
+				variable.name === name &&
+				!("variable" in owner && owner.variable === index),
+		)
+	) {
+		return "variable";
+	}
+	return null;
 }
 
 /** `base`, else `base_2`, `base_3`, … whichever no node or input uses yet. */

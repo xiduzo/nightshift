@@ -2,6 +2,8 @@
 import {
 	type Flow,
 	type FlowInputDef,
+	type NameClash,
+	nameClash,
 	renameInput,
 	setInputs,
 	uniqueName,
@@ -19,6 +21,14 @@ import { Textarea } from "@nightshift/ui/components/textarea";
 import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { type Change, move, NameInput, RowButtons } from "./io-rows";
+
+/** Why an input cannot take a name, by what the name clashes with. */
+const INPUT_NAME_TAKEN: Record<NameClash, (name: string) => string> = {
+	reserved: (name) => `The name ${name} is taken. Pick another name.`,
+	node: (name) => `A node is already named ${name}. Pick another name.`,
+	input: (name) => `Another input is named ${name}.`,
+	variable: (name) => `A variable is already named ${name}. Pick another name.`,
+};
 
 /** Whether a JSON input's default is JSON text. Empty counts as no default. */
 function jsonError(text: string | undefined): string | null {
@@ -77,18 +87,8 @@ export function InputsEditor({
 							count={inputs.length}
 							autoFocus={focusIndex === index}
 							onRename={(name) => {
-								if (name === "run" || name === "vars")
-									return `The name ${name} is taken. Pick another name.`;
-								if ((flow.variables ?? []).some((v) => v.name === name))
-									return `A variable is already named ${name}. Pick another name.`;
-								if (
-									inputs.some(
-										(other, at) => at !== index && other.name === name,
-									)
-								)
-									return `Another input is named ${name}.`;
-								if (flow.nodes.some((node) => node.id === name))
-									return `A node is already named ${name}. Pick another name.`;
+								const clash = nameClash(flow, name, { input: index });
+								if (clash !== null) return INPUT_NAME_TAKEN[clash](name);
 								onChange((current) => renameInput(current, index, name));
 								return null;
 							}}

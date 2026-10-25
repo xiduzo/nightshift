@@ -2,6 +2,8 @@
 import {
 	type Flow,
 	type FlowVariableDef,
+	type NameClash,
+	nameClash,
 	renameVariable,
 	setVariables,
 	uniqueName,
@@ -25,6 +27,14 @@ import { useId, useState } from "react";
 import { OutputSchemaField } from "../output-schema-field";
 import { TemplateField } from "../template-field";
 import { type Change, move, NameInput, RowButtons } from "./io-rows";
+
+/** Why a variable cannot take a name, by what the name clashes with. */
+const VARIABLE_NAME_TAKEN: Record<NameClash, (name: string) => string> = {
+	reserved: (name) => `The name ${name} is taken. Pick another name.`,
+	node: (name) => `A node is already named ${name}. Pick another name.`,
+	input: (name) => `An input is already named ${name}. Pick another name.`,
+	variable: (name) => `Another variable is named ${name}.`,
+};
 
 /** What each type of a variable holds, for its select. */
 const VARIABLE_TYPES: Record<VariableType, string> = {
@@ -80,18 +90,8 @@ export function VariablesEditor({
 							count={variables.length}
 							autoFocus={focusIndex === index}
 							onRename={(name) => {
-								if (name === "run" || name === "vars")
-									return `The name ${name} is taken. Pick another name.`;
-								if (
-									variables.some(
-										(other, at) => at !== index && other.name === name,
-									)
-								)
-									return `Another variable is named ${name}.`;
-								if (flow.inputs.some((input) => input.name === name))
-									return `An input is already named ${name}. Pick another name.`;
-								if (flow.nodes.some((node) => node.id === name))
-									return `A node is already named ${name}. Pick another name.`;
+								const clash = nameClash(flow, name, { variable: index });
+								if (clash !== null) return VARIABLE_NAME_TAKEN[clash](name);
 								onChange((current) => renameVariable(current, index, name));
 								return null;
 							}}

@@ -31,6 +31,9 @@ export {
 	updateNode,
 } from "./graph";
 export {
+	type NameClash,
+	type NameOwner,
+	nameClash,
 	uniqueName,
 	uniqueOutputName,
 } from "./names";

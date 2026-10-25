@@ -2,7 +2,9 @@ import {
 	type CallEach,
 	type Flow,
 	type FlowNode,
+	type NameClash,
 	type NodeOption,
+	nameClash,
 	removeOutcome,
 	renameNode,
 	renameOutcome,
@@ -18,6 +20,16 @@ import { outcomeLabel } from "../canvas/outcome-badge";
 import { optionNoun } from "../flow-draft";
 import type { Selection } from "./editor-canvas";
 
+/** Why a node cannot take a name, by what the name clashes with. */
+const NODE_NAME_TAKEN: Record<NameClash, (name: string) => string> = {
+	reserved: (name) => `The name ${name} is taken. Pick another name.`,
+	node: (name) => `${name} is taken by another node.`,
+	input: (name) =>
+		`An input of this flow is already named ${name}. Pick another name.`,
+	variable: (name) =>
+		`A variable of this flow is already named ${name}. Pick another name.`,
+};
+
 /**
  * The edits of the selected node that reach past the node: a rename, and
  * outcome edits that drop edges. A drop says so in a toast with an undo.
@@ -28,13 +40,8 @@ export function nodeEdits(
 	setSelection: Dispatch<SetStateAction<Selection>>,
 ) {
 	const renameSelected = (node: FlowNode) => (next: string) => {
-		if (draft.nodes.some((other) => other.id === next)) {
-			return `${next} is taken by another node.`;
-		}
-		if (draft.inputs.some((input) => input.name === next)) {
-			return `An input of this flow is already named ${next}. Pick another name.`;
-		}
-		if (next === "run") return "The name run is taken. Pick another name.";
+		const clash = nameClash(draft, next, { node: node.id });
+		if (clash !== null) return NODE_NAME_TAKEN[clash](next);
 		setDraft((current) => renameNode(current, node.id, next));
 		setSelection({ kind: "node", id: next });
 		return null;
