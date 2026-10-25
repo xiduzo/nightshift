@@ -20,6 +20,7 @@ import {
 	createSandbox,
 	type Sandbox,
 	scriptedHarness,
+	sleepClock,
 	type TestEngineOptions,
 	waitFor,
 	withDevice,
@@ -427,6 +428,7 @@ describe("settings", () => {
 
 		test("a flow without its own policy uses the settings' network grace", async () => {
 			const harness = networkDown();
+			const clock = sleepClock();
 			const engine = makeEngine(
 				harness,
 				{
@@ -438,13 +440,13 @@ describe("settings", () => {
 						},
 					}).read,
 				},
-				{ minuteMs: 100 },
+				{ minuteMs: 100, now: clock.now },
 			);
 			const run = await engine.startRun({
 				projectId: await projectId(engine),
 				flow: flowOf([agent("worker")]),
 			});
-			const detail = await waitForEnd(engine, run.id);
+			const detail = await clock.follow(engine, run.id);
 			expect(detail.status).toBe("failed");
 			// One wait of 1 min fits the grace of 1 min; the next of 2 does not.
 			expect(harness.calls).toHaveLength(2);
@@ -453,6 +455,7 @@ describe("settings", () => {
 
 		test("a number the flow sets itself wins over the settings", async () => {
 			const harness = networkDown();
+			const clock = sleepClock();
 			const engine = makeEngine(
 				harness,
 				{
@@ -464,15 +467,16 @@ describe("settings", () => {
 						},
 					}).read,
 				},
-				{ minuteMs: 100 },
+				{ minuteMs: 100, now: clock.now },
 			);
 			const run = await engine.startRun({
 				projectId: await projectId(engine),
 				// Only the grace: the other numbers still come from the settings.
 				flow: flowOf([agent("worker")], [], { networkGraceMinutes: 4 }),
 			});
-			const detail = await waitForEnd(engine, run.id);
+			const detail = await clock.follow(engine, run.id);
 			expect(detail.status).toBe("failed");
+			// Waits of 1 and 2 min fit the grace of 4 min; the next of 5 does not.
 			expect(harness.calls).toHaveLength(3);
 			expect(detail.steps[0]?.error).toContain("grace of 4 min");
 		});

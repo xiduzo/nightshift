@@ -32,6 +32,7 @@ import {
 	mustGit,
 	type Sandbox,
 	scriptedHarness,
+	sleepClock,
 	type TestEngineOptions,
 	waitFor,
 	withDevice,
@@ -1014,7 +1015,8 @@ describe("run policy", () => {
 				message: "connection refused",
 			},
 		});
-		const engine = makeEngine(harness, {}, { minuteMs: 100 });
+		const clock = sleepClock();
+		const engine = makeEngine(harness, {}, { minuteMs: 100, now: clock.now });
 		const started = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf([agent("worker", "Go")], [], {
@@ -1025,13 +1027,8 @@ describe("run policy", () => {
 				},
 			}),
 		});
-		const detail = await waitFor(
-			async () => {
-				const d = await engine.getRun(started.id);
-				return d.status === "failed" ? d : null;
-			},
-			{ label: "the run to fail" },
-		);
+		const detail = await clock.follow(engine, started.id);
+		expect(detail.status).toBe("failed");
 		expect(harness.calls).toHaveLength(3);
 		expect(harness.calls[2]?.resumeSessionId).toBe("fake-session-1");
 		const waits = (await loggedEvents(started.id)).filter(
@@ -1136,8 +1133,9 @@ describe("run policy", () => {
 	});
 
 	test("an Agent step with no activity for idleMinutes errors", async () => {
+		// Silent until the idle limit stops it, however late its timer fires.
 		const harness = fakeHarness({
-			steps: [{ type: "wait", ms: 500 }],
+			steps: [{ type: "wait", ms: 60_000 }],
 		});
 		const engine = makeEngine(harness, {}, { minuteMs: 20 });
 		const started = await engine.startRun({

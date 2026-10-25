@@ -12,6 +12,7 @@ import { migrateDb } from "@nightshift/db/migrate";
 import { device, event, organization } from "@nightshift/db/schema";
 import { asc, eq, sql } from "drizzle-orm";
 import type { DeviceDirectory } from "../contract/directory";
+import type { SpaceEngine } from "../contract/engine";
 import type { EngineOptions } from "../contract/options";
 import type { PeersFactory } from "../contract/peers";
 import { type LocalDeviceDeps, localDevice } from "../device/local";
@@ -24,6 +25,7 @@ import { parseEventRow } from "../log/events";
 import type { RunLog } from "../log/run-log";
 import { systemGit } from "../projects/git";
 import { clonePathOf } from "../projects/projects";
+import type { RunDetail } from "../read/views";
 import { aloneDirectory, ownDevice } from "./alone-directory";
 import { alonePeers } from "./alone-peers";
 
@@ -319,6 +321,35 @@ export async function waitFor<T>(
 		await Bun.sleep(5);
 	}
 	throw new Error(`Timed out waiting for ${label}`);
+}
+
+/**
+ * The clock of a run policy test (`EngineInternals.now`). It stands still
+ * while a run works, and `follow` moves it to the run's wake time once the
+ * run sleeps. A wait so lasts exactly its minutes on the engine's clock,
+ * however late a busy machine fires the timer, and the work between two
+ * waits takes no time on it.
+ */
+export function sleepClock(start = Date.now()) {
+	let at = start;
+	return {
+		now: () => at,
+		/** Moves the clock to each wake time of the run, until it no longer runs or sleeps. */
+		follow(engine: Pick<SpaceEngine, "getRun">, runId: string) {
+			return waitFor(
+				async (): Promise<RunDetail | null> => {
+					const detail = await engine.getRun(runId);
+					if (detail.status === "sleeping" && (detail.wakeAt ?? at) > at) {
+						at = detail.wakeAt ?? at;
+					}
+					const going =
+						detail.status === "running" || detail.status === "sleeping";
+					return going ? null : detail;
+				},
+				{ label: "the run to end", timeoutMs: 10_000 },
+			);
+		},
+	};
 }
 
 /**

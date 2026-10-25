@@ -36,6 +36,7 @@ import {
 	mustGit,
 	type Sandbox,
 	scriptedHarness,
+	sleepClock,
 	type TestEngineOptions,
 	waitFor,
 	withDevice,
@@ -3109,7 +3110,12 @@ describe("wait nodes", () => {
 	});
 
 	test("a duration sleeps the run on the engine's timer, and the wake continues the flow", async () => {
-		const engine = makeEngine(fakeHarness(), {}, { minuteMs: 50 });
+		const clock = sleepClock();
+		const engine = makeEngine(
+			fakeHarness(),
+			{},
+			{ minuteMs: 50, now: clock.now },
+		);
 		const run = await engine.startRun({
 			projectId: await projectId(engine),
 			flow: flowOf(
@@ -3122,10 +3128,11 @@ describe("wait nodes", () => {
 		});
 		await waitForStatus(engine, run.id, "sleeping");
 		const sleeping = await engine.getRun(run.id);
-		expect(sleeping.wakeAt).toBeGreaterThan(sleeping.createdAt);
+		// Two minutes from now on the engine's clock: it stands still meanwhile.
+		expect(sleeping.wakeAt).toBe(clock.now() + 2 * 50);
 		expect(sleeping.signal).toBeNull();
-		await waitForStatus(engine, run.id, "finished");
-		const detail = await engine.getRun(run.id);
+		const detail = await clock.follow(engine, run.id);
+		expect(detail.status).toBe("finished");
 		expect(detail.steps.map((s) => [s.nodeId, s.outcome])).toEqual([
 			["pause", "done"],
 			["after", "pass"],
@@ -3191,10 +3198,12 @@ describe("wait nodes", () => {
 
 	test("a new daemon gets the wake timer of a sleeping Wait node back, and a signal wait stays open", async () => {
 		const dying = new AbortController();
+		// The clock stands still: this daemon never reaches the wake time.
+		const clock = sleepClock();
 		const first = makeEngine(
 			fakeHarness(),
 			{},
-			{ minuteMs: 50, signal: dying.signal },
+			{ minuteMs: 50, now: clock.now, signal: dying.signal },
 		);
 		const id = await projectId(first);
 		const timed = await first.startRun({
@@ -3221,7 +3230,7 @@ describe("wait nodes", () => {
 		const second = makeEngine(
 			fakeHarness(),
 			{},
-			{ minuteMs: 50, now: () => Date.now() + 61 * 50 },
+			{ minuteMs: 50, now: () => clock.now() + 61 * 50 },
 		);
 		expect(await statusOf(second, signalled.id)).toBe("sleeping");
 		await waitForStatus(second, timed.id, "finished");
