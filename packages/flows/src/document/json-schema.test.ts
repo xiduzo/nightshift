@@ -5,15 +5,25 @@ import { z } from "zod";
 import * as flows from "../index";
 
 /**
- * The published schemas, as JSON Schema. A move of a schema between files
- * must not change what it accepts, its defaults or its error messages: the
- * snapshots pin them for every schema on the package root.
+ * The schemas of the package, as JSON Schema. A move of a schema between
+ * files must not change what it accepts, its defaults or its error
+ * messages: the snapshots pin every schema a source file of the package
+ * exports, on the package root or not.
  */
-const schemas = Object.entries(flows as Record<string, unknown>)
-	.filter(
-		(entry): entry is [string, z.ZodType] => entry[1] instanceof z.ZodType,
-	)
-	.sort(([a], [b]) => a.localeCompare(b));
+const src = join(import.meta.dir, "..");
+const declared = new Map<string, z.ZodType>();
+for (const file of new Bun.Glob("**/*.ts").scanSync(src)) {
+	if (/(\.test\.ts$|(^|\/)(testing|fixtures)\/)/.test(file)) continue;
+	const module = (await import(join(src, file))) as Record<string, unknown>;
+	for (const [name, value] of Object.entries(module)) {
+		if (!(value instanceof z.ZodType)) continue;
+		const known = declared.get(name);
+		if (known && known !== value)
+			throw new Error(`Two schemas are named ${name}: rename one.`);
+		declared.set(name, value);
+	}
+}
+const schemas = [...declared].sort(([a], [b]) => a.localeCompare(b));
 
 function jsonSchemas(schema: z.ZodType) {
 	return {
@@ -25,6 +35,7 @@ function jsonSchemas(schema: z.ZodType) {
 describe("published schemas", () => {
 	test("the flow document is one of them", () => {
 		expect(schemas.map(([name]) => name)).toContain("flowSchema");
+		expect(flows.flowSchema).toBe(declared.get("flowSchema") as never);
 	});
 
 	// The files a person writes, in full.
@@ -36,7 +47,7 @@ describe("published schemas", () => {
 	]) {
 		test(`${name} as JSON Schema`, () => {
 			const schema = schemas.find(([key]) => key === name)?.[1];
-			if (schema === undefined) throw new Error(`${name} is not published`);
+			if (schema === undefined) throw new Error(`${name} is not declared`);
 			expect(jsonSchemas(schema)).toMatchSnapshot();
 		});
 	}

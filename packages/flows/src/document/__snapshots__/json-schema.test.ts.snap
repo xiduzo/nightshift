@@ -3344,6 +3344,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "mcpServerSchema": "a26196da9adb9b7777c1554b9c04c2be3e49961c1dc5b9a2b94ed1d9b1253727",
   "nameSchema": "82cd45042469c87788418eea427bbaeb9f7aef07c90da2027149303eeab2f03c",
   "nodeIdSchema": "82cd45042469c87788418eea427bbaeb9f7aef07c90da2027149303eeab2f03c",
+  "option": "6bf55e601c5096c5094c68aa7ec3842acb0de882ce5552afb5e23334595396d9",
   "outcomeColorSchema": "a08d55161170d015984cde21947f73357d874c2c1469cf21d5df857936510817",
   "outcomeSchema": "71f189789579b92afec5143845c2121d3d596711dad7343aa3a39aeb378953bc",
   "permissionModeSchema": "759773decf0c9f4a4772f09d6bb1732999436b3b8f7b763134ae9a4b7478b3bd",
