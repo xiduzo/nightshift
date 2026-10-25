@@ -201,10 +201,15 @@ export function createSpaces(deps: SpacesDeps) {
 				await deps.runCopies.deleteRunBranches(spaceId, runId, options);
 			},
 
-			async listDevices(projectId) {
+			async listDevices(projectId, forNode) {
 				await ready;
 				if (!actor) throw new Error("Sign in to see your devices.");
-				return deps.placement.devicesFor(spaceId, actor.personId, projectId);
+				return deps.placement.devicesFor(
+					spaceId,
+					actor.personId,
+					projectId,
+					forNode,
+				);
 			},
 
 			async listPlacements(projectId) {

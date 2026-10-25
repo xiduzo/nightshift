@@ -1,6 +1,7 @@
 import type { Database } from "@nightshift/db";
 import type {
 	AgentProfileSettings,
+	Flow,
 	FlowNode,
 	permissionModeSchema,
 	Schedule,
@@ -10,15 +11,17 @@ import type { z } from "zod";
 import type { Device } from "../device";
 import type {
 	CopyStamp,
+	PlannedDevice,
 	RunBus,
 	RunHistory,
 	RunLog,
+	RunPlan,
 	RunRow,
 	TranscriptEntry,
 } from "../log";
 import type { ListedProject, SpaceDocuments } from "../projects";
 import type { PendingCommand, RunWalker } from "../read";
-import type { Actor } from "./engine";
+import type { Actor, StartRunInput } from "./engine";
 import type { Relay } from "./relay";
 
 /**
@@ -31,14 +34,12 @@ import type { Relay } from "./relay";
  * with the engine's own parts (`PeerContext`).
  */
 export type Peers = {
-	/** Which Device a step runs on, and which Devices a run may use. */
+	/** A run's plan, made once at its start, and the Devices a Person may use. */
 	placement: PlacementPort;
-	/** The Offer rules of run start and of a schedule on another Person's Device. */
+	/** The Offer rule of a schedule on another Person's Device. */
 	offers: OffersPort;
 	/** The Host that keeps the Space, or null when this Replica keeps it. */
 	hostOf(spaceId: string): Promise<string | null>;
-	/** The Person who owns this computer, as the Host that keeps the Space knows them. Null in a Space of this Replica's own. */
-	personOnHost(spaceId: string): Promise<string | null>;
 	/** The runs walked elsewhere, and the runs that move between Walkers. */
 	runs: RunsPort;
 	/**
@@ -102,37 +103,45 @@ export type PeerContext = {
 export type PeersFactory = (context: PeerContext) => Peers;
 
 export type PlacementPort = {
-	/** The Device a step of `node` runs on: the node's `device`, else the run's, else the Walker. */
+	/**
+	 * Plans a run at its start, once (`RunPlan`): the Person it runs for,
+	 * as the Host of its Space knows them; its Device (`deviceId`, else
+	 * this computer); and the Device of each node: its `device`, else its
+	 * profile's Device, else the run's. Every Device is checked: one of the
+	 * Person's own, or another Person's through its Offers into the Space
+	 * (the nodes placed there stay within them), online, with a Clone for
+	 * the run's worktree. Returns the flows it runs, from that Device's
+	 * Clone, each profile resolved where its node runs. Throws the refusal.
+	 * Run start keeps the plan on the run's row (`planColumns`); the walk
+	 * only reads it (`deviceFor`).
+	 */
+	plan(input: PlanInput): Promise<PlannedRun>;
+	/** The Device a step of `node` runs on, as the run's plan says (`planOf`). */
 	deviceFor(node: FlowNode, row: RunRow): Device;
-	/** A Device by id, for a step of the run: this computer, or another one. */
+	/** A Device by id, for a step of the run: this computer, or another Device of its plan. */
 	deviceById(id: string, row: RunRow): Device;
 	/**
-	 * Places a run: its Device (`deviceId`, else this computer), the
-	 * Devices its nodes name, and this computer. Throws the refusal when
-	 * the run cannot run there.
+	 * The Device a run's walk moves to (`to`): one of the Person's own
+	 * Devices, not this computer, online. Null when it is not one of
+	 * theirs; throws the refusal when it is offline. A move keeps the plan:
+	 * each node's Device and the run's Person stay, only the Walker changes.
 	 */
-	place(input: {
-		deviceId: string | undefined;
-		project: ListedProject;
-		runId: string;
-		/** The Person who starts it, as the Space's Host knows them. */
-		personId: string | null;
-	}): Promise<{
-		run: PlacedDevice;
-		walker: PlacedDevice;
-		deviceNamed(name: string): Promise<PlacedDevice>;
-	}>;
-	/** A Person's Devices for a project of a Space: this computer first. */
-	ownDevices(
-		spaceId: string,
-		personId: string,
-		projectId: string,
-	): Promise<OwnDevice[]>;
-	/** The Devices a Person may place a run's steps on: their own, then others' through Offers. */
+	moveTo(
+		row: RunRow,
+		actor: Actor,
+		to: string,
+	): Promise<{ id: string; name: string } | null>;
+	/**
+	 * The Devices a Person may place a run's steps on: their own, then
+	 * others' through Offers. With `forNode`, the Devices that node may
+	 * name: another Person's only when the Person may run the node's
+	 * profile there through its Offers.
+	 */
 	devicesFor(
 		spaceId: string,
 		personId: string,
 		projectId: string,
+		forNode?: NodeToPlace,
 	): Promise<OwnDevice[]>;
 	/** The Devices a run of the project can run on: online, with a Clone. */
 	placements(
@@ -146,16 +155,40 @@ export type PlacementPort = {
 		projectId: string,
 		actor: string | undefined,
 	): Promise<FlowSources>;
-	/** Remembers the names of the Devices runs are placed on, once the engine starts. */
-	loadNames(): Promise<void>;
+};
+
+/** What a run's plan starts from (`PlacementPort.plan`). */
+export type PlanInput = {
+	start: StartRunInput;
+	/** The run's project, in the Space the run takes. */
+	project: ListedProject;
+	runId: string;
+	/**
+	 * A schedule starts it: a `startedBy` it names is the schedule's
+	 * Person as the Host of the Space knows them already.
+	 */
+	scheduled: boolean;
+};
+
+export type { PlannedDevice };
+
+/** A run's plan, with what run start goes on with. */
+export type PlannedRun = {
+	plan: RunPlan;
+	/** The run's Device, where its worktree goes. */
+	run: PlacedDevice;
+	flow: Flow;
+	flowName: string | null;
+	calledFlows: Record<string, Flow>;
+	/**
+	 * Each Device with the nodes placed on it, every node once: run start
+	 * asks each Device whether it has what its nodes need. The plan checked
+	 * the nodes on an offered Device against its Offers already.
+	 */
+	groups: { at: PlacedDevice; nodes: FlowNode[] }[];
 };
 
 export type OffersPort = {
-	/**
-	 * The Walker's check at run start, for a run placed on a Device another
-	 * Person owns. Null when the flow passes.
-	 */
-	refusal(nodes: readonly FlowNode[], placed: OfferedPlacement): string | null;
 	/**
 	 * The schedules of a project as a Person saves them: a schedule that
 	 * fires on another Person's Device gets the saver as its `person`, and
@@ -250,7 +283,7 @@ export type WithPaths = {
 	takeOverCommand?: string | null;
 };
 
-/** A Device a run's nodes run on, as run start placed it. */
+/** A Device a run's nodes run on, as its plan placed it. */
 export type PlacedDevice = {
 	device: Device;
 	id: string;
@@ -263,7 +296,7 @@ export type PlacedDevice = {
 	 * Another Person's Device (this computer too, for a Member who does not
 	 * own it): the run uses it through its Offers into the Space only. Its
 	 * nodes keep their profile unresolved (the Device resolves it), and the
-	 * Offer's rule (`OffersPort.refusal`) replaces the requirements: its
+	 * Offer's rule, which the plan checks, replaces the requirements: its
 	 * capabilities are its owner's.
 	 */
 	offered?: OfferedPlacement;
@@ -297,6 +330,12 @@ export type Placement = {
 	 */
 	offers?: string[];
 };
+
+/**
+ * A node, as far as the choice of its Device goes: the profile of an
+ * Agent node, or none (a node that runs nothing offered).
+ */
+export type NodeToPlace = { profile?: string };
 
 /** One of a Person's Devices, as placement sees it. */
 export type OwnDevice = Placement & {

@@ -17,6 +17,7 @@ export {
 	deviceOffers,
 	offerRefusal,
 	offersNothing,
+	offerTakes,
 	spaceOffers,
 } from "./offers";
 export { createOffers } from "./own-offers";

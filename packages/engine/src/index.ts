@@ -17,12 +17,15 @@ export type {
 	Engine,
 	EngineOptions,
 	FeedStep,
+	NodeToPlace,
 	OfferedPlacement,
 	OwnDevice,
 	PeerContext,
 	Peers,
 	PlacedDevice,
 	Placement,
+	PlanInput,
+	PlannedRun,
 	Relay,
 	RunCommandInput,
 	RunCommandKind,
@@ -128,6 +131,7 @@ export {
 	followOwnStep,
 	MissingProjectError,
 	parseTranscript,
+	planOf,
 	stampHolds,
 } from "./log";
 export type { ListedProject, Project, SpaceDocument } from "./projects";
@@ -173,5 +177,8 @@ export {
 	GateClosedError,
 	HOST_UNREACHABLE,
 	HostUnreachableError,
+	type PlanDevices,
+	planNodes,
+	UNREACHABLE_DEVICE,
 } from "./run";
 export type { ScheduleList } from "./schedules";

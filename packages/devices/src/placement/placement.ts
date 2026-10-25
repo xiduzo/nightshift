@@ -1,47 +1,58 @@
 import type { Database } from "@nightshift/db";
-import { device as deviceTable } from "@nightshift/db/schema";
 import {
+	type Actor,
 	type Device,
 	HostUnreachableError,
 	type ListedProject,
 	NOT_ON_THIS_COMPUTER,
+	type NodeToPlace,
 	type OfferedPlacement,
 	type OwnDevice,
 	type PlacedDevice,
 	type Placement,
+	type PlanDevices,
+	type PlanInput,
+	type PlannedRun,
+	planNodes,
+	planOf,
 	projectClones,
 	type RunLog,
 	type RunRow,
 	type SpaceDocuments,
+	UNREACHABLE_DEVICE,
 } from "@nightshift/engine";
-import type { FlowNode } from "@nightshift/flows";
+import type { AgentProfileSettings, FlowNode } from "@nightshift/flows";
 import type { FlowSources } from "@nightshift/flows/files";
-import { eq } from "drizzle-orm";
 import type { HostRelay, WorkRelay } from "../contract";
-import { type HostSpaces, personOnHost } from "../links";
+import { type HostSpaces, personInSpace } from "../links";
 import {
 	type DeviceOffer,
 	NO_STARTER,
+	offerRefusal,
 	offersNothing,
+	offerTakes,
 	spaceOffers,
 } from "../offers";
-import type { DeviceRegistry } from "../registry";
+import { type DeviceRegistry, selfOwnerId } from "../registry";
 import { remoteDevice } from "../work";
 
 /**
- * Placement: which Device a step runs on, and which of a Person's Devices
- * a run may use. One module owns both halves:
+ * Placement: where a run's steps run, decided once when it starts. One
+ * module owns both halves:
  *
- * - At run start (`place`): the run's Device (`deviceId`, else this
- *   computer), the Devices its nodes name (`deviceNamed`), and this
- *   computer, each checked: one of the starter's own Devices, or another
- *   Person's through its Offers into the Space (`offered`: run start then
- *   checks the nodes placed there against them), online, with a Clone
- *   where it needs one. On the Replica that keeps the Space the registry answers; on a
- *   Device in a Host's Space the Host does (`HostRelay.devices`).
- * - While the run walks (`deviceFor`): a node's `device`, resolved by name
- *   at start (`run.placements`), else the run's Device, else the Walker.
- *   Another Device is a `remoteDevice` over the work relay.
+ * - At run start (`plan`): the Person the run runs for, as the Host of its
+ *   Space knows them; the run's Device (`deviceId`, else this computer);
+ *   and each node's Device, by the engine's node walk (`planNodes`: its
+ *   `device`, else its profile's Device, else the run's) over this
+ *   module's Devices. Each Device is checked: one of the Person's own, or
+ *   another Person's through its Offers into the Space (the nodes placed
+ *   there stay within them, `offerRefusal`), online, with a Clone where
+ *   it needs one. On the Replica that keeps the Space the registry
+ *   answers; on a Device in a Host's Space the Host does
+ *   (`HostRelay.devices`). Run start keeps the plan on the run's row.
+ * - While the run walks (`deviceFor`): the plan, read from the row
+ *   (`planOf`), and nothing decided again. Another Device is a
+ *   `remoteDevice` over the work relay, named as the plan names it.
  *
  * The placed Device checks every call again itself.
  */
@@ -56,6 +67,8 @@ export type PlacementDeps = {
 	hostSpaces: HostSpaces;
 	/** A project a person has not removed, with its Clone here or null. */
 	project(projectId: string, spaceId: string): Promise<ListedProject>;
+	/** An Agent Profile of this computer by name. Default: none. */
+	profileFor?: (name: string) => AgentProfileSettings | null;
 	/** How calls reach other Devices. Without it, every step runs here. */
 	work?: WorkRelay;
 	/** The Hosts this computer links to. */
@@ -94,65 +107,67 @@ const NO_STARTER_RELAY: WorkRelay = {
 	online: () => true,
 };
 
-/** The Devices a run's nodes name, by name, from its row. */
-export function placementsOf(
-	row: Pick<RunRow, "placements">,
-): Record<string, string> {
-	if (!row.placements) return {};
-	try {
-		const parsed: unknown = JSON.parse(row.placements);
-		return parsed && typeof parsed === "object"
-			? (parsed as Record<string, string>)
-			: {};
-	} catch {
-		return {};
-	}
-}
-
 /** The Device a node names, if its kind runs on one. */
 function nodeDevice(node: FlowNode): string | undefined {
 	return "device" in node ? node.device : undefined;
+}
+
+/**
+ * The Device a name picks among the Devices a Person may use: a name of
+ * one of their own wins over another Person's. Null when none has it.
+ * Throws when two of them have it.
+ */
+export function deviceNamed(
+	devices: readonly OwnDevice[],
+	name: string,
+): OwnDevice | null {
+	const all = devices.filter((d) => d.name === name);
+	// One of their own wins, then this computer, then another Person's.
+	const own = all.filter((d) => d.offers === undefined);
+	const here = all.filter((d) => d.thisDevice);
+	const matches = own.length > 0 ? own : here.length > 0 ? here : all;
+	if (matches.length > 1) {
+		throw new Error(
+			`Two of your devices are named "${name}". Rename one on the Devices page.`,
+		);
+	}
+	return matches[0] ?? null;
 }
 
 export function createPlacement(deps: PlacementDeps) {
 	const { db, device, registry, documents, hostSpaces } = deps;
 	const work = deps.work ?? UNREACHABLE;
 
-	/** Other Devices' names, for the steps placed on them (messages only). */
-	const names = new Map<string, string>();
-
 	/** Whether an id is this computer. */
 	async function isHere(id: string): Promise<boolean> {
 		return id === device.id || id === (await deps.log.walkerId());
 	}
 
-	/** The Device id a node's steps run on: its `device`, else the run's, else the Walker. */
-	function deviceIdFor(node: FlowNode, row: RunRow): string {
-		const name = nodeDevice(node);
-		const named = name !== undefined ? placementsOf(row)[name] : undefined;
-		return named ?? row.deviceId ?? row.walkerId;
-	}
-
-	/** The Device a step of `node` runs on. Per-node placement lives here. */
+	/** The Device a step of `node` runs on, as the run's plan says. */
 	function deviceFor(node: FlowNode, row: RunRow): Device {
-		return deviceById(deviceIdFor(node, row), row, nodeDevice(node));
+		const plan = planOf(row);
+		const name = nodeDevice(node);
+		const at =
+			(name !== undefined ? plan.named[name] : undefined) ?? plan.device;
+		return deviceById(at.id, row, at.name ?? name);
 	}
 
-	/** A Device by id, for a step of the run: this computer, or a remote one. */
+	/** A Device by id, for a step of the run: this computer, or another Device of its plan. */
 	function deviceById(id: string, row: RunRow, named?: string): Device {
 		if (id === device.id || id === row.walkerId) {
 			return deps.localFor?.(row) ?? device;
 		}
+		const plan = planOf(row);
+		const name =
+			[plan.device, ...Object.values(plan.named)].find((d) => d.id === id)
+				?.name ?? named;
 		return remoteDevice(
-			row.startedBy === null ? NO_STARTER_RELAY : work,
-			{
-				id,
-				name: names.get(id) ?? named ?? "The device of this step",
-			},
+			plan.personId === null ? NO_STARTER_RELAY : work,
+			{ id, name: name ?? "The device of this step" },
 			{
 				spaceId: row.spaceId,
 				projectId: row.projectId,
-				personId: row.startedBy ?? "",
+				personId: plan.personId ?? "",
 				runId: row.id,
 			},
 		);
@@ -160,13 +175,7 @@ export function createPlacement(deps: PlacementDeps) {
 
 	/** The Person who owns this computer, as the Space's Host knows them. */
 	async function ownerHere(spaceId: string): Promise<string | null> {
-		const onHost = await personOnHost(db, spaceId);
-		if (onHost) return onHost;
-		const [self] = await db
-			.select({ ownerId: deviceTable.ownerId })
-			.from(deviceTable)
-			.where(eq(deviceTable.self, true));
-		return self?.ownerId ?? null;
+		return personInSpace(db, spaceId, await selfOwnerId(db));
 	}
 
 	/**
@@ -199,7 +208,6 @@ export function createPlacement(deps: PlacementDeps) {
 							throw error;
 						})
 				: [];
-			for (const d of listed) names.set(d.deviceId, d.name);
 			return [
 				here,
 				...listed
@@ -215,7 +223,6 @@ export function createPlacement(deps: PlacementDeps) {
 		const own: OwnDevice[] = [];
 		for (const d of await registry.list(personId)) {
 			if (d.revokedAt !== null || d.id === self) continue;
-			names.set(d.id, d.name);
 			own.push({
 				deviceId: d.id,
 				name: d.name,
@@ -266,7 +273,6 @@ export function createPlacement(deps: PlacementDeps) {
 			) {
 				continue;
 			}
-			names.set(id, paired?.name ?? name);
 			others.push({
 				deviceId: id,
 				name: paired?.name ?? name,
@@ -283,17 +289,20 @@ export function createPlacement(deps: PlacementDeps) {
 	 * The Devices a Person may place a run's steps on: their own (this
 	 * computer first), then other Persons' that offer profiles to the
 	 * Space. This computer carries `offers` when the Person does not own it.
+	 * With `forNode`, the Devices that node may name: another Person's only
+	 * when it takes the node through its Offers (`offerTakes`).
 	 */
 	async function devicesFor(
 		spaceId: string,
 		personId: string,
 		projectId: string,
+		forNode?: NodeToPlace,
 	): Promise<OwnDevice[]> {
 		const own = await ownDevices(spaceId, personId, projectId);
 		const [here, ...rest] = own as [OwnDevice, ...OwnDevice[]];
 		// In a Host's Space, this computer's Person is the one who asks here.
 		const owner = await ownerHere(spaceId);
-		const asking = (await personOnHost(db, spaceId)) ?? personId;
+		const asking = await personInSpace(db, spaceId, personId);
 		const thisOne: OwnDevice =
 			owner === asking
 				? here
@@ -303,11 +312,26 @@ export function createPlacement(deps: PlacementDeps) {
 							(o) => o.profile,
 						),
 					};
-		return [
+		const all = [
 			thisOne,
 			...rest,
 			...(await offeredDevices(spaceId, personId, projectId, own)),
 		];
+		if (!forNode) return all;
+		const mayUse = (await deps.mayUseOffers?.(spaceId, asking)) ?? false;
+		return all.filter(
+			(d) => d.offers === undefined || offerTakes(forNode, d.offers, mayUse),
+		);
+	}
+
+	/** The Device a name picks for a Person, over one list of their Devices (`deviceNamed`). */
+	async function namesFor(
+		spaceId: string,
+		personId: string,
+		projectId: string,
+	): Promise<(name: string) => OwnDevice | null> {
+		const devices = await devicesFor(spaceId, personId, projectId);
+		return (name) => deviceNamed(devices, name);
 	}
 
 	/** The Devices a run of the project can run on: online, with a Clone. */
@@ -327,29 +351,23 @@ export function createPlacement(deps: PlacementDeps) {
 	}
 
 	/**
-	 * Places a run: its Device, the Devices its nodes name, and this
-	 * computer. Each other Device is checked here first: the starter's own,
-	 * online. The run's Device needs a Clone; a named one needs one only for
-	 * nodes that work in the worktree (run start checks that).
+	 * The Devices a run of the project may use, for the Person it runs
+	 * for: this computer (through its Offers, for another Person's run),
+	 * and the others by id or by name, each checked first: the Person's
+	 * own, or another Person's through its Offers, online.
 	 */
-	async function place(input: {
-		deviceId: string | undefined;
-		project: ListedProject;
-		runId: string;
-		personId: string | null;
-	}): Promise<{
-		run: PlacedDevice;
-		walker: PlacedDevice;
-		deviceNamed(name: string): Promise<PlacedDevice>;
-	}> {
-		const { project } = input;
+	async function devicesOf(
+		project: ListedProject,
+		runId: string,
+		starter: string | null,
+	): Promise<Omit<PlanDevices, "profileFor">> {
 		const spaceId = project.spaceId;
-		// A schedule's run uses this computer's owner's Devices.
-		const personId = input.personId ?? (await ownerHere(spaceId));
+		const owner = await ownerHere(spaceId);
+		// A run without a starter uses this computer's owner's Devices.
+		const personId = starter ?? owner;
 		const mayUse = async () =>
 			personId !== null &&
 			((await deps.mayUseOffers?.(spaceId, personId)) ?? false);
-		const owner = await ownerHere(spaceId);
 		const walker: PlacedDevice = {
 			device,
 			id: device.id,
@@ -357,7 +375,7 @@ export function createPlacement(deps: PlacementDeps) {
 			thisDevice: true,
 			hasClone: project.repoPath !== null,
 			// Another Person's run here uses this computer through its Offers.
-			...(input.personId !== null && input.personId !== owner
+			...(starter !== null && starter !== owner
 				? {
 						offered: {
 							deviceName: device.name,
@@ -382,9 +400,7 @@ export function createPlacement(deps: PlacementDeps) {
 			if (hostedHere) {
 				const paired = await registry.get(id);
 				if (!paired || paired.revokedAt !== null || !deps.work) {
-					throw new Error(
-						"That device cannot take runs from this computer. Pair it with this computer, or choose another device.",
-					);
+					throw new Error(UNREACHABLE_DEVICE);
 				}
 				if (personId === null) {
 					throw new Error(
@@ -408,7 +424,6 @@ export function createPlacement(deps: PlacementDeps) {
 					`${name} is offline. Start the run when it is online, or choose another device.`,
 				);
 			}
-			names.set(id, name);
 			return {
 				...(offered ? { offered } : {}),
 				device: remoteDevice(
@@ -418,7 +433,7 @@ export function createPlacement(deps: PlacementDeps) {
 						spaceId,
 						projectId: project.id,
 						personId: personId ?? "",
-						runId: input.runId,
+						runId,
 					},
 				),
 				id,
@@ -439,40 +454,76 @@ export function createPlacement(deps: PlacementDeps) {
 			return { deviceName: name, offers, mayUse: await mayUse() };
 		}
 
-		let run = walker;
-		if (input.deviceId !== undefined && !(await isHere(input.deviceId))) {
-			run = await other(input.deviceId);
-			if (!run.hasClone) {
-				throw new Error(
-					`${run.name} does not have this project. Add its folder there first.`,
-				);
-			}
-		}
-
 		return {
-			run,
 			walker,
-			async deviceNamed(name) {
-				const all = (await list()).filter((d) => d.name === name);
-				// A name of your own Device wins over another Person's.
-				const own = all.filter((d) => !d.offers || d.thisDevice);
-				const matches = own.length > 0 ? own : all;
-				if (matches.length === 0 && name === device.name) return walker;
-				if (matches.length === 1 && matches[0]?.thisDevice) return walker;
-				if (matches.length === 0) {
-					throw new Error(
-						`The flow names the device "${name}", but you have no device of that name, and none of that name offers profiles to this Space. Check the node's device.`,
-					);
-				}
-				if (matches.length > 1) {
-					throw new Error(
-						`Two of your devices are named "${name}". Rename one on the Devices page.`,
-					);
-				}
-				const [match] = matches as [OwnDevice];
+			async byId(id) {
+				return (await isHere(id)) ? walker : other(id);
+			},
+			async byName(name) {
+				const match = deviceNamed(await list(), name);
+				if (!match) return name === device.name ? walker : null;
 				return match.thisDevice ? walker : other(match.deviceId);
 			},
 		};
+	}
+
+	/**
+	 * Plans a run at its start (`PlacementPort.plan`): its Person, its
+	 * Devices and its nodes', each checked, and the flows it runs. The
+	 * nodes on another Person's Device stay within its Offers.
+	 */
+	async function plan(input: PlanInput): Promise<PlannedRun> {
+		const { start, project, runId } = input;
+		// Every run has a starter: the Person who starts it, else this
+		// computer's owner (a schedule that names no Person fires here for
+		// them), as the Host of the Space knows them. A schedule names its
+		// Person that way already.
+		const personId =
+			input.scheduled && start.startedBy
+				? start.startedBy
+				: await personInSpace(
+						db,
+						project.spaceId,
+						start.startedBy ?? (await selfOwnerId(db)),
+					);
+		const planned = await planNodes(
+			start,
+			{
+				...(await devicesOf(project, runId, personId)),
+				profileFor: deps.profileFor ?? (() => null),
+			},
+			personId,
+		);
+		for (const { at, nodes } of planned.groups) {
+			if (!at.offered) continue;
+			const refusal = offerRefusal(nodes, at.offered);
+			if (refusal !== null) throw new Error(refusal);
+		}
+		return planned;
+	}
+
+	/**
+	 * The Device a run's walk moves to: one of the Person's own Devices
+	 * (as the Host of the run's Space knows them), not this computer, and
+	 * online. Null when it is not one of theirs. A move keeps the plan:
+	 * each node's Device and the Person stay, only the Walker changes.
+	 */
+	async function moveTo(
+		row: RunRow,
+		actor: Actor,
+		to: string,
+	): Promise<{ id: string; name: string } | null> {
+		const personId = await personInSpace(db, row.spaceId, actor.personId);
+		const target = (
+			await ownDevices(row.spaceId, personId, row.projectId)
+		).find((d) => d.deviceId === to);
+		if (!target || target.thisDevice) return null;
+		if (!target.online) {
+			throw new Error(
+				`${target.name} is offline. Move the run when it is online.`,
+			);
+		}
+		return { id: target.deviceId, name: target.name };
 	}
 
 	/**
@@ -486,7 +537,7 @@ export function createPlacement(deps: PlacementDeps) {
 	): Promise<FlowSources> {
 		// In a Host's Space, the Person as the Host knows them.
 		const personId = actor
-			? ((await personOnHost(db, spaceId)) ?? actor)
+			? await personInSpace(db, spaceId, actor)
 			: undefined;
 		const at = personId
 			? (await placements(spaceId, personId, projectId)).find(
@@ -503,26 +554,14 @@ export function createPlacement(deps: PlacementDeps) {
 		).flows(projectId);
 	}
 
-	/** Remembers the names of the Devices runs are placed on. */
-	async function loadNames(): Promise<void> {
-		for (const row of await db
-			.select({ id: deviceTable.id, name: deviceTable.name })
-			.from(deviceTable)) {
-			names.set(row.id, row.name);
-		}
-	}
-
 	return {
+		plan,
 		deviceFor,
 		deviceById: (id: string, row: RunRow) => deviceById(id, row),
-		deviceIdFor,
-		ownDevices,
+		moveTo,
 		devicesFor,
+		namesFor,
 		placements,
-		place,
 		flowsElsewhere,
-		loadNames,
-		/** A Device's name as this Replica knows it. */
-		nameOf: (id: string) => names.get(id) ?? null,
 	};
 }

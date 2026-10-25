@@ -11,6 +11,7 @@ export type {
 export type { EngineOptions } from "./options";
 export type {
 	FeedStep,
+	NodeToPlace,
 	OfferedPlacement,
 	OffersPort,
 	OwnDevice,
@@ -19,6 +20,9 @@ export type {
 	PlacedDevice,
 	Placement,
 	PlacementPort,
+	PlanInput,
+	PlannedDevice,
+	PlannedRun,
 	RunsPort,
 	WalkFile,
 	WalkFiles,

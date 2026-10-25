@@ -8,9 +8,11 @@ import {
 	device as deviceTable,
 	event,
 	organization,
+	run as runTable,
 } from "@nightshift/db/schema";
 import {
 	createSpaceDocuments,
+	planOf,
 	type RunStatus,
 	recordClone,
 	type SpaceDocuments,
@@ -35,7 +37,7 @@ import { NO_STARTER } from "../offers";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
 import { serveWork } from "../work/remote";
-import { createPlacement } from "./placement";
+import { createPlacement, deviceNamed } from "./placement";
 
 /**
  * Run-level Placement in one process: A walks a run whose steps run on
@@ -579,6 +581,249 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 		expect(
 			run.flow.nodes.map((n) => ("device" in n ? n.device : null)),
 		).toEqual([null, "test"]);
+	});
+});
+
+describe("a run's plan", () => {
+	/** A has its Clone back, and A and B share one remote. */
+	async function shareRemote(): Promise<void> {
+		await a.db.insert(clone).values({
+			id: "clone-a",
+			spaceId: a.spaceId,
+			projectId,
+			deviceId: a.deviceId,
+			path: a.repoPath,
+		});
+		const remote = join(a.root, "remote.git");
+		await mustGit(a.root, ["init", "-q", "--bare", remote]);
+		await mustGit(a.repoPath, ["remote", "add", "origin", remote]);
+		await mustGit(b.repoPath, ["remote", "add", "origin", remote]);
+	}
+
+	const gate = {
+		id: "gate",
+		type: "decision",
+		position: { x: 0, y: 0 },
+		prompt: "Go on?",
+		options: [{ name: "yes" }],
+		by: "person",
+		decider: "typesafe",
+	} as Flow["nodes"][number];
+
+	/** gate → a command on studio-b. */
+	const gateThenB = flow(
+		[
+			gate,
+			{ ...command("there", "echo from B"), device: "studio-b" },
+		] as Flow["nodes"],
+		[{ id: "e1", from: "gate", outcome: "yes", to: "there" }],
+	);
+
+	const rowOf = async (runId: string) => {
+		const [row] = await a.db
+			.select()
+			.from(runTable)
+			.where(eq(runTable.id, runId));
+		if (!row) throw new Error("No run row.");
+		return row;
+	};
+
+	const openGate = async (runId: string) => {
+		const waiting = await until(runId, "waiting");
+		const step = waiting.steps.find((s) => s.nodeId === "gate");
+		if (!step) throw new Error("No Gate step.");
+		return step.id;
+	};
+
+	test("is made once at start and kept on the run: each Device with its name, and the Person", async () => {
+		await shareRemote();
+		const started = await space().startRun({
+			projectId,
+			flow: gateThenB,
+			startedBy: personId,
+		});
+		const row = await rowOf(started.id);
+		expect(planOf(row)).toEqual({
+			device: { id: started.device.id, name: "test" },
+			named: { "studio-b": { id: B, name: "studio-b" } },
+			personId,
+		});
+		// A Replica of a version before the plan reads the same Devices.
+		expect(JSON.parse(row.placements ?? "{}")).toEqual({ "studio-b": B });
+		await space().stopRun(started.id);
+	});
+
+	test("the walk reads it: after a restart, with no list of Devices here, a step runs on the run's Device by its planned name", async () => {
+		const started = await space().startRun({
+			projectId,
+			flow: flow(
+				[gate, command("there", "echo from B")],
+				[{ id: "e1", from: "gate", outcome: "yes", to: "there" }],
+			),
+			startedBy: personId,
+			deviceId: B,
+		});
+		const stepId = await openGate(started.id);
+		// This computer forgets the Device (as a Device in a Host's Space
+		// never lists it), and starts again.
+		await a.db.delete(deviceTable).where(eq(deviceTable.id, B));
+		lifetime.abort();
+		await engine.dispose();
+		engine = peerEngine();
+		online.delete(B);
+		await space().resolveGate({ runId: started.id, stepId, choice: "yes" });
+		await until(started.id, "sleeping");
+		const waited = (await a.db.select().from(event)).find(
+			(e) => e.type === "WaitStarted",
+		);
+		expect(JSON.parse(waited?.payload ?? "{}")).toMatchObject({
+			reason: "device-offline",
+			deviceId: B,
+			message: "studio-b is offline. The step starts when it is back.",
+		});
+		online.add(B);
+		await engine.deviceBack(B);
+		const run = await until(started.id, "finished");
+		expect(String(run.steps[1]?.outputs.log_tail).trim()).toBe("from B");
+	}, 30_000);
+
+	test("a run from before the plan kept names walks: its node runs on the Device it named", async () => {
+		await shareRemote();
+		const started = await space().startRun({
+			projectId,
+			flow: gateThenB,
+			startedBy: personId,
+		});
+		const stepId = await openGate(started.id);
+		await a.db
+			.update(runTable)
+			.set({ deviceNames: null })
+			.where(eq(runTable.id, started.id));
+		await space().resolveGate({ runId: started.id, stepId, choice: "yes" });
+		const run = await until(started.id, "finished");
+		expect(run.steps.map((s) => [s.nodeId, s.outcome, s.device?.id])).toEqual([
+			["gate", "yes", expect.any(String)],
+			["there", "pass", B],
+		]);
+		expect(String(run.steps[1]?.outputs.log_tail).trim()).toBe("from B");
+	});
+
+	test("a move goes to one of the Person's own Devices, online, and keeps the plan", async () => {
+		await shareRemote();
+		const started = await space().startRun({
+			projectId,
+			flow: gateThenB,
+			startedBy: personId,
+		});
+		await openGate(started.id);
+		await expect(space().moveRun(started.id, "device-c")).rejects.toThrow(
+			"That device is not one of yours.",
+		);
+		online.delete(B);
+		await expect(space().moveRun(started.id, B)).rejects.toThrow(
+			"studio-b is offline. Move the run when it is online.",
+		);
+		await space().stopRun(started.id);
+	});
+});
+
+describe("the name of a Device", () => {
+	const own = (name: string, deviceId = name) => ({
+		deviceId,
+		name,
+		thisDevice: false,
+		online: true,
+		hasClone: true,
+	});
+	const offered = (name: string, deviceId = name) => ({
+		...own(name, deviceId),
+		offers: ["coder"],
+	});
+
+	test("picks one of the Person's own over another Person's, and nothing when none has it", () => {
+		expect(
+			deviceNamed(
+				[offered("studio", "theirs"), own("studio", "mine")],
+				"studio",
+			)?.deviceId,
+		).toBe("mine");
+		expect(deviceNamed([offered("studio")], "studio")?.deviceId).toBe("studio");
+		// Of two other people's, this computer.
+		expect(
+			deviceNamed(
+				[
+					offered("studio", "theirs"),
+					{ ...offered("studio", "here"), thisDevice: true },
+				],
+				"studio",
+			)?.deviceId,
+		).toBe("here");
+		expect(deviceNamed([own("studio")], "laptop")).toBeNull();
+		expect(() =>
+			deviceNamed([own("studio", "one"), own("studio", "two")], "studio"),
+		).toThrow('Two of your devices are named "studio".');
+	});
+});
+
+describe("the walk, from the plan alone", () => {
+	/** A's placement module, with no registry and no names it learned. */
+	const placementOfA = () =>
+		createPlacement({
+			db: a.db,
+			device: testDevice({ harnesses: {} }, a.deviceId),
+			log: { walkerId: async () => a.deviceId } as never,
+			registry: {} as never,
+			documents,
+			hostSpaces: createHostSpaces(a.db),
+			project: async () => {
+				throw new Error("No project here.");
+			},
+			work,
+		});
+	const row = (fields: object) =>
+		({
+			id: "a-run",
+			spaceId: a.spaceId,
+			projectId,
+			walkerId: a.deviceId,
+			deviceId: B,
+			placements: JSON.stringify({ "hetzner-1": "device-h" }),
+			deviceNames: JSON.stringify({ [B]: "studio-b", "device-h": "hetzner-1" }),
+			startedBy: personId,
+			...fields,
+		}) as Parameters<ReturnType<typeof createPlacement>["deviceFor"]>[1];
+
+	test("names each Device as the plan does, with no warm-up", () => {
+		const placement = placementOfA();
+		expect(placement.deviceFor(command("x", "true"), row({})).name).toBe(
+			"studio-b",
+		);
+		expect(
+			placement.deviceFor(
+				{
+					...command("y", "true"),
+					device: "hetzner-1",
+				} as Flow["nodes"][number],
+				row({}),
+			).name,
+		).toBe("hetzner-1");
+	});
+
+	test("a run from before the plan kept names: by the node's name, and before Placement on its Walker", () => {
+		const placement = placementOfA();
+		const older = row({ deviceNames: null });
+		const named = placement.deviceFor(
+			{ ...command("y", "true"), device: "hetzner-1" } as Flow["nodes"][number],
+			older,
+		);
+		expect([named.id, named.name]).toEqual(["device-h", "hetzner-1"]);
+		expect(placement.deviceFor(command("x", "true"), older).id).toBe(B);
+		expect(
+			placement.deviceFor(
+				command("x", "true"),
+				row({ deviceId: null, placements: null, deviceNames: null }),
+			).id,
+		).toBe(a.deviceId);
 	});
 });
 

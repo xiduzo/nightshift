@@ -31,21 +31,22 @@ export type BundleRows = {
 	events: (typeof event.$inferSelect)[];
 };
 
-/** The run's columns of a bundle from before its Person and its Device: read with none. */
+/** The run's columns of a bundle from before its Person and its Devices: read with none. */
 function withoutStartedBy() {
 	const {
 		startedBy: _person,
 		deviceId: _device,
 		placements: _placements,
+		deviceNames: _names,
 		...columns
 	} = getColumns(run);
 	return columns;
 }
 
 /**
- * A format 3 to 6 bundle: the live schema's tables. Format 3 has no
- * `started_by`, formats 3 and 4 no `device_id`, and formats 3 to 5 no
- * `placements`: read as null.
+ * A format 3 to 7 bundle: the live schema's tables. Format 3 has no
+ * `started_by`, formats 3 and 4 no `device_id`, formats 3 to 5 no
+ * `placements`, and formats 3 to 6 no `device_names`: read as null.
  */
 export async function readRows(
 	db: Database,
@@ -54,7 +55,7 @@ export async function readRows(
 ): Promise<BundleRows> {
 	const columns = getColumns(run);
 	const [runRow] =
-		formatVersion >= 6
+		formatVersion >= 7
 			? await db.select().from(run).where(eq(run.id, runId))
 			: (
 					await db
@@ -62,14 +63,16 @@ export async function readRows(
 							...withoutStartedBy(),
 							...(formatVersion >= 4 ? { startedBy: columns.startedBy } : {}),
 							...(formatVersion >= 5 ? { deviceId: columns.deviceId } : {}),
+							...(formatVersion >= 6 ? { placements: columns.placements } : {}),
 						})
 						.from(run)
 						.where(eq(run.id, runId))
 				).map((row) => ({
 					startedBy: null,
 					deviceId: null,
-					...row,
 					placements: null,
+					...row,
+					deviceNames: null,
 				}));
 	const projectId = runRow?.projectId ?? "";
 	const [projectRow] = await db
@@ -145,6 +148,7 @@ export async function readFormat2(
 			startedBy: null,
 			deviceId: null,
 			placements: null,
+			deviceNames: null,
 		},
 		steps: steps.map((s) => ({ ...s, ...space })),
 		sessions: sessions.map((s) => ({ ...s, ...space })),
@@ -220,6 +224,7 @@ export async function readFormat1(
 					startedBy: null,
 					deviceId: null,
 					placements: null,
+					deviceNames: null,
 				}
 			: undefined,
 		steps: steps.map((s) => ({ ...s, ...space, deviceId: null })),

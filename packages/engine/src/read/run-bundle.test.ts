@@ -189,7 +189,7 @@ describe("exportRun", () => {
 
 		const opened = await openRunBundle(path);
 		expect(opened.meta).toMatchObject({
-			formatVersion: 6,
+			formatVersion: 7,
 			runId,
 			missingTranscripts: [],
 			redacted: 0,
@@ -298,6 +298,33 @@ describe("exportRun", () => {
 		expect(opened.meta.formatVersion).toBe(3);
 		expect(opened.run.startedBy).toBeNull();
 		expect(opened.run.spaceId).toBe(sandbox.spaceId);
+		opened.close();
+	});
+
+	test("a format 6 bundle still opens: its Devices without their names", async () => {
+		const runId = await finishedRun();
+		const path = join(sandbox.root, "run.nightshift.sqlite");
+		await exportRun({
+			db: sandbox.db,
+			dataDir: sandbox.dataDir,
+			runId,
+			spaceId: sandbox.spaceId,
+			path,
+		});
+		// What a Night Shift before the run plan kept names wrote.
+		const file = createDb({ DATABASE_URL: `file:${path}` });
+		for (const statement of [
+			"ALTER TABLE run DROP COLUMN device_names",
+			"UPDATE bundle SET value = '6' WHERE key = 'format_version'",
+		]) {
+			await file.run(sql.raw(statement));
+		}
+		file.$client.close();
+
+		const opened = await openRunBundle(path);
+		expect(opened.meta.formatVersion).toBe(6);
+		expect(opened.run.deviceNames).toBeNull();
+		expect(opened.run.deviceId).toEqual(expect.any(String));
 		opened.close();
 	});
 

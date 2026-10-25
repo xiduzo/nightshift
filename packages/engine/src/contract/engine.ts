@@ -14,7 +14,7 @@ import type { LandedRunListener } from "../log";
 import type { Branches, Project } from "../projects";
 import type { OpenGate, RunDetail, RunStreamItem, RunSummary } from "../read";
 import type { ScheduleList } from "../schedules";
-import type { OwnDevice, Placement } from "./peers";
+import type { NodeToPlace, OwnDevice, Placement } from "./peers";
 
 /**
  * The engine's public contract: `Engine`, and the view of one Space,
@@ -118,9 +118,12 @@ export interface SpaceEngine {
 	listPlacements(projectId: string): Promise<Placement[]>;
 	/**
 	 * The actor's Devices for a project: this computer first, each with
-	 * whether it is online and has a Clone (a node's Device picker).
+	 * whether it is online and has a Clone, then other Persons' that offer
+	 * profiles to the Space. With `forNode`, the Devices a node may name
+	 * (a node's Device picker): another Person's only when the actor may
+	 * run the node's profile there through its Offers.
 	 */
-	listDevices(projectId: string): Promise<OwnDevice[]>;
+	listDevices(projectId: string, forNode?: NodeToPlace): Promise<OwnDevice[]>;
 
 	/** The local and remote branches of the project's clone, newest first. A run can start from one. */
 	listBranches(projectId: string): Promise<Branches>;

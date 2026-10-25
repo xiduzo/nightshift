@@ -10,6 +10,97 @@ import type { LoggedEvent } from "./events";
 
 export type RunRow = typeof run.$inferSelect;
 
+/**
+ * Where a run's steps run, decided once when it starts
+ * (`PlacementPort.plan`) and kept on its row: the walk reads it
+ * (`planOf`) and decides nothing.
+ */
+export type RunPlan = {
+	/** The run's Device: its worktree, and the steps of every node that names no Device. */
+	device: PlannedDevice;
+	/** The Devices the nodes name (`device`), by that name. */
+	named: Record<string, PlannedDevice>;
+	/**
+	 * The Person the run runs for, as the Host of its Space knows them:
+	 * every Device of the plan serves its steps for them. Null only for a
+	 * run another Replica walked before every run had one.
+	 */
+	personId: string | null;
+};
+
+/** A Device of a run's plan. Its name is null for a run from before the plan kept names. */
+export type PlannedDevice = { id: string; name: string | null };
+
+/** A JSON object of strings from a column, or an empty one. */
+function stringsOf(text: string | null): Record<string, string> {
+	if (!text) return {};
+	try {
+		const parsed: unknown = JSON.parse(text);
+		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+			return {};
+		}
+		return Object.fromEntries(
+			Object.entries(parsed).filter(
+				(entry): entry is [string, string] => typeof entry[1] === "string",
+			),
+		);
+	} catch {
+		return {};
+	}
+}
+
+/**
+ * The run's plan, from the columns of its row that keep it: `device_id`
+ * (null before Placement: the Walker), `placements`, `device_names` and
+ * `started_by`. A run from before the plan, or from a Device of a version
+ * before it, has no names: the walk names its Devices as the nodes do.
+ */
+export function planOf(
+	row: Pick<
+		RunRow,
+		"deviceId" | "walkerId" | "placements" | "deviceNames" | "startedBy"
+	>,
+): RunPlan {
+	const names = stringsOf(row.deviceNames);
+	const at = (id: string): PlannedDevice => ({ id, name: names[id] ?? null });
+	return {
+		device: at(row.deviceId ?? row.walkerId),
+		named: Object.fromEntries(
+			Object.entries(stringsOf(row.placements)).map(([name, id]) => [
+				name,
+				at(id),
+			]),
+		),
+		personId: row.startedBy,
+	};
+}
+
+/**
+ * The columns of a run's row that keep its plan. `placements` keeps its
+ * shape (name to id), so a Replica of a version before the plan reads it.
+ */
+export function planColumns(
+	plan: RunPlan,
+): Pick<RunRow, "deviceId" | "placements" | "deviceNames" | "startedBy"> {
+	const named = Object.entries(plan.named);
+	const names = Object.fromEntries(
+		[plan.device, ...named.map(([, at]) => at)].flatMap((at) =>
+			at.name === null ? [] : [[at.id, at.name]],
+		),
+	);
+	return {
+		deviceId: plan.device.id,
+		placements:
+			named.length > 0
+				? JSON.stringify(
+						Object.fromEntries(named.map(([name, at]) => [name, at.id])),
+					)
+				: null,
+		deviceNames: Object.keys(names).length > 0 ? JSON.stringify(names) : null,
+		startedBy: plan.personId,
+	};
+}
+
 /** The run's row, or an error naming the run. */
 export async function getRunRow(db: Database, runId: string): Promise<RunRow> {
 	const [row] = await db.select().from(run).where(eq(run.id, runId));

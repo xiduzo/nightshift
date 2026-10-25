@@ -111,10 +111,14 @@ async function computer(
 			...alone,
 			placement: {
 				...alone.placement,
-				ownDevices: async (spaceId, personId, projectId) => [
-					...(await alone.placement.ownDevices(spaceId, personId, projectId)),
-					...others(),
-				],
+				// The planner's answer (`PlacementPort.moveTo`): one of the
+				// others, refused while it is offline.
+				async moveTo(_row, _actor, to) {
+					const target = others().find((d) => d.deviceId === to);
+					if (!target) return null;
+					if (!target.online) throw new Error("The planner refuses it.");
+					return { id: target.deviceId, name: target.name };
+				},
 			},
 			runs: {
 				...alone.runs,
@@ -505,12 +509,12 @@ describe("a run that moves to another Device", () => {
 		await space.stopRun(runId);
 	});
 
-	test("is refused to a Device that is offline, and keeps nothing", async () => {
+	test("is refused when the planner refuses its Device, and keeps nothing", async () => {
 		const { a, b } = await pair(false);
 		const { runId } = await waitingOn(a);
 		await expect(
 			spaceOf(a, a).moveRun(runId, b.sandbox.deviceId),
-		).rejects.toThrow("laptop is offline. Move the run when it is online.");
+		).rejects.toThrow("The planner refuses it.");
 		expect(archive.size).toBe(0);
 		await spaceOf(a, a).stopRun(runId);
 	});

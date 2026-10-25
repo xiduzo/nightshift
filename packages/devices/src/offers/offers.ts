@@ -1,5 +1,6 @@
 import type {
 	DeviceDocument,
+	NodeToPlace,
 	OfferedPlacement,
 	SpaceDocument,
 } from "@nightshift/engine";
@@ -216,6 +217,20 @@ function touchesDevice(node: FlowNode): boolean {
 		case "call":
 			return node.each?.source.kind === "command";
 	}
+}
+
+/**
+ * Whether a node may name another Person's Device: it is an Agent node
+ * whose profile that Device offers to the Space, and the Person's role
+ * uses Offers. The rule `offerRefusal` holds at run start, for the choice
+ * of a node's Device; the node's other settings are checked at start.
+ */
+export function offerTakes(
+	node: NodeToPlace,
+	offers: readonly string[],
+	mayUse: boolean,
+): boolean {
+	return mayUse && node.profile !== undefined && offers.includes(node.profile);
 }
 
 /** The refusal of a run on another Person's Device that offers nothing to the Space. */

@@ -14,6 +14,7 @@ import {
 	getRunRow,
 	logMemberChange,
 	onLandedRunEvents,
+	planOf,
 	type RunLog,
 	type RunRow,
 	type RunTrigger,
@@ -138,11 +139,11 @@ export function createEngine(
 	const documents =
 		options.spaceDocuments ?? createSpaceDocuments({ db, directory });
 
-	/** Whether a run's own worktree is on this computer: placed here, or before Placement. */
-	const placedHere = (row: RunRow) =>
-		row.deviceId === null ||
-		row.deviceId === device.id ||
-		row.deviceId === row.walkerId;
+	/** Whether a run's own worktree is on this computer, as its plan says. */
+	const placedHere = (row: RunRow) => {
+		const at = planOf(row).device.id;
+		return at === device.id || at === row.walkerId;
+	};
 
 	/** The Person who owns this computer (`directory.selfOwnerId`), read when the engine is ready. */
 	let ownerId: string | null = null;
@@ -258,8 +259,6 @@ export function createEngine(
 			// leaves it for the next start.
 			projects.readRemotes().catch(() => {}),
 		)
-		// The names of the Devices runs may be placed on, for their messages.
-		.then(() => placement.loadNames())
 		// Whose runs are this computer's own: another Person's take an Offer.
 		.then(async () => {
 			ownerId = await directory.selfOwnerId();
@@ -292,12 +291,8 @@ export function createEngine(
 		runner,
 		now,
 		projectRow: (projectId) => projects.find(projectId),
-		profileFor: options.profileFor ?? (() => null),
-		place: placement.place,
+		plan: placement.plan,
 		selfName: device.name,
-		personOnHost: peers.personOnHost,
-		selfOwnerId: () => directory.selfOwnerId(),
-		offerRefusal: peers.offers.refusal,
 	});
 
 	const scheduler = createScheduler({
@@ -357,8 +352,7 @@ export function createEngine(
 		walks,
 		pendingCommands: peers.runs.pendingCommands,
 		device,
-		ownDevices: placement.ownDevices,
-		personOnHost: peers.personOnHost,
+		placement,
 	};
 
 	/** What runs left on this computer: the overview, its two actions, and the scheduled cleanup. */

@@ -2,10 +2,12 @@ import type { OwnDevice, PeerContext, Peers, PlacedDevice } from "../contract";
 import type { PeersFactory } from "../contract/peers";
 import { followOwnStep } from "../log";
 import { NOT_ON_THIS_COMPUTER } from "../projects";
+import { planNodes } from "../run";
 
 /**
  * The peers of a computer that is alone: no other Device, no Host, no
- * Offers. Every step runs here, and every Space is this Replica's own.
+ * Offers. Every step runs here, and every Space is this Replica's own:
+ * a run's plan has this computer only, and its starter's Person as is.
  * The engine's own tests walk with it. The real peers are
  * `@nightshift/devices`, whose tests cover the engine among other Devices.
  */
@@ -31,38 +33,32 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 
 	return {
 		placement: {
-			deviceFor: () => device,
-			deviceById: () => device,
-			async place(input) {
+			async plan({ start, project }) {
 				const walker: PlacedDevice = {
 					device,
 					id: device.id,
 					name: device.name,
 					thisDevice: true,
-					hasClone: input.project.repoPath !== null,
+					hasClone: project.repoPath !== null,
 				};
 				const self = await log.walkerId();
-				if (
-					input.deviceId !== undefined &&
-					input.deviceId !== device.id &&
-					input.deviceId !== self
-				) {
-					throw new Error(
-						"That device cannot take runs from this computer. Pair it with this computer, or choose another device.",
-					);
-				}
-				return {
-					run: walker,
-					walker,
-					async deviceNamed(name) {
-						if (name === device.name) return walker;
-						throw new Error(
-							`The flow names the device "${name}", but you have no device of that name, and none of that name offers profiles to this Space. Check the node's device.`,
-						);
+				// No other Device: the node walk refuses every other one.
+				return planNodes(
+					start,
+					{
+						walker,
+						byId: async (id) =>
+							id === device.id || id === self ? walker : null,
+						byName: async (name) => (name === device.name ? walker : null),
+						profileFor: context.profileFor ?? (() => null),
 					},
-				};
+					start.startedBy ?? context.ownerId(),
+				);
 			},
-			ownDevices,
+			deviceFor: () => device,
+			deviceById: () => device,
+			// No Device of the Person's but this computer.
+			moveTo: async () => null,
 			devicesFor: ownDevices,
 			async placements(spaceId, personId, projectId) {
 				return (await ownDevices(spaceId, personId, projectId))
@@ -76,10 +72,8 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 			async flowsElsewhere() {
 				throw new Error(NOT_ON_THIS_COMPUTER);
 			},
-			async loadNames() {},
 		},
 		offers: {
-			refusal: () => null,
 			async schedulesWithOffers(_project, _spaceId, actor, schedules) {
 				if (!actor || !schedules.some((s) => s.device !== undefined)) {
 					return [...schedules];
@@ -88,7 +82,6 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 			},
 		},
 		hostOf: async () => null,
-		personOnHost: async () => null,
 		runs: {
 			async walkers(_spaceId, ids) {
 				const self = await log.walkerId();

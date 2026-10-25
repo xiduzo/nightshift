@@ -7,7 +7,7 @@ import {
 import { createRunArchive } from "../archive";
 import type { HostRelay, WorkRelay } from "../contract";
 import { createRunHistoryExchange, type RunHistoryExchange } from "../exchange";
-import { createHostSpaces, type HostSpaces, personOnHost } from "../links";
+import { createHostSpaces, type HostSpaces } from "../links";
 import {
 	createEngineOffers,
 	createOfferAdmission,
@@ -17,7 +17,6 @@ import {
 	type EngineOffers,
 	type OfferAdmission,
 	type OfferUse,
-	offerRefusal,
 } from "../offers";
 import { createPlacement } from "../placement";
 import { createDeviceRegistry, type DeviceRegistry } from "../registry";
@@ -110,7 +109,7 @@ export function createPeers(
 		sessions: offeredSessions,
 	});
 
-	/** Where steps run: per node, else the run's Device (`placement.ts`). */
+	/** Where a run's steps run: its plan at start, read while it walks (`placement.ts`). */
 	const placement = createPlacement({
 		db,
 		device,
@@ -119,6 +118,7 @@ export function createPeers(
 		documents,
 		hostSpaces,
 		project: context.project,
+		...(context.profileFor ? { profileFor: context.profileFor } : {}),
 		...(work ? { work } : {}),
 		...(relay ? { relay } : {}),
 		// Another Person's run here uses this computer through its Offers.
@@ -167,17 +167,15 @@ export function createPeers(
 	const port: Peers = {
 		placement,
 		offers: {
-			refusal: offerRefusal,
 			schedulesWithOffers: createScheduleOffers({
 				db,
 				documents,
-				devicesFor: placement.devicesFor,
+				namesFor: placement.namesFor,
 				offersHere: admission.inForce,
 				...(options.mayUseOffers ? { mayUseOffers: options.mayUseOffers } : {}),
 			}),
 		},
 		hostOf,
-		personOnHost: (spaceId) => personOnHost(db, spaceId),
 		runs: {
 			walkers: createWalkers({ db, log, device, documents }),
 			pendingCommands: async (runId) =>

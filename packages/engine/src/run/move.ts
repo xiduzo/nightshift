@@ -1,5 +1,5 @@
 import type { Database } from "@nightshift/db";
-import type { Actor, OwnDevice, RunsPort } from "../contract";
+import type { Actor, PlacementPort, RunsPort } from "../contract";
 import type { Runner, RunWalks } from "../graph";
 import {
 	applyWalkerMoves,
@@ -18,7 +18,8 @@ import type { RunRelay } from "./relay";
  * has stopped: this computer keeps the run's walk state (its Checkpoint
  * and its steps' files) in the archive and logs `WalkerMoved`, in a Turn
  * of the runner (`hold`), so no answer, wake or resume comes in between.
- * The new Walker takes it over from there.
+ * The new Walker takes it over from there. The run's plan stays: its
+ * steps run on the Devices it planned, for the same Person.
  */
 export async function moveRun(
 	deps: {
@@ -30,14 +31,8 @@ export async function moveRun(
 		archive: Pick<RunsPort, "keepWalk">;
 		walks: Pick<RunWalks, "exportWalk">;
 		device: { id: string };
-		/** This computer's owner as the Host that keeps the Space knows them (`Peers.personOnHost`). */
-		personOnHost(spaceId: string): Promise<string | null>;
-		/** The Person's own Devices that a run of the project can move to. */
-		ownDevices(
-			spaceId: string,
-			personId: string,
-			projectId: string,
-		): Promise<OwnDevice[]>;
+		/** Where the walk may move: one of the Person's own Devices, online (`PlacementPort.moveTo`). */
+		placement: Pick<PlacementPort, "moveTo">;
 	},
 	row: RunRow,
 	actor: Actor | undefined,
@@ -64,18 +59,9 @@ export async function moveRun(
 		if (status === "finished") {
 			throw new Error("The run has ended. There is nothing to move.");
 		}
-		const personId = (await deps.personOnHost(row.spaceId)) ?? actor.personId;
-		const target = (
-			await deps.ownDevices(row.spaceId, personId, row.projectId)
-		).find((d) => d.deviceId === to);
-		if (!target || target.thisDevice) {
-			throw new Error("That device is not one of yours.");
-		}
-		if (!target.online) {
-			throw new Error(
-				`${target.name} is offline. Move the run when it is online.`,
-			);
-		}
+		// The plan stays: only the Walker changes.
+		const target = await deps.placement.moveTo(row, actor, to);
+		if (!target) throw new Error("That device is not one of yours.");
 		await deps.archive.keepWalk(await deps.walks.exportWalk(runId));
 		runner.forget(runId);
 		const moved = await log.append({

@@ -17,7 +17,7 @@ import { eq } from "drizzle-orm";
 import type { WorkReply } from "../contract";
 import { createHostExchange } from "../exchange";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
-import type { DeviceRegistry } from "../registry";
+import { type DeviceRegistry, selfOwnerId } from "../registry";
 import { withPeers } from "../testing";
 import { createWorkHub } from "../work";
 import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
@@ -207,6 +207,30 @@ describe("another Person's run on the computer that walks it", () => {
 			await sandbox.db.select().from(event).where(eq(event.type, type))
 		).map((row) => parseEventRow(row).payload);
 	}
+
+	test("a node may name this computer only when its profile is offered, and the Person may use Offers", async () => {
+		await offer();
+		const { id: projectId } = await engine
+			.space(sandbox.spaceId)
+			.addProject({ repoPath: sandbox.repoPath });
+		const names = async (personId: string, forNode?: { profile?: string }) =>
+			(
+				await engine
+					.space(sandbox.spaceId, { personId })
+					.listDevices(projectId, forNode)
+			).map((d) => [d.name, d.offers]);
+		expect(await names(carol, { profile: "coder" })).toEqual([
+			["test", ["coder"]],
+		]);
+		// Another profile, and a node with none (a Command): not here.
+		expect(await names(carol, { profile: "reviewer" })).toEqual([]);
+		expect(await names(carol, {})).toEqual([]);
+		// Every Device of the Person's, for Move to.
+		expect(await names(carol)).toEqual([["test", ["coder"]]]);
+		// Its owner's own computer takes every node.
+		const owner = (await selfOwnerId(sandbox.db)) as string;
+		expect(await names(owner, {})).toEqual([["test", undefined]]);
+	});
 
 	test("without an Offer it is refused at start", async () => {
 		const space = engine.space(sandbox.spaceId);

@@ -7,7 +7,7 @@ import {
 } from "@nightshift/engine";
 import type { FlowNode, Schedule } from "@nightshift/flows";
 import { readFlowSources } from "@nightshift/flows/files";
-import { personOnHost } from "../links";
+import { personInSpace } from "../links";
 import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
 
 /**
@@ -15,17 +15,21 @@ import { type DeviceOffer, offerRefusal, spaceOffers } from "./offers";
  * runs there, through that Device's Offers: each such schedule gets the
  * saver as its `person`, and is refused unless the Offers in the Space
  * cover what its flow runs on that Device now. A schedule on one of the
- * saver's own Devices names no Person.
+ * saver's own Devices names no Person. The Device a schedule's name picks
+ * is Placement's rule (`namesFor`): a name of the saver's own Device wins.
  */
 export function createScheduleOffers(deps: {
 	db: Database;
 	documents: SpaceDocuments;
-	/** The Devices a Person may place a run of the project on (`Placement.devicesFor`). */
-	devicesFor(
+	/**
+	 * The Device a name picks among those a Person may place a run of the
+	 * project on (`Placement.namesFor`): null when none has it.
+	 */
+	namesFor(
 		spaceId: string,
 		personId: string,
 		projectId: string,
-	): Promise<OwnDevice[]>;
+	): Promise<(name: string) => OwnDevice | null>;
 	/** This computer's Offers into the Space that are in force. */
 	offersHere(spaceId: string): Promise<DeviceOffer[]>;
 	/** Whether the Person's role in the Space lets them use Offers. */
@@ -41,16 +45,15 @@ export function createScheduleOffers(deps: {
 		if (!actor || !schedules.some((s) => s.device !== undefined)) {
 			return [...schedules];
 		}
-		const personId = (await personOnHost(db, spaceId)) ?? actor.personId;
-		const devices = await deps.devicesFor(spaceId, personId, project.id);
+		const personId = await personInSpace(db, spaceId, actor.personId);
+		const named = await deps.namesFor(spaceId, personId, project.id);
 		const document = await deps.documents.open(spaceId);
 		const out: Schedule[] = [];
 		for (const schedule of schedules) {
 			const { person: _old, ...rest } = schedule;
-			const named = devices.filter((d) => d.name === schedule.device);
-			const own = named.find((d) => d.offers === undefined);
-			const theirs = named.find((d) => d.offers !== undefined);
-			if (schedule.device === undefined || own || !theirs) {
+			const theirs =
+				schedule.device === undefined ? null : named(schedule.device);
+			if (theirs?.offers === undefined) {
 				out.push(rest);
 				continue;
 			}

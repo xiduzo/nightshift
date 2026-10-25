@@ -43,11 +43,13 @@ export {
 export { logMemberChange } from "./member-events";
 export type { RunLog } from "./run-log";
 export { createRunLog } from "./run-log";
-export type { RunRow } from "./run-row";
+export type { PlannedDevice, RunPlan, RunRow } from "./run-row";
 export {
 	applyWalkerMoves,
 	getRunRow,
 	hasRunRow,
+	planColumns,
+	planOf,
 	runIdsOfProject,
 	runIdsWalkedBy,
 	runsArriving,
