@@ -161,16 +161,18 @@ export type DevicesDeps = {
  */
 export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	const { db, self, ownerId, local } = deps;
-	const handover = await takeOver(deps.kept);
-
+	// What can fail comes first: then the runtime before keeps running.
 	const reach = reachFor(deps.settings.current());
 	const certificate = ownCertificate(deps.env);
 	const fingerprint = certificate?.fingerprint ?? null;
+	const devicesPage = new URL("/devices", deps.env.CORS_ORIGIN).toString();
 	const hostLinks = createHostLinks(db);
 	const keyStore = await deviceKeyStore({
 		dataDir: deps.dataDir,
 		...deps.keyStore,
 	});
+
+	const handover = await takeOver(deps.kept);
 
 	/** Per Host: what outlives a reload. */
 	function keptFor(hostId: string) {
@@ -233,7 +235,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		registry: engine.devices,
 		settings: deps.settings,
 		self,
-		devicesPage: new URL("/devices", deps.env.CORS_ORIGIN).toString(),
+		devicesPage,
 		fingerprint,
 		disconnect: deps.disconnect,
 	});
@@ -383,6 +385,9 @@ async function takeOver(kept: KeptDevices): Promise<Handover> {
 	const before = kept.nightshiftDevices;
 	if (before) {
 		await before.release();
+		// Nothing keeps the runtime before: a Device back meanwhile waits for its minute.
+		before.wake = () => {};
+		before.release = async () => {};
 		return before;
 	}
 	await kept.nightshiftLinks?.close();

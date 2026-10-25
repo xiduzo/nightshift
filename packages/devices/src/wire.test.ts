@@ -279,12 +279,10 @@ describe("the devices runtime across a reload", () => {
 		expect(swept).toBe(at);
 		expect(stopped).toEqual(["links", "engine"]);
 		expect(kept.nightshiftDevices?.hub).toBe(hub);
-		expect([
-			kept.nightshiftLinks,
-			kept.nightshiftEngine,
-			kept.nightshiftPresence,
-			kept.nightshiftWork,
-		]).toEqual([undefined, undefined, undefined, undefined]);
+		const slots: Record<string, unknown> = { ...kept };
+		expect(Object.keys(slots).filter((name) => slots[name])).toEqual([
+			"nightshiftDevices",
+		]);
 	});
 
 	test("the Links and the presence sweep before it stop: one of each runs", async () => {
