@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { deciderNameSchema, type NodeCheck, nodeBase, placed } from "./common";
+import { deciderNameSchema, type NodeCheck, nodeBase, placed } from "./base";
 import { checkOptions, option } from "./outcomes";
 
 /**

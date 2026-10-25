@@ -29,6 +29,23 @@ export {
 	permissionModeSchema,
 } from "./agent";
 export {
+	type DeciderName,
+	deciderNameSchema,
+	deviceNameSchema,
+	flowNameSchema,
+	type JsonValue,
+	jsonSchemaSchema,
+	labelSchema,
+	type NodeCheck,
+	nameSchema,
+	nodeIdSchema,
+	reservedNames,
+	reservedOutcomes,
+	secretNameSchema,
+	type VariableWrite,
+	variableWriteSchema,
+} from "./base";
+export {
 	type CallEach,
 	type CallEachNode,
 	type CallNode,
@@ -56,23 +73,6 @@ export {
 	LEGACY_COMMAND_EXITS,
 	STANDARD_EXIT_CODES,
 } from "./command";
-export {
-	type DeciderName,
-	deciderNameSchema,
-	deviceNameSchema,
-	flowNameSchema,
-	type JsonValue,
-	jsonSchemaSchema,
-	labelSchema,
-	type NodeCheck,
-	nameSchema,
-	nodeIdSchema,
-	reservedNames,
-	reservedOutcomes,
-	secretNameSchema,
-	type VariableWrite,
-	variableWriteSchema,
-} from "./common";
 export {
 	checkDecisionNode,
 	type DecidedBy,

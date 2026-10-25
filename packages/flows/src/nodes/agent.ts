@@ -7,7 +7,7 @@ import {
 	nameSchema,
 	nodeBase,
 	placed,
-} from "./common";
+} from "./base";
 import { checkOptions, option } from "./outcomes";
 
 /**

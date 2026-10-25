@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type NodeCheck, nameSchema, nodeBase, placed } from "./common";
+import { type NodeCheck, nameSchema, nodeBase, placed } from "./base";
 
 /**
  * Calls one tool of a Connection (an MCP server defined once on this

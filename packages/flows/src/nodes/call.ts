@@ -6,7 +6,7 @@ import {
 	nameSchema,
 	nodeBase,
 	reservedOutcomes,
-} from "./common";
+} from "./base";
 
 /**
  * The Call node: it runs another flow of the project, once or once per

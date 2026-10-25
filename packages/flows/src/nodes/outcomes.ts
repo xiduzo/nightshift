@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { labelSchema, type NodeCheck, reservedOutcomes } from "./common";
+import { labelSchema, type NodeCheck, reservedOutcomes } from "./base";
 
 /**
  * The outcomes a node lists itself: an Agent's own outcomes, a Command's

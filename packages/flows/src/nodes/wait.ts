@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { labelSchema, type NodeCheck, nodeBase } from "./common";
+import { labelSchema, type NodeCheck, nodeBase } from "./base";
 
 /** The Wait node: it sleeps until a time, a command passes, or a signal arrives. */
 

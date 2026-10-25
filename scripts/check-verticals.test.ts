@@ -744,6 +744,65 @@ describe("leaf contracts and peer ports expire", () => {
 	});
 });
 
+describe("catch-all names (k)", () => {
+	const files = {
+		"src/runs/index.ts": 'export { run } from "./run";\n',
+		"src/runs/run.ts": "export const run = 1;\n",
+		"src/index.ts": 'export { run } from "./runs";\n',
+	};
+
+	test("a catch-all file name fails at any depth, its test too", () => {
+		expect(
+			check(PKG, {
+				...files,
+				"src/runs/utils.ts": "export const a = 1;\n",
+				"src/runs/utils.test.ts": "export {};\n",
+				"src/runs/graph/common.tsx": "export const b = 1;\n",
+				"src/runs/shared.ts": "export const c = 1;\n",
+				"scripts/helpers.ts": "export const d = 1;\n",
+			}),
+		).toEqual([
+			'packages/demo/scripts/helpers.ts: "helpers" is a catch-all name. Name the file for what it holds, or move each part into the file that uses it.',
+			'packages/demo/src/runs/graph/common.tsx: "common" is a catch-all name. Name the file for what it holds, or move each part into the file that uses it.',
+			'packages/demo/src/runs/shared.ts: "shared" is a catch-all name. Name the file for what it holds, or move each part into the file that uses it.',
+			'packages/demo/src/runs/utils.test.ts: "utils" is a catch-all name. Name the file for what it holds, or move each part into the file that uses it.',
+			'packages/demo/src/runs/utils.ts: "utils" is a catch-all name. Name the file for what it holds, or move each part into the file that uses it.',
+		]);
+	});
+
+	test("a catch-all folder fails at any depth, once", () => {
+		expect(
+			check(PKG, {
+				...files,
+				"src/runs/helpers/a.ts": "export const a = 1;\n",
+				"src/runs/helpers/b.ts": "export const b = 1;\n",
+				"src/runs/misc/util/c.ts": "export const c = 1;\n",
+			}),
+		).toEqual([
+			'packages/demo/src/runs/helpers/: "helpers" is a catch-all folder. Name it for what it holds, or move each file into the folder that uses it.',
+			'packages/demo/src/runs/misc/: "misc" is a catch-all folder. Name it for what it holds, or move each file into the folder that uses it.',
+			'packages/demo/src/runs/misc/util/: "util" is a catch-all folder. Name it for what it holds, or move each file into the folder that uses it.',
+		]);
+	});
+
+	test("a name for what the file holds passes, and so does an app's shared/", () => {
+		expect(
+			check(PKG, {
+				...files,
+				"src/runs/base.ts": "export const a = 1;\n",
+				"src/runs/common-names.ts": "export const b = 1;\n",
+			}),
+		).toEqual([]);
+		expect(
+			check(APP, {
+				"src/shared/time/index.ts": 'export { now } from "./now";\n',
+				"src/shared/time/now.ts": "export const now = 1;\n",
+				"src/main.ts": 'import { now } from "./shared/time";\nnow;\n',
+			}),
+		).toEqual([]);
+	});
+});
+
 describe("barrels hold only imports and exports (j)", () => {
 	test("a barrel with code fails, and so does a package's root index.ts", () => {
 		expect(

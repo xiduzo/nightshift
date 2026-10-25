@@ -5,7 +5,7 @@ import {
 	nodeBase,
 	placed,
 	secretNameSchema,
-} from "./common";
+} from "./base";
 import { checkOptions, outcomeColorSchema } from "./outcomes";
 
 /** The Command node: a shell command whose exit code picks the outcome. */

@@ -29,6 +29,9 @@
  *     another vertical than a shared piece
  * (j) a barrel, or a package's root `index.ts`, with a statement that is
  *     not an import or an export
+ * (k) a catch-all name at any depth: a file named utils, util, helpers,
+ *     helper, common, misc or shared, and a folder named utils, util,
+ *     helpers, helper, common or misc
  *
  * It reads every file of the workspace, not only `src/`. A file outside
  * `src/` (a config file, a script) belongs to no vertical: it imports a
@@ -177,6 +180,21 @@ const KIND_BUCKETS = new Set([
 	"common",
 	"misc",
 ]);
+
+/**
+ * Catch-all names: they say nothing of what a file holds, so anything ends
+ * up in them. Never a file name or a folder name, at any depth. `shared` is
+ * an app's folder of named shared pieces, so only a file may not take it.
+ */
+const CATCH_ALL_FOLDERS = new Set([
+	"utils",
+	"util",
+	"helpers",
+	"helper",
+	"common",
+	"misc",
+]);
+const CATCH_ALL_FILES = new Set([...CATCH_ALL_FOLDERS, "shared"]);
 
 /** The app's shared piece that composes the features. */
 const SHELL = "shared/shell";
@@ -628,6 +646,33 @@ export function checkWorkspace(
 		const path = relative(dirname(from), to.dir).split(sep).join("/");
 		return path.startsWith(".") ? path : `./${path}`;
 	};
+
+	// (k) Catch-all names, at any depth. A kind bucket at the top of src/
+	// has its own message (c).
+	const catchAllFolders = new Set<string>();
+	for (const path of files.keys()) {
+		const base = (path.split(sep).pop() ?? "").replace(/(\.test)?\.tsx?$/, "");
+		if (CATCH_ALL_FILES.has(base)) {
+			problems.push(
+				`${rel(path)}: "${base}" is a catch-all name. Name the file for what it holds, or move each part into the file that uses it.`,
+			);
+		}
+		let dir = dirname(path);
+		while (inside(wsDir, dir) && dir !== wsDir) {
+			const name = dir.split(sep).pop() ?? "";
+			if (
+				CATCH_ALL_FOLDERS.has(name) &&
+				!(dirname(dir) === src && KIND_BUCKETS.has(name))
+			)
+				catchAllFolders.add(dir);
+			dir = dirname(dir);
+		}
+	}
+	for (const dir of [...catchAllFolders].sort()) {
+		problems.push(
+			`${rel(dir)}/: "${dir.split(sep).pop()}" is a catch-all folder. Name it for what it holds, or move each file into the folder that uses it.`,
+		);
+	}
 
 	// (d), (e) and (f): imports that leave the workspace, name it, or reach
 	// a test from production code.

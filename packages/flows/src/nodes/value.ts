@@ -7,7 +7,7 @@ import {
 	type NodeCheck,
 	nodeBase,
 	placed,
-} from "./common";
+} from "./base";
 
 /** The Value node: it makes `data` that matches its output schema, by a rule or a model. */
 
