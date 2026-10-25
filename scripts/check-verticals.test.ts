@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import {
+	checkEntries,
 	checkWorkspace,
 	checkWorkspaces,
 	isTest,
@@ -863,6 +864,137 @@ describe("no cycle between verticals (l)", () => {
 			),
 		).toEqual([
 			"scripts/check-verticals.ts: gates is in no cycle any more. Remove it from KNOWN_CYCLES, and its entry from STRUCTURE.md section 8.",
+		]);
+	});
+});
+
+describe("every value name on an entry has an importer (m)", () => {
+	/**
+	 * Writes `files` (path → source) to a new root and checks the entries of
+	 * packages/demo. It exports a root and the barrel of migrate.
+	 */
+	const entries = (
+		files: Record<string, string>,
+		options: Parameters<typeof checkEntries>[2] = {},
+	) => {
+		const root = mkdtempSync(join(tmpdir(), "check-entries-"));
+		roots.push(root);
+		for (const [path, text] of Object.entries({
+			"packages/demo/package.json": JSON.stringify({
+				name: "@demo/pkg",
+				exports: {
+					".": "./src/index.ts",
+					"./migrate": "./src/migrate/index.ts",
+				},
+			}),
+			"packages/demo/src/migrate/index.ts":
+				'export { migrate, migrationsFolder } from "./migrate";\n',
+			"packages/demo/src/migrate/migrate.ts":
+				"export const migrate = 1;\nexport const migrationsFolder = 2;\n",
+			"packages/demo/src/runs/index.ts":
+				'export { run, walk } from "./run";\nexport type { Run } from "./run";\n',
+			"packages/demo/src/runs/run.ts":
+				"export const run = 1;\nexport const walk = 2;\nexport type Run = number;\n",
+			"packages/demo/src/index.ts":
+				'export { run, walk, type Run } from "./runs";\nexport { migrate } from "./migrate";\n',
+			"apps/user/package.json": JSON.stringify({ name: "user" }),
+			...files,
+		})) {
+			const full = join(root, path);
+			mkdirSync(dirname(full), { recursive: true });
+			writeFileSync(full, text);
+		}
+		return checkEntries(root, ["packages/demo"], {
+			exceptions: [],
+			pending: {},
+			...options,
+		});
+	};
+	const userImports = (text: string) => ({ "apps/user/src/main.ts": text });
+
+	test("a value name that no other workspace imports fails, a type does not", () => {
+		expect(
+			entries(
+				userImports(
+					'import { run } from "@demo/pkg";\nimport { migrate, migrationsFolder } from "@demo/pkg/migrate";\n[run, migrate, migrationsFolder];\n',
+				),
+			),
+		).toEqual([
+			'packages/demo/src/index.ts: no other workspace imports "migrate", "walk" from "@demo/pkg". Take them off the entry.',
+		]);
+	});
+
+	test("a test in another workspace counts, a namespace import uses every name", () => {
+		expect(
+			entries({
+				"apps/user/src/main.test.ts":
+					'import * as demo from "@demo/pkg";\nimport { migrationsFolder } from "@demo/pkg/migrate";\n[demo, migrationsFolder];\n',
+			}),
+		).toEqual([]);
+	});
+
+	test("a root re-export carries the use of its name through to the barrel", () => {
+		expect(
+			entries(
+				userImports(
+					'import * as demo from "@demo/pkg";\nimport { migrationsFolder } from "@demo/pkg/migrate";\n[demo, migrationsFolder];\n',
+				),
+			),
+		).toEqual([]);
+		expect(
+			entries(
+				userImports(
+					'import { run, walk } from "@demo/pkg";\nimport { migrationsFolder } from "@demo/pkg/migrate";\n[run, walk, migrationsFolder];\n',
+				),
+			),
+		).toEqual([
+			'packages/demo/src/index.ts: no other workspace imports "migrate" from "@demo/pkg". Take it off the entry.',
+			'packages/demo/src/migrate/index.ts: no other workspace imports "migrate" from "@demo/pkg/migrate". Take it off the entry.',
+		]);
+	});
+
+	test("a production file of the package outside the barrel's vertical counts, a test does not", () => {
+		const user = userImports(
+			'import * as demo from "@demo/pkg";\nimport { migrate } from "@demo/pkg/migrate";\n[demo, migrate];\n',
+		);
+		expect(
+			entries({
+				...user,
+				"packages/demo/src/runs/run.test.ts":
+					'import { migrationsFolder } from "../migrate";\nmigrationsFolder;\n',
+			}),
+		).toEqual([
+			'packages/demo/src/migrate/index.ts: no other workspace imports "migrationsFolder" from "@demo/pkg/migrate". Take it off the entry.',
+		]);
+		expect(
+			entries({
+				...user,
+				"packages/demo/src/runs/run.ts":
+					'import { migrationsFolder } from "../migrate";\nexport const run = migrationsFolder;\nexport const walk = 2;\nexport type Run = number;\n',
+			}),
+		).toEqual([]);
+	});
+
+	test("an exception skips an entry", () => {
+		expect(
+			entries(userImports('import { run } from "@demo/pkg";\nrun;\n'), {
+				exceptions: ["@demo/pkg", "@demo/pkg/migrate"],
+			}),
+		).toEqual([]);
+	});
+
+	test("a pending name passes until a workspace imports it", () => {
+		const pending = { pending: { "@demo/pkg": ["walk", "migrate"] } };
+		const used =
+			'import { run } from "@demo/pkg";\nimport * as m from "@demo/pkg/migrate";\n[run, m];\n';
+		expect(entries(userImports(used), pending)).toEqual([]);
+		expect(
+			entries(
+				userImports(`${used}import { walk } from "@demo/pkg";\nwalk;\n`),
+				pending,
+			),
+		).toEqual([
+			'scripts/check-verticals.ts: "walk" of "@demo/pkg" has an importer now. Remove it from PENDING_NAMES.',
 		]);
 	});
 });

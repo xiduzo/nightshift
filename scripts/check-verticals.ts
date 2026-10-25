@@ -14,8 +14,8 @@
  *     and a vertical with no `index.ts`
  * (b) a name on a barrel that no file outside the vertical imports. A
  *     barrel that `package.json` `exports` names is a public entry of the
- *     package (`@nightshift/db/migrate`): other workspaces import it, so it
- *     is not checked, like the root `index.ts`
+ *     package (`@nightshift/db/migrate`): rule (m) checks it, like the root
+ *     `index.ts`
  * (c) a kind bucket at the top of `src/` (lib, utils, helpers, hooks,
  *     components, types, common, misc), and a loose file in an app's `shared/`
  * (d) a relative import that leaves the workspace
@@ -36,6 +36,10 @@
  *     included. An import through a peer port or of a leaf contract is
  *     not part of a cycle, nor is a test. KNOWN_CYCLES lists the ones that
  *     wait for their fix
+ * And across the workspaces it checks:
+ * (m) a value name on a package entry that no other workspace imports
+ *     (`checkEntries`: types are exempt, PENDING_NAMES wait for their
+ *     importer)
  *
  * It reads every file of the workspace, not only `src/`. A file outside
  * `src/` (a config file, a script) belongs to no vertical: it imports a
@@ -59,6 +63,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import ts from "typescript";
+
+import { ENTRY_EXCEPTIONS } from "./check-layers";
 
 /**
  * The workspaces that section 4 does not cover: `ui` and `ui-native` (React
@@ -253,6 +259,17 @@ type SourceFile = {
 	exports: { names: string[]; stars: string[] };
 	/** Every statement is an import or an export of names (rule j). */
 	onlyImportsAndExports: boolean;
+	/**
+	 * The names it exports as values (m). `verbatimModuleSyntax` makes a
+	 * type export say `type`, so the syntax tells them apart.
+	 */
+	values: Set<string>;
+	/** `export { imported as exported } from "specifier"`. */
+	reexports: { specifier: string; imported: string; exported: string }[];
+	/** `export { local as exported }` of a name it imports. */
+	localExports: { local: string; exported: string }[];
+	/** Each imported name by its local name (`*` for a namespace). */
+	bindings: Map<string, { specifier: string; imported: string }>;
 };
 
 /** A test, by its path in the workspace (`src/runs/run.test.ts`, `test/x.ts`). */
@@ -343,7 +360,12 @@ function importOrExport(statement: ts.Statement): boolean {
 	);
 }
 
+/** Each file parsed once, for every rule and every workspace. */
+const parsed = new Map<string, SourceFile>();
+
 function parse(path: string): SourceFile {
+	const cached = parsed.get(path);
+	if (cached) return cached;
 	const text = readFileSync(path, "utf8");
 	const source = ts.createSourceFile(
 		path,
@@ -355,6 +377,10 @@ function parse(path: string): SourceFile {
 	const imports: Import[] = [];
 	const exportNames: string[] = [];
 	const stars: string[] = [];
+	const values = new Set<string>();
+	const reexports: SourceFile["reexports"] = [];
+	const localExports: SourceFile["localExports"] = [];
+	const bindings: SourceFile["bindings"] = new Map();
 	const exported = (node: ts.Node) =>
 		ts.canHaveModifiers(node) &&
 		(ts.getModifiers(node) ?? []).some(
@@ -365,12 +391,24 @@ function parse(path: string): SourceFile {
 			ts.isImportDeclaration(node) &&
 			ts.isStringLiteral(node.moduleSpecifier)
 		) {
-			imports.push({
-				specifier: node.moduleSpecifier.text,
-				names: bindingNames(node.importClause),
-			});
+			const specifier = node.moduleSpecifier.text;
+			const clause = node.importClause;
+			imports.push({ specifier, names: bindingNames(clause) });
+			if (clause?.name)
+				bindings.set(clause.name.text, { specifier, imported: "default" });
+			const named = clause?.namedBindings;
+			if (named && ts.isNamespaceImport(named))
+				bindings.set(named.name.text, { specifier, imported: "*" });
+			else if (named && ts.isNamedImports(named))
+				for (const element of named.elements)
+					bindings.set(element.name.text, {
+						specifier,
+						imported: (element.propertyName ?? element.name).text,
+					});
 		} else if (ts.isExportDeclaration(node)) {
 			const clause = node.exportClause;
+			const valueElement = (e: ts.ExportSpecifier) =>
+				!node.isTypeOnly && !e.isTypeOnly;
 			if (node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
 				const specifier = node.moduleSpecifier.text;
 				if (!clause) {
@@ -379,18 +417,40 @@ function parse(path: string): SourceFile {
 				} else if (ts.isNamespaceExport(clause)) {
 					imports.push({ specifier, names: "all" });
 					exportNames.push(clause.name.text);
+					if (!node.isTypeOnly) values.add(clause.name.text);
+					reexports.push({
+						specifier,
+						imported: "*",
+						exported: clause.name.text,
+					});
 				} else {
 					imports.push({
 						specifier,
 						names: clause.elements.map((e) => (e.propertyName ?? e.name).text),
 					});
-					exportNames.push(...clause.elements.map((e) => e.name.text));
+					for (const e of clause.elements) {
+						exportNames.push(e.name.text);
+						if (valueElement(e)) values.add(e.name.text);
+						reexports.push({
+							specifier,
+							imported: (e.propertyName ?? e.name).text,
+							exported: e.name.text,
+						});
+					}
 				}
 			} else if (clause && ts.isNamedExports(clause)) {
-				exportNames.push(...clause.elements.map((e) => e.name.text));
+				for (const e of clause.elements) {
+					exportNames.push(e.name.text);
+					if (valueElement(e)) values.add(e.name.text);
+					localExports.push({
+						local: (e.propertyName ?? e.name).text,
+						exported: e.name.text,
+					});
+				}
 			}
 		} else if (ts.isExportAssignment(node)) {
 			exportNames.push("default");
+			values.add("default");
 		} else if (
 			ts.isCallExpression(node) &&
 			(node.expression.kind === ts.SyntaxKind.ImportKeyword ||
@@ -424,11 +484,15 @@ function parse(path: string): SourceFile {
 			const isDefault = (ts.getModifiers(node as ts.HasModifiers) ?? []).some(
 				(m) => m.kind === ts.SyntaxKind.DefaultKeyword,
 			);
-			if (isDefault) exportNames.push("default");
-			else if (ts.isVariableStatement(node)) {
+			if (isDefault) {
+				exportNames.push("default");
+				values.add("default");
+			} else if (ts.isVariableStatement(node)) {
 				for (const declaration of node.declarationList.declarations) {
-					if (ts.isIdentifier(declaration.name))
+					if (ts.isIdentifier(declaration.name)) {
 						exportNames.push(declaration.name.text);
+						values.add(declaration.name.text);
+					}
 				}
 			} else if (
 				(ts.isFunctionDeclaration(node) ||
@@ -441,18 +505,29 @@ function parse(path: string): SourceFile {
 				ts.isIdentifier(node.name)
 			) {
 				exportNames.push(node.name.text);
+				if (
+					!ts.isInterfaceDeclaration(node) &&
+					!ts.isTypeAliasDeclaration(node)
+				)
+					values.add(node.name.text);
 			}
 		}
 		ts.forEachChild(node, visit);
 	};
 	visit(source);
-	return {
+	const file: SourceFile = {
 		path,
 		test: false,
 		imports,
 		exports: { names: exportNames, stars },
 		onlyImportsAndExports: source.statements.every(importOrExport),
+		values,
+		reexports,
+		localExports,
+		bindings,
 	};
+	parsed.set(path, file);
+	return file;
 }
 
 /** `"@/*": ["./src/*"]` style aliases of the workspace tsconfig. */
@@ -493,6 +568,29 @@ function resolveFile(base: string): string | undefined {
 			base.replace(/\.jsx?$/, ".tsx"),
 		);
 	return candidates.find((c) => existsSync(c) && statSync(c).isFile());
+}
+
+/**
+ * The file that a relative or aliased import of the workspace names, or
+ * nothing for a package import.
+ */
+function resolverFor(
+	wsDir: string,
+): (from: string, specifier: string) => string | undefined {
+	const pathAliases = aliases(wsDir);
+	return (from, specifier) => {
+		if (specifier.startsWith(".")) {
+			return resolveFile(resolve(dirname(from), specifier));
+		}
+		for (const alias of pathAliases) {
+			if (specifier.startsWith(alias.prefix)) {
+				return resolveFile(
+					join(alias.target, specifier.slice(alias.prefix.length)),
+				);
+			}
+		}
+		return undefined;
+	};
 }
 
 type Vertical = { name: string; dir: string; barrel?: string };
@@ -696,19 +794,7 @@ export function checkWorkspace(
 	}
 
 	const pathAliases = aliases(wsDir);
-	const resolveImport = (from: string, specifier: string) => {
-		if (specifier.startsWith(".")) {
-			return resolveFile(resolve(dirname(from), specifier));
-		}
-		for (const alias of pathAliases) {
-			if (specifier.startsWith(alias.prefix)) {
-				return resolveFile(
-					join(alias.target, specifier.slice(alias.prefix.length)),
-				);
-			}
-		}
-		return undefined;
-	};
+	const resolveImport = resolverFor(wsDir);
 
 	const leafContracts = options.leafContracts ?? {};
 	const peerPorts = options.peerPorts ?? {};
@@ -1009,9 +1095,233 @@ export function checkWorkspace(
 	return problems;
 }
 
+/** Every folder in `apps/` and `packages/` with a `package.json`, sorted. */
+function allWorkspaces(root: string): string[] {
+	const found: string[] = [];
+	for (const group of ["apps", "packages"]) {
+		const dir = join(root, group);
+		if (!existsSync(dir)) continue;
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			if (
+				entry.isDirectory() &&
+				existsSync(join(dir, entry.name, "package.json"))
+			)
+				found.push(`${group}/${entry.name}`);
+		}
+	}
+	return found.sort();
+}
+
+/**
+ * Value names on an entry that no workspace of this branch imports yet,
+ * because the code that imports them is on its way: the flow canvas work on
+ * main imports these from the flows root. A name fails once a workspace
+ * imports it, so the list empties itself as that code lands. Listed in
+ * section 8 of STRUCTURE.md.
+ *
+ * Shape: { entry: ["name"] }
+ */
+export const PENDING_NAMES: Record<string, string[]> = {
+	"@nightshift/flows": [
+		"addSection",
+		"nodeOutputFields",
+		"removeSection",
+		"runFields",
+		"sectionColors",
+		"sectionOf",
+		"updateSection",
+	],
+};
+
+type Entry = {
+	/** How another workspace imports it: `@nightshift/db/migrate`. */
+	specifier: string;
+	file: string;
+	workspace: string;
+	/** The vertical folder of the file, or the file itself at the top of src/. */
+	home: string;
+};
+
+/**
+ * (m) Every value name on a package entry has an importer: a file of
+ * another workspace imports or re-exports it, tests too. A file of the
+ * entry's own package outside the entry's vertical counts as well, but an
+ * entry file (the root index that re-exports a vertical's barrel) counts
+ * only for the names it passes on that are used in turn.
+ *
+ * Types are exempt: a type that the emitted declaration of another package
+ * names must stay on an entry (TS2883). So are the names that `export *`
+ * passes on (only the drizzle schema has it). A wildcard entry, an entry of
+ * NOT_CHECKED, and an entry in ENTRY_EXCEPTIONS of check-layers are not
+ * checked.
+ *
+ * `workspaces` are the workspaces whose entries it checks. The files of
+ * every workspace count as importers.
+ */
+export function checkEntries(
+	root: string,
+	workspaces: string[],
+	{
+		exceptions = ENTRY_EXCEPTIONS.map((e) => e.entry),
+		pending = PENDING_NAMES,
+	}: { exceptions?: string[]; pending?: Record<string, string[]> } = {},
+): string[] {
+	const rel = (path: string) => relative(root, path).split(sep).join("/");
+	const all = allWorkspaces(root);
+
+	const entries: Entry[] = [];
+	const bySpecifier = new Map<string, Entry>();
+	const byFile = new Map<string, Entry>();
+	for (const workspace of all) {
+		const wsDir = resolve(root, workspace);
+		const { name, exports } = packageJson(wsDir);
+		if (!name || !exports || typeof exports !== "object") continue;
+		for (const [key, value] of Object.entries(exports)) {
+			if (key.includes("*")) continue;
+			const target =
+				typeof value === "string"
+					? value
+					: Object.values(value as Record<string, unknown>).find(
+							(v): v is string => typeof v === "string",
+						);
+			if (!target || !/\.tsx?$/.test(target)) continue;
+			const file = resolve(wsDir, target);
+			if (!existsSync(file)) continue;
+			const src = join(wsDir, "src");
+			const top = relative(src, file).split(sep);
+			const entry: Entry = {
+				specifier: key === "." ? name : `${name}/${key.replace(/^\.\//, "")}`,
+				file,
+				workspace,
+				home: top.length > 1 ? join(src, top[0] as string) : file,
+			};
+			entries.push(entry);
+			bySpecifier.set(entry.specifier, entry);
+			if (!byFile.has(file)) byFile.set(file, entry);
+		}
+	}
+
+	const uses = new Map<string, Set<string> | "all">();
+	/** Adds the names to the uses of an entry file. True when it grew. */
+	const mark = (file: string, names: string[] | "all"): boolean => {
+		const current = uses.get(file);
+		if (current === "all") return false;
+		if (names === "all") {
+			uses.set(file, "all");
+			return true;
+		}
+		const set = current ?? new Set<string>();
+		const before = set.size;
+		for (const name of names) set.add(name);
+		uses.set(file, set);
+		return set.size > before;
+	};
+
+	// Another workspace's imports and re-exports, tests too. And the
+	// imports of an entry file inside its own package, kept for below.
+	const inPackage: {
+		entry: Entry;
+		file: SourceFile;
+		specifier: string;
+		names: string[] | "all";
+	}[] = [];
+	for (const workspace of all) {
+		const wsDir = resolve(root, workspace);
+		const resolveImport = resolverFor(wsDir);
+		const paths: string[] = [];
+		walk(wsDir, paths, true);
+		for (const path of paths) {
+			const file = parse(path);
+			file.test = isTest(relative(wsDir, path));
+			for (const imported of file.imports) {
+				const entry = bySpecifier.get(imported.specifier);
+				if (entry) {
+					if (entry.workspace !== workspace) mark(entry.file, imported.names);
+					continue;
+				}
+				if (file.test) continue;
+				if (!/^[.@]/.test(imported.specifier)) continue;
+				const target = resolveImport(path, imported.specifier);
+				const own = target ? byFile.get(target) : undefined;
+				if (
+					own &&
+					own.workspace === workspace &&
+					path !== own.file &&
+					!(path === own.home || path.startsWith(`${own.home}${sep}`))
+				) {
+					inPackage.push({
+						entry: own,
+						file,
+						specifier: imported.specifier,
+						names: imported.names,
+					});
+				}
+			}
+		}
+	}
+
+	/** The names of `specifier` that an entry file passes on and are used. */
+	const passedOn = (file: SourceFile, specifier: string): string[] | "all" => {
+		const used = uses.get(file.path);
+		if (file.exports.stars.includes(specifier))
+			return used === "all" ? "all" : [...(used ?? [])];
+		const isUsed = (name: string) => used === "all" || !!used?.has(name);
+		const names: string[] = [];
+		for (const r of file.reexports) {
+			if (r.specifier !== specifier || !isUsed(r.exported)) continue;
+			if (r.imported === "*") return "all";
+			names.push(r.imported);
+		}
+		for (const [local, binding] of file.bindings) {
+			if (binding.specifier !== specifier) continue;
+			const exports = file.localExports.filter((e) => e.local === local);
+			// A name it imports for its own code is a use.
+			if (exports.length && !exports.some((e) => isUsed(e.exported))) continue;
+			if (binding.imported === "*") return "all";
+			names.push(binding.imported);
+		}
+		return names;
+	};
+	for (let changed = true; changed; ) {
+		changed = false;
+		for (const { entry, file, specifier, names } of inPackage) {
+			const passed = byFile.has(file.path) ? passedOn(file, specifier) : names;
+			if (mark(entry.file, passed)) changed = true;
+		}
+	}
+
+	const problems: string[] = [];
+	for (const entry of entries) {
+		if (!workspaces.includes(entry.workspace)) continue;
+		if (NOT_CHECKED.has(entry.workspace)) continue;
+		if (exceptions.includes(entry.specifier)) continue;
+		const used = uses.get(entry.file);
+		const values = parse(entry.file).values;
+		const waiting = pending[entry.specifier] ?? [];
+		for (const name of waiting) {
+			if (!values.has(name) || used === "all" || used?.has(name)) {
+				problems.push(
+					`scripts/check-verticals.ts: "${name}" of "${entry.specifier}" ${values.has(name) ? "has an importer now" : "is not on the entry any more"}. Remove it from PENDING_NAMES.`,
+				);
+			}
+		}
+		if (used === "all") continue;
+		const unused = [...values]
+			.filter((name) => !used?.has(name) && !waiting.includes(name))
+			.sort();
+		if (unused.length) {
+			problems.push(
+				`${rel(entry.file)}: no other workspace imports ${unused.map((n) => `"${n}"`).join(", ")} from "${entry.specifier}". Take ${unused.length === 1 ? "it" : "them"} off the entry.`,
+			);
+		}
+	}
+	return problems;
+}
+
 /**
  * The problems of each named workspace, with the listed exceptions of
- * each. A name that is not a workspace is a problem too.
+ * each, and of the entries of those workspaces. A name that is not a
+ * workspace is a problem too.
  */
 export function checkWorkspaces(root: string, workspaces: string[]): string[] {
 	const problems: string[] = [];
@@ -1029,6 +1339,7 @@ export function checkWorkspaces(root: string, workspaces: string[]): string[] {
 			}),
 		);
 	}
+	problems.push(...checkEntries(root, workspaces));
 	return problems;
 }
 
