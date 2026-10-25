@@ -8,7 +8,6 @@ import {
 import {
 	boxPosition,
 	FRAME_PADDING,
-	frameHeader,
 	frameRect,
 	membersBounds,
 	moveSection,
@@ -41,20 +40,13 @@ describe("frames", () => {
 			width: 656,
 			height: 220,
 		});
-		const header = frameHeader(section);
+		const { top, right, bottom, left } = FRAME_PADDING;
 		expect(frameRect(flow, section, sizes)).toEqual({
-			x: -FRAME_PADDING,
-			y: -FRAME_PADDING - header,
-			width: 656 + 2 * FRAME_PADDING,
-			height: 220 + 2 * FRAME_PADDING + header,
+			x: -left,
+			y: -top,
+			width: 656 + left + right,
+			height: 220 + top + bottom,
 		});
-	});
-
-	test("a description makes the header taller", () => {
-		expect(frameHeader({ description: "Checks the work" })).toBeGreaterThan(
-			frameHeader({}),
-		);
-		expect(frameHeader({ description: "  " })).toBe(frameHeader({}));
 	});
 
 	test("unmeasured nodes count with a typical size, unknown ids not at all", () => {

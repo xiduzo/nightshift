@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { groupEdges } from "../canvas/edge-groups";
+import { exitHandleId, groupEdges } from "../canvas/edge-groups";
 import type { FlowCanvasNode } from "../canvas/flow-node";
 import {
 	canvasEdges,
@@ -67,11 +67,12 @@ import {
 	type CanvasNode,
 	canvasNodeTypes,
 	SectionActionsContext,
+	type SectionBoxData,
 } from "../canvas/sections/section-nodes";
 import { useSectionCanvas } from "../canvas/sections/use-section-canvas";
 import { useMeasured } from "../canvas/use-measured";
 import { loadElk } from "./lib/elk";
-import { layoutFlow, type NodeHandles } from "./lib/flow-layout";
+import { layoutFlow, type NodeHandles, type Size } from "./lib/flow-layout";
 import { isNodeType, NODE_DRAG_TYPE } from "./node-dock";
 import {
 	applyNodeSelection,
@@ -185,31 +186,52 @@ export function CanvasControls({
 
 /**
  * Where React Flow measured each node's handles, from the node's top-left
- * corner. Only the height counts: inputs sit on the left side of a node and
- * outcomes on its right.
+ * corner, and each folded box's size and handles, by Section id. Only the
+ * height counts: inputs sit on the left side of a node and outcomes on its
+ * right. A box names its exits as the layout does ("verdict · pass").
  */
 function measuredHandles(
 	nodeLookup: ReadonlyMap<string, InternalNode<CanvasNode>>,
-): Record<string, NodeHandles> {
+) {
 	const handles: Record<string, NodeHandles> = {};
+	const sectionHandles: Record<string, NodeHandles> = {};
+	const sectionSizes: Record<string, Size> = {};
 	for (const [id, node] of nodeLookup) {
-		if (sectionIdOf(id) !== undefined) continue;
+		if (node.type === "sectionFrame") continue;
 		const bounds = node.internals.handleBounds;
-		const width = node.measured.width;
+		const { width, height } = node.measured;
 		if (!bounds || width === undefined) continue;
+		const labels =
+			node.type === "sectionBox"
+				? new Map(
+						(node.data as SectionBoxData).exits.map((exit) => [
+							exitHandleId(exit.from, exit.outcome),
+							exit.label,
+						]),
+					)
+				: undefined;
 		const input = bounds.target?.[0];
-		handles[id] = {
+		const measuredHandles: NodeHandles = {
 			input: input ? { x: 0, y: input.y + input.height / 2 } : undefined,
 			outcomes: Object.fromEntries(
-				(bounds.source ?? []).flatMap((handle) =>
-					handle.id
-						? [[handle.id, { x: width, y: handle.y + handle.height / 2 }]]
-						: [],
-				),
+				(bounds.source ?? []).flatMap((handle) => {
+					const name =
+						handle.id && (labels ? labels.get(handle.id) : handle.id);
+					return name
+						? [[name, { x: width, y: handle.y + handle.height / 2 }]]
+						: [];
+				}),
 			),
 		};
+		const sectionId = sectionIdOf(id);
+		if (sectionId === undefined) {
+			handles[id] = measuredHandles;
+			continue;
+		}
+		sectionHandles[sectionId] = measuredHandles;
+		if (height !== undefined) sectionSizes[sectionId] = { width, height };
 	}
-	return handles;
+	return { handles, sectionHandles, sectionSizes };
 }
 
 /** A Section's frame or box has no fill on the mini map, only its outline. */
@@ -338,6 +360,7 @@ export function EditorCanvas({
 				errors: counts.edgeErrors,
 				selected: selection?.kind === "edge" ? selection.id : undefined,
 				boxes: boxPositions,
+				endOf: sections.endOf,
 			}).map((edge) =>
 				// A line to a folded box stands for edges you cannot see:
 				// Delete does not remove them. Select one on its label.
@@ -346,7 +369,7 @@ export function EditorCanvas({
 					? { ...edge, deletable: false }
 					: edge,
 			),
-		[flow, groups, routes, counts, selection, boxPositions],
+		[flow, groups, routes, counts, selection, boxPositions, sections.endOf],
 	);
 	// A drawn edge carries every edge of its node pair, under its first id.
 	const groupOf = useMemo(
@@ -507,13 +530,13 @@ export function EditorCanvas({
 		const { width, height, nodeLookup } = store.getState();
 		const viewport = { width: width / 1.15, height: height / 1.15 };
 		try {
-			// TODO(sections-layout): pass `folded` once `layoutFlow` takes
-			// it. It lays out a folded Section as one box and moves its
-			// nodes as a block (the box is their top-left corner).
+			// A folded Section is one box: the layout moves its nodes as a
+			// block, so the box (their top-left corner) lands where it laid it.
 			const laid = await layoutFlow(flow, {
 				layout: await loadElk(),
 				sizes: measured,
-				handles: measuredHandles(nodeLookup),
+				...measuredHandles(nodeLookup),
+				folded,
 				viewport,
 			});
 			const at = new Map(
@@ -523,6 +546,7 @@ export function EditorCanvas({
 				laid.flow.nodes,
 				groupEdges(laid.flow),
 				laid.routes,
+				sections.endOf,
 			);
 			setRoutes(book);
 			writeRoutes(routesKey, book);
@@ -556,7 +580,17 @@ export function EditorCanvas({
 				},
 			},
 		});
-	}, [flow, routes, routesKey, measured, onFlowChange, fitView, store]);
+	}, [
+		flow,
+		routes,
+		routesKey,
+		measured,
+		folded,
+		sections.endOf,
+		onFlowChange,
+		fitView,
+		store,
+	]);
 
 	const selectEdge = useCallback(
 		(id: string) => onSelect({ kind: "edge", id }),

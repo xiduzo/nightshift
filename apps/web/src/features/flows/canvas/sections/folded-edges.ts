@@ -5,6 +5,7 @@
 
 import { type Flow, type FlowEdge, nodeOutcomes } from "@nightshift/flows";
 import { type EdgeGroup, pairKey } from "../edge-groups";
+import type { EndOf } from "../route-cache";
 import { sectionNodeId } from "./section-ids";
 
 /**
@@ -26,6 +27,15 @@ export function foldedMembers(
 	return boxOf;
 }
 
+/** What each node is drawn as, for kept routes: itself, or its folded box. */
+export function sectionEnds(
+	flow: Pick<Flow, "sections">,
+	folded: ReadonlySet<string>,
+): EndOf {
+	const boxOf = foldedMembers(flow, folded);
+	return (nodeId) => boxOf.get(nodeId) ?? nodeId;
+}
+
 /**
  * The drawn edges with the folded Sections as boxes. A group whose source
  * is a box holds edges of several nodes: they come in the order the box
@@ -40,6 +50,10 @@ export function foldEdgeGroups(
 	const boxOf = foldedMembers(flow, folded);
 	if (boxOf.size === 0) return groups;
 	const end = (node: string) => boxOf.get(node) ?? node;
+	const pairOf = new Map<string, EdgeGroup>();
+	for (const group of groups) {
+		for (const edge of group.edges) pairOf.set(edge.id, group);
+	}
 
 	const pairs = new Map<
 		string,
@@ -78,6 +92,14 @@ export function foldEdgeGroups(
 	return [...pairs.entries()].map(([key, { from, to, edges }]) => {
 		const sorted = [...edges].sort((a, b) => order(a) - order(b));
 		const first = sorted[0] as FlowEdge;
-		return { id: first.id, key, from, to, edges: sorted };
+		const routedAs = pairOf.get(first.id);
+		return {
+			id: first.id,
+			key,
+			from,
+			to,
+			edges: sorted,
+			...(routedAs && routedAs.key !== key && { routedAs }),
+		};
 	});
 }

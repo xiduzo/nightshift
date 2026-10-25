@@ -55,6 +55,8 @@ export type SectionFrameData = {
 export type SectionBoxExit = {
 	from: string;
 	outcome: string;
+	/** `SectionExit.label`, "verdict · pass": how "Lay out" names the handle. */
+	label: string;
 	color?: OutcomeColor;
 };
 
@@ -171,7 +173,7 @@ const SectionFrame = memo(function SectionFrame({
 		>
 			<div
 				className={cn(
-					"pointer-events-auto flex cursor-grab items-start gap-2 rounded-t-[10px] px-3 pt-2 active:cursor-grabbing",
+					"pointer-events-auto flex cursor-grab items-start gap-2 rounded-t-[10px] px-3 pt-1.5 active:cursor-grabbing",
 					overview && "invisible",
 				)}
 				style={{ height: header }}
@@ -195,7 +197,7 @@ const SectionFrame = memo(function SectionFrame({
 					</div>
 					{description ? (
 						<p
-							className="truncate text-muted-foreground text-xs"
+							className="-mt-0.5 truncate text-muted-foreground text-xs"
 							title={description}
 						>
 							{description}

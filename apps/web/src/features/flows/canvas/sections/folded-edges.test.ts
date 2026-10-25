@@ -3,7 +3,8 @@ import { FLOW_VERSION, type Flow } from "@nightshift/flows";
 import featureFactory from "../../editor/lib/fixtures/feature-factory.json";
 import { groupEdges, groupSegments, labelText } from "../edge-groups";
 import { canvasEdges } from "../outcome-edge";
-import { foldEdgeGroups, foldedMembers } from "./folded-edges";
+import { recordRoutes } from "../route-cache";
+import { foldEdgeGroups, foldedMembers, sectionEnds } from "./folded-edges";
 
 /** The feature-factory flow with the Sections of the research sketch. */
 const factory = {
@@ -142,5 +143,49 @@ describe("foldEdgeGroups", () => {
 		);
 		const into = edges.find((edge) => edge.target === "section:review");
 		expect(into?.sourceHandle).toBe("frontend");
+	});
+});
+
+describe("kept routes", () => {
+	const route = {
+		points: [
+			{ x: 0, y: 0 },
+			{ x: 100, y: 0 },
+		],
+	};
+	const routes = new Map([["verdict->publish", route]]);
+
+	test("a line from a box follows the route its node pair got while folded", () => {
+		const folded = new Set(["review"]);
+		const endOf = sectionEnds(factory, folded);
+		const book = recordRoutes(
+			factory.nodes,
+			groupEdges(factory),
+			routes,
+			endOf,
+		);
+		const out = canvasEdges(factory, fold("review"), {
+			routes: book,
+			endOf,
+		}).find(
+			(edge) => edge.source === "section:review" && edge.target === "publish",
+		);
+		expect(out?.data?.route).toEqual(route);
+	});
+
+	test("a route kept while folded does not show once the Section unfolds", () => {
+		const endOf = sectionEnds(factory, new Set(["review"]));
+		const book = recordRoutes(
+			factory.nodes,
+			groupEdges(factory),
+			routes,
+			endOf,
+		);
+		const open = sectionEnds(factory, new Set());
+		const edge = canvasEdges(factory, groupEdges(factory), {
+			routes: book,
+			endOf: open,
+		}).find((e) => e.source === "verdict" && e.target === "publish");
+		expect(edge?.data?.route).toBeUndefined();
 	});
 });

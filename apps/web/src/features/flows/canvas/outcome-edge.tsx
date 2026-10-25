@@ -44,7 +44,7 @@ import {
 	outcomeStyle,
 	resolveOutcomeColor,
 } from "./outcome-badge";
-import { type RouteBook, routeOf } from "./route-cache";
+import { type EndOf, type RouteBook, routeOf } from "./route-cache";
 
 export type OutcomeEdgeData = {
 	/** One per edge of the flow this drawn edge carries, in handle order. */
@@ -70,6 +70,7 @@ export function canvasEdges(
 		traversals,
 		selected,
 		boxes,
+		endOf,
 	}: {
 		routes?: RouteBook;
 		/** Ids of edges with an error. */
@@ -80,6 +81,8 @@ export function canvasEdges(
 		selected?: string;
 		/** Where each folded Section's box is, by its canvas id. */
 		boxes?: ReadonlyMap<string, Point>;
+		/** What each node is drawn as: itself, or its folded Section's box. */
+		endOf?: EndOf;
 	} = {},
 ): FlowCanvasEdge[] {
 	const at = new Map<string, Point>(
@@ -102,7 +105,12 @@ export function canvasEdges(
 			sourceHandle: segments[0] && handleOf(segments[0]),
 			target: group.to,
 			selected: selectedSegment !== undefined,
-			data: { segments, selectedSegment, route: routeOf(routes, group, at) },
+			data: {
+				segments,
+				selectedSegment,
+				// Routes are kept per node pair, with what each end was drawn as.
+				route: routeOf(routes, group.routedAs ?? group, at, endOf),
+			},
 		};
 	});
 }

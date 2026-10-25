@@ -13,10 +13,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { type EdgeGroup, groupEdges } from "../edge-groups";
 import type { Point } from "../edge-route";
 import type { NodeRunState } from "../flow-node";
+import type { EndOf } from "../route-cache";
 import type { Measured } from "../use-measured";
 import { foldsStorageKey, readFolds, withFold, writeFolds } from "./fold-state";
-import { foldEdgeGroups, foldedMembers } from "./folded-edges";
-import { boxPosition, frameHeader, frameRect } from "./section-geometry";
+import { foldEdgeGroups, foldedMembers, sectionEnds } from "./folded-edges";
+import { boxPosition, FRAME_PADDING, frameRect } from "./section-geometry";
 import { sectionNodeId } from "./section-ids";
 import type { SectionBoxNode, SectionFrameNode } from "./section-nodes";
 import { sectionRunSummary } from "./section-run";
@@ -82,6 +83,8 @@ export type SectionCanvas = {
 	boxes: SectionBoxNode[];
 	/** Where each box is, by its canvas id, for edge routes. */
 	boxPositions: ReadonlyMap<string, Point>;
+	/** What each node is drawn as: itself, or its folded Section's box. */
+	endOf: EndOf;
 };
 
 /** The Sections of `flow` as canvas nodes. */
@@ -116,6 +119,7 @@ export function useSectionCanvas(
 		() => foldEdgeGroups(flow, groupEdges(flow), folded),
 		[flow, folded],
 	);
+	const endOf = useMemo(() => sectionEnds(flow, folded), [flow, folded]);
 
 	const layer = useMemo(() => {
 		const sections = flow.sections ?? [];
@@ -154,7 +158,7 @@ export function useSectionCanvas(
 						section,
 						count,
 						issues: sectionIssues,
-						header: frameHeader(section),
+						header: FRAME_PADDING.top,
 					},
 				});
 				continue;
@@ -181,11 +185,12 @@ export function useSectionCanvas(
 				data: {
 					section,
 					count,
-					exits: boundary.outgoing.map(({ from, outcome }) => {
+					exits: boundary.outgoing.map(({ from, outcome, label }) => {
 						const node = nodeOf(from);
 						return {
 							from,
 							outcome,
+							label,
 							color: node ? outcomeColor(node, outcome) : undefined,
 						};
 					}),
@@ -209,5 +214,5 @@ export function useSectionCanvas(
 		run,
 	]);
 
-	return { groups, ...layer };
+	return { groups, endOf, ...layer };
 }

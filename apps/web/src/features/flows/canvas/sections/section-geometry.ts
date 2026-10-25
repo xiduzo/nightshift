@@ -5,24 +5,21 @@
 // Positions in the flow file stay per node.
 
 import { type Flow, type FlowSection, moveNode } from "@nightshift/flows";
+import { SECTION_PADDING } from "../../editor/lib/flow-layout";
 import type { Point } from "../edge-route";
 import type { Measured } from "../use-measured";
 
 /** A node React Flow has not measured yet: `w-64` and a typical body. */
 const FALLBACK_SIZE = { width: 256, height: 160 };
 
-/** Between the members and the frame. */
-export const FRAME_PADDING = 24;
-/** Above the members: the frame's name, and its description when it has one. */
-const HEADER = 40;
-const HEADER_DESCRIBED = 58;
+/**
+ * Between the members and the frame: the room "Lay out" leaves, so a frame
+ * drawn around laid-out members matches the layout. The top holds the
+ * frame's header: its name, and one line of description.
+ */
+export const FRAME_PADDING = SECTION_PADDING;
 
 export type Rect = Point & { width: number; height: number };
-
-/** The height of a frame's header. */
-export function frameHeader(section: Pick<FlowSection, "description">): number {
-	return section.description?.trim() ? HEADER_DESCRIBED : HEADER;
-}
 
 /** The box around the nodes, by their positions and sizes. Null for no known node. */
 export function membersBounds(
@@ -47,7 +44,7 @@ export function membersBounds(
 	return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-/** The frame of an unfolded Section: its members, padded, with a header on top. */
+/** The frame of an unfolded Section: its members, padded, with room for a header on top. */
 export function frameRect(
 	flow: Pick<Flow, "nodes">,
 	section: FlowSection,
@@ -55,12 +52,12 @@ export function frameRect(
 ): Rect | null {
 	const bounds = membersBounds(flow, section.nodes, sizes);
 	if (!bounds) return null;
-	const header = frameHeader(section);
+	const { top, right, bottom, left } = FRAME_PADDING;
 	return {
-		x: bounds.x - FRAME_PADDING,
-		y: bounds.y - FRAME_PADDING - header,
-		width: bounds.width + 2 * FRAME_PADDING,
-		height: bounds.height + 2 * FRAME_PADDING + header,
+		x: bounds.x - left,
+		y: bounds.y - top,
+		width: bounds.width + left + right,
+		height: bounds.height + top + bottom,
 	};
 }
 

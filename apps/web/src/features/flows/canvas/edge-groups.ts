@@ -27,6 +27,12 @@ export type EdgeGroup = {
 	to: string;
 	/** In the order the source node shows its outcomes. Never empty. */
 	edges: FlowEdge[];
+	/**
+	 * The node pair whose kept route this drawn edge follows, when it joins
+	 * a folded Section's box (`foldEdgeGroups`). "Lay out" routes node
+	 * pairs, so a drawn edge to a box follows its first edge's pair.
+	 */
+	routedAs?: EdgeGroup;
 };
 
 export function pairKey(from: string, to: string): string {
