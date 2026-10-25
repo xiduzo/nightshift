@@ -46,6 +46,11 @@ import { serveWork } from "./remote";
  * `replyDeadlineMs` is aborted: nothing runs here for a Walker that is
  * gone.
  *
+ * A call outlives its server too. The calls and the link they reply over
+ * are `ServedCalls`, which a `bun --hot` reload gives to the next server:
+ * a session runs on through the reload, once, and its replies go over the
+ * new link.
+ *
  * Another Person's run uses this computer through its Offers only
  * (`checkWork`). Its sessions name an offered profile, which this computer
  * resolves itself (`offeredSession`: the permission mode no wider than
@@ -118,6 +123,23 @@ export type WorkServer = {
 	running(): number;
 };
 
+/**
+ * The calls this computer serves for one Host, and the link their replies
+ * go over. They outlive the work server that took them: the next one
+ * takes them over (`createWorkServer({ served })`) and names them to the
+ * Host, so the Host keeps waiting for them.
+ */
+export type ServedCalls = {
+	/** The calls running here, by id. Aborting one ends it. */
+	readonly running: Map<string, AbortController>;
+	/** The link the replies go over: the one attached last. Null while none is. */
+	link: Pick<Link, "ready"> | null;
+};
+
+export function servedCalls(): ServedCalls {
+	return { running: new Map(), link: null };
+}
+
 export function createWorkServer(
 	deps: {
 		/** The Host whose runs it serves. */
@@ -126,13 +148,15 @@ export function createWorkServer(
 		engine: WorkEngine;
 		/** This computer as a Device. */
 		device: Device;
+		/** The calls of the server before this one, which this one takes over. Default: none. */
+		served?: ServedCalls;
 		replyDeadlineMs?: number;
 	} & Partial<OfferDeps>,
 ): WorkServer {
 	const replyDeadlineMs = deps.replyDeadlineMs ?? REPLY_DEADLINE_MS;
-	const calls = new Map<string, AbortController>();
-	/** The link the replies go over: the one attached last. A call outlives a link that restarts. */
-	let link: Pick<Link, "ready"> | null = null;
+	/** The calls, and the link they reply over. A call outlives a link that restarts, and this server. */
+	const served = deps.served ?? servedCalls();
+	const calls = served.running;
 
 	/** The replies of one call, sent in order, a batch at a time. */
 	function outbox(id: string, abort: () => void) {
@@ -152,6 +176,7 @@ export function createWorkServer(
 					const done = ended && pending.length === 0;
 					const since = failingSince ?? Date.now();
 					try {
+						const link = served.link;
 						if (!link) throw new Error("No link to the Host.");
 						// Offline: wait for the link, but not past the deadline.
 						const client = await link.ready(
@@ -239,7 +264,7 @@ export function createWorkServer(
 	return {
 		running: () => calls.size,
 		attach(next) {
-			link = next;
+			served.link = next;
 			const stop = next.stream("devices.work", async (client, signal) => {
 				const stream = await client.devices.work(
 					{ running: [...calls.keys()] },
@@ -255,7 +280,7 @@ export function createWorkServer(
 			});
 			return () => {
 				stop();
-				if (link === next) link = null;
+				if (served.link === next) served.link = null;
 			};
 		},
 	};
