@@ -5,7 +5,7 @@ import {
 	type Flow,
 	removeSection,
 } from "@nightshift/flows";
-import { restoreSection } from "./section-edits";
+import { restoreSection, undoSubflow } from "./section-edits";
 
 const flow: Flow = {
 	version: FLOW_VERSION,
@@ -51,5 +51,18 @@ describe("restoreSection", () => {
 		const section = flow.sections?.[1];
 		if (!section) throw new Error("no section");
 		expect(restoreSection(flow, section, 1)).toBe(flow);
+	});
+});
+
+describe("undoSubflow", () => {
+	const caller: Flow = { ...flow, sections: [] };
+
+	test("gives the draft before, while the draft is the one it made", () => {
+		expect(undoSubflow(caller, { caller }, flow)).toBe(flow);
+	});
+
+	test("gives nothing once the draft changed since", () => {
+		const edited: Flow = { ...caller, start: "b" };
+		expect(undoSubflow(edited, { caller }, flow)).toBeNull();
 	});
 });

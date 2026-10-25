@@ -1,7 +1,7 @@
 /**
  * The inspector of the selected Section: its name, colour and description,
  * its warnings, its nodes, and fold and remove. Removing a Section keeps its
- * nodes.
+ * nodes. "Make subflow" moves them to a flow of their own (the dialog).
  */
 import {
 	type Flow,
@@ -27,6 +27,7 @@ import {
 	ChevronsDownUpIcon,
 	ChevronsUpDownIcon,
 	GroupIcon,
+	SquareFunctionIcon,
 	Trash2Icon,
 	TriangleAlertIcon,
 } from "lucide-react";
@@ -48,6 +49,7 @@ export function SectionInspector({
 	onSetFolded,
 	onRemove,
 	onSelectNode,
+	onMakeSubflow,
 }: {
 	flow: Flow;
 	section: FlowSection;
@@ -61,6 +63,8 @@ export function SectionInspector({
 	onRemove: () => void;
 	/** Selects one of its nodes on the canvas. */
 	onSelectNode: (nodeId: string) => void;
+	/** Opens "Make subflow from section". */
+	onMakeSubflow: () => void;
 }) {
 	const id = useId();
 	const known = new Set(flow.nodes.map((node) => node.id));
@@ -235,6 +239,21 @@ export function SectionInspector({
 						: "The flow has no single way into this Section."}{" "}
 					Remove the Section to keep its nodes without a frame.
 				</Note>
+			</InspectorSection>
+
+			<InspectorSection
+				title="Subflow"
+				description="Move these nodes to a new flow. A Subflow runs it here in their place. You see each change before it happens."
+			>
+				<Button
+					variant="outline"
+					size="sm"
+					className="self-start"
+					onClick={onMakeSubflow}
+				>
+					<SquareFunctionIcon data-icon="inline-start" />
+					Make subflow
+				</Button>
 			</InspectorSection>
 		</div>
 	);

@@ -7,12 +7,13 @@ import {
 import type { Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";
 import { type Selection, selectedNodeIds, withoutNodes } from "../selection";
+import type { SubflowMade } from "./make-subflow";
 import { sectionName, sectionProblemText } from "./section-problems";
 
 /**
  * The edits of Sections that reach past one field: make one from the
- * selected nodes, remove one (with an undo), and fold one without leaving
- * hidden nodes selected.
+ * selected nodes, remove one (with an undo), fold one without leaving
+ * hidden nodes selected, and put a Subflow in its place (with an undo).
  */
 export function sectionEdits(
 	draft: Flow,
@@ -69,7 +70,58 @@ export function sectionEdits(
 		});
 	};
 
-	return { makeSection, removeWithUndo, setSectionFolded };
+	/**
+	 * The new flow file of "Make subflow" is saved: the Subflow takes the
+	 * Section's place in the draft and is selected. Undo puts the draft back
+	 * while nothing else changed it. The new flow file stays.
+	 */
+	const applySubflow = (
+		sectionId: string,
+		made: SubflowMade,
+		latest: () => Flow,
+	) => {
+		const before = draft;
+		setDraft(made.caller);
+		setFolded(sectionId, false);
+		setSelection({ kind: "node", id: made.callNode });
+		toast.success(
+			`Made the Subflow "${made.name}". Save this flow to keep the change.`,
+			{
+				description: "Press i to look inside it.",
+				action: {
+					label: "Undo",
+					onClick: () => {
+						const back = undoSubflow(latest(), made, before);
+						if (back === null) {
+							toast.error(
+								"Could not undo. You changed this flow after you made the Subflow.",
+							);
+							return;
+						}
+						setDraft(back);
+						setSelection({ kind: "section", id: sectionId });
+						toast.info(
+							`The Section is back. The flow "${made.name}" stays in the project.`,
+						);
+					},
+				},
+			},
+		);
+	};
+
+	return { makeSection, removeWithUndo, setSectionFolded, applySubflow };
+}
+
+/**
+ * The draft before "Make subflow", while the draft is still the one the
+ * action made. Null when something changed it since: undo would lose that.
+ */
+export function undoSubflow(
+	current: Flow,
+	made: Pick<SubflowMade, "caller">,
+	before: Flow,
+): Flow | null {
+	return current === made.caller ? before : null;
 }
 
 /**

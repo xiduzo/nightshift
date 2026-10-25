@@ -48,6 +48,7 @@ import { LeaveDialog } from "./leave-dialog";
 import { NodeDock } from "./node-dock";
 import { nodeEdits } from "./node-edits";
 import { ProjectFlowsContext } from "./project-flows-context";
+import { MakeSubflowDialog } from "./sections/make-subflow-dialog";
 import { sectionEdits } from "./sections/section-edits";
 import { SectionInspector } from "./sections/section-inspector";
 import { type Selection, selectedNodeIds } from "./selection";
@@ -90,6 +91,8 @@ function Editor({
 	const [selection, setSelection] = useState<Selection>(null);
 	// The Section just made: its inspector asks for a name first.
 	const [madeSection, setMadeSection] = useState<string | null>(null);
+	// The Section "Make subflow" works on, while its dialog is open.
+	const [subflowOf, setSubflowOf] = useState<string | null>(null);
 	const folds = useFoldedSections(`${projectId}/${name}`);
 
 	const dirty = useMemo(
@@ -227,6 +230,11 @@ function Editor({
 	};
 
 	const sections = sectionEdits(draft, setDraft, setSelection, folds.setFolded);
+	const draftRef = useRef(draft);
+	draftRef.current = draft;
+	const subflowSection = draft.sections?.find(
+		(section) => section.id === subflowOf,
+	);
 	const makeSection = (nodeIds: readonly string[]) => {
 		const id = sections.makeSection(nodeIds);
 		if (id) setMadeSection(id);
@@ -415,6 +423,7 @@ function Editor({
 			}
 			onRemove={() => sections.removeWithUndo(selectedSection.id)}
 			onSelectNode={selectNode}
+			onMakeSubflow={() => setSubflowOf(selectedSection.id)}
 		/>
 	) : settingsOpen ? (
 		<FlowInspector
@@ -605,6 +614,31 @@ function Editor({
 				flowName={name}
 				inputs={draft.inputs}
 			/>
+
+			{subflowSection ? (
+				<MakeSubflowDialog
+					open
+					onOpenChange={(open) => {
+						if (!open) setSubflowOf(null);
+					}}
+					projectId={projectId}
+					flowName={name}
+					draft={draft}
+					section={subflowSection}
+					flows={projectFlows.flows}
+					onMade={(made) => {
+						sections.applySubflow(
+							subflowSection.id,
+							made,
+							() => draftRef.current,
+						);
+						// The Subflow view reads the new flow from the project's list.
+						void queryClient.invalidateQueries({
+							queryKey: flowQueries.lists(),
+						});
+					}}
+				/>
+			) : null}
 
 			<LeaveDialog
 				blocked={blocker.status === "blocked"}
