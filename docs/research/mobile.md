@@ -825,13 +825,15 @@ cd apps/mobile
 eas update --channel production --environment production --message "What changed"
 ```
 
-The app checks for an update when it starts. It downloads the update in the
-background and uses it from the next start.
+The app checks for an update when it starts, and waits on the splash screen
+for up to 5 seconds (`fallbackToCacheTimeout` in `app.json`). An update that
+arrives in time starts at once. A slower one downloads in the background and
+starts at the next launch.
 
 An update reaches only the builds with the same runtime version. The runtime
 version is the fingerprint of the native project (`"policy": "fingerprint"`
-in `app.json`). A change to native code, a native dependency or a config
-plugin changes the fingerprint, so it needs a new build. The older builds do
+in `app.json`). A change to native code, a native dependency, a config
+plugin or the `updates` settings changes the fingerprint, so it needs a new build. The older builds do
 not get an update for the new fingerprint. `eas fingerprint:compare` shows
 what changed.
 
