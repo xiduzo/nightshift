@@ -22,6 +22,7 @@ import {
 	type RunLog,
 	type RunRow,
 	type RunStatus,
+	runsArriving,
 } from "../log";
 import {
 	countDaemonResumes,
@@ -212,22 +213,32 @@ export function createRecovery(deps: RecoveryDeps) {
 	}
 
 	async function recover(): Promise<void> {
-		// Only the runs this Device walks: a run walked elsewhere is its
-		// Walker's to recover.
+		// Only the runs this Device walks, as their rows say: a run walked
+		// elsewhere is its Walker's to recover. A run moved here has the
+		// events of its old Walker too, and a run moved away is not ours.
+		const self = await log.walkerId();
+		const walkedHere = db
+			.select({ id: run.id })
+			.from(run)
+			.where(eq(run.walkerId, self));
 		const rows = await db
 			.select()
 			.from(event)
 			.where(
 				and(
 					isNotNull(event.runId),
-					eq(event.walkerId, await log.walkerId()),
+					inArray(event.runId, walkedHere),
 					inArray(event.type, [...LIFECYCLE_EVENT_TYPES]),
 				),
 			)
 			.orderBy(asc(event.seq));
+		// A run that moved here and has not arrived: its take-over gives it
+		// its walk state and its timer, once the engine is ready.
+		const arriving = new Set(await runsArriving(db, [self]));
 		const byRun = groupByRun(rows.map(parseEventRow));
 		toResume = [];
 		for (const [runId, events] of byRun) {
+			if (arriving.has(runId)) continue;
 			// The lifecycle events are enough to see what is open.
 			const open = openWork(events, "interrupted");
 			// A step that ran past its time budget or idle limit meanwhile

@@ -223,8 +223,9 @@ export type EnginePayloads = {
 	WalkerMoved: { from: string; to: string; by: string | null };
 	/**
 	 * The new Walker has the run's Walk state from the archive, and walks
-	 * it from here: its first event after `WalkerMoved`. Until it is in the
-	 * log, the run still arrives, and the new Walker tries again.
+	 * it from here: its first event after `WalkerMoved`. Until the new
+	 * Walker wrote to the run, the run still arrives, and it tries again
+	 * (`runsArriving`).
 	 */
 	WalkerArrived: { from: string };
 	/**

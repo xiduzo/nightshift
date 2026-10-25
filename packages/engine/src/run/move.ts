@@ -7,6 +7,7 @@ import {
 	type RunBus,
 	type RunLog,
 	type RunRow,
+	runsArriving,
 	stepIdsOfRun,
 } from "../log";
 import { deriveRunState } from "../read";
@@ -103,7 +104,7 @@ export async function moveRun(
 export async function takeOver(
 	deps: {
 		db: Database;
-		log: Pick<RunLog, "events" | "append">;
+		log: Pick<RunLog, "events" | "append" | "walkerId">;
 		runner: Pick<
 			Runner,
 			"hold" | "forget" | "restore" | "continueTranscriptAfter"
@@ -114,10 +115,11 @@ export async function takeOver(
 	runId: string,
 ): Promise<void> {
 	await deps.runner.hold(runId, async ({ row, events }) => {
+		const self = await deps.log.walkerId();
 		const moved = events.findLast((e) => e.type === "WalkerMoved");
 		if (
 			moved?.type !== "WalkerMoved" ||
-			events.some((e) => e.type === "WalkerArrived" && e.seq > moved.seq)
+			!(await runsArriving(deps.db, [self])).includes(runId)
 		) {
 			return;
 		}

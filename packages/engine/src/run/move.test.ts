@@ -3,7 +3,12 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fakeHarness } from "@nightshift/agents/testing";
 import { project } from "@nightshift/db/schema";
-import type { CommandNode, DecisionNode, Flow } from "@nightshift/flows";
+import type {
+	CommandNode,
+	DecisionNode,
+	Flow,
+	WaitNode,
+} from "@nightshift/flows";
 import { eq } from "drizzle-orm";
 import type {
 	OwnDevice,
@@ -91,9 +96,13 @@ afterEach(async () => {
 type Computer = Awaited<ReturnType<typeof computer>>;
 
 /** A computer whose peers share `archive`, and see the Devices of `others()` as its owner's. */
-async function computer(others: () => OwnDevice[] = () => []) {
-	const sandbox = await createSandbox();
-	sandboxes.push(sandbox);
+async function computer(
+	others: () => OwnDevice[] = () => [],
+	/** A computer's database to start on again: a restart. Default: a new one. */
+	again?: Sandbox,
+) {
+	const sandbox = again ?? (await createSandbox());
+	if (!again) sandboxes.push(sandbox);
 	let context: PeerContext | undefined;
 	const peers: PeersFactory = (ctx) => {
 		context = ctx;
@@ -504,6 +513,39 @@ describe("a run that moves to another Device", () => {
 		).rejects.toThrow("laptop is offline. Move the run when it is online.");
 		expect(archive.size).toBe(0);
 		await spaceOf(a, a).stopRun(runId);
+	});
+
+	test("a sleeping run that arrived gets its timer back after a restart of its new Walker", async () => {
+		const { a, b } = await pair();
+		const pause: WaitNode = {
+			id: "pause",
+			type: "wait",
+			position: { x: 0, y: 0 },
+			until: { kind: "time", at: new Date(Date.now() + 4_000).toISOString() },
+		};
+		const space = spaceOf(a, a);
+		const { id: projectId } = await space.addProject({
+			repoPath: a.sandbox.repoPath,
+		});
+		const { id: runId } = await space.startRun({
+			projectId,
+			flow: flowOf([pause]),
+		});
+		await waitFor(
+			async () => (await space.getRun(runId)).status === "sleeping",
+			{ label: "the run to sleep" },
+		);
+		await space.moveRun(runId, b.sandbox.deviceId);
+		await copyRows(a, b, projectId);
+		await b.context.takeOver(runId);
+		// B restarts before the wake: the next engine's recovery sets the timer.
+		await b.engine.dispose();
+		const again = await computer(() => [deviceOf(a)], b.sandbox);
+		await waitFor(
+			async () => (await spaceOf(again, a).getRun(runId)).status === "finished",
+			{ label: "the run to wake and end on B", timeoutMs: 15_000 },
+		);
+		await again.engine.dispose();
 	});
 
 	test("cannot be taken over without its Checkpoint in the archive, and arrives once it is there", async () => {

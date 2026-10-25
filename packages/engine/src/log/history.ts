@@ -7,7 +7,7 @@ import type { RunBus } from "./bus";
 import { asCommand } from "./command-stamp";
 import type { LoggedEvent } from "./events";
 import type { ForeignEvent, RunLog } from "./run-log";
-import { followWalkerMoves } from "./run-row";
+import { followWalkerMoves, runsArriving } from "./run-row";
 import type { TranscriptEntry } from "./step-events";
 import {
 	commandLogPath,
@@ -554,25 +554,12 @@ export function createRunHistory(deps: {
 	}
 
 	/**
-	 * The runs that moved to one of `here` and have not arrived: their
-	 * latest `WalkerMoved` names one of them, and no `WalkerArrived` came
-	 * after it. Read from the log, so a take-over that failed, or that a
-	 * restart cut short, is found again.
+	 * The runs that moved to one of `here` and have not arrived
+	 * (`runsArriving`). Read from the log, so a take-over that failed, or
+	 * that a restart cut short, is found again.
 	 */
-	async function arriving(here: readonly string[]): Promise<string[]> {
-		if (here.length === 0) return [];
-		const lastMove = sql`(select max(w.seq) from ${event} w where w.run_id = ${run.id} and w.type = 'WalkerMoved')`;
-		const rows = await db
-			.select({ id: run.id })
-			.from(run)
-			.where(
-				and(
-					inArray(run.walkerId, [...here]),
-					sql`(select json_extract(m.payload, '$.to') from ${event} m where m.seq = ${lastMove}) in ${[...here]}`,
-					sql`not exists (select 1 from ${event} a where a.run_id = ${run.id} and a.type = 'WalkerArrived' and a.seq > ${lastMove})`,
-				),
-			);
-		return rows.map((r) => r.id);
+	function arriving(here: readonly string[]): Promise<string[]> {
+		return runsArriving(db, here);
 	}
 
 	/** The latest presence event of each Device (`DeviceOnline` or `DeviceOffline`), by Device id. */

@@ -50,6 +50,7 @@ export {
 	hasRunRow,
 	runIdsOfProject,
 	runIdsWalkedBy,
+	runsArriving,
 	spaceOfRun,
 	stepIdsOfRun,
 } from "./run-row";
