@@ -248,8 +248,15 @@ const entriesOf = (items: RunStreamItem[]): TranscriptEntry[] =>
 	items.flatMap((i) => (i.kind === "transcript" ? [i.entry] : []));
 const statusesOf = (items: RunStreamItem[]): RunStatus[] =>
 	items.flatMap((i) => (i.kind === "status" ? [i.status] : []));
-const isStatus = (status: RunStatus) => (item: RunStreamItem) =>
-	item.kind === "status" && item.status === status;
+/**
+ * Until the run has the status and `whole` says its transcript is in.
+ * The transcript has its own reader, so its last entries may come after
+ * the status: a watch keeps going after a run ends.
+ */
+const endedWith =
+	(status: RunStatus, whole: (entries: TranscriptEntry[]) => boolean) =>
+	(_item: RunStreamItem, items: RunStreamItem[]) =>
+		statusesOf(items).includes(status) && whole(entriesOf(items));
 
 async function readTranscript(path: string): Promise<TranscriptEntry[]> {
 	const text = await readFile(path, "utf8");
@@ -1663,7 +1670,11 @@ describe("watchRun", () => {
 			}
 			session.finish(0.01);
 		})();
-		const items = await collect(engine, run.id, isStatus("finished"));
+		const items = await collect(
+			engine,
+			run.id,
+			endedWith("finished", (entries) => entries.length === 75),
+		);
 		await producer;
 
 		expect(items[0]).toEqual({ kind: "status", status: "running" });
@@ -1683,7 +1694,6 @@ describe("watchRun", () => {
 		expect(
 			stepItems.some((s) => s.nodeId === "worker" && s.outcome === "pass"),
 		).toBe(true);
-		expect(items.at(-1)).toEqual({ kind: "status", status: "finished" });
 	});
 
 	test("afterSeq skips entries the caller has", async () => {
@@ -2695,7 +2705,13 @@ describe("gates", () => {
 			projectId: await projectId(engine),
 			flow: gateFlow(),
 		});
-		const watching = collect(engine, run.id, isStatus("finished"));
+		const watching = collect(
+			engine,
+			run.id,
+			endedWith("finished", (entries) =>
+				entries.some((e) => e.event.type === "gate-resolved"),
+			),
+		);
 		const open = await openGateOf(engine, run.id);
 		await engine.resolveGate({
 			runId: run.id,
