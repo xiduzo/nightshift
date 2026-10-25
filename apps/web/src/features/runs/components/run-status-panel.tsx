@@ -1,4 +1,4 @@
-import { runActions } from "@nightshift/client";
+import { runActions, useRunActed } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import { Card } from "@nightshift/ui/components/card";
 import {
@@ -9,7 +9,7 @@ import {
 import { ScrollArea } from "@nightshift/ui/components/scroll-area";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	ChevronRightIcon,
@@ -28,13 +28,14 @@ import { type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 import { walkerName } from "@/features/devices";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
+import { orpc } from "@/shared/api";
 import {
 	formatCountdown,
 	formatDateTime,
 	formatTime,
 	useNow,
 } from "@/shared/format";
-import { runMutations, runQueries } from "../queries";
+import { runMutations } from "../queries";
 import type { CurrentWait } from "../transcript/transcript";
 import { ResumeComposer } from "./resume-composer";
 
@@ -340,12 +341,12 @@ function Countdown({
 
 /** Sends the signal a run waits for, so its Wait step ends. */
 function SignalButton({ runId, name }: { runId: string; name: string }) {
-	const queryClient = useQueryClient();
+	const runActed = useRunActed({ orpc });
 	const send = useMutation(
 		runMutations.signal({
 			onSuccess: () => {
 				toast.success(`Sent ${name}. The flow goes on.`);
-				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
+				runActed(runId);
 			},
 			onError: (error) => toast.error(`Could not send: ${error.message}`),
 		}),
@@ -368,11 +369,10 @@ function SignalButton({ runId, name }: { runId: string; name: string }) {
 
 /** Wakes a sleeping run now instead of at its wake time. */
 function WakeButton({ runId }: { runId: string }) {
-	const queryClient = useQueryClient();
+	const runActed = useRunActed({ orpc });
 	const wake = useMutation(
 		runMutations.resume({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: runQueries.all() }),
+			onSuccess: () => runActed(runId),
 			onError: (error) => toast.error(`Could not wake: ${error.message}`),
 		}),
 	);

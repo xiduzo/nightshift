@@ -26,8 +26,9 @@ export type LiveRunOptions<T> = {
 /**
  * Follows one run live through the live cache: its steps, its status and
  * its transcript entries, in batches. It reconnects with backoff and hands
- * on each entry once. Step and status items read the run and its Gates
- * again. A new `runId` starts from nothing.
+ * on each entry once. Lay its steps over the run you read (`mergeSteps`):
+ * the run is read again only when a step starts or ends, or the run
+ * changes. A new `runId` starts from nothing.
  */
 export function useLiveRun<T>(
 	host: HostApi,

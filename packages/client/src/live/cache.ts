@@ -46,30 +46,45 @@ import type { Notice, ShownNotifications } from "./shown";
  * notification (`ShownNotifications`).
  */
 
-/** What a screen reads again: the open Gates, or what comes from the runs. */
-type Read = "gates" | "runs";
+/**
+ * What a screen reads again. `gates`: the open Gates. `run`: what one run
+ * changes, its detail and files, the lists of runs, the dashboard's
+ * numbers and a schedule's last start. `runs`: the same for every run.
+ * The Devices a run can run on or move to do not change with a run.
+ */
+type Read =
+	| { kind: "gates" }
+	| { kind: "runs" }
+	| { kind: "run"; runId: string };
 
-/** A missed stretch of a stream, an answer, a Gate, a step or status of a run: read both. */
-const EVERYTHING: readonly Read[] = ["gates", "runs"];
+const GATES: Read = { kind: "gates" };
+const ofRun = (runId: string): Read => ({ kind: "run", runId });
+
+/** A missed stretch of the stream, or an item this screen does not know: read both, of every run. */
+const EVERYTHING: readonly Read[] = [GATES, { kind: "runs" }];
 
 /**
  * What an item of `notifications.watch` reads again. A Gate that opens or
  * closes changes the inbox and the run it waits in. A run that ends or
- * changes changes the runs; a Gate that closes with it sends its own
- * `gate-closed`. An item of a kind this screen does not know reads both.
+ * changes changes that run; a Gate that closes with it sends its own
+ * `gate-closed`. An item of a kind this screen does not know reads
+ * everything.
  */
 function readsAfter(item: NotificationItem): readonly Read[] {
 	switch (item.kind) {
 		case "run-finished":
 		case "run-failed":
 		case "run-changed":
-			return ["runs"];
+			return [ofRun(item.runId)];
+		case "gate-opened":
+		case "gate-closed":
+			return [GATES, ofRun(item.runId)];
 		default:
 			return EVERYTHING;
 	}
 }
 
-/** A burst of items (each connect of a run's stream sends every step) reads once. */
+/** A burst of items (a walk that starts and ends steps, a person who acts) reads once. */
 const READ_MS = 300;
 const DEFAULT_FLUSH_MS = 50;
 
@@ -127,9 +142,16 @@ export type LiveCache = {
 	 */
 	gateAnswered(gate: GateAnswer, result: GateAnswerResult): void;
 	/**
+	 * The person acted on a run on this screen: started, stopped, resumed,
+	 * moved it, ran a step again, or sent it a signal. Reads the run again,
+	 * with the reads of the stream in the same burst.
+	 */
+	runActed(runId: string): void;
+	/**
 	 * Follows one run (`followRun`) and hands on what came in, in batches.
-	 * Step and status items read the runs and Gates again, once per burst.
-	 * Resolves when `signal` aborts, or when the run is not found.
+	 * It reads nothing again: the screen lays the steps over what it read
+	 * (`mergeSteps`), and the notifications stream says when a step starts
+	 * or ends. Resolves when `signal` aborts, or when the run is not found.
 	 */
 	followRun(options: FollowLiveRunOptions): Promise<void>;
 };
@@ -142,37 +164,70 @@ export function createLiveCache({
 }: LiveCacheOptions): LiveCache {
 	const gates = createGateQueries(orpc);
 	const runs = createRunQueries(orpc);
-	const keys: Record<Read, readonly (() => readonly unknown[])[]> = {
-		gates: [gates.all],
-		// What comes from the runs: the dashboard's numbers, a schedule's last start.
-		runs: [
-			runs.all,
-			createDashboardQueries(orpc).all,
-			createScheduleQueries(orpc).all,
-		],
-	};
+	const dashboard = createDashboardQueries(orpc);
+	const schedules = createScheduleQueries(orpc);
 	const openKey = gates.open().queryKey;
 	/** The notifications stream was live before: a new `live` may have missed items. */
 	let wasLive = false;
 	/** How the screen that follows shows notifications. Null until one follows. */
 	let shown: ShownNotifications | null = null;
 	/** What the next read reads, and whether it waits already. */
-	const pending = new Set<Read>();
+	const pending = {
+		gates: false,
+		/** Every run: the stream missed a stretch. */
+		everyRun: false,
+		/** The runs whose detail to read. */
+		details: new Set<string>(),
+		/** The runs whose files to read. */
+		files: new Set<string>(),
+		/** A run changed: the lists of runs, the dashboard and the schedules. */
+		lists: false,
+	};
 	let waiting = false;
+
+	function invalidate(queryKey: readonly unknown[]) {
+		void queryClient.invalidateQueries({ queryKey });
+	}
 
 	/** Reads again, once per burst. */
 	function read(what: readonly Read[]) {
-		for (const one of what) pending.add(one);
+		for (const one of what) {
+			if (one.kind === "gates") {
+				pending.gates = true;
+				continue;
+			}
+			pending.lists = true;
+			if (one.kind === "runs") {
+				pending.everyRun = true;
+			} else {
+				pending.details.add(one.runId);
+				pending.files.add(one.runId);
+			}
+		}
 		if (waiting) return;
 		waiting = true;
 		schedule(() => {
 			waiting = false;
-			const due = [...pending];
-			pending.clear();
-			for (const one of due) {
-				for (const key of keys[one]) {
-					void queryClient.invalidateQueries({ queryKey: key() });
-				}
+			const { gates: readGates, everyRun, lists } = pending;
+			const details = [...pending.details];
+			const files = [...pending.files];
+			pending.gates = false;
+			pending.everyRun = false;
+			pending.lists = false;
+			pending.details.clear();
+			pending.files.clear();
+			if (readGates) invalidate(gates.all());
+			if (everyRun) {
+				invalidate(runs.getKey());
+				invalidate(runs.artifactsKey());
+			} else {
+				for (const runId of details) invalidate(runs.getKey(runId));
+				for (const runId of files) invalidate(runs.artifactsKey(runId));
+			}
+			if (lists) {
+				invalidate(runs.lists());
+				invalidate(dashboard.all());
+				invalidate(schedules.lists());
 			}
 		}, READ_MS);
 	}
@@ -205,8 +260,11 @@ export function createLiveCache({
 		item: Extract<NotificationItem, { alert: boolean }>,
 	): Promise<{ title: string; body?: string }> {
 		try {
-			// Read now: what the cache has may be from before the item.
+			// Read now: what the cache has may be from before the item. This
+			// read is the item's read of the open Gates or of the run, so the
+			// burst does not read them a second time.
 			if (item.kind === "gate-opened") {
+				pending.gates = false;
 				const open = await queryClient.fetchQuery({
 					...gates.open(),
 					staleTime: 0,
@@ -217,6 +275,7 @@ export function createLiveCache({
 				if (gate) return describeNotice({ kind: item.kind, gate });
 			} else {
 				// By its id: a run of any of the person's Spaces.
+				pending.details.delete(item.runId);
 				const run = await queryClient.fetchQuery({
 					...runs.get(item.runId),
 					staleTime: 0,
@@ -306,8 +365,12 @@ export function createLiveCache({
 					(one) => one.runId !== gate.runId || one.stepId !== gate.stepId,
 				),
 			);
-			read(EVERYTHING);
+			read([GATES, ofRun(gate.runId)]);
 			void close(gateKey(gate));
+		},
+
+		runActed(runId) {
+			read([ofRun(runId)]);
 		},
 
 		async followRun({
@@ -321,7 +384,6 @@ export function createLiveCache({
 				schedule,
 				lastSeq: follow.afterSeq ?? null,
 				onFlush: onBatch,
-				onRunChanged: () => read(EVERYTHING),
 			});
 			const stop = () => buffer.stop({ flush: flushOnStop });
 			follow.signal.addEventListener("abort", stop, { once: true });

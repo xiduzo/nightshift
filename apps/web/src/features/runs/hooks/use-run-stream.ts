@@ -17,8 +17,9 @@ const BY_STEP: EntryFold<RunTranscript> = {
  * Follows one run live through the live cache (`useLiveRun`: reconnects
  * with backoff, hands on each entry once, in batches of 50 ms). A run
  * another device walks streams the same way: the server follows its
- * running step live through the Host. Status and step items read the run
- * and the Gates again, which carry the edge traversals and the cost.
+ * running step live through the Host. The page lays the steps over the
+ * run it read; the live cache reads the run again when a step starts or
+ * ends, for the edge traversals.
  */
 export function useRunStream(runId: string) {
 	const { entries, ...live } = useLiveRun({ client, orpc }, runId, {

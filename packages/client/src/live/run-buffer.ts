@@ -28,8 +28,6 @@ export type RunStreamBufferOptions = {
 	/** The seq the stream starts after, when the caller has entries already. */
 	lastSeq?: number | null;
 	onFlush(batch: RunStreamBatch): void;
-	/** A step or the status changed: the run is read again. */
-	onRunChanged(): void;
 };
 
 export type RunStreamBuffer = {
@@ -80,13 +78,11 @@ export function createRunStreamBuffer(
 			if (stopped) return;
 			steps.push(step);
 			scheduleFlush();
-			options.onRunChanged();
 		},
 		status(next) {
 			if (stopped) return;
 			status = next;
 			scheduleFlush();
-			options.onRunChanged();
 		},
 		stop({ flush: handOn = false } = {}) {
 			if (stopped) return;

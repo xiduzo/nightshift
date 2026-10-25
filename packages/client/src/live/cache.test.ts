@@ -8,7 +8,7 @@ import type {
 	NotificationItem,
 	NotificationWatchClient,
 } from "../notifications";
-import type { RunWatchClient } from "../runs";
+import { createRunQueries, type RunWatchClient } from "../runs";
 import { createScheduleQueries } from "../schedules";
 import { createLiveCache } from "./cache";
 import type { RunStreamBatch, Schedule } from "./run-buffer";
@@ -54,12 +54,16 @@ const NEW_GATE = {
 	question: "Publish?",
 };
 
+/** The procedures the live cache called, by name. */
+const called: string[] = [];
+
 /** Mostly the query keys are used. `runs.get` answers one run, `gates.list` the Gates open now. */
 const orpc = createQueryUtils(
 	createApiClient({
 		link: {
 			call: (path) => {
 				const name = path.join(".");
+				called.push(name);
 				if (name === "runs.get") return Promise.resolve(RUN);
 				if (name === "gates.list") return Promise.resolve([NEW_GATE]);
 				return new Promise(() => {});
@@ -68,9 +72,43 @@ const orpc = createQueryUtils(
 	}),
 );
 const gatesKey = createGateQueries(orpc).open().queryKey;
-const runsKey = orpc.runs.list.queryKey({ input: {} });
-const dashboardKey = createDashboardQueries(orpc).summary().queryKey;
-const schedulesKey = createScheduleQueries(orpc).list("p1").queryKey;
+const runs = createRunQueries(orpc);
+
+/** Every query a screen may hold, by a short name: the test checks which ones a read reads again. */
+const KEYS = {
+	gates: gatesKey,
+	everyRun: runs.everyRun().queryKey,
+	ofProject: runs.ofProject("p1").queryKey,
+	run1: runs.get("r1").queryKey,
+	run2: runs.get("r2").queryKey,
+	files1: runs.artifacts("r1", true).queryKey,
+	files2: runs.artifacts("r2", true).queryKey,
+	devices: runs.devices("p1").queryKey,
+	placements: runs.placements("p1").queryKey,
+	moveTargets: runs.moveTargets("r1").queryKey,
+	dashboard: createDashboardQueries(orpc).summary().queryKey,
+	flowHealth: createDashboardQueries(orpc).flow("p1", "fix").queryKey,
+	schedules: createScheduleQueries(orpc).list("p1").queryKey,
+	cron: createScheduleQueries(orpc).preview("0 3 * * *").queryKey,
+} as const;
+type Name = keyof typeof KEYS;
+
+/** What any change of run r1 reads again: the run, its files, the lists, the numbers, the schedules. */
+const RUN_1: Name[] = [
+	"everyRun",
+	"ofProject",
+	"run1",
+	"files1",
+	"dashboard",
+	"flowHealth",
+	"schedules",
+];
+/** What a missed stretch of the stream reads again: the Gates, and what every run changes. */
+const EVERYTHING: Name[] = ["gates", ...RUN_1, "run2", "files2"];
+const NOTHING: Name[] = [];
+
+/** Names in the order `stale()` gives them. */
+const sorted = (names: readonly Name[]) => [...names].sort();
 
 const gate = (runId: string, stepId: string) =>
 	({
@@ -150,14 +188,14 @@ function fakeHost() {
 	};
 }
 
-/** A live cache on a query client with the inbox, the runs, the dashboard and the schedules read. */
+/** A live cache on a query client that holds every query of `KEYS`. */
 function setUp() {
 	const queryClient = new QueryClient();
+	for (const key of Object.values(KEYS)) {
+		// Only whether they are read again counts, not what they hold.
+		queryClient.setQueryData(key as readonly unknown[], {});
+	}
 	queryClient.setQueryData(gatesKey, [gate("r1", "a"), gate("r2", "b")]);
-	queryClient.setQueryData(runsKey, []);
-	// Only whether they are read again counts, not what they hold.
-	queryClient.setQueryData(dashboardKey as readonly unknown[], {});
-	queryClient.setQueryData(schedulesKey as readonly unknown[], {});
 	const timers = handSchedule();
 	const live = createLiveCache({
 		queryClient,
@@ -165,12 +203,15 @@ function setUp() {
 		schedule: timers.schedule,
 		wait: async () => {},
 	});
-	const isStale = (key: readonly unknown[]) =>
-		queryClient.getQueryState(key)?.isInvalidated ?? false;
-	const stale = () => ({
-		gates: isStale(gatesKey),
-		runs: isStale(runsKey) && isStale(dashboardKey) && isStale(schedulesKey),
-	});
+	/** The queries read again so far, by name, sorted. */
+	const stale = () =>
+		(Object.keys(KEYS) as Name[])
+			.filter(
+				(name) =>
+					queryClient.getQueryState(KEYS[name] as readonly unknown[])
+						?.isInvalidated ?? false,
+			)
+			.sort();
 	return { queryClient, live, stale, timers };
 }
 
@@ -234,16 +275,16 @@ const runChanged: NotificationItem = {
 };
 
 describe("the live cache follows the Host", () => {
-	test("a Gate that opens or closes reads the Gates and the runs again, once per burst", async () => {
+	test("a Gate that opens or closes reads the Gates and its run again, once per burst", async () => {
 		const { live, stale, timers } = setUp();
 		const { host } = follow(live);
 		await host.send(opened(false), closedGate);
-		expect(stale()).toEqual({ gates: false, runs: false });
+		expect(stale()).toEqual(NOTHING);
 		timers.due(300);
-		expect(stale()).toEqual({ gates: true, runs: true });
+		expect(stale()).toEqual(sorted(["gates", ...RUN_1]));
 	});
 
-	test("a run that ends or changes reads the runs, the dashboard and the schedules again, not the Gates", async () => {
+	test("a run that ends or changes reads that run, the lists, the dashboard and the schedules again", async () => {
 		for (const item of [
 			ended("run-finished"),
 			ended("run-failed"),
@@ -253,8 +294,33 @@ describe("the live cache follows the Host", () => {
 			const { host } = follow(live);
 			await host.send(item);
 			timers.due(300);
-			expect(stale()).toEqual({ gates: false, runs: true });
+			// Not the Gates, not another run, not the Devices of a project.
+			expect(stale()).toEqual(sorted(RUN_1));
 		}
+	});
+
+	test("a burst of items of two runs reads each run once, and the lists once", async () => {
+		const { live, stale, timers, queryClient } = setUp();
+		const { host } = follow(live);
+		const reads: unknown[] = [];
+		const invalidate = queryClient.invalidateQueries.bind(queryClient);
+		queryClient.invalidateQueries = (filters, options) => {
+			reads.push(filters?.queryKey);
+			return invalidate(filters, options);
+		};
+		await host.send(runChanged, { ...runChanged, runId: "r2" }, runChanged);
+		timers.due(300);
+		expect(stale()).toEqual(sorted([...RUN_1, "run2", "files2"]));
+		// Each run's detail and files once, then the lists, the dashboard, the schedules.
+		expect(reads).toEqual([
+			runs.getKey("r1"),
+			runs.getKey("r2"),
+			runs.artifactsKey("r1"),
+			runs.artifactsKey("r2"),
+			runs.lists(),
+			orpc.dashboard.key(),
+			orpc.schedules.list.key(),
+		]);
 	});
 
 	test("an item of a kind this screen does not know reads everything again", async () => {
@@ -262,7 +328,7 @@ describe("the live cache follows the Host", () => {
 		const { host } = follow(live);
 		await host.send({ kind: "run-moved", runId: "r1" } as never);
 		timers.due(300);
-		expect(stale()).toEqual({ gates: true, runs: true });
+		expect(stale()).toEqual(sorted(EVERYTHING));
 	});
 
 	test("the first live reads nothing; each one after reads everything", async () => {
@@ -270,14 +336,14 @@ describe("the live cache follows the Host", () => {
 		const first = follow(live);
 		await Bun.sleep(0);
 		timers.due(300);
-		expect(stale()).toEqual({ gates: false, runs: false });
+		expect(stale()).toEqual(NOTHING);
 		first.host.stop();
 		await first.followed;
 		// The phone comes back to the front: what happened meanwhile is lost.
 		follow(live);
 		await Bun.sleep(0);
 		timers.due(300);
-		expect(stale()).toEqual({ gates: true, runs: true });
+		expect(stale()).toEqual(sorted(EVERYTHING));
 	});
 
 	test("the phone says it is the phone", async () => {
@@ -328,6 +394,19 @@ describe("the live cache follows the Host", () => {
 			title: "A run finished",
 			body: "Fix the login\nEnded on ship",
 		});
+	});
+
+	test("the words of a notice are the read of its item: the burst does not read them again", async () => {
+		const { live, stale, timers } = setUp();
+		const { host, shown } = follow(live);
+		await host.send(ended("run-finished"), opened(true));
+		called.length = 0;
+		await shown[0]?.describe();
+		await shown[1]?.describe();
+		timers.due(300);
+		expect(called).toEqual(["runs.get", "gates.list"]);
+		// The run's detail and the open Gates are fresh; the rest of the run is read again.
+		expect(stale()).toEqual(sorted(RUN_1.filter((name) => name !== "run1")));
 	});
 
 	test("an item that does not alert shows nothing", async () => {
@@ -388,7 +467,7 @@ describe("the one Gate refusal rule", () => {
 			await Bun.sleep(0);
 			expect(closed).toEqual(["r1:a"]);
 			timers.due(300);
-			expect(stale()).toEqual({ gates: true, runs: true });
+			expect(stale()).toEqual(sorted(["gates", ...RUN_1]));
 		}
 	});
 
@@ -404,13 +483,25 @@ describe("the one Gate refusal rule", () => {
 			await Bun.sleep(0);
 			expect(closed).toEqual([]);
 			timers.due(300);
-			expect(stale()).toEqual({ gates: false, runs: false });
+			expect(stale()).toEqual(NOTHING);
 		}
 	});
 });
 
+describe("a run the person acted on", () => {
+	test("reads that run again, in one burst with the items of the stream", async () => {
+		const { live, stale, timers } = setUp();
+		const { host } = follow(live);
+		live.runActed("r1");
+		await host.send(runChanged);
+		expect(stale()).toEqual(NOTHING);
+		timers.due(300);
+		expect(stale()).toEqual(sorted(RUN_1));
+	});
+});
+
 describe("the live cache follows one run", () => {
-	test("in batches, and its steps read the runs and Gates once per burst", async () => {
+	test("in batches, and it reads nothing again: the screen lays the steps over the run", async () => {
 		const { live, stale, timers } = setUp();
 		const controller = new AbortController();
 		const batches: RunStreamBatch[] = [];
@@ -453,9 +544,8 @@ describe("the live cache follows one run", () => {
 		expect(batches).toHaveLength(1);
 		expect(batches[0]?.lastSeq).toBe(6);
 		expect(batches[0]?.status).toBe("running");
-		expect(stale()).toEqual({ gates: false, runs: false });
 		timers.due(300);
-		expect(stale()).toEqual({ gates: true, runs: true });
+		expect(stale()).toEqual(NOTHING);
 		controller.abort();
 		await followed;
 	});

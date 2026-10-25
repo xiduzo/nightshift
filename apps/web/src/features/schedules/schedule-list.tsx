@@ -39,9 +39,9 @@ import {
 	PowerOffIcon,
 	Trash2Icon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
-import { RunStatusBadge, runQueries } from "@/features/runs";
+import { RunStatusBadge } from "@/features/runs";
 import { settingsQueries } from "@/features/settings";
 import type {
 	ScheduleIssue,
@@ -83,19 +83,6 @@ export function ScheduleList({ projectId }: { projectId: string }) {
 	const settings = useQuery(settingsQueries.get());
 	const schedulerOff = settings.data ? !settings.data.values.scheduler : false;
 	const schedulerLock = settings.data?.fields.scheduler.locked;
-
-	// A schedule that fired started a run: the run lists should show it.
-	const fired = schedules
-		.map((s) => (s.last?.kind === "fired" ? s.last.runId : ""))
-		.join(",");
-	const seenFired = useRef<string | null>(null);
-	useEffect(() => {
-		if (!list.data) return;
-		if (seenFired.current !== null && seenFired.current !== fired) {
-			void queryClient.invalidateQueries({ queryKey: runQueries.all() });
-		}
-		seenFired.current = fired;
-	}, [fired, list.data, queryClient]);
 
 	const save = useMutation(
 		scheduleMutations.save({

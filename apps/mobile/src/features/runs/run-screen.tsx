@@ -75,13 +75,17 @@ function SignedInRun({ runId }: { runId: string }) {
 	const projects = useQuery(projectQueries.list());
 	const live = usePhoneLiveRun(runId);
 
+	// A pull reads this run and the open Gates again, not every run.
 	const refresh = useCallback(
 		() =>
-			Promise.all([
-				queryClient.invalidateQueries({ queryKey: runQueries.all() }),
-				queryClient.invalidateQueries({ queryKey: gateQueries.all() }),
-			]),
-		[queryClient, runQueries, gateQueries],
+			Promise.all(
+				[
+					runQueries.getKey(runId),
+					runQueries.artifactsKey(runId),
+					gateQueries.all(),
+				].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+			),
+		[queryClient, runQueries, gateQueries, runId],
 	);
 
 	return (

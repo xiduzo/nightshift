@@ -10,6 +10,7 @@ import {
 	missingInputs,
 	type Project,
 	placementChoices,
+	useRunActed,
 } from "@nightshift/client";
 import { Card, CardContent } from "@nightshift/ui-native/components/ui/card";
 import { Skeleton } from "@nightshift/ui-native/components/ui/skeleton";
@@ -21,7 +22,7 @@ import { useCallback, useState } from "react";
 import { View } from "react-native";
 
 import { canFollowOnLockScreen, useFollowAfterStart } from "@/features/glance";
-import { useHostQueries } from "@/features/host";
+import { useHostQueries, useSignedIn } from "@/features/host";
 import { openRun } from "@/features/runs";
 import { ActionBar } from "@/shared/action-bar";
 import { EmptyState } from "@/shared/empty";
@@ -123,7 +124,7 @@ function NewRun({
 	const flowQueries = useHostQueries(createFlowQueries);
 	const runQueries = useHostQueries(createRunQueries);
 	const runMutations = useHostQueries(createRunMutations);
-	const queryClient = useQueryClient();
+	const runActed = useRunActed(useSignedIn().host);
 	const projectId = project?.id ?? "";
 	const [flowName, setFlowName] = useState<string | null>(null);
 	const [values, setValues] = useState<InputTexts>({});
@@ -165,7 +166,7 @@ function NewRun({
 	const start = useMutation(
 		runMutations.start({
 			onSuccess: (run) => {
-				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
+				runActed(run.id);
 				if (followOnLockScreen) void followAfterStart(run.id);
 				// Close New run, then follow the run on the main screens.
 				if (router.canDismiss()) router.dismiss();

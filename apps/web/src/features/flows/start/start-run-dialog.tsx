@@ -1,4 +1,4 @@
-import { waitedText } from "@nightshift/client";
+import { useRunActed, waitedText } from "@nightshift/client";
 import type { FlowInputDef } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -30,12 +30,13 @@ import {
 } from "@nightshift/ui/components/select";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { PlayIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { runMutations, runQueries } from "@/features/runs/queries";
+import { orpc } from "@/shared/api";
 import {
 	dayWord,
 	formatDayTime,
@@ -187,7 +188,7 @@ function StartRunForm({
 }) {
 	const id = useId();
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
+	const runActed = useRunActed({ orpc });
 	const [stop, setStop] = useState(readStoredStop);
 	const [values, setValues] = useState(() =>
 		readStoredInputs(projectId, flowName, inputs),
@@ -225,7 +226,7 @@ function StartRunForm({
 		runMutations.start({
 			onSuccess: (run) => {
 				onStarted();
-				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
+				runActed(run.id);
 				void navigate({ to: "/runs/$runId", params: { runId: run.id } });
 			},
 			onError: (error) => toast.error(`Could not start: ${error.message}`),

@@ -14,8 +14,14 @@ const ARTIFACTS_POLL_MS = 15_000;
  */
 export function createRunQueries(orpc: ApiQueryUtils) {
 	return {
-		/** Every runs query. Invalidate it after a run changes. */
-		all: () => orpc.runs.key(),
+		/** Every list of runs. The live cache reads them again after a run changes. */
+		lists: () => orpc.runs.list.key(),
+		/** The detail of one run, or of every run without `runId`: to read it again. */
+		getKey: (runId?: string) =>
+			orpc.runs.get.key(runId === undefined ? {} : { input: { runId } }),
+		/** The files of one run, or of every run without `runId`: to read them again. */
+		artifactsKey: (runId?: string) =>
+			orpc.runs.artifacts.key(runId === undefined ? {} : { input: { runId } }),
 		/** The runs of the Space, of every project. A failed read again keeps the list. */
 		everyRun: () => ({
 			...orpc.runs.list.queryOptions({ input: {} }),

@@ -1,7 +1,7 @@
 import {
 	type RunActions as Allowed,
 	createRunMutations,
-	createRunQueries,
+	useRunActed,
 } from "@nightshift/client";
 import {
 	AlertDialog,
@@ -25,11 +25,11 @@ import {
 	Text,
 	TextClassContext,
 } from "@nightshift/ui-native/components/ui/text";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { CircleStop, type LucideIcon, Play } from "lucide-react-native";
 import { View } from "react-native";
 
-import { useHostQueries } from "@/features/host";
+import { useHostQueries, useSignedIn } from "@/features/host";
 import { ErrorAlert } from "@/shared/feedback";
 
 /**
@@ -44,11 +44,9 @@ export function RunActions({
 	runId: string;
 	allows: Pick<Allowed, "stop" | "resume">;
 }) {
-	const runQueries = useHostQueries(createRunQueries);
 	const runMutations = useHostQueries(createRunMutations);
-	const queryClient = useQueryClient();
-	const refetch = () =>
-		queryClient.invalidateQueries({ queryKey: runQueries.all() });
+	const runActed = useRunActed(useSignedIn().host);
+	const refetch = () => runActed(runId);
 	const stop = useMutation(runMutations.stop({ onSuccess: refetch }));
 	const resume = useMutation(runMutations.resume({ onSuccess: refetch }));
 

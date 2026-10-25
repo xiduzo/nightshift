@@ -1,3 +1,4 @@
+import { useRunActed } from "@nightshift/client";
 import {
 	InputGroup,
 	InputGroupAddon,
@@ -8,12 +9,13 @@ import {
 import { Kbd } from "@nightshift/ui/components/kbd";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { cn } from "@nightshift/ui/lib/utils";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { PlayIcon } from "lucide-react";
 import { useId, useState } from "react";
 
 import type { StepSummary } from "@/shared/api";
-import { runMutations, runQueries } from "../queries";
+import { orpc } from "@/shared/api";
+import { runMutations } from "../queries";
 
 /** Continues a stopped, failed or interrupted run at its last step's node. */
 export function ResumeComposer({
@@ -26,14 +28,14 @@ export function ResumeComposer({
 	className?: string;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
+	const runActed = useRunActed({ orpc });
 	const [prompt, setPrompt] = useState("");
 
 	const resumeRun = useMutation(
 		runMutations.resume({
 			onSuccess: () => {
 				setPrompt("");
-				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
+				runActed(runId);
 			},
 		}),
 	);

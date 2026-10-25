@@ -1,4 +1,4 @@
-import { hasEnded, runActions, whyNot } from "@nightshift/client";
+import { hasEnded, runActions, useRunActed, whyNot } from "@nightshift/client";
 import { Button } from "@nightshift/ui/components/button";
 import {
 	DropdownMenu,
@@ -9,11 +9,12 @@ import {
 	DropdownMenuTrigger,
 } from "@nightshift/ui/components/dropdown-menu";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRightLeftIcon, MonitorIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import type { RunDetail, RunStatus } from "@/shared/api";
+import { orpc } from "@/shared/api";
 import { runMutations, runQueries } from "../queries";
 
 /**
@@ -28,7 +29,7 @@ export function MoveMenu({
 	run: RunDetail;
 	status: RunStatus;
 }) {
-	const queryClient = useQueryClient();
+	const runActed = useRunActed({ orpc });
 	// Your own devices that are online, from the run's own Space.
 	const moveTargets = useQuery({
 		...runQueries.moveTargets(run.id),
@@ -40,7 +41,7 @@ export function MoveMenu({
 			onSuccess: (_, input) => {
 				const to = targets.find((d) => d.deviceId === input.deviceId);
 				toast.success(`${to?.name ?? "The device"} goes on with the run.`);
-				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
+				runActed(input.runId);
 			},
 			onError: (error) => toast.error(`Could not move: ${error.message}`),
 		}),

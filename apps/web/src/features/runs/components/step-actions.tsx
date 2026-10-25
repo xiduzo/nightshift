@@ -1,3 +1,4 @@
+import { useRunActed } from "@nightshift/client";
 import {
 	Alert,
 	AlertDescription,
@@ -29,7 +30,7 @@ import {
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Switch } from "@nightshift/ui/components/switch";
 import { Textarea } from "@nightshift/ui/components/textarea";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
 	CircleAlertIcon,
 	EllipsisVerticalIcon,
@@ -39,7 +40,8 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import type { StepSummary } from "@/shared/api";
-import { runMutations, runQueries } from "../queries";
+import { orpc } from "@/shared/api";
+import { runMutations } from "../queries";
 
 /** An Agent step whose conversation can go on: its harness named a session. */
 function continuesSession(step: StepSummary): boolean {
@@ -107,7 +109,7 @@ export function RestartStepDialog({
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const queryClient = useQueryClient();
+	const runActed = useRunActed({ orpc });
 	const [prompt, setPrompt] = useState("");
 	const agent = continuesSession(step);
 	const restart = useMutation(
@@ -116,7 +118,7 @@ export function RestartStepDialog({
 				setPrompt("");
 				onOpenChange(false);
 				toast.success(`Restarted ${step.nodeId}.`);
-				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
+				runActed(runId);
 			},
 		}),
 	);
@@ -250,7 +252,7 @@ function RerunDialog({
 	onOpenChange: (open: boolean) => void;
 }) {
 	const id = useId();
-	const queryClient = useQueryClient();
+	const runActed = useRunActed({ orpc });
 	const [prompt, setPrompt] = useState("");
 	const [fresh, setFresh] = useState(false);
 	const agent = continuesSession(step);
@@ -261,7 +263,7 @@ function RerunDialog({
 				setFresh(false);
 				onOpenChange(false);
 				toast.success(`Running again from ${step.nodeId}.`);
-				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
+				runActed(runId);
 			},
 		}),
 	);

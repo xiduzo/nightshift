@@ -1,4 +1,4 @@
-import { runActions } from "@nightshift/client";
+import { runActions, useRunActed } from "@nightshift/client";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -27,7 +27,7 @@ import {
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
 	AlarmClockIcon,
 	ChevronDownIcon,
@@ -43,9 +43,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { WalkerBadge, walkerName } from "@/features/devices";
 import type { RunDetail, RunStatus, StepSummary } from "@/shared/api";
-import { SERVER_URL } from "@/shared/api";
+import { orpc, SERVER_URL } from "@/shared/api";
 import { dayWord, formatDateTime, formatTime } from "@/shared/format";
-import { runMutations, runQueries } from "../queries";
+import { runMutations } from "../queries";
 import { CostText } from "./cost-text";
 import { Elapsed } from "./elapsed";
 import { MoveMenu } from "./move-menu";
@@ -145,11 +145,10 @@ export function RunActions({
 	const running = allows.restart
 		? [...steps].reverse().find((step) => step.endedAt === null)
 		: undefined;
-	const queryClient = useQueryClient();
+	const runActed = useRunActed({ orpc });
 	const stopRun = useMutation(
 		runMutations.stop({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: runQueries.all() }),
+			onSuccess: (_, { runId }) => runActed(runId),
 			onError: (error, { when }) =>
 				toast.error(
 					when === "cancel-after-step"

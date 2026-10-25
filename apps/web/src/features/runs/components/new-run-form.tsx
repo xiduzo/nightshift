@@ -1,3 +1,4 @@
+import { useRunActed } from "@nightshift/client";
 import {
 	HARNESS_CATALOG,
 	QUICK_RUN_HARNESS,
@@ -29,14 +30,15 @@ import {
 } from "@nightshift/ui/components/native-select";
 import { Spinner } from "@nightshift/ui/components/spinner";
 import { Textarea } from "@nightshift/ui/components/textarea";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { PlayIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useState } from "react";
 
 import { EFFORTS, ModelCombobox, PERMISSION_MODES } from "@/features/agents";
 import type { Effort, PermissionMode } from "@/shared/api";
-import { runMutations, runQueries } from "../queries";
+import { orpc } from "@/shared/api";
+import { runMutations } from "../queries";
 
 /**
  * A quick run: one Agent node with a prompt, no flow file, in a dialog. The
@@ -54,7 +56,7 @@ export function QuickRunDialog({
 }) {
 	const id = useId();
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
+	const runActed = useRunActed({ orpc });
 	const [prompt, setPrompt] = useState("");
 	const [model, setModel] = useState<string>(
 		HARNESS_CATALOG[QUICK_RUN_HARNESS].defaultModel,
@@ -68,7 +70,7 @@ export function QuickRunDialog({
 	const startRun = useMutation(
 		runMutations.start({
 			onSuccess: (run) => {
-				void queryClient.invalidateQueries({ queryKey: runQueries.all() });
+				runActed(run.id);
 				void navigate({ to: "/runs/$runId", params: { runId: run.id } });
 			},
 		}),

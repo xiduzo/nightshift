@@ -33,17 +33,13 @@ const step = (id: string) => ({ id }) as StepSummary;
 function buffer(lastSeq?: number) {
 	const timers = handSchedule();
 	const batches: RunStreamBatch[] = [];
-	let refetches = 0;
 	const it = createRunStreamBuffer({
 		flushMs: 50,
 		schedule: timers.schedule,
 		lastSeq,
 		onFlush: (batch) => batches.push(batch),
-		onRunChanged: () => {
-			refetches += 1;
-		},
 	});
-	return { it, timers, batches, refetches: () => refetches };
+	return { it, timers, batches };
 }
 
 describe("the buffer of a run's stream", () => {
@@ -65,16 +61,6 @@ describe("the buffer of a run's stream", () => {
 		]);
 	});
 
-	test("each step and status says the run changed; entries alone do not", () => {
-		const { it, timers, refetches } = buffer();
-		it.entry(entry(1));
-		timers.due(50);
-		expect(refetches()).toBe(0);
-		it.step(step("a"));
-		it.status("finished" as RunStatus);
-		expect(refetches()).toBe(2);
-	});
-
 	test("the last seq follows the entries, from where the follow started", () => {
 		const { it, timers, batches } = buffer(7);
 		it.step(step("build"));
@@ -85,7 +71,7 @@ describe("the buffer of a run's stream", () => {
 	});
 
 	test("a stop with flush hands on what gathered, and nothing comes after", () => {
-		const { it, timers, batches, refetches } = buffer();
+		const { it, timers, batches } = buffer();
 		it.entry(entry(1));
 		it.step(step("build"));
 		it.stop({ flush: true });
@@ -94,7 +80,6 @@ describe("the buffer of a run's stream", () => {
 		it.step(step("test"));
 		timers.due(50);
 		expect(batches).toHaveLength(1);
-		expect(refetches()).toBe(1);
 		expect(timers.waiting).toEqual([]);
 	});
 

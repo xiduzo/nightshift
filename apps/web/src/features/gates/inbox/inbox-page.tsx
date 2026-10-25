@@ -1,4 +1,10 @@
-import { gateParts, gateRun, runActions, waitedText } from "@nightshift/client";
+import {
+	gateParts,
+	gateRun,
+	runActions,
+	useRunActed,
+	waitedText,
+} from "@nightshift/client";
 import {
 	Alert,
 	AlertAction,
@@ -32,7 +38,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	CircleAlertIcon,
@@ -47,6 +53,7 @@ import { toast } from "sonner";
 import { projectQueries } from "@/features/projects";
 import { runMutations, runQueries } from "@/features/runs/queries";
 import type { OpenGate, RunSummary } from "@/shared/api";
+import { orpc } from "@/shared/api";
 import { formatCountdown, formatTime, useNow } from "@/shared/format";
 import { SiteHeader } from "@/shared/page";
 import { useOpenGates } from "../use-open-gates";
@@ -281,11 +288,10 @@ function SleepingGroup({
 	projectNames: Map<string, string>;
 }) {
 	const now = useNow(1000);
-	const queryClient = useQueryClient();
+	const runActed = useRunActed({ orpc });
 	const wake = useMutation(
 		runMutations.resume({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: runQueries.all() }),
+			onSuccess: (_, { runId }) => runActed(runId),
 			onError: (error) => toast.error(`Could not wake: ${error.message}`),
 		}),
 	);

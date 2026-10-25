@@ -12,6 +12,8 @@ export function createScheduleQueries(orpc: ApiQueryUtils) {
 	return {
 		/** Every schedules query. Invalidate it after a schedule changes. */
 		all: () => orpc.schedules.key(),
+		/** Every list of schedules: a schedule's last start comes from the runs. */
+		lists: () => orpc.schedules.list.key(),
 		/** The schedules of one project, with the next start and the last result of each. */
 		list: (projectId: string) =>
 			orpc.schedules.list.queryOptions({ input: { projectId } }),
