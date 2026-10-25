@@ -1,3 +1,5 @@
+import { Refusal } from "@nightshift/refusal";
+
 /** AppleScript's "User canceled." error number. */
 const USER_CANCELED = "-128";
 
@@ -17,7 +19,10 @@ export function canChooseFolder(): boolean {
  */
 export async function chooseFolder(prompt: string): Promise<string | null> {
 	if (process.platform !== "darwin") {
-		throw new Error("Choosing a folder is only supported on macOS.");
+		throw new Refusal(
+			"unavailable",
+			"This computer cannot open a folder picker. Add the project from GitHub instead.",
+		);
 	}
 	const proc = Bun.spawn(
 		[
@@ -37,7 +42,10 @@ export async function chooseFolder(prompt: string): Promise<string | null> {
 	]);
 	if (exitCode !== 0) {
 		if (stderr.includes(USER_CANCELED)) return null;
-		throw new Error(`Could not open the folder picker: ${stderr.trim()}`);
+		// A failure: the person sees plain words, the details go to the log.
+		throw new Error(
+			`osascript could not open the folder picker: ${stderr.trim()}`,
+		);
 	}
 	const path = stdout.trim();
 	return path.length > 1 ? path.replace(/\/$/, "") : path;

@@ -265,6 +265,7 @@
         "@nightshift/devices": "workspace:*",
         "@nightshift/engine": "workspace:*",
         "@nightshift/notifications": "workspace:*",
+        "@nightshift/refusal": "workspace:*",
         "@orpc/openapi": "catalog:",
         "@orpc/server": "catalog:",
         "@orpc/zod": "catalog:",

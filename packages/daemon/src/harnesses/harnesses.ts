@@ -21,6 +21,7 @@ import type {
 	localDevice,
 	SettingsStore,
 } from "@nightshift/engine";
+import { Refusal } from "@nightshift/refusal";
 
 type LocalDeviceOptions = Parameters<typeof localDevice>[0];
 
@@ -101,7 +102,9 @@ export function localHarnesses(deps: {
 						expanded.missing.length === 1
 							? ["secret", "it is", "it"]
 							: ["secrets", "they are", "them"];
-					throw new Error(
+					// Words for the person: the step shows them as they are.
+					throw new Refusal(
+						"conflict",
 						`${agent.label} needs the ${noun} ${expanded.missing.join(", ")}, but ${isNot} not saved. Save ${it} under Agents → Secrets, or remove the reference.`,
 					);
 				},
