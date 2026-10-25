@@ -79,8 +79,10 @@ packages/engine/src/
   graph/checkpointer.ts    LibsqlSaver: BaseCheckpointSaver on db.$client.
                            Tables lg_checkpoint and lg_write (drizzle schema in
                            packages/db, migration
-                           20261016155422_langgraph_checkpoints). pruneThread
-                           keeps a thread's latest root checkpoint.
+                           20261016155422_langgraph_checkpoints). A put
+                           keeps only the latest checkpoint of its
+                           namespace; pruneThread also drops the
+                           namespaces LangGraph never enters again.
   graph/compile.ts         compileFlow(flow, ctx): StateGraph. START →
                            flow.start; every flow node, made by its kind's
                            factory, plus its park node park__<id> and the
@@ -347,15 +349,17 @@ packages/engine/src/
    engine before any of these.
 10. **Finish.** When the root stream ends with `state.ended.status ===
     "finished"`, the runner prunes the thread to its latest checkpoint
-    (`Thread.prune`: the older root checkpoints and the body namespaces
-    go), then appends `RunEnded finished` with the reason the old walk
-    used (`Ended at node "x" with "y".` for a non-`pass` chosen end). The
-    prune comes first, so a person who resumes once the log says the run
-    ended finds no drive holding it. Since 2026-10-25 every end prunes: a failed or stopped run (by
-    its drive, a stop or a step past its time) keeps its latest root
-    checkpoint and the namespaces of the tasks that checkpoint still has,
-    so a body that parked, waits or was cut short inside a Call goes on
-    in its own namespace. An interrupted run (the daemon died) prunes when
+    (`Thread.prune`: the body namespaces go), then appends `RunEnded
+    finished` with the reason the old walk used (`Ended at node "x" with
+    "y".` for a non-`pass` chosen end). The prune comes first, so a person
+    who resumes once the log says the run ended finds no drive holding
+    it. Since 2026-10-25 every end prunes, and so does a run that parks
+    at a wait or a Gate: a failed, stopped or parked run keeps its latest
+    root checkpoint and the namespaces of the tasks that are not done, so
+    a body that parked, waits or was cut short inside a Call goes on in
+    its own namespace. The saver itself keeps only the latest checkpoint
+    of each namespace, and drops the namespaces below an older one, at
+    every put. An interrupted run (the daemon died) prunes when
     its next drive ends. The history was the walk's bookkeeping and the event
     log is the record; the final state is what `resumeRun` of a finished
     run re-enters on: `Command({ goto, update: { ended: null, pending:

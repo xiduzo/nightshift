@@ -14,7 +14,7 @@ import {
 /**
  * A LangGraph checkpoint: the state of one run (the thread id is the run id)
  * after one super-step. Written by the engine's `LibsqlSaver`, read back on
- * resume. The blobs are what LangGraph's serializer produced; `type` names
+ * resume. Only the latest of each namespace is kept. The blobs are what LangGraph's serializer produced; `type` names
  * the encoding.
  */
 export const lgCheckpoint = sqliteTable(
