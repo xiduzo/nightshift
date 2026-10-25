@@ -6,7 +6,8 @@ export type PushRoute =
 
 /**
  * Where a tap on a notification goes: a run's end opens the run, a Gate
- * opens the Gate, anything else opens the inbox.
+ * opens the Gate, anything else opens the inbox. A run and a Gate open
+ * from any of the Person's Spaces, so a route names no Space.
  */
 export function routeOf(data: {
 	kind: string;

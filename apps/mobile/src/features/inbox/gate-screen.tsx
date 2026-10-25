@@ -2,6 +2,7 @@ import {
 	type ChoiceRoute,
 	choiceRoutes,
 	costLabel,
+	createProjectQueries,
 	createRunQueries,
 	createSpaceQueries,
 	type GateChoice,
@@ -71,7 +72,6 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import { useHost, useHostQueries } from "@/features/host";
-import { useSwitchSpace } from "@/features/spaces";
 import { ActionBar } from "@/shared/action-bar";
 import { EmptyState } from "@/shared/empty";
 import { ErrorAlert } from "@/shared/feedback";
@@ -207,14 +207,14 @@ function OpenGateScreen({
 	const { flow } = gateRun(gate);
 	const spaceQueries = useHostQueries(createSpaceQueries);
 	const spaces = useQuery(spaceQueries.list());
-	/** The run's steps and flow load only in the Space this phone works in. */
-	const sameSpace = spaces.data?.active === gate.spaceId;
 	const manySpaces = (spaces.data?.spaces.length ?? 1) > 1;
+	const projectQueries = useHostQueries(createProjectQueries);
+	const projects = useQuery(projectQueries.list());
+	/** A project screen shows the projects of the Space this phone works in only. */
+	const projectHere =
+		projects.data?.some((project) => project.id === gate.projectId) ?? false;
 	const runQueries = useHostQueries(createRunQueries);
-	const run = useQuery({
-		...runQueries.get(gate.runId),
-		enabled: sameSpace,
-	});
+	const run = useQuery(runQueries.get(gate.runId));
 	const labels = run.data ? nodeLabels(run.data) : NO_LABELS;
 	const routes = choiceRoutes(run.data, gate, gate.choices, labels);
 	const answer = useGateAnswer(gate, { onSent, onClosed });
@@ -246,9 +246,7 @@ function OpenGateScreen({
 
 	return (
 		<Screen
-			onRefresh={() =>
-				Promise.all([onRefresh(), sameSpace ? run.refetch() : null])
-			}
+			onRefresh={() => Promise.all([onRefresh(), run.refetch()])}
 			footer={
 				answerable && !answer.sent ? (
 					<ActionBar
@@ -268,34 +266,32 @@ function OpenGateScreen({
 				) : undefined
 			}
 		>
-			{sameSpace ? (
-				<Stack.Screen
-					options={{
-						headerRight: () => (
-							<Button
-								variant="ghost"
-								size="icon"
-								className="size-11"
-								onPress={() =>
-									router.push({
-										pathname: "/gate-actions",
-										params: { runId: gate.runId, stepId: gate.stepId },
-									})
-								}
-								accessibilityLabel="More actions"
-							>
-								<Icon as={Ellipsis} className="size-5" />
-							</Button>
-						),
-					}}
-				/>
-			) : null}
+			<Stack.Screen
+				options={{
+					headerRight: () => (
+						<Button
+							variant="ghost"
+							size="icon"
+							className="size-11"
+							onPress={() =>
+								router.push({
+									pathname: "/gate-actions",
+									params: { runId: gate.runId, stepId: gate.stepId },
+								})
+							}
+							accessibilityLabel="More actions"
+						>
+							<Icon as={Ellipsis} className="size-5" />
+						</Button>
+					),
+				}}
+			/>
 
 			<View className="gap-3">
 				<Breadcrumbs
 					gate={gate}
 					manySpaces={manySpaces}
-					linked={sameSpace}
+					projectHere={projectHere}
 					runHref={runHref}
 				/>
 				<Text
@@ -346,11 +342,7 @@ function OpenGateScreen({
 							: undefined
 					}
 				/>
-				{!spaces.data ? (
-					<Skeleton className="h-24 w-full rounded-xl" />
-				) : !sameSpace ? (
-					<OtherSpace spaceId={gate.spaceId} spaceName={gate.spaceName} />
-				) : run.data ? (
+				{run.data ? (
 					<Card className="px-4 py-4">
 						<StepTrail
 							items={run.data.steps
@@ -377,7 +369,6 @@ function OpenGateScreen({
 				links={links}
 				runTitle={gate.runTitle}
 				runId={gate.runId}
-				linked={sameSpace}
 				runHref={runHref}
 			/>
 
@@ -460,16 +451,19 @@ function OpenGateScreen({
 	);
 }
 
-/** "Acme › website › Fix the login bug": the project and the run open their screens. */
+/**
+ * "Acme › website › Fix the login bug": the run opens its screen, and so
+ * does the project when it is in the Space this phone works in.
+ */
 function Breadcrumbs({
 	gate,
 	manySpaces,
-	linked,
+	projectHere,
 	runHref,
 }: {
 	gate: OpenGate;
 	manySpaces: boolean;
-	linked: boolean;
+	projectHere: boolean;
 	runHref: Href;
 }) {
 	return (
@@ -485,7 +479,7 @@ function Breadcrumbs({
 			<Crumb
 				label={gate.projectName}
 				href={
-					linked
+					projectHere
 						? {
 								pathname: "/projects/[projectId]",
 								params: { projectId: gate.projectId },
@@ -494,7 +488,7 @@ function Breadcrumbs({
 				}
 			/>
 			<Icon as={ChevronRight} className="size-3.5 text-muted-foreground" />
-			<Crumb label={gate.runTitle} href={linked ? runHref : undefined} />
+			<Crumb label={gate.runTitle} href={runHref} />
 		</View>
 	);
 }
@@ -520,35 +514,6 @@ function Crumb({ label, href }: { label: string; href: Href | undefined }) {
 	);
 }
 
-/** The run is in another Space than the one this phone works in. */
-function OtherSpace({
-	spaceId,
-	spaceName,
-}: {
-	spaceId: string;
-	spaceName: string;
-}) {
-	const switchSpace = useSwitchSpace();
-	return (
-		<Card className="gap-3 px-4 py-4">
-			<Text className="text-muted-foreground text-sm">
-				{`This run is in ${spaceName}. Switch to that Space to see its steps and where each choice leads.`}
-			</Text>
-			<Button
-				size="lg"
-				variant="outline"
-				className="h-auto min-h-11 self-start py-2"
-				disabled={switchSpace.isPending}
-				onPress={() => switchSpace.mutate({ spaceId })}
-			>
-				<Text>
-					{switchSpace.isPending ? "Switching…" : `Switch to ${spaceName}`}
-				</Text>
-			</Button>
-		</Card>
-	);
-}
-
 const LINK_ICON: Record<GateLink["kind"], LucideIcon> = {
 	pull: GitPullRequest,
 	issue: CircleDot,
@@ -561,16 +526,13 @@ function CheckFirst({
 	links,
 	runTitle,
 	runId,
-	linked,
 	runHref,
 }: {
 	links: readonly GateLink[];
 	runTitle: string;
 	runId: string;
-	linked: boolean;
 	runHref: Href;
 }) {
-	if (links.length === 0 && !linked) return null;
 	return (
 		<View className="gap-2">
 			<SectionHead
@@ -603,22 +565,18 @@ function CheckFirst({
 						accessibilityHint="Shows the link and a button to open it"
 					/>
 				))}
-				{linked ? (
-					<ListRow
-						icon={SquareTerminal}
-						title="Transcript"
-						caption="What the agents said and did"
-						href={{ pathname: "/transcript/[runId]", params: { runId } }}
-					/>
-				) : null}
-				{linked ? (
-					<ListRow
-						icon={CirclePlay}
-						title="Open the run"
-						caption={runTitle}
-						href={runHref}
-					/>
-				) : null}
+				<ListRow
+					icon={SquareTerminal}
+					title="Transcript"
+					caption="What the agents said and did"
+					href={{ pathname: "/transcript/[runId]", params: { runId } }}
+				/>
+				<ListRow
+					icon={CirclePlay}
+					title="Open the run"
+					caption={runTitle}
+					href={runHref}
+				/>
 			</ListGroup>
 		</View>
 	);

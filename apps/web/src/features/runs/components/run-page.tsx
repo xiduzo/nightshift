@@ -243,22 +243,29 @@ export function RunPage({ runId }: { runId: string }) {
 		showConsole(true);
 	};
 
+	// A run of another of your Spaces opens here too. Its project page
+	// shows only in the Space you work in, so its crumbs show only there.
+	const projectCrumbs: Crumb[] = project
+		? [
+				{
+					label: project.name,
+					link: {
+						to: "/projects/$projectId",
+						params: { projectId: runData.projectId },
+					},
+				},
+				{
+					label: "Runs",
+					link: {
+						to: "/projects/$projectId/runs",
+						params: { projectId: runData.projectId },
+					},
+				},
+			]
+		: [];
 	const crumbs: Crumb[] = [
 		{ label: "Home", link: { to: "/" } },
-		{
-			label: project?.name ?? "Project",
-			link: {
-				to: "/projects/$projectId",
-				params: { projectId: runData.projectId },
-			},
-		},
-		{
-			label: "Runs",
-			link: {
-				to: "/projects/$projectId/runs",
-				params: { projectId: runData.projectId },
-			},
-		},
+		...projectCrumbs,
 		{ label: runData.title },
 	];
 

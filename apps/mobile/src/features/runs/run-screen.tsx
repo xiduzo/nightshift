@@ -100,7 +100,7 @@ function SignedInRun({ runId }: { runId: string }) {
 				<ErrorAlert
 					title="This run did not load"
 					message={run.error.message}
-					fix="If the run belongs to another Space, choose that Space on the Runs tab. Or pull down to try again."
+					fix="Pull down to try again."
 					onRetry={() => void run.refetch()}
 				/>
 			) : (
