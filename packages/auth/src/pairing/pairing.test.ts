@@ -169,8 +169,28 @@ describe("Device keys", () => {
 		expect(await keys.verify(`${key}x`)).toBeNull();
 		expect(await keys.verify("a-session-token")).toBeNull();
 
+		// Kept in memory once verified, and still refused at once.
+		expect(await keys.verify(key)).not.toBeNull();
 		await keys.revoke(DEVICE);
 		expect(await keys.verify(key)).toBeNull();
+	});
+
+	test("a verified key is kept in memory: later calls read and write nothing", async () => {
+		const ada = await sandbox.signUp("Ada");
+		const { key } = await keys.issue({
+			personId: ada.userId,
+			deviceId: DEVICE,
+			deviceName: "MacBook",
+		});
+		const statements = sandbox.countStatements();
+		expect(await keys.verify(key, "sync")).not.toBeNull();
+		// Its row, once. A new key's expiry is less than a day old: no write.
+		expect(statements()).toBe(1);
+		expect(await keys.verify(key, "sync")).not.toBeNull();
+		expect(await keys.verify(key)).not.toBeNull();
+		expect(statements()).toBe(1);
+		const [row] = await sandbox.db.select().from(apikey);
+		expect(row?.lastRequest).toBeNull();
 	});
 
 	test("pairing again replaces the Device's key", async () => {
@@ -213,11 +233,13 @@ describe("Device keys", () => {
 		expect(await keys.verify(key)).not.toBeNull();
 		expect(await expiry()).toBeGreaterThan(Date.now() + 29 * 86_400_000);
 
-		// Past the idle time: refused, and gone.
+		// Past the idle time: refused, and gone. (A Host keeps a valid key in
+		// memory for a minute: a Host that starts now reads the row.)
 		await sandbox.db
 			.update(apikey)
 			.set({ expiresAt: new Date(Date.now() - 1_000) })
 			.where(eq(apikey.id, keyId));
+		keys = createDeviceKeys({ auth: sandbox.auth, db: sandbox.db });
 		expect(await keys.verify(key)).toBeNull();
 		expect(await sandbox.db.select().from(apikey)).toHaveLength(0);
 	});

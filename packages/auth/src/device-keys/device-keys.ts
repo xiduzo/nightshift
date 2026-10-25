@@ -1,4 +1,4 @@
-import { apiKey } from "@better-auth/api-key";
+import { apiKey, defaultKeyHasher } from "@better-auth/api-key";
 import type { Database } from "@nightshift/db";
 import { apikey } from "@nightshift/db/schema";
 import { eq, inArray } from "drizzle-orm";
@@ -15,6 +15,11 @@ import type { Auth } from "../auth";
  *
  * A key expires after `idleDays` without use: every use moves the expiry
  * on (at most once a day, so a busy Device does not write on every call).
+ *
+ * A Device calls its Host every few seconds, so a Host checks a key itself
+ * against its hash, and keeps a valid key in memory for `VERIFIED_MS`.
+ * Moving the expiry is the only write. Revoking a key drops it from memory
+ * at once. (The plugin's own check writes the key's row on every call.)
  */
 
 /** Every Device key starts with it, so a key is never taken for a session token. */
@@ -45,6 +50,9 @@ export type DeviceKeyPermission = keyof typeof DEVICE_KEY_PERMISSIONS;
 export const DEFAULT_DEVICE_KEY_IDLE_DAYS = 30;
 
 const DAY_MS = 86_400_000;
+
+/** How long a Host keeps a valid key in memory before it reads its row again. */
+const VERIFIED_MS = 60_000;
 
 /** A Device key, resolved: the Device, its owner on this Host, and what it may do. */
 export type DeviceKeyAccess = {
@@ -100,6 +108,9 @@ export function createDeviceKeys(options: {
 	const idleMs = () =>
 		(options.idleDays?.() ?? DEFAULT_DEVICE_KEY_IDLE_DAYS) * DAY_MS;
 
+	/** The valid keys this Host checked lately, by their hash. */
+	const verified = new Map<string, Verified>();
+
 	async function keyIdsOf(deviceId: string): Promise<string[]> {
 		const rows = await db
 			.select({ id: apikey.id, metadata: apikey.metadata })
@@ -110,8 +121,43 @@ export function createDeviceKeys(options: {
 	}
 
 	async function revoke(deviceId: string): Promise<void> {
+		for (const [hash, found] of verified) {
+			if (found.access.deviceId === deviceId) verified.delete(hash);
+		}
 		const ids = await keyIdsOf(deviceId);
 		if (ids.length > 0) await db.delete(apikey).where(inArray(apikey.id, ids));
+	}
+
+	/** The key of that hash, from memory while it is fresh, else from its row. */
+	async function lookup(hash: string): Promise<Verified | null> {
+		const kept = verified.get(hash);
+		if (kept && Date.now() - kept.checkedAt < VERIFIED_MS) return kept;
+		verified.delete(hash);
+		const [row] = await db
+			.select({
+				id: apikey.id,
+				referenceId: apikey.referenceId,
+				enabled: apikey.enabled,
+				expiresAt: apikey.expiresAt,
+				permissions: apikey.permissions,
+				metadata: apikey.metadata,
+			})
+			.from(apikey)
+			.where(eq(apikey.key, hash));
+		const deviceId = row ? deviceIdOf(row.metadata) : null;
+		if (!row || row.enabled === false || !deviceId) return null;
+		const found: Verified = {
+			access: {
+				keyId: row.id,
+				deviceId,
+				personId: row.referenceId,
+				permissions: permissionsOf(row.permissions),
+			},
+			expiresAt: row.expiresAt?.getTime() ?? null,
+			checkedAt: Date.now(),
+		};
+		verified.set(hash, found);
+		return found;
 	}
 
 	return {
@@ -133,41 +179,62 @@ export function createDeviceKeys(options: {
 
 		async verify(key, need) {
 			if (!isDeviceKey(key)) return null;
-			const result = await auth.api
-				.verifyApiKey({
-					body: {
-						key,
-						...(need
-							? { permissions: { [need]: [...DEVICE_KEY_PERMISSIONS[need]] } }
-							: {}),
-					},
-				})
-				.catch(() => null);
-			const found = result?.valid ? result.key : null;
+			const hash = await defaultKeyHasher(key);
+			const found = await lookup(hash);
 			if (!found) return null;
-			const deviceId = deviceIdOf(found.metadata);
-			if (!deviceId) return null;
+			const { keyId } = found.access;
+			if (found.expiresAt !== null && found.expiresAt <= Date.now()) {
+				// Past the idle time: refused, and gone, as the plugin does.
+				verified.delete(hash);
+				await db.delete(apikey).where(eq(apikey.id, keyId));
+				return null;
+			}
+			if (need && !allows(found.access.permissions, need)) return null;
 			// Idle expiry: a use moves the expiry on, at most once a day.
-			const expiresAt = found.expiresAt
-				? new Date(found.expiresAt).getTime()
-				: null;
 			const next = Date.now() + idleMs();
-			if (expiresAt === null || next - expiresAt > DAY_MS) {
+			if (found.expiresAt === null || next - found.expiresAt > DAY_MS) {
 				await db
 					.update(apikey)
 					.set({ expiresAt: new Date(next) })
-					.where(eq(apikey.id, found.id));
+					.where(eq(apikey.id, keyId));
+				found.expiresAt = next;
 			}
-			return {
-				keyId: found.id,
-				deviceId,
-				personId: found.referenceId,
-				permissions: (found.permissions ?? {}) as Record<string, string[]>,
-			};
+			return found.access;
 		},
 
 		revoke,
 	};
+}
+
+/** A valid key as a Host keeps it in memory. */
+type Verified = {
+	access: DeviceKeyAccess;
+	/** Epoch ms, or null for a key that never expires. */
+	expiresAt: number | null;
+	/** When this Host read the key's row. */
+	checkedAt: number;
+};
+
+/** Whether a key's permissions hold every action of `need`. */
+function allows(
+	permissions: Record<string, string[]>,
+	need: DeviceKeyPermission,
+): boolean {
+	const held = permissions[need] ?? [];
+	return DEVICE_KEY_PERMISSIONS[need].every((action) => held.includes(action));
+}
+
+/** A key's permissions: a JSON string in the table. */
+function permissionsOf(value: string | null): Record<string, string[]> {
+	if (!value) return {};
+	try {
+		const parsed = JSON.parse(value) as unknown;
+		return parsed && typeof parsed === "object"
+			? (parsed as Record<string, string[]>)
+			: {};
+	} catch {
+		return {};
+	}
 }
 
 /** The Device id in a key's metadata (a JSON string in the table, an object from the plugin). */
