@@ -14,9 +14,11 @@ export type {
 	FlowIssue,
 	FlowListItem,
 	LoadedFlow,
+	ProjectFlowMap,
 	ValidateOptions,
 } from "./issues";
 export {
+	calledFlow,
 	schemaFields,
 	type TemplateField,
 	type TemplateNode,

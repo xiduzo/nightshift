@@ -48,5 +48,5 @@ export type LoadedFlow = FlowFile & {
 	issues: FlowIssue[];
 };
 
-/** The flows a check may look up, by name; null when a file does not parse. */
-export type Flows = Readonly<Record<string, Flow | null>>;
+/** The flow files of a project, by name. Null when a file does not load. */
+export type ProjectFlowMap = Readonly<Record<string, Flow | null>>;

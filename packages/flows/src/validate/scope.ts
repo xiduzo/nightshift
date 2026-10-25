@@ -6,7 +6,7 @@ import {
 	type TemplateRef,
 	templateRefs,
 } from "../template";
-import type { At, Flows, Report } from "./issues";
+import type { At, ProjectFlowMap, Report } from "./issues";
 import { readsName, type TemplateScope } from "./template-scope";
 
 /** The references of templates and rules: what they may read, and the checks of each one. */
@@ -16,7 +16,7 @@ export type Scope = {
 	flow: Flow;
 	nodes: ReadonlyMap<string, FlowNode>;
 	/** Undefined when the project's flows are not known. */
-	flows: Flows | undefined;
+	flows: ProjectFlowMap | undefined;
 	/** What a template may read (`templateScope`). */
 	template: TemplateScope;
 	/** The variables a template or a rule read so far, for the unused-variable warning. */

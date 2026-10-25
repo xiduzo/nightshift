@@ -61,7 +61,7 @@ export function CallFields({
 	onSetEach: (each: CallEach | undefined) => void;
 }) {
 	const id = useId();
-	const called = calledFlow(node, support.flows);
+	const called = calledFlow(node.flow, support.flows) ?? null;
 	// Switching "once per item" off and on keeps the list fields.
 	const lastEach = useRef<CallEach | undefined>(undefined);
 	const { each } = node;

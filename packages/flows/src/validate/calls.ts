@@ -1,6 +1,6 @@
 import { type Flow, runsEach } from "../document";
 import type { CallNode } from "../nodes";
-import type { Flows, Report, ValidateOptions } from "./issues";
+import type { ProjectFlowMap, Report, ValidateOptions } from "./issues";
 
 /** The checks of a Call node that need the flow it calls. */
 
@@ -23,7 +23,7 @@ export type ErrorsOf = (
  */
 export function checkCall(
 	node: CallNode,
-	flows: Flows,
+	flows: ProjectFlowMap,
 	chain: readonly string[],
 	error: Report,
 	warning: Report,
@@ -115,7 +115,7 @@ export function checkCall(
 function pathBack(
 	start: string,
 	target: string,
-	flows: Flows,
+	flows: ProjectFlowMap,
 	skip: ReadonlySet<string>,
 ): string[] | null {
 	if (start === target) return [start];

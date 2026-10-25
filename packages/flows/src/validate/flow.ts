@@ -8,7 +8,12 @@ import {
 import { reservedNames } from "../nodes";
 import { checkCall, type ErrorsOf } from "./calls";
 import { findCycles } from "./cycles";
-import type { FlowIssue, Flows, Report, ValidateOptions } from "./issues";
+import type {
+	FlowIssue,
+	ProjectFlowMap,
+	Report,
+	ValidateOptions,
+} from "./issues";
 import { checkNode } from "./nodes";
 import { describeNode, type Scope } from "./scope";
 import { checkSections } from "./sections";
@@ -61,7 +66,7 @@ function validateIn(
 	const warning: Report = (message, at) =>
 		issues.push({ severity: "warning", message, ...at });
 
-	const flows: Flows | undefined =
+	const flows: ProjectFlowMap | undefined =
 		options.flows === undefined
 			? undefined
 			: options.name === undefined

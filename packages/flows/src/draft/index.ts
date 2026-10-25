@@ -15,11 +15,9 @@ export {
 export {
 	addEdge,
 	addNode,
-	calledFlow,
 	callersOf,
 	edgeInLoop,
 	moveNode,
-	type ProjectFlowMap,
 	removeEdge,
 	removeNode,
 	renameNode,

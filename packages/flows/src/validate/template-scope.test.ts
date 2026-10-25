@@ -6,8 +6,9 @@ import {
 	flowSchema,
 } from "../document";
 import { validateFlow } from "./flow";
-import type { Flows } from "./issues";
+import type { ProjectFlowMap } from "./issues";
 import {
+	calledFlow,
 	type TemplateField,
 	type TemplateScope,
 	templateScope,
@@ -123,10 +124,10 @@ function mainFlow(use = "true"): Flow {
 	return flowSchema.parse(input);
 }
 
-const flows: Flows = { review, task };
+const flows: ProjectFlowMap = { review, task };
 
 /** The errors of `main` when `use` runs `command`. `known`: the project's flows. */
-function errorsOf(command: string, known?: Flows): string[] {
+function errorsOf(command: string, known?: ProjectFlowMap): string[] {
 	return validateFlow(mainFlow(command), { flows: known, name: "main" })
 		.filter((issue) => issue.severity === "error")
 		.map((issue) => issue.message);
@@ -207,7 +208,7 @@ describe("the template scope", () => {
 	});
 
 	test("a Subflow node adds the outputs of the flow it calls, once it is known", () => {
-		const sub = (known: Flows | undefined) =>
+		const sub = (known: ProjectFlowMap | undefined) =>
 			templateScope(mainFlow(), { flows: known }).nodes.find(
 				(node) => node.id === "sub",
 			);
@@ -237,6 +238,23 @@ describe("the template scope", () => {
 		expect(scope.vars).toBeNull();
 		expect(scope.nodes).toEqual([]);
 		expect(scope.inputs.map((input) => input.ref)).toEqual(["topic", "spec"]);
+	});
+});
+
+describe("calledFlow", () => {
+	test("finds the flow a Call node names", () => {
+		expect(calledFlow("review", { review })).toBe(review);
+	});
+
+	test("is undefined while the flows load, for no name, or a broken or unknown flow", () => {
+		expect(calledFlow("review", undefined)).toBeUndefined();
+		expect(calledFlow("", { review })).toBeUndefined();
+		expect(calledFlow("broken", { broken: null })).toBeUndefined();
+		expect(calledFlow("missing", { review })).toBeUndefined();
+	});
+
+	test("a flow name that every object has as a property is no flow", () => {
+		expect(calledFlow("constructor", { review })).toBeUndefined();
 	});
 });
 

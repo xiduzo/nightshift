@@ -6,7 +6,7 @@ import {
 	runsEach,
 } from "../document";
 import { runFields } from "../template";
-import type { Flows } from "./issues";
+import type { ProjectFlowMap } from "./issues";
 
 /**
  * What a template may read in a flow. The checks of a flow and the editor's
@@ -50,7 +50,7 @@ export type TemplateScope = {
 
 export type TemplateScopeOptions = {
 	/** The project's flows by name, for the outputs of Subflow nodes. Leave out while they load. */
-	flows?: Flows;
+	flows?: ProjectFlowMap;
 	/** The scope of a variable's initial value: the inputs and `run` only. */
 	initialValue?: boolean;
 };
@@ -103,7 +103,10 @@ export function readsName(scope: TemplateScope, name: string): boolean {
 	);
 }
 
-function templateNode(node: FlowNode, flows: Flows | undefined): TemplateNode {
+function templateNode(
+	node: FlowNode,
+	flows: ProjectFlowMap | undefined,
+): TemplateNode {
 	const json: readonly string[] = jsonOutputFields;
 	const field = (name: string): TemplateField => ({
 		name,
@@ -150,10 +153,10 @@ function templateNode(node: FlowNode, flows: Flows | undefined): TemplateNode {
 	return { id: node.id, fields, open: false };
 }
 
-/** The flow named `name` among the project's flows; undefined when it is not known or broken. */
+/** The flow a Call node calls, by its name: undefined while the flows load, or when it is not known or broken. */
 export function calledFlow(
 	name: string,
-	flows: Flows | undefined,
+	flows: ProjectFlowMap | undefined,
 ): Flow | undefined {
 	if (flows === undefined || !Object.hasOwn(flows, name)) return undefined;
 	return flows[name] ?? undefined;

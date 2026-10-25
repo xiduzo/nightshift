@@ -38,7 +38,6 @@ export {
 	addEdge,
 	addNode,
 	addSection,
-	calledFlow,
 	callersOf,
 	checkDraft,
 	commandNode,
@@ -63,7 +62,6 @@ export {
 	nodeOptions,
 	type OptionNode,
 	type Position,
-	type ProjectFlowMap,
 	planSubflowFromSection,
 	removeEdge,
 	removeNode,
@@ -223,10 +221,12 @@ export {
 	type VariableResult,
 } from "./template";
 export {
+	calledFlow,
 	type FlowFile,
 	type FlowIssue,
 	type FlowListItem,
 	type LoadedFlow,
+	type ProjectFlowMap,
 	parseFlow,
 	schemaFields,
 	type TemplateField,

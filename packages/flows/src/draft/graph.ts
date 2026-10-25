@@ -10,6 +10,7 @@ import type {
 	Outcome,
 	Policy,
 } from "../document";
+import type { ProjectFlowMap } from "../validate";
 import { uniqueEdgeId, uniqueNodeId } from "./names";
 import {
 	agentNode,
@@ -24,9 +25,6 @@ import {
 } from "./nodes";
 import { renameRefs, rewriteFlowTemplates } from "./refs";
 import { sectionsWithoutNode, sectionsWithRenamedNode } from "./sections";
-
-/** The flow files of a project, by name. Null when a file does not load. */
-export type ProjectFlowMap = Readonly<Record<string, Flow | null>>;
 
 /**
  * Sets one value of the run policy, or clears it (back to the daemon's
@@ -193,16 +191,6 @@ export function updateEdge(
 
 export function removeEdge(flow: Flow, id: string): Flow {
 	return { ...flow, edges: flow.edges.filter((edge) => edge.id !== id) };
-}
-
-/** The flow a Call node calls, when it loads. */
-export function calledFlow(
-	node: FlowNode,
-	flows: ProjectFlowMap | undefined,
-): Flow | null {
-	if (node.type !== "call") return null;
-	if (node.flow === "" || !flows) return null;
-	return flows[node.flow] ?? null;
 }
 
 /** The flows of the project that call `name` through a Call node. */
