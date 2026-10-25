@@ -105,16 +105,26 @@ export const runs = {
 		.handler(({ context, input }) =>
 			context.space.moveRun(input.runId, input.deviceId),
 		),
-	/** The Person's Devices for the project: online, with a Clone or not (a node's Device, Move to). */
+	/**
+	 * The Person's Devices for the project: online, with a Clone or not
+	 * (Move to). With `forNode`, the Devices that node may name (a node's
+	 * Device): another person's only when it offers the node's profile.
+	 */
 	devices: protectedProcedure
 		.route({
 			summary:
-				"Lists the Person's Devices for a project: online or not, with a Clone or not.",
+				"Lists the Person's Devices for a project: online or not, with a Clone or not. With forNode, the Devices that node may name.",
 		})
 		.output(output(z.array(ownDeviceSchema)))
-		.input(z.object({ projectId: z.string() }))
+		.input(
+			z.object({
+				projectId: z.string(),
+				/** The node the Device is for: an Agent node's profile, or none. */
+				forNode: z.object({ profile: z.string().min(1).optional() }).optional(),
+			}),
+		)
 		.handler(({ context, input }) =>
-			context.space.listDevices(input.projectId),
+			context.space.listDevices(input.projectId, input.forNode),
 		),
 	resume: runProcedure(
 		z.object({ runId: z.string(), prompt: z.string().min(1).optional() }),

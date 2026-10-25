@@ -13,17 +13,14 @@ import {
 import { Badge } from "@nightshift/ui/components/badge";
 import { Button } from "@nightshift/ui/components/button";
 import { Input } from "@nightshift/ui/components/input";
+import { useQuery } from "@tanstack/react-query";
 import { PlayIcon, Trash2Icon } from "lucide-react";
 import { useId, useState } from "react";
+import { runQueries } from "@/features/runs/queries";
 import { PanelHeader } from "@/shared/panel";
 import { NODE_TYPE } from "../../canvas/node-type";
 import type { DaemonConnection } from "../connections-field";
-import {
-	type DeviceChoice,
-	DeviceField,
-	runsOnDevice,
-	withDevice,
-} from "../device-field";
+import { DeviceField, runsOnDevice, withDevice } from "../device-field";
 import { Field, InspectorSection, PositiveIntInput } from "../fields";
 import { VariableWritesSection } from "../variable-writes-field";
 import { AgentAdvanced } from "./agent-advanced";
@@ -50,13 +47,10 @@ export function NodeInspector({
 	onDelete,
 	calledFlows,
 	connections,
-	devices,
 }: {
 	projectId: string;
 	flow: Flow;
 	node: FlowNode;
-	/** Your devices, for where a step runs; undefined while they load. */
-	devices?: readonly DeviceChoice[];
 	/** The daemon's connections, for an Agent or Tool node; undefined while they load. */
 	connections?: readonly DaemonConnection[];
 	/** Subflow nodes: the project's flows and the actions on them. */
@@ -77,6 +71,13 @@ export function NodeInspector({
 }) {
 	const id = useId();
 	const isStart = flow.start === node.id;
+	// The devices this node may name, as the Host says: by its profile.
+	const profile = node.type === "agent" ? node.profile : undefined;
+	const nodeDevices = useQuery({
+		...runQueries.devices(projectId, profile !== undefined ? { profile } : {}),
+		enabled: runsOnDevice(node),
+		meta: { quietErrors: true },
+	});
 	const { label: typeLabel, icon: Icon } = NODE_TYPE[node.type];
 
 	return (
@@ -264,8 +265,7 @@ export function NodeInspector({
 					<DeviceField
 						id={`${id}-device`}
 						value={"device" in node ? node.device : undefined}
-						devices={devices}
-						profile={node.type === "agent" ? node.profile : undefined}
+						devices={nodeDevices.data}
 						onChange={(device) =>
 							onChange((current) => withDevice(current, device))
 						}

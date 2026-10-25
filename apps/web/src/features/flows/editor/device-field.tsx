@@ -11,30 +11,14 @@ import {
 import { Field } from "./fields";
 
 /**
- * A device by the name a node gives it: one of yours, or another
- * person's with the profiles it offers to the Space (`offers`).
+ * A device a node can name, as the Host lists it: one of yours, or
+ * another person's with the profiles it offers to the Space (`offers`).
  */
 export type DeviceChoice = {
 	name: string;
 	thisDevice: boolean;
 	offers?: string[];
 };
-
-/**
- * The devices a node can name: yours, and other people's that offer the
- * node's profile to the Space. Only an Agent node with an offered profile
- * runs on another person's device.
- */
-export function choicesFor(
-	devices: readonly DeviceChoice[],
-	profile: string | undefined,
-): DeviceChoice[] {
-	return devices.filter(
-		(d) =>
-			d.offers === undefined ||
-			(profile !== undefined && d.offers.includes(profile)),
-	);
-}
 
 /** The node types whose step runs on a device; a Decision and a Value only when a model decides. */
 export function runsOnDevice(node: FlowNode): boolean {
@@ -67,25 +51,24 @@ const RUN_DEVICE = "__run__";
 
 /**
  * Where a step runs: one of your devices by name, or the device the run
- * starts on. A name that is not one of your devices stays, marked, so a
- * flow from a colleague keeps its choice.
+ * starts on. The list is what the Host says this node may name: yours,
+ * and other people's that offer the node's profile to the Space. A name
+ * that is not one of them stays, marked, so a flow from a colleague keeps
+ * its choice.
  */
 export function DeviceField({
 	id,
 	value,
 	devices,
-	profile,
 	onChange,
 }: {
 	id: string;
 	value: string | undefined;
-	/** Your devices and the ones offered to the Space; undefined while they load. */
+	/** The devices this node may name (`runs.devices` with `forNode`); undefined while they load. */
 	devices: readonly DeviceChoice[] | undefined;
-	/** The node's profile: other people's devices that offer it are listed. */
-	profile?: string | undefined;
 	onChange: (device: string | undefined) => void;
 }) {
-	const listed = choicesFor(devices ?? [], profile);
+	const listed = devices ?? [];
 	const names = [...new Set(listed.map((d) => d.name))];
 	const unknown = value !== undefined && !names.includes(value);
 	const label = (name: string) => {

@@ -39,9 +39,14 @@ export function createRunQueries(orpc: ApiQueryUtils) {
 			refetchInterval: live ? ARTIFACTS_POLL_MS : (false as const),
 			meta: { quietRefetchErrors: true },
 		}),
-		/** The person's Devices for the project, online or not: a node's Device, Move to. */
-		devices: (projectId: string) =>
-			orpc.runs.devices.queryOptions({ input: { projectId } }),
+		/**
+		 * The person's Devices for the project, online or not (Move to). With
+		 * `forNode`, the Devices that node may name, as the Host decides.
+		 */
+		devices: (projectId: string, forNode?: { profile?: string }) =>
+			orpc.runs.devices.queryOptions({
+				input: { projectId, ...(forNode ? { forNode } : {}) },
+			}),
 		/** The person's Devices a run of the project can run on, this computer first. */
 		placements: (projectId: string) =>
 			orpc.runs.placements.queryOptions({ input: { projectId } }),

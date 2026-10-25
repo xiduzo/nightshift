@@ -82,7 +82,6 @@ function Editor({
 	);
 	const {
 		projectFlows,
-		devices,
 		nodeDefaults,
 		policyDefaults,
 		connections,
@@ -301,7 +300,6 @@ function Editor({
 			projectId={projectId}
 			flow={draft}
 			node={selectedNode}
-			devices={devices}
 			onChange={(change) =>
 				setDraft((current) => updateNode(current, selectedNode.id, change))
 			}
