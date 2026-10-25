@@ -57,6 +57,7 @@ function rowsOf(walkerId: string, projectId = "project-none"): RunRows {
 				startedBy: null,
 				deviceId: null,
 				placements: null,
+				deviceNames: null,
 				createdAt: Date.now(),
 			},
 		],
@@ -186,13 +187,19 @@ describe("a Host in memory", () => {
 		const rows = rowsOf(b.deviceId);
 		const [run] = rows.runs;
 		if (!run) throw new Error("No run.");
-		const { startedBy, deviceId, placements, ...older } = run;
+		const { startedBy, deviceId, placements, deviceNames, ...older } = run;
 		await client.sync.push({
 			...rows,
 			runs: [{ ...older, newer: true } as unknown as typeof run],
 		});
 		expect(seen.rows?.runs).toEqual([
-			{ ...older, startedBy: null, deviceId: null, placements: null },
+			{
+				...older,
+				startedBy: null,
+				deviceId: null,
+				placements: null,
+				deviceNames: null,
+			},
 		]);
 
 		// A command names its run: the Host acts in the key's Person's name,

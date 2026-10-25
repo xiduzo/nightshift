@@ -59,6 +59,14 @@ export const run = sqliteTable(
 		 */
 		placements: text("placements"),
 		/**
+		 * JSON: the names of the Devices of `device_id` and `placements`, by
+		 * id, as run start knew them: `{ "<device id>": "hetzner-1" }`. With
+		 * those two and `started_by` it is the run's plan, which the walk
+		 * reads. Null: a run from before the plan, or from a Device of a
+		 * version before it.
+		 */
+		deviceNames: text("device_names"),
+		/**
 		 * The Person who started the run: for a schedule, its Person, else
 		 * the owner of the Device that fired it. Null only for a run another
 		 * Replica walked before every run had a starter. No foreign key: a

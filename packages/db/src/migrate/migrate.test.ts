@@ -278,3 +278,41 @@ describe("migration run_starters", () => {
 		]);
 	});
 });
+
+describe("migration run_device_names", () => {
+	test("gives each run the names of its Devices this computer knows: its own and the ones its nodes name", async () => {
+		const db = await databaseBefore("run_device_names");
+		const [self] = await rows<{ id: string; name: string }>(
+			db,
+			"SELECT id, name FROM device WHERE self = 1",
+		);
+		const run = (id: string, device: string, placements: string) =>
+			`INSERT INTO run (id, space_id, project_id, flow, title, worktree_path, branch, base_ref, walker_id, device_id, placements) VALUES ('${id}', 's', 'p1', '{}', 'Run', '/w/${id}', 'b-${id}', 'main', '${self?.id}', ${device}, ${placements})`;
+		for (const statement of [
+			"INSERT INTO project (id, space_id, name) VALUES ('p1', 's', 'repo')",
+			"INSERT INTO device (id, name, platform) VALUES ('d-b', 'studio-b', 'linux')",
+			"INSERT INTO device (id, name, platform) VALUES ('d-c', 'hetzner-1', 'linux')",
+			run("before-placement", "NULL", "NULL"),
+			run("on-b", "'d-b'", "NULL"),
+			run("named", "'d-b'", `'{"hetzner-1":"d-c","gone":"d-x"}'`),
+			run("unknown", "'d-x'", "'not json'"),
+		]) {
+			await db.run(sql.raw(statement));
+		}
+
+		await migrateDb(db);
+
+		const named = await rows<{ id: string; device_names: string }>(
+			db,
+			"SELECT id, device_names FROM run ORDER BY id",
+		);
+		expect(
+			named.map((r) => [r.id, JSON.parse(r.device_names) as unknown]),
+		).toEqual([
+			["before-placement", { [self?.id ?? ""]: self?.name }],
+			["named", { "d-b": "studio-b", "d-c": "hetzner-1" }],
+			["on-b", { "d-b": "studio-b" }],
+			["unknown", {}],
+		]);
+	});
+});

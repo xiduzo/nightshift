@@ -28,6 +28,12 @@ const runRowSchema = z.object({
 	deviceId: z.string().nullable().default(null),
 	/** The Devices its nodes name, by name (JSON). A Device of a version before it sends none. */
 	placements: z.string().nullable().default(null),
+	/**
+	 * The names of its Devices, by id (JSON): with the three above, its
+	 * plan. A Device of a version before it sends none; one of a version
+	 * before it drops it.
+	 */
+	deviceNames: z.string().nullable().default(null),
 	createdAt: z.number(),
 });
 
