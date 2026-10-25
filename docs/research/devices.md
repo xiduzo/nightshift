@@ -350,6 +350,21 @@ Device's capabilities, or the Offer: "The flow uses `gh` on `hetzner-1`,
 but that device has no `gh`"; "hetzner-1 offers `codex-server` to this
 Space, not `claude`". `device: "any"` can come later.
 
+Placement is decided once, when the run starts, as the run plan. The
+devices' planner (`placement/placement.ts`, `PlacementPort.plan`) finds
+the Person the run runs for (as the Host of its Space knows them), the
+run's Device and each named Device (one of the Person's own, or another
+Person's through its Offers, online, with a Clone where it needs one),
+and runs the engine's node walk (`planNodes`) over them: the rule above,
+with each profile resolved where its node runs. The nodes on an offered
+Device must stay within its Offers. The run's row keeps the plan
+(`device_id`, `placements`, `device_names`, `started_by`), and the walk
+reads it (`planOf`) and decides nothing again: a restart needs no list of
+Devices to name them. A move keeps the plan; only the Walker changes. A
+node's Device field in the editor lists what the planner allows
+(`runs.devices` with `forNode`). A run from before the plan kept names
+walks with the names its nodes give.
+
 ### Who walks
 
 A Run's Walker is chosen at start; the default is the Space's Host, because
