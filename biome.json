@@ -56,6 +56,9 @@
 			"suspicious": {
 				"noImportCycles": "error"
 			},
+			"performance": {
+				"noReExportAll": "error"
+			},
 			"nursery": {
 				"useSortedClasses": {
 					"level": "warn",
@@ -167,6 +170,16 @@
 			],
 			"linter": {
 				"enabled": false
+			}
+		},
+		{
+			"includes": ["packages/db/src/schema/index.ts"],
+			"linter": {
+				"rules": {
+					"performance": {
+						"noReExportAll": "off"
+					}
+				}
 			}
 		},
 		{
