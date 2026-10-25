@@ -308,9 +308,26 @@ export async function sleep(
  * - a `resume` (the run was stopped while it slept, and a person resumed
  *   it) parks the step as stopped and jumps back, so the node reopens the
  *   step when it has a session, else starts its next visit, as the engine
- *   does after `closeOpenWork`.
+ *   does after `closeOpenWork`. A sleep a stop ended before it was
+ *   checkpointed does the same with no answer (`interruptNode`'s `stale`).
  */
-export function waitNode(nodeId: string): NodeAction {
+export function waitNode(
+	nodeId: string,
+	ctx: Pick<StepContext, "log" | "run">,
+): NodeAction {
+	const stopped = (pending: PendingWait, prompt: string | null): Command => {
+		const parked: PendingParked = {
+			kind: "parked",
+			stepId: pending.stepId,
+			nodeId,
+			visit: pending.visit,
+			harnessSessionId: pending.session?.harnessSessionId ?? null,
+			prompt,
+			status: "stopped",
+			reason: null,
+		};
+		return new Command({ update: { pending: parked }, goto: nodeId });
+	};
 	return interruptNode({
 		kind: "wait",
 		nodeId,
@@ -327,17 +344,7 @@ export function waitNode(nodeId: string): NodeAction {
 			// A checkpoint from before this module is read in today's shape.
 			const pending = pendingWaitOf(raw) as PendingWait;
 			if (answer?.kind === "resume") {
-				const parked: PendingParked = {
-					kind: "parked",
-					stepId: pending.stepId,
-					nodeId,
-					visit: pending.visit,
-					harnessSessionId: pending.session?.harnessSessionId ?? null,
-					prompt: answer.prompt ?? null,
-					status: "stopped",
-					reason: null,
-				};
-				return new Command({ update: { pending: parked }, goto: nodeId });
+				return stopped(pending, answer.prompt ?? null);
 			}
 			if (answer?.kind === "signal") {
 				return new Command({
@@ -355,6 +362,12 @@ export function waitNode(nodeId: string): NodeAction {
 				update: { pending: { ...pending, session } },
 				goto: nodeId,
 			});
+		},
+		// A stop ended the step before the sleep was checkpointed: it parks as
+		// stopped, as a resume of a stopped sleep does.
+		stale: {
+			ctx,
+			letGo: (raw) => stopped(pendingWaitOf(raw) as PendingWait, null),
 		},
 	});
 }

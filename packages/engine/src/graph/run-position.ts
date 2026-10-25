@@ -1,5 +1,10 @@
 import type { FlowNode } from "@nightshift/flows";
-import { type LoggedEvent, type Scope, scopeKey } from "../log";
+import {
+	type EnginePayloads,
+	type LoggedEvent,
+	type Scope,
+	scopeKey,
+} from "../log";
 import { countVisits, type DerivedStep, deriveSteps } from "../read";
 import type { Pending, RunStateUpdate, RunStateValues } from "./state";
 
@@ -13,21 +18,30 @@ import type { Pending, RunStateUpdate, RunStateValues } from "./state";
  * that runs, a Gate that is open, the step of a daemon that died, or a step
  * a re-entry left uncommitted on purpose so that the node takes it up.
  *
+ * The log is at most one super-step ahead of the checkpoint. A step can end
+ * in the log and the commit after it not land: the daemon died, a stop
+ * fenced the drive off, or the engine failed in between. Such a step is
+ * done (`Position.done`): the node goes on from its logged end and runs
+ * nothing again.
+ *
  * This module is the one owner of that rule (design rule 5):
  *
  * - The commit: every node that ends a step, or keeps it open across
  *   super-steps (a wait, the elements of a Call with `each`), commits its
  *   visit through `commitVisit`. Nothing else writes `visits`.
  * - Where a node is (`positionOf`): the step a wait, a park or a Gate holds
- *   for it (`pending`), a loop that is mid-way (`loops`), the step the log
- *   has and the checkpoint never committed, and the visit a new step gets.
- *   The resume point (`resume-point.ts`) decides from these; the step
- *   runner numbers a new step from them.
+ *   for it (`pending`), a loop that is mid-way (`loops`) and a loop cursor
+ *   behind the log, the step the log has and the checkpoint never
+ *   committed, a step that is done, and the visit a new step gets. The
+ *   resume point (`resume-point.ts`) decides from these; the step runner
+ *   numbers a new step from them.
  * - The front of the walk in the log (`frontOf`, `latestFront`,
  *   `reenteredNode`): the last step, and whether the walk moved on from
  *   it.
  * - The re-entry seed (`loggedVisits`, `takeBackVisit`): the visits a
  *   re-entry writes so that exactly the step it means is left uncommitted.
+ * - A stale hold (`holdEnded`): a wait or a Gate the checkpoint holds whose
+ *   step a stop ended in the log.
  *
  * The checkpoint is the walk's, the log is the read model (ADR "The walk
  * reads the checkpoint; the event log is the read model"). This module
@@ -41,6 +55,31 @@ import type { Pending, RunStateUpdate, RunStateValues } from "./state";
 
 type NodeRef = Pick<FlowNode, "id">;
 type EdgeTakenEvent = Extract<LoggedEvent, { type: "EdgeTaken" }>;
+
+/**
+ * A step that ended before its work was done: a stop, an error (also a
+ * step past its time limits), or a daemon death. Its node takes it up
+ * again by its rules; a step that ended on its own is never taken up.
+ */
+export function isCutShort(step: Pick<DerivedStep, "outcome">): boolean {
+	return (
+		step.outcome === "stopped" ||
+		step.outcome === "error" ||
+		step.outcome === "interrupted"
+	);
+}
+
+/**
+ * A step that ended on its own, after the last commit of its node: the
+ * walk is past it in the log, and the checkpoint does not know.
+ */
+export type DoneStep = {
+	step: DerivedStep;
+	/** Its `StepEnded`: the outcome, the outputs, the error and the variables. */
+	ended: EnginePayloads["StepEnded"];
+	/** The edge the walk took after it, when the log has one. */
+	edge: EnginePayloads["EdgeTaken"] | null;
+};
 
 /**
  * Commits the node's visit: the checkpoint counts the step, so no re-entry
@@ -77,6 +116,21 @@ export type Position = {
 	 * Its latest step, else null.
 	 */
 	uncommitted(node: NodeRef): DerivedStep | null;
+	/**
+	 * The step of `node` that is done though the checkpoint holds it open
+	 * or never committed it: it ended on its own (`isCutShort` is false)
+	 * after the last commit. The step the checkpoint names is its held
+	 * wait, its loop, or its uncommitted step. Not a parked step: the
+	 * checkpoint saw that end. Not the last step of a run that finished: a
+	 * resume reopens that one on purpose (`takeBackVisit`).
+	 */
+	done(node: NodeRef): DoneStep | null;
+	/**
+	 * The index of the last element of the node's loop that ended in the
+	 * log, when the checkpoint's cursor (`loops`) is behind it: the commit
+	 * after that element never landed. Null when the cursor agrees.
+	 */
+	cursorBehind(node: NodeRef): number | null;
 	/** The visit a new step of `node` gets: one more than the log counts in this scope. */
 	nextVisit(node: NodeRef): number;
 };
@@ -101,25 +155,88 @@ export function positionOf(
 		steps().findLast(
 			(s) => s.nodeId === node.id && scopeKey(s.scope) === key,
 		) ?? null;
+	const byId = (stepId: string | null) =>
+		stepId ? (steps().find((s) => s.id === stepId) ?? null) : null;
+	const looping = (node: NodeRef) => Boolean(state.loops?.[node.id]);
+	const uncommitted = (node: NodeRef) => {
+		const logged = countVisits(events, node.id, key);
+		if (logged <= (state.visits?.[node.id] ?? 0)) return null;
+		return latest(node);
+	};
 	return {
 		held(node) {
 			const pending = heldStep(state, node.id);
-			if (!pending) return null;
-			const stepId = pending.stepId;
-			return {
-				pending,
-				step: stepId ? (steps().find((s) => s.id === stepId) ?? null) : null,
-			};
+			return pending ? { pending, step: byId(pending.stepId) } : null;
 		},
-		looping: (node) => Boolean(state.loops?.[node.id]),
+		looping,
 		latest,
-		uncommitted(node) {
-			const logged = countVisits(events, node.id, key);
-			if (logged <= (state.visits?.[node.id] ?? 0)) return null;
-			return latest(node);
+		uncommitted,
+		done(node) {
+			const pending = heldStep(state, node.id);
+			if (pending && pending.kind !== "wait") return null;
+			const step = pending
+				? byId(pending.stepId)
+				: looping(node)
+					? latest(node)
+					: uncommitted(node);
+			if (!step || step.endedAt === null || isCutShort(step)) return null;
+			return doneAfter(events, step, key);
+		},
+		cursorBehind(node) {
+			let last = 0;
+			for (const item of latest(node)?.items ?? []) {
+				if (!item.open && item.index !== null) {
+					last = Math.max(last, item.index);
+				}
+			}
+			const cursor = state.loops?.[node.id]?.index ?? 0;
+			return last > cursor ? last : null;
 		},
 		nextVisit: (node) => countVisits(events, node.id, key) + 1,
 	};
+}
+
+/**
+ * The step's own end and the edge after it, unless the run finished after
+ * that end. `key` is the step's scope.
+ */
+function doneAfter(
+	events: readonly LoggedEvent[],
+	step: DerivedStep,
+	key: string,
+): DoneStep | null {
+	const ended = events.find(
+		(e) =>
+			e.type === "StepEnded" && e.stepId === step.id && e.seq > step.openedSeq,
+	);
+	if (ended?.type !== "StepEnded") return null;
+	const finished = events.some(
+		(e) =>
+			e.type === "RunEnded" &&
+			e.payload.status === "finished" &&
+			e.seq > ended.seq,
+	);
+	if (finished) return null;
+	const edge = events.find(
+		(e): e is EdgeTakenEvent =>
+			e.type === "EdgeTaken" &&
+			e.seq > ended.seq &&
+			e.payload.from === step.nodeId &&
+			scopeKey(e.payload.scope ?? null) === key,
+	);
+	return { step, ended: ended.payload, edge: edge?.payload ?? null };
+}
+
+/**
+ * Whether `step` ended on its own and the run did not finish after it: a
+ * re-entry goes on from its end, and no harness session continues it.
+ */
+export function isDone(
+	events: readonly LoggedEvent[],
+	step: DerivedStep,
+): boolean {
+	if (step.endedAt === null || isCutShort(step)) return false;
+	return doneAfter(events, step, scopeKey(step.scope)) !== null;
 }
 
 /** The step the checkpoint holds for `nodeId`, or null when it holds another node's, or none. */
@@ -129,6 +246,20 @@ export function heldStep(
 ): Pending | null {
 	const pending = state.pending ?? null;
 	return pending?.nodeId === nodeId ? pending : null;
+}
+
+/**
+ * Whether the log ended the step a wait or a Gate holds: a stop ended it
+ * after the hold was written. Such a hold is stale: no wake and no answer
+ * comes for it.
+ */
+export function holdEnded(
+	events: readonly LoggedEvent[],
+	pending: Pending,
+): boolean {
+	if (pending.kind === "parked" || pending.stepId === null) return false;
+	const step = deriveSteps(events).find((s) => s.id === pending.stepId);
+	return step !== undefined && step.endedAt !== null;
 }
 
 /** The front of the walk: its last step, and the edge the walk took after that step started. */

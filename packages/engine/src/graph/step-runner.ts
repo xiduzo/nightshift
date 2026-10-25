@@ -42,14 +42,15 @@ import {
 import { dataProblem } from "./output-schema";
 import {
 	entryOf,
-	type ResumePoint,
 	type ResumeRules,
 	resumePoint,
+	type StepEntry,
 } from "./resume-point";
 import {
 	parkCommand,
 	parkStopped,
 	route,
+	routeDone,
 	type StepEnd,
 	scopeOf,
 } from "./route";
@@ -239,7 +240,7 @@ export type StepSpec = {
 	 * says how the step was entered, with the prompt and the harness session
 	 * a continued or reopened step carries.
 	 */
-	body(step: StepHandle, entry: ResumePoint): Promise<BodyResult>;
+	body(step: StepHandle, entry: StepEntry): Promise<BodyResult>;
 	/**
 	 * The outputs of a step that ends before its body spoke (the wait ended
 	 * past the stop time, the body threw, a wait gave up): the visit and the
@@ -261,6 +262,7 @@ export async function runStep(
 ): Promise<Command> {
 	const events = await ctx.log.events(ctx.run.id);
 	const entry = resumePoint(node, state, events, scopeOf(config), spec.rules);
+	if (entry.kind === "done") return routeDone(ctx, state, node, entry, config);
 	const begun = await beginStep(
 		ctx,
 		node,

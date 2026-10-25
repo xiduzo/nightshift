@@ -2,7 +2,7 @@ import type { FlowNode } from "@nightshift/flows";
 import type { LoggedEvent, Scope } from "../log";
 import { type DerivedStep, deriveSteps } from "../read";
 import { DEFAULT_RESUME_PROMPT } from "./context";
-import { positionOf } from "./run-position";
+import { type DoneStep, isCutShort, positionOf } from "./run-position";
 import { pendingWaitOf } from "./sleep";
 import type { RunStateValues } from "./state";
 import type { StepStart } from "./step-runner";
@@ -40,6 +40,11 @@ import type { StepStart } from "./step-runner";
  *
  * The rule, in order. For a node `n` in scope `s`:
  *
+ * 0. The step the checkpoint holds open or never committed ended on its
+ *    own after the last commit (`Position.done`: the daemon died, a stop
+ *    came or the engine failed between its end and the commit): the node
+ *    goes on from its logged end and runs nothing again (`done`). The same
+ *    for every kind.
  * 1. `pending` is this node's wait that ended (the runner appended
  *    `WaitEnded`): the step it names continues when it is still open, and
  *    is reopened when recovery ended it meanwhile (the daemon died after the
@@ -65,6 +70,8 @@ import type { StepStart } from "./step-runner";
 /** What a node does with its step when it re-enters. */
 export type ResumePoint =
 	| { kind: "new" }
+	/** The step is done: the node routes on its logged end (`routeDone`). */
+	| ({ kind: "done" } & DoneStep)
 	| {
 			kind: "continue";
 			step: DerivedStep;
@@ -134,6 +141,8 @@ export function resumePoint(
 	rules: ResumeRules,
 ): ResumePoint {
 	const at = positionOf(state, events, scope);
+	const done = at.done(node);
+	if (done) return { kind: "done", ...done };
 	const held = at.held(node);
 
 	const sleeping = pendingWaitOf(held?.pending);
@@ -199,8 +208,14 @@ export function resumePoint(
 	}
 }
 
-/** The `StepStart` for `beginStep`: the seam between deciding and appending. */
-export function entryOf(point: ResumePoint): StepStart {
+/** How a node enters its step: every point but a step that is done, which begins nothing. */
+export type StepEntry = Exclude<ResumePoint, { kind: "done" }>;
+
+/**
+ * The `StepStart` for `beginStep`: the seam between deciding and appending.
+ * A step that is done begins nothing: its node routes on it first.
+ */
+export function entryOf(point: StepEntry): StepStart {
 	switch (point.kind) {
 		case "new":
 			return { kind: "new" };
@@ -246,15 +261,6 @@ function reopen(
 		harnessSessionId: session,
 		prompt: session ? prompt : null,
 	};
-}
-
-/** A step that ended before its work was done: a stop, an error, or a daemon death. */
-function isCutShort(step: DerivedStep): boolean {
-	return (
-		step.outcome === "stopped" ||
-		step.outcome === "error" ||
-		step.outcome === "interrupted"
-	);
 }
 
 /** The step's Gate is asked: it is open and `GateOpened` came after its latest opening. */

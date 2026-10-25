@@ -75,7 +75,11 @@ export type ThreadDeps = {
 export type ThreadState =
 	/** The thread sits at an interrupt: a wait, a Gate, or a parked step. */
 	| { kind: "interrupted"; value: Parked }
-	/** A node is pending without an interrupt: the daemon died, or the engine failed, while it ran. */
+	/**
+	 * A node is pending without an interrupt: the daemon died, a stop came,
+	 * or the engine failed, while it ran or before its super-step was
+	 * checkpointed.
+	 */
 	| { kind: "pending"; next: string[] }
 	/** The thread reached END. */
 	| { kind: "ended"; ended: Ended | null }
@@ -215,9 +219,15 @@ function stateOf(
 	if (interrupt) {
 		return { kind: "interrupted", value: interrupt.value as Parked };
 	}
-	if (snapshot.next.length > 0) {
-		return { kind: "pending", next: [...snapshot.next] };
-	}
+	// `next` leaves out a task whose writes are saved but whose super-step
+	// has no checkpoint yet (the daemon died, or a stop came, in between).
+	// The thread is still at that task: `invoke(null)` applies its writes
+	// and goes on.
+	const next =
+		snapshot.next.length > 0
+			? snapshot.next
+			: snapshot.tasks.map((task) => task.name);
+	if (next.length > 0) return { kind: "pending", next: [...next] };
 	if (!hasCheckpoint) return { kind: "fresh" };
 	return { kind: "ended", ended: values.ended ?? null };
 }

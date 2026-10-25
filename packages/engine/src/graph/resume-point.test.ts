@@ -14,6 +14,7 @@ import {
 	type ResumeRules,
 	rerunEntryOf,
 	resumePoint,
+	type StepEntry,
 } from "./resume-point";
 import type { Pending, RunStateValues } from "./state";
 
@@ -150,6 +151,7 @@ const parkedPending = (
 /** A point without the step object: one cell of the table. */
 type Point =
 	| { kind: "new" }
+	| { kind: "done"; stepId: string }
 	| {
 			kind: "continue" | "reopen";
 			stepId: string;
@@ -160,6 +162,7 @@ type Point =
 /** The point without the step object, for the table. */
 function summary(point: ResumePoint): Point {
 	if (point.kind === "new") return { kind: "new" };
+	if (point.kind === "done") return { kind: "done", stepId: point.step.id };
 	return {
 		kind: point.kind,
 		stepId: point.step.id,
@@ -659,6 +662,12 @@ describe("resumePoint", () => {
 	});
 
 	test("entryOf maps the point onto beginStep's StepStart, prompt and all", () => {
+		const point = (...args: Parameters<typeof resumePoint>): StepEntry => {
+			const found = resumePoint(...args);
+			if (found.kind === "done")
+				throw new Error("A step that is done begins nothing.");
+			return found;
+		};
 		const events = logOf(
 			started("s1"),
 			...session("s1", "h1"),
@@ -669,21 +678,21 @@ describe("resumePoint", () => {
 			visits: { [NODE.id]: 1 },
 		});
 		expect(
-			entryOf(resumePoint(NODE, state, events, null, RESUME_RULES.agent)),
+			entryOf(point(NODE, state, events, null, RESUME_RULES.agent)),
 		).toEqual({
 			kind: "reopen",
 			stepId: "s1",
 			prompt: "Go on.",
 		});
 		expect(
-			entryOf(resumePoint(NODE, state, events, null, RESUME_RULES.call)),
+			entryOf(point(NODE, state, events, null, RESUME_RULES.call)),
 		).toEqual({
 			kind: "new",
 		});
 		const open = logOf(started("s1"), ...session("s1", "h1"));
 		expect(
 			entryOf(
-				resumePoint(
+				point(
 					NODE,
 					stateOf({ pending: waitPending("s1", "h1") }),
 					open,

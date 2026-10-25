@@ -152,7 +152,9 @@ describe("driveGraph", () => {
 		const started = (await h.events()).filter(
 			(e) => e.type === "SessionStarted",
 		);
-		expect(rows.map((r) => r.id)).toEqual(started.map((e) => e.sessionId));
+		expect(rows.map((r) => r.id as string | null)).toEqual(
+			started.map((e) => e.sessionId),
+		);
 		expect(rows).toEqual([]);
 		expect(scripted.sessions).toEqual([]);
 	});

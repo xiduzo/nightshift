@@ -18,6 +18,7 @@ import {
 import { DEFAULT_RESUME_PROMPT } from "./context";
 import { sessionOf } from "./resume-point";
 import {
+	isDone,
 	latestFront,
 	loggedVisits,
 	positionOf,
@@ -104,7 +105,12 @@ export function resumeTarget(
 	} else if (last) {
 		nodeId = last.nodeId;
 		scope = last.scope;
-		if (last.nodeType === "agent" && sessionOf(last) !== null) {
+		// A step that is done goes on from its end: no session continues.
+		if (
+			last.nodeType === "agent" &&
+			sessionOf(last) !== null &&
+			!isDone(events, last)
+		) {
 			stepId = last.id;
 		}
 	} else {

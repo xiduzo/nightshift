@@ -44,7 +44,7 @@ import {
 	warnDeciderCost,
 } from "../cost";
 import { checkOutputData, normalizeOutputData } from "../output-schema";
-import { RESUME_RULES, type ResumePoint, rerunEntryOf } from "../resume-point";
+import { RESUME_RULES, rerunEntryOf, type StepEntry } from "../resume-point";
 import { scopeOf } from "../route";
 import type { RunStateValues } from "../state";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
@@ -240,7 +240,7 @@ export const AGENT: NodeKind<AgentNode> = {
  */
 function resumeSessionOf(
 	node: AgentNode,
-	entry: ResumePoint,
+	entry: StepEntry,
 	state: RunStateValues,
 	step: StepHandle,
 	config: LangGraphRunnableConfig,

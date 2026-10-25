@@ -124,6 +124,7 @@ const stateOf = (
 /** The point without the step object. */
 function summary(point: ResumePoint) {
 	if (point.kind === "new") return { kind: "new" };
+	if (point.kind === "done") return { kind: "done", stepId: point.step.id };
 	return {
 		kind: point.kind,
 		stepId: point.step.id,
@@ -142,6 +143,7 @@ describe("the daemon side agrees with the node side", () => {
 			started("s2", "b", 1),
 			...session("s2", "h-b"),
 			ended("s2", "pass"),
+			runEnded("finished"),
 		);
 		expect(reenteredNode(events)).toBe("b");
 		expect(resumeTarget(events)).toEqual({
@@ -169,6 +171,30 @@ describe("the daemon side agrees with the node side", () => {
 			harnessSessionId: "h-b",
 			prompt: DEFAULT_RESUME_PROMPT,
 		});
+	});
+
+	test("a last step that ended before its commit, in a run that did not finish, is done: no session continues, the node goes on from its end", () => {
+		const events = logOf(
+			runStarted(),
+			started("s1", "a", 1),
+			...session("s1", "h-a"),
+			ended("s1", "pass"),
+			runEnded("stopped"),
+		);
+		expect(resumeTarget(events)).toEqual({
+			nodeId: "a",
+			stepId: null,
+			scope: null,
+			topNodeId: "a",
+		});
+		const point = resumePoint(
+			{ id: "a" },
+			stateOf(),
+			events,
+			null,
+			RESUME_RULES.agent,
+		);
+		expect(summary(point)).toEqual({ kind: "done", stepId: "s1" });
 	});
 
 	test("the walk moved on after its last step: the edge's target, no step to continue", () => {

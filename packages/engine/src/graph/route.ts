@@ -7,7 +7,7 @@ import { type FlowNode, type JsonValue, nextEdge } from "@nightshift/flows";
 import type { Scope, StepOutcome, StepOutputs } from "../log";
 import type { NodeAction, StepContext } from "./context";
 import { interruptNode } from "./interrupt";
-import { commitVisit } from "./run-position";
+import { commitVisit, type DoneStep } from "./run-position";
 import type { PendingParked, RunStateUpdate, RunStateValues } from "./state";
 
 /**
@@ -118,13 +118,52 @@ export function parkStopped(
  *   `fail`, `needs-input` and the rest park as failed.
  * - every edge on the outcome at its max parks as failed.
  */
-export async function route(
+export function route(
 	ctx: StepContext,
 	state: RunStateValues,
 	node: FlowNode,
 	end: StepEnd,
 	config: LangGraphRunnableConfig,
 	extra?: RunStateUpdate,
+): Promise<Command> {
+	return routeOn(ctx, state, node, end, config, extra, null);
+}
+
+/**
+ * Goes on from a step that is done (`Position.done`): it ended on its own,
+ * and the commit after its end never landed. The route is the one its end
+ * took: the same state update, and the edge the log took, if it took one.
+ * Nothing is appended twice: an `EdgeTaken` the log has is taken in the
+ * state only.
+ */
+export function routeDone(
+	ctx: StepContext,
+	state: RunStateValues,
+	node: FlowNode,
+	done: DoneStep,
+	config: LangGraphRunnableConfig,
+	extra?: RunStateUpdate,
+): Promise<Command> {
+	const { ended } = done;
+	const end: StepEnd = {
+		stepId: done.step.id,
+		visit: done.step.visit,
+		outcome: ended.outcome,
+		outputs: ended.outputs,
+		error: ended.error,
+		...(ended.variables ? { variables: ended.variables } : {}),
+	};
+	return routeOn(ctx, state, node, end, config, extra, done.edge);
+}
+
+async function routeOn(
+	ctx: StepContext,
+	state: RunStateValues,
+	node: FlowNode,
+	end: StepEnd,
+	config: LangGraphRunnableConfig,
+	extra: RunStateUpdate | undefined,
+	taken: DoneStep["edge"],
 ): Promise<Command> {
 	const { outcome, visit } = end;
 	const update: RunStateUpdate = {
@@ -147,6 +186,18 @@ export async function route(
 			"failed",
 			`Node "${node.id}" failed: ${end.error ?? "unknown error"}`,
 		);
+	}
+	if (taken) {
+		// The walk took this edge before the commit was lost.
+		return new Command({
+			update: {
+				...update,
+				traversals: {
+					[taken.edgeId]: (state.traversals[taken.edgeId] ?? 0) + 1,
+				},
+			},
+			goto: taken.to,
+		});
 	}
 	const choice = nextEdge({
 		flow: ctx.flow,

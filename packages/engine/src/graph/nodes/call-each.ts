@@ -47,8 +47,8 @@ import {
 } from "../each";
 import { renderBindings, resolveInputs } from "../inputs";
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
-import { parkCommand, route, type StepEnd, scopeOf } from "../route";
-import { commitVisit } from "../run-position";
+import { parkCommand, route, routeDone, type StepEnd, scopeOf } from "../route";
+import { commitVisit, positionOf } from "../run-position";
 import type { Loop } from "../state";
 import { beginStep, readyDevice, type StepHandle } from "../step-runner";
 import {
@@ -101,12 +101,24 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 		const runId = ctx.run.id;
 		const scope = scopeOf(config);
 		const events = await ctx.log.events(runId);
+		const point = resumePoint(
+			node,
+			state,
+			events,
+			scope,
+			RESUME_RULES.callEach,
+		);
+		if (point.kind === "done") {
+			return routeDone(ctx, state, node, point, config, {
+				loops: { [node.id]: null },
+			});
+		}
 		const begun = await beginStep(
 			ctx,
 			node,
 			state,
 			config,
-			entryOf(resumePoint(node, state, events, scope, RESUME_RULES.callEach)),
+			entryOf(point),
 			events,
 		);
 		if (begun.kind === "parked") return begun.command;
@@ -206,9 +218,9 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 		 * cleared as `route()` does: a resume through the park node set it,
 		 * and the next entry must not read it again.
 		 */
-		const next = (element: Element) => {
+		const next = (index: number) => {
 			step.leaveOpen();
-			const cursor: Loop = { index: element.index };
+			const cursor: Loop = { index };
 			return new Command({
 				update: {
 					loops: { [node.id]: cursor },
@@ -247,6 +259,14 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				inputs: open.inputs ?? { [as]: open.facts.value },
 			};
 		} else {
+			// An element of this step ended and the commit after it never
+			// landed: the cursor catches up first, so the next element runs in
+			// a super-step, and a body namespace, of its own.
+			const behind =
+				step.opened === "new"
+					? null
+					: positionOf(state, events, scope).cursorBehind(node);
+			if (behind !== null) return next(behind);
 			if (ctx.signal().aborted) return parkStopped(null);
 			const stop = stopBeforeNext(
 				ctx,
@@ -369,7 +389,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			element = { facts, index, branch, baseBranch, inputs };
 			if (failure !== null) {
 				await endItem(facts.id, "failed", failure, {});
-				return next(element);
+				return next(element.index);
 			}
 		}
 
@@ -416,7 +436,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			case "failed": {
 				const outputs = await bodyOutputs(ctx, body);
 				await endItem(element.facts.id, "failed", ended.reason, outputs);
-				return next(element);
+				return next(element.index);
 			}
 			case "finished": {
 				const outputs = await bodyOutputs(ctx, body, ended);
@@ -430,7 +450,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 					return finish("halted", null);
 				}
 				await endItem(element.facts.id, "done", null, outputs);
-				return next(element);
+				return next(element.index);
 			}
 		}
 	};

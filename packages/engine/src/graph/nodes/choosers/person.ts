@@ -9,7 +9,14 @@ import type { GateChoice } from "../../../log";
 import { messageOf, type NodeAction, type StepContext } from "../../context";
 import { interruptNode } from "../../interrupt";
 import { RESUME_RULES, resumePoint } from "../../resume-point";
-import { askNodeId, route, type StepEnd, scopeOf } from "../../route";
+import {
+	askNodeId,
+	route,
+	routeDone,
+	type StepEnd,
+	scopeOf,
+} from "../../route";
+import type { DoneStep } from "../../run-position";
 import type { PendingGate, ResumeValue, RunStateValues } from "../../state";
 import { beginStep, type OpenStep } from "../../step-runner";
 import { type Chooser, decisionOutputs, gateChoices } from "./chooser";
@@ -49,6 +56,9 @@ export function personChooser(node: DecisionNode, ctx: StepContext): Chooser {
 	return async (state, config) => {
 		const asked = await ensureOpen(ctx, node, state, config);
 		if (asked.kind === "parked") return asked.command;
+		if (asked.kind === "done") {
+			return routeDone(ctx, state, node, asked.done, config);
+		}
 		if (asked.kind === "failed")
 			return route(ctx, state, node, asked.end, config);
 		const pending: PendingGate = {
@@ -85,6 +95,12 @@ export function gateAskNode(node: DecisionNode, ctx: StepContext): NodeAction {
 			if (done.kind === "parked") return done.command;
 			return route(ctx, state, node, done.end, config);
 		},
+		// A stop ended the Gate's step before the Gate was checkpointed: the
+		// node asks again in a new visit, as a reopen does.
+		stale: {
+			ctx,
+			letGo: () => new Command({ update: { pending: null }, goto: node.id }),
+		},
 	});
 }
 
@@ -98,6 +114,8 @@ type OpenGate = {
 type Ensured =
 	| OpenGate
 	| { kind: "parked"; command: Command }
+	/** The Gate was answered before the commit was lost: the node goes on from the answer. */
+	| { kind: "done"; done: DoneStep }
 	| { kind: "failed"; end: StepEnd };
 
 /**
@@ -127,6 +145,7 @@ async function ensureOpen(
 		scopeOf(config),
 		RESUME_RULES.gate,
 	);
+	if (point.kind === "done") return { kind: "done", done: point };
 	if (point.kind === "continue" && point.step.gate) {
 		const {
 			step: own,

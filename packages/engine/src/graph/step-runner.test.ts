@@ -19,7 +19,7 @@ import {
 	testDevice,
 } from "../testing/test-support";
 import { STOP_AFTER_STEP_REASON, STOP_TIME_REASON } from "./context";
-import { RESUME_RULES, type ResumePoint } from "./resume-point";
+import { RESUME_RULES, type StepEntry } from "./resume-point";
 import type { PendingWait, RunStateValues } from "./state";
 import { type BodyResult, runStep, type StepHandle } from "./step-runner";
 
@@ -100,7 +100,7 @@ async function runRow(row: Row) {
 	let ctx = h.ctx;
 	let state = stateOf();
 	const config = { configurable: { thread_id: h.runId } };
-	const seen: ResumePoint[] = [];
+	const seen: StepEntry[] = [];
 
 	// A continued entry: a first visit waited, so the log has an open step
 	// and `pending` names it (what the wait node hands back on a wake).
@@ -146,7 +146,7 @@ async function runRow(row: Row) {
 
 	const body = async (
 		step: StepHandle,
-		entry: ResumePoint,
+		entry: StepEntry,
 	): Promise<BodyResult> => {
 		seen.push(entry);
 		step.record(null, { type: "command-start", command: "fake" });

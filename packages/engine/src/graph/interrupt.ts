@@ -1,11 +1,12 @@
 import {
 	type Command,
 	interrupt,
+	isGraphInterrupt,
 	type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
 
-import type { NodeAction } from "./context";
-import { heldStep } from "./run-position";
+import type { NodeAction, StepContext } from "./context";
+import { heldStep, holdEnded } from "./run-position";
 import type { Parked, Pending, ResumeValue, RunStateValues } from "./state";
 
 /**
@@ -22,6 +23,13 @@ import type { Parked, Pending, ResumeValue, RunStateValues } from "./state";
  * re-runs on the resume, and only `answer` writes state. The interrupt
  * payloads (`Parked`) are the seam to the runner and the tests; this module
  * does not change them.
+ *
+ * A held step can be stale: a stop ended the open Gate or the sleep in the
+ * log after the node held it, and before the hold was checkpointed (the
+ * run position, `holdEnded`). No answer comes for it, so with no answer
+ * waiting the node lets the step go (`letGo`) instead of waiting forever:
+ * the Gate asks again, a sleep parks as stopped. An answer that waits is
+ * taken as always.
  */
 export function interruptNode<K extends Pending["kind"]>(spec: {
 	kind: K;
@@ -37,6 +45,15 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 		state: RunStateValues,
 		config: LangGraphRunnableConfig,
 	): Command | Promise<Command>;
+	/** A held step the log may have ended: the log to look in, and what the node does then. */
+	stale?: {
+		ctx: Pick<StepContext, "log" | "run">;
+		letGo(
+			pending: Extract<Pending, { kind: K }>,
+			state: RunStateValues,
+			config: LangGraphRunnableConfig,
+		): Command | Promise<Command>;
+	};
 }): NodeAction {
 	return async (state, config) => {
 		const pending = heldStep(state, spec.nodeId);
@@ -44,7 +61,21 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 			throw new Error(spec.missing);
 		}
 		const own = pending as Extract<Pending, { kind: K }>;
-		const answer = interrupt<Parked, ResumeValue | undefined>(spec.value(own));
+		let answer: ResumeValue | undefined;
+		try {
+			answer = interrupt<Parked, ResumeValue | undefined>(spec.value(own));
+		} catch (error) {
+			// No answer waits. A stale hold gets none: the node lets it go.
+			const { stale } = spec;
+			if (
+				isGraphInterrupt(error) &&
+				stale &&
+				holdEnded(await stale.ctx.log.events(stale.ctx.run.id), own)
+			) {
+				return stale.letGo(own, state, config);
+			}
+			throw error;
+		}
 		return spec.answer(own, answer, state, config);
 	};
 }

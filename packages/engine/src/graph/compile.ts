@@ -54,7 +54,7 @@ export function compileFlow(flow: Flow, ctx: StepContext) {
 				case "wait": {
 					const wait = waitNodeId(node.id);
 					own.push(wait);
-					graph.addNode(wait, waitNode(node.id), { ends: [node.id] });
+					graph.addNode(wait, waitNode(node.id, ctx), { ends: [node.id] });
 					break;
 				}
 				case "ask": {

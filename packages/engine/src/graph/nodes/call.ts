@@ -12,7 +12,7 @@ import {
 import { eachOutputs } from "../each";
 import { renderBindings, resolveInputs } from "../inputs";
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
-import { route, scopeOf } from "../route";
+import { route, routeDone, scopeOf } from "../route";
 import { beginStep } from "../step-runner";
 import {
 	type BodyGraph,
@@ -51,20 +51,22 @@ export function callNode(node: CallNode, ctx: StepContext): NodeAction {
 	return async (state, config) => {
 		const runId = ctx.run.id;
 		const events = await ctx.log.events(runId);
+		const point = resumePoint(
+			node,
+			state,
+			events,
+			scopeOf(config),
+			CALL.resumeRules(node),
+		);
+		if (point.kind === "done") {
+			return routeDone(ctx, state, node, point, config);
+		}
 		const begun = await beginStep(
 			ctx,
 			node,
 			state,
 			config,
-			entryOf(
-				resumePoint(
-					node,
-					state,
-					events,
-					scopeOf(config),
-					CALL.resumeRules(node),
-				),
-			),
+			entryOf(point),
 			events,
 		);
 		if (begun.kind === "parked") return begun.command;
