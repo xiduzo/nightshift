@@ -170,7 +170,7 @@ These are signals, not hard limits. A file past the limit needs a reason in its 
 ```
 apps/web/src/
   router.tsx               the router and its query client (TanStack Start reads it here)
-  routes/                  thin TanStack Router files: createFileRoute, search and params, one page from a vertical
+  routes/                  thin TanStack Router files: createFileRoute, search and params, one page from a vertical and its preload
   shared/
     api/                   the oRPC client, query client, server URL, auth client, contract.ts (the API types only the web app needs; the rest come from @nightshift/client)
     page/                  the parts of a page: site header, page heading, loader, logo
@@ -202,7 +202,7 @@ Imports point one way, so no barrel closes a cycle. Biome's `noImportCycles` fai
 - A concept goes to the vertical that owns it in `docs/glossary.md`, not to its biggest user. Outcomes are declared by flow nodes, so `outcome-badge` is in `flows/canvas`. The Walker is a Device, so `walker-badge` is in `devices`.
 
 - A route file declares the route (path, `ssr`, search and params validation) and renders one page from a vertical's barrel. It gives the params and the search to the page as props. It holds no other markup.
-- A route loads data in a `loader` (`ensureQueryData`) only when that does not change what the person sees. No route has a loader today. The build prerenders the pages, so a loader also runs at build time. A loader that waits for data also blocks the navigation. Each page shows its own skeleton and its own error instead.
+- A route starts the data of its page in a `loader` that does not wait. It calls the vertical's `preload<Page>` (a `preload.ts` beside the page), which calls `preloadQuery` (`shared/api`): `ensureQueryData` in the browser only, with any error left to the page. The router preloads a route when you point at its link (`defaultPreload: "intent"`). A loader never waits for data: that blocks the navigation, and the build prerenders the pages, so a loader also runs at build time, without a session. Each page shows its own skeleton and its own error. A `preload.ts` imports only query options, because the route tree, and so every page, loads it.
 - A vertical's `queries.ts` builds its factories from `@nightshift/client` on the app's `orpc` (`createRunQueries(orpc)`), when the package has them. The web-only ones (settings, access, agents) stay in the vertical.
 - Query options live in the vertical's queries. A component does not build `orpc.x.y.queryOptions(...)` for another vertical's data. It imports that vertical's factory from its barrel, or from its `queries.ts` through a peer port (see above).
 - A query factory keeps the query key of the oRPC procedure (`orpc.x.y.queryOptions({ input })`). A polling rule (`refetchInterval` and its `meta`) is part of the factory, in the vertical that owns the data. A call site adds only its own options (`enabled`, `select`, `staleTime`).
