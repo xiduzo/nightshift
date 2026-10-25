@@ -346,6 +346,8 @@ describe("the command", () => {
 		expect(isTest("features/runs/run-list.tsx")).toBe(false);
 	});
 
+	// The two runs on the whole repository get the time a busy computer
+	// needs: the default 5 s is wall time, and other processes count there.
 	test("it passes on this repository", () => {
 		const result = Bun.spawnSync([
 			process.execPath,
@@ -353,7 +355,7 @@ describe("the command", () => {
 		]);
 		expect(result.stderr.toString()).toBe("");
 		expect(result.exitCode).toBe(0);
-	});
+	}, 120_000);
 
 	test("it stays fast on this repository", () => {
 		// This guards against an accidental O(n²) (for example a parse per
@@ -367,7 +369,7 @@ describe("the command", () => {
 		expect(checkWorkspaces(root, workspacesOf(root))).toEqual([]);
 		const { user, system } = process.cpuUsage(before);
 		expect((user + system) / 1000).toBeLessThan(15_000);
-	});
+	}, 120_000);
 
 	test("every workspace is checked, except ui, ui-native and config", () => {
 		const root = join(import.meta.dir, "..");
