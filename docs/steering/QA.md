@@ -30,7 +30,7 @@ The night-shift script's sandbox test is the model for integration tests: a repo
 - **Mock boundary:** Only mock at system boundaries (harness CLIs, `gh`, `acli`, the file system of a worktree, the clock). Do not mock internal application code.
 - **Database:** Integration tests run against a real libsql file in a temp directory. No in-memory fakes of the schema.
 - **Harness sessions:** A test never spawns a real coding agent. A fake harness binary replays a scripted NDJSON stream.
-- **Time:** Run policy tests inject a clock. No real sleeps.
+- **Time:** Run policy tests inject a clock. No real sleeps. In the engine, `sleepClock` (`testing/test-support.ts`) stands still while a run works and moves to its wake time when it sleeps, so a wait lasts exactly its minutes however late a timer fires. Assert what the engine's clock says, not the wall clock.
 - **Determinism:** A test that reads the network is a bug.
 
 ## Gherkin → Test Mapping

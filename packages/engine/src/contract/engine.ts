@@ -297,6 +297,8 @@ export interface SpaceEngine {
 	 * archive), then yields live items until the signal aborts. `afterSeq`
 	 * skips transcript entries the caller already has. It throws when the
 	 * transcript cannot be read: the caller watches again from its cursor.
+	 * The transcript has its own reader: its last entries can come after
+	 * the status that ends the run, so a watcher reads on after it.
 	 */
 	watchRun(
 		runId: string,
