@@ -163,24 +163,26 @@ export function createRunWalks(deps: {
 		}
 		const buffer = (value: string | null) =>
 			value === null ? null : Buffer.from(value, "base64");
-		await db.transaction(async (tx) => {
-			for (const c of checkpoints) {
-				await tx
+		const inserts = [
+			...checkpoints.map((c) =>
+				db
 					.insert(lgCheckpoint)
 					.values({
 						...c,
 						checkpoint: buffer(c.checkpoint),
 						metadata: buffer(c.metadata),
 					})
-					.onConflictDoNothing();
-			}
-			for (const w of writes) {
-				await tx
+					.onConflictDoNothing(),
+			),
+			...writes.map((w) =>
+				db
 					.insert(lgWrite)
 					.values({ ...w, value: buffer(w.value) })
-					.onConflictDoNothing();
-			}
-		});
+					.onConflictDoNothing(),
+			),
+		];
+		const [first, ...rest] = inserts;
+		if (first) await db.batch([first, ...rest]);
 	}
 
 	async function importTranscript(

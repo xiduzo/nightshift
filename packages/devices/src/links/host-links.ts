@@ -3,7 +3,7 @@ import type { Database } from "@nightshift/db";
 import { device, hostLink } from "@nightshift/db/schema";
 import { type KeyStoreKind, valueStore } from "@nightshift/engine";
 import { Refusal } from "@nightshift/refusal";
-import { and, asc, eq, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
 
 export type { KeyStoreKind } from "@nightshift/engine";
 
@@ -86,42 +86,57 @@ export function createHostLinks(db: Database): HostLinks {
 		},
 		get,
 		async save(link) {
-			await db.transaction(async (tx) => {
-				if (link.role === "home") {
-					const [other] = await tx
-						.select()
-						.from(hostLink)
+			// The check reads before the batch writes: a pairing is one at a
+			// time, and the batch replaces only a home link without access.
+			const [other] =
+				link.role === "home"
+					? await db
+							.select()
+							.from(hostLink)
+							.where(
+								and(
+									eq(hostLink.role, "home"),
+									ne(hostLink.hostId, link.hostId),
+								),
+							)
+					: [];
+			if (other && !other.revokedAt) {
+				throw new Refusal("conflict", SECOND_HOME);
+			}
+			const values = {
+				name: link.name,
+				addresses: JSON.stringify(link.addresses),
+				certificate: link.certificate,
+				fingerprint: link.fingerprint,
+				role: link.role,
+				personId: link.personId,
+				keyStore: link.keyStore,
+				revokedAt: null,
+			};
+			const upsert = db
+				.insert(hostLink)
+				.values({ hostId: link.hostId, ...values })
+				.onConflictDoUpdate({ target: hostLink.hostId, set: values });
+			if (link.role === "home") {
+				await db.batch([
+					db
+						.delete(hostLink)
 						.where(
-							and(eq(hostLink.role, "home"), ne(hostLink.hostId, link.hostId)),
-						);
-					if (other && !other.revokedAt) {
-						throw new Refusal("conflict", SECOND_HOME);
-					}
-					if (other) {
-						await tx.delete(hostLink).where(eq(hostLink.hostId, other.hostId));
-					}
-				}
-				const values = {
-					name: link.name,
-					addresses: JSON.stringify(link.addresses),
-					certificate: link.certificate,
-					fingerprint: link.fingerprint,
-					role: link.role,
-					personId: link.personId,
-					keyStore: link.keyStore,
-					revokedAt: null,
-				};
-				await tx
-					.insert(hostLink)
-					.values({ hostId: link.hostId, ...values })
-					.onConflictDoUpdate({ target: hostLink.hostId, set: values });
-				if (link.role === "home") {
-					await tx
+							and(
+								eq(hostLink.role, "home"),
+								ne(hostLink.hostId, link.hostId),
+								isNotNull(hostLink.revokedAt),
+							),
+						),
+					upsert,
+					db
 						.update(device)
 						.set({ homeHost: link.addresses[0] ?? null })
-						.where(eq(device.self, true));
-				}
-			});
+						.where(eq(device.self, true)),
+				]);
+			} else {
+				await upsert;
+			}
 			const saved = await get(link.hostId);
 			if (!saved) throw new Error("The link to the Host was not saved.");
 			return saved;

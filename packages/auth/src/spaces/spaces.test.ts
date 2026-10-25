@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { device, user } from "@nightshift/db/schema";
+import { device, organization, user } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 import { requestAccess } from "../access";
 import { type Permissions, roleAllows } from "../index";
 import { createLocalSession } from "../local-session";
 import { type AuthSandbox, createAuthSandbox } from "../testing/sandbox";
-import { LOCAL_EMAIL, localPerson, personalSpaceId, spacesOf } from "./spaces";
+import {
+	ensurePersonalSpace,
+	LOCAL_EMAIL,
+	localPerson,
+	personalSpaceId,
+	spacesOf,
+} from "./spaces";
 
 let sandbox: AuthSandbox;
 beforeEach(async () => {
@@ -38,6 +44,16 @@ describe("personal Space", () => {
 			headers: ada.headers,
 		});
 		expect(session?.session.activeOrganizationId).toBe(spaces[0]?.id);
+	});
+
+	test("is made with its owner membership, or not at all", async () => {
+		// No Person has this id: the membership fails, so the Space does too.
+		await expect(ensurePersonalSpace(sandbox.db, "nobody")).rejects.toThrow();
+		const spaces = await sandbox.db
+			.select()
+			.from(organization)
+			.where(eq(organization.slug, "personal-nobody"));
+		expect(spaces).toEqual([]);
 	});
 
 	test("lists the personal Space first", async () => {

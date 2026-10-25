@@ -49,22 +49,22 @@ export async function ensurePersonalSpace(
 	if (found) return found;
 	const id = randomUUID();
 	const createdAt = new Date();
-	await db.transaction(async (tx) => {
-		await tx.insert(organization).values({
+	await db.batch([
+		db.insert(organization).values({
 			id,
 			name: "Personal",
 			slug: `personal-${userId}`,
 			personal: true,
 			createdAt,
-		});
-		await tx.insert(member).values({
+		}),
+		db.insert(member).values({
 			id: randomUUID(),
 			organizationId: id,
 			userId,
 			role: "owner",
 			createdAt,
-		});
-	});
+		}),
+	]);
 	return id;
 }
 
