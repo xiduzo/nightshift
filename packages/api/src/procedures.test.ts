@@ -1160,7 +1160,10 @@ describe("the Needs-you inbox", () => {
 				appRouter.gates.resolve,
 				{ runId: "platform-run", stepId: "s", choice: "yes" },
 				{ context, path: ["gates", "resolve"] },
-			).catch((e: unknown) => e as ORPCError<string, unknown>);
+			).then(
+				() => new Error("The call did not fail."),
+				(e: unknown) => e as Error,
+			);
 			expect(error).toBeInstanceOf(ORPCError);
 			expect(error).toMatchObject({
 				code: "INTERNAL_SERVER_ERROR",

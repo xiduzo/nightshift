@@ -75,8 +75,9 @@ export async function requestAccess(
 	const { session } = resolved;
 	const spaceId = session ? await activeSpaceId(db, session.session) : null;
 	const inSpace = () => {
-		if (!spaceId)
+		if (!spaceId) {
 			throw new Refusal("signed-out", "Sign in to use Night Shift.");
+		}
 		return spaceId;
 	};
 	return {
