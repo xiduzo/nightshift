@@ -223,7 +223,8 @@ describe("httpsLink", () => {
 			key: "nsd_key",
 			clientFor: host.clientFor,
 			heartbeatMs: 20,
-			streamBackoff: { firstMs: 60, maxMs: 60 },
+			// A wait of 60 to 120 ms: the backoff takes up to half off.
+			streamBackoff: { firstMs: 120, maxMs: 120 },
 		});
 		const failing: number[] = [];
 		const returning: number[] = [];
