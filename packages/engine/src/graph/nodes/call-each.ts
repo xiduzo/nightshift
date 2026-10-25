@@ -48,6 +48,7 @@ import {
 import { renderBindings, resolveInputs } from "../inputs";
 import { entryOf, RESUME_RULES, resumePoint } from "../resume-point";
 import { parkCommand, route, type StepEnd, scopeOf } from "../route";
+import { commitVisit } from "../run-position";
 import type { Loop } from "../state";
 import { beginStep, readyDevice, type StepHandle } from "../step-runner";
 import {
@@ -168,7 +169,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 				update: {
 					loops: { [node.id]: null },
 					nodes: { [node.id]: end.outputs },
-					visits: { [node.id]: visit },
+					...commitVisit(node, visit),
 				},
 			});
 		};
@@ -200,7 +201,8 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 		};
 		/**
 		 * Back to this node for the next element, with the cursor checkpointed
-		 * (the list and the element's result are in the log). `pending` is
+		 * (the list and the element's result are in the log) and the visit
+		 * committed while the step stays open (`commitVisit`). `pending` is
 		 * cleared as `route()` does: a resume through the park node set it,
 		 * and the next entry must not read it again.
 		 */
@@ -210,7 +212,7 @@ export function callEachNode(node: CallEachNode, ctx: StepContext): NodeAction {
 			return new Command({
 				update: {
 					loops: { [node.id]: cursor },
-					visits: { [node.id]: visit },
+					...commitVisit(node, visit),
 					pending: null,
 				},
 				goto: node.id,

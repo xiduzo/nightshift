@@ -1,9 +1,10 @@
 import type { FlowNode } from "@nightshift/flows";
-import { type LoggedEvent, type Scope, scopeKey } from "../log";
-import { countVisits, type DerivedStep, deriveSteps } from "../read";
+import type { LoggedEvent, Scope } from "../log";
+import { type DerivedStep, deriveSteps } from "../read";
 import { DEFAULT_RESUME_PROMPT } from "./context";
+import { positionOf } from "./run-position";
 import { pendingWaitOf } from "./sleep";
-import type { Pending, RunStateValues } from "./state";
+import type { RunStateValues } from "./state";
 import type { StepStart } from "./step-runner";
 
 /**
@@ -12,6 +13,11 @@ import type { StepStart } from "./step-runner";
  * checkpoint (`state.pending`, `state.loops`, `state.visits`) and the log:
  * does the node start a new visit, continue a step the log still has open,
  * or reopen a step that ended (`StepReopened`)?
+ *
+ * Where the node is comes from the run position (`run-position.ts`): the
+ * step the checkpoint holds for it, a loop mid-way, and the step the log
+ * has that the checkpoint never committed. This module decides what the
+ * node does there.
  *
  * This is a deep module behind a small interface: `resumePoint()` returns
  * `{ kind: "new" }`, `{ kind: "continue", step }` or `{ kind: "reopen",
@@ -25,9 +31,9 @@ import type { StepStart } from "./step-runner";
  * every kind).
  *
  * The daemon side of the same question is `reentry.ts`: what `RunResumed`
- * records and how the thread moves. It reads `sessionOf` and
- * `latestStepOf` from here, so what the engine promises in `RunResumed` is
- * what the node finds when it re-enters.
+ * records and how the thread moves. It reads `sessionOf` from here, and
+ * both read the run position, so what the engine promises in `RunResumed`
+ * is what the node finds when it re-enters.
  *
  * The log is written exactly as before (design rule 3): this module appends
  * nothing; it only decides.
@@ -45,8 +51,9 @@ import type { StepStart } from "./step-runner";
  * 3. The node loops over elements (`loops`, Call with `each`): the latest
  *    step of the node in this scope continues (open) or is reopened (ended).
  * 4. The log has a step of this node in this scope that the checkpoint
- *    never saw (`uncommittedStep`, design rule 5: the daemon died while it
- *    ran): taken up when the rules say so (`crashed`), else a new visit.
+ *    never saw (`Position.uncommitted`, design rule 5: the daemon died
+ *    while it ran): taken up when the rules say so (`crashed`), else a new
+ *    visit.
  * 5. Else a new visit.
  *
  * A step is "open" while `endedAt` is null. The prompt and the harness
@@ -126,12 +133,12 @@ export function resumePoint(
 	scope: Scope | null,
 	rules: ResumeRules,
 ): ResumePoint {
-	const steps = deriveSteps(events);
-	const pending = ownPending(node, state.pending);
+	const at = positionOf(state, events, scope);
+	const held = at.held(node);
 
-	const sleeping = pendingWaitOf(pending);
-	if (sleeping) {
-		const own = steps.find((s) => s.id === sleeping.stepId);
+	const sleeping = pendingWaitOf(held?.pending);
+	if (held && sleeping) {
+		const own = held.step;
 		if (!own) return { kind: "new" };
 		const session = sleeping.session?.harnessSessionId ?? sessionOf(own);
 		const prompt = sleeping.session?.prompt ?? DEFAULT_RESUME_PROMPT;
@@ -141,10 +148,8 @@ export function resumePoint(
 		});
 	}
 
-	if (pending?.kind === "parked") {
-		const own = pending.stepId
-			? steps.find((s) => s.id === pending.stepId)
-			: undefined;
+	if (held?.pending.kind === "parked") {
+		const { pending, step: own } = held;
 		if (!own) return { kind: "new" };
 		const session = pending.harnessSessionId ?? sessionOf(own);
 		const prompt = pending.prompt ?? DEFAULT_RESUME_PROMPT;
@@ -160,12 +165,12 @@ export function resumePoint(
 		}
 	}
 
-	if (rules.loop && state.loops[node.id]) {
-		const latest = latestStepOf(node, events, scope);
+	if (rules.loop && at.looping(node)) {
+		const latest = at.latest(node);
 		if (latest) return takeUpFromLog(events, latest);
 	}
 
-	const crashed = uncommittedStep(node, state, events, scope);
+	const crashed = at.uncommitted(node);
 	if (!crashed) return { kind: "new" };
 	switch (rules.crashed) {
 		case "new":
@@ -204,14 +209,6 @@ export function entryOf(point: ResumePoint): StepStart {
 		case "reopen":
 			return { kind: "reopen", stepId: point.step.id, prompt: point.prompt };
 	}
-}
-
-/** This node's `pending`, or null when the pending step is another node's. */
-function ownPending(
-	node: Pick<FlowNode, "id">,
-	pending: Pending | null,
-): Pending | null {
-	return pending?.nodeId === node.id ? pending : null;
 }
 
 /** An existing step: continued while open, reopened once ended. */
@@ -288,38 +285,6 @@ export function resumePromptOf(
 			e.payload.stepId === step.id,
 	);
 	return resumed?.type === "RunResumed" ? resumed.payload.prompt : null;
-}
-
-/**
- * The step of this node the log has but the graph never committed: the
- * daemon died while it ran (design rule 5). The graph's `visits` count the
- * node's committed visits; the log counts one more while a step runs.
- * Recovery ends it `interrupted`; a node that re-runs may take it up.
- */
-export function uncommittedStep(
-	node: Pick<FlowNode, "id">,
-	state: Pick<RunStateValues, "visits">,
-	events: readonly LoggedEvent[],
-	scope: Scope | null,
-): DerivedStep | null {
-	const key = scopeKey(scope);
-	const logged = countVisits(events, node.id, key);
-	if (logged <= (state.visits[node.id] ?? 0)) return null;
-	return latestStepOf(node, events, scope);
-}
-
-/** The latest step of the node in this scope, as the log has it. */
-export function latestStepOf(
-	node: Pick<FlowNode, "id">,
-	events: readonly LoggedEvent[],
-	scope: Scope | null,
-): DerivedStep | null {
-	const key = scopeKey(scope);
-	return (
-		deriveSteps(events).findLast(
-			(s) => s.nodeId === node.id && scopeKey(s.scope) === key,
-		) ?? null
-	);
 }
 
 /**

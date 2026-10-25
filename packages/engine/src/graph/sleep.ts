@@ -18,6 +18,7 @@ import {
 import { interruptNode } from "./interrupt";
 import { planWait, type WaitStreak } from "./policy";
 import { waitNodeId } from "./route";
+import { commitVisit, heldStep } from "./run-position";
 import type {
 	Pending,
 	PendingParked,
@@ -122,8 +123,9 @@ function stopTimeWaitReason(request: WaitRequest): string {
 }
 
 /**
- * The pending wait of this node (or of any node without `nodeId`), in
- * today's shape. The one place that reads `pending` as a sleep.
+ * A pending wait in today's shape: the one place that reads `pending` as a
+ * sleep. A node passes the step the checkpoint holds for it
+ * (`heldStep`, `graph/run-position.ts`).
  *
  * A checkpoint written before this module holds the wait's continuation
  * flat next to it (`harnessSessionId`, `prompt`, `resetAt`): a run that
@@ -132,10 +134,8 @@ function stopTimeWaitReason(request: WaitRequest): string {
  */
 export function pendingWaitOf(
 	pending: Pending | null | undefined,
-	nodeId?: string,
 ): PendingWait | null {
 	if (pending?.kind !== "wait") return null;
-	if (nodeId !== undefined && pending.nodeId !== nodeId) return null;
 	const raw = pending as PendingWait | LegacyPendingWait;
 	if ("session" in raw) return raw;
 	const { harnessSessionId, prompt, resetAt: _, ...wait } = raw;
@@ -159,10 +159,11 @@ type LegacyPendingWait = Omit<PendingWait, "session"> & {
  */
 function streakOf(
 	state: RunStateValues,
+	node: FlowNode,
 	step: OpenStep,
 	reason: PendingWait["reason"],
 ): WaitStreak | null {
-	const previous = pendingWaitOf(state.pending);
+	const previous = pendingWaitOf(heldStep(state, node.id));
 	return step.opened === "continue" &&
 		previous?.stepId === step.stepId &&
 		previous.reason === reason
@@ -203,7 +204,7 @@ export async function sleep(
 ): Promise<SleepOutcome> {
 	const runId = ctx.run.id;
 	const now = ctx.now();
-	const streak = streakOf(state, step, request.reason);
+	const streak = streakOf(state, node, step, request.reason);
 	const since = streak?.since ?? now;
 	let until: number | null;
 	let message: string;
@@ -288,7 +289,7 @@ export async function sleep(
 	return {
 		kind: "asleep",
 		command: new Command({
-			update: { pending, visits: { [node.id]: step.visit } },
+			update: { pending, ...commitVisit(node, step.visit) },
 			goto: waitNodeId(node.id),
 		}),
 	};

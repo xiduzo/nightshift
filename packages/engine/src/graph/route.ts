@@ -7,6 +7,7 @@ import { type FlowNode, type JsonValue, nextEdge } from "@nightshift/flows";
 import type { Scope, StepOutcome, StepOutputs } from "../log";
 import type { NodeAction, StepContext } from "./context";
 import { interruptNode } from "./interrupt";
+import { commitVisit } from "./run-position";
 import type { PendingParked, RunStateUpdate, RunStateValues } from "./state";
 
 /**
@@ -96,13 +97,14 @@ export function parkStopped(
 		update: {
 			...update,
 			nodes: { [node.id]: end.outputs },
-			visits: { [node.id]: end.visit },
+			...commitVisit(node, end.visit),
 		},
 	});
 }
 
 /**
- * Records the ended step's outputs and visit in the state and jumps along
+ * Records the ended step's outputs in the state, commits its visit
+ * (`commitVisit`) and jumps along
  * the edge the outcome picks, with `EdgeTaken` in the log; or ends the flow
  * on a chosen end; or parks the run. Exactly `walkScope`'s rules:
  *
@@ -129,7 +131,7 @@ export async function route(
 		...extra,
 		nodes: { [node.id]: end.outputs },
 		...(end.variables ? { vars: end.variables } : {}),
-		visits: { [node.id]: visit },
+		...commitVisit(node, visit),
 		pending: null,
 	};
 	const park = (status: "failed" | "stopped", reason: string | null) =>

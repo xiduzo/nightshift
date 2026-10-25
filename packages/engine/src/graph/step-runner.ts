@@ -19,12 +19,10 @@ import {
 	type StepEvent,
 	type StepOutcome,
 	type StepOutputs,
-	scopeKey,
 	transcriptPath,
 } from "../log";
 import {
 	countStepsSinceWalkBegan,
-	countVisits,
 	type DerivedStep,
 	deriveSteps,
 	deriveStopAfterStep,
@@ -55,6 +53,7 @@ import {
 	type StepEnd,
 	scopeOf,
 } from "./route";
+import { positionOf } from "./run-position";
 import {
 	type DeviceWait,
 	type OwnWait,
@@ -431,7 +430,6 @@ export async function beginStep(
 ): Promise<BeginStep> {
 	const runId = ctx.run.id;
 	const scope = scopeOf(config);
-	const key = scopeKey(scope);
 	// Asked once per step: the body works on this Device, and a new step
 	// records it.
 	const device = ctx.deviceFor(node, ctx.run);
@@ -481,7 +479,7 @@ export async function beginStep(
 		}
 		stepId = randomUUID();
 		path = transcriptPath(ctx.dataDir, runId, stepId);
-		visit = countVisits(logged, node.id, key) + 1;
+		visit = positionOf(state, logged, scope).nextVisit(node);
 		const logPath = ctx.kindOf(node).logsCommandOutput(node)
 			? commandLogPath(ctx.dataDir, runId, stepId)
 			: null;

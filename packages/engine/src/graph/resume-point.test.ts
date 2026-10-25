@@ -14,7 +14,6 @@ import {
 	type ResumeRules,
 	rerunEntryOf,
 	resumePoint,
-	uncommittedStep,
 } from "./resume-point";
 import type { Pending, RunStateValues } from "./state";
 
@@ -544,7 +543,6 @@ describe("resumePoint", () => {
 				...session("s1", "h1"),
 			);
 			expectTable({ state: stateOf(), events, scope: null }, all(NEW));
-			expect(uncommittedStep(NODE, stateOf(), events, scope)?.id).toBe("s1");
 		});
 	});
 

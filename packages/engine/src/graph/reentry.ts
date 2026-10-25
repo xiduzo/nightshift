@@ -1,15 +1,12 @@
 import type { Flow } from "@nightshift/flows";
-import {
-	type EnginePayloads,
-	type LoggedEvent,
-	type ResumedBy,
-	type RunStatus,
-	type Scope,
-	scopeKey,
+import type {
+	EnginePayloads,
+	LoggedEvent,
+	ResumedBy,
+	RunStatus,
+	Scope,
 } from "../log";
 import {
-	countVisits,
-	type DerivedStep,
 	deriveInputs,
 	deriveNodeOutputs,
 	deriveRunState,
@@ -19,7 +16,14 @@ import {
 	deriveVariables,
 } from "../read";
 import { DEFAULT_RESUME_PROMPT } from "./context";
-import { latestStepOf, sessionOf } from "./resume-point";
+import { sessionOf } from "./resume-point";
+import {
+	latestFront,
+	loggedVisits,
+	positionOf,
+	reenteredNode,
+	takeBackVisit,
+} from "./run-position";
 import type { RunStateUpdate } from "./state";
 import type { ThreadEntry, ThreadSnapshot } from "./thread";
 
@@ -30,7 +34,9 @@ import type { ThreadEntry, ThreadSnapshot } from "./thread";
  * checkpoint, what `RunResumed` records and how the thread moves: one call
  * gives both, so the node finds what the log promises. The node side of
  * the same question is the resume point (`resume-point.ts`): what a node
- * does with its step when it re-enters. Both read `sessionOf`.
+ * does with its step when it re-enters. Both read `sessionOf`, and where
+ * the run is (the front of the walk, the visits a re-entry seeds) comes
+ * from the run position (`run-position.ts`).
  *
  * The runner's re-entry Turn appends the plan's `RunResumed` and drives
  * its entry (`runner.ts`). This module appends nothing and drives nothing:
@@ -38,51 +44,13 @@ import type { ThreadEntry, ThreadSnapshot } from "./thread";
  * plan against the resume point.
  */
 
-type EdgeTakenEvent = Extract<LoggedEvent, { type: "EdgeTaken" }>;
-
-/**
- * The front of the walk in a scope (`key`; null for every scope): the last
- * step, and the `EdgeTaken` after it started when the walk moved on from
- * it. Both `reenteredNode` and `resumeTarget` read the front, so they agree
- * on which step is left to take up.
- */
-function walkFront(
-	steps: readonly DerivedStep[],
-	events: readonly LoggedEvent[],
-	key: string | null,
-): { last: DerivedStep | null; movedOn: EdgeTakenEvent | null } {
-	const inScope = (scope: Scope | null | undefined) =>
-		key === null || scopeKey(scope ?? null) === key;
-	const last = steps.findLast((s) => inScope(s.scope)) ?? null;
-	let lastEdge: EdgeTakenEvent | null = null;
-	for (const e of events) {
-		if (e.type !== "EdgeTaken" || !inScope(e.payload.scope)) continue;
-		if (!lastEdge || e.seq > lastEdge.seq) lastEdge = e;
-	}
-	const movedOn =
-		lastEdge && (!last || lastEdge.seq > last.startSeq) ? lastEdge : null;
-	return { last, movedOn };
-}
-
-/**
- * The top-level node a re-entry reopens: the one of the last top-level
- * step, when the walk did not move on from it (no later top-level
- * `EdgeTaken`). Its visit is left uncommitted on purpose, so the node finds
- * the step with `uncommittedStep` and takes it up by its own rules: an
- * Agent continues its harness session with the resume prompt, a Call goes
- * on inside it. Null when the run moved on, or never started a step.
- */
-export function reenteredNode(events: readonly LoggedEvent[]): string | null {
-	const { last, movedOn } = walkFront(deriveSteps(events), events, "");
-	return last && !movedOn ? last.nodeId : null;
-}
-
 /**
  * The state a thread without a checkpoint (a run from before this engine)
  * is re-entered with, from the log: the inputs and the stop time, the
- * committed visits of every top-level node, the node outputs for templates
- * and the edge counts. Without it every node with a step in the log looks
- * uncommitted (`uncommittedStep`), so a Call later in the flow would reopen
+ * committed visits of every top-level node (`loggedVisits`), the node
+ * outputs for templates and the edge counts. Without it every node with a
+ * step in the log looks uncommitted (`Position.uncommitted`), so a Call
+ * later in the flow would reopen
  * a finished step, `{{node.output}}` would render empty and edge `max`
  * counts would start over. Bodies get fresh namespaces and read their
  * scope from the log. The `reenteredNode`'s last visit stays uncommitted.
@@ -102,26 +70,6 @@ export function reentryUpdate(
 		ended: null,
 		pending: null,
 	};
-}
-
-/**
- * The committed visits of every top-level node, as the log counts them:
- * every step of the node ended or was taken over by the walk, so none is
- * left for `uncommittedStep` to take up. `reentered`'s last visit stays
- * uncommitted (its count is one less).
- */
-export function loggedVisits(
-	flow: Flow,
-	events: readonly LoggedEvent[],
-	reentered: string | null,
-): Record<string, number> {
-	const visits: Record<string, number> = {};
-	for (const node of flow.nodes) {
-		const count =
-			countVisits(events, node.id, "") - (node.id === reentered ? 1 : 0);
-		if (count > 0) visits[node.id] = count;
-	}
-	return visits;
 }
 
 /** What `RunResumed` records (`resumeTarget`). */
@@ -146,7 +94,7 @@ export function resumeTarget(
 	events: readonly LoggedEvent[],
 ): ResumeTarget | null {
 	const steps = deriveSteps(events);
-	const { last, movedOn } = walkFront(steps, events, null);
+	const { last, movedOn } = latestFront(events);
 	let nodeId: string;
 	let stepId: string | null = null;
 	let scope: Scope | null;
@@ -321,14 +269,10 @@ function reenteredSeed(
 	thread: ThreadSnapshot,
 ): RunStateUpdate {
 	if (!thread.hasCheckpoint) return reentryUpdate(flow, events);
-	const reentered = reenteredNode(events);
-	const committed = reentered ? (thread.values.visits?.[reentered] ?? 0) : 0;
 	return {
 		ended: null,
 		pending: null,
-		...(reentered && committed > 0
-			? { visits: { [reentered]: committed - 1 } }
-			: {}),
+		...takeBackVisit(thread.values, reenteredNode(events)),
 	};
 }
 
@@ -343,7 +287,7 @@ function planRerun(
 	const { nodeId } = request;
 	const last =
 		request.stepId === undefined
-			? latestStepOf({ id: nodeId }, events, null)
+			? positionOf(thread.values, events, null).latest({ id: nodeId })
 			: deriveSteps(events).find((s) => s.id === request.stepId);
 	if (
 		request.stepId !== undefined &&

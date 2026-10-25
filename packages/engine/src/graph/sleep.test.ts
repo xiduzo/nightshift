@@ -696,11 +696,9 @@ describe("pendingWaitOf: the one reader of a pending wait", () => {
 		streak: { count: 1, since: 1_000 },
 	};
 
-	test("reads today's shape as it is, and only this node's", () => {
+	test("reads today's shape as it is, and nothing that is not a wait", () => {
 		const pending: Pending = { ...base, reason: "usage-limit", session: null };
 		expect(pendingWaitOf(pending)).toBe(pending);
-		expect(pendingWaitOf(pending, "n")).toBe(pending);
-		expect(pendingWaitOf(pending, "other")).toBeNull();
 		expect(pendingWaitOf(null)).toBeNull();
 		expect(
 			pendingWaitOf({

@@ -5,6 +5,7 @@ import {
 } from "@langchain/langgraph";
 
 import type { NodeAction } from "./context";
+import { heldStep } from "./run-position";
 import type { Parked, Pending, ResumeValue, RunStateValues } from "./state";
 
 /**
@@ -38,8 +39,8 @@ export function interruptNode<K extends Pending["kind"]>(spec: {
 	): Command | Promise<Command>;
 }): NodeAction {
 	return async (state, config) => {
-		const pending = state.pending;
-		if (pending?.kind !== spec.kind || pending.nodeId !== spec.nodeId) {
+		const pending = heldStep(state, spec.nodeId);
+		if (pending?.kind !== spec.kind) {
 			throw new Error(spec.missing);
 		}
 		const own = pending as Extract<Pending, { kind: K }>;

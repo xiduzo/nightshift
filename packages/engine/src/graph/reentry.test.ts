@@ -10,10 +10,8 @@ import { DEFAULT_RESUME_PROMPT } from "./context";
 import {
 	DAEMON_RESUME_PROMPT,
 	DAEMON_RESUME_REASON,
-	loggedVisits,
 	planReentry,
 	type ReentryRequest,
-	reenteredNode,
 	reentryUpdate,
 	resumeTarget,
 } from "./reentry";
@@ -23,6 +21,7 @@ import {
 	rerunEntryOf,
 	resumePoint,
 } from "./resume-point";
+import { reenteredNode } from "./run-position";
 import type { Parked, RunStateValues } from "./state";
 import type { ThreadSnapshot, ThreadState } from "./thread";
 
@@ -215,22 +214,6 @@ describe("the daemon side agrees with the node side", () => {
 	test("no step yet: no target, no re-entered node", () => {
 		expect(resumeTarget(logOf())).toBeNull();
 		expect(reenteredNode(logOf())).toBeNull();
-	});
-
-	test("the visits are the log's counts: no step is left uncommitted", () => {
-		const flow = {
-			nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
-		} as unknown as Parameters<typeof loggedVisits>[0];
-		const events = logOf(
-			started("s1", "a", 1),
-			...session("s1", "h-1"),
-			ended("s1", "pass"),
-			started("s2", "b", 1, null, "decision"),
-			ended("s2", "error"),
-			started("s3", "a", 2),
-		);
-		expect(loggedVisits(flow, events, null)).toEqual({ a: 2, b: 1 });
-		expect(loggedVisits(flow, events, "a")).toEqual({ a: 1, b: 1 });
 	});
 });
 

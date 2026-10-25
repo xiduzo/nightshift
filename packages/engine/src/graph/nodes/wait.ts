@@ -15,6 +15,7 @@ import {
 	type StepContext,
 } from "../context";
 import { RESUME_RULES } from "../resume-point";
+import { heldStep } from "../run-position";
 import { type OwnWait, pendingWaitOf } from "../sleep";
 import type { PendingWait } from "../state";
 import { type BodyResult, runStep, type StepHandle } from "../step-runner";
@@ -54,7 +55,7 @@ import { type BodyResult, runStep, type StepHandle } from "../step-runner";
  */
 export function waitStepNode(node: WaitNode, ctx: StepContext): NodeAction {
 	return (state, config) => {
-		const pending = pendingWaitOf(state.pending, node.id);
+		const pending = pendingWaitOf(heldStep(state, node.id));
 		return runStep(ctx, node, state, config, {
 			rules: WAIT.resumeRules(node),
 			// A step that ends at its wake before the node spoke (the stop time
