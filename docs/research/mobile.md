@@ -813,6 +813,30 @@ Push on Android needs Firebase Cloud Messaging: a `google-services.json`
 (`android.googleServicesFile` in `app.json`) and the FCM V1 key on EAS. The
 app does not have these yet, so an Android phone does not get Gate pushes.
 
+### Updates without a new build
+
+A TestFlight or Play build gets new JavaScript over the air with EAS Update
+(`expo-updates`). Each build profile in `eas.json` has its channel:
+`development`, `preview` or `production`. Publish to the channel of the
+builds that must get the update:
+
+```bash
+cd apps/mobile
+eas update --channel production --environment production --message "What changed"
+```
+
+The app checks for an update when it starts. It downloads the update in the
+background and uses it from the next start.
+
+An update reaches only the builds with the same runtime version. The runtime
+version is the fingerprint of the native project (`"policy": "fingerprint"`
+in `app.json`). A change to native code, a native dependency or a config
+plugin changes the fingerprint, so it needs a new build. The older builds do
+not get an update for the new fingerprint. `eas fingerprint:compare` shows
+what changed.
+
+TestFlight builds 1 to 5 have no `expo-updates`. They get no updates.
+
 ## Out of scope
 
 These need the user's own accounts, or a decision about other people's

@@ -7,6 +7,12 @@
 		"icon": "./assets/images/icon.png",
 		"scheme": "nightshift",
 		"userInterfaceStyle": "automatic",
+		"runtimeVersion": {
+			"policy": "fingerprint"
+		},
+		"updates": {
+			"url": "https://u.expo.dev/61f0dd73-7856-4392-9f90-3464f62df875"
+		},
 		"ios": {
 			"supportsTablet": true,
 			"bundleIdentifier": "dev.nightshift.mobile",
