@@ -19,7 +19,7 @@ export type FollowHostHookOptions = {
  * item of the notifications stream changes (the inbox, the runs, the
  * dashboard, the schedules), shows a notice for an item that alerts, and
  * takes away notifications of Gates that no longer wait. It keeps the open
- * Gates read, so their fallback poll runs. Mount it once per app, behind
+ * Gates read, also by a poll while the stream is down. Mount it once per app, behind
  * the sign-in.
  */
 export function useFollowHost(

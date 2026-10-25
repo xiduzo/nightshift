@@ -8,7 +8,7 @@ import type {
 	NotificationItem,
 	NotificationWatchClient,
 } from "../notifications";
-import { createRunQueries, type RunWatchClient } from "../runs";
+import { createRunQueries, type RunWatchClient, type Wait } from "../runs";
 import { createScheduleQueries } from "../schedules";
 import { createLiveCache } from "./cache";
 import type { RunStreamBatch, Schedule } from "./run-buffer";
@@ -189,7 +189,7 @@ function fakeHost() {
 }
 
 /** A live cache on a query client that holds every query of `KEYS`. */
-function setUp() {
+function setUp(wait: Wait = async () => {}) {
 	const queryClient = new QueryClient();
 	for (const key of Object.values(KEYS)) {
 		// Only whether they are read again counts, not what they hold.
@@ -201,7 +201,7 @@ function setUp() {
 		queryClient,
 		orpc,
 		schedule: timers.schedule,
-		wait: async () => {},
+		wait,
 	});
 	/** The queries read again so far, by name, sorted. */
 	const stale = () =>
@@ -448,6 +448,48 @@ describe("the live cache follows the Host", () => {
 		});
 		await Bun.sleep(0);
 		expect(dismissed).toEqual(["r2:b", "r9:z"]);
+	});
+});
+
+describe("the open Gates while the stream is down", () => {
+	/** Waits until the follow stops: the stream stays down for the whole test. */
+	const untilStopped: Wait = (_ms, signal) =>
+		new Promise((resolve) => {
+			signal?.addEventListener("abort", () => resolve(), { once: true });
+		});
+
+	test("are read again once a minute until the stream is live", async () => {
+		const { live, stale, timers } = setUp(untilStopped);
+		const controller = new AbortController();
+		const followed = live.followHost({
+			client: {
+				notifications: {
+					watch: () => Promise.reject(new TypeError("Network request failed")),
+				},
+			},
+			shown: fakeScreen().screen,
+			signal: controller.signal,
+		});
+		await Bun.sleep(0);
+		timers.due(60_000);
+		timers.due(300);
+		expect(stale()).toEqual(["gates"]);
+		controller.abort();
+		await followed;
+	});
+
+	test("are not polled while the stream is live, nor once nothing follows", async () => {
+		const { live, stale, timers } = setUp();
+		const { host, followed } = follow(live);
+		await Bun.sleep(0);
+		timers.due(60_000);
+		timers.due(300);
+		expect(stale()).toEqual(NOTHING);
+		host.stop();
+		await followed;
+		timers.due(60_000);
+		timers.due(300);
+		expect(stale()).toEqual(NOTHING);
 	});
 });
 

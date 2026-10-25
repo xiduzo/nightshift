@@ -86,6 +86,8 @@ function readsAfter(item: NotificationItem): readonly Read[] {
 
 /** A burst of items (a walk that starts and ends steps, a person who acts) reads once. */
 const READ_MS = 300;
+/** How often the open Gates are read again while the notifications stream is down. */
+const GATES_POLL_MS = 60_000;
 const DEFAULT_FLUSH_MS = 50;
 
 export type LiveCacheOptions = {
@@ -132,6 +134,7 @@ export type LiveCache = {
 	 * notifications away. Each read of the open Gates takes away the
 	 * notifications of Gates that no longer wait. Each `live` after the
 	 * first reads everything again: items of the time it was down are lost.
+	 * While the stream is down, it reads the open Gates once a minute.
 	 */
 	followHost(options: FollowHostOptions): Promise<void>;
 	/**
@@ -184,6 +187,8 @@ export function createLiveCache({
 		lists: false,
 	};
 	let waiting = false;
+	/** Stops the poll of the open Gates. Null while the stream is live, or nothing follows. */
+	let stopPoll: (() => void) | null = null;
 
 	function invalidate(queryKey: readonly unknown[]) {
 		void queryClient.invalidateQueries({ queryKey });
@@ -323,8 +328,25 @@ export function createLiveCache({
 		}
 	}
 
+	/** Reads the open Gates once a minute: the fallback while the stream is down. */
+	function pollGates() {
+		stopPoll = schedule(() => {
+			read([GATES]);
+			pollGates();
+		}, GATES_POLL_MS);
+	}
+
+	function stopPolling() {
+		stopPoll?.();
+		stopPoll = null;
+	}
+
 	function onConnection(connection: RunStreamConnection) {
-		if (connection !== "live") return;
+		if (connection !== "live") {
+			if (!stopPoll) pollGates();
+			return;
+		}
+		stopPolling();
 		if (wasLive) read(EVERYTHING);
 		wasLive = true;
 	}
@@ -355,6 +377,7 @@ export function createLiveCache({
 				});
 			} finally {
 				stop();
+				stopPolling();
 			}
 		},
 

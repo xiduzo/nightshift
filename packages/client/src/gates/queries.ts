@@ -3,14 +3,7 @@ import type { UseMutationOptions } from "@tanstack/react-query";
 import type { ApiQueryUtils } from "../api";
 import { answerGate, type GateAnswer, type GateAnswerResult } from "./answer";
 
-/**
- * How often the inbox and its badge read the open Gates again. The live
- * cache follows `notifications.watch` and reads them again on each item:
- * this is only the fallback while that stream is down.
- */
-const FALLBACK_POLL_MS = 60_000;
-
-/** The query options of Gates, and how often the inbox reads them again. */
+/** The query options of Gates. */
 export function createGateQueries(orpc: ApiQueryUtils) {
 	return {
 		/** Every gates query. Invalidate it after a Gate is answered. */
@@ -18,16 +11,13 @@ export function createGateQueries(orpc: ApiQueryUtils) {
 		/**
 		 * The open Gates of every Space the person is in, oldest first, each
 		 * with its Space and whether they may answer it: the Needs-you inbox.
-		 * It does not change with the active Space. The notifications stream
-		 * invalidates it; it also reads again once a minute, also while the app
-		 * is in the background, for when the stream is down. Refetches when the
-		 * window gets focus. A failed read does not toast; the inbox shows the
-		 * error itself.
+		 * It does not change with the active Space. The live cache reads it
+		 * again on each item of the notifications stream, and once a minute
+		 * while that stream is down. Refetches when the window gets focus. A
+		 * failed read does not toast; the inbox shows the error itself.
 		 */
 		open: () => ({
 			...orpc.gates.list.queryOptions(),
-			refetchInterval: FALLBACK_POLL_MS,
-			refetchIntervalInBackground: true,
 			refetchOnWindowFocus: "always" as const,
 			meta: { quietErrors: true },
 		}),
