@@ -1,5 +1,10 @@
 /** The outcomes of an Agent node, and the checker that picks one. */
-import type { AgentNode, Flow, NodeOption } from "@nightshift/flows";
+import {
+	type AgentNode,
+	type Flow,
+	type NodeOption,
+	nodeOutcomes,
+} from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Input } from "@nightshift/ui/components/input";
 import {
@@ -128,7 +133,7 @@ export function AgentOutcomeSection({
 			<InspectorSection title="Outcomes" className="gap-3">
 				{lead}
 				<div className="flex flex-wrap gap-1.5">
-					{(["pass", "fail", "needs-input"] as const).map((outcome) => (
+					{nodeOutcomes(node).map((outcome) => (
 						<OutcomePill key={outcome} outcome={outcome} />
 					))}
 				</div>

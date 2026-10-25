@@ -2,6 +2,7 @@
 import {
 	type Flow,
 	type FlowOutputDef,
+	outputFieldsByType,
 	setOutputs,
 	uniqueOutputName,
 } from "@nightshift/flows";
@@ -13,8 +14,8 @@ import { useId, useState } from "react";
 import { TemplateField } from "../template-field";
 import { type Change, move, NameInput, RowButtons } from "./io-rows";
 
-/** Fields a Call node has on its own; an output may not shadow them. */
-const RESERVED_OUTPUTS = ["outcome", "ended", "visit"];
+/** Fields a Subflow node has on its own; an output may not shadow them. */
+const RESERVED_OUTPUTS: readonly string[] = outputFieldsByType.call;
 
 /**
  * The flow's outputs: values it returns to the Call node that calls

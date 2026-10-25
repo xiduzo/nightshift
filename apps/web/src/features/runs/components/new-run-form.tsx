@@ -30,20 +30,11 @@ import { useNavigate } from "@tanstack/react-router";
 import { PlayIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useState } from "react";
 
+import { EFFORTS, PERMISSION_MODES } from "@/features/agents";
 import type { Effort, PermissionMode } from "@/shared/api";
 import { runMutations, runQueries } from "../queries";
 
 const MODELS = ["sonnet", "opus", "haiku"];
-
-const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
-	{ value: "auto", label: "Auto (approves safe actions, for nights)" },
-	{ value: "acceptEdits", label: "Accept edits (no shell commands)" },
-	{ value: "default", label: "Ask for each tool" },
-	{ value: "plan", label: "Plan only" },
-	{ value: "bypassPermissions", label: "Bypass permissions" },
-];
-
-const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
 
 /**
  * A quick run: one Agent node with a prompt, no flow file, in a dialog. The

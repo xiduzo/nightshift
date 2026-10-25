@@ -1,3 +1,4 @@
+import { effortSchema } from "@nightshift/flows";
 import type { Effort, PermissionMode } from "@/shared/api";
 
 /** The permission modes an Agent node or a profile can run in, most useful for nights first. */
@@ -9,7 +10,8 @@ export const PERMISSION_MODES: { value: PermissionMode; label: string }[] = [
 	{ value: "bypassPermissions", label: "Bypass permissions" },
 ];
 
-export const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
+/** The efforts an Agent node or a profile can ask for, least first. */
+export const EFFORTS: readonly Effort[] = effortSchema.options;
 
 export function permissionLabel(mode: PermissionMode): string {
 	return PERMISSION_MODES.find((m) => m.value === mode)?.label ?? mode;
