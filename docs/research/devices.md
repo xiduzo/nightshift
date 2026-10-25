@@ -570,6 +570,18 @@ iroh.
 
 ## Slices
 
+The *Landed* notes below are history: each one says what a slice built
+when it landed. Some names changed since, and the notes use today's.
+The ADR table of `docs/steering/TECH.md` says why each one changed.
+
+- `checkWork`, `admitWork`, `serveChecked` and `offeredDevice` are now one
+  Offer admission (`createOfferAdmission`, `packages/devices/src/offers/admission.ts`):
+  `OfferAdmission.serve` for a call over the wire, `OfferAdmission.deviceFor`
+  for a run this computer walks itself.
+- `WorkServer.withdrawn` is `OfferAdmission.withdrawn`, over the calls
+  under each Offer (`OfferUse.calls`).
+- `place` is the planner (`PlacementPort.plan`, and `moveTo` for a move).
+
 1. **The seam and the Owner rule.** The Device port with the local
    adapter. Projects by remote with Clones. `event.seq` per Walker. One
    Device row. No behaviour change.
@@ -1169,11 +1181,12 @@ iroh.
      Replies that cannot reach the Host for a minute abort the call on the
      Device: nothing runs for a Walker that is gone.
    - **Two checks, two code paths.** The Host, before it places a run
-     (`place` in `packages/devices/src/placement/placement.ts`): the Device is paired here and not revoked,
+     (`PlacementPort.plan`, then `place`, in `packages/devices/src/placement/`): the Device is paired here and not revoked,
      its owner is the Person who starts the run (another Person's Device
      is Offers, part B: "colleague-laptop is not your device."), it takes
      work now, and the Space document has its Clone of the project. The
-     placed Device, for every call, from its own Replica (`checkWork`):
+     placed Device, for every call, from its own Replica
+     (`OfferAdmission.serve`, then `checkWork`):
      the Space is one it takes part in through this Host; the Person is
      its owner as that Host knows them (`personOnHost`) with a role that
      allows `run.start` (the Space document's Member mirror, as commands
@@ -1208,7 +1221,8 @@ iroh.
    - Tests: `packages/devices/src/placement/placement.test.ts` (in-memory
      relay: the steps and worktree on B, a stop ends B's command, flows from
      B's Clone, rename and remove without a Clone, the refusals);
-     `packages/devices/src/work/work.test.ts` (`checkWork`, the hub);
+     `packages/devices/src/work/work.test.ts` (the work server, the hub;
+     the checks are in `packages/devices/src/offers/admission.test.ts`);
      `apps/server/test/devices/placement.test.ts` (two daemons: A the Host
      without a Clone lists B's flows and walks a run whose command and
      fake Claude Code steps run on B, the events and transcript land in A's
@@ -1267,7 +1281,7 @@ iroh.
      another of its Person's Devices through its Host: `devices.call`, a
      stream over its link (closing it cancels the call); the Host relays it
      through its hub, or serves it itself with its own `localDevice` when
-     it is the Device (`checkWork` with its owner). `devices.reachable`
+     it is the Device (`OfferAdmission.serve`). `devices.reachable`
      says whether one takes work. `createWorkRelay` (`packages/devices`)
      picks the hub for a Space this computer keeps and the Host for the
      others. A
@@ -1458,7 +1472,8 @@ iroh.
      node's own permission mode, if any). The Device resolves its own
      profile (`offeredSession`) and says which harness runs it in `ready`
      (`harness`, appended), so the Walker records the session.
-   - **The Walker's check at run start** (`place`, then `offerRefusal`):
+   - **The Walker's check at run start** (`PlacementPort.plan`, then
+     `place` and `offerRefusal`):
      a run's Device of another Person needs Offers into the Space
      (refused at once: "hetzner-1 is not your device. It offers nothing
      to this Space."), and the starter's role must allow `offer.use`
@@ -1472,10 +1487,12 @@ iroh.
      needs no Offer; a command, a tool, a model decision or value, a wait
      on a command and a list from a command are refused. The same rule
      holds for this computer: another Person's run walked here uses it
-     through its own Offers (`offeredDevice`). Before, any Member could
+     through its own Offers (`OfferAdmission.deviceFor`, then
+     `offeredDevice`). Before, any Member could
      run anything on the Host.
-   - **The Device's own checks** (`checkWork` in
-     `packages/devices/src/work/work.ts`, a second code path): for a run its
+   - **The Device's own checks** (`OfferAdmission.serve` in
+     `packages/devices/src/offers/admission.ts`; then `checkWork`, a second
+     code path, which the one admission replaced): for a run its
      owner did not start, the requester is a Member (the Space
      document's Member mirror) whose role allows `offer.use`; it has
      Offers in force into that Space; the call is an offered session of
@@ -1492,7 +1509,8 @@ iroh.
    - **Withdrawing** stops running steps as stopped: the Walker tracks the
      offered sessions it carries (per run, Device, Space and profile) and
      `engine.offers.withdraw` stops those runs; the Device then aborts
-     what still runs under it (`WorkServer.withdrawn`), also when its Host
+     what still runs under it (`OfferAdmission.withdrawn`, then
+     `WorkServer.withdrawn`), also when its Host
      cannot be reached.
    - **Git identity** on a Device that runs a colleague's step: the run's
      `worktree` call carries the starter as `RunRef.author`, as in part A.
@@ -1513,8 +1531,8 @@ iroh.
    - Tests: `packages/devices/src/offers/offers.test.ts` (the run-start rule, the
      clamp, the queue, another Person's run on the computer that walks it,
      withdrawing stops it, the Space document's entry has only the public
-     fields); `packages/devices/src/work/work.test.ts` (`checkWork` called
-     directly, as a bypassed Host would: no Offer, an Offer on one side
+     fields); `packages/devices/src/offers/admission.test.ts` (the admission
+     called directly, as a bypassed Host would: no Offer, an Offer on one side
      only, another profile, a command, a non-member, a viewer; the work
      server's clamp, queue and abort); `apps/server/test/devices/offers.test.ts`
      (two daemons, two Persons: refused without an Offer, the offer
@@ -1530,8 +1548,9 @@ iroh.
      the nodes placed there, and the requirements to the others. Its
      nodes keep their profile unresolved; the "profile's Device" fallback
      to this computer is skipped when the run's Device or this computer is
-     offered. The Device checks again per call (`checkWork`), on a Device
-     and on the Host for itself (`serveChecked`, shared). A Device that
+     offered. The Device checks again per call (`OfferAdmission.serve`),
+     on a Device and on the Host for itself (then `checkWork` and
+     `serveChecked`). A Device that
      walks a run reaches another Person's Device through the Host
      (`devices.call`): the Host relays it when that Device offers to the
      run's Space, and `devices.reachable` answers for it. The Hand-off
