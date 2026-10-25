@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { END, MemorySaver, START, StateGraph } from "@langchain/langgraph";
+import { agentSession } from "@nightshift/db/schema";
+import { eq } from "drizzle-orm";
 import {
+	agent,
 	command,
 	drive,
 	edge,
@@ -8,7 +11,12 @@ import {
 	type Harness,
 	startRun,
 } from "../testing/graph";
-import { createSandbox, type Sandbox, waitFor } from "../testing/test-support";
+import {
+	createSandbox,
+	type Sandbox,
+	scriptedHarness,
+	waitFor,
+} from "../testing/test-support";
 import { RunState } from "./state";
 import {
 	type DriveOutcome,
@@ -112,6 +120,41 @@ describe("driveGraph", () => {
 		expect(endingOf(outcome)).toBeNull();
 		expect(await h.types()).toEqual(types);
 		expect(await checkpoints(h)).toBe(written);
+	});
+
+	test("a fence closed while a step opens: no session row is written without its SessionStarted", async () => {
+		const scripted = scriptedHarness();
+		const h = await startRun(sandbox, flowOf([agent("worker", "Build it")]), {
+			harness: scripted.harness,
+		});
+		// The drive waits in the step's opening, after StepStarted; the stop
+		// comes then, and the step goes on to start its session.
+		const opening = Promise.withResolvers<void>();
+		let waiting = false;
+		const recorder = h.ctx.recorder;
+		h.ctx.recorder = async (stepId) => {
+			waiting = true;
+			await opening.promise;
+			return recorder(stepId);
+		};
+		const controller = new AbortController();
+		const driving = h.thread.drive({ inputs: {} }, { controller });
+		await waitFor(() => waiting);
+		await h.thread.fence.close();
+		controller.abort();
+		opening.resolve();
+		expect(await driving).toEqual({ kind: "fenced" });
+
+		const rows = await sandbox.db
+			.select()
+			.from(agentSession)
+			.where(eq(agentSession.runId, h.runId));
+		const started = (await h.events()).filter(
+			(e) => e.type === "SessionStarted",
+		);
+		expect(rows.map((r) => r.id)).toEqual(started.map((e) => e.sessionId));
+		expect(rows).toEqual([]);
+		expect(scripted.sessions).toEqual([]);
 	});
 
 	test("a graph that stops without an end or an interrupt throws", async () => {

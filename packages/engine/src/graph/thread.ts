@@ -152,6 +152,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 		// Resolved at each use: the settings may change while the thread is open.
 		policy: () => deps.policyFor(flow),
 		log: fencedLog(deps.log, fence),
+		write: (fn) => fence.write(fn),
 		bus: deps.bus,
 		recorder: (stepId) => deps.recorders.open(runId, stepId),
 		deviceFor: deps.deviceFor,

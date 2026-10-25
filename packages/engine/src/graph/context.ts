@@ -97,6 +97,13 @@ export type StepContext = {
 	policy(): ResolvedPolicy;
 	/** `append` writes a fact; `events(runId)` reads the log for lookups. */
 	log: RunLog;
+	/**
+	 * Runs `fn` as one write of the drive (`fence.ts`): it begins only while
+	 * the run's fence is open, and a stop waits for it to settle. The step
+	 * runner writes a row and the event that names it in one, so a stop
+	 * never leaves a row without its event.
+	 */
+	write<T>(fn: () => Promise<T>): Promise<T>;
 	bus: RunBus;
 	/**
 	 * Opens a step's transcript in this computer's data folder for

@@ -143,9 +143,10 @@ export type StepHandle = {
 	/** Resets the idle clock (Agent nodes with `idleMinutes`). */
 	touch(): void;
 	/**
-	 * Starts a harness session of this step: the `agent_session` row,
-	 * `SessionStarted`, the bus. The body records the rest through the
-	 * returned record, so no node touches the database.
+	 * Starts a harness session of this step: the `agent_session` row and
+	 * `SessionStarted` (one write of the drive), the bus. The body records
+	 * the rest through the returned record, so no node touches the
+	 * database.
 	 */
 	session(start: EnginePayloads["SessionStarted"]): Promise<SessionRecord>;
 	/** Logs a warning about this step (`RunWarned`): it did not fail, but a person should know. */
@@ -483,31 +484,34 @@ export async function beginStep(
 		const logPath = ctx.kindOf(node).logsCommandOutput(node)
 			? commandLogPath(ctx.dataDir, runId, stepId)
 			: null;
-		await ctx.db.insert(stepTable).values({
-			id: stepId,
-			spaceId: ctx.run.spaceId,
-			runId,
-			nodeId: node.id,
-			nodeType: node.type,
-			visit,
-			transcriptPath: path,
-			// The Device the step runs on (its Placement), not the Walker.
-			deviceId: device.id,
-		});
-		await ctx.log.append({
-			type: "StepStarted",
-			runId,
-			stepId,
-			payload: {
+		// The row and its event are one write: a stop lands before or after both.
+		await ctx.write(async () => {
+			await ctx.db.insert(stepTable).values({
+				id: stepId,
+				spaceId: ctx.run.spaceId,
+				runId,
 				nodeId: node.id,
 				nodeType: node.type,
 				visit,
 				transcriptPath: path,
-				logPath,
-				scope,
+				// The Device the step runs on (its Placement), not the Walker.
 				deviceId: device.id,
-				...budget,
-			},
+			});
+			await ctx.log.append({
+				type: "StepStarted",
+				runId,
+				stepId,
+				payload: {
+					nodeId: node.id,
+					nodeType: node.type,
+					visit,
+					transcriptPath: path,
+					logPath,
+					scope,
+					deviceId: device.id,
+					...budget,
+				},
+			});
 		});
 	} else {
 		existing = deriveSteps(logged).find((s) => s.id === start.stepId) ?? null;
@@ -599,34 +603,38 @@ export async function beginStep(
 		},
 		async session(started) {
 			const sessionId = randomUUID();
-			await ctx.db.insert(agentSession).values({
-				id: sessionId,
-				spaceId: ctx.run.spaceId,
-				runId,
-				stepId,
-				prompt: started.prompt,
-			});
-			await ctx.log.append({
-				type: "SessionStarted",
-				runId,
-				stepId,
-				sessionId,
-				payload: started,
+			await ctx.write(async () => {
+				await ctx.db.insert(agentSession).values({
+					id: sessionId,
+					spaceId: ctx.run.spaceId,
+					runId,
+					stepId,
+					prompt: started.prompt,
+				});
+				await ctx.log.append({
+					type: "SessionStarted",
+					runId,
+					stepId,
+					sessionId,
+					payload: started,
+				});
 			});
 			changed();
 			return {
 				id: sessionId,
 				async assigned(harnessSessionId, model) {
-					await ctx.db
-						.update(agentSession)
-						.set({ harnessSessionId })
-						.where(eq(agentSession.id, sessionId));
-					await ctx.log.append({
-						type: "HarnessSessionAssigned",
-						runId,
-						stepId,
-						sessionId,
-						payload: { harnessSessionId, model },
+					await ctx.write(async () => {
+						await ctx.db
+							.update(agentSession)
+							.set({ harnessSessionId })
+							.where(eq(agentSession.id, sessionId));
+						await ctx.log.append({
+							type: "HarnessSessionAssigned",
+							runId,
+							stepId,
+							sessionId,
+							payload: { harnessSessionId, model },
+						});
 					});
 					changed();
 				},

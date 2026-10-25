@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
 	ChannelVersions,
@@ -17,15 +18,18 @@ import { LibsqlSaver } from "./checkpointer";
  * A stop does not wait for the drive to unwind (a harness that hangs, or a
  * process whose timers stopped, would hold it forever). It closes the
  * drive's fence and writes the run's end itself. A drive writes the run
- * only through its thread: the log (`StepContext.log`) and the checkpoint
- * saver (the thread's graph and every body graph in it). Both go through
- * the fence, so a drive that wakes later, or never, writes nothing more:
- * no `StepEnded`, no `RunEnded`, no edge, no step, no checkpoint. Its
- * first write throws `FencedError`, and the runner drops the drive quietly.
+ * only through its thread: the log (`StepContext.log`), the `step` and
+ * `agent_session` rows (`StepContext.write`) and the checkpoint saver (the
+ * thread's graph and every body graph in it). All go through the fence, so
+ * a drive that wakes later, or never, writes nothing more: no `StepEnded`,
+ * no `RunEnded`, no edge, no step, no session row, no checkpoint. Its first
+ * write throws `FencedError`, and the runner drops the drive quietly.
  *
  * A write that started before the fence closed is in flight: `close`
  * resolves once those settled, so the stop reads the log after them and
- * never ends a step twice.
+ * never ends a step twice. A write made inside another write of the same
+ * fence is part of it: a row and the event that names it are one write,
+ * so a stop never lands between them.
  *
  * Transcript entries are not fenced: they are the harness's last words,
  * not facts of the run, and the harness was told to stop.
@@ -41,7 +45,11 @@ export class FencedError extends Error {
 
 export type Fence = {
 	readonly closed: boolean;
-	/** Runs one write, or throws `FencedError` once the fence is closed. */
+	/**
+	 * Runs one write, or throws `FencedError` once the fence is closed. A
+	 * write inside `fn` is part of it: it runs even when the fence closed
+	 * meanwhile, and `close` waits for the whole.
+	 */
 	write<T>(fn: () => Promise<T>): Promise<T>;
 	/** Closes the fence. Resolves once the writes in flight settled. */
 	close(): Promise<void>;
@@ -50,13 +58,16 @@ export type Fence = {
 export function createFence(runId: string): Fence {
 	let closed = false;
 	const inFlight = new Set<Promise<unknown>>();
+	/** Set inside a write of this fence. */
+	const writing = new AsyncLocalStorage<true>();
 	return {
 		get closed() {
 			return closed;
 		},
 		write<T>(fn: () => Promise<T>): Promise<T> {
+			if (writing.getStore()) return fn();
 			if (closed) return Promise.reject(new FencedError(runId));
-			const promise = fn();
+			const promise = writing.run(true, fn);
 			inFlight.add(promise);
 			const done = () => inFlight.delete(promise);
 			promise.then(done, done);
