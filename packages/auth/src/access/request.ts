@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
+import { Refusal } from "@nightshift/refusal";
 
 import { type Auth, hasPermission, type Session } from "../auth";
 import {
@@ -10,6 +11,7 @@ import {
 } from "../host-access";
 import type { LocalSession } from "../local-session";
 import { activeSpaceId, type Permissions, type Role } from "../spaces";
+import { refuse } from "./auth-refusals";
 
 /** Who a request is, in which Space, and what they may do there. */
 export type RequestAccess = {
@@ -73,7 +75,8 @@ export async function requestAccess(
 	const { session } = resolved;
 	const spaceId = session ? await activeSpaceId(db, session.session) : null;
 	const inSpace = () => {
-		if (!spaceId) throw new Error("Sign in to use Night Shift.");
+		if (!spaceId)
+			throw new Refusal("signed-out", "Sign in to use Night Shift.");
 		return spaceId;
 	};
 	return {
@@ -91,51 +94,65 @@ export async function requestAccess(
 				: Promise.resolve(false);
 		},
 		async setActiveSpace(id) {
-			await auth.api.setActiveOrganization({
-				headers: resolved.headers,
-				body: { organizationId: id },
-			});
+			await auth.api
+				.setActiveOrganization({
+					headers: resolved.headers,
+					body: { organizationId: id },
+				})
+				.catch(refuse);
 		},
 		members: {
 			async invite(email, role) {
-				const created = await auth.api.createInvitation({
-					headers: resolved.headers,
-					body: { email, role, organizationId: inSpace() },
-				});
+				const created = await auth.api
+					.createInvitation({
+						headers: resolved.headers,
+						body: { email, role, organizationId: inSpace() },
+					})
+					.catch(refuse);
 				return { id: created.id };
 			},
 			async cancelInvitation(invitationId) {
-				await auth.api.cancelInvitation({
-					headers: resolved.headers,
-					body: { invitationId },
-				});
+				await auth.api
+					.cancelInvitation({
+						headers: resolved.headers,
+						body: { invitationId },
+					})
+					.catch(refuse);
 			},
 			async setRole(memberId, role) {
-				await auth.api.updateMemberRole({
-					headers: resolved.headers,
-					body: { memberId, role, organizationId: inSpace() },
-				});
+				await auth.api
+					.updateMemberRole({
+						headers: resolved.headers,
+						body: { memberId, role, organizationId: inSpace() },
+					})
+					.catch(refuse);
 			},
 			async remove(memberId) {
-				await auth.api.removeMember({
-					headers: resolved.headers,
-					body: { memberIdOrEmail: memberId, organizationId: inSpace() },
-				});
+				await auth.api
+					.removeMember({
+						headers: resolved.headers,
+						body: { memberIdOrEmail: memberId, organizationId: inSpace() },
+					})
+					.catch(refuse);
 			},
 			async accept(invitationId) {
-				const accepted = await auth.api.acceptInvitation({
-					headers: resolved.headers,
-					body: { invitationId },
-				});
+				const accepted = await auth.api
+					.acceptInvitation({
+						headers: resolved.headers,
+						body: { invitationId },
+					})
+					.catch(refuse);
 				if (!accepted) throw new Error("Could not accept the invitation.");
 				return { spaceId: accepted.member.organizationId };
 			},
 		},
 		async createSpace(name) {
-			const created = await auth.api.createOrganization({
-				headers: resolved.headers,
-				body: { name, slug: `${slugOf(name)}-${randomUUID().slice(0, 8)}` },
-			});
+			const created = await auth.api
+				.createOrganization({
+					headers: resolved.headers,
+					body: { name, slug: `${slugOf(name)}-${randomUUID().slice(0, 8)}` },
+				})
+				.catch(refuse);
 			if (!created) throw new Error("Could not create the Space.");
 			return { id: created.id };
 		},

@@ -1,3 +1,4 @@
+import { Refusal } from "@nightshift/refusal";
 import { deviceAuthorization } from "better-auth/plugins/device-authorization";
 
 import type { Auth } from "../auth";
@@ -115,7 +116,8 @@ export async function redeemPairing(
 			case "expired_token":
 				return { status: "expired" };
 			default:
-				throw new Error(
+				throw new Refusal(
+					"invalid",
 					"This pairing code is not valid. Start the pairing again.",
 				);
 		}
@@ -140,10 +142,10 @@ export async function reviewPairing(
 	const review = await auth.api
 		.deviceVerify({ headers, query: { user_code: code } })
 		.catch((error) => {
-			throw readable(error);
+			throw refusalOf(error);
 		});
 	// The plugin names the client only to the Person who holds the code.
-	if (!review.client_id) throw new Error(NOT_YOURS);
+	if (!review.client_id) throw new Refusal("forbidden", NOT_YOURS);
 	return {
 		userCode: code,
 		status: review.status as PairingReview["status"],
@@ -160,7 +162,7 @@ export async function approvePairing(
 	await auth.api
 		.deviceApprove({ headers, body: { userCode: normalizeUserCode(userCode) } })
 		.catch((error) => {
-			throw readable(error);
+			throw refusalOf(error);
 		});
 }
 
@@ -173,7 +175,7 @@ export async function denyPairing(
 	await auth.api
 		.deviceDeny({ headers, body: { userCode: normalizeUserCode(userCode) } })
 		.catch((error) => {
-			throw readable(error);
+			throw refusalOf(error);
 		});
 }
 
@@ -191,13 +193,13 @@ function oauthError(error: unknown): string | null {
 	return typeof body?.error === "string" ? body.error : null;
 }
 
-/** The plugin's errors, in words for the Person approving. */
-function readable(error: unknown): Error {
+/** The plugin's refusals, in words for the Person approving. Any other error stays a failure. */
+function refusalOf(error: unknown): unknown {
 	const status = (error as { status?: unknown } | null)?.status;
 	if (status === "UNAUTHORIZED") {
-		return new Error("Sign in to approve a device.");
+		return new Refusal("signed-out", "Sign in to approve a device.");
 	}
-	if (status === "FORBIDDEN") return new Error(NOT_YOURS);
+	if (status === "FORBIDDEN") return new Refusal("forbidden", NOT_YOURS);
 	switch (oauthError(error)) {
 		case "invalid_request": {
 			const text = String(
@@ -205,22 +207,24 @@ function readable(error: unknown): Error {
 					?.error_description ?? "",
 			);
 			if (/processed/i.test(text)) {
-				return new Error("This code was already used.");
+				return new Refusal("conflict", "This code was already used.");
 			}
 			if (/claimed/i.test(text)) {
-				return new Error("Enter the code first, then approve it.");
+				return new Refusal("invalid", "Enter the code first, then approve it.");
 			}
-			return new Error(
+			return new Refusal(
+				"not-found",
 				"No device waits with this code. Check the code and try again.",
 			);
 		}
 		case "expired_token":
-			return new Error(
+			return new Refusal(
+				"conflict",
 				"This code has expired. Start the pairing again on the device.",
 			);
 		case "access_denied":
-			return new Error(NOT_YOURS);
+			return new Refusal("forbidden", NOT_YOURS);
 		default:
-			return error instanceof Error ? error : new Error(String(error));
+			return error;
 	}
 }

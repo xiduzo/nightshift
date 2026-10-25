@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { account, session } from "@nightshift/db/schema";
+import { Refusal } from "@nightshift/refusal";
 import { and, eq, gt, inArray } from "drizzle-orm";
 
 import type { Auth } from "../auth";
@@ -47,17 +48,21 @@ export async function setLogin(
 ): Promise<{ email: string }> {
 	const email = input.email.trim().toLowerCase();
 	if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-		throw new Error(`${input.email} is not an email address.`);
+		throw new Refusal("invalid", `${input.email} is not an email address.`);
 	}
 	if (input.password.length < MIN_PASSWORD_LENGTH) {
-		throw new Error(
+		throw new Refusal(
+			"invalid",
 			`Use a password of at least ${MIN_PASSWORD_LENGTH} characters.`,
 		);
 	}
 	const ctx = await auth.$context;
 	const other = await ctx.internalAdapter.findUserByEmail(email);
 	if (other && other.user.id !== personId) {
-		throw new Error(`Another Person here signs in with ${email}.`);
+		throw new Refusal(
+			"conflict",
+			`Another Person here signs in with ${email}.`,
+		);
 	}
 	await ctx.internalAdapter.updateUser(personId, {
 		email,

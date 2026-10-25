@@ -6,6 +6,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { expo } from "@better-auth/expo";
 import type { Database } from "@nightshift/db";
 import { authSchema as schema } from "@nightshift/db";
+import { Refusal } from "@nightshift/refusal";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin } from "better-auth/plugins/admin";
@@ -270,8 +271,15 @@ function actor(): string | null {
 	return context?.session?.user?.id ?? null;
 }
 
+/**
+ * Refuses in a hook: an `APIError` for Better Auth's own endpoints, with
+ * the `Refusal` as its cause, so a call through `auth.api` keeps the words.
+ */
 function refuse(message: string): never {
-	throw new APIError("FORBIDDEN", { message });
+	throw new APIError("FORBIDDEN", {
+		message,
+		cause: new Refusal("forbidden", message),
+	});
 }
 
 export type Auth = ReturnType<typeof createAuth>;
