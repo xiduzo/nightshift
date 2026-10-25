@@ -17,7 +17,7 @@ import type { FlowRange, RunStatus } from "@/shared/api";
 import { formatCost, formatDateTime } from "@/shared/format";
 import { ChartSection, DetailsEmpty, Swatch } from "./details";
 import { formatNightShort, nightChartRows } from "./nights";
-import { RUN_STATUS_CHART } from "./runs-donut";
+import { RUN_STATUS_CHART } from "./run-statuses";
 
 /** Runs per night, stacked by status, like the Runs details. */
 export function RunsPerNight({

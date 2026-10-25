@@ -41,7 +41,7 @@ import {
 } from "./details";
 import { nightChartRows } from "./nights";
 import { nightsOf } from "./ranges";
-import { RUN_STATUS_CHART } from "./runs-donut";
+import { RUN_STATUS_CHART } from "./run-statuses";
 
 type Tab = "overview" | "groups" | "failed";
 

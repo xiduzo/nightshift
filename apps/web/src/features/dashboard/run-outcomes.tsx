@@ -13,7 +13,7 @@ import { Label, Pie, PieChart } from "recharts";
 import type { DashboardSummary } from "@/shared/api";
 import { PageSection } from "@/shared/page";
 import { nightsOf } from "./ranges";
-import { RUN_STATUS_CHART } from "./runs-donut";
+import { RUN_STATUS_CHART } from "./run-statuses";
 
 const RANGES = [7, 30] as const;
 type Range = (typeof RANGES)[number];

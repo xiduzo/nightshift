@@ -2,4 +2,5 @@
 
 export { HomePage } from "./home-page";
 export { ProjectDashboardPage } from "./project-dashboard-page";
-export { describeRunStatuses, RunsDonut } from "./runs-donut";
+export { describeRunStatuses } from "./run-statuses";
+export { RunsDonut } from "./runs-donut";

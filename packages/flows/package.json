@@ -1,6 +1,7 @@
 {
 	"name": "@nightshift/flows",
 	"type": "module",
+	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
 		"./files": "./src/files.ts"

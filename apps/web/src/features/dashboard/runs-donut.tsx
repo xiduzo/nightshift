@@ -1,65 +1,14 @@
-import { runStatusLabel } from "@nightshift/client";
-import {
-	type ChartConfig,
-	ChartContainer,
-} from "@nightshift/ui/components/chart";
 import { cn } from "@nightshift/ui/lib/utils";
-import { Pie, PieChart } from "recharts";
+import { lazy, Suspense } from "react";
 
-import type { RunStatus, RunSummary } from "@/shared/api";
+import type { RunSummary } from "@/shared/api";
 
-/** Live statuses first, then how runs ended. */
-const ORDER: RunStatus[] = [
-	"running",
-	"waiting",
-	"sleeping",
-	"finished",
-	"failed",
-	"interrupted",
-	"stopped",
-];
+// The chart library is large and every page shows the sidebar: it loads after the page.
+const RunsDonutChart = lazy(() =>
+	import("./runs-donut-chart").then((m) => ({ default: m.RunsDonutChart })),
+);
 
-export const RUN_STATUS_CHART = {
-	running: { label: runStatusLabel("running"), color: "var(--status-running)" },
-	waiting: { label: runStatusLabel("waiting"), color: "var(--status-waiting)" },
-	sleeping: {
-		label: runStatusLabel("sleeping"),
-		color: "var(--status-sleeping)",
-	},
-	finished: {
-		label: runStatusLabel("finished"),
-		color: "var(--status-finished)",
-	},
-	failed: { label: runStatusLabel("failed"), color: "var(--status-failed)" },
-	interrupted: {
-		label: runStatusLabel("interrupted"),
-		color: "var(--status-interrupted)",
-	},
-	stopped: { label: runStatusLabel("stopped"), color: "var(--status-stopped)" },
-} satisfies ChartConfig;
-
-/** How many runs have each status, in a fixed order, without the empty ones. */
-export function countRunStatuses(runs: RunSummary[]) {
-	return ORDER.flatMap((status) => {
-		const count = runs.filter((run) => run.status === status).length;
-		return count > 0 ? [{ status, count, fill: `var(--color-${status})` }] : [];
-	});
-}
-
-/** One line for screen readers and tooltips: "3 runs: 2 finished, 1 failed". */
-export function describeRunStatuses(runs: RunSummary[]) {
-	const counts = countRunStatuses(runs);
-	const total = `${runs.length} ${runs.length === 1 ? "run" : "runs"}`;
-	if (counts.length === 0) return total;
-	return `${total}: ${counts
-		.map(
-			({ status, count }) =>
-				`${count} ${RUN_STATUS_CHART[status].label.toLowerCase()}`,
-		)
-		.join(", ")}`;
-}
-
-/** A donut of run statuses, after the shadcn `chart-pie-donut` block. Small enough for a sidebar badge. */
+/** The donut of run statuses in the sidebar. An empty space of the same size shows until it loads. */
 export function RunsDonut({
 	runs,
 	className,
@@ -68,24 +17,15 @@ export function RunsDonut({
 	className?: string;
 }) {
 	return (
-		<ChartContainer
-			config={RUN_STATUS_CHART}
-			initialDimension={{ width: 16, height: 16 }}
-			className={cn("aspect-square size-4", className)}
-			aria-hidden="true"
-		>
-			{/* Recharts keeps a 5px margin by default; at 16px that leaves a dot. */}
-			<PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-				<Pie
-					data={countRunStatuses(runs)}
-					dataKey="count"
-					nameKey="status"
-					innerRadius="50%"
-					outerRadius="100%"
-					strokeWidth={0}
-					isAnimationActive={false}
+		<Suspense
+			fallback={
+				<span
+					aria-hidden="true"
+					className={cn("aspect-square size-4", className)}
 				/>
-			</PieChart>
-		</ChartContainer>
+			}
+		>
+			<RunsDonutChart runs={runs} className={className} />
+		</Suspense>
 	);
 }

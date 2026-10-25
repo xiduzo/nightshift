@@ -12,7 +12,7 @@ import {
 	formatRelative,
 } from "@/shared/format";
 import { ChartSection, MoreRows } from "./details";
-import { RUN_STATUS_CHART } from "./runs-donut";
+import { RUN_STATUS_CHART } from "./run-statuses";
 
 type WarningRow = FlowRange["warningRows"]["rows"][number];
 

@@ -2,6 +2,9 @@
 	"name": "web",
 	"private": true,
 	"type": "module",
+	"sideEffects": [
+		"*.css"
+	],
 	"scripts": {
 		"build": "tsc -b ../../packages/api && vite build",
 		"serve": "vite preview",
