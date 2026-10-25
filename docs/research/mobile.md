@@ -832,12 +832,13 @@ starts at the next launch.
 
 An update reaches only the builds with the same runtime version. The runtime
 version is the fingerprint of the native project (`"policy": "fingerprint"`
-in `app.json`). A change to native code, a native dependency, a config
-plugin or the `updates` settings changes the fingerprint, so it needs a new build. The older builds do
-not get an update for the new fingerprint. `eas fingerprint:compare` shows
-what changed.
+in `app.json`). A change to native code, a native dependency, a config plugin
+or the `updates` settings changes the fingerprint, so it needs a new build.
+The older builds do not get an update for the new fingerprint.
+`eas fingerprint:compare` shows what changed.
 
-TestFlight builds 1 to 5 have no `expo-updates`. They get no updates.
+TestFlight builds 1 to 5 have no `expo-updates`. They get no updates. Build 6
+has an older fingerprint and gets no later update: install build 7 or newer.
 
 ## Out of scope
 
