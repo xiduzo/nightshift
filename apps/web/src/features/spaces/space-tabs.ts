@@ -1,10 +1,11 @@
+import { spaceChanged } from "@nightshift/client";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 
 /**
  * The tabs of one browser share one session, so one active Space. A tab
- * that changes it tells the others, and each one loads every query again:
- * its cache still holds the lists of the Space it showed before.
+ * that changes it tells the others, and each one forgets what its cache
+ * holds of the Space before and reads again what it shows (`spaceChanged`).
  */
 
 /** The part of a `BroadcastChannel` the tabs use. */
@@ -24,18 +25,18 @@ export function createSpaceTabs(open: () => TabChannel | null) {
 		return channel;
 	};
 	return {
-		/** This tab changed the active Space: it and every other tab load every query again. */
+		/** This tab changed the active Space: it and every other tab read the new one. */
 		async changed(queryClient: QueryClient): Promise<void> {
 			tabs()?.postMessage(CHANGED);
-			await queryClient.invalidateQueries();
+			await spaceChanged(queryClient);
 		},
-		/** Loads every query again when another tab changes the active Space. Returns the stop. */
+		/** Reads the new Space when another tab changes the active Space. Returns the stop. */
 		follow(queryClient: QueryClient): () => void {
 			const channel = tabs();
 			if (!channel) return () => {};
 			const hear = (event: Event) => {
 				if ((event as MessageEvent).data === CHANGED) {
-					void queryClient.invalidateQueries();
+					void spaceChanged(queryClient);
 				}
 			};
 			channel.addEventListener("message", hear);

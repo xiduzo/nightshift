@@ -192,4 +192,5 @@ export {
 	type PendingInvitation,
 	type SpaceMember,
 	type SpaceRole,
+	spaceChanged,
 } from "./spaces";
