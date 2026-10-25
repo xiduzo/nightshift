@@ -10,6 +10,7 @@ import {
 	run,
 	step,
 } from "@nightshift/db/schema";
+import { Refusal } from "@nightshift/refusal";
 import {
 	and,
 	asc,
@@ -67,6 +68,9 @@ export const NOT_ON_THIS_COMPUTER =
 /** A change this Replica cannot make to a Space a Host keeps. */
 export const HOSTED_ELSEWHERE =
 	"This Space is kept by another computer. Change its projects there.";
+
+/** A project that is not in the Space, or that a person removed. */
+export const PROJECT_NOT_FOUND = "Night Shift cannot find this project.";
 
 /** A project row with the path of its Clone on this computer. */
 export type ProjectRow = typeof project.$inferSelect & { repoPath: string };
@@ -165,7 +169,9 @@ export function createProjects(deps: ProjectsDeps) {
 		change: Partial<SpaceProject>,
 	): Promise<void> {
 		const document = await documents.open(row.spaceId);
-		if (document.hostedElsewhere) throw new Error(HOSTED_ELSEWHERE);
+		if (document.hostedElsewhere) {
+			throw new Refusal("conflict", HOSTED_ELSEWHERE);
+		}
 		const parsed = spaceProjectSchema.safeParse(document.projects.get(row.id));
 		const entry = parsed.success ? parsed.data : projectEntry(row);
 		await document.change(() => {
@@ -191,7 +197,7 @@ export function createProjects(deps: ProjectsDeps) {
 			deviceName: names.get(deviceId) ?? deviceId,
 		};
 		if (document.hostedElsewhere) {
-			if (!deps.relay) throw new Error(HOSTED_ELSEWHERE);
+			if (!deps.relay) throw new Refusal("conflict", HOSTED_ELSEWHERE);
 			await deps.relay.addClone({ spaceId, ...clone });
 			return;
 		}
@@ -228,7 +234,7 @@ export function createProjects(deps: ProjectsDeps) {
 			.select()
 			.from(project)
 			.where(eq(project.id, projectId));
-		if (!row) throw new Error(`Project not found: ${projectId}`);
+		if (!row) throw new Refusal("not-found", PROJECT_NOT_FOUND);
 		return row;
 	}
 
@@ -285,7 +291,7 @@ export function createProjects(deps: ProjectsDeps) {
 						inSpace(spaceId),
 					),
 				);
-			if (!row) throw new Error(`Project not found: ${projectId}`);
+			if (!row) throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			return row;
 		},
 
@@ -312,9 +318,9 @@ export function createProjects(deps: ProjectsDeps) {
 						inSpace(spaceId),
 					),
 				);
-			throw new Error(
-				elsewhere ? NOT_ON_THIS_COMPUTER : `Project not found: ${projectId}`,
-			);
+			throw elsewhere
+				? new Refusal("conflict", NOT_ON_THIS_COMPUTER)
+				: new Refusal("not-found", PROJECT_NOT_FOUND);
 		},
 
 		/**
@@ -344,7 +350,8 @@ export function createProjects(deps: ProjectsDeps) {
 					known.removedAt === null &&
 					existsSync(elsewhere.repoPath)
 				) {
-					throw new Error(
+					throw new Refusal(
+						"conflict",
 						`This computer already has this project, in ${elsewhere.repoPath}. Remove it first to use this folder instead.`,
 					);
 				}
@@ -379,7 +386,8 @@ export function createProjects(deps: ProjectsDeps) {
 			const name = input.name ?? path.split("/").at(-1) ?? path;
 			const document = await documents.open(spaceId);
 			if (document.hostedElsewhere) {
-				throw new Error(
+				throw new Refusal(
+					"conflict",
 					"This Space is kept by another computer. Add the project there first, then add this folder.",
 				);
 			}
@@ -438,14 +446,14 @@ export function createProjects(deps: ProjectsDeps) {
 				(await directory.hostedElsewhere(from)) ||
 				(await directory.hostedElsewhere(to))
 			) {
-				throw new Error(HOSTED_ELSEWHERE);
+				throw new Refusal("conflict", HOSTED_ELSEWHERE);
 			}
 			if (!(await spaceExists(db, to))) {
-				throw new Error("That Space does not exist.");
+				throw new Refusal("not-found", "That Space does not exist.");
 			}
 			const row = await rowOf(projectId);
 			if (row.spaceId !== from) {
-				throw new Error(`Project not found: ${projectId}`);
+				throw new Refusal("not-found", PROJECT_NOT_FOUND);
 			}
 			const runs = db
 				.select({ id: run.id })
@@ -538,7 +546,8 @@ export function createProjects(deps: ProjectsDeps) {
 /** The row, when it is in the Space. A folder is one Space's project at a time. */
 function ownSpace<T extends { spaceId: string }>(row: T, spaceId: string): T {
 	if (row.spaceId !== spaceId) {
-		throw new Error(
+		throw new Refusal(
+			"conflict",
 			"This folder is a project in another Space. Switch to that Space to use it.",
 		);
 	}

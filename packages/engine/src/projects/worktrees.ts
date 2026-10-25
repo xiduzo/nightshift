@@ -1,5 +1,6 @@
 import { mkdir, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { Refusal } from "@nightshift/refusal";
 
 import { type Git, gitOrThrow, systemGit } from "./git";
 
@@ -84,17 +85,19 @@ export function createWorktrees(git: Git) {
 		try {
 			real = await realpath(path);
 		} catch {
-			throw new Error(`The folder ${path} does not exist.`);
+			throw new Refusal("invalid", `The folder ${path} does not exist.`);
 		}
 		const result = await git.run(real, ["rev-parse", "--show-toplevel"]);
 		if (result.exitCode !== 0 || !result.stdout) {
-			throw new Error(
+			throw new Refusal(
+				"invalid",
 				`${path} is not a git repository. Pick the folder of a git clone.`,
 			);
 		}
 		const topLevel = await realpath(result.stdout);
 		if (topLevel !== real) {
-			throw new Error(
+			throw new Refusal(
+				"invalid",
 				`${path} is inside a git repository, but it is not the top folder. Use ${topLevel}.`,
 			);
 		}
@@ -119,7 +122,8 @@ export function createWorktrees(git: Git) {
 			`${ref}^{commit}`,
 		]);
 		if (result.exitCode !== 0 || !result.stdout) {
-			throw new Error(
+			throw new Refusal(
+				"invalid",
 				`The branch or commit "${ref}" does not exist in this project.`,
 			);
 		}

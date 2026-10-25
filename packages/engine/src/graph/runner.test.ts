@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { run } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
+import { FAILURE_MESSAGE } from "@nightshift/refusal";
 import { eq } from "drizzle-orm";
 import { defaultRunSettings } from "../device-config/settings";
 import { getRunRow } from "../log/run-row";
@@ -22,7 +23,12 @@ import {
 	scriptedHarness,
 	waitFor,
 } from "../testing/test-support";
-import { RELEASED, type Runner, type RunnerDeps } from "./runner";
+import {
+	ENGINE_FAILED,
+	RELEASED,
+	type Runner,
+	type RunnerDeps,
+} from "./runner";
 import { openThread } from "./thread";
 
 /**
@@ -114,6 +120,9 @@ describe("take: one Turn at a time per run", () => {
 		expect(String((b as PromiseRejectedResult).reason)).toContain(
 			"The run cap is reached: 1 of 1",
 		);
+		expect((b as PromiseRejectedResult).reason).toMatchObject({
+			kind: "conflict",
+		});
 		expect(runner.isActive(other)).toBe(false);
 	});
 
@@ -357,9 +366,14 @@ describe("take: a drive's time and a thread that cannot move", () => {
 		await start(runner, h.runId);
 		await waitFor(() => sessions[0]);
 		await runner.take(h.runId, { kind: "stop" });
+		const logged = spyOn(console, "error").mockImplementation(() => {});
 		await expect(
 			runner.take(h.runId, { kind: "rerun", by: "person", nodeId: "worker" }),
 		).rejects.toThrow("the checkpoint is gone");
+		// The person reads plain words. The error goes to the log.
+		const details = String(logged.mock.calls[0]?.[1]);
+		logged.mockRestore();
+		expect(details).toContain("the checkpoint is gone");
 		const events = await h.events();
 		expect(events.at(-2)).toMatchObject({
 			type: "RunResumed",
@@ -369,10 +383,41 @@ describe("take: a drive's time and a thread that cannot move", () => {
 			type: "RunEnded",
 			payload: {
 				status: "failed",
-				reason: "The run could not start again: the checkpoint is gone",
+				reason: `The run could not start again. ${FAILURE_MESSAGE}`,
 			},
 		});
 		expect(runner.isActive(h.runId)).toBe(false);
+	});
+
+	test("a walk that breaks on a failure ends the run failed in plain words, and logs the details", async () => {
+		const broken = new TypeError(
+			"Cannot read properties of undefined (reading 'checkpoint_ns')",
+		);
+		const { h, runner } = await setup(worker(), 2, {
+			openThread: (row, deps) => ({
+				...openThread(row, deps),
+				drive: async () => {
+					throw broken;
+				},
+			}),
+		});
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		try {
+			await start(runner, h.runId);
+			await waitFor(async () => (await statusOf(h)) === "failed", {
+				label: "the failed run",
+			});
+			expect((await h.events()).at(-1)).toMatchObject({
+				type: "RunEnded",
+				payload: { status: "failed", reason: ENGINE_FAILED },
+			});
+			expect(logged).toHaveBeenCalledWith(
+				`[engine] the walk of run ${h.runId} failed`,
+				broken,
+			);
+		} finally {
+			logged.mockRestore();
+		}
 	});
 });
 

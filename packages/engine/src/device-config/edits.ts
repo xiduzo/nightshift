@@ -8,6 +8,7 @@ import {
 	type HarnessName,
 	isCustomHarness,
 } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 
 import type { CliToolStore } from "./cli-tools";
 import type {
@@ -63,14 +64,16 @@ export async function saveProfile(
 		(previousName === undefined || renamed) &&
 		stores.profiles.get(profile.name)
 	) {
-		throw new Error(
+		throw new Refusal(
+			"conflict",
 			`A profile named "${profile.name}" already exists. Pick another name.`,
 		);
 	}
 	if (renamed) {
 		const use = await options.flowsUsing(previousName);
 		if (use.length > 0) {
-			throw new Error(
+			throw new Refusal(
+				"conflict",
 				`The flows ${use.map((u) => u.flowName).join(", ")} use "${previousName}". Change it there first, or keep the name.`,
 			);
 		}
@@ -79,13 +82,15 @@ export async function saveProfile(
 		(name) => !stores.connections.get(name),
 	);
 	if (unknown.length > 0) {
-		throw new Error(
+		throw new Refusal(
+			"conflict",
 			`There is no connection named ${unknown.map((n) => `"${n}"`).join(", ")}. Add it under Agents → Tools first.`,
 		);
 	}
 	const unknownClis = profile.clis.filter((name) => !stores.cliTools.get(name));
 	if (unknownClis.length > 0) {
-		throw new Error(
+		throw new Refusal(
+			"conflict",
 			`There is no CLI tool named ${unknownClis.map((n) => `"${n}"`).join(", ")}. Add it under Agents → Tools first.`,
 		);
 	}
@@ -120,7 +125,8 @@ export async function saveConnection(
 		previousName !== connection.name &&
 		stores.connections.get(connection.name)
 	) {
-		throw new Error(
+		throw new Refusal(
+			"conflict",
 			`A connection named "${connection.name}" already exists. Pick another name.`,
 		);
 	}
@@ -192,7 +198,8 @@ export async function removeHarness(
 		.filter((p) => p.harness === harness)
 		.map((p) => p.name);
 	if (using.length > 0) {
-		throw new Error(
+		throw new Refusal(
+			"conflict",
 			`The ${using.length === 1 ? "profile" : "profiles"} ${using.join(", ")} run on ${label}. Move ${using.length === 1 ? "it" : "them"} to another harness first.`,
 		);
 	}
@@ -219,7 +226,8 @@ export async function saveCustomAgent(
 	const agents = stores.settings.current().customAgents;
 	if (previousSlug === undefined) {
 		if (agents.some((a) => a.slug === agent.slug)) {
-			throw new Error(
+			throw new Refusal(
+				"conflict",
 				`A custom agent named acp:${agent.slug} already exists. Pick another name.`,
 			);
 		}
@@ -227,7 +235,10 @@ export async function saveCustomAgent(
 		return customAgentSchema.parse(agent);
 	}
 	if (!agents.some((a) => a.slug === previousSlug)) {
-		throw new Error("This custom agent was removed. Add it again.");
+		throw new Refusal(
+			"not-found",
+			"This custom agent was removed. Add it again.",
+		);
 	}
 	const saved = customAgentSchema.parse({ ...agent, slug: previousSlug });
 	await stores.settings.save({

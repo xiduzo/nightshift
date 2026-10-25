@@ -323,10 +323,12 @@ describe("projects", () => {
 		expect(await engine.listProjects()).toEqual([]);
 		expect((await engine.listRuns()).map((r) => r.id)).toEqual([run.id]);
 		expect((await engine.getRun(run.id)).status).toBe("finished");
-		await expect(engine.listFlows(id)).rejects.toThrow("Project not found");
+		await expect(engine.listFlows(id)).rejects.toThrow(
+			"Night Shift cannot find this project.",
+		);
 		await expect(
 			engine.startRun({ projectId: id, flowName: "anything" }),
-		).rejects.toThrow("Project not found");
+		).rejects.toThrow("Night Shift cannot find this project.");
 
 		const restored = await engine.addProject({ repoPath: sandbox.repoPath });
 		expect(restored.id).toBe(id);
@@ -1738,7 +1740,9 @@ describe("watchRun", () => {
 		const iterator = engine
 			.watchRun("missing", { signal: new AbortController().signal })
 			[Symbol.asyncIterator]();
-		await expect(iterator.next()).rejects.toThrow("Run not found");
+		await expect(iterator.next()).rejects.toThrow(
+			"Night Shift cannot find this run.",
+		);
 	});
 });
 
@@ -2782,7 +2786,7 @@ describe("gates", () => {
 				stepId: open.stepId,
 				choice: "approve",
 			}),
-		).rejects.toThrow("Run not found");
+		).rejects.toThrow("Night Shift cannot find this run.");
 		await expect(engine.resumeRun(run.id)).rejects.toThrow("waits at a Gate");
 		expect(await statusOf(engine, run.id)).toBe("waiting");
 
@@ -3134,7 +3138,7 @@ describe("wait nodes", () => {
 			"This run does not wait for that signal.",
 		);
 		await expect(engine.signalRun("missing", "deployed")).rejects.toThrow(
-			"Run not found",
+			"Night Shift cannot find this run.",
 		);
 		expect(await statusOf(engine, run.id)).toBe("sleeping");
 

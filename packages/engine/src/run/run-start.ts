@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "@nightshift/db";
 import { run } from "@nightshift/db/schema";
 import type { Flow, FlowNode, FlowNodeType } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import type { PlacementPort, PlannedRun, StartRunInput } from "../contract";
 import type { Capabilities, Device } from "../device";
 import {
@@ -164,16 +165,17 @@ export async function prepareRun(
 		const refusal = at.offered
 			? null
 			: refusalOf(nodes, await capabilitiesFor(nodes, at.device));
-		if (refusal !== null) throw new Error(refusal);
+		if (refusal !== null) throw new Refusal("conflict", refusal);
 		const worker = nodes.find((n) => kindOf(n).works(n) === "worktree");
 		if (worker && !at.hasClone) {
-			throw new Error(
+			throw new Refusal(
+				"conflict",
 				`The flow runs node "${worker.id}" on ${at.name}, but that device does not have this project. Add its folder there first.`,
 			);
 		}
 	}
 	if (input.stopAt !== undefined && input.stopAt <= deps.now()) {
-		throw new Error("The stop time has passed already.");
+		throw new Refusal("invalid", "The stop time has passed already.");
 	}
 	const inputs = resolveInputs(flow.inputs ?? [], input.inputs, {
 		what: "The flow",

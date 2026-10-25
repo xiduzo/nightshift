@@ -50,6 +50,7 @@ export {
 	hasRunRow,
 	planColumns,
 	planOf,
+	RUN_NOT_FOUND,
 	runIdsOfProject,
 	runIdsWalkedBy,
 	runsArriving,

@@ -1,10 +1,12 @@
 import type { Database } from "@nightshift/db";
 import { type Flow, optionProblem } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import type { Actor, OwnDevice, PlacementPort, RunsPort } from "../contract";
 import { type Runner, type RunWalks, rerunNodeRefusal } from "../graph";
 import {
 	applyWalkerMoves,
 	type LoggedEvent,
+	RUN_NOT_FOUND,
 	type RunBus,
 	type RunLog,
 	type RunRow,
@@ -154,7 +156,7 @@ export function createRunActions(deps: RunActionsDeps) {
 	/** The run's row when it is in the Space, else "not found": the action's one read of it. */
 	async function rowIn(spaceId: string, runId: string): Promise<RunRow> {
 		const row = await deps.runRow(runId);
-		if (row.spaceId !== spaceId) throw new Error(`Run not found: ${runId}`);
+		if (row.spaceId !== spaceId) throw new Refusal("not-found", RUN_NOT_FOUND);
 		return row;
 	}
 

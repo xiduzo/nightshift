@@ -12,6 +12,7 @@ export {
 	clonePathOf,
 	createProjects,
 	NOT_ON_THIS_COMPUTER,
+	PROJECT_NOT_FOUND,
 	toProject,
 } from "./projects";
 export {

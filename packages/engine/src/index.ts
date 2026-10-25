@@ -130,6 +130,7 @@ export {
 	MissingProjectError,
 	parseTranscript,
 	planOf,
+	RUN_NOT_FOUND,
 	stampHolds,
 } from "./log";
 export type { ListedProject, Project, SpaceDocument } from "./projects";
@@ -148,6 +149,7 @@ export {
 	memberName,
 	memberRole,
 	NOT_ON_THIS_COMPUTER,
+	PROJECT_NOT_FOUND,
 	type ProjectReadiness,
 	projectClones,
 	recordClone,

@@ -4,6 +4,7 @@ import {
 	type FlowNode,
 	resolveAgentNode,
 } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import type {
 	PlacedDevice,
 	PlannedDevice,
@@ -78,7 +79,8 @@ async function placeNodes(
 		}
 		const found = await devices.byName(name);
 		if (!found) {
-			throw new Error(
+			throw new Refusal(
+				"invalid",
 				`The flow names the device "${name}", but you have no device of that name, and none of that name offers profiles to this Space. Check the node's device.`,
 			);
 		}
@@ -158,7 +160,8 @@ async function placeNodes(
 		}),
 	}));
 	if (missing.size > 0) {
-		throw new Error(
+		throw new Refusal(
+			"invalid",
 			[...missing]
 				.map(([key, { nodeIds, on }]) => {
 					const name = key.split("\u0000")[0];
@@ -189,11 +192,12 @@ export async function planNodes(
 	let run = walker;
 	if (start.deviceId !== undefined) {
 		const found = await devices.byId(start.deviceId);
-		if (!found) throw new Error(UNREACHABLE_DEVICE);
+		if (!found) throw new Refusal("invalid", UNREACHABLE_DEVICE);
 		run = found;
 	}
 	if (run !== walker && !run.hasClone) {
-		throw new Error(
+		throw new Refusal(
+			"conflict",
 			`${run.name} does not have this project. Add its folder there first.`,
 		);
 	}

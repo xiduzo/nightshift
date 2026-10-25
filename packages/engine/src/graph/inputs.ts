@@ -5,6 +5,7 @@ import {
 	renderValue,
 	type TemplateContext,
 } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 
 import type { InputValues } from "../log";
 
@@ -57,6 +58,7 @@ function parseJsonText(
  * The flow's input values: the given value, else the default (JSON text for
  * a `json` input), else "" for `text` and null for `json`. Refuses names the
  * flow does not declare and required inputs without a value or a default.
+ * Each refusal is `invalid`.
  */
 export function resolveInputs(
 	declared: readonly FlowInputDef[],
@@ -66,7 +68,8 @@ export function resolveInputs(
 	const names = new Set(declared.map((input) => input.name));
 	const unknown = Object.keys(given ?? {}).filter((name) => !names.has(name));
 	if (unknown.length > 0) {
-		throw new Error(
+		throw new Refusal(
+			"invalid",
 			`${options.what} has no input ${unknown.map((n) => `"${n}"`).join(", ")}.`,
 		);
 	}
@@ -84,7 +87,7 @@ export function resolveInputs(
 				const parsed = parseJsonText(present, label);
 				if (parsed.ok) values[input.name] = parsed.value;
 				else if (options.jsonText === "lenient") values[input.name] = present;
-				else throw new Error(parsed.error);
+				else throw new Refusal("invalid", parsed.error);
 			} else {
 				values[input.name] = present;
 			}
@@ -98,7 +101,7 @@ export function resolveInputs(
 					input.default,
 					`The default of input "${input.name}"`,
 				);
-				if (!parsed.ok) throw new Error(parsed.error);
+				if (!parsed.ok) throw new Refusal("invalid", parsed.error);
 				values[input.name] = parsed.value;
 			}
 			continue;
@@ -107,7 +110,8 @@ export function resolveInputs(
 		values[input.name] = type === "text" ? "" : null;
 	}
 	if (missing.length > 0) {
-		throw new Error(
+		throw new Refusal(
+			"invalid",
 			`${options.what} needs a value for: ${missing.join(", ")}.`,
 		);
 	}

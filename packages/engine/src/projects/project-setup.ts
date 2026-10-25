@@ -1,5 +1,6 @@
 import { realpath, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { Refusal } from "@nightshift/refusal";
 
 import { type Git, gitOrThrow, systemGit } from "./git";
 
@@ -202,7 +203,12 @@ export async function setUpGit(
 	const blocker = before.steps.find(
 		(step) => step.status === "failed" && step.fix !== "set-up-git",
 	);
-	if (blocker) throw new Error(blocker.problem ?? "The folder is not ready.");
+	if (blocker) {
+		throw new Refusal(
+			"conflict",
+			blocker.problem ?? "The folder is not ready.",
+		);
+	}
 	if (before.ready) return before;
 
 	const git = options.git ?? systemGit();
@@ -212,7 +218,7 @@ export async function setUpGit(
 	const email = input.email?.trim();
 	if (name) await gitOrThrow(git, dir, ["config", "user.name", name]);
 	if (email) await gitOrThrow(git, dir, ["config", "user.email", email]);
-	if (!(await hasIdentity(git, dir))) throw new Error(NO_IDENTITY);
+	if (!(await hasIdentity(git, dir))) throw new Refusal("invalid", NO_IDENTITY);
 
 	const gitignore = join(dir, ".gitignore");
 	if (!(await Bun.file(gitignore).exists())) {

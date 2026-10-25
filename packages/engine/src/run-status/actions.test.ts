@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { Refusal } from "@nightshift/refusal";
+
 import {
 	type RunAction,
 	RunRefusal,
@@ -80,5 +82,25 @@ describe("why a run does not allow an action", () => {
 			"not-now",
 		);
 		expect(refusal("stop", "running", false)).toBeNull();
+	});
+});
+
+describe("a run refusal", () => {
+	test("is a Refusal of the kind its rule is, so the API answers with its status", () => {
+		let notNow: unknown = null;
+		try {
+			refuseUnless("stop", "finished", true);
+		} catch (error) {
+			notNow = error;
+		}
+		expect(notNow).toBeInstanceOf(Refusal);
+		expect(notNow).toMatchObject({ rule: "not-now", kind: "conflict" });
+		const kindOf = (rule: ConstructorParameters<typeof RunRefusal>[0]) =>
+			new RunRefusal(rule, WALKED_ELSEWHERE).kind;
+		expect(kindOf("walked-elsewhere")).toBe("conflict");
+		expect(kindOf("invalid-answer")).toBe("invalid");
+		expect(kindOf("not-your-device")).toBe("forbidden");
+		expect(kindOf("signed-out")).toBe("signed-out");
+		expect(kindOf("walker-unreachable")).toBe("unavailable");
 	});
 });

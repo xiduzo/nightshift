@@ -1,5 +1,7 @@
 import type { Database } from "@nightshift/db";
+import { Refusal } from "@nightshift/refusal";
 import {
+	RUN_NOT_FOUND,
 	type RunLog,
 	type RunRow,
 	type RunStatus,
@@ -87,7 +89,8 @@ export function createRunCopies(deps: RunCopiesDeps) {
 	async function refuseOpen(runId: string): Promise<void> {
 		const status = await deps.runStatus(runId);
 		if (deps.isActive(runId) || (status && isOpenStatus(status))) {
-			throw new Error(
+			throw new Refusal(
+				"conflict",
 				"This run is still going. Wait until it ends, or stop it first.",
 			);
 		}
@@ -96,7 +99,7 @@ export function createRunCopies(deps: RunCopiesDeps) {
 	/** The run (of the Space), its clone here, and what it left there. */
 	async function stateOf(spaceId: string, runId: string) {
 		const row = await deps.runRow(runId);
-		if (row.spaceId !== spaceId) throw new Error(`Run not found: ${runId}`);
+		if (row.spaceId !== spaceId) throw new Refusal("not-found", RUN_NOT_FOUND);
 		const project = await projects.get(row.projectId, spaceId);
 		const shortId = shortIdOf(runId);
 		const inspected = await branches.inspect(project.repoPath, [
@@ -187,15 +190,20 @@ export function createRunCopies(deps: RunCopiesDeps) {
 		const { row, repoPath, state } = await stateOf(spaceId, runId);
 		await refuseOpen(runId);
 		if (state.exists && !state.registered) {
-			throw new Error(
+			throw new Refusal(
+				"conflict",
 				"Git does not know this folder as a copy of the project, so Night Shift leaves it. Remove it yourself.",
 			);
 		}
 		if (!state.exists && !state.registered) {
-			throw new Error("This run has no copy of the project on this computer.");
+			throw new Refusal(
+				"not-found",
+				"This run has no copy of the project on this computer.",
+			);
 		}
 		if (state.changes !== 0 && !options.force) {
-			throw new Error(
+			throw new Refusal(
+				"conflict",
 				"The run's copy has changes that are not committed. Confirm to remove them too.",
 			);
 		}
@@ -215,16 +223,21 @@ export function createRunCopies(deps: RunCopiesDeps) {
 		const { row, repoPath, state } = await stateOf(spaceId, runId);
 		await refuseOpen(runId);
 		if (state.exists && state.registered) {
-			throw new Error(
+			throw new Refusal(
+				"conflict",
 				"Remove the run's copy of the project first. Its branch is in use there.",
 			);
 		}
 		if (state.branches.length === 0) {
-			throw new Error("This run has no branches on this computer.");
+			throw new Refusal(
+				"not-found",
+				"This run has no branches on this computer.",
+			);
 		}
 		const unsaved = unsavedCommits(state);
 		if (unsaved > 0 && !options.force) {
-			throw new Error(
+			throw new Refusal(
+				"conflict",
 				`${commits(unsaved)} of this run ${unsaved === 1 ? "is" : "are"} only on this computer. Confirm to delete ${unsaved === 1 ? "it" : "them"} too.`,
 			);
 		}

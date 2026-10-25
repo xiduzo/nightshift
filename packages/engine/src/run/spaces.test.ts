@@ -127,8 +127,11 @@ describe("Spaces", () => {
 		expect(await other.listRuns()).toEqual([]);
 		expect(await other.listRuns({ projectId: added.id })).toEqual([]);
 		expect(await other.listGates()).toEqual([]);
-		const notFound = `Run not found: ${started.id}`;
-		await expect(other.getRun(started.id)).rejects.toThrow(notFound);
+		const notFound = "Night Shift cannot find this run.";
+		await expect(other.getRun(started.id)).rejects.toMatchObject({
+			kind: "not-found",
+			message: notFound,
+		});
 		await expect(other.stopRun(started.id)).rejects.toThrow(notFound);
 		await expect(other.resumeRun(started.id)).rejects.toThrow(notFound);
 		await expect(other.signalRun(started.id, "go")).rejects.toThrow(notFound);
@@ -145,8 +148,11 @@ describe("Spaces", () => {
 		await expect(watching[Symbol.asyncIterator]().next()).rejects.toThrow(
 			notFound,
 		);
-		const projectGone = `Project not found: ${added.id}`;
-		await expect(other.listFlows(added.id)).rejects.toThrow(projectGone);
+		const projectGone = "Night Shift cannot find this project.";
+		await expect(other.listFlows(added.id)).rejects.toMatchObject({
+			kind: "not-found",
+			message: projectGone,
+		});
 		await expect(other.listSchedules(added.id)).rejects.toThrow(projectGone);
 		await expect(other.removeProject(added.id)).rejects.toThrow(projectGone);
 		await expect(other.startRun({ projectId: added.id, flow })).rejects.toThrow(
@@ -269,7 +275,9 @@ describe("Spaces", () => {
 		}
 		// The new Space has it, Gate and all; the old one does not.
 		expect(await mine.listProjects()).toEqual([]);
-		await expect(mine.getRun(started.id)).rejects.toThrow("Run not found");
+		await expect(mine.getRun(started.id)).rejects.toThrow(
+			"Night Shift cannot find this run.",
+		);
 		expect((await theirs.listProjects()).map((p) => p.id)).toEqual([added.id]);
 		expect(await theirs.listGates()).toHaveLength(1);
 		const [moved] = await sandbox.db

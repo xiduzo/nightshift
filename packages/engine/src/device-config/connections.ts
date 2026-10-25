@@ -6,6 +6,7 @@ import {
 	nameSchema,
 	secretNameSchema,
 } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
 
 import { type DeviceDocument, mapView } from "./device-document";
@@ -364,7 +365,7 @@ export function createConnectionStore(options: {
 		secretSource: source,
 		async setSecret(name, value) {
 			secretNameSchema.parse(name);
-			if (value === "") throw new Error("A secret needs a value.");
+			if (value === "") throw new Refusal("invalid", "A secret needs a value.");
 			await secrets.set(name, value);
 			await writeSecrets(new Map(secretView()).set(name, now()));
 		},

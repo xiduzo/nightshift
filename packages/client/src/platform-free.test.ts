@@ -160,10 +160,27 @@ describe("the push contract it reads", () => {
 });
 
 describe("the run rule it reads", () => {
-	test("imports nothing and uses no API of one platform", () => {
+	test("imports only the refusal type and uses no API of one platform", () => {
 		const dir = join(import.meta.dir, "../../engine/src/run-status");
 		const files = sourceFiles(dir);
 		expect(files.length).toBeGreaterThan(1);
+		const found = files.flatMap((file) =>
+			violations(
+				relative(dir, file),
+				readFileSync(file, "utf8"),
+				{ "@nightshift/refusal": "values" },
+				false,
+			),
+		);
+		expect(found).toEqual([]);
+	});
+});
+
+describe("the refusal type the run rule names", () => {
+	test("imports nothing and uses no API of one platform", () => {
+		const dir = join(import.meta.dir, "../../refusal/src");
+		const files = sourceFiles(dir);
+		expect(files.length).toBeGreaterThan(0);
 		const found = files.flatMap((file) =>
 			violations(relative(dir, file), readFileSync(file, "utf8"), {}, false),
 		);

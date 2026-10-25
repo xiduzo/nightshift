@@ -6,6 +6,7 @@ import {
 	validateFlow,
 } from "@nightshift/flows";
 import { type FlowSources, parsedFlows } from "@nightshift/flows/files";
+import { Refusal } from "@nightshift/refusal";
 import type { StartRunInput } from "../contract";
 
 /** The names of the flows a flow's Call nodes call. */
@@ -17,7 +18,8 @@ function refuseErrors(issues: readonly FlowIssue[], what = "The flow"): void {
 	const errors = issues.filter((i) => i.severity === "error");
 	if (errors.length === 0) return;
 	const list = errors.map((e) => `- ${e.message}`).join("\n");
-	throw new Error(
+	throw new Refusal(
+		"invalid",
 		`${what} cannot run. Fix ${errors.length === 1 ? "this error" : `these ${errors.length} errors`} first:\n${list}`,
 	);
 }
@@ -43,7 +45,10 @@ export function flowsForRun(
 			? sources[input.flowName]
 			: undefined;
 		if (!source) {
-			throw new Error(`The flow "${input.flowName}" does not exist.`);
+			throw new Refusal(
+				"not-found",
+				`The flow "${input.flowName}" does not exist.`,
+			);
 		}
 		const parsed = parseFlow(
 			migrateFlow("json" in source ? source.json : null),
@@ -54,14 +59,17 @@ export function flowsForRun(
 		);
 		refuseErrors(parsed.issues);
 		if (!parsed.flow) {
-			throw new Error(`The flow "${input.flowName}" is not valid.`);
+			throw new Refusal(
+				"invalid",
+				`The flow "${input.flowName}" is not valid.`,
+			);
 		}
 		flow = parsed.flow;
 		flowName = input.flowName;
 	} else {
 		const parsed = parseFlow(migrateFlow(input.flow), { flows: files });
 		refuseErrors(parsed.issues);
-		if (!parsed.flow) throw new Error("The flow is not valid.");
+		if (!parsed.flow) throw new Refusal("invalid", "The flow is not valid.");
 		flow = parsed.flow;
 		flowName = null;
 	}
@@ -72,7 +80,8 @@ export function flowsForRun(
 		if (Object.hasOwn(calledFlows, name)) continue;
 		const called = name === flowName ? flow : files[name];
 		if (!called) {
-			throw new Error(
+			throw new Refusal(
+				"invalid",
 				`The called flow "${name}" ${called === null ? "is not valid" : "does not exist"}.`,
 			);
 		}

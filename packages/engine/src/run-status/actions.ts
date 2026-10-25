@@ -1,3 +1,5 @@
+import { Refusal, type RefusalKind } from "@nightshift/refusal";
+
 import type { RunStatus } from "./status";
 
 /**
@@ -66,7 +68,8 @@ export const ARRIVING =
 const ENDED_NOTHING_TO_STOP = "This run has ended. There is nothing to stop.";
 const NO_GATE = "This run does not wait at a Gate.";
 const NO_SIGNAL = "This run does not wait for that signal.";
-const STILL_RUNNING =
+/** Why a run that a drive holds refuses a Turn that needs it to stand still. */
+export const STILL_RUNNING =
 	"This run is still running. Stop it or wait for it to end.";
 const AT_GATE =
 	"This run waits at a Gate. Answer the Gate, or stop the run first.";
@@ -183,13 +186,34 @@ export type RefusalRule =
 	/** This computer cannot reach the Walker of the run. */
 	| "walker-unreachable";
 
-/** A person asked a run for what it does not allow: the message says why, and what to do. */
-export class RunRefusal extends Error {
+/** The kind of refusal each rule is: what the API answers it with. */
+const RULE_KINDS: Record<RefusalRule, RefusalKind> = {
+	"walked-elsewhere": "conflict",
+	arriving: "conflict",
+	"not-now": "conflict",
+	"gate-closed": "conflict",
+	"invalid-answer": "invalid",
+	"wrong-signal": "conflict",
+	"unknown-node": "invalid",
+	"unknown-step": "invalid",
+	"no-step": "conflict",
+	"step-ended": "conflict",
+	"walks-here": "invalid",
+	"not-your-device": "forbidden",
+	"signed-out": "signed-out",
+	"walker-unreachable": "unavailable",
+};
+
+/**
+ * A person asked a run for what it does not allow: the message says why,
+ * and what to do. It is a `Refusal` of the kind its rule is.
+ */
+export class RunRefusal extends Refusal {
 	constructor(
 		readonly rule: RefusalRule,
 		message: string,
 	) {
-		super(message);
+		super(RULE_KINDS[rule], message);
 		this.name = "RunRefusal";
 	}
 }

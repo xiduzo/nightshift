@@ -1,3 +1,5 @@
+import { Refusal } from "@nightshift/refusal";
+
 import { type GitResult, type GitRunOptions, runProcess } from "./git";
 
 /**
@@ -128,7 +130,8 @@ export function systemGitHubCli(
 				{ timeoutMs: ASK_TIMEOUT_MS },
 			);
 			if (result.exitCode !== 0) {
-				throw new Error(
+				throw new Refusal(
+					"unavailable",
 					"GitHub did not list your repositories. Try again, or enter one yourself.",
 				);
 			}

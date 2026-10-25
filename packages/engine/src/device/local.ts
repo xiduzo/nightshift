@@ -19,6 +19,7 @@ import {
 	isCustomHarness,
 } from "@nightshift/flows";
 import { readFlowSources } from "@nightshift/flows/files";
+import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
 import {
@@ -344,7 +345,7 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 	/** The folder of the project's Clone here; throws without one. */
 	async function cloneOf(projectId: string): Promise<string> {
 		const path = (await deps.clonePath?.(projectId)) ?? null;
-		if (path === null) throw new Error(NOT_ON_THIS_COMPUTER);
+		if (path === null) throw new Refusal("conflict", NOT_ON_THIS_COMPUTER);
 		return path;
 	}
 
@@ -396,7 +397,8 @@ export function localDevice(deps: LocalDeviceDeps): Device {
 				(step) => step.status === "failed" && step.id !== "identity",
 			);
 			if (notReady) {
-				throw new Error(
+				throw new Refusal(
+					"conflict",
 					`The project is not ready for runs. ${notReady.problem} ${
 						notReady.id === "git"
 							? "Install git, then start the run again."

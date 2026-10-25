@@ -8,6 +8,7 @@ import {
 	type ScheduleIssue,
 } from "@nightshift/flows";
 import { readSchedulesFile } from "@nightshift/flows/files";
+import { Refusal, wordsFor } from "@nightshift/refusal";
 import { and, asc, gt, inArray } from "drizzle-orm";
 import type { StartRunInput } from "../contract";
 import {
@@ -294,7 +295,11 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 			);
 			runId = run.id;
 		} catch (cause) {
-			error = cause instanceof Error ? cause.message : String(cause);
+			// The schedule shows why in words for people. A failure goes to the log.
+			if (!(cause instanceof Refusal)) {
+				console.error(`[schedules] ${schedule.id} did not start a run`, cause);
+			}
+			error = wordsFor(cause);
 		}
 		await deps.log.append({
 			type: "ScheduleFired",

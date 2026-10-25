@@ -1,3 +1,5 @@
+import { Refusal } from "@nightshift/refusal";
+
 import type { ArtifactStore } from "../artifacts";
 import type { RunCopiesService } from "../cleanup";
 import type {
@@ -9,10 +11,16 @@ import type {
 } from "../contract";
 import { type FlowFiles, flowUse } from "../flows";
 import type { Runner } from "../graph";
-import type { RunLog, RunRow, RunTrigger } from "../log";
+import {
+	RUN_NOT_FOUND,
+	type RunLog,
+	type RunRow,
+	type RunTrigger,
+} from "../log";
 import {
 	type Branches,
 	type ListedProject,
+	PROJECT_NOT_FOUND,
 	type Projects,
 	type SpaceDocuments,
 	toProject,
@@ -80,7 +88,7 @@ export function createSpaces(deps: SpacesDeps) {
 	/** The run's row when it is in the Space, else "not found". */
 	async function getRunRow(runId: string, spaceId: string): Promise<RunRow> {
 		const row = await deps.runRow(runId);
-		if (row.spaceId !== spaceId) throw new Error(`Run not found: ${runId}`);
+		if (row.spaceId !== spaceId) throw new Refusal("not-found", RUN_NOT_FOUND);
 		return row;
 	}
 
@@ -95,7 +103,8 @@ export function createSpaces(deps: SpacesDeps) {
 	async function noActiveRun(projectId: string, what: string) {
 		const runIds = await deps.runIdsOfProject(projectId);
 		if (runIds.some((id) => deps.runner.isActive(id))) {
-			throw new Error(
+			throw new Refusal(
+				"conflict",
 				`A run of this project is still running. Stop it to ${what}.`,
 			);
 		}
@@ -138,7 +147,7 @@ export function createSpaces(deps: SpacesDeps) {
 				const [renamed] = await withClones(spaceId, [
 					await projects.find(projectId, spaceId),
 				]);
-				if (!renamed) throw new Error(`Project not found: ${projectId}`);
+				if (!renamed) throw new Refusal("not-found", PROJECT_NOT_FOUND);
 				return renamed;
 			},
 
@@ -156,12 +165,14 @@ export function createSpaces(deps: SpacesDeps) {
 				for (const runId of runIds) {
 					const status = deriveRunState(await log.events(runId)).status;
 					if (status === "waiting") {
-						throw new Error(
+						throw new Refusal(
+							"conflict",
 							"A run of this project waits at a Gate. Answer or stop it first.",
 						);
 					}
 					if (status === "sleeping") {
-						throw new Error(
+						throw new Refusal(
+							"conflict",
 							"A run of this project sleeps until a wait ends. Stop it first.",
 						);
 					}
@@ -193,7 +204,9 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listDevices(projectId, forNode) {
 				await ready;
-				if (!actor) throw new Error("Sign in to see your devices.");
+				if (!actor) {
+					throw new Refusal("signed-out", "Sign in to see your devices.");
+				}
 				return deps.placement.devicesFor(
 					spaceId,
 					actor.personId,
@@ -204,7 +217,7 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async listPlacements(projectId) {
 				await ready;
-				if (!actor) throw new Error("Sign in to start a run.");
+				if (!actor) throw new Refusal("signed-out", "Sign in to start a run.");
 				return deps.placement.placements(spaceId, actor.personId, projectId);
 			},
 

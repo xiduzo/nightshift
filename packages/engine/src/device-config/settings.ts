@@ -10,6 +10,7 @@ import {
 	permissionModeSchema,
 	type ResolvedPolicy,
 } from "@nightshift/flows";
+import { Refusal } from "@nightshift/refusal";
 import { z } from "zod";
 
 import { type DeviceDocument, mapView } from "./device-document";
@@ -447,7 +448,8 @@ export function createSettingsStore(options: {
 				max: after("usageLimitMaxWaitMinutes") as number,
 			};
 			if (usage.first > usage.max) {
-				throw new Error(
+				throw new Refusal(
+					"invalid",
 					"The first usage-limit wait cannot be longer than the longest one.",
 				);
 			}

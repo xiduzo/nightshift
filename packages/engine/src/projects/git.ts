@@ -1,3 +1,5 @@
+import { Refusal } from "@nightshift/refusal";
+
 /**
  * The git port. Every `git` and `xcode-select` process the engine starts
  * goes through a `Git`: run worktrees, the git setup of a project folder,
@@ -49,20 +51,31 @@ export type Git = {
 /** The `install-git` fix alone (`Git.install`). */
 export type GitInstaller = Pick<Git, "install">;
 
+/** What a person reads when a git command fails. The command and its output go to the log. */
+const GIT_FAILED =
+	"A git command failed in the project folder. Night Shift saved the details.";
+
+/**
+ * A git command failed. A failure, not a refusal: its message is plain
+ * words, and the command, its exit code and its error output stay on the
+ * error for the log.
+ */
 export class GitError extends Error {
 	constructor(
-		message: string,
+		readonly args: readonly string[],
+		readonly exitCode: number,
 		readonly stderr: string,
 	) {
-		super(message);
+		super(GIT_FAILED);
 		this.name = "GitError";
 	}
 }
 
 /** Git is not on this computer: the `git` program cannot start. */
-export class GitNotInstalledError extends Error {
+export class GitNotInstalledError extends Refusal {
 	constructor() {
 		super(
+			"conflict",
 			"Git is not installed on this computer. Install git, then try again.",
 		);
 		this.name = "GitNotInstalledError";
@@ -77,10 +90,7 @@ export async function gitOrThrow(
 ): Promise<string> {
 	const result = await git.run(cwd, args);
 	if (result.exitCode !== 0) {
-		throw new GitError(
-			`git ${args.join(" ")} failed: ${result.stderr || `exit code ${result.exitCode}`}`,
-			result.stderr,
-		);
+		throw new GitError(args, result.exitCode, result.stderr);
 	}
 	return result.stdout;
 }

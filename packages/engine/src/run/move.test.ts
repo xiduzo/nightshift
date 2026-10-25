@@ -531,7 +531,7 @@ describe("a run that moves to another Device", () => {
 		// A run of another Space is not found there.
 		await expect(
 			a.engine.space("another-space", actor).listMoveTargets(runId),
-		).rejects.toThrow("Run not found");
+		).rejects.toThrow("Night Shift cannot find this run.");
 	});
 
 	test("has no target while the owner's other Device is offline", async () => {

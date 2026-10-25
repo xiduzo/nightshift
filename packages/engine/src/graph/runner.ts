@@ -6,6 +6,7 @@ import type {
 	JsonValue,
 	ResolvedPolicy,
 } from "@nightshift/flows";
+import { Refusal, wordsFor } from "@nightshift/refusal";
 import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
 import {
@@ -20,8 +21,13 @@ import {
 	runsArriving,
 } from "../log";
 import { deriveRunState, deriveSteps } from "../read";
-import { ARRIVING, RunRefusal, WALKED_ELSEWHERE } from "../run-status";
-import { createRecorders, messageOf } from "./context";
+import {
+	ARRIVING,
+	RunRefusal,
+	STILL_RUNNING,
+	WALKED_ELSEWHERE,
+} from "../run-status";
+import { createRecorders } from "./context";
 import { findOverdue } from "./deadlines";
 import { FencedError } from "./fence";
 import { type CloseDeps, type CutShort, closeOpenWork } from "./open-work";
@@ -222,6 +228,12 @@ export class RestartTooLate extends RunRefusal {
 
 /** What a released runner says to a Turn: the engine hands its runs to the next one. */
 export const RELEASED = "Night Shift is restarting. Try again in a moment.";
+/**
+ * Why a run failed when its walk broke on an error that is not a refusal.
+ * The error itself goes to the log.
+ */
+export const ENGINE_FAILED =
+	"Something went wrong in Night Shift. It saved the details. Resume the run to try again.";
 /** How long `release` waits for the Turns in flight. */
 const RELEASE_WAIT_MS = 5_000;
 const DEFAULT_OVERDUE_SWEEP_MS = 5_000;
@@ -391,7 +403,7 @@ export function createRunner(deps: RunnerDeps) {
 
 	/** Throws when no Turn of `runId` may be asked for here: released (I7), or inside one (I11). */
 	function refuseTurn(runId: string): void {
-		if (released) throw new Error(RELEASED);
+		if (released) throw new Refusal("unavailable", RELEASED);
 		if (turnOf.getStore()?.has(runId)) {
 			throw new Error(
 				`A Turn of run ${runId} cannot wait for another Turn of the same run.`,
@@ -412,7 +424,7 @@ export function createRunner(deps: RunnerDeps) {
 		const within = new Set([...(turnOf.getStore() ?? []), runId]);
 		const previous = queues.get(runId) ?? Promise.resolve();
 		const current = previous.then(() => {
-			if (released) throw new Error(RELEASED);
+			if (released) throw new Refusal("unavailable", RELEASED);
 			return turnOf.run(within, () => runTurn(runId, fn));
 		});
 		const tail = current.then(
@@ -459,11 +471,7 @@ export function createRunner(deps: RunnerDeps) {
 		intent: Intent,
 		options: TakeOptions,
 	): boolean {
-		if (slots.has(runId)) {
-			throw new Error(
-				"This run is still running. Stop it or wait for it to end.",
-			);
-		}
+		if (slots.has(runId)) throw new RunRefusal("not-now", STILL_RUNNING);
 		const runCap = deps.settings().maxConcurrentRuns;
 		if (slots.size >= runCap) {
 			if (options.whenFull === "queue") {
@@ -478,7 +486,8 @@ export function createRunner(deps: RunnerDeps) {
 				);
 				return false;
 			}
-			throw new Error(
+			throw new Refusal(
+				"conflict",
 				`The run cap is reached: ${slots.size} of ${runCap} runs are running. Stop a run or wait for one to end.`,
 			);
 		}
@@ -522,7 +531,7 @@ export function createRunner(deps: RunnerDeps) {
 	 * ends. A released runner begins no drive (I7).
 	 */
 	function drive(row: RunRow, input: StreamInput): void {
-		if (released) throw new Error(RELEASED);
+		if (released) throw new Refusal("unavailable", RELEASED);
 		const runId = row.id;
 		const walk: Walk = {
 			controller: new AbortController(),
@@ -576,7 +585,7 @@ export function createRunner(deps: RunnerDeps) {
 				thread?.ctx.log ?? log,
 				runId,
 				"failed",
-				`The engine failed: ${messageOf(error)}`,
+				error instanceof Refusal ? error.message : ENGINE_FAILED,
 			);
 		}
 	}
@@ -710,7 +719,7 @@ export function createRunner(deps: RunnerDeps) {
 			request,
 			now: deps.now(),
 		});
-		if (released) throw new Error(RELEASED);
+		if (released) throw new Refusal("unavailable", RELEASED);
 		await log.append({ type: "RunResumed", runId, payload: plan.resumed });
 		try {
 			if (plan.clearTasks) await thread.clearTasks();
@@ -718,12 +727,15 @@ export function createRunner(deps: RunnerDeps) {
 		} catch (error) {
 			// The next engine's recovery takes the run from here.
 			if (released) throw error;
+			if (!(error instanceof Refusal)) {
+				console.error(`[engine] run ${runId} could not start again`, error);
+			}
 			await log.append({
 				type: "RunEnded",
 				runId,
 				payload: {
 					status: "failed",
-					reason: `The run could not start again: ${messageOf(error)}`,
+					reason: `The run could not start again. ${wordsFor(error)}`,
 				},
 			});
 			throw error;

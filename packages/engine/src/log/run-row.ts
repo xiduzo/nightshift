@@ -1,5 +1,6 @@
 import type { Database } from "@nightshift/db";
 import { event, run, step } from "@nightshift/db/schema";
+import { Refusal } from "@nightshift/refusal";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { LoggedEvent } from "./events";
 
@@ -101,10 +102,13 @@ export function planColumns(
 	};
 }
 
-/** The run's row, or an error naming the run. */
+/** What a person reads for a run that is not here, or not in their Space. */
+export const RUN_NOT_FOUND = "Night Shift cannot find this run.";
+
+/** The run's row. Refuses (`not-found`) a run that is not here. */
 export async function getRunRow(db: Database, runId: string): Promise<RunRow> {
 	const [row] = await db.select().from(run).where(eq(run.id, runId));
-	if (!row) throw new Error(`Run not found: ${runId}`);
+	if (!row) throw new Refusal("not-found", RUN_NOT_FOUND);
 	return row;
 }
 

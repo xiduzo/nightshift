@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, realpath, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { Refusal } from "@nightshift/refusal";
 
 import {
 	type Git,
@@ -176,7 +177,7 @@ export function createGitHubClones(deps: {
 		},
 		async start(input) {
 			const name = parseGitHubRepo(input);
-			if (name === null) throw new Error(NOT_A_GITHUB_REPO);
+			if (name === null) throw new Refusal("invalid", NOT_A_GITHUB_REPO);
 			const key = keyOf(name);
 			const running = clones.get(key);
 			if (running?.state === "cloning") return running;

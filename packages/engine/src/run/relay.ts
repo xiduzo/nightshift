@@ -1,4 +1,5 @@
 import type { Database } from "@nightshift/db";
+import { Refusal } from "@nightshift/refusal";
 import type { Actor, Relay, RunCommandInput, StartRunInput } from "../contract";
 import { hasRunRow, type RunLog, type RunRow } from "../log";
 import type { RunSummary } from "../read";
@@ -11,11 +12,12 @@ export const HOST_UNREACHABLE =
 /**
  * The Host that keeps the Space cannot be reached now: this computer has
  * no online Link to it. The person tries again later. `Relay` throws it
- * for an action on such a Space.
+ * for an action on such a Space. The API answers it with its own code
+ * (`HOST_UNREACHABLE`), so a screen can say so.
  */
-export class HostUnreachableError extends Error {
+export class HostUnreachableError extends Refusal {
 	constructor() {
-		super(HOST_UNREACHABLE);
+		super("unavailable", HOST_UNREACHABLE);
 		this.name = "HostUnreachableError";
 	}
 }
@@ -87,7 +89,8 @@ export function createRunRelay(deps: {
 				}
 				await Bun.sleep(200);
 			}
-			throw new Error(
+			throw new Refusal(
+				"unavailable",
 				"The run started, but it has not reached this computer yet. It shows in the run list in a moment.",
 			);
 		},
