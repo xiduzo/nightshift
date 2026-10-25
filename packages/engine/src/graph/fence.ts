@@ -120,11 +120,8 @@ export class FencedSaver extends LibsqlSaver {
 		);
 	}
 
-	override pruneThread(
-		threadId: string,
-		live?: readonly string[],
-	): Promise<void> {
-		return this.fence.write(() => super.pruneThread(threadId, live));
+	override pruneThread(threadId: string): Promise<void> {
+		return this.fence.write(() => super.pruneThread(threadId));
 	}
 
 	override deleteThread(threadId: string): Promise<void> {

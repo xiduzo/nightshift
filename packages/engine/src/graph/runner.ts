@@ -68,9 +68,11 @@ import {
  *   ends the run's open work itself (`closeOpenWork`, `open-work.ts`). A
  *   step past the time limits its log records ends the same way
  *   (`overdue`, `deadlines.ts`), from the runner's own sweep.
- * - A run that ended (finished, failed, stopped) keeps only the
- *   checkpoints a re-entry reads (`Thread.prune`): the log is the record.
- *   One that a dead daemon left is pruned by startup recovery (`prune`).
+ * - The saver keeps the latest checkpoint of each namespace only
+ *   (`checkpointer.ts`). A run that ended (finished, failed, stopped),
+ *   waits or holds a Gate also drops the namespaces of its done tasks
+ *   (`Thread.prune`): the log is the record. One that a dead daemon left
+ *   is pruned by startup recovery (`prune`).
  * - How a sleep ends is the sleep module's (`planWake`, `recordWake`,
  *   `graph/sleep.ts`); how a re-entry moves the thread is the planner's
  *   (`planReentry`, `graph/reentry.ts`).
@@ -570,7 +572,13 @@ export function createRunner(deps: RunnerDeps) {
 			});
 			if (outcome.kind === "parked") onInterrupt(runId, outcome.parked);
 			const ending = endingOf(outcome);
-			if (!ending) return;
+			if (!ending) {
+				// A run that waits or holds a Gate keeps only what its resume
+				// reads. The prune does not hold the slot, so an answer that
+				// comes at once is not refused: it is safe beside a drive.
+				if (outcome.kind === "parked") void pruneThread(thread, runId);
+				return;
+			}
 			dropThread(runId, thread);
 			// The prune comes first: once the log says the run ended, a
 			// person may resume it, and the slot frees right after the end.
@@ -596,12 +604,13 @@ export function createRunner(deps: RunnerDeps) {
 	}
 
 	/**
-	 * Drops an ended run's checkpoint history (`Thread.prune`): it keeps the
-	 * latest root checkpoint and the namespaces of the tasks it still has.
-	 * The history was the walk's bookkeeping and the event log is the
-	 * record. What is kept is all a resume, a restart or a rerun reads
-	 * (`planReentry`): a finished run's final state, or a failed or stopped
-	 * run's interrupt or cut-short node with the body it parked in.
+	 * Drops what the run's thread no longer needs (`Thread.prune`): it keeps
+	 * the latest root checkpoint and the namespaces of the tasks that are
+	 * not done. The event log is the record. What is kept is all a resume,
+	 * a restart, a rerun or a wake reads (`planReentry`, `planWake`): a
+	 * finished run's final state, or the interrupt or cut-short node of a
+	 * run that failed, stopped, waits or holds a Gate, with the body it
+	 * parked in.
 	 */
 	async function pruneThread(
 		thread: Thread | (() => Thread),

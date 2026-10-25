@@ -136,11 +136,11 @@ export type Thread = {
 	/** Drops a task left at an interrupt or at a node cut short, so only a jump runs. */
 	clearTasks(): Promise<void>;
 	/**
-	 * Keeps what a re-entry reads, and drops the rest of the thread's
-	 * history: the latest root checkpoint, and the namespaces of the tasks
-	 * it still has (a body that parked, waits or was cut short inside a
-	 * Call node goes on in its own namespace). A finished run has no task
-	 * left: it keeps its latest checkpoint only. Fenced.
+	 * Keeps what a re-entry reads, and drops the rest of the thread
+	 * (`LibsqlSaver.pruneThread`): the latest checkpoint of the root and of
+	 * each namespace of a task that is not done (a body that parked, waits
+	 * or was cut short inside a Call node goes on in its own namespace). A
+	 * finished run has no task left: it keeps one checkpoint. Fenced.
 	 */
 	prune(): Promise<void>;
 };
@@ -207,11 +207,7 @@ export function openThread(row: RunRow, deps: ThreadDeps): Thread {
 		async clearTasks() {
 			await graph.updateState(configOf(runId), null, END);
 		},
-		async prune() {
-			const latest = await graph.getState(configOf(runId));
-			const live = latest.tasks.map((task) => `${task.name}:${task.id}`);
-			await saver.pruneThread(runId, live);
-		},
+		prune: () => saver.pruneThread(runId),
 	};
 }
 

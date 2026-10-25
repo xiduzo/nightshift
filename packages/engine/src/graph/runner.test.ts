@@ -421,7 +421,7 @@ describe("take: a drive's time and a thread that cannot move", () => {
 	});
 });
 
-describe("an ended run keeps only the checkpoints a re-entry reads", () => {
+describe("a run keeps only the checkpoints a re-entry reads", () => {
 	/** The run's checkpoints per namespace: "" for the root. */
 	async function checkpoints(runId: string): Promise<Record<string, number>> {
 		const result = await sandbox.db.$client.execute({
@@ -484,8 +484,13 @@ describe("an ended run keeps only the checkpoints a re-entry reads", () => {
 		runners.push(runner);
 		await start(runner, h.runId);
 		await waitFor(async () => (await statusOf(h)) === "waiting");
-		const before = await checkpoints(h.runId);
-		expect(before[""]).toBeGreaterThan(1);
+		// A run that waits at a Gate holds one checkpoint per namespace: the
+		// root's and the body's it waits in.
+		const parked = await waitFor(async () => {
+			const now = await checkpoints(h.runId);
+			return Object.values(now).every((n) => n === 1) ? now : null;
+		});
+		expect(Object.keys(parked)).toHaveLength(2);
 
 		await runner.take(h.runId, { kind: "stop" });
 		const kept = await checkpoints(h.runId);

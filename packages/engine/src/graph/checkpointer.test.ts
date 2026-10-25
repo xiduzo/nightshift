@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { RunnableConfig } from "@langchain/core/runnables";
 import {
 	Annotation,
 	Command,
@@ -44,6 +43,31 @@ const metadata = (step: number): CheckpointMetadata => ({
 	parents: {},
 });
 
+/** A body's metadata: the checkpoints of the namespaces above it that it began under. */
+const bodyMetadata = (
+	step: number,
+	parents: Record<string, string>,
+): CheckpointMetadata => ({ ...metadata(step), parents });
+
+const body = (threadId: string, ns: string) => ({
+	configurable: { thread_id: threadId, checkpoint_ns: ns },
+});
+
+/** The thread's rows in `table`, as [namespace, checkpoint id], in order. */
+async function rows(
+	table: "lg_checkpoint" | "lg_write",
+	threadId: string,
+): Promise<[string, string][]> {
+	const result = await sandbox.db.$client.execute({
+		sql: `SELECT checkpoint_ns, checkpoint_id FROM ${table} WHERE thread_id = ? ORDER BY checkpoint_ns, checkpoint_id`,
+		args: [threadId],
+	});
+	return result.rows.map((row) => [
+		String(row.checkpoint_ns),
+		String(row.checkpoint_id),
+	]);
+}
+
 /** A checkpoint with a time-ordered id, as LangGraph makes them. */
 function checkpoint(values: Record<string, unknown> = {}) {
 	const cp = emptyCheckpoint();
@@ -53,7 +77,7 @@ function checkpoint(values: Record<string, unknown> = {}) {
 }
 
 describe("LibsqlSaver", () => {
-	test("put and getTuple round trip, newest checkpoint by default", async () => {
+	test("put and getTuple round trip; a new checkpoint replaces the older one", async () => {
 		const first = checkpoint({ count: 1 });
 		const second = checkpoint({ count: 2 });
 		const firstConfig = await saver.put(
@@ -74,30 +98,34 @@ describe("LibsqlSaver", () => {
 		expect(newest?.parentConfig).toEqual(firstConfig);
 		expect(newest?.pendingWrites).toEqual([]);
 
-		const byId = await saver.getTuple(thread("run-1", first.id));
-		expect(byId?.checkpoint.channel_values).toEqual({ count: 1 });
-		expect(byId?.parentConfig).toBeUndefined();
+		const byId = await saver.getTuple(thread("run-1", second.id));
+		expect(byId?.checkpoint.channel_values).toEqual({ count: 2 });
+		expect(await saver.getTuple(thread("run-1", first.id))).toBeUndefined();
 
 		expect(await saver.getTuple(thread("other"))).toBeUndefined();
 	});
 
 	test("list is newest first, honours limit and before", async () => {
+		// One namespace each: a namespace keeps only its latest checkpoint.
+		const all = { configurable: { thread_id: "run-1" } };
 		const a = checkpoint({ i: 0 });
 		const b = checkpoint({ i: 1 });
 		const c = checkpoint({ i: 2 });
 		const d = checkpoint({ i: 3 });
-		let config: RunnableConfig = thread("run-1");
 		for (const [i, cp] of [a, b, c, d].entries()) {
-			config = await saver.put(config, cp, metadata(i - 1), {});
+			await saver.put(
+				{ configurable: { thread_id: "run-1", checkpoint_ns: `n${i}` } },
+				cp,
+				metadata(i - 1),
+				{},
+			);
 		}
 		await saver.put(thread("run-2"), checkpoint(), metadata(-1), {});
 
 		const ids = async (
 			options?: Parameters<LibsqlSaver["list"]>[1],
 		): Promise<string[]> => {
-			const tuples = await Array.fromAsync(
-				saver.list(thread("run-1"), options),
-			);
+			const tuples = await Array.fromAsync(saver.list(all, options));
 			return tuples.map((t) => t.checkpoint.id);
 		};
 		expect(await ids()).toEqual([d.id, c.id, b.id, a.id]);
@@ -131,61 +159,145 @@ describe("LibsqlSaver", () => {
 		]);
 	});
 
-	test("pruneThread keeps the latest root checkpoint and its writes, drops the rest of the thread", async () => {
-		const body = (threadId: string) => ({
-			configurable: { thread_id: threadId, checkpoint_ns: "sub:task-1" },
-		});
-		const older = await saver.put(
+	test("a new checkpoint drops the older ones of its namespace, and the namespaces below an older one", async () => {
+		const first = await saver.put(
 			thread("run-1"),
 			checkpoint({ count: 1 }),
 			metadata(-1),
 			{},
 		);
-		await saver.putWrites(older, [["count", 1]], "task-a");
-		const inBody = await saver.put(
-			body("run-1"),
+		await saver.putWrites(first, [["count", 1]], "task-a");
+		const rootId = String(first.configurable?.checkpoint_id);
+		const inBody = body("run-1", "call:task-a");
+		const older = await saver.put(
+			inBody,
+			checkpoint({ count: 8 }),
+			bodyMetadata(-1, { "": rootId }),
+			{},
+		);
+		await saver.putWrites(older, [["count", 8]], "task-b");
+		const newer = await saver.put(
+			older,
 			checkpoint({ count: 9 }),
+			bodyMetadata(0, { "": rootId }),
+			{},
+		);
+		await saver.putWrites(newer, [["count", 9]], "task-c");
+
+		expect(await rows("lg_checkpoint", "run-1")).toEqual([
+			["", rootId],
+			["call:task-a", String(newer.configurable?.checkpoint_id)],
+		]);
+		expect((await saver.getTuple(inBody))?.pendingWrites).toEqual([
+			["task-c", "count", 9],
+		]);
+
+		const second = await saver.put(
+			first,
+			checkpoint({ count: 2 }),
 			metadata(0),
 			{},
 		);
-		await saver.putWrites(inBody, [["count", 9]], "task-b");
-		const latest = await saver.put(
-			{ ...thread("run-1"), ...older },
-			checkpoint({ count: 2 }),
-			metadata(1),
+		expect(await rows("lg_checkpoint", "run-1")).toEqual([
+			["", String(second.configurable?.checkpoint_id)],
+		]);
+		expect(await rows("lg_write", "run-1")).toEqual([]);
+	});
+
+	test("pruneThread drops the namespaces of done tasks and the older checkpoints, keeps what a resume reads", async () => {
+		const root = await saver.put(
+			thread("run-1"),
+			checkpoint({ count: 1 }),
+			metadata(0),
 			{},
 		);
-		await saver.putWrites(latest, [["count", 2]], "task-c");
-		const other = await saver.put(
-			thread("run-2"),
-			checkpoint({ count: 5 }),
-			metadata(-1),
+		const rootId = String(root.configurable?.checkpoint_id);
+		// A database from before: an older root checkpoint and its writes.
+		const legacy = checkpoint({ count: 0 });
+		await sandbox.db.$client.batch(
+			[
+				{
+					sql: "INSERT INTO lg_checkpoint (thread_id, checkpoint_ns, checkpoint_id, type, checkpoint, metadata) VALUES ('run-1', '', ?, 'json', '{}', '{}')",
+					args: ["0".repeat(8) + legacy.id.slice(8)],
+				},
+				{
+					sql: "INSERT INTO lg_write (thread_id, checkpoint_ns, checkpoint_id, task_id, task_path, idx, channel, type, value) VALUES ('run-1', '', ?, 'old', '', 0, 'count', 'json', '0')",
+					args: ["0".repeat(8) + legacy.id.slice(8)],
+				},
+			],
+			"write",
+		);
+		// Two elements: one done, one parked at a Gate in a body of its own.
+		await saver.putWrites(root, [["count", 2]], "done-task");
+		await saver.putWrites(root, [["__interrupt__", "Ship it?"]], "open-task");
+		const done = await saver.put(
+			body("run-1", "each:done-task"),
+			checkpoint(),
+			bodyMetadata(1, { "": rootId }),
 			{},
 		);
-		await saver.putWrites(other, [["count", 5]], "task-d");
+		const open = await saver.put(
+			body("run-1", "each:open-task"),
+			checkpoint(),
+			bodyMetadata(1, { "": rootId }),
+			{},
+		);
+		const openId = String(open.configurable?.checkpoint_id);
+		const inner = await saver.put(
+			body("run-1", "each:open-task|gate:inner-task"),
+			checkpoint(),
+			bodyMetadata(0, { "": rootId, "each:open-task": openId }),
+			{},
+		);
+		await saver.putWrites(inner, [["__interrupt__", "Ship it?"]], "x");
+		await saver.put(
+			body("run-1", "each:done-task|step:below"),
+			checkpoint(),
+			bodyMetadata(0, {
+				"": rootId,
+				"each:done-task": String(done.configurable?.checkpoint_id),
+			}),
+			{},
+		);
 
 		await saver.pruneThread("run-1");
 
-		const kept = await saver.getTuple(thread("run-1"));
-		expect(kept?.checkpoint.channel_values).toEqual({ count: 2 });
-		expect(kept?.pendingWrites).toEqual([["task-c", "count", 2]]);
-		expect(await saver.getTuple(body("run-1"))).toBeUndefined();
-		const count = async (table: string, threadId: string) =>
-			Number(
-				(
-					await sandbox.db.$client.execute({
-						sql: `SELECT count(*) AS n FROM ${table} WHERE thread_id = ?`,
-						args: [threadId],
-					})
-				).rows[0]?.n,
+		expect(await rows("lg_checkpoint", "run-1")).toEqual([
+			["", rootId],
+			["each:open-task", openId],
+			[
+				"each:open-task|gate:inner-task",
+				String(inner.configurable?.checkpoint_id),
+			],
+		]);
+		expect((await saver.getTuple(thread("run-1")))?.pendingWrites).toEqual([
+			["done-task", "count", 2],
+			["open-task", "__interrupt__", "Ship it?"],
+		]);
+		const before = await rows("lg_write", "run-1");
+		await saver.pruneThread("run-1");
+		expect(await rows("lg_write", "run-1")).toEqual(before);
+	});
+
+	test("pruneAll prunes every thread that holds more than a resume reads", async () => {
+		const legacy = async (threadId: string, ids: string[]) => {
+			await sandbox.db.$client.batch(
+				ids.map((id) => ({
+					sql: "INSERT INTO lg_checkpoint (thread_id, checkpoint_ns, checkpoint_id, type, checkpoint, metadata) VALUES (?, '', ?, 'json', '{}', '{}')",
+					args: [threadId, id],
+				})),
+				"write",
 			);
-		expect(await count("lg_checkpoint", "run-1")).toBe(1);
-		expect(await count("lg_write", "run-1")).toBe(1);
-		expect(await count("lg_checkpoint", "run-2")).toBe(1);
-		expect(await count("lg_write", "run-2")).toBe(1);
-		// Pruning an already pruned thread changes nothing.
-		await saver.pruneThread("run-1");
-		expect(await count("lg_checkpoint", "run-1")).toBe(1);
+		};
+		await legacy("old-1", [uuid6(-3), uuid6(-3), uuid6(-3)]);
+		await legacy("old-2", [uuid6(-3), uuid6(-3)]);
+		await saver.put(thread("clean"), checkpoint(), metadata(-1), {});
+
+		await saver.pruneAll();
+
+		for (const threadId of ["old-1", "old-2", "clean"]) {
+			expect(await rows("lg_checkpoint", threadId)).toHaveLength(1);
+		}
 	});
 
 	test("deleteThread removes the thread's checkpoints and writes, nothing else", async () => {
@@ -241,22 +353,49 @@ describe("a graph on LibsqlSaver", () => {
 			.addEdge("work", "ask")
 			.compile({ checkpointer });
 
-	test("checkpoints every super-step in lg_checkpoint", async () => {
+	test("keeps the latest checkpoint of the thread only", async () => {
 		const graph = compile(saver);
 		await graph.invoke({}, thread("run-1"));
 		const history = await Array.fromAsync(
 			graph.getStateHistory(thread("run-1")),
 		);
-		// input, after work, parked at ask: one checkpoint per super-step.
-		expect(history.map((s) => [...s.next])).toEqual([
-			["ask"],
-			["work"],
-			["__start__"],
-		]);
-		const { rows } = await sandbox.db.$client.execute(
-			"SELECT count(*) AS n FROM lg_checkpoint WHERE thread_id = 'run-1'",
+		// Parked at ask: the input and the step after work are gone.
+		expect(history.map((s) => [...s.next])).toEqual([["ask"]]);
+		expect(await rows("lg_checkpoint", "run-1")).toHaveLength(1);
+	});
+
+	test("a long loop with a body on each turn keeps a bounded number of checkpoints", async () => {
+		const Loop = Annotation.Root({
+			turns: Annotation<number>({ reducer: (_, b) => b, default: () => 0 }),
+		});
+		const inner = new StateGraph(Loop)
+			.addNode("a", (s) => ({ turns: s.turns }))
+			.addNode("b", (s) => ({ turns: s.turns + 1 }))
+			.addEdge(START, "a")
+			.addEdge("a", "b")
+			.compile();
+		const graph = new StateGraph(Loop)
+			.addNode("turn", async (s, config) => inner.invoke(s, config))
+			.addEdge(START, "turn")
+			.addConditionalEdges("turn", (s) => (s.turns < 40 ? "turn" : END))
+			.compile({ checkpointer: saver });
+		let most = 0;
+		const stream = await graph.stream(
+			{},
+			{
+				...thread("run-1"),
+				durability: "sync",
+				subgraphs: true,
+				recursionLimit: 100,
+			},
 		);
-		expect(Number(rows[0]?.n)).toBe(3);
+		for await (const _ of stream) {
+			most = Math.max(most, (await rows("lg_checkpoint", "run-1")).length);
+		}
+		expect((await graph.getState(thread("run-1"))).values.turns).toBe(40);
+		// The root, and the body of the turn that runs.
+		expect(most).toBeLessThanOrEqual(2);
+		expect(await rows("lg_checkpoint", "run-1")).toHaveLength(1);
 	});
 
 	test("an interrupt resumes on a second saver over the same database file", async () => {
