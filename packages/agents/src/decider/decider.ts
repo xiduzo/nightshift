@@ -4,7 +4,8 @@
  * made by a model on `chat()` with an output schema, on the same decider's
  * text adapter. The deciders are TanStack's own adapters, and Ollama's text
  * adapter behind a small evaluate adapter (`./ollama`); this module only
- * picks one and fills in its API key.
+ * picks one and fills in its API key. A provider's package loads on its
+ * first call, not when Night Shift starts: the model lists here are copies.
  */
 
 import { canMakeValue, valueDeciderNameSchema } from "@nightshift/flows";
@@ -17,21 +18,10 @@ import {
 	type TokenUsage,
 } from "@tanstack/ai";
 import { ollamaText } from "@tanstack/ai-ollama";
-import { OLLAYA_EVALUATE_MODELS, ollayaDecider } from "@tanstack/ai-ollaya";
-import {
-	createOpenaiChat,
-	createOpenaiDecider,
-	OPENAI_EVALUATE_MODELS,
-} from "@tanstack/ai-openai";
-import {
-	createOpenRouterDecider,
-	createOpenRouterText,
-	OPENROUTER_EVALUATE_MODELS,
-} from "@tanstack/ai-openrouter";
-import {
-	createTypesafeDecider,
-	TYPESAFE_EVALUATE_MODELS,
-} from "@tanstack/ai-typesafe";
+import type { OLLAYA_EVALUATE_MODELS } from "@tanstack/ai-ollaya";
+import type { OPENAI_EVALUATE_MODELS } from "@tanstack/ai-openai";
+import type { OPENROUTER_EVALUATE_MODELS } from "@tanstack/ai-openrouter";
+import type { TYPESAFE_EVALUATE_MODELS } from "@tanstack/ai-typesafe";
 import type {
 	AgentErrorKind,
 	Decider,
@@ -61,7 +51,10 @@ export type ValueAdapter = {
 	defaultModel: string;
 	/** The chat models the adapter knows, when it lists them. Any other id works too. */
 	models?: readonly string[];
-	create: (model: string, apiKey: string | undefined) => AnyTextAdapter;
+	create: (
+		model: string,
+		apiKey: string | undefined,
+	) => AnyTextAdapter | Promise<AnyTextAdapter>;
 };
 
 export type DeciderAdapter = {
@@ -73,7 +66,10 @@ export type DeciderAdapter = {
 	defaultModel: string;
 	/** The secret that holds its API key. Null: it needs none. */
 	apiKey: string | null;
-	create: (model: string, apiKey: string | undefined) => AnyEvaluateAdapter;
+	create: (
+		model: string,
+		apiKey: string | undefined,
+	) => AnyEvaluateAdapter | Promise<AnyEvaluateAdapter>;
 	/** Set when the decider can also make a value (a Value node made by a model). */
 	value?: ValueAdapter;
 	/**
@@ -98,57 +94,99 @@ export type DeciderAdapter = {
 	explain?: (message: string, model: string) => string | undefined;
 };
 
+/*
+ * The decision models each package knows. Copies, so the registry does not
+ * load the packages: the types fail when a package's list changes.
+ */
+const TYPESAFE_MODELS = [
+	"jev-latest",
+	"jev-1.13.0",
+] as const satisfies typeof TYPESAFE_EVALUATE_MODELS;
+const OPENROUTER_MODELS = [
+	"~typesafe/jev-latest",
+	"typesafe/jev-1.13",
+	"typesafe/jev-1.13.0",
+] as const satisfies typeof OPENROUTER_EVALUATE_MODELS;
+const OPENAI_MODELS = [
+	"gpt-6-luna",
+] as const satisfies typeof OPENAI_EVALUATE_MODELS;
+const OLLAYA_MODELS = [
+	"laya:latest",
+	"laya:en",
+	"laya:multilingual",
+] as const satisfies typeof OLLAYA_EVALUATE_MODELS;
+
 /** Every TanStack AI decider adapter (the `evaluate` activity). */
 export const DECIDER_ADAPTERS: Record<DeciderName, DeciderAdapter> = {
 	typesafe: {
 		label: "TypeSafe Jev",
 		pkg: "@tanstack/ai-typesafe",
-		models: TYPESAFE_EVALUATE_MODELS,
+		models: TYPESAFE_MODELS,
 		defaultModel: "jev-latest",
 		apiKey: "TYPESAFE_API_KEY",
-		create: (model, key) => createTypesafeDecider(model, key ?? ""),
+		create: async (model, key) => {
+			const { createTypesafeDecider } = await import("@tanstack/ai-typesafe");
+			return createTypesafeDecider(model, key ?? "");
+		},
 	},
 	openrouter: {
 		label: "Jev on OpenRouter",
 		pkg: "@tanstack/ai-openrouter",
-		models: OPENROUTER_EVALUATE_MODELS,
+		models: OPENROUTER_MODELS,
 		defaultModel: "~typesafe/jev-latest",
 		apiKey: "OPENROUTER_API_KEY",
-		create: (model, key) => createOpenRouterDecider(model, key ?? ""),
+		create: async (model, key) => {
+			const { createOpenRouterDecider } = await import(
+				"@tanstack/ai-openrouter"
+			);
+			return createOpenRouterDecider(model, key ?? "");
+		},
 		pricing: { providerId: "openrouter" },
 		value: {
 			defaultModel: "~openai/gpt-mini-latest",
-			create: (model, key) =>
-				createOpenRouterText(
+			create: async (model, key) => {
+				const { createOpenRouterText } = await import(
+					"@tanstack/ai-openrouter"
+				);
+				return createOpenRouterText(
 					model as Parameters<typeof createOpenRouterText>[0],
 					key ?? "",
-				),
+				);
+			},
 		},
 	},
 	openai: {
 		label: "OpenAI Decisions",
 		pkg: "@tanstack/ai-openai",
-		models: OPENAI_EVALUATE_MODELS,
+		models: OPENAI_MODELS,
 		defaultModel: "gpt-6-luna",
 		apiKey: "OPENAI_API_KEY",
-		create: (model, key) => createOpenaiDecider(model, key ?? ""),
+		create: async (model, key) => {
+			const { createOpenaiDecider } = await import("@tanstack/ai-openai");
+			return createOpenaiDecider(model, key ?? "");
+		},
 		pricing: { providerId: "openai" },
 		value: {
 			defaultModel: "gpt-5-mini",
-			create: (model, key) =>
-				createOpenaiChat(
+			create: async (model, key) => {
+				const { createOpenaiChat } = await import("@tanstack/ai-openai");
+				return createOpenaiChat(
 					model as Parameters<typeof createOpenaiChat>[0],
 					key ?? "",
-				),
+				);
+			},
 		},
 	},
 	ollaya: {
 		label: "Ollaya on this computer",
 		pkg: "@tanstack/ai-ollaya",
-		models: OLLAYA_EVALUATE_MODELS,
+		models: OLLAYA_MODELS,
 		defaultModel: "laya:latest",
 		apiKey: null,
-		create: (model) => ollayaDecider(model),
+		create: async (model) => {
+			const { ollayaDecider } = await import("@tanstack/ai-ollaya");
+			return ollayaDecider(model);
+		},
 		pricing: "free",
 	},
 	ollama: {
@@ -258,7 +296,7 @@ async function decideOnce(
 		);
 	}
 	const result = await decide({
-		adapter: spec.create(input.model ?? spec.defaultModel, key),
+		adapter: await spec.create(input.model ?? spec.defaultModel, key),
 		state: input.prompt,
 		questions: {
 			label: choice({
@@ -314,7 +352,7 @@ async function valueOnce(
 	let usage: TokenUsage | undefined;
 	try {
 		const data: unknown = await chat({
-			adapter: maker.create(model, key),
+			adapter: await maker.create(model, key),
 			messages: [{ role: "user", content: input.prompt }],
 			outputSchema: input.output as Parameters<typeof chat>[0]["outputSchema"],
 			stream: false,
