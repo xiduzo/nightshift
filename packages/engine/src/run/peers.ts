@@ -4,14 +4,22 @@ import type {
 	Flow,
 	FlowNode,
 	permissionModeSchema,
-	Schedule,
 } from "@nightshift/flows";
 import type { FlowSources } from "@nightshift/flows/files";
 import type { z } from "zod";
+import type {
+	Actor,
+	NodeToPlace,
+	OffersPort,
+	OwnDevice,
+	Placement,
+	Relay,
+	StartRunInput,
+} from "../contract";
 import type { Device } from "../device";
+import type { WalkFile, WalkFiles, WalkRef } from "../graph";
 import type {
 	CopyStamp,
-	PlannedDevice,
 	RunBus,
 	RunHistory,
 	RunLog,
@@ -20,9 +28,7 @@ import type {
 	TranscriptEntry,
 } from "../log";
 import type { ListedProject, SpaceDocuments } from "../projects";
-import type { PendingCommand, RunWalker } from "../read";
-import type { Actor, StartRunInput } from "./engine";
-import type { Relay } from "./relay";
+import type { FeedStep, PendingCommand, RunWalker } from "../read";
 
 /**
  * The port of the other Devices and Hosts (`Peers`). The run engine walks
@@ -170,8 +176,6 @@ export type PlanInput = {
 	scheduled: boolean;
 };
 
-export type { PlannedDevice };
-
 /** A run's plan, with what run start goes on with. */
 export type PlannedRun = {
 	plan: RunPlan;
@@ -186,20 +190,6 @@ export type PlannedRun = {
 	 * the nodes on an offered Device against its Offers already.
 	 */
 	groups: { at: PlacedDevice; nodes: FlowNode[] }[];
-};
-
-export type OffersPort = {
-	/**
-	 * The schedules of a project as a Person saves them: a schedule that
-	 * fires on another Person's Device gets the saver as its `person`, and
-	 * is refused unless that Device's Offers cover what its flow runs there.
-	 */
-	schedulesWithOffers(
-		project: { id: string; repoPath: string },
-		spaceId: string,
-		actor: Actor | undefined,
-		schedules: readonly Schedule[],
-	): Promise<Schedule[]>;
 };
 
 export type RunsPort = {
@@ -238,44 +228,6 @@ export type RunsPort = {
 	archived(ref: WalkRef): Promise<string | null>;
 };
 
-/** A file of a run's walk state, by its Space and run (and step). */
-export type WalkRef =
-	| { kind: "checkpoint"; spaceId: string; runId: string }
-	| {
-			kind: "transcript" | "log";
-			spaceId: string;
-			runId: string;
-			stepId: string;
-	  };
-
-/**
- * One file of a run's walk state. Its content is the engine's: the peers
- * keep and carry it. A step's file has the stamp of the end it holds.
- */
-export type WalkFile = { ref: WalkRef; content: string; stamp?: CopyStamp };
-
-/** What the peers read of the walk state of the runs this computer walks. */
-export type WalkFiles = {
-	/**
-	 * The walk state of a run this computer walks: the transcript and the
-	 * command log of each of `steps` (default: every step of the run) that
-	 * it has, each with its stamp, then the latest Checkpoint. Empty for a
-	 * run walked elsewhere.
-	 */
-	exportWalk(
-		runId: string,
-		options?: { steps?: readonly string[] },
-	): Promise<WalkFile[]>;
-	/**
-	 * One file of a run this computer walks. Null when it has none, when
-	 * another Device walks the run, or when the step is not of the run.
-	 */
-	ownFile(ref: WalkRef): Promise<string | null>;
-};
-
-/** One step, by its Space and run. */
-export type FeedStep = { spaceId: string; runId: string; stepId: string };
-
 /** A run summary or detail with the worktree fields `pathsFor` may hide. */
 export type WithPaths = {
 	device: { id: string; thisDevice: boolean };
@@ -312,35 +264,4 @@ export type OfferedPlacement = {
 	}[];
 	/** The starter's role in the Space uses Offers (`offer.use`). */
 	mayUse: boolean;
-};
-
-/**
- * A Device a run of a project can be placed on, online, with a Clone of
- * the project: one of the Person's own, or another Person's that offers
- * profiles to the Space.
- */
-export type Placement = {
-	deviceId: string;
-	name: string;
-	/** This computer. */
-	thisDevice: boolean;
-	/**
-	 * Another Person's Device: the profiles it offers to the Space, the
-	 * only ones a run there may use. Absent for the Person's own Devices.
-	 */
-	offers?: string[];
-};
-
-/**
- * A node, as far as the choice of its Device goes: the profile of an
- * Agent node, or none (a node that runs nothing offered).
- */
-export type NodeToPlace = { profile?: string };
-
-/** One of a Person's Devices, as placement sees it. */
-export type OwnDevice = Placement & {
-	/** It takes work now. */
-	online: boolean;
-	/** It has a Clone of the project. */
-	hasClone: boolean;
 };

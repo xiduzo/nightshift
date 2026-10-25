@@ -6,7 +6,6 @@ import { type FakeHarness, fakeHarness } from "@nightshift/agents/testing";
 import type { HarnessName } from "@nightshift/agents/types";
 import { event } from "@nightshift/db/schema";
 import type { AgentNode, Flow, FlowEdge } from "@nightshift/flows";
-import type { SpaceEngine } from "../contract/engine";
 import { expandMcpServers } from "../device-config/mcp";
 import type { RunStatus } from "../log/events";
 import {
@@ -17,6 +16,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine } from "./engine";
+import type { SpaceEngine } from "./space-engine";
 
 let sandbox: Sandbox;
 beforeEach(async () => {

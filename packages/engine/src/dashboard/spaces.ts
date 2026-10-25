@@ -1,4 +1,4 @@
-import type { SpaceEngine } from "../contract";
+import type { SpaceEngine } from "../run";
 import { summarizeDashboard } from "./summary";
 import type { DashboardSummary } from "./types";
 

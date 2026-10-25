@@ -3,7 +3,7 @@ import type { Database } from "@nightshift/db";
 import { run } from "@nightshift/db/schema";
 import type { Flow, FlowNode, FlowNodeType } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { PlacementPort, PlannedRun, StartRunInput } from "../contract";
+import type { StartRunInput } from "../contract";
 import type { Capabilities, Device } from "../device";
 import {
 	kindOf,
@@ -31,6 +31,7 @@ import {
 	runFacts,
 	toSummary,
 } from "../read";
+import type { PlacementPort, PlannedRun } from "./peers";
 
 /**
  * Run start: from a `StartRunInput` to a run the runner drives. Two layers

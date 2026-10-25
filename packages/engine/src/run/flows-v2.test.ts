@@ -17,7 +17,6 @@ import type {
 	FlowEdge,
 	FlowInput,
 } from "@nightshift/flows";
-import type { SpaceEngine } from "../contract/engine";
 import { saverFor } from "../graph/checkpointer";
 import { appendEvent } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
@@ -33,6 +32,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine } from "./engine";
+import type { SpaceEngine } from "./space-engine";
 
 /**
  * Flow format 2: inputs and outputs, templates with paths, the Call

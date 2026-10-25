@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { FLOW_VERSION, type Flow, type FlowNode } from "@nightshift/flows";
-import type { PlacedDevice } from "../contract";
 import type { Device } from "../device";
+import type { PlacedDevice } from "./peers";
 import { type PlanDevices, planNodes, UNREACHABLE_DEVICE } from "./run-plan";
 
 /**

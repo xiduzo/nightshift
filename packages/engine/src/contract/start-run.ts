@@ -1,6 +1,41 @@
-import { flowNameSchema, flowSchema } from "@nightshift/flows";
+import {
+	type Flow,
+	flowNameSchema,
+	flowSchema,
+	type JsonValue,
+} from "@nightshift/flows";
 import { z } from "zod";
-import type { StartRunInput } from "./engine";
+
+/** A run start: the flow, the project and what a person or a schedule chose. */
+export type StartRunInput = {
+	projectId: string;
+	/**
+	 * Values for the flow's `inputs`, by name: a string for a `text` input,
+	 * any JSON value (or JSON text) for a `json` input. A missing or empty
+	 * value takes the input's default; a required input without either
+	 * refuses the start. Names the flow does not declare are refused.
+	 */
+	inputs?: Record<string, JsonValue>;
+	/** Epoch ms. No new step starts after it; the run then ends as stopped. */
+	stopAt?: number;
+	/** Git ref to branch the worktree from. Defaults to the clone's current HEAD. */
+	baseRef?: string;
+	/**
+	 * The Person who starts the run (their id). Commits in the run's
+	 * worktree are in their name. Absent: a schedule, or nobody known.
+	 */
+	startedBy?: string;
+	/**
+	 * The Device the run's steps run on, and its worktree's home (its
+	 * Placement): one of the starter's Devices with a Clone of the project
+	 * (`listPlacements`). Default: this computer.
+	 */
+	deviceId?: string;
+} & (
+	| { flowName: string; flow?: never }
+	/** A flow that is not a file, for example a quick run. */
+	| { flow: Flow; flowName?: never }
+);
 
 /** The fields of a run start that a person chooses, beside its flow. */
 const startFields = {

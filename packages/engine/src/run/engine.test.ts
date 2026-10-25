@@ -21,7 +21,6 @@ import {
 	type WaitNode,
 } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
-import type { Engine, SpaceEngine } from "../contract/engine";
 import {
 	defaultRunSettings,
 	type RunSettings,
@@ -42,7 +41,9 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { GateClosedError } from "./actions";
+import type { Engine } from "./engine";
 import { createEngine, type EngineInternals } from "./engine";
+import type { SpaceEngine } from "./space-engine";
 
 let sandbox: Sandbox;
 /** The run log of each engine the test made, oldest first: checked against the database after it. */

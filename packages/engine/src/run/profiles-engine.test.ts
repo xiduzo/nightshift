@@ -7,7 +7,6 @@ import type {
 	Flow,
 	FlowEdge,
 } from "@nightshift/flows";
-import type { SpaceEngine } from "../contract/engine";
 import { createProfileStore } from "../device-config/profiles";
 import type { RunDetail } from "../read/views";
 import {
@@ -18,6 +17,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine } from "./engine";
+import type { SpaceEngine } from "./space-engine";
 
 /** Agent Profiles: resolved into the run's copy when a run starts. */
 

@@ -1,33 +1,16 @@
-/** The engine's public contract: `Engine`, the view of one Space (`SpaceEngine`), what it takes (`EngineOptions`), what it asks of the Hosts (`Relay`), the schema of a run start (`startRunInputSchema`), and its ports to the devices (`Peers`, `DeviceDirectory`). */
+/**
+ * What the engine shares with its callers and the Devices, in words every
+ * vertical may name: who acts (`Actor`), a change of Members
+ * (`MemberChange`), a run start and its schema (`StartRunInput`,
+ * `startRunInputSchema`), where a run can be placed (`Placement`,
+ * `OwnDevice`, `NodeToPlace`), and the ports a vertical asks of the
+ * devices: the Device rows (`DeviceDirectory`), the Hosts (`Relay`) and the
+ * Offer rule of a schedule (`OffersPort`). It imports no other vertical.
+ */
 
+export type { Actor, MemberChange } from "./actor";
 export type { DeviceDirectory } from "./directory";
-export type {
-	Actor,
-	Engine,
-	MemberChange,
-	SpaceEngine,
-	StartRunInput,
-} from "./engine";
-export type { EngineOptions } from "./options";
-export type {
-	FeedStep,
-	NodeToPlace,
-	OfferedPlacement,
-	OffersPort,
-	OwnDevice,
-	PeerContext,
-	Peers,
-	PlacedDevice,
-	Placement,
-	PlacementPort,
-	PlanInput,
-	PlannedDevice,
-	PlannedRun,
-	RunsPort,
-	WalkFile,
-	WalkFiles,
-	WalkRef,
-	WithPaths,
-} from "./peers";
+export type { OffersPort } from "./offers";
+export type { NodeToPlace, OwnDevice, Placement } from "./placement";
 export type { Relay, RunCommandInput, RunCommandKind } from "./relay";
-export { startRunInputSchema } from "./start-run";
+export { type StartRunInput, startRunInputSchema } from "./start-run";

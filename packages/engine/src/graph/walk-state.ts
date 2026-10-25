@@ -3,8 +3,8 @@ import { dirname } from "node:path";
 import type { Database } from "@nightshift/db";
 import { lgCheckpoint, lgWrite, step } from "@nightshift/db/schema";
 import { and, eq, sql } from "drizzle-orm";
-import type { WalkFile, WalkFiles, WalkRef } from "../contract";
 import {
+	type CopyStamp,
 	copyStampOf,
 	ForeignRowsError,
 	parseTranscript,
@@ -22,6 +22,41 @@ import {
  * writes and reads them. The archive of `@nightshift/devices` keeps and
  * carries them, and never sees the checkpoint tables.
  */
+
+/** A file of a run's walk state, by its Space and run (and step). */
+export type WalkRef =
+	| { kind: "checkpoint"; spaceId: string; runId: string }
+	| {
+			kind: "transcript" | "log";
+			spaceId: string;
+			runId: string;
+			stepId: string;
+	  };
+
+/**
+ * One file of a run's walk state. Its content is the engine's: the peers
+ * keep and carry it. A step's file has the stamp of the end it holds.
+ */
+export type WalkFile = { ref: WalkRef; content: string; stamp?: CopyStamp };
+
+/** What the peers read of the walk state of the runs this computer walks. */
+export type WalkFiles = {
+	/**
+	 * The walk state of a run this computer walks: the transcript and the
+	 * command log of each of `steps` (default: every step of the run) that
+	 * it has, each with its stamp, then the latest Checkpoint. Empty for a
+	 * run walked elsewhere.
+	 */
+	exportWalk(
+		runId: string,
+		options?: { steps?: readonly string[] },
+	): Promise<WalkFile[]>;
+	/**
+	 * One file of a run this computer walks. Null when it has none, when
+	 * another Device walks the run, or when the step is not of the run.
+	 */
+	ownFile(ref: WalkRef): Promise<string | null>;
+};
 
 /** The walk state of this computer's runs: what the peers read (`WalkFiles`), and the import of a run moved here. */
 export type RunWalks = WalkFiles & {

@@ -5,10 +5,10 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import { lgCheckpoint, lgWrite, run, step } from "@nightshift/db/schema";
 import type { CommandNode, DecisionNode, Flow } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
-import type { PeerContext, SpaceEngine, WalkFile } from "../contract";
 import { createRunHistory, ForeignRowsError } from "../log";
 import { createRunBus } from "../log/bus";
 import { createRunLog } from "../log/run-log";
+import type { PeerContext, SpaceEngine } from "../run";
 import { createEngine } from "../run";
 import { alonePeers } from "../testing/alone-peers";
 import {
@@ -17,6 +17,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import type { WalkFile } from "./walk-state";
 import { createRunWalks } from "./walk-state";
 
 /**

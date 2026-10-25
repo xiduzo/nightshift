@@ -12,9 +12,6 @@ import { migrateDb } from "@nightshift/db/migrate";
 import { device, event, organization } from "@nightshift/db/schema";
 import { asc, eq, sql } from "drizzle-orm";
 import type { DeviceDirectory } from "../contract/directory";
-import type { SpaceEngine } from "../contract/engine";
-import type { EngineOptions } from "../contract/options";
-import type { PeersFactory } from "../contract/peers";
 import { type LocalDeviceDeps, localDevice } from "../device/local";
 import type { Device } from "../device/types";
 import {
@@ -26,6 +23,9 @@ import type { RunLog } from "../log/run-log";
 import { systemGit } from "../projects/git";
 import { clonePathOf } from "../projects/projects";
 import type { RunDetail } from "../read/views";
+import type { EngineOptions } from "../run/engine-options";
+import type { PeersFactory } from "../run/peers";
+import type { SpaceEngine } from "../run/space-engine";
 import { aloneDirectory, ownDevice } from "./alone-directory";
 import { alonePeers } from "./alone-peers";
 

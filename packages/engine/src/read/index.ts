@@ -41,6 +41,7 @@ export {
 } from "./read-model";
 export type { RunBundleSummary } from "./run-bundle";
 export { exportRun, openRunBundle } from "./run-bundle";
+export type { FeedStep } from "./run-transcript";
 export type {
 	OpenGate,
 	PendingCommand,

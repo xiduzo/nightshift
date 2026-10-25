@@ -10,4 +10,10 @@ export { resolvePolicy } from "./policy";
 export { rerunNodeRefusal } from "./reentry";
 export type { Runner } from "./runner";
 export { createRunner } from "./runner";
-export { createRunWalks, type RunWalks } from "./walk-state";
+export {
+	createRunWalks,
+	type RunWalks,
+	type WalkFile,
+	type WalkFiles,
+	type WalkRef,
+} from "./walk-state";

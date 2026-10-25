@@ -12,7 +12,6 @@ import {
 } from "@nightshift/db/schema";
 import type { DecisionNode, Flow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-import type { Engine } from "../contract/engine";
 import { createRunLog, type RunLog } from "../log/run-log";
 import {
 	createSpaceDocuments,
@@ -31,6 +30,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { GateClosedError } from "./actions";
+import type { Engine } from "./engine";
 import { createEngine, type EngineInternals } from "./engine";
 
 /**

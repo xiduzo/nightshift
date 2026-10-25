@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { FeedStep } from "../contract";
 import {
 	createRunBus,
 	type LoggedEvent,
@@ -7,6 +6,7 @@ import {
 	type TranscriptEntry,
 	waker,
 } from "../log";
+import type { FeedStep } from "./run-transcript";
 import { followRunTranscript, type RunTranscriptPorts } from "./run-transcript";
 
 /**

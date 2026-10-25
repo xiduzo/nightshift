@@ -1,4 +1,4 @@
-import type { StartRunInput } from "./engine";
+import type { StartRunInput } from "./start-run";
 
 /**
  * What the engine asks of the Hosts this Device links to: the actions on

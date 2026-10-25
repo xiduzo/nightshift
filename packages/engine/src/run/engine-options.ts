@@ -1,9 +1,9 @@
 import type { Database } from "@nightshift/db";
 import type { AgentProfileSettings } from "@nightshift/flows";
+import type { DeviceDirectory } from "../contract";
 import type { Device } from "../device";
 import type { RunSettings } from "../device-config";
 import type { Git, SpaceDocuments } from "../projects";
-import type { DeviceDirectory } from "./directory";
 import type { PeersFactory } from "./peers";
 
 /** What `createEngine` takes: the database, this computer as a Device, and the hooks of the daemon. */

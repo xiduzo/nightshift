@@ -9,7 +9,6 @@ import type {
 	Policy,
 	ToolNode,
 } from "@nightshift/flows";
-import type { SpaceEngine } from "../contract/engine";
 import type { McpExpansion } from "../device-config/mcp";
 import {
 	defaultRunSettings,
@@ -26,6 +25,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine, type EngineInternals } from "./engine";
+import type { SpaceEngine } from "./space-engine";
 
 /** The engine's hooks for the daemon's settings and connections. */
 

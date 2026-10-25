@@ -4,7 +4,6 @@ import { device, event, run } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
 import { writeFlowFile, writeSchedulesFile } from "@nightshift/flows/files";
 import { asc, eq, inArray } from "drizzle-orm";
-import type { SpaceEngine } from "../contract/engine";
 import {
 	defaultRunSettings,
 	type RunSettings,
@@ -12,6 +11,7 @@ import {
 import { appendEvent, type EnginePayloads, parseEventRow } from "../log/events";
 import type { RunSummary } from "../read/views";
 import { createEngine, type EngineInternals } from "../run/engine";
+import type { SpaceEngine } from "../run/space-engine";
 import {
 	createSandbox,
 	type Sandbox,

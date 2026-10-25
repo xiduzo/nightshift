@@ -1,5 +1,4 @@
 import type { Database } from "@nightshift/db";
-import type { RunsPort } from "../contract";
 import type { Runner, RunWalks } from "../graph";
 import {
 	parseTranscript,
@@ -7,6 +6,7 @@ import {
 	runsArriving,
 	stepIdsOfRun,
 } from "../log";
+import type { RunsPort } from "./peers";
 
 /**
  * This computer walks a run another Device moved here (`WalkerMoved`, the

@@ -2,13 +2,7 @@ import { Refusal } from "@nightshift/refusal";
 
 import type { ArtifactStore } from "../artifacts";
 import type { RunCopiesService } from "../cleanup";
-import type {
-	Actor,
-	PlacementPort,
-	SpaceEngine,
-	StartRunInput,
-	WithPaths,
-} from "../contract";
+import type { Actor, StartRunInput } from "../contract";
 import { type FlowFiles, flowUse } from "../flows";
 import type { Runner } from "../graph";
 import {
@@ -33,7 +27,9 @@ import {
 } from "../read";
 import type { ScheduleFiles } from "../schedules";
 import type { RunActions } from "./actions";
+import type { PlacementPort, WithPaths } from "./peers";
 import type { RunRelay } from "./relay";
+import type { SpaceEngine } from "./space-engine";
 
 /**
  * What a person does in one Space (`SpaceEngine`). Every method reads and

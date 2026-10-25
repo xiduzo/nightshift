@@ -21,7 +21,6 @@ import type {
 	FlowInput,
 } from "@nightshift/flows";
 import { asc, eq } from "drizzle-orm";
-import type { SpaceEngine } from "../contract/engine";
 import type { RunStatus } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import type { TranscriptEntry } from "../log/step-events";
@@ -38,6 +37,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine, type EngineInternals } from "./engine";
+import type { SpaceEngine } from "./space-engine";
 
 let sandbox: Sandbox;
 /** The run log of each engine the test made, oldest first: checked against the database after it. */

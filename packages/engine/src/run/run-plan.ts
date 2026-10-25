@@ -5,13 +5,10 @@ import {
 	resolveAgentNode,
 } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type {
-	PlacedDevice,
-	PlannedDevice,
-	PlannedRun,
-	StartRunInput,
-} from "../contract";
+import type { StartRunInput } from "../contract";
 import { flowsForRun } from "../flows";
+import type { PlannedDevice } from "../log";
+import type { PlacedDevice, PlannedRun } from "./peers";
 
 /**
  * The node walk of a run's plan: where each node runs, and its profile.

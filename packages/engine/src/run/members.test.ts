@@ -3,7 +3,6 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import { device, event, user } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { and, eq, isNull } from "drizzle-orm";
-import type { Engine } from "../contract/engine";
 import { parseEventRow } from "../log/events";
 import { createRunLog, type RunLog } from "../log/run-log";
 import {
@@ -20,6 +19,7 @@ import {
 	waitFor,
 	withDevice,
 } from "../testing/test-support";
+import type { Engine } from "./engine";
 import { createEngine } from "./engine";
 
 /**

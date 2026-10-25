@@ -2,93 +2,22 @@ import type {
 	Flow,
 	FlowIssue,
 	FlowListItem,
-	JsonValue,
 	LoadedFlow,
 	Schedule,
 	ScheduleIssue,
 } from "@nightshift/flows";
 import type { Artifact } from "../artifacts";
 import type { RunCopies } from "../cleanup";
+import type {
+	NodeToPlace,
+	OwnDevice,
+	Placement,
+	StartRunInput,
+} from "../contract";
 import type { FlowUse } from "../flows";
-import type { LandedRunListener } from "../log";
 import type { Branches, Project } from "../projects";
 import type { OpenGate, RunDetail, RunStreamItem, RunSummary } from "../read";
 import type { ScheduleList } from "../schedules";
-import type { NodeToPlace, OwnDevice, Placement } from "./peers";
-
-/**
- * The engine's public contract: `Engine`, and the view of one Space,
- * `SpaceEngine`. A run walks a flow, and the flows it calls, in one worktree.
- */
-
-/**
- * The engine of this Device. Its background work (the walk, recovery, the
- * scheduler) covers every Space the Device holds, and writes each row with
- * its own Space. What a person does goes through one Space's view.
- */
-export interface Engine {
-	/**
-	 * What a person does in one Space. Nothing it reads, returns or changes
-	 * is of another Space: a project or run of another Space is "not found".
-	 * `actor` is the Person who acts: an action on a run walked elsewhere
-	 * travels to its Walker in their name.
-	 */
-	space(spaceId: string, actor?: Actor): SpaceEngine;
-	/**
-	 * The Space of a run this computer keeps, or null when it has none of
-	 * that id. Who may see or act on the run there is the caller's check:
-	 * then it goes through that Space's view.
-	 */
-	spaceOfRun(runId: string): Promise<string | null>;
-	/**
-	 * Logs a change of a Space's Members in that Space's event log
-	 * (`MemberJoined`, `MemberRemoved`, `MemberRoleChanged`), with who made it.
-	 */
-	logMemberChange(change: MemberChange): Promise<void>;
-	/**
-	 * Calls `listener` with the run events that land in this Replica from
-	 * now on: appended here, or brought by the exchange from another
-	 * Walker. Each carries its run's Space. The notifier reads Gates and
-	 * run endings from it. Returns the unsubscribe.
-	 */
-	onRunEvents(listener: LandedRunListener): () => void;
-	/**
-	 * A Device is back (its link to this Host took work again): the steps
-	 * of the runs this computer walks that sleep because a Device was
-	 * offline look again now, instead of at their next try.
-	 */
-	deviceBack(deviceId: string): Promise<void>;
-	/**
-	 * Hands this computer's runs over to a new engine in the same process
-	 * (`bun --hot` evaluates the daemon again). Stops the scheduler, the
-	 * resumes and the wake timers, and lets go of every run this engine
-	 * drives: each drive writes nothing more and its harness is aborted.
-	 * The log is left as it is, so the next engine's recovery finds the
-	 * open work, ends it `interrupted` and continues it, as after a
-	 * restart. Resolves once the drives' writes in flight settled.
-	 */
-	dispose(): Promise<void>;
-}
-
-/** A change of a Space's Members, as the auth hooks report it. */
-export type MemberChange =
-	| {
-			kind: "joined";
-			spaceId: string;
-			personId: string;
-			role: string;
-			by: string | null;
-			invitedBy?: string;
-	  }
-	| { kind: "removed"; spaceId: string; personId: string; by: string | null }
-	| {
-			kind: "role";
-			spaceId: string;
-			personId: string;
-			role: string;
-			previousRole: string;
-			by: string | null;
-	  };
 
 /** The engine as a person in one Space sees it: the API layer only calls this. */
 export interface SpaceEngine {
@@ -305,36 +234,3 @@ export interface SpaceEngine {
 		options: { signal: AbortSignal; afterSeq?: number },
 	): AsyncIterable<RunStreamItem>;
 }
-
-/** Who acts in a Space: the Person of the session. */
-export type Actor = { personId: string };
-
-export type StartRunInput = {
-	projectId: string;
-	/**
-	 * Values for the flow's `inputs`, by name: a string for a `text` input,
-	 * any JSON value (or JSON text) for a `json` input. A missing or empty
-	 * value takes the input's default; a required input without either
-	 * refuses the start. Names the flow does not declare are refused.
-	 */
-	inputs?: Record<string, JsonValue>;
-	/** Epoch ms. No new step starts after it; the run then ends as stopped. */
-	stopAt?: number;
-	/** Git ref to branch the worktree from. Defaults to the clone's current HEAD. */
-	baseRef?: string;
-	/**
-	 * The Person who starts the run (their id). Commits in the run's
-	 * worktree are in their name. Absent: a schedule, or nobody known.
-	 */
-	startedBy?: string;
-	/**
-	 * The Device the run's steps run on, and its worktree's home (its
-	 * Placement): one of the starter's Devices with a Clone of the project
-	 * (`listPlacements`). Default: this computer.
-	 */
-	deviceId?: string;
-} & (
-	| { flowName: string; flow?: never }
-	/** A flow that is not a file, for example a quick run. */
-	| { flow: Flow; flowName?: never }
-);

@@ -1,7 +1,7 @@
 import type { Database } from "@nightshift/db";
 import { type Flow, optionProblem } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
-import type { Actor, OwnDevice, PlacementPort, RunsPort } from "../contract";
+import type { Actor, OwnDevice } from "../contract";
 import { type Runner, type RunWalks, rerunNodeRefusal } from "../graph";
 import {
 	applyWalkerMoves,
@@ -19,6 +19,7 @@ import {
 	deriveStopAfterStep,
 } from "../read";
 import { RunRefusal, refuseUnless, whyNot } from "../run-status";
+import type { PlacementPort, RunsPort } from "./peers";
 import type { RunRelay } from "./relay";
 
 /**

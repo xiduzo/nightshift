@@ -10,13 +10,8 @@ import type {
 	WaitNode,
 } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-import type {
-	OwnDevice,
-	PeerContext,
-	PeersFactory,
-	WalkFile,
-	WalkRef,
-} from "../contract/peers";
+import type { OwnDevice } from "../contract";
+import type { WalkFile, WalkRef } from "../graph/walk-state";
 import { createRunLog } from "../log/run-log";
 import {
 	parseTranscript,
@@ -31,6 +26,7 @@ import {
 	withDevice,
 } from "../testing/test-support";
 import { createEngine } from "./engine";
+import type { PeerContext, PeersFactory } from "./peers";
 
 /**
  * "Move to …" between two computers in one process, each with its own

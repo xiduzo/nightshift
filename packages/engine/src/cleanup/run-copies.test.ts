@@ -5,11 +5,11 @@ import { fakeHarness } from "@nightshift/agents/testing";
 import { event } from "@nightshift/db/schema";
 import type { Flow } from "@nightshift/flows";
 import { eq } from "drizzle-orm";
-import type { SpaceEngine } from "../contract/engine";
 import { defaultRunSettings } from "../device-config/settings";
 import { parseEventRow } from "../log/events";
 import type { WorktreeRemoval } from "../log/worktree-removals";
 import { createEngine, type EngineInternals } from "../run/engine";
+import type { SpaceEngine } from "../run/space-engine";
 import {
 	createSandbox,
 	mustGit,

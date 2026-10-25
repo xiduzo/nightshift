@@ -1,8 +1,13 @@
-import type { OwnDevice, PeerContext, Peers, PlacedDevice } from "../contract";
-import type { PeersFactory } from "../contract/peers";
+import type { OwnDevice } from "../contract";
 import { followOwnStep } from "../log";
 import { NOT_ON_THIS_COMPUTER } from "../projects";
-import { planNodes } from "../run";
+import {
+	type PeerContext,
+	type Peers,
+	type PlacedDevice,
+	planNodes,
+} from "../run";
+import type { PeersFactory } from "../run/peers";
 
 /**
  * The peers of a computer that is alone: no other Device, no Host, no

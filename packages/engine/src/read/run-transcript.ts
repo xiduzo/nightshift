@@ -1,4 +1,3 @@
-import type { FeedStep } from "../contract";
 import { type RunBus, type RunLog, type TranscriptEntry, waker } from "../log";
 import { type DerivedStep, deriveSteps } from "./derive-steps";
 
@@ -8,6 +7,9 @@ import { type DerivedStep, deriveSteps } from "./derive-steps";
  * engine's. Where each step's entries come from (this computer's files,
  * the archive, a live feed) is the peers' (`RunsPort.stepEntries`).
  */
+
+/** One step, by its Space and run. */
+export type FeedStep = { spaceId: string; runId: string; stepId: string };
 
 /** A step's entries after `afterSeq`, then live, until its transcript is whole. */
 export type StepEntries = (

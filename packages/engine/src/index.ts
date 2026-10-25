@@ -14,26 +14,13 @@ export type { RunCopies, RunCopy } from "./cleanup";
 export type {
 	Actor,
 	DeviceDirectory,
-	Engine,
-	EngineOptions,
-	FeedStep,
 	NodeToPlace,
-	OfferedPlacement,
 	OwnDevice,
-	PeerContext,
-	Peers,
-	PlacedDevice,
 	Placement,
-	PlanInput,
-	PlannedRun,
 	Relay,
 	RunCommandInput,
 	RunCommandKind,
-	SpaceEngine,
 	StartRunInput,
-	WalkFile,
-	WalkFiles,
-	WalkRef,
 } from "./contract";
 export { startRunInputSchema } from "./contract";
 export {
@@ -110,6 +97,7 @@ export {
 } from "./device-config";
 export type { FlowRef, FlowUse } from "./flows";
 export { flowsForRun } from "./flows";
+export type { WalkFile, WalkFiles, WalkRef } from "./graph";
 export type {
 	CopyStamp,
 	HistoryCursors,
@@ -162,6 +150,7 @@ export {
 	worktreeLocation,
 } from "./projects";
 export type {
+	FeedStep,
 	OpenGate,
 	RunDetail,
 	RunStreamItem,
@@ -173,6 +162,17 @@ export {
 	openRunBundle,
 	type RunBundleSummary,
 } from "./read";
+export type {
+	Engine,
+	EngineOptions,
+	OfferedPlacement,
+	PeerContext,
+	Peers,
+	PlacedDevice,
+	PlanInput,
+	PlannedRun,
+	SpaceEngine,
+} from "./run";
 export {
 	createEngine,
 	GateClosedError,

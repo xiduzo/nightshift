@@ -2,7 +2,7 @@ import { harnessFacts } from "@nightshift/agents/harness-facts";
 import { isCustomHarness } from "@nightshift/flows";
 import { createArtifactStore } from "../artifacts";
 import { createRunCopies, startCleanupJob } from "../cleanup";
-import type { Engine, EngineOptions, StartRunInput } from "../contract";
+import type { Actor, MemberChange, StartRunInput } from "../contract";
 import { defaultRunSettings, type RunSettings } from "../device-config";
 import { createFlowFiles } from "../flows";
 import { createRunner, createRunWalks, resolvePolicy } from "../graph";
@@ -12,6 +12,7 @@ import {
 	createRunHistory,
 	createRunLog,
 	getRunRow,
+	type LandedRunListener,
 	logMemberChange,
 	onLandedRunEvents,
 	planOf,
@@ -40,10 +41,12 @@ import {
 	DEFAULT_SCHEDULE_TICK_MS,
 } from "../schedules";
 import { createRunActions } from "./actions";
+import type { EngineOptions } from "./engine-options";
 import { createRecovery } from "./recovery";
 import { createRunRelay } from "./relay";
 import { createRunStart } from "./run-start";
 import { createSpaces } from "./space";
+import type { SpaceEngine } from "./space-engine";
 import { takeOver } from "./take-over";
 import { wakeOfflineSleeps } from "./wake";
 
@@ -57,7 +60,8 @@ import { wakeOfflineSleeps } from "./wake";
  * - `run-start.ts`: `startRun` validates, checks what this daemon has,
  *   writes `RunStarted` and hands the thread to the runner.
  * - `recovery.ts`: startup recovery and the daemon's automatic resume.
- * - `space.ts`: what a person does in one Space (`SpaceEngine`).
+ * - `space.ts`: what a person does in one Space (`SpaceEngine`, in
+ *   `space-engine.ts`).
  * - `actions.ts`: the run actions (stop, answer a Gate, send a Signal,
  *   move, resume, restart a step, run again). One entry reads the run's
  *   row once, refuses by the run's one rule (`run-status/`), and takes the
@@ -73,7 +77,7 @@ import { wakeOfflineSleeps } from "./wake";
  * - `projects/`: projects by remote and their Clones on this computer,
  *   over the git port. A project is defined in its Space document. Its
  *   `project` row is the document's projection.
- * - `peers` (`EngineOptions.peers`, the port in `contract/peers.ts`):
+ * - `peers` (`EngineOptions.peers`, the port in `peers.ts`):
  *   placement, Offers, the Host that keeps a Space and the runs walked
  *   elsewhere. `@nightshift/devices` implements it over its Links.
  *
@@ -87,6 +91,55 @@ const DEFAULT_MAX_CONCURRENT_RUNS = 2;
 const DEFAULT_MAX_STEPS_PER_RUN = 500;
 /** How long a new daemon waits before it resumes the runs the last one stopped mid-step. */
 const DAEMON_RESUME_GRACE_MS = 5_000;
+
+/**
+ * The engine of this Device. Its background work (the walk, recovery, the
+ * scheduler) covers every Space the Device holds, and writes each row with
+ * its own Space. What a person does goes through one Space's view.
+ */
+export interface Engine {
+	/**
+	 * What a person does in one Space. Nothing it reads, returns or changes
+	 * is of another Space: a project or run of another Space is "not found".
+	 * `actor` is the Person who acts: an action on a run walked elsewhere
+	 * travels to its Walker in their name.
+	 */
+	space(spaceId: string, actor?: Actor): SpaceEngine;
+	/**
+	 * The Space of a run this computer keeps, or null when it has none of
+	 * that id. Who may see or act on the run there is the caller's check:
+	 * then it goes through that Space's view.
+	 */
+	spaceOfRun(runId: string): Promise<string | null>;
+	/**
+	 * Logs a change of a Space's Members in that Space's event log
+	 * (`MemberJoined`, `MemberRemoved`, `MemberRoleChanged`), with who made it.
+	 */
+	logMemberChange(change: MemberChange): Promise<void>;
+	/**
+	 * Calls `listener` with the run events that land in this Replica from
+	 * now on: appended here, or brought by the exchange from another
+	 * Walker. Each carries its run's Space. The notifier reads Gates and
+	 * run endings from it. Returns the unsubscribe.
+	 */
+	onRunEvents(listener: LandedRunListener): () => void;
+	/**
+	 * A Device is back (its link to this Host took work again): the steps
+	 * of the runs this computer walks that sleep because a Device was
+	 * offline look again now, instead of at their next try.
+	 */
+	deviceBack(deviceId: string): Promise<void>;
+	/**
+	 * Hands this computer's runs over to a new engine in the same process
+	 * (`bun --hot` evaluates the daemon again). Stops the scheduler, the
+	 * resumes and the wake timers, and lets go of every run this engine
+	 * drives: each drive writes nothing more and its harness is aborted.
+	 * The log is left as it is, so the next engine's recovery finds the
+	 * open work, ends it `interrupted` and continues it, as after a
+	 * restart. Resolves once the drives' writes in flight settled.
+	 */
+	dispose(): Promise<void>;
+}
 
 /** Knobs for tests only. Not part of the engine contract. */
 export type EngineInternals = {
