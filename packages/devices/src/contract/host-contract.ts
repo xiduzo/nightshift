@@ -1,6 +1,10 @@
 import type { DeviceKeyPermission } from "@nightshift/auth";
-import type { OwnDevice, TranscriptEntry } from "@nightshift/engine";
-import { flowNameSchema, flowSchema, labelSchema } from "@nightshift/flows";
+import {
+	type OwnDevice,
+	startRunInputSchema,
+	type TranscriptEntry,
+} from "@nightshift/engine";
+import { labelSchema } from "@nightshift/flows";
 import { type ContractRouterClient, oc } from "@orpc/contract";
 import { z } from "zod";
 import { archiveRefSchema, copyStampSchema } from "./archive";
@@ -73,14 +77,12 @@ const deviceId = z.string().regex(/^[\w-]{1,64}$/);
 const deviceName = z.string().trim().min(1).max(64);
 
 /** A run start, as a Device asks its Host for its Person: the Host walks it, its steps on `deviceId`. */
-const runStartFields = {
-	projectId: z.string(),
-	baseRef: z.string().min(1).optional(),
-	stopAt: z.number().int().positive().optional(),
-	inputs: z.record(z.string(), z.json()).optional(),
-	spaceId: z.string().min(1),
-	deviceId: z.string().min(1).max(64),
-};
+const runStartInput = startRunInputSchema.and(
+	z.object({
+		spaceId: z.string().min(1),
+		deviceId: z.string().min(1).max(64),
+	}),
+);
 
 /** A person's action on a run another Device walks, as a Device sends it. */
 const runCommandInput = z.discriminatedUnion("kind", [
@@ -261,12 +263,7 @@ export const hostContract = {
 			.route({
 				summary: "Starts a run placed on another Device. This Host walks it.",
 			})
-			.input(
-				z.union([
-					z.object({ ...runStartFields, flowName: flowNameSchema }),
-					z.object({ ...runStartFields, flow: flowSchema }),
-				]),
-			)
+			.input(runStartInput)
 			.output(described(z.object({ runId: z.string() }))),
 		/** The key's Person's Devices for a project: online, with a Clone or not. */
 		devices: sync

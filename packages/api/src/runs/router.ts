@@ -1,4 +1,5 @@
-import { flowNameSchema, flowSchema, labelSchema } from "@nightshift/flows";
+import { startRunInputSchema } from "@nightshift/engine";
+import { labelSchema } from "@nightshift/flows";
 import { z } from "zod";
 
 import { output, stream } from "../output";
@@ -12,20 +13,6 @@ import {
 	runStreamItemSchema,
 	runSummarySchema,
 } from "./schemas";
-
-/** What starts a run: a flow file or an inline flow, and where its steps run. */
-export const runStartFields = {
-	projectId: z.string(),
-	baseRef: z.string().min(1).optional(),
-	stopAt: z.number().int().positive().optional(),
-	inputs: z.record(z.string(), z.json()).optional(),
-	/** The Device the run's steps run on. Default: this computer. */
-	deviceId: z.string().min(1).max(64).optional(),
-};
-const runStartInput = z.union([
-	z.object({ ...runStartFields, flowName: flowNameSchema }),
-	z.object({ ...runStartFields, flow: flowSchema }),
-]);
 
 /**
  * Lists, starts and the Devices of a project are the session's Space's. A
@@ -71,7 +58,7 @@ export const runs = {
 			summary: "Starts a run of a flow file, or of a flow given inline.",
 		})
 		.output(output(runSummarySchema))
-		.input(runStartInput)
+		.input(startRunInputSchema)
 		.handler(({ context, input }) =>
 			context.space.startRun({
 				...input,

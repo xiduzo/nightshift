@@ -1,4 +1,4 @@
-/** The engine's public contract: `Engine`, the view of one Space (`SpaceEngine`), what it takes (`EngineOptions`), what it asks of the Hosts (`Relay`), and its ports to the devices (`Peers`, `DeviceDirectory`). */
+/** The engine's public contract: `Engine`, the view of one Space (`SpaceEngine`), what it takes (`EngineOptions`), what it asks of the Hosts (`Relay`), the schema of a run start (`startRunInputSchema`), and its ports to the devices (`Peers`, `DeviceDirectory`). */
 
 export type { DeviceDirectory } from "./directory";
 export type {
@@ -30,3 +30,4 @@ export type {
 	WithPaths,
 } from "./peers";
 export type { Relay, RunCommandInput, RunCommandKind } from "./relay";
+export { startRunInputSchema } from "./start-run";

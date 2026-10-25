@@ -35,6 +35,7 @@ export type {
 	WalkFiles,
 	WalkRef,
 } from "./contract";
+export { startRunInputSchema } from "./contract";
 export {
 	type DashboardSummary,
 	type FlowHealthDetail,
