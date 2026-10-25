@@ -17,7 +17,7 @@ import {
 } from "@nightshift/ui/components/empty";
 import { Skeleton } from "@nightshift/ui/components/skeleton";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { MailXIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -27,6 +27,7 @@ import type { InvitationView } from "@/shared/api";
 import { authClient } from "@/shared/api";
 import { spaceMutations, spaceQueries } from "./queries";
 import { roleLabel } from "./roles";
+import { useSpaceChanged } from "./space-tabs";
 
 /**
  * The page of an invitation link. The invited person makes their account
@@ -59,7 +60,7 @@ export function InvitePage({ invitationId }: { invitationId: string }) {
 
 function PendingInvitation({ invitation }: { invitation: InvitationView }) {
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
+	const spaceChanged = useSpaceChanged();
 	const session = authClient.useSession();
 	const signedInAs = session.data?.user.email ?? null;
 	const isInvitee =
@@ -71,7 +72,7 @@ function PendingInvitation({ invitation }: { invitation: InvitationView }) {
 			onSuccess: async () => {
 				toast.success(`You joined ${invitation.spaceName}`);
 				// You work in the Space now: every page shows it.
-				await queryClient.invalidateQueries();
+				await spaceChanged();
 				await navigate({ to: "/" });
 			},
 			onError: (error) => toast.error(`Not joined: ${error.message}`),

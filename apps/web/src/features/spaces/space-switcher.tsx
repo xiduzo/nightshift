@@ -15,7 +15,7 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@nightshift/ui/components/sidebar";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
 	ChevronsUpDownIcon,
@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { Logo } from "@/shared/page";
 import { CreateSpaceDialog } from "./create-space-dialog";
 import { spaceMutations, spaceQueries } from "./queries";
+import { useSpaceChanged } from "./space-tabs";
 
 /** The personal Space always reads "Personal", whatever it is called. */
 const spaceName = (space: { name: string; personal: boolean }) =>
@@ -42,7 +43,7 @@ const spaceName = (space: { name: string; personal: boolean }) =>
 export function SpaceSwitcher() {
 	const { isMobile } = useSidebar();
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
+	const spaceChanged = useSpaceChanged();
 	const [creating, setCreating] = useState(false);
 	const spaces = useQuery(spaceQueries.list());
 	const active = spaces.data?.spaces.find(
@@ -53,7 +54,7 @@ export function SpaceSwitcher() {
 			onSuccess: async () => {
 				// Every page shows the new Space: its projects, runs and Gates.
 				await navigate({ to: "/" });
-				await queryClient.invalidateQueries();
+				await spaceChanged();
 			},
 			onError: (error) => {
 				toast.error(`Could not switch the Space. ${error.message}`);

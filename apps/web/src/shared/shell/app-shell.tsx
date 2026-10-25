@@ -9,15 +9,16 @@ import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 import { isOutsideApp, useAccessGuard } from "@/features/access";
 import { NotificationStream } from "@/features/notifications";
+import { SpaceTabs } from "@/features/spaces";
 
 import { AppSidebar } from "./app-sidebar";
 import { TabBadge } from "./use-tab-badge";
 
 /**
  * The app frame around the page (`children`): the theme, the sidebar, the
- * toasts, the notifications stream and the tab badge. A page outside the app (signing in)
- * shows without the sidebar. The app shows only when the access guard
- * lets it.
+ * toasts, the notifications stream, the Space another tab switches to,
+ * and the tab badge. A page outside the app (signing in) shows without
+ * the sidebar. The app shows only when the access guard lets it.
  */
 export function AppShell({ children }: { children: ReactNode }) {
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -45,6 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 			{outsideApp || !appMayShow ? null : (
 				<>
 					<NotificationStream />
+					<SpaceTabs />
 					<TabBadge />
 				</>
 			)}

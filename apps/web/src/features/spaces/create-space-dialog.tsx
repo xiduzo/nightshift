@@ -16,13 +16,14 @@ import {
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import { Spinner } from "@nightshift/ui/components/spinner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import { spaceMutations } from "./queries";
+import { useSpaceChanged } from "./space-tabs";
 
 /**
  * Creates a Space with you as its owner, then switches to it. Your
@@ -49,7 +50,7 @@ export function CreateSpaceDialog({
 function CreateSpaceForm({ onCreated }: { onCreated: () => void }) {
 	const id = useId();
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
+	const spaceChanged = useSpaceChanged();
 	const [name, setName] = useState("");
 	const create = useMutation(
 		spaceMutations.create({
@@ -58,7 +59,7 @@ function CreateSpaceForm({ onCreated }: { onCreated: () => void }) {
 				onCreated();
 				// You work in the new Space now: every page shows it.
 				await navigate({ to: "/" });
-				await queryClient.invalidateQueries();
+				await spaceChanged();
 			},
 		}),
 	);
