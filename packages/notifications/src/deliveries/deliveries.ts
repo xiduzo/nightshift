@@ -14,11 +14,14 @@ import { and, eq, inArray } from "drizzle-orm";
 export type NoticeKind = "gate-opened" | "run-finished" | "run-failed";
 
 /**
- * `held`: waits until `dueAt` while another screen is open. `quiet`:
- * waits for the end of quiet hours. `sent`: went out. `dropped`: did not
- * go out and never will. `withdrawn`: the Gate closed after it went out.
+ * `sending`: claimed, and going out to `heldFor` now. A crash before it
+ * went out leaves it so, and a later check sends it. `held`: waits until
+ * `dueAt` while another screen is open. `quiet`: waits for the end of
+ * quiet hours. `sent`: went out. `dropped`: did not go out and never
+ * will. `withdrawn`: the Gate closed after it went out.
  */
 export type DeliveryStatus =
+	| "sending"
 	| "held"
 	| "quiet"
 	| "sent"
@@ -58,7 +61,7 @@ export type DeliveryChange = Partial<
 >;
 
 /** The statuses of an entry that can still reach a screen, or did. */
-const LIVE: DeliveryStatus[] = ["held", "quiet", "sent"];
+const LIVE: DeliveryStatus[] = ["sending", "held", "quiet", "sent"];
 
 export type DeliveryLog = ReturnType<typeof createDeliveryLog>;
 
@@ -182,6 +185,15 @@ export function createDeliveryLog(db: Database) {
 			return rows.map(toDelivery);
 		},
 
+		/** The entries that were claimed and are going out, or that a crash cut short. */
+		async sending(): Promise<Delivery[]> {
+			const rows = await db
+				.select()
+				.from(notificationDelivery)
+				.where(eq(notificationDelivery.status, "sending"));
+			return rows.map(toDelivery);
+		},
+
 		/** The entries that wait for the end of quiet hours. */
 		async quiet(): Promise<Delivery[]> {
 			const rows = await db
@@ -191,7 +203,7 @@ export function createDeliveryLog(db: Database) {
 			return rows.map(toDelivery);
 		},
 
-		/** The Gates of the log that may still be open: held, quiet or sent. */
+		/** The Gates of the log that may still be open: sending, held, quiet or sent. */
 		async liveGates(): Promise<Delivery[]> {
 			const rows = await db
 				.select()

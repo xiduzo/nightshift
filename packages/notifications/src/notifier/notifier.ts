@@ -55,8 +55,11 @@ import type { RunEvent, RunEventSource } from "./sources";
  *
  * At start, the open Gates are read: one the log has not told yet (it
  * opened while no notifier listened) is pushed then, the others tell
- * nobody again. Every piece of work runs one after the other, so two
- * landings never race.
+ * nobody again. A push is claimed before it goes out (`sending`): one a
+ * crash cut short goes out at the first check a minute after its claim
+ * (`LOST_AFTER_MS`), so a reload never sends one twice that the last
+ * notifier still sends. Every piece of work runs one after the other, so
+ * two landings never race.
  */
 
 export type NotifierDeps = {
@@ -99,6 +102,9 @@ export type Notifier = {
 };
 
 const DEFAULT_TICK_MS = 15_000;
+
+/** A push still `sending` this long after its claim was cut short by a crash. */
+const LOST_AFTER_MS = 60_000;
 
 /**
  * The screens of this computer itself: the desktop notification. The
@@ -297,15 +303,17 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 			settings.holdMinutes > 0 && deps.inApp.isActive(claim.personId);
 		const held = holding ? targets.filter((t) => t.kind !== "desktop") : [];
 		const immediate = targets.filter((t) => !held.includes(t));
+		// Every target until the push went out: a crash before then leaves
+		// them all to the next check (`sendDue`).
 		const claimed = await deps.deliveries.claim(
 			claim,
-			held.length > 0
-				? {
-						status: "held",
-						dueAt: at + settings.holdMinutes * 60_000,
-						heldFor: held.map((t) => t.id),
-					}
-				: { status: "sent" },
+			{
+				status: "sending",
+				heldFor: targets.map((t) => t.id),
+				...(held.length > 0
+					? { dueAt: at + settings.holdMinutes * 60_000 }
+					: {}),
+			},
 			at,
 		);
 		if (!claimed) return;
@@ -313,9 +321,8 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 		await deps.deliveries.update(claim.personId, claim.key, {
 			sentTo,
 			sentAt: sentTo.length > 0 ? at : null,
-			...(held.length > 0
-				? {}
-				: { status: sentTo.length > 0 ? "sent" : "dropped" }),
+			heldFor: held.map((t) => t.id),
+			status: held.length > 0 ? "held" : sentTo.length > 0 ? "sent" : "dropped",
 		});
 	}
 
@@ -408,15 +415,21 @@ export function createNotifier(deps: NotifierDeps): Notifier {
 	/**
 	 * Sends the held pushes that are due: their time came, or their Person
 	 * has no screen open anymore (the phone app went to the background, the
-	 * last page closed a minute ago).
+	 * last page closed a minute ago). A push a crash cut short is due too.
 	 */
 	async function sendDue(at: number): Promise<void> {
 		const held = await deps.deliveries.held();
-		const due = held.filter(
-			(row) =>
-				(row.dueAt !== null && row.dueAt <= at) ||
-				!deps.inApp.isActive(row.personId),
+		const lost = (await deps.deliveries.sending()).filter(
+			(row) => row.createdAt + LOST_AFTER_MS <= at,
 		);
+		const due = [
+			...held.filter(
+				(row) =>
+					(row.dueAt !== null && row.dueAt <= at) ||
+					!deps.inApp.isActive(row.personId),
+			),
+			...lost,
+		];
 		for (const row of due) {
 			const settings = await deps.settings.get(row.personId);
 			if (inQuietHours(settings, at)) {

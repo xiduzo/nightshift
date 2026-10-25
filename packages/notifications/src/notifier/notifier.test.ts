@@ -5,6 +5,7 @@ import {
 	createInAppChannel,
 	type InAppChannel,
 	type InAppItem,
+	type PushChannels,
 } from "../channels";
 import { createDeliveryLog, type DeliveryLog } from "../deliveries";
 import { createSettingsStore, type SettingsStore } from "../settings";
@@ -68,7 +69,7 @@ afterEach(() => {
 	cleanup();
 });
 
-function makeNotifier(): Notifier {
+function makeNotifier(push: PushChannels = { web, expo, desktop }): Notifier {
 	return createNotifier({
 		events: events.source,
 		audience: async (spaceId) => members[spaceId] ?? [],
@@ -80,7 +81,7 @@ function makeNotifier(): Notifier {
 		targets,
 		deliveries,
 		inApp,
-		push: { web, expo, desktop },
+		push,
 		now: () => clock,
 		tickMs: 1_000_000,
 		onError: (message, error) => {
@@ -160,6 +161,15 @@ async function answerGate(runId: string, stepId: string, spaceId = SPACE) {
 async function endRun(runId: string, status: string) {
 	events.land([event("RunEnded", runId, null, { status, reason: null })]);
 	await notifier.idle();
+}
+
+/** Waits until a notifier claimed the key in the delivery log. */
+async function waitForClaim(key: string): Promise<void> {
+	for (let i = 0; i < 200; i++) {
+		if ((await deliveries.live(key)).length > 0) return;
+		await new Promise((resolve) => setTimeout(resolve, 5));
+	}
+	throw new Error(`Nobody claimed ${key}.`);
 }
 
 const register = (personId: string, kind: "web" | "expo" | "desktop") =>
@@ -813,6 +823,72 @@ describe("once per key", () => {
 		notifier = makeNotifier();
 		await notifier.start();
 		expect(expo.sent()).toHaveLength(1);
+	});
+
+	test("a Gate whose push a crash cut short goes out once after the restart", async () => {
+		await register("ada", "web");
+		// The push never returns: Night Shift stops before it went out.
+		notifier = makeNotifier({
+			web: { send: () => new Promise(() => {}), withdraw: async () => {} },
+		});
+		await notifier.start();
+		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
+		events.land([event("GateOpened", "run-1", "step-1")]);
+		await waitForClaim("run-1:step-1");
+		notifier.stop();
+
+		notifier = makeNotifier();
+		await notifier.start();
+		clock += MINUTE;
+		await notifier.tick();
+		expect(web.sent().map((m) => m.key)).toEqual(["run-1:step-1"]);
+
+		// Once: the next start finds it sent.
+		notifier.stop();
+		notifier = makeNotifier();
+		await notifier.start();
+		clock += MINUTE;
+		await notifier.tick();
+		expect(web.sent()).toHaveLength(1);
+	});
+
+	test("a push that is still going out is not sent twice by the next notifier", async () => {
+		await register("ada", "web");
+		// A reload: the last notifier still waits for the push service.
+		notifier = makeNotifier({
+			web: { send: () => new Promise(() => {}), withdraw: async () => {} },
+		});
+		await notifier.start();
+		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
+		events.land([event("GateOpened", "run-1", "step-1")]);
+		await waitForClaim("run-1:step-1");
+
+		const next = makeNotifier();
+		await next.start();
+		await next.tick();
+		next.stop();
+
+		expect(web.sent()).toHaveLength(0);
+	});
+
+	test("a cut-short push of a Gate that closed meanwhile never goes out", async () => {
+		await register("ada", "web");
+		notifier = makeNotifier({
+			web: { send: () => new Promise(() => {}), withdraw: async () => {} },
+		});
+		await notifier.start();
+		events.setOpen(SPACE, [{ runId: "run-1", stepId: "step-1" }]);
+		events.land([event("GateOpened", "run-1", "step-1")]);
+		await waitForClaim("run-1:step-1");
+		notifier.stop();
+
+		events.setOpen(SPACE, []);
+		notifier = makeNotifier();
+		await notifier.start();
+		clock += MINUTE;
+		await notifier.tick();
+
+		expect(web.sent()).toHaveLength(0);
 	});
 
 	test("a Gate that closed while Night Shift was away is withdrawn at start", async () => {
