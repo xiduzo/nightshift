@@ -13,14 +13,12 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
-
-const root = join(import.meta.dir, "..");
+import { join, relative, sep } from "node:path";
 
 /** Allowed everywhere: shared TypeScript config, no code. */
 const EVERYWHERE = new Set(["@nightshift/config"]);
 
-type Rule = {
+export type Rule = {
 	layer: number;
 	/** The workspaces it may depend on, or "lower": every lower layer. */
 	mayImport: string[] | "lower";
@@ -30,7 +28,7 @@ type Rule = {
  * Section 1 of STRUCTURE.md. Apps are not packages: no workspace may depend
  * on an app.
  */
-const LAYERS: Record<string, Rule> = {
+export const LAYERS: Record<string, Rule> = {
 	// 0. Foundation
 	"@nightshift/config": { layer: 0, mayImport: [] },
 	"@nightshift/db": { layer: 0, mayImport: [] },
@@ -93,21 +91,38 @@ const LAYERS: Record<string, Rule> = {
 	},
 };
 
-const APPS = new Set(["server", "desktop", "web", "mobile"]);
+export const APPS = new Set(["server", "desktop", "web", "mobile"]);
+
+export type Exception = { from: string; to: string; why: string };
 
 /**
  * Known deviations, each with the change that removes it, and each listed
  * in section 8 of STRUCTURE.md. None today. The check fails when an
  * exception is no longer needed, so it cannot outlive its fix.
  */
-const EXCEPTIONS: { from: string; to: string; why: string }[] = [];
+export const EXCEPTIONS: Exception[] = [];
+
+export type Options = {
+	layers?: Record<string, Rule>;
+	apps?: Set<string>;
+	exceptions?: Exception[];
+};
+
+export type Result = {
+	problems: string[];
+	/** How many workspaces it checked. */
+	workspaces: number;
+	/** The exceptions that a dependency still needs. */
+	used: Exception[];
+};
 
 type Workspace = { name: string; file: string; deps: string[] };
 
-function workspaces(): Workspace[] {
+function workspacesOf(root: string): Workspace[] {
 	const found: Workspace[] = [];
 	for (const group of ["apps", "packages"]) {
 		const dir = join(root, group);
+		if (!existsSync(dir)) continue;
 		for (const entry of readdirSync(dir, { withFileTypes: true })) {
 			if (!entry.isDirectory()) continue;
 			const file = join(dir, entry.name, "package.json");
@@ -128,7 +143,7 @@ function workspaces(): Workspace[] {
 			}
 			found.push({
 				name: pkg.name,
-				file: relative(root, file),
+				file: relative(root, file).split(sep).join("/"),
 				deps: [...deps],
 			});
 		}
@@ -136,75 +151,91 @@ function workspaces(): Workspace[] {
 	return found;
 }
 
-function allowed(name: string): Set<string> {
-	const rule = LAYERS[name];
-	if (!rule) return new Set();
-	if (rule.mayImport !== "lower") return new Set(rule.mayImport);
-	return new Set(
-		Object.entries(LAYERS)
-			.filter(([, other]) => other.layer < rule.layer)
-			.map(([other]) => other),
-	);
-}
+/**
+ * The problems of the workspaces under `root` (the repository root), with
+ * the layer map, the apps and the exceptions of `options`.
+ */
+export function checkLayers(root: string, options: Options = {}): Result {
+	const layers = options.layers ?? LAYERS;
+	const apps = options.apps ?? APPS;
+	const exceptions = options.exceptions ?? EXCEPTIONS;
 
-const all = workspaces();
-const names = new Set(all.map((ws) => ws.name));
-const problems: string[] = [];
-const usedExceptions = new Set<(typeof EXCEPTIONS)[number]>();
+	const allowed = (name: string): Set<string> => {
+		const rule = layers[name];
+		if (!rule) return new Set();
+		if (rule.mayImport !== "lower") return new Set(rule.mayImport);
+		return new Set(
+			Object.entries(layers)
+				.filter(([, other]) => other.layer < rule.layer)
+				.map(([other]) => other),
+		);
+	};
 
-for (const ws of all) {
-	const rule = LAYERS[ws.name];
-	if (!rule) {
-		problems.push(
-			`${ws.file}: "${ws.name}" has no layer. Add it to section 1 of docs/steering/STRUCTURE.md and to LAYERS in scripts/check-layers.ts.`,
-		);
-		continue;
-	}
-	const ok = allowed(ws.name);
-	for (const dep of ws.deps) {
-		// Only dependencies on other workspaces count.
-		if (!names.has(dep)) continue;
-		if (EVERYWHERE.has(dep)) continue;
-		const exception = EXCEPTIONS.find(
-			(e) => e.from === ws.name && e.to === dep,
-		);
-		if (exception) {
-			usedExceptions.add(exception);
-			continue;
-		}
-		if (APPS.has(dep)) {
+	const all = workspacesOf(root);
+	const names = new Set(all.map((ws) => ws.name));
+	const problems: string[] = [];
+	const used = new Set<Exception>();
+
+	for (const ws of all) {
+		const rule = layers[ws.name];
+		if (!rule) {
 			problems.push(
-				`${ws.file}: "${ws.name}" depends on the app "${dep}". No workspace may depend on an app.`,
+				`${ws.file}: "${ws.name}" has no layer. Add it to section 1 of docs/steering/STRUCTURE.md and to LAYERS in scripts/check-layers.ts.`,
 			);
 			continue;
 		}
-		if (!ok.has(dep)) {
-			const to = LAYERS[dep];
-			const list = [...ok].filter((n) => !EVERYWHERE.has(n)).sort();
+		const ok = allowed(ws.name);
+		for (const dep of ws.deps) {
+			// Only dependencies on other workspaces count.
+			if (!names.has(dep)) continue;
+			if (EVERYWHERE.has(dep)) continue;
+			const exception = exceptions.find(
+				(e) => e.from === ws.name && e.to === dep,
+			);
+			if (exception) {
+				used.add(exception);
+				continue;
+			}
+			if (apps.has(dep)) {
+				problems.push(
+					`${ws.file}: "${ws.name}" depends on the app "${dep}". No workspace may depend on an app.`,
+				);
+				continue;
+			}
+			if (!ok.has(dep)) {
+				const to = layers[dep];
+				const list = [...ok].filter((n) => !EVERYWHERE.has(n)).sort();
+				problems.push(
+					`${ws.file}: "${ws.name}" (layer ${rule.layer}) may not depend on "${dep}"${to ? ` (layer ${to.layer})` : ""}. It may depend on: ${list.length ? list.join(", ") : "no other workspace"}.`,
+				);
+			}
+		}
+	}
+
+	for (const exception of exceptions) {
+		if (!used.has(exception)) {
 			problems.push(
-				`${ws.file}: "${ws.name}" (layer ${rule.layer}) may not depend on "${dep}"${to ? ` (layer ${to.layer})` : ""}. It may depend on: ${list.length ? list.join(", ") : "no other workspace"}.`,
+				`scripts/check-layers.ts: the exception "${exception.from}" -> "${exception.to}" is not needed any more. Remove it.`,
 			);
 		}
 	}
+
+	return { problems, workspaces: all.length, used: [...used] };
 }
 
-for (const exception of EXCEPTIONS) {
-	if (!usedExceptions.has(exception)) {
-		problems.push(
-			`scripts/check-layers.ts: the exception "${exception.from}" -> "${exception.to}" is not needed any more. Remove it.`,
-		);
-	}
-}
-
-if (problems.length) {
-	console.error(
-		"Layer check failed (docs/steering/STRUCTURE.md, section 1):\n",
+if (import.meta.main) {
+	const { problems, workspaces, used } = checkLayers(
+		join(import.meta.dir, ".."),
 	);
-	for (const problem of problems) console.error(`- ${problem}`);
-	process.exit(1);
+	if (problems.length) {
+		console.error(
+			"Layer check failed (docs/steering/STRUCTURE.md, section 1):\n",
+		);
+		for (const problem of problems) console.error(`- ${problem}`);
+		process.exit(1);
+	}
+	const note = used.length
+		? ` ${used.length} temporary exception(s): ${used.map((e) => `${e.from} -> ${e.to} (${e.why})`).join("; ")}.`
+		: "";
+	console.log(`Layer check passed: ${workspaces} workspaces.${note}`);
 }
-
-const note = usedExceptions.size
-	? ` ${usedExceptions.size} temporary exception(s): ${[...usedExceptions].map((e) => `${e.from} -> ${e.to} (${e.why})`).join("; ")}.`
-	: "";
-console.log(`Layer check passed: ${all.length} workspaces.${note}`);
