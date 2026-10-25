@@ -33,7 +33,8 @@ describe("the peer protocol", () => {
 				served++;
 			}
 		}
-		expect(served).toBe(24);
+		// 24 before `sync.commands`, which an older Host lacks.
+		expect(served).toBe(25);
 	});
 
 	test("the router's client is a HostClient", () => {
