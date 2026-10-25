@@ -9,7 +9,12 @@ import {
 	run as runTable,
 	user,
 } from "@nightshift/db/schema";
-import type { RunStatus, WalkRef } from "@nightshift/engine";
+import {
+	createSpaceDocuments,
+	type RunStatus,
+	type SpaceDocuments,
+	type WalkRef,
+} from "@nightshift/engine";
 import {
 	createRunLog,
 	createSandbox,
@@ -19,8 +24,8 @@ import {
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
 import { and, eq, sql } from "drizzle-orm";
-import type { HostRelay as Relay } from "../contract";
-import { createPeerEngine, type PeerEngine } from "../peers";
+import type { HostRelay as Relay, RunCommand } from "../contract";
+import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
 import {
 	ForeignRowsError,
@@ -75,7 +80,11 @@ const gateFlow: Flow = {
 
 function engineOf(
 	sandbox: Sandbox,
-	options: { relay?: Relay; harness?: ReturnType<typeof fakeHarness> } = {},
+	options: {
+		relay?: Relay;
+		harness?: ReturnType<typeof fakeHarness>;
+		documents?: SpaceDocuments;
+	} = {},
 ): PeerEngine {
 	return createPeerEngine(
 		withPeers({
@@ -85,6 +94,7 @@ function engineOf(
 			dataDir: sandbox.dataDir,
 			scheduler: false,
 			...(options.relay ? { relay: options.relay } : {}),
+			...(options.documents ? { spaceDocuments: options.documents } : {}),
 		}),
 		{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
 	);
@@ -511,6 +521,71 @@ describe("a batch and what follows from it", () => {
 			{ label: "the run to arrive", timeoutMs: 15_000 },
 		);
 		expect(await statusOf(engineB, a.spaceId, runId)).toBe("waiting");
+	});
+
+	test("a Command that comes before its run arrived is applied once it arrived: never lost, never twice", async () => {
+		let archive = new Map<string, string>();
+		// B's copy of A's Space: Ada is a Member there.
+		const documents = createSpaceDocuments({
+			db: b.db,
+			directory: deviceDirectory(b.db),
+		});
+		try {
+			const space = await documents.open(a.spaceId);
+			space.doc.transact(() => {
+				space.members.set("person-ada", { name: "Ada", role: "member" });
+			});
+			const engineA = engineOf(a);
+			const engineB = engineOf(b, {
+				relay: relayOf(async (ref) => archive.get(fileKey(ref)) ?? null),
+				documents,
+			});
+			const { runId } = await waitingOnA(engineA);
+			const files = await moveToB(engineA, runId);
+			// The rows that move the run to B are here; its walk state is not.
+			await copyRows(engineA, engineB);
+			const gate = (await engineB.space(a.spaceId).getRun(runId)).steps.at(-1);
+			const command: RunCommand = {
+				id: "command-1",
+				spaceId: a.spaceId,
+				runId,
+				walkerId: b.deviceId,
+				personId: "person-ada",
+				createdAt: Date.now(),
+				kind: "gate.resolve",
+				payload: { stepId: gate?.id as string, choice: "approve" },
+			};
+			const before = await typesOn(b, runId);
+
+			// Not "done, with an error": it comes again.
+			await expect(
+				engineB.exchange.apply(command, engineB, { waitMs: 500 }),
+			).rejects.toThrow("The run is still on its way to this device.");
+			expect(await typesOn(b, runId)).toEqual(before);
+
+			// The walk state is in the archive now: the run arrives, then the
+			// Command is applied, once, however often it comes.
+			archive = files;
+			expect(await engineB.exchange.apply(command, engineB)).toBeNull();
+			expect(await engineB.exchange.apply(command, engineB)).toBeNull();
+			await untilStatus(engineB, a.spaceId, runId, "finished");
+			const types = (await typesOn(b, runId)).slice(before.length);
+			expect(types[0]).toBe(`${b.deviceId}:WalkerArrived`);
+			const answers = (
+				await b.db.select().from(event).where(eq(event.runId, runId))
+			).filter(
+				(e) =>
+					e.type === "StepEnded" && JSON.parse(e.payload).outcome === "approve",
+			);
+			expect(answers).toHaveLength(1);
+			expect(JSON.parse(answers[0]?.payload as string).commandId).toBe(
+				"command-1",
+			);
+			await engineB.dispose();
+			await engineA.dispose();
+		} finally {
+			await documents.close();
+		}
 	});
 
 	test("a run moved here that a restart cut short is taken over when the next engine is ready", async () => {

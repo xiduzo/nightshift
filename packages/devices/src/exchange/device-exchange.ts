@@ -26,7 +26,8 @@ import type { RunHistoryExchange } from "./run-history";
  *   live transcripts go to the Host (`archive.tail`) while they are
  *   wanted.
  * - Commands: `sync.commands`, the Commands for the runs this computer
- *   walks, on their own stream, so they never wait behind rows. A Host of
+ *   walks, on their own stream, so they never wait behind rows, nor
+ *   behind a run that is still on its way here. A Host of
  *   an older version has none: its Commands come with the rows, and this
  *   stream waits until the link drops.
  *
@@ -97,6 +98,11 @@ export function createDeviceExchange(deps: {
 	 * Applies the Commands that wait, in the Host's order, and reports each
 	 * result once per stream (`reported`). `whole`: the set is every
 	 * Command that waits, so one it lacks is done there.
+	 *
+	 * A Command this computer cannot tell about yet (its run is still on
+	 * its way here) waits, with the later Commands of its run, so their
+	 * order holds. The others go on. Then this throws: the stream starts
+	 * again, and the Host sends the ones that wait again.
 	 */
 	async function take(
 		client: HostClient,
@@ -105,9 +111,17 @@ export function createDeviceExchange(deps: {
 		whole: boolean,
 		signal: AbortSignal,
 	) {
+		/** The runs whose Commands wait, and why the first one does. */
+		const waiting = new Map<string, unknown>();
 		for (const command of commands) {
-			if (reported.has(command.id)) continue;
-			const error = await applyOnce(command);
+			if (reported.has(command.id) || waiting.has(command.runId)) continue;
+			let error: string | null;
+			try {
+				error = await applyOnce(command);
+			} catch (notYet) {
+				waiting.set(command.runId, notYet);
+				continue;
+			}
 			await client.sync.commandDone({ id: command.id, error }, { signal });
 			reported.add(command.id);
 		}
@@ -115,10 +129,13 @@ export function createDeviceExchange(deps: {
 		for (const id of reported) {
 			if (!pending.has(id)) reported.delete(id);
 		}
-		if (!whole) return;
-		for (const id of applied.keys()) {
-			if (!pending.has(id)) applied.delete(id);
+		if (whole) {
+			for (const id of applied.keys()) {
+				if (!pending.has(id)) applied.delete(id);
+			}
 		}
+		const [first] = waiting.values();
+		if (waiting.size > 0) throw first;
 	}
 
 	/** Sends this computer's rows, a batch at a time, until `signal` aborts. Throws when a batch fails. */

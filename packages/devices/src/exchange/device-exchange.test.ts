@@ -736,6 +736,66 @@ describe("the Device's exchange with its Host", () => {
 		await untilStatus(paired.host, run.id, "finished");
 	});
 
+	test("a Command for a run still on its way here holds up no other run's Command, and is applied once that run arrived", async () => {
+		const run = await walkOnB(gateFlow);
+		// Another run moved to B and has not arrived: until it has, B cannot
+		// tell about its Command (`RunHistoryExchange.apply` throws).
+		let arrived = false;
+		const applied: string[] = [];
+		const arriving: PeerEngine = {
+			...paired.device,
+			exchange: {
+				...paired.device.exchange,
+				async apply(command, engine, options) {
+					if (command.runId !== "run-arriving") {
+						return paired.device.exchange.apply(command, engine, options);
+					}
+					if (!arrived) {
+						throw new Error("The run is still on its way to this device.");
+					}
+					applied.push(command.id);
+					return null;
+				},
+			},
+		};
+		online(paired.memory.client(paired.key), deviceExchange(arriving));
+		await untilStatus(paired.host, run.id, "waiting");
+		const { commands } = paired.host.exchange;
+		// In the Host's order, the arriving run's Command comes first.
+		const early = await commands.enqueue({
+			kind: "signal.send",
+			payload: { name: "go" },
+			spaceId: a.spaceId,
+			runId: "run-arriving",
+			walkerId: b.deviceId,
+			personId: paired.personId,
+		});
+		await Bun.sleep(5);
+		const gate = (await paired.host.space(a.spaceId).listGates())[0];
+		await paired.host
+			.space(a.spaceId, { personId: paired.personId })
+			.resolveGate({
+				runId: run.id,
+				stepId: gate?.stepId as string,
+				choice: "approve",
+			});
+		const [answer] = await commands.pendingOf(run.id);
+
+		await untilStatus(paired.device, run.id, "finished");
+		await waitFor(async () => (await commandOnA(answer?.id as string)).done, {
+			label: "the answer done on A",
+		});
+		expect(await commandOnA(early.id)).toEqual({ done: false, error: null });
+
+		arrived = true;
+		await waitFor(async () => (await commandOnA(early.id)).done, {
+			label: "the arriving run's Command done on A",
+			timeoutMs: 15_000,
+		});
+		expect(await commandOnA(early.id)).toEqual({ done: true, error: null });
+		expect(applied).toEqual([early.id]);
+	});
+
 	test("a Host of an older version has no Commands stream: its Commands come with the rows", async () => {
 		const run = await walkOnB(gateFlow);
 		const client = paired.memory.client(paired.key);
