@@ -4,12 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Flow } from "../document";
 import { singleAgentFlow } from "../document";
-import {
-	readSchedulesFile,
-	schedulesPath,
-	writeFlowFile,
-	writeSchedulesFile,
-} from "../files";
+import { readSchedulesFile, writeFlowFile, writeSchedulesFile } from "../files";
 import {
 	cronError,
 	cronToTimeAndDays,
@@ -24,6 +19,10 @@ import {
 	timeAndDaysToCron,
 	validateSchedules,
 } from "./schedules";
+
+/** Where the schedules of a repo live: `.nightshift/schedules.json`. */
+const schedulesPath = (repoPath: string) =>
+	join(repoPath, ".nightshift", "schedules.json");
 
 /** Local time, the daemon's clock. */
 const at = (day: number, hours: number, minutes = 0) =>
@@ -222,12 +221,6 @@ describe("the schedules file", () => {
 			permissionMode: "acceptEdits",
 		}),
 		inputs: [{ name: "epic", type: "text", required: true }],
-	});
-
-	test("is .nightshift/schedules.json", () => {
-		expect(schedulesPath("/repo")).toBe(
-			join("/repo", ".nightshift", "schedules.json"),
-		);
 	});
 
 	test("a missing file is no schedules", async () => {

@@ -24,7 +24,7 @@ import {
  * (`migrateFlow`); the file on disk changes only when it is written.
  */
 
-export function flowsDir(repoPath: string): string {
+function flowsDir(repoPath: string): string {
 	return join(repoPath, ".nightshift", "flows");
 }
 
@@ -109,7 +109,7 @@ function asMap(
  * Every flow file of the repo by name, null when it does not parse. For
  * `ValidateOptions.flows`. A missing directory is an empty record.
  */
-export async function loadAllFlows(
+async function loadAllFlows(
 	repoPath: string,
 ): Promise<Record<string, Flow | null>> {
 	return flowsOf(await readAll(repoPath));
@@ -161,7 +161,7 @@ export async function deleteFlowFile(
 	}
 }
 
-export function schedulesPath(repoPath: string): string {
+function schedulesPath(repoPath: string): string {
 	return join(repoPath, ".nightshift", "schedules.json");
 }
 

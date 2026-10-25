@@ -8,5 +8,4 @@ export {
 	type ResolvedAgentNode,
 	resolveAgentNode,
 	resolvedAgent,
-	resolveFlowProfiles,
 } from "./profiles";

@@ -6,12 +6,13 @@ import type { Flow } from "./document";
 import { singleAgentFlow } from "./document";
 import {
 	deleteFlowFile,
-	flowsDir,
 	listFlowFiles,
-	loadAllFlows,
 	readFlowFile,
 	writeFlowFile,
 } from "./files";
+
+/** Where the flow files of a repo live: `.nightshift/flows`. */
+const flowsDir = (repoPath: string) => join(repoPath, ".nightshift", "flows");
 
 let repo: string;
 
@@ -35,12 +36,6 @@ const quick = (): Flow => ({
 const unbounded = (): Flow => ({
 	...quick(),
 	edges: [{ id: "again", from: "agent", outcome: "fail", to: "agent" }],
-});
-
-describe("flowsDir", () => {
-	test("is .nightshift/flows under the repo", () => {
-		expect(flowsDir("/repo")).toBe(join("/repo", ".nightshift", "flows"));
-	});
 });
 
 describe("writeFlowFile", () => {
@@ -217,7 +212,7 @@ describe("version 1 files", () => {
 			outputs: [],
 			nodes: [{ prompt: "Build Epic {{epic}}" }],
 		});
-		expect((await loadAllFlows(repo)).old?.version).toBe(5);
+		expect(loaded.flow?.version).toBe(5);
 		expect(await listFlowFiles(repo)).toEqual([
 			expect.objectContaining({ name: "old", errorCount: 0, nodeCount: 1 }),
 		]);
@@ -271,16 +266,18 @@ describe("calls between flow files", () => {
 		edges: [],
 	});
 
-	test("loadAllFlows maps every flow file, null when it does not parse", async () => {
-		expect(await loadAllFlows(repo)).toEqual({});
-		await writeFlowFile(repo, "trace", body());
+	test("a called flow file that is not JSON or not a flow is there, but not valid", async () => {
+		await mkdir(flowsDir(repo), { recursive: true });
 		await writeFile(join(flowsDir(repo), "broken.json"), "not json");
 		await writeFile(join(flowsDir(repo), "wrong.json"), '{"version":2}');
-		const flows = await loadAllFlows(repo);
-		expect(Object.keys(flows).sort()).toEqual(["broken", "trace", "wrong"]);
-		expect(flows.broken).toBeNull();
-		expect(flows.wrong).toBeNull();
-		expect(flows.trace?.inputs[0]?.name).toBe("item");
+		for (const called of ["broken", "wrong"]) {
+			expect(await writeFlowFile(repo, "night", outer(called))).toEqual([
+				expect.objectContaining({
+					nodeId: "each",
+					message: expect.stringContaining("is not valid"),
+				}),
+			]);
+		}
 	});
 
 	test("writeFlowFile checks the called flow against the repo's flows", async () => {

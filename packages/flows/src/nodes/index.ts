@@ -15,7 +15,6 @@ export {
 	cliNameSchema,
 	customAgentSchema,
 	customAgentSlug,
-	customAgentSlugSchema,
 	customHarnessName,
 	customHarnessSchema,
 	effortSchema,
@@ -43,41 +42,32 @@ export {
 	reservedOutcomes,
 	secretNameSchema,
 	type VariableWrite,
-	variableWriteSchema,
 } from "./base";
 export {
 	type CallEach,
 	type CallEachNode,
 	type CallNode,
 	callEachOutputFields,
-	callEachSchema,
 	callNodeSchema,
 	callOutputFields,
 	checkCallNode,
-	commandSourceSchema,
-	filesSourceSchema,
-	jsonSourceSchema,
 	type ListSource,
-	listSourceSchema,
 } from "./call";
 export {
 	type CommandExit,
 	type CommandNode,
 	checkCommandNode,
-	commandExitSchema,
 	commandExits,
 	commandNodeSchema,
 	commandOutputFields,
 	DEFAULT_COMMAND_EXITS,
 	exitFor,
-	LEGACY_COMMAND_EXITS,
 	STANDARD_EXIT_CODES,
 } from "./command";
 export {
 	checkDecisionNode,
 	type DecidedBy,
 	type DecisionNode,
-	decidedBySchema,
 	decisionNodeSchema,
 	decisionOutputFields,
 } from "./decision";
@@ -100,7 +90,6 @@ export {
 	type ValueBy,
 	type ValueDeciderName,
 	type ValueNode,
-	valueBySchema,
 	valueDeciderNameSchema,
 	valueNodeSchema,
 	valueOutputFields,
@@ -111,5 +100,4 @@ export {
 	type WaitUntil,
 	waitNodeSchema,
 	waitOutputFields,
-	waitUntilSchema,
 } from "./wait";
