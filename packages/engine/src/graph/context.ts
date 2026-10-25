@@ -96,15 +96,12 @@ export type StepContext = {
 	 * current numbers, in bodies too.
 	 */
 	policy(): ResolvedPolicy;
-	/** `append` writes a fact; `events(runId)` reads the log for lookups. */
-	log: RunLog;
 	/**
-	 * Runs `fn` as one write of the drive (`fence.ts`): it begins only while
-	 * the run's fence is open, and a stop waits for it to settle. The step
-	 * runner writes a row and the event that names it in one, so a stop
-	 * never leaves a row without its event.
+	 * `append` writes a fact, through the drive's fence (`fence.ts`), in one
+	 * batch with the row it names: a stop never leaves a row without its
+	 * event. `events(runId)` reads the log for lookups.
 	 */
-	write<T>(fn: () => Promise<T>): Promise<T>;
+	log: RunLog;
 	bus: RunBus;
 	/**
 	 * Opens a step's transcript in this computer's data folder for

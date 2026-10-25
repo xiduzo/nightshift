@@ -486,20 +486,9 @@ export async function beginStep(
 		const logPath = ctx.kindOf(node).logsCommandOutput(node)
 			? commandLogPath(ctx.dataDir, runId, stepId)
 			: null;
-		// The row and its event are one write: a stop lands before or after both.
-		await ctx.write(async () => {
-			await ctx.db.insert(stepTable).values({
-				id: stepId,
-				spaceId: ctx.run.spaceId,
-				runId,
-				nodeId: node.id,
-				nodeType: node.type,
-				visit,
-				transcriptPath: path,
-				// The Device the step runs on (its Placement), not the Walker.
-				deviceId: device.id,
-			});
-			await ctx.log.append({
+		// The row and its event are one batch: a stop lands before or after both.
+		await ctx.log.append(
+			{
 				type: "StepStarted",
 				runId,
 				stepId,
@@ -513,8 +502,23 @@ export async function beginStep(
 					deviceId: device.id,
 					...budget,
 				},
-			});
-		});
+			},
+			{
+				before: [
+					ctx.db.insert(stepTable).values({
+						id: stepId,
+						spaceId: ctx.run.spaceId,
+						runId,
+						nodeId: node.id,
+						nodeType: node.type,
+						visit,
+						transcriptPath: path,
+						// The Device the step runs on (its Placement), not the Walker.
+						deviceId: device.id,
+					}),
+				],
+			},
+		);
 	} else {
 		existing = deriveSteps(logged).find((s) => s.id === start.stepId) ?? null;
 		if (!existing) throw new Error(`Step not found: ${start.stepId}`);
@@ -605,39 +609,47 @@ export async function beginStep(
 		},
 		async session(started) {
 			const sessionId = randomUUID();
-			await ctx.write(async () => {
-				await ctx.db.insert(agentSession).values({
-					id: sessionId,
-					spaceId: ctx.run.spaceId,
-					runId,
-					stepId,
-					prompt: started.prompt,
-				});
-				await ctx.log.append({
+			await ctx.log.append(
+				{
 					type: "SessionStarted",
 					runId,
 					stepId,
 					sessionId,
 					payload: started,
-				});
-			});
+				},
+				{
+					before: [
+						ctx.db.insert(agentSession).values({
+							id: sessionId,
+							spaceId: ctx.run.spaceId,
+							runId,
+							stepId,
+							prompt: started.prompt,
+						}),
+					],
+				},
+			);
 			changed();
 			return {
 				id: sessionId,
 				async assigned(harnessSessionId, model) {
-					await ctx.write(async () => {
-						await ctx.db
-							.update(agentSession)
-							.set({ harnessSessionId })
-							.where(eq(agentSession.id, sessionId));
-						await ctx.log.append({
+					await ctx.log.append(
+						{
 							type: "HarnessSessionAssigned",
 							runId,
 							stepId,
 							sessionId,
 							payload: { harnessSessionId, model },
-						});
-					});
+						},
+						{
+							before: [
+								ctx.db
+									.update(agentSession)
+									.set({ harnessSessionId })
+									.where(eq(agentSession.id, sessionId)),
+							],
+						},
+					);
 					changed();
 				},
 				async spent(payload) {

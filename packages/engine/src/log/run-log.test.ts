@@ -175,6 +175,37 @@ describe("run log", () => {
 		expect(await log.derive(["r1"], deriveRunStatus)).toEqual(statuses);
 	});
 
+	test("an append and the rows it names land in one batch, or not at all", async () => {
+		const log = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+		const projectRow = (id: string) =>
+			sandbox.db
+				.insert(project)
+				.values({ id, spaceId: sandbox.spaceId, name: id });
+		const projectIds = async () =>
+			(await sandbox.db.select({ id: project.id }).from(project)).map(
+				(row) => row.id,
+			);
+		const logged = await log.append(started("r1"), {
+			before: [projectRow("kept")],
+		});
+		expect(await projectIds()).toContain("kept");
+		expect(await log.events("r1")).toEqual([logged]);
+
+		await sandbox.db.$client.execute(
+			"CREATE TRIGGER refuse BEFORE INSERT ON event WHEN NEW.type = 'EdgeTaken' BEGIN SELECT RAISE(ABORT, 'refused'); END",
+		);
+		await expect(
+			log.append(edge("r1", 1), { before: [projectRow("lost")] }),
+		).rejects.toThrow();
+		expect(await projectIds()).not.toContain("lost");
+		// A write after the event that fails takes the event with it.
+		await expect(
+			log.append(ended("r1"), { after: [projectRow("kept")] }),
+		).rejects.toThrow();
+		expect(await log.events("r1")).toEqual([logged]);
+		expect(await fromDb("r1")).toEqual([logged]);
+	});
+
 	test("ended runs are dropped least recently used first; open runs stay", async () => {
 		const log = createRunLog(sandbox.db, {
 			walkerId: sandbox.deviceId,

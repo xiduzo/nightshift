@@ -358,26 +358,34 @@ export function createProjects(deps: ProjectsDeps) {
 				// The Space knows of the Clone first: through its Host, when a Host keeps it.
 				await recordCloneHere(known.id, spaceId, deviceId);
 				// A Clone that moved, or a removed project's: this folder now.
-				if (elsewhere) {
-					await db
-						.update(clone)
-						.set({ path })
-						.where(
-							and(eq(clone.projectId, known.id), eq(clone.deviceId, deviceId)),
-						);
-				} else {
-					await db.insert(clone).values({
-						id: randomUUID(),
-						spaceId,
-						projectId: known.id,
-						deviceId,
-						path,
-					});
-				}
-				await log.append({
-					type: "CloneAdded",
-					payload: { projectId: known.id, deviceId, path },
-				});
+				// The row and its event are one batch.
+				await log.append(
+					{
+						type: "CloneAdded",
+						payload: { projectId: known.id, deviceId, path },
+					},
+					{
+						before: [
+							elsewhere
+								? db
+										.update(clone)
+										.set({ path })
+										.where(
+											and(
+												eq(clone.projectId, known.id),
+												eq(clone.deviceId, deviceId),
+											),
+										)
+								: db.insert(clone).values({
+										id: randomUUID(),
+										spaceId,
+										projectId: known.id,
+										deviceId,
+										path,
+									}),
+						],
+					},
+				);
 				return restore({ ...known, repoPath: path });
 			}
 

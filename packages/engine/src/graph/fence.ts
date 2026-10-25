@@ -18,9 +18,10 @@ import { LibsqlSaver } from "./checkpointer";
  * A stop does not wait for the drive to unwind (a harness that hangs, or a
  * process whose timers stopped, would hold it forever). It closes the
  * drive's fence and writes the run's end itself. A drive writes the run
- * only through its thread: the log (`StepContext.log`), the `step` and
- * `agent_session` rows (`StepContext.write`) and the checkpoint saver (the
- * thread's graph and every body graph in it). All go through the fence, so
+ * only through its thread: the log (`StepContext.log`, which writes the
+ * `step` and `agent_session` rows in one batch with the events that name
+ * them) and the checkpoint saver (the thread's graph and every body graph
+ * in it). All go through the fence, so
  * a drive that wakes later, or never, writes nothing more: no `StepEnded`,
  * no `RunEnded`, no edge, no step, no session row, no checkpoint. Its first
  * write throws `FencedError`, and the runner drops the drive quietly.
@@ -28,7 +29,7 @@ import { LibsqlSaver } from "./checkpointer";
  * A write that started before the fence closed is in flight: `close`
  * resolves once those settled, so the stop reads the log after them and
  * never ends a step twice. A write made inside another write of the same
- * fence is part of it: a row and the event that names it are one write,
+ * fence is part of it. A row and the event that names it are one batch,
  * so a stop never lands between them.
  *
  * Transcript entries are not fenced: they are the harness's last words,
@@ -84,7 +85,7 @@ export function createFence(runId: string): Fence {
 export function fencedLog(log: RunLog, fence: Fence): RunLog {
 	return {
 		...log,
-		append: (input) => fence.write(() => log.append(input)),
+		append: (input, writes) => fence.write(() => log.append(input, writes)),
 	};
 }
 

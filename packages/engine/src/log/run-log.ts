@@ -7,6 +7,7 @@ import {
 	appendEvent,
 	type EngineEventType,
 	type EventInput,
+	type EventWrites,
 	groupByRun,
 	type LoggedEvent,
 	parseEventRow,
@@ -18,9 +19,10 @@ import {
  * engine goes through `append`, so the copy here is exactly the log on disk.
  *
  * - A run's log is read from the database once, on its first use.
- * - `append` writes the event first and keeps it only once the insert has
- *   returned: nothing is kept (or published by the caller) before it is
- *   durable. An insert that throws leaves the copy as it was.
+ * - `append` writes the event first, in one batch with the rows it names,
+ *   and keeps it only once the batch committed: nothing is kept (or
+ *   published by the caller) before it is durable. A write that throws
+ *   leaves the copy as it was.
  * - Open runs (running, waiting, sleeping) stay in memory. The logs of ended
  *   runs are dropped, least recently used first, beyond `maxIdleEvents`.
  * - `derive` keeps a value derived from a run's log (a run summary, an open
@@ -49,16 +51,6 @@ export type ForeignEvent = {
 	at: number;
 	walkerId: string;
 	walkerSeq: number;
-};
-
-/**
- * Statements that commit with the events of an ingest, in one
- * transaction: `before` the events (the rows they name), `after` them
- * (what the log says now: a run's Walker, a session's harness id).
- */
-export type IngestWrites = {
-	before?: readonly BatchItem<"sqlite">[];
-	after?: readonly BatchItem<"sqlite">[];
 };
 
 /** Called with the events that just landed in this Replica. */
@@ -263,17 +255,19 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 		walkerId,
 
 		/**
-		 * Appends one event as the Walker's next. It is kept only after the
-		 * insert returned, with the seq and time the database gave it.
+		 * Appends one event as the Walker's next, in one batch with `writes`
+		 * (the row the event names, say). It is kept only after the batch
+		 * committed, with the seq and time the database gave it.
 		 */
 		async append<T extends EngineEventType>(
 			input: EventInput<T>,
+			writes?: EventWrites,
 		): Promise<LoggedEvent> {
 			const walker = await walkerId();
 			const logged = await stampedAppend(
 				input.runId,
 				input.payload,
-				(payload) => appendEvent(db, { ...input, payload }, walker),
+				(payload) => appendEvent(db, { ...input, payload }, walker, writes),
 			);
 			keep(logged);
 			landed([logged]);
@@ -293,7 +287,7 @@ export function createRunLog(db: Database, options: RunLogOptions) {
 		 */
 		async ingest(
 			events: readonly ForeignEvent[],
-			writes: IngestWrites = {},
+			writes: EventWrites = {},
 		): Promise<LoggedEvent[]> {
 			const inserts = events.map((e) =>
 				db

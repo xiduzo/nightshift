@@ -581,10 +581,10 @@ describe("the Gate node", () => {
 		const { log } = h;
 		h.ctx.log = {
 			...log,
-			append: (e) =>
+			append: (e, writes) =>
 				e.type === "GateOpened"
 					? Promise.reject(new Error("disk full"))
-					: log.append(e),
+					: log.append(e, writes),
 		};
 		const { parked } = await drive(h, { inputs: { task: "it" } });
 		expect(parked).toEqual([

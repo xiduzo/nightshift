@@ -15,6 +15,7 @@ import type {
 	WaitUntil,
 } from "@nightshift/flows";
 import { sql } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 
 import type { RunStatus } from "../run-status";
 import { upgradePayload } from "./upgrade-payload";
@@ -497,19 +498,32 @@ export type EventInput<T extends EngineEventType> = {
 };
 
 /**
+ * Statements that commit in one batch with the events they go with:
+ * `before` the events (the rows they name), `after` them (what the log
+ * says now: a run's Walker, a session's harness id).
+ */
+export type EventWrites = {
+	before?: readonly BatchItem<"sqlite">[];
+	after?: readonly BatchItem<"sqlite">[];
+};
+
+/**
  * Appends one event as `walkerId`'s next and returns it as committed, with
  * its seq and time. The Walker's count (`walker_seq`) is taken in the same
  * statement, so two appends cannot get one number. The event's Space is
  * its run's, or for a fact of no run its project's (`payload.projectId`),
- * read in the same statement too. The engine appends through its run log
- * (`run-log.ts`), never here directly.
+ * read in the same statement too. `writes` commit in one batch with the
+ * event: a row and the event that names it land together or not at all.
+ * The engine appends through its run log (`run-log.ts`), never here
+ * directly.
  */
 export async function appendEvent<T extends EngineEventType>(
 	db: Database,
 	input: EventInput<T>,
 	walkerId: string,
+	writes: EventWrites = {},
 ): Promise<LoggedEvent> {
-	const [row] = await db
+	const insert = db
 		.insert(event)
 		.values({
 			runId: input.runId ?? null,
@@ -522,6 +536,17 @@ export async function appendEvent<T extends EngineEventType>(
 			walkerSeq: sql`(select coalesce(max(${event.walkerSeq}), 0) + 1 from ${event} where ${event.walkerId} = ${walkerId})`,
 		})
 		.returning();
+	const before = writes.before ?? [];
+	const after = writes.after ?? [];
+	const [row] =
+		before.length === 0 && after.length === 0
+			? await insert
+			: ((
+					await db.batch([...before, insert, ...after] as unknown as [
+						BatchItem<"sqlite">,
+						...BatchItem<"sqlite">[],
+					])
+				)[before.length] as (typeof event.$inferSelect)[]);
 	if (!row) throw new Error(`Could not append ${input.type}.`);
 	return parseEventRow(row);
 }

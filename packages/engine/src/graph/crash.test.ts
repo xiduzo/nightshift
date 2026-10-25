@@ -176,23 +176,13 @@ function faultyThreads(fault: Fault | null) {
 	const open: typeof openThread = (row, deps) => {
 		const thread = openThread(row, deps);
 		const { ctx, saver } = thread;
-		const { log, write } = ctx;
-		let inWrite = 0;
-		ctx.write = async (fn) => {
-			await point("a row and its event");
-			inWrite += 1;
-			try {
-				return await write(fn);
-			} finally {
-				inWrite -= 1;
-			}
-		};
+		const { log } = ctx;
 		ctx.log = {
 			...log,
-			append: async (input) => {
-				// A row and its event are one write, counted once.
-				if (inWrite === 0) await point(input.type);
-				return log.append(input);
+			// A row and its event are one batch, counted once.
+			append: async (input, writes) => {
+				await point(input.type);
+				return log.append(input, writes);
 			},
 		};
 		const put = saver.put.bind(saver);

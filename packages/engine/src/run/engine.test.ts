@@ -887,12 +887,12 @@ describe("stop and resume", () => {
 		let failed = false;
 		const runLog: RunLog = {
 			...inner,
-			async append(e) {
+			async append(e, writes) {
 				if (e.type === "RunEnded" && !failed) {
 					failed = true;
 					throw new Error("The disk is full.");
 				}
-				return inner.append(e);
+				return inner.append(e, writes);
 			},
 		};
 		const engine = makeEngine(scriptedHarness().harness, {}, { runLog });
@@ -1090,14 +1090,14 @@ describe("stop and resume", () => {
 			let held: Promise<void> | null = null;
 			const runLog: RunLog = {
 				...inner,
-				async append(input) {
+				async append(input, writes) {
 					if (input.type === "RunResumed" && held === null) {
 						held = new Promise<void>((resolve) => {
 							release = resolve;
 						});
 						await held;
 					}
-					return inner.append(input);
+					return inner.append(input, writes);
 				},
 			};
 			const { harness, sessions } = scriptedHarness();

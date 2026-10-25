@@ -196,21 +196,28 @@ export function createDeviceRegistry(deps: {
 				homeHost: input.homeHost,
 				revokedAt: null,
 			};
-			await db
-				.insert(device)
-				.values({ id: input.id, ...values })
-				.onConflictDoUpdate({ target: device.id, set: values });
-			await log.append({
-				type: "DeviceJoined",
-				payload: {
-					deviceId: input.id,
-					name: input.name,
-					platform: input.platform,
-					ownerId: input.ownerId,
-					home: input.homeHost !== null,
+			// The row and its event are one batch.
+			await log.append(
+				{
+					type: "DeviceJoined",
+					payload: {
+						deviceId: input.id,
+						name: input.name,
+						platform: input.platform,
+						ownerId: input.ownerId,
+						home: input.homeHost !== null,
+					},
+					spaceId: await spaceOf(input.ownerId),
 				},
-				spaceId: await spaceOf(input.ownerId),
-			});
+				{
+					before: [
+						db
+							.insert(device)
+							.values({ id: input.id, ...values })
+							.onConflictDoUpdate({ target: device.id, set: values }),
+					],
+				},
+			);
 			const joined = await row(input.id);
 			if (!joined) throw new Error("The Device was not recorded.");
 			return toPaired(joined);
@@ -268,15 +275,21 @@ export function createDeviceRegistry(deps: {
 				);
 			}
 			if (found.revokedAt) return;
-			await db
-				.update(device)
-				.set({ revokedAt: new Date(now()) })
-				.where(eq(device.id, id));
-			await log.append({
-				type: "DeviceRevoked",
-				payload: { deviceId: id },
-				spaceId: await spaceOf(found.ownerId ?? ""),
-			});
+			await log.append(
+				{
+					type: "DeviceRevoked",
+					payload: { deviceId: id },
+					spaceId: await spaceOf(found.ownerId ?? ""),
+				},
+				{
+					before: [
+						db
+							.update(device)
+							.set({ revokedAt: new Date(now()) })
+							.where(eq(device.id, id)),
+					],
+				},
+			);
 			if (online.delete(id)) await logPresence("DeviceOffline", found);
 		},
 

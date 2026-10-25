@@ -196,12 +196,12 @@ describe("take: a stop", () => {
 		const runner = testRunner(h, {
 			log: {
 				...h.log,
-				async append(event) {
+				async append(event, writes) {
 					if (event.type === "RunEnded" && !failed) {
 						failed = true;
 						throw new Error("The disk is full.");
 					}
-					return h.log.append(event);
+					return h.log.append(event, writes);
 				},
 			},
 		});

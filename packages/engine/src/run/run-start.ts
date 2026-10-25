@@ -3,6 +3,7 @@ import type { Database } from "@nightshift/db";
 import { run } from "@nightshift/db/schema";
 import type { Flow, FlowNode, FlowNodeType } from "@nightshift/flows";
 import { Refusal } from "@nightshift/refusal";
+import { eq } from "drizzle-orm";
 import type { StartRunInput } from "../contract";
 import type { Capabilities, Device } from "../device";
 import {
@@ -270,40 +271,45 @@ export function createRunStart(deps: RunStartDeps) {
 					...(author ? { author } : {}),
 				});
 				const walkerId = await log.walkerId();
-				const [row] = await db
-					.insert(run)
-					.values({
-						id: runId,
-						// The run is in its project's Space, also when the scheduler starts it.
-						spaceId: projectRow.spaceId,
-						projectId: projectRow.id,
-						flowName,
-						flow: JSON.stringify(flow),
-						bodyFlows: JSON.stringify(calledFlows),
-						title,
-						worktreePath: worktree.worktreePath,
-						branch: worktree.branch,
-						baseRef: worktree.baseRef,
-						walkerId,
-						// The walk reads the plan, and decides nothing again.
-						...planColumns(planned.plan),
-					})
-					.returning();
-				if (!row) throw new Error("Could not create the run.");
-				await log.append({
-					type: "RunStarted",
-					runId,
-					payload: {
-						projectId: projectRow.id,
-						flowName,
-						title,
-						start: flow.start,
-						stopAt: prepared.stopAt,
-						inputs,
-						trigger,
-						startedBy,
+				// The row and the event that names it are one batch.
+				await log.append(
+					{
+						type: "RunStarted",
+						runId,
+						payload: {
+							projectId: projectRow.id,
+							flowName,
+							title,
+							start: flow.start,
+							stopAt: prepared.stopAt,
+							inputs,
+							trigger,
+							startedBy,
+						},
 					},
-				});
+					{
+						before: [
+							db.insert(run).values({
+								id: runId,
+								// The run is in its project's Space, also when the scheduler starts it.
+								spaceId: projectRow.spaceId,
+								projectId: projectRow.id,
+								flowName,
+								flow: JSON.stringify(flow),
+								bodyFlows: JSON.stringify(calledFlows),
+								title,
+								worktreePath: worktree.worktreePath,
+								branch: worktree.branch,
+								baseRef: worktree.baseRef,
+								walkerId,
+								// The walk reads the plan, and decides nothing again.
+								...planColumns(planned.plan),
+							}),
+						],
+					},
+				);
+				const [row] = await db.select().from(run).where(eq(run.id, runId));
+				if (!row) throw new Error("Could not create the run.");
 				await log.append({
 					type: "WorktreeCreated",
 					runId,
