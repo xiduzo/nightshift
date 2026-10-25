@@ -18,6 +18,7 @@ import {
 } from "../log";
 import { addCost, type CostTally, NO_COST, sessionCost } from "./cost";
 import {
+	deriveCalledTraversals,
 	deriveEndedAt,
 	deriveGateWaits,
 	deriveInputs,
@@ -437,8 +438,9 @@ export function toRunDetail(
 		flow: parseRunFlow(row),
 		calledFlows: parseCalledFlows(row),
 		steps: deriveSteps(events).map((step) => toStepSummary(step, deviceOf)),
-		// Edges of the top-level flow; body edges count per item.
+		// Edges of the top-level flow; a called flow's edges count per scope.
 		traversals: deriveTraversals(events),
+		calledTraversals: deriveCalledTraversals(events),
 		takeOverCommand: takeOverCommand(row.worktreePath, last, harnessOf),
 		resumes: deriveResumes(events),
 		commands,

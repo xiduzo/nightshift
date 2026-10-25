@@ -175,6 +175,12 @@ export const runDetailSchema = exact<RunDetail>()(
 		calledFlows: z.record(z.string(), flowSchema),
 		steps: z.array(stepSummarySchema),
 		traversals: z.record(z.string(), z.number()),
+		calledTraversals: z.array(
+			z.object({
+				scope: scopeSchema,
+				traversals: z.record(z.string(), z.number()),
+			}),
+		),
 		takeOverCommand: z.string().nullable(),
 		resumes: z.array(
 			z.object({

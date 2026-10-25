@@ -36,7 +36,6 @@ import { useRunStream } from "../hooks/use-run-stream";
 import {
 	calledFlowName,
 	calledFlowOf,
-	derivedTraversals,
 	type ItemScope,
 	nodeOfStep,
 	stepAtScope,
@@ -44,6 +43,7 @@ import {
 	stepRunsEach,
 	stepsIn,
 	stepsUnder,
+	traversalsIn,
 } from "../lib/run-steps";
 import { runQueries } from "../queries";
 import { StepTranscript } from "../transcript/step-transcript";
@@ -205,9 +205,7 @@ export function RunPage({ runId }: { runId: string }) {
 	const graphFlow = (focus && focusFlow) || runData.flow;
 	const graphScope: ItemScope = focus && focusFlow ? focus : null;
 	const graphSteps = stepsIn(steps, graphScope);
-	const graphTraversals = graphScope
-		? derivedTraversals(graphFlow, graphSteps)
-		: runData.traversals;
+	const graphTraversals = traversalsIn(runData, graphScope);
 	const graphSelected = selectedStep
 		? stepAtScope(steps, selectedStep, graphScope)
 		: undefined;

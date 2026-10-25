@@ -329,6 +329,12 @@ describe("Call with each", () => {
 		expect(new Set(bodySteps.map((s) => s.scope?.parentStepId))).toEqual(
 			new Set([loop.id]),
 		);
+		// Each item walked the body's edge once; the top-level flow has none.
+		expect(detail.traversals).toEqual({});
+		expect(detail.calledTraversals).toEqual([
+			{ scope: { parentStepId: loop.id, itemId: "2" }, traversals: { b1: 1 } },
+			{ scope: { parentStepId: loop.id, itemId: "1" }, traversals: { b1: 1 } },
+		]);
 
 		const transcript = await readTranscript(started.id, loop.id);
 		expect(transcript.map((e) => e.event.type)).toEqual([

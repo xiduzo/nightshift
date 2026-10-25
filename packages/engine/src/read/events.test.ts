@@ -13,6 +13,7 @@ import { NO_COST, sessionCost } from "./cost";
 import {
 	countDaemonResumes,
 	countStepsSinceWalkBegan,
+	deriveCalledTraversals,
 	deriveGateWaits,
 	deriveOpenGate,
 	deriveRunState,
@@ -718,6 +719,27 @@ describe("Call scopes", () => {
 		expect(deriveTraversals(b.events, key)).toEqual({ e1: 1 });
 		expect(lastHarnessSessionOfNode(b.events, "worker", key)).toBe("h-1");
 		expect(lastHarnessSessionOfNode(b.events, "worker")).toBeNull();
+	});
+
+	test("each called flow's edge counts come per scope, the top level apart", () => {
+		const b = nested();
+		const taken = (edgeId: string, itemId: string) =>
+			b.push("EdgeTaken", {
+				edgeId,
+				from: "worker",
+				to: "check",
+				outcome: "pass",
+				scope: { parentStepId: "inner", itemId },
+			});
+		taken("e1", "a1");
+		taken("e2", "a2");
+		taken("e1", "a1");
+		b.edge("e9", "worker", "check");
+		expect(deriveCalledTraversals(b.events)).toEqual([
+			{ scope: { parentStepId: "inner", itemId: "a1" }, traversals: { e1: 2 } },
+			{ scope: { parentStepId: "inner", itemId: "a2" }, traversals: { e2: 1 } },
+		]);
+		expect(deriveTraversals(b.events)).toEqual({ e9: 1 });
 	});
 
 	test("items derive their states, blocked ones included", () => {

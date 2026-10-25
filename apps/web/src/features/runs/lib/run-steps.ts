@@ -6,7 +6,7 @@ import {
 	runsEach,
 } from "@nightshift/flows";
 
-import type { ItemSummary, StepSummary } from "@/shared/api";
+import type { ItemSummary, RunDetail, StepSummary } from "@/shared/api";
 
 /**
  * The steps of a run form a tree: the top-level flow's steps, and under each
@@ -185,28 +185,18 @@ export function itemsOf(
 }
 
 /**
- * How often the steps of one scope took each edge of its flow: one step to
- * the next, on the first step's outcome. The engine counts edges per run; a
- * called flow's own walk is derived here.
+ * How often the steps of one scope took each edge of its flow, as the engine
+ * logged them: the run's own flow at the top level, a called flow per scope.
  */
-export function derivedTraversals(
-	flow: Flow,
-	steps: readonly StepSummary[],
+export function traversalsIn(
+	run: Pick<RunDetail, "traversals" | "calledTraversals">,
+	scope: ItemScope,
 ): Record<string, number> {
-	const counts: Record<string, number> = {};
-	for (let index = 1; index < steps.length; index++) {
-		const from = steps[index - 1];
-		const to = steps[index];
-		if (!from || !to || from.outcome === null) continue;
-		const edge = flow.edges.find(
-			(candidate) =>
-				candidate.from === from.nodeId &&
-				candidate.outcome === from.outcome &&
-				candidate.to === to.nodeId,
-		);
-		if (edge) counts[edge.id] = (counts[edge.id] ?? 0) + 1;
-	}
-	return counts;
+	if (!scope) return run.traversals;
+	return (
+		run.calledTraversals.find((entry) => sameScope(entry.scope, scope))
+			?.traversals ?? {}
+	);
 }
 
 /** The chain of scopes from the top down to `scope`, top first, `scope` last. */

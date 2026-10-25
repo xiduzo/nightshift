@@ -17,7 +17,7 @@ import {
 	ofType,
 	withEnclosing,
 } from "./derive-steps";
-import type { RunResume } from "./views";
+import type { RunResume, ScopeTraversals } from "./views";
 
 /**
  * Pure projections of a run's event log onto the run as a whole: its status
@@ -243,6 +243,30 @@ export function deriveTraversals(
 		counts[e.payload.edgeId] = (counts[e.payload.edgeId] ?? 0) + 1;
 	}
 	return counts;
+}
+
+/**
+ * How often each called flow took each of its edges: one entry per scope
+ * (a Call step, or one element of a Call with `each`) that took an edge,
+ * in the order of its first edge. The top level is `deriveTraversals`.
+ */
+export function deriveCalledTraversals(
+	events: readonly LoggedEvent[],
+): ScopeTraversals[] {
+	const scopes = new Map<string, ScopeTraversals>();
+	for (const e of ofType(events, "EdgeTaken")) {
+		const scope = e.payload.scope;
+		if (!scope) continue;
+		const key = scopeKey(scope);
+		const entry = scopes.get(key) ?? {
+			scope: { parentStepId: scope.parentStepId, itemId: scope.itemId },
+			traversals: {},
+		};
+		scopes.set(key, entry);
+		entry.traversals[e.payload.edgeId] =
+			(entry.traversals[e.payload.edgeId] ?? 0) + 1;
+	}
+	return [...scopes.values()];
 }
 
 /**

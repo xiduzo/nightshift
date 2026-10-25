@@ -12,6 +12,7 @@ import type {
 	RunStatus,
 	RunTrigger,
 	RunWarningKind,
+	Scope,
 	SessionOutcome,
 	StepOutcome,
 	TranscriptEntry,
@@ -233,8 +234,10 @@ export type RunDetail = RunSummary & {
 	calledFlows: Record<string, Flow>;
 	/** In the order they started. */
 	steps: StepSummary[];
-	/** How often the run took each edge, by edge id. */
+	/** How often the run took each edge of its flow, by edge id. */
 	traversals: Record<string, number>;
+	/** How often each flow a Call step called took each of its edges, per scope. */
+	calledTraversals: ScopeTraversals[];
 	/** The resume command for the last harness session, to take over in a terminal. */
 	takeOverCommand: string | null;
 	/** Every resume, oldest first. */
@@ -248,6 +251,12 @@ export type RunDetail = RunSummary & {
 	handOffs: HandOff[];
 	/** Every value each variable took, in every flow the run ran, oldest first. */
 	variables: VariableChange[];
+};
+
+/** How often the steps of one scope took each edge of their flow, by edge id. */
+export type ScopeTraversals = {
+	scope: Scope;
+	traversals: Record<string, number>;
 };
 
 /** The run's work moved from one Device to another before a step there. */
