@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { FAILURE_MESSAGE, Refusal, wordsFor } from ".";
+import { FAILURE_MESSAGE, Refusal, wordsFor } from "./refusal";
 
 describe("a refusal", () => {
 	test("carries its kind and its words, and keeps its cause for the log", () => {
