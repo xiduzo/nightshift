@@ -1,15 +1,28 @@
 /**
- * Checks the layer map of docs/steering/STRUCTURE.md (section 1).
+ * Checks the package rules of docs/steering/STRUCTURE.md (sections 1 and 3).
  *
- * Every `apps/*` and `packages/*` workspace may depend only on the
- * workspaces its layer allows. Bun links only declared dependencies, so the
- * dependencies in each package.json are the real import graph between
- * workspaces. `@nightshift/config` (shared tsconfig) is allowed everywhere.
+ * (L1) Every `apps/*` and `packages/*` workspace may depend only on the
+ *      workspaces its layer allows. Bun links only declared dependencies,
+ *      so the dependencies in each package.json are the real import graph
+ *      between workspaces. `@nightshift/config` (shared tsconfig) is
+ *      allowed everywhere.
+ * (L2) Every declared workspace dependency is used: a file of the
+ *      workspace imports it (a .ts, .tsx, .js, .mjs, .cjs or .css file), or
+ *      its tsconfig extends it.
+ * (L3) Every entry in `exports` has an importer in another workspace. Tests
+ *      count. A wildcard entry (the shadcn layout) is not checked.
+ * (L4) An entry points at the root `src/index.ts`, a file directly in
+ *      `src/`, or a barrel one folder down (`src/<vertical>/index.ts`,
+ *      `src/testing/index.ts`). A deeper file is a LIGHT_ENTRIES item, with
+ *      its reason. `ui` and `ui-native` keep the shadcn layout.
+ * (L5) The allow-lists of `noRestrictedImports` in biome.json name exactly
+ *      the entries of every package.json.
  *
  *   bun scripts/check-layers.ts
  *
  * Exits 1 and names each violation. Fix the dependency, do not add an
- * exception. If a rule is wrong, change STRUCTURE.md and this map together.
+ * exception. If a rule is wrong, change STRUCTURE.md and this script
+ * together.
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -68,23 +81,18 @@ export const LAYERS: Record<string, Rule> = {
 			"@nightshift/notifications",
 		],
 	},
-	// 6. Apps
+	// 6. Apps. The web app and the phone app read the API's types through
+	// `@nightshift/client`, never from `@nightshift/api` itself.
 	server: { layer: 6, mayImport: "lower" },
 	desktop: { layer: 6, mayImport: ["@nightshift/daemon"] },
 	web: {
 		layer: 6,
-		mayImport: [
-			"@nightshift/client",
-			"@nightshift/api",
-			"@nightshift/flows",
-			"@nightshift/ui",
-		],
+		mayImport: ["@nightshift/client", "@nightshift/flows", "@nightshift/ui"],
 	},
 	mobile: {
 		layer: 6,
 		mayImport: [
 			"@nightshift/client",
-			"@nightshift/api",
 			"@nightshift/flows",
 			"@nightshift/ui-native",
 		],
@@ -93,42 +101,143 @@ export const LAYERS: Record<string, Rule> = {
 
 export const APPS = new Set(["server", "desktop", "web", "mobile"]);
 
+/** The packages in the shadcn layout: their entries point deep (L4). */
+const SHADCN = new Set(["@nightshift/ui", "@nightshift/ui-native"]);
+
 export type Exception = { from: string; to: string; why: string };
 
 /**
- * Known deviations, each with the change that removes it, and each listed
- * in section 8 of STRUCTURE.md. None today. The check fails when an
- * exception is no longer needed, so it cannot outlive its fix.
+ * Known deviations of the layer map (L1), each with the change that removes
+ * it, and each listed in section 8 of STRUCTURE.md. None today. The check
+ * fails when an exception is no longer needed, so it cannot outlive its fix.
  */
 export const EXCEPTIONS: Exception[] = [];
+
+export type EntryException = { entry: string; why: string };
+
+/**
+ * Entries that no other workspace imports yet (L3), each listed in section
+ * 8 of STRUCTURE.md with the change that removes it. The check fails once
+ * another workspace imports the entry.
+ */
+export const ENTRY_EXCEPTIONS: EntryException[] = [
+	{
+		entry: "@nightshift/devices/testing",
+		why: "only the tests of devices use its fakes today",
+	},
+];
+
+/**
+ * Entries that point past a vertical's barrel (L4), with the reason. One
+ * entry per item.
+ */
+export const LIGHT_ENTRIES: Record<string, string> = {
+	// The engine and the web app read what a harness can do without loading
+	// a harness: the barrel of harnesses imports every harness adapter.
+	"@nightshift/agents/harness-facts":
+		"the barrel of harnesses loads every harness",
+};
 
 export type Options = {
 	layers?: Record<string, Rule>;
 	apps?: Set<string>;
 	exceptions?: Exception[];
+	entryExceptions?: EntryException[];
+	lightEntries?: Record<string, string>;
 };
 
 export type Result = {
 	problems: string[];
 	/** How many workspaces it checked. */
 	workspaces: number;
-	/** The exceptions that a dependency still needs. */
-	used: Exception[];
+	/** The exceptions that a dependency or an entry still needs. */
+	used: (Exception | EntryException)[];
 };
 
-type Workspace = { name: string; file: string; deps: string[] };
+type Workspace = {
+	name: string;
+	dir: string;
+	/** Its package.json, relative to the root, with `/`. */
+	file: string;
+	deps: string[];
+	/** Each `exports` key with its target. */
+	exports: Record<string, string>;
+	/** The bare specifiers its files import, and what its tsconfig extends. */
+	specifiers: Set<string>;
+};
+
+/** Folders that hold no source, anywhere: installs and build output. */
+const SKIP_DIRS = new Set(["node_modules", "dist"]);
+/** Folders at the top of a workspace that hold no source of its own. */
+const SKIP_TOP_DIRS = new Set(["build", "ios", "android"]);
+
+const SOURCE = /\.(tsx?|mjs|cjs|js|css)$/;
+
+/** Where a file names a module: imports, exports, require, CSS at-rules. */
+const SPECIFIERS = [
+	/\bfrom\s*["']([^"'\n]+)["']/g,
+	/\bimport\s*["']([^"'\n]+)["']/g,
+	/\bimport\s*\(\s*["']([^"'\n]+)["']/g,
+	/\brequire\s*\(\s*["']([^"'\n]+)["']/g,
+	/@(?:import|plugin|reference)\s+["']([^"'\n]+)["']/g,
+];
+
+function sourceFiles(dir: string, out: string[], top = false): void {
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		const path = join(dir, entry.name);
+		if (entry.isDirectory()) {
+			if (SKIP_DIRS.has(entry.name) || entry.name.startsWith(".")) continue;
+			if (top && SKIP_TOP_DIRS.has(entry.name)) continue;
+			sourceFiles(path, out);
+		} else if (SOURCE.test(entry.name)) out.push(path);
+	}
+}
+
+/** The bare specifiers of a workspace's files and its tsconfig `extends`. */
+function specifiersOf(dir: string): Set<string> {
+	const found = new Set<string>();
+	const files: string[] = [];
+	sourceFiles(dir, files, true);
+	for (const file of files) {
+		const text = readFileSync(file, "utf8");
+		for (const pattern of SPECIFIERS) {
+			for (const match of text.matchAll(pattern)) {
+				const specifier = match[1] as string;
+				if (!specifier.startsWith(".")) found.add(specifier);
+			}
+		}
+	}
+	for (const name of readdirSync(dir)) {
+		if (!/^tsconfig.*\.json$/.test(name)) continue;
+		const text = readFileSync(join(dir, name), "utf8");
+		const extend = /"extends"\s*:\s*(\[[^\]]*\]|"[^"]*")/.exec(text)?.[1];
+		for (const match of (extend ?? "").matchAll(/"([^"]+)"/g))
+			found.add(match[1] as string);
+	}
+	return found;
+}
+
+/** `@scope/name/sub/path` → `@scope/name`, `name/sub` → `name`. */
+function packageOf(specifier: string): string {
+	const parts = specifier.split("/");
+	return specifier.startsWith("@")
+		? parts.slice(0, 2).join("/")
+		: (parts[0] as string);
+}
 
 function workspacesOf(root: string): Workspace[] {
 	const found: Workspace[] = [];
 	for (const group of ["apps", "packages"]) {
-		const dir = join(root, group);
-		if (!existsSync(dir)) continue;
-		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		const groupDir = join(root, group);
+		if (!existsSync(groupDir)) continue;
+		for (const entry of readdirSync(groupDir, { withFileTypes: true })) {
 			if (!entry.isDirectory()) continue;
-			const file = join(dir, entry.name, "package.json");
+			const dir = join(groupDir, entry.name);
+			const file = join(dir, "package.json");
 			if (!existsSync(file)) continue;
 			const pkg = JSON.parse(readFileSync(file, "utf8")) as {
 				name: string;
+				exports?: unknown;
 				[field: string]: unknown;
 			};
 			const deps = new Set<string>();
@@ -141,14 +250,79 @@ function workspacesOf(root: string): Workspace[] {
 				const map = pkg[field] as Record<string, string> | undefined;
 				for (const dep of Object.keys(map ?? {})) deps.add(dep);
 			}
+			const exports: Record<string, string> = {};
+			if (typeof pkg.exports === "string") exports["."] = pkg.exports;
+			else if (pkg.exports && typeof pkg.exports === "object") {
+				for (const [key, value] of Object.entries(pkg.exports)) {
+					const target =
+						typeof value === "string"
+							? value
+							: Object.values(value as Record<string, unknown>).find(
+									(v) => typeof v === "string",
+								);
+					if (typeof target === "string") exports[key] = target;
+				}
+			}
 			found.push({
 				name: pkg.name,
+				dir,
 				file: relative(root, file).split(sep).join("/"),
 				deps: [...deps],
+				exports,
+				specifiers: specifiersOf(dir),
 			});
 		}
 	}
 	return found;
+}
+
+/** `@nightshift/agents` + `./types` → `@nightshift/agents/types`. */
+const entryName = (name: string, key: string) =>
+	key === "." ? name : `${name}/${key.replace(/^\.\//, "")}`;
+
+/** L4: the root index, a file directly in src/, or a barrel one folder down. */
+const shallowEntry = (target: string) =>
+	/^\.\/src\/[^/]+\.tsx?$/.test(target) ||
+	/^\.\/src\/[^/]+\/index\.tsx?$/.test(target);
+
+/** The full allow-lists of `noRestrictedImports` in biome.json (L5). */
+function biomeAllowLists(
+	text: string,
+): { where: string; entries: Set<string> }[] {
+	const lists: { where: string; entries: Set<string> }[] = [];
+	const visit = (value: unknown, where: string): void => {
+		if (Array.isArray(value)) {
+			value.forEach((item, i) => {
+				visit(item, `${where}[${i}]`);
+			});
+			return;
+		}
+		if (!value || typeof value !== "object") return;
+		const record = value as Record<string, unknown>;
+		const group = record.group;
+		if (
+			Array.isArray(group) &&
+			typeof group[0] === "string" &&
+			group[0].endsWith("/**") &&
+			typeof record.message === "string" &&
+			record.message.startsWith("Import a package by an entry")
+		) {
+			lists.push({
+				where,
+				entries: new Set(
+					group
+						.filter((g): g is string => typeof g === "string")
+						.filter((g) => g.startsWith("!"))
+						.map((g) => g.slice(1)),
+				),
+			});
+			return;
+		}
+		for (const [key, inner] of Object.entries(record))
+			visit(inner, where ? `${where}.${key}` : key);
+	};
+	visit(JSON.parse(text), "");
+	return lists;
 }
 
 /**
@@ -159,6 +333,8 @@ export function checkLayers(root: string, options: Options = {}): Result {
 	const layers = options.layers ?? LAYERS;
 	const apps = options.apps ?? APPS;
 	const exceptions = options.exceptions ?? EXCEPTIONS;
+	const entryExceptions = options.entryExceptions ?? ENTRY_EXCEPTIONS;
+	const lightEntries = options.lightEntries ?? LIGHT_ENTRIES;
 
 	const allowed = (name: string): Set<string> => {
 		const rule = layers[name];
@@ -174,8 +350,9 @@ export function checkLayers(root: string, options: Options = {}): Result {
 	const all = workspacesOf(root);
 	const names = new Set(all.map((ws) => ws.name));
 	const problems: string[] = [];
-	const used = new Set<Exception>();
+	const used = new Set<Exception | EntryException>();
 
+	// (L1) The layer map, and (L2) every workspace dependency is used.
 	for (const ws of all) {
 		const rule = layers[ws.name];
 		if (!rule) {
@@ -185,9 +362,15 @@ export function checkLayers(root: string, options: Options = {}): Result {
 			continue;
 		}
 		const ok = allowed(ws.name);
+		const imported = new Set([...ws.specifiers].map(packageOf));
 		for (const dep of ws.deps) {
 			// Only dependencies on other workspaces count.
 			if (!names.has(dep)) continue;
+			if (!imported.has(dep)) {
+				problems.push(
+					`${ws.file}: "${ws.name}" declares "${dep}", but no file imports it. Remove the dependency.`,
+				);
+			}
 			if (EVERYWHERE.has(dep)) continue;
 			const exception = exceptions.find(
 				(e) => e.from === ws.name && e.to === dep,
@@ -220,6 +403,74 @@ export function checkLayers(root: string, options: Options = {}): Result {
 		}
 	}
 
+	// (L3) Every entry has an importer in another workspace, and (L4) it
+	// points at an allowed file.
+	const entries = new Set<string>();
+	const seenLight = new Set<string>();
+	for (const ws of all) {
+		for (const [key, target] of Object.entries(ws.exports)) {
+			const entry = entryName(ws.name, key);
+			entries.add(entry);
+			if (key.includes("*")) continue;
+			const importers = all.filter(
+				(other) => other !== ws && other.specifiers.has(entry),
+			);
+			const exception = entryExceptions.find((e) => e.entry === entry);
+			if (exception) {
+				if (importers.length) {
+					problems.push(
+						`scripts/check-layers.ts: ${importers.map((o) => o.name).join(", ")} import${importers.length === 1 ? "s" : ""} "${entry}" now. Remove its exception.`,
+					);
+				} else used.add(exception);
+			} else if (!importers.length) {
+				problems.push(
+					`${ws.file}: no other workspace imports the entry "${entry}". Remove it from exports.`,
+				);
+			}
+			if (SHADCN.has(ws.name)) continue;
+			if (lightEntries[entry] !== undefined) {
+				seenLight.add(entry);
+				if (shallowEntry(target)) {
+					problems.push(
+						`scripts/check-layers.ts: "${entry}" points at ${target}, which an entry may name. Remove it from LIGHT_ENTRIES.`,
+					);
+				}
+			} else if (!shallowEntry(target)) {
+				problems.push(
+					`${ws.file}: the entry "${entry}" points at ${target}, past a barrel. Point it at src/index.ts, a file directly in src/, or a barrel one folder down (src/<vertical>/index.ts).`,
+				);
+			}
+		}
+	}
+	for (const entry of Object.keys(lightEntries)) {
+		if (!seenLight.has(entry)) {
+			problems.push(
+				`scripts/check-layers.ts: "${entry}" is not an entry of a package.json any more. Remove it from LIGHT_ENTRIES.`,
+			);
+		}
+	}
+
+	// (L5) Biome's allow-lists name exactly these entries.
+	const biome = join(root, "biome.json");
+	if (existsSync(biome)) {
+		for (const { where, entries: listed } of biomeAllowLists(
+			readFileSync(biome, "utf8"),
+		)) {
+			const missing = [...entries].filter((e) => !listed.has(e)).sort();
+			const extra = [...listed].filter((e) => !entries.has(e)).sort();
+			if (missing.length) {
+				problems.push(
+					`biome.json: the allow-list at ${where} lacks ${missing.map((e) => `"!${e}"`).join(", ")}. Every list names every entry.`,
+				);
+			}
+			if (extra.length) {
+				problems.push(
+					`biome.json: the allow-list at ${where} names ${extra.map((e) => `"!${e}"`).join(", ")}, which no package.json exports. Remove ${extra.length === 1 ? "it" : "them"}.`,
+				);
+			}
+		}
+	}
+
 	return { problems, workspaces: all.length, used: [...used] };
 }
 
@@ -229,13 +480,13 @@ if (import.meta.main) {
 	);
 	if (problems.length) {
 		console.error(
-			"Layer check failed (docs/steering/STRUCTURE.md, section 1):\n",
+			"Layer check failed (docs/steering/STRUCTURE.md, sections 1 and 3):\n",
 		);
 		for (const problem of problems) console.error(`- ${problem}`);
 		process.exit(1);
 	}
 	const note = used.length
-		? ` ${used.length} temporary exception(s): ${used.map((e) => `${e.from} -> ${e.to} (${e.why})`).join("; ")}.`
+		? ` ${used.length} temporary exception(s): ${used.map((e) => `${"entry" in e ? e.entry : `${e.from} -> ${e.to}`} (${e.why})`).join("; ")}.`
 		: "";
 	console.log(`Layer check passed: ${workspaces} workspaces.${note}`);
 }

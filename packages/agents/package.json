@@ -4,9 +4,9 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./harness-facts": "./src/harnesses/facts.ts",
-		"./mcp": "./src/tools/mcp.ts",
 		"./pricing": "./src/pricing/index.ts",
-		"./types": "./src/port/types.ts",
+		"./tools": "./src/tools/index.ts",
+		"./types": "./src/port/index.ts",
 		"./testing": "./src/testing/index.ts"
 	},
 	"scripts": {

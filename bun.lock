@@ -39,7 +39,6 @@
         "@better-auth/expo": "catalog:",
         "@expo/metro-runtime": "~58.0.14",
         "@expo/ui": "~58.0.22",
-        "@nightshift/api": "workspace:*",
         "@nightshift/client": "workspace:*",
         "@nightshift/flows": "workspace:*",
         "@nightshift/ui-native": "workspace:*",
@@ -114,7 +113,6 @@
     "apps/web": {
       "name": "web",
       "dependencies": {
-        "@nightshift/api": "workspace:*",
         "@nightshift/client": "workspace:*",
         "@nightshift/flows": "workspace:*",
         "@nightshift/ui": "workspace:*",
@@ -146,7 +144,6 @@
         "zod": "catalog:",
       },
       "devDependencies": {
-        "@nightshift/config": "workspace:*",
         "@tanstack/react-query-devtools": "^5.102.8",
         "@tanstack/react-router-devtools": "^1.167.1",
         "@testing-library/dom": "^10.4.1",

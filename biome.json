@@ -88,8 +88,8 @@
 									"@nightshift/**",
 									"!@nightshift/agents",
 									"!@nightshift/agents/harness-facts",
-									"!@nightshift/agents/mcp",
 									"!@nightshift/agents/pricing",
+									"!@nightshift/agents/tools",
 									"!@nightshift/agents/types",
 									"!@nightshift/agents/testing",
 									"!@nightshift/api",
@@ -203,8 +203,8 @@
 											"@nightshift/**",
 											"!@nightshift/agents",
 											"!@nightshift/agents/harness-facts",
-											"!@nightshift/agents/mcp",
 											"!@nightshift/agents/pricing",
+											"!@nightshift/agents/tools",
 											"!@nightshift/agents/types",
 											"!@nightshift/agents/testing",
 											"!@nightshift/api",
@@ -321,8 +321,8 @@
 											"@nightshift/**",
 											"!@nightshift/agents",
 											"!@nightshift/agents/harness-facts",
-											"!@nightshift/agents/mcp",
 											"!@nightshift/agents/pricing",
+											"!@nightshift/agents/tools",
 											"!@nightshift/agents/types",
 											"!@nightshift/agents/testing",
 											"!@nightshift/api",
@@ -392,14 +392,14 @@
 											"@nightshift/engine",
 											"@nightshift/engine/**",
 											"@nightshift/api",
-											"@nightshift/api/context",
+											"@nightshift/api/**",
 											"@nightshift/flows/files",
 											"@nightshift/notifications",
 											"@nightshift/notifications/**",
 											"@nightshift/ui-native",
 											"@nightshift/ui-native/**"
 										],
-										"message": "The web app imports only @nightshift/client, @nightshift/api/client (types), the @nightshift/flows root and @nightshift/ui."
+										"message": "The web app imports only @nightshift/client, the @nightshift/flows root and @nightshift/ui. The API types come through @nightshift/client."
 									}
 								]
 							}
@@ -422,8 +422,8 @@
 											"@nightshift/**",
 											"!@nightshift/agents",
 											"!@nightshift/agents/harness-facts",
-											"!@nightshift/agents/mcp",
 											"!@nightshift/agents/pricing",
+											"!@nightshift/agents/tools",
 											"!@nightshift/agents/types",
 											"!@nightshift/agents/testing",
 											"!@nightshift/api",
@@ -497,12 +497,12 @@
 											"@nightshift/notifications",
 											"@nightshift/notifications/**",
 											"@nightshift/api",
-											"@nightshift/api/context",
+											"@nightshift/api/**",
 											"@nightshift/flows/files",
 											"@nightshift/ui",
 											"@nightshift/ui/**"
 										],
-										"message": "The phone app imports only @nightshift/client, @nightshift/api/client (types), the @nightshift/flows root and @nightshift/ui-native."
+										"message": "The phone app imports only @nightshift/client, the @nightshift/flows root and @nightshift/ui-native. The API types come through @nightshift/client."
 									}
 								]
 							}

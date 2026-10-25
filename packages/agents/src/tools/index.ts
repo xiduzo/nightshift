@@ -18,6 +18,7 @@ export {
 	type McpToolCall,
 	type McpToolInfo,
 	toolCallOf,
+	toolInfo,
 	toolResultText,
 	withMcpClient,
 } from "./mcp";

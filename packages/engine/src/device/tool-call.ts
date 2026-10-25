@@ -4,7 +4,7 @@ import {
 	type McpToolCall,
 	toolInfo,
 	withMcpClient,
-} from "@nightshift/agents/mcp";
+} from "@nightshift/agents/tools";
 import type { McpServerConfig } from "@nightshift/agents/types";
 import type { JsonValue } from "@nightshift/flows";
 

@@ -1,4 +1,4 @@
-import type { McpToolCall } from "@nightshift/agents/mcp";
+import type { McpToolCall } from "@nightshift/agents/tools";
 import {
 	type JsonValue,
 	renderValue,

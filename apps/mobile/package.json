@@ -18,7 +18,6 @@
 		"@better-auth/expo": "catalog:",
 		"@expo/metro-runtime": "~58.0.14",
 		"@expo/ui": "~58.0.22",
-		"@nightshift/api": "workspace:*",
 		"@nightshift/client": "workspace:*",
 		"@nightshift/flows": "workspace:*",
 		"@nightshift/ui-native": "workspace:*",

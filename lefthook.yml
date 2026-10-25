@@ -8,14 +8,23 @@ pre-commit:
       glob: "*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc}"
       run: bun biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
       stage_fixed: true
+    # The layer check reads the dependencies, the entries, what each file
+    # imports and biome's allow-lists.
     - name: layers
       glob:
         - "package.json"
         - "**/package.json"
-        - "scripts/check-layers.ts"
+        - "**/tsconfig*.json"
+        - "biome.json"
+        - "*.{ts,tsx,js,mjs,cjs,css}"
       run: bun scripts/check-layers.ts
+    # The vertical check reads the source, the entries and the path aliases.
     - name: verticals
-      glob: "*.{ts,tsx}"
+      glob:
+        - "*.{ts,tsx}"
+        - "package.json"
+        - "**/package.json"
+        - "**/tsconfig.json"
       run: bun scripts/check-verticals.ts
     - name: check tests
       glob:
