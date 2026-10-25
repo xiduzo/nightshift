@@ -10,7 +10,7 @@ import {
 	type WalkFile,
 	type WalkFiles,
 } from "@nightshift/engine";
-import { Refusal } from "@nightshift/refusal";
+import { Refusal, wordsFor } from "@nightshift/refusal";
 import { eq, sql } from "drizzle-orm";
 import { dropArchive, readCopy, writeArchive } from "../archive";
 import type { ArchiveRef, RunCommand, RunRows, SyncCursors } from "../contract";
@@ -27,6 +27,15 @@ import {
 	type TranscriptFeeds,
 } from "./feeds";
 import { createTakeOvers } from "./take-overs";
+
+/** Why a Command waits: its run is not walked here yet. It comes again. */
+const ON_ITS_WAY = "The run is still on its way to this device.";
+/** Why a Command is not applied: its run moved on from this computer. */
+const MOVED_ON = "The run moved to another device before this reached it.";
+/** Why a Command is not applied: its run ended on another device. */
+const ENDED_ELSEWHERE = "The run ended before this reached it.";
+/** Why a Command is not applied: its run is of another Space here. */
+const NOT_HERE = "This device does not run this run.";
 
 /**
  * Run history between this Replica and its Hosts: the one module both
@@ -88,15 +97,15 @@ export type RunHistoryExchange = {
 	/**
 	 * Applies a Command for a run this computer walks, through `engine`,
 	 * once. Returns why not, or null when it is applied: now, or before
-	 * (its id is in the log). A run that is not walked here waits up to
-	 * `waitMs` (default 30 s) for the rows that move it here. Throws when
-	 * it cannot tell yet (a take-over that has not arrived): the Command
-	 * waits, and comes again.
+	 * (its id is in the log). A run that moved on from here, or that ended
+	 * elsewhere, is a reason. Throws at once while the run is still on its
+	 * way here (`ON_ITS_WAY`: the rows that move it here, or its take-over,
+	 * have not arrived): the Command waits, however long that takes, and
+	 * comes again.
 	 */
 	apply(
 		command: RunCommand,
 		engine: Pick<Engine, "space">,
-		options?: { waitMs?: number },
 	): Promise<string | null>;
 	/**
 	 * What the Host's archive takes after a pushed batch: the files of its
@@ -224,32 +233,38 @@ export function createRunHistoryExchange(deps: {
 		}
 	}
 
-	/** Whether the run of the Space is walked here, as its row says. */
-	async function walkedHere(runId: string, spaceId: string) {
-		const owner = await runOwner(runId);
-		return (
-			owner !== null &&
-			owner.spaceId === spaceId &&
-			(await here()).includes(owner.walkerId)
-		);
-	}
-
 	/**
-	 * Waits until the run is walked here: a Command can come before the
-	 * rows that moved its run here. False after `waitMs`.
+	 * Where the run of a Command stands, as this Replica's log says:
+	 * - `here`: this computer walks it.
+	 * - `on-its-way`: not yet. A Command can come before the rows that move
+	 *   its run here, and they can take long. So can a run this Replica
+	 *   does not have yet: its Host names this computer as its Walker.
+	 * - Any other answer is why the Command is not for this computer: the
+	 *   run moved on from here (its latest move is from here), it ended
+	 *   elsewhere (a finished run never moves), or it is of another Space.
 	 */
-	async function untilWalkedHere(
+	async function standing(
 		runId: string,
 		spaceId: string,
-		waitMs: number,
-	) {
-		const deadline = Date.now() + waitMs;
-		while (!(await walkedHere(runId, spaceId))) {
-			const left = deadline - Date.now();
-			if (left <= 0) return false;
-			await landedWithin(Math.min(left, 1_000));
+	): Promise<"here" | "on-its-way" | string> {
+		const owner = await runOwner(runId);
+		if (owner === null) return "on-its-way";
+		if (owner.spaceId !== spaceId) return NOT_HERE;
+		const ids = await here();
+		if (ids.includes(owner.walkerId)) return "here";
+		const events = await log.events(runId);
+		const lastMove = events.findLast((e) => e.type === "WalkerMoved");
+		if (
+			lastMove?.type === "WalkerMoved" &&
+			ids.includes(lastMove.payload.from)
+		) {
+			return MOVED_ON;
 		}
-		return true;
+		const last = events.at(-1);
+		if (last?.type === "RunEnded" && last.payload.status === "finished") {
+			return ENDED_ELSEWHERE;
+		}
+		return "on-its-way";
 	}
 
 	function landedWithin(timeoutMs: number, signal?: AbortSignal) {
@@ -318,19 +333,15 @@ export function createRunHistoryExchange(deps: {
 
 		landed: (signal, timeoutMs) => landedWithin(timeoutMs, signal),
 
-		async apply(command, engine, options = {}) {
+		async apply(command, engine) {
 			// Its id in the log: applied here before, also before a restart.
 			if (await history.applied(command)) return null;
-			const waitMs = options.waitMs ?? 30_000;
-			if (!(await untilWalkedHere(command.runId, command.spaceId, waitMs))) {
-				return "This device does not run this run.";
-			}
+			const stands = await standing(command.runId, command.spaceId);
+			if (stands === "on-its-way") throw new Refusal("conflict", ON_ITS_WAY);
+			if (stands !== "here") return stands;
 			// A run that moved here takes its walk state first.
 			if (!(await takeOvers.arrived(command.runId))) {
-				throw new Refusal(
-					"conflict",
-					"The run is still on its way to this device.",
-				);
+				throw new Refusal("conflict", ON_ITS_WAY);
 			}
 			const role = memberRole(
 				await documents.open(command.spaceId),
@@ -348,7 +359,14 @@ export function createRunHistoryExchange(deps: {
 				);
 				return null;
 			} catch (error) {
-				return error instanceof Error ? error.message : String(error);
+				// The words go to the person who asked. A failure's details stay in this log.
+				if (!(error instanceof Refusal)) {
+					console.error(
+						`[devices] command ${command.kind} on run ${command.runId} failed:`,
+						error,
+					);
+				}
+				return wordsFor(error);
 			}
 		},
 

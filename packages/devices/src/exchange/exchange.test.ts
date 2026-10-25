@@ -542,9 +542,7 @@ describe("a batch and what follows from it", () => {
 			});
 			const { runId } = await waitingOnA(engineA);
 			const files = await moveToB(engineA, runId);
-			// The rows that move the run to B are here; its walk state is not.
-			await copyRows(engineA, engineB);
-			const gate = (await engineB.space(a.spaceId).getRun(runId)).steps.at(-1);
+			const gate = (await engineA.space(a.spaceId).getRun(runId)).steps.at(-1);
 			const command: RunCommand = {
 				id: "command-1",
 				spaceId: a.spaceId,
@@ -555,12 +553,22 @@ describe("a batch and what follows from it", () => {
 				kind: "gate.resolve",
 				payload: { stepId: gate?.id as string, choice: "approve" },
 			};
-			const before = await typesOn(b, runId);
 
-			// Not "done, with an error": it comes again.
-			await expect(
-				engineB.exchange.apply(command, engineB, { waitMs: 500 }),
-			).rejects.toThrow("The run is still on its way to this device.");
+			// The rows that move the run to B are not here yet, however long
+			// they take: not "done, with an error", it comes again. At once,
+			// so the Commands of other runs never wait behind it.
+			const asked = Date.now();
+			await expect(engineB.exchange.apply(command, engineB)).rejects.toThrow(
+				"The run is still on its way to this device.",
+			);
+			expect(Date.now() - asked).toBeLessThan(5_000);
+
+			// The rows that move the run to B are here; its walk state is not.
+			await copyRows(engineA, engineB);
+			const before = await typesOn(b, runId);
+			await expect(engineB.exchange.apply(command, engineB)).rejects.toThrow(
+				"The run is still on its way to this device.",
+			);
 			expect(await typesOn(b, runId)).toEqual(before);
 
 			// The walk state is in the archive now: the run arrives, then the
@@ -586,6 +594,59 @@ describe("a batch and what follows from it", () => {
 		} finally {
 			await documents.close();
 		}
+	});
+
+	test("a Command for a run that moved on from here, or that ended elsewhere, is done with why", async () => {
+		const engineA = engineOf(a);
+		const engineB = engineOf(b);
+		const { projectId, runId } = await waitingOnA(engineA);
+		const command = (walkerId: string): RunCommand => ({
+			id: `command-${walkerId}`,
+			spaceId: a.spaceId,
+			runId,
+			walkerId,
+			personId: "person-a",
+			createdAt: Date.now(),
+			kind: "signal.send",
+			payload: { name: "go" },
+		});
+
+		// Another run of A finished there: it never moves to B any more.
+		const ended = await engineA
+			.space(a.spaceId)
+			.startRun({ projectId, flow: gateFlow });
+		await untilStatus(engineA, a.spaceId, ended.id, "waiting");
+		const gate = (await engineA.space(a.spaceId).listGates()).find(
+			(g) => g.runId === ended.id,
+		);
+		await engineA.space(a.spaceId).resolveGate({
+			runId: ended.id,
+			stepId: gate?.stepId as string,
+			choice: "approve",
+		});
+		await untilStatus(engineA, a.spaceId, ended.id, "finished");
+		await copyRows(engineA, engineB);
+		expect(
+			await engineB.exchange.apply(
+				{ ...command(b.deviceId), runId: ended.id },
+				engineB,
+			),
+		).toBe("The run ended before this reached it.");
+
+		// A moved the first run on to B: a Command for A that comes now is not
+		// A's. (The move is a fixture past the engine: a fresh engine reads it.)
+		await moveToB(engineA, runId);
+		await a.db
+			.update(runTable)
+			.set({ walkerId: b.deviceId })
+			.where(eq(runTable.id, runId));
+		await engineA.dispose();
+		const restarted = engineOf(a);
+		expect(await restarted.exchange.apply(command(a.deviceId), restarted)).toBe(
+			"The run moved to another device before this reached it.",
+		);
+		await engineB.dispose();
+		await restarted.dispose();
 	});
 
 	test("a run moved here that a restart cut short is taken over when the next engine is ready", async () => {

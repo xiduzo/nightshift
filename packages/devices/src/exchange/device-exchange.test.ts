@@ -97,7 +97,6 @@ function deviceExchange(
 		selfId,
 		projectWaitMs: 5_000,
 		idleMs: 1_000,
-		commandWaitMs: 500,
 	});
 }
 
@@ -105,6 +104,7 @@ function deviceExchange(
 function online(
 	client: HostClient = paired.memory.client(paired.key),
 	on: DeviceExchange = exchange,
+	streamBackoff = { firstMs: 5, maxMs: 20 },
 ) {
 	const link = httpsLink({
 		link: {
@@ -124,7 +124,7 @@ function online(
 		heartbeatMs: 20,
 		firstBackoffMs: 5,
 		maxBackoffMs: 20,
-		streamBackoff: { firstMs: 5, maxMs: 20 },
+		streamBackoff,
 	});
 	const detach = on.attach(link);
 	const period = {
@@ -602,7 +602,7 @@ describe("the Device's exchange with its Host", () => {
 		});
 	});
 
-	test("B refuses a Command for a run it does not walk, or from a role that does not allow it; A records why", async () => {
+	test("B refuses a Command from a role that does not allow it, and A records why; a Command for a run B does not have yet waits for it", async () => {
 		const run = await walkOnB(gateFlow);
 		online();
 		await untilStatus(paired.host, run.id, "waiting");
@@ -630,18 +630,19 @@ describe("the Device's exchange with its Host", () => {
 		});
 
 		await waitFor(async () => (await commandOnA(viewer.id)).done, {
-			label: "both Commands done",
-		});
-		await waitFor(async () => (await commandOnA(elsewhere.id)).done);
-		expect(await commandOnA(elsewhere.id)).toEqual({
-			done: true,
-			error: "This device does not run this run.",
+			label: "the viewer's Command done",
 		});
 		expect(await commandOnA(viewer.id)).toEqual({
 			done: true,
 			error: "The person who asked may not do this in this Space.",
 		});
 		expect(await statusOn(paired.device, run.id)).toBe("waiting");
+		// A says B walks it, so its rows are on their way: never lost.
+		await Bun.sleep(1_500);
+		expect(await commandOnA(elsewhere.id)).toEqual({
+			done: false,
+			error: null,
+		});
 	});
 
 	test("a Command applied before a restart is not applied again: its id is in the event it wrote", async () => {
@@ -746,9 +747,9 @@ describe("the Device's exchange with its Host", () => {
 			...paired.device,
 			exchange: {
 				...paired.device.exchange,
-				async apply(command, engine, options) {
+				async apply(command, engine) {
 					if (command.runId !== "run-arriving") {
-						return paired.device.exchange.apply(command, engine, options);
+						return paired.device.exchange.apply(command, engine);
 					}
 					if (!arrived) {
 						throw new Error("The run is still on its way to this device.");
@@ -793,6 +794,58 @@ describe("the Device's exchange with its Host", () => {
 			timeoutMs: 15_000,
 		});
 		expect(await commandOnA(early.id)).toEqual({ done: true, error: null });
+		expect(applied).toEqual([early.id]);
+	});
+
+	test("a Command whose run arrives goes as soon as a row lands here, not after the link's backoff", async () => {
+		let arrived = false;
+		const applied: string[] = [];
+		const arriving: PeerEngine = {
+			...paired.device,
+			exchange: {
+				...paired.device.exchange,
+				async apply(command, engine) {
+					if (command.runId !== "run-arriving") {
+						return paired.device.exchange.apply(command, engine);
+					}
+					if (!arrived) {
+						throw new Error("The run is still on its way to this device.");
+					}
+					applied.push(command.id);
+					return null;
+				},
+			},
+		};
+		// The link waits a minute before it starts a stream again, and the
+		// lane looks again by itself only after a minute.
+		const slow = createDeviceExchange({
+			engine: arriving,
+			hostId: paired.hostId,
+			selfId: b.deviceId,
+			idleMs: 60_000,
+		});
+		online(paired.memory.client(paired.key), slow, {
+			firstMs: 60_000,
+			maxMs: 60_000,
+		});
+		const early = await paired.host.exchange.commands.enqueue({
+			kind: "signal.send",
+			payload: { name: "go" },
+			spaceId: a.spaceId,
+			runId: "run-arriving",
+			walkerId: b.deviceId,
+			personId: paired.personId,
+		});
+		await Bun.sleep(500);
+		expect(await commandOnA(early.id)).toEqual({ done: false, error: null });
+
+		// The run arrives, and a row lands on B: the Command goes now.
+		arrived = true;
+		await walkOnB(quickFlow);
+		await waitFor(async () => (await commandOnA(early.id)).done, {
+			label: "the arriving run's Command done on A",
+			timeoutMs: 10_000,
+		});
 		expect(applied).toEqual([early.id]);
 	});
 

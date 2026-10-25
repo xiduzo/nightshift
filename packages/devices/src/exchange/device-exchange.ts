@@ -27,9 +27,10 @@ import type { RunHistoryExchange } from "./run-history";
  *   wanted.
  * - Commands: `sync.commands`, the Commands for the runs this computer
  *   walks, on their own stream, so they never wait behind rows, nor
- *   behind a run that is still on its way here. A Host of
- *   an older version has none: its Commands come with the rows, and this
- *   stream waits until the link drops.
+ *   behind a run that is still on its way here. Such a run's Commands
+ *   wait until it arrived, however long that takes, and go as soon as a
+ *   row lands here. A Host of an older version has none: its Commands
+ *   come with the rows, and this stream waits until the link drops.
  *
  * A Command is checked again here, from this Replica, and applied like a
  * local action (`RunHistoryExchange.apply`); then the Host is told. It is
@@ -68,10 +69,11 @@ export function createDeviceExchange(deps: {
 	applied?: AppliedCommands;
 	/** How long a batch waits for its project before the stream starts again. Default 30 s. */
 	projectWaitMs?: number;
-	/** How long the push loop waits for a new row before it looks again. Default 15 s. */
+	/**
+	 * How long a loop waits for a new row before it looks again: the push,
+	 * and the Commands of a run still on its way here. Default 15 s.
+	 */
 	idleMs?: number;
-	/** How long a Command waits for the rows that move its run here. Default 30 s. */
-	commandWaitMs?: number;
 }): DeviceExchange {
 	const { engine, hostId, selfId } = deps;
 	const { exchange } = engine;
@@ -81,11 +83,7 @@ export function createDeviceExchange(deps: {
 	function applyOnce(command: RunCommand): Promise<string | null> {
 		const known = applied.get(command.id);
 		if (known) return known;
-		const result = exchange.apply(command, engine, {
-			...(deps.commandWaitMs !== undefined
-				? { waitMs: deps.commandWaitMs }
-				: {}),
-		});
+		const result = exchange.apply(command, engine);
 		applied.set(command.id, result);
 		// A failure to read the checks applies nothing: the stream tries again.
 		result.catch(() => {
@@ -101,8 +99,8 @@ export function createDeviceExchange(deps: {
 	 *
 	 * A Command this computer cannot tell about yet (its run is still on
 	 * its way here) waits, with the later Commands of its run, so their
-	 * order holds. The others go on. Then this throws: the stream starts
-	 * again, and the Host sends the ones that wait again.
+	 * order holds. The others go on. Returns why the first of those waits,
+	 * or null when none does: the caller takes them again later.
 	 */
 	async function take(
 		client: HostClient,
@@ -110,7 +108,7 @@ export function createDeviceExchange(deps: {
 		reported: Set<string>,
 		whole: boolean,
 		signal: AbortSignal,
-	) {
+	): Promise<{ why: unknown } | null> {
 		/** The runs whose Commands wait, and why the first one does. */
 		const waiting = new Map<string, unknown>();
 		for (const command of commands) {
@@ -135,7 +133,7 @@ export function createDeviceExchange(deps: {
 			}
 		}
 		const [first] = waiting.values();
-		if (waiting.size > 0) throw first;
+		return waiting.size > 0 ? { why: first } : null;
 	}
 
 	/** Sends this computer's rows, a batch at a time, until `signal` aborts. Throws when a batch fails. */
@@ -210,15 +208,18 @@ export function createDeviceExchange(deps: {
 					await exchange.advance(hostId, batch.cursors);
 				}
 				// A Host of an older version sends its Commands here, after
-				// the rows they need, and only when some wait.
+				// the rows they need, and only when some wait. One whose run
+				// is still on its way starts the stream again: the Host sends
+				// it again.
 				if (batch.commands.length > 0 || reported.size > 0) {
-					await take(
+					const waits = await take(
 						client,
 						batch.commands,
 						reported,
 						batch.commands.length > 0,
 						signal,
 					);
+					if (waits) throw waits.why;
 				}
 			}
 		} finally {
@@ -226,7 +227,13 @@ export function createDeviceExchange(deps: {
 		}
 	}
 
-	/** The Commands stream, apart from the rows. */
+	/**
+	 * The Commands stream, apart from the rows. A Command whose run is
+	 * still on its way here waits on this stream, however long the run
+	 * takes: the stream takes the Commands again when a row lands here (the
+	 * rows that move the run here, its take-over), when the Host sends a
+	 * new set, and after `idleMs`.
+	 */
 	async function commands(client: HostClient, signal: AbortSignal) {
 		const reported = new Set<string>();
 		let stream: AsyncIterable<{ commands: RunCommand[] }>;
@@ -239,8 +246,42 @@ export function createDeviceExchange(deps: {
 			await pause(OLDER_HOST_WAIT_MS, signal);
 			return;
 		}
-		for await (const batch of stream) {
-			await take(client, batch.commands, reported, true, signal);
+		const batches = stream[Symbol.asyncIterator]();
+		let latest: RunCommand[] = [];
+		/** The Host's next set, asked for once the last one was taken. */
+		let next: Promise<IteratorResult<{ commands: RunCommand[] }>> | null = null;
+		let waits = false;
+		try {
+			while (!signal.aborted) {
+				if (!next) {
+					next = batches.next();
+					// A race may leave it for a later turn, or the stream may end
+					// first: its failure is read there, or not at all.
+					next.catch(() => {});
+				}
+				const cycle = new AbortController();
+				const landed = waits
+					? exchange
+							.landed(
+								AbortSignal.any([signal, cycle.signal]),
+								deps.idleMs ?? 15_000,
+							)
+							.then(() => null)
+					: null;
+				try {
+					const got = await (landed ? Promise.race([next, landed]) : next);
+					if (got !== null) {
+						if (got.done) return;
+						latest = got.value.commands;
+						next = null;
+					}
+				} finally {
+					cycle.abort();
+				}
+				waits = (await take(client, latest, reported, true, signal)) !== null;
+			}
+		} finally {
+			void Promise.resolve(batches.return?.()).catch(() => {});
 		}
 	}
 
