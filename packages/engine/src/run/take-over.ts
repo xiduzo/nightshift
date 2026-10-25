@@ -35,49 +35,54 @@ export async function takeOver(
 	},
 	runId: string,
 ): Promise<void> {
-	await deps.runner.hold(runId, async ({ row, events }) => {
-		const self = await deps.log.walkerId();
-		const moved = events.findLast((e) => e.type === "WalkerMoved");
-		if (
-			moved?.type !== "WalkerMoved" ||
-			!(await runsArriving(deps.db, [self])).includes(runId)
-		) {
-			return;
-		}
-		const checkpoint = await deps.archive.archived({
-			kind: "checkpoint",
-			spaceId: row.spaceId,
-			runId,
-		});
-		if (checkpoint === null) {
-			throw new Error("The archive has no checkpoint of the run.");
-		}
-		await deps.walks.importWalk(runId, checkpoint);
-		// The old Walker's transcript files are on its disk, not here: each
-		// step's file starts as the archive's copy (a step reopened or
-		// answered here goes on in it), and the next entry is numbered after
-		// the last one the old Walker archived.
-		let lastSeq = 0;
-		for (const stepId of await stepIdsOfRun(deps.db, runId)) {
-			const text = await deps.archive.archived({
-				kind: "transcript",
+	// The one Turn a run that still arrives takes (`arrival`).
+	await deps.runner.hold(
+		runId,
+		async ({ row, events }) => {
+			const self = await deps.log.walkerId();
+			const moved = events.findLast((e) => e.type === "WalkerMoved");
+			if (
+				moved?.type !== "WalkerMoved" ||
+				!(await runsArriving(deps.db, [self], [runId])).includes(runId)
+			) {
+				return;
+			}
+			const checkpoint = await deps.archive.archived({
+				kind: "checkpoint",
 				spaceId: row.spaceId,
 				runId,
-				stepId,
 			});
-			if (text === null) continue;
-			await deps.walks.importTranscript(runId, stepId, text);
-			for (const entry of parseTranscript(text)) {
-				lastSeq = Math.max(lastSeq, entry.seq);
+			if (checkpoint === null) {
+				throw new Error("The archive has no checkpoint of the run.");
 			}
-		}
-		await deps.log.append({
-			type: "WalkerArrived",
-			runId,
-			payload: { from: moved.payload.from },
-		});
-		deps.runner.continueTranscriptAfter(runId, lastSeq);
-		deps.runner.forget(runId);
-		deps.runner.restore(runId, await deps.log.events(runId));
-	});
+			await deps.walks.importWalk(runId, checkpoint);
+			// The old Walker's transcript files are on its disk, not here: each
+			// step's file starts as the archive's copy (a step reopened or
+			// answered here goes on in it), and the next entry is numbered after
+			// the last one the old Walker archived.
+			let lastSeq = 0;
+			for (const stepId of await stepIdsOfRun(deps.db, runId)) {
+				const text = await deps.archive.archived({
+					kind: "transcript",
+					spaceId: row.spaceId,
+					runId,
+					stepId,
+				});
+				if (text === null) continue;
+				await deps.walks.importTranscript(runId, stepId, text);
+				for (const entry of parseTranscript(text)) {
+					lastSeq = Math.max(lastSeq, entry.seq);
+				}
+			}
+			await deps.log.append({
+				type: "WalkerArrived",
+				runId,
+				payload: { from: moved.payload.from },
+			});
+			deps.runner.continueTranscriptAfter(runId, lastSeq);
+			deps.runner.forget(runId);
+			deps.runner.restore(runId, await deps.log.events(runId));
+		},
+		{ arrival: true },
+	);
 }

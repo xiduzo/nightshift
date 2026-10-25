@@ -56,6 +56,13 @@ const RELAYED: ReadonlySet<RunAction> = new Set([
 export const WALKED_ELSEWHERE =
 	"Another device runs this run. Try again on that device.";
 
+/**
+ * Why a run that moved to this computer refuses every action until it
+ * arrived: its new Walker has no Checkpoint of it yet.
+ */
+export const ARRIVING =
+	"This run is still on its way to this computer. Try again in a moment.";
+
 const ENDED_NOTHING_TO_STOP = "This run has ended. There is nothing to stop.";
 const NO_GATE = "This run does not wait at a Gate.";
 const NO_SIGNAL = "This run does not wait for that signal.";
@@ -149,6 +156,8 @@ export function runActions(status: RunStatus, walkedHere: boolean): RunActions {
 export type RefusalRule =
 	/** Only the Walker takes the action, and another Device walks the run. */
 	| "walked-elsewhere"
+	/** The run moved to this computer and has not arrived yet (`ARRIVING`). */
+	| "arriving"
 	/** The run's status does not allow the action (`whyNot`). */
 	| "not-now"
 	/** The answer is not for the open Gate, or an answer is on its way already. */

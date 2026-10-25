@@ -584,6 +584,34 @@ describe("a run that moves to another Device", () => {
 		await again.engine.dispose();
 	});
 
+	test("refuses every action on its new Walker until it arrived, then takes them", async () => {
+		const { a, b } = await pair();
+		const { runId, projectId } = await waitingOn(a);
+		const open = (await spaceOf(a, a).getRun(runId)).steps.at(-1)?.id ?? "";
+		await spaceOf(a, a).moveRun(runId, b.sandbox.deviceId);
+		await copyRows(a, b, projectId);
+		const onB = spaceOf(b, a);
+		const before = await b.context.log.events(runId);
+
+		// B walks it now, but has no Checkpoint of it yet.
+		const arriving =
+			"This run is still on its way to this computer. Try again in a moment.";
+		await expect(
+			onB.resolveGate({ runId, stepId: open, choice: "approve" }),
+		).rejects.toThrow(arriving);
+		await expect(onB.resumeRun(runId)).rejects.toThrow(arriving);
+		await expect(onB.stopRun(runId, { when: "after-step" })).rejects.toThrow(
+			arriving,
+		);
+		expect(await b.context.log.events(runId)).toEqual(before);
+
+		await b.context.takeOver(runId);
+		await onB.resolveGate({ runId, stepId: open, choice: "approve" });
+		await waitFor(async () => (await onB.getRun(runId)).status === "finished", {
+			label: "the run to end on B",
+		});
+	});
+
 	test("cannot be taken over without its Checkpoint in the archive, and arrives once it is there", async () => {
 		const { a, b } = await pair();
 		const { runId, projectId } = await waitingOn(a);

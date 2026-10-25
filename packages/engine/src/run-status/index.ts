@@ -6,6 +6,7 @@
  */
 
 export {
+	ARRIVING,
 	type RefusalRule,
 	type RunAction,
 	type RunActions,

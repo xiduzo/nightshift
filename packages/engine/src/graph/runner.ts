@@ -17,9 +17,10 @@ import {
 	type RunLog,
 	type RunRow,
 	type RunStatus,
+	runsArriving,
 } from "../log";
 import { deriveRunState, deriveSteps } from "../read";
-import { RunRefusal, WALKED_ELSEWHERE } from "../run-status";
+import { ARRIVING, RunRefusal, WALKED_ELSEWHERE } from "../run-status";
 import { createRecorders, messageOf } from "./context";
 import { findOverdue } from "./deadlines";
 import { FencedError } from "./fence";
@@ -105,6 +106,11 @@ import {
  *   checks again.
  * - I11 No Turn waits for a Turn of its own run: that is a deadlock. A
  *   `take` or `hold` of a run from inside a Turn of that run throws.
+ * - I12 A Turn of a run that moved here and has not arrived (no
+ *   `WalkerArrived` yet, `runsArriving`) is refused (`arriving`): it has
+ *   no Checkpoint here. Only its take-over holds it (`hold`, `arrival`).
+ *   The overdue check and the prune leave it. Its test moves a run
+ *   between two computers (`run/move.test.ts`).
  *
  * Over 600 lines on purpose: the drive, the slots, the queues and the
  * stop of a run share one state per run, so they stay in one module.
@@ -346,6 +352,12 @@ export function createRunner(deps: RunnerDeps) {
 		);
 		await settleTurns();
 		dispose();
+	}
+
+	/** Whether the run moved here and has not arrived (`runsArriving`). */
+	async function arriving(runId: string): Promise<boolean> {
+		const here = [await log.walkerId()];
+		return (await runsArriving(db, here, [runId])).length > 0;
 	}
 
 	/** Waits for the Turns in flight, up to `RELEASE_WAIT_MS`. */
@@ -900,6 +912,14 @@ export function createRunner(deps: RunnerDeps) {
 			}
 			throw new RunRefusal("walked-elsewhere", WALKED_ELSEWHERE);
 		}
+		// A drive holds a run that arrived. One without a drive may still
+		// arrive: it has no Checkpoint here yet (I12).
+		if (!slots.has(runId) && (await arriving(runId))) {
+			if (intent.kind === "overdue" || intent.kind === "prune") {
+				return UNCHANGED;
+			}
+			throw new RunRefusal("arriving", ARRIVING);
+		}
 		if (intent.kind === "prune") {
 			// The thread opens for the prune only: a resume opens its own.
 			await pruneThread(
@@ -975,16 +995,21 @@ export function createRunner(deps: RunnerDeps) {
 	 * A Turn that drives nothing: `fn` sees the run's row, its log, and
 	 * whether a drive or a Turn holds a slot of it, and no other Turn of the
 	 * run comes in between. For an action that writes one fact (a stop
-	 * after the step, a move).
+	 * after the step, a move). A run that still arrives here is refused
+	 * (I12), unless the Turn is its take-over (`arrival`).
 	 */
 	async function hold<T>(
 		runId: string,
 		fn: (held: Held) => Promise<T>,
+		options: { arrival?: boolean } = {},
 	): Promise<T> {
 		return inTurn(runId, async () => {
 			const row = await getRunRow(db, runId);
 			if (row.walkerId !== (await log.walkerId())) {
 				throw new RunRefusal("walked-elsewhere", WALKED_ELSEWHERE);
+			}
+			if (!options.arrival && (await arriving(runId))) {
+				throw new RunRefusal("arriving", ARRIVING);
 			}
 			return fn({
 				row,

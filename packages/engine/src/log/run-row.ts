@@ -172,19 +172,21 @@ export function followWalkerMoves(db: Database, runIds: readonly string[]) {
  * The runs that moved to one of `here` and have not arrived: their latest
  * `WalkerMoved` names one of them, and none of them wrote to the run
  * since. The new Walker's first event there is `WalkerArrived`, once it
- * has the run's Walk state.
+ * has the run's Walk state. With `among`, only those runs are looked at.
  */
 export async function runsArriving(
 	db: Database,
 	here: readonly string[],
+	among?: readonly string[],
 ): Promise<string[]> {
-	if (here.length === 0) return [];
+	if (here.length === 0 || among?.length === 0) return [];
 	const lastMove = sql`(select max(w.seq) from ${event} w where w.run_id = ${run.id} and w.type = 'WalkerMoved')`;
 	const rows = await db
 		.select({ id: run.id })
 		.from(run)
 		.where(
 			and(
+				among ? inArray(run.id, [...among]) : undefined,
 				inArray(run.walkerId, [...here]),
 				sql`(select json_extract(m.payload, '$.to') from ${event} m where m.seq = ${lastMove}) in ${[...here]}`,
 				sql`not exists (select 1 from ${event} a where a.run_id = ${run.id} and a.walker_id in ${[...here]} and a.seq > ${lastMove})`,
