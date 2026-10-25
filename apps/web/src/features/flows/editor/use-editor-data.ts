@@ -1,4 +1,4 @@
-import type { Policy } from "@nightshift/flows";
+import { policyFromSettings } from "@nightshift/flows";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { connectionQueries, profileQueries } from "@/features/agents";
@@ -18,17 +18,10 @@ export function useEditorData(projectId: string, name: string) {
 	const settings = useQuery(settingsQueries.get());
 	const daemonConnections = useQuery(connectionQueries.list());
 	const nodeDefaults = settings.data?.values;
-	const policyDefaults = useMemo((): Required<Policy> | undefined => {
-		const values = settings.data?.values;
-		if (!values) return undefined;
-		return {
-			usageLimitFirstWaitMinutes: values.usageLimitFirstWaitMinutes,
-			usageLimitMaxWaitMinutes: values.usageLimitMaxWaitMinutes,
-			networkGraceMinutes: values.networkGraceMinutes,
-			maxSteps: values.maxStepsPerRun,
-			resumeInterruptedRuns: values.resumeInterruptedRuns,
-		};
-	}, [settings.data]);
+	const policyDefaults = useMemo(
+		() => nodeDefaults && policyFromSettings(nodeDefaults),
+		[nodeDefaults],
+	);
 	const connections = daemonConnections.data?.connections;
 	const connectionNames = useMemo(
 		() => connections?.map((connection) => connection.name),

@@ -209,6 +209,26 @@ export const DEFAULT_POLICY: Readonly<Required<Policy>> = {
 	maxSteps: 500,
 	resumeInterruptedRuns: true,
 };
+
+/** The daemon settings that hold the run policy of a flow that does not set its own. */
+type PolicySettings = {
+	usageLimitFirstWaitMinutes: number;
+	usageLimitMaxWaitMinutes: number;
+	networkGraceMinutes: number;
+	maxStepsPerRun: number;
+	resumeInterruptedRuns: boolean;
+};
+
+/** The run policy of a flow that sets none of its own: the daemon's settings. */
+export function policyFromSettings(settings: PolicySettings): Required<Policy> {
+	return {
+		usageLimitFirstWaitMinutes: settings.usageLimitFirstWaitMinutes,
+		usageLimitMaxWaitMinutes: settings.usageLimitMaxWaitMinutes,
+		networkGraceMinutes: settings.networkGraceMinutes,
+		maxSteps: settings.maxStepsPerRun,
+		resumeInterruptedRuns: settings.resumeInterruptedRuns,
+	};
+}
 export type FlowInputDef = z.infer<typeof flowInputSchema>;
 export type FlowOutputDef = z.infer<typeof flowOutputSchema>;
 export type FlowVariableDef = z.infer<typeof flowVariableSchema>;

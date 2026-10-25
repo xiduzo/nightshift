@@ -24,6 +24,8 @@ export {
 	outcomeColor,
 	outputFieldsByType,
 	type Policy,
+	policyFromSettings,
+	QUICK_RUN_HARNESS,
 	type ResolvedPolicy,
 	runsEach,
 	type SectionColor,

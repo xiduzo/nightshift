@@ -1,4 +1,8 @@
-import { singleAgentFlow } from "@nightshift/flows";
+import {
+	HARNESS_CATALOG,
+	QUICK_RUN_HARNESS,
+	singleAgentFlow,
+} from "@nightshift/flows";
 import { Alert, AlertDescription } from "@nightshift/ui/components/alert";
 import { Button } from "@nightshift/ui/components/button";
 import {
@@ -30,11 +34,9 @@ import { useNavigate } from "@tanstack/react-router";
 import { PlayIcon, TriangleAlertIcon } from "lucide-react";
 import { useId, useState } from "react";
 
-import { EFFORTS, PERMISSION_MODES } from "@/features/agents";
+import { EFFORTS, ModelCombobox, PERMISSION_MODES } from "@/features/agents";
 import type { Effort, PermissionMode } from "@/shared/api";
 import { runMutations, runQueries } from "../queries";
-
-const MODELS = ["sonnet", "opus", "haiku"];
 
 /**
  * A quick run: one Agent node with a prompt, no flow file, in a dialog. The
@@ -54,7 +56,9 @@ export function QuickRunDialog({
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const [prompt, setPrompt] = useState("");
-	const [model, setModel] = useState("sonnet");
+	const [model, setModel] = useState<string>(
+		HARNESS_CATALOG[QUICK_RUN_HARNESS].defaultModel,
+	);
 	const [permissionMode, setPermissionMode] =
 		useState<PermissionMode>("acceptEdits");
 	const [effort, setEffort] = useState<Effort | "">("");
@@ -149,21 +153,12 @@ export function QuickRunDialog({
 						<div className="grid gap-5 sm:grid-cols-2">
 							<Field>
 								<FieldLabel htmlFor={`${id}-model`}>Model</FieldLabel>
-								<Input
+								<ModelCombobox
 									id={`${id}-model`}
-									list={`${id}-models`}
+									harness={QUICK_RUN_HARNESS}
 									value={model}
-									onChange={(event) => setModel(event.target.value)}
-									className="font-mono"
-									autoComplete="off"
-									spellCheck={false}
-									required
+									onChange={setModel}
 								/>
-								<datalist id={`${id}-models`}>
-									{MODELS.map((value) => (
-										<option key={value} value={value} />
-									))}
-								</datalist>
 							</Field>
 							<Field>
 								<FieldLabel htmlFor={`${id}-effort`}>

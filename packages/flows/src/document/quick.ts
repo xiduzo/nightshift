@@ -1,5 +1,8 @@
-import type { AgentNode } from "../nodes";
+import type { AgentNode, HarnessName } from "../nodes";
 import { FLOW_VERSION, type Flow } from "./flow";
+
+/** The harness a quick run's agent runs on. */
+export const QUICK_RUN_HARNESS: HarnessName = "claude-code";
 
 /** A one-node flow for a quick run from a prompt. */
 export function singleAgentFlow(
@@ -11,7 +14,7 @@ export function singleAgentFlow(
 		type: "agent",
 		position: { x: 0, y: 0 },
 		prompt: input.prompt,
-		harness: "claude-code",
+		harness: QUICK_RUN_HARNESS,
 		model: input.model,
 		permissionMode: input.permissionMode,
 		session: "fresh",

@@ -19,6 +19,7 @@ export {
 	flowSchema,
 	type Outcome,
 	type Policy,
+	policyFromSettings,
 	type ResolvedPolicy,
 	type SectionColor,
 	sectionColors,
@@ -37,7 +38,7 @@ export {
 	outputFieldsByType,
 	runsEach,
 } from "./node";
-export { singleAgentFlow } from "./quick";
+export { QUICK_RUN_HARNESS, singleAgentFlow } from "./quick";
 export {
 	type NextEdge,
 	type NextEdgeInput,
