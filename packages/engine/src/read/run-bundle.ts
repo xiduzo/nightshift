@@ -155,7 +155,7 @@ export async function exportRun(options: {
 		.orderBy(asc(event.seq));
 
 	const redact = redactor(options.redact ?? []);
-	const out = createDb({ DATABASE_URL: `file:${path}` });
+	const out = createDb({ DATABASE_URL: `file:${path}` }, { singleFile: true });
 	try {
 		for (const statement of DDL) await out.run(sql.raw(statement));
 		if (projectRow) await out.insert(project).values(projectRow);
@@ -244,7 +244,7 @@ export type RunBundle = {
 /** Opens a run bundle to read. It never writes to the file. */
 export async function openRunBundle(path: string): Promise<RunBundle> {
 	if (!existsSync(path)) throw new Error(`${path} does not exist.`);
-	const db = createDb({ DATABASE_URL: `file:${path}` });
+	const db = createDb({ DATABASE_URL: `file:${path}` }, { singleFile: true });
 	try {
 		const tables = await db.all<{ name: string }>(
 			sql`select name from sqlite_master where type = 'table' and name = 'bundle'`,

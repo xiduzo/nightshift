@@ -127,7 +127,10 @@ describe("exportRun", () => {
 		});
 		expect(summary).toMatchObject({ path, runId, missingTranscripts: [] });
 
-		const file = createDb({ DATABASE_URL: `file:${path}` });
+		const file = createDb(
+			{ DATABASE_URL: `file:${path}` },
+			{ singleFile: true },
+		);
 		const tables = await file.all<{ name: string }>(
 			sql`select name from sqlite_master where type = 'table' order by name`,
 		);
@@ -238,7 +241,10 @@ describe("exportRun", () => {
 		});
 		const live = await liveEvents(runId);
 		// What a Night Shift before Clones wrote.
-		const file = createDb({ DATABASE_URL: `file:${path}` });
+		const file = createDb(
+			{ DATABASE_URL: `file:${path}` },
+			{ singleFile: true },
+		);
 		for (const statement of [
 			...WITHOUT_SPACE,
 			"ALTER TABLE run DROP COLUMN walker_id",
@@ -285,7 +291,10 @@ describe("exportRun", () => {
 			path,
 		});
 		// What a Night Shift before Members wrote.
-		const file = createDb({ DATABASE_URL: `file:${path}` });
+		const file = createDb(
+			{ DATABASE_URL: `file:${path}` },
+			{ singleFile: true },
+		);
 		for (const statement of [
 			"ALTER TABLE run DROP COLUMN started_by",
 			"UPDATE bundle SET value = '3' WHERE key = 'format_version'",
@@ -312,7 +321,10 @@ describe("exportRun", () => {
 			path,
 		});
 		// What a Night Shift before the run plan kept names wrote.
-		const file = createDb({ DATABASE_URL: `file:${path}` });
+		const file = createDb(
+			{ DATABASE_URL: `file:${path}` },
+			{ singleFile: true },
+		);
 		for (const statement of [
 			"ALTER TABLE run DROP COLUMN device_names",
 			"UPDATE bundle SET value = '6' WHERE key = 'format_version'",
@@ -340,7 +352,10 @@ describe("exportRun", () => {
 		});
 		const live = await liveEvents(runId);
 		// What a Night Shift before Spaces wrote.
-		const file = createDb({ DATABASE_URL: `file:${path}` });
+		const file = createDb(
+			{ DATABASE_URL: `file:${path}` },
+			{ singleFile: true },
+		);
 		for (const statement of [
 			...WITHOUT_SPACE,
 			"UPDATE bundle SET value = '2' WHERE key = 'format_version'",
