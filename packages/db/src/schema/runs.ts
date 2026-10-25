@@ -59,9 +59,10 @@ export const run = sqliteTable(
 		 */
 		placements: text("placements"),
 		/**
-		 * The Person who started the run. Null for a run a schedule started,
-		 * and for runs from before Members. No foreign key: a run walked
-		 * elsewhere may name a Person this Replica does not know.
+		 * The Person who started the run: for a schedule, its Person, else
+		 * the owner of the Device that fired it. Null only for a run another
+		 * Replica walked before every run had a starter. No foreign key: a
+		 * run walked elsewhere may name a Person this Replica does not know.
 		 */
 		startedBy: text("started_by"),
 		createdAt: createdAt(),

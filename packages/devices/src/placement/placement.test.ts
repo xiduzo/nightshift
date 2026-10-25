@@ -13,6 +13,7 @@ import {
 	createSpaceDocuments,
 	type RunStatus,
 	recordClone,
+	type SpaceDocuments,
 } from "@nightshift/engine";
 import {
 	createSandbox,
@@ -22,8 +23,13 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
+import { writeFlowFile, writeSchedulesFile } from "@nightshift/flows/files";
 import { and, eq } from "drizzle-orm";
-import type { WorkRelay, WorkRequest } from "../contract";
+import {
+	type WorkRelay,
+	type WorkRequest,
+	workRequestSchema,
+} from "../contract";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
 import { serveWork } from "../work/remote";
@@ -31,13 +37,17 @@ import { serveWork } from "../work/remote";
 /**
  * Run-level Placement in one process: A walks a run whose steps run on
  * Device B. A has no Clone of the project; B has. The work relay is
- * in-memory here (`serveWork` on B's local Device), the Host's hub in the
- * daemon.
+ * in-memory here (`serveWork` on B's local Device, after B reads the
+ * request as its work server does), the Host's hub in the daemon.
  */
 
 let a: Sandbox;
 let b: Sandbox;
 let engine: PeerEngine;
+/** A's engine's lifetime. */
+let lifetime: AbortController;
+let work: WorkRelay;
+let documents: SpaceDocuments;
 let online: Set<string>;
 let requests: WorkRequest[];
 /** B's calls that are still running there. */
@@ -80,7 +90,7 @@ beforeEach(async () => {
 	requests = [];
 	running = 0;
 	const onB = bDevice(() => projectId);
-	const work: WorkRelay = {
+	work = {
 		online: (id) => online.has(id),
 		async *call(id, request, signal) {
 			if (!online.has(id)) {
@@ -88,6 +98,14 @@ beforeEach(async () => {
 				return;
 			}
 			requests.push(request);
+			if (!workRequestSchema.safeParse(request).success) {
+				yield {
+					kind: "error",
+					message:
+						"This device cannot read that request. Update Night Shift on both computers.",
+				};
+				return;
+			}
 			const controller = new AbortController();
 			signal?.addEventListener("abort", () => controller.abort(), {
 				once: true,
@@ -100,22 +118,11 @@ beforeEach(async () => {
 			}
 		},
 	};
-	const documents = createSpaceDocuments({
+	documents = createSpaceDocuments({
 		db: a.db,
 		directory: deviceDirectory(a.db),
 	});
-	engine = createPeerEngine(
-		withPeers({
-			db: a.db,
-			dataDir: a.dataDir,
-			scheduler: false,
-			harnesses: { "claude-code": fakeHarness(reportingScript("pass")) },
-			profileFor: (name) =>
-				name === "everywhere" || name === "here_only" ? PROFILE : null,
-			spaceDocuments: documents,
-			work,
-		}),
-	);
+	engine = peerEngine();
 	const [self] = await a.db
 		.select({ ownerId: deviceTable.ownerId })
 		.from(deviceTable)
@@ -140,8 +147,29 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+	lifetime.abort();
 	await Promise.all([a.cleanup(), b.cleanup()]);
 });
+
+/** A's engine. Without `internals`, it fires no schedules. */
+function peerEngine(
+	internals?: Parameters<typeof createPeerEngine>[1],
+): PeerEngine {
+	lifetime = new AbortController();
+	return createPeerEngine(
+		withPeers({
+			db: a.db,
+			dataDir: a.dataDir,
+			...(internals ? {} : { scheduler: false as const }),
+			harnesses: { "claude-code": fakeHarness(reportingScript("pass")) },
+			profileFor: (name) =>
+				name === "everywhere" || name === "here_only" ? PROFILE : null,
+			spaceDocuments: documents,
+			work,
+		}),
+		{ ...internals, signal: lifetime.signal },
+	);
+}
 
 const flow = (nodes: Flow["nodes"], edges: Flow["edges"] = []): Flow =>
 	({
@@ -549,4 +577,68 @@ describe("nodes placed on Devices, with the Hand-off", () => {
 			run.flow.nodes.map((n) => ("device" in n ? n.device : null)),
 		).toEqual([null, "test"]);
 	});
+});
+
+describe("a scheduled run with a node on another of the Person's Devices", () => {
+	const TICK_MS = 5;
+	/** Local time, October 2026. */
+	const at = (day: number, hours: number, minutes = 0, seconds = 0) =>
+		new Date(2026, 9, day, hours, minutes, seconds).getTime();
+	let clock: number;
+
+	beforeEach(() => {
+		// A fires the project's schedules, on its own clock.
+		lifetime.abort();
+		clock = at(16, 21, 59);
+		engine = peerEngine({ now: () => clock, scheduleTickMs: TICK_MS });
+	});
+	afterEach(() => Bun.sleep(TICK_MS * 4));
+
+	test("runs that node there, as the run of the Person the schedule runs for", async () => {
+		await a.db.insert(clone).values({
+			id: "clone-a",
+			spaceId: a.spaceId,
+			projectId,
+			deviceId: a.deviceId,
+			path: a.repoPath,
+		});
+		const remote = join(a.root, "remote.git");
+		await mustGit(a.root, ["init", "-q", "--bare", remote]);
+		await mustGit(a.repoPath, ["remote", "add", "origin", remote]);
+		await mustGit(b.repoPath, ["remote", "add", "origin", remote]);
+		await writeFlowFile(
+			a.repoPath,
+			"night",
+			flow([
+				{ ...command("there", "echo from B"), device: "studio-b" },
+			] as Flow["nodes"]),
+		);
+		// The schedule names no Person: it fires here, for A's owner.
+		await writeSchedulesFile(a.repoPath, [
+			{
+				id: "nightly",
+				flow: "night",
+				inputs: {},
+				cron: "0 22 * * *",
+				enabled: true,
+			},
+		]);
+		await Bun.sleep(TICK_MS * 4);
+		clock = at(16, 22, 0, 20);
+		const scheduled = await waitFor(
+			async () => (await engine.space(a.spaceId).listRuns())[0],
+			{ label: "the scheduled run", timeoutMs: 10_000 },
+		);
+		expect(scheduled.trigger.kind).toBe("schedule");
+		expect(scheduled.startedBy?.id).toBe(personId);
+
+		const run = await until(scheduled.id, "finished");
+		expect(run.steps.map((s) => [s.nodeId, s.outcome, s.device?.id])).toEqual([
+			["there", "pass", B],
+		]);
+		expect(String(run.steps[0]?.outputs.log_tail).trim()).toBe("from B");
+		// Every call B took named the run's starter.
+		expect(requests.length).toBeGreaterThan(0);
+		for (const request of requests) expect(request.personId).toBe(personId);
+	}, 30_000);
 });

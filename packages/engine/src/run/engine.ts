@@ -296,6 +296,7 @@ export function createEngine(
 		place: placement.place,
 		selfName: device.name,
 		personOnHost: peers.personOnHost,
+		selfOwnerId: () => directory.selfOwnerId(),
 		offerRefusal: peers.offers.refusal,
 	});
 

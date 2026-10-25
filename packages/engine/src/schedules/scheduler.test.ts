@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fakeHarness } from "@nightshift/agents/testing";
-import { event, run } from "@nightshift/db/schema";
+import { device, event, run } from "@nightshift/db/schema";
 import type { Flow, Schedule } from "@nightshift/flows";
 import { writeFlowFile, writeSchedulesFile } from "@nightshift/flows/files";
-import { asc, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import type { SpaceEngine } from "../contract/engine";
 import {
 	defaultRunSettings,
@@ -235,6 +235,28 @@ describe("the scheduler", () => {
 				issues: [],
 			},
 		]);
+	});
+
+	test("a scheduled run has a starter: the schedule's Person, else this computer's owner", async () => {
+		const { engine } = startDaemon();
+		await setup(engine, [
+			nightly({ id: "mine" }),
+			nightly({ id: "carols", person: "person-carol" }),
+		]);
+		clock = at(16, 22, 0, 20);
+		const facts = await waitForFacts(2);
+		const [self] = await sandbox.db
+			.select({ ownerId: device.ownerId })
+			.from(device)
+			.where(eq(device.self, true));
+		const runs = await engine.listRuns();
+		const starterOf = (scheduleId: string) => {
+			const fact = facts.find((f) => f.payload.scheduleId === scheduleId);
+			return runs.find((r) => r.id === firedRunId(fact))?.startedBy?.id;
+		};
+		expect(starterOf("mine")).toBe(self?.ownerId as string);
+		expect(starterOf("carols")).toBe("person-carol");
+		for (const run of runs) await waitForEnd(engine, run.id);
 	});
 
 	test("a run started by hand says so", async () => {

@@ -244,3 +244,37 @@ describe("migration members", () => {
 		]);
 	});
 });
+
+describe("migration run_starters", () => {
+	test("gives the runs this computer walks without a starter its Person, as the Host of their Space knows them", async () => {
+		const db = await databaseBefore("run_starters");
+		const [self] = await rows<{ id: string; ownerId: string }>(
+			db,
+			"SELECT id, owner_id AS ownerId FROM device WHERE self = 1",
+		);
+		const run = (id: string, space: string, walker: string, by: string) =>
+			`INSERT INTO run (id, space_id, project_id, flow, title, worktree_path, branch, base_ref, walker_id, started_by) VALUES ('${id}', '${space}', 'p1', '{}', 'Run', '/w/${id}', 'b-${id}', 'main', '${walker}', ${by})`;
+		for (const statement of [
+			"INSERT INTO project (id, space_id, name) VALUES ('p1', 's', 'repo')",
+			"INSERT INTO host_link (host_id, name, addresses, role, person_id, key_store) VALUES ('h1', 'studio', '[]', 'home', 'person-on-host', 'file')",
+			"INSERT INTO host_space (space_id, host_id, name, role) VALUES ('team', 'h1', 'Team', 'member')",
+			run("scheduled", "s", self?.id ?? "", "NULL"),
+			run("in-team", "team", self?.id ?? "", "NULL"),
+			run("elsewhere", "s", "another-device", "NULL"),
+			run("started", "s", self?.id ?? "", "'u2'"),
+		]) {
+			await db.run(sql.raw(statement));
+		}
+
+		await migrateDb(db);
+
+		expect(
+			await rows(db, "SELECT id, started_by FROM run ORDER BY id"),
+		).toEqual([
+			{ id: "elsewhere", started_by: null },
+			{ id: "in-team", started_by: "person-on-host" },
+			{ id: "scheduled", started_by: self?.ownerId },
+			{ id: "started", started_by: "u2" },
+		]);
+	});
+});

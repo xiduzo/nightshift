@@ -177,10 +177,10 @@ describe("who started a run", () => {
 		expect(await worktreeConfig(started.worktreePath, "user.name")).toBe("");
 	});
 
-	test("a run without a Person (a schedule) names nobody", async () => {
+	test("a run started without a Person is the run of this computer's owner", async () => {
 		const engine = makeEngine();
 		const { started } = await startAndWait(engine);
-		expect(started.startedBy).toBeNull();
+		expect(started.startedBy?.id).toBe(await localPersonId());
 	});
 });
 

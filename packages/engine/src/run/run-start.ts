@@ -404,6 +404,8 @@ export type RunStartDeps = Omit<PrepareRunDeps, "deviceNamed" | "walker"> & {
 	selfName: string;
 	/** The starter as the Host that keeps the Space knows them (`Peers.personOnHost`). */
 	personOnHost(spaceId: string): Promise<string | null>;
+	/** The Person who owns this computer (`DeviceDirectory.selfOwnerId`). */
+	selfOwnerId(): Promise<string | null>;
 };
 
 export type RunStart = ReturnType<typeof createRunStart>;
@@ -431,13 +433,16 @@ export function createRunStart(deps: RunStartDeps) {
 			kind: "start",
 			prepare: async () => {
 				const projectRow = await deps.projectRow(input.projectId);
-				// In a Host's Space, the Person as the Host knows them. A
-				// schedule names its Person as the Space knows them already.
-				const startedBy = input.startedBy
-					? trigger.kind === "schedule"
+				// Every run has a starter: the Person who starts it, else this
+				// computer's owner (a schedule that names no Person fires
+				// here for them). In a Host's Space, the Person as the Host
+				// knows them. A schedule names its Person that way already.
+				const startedBy =
+					trigger.kind === "schedule" && input.startedBy
 						? input.startedBy
-						: ((await deps.personOnHost(projectRow.spaceId)) ?? input.startedBy)
-					: null;
+						: ((await deps.personOnHost(projectRow.spaceId)) ??
+							input.startedBy ??
+							(await deps.selfOwnerId()));
 				const placement = await deps.place({
 					deviceId: input.deviceId,
 					project: projectRow,
@@ -451,9 +456,8 @@ export function createRunStart(deps: RunStartDeps) {
 					deviceNamed: placement.deviceNamed,
 				});
 				const { flow, flowName, calledFlows, inputs, title } = prepared;
-				const author = input.startedBy
-					? await gitAuthorOf(db, input.startedBy)
-					: null;
+				const authorId = input.startedBy ?? startedBy;
+				const author = authorId ? await gitAuthorOf(db, authorId) : null;
 				// The worktree lives on the run's Device.
 				const worktree = await device.worktree({
 					id: runId,
