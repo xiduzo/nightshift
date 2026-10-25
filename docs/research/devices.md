@@ -995,7 +995,10 @@ iroh.
      commands with the stream, checks again from its own Replica (the run
      is its own; the Space document's Member mirror gives the Person a
      role that allows it), applies it as the local action, and reports
-     it (`sync.commandDone`, with its reason when it refused). A command
+     it (`sync.commandDone`, with its reason when it refused). It applies
+     a command once: it notes the command when it starts and keeps the
+     result until the Host stops sending it, also across a `bun --hot`
+     reload (`AppliedCommands`), but not across a restart. A command
      to an offline Walker waits; the run page, the inbox and the run
      header show it as sent ("Answer sent"). Pending commands are known
      where they wait: on the Host. A Device whose Host is offline refuses
@@ -1214,8 +1217,9 @@ iroh.
      stream over its link (closing it cancels the call); the Host relays it
      through its hub, or serves it itself with its own `localDevice` when
      it is the Device (`checkWork` with its owner). `devices.reachable`
-     says whether one takes work. `createWorkRelay` (apps/server) picks the
-     hub for a Space this computer keeps and the Host for the others. A
+     says whether one takes work. `createWorkRelay` (`packages/devices`)
+     picks the hub for a Space this computer keeps and the Host for the
+     others. A
      Device in a Host's Space learns its Person's Devices from the Host
      (`sync.devices`). The Host still walks a run that a Device starts for
      another Device (part A); a run the Device starts for itself, with
@@ -1226,8 +1230,9 @@ iroh.
      `device-offline`, `WaitStarted.deviceId`) and looks again every
      minute; Command and Tool nodes got a wait node for it. On a Host, a
      Device whose link takes work again wakes those sleeps at once
-     (`createWorkHub({ onBack })` → `Engine.deviceBack`); a Device that
-     walks through its Host has the minute only. Online now means a work
+     (`createWorkHub({ onBack })` → `Engine.deviceBack` of the newest
+     engine, also after a `bun --hot` reload); a Device that walks through
+     its Host has the minute only. Online now means a work
      stream is open; a call already made waits out a short drop (45 s).
    - **Offline during a step.** The placed Device keeps the session and
      its replies while they cannot reach the Host, up to ten minutes
@@ -1247,6 +1252,10 @@ iroh.
      does not ask the placed Device before re-running; the old session is
      stopped when the Device is back, and the resumed one continues the
      harness session. A Command step runs again from its start.
+   - **A `bun --hot` reload of the placed Device** is not a restart: the
+     devices runtime (`startDevices`) hands the calls it serves to the
+     next one (`ServedCalls`), which names them to the Host again. The
+     session runs on, once, and its replies go over the new link.
    - **Usage limits per Device.** `WaitStarted.deviceId` names the Device
      of a policy wait: a usage limit is that Device's harness login's (the
      open item). Steps of other runs on that Device still try once
