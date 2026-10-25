@@ -32,6 +32,10 @@
  * (k) a catch-all name at any depth: a file named utils, util, helpers,
  *     helper, common, misc or shared, and a folder named utils, util,
  *     helpers, helper, common or misc
+ * (l) a cycle between the verticals of a workspace, `import type`
+ *     included. An import through a peer port or of a leaf contract is
+ *     not part of a cycle, nor is a test. KNOWN_CYCLES lists the ones that
+ *     wait for their fix
  *
  * It reads every file of the workspace, not only `src/`. A file outside
  * `src/` (a config file, a script) belongs to no vertical: it imports a
@@ -157,6 +161,22 @@ export const PEER_PORTS: Record<
 };
 
 /**
+ * Known cycles between verticals, each listed in section 8 of STRUCTURE.md
+ * with the change that removes it. The cycle check skips the imports of a
+ * listed vertical, and fails once the vertical is in no cycle.
+ *
+ * Shape: { workspace: ["vertical"] }
+ */
+export const KNOWN_CYCLES: Record<string, string[]> = {
+	// contract/ names the types of the verticals that implement its ports
+	// (Actor, StartRunInput, FeedStep, the WalkFile types, DeviceDirectory
+	// and more), and those verticals import contract/. The fix moves those
+	// types into contract/, so it imports no vertical, as the contract of
+	// devices does.
+	"packages/engine": ["contract"],
+};
+
+/**
  * The folders at the top of an app's `src/` besides `features/` and
  * `shared/`: the one folder of entry files that its framework reads.
  */
@@ -216,6 +236,8 @@ export type Options = {
 	peerPorts?: Record<string, Record<string, string>>;
 	/** An app's entry folders at the top of `src/` (ENTRY_DIRS). */
 	entryDirs?: string[];
+	/** The verticals whose imports the cycle check skips (KNOWN_CYCLES). */
+	knownCycles?: string[];
 };
 
 type Import = {
@@ -524,6 +546,77 @@ function verticalsOf(src: string, app: boolean): Vertical[] {
 	return found;
 }
 
+type Edges = Map<string, Map<string, string>>;
+
+/**
+ * The groups of verticals that import each other (the strongly connected
+ * components with more than one vertical, by Tarjan), each sorted.
+ */
+function cyclicGroups(edges: Edges): string[][] {
+	const index = new Map<string, number>();
+	const low = new Map<string, number>();
+	const stack: string[] = [];
+	const onStack = new Set<string>();
+	const groups: string[][] = [];
+	const visit = (node: string): void => {
+		index.set(node, index.size);
+		low.set(node, index.get(node) as number);
+		stack.push(node);
+		onStack.add(node);
+		for (const next of edges.get(node)?.keys() ?? []) {
+			if (!index.has(next)) {
+				visit(next);
+				low.set(
+					node,
+					Math.min(low.get(node) as number, low.get(next) as number),
+				);
+			} else if (onStack.has(next)) {
+				low.set(
+					node,
+					Math.min(low.get(node) as number, index.get(next) as number),
+				);
+			}
+		}
+		if (low.get(node) !== index.get(node)) return;
+		const group: string[] = [];
+		let member: string | undefined;
+		do {
+			member = stack.pop() as string;
+			onStack.delete(member);
+			group.push(member);
+		} while (member !== node);
+		if (group.length > 1) groups.push(group.sort());
+	};
+	for (const node of [...edges.keys()].sort())
+		if (!index.has(node)) visit(node);
+	return groups.sort((a, b) => ((a[0] as string) < (b[0] as string) ? -1 : 1));
+}
+
+/** The shortest cycle through the first vertical of `group`: [a, b, …, a]. */
+function shortestCycle(edges: Edges, group: string[]): string[] {
+	const start = group[0] as string;
+	const members = new Set(group);
+	const previous = new Map<string, string>();
+	const queue = [start];
+	while (queue.length) {
+		const node = queue.shift() as string;
+		for (const next of [...(edges.get(node)?.keys() ?? [])].sort()) {
+			if (!members.has(next)) continue;
+			if (next === start) {
+				const chain: string[] = [];
+				for (let at = node; at !== start; at = previous.get(at) as string)
+					chain.unshift(at);
+				return [start, ...chain, start];
+			}
+			if (!previous.has(next)) {
+				previous.set(next, node);
+				queue.push(next);
+			}
+		}
+	}
+	return [start, start];
+}
+
 /**
  * The problems of one workspace (`apps/web`, `packages/engine`), as
  * messages. `root` is the repository root.
@@ -721,6 +814,8 @@ export function checkWorkspace(
 		used.set(barrel, set);
 	};
 
+	/** The imports between verticals for (l), each with one file that makes it. */
+	const edges = new Map<string, Map<string, string>>();
 	for (const file of files.values()) {
 		const from = verticalOf(file.path);
 		for (const imported of file.imports) {
@@ -728,6 +823,11 @@ export function checkWorkspace(
 			if (!target) continue;
 			const to = verticalOf(target);
 			if (!to || to === from) continue;
+			if (from && !file.test && !exempt(from, to, target)) {
+				const out = edges.get(from.name) ?? new Map<string, string>();
+				if (!out.has(to.name)) out.set(to.name, file.path);
+				edges.set(from.name, out);
+			}
 			if (target === to.barrel) {
 				if (!file.test || to.name.endsWith("testing"))
 					markUsed(target, imported.names);
@@ -773,6 +873,33 @@ export function checkWorkspace(
 				);
 			}
 		}
+	}
+
+	// (l) No cycle between verticals, `import type` included. A known cycle
+	// vertical's own imports do not count, until it is in no cycle.
+	const knownCycles = new Set(options.knownCycles ?? []);
+	const cyclic = cyclicGroups(edges);
+	for (const name of knownCycles) {
+		if (!cyclic.some((group) => group.includes(name))) {
+			problems.push(
+				`scripts/check-verticals.ts: ${name} is in no cycle any more. Remove it from KNOWN_CYCLES, and its entry from STRUCTURE.md section 8.`,
+			);
+		}
+	}
+	const counted = new Map(
+		[...edges].filter(([from]) => !knownCycles.has(from)),
+	);
+	for (const group of cyclicGroups(counted)) {
+		const path = shortestCycle(counted, group);
+		const steps = path
+			.slice(1)
+			.map(
+				(to, i) =>
+					`${to} (${rel(counted.get(path[i] as string)?.get(to) as string)})`,
+			);
+		problems.push(
+			`${workspace}: the verticals ${group.join(", ")} import each other: ${[path[0], ...steps].join(" -> ")}. Move what both need into the lower vertical, or cross through a peer port.`,
+		);
 	}
 
 	// (h) The order of an app's shared pieces: they import no feature, and
@@ -898,6 +1025,7 @@ export function checkWorkspaces(root: string, workspaces: string[]): string[] {
 				leafContracts: LEAF_CONTRACTS[workspace],
 				peerPorts: PEER_PORTS[workspace],
 				entryDirs: ENTRY_DIRS[workspace],
+				knownCycles: KNOWN_CYCLES[workspace],
 			}),
 		);
 	}

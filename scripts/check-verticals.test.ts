@@ -803,6 +803,70 @@ describe("catch-all names (k)", () => {
 	});
 });
 
+describe("no cycle between verticals (l)", () => {
+	/** Three verticals: runs and gates import each other, log is below. */
+	const files = {
+		"src/runs/index.ts":
+			'export { run } from "./run";\nexport type { Run } from "./run";\n',
+		"src/runs/run.ts":
+			'import type { Gate } from "../gates";\nimport { log } from "../log";\nexport type Run = { gate?: Gate };\nexport const run = log;\n',
+		"src/gates/index.ts": 'export type { Gate } from "./gate";\n',
+		"src/gates/gate.ts":
+			'import type { Run } from "../runs";\nexport type Gate = { run: Run };\n',
+		"src/log/index.ts": 'export { log } from "./log";\n',
+		"src/log/log.ts": "export const log = 1;\n",
+		"src/index.ts":
+			'export { run, type Run } from "./runs";\nexport type { Gate } from "./gates";\n',
+	};
+
+	test("a cycle of type imports fails, and names the path", () => {
+		expect(check(PKG, files)).toEqual([
+			"packages/demo: the verticals gates, runs import each other: gates -> runs (packages/demo/src/gates/gate.ts) -> gates (packages/demo/src/runs/run.ts). Move what both need into the lower vertical, or cross through a peer port.",
+		]);
+	});
+
+	test("an import through a peer port is not part of a cycle", () => {
+		expect(
+			check(
+				PKG,
+				{
+					...files,
+					"src/runs/run-type.ts": "export type RunId = string;\n",
+					"src/gates/gate.ts":
+						'import type { RunId } from "../runs/run-type";\nexport type Gate = { run: RunId };\n',
+				},
+				{ peerPorts: { gates: { runs: "run-type" } } },
+			),
+		).toEqual([]);
+	});
+
+	test("a test does not make a cycle", () => {
+		expect(
+			check(PKG, {
+				...files,
+				"src/gates/gate.ts": "export type Gate = { run: string };\n",
+				"src/gates/gate.test.ts": 'import { run } from "../runs";\nrun;\n',
+			}),
+		).toEqual([]);
+	});
+
+	test("a known cycle skips the imports of its vertical, and fails once it is gone", () => {
+		expect(check(PKG, files, { knownCycles: ["gates"] })).toEqual([]);
+		expect(
+			check(
+				PKG,
+				{
+					...files,
+					"src/gates/gate.ts": "export type Gate = { run: string };\n",
+				},
+				{ knownCycles: ["gates"] },
+			),
+		).toEqual([
+			"scripts/check-verticals.ts: gates is in no cycle any more. Remove it from KNOWN_CYCLES, and its entry from STRUCTURE.md section 8.",
+		]);
+	});
+});
+
 describe("barrels hold only imports and exports (j)", () => {
 	test("a barrel with code fails, and so does a package's root index.ts", () => {
 		expect(
