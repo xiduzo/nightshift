@@ -13,7 +13,9 @@ import {
 
 import {
 	forgetHostAddress,
+	forgetKeptQueries,
 	hostAddressOf,
+	keepQueries,
 	loadHostAddress,
 	needsHttps,
 	saveHostAddress,
@@ -74,8 +76,34 @@ async function readSession(host: Host) {
 }
 
 /**
+ * Keeps the reads of the screens between starts for the Person signed in
+ * at `host` (`keepQueries`). True once what was kept is back in the cache,
+ * so the screens show it at once and read again behind it.
+ */
+function useKeptQueries(host: Host | null, personId: string | undefined) {
+	const queryClient = useQueryClient();
+	const key = host && personId ? `${host.address} ${personId}` : null;
+	const [restored, setRestored] = useState<string | null>(null);
+	useEffect(() => {
+		if (!host || !personId) return;
+		const [stop, restoring] = keepQueries(queryClient, host.address, personId);
+		let current = true;
+		void restoring.finally(() => {
+			if (current) setRestored(`${host.address} ${personId}`);
+		});
+		return () => {
+			current = false;
+			stop();
+			setRestored(null);
+		};
+	}, [queryClient, host, personId]);
+	return key !== null && restored === key;
+}
+
+/**
  * The Host this phone is signed in to. The Host address is kept in
  * SecureStore, the session cookie too (per Host, by the auth client).
+ * The reads of the screens are kept per Host and Person between starts.
  */
 export function HostProvider({ children }: { children: ReactNode }) {
 	const queryClient = useQueryClient();
@@ -97,7 +125,11 @@ export function HostProvider({ children }: { children: ReactNode }) {
 		queryKey: sessionKey(address),
 		enabled: host !== null,
 		queryFn: () => (host ? readSession(host) : null),
+		// Offline it fails as before, and the person sees why, instead of a blank wait.
+		networkMode: "always",
 	});
+	const personId = session.data?.user.id;
+	const restored = useKeptQueries(host, personId);
 
 	/** Works with this Host from now on: its session, its data. */
 	const enter = useCallback(
@@ -176,7 +208,8 @@ export function HostProvider({ children }: { children: ReactNode }) {
 		await host.auth.signOut().catch(() => undefined);
 		queryClient.setQueryData(sessionKey(host.address), null);
 		queryClient.removeQueries({ predicate: notOfHost });
-	}, [host, queryClient]);
+		if (personId) await forgetKeptQueries(host.address, personId);
+	}, [host, personId, queryClient]);
 
 	const forget = useCallback(async () => {
 		await signOut();
@@ -185,7 +218,9 @@ export function HostProvider({ children }: { children: ReactNode }) {
 	}, [signOut]);
 
 	const state: HostState =
-		address === undefined || (host && session.isPending)
+		address === undefined ||
+		(host && session.isPending) ||
+		(session.data && !restored)
 			? { status: "loading" }
 			: host && session.data
 				? {
