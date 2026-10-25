@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
 	createRunBus,
+	type Derive,
 	type LoggedEvent,
 	type RunBus,
 	type TranscriptEntry,
@@ -140,7 +141,10 @@ async function* stepEntries(
 
 function ports(extra: Partial<RunTranscriptPorts> = {}): RunTranscriptPorts {
 	return {
-		log: { events: async () => [...events] },
+		log: {
+			derive: async <T>(runIds: readonly string[], fn: Derive<T>) =>
+				new Map(runIds.map((id) => [id, fn([...events])])),
+		},
 		bus,
 		stepEntries,
 		holdMs: 1_000,

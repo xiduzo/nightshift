@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type CopyStamp, copyStampOf, stampHolds } from "./copy-stamp";
+import { type CopyStamp, copyStamps, stampHolds } from "./copy-stamp";
 import type { LoggedEvent } from "./events";
 
 /**
@@ -7,6 +7,10 @@ import type { LoggedEvent } from "./events";
  * whether it had ended. A reader keeps a copy only when its stamp holds
  * the step as the reader's log says.
  */
+
+/** The stamp of one step of a run's events. */
+const copyStampOf = (events: readonly LoggedEvent[], stepId: string) =>
+	copyStamps(events).get(stepId) ?? null;
 
 /** A step's lifecycle events, in `seq` order from 1. */
 function events(
@@ -53,14 +57,17 @@ describe("the stamp of a step", () => {
 		).toEqual(at(2, true));
 	});
 
-	test("reads the events in seq order, whatever order they come in", () => {
-		const reversed = events(
-			"StepStarted",
-			"StepEnded",
-			"StepReopened",
-			"StepEnded",
-		).reverse();
-		expect(copyStampOf(reversed, "step-1")).toEqual(at(2, true));
+	test("stamps every step of the run in one pass", () => {
+		const first = events("StepStarted", "StepEnded");
+		const second = events("StepStarted", "StepEnded", "StepReopened").map(
+			(e) => ({ ...e, seq: e.seq + first.length, stepId: "step-2" }),
+		);
+		expect(copyStamps([...first, ...second])).toEqual(
+			new Map([
+				["step-1", at(1, true)],
+				["step-2", at(2, false)],
+			]),
+		);
 	});
 
 	test("is null for a step the events do not start", () => {

@@ -837,7 +837,7 @@ describe("a run walked elsewhere", () => {
 			personId: "person-a",
 		});
 		expect(await commands.pendingFor("device-b")).toEqual([kept]);
-		expect((await commands.pendingOf("run-1")).map((c) => c.id)).toEqual([
+		expect((await commands.pendingOf(["run-1"])).map((c) => c.id)).toEqual([
 			kept.id,
 		]);
 		// Only its Walker may say it is done.

@@ -5,7 +5,7 @@ import { project, run } from "@nightshift/db/schema";
 import { type Flow, flowSchema, migrateFlow } from "@nightshift/flows";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import {
-	getRunRow,
+	type Derive,
 	type LoggedEvent,
 	type RunBus,
 	type RunLog,
@@ -150,6 +150,22 @@ export function runFacts(events: readonly LoggedEvent[]) {
 }
 
 export type RunFacts = ReturnType<typeof runFacts>;
+
+/** The run's status, or null for a run the log has nothing on. */
+function knownStatus(events: readonly LoggedEvent[]): RunStatus | null {
+	return events.length === 0 ? null : deriveRunState(events).status;
+}
+
+/** A run's status and whether it is on this computer (`ReadModel.runHere`). */
+export type RunHere = {
+	id: string;
+	status: RunStatus;
+	wakeAt: number | null;
+	/** This computer walks it. */
+	walkedHere: boolean;
+	/** Its steps run on this computer (its Device, as its row says). */
+	stepsHere: boolean;
+};
 
 /** A cost tally as the summaries carry it. */
 function costFields(cost: CostTally) {
@@ -419,10 +435,15 @@ export function toStepSummary(
 	};
 }
 
-/** Everything the run page shows: the summary, the flows, the steps, the edges, the resumes. */
+/**
+ * Everything the run page shows: the summary, the flows, the steps, the
+ * edges, the resumes. `facts` and `steps` are `runFacts` and `deriveSteps`
+ * of `events`, as the run log keeps them (`RunLog.derive`).
+ */
 export function toRunDetail(
 	row: RunRow,
 	events: readonly LoggedEvent[],
+	derived: { facts: RunFacts; steps: readonly DerivedStep[] },
 	harnessOf: HarnessOf,
 	names: ReadonlyMap<string, string>,
 	walker: RunWalker,
@@ -434,10 +455,10 @@ export function toRunDetail(
 	const last =
 		walker.thisDevice && device.thisDevice ? lastHarnessSession(events) : null;
 	return {
-		...toSummary(row, runFacts(events), names, walker, device),
+		...toSummary(row, derived.facts, names, walker, device),
 		flow: parseRunFlow(row),
 		calledFlows: parseCalledFlows(row),
-		steps: deriveSteps(events).map((step) => toStepSummary(step, deviceOf)),
+		steps: derived.steps.map((step) => toStepSummary(step, deviceOf)),
 		// Edges of the top-level flow; a called flow's edges count per scope.
 		traversals: deriveTraversals(events),
 		calledTraversals: deriveCalledTraversals(events),
@@ -465,6 +486,8 @@ export type ReadModelDeps = {
 	db: Database;
 	log: RunLog;
 	bus: RunBus;
+	/** This computer's Device id (and the run log's Walker id). */
+	deviceId: string;
 	/** The harness port of that name, for its take-over command. */
 	harnessOf: HarnessOf;
 	/** The Walkers of runs of a Space (and the Devices their steps run on), by id. */
@@ -472,8 +495,10 @@ export type ReadModelDeps = {
 		spaceId: string,
 		ids: readonly string[],
 	): Promise<Map<string, RunWalker>>;
-	/** The run's actions that wait for its Walker. */
-	pendingCommands(runId: string): Promise<PendingCommand[]>;
+	/** The actions of each run that wait for its Walker, by run id. */
+	pendingCommands(
+		runIds: readonly string[],
+	): Promise<Map<string, PendingCommand[]>>;
 	/** A step's transcript, wherever its run is walked (`RunsPort.stepEntries`). */
 	stepEntries: StepEntries;
 };
@@ -487,6 +512,15 @@ export type ReadModel = ReturnType<typeof createReadModel>;
 /** The reads that need the database, the run log or the bus. */
 export function createReadModel(deps: ReadModelDeps) {
 	const { db, log, bus, harnessOf } = deps;
+
+	/*
+	 * Every read of a run's derived state goes through the run log's
+	 * `derive`: the run list, each watcher of the run and the run page
+	 * share one derivation per append.
+	 */
+	async function one<T>(runId: string, fn: Derive<T>): Promise<T> {
+		return (await log.derive([runId], fn)).get(runId) as T;
+	}
 
 	/** Names the Devices a Space's runs name: their Walkers and Placements. */
 	async function namer(
@@ -538,13 +572,16 @@ export function createReadModel(deps: ReadModelDeps) {
 		);
 	}
 
-	async function getRun(runId: string): Promise<RunDetail> {
-		const row = await getRunRow(db, runId);
+	/** The run page of `row`, the run's row (the caller has read it). */
+	async function getRun(row: RunRow): Promise<RunDetail> {
+		const runId = row.id;
 		const events = await log.events(runId);
+		const steps = await one(runId, deriveSteps);
+		const facts = await one(runId, runFacts);
 		const deviceOf = await namer(row.spaceId, [
 			row.walkerId,
 			runDeviceId(row),
-			...deriveSteps(events).map((s) => s.deviceId),
+			...steps.map((s) => s.deviceId),
 			...events.flatMap((e) =>
 				e.type === "HandedOff" ? [e.payload.from, e.payload.to] : [],
 			),
@@ -553,18 +590,43 @@ export function createReadModel(deps: ReadModelDeps) {
 		return toRunDetail(
 			row,
 			events,
+			{ facts, steps },
 			harnessOf,
 			await namesOf(db, [row.startedBy]),
 			walker,
-			walker.thisDevice ? [] : await deps.pendingCommands(runId),
+			walker.thisDevice
+				? []
+				: ((await deps.pendingCommands([runId])).get(runId) ?? []),
 			deviceOf,
 		);
 	}
 
 	/** The run's status, or null for a run the log has nothing on. */
 	async function runStatus(runId: string): Promise<RunStatus | null> {
-		const events = await log.events(runId);
-		return events.length === 0 ? null : deriveRunState(events).status;
+		return one(runId, knownStatus);
+	}
+
+	/**
+	 * Where a run is and what it does, cheap: its status, when it wakes,
+	 * and whether this computer walks it or runs its steps. Null when this
+	 * Replica has no such run. One row and the run log's kept facts.
+	 */
+	async function runHere(runId: string): Promise<RunHere | null> {
+		const [row] = await db
+			.select({ walkerId: run.walkerId, deviceId: run.deviceId })
+			.from(run)
+			.where(eq(run.id, runId));
+		if (!row) return null;
+		const facts = await one(runId, runFacts);
+		const self = await log.walkerId();
+		const here = (id: string) => id === self || id === deps.deviceId;
+		return {
+			id: runId,
+			status: facts.status,
+			wakeAt: facts.wakeAt,
+			walkedHere: here(row.walkerId),
+			stepsHere: here(runDeviceId(row)),
+		};
 	}
 
 	/** The open Gates of the Space's runs of projects a person has not removed, oldest first. */
@@ -585,20 +647,25 @@ export function createReadModel(deps: ReadModelDeps) {
 				.filter((id) => facts.get(id)?.status === "waiting"),
 			deriveOpenGate,
 		);
+		const withGate = rows.filter((r) => open.has(r.run.id));
 		const walkers = await deps.walkers(
 			spaceId,
-			rows.filter((r) => open.has(r.run.id)).map((r) => r.run.walkerId),
+			withGate.map((r) => r.run.walkerId),
+		);
+		// One read for the answers that wait for a Walker elsewhere.
+		const pending = await deps.pendingCommands(
+			withGate
+				.filter((r) => !walkerOf(walkers, r.run.walkerId).thisDevice)
+				.map((r) => r.run.id),
 		);
 		const gates: OpenGate[] = [];
 		for (const { run: row, projectName } of rows) {
 			const gate = open.get(row.id);
 			if (!gate) continue;
 			const walker = walkerOf(walkers, row.walkerId);
-			const answerPending =
-				!walker.thisDevice &&
-				(await deps.pendingCommands(row.id)).some(
-					(c) => c.kind === "gate.resolve",
-				);
+			const answerPending = (pending.get(row.id) ?? []).some(
+				(c) => c.kind === "gate.resolve",
+			);
 			gates.push({
 				spaceId: row.spaceId,
 				runId: row.id,
@@ -628,11 +695,11 @@ export function createReadModel(deps: ReadModelDeps) {
 	 * its cursor.
 	 */
 	async function* watch(
-		runId: string,
+		runRow: RunRow,
 		signal: AbortSignal,
 		afterSeq: number,
 	): AsyncGenerator<RunStreamItem> {
-		const runRow = await getRunRow(db, runId);
+		const runId = runRow.id;
 		if (signal.aborted) return;
 
 		const queue: (
@@ -662,11 +729,14 @@ export function createReadModel(deps: ReadModelDeps) {
 		signal.addEventListener("abort", stopTranscript, { once: true });
 
 		try {
-			const events = await log.events(runId);
-			let lastStatus: RunStatus = deriveRunState(events).status;
+			// Keeps the run's log in memory while it is open (`logOf`): each
+			// change then derives from it, not from a read of every event.
+			await log.events(runId);
+			let lastStatus: RunStatus = (await one(runId, runFacts)).status;
 			yield { kind: "status", status: lastStatus };
 
-			const steps = deriveSteps(events);
+			// A copy: the steps the run log keeps are shared.
+			const steps = [...(await one(runId, deriveSteps))];
 			let deviceOf = await namer(runRow.spaceId, [
 				runRow.walkerId,
 				...steps.map((s) => s.deviceId),
@@ -707,7 +777,7 @@ export function createReadModel(deps: ReadModelDeps) {
 				} else if (item.kind === "error") {
 					throw item.error;
 				} else if (item.kind === "step-changed") {
-					const current = deriveSteps(await log.events(runId)).find(
+					const current = (await one(runId, deriveSteps)).find(
 						(s) => s.id === item.stepId,
 					);
 					if (current) {
@@ -724,7 +794,7 @@ export function createReadModel(deps: ReadModelDeps) {
 						yield { kind: "step", step: toStepSummary(current, deviceOf) };
 					}
 				} else {
-					const status = deriveRunState(await log.events(runId)).status;
+					const status = (await one(runId, runFacts)).status;
 					if (status !== lastStatus) {
 						lastStatus = status;
 						yield { kind: "status", status };
@@ -738,5 +808,5 @@ export function createReadModel(deps: ReadModelDeps) {
 		}
 	}
 
-	return { listRuns, getRun, runStatus, listGates, watch };
+	return { listRuns, getRun, runStatus, runHere, listGates, watch };
 }

@@ -20,7 +20,8 @@ export type StepEntries = (
 
 /** What a run's transcript reads: the steps from the log, each step's entries from the peers. */
 export type RunTranscriptPorts = {
-	log: Pick<RunLog, "events">;
+	/** The run's steps, derived once per append for every reader (`RunLog.derive`). */
+	log: Pick<RunLog, "derive">;
 	bus: RunBus;
 	stepEntries: StepEntries;
 	/** How long an entry waits for a lower seq that another step still owes. Default five seconds. */
@@ -193,7 +194,8 @@ export async function* followRunTranscript(
 		try {
 			const first = replaying === null;
 			let initial = 0;
-			const steps = deriveSteps(await ports.log.events(run.id)).sort(
+			const derived = await ports.log.derive([run.id], deriveSteps);
+			const steps = (derived.get(run.id) ?? []).toSorted(
 				(a, b) => a.openedSeq - b.openedSeq,
 			);
 			for (const step of steps) {

@@ -198,8 +198,10 @@ export type RunsPort = {
 		spaceId: string,
 		ids: readonly string[],
 	): Promise<Map<string, RunWalker>>;
-	/** The actions on a run that wait for its Walker. */
-	pendingCommands(runId: string): Promise<PendingCommand[]>;
+	/** The actions on each run that wait for its Walker, by run id, in one read. */
+	pendingCommands(
+		runIds: readonly string[],
+	): Promise<Map<string, PendingCommand[]>>;
 	/**
 	 * A step's transcript, wherever its run is walked and wherever its copy
 	 * is kept: its entries after `afterSeq` (the run-wide seq), in `seq`

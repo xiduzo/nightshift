@@ -461,7 +461,7 @@ describe("the devices runtime across a reload", () => {
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
-		const [command] = await paired.host.exchange.commands.pendingOf(run.id);
+		const [command] = await paired.host.exchange.commands.pendingOf([run.id]);
 		await entered.promise;
 
 		const reloading = startB();

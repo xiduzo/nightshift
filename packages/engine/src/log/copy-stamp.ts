@@ -23,27 +23,28 @@ export type CopyStamp = {
 };
 
 /**
- * The stamp a copy of a step's file taken now carries, from the run's
- * events. Null for a step the events do not start.
+ * The stamp a copy of each step's file taken now carries, by step id, from
+ * a run's events in seq order (a Run Log's own order). A step the events
+ * do not start has none. One pass: the run log keeps it per run until the
+ * next append (`RunLog.derive`), so every reader of a stamp shares it.
  */
-export function copyStampOf(
+export function copyStamps(
 	events: readonly LoggedEvent[],
-	stepId: string,
-): CopyStamp | null {
-	let opening = 0;
-	let ended = false;
-	for (const e of [...events].sort((x, y) => x.seq - y.seq)) {
-		if (e.stepId !== stepId) continue;
+): ReadonlyMap<string, CopyStamp> {
+	const stamps = new Map<string, CopyStamp>();
+	for (const e of events) {
+		if (e.stepId === null) continue;
+		const stamp = stamps.get(e.stepId);
 		// As the read model does: a second start begins the step again.
 		if (e.type === "StepStarted") {
-			opening = 1;
-			ended = false;
-		} else if (e.type === "StepReopened" && opening > 0) {
-			opening++;
-			ended = false;
-		} else if (e.type === "StepEnded" && opening > 0) ended = true;
+			stamps.set(e.stepId, { opening: 1, ended: false });
+		} else if (e.type === "StepReopened" && stamp) {
+			stamps.set(e.stepId, { opening: stamp.opening + 1, ended: false });
+		} else if (e.type === "StepEnded" && stamp) {
+			stamps.set(e.stepId, { opening: stamp.opening, ended: true });
+		}
 	}
-	return opening === 0 ? null : { opening, ended };
+	return stamps;
 }
 
 /**

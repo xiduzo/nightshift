@@ -100,7 +100,7 @@ export const alonePeers: PeersFactory = (context: PeerContext): Peers => {
 					}),
 				);
 			},
-			pendingCommands: async () => [],
+			pendingCommands: async () => new Map(),
 			// Every run is walked here: its own file, then live.
 			stepEntries: (step, afterSeq, signal) =>
 				followOwnStep(

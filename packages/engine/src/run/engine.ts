@@ -7,7 +7,7 @@ import { defaultRunSettings, type RunSettings } from "../device-config";
 import { createFlowFiles } from "../flows";
 import { createRunner, createRunWalks, resolvePolicy } from "../graph";
 import {
-	copyStampOf,
+	copyStamps,
 	createRunBus,
 	createRunHistory,
 	createRunLog,
@@ -33,6 +33,7 @@ import {
 	createReadModel,
 	parseCalledFlows,
 	parseRunFlow,
+	type RunHere,
 	type RunSummary,
 } from "../read";
 import {
@@ -123,6 +124,13 @@ export interface Engine {
 	 * run endings from it. Returns the unsubscribe.
 	 */
 	onRunEvents(listener: LandedRunListener): () => void;
+	/**
+	 * A run's status, when it wakes, and whether this computer walks it or
+	 * runs its steps, in any Space of this Replica. Null for a run it does
+	 * not have. Cheap: one row and the facts the run log keeps, for a
+	 * reader that asks on every landed event (keep this computer awake).
+	 */
+	runHere(runId: string): Promise<RunHere | null>;
 	/**
 	 * A Device is back (its link to this Host took work again): the steps
 	 * of the runs this computer walks that sleep because a Device was
@@ -233,8 +241,11 @@ export function createEngine(
 		...(options.profileFor ? { profileFor: options.profileFor } : {}),
 		ready: peersReady,
 		ownerId: () => ownerId,
+		// Every open step's reader asks on each change of the run: the run
+		// log derives the stamps once per append for all of them.
 		stepStamp: async ({ runId, stepId }) =>
-			copyStampOf(await runLog.events(runId), stepId),
+			(await runLog.derive([runId], copyStamps)).get(runId)?.get(stepId) ??
+			null,
 		project: (projectId, spaceId) => projects.find(projectId, spaceId),
 		takeOver: (runId) =>
 			takeOver({ db, log: runLog, runner, archive: peers.runs, walks }, runId),
@@ -331,6 +342,7 @@ export function createEngine(
 		db,
 		log: runLog,
 		bus,
+		deviceId: device.id,
 		// Any harness, added or not: an old run's session stays takeable.
 		// A custom agent has no take-over command.
 		harnessOf: (name) =>
@@ -476,6 +488,10 @@ export function createEngine(
 		},
 		logMemberChange: (change) => logMemberChange(runLog, change),
 		onRunEvents: (listener) => onLandedRunEvents(db, runLog, listener),
+		async runHere(runId) {
+			await ready;
+			return reads.runHere(runId);
+		},
 		async deviceBack(_deviceId) {
 			await ready;
 			await wakeOfflineSleeps({ db, log: runLog, runner });

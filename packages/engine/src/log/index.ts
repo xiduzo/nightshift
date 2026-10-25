@@ -2,7 +2,7 @@
 
 export type { RunBus } from "./bus";
 export { createRunBus } from "./bus";
-export { type CopyStamp, copyStampOf, stampHolds } from "./copy-stamp";
+export { type CopyStamp, copyStamps, stampHolds } from "./copy-stamp";
 export type {
 	EngineEventType,
 	EnginePayloads,
@@ -41,7 +41,7 @@ export {
 	onLandedRunEvents,
 } from "./landed";
 export { logMemberChange } from "./member-events";
-export type { RunLog } from "./run-log";
+export type { Derive, RunLog } from "./run-log";
 export { createRunLog } from "./run-log";
 export type { PlannedDevice, RunPlan, RunRow } from "./run-row";
 export {

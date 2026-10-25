@@ -114,8 +114,7 @@ export function createSpaces(deps: SpacesDeps) {
 		afterSeq: number,
 	): AsyncGenerator<RunStreamItem> {
 		await ready;
-		await getRunRow(runId, spaceId);
-		yield* reads.watch(runId, signal, afterSeq);
+		yield* reads.watch(await getRunRow(runId, spaceId), signal, afterSeq);
 	}
 
 	/** What a person does in one Space. */
@@ -250,8 +249,8 @@ export function createSpaces(deps: SpacesDeps) {
 
 			async getRun(runId) {
 				await ready;
-				await getRunRow(runId, spaceId);
-				return (await deps.pathsFor(spaceId, actor))(await reads.getRun(runId));
+				const row = await getRunRow(runId, spaceId);
+				return (await deps.pathsFor(spaceId, actor))(await reads.getRun(row));
 			},
 
 			async listArtifacts(runId) {

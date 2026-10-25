@@ -467,7 +467,7 @@ describe("the Device's exchange with its Host", () => {
 			});
 		await untilStatus(paired.device, run.id, "finished");
 		await untilStatus(paired.host, run.id, "finished");
-		expect(await paired.host.exchange.commands.pendingOf(run.id)).toEqual([]);
+		expect(await paired.host.exchange.commands.pendingOf([run.id])).toEqual([]);
 	});
 
 	test("a Command applied just before the link dropped is not applied again when it is back", async () => {
@@ -498,7 +498,7 @@ describe("the Device's exchange with its Host", () => {
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
-		const [command] = await paired.host.exchange.commands.pendingOf(run.id);
+		const [command] = await paired.host.exchange.commands.pendingOf([run.id]);
 		await waitFor(() => dropped && status(period) === "offline", {
 			label: "the link to drop",
 		});
@@ -588,7 +588,7 @@ describe("the Device's exchange with its Host", () => {
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
-		const [command] = await paired.host.exchange.commands.pendingOf(run.id);
+		const [command] = await paired.host.exchange.commands.pendingOf([run.id]);
 		await untilStatus(paired.device, run.id, "finished");
 		await waitFor(async () => (await commandOnA(command?.id as string)).done, {
 			label: "the Command done on A",
@@ -664,7 +664,7 @@ describe("the Device's exchange with its Host", () => {
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
-		const [command] = await paired.host.exchange.commands.pendingOf(run.id);
+		const [command] = await paired.host.exchange.commands.pendingOf([run.id]);
 		await untilStatus(paired.device, run.id, "finished");
 		await first.stop();
 		await paired.device.dispose();
@@ -780,7 +780,7 @@ describe("the Device's exchange with its Host", () => {
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
-		const [answer] = await commands.pendingOf(run.id);
+		const [answer] = await commands.pendingOf([run.id]);
 
 		await untilStatus(paired.device, run.id, "finished");
 		await waitFor(async () => (await commandOnA(answer?.id as string)).done, {
@@ -876,7 +876,7 @@ describe("the Device's exchange with its Host", () => {
 				stepId: gate?.stepId as string,
 				choice: "approve",
 			});
-		const [command] = await paired.host.exchange.commands.pendingOf(run.id);
+		const [command] = await paired.host.exchange.commands.pendingOf([run.id]);
 		await untilStatus(paired.device, run.id, "finished");
 		await waitFor(async () => (await commandOnA(command?.id as string)).done, {
 			label: "the Command done on A",

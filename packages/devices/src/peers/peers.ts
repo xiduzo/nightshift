@@ -5,7 +5,7 @@ import {
 	type Peers,
 } from "@nightshift/engine";
 import { createRunArchive } from "../archive";
-import type { HostRelay, WorkRelay } from "../contract";
+import type { HostRelay, RunCommand, WorkRelay } from "../contract";
 import { createRunHistoryExchange, type RunHistoryExchange } from "../exchange";
 import { createHostSpaces, type HostSpaces } from "../links";
 import {
@@ -193,12 +193,18 @@ export function createPeers(
 		hostOf,
 		runs: {
 			walkers: createWalkers({ db, log, device, documents }),
-			pendingCommands: async (runId) =>
-				(await exchange.commands.pendingOf(runId)).map((c) => ({
-					id: c.id,
-					kind: c.kind,
-					createdAt: c.createdAt,
-				})),
+			pendingCommands: async (runIds) => {
+				const byRun = new Map<
+					string,
+					Pick<RunCommand, "id" | "kind" | "createdAt">[]
+				>();
+				for (const c of await exchange.commands.pendingOf(runIds)) {
+					const pending = byRun.get(c.runId) ?? [];
+					pending.push({ id: c.id, kind: c.kind, createdAt: c.createdAt });
+					byRun.set(c.runId, pending);
+				}
+				return byRun;
+			},
 			stepEntries: (step, afterSeq, signal) =>
 				exchange.feeds.entries(step, afterSeq, signal),
 			keepWalk: archive.keepWalk,

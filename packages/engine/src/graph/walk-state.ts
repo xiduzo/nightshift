@@ -5,7 +5,7 @@ import { lgCheckpoint, lgWrite, step } from "@nightshift/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import {
 	type CopyStamp,
-	copyStampOf,
+	copyStamps,
 	ForeignRowsError,
 	parseTranscript,
 	type RunHistory,
@@ -88,7 +88,7 @@ export function createRunWalks(deps: {
 	db: Database;
 	/** This computer's data folder, where its steps' transcripts are. */
 	dataDir: string;
-	log: Pick<RunLog, "walkerId" | "events">;
+	log: Pick<RunLog, "walkerId" | "derive">;
 	history: Pick<RunHistory, "runOwner" | "ownStepFiles">;
 }): RunWalks {
 	const { db, dataDir, log, history } = deps;
@@ -110,11 +110,11 @@ export function createRunWalks(deps: {
 		const { steps } = options;
 		// The stamps before the files: a file read after a reopen holds more
 		// than its stamp says, never less.
-		const events = await log.events(runId);
+		const stamps = (await log.derive([runId], copyStamps)).get(runId);
 		const files: WalkFile[] = [];
 		for (const stepId of await stepIdsOfRun(db, runId)) {
 			if (steps && !steps.includes(stepId)) continue;
-			const stamp = copyStampOf(events, stepId);
+			const stamp = stamps?.get(stepId);
 			const own = await history.ownStepFiles(stepId, self);
 			if (!own) continue;
 			const at = { spaceId, runId, stepId };

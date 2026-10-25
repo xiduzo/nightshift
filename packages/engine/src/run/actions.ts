@@ -183,7 +183,8 @@ export function createRunActions(deps: RunActionsDeps) {
 				});
 			case "answer": {
 				refuseAnswer(events, request);
-				const pending = await deps.archive.pendingCommands(row.id);
+				const pending =
+					(await deps.archive.pendingCommands([row.id])).get(row.id) ?? [];
 				if (pending.some((c) => c.kind === "gate.resolve")) {
 					throw new GateClosedError(
 						"An answer to this Gate is already on its way to the device that runs it.",

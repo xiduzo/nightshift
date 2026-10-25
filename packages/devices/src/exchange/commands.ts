@@ -6,7 +6,7 @@ import type {
 	RunCommandKind,
 	SpaceEngine,
 } from "@nightshift/engine";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type { RunCommand } from "../contract";
 
 /**
@@ -85,12 +85,18 @@ export function createRunCommands(deps: { db: Database }) {
 			return rows.map(toCommand);
 		},
 
-		/** The run's commands that wait for its Walker, oldest first. */
-		async pendingOf(runId: string): Promise<RunCommand[]> {
+		/** The runs' commands that wait for their Walkers, oldest first, in one read. */
+		async pendingOf(runIds: readonly string[]): Promise<RunCommand[]> {
+			if (runIds.length === 0) return [];
 			const rows = await db
 				.select()
 				.from(runCommand)
-				.where(and(eq(runCommand.runId, runId), isNull(runCommand.doneAt)))
+				.where(
+					and(
+						inArray(runCommand.runId, [...runIds]),
+						isNull(runCommand.doneAt),
+					),
+				)
 				.orderBy(asc(runCommand.createdAt));
 			return rows.map(toCommand);
 		},
