@@ -29,6 +29,7 @@ below it, from the bottom up:
 
 | Vertical | Holds |
 | --- | --- |
+| `run-status/` | A run's status and which actions it allows (`runActions`, `whyNot`), with the refusal they share (`RunRefusal`, one named rule each). It imports nothing: the package entry `@nightshift/engine/run-status` gives it to `@nightshift/client` for the apps. |
 | `device-config/` | This computer's Device document: settings, connections and secrets, CLI tools, Agent Profiles, MCP servers. |
 | `log/` | The event payloads and append and parse (`events.ts`), the run log in memory (`run-log.ts`), the bus, the run and step rows (`run-row.ts`), the member events, the transcript files and the transcript event types (`step-events.ts`). |
 | `read/` | The pure projections of the log (`derive-run.ts`, `derive-steps.ts`), cost (`cost.ts`), the run views (`views.ts`), the read model, the Persons a run names (`people.ts`) and the run bundle. |
@@ -37,7 +38,7 @@ below it, from the bottom up:
 | `device/` | The execution port (`Device`), this computer (`local.ts`), commands and tool calls. |
 | `graph/` | The flow as a graph, below. |
 | `schedules/` | The scheduler and the schedules file of a project (`schedule-files.ts`). |
-| `run/` | The composition root (`engine.ts`), what a person does in one Space (`space.ts`), run start, recovery, and the run actions (`stop.ts`, `move.ts`, `gate.ts`, `wake.ts`, over one `actions` object, and the relay to a Walker in `relay.ts`). |
+| `run/` | The composition root (`engine.ts`), what a person does in one Space (`space.ts`), run start, startup recovery, the run actions (`actions.ts`, with the relay to a Walker in `relay.ts`), the other end of a move (`take-over.ts`) and the wake when a Device is back (`wake.ts`). |
 
 `contract/` holds only types: `Engine`, `SpaceEngine`, `StartRunInput`,
 `EngineOptions`, `Relay`, `Peers` and `DeviceDirectory`. A type-only import
@@ -196,7 +197,10 @@ packages/engine/src/
                            planReentry) and WaitEnded (recordWake) before a
                            drive, ends open work through closeOpenWork,
                            reacts to how a drive ended, and prunes an ended
-                           run's thread to what a re-entry reads.
+                           run's thread to what a re-entry reads (also a
+                           run a dead daemon left: the prune Turn of
+                           startup recovery). A stop ends every run that
+                           is going, also one that no drive holds.
   testing/graph.ts         The one set of graph test helpers: node builders
                            (agent(), command(), edge(), flowOf()), startRun()
                            for a run row with its log and its Thread (opened
@@ -210,15 +214,23 @@ packages/engine/src/
                            dependencies (db, log, runner, bus, settings,
                            clock), and wires them. It holds no logic.
   run/space.ts             createSpaces(deps): the SpaceEngine of one
-                           Space. Each method waits for the engine, checks
-                           the Space and hands over to the module that
-                           owns the action.
-  run/stop.ts, move.ts,    The run actions: stopRun, moveRun and takeOver,
-  gate.ts, wake.ts         resolveGate, signalRun and the wake when a Device
-                           is back. Each writes one run-level fact, in a
-                           Turn of the runner. On a run another Device
-                           walks, it travels to the Walker (relay.ts).
-                           engine.ts gives all of them one actions object.
+                           Space. Each method waits for the engine and
+                           hands over to the module that owns the action.
+  run/actions.ts           The run actions behind one entry, act(spaceId,
+                           actor, runId, request): stop, answer a Gate,
+                           send a Signal, move, resume, restart a step, run
+                           again. It reads the run's row once (its Space,
+                           its Walker), refuses by the run's one rule
+                           (run-status/, RunRefusal), and takes the action
+                           as a Turn of the runner (take, or hold for a
+                           stop after the step and a move), or hands it to
+                           the Walker as a command (relay.ts): a stop, an
+                           answer, a signal and a move travel, the rest
+                           only the Walker takes. moveTargets lists the
+                           Devices a move may go to.
+  run/take-over.ts,        takeOver: the other end of a move. wake.ts: the
+  wake.ts                  runs that slept for a Device that is back look
+                           again.
   run/run-start.ts         Run start. prepareRun loads and validates the
                            flow and its called flows, resolves profiles and
                            asks every requirement in REQUIREMENTS (the
@@ -230,16 +242,15 @@ packages/engine/src/
                            start's Turn: with the slot held, it creates the
                            worktree and the run row, appends RunStarted and
                            WorktreeCreated, and the runner drives.
-  run/recovery.ts          createRecovery(deps): recoverInterruptedWork
-                           (a dead daemon's open sessions, steps and runs
-                           become interrupted through closeOpenWork, as a
-                           stop ends them; sleeping runs get their
-                           timers back through runner.restore; after a
-                           grace period the daemon
-                           resumes the rest unless daemonResumeBlock says
-                           why not, queued on a full run cap), resume,
-                           restartStep and rerunFrom (their refusals, then
-                           a Turn of the runner).
+  run/recovery.ts          createRecovery(deps): startup recovery only.
+                           recoverInterruptedWork (a dead daemon's open
+                           sessions, steps and runs become interrupted
+                           through closeOpenWork, as a stop ends them, and
+                           a run that ends so is pruned; sleeping runs get
+                           their timers back through runner.restore; after
+                           a grace period the daemon resumes the rest
+                           unless daemonResumeBlock says why not, queued on
+                           a full run cap).
   read/read-model.ts       What people see of a run, from the log: runFacts,
                            toSummary, toStepSummary, toRunDetail,
                            takeOverCommand, the flow snapshot parsers;
@@ -490,7 +501,7 @@ Decisions taken while implementing, from the code and its comments:
   (`runner.onCustom`). The `step-started` and `step-ended` custom stream
   chunks (`RunEvent`) make the runner publish `{ kind: "status-changed" }`
   on the bus; transcript entries reach the bus from the recorder already.
-- **`resolveGate` waits for the step to end** (`run/gate.ts`). It reserves a
+- **`resolveGate` waits for the step to end** (`run/actions.ts`). It reserves a
   slot, resumes the thread with `{ kind: "gate", choice, note }` and
   returns once the log has the step's `StepEnded`, so the run no longer
   waits when the caller looks again. A full run cap leaves the Gate open.
