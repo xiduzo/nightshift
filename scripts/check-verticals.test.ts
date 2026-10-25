@@ -1029,13 +1029,6 @@ describe("barrels hold only imports and exports (j)", () => {
 	});
 });
 
-/**
- * A run over the whole repository takes seconds of wall time, and many
- * more on a busy computer. Its wall time is no signal: the CPU bound of
- * "it stays fast" is the guard.
- */
-const WHOLE_REPOSITORY = { timeout: 120_000 };
-
 describe("the command", () => {
 	test("tests are told apart from production files", () => {
 		expect(isTest("features/runs/run-list.test.tsx")).toBe(true);
