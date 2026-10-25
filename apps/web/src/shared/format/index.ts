@@ -1,5 +1,6 @@
-/** How times, durations, costs and counts read, and useNow that keeps them current. */
+/** How times, durations, costs and counts read, and useNow (from `@nightshift/client`) that keeps them current. */
 
+export { useNow } from "@nightshift/client";
 export type { KnownCost } from "./format";
 export {
 	costNote,
@@ -19,4 +20,3 @@ export {
 	sumKnownCost,
 	truncate,
 } from "./format";
-export { useNow } from "./use-now";

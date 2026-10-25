@@ -168,6 +168,7 @@ export {
 	stepName,
 	stepState,
 	type TranscriptEntry,
+	useNow,
 	type Wait,
 	type WaitEvent,
 	waitFor,

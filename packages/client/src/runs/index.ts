@@ -54,3 +54,4 @@ export type {
 	TranscriptEntry,
 	WaitEvent,
 } from "./types";
+export { useNow } from "./use-now";
