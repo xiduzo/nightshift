@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { CLIENT_IP_HEADERS } from "../index";
+import { CLIENT_IP_HEADERS } from "../auth";
 import {
 	type AuthSandbox,
 	cookiesOf,

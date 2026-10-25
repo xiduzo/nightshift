@@ -7,11 +7,9 @@
 export { PHONE_DELAYS, phoneDelayLabel } from "./phone-delay";
 export {
 	gateKey,
-	isGateKey,
 	PUSH_ACTION,
 	PUSH_ANDROID_CHANNEL,
 	PUSH_CATEGORY,
-	PUSH_MESSAGE_KINDS,
 	type PushData,
 	type PushMessageKind,
 	type PushRoute,

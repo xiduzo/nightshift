@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
 import { session, user } from "@nightshift/db/schema";
 
-import { testDatabase } from "../testing";
+import { testDatabase } from "../testing/database";
 import { createTargetStore, registerScreenSchema, targetView } from "./targets";
 
 let db: Database;

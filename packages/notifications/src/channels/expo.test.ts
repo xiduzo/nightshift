@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { PushTarget } from "../targets";
-import { type FakeExpoClient, fakeExpoClient } from "../testing";
+import { type FakeExpoClient, fakeExpoClient } from "../testing/expo";
 import type { NotificationMessage } from "./channel";
 import { createExpoChannel, type ExpoChannel } from "./expo";
 

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
 
-import { fakeVapidKeys, testDatabase } from "../testing";
+import { fakeVapidKeys } from "../testing";
+import { testDatabase } from "../testing/database";
 import { createVapidKeyStore } from "./vapid-keys";
 
 /** The VAPID keys are made once and kept: a browser's subscription depends on them. */

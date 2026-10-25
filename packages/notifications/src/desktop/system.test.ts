@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { fakePrograms } from "../testing";
+import { fakePrograms } from "../testing/desktop";
 import type { DesktopNotice } from "./desktop";
 import { systemDesktopNotifier } from "./system";
 

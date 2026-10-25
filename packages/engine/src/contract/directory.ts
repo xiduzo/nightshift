@@ -5,7 +5,7 @@
  * which implements this port (`deviceDirectory`). The engine never queries
  * them. The Space documents need it before the engine and its `Peers`
  * exist, so the daemon makes it first and gives it to both. The engine's
- * own tests use `aloneDirectory` (`./testing`).
+ * own tests use `aloneDirectory` (`testing/alone-directory.ts`).
  */
 export type DeviceDirectory = {
 	/**

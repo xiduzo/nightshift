@@ -7,7 +7,6 @@ import {
 	isGateKey,
 	type PushData,
 	parseGateKey,
-	parseKey,
 	pushDataOf,
 	routeOf,
 	runEndKey,
@@ -15,6 +14,7 @@ import {
 	webPathOf,
 	withdrawKeyOf,
 } from ".";
+import { parseKey } from "./keys";
 
 describe("a notification key", () => {
 	test("a Gate's key is its run and step, and reads back", () => {

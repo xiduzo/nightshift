@@ -3,9 +3,7 @@
 export { isTimeZone } from "./clock";
 export { summarizeFlow } from "./flow-health";
 export { projectDashboard, spacesDashboard } from "./spaces";
-export {
-	type DashboardSummary,
-	type FlowHealthDetail,
-	HOUR_RANGES,
-	NIGHT_RANGES,
+export type {
+	DashboardSummary,
+	FlowHealthDetail,
 } from "./types";

@@ -1,5 +1,4 @@
 export {
-	appDataDir,
 	checkoutRoot,
 	DATABASE_FILE,
 	type DataDirConfig,

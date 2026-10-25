@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { user } from "@nightshift/db/schema";
 import { eq } from "drizzle-orm";
 import { requestAccess } from "../access";
-import { hasPermission, type MemberChange } from "../index";
+import { hasPermission } from "../auth";
+import type { MemberChange } from "../index";
 import {
 	type AuthSandbox,
 	cookiesOf,

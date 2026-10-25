@@ -9,11 +9,9 @@ import { isGateKey } from "@nightshift/notifications/contract";
 
 export {
 	gateKey,
-	isGateKey,
 	PUSH_ACTION,
 	PUSH_ANDROID_CHANNEL,
 	PUSH_CATEGORY,
-	PUSH_MESSAGE_KINDS,
 	type PushData,
 	type PushMessageKind,
 	type PushRoute,

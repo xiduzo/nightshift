@@ -14,10 +14,7 @@ export {
 	type Auth,
 	type AuthConfig,
 	type AuthOptions,
-	CLIENT_IP_HEADERS,
 	createAuth,
-	hasPermission,
-	INVITATION_DAYS,
 	PEER_ADDRESS_HEADER,
 	type Session,
 } from "./auth";
@@ -26,7 +23,6 @@ export {
 	createDeviceKeys,
 	type DeviceKeyAccess,
 	type DeviceKeyPermission,
-	isDeviceKey,
 } from "./device-keys";
 export {
 	authEndpointAllowed,
@@ -75,6 +71,4 @@ export {
 	spaceIds,
 	spaceRoster,
 	spacesOf,
-	statements,
 } from "./spaces";
-export { TRUSTED_BROWSER_DAYS } from "./two-factor";

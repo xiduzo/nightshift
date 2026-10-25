@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Database } from "@nightshift/db";
 
-import { testDatabase } from "../testing";
+import { testDatabase } from "../testing/database";
 import { createSettingsStore, defaultSettings, inQuietHours } from "./settings";
 
 let db: Database;

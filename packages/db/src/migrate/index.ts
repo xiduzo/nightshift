@@ -1,1 +1,1 @@
-export { migrateDb, migrationsFolder } from "./migrate";
+export { migrateDb } from "./migrate";

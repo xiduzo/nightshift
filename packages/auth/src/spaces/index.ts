@@ -23,7 +23,6 @@ export {
 	type Role,
 	roleAllows,
 	roles,
-	statements,
 } from "./roles";
 export {
 	activeSpaceId,

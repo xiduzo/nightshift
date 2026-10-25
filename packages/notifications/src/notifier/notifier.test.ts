@@ -9,13 +9,9 @@ import {
 import { createDeliveryLog, type DeliveryLog } from "../deliveries";
 import { createSettingsStore, type SettingsStore } from "../settings";
 import { createTargetStore, type TargetStore } from "../targets";
-import {
-	type FakeChannel,
-	type FakeRunEvents,
-	fakeChannel,
-	fakeRunEvents,
-	testDatabase,
-} from "../testing";
+import { type FakeRunEvents, fakeRunEvents } from "../testing";
+import { testDatabase } from "../testing/database";
+import { type FakeChannel, fakeChannel } from "../testing/fakes";
 import { createNotifier, type Notifier } from "./notifier";
 import { type OpenGateRef, oneSenderPerSpace, type RunEvent } from "./sources";
 

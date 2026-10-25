@@ -4,20 +4,17 @@
  * VAPID keys, fakes of the desktop notification's OS ports, and a migrated
  * database. Only tests import this entry.
  */
-export { testDatabase } from "./database";
-export {
-	type FakeDesktopNotifier,
-	type FakePrograms,
-	fakeDesktopNotifier,
-	fakePrograms,
+
+export type {
+	FakeDesktopNotifier,
+	FakePrograms,
 } from "./desktop";
-export { type FakeExpoClient, fakeExpoClient } from "./expo";
+export type { FakeExpoClient } from "./expo";
 export {
 	type ChannelCall,
 	type FakeChannel,
 	type FakeRunEvents,
 	type FakeWebPushSender,
-	fakeChannel,
 	fakeRunEvents,
 	fakeVapidKeys,
 	fakeWebPushSender,

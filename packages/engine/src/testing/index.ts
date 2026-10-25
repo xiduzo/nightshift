@@ -8,8 +8,7 @@ export { createRunBus } from "../log/bus";
 export { parseEventRow } from "../log/events";
 export { createRunHistory } from "../log/history";
 export { createRunLog } from "../log/run-log";
-export { aloneDirectory } from "./alone-directory";
-export { alonePeers } from "./alone-peers";
+
 export {
 	createSandbox,
 	expectRunLogsInSync,

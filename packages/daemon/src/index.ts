@@ -10,11 +10,10 @@ export type {
 	DesktopWindow,
 	DesktopWindowState,
 } from "@nightshift/notifications";
-export {
-	createDaemon,
-	type Daemon,
-	type DaemonInfo,
-	type DaemonOptions,
+export type {
+	Daemon,
+	DaemonInfo,
+	DaemonOptions,
 } from "./daemon";
 export {
 	directoryWeb,
