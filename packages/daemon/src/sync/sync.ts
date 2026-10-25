@@ -21,6 +21,9 @@ import * as Y from "yjs";
  *
  * This is the transport only. Who may open which document is the policy
  * of `@nightshift/auth` (`documentAccess`).
+ *
+ * One per process: a client's connection outlives a `bun --hot` reload.
+ * The next daemon keeps it and binds it to its own closures (`keepSync`).
  */
 
 /**
@@ -35,7 +38,21 @@ export type KeptDocuments = {
 	store(name: string, state: Uint8Array): Promise<void>;
 };
 
+/** What the relay reads, from the daemon that made it or kept it last. */
+export type SyncOptions = {
+	/** The live document the daemon owns under that name, or null. */
+	document: (name: string) => Y.Doc | null;
+	/** The documents it keeps for others. None by default. */
+	kept?: KeptDocuments;
+	authorize: SyncAuthorize;
+};
+
 export type Sync = {
+	/**
+	 * Reads `options` from now on: the closures of the next daemon after a
+	 * reload. The connections stay.
+	 */
+	rebind(options: SyncOptions): void;
 	/** For the daemon's fetch handler: upgrades a request for the sync path. */
 	upgrade(request: Request, server: Server<SocketData>): Response | undefined;
 	/** Bun's WebSocket handlers for the upgraded sockets. */
@@ -58,19 +75,32 @@ export type SocketData = {
 /** Updates the bridge applies, so it does not send them back. */
 const BRIDGE = Symbol("sync-bridge");
 
-export function createSync(options: {
-	/** The live document the daemon owns under that name, or null. */
-	document: (name: string) => Y.Doc | null;
-	/** The documents it keeps for others. None by default. */
-	kept?: KeptDocuments;
-	authorize: SyncAuthorize;
-}): Sync {
+/** What `bun --hot` keeps of the relay. */
+export type KeptSync = { nightshiftSync?: Sync };
+
+/**
+ * The relay of this process: the one the daemon before kept, bound to
+ * `options` now, else a new one. A client's connection outlives the
+ * reload, and each new request meets the newest daemon's database, auth,
+ * Device keys and registry.
+ */
+export function keepSync(kept: KeptSync, options: SyncOptions): Sync {
+	kept.nightshiftSync?.rebind(options);
+	kept.nightshiftSync ??= createSync(options);
+	return kept.nightshiftSync;
+}
+
+export function createSync(first: SyncOptions): Sync {
 	const unbind = new Map<string, () => void>();
-	const { kept } = options;
-	const isKept = async (name: string) =>
-		options.document(name) === null &&
-		kept !== undefined &&
-		(await kept.has(name));
+	let options = first;
+	const isKept = async (name: string) => {
+		const { kept } = options;
+		return (
+			options.document(name) === null &&
+			kept !== undefined &&
+			(await kept.has(name))
+		);
+	};
 
 	const hocuspocus = new Hocuspocus({
 		quiet: true,
@@ -93,6 +123,7 @@ export function createSync(options: {
 			return typeof granted === "object" ? granted.context : undefined;
 		},
 		async onLoadDocument({ documentName, document }) {
+			const { kept } = options;
 			const owned = options.document(documentName);
 			if (!owned && kept && (await isKept(documentName))) {
 				const state = await kept.fetch(documentName);
@@ -116,6 +147,7 @@ export function createSync(options: {
 			});
 		},
 		async onStoreDocument({ documentName, document }) {
+			const { kept } = options;
 			// The Owner writes its own documents; this stores the kept ones.
 			if (kept && (await isKept(documentName))) {
 				await kept.store(documentName, Y.encodeStateAsUpdate(document));
@@ -129,6 +161,9 @@ export function createSync(options: {
 
 	return {
 		hocuspocus,
+		rebind(next) {
+			options = next;
+		},
 		upgrade(request, server) {
 			const peer = server.requestIP(request)?.address ?? null;
 			// Bun empties the request's headers once it upgrades: keep a copy.

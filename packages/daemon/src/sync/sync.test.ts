@@ -33,7 +33,13 @@ import {
 import type { Server } from "bun";
 import * as Y from "yjs";
 import { isThisComputer } from "../http";
-import { createSync, type SocketData, type Sync } from "./sync";
+import {
+	createSync,
+	type KeptSync,
+	keepSync,
+	type SocketData,
+	type Sync,
+} from "./sync";
 
 /**
  * Hocuspocus 4 under Bun 1.3, in-process: Bun.serve accepts the socket and
@@ -495,5 +501,50 @@ describe("Device keys on the relay", () => {
 		// The owner's own client stays.
 		expect(ui.provider.isSynced).toBe(true);
 		expect(ui.failed).toEqual([]);
+	});
+});
+
+describe("the relay across a bun --hot reload", () => {
+	test("the next daemon keeps it with its connections, and it answers with that daemon's closures", async () => {
+		// The first daemon made the relay of `beforeEach`.
+		const kept: KeptSync = { nightshiftSync: sync };
+		const client = connect();
+		await waitFor(() => client.provider.isSynced);
+
+		// The next daemon: its own documents, kept documents and access check.
+		const fresh = new Y.Doc();
+		fresh.getMap("facts").set("from", "the next daemon");
+		const keptState = new Y.Doc();
+		keptState.getMap("facts").set("platform", "linux");
+		const asked: string[] = [];
+		const next = keepSync(kept, {
+			document: (name) =>
+				name === document.name ? document.doc : name === "fresh" ? fresh : null,
+			kept: {
+				has: (name) => name === "device:kept-by-next",
+				fetch: async () => Y.encodeStateAsUpdate(keptState),
+				store: async () => {},
+			},
+			authorize: async ({ documentName }) => {
+				asked.push(documentName);
+				return "write" as const;
+			},
+		});
+		expect(next).toBe(sync);
+		expect(kept.nightshiftSync).toBe(sync);
+
+		// The client from before the reload stays, and still syncs.
+		const tools = createCliToolStore({ document });
+		await tools.save({ name: "gh", description: "GitHub" });
+		await waitFor(() => client.doc.getMap("cliTools").has("gh"));
+		expect(client.failed).toEqual([]);
+
+		// A client after it: the next daemon's documents and check answer.
+		const later = connect("fresh");
+		const keptHere = connect("device:kept-by-next");
+		await waitFor(() => later.provider.isSynced && keptHere.provider.isSynced);
+		expect(later.doc.getMap("facts").get("from")).toBe("the next daemon");
+		expect(keptHere.doc.getMap("facts").get("platform")).toBe("linux");
+		expect(asked.sort()).toEqual(["device:kept-by-next", "fresh"]);
 	});
 });

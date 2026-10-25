@@ -7,7 +7,7 @@ import type {
 import type { InAppChannel, Notifications } from "@nightshift/notifications";
 
 import type { KeepAwake } from "../keep-awake";
-import type { Sync } from "../sync";
+import type { KeptSync } from "../sync";
 import type { Lease } from "./lease";
 
 /**
@@ -17,12 +17,16 @@ import type { Lease } from "./lease";
  * that must have one owner per process keeps it:
  *
  * - kept as it is: the lease, the Device and Space documents (one writer
- *   each), the relay, the in-app channel (an open notification stream
- *   outlives a reload), the listeners (Bun reloads a server of the same
- *   `id` in place);
+ *   each), the in-app channel (an open notification stream outlives a
+ *   reload), the listeners (Bun reloads a server of the same `id` in
+ *   place);
+ * - kept and bound to the newest daemon: the relay (`keepSync`: its
+ *   connections stay, and a new request meets the newest daemon's
+ *   database, auth and Device keys);
  * - handed over: the devices (`startDevices` keeps one slot,
  *   `nightshiftDevices`: its engine lets go of its runs, and the work hub,
- *   the applied commands and the calls served for a Host go on);
+ *   the applied commands, the calls served for a Host, the Devices online
+ *   and the pairings in progress go on);
  * - replaced, the old one stopped first: the notifier (`stop`), the
  *   keep-awake (`stop`), the scheduler (`abort`), the timers
  *   (`clearInterval`).
@@ -30,20 +34,20 @@ import type { Lease } from "./lease";
  * The names stay as they are: a running dev daemon reloads into new code
  * with the same names.
  */
-export type HotRegistry = KeptDevices & {
-	nightshiftLease?: Lease;
-	nightshiftDocument?: DeviceDocument;
-	nightshiftSpaces?: SpaceDocuments;
-	nightshiftSync?: Sync;
-	nightshiftInApp?: InAppChannel;
-	nightshiftNotifications?: Notifications;
-	nightshiftKeepAwake?: KeepAwake;
-	nightshiftScheduler?: AbortController;
-	/** The clones from GitHub that run, and how the last ones ended. */
-	nightshiftGitHubClones?: GitHubClones;
-	nightshiftFacts?: Timer;
-	/** The stop of the newest daemon: the signal handlers call it. */
-	nightshiftStop?: () => Promise<void>;
-};
+export type HotRegistry = KeptDevices &
+	KeptSync & {
+		nightshiftLease?: Lease;
+		nightshiftDocument?: DeviceDocument;
+		nightshiftSpaces?: SpaceDocuments;
+		nightshiftInApp?: InAppChannel;
+		nightshiftNotifications?: Notifications;
+		nightshiftKeepAwake?: KeepAwake;
+		nightshiftScheduler?: AbortController;
+		/** The clones from GitHub that run, and how the last ones ended. */
+		nightshiftGitHubClones?: GitHubClones;
+		nightshiftFacts?: Timer;
+		/** The stop of the newest daemon: the signal handlers call it. */
+		nightshiftStop?: () => Promise<void>;
+	};
 
 export const hot = globalThis as HotRegistry;

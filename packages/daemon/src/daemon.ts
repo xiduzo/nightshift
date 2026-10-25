@@ -78,7 +78,7 @@ import {
 	secretsDir,
 	stopOnSignals,
 } from "./runtime";
-import { createSync } from "./sync";
+import { keepSync } from "./sync";
 
 export type DaemonOptions = {
 	/** The port the daemon listens on: its own addresses may call it. Default: PORT, else DEFAULT_PORT. */
@@ -365,9 +365,10 @@ export async function createDaemon(
 
 	/**
 	 * The relay's document half: the owner's clients sync this Device's
-	 * document here. Kept across `bun --hot` reloads, like the document.
+	 * document here. Kept across `bun --hot` reloads with its connections,
+	 * like the document, and bound to this daemon's closures.
 	 */
-	hot.nightshiftSync ??= createSync({
+	const sync = keepSync(hot, {
 		document: (name) =>
 			name === document.name
 				? document.doc
@@ -391,7 +392,6 @@ export async function createDaemon(
 			deviceKey: (token) => devices.host.syncKey(token),
 		}),
 	});
-	const sync = hot.nightshiftSync;
 
 	const { notifications, settings: computerSettings } = await wireNotifications(
 		{

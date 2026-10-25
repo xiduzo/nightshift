@@ -1,1 +1,6 @@
-export { createSync, type SocketData, type Sync } from "./sync";
+export {
+	type KeptSync,
+	keepSync,
+	type SocketData,
+	type Sync,
+} from "./sync";
