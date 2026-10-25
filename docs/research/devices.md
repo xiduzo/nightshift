@@ -886,8 +886,10 @@ iroh.
      hook returns).
    - **Device-key auth.** A procedure call with `Authorization: Bearer
      nsd_…` is a Device: no session, never the local session, even from
-     loopback. `deviceProcedure("sync")` takes it (`link.hello`,
-     `link.heartbeat`); `pairing.start` and `pairing.redeem` are public.
+     loopback. The Host's contract names the permission each procedure
+     needs (`sync` for `link.hello`, `link.heartbeat`), and `hostRouter`
+     checks it (`packages/devices/src/host/router.ts`); `pairing.start`
+     and `pairing.redeem` need no key.
      On the relay, `documentAccess` takes a Device key as the provider
      token (`deviceKey` → `{ deviceId, personId, home }`): it opens the
      Device's own document, only on its home Host and only for the
