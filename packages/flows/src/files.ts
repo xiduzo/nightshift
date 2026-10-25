@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { Refusal } from "@nightshift/refusal";
 import { FLOW_VERSION, type Flow, flowSchema, migrateFlow } from "./document";
 import { flowNameSchema } from "./nodes";
 import {
@@ -330,19 +331,20 @@ function loadedFlow(
 	return { name, path, ...parseFlow(file.json, { flows, name }) };
 }
 
-/** The file path of a flow. Throws on a name that is not a valid flow name. */
+/** The file path of a flow. Refuses (`invalid`) a name that is not a valid flow name. */
 function flowPath(repoPath: string, name: string): string {
 	const result = flowNameSchema.safeParse(name);
 	if (!result.success) {
-		throw new Error(
-			`Invalid flow name "${name}": ${result.error.issues[0]?.message ?? "not allowed"}`,
+		throw new Refusal(
+			"invalid",
+			`The flow name "${name}" is not valid. ${result.error.issues[0]?.message ?? "Pick another name."}`,
 		);
 	}
 	return join(flowsDir(repoPath), `${name}.json`);
 }
 
-function notFound(name: string): Error {
-	return new Error(`The flow "${name}" does not exist.`);
+function notFound(name: string): Refusal {
+	return new Refusal("not-found", `The flow "${name}" does not exist.`);
 }
 
 function isNotFound(error: unknown): boolean {

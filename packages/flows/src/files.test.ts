@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Refusal } from "@nightshift/refusal";
 import type { Flow } from "./document";
 import { singleAgentFlow } from "./document";
 import {
@@ -78,10 +79,13 @@ describe("readFlowFile", () => {
 		});
 	});
 
-	test("throws a clear error when the file is missing", async () => {
-		await expect(readFlowFile(repo, "missing")).rejects.toThrow(
-			/The flow "missing" does not exist/,
-		);
+	test("refuses a missing file as not found, in words for people", async () => {
+		const refusal = await readFlowFile(repo, "missing").catch((e) => e);
+		expect(refusal).toBeInstanceOf(Refusal);
+		expect(refusal).toMatchObject({
+			kind: "not-found",
+			message: 'The flow "missing" does not exist.',
+		});
 	});
 
 	test("invalid JSON loads with flow null and one issue", async () => {
@@ -163,13 +167,13 @@ describe("flow names", () => {
 	for (const name of bad) {
 		test(`rejects ${JSON.stringify(name)} in every function`, async () => {
 			await expect(readFlowFile(repo, name)).rejects.toThrow(
-				/Invalid flow name/,
+				/The flow name .* is not valid/,
 			);
 			await expect(writeFlowFile(repo, name, quick())).rejects.toThrow(
-				/Invalid flow name/,
+				/The flow name .* is not valid/,
 			);
 			await expect(deleteFlowFile(repo, name)).rejects.toThrow(
-				/Invalid flow name/,
+				/The flow name .* is not valid/,
 			);
 		});
 	}
