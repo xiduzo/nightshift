@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, flowSchema } from "../document";
+import { FLOW_VERSION, type Flow, flowSchema } from "../document";
 import { validateFlow } from "../validate";
 import { renameNode } from "./graph";
 import { type NameOwner, nameClash } from "./names";
@@ -8,7 +8,7 @@ import { renameInput, renameVariable } from "./refs";
 const at = { x: 0, y: 0 };
 
 const flow: Flow = flowSchema.parse({
-	version: 5,
+	version: FLOW_VERSION,
 	inputs: [{ name: "topic", type: "text" }],
 	variables: [{ name: "tries", type: "number" }],
 	start: "build",

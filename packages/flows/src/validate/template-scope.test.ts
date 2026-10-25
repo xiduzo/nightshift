@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { type Flow, type FlowInput, flowSchema } from "../document";
+import {
+	FLOW_VERSION,
+	type Flow,
+	type FlowInput,
+	flowSchema,
+} from "../document";
 import { validateFlow } from "./flow";
 import type { Flows } from "./issues";
 import {
@@ -12,7 +17,7 @@ const at = { x: 0, y: 0 };
 
 /** A flow that `main` calls once: its output holds JSON. */
 const review: Flow = flowSchema.parse({
-	version: 5,
+	version: FLOW_VERSION,
 	outputs: [
 		{
 			name: "verdict",
@@ -27,7 +32,7 @@ const review: Flow = flowSchema.parse({
 
 /** A flow that `main` runs per element. */
 const task: Flow = flowSchema.parse({
-	version: 5,
+	version: FLOW_VERSION,
 	inputs: [{ name: "item", type: "json", required: true }],
 	start: "work",
 	nodes: [
@@ -39,7 +44,7 @@ const task: Flow = flowSchema.parse({
 /** Every node type that adds a rule to the scope, and `use`, whose command reads them. */
 function mainFlow(use = "true"): Flow {
 	const input: FlowInput = {
-		version: 5,
+		version: FLOW_VERSION,
 		inputs: [
 			{ name: "topic", type: "text", description: "What to work on" },
 			{ name: "spec", type: "json", label: "Spec" },
