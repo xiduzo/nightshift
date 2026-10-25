@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { brotliDecompressSync, gunzipSync } from "node:zlib";
 
 import { DAEMON_META, directoryWeb, type WebFiles, webHandler } from "./web";
 
@@ -19,11 +20,15 @@ function files(paths: Record<string, string>): WebFiles {
 	};
 }
 
+/** An asset worth compressing. */
+const BIG = `console.log(${JSON.stringify("night shift ".repeat(500))});`;
+
 const ui = webHandler(
 	files({
 		"/index.html": PAGE.replace("Night Shift", "home"),
 		"/devices/index.html": PAGE.replace("Night Shift", "devices"),
 		"/assets/app-1234.js": "console.log(1)",
+		"/assets/big-1234.js": BIG,
 	}),
 );
 
@@ -81,5 +86,51 @@ describe("the web UI the daemon serves", () => {
 		expect(
 			await handler(new Request("http://localhost/%2e%2e/secret.txt")),
 		).toBeNull();
+	});
+
+	test("a large text file goes compressed, in the encoding the browser takes", async () => {
+		const asset = (encoding: string) =>
+			ui(
+				new Request("http://localhost:3000/assets/big-1234.js", {
+					headers: { "accept-encoding": encoding },
+				}),
+			);
+		const br = await asset("gzip, deflate, br");
+		expect(br?.headers.get("content-encoding")).toBe("br");
+		expect(br?.headers.get("vary")).toBe("Accept-Encoding");
+		const brBody = Buffer.from(await (br as Response).arrayBuffer());
+		expect(brBody.byteLength).toBeLessThan(BIG.length / 5);
+		expect(brotliDecompressSync(brBody).toString()).toBe(BIG);
+
+		const gz = await asset("gzip");
+		expect(gz?.headers.get("content-encoding")).toBe("gzip");
+		const gzBody = Buffer.from(await (gz as Response).arrayBuffer());
+		expect(gunzipSync(gzBody).toString()).toBe(BIG);
+
+		const plain = await asset("identity");
+		expect(plain?.headers.get("content-encoding")).toBeNull();
+		expect(await plain?.text()).toBe(BIG);
+		// A small file goes as it is.
+		const small = await ui(
+			new Request("http://localhost:3000/assets/app-1234.js", {
+				headers: { "accept-encoding": "br" },
+			}),
+		);
+		expect(small?.headers.get("content-encoding")).toBeNull();
+	});
+
+	test("a page has an ETag: the same page again is a 304", async () => {
+		const first = await get("/devices");
+		const etag = first?.headers.get("etag");
+		expect(etag).toMatch(/^".+"$/);
+		const again = await ui(
+			new Request("http://localhost:3000/devices", {
+				headers: { accept: "text/html", "if-none-match": etag ?? "" },
+			}),
+		);
+		expect(again?.status).toBe(304);
+		expect(await again?.text()).toBe("");
+		const other = await get("/runs/abc");
+		expect(other?.headers.get("etag")).not.toBe(etag);
 	});
 });

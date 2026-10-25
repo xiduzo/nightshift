@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
+import { promisify } from "node:util";
+import { brotliCompress, constants, gzip } from "node:zlib";
 
 /**
  * The web UI, served by the daemon itself: the `nightshift` binary carries
@@ -49,10 +52,34 @@ const DAEMON_PATHS = ["/rpc", "/api", "/sync", "/health"];
  * page's path gets its prerendered page (`/devices` → `/devices/index.html`),
  * else the app's first page, which routes in the browser. `/` is the UI for
  * a browser only: a probe without `Accept: text/html` gets the daemon's "OK".
+ *
+ * Each file is read and compressed once (brotli and gzip), then answered
+ * from memory in the encoding the browser takes. A file that is not
+ * named by its content has an ETag: the browser asks again and gets 304
+ * while it is the same.
  */
 export function webHandler(
 	files: WebFiles,
 ): (request: Request) => Promise<Response | null> {
+	const prepared = new Map<
+		string,
+		{ version: string; file: Promise<Prepared> }
+	>();
+	/** The file at `path`, read and compressed once per version of it. */
+	function prepare(path: string, file: Blob): Promise<Prepared> {
+		const version = `${file.size}:${(file as Partial<File>).lastModified ?? 0}`;
+		const known = prepared.get(path);
+		if (known?.version === version) return known.file;
+		const ready = prepareFile(path, file);
+		prepared.set(path, { version, file: ready });
+		ready.catch(() => {
+			if (prepared.get(path)?.file === ready) prepared.delete(path);
+		});
+		return ready;
+	}
+	async function respond(path: string, file: Blob, request: Request) {
+		return answer(path, await prepare(path, file), request);
+	}
 	return async (request) => {
 		if (request.method !== "GET" && request.method !== "HEAD") return null;
 		let path: string;
@@ -84,24 +111,76 @@ export function webHandler(
 	};
 }
 
-async function respond(
-	path: string,
-	file: Blob,
-	request: Request,
-): Promise<Response> {
+/** A file as the daemon answers it: its bytes, compressed copies, and its ETag. */
+type Prepared = {
+	type: string;
+	body: Uint8Array;
+	br: Uint8Array | null;
+	gzip: Uint8Array | null;
+	etag: string;
+};
+
+/** The UI's text files, worth compressing. Images and fonts are compressed already. */
+const COMPRESSIBLE =
+	/\.(?:html|js|mjs|css|svg|json|txt|xml|map|webmanifest|wasm)$/;
+
+/** A file smaller than this goes as it is. */
+const COMPRESS_FROM_BYTES = 1024;
+
+const brotliAsync = promisify(brotliCompress);
+const gzipAsync = promisify(gzip);
+
+async function prepareFile(path: string, file: Blob): Promise<Prepared> {
 	const html = path.endsWith(".html");
-	const headers = new Headers({
-		"content-type": html
+	const body = html
+		? new TextEncoder().encode(
+				(await file.text()).replace("<head>", `<head>${DAEMON_META}`),
+			)
+		: new Uint8Array(await file.arrayBuffer());
+	const compress =
+		COMPRESSIBLE.test(path) && body.byteLength >= COMPRESS_FROM_BYTES;
+	const [br, gz] = compress
+		? await Promise.all([
+				// Quality 9: near the best size, in a fraction of the time of 11.
+				brotliAsync(body, {
+					params: { [constants.BROTLI_PARAM_QUALITY]: 9 },
+				}),
+				gzipAsync(body, { level: 9 }),
+			])
+		: [null, null];
+	return {
+		type: html
 			? "text/html; charset=utf-8"
 			: file.type || "application/octet-stream",
-		// Vite names the built assets by their content.
-		"cache-control": path.startsWith("/assets/")
+		body,
+		br: br && new Uint8Array(br),
+		gzip: gz && new Uint8Array(gz),
+		etag: `"${createHash("sha256").update(body).digest("base64url").slice(0, 27)}"`,
+	};
+}
+
+function answer(path: string, file: Prepared, request: Request): Response {
+	// Vite names the built assets by their content.
+	const immutable = path.startsWith("/assets/");
+	const headers = new Headers({
+		"content-type": file.type,
+		"cache-control": immutable
 			? "public, max-age=31536000, immutable"
 			: "no-cache",
 	});
-	if (!html) {
-		return new Response(request.method === "HEAD" ? null : file, { headers });
+	if (!immutable) headers.set("etag", file.etag);
+	if (file.br || file.gzip) headers.set("vary", "Accept-Encoding");
+	if (!immutable && request.headers.get("if-none-match") === file.etag) {
+		return new Response(null, { status: 304, headers });
 	}
-	const text = (await file.text()).replace("<head>", `<head>${DAEMON_META}`);
-	return new Response(request.method === "HEAD" ? null : text, { headers });
+	const accepts = request.headers.get("accept-encoding") ?? "";
+	const encoded =
+		file.br && /\bbr\b/.test(accepts)
+			? { encoding: "br", body: file.br }
+			: file.gzip && /\bgzip\b/.test(accepts)
+				? { encoding: "gzip", body: file.gzip }
+				: null;
+	if (encoded) headers.set("content-encoding", encoded.encoding);
+	const body = encoded?.body ?? file.body;
+	return new Response(request.method === "HEAD" ? null : body, { headers });
 }
