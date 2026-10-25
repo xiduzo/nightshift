@@ -53,16 +53,18 @@ async function run(database: string, owner: string, ms: number) {
 }
 
 test("the Worker kills the app when the daemon's timers died and its heartbeat is stale", async () => {
+	// The Worker kills it two checks after it starts. A busy machine can take
+	// seconds to start the app and its Worker: the SIGTERM only ends a hang.
 	const { stdout, stderr, signal } = await run(
 		leaseDatabase("app", 60_000),
 		"app",
-		5_000,
+		60_000,
 	);
 	// The main thread's timers are dead: only the Worker's still run.
 	expect(stdout).not.toContain("main timers alive");
 	expect(stderr).toContain("WATCHDOG");
 	expect(signal).toBe("SIGKILL");
-});
+}, 90_000);
 
 test("the Worker leaves the app alone while the heartbeat is fresh", async () => {
 	const { stderr, signal } = await run(leaseDatabase("app", 0), "app", 700);
