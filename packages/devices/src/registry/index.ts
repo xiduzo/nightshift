@@ -2,6 +2,7 @@
 
 export {
 	createDeviceRegistry,
+	type DevicePresence,
 	type DeviceRegistry,
 	deviceNamesOf,
 	OFFLINE_AFTER_MS,

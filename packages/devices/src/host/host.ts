@@ -40,6 +40,13 @@ type Pending = {
 	expiresAt: number;
 };
 
+/**
+ * The pairings in progress, by device code. In memory: a pairing outlives
+ * no Host restart. A `bun --hot` reload hands them to the next Host, so a
+ * Device that asked for a code before it still joins under its own name.
+ */
+export type PendingPairings = Map<string, Pending>;
+
 export function createHost(deps: {
 	auth: Auth;
 	db: Database;
@@ -52,6 +59,8 @@ export function createHost(deps: {
 	fingerprint: string | null;
 	/** Ends the Device's open connections to the relay. */
 	disconnect(deviceId: string): void;
+	/** The pairings in progress of the Host before a reload. Default: none. */
+	pending?: PendingPairings;
 }) {
 	const { auth, registry, settings } = deps;
 	const keys = createDeviceKeys({
@@ -59,8 +68,7 @@ export function createHost(deps: {
 		db: deps.db,
 		idleDays: () => settings.current().deviceKeyIdleDays,
 	});
-	/** By device code. Kept in memory: a pairing outlives no Host restart. */
-	const pending = new Map<string, Pending>();
+	const pending: PendingPairings = deps.pending ?? new Map();
 
 	const isHost = () => settings.current().host;
 	function requireHost() {

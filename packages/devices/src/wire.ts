@@ -15,7 +15,13 @@ import {
 	createHostExchange,
 	type HostExchange,
 } from "./exchange";
-import { createDevices, createHost, type Devices, type Host } from "./host";
+import {
+	createDevices,
+	createHost,
+	type Devices,
+	type Host,
+	type PendingPairings,
+} from "./host";
 import {
 	createDeviceLinks,
 	createHostLinks,
@@ -35,7 +41,7 @@ import {
 	type PeerEngineOptions,
 } from "./peers";
 import { listenHostname, ownCertificate, type Reach, reachFor } from "./reach";
-import { OFFLINE_AFTER_MS } from "./registry";
+import { type DevicePresence, OFFLINE_AFTER_MS } from "./registry";
 import { createRelay, createWorkRelay } from "./relay";
 import {
 	createWorkHub,
@@ -93,6 +99,12 @@ type Handover = {
 	 * per Offer, so a session that runs on through a reload still counts.
 	 */
 	readonly offerUse: OfferUse;
+	/**
+	 * On a Host: the Devices online now, and the pairings in progress. A
+	 * Device's link outlives a reload, and so does a code it asked for.
+	 */
+	readonly presence: DevicePresence;
+	readonly pending: PendingPairings;
 	/** Per Host: the commands this computer applied, and the calls it serves as a placed Device. */
 	readonly hosts: Map<
 		string,
@@ -160,7 +172,8 @@ export type DevicesDeps = {
  * Links and presence sweep stop, the commands it is applying end, and its
  * engine lets go of its runs. Then this one takes over what must outlive
  * the reload (the work hub, the applied commands, the calls served as a
- * placed Device, the Offers in use) and binds them to its own engine.
+ * placed Device, the Offers in use, the Devices online and the pairings
+ * in progress) and binds them to its own engine.
  */
 export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 	const { db, self, ownerId, local } = deps;
@@ -215,6 +228,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 			// and who may use Offers in a Space.
 			ownOffers: () => deviceOffers(deps.document),
 			offerUse: handover.offerUse,
+			presence: handover.presence,
 			mayUseOffers: async (spaceId, personId) => {
 				const role = memberRole(await deps.spaces.open(spaceId), personId);
 				return role !== null && roleAllows(role, { offer: ["use"] });
@@ -233,6 +247,7 @@ export async function startDevices(deps: DevicesDeps): Promise<DevicesRuntime> {
 		devicesPage,
 		fingerprint,
 		disconnect: deps.disconnect,
+		pending: handover.pending,
 	});
 
 	/** This computer as the Host of run history: what paired Devices pull, push and archive. */
@@ -394,6 +409,8 @@ async function takeOver(kept: KeptDevices): Promise<Handover> {
 		hub:
 			hub ?? createWorkHub({ onBack: (deviceId) => handover.wake(deviceId) }),
 		offerUse: createOfferUse(),
+		presence: new Map(),
+		pending: new Map(),
 		hosts: new Map(),
 		wake: () => {},
 		release: async () => {},

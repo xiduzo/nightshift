@@ -59,8 +59,15 @@ export function createPeerEngine(
 	options: PeerEngineOptions,
 	internals?: Parameters<typeof createEngine>[1],
 ): PeerEngine {
-	const { work, ownOffers, mayUseOffers, offerUse, relay, ...engineOptions } =
-		options;
+	const {
+		work,
+		ownOffers,
+		mayUseOffers,
+		offerUse,
+		presence,
+		relay,
+		...engineOptions
+	} = options;
 	let built: BuiltPeers | undefined;
 	const engine = createEngine(
 		{
@@ -73,6 +80,7 @@ export function createPeerEngine(
 					...(ownOffers ? { ownOffers } : {}),
 					...(mayUseOffers ? { mayUseOffers } : {}),
 					...(offerUse ? { offerUse } : {}),
+					...(presence ? { presence } : {}),
 				});
 				return built.port;
 			},

@@ -26,8 +26,17 @@ export const OFFLINE_AFTER_MS = 45_000;
  * fact. A Host that starts again starts with every Device offline: a
  * Device whose last word in the log was `DeviceOnline` gets
  * `DeviceOffline`, so the log never says a Device stayed online across a
- * Host that was down.
+ * Host that was down. A `bun --hot` reload is no new start: the registry
+ * before hands its presence to the next one (`DevicePresence`).
  */
+
+/**
+ * Device id → when its link last answered, for the Devices online now. It
+ * outlives a registry: the devices runtime hands it to the next engine's
+ * registry on a `bun --hot` reload, so a Device online before the reload
+ * is online after it, and nothing is logged.
+ */
+export type DevicePresence = Map<string, number>;
 
 export type PairedDevice = {
 	id: string;
@@ -101,12 +110,13 @@ export function createDeviceRegistry(deps: {
 	log: RunLog;
 	/** The engine's event log: the latest presence of each Device. */
 	history: Pick<RunHistory, "devicePresence">;
+	/** The presence of the registry before a reload. Default: every Device offline. */
+	presence?: DevicePresence;
 	now?: () => number;
 }): DeviceRegistry {
 	const { db, log } = deps;
 	const now = deps.now ?? Date.now;
-	/** Device id → when its link last answered, for the Devices online now. */
-	const online = new Map<string, number>();
+	const online: DevicePresence = deps.presence ?? new Map();
 
 	const ready = closeStalePresence().catch((error) => {
 		console.error("Device presence was not tidied up:", error);

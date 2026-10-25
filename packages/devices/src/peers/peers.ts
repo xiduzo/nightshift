@@ -19,7 +19,11 @@ import {
 	type OfferUse,
 } from "../offers";
 import { createPlacement } from "../placement";
-import { createDeviceRegistry, type DeviceRegistry } from "../registry";
+import {
+	createDeviceRegistry,
+	type DevicePresence,
+	type DeviceRegistry,
+} from "../registry";
 import { createPrivatePaths } from "./private-paths";
 import { createWalkers } from "./walkers";
 
@@ -51,6 +55,11 @@ export type PeerOptions = {
 	 * makes its own.
 	 */
 	offerUse?: OfferUse;
+	/**
+	 * On a Host: the Devices online now, which a `bun --hot` reload hands
+	 * to the next engine's registry. Without it, every Device starts offline.
+	 */
+	presence?: DevicePresence;
 };
 
 /** The Members of a Space, as its document mirrors them: a Person this Replica may have no account of. */
@@ -89,7 +98,13 @@ export function createPeers(
 ): BuiltPeers {
 	const { db, dataDir, device, log, history, documents, now } = context;
 	const { relay } = options;
-	const registry = createDeviceRegistry({ db, log, history, now });
+	const registry = createDeviceRegistry({
+		db,
+		log,
+		history,
+		now,
+		...(options.presence ? { presence: options.presence } : {}),
+	});
 	const hostSpaces = createHostSpaces(db);
 
 	/** The offered sessions running now: what withdrawing an Offer stops. */

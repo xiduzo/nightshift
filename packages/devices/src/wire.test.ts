@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { Auth, DeviceKeyAccess } from "@nightshift/auth";
+import { createAuthSandbox } from "@nightshift/auth/testing";
 import { event, hostLink, runCommand, user } from "@nightshift/db/schema";
 import {
 	createProfileStore,
@@ -21,6 +22,7 @@ import type { HostClient, WorkReply, WorkRequest } from "./contract";
 import { deviceKeyStore } from "./links";
 import { setDeviceOffer } from "./offers/offers";
 import type { PeerEngine } from "./peers";
+import { OFFLINE_AFTER_MS } from "./registry";
 import { type PairedReplicas, pairedReplicas, withPeers } from "./testing";
 import { type DevicesRuntime, type KeptDevices, startDevices } from "./wire";
 import { createWorkHub } from "./work";
@@ -70,7 +72,11 @@ afterEach(async () => {
 
 /** B's runtime, as the daemon starts it: again on each reload, with what `bun --hot` kept. */
 async function startB(
-	options: { host?: boolean; clientFor?: (address: string) => HostClient } = {},
+	options: {
+		host?: boolean;
+		clientFor?: (address: string) => HostClient;
+		auth?: Auth;
+	} = {},
 ): Promise<DevicesRuntime> {
 	const settings = createSettingsStore({
 		document,
@@ -80,7 +86,7 @@ async function startB(
 	await Promise.all([settings.load(), profiles.load()]);
 	const [owner] = await b.db.select().from(user);
 	return startDevices({
-		auth: noPairing,
+		auth: options.auth ?? noPairing,
 		db: b.db,
 		env: { CORS_ORIGIN: "https://b.invalid" },
 		settings,
@@ -349,6 +355,51 @@ describe("the devices runtime across a reload", () => {
 		expect(woken).toEqual(["after device-c"]);
 		taking.abort();
 		await next;
+	});
+
+	test("a Device online before the reload is online after it, and its presence is logged once", async () => {
+		const first = await startB({ host: true });
+		const [owner] = await b.db.select().from(user);
+		await first.engine.devices.join({
+			id: "device-c",
+			name: "C",
+			platform: "test",
+			ownerId: owner?.id as string,
+			homeHost: null,
+		});
+		await first.engine.devices.seen("device-c");
+
+		const second = await startB({ host: true });
+		// The next runtime's registry has tidied up what it took for stale.
+		await second.engine.devices.sweep(OFFLINE_AFTER_MS);
+		expect((await second.engine.devices.get("device-c"))?.online).toBe(true);
+		const presence = (await b.db.select().from(event).orderBy(event.seq))
+			.map((e) => e.type)
+			.filter((type) => type === "DeviceOnline" || type === "DeviceOffline");
+		expect(presence).toEqual(["DeviceOnline"]);
+	});
+
+	test("a pairing started before the reload keeps the joining Device's name and platform", async () => {
+		const people = await createAuthSandbox();
+		try {
+			const first = await startB({ host: true, auth: people.auth });
+			const code = await first.devices.startPairing({
+				deviceId: "device-c",
+				name: "C",
+				platform: "linux",
+			});
+
+			const second = await startB({ host: true, auth: people.auth });
+			const { headers } = await people.signUp("Ada");
+			const review = await second.devices.review(headers, code.userCode);
+			expect(review.device).toEqual({
+				id: "device-c",
+				name: "C",
+				platform: "linux",
+			});
+		} finally {
+			people.cleanup();
+		}
 	});
 
 	test("a Command B is applying is applied once: the next runtime reports its result", async () => {
