@@ -134,6 +134,8 @@ const twoFactorSchema = z.object({
 	required: z.boolean(),
 	/** The Host refuses the session until it turns two-factor on. */
 	setUpNeeded: z.boolean(),
+	/** How many days a browser the person trusts skips the code at sign-in. */
+	trustedBrowserDays: z.number().int().positive(),
 });
 
 /** How the session's Person signs in. */

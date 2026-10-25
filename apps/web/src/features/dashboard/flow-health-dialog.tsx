@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
-import type { Project } from "@/shared/api";
+import type { NightRange, Project } from "@/shared/api";
 import {
 	formatCost,
 	formatDateTime,
@@ -19,7 +19,6 @@ import {
 	DetailsHeader,
 	DetailsTabContent,
 	DetailsTabs,
-	type NightRange,
 	NightRangeToggle,
 	Stat,
 } from "./details";
@@ -91,7 +90,13 @@ function FlowHealthDetails({
 				]}
 				value={tab}
 				onValueChange={setTab}
-				toggle={<NightRangeToggle value={range} onValueChange={setRange} />}
+				toggle={
+					<NightRangeToggle
+						ranges={detail.data?.ranges.map((r) => r.nights) ?? []}
+						value={range}
+						onValueChange={setRange}
+					/>
+				}
 			>
 				{detail.error && !inRange ? (
 					<DetailsEmpty>

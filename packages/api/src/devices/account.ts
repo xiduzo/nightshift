@@ -1,4 +1,4 @@
-import { hasLogin } from "@nightshift/auth";
+import { hasLogin, TRUSTED_BROWSER_DAYS } from "@nightshift/auth";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
@@ -32,7 +32,12 @@ export const account = {
 					person: null,
 					thisComputer: context.fromThisComputer,
 					hasPassword: false,
-					twoFactor: { enabled: false, required, setUpNeeded: false },
+					twoFactor: {
+						enabled: false,
+						required,
+						setUpNeeded: false,
+						trustedBrowserDays: TRUSTED_BROWSER_DAYS,
+					},
 				};
 			}
 			return {
@@ -44,6 +49,7 @@ export const account = {
 					enabled: session.user.twoFactorEnabled === true,
 					required,
 					setUpNeeded: !context.hostAccess.allowed,
+					trustedBrowserDays: TRUSTED_BROWSER_DAYS,
 				},
 			};
 		}),

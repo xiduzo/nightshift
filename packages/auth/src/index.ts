@@ -72,3 +72,4 @@ export {
 	spaceRoster,
 	spacesOf,
 } from "./spaces";
+export { TRUSTED_BROWSER_DAYS } from "./two-factor";

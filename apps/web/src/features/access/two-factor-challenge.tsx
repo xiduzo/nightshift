@@ -10,10 +10,12 @@ import {
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
 import { Spinner } from "@nightshift/ui/components/spinner";
+import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { authClient } from "@/shared/api";
 import { CODE_LENGTH, CodeInput } from "./code-input";
-import { authErrorMessage, TRUSTED_BROWSER_DAYS } from "./two-factor";
+import { accountQueries } from "./queries";
+import { authErrorMessage } from "./two-factor";
 
 /**
  * The second step of signing in, after a right password: the code from
@@ -35,6 +37,9 @@ export function TwoFactorChallenge({
 	const [trust, setTrust] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [pending, setPending] = useState(false);
+	// How long a trusted browser skips the code: the Host's rule.
+	const trustDays = useQuery(accountQueries.status()).data?.twoFactor
+		.trustedBrowserDays;
 
 	const ready = backup ? code.trim().length > 0 : code.length === CODE_LENGTH;
 
@@ -125,7 +130,9 @@ export function TwoFactorChallenge({
 					/>
 					<FieldContent>
 						<FieldLabel htmlFor={`${id}-trust`}>
-							Trust this browser for {TRUSTED_BROWSER_DAYS} days
+							{trustDays
+								? `Trust this browser for ${trustDays} days`
+								: "Trust this browser"}
 						</FieldLabel>
 						<FieldDescription>
 							You skip the code here. Do not use this on a shared computer.

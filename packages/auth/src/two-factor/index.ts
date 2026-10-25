@@ -1,1 +1,1 @@
-export { twoFactorPlugin } from "./two-factor";
+export { TRUSTED_BROWSER_DAYS, twoFactorPlugin } from "./two-factor";

@@ -19,7 +19,12 @@ import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { RunStatusBadge } from "@/features/runs";
-import type { ActivityRange, DashboardSummary, Project } from "@/shared/api";
+import type {
+	ActivityRange,
+	DashboardSummary,
+	HourRange,
+	Project,
+} from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	formatDayTime,
@@ -42,9 +47,6 @@ import {
 } from "./details";
 import { hoursOf } from "./ranges";
 
-/** In hours: a day, two, a week. */
-const RANGES = [24, 48, 168] as const;
-type Range = (typeof RANGES)[number];
 type Tab = "overview" | "open" | "groups";
 const CHART_CONFIG = {
 	active: { label: "Runs at work", color: "var(--status-running)" },
@@ -88,7 +90,7 @@ function ActivityDetails({
 	onNavigate: () => void;
 }) {
 	const now = useNow(60_000);
-	const [range, setRange] = useState<Range>(24);
+	const [range, setRange] = useState<HourRange>(24);
 	const [tab, setTab] = useState<Tab>("overview");
 	const { perHour, peak, busy, started, groups } = hoursOf(summary, range);
 	const open = summary.open;
@@ -117,7 +119,7 @@ function ActivityDetails({
 				onValueChange={setTab}
 				toggle={
 					<RangeToggle
-						ranges={RANGES}
+						ranges={summary.activity.map((a) => a.hours)}
 						value={range}
 						onValueChange={setRange}
 						short={(hours) => (hours > 48 ? "7d" : `${hours}h`)}

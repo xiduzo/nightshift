@@ -20,6 +20,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { RunStatusBadge } from "@/features/runs";
 import type {
 	DashboardSummary,
+	NightRange,
 	NightsRange,
 	Project,
 	RunStatus,
@@ -34,7 +35,6 @@ import {
 	DetailsTabContent,
 	DetailsTabs,
 	MoreRows,
-	type NightRange,
 	NightRangeToggle,
 	Stat,
 	Swatch,
@@ -108,7 +108,13 @@ function RunsDetails({
 				]}
 				value={tab}
 				onValueChange={setTab}
-				toggle={<NightRangeToggle value={range} onValueChange={setRange} />}
+				toggle={
+					<NightRangeToggle
+						ranges={summary.nights.map((n) => n.nights)}
+						value={range}
+						onValueChange={setRange}
+					/>
+				}
 			>
 				<DetailsTabContent value="overview">
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

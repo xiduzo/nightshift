@@ -13,6 +13,7 @@ import {
 	OPEN_HOST,
 	personalSpaceId,
 	requestAccess,
+	TRUSTED_BROWSER_DAYS,
 	TWO_FACTOR_REQUIRED,
 } from "@nightshift/auth";
 import {
@@ -641,7 +642,13 @@ describe("a Host that requires two-factor sign-in", () => {
 			person: { name: "Ada", email: "ada@example.com" },
 			thisComputer: false,
 			hasPassword: true,
-			twoFactor: { enabled: false, required: true, setUpNeeded: true },
+			// How long a trusted browser skips the code: the rule of auth, not a copy.
+			twoFactor: {
+				enabled: false,
+				required: true,
+				setUpNeeded: true,
+				trustedBrowserDays: TRUSTED_BROWSER_DAYS,
+			},
 		});
 		expect(
 			await call(appRouter.healthCheck, undefined, { context: refused }),

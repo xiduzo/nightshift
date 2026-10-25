@@ -24,7 +24,7 @@ import { ArrowRightIcon, CircleHelpIcon } from "lucide-react";
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { CostText, RunStatusBadge } from "@/features/runs";
-import type { DashboardSummary, Project } from "@/shared/api";
+import type { DashboardSummary, NightRange, Project } from "@/shared/api";
 import { DataTable, dataTableColumns } from "@/shared/data-table";
 import {
 	formatCost,
@@ -39,7 +39,6 @@ import {
 	DetailsHeader,
 	DetailsTabContent,
 	DetailsTabs,
-	type NightRange,
 	NightRangeToggle,
 	Stat,
 	Swatch,
@@ -120,7 +119,13 @@ function SpendDetails({
 				]}
 				value={tab}
 				onValueChange={setTab}
-				toggle={<NightRangeToggle value={range} onValueChange={setRange} />}
+				toggle={
+					<NightRangeToggle
+						ranges={summary.nights.map((n) => n.nights)}
+						value={range}
+						onValueChange={setRange}
+					/>
+				}
 			>
 				<DetailsTabContent value="overview">
 					{unknown > 0 ? (

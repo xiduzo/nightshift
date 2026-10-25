@@ -25,7 +25,7 @@ import {
 import { ChevronRightIcon } from "lucide-react";
 import { type CSSProperties, type ReactNode, useId } from "react";
 
-import type { Project } from "@/shared/api";
+import type { NightRange, Project } from "@/shared/api";
 
 /**
  * The details dialog behind a stat card, after the details dialog of a Home
@@ -203,21 +203,22 @@ export function DetailsTabContent({
 	);
 }
 
-/** The ranges of a dialog over nights. */
-export const NIGHT_RANGES = [7, 30, 90] as const;
-export type NightRange = (typeof NIGHT_RANGES)[number];
-
-/** "7n 30n 90n". */
+/**
+ * "7n 30n 90n": the ranges over nights the dashboard reply has
+ * (`summary.nights`, a flow's `ranges`). The engine decides them.
+ */
 export function NightRangeToggle({
+	ranges,
 	value,
 	onValueChange,
 }: {
+	ranges: readonly NightRange[];
 	value: NightRange;
 	onValueChange: (range: NightRange) => void;
 }) {
 	return (
 		<RangeToggle
-			ranges={NIGHT_RANGES}
+			ranges={ranges}
 			value={value}
 			onValueChange={onValueChange}
 			short={(nights) => `${nights}n`}

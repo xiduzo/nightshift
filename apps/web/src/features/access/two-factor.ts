@@ -3,9 +3,6 @@
  * and the setup key a person types into an authenticator app.
  */
 
-/** How long a trusted browser skips the code. The daemon's `TRUSTED_BROWSER_DAYS`. */
-export const TRUSTED_BROWSER_DAYS = 30;
-
 /** A Better Auth client error: its code, status and message. */
 export type AuthError = {
 	code?: string;

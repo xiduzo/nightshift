@@ -23,6 +23,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import type {
 	DashboardSummary,
 	GateState,
+	NightRange,
 	NightsRange,
 	OpenGate,
 	Project,
@@ -37,7 +38,6 @@ import {
 	DetailsTabContent,
 	DetailsTabs,
 	MoreRows,
-	type NightRange,
 	NightRangeToggle,
 	Stat,
 	Swatch,
@@ -122,7 +122,13 @@ function GatesDetails({
 				]}
 				value={tab}
 				onValueChange={setTab}
-				toggle={<NightRangeToggle value={range} onValueChange={setRange} />}
+				toggle={
+					<NightRangeToggle
+						ranges={summary.nights.map((n) => n.nights)}
+						value={range}
+						onValueChange={setRange}
+					/>
+				}
 			>
 				<DetailsTabContent value="overview">
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
