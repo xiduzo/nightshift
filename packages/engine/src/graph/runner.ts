@@ -292,7 +292,7 @@ export function createRunner(deps: RunnerDeps) {
 	});
 
 	const sweep = setInterval(
-		() => void sweepOverdue(),
+		() => sweepOverdue(),
 		deps.overdueSweepMs ?? DEFAULT_OVERDUE_SWEEP_MS,
 	);
 	sweep.unref?.();
@@ -953,29 +953,33 @@ export function createRunner(deps: RunnerDeps) {
 		});
 	}
 
-	let sweeping = false;
+	/** The runs whose overdue check has not settled yet. */
+	const checking = new Set<string>();
 	/**
 	 * Checks the running step of every run this process drives against its
 	 * recorded limits (`overdue`). The steps' own timers stay the fast path,
 	 * so a step must be a minute past its limit (one `minuteMs`) before this
 	 * ends it.
+	 *
+	 * Each run's check is its own Turn, in its own queue, and the sweep
+	 * waits for none of them: a run whose Turns are slow holds back only its
+	 * own check. A run whose last check has not settled is left out, so
+	 * checks never pile up behind it. There is at most one check per slot,
+	 * so the run cap bounds how many run at once.
 	 */
-	async function sweepOverdue(): Promise<void> {
-		if (sweeping || released) return;
-		sweeping = true;
-		try {
-			for (const runId of [...slots.keys()]) {
-				try {
-					await take(runId, { kind: "overdue", graceMs: deps.minuteMs });
-				} catch (error) {
+	function sweepOverdue(): void {
+		if (released) return;
+		for (const runId of slots.keys()) {
+			if (checking.has(runId)) continue;
+			checking.add(runId);
+			take(runId, { kind: "overdue", graceMs: deps.minuteMs })
+				.catch((error) => {
 					console.error(
 						`[engine] could not check the time of run ${runId}`,
 						error,
 					);
-				}
-			}
-		} finally {
-			sweeping = false;
+				})
+				.finally(() => checking.delete(runId));
 		}
 	}
 

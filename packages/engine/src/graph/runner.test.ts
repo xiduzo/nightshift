@@ -280,6 +280,38 @@ describe("take: a drive's time and a thread that cannot move", () => {
 		expect(runner.isActive(h.runId)).toBe(false);
 	});
 
+	test("the sweep: a run whose Turn is slow holds back only its own check, not another run's", async () => {
+		let now = Date.now();
+		const { h, runner, sessions } = await setup(worker(), 2, {
+			now: () => now,
+			overdueSweepMs: 10,
+		});
+		await start(runner, h.runId);
+		await waitFor(() => sessions[0]);
+		// A Turn of the first run that does not end: its checks wait behind it.
+		const slow = latch();
+		let held = false;
+		const holding = runner.hold(h.runId, async () => {
+			held = true;
+			await slow.opened;
+		});
+		await waitFor(() => held);
+		const late = await another(
+			flowOf([agent("worker", "Build it", { timeoutMinutes: 60 })]),
+		);
+		await start(runner, late);
+		await waitFor(() => sessions[1]);
+		now += 62 * h.deps.minuteMs;
+
+		await waitFor(async () => (await statusOf(h, late)) === "failed", {
+			label: "the sweep to end the late run",
+		});
+		expect(sessions[1]?.input.signal.aborted).toBe(true);
+		expect(await statusOf(h)).toBe("running");
+		slow.open();
+		await holding;
+	});
+
 	test("a rerun whose thread cannot move ends the run failed, so the log does not say it runs", async () => {
 		const { h, runner, sessions } = await setup(worker(), 2, {
 			openThread: (row, deps) => ({
