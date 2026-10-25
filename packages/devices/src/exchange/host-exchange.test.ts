@@ -430,6 +430,46 @@ describe("live transcripts", () => {
 	});
 });
 
+describe("the Commands that wait for a Device", () => {
+	test("come on their own stream, again each time they change; an older Device gets them with the rows", async () => {
+		const key = keyOf("device-mine", ownerId);
+		const kept = await engine.exchange.commands.enqueue({
+			kind: "signal.send",
+			payload: { name: "go" },
+			spaceId: sandbox.spaceId,
+			runId: "run-1",
+			walkerId: "device-mine",
+			personId: ownerId,
+		});
+		const stop = new AbortController();
+		try {
+			const commands = host()
+				.commands(key, stop.signal)
+				[Symbol.asyncIterator]();
+			expect((await commands.next()).value).toEqual({ commands: [kept] });
+			const next = commands.next();
+			await engine.exchange.commands.done(kept.id, "device-mine", null);
+			expect((await next).value).toEqual({ commands: [] });
+
+			// An older Device asks for rows only, without the option.
+			const again = await engine.exchange.commands.enqueue({
+				kind: "signal.send",
+				payload: { name: "go" },
+				spaceId: sandbox.spaceId,
+				runId: "run-1",
+				walkerId: "device-mine",
+				personId: ownerId,
+			});
+			const rows = host()
+				.stream(key, { cursors: {} }, stop.signal)
+				[Symbol.asyncIterator]();
+			expect((await rows.next()).value?.commands).toEqual([again]);
+		} finally {
+			stop.abort();
+		}
+	});
+});
+
 describe("a push the Host refuses", () => {
 	/** A run of `walkerId` in the owner's Space, of `project`, with one event. */
 	const rowsOf = (walkerId: string, project = projectId) => ({
