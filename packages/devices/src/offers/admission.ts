@@ -46,7 +46,11 @@ import {
  *   waits for one of the Offer's sessions while it runs its session cap.
  *   One slot map per Offer counts the sessions of both paths, and a
  *   reload hands it to the next engine (`OfferUse`).
- * - Withdrawing an Offer aborts the calls under it (`withdrawn`).
+ * - Withdrawing an Offer aborts the calls under it (`withdrawn`). A
+ *   session it aborts answers with why, so the step of a run walked
+ *   elsewhere fails at once: its Walker does not wait for this Device as
+ *   for one that went quiet. A run walked here is stopped first
+ *   (`EngineOffers.withdraw`): its step ends as stopped.
  *
  * Its owner's run that comes over the wire passes here too: their role
  * starts runs, and the Clone and folder rules hold. Its owner's run that
@@ -238,10 +242,12 @@ export function createOfferAdmission(deps: {
 			const stop = new AbortController();
 			const both = AbortSignal.any([signal, stop.signal]);
 			const forget = calls.add(request.spaceId, profile, () => stop.abort());
+			/** Its owner withdrew the Offer: the run's step fails and says why. */
+			const withdrawn = () => stop.signal.aborted && !signal.aborted;
 			let release: (() => void) | null = null;
 			try {
 				release = await slots.take(key, offer.sessionCap, both);
-				yield* serveWork(
+				for await (const reply of serveWork(
 					device,
 					{
 						...request,
@@ -251,10 +257,23 @@ export function createOfferAdmission(deps: {
 						},
 					},
 					both,
-				);
+				)) {
+					if (withdrawn()) break;
+					yield reply;
+				}
+			} catch (error) {
+				if (!withdrawn()) throw error;
 			} finally {
 				release?.();
 				forget();
+			}
+			// Not a session that ended or a Device that went quiet, which a
+			// Walker waits for: an error, so the step fails at once.
+			if (withdrawn()) {
+				yield {
+					kind: "error",
+					message: `${device.name} no longer offers "${profile}" to this Space. Choose another device for this step.`,
+				};
 			}
 		} catch (error) {
 			yield {

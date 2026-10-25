@@ -114,8 +114,11 @@ export type EngineOffers = {
 	/**
 	 * Takes an Offer off the Space's document, logs `OfferWithdrawn`, and
 	 * stops the runs walked here whose running step is a session under it:
-	 * the step ends as stopped. A Space a Host keeps: through that Host.
-	 * Nothing to withdraw is no error.
+	 * the step ends as stopped. A Space a Host keeps: through that Host,
+	 * and the runs walked here stop also when it cannot be reached. A run
+	 * walked elsewhere is its Walker's to stop: the offering Device aborts
+	 * its session (`OfferAdmission.withdrawn`). Nothing to withdraw is no
+	 * error.
 	 */
 	withdraw(input: {
 		spaceId: string;
@@ -195,9 +198,13 @@ export function createEngineOffers(deps: {
 				if (!relay || deviceId !== deps.deviceId) {
 					throw new HostUnreachableError();
 				}
-				await relay.withdrawOffer({ spaceId, profile });
-				// The runs this computer walks stop their steps under it too.
-				await deps.stopUnder({ spaceId, deviceId, profile });
+				try {
+					await relay.withdrawOffer({ spaceId, profile });
+				} finally {
+					// The runs this computer walks stop their steps under it too,
+					// also when the Host cannot be reached.
+					await deps.stopUnder({ spaceId, deviceId, profile });
+				}
 				return;
 			}
 			const document = await documents.open(spaceId);

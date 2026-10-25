@@ -293,7 +293,9 @@ function outcomeOf(replies: WorkReply[]): string {
 			message?: string;
 			spawnError?: string | null;
 		};
-		if (value?.type === "refused") return value.message ?? "";
+		if (value?.type === "refused" || value?.type === "error") {
+			return value.message ?? "";
+		}
 		if (value?.type === "exit" && value.spawnError) return value.spawnError;
 		if (value?.kind === "failed" || value?.kind === "error") {
 			return value.message ?? "";
@@ -481,16 +483,23 @@ for (const [path, call] of Object.entries(paths)) {
 			]);
 		});
 
-		test("withdrawing the Offer aborts the sessions under it", async () => {
-			await offer(2);
+		test("withdrawing the Offer aborts the sessions under it, and says so to their runs", async () => {
+			await offer(1);
 			const running = outcome(request({ call: offered("wait") }));
 			await until(() => waiting.length === 1);
+			// One more waits for the Offer's one session.
+			const queued = outcome(request({ call: offered("queued") }));
 			admission.withdrawn(SPACE, "other-profile");
 			await Bun.sleep(20);
 			expect(waiting[0]?.input.signal.aborted).toBe(false);
 			admission.withdrawn(SPACE, "coder");
-			await running;
+			// Not a Device that went quiet, which a run waits for: a step that fails.
+			const withdrawn =
+				'hetzner-1 no longer offers "coder" to this Space. Choose another device for this step.';
+			expect(await running).toBe(withdrawn);
+			expect(await queued).toBe(withdrawn);
 			expect(waiting[0]?.input.signal.aborted).toBe(true);
+			expect(ran).toHaveLength(1);
 		});
 	});
 }
