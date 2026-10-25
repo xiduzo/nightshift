@@ -972,9 +972,9 @@ iroh.
      follows an ingest is read from the log, so a batch that comes again
      after a crash repeats it safely: the run's Walker (the `to` of its
      latest `WalkerMoved`) and a session's harness id, in the same
-     transaction; a run that moved here, taken over until its
-     `WalkerArrived` is in the log; a copy of a step reopened elsewhere,
-     dropped. A Command's id is in the first event it writes, so the log
+     transaction; a run that moved here, taken over until it arrived
+     (`WalkerArrived`, the new Walker's first event there); a copy of a
+     step reopened elsewhere, dropped. A Command's id is in the first event it writes, so the log
      is the dedup across restarts. The wire stays compatible both ways:
      `sync.commands` and the `commands: false` option of `sync.stream` are
      new and optional, and the order of a batch needs nothing of the
