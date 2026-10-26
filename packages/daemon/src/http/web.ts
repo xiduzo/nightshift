@@ -114,9 +114,9 @@ export function webHandler(
 /** A file as the daemon answers it: its bytes, compressed copies, and its ETag. */
 type Prepared = {
 	type: string;
-	body: Uint8Array;
-	br: Uint8Array | null;
-	gzip: Uint8Array | null;
+	body: Uint8Array<ArrayBuffer>;
+	br: Uint8Array<ArrayBuffer> | null;
+	gzip: Uint8Array<ArrayBuffer> | null;
 	etag: string;
 };
 
