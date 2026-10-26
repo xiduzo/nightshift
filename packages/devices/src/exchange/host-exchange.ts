@@ -116,14 +116,16 @@ export function createHostExchange(deps: {
 		return (await registry.get(walkerId))?.ownerId ?? null;
 	}
 
+	/** The rows of `spaces` after `cursors` (default: the Person's Spaces), every Walker's but the Device's own. */
 	async function batch(
 		key: DeviceKeyAccess,
 		cursors: SyncCursors,
 		withCommands = true,
+		spaces?: readonly string[],
 	): Promise<SyncBatch> {
 		await admit(key);
 		const { rows, cursors: moved } = await exchange.rowsAfter({
-			spaces: await memberSpaces(key),
+			spaces: spaces ?? (await memberSpaces(key)),
 			cursors,
 			except: key.deviceId,
 		});
@@ -145,14 +147,15 @@ export function createHostExchange(deps: {
 	}
 
 	/**
-	 * Resolves when rows land, the Commands change (with `commands`), the
-	 * steps someone follows of the Device's runs change, the time is up, or
-	 * the signal aborts.
+	 * Resolves when rows land that the Device lacks (of `on.rows`' Spaces,
+	 * another Walker's), the Commands change (with `commands`), the steps
+	 * someone follows of the Device's runs change, the time is up, or the
+	 * signal aborts.
 	 */
 	function change(
 		signal: AbortSignal,
 		deviceId: string,
-		on: { rows: boolean; commands: boolean },
+		on: { rows: readonly string[] | null; commands: boolean },
 	): Promise<void> {
 		return new Promise((resolve) => {
 			const done = () => {
@@ -169,7 +172,15 @@ export function createHostExchange(deps: {
 				? exchange.feeds.onWanted(deviceId, done)
 				: () => false;
 			const timer = setTimeout(done, STREAM_IDLE_MS);
-			if (on.rows) void exchange.landed(signal, STREAM_IDLE_MS).then(done);
+			// Not the rows this Device pushed: it has them.
+			if (on.rows) {
+				void exchange
+					.landed(signal, STREAM_IDLE_MS, {
+						spaces: on.rows,
+						except: deviceId,
+					})
+					.then(done);
+			}
 			if (signal.aborted) done();
 			else signal.addEventListener("abort", done, { once: true });
 		});
@@ -191,15 +202,16 @@ export function createHostExchange(deps: {
 			let sentCommands = "";
 			let sentFollows = "";
 			while (!signal?.aborted) {
+				const spaces = await memberSpaces(key);
 				const cycle = new AbortController();
 				const signals = signal ? [signal, cycle.signal] : [cycle.signal];
 				// Listen before reading, so nothing lands unseen between the two.
 				const changed = change(AbortSignal.any(signals), key.deviceId, {
-					rows: true,
+					rows: spaces,
 					commands: withCommands,
 				});
 				try {
-					const next = await batch(key, at, withCommands);
+					const next = await batch(key, at, withCommands, spaces);
 					const commands = next.commands.map((c) => c.id).join();
 					const follows = followsOf(next);
 					if (
@@ -227,7 +239,7 @@ export function createHostExchange(deps: {
 				const signals = signal ? [signal, cycle.signal] : [cycle.signal];
 				// Listen before reading, so no Command is kept unseen between the two.
 				const changed = change(AbortSignal.any(signals), key.deviceId, {
-					rows: false,
+					rows: null,
 					commands: true,
 				});
 				try {

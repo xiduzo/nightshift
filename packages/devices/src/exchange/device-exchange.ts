@@ -3,7 +3,7 @@ import type { Engine } from "@nightshift/engine";
 import { ORPCError } from "@orpc/client";
 import type { HostClient, RunCommand, RunRows } from "../contract";
 import { type HostSpaces, type Link, pause } from "../links";
-import { isEmpty, MissingProjectError } from "./rows";
+import { isEmpty, MissingProjectError, mergeCursors } from "./rows";
 import type { RunHistoryExchange } from "./run-history";
 
 /**
@@ -14,7 +14,8 @@ import type { RunHistoryExchange } from "./run-history";
  * them when it drops, and starts them again after a failure:
  *
  * - Push: the rows this computer walked in the Spaces the Host keeps,
- *   after the Host's cursor, whenever an event lands here (`sync.push`).
+ *   after the Host's cursor, whenever one of them lands here (`sync.push`;
+ *   a spend so far waits for the next, `RunHistoryExchange.landed`).
  *   After a batch with a node that ended, that step's transcript and
  *   command log, and its run's walk state when it changed, go to the
  *   Host's archive (the Host takes files of runs it has). The cursor moves when both are
@@ -139,19 +140,27 @@ export function createDeviceExchange(deps: {
 		return waiting.size > 0 ? { why: first } : null;
 	}
 
-	/** Sends this computer's rows, a batch at a time, until `signal` aborts. Throws when a batch fails. */
+	/**
+	 * Sends this computer's rows, a batch at a time, until `signal` aborts.
+	 * Throws when a batch fails. It wakes for this computer's own events
+	 * in the Host's Spaces only: the rows it pulls are not its to send.
+	 */
 	async function push(client: HostClient, signal: AbortSignal) {
+		// The cursor of this computer's own rows moves only here.
+		let at = await exchange.cursorsWith(hostId);
 		while (!signal.aborted) {
+			const spaces = await engine.hostSpaces.ofHost(hostId);
 			const cycle = new AbortController();
+			// Listen before reading, so nothing lands unseen between the two.
 			const landed = exchange.landed(
 				AbortSignal.any([signal, cycle.signal]),
 				deps.idleMs ?? 15_000,
+				{ spaces, only: selfId },
 			);
 			try {
-				const spaces = await engine.hostSpaces.ofHost(hostId);
 				const { rows: batch, cursors } = await exchange.rowsAfter({
 					spaces,
-					cursors: await exchange.cursorsWith(hostId),
+					cursors: at,
 					only: selfId,
 					limit: deps.batchRows ?? 200,
 				});
@@ -164,6 +173,7 @@ export function createDeviceExchange(deps: {
 				// The Host has the runs now: their ended nodes' files follow.
 				await archive(client, batch, signal);
 				await exchange.advance(hostId, cursors);
+				at = mergeCursors(at, cursors);
 			} finally {
 				cycle.abort();
 			}

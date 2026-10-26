@@ -3,6 +3,8 @@ import type { DeviceKeyAccess } from "@nightshift/auth";
 import {
 	event,
 	member,
+	organization,
+	project as projectTable,
 	run as runTable,
 	step as stepTable,
 	user,
@@ -15,6 +17,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import { ORPCError } from "@orpc/server";
+import type { SyncBatch } from "../contract";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import type { DeviceRegistry } from "../registry";
 import { withPeers } from "../testing";
@@ -28,12 +31,14 @@ import { createHostExchange } from "./host-exchange";
  */
 
 let sandbox: Sandbox;
+let runLog: ReturnType<typeof createRunLog>;
 let engine: PeerEngine;
 let documents: SpaceDocuments;
 let ownerId: string;
 let projectId: string;
 beforeEach(async () => {
 	sandbox = await createSandbox();
+	runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
 	documents = createSpaceDocuments({
 		db: sandbox.db,
 		directory: deviceDirectory(sandbox.db),
@@ -47,7 +52,7 @@ beforeEach(async () => {
 			scheduler: false,
 			spaceDocuments: documents,
 		}),
-		{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
+		{ runLog },
 	);
 	const [owner] = await sandbox.db.select().from(user);
 	ownerId = owner?.id as string;
@@ -535,5 +540,98 @@ describe("a push the Host refuses", () => {
 		expect(await host().push(mine, rowsOf("device-mine"))).toEqual({
 			events: 1,
 		});
+	});
+});
+
+describe("a Device's stream of rows", () => {
+	test("wakes for another Walker's rows of its Person's Spaces only", async () => {
+		// A Space the colleague is not a Member of, with a run.
+		await sandbox.db.insert(organization).values({
+			id: "space-other",
+			name: "Other",
+			slug: "space-other",
+			createdAt: new Date(),
+		});
+		await sandbox.db
+			.insert(projectTable)
+			.values({ id: "p-other", spaceId: "space-other", name: "other" });
+		const runRow = (id: string, spaceId: string, ofProject: string) => ({
+			id,
+			spaceId,
+			projectId: ofProject,
+			flow: "{}",
+			title: id,
+			worktreePath: "/w",
+			branch: "b",
+			baseRef: "main",
+			walkerId: sandbox.deviceId,
+		});
+		await sandbox.db
+			.insert(runTable)
+			.values([
+				runRow("run-shared", sandbox.spaceId, projectId),
+				runRow("run-other", "space-other", "p-other"),
+			]);
+		const edge = (runId: string) => ({
+			type: "EdgeTaken" as const,
+			runId,
+			payload: { edgeId: "e", from: "a", to: "b", outcome: "pass" },
+		});
+		// The colleague's Device has its own rows: they never wake its stream.
+		const own = (walkerSeq: number) => ({
+			spaceId: sandbox.spaceId,
+			runId: "run-shared",
+			stepId: null,
+			sessionId: null,
+			type: "EdgeTaken",
+			payload: "{}",
+			at: Date.now(),
+			walkerId: "device-colleague",
+			walkerSeq,
+		});
+
+		let reads = 0;
+		const rowsAfter = engine.exchange.rowsAfter;
+		engine.exchange.rowsAfter = (input) => {
+			reads++;
+			return rowsAfter(input);
+		};
+		const stop = new AbortController();
+		try {
+			const rows = host()
+				.stream(
+					keyOf("device-colleague", "colleague"),
+					{ cursors: {} },
+					stop.signal,
+				)
+				[Symbol.asyncIterator]();
+			const next = rows.next();
+			await waitFor(() => reads === 1, { label: "the first read" });
+
+			await runLog.append(edge("run-other"));
+			await runLog.ingest([own(1)]);
+			// A spend so far goes with the next row that wakes it.
+			await runLog.append({
+				type: "SessionUsage",
+				runId: "run-shared",
+				payload: { usage: {}, costUsd: null } as never,
+			});
+			await Bun.sleep(100);
+			expect(reads).toBe(1);
+
+			await runLog.append(edge("run-shared"));
+			const batch = (await next).value;
+			expect(reads).toBe(2);
+			const events: SyncBatch["rows"]["events"] = batch
+				? batch.rows.events
+				: [];
+			expect(events.map((e) => [e.runId, e.type])).toEqual([
+				["run-shared", "SessionUsage"],
+				["run-shared", "EdgeTaken"],
+			]);
+		} finally {
+			stop.abort();
+			engine.exchange.rowsAfter = rowsAfter;
+		}
 	});
 });

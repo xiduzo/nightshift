@@ -23,7 +23,7 @@ import {
 	waitFor,
 } from "@nightshift/engine/testing";
 import type { Flow } from "@nightshift/flows";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, max, sql } from "drizzle-orm";
 import type { HostRelay as Relay, RunCommand } from "../contract";
 import { createPeerEngine, deviceDirectory, type PeerEngine } from "../peers";
 import { withPeers } from "../testing";
@@ -78,6 +78,9 @@ const gateFlow: Flow = {
 	edges: [{ id: "e1", from: "hello", outcome: "pass", to: "ship" }],
 } as Flow;
 
+/** The run log of each sandbox's latest engine: the events a test logs land through it. */
+const runLogs = new Map<Sandbox, ReturnType<typeof createRunLog>>();
+
 function engineOf(
 	sandbox: Sandbox,
 	options: {
@@ -96,8 +99,14 @@ function engineOf(
 			...(options.relay ? { relay: options.relay } : {}),
 			...(options.documents ? { spaceDocuments: options.documents } : {}),
 		}),
-		{ runLog: createRunLog(sandbox.db, { walkerId: sandbox.deviceId }) },
+		{ runLog: runLogFor(sandbox) },
 	);
+}
+
+function runLogFor(sandbox: Sandbox) {
+	const runLog = createRunLog(sandbox.db, { walkerId: sandbox.deviceId });
+	runLogs.set(sandbox, runLog);
+	return runLog;
 }
 
 async function statusOf(engine: PeerEngine, spaceId: string, runId: string) {
@@ -333,14 +342,24 @@ describe("a batch and what follows from it", () => {
 		type: string,
 		payload: object,
 	) {
-		await sandbox.db.insert(event).values({
-			spaceId: a.spaceId,
-			runId,
-			type,
-			payload: JSON.stringify(payload),
-			walkerId,
-			walkerSeq: sql`(select coalesce(max(${event.walkerSeq}), 0) + 1 from ${event} where ${event.walkerId} = ${walkerId})`,
-		});
+		const [counted] = await sandbox.db
+			.select({ latest: max(event.walkerSeq) })
+			.from(event)
+			.where(eq(event.walkerId, walkerId));
+		// Through the run log, as every event lands.
+		await (runLogs.get(sandbox) ?? runLogFor(sandbox)).ingest([
+			{
+				spaceId: a.spaceId,
+				runId,
+				stepId: null,
+				sessionId: null,
+				type,
+				payload: JSON.stringify(payload),
+				at: Date.now(),
+				walkerId,
+				walkerSeq: (counted?.latest ?? 0) + 1,
+			},
+		]);
 	}
 
 	/** The types of the run's events on a Replica, in the order they landed there. */

@@ -3,6 +3,7 @@ import { syncCursor } from "@nightshift/db/schema";
 import {
 	type CopyStamp,
 	type Engine,
+	type LandedScope,
 	type LoggedEvent,
 	memberRole,
 	type PeerContext,
@@ -36,6 +37,14 @@ const MOVED_ON = "The run moved to another device before this reached it.";
 const ENDED_ELSEWHERE = "The run ended before this reached it.";
 /** Why a Command is not applied: its run is of another Space here. */
 const NOT_HERE = "This device does not run this run.";
+
+/**
+ * Events that do not wake the exchange. A session's spend so far lands
+ * every few seconds while an agent works, more than half of all events,
+ * and only its latest counts: it goes with the next event that wakes the
+ * exchange, or at the next look when nothing else lands.
+ */
+const QUIET: ReadonlySet<string> = new Set(["SessionUsage"]);
 
 /**
  * Run history between this Replica and its Hosts: the one module both
@@ -90,10 +99,17 @@ export type RunHistoryExchange = {
 	/** Moves this Replica's cursors with a Host forward (never back). */
 	advance(hostId: string, cursors: SyncCursors): Promise<void>;
 	/**
-	 * Resolves when an event lands in this Replica (appended or ingested),
-	 * after `timeoutMs`, or when `signal` aborts: whichever comes first.
+	 * Resolves when a run event lands in this Replica (appended or
+	 * ingested) of `scope`'s Spaces and Walkers, after `timeoutMs`, or when
+	 * `signal` aborts: whichever comes first. A spend so far
+	 * (`SessionUsage`) does not wake it: it goes with the next event that
+	 * does, or after `timeoutMs`.
 	 */
-	landed(signal: AbortSignal, timeoutMs: number): Promise<void>;
+	landed(
+		signal: AbortSignal,
+		timeoutMs: number,
+		scope?: LandedScope,
+	): Promise<void>;
 	/**
 	 * Applies a Command for a run this computer walks, through `engine`,
 	 * once. Returns why not, or null when it is applied: now, or before
@@ -267,7 +283,11 @@ export function createRunHistoryExchange(deps: {
 		return "on-its-way";
 	}
 
-	function landedWithin(timeoutMs: number, signal?: AbortSignal) {
+	function landedWithin(
+		timeoutMs: number,
+		signal?: AbortSignal,
+		scope?: LandedScope,
+	) {
 		return new Promise<void>((resolve) => {
 			if (signal?.aborted) return resolve();
 			const done = () => {
@@ -277,7 +297,9 @@ export function createRunHistoryExchange(deps: {
 				resolve();
 			};
 			const timer = setTimeout(done, timeoutMs);
-			const off = log.onLanded(done);
+			const off = history.landed.subscribe((events) => {
+				if (events.some((e) => !QUIET.has(e.type))) done();
+			}, scope);
 			signal?.addEventListener("abort", done, { once: true });
 		});
 	}
@@ -331,7 +353,8 @@ export function createRunHistoryExchange(deps: {
 			}
 		},
 
-		landed: (signal, timeoutMs) => landedWithin(timeoutMs, signal),
+		landed: (signal, timeoutMs, scope) =>
+			landedWithin(timeoutMs, signal, scope),
 
 		async apply(command, engine) {
 			// Its id in the log: applied here before, also before a restart.
