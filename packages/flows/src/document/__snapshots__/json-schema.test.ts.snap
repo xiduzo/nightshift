@@ -1063,6 +1063,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     },
                     {
                       "properties": {
+                        "key": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
                         "kind": {
                           "const": "signal",
                           "type": "string",
@@ -2458,6 +2462,10 @@ exports[`published schemas flowSchema as JSON Schema 1`] = `
                     {
                       "additionalProperties": false,
                       "properties": {
+                        "key": {
+                          "minLength": 1,
+                          "type": "string",
+                        },
                         "kind": {
                           "const": "signal",
                           "type": "string",
@@ -2841,15 +2849,45 @@ exports[`published schemas schedulesFileSchema as JSON Schema 1`] = `
               "minLength": 1,
               "type": "string",
             },
+            "signal": {
+              "properties": {
+                "key": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "name": {
+                  "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "name",
+              ],
+              "type": "object",
+            },
             "stopAt": {
               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
               "type": "string",
             },
+            "webhook": {
+              "properties": {
+                "secret": {
+                  "pattern": "^\\$\\{[A-Za-z_][A-Za-z0-9_]{0,127}\\}$",
+                  "type": "string",
+                },
+                "when": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "secret",
+              ],
+              "type": "object",
+            },
           },
           "required": [
             "id",
-            "flow",
-            "cron",
           ],
           "type": "object",
         },
@@ -2956,16 +2994,48 @@ exports[`published schemas schedulesFileSchema as JSON Schema 1`] = `
               "minLength": 1,
               "type": "string",
             },
+            "signal": {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "name": {
+                  "pattern": "^[a-z][a-z0-9-]{0,29}$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "name",
+              ],
+              "type": "object",
+            },
             "stopAt": {
               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
               "type": "string",
             },
+            "webhook": {
+              "additionalProperties": false,
+              "properties": {
+                "secret": {
+                  "pattern": "^\\$\\{[A-Za-z_][A-Za-z0-9_]{0,127}\\}$",
+                  "type": "string",
+                },
+                "when": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "secret",
+              ],
+              "type": "object",
+            },
           },
           "required": [
             "id",
-            "flow",
             "inputs",
-            "cron",
             "enabled",
           ],
           "type": "object",
@@ -3304,7 +3374,7 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "assistantAgentSchema": "36bfe28d5f2ea9f04d7ede5e9b04c55b639f78d55df97c28163748894aa7622f",
   "callEachSchema": "9beea47d254094b6284537655fecbbddd2721f074705bffb1c0b45fb9109f0d7",
   "callNodeSchema": "3db8301e635a18936d1f3dd38a3d3b832e454808871572edde59bb8910fd74c3",
-  "chatRequestSchema": "d93c413ed5713caebe737e036ef4708cb0c297f2ae8e264e8b742aa6edf95dca",
+  "chatRequestSchema": "aa062554707d50ad5b199158411ca2c73a635c073c39c61e38db9ddf21bd298c",
   "cliNameSchema": "51a3ab3696b70b9bee33bc67a8d7cb8f1ae494ccef5ccc7e73878b93fb22c12c",
   "commandExitSchema": "81c5c7ed3b70f87931cdd1b3beb8943305b5a7b50e6f5840b9d885ba920e88a3",
   "commandNodeSchema": "106f873f9e0b322e9edf9be7b05b9eb4b1ccb19e600babc8a1a84d45e47d14af",
@@ -3320,9 +3390,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "flowEdgeSchema": "fa102c4d0dbb7e0dc39d6b2ff6a8dda61e677b0a5b06f37519200f3145d3e80d",
   "flowInputSchema": "614c08d07a4c7b5980a98cf8447cd5bd3491dd84a298256e50dee562624f2c57",
   "flowNameSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "flowNodeSchema": "6fb0a4209b8894cdedca1addbe02ffee826a1461d89fb6bf62cb58e2ccb067a5",
+  "flowNodeSchema": "028d9752731ca5a40d4433ad1c49998b2767da59e27b4c9b6f1ac57122308291",
   "flowOutputSchema": "5cac9a44d87581c7f53da7394228745dfd952219f5dfd90f3620c516c272edb7",
-  "flowSchema": "5fd894064fcdf0e944ece285f1cb4b31994eb3a3aa00126757dd83c0006c3a1a",
+  "flowSchema": "d167e363776a675ca9ec693019be1e5b60564d6759fdd41efefde0216d5af896",
   "flowSectionSchema": "3cd74de667afdadb6253862ee3c7d71ee76f3e26c484bc8a0eb4fba4ccca8beb",
   "flowVariableSchema": "bc241c9d8a19a055e9866d040bc4720e0dbd3eacb515865d1036ca65e8be7679",
   "harnessNameSchema": "5680ae13dedd38277934574bb77ad18e9ec2d67a68bd7c7266e1c5ebd57d3318",
@@ -3340,12 +3410,14 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "permissionModeSchema": "759773decf0c9f4a4772f09d6bb1732999436b3b8f7b763134ae9a4b7478b3bd",
   "policySchema": "c71ca6d9449c26281734e9b83bd509468adc49682849863fca0aea5ad00f48a0",
   "scheduleIdSchema": "c14f6b5ca3d549bfa32545d71c33dba3aa39a25a595b289d3cfd54c23c3e8274",
-  "scheduleSchema": "8d24fd7c9303f41084ec74e1ef4da372577d1bea6c7205e82c193126037d91bc",
-  "schedulesFileSchema": "a58f53e65cddb3ebb52d62f05fe5c0cd33da5c86fe05a7aa61e6984780f22eab",
+  "scheduleSchema": "c6e4ea959d51459d55f9b393d9344350cbe092773ac566d3cb1ac354a0c8c4dd",
+  "scheduleSignalSchema": "72340129c840cb54c596990620242a4a89780d13706772bdabc77b1f8ebf3dad",
+  "scheduleWebhookSchema": "70545dcc8c286be6daaed5f150a58473f47db13bd006063aae6d7a1b7795a442",
+  "schedulesFileSchema": "3eab457fc7e32059aab407e8d51c3b190aa8b358f1719a8142ce517b996b58de",
   "secretNameSchema": "612e95d5a8b5905b3c592edbbc8941ad8d712715ed1395e3b66c26bb99fb4410",
   "sectionColorSchema": "eb33494a8a38518924b512496789c058e769c86bca49c34eca8ae5888c5489a1",
   "suggestionKindSchema": "1a9702439df52e7984afdb2307e7a9039d6de5e6881299269eb72f5509e108b6",
-  "suggestionRequestSchema": "10140034e6f5f94ed8f2779d9a9aa837cae0bc4668d71c13656ff973cd6b6e58",
+  "suggestionRequestSchema": "3652d1a8704469d6a35a805d1ad733f4ac8f3c9939c564b48b3b940948f1a937",
   "suggestionSchema": "224aa6217ef03492d1a57666aa46a216efcc7e4596391dac41922d09920dfad1",
   "textRangeSchema": "f4f1728b7fbe3eeb75cd4b9e3609d9349b8ce81db2bc7f521acb8351d420c77e",
   "timeOfDaySchema": "8684ebbaf52e062cf5e284260d4f3a9bc9583a4a7a3db8007313edc210ccccae",
@@ -3355,8 +3427,9 @@ exports[`published schemas every published schema as a JSON Schema hash 1`] = `
   "valueNodeSchema": "3dc5d1af5414cd694f6660c3e1c711ba10401d283ae92e6c4cea2673dda3b08e",
   "variableTypeSchema": "1117a60eccb8c2baefec4e9cebcf2c4a387a033ded5c8a7071a9474221fa733c",
   "variableWriteSchema": "2c39a4e86bcbb12e591793c1361222cd3dd9380833ce702eef65f3ca45cee0a2",
-  "waitNodeSchema": "8b161da59bbae64dabd06ff81740ca7695dae7906ae794625d1a101259adcb7c",
-  "waitUntilSchema": "ddb80380cd2540a3365e440a5cfb7d24e3628444436dda8735eaeafb88b5a245",
+  "waitNodeSchema": "7bedcef5392aa97907a474e2bad158b5563f6a59d94d44e59a566c526231c4e2",
+  "waitUntilSchema": "abb046648846ed643412eb8c1a94deda8c0b60af38f201c55a0b5c36e6d8ef6e",
+  "webhookSecretSchema": "a0a552b5d82356dc8e33835d829408eb750ffa1fb7ea4f2f1d38c75ff5d2ccf6",
 }
 `;
 

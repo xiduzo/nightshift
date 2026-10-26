@@ -13,8 +13,10 @@ export {
 export {
 	chooseByRule,
 	evaluateRule,
+	isTruthy,
 	type RuleEvaluation,
 	type RuleOutcome,
+	ruleMessage,
 	ruleNames,
 	ruleProblem,
 	ruleVariableNames,

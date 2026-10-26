@@ -91,9 +91,9 @@ Outcomes: `pass`, `fail`. Outputs: `outcome`, `data`, `note`, `visit`.
 
 ### wait
 
-Waits, then ends `done`. `until` is one of: `duration`, `time`, `command`, `signal` (`{ kind: "duration", minutes }`, `{ kind: "time", at: "07:00" }`, `{ kind: "command", command, everyMinutes }` until it exits 0, `{ kind: "signal", name }`). `timeoutMinutes` ends it `timeout`.
+Waits, then ends `done`. `until` is one of: `duration`, `time`, `command`, `signal` (`{ kind: "duration", minutes }`, `{ kind: "time", at: "07:00" }`, `{ kind: "command", command, everyMinutes }` until it exits 0, `{ kind: "signal", name, key? }`). `timeoutMinutes` ends it `timeout`. A signal comes from a person on the run page, or from a webhook schedule of the project: then `data` holds the webhook (`{{wait_ci.data.body.check_suite.conclusion}}`). With `key` (a template, for example `{{pr}}`), only a webhook whose signal key is that text wakes it.
 
-Outcomes: `done`, `timeout`. Outputs: `outcome`, `waited_minutes`, `log_tail`, `visit`.
+Outcomes: `done`, `timeout`. Outputs: `outcome`, `waited_minutes`, `log_tail`, `data`, `visit`.
 
 `{"id":"cool_down","type":"wait","position":{"x":0,"y":0},"until":{"kind":"duration","minutes":10}}`
 
@@ -127,6 +127,10 @@ Rules (a Decision's `when`, a Value's `expression`, a write's `expression`) are 
 ## Variables
 
 A variable is a named, typed value the flow keeps while it runs. Declare it in `variables`. `initial` is a template over the inputs and `run` only. Read it as `{{vars.name}}`. A node changes it with `set`, a list of `{ variable, value | expression, on? }`: exactly one of `value` (a template) or `expression` (JSONata), and `on` lists the outcomes that write (unset: every outcome). Writes apply in order when the step ends. The node's own id reads the step that just ended. Each flow, each Subflow and each element of a Subflow with `each` has its own variables. A value that does not fit the type ends the step with an error.
+
+## Schedules and webhooks
+
+A schedule in `.nightshift/schedules.json` starts a flow at set times (`cron`) or when a webhook arrives (`webhook: { secret: "${NAME}", when? }`, `when` a JSONata rule over `event`). A webhook schedule's `inputs` are templates over the event: `{{event.body.pull_request.number}}`, `{{event.headers.x-github-event}}`. It can also send a signal to the project's runs (`signal: { name, key? }`, `key` JSONata over `event`): a Wait on that name wakes, with the event as its `data`. Wait for CI with a signal and a `timeoutMinutes`, not with a command that polls.
 
 ## Sections
 

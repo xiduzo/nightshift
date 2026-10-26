@@ -2081,6 +2081,7 @@ describe("validateFlow: wait nodes", () => {
 			{ kind: "time", at: "{{deploy_window}}" },
 			{ kind: "command", command: "gh pr checks 1", everyMinutes: 5 },
 			{ kind: "signal", name: "deploy-finished" },
+			{ kind: "signal", name: "pr-checked", key: "{{deploy_window}}" },
 		]) {
 			const parsed = parseFlow({
 				...base,
@@ -2136,7 +2137,7 @@ describe("validateFlow: wait nodes", () => {
 		]);
 	});
 
-	test("the time and the command are templates over known names", () => {
+	test("the time, the command and the key are templates over known names", () => {
 		const issues = validateFlow(
 			flow(
 				[
@@ -2146,8 +2147,9 @@ describe("validateFlow: wait nodes", () => {
 						command: "gh pr checks {{ghost.pr}}",
 						everyMinutes: 5,
 					}),
+					wait("ci", { kind: "signal", name: "ci-done", key: "{{ghost.sha}}" }),
 				],
-				[edge("a", "at", "done", "poll")],
+				[edge("a", "at", "done", "poll"), edge("b", "poll", "done", "ci")],
 				"at",
 			),
 		);
@@ -2156,6 +2158,7 @@ describe("validateFlow: wait nodes", () => {
 		).toEqual([
 			["at", expect.stringContaining("{{ghost.when}}")],
 			["poll", expect.stringContaining("{{ghost.pr}}")],
+			["ci", expect.stringContaining("{{ghost.sha}}")],
 		]);
 	});
 

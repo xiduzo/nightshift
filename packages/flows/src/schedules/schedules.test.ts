@@ -21,6 +21,9 @@ import {
 } from "./schedules";
 
 /** Where the schedules of a repo live: `.nightshift/schedules.json`. */
+// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+const HOOK_SECRET = "${HOOK_SECRET}";
+
 const schedulesPath = (repoPath: string) =>
 	join(repoPath, ".nightshift", "schedules.json");
 
@@ -203,6 +206,98 @@ describe("validateSchedules", () => {
 		]);
 		expect(issues.every((i) => i.severity === "error")).toBe(true);
 	});
+
+	const hook = (extra: Partial<Schedule> = {}): Schedule => {
+		const { cron: _, ...rest } = schedule({
+			inputs: { epic: "{{event.body.issue.number}}" },
+		});
+		return { ...rest, webhook: { secret: HOOK_SECRET }, ...extra };
+	};
+
+	test("a webhook schedule reads the event in its inputs", () => {
+		expect(
+			validateSchedules(
+				[
+					hook({
+						inputs: {
+							epic: "#{{event.body.issue.number}}",
+							plan: "{{event.body}}",
+						},
+						webhook: {
+							secret: HOOK_SECRET,
+							when: 'event.headers.`x-github-event` = "issues"',
+						},
+						signal: { name: "issue-opened", key: "event.body.issue.number" },
+					}),
+					// A signal alone starts no flow.
+					{
+						id: "ci",
+						inputs: {},
+						enabled: true,
+						webhook: { secret: HOOK_SECRET },
+						signal: { name: "ci-done" },
+					},
+				],
+				flows,
+			),
+		).toEqual([]);
+	});
+
+	test("reports a schedule with neither or both triggers, bad rules and other names", () => {
+		const issues = validateSchedules(
+			[
+				hook({ id: "both", cron: "0 22 * * *" }),
+				{ ...hook({ id: "neither" }), webhook: undefined },
+				hook({
+					id: "rules",
+					webhook: { secret: HOOK_SECRET, when: "event.(" },
+					signal: { name: "go", key: "]" },
+				}),
+				hook({ id: "names", inputs: { epic: "{{run.branch}}" } }),
+				schedule({
+					id: "cron-signal",
+					inputs: { epic: "1" },
+					signal: { name: "go" },
+				}),
+				{ ...hook({ id: "no-flow" }), flow: undefined },
+			],
+			flows,
+		);
+		expect(issues.map((i) => [i.scheduleId, i.message])).toEqual([
+			[
+				"both",
+				"A schedule runs at set times or when a webhook arrives, not both.",
+			],
+			[
+				"neither",
+				"Choose when this schedule runs: at set times or when a webhook arrives.",
+			],
+			["rules", expect.stringContaining("The webhook's rule is not valid:")],
+			["rules", expect.stringContaining("The signal's key is not valid:")],
+			[
+				"names",
+				'The input "epic" can read only the webhook, as {{event.body.number}} or {{event.headers.x-github-event}}.',
+			],
+			[
+				"cron-signal",
+				"Only a schedule that waits for a webhook can send a signal.",
+			],
+			["no-flow", "Choose a flow."],
+		]);
+	});
+
+	test("the schema takes a secret only as a reference by name", () => {
+		const parse = (secret: string) =>
+			scheduleSchema.safeParse({
+				id: "hook",
+				flow: "night",
+				webhook: { secret },
+			}).success;
+		expect(parse(HOOK_SECRET)).toBe(true);
+		expect(parse("hunter2")).toBe(false);
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: a secret reference, as a person writes it.
+		expect(parse("${}")).toBe(false);
+	});
 });
 
 describe("the schedules file", () => {
@@ -279,12 +374,12 @@ describe("the schedules file", () => {
 
 		await writeFile(
 			schedulesPath(repo),
-			JSON.stringify({ version: 1, schedules: [{ id: "x" }] }),
+			JSON.stringify({ version: 1, schedules: [{ id: "x", flow: 7 }] }),
 		);
 		const wrong = await readSchedulesFile(repo);
 		expect(wrong.schedules).toEqual([]);
 		expect(wrong.issues.map((i) => i.message)).toContain(
-			"schedules.0.flow: Invalid input: expected string, received undefined",
+			"schedules.0.flow: Invalid input: expected string, received number",
 		);
 	});
 });

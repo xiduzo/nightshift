@@ -2,13 +2,15 @@ import { Cron } from "croner";
 import { z } from "zod";
 
 import type { FlowInputDef } from "../document";
-import { deviceNameSchema, flowNameSchema } from "../nodes";
+import { deviceNameSchema, flowNameSchema, labelSchema } from "../nodes";
+import { ruleProblem, templateRefs } from "../template";
 
 /**
  * The schedules file: `.nightshift/schedules.json` in the project's clone,
  * next to the flows and versioned with them. Each schedule starts one flow
- * file with fixed input values when its cron line comes due. The daemon
- * reads the file again on every tick, so an edit applies without a restart.
+ * file when its cron line comes due, or when a webhook arrives at its
+ * address (`webhook`). The daemon reads the file again on every tick and on
+ * every webhook, so an edit applies without a restart.
  *
  * ```json
  * {
@@ -22,14 +24,24 @@ import { deviceNameSchema, flowNameSchema } from "../nodes";
  *       "stopAt": "07:00",
  *       "baseRef": "main",
  *       "enabled": true
+ *     },
+ *     {
+ *       "id": "review-pr",
+ *       "flow": "review",
+ *       "inputs": { "pr": "{{event.body.pull_request.number}}" },
+ *       "webhook": {
+ *         "secret": "${GITHUB_HOOK_SECRET}",
+ *         "when": "event.body.action = \"opened\""
+ *       }
  *     }
  *   ]
  * }
  * ```
  *
  * The schema checks shape only. `validateSchedules` checks meaning (the flow
- * exists and runs, the cron line parses, the inputs fit the flow).
- * Browser-safe; file access lives in `@nightshift/flows/files`.
+ * exists and runs, the cron line parses, the inputs fit the flow, a
+ * schedule has a cron line or a webhook). Browser-safe; file access lives
+ * in `@nightshift/flows/files`.
  */
 
 export const SCHEDULES_VERSION = 1;
@@ -47,21 +59,66 @@ export const timeOfDaySchema = z
 	.string()
 	.regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM, for example 07:00.");
 
+/** A webhook's secret: one secret by name, as `${NAME}`. */
+export const webhookSecretSchema = z
+	.string()
+	.trim()
+	.regex(
+		/^\$\{[A-Za-z_][A-Za-z0-9_]{0,127}\}$/,
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: secret references, as a person writes them.
+		"Name a secret as ${NAME}, for example ${GITHUB_HOOK_SECRET}.",
+	);
+
+/**
+ * A schedule that starts when a webhook arrives at its address
+ * (`POST /hooks/<project id>/<schedule id>`). The sender proves it knows
+ * `secret`: GitHub signs the body with it (`X-Hub-Signature-256`), any
+ * other sender sends `Authorization: Bearer <secret>`. `when` is a JSONata
+ * rule over `event` (`event.body`, `event.headers`): a webhook it does not
+ * hold for is filtered out.
+ */
+export const scheduleWebhookSchema = z.object({
+	secret: webhookSecretSchema,
+	when: z.string().trim().min(1).optional(),
+});
+export type ScheduleWebhook = z.infer<typeof scheduleWebhookSchema>;
+
+/**
+ * The signal a webhook sends to the project's runs: each run whose Wait
+ * waits for `name` wakes, with the event as the Wait's `data`. `key` is a
+ * JSONata expression over `event`: then only a Wait whose own `key`
+ * renders to the same text wakes. A Wait without a key takes any.
+ */
+export const scheduleSignalSchema = z.object({
+	name: labelSchema,
+	key: z.string().trim().min(1).optional(),
+});
+export type ScheduleSignal = z.infer<typeof scheduleSignalSchema>;
+
 export const scheduleSchema = z.object({
 	id: scheduleIdSchema,
-	/** The flow file to start, by name. */
-	flow: flowNameSchema,
+	/**
+	 * The flow file to start, by name. A webhook schedule that only sends
+	 * a `signal` starts none.
+	 */
+	flow: flowNameSchema.optional(),
 	/**
 	 * Values for the flow's inputs, by name, as the start dialog sends them:
 	 * a string for a `text` input, any JSON value (or JSON text) for `json`.
-	 * Missing values take the input's default.
+	 * Missing values take the input's default. A webhook schedule's values
+	 * are templates over the event: `{{event.body.pull_request.number}}`.
 	 */
 	inputs: z.record(z.string(), z.json()).default({}),
 	/**
 	 * Five fields (minute hour day-of-month month day-of-week) in the
-	 * daemon's local time zone, for example `0 22 * * 1-5`.
+	 * daemon's local time zone, for example `0 22 * * 1-5`. A schedule has
+	 * either `cron` or `webhook`.
 	 */
-	cron: z.string().trim().min(1, "Enter a cron expression."),
+	cron: z.string().trim().min(1, "Enter a cron expression.").optional(),
+	/** Starts the run when a webhook arrives, instead of at cron times. */
+	webhook: scheduleWebhookSchema.optional(),
+	/** With `webhook`: a signal it sends as well as, or instead of, a run. */
+	signal: scheduleSignalSchema.optional(),
 	/** The stop time: the first such time of day after the run starts. */
 	stopAt: timeOfDaySchema.optional(),
 	/** The git ref to branch the worktree from. Default: the clone's current HEAD. */
@@ -286,11 +343,13 @@ function isEmpty(value: unknown): boolean {
 }
 
 /**
- * The problems of each schedule: a duplicate id, a flow that does not exist,
- * does not load or has errors, a cron line that does not parse, and input
- * values the flow does not take or lacks (a required input without a value
- * or a default), or JSON text that does not parse. `flows` holds the
- * project's flow files by name, null when one does not parse.
+ * The problems of each schedule: a duplicate id, neither or both of a cron
+ * line and a webhook, a flow that does not exist, does not load or has
+ * errors, a cron line, a webhook rule or a signal key that does not parse,
+ * and input values the flow does not take or lacks (a required input
+ * without a value or a default), JSON text that does not parse, or a
+ * webhook's template that reads something else than `event`. `flows` holds
+ * the project's flow files by name, null when one does not parse.
  */
 export function validateSchedules(
 	schedules: readonly Schedule[],
@@ -306,9 +365,38 @@ export function validateSchedules(
 		}
 		seen.add(schedule.id);
 
-		const cronProblem = cronError(schedule.cron);
-		if (cronProblem) error(`The cron expression is not valid: ${cronProblem}`);
+		const { cron, webhook, signal } = schedule;
+		if (cron !== undefined && webhook !== undefined) {
+			error(
+				"A schedule runs at set times or when a webhook arrives, not both.",
+			);
+		} else if (cron === undefined && webhook === undefined) {
+			error(
+				"Choose when this schedule runs: at set times or when a webhook arrives.",
+			);
+		}
+		if (cron !== undefined) {
+			const cronProblem = cronError(cron);
+			if (cronProblem)
+				error(`The cron expression is not valid: ${cronProblem}`);
+		}
+		if (signal !== undefined && webhook === undefined) {
+			error("Only a schedule that waits for a webhook can send a signal.");
+		}
+		const whenProblem = webhook?.when ? ruleProblem(webhook.when) : null;
+		if (whenProblem) error(`The webhook's rule is not valid: ${whenProblem}`);
+		const keyProblem = signal?.key ? ruleProblem(signal.key) : null;
+		if (keyProblem) error(`The signal's key is not valid: ${keyProblem}`);
 
+		if (schedule.flow === undefined) {
+			// A webhook that only wakes Waits starts no flow.
+			if (webhook === undefined || signal === undefined) {
+				error("Choose a flow.");
+			} else if (Object.keys(schedule.inputs).length > 0) {
+				error("A schedule without a flow has no inputs.");
+			}
+			continue;
+		}
 		if (!Object.hasOwn(flows, schedule.flow)) {
 			error(`The flow "${schedule.flow}" does not exist.`);
 			continue;
@@ -338,6 +426,16 @@ export function validateSchedules(
 					error(`The input "${input.label ?? input.name}" needs a value.`);
 				}
 				continue;
+			}
+			// A webhook's value is a template over the event, read when it arrives.
+			if (webhook !== undefined && typeof value === "string") {
+				const refs = templateRefs(value);
+				if (refs.some((ref) => ref.name !== "event")) {
+					error(
+						`The input "${input.name}" can read only the webhook, as {{event.body.number}} or {{event.headers.x-github-event}}.`,
+					);
+				}
+				if (refs.length > 0) continue;
 			}
 			if ((input.type ?? "text") === "json" && typeof value === "string") {
 				try {
