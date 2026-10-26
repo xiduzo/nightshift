@@ -1,4 +1,4 @@
-import type { Flow } from "@nightshift/flows";
+import { type Flow, nodesWithin } from "@nightshift/flows";
 import {
 	Background,
 	BackgroundVariant,
@@ -77,10 +77,10 @@ export function RunGraph({
 		if (
 			selectedNodeId &&
 			open.section &&
-			!open.section.nodes.includes(selectedNodeId)
+			!nodesWithin(flow, open.section).includes(selectedNodeId)
 		)
 			setOpenId(null);
-	}, [selectedNodeId, open.section]);
+	}, [selectedNodeId, open.section, flow]);
 
 	const runStates = useMemo(() => {
 		const states = new Map<string, NodeRunState>();
@@ -193,14 +193,14 @@ export function RunGraph({
 						measured={measured}
 						open={open.section?.id ?? null}
 						onOpen={setOpenId}
-						onClose={() => setOpenId(null)}
+						onClose={() => setOpenId(open.up)}
 						fit={FIT}
 					/>
 					{open.section ? (
 						<OpenSectionBar
-							section={open.section}
+							path={open.path}
 							flowLabel={flowLabel}
-							onClose={() => setOpenId(null)}
+							onOpen={setOpenId}
 						/>
 					) : null}
 					<Background variant={BackgroundVariant.Dots} gap={16} size={1} />

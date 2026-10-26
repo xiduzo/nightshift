@@ -14,3 +14,10 @@ export {
 	sectionBoundary,
 	sectionOf,
 } from "./shape";
+export {
+	nodesWithin,
+	parentSection,
+	sectionLevel,
+	sectionPath,
+	sectionsWithin,
+} from "./tree";

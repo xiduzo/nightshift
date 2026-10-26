@@ -140,3 +140,77 @@ describe("Sections follow node edits", () => {
 		expect("sections" in renameNode(chain, "b", "bee")).toBe(false);
 	});
 });
+
+describe("Sections inside Sections", () => {
+	const outer = (flow: Flow) =>
+		flow.sections?.find((section) => section.id === "outer");
+
+	test("a Section made of nodes inside a Section goes inside it", () => {
+		const made = addSection(chain, ["b", "c", "d"], { label: "Outer" });
+		if (!made.ok) throw new Error("no outer");
+		const inner = addSection(made.flow, ["c", "d"], { label: "Inner" });
+		if (!inner.ok) throw new Error(JSON.stringify(inner.problems));
+		expect(outer(inner.flow)).toMatchObject({
+			nodes: ["b"],
+			sections: ["inner"],
+		});
+		expect(inner.flow.sections?.at(-1)).toMatchObject({
+			id: "inner",
+			nodes: ["c", "d"],
+		});
+	});
+
+	test("a Section made of a box and nodes holds the box", () => {
+		const inner = addSection(chain, ["c", "d"], { label: "Inner" });
+		if (!inner.ok) throw new Error("no inner");
+		const made = addSection(inner.flow, ["b"], { label: "Outer" }, ["inner"]);
+		if (!made.ok) throw new Error(JSON.stringify(made.problems));
+		expect(outer(made.flow)).toMatchObject({
+			nodes: ["b"],
+			sections: ["inner"],
+		});
+	});
+
+	test("refuses nodes from different levels", () => {
+		const inner = addSection(chain, ["c", "d"], { label: "Inner" });
+		if (!inner.ok) throw new Error("no inner");
+		const made = addSection(inner.flow, ["b", "c"]);
+		expect(made.ok).toBe(false);
+		if (made.ok) return;
+		expect(made.problems[0]).toEqual({ code: "not-together" });
+	});
+
+	test("removing the outer Section keeps the inner one, on top", () => {
+		const inner = addSection(chain, ["c", "d"], { label: "Inner" });
+		if (!inner.ok) throw new Error("no inner");
+		const made = addSection(inner.flow, ["b"], { label: "Outer" }, ["inner"]);
+		if (!made.ok) throw new Error("no outer");
+		const removed = removeSection(made.flow, "outer");
+		expect(removed.sections).toEqual([
+			{ id: "inner", label: "Inner", nodes: ["c", "d"] },
+		]);
+	});
+
+	test("removing the inner Section gives its nodes to the outer one", () => {
+		const made = addSection(chain, ["b", "c", "d"], { label: "Outer" });
+		if (!made.ok) throw new Error("no outer");
+		const inner = addSection(made.flow, ["c", "d"], { label: "Inner" });
+		if (!inner.ok) throw new Error("no inner");
+		const removed = removeSection(inner.flow, "inner");
+		expect(removed.sections).toEqual([
+			{ id: "outer", label: "Outer", nodes: ["b", "c", "d"] },
+		]);
+	});
+
+	test("a Section left with nothing goes, and the mention of it too", () => {
+		const made = addSection(chain, ["b", "c"], { label: "Outer" });
+		if (!made.ok) throw new Error("no outer");
+		const inner = addSection(made.flow, ["c"], { label: "Inner" });
+		if (!inner.ok) throw new Error("no inner");
+		const without = removeNode(inner.flow, "c");
+		expect(without.sections).toEqual([
+			{ id: "outer", label: "Outer", nodes: ["b"] },
+		]);
+		expect(removeNode(without, "b").sections).toBeUndefined();
+	});
+});

@@ -1,13 +1,14 @@
 // What is selected on the editor's canvas. One node, edge or Section opens
-// the inspector. Several nodes (Shift-drag a box, or Cmd/Ctrl-click) can be
-// made into a Section.
+// the inspector. Several nodes and boxes (Shift-drag a box, or Cmd/Ctrl-
+// click) can be made into a Section.
 
 import type { Flow } from "@nightshift/flows";
 import { sectionIdOf, sectionNodeId } from "../canvas/sections/section-ids";
 
 export type Selection =
 	| { kind: "node"; id: string }
-	| { kind: "nodes"; ids: string[] }
+	/** Several: nodes, and the boxes of Sections in `sections`, if any. */
+	| { kind: "nodes"; ids: string[]; sections?: string[] }
 	| { kind: "edge"; id: string }
 	| { kind: "section"; id: string }
 	| null;
@@ -23,16 +24,25 @@ export function selectedNodeIds(selection: Selection): string[] {
 	return [];
 }
 
-/** The canvas nodes that are selected: nodes of the flow, or a Section's frame or box. */
-function canvasIds(selection: Selection): string[] {
-	if (selection?.kind === "section") return [sectionNodeId(selection.id)];
-	return selectedNodeIds(selection);
+/** The Sections whose boxes are selected, alone or with others. */
+export function selectedSectionIds(selection: Selection): string[] {
+	if (selection?.kind === "section") return [selection.id];
+	if (selection?.kind === "nodes") return selection.sections ?? [];
+	return [];
+}
+
+/** The canvas nodes that are selected: nodes of the flow, or Section boxes. */
+export function canvasIds(selection: Selection): string[] {
+	return [
+		...selectedNodeIds(selection),
+		...selectedSectionIds(selection).map(sectionNodeId),
+	];
 }
 
 /**
- * The selection after React Flow selects or unselects canvas nodes. Nodes
- * win over Sections: a box drawn around a frame and its nodes selects the
- * nodes. An edge stays selected until React Flow unselects it.
+ * The selection after React Flow selects or unselects canvas nodes. One
+ * node or one box alone is that node or Section, more are several. An
+ * edge stays selected until React Flow unselects it.
  */
 export function applyNodeSelection(
 	current: Selection,
@@ -46,9 +56,12 @@ export function applyNodeSelection(
 	}
 	const nodes = [...ids].filter((id) => sectionIdOf(id) === undefined);
 	const sections = [...ids].flatMap((id) => sectionIdOf(id) ?? []);
+	if (nodes.length + sections.length > 1)
+		return sections.length > 0
+			? { kind: "nodes", ids: nodes, sections }
+			: { kind: "nodes", ids: nodes };
 	if (nodes.length === 1) return { kind: "node", id: nodes[0] as string };
-	if (nodes.length > 1) return { kind: "nodes", ids: nodes };
-	const section = sections.at(-1);
+	const section = sections[0];
 	if (section !== undefined) return { kind: "section", id: section };
 	return current?.kind === "edge" ? current : null;
 }
@@ -62,10 +75,14 @@ export function withoutNodes(
 	if (current?.kind !== "nodes") return current;
 	const ids = current.ids.filter((id) => !gone.has(id));
 	if (ids.length === current.ids.length) return current;
-	if (ids.length === 0) return null;
-	return ids.length === 1
-		? { kind: "node", id: ids[0] as string }
-		: { kind: "nodes", ids };
+	const sections = current.sections ?? [];
+	if (ids.length + sections.length > 1)
+		return sections.length > 0
+			? { kind: "nodes", ids, sections }
+			: { kind: "nodes", ids };
+	if (ids.length === 1) return { kind: "node", id: ids[0] as string };
+	const section = sections[0];
+	return section === undefined ? null : { kind: "section", id: section };
 }
 
 /** The selection without what the flow no longer has, as after an undo. */
@@ -80,8 +97,17 @@ export function selectionIn(
 			? current
 			: null;
 	const known = new Set(flow.nodes.map((node) => node.id));
+	const kept =
+		current?.kind === "nodes" && current.sections
+			? {
+					...current,
+					sections: current.sections.filter((id) =>
+						flow.sections?.some((section) => section.id === id),
+					),
+				}
+			: current;
 	return withoutNodes(
-		current,
+		kept,
 		new Set(selectedNodeIds(current).filter((id) => !known.has(id))),
 	);
 }

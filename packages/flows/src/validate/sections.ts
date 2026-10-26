@@ -4,9 +4,10 @@ import { canMakeSection, type SectionProblem } from "../sections";
 import type { Report } from "./issues";
 
 /**
- * Unique ids, known nodes, a node in one Section only, and each Section
- * one connected part with one entry. A node that two Sections hold is
- * reported on the later Section.
+ * Unique ids, known nodes and Sections, a node or Section in one Section
+ * only, no Section inside itself, and each Section one connected part
+ * with one entry. A node or Section that two Sections hold is reported on
+ * the later Section.
  */
 export function checkSections(flow: Flow, warning: Report): void {
 	const sections = flow.sections ?? [];
@@ -23,7 +24,10 @@ export function checkSections(flow: Flow, warning: Report): void {
 	});
 
 	sections.forEach((section, index) => {
-		const check = canMakeSection(flow, section.nodes, { section: section.id });
+		const check = canMakeSection(flow, section.nodes, {
+			section: section.id,
+			sections: section.sections ?? [],
+		});
 		if (check.ok) return;
 		for (const problem of check.problems) {
 			report(problem, section, sections, index, firstIndex, warning);
@@ -64,6 +68,34 @@ function report(
 					{ ...at, nodeId: node },
 				);
 			}
+			return;
+		case "unknown-sections":
+			for (const id of problem.sections) {
+				warning(
+					`${name} holds the Section "${id}", but this flow has no Section "${id}". Remove it from ${name}.`,
+					at,
+				);
+			}
+			return;
+		case "section-in-other-section":
+			for (const { section: inner, holder } of problem.sections) {
+				const holderIndex = firstIndex.get(holder) ?? index;
+				const other = sections[holderIndex];
+				// The first Section that holds it keeps it.
+				if (holderIndex >= index || other === undefined) continue;
+				warning(
+					`Section "${inner}" is in ${nameOf(other)} and in ${name}. Put each Section in one Section only.`,
+					at,
+				);
+			}
+			return;
+		case "holds-itself":
+			warning(
+				`${name} holds itself, or a Section around it. Remove ${list(problem.sections)} from it.`,
+				at,
+			);
+			return;
+		case "not-together":
 			return;
 		case "not-connected":
 			warning(

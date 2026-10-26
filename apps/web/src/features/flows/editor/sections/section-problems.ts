@@ -41,6 +41,20 @@ export function sectionProblemText(
 			});
 			return `${sentences.join(" ")} A node can be in one Section only.`;
 		}
+		case "unknown-sections":
+			return `This flow has no Section ${quotedList(problem.sections)}. Select boxes on the canvas.`;
+		case "section-in-other-section": {
+			const sentences = problem.sections.map(({ section: id, holder }) => {
+				const inner = flow.sections?.find((s) => s.id === id);
+				const outer = flow.sections?.find((s) => s.id === holder);
+				return `The Section ${inner ? sectionName(inner) : `"${id}"`} is in ${outer ? sectionName(outer) : `"${holder}"`} already.`;
+			});
+			return `${sentences.join(" ")} A Section can be in one Section only.`;
+		}
+		case "holds-itself":
+			return "A Section cannot be inside itself.";
+		case "not-together":
+			return "Select nodes and boxes that are in the same Section, or all outside every Section.";
 		case "not-connected":
 			return "The selected nodes do not connect into one part. Add the nodes between them, or select fewer.";
 		case "no-entry":

@@ -54,6 +54,30 @@ describe("restoreSection", () => {
 	});
 });
 
+describe("restoreSection inside a Section", () => {
+	const nested: Flow = {
+		...flow,
+		sections: [
+			{ id: "outer", label: "Outer", nodes: ["a"], sections: ["inner"] },
+			{ id: "inner", label: "Inner", nodes: ["b", "c"] },
+		],
+	};
+
+	test("undoes the removal of an inner Section", () => {
+		const removed = removeSection(nested, "inner");
+		const inner = nested.sections?.[1];
+		if (!inner) throw new Error("no inner");
+		expect(restoreSection(removed, inner, 1, "outer")).toEqual(nested);
+	});
+
+	test("undoes the removal of an outer Section", () => {
+		const removed = removeSection(nested, "outer");
+		const outer = nested.sections?.[0];
+		if (!outer) throw new Error("no outer");
+		expect(restoreSection(removed, outer, 0)).toEqual(nested);
+	});
+});
+
 describe("undoSubflow", () => {
 	const caller: Flow = { ...flow, sections: [] };
 

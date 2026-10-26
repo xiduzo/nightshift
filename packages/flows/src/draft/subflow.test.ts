@@ -451,6 +451,32 @@ describe("planSubflowFromSection, small flows", () => {
 		expect(change(plan.changes, "exit-added")[0]?.endNode).toBeNull();
 	});
 
+	test("a Section inside a Section: the Call takes its place in the outer one, the inner Sections go along", () => {
+		const nested = flowOf({
+			start: "a",
+			nodes: ["a", "b", "c", "d", "e"].map((id) => command(id)),
+			edges: [
+				{ id: "ab", from: "a", outcome: "pass", to: "b" },
+				{ id: "bc", from: "b", outcome: "pass", to: "c" },
+				{ id: "cd", from: "c", outcome: "pass", to: "d" },
+				{ id: "de", from: "d", outcome: "pass", to: "e" },
+			],
+			sections: [
+				{ id: "outer", label: "Outer", nodes: ["b"], sections: ["middle"] },
+				{ id: "middle", label: "Middle", nodes: ["c"], sections: ["last"] },
+				{ id: "last", label: "Last", nodes: ["d"] },
+			],
+		});
+		const plan = planned(planSubflowFromSection(nested, "middle", plain));
+		expect(plan.subflow.nodes.map((n) => n.id)).toEqual(["c", "d"]);
+		expect(plan.subflow.sections).toEqual([
+			{ id: "last", label: "Last", nodes: ["d"] },
+		]);
+		expect(plan.caller.sections).toEqual([
+			{ id: "outer", label: "Outer", nodes: ["b", "middle"] },
+		]);
+	});
+
 	test("one exit on a failure: an end node turns it into an end the Call passes on", () => {
 		// c has one exit, a catch-all: it never ends the flow as chosen.
 		const flow = chain({

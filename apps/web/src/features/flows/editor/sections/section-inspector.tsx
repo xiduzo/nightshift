@@ -7,6 +7,7 @@ import {
 	type Flow,
 	type FlowIssue,
 	type FlowSection,
+	nodesWithin,
 	type SectionColor,
 	sectionBoundary,
 	sectionColors,
@@ -65,8 +66,8 @@ export function SectionInspector({
 	onMakeSubflow: () => void;
 }) {
 	const id = useId();
-	const known = new Set(flow.nodes.map((node) => node.id));
-	const members = section.nodes.filter((node) => known.has(node));
+	// With the nodes of the Sections inside it.
+	const members = nodesWithin(flow, section);
 	const { entry } = sectionBoundary(flow, members);
 	const name = section.label.trim() || section.id;
 

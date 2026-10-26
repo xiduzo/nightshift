@@ -47,7 +47,7 @@ export function useSectionCanvas(
 		measured,
 		editable,
 		issues,
-		selectedSection,
+		selectedSections,
 		selectedNode,
 		run,
 	}: {
@@ -56,7 +56,8 @@ export function useSectionCanvas(
 		editable: boolean;
 		/** Validation issues by Section id. */
 		issues?: ReadonlyMap<string, FlowIssue[]>;
-		selectedSection?: string | null;
+		/** The Sections whose boxes show selected. */
+		selectedSections?: readonly string[];
 		/** A box shows selected when it hides this node (run view). */
 		selectedNode?: string | null;
 		/** Run view: each node's latest step, and the node of every step in order. */
@@ -100,7 +101,7 @@ export function useSectionCanvas(
 			const id = sectionNodeId(section.id);
 			const count = section.nodes.filter((node) => known.has(node)).length;
 			const sectionIssues = issues?.get(section.id) ?? NO_ISSUES;
-			const selected = selectedSection === section.id;
+			const selected = selectedSections?.includes(section.id) ?? false;
 			const position = boxPosition(flow, section);
 			if (!position) continue;
 			boxPositions.set(id, position);
@@ -146,7 +147,7 @@ export function useSectionCanvas(
 		measured,
 		editable,
 		issues,
-		selectedSection,
+		selectedSections,
 		selectedNode,
 		run,
 	]);

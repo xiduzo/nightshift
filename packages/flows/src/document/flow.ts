@@ -150,15 +150,25 @@ export const sectionColorSchema = z.enum(sectionColors);
  * A named, coloured group of nodes of this flow, in the editor only: the
  * engine and the run do not read it. Its nodes should form one connected
  * part that the flow enters at one node (`validateFlow` warns when they do
- * not). The canvas shows it as one box. You open the box to see its nodes.
+ * not). The canvas shows it as one box. You open the box to see its nodes,
+ * and the Sections inside it as boxes of their own.
  */
 export const flowSectionSchema = z.object({
 	id: z.string().min(1),
 	label: z.string(),
 	color: sectionColorSchema.optional(),
 	description: z.string().optional(),
-	/** The ids of the nodes in the Section. A node is in at most one Section. */
+	/**
+	 * The ids of the nodes in the Section itself. A node is in at most one
+	 * Section: the lowest one that holds it.
+	 */
 	nodes: z.array(nodeIdSchema),
+	/**
+	 * The ids of the Sections inside this one. A Section is inside at most
+	 * one other. Optional, so a Section without Sections inside keeps its
+	 * place in the file as it is.
+	 */
+	sections: z.array(z.string().min(1)).optional(),
 });
 
 export const flowSchema = z.object({

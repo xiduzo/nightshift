@@ -1,38 +1,37 @@
-// An open Section: the canvas shows only its nodes, as if you stepped
-// inside it. Zoom far into its box and it opens. Zoom far out of an
-// open Section and you are back on the whole flow. Like a network inside a
-// component in TouchDesigner, but the flow file does not change: only the
-// view does.
+// An open Section: the canvas shows only what is inside it, as if you
+// stepped inside. Its nodes show, and the Sections inside it as boxes.
+// Zoom far into a box and it opens. Zoom far out of an open Section and
+// you are one level up, on the Section around it or the whole flow. Like a
+// network inside a component in TouchDesigner, but the flow file does not
+// change: only the view does.
 
-import type { Flow, FlowSection } from "@nightshift/flows";
+import {
+	type Flow,
+	type FlowSection,
+	parentSection,
+	sectionLevel,
+	sectionPath,
+} from "@nightshift/flows";
 import { useMemo } from "react";
 
-/** The part of the flow a Section holds: its nodes and the edges between them. */
-export function sectionPart(flow: Flow, section: FlowSection): Flow {
-	const members = new Set(section.nodes);
-	return {
-		...flow,
-		nodes: flow.nodes.filter((node) => members.has(node.id)),
-		edges: flow.edges.filter(
-			(edge) => members.has(edge.from) && members.has(edge.to),
-		),
-		sections: undefined,
-	};
-}
-
 /**
- * The open Section of `flow`, and what the canvas shows: its part, or the
- * whole flow when no Section is open or the open one is gone.
+ * The open Section of `flow`, the Sections around it (outermost first,
+ * ending with it), and what the canvas shows: one level of the nesting
+ * (`sectionLevel`). The whole flow when no Section is open or the open
+ * one is gone.
  */
 export function useOpenSection(flow: Flow, openId: string | null) {
-	const section = openId
-		? (flow.sections?.find((candidate) => candidate.id === openId) ?? null)
-		: null;
-	const view = useMemo(
-		() => (section ? sectionPart(flow, section) : flow),
-		[flow, section],
-	);
-	return { section, view };
+	return useMemo(() => {
+		const path = openId ? sectionPath(flow, openId) : [];
+		const section: FlowSection | null = path.at(-1) ?? null;
+		return {
+			section,
+			path,
+			/** The level one step out: the Section around it, or null for the whole flow. */
+			up: section ? (parentSection(flow, section.id)?.id ?? null) : null,
+			view: sectionLevel(flow, section?.id ?? null),
+		};
+	}, [flow, openId]);
 }
 
 type Size = { width: number; height: number };

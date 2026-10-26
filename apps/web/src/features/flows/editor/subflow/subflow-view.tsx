@@ -465,14 +465,14 @@ function ReadOnlyCanvas({
 						measured={measured}
 						open={open.section?.id ?? null}
 						onOpen={setOpenId}
-						onClose={() => setOpenId(null)}
+						onClose={() => setOpenId(open.up)}
 						fit={FIT}
 					/>
 					{open.section ? (
 						<OpenSectionBar
-							section={open.section}
+							path={open.path}
 							flowLabel={name}
-							onClose={() => setOpenId(null)}
+							onOpen={setOpenId}
 						/>
 					) : null}
 				</ReactFlow>

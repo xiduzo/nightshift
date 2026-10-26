@@ -1,5 +1,6 @@
 /** Copy and paste of nodes: within one flow, or from one flow into another. */
 import type { Flow, FlowEdge, FlowNode, FlowSection } from "../document";
+import { nodesWithin } from "../sections";
 import { uniqueEdgeId, uniqueNodeId } from "./names";
 import type { Position } from "./nodes";
 import { rewriteRefs, rewriteTemplates } from "./refs";
@@ -7,7 +8,8 @@ import { uniqueSectionId } from "./sections";
 
 /**
  * Nodes as they were copied: the edges between them, and the Sections
- * they fill completely. Edges to nodes that were not copied stay behind.
+ * they fill completely, with the Sections inside those. Edges to nodes
+ * that were not copied stay behind.
  */
 export type FlowClip = {
 	nodes: FlowNode[];
@@ -26,10 +28,25 @@ export function copyNodes(flow: Flow, ids: readonly string[]): FlowClip | null {
 		edges: flow.edges.filter(
 			(edge) => copied.has(edge.from) && copied.has(edge.to),
 		),
-		sections: (flow.sections ?? []).filter((section) =>
-			section.nodes.every((id) => copied.has(id)),
-		),
+		sections: copiedSections(flow, copied),
 	};
+}
+
+/** The Sections whose nodes were all copied, holding only copied Sections. */
+function copiedSections(
+	flow: Flow,
+	copied: ReadonlySet<string>,
+): FlowSection[] {
+	const whole = (flow.sections ?? []).filter((section) => {
+		const nodes = nodesWithin(flow, section);
+		return nodes.length > 0 && nodes.every((id) => copied.has(id));
+	});
+	const kept = new Set(whole.map((section) => section.id));
+	return whole.map((section) => {
+		const { sections: inner, ...rest } = section;
+		const sections = (inner ?? []).filter((id) => kept.has(id));
+		return sections.length > 0 ? { ...rest, sections } : rest;
+	});
 }
 
 /**
@@ -88,12 +105,31 @@ export function pasteNodes(
 	}
 	// A pasted Section has no edge in yet: the issues ask for one, as they
 	// do for a Section whose nodes no longer form one.
+	const sectionNames = new Map<string, string>();
 	for (const section of clip.sections) {
 		const id = uniqueSectionId(next, section.id);
+		sectionNames.set(section.id, id);
 		const nodes = section.nodes.flatMap((node) => names.get(node) ?? []);
 		next = {
 			...next,
 			sections: [...(next.sections ?? []), { ...section, id, nodes }],
+		};
+	}
+	// The pasted Sections hold each other under their new ids.
+	if (clip.sections.some((section) => section.sections)) {
+		const pastedIds = new Set(sectionNames.values());
+		next = {
+			...next,
+			sections: (next.sections ?? []).map((section) =>
+				pastedIds.has(section.id) && section.sections
+					? {
+							...section,
+							sections: section.sections.flatMap(
+								(id) => sectionNames.get(id) ?? [],
+							),
+						}
+					: section,
+			),
 		};
 	}
 	const ids = [...names.values()];

@@ -6,6 +6,7 @@
  */
 import type { Flow, FlowEdge, FlowSection } from "../document";
 import { nodeOutcomes } from "../document";
+import { findSection, nodesWithin, sectionPath } from "./tree";
 
 /**
  * Why a set of nodes cannot be a Section. Codes, not words: the editor
@@ -13,6 +14,11 @@ import { nodeOutcomes } from "../document";
  * - `empty`: no nodes.
  * - `unknown-nodes`: ids that are not nodes of the flow.
  * - `in-other-section`: nodes that another Section holds already.
+ * - `unknown-sections`: ids that are not Sections of the flow.
+ * - `section-in-other-section`: Sections that another Section holds already.
+ * - `holds-itself`: the Section itself, or a Section around it.
+ * - `not-together`: the nodes and Sections are not all in the same
+ *   Section, or not all outside every Section.
  * - `not-connected`: the nodes fall apart in `parts` (edges between them,
  *   in either direction, connect them).
  * - `no-entry`: no edge from outside leads in, and the start is not in it.
@@ -25,6 +31,13 @@ export type SectionProblem =
 			code: "in-other-section";
 			nodes: { node: string; section: string }[];
 	  }
+	| { code: "unknown-sections"; sections: string[] }
+	| {
+			code: "section-in-other-section";
+			sections: { section: string; holder: string }[];
+	  }
+	| { code: "holds-itself"; sections: string[] }
+	| { code: "not-together" }
 	| { code: "not-connected"; parts: string[][] }
 	| { code: "no-entry" }
 	| { code: "several-entries"; entries: string[] };
@@ -39,12 +52,21 @@ export type SectionCheckOptions = {
 	 * own nodes do not count as "in another Section".
 	 */
 	section?: string;
+	/** The ids of the Sections that go inside it. */
+	sections?: readonly string[];
+	/**
+	 * The Section the nodes and Sections move out of, to be inside the new
+	 * one: holding them there does not count as "in another Section".
+	 */
+	from?: string;
 };
 
 /**
- * Whether `nodeIds` can be a Section of `flow`: known nodes, none in
- * another Section, one connected part, and one entry. Returns the entry,
- * else every problem found. Unknown ids are left out of the other checks.
+ * Whether `nodeIds`, with the Sections `options.sections` inside, can be a
+ * Section of `flow`: known nodes and Sections, none in another Section,
+ * no Section inside itself, and all their nodes one connected part with
+ * one entry. Returns the entry, else every problem found. Unknown ids are
+ * left out of the other checks.
  */
 export function canMakeSection(
 	flow: Flow,
@@ -53,19 +75,62 @@ export function canMakeSection(
 ): SectionCheck {
 	const problems: SectionProblem[] = [];
 	const known = new Set(flow.nodes.map((node) => node.id));
-	const members = unique(nodeIds).filter((id) => known.has(id));
+	const own = unique(nodeIds).filter((id) => known.has(id));
 	const unknown = unique(nodeIds).filter((id) => !known.has(id));
 	if (unknown.length > 0)
 		problems.push({ code: "unknown-nodes", nodes: unknown });
+
+	const childIds = unique(options.sections ?? []);
+	const unknownSections = childIds.filter(
+		(id) => findSection(flow, id) === undefined,
+	);
+	if (unknownSections.length > 0)
+		problems.push({ code: "unknown-sections", sections: unknownSections });
+	// The Section and those around it cannot be inside it.
+	const around = new Set(
+		options.section === undefined
+			? []
+			: sectionPath(flow, options.section).map((section) => section.id),
+	);
+	const loops = childIds.filter((id) => around.has(id));
+	if (loops.length > 0)
+		problems.push({ code: "holds-itself", sections: loops });
+	const children = childIds.flatMap((id) => {
+		const child = findSection(flow, id);
+		return child && !around.has(id) ? [child] : [];
+	});
+
+	const mine = new Set(
+		[options.section, options.from].filter(
+			(id): id is string => id !== undefined,
+		),
+	);
+	const heldSections: { section: string; holder: string }[] = [];
+	for (const child of children) {
+		const holder = (flow.sections ?? []).find(
+			(section) =>
+				!mine.has(section.id) &&
+				section.id !== child.id &&
+				(section.sections ?? []).includes(child.id),
+		);
+		if (holder) heldSections.push({ section: child.id, holder: holder.id });
+	}
+	if (heldSections.length > 0)
+		problems.push({ code: "section-in-other-section", sections: heldSections });
+
+	const members = unique([
+		...own,
+		...children.flatMap((child) => nodesWithin(flow, child)),
+	]);
 	if (members.length === 0) {
 		problems.push({ code: "empty" });
 		return { ok: false, problems };
 	}
 
 	const taken: { node: string; section: string }[] = [];
-	for (const id of members) {
+	for (const id of own) {
 		const other = (flow.sections ?? []).find(
-			(section) => section.id !== options.section && section.nodes.includes(id),
+			(section) => !mine.has(section.id) && section.nodes.includes(id),
 		);
 		if (other) taken.push({ node: id, section: other.id });
 	}
@@ -171,7 +236,11 @@ export function sectionBoundary(
 	};
 }
 
-/** The Section that holds the node, if any: the first one that lists it. */
+/**
+ * The Section that holds the node, if any: the first one that lists it.
+ * That is the lowest Section around the node; `sectionPath` gives the
+ * ones around it.
+ */
 export function sectionOf(flow: Flow, nodeId: string): FlowSection | undefined {
 	return (flow.sections ?? []).find((section) =>
 		section.nodes.includes(nodeId),

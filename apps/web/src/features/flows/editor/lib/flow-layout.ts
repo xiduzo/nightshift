@@ -32,6 +32,7 @@ import {
 	moveNode,
 	nodeOutcomes,
 	sectionBoundary,
+	sectionLevel,
 } from "@nightshift/flows";
 import type {
 	ElkExtendedEdge,
@@ -741,13 +742,22 @@ export type LayoutFlowOptions = FlowGraphOptions & {
 	viewport?: Size;
 };
 
+/** The routes inside one open Section. */
+export type LaidLevel = {
+	/** What the Section shows open: its nodes, and its Sections as boxes. */
+	flow: Flow;
+	/** By pair key. */
+	routes: Map<string, EdgeRoute>;
+};
+
 export type LaidFlow = {
 	flow: Flow;
 	/** By pair key. An edge between two nodes of one folded Section has none. */
 	routes: Map<string, EdgeRoute>;
-	/** By pair key: the edges inside folded Sections, routed for when the
-	 *  Section opens. Their ends are nodes, never a box. */
-	inside: Map<string, EdgeRoute>;
+	/** The edges inside folded Sections, routed for when the Section
+	 *  opens: one entry per Section, at any depth, with what that Section
+	 *  shows open (`sectionLevel`), whose boxes are the ends. */
+	inside: LaidLevel[];
 	direction?: Direction;
 	/** By Section id, on the canvas grid. Sections the layout left out (see
 	 *  `layoutSections`) have none. */
@@ -769,35 +779,32 @@ export async function layoutFlow(
 	{ layout, viewport, ...options }: LayoutFlowOptions,
 ): Promise<LaidFlow> {
 	if (flow.nodes.length === 0) {
-		return { flow, routes: new Map(), inside: new Map(), sections: new Map() };
+		return { flow, routes: new Map(), inside: [], sections: new Map() };
 	}
+	// Sections inside Sections: the top level shows the outer ones only.
+	const level = sectionLevel(flow, null);
 	const { boxes, routes, direction } = await layoutBest(
 		layout,
-		flowGraph(flow, options),
+		flowGraph(level, options),
 		viewport,
 	);
 
 	const at = new Map<string, Point>();
-	const inside = new Map<string, EdgeRoute>();
+	const inside: LaidLevel[] = [];
 	const sections = new Map<string, SectionBox>();
-	for (const section of layoutSections(flow)) {
+	for (const section of layoutSections(level)) {
 		const box = boxes.get(sectionNodeId(section.id));
 		if (!box) continue;
 		const folded = options.folded?.has(section.id) ?? false;
 		if (folded) {
 			// Its members get a layout of their own, left to right as in an
 			// open frame, with its top-left corner on the box.
-			const laid = await layoutInside(layout, flow, section, options);
+			const laid = await layoutInside(layout, flow, section.id, options);
 			const shift = { x: snap(box.x), y: snap(box.y) };
-			for (const [id, member] of laid.boxes) {
-				at.set(id, {
-					x: shift.x + snap(member.x),
-					y: shift.y + snap(member.y),
-				});
+			for (const [id, member] of laid.at) {
+				at.set(id, { x: shift.x + member.x, y: shift.y + member.y });
 			}
-			for (const [key, route] of laid.routes) {
-				inside.set(key, moveRoute(route, shift));
-			}
+			for (const each of laid.levels) inside.push(moveLevel(each, shift));
 			sections.set(section.id, {
 				x: snap(box.x),
 				y: snap(box.y),
@@ -832,27 +839,60 @@ export async function layoutFlow(
 }
 
 /**
- * The members of one Section, and the edges between them, laid out left to
- * right on their own, from 0, 0. The member the Section starts at comes
- * first.
+ * What one Section holds, laid out left to right on its own, from 0, 0:
+ * its nodes, and the Sections inside it as boxes, each laid out inside the
+ * same way. The node the Section starts at comes first. Where each node
+ * goes, on the grid, and the routes of each level.
  */
 async function layoutInside(
 	layout: ElkLayout,
 	flow: Flow,
-	section: FlowSection,
+	sectionId: string,
 	{ sizes, handles }: FlowGraphOptions,
-): Promise<Laid> {
-	const members = new Set(section.nodes);
-	const part: Flow = {
-		...flow,
-		start: sectionBoundary(flow, section.nodes).entry ?? section.nodes[0] ?? "",
-		nodes: flow.nodes.filter((node) => members.has(node.id)),
-		edges: flow.edges.filter(
-			(edge) => members.has(edge.from) && members.has(edge.to),
+): Promise<{ at: Map<string, Point>; levels: LaidLevel[] }> {
+	const part = sectionLevel(flow, sectionId);
+	const members = part.nodes.map((node) => node.id);
+	const graph = flowGraph(
+		{
+			...part,
+			start: sectionBoundary(flow, members).entry ?? members[0] ?? "",
+		},
+		{
+			sizes,
+			handles,
+			folded: new Set((part.sections ?? []).map((inner) => inner.id)),
+		},
+	);
+	const laid = await layoutBest(layout, graph);
+	const at = new Map<string, Point>();
+	const levels: LaidLevel[] = [{ flow: part, routes: laid.routes }];
+	for (const inner of layoutSections(part)) {
+		const box = laid.boxes.get(sectionNodeId(inner.id));
+		if (!box) continue;
+		const deeper = await layoutInside(layout, flow, inner.id, {
+			sizes,
+			handles,
+		});
+		const shift = { x: snap(box.x), y: snap(box.y) };
+		for (const [id, member] of deeper.at) {
+			at.set(id, { x: shift.x + member.x, y: shift.y + member.y });
+		}
+		for (const each of deeper.levels) levels.push(moveLevel(each, shift));
+	}
+	for (const id of members) {
+		const box = laid.boxes.get(id);
+		if (box && !at.has(id)) at.set(id, { x: snap(box.x), y: snap(box.y) });
+	}
+	return { at, levels };
+}
+
+function moveLevel(level: LaidLevel, by: Point): LaidLevel {
+	return {
+		flow: level.flow,
+		routes: new Map(
+			[...level.routes].map(([key, route]) => [key, moveRoute(route, by)]),
 		),
-		sections: undefined,
 	};
-	return layoutBest(layout, flowGraph(part, { sizes, handles }));
 }
 
 function moveRoute(route: EdgeRoute, by: Point): EdgeRoute {

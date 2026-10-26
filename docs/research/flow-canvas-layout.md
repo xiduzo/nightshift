@@ -746,7 +746,11 @@ The developer answered the open questions:
    the box takes their place again. Nothing is folded or kept per browser.
    "Lay out" lays out the nodes inside each box too.
 2. **Section membership:** a Section is one connected part with one entry.
-   The editor refuses a selection that is not.
+   The editor refuses a selection that is not. *Added 2026-10-26:* a
+   Section can hold other Sections (`sections` on the Section). A node is
+   in the lowest Section that holds it. Inside an open Section, the inner
+   ones show as boxes. Zoom out goes up one level, and the breadcrumb shows
+   every level.
 3. **Edge labels:** the canvas may hide labels that the node rows already
    show. Labels stay on merged edges, `max`, run counts, and hover or
    selection.

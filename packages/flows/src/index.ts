@@ -243,13 +243,17 @@ export {
 	timeAndDaysToCron,
 } from "./schedules";
 export {
+	nodesWithin,
+	parentSection,
 	type SectionBoundary,
 	type SectionCheck,
 	type SectionCheckOptions,
 	type SectionExit,
 	type SectionProblem,
 	sectionBoundary,
+	sectionLevel,
 	sectionOf,
+	sectionPath,
 } from "./sections";
 export {
 	applyVariableWrites,

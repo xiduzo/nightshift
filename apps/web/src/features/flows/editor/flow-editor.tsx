@@ -10,6 +10,7 @@ import {
 	isSavable,
 	newElementFlow,
 	newFlow,
+	parentSection,
 	removeEdge,
 	removeNode,
 	sectionOf,
@@ -75,7 +76,12 @@ import { ProjectFlowsContext } from "./project-flows-context";
 import { MakeSubflowDialog } from "./sections/make-subflow-dialog";
 import { sectionEdits } from "./sections/section-edits";
 import { SectionInspector } from "./sections/section-inspector";
-import { type Selection, selectedNodeIds, selectionIn } from "./selection";
+import {
+	type Selection,
+	selectedNodeIds,
+	selectedSectionIds,
+	selectionIn,
+} from "./selection";
 import { SubflowView } from "./subflow/subflow-view";
 import { useSubflowStack } from "./subflow/use-subflow-stack";
 import { useEditorData } from "./use-editor-data";
@@ -129,7 +135,8 @@ function Editor({
 	const [subflowOf, setSubflowOf] = useState<string | null>(null);
 	// The Section whose nodes alone show on the canvas.
 	const [openSection, setOpenSection] = useState<string | null>(null);
-	// A node added or pasted while a Section is open joins it.
+	// A node added or pasted while a Section is open joins it, unless it
+	// came in a pasted Section: then that Section joins it.
 	const setDraftInOpen = useCallback<typeof setDraft>(
 		(change, gesture) =>
 			setDraft((current) => {
@@ -140,11 +147,19 @@ function Editor({
 				const before = new Set(current.nodes.map((node) => node.id));
 				const added = next.nodes
 					.map((node) => node.id)
-					.filter((id) => !before.has(id));
-				if (added.length === 0) return next;
+					.filter((id) => !before.has(id) && !sectionOf(next, id));
+				const had = new Set((current.sections ?? []).map((s) => s.id));
+				const addedSections = (next.sections ?? [])
+					.filter((s) => !had.has(s.id) && !parentSection(next, s.id))
+					.map((s) => s.id)
+					.filter((id) => id !== section);
+				if (added.length === 0 && addedSections.length === 0) return next;
 				return updateSection(next, section, (s) => ({
 					...s,
 					nodes: [...s.nodes, ...added],
+					...(addedSections.length > 0 && {
+						sections: [...(s.sections ?? []), ...addedSections],
+					}),
 				}));
 			}, gesture),
 		[setDraft, openSection],
@@ -294,8 +309,11 @@ function Editor({
 	const subflowSection = draft.sections?.find(
 		(section) => section.id === subflowOf,
 	);
-	const makeSection = (nodeIds: readonly string[]) => {
-		const id = sections.makeSection(nodeIds);
+	const makeSection = (
+		nodeIds: readonly string[],
+		sectionIds: readonly string[] = [],
+	) => {
+		const id = sections.makeSection(nodeIds, sectionIds);
 		if (id) setMadeSection(id);
 	};
 	const makeSectionRef = useRef(makeSection);
@@ -326,15 +344,16 @@ function Editor({
 				if (edits[edit]()) event.preventDefault();
 				return;
 			}
-			// Cmd/Ctrl+G: make a Section of the selected nodes.
+			// Cmd/Ctrl+G: make a Section of the selected nodes and boxes.
 			if (key === "g" && mod && !event.shiftKey && !event.altKey) {
 				const target = event.target as HTMLElement | null;
 				if (target?.closest("input, textarea, [contenteditable='true']"))
 					return;
 				const ids = selectedNodeIds(selectionRef.current);
-				if (ids.length === 0) return;
+				const sectionIds = selectedSectionIds(selectionRef.current);
+				if (ids.length + sectionIds.length === 0) return;
 				event.preventDefault();
-				makeSectionRef.current(ids);
+				makeSectionRef.current(ids, sectionIds);
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
@@ -888,6 +907,6 @@ function ignoreChange() {}
 function selectionKey(selection: Selection): string {
 	if (!selection) return "flow";
 	return selection.kind === "nodes"
-		? `nodes:${selection.ids.join(",")}`
+		? `nodes:${selection.ids.join(",")}:${(selection.sections ?? []).join(",")}`
 		: `${selection.kind}:${selection.id}`;
 }

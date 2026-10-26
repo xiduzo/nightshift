@@ -177,3 +177,32 @@ describe("Sections in the file", () => {
 		expect(result.issues[0]?.message).toStartWith("sections.0.color:");
 	});
 });
+
+describe("Sections inside Sections", () => {
+	test("a valid nesting has no issues", () => {
+		const flow = flowWith([
+			{ id: "inner", label: "Inner", nodes: ["c", "d"] },
+			{ id: "outer", label: "Outer", nodes: ["b"], sections: ["inner"] },
+		]);
+		expect(sectionIssues(flow)).toEqual([]);
+	});
+
+	test("warns on an unknown Section, one held twice, and one inside itself", () => {
+		const messages = sectionIssues(
+			flowWith([
+				{ id: "inner", label: "Inner", nodes: ["c"] },
+				{ id: "x", label: "X", nodes: ["b"], sections: ["inner", "nope"] },
+				{ id: "y", label: "Y", nodes: ["d"], sections: ["inner", "y"] },
+			]),
+		).map((issue) => issue.message);
+		expect(messages).toContain(
+			'Section "X" holds the Section "nope", but this flow has no Section "nope". Remove it from Section "X".',
+		);
+		expect(messages).toContain(
+			'Section "inner" is in Section "X" and in Section "Y". Put each Section in one Section only.',
+		);
+		expect(messages).toContain(
+			'Section "Y" holds itself, or a Section around it. Remove "y" from it.',
+		);
+	});
+});

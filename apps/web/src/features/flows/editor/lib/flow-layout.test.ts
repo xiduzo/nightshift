@@ -5,6 +5,7 @@ import {
 	type Flow,
 	type FlowEdge,
 	nodeOutcomes,
+	nodesWithin,
 } from "@nightshift/flows";
 import type { ElkNode } from "elkjs/lib/elk-api.js";
 
@@ -394,7 +395,9 @@ describe("Sections", () => {
 		const owner = new Map<string, string>();
 		for (const id of sections.keys()) {
 			const section = laid.sections?.find((candidate) => candidate.id === id);
-			for (const node of section?.nodes ?? []) owner.set(node, id);
+			// With the nodes of the Sections inside it.
+			const nodes = section ? nodesWithin(laid, section) : [];
+			for (const node of nodes) owner.set(node, id);
 		}
 		const visible: [string, Box][] = [];
 		for (const [id, box] of sections) visible.push([`section ${id}`, box]);
@@ -629,7 +632,9 @@ describe("Sections", () => {
 					const from = boxOf.get(group.from);
 					if (from && from === boxOf.get(group.to)) {
 						expect(laid.routes.has(group.key)).toBe(false);
-						expect(laid.inside.has(group.key)).toBe(true);
+						expect(
+							laid.inside.some((level) => level.routes.has(group.key)),
+						).toBe(true);
 						continue;
 					}
 					if (laid.direction !== "wrapped") {
@@ -651,6 +656,50 @@ describe("Sections", () => {
 				);
 			}
 		}
+	});
+
+	test("lays out a Section inside a Section, each inside its own box", async () => {
+		// Review inside Build: Build holds its own nodes and the Review box.
+		const nested = sectioned([
+			{
+				id: "make",
+				label: "Build",
+				nodes: ["build", "stack", "scope"],
+				sections: ["review"],
+			},
+			{ id: "review", label: "Review", nodes: ["security", "code", "verdict"] },
+		]);
+		const laid = await layoutFlow(nested, {
+			layout,
+			folded: new Set(["make", "review"]),
+		});
+		expectTidy(laid);
+		// The top level shows Build only, with all six nodes inside.
+		expect([...laid.sections.keys()]).toEqual(["make"]);
+		const make = laid.sections.get("make") as Box;
+		const six = laid.flow.nodes.filter((n) =>
+			["build", "stack", "scope", "security", "code", "verdict"].includes(n.id),
+		);
+		expect(Math.min(...six.map((n) => n.position.x))).toBe(make.x);
+		expect(Math.min(...six.map((n) => n.position.y))).toBe(make.y);
+		expectApart({ ...laid.flow, nodes: six });
+		// One level for Build open (Review a box in it), one for Review open.
+		const [buildOpen, reviewOpen] = laid.inside;
+		expect(buildOpen?.flow.sections?.map((s) => s.id)).toEqual(["review"]);
+		expect(reviewOpen?.flow.nodes.map((n) => n.id).sort()).toEqual([
+			"code",
+			"security",
+			"verdict",
+		]);
+		// An edge between two Review nodes routes on the Review level only.
+		const inReview = groupEdges(nested).find(
+			(g) =>
+				["security", "code", "verdict"].includes(g.from) &&
+				["security", "code", "verdict"].includes(g.to),
+		);
+		if (!inReview) throw new Error("no edge inside Review");
+		expect(reviewOpen?.routes.has(inReview.key)).toBe(true);
+		expect(buildOpen?.routes.has(inReview.key)).toBe(false);
 	});
 
 	test("lays out the nodes of a Section it cannot keep as loose nodes", async () => {

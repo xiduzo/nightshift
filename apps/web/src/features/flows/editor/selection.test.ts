@@ -26,7 +26,7 @@ describe("applyNodeSelection", () => {
 		).toEqual({ kind: "node", id: "b" });
 	});
 
-	test("a Section's frame selects the Section", () => {
+	test("a Section's box selects the Section", () => {
 		expect(applyNodeSelection(null, [on("section:review")])).toEqual({
 			kind: "section",
 			id: "review",
@@ -38,10 +38,18 @@ describe("applyNodeSelection", () => {
 		).toBeNull();
 	});
 
-	test("nodes win over a frame in the same box", () => {
+	test("boxes and nodes together are several, to make a Section of", () => {
 		expect(
 			applyNodeSelection(null, [on("section:review"), on("ux"), on("code")]),
-		).toEqual({ kind: "nodes", ids: ["ux", "code"] });
+		).toEqual({ kind: "nodes", ids: ["ux", "code"], sections: ["review"] });
+		expect(
+			applyNodeSelection(null, [on("section:review"), on("section:ship")]),
+		).toEqual({ kind: "nodes", ids: [], sections: ["review", "ship"] });
+		expect(
+			applyNodeSelection({ kind: "nodes", ids: ["ux"], sections: ["review"] }, [
+				off("ux"),
+			]),
+		).toEqual({ kind: "section", id: "review" });
 	});
 
 	test("unselecting every node leaves nothing, an edge stays", () => {

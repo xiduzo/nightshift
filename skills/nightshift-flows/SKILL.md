@@ -130,7 +130,7 @@ A variable is a named, typed value the flow keeps while it runs. Declare it in `
 
 ## Sections
 
-`{ id, label, color?, description?, nodes }`: a frame around nodes, for the editor only. A node is in at most one Section. Its nodes should form one connected part that the flow enters at one node. Colours: `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `violet`, `pink`. Outcome colours: `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `pink`, `gray`.
+`{ id, label, color?, description?, nodes, sections? }`: a box around nodes, for the editor only. `sections` lists the ids of the Sections inside it. A node is in one Section at most: the lowest one that holds it. A Section is inside one other at most. All its nodes, also those of the Sections inside, should form one connected part that the flow enters at one node. Colours: `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `violet`, `pink`. Outcome colours: `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `pink`, `gray`.
 
 ## Checklist
 

@@ -51,9 +51,12 @@ import {
 } from "../nodes";
 import {
 	canMakeSection,
+	nodesWithin,
+	parentSection,
 	type SectionExit,
 	type SectionProblem,
 	sectionBoundary,
+	sectionsWithin,
 } from "../sections";
 import {
 	ruleNames,
@@ -67,7 +70,7 @@ import {
 	validateFlow,
 } from "../validate";
 import { rewriteOwnTemplates, rewriteRefs, rewriteTemplates } from "./refs";
-import { removeSection } from "./sections";
+import { removeSectionAndInside, updateSection } from "./sections";
 
 export type SubflowOptions = {
 	/** The new flow's file name, without `.json`. */
@@ -285,7 +288,10 @@ export function planSubflowFromSection(
 	) {
 		blockers.push({ code: "name-taken", name });
 	}
-	const check = canMakeSection(flow, section.nodes, { section: sectionId });
+	const check = canMakeSection(flow, section.nodes, {
+		section: sectionId,
+		sections: section.sections ?? [],
+	});
 	if (!check.ok) {
 		blockers.push({ code: "section-not-valid", problems: check.problems });
 		return { ok: false, blockers };
@@ -298,7 +304,12 @@ export function planSubflowFromSection(
 		return { ok: false, blockers };
 	}
 
-	const plan = new Planner(flow, section.nodes, check.entry, options);
+	const plan = new Planner(
+		flow,
+		nodesWithin(flow, section),
+		check.entry,
+		options,
+	);
 	blockers.push(...plan.blockers());
 	if (blockers.length > 0) return { ok: false, blockers };
 	return plan.build(sectionId, section.label, section.description, blockers);
@@ -910,6 +921,9 @@ class Planner {
 			});
 		}
 
+		// The Sections inside the Section go along, the outer ones now on top.
+		const own = flow.sections?.find((section) => section.id === sectionId);
+		const inside = own ? sectionsWithin(flow, own) : [];
 		const subflowDraft: Flow = {
 			version: FLOW_VERSION,
 			...(sectionDescription !== undefined &&
@@ -930,6 +944,7 @@ class Planner {
 				...endNodes.values(),
 			],
 			edges: subEdges,
+			...(inside.length > 0 && { sections: inside }),
 		};
 
 		// The caller: the Call (and the Decision) in place of the Section.
@@ -1028,7 +1043,10 @@ class Planner {
 		if (decisionId !== null && !callEdgeAdded)
 			callerEdges.push(callEdge(decisionId));
 
-		const callerDraft = removeSection(
+		// The Call (and the Decision) take the Section's place in the Section
+		// around it, if any.
+		const around = parentSection(flow, sectionId);
+		const withoutSection = removeSectionAndInside(
 			{
 				...flow,
 				start: members.has(flow.start) ? callId : flow.start,
@@ -1041,6 +1059,16 @@ class Planner {
 			},
 			sectionId,
 		);
+		const callerDraft = around
+			? updateSection(withoutSection, around.id, (holder) => ({
+					...holder,
+					nodes: [
+						...holder.nodes,
+						callId,
+						...(decisionId === null ? [] : [decisionId]),
+					],
+				}))
+			: withoutSection;
 
 		// A loop through the Call needs a limit outside the Section.
 		const unbounded = loopsBack(callerDraft, callId);

@@ -2,7 +2,12 @@
 // shows which Section is open. Put `SectionZoom` inside `<ReactFlow>`: it
 // reads the canvas's zoom and nodes from React Flow.
 
-import type { Flow, FlowSection } from "@nightshift/flows";
+import {
+	type Flow,
+	type FlowSection,
+	nodesWithin,
+	sectionPath,
+} from "@nightshift/flows";
 import {
 	Breadcrumb,
 	BreadcrumbItem,
@@ -19,6 +24,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@nightshift/ui/components/tooltip";
+import { cn } from "@nightshift/ui/lib/utils";
 import {
 	type FitViewOptions,
 	Panel,
@@ -26,7 +32,7 @@ import {
 	useStoreApi,
 } from "@xyflow/react";
 import { ArrowUpIcon, GroupIcon } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef } from "react";
 import { readSubflowKey } from "../../editor/subflow/use-subflow-stack";
 import type { Measured } from "../use-measured";
 import {
@@ -54,9 +60,9 @@ const BOX_FALLBACK = { width: 256, height: 160 };
 /**
  * Zoom far into a box and its Section opens: its nodes take the box's
  * place, at the box's size, and the zoom goes on inside. Zoom far out of
- * the open Section and it closes: the box takes the place of its nodes,
- * and the zoom goes on outside. `u` closes it too. Opened or closed with a
- * button or a key, the view then settles on the nodes, or on the box.
+ * the open Section and you go up one level: the box takes the place of its
+ * nodes, and the zoom goes on outside. `u` goes up too. Opened or closed
+ * with a button or a key, the view then settles on the nodes, or on the box.
  */
 export function SectionZoom({
 	flow,
@@ -73,6 +79,7 @@ export function SectionZoom({
 	/** The id of the open Section, or null on the whole flow. */
 	open: string | null;
 	onOpen: (sectionId: string) => void;
+	/** Up one level: to the Section around the open one, or the whole flow. */
 	onClose: () => void;
 	/** How a fit shows the open Section's nodes. */
 	fit: FitViewOptions;
@@ -115,7 +122,7 @@ export function SectionZoom({
 			const canvas = { width: state.width, height: state.height };
 			const { open, onOpen, onClose, fit } = latest.current;
 
-			if (event.deltaY < 0 && open === null) {
+			if (event.deltaY < 0) {
 				const rect = domNode.getBoundingClientRect();
 				const at = {
 					x: (event.clientX - rect.left - x) / zoom,
@@ -196,7 +203,23 @@ export function SectionZoom({
 		const closed = before.current;
 		before.current = open;
 		if (closed === open) return;
-		const sectionId = open ?? closed;
+		// The box that hands over: the Section one level inside the outer of
+		// the two views, on the way to the inner one. None for a jump to a
+		// Section that is not inside or around the one before.
+		const pathOf = (id: string | null) =>
+			id === null
+				? []
+				: sectionPath(latest.current.flow, id).map((section) => section.id);
+		const from = pathOf(closed);
+		const to = pathOf(open);
+		const startsWith = (path: string[], head: string[]) =>
+			head.every((id, index) => path[index] === id);
+		const opening = startsWith(to, from);
+		const sectionId = opening
+			? to[from.length]
+			: startsWith(from, to)
+				? from[to.length]
+				: undefined;
 		const viewportEl = store
 			.getState()
 			.domNode?.querySelector<HTMLElement>(".react-flow__viewport");
@@ -222,7 +245,7 @@ export function SectionZoom({
 			const { flow, measured, fit } = latest.current;
 			const section = flow.sections?.find((each) => each.id === sectionId);
 			const members = section
-				? membersBounds(flow, section.nodes, measured)
+				? membersBounds(flow, nodesWithin(flow, section), measured)
 				: null;
 			const [x, y, zoom] = state.transform;
 			const now = { x, y, zoom };
@@ -245,7 +268,7 @@ export function SectionZoom({
 				return;
 			}
 			const box = { x: members.x, y: members.y, ...boxSize(sectionId) };
-			if (open !== null) {
+			if (opening) {
 				// The nodes as measured now, in place of the box.
 				const content = nodesBounds(nodes) ?? members;
 				void setViewport(clamp(handOver(box, content, now), state));
@@ -348,20 +371,41 @@ function clamp(
 }
 
 /**
- * Over the canvas while a Section is open: where you are, and the way back
- * to the whole flow.
+ * Over the canvas while a Section is open: where you are, with a link to
+ * each level around it, and the way up one level.
  */
 export function OpenSectionBar({
-	section,
+	path,
 	flowLabel,
-	onClose,
+	onOpen,
 }: {
-	section: FlowSection;
+	/** The open Section and the Sections around it, outermost first. */
+	path: readonly FlowSection[];
 	/** What the whole flow is called in the breadcrumb, such as its name. */
 	flowLabel: string;
-	onClose: () => void;
+	/** Shows that Section, or the whole flow for null. */
+	onOpen: (sectionId: string | null) => void;
 }) {
-	const name = section.label.trim() || section.id;
+	const open = path.at(-1);
+	if (!open) return null;
+	const around = path.slice(0, -1);
+	const up = around.at(-1)?.id ?? null;
+	const link = (label: string, id: string | null, mono = false) => (
+		<BreadcrumbLink
+			render={
+				<button
+					type="button"
+					className={cn(
+						"truncate rounded-sm font-normal outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+						mono && "font-mono",
+					)}
+					onClick={() => onOpen(id)}
+				/>
+			}
+		>
+			{label}
+		</BreadcrumbLink>
+	);
 	return (
 		<Panel position="bottom-center" className="m-3! max-w-[calc(100%-1.5rem)]">
 			<Card
@@ -371,18 +415,16 @@ export function OpenSectionBar({
 				<Breadcrumb aria-label="Where in the flow" className="min-w-0">
 					<BreadcrumbList className="flex-nowrap gap-1 text-xs sm:gap-1.5">
 						<BreadcrumbItem className="shrink-0">
-							<BreadcrumbLink
-								render={
-									<button
-										type="button"
-										className="rounded-sm font-mono font-normal outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-										onClick={onClose}
-									/>
-								}
-							>
-								{flowLabel}
-							</BreadcrumbLink>
+							{link(flowLabel, null, true)}
 						</BreadcrumbItem>
+						{around.map((section) => (
+							<Fragment key={section.id}>
+								<BreadcrumbSeparator />
+								<BreadcrumbItem className="min-w-0 max-w-32">
+									{link(nameOf(section), section.id)}
+								</BreadcrumbItem>
+							</Fragment>
+						))}
 						<BreadcrumbSeparator />
 						<BreadcrumbItem className="min-w-0">
 							<BreadcrumbPage
@@ -390,24 +432,33 @@ export function OpenSectionBar({
 								className="flex min-w-0 items-center gap-1 font-medium"
 							>
 								<GroupIcon className="size-3.5 shrink-0" aria-hidden="true" />
-								<span className="truncate">{name}</span>
+								<span className="truncate">{nameOf(open)}</span>
 							</BreadcrumbPage>
 						</BreadcrumbItem>
 					</BreadcrumbList>
 				</Breadcrumb>
 				<Tooltip>
 					<TooltipTrigger
-						render={<Button variant="ghost" size="xs" onClick={onClose} />}
+						render={
+							<Button variant="ghost" size="xs" onClick={() => onOpen(up)} />
+						}
 					>
 						<ArrowUpIcon data-icon="inline-start" />
 						Go up
 					</TooltipTrigger>
 					<TooltipContent side="top">
-						Back to the whole flow. Or zoom out.
+						{up === null
+							? "Back to the whole flow. Or zoom out."
+							: "Back to the Section around it. Or zoom out."}
 						<Kbd>U</Kbd>
 					</TooltipContent>
 				</Tooltip>
 			</Card>
 		</Panel>
 	);
+}
+
+/** A Section's label, else its id. */
+function nameOf(section: FlowSection): string {
+	return section.label.trim() || section.id;
 }

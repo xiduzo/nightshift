@@ -3,9 +3,12 @@ import {
 	addEdge,
 	type FlowCheck,
 	moveNode,
+	nodesWithin,
 	removeEdge,
 	removeNode,
 	sectionBoundary,
+	sectionLevel,
+	sectionPath,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
 import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
@@ -70,9 +73,11 @@ import { layoutFlow, type NodeHandles, type Size } from "./lib/flow-layout";
 import { isNodeType, NODE_DRAG_TYPE } from "./node-dock";
 import {
 	applyNodeSelection,
+	canvasIds,
 	type Selection,
 	type SelectionSetter,
 	selectedNodeIds,
+	selectedSectionIds,
 	withoutNodes,
 } from "./selection";
 
@@ -165,7 +170,7 @@ export function EditorCanvas({
 	onFlowChange: (change: (flow: Flow) => Flow, gesture?: string) => void;
 	onSelect: SelectionSetter;
 	/** "Make section" from the selected nodes. */
-	onMakeSection: (nodeIds: string[]) => void;
+	onMakeSection: (nodeIds: string[], sectionIds: string[]) => void;
 	/** A node type dragged from the dock was dropped at this point of the screen. */
 	onDropNode: (type: FlowNodeType, at: { x: number; y: number }) => void;
 	/** A node was double-clicked, for example a Subflow to look inside. */
@@ -229,19 +234,32 @@ export function EditorCanvas({
 	// Something picked outside the open Section shows the whole flow again.
 	useEffect(() => {
 		if (!open.section) return;
-		const members = new Set(open.section.nodes);
+		const openId = open.section.id;
+		const members = new Set(nodesWithin(flow, open.section));
 		const outside =
 			selection?.kind === "section"
-				? selection.id !== open.section.id
-				: selectedNodeIds(selection).some((id) => !members.has(id));
+				? !sectionPath(flow, selection.id).some(
+						(section) => section.id === openId,
+					)
+				: [
+						...selectedNodeIds(selection).filter((id) => !members.has(id)),
+						...selectedSectionIds(selection).filter(
+							(id) =>
+								!sectionPath(flow, id).some((section) => section.id === openId),
+						),
+					].length > 0;
 		if (outside) onOpenSection(null);
-	}, [selection, open.section, onOpenSection]);
+	}, [flow, selection, open.section, onOpenSection]);
 
+	const selectedSections = useMemo(
+		() => selectedSectionIds(selection),
+		[selection],
+	);
 	const sections = useSectionCanvas(view, {
 		measured,
 		editable: !preview,
 		issues: counts.bySection,
-		selectedSection: selection?.kind === "section" ? selection.id : null,
+		selectedSections,
 	});
 	const { hidden } = sections;
 
@@ -357,8 +375,10 @@ export function EditorCanvas({
 					// they are now.
 					const carried = new Set<string>();
 					for (const [sectionId, to] of sectionMoves) {
-						const section = next.sections?.find((s) => s.id === sectionId);
-						if (!section) continue;
+						const found = next.sections?.find((s) => s.id === sectionId);
+						if (!found) continue;
+						// With the nodes of the Sections inside it.
+						const section = { ...found, nodes: nodesWithin(next, found) };
 						const delta = sectionDragDelta(next, section, to);
 						if (delta) next = moveSection(next, section, delta);
 						for (const id of section.nodes) carried.add(id);
@@ -433,7 +453,9 @@ export function EditorCanvas({
 			const sectionId = sectionIdOf(target);
 			if (sectionId === undefined) return target;
 			const section = flow.sections?.find((s) => s.id === sectionId);
-			return section ? sectionBoundary(flow, section.nodes).entry : null;
+			return section
+				? sectionBoundary(flow, nodesWithin(flow, section)).entry
+				: null;
 		},
 		[flow],
 	);
@@ -497,17 +519,27 @@ export function EditorCanvas({
 				laid.flow.nodes.map((node) => [node.id, node.position]),
 			);
 			const laidGroups = groupEdges(laid.flow);
-			const book = {
+			// Each route with the ends of the level that draws it: the boxes
+			// of the Sections it shows, also while another level is open.
+			const endsOf = (level: Flow) => sectionEnds(level, sectionIds(level));
+			const book = Object.assign(
+				{},
 				// Inside a Section, the routes hold once it opens.
-				...recordRoutes(laid.flow.nodes, laidGroups, laid.inside),
-				...recordRoutes(
+				...laid.inside.map((level) =>
+					recordRoutes(
+						laid.flow.nodes,
+						laidGroups,
+						level.routes,
+						endsOf(level.flow),
+					),
+				),
+				recordRoutes(
 					laid.flow.nodes,
 					laidGroups,
 					laid.routes,
-					// The whole flow's ends, also while a Section is open.
-					sectionEnds(flow, folded),
+					endsOf(sectionLevel(flow, null)),
 				),
-			};
+			);
 			setRoutes(book);
 			writeRoutes(routesKey, book);
 			onFlowChange((current) =>
@@ -548,7 +580,10 @@ export function EditorCanvas({
 		() => ({ open: onOpenSection }),
 		[onOpenSection],
 	);
-	const multi = !preview && selection?.kind === "nodes" ? selection.ids : null;
+	const multi =
+		!preview && selection?.kind === "nodes"
+			? { nodes: selection.ids, sections: selection.sections ?? [] }
+			: null;
 
 	return (
 		<div className="relative h-full min-h-0 overflow-hidden bg-muted/40 dark:bg-muted/20">
@@ -614,23 +649,27 @@ export function EditorCanvas({
 							measured={measured}
 							open={open.section?.id ?? null}
 							onOpen={onOpenSection}
-							onClose={() => onOpenSection(null)}
+							onClose={() => onOpenSection(open.up)}
 							fit={fit}
 						/>
 						{open.section && !preview ? (
 							<OpenSectionBar
-								section={open.section}
+								path={open.path}
 								flowLabel={flowLabel}
-								onClose={() => onOpenSection(null)}
+								onOpen={onOpenSection}
 							/>
 						) : null}
 						{multi ? (
-							<NodeToolbar nodeId={multi} isVisible position={Position.Top}>
+							<NodeToolbar
+								nodeId={canvasIds(selection)}
+								isVisible
+								position={Position.Top}
+							>
 								<Button
 									variant="outline"
 									size="sm"
 									className="bg-background shadow-sm dark:bg-background"
-									onClick={() => onMakeSection(multi)}
+									onClick={() => onMakeSection(multi.nodes, multi.sections)}
 								>
 									<GroupIcon data-icon="inline-start" />
 									Make section

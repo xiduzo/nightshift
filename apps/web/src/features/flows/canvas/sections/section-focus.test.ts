@@ -1,41 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { commandNode, FLOW_VERSION, type Flow } from "@nightshift/flows";
 import {
 	closesOnZoomOut,
 	handOver,
 	opensOnZoomIn,
-	sectionPart,
 	zoomAfterClose,
 } from "./section-focus";
 
-const origin = { x: 0, y: 0 };
-const flow: Flow = {
-	version: FLOW_VERSION,
-	inputs: [],
-	outputs: [],
-	start: "a",
-	nodes: ["a", "b", "c", "d"].map((id) => commandNode(id, origin)),
-	edges: [
-		{ id: "a-ok-b", from: "a", outcome: "ok", to: "b" },
-		{ id: "b-ok-c", from: "b", outcome: "ok", to: "c" },
-		{ id: "c-ok-d", from: "c", outcome: "ok", to: "d" },
-		{ id: "c-fail-b", from: "c", outcome: "fail", to: "b" },
-	],
-	sections: [{ id: "middle", label: "Middle", nodes: ["b", "c"] }],
-};
 const canvas = { width: 1200, height: 800 };
-
-describe("sectionPart", () => {
-	test("keeps the Section's nodes and the edges between them", () => {
-		const section = flow.sections?.[0];
-		if (!section) throw new Error("no section");
-		const part = sectionPart(flow, section);
-		expect(part.nodes.map((node) => node.id)).toEqual(["b", "c"]);
-		expect(part.edges.map((edge) => edge.id)).toEqual(["b-ok-c", "c-fail-b"]);
-		expect(part.sections).toBeUndefined();
-		expect(part.start).toBe("a");
-	});
-});
 
 describe("opensOnZoomIn", () => {
 	const box = { width: 256, height: 160 };

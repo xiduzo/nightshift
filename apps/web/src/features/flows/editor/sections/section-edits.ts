@@ -2,6 +2,7 @@ import {
 	addSection,
 	type Flow,
 	type FlowSection,
+	parentSection,
 	removeSection,
 } from "@nightshift/flows";
 import type { Dispatch, SetStateAction } from "react";
@@ -20,9 +21,15 @@ export function sectionEdits(
 	setDraft: Dispatch<SetStateAction<Flow>>,
 	setSelection: Dispatch<SetStateAction<Selection>>,
 ) {
-	/** Returns the new Section's id, or null when the nodes cannot form one. */
-	const makeSection = (nodeIds: readonly string[]): string | null => {
-		const result = addSection(draft, nodeIds);
+	/**
+	 * A Section of the nodes and the Sections `sectionIds`. Returns its id,
+	 * or null when they cannot form one.
+	 */
+	const makeSection = (
+		nodeIds: readonly string[],
+		sectionIds: readonly string[] = [],
+	): string | null => {
+		const result = addSection(draft, nodeIds, {}, sectionIds);
 		if (!result.ok) {
 			toast.error("Could not make a section", {
 				description: result.problems
@@ -41,13 +48,16 @@ export function sectionEdits(
 		const index = sections.findIndex((section) => section.id === sectionId);
 		const section = sections[index];
 		if (!section) return;
+		const around = parentSection(draft, sectionId)?.id;
 		setDraft((current) => removeSection(current, sectionId));
 		setSelection(null);
 		toast.info(`Removed the Section ${sectionName(section)}. Its nodes stay.`, {
 			action: {
 				label: "Undo",
 				onClick: () =>
-					setDraft((current) => restoreSection(current, section, index)),
+					setDraft((current) =>
+						restoreSection(current, section, index, around),
+					),
 			},
 		});
 	};
@@ -106,27 +116,48 @@ export function undoSubflow(
 }
 
 /**
- * Puts a removed Section back where it was, with the nodes it held that are
- * still in the flow and in no other Section.
+ * Puts a removed Section back where it was, inside the Section `around` if
+ * it still exists. It takes back the nodes and Sections it held that are
+ * still in the flow and in no other Section, or in `around`, where the
+ * removal put them.
  */
 export function restoreSection(
 	flow: Flow,
 	section: FlowSection,
 	index: number,
+	around?: string,
 ): Flow {
 	const sections = flow.sections ?? [];
 	if (sections.some((other) => other.id === section.id)) return flow;
+	const parent = sections.find((other) => other.id === around);
 	const known = new Set(flow.nodes.map((node) => node.id));
-	const taken = new Set(sections.flatMap((other) => other.nodes));
+	const others = sections.filter((other) => other !== parent);
+	const taken = new Set(others.flatMap((other) => other.nodes));
+	const held = new Set(others.flatMap((other) => other.sections ?? []));
 	const nodes = section.nodes.filter((id) => known.has(id) && !taken.has(id));
-	if (nodes.length === 0) return flow;
-	const at = Math.min(index, sections.length);
+	const inner = (section.sections ?? []).filter(
+		(id) => !held.has(id) && sections.some((other) => other.id === id),
+	);
+	if (nodes.length === 0 && inner.length === 0) return flow;
+	const back: FlowSection = { ...section, nodes };
+	if (section.sections) {
+		if (inner.length > 0) back.sections = inner;
+		else delete back.sections;
+	}
+	const mine = new Set([...nodes, ...inner]);
+	const rest = sections.map((other) => {
+		if (other !== parent) return other;
+		const { sections: kids = [], ...fields } = other;
+		const kept = [...kids.filter((id) => !mine.has(id)), section.id];
+		return {
+			...fields,
+			nodes: other.nodes.filter((id) => !mine.has(id)),
+			sections: kept,
+		};
+	});
+	const at = Math.min(index, rest.length);
 	return {
 		...flow,
-		sections: [
-			...sections.slice(0, at),
-			{ ...section, nodes },
-			...sections.slice(at),
-		],
+		sections: [...rest.slice(0, at), back, ...rest.slice(at)],
 	};
 }

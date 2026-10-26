@@ -83,3 +83,34 @@ describe("pasteNodes", () => {
 		});
 	});
 });
+
+describe("Sections inside Sections", () => {
+	const nested: Flow = {
+		...chain,
+		sections: [
+			{ id: "end", label: "End", nodes: ["c"] },
+			{ id: "tail", label: "Tail", nodes: ["b"], sections: ["end"] },
+		],
+	};
+
+	test("copies a Section with the Sections inside it", () => {
+		expect(copyNodes(nested, ["b", "c"])?.sections).toEqual([
+			{ id: "end", label: "End", nodes: ["c"] },
+			{ id: "tail", label: "Tail", nodes: ["b"], sections: ["end"] },
+		]);
+		// Only the inner one is whole.
+		expect(copyNodes(nested, ["c"])?.sections).toEqual([
+			{ id: "end", label: "End", nodes: ["c"] },
+		]);
+	});
+
+	test("pastes them holding each other under their new ids", () => {
+		const clip = copyNodes(nested, ["b", "c"]);
+		if (!clip) throw new Error("no clip");
+		const pasted = pasteNodes(nested, clip).flow.sections?.slice(2);
+		expect(pasted).toEqual([
+			{ id: "end-2", label: "End", nodes: ["c_2"] },
+			{ id: "tail-2", label: "Tail", nodes: ["b_2"], sections: ["end-2"] },
+		]);
+	});
+});
