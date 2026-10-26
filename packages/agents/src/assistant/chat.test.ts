@@ -189,6 +189,7 @@ describe("runReport", () => {
 		steps: [
 			{
 				id: "s1",
+				flow: null,
 				nodeId: "build",
 				nodeType: "agent",
 				visit: 1,
@@ -198,6 +199,7 @@ describe("runReport", () => {
 			},
 			{
 				id: "s2",
+				flow: "build-task",
 				nodeId: "test",
 				nodeType: "command",
 				visit: 1,
@@ -215,7 +217,10 @@ describe("runReport", () => {
 		expect(report.length).toBeLessThanOrEqual(RUN_REPORT_LIMIT);
 		expect(report).toContain("Status: failed. Why: The step `test` failed");
 		expect(report).toContain("- `build` (agent): pass. note: Fixed it.");
-		expect(report).toContain("- `test` (command): fail");
+		expect(report).toContain(
+			'- `test` in the called flow "build-task" (command): fail',
+		);
+		expect(report).toContain("The step that failed: `test` in the called flow");
 		expect(report).toContain("The draft changed since this run: 1 steps added");
 		expect(report).toContain("line 4999");
 		expect(report).not.toContain("line 10\n");

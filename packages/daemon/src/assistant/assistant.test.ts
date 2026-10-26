@@ -295,6 +295,18 @@ describe("assistant.chat", () => {
 		expect(harness.calls[3]?.resumeSessionId).toBeUndefined();
 	});
 
+	test("a chat about a run: told once, while every message names the run", async () => {
+		const harness = fakeHarness({ steps: [{ type: "text", text: "Ok." }] });
+		const assistant = createAssistant(deps({ harnessFor: () => harness }));
+		const first = await chat(assistant, { runId: "r1" });
+		const threadId = first[0]?.type === "thread" ? first[0].threadId : "";
+		await chat(assistant, { threadId, runId: "r1", message: "Fix it." });
+		expect(harness.calls[0]?.prompt).toContain("This chat is about run r1");
+		expect(harness.calls[0]?.tools?.map((t) => t.name)).toContain("get_run");
+		expect(harness.calls[1]?.prompt).not.toContain("This chat is about run");
+		expect(harness.calls[1]?.tools?.map((t) => t.name)).toContain("get_run");
+	});
+
 	test("one message at a time per thread", async () => {
 		const harness = fakeHarness({
 			steps: [
@@ -413,6 +425,47 @@ describe("chatRun", () => {
 		expect(found?.transcript).toContain("line 999");
 		expect(found?.transcript).not.toContain("$ bun test");
 		expect(found?.transcript.length).toBeLessThanOrEqual(300);
+	});
+
+	test("a failure inside a called flow: that step, with the flow it ran in", async () => {
+		const nested = {
+			...run,
+			flow: {
+				...withTests,
+				nodes: [{ id: "each_task", type: "call", flow: "build-task" }],
+			},
+			calledFlows: {
+				"build-task": { nodes: [{ id: "check", type: "command" }] },
+			},
+			steps: [
+				{
+					...run.steps[0],
+					id: "c1",
+					nodeId: "each_task",
+					nodeType: "call",
+					outcome: "fail",
+					scope: null,
+				},
+				{
+					...run.steps[1],
+					id: "c2",
+					nodeId: "check",
+					scope: { parentStepId: "c1", itemId: null },
+				},
+			],
+		};
+		const found = await chatRun(
+			{
+				flowMap: async () => ({}),
+				getRun: async () => nested,
+				watchRun: async function* () {},
+			} as unknown as ChatSpace,
+			"p1",
+			"r1",
+			{ signal: new AbortController().signal },
+		);
+		expect(found?.failedStepId).toBe("c2");
+		expect(found?.steps.map((s) => s.flow)).toEqual([null, "build-task"]);
 	});
 
 	test("a run of another project, or none: null", async () => {

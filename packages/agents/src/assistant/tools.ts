@@ -44,6 +44,8 @@ export type AuthoringSkill = {
 /** One step of a run, as `get_run` shows it. */
 export type AuthoringRunStep = {
 	id: string;
+	/** The called flow the step ran in (through a Subflow node). Null: the run's own flow. */
+	flow: string | null;
 	nodeId: string;
 	nodeType: string;
 	visit: number;
@@ -65,7 +67,7 @@ export type AuthoringRun = {
 	flow: Flow;
 	/** In the order they started. */
 	steps: AuthoringRunStep[];
-	/** The step the run failed or stopped at, or null. */
+	/** The step the run failed or stopped at, or null. Inside a called flow: that step, not its Subflow step. */
 	failedStepId: string | null;
 	/** The last lines of that step's transcript, oldest first. */
 	transcript: string[];
@@ -197,9 +199,11 @@ export function runReport(run: AuthoringRun, draft: Flow): string {
 	if (steps.length < run.steps.length) {
 		lines.push(`(the last ${steps.length} of ${run.steps.length})`);
 	}
+	const where = (step: AuthoringRunStep) =>
+		step.flow ? ` in the called flow "${step.flow}"` : "";
 	for (const step of steps) {
 		const parts = [
-			`- \`${step.nodeId}\` (${step.nodeType}${step.visit > 1 ? `, visit ${step.visit}` : ""}): ${step.outcome ?? "running"}`,
+			`- \`${step.nodeId}\`${where(step)} (${step.nodeType}${step.visit > 1 ? `, visit ${step.visit}` : ""}): ${step.outcome ?? "running"}`,
 		];
 		if (step.error) parts.push(`error: ${cut(step.error, NOTE_LIMIT)}`);
 		if (step.note) parts.push(`note: ${cut(step.note, NOTE_LIMIT)}`);
@@ -208,6 +212,12 @@ export function runReport(run: AuthoringRun, draft: Flow): string {
 	const failed = run.steps.find((step) => step.id === run.failedStepId);
 	if (failed) {
 		lines.push(
+			"",
+			`The step that failed: \`${failed.nodeId}\`${
+				failed.flow
+					? ` in the called flow "${failed.flow}". Read it with get_flow: a fix may belong there, or in the Subflow node that calls it`
+					: ""
+			}.`,
 			"",
 			`## The end of the transcript of \`${failed.nodeId}\``,
 			"",

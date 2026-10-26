@@ -79,7 +79,9 @@ export type TranscriptTimes = { idleMs?: number; totalMs?: number };
 
 /**
  * The run for the chat, or null when the Space has no run of that id in
- * this project. The failed step is the last one that ended badly.
+ * this project. The failed step is the last one that ended badly, inside
+ * the flows it called: a step in a called flow, not the Subflow step that
+ * failed because of it. Each step names the called flow it ran in.
  */
 export async function chatRun(
 	space: ChatSpace,
@@ -89,10 +91,29 @@ export async function chatRun(
 ): Promise<AuthoringRun | null> {
 	const detail = await space.getRun(runId).catch(() => null);
 	if (!detail || detail.projectId !== projectId) return null;
+	const byId = new Map(detail.steps.map((step) => [step.id, step]));
+	const flowOf = new Map<string, string | null>();
+	/** The called flow a step ran in: the `flow` of its parent's Subflow node. */
+	const calledFlow = (stepId: string, depth = 0): string | null => {
+		const known = flowOf.get(stepId);
+		if (known !== undefined) return known;
+		const step = byId.get(stepId);
+		const parent = step?.scope ? byId.get(step.scope.parentStepId) : null;
+		let name: string | null = null;
+		if (parent && depth < 20) {
+			const outer = calledFlow(parent.id, depth + 1);
+			const flow = outer ? detail.calledFlows[outer] : detail.flow;
+			const node = flow?.nodes.find((n) => n.id === parent.nodeId);
+			name = node?.type === "call" ? node.flow : null;
+		}
+		flowOf.set(stepId, name);
+		return name;
+	};
 	const steps: AuthoringRunStep[] = detail.steps.map((step) => {
 		const note = step.outputs.note ?? step.outputs.summary;
 		return {
 			id: step.id,
+			flow: calledFlow(step.id),
 			nodeId: step.nodeId,
 			nodeType: step.nodeType,
 			visit: step.visit,
@@ -101,14 +122,16 @@ export async function chatRun(
 			note: typeof note === "string" && note.trim() !== "" ? note : null,
 		};
 	});
+	const bad = detail.steps.filter(
+		(step) =>
+			step.error !== null || (step.outcome !== null && BAD.has(step.outcome)),
+	);
+	// A Subflow step that failed because a step inside it did is not the cause.
+	const parents = new Set(
+		bad.flatMap((step) => (step.scope ? [step.scope.parentStepId] : [])),
+	);
 	const failed =
-		[...steps]
-			.reverse()
-			.find(
-				(step) =>
-					step.error !== null ||
-					(step.outcome !== null && BAD.has(step.outcome)),
-			) ?? null;
+		[...bad].reverse().find((step) => !parents.has(step.id)) ?? null;
 	return {
 		id: detail.id,
 		status: detail.status,
