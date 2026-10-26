@@ -53,7 +53,7 @@ import {
 	moveSection,
 	sectionDragDelta,
 } from "../canvas/sections/section-geometry";
-import { sectionIdOf } from "../canvas/sections/section-ids";
+import { isOutsideId, sectionIdOf } from "../canvas/sections/section-ids";
 import {
 	type CanvasNode,
 	canvasNodeTypes,
@@ -256,6 +256,7 @@ export function EditorCanvas({
 		[selection],
 	);
 	const sections = useSectionCanvas(view, {
+		outside: open.section ? { flow, open: open.section.id } : undefined,
 		measured,
 		editable: !preview,
 		issues: counts.bySection,
@@ -303,7 +304,8 @@ export function EditorCanvas({
 	const { groups, boxPositions } = sections;
 	const edges = useMemo<FlowCanvasEdge[]>(
 		() =>
-			canvasEdges(view, groups, {
+			// The whole flow: an edge from outside reads its colour there.
+			canvasEdges(flow, groups, {
 				routes,
 				errors: counts.edgeErrors,
 				selected: selection?.kind === "edge" ? selection.id : undefined,
@@ -311,15 +313,17 @@ export function EditorCanvas({
 				endOf: sections.endOf,
 				changes: preview?.edges,
 			}).map((edge) =>
-				// A line to a box stands for edges you cannot see:
-				// Delete does not remove them. Select one on its label.
-				sectionIdOf(edge.source) !== undefined ||
-				sectionIdOf(edge.target) !== undefined
+				// A line to a box, or to what lies outside the open Section,
+				// stands for edges you cannot see: Delete does not remove
+				// them. Select one on its label.
+				[edge.source, edge.target].some(
+					(end) => sectionIdOf(end) !== undefined || isOutsideId(end),
+				)
 					? { ...edge, deletable: false }
 					: edge,
 			),
 		[
-			view,
+			flow,
 			groups,
 			routes,
 			counts,
@@ -604,7 +608,7 @@ export function EditorCanvas({
 						nodesConnectable={!preview}
 						elementsSelectable={!preview}
 						onNodeDoubleClick={(_, node) => {
-							if (preview) return;
+							if (preview || isOutsideId(node.id)) return;
 							const sectionId = sectionIdOf(node.id);
 							if (sectionId === undefined) onNodeDoubleClick?.(node.id);
 							else onOpenSection(sectionId);

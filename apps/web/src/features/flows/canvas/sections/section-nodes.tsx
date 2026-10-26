@@ -1,6 +1,7 @@
 // A Section on the canvas: one box that stands for its nodes, a React Flow
 // node at the top-left corner of its members (`section-geometry.ts`). Open
-// it to see its nodes (`section-focus.ts`).
+// it to see its nodes (`section-focus.ts`), and beside them what lies
+// outside it (`outside-links.ts`).
 
 import type {
 	FlowIssue,
@@ -19,6 +20,7 @@ import {
 	Position,
 } from "@xyflow/react";
 import {
+	ArrowUpRightIcon,
 	CircleDashedIcon,
 	GroupIcon,
 	PlayIcon,
@@ -38,6 +40,7 @@ import {
 	outcomeLabel,
 	outcomeStyle,
 } from "../outcome-badge";
+import type { OutsideEnd } from "./outside-links";
 import type { SectionRunSummary } from "./section-run";
 
 /** One handle of a box: the edges of one node and outcome that leave. */
@@ -63,12 +66,13 @@ export type SectionBoxData = {
 };
 
 export type SectionBoxNode = Node<SectionBoxData, "sectionBox">;
+export type OutsideNode = Node<OutsideEnd, "outside">;
 /** Every node a flow canvas draws. */
-export type CanvasNode = FlowCanvasNode | SectionBoxNode;
+export type CanvasNode = FlowCanvasNode | SectionBoxNode | OutsideNode;
 
 export type SectionActions = {
-	/** Shows only the Section's nodes on the canvas. */
-	open: (sectionId: string) => void;
+	/** Shows only the Section's nodes on the canvas, or the whole flow for null. */
+	open: (sectionId: string | null) => void;
 	/** Selects a node that a box hides. Run view only. */
 	selectNode?: (nodeId: string) => void;
 };
@@ -364,8 +368,85 @@ const SectionBox = memo(function SectionBox({
 	);
 });
 
-/** The node types of every flow canvas: the flow's nodes, and Section boxes. */
+/**
+ * What lies outside an open Section, at the end of the edges that cross
+ * its border: a node, or the box of a Section. Its button shows it.
+ */
+const Outside = memo(function Outside({ data }: NodeProps<OutsideNode>) {
+	const { side, label, section, level, exits } = data;
+	const open = useContext(SectionActionsContext)?.open;
+	const color = section ? sectionColor(section.color) : undefined;
+	return (
+		<div
+			className="relative flex w-44 items-center gap-2 rounded-lg border-2 border-dashed bg-card py-2 pr-1.5 pl-3 text-card-foreground text-xs"
+			style={color ? { borderColor: mix(color, 60) } : undefined}
+		>
+			{side === "out" ? (
+				<Handle
+					type="target"
+					position={Position.Left}
+					isConnectable={false}
+					className="size-2.5! min-h-0! min-w-0! border-2! border-card! bg-muted-foreground!"
+				/>
+			) : null}
+			<div className="flex min-w-0 flex-1 flex-col">
+				<span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+					{side === "in" ? "From" : "To"}
+				</span>
+				<span
+					className={cn(
+						"flex min-w-0 items-center gap-1.5 font-medium",
+						!section && "font-mono",
+					)}
+					style={{ color: section?.color ? color : undefined }}
+				>
+					{section ? (
+						<GroupIcon
+							className="size-3.5 shrink-0 text-muted-foreground"
+							aria-hidden="true"
+						/>
+					) : null}
+					<span className="truncate" title={label}>
+						{label}
+					</span>
+				</span>
+			</div>
+			{open ? (
+				<Button
+					variant="ghost"
+					size="icon-xs"
+					className="nodrag nopan shrink-0"
+					aria-label={`Show ${label}`}
+					title={`Show ${label}`}
+					onClick={(event) => {
+						event.stopPropagation();
+						open(level);
+					}}
+				>
+					<ArrowUpRightIcon />
+				</Button>
+			) : null}
+			{exits.map((exit) => (
+				<Handle
+					key={exitHandleId(exit.from, exit.outcome)}
+					type="source"
+					id={exitHandleId(exit.from, exit.outcome)}
+					position={Position.Right}
+					isConnectable={false}
+					className="size-2.5! min-h-0! min-w-0! border-2! border-card!"
+					style={{ background: outcomeStyle(exit.outcome, exit.color).color }}
+				/>
+			))}
+		</div>
+	);
+});
+
+/**
+ * The node types of every flow canvas: the flow's nodes, Section boxes,
+ * and what lies outside an open Section.
+ */
 export const canvasNodeTypes: NodeTypes = {
 	...nodeTypes,
 	sectionBox: SectionBox,
+	outside: Outside,
 };

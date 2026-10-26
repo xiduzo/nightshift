@@ -375,6 +375,7 @@ function ReadOnlyCanvas({
 	const open = useOpenSection(flow, openId);
 	const view = open.view;
 	const sections = useSectionCanvas(view, {
+		outside: open.section ? { flow, open: open.section.id } : undefined,
 		measured,
 		editable: false,
 	});
@@ -408,7 +409,7 @@ function ReadOnlyCanvas({
 	// belong to its own editor.
 	const edges = useMemo<FlowCanvasEdge[]>(
 		() =>
-			canvasEdges(view, sections.groups, {
+			canvasEdges(flow, sections.groups, {
 				boxes: sections.boxPositions,
 			}).map((edge) => ({
 				...edge,
@@ -416,7 +417,7 @@ function ReadOnlyCanvas({
 				focusable: false,
 				deletable: false,
 			})),
-		[view, sections.groups, sections.boxPositions],
+		[flow, sections.groups, sections.boxPositions],
 	);
 
 	return (
@@ -435,6 +436,7 @@ function ReadOnlyCanvas({
 							setOpenId(canvasNode.data.section.id);
 							return;
 						}
+						if (canvasNode.type === "outside") return;
 						const { node } = canvasNode.data;
 						if (node.type === "call") enter(node.id, node.flow);
 					}}

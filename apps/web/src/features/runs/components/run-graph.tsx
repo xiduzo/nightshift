@@ -96,6 +96,7 @@ export function RunGraph({
 		[runStates, steps],
 	);
 	const sections = useSectionCanvas(view, {
+		outside: open.section ? { flow, open: open.section.id } : undefined,
 		measured,
 		editable: false,
 		selectedNode: selectedNodeId,
@@ -142,13 +143,13 @@ export function RunGraph({
 	);
 	const edges = useMemo<FlowCanvasEdge[]>(
 		() =>
-			canvasEdges(view, sections.groups, {
+			canvasEdges(flow, sections.groups, {
 				routes,
 				traversals,
 				boxes: sections.boxPositions,
 				endOf: sections.endOf,
 			}).map((edge) => ({ ...edge, selectable: false, focusable: false })),
-		[view, routes, traversals, sections],
+		[flow, routes, traversals, sections],
 	);
 
 	return (
@@ -166,7 +167,7 @@ export function RunGraph({
 						if (node.type === "sectionBox") {
 							const now = node.data.run?.now;
 							if (now) onSelectNode(now.nodeId);
-						} else onSelectNode(node.id);
+						} else if (node.type !== "outside") onSelectNode(node.id);
 					}}
 					onNodeDoubleClick={(_, node) => {
 						if (node.type === "sectionBox") setOpenId(node.data.section.id);
