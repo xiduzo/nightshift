@@ -2,6 +2,7 @@
 
 export {
 	type AssistantService,
+	type AssistantUsage,
 	applySuggestion,
 	type Change as SuggestionChange,
 	type ChatEvent,

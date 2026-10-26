@@ -15,6 +15,7 @@ export {
 } from "./apply";
 export {
 	type AssistantService,
+	type AssistantUsage,
 	type ChatEvent,
 	type ChatRequest,
 	chatRequestSchema,

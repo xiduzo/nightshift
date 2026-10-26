@@ -1113,11 +1113,7 @@ function allWorkspaces(root: string): string[] {
  *
  * Shape: { entry: ["name"] }
  */
-export const PENDING_NAMES: Record<string, string[]> = {
-	// The assistant's shared logic. The chat (agents, daemon) of the
-	// assistant build imports them.
-	"@nightshift/flows": ["flowAuthoringGuide", "proposalIssues"],
-};
+export const PENDING_NAMES: Record<string, string[]> = {};
 
 type Entry = {
 	/** How another workspace imports it: `@nightshift/db/migrate`. */
