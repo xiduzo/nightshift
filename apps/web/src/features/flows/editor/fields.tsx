@@ -18,8 +18,20 @@ import {
 } from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
 import { ChevronRightIcon, InfoIcon } from "lucide-react";
-import { type ReactNode, useEffect, useId, useState } from "react";
-import { type InspectorTab, useInspectorTab } from "./inspector-tabs";
+import {
+	type ReactNode,
+	type RefObject,
+	useEffect,
+	useId,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
+import {
+	ErrorCount,
+	type InspectorTab,
+	useInspectorTab,
+} from "./inspector-tabs";
 
 /** The muted "(optional)" after a label. */
 export function Optional({ children = "optional" }: { children?: ReactNode }) {
@@ -129,8 +141,47 @@ export function Note({
 }
 
 /**
+ * How many fields in `ref` have a problem, also in a folded section or a tab
+ * that is not open. A field has a problem when a control is marked invalid
+ * or when it shows a FieldError. A field with both counts once.
+ */
+function countProblems(element: HTMLElement): number {
+	const invalid = element.querySelectorAll('[aria-invalid="true"]').length;
+	const alone = [
+		...element.querySelectorAll('[data-slot="field-error"]'),
+	].filter(
+		(error) =>
+			!error
+				.closest('[data-slot="field"]')
+				?.querySelector('[aria-invalid="true"]'),
+	).length;
+	return invalid + alone;
+}
+
+function useErrorCount(ref: RefObject<HTMLElement | null>): number {
+	const [count, setCount] = useState(0);
+	useLayoutEffect(() => {
+		const element = ref.current;
+		if (!element) return;
+		const update = () => setCount(countProblems(element));
+		update();
+		const observer = new MutationObserver(update);
+		observer.observe(element, {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			attributeFilter: ["aria-invalid"],
+		});
+		return () => observer.disconnect();
+	}, [ref]);
+	return count;
+}
+
+/**
  * One section of the inspector: a heading that folds it, and the fields.
  * In the node inspector it shows only on its tab (`tab`, Work by default).
+ * A folded section stays rendered, so its heading and its tab can show how
+ * many errors it holds.
  */
 export function InspectorSection({
 	title,
@@ -154,9 +205,12 @@ export function InspectorSection({
 }) {
 	const headingId = useId();
 	const [open, setOpen] = useState(defaultOpen);
-	const shown = useInspectorTab(tab);
+	const ref = useRef<HTMLDivElement>(null);
+	const errors = useErrorCount(ref);
+	const shown = useInspectorTab(tab, errors);
 	return (
 		<Collapsible
+			ref={ref}
 			open={open}
 			onOpenChange={setOpen}
 			hidden={!shown}
@@ -176,13 +230,14 @@ export function InspectorSection({
 						{title}
 					</span>
 					{aside}
+					{open ? null : <ErrorCount count={errors} />}
 					<ChevronRightIcon
 						className="size-4 text-muted-foreground transition-transform group-data-panel-open/section:rotate-90 motion-reduce:transition-none"
 						aria-hidden="true"
 					/>
 				</CollapsibleTrigger>
 			</h3>
-			<CollapsibleContent className="px-4 pt-1 pb-5">
+			<CollapsibleContent keepMounted className="px-4 pt-1 pb-5">
 				<div className={cn("flex flex-col gap-4", className)}>
 					{description ? <Note>{description}</Note> : null}
 					{children}
