@@ -319,21 +319,15 @@ const FlowNodeCard = memo(function FlowNodeCard({
 						}
 						title={meta.label}
 					>
-						<Icon className="size-4" aria-hidden="true" />
-						{state && StateIcon ? (
-							<span
-								className="absolute -right-1.5 -bottom-1.5 grid size-4 place-items-center rounded-full border-2 border-card text-background"
-								style={{ background: state.color }}
+						{/* A running step turns its state's icon, so it reads as busy. */}
+						{running && StateIcon ? (
+							<StateIcon
+								className="size-4 animate-spin motion-reduce:animate-none"
 								aria-hidden="true"
-							>
-								<StateIcon
-									className={cn(
-										"size-2.5",
-										running && "animate-spin motion-reduce:animate-none",
-									)}
-								/>
-							</span>
-						) : null}
+							/>
+						) : (
+							<Icon className="size-4" aria-hidden="true" />
+						)}
 						{waiting ? (
 							<span
 								className="absolute inset-0 rounded-lg ring-2 ring-status-waiting motion-safe:animate-ping"
