@@ -1,5 +1,6 @@
 /** Checks a draft: the schema, the connections and profiles it names, and `validateFlow`. */
 import { type Flow, flowSchema } from "../document";
+import { profileOf } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";
 import { validateFlow } from "../validate";
 import { missingConnections } from "./nodes";
@@ -22,7 +23,7 @@ export type DraftMessages = {
 	schemaIssue: (flow: Flow, issue: DraftSchemaIssue) => string;
 	/** A connection the node names that this computer does not have. */
 	missingConnection: (name: string) => string;
-	/** An Agent Profile the node names that this computer does not have. */
+	/** A profile the node names that neither this computer nor the project has. */
 	missingProfile: (name: string) => string;
 };
 
@@ -33,7 +34,7 @@ export type DraftCheckOptions = {
 	name?: string;
 	/** The names of the connections. Leave it out while they load. */
 	connections?: readonly string[];
-	/** The names of the Agent Profiles. Leave it out while they load. */
+	/** The names of the profiles, this computer's and the project's. Leave it out while they load. */
 	profiles?: readonly string[];
 };
 
@@ -86,11 +87,11 @@ export function checkDraft(
 
 	if (profiles) {
 		for (const node of flow.nodes) {
-			if (node.type !== "agent" || node.profile === undefined) continue;
-			if (profiles.includes(node.profile)) continue;
+			const profile = profileOf(node);
+			if (profile === undefined || profiles.includes(profile)) continue;
 			issues.push({
 				severity: "error",
-				message: messages.missingProfile(node.profile),
+				message: messages.missingProfile(profile),
 				nodeId: node.id,
 			});
 		}

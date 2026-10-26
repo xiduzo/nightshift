@@ -107,7 +107,10 @@ describe("proposalIssues", () => {
 				"build",
 				'This computer has no connection "made_up". Use one it has, or leave it out.',
 			],
-			["build", 'This computer has no Agent Profile "worker". Use one it has.'],
+			[
+				"build",
+				'Neither this computer nor the project has a profile "worker". Use one they have.',
+			],
 		]);
 	});
 

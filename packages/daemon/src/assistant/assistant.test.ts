@@ -69,6 +69,7 @@ function deps(over: Partial<AssistantDeps> = {}): AssistantDeps {
 				throw new Error("No such run");
 			},
 			watchRun: async function* () {},
+			listProjectProfiles: async () => ({ profiles: [], issues: [] }),
 		}),
 		cliTools: { list: () => [] },
 		connections: { list: () => [] },

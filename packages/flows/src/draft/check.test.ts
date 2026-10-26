@@ -55,4 +55,24 @@ describe("checkDraft", () => {
 			nodeId: "worker",
 		});
 	});
+
+	test("a Decision by a model names a profile too; by a person it reads none", () => {
+		const decision = {
+			id: "pick",
+			type: "decision" as const,
+			position: { x: 0, y: 0 },
+			prompt: "Go?",
+			options: [{ name: "yes" }],
+			by: "model" as const,
+			profile: "small",
+		};
+		const check = (by: "model" | "person") =>
+			checkDraft(
+				{ ...flow, nodes: [{ ...decision, by }], start: "pick" },
+				messages,
+				{ profiles: ["day"] },
+			).issues.map((i) => i.message);
+		expect(check("model")).toContain("profile small");
+		expect(check("person")).not.toContain("profile small");
+	});
 });

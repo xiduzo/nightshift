@@ -16,10 +16,17 @@ import type {
 	SpaceEngine,
 	TranscriptEntry,
 } from "@nightshift/engine";
-import { type ChatRequest, isAgentProfile } from "@nightshift/flows";
+import {
+	type ChatRequest,
+	isAgentProfile,
+	type Profile,
+} from "@nightshift/flows";
 
 /** What the port reads in the Space. */
-export type ChatSpace = Pick<SpaceEngine, "flowMap" | "getRun" | "watchRun">;
+export type ChatSpace = Pick<
+	SpaceEngine,
+	"flowMap" | "getRun" | "watchRun" | "listProjectProfiles"
+>;
 
 export type AuthoringPortDeps = {
 	space: ChatSpace;
@@ -46,8 +53,20 @@ export function authoringPort(
 	return {
 		draft: async () => ({ name: request.flowName, flow: request.flow }),
 		flows: () => deps.space.flowMap(request.projectId),
-		profiles: async () =>
-			deps.profiles.list().map((profile) => {
+		// This computer's, then the project's that this computer does not override.
+		profiles: async () => {
+			const own = deps.profiles.list();
+			let project: Profile[] = [];
+			try {
+				project = (await deps.space.listProjectProfiles(request.projectId))
+					.profiles;
+			} catch {
+				// No project profiles to read: the computer's are the list.
+			}
+			return [
+				...own,
+				...project.filter((p) => !own.some((o) => o.name === p.name)),
+			].map((profile) => {
 				const description = profile.description ?? null;
 				if (!isAgentProfile(profile)) {
 					const { name, decider, model } = profile;
@@ -55,7 +74,8 @@ export function authoringPort(
 				}
 				const { name, harness, model } = profile;
 				return { name, harness, model, description };
-			}),
+			});
+		},
 		tools: async () => ({
 			clis: deps.cliTools
 				.list()

@@ -144,7 +144,7 @@ describe("authoringTools", () => {
 			"error:",
 		);
 		expect(await call(tools, "check_flow", { flow: broken })).toContain(
-			'error: This computer has no Agent Profile "ghost"',
+			'error: Neither this computer nor the project has a profile "ghost"',
 		);
 	});
 

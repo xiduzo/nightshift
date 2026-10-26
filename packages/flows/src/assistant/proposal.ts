@@ -10,6 +10,7 @@ import {
 	flowSchema,
 } from "../document";
 import { checkDraft, type DraftMessages } from "../draft";
+import { profileOf } from "../profiles";
 import type { FlowIssue, ProjectFlowMap } from "../validate";
 
 export type ProposalCheckOptions = {
@@ -62,7 +63,7 @@ export function proposalIssues(
 
 	const profiles = options.profiles && [
 		...options.profiles,
-		...draft.nodes.flatMap(profileOf),
+		...draft.nodes.flatMap(profilesOf),
 	];
 	const connections = options.connections && [
 		...options.connections,
@@ -89,7 +90,7 @@ const messages: DraftMessages = {
 	missingConnection: (name) =>
 		`This computer has no connection "${name}". Use one it has, or leave it out.`,
 	missingProfile: (name) =>
-		`This computer has no Agent Profile "${name}". Use one it has.`,
+		`Neither this computer nor the project has a profile "${name}". Use one they have.`,
 };
 
 /** A schema issue, on its node or edge when it has one: `Node "build": prompt: …`. */
@@ -121,10 +122,9 @@ function schemaIssue(
 	};
 }
 
-function profileOf(node: FlowNode): string[] {
-	return node.type === "agent" && node.profile !== undefined
-		? [node.profile]
-		: [];
+function profilesOf(node: FlowNode): string[] {
+	const name = profileOf(node);
+	return name !== undefined ? [name] : [];
 }
 
 function connectionsOf(node: FlowNode): string[] {
