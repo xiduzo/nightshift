@@ -131,7 +131,7 @@ export function AgentOutcomeSection({
 				: []),
 		];
 		return (
-			<InspectorSection title="Outcomes" className="gap-3">
+			<InspectorSection title="Outcomes" tab="results" className="gap-3">
 				{lead}
 				<div className="flex flex-wrap gap-1.5">
 					{nodeOutcomes(node).map((outcome) => (

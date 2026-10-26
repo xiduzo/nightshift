@@ -17,6 +17,13 @@ const OPTION_TITLES = {
 	exit: "Exit codes",
 } as const;
 
+/** A Decision's options are its work; outcomes and exits are what it gives later nodes. */
+const OPTION_TABS = {
+	option: "work",
+	outcome: "results",
+	exit: "results",
+} as const;
+
 /** The options, outcomes or exits of a node, with the edits that keep its edges in step. */
 export function NodeOptionsField<T extends OptionNode>({
 	id,
@@ -59,6 +66,7 @@ export function NodeOptionsField<T extends OptionNode>({
 	return (
 		<InspectorSection
 			title={OPTION_TITLES[kind]}
+			tab={OPTION_TABS[kind]}
 			aside={
 				<Badge variant="secondary" className="tabular-nums">
 					{options.length}

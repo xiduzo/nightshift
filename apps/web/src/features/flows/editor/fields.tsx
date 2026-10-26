@@ -1,3 +1,9 @@
+import { Button } from "@nightshift/ui/components/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@nightshift/ui/components/collapsible";
 import {
 	FieldDescription,
 	FieldError,
@@ -5,9 +11,15 @@ import {
 	Field as ShadcnField,
 } from "@nightshift/ui/components/field";
 import { Input } from "@nightshift/ui/components/input";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@nightshift/ui/components/tooltip";
 import { cn } from "@nightshift/ui/lib/utils";
-import { type ReactNode, useEffect, useState } from "react";
-import { PanelSection } from "@/shared/panel";
+import { ChevronRightIcon, InfoIcon } from "lucide-react";
+import { type ReactNode, useEffect, useId, useState } from "react";
+import { type InspectorTab, useInspectorTab } from "./inspector-tabs";
 
 /** The muted "(optional)" after a label. */
 export function Optional({ children = "optional" }: { children?: ReactNode }) {
@@ -17,9 +29,10 @@ export function Optional({ children = "optional" }: { children?: ReactNode }) {
 }
 
 /**
- * A labelled form row with an optional hint or error below: shadcn's Field,
- * FieldLabel, FieldDescription and FieldError. The hint and the error share
- * the id `${id}-hint`, so a control's `aria-describedby` finds either.
+ * A labelled form row: shadcn's Field, FieldLabel and FieldError. The hint
+ * sits behind an info icon beside the label, so the form stays quiet; an
+ * error shows under the control. Both carry the id `${id}-hint`, so a
+ * control's `aria-describedby` finds either.
  */
 export function Field({
 	id,
@@ -41,19 +54,32 @@ export function Field({
 	return (
 		<ShadcnField
 			data-invalid={error ? true : undefined}
-			className={cn("gap-2", className)}
+			className={cn("gap-1.5", className)}
 		>
-			<FieldLabel htmlFor={id}>
-				{label}
-				{optional ? <Optional /> : null}
-			</FieldLabel>
+			<div className="flex min-w-0 items-center gap-1">
+				<FieldLabel htmlFor={id}>
+					{label}
+					{optional ? <Optional /> : null}
+				</FieldLabel>
+				{hint && !error ? (
+					<Tooltip>
+						<TooltipTrigger
+							render={<span aria-hidden="true" />}
+							className="inline-flex text-muted-foreground/70 hover:text-foreground"
+						>
+							<InfoIcon className="size-3.5" />
+						</TooltipTrigger>
+						<TooltipContent className="max-w-64">{hint}</TooltipContent>
+					</Tooltip>
+				) : null}
+			</div>
 			{children}
 			{error ? (
 				<FieldError id={`${id}-hint`} className="text-xs">
 					{error}
 				</FieldError>
 			) : hint ? (
-				<FieldDescription id={`${id}-hint`} className="text-xs">
+				<FieldDescription id={`${id}-hint`} className="sr-only">
 					{hint}
 				</FieldDescription>
 			) : null}
@@ -61,7 +87,13 @@ export function Field({
 	);
 }
 
-/** A short note under a group of fields, such as what later nodes can read. */
+const NOTE =
+	"text-muted-foreground text-xs leading-relaxed [&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:py-px [&_code]:font-mono [&_code]:text-foreground";
+
+/**
+ * A short note under a group of fields, such as what later nodes can read.
+ * It shows one line; a click shows all of it.
+ */
 export function Note({
 	id,
 	children,
@@ -71,27 +103,40 @@ export function Note({
 	children: ReactNode;
 	className?: string;
 }) {
+	const [open, setOpen] = useState(false);
+	if (open)
+		return (
+			<p id={id} className={cn(NOTE, className)}>
+				{children}
+			</p>
+		);
 	return (
-		<p
+		<button
+			type="button"
 			id={id}
+			title="Show all"
+			aria-expanded={false}
 			className={cn(
-				"text-muted-foreground text-xs leading-relaxed [&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:py-px [&_code]:font-mono [&_code]:text-foreground",
+				NOTE,
+				"line-clamp-1 cursor-pointer rounded-sm text-left outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
 				className,
 			)}
+			onClick={() => setOpen(true)}
 		>
 			{children}
-		</p>
+		</button>
 	);
 }
 
 /**
- * One section of the inspector: a separator, a small uppercase heading, and
- * the fields. Every section folds from its heading.
+ * One section of the inspector: a heading that folds it, and the fields.
+ * In the node inspector it shows only on its tab (`tab`, Work by default).
  */
 export function InspectorSection({
 	title,
 	description,
 	aside,
+	tab = "work",
 	defaultOpen = true,
 	children,
 	className,
@@ -100,18 +145,50 @@ export function InspectorSection({
 	description?: ReactNode;
 	/** A badge or count beside the heading. */
 	aside?: ReactNode;
+	/** The node inspector's tab the section is on. */
+	tab?: InspectorTab;
 	/** Closed at first: for settings that most nodes leave alone. */
 	defaultOpen?: boolean;
 	children: ReactNode;
 	className?: string;
 }) {
+	const headingId = useId();
+	const [open, setOpen] = useState(defaultOpen);
+	const shown = useInspectorTab(tab);
 	return (
-		<PanelSection title={title} aside={aside} defaultOpen={defaultOpen}>
-			<div className={cn("flex flex-col gap-5", className)}>
-				{description ? <Note>{description}</Note> : null}
-				{children}
-			</div>
-		</PanelSection>
+		<Collapsible
+			open={open}
+			onOpenChange={setOpen}
+			hidden={!shown}
+			className="border-t first:border-t-0"
+			render={<section aria-labelledby={headingId} />}
+		>
+			<h3 id={headingId}>
+				<CollapsibleTrigger
+					render={
+						<Button
+							variant="ghost"
+							className="group/section h-11 w-full justify-start gap-2 rounded-none px-4 aria-expanded:bg-transparent hover:aria-expanded:bg-muted dark:aria-expanded:bg-transparent dark:hover:aria-expanded:bg-muted/50"
+						/>
+					}
+				>
+					<span className="flex-1 text-left font-semibold text-sm">
+						{title}
+					</span>
+					{aside}
+					<ChevronRightIcon
+						className="size-4 text-muted-foreground transition-transform group-data-panel-open/section:rotate-90 motion-reduce:transition-none"
+						aria-hidden="true"
+					/>
+				</CollapsibleTrigger>
+			</h3>
+			<CollapsibleContent className="px-4 pt-1 pb-5">
+				<div className={cn("flex flex-col gap-4", className)}>
+					{description ? <Note>{description}</Note> : null}
+					{children}
+				</div>
+			</CollapsibleContent>
+		</Collapsible>
 	);
 }
 

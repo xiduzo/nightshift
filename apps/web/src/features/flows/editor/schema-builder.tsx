@@ -230,7 +230,7 @@ export function FieldsEditor({
 			<div className="flex flex-wrap items-center gap-1.5">
 				<Button
 					variant="outline"
-					size="xs"
+					size="sm"
 					onClick={() =>
 						onChange([
 							...fields,

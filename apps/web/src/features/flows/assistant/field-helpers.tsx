@@ -23,7 +23,6 @@ import {
 	writeChanges,
 } from "@nightshift/flows";
 import { Button } from "@nightshift/ui/components/button";
-import { Kbd, KbdGroup } from "@nightshift/ui/components/kbd";
 import { SparklesIcon } from "lucide-react";
 import {
 	type KeyboardEvent,
@@ -68,10 +67,13 @@ export function selectionOf(
 		: undefined;
 }
 
-/** The one look of every helper: an outline button with a sparkle, "Suggest …". */
-function suggestButton(label: string, size: "xs" | "sm" = "xs") {
+/**
+ * The one look of every helper: a small outline button with a sparkle,
+ * "Suggest …", the size of the Add buttons beside it.
+ */
+function suggestButton(label: string, title?: string) {
 	return (
-		<Button variant="outline" size={size}>
+		<Button variant="outline" size="sm" title={title}>
 			<SparklesIcon data-icon="inline-start" />
 			{label}
 		</Button>
@@ -86,8 +88,6 @@ type HelperCopy = {
 	description: string;
 	picks: readonly string[];
 	placeholder: string;
-	/** The size of the button next to it. Default xs. */
-	size?: "xs" | "sm";
 };
 
 /**
@@ -118,7 +118,7 @@ function FieldSuggest({
 			toolSchema={toolSchema}
 			open={open}
 			onOpenChange={setOpen}
-			trigger={suggestButton(copy.label, copy.size)}
+			trigger={suggestButton(copy.label)}
 			title={copy.title}
 			description={copy.description}
 			picks={copy.picks}
@@ -167,6 +167,7 @@ export function PromptSuggest({
 				finalFocus={field}
 				trigger={suggestButton(
 					question ? "Suggest question" : "Suggest prompt",
+					"Also ⌘I or Ctrl+I in the field",
 				)}
 				title={
 					selection
@@ -208,10 +209,6 @@ export function PromptSuggest({
 					) : null
 				}
 			/>
-			<KbdGroup aria-hidden="true" className="text-muted-foreground">
-				<Kbd>⌘/Ctrl</Kbd>
-				<Kbd>I</Kbd>
-			</KbdGroup>
 		</div>
 	);
 }
@@ -258,7 +255,6 @@ export function SetSuggest({ node }: { node: FlowNode }) {
 			nodeId={node.id}
 			copy={{
 				label: "Suggest variables",
-				size: "sm",
 				title: "Suggest variables",
 				description:
 					"The agent proposes the variables this node sets when its step ends. Apply adds the ones the flow does not have yet.",
@@ -297,7 +293,6 @@ export function OutcomesSuggest({ node }: { node: AgentNode | DecisionNode }) {
 				decision
 					? {
 							label: "Suggest options",
-							size: "sm",
 							title: "Suggest options",
 							description:
 								"The agent proposes the options from the question and from where the flow goes next. Edges move with a renamed option.",
@@ -307,7 +302,6 @@ export function OutcomesSuggest({ node }: { node: AgentNode | DecisionNode }) {
 						}
 					: {
 							label: "Suggest outcomes",
-							size: "sm",
 							title: "Suggest outcomes",
 							description:
 								"The agent proposes outcomes from this node's prompt and from where the flow goes next. Edges move with a renamed outcome.",
@@ -340,7 +334,6 @@ export function RulesSuggest({ node }: { node: DecisionNode }) {
 			nodeId={node.id}
 			copy={{
 				label: "Suggest rules",
-				size: "sm",
 				title: "Suggest rules",
 				description:
 					"The agent writes a rule for each option from the values of earlier nodes. The last option stays the default.",
@@ -544,7 +537,6 @@ export function InputsSuggest() {
 			kind="inputs"
 			copy={{
 				label: "Suggest inputs",
-				size: "sm",
 				title: "Suggest inputs",
 				description:
 					"The agent proposes the values you give when you start a run. It keeps the ones the steps use.",

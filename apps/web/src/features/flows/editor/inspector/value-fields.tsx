@@ -146,7 +146,7 @@ export function ValueFields({
 				)}
 			</InspectorSection>
 
-			<InspectorSection title="Output">
+			<InspectorSection title="Output" tab="results">
 				<OutputSchemaField
 					id={`${id}-output`}
 					nodeId={node.id}
@@ -163,17 +163,18 @@ export function ValueFields({
 			</InspectorSection>
 
 			{by === "model" ? (
-				<InspectorSection title="Model">
+				<InspectorSection title="Model" tab="setup">
 					<Field
 						id={`${id}-decider`}
 						label="Decider"
-						hint={
+						error={
 							cannot
 								? "This decider cannot make a value. Choose one that can."
 								: keyMissing && decider?.apiKey
 									? `Add the secret ${decider.apiKey} on the Agents page, or this node cannot make a value.`
-									: "The decider whose model makes the value."
+									: null
 						}
+						hint="The decider whose model makes the value."
 					>
 						<NativeSelect
 							id={`${id}-decider`}

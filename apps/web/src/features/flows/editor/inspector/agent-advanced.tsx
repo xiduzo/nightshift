@@ -47,6 +47,7 @@ export function AgentAdvanced({
 		<>
 			<InspectorSection
 				title="Output"
+				tab="results"
 				defaultOpen={node.output !== undefined}
 				aside={
 					node.output !== undefined ? (
@@ -71,6 +72,7 @@ export function AgentAdvanced({
 
 			<InspectorSection
 				title="Tools"
+				tab="setup"
 				defaultOpen={toolCount > 0}
 				aside={
 					missing.length > 0 ? (

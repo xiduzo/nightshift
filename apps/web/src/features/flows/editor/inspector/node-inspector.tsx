@@ -17,11 +17,11 @@ import { useQuery } from "@tanstack/react-query";
 import { PlayIcon, Trash2Icon } from "lucide-react";
 import { useId, useState } from "react";
 import { runQueries } from "@/features/runs/queries";
-import { PanelHeader } from "@/shared/panel";
 import { NODE_TYPE } from "../../canvas/node-type";
 import type { DaemonConnection } from "../connections-field";
 import { DeviceField, runsOnDevice, withDevice } from "../device-field";
 import { Field, InspectorSection, PositiveIntInput } from "../fields";
+import { InspectorTabs } from "../inspector-tabs";
 import { VariableWritesSection } from "../variable-writes-field";
 import { AgentAdvanced } from "./agent-advanced";
 import { AgentFields } from "./agent-fields";
@@ -82,251 +82,253 @@ export function NodeInspector({
 
 	return (
 		<div className="flex flex-col">
-			<PanelHeader
-				icon={Icon}
-				kicker={typeLabel}
-				title={node.id}
-				badges={
-					isStart ? (
-						<Badge variant="secondary" className="normal-case tracking-normal">
-							<PlayIcon aria-hidden="true" />
-							Start
-						</Badge>
-					) : null
-				}
-				actions={
-					<>
-						{isStart ? null : (
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={onSetStart}
-								title="Start the run here"
-							>
-								<PlayIcon data-icon="inline-start" />
-								Set as start
-							</Button>
-						)}
+			<div className="flex items-center gap-3 p-4 pb-3">
+				<div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
+					<Icon className="size-4" aria-hidden="true" />
+				</div>
+				<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+					<h2 className="min-w-0">
+						<Input
+							aria-label="Label"
+							title="The name on the canvas"
+							value={node.label ?? ""}
+							placeholder={node.id}
+							autoComplete="off"
+							className="-mx-1.5 h-7 w-[calc(100%+0.75rem)] border-transparent bg-transparent px-1.5 font-semibold text-base shadow-none hover:border-input focus-visible:border-input md:text-base dark:bg-transparent"
+							onChange={(event) => {
+								const label = event.target.value;
+								onChange((current) => ({
+									...current,
+									label: label || undefined,
+								}));
+							}}
+						/>
+					</h2>
+					<div className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs">
+						<span className="shrink-0">{typeLabel}</span>
+						<span aria-hidden="true">·</span>
+						<IdField
+							key={node.id}
+							id={`${id}-id`}
+							nodeId={node.id}
+							onRename={onRename}
+						/>
+						{isStart ? (
+							<Badge variant="secondary" className="h-4 shrink-0 px-1.5">
+								<PlayIcon aria-hidden="true" />
+								Start
+							</Badge>
+						) : null}
+					</div>
+				</div>
+				<div className="flex shrink-0 items-center">
+					{isStart ? null : (
 						<Button
 							variant="ghost"
 							size="icon-sm"
-							className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-							onClick={onDelete}
-							aria-label={`Delete ${node.id}`}
-							title="Delete node (Backspace)"
+							onClick={onSetStart}
+							aria-label="Set as start"
+							title="Start the run here"
 						>
-							<Trash2Icon />
+							<PlayIcon />
 						</Button>
-					</>
-				}
-			/>
+					)}
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+						onClick={onDelete}
+						aria-label={`Delete ${node.id}`}
+						title="Delete node (Backspace)"
+					>
+						<Trash2Icon />
+					</Button>
+				</div>
+			</div>
 
-			<InspectorSection title="Node">
-				<IdField
-					key={node.id}
-					id={`${id}-id`}
-					nodeId={node.id}
-					onRename={onRename}
-				/>
-
-				<Field
-					id={`${id}-label`}
-					label="Label"
-					optional
-					hint="Shown on the canvas."
-				>
-					<Input
-						id={`${id}-label`}
-						value={node.label ?? ""}
-						placeholder={node.id}
-						autoComplete="off"
-						onChange={(event) => {
-							const label = event.target.value;
-							onChange((current) => ({
-								...current,
-								label: label || undefined,
-							}));
-						}}
+			<InspectorTabs>
+				{node.type === "agent" ? (
+					<AgentFields
+						projectId={projectId}
+						flow={flow}
+						node={node}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "agent" ? change(current) : current,
+							)
+						}
+						onRenameOutcome={onRenameOutcome}
+						onRemoveOutcome={onRemoveOutcome}
+						onSetOutcomes={onSetAgentOutcomes}
 					/>
-				</Field>
-			</InspectorSection>
+				) : null}
+				{node.type === "command" ? (
+					<CommandFields
+						node={node}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "command" ? change(current) : current,
+							)
+						}
+						onRenameOutcome={onRenameOutcome}
+						onRemoveOutcome={onRemoveOutcome}
+					/>
+				) : null}
+				{node.type === "decision" ? (
+					<DecisionFields
+						flow={flow}
+						node={node}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "decision" ? change(current) : current,
+							)
+						}
+						onRenameOutcome={onRenameOutcome}
+						onRemoveOutcome={onRemoveOutcome}
+					/>
+				) : null}
 
-			{node.type === "agent" ? (
-				<AgentFields
-					projectId={projectId}
-					flow={flow}
-					node={node}
-					onChange={(change) =>
-						onChange((current) =>
-							current.type === "agent" ? change(current) : current,
-						)
-					}
-					onRenameOutcome={onRenameOutcome}
-					onRemoveOutcome={onRemoveOutcome}
-					onSetOutcomes={onSetAgentOutcomes}
-				/>
-			) : null}
-			{node.type === "command" ? (
-				<CommandFields
-					node={node}
-					onChange={(change) =>
-						onChange((current) =>
-							current.type === "command" ? change(current) : current,
-						)
-					}
-					onRenameOutcome={onRenameOutcome}
-					onRemoveOutcome={onRemoveOutcome}
-				/>
-			) : null}
-			{node.type === "decision" ? (
-				<DecisionFields
-					flow={flow}
-					node={node}
-					onChange={(change) =>
-						onChange((current) =>
-							current.type === "decision" ? change(current) : current,
-						)
-					}
-					onRenameOutcome={onRenameOutcome}
-					onRemoveOutcome={onRemoveOutcome}
-				/>
-			) : null}
+				{node.type === "call" ? (
+					<CallFields
+						flow={flow}
+						node={node}
+						support={calledFlows}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "call" ? change(current) : current,
+							)
+						}
+						onSetEach={onSetCallEach}
+					/>
+				) : null}
 
-			{node.type === "call" ? (
-				<CallFields
-					flow={flow}
-					node={node}
-					support={calledFlows}
-					onChange={(change) =>
-						onChange((current) =>
-							current.type === "call" ? change(current) : current,
-						)
-					}
-					onSetEach={onSetCallEach}
-				/>
-			) : null}
-
-			{node.type === "value" ? (
-				<ValueFields
-					flow={flow}
-					node={node}
-					onChange={(change) =>
-						onChange((current) =>
-							current.type === "value" ? change(current) : current,
-						)
-					}
-				/>
-			) : null}
-
-			{node.type === "wait" ? (
-				<WaitFields
-					flow={flow}
-					node={node}
-					onChange={(change) =>
-						onChange((current) =>
-							current.type === "wait" ? change(current) : current,
-						)
-					}
-				/>
-			) : null}
-
-			{node.type === "tool" ? (
-				<ToolFields
-					flow={flow}
-					node={node}
-					connections={connections}
-					onChange={(change) =>
-						onChange((current) =>
-							current.type === "tool" ? change(current) : current,
-						)
-					}
-				/>
-			) : null}
-
-			{node.type === "agent" ? (
-				<AgentAdvanced
-					node={node}
-					connections={connections}
-					onChange={(change) =>
-						onChange((current) =>
-							current.type === "agent" ? change(current) : current,
-						)
-					}
-				/>
-			) : null}
-
-			<VariableWritesSection flow={flow} node={node} onChange={onChange} />
-
-			{runsOnDevice(node) ? (
-				<InspectorSection
-					title="Device"
-					defaultOpen={"device" in node && node.device !== undefined}
-				>
-					<DeviceField
-						id={`${id}-device`}
-						value={"device" in node ? node.device : undefined}
-						devices={nodeDevices.data}
-						onChange={(device) =>
-							onChange((current) => withDevice(current, device))
+				{node.type === "value" ? (
+					<ValueFields
+						flow={flow}
+						node={node}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "value" ? change(current) : current,
+							)
 						}
 					/>
-				</InspectorSection>
-			) : null}
+				) : null}
 
-			{/* A Gate (a Decision decided by you) waits as long as it must: no limits. */}
-			{node.type === "decision" && node.by === "person" ? null : (
-				<InspectorSection
-					title="Limits"
-					defaultOpen={
-						node.timeoutMinutes !== undefined ||
-						(node.type === "agent" && node.idleMinutes !== undefined)
-					}
-				>
-					<Field
-						id={`${id}-timeout`}
-						label="Timeout in minutes"
-						optional
-						hint="The step fails when one visit runs longer."
+				{node.type === "wait" ? (
+					<WaitFields
+						flow={flow}
+						node={node}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "wait" ? change(current) : current,
+							)
+						}
+					/>
+				) : null}
+
+				{node.type === "tool" ? (
+					<ToolFields
+						flow={flow}
+						node={node}
+						connections={connections}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "tool" ? change(current) : current,
+							)
+						}
+					/>
+				) : null}
+
+				{node.type === "agent" ? (
+					<AgentAdvanced
+						node={node}
+						connections={connections}
+						onChange={(change) =>
+							onChange((current) =>
+								current.type === "agent" ? change(current) : current,
+							)
+						}
+					/>
+				) : null}
+
+				<VariableWritesSection flow={flow} node={node} onChange={onChange} />
+
+				{runsOnDevice(node) ? (
+					<InspectorSection
+						title="Device"
+						tab="setup"
+						defaultOpen={"device" in node && node.device !== undefined}
 					>
-						<PositiveIntInput
-							id={`${id}-timeout`}
-							value={node.timeoutMinutes}
-							placeholder="No limit"
-							describedBy={`${id}-timeout-hint`}
-							onChange={(timeoutMinutes) =>
-								onChange((current) => ({ ...current, timeoutMinutes }))
+						<DeviceField
+							id={`${id}-device`}
+							value={"device" in node ? node.device : undefined}
+							devices={nodeDevices.data}
+							onChange={(device) =>
+								onChange((current) => withDevice(current, device))
 							}
 						/>
-					</Field>
-					{node.type === "agent" ? (
+					</InspectorSection>
+				) : null}
+
+				{/* A Gate (a Decision decided by you) waits as long as it must: no limits. */}
+				{node.type === "decision" && node.by === "person" ? null : (
+					<InspectorSection
+						title="Limits"
+						tab="setup"
+						defaultOpen={
+							node.timeoutMinutes !== undefined ||
+							(node.type === "agent" && node.idleMinutes !== undefined)
+						}
+					>
 						<Field
-							id={`${id}-idle`}
-							label="Idle timeout in minutes"
+							id={`${id}-timeout`}
+							label="Timeout in minutes"
 							optional
-							hint="The step fails when the agent shows no activity for this long."
+							hint="The step fails when one visit runs longer."
 						>
 							<PositiveIntInput
-								id={`${id}-idle`}
-								value={node.idleMinutes}
+								id={`${id}-timeout`}
+								value={node.timeoutMinutes}
 								placeholder="No limit"
-								describedBy={`${id}-idle-hint`}
-								onChange={(idleMinutes) =>
-									onChange((current) =>
-										current.type === "agent"
-											? { ...current, idleMinutes }
-											: current,
-									)
+								describedBy={`${id}-timeout-hint`}
+								onChange={(timeoutMinutes) =>
+									onChange((current) => ({ ...current, timeoutMinutes }))
 								}
 							/>
 						</Field>
-					) : null}
-				</InspectorSection>
-			)}
+						{node.type === "agent" ? (
+							<Field
+								id={`${id}-idle`}
+								label="Idle timeout in minutes"
+								optional
+								hint="The step fails when the agent shows no activity for this long."
+							>
+								<PositiveIntInput
+									id={`${id}-idle`}
+									value={node.idleMinutes}
+									placeholder="No limit"
+									describedBy={`${id}-idle-hint`}
+									onChange={(idleMinutes) =>
+										onChange((current) =>
+											current.type === "agent"
+												? { ...current, idleMinutes }
+												: current,
+										)
+									}
+								/>
+							</Field>
+						) : null}
+					</InspectorSection>
+				)}
+			</InspectorTabs>
 		</div>
 	);
 }
 
-/** Commits on blur or Enter, so the edges follow one rename and not every keystroke. */
+/**
+ * The node's id, in the header. Commits on blur or Enter, so the edges
+ * follow one rename and not every keystroke.
+ */
 function IdField({
 	id,
 	nodeId,
@@ -356,26 +358,18 @@ function IdField({
 	};
 
 	return (
-		<Field
-			id={id}
-			label="Id"
-			error={error}
-			hint={
-				<>
-					Later nodes use its outputs as{" "}
-					<code className="font-mono">{`{{${nodeId}.field}}`}</code>. Renaming
-					it updates every edge and reference.
-				</>
-			}
-		>
-			<Input
+		<>
+			<input
 				id={id}
+				aria-label="Id"
+				title={`Later nodes use its outputs as {{${nodeId}.field}}. Renaming it updates every edge and reference.`}
 				value={text}
-				className="font-mono"
+				size={Math.max(text.length, 2)}
+				className="min-w-0 max-w-full rounded-sm bg-transparent px-0.5 font-mono text-foreground outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-1 focus-visible:ring-ring aria-invalid:text-destructive"
 				autoComplete="off"
 				spellCheck={false}
 				aria-invalid={error !== null}
-				aria-describedby={`${id}-hint`}
+				aria-describedby={error ? `${id}-error` : undefined}
 				onChange={(event) => {
 					setText(event.target.value);
 					setError(null);
@@ -391,6 +385,15 @@ function IdField({
 					}
 				}}
 			/>
-		</Field>
+			{error ? (
+				<span
+					id={`${id}-error`}
+					role="alert"
+					className="truncate text-destructive"
+				>
+					{error}
+				</span>
+			) : null}
+		</>
 	);
 }

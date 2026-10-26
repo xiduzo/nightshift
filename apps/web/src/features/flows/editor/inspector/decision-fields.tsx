@@ -209,15 +209,16 @@ export function DecisionFields({
 			</NodeOptionsField>
 
 			{by === "model" ? (
-				<InspectorSection title="Model">
+				<InspectorSection title="Model" tab="setup">
 					<Field
 						id={`${id}-decider`}
 						label="Decider"
-						hint={
+						error={
 							keyMissing && decider?.apiKey
 								? `Add the secret ${decider.apiKey} on the Agents page, or this node cannot decide.`
-								: "The decision model that picks the option."
+								: null
 						}
+						hint="The decision model that picks the option."
 					>
 						<NativeSelect
 							id={`${id}-decider`}

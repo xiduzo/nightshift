@@ -125,16 +125,19 @@ export function AgentFields({
 
 	return (
 		<>
-			<InspectorSection title="Agent">
+			<InspectorSection title="Agent" tab="setup">
 				<Field
 					id={`${id}-profile`}
 					label="Profile"
-					hint={
+					error={
 						unknownProfile
 							? `There is no profile named ${node.profile}. The flow cannot run until you pick another or add it under Agents.`
-							: profile
-								? "This node uses the profile. Change a field below to override it for this node only. Choose From the profile to undo."
-								: "A saved agent setup from the Agents page. Without one, set the harness and model below."
+							: null
+					}
+					hint={
+						profile
+							? "This node uses the profile. Change a field below to override it for this node only. Choose From the profile to undo."
+							: "A saved agent setup from the Agents page. Without one, set the harness and model below."
 					}
 				>
 					<NativeSelect

@@ -62,6 +62,7 @@ export function VariableWritesSection({
 	return (
 		<InspectorSection
 			title="Set variables"
+			tab="results"
 			defaultOpen={writes.length > 0}
 			aside={
 				writes.length > 0 ? (
