@@ -92,6 +92,7 @@ import {
 	stepsHint,
 } from "./gate-view";
 import { nextGate } from "./inbox-view";
+import { InlineMarkdown } from "./markdown";
 import { QuestionSections } from "./question-sections";
 import { SentCard } from "./sent-card";
 import {
@@ -304,7 +305,7 @@ function OpenGateScreen({
 					selectable
 					className="font-bold text-2xl tracking-tight"
 				>
-					{headline}
+					<InlineMarkdown text={headline} />
 				</Text>
 				<View className="flex-row flex-wrap items-center gap-2">
 					<StatusBadge look={status} />

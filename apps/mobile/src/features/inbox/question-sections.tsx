@@ -1,16 +1,16 @@
 import type { ContextItem } from "@nightshift/client";
 import { Card } from "@nightshift/ui-native/components/ui/card";
-import { Text } from "@nightshift/ui-native/components/ui/text";
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
 
 import { SectionHead } from "@/shared/list";
 import { FactGrid, FactTile } from "@/shared/tiles";
 import { questionSections } from "./gate-view";
+import { CodeBlock, Markdown } from "./markdown";
 
 /**
  * What a Gate shows below its headline: the rest of the question, short
  * labelled values as tiles ("At a glance"), and longer text and code each
- * under its label. Code scrolls sideways.
+ * under its label. Text reads as Markdown. Code scrolls sideways.
  */
 export function QuestionSections({
 	context,
@@ -23,10 +23,8 @@ export function QuestionSections({
 			{body.length > 0 ? (
 				<View className="gap-2">
 					<SectionHead title="The question" />
-					{body.map((paragraph, index) => (
-						<Text key={index} selectable>
-							{paragraph}
-						</Text>
+					{body.map((text, index) => (
+						<Markdown key={index} text={text} />
 					))}
 				</View>
 			) : null}
@@ -48,18 +46,10 @@ export function QuestionSections({
 				<View key={`${section.label}:${index}`} className="gap-2">
 					<SectionHead title={section.label} />
 					{section.kind === "code" ? (
-						<Card className="gap-0 overflow-hidden bg-muted py-0">
-							<ScrollView horizontal>
-								<Text selectable className="p-3 font-mono text-xs">
-									{section.value}
-								</Text>
-							</ScrollView>
-						</Card>
+						<CodeBlock code={section.value} language={section.language} />
 					) : (
 						<Card className="px-4 py-3">
-							<Text selectable className="text-sm">
-								{section.value}
-							</Text>
+							<Markdown text={section.value} className="text-sm" />
 						</Card>
 					)}
 				</View>

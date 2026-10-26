@@ -108,7 +108,27 @@ describe("questionSections", () => {
 				kind: "text",
 				value: "First we change the form.\nThen we change the server.",
 			},
-			{ label: "Diff", kind: "code", value: "- a\n+ b" },
+			{ label: "Diff", kind: "code", language: "diff", value: "- a\n+ b" },
+		]);
+	});
+
+	test("JSON shows as code with its language, Markdown stays one text", () => {
+		const { context } = parseGateQuestion(
+			[
+				"Ship **the fix**?",
+				"## Why\n\n- tests pass\n- review done",
+				'Result: {"ok": true}',
+			].join("\n\n"),
+		);
+		const sections = questionSections(context);
+		expect(sections.body).toEqual(["## Why\n\n- tests pass\n- review done"]);
+		expect(sections.sections).toEqual([
+			{
+				label: "Result",
+				kind: "code",
+				language: "json",
+				value: '{\n  "ok": true\n}',
+			},
 		]);
 	});
 

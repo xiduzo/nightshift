@@ -96,6 +96,14 @@ export function sentText(
 	return /[.?!]$/.test(goesOn) ? goesOn : `${goesOn}.`;
 }
 
+/** Longer text or code under its label. Code keeps the language of its fence. */
+export type QuestionSection = {
+	label: string;
+	kind: "text" | "code";
+	language?: string;
+	value: string;
+};
+
 /** The longest text that shows as a tile under "At a glance". */
 const GLANCE_MAX = 60;
 
@@ -103,22 +111,23 @@ const GLANCE_MAX = 60;
  * The parts of a Gate's question below its headline:
  * - `body`: the rest of the question, its paragraphs without a label.
  * - `glance`: short labelled values ("Branch: fix/login"), as tiles.
- * - `sections`: longer labelled text, and code, each under its label.
+ * - `sections`: longer labelled text, and code with its language, each
+ *   under its label.
  */
 export function questionSections(context: readonly ContextItem[]): {
 	body: string[];
 	glance: { label: string; value: string }[];
-	sections: { label: string; kind: "text" | "code"; value: string }[];
+	sections: QuestionSection[];
 } {
 	const body: string[] = [];
 	const glance: { label: string; value: string }[] = [];
-	const sections: { label: string; kind: "text" | "code"; value: string }[] =
-		[];
+	const sections: QuestionSection[] = [];
 	for (const item of context) {
 		if (item.kind === "code") {
 			sections.push({
 				label: item.label ?? "Code",
 				kind: "code",
+				language: item.language,
 				value: item.value,
 			});
 		} else if (item.label === null) {
