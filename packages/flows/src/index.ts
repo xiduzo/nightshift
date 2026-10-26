@@ -1,6 +1,19 @@
 // Browser-safe. File access lives in "@nightshift/flows/files".
 
 export {
+	type AssistantService,
+	type ChatEvent,
+	type ChatRequest,
+	chatRequestSchema,
+	type FlowProposal,
+	type Suggestion,
+	type SuggestionEvent,
+	type SuggestionKind,
+	type SuggestionRequest,
+	suggestionRequestSchema,
+	suggestionSchema,
+} from "./assistant";
+export {
 	DEFAULT_POLICY,
 	FLOW_VERSION,
 	type Flow,

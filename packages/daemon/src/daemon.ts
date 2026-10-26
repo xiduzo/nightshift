@@ -49,6 +49,7 @@ import {
 	systemGitInstaller,
 } from "@nightshift/engine";
 
+import { createAssistant } from "./assistant";
 import { localHarnesses, programChecks, reportDeviceFacts } from "./harnesses";
 import {
 	authOriginsOf,
@@ -456,6 +457,7 @@ export async function createDaemon(
 		cliTools,
 		toolLaunchers,
 		profiles,
+		assistant: createAssistant(),
 		checks: programChecks(),
 		projectSetup: {
 			check: (path) => checkProjectFolder(path),

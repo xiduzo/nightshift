@@ -42,6 +42,7 @@ export {
 	reservedOutcomes,
 	secretNameSchema,
 	type VariableWrite,
+	variableWriteSchema,
 } from "./base";
 export {
 	type CallEach,

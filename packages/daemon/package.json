@@ -18,6 +18,7 @@
 		"@nightshift/db": "workspace:*",
 		"@nightshift/devices": "workspace:*",
 		"@nightshift/engine": "workspace:*",
+		"@nightshift/flows": "workspace:*",
 		"@nightshift/notifications": "workspace:*",
 		"@nightshift/refusal": "workspace:*",
 		"@orpc/openapi": "catalog:",

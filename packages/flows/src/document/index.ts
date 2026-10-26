@@ -17,6 +17,7 @@ export {
 	type FlowSection,
 	type FlowVariableDef,
 	flowSchema,
+	flowVariableSchema,
 	type Outcome,
 	type Policy,
 	policyFromSettings,

@@ -26,6 +26,7 @@ import type {
 	SettingsStore,
 	ToolLaunchers,
 } from "@nightshift/engine";
+import type { AssistantService } from "@nightshift/flows";
 import type { Notifications } from "@nightshift/notifications";
 
 export type Context = {
@@ -94,6 +95,8 @@ export type Context = {
 	/** The CLI tools' logins: signing one in, when it last did, its folder. */
 	toolLaunchers: Pick<ToolLaunchers, "signIn" | "signedInAt" | "forget">;
 	profiles: ProfileStore;
+	/** Helps the person build a flow in the editor, on one of this computer's profiles. */
+	assistant: AssistantService;
 	/** Read-only checks of the CLIs and MCP servers on this machine. */
 	checks: {
 		harness(harness: HarnessName, bin: string): Promise<CliCheck>;

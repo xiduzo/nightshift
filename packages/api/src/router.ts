@@ -1,6 +1,6 @@
 import type { RouterClient } from "@orpc/server";
 import { z } from "zod";
-
+import { assistant } from "./assistant";
 import {
 	cliTools,
 	connections,
@@ -47,6 +47,7 @@ export const appRouter = {
 	projects,
 	flows,
 	gates,
+	assistant,
 	schedules,
 	runs,
 	notifications,
