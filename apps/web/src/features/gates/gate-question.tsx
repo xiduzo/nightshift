@@ -16,7 +16,8 @@ import { cn } from "@nightshift/ui/lib/utils";
 import { ChevronDownIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Markdown } from "@/shared/markdown";
+import { CodeView } from "@/shared/code";
+import { InlineMarkdown, Markdown } from "@/shared/markdown";
 
 /** Context longer than this folds away behind "Show context". */
 const LONG_CONTEXT = 480;
@@ -45,7 +46,7 @@ export function GateQuestion({
 				id={headingId}
 				className="max-w-prose whitespace-pre-wrap break-words font-semibold text-base leading-snug tracking-tight"
 			>
-				{headline}
+				<InlineMarkdown text={headline} />
 			</h2>
 			{context.length === 0 ? null : long ? (
 				<Collapsible className="flex flex-col gap-3">
@@ -84,7 +85,8 @@ export function GateQuestion({
 }
 
 /**
- * The context of a Gate: text as Markdown, code as code blocks. `plain`
+ * The context of a Gate: text as Markdown, code and JSON as highlighted code
+ * blocks, a diff with its added and removed lines marked. `plain`
  * drops the rule on the left, for a pane that holds nothing else.
  */
 export function ContextList({
@@ -98,15 +100,22 @@ export function ContextList({
 		<div className={cn("flex min-w-0 flex-col", plain ? "gap-4" : "gap-3")}>
 			{items.map((item, index) => (
 				<ContextBlock key={index} label={item.label} plain={plain}>
-					{item.kind === "code" ? (
+					{item.kind === "code" && item.language === "diff" ? (
 						<CodeBlock size="sm" className="bg-muted/40">
 							<CodeBlockActions>
 								<CodeBlockCopyButton value={item.value} />
 							</CodeBlockActions>
 							<CodeBlockContent className="max-h-72 text-xs">
-								{item.language === "diff" ? diffLines(item.value) : item.value}
+								{diffLines(item.value)}
 							</CodeBlockContent>
 						</CodeBlock>
+					) : item.kind === "code" ? (
+						<CodeView
+							code={item.value}
+							language={item.language ?? "text"}
+							className="bg-muted/40"
+							contentClassName="max-h-72 text-xs"
+						/>
 					) : (
 						<Markdown text={item.value} />
 					)}

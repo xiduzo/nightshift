@@ -12,12 +12,30 @@ export type ContextItem = {
 const FENCE = /```([\w+-]*)[^\n]*\n([\s\S]*?)(?:\n```|$)/g;
 /** A line that is only a label: `Diff:`, `Plan summary:`. */
 const LABEL_LINE = /^([^\n:]{1,48}):\s*$/;
+/** A label and a JSON value on one line: `Result: {"ok": true}`. */
+const LABELLED_JSON = /^([^\n:{["]{1,48}):\s*([[{].*)$/;
+
+/**
+ * A JSON object or array, pretty-printed, or null for anything else. A
+ * template puts an object in a question as JSON on one line.
+ */
+function prettyJson(text: string): string | null {
+	const trimmed = text.trim();
+	if (!/^[[{]/.test(trimmed)) return null;
+	try {
+		return JSON.stringify(JSON.parse(trimmed), null, 2);
+	} catch {
+		return null;
+	}
+}
 
 /**
  * Splits a rendered question into the question itself (its first paragraph)
- * and the context after it. Fenced code becomes a code item; a paragraph
- * that opens with a `Label:` line becomes a labelled item. Display only: the
- * text stays exactly what the flow rendered.
+ * and the context after it. The context is Markdown. Fenced code becomes a
+ * code item; a paragraph that opens with a `Label:` line becomes a labelled
+ * item; paragraphs without a label stay together, so a list or a heading
+ * keeps its text. JSON, fenced or not, becomes a pretty-printed `json` code
+ * item. Display only: the flow's text is not changed.
  */
 export function parseGateQuestion(question: string): {
 	headline: string;
@@ -34,11 +52,15 @@ export function parseGateQuestion(question: string): {
 	let last = 0;
 	for (const match of question.matchAll(FENCE)) {
 		pushText(question.slice(last, match.index));
+		const code = match[2] ?? "";
+		const language = match[1] || undefined;
+		const json =
+			language === undefined || language === "json" ? prettyJson(code) : null;
 		blocks.push({
 			label: null,
 			kind: "code",
-			language: match[1] || undefined,
-			value: match[2] ?? "",
+			language: json === null ? language : "json",
+			value: json ?? code,
 		});
 		last = match.index + match[0].length;
 	}
@@ -60,14 +82,41 @@ export function parseGateQuestion(question: string): {
 			continue;
 		}
 		const [firstLine = "", ...rest] = block.value.split("\n");
+		const inline = LABELLED_JSON.exec(block.value);
+		const inlineJson = inline?.[2] ? prettyJson(inline[2]) : null;
+		if (inline?.[1] && inlineJson !== null) {
+			context.push(jsonItem(inline[1], inlineJson));
+			continue;
+		}
 		const label = LABEL_LINE.exec(firstLine)?.[1] ?? null;
-		context.push(
-			label && rest.length > 0
-				? { label, kind: "text", value: rest.join("\n").trim() }
-				: block,
-		);
+		const value = label && rest.length > 0 ? rest.join("\n").trim() : null;
+		const json = prettyJson(value ?? block.value);
+		if (json !== null) {
+			context.push(jsonItem(value === null ? null : label, json));
+			continue;
+		}
+		if (value !== null) {
+			context.push({ label, kind: "text", value });
+			continue;
+		}
+		// A paragraph without a label goes on the Markdown before it.
+		const previous = context.at(-1);
+		if (
+			previous?.kind === "text" &&
+			previous.label === null &&
+			!labelOnly(previous) &&
+			!labelOnly(block)
+		) {
+			previous.value = `${previous.value}\n\n${block.value}`;
+			continue;
+		}
+		context.push(block);
 	}
 	return { headline: first.value, context };
+}
+
+function jsonItem(label: string | null, value: string): ContextItem {
+	return { label: label ?? "json", kind: "code", language: "json", value };
 }
 
 function labelOnly(item: ContextItem): string | null {

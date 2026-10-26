@@ -55,6 +55,7 @@ import { runMutations, runQueries } from "@/features/runs/queries";
 import type { OpenGate, RunSummary } from "@/shared/api";
 import { orpc } from "@/shared/api";
 import { formatCountdown, formatTime, useNow } from "@/shared/format";
+import { InlineMarkdown } from "@/shared/markdown";
 import { SiteHeader } from "@/shared/page";
 import { useOpenGates } from "../use-open-gates";
 import { GateDetail } from "./gate-detail";
@@ -265,7 +266,9 @@ function GateNavItem({
 			</ItemMedia>
 			<ItemContent className="min-w-0">
 				<ItemTitle className="w-full">
-					<span className="line-clamp-2">{headline}</span>
+					<span className="line-clamp-2">
+						<InlineMarkdown text={headline} links={false} />
+					</span>
 				</ItemTitle>
 				<ItemDescription className="truncate text-xs">
 					<span className="font-medium">{flow}</span>

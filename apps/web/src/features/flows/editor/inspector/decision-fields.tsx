@@ -61,7 +61,7 @@ export function DecisionFields({
 		by === "person"
 			? {
 					label: "Question",
-					hint: "What you are asked in the Needs-you inbox, with the context you need to answer. The run waits until you do.",
+					hint: "What you are asked in the Needs-you inbox, with the context you need to answer. Write it in Markdown. JSON shows formatted. The run waits until you answer.",
 					placeholder:
 						"The worker opened {{worker.summary}}. Merge it and go on?",
 					invalid: node.prompt.trim() === "",

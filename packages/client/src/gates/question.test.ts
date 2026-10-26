@@ -32,6 +32,49 @@ describe("parseGateQuestion", () => {
 		});
 	});
 
+	test("paragraphs without a label stay one Markdown text", () => {
+		expect(
+			parseGateQuestion("Ship it?\n\n## Changes\n\n1. Login\n\n2. Logout"),
+		).toEqual({
+			headline: "Ship it?",
+			context: [
+				{
+					label: null,
+					kind: "text",
+					value: "## Changes\n\n1. Login\n\n2. Logout",
+				},
+			],
+		});
+	});
+
+	test("JSON shows pretty-printed, with or without a fence", () => {
+		const pretty = '{\n  "ok": true,\n  "items": [\n    1\n  ]\n}';
+		const json = (label: string) => ({
+			label,
+			kind: "code",
+			language: "json",
+			value: pretty,
+		});
+		expect(
+			parseGateQuestion('Go on?\n\nResult: {"ok":true,"items":[1]}').context,
+		).toEqual([json("Result")]);
+		expect(
+			parseGateQuestion('Go on?\n\nResult:\n{"ok":true,"items":[1]}').context,
+		).toEqual([json("Result")]);
+		expect(
+			parseGateQuestion('Go on?\n\n{"ok":true,"items":[1]}').context,
+		).toEqual([json("json")]);
+		expect(
+			parseGateQuestion('Go on?\n\n```\n{"ok":true,"items":[1]}\n```').context,
+		).toEqual([json("json")]);
+	});
+
+	test("text that only looks like JSON stays text", () => {
+		expect(parseGateQuestion("Go on?\n\n{not json}").context).toEqual([
+			{ label: null, kind: "text", value: "{not json}" },
+		]);
+	});
+
 	test("a question that starts with code is all headline", () => {
 		const text = "```\nx\n```\nOK?";
 		expect(parseGateQuestion(text)).toEqual({ headline: text, context: [] });

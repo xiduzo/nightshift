@@ -28,6 +28,7 @@ import { useId } from "react";
 import { projectQueries } from "@/features/projects";
 import type { OpenGate } from "@/shared/api";
 import { formatDateTime } from "@/shared/format";
+import { InlineMarkdown } from "@/shared/markdown";
 import { GateChoiceForm } from "../gate-choice-form";
 import { GateLinkItem } from "../gate-link-item";
 import { ContextList } from "../gate-question";
@@ -80,7 +81,7 @@ export function GateDetail({ gate, now }: { gate: OpenGate; now: number }) {
 						</Link>
 					</nav>
 					<h1 className="whitespace-pre-wrap text-balance break-words font-semibold text-xl leading-snug tracking-tight">
-						{headline}
+						<InlineMarkdown text={headline} />
 					</h1>
 					<div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
 						<Badge

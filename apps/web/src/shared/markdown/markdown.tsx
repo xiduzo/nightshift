@@ -86,3 +86,35 @@ export function Markdown({
 		</div>
 	);
 }
+
+const INLINE_ELEMENTS = ["p", "strong", "em", "del", "code", "a"];
+
+/**
+ * One line an agent or a flow wrote, such as a Gate's question: bold,
+ * italic, code and links only. Put it inside a heading or a span. Without
+ * `links`, a link shows as its text, for a line inside a link or a button.
+ */
+export function InlineMarkdown({
+	text,
+	links = true,
+}: {
+	text: string;
+	links?: boolean;
+}) {
+	return (
+		<ReactMarkdown
+			remarkPlugins={[remarkGfm]}
+			allowedElements={
+				links ? INLINE_ELEMENTS : INLINE_ELEMENTS.filter((e) => e !== "a")
+			}
+			unwrapDisallowed
+			components={{
+				p: ({ children }) => children,
+				a: COMPONENTS.a,
+				code: COMPONENTS.code,
+			}}
+		>
+			{text}
+		</ReactMarkdown>
+	);
+}
