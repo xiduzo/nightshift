@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { gateParts, parseGateQuestion } from "./question";
+import { type ContextItem, gateParts, parseGateQuestion } from "./question";
 
 describe("parseGateQuestion", () => {
 	test("a question of one paragraph has no context", () => {
@@ -49,7 +49,7 @@ describe("parseGateQuestion", () => {
 
 	test("JSON shows pretty-printed, with or without a fence", () => {
 		const pretty = '{\n  "ok": true,\n  "items": [\n    1\n  ]\n}';
-		const json = (label: string) => ({
+		const json = (label: string): ContextItem => ({
 			label,
 			kind: "code",
 			language: "json",
